@@ -1,8 +1,10 @@
 import { safeNodeAdminUrl } from '../../../lib/utils'
+import { getAuthToken } from '../../../api/client'
 import { nodeApi, probeLocalNode } from '../../node/localNodeApi'
 import type { ComposePreviewEntry, ComposePreviewRender, SourcePreviewDocument, SourceRendererCapabilities } from './types'
 import type { PwaExplicitStyleBinding } from './pwaDesignDraft'
 import type { PwaBuildVerificationResult, PwaRuntimeCaptureResult, PwaSourceSavedEvidence } from './pwaVerificationModel'
+import { captureWithTemporaryPwaAuthProfile, type PreparedPwaAuthProfile } from './pwaRuntimeAuth'
 import { androidProjectRootCandidates } from './sourcePreviewProjectRoot'
 
 export function sourcePreviewAdminUrl(): string {
@@ -114,17 +116,39 @@ export async function capturePwaSourceRuntime(
   target.search = evidence.route.search || target.search
   target.hash = evidence.route.hash || ''
   const url = target.toString()
-  return nodeApi<PwaRuntimeCaptureResult>(sourcePreviewAdminUrl(), '/api/source-preview/capture-pwa-runtime', {
-    method: 'POST',
-    body: JSON.stringify({
-      projectRoot: evidence.projectRoot,
-      url,
-      viewport: { ...evidence.viewport, deviceScaleFactor: window.devicePixelRatio || 1 },
-      waitFor: { condition: 'networkidle', selector: 'body', timeoutMs: 30_000, settleMs: 500 },
-      evidence: {
-        sourceRevisions: evidence.sourceRevisions,
-        routeRevision: `pwa-draft-r${evidence.draftRevision}`,
+  const adminUrl = sourcePreviewAdminUrl()
+  const token = getAuthToken()
+  return captureWithTemporaryPwaAuthProfile(evidence.projectRoot, token, {
+    prepare: (projectRoot, currentToken) => nodeApi<PreparedPwaAuthProfile>(
+      adminUrl,
+      '/api/source-preview/pwa-auth-profile/prepare',
+      { method: 'POST', body: JSON.stringify({ projectRoot, token: currentToken }) },
+      15_000,
+    ),
+    capture: (profile) => nodeApi<PwaRuntimeCaptureResult>(
+      adminUrl,
+      '/api/source-preview/capture-pwa-runtime',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          projectRoot: evidence.projectRoot,
+          url,
+          viewport: { ...evidence.viewport, deviceScaleFactor: window.devicePixelRatio || 1 },
+          waitFor: { condition: 'networkidle', selector: 'body', timeoutMs: 30_000, settleMs: 500 },
+          authProfile: profile,
+          evidence: {
+            sourceRevisions: evidence.sourceRevisions,
+            routeRevision: `pwa-draft-r${evidence.draftRevision}`,
+          },
+        }),
       },
-    }),
-  }, 45_000)
+      45_000,
+    ),
+    cleanup: (projectRoot, profile) => nodeApi(
+      adminUrl,
+      '/api/source-preview/pwa-auth-profile/cleanup',
+      { method: 'POST', body: JSON.stringify({ projectRoot, profile }) },
+      15_000,
+    ),
+  })
 }

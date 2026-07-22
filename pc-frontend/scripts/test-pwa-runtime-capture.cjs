@@ -24,6 +24,9 @@ const verification = loadTypescriptModule(
 const context = loadTypescriptModule(
   'src/features/ui-tuner/source-preview/pwaDesignContext.ts',
 )
+const runtimeAuth = loadTypescriptModule(
+  'src/features/ui-tuner/source-preview/pwaRuntimeAuth.ts',
+)
 
 const verified = { phase: 'BUILD_VERIFIED', message: 'verified', mismatches: [] }
 const pending = verification.pwaRuntimeCapturePendingState(verified)
@@ -73,12 +76,74 @@ assert.equal(contextPack.pwaDesign.runtimeCapture.sha256, artifact.sha256)
 assert.equal(contextPack.pwaDesign.contextPolicy.screenshotsEmbeddedAsBase64, false)
 assert.doesNotMatch(JSON.stringify(contextPack), /data:image|base64Embedded|"base64"/i)
 
+async function testTemporaryAuthLifecycle() {
+  const profile = 'pc_ui_tuner_0123456789abcdef0123456789abcdef'
+  const secret = 'frontend-secret-must-not-enter-capture'
+  const calls = []
+  const captured = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', secret, {
+    prepare: async (projectRoot, token) => {
+      calls.push(['prepare', projectRoot])
+      assert.equal(token, secret)
+      return { profile, expiresAt: '2026-07-23T00:10:00Z' }
+    },
+    capture: async (preparedProfile) => {
+      calls.push(['capture', preparedProfile])
+      return { ok: true, status: 'CAPTURED', artifact, base64Embedded: false }
+    },
+    cleanup: async (projectRoot, preparedProfile) => {
+      calls.push(['cleanup', projectRoot, preparedProfile])
+    },
+  })
+  assert.equal(captured.ok, true)
+  assert.deepEqual(calls, [
+    ['prepare', 'C:\\project'],
+    ['capture', profile],
+    ['cleanup', 'C:\\project', profile],
+  ])
+  assert.doesNotMatch(JSON.stringify(calls.slice(1)), new RegExp(secret))
+
+  let missingTokenCalls = 0
+  const missing = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', null, {
+    prepare: async () => { missingTokenCalls += 1 },
+    capture: async () => { missingTokenCalls += 1 },
+    cleanup: async () => { missingTokenCalls += 1 },
+  })
+  assert.equal(missing.diagnostic.code, 'AUTHENTICATION_REQUIRED')
+  assert.equal(missingTokenCalls, 0)
+
+  let expiredCleaned = false
+  const expired = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', secret, {
+    prepare: async () => ({ profile, expiresAt: '2026-07-23T00:10:00Z' }),
+    capture: async () => ({
+      ok: false, status: 'CAPTURE_FAILED', base64Embedded: false,
+      diagnostic: { code: 'AUTHENTICATION_REQUIRED', message: 'expired', retryable: false, nextStep: 'login' },
+    }),
+    cleanup: async () => { expiredCleaned = true },
+  })
+  assert.equal(expired.diagnostic.code, 'AUTHENTICATION_REQUIRED')
+  assert.equal(expiredCleaned, true)
+
+  const cleanupFailed = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', secret, {
+    prepare: async () => ({ profile, expiresAt: '2026-07-23T00:10:00Z' }),
+    capture: async () => ({ ok: true, status: 'CAPTURED', artifact, base64Embedded: false }),
+    cleanup: async () => { throw new Error('simulated cleanup failure') },
+  })
+  assert.equal(cleanupFailed.diagnostic.code, 'AUTH_PROFILE_CLEANUP_FAILED')
+  assert.doesNotMatch(JSON.stringify(cleanupFailed), new RegExp(secret))
+}
+
 const api = fs.readFileSync(path.join(
   projectRoot, 'src/features/ui-tuner/source-preview/sourcePreviewApi.ts',
 ), 'utf8')
 assert.match(api, /PWA_RUNTIME_URL_REQUIRED/)
 assert.match(api, /target\.pathname = evidence\.route\.path/)
 assert.match(api, /\/api\/source-preview\/capture-pwa-runtime/)
-assert.doesNotMatch(api, /Authorization|Cookie|authProfile\s*:/)
+assert.match(api, /getAuthToken\(\)/)
+assert.match(api, /\/api\/source-preview\/pwa-auth-profile\/prepare/)
+assert.match(api, /authProfile: profile/)
+assert.match(api, /\/api\/source-preview\/pwa-auth-profile\/cleanup/)
+assert.doesNotMatch(api, /Authorization|Cookie/)
 
-console.log('PWA runtime capture frontend integration tests passed')
+testTemporaryAuthLifecycle().then(() => {
+  console.log('PWA runtime capture frontend integration tests passed')
+})
