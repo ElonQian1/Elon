@@ -77,7 +77,15 @@ const BOTTOM_NAV_MENU_PNG: &[u8] =
 const BOTTOM_NAV_MENU_ACTIVE_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_bottom_nav_menu_active.png");
 const BOTTOM_NAV_COMPOSE_ICON_PNG: &[u8] =
-    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_side_menu_new_chat.png");
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_top_add_plus_custom.png");
+const HOME_AI_AVATAR_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_home_ai_avatar.png");
+const HOME_ACTION_GROUP_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_home_action_group.png");
+const HOME_ACTION_ADD_FRIEND_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_home_action_add_friend.png");
+const HOME_ACTION_NEW_PROJECT_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_home_action_new_project.png");
 const INPUT_ADD_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_input_add_new.png");
 const INPUT_VOICE_WAVE_PNG: &[u8] =
@@ -190,6 +198,10 @@ fn build_html() -> String {
     let bottom_nav_menu_png_b64 = encode_png(BOTTOM_NAV_MENU_PNG);
     let bottom_nav_menu_active_png_b64 = encode_png(BOTTOM_NAV_MENU_ACTIVE_PNG);
     let bottom_nav_compose_icon_png_b64 = encode_png(BOTTOM_NAV_COMPOSE_ICON_PNG);
+    let home_ai_avatar_png_b64 = encode_png(HOME_AI_AVATAR_PNG);
+    let home_action_group_png_b64 = encode_png(HOME_ACTION_GROUP_PNG);
+    let home_action_add_friend_png_b64 = encode_png(HOME_ACTION_ADD_FRIEND_PNG);
+    let home_action_new_project_png_b64 = encode_png(HOME_ACTION_NEW_PROJECT_PNG);
     let input_add_png_b64 = encode_png(INPUT_ADD_PNG);
     let input_voice_wave_png_b64 = encode_png(INPUT_VOICE_WAVE_PNG);
     let input_emoji_png_b64 = encode_png(INPUT_EMOJI_PNG);
@@ -299,6 +311,16 @@ fn build_html() -> String {
         .replace(
             "__BOTTOM_NAV_COMPOSE_ICON_PNG_B64__",
             &bottom_nav_compose_icon_png_b64,
+        )
+        .replace("__HOME_AI_AVATAR_PNG_B64__", &home_ai_avatar_png_b64)
+        .replace("__HOME_ACTION_GROUP_PNG_B64__", &home_action_group_png_b64)
+        .replace(
+            "__HOME_ACTION_ADD_FRIEND_PNG_B64__",
+            &home_action_add_friend_png_b64,
+        )
+        .replace(
+            "__HOME_ACTION_NEW_PROJECT_PNG_B64__",
+            &home_action_new_project_png_b64,
         )
         .replace("__INPUT_ADD_PNG_B64__", &input_add_png_b64)
         .replace("__INPUT_VOICE_WAVE_PNG_B64__", &input_voice_wave_png_b64)

@@ -10,14 +10,18 @@ internal class MainBottomNavigationController(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
     private val selectTab: (TextView) -> Unit,
-    private val createConversationAndOpen: () -> Unit
+    private val showHomeActions: (View, TextView) -> Unit
 ) {
     fun setup() {
         binding.tabChat.setOnClickListener { selectTab(binding.tabChat) }
         binding.tabProject.setOnClickListener { selectTab(binding.tabProject) }
         binding.tabProfile.setOnClickListener { selectTab(binding.tabProfile) }
         binding.bottomComposeButton.setOnClickListener {
-            createConversationAndOpen()
+            val tab = if (
+                binding.projectPage.visibility == View.VISIBLE ||
+                binding.marketplacePage.visibility == View.VISIBLE
+            ) binding.tabProject else binding.tabChat
+            showHomeActions(binding.bottomComposeButton, tab)
         }
     }
 

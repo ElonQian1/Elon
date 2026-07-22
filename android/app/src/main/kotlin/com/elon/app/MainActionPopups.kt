@@ -38,7 +38,7 @@ internal class MainActionPopups(
     fun showHomeActionPopup(anchor: View, tab: TextView) {
         val actions = if (tab == binding.tabProject) {
             listOf(
-                TopAction("新建项目", R.drawable.ic_popup_new_project) { showCreateProjectDialog() },
+                TopAction("新建项目", R.drawable.ic_home_action_new_project) { showCreateProjectDialog() },
                 TopAction("发现项目", R.drawable.ic_popup_project) { showStoreDialog() },
                 TopAction("项目记录", R.drawable.ic_popup_history) { showProjectRecordDialog() },
                 TopAction("Git 仓库", R.drawable.ic_popup_settings) { showGitProjectDialog() },
@@ -47,16 +47,26 @@ internal class MainActionPopups(
             )
         } else {
             listOf(
-                TopAction("发起群聊", R.drawable.ic_popup_group) { showCreateGroupDialog() },
-                TopAction("添加好友", R.drawable.ic_popup_add_friend) { showAddFriendDialog() },
-                TopAction("新建项目", R.drawable.ic_popup_new_project) { showCreateProjectDialog() }
+                TopAction("发起群聊", R.drawable.ic_home_action_group) { showCreateGroupDialog() },
+                TopAction("添加好友", R.drawable.ic_home_action_add_friend) { showAddFriendDialog() },
+                TopAction("新建项目", R.drawable.ic_home_action_new_project) { showCreateProjectDialog() }
             )
         }
-        val popup = showTopActionPopup(anchor, actions)
+        val popup = if (anchor === binding.bottomComposeButton) {
+            val rendered = renderer().showBottomActionPopup(anchor, getActionPopup(), actions)
+            setActionPopup(rendered)
+            rendered
+        } else {
+            showTopActionPopup(anchor, actions)
+        }
         if (anchor === binding.addButton) {
             setTopAddButtonExpanded(true)
             popup.setOnDismissListener {
                 setTopAddButtonExpanded(false)
+                if (getActionPopup() === popup) setActionPopup(null)
+            }
+        } else {
+            popup.setOnDismissListener {
                 if (getActionPopup() === popup) setActionPopup(null)
             }
         }

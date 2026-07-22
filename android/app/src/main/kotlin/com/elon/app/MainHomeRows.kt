@@ -579,7 +579,7 @@ internal class MainHomeRows(
                 layoutParams = LinearLayout.LayoutParams(size, size)
                 contentDescription = activity.getString(R.string.app_name)
                 scaleType = ImageView.ScaleType.FIT_CENTER
-                setImageResource(R.drawable.ic_app_brand)
+                setImageResource(R.drawable.ic_home_ai_avatar)
             }
         }
 

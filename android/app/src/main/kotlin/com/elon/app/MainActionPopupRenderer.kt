@@ -24,6 +24,8 @@ internal const val WECHAT_POPUP_PANEL_COLOR = "#242424"
 internal const val WECHAT_POPUP_TEXT_COLOR = "#D6D6D6"
 internal const val WECHAT_POPUP_DIVIDER_COLOR = "#2E2E2E"
 internal const val LEGACY_MESSAGE_POPUP_COLOR = "#242424"
+private const val HOME_ACTION_POPUP_PANEL_COLOR = "#D9D9D9"
+private const val HOME_ACTION_POPUP_TEXT_COLOR = "#606060"
 
 private const val MESSAGE_POPUP_DEFAULT_COLUMNS = 5
 private const val MESSAGE_POPUP_CELL_WIDTH_DP = 54
@@ -40,6 +42,64 @@ internal class MainActionPopupRenderer(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) {
+    fun showBottomActionPopup(
+        anchor: View,
+        previousPopup: PopupWindow?,
+        actions: List<TopAction>
+    ): PopupWindow {
+        previousPopup?.dismiss()
+
+        val popupWidth = dp(176)
+        val verticalPadding = dp(6)
+        val rowHeight = dp(48)
+        val visibleActions = actions.take(6)
+        val popupHeight = verticalPadding * 2 + rowHeight * visibleActions.size
+        val panel = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, verticalPadding, 0, verticalPadding)
+            background = GradientDrawable().apply {
+                cornerRadius = dp(16).toFloat()
+                setColor(Color.parseColor(HOME_ACTION_POPUP_PANEL_COLOR))
+            }
+            clipToOutline = true
+            alpha = 0f
+            scaleX = 0.96f
+            scaleY = 0.96f
+        }
+
+        lateinit var popup: PopupWindow
+        visibleActions.forEach { action ->
+            panel.addView(
+                createBottomActionRow(action) { popup.dismiss() },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    rowHeight
+                )
+            )
+        }
+
+        val anchorLocation = IntArray(2)
+        anchor.getLocationOnScreen(anchorLocation)
+        val popupX = (anchorLocation[0] + anchor.width - popupWidth)
+            .coerceIn(dp(12), activity.resources.displayMetrics.widthPixels - popupWidth - dp(12))
+        val popupY = (anchorLocation[1] - popupHeight - dp(12)).coerceAtLeast(dp(76))
+        popup = PopupWindow(panel, popupWidth, popupHeight, true).apply {
+            isOutsideTouchable = true
+            elevation = 0f
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            showAtLocation(anchor, Gravity.NO_GRAVITY, popupX, popupY)
+        }
+        panel.pivotX = popupWidth.toFloat()
+        panel.pivotY = popupHeight.toFloat()
+        panel.animate()
+            .alpha(1f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(140L)
+            .start()
+        return popup
+    }
+
     fun showTopActionPopup(anchor: View, previousPopup: PopupWindow?, actions: List<TopAction>): PopupWindow {
         previousPopup?.dismiss()
 
@@ -278,6 +338,38 @@ internal class MainActionPopupRenderer(
                 text = action.title
                 setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
                 textSize = 15.5f
+            })
+            setOnClickListener {
+                dismissPopup()
+                action.action()
+            }
+        }
+    }
+
+    private fun createBottomActionRow(action: TopAction, dismissPopup: () -> Unit): View {
+        return LinearLayout(activity).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(18), 0, dp(14), 0)
+            isClickable = true
+            foreground = selectableForeground()
+
+            addView(ImageView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(28), dp(28))
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                setImageResource(action.iconRes)
+            })
+            addView(TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    marginStart = dp(12)
+                }
+                includeFontPadding = false
+                text = action.title
+                setTextColor(Color.parseColor(HOME_ACTION_POPUP_TEXT_COLOR))
+                textSize = 16f
             })
             setOnClickListener {
                 dismissPopup()

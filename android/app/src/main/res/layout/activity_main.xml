@@ -137,7 +137,7 @@
                 android:layout_width="46dp"
                 android:layout_height="44dp"
                 android:layout_gravity="end|center_vertical"
-                android:layout_marginEnd="70dp"
+                android:layout_marginEnd="12dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="搜索"
                 android:padding="8dp"
@@ -238,7 +238,7 @@
                     android:layout_height="44dp"
                     android:contentDescription="@string/app_name"
                     android:scaleType="fitCenter"
-                    android:src="@drawable/ic_app_brand" />
+                    android:src="@drawable/ic_home_ai_avatar" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -1469,7 +1469,7 @@
                     android:layout_width="@dimen/main_bottom_menu_height"
                     android:layout_height="@dimen/main_bottom_menu_height"
                     android:clickable="true"
-                    android:contentDescription="新建 AI 会话"
+                    android:contentDescription="打开新建菜单"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackgroundBorderless">
 
@@ -1481,11 +1481,12 @@
                         android:src="@drawable/bg_bottom_nav_compose" />
 
                     <ImageView
+                        android:id="@+id/bottomActionPlusIcon"
                         android:layout_width="28dp"
                         android:layout_height="28dp"
                         android:layout_gravity="center"
                         android:contentDescription="@null"
-                        android:src="@drawable/ic_side_menu_new_chat" />
+                        android:src="@drawable/ic_top_add_plus_custom" />
                 </FrameLayout>
             </LinearLayout>
         </FrameLayout>

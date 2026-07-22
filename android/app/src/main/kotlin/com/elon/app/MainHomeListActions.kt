@@ -113,7 +113,7 @@ internal class MainHomeListActions(
         if (listVisible) {
             binding.topTitleText.text = currentConversationHomeTitle()
             binding.searchButton.visibility = if (friendSearchActive) View.GONE else View.VISIBLE
-            binding.addButton.visibility = if (friendSearchActive) View.GONE else View.VISIBLE
+            binding.addButton.visibility = View.GONE
         }
 
         homeRows().cancelHomeRowShimmer()

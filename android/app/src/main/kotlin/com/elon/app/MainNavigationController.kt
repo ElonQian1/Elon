@@ -56,7 +56,7 @@ internal class MainNavigationController(
     private val onAgentTabSelected: () -> Unit,
     private val handleProjectSpaceInternalBack: () -> Boolean,
     private val openProjectSpacePostComposer: () -> Unit,
-    private val showCreateProjectDialog: () -> Unit, private val createConversationAndOpen: () -> Unit, private val projectBrowserDependencies: ProjectBrowserSheetDependencies
+    private val showCreateProjectDialog: () -> Unit, private val projectBrowserDependencies: ProjectBrowserSheetDependencies
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
@@ -73,7 +73,7 @@ internal class MainNavigationController(
     private var exitConfirmDialog: AlertDialog? = null
     private val designMetrics = MainNavigationDesignMetrics(activity, binding, ::updateBottomTabVisual)
     private val projectBrowser = ProjectBrowserSheetController(activity, binding, ::dp, projectBrowserDependencies)
-    private val bottomNavigation = MainBottomNavigationController(activity, binding, { selectBottomTab(it, false) }, { projectBrowser.close(false); createConversationAndOpen() })
+    private val bottomNavigation = MainBottomNavigationController(activity, binding, { selectBottomTab(it, false) }) { anchor, tab -> projectBrowser.close(false); showHomeActionPopup(anchor, tab) }
     private val homeChrome = HomeChromeController(
         activity, binding, actionPopupProvider, ::dp, ::setNavigationBarColor, bottomNavigation::setVisible,
         { showConversationHome(animate = false) },
@@ -250,7 +250,7 @@ internal class MainNavigationController(
         if (tab == binding.tabChat) homeChrome.showHome() else if (tab == binding.tabProfile) homeChrome.showMenuOnly() else showMainTabs()
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = if (tab == binding.tabChat || tab == binding.tabProject) View.VISIBLE else View.GONE
+        binding.addButton.visibility = View.GONE
         binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
@@ -848,7 +848,7 @@ internal class MainNavigationController(
         hideProjectTopTabs()
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = View.VISIBLE
+        binding.addButton.visibility = View.GONE
         binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
@@ -899,7 +899,7 @@ internal class MainNavigationController(
         setProjectHomeSegmentVisible(true)
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
-        binding.addButton.visibility = View.VISIBLE
+        binding.addButton.visibility = View.GONE
         binding.addButton.setOnClickListener {
             showHomeActionPopup(binding.addButton, binding.tabProject)
         }

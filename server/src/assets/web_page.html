@@ -269,6 +269,7 @@
       border: 0;
       color: #D3D3D3;
       box-shadow: none;
+      display: none !important;
     }
     #addBtn:hover { background: transparent; color: #D3D3D3; }
     .app.project-tabs-visible #addBtn {
@@ -3613,6 +3614,45 @@
       display: block;
       margin: auto;
     }
+    .home-action-menu {
+      position: fixed;
+      right: max(20px, calc((100vw - 720px) / 2 + 20px));
+      bottom: calc(76px + env(safe-area-inset-bottom));
+      z-index: 96;
+      width: 176px;
+      padding: 6px 0;
+      border-radius: 16px;
+      background: #D9D9D9;
+      overflow: hidden;
+      transform-origin: right bottom;
+      animation: home-action-pop 140ms cubic-bezier(.2, 0, 0, 1) both;
+    }
+    .home-action-menu.hidden { display: none; }
+    .home-action-menu button {
+      width: 100%;
+      height: 48px;
+      border: 0;
+      background: transparent;
+      color: #606060;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 14px 0 18px;
+      font-size: 16px;
+      cursor: pointer;
+      text-align: left;
+    }
+    .home-action-menu button:active { transform: scale(.96); }
+    .home-action-menu img {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+      flex: 0 0 28px;
+    }
+    @keyframes home-action-pop {
+      from { opacity: 0; transform: scale(.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
     .project-space-ai-menu {
       grid-area: tabs;
       background: var(--store-detail-bg);
@@ -4846,8 +4886,22 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         </span>
       </button>
     </div>
-    <button class="bottom-compose-button" id="bottomComposeBtn" type="button" aria-label="新建会话">
+    <button class="bottom-compose-button" id="bottomComposeBtn" type="button" aria-label="打开新建菜单" aria-expanded="false">
       <img src="data:image/png;base64,__BOTTOM_NAV_COMPOSE_ICON_PNG_B64__" alt="" aria-hidden="true" />
+    </button>
+  </nav>
+  <nav class="home-action-menu hidden" id="homeActionMenu" aria-label="新建菜单" aria-hidden="true">
+    <button type="button" id="homeActionGroupBtn">
+      <img src="data:image/png;base64,__HOME_ACTION_GROUP_PNG_B64__" alt="" aria-hidden="true" />
+      <span>发起群聊</span>
+    </button>
+    <button type="button" id="homeActionAddFriendBtn">
+      <img src="data:image/png;base64,__HOME_ACTION_ADD_FRIEND_PNG_B64__" alt="" aria-hidden="true" />
+      <span>添加好友</span>
+    </button>
+    <button type="button" id="homeActionNewProjectBtn">
+      <img src="data:image/png;base64,__HOME_ACTION_NEW_PROJECT_PNG_B64__" alt="" aria-hidden="true" />
+      <span>新建项目</span>
     </button>
   </nav>
   <nav class="project-space-ai-menu hidden" id="projectSpaceAiMenu">
@@ -5152,6 +5206,10 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   const tabChatBtn = $('tabChatBtn');
   const bottomMenuBtn = $('bottomMenuBtn');
   const bottomComposeBtn = $('bottomComposeBtn');
+  const homeActionMenu = $('homeActionMenu');
+  const homeActionGroupBtn = $('homeActionGroupBtn');
+  const homeActionAddFriendBtn = $('homeActionAddFriendBtn');
+  const homeActionNewProjectBtn = $('homeActionNewProjectBtn');
   const projectBrowserSheet = $('projectBrowserSheet');
   const projectBrowserDrag = $('projectBrowserDrag');
   const projectBrowserSearchInput = $('projectBrowserSearchInput');
@@ -6740,6 +6798,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   // ====== Tab 切换 ======
   function switchTab(tabId) {
     currentTab = tabId;
+    setHomeActionMenuVisible(false);
     tabs.forEach((t) => t.classList.toggle('active', t.dataset.tab === tabId));
     pages.forEach((p) => p.classList.toggle('active', p.id === tabId));
     const inProjectChat = tabId === 'chatPage' && !!currentProject;
@@ -6961,6 +7020,13 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   function createFriendAvatarElement(friend, sizeClass) {
     const avatar = document.createElement('span');
     avatar.className = (sizeClass || 'brand') + ' round';
+    if (friend && friend.id === SOCIAL_AI_USER_ID) {
+      const img = document.createElement('img');
+      img.src = 'data:image/png;base64,__HOME_AI_AVATAR_PNG_B64__';
+      img.alt = '';
+      avatar.appendChild(img);
+      return avatar;
+    }
     const src = friend && (friend.avatar_data_url || friend.avatarDataUrl);
     if (src) {
       const img = document.createElement('img');
@@ -7160,7 +7226,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       }
       conversationList.innerHTML = searchQuery
         ? '<div class="empty-tip">没有匹配的好友、群聊或项目</div>'
-        : '<div class="empty-tip">还没有好友<br/>点击右上角 ＋ 添加一位好友'
+        : '<div class="empty-tip">还没有好友<br/>点击底部 ＋ 添加一位好友'
           + '<br/><button id="emptyAddFriendBtn">添加好友</button></div>';
       if (!searchQuery) {
         const b = $('emptyAddFriendBtn');
@@ -9857,12 +9923,42 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     addFriendMask.classList.remove('active');
     setTopAddButtonExpanded(false);
   }
+  function setHomeActionMenuVisible(visible) {
+    if (!homeActionMenu || !bottomComposeBtn) return;
+    homeActionMenu.classList.toggle('hidden', !visible);
+    homeActionMenu.setAttribute('aria-hidden', visible ? 'false' : 'true');
+    bottomComposeBtn.setAttribute('aria-expanded', visible ? 'true' : 'false');
+  }
   if (bottomComposeBtn) {
     bottomComposeBtn.addEventListener('click', () => {
       closeProjectBrowser();
-      addBtn.click();
+      const willOpen = homeActionMenu && homeActionMenu.classList.contains('hidden');
+      setHomeActionMenuVisible(!!willOpen);
     });
   }
+  if (homeActionGroupBtn) {
+    homeActionGroupBtn.addEventListener('click', () => {
+      setHomeActionMenuVisible(false);
+      showNativeOnly('发起群聊请在 Android APK 中使用。');
+    });
+  }
+  if (homeActionAddFriendBtn) {
+    homeActionAddFriendBtn.addEventListener('click', () => {
+      setHomeActionMenuVisible(false);
+      openAddFriendDialog();
+    });
+  }
+  if (homeActionNewProjectBtn) {
+    homeActionNewProjectBtn.addEventListener('click', () => {
+      setHomeActionMenuVisible(false);
+      openNewProject(false);
+    });
+  }
+  document.addEventListener('click', (event) => {
+    if (!homeActionMenu || homeActionMenu.classList.contains('hidden')) return;
+    if (homeActionMenu.contains(event.target) || bottomComposeBtn.contains(event.target)) return;
+    setHomeActionMenuVisible(false);
+  });
   addBtn.addEventListener('click', () => {
     if (currentTab === 'chatPage' && !isAnyChatActive()) {
       openAddFriendDialog();

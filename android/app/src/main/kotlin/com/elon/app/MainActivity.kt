@@ -651,7 +651,7 @@ class MainActivity : AppCompatActivity() {
             loadMarketplace = { marketplaceActions.loadProjects() },
             onAgentTabSelected = { agentPageController.refresh() },
             handleProjectSpaceInternalBack = projectSpaceController::handleProjectSpaceInternalBack,
-            openProjectSpacePostComposer = projectSpaceController::openPostComposerFromSpace, showCreateProjectDialog = { projectActions.showCreateProjectDialog() }, createConversationAndOpen = { conversationActions.createConversationAndOpen() }, projectBrowserDependencies = ProjectBrowserSheetDependencies({ s.projects }, { index -> openProjectSpaceForProject(index, true) }, uiTools::selectableForeground)
+            openProjectSpacePostComposer = projectSpaceController::openPostComposerFromSpace, showCreateProjectDialog = { projectActions.showCreateProjectDialog() }, projectBrowserDependencies = ProjectBrowserSheetDependencies({ s.projects }, { index -> openProjectSpaceForProject(index, true) }, uiTools::selectableForeground)
         )
     }
 
