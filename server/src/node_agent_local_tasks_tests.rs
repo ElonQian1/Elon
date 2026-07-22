@@ -202,6 +202,14 @@ async fn production_create_handler_replays_bound_result_and_rejects_changed_body
     );
     runtime.local_tasks =
         crate::node_agent_local_task_store::LocalTaskStore::new(root.join("tasks.sqlite3"));
+    grant_project_access(
+        &mut runtime,
+        &root,
+        owner,
+        "agent-idempotency-handler",
+        "install-idempotency-handler",
+    )
+    .await;
     let request = CreateLocalTaskRequest {
         project_id: "elon-self".into(),
         channel_id: None,
@@ -345,6 +353,14 @@ async fn production_handler_restart_takeover_replays_exact_plan_without_redispat
     let mut runtime = test_runtime(root.clone(), owner, "agent-restart", "install-restart");
     runtime.local_tasks =
         crate::node_agent_local_task_store::LocalTaskStore::new(root.join("tasks.sqlite3"));
+    grant_project_access(
+        &mut runtime,
+        &root,
+        owner,
+        "agent-restart",
+        "install-restart",
+    )
+    .await;
     let prompt = "EXACT_EXECUTOR_PROMPT_RESTART_BOUNDARY";
     install_dispatch_capture(prompt);
     let request = CreateLocalTaskRequest {
@@ -444,4 +460,24 @@ fn test_runtime(
     );
     runtime.task_journal = crate::node_agent_task_journal::TaskJournal::new(root.join("journal"));
     runtime
+}
+
+async fn grant_project_access(
+    runtime: &mut crate::NodeRuntime,
+    root: &std::path::Path,
+    owner: &str,
+    agent: &str,
+    install: &str,
+) {
+    runtime.full_access_grants =
+        crate::node_agent_full_access::FullAccessGrantState::load_from_path(
+            root.join("full-access.json"),
+        );
+    let identity =
+        crate::node_agent_full_access::FullAccessGrantIdentity::new(owner, agent, install).unwrap();
+    runtime
+        .full_access_grants
+        .grant_project(&identity, "elon-self", root.to_string_lossy().as_ref())
+        .await
+        .unwrap();
 }
