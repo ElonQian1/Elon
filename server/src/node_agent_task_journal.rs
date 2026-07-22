@@ -10,6 +10,8 @@ mod cursor;
 mod dispatch;
 #[path = "node_agent_task_journal_recovery.rs"]
 mod recovery;
+#[path = "node_agent_task_journal_start.rs"]
+mod start;
 #[path = "node_agent_task_journal_terminal.rs"]
 mod terminal;
 
@@ -37,8 +39,8 @@ use crate::{
     node_agent_workspace_match::{canonical_or_original, record_cwd_matches_workspace},
 };
 
+use dispatch::advance_dispatch_record;
 pub(crate) use dispatch::TaskDispatchProgress;
-use dispatch::{advance_dispatch_record, default_dispatch_schema};
 
 #[derive(Clone, Debug)]
 pub(crate) struct TaskJournal {
@@ -172,56 +174,6 @@ impl TaskJournal {
 
     pub(crate) fn default() -> Self {
         Self::new(super::state_path().with_file_name("task-journal"))
-    }
-
-    pub(crate) fn record_started(&self, start: TaskJournalStart<'_>) -> Result<()> {
-        with_task_journal_io_lock(|| {
-            let now = now_ms();
-            let mut registry = self.load_registry()?;
-            let record = TaskJournalRecord {
-                req_id: start.req_id.to_string(),
-                cli_name: start.cli_name.to_string(),
-                route: start.route.map(str::to_string),
-                run_handle_id: start.run_handle_id.map(str::to_string),
-                cwd: start.cwd.map(str::to_string),
-                runtime_permission: start.runtime_permission.map(str::to_string),
-                os_pid: None,
-                process_started_at_ms: None,
-                process_identity: None,
-                codex_session_id: None,
-                codex_session_scope_key: None,
-                codex_session_updated_at_ms: None,
-                status: "running".to_string(),
-                phase: "dispatch".to_string(),
-                current_command: None,
-                last_progress_ms: Some(now),
-                heartbeat_at_ms: Some(now),
-                timeout_policy: None,
-                dispatch: Some(TaskDispatchProgress {
-                    schema: default_dispatch_schema(),
-                    stage: "persisted".to_string(),
-                    stage_started_at_ms: now,
-                    stages: Vec::new(),
-                    failure: None,
-                }),
-                started_at_ms: now,
-                updated_at_ms: now,
-                cancel_requested_at_ms: None,
-                cancel_intent: None,
-            };
-            registry.insert(start.req_id.to_string(), record);
-            self.save_registry(&registry)?;
-            self.append_event(json!({
-                "type": "started",
-                "req_id": start.req_id,
-                "cli": start.cli_name,
-                "route": start.route,
-                "run_handle_id": start.run_handle_id,
-                "cwd": start.cwd,
-                "runtime_permission": start.runtime_permission,
-                "at_ms": now
-            }))
-        })
     }
 
     pub(crate) fn load_codex_session(&self, scope_key: &str) -> Result<Option<String>> {
