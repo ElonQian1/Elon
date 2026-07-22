@@ -195,6 +195,34 @@ fn journal_state_reads_review_after_paginated_event_window() {
 }
 
 #[test]
+fn restart_drain_transition_is_a_supported_supervision_event() {
+    let directory = std::env::temp_dir().join(format!(
+        "elon-supervision-drain-test-{}-{}",
+        std::process::id(),
+        now_ms()
+    ));
+    let journal = TaskJournal::new(&directory);
+
+    record_supervision_event(
+        &journal,
+        "local-stale-runtime",
+        "supervision_stale_runtime_resume_required",
+        json!({"state":"resume_required", "journal_preserved":true}),
+    )
+    .unwrap();
+
+    assert_eq!(
+        journal
+            .snapshot("local-stale-runtime", 0, 10)
+            .unwrap()
+            .events
+            .len(),
+        1
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
 fn resume_requires_explicit_current_protocol() {
     let missing = normalize_contract(SupervisionContractInput {
         protocol: None,
