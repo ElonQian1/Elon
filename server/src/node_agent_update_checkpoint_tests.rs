@@ -545,10 +545,10 @@ fn reconciled_terminal_history_is_excluded_but_fresh_ownership_still_blocks() {
     assert_eq!(fresh.live_execution_task_ids, ["historical-resume"]);
     assert_eq!(fresh.active_foreground_task_ids, ["historical-resume"]);
 
-    let mut unproven_gate = store.load().unwrap().install_gate;
-    unproven_gate.classifications[0].resume_ineligibility_proof = None;
-    store.update_install_gate(unproven_gate).unwrap();
-    let unproven = checkpoint_active_update_transactions(
+    let mut resumable_gate = store.load().unwrap().install_gate;
+    resumable_gate.classifications[0].resume_ineligibility_proof = None;
+    store.update_install_gate(resumable_gate).unwrap();
+    let resumable = checkpoint_active_update_transactions(
         &store,
         &local_tasks,
         &journal,
@@ -559,8 +559,8 @@ fn reconciled_terminal_history_is_excluded_but_fresh_ownership_still_blocks() {
         &HashSet::new(),
     )
     .unwrap();
-    assert!(!unproven.install_may_proceed());
-    assert!(unproven.live_execution_task_ids.is_empty());
-    assert_eq!(unproven.active_foreground_task_ids, ["historical-resume"]);
+    assert!(resumable.install_may_proceed());
+    assert!(resumable.live_execution_task_ids.is_empty());
+    assert!(resumable.active_foreground_task_ids.is_empty());
     let _ = std::fs::remove_dir_all(root);
 }

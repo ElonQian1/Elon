@@ -55,5 +55,6 @@ pub(crate) fn payload(record: Option<&crate::node_agent_task_journal::TaskJourna
         "eta_kind": remaining_ms.map(|_| "timeout_upper_bound"),
         "timeout_reason": timeout_reason,
         "timeout_policy": record.timeout_policy,
+        "dispatch": record.dispatch,
     })
 }

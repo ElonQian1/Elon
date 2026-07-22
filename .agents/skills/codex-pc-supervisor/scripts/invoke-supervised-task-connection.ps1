@@ -1,5 +1,6 @@
 function Get-NodeConnection {
     param([int]$RetrySeconds = 0)
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
     $candidateUrls = New-Object System.Collections.Generic.List[string]
     if (-not [string]::IsNullOrWhiteSpace($env:ELON_NODE_ADMIN_URL)) {
         $candidateUrls.Add($env:ELON_NODE_ADMIN_URL.TrimEnd('/'))
@@ -12,10 +13,16 @@ function Get-NodeConnection {
     $candidateUrls.Add('http://127.0.0.1:7799')
     foreach ($port in 7800..7819) { $candidateUrls.Add("http://127.0.0.1:$port") }
 
-    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $candidateBuildMs = $timer.ElapsedMilliseconds
+    $priorityProbeMs = 0
+    $fallbackProbeMs = 0
+    $priorityAttemptCount = 0
+    $fallbackCandidateCount = 0
     do {
         $uniqueCandidates = @($candidateUrls | Select-Object -Unique)
-        foreach ($candidateUrl in @($uniqueCandidates | Select-Object -First 4)) {
+        $priorityTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        foreach ($candidateUrl in @($uniqueCandidates | Select-Object -First 1)) {
+            $priorityAttemptCount++
             try {
                 $status = Invoke-Utf8JsonRequest -Method Get -Uri "$candidateUrl/api/status" `
                     -Headers @{ Origin = $candidateUrl } -TimeoutSec 1
@@ -28,21 +35,47 @@ function Get-NodeConnection {
                     -not [string]::IsNullOrWhiteSpace($version)) {
                     $script:LastNodeAdminUrl = $candidateUrl
                     Save-CachedNodeUrl $candidateUrl
+                    $priorityProbeMs += $priorityTimer.ElapsedMilliseconds
                     return [pscustomobject]@{
                         BaseUrl = $candidateUrl; Header = $header; Token = $token; Version = $version
                         SupervisionProtocol = [string](Get-ObjectField $supervisionStatus 'protocol')
                         SupervisionCapabilities = @((Get-ObjectField $supervisionStatus 'capabilities') | ForEach-Object { [string]$_ })
                         ProbeMs = $timer.ElapsedMilliseconds; ProbeStrategy = 'cached_or_priority_bounded'
+                        ProbeTimings = [pscustomobject][ordered]@{
+                            candidate_build_ms = $candidateBuildMs
+                            priority_probe_ms = $priorityProbeMs
+                            fallback_probe_ms = $fallbackProbeMs
+                            total_ms = $timer.ElapsedMilliseconds
+                            priority_attempt_count = $priorityAttemptCount
+                            fallback_candidate_count = $fallbackCandidateCount
+                            cache_candidate_present = -not [string]::IsNullOrWhiteSpace($cachedUrl)
+                            result_phase = 'priority'
+                        }
                     }
                 }
             } catch { continue }
         }
-        $parallel = Invoke-ParallelNodeProbe @($uniqueCandidates | Select-Object -Skip 4) 1200
+        $priorityProbeMs += $priorityTimer.ElapsedMilliseconds
+        $fallbackCandidates = @($uniqueCandidates | Select-Object -Skip 1)
+        $fallbackCandidateCount += $fallbackCandidates.Count
+        $fallbackTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        $parallel = Invoke-ParallelNodeProbe $fallbackCandidates 1200
+        $fallbackProbeMs += $fallbackTimer.ElapsedMilliseconds
         if ($null -ne $parallel) {
             $script:LastNodeAdminUrl = $parallel.BaseUrl
             Save-CachedNodeUrl $parallel.BaseUrl
             $parallel | Add-Member -NotePropertyName ProbeMs -NotePropertyValue $timer.ElapsedMilliseconds -Force
             $parallel | Add-Member -NotePropertyName ProbeStrategy -NotePropertyValue 'parallel_bounded_fallback' -Force
+            $parallel | Add-Member -NotePropertyName ProbeTimings -NotePropertyValue ([pscustomobject][ordered]@{
+                candidate_build_ms = $candidateBuildMs
+                priority_probe_ms = $priorityProbeMs
+                fallback_probe_ms = $fallbackProbeMs
+                total_ms = $timer.ElapsedMilliseconds
+                priority_attempt_count = $priorityAttemptCount
+                fallback_candidate_count = $fallbackCandidateCount
+                cache_candidate_present = -not [string]::IsNullOrWhiteSpace($cachedUrl)
+                result_phase = 'parallel_fallback'
+            }) -Force
             return $parallel
         }
         if ($timer.Elapsed.TotalSeconds -lt $RetrySeconds) { Start-Sleep -Seconds 2 }

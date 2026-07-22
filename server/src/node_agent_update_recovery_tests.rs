@@ -187,6 +187,66 @@ fn lifecycle_lookup_and_final_review_share_the_same_receipt() {
 }
 
 #[test]
+fn compatible_terminal_receipts_are_canonicalized_without_losing_raw_audit() {
+    let (root, store) = temp_store();
+    let mut sparse =
+        UpdateRecoveryReceipt::planned("update-terminal-a", "root-terminal", "task-terminal");
+    sparse.state = UpdateRecoveryState::Failed;
+    sparse.updated_at_ms = 20;
+    let mut detailed =
+        UpdateRecoveryReceipt::planned("update-terminal-b", "root-terminal", "task-terminal");
+    detailed.state = UpdateRecoveryState::Failed;
+    detailed.updated_at_ms = 10;
+    detailed.terminal_task_status = Some("done".to_string());
+    detailed.terminal_finished_at_ms = Some(99);
+    detailed.terminal_success = Some(true);
+    detailed.terminal_outcome = Some("completed".to_string());
+    detailed.completion_event_id = Some("event-terminal".to_string());
+    store.upsert(sparse).unwrap();
+    store.upsert(detailed).unwrap();
+
+    let canonical = store
+        .receipt_for_task("task-terminal")
+        .expect("compatible terminal facts")
+        .expect("canonical receipt");
+    assert_eq!(canonical.state, UpdateRecoveryState::Failed);
+    assert_eq!(canonical.terminal_task_status.as_deref(), Some("done"));
+    assert_eq!(canonical.terminal_finished_at_ms, Some(99));
+    assert_eq!(
+        canonical.completion_event_id.as_deref(),
+        Some("event-terminal")
+    );
+    assert_eq!(
+        store.receipts_for_task("task-terminal").unwrap().len(),
+        2,
+        "canonical lookup must preserve the append-only receipt audit"
+    );
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn conflicting_terminal_receipts_remain_fail_closed() {
+    let (root, store) = temp_store();
+    let mut first =
+        UpdateRecoveryReceipt::planned("update-conflict-a", "root-conflict", "task-conflict");
+    first.state = UpdateRecoveryState::Failed;
+    first.terminal_task_status = Some("done".to_string());
+    let mut second =
+        UpdateRecoveryReceipt::planned("update-conflict-b", "root-conflict", "task-conflict");
+    second.state = UpdateRecoveryState::Failed;
+    second.terminal_task_status = Some("failed".to_string());
+    store.upsert(first).unwrap();
+    store.upsert(second).unwrap();
+
+    let error = store
+        .receipt_for_task("task-conflict")
+        .expect_err("different completion facts must not be merged");
+    assert!(error.to_string().contains("terminal_task_status"));
+    assert_eq!(store.receipts_for_task("task-conflict").unwrap().len(), 2);
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
 fn compact_status_counts_all_receipts_and_pages_without_events() {
     let (root, store) = temp_store();
     let mut active = UpdateRecoveryReceipt::planned("update-page-a", "root-a", "task-a");

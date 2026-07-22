@@ -20,7 +20,7 @@ pub(crate) async fn register(
     cancel_tx: watch::Sender<bool>,
     requires_cloud_control: bool,
     supervised: bool,
-    inherited_workspace_resume: bool,
+    true_workspace_resume: bool,
     admission: Option<&crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard>,
 ) -> Result<CliPromptRegistration> {
     let handle = ActiveCliPromptHandle::new(
@@ -32,7 +32,7 @@ pub(crate) async fn register(
         cancel_tx,
     )
     .with_requires_cloud_control(requires_cloud_control)
-    .with_exclusive_workspace(supervised || inherited_workspace_resume);
+    .with_exclusive_workspace(supervised || true_workspace_resume);
     if supervised {
         runtime
             .try_register_supervised_cli_prompt(handle, admission)

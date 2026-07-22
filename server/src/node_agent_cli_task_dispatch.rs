@@ -1,6 +1,6 @@
 //! Shared CLI task admission/launch path for cloud WebSocket dispatch and localhost workbench.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use homecli_proto::{AgentToServer, CliCodexCredentialBinding, CliProjectContext};
 use tokio::sync::{mpsc, watch};
@@ -17,6 +17,18 @@ use crate::{
 #[path = "node_agent_cli_task_dispatch_failure.rs"]
 mod failure;
 use failure::send_preflight_failure;
+#[path = "node_agent_cli_task_dispatch_admission.rs"]
+mod admission;
+
+const WORKSPACE_PREPARE_TIMEOUT: Duration = Duration::from_secs(8);
+const DATA_ROOT_TRANSITION_TIMEOUT: Duration = Duration::from_secs(8);
+
+fn is_true_workspace_resume(
+    _inherited_workspace_present: bool,
+    resume_admission_present: bool,
+) -> bool {
+    resume_admission_present
+}
 
 #[derive(Debug)]
 pub(crate) struct CliTaskDispatchRequest {
@@ -144,6 +156,29 @@ async fn run_cli_task(
             .await;
             return;
         }
+    }
+    if let Err(error) =
+        runtime
+            .task_journal
+            .record_started(node_agent_task_journal::TaskJournalStart {
+                req_id: &req_id_for_cleanup,
+                cli_name: &cli,
+                route: Some(node_agent_active_task::route_for_cli(&cli)),
+                run_handle_id: Some(&req_id_for_cleanup),
+                cwd: cwd.as_deref(),
+                runtime_permission: requested_runtime_permission.as_deref(),
+            })
+    {
+        send_preflight_failure(
+            &runtime,
+            &completion_context,
+            &cli,
+            &out_tx,
+            req_id,
+            format!("DISPATCH_PERSIST_FAILED: 无法持久化派发起点: {error}"),
+        )
+        .await;
+        return;
     }
     let resolved_cli = match runtime.resolve_cli(&cli).await {
         Ok(resolved) => resolved,
@@ -397,7 +432,10 @@ async fn run_cli_task(
     // Workspace preparation and build admission share the data-root transition
     // lock. A root switch can happen before this transaction or after the
     // lease is registered, never between selecting a workspace and its cache.
-    let inherited_workspace_resume = inherited_workspace.is_some();
+    // A fresh supervised Submit also arrives with a pre-provisioned inherited
+    // workspace. Only a held Resume admission guard denotes a true Resume.
+    let true_workspace_resume =
+        is_true_workspace_resume(inherited_workspace.is_some(), resume_admission.is_some());
     let supervision_root_task_id =
         match crate::node_agent_cli_supervision_lease::root_task_id_for_task(
             &runtime.task_journal,
@@ -418,28 +456,24 @@ async fn run_cli_task(
                 return;
             }
         };
-    let transition = runtime.node_data_root_transition.clone().lock_owned().await;
-    let data_paths = runtime.node_data_root.read().await.paths.clone();
-    let prepared = tokio::task::spawn_blocking(move || {
-        let result = match inherited_workspace {
-            Some(workspace) => crate::node_agent_cli_runner::prepare_inherited_cli_prompt_cwd_in(
-                data_paths.as_ref(),
-                workspace,
-                project_context,
-            ),
-            None => crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in_with_supervision(
-                data_paths.as_ref(),
-                cwd,
-                project_context,
-                supervision_root_task_id.as_deref(),
-            ),
-        };
-        (transition, data_paths, result)
-    })
-    .await;
-    let (transition, data_paths, prepared_cwd) = match prepared {
-        Ok((transition, data_paths, Ok(cwd))) => (transition, data_paths, cwd),
-        Ok((_transition, _data_paths, Err(error))) => {
+    let _ = runtime
+        .task_journal
+        .record_dispatch_stage(&req_id_for_cleanup, "workspace_prepare");
+    let transition = match tokio::time::timeout(
+        DATA_ROOT_TRANSITION_TIMEOUT,
+        runtime.node_data_root_transition.clone().lock_owned(),
+    )
+    .await
+    {
+        Ok(transition) => transition,
+        Err(_) => {
+            let error = "DATA_ROOT_TRANSITION_TIMEOUT: 等待数据根切换门禁超过 8 秒";
+            let _ = runtime.task_journal.record_dispatch_failure(
+                &req_id_for_cleanup,
+                "workspace_prepare",
+                "data_root_transition_timeout",
+                error,
+            );
             send_preflight_failure(
                 &runtime,
                 &completion_context,
@@ -451,7 +485,45 @@ async fn run_cli_task(
             .await;
             return;
         }
-        Err(error) => {
+    };
+    let data_paths = runtime.node_data_root.read().await.paths.clone();
+    let prepared = tokio::time::timeout(
+        WORKSPACE_PREPARE_TIMEOUT,
+        tokio::task::spawn_blocking(move || {
+            let result = match inherited_workspace {
+                Some(workspace) => {
+                    crate::node_agent_cli_runner::prepare_inherited_cli_prompt_cwd_in(
+                        data_paths.as_ref(),
+                        workspace,
+                        project_context,
+                    )
+                }
+                None => crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in_with_supervision(
+                    data_paths.as_ref(),
+                    cwd,
+                    project_context,
+                    supervision_root_task_id.as_deref(),
+                ),
+            };
+            (transition, data_paths, result)
+        }),
+    )
+    .await;
+    let (transition, data_paths, prepared_cwd) = match prepared {
+        Ok(Ok((transition, data_paths, Ok(cwd)))) => (transition, data_paths, cwd),
+        Ok(Ok((_transition, _data_paths, Err(error)))) => {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                error.to_string(),
+            )
+            .await;
+            return;
+        }
+        Ok(Err(error)) => {
             send_preflight_failure(
                 &runtime,
                 &completion_context,
@@ -463,61 +535,81 @@ async fn run_cli_task(
             .await;
             return;
         }
-    };
-    if let Err(error) = crate::node_agent_cli_supervision_lease::acquire_for_task(
-        &runtime.task_journal,
-        &req_id_for_cleanup,
-        completion_context.supervision_protocol.as_deref(),
-        prepared_cwd.conversation_workspace.as_ref(),
-    ) {
-        send_preflight_failure(
-            &runtime,
-            &completion_context,
-            resolved_cli.name(),
-            &out_tx,
-            req_id,
-            format!("failed to persist supervision worktree lease: {error}"),
-        )
-        .await;
-        return;
-    }
-    let build_run_guard = if let Some(project_context) = prepared_cwd
-        .project_context
-        .as_ref()
-        .filter(|context| !crate::cli_prompt_read_only(context.runtime_permission.as_deref()))
-        .filter(|_| prepared_cwd.data_policy.uses_managed_workspace())
-    {
-        if let Some(data_paths) = data_paths.as_ref() {
-            match crate::node_agent_build_runtime::register_cli_run(
-                data_paths,
-                crate::node_agent_build_runtime::BuildRunRequest {
-                    task_id: &req_id_for_cleanup,
-                    project_id: &project_context.project_id,
-                    cwd: prepared_cwd.cwd.as_deref().map(std::path::Path::new),
-                },
-            ) {
-                Ok(run) => Some(run),
-                Err(error) => {
-                    send_preflight_failure(
-                        &runtime,
-                        &completion_context,
-                        resolved_cli.name(),
-                        &out_tx,
-                        req_id,
-                        format!("一龙推荐构建环境准备失败: {error:#}"),
-                    )
-                    .await;
-                    return;
-                }
-            }
-        } else {
-            warn!("推荐数据根暂不可用，继续继承原项目构建环境");
-            None
+        Err(_) => {
+            let error = "WORKSPACE_PREPARE_TIMEOUT: 项目工作区准备超过 8 秒";
+            let _ = runtime.task_journal.record_dispatch_failure(
+                &req_id_for_cleanup,
+                "workspace_prepare",
+                "workspace_prepare_timeout",
+                error,
+            );
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                error.to_string(),
+            )
+            .await;
+            return;
         }
-    } else {
-        None
     };
-    drop(transition);
+    let supervised_registration = completion_context.is_desktop_supervised();
+    let admission = admission::register_active_and_prepare_build(
+        &runtime,
+        &req_id_for_cleanup,
+        resolved_cli.name(),
+        &prepared_cwd,
+        runtime_permission.clone(),
+        cancel_tx,
+        effective_requires_cloud_control,
+        supervised_registration,
+        true_workspace_resume,
+        resume_admission,
+        transition,
+        data_paths,
+        completion_context.supervision_protocol.as_deref(),
+    )
+    .await;
+    let (deadline_cancel_tx, build_run_guard) = match admission {
+        admission::AdmissionOutcome::Ready {
+            deadline_cancel_tx,
+            build_run_guard,
+        } => (deadline_cancel_tx, build_run_guard),
+        admission::AdmissionOutcome::Duplicate => {
+            warn!(%req_id_for_cleanup, "PC CLI duplicate task registration race lost");
+            send_cli_prompt_reattached(
+                &out_tx,
+                req_id,
+                cli,
+                prepared_cwd.cwd,
+                requested_runtime_permission,
+            );
+            return;
+        }
+        admission::AdmissionOutcome::Failed {
+            message,
+            active_handle_registered,
+        } => {
+            send_preflight_failure(
+                &runtime,
+                &completion_context,
+                resolved_cli.name(),
+                &out_tx,
+                req_id,
+                message,
+            )
+            .await;
+            if active_handle_registered {
+                runtime.finish_cli_prompt(&req_id_for_cleanup).await;
+            }
+            return;
+        }
+    };
+    let _ = runtime
+        .task_journal
+        .record_dispatch_stage(&req_id_for_cleanup, "runtime_prepare");
     let original_prompt = prompt.clone();
     let ui_design_routed =
         crate::node_agent_ui_design_workspace::is_ui_design_task_prompt(&original_prompt);
@@ -549,53 +641,6 @@ async fn run_cli_task(
         ui_design_route_status,
     );
 
-    let deadline_cancel_tx = cancel_tx.clone();
-    let supervised_registration = completion_context.is_desktop_supervised();
-    let registration = crate::node_agent_cli_task_registration::register(
-        &runtime,
-        &req_id_for_cleanup,
-        resolved_cli.name(),
-        prepared_cwd.cwd.clone(),
-        runtime_permission.clone(),
-        cancel_tx,
-        effective_requires_cloud_control,
-        supervised_registration,
-        inherited_workspace_resume,
-        resume_admission.as_ref(),
-    )
-    .await
-    .unwrap_or_else(|error| {
-        warn!(%error, %req_id_for_cleanup, "supervised CLI owner admission failed closed");
-        crate::node_agent_active_task_registry::CliPromptRegistration::WorkspaceBusy
-    });
-    match registration {
-        crate::node_agent_active_task_registry::CliPromptRegistration::Inserted => {}
-        crate::node_agent_active_task_registry::CliPromptRegistration::DuplicateReq => {
-            warn!(%req_id_for_cleanup, "PC CLI duplicate task registration race lost");
-            send_cli_prompt_reattached(
-                &out_tx,
-                req_id,
-                cli,
-                prepared_cwd.cwd,
-                requested_runtime_permission,
-            );
-            return;
-        }
-        crate::node_agent_active_task_registry::CliPromptRegistration::WorkspaceBusy => {
-            warn!(%req_id_for_cleanup, "supervised resume workspace is already active");
-            send_preflight_failure(
-                &runtime,
-                &completion_context,
-                resolved_cli.name(),
-                &out_tx,
-                req_id,
-                "父任务隔离 worktree 已被其他活跃任务占用，已拒绝续跑。".to_string(),
-            )
-            .await;
-            return;
-        }
-    }
-    drop(resume_admission); // Active registry now owns CLI-lifetime exclusion.
     if let Some(error) = prestart_cancel_admission_error(&runtime.task_journal, &req_id_for_cleanup)
     {
         send_preflight_failure(
@@ -685,20 +730,9 @@ async fn run_cli_task(
         runtime.finish_cli_prompt(&req_id_for_cleanup).await;
         return;
     }
-    if let Err(error) =
-        runtime
-            .task_journal
-            .record_started(node_agent_task_journal::TaskJournalStart {
-                req_id: &req_id_for_cleanup,
-                cli_name: resolved_cli.name(),
-                route: Some(node_agent_active_task::route_for_cli(resolved_cli.name())),
-                run_handle_id: Some(&req_id_for_cleanup),
-                cwd: prepared_cwd.cwd.as_deref(),
-                runtime_permission: runtime_permission.as_deref(),
-            })
-    {
-        warn!(%error, "failed to persist PC task start journal event");
-    }
+    let _ = runtime
+        .task_journal
+        .record_dispatch_stage(&req_id_for_cleanup, "process_spawn");
 
     run_cli_prompt(CliPromptRun {
         req_id,
@@ -762,36 +796,5 @@ async fn validate_completion_producer_identity(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn duplicate_dispatch_returns_idempotent_acceptance_not_terminal() {
-        let (tx, mut rx) = mpsc::unbounded_channel();
-        send_cli_prompt_reattached(
-            &tx,
-            "req-duplicate".to_string(),
-            "codex".to_string(),
-            Some("D:/workspace".to_string()),
-            Some("full_access".to_string()),
-        );
-
-        let Message::Text(payload) = rx.try_recv().expect("duplicate response") else {
-            panic!("duplicate response must be websocket text");
-        };
-        let event: AgentToServer =
-            serde_json::from_str(payload.as_ref()).expect("valid duplicate response");
-        assert!(matches!(
-            event,
-            AgentToServer::CliPromptAccepted {
-                req_id,
-                cli: Some(cli),
-                cwd: Some(cwd),
-                runtime_permission: Some(runtime_permission),
-            } if req_id == "req-duplicate"
-                && cli == "codex"
-                && cwd == "D:/workspace"
-                && runtime_permission == "full_access"
-        ));
-    }
-}
+#[path = "node_agent_cli_task_dispatch_tests.rs"]
+mod tests;

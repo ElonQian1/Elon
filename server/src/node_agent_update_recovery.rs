@@ -8,6 +8,10 @@ use std::{
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
+#[path = "node_agent_update_recovery_receipt_merge.rs"]
+mod receipt_merge;
+use receipt_merge::canonical_terminal_receipt;
+
 pub(crate) const UPDATE_RECOVERY_PROTOCOL: &str = "elon.node_update_recovery.v1";
 pub(crate) const UPDATE_RECOVERY_SCHEMA_VERSION: u32 = 1;
 
@@ -475,6 +479,8 @@ pub(crate) struct UpdateGateTaskClassification {
     #[serde(default)]
     pub(crate) replayable_sidecar: bool,
     #[serde(default)]
+    pub(crate) live_journal_process: bool,
+    #[serde(default)]
     pub(crate) pending_approval_ids: Vec<String>,
     #[serde(default)]
     pub(crate) non_repeatable_action: Option<String>,
@@ -486,6 +492,10 @@ pub(crate) struct UpdateGateTaskClassification {
     pub(crate) terminal_recovery_receipt_count: usize,
     #[serde(default)]
     pub(crate) ambiguous_recovery_receipts: bool,
+    #[serde(default)]
+    pub(crate) cancel_intent_persisted: bool,
+    #[serde(default)]
+    pub(crate) cancel_side_effect_committed: bool,
     #[serde(default)]
     pub(crate) resume_eligible: Option<bool>,
     #[serde(default)]
@@ -644,7 +654,16 @@ impl UpdateRecoveryStore {
     }
 
     pub(crate) fn receipt_for_task(&self, task_id: &str) -> Result<Option<UpdateRecoveryReceipt>> {
-        let matches = self
+        let matches = self.receipts_for_task(task_id)?;
+        match matches.len() {
+            0 => Ok(None),
+            1 => Ok(matches.into_iter().next()),
+            _ => canonical_terminal_receipt(&matches).map(Some),
+        }
+    }
+
+    pub(crate) fn receipts_for_task(&self, task_id: &str) -> Result<Vec<UpdateRecoveryReceipt>> {
+        Ok(self
             .load()?
             .receipts
             .into_iter()
@@ -652,12 +671,7 @@ impl UpdateRecoveryStore {
                 receipt.original_task_id == task_id
                     || receipt.resume_task_id.as_deref() == Some(task_id)
             })
-            .collect::<Vec<_>>();
-        match matches.len() {
-            0 => Ok(None),
-            1 => Ok(matches.into_iter().next()),
-            _ => bail!("multiple update recovery receipts target the same task"),
-        }
+            .collect())
     }
 
     pub(crate) fn update_install_gate(&self, gate: UpdateInstallGate) -> Result<()> {

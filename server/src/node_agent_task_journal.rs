@@ -6,6 +6,8 @@ mod cancel;
 mod cancel_tombstones;
 #[path = "node_agent_task_journal_cursor.rs"]
 mod cursor;
+#[path = "node_agent_task_journal_dispatch.rs"]
+mod dispatch;
 #[path = "node_agent_task_journal_recovery.rs"]
 mod recovery;
 #[path = "node_agent_task_journal_terminal.rs"]
@@ -34,6 +36,9 @@ use crate::{
     node_agent_task_journal_lock::with_task_journal_io_lock,
     node_agent_workspace_match::{canonical_or_original, record_cwd_matches_workspace},
 };
+
+pub(crate) use dispatch::TaskDispatchProgress;
+use dispatch::{advance_dispatch_record, default_dispatch_schema};
 
 #[derive(Clone, Debug)]
 pub(crate) struct TaskJournal {
@@ -84,6 +89,8 @@ pub(crate) struct TaskJournalRecord {
     pub heartbeat_at_ms: Option<u128>,
     #[serde(default)]
     pub timeout_policy: Option<crate::node_agent_cli_runtime_policy::CliRuntimePolicy>,
+    #[serde(default)]
+    pub dispatch: Option<TaskDispatchProgress>,
     pub started_at_ms: u128,
     pub updated_at_ms: u128,
     pub cancel_requested_at_ms: Option<u128>,
@@ -185,11 +192,18 @@ impl TaskJournal {
                 codex_session_scope_key: None,
                 codex_session_updated_at_ms: None,
                 status: "running".to_string(),
-                phase: "reasoning".to_string(),
+                phase: "dispatch".to_string(),
                 current_command: None,
                 last_progress_ms: Some(now),
                 heartbeat_at_ms: Some(now),
                 timeout_policy: None,
+                dispatch: Some(TaskDispatchProgress {
+                    schema: default_dispatch_schema(),
+                    stage: "persisted".to_string(),
+                    stage_started_at_ms: now,
+                    stages: Vec::new(),
+                    failure: None,
+                }),
                 started_at_ms: now,
                 updated_at_ms: now,
                 cancel_requested_at_ms: None,
@@ -292,6 +306,7 @@ impl TaskJournal {
             let process_identity = crate::node_agent_cli_worker::process_identity(pid);
             let mut registry = self.load_registry()?;
             if let Some(record) = registry.get_mut(req_id) {
+                advance_dispatch_record(record, "sidecar_heartbeat", now);
                 record.os_pid = Some(pid);
                 record.process_started_at_ms = Some(now);
                 record.process_identity.clone_from(&process_identity);
@@ -338,6 +353,7 @@ impl TaskJournal {
                 if is_terminal_status(&record.status) {
                     return Ok(());
                 }
+                advance_dispatch_record(record, "active", now);
                 record.phase = normalize_runtime_phase(phase).to_string();
                 record.current_command = current_command
                     .map(crate::node_agent_cli_output_aggregate::sanitize_command)
@@ -357,6 +373,13 @@ impl TaskJournal {
             if let Some(record) = registry.get_mut(req_id) {
                 if is_terminal_status(&record.status) {
                     return Ok(());
+                }
+                if record
+                    .dispatch
+                    .as_ref()
+                    .is_some_and(|dispatch| dispatch.stage == "sidecar_heartbeat")
+                {
+                    advance_dispatch_record(record, "active", now);
                 }
                 record.heartbeat_at_ms = Some(now);
                 record.updated_at_ms = now;
@@ -690,12 +713,11 @@ impl TaskJournal {
     }
 }
 
-pub(crate) fn runtime_status_payload(record: Option<&TaskJournalRecord>) -> Value {
-    crate::node_agent_task_runtime_status::payload(record)
-}
+pub(crate) use crate::node_agent_task_runtime_status::payload as runtime_status_payload;
 
 fn normalize_runtime_phase(phase: &str) -> &'static str {
     match phase.trim().to_ascii_lowercase().as_str() {
+        "dispatch" => "dispatch",
         "reasoning" => "reasoning",
         "command" => "command",
         "editing" => "editing",

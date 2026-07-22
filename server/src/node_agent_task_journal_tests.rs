@@ -217,6 +217,58 @@ fn recovery_running_is_visible_to_inspect_and_wait_without_terminal_downgrade() 
 }
 
 #[test]
+fn dispatch_stages_and_timeout_failure_are_durable_and_public() {
+    let dir = unique_test_dir("dispatch-stages");
+    let journal = TaskJournal::new(&dir);
+    journal
+        .record_started(TaskJournalStart {
+            req_id: "req-dispatch",
+            cli_name: "codex",
+            route: Some("route_a_external_cli"),
+            run_handle_id: Some("req-dispatch"),
+            cwd: Some("D:/isolated"),
+            runtime_permission: Some("full_access"),
+        })
+        .unwrap();
+    for stage in [
+        "workspace_prepare",
+        "supervised_registration",
+        "active_handle",
+        "build_admission_cache_telemetry",
+    ] {
+        journal
+            .record_dispatch_stage("req-dispatch", stage)
+            .unwrap();
+    }
+    journal
+        .record_dispatch_failure(
+            "req-dispatch",
+            "build_admission_cache_telemetry",
+            "build_admission_timeout",
+            "cache scan exceeded bounded deadline",
+        )
+        .unwrap();
+
+    let snapshot = journal.snapshot("req-dispatch", 0, 30).unwrap();
+    let runtime = runtime_status_payload(snapshot.record.as_ref());
+    assert_eq!(runtime["phase"], "failed");
+    assert_eq!(
+        runtime["dispatch"]["stage"],
+        "build_admission_cache_telemetry"
+    );
+    assert_eq!(
+        runtime["dispatch"]["failure"]["code"],
+        "build_admission_timeout"
+    );
+    assert_eq!(runtime["dispatch"]["stages"].as_array().unwrap().len(), 5);
+    assert!(snapshot.events.iter().any(|event| {
+        event.event["type"] == "dispatch_failure"
+            && event.event["code"] == "build_admission_timeout"
+    }));
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
 fn late_cancel_after_terminal_is_audit_only() {
     let dir = unique_test_dir("late-cancel-terminal");
     let journal = TaskJournal::new(&dir);

@@ -15,6 +15,30 @@ pub(super) async fn send_preflight_failure(
     req_id: String,
     error: String,
 ) {
+    let existing_failure = runtime
+        .task_journal
+        .snapshot(&req_id, 0, 1)
+        .ok()
+        .and_then(|snapshot| snapshot.record)
+        .and_then(|record| record.dispatch)
+        .and_then(|dispatch| dispatch.failure);
+    if existing_failure.is_none() {
+        let stage = runtime
+            .task_journal
+            .snapshot(&req_id, 0, 1)
+            .ok()
+            .and_then(|snapshot| snapshot.record)
+            .and_then(|record| record.dispatch)
+            .map(|dispatch| dispatch.stage)
+            .filter(|stage| !stage.is_empty())
+            .unwrap_or_else(|| "preflight".to_string());
+        let _ = runtime.task_journal.record_dispatch_failure(
+            &req_id,
+            &stage,
+            "dispatch_preflight_failed",
+            &error,
+        );
+    }
     let message = AgentToServer::CliDone {
         req_id,
         exit_ok: false,

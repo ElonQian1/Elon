@@ -24,6 +24,7 @@ pub(crate) fn journal_record_for_workspace(
         last_progress_ms: None,
         heartbeat_at_ms: None,
         timeout_policy: None,
+        dispatch: None,
         started_at_ms: updated_at_ms.saturating_sub(5),
         updated_at_ms,
         cancel_requested_at_ms: Some(updated_at_ms.saturating_sub(1)),

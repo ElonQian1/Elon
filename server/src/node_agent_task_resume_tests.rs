@@ -26,6 +26,7 @@ fn record(status: &str) -> TaskJournalRecord {
         last_progress_ms: None,
         heartbeat_at_ms: None,
         timeout_policy: None,
+        dispatch: None,
         started_at_ms: 1,
         updated_at_ms: 2,
         cancel_requested_at_ms: None,

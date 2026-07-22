@@ -52,6 +52,7 @@ $script:Utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 $script:Utf8NoBomStrict = [System.Text.UTF8Encoding]::new($false, $true)
 $OutputEncoding = $script:Utf8NoBom
 try { [Console]::OutputEncoding = $script:Utf8NoBom } catch {}
+try { Add-Type -AssemblyName System.Net.Http -ErrorAction Stop } catch {}
 
 function Get-ObjectField {
     param([object]$InputObject, [string]$Name)
@@ -498,15 +499,6 @@ function Resolve-MonotonicTaskCursor {
     return [Math]::Max($CurrentCursor, $ReturnedCursor)
 }
 
-function Get-WaitFailureCode {
-    param([System.Exception]$Exception)
-    if ($Exception -is [System.Net.WebException] -and
-        $Exception.Status -eq [System.Net.WebExceptionStatus]::Timeout) {
-        return 'request_timeout'
-    }
-    return 'node_unreachable'
-}
-
 function New-ImprovementTaskBody {
     param(
         [object]$ParentDetail,
@@ -554,6 +546,7 @@ function New-ResumeTaskBody {
 }
 
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-delta.ps1')
+. (Join-Path $PSScriptRoot 'invoke-supervised-task-wait.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-idempotency.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-review.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-workspace.ps1')
@@ -577,6 +570,7 @@ switch ($Action) {
             supervision_protocol = $nodeConnection.SupervisionProtocol
             supervision_capabilities = @($nodeConnection.SupervisionCapabilities)
             probe_ms = $nodeConnection.ProbeMs; probe_strategy = $nodeConnection.ProbeStrategy
+            phase_timings = $nodeConnection.ProbeTimings
             cache_contains_token = $false
         })
     }
@@ -629,6 +623,8 @@ switch ($Action) {
             install_may_proceed = Get-ObjectField $response 'install_may_proceed'
             excluded_terminal_history_count = Get-ObjectField $response 'excluded_terminal_history_count'
             active_foreground_task_ids = Get-ObjectField $response 'active_foreground_task_ids'
+            orphan_rows_reconciled = Get-ObjectField $response 'orphan_rows_reconciled'
+            orphan_reconcile_error = Get-ObjectField $response 'orphan_reconcile_error'
             install_gate = Get-ObjectField $response 'install_gate'
         })
     }
@@ -683,84 +679,9 @@ switch ($Action) {
         })
     }
     'Wait' {
-        if ($Compact) {
-            Assert-NodeSupervisionCapability $nodeConnection $script:DeltaWaitCapability 'Compact Wait'
-        }
-        $terminalStatuses = @('done', 'finished', 'success', 'succeeded', 'failed', 'error', 'canceled', 'cancelled', 'interrupted', 'resume_required')
-        $timer = [System.Diagnostics.Stopwatch]::StartNew()
-        $detail = $null
-        $status = ''
-        $cursor = if ($Since -ge 0) { $Since } else { 0 }
-        $initialCursor = $cursor
-        $cursorEpoch = $ExpectedCursorEpoch
-        $waitLimit = if ($PSBoundParameters.ContainsKey('Limit')) { $Limit } else { 25 }
-        $collectedEvents = New-Object System.Collections.Generic.List[object]
-        $seenEvents = @{}
-        $sawCursorReset = $false
-        $lastWaitError = $null
-        do {
-            try {
-                # Poll only a small event window. The node computes the
-                # supervision evidence summary from the complete journal.
-                $remainingEventCapacity = $waitLimit - $collectedEvents.Count
-                if ($remainingEventCapacity -le 0) { break }
-                $pageLimit = [Math]::Max(1, [Math]::Min($waitLimit, $remainingEventCapacity))
-                $remainingSeconds = [Math]::Max(1, [Math]::Min(15, [Math]::Ceiling($WaitSeconds - $timer.Elapsed.TotalSeconds)))
-                $detail = Get-TaskDetail $nodeConnection $TaskId $pageLimit $cursor $cursorEpoch $remainingSeconds
-                $record = Get-RecordFromDetail $detail
-                $status = ([string](Get-ObjectField $record 'status')).ToLowerInvariant()
-                if (Merge-TaskDeltaEvents $collectedEvents $seenEvents $detail) {
-                    $sawCursorReset = $true
-                }
-                $returnedCursor = [int](Get-ObjectField $detail 'last_event_seq')
-                $cursor = Resolve-MonotonicTaskCursor $cursor $returnedCursor `
-                    ([bool](Get-ObjectField $detail 'cursor_reset')) `
-                    ([int](Get-ObjectField $detail 'resume_cursor'))
-                $returnedEpoch = [string](Get-ObjectField $detail 'cursor_epoch')
-                if (-not [string]::IsNullOrWhiteSpace($returnedEpoch)) { $cursorEpoch = $returnedEpoch }
-                if ($terminalStatuses -contains $status -or $status -eq 'waiting_approval') { break }
-                if ($collectedEvents.Count -ge $waitLimit) { break }
-                if ((Get-ObjectField $detail 'has_more') -eq $true) { continue }
-            } catch {
-                $lastWaitError = $_.Exception
-                if ($timer.Elapsed.TotalSeconds -ge $WaitSeconds) {
-                    $reason = Get-WaitFailureCode $_.Exception
-                    throw "$reason`: Compact Wait exhausted its WaitSeconds boundary."
-                }
-            }
-            $remainingSleepMs = [Math]::Floor(($WaitSeconds - $timer.Elapsed.TotalSeconds) * 1000)
-            if ($remainingSleepMs -gt 0) { Start-Sleep -Milliseconds ([Math]::Min(2000, $remainingSleepMs)) }
-        } while ($timer.Elapsed.TotalSeconds -lt $WaitSeconds)
-        if ($null -eq $detail -and $null -ne $lastWaitError) {
-            $reason = Get-WaitFailureCode $lastWaitError
-            throw "$reason`: Compact Wait exhausted its WaitSeconds boundary."
-        }
-        $isTerminal = $terminalStatuses -contains $status
-        $resultDetail = if ($Compact) {
-            Select-TaskDeltaChanges `
-                (Convert-ToCompactTaskDetail $detail ($collectedEvents.ToArray()) $isTerminal) `
-                $ExpectedStateDigest $ExpectedEvidenceDigest
-        } else { $detail }
-        Convert-ToJsonResult ([ordered]@{
-            ok = $true; action = 'Wait'; protocol = $script:SupervisionProtocol
-            node_url = $nodeConnection.BaseUrl; task_id = $TaskId; status = $status
-            since = $(if ($Since -ge 0) { $Since } else { 0 }); limit = $waitLimit
-            next_cursor = $cursor; detail = $resultDetail
-            cursor_reset = [bool]($sawCursorReset -or (Get-ObjectField $detail 'cursor_reset'))
-            requested_cursor = Get-ObjectField $detail 'requested_cursor'
-            old_cursor = Get-ObjectField $detail 'old_cursor'
-            new_cursor = Get-ObjectField $detail 'new_cursor'
-            resume_cursor = Get-ObjectField $detail 'resume_cursor'
-            cursor_epoch = Get-ObjectField $detail 'cursor_epoch'
-            requested_cursor_epoch = Get-ObjectField $detail 'requested_cursor_epoch'
-            previous_cursor_epoch = Get-ObjectField $detail 'previous_cursor_epoch'
-            sidecar_update_epoch = Get-ObjectField $detail 'sidecar_update_epoch'
-            delta_from = $initialCursor
-            delta_to = $cursor
-            delta_event_count = $collectedEvents.Count
-            state_digest = $(if ($Compact) { Get-ObjectField $resultDetail 'state_digest' } else { $null })
-            delta_schema = $(if ($Compact) { $script:TaskDeltaSchema } else { $null })
-        })
+        Invoke-SupervisedWait $nodeConnection $TaskId ([bool]$Compact) $WaitSeconds $Since `
+            $Limit ([bool]$PSBoundParameters.ContainsKey('Limit')) $ExpectedCursorEpoch `
+            $ExpectedStateDigest $ExpectedEvidenceDigest
     }
     'Review' {
         Assert-NodeSupervisionCapability $nodeConnection $script:DesktopReviewCapability 'Desktop Review'

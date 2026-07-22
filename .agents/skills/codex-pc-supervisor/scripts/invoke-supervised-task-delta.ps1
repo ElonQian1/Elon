@@ -95,6 +95,7 @@ function Convert-ToCompactTaskDetail {
         phase = Get-ObjectField $runtime 'phase'; current_command = Get-ObjectField $runtime 'current_command'
         last_progress = Get-ObjectField $runtime 'last_progress'; heartbeat = Get-ObjectField $runtime 'heartbeat'
         idle_duration = Get-ObjectField $runtime 'idle_duration'; timeout_policy = Get-ObjectField $runtime 'timeout_policy'
+        dispatch = Get-ObjectField $runtime 'dispatch'
     }
     # heartbeat and idle_duration are liveness observations derived from time.
     # Repeating them must not force the complete semantic state body to be sent
@@ -103,6 +104,7 @@ function Convert-ToCompactTaskDetail {
     $semanticRuntime = [ordered]@{
         phase = $runtimeSnapshot.phase; current_command = $runtimeSnapshot.current_command
         last_progress = $runtimeSnapshot.last_progress; timeout_policy = $runtimeSnapshot.timeout_policy
+        dispatch = $runtimeSnapshot.dispatch
     }
     return [ordered]@{
         record = $recordSnapshot

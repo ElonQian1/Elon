@@ -91,7 +91,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         receipt.as_ref(),
         crate::node_agent_local_task_resume::ResumeWorkspaceMode::Inspect,
     )
-    .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    .map_err(resume_workspace_error)?;
     validate_migration_lineage(runtime, &parent, &parent_contract, &resolved)
         .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
     validate_orphan_occupancy(runtime, &parent, &parent_contract, &resolved)
@@ -117,7 +117,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         receipt.as_ref(),
         crate::node_agent_local_task_resume::ResumeWorkspaceMode::Inspect,
     )
-    .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    .map_err(resume_workspace_error)?;
     validate_migration_lineage(runtime, &parent, &parent_contract, &resolved)
         .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
     let orphan_occupancy = validate_orphan_occupancy(runtime, &parent, &parent_contract, &resolved)
@@ -139,15 +139,22 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         conversation_id: parent.conversation_id.clone(),
         runtime_permission: Some("full_access".to_string()),
     };
+    let inherited_workspace_exists =
+        FsPath::new(&resolved.inherited_workspace.workspace_path).exists();
+    let authorization_path = if inherited_workspace_exists {
+        resolved.inherited_workspace.workspace_path.as_str()
+    } else {
+        resolved.authorized_workspace_path.as_str()
+    };
     crate::node_agent_full_access::require_route_a_full_access_grant(
         &runtime.full_access_grants,
         &identity,
         "codex",
         Some("full_access"),
         Some(&authorization_context),
-        Some(&resolved.authorized_workspace_path),
+        Some(authorization_path),
         false,
-        None,
+        inherited_workspace_exists.then_some(&parent),
     )
     .await
     .map_err(|error| json_error(StatusCode::FORBIDDEN, error.to_string()))?;
@@ -229,7 +236,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
             receipt.as_ref(),
             crate::node_agent_local_task_resume::ResumeWorkspaceMode::Acquire,
         )
-        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+        .map_err(resume_workspace_error)?;
     }
     if resolved.snapshot_continue_required {
         let data_paths = runtime.node_data_root.read().await.paths.clone();
@@ -567,6 +574,18 @@ fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
         .into_response()
 }
 
+fn resume_workspace_error(error: anyhow::Error) -> Response {
+    let message = error.to_string();
+    if message.contains("续跑请求只能引用父任务原授权根或其已记录的隔离 worktree")
+    {
+        return json_error(
+            StatusCode::FORBIDDEN,
+            format!("WORKSPACE_IDENTITY_MISMATCH: {message}"),
+        );
+    }
+    json_error(StatusCode::CONFLICT, message)
+}
+
 fn internal_error(error: anyhow::Error) -> Response {
     json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
 }
@@ -612,5 +631,13 @@ mod snapshot_continue_tests {
                 .to_string()
                 .contains("不可重复")
         );
+    }
+
+    #[tokio::test]
+    async fn external_resume_workspace_mismatch_is_forbidden() {
+        let response = resume_workspace_error(anyhow::anyhow!(
+            "续跑请求只能引用父任务原授权根或其已记录的隔离 worktree。"
+        ));
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
     }
 }

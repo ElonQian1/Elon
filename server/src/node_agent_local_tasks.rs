@@ -190,6 +190,11 @@ async fn get_task(
         Ok(receipt) => receipt,
         Err(error) => return internal_error(error),
     };
+    let update_recovery_receipts = match runtime.update_recovery.receipts_for_task(&record.task_id)
+    {
+        Ok(receipts) => receipts,
+        Err(error) => return internal_error(error),
+    };
     let resume_workspace_status =
         crate::node_agent_local_task_resume_routes::inspect_resume_workspace_status(
             &runtime,
@@ -217,6 +222,7 @@ async fn get_task(
         "runtime": runtime_status,
         "supervision": supervision,
         "update_recovery": update_recovery,
+        "update_recovery_receipts": update_recovery_receipts,
         "resume_workspace_status": resume_workspace_status,
     }))
     .into_response()

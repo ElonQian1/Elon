@@ -132,11 +132,11 @@ pub(crate) fn proven_stale_cancelled_tasks(
             continue;
         }
         let snapshot = journal.snapshot(&task.task_id, 0, 1)?;
-        if snapshot
-            .record
-            .as_ref()
-            .and_then(|record| record.cancel_intent.as_ref())
-            .is_none()
+        let Some(record) = snapshot.record.as_ref() else {
+            continue;
+        };
+        if record.cancel_intent.is_none()
+            || crate::node_agent_local_task_orphan_reconcile::recorded_process_is_live(record)?
         {
             continue;
         }
@@ -177,8 +177,16 @@ fn checkpoint_active_update_transactions(
         let replayable_sidecar = sidecar.as_ref().is_some_and(|session| {
             session.can_replay_output_at(crate::node_agent_cli_sidecar::now_ms())
         });
+        let journal_process_live = journal
+            .snapshot(&task.task_id, 0, 1)?
+            .record
+            .as_ref()
+            .map(crate::node_agent_local_task_orphan_reconcile::recorded_process_is_live)
+            .transpose()?
+            .unwrap_or(false);
         let live_execution = live_sidecar
             || replayable_sidecar
+            || journal_process_live
             || fresh_runtime_handle_task_ids.contains(&task.task_id);
         if live_execution {
             decision.live_execution_task_ids.push(task.task_id.clone());
@@ -202,11 +210,6 @@ fn checkpoint_active_update_transactions(
                         && classification.finished_at_ms == task.finished_at_ms
                         && classification.excluded_from_install_blockers
                         && !classification.ambiguous_recovery_receipts
-                        && (classification.terminal_recovery_receipt
-                            || classification
-                                .resume_ineligibility_proof
-                                .as_deref()
-                                .is_some_and(|reason| !reason.trim().is_empty()))
                 })
             && !live_execution
         {

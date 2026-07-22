@@ -210,6 +210,12 @@ fn journal_record_protects(
     if now.saturating_sub(heartbeat) <= stale_after_ms {
         return Ok(true);
     }
+    recorded_process_is_live(record)
+}
+
+pub(crate) fn recorded_process_is_live(
+    record: &crate::node_agent_task_journal::TaskJournalRecord,
+) -> Result<bool> {
     let Some(pid) = record.os_pid else {
         return Ok(false);
     };
@@ -367,6 +373,7 @@ mod tests {
             last_progress_ms: None,
             heartbeat_at_ms: Some(0),
             timeout_policy: None,
+            dispatch: None,
             started_at_ms: 0,
             updated_at_ms: 0,
             cancel_requested_at_ms: None,
@@ -403,6 +410,7 @@ mod tests {
             last_progress_ms: None,
             heartbeat_at_ms: Some(0),
             timeout_policy: None,
+            dispatch: None,
             started_at_ms: 0,
             updated_at_ms: 0,
             cancel_requested_at_ms: None,

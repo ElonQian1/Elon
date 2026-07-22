@@ -17,6 +17,12 @@ use crate::{
 
 pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
     let credentials = runtime.creds().await.context("节点当前没有已绑定身份")?;
+    let (orphan_rows_reconciled, orphan_reconcile_error) =
+        match crate::node_agent_local_task_orphan_reconcile::reconcile_once(runtime.as_ref()).await
+        {
+            Ok(count) => (count, None),
+            Err(error) => (0, Some(error.to_string())),
+        };
     let fresh_handles = runtime
         .active_cli_prompts
         .views_without_approvals()
@@ -52,8 +58,11 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         };
         let (recovery_receipt_count, terminal_recovery_receipt_count, terminal_recovery_receipt) =
             recovery_receipt_evidence(&recovery_ledger, &task.task_id);
-        let ambiguous_recovery_receipts =
-            recovery_receipt_count > 1 && terminal_recovery_receipt_count != recovery_receipt_count;
+        let ambiguous_recovery_receipts = recovery_receipt_count > 1
+            && runtime
+                .update_recovery
+                .receipt_for_task(&task.task_id)
+                .is_err();
         let contract = load_supervision_contract(&runtime.task_journal, &task.task_id)?;
         let resume = crate::node_agent_local_task_resume_routes::inspect_resume_workspace_status(
             &runtime,
@@ -75,21 +84,39 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
             })
             .flatten();
         let fresh_runtime_handle = fresh_handles.contains(&task.task_id);
-        let base_terminal = task.status == "resume_required" && task.finished_at_ms.is_some();
-        let no_execution_owner = !fresh_runtime_handle && !live_sidecar && !replayable_sidecar;
+        let live_journal_process = snapshot
+            .record
+            .as_ref()
+            .map(crate::node_agent_local_task_orphan_reconcile::recorded_process_is_live)
+            .transpose()?
+            .unwrap_or(false);
+        let cancel_intent_persisted = snapshot
+            .record
+            .as_ref()
+            .and_then(|record| record.cancel_intent.as_ref())
+            .is_some();
+        let cancel_side_effect_committed = snapshot
+            .record
+            .as_ref()
+            .and_then(|record| record.cancel_intent.as_ref())
+            .and_then(|intent| intent.side_effect.as_ref())
+            .is_some();
+        let resumable_checkpoint =
+            task.status == "resume_required" && task.finished_at_ms.is_some();
+        let durable_cancelled = task.status == "cancel_requested" && cancel_intent_persisted;
+        let persisted_inactive = resumable_checkpoint || durable_cancelled;
+        let no_execution_owner =
+            !fresh_runtime_handle && !live_sidecar && !replayable_sidecar && !live_journal_process;
         let no_unsafe_wait = pending_approval_ids.is_empty() && non_repeatable_action.is_none();
-        let terminal_proof = terminal_exclusion_proven(
-            terminal_recovery_receipt,
-            resume_ineligibility_proof.as_deref(),
-        );
-        let excluded = base_terminal
+        let excluded = persisted_inactive
             && no_execution_owner
             && no_unsafe_wait
-            && !ambiguous_recovery_receipts
-            && terminal_proof;
+            && !ambiguous_recovery_receipts;
         let reason = classification_reason(
             excluded,
-            base_terminal,
+            persisted_inactive,
+            durable_cancelled,
+            cancel_side_effect_committed,
             no_execution_owner,
             no_unsafe_wait,
             ambiguous_recovery_receipts,
@@ -103,12 +130,15 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
             fresh_runtime_handle,
             live_sidecar,
             replayable_sidecar,
+            live_journal_process,
             pending_approval_ids,
             non_repeatable_action,
             terminal_recovery_receipt,
             recovery_receipt_count,
             terminal_recovery_receipt_count,
             ambiguous_recovery_receipts,
+            cancel_intent_persisted,
+            cancel_side_effect_committed,
             resume_eligible,
             resume_ineligibility_proof,
             excluded_from_install_blockers: excluded,
@@ -137,7 +167,8 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         safe_checkpoint_count: current.safe_checkpoint_count,
         capability: "local_update_gate_reconcile_v1".to_string(),
         reason: (!blockers.is_empty()).then(|| {
-            "one or more update candidates still lack terminal exclusion proof".to_string()
+            "one or more update candidates retain live ownership or unsafe audit evidence"
+                .to_string()
         }),
         excluded_terminal_history_count: excluded_count,
         reconcile_id: Some(reconcile_id.clone()),
@@ -152,6 +183,8 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         "idempotency": "stable_reconcile_id",
         "reconcile_id": reconcile_id,
         "install_may_proceed": blockers.is_empty(),
+        "orphan_rows_reconciled": orphan_rows_reconciled,
+        "orphan_reconcile_error": orphan_reconcile_error,
         "excluded_terminal_history_count": excluded_count,
         "active_foreground_task_ids": blockers,
         "install_gate": gate,
@@ -172,7 +205,9 @@ fn blocked_identity(
 
 fn classification_reason(
     excluded: bool,
-    base_terminal: bool,
+    persisted_inactive: bool,
+    durable_cancelled: bool,
+    cancel_side_effect_committed: bool,
     no_execution_owner: bool,
     no_unsafe_wait: bool,
     ambiguous_recovery_receipts: bool,
@@ -180,15 +215,25 @@ fn classification_reason(
     resume_eligible: Option<bool>,
 ) -> String {
     if excluded {
-        return if terminal_receipt {
-            "terminal resume_required task with only failed/verified recovery receipts and no remaining execution ownership"
+        return if durable_cancelled {
+            if cancel_side_effect_committed {
+                "durable cancel side effect is committed and no execution owner or unsafe wait remains"
+            } else {
+                "durable cancel intent has no remaining execution owner or unsafe wait"
+            }
+        } else if terminal_receipt {
+            "resume_required checkpoint has compatible terminal recovery receipts and no execution owner or unsafe wait remains"
         } else {
-            "terminal resume_required task is explicitly ineligible for resume and has no remaining execution ownership"
+            "resume_required checkpoint has no execution owner or unsafe wait and remains available for explicit Resume"
         }.to_string();
     }
-    if !base_terminal {
-        return "status or finished_at does not prove a terminal resume_required history row"
-            .to_string();
+    if !persisted_inactive {
+        return if !cancel_side_effect_committed && resume_eligible.is_none() {
+            "status does not prove a durable resume checkpoint or committed cancellation"
+        } else {
+            "task is not a durable inactive resume/cancel checkpoint"
+        }
+        .to_string();
     }
     if !no_execution_owner {
         return "fresh runtime handle or live/replayable sidecar still owns the task".to_string();
@@ -200,18 +245,7 @@ fn classification_reason(
         return "multiple update recovery receipts target the task; terminal proof is ambiguous"
             .to_string();
     }
-    if resume_eligible == Some(true) {
-        return "task remains eligible for resume".to_string();
-    }
-    "terminal recovery eligibility is unknown and no failed/verified receipt exists".to_string()
-}
-
-fn terminal_exclusion_proven(
-    terminal_recovery_receipt: bool,
-    resume_ineligibility_proof: Option<&str>,
-) -> bool {
-    terminal_recovery_receipt
-        || resume_ineligibility_proof.is_some_and(|reason| !reason.trim().is_empty())
+    "persisted inactive task remains fail-closed for an unclassified reason".to_string()
 }
 
 fn recovery_receipt_evidence(ledger: &UpdateRecoveryLedger, task_id: &str) -> (usize, usize, bool) {
@@ -249,32 +283,50 @@ fn stable_reconcile_id(
 
 #[cfg(test)]
 mod tests {
-    use super::{classification_reason, recovery_receipt_evidence, terminal_exclusion_proven};
+    use super::{classification_reason, recovery_receipt_evidence, stable_reconcile_id};
     use crate::node_agent_update_recovery::{
-        UpdateRecoveryLedger, UpdateRecoveryReceipt, UpdateRecoveryState,
+        UpdateGateTaskClassification, UpdateRecoveryLedger, UpdateRecoveryReceipt,
+        UpdateRecoveryState,
     };
 
     #[test]
     fn unknown_resume_evidence_stays_fail_closed() {
         assert!(
-            classification_reason(false, true, true, true, false, false, None).contains("unknown")
+            classification_reason(false, false, false, false, true, true, false, false, None)
+                .contains("does not prove")
         );
     }
 
     #[test]
     fn active_execution_owner_stays_blocking() {
-        assert!(
-            classification_reason(false, true, false, true, false, true, Some(false))
-                .contains("sidecar")
-        );
+        assert!(classification_reason(
+            false,
+            true,
+            false,
+            false,
+            false,
+            true,
+            false,
+            true,
+            Some(false)
+        )
+        .contains("sidecar"));
     }
 
     #[test]
     fn duplicate_recovery_receipts_stay_blocking_without_aborting_reconcile() {
-        assert!(
-            classification_reason(false, true, true, true, true, false, Some(false))
-                .contains("ambiguous")
-        );
+        assert!(classification_reason(
+            false,
+            true,
+            false,
+            false,
+            true,
+            true,
+            true,
+            false,
+            Some(false)
+        )
+        .contains("ambiguous"));
 
         let mut ledger = UpdateRecoveryLedger::default();
         let mut first = UpdateRecoveryReceipt::planned("update-a", "root-a", "task-a");
@@ -289,12 +341,46 @@ mod tests {
     }
 
     #[test]
-    fn generic_ineligible_without_durable_reason_is_not_terminal_proof() {
-        assert!(!terminal_exclusion_proven(false, None));
-        assert!(terminal_exclusion_proven(
-            false,
-            Some("terminal workspace snapshot was rejected")
-        ));
-        assert!(terminal_exclusion_proven(true, None));
+    fn durable_cancel_intent_is_excluded_after_execution_ownership_is_gone() {
+        assert!(
+            classification_reason(true, true, true, true, true, true, false, false, None)
+                .contains("cancel side effect")
+        );
+        assert!(
+            classification_reason(true, true, true, false, true, true, false, false, None)
+                .contains("cancel intent")
+        );
+        assert!(
+            classification_reason(false, false, false, false, true, true, false, false, None)
+                .contains("does not prove")
+        );
+    }
+
+    #[test]
+    fn reconcile_id_is_idempotent_and_live_ownership_changes_the_audit() {
+        let inactive = UpdateGateTaskClassification {
+            task_id: "task-a".to_string(),
+            status: "resume_required".to_string(),
+            finished_at_ms: Some(10),
+            excluded_from_install_blockers: true,
+            reason: "durable inactive checkpoint".to_string(),
+            ..Default::default()
+        };
+        let first = stable_reconcile_id("release-a", std::slice::from_ref(&inactive)).unwrap();
+        let second = stable_reconcile_id("release-a", std::slice::from_ref(&inactive)).unwrap();
+        assert_eq!(
+            first, second,
+            "consecutive reconcile passes must be idempotent"
+        );
+
+        let mut live = inactive;
+        live.fresh_runtime_handle = true;
+        live.excluded_from_install_blockers = false;
+        live.reason = "fresh runtime handle still owns the task".to_string();
+        assert_ne!(
+            first,
+            stable_reconcile_id("release-a", &[live]).unwrap(),
+            "a real live handle must remain visible to the install audit"
+        );
     }
 }

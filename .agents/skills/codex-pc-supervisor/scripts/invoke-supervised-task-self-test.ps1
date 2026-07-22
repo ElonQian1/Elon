@@ -188,6 +188,15 @@ function Invoke-SupervisionSelfTest {
             last_progress = 1784361600000
             heartbeat = 1784361605000
             idle_duration = 5
+            dispatch = [ordered]@{
+                schema = 'elon.task_dispatch_progress.v1'
+                stage = 'active'
+                stages = @([ordered]@{
+                    stage = 'build_admission_cache_telemetry'
+                    duration_ms = 25
+                    outcome = 'completed'
+                })
+            }
         }
         supervision = [ordered]@{ evidence = [ordered]@{
             event_count = 99
@@ -245,6 +254,11 @@ function Invoke-SupervisionSelfTest {
         'timeout', [System.Net.WebExceptionStatus]::Timeout))
     $unreachableFailure = Get-WaitFailureCode ([System.Net.WebException]::new(
         'connect', [System.Net.WebExceptionStatus]::ConnectFailure))
+    $apiFailure = Get-WaitFailureCode ([System.Exception]::new(
+        'Node API returned HTTP 500: structured failure'))
+    $genericFailure = Get-WaitFailureCode ([System.Exception]::new('unexpected parse failure'))
+    $noChangeOutcome = Resolve-WaitOutcome $false 'running' 0 $false $true
+    $changedOutcome = Resolve-WaitOutcome $false 'running' 1 $false $false
     $invalidDeltaRejected = $false
     try {
         $null = Merge-TaskDeltaEvents $deltaEvents $deltaSeen ([pscustomobject]@{
@@ -349,6 +363,7 @@ function Invoke-SupervisionSelfTest {
             $null -eq (Get-ObjectField $testBindingBody 'user_token')
         inspect_wait_active = $activeCompact.record.status -eq 'running' -and
             $activeCompact.runtime.phase -eq 'verification' -and
+            $activeCompact.runtime.dispatch.stage -eq 'active' -and
             $activeCompact.last_event_seq -eq 42 -and
             $activeCompact.events[0].type -eq 'recovery_running'
         compact_delta_omits_repeated_evidence_arrays = $null -eq $activeCompact.terminal_evidence -and
@@ -367,6 +382,10 @@ function Invoke-SupervisionSelfTest {
         epoch_reset_uses_resume_cursor = $resetPageCursor -eq 7
         compact_wait_timeout_classified = $timeoutFailure -eq 'request_timeout'
         compact_wait_unreachable_classified = $unreachableFailure -eq 'node_unreachable'
+        compact_wait_api_error_not_unreachable = $apiFailure -eq 'node_api_error' -and
+            $genericFailure -eq 'request_failed'
+        compact_wait_no_change_outcome = $noChangeOutcome -eq 'no_change_timeout' -and
+            $changedOutcome -eq 'changed'
         compact_delta_invalid_epoch_rejected = $invalidDeltaRejected
         criteria_json = $jsonCriteria.Count -eq 2 -and
             $jsonCriteria[1] -ceq (ConvertFrom-Utf8Base64 '5p2h5Lu25LqM')
@@ -401,6 +420,7 @@ function Invoke-SupervisionSelfTest {
             'compact_delta_ignores_volatile_liveness', 'compact_delta_omits_unchanged_terminal_evidence',
             'compact_delta_dictionary_field_access',
             'compact_wait_timeout_classified', 'compact_wait_unreachable_classified',
+            'compact_wait_api_error_not_unreachable', 'compact_wait_no_change_outcome',
             'criteria_json_array', 'criteria_utf8_file'
         )
     })
