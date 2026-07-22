@@ -66,6 +66,8 @@ pub(crate) struct TaskJournalRecord {
     #[serde(default)]
     pub process_started_at_ms: Option<u128>,
     #[serde(default)]
+    pub process_identity: Option<String>,
+    #[serde(default)]
     pub codex_session_id: Option<String>,
     #[serde(default)]
     pub codex_session_scope_key: Option<String>,
@@ -178,6 +180,7 @@ impl TaskJournal {
                 runtime_permission: start.runtime_permission.map(str::to_string),
                 os_pid: None,
                 process_started_at_ms: None,
+                process_identity: None,
                 codex_session_id: None,
                 codex_session_scope_key: None,
                 codex_session_updated_at_ms: None,
@@ -286,10 +289,12 @@ impl TaskJournal {
     pub(crate) fn record_process_started(&self, req_id: &str, pid: u32) -> Result<()> {
         with_task_journal_io_lock(|| {
             let now = now_ms();
+            let process_identity = crate::node_agent_cli_worker::process_identity(pid);
             let mut registry = self.load_registry()?;
             if let Some(record) = registry.get_mut(req_id) {
                 record.os_pid = Some(pid);
                 record.process_started_at_ms = Some(now);
+                record.process_identity.clone_from(&process_identity);
                 record.updated_at_ms = now;
             }
             self.save_registry(&registry)?;
@@ -297,6 +302,7 @@ impl TaskJournal {
                 "type": "process_started",
                 "req_id": req_id,
                 "pid": pid,
+                "process_identity": process_identity,
                 "at_ms": now
             }))
         })

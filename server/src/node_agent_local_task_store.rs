@@ -3,10 +3,14 @@ use anyhow::{bail, Context, Result};
 use homecli_proto::CliCompletionEnvelope;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
-use std::{collections::HashSet, path::PathBuf};
+#[cfg(test)]
+use std::collections::HashSet;
+use std::path::PathBuf;
 
 #[path = "node_agent_local_post_idempotency.rs"]
 pub(crate) mod idempotency;
+#[path = "node_agent_local_task_store_orphan.rs"]
+mod orphan;
 #[path = "node_agent_local_task_store_reconcile.rs"]
 pub(crate) mod reconcile;
 #[path = "node_agent_local_task_store_safety.rs"]
@@ -248,48 +252,6 @@ impl LocalTaskStore {
         )?;
         tx.commit()?;
         Ok(changed > 0)
-    }
-
-    /// Preserve one-click recovery when every runtime ownership signal is stale.
-    pub(crate) fn mark_stale_without_runtime(
-        &self,
-        protected_req_ids: &HashSet<String>,
-        started_before_ms: i64,
-    ) -> Result<usize> {
-        let mut conn = self.open()?;
-        let tx = conn.transaction()?;
-        let running_ids = {
-            let mut stmt = tx.prepare(
-                "SELECT task_id FROM local_tasks
-                  WHERE status IN ('running','recovering','reattaching')
-                    AND completion_event_id IS NULL
-                    AND started_at_ms <= ?1",
-            )?;
-            let ids = stmt
-                .query_map([started_before_ms], |row| row.get::<_, String>(0))?
-                .collect::<rusqlite::Result<Vec<_>>>()?;
-            ids
-        };
-        let mut changed = 0;
-        for task_id in running_ids {
-            if protected_req_ids.contains(&task_id) {
-                continue;
-            }
-            changed += tx.execute(
-                "UPDATE local_tasks
-                    SET status = 'resume_required',
-                        error = '本机执行句柄、进程、sidecar 与 heartbeat 均已过期：工作区、journal 和 completion outbox 已保留，请点击 Resume 检查现场后续跑',
-                        sync_state = 'local_only',
-                        finished_at_ms = ?1
-                  WHERE task_id = ?2
-                    AND status IN ('running','recovering','reattaching')
-                    AND completion_event_id IS NULL
-                    AND started_at_ms <= ?3",
-                params![now_ms(), task_id, started_before_ms],
-            )?;
-        }
-        tx.commit()?;
-        Ok(changed)
     }
 
     pub(crate) fn get(&self, task_id: &str) -> Result<Option<LocalTaskRecord>> {

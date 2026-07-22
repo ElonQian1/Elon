@@ -2,6 +2,7 @@
 //! NodeRuntime — PC 节点的核心运行时状态：凭证、CLI 状态、任务注册表、lifecycle。
 //! 从 node_agent_main.rs 抽取，保持原有公共接口不变。
 
+use anyhow::Context;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -245,6 +246,39 @@ impl NodeRuntime {
         handle: node_agent_active_task::ActiveCliPromptHandle,
     ) -> node_agent_active_task_registry::CliPromptRegistration {
         self.active_cli_prompts.try_insert_with_status(handle).await
+    }
+
+    pub(crate) async fn try_register_supervised_cli_prompt(
+        &self,
+        handle: node_agent_active_task::ActiveCliPromptHandle,
+        admission: Option<&crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard>,
+    ) -> anyhow::Result<node_agent_active_task_registry::CliPromptRegistration> {
+        let workspace = handle
+            .cwd()
+            .map(Path::new)
+            .context("supervised CLI handle is missing its workspace")?;
+        let owned_admission;
+        let admission = match admission {
+            Some(admission) => {
+                admission.ensure_covers(workspace)?;
+                admission
+            }
+            None => {
+                owned_admission =
+                    crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire(
+                        workspace,
+                    )?;
+                &owned_admission
+            }
+        };
+        admission.ensure_covers(workspace)?;
+        let req_id = handle.req_id().to_string();
+        let registered = self.active_cli_prompts.try_insert_with_status(handle).await;
+        if registered == node_agent_active_task_registry::CliPromptRegistration::Inserted {
+            self.local_tasks
+                .restore_running_after_orphan_claim(&req_id)?;
+        }
+        Ok(registered)
     }
 
     pub(crate) async fn cancel_cli_prompt(&self, req_id: &str) -> bool {

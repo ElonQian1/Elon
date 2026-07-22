@@ -62,6 +62,8 @@ struct TaskContract {
 
 pub(crate) struct TerminalFinalizationPreflight<'a> {
     identity: Option<&'a VerifiedTerminalLeaseIdentity>,
+    receipt_root: Option<PathBuf>,
+    task_id: Option<String>,
     receipt_path: Option<PathBuf>,
     original_bytes: Option<Vec<u8>>,
     receipt: Option<TerminalFinalizationReceipt>,
@@ -74,6 +76,8 @@ impl<'a> TerminalFinalizationPreflight<'a> {
     pub(crate) fn not_applicable() -> Self {
         Self {
             identity: None,
+            receipt_root: None,
+            task_id: None,
             receipt_path: None,
             original_bytes: None,
             receipt: None,
@@ -87,8 +91,26 @@ impl<'a> TerminalFinalizationPreflight<'a> {
         let Some(identity) = self.identity else {
             return Ok(());
         };
+        let receipt_root = self
+            .receipt_root
+            .as_deref()
+            .context("terminal receipt root missing")?;
+        let task_id = self
+            .task_id
+            .as_deref()
+            .context("terminal task id missing")?;
         match self.lease.context("terminal lease expectation missing")? {
             TerminalLeaseExpectation::Exact => {
+                anyhow::ensure!(
+                    find_receipt(
+                        receipt_root,
+                        &identity.root_task_id,
+                        &identity.active,
+                        Some(task_id),
+                    )?
+                    .is_none(),
+                    "failed or canceled completion refuses a finalization receipt"
+                );
                 identity.revalidate_lease(TerminalLeaseExpectation::Exact)
             }
             TerminalLeaseExpectation::Missing => {
@@ -96,14 +118,20 @@ impl<'a> TerminalFinalizationPreflight<'a> {
                     .receipt_path
                     .as_ref()
                     .context("terminal receipt path missing")?;
-                let current = fs::read(path)
-                    .with_context(|| format!("reread terminal receipt {}", path.display()))?;
+                let (current_path, current_receipt, current) = find_receipt(
+                    receipt_root,
+                    &identity.root_task_id,
+                    &identity.active,
+                    Some(task_id),
+                )?
+                .context("terminal finalization receipt disappeared after preflight")?;
                 anyhow::ensure!(
-                    self.original_bytes.as_deref() == Some(current.as_slice()),
+                    current_path == *path
+                        && self.original_bytes.as_deref() == Some(current.as_slice()),
                     "terminal finalization receipt changed after preflight"
                 );
                 validate_completed_identity(
-                    self.receipt.as_ref().context("terminal receipt missing")?,
+                    &current_receipt,
                     identity,
                     self.contract_root.as_deref(),
                 )?;
@@ -118,8 +146,17 @@ impl<'a> TerminalFinalizationPreflight<'a> {
                     crate::node_agent_atomic_file::write(path, &serde_json::to_vec(receipt)?)?;
                 }
                 let durable_check = (|| {
-                    let (durable, _) = read_receipt(path)?
-                        .context("terminal finalization receipt disappeared after binding")?;
+                    let (durable_path, durable, _) = find_receipt(
+                        receipt_root,
+                        &identity.root_task_id,
+                        &identity.active,
+                        Some(task_id),
+                    )?
+                    .context("terminal finalization receipt disappeared after binding")?;
+                    anyhow::ensure!(
+                        durable_path == *path,
+                        "terminal finalization receipt path changed after binding"
+                    );
                     assert_binding(&durable, completion)?;
                     identity.revalidate_lease(TerminalLeaseExpectation::Missing)
                 })();
@@ -166,8 +203,11 @@ fn preflight_with_roots<'a>(
         completion.exit_ok,
         completion.error.as_deref(),
     );
+    let receipt_root = receipt_root
+        .map(Path::to_path_buf)
+        .unwrap_or_else(default_receipt_root);
     let located = find_receipt(
-        receipt_root.unwrap_or(&default_receipt_root()),
+        &receipt_root,
         &identity.root_task_id,
         &identity.active,
         Some(&completion.req_id),
@@ -179,6 +219,8 @@ fn preflight_with_roots<'a>(
         );
         return Ok(TerminalFinalizationPreflight {
             identity: Some(identity),
+            receipt_root: Some(receipt_root),
+            task_id: Some(completion.req_id.clone()),
             receipt_path: None,
             original_bytes: None,
             receipt: None,
@@ -207,6 +249,8 @@ fn preflight_with_roots<'a>(
     }
     Ok(TerminalFinalizationPreflight {
         identity: Some(identity),
+        receipt_root: Some(receipt_root),
+        task_id: Some(completion.req_id.clone()),
         receipt_path: Some(path),
         original_bytes: Some(bytes),
         receipt: Some(receipt),
@@ -423,20 +467,6 @@ fn assert_binding(
             .context("boundAtUtc missing")?,
         "boundAtUtc",
     )
-}
-
-fn read_receipt(path: &Path) -> Result<Option<(TerminalFinalizationReceipt, Vec<u8>)>> {
-    if !path.exists() {
-        return Ok(None);
-    }
-    let metadata = fs::symlink_metadata(path)?;
-    anyhow::ensure!(
-        metadata.file_type().is_file(),
-        "terminal receipt is not a regular file"
-    );
-    let bytes = fs::read(path)?;
-    let receipt = serde_json::from_slice(&bytes).context("parse terminal finalization receipt")?;
-    Ok(Some((receipt, bytes)))
 }
 
 fn default_receipt_root() -> PathBuf {

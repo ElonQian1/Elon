@@ -5,9 +5,9 @@
 //! only a live PID, sidecar, current handle, or fresh journal heartbeat may keep
 //! a still-nonterminal row in `running` after that replay fails.
 
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{collections::HashSet, path::Path, sync::Arc, time::Duration};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use tracing::{info, warn};
 
 use crate::NodeRuntime;
@@ -21,14 +21,19 @@ pub(crate) async fn reconcile_once(runtime: &NodeRuntime) -> Result<usize> {
 }
 
 async fn reconcile_with_stale_after(runtime: &NodeRuntime, stale_after_ms: u128) -> Result<usize> {
-    for completion in runtime
+    let pending = runtime
         .completion_outbox
         .list_pending(COMPLETION_SCAN_LIMIT)?
         .into_iter()
         .filter(|completion| {
             completion.origin == crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN
         })
-    {
+        .collect::<Vec<_>>();
+    let observed_events = pending
+        .iter()
+        .map(|completion| completion.event_id.clone())
+        .collect::<HashSet<_>>();
+    for completion in pending {
         match crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(
             runtime,
         )
@@ -50,52 +55,218 @@ async fn reconcile_with_stale_after(runtime: &NodeRuntime, stale_after_ms: u128)
     }
 
     let now = crate::node_agent_cli_sidecar::now_ms();
-    let mut protected = runtime
-        .active_cli_prompts
-        .views_without_approvals()
-        .await
-        .into_iter()
-        .filter(|handle| handle.control_handle_live)
-        .map(|handle| handle.req_id)
-        .collect::<HashSet<_>>();
-    protected.extend(
-        runtime
-            .cli_sidecars
-            .all_sessions()?
-            .into_iter()
-            .filter(|session| session.protects_startup_reconcile_at(now))
-            .map(|session| session.task_id),
-    );
-
-    for task in runtime.local_tasks.list_update_install_candidates()? {
-        let Some(record) = runtime.task_journal.snapshot(&task.task_id, 0, 1)?.record else {
-            continue;
-        };
-        if journal_record_protects(&record, now, stale_after_ms) {
-            protected.insert(task.task_id);
-        }
-    }
     let cutoff = (now.min(i64::MAX as u128) as i64)
         .saturating_sub(stale_after_ms.min(i64::MAX as u128) as i64);
+    let candidates = runtime.local_tasks.list_update_install_candidates()?;
+    let mut changed = 0;
+    for candidate in candidates.into_iter().filter(|task| {
+        matches!(
+            task.status.as_str(),
+            "running" | "recovering" | "reattaching"
+        ) && task.completion_event_id.is_none()
+            && task.started_at_ms <= cutoff
+    }) {
+        changed += usize::from(
+            reconcile_candidate(
+                runtime,
+                &candidate.task_id,
+                now,
+                stale_after_ms,
+                cutoff,
+                &observed_events,
+            )
+            .await?,
+        );
+    }
+    Ok(changed)
+}
+
+async fn reconcile_candidate(
+    runtime: &NodeRuntime,
+    task_id: &str,
+    now: u128,
+    stale_after_ms: u128,
+    cutoff: i64,
+    observed_events: &HashSet<String>,
+) -> Result<bool> {
+    let initial = runtime
+        .local_tasks
+        .get(task_id)?
+        .context("orphan candidate disappeared before admission")?;
+    let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
+        &runtime.task_journal,
+        task_id,
+    )?;
+    let admission_base = if is_platform_supervised(&initial) {
+        let contract = contract
+            .as_ref()
+            .context("supervised orphan candidate has no durable contract")?;
+        Some(
+            crate::node_agent_supervision_terminal_lease_safety::admission_base(
+                &initial, contract, task_id,
+            )?,
+        )
+    } else {
+        None
+    };
+    let _admission = admission_base
+        .as_deref()
+        .map(crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire)
+        .transpose()?;
+
+    // Every ownership probe is repeated under the same cross-process admission
+    // guard used by Resume and supervised handle registration. The database
+    // transition follows immediately, so a pre-guard inventory can never be
+    // used as authority for resume_required.
+    let task = runtime
+        .local_tasks
+        .get(task_id)?
+        .context("orphan candidate disappeared after admission")?;
+    if !matches!(
+        task.status.as_str(),
+        "running" | "recovering" | "reattaching"
+    ) || task.completion_event_id.is_some()
+        || task.started_at_ms > cutoff
+    {
+        return Ok(false);
+    }
+    if runtime
+        .completion_outbox
+        .latest_for_req_id(task_id)?
+        .is_some_and(|completion| !observed_events.contains(&completion.event_id))
+    {
+        // The pass-wide replay may have raced with this just-arrived receipt.
+        // Preserve the row; the next bounded pass will reconcile it through the
+        // normal terminal trust boundary.
+        return Ok(false);
+    }
+
+    let active_workspace = task
+        .workspace_status
+        .as_ref()
+        .and_then(|status| status.get("active_workspace_path"))
+        .and_then(serde_json::Value::as_str)
+        .map(Path::new)
+        .unwrap_or_else(|| Path::new(&task.workspace_path));
+    if runtime
+        .active_cli_prompt_views_for_workspace(active_workspace)
+        .await
+        .into_iter()
+        .any(|handle| handle.control_handle_live)
+        || runtime
+            .active_cli_prompt_view(task_id)
+            .await
+            .is_some_and(|handle| handle.control_handle_live)
+    {
+        return Ok(false);
+    }
+    if is_platform_supervised(&task) {
+        let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
+            &runtime.task_journal,
+            task_id,
+        )?
+        .context("supervised orphan contract disappeared under admission")?;
+        let root = contract.root_task_id.as_deref().unwrap_or(task_id);
+        if crate::node_agent_supervision_terminal_lease_safety::lineage_or_workspace_is_active(
+            runtime,
+            task_id,
+            root,
+            active_workspace,
+            false,
+        )
+        .await?
+        {
+            return Ok(false);
+        }
+    }
+    if let Some(sidecar) = runtime.cli_sidecars.session_for_task(task_id)? {
+        if sidecar_record_protects(&sidecar, now)? {
+            return Ok(false);
+        }
+    }
+    if let Some(record) = runtime.task_journal.snapshot(task_id, 0, 1)?.record {
+        if journal_record_protects(&record, now, stale_after_ms)? {
+            return Ok(false);
+        }
+    }
     runtime
         .local_tasks
-        .mark_stale_without_runtime(&protected, cutoff)
+        .mark_one_stale_without_runtime(task_id, cutoff)
 }
 
 fn journal_record_protects(
     record: &crate::node_agent_task_journal::TaskJournalRecord,
     now: u128,
     stale_after_ms: u128,
-) -> bool {
-    let process_live = record
-        .os_pid
-        .is_some_and(crate::node_agent_cli_worker::process_is_running);
-    let heartbeat = record.heartbeat_at_ms.unwrap_or(record.updated_at_ms);
-    let heartbeat_fresh = now >= heartbeat && now.saturating_sub(heartbeat) <= stale_after_ms;
-    matches!(
+) -> Result<bool> {
+    if !matches!(
         record.status.as_str(),
         "running" | "recovering" | "reattaching"
-    ) && (process_live || heartbeat_fresh)
+    ) {
+        return Ok(false);
+    }
+    let heartbeat = record.heartbeat_at_ms.unwrap_or(record.updated_at_ms);
+    anyhow::ensure!(heartbeat <= now, "journal heartbeat is in the future");
+    if now.saturating_sub(heartbeat) <= stale_after_ms {
+        return Ok(true);
+    }
+    let Some(pid) = record.os_pid else {
+        return Ok(false);
+    };
+    let running = crate::node_agent_cli_worker::process_is_running(pid);
+    let current_identity = crate::node_agent_cli_worker::process_identity(pid);
+    match (
+        running,
+        record.process_identity.as_deref(),
+        current_identity,
+    ) {
+        (false, _, _) => Ok(false),
+        (true, Some(expected), Some(actual)) => Ok(expected == actual),
+        (true, _, _) => anyhow::bail!("live journal PID has no verifiable process identity"),
+    }
+}
+
+fn sidecar_record_protects(
+    session: &crate::node_agent_cli_sidecar::CliSidecarSessionRecord,
+    now: u128,
+) -> Result<bool> {
+    anyhow::ensure!(
+        session.last_seen_at_ms <= now && session.started_at_ms <= now,
+        "sidecar heartbeat is in the future"
+    );
+    if session.is_terminal() {
+        return Ok(false);
+    }
+    if session.protects_startup_reconcile_at(now) {
+        return Ok(true);
+    }
+    for (pid, identity) in [
+        (
+            session.sidecar_pid,
+            session.sidecar_process_identity.as_deref(),
+        ),
+        (session.child_pid, session.child_process_identity.as_deref()),
+    ] {
+        let Some(pid) = pid else { continue };
+        if !crate::node_agent_cli_worker::process_is_running(pid) {
+            continue;
+        }
+        let current = crate::node_agent_cli_worker::process_identity(pid);
+        match (identity, current) {
+            (Some(expected), Some(actual)) if expected == actual => return Ok(true),
+            (Some(_), Some(_)) => continue,
+            _ => anyhow::bail!("live sidecar PID has no verifiable process identity"),
+        }
+    }
+    Ok(false)
+}
+
+fn is_platform_supervised(task: &crate::node_agent_local_task_store::LocalTaskRecord) -> bool {
+    task.workspace_status
+        .as_ref()
+        .and_then(|status| status.get("platform_provenance"))
+        .and_then(serde_json::Value::as_str)
+        == Some("elon.conversation_worktree.v1")
 }
 
 pub(crate) fn spawn_reconciler(runtime: Arc<NodeRuntime>) {
@@ -186,6 +357,7 @@ mod tests {
             runtime_permission: None,
             os_pid: Some(std::process::id()),
             process_started_at_ms: Some(1),
+            process_identity: crate::node_agent_cli_worker::process_identity(std::process::id()),
             codex_session_id: None,
             codex_session_scope_key: None,
             codex_session_updated_at_ms: None,
@@ -200,12 +372,167 @@ mod tests {
             cancel_requested_at_ms: None,
             cancel_intent: None,
         };
-        assert!(journal_record_protects(&record, now, 0));
+        assert!(journal_record_protects(&record, now, 0).unwrap());
         record.os_pid = None;
+        record.process_identity = None;
         record.heartbeat_at_ms = Some(now);
-        assert!(journal_record_protects(&record, now, 1));
+        assert!(journal_record_protects(&record, now, 1).unwrap());
         record.heartbeat_at_ms = Some(0);
-        assert!(!journal_record_protects(&record, now, 1));
+        assert!(!journal_record_protects(&record, now, 1).unwrap());
+    }
+
+    #[test]
+    fn pid_reuse_does_not_protect_but_future_heartbeat_fails_closed() {
+        let now = crate::node_agent_cli_sidecar::now_ms();
+        let mut record = crate::node_agent_task_journal::TaskJournalRecord {
+            req_id: "pid-reuse".into(),
+            cli_name: "codex".into(),
+            route: None,
+            run_handle_id: None,
+            cwd: None,
+            runtime_permission: None,
+            os_pid: Some(std::process::id()),
+            process_started_at_ms: Some(1),
+            process_identity: Some("reused-pid-with-another-start-time".into()),
+            codex_session_id: None,
+            codex_session_scope_key: None,
+            codex_session_updated_at_ms: None,
+            status: "running".into(),
+            phase: "reasoning".into(),
+            current_command: None,
+            last_progress_ms: None,
+            heartbeat_at_ms: Some(0),
+            timeout_policy: None,
+            started_at_ms: 0,
+            updated_at_ms: 0,
+            cancel_requested_at_ms: None,
+            cancel_intent: None,
+        };
+        assert!(!journal_record_protects(&record, now, 0).unwrap());
+        record.os_pid = None;
+        record.process_identity = None;
+        record.heartbeat_at_ms = Some(now.saturating_add(1));
+        assert!(journal_record_protects(&record, now, 0).is_err());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn handle_inserted_through_admission_blocks_resume_required_race() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-orphan-owner-race-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let base = root.join("base");
+        let active = root.join("conversation-worktrees/project/conversation");
+        fs::create_dir_all(active.parent().unwrap()).unwrap();
+        git(&root, &["init", "-b", "main", base.to_str().unwrap()]);
+        git(&base, &["config", "user.email", "ai@example.test"]);
+        git(&base, &["config", "user.name", "AI Test"]);
+        fs::write(base.join("README.md"), "seed\n").unwrap();
+        git(&base, &["add", "README.md"]);
+        git(&base, &["commit", "-m", "seed"]);
+        git(
+            &base,
+            &[
+                "worktree",
+                "add",
+                "-b",
+                "ai/session/project/conversation",
+                active.to_str().unwrap(),
+            ],
+        );
+        let base = base.canonicalize().unwrap();
+        let active = active.canonicalize().unwrap();
+        let runtime = test_runtime(&root);
+        runtime
+            .local_tasks
+            .create(LocalTaskStart {
+                task_id: "owner-race",
+                owner_user_id: "owner",
+                agent_id: "agent",
+                install_id: "install",
+                project_id: "project",
+                channel_id: None,
+                conversation_id: "conversation",
+                workspace_path: active.to_str().unwrap(),
+                prompt: "work",
+                cli: "codex",
+                runtime_permission: "full_access",
+            })
+            .unwrap();
+        let common = git_output(
+            &active,
+            &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+        );
+        runtime
+            .local_tasks
+            .record_initial_workspace_status(
+                "owner-race",
+                &serde_json::json!({
+                    "platform_provenance":"elon.conversation_worktree.v1",
+                    "root_task_id":"owner-race", "active_workspace_path":active,
+                    "base_workspace_path":base, "project_id":"project", "isolated":true,
+                    "branch":"ai/session/project/conversation", "git_common_dir":common,
+                    "git_remote":"unused"
+                }),
+            )
+            .unwrap();
+        crate::node_agent_local_task_supervision::record_supervision_event(
+            &runtime.task_journal,
+            "owner-race",
+            "supervision_contract",
+            crate::node_agent_local_task_supervision::contract_payload(
+                &crate::node_agent_local_task_supervision::SupervisionContract {
+                    protocol: crate::node_agent_local_task_supervision::SUPERVISION_PROTOCOL.into(),
+                    supervisor: "codex_desktop".into(),
+                    task_role: "requirement".into(),
+                    parent_task_id: None,
+                    root_task_id: Some("owner-race".into()),
+                    acceptance_criteria: vec![],
+                    improvement_policy: "after_task_only".into(),
+                },
+            ),
+        )
+        .unwrap();
+        let runtime = Arc::new(runtime);
+        let admission =
+            crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire(&base)
+                .unwrap();
+        let sweep_runtime = runtime.clone();
+        let sweep =
+            tokio::spawn(
+                async move { reconcile_with_stale_after(&sweep_runtime, 0).await.unwrap() },
+            );
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let (cancel_tx, _cancel_rx) = tokio::sync::watch::channel(false);
+        let handle = crate::node_agent_active_task::ActiveCliPromptHandle::new(
+            "owner-race",
+            "codex",
+            "route_a_external_cli",
+            Some(active.to_string_lossy().to_string()),
+            Some("full_access".into()),
+            cancel_tx,
+        )
+        .with_exclusive_workspace(true);
+        assert_eq!(
+            runtime
+                .try_register_supervised_cli_prompt(handle, Some(&admission))
+                .await
+                .unwrap(),
+            crate::node_agent_active_task_registry::CliPromptRegistration::Inserted
+        );
+        drop(admission);
+        assert_eq!(sweep.await.unwrap(), 0);
+        assert_eq!(
+            runtime
+                .local_tasks
+                .get("owner-race")
+                .unwrap()
+                .unwrap()
+                .status,
+            "running"
+        );
+        drop(runtime);
+        let _ = fs::remove_dir_all(root);
     }
 
     fn test_runtime(root: &Path) -> NodeRuntime {
@@ -270,5 +597,29 @@ mod tests {
             workspace_status: None,
             created_at_ms: 10,
         }
+    }
+
+    fn git(cwd: &Path, args: &[&str]) {
+        let output = crate::git_command_error::git_command()
+            .args(args)
+            .current_dir(cwd)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    fn git_output(cwd: &Path, args: &[&str]) -> String {
+        let output = crate::git_command_error::git_command()
+            .args(args)
+            .current_dir(cwd)
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
     }
 }

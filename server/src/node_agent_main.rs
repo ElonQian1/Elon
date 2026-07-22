@@ -255,10 +255,14 @@ mod node_agent_cli_prompt_direct;
 mod node_agent_cli_prompt_runner;
 mod node_agent_cli_prompt_sidecar;
 mod node_agent_cli_task_dispatch;
+mod node_agent_cli_task_registration;
 mod node_agent_cloud_connection;
 mod node_agent_cloud_control;
 mod node_agent_codex_effort;
 mod node_agent_codex_model_compat;
+#[cfg(test)]
+#[path = "node_agent_startup_order_tests.rs"]
+mod node_agent_startup_order_tests;
 pub(crate) use node_agent_cli_prompt_runner::{
     cli_prompt_read_only,
     resolve_attachment_args,
@@ -459,8 +463,6 @@ async fn run_agent_runtime() -> Result<()> {
         warn!(%error, "启动时重放 durable cancel intent 失败，交由周期 reconcile 重试");
     }
     node_agent_sidecar_recovery::reconcile_surviving_sidecars(runtime.clone()).await;
-    runtime.reconcile_local_completion_outbox().await;
-    node_agent_local_task_orphan_reconcile::spawn_reconciler(runtime.clone());
     node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
     node_agent_restart_drain::recover_checkpoint_after_startup(&runtime.update_recovery);
     match runtime
@@ -471,6 +473,10 @@ async fn run_agent_runtime() -> Result<()> {
         Ok(false) => warn!("当前仍是 from_release 运行时，保持更新门禁等待目标版本"),
         Err(error) => warn!(%error, "记录节点更新 runtime-online 阶段失败"),
     }
+    // Orphan conversion is the last startup ownership step. Surviving sidecars,
+    // update reattach/Resume and runtime-online state must be visible first.
+    runtime.reconcile_local_completion_outbox().await;
+    node_agent_local_task_orphan_reconcile::spawn_reconciler(runtime.clone());
     runtime.spawn_lifecycle_heartbeat();
     node_agent_cancel_saga::spawn_reconciler(runtime.clone());
     node_agent_self_evolution::spawn_scheduler(runtime.clone());

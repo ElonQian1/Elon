@@ -316,6 +316,7 @@ fn legacy_resume_derives_only_from_started_cwd_and_git_registry() {
         runtime_permission: Some("full_access".to_string()),
         os_pid: None,
         process_started_at_ms: None,
+        process_identity: None,
         codex_session_id: None,
         codex_session_scope_key: None,
         codex_session_updated_at_ms: None,

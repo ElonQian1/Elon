@@ -308,6 +308,20 @@ fn fresh_heartbeat_or_live_sidecar_blocks_stale_conversion() {
 }
 
 #[test]
+fn future_sidecar_heartbeat_is_protected_but_never_treated_as_replayable() {
+    let now = now_ms();
+    let mut record = session("future-heartbeat", "future-task");
+    record.started_at_ms = now.saturating_add(1_000);
+    record.last_seen_at_ms = now.saturating_add(1_000);
+    record.sidecar_pid = None;
+    record.sidecar_process_identity = None;
+    record.child_pid = None;
+    record.child_process_identity = None;
+    assert!(record.protects_startup_reconcile_at(now));
+    assert!(!record.can_replay_after_restart_at(now));
+}
+
+#[test]
 fn restart_replay_binds_fresh_heartbeat_session_and_process_identity() {
     let now = now_ms();
     let mut record = session("bound-session", "bound-task");

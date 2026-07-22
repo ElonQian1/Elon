@@ -19,6 +19,7 @@ const REPLACE_ATTEMPTS: usize = 6;
 #[derive(Debug)]
 pub(crate) struct ResumeAdmissionGuard {
     _file: File,
+    git_common_dir: PathBuf,
 }
 
 impl ResumeAdmissionGuard {
@@ -30,7 +31,10 @@ impl ResumeAdmissionGuard {
             match try_lock(&path) {
                 Ok(file) => {
                     validate_locked_file(&path, &file)?;
-                    return Ok(Self { _file: file });
+                    return Ok(Self {
+                        _file: file,
+                        git_common_dir: common,
+                    });
                 }
                 Err(error) if is_contention(&error) && started.elapsed() < ADMISSION_WAIT => {
                     std::thread::sleep(ADMISSION_POLL);
@@ -47,6 +51,14 @@ impl ResumeAdmissionGuard {
                 }
             }
         }
+    }
+
+    pub(crate) fn ensure_covers(&self, workspace: &Path) -> Result<()> {
+        anyhow::ensure!(
+            same_path(&self.git_common_dir, &git_common_dir(workspace)?),
+            "supervision admission guard belongs to another Git repository"
+        );
+        Ok(())
     }
 }
 

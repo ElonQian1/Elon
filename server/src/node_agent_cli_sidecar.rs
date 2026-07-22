@@ -633,7 +633,9 @@ impl CliSidecarSessionRecord {
     /// PID/event registration finishes. A fresh marker/heartbeat or a verified
     /// process identity is sufficient to defer destructive stale conversion.
     pub(crate) fn protects_startup_reconcile_at(&self, now_ms: u128) -> bool {
-        self.is_live_at(now_ms)
+        self.last_seen_at_ms > now_ms
+            || self.started_at_ms > now_ms
+            || self.is_live_at(now_ms)
             || (matches!(
                 self.state.trim().to_ascii_lowercase().as_str(),
                 "running" | "waiting_approval" | "cancel_requested"

@@ -16,6 +16,7 @@ fn record(status: &str) -> TaskJournalRecord {
         runtime_permission: Some("project_write".to_string()),
         os_pid: Some(4242),
         process_started_at_ms: Some(1),
+        process_identity: None,
         codex_session_id: None,
         codex_session_scope_key: None,
         codex_session_updated_at_ms: None,

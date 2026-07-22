@@ -607,19 +607,24 @@ fn records_process_pid_for_active_route_a_handle() {
             runtime_permission: Some("project_write"),
         })
         .expect("start event should persist");
+    let pid = std::process::id();
     journal
-        .record_process_started("req-1", 4242)
+        .record_process_started("req-1", pid)
         .expect("pid event should persist");
 
     let snapshot = journal
         .snapshot("req-1", 0, 20)
         .expect("snapshot should read");
     let record = snapshot.record.expect("record should exist");
-    assert_eq!(record.os_pid, Some(4242));
+    assert_eq!(record.os_pid, Some(pid));
     assert!(record.process_started_at_ms.is_some());
+    assert_eq!(
+        record.process_identity,
+        crate::node_agent_cli_worker::process_identity(pid)
+    );
     assert!(snapshot.events.iter().any(|event| {
         event.event.get("type").and_then(|value| value.as_str()) == Some("process_started")
-            && event.event.get("pid").and_then(|value| value.as_u64()) == Some(4242)
+            && event.event.get("pid").and_then(|value| value.as_u64()) == Some(pid as u64)
     }));
     let _ = fs::remove_dir_all(dir);
 }

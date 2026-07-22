@@ -541,34 +541,34 @@ async fn run_cli_task(
                 )
             }
         };
-    if ui_design_routed {
-        let status = if ui_design_workspace_ready {
-            ui_design_route_status
-        } else {
-            "DEGRADED"
-        };
-        let event = serde_json::json!({
-            "type": "elon.ui_design.route",
-            "status": status,
-        });
-        let _ = out_tx.send(ws_text(&AgentToServer::CliChunk {
-            req_id: req_id_for_cleanup.clone(),
-            text: format!("{event}\n"),
-        }));
-    }
+    crate::node_agent_cli_task_registration::emit_ui_design_route(
+        &out_tx,
+        &req_id_for_cleanup,
+        ui_design_routed,
+        ui_design_workspace_ready,
+        ui_design_route_status,
+    );
 
     let deadline_cancel_tx = cancel_tx.clone();
-    let handle = node_agent_active_task::ActiveCliPromptHandle::new(
-        req_id_for_cleanup.clone(),
-        resolved_cli.name().to_string(),
-        node_agent_active_task::route_for_cli(resolved_cli.name()),
+    let supervised_registration = completion_context.is_desktop_supervised();
+    let registration = crate::node_agent_cli_task_registration::register(
+        &runtime,
+        &req_id_for_cleanup,
+        resolved_cli.name(),
         prepared_cwd.cwd.clone(),
         runtime_permission.clone(),
         cancel_tx,
+        effective_requires_cloud_control,
+        supervised_registration,
+        inherited_workspace_resume,
+        resume_admission.as_ref(),
     )
-    .with_requires_cloud_control(effective_requires_cloud_control)
-    .with_exclusive_workspace(inherited_workspace_resume);
-    match runtime.try_register_cli_prompt(handle).await {
+    .await
+    .unwrap_or_else(|error| {
+        warn!(%error, %req_id_for_cleanup, "supervised CLI owner admission failed closed");
+        crate::node_agent_active_task_registry::CliPromptRegistration::WorkspaceBusy
+    });
+    match registration {
         crate::node_agent_active_task_registry::CliPromptRegistration::Inserted => {}
         crate::node_agent_active_task_registry::CliPromptRegistration::DuplicateReq => {
             warn!(%req_id_for_cleanup, "PC CLI duplicate task registration race lost");
