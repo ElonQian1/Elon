@@ -65,6 +65,7 @@ pub(crate) struct NodeRuntime {
     pub(crate) storage_settings: RwLock<pc_storage_repo::StorageSettings>,
     pub(crate) node_data_root: RwLock<NodeDataRootState>,
     pub(crate) node_data_root_transition: Arc<Mutex<()>>,
+    pub(crate) local_task_reconcile: Mutex<()>,
     pub(crate) cache_advisor: crate::node_agent_cache_advisor::CacheArchitectureAdvisor,
     persisted_state_transition: Mutex<()>,
     pub(crate) active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry,
@@ -126,6 +127,7 @@ impl NodeRuntime {
             storage_settings: RwLock::new(storage_settings),
             node_data_root: RwLock::new(node_data_root),
             node_data_root_transition: Arc::new(Mutex::new(())),
+            local_task_reconcile: Mutex::new(()),
             cache_advisor: crate::node_agent_cache_advisor::CacheArchitectureAdvisor::load_default(
             ),
             persisted_state_transition: Mutex::new(()),

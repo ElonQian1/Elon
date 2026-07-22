@@ -33,6 +33,11 @@ const STALE_CANDIDATE_LIMIT: usize = 256;
 const TERMINAL_JOURNAL_SYNC_LIMIT: usize = 1_000;
 
 pub(crate) async fn reconcile_once(runtime: &NodeRuntime) -> Result<usize> {
+    // Startup, the periodic worker, completion recovery, and the explicit
+    // update gate can all request the same pass.  Running them concurrently
+    // makes hundreds of per-repository admission checks contend with each
+    // other and can turn a bounded audit into a multi-minute lock convoy.
+    let _reconcile = runtime.local_task_reconcile.lock().await;
     reconcile_with_stale_after(runtime, STALE_AFTER_MS).await
 }
 
