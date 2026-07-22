@@ -150,6 +150,22 @@ fn one_active_item_per_root_and_review_are_persisted() {
 }
 
 #[test]
+fn same_logical_id_replay_returns_original_item_without_duplicate_queue_entry() {
+    let coordinator = coordinator("logical-id-replay");
+    let original = coordinator.register(item("evo-stable")).unwrap();
+    let replayed = coordinator.register(item("evo-stable")).unwrap();
+    assert_eq!(replayed.logical_id, original.logical_id);
+    assert_eq!(
+        coordinator.list_for_owner("owner-a").unwrap().0.len(),
+        1,
+        "crash recovery must not enqueue a second self-evolution generation"
+    );
+    let mut conflict = item("evo-stable");
+    conflict.prompt = "changed body".into();
+    assert!(coordinator.register(conflict).is_err());
+}
+
+#[test]
 fn retryable_quota_failure_waits_and_can_be_reserved_again() {
     let coordinator = coordinator("quota-retry");
     coordinator.register(item("evo-retry")).unwrap();

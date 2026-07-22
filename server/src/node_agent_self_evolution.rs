@@ -157,6 +157,27 @@ impl SelfEvolutionCoordinator {
 
     fn register(&self, item: SelfEvolutionItem) -> Result<SelfEvolutionItem> {
         self.mutate(|state| {
+            if let Some(existing) = state
+                .items
+                .iter()
+                .find(|current| current.logical_id == item.logical_id)
+            {
+                anyhow::ensure!(
+                    existing.root_task_id == item.root_task_id
+                        && existing.parent_task_id == item.parent_task_id
+                        && existing.owner_user_id == item.owner_user_id
+                        && existing.agent_id == item.agent_id
+                        && existing.install_id == item.install_id
+                        && existing.project_id == item.project_id
+                        && existing.channel_id == item.channel_id
+                        && existing.conversation_id == item.conversation_id
+                        && existing.workspace_path == item.workspace_path
+                        && existing.prompt == item.prompt
+                        && existing.runtime_permission == item.runtime_permission,
+                    "self evolution logical_id is already bound to different immutable input"
+                );
+                return Ok(existing.clone());
+            }
             if state.items.iter().any(|current| {
                 current.root_task_id == item.root_task_id
                     && !matches!(current.status.as_str(), "completed" | "failed")
@@ -373,6 +394,8 @@ impl SelfEvolutionCoordinator {
 }
 
 pub(crate) struct SelfEvolutionEnqueue {
+    pub logical_id: String,
+    pub conversation_id: String,
     pub project_id: String,
     pub channel_id: Option<String>,
     pub workspace_path: String,
@@ -473,7 +496,7 @@ pub(crate) async fn enqueue(
     }
     let now = now_ms();
     let item = SelfEvolutionItem {
-        logical_id: format!("evolution-{}", Uuid::new_v4()),
+        logical_id: request.logical_id,
         root_task_id: root_id.to_string(),
         parent_task_id: parent.task_id,
         owner_user_id: creds.owner_user_id.clone(),
@@ -481,7 +504,7 @@ pub(crate) async fn enqueue(
         install_id: runtime.install_id.clone(),
         project_id: request.project_id,
         channel_id: request.channel_id,
-        conversation_id: format!("self-evolution-{}", Uuid::new_v4()),
+        conversation_id: request.conversation_id,
         workspace_path: request.workspace_path,
         execution_worktree: None,
         execution_branch: None,

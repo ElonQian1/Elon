@@ -2,6 +2,10 @@
 
 #[path = "node_agent_local_task_cancel.rs"]
 mod cancel;
+#[path = "node_agent_local_task_create_plan.rs"]
+mod create_plan;
+#[path = "node_agent_local_task_dispatch.rs"]
+mod dispatch;
 #[path = "node_agent_local_tasks_idempotency.rs"]
 pub(crate) mod idempotency;
 #[path = "node_agent_local_task_output_consumer.rs"]
@@ -10,15 +14,20 @@ mod output_consumer;
 mod provision;
 #[path = "node_agent_local_task_root_workspace.rs"]
 pub(crate) mod root_workspace;
+#[path = "node_agent_local_tasks_support.rs"]
+mod support;
+pub(crate) use dispatch::dispatch_local_task_record;
 #[cfg(test)]
 use output_consumer::durable_completion_for_local_display;
 pub(crate) use output_consumer::spawn_local_output_consumer;
 pub(crate) use provision::{
     provision_record_and_dispatch_supervised_task, SupervisedLocalTaskProvision,
 };
+use support::{bound_credentials, internal_error, json_error};
 
 use std::sync::Arc;
 
+use crate::{node_agent_local_task_store::LocalTaskStart, NodeRuntime};
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -26,16 +35,9 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use homecli_proto::{CliCompletionProducerIdentity, CliProjectContext};
+use homecli_proto::CliProjectContext;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tokio_tungstenite::tungstenite::Message;
-
-use crate::{
-    node_agent_cli_task_dispatch::{spawn_cli_task, CliTaskDispatchRequest},
-    node_agent_local_task_store::LocalTaskStart,
-    NodeRuntime,
-};
 
 const MAX_LOCAL_PROMPT_CHARS: usize = 80_000;
 const MAX_LOCAL_ID_CHARS: usize = 200;
@@ -236,7 +238,7 @@ async fn create_task(
             "project_id、workspace_path 和 prompt 均不能为空。",
         );
     }
-    if !local_identity_is_valid(project_id) {
+    if !support::local_identity_is_valid(project_id, MAX_LOCAL_ID_CHARS) {
         return json_error(
             StatusCode::BAD_REQUEST,
             "project_id 最多 200 个字符且不能包含控制字符。",
@@ -249,7 +251,7 @@ async fn create_task(
         let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
             continue;
         };
-        if !local_identity_is_valid(value) {
+        if !support::local_identity_is_valid(value, MAX_LOCAL_ID_CHARS) {
             return json_error(
                 StatusCode::BAD_REQUEST,
                 format!("{field} 最多 200 个字符且不能包含控制字符。"),
@@ -326,6 +328,8 @@ async fn create_task(
             &runtime,
             &creds,
             crate::node_agent_self_evolution::SelfEvolutionEnqueue {
+                logical_id: task_id.clone(),
+                conversation_id: format!("self-evolution-{task_id}"),
                 project_id: project_id.to_string(),
                 channel_id: request
                     .channel_id
@@ -349,6 +353,18 @@ async fn create_task(
                     "sync_state": "local_only",
                     "self_evolution": item,
                 });
+                if let Err(response) = idempotency::save_state(
+                    &runtime,
+                    &creds.owner_user_id,
+                    idempotency_binding.as_ref(),
+                    &json!({
+                        "schema": "elon.local_post_self_evolution.v1",
+                        "logical_id": task_id,
+                        "response_body": body,
+                    }),
+                ) {
+                    return response;
+                }
                 if let Err(response) = idempotency::complete(
                     &runtime,
                     &creds.owner_user_id,
@@ -381,9 +397,7 @@ async fn create_task(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned);
-    let resume_context_seed = if recovering_idempotent_record {
-        None
-    } else if let Some(contract) = supervision
+    let resume_context_seed = if let Some(contract) = supervision
         .as_mut()
         .filter(|contract| contract.task_role == "resume_original")
     {
@@ -396,9 +410,7 @@ async fn create_task(
     } else {
         None
     };
-    let mut resume_workspace = if recovering_idempotent_record {
-        None
-    } else {
+    let mut resume_workspace =
         match crate::node_agent_local_task_resume_routes::resolve_supervised_resume_workspace(
             &runtime,
             &creds,
@@ -411,49 +423,47 @@ async fn create_task(
         {
             Ok(workspace) => workspace,
             Err(response) => return response,
-        }
-    };
-    let fresh_workspace =
-        if !recovering_idempotent_record && resume_workspace.is_none() && supervision.is_some() {
-            let data_paths = runtime.node_data_root.read().await.paths.clone();
-            let supervision_root = supervision
-                .as_ref()
-                .and_then(|contract| contract.root_task_id.as_deref().or(Some(task_id.as_str())));
-            let prepared =
-                match crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in_with_supervision(
-                    data_paths.as_ref(),
-                    Some(workspace_path.to_string()),
-                    Some(CliProjectContext {
-                        project_id: project_id.to_string(),
-                        conversation_id: conversation_id.clone(),
-                        runtime_permission: Some(runtime_permission.to_string()),
-                    }),
-                    supervision_root,
-                ) {
-                    Ok(prepared) => prepared,
-                    Err(error) => return json_error(StatusCode::CONFLICT, error.to_string()),
-                };
-            let workspace = match prepared.conversation_workspace {
-                Some(workspace)
-                    if workspace.isolated
-                        && !crate::node_agent_update_checkpoint::same_path(
-                            std::path::Path::new(workspace_path),
-                            std::path::Path::new(&workspace.workspace_path),
-                        ) =>
-                {
-                    workspace
-                }
-                _ => {
-                    return json_error(
-                        StatusCode::CONFLICT,
-                        "监督写任务未取得独立 worktree，已在派发前拒绝。",
-                    )
-                }
-            };
-            Some(workspace)
-        } else {
-            None
         };
+    let fresh_workspace = if resume_workspace.is_none() && supervision.is_some() {
+        let data_paths = runtime.node_data_root.read().await.paths.clone();
+        let supervision_root = supervision
+            .as_ref()
+            .and_then(|contract| contract.root_task_id.as_deref().or(Some(task_id.as_str())));
+        let prepared =
+            match crate::node_agent_cli_runner::prepare_cli_prompt_cwd_in_with_supervision(
+                data_paths.as_ref(),
+                Some(workspace_path.to_string()),
+                Some(CliProjectContext {
+                    project_id: project_id.to_string(),
+                    conversation_id: conversation_id.clone(),
+                    runtime_permission: Some(runtime_permission.to_string()),
+                }),
+                supervision_root,
+            ) {
+                Ok(prepared) => prepared,
+                Err(error) => return json_error(StatusCode::CONFLICT, error.to_string()),
+            };
+        let workspace = match prepared.conversation_workspace {
+            Some(workspace)
+                if workspace.isolated
+                    && !crate::node_agent_update_checkpoint::same_path(
+                        std::path::Path::new(workspace_path),
+                        std::path::Path::new(&workspace.workspace_path),
+                    ) =>
+            {
+                workspace
+            }
+            _ => {
+                return json_error(
+                    StatusCode::CONFLICT,
+                    "监督写任务未取得独立 worktree，已在派发前拒绝。",
+                )
+            }
+        };
+        Some(workspace)
+    } else {
+        None
+    };
     let mut execution_workspace_path = resume_workspace
         .as_ref()
         .map(|workspace| workspace.inherited_workspace.workspace_path.as_str())
@@ -464,7 +474,7 @@ async fn create_task(
         })
         .unwrap_or(workspace_path)
         .to_string();
-    let workspace_inheritance = resume_workspace.as_ref().map(|workspace| {
+    let mut workspace_inheritance = resume_workspace.as_ref().map(|workspace| {
         json!({
             "inherited": true,
             "parent_task_id": supervision.as_ref().and_then(|contract| contract.parent_task_id.as_deref()),
@@ -501,33 +511,90 @@ async fn create_task(
         }
         None => None,
     };
-    let inherited_authorization_record = resume_context_seed
+    let mut inherited_authorization_record = resume_context_seed
         .as_ref()
         .map(|seed| seed.inherited_authorization_record());
-    let record_prompt = compiled_resume_context
+    let mut record_prompt = compiled_resume_context
         .as_ref()
         .map(|context| context.record_prompt.as_str())
-        .unwrap_or(prompt);
+        .unwrap_or(prompt)
+        .to_string();
     let mut executor_prompt = compiled_resume_context
         .as_ref()
         .map(|context| context.executor_prompt.clone())
         .unwrap_or_else(|| {
             crate::node_agent_local_task_supervision::executor_prompt(prompt, supervision.as_ref())
         });
-    let frozen_codex_home =
+    #[cfg(test)]
+    let capture_dispatch = tests::should_capture_dispatch(prompt);
+    #[cfg(not(test))]
+    let capture_dispatch = false;
+    let frozen_codex_home = if capture_dispatch {
+        None
+    } else {
         match crate::node_agent_codex_child_env::FrozenCodexHome::capture_unmanaged_for_local_task()
         {
-            Ok(home) => home,
+            Ok(home) => Some(home),
             Err(error) => return json_error(StatusCode::CONFLICT, error.to_string()),
-        };
-    if let Err(error) = runtime.resolve_cli("codex").await {
-        return json_error(
-            StatusCode::SERVICE_UNAVAILABLE,
-            format!("本机 Codex CLI 不可用：{error}"),
-        );
+        }
+    };
+    if !capture_dispatch {
+        if let Err(error) = runtime.resolve_cli("codex").await {
+            return json_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("本机 Codex CLI 不可用：{error}"),
+            );
+        }
     }
 
-    if fresh_workspace.is_none() {
+    let computed_inherited_workspace = resume_workspace
+        .as_ref()
+        .map(|workspace| workspace.inherited_workspace.clone())
+        .or_else(|| fresh_workspace.clone());
+    let computed_plan = create_plan::DurableCreatePlan::prepared(create_plan::PreparedPlan {
+        task_id: &task_id,
+        supervision: supervision.clone(),
+        conversation_id: &conversation_id,
+        channel_id: channel_id.clone(),
+        resolved_workspace_path: workspace_path,
+        execution_workspace_path: &execution_workspace_path,
+        record_prompt: &record_prompt,
+        executor_prompt: &executor_prompt,
+        inherited_workspace: computed_inherited_workspace,
+        inherited_authorization_record: inherited_authorization_record.as_ref(),
+        workspace_inheritance: workspace_inheritance.clone(),
+        resume_context: compiled_resume_context.as_ref(),
+    });
+    let mut durable_plan = match create_plan::DurableCreatePlan::persist_or_recover(
+        &runtime,
+        &creds.owner_user_id,
+        idempotency_binding.as_ref(),
+        computed_plan,
+    ) {
+        Ok(plan) => plan,
+        Err(response) => return response,
+    };
+    execution_workspace_path = durable_plan.execution_workspace_path.clone();
+    record_prompt = durable_plan.record_prompt.clone();
+    executor_prompt = durable_plan.executor_prompt.clone();
+    workspace_inheritance = durable_plan.workspace_inheritance.clone();
+    if let Some(parent_task_id) = durable_plan.inherited_authorization_task_id.as_deref() {
+        inherited_authorization_record = match runtime
+            .local_tasks
+            .get_for_owner(&creds.owner_user_id, parent_task_id)
+        {
+            Ok(Some(record)) => Some(record),
+            Ok(None) => {
+                return json_error(
+                    StatusCode::CONFLICT,
+                    "Resume 持久授权父任务已不可读取，拒绝恢复派发。",
+                )
+            }
+            Err(error) => return internal_error(error),
+        };
+    }
+
+    if fresh_workspace.is_none() && !recovering_idempotent_record {
         if let Some(contract) = supervision.as_ref() {
             if let Err(error) = crate::node_agent_local_task_supervision::record_supervision_event(
                 &runtime.task_journal,
@@ -538,12 +605,12 @@ async fn create_task(
                 return internal_error(error);
             }
         }
-        if let Some(context) = compiled_resume_context.as_ref() {
+        if let Some(context) = durable_plan.resume_context_journal.as_ref() {
             if let Err(error) = crate::node_agent_local_task_supervision::record_supervision_event(
                 &runtime.task_journal,
                 &task_id,
                 "resume_context",
-                context.journal_payload.clone(),
+                context.clone(),
             ) {
                 return internal_error(error);
             }
@@ -560,8 +627,17 @@ async fn create_task(
                 .flatten()
         });
     let record = if let Some(record) = recovered_idempotent_record {
-        execution_workspace_path = record.workspace_path.clone();
-        executor_prompt = record.prompt.clone();
+        if record.workspace_path != durable_plan.execution_workspace_path
+            || record.prompt != durable_plan.record_prompt
+            || record.project_id != project_id
+            || record.conversation_id != durable_plan.conversation_id
+            || record.runtime_permission != runtime_permission
+        {
+            return json_error(
+                StatusCode::CONFLICT,
+                "IDEMPOTENCY_DURABLE_RECORD_DRIFT: 已持久任务与 dispatch 计划身份不一致。",
+            );
+        }
         record
     } else if let (Some(workspace), Some(contract)) =
         (fresh_workspace.as_ref(), supervision.as_ref())
@@ -575,7 +651,7 @@ async fn create_task(
             channel_id: channel_id.as_deref(),
             conversation_id: &conversation_id,
             base_workspace_path: workspace_path,
-            prompt: record_prompt,
+            prompt: &record_prompt,
             runtime_permission,
             root_task_id: contract.root_task_id.as_deref().unwrap_or(&task_id),
             contract,
@@ -601,7 +677,7 @@ async fn create_task(
                 channel_id: channel_id.as_deref(),
                 conversation_id: &conversation_id,
                 workspace_path: &execution_workspace_path,
-                prompt: record_prompt,
+                prompt: &record_prompt,
                 cli: "codex",
                 runtime_permission,
             },
@@ -615,33 +691,48 @@ async fn create_task(
     let resume_admission = resume_workspace
         .as_mut()
         .and_then(|workspace| workspace.resume_admission.take());
-    let inherited_workspace = resume_workspace
-        .map(|workspace| workspace.inherited_workspace)
-        .or(fresh_workspace);
-    dispatch_local_task_record(
-        runtime.clone(),
-        &record,
-        executor_prompt,
-        execution_workspace_path,
-        supervision.as_ref(),
-        inherited_workspace,
-        resume_admission,
-        inherited_authorization_record,
-        frozen_codex_home,
-    );
+    let inherited_workspace = durable_plan.inherited_workspace.clone();
     let response_body = json!({
         "ok": true,
         "task_id": task_id,
         "status": "running",
         "sync_state": "local_only",
         "record": record,
-        "supervision": supervision,
+        "supervision": durable_plan.supervision,
         "workspace_inheritance": workspace_inheritance,
-        "resume_context": compiled_resume_context.as_ref().map(|context| json!({
-            "schema": crate::node_agent_local_task_resume_context::RESUME_CONTEXT_SCHEMA,
-            "digest": context.digest,
-        })),
+        "resume_context": durable_plan.resume_context_response,
     });
+    if let Err(response) = durable_plan.persist_response(
+        &runtime,
+        &creds.owner_user_id,
+        idempotency_binding.as_ref(),
+        &response_body,
+    ) {
+        return response;
+    }
+    #[cfg(test)]
+    if capture_dispatch {
+        tests::record_captured_dispatch(
+            prompt,
+            &executor_prompt,
+            &execution_workspace_path,
+            supervision.as_ref(),
+            inherited_authorization_record.as_ref(),
+        );
+    }
+    if !capture_dispatch {
+        dispatch_local_task_record(
+            runtime.clone(),
+            &record,
+            executor_prompt,
+            execution_workspace_path,
+            supervision.as_ref(),
+            inherited_workspace,
+            resume_admission,
+            inherited_authorization_record,
+            frozen_codex_home.expect("non-test dispatch captured CODEX_HOME"),
+        );
+    }
     if let Err(response) = idempotency::complete(
         &runtime,
         &creds.owner_user_id,
@@ -652,67 +743,6 @@ async fn create_task(
         return response;
     }
     (StatusCode::ACCEPTED, Json(response_body)).into_response()
-}
-
-pub(crate) fn dispatch_local_task_record(
-    runtime: Arc<NodeRuntime>,
-    record: &crate::node_agent_local_task_store::LocalTaskRecord,
-    executor_prompt: String,
-    execution_workspace_path: String,
-    supervision: Option<&crate::node_agent_local_task_supervision::SupervisionContract>,
-    inherited_workspace: Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult>,
-    resume_admission: Option<crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard>,
-    inherited_authorization_record: Option<crate::node_agent_local_task_store::LocalTaskRecord>,
-    frozen_codex_home: crate::node_agent_codex_child_env::FrozenCodexHome,
-) {
-    let (out_tx, out_rx) = tokio::sync::mpsc::unbounded_channel::<Message>();
-    spawn_local_output_consumer(
-        runtime.clone(),
-        record.owner_user_id.clone(),
-        record.task_id.clone(),
-        out_rx,
-    );
-    spawn_cli_task(
-        runtime.clone(),
-        out_tx,
-        CliTaskDispatchRequest {
-            req_id: record.task_id.clone(),
-            cli: "codex".to_string(),
-            extra_args: Vec::new(),
-            cwd: Some(execution_workspace_path),
-            project_context: Some(CliProjectContext {
-                project_id: record.project_id.clone(),
-                conversation_id: record.conversation_id.clone(),
-                runtime_permission: Some(record.runtime_permission.clone()),
-            }),
-            codex_credential_binding: None,
-            requires_cloud_control: false,
-            cloud_control_deadline: None,
-            cloud_control_issued_at: None,
-            cloud_control_ttl_ms: None,
-            prompt: executor_prompt,
-            completion_context: crate::node_agent_cli_done::CliCompletionContext::local_offline(
-                CliCompletionProducerIdentity {
-                    owner_user_id: record.owner_user_id.clone(),
-                    agent_id: record.agent_id.clone(),
-                    install_id: record.install_id.clone(),
-                },
-                CliProjectContext {
-                    project_id: record.project_id.clone(),
-                    conversation_id: record.conversation_id.clone(),
-                    runtime_permission: Some(record.runtime_permission.clone()),
-                },
-                record.channel_id.clone(),
-                record.prompt.clone(),
-                supervision.map(|contract| contract.protocol.clone()),
-            ),
-            inherited_workspace,
-            resume_admission,
-            inherited_authorization_record,
-            allow_codex_auth_switch: false,
-            frozen_codex_home: Some(frozen_codex_home),
-        },
-    );
 }
 
 async fn decide_approval(
@@ -754,34 +784,6 @@ async fn decide_approval(
         "decision": decision,
     }))
     .into_response()
-}
-
-async fn bound_credentials(runtime: &Arc<NodeRuntime>) -> Result<crate::Credentials, Response> {
-    runtime.creds().await.ok_or_else(|| {
-        json_error(
-            StatusCode::UNAUTHORIZED,
-            "本机节点尚未绑定账号，不能创建或读取离线任务。",
-        )
-    })
-}
-
-fn local_identity_is_valid(value: &str) -> bool {
-    let value = value.trim();
-    !value.is_empty()
-        && value.chars().count() <= MAX_LOCAL_ID_CHARS
-        && !value.chars().any(char::is_control)
-}
-
-fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
-    (
-        status,
-        Json(json!({ "ok": false, "error": message.into() })),
-    )
-        .into_response()
-}
-
-fn internal_error(error: anyhow::Error) -> Response {
-    json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
 }
 
 #[cfg(test)]

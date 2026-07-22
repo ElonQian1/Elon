@@ -68,7 +68,7 @@ pub(crate) struct SupervisionContractInput {
     pub improvement_policy: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct SupervisionContract {
     pub protocol: String,
     pub supervisor: String,
