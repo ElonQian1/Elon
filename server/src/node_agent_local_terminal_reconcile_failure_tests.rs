@@ -1,6 +1,58 @@
 use super::*;
 
 #[tokio::test]
+async fn same_event_terminal_conflicts_leave_task_and_receipt_bytes_unchanged() {
+    for (label, error) in [
+        ("done-to-failed", "late timeout"),
+        ("done-to-canceled", "用户已停止 PC CLI 任务"),
+    ] {
+        let fixture = Fixture::new(label).await;
+        fixture.write_completed_receipt();
+        fixture.unlock();
+        let completed = fixture.completion(true, None);
+        fixture.reconcile(&completed).await.unwrap();
+        crate::node_agent_supervision_worktree_lease::acquire(&fixture.base, &fixture.active, ROOT)
+            .unwrap();
+
+        let mut conflict = completed;
+        conflict.exit_ok = false;
+        conflict.error = Some(error.into());
+        fixture
+            .assert_failed_unchanged(
+                conflict,
+                "same local completion event conflicts with status, outcome, or finished time",
+            )
+            .await;
+    }
+
+    let output = Fixture::new("done-output-conflict").await;
+    output.write_completed_receipt();
+    output.unlock();
+    let completed = output.completion(true, None);
+    output.reconcile(&completed).await.unwrap();
+    let mut changed_output = completed;
+    changed_output.final_output = "different terminal output".into();
+    output
+        .assert_failed_unchanged(
+            changed_output,
+            "same local completion event conflicts with status, outcome, or finished time",
+        )
+        .await;
+
+    let failed = Fixture::new("failed-to-done").await;
+    let failure = failed.completion(false, Some("business failure"));
+    failed.reconcile(&failure).await.unwrap();
+    failed.write_completed_receipt();
+    failed.unlock();
+    failed
+        .assert_failed_unchanged(
+            failed.completion(true, None),
+            "same local completion event conflicts with status, outcome, or finished time",
+        )
+        .await;
+}
+
+#[tokio::test]
 async fn every_terminal_write_boundary_replays_after_restart_without_early_ack() {
     for boundary in [
         TerminalWriteBoundary::Receipt,

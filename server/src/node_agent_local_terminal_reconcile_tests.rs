@@ -37,7 +37,9 @@ async fn completed_done_with_missing_lease_persists_trusted_snapshot_and_replays
 
     fixture.reconcile(&completion).await.unwrap();
     let bound = fs::read(fixture.receipt_path()).unwrap();
-    fixture.reconcile(&completion).await.unwrap();
+    let mut normalized_replay = completion.clone();
+    normalized_replay.final_output = " \n terminal output \t".into();
+    fixture.reconcile(&normalized_replay).await.unwrap();
     assert_eq!(fs::read(fixture.receipt_path()).unwrap(), bound);
     let task = fixture.task();
     assert_eq!(task.status, "done");

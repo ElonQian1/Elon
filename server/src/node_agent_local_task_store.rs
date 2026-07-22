@@ -622,7 +622,7 @@ mod tests {
     }
 
     #[test]
-    fn late_terminal_race_never_downgrades_done_or_loses_final_reply() {
+    fn same_event_terminal_conflicts_fail_closed_without_mutating_done() {
         let store = test_store("terminal-race");
         create_task(&store, "local-race");
         store.mark_recovering("local-race", "reattaching").unwrap();
@@ -633,7 +633,13 @@ mod tests {
         late_failure.exit_ok = false;
         late_failure.error = Some("late timeout".to_string());
         late_failure.final_output.clear();
-        assert!(store.reconcile_completion(&late_failure).unwrap());
+        let error = store
+            .reconcile_completion(&late_failure)
+            .expect_err("same event cannot change done to failed");
+        assert!(error
+            .to_string()
+            .contains("same local completion event conflicts"));
+
         assert!(!store
             .mark_recovering("local-race", "late recovery")
             .unwrap());
