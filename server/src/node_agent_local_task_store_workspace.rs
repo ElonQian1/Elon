@@ -91,6 +91,21 @@ impl LocalTaskStore {
         Ok(records)
     }
 
+    pub(crate) fn has_competing_workspace_occupancy(
+        &self,
+        task_id: &str,
+        workspace_path: &str,
+    ) -> Result<bool> {
+        let count: i64 = self.open()?.query_row(
+            "SELECT COUNT(*) FROM local_tasks
+              WHERE task_id <> ?1 AND workspace_path = ?2
+                AND status IN ('running','recovering','reattaching','interrupted','cancel_requested','resume_required')",
+            params![task_id, workspace_path],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
     pub(crate) fn list_terminal_lease_candidates_page(
         &self,
         cursor: Option<&TerminalLeaseCursor>,
@@ -543,11 +558,14 @@ mod tests {
     }
 
     #[test]
-    fn stale_sidecar_transition_preserves_workspace_and_root_lease_context() {
+    fn normal_task_losing_its_runtime_handle_preserves_safe_resume_identity() {
         let fixture = Fixture::new("stale-sidecar");
         let context = json!({
             "root_task_id": "root", "sidecar_session_id": "sidecar-1",
-            "journal_cursor": 42, "sidecar_output_offset": 84
+            "journal_cursor": 42, "sidecar_output_offset": 84,
+            "sidecar_output_sequence": 21, "runtime_handle_present": false,
+            "journal_preserved": true, "workspace_preserved": true,
+            "root_lease_preserved": true
         });
         assert!(fixture
             .store
@@ -555,10 +573,14 @@ mod tests {
             .unwrap());
         let record = fixture.store.get("task").unwrap().unwrap();
         assert_eq!(record.status, "resume_required");
+        let status = record.workspace_status.unwrap();
         assert_eq!(
-            record.workspace_status.unwrap()["restart_recovery"],
-            context
+            status["platform_provenance"],
+            "elon.conversation_worktree.v1"
         );
+        assert_eq!(status["root_task_id"], "root");
+        assert_eq!(status["git_head"], fixture.initial_head);
+        assert_eq!(status["restart_recovery"], context);
         assert!(fixture.active.is_dir());
         assert!(
             crate::node_agent_supervision_worktree_lease::worktree_lock_reason(

@@ -6,13 +6,19 @@ fn install_gate_requires_a_checkpoint_for_every_foreground_task() {
     let safe = UpdateCheckpointDecision {
         active_foreground_task_ids: vec!["task-a".into(), "task-b".into()],
         checkpointed_task_ids: vec!["task-b".into(), "task-a".into()],
+        live_execution_task_ids: Vec::new(),
     };
     assert!(safe.install_may_proceed());
     let unsafe_decision = UpdateCheckpointDecision {
         checkpointed_task_ids: vec!["task-a".into()],
-        ..safe
+        ..safe.clone()
     };
     assert!(!unsafe_decision.install_may_proceed());
+    let live = UpdateCheckpointDecision {
+        live_execution_task_ids: vec!["task-a".into()],
+        ..safe
+    };
+    assert!(!live.install_may_proceed());
 }
 
 #[test]
@@ -96,13 +102,41 @@ fn legacy_active_task_without_supervision_checkpoint_defers_update() {
         "old",
         "new",
         &HashSet::new(),
+        &HashSet::new(),
     )
     .unwrap();
     assert_eq!(decision.active_foreground_task_ids, ["legacy-active"]);
     assert!(decision.checkpointed_task_ids.is_empty());
     assert!(!decision.install_may_proceed());
 
+    let stale_without_persisted_cancel = checkpoint_active_update_transactions(
+        &UpdateRecoveryStore::new(root.join("recovery-unpersisted-cancel.json")),
+        &local_tasks,
+        &crate::node_agent_task_journal::TaskJournal::new(root.join("journal")),
+        &crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars")),
+        "old",
+        "new",
+        &HashSet::from(["legacy-active".to_string()]),
+        &HashSet::new(),
+    )
+    .expect("stale proof must not replace durable cancel_requested state");
+    assert!(!stale_without_persisted_cancel.install_may_proceed());
+
     assert!(local_tasks.mark_cancel_requested("legacy-active").unwrap());
+    let live_runtime = checkpoint_active_update_transactions(
+        &UpdateRecoveryStore::new(root.join("recovery-runtime-handle.json")),
+        &local_tasks,
+        &crate::node_agent_task_journal::TaskJournal::new(root.join("journal")),
+        &crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars")),
+        "old",
+        "new",
+        &HashSet::from(["legacy-active".to_string()]),
+        &HashSet::from(["legacy-active".to_string()]),
+    )
+    .expect("a fresh runtime handle must remain a blocking decision");
+    assert_eq!(live_runtime.live_execution_task_ids, ["legacy-active"]);
+    assert!(!live_runtime.install_may_proceed());
+
     let stale_decision = checkpoint_active_update_transactions(
         &UpdateRecoveryStore::new(root.join("recovery-stale.json")),
         &local_tasks,
@@ -111,6 +145,7 @@ fn legacy_active_task_without_supervision_checkpoint_defers_update() {
         "old",
         "new",
         &HashSet::from(["legacy-active".to_string()]),
+        &HashSet::new(),
     )
     .expect("exact-target stale cancel_requested task should not block the installer");
     assert!(stale_decision.active_foreground_task_ids.is_empty());
@@ -170,6 +205,7 @@ fn low_priority_post_task_improvement_yields_without_blocking_update() {
         "old",
         "new",
         &HashSet::new(),
+        &HashSet::new(),
     )
     .expect_err("updater must fail closed before the self-evolution cancel audit is durable");
     assert!(blocked.to_string().contains("durable sidecar audit"));
@@ -186,6 +222,7 @@ fn low_priority_post_task_improvement_yields_without_blocking_update() {
         "old",
         "new",
         &confirmed_stale,
+        &HashSet::new(),
     )
     .expect("exact-target stale cancel_requested evolution should not block the installer");
     assert!(stale_decision.install_may_proceed());
@@ -199,8 +236,8 @@ fn low_priority_post_task_improvement_yields_without_blocking_update() {
                 "route_a_external_cli",
                 Some(root.to_string_lossy().into_owned()),
                 Some("npipe://elon/evolution-sidecar".to_string()),
-                Some(100),
-                Some(200),
+                Some(std::process::id()),
+                None,
                 crate::node_agent_cli_sidecar::now_ms(),
             ),
         )
@@ -212,12 +249,14 @@ fn low_priority_post_task_improvement_yields_without_blocking_update() {
         &sidecars,
         "old",
         "new",
+        &confirmed_stale,
         &HashSet::new(),
     )
     .unwrap();
-    assert!(decision.active_foreground_task_ids.is_empty());
+    assert_eq!(decision.active_foreground_task_ids, ["evolution-active"]);
     assert!(decision.checkpointed_task_ids.is_empty());
-    assert!(decision.install_may_proceed());
+    assert_eq!(decision.live_execution_task_ids, ["evolution-active"]);
+    assert!(!decision.install_may_proceed());
     let _ = std::fs::remove_dir_all(root);
 }
 

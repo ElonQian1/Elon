@@ -63,6 +63,10 @@ pub(super) async fn admin_status(
         };
     let active_cli_prompts = rt.active_cli_prompts.views_without_approvals().await;
     let active_cli_prompt_count = active_cli_prompts.len();
+    let active_cli_prompt_task_ids = active_cli_prompts
+        .iter()
+        .map(|prompt| prompt.req_id.clone())
+        .collect::<Vec<_>>();
     let recent_task_records = rt.task_journal.latest_records(20).unwrap_or_else(|error| {
         warn!("PC 任务 journal 读取失败，CLI 会话桥接状态降级为空摘要: {error}");
         Vec::new()
@@ -168,6 +172,10 @@ pub(super) async fn admin_status(
         "models": live,
     });
     if let Some(object) = payload.as_object_mut() {
+        object.insert(
+            "active_cli_prompt_task_ids".to_string(),
+            serde_json::json!(active_cli_prompt_task_ids),
+        );
         object.insert(
             "desktop_supervision".to_string(),
             super::node_agent_supervision_protocol::status_payload(),

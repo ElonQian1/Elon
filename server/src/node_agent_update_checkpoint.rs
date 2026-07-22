@@ -1,6 +1,6 @@
 //! Durable update checkpoints captured immediately before the Windows runtime stops.
 
-use std::{collections::HashSet, path::Path, time::Duration};
+use std::{collections::HashSet, path::Path};
 
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
@@ -16,25 +16,28 @@ use crate::{
 };
 
 const RECOVERY_DEADLINE_MS: u128 = 24 * 60 * 60 * 1_000;
-const LOOPBACK_RUNTIME_FRESH_MS: u128 = 2 * 60 * 1_000;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct UpdateCheckpointDecision {
     pub(crate) active_foreground_task_ids: Vec<String>,
     pub(crate) checkpointed_task_ids: Vec<String>,
+    pub(crate) live_execution_task_ids: Vec<String>,
 }
 
 impl UpdateCheckpointDecision {
     pub(crate) fn install_may_proceed(&self) -> bool {
-        self.active_foreground_task_ids
-            .iter()
-            .all(|task_id| self.checkpointed_task_ids.contains(task_id))
+        self.live_execution_task_ids.is_empty()
+            && self
+                .active_foreground_task_ids
+                .iter()
+                .all(|task_id| self.checkpointed_task_ids.contains(task_id))
     }
 }
 
 pub(crate) fn checkpoint_downloaded_update(
     version_file: &Path,
     remote_text: &str,
+    fresh_runtime_handle_task_ids: &HashSet<String>,
 ) -> Result<UpdateCheckpointDecision> {
     let target: serde_json::Value =
         serde_json::from_str(remote_text).context("解析更新版本身份")?;
@@ -51,12 +54,14 @@ pub(crate) fn checkpoint_downloaded_update(
     let local_tasks = crate::node_agent_local_task_store::LocalTaskStore::default();
     let journal = crate::node_agent_task_journal::TaskJournal::default();
     let sidecars = crate::node_agent_cli_sidecar::CliSidecarRegistry::default();
-    confirmed_stale.extend(proven_stale_cancelled_tasks(
-        &local_tasks,
-        &journal,
-        &sidecars,
-        fresh_runtime_task_ids_from_loopback().as_ref(),
-    )?);
+    if crate::node_agent_restart_drain::stale_cancel_proof_window_for_update(to_git_sha)? {
+        confirmed_stale.extend(proven_stale_cancelled_tasks(
+            &local_tasks,
+            &journal,
+            &sidecars,
+            Some(fresh_runtime_handle_task_ids),
+        )?);
+    }
     let decision = checkpoint_active_update_transactions(
         &store,
         &local_tasks,
@@ -65,6 +70,7 @@ pub(crate) fn checkpoint_downloaded_update(
         &from_git_sha,
         to_git_sha,
         &confirmed_stale,
+        fresh_runtime_handle_task_ids,
     )?;
     if !decision.checkpointed_task_ids.is_empty() {
         info!(count = decision.checkpointed_task_ids.len(), %to_git_sha, "已保存节点更新任务恢复检查点");
@@ -81,7 +87,11 @@ pub(crate) fn checkpoint_downloaded_update(
         safe_checkpoint_count: decision.checkpointed_task_ids.len(),
         capability: "local_update_gate_v1".to_string(),
         reason: (!may_proceed).then(|| {
-            "active foreground task has no complete durable recovery checkpoint".to_string()
+            if decision.live_execution_task_ids.is_empty() {
+                "active foreground task has no complete durable recovery checkpoint".to_string()
+            } else {
+                "active sidecar or fresh runtime handle still owns an update candidate".to_string()
+            }
         }),
         updated_at_ms: crate::node_agent_cli_sidecar::now_ms(),
     })?;
@@ -132,37 +142,6 @@ fn proven_stale_cancelled_tasks(
     Ok(proven)
 }
 
-fn fresh_runtime_task_ids_from_loopback() -> Option<HashSet<String>> {
-    let port = crate::node_agent_admin_open::admin_port_from_env();
-    let status: serde_json::Value = reqwest::blocking::Client::builder()
-        .connect_timeout(Duration::from_secs(2))
-        .timeout(Duration::from_secs(3))
-        .no_proxy()
-        .build()
-        .ok()?
-        .get(format!("http://127.0.0.1:{port}/api/status"))
-        .send()
-        .ok()?
-        .error_for_status()
-        .ok()?
-        .json()
-        .ok()?;
-    let expected = status.get("active_cli_prompt_count")?.as_u64()? as usize;
-    let now = crate::node_agent_cli_sidecar::now_ms();
-    let fresh = status
-        .get("active_task_runtime")?
-        .as_array()?
-        .iter()
-        .filter_map(|entry| {
-            let task_id = entry.get("task_id")?.as_str()?;
-            let heartbeat = entry.get("runtime")?.get("heartbeat")?.as_u64()? as u128;
-            (now.saturating_sub(heartbeat) <= LOOPBACK_RUNTIME_FRESH_MS)
-                .then(|| task_id.to_string())
-        })
-        .collect::<HashSet<_>>();
-    (fresh.len() >= expected).then_some(fresh)
-}
-
 fn checkpoint_active_update_transactions(
     store: &UpdateRecoveryStore,
     local_tasks: &crate::node_agent_local_task_store::LocalTaskStore,
@@ -171,12 +150,26 @@ fn checkpoint_active_update_transactions(
     from_git_sha: &str,
     to_git_sha: &str,
     confirmed_stale_registry_tasks: &HashSet<String>,
+    fresh_runtime_handle_task_ids: &HashSet<String>,
 ) -> Result<UpdateCheckpointDecision> {
     let update_id = stable_update_id(to_git_sha);
     let mut decision = UpdateCheckpointDecision::default();
     for task in local_tasks.list_update_candidates()? {
+        // A confirmed-stale registry entry is historical evidence. Re-read the
+        // sidecar registry and bind the install decision to the runtime's
+        // current handle inventory before allowing that evidence to suppress a
+        // cancel_requested task.
+        let sidecar = sidecars.session_for_task(&task.task_id)?;
+        let live_sidecar = sidecar
+            .as_ref()
+            .is_some_and(|session| session.recorded_process_is_live());
+        let live_execution = live_sidecar || fresh_runtime_handle_task_ids.contains(&task.task_id);
+        if live_execution {
+            decision.live_execution_task_ids.push(task.task_id.clone());
+        }
         if task.status == "cancel_requested"
             && confirmed_stale_registry_tasks.contains(&task.task_id)
+            && !live_execution
         {
             continue;
         }
@@ -199,6 +192,11 @@ fn checkpoint_active_update_transactions(
                 "updater refused to interrupt self evolution {} without a durable sidecar audit",
                 task.task_id
             );
+            if live_execution {
+                decision
+                    .active_foreground_task_ids
+                    .push(task.task_id.clone());
+            }
             continue;
         }
         decision
@@ -216,7 +214,6 @@ fn checkpoint_active_update_transactions(
             &task.task_id
         };
         let root_task_id = contract.root_task_id.as_deref().unwrap_or(original_task_id);
-        let sidecar = sidecars.session_for_task(&task.task_id)?;
         let snapshot = journal.snapshot(&task.task_id, 0, 200)?;
         let workspace_path = sidecar
             .as_ref()

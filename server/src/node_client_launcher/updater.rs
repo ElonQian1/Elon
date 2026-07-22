@@ -7,7 +7,7 @@ pub(crate) use super::log_file;
 use super::{
     command as launcher_command, env_file, paths, process,
     update_integrity::{preferred_sha256, read_local_git_sha, verify_optional_sha256, VersionInfo},
-    DEFAULT_BASE_URL,
+    watchdog, DEFAULT_BASE_URL,
 };
 
 const DEFAULT_UPDATE_CONNECT_TIMEOUT_SECS: u64 = 20;
@@ -33,6 +33,9 @@ pub(crate) fn update_client_if_needed(install_dir: &Path) -> Result<bool> {
 #[path = "updater_impl.rs"]
 mod updater_impl;
 use self::updater_impl::*;
+
+#[path = "updater_runtime_gate.rs"]
+mod runtime_gate;
 
 #[path = "update_compat.rs"]
 mod update_compat;

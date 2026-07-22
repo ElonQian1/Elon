@@ -153,6 +153,44 @@ fn valid_resume_inherits_recorded_platform_worktree_from_base_or_active_request(
 }
 
 #[test]
+fn current_platform_resume_rejects_provenance_common_dir_and_remote_drift() {
+    for drift in ["provenance", "common", "remote"] {
+        let mut fixture = ResumeFixture::new();
+        match drift {
+            "provenance" => {
+                fixture.parent.workspace_status.as_mut().unwrap()["platform_provenance"] =
+                    "malformed".into();
+            }
+            "common" => {
+                fixture.parent.workspace_status.as_mut().unwrap()["git_common_dir"] = fixture
+                    .root
+                    .join("foreign.git")
+                    .to_string_lossy()
+                    .into_owned()
+                    .into();
+            }
+            "remote" => run_git(
+                &fixture.base,
+                &["config", "remote.origin.url", "https://evil.test/elon.git"],
+            ),
+            _ => unreachable!(),
+        }
+        assert!(
+            validate_resume_workspace(
+                &fixture.contract,
+                &fixture.parent,
+                None,
+                None,
+                "project-a",
+                fixture.active.to_string_lossy().as_ref(),
+            )
+            .is_err(),
+            "{drift} must fail closed"
+        );
+    }
+}
+
+#[test]
 fn resume_of_resume_reuses_the_platform_recorded_inherited_workspace() {
     let mut fixture = ResumeFixture::new();
     fixture.parent.conversation_id = "offline-resume-child".to_string();

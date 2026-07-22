@@ -12,6 +12,8 @@ pub(crate) mod idempotency;
 mod output_consumer;
 #[path = "node_agent_local_task_provision.rs"]
 mod provision;
+#[path = "node_agent_local_task_resume_identity.rs"]
+mod resume_identity;
 #[path = "node_agent_local_task_root_workspace.rs"]
 pub(crate) mod root_workspace;
 #[path = "node_agent_local_tasks_support.rs"]

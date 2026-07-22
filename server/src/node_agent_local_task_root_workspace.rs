@@ -60,6 +60,12 @@ pub(crate) fn resolve_resume_authorized_workspace(
         "resume parent identity mismatch"
     );
     let root_id = required_id(contract.root_task_id.as_deref(), "root_task_id")?;
+    let immediate_parent_contract =
+        crate::node_agent_local_task_supervision::load_supervision_contract(
+            journal,
+            &parent.task_id,
+        )?
+        .context("Resume 父任务缺少持久监督契约。")?;
     let mut current = parent.clone();
     let mut visited = HashSet::new();
     let mut recorded_bases = Vec::new();
@@ -70,7 +76,11 @@ pub(crate) fn resolve_resume_authorized_workspace(
             visited.insert(current.task_id.clone()),
             "监督任务谱系包含循环"
         );
-        recorded_bases.push(recorded_base_workspace(&current)?);
+        let legacy_root_without_workspace_identity =
+            current.task_id == root_id && current.workspace_status.is_none();
+        if !legacy_root_without_workspace_identity {
+            recorded_bases.push(recorded_base_workspace(&current)?);
+        }
         let current_contract = crate::node_agent_local_task_supervision::load_supervision_contract(
             journal,
             &current.task_id,
@@ -95,7 +105,17 @@ pub(crate) fn resolve_resume_authorized_workspace(
                     && current_contract.parent_task_id.is_none(),
                 "监督谱系根任务不是可信的 requirement 根"
             );
-            let root_base = recorded_base_workspace(&current)?;
+            let root_base = if legacy_root_without_workspace_identity {
+                super::resume_identity::validated_descendant_resume_base(
+                    tasks,
+                    parent,
+                    &immediate_parent_contract,
+                    root_id,
+                    project_id,
+                )?
+            } else {
+                recorded_base_workspace(&current)?
+            };
             anyhow::ensure!(
                 recorded_bases.iter().all(|base| {
                     crate::node_agent_update_checkpoint::same_path(

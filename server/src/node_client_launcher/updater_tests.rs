@@ -12,7 +12,9 @@ fn self_replace_script_stops_on_failure_before_restart() {
     );
 
     assert!(script.contains("$ErrorActionPreference = 'Stop'"));
-    assert!(script.contains("Start-ElonNodeRuntimeAndWait -Client $client -InstallDir $installDir"));
+    assert!(script.contains(
+        "Start-ElonNodeRuntimeAndWatchdogAndWait -Client $client -InstallDir $installDir"
+    ));
     assert!(script.contains("Stop-ElonNodeClientProcesses -Client $client"));
     assert!(script.contains("_internal\\elon-desktop.exe"));
     assert!(script.contains("$matchesDesktopShell"));
@@ -21,18 +23,24 @@ fn self_replace_script_stops_on_failure_before_restart() {
     assert!(script.contains("Move-ElonNodeFileWithRetry -Source $tmpExe"));
     assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $client"));
     assert!(script.contains("Start-Process -FilePath $Client -ArgumentList '--agent-runtime'"));
+    assert!(script.contains("Start-Process -FilePath $Client -ArgumentList '--watchdog'"));
+    assert!(script.contains("Wait-ElonNodeWatchdog"));
     assert!(script.contains("Wait-ElonNodeAdminHealth"));
     assert!(
         script
             .find("Move-ElonNodeFileWithRetry -Source $tmpExe")
             .unwrap()
-            < script.find("Start-ElonNodeRuntimeAndWait").unwrap()
+            < script
+                .find("Start-ElonNodeRuntimeAndWatchdogAndWait")
+                .unwrap()
     );
     assert!(
         script
             .find("Move-ElonNodeFileWithRetry -Source $tmpVersion")
             .unwrap()
-            < script.find("Start-ElonNodeRuntimeAndWait").unwrap()
+            < script
+                .find("Start-ElonNodeRuntimeAndWatchdogAndWait")
+                .unwrap()
     );
 }
 
@@ -60,9 +68,35 @@ fn package_replace_script_updates_full_client_layout() {
     assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $packageUninstall"));
     assert!(script.contains("Copy-Item -Path (Join-Path $packageInternal '*')"));
     assert!(script.contains("Move-ElonNodeFileWithRetry -Source $tmpVersion"));
-    assert!(script.contains("Start-ElonNodeRuntimeAndWait -Client $client -InstallDir $installDir"));
+    assert!(script.contains(
+        "Start-ElonNodeRuntimeAndWatchdogAndWait -Client $client -InstallDir $installDir"
+    ));
     assert!(script.contains("Start-Process -FilePath $Client -ArgumentList '--agent-runtime'"));
+    assert!(script.contains("Start-Process -FilePath $Client -ArgumentList '--watchdog'"));
+    assert!(script.contains("Wait-ElonNodeWatchdog"));
     assert!(script.contains("Wait-ElonNodeAdminHealth"));
+}
+
+#[cfg(windows)]
+#[test]
+fn package_replace_from_a_non_install_path_starts_the_installed_root() {
+    use std::path::Path;
+
+    let script = super::package_replace_script(
+        None,
+        Path::new(r"D:\build-cache\elon-node-agent-windows.zip.new"),
+        Path::new(r"C:\Users\ELon\AppData\Local\ElonNode"),
+        Path::new(r"D:\build-cache\node-agent-version.json.new"),
+        Path::new(r"C:\Users\ELon\AppData\Local\ElonNode\_internal\node-agent-version.json"),
+    );
+
+    assert!(!script.contains("Wait-Process -Id"));
+    assert!(script.contains("$client = Join-Path $installDir '一龙开发平台.exe'"));
+    assert!(script.contains(
+        "Start-ElonNodeRuntimeAndWatchdogAndWait -Client $client -InstallDir $installDir"
+    ));
+    assert!(script.contains("-ArgumentList '--agent-runtime' -WorkingDirectory $InstallDir"));
+    assert!(script.contains("-ArgumentList '--watchdog' -WorkingDirectory $InstallDir"));
 }
 
 #[cfg(windows)]
@@ -88,13 +122,40 @@ fn package_self_update_uses_extracted_repair_entrypoint() {
         .contains("Start-Process -FilePath $packageClient -ArgumentList '--repair-background'"));
     assert!(script.contains("Wait-Process -Id $repair.Id -Timeout 120"));
     assert!(script.contains("Wait-ElonNodeAdminHealth -Port $port -TimeoutSeconds 15"));
+    assert!(script.contains("Wait-ElonNodeWatchdog -Client $installedClient"));
     assert!(script.contains("browser untouched"));
     assert!(script.contains("client-update.log"));
     assert!(script.contains("Remove-Item -LiteralPath $archivePath"));
     assert!(script.contains("Remove-Item -LiteralPath $tmpVersion"));
     assert!(!script.contains("Copy-ElonNodeFileWithRetry -Source $packageClient"));
-    assert!(!script
-        .contains("Start-ElonNodeRuntimeAndWait -Client $installedClient -InstallDir $installDir"));
+    assert!(!script.contains(
+        "Start-ElonNodeRuntimeAndWatchdogAndWait -Client $installedClient -InstallDir $installDir"
+    ));
+}
+
+#[test]
+fn runtime_handle_status_requires_complete_task_identity() {
+    let status = serde_json::json!({
+        "local_admin_token_header": "x-elon-local-admin-token",
+        "active_cli_prompt_count": 2,
+        "active_cli_prompt_task_ids": ["task-a", "task-b"],
+        "active_task_runtime": [{"task_id": "task-a"}]
+    });
+    let task_ids = super::runtime_gate::runtime_handle_task_ids_from_status(&status).unwrap();
+    assert_eq!(task_ids.len(), 2);
+    assert!(task_ids.contains("task-a"));
+    assert!(task_ids.contains("task-b"));
+
+    let incomplete = serde_json::json!({
+        "local_admin_token_header": "x-elon-local-admin-token",
+        "active_cli_prompt_count": 2,
+        "active_cli_prompt_task_ids": ["task-a"],
+        "active_task_runtime": [{"task_id": "task-a"}]
+    });
+    assert!(super::runtime_gate::runtime_handle_task_ids_from_status(&incomplete).is_err());
+    assert!(
+        super::runtime_gate::runtime_handle_task_ids_from_status(&serde_json::json!({})).is_err()
+    );
 }
 
 #[test]

@@ -219,6 +219,14 @@ fn resolve_existing_resume_workspace(
                 "legacy_started_cwd_git_registry".to_string(),
             )
         };
+    if let Some(status) = parent.workspace_status.as_ref() {
+        validate_recorded_platform_repository_identity(
+            status,
+            &recorded_base,
+            requested_project_id,
+            supervision_root_task_id,
+        )?;
+    }
     let platform_identity = recorded_platform_workspace_identity(
         contract,
         parent_contract,
@@ -541,6 +549,49 @@ fn required_status_path<'a>(status: &'a serde_json::Value, field: &str) -> Resul
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .ok_or_else(|| anyhow!("父任务 workspace_status 缺少 {field}。"))
+}
+
+fn validate_recorded_platform_repository_identity(
+    status: &serde_json::Value,
+    base: &Path,
+    project_id: &str,
+    root_task_id: &str,
+) -> Result<()> {
+    let Some(provenance) = status.get("platform_provenance") else {
+        // Legacy records predate the complete platform identity. Their narrow
+        // compatibility path is validated from Git registry evidence below.
+        return Ok(());
+    };
+    anyhow::ensure!(
+        provenance.as_str() == Some("elon.conversation_worktree.v1"),
+        "父任务 workspace provenance 无效"
+    );
+    anyhow::ensure!(
+        crate::node_agent_full_access::project_ids_equivalent(
+            required_status_path(status, "project_id")?,
+            project_id,
+        ),
+        "父任务 workspace project identity 漂移"
+    );
+    anyhow::ensure!(
+        required_status_path(status, "root_task_id")? == root_task_id,
+        "父任务 workspace root identity 漂移"
+    );
+    let recorded_common = canonical_directory(
+        Path::new(required_status_path(status, "git_common_dir")?),
+        "父任务记录的 Git common-dir",
+    )?;
+    let current_common = git_resolved_path(base, &["rev-parse", "--git-common-dir"])?;
+    anyhow::ensure!(
+        same_path(&recorded_common, &current_common),
+        "父任务记录的 Git common-dir 与当前仓库漂移"
+    );
+    let current_remote = git_output(base, &["config", "--get", "remote.origin.url"])?;
+    anyhow::ensure!(
+        required_status_path(status, "git_remote")? == current_remote.trim(),
+        "父任务记录的 Git remote 与当前仓库漂移"
+    );
+    Ok(())
 }
 
 fn canonical_directory(path: &Path, label: &str) -> Result<PathBuf> {

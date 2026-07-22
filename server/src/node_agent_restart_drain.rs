@@ -324,14 +324,33 @@ pub(crate) fn confirmed_stale_registry_tasks_for_update(
     Ok(confirmed_stale_registry_tasks(&checkpoint, target_git_sha))
 }
 
+/// A durable cancel with no executor may supplement the stale registry only
+/// inside the same exact-target install window. This prevents an old drain
+/// decision from authorizing an unrelated later update.
+pub(crate) fn stale_cancel_proof_window_for_update(target_git_sha: &str) -> anyhow::Result<bool> {
+    Ok(load_checkpoint()?.is_some_and(|checkpoint| {
+        checkpoint_targets_update_install_window(&checkpoint, target_git_sha)
+    }))
+}
+
 fn confirmed_stale_registry_tasks(
     checkpoint: &RestartCheckpoint,
     target_git_sha: &str,
 ) -> std::collections::HashSet<String> {
+    if !checkpoint_targets_update_install_window(checkpoint, target_git_sha) {
+        return std::collections::HashSet::new();
+    }
+    checkpoint.stale_registry_task_ids.iter().cloned().collect()
+}
+
+fn checkpoint_targets_update_install_window(
+    checkpoint: &RestartCheckpoint,
+    target_git_sha: &str,
+) -> bool {
     if checkpoint.protocol != CHECKPOINT_PROTOCOL
         || !matches!(checkpoint.state.as_str(), "applying" | "restart_scheduled")
     {
-        return std::collections::HashSet::new();
+        return false;
     }
     let Some(target) = checkpoint
         .target_release_identity
@@ -339,16 +358,12 @@ fn confirmed_stale_registry_tasks(
         .map(str::trim)
         .filter(|value| !value.is_empty())
     else {
-        return std::collections::HashSet::new();
+        return false;
     };
-    let exact_target = target == target_git_sha
+    target == target_git_sha
         || target
             .rsplit_once('+')
-            .is_some_and(|(_, git_sha)| git_sha == target_git_sha);
-    if !exact_target {
-        return std::collections::HashSet::new();
-    }
-    checkpoint.stale_registry_task_ids.iter().cloned().collect()
+            .is_some_and(|(_, git_sha)| git_sha == target_git_sha)
 }
 
 #[derive(Default)]
@@ -662,13 +677,25 @@ mod tests {
         );
         checkpoint.stale_registry_task_ids = vec!["stale-evolution".to_string()];
         assert!(confirmed_stale_registry_tasks(&checkpoint, "targetsha").is_empty());
+        assert!(!checkpoint_targets_update_install_window(
+            &checkpoint,
+            "targetsha"
+        ));
 
         checkpoint.transition("restart_scheduled", "ready");
+        assert!(checkpoint_targets_update_install_window(
+            &checkpoint,
+            "targetsha"
+        ));
         assert_eq!(
             confirmed_stale_registry_tasks(&checkpoint, "targetsha"),
             std::collections::HashSet::from(["stale-evolution".to_string()])
         );
         assert!(confirmed_stale_registry_tasks(&checkpoint, "other-sha").is_empty());
+        assert!(!checkpoint_targets_update_install_window(
+            &checkpoint,
+            "other-sha"
+        ));
     }
 
     #[test]

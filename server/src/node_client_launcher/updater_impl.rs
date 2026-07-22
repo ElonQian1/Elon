@@ -91,6 +91,7 @@ pub(super) fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
         Some("stopping old runtime after durable checkpoint"),
     )?;
 
+    watchdog::stop_running(install_dir);
     process::stop_agent();
     let client = paths::client_exe(install_dir);
     let uninstall = paths::uninstall_exe(install_dir);
@@ -99,7 +100,8 @@ pub(super) fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
         Ok(true)
     } else {
         replace_client_files(&tmp_exe, &client, &uninstall, &tmp_version, &version_file)?;
-        Ok(false)
+        runtime_gate::restart_installed_runtime_and_watchdog(install_dir)?;
+        Ok(true)
     }
 }
 
@@ -144,6 +146,7 @@ pub(super) fn try_update_from_client_package(
         Some("stopping old runtime after durable checkpoint"),
     )?;
 
+    watchdog::stop_running(install_dir);
     process::stop_agent();
     let client = paths::client_exe(install_dir);
     if running_from_path(&client) {
@@ -151,7 +154,7 @@ pub(super) fn try_update_from_client_package(
         Ok(true)
     } else {
         replace_client_package(&tmp_zip, install_dir, &tmp_version, &version_file)?;
-        Ok(false)
+        Ok(true)
     }
 }
 
@@ -168,9 +171,11 @@ fn wait_for_safe_update_checkpoint(
     );
     let started = std::time::Instant::now();
     loop {
+        let fresh_runtime_handles = runtime_gate::fresh_runtime_handle_task_ids(install_dir)?;
         let decision = crate::node_agent_update_checkpoint::checkpoint_downloaded_update(
             version_file,
             remote_text,
+            &fresh_runtime_handles,
         )?;
         if decision.install_may_proceed() {
             return Ok(());
@@ -390,6 +395,9 @@ try {{
   if (-not (Wait-ElonNodeAdminHealth -Port $port -TimeoutSeconds 15)) {{
     throw "package repair exited but node health did not recover: http://127.0.0.1:$port/api/status"
   }}
+  if (-not (Wait-ElonNodeWatchdog -Client $installedClient -TimeoutSeconds 15)) {{
+    throw "package repair recovered runtime but not installed watchdog: $installedClient"
+  }}
   Write-ElonNodeUpdateLog "package repair update finished; runtime healthy on port $port; browser untouched"
 }} catch {{
   Write-ElonNodeUpdateLog ("package repair update failed: " + ($_ | Out-String))
@@ -420,9 +428,7 @@ pub(super) fn package_replace_script(
     let wait = pid_to_wait
         .map(|pid| format!("Wait-Process -Id {pid} -ErrorAction SilentlyContinue\n"))
         .unwrap_or_default();
-    let restart = pid_to_wait
-        .map(|_| restart_agent_runtime_after_update_script("$client", "$installDir"))
-        .unwrap_or_default();
+    let restart = restart_agent_runtime_after_update_script("$client", "$installDir");
     format!(
         r#"
 $ErrorActionPreference = 'Stop'
@@ -679,7 +685,38 @@ function Wait-ElonNodeAdminHealth {
   return (Test-ElonNodeAdminHealth -Port $Port)
 }
 
-function Start-ElonNodeRuntimeAndWait {
+function Test-ElonNodeWatchdog {
+  param([Parameter(Mandatory = $true)][string]$Client)
+  $fullClient = [System.IO.Path]::GetFullPath($Client)
+  return [bool]@(Get-CimInstance Win32_Process | Where-Object {
+    $line = if ($_.CommandLine) { [string]$_.CommandLine } else { '' }
+    $exeMatches = $false
+    if ($_.ExecutablePath) {
+      try {
+        $exeMatches = [System.IO.Path]::GetFullPath($_.ExecutablePath).Equals(
+          $fullClient,
+          [StringComparison]::OrdinalIgnoreCase
+        )
+      } catch {}
+    }
+    $exeMatches -and ($line -match '--watchdog')
+  })
+}
+
+function Wait-ElonNodeWatchdog {
+  param(
+    [Parameter(Mandatory = $true)][string]$Client,
+    [int]$TimeoutSeconds = 15
+  )
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while ((Get-Date) -lt $deadline) {
+    if (Test-ElonNodeWatchdog -Client $Client) { return $true }
+    Start-Sleep -Milliseconds 300
+  }
+  return (Test-ElonNodeWatchdog -Client $Client)
+}
+
+function Start-ElonNodeRuntimeAndWatchdogAndWait {
   param(
     [Parameter(Mandatory = $true)][string]$Client,
     [Parameter(Mandatory = $true)][string]$InstallDir
@@ -692,6 +729,10 @@ function Start-ElonNodeRuntimeAndWait {
       throw "新版一龙节点启动后健康检查超时: http://127.0.0.1:$port/api/status"
     }
   }
+  Start-Process -FilePath $Client -ArgumentList '--watchdog' -WorkingDirectory $InstallDir -WindowStyle Hidden
+  if (-not (Wait-ElonNodeWatchdog -Client $Client -TimeoutSeconds 15)) {
+    throw "新版一龙节点 runtime 已在线，但 watchdog 未从安装路径恢复: $Client"
+  }
 }
 "#;
 
@@ -701,7 +742,7 @@ pub(super) fn restart_agent_runtime_after_update_script(
     install_dir_expr: &str,
 ) -> String {
     let mut script = String::from(UPDATE_RESTART_HELPERS);
-    script.push_str("Start-ElonNodeRuntimeAndWait -Client ");
+    script.push_str("Start-ElonNodeRuntimeAndWatchdogAndWait -Client ");
     script.push_str(client_expr);
     script.push_str(" -InstallDir ");
     script.push_str(install_dir_expr);
