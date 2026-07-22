@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-20T14:57:31.103485700+00:00",
+  "updatedAt": "2026-07-22T09:39:17.921897300+00:00",
   "cases": [
     {
       "schemaVersion": 1,
@@ -28,8 +28,8 @@
         "targetHeightRatio": null,
         "currentWidthRatio": null,
         "currentHeightRatio": null,
-        "widthScale": 1,
-        "heightScale": 1,
+        "widthScale": 1.0,
+        "heightScale": 1.0,
         "targetAspectRatio": 0.48957388939256574,
         "currentAspectRatio": 0.48957388939256574
       },
@@ -42,7 +42,7 @@
       "baselineScore": {
         "scorerVersion": "visual-score-v1+projected-geometry-v1",
         "overallLoss": 0.044315,
-        "geometryError": 0,
+        "geometryError": 0.0,
         "colorError": 0.109692,
         "edgeError": 0.051921,
         "hardFailures": [
@@ -68,7 +68,7 @@
           "property": "margin.top",
           "firstValue": 9.9,
           "finalValue": 2.9,
-          "delta": -7,
+          "delta": -7.0,
           "observations": 6
         }
       ],
@@ -80,7 +80,7 @@
           "score": {
             "scorerVersion": "visual-score-v1+projected-geometry-v1",
             "overallLoss": 0.044315,
-            "geometryError": 0,
+            "geometryError": 0.0,
             "colorError": 0.109692,
             "edgeError": 0.051921,
             "hardFailures": [
@@ -97,7 +97,7 @@
           "score": {
             "scorerVersion": "visual-score-v1+projected-geometry-v1",
             "overallLoss": 0.044089,
-            "geometryError": 0,
+            "geometryError": 0.0,
             "colorError": 0.10935,
             "edgeError": 0.051305,
             "hardFailures": [
@@ -221,6 +221,214 @@
     },
     {
       "schemaVersion": 1,
+      "caseId": "case:fit_957d2ff0528d4d769922e337b22a7551",
+      "projectRoot": ".",
+      "packageName": "com.elon.app.uitest_0a3014c9",
+      "definitionId": "com.elon.app.MainActivity@root/android.container[0]/android.container[1]/android.container[0]/android.container[1]/android.container[0]/android.container[0]/android.container[1]/android.container[6]/android.container[0]/android.container[0]/android.container[2]/android.container[0]/android.container[0]/android.container[0]/android.container[1]/android.container[0]/android.image[0]",
+      "componentKind": "android.image",
+      "propertySet": [
+        "height",
+        "translationX",
+        "translationY",
+        "width"
+      ],
+      "environment": {
+        "screenId": "com.elon.app.MainActivity",
+        "scenario": null,
+        "theme": null,
+        "locale": null,
+        "density": null,
+        "fontScale": null,
+        "viewportWidth": null,
+        "viewportHeight": null
+      },
+      "translationFeatures": {
+        "parentLayoutKind": null,
+        "targetWidthRatio": null,
+        "targetHeightRatio": null,
+        "currentWidthRatio": null,
+        "currentHeightRatio": null,
+        "widthScale": 1.0,
+        "heightScale": 1.0,
+        "targetAspectRatio": 1.0,
+        "currentAspectRatio": 1.0
+      },
+      "runPhase": "ACCEPTED",
+      "outcome": "ACCEPTED",
+      "userDecision": "ACCEPTED",
+      "targetScorePassed": true,
+      "sourceParityPassed": true,
+      "promotable": true,
+      "baselineScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.024277,
+        "geometryError": 0.0,
+        "colorError": 0.0386,
+        "edgeError": 0.05752,
+        "hardFailures": []
+      },
+      "finalScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.024277,
+        "geometryError": 0.0,
+        "colorError": 0.0386,
+        "edgeError": 0.05752,
+        "hardFailures": []
+      },
+      "sourceParityLoss": 0.0,
+      "adjustments": [],
+      "trials": [
+        {
+          "trialId": "baseline_a3579ce0539c4e4cb345eea81fb91e90",
+          "kind": "BASELINE",
+          "acceptedAsBest": true,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.024277,
+            "geometryError": 0.0,
+            "colorError": 0.0386,
+            "edgeError": 0.05752,
+            "hardFailures": []
+          },
+          "error": null
+        },
+        {
+          "trialId": "fresh-runtime-source_1bb9b67217c8465188573e572e428de1",
+          "kind": "SOURCE_VERIFY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.024277,
+            "geometryError": 0.0,
+            "colorError": 0.0386,
+            "edgeError": 0.05752,
+            "hardFailures": []
+          },
+          "error": null
+        }
+      ],
+      "provenance": {
+        "runId": "fit_957d2ff0528d4d769922e337b22a7551",
+        "targetSha256": "1b2b3b05fc03833b14970bfc62e6f04a87581e31720f3036d9715a568cadc2ed",
+        "sourceRevision": "workspace-sha256:976dd2d2c81a5f28900f66ec54865f2727721e4d98078734cbc7875f8c609838",
+        "runtimeBuildId": "1.1.454-uitest_0a3014c9+462",
+        "commitId": null,
+        "trialIds": [
+          "baseline_a3579ce0539c4e4cb345eea81fb91e90",
+          "fresh-runtime-source_1bb9b67217c8465188573e572e428de1"
+        ],
+        "finalScreenshotPath": ".elon/ui-tuner/fit-runs/fit_957d2ff0528d4d769922e337b22a7551/frames/baseline_a3579ce0539c4e4cb345eea81fb91e90.png",
+        "finalDiffArtifactPath": null
+      },
+      "reviewedAt": "2026-07-22T09:27:08.173281800+00:00",
+      "reviewNote": "FitRun 终止原因: SourceVerified"
+    },
+    {
+      "schemaVersion": 1,
+      "caseId": "case:fit_a682decb2daf448c8877547e01990b2b",
+      "projectRoot": ".",
+      "packageName": "com.elon.app.uitest_0a3014c9_0a3014c9",
+      "definitionId": "com.elon.app.MainActivity@root/android.container[0]/android.container[1]/android.container[0]/android.container[1]/android.container[0]/android.container[0]/android.container[1]/android.container[6]/android.container[0]/android.container[0]/android.container[2]/android.container[0]/android.container[0]/android.container[0]/android.container[1]/android.container[0]/android.image[0]",
+      "componentKind": "android.image",
+      "propertySet": [
+        "height",
+        "translationX",
+        "translationY",
+        "width"
+      ],
+      "environment": {
+        "screenId": "com.elon.app.MainActivity",
+        "scenario": null,
+        "theme": null,
+        "locale": null,
+        "density": null,
+        "fontScale": null,
+        "viewportWidth": null,
+        "viewportHeight": null
+      },
+      "translationFeatures": {
+        "parentLayoutKind": null,
+        "targetWidthRatio": null,
+        "targetHeightRatio": null,
+        "currentWidthRatio": null,
+        "currentHeightRatio": null,
+        "widthScale": 1.0,
+        "heightScale": 1.0,
+        "targetAspectRatio": 1.0,
+        "currentAspectRatio": 1.0
+      },
+      "runPhase": "ACCEPTED",
+      "outcome": "ACCEPTED",
+      "userDecision": "ACCEPTED",
+      "targetScorePassed": true,
+      "sourceParityPassed": true,
+      "promotable": true,
+      "baselineScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.024277,
+        "geometryError": 0.0,
+        "colorError": 0.0386,
+        "edgeError": 0.05752,
+        "hardFailures": []
+      },
+      "finalScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.024277,
+        "geometryError": 0.0,
+        "colorError": 0.0386,
+        "edgeError": 0.05752,
+        "hardFailures": []
+      },
+      "sourceParityLoss": 0.0,
+      "adjustments": [],
+      "trials": [
+        {
+          "trialId": "baseline_26bdeef525f6430f804f3010fd57f9fb",
+          "kind": "BASELINE",
+          "acceptedAsBest": true,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.024277,
+            "geometryError": 0.0,
+            "colorError": 0.0386,
+            "edgeError": 0.05752,
+            "hardFailures": []
+          },
+          "error": null
+        },
+        {
+          "trialId": "fresh-runtime-source_df69375019d64ad2954826902a4a41d0",
+          "kind": "SOURCE_VERIFY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.024277,
+            "geometryError": 0.0,
+            "colorError": 0.0386,
+            "edgeError": 0.05752,
+            "hardFailures": []
+          },
+          "error": null
+        }
+      ],
+      "provenance": {
+        "runId": "fit_a682decb2daf448c8877547e01990b2b",
+        "targetSha256": "1b2b3b05fc03833b14970bfc62e6f04a87581e31720f3036d9715a568cadc2ed",
+        "sourceRevision": "workspace-sha256:c24b243dd75e648036787a721d9db8ca9f467bc67cbd7d9bc3343a8376056f43",
+        "runtimeBuildId": "1.1.454-uitest_0a3014c9_0a3014c9+462",
+        "commitId": null,
+        "trialIds": [
+          "baseline_26bdeef525f6430f804f3010fd57f9fb",
+          "fresh-runtime-source_df69375019d64ad2954826902a4a41d0"
+        ],
+        "finalScreenshotPath": ".elon/ui-tuner/fit-runs/fit_a682decb2daf448c8877547e01990b2b/frames/baseline_26bdeef525f6430f804f3010fd57f9fb.png",
+        "finalDiffArtifactPath": null
+      },
+      "reviewedAt": "2026-07-22T09:39:17.921618400+00:00",
+      "reviewNote": "FitRun 终止原因: SourceVerified"
+    },
+    {
+      "schemaVersion": 1,
       "caseId": "case:fit_fd830b5ade6842a18d9ea7cfe7e15d09",
       "projectRoot": ".",
       "packageName": "com.elon.app.uitest",
@@ -243,10 +451,10 @@
         "targetHeightRatio": null,
         "currentWidthRatio": null,
         "currentHeightRatio": null,
-        "widthScale": 1,
-        "heightScale": 1,
-        "targetAspectRatio": 1,
-        "currentAspectRatio": 1
+        "widthScale": 1.0,
+        "heightScale": 1.0,
+        "targetAspectRatio": 1.0,
+        "currentAspectRatio": 1.0
       },
       "runPhase": "ACCEPTED",
       "outcome": "ACCEPTED",
@@ -257,7 +465,7 @@
       "baselineScore": {
         "scorerVersion": "visual-score-v1+projected-geometry-v1",
         "overallLoss": 0.011349,
-        "geometryError": 0,
+        "geometryError": 0.0,
         "colorError": 0.033613,
         "edgeError": 0.006323,
         "hardFailures": []
@@ -265,12 +473,12 @@
       "finalScore": {
         "scorerVersion": "visual-score-v1+projected-geometry-v1",
         "overallLoss": 0.011349,
-        "geometryError": 0,
+        "geometryError": 0.0,
         "colorError": 0.033613,
         "edgeError": 0.006323,
         "hardFailures": []
       },
-      "sourceParityLoss": 0,
+      "sourceParityLoss": 0.0,
       "adjustments": [],
       "trials": [
         {
@@ -280,7 +488,7 @@
           "score": {
             "scorerVersion": "visual-score-v1+projected-geometry-v1",
             "overallLoss": 0.011349,
-            "geometryError": 0,
+            "geometryError": 0.0,
             "colorError": 0.033613,
             "edgeError": 0.006323,
             "hardFailures": []
@@ -294,7 +502,7 @@
           "score": {
             "scorerVersion": "visual-score-v1+projected-geometry-v1",
             "overallLoss": 0.011349,
-            "geometryError": 0,
+            "geometryError": 0.0,
             "colorError": 0.033613,
             "edgeError": 0.006323,
             "hardFailures": []

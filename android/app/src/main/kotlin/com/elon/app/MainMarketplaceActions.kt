@@ -53,6 +53,7 @@ internal class MainMarketplaceActions(
     private val reactionPrefs by lazy { activity.getSharedPreferences("project_plaza_reactions", 0) }
     private val filterChipViews = LinkedHashMap<String, TextView>()
     private var resultsContainer: LinearLayout? = null
+    private var searchPanel: View? = null
     private var searchField: EditText? = null
     private var searchDebounce: Runnable? = null
     private var searchQuery = ""
@@ -112,19 +113,15 @@ internal class MainMarketplaceActions(
         filterChipViews.clear()
         val shell = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, dp(32))
+            setPadding(0, 0, 0, dp(124))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
-        shell.addView(buildSearchBar())
-        shell.addView(buildFilterScroller(), LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            filterChipHeightPx()
-        ).apply {
-            topMargin = dp(20)
-        })
+        shell.addView(buildDiscoveryHeader())
+        searchPanel = buildSearchBar().also { it.visibility = View.GONE }
+        shell.addView(searchPanel)
         val results = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, 0, 0, 0)
@@ -140,6 +137,33 @@ internal class MainMarketplaceActions(
         return results
     }
 
+    private fun buildDiscoveryHeader(): LinearLayout = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(PLAZA_SIDE_MARGIN_DP), 0, dp(PLAZA_SIDE_MARGIN_DP), 0)
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(48)
+        )
+        addView(sectionTitle("推荐"), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(FrameLayout(activity).apply {
+            isClickable = true
+            foreground = selectableForeground()
+            contentDescription = "搜索项目"
+            setOnClickListener {
+                val panel = searchPanel ?: return@setOnClickListener
+                val showing = panel.visibility == View.VISIBLE
+                panel.visibility = if (showing) View.GONE else View.VISIBLE
+                if (!showing) searchField?.requestFocus()
+            }
+            addView(ImageView(activity).apply {
+                setImageResource(R.drawable.ic_search_simple)
+                setColorFilter(Color.parseColor(COLOR_TEXT_PRIMARY))
+                contentDescription = null
+            }, FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER))
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+    }
+
     private fun buildSearchBar(): LinearLayout {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -150,9 +174,9 @@ internal class MainMarketplaceActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(SEARCH_HEIGHT_DP)
             ).apply {
-                marginStart = dp(SEARCH_SIDE_MARGIN_DP)
-                marginEnd = dp(SEARCH_SIDE_MARGIN_DP)
-                topMargin = dp(16)
+                marginStart = dp(PLAZA_SIDE_MARGIN_DP)
+                marginEnd = dp(PLAZA_SIDE_MARGIN_DP)
+                bottomMargin = dp(12)
             }
             addView(ImageView(activity).apply {
                 setImageResource(R.drawable.ic_search_simple)
@@ -173,7 +197,7 @@ internal class MainMarketplaceActions(
         return EditText(activity).apply {
             searchField = this
             background = null
-            hint = "搜索应用"
+            hint = "搜索项目、作者"
             setText(searchQuery)
             setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT
@@ -183,7 +207,7 @@ internal class MainMarketplaceActions(
             setPadding(0, 0, 0, 0)
             setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
             setHintTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
@@ -284,35 +308,27 @@ internal class MainMarketplaceActions(
             container.addView(centerMessage("暂无匹配项目", COLOR_TEXT_SECONDARY))
             return
         }
-        container.addView(sectionTitle("推荐"), LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            marginStart = dp(CARD_SIDE_MARGIN_DP)
-            marginEnd = dp(CARD_SIDE_MARGIN_DP)
-            topMargin = dp(28)
-        })
         container.addView(buildFeaturedStrip(projects.take(5)), LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(392)
-        ).apply { topMargin = dp(18) })
-        container.addView(sectionTitle("全部项目"), LinearLayout.LayoutParams(
+            featuredCardHeightPx()
+        ).apply { topMargin = dp(4) })
+        container.addView(sectionTitle("全部"), LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            marginStart = dp(CARD_SIDE_MARGIN_DP)
-            marginEnd = dp(CARD_SIDE_MARGIN_DP)
-            topMargin = dp(28)
-            bottomMargin = dp(10)
+            marginStart = dp(PLAZA_SIDE_MARGIN_DP)
+            marginEnd = dp(PLAZA_SIDE_MARGIN_DP)
+            topMargin = dp(14)
+            bottomMargin = dp(4)
         })
         projects.forEachIndexed { index, project ->
             container.addView(buildProjectListRow(project), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                marginStart = dp(CARD_SIDE_MARGIN_DP)
-                marginEnd = dp(CARD_SIDE_MARGIN_DP)
-                topMargin = dp(if (index == 0) 0 else 12)
+                marginStart = dp(PLAZA_SIDE_MARGIN_DP)
+                marginEnd = dp(PLAZA_SIDE_MARGIN_DP)
+                topMargin = dp(if (index == 0) 0 else 16)
             })
         }
     }
@@ -321,148 +337,168 @@ internal class MainMarketplaceActions(
         text = label
         includeFontPadding = false
         setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
     }
 
     private fun buildFeaturedStrip(projects: List<StoreProject>) = HorizontalScrollView(activity).apply {
         isHorizontalScrollBarEnabled = false
         overScrollMode = View.OVER_SCROLL_NEVER
         clipToPadding = false
-        setPadding(dp(CARD_SIDE_MARGIN_DP), 0, dp(28), 0)
+        setPadding(dp(PLAZA_SIDE_MARGIN_DP), 0, dp(PLAZA_TRAILING_PADDING_DP), 0)
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             projects.forEach { project ->
-                addView(buildFeaturedCard(project), LinearLayout.LayoutParams(dp(306), dp(382)).apply {
-                    marginEnd = dp(16)
+                addView(buildFeaturedCard(project), LinearLayout.LayoutParams(featuredCardWidthPx(), featuredCardHeightPx()).apply {
+                    marginEnd = dp(FEATURED_CARD_GAP_DP)
                 })
             }
         })
     }
 
-    private fun buildFeaturedCard(project: StoreProject) = LinearLayout(activity).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(dp(24), dp(24), dp(24), dp(20))
-        background = rect("#181818", 28)
+    private fun buildFeaturedCard(project: StoreProject) = FrameLayout(activity).apply {
         isClickable = true
         foreground = selectableForeground()
+        contentDescription = "查看${project.displayTitle()}"
         setOnClickListener { openProjectSpace(project) }
+        addView(ImageView(activity).apply {
+            setImageResource(R.drawable.project_plaza_ui1_card)
+            scaleType = ImageView.ScaleType.FIT_XY
+            contentDescription = null
+        }, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         addView(LinearLayout(activity).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            addView(projectThumbnail(project), LinearLayout.LayoutParams(dp(50), dp(50)))
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(19), dp(22), dp(19), dp(14))
             addView(LinearLayout(activity).apply {
-                gravity = Gravity.END or Gravity.CENTER_VERTICAL
-                addView(reactionButton(project, "favorite", "☆", "★", "收藏"))
-                addView(reactionButton(project, "liked", "♡", "♥", "点赞"), LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(2) })
-            }, LinearLayout.LayoutParams(0, dp(50), 1f))
-        })
-        addView(TextView(activity).apply {
-            text = project.displayTitle()
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-            setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(18) })
-        addView(TextView(activity).apply {
-            text = project.description?.takeIf { it.isNotBlank() } ?: "这个项目还没有填写简介。"
-            maxLines = 2
-            ellipsize = TextUtils.TruncateAt.END
-            setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48)).apply { topMargin = dp(8) })
-        addView(LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            repeat(2) { index ->
-                addView(FrameLayout(activity).apply {
-                    background = rect(if (index == 0) "#747474" else "#656565", 10)
-                    addView(ImageView(activity).apply {
-                        setImageResource(R.drawable.ic_attach_photos)
-                        setColorFilter(Color.parseColor("#D9D9D9"))
-                    }, FrameLayout.LayoutParams(dp(28), dp(28), Gravity.CENTER))
-                }, LinearLayout.LayoutParams(0, dp(112), 1f).apply { if (index == 1) marginStart = dp(10) })
-            }
-        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(112)).apply { topMargin = dp(12) })
+                gravity = Gravity.CENTER_VERTICAL
+                addView(ImageView(activity).apply {
+                    setImageResource(R.drawable.project_plaza_ui3_avatar)
+                    scaleType = ImageView.ScaleType.FIT_XY
+                    contentDescription = "${project.displayTitle()}头像"
+                }, LinearLayout.LayoutParams(dp(36), dp(36)))
+                addView(LinearLayout(activity).apply {
+                    gravity = Gravity.END or Gravity.CENTER_VERTICAL
+                    addView(reactionImageButton(project, "favorite", R.drawable.project_plaza_ui5_star, "收藏"))
+                    addView(reactionImageButton(project, "liked", R.drawable.project_plaza_ui4_heart, "点赞"), LinearLayout.LayoutParams(dp(30), dp(36)).apply { marginStart = dp(1) })
+                }, LinearLayout.LayoutParams(0, dp(36), 1f))
+            })
+            addView(TextView(activity).apply {
+                text = project.displayTitle()
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
+            addView(TextView(activity).apply {
+                text = project.description?.takeIf { it.isNotBlank() } ?: "这个项目还没有填写简介。"
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setLineSpacing(0f, 1.05f)
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(28)).apply { topMargin = dp(6) })
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                repeat(2) { index ->
+                    addView(mediaPlaceholder(), LinearLayout.LayoutParams(dp(60), dp(85)).apply {
+                        if (index == 1) marginStart = dp(8)
+                    })
+                }
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(85)).apply { topMargin = dp(6) })
+        }, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         addView(TextView(activity).apply {
             text = "›"
             gravity = Gravity.CENTER
-            background = rect("#D9D9D9", 25)
+            background = rect("#D9D9D9", 18)
             setTextColor(Color.parseColor("#454545"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 32f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 27f)
             contentDescription = "进入${project.displayTitle()}"
-        }, LinearLayout.LayoutParams(dp(50), dp(50)).apply { gravity = Gravity.END; topMargin = dp(12) })
+        }, FrameLayout.LayoutParams(dp(28), dp(28), Gravity.END or Gravity.BOTTOM).apply {
+            marginEnd = dp(19)
+            bottomMargin = dp(17)
+        })
     }
 
-    private fun reactionButton(project: StoreProject, key: String, off: String, on: String, label: String) = TextView(activity).apply {
+    private fun mediaPlaceholder() = FrameLayout(activity).apply {
+        background = rect("#747474", 10)
+        addView(ImageView(activity).apply {
+            setImageResource(R.drawable.ic_attach_photos)
+            setColorFilter(Color.parseColor("#D9D9D9"))
+            contentDescription = null
+        }, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
+    }
+
+    private fun reactionImageButton(
+        project: StoreProject,
+        key: String,
+        drawableRes: Int,
+        label: String
+    ) = FrameLayout(activity).apply {
+        val icon = ImageView(activity).apply {
+            setImageResource(drawableRes)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = null
+        }
         fun render() {
             val selected = reactionPrefs.getBoolean("${project.id}:$key", false)
-            text = if (selected) on else off
+            icon.alpha = if (selected) 1f else 0.72f
             contentDescription = if (selected) "取消$label" else label
         }
-        gravity = Gravity.CENTER
-        setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
         isClickable = true
         foreground = selectableForeground()
         setOnClickListener {
-            reactionPrefs.edit().putBoolean("${project.id}:$key", !reactionPrefs.getBoolean("${project.id}:$key", false)).apply()
+            reactionPrefs.edit()
+                .putBoolean("${project.id}:$key", !reactionPrefs.getBoolean("${project.id}:$key", false))
+                .apply()
             render()
         }
+        val iconWidth = if (drawableRes == R.drawable.project_plaza_ui5_star) designPx(65) else designPx(59)
+        val iconHeight = if (drawableRes == R.drawable.project_plaza_ui5_star) designPx(59) else designPx(55)
+        addView(icon, FrameLayout.LayoutParams(iconWidth, iconHeight, Gravity.CENTER))
         render()
-    }.also { it.layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)) }
+    }.also { it.layoutParams = LinearLayout.LayoutParams(dp(30), dp(36)) }
 
     private fun buildProjectListRow(project: StoreProject) = LinearLayout(activity).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(12), dp(10), dp(4), dp(10))
+        setPadding(dp(9), dp(8), 0, dp(8))
         isClickable = true
         foreground = selectableForeground()
         setOnClickListener { openProjectSpace(project) }
-        addView(projectThumbnail(project), LinearLayout.LayoutParams(dp(58), dp(58)))
+        addView(projectThumbnail(project), LinearLayout.LayoutParams(designPx(159), designPx(155)))
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             addView(TextView(activity).apply {
                 text = project.displayTitle(); maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             })
             addView(TextView(activity).apply {
                 text = project.description?.takeIf { it.isNotBlank() } ?: "这个项目还没有填写简介。"
                 maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(5) })
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(16) })
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(8) })
         addView(TextView(activity).apply {
-            text = "›"; gravity = Gravity.CENTER; contentDescription = "进入${project.displayTitle()}"
+            text = "›"; gravity = Gravity.END or Gravity.CENTER_VERTICAL; contentDescription = "进入${project.displayTitle()}"
+            setPadding(0, 0, dp(3), 0)
             setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 32f)
-        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        }, LinearLayout.LayoutParams(dp(42), dp(48)))
     }
 
     private fun projectThumbnail(project: StoreProject): View {
-        return FrameLayout(activity).apply {
-            background = rect(COLOR_THUMB_BG, THUMB_RADIUS_DP)
-            clipToOutline = true
-            val iconBitmap = UserProfileStore.decodeAvatar(project.iconDataUrl)
-            if (iconBitmap != null) {
-                addView(ImageView(activity).apply {
-                    setImageBitmap(iconBitmap)
-                    scaleType = ImageView.ScaleType.CENTER_CROP
-                }, FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                ))
-            } else {
-                addView(TextView(activity).apply {
-                    includeFontPadding = false
-                    gravity = Gravity.CENTER
-                    text = avatarText(project.displayTitle())
-                    setTextColor(Color.parseColor("#253140"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_AVATAR_SP)
-                    setTypeface(typeface, Typeface.BOLD)
-                }, FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT
-                ))
-            }
+        return ImageView(activity).apply {
+            setImageResource(R.drawable.project_plaza_ui2_thumbnail)
+            scaleType = ImageView.ScaleType.FIT_XY
+            contentDescription = "${project.displayTitle()}缩略图"
         }
     }
+
+    private fun featuredCardWidthPx(): Int {
+        val width = activity.resources.displayMetrics.widthPixels.takeIf { it > 0 } ?: dp(360)
+        return (width * FEATURED_CARD_WIDTH_FRACTION).roundToInt()
+    }
+
+    private fun featuredCardHeightPx(): Int =
+        (featuredCardWidthPx() * FEATURED_CARD_HEIGHT_RATIO).roundToInt()
 
     private fun iconActionButton(
         iconRes: Int,
@@ -622,6 +658,11 @@ internal class MainMarketplaceActions(
         const val SEARCH_HEIGHT_DP = 48
         const val SEARCH_RADIUS_DP = 24
         const val SEARCH_SIDE_MARGIN_DP = 16
+        const val PLAZA_SIDE_MARGIN_DP = 20
+        const val PLAZA_TRAILING_PADDING_DP = 98
+        const val FEATURED_CARD_GAP_DP = 22
+        const val FEATURED_CARD_WIDTH_FRACTION = 0.656f
+        const val FEATURED_CARD_HEIGHT_RATIO = 1.126f
         const val DESIGN_WIDTH_PX = 1272
         const val SEGMENT_WIDTH_PX = 210
         const val SEGMENT_HEIGHT_PX = 138
