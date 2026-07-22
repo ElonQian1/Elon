@@ -16,6 +16,7 @@ use super::launcher_xml::{launcher_candidates, page_identity, parse_nodes};
 use super::visual_diff::PixelRect;
 
 const MAX_XML_BYTES: usize = 4 * 1024 * 1024;
+const RUNTIME_RESTORE_ATTEMPTS: usize = 60;
 
 #[derive(Debug)]
 struct LocatedIcon {
@@ -364,7 +365,7 @@ async fn restore_origin_page(
 }
 
 async fn wait_for_same_runtime(session: &LiveUiSession, settle_ms: u64) -> bool {
-    for _ in 0..20 {
+    for _ in 0..RUNTIME_RESTORE_ATTEMPTS {
         if session.view().await.connected {
             return true;
         }
