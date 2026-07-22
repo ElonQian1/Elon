@@ -189,7 +189,7 @@ pub(super) fn load_drain_candidates(
     store: &crate::node_agent_local_task_store::LocalTaskStore,
 ) -> anyhow::Result<Vec<crate::node_agent_local_task_store::LocalTaskRecord>> {
     store
-        .list_update_install_candidates()
+        .list_update_candidates()
         .map_err(|error| anyhow::anyhow!("durable supervised task query failed: {error:#}"))
 }
 
@@ -292,6 +292,66 @@ mod tests {
                     != Some("supervision_stale_runtime_resume_required")
             }));
         }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn shared_drain_excludes_resume_required_but_installer_gate_includes_it() {
+        let root = std::env::temp_dir().join(format!(
+            "restart-drain-query-boundary-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let store = crate::node_agent_local_task_store::LocalTaskStore::new(root.join("tasks.db"));
+        for task_id in [
+            "running",
+            "recovering",
+            "cancel-requested",
+            "resume-required",
+        ] {
+            store
+                .create(LocalTaskStart {
+                    task_id,
+                    owner_user_id: "owner",
+                    agent_id: "agent",
+                    install_id: "install",
+                    project_id: "project",
+                    channel_id: None,
+                    conversation_id: task_id,
+                    workspace_path: root.to_string_lossy().as_ref(),
+                    prompt: "query boundary",
+                    cli: "codex",
+                    runtime_permission: "full_access",
+                })
+                .unwrap();
+        }
+        assert!(store.mark_recovering("recovering", "recovering").unwrap());
+        assert!(store.mark_cancel_requested("cancel-requested").unwrap());
+        assert!(store
+            .mark_recovery_blocked("resume-required", "resume")
+            .unwrap());
+
+        let shared = load_drain_candidates(&store)
+            .unwrap()
+            .into_iter()
+            .map(|task| task.task_id)
+            .collect::<HashSet<_>>();
+        assert_eq!(
+            shared,
+            HashSet::from([
+                "running".to_string(),
+                "recovering".to_string(),
+                "cancel-requested".to_string()
+            ])
+        );
+        let installer = store
+            .list_update_install_candidates()
+            .unwrap()
+            .into_iter()
+            .map(|task| task.task_id)
+            .collect::<HashSet<_>>();
+        assert!(installer.contains("resume-required"));
+        assert_eq!(installer.len(), 4);
         let _ = std::fs::remove_dir_all(root);
     }
 

@@ -11,6 +11,8 @@ pub(crate) mod idempotency;
 pub(crate) mod reconcile;
 #[path = "node_agent_local_task_store_safety.rs"]
 mod safety;
+#[path = "node_agent_local_task_store_update.rs"]
+mod update;
 #[path = "node_agent_local_task_store_workspace.rs"]
 pub(crate) mod workspace;
 #[derive(Clone, Debug)]
