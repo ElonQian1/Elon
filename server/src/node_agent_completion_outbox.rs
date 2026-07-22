@@ -15,6 +15,8 @@ use rusqlite::{params, Connection, OptionalExtension};
 #[path = "node_agent_completion_outbox_support.rs"]
 mod support;
 use support::*;
+#[path = "node_agent_completion_outbox_recovery.rs"]
+mod recovery;
 
 const OUTBOX_FILE_NAME: &str = "cli-completion-outbox.sqlite3";
 const STATUS_PENDING: &str = "pending";

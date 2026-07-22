@@ -24,6 +24,48 @@ impl TerminalLeaseCursor {
 }
 
 impl LocalTaskStore {
+    pub(crate) fn list_terminal_repair_candidates(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<LocalTaskRecord>> {
+        let conn = self.open()?;
+        let mut stmt = conn.prepare(&format!(
+            "{} WHERE status = 'done' AND completion_event_id IS NOT NULL
+                 AND sync_state IN ('local_only','pending','retrying','rejected')
+             ORDER BY COALESCE(finished_at_ms, started_at_ms) DESC, task_id DESC
+             LIMIT ?1",
+            select_sql()
+        ))?;
+        let records = stmt
+            .query_map(params![limit.clamp(1, 1_000) as i64], read_record)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(anyhow::Error::from)?;
+        Ok(records)
+    }
+
+    pub(crate) fn list_stale_runtime_candidates(
+        &self,
+        started_before_ms: i64,
+        limit: usize,
+    ) -> Result<Vec<LocalTaskRecord>> {
+        let conn = self.open()?;
+        let mut stmt = conn.prepare(&format!(
+            "{} WHERE status IN ('running','recovering','reattaching')
+                   AND completion_event_id IS NULL AND started_at_ms <= ?1
+             ORDER BY started_at_ms, task_id
+             LIMIT ?2",
+            select_sql()
+        ))?;
+        let records = stmt
+            .query_map(
+                params![started_before_ms, limit.clamp(1, 1_000) as i64],
+                read_record,
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(anyhow::Error::from)?;
+        Ok(records)
+    }
+
     /// Installer-only view: persisted cancellation and Resume states need a
     /// fresh executor recheck, but must not widen the live drain candidate set.
     pub(crate) fn list_update_install_candidates(&self) -> Result<Vec<LocalTaskRecord>> {

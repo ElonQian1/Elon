@@ -15,12 +15,15 @@ use crate::NodeRuntime;
 const STALE_AFTER_MS: u128 = 2 * 60 * 1_000;
 const RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 const COMPLETION_SCAN_LIMIT: usize = 1_000;
+const TERMINAL_REPAIR_LIMIT: usize = 128;
+const STALE_CANDIDATE_LIMIT: usize = 256;
 
 pub(crate) async fn reconcile_once(runtime: &NodeRuntime) -> Result<usize> {
     reconcile_with_stale_after(runtime, STALE_AFTER_MS).await
 }
 
 async fn reconcile_with_stale_after(runtime: &NodeRuntime, stale_after_ms: u128) -> Result<usize> {
+    repair_historical_terminal_candidates(runtime).await?;
     let pending = runtime
         .completion_outbox
         .list_pending(COMPLETION_SCAN_LIMIT)?
@@ -57,14 +60,15 @@ async fn reconcile_with_stale_after(runtime: &NodeRuntime, stale_after_ms: u128)
     let now = crate::node_agent_cli_sidecar::now_ms();
     let cutoff = (now.min(i64::MAX as u128) as i64)
         .saturating_sub(stale_after_ms.min(i64::MAX as u128) as i64);
-    let candidates = runtime.local_tasks.list_update_install_candidates()?;
+    let candidates = runtime
+        .local_tasks
+        .list_stale_runtime_candidates(cutoff, STALE_CANDIDATE_LIMIT)?;
     let mut changed = 0;
     for candidate in candidates.into_iter().filter(|task| {
         matches!(
             task.status.as_str(),
             "running" | "recovering" | "reattaching"
         ) && task.completion_event_id.is_none()
-            && task.started_at_ms <= cutoff
     }) {
         changed += usize::from(
             reconcile_candidate(
@@ -79,6 +83,94 @@ async fn reconcile_with_stale_after(runtime: &NodeRuntime, stale_after_ms: u128)
         );
     }
     Ok(changed)
+}
+
+async fn repair_historical_terminal_candidates(runtime: &NodeRuntime) -> Result<usize> {
+    let candidates = runtime
+        .local_tasks
+        .list_terminal_repair_candidates(TERMINAL_REPAIR_LIMIT)?;
+    let mut repaired = 0;
+    for candidate in candidates.into_iter().filter(is_platform_supervised) {
+        let snapshot_trusted = candidate.workspace_status.as_ref().is_some_and(|status| {
+            status
+                .get("terminal_snapshot_status")
+                .and_then(serde_json::Value::as_str)
+                == Some("trusted")
+        });
+        let existing = runtime
+            .completion_outbox
+            .latest_for_req_id(&candidate.task_id)?;
+        if snapshot_trusted && existing.is_some() {
+            continue;
+        }
+        let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
+            &runtime.task_journal,
+            &candidate.task_id,
+        )?
+        .context("supervised historical terminal task has no durable contract")?;
+        let base = crate::node_agent_supervision_terminal_lease_safety::admission_base(
+            &candidate,
+            &contract,
+            &candidate.task_id,
+        )?;
+        let admission =
+            crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire(&base)?;
+        let task = runtime
+            .local_tasks
+            .get(&candidate.task_id)?
+            .context("historical terminal task disappeared after admission")?;
+        if task.status != "done"
+            || task.sync_state == "synced"
+            || task.completion_event_id.is_none()
+        {
+            continue;
+        }
+        let active = task
+            .workspace_status
+            .as_ref()
+            .and_then(|status| status.get("active_workspace_path"))
+            .and_then(serde_json::Value::as_str)
+            .map(Path::new)
+            .unwrap_or_else(|| Path::new(&task.workspace_path));
+        if candidate_runtime_protects(
+            runtime,
+            &task,
+            active,
+            crate::node_agent_cli_sidecar::now_ms(),
+            0,
+        )
+        .await?
+        {
+            continue;
+        }
+        let completion = match runtime.completion_outbox.latest_for_req_id(&task.task_id)? {
+            Some(completion) => completion,
+            None => {
+                crate::node_agent_terminal_finalization::historical_completion(&task, &contract)?
+                    .context("historical terminal task has neither outbox nor completed receipt")?
+            }
+        };
+        runtime
+            .completion_outbox
+            .preflight_restore_pending(&completion)?;
+        crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(runtime)
+            .reconcile_with_admission(&completion, &admission)
+            .await?;
+        runtime
+            .local_tasks
+            .mark_trusted_completion_pending(&task.task_id, &completion.event_id)?;
+        runtime.completion_outbox.enqueue(&completion)?;
+        runtime
+            .completion_outbox
+            .restore_pending(&completion.event_id, &completion.req_id)?;
+        repaired += 1;
+        info!(
+            task_id = %task.task_id,
+            event_id = %completion.event_id,
+            "recovered historical terminal completion from strict durable evidence"
+        );
+    }
+    Ok(repaired)
 }
 
 async fn reconcile_candidate(
@@ -109,7 +201,7 @@ async fn reconcile_candidate(
     } else {
         None
     };
-    let _admission = admission_base
+    let admission = admission_base
         .as_deref()
         .map(crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire)
         .transpose()?;
@@ -148,16 +240,7 @@ async fn reconcile_candidate(
         .and_then(serde_json::Value::as_str)
         .map(Path::new)
         .unwrap_or_else(|| Path::new(&task.workspace_path));
-    if runtime
-        .active_cli_prompt_views_for_workspace(active_workspace)
-        .await
-        .into_iter()
-        .any(|handle| handle.control_handle_live)
-        || runtime
-            .active_cli_prompt_view(task_id)
-            .await
-            .is_some_and(|handle| handle.control_handle_live)
-    {
+    if candidate_runtime_protects(runtime, &task, active_workspace, now, stale_after_ms).await? {
         return Ok(false);
     }
     if is_platform_supervised(&task) {
@@ -166,32 +249,91 @@ async fn reconcile_candidate(
             task_id,
         )?
         .context("supervised orphan contract disappeared under admission")?;
-        let root = contract.root_task_id.as_deref().unwrap_or(task_id);
+        if !active_workspace.is_dir() {
+            if let Some(completion) =
+                crate::node_agent_terminal_finalization::historical_completion(&task, &contract)?
+            {
+                let admission = admission
+                    .as_ref()
+                    .context("supervised orphan recovery lost its admission guard")?;
+                runtime
+                    .completion_outbox
+                    .preflight_restore_pending(&completion)?;
+                crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(
+                    runtime,
+                )
+                .reconcile_with_admission(&completion, admission)
+                .await?;
+                runtime
+                    .local_tasks
+                    .mark_trusted_completion_pending(task_id, &completion.event_id)?;
+                runtime.completion_outbox.enqueue(&completion)?;
+                runtime
+                    .completion_outbox
+                    .restore_pending(&completion.event_id, &completion.req_id)?;
+                info!(
+                    task_id,
+                    event_id = %completion.event_id,
+                    "recovered stale missing-worktree task from completed finalization receipt"
+                );
+                return Ok(true);
+            }
+        }
+    }
+    runtime
+        .local_tasks
+        .mark_one_stale_without_runtime(task_id, cutoff)
+}
+
+async fn candidate_runtime_protects(
+    runtime: &NodeRuntime,
+    task: &crate::node_agent_local_task_store::LocalTaskRecord,
+    active_workspace: &Path,
+    now: u128,
+    stale_after_ms: u128,
+) -> Result<bool> {
+    if runtime
+        .active_cli_prompt_views_for_workspace(active_workspace)
+        .await
+        .into_iter()
+        .any(|handle| handle.control_handle_live)
+        || runtime
+            .active_cli_prompt_view(&task.task_id)
+            .await
+            .is_some_and(|handle| handle.control_handle_live)
+    {
+        return Ok(true);
+    }
+    if is_platform_supervised(task) {
+        let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
+            &runtime.task_journal,
+            &task.task_id,
+        )?
+        .context("supervised orphan contract disappeared under admission")?;
+        let root = contract.root_task_id.as_deref().unwrap_or(&task.task_id);
         if crate::node_agent_supervision_terminal_lease_safety::lineage_or_workspace_is_active(
             runtime,
-            task_id,
+            &task.task_id,
             root,
             active_workspace,
             false,
         )
         .await?
         {
-            return Ok(false);
+            return Ok(true);
         }
     }
-    if let Some(sidecar) = runtime.cli_sidecars.session_for_task(task_id)? {
+    if let Some(sidecar) = runtime.cli_sidecars.session_for_task(&task.task_id)? {
         if sidecar_record_protects(&sidecar, now)? {
-            return Ok(false);
+            return Ok(true);
         }
     }
-    if let Some(record) = runtime.task_journal.snapshot(task_id, 0, 1)?.record {
+    if let Some(record) = runtime.task_journal.snapshot(&task.task_id, 0, 1)?.record {
         if journal_record_protects(&record, now, stale_after_ms)? {
-            return Ok(false);
+            return Ok(true);
         }
     }
-    runtime
-        .local_tasks
-        .mark_one_stale_without_runtime(task_id, cutoff)
+    Ok(false)
 }
 
 fn journal_record_protects(
@@ -285,7 +427,10 @@ pub(crate) fn spawn_reconciler(runtime: Arc<NodeRuntime>) {
                 match reconcile_once(&runtime).await {
                     Ok(0) => {}
                     Ok(changed) => {
-                        warn!(changed, "periodic orphan reconciliation requested Resume")
+                        warn!(
+                            changed,
+                            "periodic orphan reconciliation changed durable task state"
+                        )
                     }
                     Err(error) => warn!(%error, "periodic orphan reconciliation failed closed"),
                 }

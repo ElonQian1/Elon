@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, SecondsFormat, Utc};
-use homecli_proto::CliCompletionEnvelope;
+use homecli_proto::{CliCompletionEnvelope, CliCompletionProducerIdentity, CliProjectContext};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -269,6 +269,143 @@ pub(crate) async fn verify_completed_identity(
     verify_completed_identity_with_roots(runtime, task, supervision, completion, None, None).await
 }
 
+/// Rebuild only the completion envelope that a fully completed immutable
+/// finalization receipt can prove. This does not persist or bind anything; the
+/// caller must pass the result through `LocalTerminalReconciler` first.
+pub(crate) fn historical_completion(
+    task: &crate::node_agent_local_task_store::LocalTaskRecord,
+    supervision: &crate::node_agent_local_task_supervision::SupervisionContract,
+) -> Result<Option<CliCompletionEnvelope>> {
+    historical_completion_with_root(task, supervision, &default_receipt_root())
+}
+
+fn historical_completion_with_root(
+    task: &crate::node_agent_local_task_store::LocalTaskRecord,
+    supervision: &crate::node_agent_local_task_supervision::SupervisionContract,
+    receipt_root: &Path,
+) -> Result<Option<CliCompletionEnvelope>> {
+    let root_task_id = supervision.root_task_id.as_deref().unwrap_or(&task.task_id);
+    let Some((_, receipt, _)) = find_receipt(
+        receipt_root,
+        root_task_id,
+        Path::new(&task.workspace_path),
+        Some(&task.task_id),
+    )?
+    else {
+        return Ok(None);
+    };
+    anyhow::ensure!(
+        receipt.schema == "elon.terminal_finalization.v1" && receipt.state == "completed",
+        "historical completion requires a completed terminal finalization receipt"
+    );
+    anyhow::ensure!(
+        lower_hex(&receipt.finalization_id, 32),
+        "historical completion receipt has an invalid finalization id"
+    );
+    let binding = [
+        receipt.task_id.is_some(),
+        receipt.completion_event_id.is_some(),
+        receipt.terminal_status.is_some(),
+        receipt.bound_at_utc.is_some(),
+    ];
+    anyhow::ensure!(
+        binding.iter().all(|present| *present) || binding.iter().all(|present| !present),
+        "historical completion receipt has a partial terminal binding"
+    );
+    let event_id = if binding.iter().all(|present| *present) {
+        anyhow::ensure!(
+            receipt.task_id.as_deref() == Some(task.task_id.as_str())
+                && receipt.terminal_status.as_deref() == Some("done"),
+            "historical completion receipt binds a conflicting task or status"
+        );
+        parse_timestamp(
+            receipt
+                .bound_at_utc
+                .as_deref()
+                .context("historical completion boundAtUtc missing")?,
+            "boundAtUtc",
+        )?;
+        receipt
+            .completion_event_id
+            .clone()
+            .context("historical completion event binding missing")?
+    } else if let Some(event_id) = task.completion_event_id.as_deref() {
+        event_id.to_string()
+    } else {
+        uuid::Uuid::parse_str(&receipt.finalization_id)
+            .context("historical finalization id is not a UUID")?
+            .to_string()
+    };
+    if let Some(existing) = task.completion_event_id.as_deref() {
+        anyhow::ensure!(
+            existing == event_id,
+            "historical completion event conflicts with the local terminal row"
+        );
+    }
+    anyhow::ensure!(
+        matches!(
+            task.status.as_str(),
+            "running" | "recovering" | "reattaching" | "resume_required" | "done"
+        ) && task.error.is_none(),
+        "historical completed receipt conflicts with local task status or error"
+    );
+    let completed_at = receipt
+        .completed_at_utc
+        .as_deref()
+        .context("historical completion completedAtUtc missing")?;
+    let parsed = DateTime::parse_from_rfc3339(completed_at)
+        .context("historical completion completedAtUtc is invalid")?;
+    let receipt_ms = parsed.timestamp_millis();
+    anyhow::ensure!(receipt_ms > 0, "historical completion timestamp is invalid");
+    let created_at_ms = task
+        .finished_at_ms
+        .map(|value| value.max(0) as u64)
+        .unwrap_or(receipt_ms as u64);
+    anyhow::ensure!(
+        created_at_ms > 0,
+        "historical completion timestamp is missing"
+    );
+    Ok(Some(CliCompletionEnvelope {
+        event_id,
+        req_id: task.task_id.clone(),
+        cli: task.cli.clone(),
+        origin: crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN.to_string(),
+        producer_identity: Some(CliCompletionProducerIdentity {
+            owner_user_id: task.owner_user_id.clone(),
+            agent_id: task.agent_id.clone(),
+            install_id: task.install_id.clone(),
+        }),
+        project_context: Some(CliProjectContext {
+            project_id: task.project_id.clone(),
+            conversation_id: task.conversation_id.clone(),
+            runtime_permission: Some(task.runtime_permission.clone()),
+        }),
+        channel_id: task.channel_id.clone(),
+        prompt: Some(task.prompt.clone()),
+        final_output: task.final_reply.clone().unwrap_or_default(),
+        exit_ok: true,
+        error: None,
+        session_id: task.codex_session_id.clone(),
+        prompt_tokens: task.input_tokens.map(|value| value.max(0) as u64),
+        cached_input_tokens: task.cached_input_tokens.map(|value| value.max(0) as u64),
+        completion_tokens: task.output_tokens.map(|value| value.max(0) as u64),
+        reasoning_tokens: task.reasoning_tokens.map(|value| value.max(0) as u64),
+        total_tokens: task.total_tokens.map(|value| value.max(0) as u64),
+        model: task.model.clone(),
+        workspace_status: None,
+        created_at_ms,
+    }))
+}
+
+#[cfg(test)]
+pub(crate) fn historical_completion_for_test(
+    task: &crate::node_agent_local_task_store::LocalTaskRecord,
+    supervision: &crate::node_agent_local_task_supervision::SupervisionContract,
+    receipt_root: &Path,
+) -> Result<Option<CliCompletionEnvelope>> {
+    historical_completion_with_root(task, supervision, receipt_root)
+}
+
 async fn verify_completed_identity_with_roots(
     runtime: &crate::NodeRuntime,
     task: &crate::node_agent_local_task_store::LocalTaskRecord,
@@ -500,7 +637,7 @@ fn find_receipt(
     );
     entries.sort_by_key(|entry| entry.file_name());
     let mut matches = Vec::new();
-    let mut observed = Vec::new();
+    let mut conflicts = Vec::new();
     for entry in entries {
         let path = entry.path();
         let metadata = fs::symlink_metadata(&path)?;
@@ -527,38 +664,51 @@ fn find_receipt(
             receipt.task_contract_id == stem,
             "terminal receipt filename and TaskContract binding differ"
         );
-        observed.push(format!(
-            "root={};worktree={};task={}",
-            receipt.supervision_root_task_id,
-            receipt.worktree,
-            receipt.task_id.as_deref().unwrap_or("<unbound>")
-        ));
-        if receipt.supervision_root_task_id != root_task_id
-            || !crate::node_agent_update_checkpoint::same_path(
-                Path::new(&receipt.worktree),
-                worktree,
-            )
-            || receipt
-                .task_id
-                .as_deref()
-                .zip(task_id)
-                .is_some_and(|(bound, expected)| bound != expected)
+        anyhow::ensure!(
+            receipt.supervision_root_task_id == root_task_id,
+            "terminal receipt is stored under a different supervision root"
+        );
+        let same_worktree =
+            crate::node_agent_update_checkpoint::same_path(Path::new(&receipt.worktree), worktree);
+        let same_task = receipt
+            .task_id
+            .as_deref()
+            .zip(task_id)
+            .is_some_and(|(bound, expected)| bound == expected);
+        if !same_worktree {
+            if same_task {
+                conflicts.push(format!(
+                    "task={};worktree={}",
+                    receipt.task_id.as_deref().unwrap_or("<unbound>"),
+                    receipt.worktree
+                ));
+            }
+            continue;
+        }
+        if receipt
+            .task_id
+            .as_deref()
+            .zip(task_id)
+            .is_some_and(|(bound, expected)| bound != expected)
         {
+            conflicts.push(format!(
+                "task={};worktree={}",
+                receipt.task_id.as_deref().unwrap_or("<unbound>"),
+                receipt.worktree
+            ));
             continue;
         }
         matches.push((path, receipt, bytes));
     }
     anyhow::ensure!(
+        conflicts.is_empty(),
+        "terminal finalization receipt identity conflicts: {}",
+        conflicts.join("|")
+    );
+    anyhow::ensure!(
         matches.len() <= 1,
         "multiple terminal finalization receipts match the same task identity"
     );
-    if matches.is_empty() && !observed.is_empty() {
-        anyhow::bail!(
-            "terminal receipt directory has no identity match for root={root_task_id};worktree={}; candidates={}",
-            worktree.display(),
-            observed.join("|")
-        );
-    }
     Ok(matches.into_iter().next())
 }
 

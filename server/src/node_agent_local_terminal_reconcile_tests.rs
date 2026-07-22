@@ -173,6 +173,165 @@ async fn workspace_identity_and_receipt_conflicts_fail_closed() {
         .await;
 }
 
+#[tokio::test]
+async fn rejected_legacy_completion_repairs_trust_then_reopens_exact_outbox() {
+    let fixture = Fixture::new("legacy-rejected").await;
+    fixture.write_completed_receipt();
+    fixture.unlock();
+    fixture.remove_worktree_and_branch();
+    let completion = fixture.completion(true, None);
+    fixture
+        .runtime
+        .completion_outbox
+        .enqueue(&completion)
+        .unwrap();
+    fixture.reconcile(&completion).await.unwrap();
+
+    let mut rejected = fixture.task().workspace_status.unwrap();
+    rejected["terminal_snapshot_status"] = serde_json::json!("rejected");
+    rejected["resume_blocked_reason"] = serde_json::json!("root lease missing or drifted");
+    fixture
+        .runtime
+        .local_tasks
+        .replace_workspace_status_for_test(TASK, &rejected)
+        .unwrap();
+    fixture
+        .runtime
+        .local_tasks
+        .mark_sync_error(EVENT, false)
+        .unwrap();
+    fixture
+        .runtime
+        .completion_outbox
+        .reject(EVENT, TASK, false, "legacy terminal snapshot rejected")
+        .unwrap();
+    assert_eq!(
+        fixture.runtime.completion_outbox.pending_count().unwrap(),
+        0
+    );
+
+    fixture
+        .runtime
+        .completion_outbox
+        .preflight_restore_pending(&completion)
+        .unwrap();
+    fixture.reconcile(&completion).await.unwrap();
+    fixture
+        .runtime
+        .local_tasks
+        .mark_trusted_completion_pending(TASK, EVENT)
+        .unwrap();
+    fixture
+        .runtime
+        .completion_outbox
+        .enqueue(&completion)
+        .unwrap();
+    fixture
+        .runtime
+        .completion_outbox
+        .restore_pending(EVENT, TASK)
+        .unwrap();
+
+    let repaired = fixture.task();
+    assert_eq!(repaired.sync_state, "pending");
+    assert_eq!(
+        repaired.workspace_status.as_ref().unwrap()["terminal_snapshot_status"],
+        "trusted"
+    );
+    assert!(repaired.workspace_status.as_ref().unwrap()["resume_blocked_reason"].is_null());
+    assert_eq!(
+        fixture.runtime.completion_outbox.pending_count().unwrap(),
+        1
+    );
+
+    assert!(fixture.runtime.local_tasks.mark_synced(EVENT).unwrap());
+    assert!(fixture
+        .runtime
+        .completion_outbox
+        .acknowledge(EVENT, TASK)
+        .unwrap());
+    assert!(fixture
+        .runtime
+        .completion_outbox
+        .delete_acked(EVENT)
+        .unwrap());
+    assert_eq!(fixture.task().sync_state, "synced");
+    assert_eq!(
+        fixture.runtime.completion_outbox.pending_count().unwrap(),
+        0
+    );
+}
+
+#[tokio::test]
+async fn stale_missing_worktree_requires_a_completed_receipt_to_become_done() {
+    let trusted = Fixture::new("stale-with-receipt").await;
+    trusted.write_completed_receipt();
+    trusted.write_unrelated_receipt();
+    trusted.unlock();
+    trusted.remove_worktree_and_branch();
+    let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
+        &trusted.runtime.task_journal,
+        TASK,
+    )
+    .unwrap()
+    .unwrap();
+    let completion = crate::node_agent_terminal_finalization::historical_completion_for_test(
+        &trusted.task(),
+        &contract,
+        &trusted.receipts,
+    )
+    .unwrap()
+    .expect("completed receipt should produce one deterministic recovery event");
+    assert_eq!(completion.event_id, "cccccccc-cccc-cccc-cccc-cccccccccccc");
+    trusted
+        .runtime
+        .completion_outbox
+        .preflight_restore_pending(&completion)
+        .unwrap();
+    trusted.reconcile(&completion).await.unwrap();
+    trusted
+        .runtime
+        .local_tasks
+        .mark_trusted_completion_pending(TASK, &completion.event_id)
+        .unwrap();
+    trusted
+        .runtime
+        .completion_outbox
+        .enqueue(&completion)
+        .unwrap();
+    let recovered = trusted.task();
+    assert_eq!(recovered.status, "done");
+    assert_eq!(
+        recovered.workspace_status.as_ref().unwrap()["terminal_snapshot_status"],
+        "trusted"
+    );
+
+    let untrusted = Fixture::new("stale-without-receipt").await;
+    untrusted.unlock();
+    untrusted.remove_worktree_and_branch();
+    let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
+        &untrusted.runtime.task_journal,
+        TASK,
+    )
+    .unwrap()
+    .unwrap();
+    assert!(
+        crate::node_agent_terminal_finalization::historical_completion_for_test(
+            &untrusted.task(),
+            &contract,
+            &untrusted.receipts,
+        )
+        .unwrap()
+        .is_none()
+    );
+    assert!(untrusted
+        .runtime
+        .local_tasks
+        .mark_one_stale_without_runtime(TASK, i64::MAX)
+        .unwrap());
+    assert_eq!(untrusted.task().status, "resume_required");
+}
+
 struct Fixture {
     root: PathBuf,
     base: PathBuf,
@@ -488,6 +647,22 @@ impl Fixture {
         fs::create_dir_all(&directory).unwrap();
         fs::write(
             directory.join(format!("{id}.json")),
+            serde_json::to_vec(&receipt).unwrap(),
+        )
+        .unwrap();
+    }
+
+    fn write_unrelated_receipt(&self) {
+        let source = fs::read(self.receipt_path()).unwrap();
+        let mut receipt: serde_json::Value = serde_json::from_slice(&source).unwrap();
+        let unrelated_contract = "e".repeat(64);
+        let unrelated_worktree = self.root.join("unrelated");
+        fs::create_dir_all(&unrelated_worktree).unwrap();
+        receipt["taskContractId"] = serde_json::json!(unrelated_contract);
+        receipt["worktree"] = serde_json::json!(normalized(&unrelated_worktree));
+        fs::write(
+            self.receipt_directory()
+                .join(format!("{unrelated_contract}.json")),
             serde_json::to_vec(&receipt).unwrap(),
         )
         .unwrap();

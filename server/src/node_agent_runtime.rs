@@ -158,9 +158,9 @@ impl NodeRuntime {
     pub(crate) async fn reconcile_local_completion_outbox(&self) {
         match crate::node_agent_local_task_orphan_reconcile::reconcile_once(self).await {
             Ok(0) => {}
-            Ok(resume_required) => warn!(
-                resume_required,
-                "marked stale local tasks resume-required after durable runtime reconciliation"
+            Ok(changed) => warn!(
+                changed,
+                "reconciled stale local tasks after durable runtime ownership checks"
             ),
             Err(error) => {
                 warn!(%error, "local completion/orphan reconciliation failed closed")

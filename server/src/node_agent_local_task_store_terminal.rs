@@ -1,7 +1,9 @@
 //! Transaction-local validation for externally verified terminal snapshots.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use rusqlite::{OptionalExtension, Transaction};
+
+use super::LocalTaskStore;
 
 pub(super) fn preflight_trusted_terminal_snapshot(
     tx: &Transaction<'_>,
@@ -51,6 +53,66 @@ pub(super) fn preflight_trusted_terminal_snapshot(
         (false, None, _) => {}
     }
     Ok(())
+}
+
+impl LocalTaskStore {
+    /// Reopen only a locally trusted done result for durable outbox replay.
+    /// This is used after historical receipt reconciliation, never to reinterpret
+    /// an ordinary server rejection.
+    pub(crate) fn mark_trusted_completion_pending(
+        &self,
+        task_id: &str,
+        event_id: &str,
+    ) -> Result<bool> {
+        let conn = self.open()?;
+        let row = conn
+            .query_row(
+                "SELECT status, error, workspace_status_json, sync_state, completion_event_id
+                   FROM local_tasks WHERE task_id = ?1",
+                [task_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, Option<String>>(4)?,
+                    ))
+                },
+            )
+            .optional()?;
+        let Some((status, error, encoded, sync_state, bound_event)) = row else {
+            anyhow::bail!("historical terminal task disappeared before outbox replay");
+        };
+        let workspace_status = encoded
+            .as_deref()
+            .map(serde_json::from_str::<serde_json::Value>)
+            .transpose()?
+            .context("historical terminal task has no workspace snapshot")?;
+        anyhow::ensure!(
+            status == "done"
+                && error.is_none()
+                && bound_event.as_deref() == Some(event_id)
+                && workspace_status
+                    .get("terminal_snapshot_status")
+                    .and_then(serde_json::Value::as_str)
+                    == Some("trusted"),
+            "historical terminal task is not a trusted done completion"
+        );
+        anyhow::ensure!(
+            sync_state != "synced",
+            "synced terminal completion cannot be reopened"
+        );
+        if sync_state == "pending" {
+            return Ok(false);
+        }
+        Ok(conn.execute(
+            "UPDATE local_tasks SET sync_state = 'pending', server_ack_at_ms = NULL
+              WHERE task_id = ?1 AND completion_event_id = ?2
+                AND status = 'done' AND sync_state <> 'synced'",
+            rusqlite::params![task_id, event_id],
+        )? > 0)
+    }
 }
 
 #[cfg(test)]
