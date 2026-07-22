@@ -250,20 +250,14 @@ function Write-UntrackedAudit {
 
 function Invoke-GitFetchWithRetry {
     param(
-        [string]$RepoPath,
-        [int]$Attempts = 3
+        [string]$RepoPath
     )
-    $lastText = ""
-    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
-        $result = Invoke-GitCapture -RepoPath $RepoPath -GitArgs @(
-            "-c", "http.proxy=", "-c", "https.proxy=", "fetch", "origin", "main"
-        )
-        if ($result.ExitCode -eq 0) { return }
-        $lastText = $result.Text
-        Write-Host "GIT_FETCH_RETRY=attempt_$attempt/$Attempts"
-        if ($attempt -lt $Attempts) { Start-Sleep -Seconds 2 }
+    $result = Invoke-ElonGitHubGitWithProxyFallback -RepoPath $RepoPath `
+        -GitArgs @("fetch", "origin", "main") -RemoteName "origin"
+    Write-Host "GITHUB_SSH_ROUTE=$($result.Route)"
+    if ($result.ExitCode -ne 0) {
+        throw "git fetch origin main failed. $($result.Hint) $($result.Text)"
     }
-    throw "git fetch origin main failed after $Attempts attempts: $lastText"
 }
 
 function Invoke-CompletionCheck {
@@ -318,9 +312,6 @@ try {
     $directNetworkScript = Join-Path $taskRoot "scripts\direct-network.ps1"
     if (Test-Path -LiteralPath $directNetworkScript) {
         . $directNetworkScript
-        if (Get-Command Set-ElonProjectDirectGitSsh -ErrorAction SilentlyContinue) {
-            Set-ElonProjectDirectGitSsh
-        }
     }
 
     Clear-DeclaredTemporaryRoots -RepoPath $taskRoot -Policy $policy -Label "task"

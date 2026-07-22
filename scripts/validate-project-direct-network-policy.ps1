@@ -208,6 +208,10 @@ function New-ProjectDirectPolicyValidation {
         "NO_PROXY",
         "no_proxy",
         "Set-ElonProjectDirectGitSsh",
+        "Invoke-ElonGitHubGitWithProxyFallback",
+        "ELON_GITHUB_SSH_FALLBACK_PROXY",
+        "credentials_forbidden",
+        "connect.exe",
         "ProxyCommand=none",
         "ProxyJump=none",
         "ssh.github.com",
@@ -236,11 +240,21 @@ function New-ProjectDirectPolicyValidation {
     Add-ProjectDirectPolicyFileCheck $checks $Root "scripts\check-task-complete.ps1" @(
         "direct-network.ps1",
         "Set-ElonProjectDirectNetwork",
-        "Set-ElonProjectDirectGitSsh",
+        "Invoke-ElonGitHubGitWithProxyFallback",
         "Add-ElonProjectDirectRequestParameters",
-        "http.proxy=",
-        "https.proxy="
-    ) "completion checks must bypass proxy for Git and HTTP"
+        "GITHUB_SSH_ROUTE="
+    ) "completion checks must bypass proxy for HTTP and use bounded GitHub SSH fallback"
+
+    foreach ($script in @(
+        "scripts\ai-task-preflight.ps1",
+        "scripts\finish-ai-task.ps1",
+        "scripts\publish-node-agent.ps1"
+    )) {
+        Add-ProjectDirectPolicyFileCheck $checks $Root $script @(
+            "direct-network.ps1",
+            "Invoke-ElonGitHubGitWithProxyFallback"
+        ) "Windows workflow GitHub fetch paths must share the bounded SSH fallback"
+    }
 
     foreach ($script in @(
         "scripts\smoke-fb2-ai-center.ps1",
@@ -309,7 +323,8 @@ function New-ProjectDirectPolicyValidation {
         checks = @($checks)
         runtime = $runtime
         policy = "direct_no_proxy"
-        note = "All main-project/fb2 project access scripts in this gate must bypass local proxy env, use NO_PROXY/no_proxy=*, and use NoProxy or --noproxy for HTTP."
+        github_ssh_fallback = "direct_first_network_errors_only_loopback_http"
+        note = "HTTP and non-GitHub SSH stay direct. GitHub SSH alone may retry once through a credential-free loopback HTTP CONNECT proxy after a classified transport failure."
     }
 
     $parent = Split-Path -Parent $OutputPath

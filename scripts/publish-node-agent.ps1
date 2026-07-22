@@ -27,13 +27,13 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot "direct-network.ps1")
 . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
 . (Join-Path $PSScriptRoot "local-env.ps1")
 . (Join-Path $PSScriptRoot "node-agent-release-contract.ps1")
 . (Join-Path $PSScriptRoot "release-publish-lease.ps1")
 . (Join-Path $PSScriptRoot "node-agent-publish-http.ps1")
 . (Join-Path $PSScriptRoot "node-agent-publish-replay.ps1")
-
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
@@ -62,7 +62,6 @@ $script:NodeReleaseContext = $null
 
 try {
     Import-ElonLocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
-
     Write-Host "=== 一龙 PC 节点客户端构建 + 发布 ===" -ForegroundColor Cyan
 
 function Resolve-NodeAgentChangelog {
@@ -83,8 +82,9 @@ function Resolve-NodeAgentChangelog {
 }
 
 function Invoke-GitFetchMain {
-    git -C $RepoRoot -c http.proxy= -c https.proxy= fetch origin main
-    if ($LASTEXITCODE -ne 0) { throw "git fetch origin main 失败，无法确认 PC 节点发布基线。" }
+    $result = Invoke-ElonGitHubGitWithProxyFallback -RepoPath $RepoRoot -GitArgs @("fetch", "origin", "main") -RemoteName "origin"
+    if ($result.ExitCode -ne 0) { throw "git fetch origin main 失败，无法确认 PC 节点发布基线。$($result.Hint) $($result.Text)" }
+    Write-Host "  GitHub SSH route: $($result.Route)" -ForegroundColor DarkGray
 }
 
 function Assert-NodeAgentPublishHeadCurrent {

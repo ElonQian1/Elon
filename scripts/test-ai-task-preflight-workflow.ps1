@@ -41,6 +41,7 @@ $repoRoot = $repoRoot.Trim()
 
 $preflightScript = Join-Path $repoRoot "scripts\ai-task-preflight.ps1"
 $preflightSh = Join-Path $repoRoot "scripts\ai-task-preflight.sh"
+$directNetworkScript = Join-Path $repoRoot "scripts\direct-network.ps1"
 $finishContractScript = Join-Path $repoRoot "scripts\ai-task-finish-contract.ps1"
 $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
 $cleanupSh = Join-Path $repoRoot "scripts\cleanup-task-worktrees.sh"
@@ -305,10 +306,11 @@ try {
 
     New-Item -ItemType Directory -Path (Join-Path $seedRepo "scripts") | Out-Null
     Copy-Item -LiteralPath $preflightScript -Destination (Join-Path $seedRepo "scripts\ai-task-preflight.ps1")
+    Copy-Item -LiteralPath $directNetworkScript -Destination (Join-Path $seedRepo "scripts\direct-network.ps1")
     Copy-Item -LiteralPath $finishContractScript -Destination (Join-Path $seedRepo "scripts\ai-task-finish-contract.ps1")
     Set-Content -LiteralPath (Join-Path $seedRepo "README.md") -Value "preflight workflow test`n" -Encoding UTF8
 
-    Invoke-Git $seedRepo @("add", "README.md", "scripts/ai-task-preflight.ps1", "scripts/ai-task-finish-contract.ps1") | Out-Null
+    Invoke-Git $seedRepo @("add", "README.md", "scripts/ai-task-preflight.ps1", "scripts/direct-network.ps1", "scripts/ai-task-finish-contract.ps1") | Out-Null
     Invoke-Git $seedRepo @("commit", "-m", "seed preflight workflow test") | Out-Null
     Invoke-Git $seedRepo @("remote", "add", "origin", $originPath) | Out-Null
     Invoke-Git $seedRepo @("push", "-u", "origin", "main") | Out-Null
@@ -416,4 +418,18 @@ try {
 $formatTestOutput | ForEach-Object { Write-Host ([string]$_) }
 if ($formatTestExitCode -ne 0) {
     throw "Rust format workflow guard failed."
+}
+
+$githubSshNetworkTest = Join-Path $repoRoot "scripts\test-github-ssh-network.ps1"
+$oldPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    $githubSshTestOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $githubSshNetworkTest 2>&1
+    $githubSshTestExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $oldPreference
+}
+$githubSshTestOutput | ForEach-Object { Write-Host ([string]$_) }
+if ($githubSshTestExitCode -ne 0) {
+    throw "GitHub SSH network fallback guard failed."
 }

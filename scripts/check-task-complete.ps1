@@ -48,7 +48,6 @@ $ServerUrl = "http://43.139.149.158:8080"
 
 Set-ElonProjectDirectNetwork
 Set-Location $RepoRoot
-Set-ElonProjectDirectGitSsh
 
 function Stop-Check {
     param([string]$Message)
@@ -56,55 +55,16 @@ function Stop-Check {
     exit 1
 }
 
-function Get-GitFetchFailureHint {
-    param([string]$Output)
-
-    $text = if ($Output) { $Output } else { "" }
-    if ($text -match '(Could not resolve host|Name or service not known|Temporary failure in name resolution)') {
-        return "网络/DNS 无法解析 GitHub，请检查网络、DNS 或代理后重试。"
-    }
-    if ($text -match '(Failed to connect|Connection timed out|Connection reset|Connection refused|Operation timed out|HTTP/2 stream|early EOF|The remote end hung up unexpectedly)') {
-        return "网络连接到 GitHub 不稳定或超时，通常是临时抖动；脚本已短重试但仍失败。"
-    }
-    if ($text -match '(Permission denied|Authentication failed|Repository not found|Could not read from remote repository|Host key verification failed|publickey)') {
-        return "Git 远端认证或仓库权限异常，请检查 SSH key、GitHub 权限和 origin 地址。"
-    }
-    return "Git fetch 失败，原因未能自动分类；请查看原始输出。"
-}
-
 function Invoke-GitFetchWithRetry {
     param(
-        [string[]]$GitArgs = @("fetch", "origin", "main"),
-        [int]$Attempts = 3,
-        [int]$DelaySeconds = 2
+        [string[]]$GitArgs = @("fetch", "origin", "main")
     )
 
-    $lastOutput = ""
-    for ($i = 1; $i -le $Attempts; $i++) {
-        $oldPreference = $ErrorActionPreference
-        $ErrorActionPreference = "Continue"
-        try {
-            $output = & git -c http.proxy= -c https.proxy= @GitArgs 2>&1
-        } finally {
-            $ErrorActionPreference = $oldPreference
-        }
-        $lastOutput = ($output -join "`n").Trim()
-        if ($LASTEXITCODE -eq 0) {
-            if ($i -gt 1) {
-                Write-Host "GIT_FETCH_RETRY=success_after_$i"
-            }
-            return
-        }
-
-        $hint = Get-GitFetchFailureHint -Output $lastOutput
-        Write-Host "GIT_FETCH_RETRY=attempt_$i/$Attempts failed: $hint" -ForegroundColor Yellow
-        if ($i -lt $Attempts) {
-            Start-Sleep -Seconds $DelaySeconds
-        }
+    $result = Invoke-ElonGitHubGitWithProxyFallback -RepoPath $RepoRoot -GitArgs $GitArgs -RemoteName "origin"
+    Write-Host "GITHUB_SSH_ROUTE=$($result.Route)"
+    if ($result.ExitCode -ne 0) {
+        Stop-Check "无法确认远端 main 状态：git $($GitArgs -join ' ') 失败。$($result.Hint) 原始输出：$($result.Text)"
     }
-
-    $finalHint = Get-GitFetchFailureHint -Output $lastOutput
-    Stop-Check "无法确认远端 main 状态：git $($GitArgs -join ' ') 连续失败 $Attempts 次。$finalHint 原始输出：$lastOutput"
 }
 
 function Get-GitWorktreeEntries {
