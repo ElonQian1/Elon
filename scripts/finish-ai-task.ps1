@@ -334,6 +334,7 @@ try {
     Invoke-CompletionCheck -RepoPath $taskRoot -CompletionKind $Kind
     $businessStatus = "complete"
     $isPlatformManagedTask = $taskBranch -like "ai/session/*"
+    $isManagedTaskWorktree = $taskBranch -like "codex/*" -or $taskLeaf -match '-task-\d{8}-\d{6}'
 
     $entries = @(Get-GitWorktreeEntries -RepoPath $taskRoot)
     $mainWorktree = $entries | Where-Object { $_.Branch -eq "main" -and $_.Path } | Select-Object -First 1
@@ -348,7 +349,7 @@ try {
     if ($mainTrackedStatus.Count -gt 0) {
         $localMainStatus = "blocked_tracked_changes"
         $mainTrackedStatus | ForEach-Object { Write-Host "MAIN_TRACKED_CHANGE=$_" }
-        if ($isPlatformManagedTask) {
+        if ($isPlatformManagedTask -or $isManagedTaskWorktree) {
             Write-Host "MAIN_BASELINE_SYNC=blocked_tracked_changes:$mainPath"
             $skipMainSync = $true
         } else {
@@ -376,8 +377,6 @@ try {
 
     $taskNormalized = Normalize-PathText $taskRoot
     $mainNormalized = Normalize-PathText $mainPath
-    $isManagedTaskWorktree = $taskBranch -like "codex/*" -or $taskLeaf -match '-task-\d{8}-\d{6}'
-
     if ($taskNormalized -eq $mainNormalized) {
         $taskWorktreeStatus = "main_baseline_not_applicable"
         $taskWorktreeLeaseStatus = "not_applicable"

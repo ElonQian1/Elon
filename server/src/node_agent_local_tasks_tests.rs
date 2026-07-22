@@ -210,6 +210,7 @@ async fn production_create_handler_replays_bound_result_and_rejects_changed_body
         prompt: "fake idempotency handler request".into(),
         runtime_permission: Some("full_access".into()),
         supervision: None,
+        contract_revision: None,
     };
     let digest = idempotency::canonical_digest(&request).unwrap();
     let task_id = "local-bound-handler";
@@ -305,6 +306,7 @@ async fn production_handler_releases_claim_after_every_admission_error() {
                 improvement_policy: Some("after_task_only".into()),
             },
         ),
+        contract_revision: None,
     };
     let app = routes().with_state(Arc::new(runtime));
     for attempt in 0..2 {
@@ -353,6 +355,7 @@ async fn production_handler_restart_takeover_replays_exact_plan_without_redispat
         prompt: prompt.into(),
         runtime_permission: Some("full_access".into()),
         supervision: None,
+        contract_revision: None,
     };
     let digest = idempotency::canonical_digest(&request).unwrap();
     runtime

@@ -12,6 +12,8 @@ pub(crate) mod idempotency;
 mod output_consumer;
 #[path = "node_agent_local_task_provision.rs"]
 mod provision;
+#[path = "node_agent_local_task_request.rs"]
+mod request;
 #[path = "node_agent_local_task_resume_identity.rs"]
 mod resume_identity;
 #[path = "node_agent_local_task_root_workspace.rs"]
@@ -25,6 +27,7 @@ pub(crate) use output_consumer::spawn_local_output_consumer;
 pub(crate) use provision::{
     provision_record_and_dispatch_supervised_task, SupervisedLocalTaskProvision,
 };
+use request::CreateLocalTaskRequest;
 use support::{bound_credentials, internal_error, json_error};
 
 use std::sync::Arc;
@@ -38,7 +41,7 @@ use axum::{
     Json, Router,
 };
 use homecli_proto::CliProjectContext;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 
 const MAX_LOCAL_PROMPT_CHARS: usize = 80_000;
@@ -54,22 +57,6 @@ struct DetailQuery {
     since: Option<usize>,
     limit: Option<usize>,
     expected_cursor_epoch: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct CreateLocalTaskRequest {
-    project_id: String,
-    #[serde(default)]
-    channel_id: Option<String>,
-    #[serde(default)]
-    conversation_id: Option<String>,
-    workspace_path: String,
-    prompt: String,
-    #[serde(default)]
-    runtime_permission: Option<String>,
-    #[serde(default)]
-    supervision: Option<crate::node_agent_local_task_supervision::SupervisionContractInput>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -285,6 +272,9 @@ async fn create_task(
         },
         None => None,
     };
+    if let Err(error) = request.validate_contract_revision(supervision.as_ref()) {
+        return json_error(StatusCode::BAD_REQUEST, error);
+    }
     if let Some(contract) = supervision
         .as_ref()
         .filter(|contract| contract.task_role == "resume_original")
@@ -410,7 +400,13 @@ async fn create_task(
         .filter(|contract| contract.task_role == "resume_original")
     {
         match crate::node_agent_local_task_resume_context::resolve_seed(
-            &runtime, &creds, project_id, contract,
+            &runtime,
+            &creds,
+            project_id,
+            &task_id,
+            prompt,
+            contract,
+            request.contract_revision.as_ref(),
         ) {
             Ok(seed) => Some(seed),
             Err(error) => return json_error(StatusCode::CONFLICT, error.to_string()),

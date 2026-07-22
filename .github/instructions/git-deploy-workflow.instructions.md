@@ -20,7 +20,7 @@ applyTo: "scripts/**,.github/**,AGENTS.md,CODEX.md,AI_TASK_TEMPLATE.md"
 ## 本地 main 与未跟踪文件
 
 - `main` checkout 只存基线，不做业务编辑。
-- 已跟踪修改阻止 `main` 快进；`ai/session/*` 只报 `blocked_tracked_changes`，不触碰 `main`。普通未跟踪文件不阻止快进。
+- 已跟踪修改阻止 `main` 快进；已验证的 `codex/*` 与 `ai/session/*` 隔离任务只报 `blocked_tracked_changes`，不触碰 `main`，也不让已推送且任务树干净的结果重复执行。普通未跟踪文件不阻止快进。
 - 远端新增路径与本地未跟踪文件同名时 Git 会拒绝快进；脚本输出 `FINALIZABLE=false`。
 - 主工作区来源不明的未跟踪文件只告警，不自动提交或删除。
 - 任务 worktree 必须干净；未跟踪源码/测试显示 `candidate_track`，生成物显示 `candidate_temporary_or_precise_ignore`。

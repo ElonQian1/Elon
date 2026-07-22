@@ -97,6 +97,8 @@ function Invoke-SupervisionSelfTest {
     $improvementBody = New-ImprovementTaskBody $decodedParent 'local-parent-task' $improvementPrompt `
         $testCriteria $true
     $resumeBody = New-ResumeTaskBody $decodedParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
+    $supersedeBody = New-SupersedeTaskBody $decodedParent 'local-parent-task' `
+        'REVISED REQUIREMENT' $testCriteria 'user changed the requirement' 'after_task_or_unblock'
     $resumeParent = Convert-JsonResponseBytes (Convert-ToUtf8JsonBytes $parentJson) 'application/json'
     $resumeParent.supervision.contract.task_role = 'resume_original'
     $resumeParentBody = New-ResumeTaskBody $resumeParent 'local-parent-task' $testCriteria 'after_task_or_unblock'
@@ -343,6 +345,13 @@ function Invoke-SupervisionSelfTest {
         resume_protocol = $resumeBody.supervision.protocol -eq $script:SupervisionProtocol
         resume_parent = $resumeBody.supervision.parent_task_id -eq 'local-parent-task'
         resume_root = $resumeBody.supervision.root_task_id -eq 'local-root-task'
+        supersede_reuses_authorized_base = $supersedeBody.workspace_path -ceq $testWorkspace
+        supersede_keeps_lineage = $supersedeBody.supervision.task_role -eq 'resume_original' -and
+            $supersedeBody.supervision.parent_task_id -eq 'local-parent-task' -and
+            $supersedeBody.supervision.root_task_id -eq 'local-root-task'
+        supersede_records_explicit_revision = $supersedeBody.prompt -ceq 'REVISED REQUIREMENT' -and
+            $supersedeBody.contract_revision.schema -eq 'elon.supervision.contract_revision.v1' -and
+            $supersedeBody.contract_revision.reason -eq 'user changed the requirement'
         resume_legacy_started_cwd = $legacyResumeBody.supervision.task_role -eq 'resume_original'
         resume_receipt_rebuild = $recycledResumeBody.supervision.task_role -eq 'resume_original'
         resume_git_recovery_ready = $recoveryReadyResumeBody.supervision.task_role -eq 'resume_original'
@@ -408,6 +417,7 @@ function Invoke-SupervisionSelfTest {
             'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
             'resume_parent_role_requirement', 'resume_parent_role_resume_original',
             'resume_parent_role_reject_matrix',
+            'supersede_explicit_contract_revision',
             'resume_legacy_started_cwd', 'resume_receipt_rebuild', 'resume_git_recovery_ready',
             'resume_inherited_workspace', 'resume_recorded_head_recovery',
             'resume_git_recovery_occupied_guard', 'task_detail_path', 'cloud_projects_path',

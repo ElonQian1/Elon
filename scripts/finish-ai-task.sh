@@ -178,7 +178,7 @@ skip_main_sync=0
 if [[ -n "$main_tracked" ]]; then
   local_main_status="blocked_tracked_changes"
   printf 'MAIN_TRACKED_CHANGE=%s\n' "$main_tracked"
-  if [[ "$is_platform_managed_task" -eq 1 ]]; then
+  if [[ "$is_platform_managed_task" -eq 1 || "$task_branch" == codex/* || "$task_leaf" =~ -task-[0-9]{8}-[0-9]{6} ]]; then
     echo "MAIN_BASELINE_SYNC=blocked_tracked_changes:$main_path"
     skip_main_sync=1
   else

@@ -150,6 +150,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Submit -Proj
 powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Wait -TaskId 'local-...' -WaitSeconds 55
 powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Inspect -TaskId 'local-...' -Since 40 -Limit 25 -Compact
 powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Review -TaskId 'local-...' -Verdict accepted -Summary '独立验收通过'
+powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Supersede -TaskId 'local-...' -Prompt '完整的新需求' -AcceptanceCriteriaJson '["新验收条件"]' -AmendmentReason '用户明确改变目标'
 ```
 
 其他动作：
@@ -157,6 +158,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Review -Task
 - `Inspect`：读取任务、journal、审批、运行时和监督状态；`-Since`、`-Limit` 做增量窗口，`-Compact` 只返回有界摘要和证据。
 - `Improve`：从父任务继承项目/工作区并创建能力改进；加 `-BlockingImprovement` 时角色为 `capability_repair`。
 - `Resume`：从已终止、带当前监督协议且保留平台隔离 worktree 的父任务恢复原始 prompt，角色为 `resume_original`。父任务角色只允许 `requirement` 或 `resume_original`；能力修复验收后应 Resume 原 `requirement`（或既有 `resume_original` 代），绝不能 Resume `capability_repair`。helper 先做只读门禁；节点不信任 helper，并在解析 root workspace、lease 准入/迁移、Git identity migration 和创建子任务之前执行同一白名单。随后节点再以本机任务记录的基础仓库、隔离路径、分支、`git_head` 和 `elon-supervision:<root_task_id>` lease 做权威校验；不能用参数指定任意 worktree。历史监督后代 lease 只有在节点把持久任务契约逐代验证到同一 `requirement` 根、节点/安装/owner/项目/基础工作区身份一致且无活跃 prompt/sidecar 时，才在跨进程 Resume 准入锁内原子迁移为 root lease；通用锁与未知 lease 不迁移。父任务也是 `resume_original` 时，节点沿已验证的父监督契约继承原工作树身份，不会按续跑任务的新 conversation id 另推路径；父子 root identity 或任一 Git 身份不一致仍拒绝。身份可信且无活跃 prompt/sidecar 占用时允许原位复用有效 Git 脏现场，staged、unstaged、untracked 均不覆盖、不自动提交、不丢弃。目录仍在但 Git worktree 注册丢失时，原目录保持原位且只读；只有分支后继/主线归属、目录内容、完整 provenance 和所有同根占用均可证明时，节点才创建新的 conversation worktree、迁移根 provenance、建立唯一 root lease，任一不一致仍拒绝。
+- `Supersede`：仅在用户明确改变需求或验收条件时使用。必须携带完整的新 prompt、新验收条件和 `AmendmentReason`；原 `requirement` 合同保持不可变，新一代仍走 `resume_original` 的工作区/租约安全门禁，并在 `resume_context` 中追加 `elon.supervision.contract_revision.v1` 收据。后续普通 Resume 沿不可变父链重建最近有效需求，不会退回旧根需求；缺少收据的条件漂移继续 fail-closed。
 - 受监督任务的 `workspace_status` 启动值只是身份锚点；节点在 `finished_at_ms` 和可靠业务终态同一 SQLite 事务内，重新核对平台路径、分支、Git common-dir、origin remote、root lease、owner/node/install/project 与并发占用后，把 `git_head` 原子刷新为终态快照。HEAD 未变化时 staged、unstaged、untracked 均保留；HEAD 前进时新提交立即成为 Resume 基线。重复终态回放得到同一结果。任何身份或现场读取失败都保留原启动证据，并写入 `resume_blocked_reason`，因此旧 HEAD 不会冒充可信终态；普通非监督任务不进入该刷新路径。
 - `SelfTest`：不连接节点，校验 PS5.1/PS7 UTF-8、旧数组以及 JSON/UTF-8 文件多条件构造。
 

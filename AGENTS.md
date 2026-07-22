@@ -42,7 +42,7 @@
 - 收尾必须执行预检输出的 `FINISH_COMMAND_*`，只有 `FINALIZABLE=true` 才可正常宣告完成。
 - 预检锁定普通 `codex/*` worktree；清理只回收未锁定且 clean、已合入、超龄的任务，统一收尾负责解锁。
 - 仅在 push 被 non-fast-forward 拒绝时 rebase；不追车，不因 rebase 重编译或全量测试，只补受影响验证。
-- 业务状态与本机收尾状态分开报告；未知主工作区文件不自动提交、删除或忽略，也不再阻止无冲突的 `main` 快进。
+- 业务/本机收尾分报；保留未知文件。主工作区有跟踪修改时，隔离任务报 `blocked_tracked_changes`、跳过同步，不重复已推送工作。
 - 脚本头有 `#requires -Version 7.0` 时使用 `pwsh`；其他 Windows bootstrap 脚本可用 `powershell.exe`。
 
 修改预检、统一收尾、worktree 清理或这些工作流文档后，必须运行：

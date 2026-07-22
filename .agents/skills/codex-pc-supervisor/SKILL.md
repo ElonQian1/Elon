@@ -63,4 +63,4 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Review `
   -TaskId 'local-...' -Verdict accepted -Summary 'diff、测试和发布均已验收'
 ```
 
-Use `Inspect`, `Improve`, and `Resume` for the remaining workflow states. Run `SelfTest` after changing the helper.
+Use `Inspect`, `Improve`, and `Resume` for the remaining workflow states. When the user explicitly changes the requirement or acceptance criteria, use `Supersede` with the complete revised prompt, explicit revised criteria, and `-AmendmentReason`; it preserves the immutable root contract while continuing in the node-validated worktree. Run `SelfTest` after changing the helper.

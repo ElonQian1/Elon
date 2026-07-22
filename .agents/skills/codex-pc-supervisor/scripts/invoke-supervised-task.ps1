@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Probe', 'Projects', 'InspectProjectBinding', 'BindProject', 'ReconcileUpdate', 'Submit', 'Inspect', 'Wait', 'Review', 'Improve', 'Resume', 'SelfTest')]
+    [ValidateSet('Probe', 'Projects', 'InspectProjectBinding', 'BindProject', 'ReconcileUpdate', 'Submit', 'Inspect', 'Wait', 'Review', 'Improve', 'Resume', 'Supersede', 'SelfTest')]
     [string]$Action,
     [string]$ProjectId = 'elon-self',
     [string]$WorkspacePath,
@@ -20,6 +20,7 @@ param(
     [string]$ImprovementPolicy = 'after_task_or_unblock',
     [string]$ParentTaskId,
     [string]$RootTaskId,
+    [string]$AmendmentReason = '',
     [string]$ProjectFilterId = '',
     [switch]$IncludeSystemProjects,
     [switch]$BlockingImprovement,
@@ -45,6 +46,7 @@ $script:SupervisionProtocol = 'elon.desktop_pc_supervision.v1'
 $script:DeltaWaitCapability = 'delta_wait_v1'
 $script:TaskDeltaSchema = 'elon.supervision.task_delta.v1'
 $script:ResumeContextCapability = 'resume_context_v1'
+$script:ContractSupersedeCapability = 'contract_supersede_v1'
 $script:DesktopReviewCapability = 'desktop_review_ticket_v3'
 $script:LastNodeAdminUrl = ''
 $script:CachedNodeAdminUrl = ''
@@ -525,31 +527,12 @@ function New-ImprovementTaskBody {
         $role $RequestedParentTaskId $rootTask $BodyCriteria 'after_task_only'
 }
 
-function New-ResumeTaskBody {
-    param(
-        [object]$ParentDetail,
-        [string]$RequestedParentTaskId,
-        [string[]]$BodyCriteria,
-        [string]$BodyImprovementPolicy
-    )
-    Assert-SafeResumeParentDetail $ParentDetail $RequestedParentTaskId
-    $parentRecord = Get-RecordFromDetail $ParentDetail
-    $parentProjectId = [string](Get-ObjectField $parentRecord 'project_id')
-    $parentWorkspace = [string](Get-ObjectField $parentRecord 'workspace_path')
-    $rootTask = Get-RootTaskFromDetail $ParentDetail $RequestedParentTaskId
-    # The node is the authority for root requirement, lineage, acceptance
-    # criteria and workspace identity. Never copy the parent prompt here:
-    # doing so recursively nests compiled executor prompts across generations.
-    $resumePrompt = "Resolve elon.resume_context.v1 for parent_task_id=$RequestedParentTaskId and root_task_id=$rootTask."
-    return New-SupervisedTaskBody $parentProjectId $parentWorkspace $resumePrompt `
-        'resume_original' $RequestedParentTaskId $rootTask $BodyCriteria $BodyImprovementPolicy
-}
-
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-delta.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-wait.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-idempotency.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-review.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-workspace.ps1')
+. (Join-Path $PSScriptRoot 'invoke-supervised-task-continuation.ps1')
 . (Join-Path $PSScriptRoot 'invoke-supervised-task-self-test.ps1')
 if ($Action -eq 'SelfTest') { Invoke-SupervisionSelfTest; exit 0 }
 
@@ -713,5 +696,12 @@ switch ($Action) {
         $parentDetail = Get-TaskDetail $nodeConnection $TaskId
         $resumeBody = New-ResumeTaskBody $parentDetail $TaskId $resolvedAcceptanceCriteria $ImprovementPolicy
         Submit-Body $nodeConnection $resumeBody 'Resume'
+    }
+    'Supersede' {
+        Assert-NodeSupervisionCapability $nodeConnection $script:ContractSupersedeCapability 'Supersede'
+        $parentDetail = Get-TaskDetail $nodeConnection $TaskId
+        $supersedeBody = New-SupersedeTaskBody $parentDetail $TaskId $Prompt `
+            $resolvedAcceptanceCriteria $AmendmentReason $ImprovementPolicy
+        Submit-Body $nodeConnection $supersedeBody 'Supersede'
     }
 }

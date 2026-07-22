@@ -58,6 +58,8 @@ pub(crate) struct ResumeContextSeed {
     root: LocalTaskRecord,
     parent: LocalTaskRecord,
     parent_summary: Value,
+    effective_requirement: crate::node_agent_local_task_contract_revision::EffectiveRequirement,
+    contract_revision: Option<Value>,
 }
 
 impl ResumeContextSeed {
@@ -112,7 +114,10 @@ pub(crate) fn resolve_seed(
     runtime: &NodeRuntime,
     creds: &Credentials,
     project_id: &str,
+    task_id: &str,
+    requested_prompt: &str,
     contract: &mut SupervisionContract,
+    revision: Option<&crate::node_agent_local_task_contract_revision::ContractRevisionInput>,
 ) -> Result<ResumeContextSeed> {
     validate_parent_role_before_resume_side_effects(runtime, creds, contract)?;
     if contract.protocol != SUPERVISION_PROTOCOL || contract.task_role != "resume_original" {
@@ -163,18 +168,24 @@ pub(crate) fn resolve_seed(
     {
         bail!("resume root 不是当前协议的权威 requirement 任务。")
     }
-    if !contract.acceptance_criteria.is_empty()
-        && contract.acceptance_criteria != root_contract.acceptance_criteria
-    {
-        bail!("resume acceptance_criteria 与根任务发生漂移。")
-    }
-    contract.acceptance_criteria = root_contract.acceptance_criteria;
+    let (effective_requirement, contract_revision) =
+        crate::node_agent_local_task_contract_revision::resolve_and_apply(
+            runtime,
+            &root,
+            &parent,
+            task_id,
+            requested_prompt,
+            contract,
+            revision,
+        )?;
     let parent_summary =
         load_supervision_state(&runtime.task_journal, &parent.task_id)?.resume_summary_payload();
     Ok(ResumeContextSeed {
         root,
         parent,
         parent_summary,
+        effective_requirement,
+        contract_revision,
     })
 }
 
@@ -201,9 +212,9 @@ pub(crate) fn compile(
         root_task_id: &seed.root.task_id,
         parent_task_id: &seed.parent.task_id,
         requirement: RequirementRef {
-            task_id: &seed.root.task_id,
-            sha256: sha256_hex(seed.root.prompt.as_bytes()),
-            chars: seed.root.prompt.chars().count(),
+            task_id: &seed.effective_requirement.source_task_id,
+            sha256: sha256_hex(seed.effective_requirement.prompt.as_bytes()),
+            chars: seed.effective_requirement.prompt.chars().count(),
         },
         acceptance_criteria: &contract.acceptance_criteria,
         parent: ParentSummary {
@@ -246,7 +257,7 @@ resume_context={packet_json}
 {root_prompt}
 </authoritative-root-request>"#,
         protocol = SUPERVISION_PROTOCOL,
-        root_prompt = seed.root.prompt,
+        root_prompt = seed.effective_requirement.prompt,
     );
     let record_prompt = format!(
         "Resolve {RESUME_CONTEXT_SCHEMA}: root_task_id={}, parent_task_id={}, digest={digest}",
@@ -260,7 +271,10 @@ resume_context={packet_json}
             "root_task_id": seed.root.task_id,
             "parent_task_id": seed.parent.task_id,
             "digest": digest,
-            "requirement_sha256": sha256_hex(seed.root.prompt.as_bytes()),
+            "requirement_source_task_id": seed.effective_requirement.source_task_id,
+            "requirement_sha256": sha256_hex(seed.effective_requirement.prompt.as_bytes()),
+            "effective_contract_digest": seed.effective_requirement.digest,
+            "contract_revision": seed.contract_revision,
             "workspace_git_head": workspace.git_head,
         }),
         digest,
@@ -340,6 +354,14 @@ mod tests {
                 root: root.clone(),
                 parent: parent.clone(),
                 parent_summary: json!({"generation":generation}),
+                effective_requirement:
+                    crate::node_agent_local_task_contract_revision::EffectiveRequirement {
+                        source_task_id: root.task_id.clone(),
+                        prompt: root.prompt.clone(),
+                        acceptance_criteria: contract.acceptance_criteria.clone(),
+                        digest: "effective-digest".into(),
+                    },
+                contract_revision: None,
             };
             assert_eq!(
                 seed.inherited_authorization_record().task_id,

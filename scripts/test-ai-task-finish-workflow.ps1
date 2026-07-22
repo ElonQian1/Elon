@@ -241,6 +241,20 @@ try {
     if ($afterMain -ne $originMain) { throw "Local main did not fast-forward to origin/main." }
     if (-not (Test-Path -LiteralPath $legacyPath)) { throw "Unknown main untracked file was deleted unexpectedly." }
 
+    # A validated ordinary Codex worktree is isolated just like a platform
+    # session. Unknown tracked edits in checked-out main must be preserved and
+    # reported, but must not force the already-pushed task to repeat its work.
+    Add-Content -LiteralPath (Join-Path $mainRepo "README.md") -Value "unknown ordinary main edit"
+    $dirtyManagedOutput = Invoke-Finish -WorktreePath $taskWorktree -ContractId $taskContractId
+    Assert-Contains $dirtyManagedOutput "BUSINESS_STATUS=complete" "Dirty shared main must not erase a pushed Codex task result."
+    Assert-Contains $dirtyManagedOutput "LOCAL_MAIN_STATUS=blocked_tracked_changes" "Dirty shared main must remain visible."
+    Assert-Contains $dirtyManagedOutput "FINALIZABLE=true" "An isolated Codex worktree must finish without rewriting dirty main."
+    $dirtyManagedContent = Get-Content -Raw -LiteralPath (Join-Path $mainRepo "README.md")
+    if (-not $dirtyManagedContent.Contains("unknown ordinary main edit")) {
+        throw "Ordinary managed finish mutated an unknown tracked main edit."
+    }
+    Invoke-Git $mainRepo @("restore", "--source=HEAD", "--", "README.md") | Out-Null
+
     # Platform-managed conversation worktrees are already isolated from the
     # checked-out main baseline. Unknown tracked main edits must remain visible
     # and untouched, but they must not turn a clean, pushed platform task back
