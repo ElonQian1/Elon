@@ -220,3 +220,90 @@ fn low_priority_post_task_improvement_yields_without_blocking_update() {
     assert!(decision.install_may_proceed());
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn durable_cancel_without_live_runtime_or_sidecar_is_safe_for_update_only() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-update-stale-cancel-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let local_tasks =
+        crate::node_agent_local_task_store::LocalTaskStore::new(root.join("tasks.db"));
+    local_tasks
+        .create(LocalTaskStart {
+            task_id: "stale-cancel",
+            owner_user_id: "owner",
+            agent_id: "agent",
+            install_id: "install",
+            project_id: "project",
+            channel_id: None,
+            conversation_id: "conversation",
+            workspace_path: root.to_string_lossy().as_ref(),
+            prompt: "cancel me",
+            cli: "codex",
+            runtime_permission: "full_access",
+        })
+        .unwrap();
+    let journal = crate::node_agent_task_journal::TaskJournal::new(root.join("journal"));
+    journal
+        .record_started(crate::node_agent_task_journal::TaskJournalStart {
+            req_id: "stale-cancel",
+            cli_name: "codex",
+            route: Some("route_a_external_cli"),
+            run_handle_id: Some("stale-cancel"),
+            cwd: root.to_str(),
+            runtime_permission: Some("full_access"),
+        })
+        .unwrap();
+    let contract = crate::node_agent_local_task_supervision::SupervisionContract {
+        protocol: SUPERVISION_PROTOCOL.to_string(),
+        supervisor: "codex_desktop".to_string(),
+        task_role: "resume_original".to_string(),
+        parent_task_id: Some("parent".to_string()),
+        root_task_id: Some("root".to_string()),
+        acceptance_criteria: Vec::new(),
+        improvement_policy: "after_task_only".to_string(),
+    };
+    crate::node_agent_local_task_supervision::record_supervision_event(
+        &journal,
+        "stale-cancel",
+        "supervision_contract",
+        crate::node_agent_local_task_supervision::contract_payload(&contract),
+    )
+    .unwrap();
+    assert!(local_tasks.mark_cancel_requested("stale-cancel").unwrap());
+    let sidecars = crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars"));
+
+    assert!(
+        proven_stale_cancelled_tasks(&local_tasks, &journal, &sidecars, Some(&HashSet::new()))
+            .unwrap()
+            .is_empty()
+    );
+    journal.record_cancel_requested("stale-cancel").unwrap();
+
+    assert!(
+        proven_stale_cancelled_tasks(&local_tasks, &journal, &sidecars, None)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(proven_stale_cancelled_tasks(
+        &local_tasks,
+        &journal,
+        &sidecars,
+        Some(&HashSet::from(["stale-cancel".to_string()]))
+    )
+    .unwrap()
+    .is_empty());
+    assert_eq!(
+        proven_stale_cancelled_tasks(&local_tasks, &journal, &sidecars, Some(&HashSet::new()))
+            .unwrap(),
+        HashSet::from(["stale-cancel".to_string()])
+    );
+    assert_eq!(
+        local_tasks.get("stale-cancel").unwrap().unwrap().status,
+        "cancel_requested",
+        "update proof must not rewrite cancellation semantics"
+    );
+    let _ = std::fs::remove_dir_all(root);
+}

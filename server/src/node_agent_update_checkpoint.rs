@@ -1,6 +1,6 @@
 //! Durable update checkpoints captured immediately before the Windows runtime stops.
 
-use std::{collections::HashSet, path::Path};
+use std::{collections::HashSet, path::Path, time::Duration};
 
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
@@ -16,6 +16,7 @@ use crate::{
 };
 
 const RECOVERY_DEADLINE_MS: u128 = 24 * 60 * 60 * 1_000;
+const LOOPBACK_RUNTIME_FRESH_MS: u128 = 2 * 60 * 1_000;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct UpdateCheckpointDecision {
@@ -45,13 +46,22 @@ pub(crate) fn checkpoint_downloaded_update(
         .context("更新版本缺少 gitSha，不能建立恢复事务")?;
     let from_git_sha = read_version_git_sha(version_file).unwrap_or_default();
     let store = UpdateRecoveryStore::default();
-    let confirmed_stale =
+    let mut confirmed_stale =
         crate::node_agent_restart_drain::confirmed_stale_registry_tasks_for_update(to_git_sha)?;
+    let local_tasks = crate::node_agent_local_task_store::LocalTaskStore::default();
+    let journal = crate::node_agent_task_journal::TaskJournal::default();
+    let sidecars = crate::node_agent_cli_sidecar::CliSidecarRegistry::default();
+    confirmed_stale.extend(proven_stale_cancelled_tasks(
+        &local_tasks,
+        &journal,
+        &sidecars,
+        fresh_runtime_task_ids_from_loopback().as_ref(),
+    )?);
     let decision = checkpoint_active_update_transactions(
         &store,
-        &crate::node_agent_local_task_store::LocalTaskStore::default(),
-        &crate::node_agent_task_journal::TaskJournal::default(),
-        &crate::node_agent_cli_sidecar::CliSidecarRegistry::default(),
+        &local_tasks,
+        &journal,
+        &sidecars,
         &from_git_sha,
         to_git_sha,
         &confirmed_stale,
@@ -76,6 +86,81 @@ pub(crate) fn checkpoint_downloaded_update(
         updated_at_ms: crate::node_agent_cli_sidecar::now_ms(),
     })?;
     Ok(decision)
+}
+
+fn proven_stale_cancelled_tasks(
+    local_tasks: &crate::node_agent_local_task_store::LocalTaskStore,
+    journal: &crate::node_agent_task_journal::TaskJournal,
+    sidecars: &crate::node_agent_cli_sidecar::CliSidecarRegistry,
+    fresh_runtime_task_ids: Option<&HashSet<String>>,
+) -> Result<HashSet<String>> {
+    let Some(fresh_runtime_task_ids) = fresh_runtime_task_ids else {
+        return Ok(HashSet::new());
+    };
+    let mut proven = HashSet::new();
+    for task in local_tasks
+        .list_update_candidates()?
+        .into_iter()
+        .filter(|task| task.status == "cancel_requested")
+    {
+        let contract = load_supervision_contract(journal, &task.task_id)?;
+        if !contract
+            .as_ref()
+            .is_some_and(|contract| contract.protocol == SUPERVISION_PROTOCOL)
+            || fresh_runtime_task_ids.contains(&task.task_id)
+        {
+            continue;
+        }
+        let snapshot = journal.snapshot(&task.task_id, 0, 1)?;
+        if snapshot
+            .record
+            .as_ref()
+            .and_then(|record| record.cancel_intent.as_ref())
+            .is_none()
+        {
+            continue;
+        }
+        if sidecars
+            .session_for_task(&task.task_id)?
+            .as_ref()
+            .is_some_and(|session| session.recorded_process_is_live())
+        {
+            continue;
+        }
+        proven.insert(task.task_id);
+    }
+    Ok(proven)
+}
+
+fn fresh_runtime_task_ids_from_loopback() -> Option<HashSet<String>> {
+    let port = crate::node_agent_admin_open::admin_port_from_env();
+    let status: serde_json::Value = reqwest::blocking::Client::builder()
+        .connect_timeout(Duration::from_secs(2))
+        .timeout(Duration::from_secs(3))
+        .no_proxy()
+        .build()
+        .ok()?
+        .get(format!("http://127.0.0.1:{port}/api/status"))
+        .send()
+        .ok()?
+        .error_for_status()
+        .ok()?
+        .json()
+        .ok()?;
+    let expected = status.get("active_cli_prompt_count")?.as_u64()? as usize;
+    let now = crate::node_agent_cli_sidecar::now_ms();
+    let fresh = status
+        .get("active_task_runtime")?
+        .as_array()?
+        .iter()
+        .filter_map(|entry| {
+            let task_id = entry.get("task_id")?.as_str()?;
+            let heartbeat = entry.get("runtime")?.get("heartbeat")?.as_u64()? as u128;
+            (now.saturating_sub(heartbeat) <= LOOPBACK_RUNTIME_FRESH_MS)
+                .then(|| task_id.to_string())
+        })
+        .collect::<HashSet<_>>();
+    (fresh.len() >= expected).then_some(fresh)
 }
 
 fn checkpoint_active_update_transactions(
