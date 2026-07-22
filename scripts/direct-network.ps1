@@ -388,7 +388,7 @@ if ($MyInvocation.InvocationName -ne "." -and $args.Count -gt 0) {
     $remoteName = if ($args.Count -gt 1) { [string]$args[1] } else { "origin" }
     $result = Invoke-ElonGitHubGitWithProxyFallback -RepoPath (Get-Location).Path -GitArgs @($args) -RemoteName $remoteName
     if ($result.ProxyAttempted) { Write-Host "GITHUB_SSH_FALLBACK=$($result.Route):$($result.ExitCode)" }
-    $result.Output | ForEach-Object { Write-Output $_ }
+    $result.Output | ForEach-Object { Write-Output ([string]$_) }
     if ($result.ExitCode -ne 0) { Write-Error $result.Hint }
     exit $result.ExitCode
 }
