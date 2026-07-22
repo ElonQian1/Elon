@@ -1,4 +1,17 @@
 use super::*;
+
+#[cfg(windows)]
+#[test]
+fn missing_windows_paths_compare_across_separator_and_long_path_prefix_forms() {
+    assert!(same_path(
+        Path::new(r"C:\missing\conversation-worktrees\elon-self\task"),
+        Path::new("C:/missing/conversation-worktrees/elon-self/task"),
+    ));
+    assert!(same_path(
+        Path::new(r"\\?\C:\missing\conversation-worktrees\elon-self\task"),
+        Path::new("C:/missing/conversation-worktrees/elon-self/task"),
+    ));
+}
 use crate::node_agent_local_task_store::LocalTaskStart;
 
 #[test]

@@ -113,6 +113,7 @@ mod node_agent_local_llm;
 mod node_agent_local_task_detached_view;
 mod node_agent_local_task_durable_reconcile;
 mod node_agent_local_task_orphan_migration;
+mod node_agent_local_task_orphan_reconcile;
 mod node_agent_local_task_resume;
 mod node_agent_local_task_resume_context;
 mod node_agent_local_task_resume_lineage;
@@ -122,6 +123,7 @@ mod node_agent_local_task_store;
 mod node_agent_local_task_supervision;
 mod node_agent_local_tasks;
 mod node_agent_local_terminal_reconcile;
+mod node_agent_supervision_finalized_identity;
 mod node_agent_supervision_project_identity;
 mod node_agent_supervision_protocol;
 mod node_agent_supervision_terminal_lease;
@@ -458,6 +460,7 @@ async fn run_agent_runtime() -> Result<()> {
     }
     node_agent_sidecar_recovery::reconcile_surviving_sidecars(runtime.clone()).await;
     runtime.reconcile_local_completion_outbox().await;
+    node_agent_local_task_orphan_reconcile::spawn_reconciler(runtime.clone());
     node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
     node_agent_restart_drain::recover_checkpoint_after_startup(&runtime.update_recovery);
     match runtime

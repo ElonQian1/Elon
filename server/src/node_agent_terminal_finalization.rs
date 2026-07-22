@@ -15,7 +15,9 @@ use crate::node_agent_supervision_terminal_lease_safety::{
     TerminalLeaseExpectation, VerifiedTerminalLeaseIdentity,
 };
 
-const RECEIPT_FILE: &str = "elon-terminal-finalization-v1.json";
+const RECEIPT_DIRECTORY: &str = "terminal-finalization-receipts-v1";
+const MAX_RECEIPT_BYTES: u64 = 64 * 1024;
+const MAX_ROOT_RECEIPTS: usize = 256;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -85,19 +87,15 @@ impl<'a> TerminalFinalizationPreflight<'a> {
         let Some(identity) = self.identity else {
             return Ok(());
         };
-        let path = self
-            .receipt_path
-            .as_ref()
-            .context("terminal receipt path missing")?;
         match self.lease.context("terminal lease expectation missing")? {
             TerminalLeaseExpectation::Exact => {
-                anyhow::ensure!(
-                    read_receipt(path)?.is_none(),
-                    "failed or canceled completion refuses a finalization receipt"
-                );
                 identity.revalidate_lease(TerminalLeaseExpectation::Exact)
             }
             TerminalLeaseExpectation::Missing => {
+                let path = self
+                    .receipt_path
+                    .as_ref()
+                    .context("terminal receipt path missing")?;
                 let current = fs::read(path)
                     .with_context(|| format!("reread terminal receipt {}", path.display()))?;
                 anyhow::ensure!(
@@ -155,19 +153,33 @@ fn preflight_with_contract_root<'a>(
     completion: &CliCompletionEnvelope,
     contract_root: Option<&Path>,
 ) -> Result<TerminalFinalizationPreflight<'a>> {
+    preflight_with_roots(identity, completion, contract_root, None)
+}
+
+fn preflight_with_roots<'a>(
+    identity: &'a VerifiedTerminalLeaseIdentity,
+    completion: &CliCompletionEnvelope,
+    contract_root: Option<&Path>,
+    receipt_root: Option<&Path>,
+) -> Result<TerminalFinalizationPreflight<'a>> {
     let status = crate::node_agent_task_journal_events::completion_terminal_status(
         completion.exit_ok,
         completion.error.as_deref(),
     );
-    let path = identity.git_dir.join(RECEIPT_FILE);
+    let located = find_receipt(
+        receipt_root.unwrap_or(&default_receipt_root()),
+        &identity.root_task_id,
+        &identity.active,
+        Some(&completion.req_id),
+    )?;
     if status != "done" {
         anyhow::ensure!(
-            read_receipt(&path)?.is_none(),
+            located.is_none(),
             "failed or canceled completion refuses a finalization receipt"
         );
         return Ok(TerminalFinalizationPreflight {
             identity: Some(identity),
-            receipt_path: Some(path),
+            receipt_path: None,
             original_bytes: None,
             receipt: None,
             bind_done: false,
@@ -176,7 +188,7 @@ fn preflight_with_contract_root<'a>(
         });
     }
 
-    let (receipt, bytes) = read_receipt(&path)?
+    let (path, receipt, bytes) = located
         .context("successful supervised completion requires a completed finalization receipt")?;
     validate_completed_identity(&receipt, identity, contract_root)?;
     let fields = [
@@ -204,13 +216,88 @@ fn preflight_with_contract_root<'a>(
     })
 }
 
+pub(crate) async fn verify_completed_identity(
+    runtime: &crate::NodeRuntime,
+    task: &crate::node_agent_local_task_store::LocalTaskRecord,
+    supervision: &crate::node_agent_local_task_supervision::SupervisionContract,
+    completion: &CliCompletionEnvelope,
+) -> Result<VerifiedTerminalLeaseIdentity> {
+    verify_completed_identity_with_roots(runtime, task, supervision, completion, None, None).await
+}
+
+async fn verify_completed_identity_with_roots(
+    runtime: &crate::NodeRuntime,
+    task: &crate::node_agent_local_task_store::LocalTaskRecord,
+    supervision: &crate::node_agent_local_task_supervision::SupervisionContract,
+    completion: &CliCompletionEnvelope,
+    contract_root: Option<&Path>,
+    receipt_root: Option<&Path>,
+) -> Result<VerifiedTerminalLeaseIdentity> {
+    let root_task_id = supervision.root_task_id.as_deref().unwrap_or(&task.task_id);
+    let (_, receipt, _) = find_receipt(
+        receipt_root.unwrap_or(&default_receipt_root()),
+        root_task_id,
+        Path::new(&task.workspace_path),
+        Some(&completion.req_id),
+    )?
+    .context("successful supervised completion requires a completed finalization receipt")?;
+    let contract = load_contract(&receipt.task_contract_id, contract_root)?;
+    let evidence = crate::node_agent_supervision_finalized_identity::FinalizedIdentityEvidence {
+        worktree: PathBuf::from(&receipt.worktree),
+        base_workspace: PathBuf::from(&receipt.base_workspace),
+        git_dir: PathBuf::from(&receipt.git_dir),
+        git_common_dir: PathBuf::from(&receipt.git_common_dir),
+        branch: receipt.branch.clone(),
+        origin: receipt.origin.clone(),
+        final_head: receipt.final_head.clone(),
+        base_commit: contract.base_commit.clone(),
+    };
+    let identity =
+        crate::node_agent_supervision_terminal_lease_safety::verify_finalized_terminal_identity(
+            runtime,
+            task,
+            supervision,
+            &completion.req_id,
+            &evidence,
+        )
+        .await?;
+    validate_completed_identity(&receipt, &identity, contract_root)?;
+    Ok(identity)
+}
+
 #[cfg(test)]
-pub(crate) fn preflight_with_contract_root_for_test<'a>(
+pub(crate) async fn verify_completed_identity_for_test(
+    runtime: &crate::NodeRuntime,
+    task: &crate::node_agent_local_task_store::LocalTaskRecord,
+    supervision: &crate::node_agent_local_task_supervision::SupervisionContract,
+    completion: &CliCompletionEnvelope,
+    contract_root: &Path,
+    receipt_root: &Path,
+) -> Result<VerifiedTerminalLeaseIdentity> {
+    verify_completed_identity_with_roots(
+        runtime,
+        task,
+        supervision,
+        completion,
+        Some(contract_root),
+        Some(receipt_root),
+    )
+    .await
+}
+
+#[cfg(test)]
+pub(crate) fn preflight_with_roots_for_test<'a>(
     identity: &'a VerifiedTerminalLeaseIdentity,
     completion: &CliCompletionEnvelope,
     contract_root: &Path,
+    receipt_root: &Path,
 ) -> Result<TerminalFinalizationPreflight<'a>> {
-    preflight_with_contract_root(identity, completion, Some(contract_root))
+    preflight_with_roots(
+        identity,
+        completion,
+        Some(contract_root),
+        Some(receipt_root),
+    )
 }
 
 fn validate_completed_identity(
@@ -350,6 +437,99 @@ fn read_receipt(path: &Path) -> Result<Option<(TerminalFinalizationReceipt, Vec<
     let bytes = fs::read(path)?;
     let receipt = serde_json::from_slice(&bytes).context("parse terminal finalization receipt")?;
     Ok(Some((receipt, bytes)))
+}
+
+fn default_receipt_root() -> PathBuf {
+    std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("ElonNode")
+        .join(RECEIPT_DIRECTORY)
+}
+
+fn receipt_root_key(root_task_id: &str) -> String {
+    format!("{:x}", Sha256::digest(root_task_id.as_bytes()))
+}
+
+fn find_receipt(
+    root: &Path,
+    root_task_id: &str,
+    worktree: &Path,
+    task_id: Option<&str>,
+) -> Result<Option<(PathBuf, TerminalFinalizationReceipt, Vec<u8>)>> {
+    let directory = root.join(receipt_root_key(root_task_id));
+    if !directory.is_dir() {
+        return Ok(None);
+    }
+    let mut entries = fs::read_dir(&directory)
+        .with_context(|| format!("read terminal receipt directory {}", directory.display()))?
+        .collect::<std::io::Result<Vec<_>>>()?;
+    anyhow::ensure!(
+        entries.len() <= MAX_ROOT_RECEIPTS,
+        "terminal receipt root exceeds the bounded scan limit"
+    );
+    entries.sort_by_key(|entry| entry.file_name());
+    let mut matches = Vec::new();
+    let mut observed = Vec::new();
+    for entry in entries {
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path)?;
+        anyhow::ensure!(
+            metadata.file_type().is_file(),
+            "terminal receipt root contains a non-regular entry"
+        );
+        anyhow::ensure!(
+            metadata.len() <= MAX_RECEIPT_BYTES,
+            "terminal receipt exceeds the size limit"
+        );
+        let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else {
+            anyhow::bail!("terminal receipt filename is not UTF-8");
+        };
+        anyhow::ensure!(
+            path.extension().and_then(|value| value.to_str()) == Some("json")
+                && lower_hex(stem, 64),
+            "terminal receipt filename is not a TaskContract SHA-256 id"
+        );
+        let bytes = fs::read(&path)?;
+        let receipt: TerminalFinalizationReceipt =
+            serde_json::from_slice(&bytes).context("parse terminal finalization receipt")?;
+        anyhow::ensure!(
+            receipt.task_contract_id == stem,
+            "terminal receipt filename and TaskContract binding differ"
+        );
+        observed.push(format!(
+            "root={};worktree={};task={}",
+            receipt.supervision_root_task_id,
+            receipt.worktree,
+            receipt.task_id.as_deref().unwrap_or("<unbound>")
+        ));
+        if receipt.supervision_root_task_id != root_task_id
+            || !crate::node_agent_update_checkpoint::same_path(
+                Path::new(&receipt.worktree),
+                worktree,
+            )
+            || receipt
+                .task_id
+                .as_deref()
+                .zip(task_id)
+                .is_some_and(|(bound, expected)| bound != expected)
+        {
+            continue;
+        }
+        matches.push((path, receipt, bytes));
+    }
+    anyhow::ensure!(
+        matches.len() <= 1,
+        "multiple terminal finalization receipts match the same task identity"
+    );
+    if matches.is_empty() && !observed.is_empty() {
+        anyhow::bail!(
+            "terminal receipt directory has no identity match for root={root_task_id};worktree={}; candidates={}",
+            worktree.display(),
+            observed.join("|")
+        );
+    }
+    Ok(matches.into_iter().next())
 }
 
 fn load_contract(id: &str, override_root: Option<&Path>) -> Result<TaskContract> {

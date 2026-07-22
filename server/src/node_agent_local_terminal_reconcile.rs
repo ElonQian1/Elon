@@ -17,6 +17,18 @@ pub(crate) struct LocalTerminalReconciler<'a> {
     runtime: &'a NodeRuntime,
     #[cfg(test)]
     contract_root: Option<std::path::PathBuf>,
+    #[cfg(test)]
+    receipt_root: Option<std::path::PathBuf>,
+    #[cfg(test)]
+    fail_after: Option<TerminalWriteBoundary>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TerminalWriteBoundary {
+    Receipt,
+    LocalTask,
+    Journal,
+    Recovery,
 }
 
 impl<'a> LocalTerminalReconciler<'a> {
@@ -25,14 +37,39 @@ impl<'a> LocalTerminalReconciler<'a> {
             runtime,
             #[cfg(test)]
             contract_root: None,
+            #[cfg(test)]
+            receipt_root: None,
+            #[cfg(test)]
+            fail_after: None,
         }
     }
 
     #[cfg(test)]
-    fn for_test(runtime: &'a NodeRuntime, contract_root: std::path::PathBuf) -> Self {
+    fn for_test(
+        runtime: &'a NodeRuntime,
+        contract_root: std::path::PathBuf,
+        receipt_root: std::path::PathBuf,
+    ) -> Self {
         Self {
             runtime,
             contract_root: Some(contract_root),
+            receipt_root: Some(receipt_root),
+            fail_after: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn for_test_with_failure(
+        runtime: &'a NodeRuntime,
+        contract_root: std::path::PathBuf,
+        receipt_root: std::path::PathBuf,
+        fail_after: TerminalWriteBoundary,
+    ) -> Self {
+        Self {
+            runtime,
+            contract_root: Some(contract_root),
+            receipt_root: Some(receipt_root),
+            fail_after: Some(fail_after),
         }
     }
 
@@ -91,25 +128,27 @@ impl<'a> LocalTerminalReconciler<'a> {
             completion.exit_ok,
             completion.error.as_deref(),
         );
-        let lease = if status == "done" {
-            TerminalLeaseExpectation::Missing
-        } else {
-            TerminalLeaseExpectation::Exact
-        };
         let verified = if supervised {
             let contract = contract
                 .as_ref()
                 .context("supervised terminal task is missing its durable supervision contract")?;
-            Some(
-                crate::node_agent_supervision_terminal_lease_safety::verify_terminal_identity(
-                    self.runtime,
-                    &task,
-                    contract,
-                    &completion.req_id,
-                    lease,
+            if status == "done" {
+                Some(
+                    self.verify_completed_identity(&task, contract, completion)
+                        .await?,
                 )
-                .await?,
-            )
+            } else {
+                Some(
+                    crate::node_agent_supervision_terminal_lease_safety::verify_terminal_identity(
+                        self.runtime,
+                        &task,
+                        contract,
+                        &completion.req_id,
+                        TerminalLeaseExpectation::Exact,
+                    )
+                    .await?,
+                )
+            }
         } else {
             None
         };
@@ -127,11 +166,14 @@ impl<'a> LocalTerminalReconciler<'a> {
         self.runtime
             .local_tasks
             .preflight_completion(completion, verified.as_ref())?;
-        self.runtime.task_journal.preflight_finished_with_outcome(
-            &completion.req_id,
-            status,
-            completion.error.as_deref(),
-        )?;
+        self.runtime
+            .task_journal
+            .preflight_reconciled_finished_with_outcome(
+                &completion.req_id,
+                &completion.event_id,
+                status,
+                completion.error.as_deref(),
+            )?;
         let finalization = match verified.as_ref() {
             Some(identity) => self.preflight_finalization(identity, completion)?,
             None => crate::node_agent_terminal_finalization::TerminalFinalizationPreflight::not_applicable(),
@@ -139,23 +181,29 @@ impl<'a> LocalTerminalReconciler<'a> {
 
         // No receipt/local task/journal/recovery write occurs above this line.
         finalization.commit(completion)?;
+        self.inject_failure(TerminalWriteBoundary::Receipt)?;
         anyhow::ensure!(
             self.runtime
                 .local_tasks
                 .reconcile_completion_trusted(completion, verified.as_ref())?,
             "durable local completion could not bind the local terminal row"
         );
+        self.inject_failure(TerminalWriteBoundary::LocalTask)?;
         let durable = self
             .runtime
             .local_tasks
             .get(&completion.req_id)?
             .context("local terminal row disappeared after persistence")?;
         assert_durable_terminal(&durable, completion, supervised)?;
-        self.runtime.task_journal.record_finished_with_outcome(
-            &completion.req_id,
-            status,
-            completion.error.as_deref(),
-        )?;
+        self.runtime
+            .task_journal
+            .record_reconciled_finished_with_outcome(
+                &completion.req_id,
+                &completion.event_id,
+                status,
+                completion.error.as_deref(),
+            )?;
+        self.inject_failure(TerminalWriteBoundary::Journal)?;
         self.runtime.update_recovery.reconcile_terminal_completion(
             expected_recovery,
             &completion.req_id,
@@ -165,6 +213,21 @@ impl<'a> LocalTerminalReconciler<'a> {
             completion.exit_ok,
             completion.error.as_deref(),
         )?;
+        self.inject_failure(TerminalWriteBoundary::Recovery)?;
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn inject_failure(&self, boundary: TerminalWriteBoundary) -> Result<()> {
+        anyhow::ensure!(
+            self.fail_after != Some(boundary),
+            "injected terminal persistence failure after {boundary:?}"
+        );
+        Ok(())
+    }
+
+    #[cfg(not(test))]
+    fn inject_failure(&self, _boundary: TerminalWriteBoundary) -> Result<()> {
         Ok(())
     }
 
@@ -212,12 +275,46 @@ impl<'a> LocalTerminalReconciler<'a> {
         completion: &CliCompletionEnvelope,
     ) -> Result<crate::node_agent_terminal_finalization::TerminalFinalizationPreflight<'b>> {
         #[cfg(test)]
-        if let Some(root) = self.contract_root.as_deref() {
-            return crate::node_agent_terminal_finalization::preflight_with_contract_root_for_test(
-                identity, completion, root,
+        if let (Some(contract_root), Some(receipt_root)) =
+            (self.contract_root.as_deref(), self.receipt_root.as_deref())
+        {
+            return crate::node_agent_terminal_finalization::preflight_with_roots_for_test(
+                identity,
+                completion,
+                contract_root,
+                receipt_root,
             );
         }
         crate::node_agent_terminal_finalization::preflight(identity, completion)
+    }
+
+    async fn verify_completed_identity(
+        &self,
+        task: &LocalTaskRecord,
+        contract: &SupervisionContract,
+        completion: &CliCompletionEnvelope,
+    ) -> Result<VerifiedTerminalLeaseIdentity> {
+        #[cfg(test)]
+        if let (Some(contract_root), Some(receipt_root)) =
+            (self.contract_root.as_deref(), self.receipt_root.as_deref())
+        {
+            return crate::node_agent_terminal_finalization::verify_completed_identity_for_test(
+                self.runtime,
+                task,
+                contract,
+                completion,
+                contract_root,
+                receipt_root,
+            )
+            .await;
+        }
+        crate::node_agent_terminal_finalization::verify_completed_identity(
+            self.runtime,
+            task,
+            contract,
+            completion,
+        )
+        .await
     }
 }
 

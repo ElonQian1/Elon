@@ -1,7 +1,6 @@
 //! Durable protocol shared by local and remote node update recovery paths.
 
 use std::{
-    collections::HashSet,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -642,17 +641,6 @@ impl UpdateRecoveryStore {
             .into_iter()
             .filter(|receipt| !receipt.state.is_terminal())
             .collect())
-    }
-
-    pub(crate) fn protected_task_ids(&self) -> Result<HashSet<String>> {
-        let mut task_ids = HashSet::new();
-        for receipt in self.active()? {
-            task_ids.insert(receipt.original_task_id.clone());
-            if let Some(task_id) = receipt.resume_task_id {
-                task_ids.insert(task_id);
-            }
-        }
-        Ok(task_ids)
     }
 
     pub(crate) fn receipt_for_task(&self, task_id: &str) -> Result<Option<UpdateRecoveryReceipt>> {

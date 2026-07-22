@@ -126,6 +126,14 @@ async fn accepted_ack_updates_local_display_before_deleting_outbox_row() {
         .expect("local task record");
     assert_eq!(record.sync_state, "synced");
     assert!(record.server_ack_at_ms.is_some());
+    assert!(
+        record
+            .workspace_status
+            .as_ref()
+            .and_then(|value| value.get("terminal_snapshot_status"))
+            .is_none(),
+        "ordinary local tasks must never impersonate a supervised trusted snapshot"
+    );
     let _ = fs::remove_dir_all(root);
 }
 
@@ -274,7 +282,7 @@ fn startup_interrupts_only_running_tasks_without_durable_completion() {
     let durable_req_ids = HashSet::from([protected.req_id.clone()]);
     assert_eq!(
         local_tasks
-            .interrupt_lingering_running(&durable_req_ids, i64::MAX)
+            .mark_stale_without_runtime(&durable_req_ids, i64::MAX)
             .unwrap(),
         1
     );
@@ -314,7 +322,7 @@ fn startup_grace_blocks_marker_first_race_until_no_handle_evidence_is_old() {
 
     assert_eq!(
         local_tasks
-            .interrupt_lingering_running(&HashSet::new(), started_at.saturating_sub(1))
+            .mark_stale_without_runtime(&HashSet::new(), started_at.saturating_sub(1))
             .unwrap(),
         0,
         "a fresh durable marker must survive until handle registration can finish"
@@ -329,7 +337,7 @@ fn startup_grace_blocks_marker_first_race_until_no_handle_evidence_is_old() {
     );
     assert_eq!(
         local_tasks
-            .interrupt_lingering_running(&HashSet::new(), started_at)
+            .mark_stale_without_runtime(&HashSet::new(), started_at)
             .unwrap(),
         1,
         "only an old task with no protected handle evidence may become resume_required"

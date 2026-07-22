@@ -141,117 +141,18 @@ impl NodeRuntime {
     }
 
     /// Rebuild local UI terminal bindings from the durable outbox after an
-    /// agent crash between the two SQLite commits. The outbox remains the
-    /// source of truth and is never deleted here.
+    /// agent crash. The same bounded pass also runs periodically so stale
+    /// runtime markers cannot remain `running` forever.
     pub(crate) async fn reconcile_local_completion_outbox(&self) {
-        const STARTUP_REGISTRATION_GRACE_MS: i64 = 2 * 60 * 1_000;
-        let completions = match self.completion_outbox.list_pending(1_000) {
-            Ok(completions) => completions,
-            Err(error) => {
-                warn!(%error, "failed to read durable completion outbox during startup repair");
-                return;
-            }
-        };
-        for completion in completions {
-            if completion.origin != node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN {
-                continue;
-            }
-            match crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(
-                self,
-            )
-            .reconcile(&completion)
-            .await
-            {
-                Ok(()) => info!(
-                    req_id = %completion.req_id,
-                    event_id = %completion.event_id,
-                    "reconciled trusted local terminal state from durable outbox"
-                ),
-                Err(error) => warn!(
-                    req_id = %completion.req_id,
-                    event_id = %completion.event_id,
-                    %error,
-                    "durable local terminal reconciliation remains retryable"
-                ),
-            }
-        }
-
-        // Any remaining `running` row has lost its in-memory child handle. Keep
-        // rows that still have a durable outbox envelope recoverable, and make all
-        // other interrupted work explicit and resumable instead of displaying it as live forever.
-        let mut durable_req_ids = match self.completion_outbox.pending_req_ids() {
-            Ok(req_ids) => req_ids,
-            Err(error) => {
-                warn!(%error, "failed to read durable completion bindings during startup repair");
-                return;
-            }
-        };
-        match self.update_recovery.protected_task_ids() {
-            Ok(protected) => durable_req_ids.extend(protected),
-            Err(error) => {
-                warn!(%error, "failed to read protected update recovery task ids");
-                return;
-            }
-        }
-        durable_req_ids.extend(
-            self.active_cli_prompts
-                .views_without_approvals()
-                .await
-                .into_iter()
-                .filter(|handle| handle.control_handle_live)
-                .map(|handle| handle.req_id),
-        );
-        let now = crate::node_agent_cli_sidecar::now_ms();
-        let sessions = match self.cli_sidecars.all_sessions() {
-            Ok(sessions) => sessions,
-            Err(error) => {
-                warn!(%error, "failed to read sidecar liveness during startup repair; preserving running tasks");
-                return;
-            }
-        };
-        durable_req_ids.extend(
-            sessions
-                .into_iter()
-                .filter(|session| session.protects_startup_reconcile_at(now))
-                .map(|session| session.task_id),
-        );
-        let candidates = match self.local_tasks.list_update_install_candidates() {
-            Ok(candidates) => candidates,
-            Err(error) => {
-                warn!(%error, "failed to read startup recovery candidates; preserving running tasks");
-                return;
-            }
-        };
-        for task in candidates {
-            let snapshot = match self.task_journal.snapshot(&task.task_id, 0, 1) {
-                Ok(snapshot) => snapshot,
-                Err(error) => {
-                    warn!(task_id = %task.task_id, %error, "failed to read task heartbeat; preserving running tasks");
-                    return;
-                }
-            };
-            if snapshot.record.is_some_and(|record| {
-                matches!(
-                    record.status.as_str(),
-                    "running" | "recovering" | "reattaching"
-                ) && now.saturating_sub(record.heartbeat_at_ms.unwrap_or(record.updated_at_ms))
-                    <= STARTUP_REGISTRATION_GRACE_MS as u128
-            }) {
-                durable_req_ids.insert(task.task_id);
-            }
-        }
-        let started_before_ms =
-            (now.min(i64::MAX as u128) as i64).saturating_sub(STARTUP_REGISTRATION_GRACE_MS);
-        match self
-            .local_tasks
-            .interrupt_lingering_running(&durable_req_ids, started_before_ms)
-        {
+        match crate::node_agent_local_task_orphan_reconcile::reconcile_once(self).await {
             Ok(0) => {}
             Ok(resume_required) => warn!(
                 resume_required,
-                "marked local tasks resume-required after node-agent restart"
+                "marked stale local tasks resume-required after durable runtime reconciliation"
             ),
-            Err(error) => warn!(%error, "failed to mark lingering local tasks resume-required"),
+            Err(error) => {
+                warn!(%error, "local completion/orphan reconciliation failed closed")
+            }
         }
     }
 

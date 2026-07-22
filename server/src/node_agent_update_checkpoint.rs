@@ -489,8 +489,15 @@ pub(crate) fn same_path(left: &Path, right: &Path) -> bool {
     let left = std::fs::canonicalize(left).unwrap_or_else(|_| left.to_path_buf());
     let right = std::fs::canonicalize(right).unwrap_or_else(|_| right.to_path_buf());
     if cfg!(windows) {
-        left.to_string_lossy()
-            .eq_ignore_ascii_case(&right.to_string_lossy())
+        let normalize = |path: &Path| {
+            let value = path
+                .to_string_lossy()
+                .replace('\\', "/")
+                .trim_end_matches('/')
+                .to_string();
+            value.strip_prefix("//?/").unwrap_or(&value).to_string()
+        };
+        normalize(&left).eq_ignore_ascii_case(&normalize(&right))
     } else {
         left == right
     }

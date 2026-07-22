@@ -250,10 +250,10 @@ impl LocalTaskStore {
         Ok(changed > 0)
     }
 
-    /// Preserve one-click recovery when a restart loses in-memory child handles.
-    pub(crate) fn interrupt_lingering_running(
+    /// Preserve one-click recovery when every runtime ownership signal is stale.
+    pub(crate) fn mark_stale_without_runtime(
         &self,
-        durable_req_ids: &HashSet<String>,
+        protected_req_ids: &HashSet<String>,
         started_before_ms: i64,
     ) -> Result<usize> {
         let mut conn = self.open()?;
@@ -261,7 +261,8 @@ impl LocalTaskStore {
         let running_ids = {
             let mut stmt = tx.prepare(
                 "SELECT task_id FROM local_tasks
-                  WHERE status = 'running' AND completion_event_id IS NULL
+                  WHERE status IN ('running','recovering','reattaching')
+                    AND completion_event_id IS NULL
                     AND started_at_ms <= ?1",
             )?;
             let ids = stmt
@@ -271,17 +272,17 @@ impl LocalTaskStore {
         };
         let mut changed = 0;
         for task_id in running_ids {
-            if durable_req_ids.contains(&task_id) {
+            if protected_req_ids.contains(&task_id) {
                 continue;
             }
             changed += tx.execute(
                 "UPDATE local_tasks
                     SET status = 'resume_required',
-                        error = '节点进程重启后需要继续：工作区与 journal 已保留，请点击 Resume 让 Codex 检查现场后续跑',
+                        error = '本机执行句柄、进程、sidecar 与 heartbeat 均已过期：工作区、journal 和 completion outbox 已保留，请点击 Resume 检查现场后续跑',
                         sync_state = 'local_only',
                         finished_at_ms = ?1
                   WHERE task_id = ?2
-                    AND status = 'running'
+                    AND status IN ('running','recovering','reattaching')
                     AND completion_event_id IS NULL
                     AND started_at_ms <= ?3",
                 params![now_ms(), task_id, started_before_ms],
@@ -610,7 +611,7 @@ mod tests {
         assert!(!store.mark_recovery_running("local-running").unwrap());
         assert_eq!(
             store
-                .interrupt_lingering_running(&HashSet::new(), i64::MAX)
+                .mark_stale_without_runtime(&HashSet::new(), i64::MAX)
                 .unwrap(),
             1
         );

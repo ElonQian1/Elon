@@ -22,6 +22,8 @@ async fn completed_done_with_missing_lease_persists_trusted_snapshot_and_replays
     let fixture = Fixture::new("done").await;
     fixture.write_completed_receipt();
     fixture.unlock();
+    let expected_head = fixture.head();
+    fixture.remove_worktree_and_branch();
     let completion = fixture.completion(true, None);
     fixture
         .runtime
@@ -42,7 +44,7 @@ async fn completed_done_with_missing_lease_persists_trusted_snapshot_and_replays
     );
     assert_eq!(
         task.workspace_status.as_ref().unwrap()["git_head"],
-        fixture.head()
+        expected_head
     );
     assert_eq!(
         fixture.runtime.completion_outbox.pending_count().unwrap(),
@@ -170,6 +172,7 @@ struct Fixture {
     base: PathBuf,
     active: PathBuf,
     contracts: PathBuf,
+    receipts: PathBuf,
     branch: String,
     runtime: NodeRuntime,
 }
@@ -177,8 +180,8 @@ struct Fixture {
 impl Fixture {
     async fn new(label: &str) -> Self {
         let root = std::env::temp_dir().join(format!(
-            "elon-supervised-terminal-{label}-{}",
-            uuid::Uuid::new_v4().simple()
+            "est-{}",
+            &uuid::Uuid::new_v4().simple().to_string()[..12]
         ));
         let origin = root.join("origin.git");
         let base = root.join("base");
@@ -188,7 +191,9 @@ impl Fixture {
             .join("conversation-worktrees/elon-self")
             .join(&conversation);
         let contracts = root.join("contracts");
+        let receipts = root.join("receipts");
         fs::create_dir_all(&contracts).unwrap();
+        fs::create_dir_all(&receipts).unwrap();
         git(&root, &["init", "--bare", origin.to_str().unwrap()]);
         git(&root, &["init", "-b", "main", base.to_str().unwrap()]);
         git(&base, &["config", "user.email", "ai@example.test"]);
@@ -213,6 +218,8 @@ impl Fixture {
                 "origin/main",
             ],
         );
+        let base = base.canonicalize().unwrap();
+        let active = active.canonicalize().unwrap();
         crate::node_agent_supervision_worktree_lease::acquire(&base, &active, ROOT).unwrap();
 
         let mut runtime = NodeRuntime::new(
@@ -303,15 +310,35 @@ impl Fixture {
             base,
             active,
             contracts,
+            receipts,
             branch,
             runtime,
         }
     }
 
     async fn reconcile(&self, completion: &CliCompletionEnvelope) -> anyhow::Result<()> {
-        LocalTerminalReconciler::for_test(&self.runtime, self.contracts.clone())
-            .reconcile(completion)
-            .await
+        LocalTerminalReconciler::for_test(
+            &self.runtime,
+            self.contracts.clone(),
+            self.receipts.clone(),
+        )
+        .reconcile(completion)
+        .await
+    }
+
+    async fn reconcile_with_failure(
+        &self,
+        completion: &CliCompletionEnvelope,
+        boundary: TerminalWriteBoundary,
+    ) -> anyhow::Result<()> {
+        LocalTerminalReconciler::for_test_with_failure(
+            &self.runtime,
+            self.contracts.clone(),
+            self.receipts.clone(),
+            boundary,
+        )
+        .reconcile(completion)
+        .await
     }
 
     async fn assert_failed_unchanged(&self, completion: CliCompletionEnvelope, needle: &str) {
@@ -449,9 +476,11 @@ impl Fixture {
             "leaseMarkerFingerprint":"a".repeat(64), "fingerprint":format!("{:x}", Sha256::digest(fields.as_bytes())),
             "preparedAtUtc":"2026-07-22T01:00:00Z", "completedAtUtc":"2026-07-22T01:01:00Z", "boundAtUtc":null,
         });
-        crate::node_agent_atomic_file::write(
-            &self.receipt_path(),
-            &serde_json::to_vec(&receipt).unwrap(),
+        let directory = self.receipt_directory();
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(
+            directory.join(format!("{id}.json")),
+            serde_json::to_vec(&receipt).unwrap(),
         )
         .unwrap();
     }
@@ -470,6 +499,18 @@ impl Fixture {
     fn head(&self) -> String {
         git_output(&self.active, &["rev-parse", "HEAD^{commit}"])
     }
+    fn remove_worktree_and_branch(&self) {
+        git(
+            &self.base,
+            &[
+                "worktree",
+                "remove",
+                "--force",
+                self.active.to_str().unwrap(),
+            ],
+        );
+        git(&self.base, &["branch", "-D", &self.branch]);
+    }
     fn git_common(&self) -> String {
         git_output(
             &self.active,
@@ -477,11 +518,16 @@ impl Fixture {
         )
     }
     fn receipt_path(&self) -> PathBuf {
-        PathBuf::from(git_output(
-            &self.active,
-            &["rev-parse", "--path-format=absolute", "--git-dir"],
-        ))
-        .join("elon-terminal-finalization-v1.json")
+        fs::read_dir(self.receipt_directory())
+            .ok()
+            .and_then(|mut entries| entries.next())
+            .and_then(Result::ok)
+            .map(|entry| entry.path())
+            .unwrap_or_else(|| self.receipt_directory().join("missing.json"))
+    }
+    fn receipt_directory(&self) -> PathBuf {
+        self.receipts
+            .join(format!("{:x}", Sha256::digest(ROOT.as_bytes())))
     }
 }
 
@@ -492,12 +538,14 @@ impl Drop for Fixture {
 }
 
 fn normalized(path: &Path) -> String {
-    path.canonicalize()
+    let value = path
+        .canonicalize()
         .unwrap()
         .to_string_lossy()
         .replace('\\', "/")
         .trim_end_matches('/')
-        .to_string()
+        .to_string();
+    value.strip_prefix("//?/").unwrap_or(&value).to_string()
 }
 fn git_output(cwd: &Path, args: &[&str]) -> String {
     let output = crate::git_command_error::git_command()
@@ -515,3 +563,6 @@ fn git_output(cwd: &Path, args: &[&str]) -> String {
 fn git(cwd: &Path, args: &[&str]) {
     let _ = git_output(cwd, args);
 }
+
+#[path = "node_agent_local_terminal_reconcile_failure_tests.rs"]
+mod failure_tests;

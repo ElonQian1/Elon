@@ -26,10 +26,11 @@ pub(crate) struct VerifiedTerminalLeaseIdentity {
     pub(crate) git_dir: PathBuf,
     pub(crate) git_common_dir: PathBuf,
     pub(crate) head: String,
-    task_id: String,
-    project_id: String,
-    workspace_path: String,
-    workspace_status: serde_json::Value,
+    pub(crate) finalized_workspace_missing: bool,
+    pub(crate) task_id: String,
+    pub(crate) project_id: String,
+    pub(crate) workspace_path: String,
+    pub(crate) workspace_status: serde_json::Value,
 }
 
 pub(crate) fn admission_base(
@@ -130,6 +131,7 @@ fn build_verified_identity(
         git_dir,
         git_common_dir,
         head,
+        finalized_workspace_missing: false,
         task_id: task.task_id.clone(),
         project_id: task.project_id.clone(),
         workspace_path: task.workspace_path.clone(),
@@ -137,8 +139,37 @@ fn build_verified_identity(
     })
 }
 
+pub(crate) async fn verify_finalized_terminal_identity(
+    runtime: &NodeRuntime,
+    task: &LocalTaskRecord,
+    contract: &SupervisionContract,
+    task_id: &str,
+    evidence: &crate::node_agent_supervision_finalized_identity::FinalizedIdentityEvidence,
+) -> Result<VerifiedTerminalLeaseIdentity> {
+    if Path::new(&task.workspace_path).is_dir() {
+        return verify_terminal_identity(
+            runtime,
+            task,
+            contract,
+            task_id,
+            TerminalLeaseExpectation::Missing,
+        )
+        .await;
+    }
+    crate::node_agent_supervision_finalized_identity::verify(
+        runtime, task, contract, task_id, evidence,
+    )
+    .await
+}
+
 impl VerifiedTerminalLeaseIdentity {
     pub(crate) fn revalidate_lease(&self, expected: TerminalLeaseExpectation) -> Result<()> {
+        if self.finalized_workspace_missing {
+            anyhow::ensure!(
+                !self.active.exists(),
+                "cleaned terminal worktree path reappeared during finalization"
+            );
+        }
         let actual = crate::node_agent_supervision_worktree_lease::worktree_lock_reason(
             &self.base,
             &self.active,
@@ -198,6 +229,17 @@ impl VerifiedTerminalLeaseIdentity {
         origin: &str,
         common_dir: &Path,
     ) -> Result<()> {
+        if self.finalized_workspace_missing {
+            return crate::node_agent_supervision_finalized_identity::revalidate_repository(
+                &self.base,
+                &self.git_common_dir,
+                &self.head,
+                final_head,
+                base_commit,
+                origin,
+                common_dir,
+            );
+        }
         anyhow::ensure!(
             git(&self.active, &["rev-parse", "--verify", "HEAD^{commit}"])? == self.head
                 && self.head == final_head,
@@ -349,7 +391,7 @@ async fn validate_recorded_identity(
     Ok((base, active))
 }
 
-async fn lineage_or_workspace_is_active(
+pub(crate) async fn lineage_or_workspace_is_active(
     runtime: &NodeRuntime,
     current_task_id: &str,
     root_task_id: &str,
