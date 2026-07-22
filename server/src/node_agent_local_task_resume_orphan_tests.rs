@@ -172,6 +172,29 @@ fn orphaned_content_drift_is_rejected_without_mutating_source() {
 }
 
 #[test]
+fn missing_platform_control_files_do_not_count_as_business_drift() {
+    let fixture = Fixture::new();
+    let control = fixture.active.join(".elon/recovery-state.json");
+    std::fs::create_dir_all(control.parent().unwrap()).unwrap();
+    std::fs::write(&control, "platform\n").unwrap();
+    git(&fixture.active, &["add", ".elon/recovery-state.json"]);
+    git(
+        &fixture.active,
+        &["commit", "-m", "platform control successor"],
+    );
+    let successor = output(&fixture.active, &["rev-parse", "HEAD"]);
+    git(
+        &fixture.base,
+        &["update-ref", "refs/remotes/origin/main", &successor],
+    );
+    std::fs::remove_file(&control).unwrap();
+    fixture.orphanize("parked-platform-control-gap");
+
+    assert_eq!(fixture.inspect().unwrap().git_head, successor);
+    assert!(!control.exists());
+}
+
+#[test]
 fn legacy_workspace_status_without_new_provenance_fields_can_be_proved() {
     let mut fixture = Fixture::new();
     let status = fixture.parent.workspace_status.as_mut().unwrap();

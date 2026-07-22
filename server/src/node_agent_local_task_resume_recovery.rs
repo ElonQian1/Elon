@@ -183,7 +183,13 @@ fn validate_clean_against_commit(base: &Path, active: &Path, head: &str) -> Resu
             Some(active),
             &["ls-files", "--others", "--exclude-standard"],
         )?;
-        let status = format!("{tracked}{untracked}");
+        let tracked = business_changes(&tracked);
+        let untracked = business_changes(&untracked);
+        let status = tracked
+            .into_iter()
+            .chain(untracked)
+            .collect::<Vec<_>>()
+            .join("\n");
         anyhow::ensure!(
             status.trim().is_empty(),
             "孤儿目录业务内容与分支目标提交不一致或存在未保存差异: {}",
@@ -193,6 +199,29 @@ fn validate_clean_against_commit(base: &Path, active: &Path, head: &str) -> Resu
     })();
     let _ = std::fs::remove_file(&index);
     result
+}
+
+fn business_changes(output: &str) -> Vec<&str> {
+    output
+        .lines()
+        .filter(|line| {
+            let fields = line.split('\t').collect::<Vec<_>>();
+            let paths = if fields.len() > 1 {
+                &fields[1..]
+            } else {
+                &fields[..]
+            };
+            paths.iter().any(|path| !platform_control_path(path.trim()))
+        })
+        .collect()
+}
+
+fn platform_control_path(path: &str) -> bool {
+    let path = path.trim_start_matches("./").replace('\\', "/");
+    path == ".aiignore"
+        || [".agents/", ".ai/", ".codex/", ".copilot/", ".elon/"]
+            .iter()
+            .any(|prefix| path.starts_with(prefix))
 }
 
 fn git_with_index(
