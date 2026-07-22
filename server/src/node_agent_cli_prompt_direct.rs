@@ -374,7 +374,7 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
 
     journal_aggregate.flush(&task_journal, &req_id);
 
-    let exit_ok = child.wait().await.map(|s| s.success()).unwrap_or(false);
+    let mut exit_ok = child.wait().await.map(|s| s.success()).unwrap_or(false);
     if cli_name == "codex" && !contains_codex_reply_marker(&stdout_text) {
         if let Some(text) = codex_last_message_chunk(codex_last_message_path.as_ref()) {
             send_cli_chunk(&out_tx, &task_journal, &req_id, "stdout", &text);
@@ -501,6 +501,33 @@ pub(crate) async fn run_cli_direct_process(ctx: CliDirectRunContext) {
         }))
         .await;
         return;
+    }
+    if exit_ok && cli_name == "codex" {
+        match crate::node_agent_cli_sidecar_runner::codex_completion_disposition(&stdout_text) {
+            crate::node_agent_cli_sidecar_runner::CodexCompletionDisposition::Complete {
+                ..
+            } => {}
+            crate::node_agent_cli_sidecar_runner::CodexCompletionDisposition::Failed => {
+                exit_ok = false;
+                stderr_text
+                    .push_str("\nCodex emitted turn.failed despite a successful process exit.\n");
+            }
+            crate::node_agent_cli_sidecar_runner::CodexCompletionDisposition::ResumeRequired => {
+                if preserve_untrusted_supervised_codex_exit(
+                    &runtime,
+                    &completion_context,
+                    &task_journal,
+                    &req_id,
+                    &stderr_text,
+                ) {
+                    return;
+                }
+                exit_ok = false;
+                stderr_text.push_str(
+                    "\nCodex exited without a trusted terminal envelope and final reply.\n",
+                );
+            }
+        }
     }
     if exit_ok && cli_name == "codex" && !contains_codex_reply_marker(&stdout_text) {
         let diagnostic = if stdout_text.trim().is_empty() {

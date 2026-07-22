@@ -371,6 +371,37 @@ pub(crate) async fn run_cli_sidecar_or_fallback(
         return None;
     }
 
+    if result.exit_ok && cli_name == "codex" {
+        match crate::node_agent_cli_sidecar_runner::codex_completion_disposition(
+            &result.stdout_text,
+        ) {
+            crate::node_agent_cli_sidecar_runner::CodexCompletionDisposition::Complete {
+                ..
+            } => {}
+            crate::node_agent_cli_sidecar_runner::CodexCompletionDisposition::Failed => {
+                result.exit_ok = false;
+                result
+                    .stderr_text
+                    .push_str("\nCodex emitted turn.failed despite a successful process exit.\n");
+            }
+            crate::node_agent_cli_sidecar_runner::CodexCompletionDisposition::ResumeRequired => {
+                if preserve_untrusted_supervised_codex_exit(
+                    &runtime,
+                    &completion_context,
+                    &task_journal,
+                    &req_id,
+                    &result.stderr_text,
+                ) {
+                    return None;
+                }
+                result.exit_ok = false;
+                result.stderr_text.push_str(
+                    "\nCodex exited without a trusted terminal envelope and final reply.\n",
+                );
+            }
+        }
+    }
+
     if cli_name == "codex" && !contains_codex_reply_marker(&result.stdout_text) {
         if let Some(text) = codex_last_message_chunk(codex_last_message_path.as_ref()) {
             send_cli_chunk(&out_tx, &task_journal, &req_id, "stdout", &text);

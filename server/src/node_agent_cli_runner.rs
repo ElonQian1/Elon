@@ -55,6 +55,64 @@ pub fn contains_codex_reply_marker(output: &str) -> bool {
         .any(|line| line.trim().eq_ignore_ascii_case("codex"))
 }
 
+pub fn preserve_untrusted_supervised_codex_exit(
+    runtime: &crate::NodeRuntime,
+    completion_context: &crate::node_agent_cli_done::CliCompletionContext,
+    task_journal: &node_agent_task_journal::TaskJournal,
+    req_id: &str,
+    stderr_text: &str,
+) -> bool {
+    if !completion_context.is_desktop_supervised() {
+        return false;
+    }
+    let reason = "Codex CLI 已退出，但缺少 turn.completed 或可解析最终回复；未写入 done，隔离工作区与 session 已保留供 Resume";
+    let session = runtime.cli_sidecars.session_for_task(req_id).ok().flatten();
+    let stderr_tail = tail_chars(
+        &crate::node_agent_cli_redaction::redact_text(stderr_text),
+        2_000,
+    );
+    let recovery_context = serde_json::json!({
+        "state": "resume_required",
+        "reason": "codex_terminal_envelope_incomplete",
+        "sidecar_session_id": session.as_ref().map(|value| value.session_id.as_str()),
+        "sidecar_output_offset": session.as_ref().map(|value| value.output_offset),
+        "sidecar_output_sequence": session.as_ref().map(|value| value.output_sequence),
+        "stderr_tail": stderr_tail,
+        "journal_preserved": true,
+        "workspace_preserved": true,
+        "session_preserved": true,
+    });
+    let transitioned = runtime
+        .local_tasks
+        .mark_stale_sidecar_resume_required(req_id, reason, &recovery_context)
+        .or_else(|error| {
+            warn!(%req_id, %error, "failed to attach incomplete Codex terminal evidence to workspace status");
+            runtime.local_tasks.mark_recovery_blocked(req_id, reason)
+        });
+    if let Err(error) = transitioned {
+        warn!(%req_id, %error, "failed to preserve incomplete Codex completion as resume_required");
+    }
+    let _ = runtime.cli_sidecars.mark_task_resume_required(req_id);
+    if let Err(error) = crate::node_agent_local_task_supervision::record_supervision_event(
+        task_journal,
+        req_id,
+        "supervision_codex_terminal_incomplete",
+        recovery_context,
+    ) {
+        warn!(%req_id, %error, "failed to record incomplete Codex terminal evidence");
+    }
+    if let Err(error) = task_journal.record_finished_with_outcome(req_id, "failed", Some(reason)) {
+        warn!(%req_id, %error, "failed to mark incomplete Codex journal as recoverable failure");
+    }
+    true
+}
+
+fn tail_chars(value: &str, max_chars: usize) -> String {
+    let mut chars = value.chars().rev().take(max_chars).collect::<Vec<_>>();
+    chars.reverse();
+    chars.into_iter().collect()
+}
+
 pub fn strip_cli_control_sequences(input: &str) -> String {
     let chars: Vec<char> = input.chars().collect();
     let mut out = String::with_capacity(input.len());

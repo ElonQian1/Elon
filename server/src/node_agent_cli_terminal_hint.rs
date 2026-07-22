@@ -1,6 +1,5 @@
-//! Detects a durable Codex JSON terminal signal without treating every
-//! assistant message as completion. A bounded fallback handles CLI versions
-//! that emit the final agent message but fail to close the process.
+//! Detects a durable Codex JSON terminal signal without treating a process
+//! exit or an intermediate assistant/tool item as successful completion.
 
 use std::{collections::HashSet, time::Duration, time::Instant};
 
@@ -12,12 +11,18 @@ pub(crate) enum CodexTerminalOutcome {
     Failure,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum CodexCompletionDisposition {
+    Complete { final_reply: String },
+    Failed,
+    ResumeRequired,
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct CodexTerminalHint {
     pending_line: String,
     in_flight_items: HashSet<String>,
     terminal: Option<(CodexTerminalOutcome, Instant)>,
-    final_message_candidate_at: Option<Instant>,
 }
 
 impl CodexTerminalHint {
@@ -51,25 +56,20 @@ impl CodexTerminalHint {
         &self,
         now: Instant,
         terminal_grace: Duration,
-        final_message_grace: Duration,
+        _final_message_grace: Duration,
     ) -> Option<CodexTerminalOutcome> {
         if let Some((outcome, observed_at)) = self.terminal {
             return (now.saturating_duration_since(observed_at) >= terminal_grace)
                 .then_some(outcome);
         }
-        self.final_message_candidate_at
-            .filter(|_| self.in_flight_items.is_empty())
-            .filter(|observed_at| {
-                now.saturating_duration_since(*observed_at) >= final_message_grace
-            })
-            .map(|_| CodexTerminalOutcome::Success)
+        None
     }
 
     fn observe_value(&mut self, value: &Value, observed_at: Instant) {
         match value.get("type").and_then(Value::as_str).unwrap_or("") {
             "turn.started" => {
                 self.terminal = None;
-                self.final_message_candidate_at = None;
+                self.in_flight_items.clear();
             }
             "turn.completed" => {
                 self.terminal = Some((CodexTerminalOutcome::Success, observed_at));
@@ -78,7 +78,6 @@ impl CodexTerminalHint {
                 self.terminal = Some((CodexTerminalOutcome::Failure, observed_at));
             }
             "item.started" => {
-                self.final_message_candidate_at = None;
                 if let Some(id) = item_id(value) {
                     self.in_flight_items.insert(id.to_string());
                 }
@@ -87,20 +86,46 @@ impl CodexTerminalHint {
                 if let Some(id) = item_id(value) {
                     self.in_flight_items.remove(id);
                 }
-                let item = value.get("item").unwrap_or(value);
-                if item.get("type").and_then(Value::as_str) == Some("agent_message")
-                    && item
+            }
+            _ => {}
+        }
+    }
+}
+
+pub(crate) fn codex_completion_disposition(output: &str) -> CodexCompletionDisposition {
+    let mut terminal = None;
+    let mut final_reply = None;
+    for value in output
+        .lines()
+        .filter_map(|line| serde_json::from_str::<Value>(line.trim()).ok())
+    {
+        match value.get("type").and_then(Value::as_str).unwrap_or("") {
+            "turn.started" => {
+                terminal = None;
+                final_reply = None;
+            }
+            "turn.completed" => terminal = Some(CodexTerminalOutcome::Success),
+            "turn.failed" => terminal = Some(CodexTerminalOutcome::Failure),
+            "item.completed" => {
+                let item = value.get("item").unwrap_or(&value);
+                if item.get("type").and_then(Value::as_str) == Some("agent_message") {
+                    final_reply = item
                         .get("text")
                         .and_then(Value::as_str)
-                        .is_some_and(|text| !text.trim().is_empty())
-                {
-                    self.final_message_candidate_at = Some(observed_at);
-                } else {
-                    self.final_message_candidate_at = None;
+                        .map(str::trim)
+                        .filter(|text| !text.is_empty())
+                        .map(str::to_string);
                 }
             }
             _ => {}
         }
+    }
+    match (terminal, final_reply) {
+        (Some(CodexTerminalOutcome::Success), Some(final_reply)) => {
+            CodexCompletionDisposition::Complete { final_reply }
+        }
+        (Some(CodexTerminalOutcome::Failure), _) => CodexCompletionDisposition::Failed,
+        _ => CodexCompletionDisposition::ResumeRequired,
     }
 }
 
@@ -185,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    fn final_message_fallback_requires_no_in_flight_items_and_long_grace() {
+    fn final_message_without_turn_terminal_never_becomes_success() {
         let started = Instant::now();
         let mut hint = CodexTerminalHint::default();
         hint.observe(
@@ -194,19 +219,35 @@ mod tests {
         );
         assert_eq!(
             hint.outcome(
-                started + Duration::from_secs(29),
+                started + Duration::from_secs(30),
                 Duration::from_millis(750),
                 Duration::from_secs(30),
             ),
             None
         );
+    }
+
+    #[test]
+    fn trusted_success_requires_turn_completed_and_parseable_final_reply() {
+        let no_final = concat!(
+            "{\"type\":\"turn.started\"}\n",
+            "{\"type\":\"item.started\",\"item\":{\"id\":\"tool\",\"type\":\"command_execution\"}}\n",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"tool\",\"type\":\"command_execution\"}}\n"
+        );
         assert_eq!(
-            hint.outcome(
-                started + Duration::from_secs(30),
-                Duration::from_millis(750),
-                Duration::from_secs(30),
-            ),
-            Some(CodexTerminalOutcome::Success)
+            codex_completion_disposition(no_final),
+            CodexCompletionDisposition::ResumeRequired
+        );
+        let complete = concat!(
+            "{\"type\":\"turn.started\"}\n",
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"msg\",\"type\":\"agent_message\",\"text\":\"done\"}}\n",
+            "{\"type\":\"turn.completed\"}\n"
+        );
+        assert_eq!(
+            codex_completion_disposition(complete),
+            CodexCompletionDisposition::Complete {
+                final_reply: "done".to_string()
+            }
         );
     }
 }

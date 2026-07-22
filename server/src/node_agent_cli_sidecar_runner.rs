@@ -32,6 +32,7 @@ use crate::{
     node_agent_task_journal::TaskJournal,
 };
 use pipe_sidecar_runner::run_pipe_json_sidecar;
+pub(crate) use terminal_hint::{codex_completion_disposition, CodexCompletionDisposition};
 
 pub(crate) const SIDECAR_POLL_MS: u64 = 250;
 const OUTPUT_CURSOR_CHECKPOINT_INTERVAL: Duration = Duration::from_secs(2);

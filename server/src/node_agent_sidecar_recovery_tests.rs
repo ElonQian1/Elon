@@ -77,7 +77,10 @@ fn codex_process_exit_without_turn_terminal_is_not_completion() {
     );
     assert_eq!(codex_terminal_outcome(interrupted), None);
     assert_eq!(
-        codex_terminal_outcome("{\"type\":\"turn.completed\"}\n"),
+        codex_terminal_outcome(concat!(
+            "{\"type\":\"item.completed\",\"item\":{\"id\":\"msg\",\"type\":\"agent_message\",\"text\":\"done\"}}\n",
+            "{\"type\":\"turn.completed\"}\n"
+        )),
         Some(true)
     );
     assert_eq!(

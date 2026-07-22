@@ -325,17 +325,13 @@ fn output_contains_terminal_record(path: &Path) -> Result<bool> {
 }
 
 fn codex_terminal_outcome(output: &str) -> Option<bool> {
-    output
-        .lines()
-        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line.trim()).ok())
-        .fold(None, |outcome, value| {
-            match value.get("type").and_then(serde_json::Value::as_str) {
-                Some("turn.completed") => Some(true),
-                Some("turn.failed") => Some(false),
-                Some("turn.started") => None,
-                _ => outcome,
-            }
-        })
+    match crate::node_agent_cli_sidecar_runner::codex_completion_disposition(output) {
+        crate::node_agent_cli_sidecar_runner::CodexCompletionDisposition::Complete { .. } => {
+            Some(true)
+        }
+        crate::node_agent_cli_sidecar_runner::CodexCompletionDisposition::Failed => Some(false),
+        crate::node_agent_cli_sidecar_runner::CodexCompletionDisposition::ResumeRequired => None,
+    }
 }
 
 fn ensure_recovery_receipt(

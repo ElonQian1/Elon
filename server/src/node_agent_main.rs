@@ -68,6 +68,8 @@ mod node_agent_cli_sidecar_runner;
 #[cfg(test)]
 mod node_agent_cli_sidecar_runner_tests;
 mod node_agent_cli_supervision_lease;
+#[cfg(test)]
+mod node_agent_cli_terminal_fixture_tests;
 mod node_agent_cli_worker;
 mod node_agent_client_diagnostic_logs;
 mod node_agent_client_diagnostics;
