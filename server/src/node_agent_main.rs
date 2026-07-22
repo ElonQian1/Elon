@@ -149,6 +149,7 @@ mod node_agent_project_profile;
 mod node_agent_project_profile_node;
 mod node_agent_project_profile_python;
 mod node_agent_proxy;
+mod node_agent_pwa_auth_profile;
 mod node_agent_pwa_runtime;
 mod node_agent_registration;
 mod node_agent_release_identity;

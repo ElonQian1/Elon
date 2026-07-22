@@ -20,12 +20,17 @@ mod tests {
             "url":"http://127.0.0.1:4173/app",
             "viewport":{"width":360,"height":640,"deviceScaleFactor":1},
             "waitFor":{"condition":"load","timeoutMs":5000},
+            "authProfile":"pc_ui_tuner_0123456789abcdef0123456789abcdef",
             "evidence":{"sourceRevision":"source-r1","routeRevision":"route-r1"}
         });
         let parsed = serde_json::from_value::<CapturePwaRuntimeRequest>(request.clone());
         assert!(
             parsed.is_ok(),
             "valid source-preview request must parse: {parsed:?}"
+        );
+        assert_eq!(
+            parsed.unwrap().capture.auth_profile.as_deref(),
+            Some("pc_ui_tuner_0123456789abcdef0123456789abcdef")
         );
         let mut unsafe_request = request;
         unsafe_request["authorization"] = json!("Bearer must-not-enter-api");
