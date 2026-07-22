@@ -163,7 +163,8 @@ function Invoke-AiTaskPlatformFinalization {
     )
     $rootTaskId = [string]$ValidatedContract.supervisionRootTaskId
     $expectedLease = "elon-supervision:$rootTaskId"
-    $receiptPath = Get-AiTerminalFinalizationReceiptPath -RepoPath $TaskRoot
+    $receiptPath = Get-AiTerminalFinalizationReceiptPath -TaskContract $TaskContract `
+        -RootTaskId $rootTaskId
     $receipt = Read-AiTerminalFinalizationReceipt -Path $receiptPath
     $initialLease = Get-AiTerminalLeaseObservation -RepoPath $TaskRoot
     $identity = Get-AiTerminalFinalizationIdentity -TaskRoot $TaskRoot -BasePath $BasePath `

@@ -1,7 +1,26 @@
+function Get-AiTerminalFinalizationReceiptRoot {
+    $base = if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        Join-Path $env:LOCALAPPDATA 'ElonNode'
+    } else {
+        Join-Path ([System.IO.Path]::GetTempPath()) 'ElonNode'
+    }
+    Join-Path $base 'terminal-finalization-receipts-v1'
+}
+
 function Get-AiTerminalFinalizationReceiptPath {
-    param([Parameter(Mandatory = $true)][string]$RepoPath)
-    $gitDir = Get-AiTaskGitValue $RepoPath @('rev-parse', '--path-format=absolute', '--git-dir')
-    Join-Path ([System.IO.Path]::GetFullPath($gitDir)) 'elon-terminal-finalization-v1.json'
+    param(
+        [Parameter(Mandatory = $true)][string]$TaskContract,
+        [Parameter(Mandatory = $true)][string]$RootTaskId
+    )
+    if ($TaskContract -notmatch '^[0-9a-f]{64}$') {
+        throw 'Terminal finalization receipt requires a TaskContract SHA-256 id.'
+    }
+    if ([string]::IsNullOrWhiteSpace($RootTaskId)) {
+        throw 'Terminal finalization receipt requires a supervision root task id.'
+    }
+    $encoding = [System.Text.UTF8Encoding]::new($false)
+    $rootKey = Get-AiTaskSha256 ($encoding.GetBytes($RootTaskId))
+    Join-Path (Join-Path (Get-AiTerminalFinalizationReceiptRoot) $rootKey) "$TaskContract.json"
 }
 
 function Normalize-AiTerminalPath {

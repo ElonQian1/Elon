@@ -250,7 +250,8 @@ try {
     . (Join-Path $platformSessionWorktree 'scripts\ai-task-finish-contract.ps1')
     . (Join-Path $platformSessionWorktree 'scripts\ai-task-terminal-finalization.ps1')
     $platformContractId = New-AiTaskFinishContract -RepoPath $platformSessionWorktree
-    $platformReceiptPath = Get-AiTerminalFinalizationReceiptPath -RepoPath $platformSessionWorktree
+    $platformReceiptPath = Get-AiTerminalFinalizationReceiptPath -TaskContract $platformContractId `
+        -RootTaskId 'platform-fixture'
 
     Invoke-Git $mainRepo @("worktree", "unlock", $platformSessionWorktree) | Out-Null
     Invoke-Git $mainRepo @("worktree", "lock", "--reason", "elon-supervision:wrong-root", $platformSessionWorktree) | Out-Null
@@ -286,6 +287,7 @@ try {
         Invoke-Git $mainRepo @('worktree', 'lock', '--reason', 'elon-supervision:platform-fixture', $platformSessionWorktree) | Out-Null
     }
 
+    [System.IO.Directory]::CreateDirectory((Split-Path -Parent $platformReceiptPath)) | Out-Null
     [System.IO.File]::WriteAllText($platformReceiptPath, '{"schema":"wrong"}', [Text.UTF8Encoding]::new($false))
     $malformedBytes = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($platformReceiptPath))
     $malformedReceiptOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ExpectFailure -ContractId $platformContractId
@@ -509,10 +511,16 @@ try {
     $registeredAfterPlatformCleanup = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")
     if ($registeredAfterPlatformCleanup.Contains("branch refs/heads/ai/session/elon-self/cleanup-session")) { throw "Platform session worktree is still registered after cleanup.`n$platformCleanupText" }
     if ($registeredAfterPlatformCleanup.Contains($platformSessionWorktree)) { throw "Platform session path is still registered after cleanup.`n$platformCleanupText" }
+    if (-not (Test-Path -LiteralPath $platformReceiptPath -PathType Leaf)) { throw 'Platform cleanup removed the durable terminal finalization receipt.' }
+    Assert-ReceiptBytesUnchanged $platformReceiptPath $completedBytes 'Platform cleanup changed the durable terminal finalization receipt.'
     if (-not $registeredAfterPlatformCleanup.Contains("branch refs/heads/codex/peer-fixture")) { throw "Locked peer worktree was removed by platform cleanup." }
 
     Write-Host "PASS ai-task-finish workflow guard"
 } finally {
+    if (-not [string]::IsNullOrWhiteSpace([string]$platformReceiptPath) -and
+        (Test-Path -LiteralPath $platformReceiptPath -PathType Leaf)) {
+        Remove-Item -LiteralPath $platformReceiptPath -Force
+    }
     $resolved = Resolve-Path -LiteralPath $testRoot -ErrorAction SilentlyContinue
     if ($resolved) {
         $resolvedPath = $resolved.Path
