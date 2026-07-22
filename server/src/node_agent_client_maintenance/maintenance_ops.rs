@@ -215,7 +215,7 @@ pub(crate) fn maintenance_fallback_update_script(
     let exe_backup = current_exe.with_extension("before-update.exe");
     let version_backup = version_file.with_extension("before-update.json");
     format!(
-        "@echo off\r\nsetlocal\r\ntimeout /t 2 /nobreak >nul\r\nset \"HAD_EXE=0\"\r\nset \"HAD_IDENTITY=0\"\r\ndel /q \"{}\" 2>nul\r\ndel /q \"{}\" 2>nul\r\nif exist \"{}\" (\r\n  move /y \"{}\" \"{}\" >nul\r\n  if errorlevel 1 goto rollback\r\n  set \"HAD_EXE=1\"\r\n)\r\nmove /y \"{}\" \"{}\" >nul\r\nif errorlevel 1 goto rollback\r\nif exist \"{}\" (\r\n  move /y \"{}\" \"{}\" >nul\r\n  if errorlevel 1 goto rollback\r\n  set \"HAD_IDENTITY=1\"\r\n)\r\nmove /y \"{}\" \"{}\" >nul\r\nif errorlevel 1 goto rollback\r\nstart \"\" \"{}\" --repair-background\r\nif errorlevel 1 goto rollback\r\ndel /q \"{}\" 2>nul\r\ndel /q \"{}\" 2>nul\r\ndel \"%~f0\"\r\nexit /b 0\r\n:rollback\r\ndel /q \"{}\" 2>nul\r\nif \"%HAD_EXE%\"==\"1\" move /y \"{}\" \"{}\" >nul\r\ndel /q \"{}\" 2>nul\r\nif \"%HAD_IDENTITY%\"==\"1\" move /y \"{}\" \"{}\" >nul\r\nexit /b 1\r\n",
+        "@echo off\r\nsetlocal\r\ntimeout /t 2 /nobreak >nul\r\nset \"PHASE=0\"\r\nset \"HAD_EXE=0\"\r\nset \"HAD_IDENTITY=0\"\r\ndel /q \"{}\" 2>nul\r\ndel /q \"{}\" 2>nul\r\nif exist \"{}\" (\r\n  move /y \"{}\" \"{}\" >nul\r\n  if errorlevel 1 goto rollback\r\n  set \"HAD_EXE=1\"\r\n)\r\nset \"PHASE=1\"\r\nmove /y \"{}\" \"{}\" >nul\r\nif errorlevel 1 goto rollback\r\nset \"PHASE=2\"\r\nif exist \"{}\" (\r\n  move /y \"{}\" \"{}\" >nul\r\n  if errorlevel 1 goto rollback\r\n  set \"HAD_IDENTITY=1\"\r\n)\r\nset \"PHASE=3\"\r\nmove /y \"{}\" \"{}\" >nul\r\nif errorlevel 1 goto rollback\r\nset \"PHASE=4\"\r\nstart \"\" \"{}\" --repair-background\r\nif errorlevel 1 goto rollback\r\ndel /q \"{}\" 2>nul\r\ndel /q \"{}\" 2>nul\r\ndel \"%~f0\"\r\nexit /b 0\r\n:rollback\r\nif \"%PHASE%\"==\"4\" goto rollback_phase4\r\nif \"%PHASE%\"==\"3\" goto rollback_phase3\r\nif \"%PHASE%\"==\"2\" goto rollback_phase2\r\nif \"%PHASE%\"==\"1\" goto rollback_phase1\r\nexit /b 1\r\n:rollback_phase4\r\ndel /q \"{}\" 2>nul\r\n:rollback_phase3\r\nif \"%HAD_IDENTITY%\"==\"1\" move /y \"{}\" \"{}\" >nul\r\n:rollback_phase2\r\ndel /q \"{}\" 2>nul\r\n:rollback_phase1\r\nif \"%HAD_EXE%\"==\"1\" move /y \"{}\" \"{}\" >nul\r\nexit /b 1\r\n",
         exe_backup.display(),
         version_backup.display(),
         current_exe.display(),
@@ -231,12 +231,12 @@ pub(crate) fn maintenance_fallback_update_script(
         current_exe.display(),
         exe_backup.display(),
         version_backup.display(),
-        current_exe.display(),
-        exe_backup.display(),
-        current_exe.display(),
         version_file.display(),
         version_backup.display(),
         version_file.display(),
+        current_exe.display(),
+        exe_backup.display(),
+        current_exe.display(),
     )
 }
 pub(crate) fn spawn_client_action(action: ClientAction) -> Result<(), String> {

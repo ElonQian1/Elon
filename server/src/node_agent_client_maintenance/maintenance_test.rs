@@ -390,6 +390,9 @@ mod tests {
         assert!(identity_move < repair);
         assert!(!script.contains("--agent-runtime"));
         assert!(script.matches("if errorlevel 1 goto rollback").count() >= 5);
+        for phase in 0..=4 {
+            assert!(script.contains(&format!("set \"PHASE={phase}\"")));
+        }
         let rollback = script.find(":rollback").expect("rollback label");
         assert!(script[rollback..].contains("before-update.exe"));
         assert!(script[rollback..].contains("before-update.json"));
@@ -398,43 +401,128 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn maintenance_fallback_second_step_failure_rolls_back_without_repair() {
-        let root = std::env::temp_dir().join(format!(
-            "elon-maintenance-rollback-{}",
-            uuid::Uuid::new_v4().simple()
-        ));
-        fs::create_dir_all(root.join("_internal")).unwrap();
-        let current_exe = root.join("client.exe");
-        let new_exe = root.join("client.new.exe");
-        let version_file = root.join("_internal/node-agent-version.json");
-        let missing_new_version = root.join("_internal/missing-version.json.new");
-        fs::write(&current_exe, b"old-exe").unwrap();
-        fs::write(&new_exe, b"new-exe").unwrap();
-        fs::write(&version_file, b"old-identity").unwrap();
-        let bat = root.join("rollback-test.bat");
-        fs::write(
-            &bat,
-            maintenance_fallback_update_script(
-                &new_exe,
-                &current_exe,
-                &missing_new_version,
-                &version_file,
-            ),
-        )
-        .unwrap();
+    fn maintenance_fallback_exe_backup_failure_preserves_old_bytes_without_repair() {
+        use std::os::windows::fs::OpenOptionsExt;
 
-        let output = std::process::Command::new("cmd")
-            .args(["/D", "/C", bat.to_string_lossy().as_ref()])
-            .output()
+        let fixture = RollbackFixture::new("exe-backup");
+        let locked_backup = fixture.current_exe.with_extension("before-update.exe");
+        fs::write(&locked_backup, b"occupied-backup").unwrap();
+        let lock = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(1)
+            .open(&locked_backup)
             .unwrap();
-        assert!(!output.status.success(), "second move must fail nonzero");
-        assert_eq!(fs::read(&current_exe).unwrap(), b"old-exe");
-        assert_eq!(fs::read(&version_file).unwrap(), b"old-identity");
-        assert!(!root.join("client.before-update.exe").exists());
-        assert!(!root
-            .join("_internal/node-agent-version.before-update.json")
-            .exists());
-        let _ = fs::remove_dir_all(root);
+        fixture.write_script(&fixture.new_version);
+        fixture.assert_failed_with_old_bytes();
+        drop(lock);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn maintenance_fallback_identity_backup_failure_rolls_back_exe_without_repair() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let fixture = RollbackFixture::new("identity-backup");
+        let locked_backup = fixture.version_file.with_extension("before-update.json");
+        fs::write(&locked_backup, b"occupied-backup").unwrap();
+        let lock = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(1)
+            .open(&locked_backup)
+            .unwrap();
+        fixture.write_script(&fixture.new_version);
+        fixture.assert_failed_with_old_bytes();
+        drop(lock);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn maintenance_fallback_second_install_failure_rolls_back_without_repair() {
+        let fixture = RollbackFixture::new("second-install");
+        fixture.write_script(&fixture.root.join("missing-version.json.new"));
+        fixture.assert_failed_with_old_bytes();
+    }
+
+    #[cfg(windows)]
+    struct RollbackFixture {
+        root: std::path::PathBuf,
+        current_exe: std::path::PathBuf,
+        new_exe: std::path::PathBuf,
+        version_file: std::path::PathBuf,
+        new_version: std::path::PathBuf,
+        bat: std::path::PathBuf,
+        repair_marker: std::path::PathBuf,
+    }
+
+    #[cfg(windows)]
+    impl RollbackFixture {
+        fn new(label: &str) -> Self {
+            let root = std::env::temp_dir().join(format!(
+                "elon-maintenance-rollback-{label}-{}",
+                uuid::Uuid::new_v4().simple()
+            ));
+            fs::create_dir_all(root.join("_internal")).unwrap();
+            let current_exe = root.join("client.cmd");
+            let new_exe = root.join("client.new.cmd");
+            let version_file = root.join("_internal/node-agent-version.json");
+            let new_version = root.join("_internal/node-agent-version.json.new");
+            let repair_marker = root.join("repair-ran.txt");
+            fs::write(&current_exe, b"old-exe").unwrap();
+            fs::write(
+                &new_exe,
+                format!(
+                    "@echo off\r\necho repaired> \"{}\"\r\n",
+                    repair_marker.display()
+                ),
+            )
+            .unwrap();
+            fs::write(&version_file, b"old-identity").unwrap();
+            fs::write(&new_version, b"new-identity").unwrap();
+            let bat = root.join("rollback-test.bat");
+            Self {
+                root,
+                current_exe,
+                new_exe,
+                version_file,
+                new_version,
+                bat,
+                repair_marker,
+            }
+        }
+
+        fn write_script(&self, new_version: &Path) {
+            fs::write(
+                &self.bat,
+                maintenance_fallback_update_script(
+                    &self.new_exe,
+                    &self.current_exe,
+                    new_version,
+                    &self.version_file,
+                ),
+            )
+            .unwrap();
+        }
+
+        fn assert_failed_with_old_bytes(&self) {
+            let output = std::process::Command::new("cmd")
+                .args(["/D", "/C", self.bat.to_string_lossy().as_ref()])
+                .output()
+                .unwrap();
+            assert!(
+                !output.status.success(),
+                "injected BAT phase must fail nonzero"
+            );
+            assert_eq!(fs::read(&self.current_exe).unwrap(), b"old-exe");
+            assert_eq!(fs::read(&self.version_file).unwrap(), b"old-identity");
+            assert!(!self.repair_marker.exists(), "rollback must not run repair");
+        }
+    }
+
+    #[cfg(windows)]
+    impl Drop for RollbackFixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
     }
 
     #[test]
