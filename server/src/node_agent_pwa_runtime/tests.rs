@@ -1,10 +1,19 @@
 use super::*;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
+    sync::Notify,
     task::JoinHandle,
 };
 
@@ -132,6 +141,108 @@ fn source_revision_paths_and_auth_profiles_are_project_scoped() {
             .code,
         "AUTH_PROFILE_NOT_PREPARED"
     );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn temporary_profile_cleanup_retries_until_delayed_unlock() {
+    let root = project_root("cleanup-delayed-unlock");
+    let profile = root.join("profile");
+    fs::create_dir_all(&profile).unwrap();
+    fs::write(profile.join("locked"), b"fixture").unwrap();
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let attempts_for_remove = attempts.clone();
+
+    let removed = process::remove_temporary_profile_for_test(
+        &profile,
+        Duration::from_millis(250),
+        Duration::from_millis(2),
+        Duration::from_millis(8),
+        move |path| {
+            if attempts_for_remove.fetch_add(1, Ordering::SeqCst) < 3 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "simulated delayed Windows profile lock",
+                ));
+            }
+            fs::remove_dir_all(path)
+        },
+    )
+    .await;
+
+    assert!(removed);
+    assert_eq!(attempts.load(Ordering::SeqCst), 4);
+    assert!(!profile.exists());
+    assert_eq!(fs::read_dir(&root).unwrap().count(), 0);
+    fs::remove_dir(root).unwrap();
+}
+
+#[tokio::test]
+async fn temporary_profile_cleanup_fails_closed_after_bounded_retry_window() {
+    let root = project_root("cleanup-permanent-lock");
+    let profile = root.join("profile");
+    fs::create_dir_all(&profile).unwrap();
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let attempts_for_remove = attempts.clone();
+    let started = tokio::time::Instant::now();
+
+    let removed = process::remove_temporary_profile_for_test(
+        &profile,
+        Duration::from_millis(35),
+        Duration::from_millis(5),
+        Duration::from_millis(10),
+        move |_| {
+            attempts_for_remove.fetch_add(1, Ordering::SeqCst);
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "simulated permanent Windows profile lock",
+            ))
+        },
+    )
+    .await;
+
+    assert!(!removed);
+    assert!(started.elapsed() < Duration::from_secs(1));
+    assert!(attempts.load(Ordering::SeqCst) >= 4);
+    assert!(profile.exists());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn temporary_profile_cleanup_backoff_is_cancellable() {
+    let root = project_root("cleanup-cancel");
+    let profile = root.join("profile");
+    fs::create_dir_all(&profile).unwrap();
+    let first_attempt = Arc::new(Notify::new());
+    let first_attempt_for_remove = first_attempt.clone();
+    let profile_for_cleanup = profile.clone();
+    let cleanup = tokio::spawn(async move {
+        process::remove_temporary_profile_for_test(
+            &profile_for_cleanup,
+            Duration::from_secs(30),
+            Duration::from_secs(30),
+            Duration::from_secs(30),
+            move |_| {
+                first_attempt_for_remove.notify_one();
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "simulated lock while cancellation is requested",
+                ))
+            },
+        )
+        .await
+    });
+
+    tokio::time::timeout(Duration::from_secs(1), first_attempt.notified())
+        .await
+        .expect("cleanup should try removal before backing off");
+    cleanup.abort();
+    assert!(tokio::time::timeout(Duration::from_secs(1), cleanup)
+        .await
+        .expect("cancelled cleanup should stop promptly")
+        .unwrap_err()
+        .is_cancelled());
+    assert!(profile.exists());
     fs::remove_dir_all(root).unwrap();
 }
 

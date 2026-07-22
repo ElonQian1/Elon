@@ -10,6 +10,10 @@ use tokio::{process::Child, time::sleep};
 
 use super::browser::ProcessCleanup;
 
+const PROFILE_CLEANUP_TIMEOUT: Duration = Duration::from_secs(5);
+const PROFILE_CLEANUP_INITIAL_BACKOFF: Duration = Duration::from_millis(50);
+const PROFILE_CLEANUP_MAX_BACKOFF: Duration = Duration::from_millis(500);
+
 pub(super) struct BrowserProcess {
     child: Child,
     profile_dir: PathBuf,
@@ -98,20 +102,7 @@ impl BrowserProcess {
                 .await
                 .is_ok();
         }
-        let mut removed = false;
-        for _ in 0..10 {
-            match fs::remove_dir_all(&self.profile_dir) {
-                Ok(()) => {
-                    removed = true;
-                    break;
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                    removed = true;
-                    break;
-                }
-                Err(_) => sleep(Duration::from_millis(100)).await,
-            }
-        }
+        let removed = remove_temporary_profile(&self.profile_dir).await;
         ProcessCleanup {
             browser_process_reaped: reaped,
             temporary_profile_removed: removed,
@@ -121,13 +112,47 @@ impl BrowserProcess {
     async fn abort_launch(&mut self) {
         kill_process_tree(&mut self.child).await;
         let _ = tokio::time::timeout(Duration::from_secs(5), self.child.wait()).await;
-        for _ in 0..10 {
-            match fs::remove_dir_all(&self.profile_dir) {
-                Ok(()) => break,
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
-                Err(_) => sleep(Duration::from_millis(100)).await,
-            }
+        let _ = remove_temporary_profile(&self.profile_dir).await;
+    }
+}
+
+async fn remove_temporary_profile(profile_dir: &Path) -> bool {
+    remove_temporary_profile_with(
+        profile_dir,
+        PROFILE_CLEANUP_TIMEOUT,
+        PROFILE_CLEANUP_INITIAL_BACKOFF,
+        PROFILE_CLEANUP_MAX_BACKOFF,
+        |path| fs::remove_dir_all(path),
+    )
+    .await
+}
+
+async fn remove_temporary_profile_with<F>(
+    profile_dir: &Path,
+    timeout: Duration,
+    initial_backoff: Duration,
+    max_backoff: Duration,
+    mut remove: F,
+) -> bool
+where
+    F: FnMut(&Path) -> std::io::Result<()>,
+{
+    let started = Instant::now();
+    let mut backoff = initial_backoff;
+    loop {
+        match remove(profile_dir) {
+            Ok(()) => return true,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return true,
+            Err(_) => {}
         }
+        let Some(remaining) = timeout.checked_sub(started.elapsed()) else {
+            return false;
+        };
+        if remaining.is_zero() {
+            return false;
+        }
+        sleep(backoff.min(remaining)).await;
+        backoff = backoff.saturating_mul(2).min(max_backoff);
     }
 }
 
@@ -219,4 +244,18 @@ pub(super) fn missing_browser_diagnostic_for_test() -> CaptureDiagnostic {
     locate_browser_from(&[PathBuf::from("Z:/definitely-missing/elon-browser.exe")])
         .ok_or_else(browser_not_found)
         .unwrap_err()
+}
+
+#[cfg(test)]
+pub(super) async fn remove_temporary_profile_for_test<F>(
+    profile_dir: &Path,
+    timeout: Duration,
+    initial_backoff: Duration,
+    max_backoff: Duration,
+    remove: F,
+) -> bool
+where
+    F: FnMut(&Path) -> std::io::Result<()>,
+{
+    remove_temporary_profile_with(profile_dir, timeout, initial_backoff, max_backoff, remove).await
 }
