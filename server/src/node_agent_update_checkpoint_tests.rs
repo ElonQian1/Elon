@@ -35,6 +35,37 @@ fn install_gate_requires_a_checkpoint_for_every_foreground_task() {
 }
 
 #[test]
+fn reconciled_duplicate_receipts_follow_the_opt_in_install_gate() {
+    let classification = crate::node_agent_update_recovery::UpdateGateTaskClassification {
+        ambiguous_recovery_receipts: true,
+        excluded_from_install_blockers: true,
+        non_repeatable_action: Some("journal_exceeds_audit_limit".to_string()),
+        ..Default::default()
+    };
+    assert!(reconciled_classification_allows_install(
+        &classification,
+        false,
+        true,
+        &[],
+        None,
+    ));
+    assert!(!reconciled_classification_allows_install(
+        &classification,
+        true,
+        true,
+        &[],
+        None,
+    ));
+    assert!(!reconciled_classification_allows_install(
+        &classification,
+        false,
+        true,
+        &["approval-1".to_string()],
+        None,
+    ));
+}
+
+#[test]
 fn checkpoint_preserves_platform_isolated_workspace_identity() {
     let mut fingerprint = WorkspaceGitFingerprint {
         workspace_path: "C:\\conversation-worktrees\\project\\conversation".to_string(),

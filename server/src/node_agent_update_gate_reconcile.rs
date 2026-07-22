@@ -286,7 +286,7 @@ fn can_exclude_from_install(
         && (!receipt_install_gate_enabled || !ambiguous_recovery_receipts)
 }
 
-fn receipt_install_gate_enabled() -> bool {
+pub(crate) fn receipt_install_gate_enabled() -> bool {
     receipt_install_gate_enabled_from(
         std::env::var(UPDATE_RECEIPT_INSTALL_GATE_ENV)
             .ok()

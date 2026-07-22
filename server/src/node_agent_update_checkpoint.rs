@@ -165,6 +165,8 @@ fn checkpoint_active_update_transactions(
     let update_id = stable_update_id(to_git_sha);
     let mut decision = UpdateCheckpointDecision::default();
     let reconciled_gate = store.load()?.install_gate;
+    let receipt_install_gate_enabled =
+        crate::node_agent_update_gate_reconcile::receipt_install_gate_enabled();
     for task in local_tasks.list_update_install_candidates()? {
         // A confirmed-stale registry entry is historical evidence. Re-read the
         // sidecar registry and bind the install decision to the runtime's
@@ -199,28 +201,31 @@ fn checkpoint_active_update_transactions(
         {
             continue;
         }
-        if persisted_inactive
-            && reconciled_gate.target_git_sha == to_git_sha
-            && reconciled_gate
+        let reconciled_classification =
+            reconciled_gate
                 .classifications
                 .iter()
-                .any(|classification| {
+                .find(|classification| {
                     classification.task_id == task.task_id
                         && classification.status == task.status
                         && classification.finished_at_ms == task.finished_at_ms
-                        && classification.excluded_from_install_blockers
-                        && !classification.ambiguous_recovery_receipts
-                })
+                });
+        if persisted_inactive
+            && reconciled_gate.target_git_sha == to_git_sha
             && !live_execution
+            && reconciled_classification.is_some()
         {
             // Re-read all safety-sensitive journal state at install time. The
             // persisted administrator audit is necessary, but never sufficient
             // by itself if approvals or actions appeared after reconciliation.
             let audit = journal.snapshot(&task.task_id, 0, 10_000)?;
-            if !audit.has_more
-                && audit.approvals.pending_approval_ids().is_empty()
-                && incomplete_non_repeatable_action(&audit.events).is_none()
-            {
+            if reconciled_classification_allows_install(
+                reconciled_classification.expect("classification checked above"),
+                receipt_install_gate_enabled,
+                audit.has_more,
+                &audit.approvals.pending_approval_ids(),
+                incomplete_non_repeatable_action(&audit.events).as_deref(),
+            ) {
                 continue;
             }
         }
@@ -341,6 +346,26 @@ fn checkpoint_active_update_transactions(
         }
     }
     Ok(decision)
+}
+
+fn reconciled_classification_allows_install(
+    classification: &crate::node_agent_update_recovery::UpdateGateTaskClassification,
+    receipt_install_gate_enabled: bool,
+    audit_has_more: bool,
+    pending_approval_ids: &[String],
+    incomplete_action: Option<&str>,
+) -> bool {
+    if !classification.excluded_from_install_blockers
+        || (classification.ambiguous_recovery_receipts && receipt_install_gate_enabled)
+        || !pending_approval_ids.is_empty()
+    {
+        return false;
+    }
+    if audit_has_more {
+        return classification.non_repeatable_action.as_deref()
+            == Some("journal_exceeds_audit_limit");
+    }
+    incomplete_action.is_none()
 }
 
 pub(crate) fn fingerprint_workspace(path: &Path) -> WorkspaceGitFingerprint {
