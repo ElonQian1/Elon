@@ -5,7 +5,11 @@ Import-Module "$PSScriptRoot\Validation.Evidence.psm1" -Force -DisableNameChecki
 function Add-CargoArgumentOnce {
     param([string[]]$Arguments,[Parameter(Mandatory)][string]$Value)
     if ($Arguments -contains $Value) { return @($Arguments) }
-    return @($Arguments) + @($Value)
+    $separator=[Array]::IndexOf(@($Arguments),'--')
+    if($separator -lt 0){return @($Arguments)+@($Value)}
+    $before=if($separator -gt 0){@($Arguments[0..($separator-1)])}else{@()}
+    $after=@($Arguments[$separator..($Arguments.Count-1)])
+    return @($before)+@($Value)+@($after)
 }
 
 function Get-CargoManifestPathFromArguments {

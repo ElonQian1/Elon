@@ -624,7 +624,9 @@ impl CliSidecarSessionRecord {
         .into_iter()
         .any(|(pid, identity)| {
             pid.zip(identity).is_some_and(|(pid, identity)| {
-                crate::node_agent_cli_worker::process_identity(pid).as_deref() == Some(identity)
+                crate::node_agent_cli_worker::process_is_running(pid)
+                    && crate::node_agent_cli_worker::process_identity(pid).as_deref()
+                        == Some(identity)
             })
         })
     }

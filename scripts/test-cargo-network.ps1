@@ -64,6 +64,12 @@ checksum = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         'disk'=@('No space left on device (os error 112)','CARGO_DISK_CRITICAL',$false)
     }
     foreach($name in $cases.Keys){$diag=Get-CargoFailureDiagnostic @($cases[$name][0]);Assert-Equal $cases[$name][1] $diag.code "$name diagnostic";Assert-Equal $cases[$name][2] $diag.retryable "$name retry contract"}
+    Assert-Equal 'CARGO_UNKNOWN_FAILURE' (Get-CargoFailureDiagnostic @('warning: unused PatchApplyReadinessLevel','error: Unrecognized option: offline')).code 'TLS token must not match inside Rust identifiers'
+
+    $testArguments=@('test','--manifest-path','server\Cargo.toml','node_agent_cli_sidecar','--','--nocapture')
+    $offlineArguments=@(Add-CargoArgumentOnce $testArguments '--offline')
+    Assert-True ([Array]::IndexOf($offlineArguments,'--offline') -lt [Array]::IndexOf($offlineArguments,'--')) 'Cargo global flags must be inserted before test harness separator'
+    Assert-Equal '--nocapture' $offlineArguments[-1] 'test harness arguments must keep their order'
 
     $healthPath=Join-Path $temp 'health.json'
     Update-CargoSourceHealthState $healthPath 'test' $false 'timeout' 2 300|Out-Null

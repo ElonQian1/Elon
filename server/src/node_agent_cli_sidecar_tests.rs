@@ -308,6 +308,34 @@ fn fresh_heartbeat_or_live_sidecar_blocks_stale_conversion() {
 }
 
 #[test]
+fn exited_process_with_retained_handle_is_not_a_live_sidecar() {
+    #[cfg(windows)]
+    let mut command = {
+        let mut command = Command::new("cmd.exe");
+        command.args(["/C", "ping -n 2 127.0.0.1 >NUL"]);
+        command
+    };
+    #[cfg(not(windows))]
+    let mut command = {
+        let mut command = Command::new("sh");
+        command.args(["-c", "sleep 0.2"]);
+        command
+    };
+    let mut child = command.spawn().expect("spawn short-lived sidecar fixture");
+    let pid = child.id();
+    let mut record = session("exited-sidecar", "exited-sidecar-task");
+    record.sidecar_pid = Some(pid);
+    record.sidecar_process_identity = crate::node_agent_cli_worker::process_identity(pid);
+    assert!(record.sidecar_process_identity.is_some());
+    child.wait().expect("wait for sidecar fixture");
+    assert!(!crate::node_agent_cli_worker::process_is_running(pid));
+    assert!(
+        !record.recorded_process_is_live(),
+        "an exited Windows process can retain its creation identity while a handle remains open"
+    );
+}
+
+#[test]
 fn future_sidecar_heartbeat_is_protected_but_never_treated_as_replayable() {
     let now = now_ms();
     let mut record = session("future-heartbeat", "future-task");
