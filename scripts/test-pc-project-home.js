@@ -4,7 +4,7 @@ const path = require('node:path')
 
 const root = path.resolve(__dirname, '..')
 const projectsPage = read('pc-frontend/src/features/projects/ProjectsPage.tsx')
-const projectsCss = read('pc-frontend/src/features/projects/ProjectsPage.module.css')
+const projectPlaza = read('pc-frontend/src/features/plaza/ProjectPlazaView.tsx')
 const landing = read('pc-frontend/src/features/conversation/ProjectLanding.tsx')
 const landingDownloads = read('pc-frontend/src/features/conversation/ProjectLandingDownloads.tsx')
 const landingCss = read('pc-frontend/src/features/conversation/ProjectLanding.module.css')
@@ -13,13 +13,12 @@ const conversationDraft = read('pc-frontend/src/features/conversation/NewConvers
 const conversationDraftCss = read('pc-frontend/src/features/conversation/NewConversationDraft.module.css')
 
 assert.match(
-  projectsPage,
-  /async function openProject[\s\S]*selectProject\(projectId\)[\s\S]*navigate\('\/workspace'\)/,
+  projectPlaza,
+  /async function openProject\(project: PlazaProject\)[\s\S]*selectProject\(project\.id\)[\s\S]*navigate\('\/workspace'\)/,
   'project selection should enter the workspace landing directly',
 )
 assert.doesNotMatch(projectsPage, /function ProjectHome\(/, 'project center should not keep a duplicate project-home intermediary')
-assert.match(projectsPage, /onManage=.*navigate\(`\/projects\/\$\{projectId\}`\)/, 'project management should remain a secondary action')
-assert.match(projectsCss, /grid-template-columns:\s*var\(--sidebar-width\) minmax\(0, 1fr\)/, 'project center should use the reclaimed main width')
+assert.match(projectsPage, /<ProjectPlazaView \/>/, 'project center should delegate to the current project plaza')
 
 for (const contract of ['workflowGrid', 'landing?.highlights', 'landing?.target_users', 'quickChannels', 'projectResources']) {
   assert.ok(landing.includes(contract), `project landing should include ${contract}`)
