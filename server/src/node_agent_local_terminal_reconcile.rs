@@ -25,8 +25,9 @@ pub(crate) struct LocalTerminalReconciler<'a> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum TerminalWriteBoundary {
-    Receipt,
+    BeforeLocalTask,
     LocalTask,
+    Receipt,
     Journal,
     Recovery,
 }
@@ -74,6 +75,24 @@ impl<'a> LocalTerminalReconciler<'a> {
     }
 
     pub(crate) async fn reconcile(&self, completion: &CliCompletionEnvelope) -> Result<()> {
+        self.reconcile_with_optional_admission(completion, None)
+            .await
+    }
+
+    pub(crate) async fn reconcile_with_admission(
+        &self,
+        completion: &CliCompletionEnvelope,
+        admission: &crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard,
+    ) -> Result<()> {
+        self.reconcile_with_optional_admission(completion, Some(admission))
+            .await
+    }
+
+    async fn reconcile_with_optional_admission(
+        &self,
+        completion: &CliCompletionEnvelope,
+        admission: Option<&crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard>,
+    ) -> Result<()> {
         anyhow::ensure!(
             completion.origin == crate::node_agent_completion_outbox::LOCAL_OFFLINE_ORIGIN,
             "only local_offline completions can use local terminal reconciliation"
@@ -103,10 +122,18 @@ impl<'a> LocalTerminalReconciler<'a> {
         } else {
             None
         };
-        let _admission = admission_base
-            .as_deref()
-            .map(crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire)
-            .transpose()?;
+        let owned_admission = if admission.is_none() {
+            admission_base
+                .as_deref()
+                .map(crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire)
+                .transpose()?
+        } else {
+            None
+        };
+        let admission = admission.or(owned_admission.as_ref());
+        if let (Some(base), Some(admission)) = (admission_base.as_deref(), admission) {
+            admission.ensure_covers(base)?;
+        }
 
         // Reload under the cross-process guard so every later preflight and
         // persistence step refers to the same durable task identity.
@@ -180,8 +207,7 @@ impl<'a> LocalTerminalReconciler<'a> {
         };
 
         // No receipt/local task/journal/recovery write occurs above this line.
-        finalization.commit(completion)?;
-        self.inject_failure(TerminalWriteBoundary::Receipt)?;
+        self.inject_failure(TerminalWriteBoundary::BeforeLocalTask)?;
         anyhow::ensure!(
             self.runtime
                 .local_tasks
@@ -195,6 +221,11 @@ impl<'a> LocalTerminalReconciler<'a> {
             .get(&completion.req_id)?
             .context("local terminal row disappeared after persistence")?;
         assert_durable_terminal(&durable, completion, supervised)?;
+        // The receipt binds a CLI event only after the corresponding local
+        // terminal row and trusted snapshot are durable. A crash before this
+        // point leaves the immutable completed receipt unbound and replayable.
+        finalization.commit(completion)?;
+        self.inject_failure(TerminalWriteBoundary::Receipt)?;
         self.runtime
             .task_journal
             .record_reconciled_finished_with_outcome(

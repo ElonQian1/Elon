@@ -55,8 +55,9 @@ async fn same_event_terminal_conflicts_leave_task_and_receipt_bytes_unchanged() 
 #[tokio::test]
 async fn every_terminal_write_boundary_replays_after_restart_without_early_ack() {
     for boundary in [
-        TerminalWriteBoundary::Receipt,
+        TerminalWriteBoundary::BeforeLocalTask,
         TerminalWriteBoundary::LocalTask,
+        TerminalWriteBoundary::Receipt,
         TerminalWriteBoundary::Journal,
         TerminalWriteBoundary::Recovery,
     ] {
@@ -82,10 +83,26 @@ async fn every_terminal_write_boundary_replays_after_restart_without_early_ack()
             1,
             "no partial terminal transaction may acknowledge or delete its outbox source"
         );
-        let bound_bytes = fs::read(fixture.receipt_path()).unwrap();
-        let bound: serde_json::Value = serde_json::from_slice(&bound_bytes).unwrap();
-        assert_eq!(bound["taskId"], TASK);
-        assert_eq!(bound["completionEventId"], EVENT);
+        let interrupted_bytes = fs::read(fixture.receipt_path()).unwrap();
+        let interrupted: serde_json::Value = serde_json::from_slice(&interrupted_bytes).unwrap();
+        if matches!(
+            boundary,
+            TerminalWriteBoundary::BeforeLocalTask | TerminalWriteBoundary::LocalTask
+        ) {
+            assert!(interrupted["taskId"].is_null());
+            assert!(interrupted["completionEventId"].is_null());
+        } else {
+            assert_eq!(interrupted["taskId"], TASK);
+            assert_eq!(interrupted["completionEventId"], EVENT);
+        }
+        let interrupted_task = fixture.task();
+        if boundary == TerminalWriteBoundary::BeforeLocalTask {
+            assert_eq!(interrupted_task.status, "running");
+            assert!(interrupted_task.completion_event_id.is_none());
+        } else {
+            assert_eq!(interrupted_task.status, "done");
+            assert_eq!(interrupted_task.completion_event_id.as_deref(), Some(EVENT));
+        }
 
         let restarted = reopened_runtime(&fixture);
         LocalTerminalReconciler::for_test(
@@ -97,7 +114,10 @@ async fn every_terminal_write_boundary_replays_after_restart_without_early_ack()
         .await
         .unwrap();
 
-        assert_eq!(fs::read(fixture.receipt_path()).unwrap(), bound_bytes);
+        let rebound: serde_json::Value =
+            serde_json::from_slice(&fs::read(fixture.receipt_path()).unwrap()).unwrap();
+        assert_eq!(rebound["taskId"], TASK);
+        assert_eq!(rebound["completionEventId"], EVENT);
         let task = restarted.local_tasks.get(TASK).unwrap().unwrap();
         assert_eq!(task.status, "done");
         assert_eq!(task.completion_event_id.as_deref(), Some(EVENT));
