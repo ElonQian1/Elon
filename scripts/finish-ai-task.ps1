@@ -21,7 +21,15 @@ param(
 
     [switch]$SkipArtifactCleanup,
 
-    [switch]$SkipWorktreeCleanup
+    [switch]$SkipWorktreeCleanup,
+
+    [ValidateSet('None','Missing','Foreign','Reacquire')]
+    [string]$TestLeaseMutationAfterIdentity = 'None',
+
+    [ValidateSet('None','Missing','Foreign','Reacquire')]
+    [string]$TestLeaseMutationBeforeFinalization = 'None',
+
+    [switch]$TestFailAfterPlatformUnlock
 )
 
 $ErrorActionPreference = "Stop"
@@ -31,6 +39,7 @@ $taskWorktreeStatus = "not_checked"
 $taskWorktreeLeaseStatus = "not_checked"
 
 . (Join-Path $PSScriptRoot 'ai-task-finish-contract.ps1')
+. (Join-Path $PSScriptRoot 'ai-task-terminal-finalization.ps1')
 
 function Invoke-NativeCapture {
     param(
@@ -293,7 +302,10 @@ try {
         throw "Managed task worktree requires the immutable TaskContract emitted by preflight."
     }
     if (-not [string]::IsNullOrWhiteSpace($TaskContract)) {
-        $validatedContract = Assert-AiTaskFinishContract -RepoPath $taskRoot -ContractId $TaskContract
+        $validatedContract = Assert-AiTaskFinishContract `
+            -RepoPath $taskRoot `
+            -ContractId $TaskContract `
+            -AllowReleasedPlatformLease:($taskBranch -like "ai/session/*")
         Write-Host "FINISH_CONTRACT_STATUS=validated:$TaskContract"
     } elseif ($AllowLegacyNoTaskContract) {
         if ($taskBranch -like "ai/session/*") {
@@ -383,18 +395,19 @@ try {
             throw "Platform session finish requires validated immutable provenance/root."
         }
         $expectedLease = "elon-supervision:$([string]$validatedContract.supervisionRootTaskId)"
-        $actualLease = Get-AiTaskWorktreeLeaseReason -RepoPath $taskRoot
-        if ([string]::IsNullOrWhiteSpace($actualLease)) {
-            throw "Refusing to finish platform task with a missing or unknown lease."
-        } elseif ($actualLease -ne $expectedLease) {
-            throw "Refusing to release foreign or wrong-root platform lease: $actualLease"
-        } else {
-            $unlock = Invoke-GitCapture -RepoPath $mainPath -GitArgs @("worktree", "unlock", $taskRoot)
-            if ($unlock.ExitCode -ne 0) {
-                throw "Unable to release exact platform task worktree lease: $($unlock.Text)"
-            }
-            $taskWorktreeLeaseStatus = "released"
-        }
+        Invoke-AiTerminalTestLeaseMutation `
+            -Mutation $TestLeaseMutationBeforeFinalization `
+            -BasePath $mainPath `
+            -TaskRoot $taskRoot `
+            -ExpectedLease $expectedLease
+        $null = Invoke-AiTaskPlatformFinalization `
+            -TaskRoot $taskRoot `
+            -BasePath $mainPath `
+            -TaskContract $TaskContract `
+            -ValidatedContract $validatedContract `
+            -TestLeaseMutationAfterIdentity $TestLeaseMutationAfterIdentity `
+            -TestFailAfterUnlock:$TestFailAfterPlatformUnlock
+        $taskWorktreeLeaseStatus = "released"
         $taskWorktreeStatus = "platform_managed"
     } elseif ($SkipWorktreeCleanup) {
         $taskWorktreeStatus = "skipped_by_option"

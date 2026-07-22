@@ -120,7 +120,8 @@ function New-AiTaskFinishContract {
 function Assert-AiTaskFinishContract {
     param(
         [Parameter(Mandatory = $true)][string]$RepoPath,
-        [Parameter(Mandatory = $true)][string]$ContractId
+        [Parameter(Mandatory = $true)][string]$ContractId,
+        [switch]$AllowReleasedPlatformLease
     )
     if ($ContractId -notmatch '^[0-9a-f]{64}$') { throw 'TaskContract must be a SHA-256 id.' }
     $path = Join-Path (Get-AiTaskFinishContractRoot) "$ContractId.json"
@@ -145,7 +146,11 @@ function Assert-AiTaskFinishContract {
             [string]$contract.leaseReason -ne "elon-supervision:$([string]$contract.supervisionRootTaskId)") {
             throw 'Platform task finish contract lacks immutable provenance/root/lease identity.'
         }
-        $platform = Get-AiTaskPlatformIdentity -RepoPath $RepoPath -Branch $branch -ExpectedRoot ([string]$contract.supervisionRootTaskId)
+        $platform = Get-AiTaskPlatformIdentity `
+            -RepoPath $RepoPath `
+            -Branch $branch `
+            -ExpectedRoot ([string]$contract.supervisionRootTaskId) `
+            -AllowReleasedLease:$AllowReleasedPlatformLease
         if ([string]$platform.GitCommonDir -ne [string]$contract.gitCommonDir) {
             throw 'Platform task finish contract Git common-dir identity mismatch.'
         }

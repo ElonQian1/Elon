@@ -6,17 +6,21 @@ $checkScript = Join-Path $repoRoot "scripts\check-task-complete.ps1"
 $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
 $directNetworkScript = Join-Path $repoRoot "scripts\direct-network.ps1"
 $finishContractScript = Join-Path $repoRoot "scripts\ai-task-finish-contract.ps1"
+$terminalFinalizationScript = Join-Path $repoRoot "scripts\ai-task-terminal-finalization.ps1"
+$terminalFinalizationReceiptScript = Join-Path $repoRoot "scripts\ai-task-terminal-finalization-receipt.ps1"
 $policyFile = Join-Path $repoRoot ".ai\workspace-policy.txt"
 
 $finishSource = Get-Content -Raw -LiteralPath $finishScript
-if (-not $finishSource.Contains('worktree", "unlock"')) {
+$terminalFinalizationSource = Get-Content -Raw -LiteralPath $terminalFinalizationScript
+if (-not $terminalFinalizationSource.Contains("@('worktree', 'unlock'")) {
     throw "PowerShell finish must unlock its completed managed worktree before removal."
 }
 $finishShellSource = Get-Content -Raw -LiteralPath (Join-Path $repoRoot "scripts\finish-ai-task.sh")
 if (-not $finishShellSource.Contains('worktree unlock "$task_root"')) {
     throw "Shell finish must unlock its completed managed worktree before removal."
 }
-if (-not $finishSource.Contains('Get-AiTaskWorktreeLeaseReason') -or
+if (-not $terminalFinalizationSource.Contains('Get-AiTerminalLeaseObservation') -or
+    -not $terminalFinalizationSource.Contains('intentionally adjacent to unlock') -or
     -not $finishShellSource.Contains('ai_finish_worktree_lease_reason')) {
     throw "Platform finish must inspect the exact immutable supervision lease before unlock."
 }
@@ -65,12 +69,37 @@ function Assert-Contains {
     }
 }
 
+function Invoke-GitCaptureResult {
+    param([string]$Path, [string[]]$GitArgs)
+    $oldPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $output = @(& git -C $Path @GitArgs 2>&1)
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $oldPreference
+    }
+    [pscustomobject]@{
+        ExitCode = $exitCode
+        Text = (($output | ForEach-Object { [string]$_ }) -join "`n").Trim()
+    }
+}
+
+function Assert-ReceiptBytesUnchanged {
+    param([string]$Path, [string]$Before, [string]$Message)
+    $after = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($Path))
+    if ($after -ne $Before) { throw $Message }
+}
+
 function Invoke-Finish {
     param(
         [string]$WorktreePath,
         [switch]$ExpectFailure,
         [switch]$PerformCleanup,
         [switch]$NoLegacy,
+        [ValidateSet('None','Missing','Foreign','Reacquire')][string]$LeaseMutation = 'None',
+        [ValidateSet('None','Missing','Foreign','Reacquire')][string]$InitialLeaseMutation = 'None',
+        [switch]$TestFailAfterUnlock,
         [string]$ContractId = ''
     )
 
@@ -88,6 +117,15 @@ function Invoke-Finish {
     }
     if (-not $PerformCleanup) {
         $finishArgs += "-SkipWorktreeCleanup"
+    }
+    if ($LeaseMutation -ne 'None') {
+        $finishArgs += @('-TestLeaseMutationAfterIdentity', $LeaseMutation)
+    }
+    if ($InitialLeaseMutation -ne 'None') {
+        $finishArgs += @('-TestLeaseMutationBeforeFinalization', $InitialLeaseMutation)
+    }
+    if ($TestFailAfterUnlock) {
+        $finishArgs += '-TestFailAfterPlatformUnlock'
     }
 
     $oldPreference = $ErrorActionPreference
@@ -134,6 +172,8 @@ try {
     Copy-Item -LiteralPath $cleanupScript -Destination (Join-Path $mainRepo "scripts\cleanup-task-worktrees.ps1")
     Copy-Item -LiteralPath $directNetworkScript -Destination (Join-Path $mainRepo "scripts\direct-network.ps1")
     Copy-Item -LiteralPath $finishContractScript -Destination (Join-Path $mainRepo "scripts\ai-task-finish-contract.ps1")
+    Copy-Item -LiteralPath $terminalFinalizationScript -Destination (Join-Path $mainRepo "scripts\ai-task-terminal-finalization.ps1")
+    Copy-Item -LiteralPath $terminalFinalizationReceiptScript -Destination (Join-Path $mainRepo "scripts\ai-task-terminal-finalization-receipt.ps1")
     Copy-Item -LiteralPath $policyFile -Destination (Join-Path $mainRepo ".ai\workspace-policy.txt")
     Set-Content -LiteralPath (Join-Path $mainRepo "README.md") -Value "finish workflow fixture`n" -Encoding UTF8
 
@@ -208,7 +248,9 @@ try {
     Add-Content -LiteralPath (Join-Path $mainRepo "README.md") -Value "unknown platform-owned main edit"
     Invoke-Git $mainRepo @("worktree", "lock", "--reason", "elon-supervision:platform-fixture", $platformSessionWorktree) | Out-Null
     . (Join-Path $platformSessionWorktree 'scripts\ai-task-finish-contract.ps1')
+    . (Join-Path $platformSessionWorktree 'scripts\ai-task-terminal-finalization.ps1')
     $platformContractId = New-AiTaskFinishContract -RepoPath $platformSessionWorktree
+    $platformReceiptPath = Get-AiTerminalFinalizationReceiptPath -RepoPath $platformSessionWorktree
 
     Invoke-Git $mainRepo @("worktree", "unlock", $platformSessionWorktree) | Out-Null
     Invoke-Git $mainRepo @("worktree", "lock", "--reason", "elon-supervision:wrong-root", $platformSessionWorktree) | Out-Null
@@ -220,15 +262,129 @@ try {
     Assert-Contains $foreignLeaseOutput "lease identity mismatch" "Platform finish must fail closed for an unknown foreign lease."
     Invoke-Git $mainRepo @("worktree", "unlock", $platformSessionWorktree) | Out-Null
     $missingLeaseOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ExpectFailure -ContractId $platformContractId
-    Assert-Contains $missingLeaseOutput "root lease disappeared" "Platform finish must fail closed when no reconciler provenance proves a missing lease."
+    Assert-Contains $missingLeaseOutput "requires exact/exact" "Receipt-null finish must reject initial/fresh missing lease observations."
+    if (Test-Path -LiteralPath $platformReceiptPath) {
+        throw 'Receipt-null missing lease failure persisted a receipt.'
+    }
     Invoke-Git $mainRepo @("worktree", "lock", "--reason", "elon-supervision:platform-fixture", $platformSessionWorktree) | Out-Null
 
+    foreach ($case in @(
+        @{ Name = 'foreign'; Initial = 'Foreign'; Fresh = 'None' },
+        @{ Name = 'exact-to-missing'; Initial = 'None'; Fresh = 'Missing' },
+        @{ Name = 'same-root-reacquire'; Initial = 'None'; Fresh = 'Reacquire' }
+    )) {
+        $caseOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ExpectFailure `
+            -ContractId $platformContractId -InitialLeaseMutation $case.Initial -LeaseMutation $case.Fresh
+        Assert-Contains $caseOutput 'FINALIZABLE=false' "Receipt-null $($case.Name) mutation must fail closed."
+        if (Test-Path -LiteralPath $platformReceiptPath) {
+            throw "Receipt-null $($case.Name) mutation persisted a receipt."
+        }
+        $actual = Get-AiTaskWorktreeLeaseReason -RepoPath $platformSessionWorktree
+        if (-not [string]::IsNullOrWhiteSpace($actual)) {
+            Invoke-Git $mainRepo @('worktree', 'unlock', $platformSessionWorktree) | Out-Null
+        }
+        Invoke-Git $mainRepo @('worktree', 'lock', '--reason', 'elon-supervision:platform-fixture', $platformSessionWorktree) | Out-Null
+    }
+
+    [System.IO.File]::WriteAllText($platformReceiptPath, '{"schema":"wrong"}', [Text.UTF8Encoding]::new($false))
+    $malformedBytes = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($platformReceiptPath))
+    $malformedReceiptOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ExpectFailure -ContractId $platformContractId
+    Assert-Contains $malformedReceiptOutput 'receipt schema fields' 'Malformed existing receipt must never be overwritten.'
+    Assert-ReceiptBytesUnchanged $platformReceiptPath $malformedBytes 'Malformed receipt failure changed receipt bytes.'
+    Remove-Item -LiteralPath $platformReceiptPath -Force
+
+    function New-PreparedReceiptFixture {
+        $currentLease = Get-AiTaskWorktreeLeaseReason -RepoPath $platformSessionWorktree
+        if (-not [string]::IsNullOrWhiteSpace($currentLease)) {
+            Invoke-Git $mainRepo @('worktree', 'unlock', $platformSessionWorktree) | Out-Null
+        }
+        Invoke-Git $mainRepo @('worktree', 'lock', '--reason', 'elon-supervision:platform-fixture', $platformSessionWorktree) | Out-Null
+        if (Test-Path -LiteralPath $platformReceiptPath) { Remove-Item -LiteralPath $platformReceiptPath -Force }
+        $validated = Assert-AiTaskFinishContract -RepoPath $platformSessionWorktree -ContractId $platformContractId
+        $identity = Get-AiTerminalFinalizationIdentity -TaskRoot $platformSessionWorktree -BasePath $mainRepo `
+            -TaskContract $platformContractId -ValidatedContract $validated
+        $observation = Get-AiTerminalLeaseObservation -RepoPath $platformSessionWorktree
+        $prepared = New-AiPreparedTerminalFinalizationReceipt -Identity $identity `
+            -LeaseMarkerFingerprint $observation.MarkerFingerprint
+        Write-AiTerminalFinalizationReceipt -Path $platformReceiptPath -Receipt $prepared
+        [pscustomobject]@{
+            Bytes = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($platformReceiptPath))
+            FinalizationId = [string]$prepared.finalizationId
+        }
+    }
+
+    foreach ($case in @(
+        @{ Name = 'exact-to-missing'; Initial = 'None'; Fresh = 'Missing' },
+        @{ Name = 'foreign-to-missing'; Initial = 'Foreign'; Fresh = 'Missing' },
+        @{ Name = 'same-root-reacquired-to-missing'; Initial = 'Reacquire'; Fresh = 'Missing' },
+        @{ Name = 'exact-marker-drift'; Initial = 'Reacquire'; Fresh = 'None' }
+    )) {
+        $preparedFixture = New-PreparedReceiptFixture
+        $preparedFailure = Invoke-Finish -WorktreePath $platformSessionWorktree -ExpectFailure `
+            -ContractId $platformContractId -InitialLeaseMutation $case.Initial -LeaseMutation $case.Fresh
+        Assert-Contains $preparedFailure 'FINALIZABLE=false' "Prepared $($case.Name) mutation must fail closed."
+        Assert-ReceiptBytesUnchanged $platformReceiptPath $preparedFixture.Bytes "Prepared $($case.Name) mutation changed receipt bytes."
+    }
+
+    # Existing prepared + initial exact + fresh exact with the same durable
+    # marker is the positive recovery path: this invocation owns the unlock.
+    $preparedExact = New-PreparedReceiptFixture
+    $preparedExactOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ContractId $platformContractId
+    Assert-Contains $preparedExactOutput "TERMINAL_FINALIZATION_STATUS=prepared:$($preparedExact.FinalizationId)" 'Prepared exact/exact recovery must preserve its finalization id.'
+    Assert-Contains $preparedExactOutput "TERMINAL_FINALIZATION_STATUS=completed:$($preparedExact.FinalizationId)" 'Prepared exact/exact recovery must complete the same finalization.'
+    Assert-Contains $preparedExactOutput 'FINALIZABLE=true' 'Prepared exact/exact recovery must be finalizable.'
+    $preparedExactReceipt = Read-AiTerminalFinalizationReceipt -Path $platformReceiptPath
+    if ($preparedExactReceipt.state -ne 'completed' -or $preparedExactReceipt.finalizationId -ne $preparedExact.FinalizationId) {
+        throw 'Prepared exact/exact recovery did not complete the original receipt.'
+    }
+    if (-not [string]::IsNullOrWhiteSpace((Get-AiTaskWorktreeLeaseReason -RepoPath $platformSessionWorktree))) {
+        throw 'Prepared exact/exact recovery did not release the platform lease.'
+    }
+
+    # Preserve the crash-after-unlock path: a receipt-null exact/exact run
+    # persists prepared, verifies no lease, then a none/none replay completes.
+    $null = New-PreparedReceiptFixture
+    Remove-Item -LiteralPath $platformReceiptPath -Force
+    $interruptedOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ExpectFailure `
+        -ContractId $platformContractId -TestFailAfterUnlock
+    Assert-Contains $interruptedOutput 'missing-lease verification' 'Unlock interruption must occur only after immediate missing-lease verification.'
+    $interruptedReceipt = Read-AiTerminalFinalizationReceipt -Path $platformReceiptPath
+    if ($null -eq $interruptedReceipt -or $interruptedReceipt.state -ne 'prepared') {
+        throw 'Unlock interruption lost the prepared receipt.'
+    }
+    $interruptedFinalizationId = [string]$interruptedReceipt.finalizationId
+    if (-not [string]::IsNullOrWhiteSpace((Get-AiTaskWorktreeLeaseReason -RepoPath $platformSessionWorktree))) {
+        throw 'Unlock interruption unexpectedly retained a lease.'
+    }
     $platformFinishOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ContractId $platformContractId
+    Assert-Contains $platformFinishOutput "TERMINAL_FINALIZATION_STATUS=completed:$interruptedFinalizationId" 'Prepared none/none replay must complete the interrupted finalization.'
     Assert-Contains $platformFinishOutput "BUSINESS_STATUS=complete" "A platform session must retain its completed business state."
     Assert-Contains $platformFinishOutput "LOCAL_MAIN_STATUS=blocked_tracked_changes" "A platform session must report the dirty main baseline."
     Assert-Contains $platformFinishOutput "TASK_WORKTREE_STATUS=platform_managed" "A platform session must remain platform-managed."
     Assert-Contains $platformFinishOutput "TASK_WORKTREE_LEASE_STATUS=released" "A completed platform session must release its execution lease even when shared main is dirty."
     Assert-Contains $platformFinishOutput "FINALIZABLE=true" "Unknown main edits must not block a clean, pushed platform session."
+
+    $completedBytes = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($platformReceiptPath))
+    foreach ($case in @(
+        @{ Name = 'exact-to-missing'; Initial = 'Reacquire'; Fresh = 'Missing' },
+        @{ Name = 'foreign-to-missing'; Initial = 'Foreign'; Fresh = 'Missing' },
+        @{ Name = 'missing-to-reacquired'; Initial = 'None'; Fresh = 'Reacquire' },
+        @{ Name = 'exact-marker-drift'; Initial = 'Reacquire'; Fresh = 'None' }
+    )) {
+        $completedFailure = Invoke-Finish -WorktreePath $platformSessionWorktree -ExpectFailure `
+            -ContractId $platformContractId -InitialLeaseMutation $case.Initial -LeaseMutation $case.Fresh
+        Assert-Contains $completedFailure 'FINALIZABLE=false' "Completed $($case.Name) mutation must fail closed."
+        Assert-ReceiptBytesUnchanged $platformReceiptPath $completedBytes "Completed $($case.Name) mutation changed receipt bytes."
+        $actual = Get-AiTaskWorktreeLeaseReason -RepoPath $platformSessionWorktree
+        if (-not [string]::IsNullOrWhiteSpace($actual)) {
+            Invoke-Git $mainRepo @('worktree', 'unlock', $platformSessionWorktree) | Out-Null
+        }
+    }
+
+    $completedReplayOutput = Invoke-Finish -WorktreePath $platformSessionWorktree -ContractId $platformContractId
+    Assert-Contains $completedReplayOutput "TERMINAL_FINALIZATION_STATUS=completed:$interruptedFinalizationId" 'Completed none/none replay must be idempotent.'
+    Assert-ReceiptBytesUnchanged $platformReceiptPath $completedBytes 'Completed replay changed receipt bytes.'
+
     $platformRegistration = Invoke-Git $mainRepo @("worktree", "list", "--porcelain")
     $platformEntry = ($platformRegistration -split "`n`n" | Where-Object { $_.Contains($platformSessionWorktree) }) -join "`n"
     if ($platformEntry -match '(?m)^locked(?: |$)') {
@@ -243,13 +399,28 @@ try {
     # A same-path remote addition must be left to Git's overwrite protection.
     # The finish gate reports the already-complete business state separately
     # from the blocked local-main cleanup state.
+    Invoke-Git $peerWorktree @('config', 'user.email', 'finish-test@example.invalid') | Out-Null
+    Invoke-Git $peerWorktree @('config', 'user.name', 'finish-test') | Out-Null
+    Invoke-Git $peerWorktree @('fetch', 'origin') | Out-Null
+    Invoke-Git $peerWorktree @('rebase', 'origin/main') | Out-Null
+    Set-Content -LiteralPath (Join-Path $peerWorktree 'peer-advance.txt') -Value 'force a real non-fast-forward fixture' -Encoding UTF8
+    Invoke-Git $peerWorktree @('add', 'peer-advance.txt') | Out-Null
+    Invoke-Git $peerWorktree @('commit', '-m', 'advance collision fixture origin') | Out-Null
+    Invoke-Git $peerWorktree @('push', 'origin', 'HEAD:main') | Out-Null
+
     $mainCollisionPath = Join-Path $mainRepo "collision-test.rs"
     $taskCollisionPath = Join-Path $taskWorktree "collision-test.rs"
     Set-Content -LiteralPath $mainCollisionPath -Value "unknown local content" -Encoding UTF8
     Set-Content -LiteralPath $taskCollisionPath -Value "intentional tracked content" -Encoding UTF8
     Invoke-Git $taskWorktree @("add", "collision-test.rs") | Out-Null
     Invoke-Git $taskWorktree @("commit", "-m", "add collision fixture") | Out-Null
-    Invoke-Git $taskWorktree @("push", "origin", "HEAD:main") | Out-Null
+    $rejectedPush = Invoke-GitCaptureResult $taskWorktree @('push', 'origin', 'HEAD:main')
+    if ($rejectedPush.ExitCode -eq 0 -or $rejectedPush.Text -notmatch 'non-fast-forward|fetch first|rejected') {
+        throw "Collision fixture did not produce a real non-fast-forward rejection.`n$($rejectedPush.Text)"
+    }
+    Invoke-Git $taskWorktree @('fetch', 'origin') | Out-Null
+    Invoke-Git $taskWorktree @('rebase', 'origin/main') | Out-Null
+    Invoke-Git $taskWorktree @('push', 'origin', 'HEAD:main') | Out-Null
 
     $collisionOutput = Invoke-Finish -WorktreePath $taskWorktree -ExpectFailure -ContractId $taskContractId
     Assert-Contains $collisionOutput "BUSINESS_STATUS=complete" "A local-main collision must not erase the completed remote business state."
