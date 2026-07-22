@@ -221,7 +221,10 @@ async fn late_local_finish_cannot_downgrade_synced_or_rejected_state() {
     assert!(local_tasks.finish(OWNER, &accepted).unwrap());
     let mut stale_fallback = accepted.clone();
     stale_fallback.event_id = "local-display-stale".to_string();
-    assert!(!local_tasks.finish(OWNER, &stale_fallback).unwrap());
+    let error = local_tasks
+        .finish(OWNER, &stale_fallback)
+        .expect_err("a late different event must fail closed");
+    assert!(error.to_string().contains("different completion event"));
     let accepted_record = local_tasks
         .get_for_owner(OWNER, &accepted.req_id)
         .unwrap()
