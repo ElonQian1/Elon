@@ -281,7 +281,7 @@ function Invoke-NodeApi {
         [object]$Body = $null,
         [byte[]]$BodyBytes = $null,
         [System.Collections.IDictionary]$ExtraHeaders = $null,
-        [ValidateRange(1, 60)][int]$TimeoutSec = 15
+        [ValidateRange(1, 120)][int]$TimeoutSec = 15
     )
     $requestHeaders = @{ Origin = $Connection.BaseUrl }
     $requestHeaders[$Connection.Header] = $Connection.Token
@@ -600,9 +600,9 @@ switch ($Action) {
     'ReconcileUpdate' {
         # Reconcile performs a complete, fail-closed audit of historical task
         # ownership and worktree evidence. Keep ordinary task reads at 15s,
-        # but give this explicit maintenance operation a bounded 60s window.
+        # but give this explicit maintenance operation a bounded 120s window.
         $response = Invoke-NodeApi $nodeConnection 'Post' '/api/update-recovery/reconcile' @{} `
-            -TimeoutSec 60
+            -TimeoutSec 120
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'ReconcileUpdate'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl
