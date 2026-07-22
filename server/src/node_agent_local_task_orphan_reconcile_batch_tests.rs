@@ -61,6 +61,74 @@ async fn invalid_candidate_does_not_block_later_safe_orphan_reconciliation() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[tokio::test]
+async fn malformed_terminal_repair_does_not_block_later_safe_orphan_reconciliation() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-orphan-terminal-batch-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let runtime = test_runtime(&root);
+    for task_id in ["bad-terminal", "good-running"] {
+        runtime
+            .local_tasks
+            .create(LocalTaskStart {
+                task_id,
+                owner_user_id: "owner",
+                agent_id: "agent",
+                install_id: "install",
+                project_id: "project",
+                channel_id: None,
+                conversation_id: task_id,
+                workspace_path: root.to_str().unwrap(),
+                prompt: "work",
+                cli: "codex",
+                runtime_permission: "full_access",
+            })
+            .unwrap();
+    }
+    runtime
+        .local_tasks
+        .record_initial_workspace_status(
+            "bad-terminal",
+            &serde_json::json!({
+                "platform_provenance": "elon.conversation_worktree.v1",
+                "active_workspace_path": root,
+            }),
+        )
+        .unwrap();
+    rusqlite::Connection::open(root.join("tasks.sqlite3"))
+        .unwrap()
+        .execute(
+            "UPDATE local_tasks
+                SET status='done', completion_event_id='bad-event',
+                    sync_state='local_only', finished_at_ms=started_at_ms
+              WHERE task_id='bad-terminal'",
+            [],
+        )
+        .unwrap();
+
+    assert_eq!(reconcile_with_stale_after(&runtime, 0).await.unwrap(), 1);
+    assert_eq!(
+        runtime
+            .local_tasks
+            .get("bad-terminal")
+            .unwrap()
+            .unwrap()
+            .status,
+        "done"
+    );
+    assert_eq!(
+        runtime
+            .local_tasks
+            .get("good-running")
+            .unwrap()
+            .unwrap()
+            .status,
+        "resume_required"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
 fn test_runtime(root: &Path) -> NodeRuntime {
     let mut runtime = NodeRuntime::new(
         crate::node_agent_config::NodeConfig {

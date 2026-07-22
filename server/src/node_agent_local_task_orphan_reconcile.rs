@@ -108,86 +108,95 @@ async fn repair_historical_terminal_candidates(runtime: &NodeRuntime) -> Result<
         .list_terminal_repair_candidates(TERMINAL_REPAIR_LIMIT)?;
     let mut repaired = 0;
     for candidate in candidates.into_iter().filter(is_platform_supervised) {
-        let snapshot_trusted = candidate.workspace_status.as_ref().is_some_and(|status| {
-            status
-                .get("terminal_snapshot_status")
-                .and_then(serde_json::Value::as_str)
-                == Some("trusted")
-        });
-        let existing = runtime
-            .completion_outbox
-            .latest_for_req_id(&candidate.task_id)?;
-        if snapshot_trusted && existing.is_some() {
-            continue;
+        match repair_historical_terminal_candidate(runtime, &candidate).await {
+            Ok(changed) => repaired += usize::from(changed),
+            Err(error) => warn!(
+                task_id = %candidate.task_id,
+                %error,
+                "historical terminal repair remains fail-closed while later candidates continue"
+            ),
         }
-        let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
-            &runtime.task_journal,
-            &candidate.task_id,
-        )?
-        .context("supervised historical terminal task has no durable contract")?;
-        let base = crate::node_agent_supervision_terminal_lease_safety::admission_base(
-            &candidate,
-            &contract,
-            &candidate.task_id,
-        )?;
-        let admission =
-            crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire(&base)?;
-        let task = runtime
-            .local_tasks
-            .get(&candidate.task_id)?
-            .context("historical terminal task disappeared after admission")?;
-        if task.status != "done"
-            || task.sync_state == "synced"
-            || task.completion_event_id.is_none()
-        {
-            continue;
-        }
-        let active = task
-            .workspace_status
-            .as_ref()
-            .and_then(|status| status.get("active_workspace_path"))
-            .and_then(serde_json::Value::as_str)
-            .map(Path::new)
-            .unwrap_or_else(|| Path::new(&task.workspace_path));
-        if candidate_runtime_protects(
-            runtime,
-            &task,
-            active,
-            crate::node_agent_cli_sidecar::now_ms(),
-            0,
-        )
-        .await?
-        {
-            continue;
-        }
-        let completion = match runtime.completion_outbox.latest_for_req_id(&task.task_id)? {
-            Some(completion) => completion,
-            None => {
-                crate::node_agent_terminal_finalization::historical_completion(&task, &contract)?
-                    .context("historical terminal task has neither outbox nor completed receipt")?
-            }
-        };
-        runtime
-            .completion_outbox
-            .preflight_restore_pending(&completion)?;
-        crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(runtime)
-            .reconcile_with_admission(&completion, &admission)
-            .await?;
-        runtime
-            .local_tasks
-            .mark_trusted_completion_pending(&task.task_id, &completion.event_id)?;
-        runtime.completion_outbox.enqueue(&completion)?;
-        runtime
-            .completion_outbox
-            .restore_pending(&completion.event_id, &completion.req_id)?;
-        repaired += 1;
-        info!(
-            task_id = %task.task_id,
-            event_id = %completion.event_id,
-            "recovered historical terminal completion from strict durable evidence"
-        );
     }
     Ok(repaired)
+}
+
+async fn repair_historical_terminal_candidate(
+    runtime: &NodeRuntime,
+    candidate: &crate::node_agent_local_task_store::LocalTaskRecord,
+) -> Result<bool> {
+    let snapshot_trusted = candidate.workspace_status.as_ref().is_some_and(|status| {
+        status
+            .get("terminal_snapshot_status")
+            .and_then(serde_json::Value::as_str)
+            == Some("trusted")
+    });
+    let existing = runtime
+        .completion_outbox
+        .latest_for_req_id(&candidate.task_id)?;
+    if snapshot_trusted && existing.is_some() {
+        return Ok(false);
+    }
+    let contract = crate::node_agent_local_task_supervision::load_supervision_contract(
+        &runtime.task_journal,
+        &candidate.task_id,
+    )?
+    .context("supervised historical terminal task has no durable contract")?;
+    let base = crate::node_agent_supervision_terminal_lease_safety::admission_base(
+        candidate,
+        &contract,
+        &candidate.task_id,
+    )?;
+    let admission =
+        crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire(&base)?;
+    let task = runtime
+        .local_tasks
+        .get(&candidate.task_id)?
+        .context("historical terminal task disappeared after admission")?;
+    if task.status != "done" || task.sync_state == "synced" || task.completion_event_id.is_none() {
+        return Ok(false);
+    }
+    let active = task
+        .workspace_status
+        .as_ref()
+        .and_then(|status| status.get("active_workspace_path"))
+        .and_then(serde_json::Value::as_str)
+        .map(Path::new)
+        .unwrap_or_else(|| Path::new(&task.workspace_path));
+    if candidate_runtime_protects(
+        runtime,
+        &task,
+        active,
+        crate::node_agent_cli_sidecar::now_ms(),
+        0,
+    )
+    .await?
+    {
+        return Ok(false);
+    }
+    let completion = match runtime.completion_outbox.latest_for_req_id(&task.task_id)? {
+        Some(completion) => completion,
+        None => crate::node_agent_terminal_finalization::historical_completion(&task, &contract)?
+            .context("historical terminal task has neither outbox nor completed receipt")?,
+    };
+    runtime
+        .completion_outbox
+        .preflight_restore_pending(&completion)?;
+    crate::node_agent_local_terminal_reconcile::LocalTerminalReconciler::from_runtime(runtime)
+        .reconcile_with_admission(&completion, &admission)
+        .await?;
+    runtime
+        .local_tasks
+        .mark_trusted_completion_pending(&task.task_id, &completion.event_id)?;
+    runtime.completion_outbox.enqueue(&completion)?;
+    runtime
+        .completion_outbox
+        .restore_pending(&completion.event_id, &completion.req_id)?;
+    info!(
+        task_id = %task.task_id,
+        event_id = %completion.event_id,
+        "recovered historical terminal completion from strict durable evidence"
+    );
+    Ok(true)
 }
 
 async fn reconcile_candidate(
