@@ -340,6 +340,34 @@ try {
     if (-not [string]::IsNullOrWhiteSpace((Get-AiTaskWorktreeLeaseReason -RepoPath $platformSessionWorktree))) {
         throw 'Prepared exact/exact recovery did not release the platform lease.'
     }
+    $completedIdentity = [pscustomobject]@{ Fields = [ordered]@{
+        taskContractId = [string]$preparedExactReceipt.taskContractId
+        supervisionRootTaskId = [string]$preparedExactReceipt.supervisionRootTaskId
+        worktree = [string]$preparedExactReceipt.worktree
+        baseWorkspace = [string]$preparedExactReceipt.baseWorkspace
+        gitDir = [string]$preparedExactReceipt.gitDir
+        gitCommonDir = [string]$preparedExactReceipt.gitCommonDir
+        branch = [string]$preparedExactReceipt.branch
+        origin = [string]$preparedExactReceipt.origin
+        finalHead = [string]$preparedExactReceipt.finalHead
+    } }
+    foreach ($invalidTerminalStatus in @('failed', 'canceled')) {
+        $invalidBinding = ($preparedExactReceipt | ConvertTo-Json -Depth 8 -Compress | ConvertFrom-Json)
+        $invalidBinding.taskId = 'fixture-task'
+        $invalidBinding.completionEventId = 'fixture-event'
+        $invalidBinding.terminalStatus = $invalidTerminalStatus
+        $invalidBinding.boundAtUtc = [DateTime]::UtcNow.ToString('o')
+        $rejected = $false
+        try {
+            Assert-AiTerminalFinalizationReceipt -Receipt $invalidBinding -Identity $completedIdentity `
+                -TaskContract $platformContractId -RootTaskId 'platform-fixture'
+        } catch {
+            $rejected = $_.Exception.Message -like '*must be done*'
+        }
+        if (-not $rejected) {
+            throw "Completed receipt accepted forbidden terminal binding: $invalidTerminalStatus"
+        }
+    }
 
     # Preserve the crash-after-unlock path: a receipt-null exact/exact run
     # persists prepared, verifies no lease, then a none/none replay completes.

@@ -195,9 +195,9 @@ function Assert-AiTerminalFinalizationReceipt {
         throw 'Completed terminal finalization receipt has a partial completion binding.'
     }
     if ($bindingPresent -eq 4 -and
-        ([string]$Receipt.terminalStatus -notin @('done', 'failed', 'canceled') -or
+        ([string]$Receipt.terminalStatus -ne 'done' -or
          -not (Test-AiTerminalTimestamp $Receipt.boundAtUtc))) {
-        throw 'Completed terminal finalization receipt binding is invalid.'
+        throw 'Completed terminal finalization receipt binding must be done with a valid timestamp.'
     }
 }
 
