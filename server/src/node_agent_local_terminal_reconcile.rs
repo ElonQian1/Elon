@@ -356,7 +356,7 @@ fn assert_durable_terminal(
         completion.error.as_deref(),
     );
     let outcome =
-        (!completion.final_output.trim().is_empty()).then_some(completion.final_output.as_str());
+        (!completion.final_output.trim().is_empty()).then_some(completion.final_output.trim());
     anyhow::ensure!(
         task.completion_event_id.as_deref() == Some(completion.event_id.as_str())
             && task.status == status

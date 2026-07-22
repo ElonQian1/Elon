@@ -41,7 +41,7 @@ pub(super) fn ensure_same_event_is_immutable(
         completion.error.as_deref(),
     );
     let expected_outcome =
-        (!completion.final_output.trim().is_empty()).then_some(completion.final_output.as_str());
+        (!completion.final_output.trim().is_empty()).then_some(completion.final_output.trim());
     let expected_finished = completion.created_at_ms.min(i64::MAX as u64) as i64;
     anyhow::ensure!(
         status == expected_status

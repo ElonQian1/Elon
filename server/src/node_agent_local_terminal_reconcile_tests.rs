@@ -1,6 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use homecli_proto::{CliCompletionEnvelope, CliCompletionProducerIdentity, CliProjectContext};
@@ -16,6 +17,9 @@ use crate::{
 const TASK: &str = "supervised-terminal-task";
 const ROOT: &str = "supervised-terminal-root";
 const EVENT: &str = "supervised-terminal-event";
+
+#[path = "node_agent_local_terminal_reconcile_race_tests.rs"]
+mod race_tests;
 
 #[tokio::test]
 async fn completed_done_with_missing_lease_persists_trusted_snapshot_and_replays() {
@@ -174,7 +178,7 @@ struct Fixture {
     contracts: PathBuf,
     receipts: PathBuf,
     branch: String,
-    runtime: NodeRuntime,
+    runtime: Arc<NodeRuntime>,
 }
 
 impl Fixture {
@@ -249,6 +253,8 @@ impl Fixture {
         );
         runtime.update_recovery =
             crate::node_agent_update_recovery::UpdateRecoveryStore::new(root.join("recovery.json"));
+        runtime.cli_sidecars =
+            crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars"));
         runtime.full_access_grants =
             crate::node_agent_full_access::FullAccessGrantState::load_from_path(
                 root.join("grants.json"),
@@ -312,7 +318,7 @@ impl Fixture {
             contracts,
             receipts,
             branch,
-            runtime,
+            runtime: Arc::new(runtime),
         }
     }
 
@@ -546,6 +552,19 @@ fn normalized(path: &Path) -> String {
         .trim_end_matches('/')
         .to_string();
     value.strip_prefix("//?/").unwrap_or(&value).to_string()
+}
+
+fn delayed_codex_command() -> (String, Vec<String>) {
+    let command = "Start-Sleep -Milliseconds 500; Write-Output '{\"type\":\"item.completed\",\"item\":{\"type\":\"agent_message\",\"text\":\"restart done\"}}'; Write-Output '{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}'";
+    (
+        "powershell".to_string(),
+        vec![
+            "-NoProfile".into(),
+            "-Command".into(),
+            command.into(),
+            "--json".into(),
+        ],
+    )
 }
 fn git_output(cwd: &Path, args: &[&str]) -> String {
     let output = crate::git_command_error::git_command()

@@ -4,6 +4,11 @@
 //! durable JSONL after a runtime restart and commits exactly one completion
 //! envelope before repairing the local task row and journal terminal state.
 
+#[path = "node_agent_sidecar_recovery_monitor.rs"]
+mod monitor;
+pub(crate) use monitor::spawn_recovered_sidecar_monitor;
+use monitor::supervised_admission;
+
 use std::{path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -78,21 +83,49 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
         .transpose()?
         .unwrap_or(false);
     if !terminal_output {
+        let update_receipt = runtime.update_recovery.receipt_for_task(&task.task_id)?;
+        if update_receipt.is_some() {
+            // update_reconcile owns the receipt transition and attaches the
+            // same shared monitor after it establishes runtime-online state.
+            return Ok(());
+        }
+        let admission = supervised_admission(&runtime, &task)?;
         let live_runtime_handle = runtime
             .active_cli_prompt_view(&task.task_id)
             .await
             .is_some_and(|handle| handle.control_handle_live);
         let now = now_ms();
-        if live_runtime_handle || session.protects_startup_reconcile_at(now) {
+        let current = runtime
+            .cli_sidecars
+            .session_for_task(&task.task_id)?
+            .context("surviving sidecar disappeared during startup admission")?;
+        if live_runtime_handle {
             info!(task_id = %task.task_id, "sidecar 仍在启动宽限、心跳或 live handle 下，保持运行/恢复状态");
             return Ok(());
         }
-        let receipt = ensure_recovery_receipt(&runtime, &task, &session)?;
+        let terminal_arrived = current
+            .endpoint
+            .as_deref()
+            .map(Path::new)
+            .filter(|path| path.is_file())
+            .map(output_contains_terminal_record)
+            .transpose()?
+            .unwrap_or(false);
+        if terminal_arrived || current.can_replay_after_restart_at(now) {
+            spawn_recovered_sidecar_monitor(runtime, task, current, None, admission.as_ref())
+                .await?;
+            return Ok(());
+        }
+        if current.protects_startup_reconcile_at(now) {
+            info!(task_id = %task.task_id, "sidecar 仍在启动宽限或心跳下，但进程身份尚不可重接；保持 recoverable");
+            return Ok(());
+        }
+        let receipt = ensure_recovery_receipt(&runtime, &task, &current)?;
         if !stale_transition_evidence_complete(false, false, receipt.as_ref()) {
             warn!(task_id = %task.task_id, "stale sidecar evidence is incomplete; preserving recoverable state");
             return Ok(());
         }
-        move_stale_sidecar_to_resume_required(&runtime, &task, &session, receipt.as_ref())?;
+        move_stale_sidecar_to_resume_required(&runtime, &task, &current, receipt.as_ref())?;
         return Ok(());
     }
 
@@ -317,7 +350,7 @@ fn move_stale_sidecar_to_resume_required(
     Ok(())
 }
 
-fn output_contains_terminal_record(path: &Path) -> Result<bool> {
+pub(crate) fn output_contains_terminal_record(path: &Path) -> Result<bool> {
     let mut offset = 0;
     Ok(read_new_output_records(path, &mut offset)?
         .iter()
