@@ -2,6 +2,7 @@ use axum::{http::StatusCode, Json};
 #[cfg(windows)]
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 #[cfg(windows)]
 use std::process::{Command, Stdio};
 use std::{
@@ -74,7 +75,7 @@ pub(crate) async fn push_update_from_server_now(
         .await
         .map_err(|e| format!("读取新版身份失败: {e}"))?;
     let version_text = version_text.trim_start_matches('\u{feff}');
-    let release_identity = fallback_release_identity(version_text, target_release_identity)?;
+    let release = fallback_release_metadata(version_text, target_release_identity)?;
     let resp = client
         .get(&url)
         .send()
@@ -87,6 +88,7 @@ pub(crate) async fn push_update_from_server_now(
         .bytes()
         .await
         .map_err(|e| format!("读取下载内容失败: {e}"))?;
+    verify_fallback_download_sha256(&bytes, &release.windows_client_sha256)?;
     tokio::fs::write(&download_path, &bytes)
         .await
         .map_err(|e| format!("写入新版 exe 失败: {e}"))?;
@@ -120,7 +122,8 @@ pub(crate) async fn push_update_from_server_now(
         "push_update",
         true,
         &format!(
-            "Win 端正在更新升级，通信临时中断，会自动恢复。via_download_replace target={release_identity}"
+            "Win 端正在更新升级，通信临时中断，会自动恢复。via_download_replace target={} sha256={}"
+            , release.release_identity, release.windows_client_sha256
         ),
     );
     // 异步退出（让当前响应先发出）
@@ -138,6 +141,19 @@ pub(crate) fn fallback_release_identity(
     version_text: &str,
     expected: Option<&str>,
 ) -> Result<String, String> {
+    fallback_release_metadata(version_text, expected).map(|release| release.release_identity)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct FallbackReleaseMetadata {
+    pub(crate) release_identity: String,
+    pub(crate) windows_client_sha256: String,
+}
+
+pub(crate) fn fallback_release_metadata(
+    version_text: &str,
+    expected: Option<&str>,
+) -> Result<FallbackReleaseMetadata, String> {
     let value: Value = serde_json::from_str(version_text)
         .map_err(|error| format!("新版身份不是合法 JSON: {error}"))?;
     let version = value
@@ -152,6 +168,20 @@ pub(crate) fn fallback_release_identity(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .ok_or_else(|| "新版身份缺少 gitSha。".to_string())?;
+    let windows_client_sha256 = value
+        .get("windowsClientSha256")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "新版身份缺少 windowsClientSha256。".to_string())?
+        .to_ascii_lowercase();
+    if windows_client_sha256.len() != 64
+        || !windows_client_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
+    {
+        return Err("新版身份的 windowsClientSha256 必须是合法 64 位十六进制。".to_string());
+    }
     let actual = format!("{version}+{git_sha}");
     if let Some(expected) = expected.map(str::trim).filter(|value| !value.is_empty()) {
         if actual != expected {
@@ -160,7 +190,20 @@ pub(crate) fn fallback_release_identity(
             ));
         }
     }
-    Ok(actual)
+    Ok(FallbackReleaseMetadata {
+        release_identity: actual,
+        windows_client_sha256,
+    })
+}
+
+pub(crate) fn verify_fallback_download_sha256(bytes: &[u8], expected: &str) -> Result<(), String> {
+    let actual = hex::encode(Sha256::digest(bytes));
+    if actual != expected {
+        return Err(format!(
+            "新版 Windows 客户端 SHA-256 校验失败: expected {expected}, actual {actual}。已拒绝落盘和安排替换。"
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn maintenance_fallback_update_script(

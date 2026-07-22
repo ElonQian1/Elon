@@ -2,11 +2,13 @@
 mod tests {
     use super::super::{
         autostart_query_script, decode_autostart_info, fallback_release_identity,
-        install_dir_from_local_app_data, maintenance_actions, maintenance_fallback_update_script,
-        maintenance_overview, maintenance_target, primary_maintenance_action,
-        recent_maintenance_events, status_payload, truncate_chars,
+        fallback_release_metadata, install_dir_from_local_app_data, maintenance_actions,
+        maintenance_fallback_update_script, maintenance_overview, maintenance_target,
+        primary_maintenance_action, recent_maintenance_events, status_payload, truncate_chars,
+        verify_fallback_download_sha256,
     };
     use serde_json::json;
+    use sha2::Digest;
     use std::{
         fs,
         path::{Path, PathBuf},
@@ -392,14 +394,43 @@ mod tests {
 
     #[test]
     fn maintenance_fallback_identity_is_bound_to_exact_broadcast_target() {
-        let version = r#"{"version":"0.3.69","gitSha":"51841351542f7cc3"}"#;
+        let version = format!(
+            r#"{{"version":"0.3.69","gitSha":"51841351542f7cc3","windowsClientSha256":"{}"}}"#,
+            "a".repeat(64)
+        );
         assert_eq!(
-            fallback_release_identity(version, Some("0.3.69+51841351542f7cc3")).unwrap(),
+            fallback_release_identity(&version, Some("0.3.69+51841351542f7cc3")).unwrap(),
             "0.3.69+51841351542f7cc3"
         );
-        let error = fallback_release_identity(version, Some("0.3.70+aaaaaaaaaaaaaaaa"))
+        let error = fallback_release_identity(&version, Some("0.3.70+aaaaaaaaaaaaaaaa"))
             .expect_err("a different broadcast target must fail closed");
         assert!(error.contains("不一致"));
         assert!(fallback_release_identity(r#"{"version":"0.3.69"}"#, None).is_err());
+    }
+
+    #[test]
+    fn maintenance_fallback_requires_strict_client_sha_and_verifies_download_bytes() {
+        let bytes = b"verified windows client bytes";
+        let expected = hex::encode(sha2::Sha256::digest(bytes));
+        let valid = format!(
+            r#"{{"version":"0.3.70","gitSha":"aaaaaaaaaaaaaaaa","windowsClientSha256":"{expected}"}}"#
+        );
+        let release = fallback_release_metadata(&valid, Some("0.3.70+aaaaaaaaaaaaaaaa"))
+            .expect("valid same-origin metadata");
+        assert_eq!(release.windows_client_sha256, expected);
+        assert!(verify_fallback_download_sha256(bytes, &expected).is_ok());
+        assert!(verify_fallback_download_sha256(b"tampered", &expected).is_err());
+
+        for invalid in [
+            r#"{"version":"0.3.70","gitSha":"aaaaaaaaaaaaaaaa"}"#.to_string(),
+            r#"{"version":"0.3.70","gitSha":"aaaaaaaaaaaaaaaa","windowsClientSha256":"abc"}"#
+                .to_string(),
+            format!(
+                r#"{{"version":"0.3.70","gitSha":"aaaaaaaaaaaaaaaa","windowsClientSha256":"{}"}}"#,
+                "g".repeat(64)
+            ),
+        ] {
+            assert!(fallback_release_metadata(&invalid, None).is_err());
+        }
     }
 }
