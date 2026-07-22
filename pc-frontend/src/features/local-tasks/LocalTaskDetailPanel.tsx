@@ -9,10 +9,12 @@ import type {
   LocalTaskApprovalDecision,
   LocalTaskDetail,
   LocalTaskEvent,
+  LocalTaskContinuationInput,
 } from './types'
 import styles from './LocalTasksPage.module.css'
 import LocalTaskSupervisionPanel from './LocalTaskSupervisionPanel'
 import LocalTaskUpdateRecoveryPanel from './LocalTaskUpdateRecoveryPanel'
+import LocalTaskContinuationPanel from './LocalTaskContinuationPanel'
 
 interface Props {
   detail: LocalTaskDetail | null
@@ -20,6 +22,7 @@ interface Props {
   actionKey: string
   onCancel: () => void
   onDecision: (approval: LocalTaskApproval, decision: LocalTaskApprovalDecision) => void
+  onContinue: (input: LocalTaskContinuationInput) => Promise<boolean>
 }
 
 export default function LocalTaskDetailPanel({
@@ -28,6 +31,7 @@ export default function LocalTaskDetailPanel({
   actionKey,
   onCancel,
   onDecision,
+  onContinue,
 }: Props) {
   if (!detail) {
     return (
@@ -91,6 +95,24 @@ export default function LocalTaskDetailPanel({
           <Summary label="最后更新" value={formatTime(task.updated_at_ms || task.started_at_ms)} />
         </section>
 
+        {detail.recovery_timing && (
+          <section className={styles.infoCard} data-testid="recovery-timing">
+            <div className={styles.sectionHeading}>
+              <h3>{detail.recovery_timing.mode === 'supersede' ? '需求变更承接耗时' : '任务继续耗时'}</h3>
+              <span data-tone={detail.recovery_timing.handoff_within_target === false ? 'danger' : 'done'}>
+                交接目标 {formatMilliseconds(detail.recovery_timing.handoff_target_ms)}
+              </span>
+            </div>
+            <dl className={styles.taskMeta}>
+              <div><dt>恢复交接</dt><dd>{formatMilliseconds(detail.recovery_timing.handoff_ms)}</dd></div>
+              <div><dt>继续后的开发</dt><dd>{formatMilliseconds(detail.recovery_timing.resumed_work_ms)}</dd></div>
+              <div><dt>合计</dt><dd>{formatMilliseconds(detail.recovery_timing.total_since_parent_finished_ms)}</dd></div>
+              <div><dt>父任务</dt><dd>{detail.recovery_timing.parent_task_id || '-'}</dd></div>
+            </dl>
+            <p className={styles.promptText}>恢复交接和后续开发分别统计，不再把编译、测试时间算成恢复耗时。</p>
+          </section>
+        )}
+
         <section className={styles.infoCard}>
           <h3>任务内容</h3>
           <p className={styles.promptText}>{task.prompt || '节点未返回任务提示词。'}</p>
@@ -106,6 +128,7 @@ export default function LocalTaskDetailPanel({
           recovery={detail.update_recovery}
           resumeWorkspace={detail.resume_workspace_status}
         />
+        <LocalTaskContinuationPanel detail={detail} busy={actionKey === 'continue'} onContinue={onContinue} />
 
         {detail.cancel_audit && (
           <section className={styles.infoCard} data-testid="cancel-audit">
@@ -214,6 +237,17 @@ function formatDuration(seconds: number): string {
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   return minutes ? `${hours} 小时 ${minutes} 分钟` : `${hours} 小时`
+}
+
+function formatMilliseconds(milliseconds?: number): string {
+  if (milliseconds == null || !Number.isFinite(milliseconds) || milliseconds < 0) return '-'
+  if (milliseconds < 60_000) return `${Math.max(1, Math.round(milliseconds / 1_000))} 秒`
+  const minutes = Math.floor(milliseconds / 60_000)
+  const seconds = Math.round((milliseconds % 60_000) / 1_000)
+  if (minutes < 60) return seconds ? `${minutes} 分 ${seconds} 秒` : `${minutes} 分钟`
+  const hours = Math.floor(minutes / 60)
+  const remainder = minutes % 60
+  return remainder ? `${hours} 小时 ${remainder} 分钟` : `${hours} 小时`
 }
 
 function Summary({ label, value }: { label: string; value: string }) {

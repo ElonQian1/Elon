@@ -288,6 +288,15 @@
 
 .recoveryCard { border: 1px solid rgba(105,169,212,.3); border-radius: 8px; background: linear-gradient(135deg, rgba(42,142,217,.09), #24272b 48%); padding: 12px 14px; }
 .recoveryCard[data-state="failed"], .recoveryCard[data-state="conflict"], .recoveryCard[data-state="timeout"] { border-color: rgba(223,92,92,.38); }
+.continuationCard { border: 1px solid rgba(88,197,139,.32); border-radius: 8px; background: linear-gradient(135deg, rgba(88,197,139,.08), #24272b 52%); padding: 12px 14px; }
+.continuationCard p { margin: 8px 0; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+.continuationCard small { display: block; margin-top: 8px; color: #e9b56d; line-height: 1.5; }
+.continuationActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.continuationActions button { display: inline-flex; align-items: center; gap: 6px; }
+.continuationForm { display: grid; gap: 9px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-soft); }
+.continuationForm label { display: grid; gap: 5px; color: var(--text-muted); font-size: 11px; font-weight: 800; }
+.continuationForm input, .continuationForm textarea { width: 100%; border: 1px solid var(--line-soft); border-radius: 6px; background: #1d1f23; color: var(--text-main); padding: 9px 10px; font: inherit; box-sizing: border-box; }
+.continuationForm textarea { resize: vertical; line-height: 1.45; }
 .recoveryMeta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin: 9px 0 0; overflow: hidden; border-radius: 6px; background: var(--line-soft); }
 .recoveryMeta div { min-width: 0; background: #202328; padding: 8px; }
 .recoveryMeta dt { color: var(--text-muted); font-size: 9px; }

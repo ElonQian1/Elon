@@ -211,6 +211,7 @@ async fn get_task(
         "update_recovery": update_recovery,
         "update_recovery_receipts": update_recovery_receipts,
         "resume_workspace_status": resume_workspace_status,
+        "recovery_timing": crate::node_agent_local_task_recovery_timing::build_best_effort(&runtime, &record, &supervision),
     }))
     .into_response()
 }

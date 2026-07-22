@@ -285,6 +285,10 @@ fn load_revision_event(
     })
 }
 
+pub(crate) fn task_has_revision(runtime: &NodeRuntime, task_id: &str) -> Result<bool> {
+    Ok(load_revision_event(runtime, task_id)?.is_some())
+}
+
 fn requirement(
     root_task_id: &str,
     source_task_id: &str,

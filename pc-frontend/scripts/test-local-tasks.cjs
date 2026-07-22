@@ -118,6 +118,11 @@ try {
       branch: 'ai/session/project/conversation',
       git_head: '0123456789abcdef',
     },
+    recovery_timing: {
+      mode: 'supersede', parent_task_id: 'local-parent', handoff_ms: 102000,
+      resumed_work_ms: 360000, total_since_parent_finished_ms: 462000,
+      handoff_target_ms: 480000, handoff_within_target: true,
+    },
   })
   assert.strictEqual(detail.task.id, 'local-1')
   assert.strictEqual(detail.task.final_reply, '已完成本机任务')
@@ -134,6 +139,10 @@ try {
   assert.strictEqual(detail.update_recovery.state, 'reattaching')
   assert.strictEqual(detail.update_recovery.sidecar_output_offset, 58)
   assert.strictEqual(detail.resume_workspace_status.eligible, true)
+  assert.strictEqual(detail.recovery_timing.mode, 'supersede')
+  assert.strictEqual(detail.recovery_timing.handoff_ms, 102000)
+  assert.strictEqual(detail.recovery_timing.resumed_work_ms, 360000)
+  assert.strictEqual(detail.recovery_timing.handoff_within_target, true)
 
   const canceled = model.normalizeLocalTaskDetail({
     record: { req_id: 'local-cancel', status: 'cancel_requested' },
@@ -195,6 +204,7 @@ try {
   const supervisionSource = readSource('src/features/local-tasks/LocalTaskSupervisionPanel.tsx')
   const recoverySource = readSource('src/features/local-tasks/LocalTaskUpdateRecoveryPanel.tsx')
   const operationsSource = readSource('src/features/local-tasks/LocalOperationsPanel.tsx')
+  const continuationSource = readSource('src/features/local-tasks/LocalTaskContinuationPanel.tsx')
   assert.ok(!bannerSource.includes('window.location.replace'), 'cloud recovery must not force navigation')
   assert.ok(bannerSource.includes('返回云端工作台'), 'cloud recovery must expose an explicit return action')
   assert.ok(shellSource.includes('useNotifications(!localMode)'), 'local mode must disable cloud websocket notifications')
@@ -210,6 +220,10 @@ try {
   assert.ok(detailSource.includes('current_command'), 'local task details must expose the redacted current command')
   assert.ok(detailSource.includes('idle_duration'), 'local task details must expose progress-aware idle duration')
   assert.ok(detailSource.includes('cancel-audit'), 'local task details must expose cancel audit provenance')
+  assert.ok(detailSource.includes('恢复交接和后续开发分别统计'), 'recovery timing must not mix handoff with resumed work')
+  assert.ok(continuationSource.includes('继续原任务'), 'unchanged requirements must have an explicit resume action')
+  assert.ok(continuationSource.includes('需求变更承接'), 'changed requirements must have an explicit supersede action')
+  assert.ok(continuationSource.includes('新的验收条件'), 'supersede must collect explicit revised acceptance criteria')
   assert.ok(supervisionSource.includes('桌面监督闭环'), 'supervised tasks must expose their evidence and verdict in the PC workbench')
   assert.ok(supervisionSource.includes('PC 本机节点负责执行'), 'the PC workbench must explain the executor and supervisor roles')
   assert.ok(recoverySource.includes('更新恢复全过程'), 'update recovery stages must be visible in the PC workbench')

@@ -50,7 +50,7 @@ impl LocalTaskStore {
     ) -> Result<Vec<LocalTaskRecord>> {
         let conn = self.open()?;
         let mut stmt = conn.prepare(&format!(
-            "{} WHERE status IN ('running','recovering','reattaching')
+            "{} WHERE status IN ('running','recovering','reattaching','cancel_requested')
                    AND completion_event_id IS NULL AND started_at_ms <= ?1
              ORDER BY started_at_ms, task_id
              LIMIT ?2",

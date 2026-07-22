@@ -11,9 +11,14 @@ export interface LocalTaskCreateInput {
   prompt: string
   runtime_permission: LocalTaskRuntimePermission
   supervision?: LocalTaskSupervisionInput
+  contract_revision?: {
+    schema: 'elon.supervision.contract_revision.v1'
+    reason: string
+  }
 }
 
 export interface LocalTaskSupervisionInput {
+  protocol?: 'elon.desktop_pc_supervision.v1'
   supervisor?: string
   task_role?: 'requirement' | 'capability_repair' | 'resume_original' | 'post_task_improvement'
   parent_task_id?: string
@@ -175,6 +180,23 @@ export interface LocalTaskResumeWorkspaceStatus {
   reason: string
 }
 
+export interface LocalTaskContinuationInput {
+  mode: 'resume' | 'supersede'
+  prompt: string
+  acceptance_criteria: string[]
+  reason: string
+}
+
+export interface LocalTaskRecoveryTiming {
+  mode: 'resume' | 'supersede'
+  parent_task_id: string
+  handoff_ms?: number
+  resumed_work_ms: number
+  total_since_parent_finished_ms?: number
+  handoff_target_ms: number
+  handoff_within_target?: boolean
+}
+
 export interface LocalTaskDetail {
   task: LocalTaskRecord
   events: LocalTaskEvent[]
@@ -186,6 +208,7 @@ export interface LocalTaskDetail {
   cancel_audit?: LocalTaskCancelAudit
   update_recovery?: LocalTaskUpdateRecovery
   resume_workspace_status?: LocalTaskResumeWorkspaceStatus
+  recovery_timing?: LocalTaskRecoveryTiming
 }
 
 export interface LocalTaskStatusView {

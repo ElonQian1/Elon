@@ -12,6 +12,9 @@ use tracing::{info, warn};
 
 use crate::NodeRuntime;
 
+#[path = "node_agent_local_task_orphan_cancel.rs"]
+mod cancel;
+
 const STALE_AFTER_MS: u128 = 2 * 60 * 1_000;
 const RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 const COMPLETION_SCAN_LIMIT: usize = 1_000;
@@ -67,7 +70,7 @@ async fn reconcile_with_stale_after(runtime: &NodeRuntime, stale_after_ms: u128)
     for candidate in candidates.into_iter().filter(|task| {
         matches!(
             task.status.as_str(),
-            "running" | "recovering" | "reattaching"
+            "running" | "recovering" | "reattaching" | "cancel_requested"
         ) && task.completion_event_id.is_none()
     }) {
         changed += usize::from(
@@ -216,7 +219,7 @@ async fn reconcile_candidate(
         .context("orphan candidate disappeared after admission")?;
     if !matches!(
         task.status.as_str(),
-        "running" | "recovering" | "reattaching"
+        "running" | "recovering" | "reattaching" | "cancel_requested"
     ) || task.completion_event_id.is_some()
         || task.started_at_ms > cutoff
     {
@@ -280,9 +283,20 @@ async fn reconcile_candidate(
             }
         }
     }
-    runtime
+    if task.status == "cancel_requested" {
+        return cancel::reconcile_stale_cancel(runtime, task_id, cutoff);
+    }
+    let changed = runtime
         .local_tasks
-        .mark_one_stale_without_runtime(task_id, cutoff)
+        .mark_one_stale_without_runtime(task_id, cutoff)?;
+    if changed {
+        runtime.task_journal.record_finished_with_outcome(
+            task_id,
+            "resume_required",
+            Some("执行器所有权已过期；现场已保留，请检查后继续"),
+        )?;
+    }
+    Ok(changed)
 }
 
 async fn candidate_runtime_protects(
@@ -342,7 +356,7 @@ fn journal_record_protects(
 ) -> Result<bool> {
     if !matches!(
         record.status.as_str(),
-        "running" | "recovering" | "reattaching"
+        "running" | "recovering" | "reattaching" | "cancel_requested"
     ) {
         return Ok(false);
     }

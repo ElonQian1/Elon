@@ -8,6 +8,7 @@ import type {
   LocalTaskSupervisionState,
   LocalTaskUpdateRecovery,
   LocalTaskResumeWorkspaceStatus,
+  LocalTaskRecoveryTiming,
   LocalTaskStatusView,
   LocalTaskTokenUsage,
 } from './types'
@@ -56,6 +57,7 @@ export function normalizeLocalTaskDetail(payload: unknown): LocalTaskDetail {
     cancel_audit: cancelAuditFromEvents(events),
     update_recovery: normalizeUpdateRecovery(root.update_recovery),
     resume_workspace_status: normalizeResumeWorkspaceStatus(root.resume_workspace_status),
+    recovery_timing: normalizeRecoveryTiming(root.recovery_timing),
   }
 }
 
@@ -106,6 +108,21 @@ function normalizeResumeWorkspaceStatus(payload: unknown): LocalTaskResumeWorksp
     git_head: textValue(root.git_head),
     occupied: Boolean(root.occupied),
     reason: textValue(root.reason),
+  }
+}
+
+function normalizeRecoveryTiming(payload: unknown): LocalTaskRecoveryTiming | undefined {
+  const root = objectValue(payload)
+  const mode = textValue(root.mode)
+  if (mode !== 'resume' && mode !== 'supersede') return undefined
+  return {
+    mode,
+    parent_task_id: textValue(root.parent_task_id),
+    handoff_ms: numberValue(root.handoff_ms),
+    resumed_work_ms: numberValue(root.resumed_work_ms) ?? 0,
+    total_since_parent_finished_ms: numberValue(root.total_since_parent_finished_ms),
+    handoff_target_ms: numberValue(root.handoff_target_ms) ?? 0,
+    handoff_within_target: booleanValue(root.handoff_within_target),
   }
 }
 
@@ -247,6 +264,7 @@ export function mergeLocalTaskDetail(
     cancel_audit: incoming.cancel_audit ?? current.cancel_audit,
     update_recovery: incoming.update_recovery ?? current.update_recovery,
     resume_workspace_status: incoming.resume_workspace_status ?? current.resume_workspace_status,
+    recovery_timing: incoming.recovery_timing ?? current.recovery_timing,
   }
 }
 

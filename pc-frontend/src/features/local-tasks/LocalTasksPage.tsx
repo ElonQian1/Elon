@@ -33,6 +33,7 @@ import type {
   LocalTaskApproval,
   LocalTaskApprovalDecision,
   LocalTaskCreateInput,
+  LocalTaskContinuationInput,
   LocalTaskDetail,
   LocalTaskRecord,
   GlobalPublishStatus,
@@ -205,6 +206,70 @@ export default function LocalTasksPage() {
     }
   }
 
+  async function handleContinue(input: LocalTaskContinuationInput): Promise<boolean> {
+    if (!detail || actionKey) return false
+    const contract = detail.supervision.contract
+    if (!contract || !['requirement', 'resume_original'].includes(contract.task_role)) {
+      setError('当前任务没有可验证的监督合同，不能直接继续。')
+      return false
+    }
+    setActionKey('continue')
+    setError('')
+    setNotice('')
+    try {
+      const rootTaskId = contract.root_task_id || detail.task.id
+      const prompt = input.mode === 'resume'
+        ? `Resolve elon.resume_context.v1 for parent_task_id=${detail.task.id} and root_task_id=${rootTaskId}.`
+        : input.prompt.trim()
+      const createInput: LocalTaskCreateInput = {
+        project_id: detail.task.project_id,
+        channel_id: detail.task.channel_id || undefined,
+        conversation_id: continuationConversationId(input.mode),
+        workspace_path: detail.task.workspace_path,
+        prompt,
+        runtime_permission: 'full_access',
+        supervision: {
+          protocol: 'elon.desktop_pc_supervision.v1',
+          supervisor: 'codex_desktop',
+          task_role: 'resume_original',
+          parent_task_id: detail.task.id,
+          root_task_id: rootTaskId,
+          acceptance_criteria: input.mode === 'resume' ? [] : input.acceptance_criteria,
+          improvement_policy: contract.improvement_policy === 'observe_only'
+            ? 'observe_only'
+            : contract.improvement_policy === 'after_task_only'
+              ? 'after_task_only'
+              : 'after_task_or_unblock',
+        },
+        contract_revision: input.mode === 'supersede' ? {
+          schema: 'elon.supervision.contract_revision.v1',
+          reason: input.reason.trim(),
+        } : undefined,
+      }
+      await ensureLocalFullAccessGrant({
+        adminUrl: safeNodeAdminUrl(),
+        projectId: createInput.project_id,
+        projectName: createInput.project_id,
+        workspacePath: createInput.workspace_path,
+        runtimePermission: createInput.runtime_permission,
+        useLocalRouteA: true,
+      })
+      const response = await createLocalTask(createInput)
+      const taskId = taskIdFromCreateResponse(response)
+      setNotice(input.mode === 'resume'
+        ? '已按最新有效合同继续原任务。'
+        : '已保存需求修订收据，并按新的完整目标开始承接。')
+      await refreshList(true)
+      if (taskId) setSelectedId(taskId)
+      return true
+    } catch (err) {
+      setError(errorMessage(err, input.mode === 'resume' ? '继续任务失败。' : '需求变更承接失败。'))
+      return false
+    } finally {
+      setActionKey('')
+    }
+  }
+
   async function handleDecision(approval: LocalTaskApproval, decision: LocalTaskApprovalDecision) {
     if (!selectedId || actionKey) return
     setActionKey(`approval:${approval.approval_id}`)
@@ -317,10 +382,16 @@ export default function LocalTasksPage() {
           actionKey={actionKey}
           onCancel={handleCancel}
           onDecision={handleDecision}
+          onContinue={handleContinue}
         />
       </div>
     </div>
   )
+}
+
+function continuationConversationId(mode: LocalTaskContinuationInput['mode']): string {
+  if (typeof crypto.randomUUID === 'function') return `desktop-${mode}-${crypto.randomUUID()}`
+  return `desktop-${mode}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
 
 function TaskListItem({
