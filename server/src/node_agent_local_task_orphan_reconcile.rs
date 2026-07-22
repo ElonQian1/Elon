@@ -25,7 +25,10 @@ use runtime_evidence::{journal_record_protects, sidecar_record_protects};
 const STALE_AFTER_MS: u128 = 2 * 60 * 1_000;
 const RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
 const COMPLETION_SCAN_LIMIT: usize = 1_000;
-const TERMINAL_REPAIR_LIMIT: usize = 128;
+// A production node can retain hundreds of rejected historical completions.
+// Repair remains opportunistic and fail-closed, but one pass must stay well
+// below the watchdog health window before moving on to live orphan rows.
+const TERMINAL_REPAIR_LIMIT: usize = 8;
 const STALE_CANDIDATE_LIMIT: usize = 256;
 const TERMINAL_JOURNAL_SYNC_LIMIT: usize = 1_000;
 
@@ -146,8 +149,15 @@ async fn repair_historical_terminal_candidate(
         &contract,
         &candidate.task_id,
     )?;
-    let admission =
-        crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire(&base)?;
+    let Some(admission) =
+        crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::try_acquire(&base)?
+    else {
+        info!(
+            task_id = %candidate.task_id,
+            "historical terminal repair deferred because Resume admission is busy"
+        );
+        return Ok(false);
+    };
     let task = runtime
         .local_tasks
         .get(&candidate.task_id)?

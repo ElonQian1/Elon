@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fs, path::Path, time::Duration};
 
 use super::*;
 use crate::node_agent_local_task_store::{LocalTaskStart, LocalTaskStore};
@@ -129,6 +129,105 @@ async fn malformed_terminal_repair_does_not_block_later_safe_orphan_reconciliati
     let _ = fs::remove_dir_all(root);
 }
 
+#[tokio::test]
+async fn contended_terminal_repair_does_not_wait_or_block_later_orphan() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-orphan-terminal-contention-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let base = root.join("base");
+    fs::create_dir_all(&root).unwrap();
+    git(&root, &["init", "-b", "main", base.to_str().unwrap()]);
+    let base = base.canonicalize().unwrap();
+    let runtime = test_runtime(&root);
+    for task_id in ["contended-terminal", "good-after-contention"] {
+        runtime
+            .local_tasks
+            .create(LocalTaskStart {
+                task_id,
+                owner_user_id: "owner",
+                agent_id: "agent",
+                install_id: "install",
+                project_id: "project",
+                channel_id: None,
+                conversation_id: task_id,
+                workspace_path: base.to_str().unwrap(),
+                prompt: "work",
+                cli: "codex",
+                runtime_permission: "full_access",
+            })
+            .unwrap();
+    }
+    runtime
+        .local_tasks
+        .record_initial_workspace_status(
+            "contended-terminal",
+            &serde_json::json!({
+                "platform_provenance": "elon.conversation_worktree.v1",
+                "root_task_id": "contended-terminal",
+                "base_workspace_path": base,
+                "active_workspace_path": base,
+            }),
+        )
+        .unwrap();
+    crate::node_agent_local_task_supervision::record_supervision_event(
+        &runtime.task_journal,
+        "contended-terminal",
+        "supervision_contract",
+        crate::node_agent_local_task_supervision::contract_payload(
+            &crate::node_agent_local_task_supervision::SupervisionContract {
+                protocol: crate::node_agent_local_task_supervision::SUPERVISION_PROTOCOL.into(),
+                supervisor: "codex_desktop".into(),
+                task_role: "requirement".into(),
+                parent_task_id: None,
+                root_task_id: Some("contended-terminal".into()),
+                acceptance_criteria: vec![],
+                improvement_policy: "after_task_only".into(),
+            },
+        ),
+    )
+    .unwrap();
+    rusqlite::Connection::open(root.join("tasks.sqlite3"))
+        .unwrap()
+        .execute(
+            "UPDATE local_tasks
+                SET status='done', completion_event_id='contended-event',
+                    sync_state='local_only', finished_at_ms=started_at_ms
+              WHERE task_id='contended-terminal'",
+            [],
+        )
+        .unwrap();
+    let admission =
+        crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard::acquire(&base).unwrap();
+
+    let started = std::time::Instant::now();
+    assert_eq!(reconcile_with_stale_after(&runtime, 0).await.unwrap(), 1);
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "maintenance reconciliation waited for interactive admission contention"
+    );
+    assert_eq!(
+        runtime
+            .local_tasks
+            .get("contended-terminal")
+            .unwrap()
+            .unwrap()
+            .status,
+        "done"
+    );
+    assert_eq!(
+        runtime
+            .local_tasks
+            .get("good-after-contention")
+            .unwrap()
+            .unwrap()
+            .status,
+        "resume_required"
+    );
+    drop(admission);
+    let _ = fs::remove_dir_all(root);
+}
+
 fn test_runtime(root: &Path) -> NodeRuntime {
     let mut runtime = NodeRuntime::new(
         crate::node_agent_config::NodeConfig {
@@ -156,4 +255,18 @@ fn test_runtime(root: &Path) -> NodeRuntime {
     runtime.update_recovery =
         crate::node_agent_update_recovery::UpdateRecoveryStore::new(root.join("recovery.json"));
     runtime
+}
+
+fn git(cwd: &Path, args: &[&str]) {
+    let output = crate::git_command_error::git_command()
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {} failed: {}",
+        args.join(" "),
+        String::from_utf8_lossy(&output.stderr)
+    );
 }

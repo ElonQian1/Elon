@@ -23,6 +23,28 @@ pub(crate) struct ResumeAdmissionGuard {
 }
 
 impl ResumeAdmissionGuard {
+    /// Maintenance scans must never spend the normal interactive Resume wait
+    /// budget on historical rows. Contention means another process is already
+    /// validating this repository, so the candidate remains fail-closed until
+    /// a later bounded pass.
+    pub(crate) fn try_acquire(base: &Path) -> Result<Option<Self>> {
+        let common = git_common_dir(base)?;
+        let path = common.join("elon-supervision-resume-admission.lock");
+        match try_lock(&path) {
+            Ok(file) => {
+                validate_locked_file(&path, &file)?;
+                Ok(Some(Self {
+                    _file: file,
+                    git_common_dir: common,
+                }))
+            }
+            Err(error) if is_contention(&error) => Ok(None),
+            Err(error) => {
+                Err(error).with_context(|| format!("获取监督 Resume 准入锁 {}", path.display()))
+            }
+        }
+    }
+
     pub(crate) fn acquire(base: &Path) -> Result<Self> {
         let common = git_common_dir(base)?;
         let path = common.join("elon-supervision-resume-admission.lock");
