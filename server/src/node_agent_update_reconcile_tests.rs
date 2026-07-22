@@ -191,3 +191,29 @@ fn release_and_task_identity_drift_fail_closed() {
         "install-a",
     ));
 }
+
+#[test]
+fn from_release_restart_is_deferred_instead_of_target_mismatch_failure() {
+    let mut receipt = UpdateRecoveryReceipt::planned("update-release", "root", "task");
+    receipt.from_release = crate::node_agent_update_recovery::ReleaseIdentity {
+        version: "0.3.70".to_string(),
+        git_sha: "from123".to_string(),
+    };
+    receipt.to_release = crate::node_agent_update_recovery::ReleaseIdentity {
+        version: "0.3.71".to_string(),
+        git_sha: "target456".to_string(),
+    };
+
+    assert_eq!(
+        release_relation(&receipt, "0.3.70+from123"),
+        ReleaseRelation::From
+    );
+    assert_eq!(
+        release_relation(&receipt, "0.3.71+target456"),
+        ReleaseRelation::Target
+    );
+    assert_eq!(
+        release_relation(&receipt, "0.3.72+foreign"),
+        ReleaseRelation::Other
+    );
+}

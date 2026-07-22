@@ -5,7 +5,12 @@
 //! remain held while a reviewer is unavailable. Dirty worktrees are never
 //! removed here; normal cleanup keeps preserving unknown changes.
 
-use std::{future::Future, path::Path, sync::Arc, time::Duration};
+use std::{
+    future::Future,
+    path::Path,
+    sync::{Arc, Mutex, OnceLock},
+    time::Duration,
+};
 
 use anyhow::{bail, Context, Result};
 use serde_json::json;
@@ -165,12 +170,13 @@ fn required_path<'a>(value: &'a serde_json::Value, field: &str) -> Result<&'a Pa
 pub(crate) async fn reconcile_all(runtime: &NodeRuntime) -> Result<usize> {
     let mut released = 0;
     let mut locked_candidates = 0;
-    for task in runtime
-        .local_tasks
-        .list_terminal_lease_candidates()?
-        .into_iter()
-        .take(PERIODIC_CANDIDATES_SCANNED_PER_PASS)
-    {
+    let candidates = {
+        let mut scan = terminal_scan_state()
+            .lock()
+            .map_err(|_| anyhow::anyhow!("terminal scan cursor lock poisoned"))?;
+        next_terminal_candidate_batch(&runtime.local_tasks, &mut scan)?
+    };
+    for task in candidates {
         if locked_candidates >= PERIODIC_LOCKED_CANDIDATES_PER_PASS {
             break;
         }
@@ -198,6 +204,44 @@ pub(crate) async fn reconcile_all(runtime: &NodeRuntime) -> Result<usize> {
         }
     }
     Ok(released)
+}
+
+#[derive(Default)]
+struct TerminalScanState {
+    cursor: Option<crate::node_agent_local_task_store::workspace::TerminalLeaseCursor>,
+    newest_seen: Option<crate::node_agent_local_task_store::workspace::TerminalLeaseCursor>,
+}
+
+fn terminal_scan_state() -> &'static Mutex<TerminalScanState> {
+    static STATE: OnceLock<Mutex<TerminalScanState>> = OnceLock::new();
+    STATE.get_or_init(|| Mutex::new(TerminalScanState::default()))
+}
+
+fn next_terminal_candidate_batch(
+    store: &crate::node_agent_local_task_store::LocalTaskStore,
+    scan: &mut TerminalScanState,
+) -> Result<Vec<crate::node_agent_local_task_store::LocalTaskRecord>> {
+    let newest = store
+        .list_terminal_lease_candidates_page(None, 1)?
+        .first()
+        .map(crate::node_agent_local_task_store::workspace::TerminalLeaseCursor::from_record);
+    if newest != scan.newest_seen {
+        scan.cursor = None;
+        scan.newest_seen = newest;
+    }
+    let mut page = store.list_terminal_lease_candidates_page(
+        scan.cursor.as_ref(),
+        PERIODIC_CANDIDATES_SCANNED_PER_PASS,
+    )?;
+    if page.is_empty() && scan.cursor.is_some() {
+        scan.cursor = None;
+        page = store
+            .list_terminal_lease_candidates_page(None, PERIODIC_CANDIDATES_SCANNED_PER_PASS)?;
+    }
+    scan.cursor = page
+        .last()
+        .map(crate::node_agent_local_task_store::workspace::TerminalLeaseCursor::from_record);
+    Ok(page)
 }
 
 fn candidate_has_lock(task: &crate::node_agent_local_task_store::LocalTaskRecord) -> Result<bool> {
@@ -340,7 +384,54 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::git_command_error::git_command;
+    use crate::{
+        git_command_error::git_command,
+        node_agent_local_task_store::{LocalTaskStart, LocalTaskStore},
+    };
+
+    #[test]
+    fn scan_wraps_and_preempts_backlog_for_a_new_cancelled_task() {
+        let root = std::env::temp_dir().join(format!("terminal-scan-{}", Uuid::new_v4().simple()));
+        let store = LocalTaskStore::new(root.join("tasks.sqlite3"));
+        create_cancelled(&store, &root, "older");
+        let mut scan = TerminalScanState::default();
+        assert_eq!(
+            next_terminal_candidate_batch(&store, &mut scan).unwrap()[0].task_id,
+            "older"
+        );
+        assert_eq!(
+            next_terminal_candidate_batch(&store, &mut scan).unwrap()[0].task_id,
+            "older",
+            "empty cursor page must wrap to the head"
+        );
+        std::thread::sleep(Duration::from_millis(2));
+        create_cancelled(&store, &root, "newly-cancelled");
+        assert_eq!(
+            next_terminal_candidate_batch(&store, &mut scan).unwrap()[0].task_id,
+            "newly-cancelled",
+            "a new terminal head must preempt an older pagination cursor"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    fn create_cancelled(store: &LocalTaskStore, root: &Path, task_id: &str) {
+        store
+            .create(LocalTaskStart {
+                task_id,
+                owner_user_id: "owner",
+                agent_id: "node",
+                install_id: "install",
+                project_id: "project",
+                channel_id: None,
+                conversation_id: task_id,
+                workspace_path: root.to_str().unwrap(),
+                prompt: "work",
+                cli: "codex",
+                runtime_permission: "full_access",
+            })
+            .unwrap();
+        assert!(store.mark_cancel_requested(task_id).unwrap());
+    }
 
     #[test]
     fn completed_terminal_status_releases_matching_root_lease() {

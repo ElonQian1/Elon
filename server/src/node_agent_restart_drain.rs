@@ -202,7 +202,11 @@ pub(crate) fn recover_checkpoint_after_startup(
                 .map(|receipt| (task_id.clone(), receipt.active_task_id().to_string()))
         })
         .collect::<std::collections::HashMap<_, _>>();
-    if !recover_checkpoint_state(&mut checkpoint, &recovered) {
+    if !recover_checkpoint_state(
+        &mut checkpoint,
+        &recovered,
+        &crate::node_agent_release_identity::current(),
+    ) {
         return;
     }
     let _ = save_checkpoint(&checkpoint);
@@ -222,7 +226,26 @@ fn auto_resume_state(state: crate::node_agent_update_recovery::UpdateRecoverySta
 fn recover_checkpoint_state(
     checkpoint: &mut RestartCheckpoint,
     recovered: &std::collections::HashMap<String, String>,
+    current_release_identity: &str,
 ) -> bool {
+    if matches!(checkpoint.state.as_str(), "applying" | "restart_scheduled")
+        && checkpoint
+            .target_release_identity
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_some_and(|target| !restart_target_matches(target, current_release_identity))
+    {
+        checkpoint.message = format!(
+            "from_release 运行时已重新启动，仍等待目标版本 {} 安装；未报告 runtime_online。",
+            checkpoint
+                .target_release_identity
+                .as_deref()
+                .unwrap_or_default()
+        );
+        checkpoint.updated_at_ms = now_ms();
+        return true;
+    }
     match checkpoint.state.as_str() {
         "applying" | "restart_scheduled" => checkpoint.transition(
             "runtime_online",
@@ -256,6 +279,12 @@ fn recover_checkpoint_state(
         _ => return false,
     }
     true
+}
+
+fn restart_target_matches(target: &str, current: &str) -> bool {
+    let target = target.trim();
+    let current = current.trim();
+    current == target || current.starts_with(&format!("{target}+"))
 }
 
 pub(crate) fn status_payload() -> Value {
@@ -293,50 +322,83 @@ fn drain_task_disposition(
     replayable_sidecar: bool,
     safe_receipt: bool,
 ) -> DrainTaskDisposition {
-    if !durable_running || !handle_fresh {
+    if !durable_running {
         DrainTaskDisposition::Stale
     } else if replayable_sidecar || safe_receipt {
         DrainTaskDisposition::Recoverable
-    } else {
+    } else if handle_fresh {
         DrainTaskDisposition::Blocking
+    } else {
+        DrainTaskDisposition::Stale
     }
 }
 
 async fn classify_supervised_tasks(runtime: &NodeRuntime) -> DrainClassification {
     let active = runtime.active_cli_prompts.views_without_approvals().await;
+    let active = active
+        .into_iter()
+        .map(|task| (task.req_id.clone(), task))
+        .collect::<std::collections::HashMap<_, _>>();
     let now = now_ms();
     let mut result = DrainClassification::default();
-    for task in active {
+    let tasks = match runtime.local_tasks.list_update_candidates() {
+        Ok(tasks) => tasks,
+        Err(_) => {
+            for task in active.values() {
+                if crate::node_agent_local_task_supervision::load_supervision_state(
+                    &runtime.task_journal,
+                    &task.req_id,
+                )
+                .ok()
+                .is_some_and(|state| state.enabled)
+                {
+                    result.blocking.push(task.req_id.clone());
+                }
+            }
+            result.blocking.sort();
+            result.blocking.dedup();
+            return result;
+        }
+    };
+    for task in tasks {
         let supervised = crate::node_agent_local_task_supervision::load_supervision_state(
             &runtime.task_journal,
-            &task.req_id,
+            &task.task_id,
         )
         .ok()
         .is_some_and(|state| state.enabled);
         if !supervised {
             continue;
         }
-        let durable_running = runtime
-            .local_tasks
-            .get(&task.req_id)
-            .ok()
-            .flatten()
-            .is_some_and(|record| matches!(record.status.as_str(), "running" | "cancel_requested"));
-        let handle_fresh =
-            now.saturating_sub(task.last_heartbeat_ms) <= ACTIVE_HANDLE_STALE_AFTER_MS;
-        let replayable_sidecar = runtime
+        let durable_running = matches!(
+            task.status.as_str(),
+            "running" | "recovering" | "reattaching" | "cancel_requested"
+        );
+        let handle_fresh = active.get(&task.task_id).is_some_and(|handle| {
+            handle.control_handle_live
+                && now.saturating_sub(handle.last_heartbeat_ms) <= ACTIVE_HANDLE_STALE_AFTER_MS
+        });
+        let sidecar = runtime
             .cli_sidecars
-            .session_for_task(&task.req_id)
+            .session_for_task(&task.task_id)
             .ok()
-            .flatten()
-            .is_some_and(|sidecar| sidecar.can_replay_output_at(now));
+            .flatten();
+        let replayable_sidecar = sidecar
+            .as_ref()
+            .is_some_and(|sidecar| sidecar.can_replay_after_restart_at(now));
         let safe_receipt = runtime
             .update_recovery
-            .receipt_for_task(&task.req_id)
+            .receipt_for_task(&task.task_id)
             .ok()
             .flatten()
             .is_some_and(|receipt| {
-                receipt.safety.evidence_complete && !receipt.state.is_terminal()
+                receipt.safety.evidence_complete
+                    && matches!(
+                        receipt.state,
+                        crate::node_agent_update_recovery::UpdateRecoveryState::Reattaching
+                            | crate::node_agent_update_recovery::UpdateRecoveryState::ResumeCreated
+                            | crate::node_agent_update_recovery::UpdateRecoveryState::Resumed
+                    )
             });
         match drain_task_disposition(
             durable_running,
@@ -345,11 +407,37 @@ async fn classify_supervised_tasks(runtime: &NodeRuntime) -> DrainClassification
             safe_receipt,
         ) {
             DrainTaskDisposition::Stale => {
-                result.stale.push(task.req_id.clone());
-                let _ = runtime.active_cli_prompts.remove(&task.req_id).await;
+                result.stale.push(task.task_id.clone());
+                let context = json!({
+                    "state": "resume_required",
+                    "reason": "stale_runtime_and_sidecar",
+                    "sidecar_session_id": sidecar.as_ref().map(|value| value.session_id.as_str()),
+                    "sidecar_pid": sidecar.as_ref().and_then(|value| value.sidecar_pid),
+                    "child_pid": sidecar.as_ref().and_then(|value| value.child_pid),
+                    "journal_preserved": true,
+                    "workspace_preserved": true,
+                    "root_lease_preserved": true,
+                });
+                let reason = "监督任务没有活动运行句柄，且记录的 sidecar/CLI 进程均不存活；现场已保留并转入 Resume";
+                if runtime
+                    .local_tasks
+                    .mark_stale_sidecar_resume_required(&task.task_id, reason, &context)
+                    .unwrap_or(false)
+                {
+                    let _ = crate::node_agent_local_task_supervision::record_supervision_event(
+                        &runtime.task_journal,
+                        &task.task_id,
+                        "supervision_stale_runtime_resume_required",
+                        context,
+                    );
+                }
+                let _ = runtime
+                    .cli_sidecars
+                    .mark_task_resume_required(&task.task_id);
+                let _ = runtime.active_cli_prompts.remove(&task.task_id).await;
             }
-            DrainTaskDisposition::Recoverable => result.recoverable.push(task.req_id),
-            DrainTaskDisposition::Blocking => result.blocking.push(task.req_id),
+            DrainTaskDisposition::Recoverable => result.recoverable.push(task.task_id),
+            DrainTaskDisposition::Blocking => result.blocking.push(task.task_id),
         }
     }
     result.blocking.sort();
@@ -436,14 +524,19 @@ mod tests {
     fn startup_recovery_distinguishes_drained_and_interrupted_updates() {
         let mut applying = RestartCheckpoint::draining("test", Vec::new(), None, None);
         applying.transition("applying", "ready");
-        assert!(recover_checkpoint_state(&mut applying, &Default::default()));
+        assert!(recover_checkpoint_state(
+            &mut applying,
+            &Default::default(),
+            "test-release"
+        ));
         assert_eq!(applying.state, "runtime_online");
 
         let mut scheduled = RestartCheckpoint::draining("test", Vec::new(), None, None);
         scheduled.transition("restart_scheduled", "ready");
         assert!(recover_checkpoint_state(
             &mut scheduled,
-            &Default::default()
+            &Default::default(),
+            "test-release"
         ));
         assert_eq!(scheduled.state, "runtime_online");
 
@@ -451,7 +544,8 @@ mod tests {
             RestartCheckpoint::draining("test", vec!["local-task-2".to_string()], None, None);
         assert!(recover_checkpoint_state(
             &mut interrupted,
-            &Default::default()
+            &Default::default(),
+            "test-release"
         ));
         assert_eq!(interrupted.state, "resume_required");
         assert!(interrupted.message.contains("Resume"));
@@ -469,11 +563,36 @@ mod tests {
             "local-original".to_string(),
             "local-resume-generation-2".to_string(),
         )]);
-        assert!(recover_checkpoint_state(&mut checkpoint, &recovered));
+        assert!(recover_checkpoint_state(
+            &mut checkpoint,
+            &recovered,
+            "test-release"
+        ));
         assert_eq!(checkpoint.state, "resumed");
         assert_eq!(checkpoint.active_task_ids, ["local-resume-generation-2"]);
         assert_eq!(checkpoint.payload()["resume_actions"], json!([]));
         assert!(checkpoint.message.contains("无需手动 Resume"));
+    }
+
+    #[test]
+    fn from_release_restart_waits_for_target_without_reporting_online() {
+        let mut checkpoint = RestartCheckpoint::draining(
+            "test",
+            Vec::new(),
+            None,
+            Some("0.4.0+targetsha".to_string()),
+        );
+        checkpoint.transition("restart_scheduled", "ready");
+
+        assert!(recover_checkpoint_state(
+            &mut checkpoint,
+            &Default::default(),
+            "0.3.9+fromsha"
+        ));
+
+        assert_eq!(checkpoint.state, "restart_scheduled");
+        assert!(checkpoint.message.contains("等待目标版本"));
+        assert!(!checkpoint.message.contains("runtime_online"));
     }
 
     #[test]

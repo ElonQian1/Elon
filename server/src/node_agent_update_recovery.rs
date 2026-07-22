@@ -767,6 +767,9 @@ fn now_ms() -> u128 {
         .unwrap_or_default()
 }
 
+#[path = "node_agent_update_recovery_runtime.rs"]
+mod runtime;
+
 #[cfg(test)]
 #[path = "node_agent_update_recovery_tests.rs"]
 mod tests;

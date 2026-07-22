@@ -171,6 +171,10 @@ impl CliSidecarRegistry {
         })
     }
 
+    pub(crate) fn mark_task_resume_required(&self, task_id: &str) -> Result<bool> {
+        self.mark_task_terminal(task_id, "resume_required")
+    }
+
     pub(crate) fn record_output_cursor(
         &self,
         task_id: &str,
@@ -590,6 +594,25 @@ impl CliSidecarSessionRecord {
             self.state.trim().to_ascii_lowercase().as_str(),
             "running" | "waiting_approval" | "cancel_requested"
         ) && now_ms.saturating_sub(self.last_seen_at_ms) <= SIDECAR_STALE_AFTER_MS
+    }
+
+    /// A persisted heartbeat alone cannot prove liveness after a runtime
+    /// restart. At least one recorded process must still exist before startup
+    /// recovery treats the sidecar as a live control surface.
+    pub(crate) fn recorded_process_is_live(&self) -> bool {
+        [self.sidecar_pid, self.child_pid]
+            .into_iter()
+            .flatten()
+            .any(crate::node_agent_cli_worker::process_is_running)
+    }
+
+    pub(crate) fn can_replay_after_restart_at(&self, _now_ms: u128) -> bool {
+        self.capabilities.output_stream_replay
+            && matches!(
+                self.state.trim().to_ascii_lowercase().as_str(),
+                "running" | "waiting_approval" | "cancel_requested"
+            )
+            && self.recorded_process_is_live()
     }
 
     pub(crate) fn is_terminal(&self) -> bool {

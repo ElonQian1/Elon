@@ -447,11 +447,13 @@ async fn run_agent_runtime() -> Result<()> {
     runtime.reconcile_local_completion_outbox();
     node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
     node_agent_restart_drain::recover_checkpoint_after_startup(&runtime.update_recovery);
-    if let Err(error) = runtime
+    match runtime
         .update_recovery
-        .set_install_gate_phase("runtime_online", Some("new node runtime is online"))
+        .mark_runtime_online_if_target(&node_agent_release_identity::current())
     {
-        warn!(%error, "记录节点更新 runtime-online 阶段失败");
+        Ok(true) => {}
+        Ok(false) => warn!("当前仍是 from_release 运行时，保持更新门禁等待目标版本"),
+        Err(error) => warn!(%error, "记录节点更新 runtime-online 阶段失败"),
     }
     runtime.spawn_lifecycle_heartbeat();
     node_agent_cancel_saga::spawn_reconciler(runtime.clone());

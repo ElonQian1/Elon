@@ -12,8 +12,7 @@ pub(crate) mod reconcile;
 #[path = "node_agent_local_task_store_safety.rs"]
 mod safety;
 #[path = "node_agent_local_task_store_workspace.rs"]
-mod workspace;
-
+pub(crate) mod workspace;
 #[derive(Clone, Debug)]
 pub(crate) struct LocalTaskStore {
     path: PathBuf,
@@ -306,7 +305,8 @@ impl LocalTaskStore {
     pub(crate) fn list_update_candidates(&self) -> Result<Vec<LocalTaskRecord>> {
         let conn = self.open()?;
         let mut stmt = conn.prepare(&format!(
-            "{} WHERE status IN ('running','recovering') ORDER BY started_at_ms",
+            "{} WHERE status IN ('running','recovering','reattaching','cancel_requested')
+             ORDER BY started_at_ms",
             select_sql()
         ))?;
         let records = stmt

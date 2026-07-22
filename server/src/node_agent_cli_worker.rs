@@ -188,12 +188,14 @@ fn same_path(left: &Path, right: &Path) -> bool {
 }
 
 #[cfg(windows)]
-fn process_is_running(process_id: u32) -> bool {
+pub(crate) fn process_is_running(process_id: u32) -> bool {
     use std::ffi::c_void;
     const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+    const STILL_ACTIVE: u32 = 259;
 
     extern "system" {
         fn OpenProcess(desired_access: u32, inherit_handle: i32, process_id: u32) -> *mut c_void;
+        fn GetExitCodeProcess(process: *mut c_void, exit_code: *mut u32) -> i32;
         fn CloseHandle(handle: *mut c_void) -> i32;
     }
 
@@ -202,14 +204,17 @@ fn process_is_running(process_id: u32) -> bool {
         if handle.is_null() {
             false
         } else {
+            let mut exit_code = 0_u32;
+            let running =
+                GetExitCodeProcess(handle, &mut exit_code) != 0 && exit_code == STILL_ACTIVE;
             CloseHandle(handle);
-            true
+            running
         }
     }
 }
 
 #[cfg(not(windows))]
-fn process_is_running(process_id: u32) -> bool {
+pub(crate) fn process_is_running(process_id: u32) -> bool {
     process_id == std::process::id() || Path::new(&format!("/proc/{process_id}")).exists()
 }
 

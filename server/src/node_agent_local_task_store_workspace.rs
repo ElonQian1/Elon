@@ -5,9 +5,63 @@ use std::path::{Path, PathBuf};
 use anyhow::{anyhow, bail, Context, Result};
 use rusqlite::{params, OptionalExtension, Transaction};
 
-use super::{read_record, select_sql, LocalTaskRecord, LocalTaskStore};
+use super::{now_ms, read_record, select_sql, LocalTaskRecord, LocalTaskStore};
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct TerminalLeaseCursor {
+    pub(crate) terminal_at_ms: i64,
+    pub(crate) task_id: String,
+}
+
+impl TerminalLeaseCursor {
+    pub(crate) fn from_record(record: &LocalTaskRecord) -> Self {
+        Self {
+            terminal_at_ms: record.finished_at_ms.unwrap_or(record.started_at_ms),
+            task_id: record.task_id.clone(),
+        }
+    }
+}
 
 impl LocalTaskStore {
+    /// Atomically preserve the workspace/root recovery context while moving a
+    /// dead sidecar task out of the misleading running state.
+    pub(crate) fn mark_stale_sidecar_resume_required(
+        &self,
+        task_id: &str,
+        reason: &str,
+        recovery_context: &serde_json::Value,
+    ) -> Result<bool> {
+        let mut conn = self.open()?;
+        let tx = conn.transaction()?;
+        let workspace_status: Option<String> = tx
+            .query_row(
+                "SELECT workspace_status_json FROM local_tasks WHERE task_id = ?1",
+                params![task_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let mut workspace_status = workspace_status
+            .as_deref()
+            .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
+            .unwrap_or_else(|| serde_json::json!({}));
+        if let Some(object) = workspace_status.as_object_mut() {
+            object.insert("restart_recovery".to_string(), recovery_context.clone());
+        }
+        let encoded = serde_json::to_string(&workspace_status)?;
+        let changed = tx.execute(
+            "UPDATE local_tasks
+                SET status = 'resume_required', error = ?2,
+                    finished_at_ms = ?3, sync_state = 'local_only',
+                    workspace_status_json = ?4
+              WHERE task_id = ?1
+                AND completion_event_id IS NULL
+                AND status IN ('running','recovering','reattaching')",
+            params![task_id, reason, now_ms(), encoded],
+        )?;
+        tx.commit()?;
+        Ok(changed > 0)
+    }
+
     pub(crate) fn record_initial_workspace_status(
         &self,
         task_id: &str,
@@ -32,17 +86,43 @@ impl LocalTaskStore {
         Ok(records)
     }
 
-    pub(crate) fn list_terminal_lease_candidates(&self) -> Result<Vec<LocalTaskRecord>> {
+    pub(crate) fn list_terminal_lease_candidates_page(
+        &self,
+        cursor: Option<&TerminalLeaseCursor>,
+        limit: usize,
+    ) -> Result<Vec<LocalTaskRecord>> {
         let conn = self.open()?;
-        let mut stmt = conn.prepare(&format!(
-            "{} WHERE status IN ('done','failed','canceled','finished','cancel_requested')
-             ORDER BY started_at_ms DESC",
-            select_sql()
-        ))?;
-        let records = stmt
-            .query_map([], read_record)?
-            .collect::<rusqlite::Result<Vec<_>>>()
-            .map_err(anyhow::Error::from)?;
+        let limit = limit.clamp(1, 100) as i64;
+        let records = if let Some(cursor) = cursor {
+            let mut stmt = conn.prepare(&format!(
+                "{} WHERE status IN ('done','failed','canceled','cancelled','finished','cancel_requested')
+                   AND (COALESCE(finished_at_ms, started_at_ms) < ?1
+                     OR (COALESCE(finished_at_ms, started_at_ms) = ?1 AND task_id < ?2))
+                 ORDER BY COALESCE(finished_at_ms, started_at_ms) DESC, task_id DESC
+                 LIMIT ?3",
+                select_sql()
+            ))?;
+            let records = stmt
+                .query_map(
+                    params![cursor.terminal_at_ms, &cursor.task_id, limit],
+                    read_record,
+                )?
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(anyhow::Error::from)?;
+            records
+        } else {
+            let mut stmt = conn.prepare(&format!(
+                "{} WHERE status IN ('done','failed','canceled','cancelled','finished','cancel_requested')
+                 ORDER BY COALESCE(finished_at_ms, started_at_ms) DESC, task_id DESC
+                 LIMIT ?1",
+                select_sql()
+            ))?;
+            let records = stmt
+                .query_map(params![limit], read_record)?
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(anyhow::Error::from)?;
+            records
+        };
         Ok(records)
     }
 }
@@ -455,6 +535,90 @@ mod tests {
                 .unwrap()
                 .contains("禁止 Resume"));
         }
+    }
+
+    #[test]
+    fn stale_sidecar_transition_preserves_workspace_and_root_lease_context() {
+        let fixture = Fixture::new("stale-sidecar");
+        let context = json!({
+            "root_task_id": "root", "sidecar_session_id": "sidecar-1",
+            "journal_cursor": 42, "sidecar_output_offset": 84
+        });
+        assert!(fixture
+            .store
+            .mark_stale_sidecar_resume_required("task", "dead sidecar", &context)
+            .unwrap());
+        let record = fixture.store.get("task").unwrap().unwrap();
+        assert_eq!(record.status, "resume_required");
+        assert_eq!(
+            record.workspace_status.unwrap()["restart_recovery"],
+            context
+        );
+        assert!(fixture.active.is_dir());
+        assert!(
+            crate::node_agent_supervision_worktree_lease::worktree_lock_reason(
+                &fixture.base,
+                &fixture.active,
+            )
+            .unwrap()
+            .is_some()
+        );
+    }
+
+    #[test]
+    fn terminal_pages_use_finish_time_include_cancelled_and_reach_empty_page() {
+        let root = std::env::temp_dir().join(format!("terminal-pages-{}", Uuid::new_v4().simple()));
+        let store = LocalTaskStore::new(root.join("tasks.sqlite3"));
+        for task_id in [
+            "old-start-new-finish",
+            "recent-start-old-finish",
+            "cancelled",
+        ] {
+            store
+                .create(LocalTaskStart {
+                    task_id,
+                    owner_user_id: "owner",
+                    agent_id: "node",
+                    install_id: "install",
+                    project_id: "project",
+                    channel_id: None,
+                    conversation_id: task_id,
+                    workspace_path: root.to_str().unwrap(),
+                    prompt: "work",
+                    cli: "codex",
+                    runtime_permission: "full_access",
+                })
+                .unwrap();
+        }
+        let conn = store.open().unwrap();
+        conn.execute(
+            "UPDATE local_tasks SET status='done', started_at_ms=1, finished_at_ms=300 WHERE task_id='old-start-new-finish'",
+            [],
+        ).unwrap();
+        conn.execute(
+            "UPDATE local_tasks SET status='done', started_at_ms=200, finished_at_ms=100 WHERE task_id='recent-start-old-finish'",
+            [],
+        ).unwrap();
+        conn.execute(
+            "UPDATE local_tasks SET status='cancelled', started_at_ms=150, finished_at_ms=200 WHERE task_id='cancelled'",
+            [],
+        ).unwrap();
+        drop(conn);
+
+        let first = store.list_terminal_lease_candidates_page(None, 2).unwrap();
+        assert_eq!(first[0].task_id, "old-start-new-finish");
+        assert_eq!(first[1].task_id, "cancelled");
+        let cursor = TerminalLeaseCursor::from_record(first.last().unwrap());
+        let second = store
+            .list_terminal_lease_candidates_page(Some(&cursor), 2)
+            .unwrap();
+        assert_eq!(second[0].task_id, "recent-start-old-finish");
+        let cursor = TerminalLeaseCursor::from_record(second.last().unwrap());
+        assert!(store
+            .list_terminal_lease_candidates_page(Some(&cursor), 2)
+            .unwrap()
+            .is_empty());
+        let _ = fs::remove_dir_all(root);
     }
 
     fn completion(event: &str) -> CliCompletionEnvelope {

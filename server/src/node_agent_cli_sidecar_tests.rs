@@ -260,6 +260,17 @@ fn sidecar_registry_process_writer_helper() {
     }
 }
 
+#[test]
+fn restart_replay_requires_a_live_recorded_process_not_only_a_fresh_heartbeat() {
+    let mut record = session("live-session", "live-task");
+    assert!(record.can_replay_after_restart_at(now_ms()));
+    record.sidecar_pid = None;
+    record.child_pid = None;
+    record.last_seen_at_ms = now_ms();
+    assert!(record.is_live_at(now_ms()));
+    assert!(!record.can_replay_after_restart_at(now_ms()));
+}
+
 fn session(session_id: &str, task_id: &str) -> CliSidecarSessionRecord {
     CliSidecarSessionRecord::managed_pipe_json(
         session_id,

@@ -76,6 +76,28 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, receipt: UpdateRecoveryReceipt
         )?;
         return Ok(());
     }
+    match release_relation(&receipt, &crate::node_agent_release_identity::current()) {
+        ReleaseRelation::Target => {}
+        ReleaseRelation::From => {
+            // The old process can briefly win the restart race before the
+            // launcher installs the target. Keep the transaction recoverable;
+            // it is neither target-online nor a target identity failure.
+            return Ok(());
+        }
+        ReleaseRelation::Other => {
+            let reason = "节点更新恢复已熔断：节点发布身份既不是 from_release 也不是目标 release";
+            runtime
+                .local_tasks
+                .mark_recovery_blocked(&active_task_id, reason)?;
+            return set_recovery_state(
+                &runtime.update_recovery,
+                &update_id,
+                &original_task_id,
+                UpdateRecoveryState::Failed,
+                reason,
+            );
+        }
+    }
     if let Err(error) = validate_local_recovery(&runtime, &task, &receipt).await {
         let reason = format!("节点更新恢复已熔断：{error}");
         runtime
@@ -211,14 +233,24 @@ async fn validate_local_recovery(
         ),
         "任务 owner/agent/install 身份不匹配"
     );
-    anyhow::ensure!(
-        release_identity_matches(
-            &receipt.to_release,
-            &crate::node_agent_release_identity::current(),
-        ),
-        "节点发布身份与恢复回执目标不匹配"
-    );
     Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ReleaseRelation {
+    Target,
+    From,
+    Other,
+}
+
+fn release_relation(receipt: &UpdateRecoveryReceipt, current: &str) -> ReleaseRelation {
+    if release_identity_matches(&receipt.to_release, current) {
+        ReleaseRelation::Target
+    } else if release_identity_matches(&receipt.from_release, current) {
+        ReleaseRelation::From
+    } else {
+        ReleaseRelation::Other
+    }
 }
 
 fn recovery_task_identity_matches(

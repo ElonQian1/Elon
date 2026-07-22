@@ -242,3 +242,27 @@ fn invalid_state_skip_is_rejected() {
         .expect_err("planned cannot skip durable checkpoint");
     assert!(error.to_string().contains("Planned -> Applying"));
 }
+
+#[test]
+fn old_runtime_cannot_advance_target_install_gate() {
+    let (root, store) = temp_store();
+    let mut receipt = UpdateRecoveryReceipt::planned("update-target", "root", "task");
+    receipt.state = UpdateRecoveryState::Applying;
+    receipt.from_release = ReleaseIdentity {
+        version: "1.0.0".into(),
+        git_sha: "fromsha".into(),
+    };
+    receipt.to_release = ReleaseIdentity {
+        version: "1.1.0".into(),
+        git_sha: "tosha".into(),
+    };
+    store.upsert(receipt).unwrap();
+
+    assert!(!store
+        .mark_runtime_online_if_target("1.0.0+fromsha")
+        .unwrap());
+    assert_ne!(store.load().unwrap().install_gate.phase, "runtime_online");
+    assert!(store.mark_runtime_online_if_target("1.1.0+tosha").unwrap());
+    assert_eq!(store.load().unwrap().install_gate.phase, "runtime_online");
+    let _ = std::fs::remove_dir_all(root);
+}

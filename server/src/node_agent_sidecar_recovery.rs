@@ -61,12 +61,11 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
     if !recoverable_sidecar_task_status(&task.status) {
         return Ok(());
     }
-    let Some(output_path) = session.endpoint.as_deref().map(Path::new) else {
-        return Ok(());
-    };
-    if !output_path.is_file() {
-        return Ok(());
-    }
+    let output_path = session
+        .endpoint
+        .as_deref()
+        .map(Path::new)
+        .filter(|path| path.is_file());
     if runtime
         .update_recovery
         .receipt_for_task(&task.task_id)?
@@ -75,18 +74,30 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
         return Ok(());
     }
 
-    let terminal_output = output_contains_terminal_record(output_path)?;
+    let terminal_output = output_path
+        .map(output_contains_terminal_record)
+        .transpose()?
+        .unwrap_or(false);
     let receipt = ensure_recovery_receipt(&runtime, &task, &session)?;
     if !terminal_output {
-        if session.is_live_at(now_ms()) && receipt.is_some() {
+        let live_runtime_handle = runtime
+            .active_cli_prompt_view(&task.task_id)
+            .await
+            .is_some_and(|handle| handle.control_handle_live);
+        if (live_runtime_handle || session.can_replay_after_restart_at(now_ms()))
+            && receipt.is_some()
+        {
             info!(task_id = %task.task_id, "发现更新后仍存活的 sidecar，交由恢复事务重接");
+            return Ok(());
         }
+        move_stale_sidecar_to_resume_required(&runtime, &task, &session, receipt.as_ref())?;
         return Ok(());
     }
 
     if bind_existing_completion(&runtime, &task).await? {
         return Ok(());
     }
+    let output_path = output_path.context("sidecar 终态输出文件缺失")?;
     prepare_receipt_for_terminal_replay(&runtime, &task.task_id)?;
     let (cancel_tx, mut cancel_rx) = watch::channel(false);
     let _cancel_tx = cancel_tx;
@@ -225,6 +236,67 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
             }
         }
     }
+    Ok(())
+}
+
+fn move_stale_sidecar_to_resume_required(
+    runtime: &NodeRuntime,
+    task: &LocalTaskRecord,
+    session: &CliSidecarSessionRecord,
+    receipt: Option<&UpdateRecoveryReceipt>,
+) -> Result<()> {
+    let reason = "sidecar 与 CLI 子进程均已退出且没有可靠 exit 记录；工作区、journal、root lease 与恢复游标已保留，请使用 Resume 继续";
+    let root_task_id = receipt
+        .map(|value| value.root_task_id.clone())
+        .or_else(|| {
+            load_supervision_contract(&runtime.task_journal, &task.task_id)
+                .ok()
+                .flatten()
+                .and_then(|contract| contract.root_task_id)
+        })
+        .unwrap_or_else(|| task.task_id.clone());
+    let context = serde_json::json!({
+        "state": "resume_required",
+        "reason": "stale_sidecar_without_exit_record",
+        "root_task_id": root_task_id,
+        "sidecar_session_id": session.session_id,
+        "sidecar_pid": session.sidecar_pid,
+        "child_pid": session.child_pid,
+        "sidecar_last_seen_at_ms": session.last_seen_at_ms,
+        "journal_preserved": true,
+        "workspace_preserved": true,
+        "root_lease_preserved": true,
+        "sidecar_output_offset": session.output_offset,
+        "sidecar_output_sequence": session.output_sequence,
+    });
+    if runtime
+        .local_tasks
+        .mark_stale_sidecar_resume_required(&task.task_id, reason, &context)?
+    {
+        crate::node_agent_local_task_supervision::record_supervision_event(
+            &runtime.task_journal,
+            &task.task_id,
+            "supervision_stale_sidecar_resume_required",
+            context,
+        )?;
+    }
+    let _ = runtime
+        .cli_sidecars
+        .mark_task_resume_required(&task.task_id);
+    if let Some(receipt) = receipt {
+        runtime.update_recovery.update(
+            &receipt.update_id,
+            &receipt.original_task_id,
+            |current| {
+                if !current.state.is_terminal() {
+                    current.transition(UpdateRecoveryState::Paused, Some(reason))?;
+                    current.resume_strategy = Some("resume_required_stale_sidecar".to_string());
+                }
+                Ok(())
+            },
+        )?;
+    }
+    info!(task_id = %task.task_id, "moved stale persisted sidecar task to resume_required");
     Ok(())
 }
 
