@@ -339,11 +339,12 @@ async fn real_headless_fixture_uses_ephemeral_local_storage_auth() {
     )
     .unwrap();
     let (url, server) = fixture(
-        r#"<!doctype html><body><form id="login"><input type="password"></form><script>if(localStorage.getItem('lodex_token')==='fixture-token'){document.body.innerHTML='<main id="ready">authenticated</main>'}</script></body>"#,
+        r#"<!doctype html><body><form id="login"><input type="password"></form><script>if(localStorage.getItem('lodex_token')==='fixture-token'){setTimeout(()=>{document.querySelector('#login').style.display='none';document.body.insertAdjacentHTML('beforeend','<main id="ready">authenticated</main>')},200)}</script></body>"#,
     )
     .await;
     let mut capture_input = input(url);
     capture_input.auth_profile = Some("fixture_auth".to_string());
+    capture_input.wait_for.settle_ms = 500;
     let result = capture(root.to_str().unwrap(), capture_input).await;
     if result.pointer("/diagnostic/code").and_then(Value::as_str) == Some("BROWSER_NOT_FOUND") {
         server.abort();

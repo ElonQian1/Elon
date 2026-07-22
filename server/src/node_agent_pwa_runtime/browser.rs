@@ -282,8 +282,13 @@ async fn wait_for_page(
         r#"(() => {{
           const waitSelector = {wait_selector}; const authSelector = {auth_selector};
           const query = (selector) => {{ if (!selector) return true; try {{ return !!document.querySelector(selector); }} catch (_) {{ return null; }} }};
+          const visible = (element) => {{
+            if (!element) return false;
+            const style = getComputedStyle(element); const rect = element.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0' && rect.width > 0 && rect.height > 0;
+          }};
           return {{ readyState: document.readyState, waitFound: query(waitSelector), authReady: query(authSelector),
-            authForm: !!document.querySelector('input[type="password"], form[action*="login" i], form[action*="signin" i]'), href: location.href }};
+            authForm: Array.from(document.querySelectorAll('input[type="password"], form[action*="login" i], form[action*="signin" i]')).some(visible), href: location.href }};
         }})()"#
     );
     let mut network = NetworkState::new();
@@ -312,17 +317,6 @@ async fn wait_for_page(
             .get("href")
             .and_then(Value::as_str)
             .unwrap_or_default();
-        let auth_failed = network
-            .document_status
-            .is_some_and(|status| matches!(status, 401 | 403))
-            || value
-                .get("authForm")
-                .and_then(Value::as_bool)
-                .unwrap_or(false)
-            || looks_like_login_route(href);
-        if auth_failed {
-            return Err(auth_failure(prepared));
-        }
         let ready_state = value
             .get("readyState")
             .and_then(Value::as_str)
@@ -337,6 +331,18 @@ async fn wait_for_page(
                         >= Duration::from_millis(prepared.wait_for.settle_ms)
             }
         };
+        let auth_failed = network
+            .document_status
+            .is_some_and(|status| matches!(status, 401 | 403))
+            || looks_like_login_route(href)
+            || (ready
+                && value
+                    .get("authForm")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false));
+        if auth_failed {
+            return Err(auth_failure(prepared));
+        }
         let wait_found = value
             .get("waitFound")
             .and_then(Value::as_bool)
