@@ -112,10 +112,11 @@
 }
 
 .featuredRail {
+  --featured-card-width: min(65.6vw, 460px);
   display: flex;
   gap: 22px;
   overflow-x: auto;
-  padding: 4px 23vw 8px var(--plaza-side);
+  padding: 4px max(23vw, calc(100% - var(--plaza-side) - var(--featured-card-width))) 8px var(--plaza-side);
   scroll-padding-inline: var(--plaza-side);
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
@@ -125,12 +126,25 @@
   display: none;
 }
 
-.featuredCard {
-  position: relative;
-  flex: 0 0 min(65.6vw, 460px);
+.featuredCardSlot {
+  flex: 0 0 var(--featured-card-width);
   aspect-ratio: 837 / 943;
-  overflow: hidden;
   scroll-snap-align: start;
+}
+
+.featuredCard {
+  --featured-card-scale: .9;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  transform: scale(var(--featured-card-scale));
+  transform-origin: center;
+  will-change: transform;
+}
+
+.featuredCardSlot:first-child .featuredCard {
+  --featured-card-scale: 1;
 }
 
 .featuredSurface {
@@ -406,12 +420,9 @@
     --plaza-side: clamp(32px, 6vw, 72px);
   }
 
-  .featuredCard {
-    flex-basis: min(38vw, 460px);
-  }
-
   .featuredRail {
-    padding-right: 20vw;
+    --featured-card-width: min(38vw, 460px);
+    padding-right: max(20vw, calc(100% - var(--plaza-side) - var(--featured-card-width)));
   }
 }
 
@@ -420,11 +431,11 @@
     min-height: 78px;
   }
 
-  .featuredCard {
-    flex-basis: 65.6vw;
-  }
+  .featuredRail { --featured-card-width: 65.6vw; }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .featuredRail { scroll-behavior: auto; }
+  .featuredCard { transition: none; }
   .spinner { animation-duration: 1600ms; }
 }

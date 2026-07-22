@@ -340,19 +340,22 @@ internal class MainMarketplaceActions(
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
     }
 
-    private fun buildFeaturedStrip(projects: List<StoreProject>) = HorizontalScrollView(activity).apply {
-        isHorizontalScrollBarEnabled = false
-        overScrollMode = View.OVER_SCROLL_NEVER
-        clipToPadding = false
-        setPadding(dp(PLAZA_SIDE_MARGIN_DP), 0, dp(PLAZA_TRAILING_PADDING_DP), 0)
+    private fun buildFeaturedStrip(projects: List<StoreProject>) = ProjectPlazaCarousel(activity).apply {
+        configureContentInsets(dp(PLAZA_SIDE_MARGIN_DP), dp(PLAZA_TRAILING_PADDING_DP))
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
-            projects.forEach { project ->
-                addView(buildFeaturedCard(project), LinearLayout.LayoutParams(featuredCardWidthPx(), featuredCardHeightPx()).apply {
+            projects.forEachIndexed { index, project ->
+                val card = buildFeaturedCard(project).apply {
+                    val initialScale = if (index == 0) 1f else PROJECT_PLAZA_CARD_MIN_SCALE
+                    scaleX = initialScale
+                    scaleY = initialScale
+                }
+                addView(card, LinearLayout.LayoutParams(featuredCardWidthPx(), featuredCardHeightPx()).apply {
                     marginEnd = dp(FEATURED_CARD_GAP_DP)
                 })
             }
         })
+        post { refreshCardScales() }
     }
 
     private fun buildFeaturedCard(project: StoreProject) = FrameLayout(activity).apply {

@@ -16,6 +16,7 @@
     "test:pwa-design": "node scripts/test-pwa-design.cjs && node scripts/test-pwa-runtime-capture.cjs && node scripts/test-fit-run-events.cjs && node ../scripts/test-pwa-ui-tuner-bridge.js",
     "test:project-docs": "node scripts/test-project-document-sections.cjs",
     "test:project-home": "node ../scripts/test-pc-project-home.js && node ../scripts/test-pc-project-context-sidebar.js",
+    "test:plaza": "node scripts/test-project-plaza-carousel.mjs",
     "test:message-actions": "node scripts/test-message-actions-hover.cjs",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },

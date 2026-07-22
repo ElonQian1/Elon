@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Image, Loader2, Search } from 'lucide-react'
 import { api } from '../../api/client'
@@ -9,6 +9,7 @@ import starAsset from '../../assets/project-plaza/star.png'
 import thumbnailAsset from '../../assets/project-plaza/thumbnail.png'
 import plazaChevronAsset from '../../../../server/src/assets/project_view_chevron.png'
 import { useProjectStore } from '../conversation/useProjectStore'
+import { projectPlazaCardScales } from './projectCarouselScale.mjs'
 import styles from './PlazaPage.module.css'
 
 export interface PlazaProject {
@@ -40,6 +41,7 @@ const PAGE_SIZE = 30
 
 export default function ProjectPlazaView() {
   const navigate = useNavigate()
+  const featuredRailRef = useRef<HTMLDivElement>(null)
   const [projects, setProjects] = useState<PlazaProject[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -85,6 +87,43 @@ export default function ProjectPlazaView() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    const rail = featuredRailRef.current
+    if (!rail) return
+    let frame = 0
+    const cards = Array.from(rail.querySelectorAll<HTMLElement>('[data-featured-card]'))
+    const update = () => {
+      frame = 0
+      if (cards.length === 0) return
+      const first = cards[0]
+      const previewCenter = first.offsetLeft + first.offsetWidth / 2
+      const snapDistance = cards.length > 1
+        ? cards[1].offsetLeft - first.offsetLeft
+        : first.offsetWidth
+      const centers = cards.map((card) => card.offsetLeft + card.offsetWidth / 2 - rail.scrollLeft)
+      const scales = projectPlazaCardScales(centers, previewCenter, snapDistance)
+      cards.forEach((slot, index) => {
+        const visualCard = slot.firstElementChild as HTMLElement | null
+        visualCard?.style.setProperty('--featured-card-scale', scales[index].toFixed(4))
+      })
+    }
+    const scheduleUpdate = () => {
+      if (!frame) frame = window.requestAnimationFrame(update)
+    }
+    const resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(scheduleUpdate)
+    rail.addEventListener('scroll', scheduleUpdate, { passive: true })
+    resizeObserver?.observe(rail)
+    cards.forEach((card) => resizeObserver?.observe(card))
+    scheduleUpdate()
+    return () => {
+      rail.removeEventListener('scroll', scheduleUpdate)
+      resizeObserver?.disconnect()
+      if (frame) window.cancelAnimationFrame(frame)
+    }
+  }, [projects])
 
   function toggleReaction(projectId: string, kind: 'favorite' | 'liked') {
     const key = `${projectId}:${kind}`
@@ -187,11 +226,12 @@ export default function ProjectPlazaView() {
             </form>
           )}
 
-          <div className={styles.featuredRail}>
+          <div className={styles.featuredRail} ref={featuredRailRef}>
             {projects.slice(0, 5).map((project) => {
               const title = project.display_name || project.name
               return (
-                <article className={styles.featuredCard} key={`featured-${project.id}`}>
+                <div className={styles.featuredCardSlot} data-featured-card key={`featured-${project.id}`}>
+                <article className={styles.featuredCard}>
                   <img className={styles.featuredSurface} src={cardAsset} alt="" />
                   <div className={styles.featuredContent}>
                     <div className={styles.featuredTop}>
@@ -227,6 +267,7 @@ export default function ProjectPlazaView() {
                     </button>
                   </div>
                 </article>
+                </div>
               )
             })}
           </div>
