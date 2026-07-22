@@ -259,18 +259,16 @@
   cursor: pointer;
 }
 
-.primaryAction > img,
-.primaryAction > svg {
-  width: 22px;
-  height: 22px;
-}
-
 .primaryAction > img {
+  width: 16px;
+  height: 16px;
   filter: brightness(.318);
   object-fit: contain;
 }
 
 .primaryAction > svg {
+  width: 22px;
+  height: 22px;
   stroke-width: 3;
 }
 

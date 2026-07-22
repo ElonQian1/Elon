@@ -108,6 +108,32 @@ class ProjectPlazaLayoutContractTest {
         listPadding.groupValues.drop(1).forEach { value ->
             assertEquals(profilePadding, value.toInt())
         }
+        assertEquals(16, listArrow.groupValues[2].toInt() - (profilePadding * 2))
+    }
+
+    @Test
+    fun plazaFeaturedArrowUsesTheSameSixteenDpBitmapInsideItsRoundButton() {
+        val androidSource = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
+        )
+        val featuredCard = androidSource.substringAfter("private fun buildFeaturedCard")
+            .substringBefore("private fun mediaPlaceholder")
+        val featuredArrow = requireNotNull(
+            Regex(
+                """setImageResource\(R\.drawable\.project_view_chevron\)([\s\S]*?)""" +
+                    """\}, FrameLayout\.LayoutParams\(dp\((\d+)\), dp\((\d+)\),"""
+            ).find(featuredCard)
+        )
+        val featuredPadding = requireNotNull(
+            Regex(
+                """setPadding\(dp\((\d+)\), dp\((\d+)\), dp\((\d+)\), dp\((\d+)\)\)"""
+            ).find(featuredArrow.groupValues[1])
+        ).groupValues.drop(1).map(String::toInt)
+
+        assertEquals(28, featuredArrow.groupValues[2].toInt())
+        assertEquals(28, featuredArrow.groupValues[3].toInt())
+        featuredPadding.forEach { assertEquals(6, it) }
+        assertEquals(16, featuredArrow.groupValues[2].toInt() - featuredPadding[0] - featuredPadding[2])
     }
 
     @Test
@@ -123,6 +149,23 @@ class ProjectPlazaLayoutContractTest {
         )
         assertTrue(
             Regex("""\.rowAction > svg\s*\{[\s\S]*?width:\s*24px;[\s\S]*?height:\s*24px;[\s\S]*?\}""")
+                .containsMatchIn(styles)
+        )
+    }
+
+    @Test
+    fun webPlazaFeaturedChevronIsSixteenPixelsWhileItsSpinnerRemainsTwentyTwo() {
+        val styles = readRepositoryFile("pc-frontend/src/features/plaza/PlazaPage.module.css")
+        assertTrue(
+            Regex("""\.primaryAction\s*\{[\s\S]*?width:\s*32px;[\s\S]*?height:\s*32px;[\s\S]*?\}""")
+                .containsMatchIn(styles)
+        )
+        assertTrue(
+            Regex("""\.primaryAction > img\s*\{[\s\S]*?width:\s*16px;[\s\S]*?height:\s*16px;[\s\S]*?\}""")
+                .containsMatchIn(styles)
+        )
+        assertTrue(
+            Regex("""\.primaryAction > svg\s*\{[\s\S]*?width:\s*22px;[\s\S]*?height:\s*22px;[\s\S]*?\}""")
                 .containsMatchIn(styles)
         )
     }

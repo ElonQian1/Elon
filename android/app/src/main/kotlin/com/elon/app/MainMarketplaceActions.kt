@@ -410,7 +410,7 @@ internal class MainMarketplaceActions(
             scaleType = ImageView.ScaleType.FIT_CENTER
             setColorFilter(Color.parseColor("#454545"))
             background = rect("#D9D9D9", 18)
-            setPadding(dp(5), dp(5), dp(5), dp(5))
+            setPadding(dp(6), dp(6), dp(6), dp(6))
             contentDescription = "进入${project.displayTitle()}"
         }, FrameLayout.LayoutParams(dp(28), dp(28), Gravity.END or Gravity.BOTTOM).apply {
             marginEnd = dp(19)
