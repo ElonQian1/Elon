@@ -74,6 +74,60 @@ class ProjectPlazaLayoutContractTest {
     }
 
     @Test
+    fun plazaListArrowMatchesTheProfileChevronContainerStandard() {
+        val androidSource = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
+        )
+        val projectListRow = androidSource.substringAfter("private fun buildProjectListRow")
+            .substringBefore("private fun projectThumbnail")
+        val listArrow = requireNotNull(
+            Regex(
+                """setImageResource\(R\.drawable\.project_view_chevron\)([\s\S]*?)""" +
+                    """\}, LinearLayout\.LayoutParams\(dp\((\d+)\), dp\((\d+)\)\)\)"""
+            ).find(projectListRow)
+        )
+        val listPadding = requireNotNull(
+            Regex(
+                """setPadding\(dp\((\d+)\), dp\((\d+)\), dp\((\d+)\), dp\((\d+)\)\)"""
+            ).find(listArrow.groupValues[1])
+        )
+
+        val profileLayout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
+        val profileArrow = profileLayout.substringAfter(
+            "android:id=\"@+id/profileNodeResourceArrow\""
+        ).substringBefore("/>")
+        val profileWidth = xmlDpAttribute(profileArrow, "android:layout_width")
+        val profileHeight = xmlDpAttribute(profileArrow, "android:layout_height")
+        val profilePadding = xmlDpAttribute(profileArrow, "android:padding")
+
+        assertEquals(32, profileWidth)
+        assertEquals(48, profileHeight)
+        assertEquals(8, profilePadding)
+        assertEquals(profileWidth, listArrow.groupValues[2].toInt())
+        assertEquals(profileHeight, listArrow.groupValues[3].toInt())
+        listPadding.groupValues.drop(1).forEach { value ->
+            assertEquals(profilePadding, value.toInt())
+        }
+    }
+
+    @Test
+    fun webPlazaListChevronIsSixteenPixelsInsideTheFortyEightPixelAction() {
+        val styles = readRepositoryFile("pc-frontend/src/features/plaza/PlazaPage.module.css")
+        assertTrue(
+            Regex("""\.rowAction\s*\{[\s\S]*?width:\s*48px;[\s\S]*?height:\s*48px;[\s\S]*?\}""")
+                .containsMatchIn(styles)
+        )
+        assertTrue(
+            Regex("""\.rowAction > img\s*\{[\s\S]*?width:\s*16px;[\s\S]*?height:\s*16px;[\s\S]*?\}""")
+                .containsMatchIn(styles)
+        )
+        assertTrue(
+            Regex("""\.rowAction > svg\s*\{[\s\S]*?width:\s*24px;[\s\S]*?height:\s*24px;[\s\S]*?\}""")
+                .containsMatchIn(styles)
+        )
+    }
+
+    @Test
     fun projectEntryHasNoMineTabOrProjectOnlyAddButton() {
         val navigation = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainNavigationController.kt"
@@ -118,6 +172,10 @@ class ProjectPlazaLayoutContractTest {
     private fun sha256(path: Path): String = MessageDigest.getInstance("SHA-256")
         .digest(Files.readAllBytes(path))
         .joinToString("") { "%02x".format(it) }
+
+    private fun xmlDpAttribute(fragment: String, attribute: String): Int = requireNotNull(
+        Regex("""${Regex.escape(attribute)}=\"(\d+)dp\"""").find(fragment)
+    ).groupValues[1].toInt()
 
     private fun repositoryRoot(): Path {
         val cwd = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize()

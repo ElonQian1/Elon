@@ -350,17 +350,15 @@
   cursor: pointer;
 }
 
-.rowAction > img,
-.rowAction > svg {
-  width: 24px;
-  height: 24px;
-}
-
 .rowAction > img {
+  width: 16px;
+  height: 16px;
   object-fit: contain;
 }
 
 .rowAction > svg {
+  width: 24px;
+  height: 24px;
   stroke-width: 3;
 }
 

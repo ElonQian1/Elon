@@ -480,9 +480,9 @@ internal class MainMarketplaceActions(
         addView(ImageView(activity).apply {
             setImageResource(R.drawable.project_view_chevron)
             scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(dp(8), dp(8), dp(3), dp(8))
+            setPadding(dp(8), dp(8), dp(8), dp(8))
             contentDescription = "进入${project.displayTitle()}"
-        }, LinearLayout.LayoutParams(dp(42), dp(48)))
+        }, LinearLayout.LayoutParams(dp(32), dp(48)))
     }
 
     private fun projectThumbnail(project: StoreProject): View {
