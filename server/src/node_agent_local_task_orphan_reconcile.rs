@@ -311,12 +311,11 @@ async fn candidate_runtime_protects(
         )?
         .context("supervised orphan contract disappeared under admission")?;
         let root = contract.root_task_id.as_deref().unwrap_or(&task.task_id);
-        if crate::node_agent_supervision_terminal_lease_safety::lineage_or_workspace_is_active(
+        if crate::node_agent_supervision_terminal_lease_safety::runtime_lineage_or_workspace_is_active(
             runtime,
             &task.task_id,
             root,
             active_workspace,
-            false,
         )
         .await?
         {

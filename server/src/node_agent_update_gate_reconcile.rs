@@ -108,10 +108,13 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         let no_execution_owner =
             !fresh_runtime_handle && !live_sidecar && !replayable_sidecar && !live_journal_process;
         let no_unsafe_wait = pending_approval_ids.is_empty() && non_repeatable_action.is_none();
-        let excluded = persisted_inactive
-            && no_execution_owner
-            && no_unsafe_wait
-            && !ambiguous_recovery_receipts;
+        let excluded = can_exclude_from_install(
+            persisted_inactive,
+            durable_cancelled,
+            no_execution_owner,
+            no_unsafe_wait,
+            ambiguous_recovery_receipts,
+        );
         let reason = classification_reason(
             excluded,
             persisted_inactive,
@@ -248,6 +251,19 @@ fn classification_reason(
     "persisted inactive task remains fail-closed for an unclassified reason".to_string()
 }
 
+fn can_exclude_from_install(
+    persisted_inactive: bool,
+    durable_cancelled: bool,
+    no_execution_owner: bool,
+    no_unsafe_wait: bool,
+    ambiguous_recovery_receipts: bool,
+) -> bool {
+    persisted_inactive
+        && no_execution_owner
+        && (no_unsafe_wait || durable_cancelled)
+        && !ambiguous_recovery_receipts
+}
+
 fn recovery_receipt_evidence(ledger: &UpdateRecoveryLedger, task_id: &str) -> (usize, usize, bool) {
     let matches = ledger
         .receipts
@@ -283,7 +299,10 @@ fn stable_reconcile_id(
 
 #[cfg(test)]
 mod tests {
-    use super::{classification_reason, recovery_receipt_evidence, stable_reconcile_id};
+    use super::{
+        can_exclude_from_install, classification_reason, recovery_receipt_evidence,
+        stable_reconcile_id,
+    };
     use crate::node_agent_update_recovery::{
         UpdateGateTaskClassification, UpdateRecoveryLedger, UpdateRecoveryReceipt,
         UpdateRecoveryState,
@@ -354,6 +373,10 @@ mod tests {
             classification_reason(false, false, false, false, true, true, false, false, None)
                 .contains("does not prove")
         );
+        assert!(can_exclude_from_install(true, true, true, false, false));
+        assert!(!can_exclude_from_install(true, true, false, false, false));
+        assert!(!can_exclude_from_install(true, true, true, false, true));
+        assert!(!can_exclude_from_install(true, false, true, false, false));
     }
 
     #[test]
