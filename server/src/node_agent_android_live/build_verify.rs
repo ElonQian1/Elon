@@ -45,6 +45,8 @@ use install::{install_debug_apk, list_legacy_debug_packages};
 pub(crate) struct BuildVerifyRequest {
     pub(crate) preview: Option<PreviewOpenRequest>,
     pub(crate) debug_application_id_suffix: Option<String>,
+    #[serde(default)]
+    pub(crate) lkg_enabled: bool,
     pub(crate) target_rect: Option<PixelRect>,
     pub(crate) current_rect: Option<PixelRect>,
     pub(crate) projected_current_rect: Option<PixelRect>,
@@ -83,6 +85,8 @@ pub(crate) struct PrepareDebugRuntimeRequest {
     pub(crate) debug_application_id_suffix: String,
     #[serde(default)]
     pub(crate) isolated_emulator_package: bool,
+    #[serde(default)]
+    pub(crate) lkg_enabled: bool,
     pub(crate) candidate: Option<super::debug_integration::DebugMergeCandidateRequest>,
     pub(crate) lease: Option<crate::node_agent_android_device_lease::AndroidDeviceLeaseProof>,
     #[serde(skip)]
@@ -167,6 +171,7 @@ async fn prepare_debug_runtime_inner(
             &package_name,
             request.candidate.as_ref(),
             "compat-debug-prepare",
+            Some(request.lkg_enabled),
         )?,
     };
     if let Some(reporter) = reporter {
@@ -315,6 +320,7 @@ async fn build_and_verify_inner(
         &session.package_name,
         None,
         &session.id,
+        Some(request.lkg_enabled),
     )?;
     let _deployment = broker
         .debug_deployments

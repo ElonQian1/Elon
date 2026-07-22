@@ -69,7 +69,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                     "basePackageName":{"type":"string","description":"可选；默认使用项目 UI Profile 预提取的 applicationId"},
                     "deviceId":{"type":"string","description":"可选；不填时优先选择在线模拟器"},
                     "debugApplicationIdSuffix":{"type":"string","default":".uitest"},
-                    "isolatedEmulatorPackage":{"type":"boolean","default":false,"description":"仅模拟器可显式启用；真机一律使用节点固定 .uituner_<指纹> 包"},
+                    "isolatedEmulatorPackage":{"type":"boolean","default":false,"description":"仅模拟器可显式启用；真机一律使用节点固定 .uituner_<指纹> 包"}, "lkgEnabled":{"type":"boolean","default":false,"description":"本次调试任务显式启用最近成功版本；默认关闭，不参与构建、安装或收尾门禁"},
                     "candidate":super::debug_integration_contract::debug_candidate_schema(),
                     "restart":{"type":"boolean","default":false,"description":"仅在上一轮 FAILED 或源码变化后显式启动新一轮；运行中重复调用不创建新会话"}
                 }
@@ -560,7 +560,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                         "type":"string",
                         "pattern":"^\\.[A-Za-z0-9._]{1,39}$",
                         "description":"可选；仅用于并行安装 Debug 验收包，例如 .uitest"
-                    },
+                    }, "lkgEnabled":{"type":"boolean","default":false,"description":"本次构建验收显式启用最近成功版本；默认关闭"},
                     "preview":{
                         "type":"object",
                         "required":["screenId","scenario","theme","fontScale","locale"],
@@ -577,7 +577,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
     ];
     definitions.push(tool("ui_get_debug_integration_status",
-        "读取当前项目指定设备的固定调试槽、贡献提交、冲突、代次、APK SHA256 与最后可用版本。",
+        "读取当前项目指定设备的固定调试槽、贡献提交、冲突、代次，以及最近成功版本是否显式启用。",
         json!({"type":"object","required":["deviceId"],"properties":{"deviceId":{"type":"string"},"projectId":{"type":"string"}}})));
     definitions.push(crate::node_agent_pwa_runtime::tool_definition());
     definitions

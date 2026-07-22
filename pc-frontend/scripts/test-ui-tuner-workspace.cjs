@@ -177,7 +177,7 @@ try {
     'src/features/ui-tuner/live/debugPackage.ts',
     'live/debugPackage.js',
   )
-  const { liveDebugBasePackage, liveDebugCandidate, liveDebugSuffix } = require(debugPackageOutput)
+  const { lkgStatusLabel, liveDebugBasePackage, liveDebugCandidate, liveDebugSuffix } = require(debugPackageOutput)
   assert.equal(liveDebugSuffix('com.elon.app.uituner_0123abcd'), '.uituner_0123abcd')
   assert.equal(liveDebugBasePackage('com.elon.app.uituner_0123abcd'), 'com.elon.app')
   assert.equal(liveDebugBasePackage('com.elon.app.uitest_anim_legacy'), 'com.elon.app')
@@ -190,6 +190,9 @@ try {
     },
     'PC 工作台必须明确创建 ready 候选并记录共享预览所有者',
   )
+  assert.match(lkgStatusLabel(false), /^未启用；/)
+  assert.match(lkgStatusLabel(false), /不参与构建、安装或任务收尾/)
+  assert.match(lkgStatusLabel(true), /^已启用；/)
 
   const scaleOutput = compile(
     'src/features/ui-tuner/comparison/canvasViewportScale.ts',
@@ -445,6 +448,8 @@ try {
   assert.match(pageSource, /onRecaptureDevice=\{\(\) => \{ void captureDeviceSnapshot\(\) \}\}/)
   assert.match(pageSource, /realRenderer=\{renderMode\.androidVisual\}/)
   assert.match(pageSource, /runtimeEditable=\{renderMode\.runtimeEditable\}/)
+  assert.match(pageSource, /lkgEnabled, setLkgEnabled.*useState\(false\)/)
+  assert.match(pageSource, /lkgEnabled=\{lkgEnabled\}/)
   assert.match(pageSource, /<UiWorkspaceModeBar/)
   const workspaceModeSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/workspace/UiWorkspaceModeBar.tsx'),
@@ -462,6 +467,12 @@ try {
   assert.match(inspectorSource, /<UiInspectorTabs/)
   assert.match(inspectorSource, /<UiDesignGateway/)
   assert.match(inspectorSource, /supportsTypography/)
+  const livePanelSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/live/UiTunerLivePanel.tsx'),
+    'utf8',
+  )
+  assert.match(livePanelSource, /本次调试任务启用最近成功版本/)
+  assert.match(livePanelSource, /debugIntegration\.lkgEnabled && debugIntegration\.lastUsable/)
   const gatewaySource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/inspector/UiDesignGateway.tsx'),
     'utf8',

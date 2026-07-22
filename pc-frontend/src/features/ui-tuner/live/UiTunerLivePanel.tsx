@@ -19,6 +19,7 @@ import styles from './UiTunerLivePanel.module.css'
 import { UiTunerPreviewPanel } from './UiTunerPreviewPanel'
 import type { RuntimeDraftStatus } from './runtimeDraftModel'
 import { UiCapabilityGapPanel } from '../capability-gap/UiCapabilityGapPanel'
+import { lkgStatusLabel } from './debugPackage'
 
 interface UiTunerLivePanelProps {
   state: LiveUiConnectionState
@@ -46,6 +47,8 @@ interface UiTunerLivePanelProps {
   prepareBusy: boolean
   prepareError: string
   debugIntegration: DebugIntegrationStatus | null
+  lkgEnabled: boolean
+  onLkgEnabledChange: (enabled: boolean) => void
   prepareReady: boolean
   debugPackage: string
   projectRoot: string
@@ -105,6 +108,8 @@ export function UiTunerLivePanel({
   prepareBusy,
   prepareError,
   debugIntegration,
+  lkgEnabled,
+  onLkgEnabledChange,
   prepareReady,
   debugPackage,
   projectRoot,
@@ -135,6 +140,7 @@ export function UiTunerLivePanel({
             <span>{debugIntegration.status}</span>
           </div>
           <small>固定包：{debugIntegration.packageName}</small>
+          <small>最近成功版本：{lkgStatusLabel(debugIntegration.lkgEnabled)}</small>
           <small>基础提交：{debugIntegration.baseSha.slice(0, 12)} · 贡献 {debugIntegration.contributions.length} 个</small>
           {debugIntegration.contributions.slice(-5).map((contribution) => (
             <small key={contribution.commitSha} title={contribution.commitSha}>
@@ -148,7 +154,7 @@ export function UiTunerLivePanel({
             <span>历史调试包（仅报告，不自动卸载）：{debugIntegration.legacyPackages?.join('、')}</span>
           )}
           {debugIntegration.lastError && <span>{debugIntegration.lastError}</span>}
-          {debugIntegration.lastUsable && (
+          {debugIntegration.lkgEnabled && debugIntegration.lastUsable && (
             <small>
               最后可用：第 {debugIntegration.lastUsable.generation} 代 · APK {debugIntegration.lastUsable.sha256.slice(0, 12)}
             </small>
@@ -183,6 +189,16 @@ export function UiTunerLivePanel({
           <strong>启用真正的 LIVE 修改</strong>
           <p>正式 APK 只支持截图/XML 检查。安装并打开当前 PC 节点唯一的共享 Debug Runtime 包后，颜色、尺寸、间距、圆角和文字才能在真机立即变化。</p>
           <small>调试包：{debugPackage}</small>
+          <label className={styles.lkgPolicy}>
+            <input
+              type="checkbox"
+              checked={lkgEnabled}
+              disabled={prepareBusy}
+              onChange={(event) => onLkgEnabledChange(event.currentTarget.checked)}
+            />
+            <span>本次调试任务启用最近成功版本</span>
+            <small>默认关闭；只有勾选后才记录、推进并校验最近成功版本。</small>
+          </label>
           <label className={styles.projectField}>
             <span>本机 Android 项目目录</span>
             <input

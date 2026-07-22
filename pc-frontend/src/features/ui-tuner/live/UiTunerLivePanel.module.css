@@ -255,9 +255,32 @@
   font-size: 12px;
 }
 
-.prepareCard span {
-  color: #fca5a5;
-}
+  .prepareCard span {
+    color: #fca5a5;
+  }
+
+  .lkgPolicy {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 3px 7px;
+    padding: 8px 9px;
+    border: 1px solid rgba(100, 116, 139, 0.32);
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.48);
+  }
+
+  .lkgPolicy input {
+    margin: 2px 0 0;
+  }
+
+  .lkgPolicy span {
+    color: #e2e8f0;
+  }
+
+  .lkgPolicy small {
+    grid-column: 2;
+  }
 
 .installAttention {
   display: grid;

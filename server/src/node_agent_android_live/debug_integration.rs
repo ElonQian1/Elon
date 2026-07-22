@@ -56,6 +56,7 @@ impl DebugIntegrationCoordinator {
         package_name: &str,
         candidate: Option<&DebugMergeCandidateRequest>,
         compatibility_source: &str,
+        lkg_enabled: Option<bool>,
     ) -> Result<DebugIntegrationPlan> {
         let repo = inspect_repository(project_root)?;
         let candidate = normalized_candidate(candidate, compatibility_source, &repo)?;
@@ -80,6 +81,7 @@ impl DebugIntegrationCoordinator {
                 desired_generation: 0,
                 installed_generation: None,
                 status: "EMPTY".into(),
+                lkg_enabled: lkg_enabled.unwrap_or(false),
                 integration_worktree: None,
                 contributions: Vec::new(),
                 conflicts: Vec::new(),
@@ -96,6 +98,14 @@ impl DebugIntegrationCoordinator {
             device_identity,
             package_name,
         )?;
+        let policy_changed = lkg_enabled.is_some_and(|enabled| {
+            if status.lkg_enabled == enabled {
+                false
+            } else {
+                status.lkg_enabled = enabled;
+                true
+            }
+        });
         if !is_ancestor(&repo.root, &status.base_sha, &repo.head)? {
             bail!(
                 "DEBUG_CANDIDATE_BASE_DIVERGED: 候选提交不是固定集成基础 {} 的后继，拒绝猜测合并",
@@ -114,6 +124,10 @@ impl DebugIntegrationCoordinator {
             .cloned()
             .collect::<Vec<_>>();
         if additions.is_empty() {
+            if policy_changed {
+                status.updated_at = now();
+                self.save(&status)?;
+            }
             return Ok(plan_from_status(&self.root, &repo.root, &status));
         }
         for commit in additions {
@@ -174,7 +188,12 @@ impl DebugIntegrationCoordinator {
                     format!("commit={commit}; {error:#}"),
                     vec![commit.clone()],
                 )?;
-                return Err(anyhow!("DEBUG_MERGE_CONFLICT: 提交 {commit} 与当前合并序列冲突；已保留最后可用 APK，未猜测解决冲突。{error:#}"));
+                let retention = if plan.lkg_enabled {
+                    "已保留显式启用的最近成功版本"
+                } else {
+                    "最近成功版本未启用；手机当前版本未改动"
+                };
+                return Err(anyhow!("DEBUG_MERGE_CONFLICT: 提交 {commit} 与当前合并序列冲突；{retention}，未猜测解决冲突。{error:#}"));
             }
         }
         self.update(plan, |status| {
@@ -207,23 +226,27 @@ impl DebugIntegrationCoordinator {
         artifact: DebugArtifactStatus,
     ) -> Result<()> {
         let current = self.assert_current(plan)?;
-        if let Some(previous) = current.last_usable.as_ref() {
-            if previous.signer_sha256 != artifact.signer_sha256 {
-                self.record_failure(
-                    plan,
-                    "SIGNATURE_MISMATCH",
-                    format!(
-                        "expectedSigner={} actualSigner={}; 未安装且不会自动卸载手机应用",
-                        previous.signer_sha256, artifact.signer_sha256
-                    ),
-                    Vec::new(),
-                )?;
-                bail!("DEBUG_APK_SIGNATURE_MISMATCH: 新 APK 签名与固定槽已锁定签名不一致；已保留最后可用 APK 和手机当前版本，不会自动卸载应用");
+        if plan.lkg_enabled {
+            if let Some(previous) = current.last_usable.as_ref() {
+                if previous.signer_sha256 != artifact.signer_sha256 {
+                    self.record_failure(
+                        plan,
+                        "SIGNATURE_MISMATCH",
+                        format!(
+                            "expectedSigner={} actualSigner={}; 未安装且不会自动卸载手机应用",
+                            previous.signer_sha256, artifact.signer_sha256
+                        ),
+                        Vec::new(),
+                    )?;
+                    bail!("DEBUG_APK_SIGNATURE_MISMATCH: 新 APK 签名与固定槽已锁定签名不一致；已保留最后可用 APK 和手机当前版本，不会自动卸载应用");
+                }
             }
         }
         self.update(plan, |status| {
             status.status = "BUILD_READY".into();
-            status.last_usable = Some(artifact);
+            if plan.lkg_enabled {
+                status.last_usable = Some(artifact);
+            }
             status.last_error = None;
         })
     }
@@ -327,6 +350,7 @@ impl DebugIntegrationCoordinator {
                 status.desired_generation
             );
         }
+        status.lkg_enabled = plan.lkg_enabled;
         apply(&mut status);
         status.updated_at = now();
         self.save(&status)

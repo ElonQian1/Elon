@@ -37,6 +37,7 @@ pub(super) fn build_verify_request(run: &FitRunDocument) -> BuildVerifyRequest {
     BuildVerifyRequest {
         preview: None,
         debug_application_id_suffix: None,
+        lkg_enabled: false,
         target_rect: Some(pixel_rect(run.pair.target_rect)),
         current_rect: Some(pixel_rect(run.pair.current_rect)),
         projected_current_rect: Some(pixel_rect(run.pair.projected_target_rect)),

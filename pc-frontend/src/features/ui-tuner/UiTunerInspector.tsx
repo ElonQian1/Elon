@@ -49,6 +49,8 @@ interface UiTunerInspectorProps {
   livePrepareBusy: boolean
   livePrepareError: string
   debugIntegration: DebugIntegrationStatus | null
+  lkgEnabled: boolean
+  onLkgEnabledChange: (enabled: boolean) => void
   livePrepareReady: boolean
   liveDebugPackage: string
   liveProjectRoot: string
@@ -87,6 +89,8 @@ export function UiTunerInspector({
   livePrepareBusy,
   livePrepareError,
   debugIntegration,
+  lkgEnabled,
+  onLkgEnabledChange,
   livePrepareReady,
   liveDebugPackage,
   liveProjectRoot,
@@ -131,6 +135,7 @@ export function UiTunerInspector({
               onUndo={onLiveUndo} onRedo={onLiveRedo}
               prepareBusy={livePrepareBusy} prepareError={livePrepareError}
               debugIntegration={debugIntegration}
+              lkgEnabled={lkgEnabled} onLkgEnabledChange={onLkgEnabledChange}
               prepareReady={livePrepareReady} debugPackage={liveDebugPackage}
               projectRoot={liveProjectRoot} onProjectRootChange={onLiveProjectRootChange}
               onPrepareRuntime={onPrepareLiveRuntime}
@@ -202,6 +207,8 @@ interface LiveDesignPanelProps {
   prepareBusy: boolean
   prepareError: string
   debugIntegration: DebugIntegrationStatus | null
+  lkgEnabled: boolean
+  onLkgEnabledChange: (enabled: boolean) => void
   prepareReady: boolean
   debugPackage: string
   projectRoot: string
@@ -224,6 +231,7 @@ function LiveDesignPanel(props: LiveDesignPanelProps) {
       onBuildVerify={liveUi.buildVerify} prepareBusy={props.prepareBusy}
       prepareError={props.prepareError} prepareReady={props.prepareReady}
       debugIntegration={props.debugIntegration}
+      lkgEnabled={props.lkgEnabled} onLkgEnabledChange={props.onLkgEnabledChange}
       debugPackage={props.debugPackage} projectRoot={props.projectRoot}
       onProjectRootChange={props.onProjectRootChange} onPrepareRuntime={props.onPrepareRuntime}
     />

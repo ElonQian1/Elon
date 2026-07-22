@@ -56,6 +56,8 @@ pub(crate) struct DebugIntegrationStatus {
     pub(crate) desired_generation: u64,
     pub(crate) installed_generation: Option<u64>,
     pub(crate) status: String,
+    #[serde(default)]
+    pub(crate) lkg_enabled: bool,
     pub(crate) integration_worktree: Option<String>,
     pub(crate) contributions: Vec<DebugContribution>,
     pub(crate) conflicts: Vec<String>,
@@ -74,6 +76,7 @@ pub(crate) struct DebugIntegrationPlan {
     pub(crate) source_root: PathBuf,
     pub(crate) worktree: PathBuf,
     pub(crate) package_name: String,
+    pub(crate) lkg_enabled: bool,
     pub(crate) contributions: Vec<String>,
     pub(crate) base_sha: String,
 }
@@ -222,6 +225,7 @@ pub(super) fn plan_from_status(
             .join("generations")
             .join(format!("generation-{}", status.desired_generation)),
         package_name: status.package_name.clone(),
+        lkg_enabled: status.lkg_enabled,
         contributions: status
             .contributions
             .iter()

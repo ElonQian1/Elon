@@ -176,9 +176,9 @@ sidecar `sessions.json` 使用进程间互斥和同目录唯一临时文件原�
 
 Codex 会话继续在独立 conversation worktree 开发和自行编译，真机部署则进入节点托管的第二层集成槽。HTTP、MCP 和 PC 工作台提交候选时必须明确 `ready`，提供或由兼容入口确定当前 HEAD，并证明来源 worktree 干净、提交属于固定基础 SHA 的后继、来源 task/session 可审计。协调器在节点数据根的 `workspaces/android-debug-integration` 下创建代次专属 detached worktree，按接收顺序 cherry-pick；不复制脏文件、不直接混写多个 worktree，也不猜测解决冲突。
 
-槽身份是“Git common-dir + 项目 + 物理硬件序列号 + 稳定节点指纹”。状态原子记录基础 SHA、贡献提交顺序、来源、期望代次、已安装代次、冲突、共享预览所有者、APK SHA-256 和最后可用版本。合并、构建、APK 校验和安装由同一物理设备/包互斥锁串行；新候选提高代次，旧构建在暂存和安装前用 fencing token 再校验，因而不能在新构建之后安装。各代构建输出保持隔离，协调器只把通过 `aapt`/`apksigner` 校验的包名、标签、版本、签名和内容哈希原子暂存为 `<sha256>.apk`，不会让多个会话写同一路径。
+槽身份是“Git common-dir + 项目 + 物理硬件序列号 + 稳定节点指纹”。状态原子记录基础 SHA、贡献提交顺序、来源、期望代次、已安装代次、冲突、共享预览所有者、APK SHA-256，以及最近成功版本策略是否启用。最近成功版本（LKG）是 opt-in：HTTP/MCP/PC 工作台的任务请求只有显式传入 `lkgEnabled=true` 才记录、推进并按已有签名钉扎语义校验 `lastUsable`；字段缺失、旧状态缺字段或普通任务均视为“未启用”，不创建、不推进、不校验、不要求 LKG，也不能阻塞构建、ADB 覆盖安装或任务统一收尾。状态接口必须同时返回 `lkgEnabled`，PC 工作台在关闭时明确显示“未启用”，不得把空 LKG 暗示成门禁失败。合并、构建、APK 身份校验和安装仍由同一物理设备/包互斥锁串行；新候选提高代次，旧构建在暂存和安装前用 fencing token 再校验，因而不能在新构建之后安装。各代构建输出保持隔离，协调器只把通过 `aapt`/`apksigner` 校验的包名、标签、版本、签名和内容哈希原子暂存为 `<sha256>.apk`，不会让多个会话写同一路径。
 
-真机最终包名固定为 `com.elon.app.uituner_<节点指纹>`；`.uituner`、`.uitest`、`.uitest_anim` 及旧带指纹调用都只作为兼容输入。只有 `emulator-*` 且调用者显式设置隔离选项时，才保留模拟器独立测试包。正式 `com.elon.app` / “一龙ai”不变。签名漂移、非法后缀、非 ready/未提交候选、合并冲突、过期代次和设备离线均返回明确状态；系统保留最后可用 APK 与手机当前版本，不创建新真机包，不自动卸载旧包。升级前遗留的杂包只进入诊断报告，由用户明确决定是否处理。
+真机最终包名固定为 `com.elon.app.uituner_<节点指纹>`；`.uituner`、`.uitest`、`.uitest_anim` 及旧带指纹调用都只作为兼容输入。只有 `emulator-*` 且调用者显式设置隔离选项时，才保留模拟器独立测试包。正式 `com.elon.app` / “一龙ai”不变。非法后缀、非 ready/未提交候选、合并冲突、过期代次和设备离线均返回明确状态；LKG 启用时额外执行最近成功 APK 的签名钉扎和保留语义，未启用时只执行当前 APK 自身的包名、标签、版本、签名与哈希校验。两种模式都不创建新真机包，不自动卸载旧包，失败时手机当前版本保持不变。升级前遗留的杂包只进入诊断报告，由用户明确决定是否处理。
 
 本机低优先自进化是独立调度域：父用户任务先终止，节点再预创建并持久化独立 task/conversation/worktree。pause/review 操作采用“先持久 action intent、再执行外部取消或审查、最后原子提交队列状态”，所以重试不会产生半状态；配额类失败进入有界退避。取消/让路事件持久化四元组和可信 `interruption_source`，审计失败即拒绝取消。发布控制面同样使用持久的 `batch_id + immutable SHA` 阶段 ledger，把 server、PC 前端、Windows 节点的 owner、waiter、heartbeat、attempt 与错误统一成可接管且 fail-closed 的事务视图。
 

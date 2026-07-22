@@ -43,6 +43,7 @@ interface UseLiveUiSessionOptions {
   packageName?: string
   projectRoot?: string
   debugApplicationIdSuffix?: string
+  lkgEnabled: boolean
   lease?: AndroidDeviceLeaseProof
   document: UiTunerDocument
   selected: UiTunerElement | null
@@ -54,6 +55,7 @@ export function useLiveUiSession({
   packageName,
   projectRoot,
   debugApplicationIdSuffix,
+  lkgEnabled,
   lease,
   document,
   selected,
@@ -578,6 +580,7 @@ export function useLiveUiSession({
         current.id,
         preview ?? lastPreviewRef.current ?? undefined,
         debugApplicationIdSuffix,
+        lkgEnabled,
       )
       if (preview) {
         lastPreviewRef.current = preview
@@ -595,7 +598,7 @@ export function useLiveUiSession({
     } finally {
       setBusy(false)
     }
-  }, [debugApplicationIdSuffix, onNotice, refresh, refreshFrame])
+  }, [debugApplicationIdSuffix, lkgEnabled, onNotice, refresh, refreshFrame])
 
   return {
     session,

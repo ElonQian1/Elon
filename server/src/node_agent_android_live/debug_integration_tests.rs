@@ -79,6 +79,15 @@ fn register(
     source: &Path,
     request: &DebugMergeCandidateRequest,
 ) -> super::debug_integration::DebugIntegrationPlan {
+    register_with_lkg(coordinator, source, request, None)
+}
+
+fn register_with_lkg(
+    coordinator: &DebugIntegrationCoordinator,
+    source: &Path,
+    request: &DebugMergeCandidateRequest,
+    lkg_enabled: Option<bool>,
+) -> super::debug_integration::DebugIntegrationPlan {
     coordinator
         .register_candidate(
             path(source),
@@ -87,6 +96,7 @@ fn register(
             "com.elon.app.uituner_stable-node",
             Some(request),
             "compat-session",
+            lkg_enabled,
         )
         .expect("register ready candidate")
 }
@@ -147,7 +157,12 @@ fn merge_conflict_fails_closed_and_preserves_last_usable_artifact() {
     let (one_root, one) = repo.session("one", "shared.txt", "from one\n");
     let (two_root, two) = repo.session("two", "shared.txt", "from two\n");
     let coordinator = coordinator("conflict");
-    let first = register(&coordinator, &one_root, &candidate(&repo.base, &one, "one"));
+    let first = register_with_lkg(
+        &coordinator,
+        &one_root,
+        &candidate(&repo.base, &one, "one"),
+        Some(true),
+    );
     coordinator.materialize(&first).expect("first merge");
     coordinator.mark_building(&first).unwrap();
     coordinator
@@ -166,7 +181,12 @@ fn merge_conflict_fails_closed_and_preserves_last_usable_artifact() {
         )
         .unwrap();
 
-    let second = register(&coordinator, &two_root, &candidate(&repo.base, &two, "two"));
+    let second = register_with_lkg(
+        &coordinator,
+        &two_root,
+        &candidate(&repo.base, &two, "two"),
+        Some(true),
+    );
     let error = coordinator
         .materialize(&second)
         .expect_err("conflict must fail");
@@ -220,6 +240,7 @@ fn non_ready_and_dirty_candidates_are_rejected_without_a_generation() {
             "com.elon.app.uituner_stable-node",
             Some(&not_ready),
             "compat-session",
+            None,
         )
         .expect_err("non-ready candidate must fail");
     assert!(error.to_string().contains("DEBUG_CANDIDATE_NOT_READY"));
@@ -233,6 +254,7 @@ fn non_ready_and_dirty_candidates_are_rejected_without_a_generation() {
             "com.elon.app.uituner_stable-node",
             Some(&candidate(&repo.base, &commit, "one")),
             "compat-session",
+            None,
         )
         .expect_err("dirty candidate must fail");
     assert!(error.to_string().contains("DEBUG_CANDIDATE_DIRTY"));
@@ -243,10 +265,11 @@ fn signer_drift_preserves_the_pinned_artifact_and_fails_closed() {
     let repo = RepositoryFixture::new("signer-drift");
     let (source, commit) = repo.session("one", "one.txt", "one\n");
     let coordinator = coordinator("signer-drift");
-    let plan = register(
+    let plan = register_with_lkg(
         &coordinator,
         &source,
         &candidate(&repo.base, &commit, "one"),
+        Some(true),
     );
     coordinator.materialize(&plan).unwrap();
     coordinator.mark_building(&plan).unwrap();
@@ -268,8 +291,53 @@ fn signer_drift_preserves_the_pinned_artifact_and_fails_closed() {
         .expect_err("signer drift must fail");
     assert!(error.to_string().contains("DEBUG_APK_SIGNATURE_MISMATCH"));
     let status = coordinator.status(&plan.slot_id).unwrap().unwrap();
+    assert!(status.lkg_enabled);
     assert_eq!(status.status, "SIGNATURE_MISMATCH");
     assert_eq!(status.last_usable.unwrap().sha256, "usable");
+}
+
+#[test]
+fn lkg_is_disabled_by_default_and_does_not_gate_install() {
+    let repo = RepositoryFixture::new("lkg-disabled");
+    let (source, commit) = repo.session("one", "one.txt", "one\n");
+    let coordinator = coordinator("lkg-disabled");
+    let plan = register(
+        &coordinator,
+        &source,
+        &candidate(&repo.base, &commit, "one"),
+    );
+    let enabled_plan = register_with_lkg(
+        &coordinator,
+        &source,
+        &candidate(&repo.base, &commit, "one"),
+        Some(true),
+    );
+    assert_eq!(enabled_plan.generation, plan.generation);
+    coordinator.materialize(&plan).unwrap();
+    coordinator.mark_building(&plan).unwrap();
+    let artifact = |signer: &str, sha: &str| DebugArtifactStatus {
+        apk_path: format!("artifacts/{sha}.apk"),
+        sha256: sha.into(),
+        package_name: plan.package_name.clone(),
+        version_code: "1".into(),
+        version_name: "test".into(),
+        app_label: "一龙调试 stable-node".into(),
+        signer_sha256: signer.into(),
+        generation: plan.generation,
+    };
+    coordinator
+        .record_artifact(&plan, artifact("signer-a", "first"))
+        .unwrap();
+    coordinator
+        .record_artifact(&plan, artifact("signer-b", "second"))
+        .expect("default-disabled LKG must not pin or validate the prior signer");
+    coordinator
+        .authorize_install(&plan)
+        .expect("default-disabled LKG must not block ADB installation");
+    let status = coordinator.status(&plan.slot_id).unwrap().unwrap();
+    assert!(!status.lkg_enabled);
+    assert!(status.last_usable.is_none());
+    assert_eq!(status.status, "BUILD_READY");
 }
 
 fn git(root: &Path, args: &[&str]) {

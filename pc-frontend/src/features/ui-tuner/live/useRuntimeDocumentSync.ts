@@ -10,6 +10,7 @@ interface RuntimeDocumentSyncOptions {
   packageName?: string
   projectRoot?: string
   debugApplicationIdSuffix?: string
+  lkgEnabled: boolean
   lease?: AndroidDeviceLeaseProof
   document: UiTunerDocument
   selected: UiTunerElement | null
@@ -28,6 +29,7 @@ export function useRuntimeDocumentSync(options: RuntimeDocumentSyncOptions) {
     packageName: options.packageName,
     projectRoot: options.projectRoot,
     debugApplicationIdSuffix: options.debugApplicationIdSuffix,
+    lkgEnabled: options.lkgEnabled,
     lease: options.lease,
     document: options.document,
     selected: options.selected,

@@ -91,6 +91,7 @@ export default function UiTunerPage() {
   const [livePrepareBusy, setLivePrepareBusy] = useState(false)
   const [livePrepareError, setLivePrepareError] = useState('')
   const [debugIntegration, setDebugIntegration] = useState<DebugIntegrationStatus | null>(null)
+  const [lkgEnabled, setLkgEnabled] = useState(false)
   const comparisonViewport = useComparisonViewport(
     { width: tunerDoc.canvas.width, height: tunerDoc.canvas.height },
     tunerDoc.canvas.targetDesign
@@ -263,6 +264,7 @@ export default function UiTunerPage() {
         basePackageName,
         projectRoot: effectiveProjectRoot,
         debugApplicationIdSuffix: LIVE_DEBUG_SUFFIX,
+        lkgEnabled,
         lease,
         candidate: liveDebugCandidate(activeProjectId, selectedDeviceIdentity || selectedDeviceId),
       })
@@ -282,7 +284,7 @@ export default function UiTunerPage() {
     } finally {
       setLivePrepareBusy(false)
     }
-  }, [activeProjectId, captureDeviceSnapshot, deviceLease.ensureLease, effectiveProjectRoot, selectedDeviceId, selectedDeviceIdentity, selectedHardwareSerial, setDeviceDialogOpen])
+  }, [activeProjectId, captureDeviceSnapshot, deviceLease.ensureLease, effectiveProjectRoot, lkgEnabled, selectedDeviceId, selectedDeviceIdentity, selectedHardwareSerial, setDeviceDialogOpen])
 
   const liveUi = useRuntimeDocumentSync({
     deviceId: tunerDoc.runtimeSnapshot?.deviceId === selectedDeviceId ? selectedDeviceId : undefined,
@@ -291,6 +293,7 @@ export default function UiTunerPage() {
       : undefined,
     projectRoot: effectiveProjectRoot,
     debugApplicationIdSuffix: liveDebugSuffix(liveTargetPackage) || undefined,
+    lkgEnabled,
     lease: deviceLease.proof,
     document: tunerDoc, selected, workspaceMode, documentRef: tunerDocRef, selectedIdRef,
     setDocument: setTunerDoc, setSelectedId, onNotice: setNotice,
@@ -754,6 +757,7 @@ export default function UiTunerPage() {
         liveUiDraftStatus={runtimeDraft.status}
         livePrepareBusy={livePrepareBusy} livePrepareError={livePrepareError}
         debugIntegration={debugIntegration} livePrepareReady={Boolean(selectedDeviceId && effectiveProjectRoot)}
+        lkgEnabled={lkgEnabled} onLkgEnabledChange={setLkgEnabled}
         liveDebugPackage={liveTargetPackage || `${DEFAULT_ANDROID_PACKAGE}${LIVE_DEBUG_SUFFIX}`}
         liveProjectRoot={liveProjectRoot}
         onLiveProjectRootChange={updateLiveProjectRoot}

@@ -22,6 +22,7 @@ struct PreparationKey {
     slot_id: String,
     package_name: String,
     device_id: String,
+    lkg_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -140,6 +141,7 @@ impl PreparationRegistry {
             slot_id: plan.slot_id.clone(),
             package_name: plan.package_name.clone(),
             device_id: request.device_id.trim().to_string(),
+            lkg_enabled: plan.lkg_enabled,
         };
         let source_revision = Some(format!(
             "generation:{}:{}",
@@ -239,6 +241,7 @@ fn prepare_integration_plan(
         &package_name,
         request.candidate.as_ref(),
         "compat-mcp-prepare",
+        Some(request.lkg_enabled),
     )
 }
 

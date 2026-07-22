@@ -71,6 +71,10 @@ pub(super) async fn prepare_debug_runtime(
                     .get("isolatedEmulatorPackage")
                     .and_then(Value::as_bool)
                     .unwrap_or(false),
+                lkg_enabled: arguments
+                    .get("lkgEnabled")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
                 candidate: arguments
                     .get("candidate")
                     .cloned()

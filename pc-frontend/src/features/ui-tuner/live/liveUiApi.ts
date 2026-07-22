@@ -151,6 +151,7 @@ export interface DebugIntegrationStatus {
   desiredGeneration: number
   installedGeneration?: number
   status: string
+  lkgEnabled: boolean
   integrationWorktree?: string
   contributions: Array<{
     commitSha: string
@@ -179,6 +180,7 @@ export async function prepareLiveDebugRuntime(input: {
   basePackageName: string
   projectRoot: string
   debugApplicationIdSuffix: string
+  lkgEnabled: boolean
   lease: AndroidDeviceLeaseProof
   candidate: {
     ready: true
@@ -294,11 +296,12 @@ export async function buildAndVerifyLiveUi(
   sessionId: string,
   preview?: LivePreviewRequest,
   debugApplicationIdSuffix?: string,
+  lkgEnabled = false,
 ): Promise<LiveBuildVerifyResult> {
   const response = await nodeApi<{ result: LiveBuildVerifyResult }>(
     inspectorAdminUrl(),
     `/api/android-live/sessions/${encodeURIComponent(sessionId)}/build-verify`,
-    { method: 'POST', body: JSON.stringify({ preview, debugApplicationIdSuffix }) },
+    { method: 'POST', body: JSON.stringify({ preview, debugApplicationIdSuffix, lkgEnabled }) },
     20 * 60_000,
   )
   return response.result

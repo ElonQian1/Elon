@@ -23,3 +23,9 @@ export function liveDebugCandidate(projectId: string | null | undefined, deviceI
   const owner = `pc-ui:${projectId || 'local'}`
   return { ready: true as const, sourceSessionId: `${owner}:${deviceIdentity}`, previewOwner: owner }
 }
+
+export function lkgStatusLabel(enabled: boolean) {
+  return enabled
+    ? '已启用；本次任务会记录并校验最近成功版本'
+    : '未启用；不参与构建、安装或任务收尾'
+}
