@@ -4,7 +4,7 @@ applyTo: "scripts/**,.github/**,AGENTS.md,CODEX.md,AI_TASK_TEMPLATE.md"
 
 # Git、验证与发布按需手册
 
-共享硬规则以 `.github/copilot-instructions.md` 的 `WF-*` 契约为准。本文件只补充实现细节；普通源码任务不加载全部发布背景。
+共享硬规则见 `.github/copilot-instructions.md` 的 `WF-*`；本文件只补实现细节。
 
 ## 标准路径
 
@@ -15,17 +15,17 @@ applyTo: "scripts/**,.github/**,AGENTS.md,CODEX.md,AI_TASK_TEMPLATE.md"
 5. 需要发布时运行对应 `publish-*` 脚本。
 6. 最后执行预检输出的 `FINISH_COMMAND_*`，把 `<Kind>` 换成任务完成类型。
 
-不要再手动拼接“检查远端、同步 main、清理 worktree”步骤；`finish-ai-task.*` 是唯一正常收尾入口。
+不要手拼远端检查、main 同步或 worktree 清理；统一用 `finish-ai-task.*` 收尾。
 
 ## 本地 main 与未跟踪文件
 
-- `main` checkout 只保存已跟踪基线，不承担业务编辑。
-- 已跟踪修改阻止 `main` 快进；`ai/session/*` 只报告 `blocked_tracked_changes`，不触碰 `main` 或阻断已完成任务。普通未跟踪文件不阻止快进。
-- 快进时如果远端新增路径与本地未跟踪文件同名，Git 会安全拒绝；脚本输出 `FINALIZABLE=false` 并报告冲突。
-- 主工作区来源不明的未跟踪文件只产生卫生告警，不由其他任务自动提交或删除。
-- 当前任务 worktree 必须完全干净才可收尾；未跟踪源码/测试会显示 `candidate_track`，生成物会显示 `candidate_temporary_or_precise_ignore`。
+- `main` checkout 只存基线，不做业务编辑。
+- 已跟踪修改阻止 `main` 快进；`ai/session/*` 只报 `blocked_tracked_changes`，不触碰 `main`。普通未跟踪文件不阻止快进。
+- 远端新增路径与本地未跟踪文件同名时 Git 会拒绝快进；脚本输出 `FINALIZABLE=false`。
+- 主工作区来源不明的未跟踪文件只告警，不自动提交或删除。
+- 任务 worktree 必须干净；未跟踪源码/测试显示 `candidate_track`，生成物显示 `candidate_temporary_or_precise_ignore`。
 - 自动删除仅限 `.ai/workspace-policy.txt` 声明的临时根，目前是 `.ai-tmp/`。
-- 清理保护 60 分钟内及 locked worktree；预检锁定普通 `codex/*` 任务，统一收尾再解锁。平台会话 / `ai/session/*` 仅在 clean、已合入且超龄时回收。
+- 保护 60 分钟内及 locked worktree；预检锁定 `codex/*`，收尾解锁。平台会话/`ai/session/*` 仅在 clean、已合入且超龄时回收。
 
 ## push 冲突
 
@@ -38,11 +38,11 @@ git rebase origin/main
 git push origin HEAD:main
 ```
 
-兼容时保留双方逻辑。不要追逐远端前进；rebase 后复用原验证，只为冲突或命中的影响面补最小验证，不能仅因 rebase 重编译或全量测试。
+兼容时保留双方逻辑；不追逐远端。rebase 后复用原验证，仅为冲突或受影响处补最小验证。
 
 ## push 输出管理
 
-Rust 用 `scripts/push.ps1` 准备收据；失效时 `pre-push` 补验证。输出写入 `.ai-tmp/push.log`：
+Rust 收据门禁默认关闭：两个 push 入口输出 `RUST_PUSH_RECEIPT_GATE=disabled`，不运行 `prepare-push`/`cargo check`；仅 `ELON_ENABLE_RUST_PUSH_RECEIPT=1` 启用。日志写入 `.ai-tmp/push.log`：
 
 ```powershell
 git push origin HEAD:main *> .ai-tmp/push.log

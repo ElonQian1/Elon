@@ -17,6 +17,10 @@ grep -q 'rsproxy-official' scripts/validation/cargo-sources.json
 grep -q 'ustc-official' scripts/validation/cargo-sources.json
 
 grep -q 'prepare-push.ps1' .githooks/pre-push
+grep -q 'ELON_ENABLE_RUST_PUSH_RECEIPT' .githooks/pre-push
+grep -q 'RUST_PUSH_RECEIPT_GATE=disabled' .githooks/pre-push
+grep -q 'ELON_ENABLE_RUST_PUSH_RECEIPT' scripts/push.ps1
+grep -q 'RUST_PUSH_RECEIPT_GATE=disabled' scripts/push.ps1
 grep -q -- '--locked' scripts/prepare-push.ps1
 grep -q 'CARGO_SOURCE_REPAIR_REQUIRED' scripts/validation/Cargo.Network.psm1
 grep -q 'elon.ai.cargo_source_repair.v1' scripts/validation/Cargo.Network.psm1

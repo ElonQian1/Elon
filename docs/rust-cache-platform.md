@@ -227,17 +227,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-source-repair.
 
 sccache 每轮明确输出 `SCCACHE_STATUS`、`SCCACHE_PATH`、命中/未命中统计或 `SCCACHE_DEGRADED_REASON`。缺失时继续必要验证，不联网安装；恢复方式是显式安装 sccache 后运行 `scripts/rust-cache.ps1 install -Apply`。`agent-validation` domain 和 release 设置 `CARGO_INCREMENTAL=0`，普通交互开发不改变 incremental。
 
-正式推送先在 Git SSH 会话建立前准备精确收据：
+Rust 推送收据门禁默认关闭；普通 push 不准备或要求收据，也不会因此运行 `cargo check`。需要恢复原有 fail-closed 门禁时，在当前进程显式启用：
 
 ```powershell
+$env:ELON_ENABLE_RUST_PUSH_RECEIPT='1'
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\prepare-push.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\push.ps1
 ```
 
 `prepare-push` 对当前 Rust 输入计算精确键，有效收据立即复用；缺失或失效才执行完整
-验证。`push.ps1` 先准备收据再打开 Git push。版本化 pre-push 仍 fail-closed：有效
-收据只跑廉价门禁，缺失/失效则补完整验证，绝不跳过 Rust 门禁。UI-only 且键未变化的
-push 不会联网或重跑 cargo check。
+验证。启用变量后，`push.ps1` 先准备收据再打开 Git push，版本化 pre-push 也恢复
+fail-closed：有效收据只跑廉价门禁，缺失/失效则补完整验证。未启用时两个入口均明确
+输出 `RUST_PUSH_RECEIPT_GATE=disabled` 并跳过收据门禁。
 
 缓存根优先接受 `ELON_NODE_DATA_ROOT/cache/rust-cache-v2`。系统盘低水位时仅输出 `elon.rust_cache.migration_advice.v1` 建议，不自动移动或删除；迁移必须先设置新根、登记 legacy，再运行 `purge-legacy` dry-run，确认后才可 `-Apply`。
 
@@ -245,6 +246,7 @@ push 不会联网或重跑 cargo check。
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-rust-cache-platform.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-validation-orchestrator.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-cargo-network.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-rust-push-receipt-gate.ps1
 bash scripts/test-cargo-source-contract.sh
 ```
 
