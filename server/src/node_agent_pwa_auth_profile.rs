@@ -147,6 +147,7 @@ fn prepare_profile(request: PrepareRequest) -> Result<PrepareResponse, ProfileEr
         "version": 1,
         "cookies": [],
         "headers": { "Authorization": format!("Bearer {}", request.token) },
+        "localStorage": { "lodex_token": request.token },
     }))
     .map_err(|_| {
         ProfileError::internal("PWA_AUTH_PROFILE_WRITE_FAILED", "无法准备临时 PWA 登录态")
@@ -389,6 +390,7 @@ mod tests {
             .join(format!("{}.json", prepared.profile));
         let stored = fs::read_to_string(&path).unwrap();
         assert!(stored.contains(&format!("Bearer {secret}")));
+        assert!(stored.contains("lodex_token"));
 
         let cleaned = cleanup_profile(CleanupRequest {
             project_root: root.display().to_string(),

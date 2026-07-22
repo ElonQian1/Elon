@@ -133,6 +133,22 @@ async fn render_page(
         cdp.command(method, json!({}), Some(&session), deadline)
             .await?;
     }
+    if !prepared.auth.local_storage.is_empty() {
+        let values = serde_json::to_string(&prepared.auth.local_storage)
+            .map_err(|_| protocol_error("无法序列化 authProfile localStorage"))?;
+        let target_origin = serde_json::to_string(&security::origin(&prepared.url)?)
+            .map_err(|_| protocol_error("无法序列化 PWA origin"))?;
+        let source = format!(
+            "(() => {{ if (location.origin !== {target_origin}) return; const values = {values}; for (const [key, value] of Object.entries(values)) localStorage.setItem(key, value); }})()"
+        );
+        cdp.command(
+            "Page.addScriptToEvaluateOnNewDocument",
+            json!({"source":source}),
+            Some(&session),
+            deadline,
+        )
+        .await?;
+    }
     cdp.command(
         "Fetch.enable",
         json!({"patterns":[

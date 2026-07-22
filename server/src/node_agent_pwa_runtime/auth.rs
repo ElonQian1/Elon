@@ -14,6 +14,7 @@ pub(super) struct PreparedAuth {
     pub(super) profile: Option<String>,
     pub(super) cookies: Vec<PreparedCookie>,
     pub(super) headers: BTreeMap<String, String>,
+    pub(super) local_storage: BTreeMap<String, String>,
     pub(super) ready_selector: Option<String>,
 }
 
@@ -34,6 +35,8 @@ struct SessionFile {
     cookies: Vec<SessionCookie>,
     #[serde(default)]
     headers: BTreeMap<String, String>,
+    #[serde(default)]
+    local_storage: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,6 +69,7 @@ pub(super) fn prepare_auth(
             profile: None,
             cookies: Vec::new(),
             headers: BTreeMap::new(),
+            local_storage: BTreeMap::new(),
             ready_selector,
         });
     };
@@ -117,10 +121,14 @@ pub(super) fn prepare_auth(
             .map_err(|_| invalid("AUTH_PROFILE_INVALID", "无法读取 authProfile"))?,
     )
     .map_err(|_| invalid("AUTH_PROFILE_INVALID", "authProfile JSON 无效"))?;
-    if session.version != 1 || session.cookies.len() > 64 || session.headers.len() > 16 {
+    if session.version != 1
+        || session.cookies.len() > 64
+        || session.headers.len() > 16
+        || session.local_storage.len() > 16
+    {
         return Err(invalid(
             "AUTH_PROFILE_INVALID",
-            "authProfile 必须是 version=1，最多 64 个 Cookie 和 16 个 header",
+            "authProfile 必须是 version=1，最多 64 个 Cookie、16 个 header 和 16 个 localStorage 项",
         ));
     }
     let mut cookies = Vec::new();
@@ -161,11 +169,28 @@ pub(super) fn prepare_auth(
             ));
         }
     }
+    for (name, value) in &session.local_storage {
+        if name.is_empty()
+            || name.len() > 256
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
+            || value.is_empty()
+            || value.len() > 8_192
+            || value.contains(['\r', '\n', '\0'])
+        {
+            return Err(invalid(
+                "AUTH_PROFILE_INVALID",
+                "authProfile localStorage 键值无效或包含控制字符",
+            ));
+        }
+    }
     Ok(PreparedAuth {
         mode: "prepared_profile",
         profile: Some(profile),
         cookies,
         headers: session.headers,
+        local_storage: session.local_storage,
         ready_selector,
     })
 }

@@ -323,3 +323,36 @@ async fn real_headless_fixture_reports_timeout_and_auth_without_false_png() {
     auth_server.abort();
     fs::remove_dir_all(root).unwrap();
 }
+
+#[tokio::test]
+async fn real_headless_fixture_uses_ephemeral_local_storage_auth() {
+    let root = project_root("local-storage-auth");
+    let session_dir = root.join(".elon/ui-tuner/pwa-sessions");
+    fs::create_dir_all(&session_dir).unwrap();
+    fs::write(
+        session_dir.join("fixture_auth.json"),
+        serde_json::to_vec(&json!({
+            "version": 1,
+            "localStorage": { "lodex_token": "fixture-token" }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let (url, server) = fixture(
+        r#"<!doctype html><body><form id="login"><input type="password"></form><script>if(localStorage.getItem('lodex_token')==='fixture-token'){document.body.innerHTML='<main id="ready">authenticated</main>'}</script></body>"#,
+    )
+    .await;
+    let mut capture_input = input(url);
+    capture_input.auth_profile = Some("fixture_auth".to_string());
+    let result = capture(root.to_str().unwrap(), capture_input).await;
+    if result.pointer("/diagnostic/code").and_then(Value::as_str) == Some("BROWSER_NOT_FOUND") {
+        server.abort();
+        fs::remove_dir_all(root).unwrap();
+        return;
+    }
+    assert_eq!(result["ok"], true, "{result:#}");
+    assert_eq!(result["authentication"]["mode"], "prepared_profile");
+    assert_eq!(result["processCleanup"]["temporaryProfileRemoved"], true);
+    server.abort();
+    fs::remove_dir_all(root).unwrap();
+}
