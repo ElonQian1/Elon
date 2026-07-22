@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use super::debug_integration::{DebugIntegrationCoordinator, DebugMergeCandidateRequest};
 use super::debug_integration_contract::DebugArtifactStatus;
@@ -274,7 +273,7 @@ fn signer_drift_preserves_the_pinned_artifact_and_fails_closed() {
 }
 
 fn git(root: &Path, args: &[&str]) {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .current_dir(root)
         .args(args)
         .output()
@@ -288,7 +287,7 @@ fn git(root: &Path, args: &[&str]) {
 }
 
 fn git_output(root: &Path, args: &[&str]) -> String {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .current_dir(root)
         .args(args)
         .output()

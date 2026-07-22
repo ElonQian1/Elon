@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 use chrono::Utc;
@@ -238,7 +237,7 @@ pub(super) fn slot_id(repo: &str, project: &str, device: &str, node: &str) -> St
 }
 
 pub(super) fn is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> Result<bool> {
-    Ok(Command::new("git")
+    Ok(crate::git_command_error::git_command()
         .current_dir(root)
         .args(["merge-base", "--is-ancestor", ancestor, descendant])
         .status()?
@@ -246,7 +245,10 @@ pub(super) fn is_ancestor(root: &Path, ancestor: &str, descendant: &str) -> Resu
 }
 
 pub(super) fn git(root: &Path, args: &[&str]) -> Result<String> {
-    let output = Command::new("git").current_dir(root).args(args).output()?;
+    let output = crate::git_command_error::git_command()
+        .current_dir(root)
+        .args(args)
+        .output()?;
     if !output.status.success() {
         bail!(
             "git {} 失败: {}",
