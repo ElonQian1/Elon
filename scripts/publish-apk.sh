@@ -846,4 +846,4 @@ echo -e "${CYAN}${SEP}${NC}"
 
 # 自动清理已合并、工作树干净的孤儿 task worktree
 . "$SCRIPT_DIR/apk-publish-postflight.sh"
-invoke_elon_apk_worktree_cleanup "$REPO_ROOT"
+invoke_elon_apk_publish_postflight "$REPO_ROOT" "$APK_PATH" "$NEW_CODE"
