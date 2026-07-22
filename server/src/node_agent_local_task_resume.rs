@@ -18,6 +18,7 @@ use crate::{
 
 #[path = "node_agent_local_task_resume_recovery.rs"]
 mod recovery;
+pub(crate) use recovery::OrphanedWorkspaceMigration;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ResumeWorkspaceMode {
@@ -35,6 +36,7 @@ pub(crate) struct ResolvedResumeWorkspace {
     /// The recorded active directory was deleted. A resume route may create a
     /// new platform conversation worktree only after it holds admission.
     pub snapshot_continue_required: bool,
+    pub orphaned_migration: Option<OrphanedWorkspaceMigration>,
     pub lease_migration: Option<crate::node_agent_local_task_resume_lineage::LegacyLeaseMigration>,
     pub resume_admission:
         Option<crate::node_agent_supervision_worktree_lease::ResumeAdmissionGuard>,
@@ -156,14 +158,11 @@ fn resolve_existing_resume_workspace(
     if !parent_is_terminal(parent) {
         bail!("父任务仍在运行或没有可靠终态，不能继承其工作区。");
     }
-    if let Some(reason) = parent
+    let resume_blocked_reason = parent
         .workspace_status
         .as_ref()
         .and_then(|status| status.get("resume_blocked_reason"))
-        .and_then(serde_json::Value::as_str)
-    {
-        bail!("父任务终态工作区快照不可信，禁止 Resume：{reason}");
-    }
+        .and_then(serde_json::Value::as_str);
 
     let project_part = safe_path_part(&parent.project_id, "project", 80);
     let parent_conversation_part = safe_path_part(&parent.conversation_id, "conversation", 80);
@@ -227,6 +226,7 @@ fn resolve_existing_resume_workspace(
         &project_part,
         &parent_conversation_part,
         &status_branch,
+        parent.workspace_status.as_ref(),
     )?;
     let expected_branch = platform_identity.branch;
     let conversation_part = platform_identity.conversation_part;
@@ -261,6 +261,9 @@ fn resolve_existing_resume_workspace(
         bail!("父任务隔离分支不符合平台生成规则。");
     }
     if !active_exists {
+        if let Some(reason) = resume_blocked_reason {
+            bail!("父任务终态工作区快照不可信，禁止 Resume：{reason}");
+        }
         let parent_contract =
             parent_contract.ok_or_else(|| anyhow!("父任务缺少可验证的监督契约。"))?;
         if parent_contract.protocol != SUPERVISION_PROTOCOL
@@ -291,15 +294,20 @@ fn resolve_existing_resume_workspace(
             git_head,
             requires_recreation: false,
             snapshot_continue_required: true,
+            orphaned_migration: None,
             lease_migration: None,
             resume_admission: None,
         });
     }
 
     let active = active_for_compare;
+    let mut orphaned_migration = None;
     let git_head = match validate_git_worktree_identity(&authorized_base, &active, &expected_branch)
     {
         Ok(head) => {
+            if let Some(reason) = resume_blocked_reason {
+                bail!("父任务终态工作区快照不可信，禁止 Resume：{reason}");
+            }
             if recorded_head
                 .as_deref()
                 .is_some_and(|recorded| !recorded.eq_ignore_ascii_case(&head))
@@ -315,6 +323,7 @@ fn resolve_existing_resume_workspace(
                 &expected_branch,
                 recorded_head.as_deref(),
                 supervision_root_task_id,
+                parent.workspace_status.as_ref(),
                 repair_missing_git_metadata,
             )
             .with_context(|| {
@@ -323,7 +332,9 @@ fn resolve_existing_resume_workspace(
                 )
             })?;
             derivation = recovered.derivation;
-            recovered.git_head
+            let git_head = recovered.git_head;
+            orphaned_migration = recovered.orphaned_migration;
+            git_head
         }
         Err(error) => return Err(error),
     };
@@ -345,8 +356,8 @@ fn resolve_existing_resume_workspace(
         )?;
     }
 
-    let requires_recreation =
-        !repair_missing_git_metadata && derivation.contains("_recovery_ready_");
+    let requires_recreation = !repair_missing_git_metadata
+        && (derivation.contains("_recovery_ready_") || orphaned_migration.is_some());
     Ok(ResolvedResumeWorkspace {
         authorized_workspace_path: display_path(&authorized_base),
         inherited_workspace: ConversationWorkspaceResult {
@@ -360,6 +371,7 @@ fn resolve_existing_resume_workspace(
         git_head,
         requires_recreation,
         snapshot_continue_required: false,
+        orphaned_migration,
         lease_migration,
         resume_admission: None,
     })
@@ -418,6 +430,7 @@ pub(crate) fn recorded_platform_workspace_identity(
     project_part: &str,
     parent_conversation_part: &str,
     recorded_branch: &str,
+    workspace_status: Option<&serde_json::Value>,
 ) -> Result<RecordedPlatformWorkspaceIdentity> {
     let parent_expected_branch = format!("ai/session/{project_part}/{parent_conversation_part}");
     if recorded_branch == parent_expected_branch {
@@ -425,6 +438,51 @@ pub(crate) fn recorded_platform_workspace_identity(
             branch: parent_expected_branch,
             conversation_part: parent_conversation_part.to_string(),
             inherited: false,
+        });
+    }
+
+    if workspace_status
+        .and_then(|status| status.get("provenance_derivation"))
+        .and_then(serde_json::Value::as_str)
+        == Some("orphaned_workspace_controlled_migration_branch_head")
+    {
+        let status = workspace_status.expect("controlled migration status checked");
+        let source_branch = status
+            .get("migration_source_branch")
+            .and_then(serde_json::Value::as_str);
+        anyhow::ensure!(
+            source_branch == Some(parent_expected_branch.as_str()),
+            "受控迁移来源分支与根任务原始会话身份不一致"
+        );
+        let source_path = status
+            .get("migration_source_active_workspace_path")
+            .and_then(serde_json::Value::as_str)
+            .map(Path::new)
+            .ok_or_else(|| anyhow!("受控迁移 provenance 缺少原始目录身份。"))?;
+        validate_platform_worktree_shape(source_path, project_part, parent_conversation_part)
+            .context("受控迁移来源路径身份无效")?;
+        let parent_contract =
+            parent_contract.ok_or_else(|| anyhow!("受控迁移根任务缺少持久监督契约。"))?;
+        anyhow::ensure!(
+            parent_contract.protocol == SUPERVISION_PROTOCOL
+                && parent_contract.task_role == "requirement"
+                && parent_contract.parent_task_id.is_none(),
+            "受控迁移 provenance 只允许来自权威 requirement 根任务"
+        );
+        let prefix = format!("ai/session/{project_part}/");
+        let conversation_part = recorded_branch
+            .strip_prefix(&prefix)
+            .map(str::trim)
+            .filter(|value| !value.is_empty() && !value.contains(['/', '\\']))
+            .ok_or_else(|| anyhow!("受控迁移目标分支不属于当前项目平台会话。"))?;
+        anyhow::ensure!(
+            safe_path_part(conversation_part, "conversation", 80) == conversation_part,
+            "受控迁移目标会话身份无效"
+        );
+        return Ok(RecordedPlatformWorkspaceIdentity {
+            branch: recorded_branch.to_string(),
+            conversation_part: conversation_part.to_string(),
+            inherited: true,
         });
     }
 
@@ -619,6 +677,9 @@ fn same_component(left: &str, right: &str) -> bool {
     }
 }
 
+#[cfg(test)]
+#[path = "node_agent_local_task_resume_orphan_tests.rs"]
+mod orphan_tests;
 #[cfg(test)]
 #[path = "node_agent_local_task_resume_tests.rs"]
 mod tests;

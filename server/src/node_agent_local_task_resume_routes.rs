@@ -94,6 +94,9 @@ pub(crate) async fn resolve_supervised_resume_workspace(
     .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
     validate_migration_lineage(runtime, &parent, &parent_contract, &resolved)
         .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    validate_orphan_occupancy(runtime, &parent, &parent_contract, &resolved)
+        .await
+        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
 
     let admission_base = resolved.authorized_workspace_path.clone();
     let admission = tokio::task::spawn_blocking(move || {
@@ -116,6 +119,9 @@ pub(crate) async fn resolve_supervised_resume_workspace(
     )
     .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
     validate_migration_lineage(runtime, &parent, &parent_contract, &resolved)
+        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    let orphan_occupancy = validate_orphan_occupancy(runtime, &parent, &parent_contract, &resolved)
+        .await
         .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
     if resolved.snapshot_continue_required {
         validate_snapshot_continue_safety(runtime, creds, &parent, &journal_snapshot)
@@ -166,7 +172,53 @@ pub(crate) async fn resolve_supervised_resume_workspace(
             "父任务隔离 worktree 仍被存活 sidecar 占用，已拒绝续跑。",
         ));
     }
-    if resolved.requires_recreation {
+    if let (Some(migration), Some(occupancy)) = (
+        resolved.orphaned_migration.clone(),
+        orphan_occupancy.as_ref(),
+    ) {
+        let data_paths = runtime.node_data_root.read().await.paths.clone();
+        let workspace_root = data_paths
+            .as_ref()
+            .map(|paths| paths.workspaces())
+            .ok_or_else(|| json_error(StatusCode::CONFLICT, "节点缺少平台 workspace root。"))?;
+        let prepared = crate::pc_workspace_provisioner::prepare_conversation_workspace_in_with_supervision_at_ref(
+            &workspace_root,
+            &resolved.authorized_workspace_path,
+            project_id,
+            conversation_id,
+            contract.root_task_id.as_deref(),
+            &migration.target_head,
+        )
+        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+        if let Err(error) = crate::node_agent_local_task_orphan_migration::reclaim_terminal_leases(
+            FsPath::new(&resolved.authorized_workspace_path),
+            FsPath::new(&prepared.workspace_path),
+            occupancy,
+        ) {
+            rollback_created_migration_workspace(&resolved.authorized_workspace_path, &prepared);
+            return Err(json_error(StatusCode::CONFLICT, error.to_string()));
+        }
+        if let Err(error) = runtime
+            .local_tasks
+            .migrate_orphaned_root_workspace(&parent, &prepared, &migration)
+        {
+            for lease in &occupancy.reclaimable_leases {
+                let _ = crate::node_agent_supervision_worktree_lease::acquire(
+                    FsPath::new(&resolved.authorized_workspace_path),
+                    &lease.path,
+                    &lease.lease_task_id,
+                );
+            }
+            rollback_created_migration_workspace(&resolved.authorized_workspace_path, &prepared);
+            return Err(json_error(StatusCode::CONFLICT, error.to_string()));
+        }
+        resolved.inherited_workspace = prepared;
+        resolved.derivation =
+            "orphaned_workspace_controlled_migration_from_branch_head".to_string();
+        resolved.git_head = migration.target_head;
+        resolved.requires_recreation = false;
+        resolved.orphaned_migration = None;
+    } else if resolved.requires_recreation {
         resolved = crate::node_agent_local_task_resume::resolve_resume_workspace(
             contract,
             &parent,
@@ -267,6 +319,11 @@ pub(crate) async fn inspect_resume_workspace_status(
             {
                 return json!({"eligible": false, "reason": error.to_string()});
             }
+            if let Err(error) =
+                validate_orphan_occupancy(runtime, parent, parent_contract, &resolved).await
+            {
+                return json!({"eligible": false, "reason": error.to_string()});
+            }
             let recorded_workspace_exists =
                 FsPath::new(&resolved.inherited_workspace.workspace_path).exists();
             let prompt_occupied = recorded_workspace_exists
@@ -294,10 +351,63 @@ pub(crate) async fn inspect_resume_workspace_status(
                 "requires_recreation": resolved.requires_recreation,
                 "lease_migration_required": resolved.lease_migration.is_some(),
                 "lease_migration_from": resolved.lease_migration.as_ref().map(|migration| migration.legacy_task_id.as_str()),
+                "orphaned_migration_source": resolved.orphaned_migration.as_ref().map(|migration| migration.source_path.as_str()),
+                "orphaned_migration_target_head": resolved.orphaned_migration.as_ref().map(|migration| migration.target_head.as_str()),
             })
         }
         Err(error) => json!({"eligible": false, "reason": error.to_string()}),
     }
+}
+
+async fn validate_orphan_occupancy(
+    runtime: &NodeRuntime,
+    parent: &crate::node_agent_local_task_store::LocalTaskRecord,
+    parent_contract: &crate::node_agent_local_task_supervision::SupervisionContract,
+    resolved: &ResolvedResumeWorkspace,
+) -> anyhow::Result<Option<crate::node_agent_local_task_orphan_migration::OrphanMigrationOccupancy>>
+{
+    let Some(migration) = resolved.orphaned_migration.as_ref() else {
+        return Ok(None);
+    };
+    let occupancy = crate::node_agent_local_task_orphan_migration::validate_occupancy(
+        &runtime.local_tasks,
+        &runtime.task_journal,
+        parent,
+        parent_contract,
+        migration,
+        FsPath::new(&resolved.authorized_workspace_path),
+    )?;
+    for path in &occupancy.task_paths {
+        anyhow::ensure!(
+            runtime
+                .active_cli_prompt_views_for_workspace(path)
+                .await
+                .is_empty(),
+            "同根 workspace 仍有非终态 executor prompt 占用：{}",
+            path.display()
+        );
+        anyhow::ensure!(
+            !live_sidecar_occupies_workspace(runtime, path.to_string_lossy().as_ref())?,
+            "同根 workspace 仍有存活 sidecar 占用：{}",
+            path.display()
+        );
+    }
+    Ok(Some(occupancy))
+}
+
+fn rollback_created_migration_workspace(
+    base: &str,
+    workspace: &crate::pc_workspace_provisioner::ConversationWorkspaceResult,
+) {
+    let base = FsPath::new(base);
+    let active = FsPath::new(&workspace.workspace_path);
+    if let Some(root) = workspace.supervision_root_task_id.as_deref() {
+        let _ = crate::node_agent_supervision_worktree_lease::release(base, active, root);
+    }
+    let _ = crate::git_command_error::git_command()
+        .args(["worktree", "remove", "--force", &workspace.workspace_path])
+        .current_dir(base)
+        .output();
 }
 
 fn validate_migration_lineage(

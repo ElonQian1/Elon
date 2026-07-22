@@ -331,6 +331,7 @@ mod tests {
             git_head: "0123456789abcdef".into(),
             requires_recreation: false,
             snapshot_continue_required: false,
+            orphaned_migration: None,
             lease_migration: None,
             resume_admission: None,
         };

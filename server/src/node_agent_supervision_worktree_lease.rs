@@ -17,6 +17,12 @@ pub(crate) use transition::{migrate_legacy_child_lease, ResumeAdmissionGuard};
 
 const LEASE_PREFIX: &str = "elon-supervision:";
 
+#[derive(Clone, Debug)]
+pub(crate) struct WorktreeLock {
+    pub(crate) path: std::path::PathBuf,
+    pub(crate) reason: String,
+}
+
 pub(crate) fn acquire(base: &Path, active: &Path, root_task_id: &str) -> Result<()> {
     let expected = lease_reason(root_task_id)?;
     match worktree_lock_reason(base, active)? {
@@ -66,6 +72,35 @@ pub(crate) fn worktree_lock_reason(base: &Path, active: &Path) -> Result<Option<
         }
     }
     Ok(None)
+}
+
+pub(crate) fn list_worktree_locks(base: &Path) -> Result<Vec<WorktreeLock>> {
+    let output = git_output(base, &["worktree", "list", "--porcelain"])?;
+    let mut locks = Vec::new();
+    for entry in output.split("\n\n") {
+        let mut path = None;
+        let mut reason = None;
+        for line in entry.lines() {
+            if let Some(value) = line.strip_prefix("worktree ") {
+                path = Some(canonical_or_original(Path::new(value)));
+            } else if line == "locked" {
+                reason = Some(String::new());
+            } else if let Some(value) = line.strip_prefix("locked ") {
+                reason = Some(value.trim().to_string());
+            }
+        }
+        if let (Some(path), Some(reason)) = (path, reason) {
+            locks.push(WorktreeLock { path, reason });
+        }
+    }
+    Ok(locks)
+}
+
+pub(crate) fn supervision_lease_task_id(reason: &str) -> Option<&str> {
+    reason
+        .strip_prefix(LEASE_PREFIX)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
 }
 
 pub(crate) fn is_supervision_lease(reason: &str) -> bool {

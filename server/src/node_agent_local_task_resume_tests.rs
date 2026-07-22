@@ -24,6 +24,14 @@ impl ResumeFixture {
         run_git(&base, &["init"]);
         run_git(&base, &["config", "user.email", "ai@example.test"]);
         run_git(&base, &["config", "user.name", "AI Test"]);
+        run_git(
+            &base,
+            &[
+                "config",
+                "remote.origin.url",
+                "https://example.test/elon.git",
+            ],
+        );
         std::fs::write(base.join("README.md"), "seed\n").expect("write seed");
         run_git(&base, &["add", "README.md"]);
         run_git(&base, &["commit", "-m", "seed"]);
@@ -40,6 +48,10 @@ impl ResumeFixture {
             ],
         );
         let git_head = git_output(&active, &["rev-parse", "--verify", "HEAD^{commit}"]);
+        run_git(
+            &base,
+            &["update-ref", "refs/remotes/origin/main", &git_head],
+        );
 
         let parent = LocalTaskRecord {
             task_id: "local-parent".to_string(),
@@ -66,11 +78,16 @@ impl ResumeFixture {
             reasoning_tokens: None,
             total_tokens: None,
             workspace_status: Some(json!({
+                "platform_provenance": "elon.conversation_worktree.v1",
+                "project_id": "project-a",
+                "root_task_id": "local-parent",
                 "base_workspace_path": base.to_string_lossy(),
                 "active_workspace_path": active.to_string_lossy(),
                 "isolated": true,
                 "branch": "ai/session/project-a/conversation-a",
                 "git_head": git_head,
+                "git_common_dir": git_output(&base, &["rev-parse", "--path-format=absolute", "--git-common-dir"]),
+                "git_remote": "https://example.test/elon.git",
                 "prepare_status": "prepared",
                 "merge_status": "skipped"
             })),
@@ -609,76 +626,6 @@ fn locked_worktree_survives_cleanup_while_a_spawned_process_is_alive() {
 
     let _ = child.kill();
     let _ = child.wait();
-}
-
-#[test]
-fn orphaned_worktree_resume_rebuilds_metadata_and_preserves_user_files() {
-    let fixture = ResumeFixture::new();
-    std::fs::write(fixture.active.join("README.md"), "uncommitted edit\n")
-        .expect("write tracked edit");
-    std::fs::write(
-        fixture.active.join("publish-alive.txt"),
-        "do not overwrite\n",
-    )
-    .expect("write untracked evidence");
-
-    crate::node_agent_supervision_worktree_lease::release(
-        &fixture.base,
-        &fixture.active,
-        "local-parent",
-    )
-    .unwrap();
-    let parked = fixture.root.join("parked-active");
-    std::fs::rename(&fixture.active, &parked).expect("park active directory");
-    run_git(&fixture.base, &["worktree", "prune", "--expire", "now"]);
-    std::fs::rename(&parked, &fixture.active).expect("restore orphaned directory");
-    assert!(!recovery::is_git_worktree(&fixture.active));
-
-    let inspected = inspect_resume_workspace(
-        &fixture.contract,
-        &fixture.parent,
-        None,
-        None,
-        "project-a",
-        fixture.base.to_string_lossy().as_ref(),
-    )
-    .expect("read-only inspection should recognize recoverable metadata loss");
-    assert!(inspected
-        .derivation
-        .contains("recovery_ready_recorded_head"));
-    assert!(!recovery::is_git_worktree(&fixture.active));
-
-    let resolved = validate_resume_workspace(
-        &fixture.contract,
-        &fixture.parent,
-        None,
-        None,
-        "project-a",
-        fixture.base.to_string_lossy().as_ref(),
-    )
-    .expect("Resume should rebuild the recorded worktree");
-    assert!(resolved.derivation.contains("git_rebuilt_recorded_head"));
-    assert!(recovery::is_git_worktree(&fixture.active));
-    assert_eq!(
-        std::fs::read_to_string(fixture.active.join("README.md")).unwrap(),
-        "uncommitted edit\n"
-    );
-    assert_eq!(
-        std::fs::read_to_string(fixture.active.join("publish-alive.txt")).unwrap(),
-        "do not overwrite\n"
-    );
-    let status = git_output(&fixture.active, &["status", "--short"]);
-    assert!(status.contains("README.md"));
-    assert!(status.contains("publish-alive.txt"));
-    assert_eq!(
-        crate::node_agent_supervision_worktree_lease::worktree_lock_reason(
-            &fixture.base,
-            &fixture.active
-        )
-        .unwrap()
-        .as_deref(),
-        Some("elon-supervision:local-parent")
-    );
 }
 
 fn run_git(cwd: &Path, args: &[&str]) {

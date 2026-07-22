@@ -1,290 +1,240 @@
-//! Safe reconstruction for a platform worktree whose Git registration was lost.
+//! Read-only proof for migrating an orphaned platform worktree.
+//!
+//! The source directory is never renamed, removed, or repaired in place.  A
+//! Resume route may use the resulting plan to create a new platform worktree
+//! only after durable task/lease occupancy has also been proved safe.
 
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::git_command_error::{git_command, git_failure_message, git_spawn_context};
 
+#[derive(Clone, Debug)]
+pub(crate) struct OrphanedWorkspaceMigration {
+    pub(crate) source_path: String,
+    pub(crate) source_branch: String,
+    pub(crate) recorded_head: String,
+    pub(crate) target_head: String,
+}
+
 pub(super) struct MissingWorktreeRecovery {
     pub(super) git_head: String,
     pub(super) derivation: String,
+    pub(super) orphaned_migration: Option<OrphanedWorkspaceMigration>,
 }
 
 pub(super) fn is_git_worktree(path: &Path) -> bool {
     git_output(path, &["rev-parse", "--is-inside-work-tree"]).is_ok_and(|value| value == "true")
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn inspect_or_repair(
     base: &Path,
     active: &Path,
     branch: &str,
     recorded_head: Option<&str>,
     supervision_root_task_id: &str,
-    repair: bool,
+    workspace_status: Option<&Value>,
+    _repair: bool,
 ) -> Result<MissingWorktreeRecovery> {
     if is_git_worktree(active) {
-        bail!("活动工作区仍有 Git 元数据，拒绝按 orphaned worktree 重建。")
+        bail!("活动工作区仍有 Git 元数据，拒绝按 orphaned worktree 迁移。")
     }
-    let (git_head, head_source) = recovery_head(base, branch, recorded_head)?;
-    validate_branch_recovery_identity(base, branch, &git_head)?;
-    if repair {
-        rebuild_without_overwriting_files(
-            base,
-            active,
-            branch,
-            &git_head,
-            supervision_root_task_id,
-        )?;
-    }
-    Ok(MissingWorktreeRecovery {
-        git_head,
-        derivation: if repair {
-            format!("workspace_status_git_rebuilt_{head_source}")
-        } else {
-            format!("workspace_status_git_recovery_ready_{head_source}")
-        },
-    })
-}
+    let status = workspace_status.context("孤儿工作区缺少持久 workspace_status")?;
+    validate_status_identity(base, active, branch, supervision_root_task_id, status)?;
+    validate_stale_git_marker(base, active)?;
 
-fn recovery_head(
-    base: &Path,
-    branch: &str,
-    recorded_head: Option<&str>,
-) -> Result<(String, &'static str)> {
-    if let Some(recorded) = recorded_head
+    let recorded_head = recorded_head
         .map(str::trim)
         .filter(|value| !value.is_empty())
-    {
-        let head = resolve_commit(base, recorded)
-            .context("父任务记录的 git_head 在基础仓库中不存在，拒绝重建隔离 worktree")?;
-        return Ok((head, "recorded_head"));
-    }
-
+        .context("孤儿工作区缺少记录 HEAD，拒绝猜测迁移来源")?;
+    let recorded_head =
+        resolve_commit(base, recorded_head).context("孤儿工作区记录 HEAD 在授权仓库中不存在")?;
     let branch_ref = format!("refs/heads/{branch}");
-    let head = resolve_commit(base, &branch_ref)
-        .context("旧父任务未记录 git_head，且隔离分支已不存在；无法猜测提交，已保护现场")?;
-    Ok((head, "legacy_branch_ref"))
-}
+    let target_head = resolve_commit(base, &branch_ref).context("孤儿工作区记录分支已不存在")?;
+    ensure_ancestor(
+        base,
+        &recorded_head,
+        &target_head,
+        "记录 HEAD 不是分支 HEAD 的祖先",
+    )?;
+    let origin_main = resolve_commit(base, "refs/remotes/origin/main")
+        .context("授权仓库缺少 origin/main 身份")?;
+    ensure_ancestor(
+        base,
+        &target_head,
+        &origin_main,
+        "孤儿分支 HEAD 尚未进入 origin/main",
+    )?;
+    validate_clean_against_commit(base, active, &target_head)?;
 
-fn validate_branch_recovery_identity(base: &Path, branch: &str, head: &str) -> Result<()> {
-    let branch_ref = format!("refs/heads/{branch}");
-    if let Ok(branch_head) = resolve_commit(base, &branch_ref) {
-        if !branch_head.eq_ignore_ascii_case(head) {
-            bail!("隔离分支当前 HEAD ({branch_head}) 与父任务记录 ({head}) 不一致，已拒绝覆盖。");
-        }
-    }
-
-    let registrations = git_output(base, &["worktree", "list", "--porcelain"])?;
-    let expected_ref = format!("branch refs/heads/{branch}");
-    if registrations.lines().any(|line| line == expected_ref) {
-        bail!("隔离分支仍被其它 Git worktree 注册，已拒绝重复重建。")
-    }
-    Ok(())
-}
-
-fn rebuild_without_overwriting_files(
-    base: &Path,
-    active: &Path,
-    branch: &str,
-    head: &str,
-    supervision_root_task_id: &str,
-) -> Result<()> {
-    let parent = active
-        .parent()
-        .ok_or_else(|| anyhow!("活动 worktree 缺少父目录。"))?;
-    let backup = parent.join(format!(
-        ".{}-resume-backup-{}",
-        active
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or("conversation"),
-        Uuid::new_v4().simple()
-    ));
-
-    std::fs::rename(active, &backup).with_context(|| {
-        format!(
-            "活动目录仍被存活后代进程占用，或无法建立恢复快照；现场保持不变: {}",
-            active.display()
-        )
-    })?;
-
-    let attempt = (|| -> Result<()> {
-        add_metadata_only_worktree(base, active, branch, head, supervision_root_task_id)?;
-        move_user_entries(&backup, active)?;
-        validate_rebuilt_identity(base, active, branch, head)?;
-        remove_stale_git_marker_and_empty_backup(&backup)?;
-        Ok(())
-    })();
-    if let Err(error) = attempt {
-        let rollback_error = rollback_rebuild(base, active, &backup).err();
-        return match rollback_error {
-            Some(rollback) => Err(error).context(format!(
-                "重建失败且自动回滚不完整；用户文件快照保留在 {}: {rollback:#}",
-                backup.display()
-            )),
-            None => Err(error).context("重建失败，已恢复原目录且未覆盖用户文件"),
-        };
-    }
-    Ok(())
-}
-
-fn add_metadata_only_worktree(
-    base: &Path,
-    active: &Path,
-    branch: &str,
-    head: &str,
-    supervision_root_task_id: &str,
-) -> Result<()> {
-    let active_arg = git_path_arg(active);
-    let branch_ref = format!("refs/heads/{branch}");
-    let reason =
-        crate::node_agent_supervision_worktree_lease::lease_reason(supervision_root_task_id)?;
-    if resolve_commit(base, &branch_ref).is_ok() {
-        run_git(
-            base,
-            &[
-                "worktree",
-                "add",
-                "--lock",
-                "--reason",
-                &reason,
-                "--no-checkout",
-                &active_arg,
-                branch,
-            ],
-        )
-    } else {
-        run_git(
-            base,
-            &[
-                "worktree",
-                "add",
-                "--lock",
-                "--reason",
-                &reason,
-                "--no-checkout",
-                "-b",
-                branch,
-                &active_arg,
-                head,
-            ],
-        )
-    }
-}
-
-fn move_user_entries(from: &Path, to: &Path) -> Result<()> {
-    for entry in
-        std::fs::read_dir(from).with_context(|| format!("无法读取恢复快照 {}", from.display()))?
-    {
-        let entry = entry?;
-        if entry
-            .file_name()
-            .to_string_lossy()
-            .eq_ignore_ascii_case(".git")
-        {
-            continue;
-        }
-        let destination = to.join(entry.file_name());
-        if destination.exists() {
-            bail!(
-                "重建目标已存在同名路径，拒绝覆盖用户文件: {}",
-                destination.display()
-            );
-        }
-        std::fs::rename(entry.path(), &destination).with_context(|| {
-            format!("无法把用户文件移回重建 worktree: {}", destination.display())
-        })?;
-    }
-    Ok(())
-}
-
-fn validate_rebuilt_identity(base: &Path, active: &Path, branch: &str, head: &str) -> Result<()> {
-    let actual_head = resolve_commit(active, "HEAD")?;
-    if !actual_head.eq_ignore_ascii_case(head) {
-        bail!("重建 worktree 的 HEAD 与父任务记录不一致。")
-    }
-    let actual_branch = git_output(active, &["branch", "--show-current"])?;
-    if actual_branch != branch {
-        bail!("重建 worktree 的分支与父任务记录不一致。")
-    }
-    let base_common = resolved_git_path(base, &["rev-parse", "--git-common-dir"])?;
-    let active_common = resolved_git_path(active, &["rev-parse", "--git-common-dir"])?;
-    if !same_path(&base_common, &active_common) {
-        bail!("重建 worktree 未连接到父任务基础仓库。")
-    }
-    Ok(())
-}
-
-fn remove_stale_git_marker_and_empty_backup(backup: &Path) -> Result<()> {
-    let stale_git = backup.join(".git");
-    if stale_git.is_dir() {
-        std::fs::remove_dir_all(&stale_git)?;
-    } else if stale_git.exists() {
-        std::fs::remove_file(&stale_git)?;
-    }
-    std::fs::remove_dir(backup).with_context(|| {
-        format!(
-            "恢复快照仍含未迁移文件，已停止清理并保留: {}",
-            backup.display()
-        )
+    Ok(MissingWorktreeRecovery {
+        git_head: target_head.clone(),
+        derivation: "orphaned_workspace_controlled_migration_ready_branch_head".to_string(),
+        orphaned_migration: Some(OrphanedWorkspaceMigration {
+            source_path: active.to_string_lossy().to_string(),
+            source_branch: branch.to_string(),
+            recorded_head,
+            target_head,
+        }),
     })
 }
 
-fn rollback_rebuild(base: &Path, active: &Path, backup: &Path) -> Result<()> {
-    if active.exists() && backup.exists() {
-        move_user_entries(active, backup)?;
-    }
-    let active_arg = git_path_arg(active);
-    let _ = run_git(
-        base,
-        &["worktree", "remove", "--force", "--force", &active_arg],
+fn validate_status_identity(
+    base: &Path,
+    active: &Path,
+    branch: &str,
+    root_task_id: &str,
+    status: &Value,
+) -> Result<()> {
+    optional_eq(
+        status,
+        "platform_provenance",
+        "elon.conversation_worktree.v1",
+    )?;
+    optional_eq(status, "root_task_id", root_task_id)?;
+    let recorded_base = canonical(Path::new(required(status, "base_workspace_path")?))?;
+    let recorded_active = canonical(Path::new(required(status, "active_workspace_path")?))?;
+    anyhow::ensure!(
+        same_path(base, &recorded_base),
+        "授权 base repo 与记录路径漂移"
     );
-    if active.exists() {
-        let git_marker = active.join(".git");
-        if git_marker.is_file() {
-            std::fs::remove_file(&git_marker)?;
-        }
-        if std::fs::read_dir(active)?.next().is_none() {
-            std::fs::remove_dir(active)?;
-        }
+    anyhow::ensure!(
+        same_path(active, &recorded_active),
+        "孤儿目录与记录路径漂移"
+    );
+    required_eq(status, "branch", branch)?;
+
+    let current_common = git_path(
+        base,
+        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    )?;
+    if let Some(recorded) = optional(status, "git_common_dir") {
+        let recorded_common = canonical(Path::new(recorded))?;
+        anyhow::ensure!(
+            same_path(&current_common, &recorded_common),
+            "Git common-dir 身份漂移"
+        );
     }
-    if !active.exists() && backup.exists() {
-        std::fs::rename(backup, active)?;
-    }
+    let remote = git_output(base, &["config", "--get", "remote.origin.url"])?;
+    anyhow::ensure!(
+        !remote.trim().is_empty(),
+        "授权 base repo 缺少 origin remote"
+    );
+    optional_eq(status, "git_remote", remote.trim())
+}
+
+fn validate_stale_git_marker(base: &Path, active: &Path) -> Result<()> {
+    let marker = active.join(".git");
+    let metadata = std::fs::symlink_metadata(&marker)
+        .with_context(|| format!("孤儿目录缺少原始 .git marker: {}", marker.display()))?;
+    anyhow::ensure!(
+        metadata.file_type().is_file(),
+        "孤儿 .git marker 不是普通文件"
+    );
+    let raw = std::fs::read_to_string(&marker)?;
+    let gitdir = raw
+        .trim()
+        .strip_prefix("gitdir:")
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .context("孤儿 .git marker 格式无效")?;
+    anyhow::ensure!(gitdir.is_absolute(), "孤儿 .git marker 不是绝对路径");
+    anyhow::ensure!(
+        !gitdir.exists(),
+        "孤儿 .git marker 目标仍存在，拒绝绕过 Git 注册"
+    );
+    let common = git_path(
+        base,
+        &["rev-parse", "--path-format=absolute", "--git-common-dir"],
+    )?;
+    let worktrees = common.join("worktrees");
+    let parent = gitdir
+        .parent()
+        .context("孤儿 .git marker 缺少 admin 父目录")?;
+    anyhow::ensure!(
+        same_path(parent, &worktrees),
+        "孤儿 .git marker 指向其它 Git common-dir"
+    );
     Ok(())
 }
 
-fn resolve_commit(repo: &Path, reference: &str) -> Result<String> {
+fn validate_clean_against_commit(base: &Path, active: &Path, head: &str) -> Result<()> {
+    let index = std::env::temp_dir().join(format!(
+        "elon-orphan-compare-{}-{}.index",
+        std::process::id(),
+        Uuid::new_v4().simple()
+    ));
+    let result = (|| -> Result<()> {
+        git_with_index(base, &index, None, &["read-tree", head])?;
+        let tracked = git_with_index(
+            base,
+            &index,
+            Some(active),
+            &["diff", "--name-status", "--no-ext-diff"],
+        )?;
+        let untracked = git_with_index(
+            base,
+            &index,
+            Some(active),
+            &["ls-files", "--others", "--exclude-standard"],
+        )?;
+        let status = format!("{tracked}{untracked}");
+        anyhow::ensure!(
+            status.trim().is_empty(),
+            "孤儿目录业务内容与分支目标提交不一致或存在未保存差异: {}",
+            status.lines().take(8).collect::<Vec<_>>().join(" | ")
+        );
+        Ok(())
+    })();
+    let _ = std::fs::remove_file(&index);
+    result
+}
+
+fn git_with_index(
+    cwd: &Path,
+    index: &Path,
+    worktree: Option<&Path>,
+    args: &[&str],
+) -> Result<String> {
+    let mut command = git_command();
+    command
+        .args(args)
+        .current_dir(cwd)
+        .env("GIT_INDEX_FILE", index);
+    if let Some(worktree) = worktree {
+        command.env("GIT_WORK_TREE", worktree);
+    }
+    let output = command.output().with_context(|| git_spawn_context(args))?;
+    if !output.status.success() {
+        bail!(git_failure_message(cwd, args, &output));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).replace("\r\n", "\n"))
+}
+
+fn ensure_ancestor(base: &Path, ancestor: &str, descendant: &str, message: &str) -> Result<()> {
+    let status = git_command()
+        .args(["merge-base", "--is-ancestor", ancestor, descendant])
+        .current_dir(base)
+        .status()
+        .context("验证孤儿工作区提交谱系")?;
+    anyhow::ensure!(status.success(), "{message}");
+    Ok(())
+}
+
+fn resolve_commit(base: &Path, reference: &str) -> Result<String> {
     git_output(
-        repo,
+        base,
         &["rev-parse", "--verify", &format!("{reference}^{{commit}}")],
     )
 }
 
-fn resolved_git_path(cwd: &Path, args: &[&str]) -> Result<PathBuf> {
-    let raw = git_output(cwd, args)?;
-    let path = PathBuf::from(raw.trim());
-    let path = if path.is_absolute() {
-        path
-    } else {
-        cwd.join(path)
-    };
-    std::fs::canonicalize(&path)
-        .with_context(|| format!("无法解析 Git 身份路径: {}", path.display()))
-}
-
-fn run_git(cwd: &Path, args: &[&str]) -> Result<()> {
-    let output = git_command()
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .with_context(|| git_spawn_context(args))?;
-    if !output.status.success() {
-        bail!(git_failure_message(cwd, args, &output));
-    }
-    Ok(())
+fn git_path(cwd: &Path, args: &[&str]) -> Result<PathBuf> {
+    canonical(Path::new(git_output(cwd, args)?.trim()))
 }
 
 fn git_output(cwd: &Path, args: &[&str]) -> Result<String> {
@@ -299,31 +249,59 @@ fn git_output(cwd: &Path, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
+fn required<'a>(status: &'a Value, field: &str) -> Result<&'a str> {
+    status
+        .get(field)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow!("孤儿 workspace_status 缺少 {field}"))
+}
+
+fn optional<'a>(status: &'a Value, field: &str) -> Option<&'a str> {
+    status
+        .get(field)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+}
+
+fn required_eq(status: &Value, field: &str, expected: &str) -> Result<()> {
+    anyhow::ensure!(
+        required(status, field)? == expected,
+        "孤儿 workspace_status 的 {field} 身份漂移"
+    );
+    Ok(())
+}
+
+fn optional_eq(status: &Value, field: &str, expected: &str) -> Result<()> {
+    if let Some(recorded) = optional(status, field) {
+        anyhow::ensure!(
+            recorded == expected,
+            "孤儿 workspace_status 的 {field} 身份漂移"
+        );
+    }
+    Ok(())
+}
+
+fn canonical(path: &Path) -> Result<PathBuf> {
+    std::fs::canonicalize(path).with_context(|| format!("无法解析身份路径 {}", path.display()))
+}
+
 fn same_path(left: &Path, right: &Path) -> bool {
     if cfg!(windows) {
-        display_path(left).eq_ignore_ascii_case(&display_path(right))
+        normalize_windows_path(left).eq_ignore_ascii_case(&normalize_windows_path(right))
     } else {
         left == right
     }
 }
 
-fn display_path(path: &Path) -> String {
-    path.to_string_lossy().to_string()
-}
-
-#[cfg(windows)]
-fn git_path_arg(path: &Path) -> String {
-    let value = path.to_string_lossy();
-    if let Some(rest) = value.strip_prefix("\\\\?\\UNC\\") {
-        return format!("\\\\{rest}");
-    }
-    if let Some(rest) = value.strip_prefix("\\\\?\\") {
-        return rest.to_string();
-    }
-    value.to_string()
-}
-
-#[cfg(not(windows))]
-fn git_path_arg(path: &Path) -> String {
-    display_path(path)
+fn normalize_windows_path(path: &Path) -> String {
+    let raw = path.to_string_lossy().replace('/', "\\");
+    raw.strip_prefix(r"\\?\UNC\")
+        .map(|value| format!(r"\\{value}"))
+        .or_else(|| raw.strip_prefix(r"\\?\").map(ToOwned::to_owned))
+        .unwrap_or(raw)
+        .trim_end_matches('\\')
+        .to_string()
 }

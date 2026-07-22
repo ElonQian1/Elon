@@ -82,6 +82,7 @@ pub(crate) fn resolve_recycled_resume_workspace(
         &project_part,
         &parent_conversation_part,
         &status_branch,
+        parent.workspace_status.as_ref(),
     )?;
     let expected_branch = platform_identity.branch;
     validate_platform_path(&active, &project_part, &platform_identity.conversation_part)?;
@@ -125,6 +126,7 @@ pub(crate) fn resolve_recycled_resume_workspace(
             git_head: head.to_string(),
             requires_recreation: true,
             snapshot_continue_required: false,
+            orphaned_migration: None,
             lease_migration: None,
             resume_admission: None,
         });

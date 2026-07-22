@@ -110,6 +110,7 @@ mod node_agent_local_admin;
 mod node_agent_local_llm;
 mod node_agent_local_task_detached_view;
 mod node_agent_local_task_durable_reconcile;
+mod node_agent_local_task_orphan_migration;
 mod node_agent_local_task_resume;
 mod node_agent_local_task_resume_context;
 mod node_agent_local_task_resume_lineage;

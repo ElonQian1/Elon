@@ -1,6 +1,6 @@
 # Codex 桌面监督与 PC 本机执行
 
-最后更新：2026-07-18
+最后更新：2026-07-22
 
 ## 目标
 
@@ -156,7 +156,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Review -Task
 
 - `Inspect`：读取任务、journal、审批、运行时和监督状态；`-Since`、`-Limit` 做增量窗口，`-Compact` 只返回有界摘要和证据。
 - `Improve`：从父任务继承项目/工作区并创建能力改进；加 `-BlockingImprovement` 时角色为 `capability_repair`。
-- `Resume`：从已终止、带当前监督协议且保留平台隔离 worktree 的父任务恢复原始 prompt，角色为 `resume_original`。父任务角色只允许 `requirement` 或 `resume_original`；能力修复验收后应 Resume 原 `requirement`（或既有 `resume_original` 代），绝不能 Resume `capability_repair`。helper 先做只读门禁；节点不信任 helper，并在解析 root workspace、lease 准入/迁移、Git metadata repair 和创建子任务之前执行同一白名单。随后节点再以本机任务记录的基础仓库、隔离路径、分支、`git_head` 和 `elon-supervision:<root_task_id>` lease 做权威校验；不能用参数指定任意 worktree。历史监督后代 lease 只有在节点把持久任务契约逐代验证到同一 `requirement` 根、节点/安装/owner/项目/基础工作区身份一致且无活跃 prompt/sidecar 时，才在跨进程 Resume 准入锁内原子迁移为 root lease；通用锁与未知 lease 不迁移。父任务也是 `resume_original` 时，节点沿已验证的父监督契约继承原工作树身份，不会按续跑任务的新 conversation id 另推路径；父子 root identity 或任一 Git 身份不一致仍拒绝。身份可信且无活跃 prompt/sidecar 占用时允许原位复用脏现场，staged、unstaged、untracked 均不覆盖、不自动提交、不丢弃。目录仍在但 Git worktree 注册丢失时，只读门禁会标记 `recovery_required`，节点在同样的独占门禁后以 root lease 原子重建元数据，再原样移回用户文件。
+- `Resume`：从已终止、带当前监督协议且保留平台隔离 worktree 的父任务恢复原始 prompt，角色为 `resume_original`。父任务角色只允许 `requirement` 或 `resume_original`；能力修复验收后应 Resume 原 `requirement`（或既有 `resume_original` 代），绝不能 Resume `capability_repair`。helper 先做只读门禁；节点不信任 helper，并在解析 root workspace、lease 准入/迁移、Git identity migration 和创建子任务之前执行同一白名单。随后节点再以本机任务记录的基础仓库、隔离路径、分支、`git_head` 和 `elon-supervision:<root_task_id>` lease 做权威校验；不能用参数指定任意 worktree。历史监督后代 lease 只有在节点把持久任务契约逐代验证到同一 `requirement` 根、节点/安装/owner/项目/基础工作区身份一致且无活跃 prompt/sidecar 时，才在跨进程 Resume 准入锁内原子迁移为 root lease；通用锁与未知 lease 不迁移。父任务也是 `resume_original` 时，节点沿已验证的父监督契约继承原工作树身份，不会按续跑任务的新 conversation id 另推路径；父子 root identity 或任一 Git 身份不一致仍拒绝。身份可信且无活跃 prompt/sidecar 占用时允许原位复用有效 Git 脏现场，staged、unstaged、untracked 均不覆盖、不自动提交、不丢弃。目录仍在但 Git worktree 注册丢失时，原目录保持原位且只读；只有分支后继/主线归属、目录内容、完整 provenance 和所有同根占用均可证明时，节点才创建新的 conversation worktree、迁移根 provenance、建立唯一 root lease，任一不一致仍拒绝。
 - 受监督任务的 `workspace_status` 启动值只是身份锚点；节点在 `finished_at_ms` 和可靠业务终态同一 SQLite 事务内，重新核对平台路径、分支、Git common-dir、origin remote、root lease、owner/node/install/project 与并发占用后，把 `git_head` 原子刷新为终态快照。HEAD 未变化时 staged、unstaged、untracked 均保留；HEAD 前进时新提交立即成为 Resume 基线。重复终态回放得到同一结果。任何身份或现场读取失败都保留原启动证据，并写入 `resume_blocked_reason`，因此旧 HEAD 不会冒充可信终态；普通非监督任务不进入该刷新路径。
 - `SelfTest`：不连接节点，校验 PS5.1/PS7 UTF-8、旧数组以及 JSON/UTF-8 文件多条件构造。
 
@@ -197,7 +197,7 @@ Desktop helper 的 Review 必须通过 `-DesktopReviewStateRoot/-DesktopReviewIn
 - 本机管理 API 继续要求动态 admin token 和受信 Origin；Skill 不打印 token。
 - 执行 prompt 带 `<elon-pc-executor>`，执行者看到后禁止重新派发，避免递归。
 - 契约使用 journal 事件持久化，没有为旧任务新增强制数据库列。
-- `resume_original` 必须指向已终止的同节点、同项目受监督父任务，并复用节点记录的隔离现场；resume-of-resume 还必须证明父任务是当前协议的 `resume_original`、父子 `root_task_id` 一致、记录分支与平台路径相互对应。正常现场校验 Git worktree 注册和匹配 root lease；仅为兼容历史节点，完整可信谱系中的旧后代 lease 可在无临时解锁窗口的原子门禁内一次性迁移，任何通用/陌生/身份不明 lease 仍拒绝。注册丢失的现场只有在基础仓库、平台路径、分支和已记录 `git_head`（旧记录可退化为仍存在且未漂移的分支引用）全部一致时才可原位重建。可信独占的脏现场可恢复且三类 Git 修改保持不变；非法继承、root/分支/提交身份漂移和并发占用都会以冲突拒绝。
+- `resume_original` 必须指向已终止的同节点、同项目受监督父任务，并复用节点记录的隔离现场；resume-of-resume 还必须证明父任务是当前协议的 `resume_original`、父子 `root_task_id` 一致、记录分支与平台路径相互对应。正常现场校验 Git worktree 注册和匹配 root lease；仅为兼容历史节点，完整可信谱系中的旧后代 lease 可在无临时解锁窗口的原子门禁内一次性迁移，任何通用/陌生/身份不明 lease 仍拒绝。注册丢失但原目录仍在时只允许权威 `requirement` 根做受控迁移：记录 HEAD 到现分支 HEAD 的后继关系、`origin/main` 归属、原目录零差异、owner/install/project/root/common-dir/remote/path/branch 和全部同根 registry/lease 关联必须同时成立；平台创建新 worktree 并迁移 provenance，不原位重建、不移动或覆盖孤儿目录。可信独占且 Git 注册仍有效的脏现场仍可原位恢复并保留三类修改；非法继承、身份漂移和非终态占用都会以冲突拒绝。
 - PC 工作台只在 `supervision.enabled=true` 时显示监督卡，普通本机任务不受影响。
 - 版本发布、灰度、回滚和节点兼容仍以 `docs/node-agent-upgrade-compatibility.md` 为准。
 - 任何协议升级必须新增版本号或保持向后兼容，并补 Rust、PowerShell 与 PC 前端测试。

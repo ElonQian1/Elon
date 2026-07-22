@@ -7,6 +7,9 @@ use rusqlite::{params, OptionalExtension, Transaction};
 
 use super::{now_ms, read_record, select_sql, LocalTaskRecord, LocalTaskStore};
 
+#[path = "node_agent_local_task_store_orphan_migration.rs"]
+mod orphan_migration;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct TerminalLeaseCursor {
     pub(crate) terminal_at_ms: i64,
