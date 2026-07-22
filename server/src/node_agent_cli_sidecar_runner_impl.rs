@@ -143,20 +143,20 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
                             pty.write_input("\x1b[1;1R")?;
                         }
                         let visible_text = text.replace("\x1b[6n", "");
-                        let observation = crate::node_agent_cli_output_aggregate::progress_observation(
-                            &visible_text,
-                        );
-                        if observation.progress {
-                            idle_deadline = tokio::time::Instant::now()
-                                + Duration::from_secs(runtime_policy.idle_timeout_secs.max(1));
-                            task_journal.record_runtime_progress(
-                                &config.task_id,
-                                observation.phase.as_deref().unwrap_or("reasoning"),
-                                observation.current_command.as_deref(),
-                            )?;
-                        }
                         let safe_text = output_redactor.push(&visible_text);
                         if !safe_text.is_empty() {
+                            let observation = crate::node_agent_cli_output_aggregate::progress_observation(
+                                &safe_text,
+                            );
+                            if observation.progress {
+                                idle_deadline = tokio::time::Instant::now()
+                                    + Duration::from_secs(runtime_policy.idle_timeout_secs.max(1));
+                                task_journal.record_runtime_progress(
+                                    &config.task_id,
+                                    observation.phase.as_deref().unwrap_or("reasoning"),
+                                    observation.current_command.as_deref(),
+                                )?;
+                            }
                             write_pty_chunk(
                                 &config,
                                 &task_journal,
@@ -199,6 +199,14 @@ pub(super) async fn run_pty_sidecar(config: CliSidecarLaunchConfig) -> Result<()
 
     let safe_tail = output_redactor.finish();
     if !safe_tail.is_empty() {
+        let observation = crate::node_agent_cli_output_aggregate::progress_observation(&safe_tail);
+        if observation.progress {
+            task_journal.record_runtime_progress(
+                &config.task_id,
+                observation.phase.as_deref().unwrap_or("reasoning"),
+                observation.current_command.as_deref(),
+            )?;
+        }
         write_pty_chunk(
             &config,
             &task_journal,

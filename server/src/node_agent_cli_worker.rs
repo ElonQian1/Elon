@@ -213,9 +213,60 @@ pub(crate) fn process_is_running(process_id: u32) -> bool {
     }
 }
 
+#[cfg(windows)]
+pub(crate) fn process_identity(process_id: u32) -> Option<String> {
+    use std::ffi::c_void;
+    const PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000;
+
+    #[repr(C)]
+    struct FileTime {
+        low: u32,
+        high: u32,
+    }
+
+    extern "system" {
+        fn OpenProcess(desired_access: u32, inherit_handle: i32, process_id: u32) -> *mut c_void;
+        fn GetProcessTimes(
+            process: *mut c_void,
+            creation: *mut FileTime,
+            exit: *mut FileTime,
+            kernel: *mut FileTime,
+            user: *mut FileTime,
+        ) -> i32;
+        fn CloseHandle(handle: *mut c_void) -> i32;
+    }
+
+    unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, process_id);
+        if handle.is_null() {
+            return None;
+        }
+        let mut creation = FileTime { low: 0, high: 0 };
+        let mut exit = FileTime { low: 0, high: 0 };
+        let mut kernel = FileTime { low: 0, high: 0 };
+        let mut user = FileTime { low: 0, high: 0 };
+        let ok = GetProcessTimes(handle, &mut creation, &mut exit, &mut kernel, &mut user) != 0;
+        CloseHandle(handle);
+        ok.then(|| {
+            let created = ((creation.high as u64) << 32) | creation.low as u64;
+            format!("windows:{process_id}:{created}")
+        })
+    }
+}
+
 #[cfg(not(windows))]
 pub(crate) fn process_is_running(process_id: u32) -> bool {
     process_id == std::process::id() || Path::new(&format!("/proc/{process_id}")).exists()
+}
+
+#[cfg(not(windows))]
+pub(crate) fn process_identity(process_id: u32) -> Option<String> {
+    let stat = fs::read_to_string(format!("/proc/{process_id}/stat")).ok()?;
+    // The comm field can contain spaces and parentheses. Everything after its
+    // final ')' starts at field 3; process start time is field 22.
+    let tail = stat.rsplit_once(')')?.1.trim();
+    let start_ticks = tail.split_whitespace().nth(19)?;
+    Some(format!("procfs:{process_id}:{start_ticks}"))
 }
 
 #[cfg(test)]

@@ -506,6 +506,63 @@ mod tests {
     use crate::node_agent_cli_sidecar_io::{append_output, CliSidecarOutputRecord};
 
     #[test]
+    fn progress_observation_receives_only_stream_redacted_text() {
+        let raw = serde_json::to_string(&serde_json::json!({
+            "type":"item.started",
+            "item":{
+                "id":"secret-command",
+                "type":"command_execution",
+                "command":"TOKEN=fake-progress-persisted cargo test"
+            }
+        }))
+        .unwrap()
+            + "\n";
+        let mut redactor = crate::node_agent_cli_redaction::CliOutputRedactor::default();
+        let safe = redactor.push(&raw);
+        assert!(!safe.contains("fake-progress-persisted"));
+        let observation = crate::node_agent_cli_output_aggregate::progress_observation(&safe);
+        assert!(observation.progress);
+        assert!(!observation
+            .current_command
+            .as_deref()
+            .unwrap_or_default()
+            .contains("fake-progress-persisted"));
+
+        let root = std::env::temp_dir().join(format!(
+            "sidecar-progress-redaction-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let journal = crate::node_agent_task_journal::TaskJournal::new(&root);
+        journal
+            .record_started(crate::node_agent_task_journal::TaskJournalStart {
+                req_id: "redacted-progress",
+                cli_name: "codex",
+                route: Some("managed_pty_conpty_sidecar"),
+                run_handle_id: Some("redacted-progress"),
+                cwd: Some("C:/safe"),
+                runtime_permission: Some("full_access"),
+            })
+            .unwrap();
+        journal
+            .record_runtime_progress(
+                "redacted-progress",
+                observation.phase.as_deref().unwrap_or("execution"),
+                observation.current_command.as_deref(),
+            )
+            .unwrap();
+        journal
+            .record_cli_chunk("redacted-progress", "stdout", &safe)
+            .unwrap();
+        let persisted = std::fs::read_dir(&root)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter_map(|entry| std::fs::read_to_string(entry.path()).ok())
+            .collect::<String>();
+        assert!(!persisted.contains("fake-progress-persisted"));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn sidecar_uses_pipe_sidecar_for_codex_when_json_direct_stdout_is_enabled() {
         assert!(super::sidecar_enabled_for_cli_name("codex", true, true));
         assert!(super::sidecar_enabled_for_cli_name(" CODEX ", true, true));

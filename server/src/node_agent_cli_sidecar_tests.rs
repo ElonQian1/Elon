@@ -265,10 +265,35 @@ fn restart_replay_requires_a_live_recorded_process_not_only_a_fresh_heartbeat() 
     let mut record = session("live-session", "live-task");
     assert!(record.can_replay_after_restart_at(now_ms()));
     record.sidecar_pid = None;
+    record.sidecar_process_identity = None;
     record.child_pid = None;
+    record.child_process_identity = None;
     record.last_seen_at_ms = now_ms();
     assert!(record.is_live_at(now_ms()));
     assert!(!record.can_replay_after_restart_at(now_ms()));
+}
+
+#[test]
+fn restart_replay_binds_fresh_heartbeat_session_and_process_identity() {
+    let now = now_ms();
+    let mut record = session("bound-session", "bound-task");
+    assert!(record.can_replay_after_restart_at(now));
+
+    record.last_seen_at_ms = now.saturating_sub(2 * 60 * 1_000 + 1);
+    assert!(!record.can_replay_after_restart_at(now), "stale heartbeat");
+    record.last_seen_at_ms = now;
+    record.sidecar_process_identity = Some("windows:reused-pid:wrong-start".into());
+    assert!(
+        !record.can_replay_after_restart_at(now),
+        "PID reuse identity"
+    );
+    record.sidecar_process_identity =
+        crate::node_agent_cli_worker::process_identity(std::process::id());
+    record.session_id.clear();
+    assert!(
+        !record.can_replay_after_restart_at(now),
+        "missing session identity"
+    );
 }
 
 fn session(session_id: &str, task_id: &str) -> CliSidecarSessionRecord {
@@ -278,7 +303,7 @@ fn session(session_id: &str, task_id: &str) -> CliSidecarSessionRecord {
         "codex",
         "route_a_external_cli",
         None,
-        None,
+        Some("C:/fake-sidecar-output.jsonl".into()),
         Some(std::process::id()),
         None,
         now_ms(),

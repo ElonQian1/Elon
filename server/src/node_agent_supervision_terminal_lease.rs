@@ -177,19 +177,24 @@ pub(crate) async fn reconcile_all(runtime: &NodeRuntime) -> Result<usize> {
         next_terminal_candidate_batch(&runtime.local_tasks, &mut scan)?
     };
     for task in candidates {
-        if locked_candidates >= PERIODIC_LOCKED_CANDIDATES_PER_PASS {
-            break;
-        }
         match candidate_has_lock(&task) {
-            Ok(false) => continue,
+            Ok(false) => {
+                advance_terminal_scan(&task)?;
+                continue;
+            }
+            Ok(true) if locked_candidates >= PERIODIC_LOCKED_CANDIDATES_PER_PASS => break,
             Ok(true) => locked_candidates += 1,
             Err(error) => {
+                if locked_candidates >= PERIODIC_LOCKED_CANDIDATES_PER_PASS {
+                    break;
+                }
                 locked_candidates += 1;
                 warn!(
                     task_id = %task.task_id,
                     %error,
                     "terminal supervision lease candidate probe failed closed"
                 );
+                advance_terminal_scan(&task)?;
                 continue;
             }
         }
@@ -202,6 +207,10 @@ pub(crate) async fn reconcile_all(runtime: &NodeRuntime) -> Result<usize> {
                 "terminal supervision lease was preserved because reconciliation was not provably safe"
             ),
         }
+        // Advance only through the candidate actually examined. A second
+        // locked candidate that exceeds this pass's budget remains the first
+        // candidate of the next page instead of being skipped with the rest.
+        advance_terminal_scan(&task)?;
     }
     Ok(released)
 }
@@ -238,10 +247,25 @@ fn next_terminal_candidate_batch(
         page = store
             .list_terminal_lease_candidates_page(None, PERIODIC_CANDIDATES_SCANNED_PER_PASS)?;
     }
-    scan.cursor = page
-        .last()
-        .map(crate::node_agent_local_task_store::workspace::TerminalLeaseCursor::from_record);
     Ok(page)
+}
+
+fn advance_terminal_scan(task: &crate::node_agent_local_task_store::LocalTaskRecord) -> Result<()> {
+    let mut scan = terminal_scan_state()
+        .lock()
+        .map_err(|_| anyhow::anyhow!("terminal scan cursor lock poisoned"))?;
+    scan.cursor =
+        Some(crate::node_agent_local_task_store::workspace::TerminalLeaseCursor::from_record(task));
+    Ok(())
+}
+
+#[cfg(test)]
+fn advance_test_scan(
+    scan: &mut TerminalScanState,
+    task: &crate::node_agent_local_task_store::LocalTaskRecord,
+) {
+    scan.cursor =
+        Some(crate::node_agent_local_task_store::workspace::TerminalLeaseCursor::from_record(task));
 }
 
 fn candidate_has_lock(task: &crate::node_agent_local_task_store::LocalTaskRecord) -> Result<bool> {
@@ -399,6 +423,8 @@ mod tests {
             next_terminal_candidate_batch(&store, &mut scan).unwrap()[0].task_id,
             "older"
         );
+        let processed = next_terminal_candidate_batch(&store, &mut scan).unwrap();
+        advance_test_scan(&mut scan, &processed[0]);
         assert_eq!(
             next_terminal_candidate_batch(&store, &mut scan).unwrap()[0].task_id,
             "older",
@@ -410,6 +436,41 @@ mod tests {
             next_terminal_candidate_batch(&store, &mut scan).unwrap()[0].task_id,
             "newly-cancelled",
             "a new terminal head must preempt an older pagination cursor"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn cursor_advances_only_to_processed_candidate_with_multiple_locked_rows() {
+        let root = std::env::temp_dir().join(format!(
+            "terminal-scan-progress-{}",
+            Uuid::new_v4().simple()
+        ));
+        let store = LocalTaskStore::new(root.join("tasks.sqlite3"));
+        for task_id in ["oldest", "middle", "newest"] {
+            create_cancelled(&store, &root, task_id);
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        let mut scan = TerminalScanState::default();
+        let first_page = next_terminal_candidate_batch(&store, &mut scan).unwrap();
+        assert_eq!(
+            first_page
+                .iter()
+                .map(|task| task.task_id.as_str())
+                .collect::<Vec<_>>(),
+            ["newest", "middle", "oldest"]
+        );
+        // Simulate the one-locked-candidate budget consuming only the first
+        // row. The next pass must start at the second row from that same page.
+        advance_test_scan(&mut scan, &first_page[0]);
+        let second_page = next_terminal_candidate_batch(&store, &mut scan).unwrap();
+        assert_eq!(second_page[0].task_id, "middle");
+        assert_eq!(second_page[1].task_id, "oldest");
+        advance_test_scan(&mut scan, second_page.last().unwrap());
+        assert_eq!(
+            next_terminal_candidate_batch(&store, &mut scan).unwrap()[0].task_id,
+            "newest",
+            "empty tail page wraps without losing cancelled candidates"
         );
         let _ = fs::remove_dir_all(root);
     }

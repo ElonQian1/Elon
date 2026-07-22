@@ -33,20 +33,22 @@ impl LocalTaskStore {
     ) -> Result<bool> {
         let mut conn = self.open()?;
         let tx = conn.transaction()?;
-        let workspace_status: Option<String> = tx
+        let workspace_status: Option<Option<String>> = tx
             .query_row(
                 "SELECT workspace_status_json FROM local_tasks WHERE task_id = ?1",
                 params![task_id],
                 |row| row.get(0),
             )
             .optional()?;
-        let mut workspace_status = workspace_status
-            .as_deref()
-            .and_then(|value| serde_json::from_str::<serde_json::Value>(value).ok())
-            .unwrap_or_else(|| serde_json::json!({}));
-        if let Some(object) = workspace_status.as_object_mut() {
-            object.insert("restart_recovery".to_string(), recovery_context.clone());
-        }
+        let encoded = workspace_status
+            .context("stale sidecar task does not exist")?
+            .context("stale sidecar task is missing workspace_status_json")?;
+        let mut workspace_status: serde_json::Value = serde_json::from_str(&encoded)
+            .context("stale sidecar task has invalid workspace_status_json")?;
+        let object = workspace_status
+            .as_object_mut()
+            .context("stale sidecar workspace_status_json is not an object")?;
+        object.insert("restart_recovery".to_string(), recovery_context.clone());
         let encoded = serde_json::to_string(&workspace_status)?;
         let changed = tx.execute(
             "UPDATE local_tasks
@@ -563,6 +565,72 @@ mod tests {
             .unwrap()
             .is_some()
         );
+    }
+
+    #[test]
+    fn stale_sidecar_rejects_missing_or_corrupt_workspace_identity_without_mutation() {
+        for (label, raw) in [("missing", None), ("corrupt", Some("{not-json"))] {
+            let fixture = Fixture::new(label);
+            fixture
+                .store
+                .open()
+                .unwrap()
+                .execute(
+                    "UPDATE local_tasks SET workspace_status_json = ?1 WHERE task_id = 'task'",
+                    [raw],
+                )
+                .unwrap();
+            let before: (String, Option<String>) = fixture
+                .store
+                .open()
+                .unwrap()
+                .query_row(
+                    "SELECT status, workspace_status_json FROM local_tasks WHERE task_id = 'task'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .unwrap();
+            assert!(fixture
+                .store
+                .mark_stale_sidecar_resume_required(
+                    "task",
+                    "dead sidecar",
+                    &json!({"state":"resume_required"}),
+                )
+                .is_err());
+            let after: (String, Option<String>) = fixture
+                .store
+                .open()
+                .unwrap()
+                .query_row(
+                    "SELECT status, workspace_status_json FROM local_tasks WHERE task_id = 'task'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .unwrap();
+            assert_eq!(
+                after, before,
+                "{label} identity must remain byte-for-byte intact"
+            );
+        }
+    }
+
+    #[test]
+    fn stale_sidecar_does_not_rewrite_cancel_requested_semantics() {
+        let fixture = Fixture::new("stale-cancel");
+        assert!(fixture.store.mark_cancel_requested("task").unwrap());
+        let before = fixture.status();
+        assert!(!fixture
+            .store
+            .mark_stale_sidecar_resume_required(
+                "task",
+                "dead sidecar",
+                &json!({"state":"resume_required"}),
+            )
+            .unwrap());
+        let record = fixture.store.get("task").unwrap().unwrap();
+        assert_eq!(record.status, "cancel_requested");
+        assert_eq!(record.workspace_status.unwrap(), before);
     }
 
     #[test]

@@ -54,7 +54,11 @@ pub(crate) struct CliSidecarSessionRecord {
     #[serde(default)]
     pub sidecar_pid: Option<u32>,
     #[serde(default)]
+    pub sidecar_process_identity: Option<String>,
+    #[serde(default)]
     pub child_pid: Option<u32>,
+    #[serde(default)]
+    pub child_process_identity: Option<String>,
     #[serde(default)]
     pub worker_path: Option<String>,
     #[serde(default)]
@@ -139,6 +143,8 @@ impl CliSidecarRegistry {
                 }
                 if child_pid.is_some() {
                     session.child_pid = child_pid;
+                    session.child_process_identity =
+                        child_pid.and_then(crate::node_agent_cli_worker::process_identity);
                 }
                 session.last_seen_at_ms = now_ms();
                 Ok((true, true))
@@ -514,7 +520,11 @@ impl CliSidecarSessionRecord {
             transport: "managed_pty_conpty_sidecar".to_string(),
             endpoint,
             sidecar_pid,
+            sidecar_process_identity: sidecar_pid
+                .and_then(crate::node_agent_cli_worker::process_identity),
             child_pid,
+            child_process_identity: child_pid
+                .and_then(crate::node_agent_cli_worker::process_identity),
             worker_path: None,
             worker_release: None,
             worker_sha256: None,
@@ -554,7 +564,11 @@ impl CliSidecarSessionRecord {
             transport: "managed_pipe_json_sidecar".to_string(),
             endpoint,
             sidecar_pid,
+            sidecar_process_identity: sidecar_pid
+                .and_then(crate::node_agent_cli_worker::process_identity),
             child_pid,
+            child_process_identity: child_pid
+                .and_then(crate::node_agent_cli_worker::process_identity),
             worker_path: None,
             worker_release: None,
             worker_sha256: None,
@@ -590,29 +604,58 @@ impl CliSidecarSessionRecord {
     }
 
     pub(crate) fn is_live_at(&self, now_ms: u128) -> bool {
-        matches!(
-            self.state.trim().to_ascii_lowercase().as_str(),
-            "running" | "waiting_approval" | "cancel_requested"
-        ) && now_ms.saturating_sub(self.last_seen_at_ms) <= SIDECAR_STALE_AFTER_MS
+        now_ms >= self.last_seen_at_ms
+            && self.last_seen_at_ms >= self.started_at_ms
+            && matches!(
+                self.state.trim().to_ascii_lowercase().as_str(),
+                "running" | "waiting_approval" | "cancel_requested"
+            )
+            && now_ms.saturating_sub(self.last_seen_at_ms) <= SIDECAR_STALE_AFTER_MS
     }
 
     /// A persisted heartbeat alone cannot prove liveness after a runtime
     /// restart. At least one recorded process must still exist before startup
     /// recovery treats the sidecar as a live control surface.
     pub(crate) fn recorded_process_is_live(&self) -> bool {
-        [self.sidecar_pid, self.child_pid]
-            .into_iter()
-            .flatten()
-            .any(crate::node_agent_cli_worker::process_is_running)
+        [
+            (self.sidecar_pid, self.sidecar_process_identity.as_deref()),
+            (self.child_pid, self.child_process_identity.as_deref()),
+        ]
+        .into_iter()
+        .any(|(pid, identity)| {
+            pid.zip(identity).is_some_and(|(pid, identity)| {
+                crate::node_agent_cli_worker::process_identity(pid).as_deref() == Some(identity)
+            })
+        })
     }
 
-    pub(crate) fn can_replay_after_restart_at(&self, _now_ms: u128) -> bool {
-        self.capabilities.output_stream_replay
+    fn sidecar_process_identity_matches(&self) -> bool {
+        self.sidecar_pid
+            .zip(self.sidecar_process_identity.as_deref())
+            .is_some_and(|(pid, identity)| {
+                crate::node_agent_cli_worker::process_identity(pid).as_deref() == Some(identity)
+            })
+    }
+
+    fn replay_session_identity_is_valid(&self) -> bool {
+        !self.session_id.trim().is_empty()
+            && !self.task_id.trim().is_empty()
+            && self
+                .endpoint
+                .as_deref()
+                .map(str::trim)
+                .is_some_and(|endpoint| !endpoint.is_empty())
             && matches!(
-                self.state.trim().to_ascii_lowercase().as_str(),
-                "running" | "waiting_approval" | "cancel_requested"
+                self.transport.as_str(),
+                "managed_pty_conpty_sidecar" | "managed_pipe_json_sidecar"
             )
-            && self.recorded_process_is_live()
+    }
+
+    pub(crate) fn can_replay_after_restart_at(&self, now_ms: u128) -> bool {
+        self.capabilities.output_stream_replay
+            && self.is_live_at(now_ms)
+            && self.replay_session_identity_is_valid()
+            && self.sidecar_process_identity_matches()
     }
 
     pub(crate) fn is_terminal(&self) -> bool {
@@ -625,6 +668,7 @@ impl CliSidecarSessionRecord {
 
 pub(crate) fn sidecar_status_view(session: &CliSidecarSessionRecord) -> serde_json::Value {
     let now = now_ms();
+    let live_after_restart = session.can_replay_after_restart_at(now);
     json!({
         "session_id": session.session_id,
         "task_id": session.task_id,
@@ -642,11 +686,11 @@ pub(crate) fn sidecar_status_view(session: &CliSidecarSessionRecord) -> serde_js
         "output_sequence": session.output_sequence,
         "started_at_ms": session.started_at_ms,
         "last_seen_at_ms": session.last_seen_at_ms,
-        "live_after_restart": session.is_live_at(now),
-        "attachable_after_restart": session.is_attachable_at(now),
-        "output_replayable_after_restart": session.can_replay_output_at(now),
-        "cancelable_after_restart": session.can_cancel_at(now),
-        "approval_recoverable_after_restart": session.can_recover_tool_approval_after_restart(now),
+        "live_after_restart": live_after_restart,
+        "attachable_after_restart": live_after_restart && session.capabilities.terminal_attach,
+        "output_replayable_after_restart": live_after_restart,
+        "cancelable_after_restart": live_after_restart && session.capabilities.cancel,
+        "approval_recoverable_after_restart": live_after_restart && session.capabilities.tool_approval_recovery,
         "capabilities": session.capabilities,
     })
 }

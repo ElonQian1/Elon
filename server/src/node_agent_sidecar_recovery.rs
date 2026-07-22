@@ -269,20 +269,22 @@ fn move_stale_sidecar_to_resume_required(
         "sidecar_output_offset": session.output_offset,
         "sidecar_output_sequence": session.output_sequence,
     });
-    if runtime
-        .local_tasks
-        .mark_stale_sidecar_resume_required(&task.task_id, reason, &context)?
-    {
-        crate::node_agent_local_task_supervision::record_supervision_event(
-            &runtime.task_journal,
-            &task.task_id,
-            "supervision_stale_sidecar_resume_required",
-            context,
-        )?;
+    let transitioned =
+        runtime
+            .local_tasks
+            .mark_stale_sidecar_resume_required(&task.task_id, reason, &context)?;
+    if !transitioned {
+        return Ok(());
     }
-    let _ = runtime
+    runtime
         .cli_sidecars
-        .mark_task_resume_required(&task.task_id);
+        .mark_task_resume_required(&task.task_id)?;
+    crate::node_agent_local_task_supervision::record_supervision_event(
+        &runtime.task_journal,
+        &task.task_id,
+        "supervision_stale_sidecar_resume_required",
+        context,
+    )?;
     if let Some(receipt) = receipt {
         runtime.update_recovery.update(
             &receipt.update_id,

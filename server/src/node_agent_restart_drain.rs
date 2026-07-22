@@ -103,7 +103,9 @@ pub(crate) async fn schedule_update(
     download_url: Option<String>,
     target_release_identity: Option<String>,
 ) -> Result<Value, String> {
-    let classification = classify_supervised_tasks(runtime.as_ref()).await;
+    let classification = classify_supervised_tasks(runtime.as_ref())
+        .await
+        .map_err(|error| format!("读取监督任务排空状态失败，已拒绝更新：{error:#}"))?;
     let active = classification.blocking;
     let cloud_http_url = runtime.cloud_http_url();
     if active.is_empty() {
@@ -149,7 +151,16 @@ pub(crate) async fn schedule_update(
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_secs(DRAIN_POLL_SECS)).await;
-            let classification = classify_supervised_tasks(runtime_for_drain.as_ref()).await;
+            let classification = match classify_supervised_tasks(runtime_for_drain.as_ref()).await {
+                Ok(classification) => classification,
+                Err(error) => {
+                    checkpoint.message =
+                        format!("读取监督任务排空状态失败，更新继续保持延期：{error:#}");
+                    checkpoint.updated_at_ms = now_ms();
+                    let _ = save_checkpoint(&checkpoint);
+                    continue;
+                }
+            };
             let active = classification.blocking;
             checkpoint.recoverable_task_ids = classification.recoverable;
             checkpoint.stale_registry_task_ids = classification.stale;
@@ -318,6 +329,7 @@ enum DrainTaskDisposition {
 
 fn drain_task_disposition(
     durable_running: bool,
+    cancel_requested: bool,
     handle_fresh: bool,
     replayable_sidecar: bool,
     safe_receipt: bool,
@@ -326,6 +338,10 @@ fn drain_task_disposition(
         DrainTaskDisposition::Stale
     } else if replayable_sidecar || safe_receipt {
         DrainTaskDisposition::Recoverable
+    } else if cancel_requested {
+        // Cancellation is its own durable state machine. Never rewrite it to
+        // Resume merely because the executor heartbeat became stale.
+        DrainTaskDisposition::Blocking
     } else if handle_fresh {
         DrainTaskDisposition::Blocking
     } else {
@@ -333,7 +349,7 @@ fn drain_task_disposition(
     }
 }
 
-async fn classify_supervised_tasks(runtime: &NodeRuntime) -> DrainClassification {
+async fn classify_supervised_tasks(runtime: &NodeRuntime) -> anyhow::Result<DrainClassification> {
     let active = runtime.active_cli_prompts.views_without_approvals().await;
     let active = active
         .into_iter()
@@ -341,32 +357,15 @@ async fn classify_supervised_tasks(runtime: &NodeRuntime) -> DrainClassification
         .collect::<std::collections::HashMap<_, _>>();
     let now = now_ms();
     let mut result = DrainClassification::default();
-    let tasks = match runtime.local_tasks.list_update_candidates() {
-        Ok(tasks) => tasks,
-        Err(_) => {
-            for task in active.values() {
-                if crate::node_agent_local_task_supervision::load_supervision_state(
-                    &runtime.task_journal,
-                    &task.req_id,
-                )
-                .ok()
-                .is_some_and(|state| state.enabled)
-                {
-                    result.blocking.push(task.req_id.clone());
-                }
-            }
-            result.blocking.sort();
-            result.blocking.dedup();
-            return result;
-        }
-    };
+    let tasks = load_drain_candidates(&runtime.local_tasks)?;
+    let mut seen = std::collections::HashSet::new();
     for task in tasks {
+        seen.insert(task.task_id.clone());
         let supervised = crate::node_agent_local_task_supervision::load_supervision_state(
             &runtime.task_journal,
             &task.task_id,
-        )
-        .ok()
-        .is_some_and(|state| state.enabled);
+        )?
+        .enabled;
         if !supervised {
             continue;
         }
@@ -378,19 +377,13 @@ async fn classify_supervised_tasks(runtime: &NodeRuntime) -> DrainClassification
             handle.control_handle_live
                 && now.saturating_sub(handle.last_heartbeat_ms) <= ACTIVE_HANDLE_STALE_AFTER_MS
         });
-        let sidecar = runtime
-            .cli_sidecars
-            .session_for_task(&task.task_id)
-            .ok()
-            .flatten();
+        let sidecar = runtime.cli_sidecars.session_for_task(&task.task_id)?;
         let replayable_sidecar = sidecar
             .as_ref()
             .is_some_and(|sidecar| sidecar.can_replay_after_restart_at(now));
         let safe_receipt = runtime
             .update_recovery
-            .receipt_for_task(&task.task_id)
-            .ok()
-            .flatten()
+            .receipt_for_task(&task.task_id)?
             .is_some_and(|receipt| {
                 receipt.safety.evidence_complete
                     && matches!(
@@ -402,12 +395,12 @@ async fn classify_supervised_tasks(runtime: &NodeRuntime) -> DrainClassification
             });
         match drain_task_disposition(
             durable_running,
+            task.status == "cancel_requested",
             handle_fresh,
             replayable_sidecar,
             safe_receipt,
         ) {
             DrainTaskDisposition::Stale => {
-                result.stale.push(task.task_id.clone());
                 let context = json!({
                     "state": "resume_required",
                     "reason": "stale_runtime_and_sidecar",
@@ -419,31 +412,57 @@ async fn classify_supervised_tasks(runtime: &NodeRuntime) -> DrainClassification
                     "root_lease_preserved": true,
                 });
                 let reason = "监督任务没有活动运行句柄，且记录的 sidecar/CLI 进程均不存活；现场已保留并转入 Resume";
-                if runtime
-                    .local_tasks
-                    .mark_stale_sidecar_resume_required(&task.task_id, reason, &context)
-                    .unwrap_or(false)
-                {
-                    let _ = crate::node_agent_local_task_supervision::record_supervision_event(
+                let transitioned = runtime.local_tasks.mark_stale_sidecar_resume_required(
+                    &task.task_id,
+                    reason,
+                    &context,
+                )?;
+                if transitioned {
+                    runtime
+                        .cli_sidecars
+                        .mark_task_resume_required(&task.task_id)?;
+                    runtime.active_cli_prompts.remove(&task.task_id).await;
+                    crate::node_agent_local_task_supervision::record_supervision_event(
                         &runtime.task_journal,
                         &task.task_id,
                         "supervision_stale_runtime_resume_required",
                         context,
-                    );
+                    )?;
+                    result.stale.push(task.task_id.clone());
+                } else {
+                    // A concurrent durable transition is not proof that the
+                    // task is safe to drain. Re-read on the next pass.
+                    result.blocking.push(task.task_id.clone());
                 }
-                let _ = runtime
-                    .cli_sidecars
-                    .mark_task_resume_required(&task.task_id);
-                let _ = runtime.active_cli_prompts.remove(&task.task_id).await;
             }
             DrainTaskDisposition::Recoverable => result.recoverable.push(task.task_id),
             DrainTaskDisposition::Blocking => result.blocking.push(task.task_id),
         }
     }
+    // A missing durable row must never turn an otherwise active supervised
+    // handle into an empty blocking set. Journal read failures also propagate.
+    for task in active.values().filter(|task| !seen.contains(&task.req_id)) {
+        if crate::node_agent_local_task_supervision::load_supervision_state(
+            &runtime.task_journal,
+            &task.req_id,
+        )?
+        .enabled
+        {
+            result.blocking.push(task.req_id.clone());
+        }
+    }
     result.blocking.sort();
     result.recoverable.sort();
     result.stale.sort();
-    result
+    Ok(result)
+}
+
+fn load_drain_candidates(
+    store: &crate::node_agent_local_task_store::LocalTaskStore,
+) -> anyhow::Result<Vec<crate::node_agent_local_task_store::LocalTaskRecord>> {
+    store
+        .list_update_candidates()
+        .map_err(|error| anyhow::anyhow!("durable supervised task query failed: {error:#}"))
 }
 
 async fn apply_update(
@@ -598,24 +617,45 @@ mod tests {
     #[test]
     fn drain_only_waits_for_genuine_uncheckpointed_execution() {
         assert_eq!(
-            drain_task_disposition(true, true, false, false),
+            drain_task_disposition(true, false, true, false, false),
             DrainTaskDisposition::Blocking
         );
         assert_eq!(
-            drain_task_disposition(true, true, true, false),
+            drain_task_disposition(true, false, true, true, false),
             DrainTaskDisposition::Recoverable
         );
         assert_eq!(
-            drain_task_disposition(true, true, false, true),
+            drain_task_disposition(true, false, true, false, true),
             DrainTaskDisposition::Recoverable
         );
         assert_eq!(
-            drain_task_disposition(true, false, false, false),
+            drain_task_disposition(true, false, false, false, false),
             DrainTaskDisposition::Stale
         );
         assert_eq!(
-            drain_task_disposition(false, true, false, false),
+            drain_task_disposition(false, false, true, false, false),
             DrainTaskDisposition::Stale
         );
+        assert_eq!(
+            drain_task_disposition(true, true, false, false, false),
+            DrainTaskDisposition::Blocking,
+            "cancel_requested keeps cancellation semantics while unsettled"
+        );
+    }
+
+    #[test]
+    fn injected_database_read_error_is_not_an_empty_active_set() {
+        let root = std::env::temp_dir().join(format!(
+            "restart-drain-db-error-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let store = crate::node_agent_local_task_store::LocalTaskStore::new(&root);
+        let error = load_drain_candidates(&store)
+            .expect_err("a DB open failure must fail closed instead of returning zero blockers");
+        assert!(error
+            .to_string()
+            .contains("durable supervised task query failed"));
+        let _ = std::fs::remove_dir_all(root);
     }
 }
