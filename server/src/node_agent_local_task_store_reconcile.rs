@@ -36,6 +36,18 @@ pub(super) fn ensure_same_event_is_immutable(
         event_id == completion.event_id,
         "local task already binds a different completion event"
     );
+    if matches!(status.as_str(), "done" | "failed" | "canceled") {
+        anyhow::ensure!(
+            finished_at_ms.is_some(),
+            "terminal local task completion is missing finished time"
+        );
+        // The first durable terminal transition wins. A late producer can
+        // replay the same event with stale timeout/cancel output after the
+        // successful completion was already persisted. The UPDATE path keeps
+        // terminal status, error, final reply, and finished time monotonic, so
+        // accept that replay without treating the durable row as corrupt.
+        return Ok(());
+    }
     let expected_status = crate::node_agent_task_journal_events::completion_terminal_status(
         completion.exit_ok,
         completion.error.as_deref(),
