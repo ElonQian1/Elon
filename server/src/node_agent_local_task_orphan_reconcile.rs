@@ -20,7 +20,7 @@ mod runtime_evidence;
 mod terminal_drift;
 
 pub(crate) use runtime_evidence::recorded_process_is_live;
-use runtime_evidence::{journal_record_protects, sidecar_record_protects};
+use runtime_evidence::{exact_runtime_protects, journal_record_protects, sidecar_record_protects};
 
 const STALE_AFTER_MS: u128 = 2 * 60 * 1_000;
 const RECONCILE_INTERVAL: Duration = Duration::from_secs(30);
@@ -252,6 +252,17 @@ async fn reconcile_candidate(
         .local_tasks
         .get(task_id)?
         .context("orphan candidate disappeared before admission")?;
+    if initial.status == "cancel_requested" {
+        return cancel::reconcile_candidate(
+            runtime,
+            &initial,
+            now,
+            stale_after_ms,
+            cutoff,
+            observed_events,
+        )
+        .await;
+    }
     let admission_base = if is_platform_supervised(&initial) {
         let contract = contract.context("supervised orphan candidate has no durable contract")?;
         Some(
@@ -347,9 +358,6 @@ async fn reconcile_candidate(
             }
         }
     }
-    if task.status == "cancel_requested" {
-        return cancel::reconcile_stale_cancel(runtime, task_id, cutoff);
-    }
     let changed = runtime
         .local_tasks
         .mark_one_stale_without_runtime(task_id, cutoff)?;
@@ -371,16 +379,7 @@ async fn candidate_runtime_protects(
     now: u128,
     stale_after_ms: u128,
 ) -> Result<bool> {
-    if runtime
-        .active_cli_prompt_views_for_workspace(active_workspace)
-        .await
-        .into_iter()
-        .any(|handle| handle.control_handle_live)
-        || runtime
-            .active_cli_prompt_view(&task.task_id)
-            .await
-            .is_some_and(|handle| handle.control_handle_live)
-    {
+    if exact_runtime_protects(runtime, task, active_workspace, now, stale_after_ms).await? {
         return Ok(true);
     }
     if is_platform_supervised(task) {
@@ -395,16 +394,6 @@ async fn candidate_runtime_protects(
         )
         .await?
         {
-            return Ok(true);
-        }
-    }
-    if let Some(sidecar) = runtime.cli_sidecars.session_for_task(&task.task_id)? {
-        if sidecar_record_protects(&sidecar, now)? {
-            return Ok(true);
-        }
-    }
-    if let Some(record) = runtime.task_journal.record(&task.task_id)? {
-        if journal_record_protects(&record, now, stale_after_ms)? {
             return Ok(true);
         }
     }

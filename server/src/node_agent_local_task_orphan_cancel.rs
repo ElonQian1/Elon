@@ -1,8 +1,49 @@
 //! Terminal convergence for stale `cancel_requested` local tasks.
 
+use std::{collections::HashSet, path::Path};
+
 use anyhow::Result;
 
 use crate::NodeRuntime;
+
+pub(super) async fn reconcile_candidate(
+    runtime: &NodeRuntime,
+    task: &crate::node_agent_local_task_store::LocalTaskRecord,
+    now: u128,
+    stale_after_ms: u128,
+    cutoff: i64,
+    observed_events: &HashSet<String>,
+) -> Result<bool> {
+    if task.status != "cancel_requested"
+        || task.completion_event_id.is_some()
+        || task.started_at_ms > cutoff
+        || runtime
+            .completion_outbox
+            .latest_for_req_id(&task.task_id)?
+            .is_some_and(|completion| !observed_events.contains(&completion.event_id))
+    {
+        return Ok(false);
+    }
+    let active_workspace = task
+        .workspace_status
+        .as_ref()
+        .and_then(|status| status.get("active_workspace_path"))
+        .and_then(serde_json::Value::as_str)
+        .map(Path::new)
+        .unwrap_or_else(|| Path::new(&task.workspace_path));
+    if super::runtime_evidence::exact_runtime_protects(
+        runtime,
+        task,
+        active_workspace,
+        now,
+        stale_after_ms,
+    )
+    .await?
+    {
+        return Ok(false);
+    }
+    reconcile_stale_cancel(runtime, &task.task_id, cutoff)
+}
 
 pub(super) fn reconcile_stale_cancel(
     runtime: &NodeRuntime,

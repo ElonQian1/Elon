@@ -1,4 +1,40 @@
+use std::path::Path;
+
 use anyhow::Result;
+
+use crate::NodeRuntime;
+
+pub(super) async fn exact_runtime_protects(
+    runtime: &NodeRuntime,
+    task: &crate::node_agent_local_task_store::LocalTaskRecord,
+    active_workspace: &Path,
+    now: u128,
+    stale_after_ms: u128,
+) -> Result<bool> {
+    if runtime
+        .active_cli_prompt_views_for_workspace(active_workspace)
+        .await
+        .into_iter()
+        .any(|handle| handle.control_handle_live)
+        || runtime
+            .active_cli_prompt_view(&task.task_id)
+            .await
+            .is_some_and(|handle| handle.control_handle_live)
+    {
+        return Ok(true);
+    }
+    if let Some(sidecar) = runtime.cli_sidecars.session_for_task(&task.task_id)? {
+        if sidecar_record_protects(&sidecar, now)? {
+            return Ok(true);
+        }
+    }
+    if let Some(record) = runtime.task_journal.record(&task.task_id)? {
+        if journal_record_protects(&record, now, stale_after_ms)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
 
 pub(super) fn journal_record_protects(
     record: &crate::node_agent_task_journal::TaskJournalRecord,

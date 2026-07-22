@@ -1,7 +1,12 @@
 use std::{fs, path::Path, time::Duration};
 
+use homecli_proto::CancelRequestAudit;
+
 use super::*;
-use crate::node_agent_local_task_store::{LocalTaskStart, LocalTaskStore};
+use crate::{
+    node_agent_local_task_store::{LocalTaskStart, LocalTaskStore},
+    node_agent_task_journal::{CancelIntentTarget, TaskJournalStart},
+};
 
 #[tokio::test]
 async fn invalid_candidate_does_not_block_later_safe_orphan_reconciliation() {
@@ -225,6 +230,86 @@ async fn contended_terminal_repair_does_not_wait_or_block_later_orphan() {
         "resume_required"
     );
     drop(admission);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[tokio::test]
+async fn durable_cancel_with_malformed_supervision_contract_still_converges() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-orphan-malformed-supervised-cancel-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let runtime = test_runtime(&root);
+    runtime
+        .local_tasks
+        .create(LocalTaskStart {
+            task_id: "malformed-supervised-cancel",
+            owner_user_id: "owner",
+            agent_id: "agent",
+            install_id: "install",
+            project_id: "project",
+            channel_id: None,
+            conversation_id: "malformed-supervised-cancel",
+            workspace_path: root.to_str().unwrap(),
+            prompt: "work",
+            cli: "codex",
+            runtime_permission: "full_access",
+        })
+        .unwrap();
+    runtime
+        .local_tasks
+        .record_initial_workspace_status(
+            "malformed-supervised-cancel",
+            &serde_json::json!({
+                "platform_provenance": "elon.conversation_worktree.v1",
+                "active_workspace_path": root,
+            }),
+        )
+        .unwrap();
+    runtime
+        .task_journal
+        .record_started(TaskJournalStart {
+            req_id: "malformed-supervised-cancel",
+            cli_name: "codex",
+            route: Some("route_a_external_cli"),
+            run_handle_id: Some("malformed-supervised-cancel"),
+            cwd: root.to_str(),
+            runtime_permission: Some("full_access"),
+        })
+        .unwrap();
+    runtime
+        .task_journal
+        .record_cancel_intent(
+            "malformed-supervised-cancel",
+            CancelIntentTarget {
+                run_handle_id: Some("malformed-supervised-cancel".into()),
+                active_started_at_ms: None,
+                sidecar_session_id: None,
+            },
+            &CancelRequestAudit {
+                requested_by: Some("owner".into()),
+                source: Some("test".into()),
+                reason: Some("stop".into()),
+                requested_at_ms: Some(1),
+                interruption_source: None,
+            },
+        )
+        .unwrap();
+    runtime
+        .local_tasks
+        .mark_cancel_requested("malformed-supervised-cancel")
+        .unwrap();
+
+    assert_eq!(reconcile_with_stale_after(&runtime, 0).await.unwrap(), 1);
+    assert_eq!(
+        runtime
+            .local_tasks
+            .get("malformed-supervised-cancel")
+            .unwrap()
+            .unwrap()
+            .status,
+        "canceled"
+    );
     let _ = fs::remove_dir_all(root);
 }
 
