@@ -10,8 +10,8 @@ use tracing::{info, warn};
 use crate::node_agent_cli_done::CliCompletionContext;
 use crate::node_agent_codex_child_env::FrozenCodexHome;
 use crate::{
-    node_agent_active_task, node_agent_full_access, node_agent_task_journal,
-    resolve_attachment_args, run_cli_prompt, ws_text, CliPromptRun, NodeRuntime,
+    node_agent_full_access, node_agent_task_journal, resolve_attachment_args, run_cli_prompt,
+    ws_text, CliPromptRun, NodeRuntime,
 };
 
 #[path = "node_agent_cli_task_dispatch_failure.rs"]
@@ -19,6 +19,8 @@ mod failure;
 use failure::send_preflight_failure;
 #[path = "node_agent_cli_task_dispatch_admission.rs"]
 mod admission;
+#[path = "node_agent_cli_task_dispatch_receipt.rs"]
+mod receipt;
 
 const WORKSPACE_PREPARE_TIMEOUT: Duration = Duration::from_secs(8);
 const DATA_ROOT_TRANSITION_TIMEOUT: Duration = Duration::from_secs(8);
@@ -62,8 +64,9 @@ pub(crate) fn spawn_cli_task(
     out_tx: mpsc::UnboundedSender<Message>,
     request: CliTaskDispatchRequest,
 ) {
+    let receipt_ready = receipt::prepare_local(&runtime.task_journal, &request);
     tokio::spawn(async move {
-        run_cli_task(runtime, out_tx, request).await;
+        run_cli_task(runtime, out_tx, request, receipt_ready).await;
     });
 }
 
@@ -86,6 +89,7 @@ async fn run_cli_task(
     runtime: Arc<NodeRuntime>,
     out_tx: mpsc::UnboundedSender<Message>,
     request: CliTaskDispatchRequest,
+    receipt_ready: bool,
 ) {
     let CliTaskDispatchRequest {
         req_id,
@@ -157,27 +161,18 @@ async fn run_cli_task(
             return;
         }
     }
-    if let Err(error) =
-        runtime
-            .task_journal
-            .record_started(node_agent_task_journal::TaskJournalStart {
-                req_id: &req_id_for_cleanup,
-                cli_name: &cli,
-                route: Some(node_agent_active_task::route_for_cli(&cli)),
-                run_handle_id: Some(&req_id_for_cleanup),
-                cwd: cwd.as_deref(),
-                runtime_permission: requested_runtime_permission.as_deref(),
-            })
+    if !receipt::ensure_worker(
+        receipt_ready,
+        &runtime,
+        &completion_context,
+        &out_tx,
+        &req_id_for_cleanup,
+        &cli,
+        cwd.as_deref(),
+        requested_runtime_permission.as_deref(),
+    )
+    .await
     {
-        send_preflight_failure(
-            &runtime,
-            &completion_context,
-            &cli,
-            &out_tx,
-            req_id,
-            format!("DISPATCH_PERSIST_FAILED: 无法持久化派发起点: {error}"),
-        )
-        .await;
         return;
     }
     let resolved_cli = match runtime.resolve_cli(&cli).await {

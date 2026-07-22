@@ -8,9 +8,24 @@ use super::{
 
 impl TaskJournal {
     pub(crate) fn record_started(&self, start: TaskJournalStart<'_>) -> Result<()> {
+        self.record_started_inner(start, false).map(|_| ())
+    }
+
+    pub(crate) fn record_started_if_absent(&self, start: TaskJournalStart<'_>) -> Result<bool> {
+        self.record_started_inner(start, true)
+    }
+
+    fn record_started_inner(
+        &self,
+        start: TaskJournalStart<'_>,
+        only_if_absent: bool,
+    ) -> Result<bool> {
         with_task_journal_io_lock(|| {
             let now = now_ms();
             let mut registry = self.load_registry()?;
+            if only_if_absent && registry.contains_key(start.req_id) {
+                return Ok(false);
+            }
             let record = TaskJournalRecord {
                 req_id: start.req_id.to_string(),
                 cli_name: start.cli_name.to_string(),
@@ -53,7 +68,8 @@ impl TaskJournal {
                 "cwd": start.cwd,
                 "runtime_permission": start.runtime_permission,
                 "at_ms": now
-            }))
+            }))?;
+            Ok(true)
         })
     }
 }
