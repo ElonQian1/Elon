@@ -446,7 +446,7 @@ async fn run_agent_runtime() -> Result<()> {
         warn!(%error, "启动时重放 durable cancel intent 失败，交由周期 reconcile 重试");
     }
     node_agent_sidecar_recovery::reconcile_surviving_sidecars(runtime.clone()).await;
-    runtime.reconcile_local_completion_outbox();
+    runtime.reconcile_local_completion_outbox().await;
     node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
     node_agent_restart_drain::recover_checkpoint_after_startup(&runtime.update_recovery);
     match runtime

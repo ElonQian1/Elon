@@ -274,6 +274,40 @@ fn restart_replay_requires_a_live_recorded_process_not_only_a_fresh_heartbeat() 
 }
 
 #[test]
+fn marker_before_process_started_is_protected_by_launch_grace() {
+    let now = now_ms();
+    let mut record = session("marker-first", "task-marker-first");
+    record.sidecar_pid = None;
+    record.sidecar_process_identity = None;
+    record.child_pid = None;
+    record.child_process_identity = None;
+    assert!(record.protects_startup_reconcile_at(now));
+
+    record.started_at_ms = now.saturating_sub(2 * 60 * 1_000 + 1);
+    record.last_seen_at_ms = record.started_at_ms;
+    assert!(!record.protects_startup_reconcile_at(now));
+}
+
+#[test]
+fn fresh_heartbeat_or_live_sidecar_blocks_stale_conversion() {
+    let now = now_ms();
+    let mut record = session("fresh-or-live", "task-fresh-or-live");
+    record.sidecar_pid = None;
+    record.sidecar_process_identity = None;
+    record.child_pid = None;
+    record.child_process_identity = None;
+    record.started_at_ms = now.saturating_sub(10 * 60 * 1_000);
+    record.last_seen_at_ms = now;
+    assert!(record.protects_startup_reconcile_at(now), "fresh heartbeat");
+
+    record.last_seen_at_ms = now.saturating_sub(10 * 60 * 1_000);
+    record.sidecar_pid = Some(std::process::id());
+    record.sidecar_process_identity =
+        crate::node_agent_cli_worker::process_identity(std::process::id());
+    assert!(record.protects_startup_reconcile_at(now), "live sidecar");
+}
+
+#[test]
 fn restart_replay_binds_fresh_heartbeat_session_and_process_identity() {
     let now = now_ms();
     let mut record = session("bound-session", "bound-task");

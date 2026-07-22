@@ -78,21 +78,26 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
         .map(output_contains_terminal_record)
         .transpose()?
         .unwrap_or(false);
-    let receipt = ensure_recovery_receipt(&runtime, &task, &session)?;
     if !terminal_output {
         let live_runtime_handle = runtime
             .active_cli_prompt_view(&task.task_id)
             .await
             .is_some_and(|handle| handle.control_handle_live);
-        if (live_runtime_handle || session.can_replay_after_restart_at(now_ms()))
-            && receipt.is_some()
-        {
-            info!(task_id = %task.task_id, "发现更新后仍存活的 sidecar，交由恢复事务重接");
+        let now = now_ms();
+        if live_runtime_handle || session.protects_startup_reconcile_at(now) {
+            info!(task_id = %task.task_id, "sidecar 仍在启动宽限、心跳或 live handle 下，保持运行/恢复状态");
+            return Ok(());
+        }
+        let receipt = ensure_recovery_receipt(&runtime, &task, &session)?;
+        if !stale_transition_evidence_complete(false, false, receipt.as_ref()) {
+            warn!(task_id = %task.task_id, "stale sidecar evidence is incomplete; preserving recoverable state");
             return Ok(());
         }
         move_stale_sidecar_to_resume_required(&runtime, &task, &session, receipt.as_ref())?;
         return Ok(());
     }
+
+    let _receipt = ensure_recovery_receipt(&runtime, &task, &session)?;
 
     if bind_existing_completion(&runtime, &task).await? {
         return Ok(());
@@ -237,6 +242,16 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionReco
         }
     }
     Ok(())
+}
+
+fn stale_transition_evidence_complete(
+    live_runtime_handle: bool,
+    protected_sidecar: bool,
+    receipt: Option<&UpdateRecoveryReceipt>,
+) -> bool {
+    !live_runtime_handle
+        && !protected_sidecar
+        && receipt.is_some_and(|receipt| receipt.safety.evidence_complete)
 }
 
 fn move_stale_sidecar_to_resume_required(

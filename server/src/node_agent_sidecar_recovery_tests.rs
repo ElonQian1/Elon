@@ -85,3 +85,29 @@ fn codex_process_exit_without_turn_terminal_is_not_completion() {
         Some(false)
     );
 }
+
+#[test]
+fn only_complete_evidence_with_no_live_handle_allows_resume_required() {
+    let mut receipt = UpdateRecoveryReceipt::planned("update", "root", "task");
+    assert!(!stale_transition_evidence_complete(
+        false,
+        false,
+        Some(&receipt)
+    ));
+    receipt.safety.evidence_complete = true;
+    assert!(stale_transition_evidence_complete(
+        false,
+        false,
+        Some(&receipt)
+    ));
+    assert!(!stale_transition_evidence_complete(
+        true,
+        false,
+        Some(&receipt)
+    ));
+    assert!(!stale_transition_evidence_complete(
+        false,
+        true,
+        Some(&receipt)
+    ));
+}

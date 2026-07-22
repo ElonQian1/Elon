@@ -248,7 +248,7 @@ fn startup_interrupts_only_running_tasks_without_durable_completion() {
     let durable_req_ids = HashSet::from([protected.req_id.clone()]);
     assert_eq!(
         local_tasks
-            .interrupt_lingering_running(&durable_req_ids)
+            .interrupt_lingering_running(&durable_req_ids, i64::MAX)
             .unwrap(),
         1
     );
@@ -271,6 +271,51 @@ fn startup_interrupts_only_running_tasks_without_durable_completion() {
         .as_deref()
         .is_some_and(|error| error.contains("Resume")));
     assert!(resume_required.finished_at_ms.is_some());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn startup_grace_blocks_marker_first_race_until_no_handle_evidence_is_old() {
+    let root = test_root();
+    let local_tasks = LocalTaskStore::new(root.join("local-tasks.sqlite3"));
+    let task = completion("event-marker-first", "req-marker-first");
+    create_local_task(&local_tasks, &task);
+    let started_at = local_tasks
+        .get_for_owner(OWNER, &task.req_id)
+        .unwrap()
+        .unwrap()
+        .started_at_ms;
+
+    assert_eq!(
+        local_tasks
+            .interrupt_lingering_running(&HashSet::new(), started_at.saturating_sub(1))
+            .unwrap(),
+        0,
+        "a fresh durable marker must survive until handle registration can finish"
+    );
+    assert_eq!(
+        local_tasks
+            .get_for_owner(OWNER, &task.req_id)
+            .unwrap()
+            .unwrap()
+            .status,
+        "running"
+    );
+    assert_eq!(
+        local_tasks
+            .interrupt_lingering_running(&HashSet::new(), started_at)
+            .unwrap(),
+        1,
+        "only an old task with no protected handle evidence may become resume_required"
+    );
+    assert_eq!(
+        local_tasks
+            .get_for_owner(OWNER, &task.req_id)
+            .unwrap()
+            .unwrap()
+            .status,
+        "resume_required"
+    );
     let _ = fs::remove_dir_all(root);
 }
 

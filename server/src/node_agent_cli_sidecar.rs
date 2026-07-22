@@ -629,6 +629,19 @@ impl CliSidecarSessionRecord {
         })
     }
 
+    /// Startup reconciliation may observe the durable marker before the child
+    /// PID/event registration finishes. A fresh marker/heartbeat or a verified
+    /// process identity is sufficient to defer destructive stale conversion.
+    pub(crate) fn protects_startup_reconcile_at(&self, now_ms: u128) -> bool {
+        self.is_live_at(now_ms)
+            || (matches!(
+                self.state.trim().to_ascii_lowercase().as_str(),
+                "running" | "waiting_approval" | "cancel_requested"
+            ) && now_ms >= self.started_at_ms
+                && now_ms.saturating_sub(self.started_at_ms) <= SIDECAR_STALE_AFTER_MS)
+            || self.recorded_process_is_live()
+    }
+
     fn sidecar_process_identity_matches(&self) -> bool {
         self.sidecar_pid
             .zip(self.sidecar_process_identity.as_deref())

@@ -268,16 +268,18 @@ impl LocalTaskStore {
     pub(crate) fn interrupt_lingering_running(
         &self,
         durable_req_ids: &HashSet<String>,
+        started_before_ms: i64,
     ) -> Result<usize> {
         let mut conn = self.open()?;
         let tx = conn.transaction()?;
         let running_ids = {
             let mut stmt = tx.prepare(
                 "SELECT task_id FROM local_tasks
-                  WHERE status = 'running' AND completion_event_id IS NULL",
+                  WHERE status = 'running' AND completion_event_id IS NULL
+                    AND started_at_ms <= ?1",
             )?;
             let ids = stmt
-                .query_map([], |row| row.get::<_, String>(0))?
+                .query_map([started_before_ms], |row| row.get::<_, String>(0))?
                 .collect::<rusqlite::Result<Vec<_>>>()?;
             ids
         };
@@ -294,8 +296,9 @@ impl LocalTaskStore {
                         finished_at_ms = ?1
                   WHERE task_id = ?2
                     AND status = 'running'
-                    AND completion_event_id IS NULL",
-                params![now_ms(), task_id],
+                    AND completion_event_id IS NULL
+                    AND started_at_ms <= ?3",
+                params![now_ms(), task_id, started_before_ms],
             )?;
         }
         tx.commit()?;
@@ -620,7 +623,9 @@ mod tests {
         assert!(record.error.is_none());
         assert!(!store.mark_recovery_running("local-running").unwrap());
         assert_eq!(
-            store.interrupt_lingering_running(&HashSet::new()).unwrap(),
+            store
+                .interrupt_lingering_running(&HashSet::new(), i64::MAX)
+                .unwrap(),
             1
         );
         assert!(store.mark_recovery_running("local-running").unwrap());
