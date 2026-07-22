@@ -90,6 +90,11 @@ fn checkpoint_active_update_transactions(
     let update_id = stable_update_id(to_git_sha);
     let mut decision = UpdateCheckpointDecision::default();
     for task in local_tasks.list_update_candidates()? {
+        if task.status == "cancel_requested"
+            && confirmed_stale_registry_tasks.contains(&task.task_id)
+        {
+            continue;
+        }
         let contract = load_supervision_contract(journal, &task.task_id)?;
         if contract.as_ref().is_some_and(|contract| {
             contract.protocol == SUPERVISION_PROTOCOL
@@ -105,10 +110,8 @@ fn checkpoint_active_update_transactions(
                 .record_cancel_command_with_audit(&task.task_id, &audit)
                 .with_context(|| format!("persist updater cancel audit for {}", task.task_id))?;
             anyhow::ensure!(
-                recorded
-                    || (task.status == "cancel_requested"
-                        && confirmed_stale_registry_tasks.contains(&task.task_id)),
-                "updater refused to interrupt self evolution {} without a durable sidecar audit or exact-target stale-runtime proof",
+                recorded,
+                "updater refused to interrupt self evolution {} without a durable sidecar audit",
                 task.task_id
             );
             continue;

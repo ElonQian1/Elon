@@ -101,6 +101,20 @@ fn legacy_active_task_without_supervision_checkpoint_defers_update() {
     assert_eq!(decision.active_foreground_task_ids, ["legacy-active"]);
     assert!(decision.checkpointed_task_ids.is_empty());
     assert!(!decision.install_may_proceed());
+
+    assert!(local_tasks.mark_cancel_requested("legacy-active").unwrap());
+    let stale_decision = checkpoint_active_update_transactions(
+        &UpdateRecoveryStore::new(root.join("recovery-stale.json")),
+        &local_tasks,
+        &crate::node_agent_task_journal::TaskJournal::new(root.join("journal")),
+        &crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars")),
+        "old",
+        "new",
+        &HashSet::from(["legacy-active".to_string()]),
+    )
+    .expect("exact-target stale cancel_requested task should not block the installer");
+    assert!(stale_decision.active_foreground_task_ids.is_empty());
+    assert!(stale_decision.install_may_proceed());
     let _ = std::fs::remove_dir_all(root);
 }
 
