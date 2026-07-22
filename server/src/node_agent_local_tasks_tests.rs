@@ -41,14 +41,14 @@ pub(super) fn record_captured_dispatch(
     }
 }
 
-fn install_dispatch_capture(prompt: &str) {
+pub(super) fn install_dispatch_capture(prompt: &str) {
     dispatch_captures()
         .lock()
         .unwrap()
         .insert(prompt.to_string(), Vec::new());
 }
 
-fn take_dispatch_captures(prompt: &str) -> Vec<CapturedDispatch> {
+pub(super) fn take_dispatch_captures(prompt: &str) -> Vec<CapturedDispatch> {
     dispatch_captures()
         .lock()
         .unwrap()

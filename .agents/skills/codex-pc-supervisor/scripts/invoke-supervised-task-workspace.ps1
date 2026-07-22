@@ -26,12 +26,63 @@ function Resolve-SubmitProjectWorkspace {
     if (-not (Test-Path -LiteralPath $resolved -PathType Container)) {
         throw "WORKSPACE_IDENTITY_MISMATCH: authoritative workspace_path is unavailable: $resolved"
     }
+    $grantState = Ensure-SubmitFullAccessGrant $Connection $projectId $resolved
     [pscustomobject]@{
         ProjectId = $projectId; RequestedPath = $requested; AuthorizedPath = $resolved
         ResolvedPath = $resolved
         Corrected = (-not [string]::IsNullOrWhiteSpace($requested) -and $requested -ne $resolved)
         RuntimePermission = $permission
+        FullAccessGrant = $grantState
     }
+}
+
+function Convert-ToComparableWorkspacePath {
+    param([string]$Value)
+    if ([string]::IsNullOrWhiteSpace($Value)) { return '' }
+    $path = [System.IO.Path]::GetFullPath($Value.Trim())
+    if ($path.StartsWith('\\?\')) { $path = $path.Substring(4) }
+    return $path.TrimEnd('\', '/').ToLowerInvariant()
+}
+
+function Test-EquivalentProjectId {
+    param([string]$Left, [string]$Right)
+    $canonical = {
+        param([string]$Value)
+        $value = $Value.Trim().ToLowerInvariant()
+        if ($value -eq 'elon-project') { return 'elon-self' }
+        return $value
+    }
+    return (& $canonical $Left) -eq (& $canonical $Right)
+}
+
+function New-FullAccessGrantBody {
+    param([string]$ProjectId, [string]$WorkspacePath)
+    [ordered]@{
+        project_id = $ProjectId.Trim()
+        workspace_path = [System.IO.Path]::GetFullPath($WorkspacePath)
+        confirm_full_access = $true
+    }
+}
+
+function Ensure-SubmitFullAccessGrant {
+    param([object]$Connection, [string]$ProjectId, [string]$WorkspacePath)
+    $expectedPath = Convert-ToComparableWorkspacePath $WorkspacePath
+    $payload = Invoke-NodeApi $Connection 'Get' '/api/full-access/grants'
+    $matched = @((Get-ObjectField $payload 'grants') | Where-Object {
+        (Test-EquivalentProjectId ([string](Get-ObjectField $_ 'project_id')) $ProjectId) -and
+        (Convert-ToComparableWorkspacePath ([string](Get-ObjectField $_ 'workspace_path'))) -eq $expectedPath
+    })
+    if ($matched.Count -gt 0) { return 'already_granted' }
+
+    $response = Invoke-NodeApi $Connection 'Post' '/api/full-access/grants' `
+        (New-FullAccessGrantBody $ProjectId $WorkspacePath)
+    $grant = Get-ObjectField $response 'grant'
+    if ($null -eq $grant -or
+        -not (Test-EquivalentProjectId ([string](Get-ObjectField $grant 'project_id')) $ProjectId) -or
+        (Convert-ToComparableWorkspacePath ([string](Get-ObjectField $grant 'workspace_path'))) -ne $expectedPath) {
+        throw 'PROJECT_FULL_ACCESS_GRANT_MISMATCH: node did not persist the exact authoritative project workspace grant.'
+    }
+    return 'granted'
 }
 
 function Submit-Body {

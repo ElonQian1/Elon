@@ -10,31 +10,70 @@ use crate::{
     node_agent_task_journal::TaskJournal,
 };
 
+pub(crate) struct ResolvedRequestWorkspace {
+    pub(crate) request_path: String,
+    pub(crate) grant_path: String,
+}
+
 pub(crate) fn resolve_request_workspace(
     runtime: &crate::NodeRuntime,
     creds: &crate::Credentials,
     project_id: &str,
     requested_workspace_path: &str,
     contract: Option<&SupervisionContract>,
-) -> Result<String> {
-    let Some(contract) = contract.filter(|contract| {
-        matches!(
-            contract.task_role.as_str(),
-            "capability_repair" | "post_task_improvement"
-        )
-    }) else {
-        return Ok(requested_workspace_path.to_string());
+) -> Result<ResolvedRequestWorkspace> {
+    let Some(contract) = contract else {
+        return Ok(same_request_and_grant(requested_workspace_path.to_string()));
     };
-    resolve_chained_authorized_workspace(
-        &runtime.local_tasks,
-        &runtime.task_journal,
-        &runtime.update_recovery,
-        creds,
-        &runtime.install_id,
-        project_id,
-        requested_workspace_path,
-        contract,
-    )
+    match contract.task_role.as_str() {
+        "resume_original" => {
+            let parent_id = contract
+                .parent_task_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .context("Resume 缺少 parent_task_id。")?;
+            let parent = runtime
+                .local_tasks
+                .get_for_owner(&creds.owner_user_id, parent_id)?
+                .context("Resume 的父任务不存在或不属于当前账号。")?;
+            let grant_path = resolve_resume_authorized_workspace(
+                &runtime.local_tasks,
+                &runtime.task_journal,
+                &runtime.update_recovery,
+                creds,
+                &runtime.install_id,
+                project_id,
+                &parent,
+                contract,
+            )?;
+            Ok(ResolvedRequestWorkspace {
+                request_path: requested_workspace_path.to_string(),
+                grant_path,
+            })
+        }
+        "capability_repair" | "post_task_improvement" => {
+            let resolved = resolve_chained_authorized_workspace(
+                &runtime.local_tasks,
+                &runtime.task_journal,
+                &runtime.update_recovery,
+                creds,
+                &runtime.install_id,
+                project_id,
+                requested_workspace_path,
+                contract,
+            )?;
+            Ok(same_request_and_grant(resolved))
+        }
+        _ => Ok(same_request_and_grant(requested_workspace_path.to_string())),
+    }
+}
+
+fn same_request_and_grant(path: String) -> ResolvedRequestWorkspace {
+    ResolvedRequestWorkspace {
+        request_path: path.clone(),
+        grant_path: path,
+    }
 }
 
 /// Resolve a resume parent through its persisted supervision ancestry.  Unlike
@@ -300,6 +339,7 @@ fn required_id<'a>(value: Option<&'a str>, name: &str) -> Result<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::node_agent_local_task_store::{LocalTaskStart, LocalTaskStore};
 
     fn record(
         workspace_path: &str,
@@ -361,6 +401,112 @@ mod tests {
         validate_requested_workspace(active.to_string_lossy().as_ref(), &root, &resolved).unwrap();
         assert!(validate_requested_workspace("C:/unrelated-root", &root, &resolved).is_err());
         let _ = std::fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn resume_request_resolves_inherited_worktree_to_authoritative_base_before_grant_check() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-resume-request-root-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let base = root.join("base");
+        let active = root.join("conversation-worktrees/elon-self/conversation");
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::create_dir_all(&active).unwrap();
+        let credentials = crate::node_agent_config::Credentials {
+            agent_id: "agent".into(),
+            agent_secret: "unused".into(),
+            owner_user_id: "owner".into(),
+            user_token: None,
+        };
+        let mut runtime = crate::NodeRuntime::new(
+            crate::node_agent_config::NodeConfig {
+                cloud_url: "ws://127.0.0.1".into(),
+                cloud_http_url: "http://127.0.0.1".into(),
+                ollama_url: "http://127.0.0.1".into(),
+                lm_studio_url: None,
+                custom_url: None,
+                price_per_1k: 0.0,
+            },
+            Some(credentials.clone()),
+            crate::pc_storage_repo::StorageSettings::default(),
+            crate::node_agent_data_root::resolve(None, None, None),
+            "install".into(),
+        );
+        runtime.local_tasks = LocalTaskStore::new(root.join("tasks.sqlite3"));
+        runtime.task_journal = TaskJournal::new(root.join("journal"));
+        runtime.update_recovery =
+            crate::node_agent_update_recovery::UpdateRecoveryStore::new(root.join("recovery.json"));
+        runtime
+            .local_tasks
+            .create(LocalTaskStart {
+                task_id: "local-parent",
+                owner_user_id: "owner",
+                agent_id: "agent",
+                install_id: "install",
+                project_id: "elon-self",
+                channel_id: None,
+                conversation_id: "conversation",
+                workspace_path: active.to_str().unwrap(),
+                prompt: "work",
+                cli: "codex",
+                runtime_permission: "full_access",
+            })
+            .unwrap();
+        runtime
+            .local_tasks
+            .record_initial_workspace_status(
+                "local-parent",
+                &serde_json::json!({
+                    "isolated": true,
+                    "platform_provenance": "elon.conversation_worktree.v1",
+                    "project_id": "elon-self",
+                    "root_task_id": "local-parent",
+                    "base_workspace_path": base,
+                    "active_workspace_path": active,
+                    "branch": "ai/session/elon-self/conversation",
+                }),
+            )
+            .unwrap();
+        crate::node_agent_local_task_supervision::record_supervision_event(
+            &runtime.task_journal,
+            "local-parent",
+            "supervision_contract",
+            crate::node_agent_local_task_supervision::contract_payload(&SupervisionContract {
+                protocol: SUPERVISION_PROTOCOL.into(),
+                supervisor: "codex_desktop".into(),
+                task_role: "requirement".into(),
+                parent_task_id: None,
+                root_task_id: Some("local-parent".into()),
+                acceptance_criteria: vec![],
+                improvement_policy: "observe_only".into(),
+            }),
+        )
+        .unwrap();
+        let resume = SupervisionContract {
+            protocol: SUPERVISION_PROTOCOL.into(),
+            supervisor: "codex_desktop".into(),
+            task_role: "resume_original".into(),
+            parent_task_id: Some("local-parent".into()),
+            root_task_id: Some("local-parent".into()),
+            acceptance_criteria: vec![],
+            improvement_policy: "observe_only".into(),
+        };
+
+        let resolved = resolve_request_workspace(
+            &runtime,
+            &credentials,
+            "elon-self",
+            active.to_str().unwrap(),
+            Some(&resume),
+        )
+        .unwrap();
+        assert_eq!(resolved.request_path, active.to_string_lossy());
+        assert!(crate::node_agent_update_checkpoint::same_path(
+            Path::new(&resolved.grant_path),
+            &base
+        ));
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

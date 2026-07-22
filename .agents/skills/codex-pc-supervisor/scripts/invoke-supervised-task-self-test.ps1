@@ -175,6 +175,10 @@ function Invoke-SupervisionSelfTest {
     $testEpochPath = Get-TaskDetailPath 'local-test?id' 25 42 'journal:a/b?c'
     $testProjectsPath = Get-CloudProjectsPath $true
     $testBindingBody = New-ProjectBindingBody 'elon-self' $testWorkspace
+    $testGrantBody = New-FullAccessGrantBody 'elon-self' $testWorkspace
+    $testGrantPathMatch =
+        (Convert-ToComparableWorkspacePath $testWorkspace) -eq
+        (Convert-ToComparableWorkspacePath ('\\?\' + $testWorkspace))
     $criteriaJson = ConvertFrom-Utf8Base64 'WyLmnaHku7bkuIAiLCLmnaHku7bkuowiXQ=='
     $jsonCriteria = @(Resolve-AcceptanceCriteria @() $criteriaJson '')
     $activeDetail = [ordered]@{
@@ -370,6 +374,11 @@ function Invoke-SupervisionSelfTest {
             $testBindingBody.workspace_path -ceq [System.IO.Path]::GetFullPath($testWorkspace) -and
             $null -eq (Get-ObjectField $testBindingBody 'token') -and
             $null -eq (Get-ObjectField $testBindingBody 'user_token')
+        full_access_grant_body = $testGrantBody.project_id -eq 'elon-self' -and
+            $testGrantBody.confirm_full_access -eq $true -and $testGrantPathMatch -and
+            (Test-EquivalentProjectId 'elon-project' 'elon-self') -and
+            $null -eq (Get-ObjectField $testGrantBody 'token') -and
+            $null -eq (Get-ObjectField $testGrantBody 'user_token')
         inspect_wait_active = $activeCompact.record.status -eq 'running' -and
             $activeCompact.runtime.phase -eq 'verification' -and
             $activeCompact.runtime.dispatch.stage -eq 'active' -and
@@ -422,6 +431,7 @@ function Invoke-SupervisionSelfTest {
             'resume_inherited_workspace', 'resume_recorded_head_recovery',
             'resume_git_recovery_occupied_guard', 'task_detail_path', 'cloud_projects_path',
             'project_binding_body_without_token',
+            'authoritative_full_access_grant_without_token',
             'expected_cursor_epoch_handshake', 'desktop_review_paths_fail_closed',
             'desktop_review_requires_v3_capability',
             'inspect_wait_active_runtime', 'compact_delta_evidence_digest',

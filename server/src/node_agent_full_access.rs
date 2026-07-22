@@ -494,7 +494,8 @@ fn canonical_existing_path(value: &str) -> Option<String> {
 }
 
 fn is_legacy_conversation_worktree(cwd: &str, project_id: &str, conversation_id: &str) -> bool {
-    let parts = cwd
+    let normalized_cwd = cwd.replace('\\', "/");
+    let parts = normalized_cwd
         .split('/')
         .filter(|part| !part.is_empty())
         .map(|part| normalize_workspace_component(part.to_string()))
@@ -526,6 +527,18 @@ pub(crate) async fn current_grant_identity(
         &credentials.agent_id,
         &runtime.install_id,
     )
+}
+
+pub(crate) async fn require_project_workspace(
+    runtime: &crate::NodeRuntime,
+    project_id: &str,
+    workspace_path: &str,
+) -> Result<()> {
+    let identity = current_grant_identity(runtime).await?;
+    runtime
+        .full_access_grants
+        .require_project(&identity, project_id, workspace_path)
+        .await
 }
 
 pub(crate) async fn grant_handler(

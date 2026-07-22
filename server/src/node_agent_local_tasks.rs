@@ -1,5 +1,7 @@
 //! Localhost control plane for owner-only offline Codex tasks.
 
+#[path = "node_agent_local_task_approval.rs"]
+mod approval;
 #[path = "node_agent_local_task_cancel.rs"]
 mod cancel;
 #[path = "node_agent_local_task_create_plan.rs"]
@@ -59,11 +61,6 @@ struct DetailQuery {
     expected_cursor_epoch: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct ApprovalDecisionRequest {
-    decision: String,
-}
-
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
     Router::new()
         .route("/api/local-tasks", get(list_tasks).post(create_task))
@@ -74,7 +71,7 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
         )
         .route(
             "/api/local-tasks/:task_id/tool-approvals/:approval_id/decision",
-            post(decide_approval),
+            post(approval::decide_approval),
         )
         .merge(crate::node_agent_local_task_supervision::routes())
         .merge(crate::node_agent_self_evolution::routes())
@@ -298,16 +295,7 @@ async fn create_task(
             "PROJECT_FULL_ACCESS_DISABLED: 本机监督任务要求项目启用完全访问。",
         );
     }
-    let (task_id, idempotency_binding) =
-        match idempotency::begin(&runtime, &creds.owner_user_id, &headers, &request) {
-            idempotency::Begin::Unbound { task_id } => (task_id, None),
-            idempotency::Begin::Bound(binding) => (binding.task_id.clone(), Some(binding)),
-            idempotency::Begin::Response(response) => return response,
-        };
-    let recovering_idempotent_record = idempotency_binding
-        .as_ref()
-        .is_some_and(|binding| binding.recover_existing);
-    let workspace_path = match root_workspace::resolve_request_workspace(
+    let resolved_workspace = match root_workspace::resolve_request_workspace(
         &runtime,
         &creds,
         project_id,
@@ -317,7 +305,25 @@ async fn create_task(
         Ok(path) => path,
         Err(error) => return json_error(StatusCode::CONFLICT, error.to_string()),
     };
-    let workspace_path = workspace_path.as_str();
+    if let Err(error) = crate::node_agent_full_access::require_project_workspace(
+        &runtime,
+        project_id,
+        &resolved_workspace.grant_path,
+    )
+    .await
+    {
+        return json_error(StatusCode::FORBIDDEN, error.to_string());
+    }
+    let (task_id, idempotency_binding) =
+        match idempotency::begin(&runtime, &creds.owner_user_id, &headers, &request) {
+            idempotency::Begin::Unbound { task_id } => (task_id, None),
+            idempotency::Begin::Bound(binding) => (binding.task_id.clone(), Some(binding)),
+            idempotency::Begin::Response(response) => return response,
+        };
+    let recovering_idempotent_record = idempotency_binding
+        .as_ref()
+        .is_some_and(|binding| binding.recover_existing);
+    let workspace_path = resolved_workspace.request_path.as_str();
     if supervision
         .as_ref()
         .is_some_and(|contract| contract.task_role == "post_task_improvement")
@@ -750,47 +756,10 @@ async fn create_task(
     (StatusCode::ACCEPTED, Json(response_body)).into_response()
 }
 
-async fn decide_approval(
-    State(runtime): State<Arc<NodeRuntime>>,
-    Path((task_id, approval_id)): Path<(String, String)>,
-    Json(request): Json<ApprovalDecisionRequest>,
-) -> Response {
-    let creds = match bound_credentials(&runtime).await {
-        Ok(creds) => creds,
-        Err(response) => return response,
-    };
-    match runtime
-        .local_tasks
-        .get_for_owner(&creds.owner_user_id, task_id.trim())
-    {
-        Ok(Some(record)) if record.status == "running" => {}
-        Ok(Some(_)) => return json_error(StatusCode::CONFLICT, "任务已结束，审批不再可操作。"),
-        Ok(None) => return json_error(StatusCode::NOT_FOUND, "本机任务不存在。"),
-        Err(error) => return internal_error(error),
-    }
-    let decision = match request.decision.trim() {
-        "approve" => "approve",
-        "deny" => "deny",
-        _ => return json_error(StatusCode::BAD_REQUEST, "decision 只能是 approve 或 deny。"),
-    };
-    if !runtime
-        .decide_tool_approval(task_id.trim(), approval_id.trim(), decision)
-        .await
-    {
-        return json_error(
-            StatusCode::CONFLICT,
-            "审批已失效，或运行时已不存在对应等待项。",
-        );
-    }
-    Json(json!({
-        "ok": true,
-        "task_id": task_id,
-        "approval_id": approval_id,
-        "decision": decision,
-    }))
-    .into_response()
-}
-
 #[cfg(test)]
 #[path = "node_agent_local_tasks_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "node_agent_local_tasks_supervised_submit_tests.rs"]
+mod supervised_submit_tests;

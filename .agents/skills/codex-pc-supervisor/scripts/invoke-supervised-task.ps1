@@ -299,7 +299,7 @@ function New-DesktopReviewTicket {
     $stateRoot = if (-not [string]::IsNullOrWhiteSpace($DesktopReviewStateRoot)) { $DesktopReviewStateRoot } elseif (-not [string]::IsNullOrWhiteSpace($StateRoot)) { $StateRoot } else { [string]$env:ELON_DESKTOP_REVIEW_STATE_ROOT }
     $installRoot = if (-not [string]::IsNullOrWhiteSpace($DesktopReviewInstallRoot)) { $DesktopReviewInstallRoot } elseif (-not [string]::IsNullOrWhiteSpace($InstallRoot)) { $InstallRoot } else { [string]$env:ELON_DESKTOP_REVIEW_INSTALL_ROOT }
     if ([string]::IsNullOrWhiteSpace($stateRoot) -or [string]::IsNullOrWhiteSpace($installRoot)) {
-        throw 'desktop_review_paths_not_configured: set -DesktopReviewStateRoot/-DesktopReviewInstallRoot or ELON_DESKTOP_REVIEW_STATE_ROOT/ELON_DESKTOP_REVIEW_INSTALL_ROOT'
+        throw 'desktop_review_paths_not_configured: set -DesktopReviewStateRoot/-DesktopReviewInstallRoot or ELON_DESKTOP_REVIEW_STATE_ROOT/ELON_DESKTOP_REVIEW_INSTALL_ROOT; from a distinct Desktop Windows identity run <InstallRoot>\_internal\desktop-review-credential.ps1 -Action Diagnose -StateRoot <Desktop-only-state> -InstallRoot <Node-install>; the executor SID cannot act as Desktop reviewer'
     }
     $signer = Join-Path ([IO.Path]::GetFullPath($installRoot)) '_internal\new-desktop-review-ticket.ps1'
     if (Test-Path -LiteralPath $signer -PathType Leaf) {

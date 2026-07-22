@@ -1,5 +1,5 @@
 function Get-NodeConnection {
-    param([int]$RetrySeconds = 0)
+    param([int]$RetrySeconds = 2)
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
     $candidateUrls = New-Object System.Collections.Generic.List[string]
     if (-not [string]::IsNullOrWhiteSpace($env:ELON_NODE_ADMIN_URL)) {
@@ -78,7 +78,7 @@ function Get-NodeConnection {
             }) -Force
             return $parallel
         }
-        if ($timer.Elapsed.TotalSeconds -lt $RetrySeconds) { Start-Sleep -Seconds 2 }
+        if ($timer.Elapsed.TotalSeconds -lt $RetrySeconds) { Start-Sleep -Milliseconds 100 }
     } while ($timer.Elapsed.TotalSeconds -lt $RetrySeconds)
     throw 'No authorized Yilong PC node found on 127.0.0.1 ports 7799-7819.'
 }
