@@ -187,6 +187,83 @@ fn lifecycle_lookup_and_final_review_share_the_same_receipt() {
 }
 
 #[test]
+fn compact_status_counts_all_receipts_and_pages_without_events() {
+    let (root, store) = temp_store();
+    let mut active = UpdateRecoveryReceipt::planned("update-page-a", "root-a", "task-a");
+    active.updated_at_ms = 30;
+    let mut failed = UpdateRecoveryReceipt::planned("update-page-b", "root-b", "task-b");
+    failed.state = UpdateRecoveryState::Failed;
+    failed.updated_at_ms = 20;
+    let mut verified = UpdateRecoveryReceipt::planned("update-page-c", "root-c", "task-c");
+    verified.state = UpdateRecoveryState::Verified;
+    verified.updated_at_ms = 10;
+    store.upsert(active).unwrap();
+    store.upsert(failed).unwrap();
+    store.upsert(verified).unwrap();
+
+    let first = store.status_page_payload(0, 1, false).unwrap();
+    assert_eq!(first["receipt_count"], 3);
+    assert_eq!(first["active_count"], 1);
+    assert_eq!(first["receipts"].as_array().unwrap().len(), 1);
+    assert!(first["receipts"][0].get("events").is_none());
+    assert_eq!(first["receipts"][0]["event_count"], 1);
+    assert_eq!(first["next_cursor"], 1);
+    assert_eq!(first["has_more"], true);
+
+    let second = store.status_page_payload(1, 2, true).unwrap();
+    assert_eq!(second["receipts"].as_array().unwrap().len(), 2);
+    assert!(second["receipts"][0]["events"].is_array());
+    assert_eq!(second["has_more"], false);
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn terminal_binding_ignores_completed_parent_after_resume_child_exists() {
+    let (root, store) = temp_store();
+    let mut receipt = UpdateRecoveryReceipt::planned("update-7", "root-7", "task-7");
+    receipt.resume_task_id = Some("resume-7".to_string());
+    receipt.state = UpdateRecoveryState::Resumed;
+    store.upsert(receipt).unwrap();
+
+    assert_eq!(
+        store
+            .reconcile_terminal_completion(
+                crate::node_agent_update_recovery_terminal::ExpectedRecovery::NotApplicable,
+                "task-7",
+                "old-canceled",
+                "canceled",
+                10,
+                false,
+                None,
+            )
+            .unwrap(),
+        crate::node_agent_update_recovery_terminal::TerminalRecoveryDisposition::NotApplicable
+    );
+    let unchanged = store.load().unwrap().receipts.remove(0);
+    assert!(unchanged.completion_event_id.is_none());
+    assert!(unchanged.terminal_task_status.is_none());
+
+    assert_eq!(
+        store
+            .reconcile_terminal_completion(
+                crate::node_agent_update_recovery_terminal::ExpectedRecovery::Required,
+                "resume-7",
+                "resume-done",
+                "done",
+                20,
+                true,
+                None,
+            )
+            .unwrap(),
+        crate::node_agent_update_recovery_terminal::TerminalRecoveryDisposition::Reconciled
+    );
+    let bound = store.load().unwrap().receipts.remove(0);
+    assert_eq!(bound.completion_event_id.as_deref(), Some("resume-done"));
+    assert_eq!(bound.terminal_task_status.as_deref(), Some("done"));
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
 fn recovered_child_completion_idempotently_promotes_resumed_receipt() {
     let (root, store) = temp_store();
     let mut receipt =

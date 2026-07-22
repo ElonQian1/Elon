@@ -49,6 +49,7 @@ pub(crate) fn checkpoint_downloaded_update(
         .context("更新版本缺少 gitSha，不能建立恢复事务")?;
     let from_git_sha = read_version_git_sha(version_file).unwrap_or_default();
     let store = UpdateRecoveryStore::default();
+    let previous_gate = store.load()?.install_gate;
     let mut confirmed_stale =
         crate::node_agent_restart_drain::confirmed_stale_registry_tasks_for_update(to_git_sha)?;
     let local_tasks = crate::node_agent_local_task_store::LocalTaskStore::default();
@@ -76,6 +77,9 @@ pub(crate) fn checkpoint_downloaded_update(
         info!(count = decision.checkpointed_task_ids.len(), %to_git_sha, "已保存节点更新任务恢复检查点");
     }
     let may_proceed = decision.install_may_proceed();
+    let preserved_audit = (previous_gate.target_git_sha == to_git_sha)
+        .then_some(previous_gate)
+        .unwrap_or_default();
     store.update_install_gate(UpdateInstallGate {
         phase: if may_proceed {
             "checkpoint_saved".to_string()
@@ -94,6 +98,10 @@ pub(crate) fn checkpoint_downloaded_update(
             }
         }),
         updated_at_ms: crate::node_agent_cli_sidecar::now_ms(),
+        excluded_terminal_history_count: preserved_audit.excluded_terminal_history_count,
+        reconcile_id: preserved_audit.reconcile_id,
+        reconciled_at_ms: preserved_audit.reconciled_at_ms,
+        classifications: preserved_audit.classifications,
     })?;
     Ok(decision)
 }
@@ -156,6 +164,7 @@ fn checkpoint_active_update_transactions(
 ) -> Result<UpdateCheckpointDecision> {
     let update_id = stable_update_id(to_git_sha);
     let mut decision = UpdateCheckpointDecision::default();
+    let reconciled_gate = store.load()?.install_gate;
     for task in local_tasks.list_update_install_candidates()? {
         // A confirmed-stale registry entry is historical evidence. Re-read the
         // sidecar registry and bind the install decision to the runtime's
@@ -165,7 +174,12 @@ fn checkpoint_active_update_transactions(
         let live_sidecar = sidecar
             .as_ref()
             .is_some_and(|session| session.recorded_process_is_live());
-        let live_execution = live_sidecar || fresh_runtime_handle_task_ids.contains(&task.task_id);
+        let replayable_sidecar = sidecar.as_ref().is_some_and(|session| {
+            session.can_replay_output_at(crate::node_agent_cli_sidecar::now_ms())
+        });
+        let live_execution = live_sidecar
+            || replayable_sidecar
+            || fresh_runtime_handle_task_ids.contains(&task.task_id);
         if live_execution {
             decision.live_execution_task_ids.push(task.task_id.clone());
         }
@@ -176,6 +190,35 @@ fn checkpoint_active_update_transactions(
             && !live_execution
         {
             continue;
+        }
+        if persisted_inactive
+            && reconciled_gate.target_git_sha == to_git_sha
+            && reconciled_gate
+                .classifications
+                .iter()
+                .any(|classification| {
+                    classification.task_id == task.task_id
+                        && classification.status == task.status
+                        && classification.finished_at_ms == task.finished_at_ms
+                        && classification.excluded_from_install_blockers
+                        && (classification.terminal_recovery_receipt
+                            || classification
+                                .resume_ineligibility_proof
+                                .as_deref()
+                                .is_some_and(|reason| !reason.trim().is_empty()))
+                })
+            && !live_execution
+        {
+            // Re-read all safety-sensitive journal state at install time. The
+            // persisted administrator audit is necessary, but never sufficient
+            // by itself if approvals or actions appeared after reconciliation.
+            let audit = journal.snapshot(&task.task_id, 0, 10_000)?;
+            if !audit.has_more
+                && audit.approvals.pending_approval_ids().is_empty()
+                && incomplete_non_repeatable_action(&audit.events).is_none()
+            {
+                continue;
+            }
         }
         if persisted_inactive {
             decision
@@ -258,9 +301,6 @@ fn checkpoint_active_update_transactions(
             .record
             .as_ref()
             .and_then(|record| record.codex_session_scope_key.clone());
-        let replayable_sidecar = sidecar.as_ref().is_some_and(|session| {
-            session.can_replay_output_at(crate::node_agent_cli_sidecar::now_ms())
-        });
         if let Some(sidecar) = sidecar {
             receipt.sidecar_session_id = Some(sidecar.session_id);
             receipt.sidecar_output_offset = sidecar.output_offset;

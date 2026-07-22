@@ -232,9 +232,9 @@ export default function ProjectPlazaView() {
           </div>
 
           <div className={styles.allHeading}><h2>全部</h2></div>
-          <div className={styles.projectList}>
+          <div className={styles.projectList} data-testid="project-list">
             {projects.map((project) => (
-              <article className={styles.projectRow} key={project.id}>
+              <article className={styles.projectRow} data-testid="project-row" data-project-id={project.id} key={project.id}>
                 <img className={styles.thumbnail} src={thumbnailAsset} alt="" />
                 <button className={styles.projectRowMain} type="button" onClick={() => void openProject(project)}>
                   <strong>{project.display_name || project.name}</strong>
@@ -259,6 +259,7 @@ export default function ProjectPlazaView() {
             <div className={styles.loadMoreRow}>
               <button
                 className={styles.loadMoreBtn}
+                data-testid="project-list-more"
                 type="button"
                 disabled={loadingMore}
                 onClick={() => void load({ append: true, cursor: nextCursor })}

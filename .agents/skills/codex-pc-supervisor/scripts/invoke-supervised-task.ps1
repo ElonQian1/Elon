@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Probe', 'Projects', 'Submit', 'Inspect', 'Wait', 'Review', 'Improve', 'Resume', 'SelfTest')]
+    [ValidateSet('Probe', 'Projects', 'InspectProjectBinding', 'BindProject', 'ReconcileUpdate', 'Submit', 'Inspect', 'Wait', 'Review', 'Improve', 'Resume', 'SelfTest')]
     [string]$Action,
     [string]$ProjectId = 'elon-self',
     [string]$WorkspacePath,
@@ -268,56 +268,7 @@ function Save-CachedNodeUrl {
     } catch {}
 }
 
-function Get-NodeConnection {
-    param([int]$RetrySeconds = 0)
-    $candidateUrls = New-Object System.Collections.Generic.List[string]
-    if (-not [string]::IsNullOrWhiteSpace($env:ELON_NODE_ADMIN_URL)) {
-        $candidateUrls.Add($env:ELON_NODE_ADMIN_URL.TrimEnd('/'))
-    }
-    if (-not [string]::IsNullOrWhiteSpace($script:LastNodeAdminUrl)) {
-        $candidateUrls.Add($script:LastNodeAdminUrl)
-    }
-    $cachedUrl = Get-CachedNodeUrl
-    if (-not [string]::IsNullOrWhiteSpace($cachedUrl)) { $candidateUrls.Add($cachedUrl) }
-    $candidateUrls.Add('http://127.0.0.1:7799')
-    foreach ($port in 7800..7819) {
-        $candidateUrls.Add("http://127.0.0.1:$port")
-    }
-
-    $timer = [System.Diagnostics.Stopwatch]::StartNew()
-    do {
-        foreach ($candidateUrl in ($candidateUrls | Select-Object -Unique)) {
-            try {
-                $statusHeaders = @{ Origin = $candidateUrl }
-                $status = Invoke-Utf8JsonRequest -Method Get -Uri "$candidateUrl/api/status" `
-                    -Headers $statusHeaders -TimeoutSec 2
-                $token = [string](Get-ObjectField $status 'local_admin_token')
-                $header = [string](Get-ObjectField $status 'local_admin_token_header')
-                $version = [string](Get-ObjectField $status 'version')
-                $supervisionStatus = Get-ObjectField $status 'desktop_supervision'
-                if (-not [string]::IsNullOrWhiteSpace($token) -and
-                    $header.ToLowerInvariant() -eq 'x-elon-local-admin-token' -and
-                    -not [string]::IsNullOrWhiteSpace($version)) {
-                    $script:LastNodeAdminUrl = $candidateUrl
-                    Save-CachedNodeUrl $candidateUrl
-                    return [pscustomobject]@{
-                        BaseUrl = $candidateUrl
-                        Header = $header
-                        Token = $token
-                        Version = $version
-                        SupervisionProtocol = [string](Get-ObjectField $supervisionStatus 'protocol')
-                        SupervisionCapabilities = @((Get-ObjectField $supervisionStatus 'capabilities') | ForEach-Object { [string]$_ })
-                        ProbeMs = $timer.ElapsedMilliseconds
-                    }
-                }
-            } catch {
-                continue
-            }
-        }
-        if ($timer.Elapsed.TotalSeconds -lt $RetrySeconds) { Start-Sleep -Seconds 2 }
-    } while ($timer.Elapsed.TotalSeconds -lt $RetrySeconds)
-    throw 'No authorized Yilong PC node found on 127.0.0.1 ports 7799-7819.'
-}
+. (Join-Path $PSScriptRoot 'invoke-supervised-task-connection.ps1')
 
 function Invoke-NodeApi {
     param(
@@ -365,6 +316,17 @@ function Get-CloudProjectsPath {
     param([bool]$IncludeSystem)
     if ($IncludeSystem) { return '/api/cloud-projects?include_system=true' }
     return '/api/cloud-projects'
+}
+
+function New-ProjectBindingBody {
+    param([string]$RequestedProjectId, [string]$RequestedWorkspacePath)
+    if ([string]::IsNullOrWhiteSpace($RequestedProjectId) -or
+        [string]::IsNullOrWhiteSpace($RequestedWorkspacePath)) {
+        throw 'ProjectId and WorkspacePath are required.'
+    }
+    $resolved = [System.IO.Path]::GetFullPath($RequestedWorkspacePath)
+    if (-not [System.IO.Path]::IsPathRooted($resolved)) { throw 'WorkspacePath must be absolute.' }
+    return [ordered]@{ project_id = $RequestedProjectId.Trim(); workspace_path = $resolved }
 }
 
 function New-SupervisedTaskBody {
@@ -614,7 +576,8 @@ switch ($Action) {
             node_url = $nodeConnection.BaseUrl; node_version = $nodeConnection.Version
             supervision_protocol = $nodeConnection.SupervisionProtocol
             supervision_capabilities = @($nodeConnection.SupervisionCapabilities)
-            probe_ms = $nodeConnection.ProbeMs; cache_contains_token = $false
+            probe_ms = $nodeConnection.ProbeMs; probe_strategy = $nodeConnection.ProbeStrategy
+            cache_contains_token = $false
         })
     }
     'Projects' {
@@ -632,7 +595,41 @@ switch ($Action) {
             node_url = $nodeConnection.BaseUrl; node_version = $nodeConnection.Version
             node_id = Get-ObjectField $response 'node_id'
             transport = Get-ObjectField $response 'transport'
+            cloud_round_trip_ms = Get-ObjectField $response 'cloud_round_trip_ms'
+            project_count = Get-ObjectField $response 'project_count'
             projects = $projects
+        })
+    }
+    'InspectProjectBinding' {
+        $body = New-ProjectBindingBody $ProjectId $WorkspacePath
+        $response = Invoke-NodeApi $nodeConnection 'Post' '/api/cloud-projects/inspect-binding' $body
+        Convert-ToJsonResult ([ordered]@{
+            ok = $true; action = 'InspectProjectBinding'; protocol = $script:SupervisionProtocol
+            node_url = $nodeConnection.BaseUrl; binding = Get-ObjectField $response 'binding'
+        })
+    }
+    'BindProject' {
+        $body = New-ProjectBindingBody $ProjectId $WorkspacePath
+        $response = Invoke-NodeApi $nodeConnection 'Post' '/api/cloud-projects/rebind' $body
+        Convert-ToJsonResult ([ordered]@{
+            ok = $true; action = 'BindProject'; protocol = $script:SupervisionProtocol
+            node_url = $nodeConnection.BaseUrl
+            project_id = Get-ObjectField $response 'project_id'
+            binding = Get-ObjectField $response 'binding'
+            cloud_receipt = Get-ObjectField $response 'cloud_receipt'
+            timings = Get-ObjectField $response 'timings'
+        })
+    }
+    'ReconcileUpdate' {
+        $response = Invoke-NodeApi $nodeConnection 'Post' '/api/update-recovery/reconcile' @{}
+        Convert-ToJsonResult ([ordered]@{
+            ok = $true; action = 'ReconcileUpdate'; protocol = $script:SupervisionProtocol
+            node_url = $nodeConnection.BaseUrl
+            reconcile_id = Get-ObjectField $response 'reconcile_id'
+            install_may_proceed = Get-ObjectField $response 'install_may_proceed'
+            excluded_terminal_history_count = Get-ObjectField $response 'excluded_terminal_history_count'
+            active_foreground_task_ids = Get-ObjectField $response 'active_foreground_task_ids'
+            install_gate = Get-ObjectField $response 'install_gate'
         })
     }
     'Submit' {

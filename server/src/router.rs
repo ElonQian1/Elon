@@ -78,9 +78,13 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         header::CACHE_CONTROL,
         HeaderValue::from_static("no-cache, no-store, must-revalidate"),
     );
+    let immutable_assets = SetResponseHeaderLayer::overriding(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=31536000, immutable"),
+    );
     // /pc: assets 用 ServeDir，其余路径 fallback 到 index.html，支持强刷子路由。
     let pc_assets_svc = tower::ServiceBuilder::new()
-        .layer(no_cache.clone())
+        .layer(immutable_assets.clone())
         .service(ServeDir::new(pc_next_dist.join("assets")));
     let pc_router = axum::Router::new()
         .route("/pc-workbench-sw.js", get(web::pc_workbench_service_worker))
@@ -97,7 +101,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .with_state(Arc::clone(&state));
     // /pc-next 保持向后兼容（与 /pc 相同）
     let pc_next_assets_svc = tower::ServiceBuilder::new()
-        .layer(no_cache.clone())
+        .layer(immutable_assets)
         .service(ServeDir::new(pc_next_dist.join("assets")));
     let pc_next_router = axum::Router::new()
         .route_service(

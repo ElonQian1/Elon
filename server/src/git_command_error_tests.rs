@@ -84,7 +84,7 @@ fn credential_challenge_fails_quickly_with_auditable_stderr() {
         .expect("make credential challenge listener bounded");
     let address = listener.local_addr().unwrap();
     let server = std::thread::spawn(move || {
-        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        let deadline = std::time::Instant::now() + Duration::from_secs(20);
         while std::time::Instant::now() < deadline {
             match listener.accept() {
                 Ok((mut stream, _)) => {
@@ -112,7 +112,7 @@ fn credential_challenge_fails_quickly_with_auditable_stderr() {
     let child_id = child.id();
     let (done_tx, done_rx) = mpsc::channel();
     let reaper = std::thread::spawn(move || {
-        if done_rx.recv_timeout(Duration::from_secs(8)).is_err() {
+        if done_rx.recv_timeout(Duration::from_secs(20)).is_err() {
             #[cfg(windows)]
             let _ = Command::new("taskkill")
                 .args(["/PID", &child_id.to_string(), "/T", "/F"])

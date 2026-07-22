@@ -179,6 +179,7 @@ mod node_agent_task_resume;
 mod node_agent_task_resume_sidecar;
 #[cfg(test)]
 mod node_agent_task_resume_sidecar_tests;
+mod node_agent_task_runtime_status;
 mod node_agent_tts;
 pub use node_agent_tts::run_tts_synthesis;
 #[cfg(test)]
@@ -187,9 +188,11 @@ mod node_agent_tool_approval;
 mod node_agent_tool_guard;
 mod node_agent_ui_design_workspace;
 mod node_agent_update_checkpoint;
+mod node_agent_update_gate_reconcile;
 mod node_agent_update_reconcile;
 mod node_agent_update_recovery;
 mod node_agent_update_recovery_api;
+mod node_agent_update_recovery_status;
 mod node_agent_update_recovery_terminal;
 mod node_agent_update_resume;
 mod node_agent_workspace_match;
@@ -250,6 +253,7 @@ mod node_agent_cli_prompt_direct;
 mod node_agent_cli_prompt_runner;
 mod node_agent_cli_prompt_sidecar;
 mod node_agent_cli_task_dispatch;
+mod node_agent_cloud_connection;
 mod node_agent_cloud_control;
 mod node_agent_codex_effort;
 mod node_agent_codex_model_compat;
@@ -275,6 +279,7 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
                 continue;
             }
         };
+        runtime.begin_connection_attempt().await;
         runtime.set_connected(false, "连接中…").await;
         match run_session(&runtime.cfg, &creds, &runtime).await {
             Ok(()) => {
@@ -286,6 +291,7 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
                 runtime.set_connected(false, &format!("错误: {}", e)).await;
             }
         }
+        runtime.set_connection_backoff(backoff).await;
         tokio::time::sleep(backoff).await;
         backoff = (backoff * 2).min(Duration::from_secs(60));
     }

@@ -685,20 +685,7 @@ impl TaskJournal {
 }
 
 pub(crate) fn runtime_status_payload(record: Option<&TaskJournalRecord>) -> Value {
-    let Some(record) = record else {
-        return Value::Null;
-    };
-    let now = now_ms();
-    let last_progress = record.last_progress_ms.unwrap_or(record.started_at_ms);
-    let heartbeat = record.heartbeat_at_ms.unwrap_or(record.updated_at_ms);
-    json!({
-        "phase": record.phase,
-        "current_command": record.current_command,
-        "last_progress": last_progress,
-        "heartbeat": heartbeat,
-        "idle_duration": now.saturating_sub(last_progress) / 1000,
-        "timeout_policy": record.timeout_policy,
-    })
+    crate::node_agent_task_runtime_status::payload(record)
 }
 
 fn normalize_runtime_phase(phase: &str) -> &'static str {

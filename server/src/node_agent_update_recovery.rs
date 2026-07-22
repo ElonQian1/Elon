@@ -452,7 +452,42 @@ pub(crate) struct UpdateInstallGate {
     #[serde(default)]
     pub(crate) reason: Option<String>,
     #[serde(default)]
+    pub(crate) excluded_terminal_history_count: usize,
+    #[serde(default)]
+    pub(crate) reconcile_id: Option<String>,
+    #[serde(default)]
+    pub(crate) reconciled_at_ms: Option<u128>,
+    #[serde(default)]
+    pub(crate) classifications: Vec<UpdateGateTaskClassification>,
+    #[serde(default)]
     pub(crate) updated_at_ms: u128,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) struct UpdateGateTaskClassification {
+    pub(crate) task_id: String,
+    pub(crate) status: String,
+    #[serde(default)]
+    pub(crate) finished_at_ms: Option<i64>,
+    #[serde(default)]
+    pub(crate) fresh_runtime_handle: bool,
+    #[serde(default)]
+    pub(crate) live_sidecar: bool,
+    #[serde(default)]
+    pub(crate) replayable_sidecar: bool,
+    #[serde(default)]
+    pub(crate) pending_approval_ids: Vec<String>,
+    #[serde(default)]
+    pub(crate) non_repeatable_action: Option<String>,
+    #[serde(default)]
+    pub(crate) terminal_recovery_receipt: bool,
+    #[serde(default)]
+    pub(crate) resume_eligible: Option<bool>,
+    #[serde(default)]
+    pub(crate) resume_ineligibility_proof: Option<String>,
+    #[serde(default)]
+    pub(crate) excluded_from_install_blockers: bool,
+    pub(crate) reason: String,
 }
 
 impl Default for UpdateInstallGate {
@@ -464,6 +499,10 @@ impl Default for UpdateInstallGate {
             safe_checkpoint_count: 0,
             capability: default_update_gate_capability(),
             reason: None,
+            excluded_terminal_history_count: 0,
+            reconcile_id: None,
+            reconciled_at_ms: None,
+            classifications: Vec::new(),
             updated_at_ms: now_ms(),
         }
     }
@@ -625,26 +664,6 @@ impl UpdateRecoveryStore {
             1 => Ok(matches.into_iter().next()),
             _ => bail!("multiple update recovery receipts target the same task"),
         }
-    }
-
-    pub(crate) fn status_payload(&self, limit: usize) -> Result<serde_json::Value> {
-        let ledger = self.load()?;
-        let mut receipts = ledger.receipts;
-        receipts.sort_by(|left, right| right.updated_at_ms.cmp(&left.updated_at_ms));
-        receipts.truncate(limit.clamp(1, 100));
-        let active_count = receipts
-            .iter()
-            .filter(|receipt| !receipt.state.is_terminal())
-            .count();
-        Ok(serde_json::json!({
-            "schema_version": UPDATE_RECOVERY_SCHEMA_VERSION,
-            "protocol": UPDATE_RECOVERY_PROTOCOL,
-            "expected_downtime_explicit": true,
-            "cursor_replay_supported": true,
-            "install_gate": ledger.install_gate,
-            "active_count": active_count,
-            "receipts": receipts,
-        }))
     }
 
     pub(crate) fn update_install_gate(&self, gate: UpdateInstallGate) -> Result<()> {

@@ -5,6 +5,9 @@ use std::collections::HashSet;
 use std::{sync::atomic::Ordering, sync::Arc};
 use tracing::warn;
 
+const ADMIN_STATUS_MAX_BYTES: usize = 64 * 1024;
+const ADMIN_STATUS_PAYLOAD_BUDGET: usize = ADMIN_STATUS_MAX_BYTES - 1024;
+
 pub(super) async fn admin_health() -> Json<serde_json::Value> {
     Json(serde_json::json!({
         "service": "elon-node-agent",
@@ -35,6 +38,27 @@ mod tests {
         assert!(super::visible_active_runtime("running", "task-a", &live));
         assert!(!super::visible_active_runtime("done", "task-a", &live));
     }
+
+    #[test]
+    fn oversized_status_is_compacted_below_the_declared_limit() {
+        let mut payload = serde_json::json!({
+            "version": "test",
+            "models": [{"description": "x".repeat(100_000)}],
+            "cli_tools": [{"description": "x".repeat(100_000)}],
+            "local_ai": {"models": [{"description": "x".repeat(100_000)}], "cli_tools": []},
+            "update_recovery": {"install_gate": {"active_foreground_task_ids": ["x".repeat(100_000)]}},
+            "local_admin_token": "local-secret",
+        });
+        super::enforce_status_response_limit(&mut payload);
+        let bytes = serde_json::to_vec(&payload).unwrap();
+        assert!(bytes.len() <= super::ADMIN_STATUS_MAX_BYTES);
+        assert_eq!(payload["local_admin_token"], "local-secret");
+        assert_eq!(
+            payload["response_limits"]["max_bytes"],
+            super::ADMIN_STATUS_MAX_BYTES
+        );
+        assert_eq!(payload["response_limits"]["compacted"], true);
+    }
 }
 
 pub(super) async fn admin_status(
@@ -44,12 +68,24 @@ pub(super) async fn admin_status(
     rt.refresh_models_background();
     rt.ensure_cli_probe_background(false).await;
     let creds = rt.creds().await;
-    let (connected, last_event, live) = {
+    let (connected, last_event, live, connection) = {
         let st = rt.status.read().await;
         (
             st.connected,
             st.last_event.clone(),
             st.models_cached.clone(),
+            serde_json::json!({
+                "schema": "elon.node_connection_timing.v1",
+                "attempt": st.connection_attempt,
+                "stage": st.connection_stage,
+                "attempt_started_at_ms": st.connection_attempt_started_at_ms,
+                "stage_started_at_ms": st.stage_started_at_ms,
+                "stage_durations_ms": st.stage_durations_ms,
+                "connected_at_ms": st.connected_at_ms,
+                "last_disconnected_at_ms": st.last_disconnected_at_ms,
+                "last_connect_duration_ms": st.last_connect_duration_ms,
+                "next_backoff_ms": st.next_backoff_ms,
+            }),
         )
     };
     let hardware = rt.hardware_profile().await;
@@ -113,7 +149,7 @@ pub(super) async fn admin_status(
         });
     let update_recovery = rt
         .update_recovery
-        .status_payload(20)
+        .status_summary_payload(5)
         .unwrap_or_else(|error| {
             warn!(%error, "节点更新恢复状态读取失败，管理状态降级为空摘要");
             serde_json::json!({"protocol":"elon.node_update_recovery.v1","error":"unavailable"})
@@ -176,6 +212,7 @@ pub(super) async fn admin_status(
             "active_cli_prompt_task_ids".to_string(),
             serde_json::json!(active_cli_prompt_task_ids),
         );
+        object.insert("connection".to_string(), connection);
         object.insert(
             "desktop_supervision".to_string(),
             super::node_agent_supervision_protocol::status_payload(),
@@ -193,5 +230,103 @@ pub(super) async fn admin_status(
             );
         }
     }
+    enforce_status_response_limit(&mut payload);
     Json(payload)
+}
+
+fn enforce_status_response_limit(payload: &mut serde_json::Value) {
+    let original_bytes = serde_json::to_vec(payload)
+        .map(|bytes| bytes.len())
+        .unwrap_or(0);
+    if original_bytes > ADMIN_STATUS_PAYLOAD_BUDGET {
+        if let Some(object) = payload.as_object_mut() {
+            object.insert("models".to_string(), serde_json::json!([]));
+            object.insert("cli_tools".to_string(), serde_json::json!([]));
+            if let Some(local_ai) = object
+                .get_mut("local_ai")
+                .and_then(serde_json::Value::as_object_mut)
+            {
+                local_ai.insert("models".to_string(), serde_json::json!([]));
+                local_ai.insert("cli_tools".to_string(), serde_json::json!([]));
+            }
+        }
+    }
+    if serde_json::to_vec(payload)
+        .map(|bytes| bytes.len())
+        .unwrap_or(0)
+        > ADMIN_STATUS_PAYLOAD_BUDGET
+    {
+        let essential = serde_json::json!({
+            "version": payload.get("version").cloned(),
+            "release_identity": payload.get("release_identity").cloned(),
+            "build_git_sha": payload.get("build_git_sha").cloned(),
+            "connected": payload.get("connected").cloned(),
+            "logged_in": payload.get("logged_in").cloned(),
+            "agent_id": payload.get("agent_id").cloned(),
+            "active_cli_prompt_count": payload.get("active_cli_prompt_count").cloned(),
+            "active_cli_prompt_task_ids": payload.get("active_cli_prompt_task_ids").cloned(),
+            "active_task_runtime": payload.get("active_task_runtime").cloned(),
+            "restart_recovery": payload.get("restart_recovery").cloned(),
+            "update_recovery": payload.get("update_recovery").cloned(),
+            "lifecycle": payload.get("lifecycle").cloned(),
+            "local_admin_token_header": payload.get("local_admin_token_header").cloned(),
+            "local_admin_token": payload.get("local_admin_token").cloned(),
+            "compacted": true,
+        });
+        *payload = essential;
+    }
+    if serde_json::to_vec(payload)
+        .map(|bytes| bytes.len())
+        .unwrap_or(0)
+        > ADMIN_STATUS_PAYLOAD_BUDGET
+    {
+        let blocker_count = payload
+            .pointer("/update_recovery/install_gate/active_foreground_task_ids")
+            .and_then(serde_json::Value::as_array)
+            .map(Vec::len);
+        *payload = serde_json::json!({
+            "version": payload.get("version").cloned(),
+            "release_identity": payload.get("release_identity").cloned(),
+            "build_git_sha": payload.get("build_git_sha").cloned(),
+            "connected": payload.get("connected").cloned(),
+            "logged_in": payload.get("logged_in").cloned(),
+            "agent_id": payload.get("agent_id").cloned(),
+            "active_cli_prompt_count": payload.get("active_cli_prompt_count").cloned(),
+            "update_blocker_count": blocker_count,
+            "local_admin_token_header": payload.get("local_admin_token_header").cloned(),
+            "local_admin_token": payload.get("local_admin_token").cloned(),
+            "compacted": true,
+        });
+    }
+    let actual_bytes = serde_json::to_vec(payload)
+        .map(|bytes| bytes.len())
+        .unwrap_or(0);
+    if let Some(object) = payload.as_object_mut() {
+        object.insert(
+            "response_limits".to_string(),
+            serde_json::json!({
+                "schema": "elon.node_status_limits.v1",
+                "max_bytes": ADMIN_STATUS_MAX_BYTES,
+                "actual_bytes_before_metadata": actual_bytes,
+                "original_bytes": original_bytes,
+                "compacted": original_bytes > ADMIN_STATUS_PAYLOAD_BUDGET,
+            }),
+        );
+    }
+    if serde_json::to_vec(payload)
+        .map(|bytes| bytes.len())
+        .unwrap_or(ADMIN_STATUS_MAX_BYTES + 1)
+        > ADMIN_STATUS_MAX_BYTES
+    {
+        *payload = serde_json::json!({
+            "service": "elon-node-agent",
+            "status": "compacted",
+            "response_limits": {
+                "schema": "elon.node_status_limits.v1",
+                "max_bytes": ADMIN_STATUS_MAX_BYTES,
+                "original_bytes": original_bytes,
+                "compacted": true,
+            }
+        });
+    }
 }

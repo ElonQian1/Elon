@@ -451,3 +451,103 @@ fn durable_cancel_without_live_runtime_or_sidecar_is_safe_for_update_only() {
     );
     let _ = std::fs::remove_dir_all(root);
 }
+
+#[test]
+fn reconciled_terminal_history_is_excluded_but_fresh_ownership_still_blocks() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-update-terminal-reconcile-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let local_tasks =
+        crate::node_agent_local_task_store::LocalTaskStore::new(root.join("tasks.db"));
+    local_tasks
+        .create(LocalTaskStart {
+            task_id: "historical-resume",
+            owner_user_id: "owner",
+            agent_id: "agent",
+            install_id: "install",
+            project_id: "project",
+            channel_id: None,
+            conversation_id: "conversation",
+            workspace_path: root.to_string_lossy().as_ref(),
+            prompt: "historical task",
+            cli: "codex",
+            runtime_permission: "full_access",
+        })
+        .unwrap();
+    local_tasks
+        .mark_recovery_blocked("historical-resume", "cannot be resumed")
+        .unwrap();
+    let task = local_tasks.get("historical-resume").unwrap().unwrap();
+    let store = UpdateRecoveryStore::new(root.join("recovery.json"));
+    store
+        .update_install_gate(UpdateInstallGate {
+            target_git_sha: "new".to_string(),
+            classifications: vec![
+                crate::node_agent_update_recovery::UpdateGateTaskClassification {
+                    task_id: task.task_id.clone(),
+                    status: task.status.clone(),
+                    finished_at_ms: task.finished_at_ms,
+                    resume_eligible: Some(false),
+                    resume_ineligibility_proof: Some(
+                        "terminal workspace snapshot was rejected".to_string(),
+                    ),
+                    excluded_from_install_blockers: true,
+                    reason: "audited terminal history".to_string(),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        })
+        .unwrap();
+    let journal = crate::node_agent_task_journal::TaskJournal::new(root.join("journal"));
+    let sidecars = crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars"));
+    let safe = checkpoint_active_update_transactions(
+        &store,
+        &local_tasks,
+        &journal,
+        &sidecars,
+        "old",
+        "new",
+        &HashSet::new(),
+        &HashSet::new(),
+    )
+    .unwrap();
+    assert!(safe.install_may_proceed());
+    assert!(safe.active_foreground_task_ids.is_empty());
+
+    let fresh = checkpoint_active_update_transactions(
+        &store,
+        &local_tasks,
+        &journal,
+        &sidecars,
+        "old",
+        "new",
+        &HashSet::new(),
+        &HashSet::from(["historical-resume".to_string()]),
+    )
+    .unwrap();
+    assert!(!fresh.install_may_proceed());
+    assert_eq!(fresh.live_execution_task_ids, ["historical-resume"]);
+    assert_eq!(fresh.active_foreground_task_ids, ["historical-resume"]);
+
+    let mut unproven_gate = store.load().unwrap().install_gate;
+    unproven_gate.classifications[0].resume_ineligibility_proof = None;
+    store.update_install_gate(unproven_gate).unwrap();
+    let unproven = checkpoint_active_update_transactions(
+        &store,
+        &local_tasks,
+        &journal,
+        &sidecars,
+        "old",
+        "new",
+        &HashSet::new(),
+        &HashSet::new(),
+    )
+    .unwrap();
+    assert!(!unproven.install_may_proceed());
+    assert!(unproven.live_execution_task_ids.is_empty());
+    assert_eq!(unproven.active_foreground_task_ids, ["historical-resume"]);
+    let _ = std::fs::remove_dir_all(root);
+}

@@ -172,6 +172,7 @@ function Invoke-SupervisionSelfTest {
     $testDetailPath = Get-TaskDetailPath 'local-test?id'
     $testEpochPath = Get-TaskDetailPath 'local-test?id' 25 42 'journal:a/b?c'
     $testProjectsPath = Get-CloudProjectsPath $true
+    $testBindingBody = New-ProjectBindingBody 'elon-self' $testWorkspace
     $criteriaJson = ConvertFrom-Utf8Base64 'WyLmnaHku7bkuIAiLCLmnaHku7bkuowiXQ=='
     $jsonCriteria = @(Resolve-AcceptanceCriteria @() $criteriaJson '')
     $activeDetail = [ordered]@{
@@ -342,6 +343,10 @@ function Invoke-SupervisionSelfTest {
         desktop_review_requires_v3_capability = $legacyDesktopCapabilityRejected -and
             $script:DesktopReviewCapability -eq 'desktop_review_ticket_v3'
         cloud_projects_path = $testProjectsPath -eq '/api/cloud-projects?include_system=true'
+        project_binding_body = $testBindingBody.project_id -eq 'elon-self' -and
+            $testBindingBody.workspace_path -ceq [System.IO.Path]::GetFullPath($testWorkspace) -and
+            $null -eq (Get-ObjectField $testBindingBody 'token') -and
+            $null -eq (Get-ObjectField $testBindingBody 'user_token')
         inspect_wait_active = $activeCompact.record.status -eq 'running' -and
             $activeCompact.runtime.phase -eq 'verification' -and
             $activeCompact.last_event_seq -eq 42 -and
@@ -387,6 +392,7 @@ function Invoke-SupervisionSelfTest {
             'resume_legacy_started_cwd', 'resume_receipt_rebuild', 'resume_git_recovery_ready',
             'resume_inherited_workspace', 'resume_recorded_head_recovery',
             'resume_git_recovery_occupied_guard', 'task_detail_path', 'cloud_projects_path',
+            'project_binding_body_without_token',
             'expected_cursor_epoch_handshake', 'desktop_review_paths_fail_closed',
             'desktop_review_requires_v3_capability',
             'inspect_wait_active_runtime', 'compact_delta_evidence_digest',

@@ -320,6 +320,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)"
 . "$SCRIPT_DIR/release-publish-lease.sh"
 . "$SCRIPT_DIR/publish-server-common.sh"
+. "$SCRIPT_DIR/publish-static-dist.sh"
 json_field() { elon_release_json_field "$1" "$2"; }
 if [ -z "$REPO_ROOT" ]; then
   echo -e "${RED}❌ 当前目录不在 git 仓库中${NC}" >&2; exit 1
@@ -641,8 +642,7 @@ upload_static_dist() {
     rm -rf "$staging_dir"
     mkdir -p "$staging_dir"
     cp -a "$local_dir"/. "$staging_dir"/
-    rm -rf "$remote_dir"
-    mv "$staging_dir" "$remote_dir"
+    activate_static_dist "$staging_dir" "$remote_dir" "$SHA"
   else
     # shellcheck disable=SC2086
     if ! ssh $SSH_OPTS "$SERVER" "mkdir -p '$staging_dir'"; then
@@ -657,7 +657,7 @@ upload_static_dist() {
       [ "$required" -eq 1 ] && return 1
       return 0
     fi
-    if ! ssh $SSH_OPTS "$SERVER" "rm -rf '$remote_dir' && mv '$staging_dir' '$remote_dir'"; then
+    if ! activate_remote_static_dist "$staging_dir" "$remote_dir" "$SHA"; then
       # shellcheck disable=SC2086
       ssh $SSH_OPTS "$SERVER" "rm -rf '$staging_dir'" 2>/dev/null || true
       echo -e "${YELLOW}   ⚠️  $label 目录替换失败（staging 已清理）${NC}"
@@ -665,7 +665,7 @@ upload_static_dist() {
       return 0
     fi
   fi
-  echo -e "${GREEN}   ✅ $label 上传并替换完成 → $remote_dir${NC}"
+  echo -e "${GREEN}   ✅ $label 原子入口发布完成（旧 hash 保留宽限期）→ $remote_dir${NC}"
 }
 
 export_pc_legacy_dist() {

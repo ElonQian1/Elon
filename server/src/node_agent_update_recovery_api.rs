@@ -3,21 +3,63 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::NodeRuntime;
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
-    Router::new().route(
-        "/api/local-tasks/:task_id/update-recovery/resume",
-        post(resume_update_recovery),
-    )
+    Router::new()
+        .route("/api/update-recovery", get(update_recovery_page))
+        .route(
+            "/api/update-recovery/reconcile",
+            post(reconcile_update_gate),
+        )
+        .route(
+            "/api/local-tasks/:task_id/update-recovery/resume",
+            post(resume_update_recovery),
+        )
+}
+
+async fn reconcile_update_gate(State(runtime): State<Arc<NodeRuntime>>) -> Response {
+    match crate::node_agent_update_gate_reconcile::reconcile(runtime).await {
+        Ok(payload) => Json(payload).into_response(),
+        Err(error) => json_error(StatusCode::CONFLICT, error.to_string()),
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct RecoveryPageQuery {
+    #[serde(default)]
+    cursor: usize,
+    #[serde(default = "default_page_limit")]
+    limit: usize,
+    #[serde(default)]
+    include_events: bool,
+}
+
+fn default_page_limit() -> usize {
+    20
+}
+
+async fn update_recovery_page(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Query(query): Query<RecoveryPageQuery>,
+) -> Response {
+    match runtime.update_recovery.status_page_payload(
+        query.cursor,
+        query.limit,
+        query.include_events,
+    ) {
+        Ok(payload) => Json(payload).into_response(),
+        Err(error) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+    }
 }
 
 async fn resume_update_recovery(

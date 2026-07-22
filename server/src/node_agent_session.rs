@@ -11,7 +11,7 @@ use homecli_proto::{
     CAP_PROJECT_BUILD_CACHE_V1, PROTO_VERSION,
 };
 use tokio::sync::{mpsc, watch};
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn};
 
 use super::node_agent_config::machine_label;
@@ -63,6 +63,7 @@ pub(super) async fn run_session(
     }
 
     // 检测本机可用的 CLI（返回 (cli名, 完整路径)）
+    runtime.set_connection_stage("cli_probe").await;
     let cli_probe = runtime.refresh_cli_probe_now().await;
     let cli_pairs = cli_probe.available_pairs();
     let available_clis: Vec<String> = cli_probe.available_names();
@@ -78,11 +79,13 @@ pub(super) async fn run_session(
     }
     // 将完整路径存到 runtime，供 run_cli_prompt 使用
     runtime.set_cli_paths(cli_pairs.clone()).await;
+    runtime.set_connection_stage("cloud_runtime_probe").await;
     let server_runtime_status = node_agent_route_c_status::server_runtime_status_from_cloud(
         &cfg.cloud_http_url,
         creds.user_token.as_deref(),
     )
     .await;
+    runtime.set_connection_stage("dev_runtime_probe").await;
     let transition = runtime.node_data_root_transition.clone().lock_owned().await;
     let data_root = runtime.node_data_root.read().await.clone();
     let workspace_root = data_root
@@ -130,14 +133,7 @@ pub(super) async fn run_session(
     let storage_settings = runtime.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
 
-    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-    let mut request = cfg.cloud_url.as_str().into_client_request()?;
-    request.headers_mut().insert(
-        "Authorization",
-        format!("Bearer {}", creds.agent_secret).parse()?,
-    );
-
-    let (ws_stream, _) = connect_async(request).await?;
+    let ws_stream = crate::node_agent_cloud_connection::connect(cfg, creds, runtime).await?;
     info!("✅ 已连接到云端: {}", cfg.cloud_url);
 
     let (ws_write, mut ws_read) = ws_stream.split();
@@ -163,6 +159,7 @@ pub(super) async fn run_session(
     // The cloud requires the first WebSocket frame to be Register within 10s.
     // Discover capabilities first so the registered session can immediately
     // answer protocol pings and accept dispatched work.
+    runtime.set_connection_stage("cloud_register").await;
     let lifecycle =
         node_agent_lifecycle::runtime_report(runtime, true, true, "正在注册云端会话").await;
     out_tx.send(ws_text(&AgentToServer::Register {

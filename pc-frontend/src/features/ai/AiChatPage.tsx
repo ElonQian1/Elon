@@ -742,7 +742,7 @@ export default function AiChatPage() {
           onOpenDoctor={() => navigate('/doctor')}
           onCodexVaultBackup={handleCodexVaultShortcut}
         />
-        <div className={styles.convList}>
+        <div className={styles.convList} data-testid="ai-conversation-list">
           {historyGroups.length === 0 && (
             <p className={styles.hint}>{conversationsLoaded ? '还没有对话记录' : '正在加载对话记录...'}</p>
           )}
@@ -757,7 +757,7 @@ export default function AiChatPage() {
                 </div>
                 {visibleItems.map((conversation) => (
                   <button
-                    key={conversation.id}
+                    key={conversation.id} data-testid="ai-conversation-row" data-conversation-id={conversation.id}
                     className={[styles.historyItem, conversation.id === activeConvId ? styles.historyItemActive : ''].join(' ')}
                     onClick={() => selectConversation(conversation.id)}
                     type="button"
@@ -779,7 +779,7 @@ export default function AiChatPage() {
                 ))}
                 {group.conversations.length > 5 && (
                   <button
-                    className={styles.historyExpand}
+                    className={styles.historyExpand} data-testid="ai-conversation-list-more"
                     onClick={() => setExpandedHistoryGroups((current) => ({
                       ...current,
                       [group.id]: !expanded,

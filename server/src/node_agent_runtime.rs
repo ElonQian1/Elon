@@ -2,11 +2,11 @@
 //! NodeRuntime — PC 节点的核心运行时状态：凭证、CLI 状态、任务注册表、lifecycle。
 //! 从 node_agent_main.rs 抽取，保持原有公共接口不变。
 
-use std::path::Path;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use std::{collections::BTreeMap, path::Path};
 use tokio::sync::{Mutex, Notify, RwLock};
 use tracing::{info, warn};
 
@@ -39,6 +39,15 @@ pub(crate) struct NodeStatus {
     pub(crate) connected: bool,
     pub(crate) last_event: String,
     pub(crate) models_cached: Vec<ModelCapability>,
+    pub(crate) connection_attempt: u64,
+    pub(crate) connection_attempt_started_at_ms: Option<u128>,
+    pub(crate) connected_at_ms: Option<u128>,
+    pub(crate) last_disconnected_at_ms: Option<u128>,
+    pub(crate) connection_stage: String,
+    pub(crate) stage_started_at_ms: Option<u128>,
+    pub(crate) stage_durations_ms: BTreeMap<String, u128>,
+    pub(crate) last_connect_duration_ms: Option<u128>,
+    pub(crate) next_backoff_ms: Option<u64>,
 }
 
 pub(crate) struct NodeRuntime {
@@ -658,9 +667,60 @@ impl NodeRuntime {
     }
 
     pub(crate) async fn set_connected(&self, on: bool, evt: &str) {
+        let now = crate::node_agent_cli_sidecar::now_ms();
         let mut s = self.status.write().await;
+        if on && !s.connected {
+            if let (Some(stage_started), false) =
+                (s.stage_started_at_ms, s.connection_stage.is_empty())
+            {
+                let stage = s.connection_stage.clone();
+                *s.stage_durations_ms.entry(stage).or_default() +=
+                    now.saturating_sub(stage_started);
+            }
+            s.connection_stage = "connected".to_string();
+            s.stage_started_at_ms = Some(now);
+            s.connected_at_ms = Some(now);
+            s.last_connect_duration_ms = s
+                .connection_attempt_started_at_ms
+                .map(|started| now.saturating_sub(started));
+            s.next_backoff_ms = None;
+        } else if !on && s.connected {
+            s.last_disconnected_at_ms = Some(now);
+        }
         s.connected = on;
         s.last_event = evt.to_string();
+    }
+
+    pub(crate) async fn begin_connection_attempt(&self) {
+        let now = crate::node_agent_cli_sidecar::now_ms();
+        let mut status = self.status.write().await;
+        status.connection_attempt = status.connection_attempt.saturating_add(1);
+        status.connection_attempt_started_at_ms = Some(now);
+        status.connection_stage = "local_capability_scan".to_string();
+        status.stage_started_at_ms = Some(now);
+        status.stage_durations_ms.clear();
+    }
+
+    pub(crate) async fn set_connection_stage(&self, stage: &str) {
+        let now = crate::node_agent_cli_sidecar::now_ms();
+        let mut status = self.status.write().await;
+        if status.connection_stage == stage {
+            return;
+        }
+        if let Some(started) = status.stage_started_at_ms {
+            let previous = status.connection_stage.clone();
+            if !previous.is_empty() {
+                *status.stage_durations_ms.entry(previous).or_default() +=
+                    now.saturating_sub(started);
+            }
+        }
+        status.connection_stage = stage.to_string();
+        status.stage_started_at_ms = Some(now);
+    }
+
+    pub(crate) async fn set_connection_backoff(&self, backoff: std::time::Duration) {
+        self.status.write().await.next_backoff_ms =
+            Some(backoff.as_millis().min(u64::MAX as u128) as u64);
     }
 
     pub(crate) async fn is_cloud_connected(&self) -> bool {

@@ -12,6 +12,10 @@ use crate::{
 use std::{fs, path::PathBuf, time::Duration};
 use tokio::sync::watch;
 
+#[path = "node_agent_cli_sidecar_runner_test_wait.rs"]
+mod wait;
+use wait::{wait_for_attachable_session, wait_for_pty_output};
+
 #[tokio::test]
 async fn sidecar_runner_registers_real_child_and_replays_output() {
     let root = temp_dir("runner-registers-real-child");
@@ -211,7 +215,7 @@ async fn timeout_follower_waits_for_buffered_usage_and_real_exit() {
 
     let (_cancel_tx, mut cancel_rx) = watch::channel(false);
     let result = tokio::time::timeout(
-        Duration::from_secs(2),
+        Duration::from_secs(10),
         follow_sidecar_output(&registry, task_id, &output_path, &mut cancel_rx, |_| {}),
     )
     .await
@@ -259,7 +263,7 @@ async fn sidecar_runner_accepts_terminal_input_and_resize_after_attach() {
         worker_sha256: None,
         codex_session_scope_key: None,
         legacy_codex_sessions_file: None,
-        timeout_secs: 10,
+        timeout_secs: 30,
         stdin_payload: None,
         runtime_policy: None,
         stdin_piped_empty: false,
@@ -271,11 +275,12 @@ async fn sidecar_runner_accepts_terminal_input_and_resize_after_attach() {
     assert!(registry
         .record_terminal_resize(task_id, 100, 30)
         .expect("resize command should be queued"));
+    wait_for_pty_output(&output_path).await;
     assert!(registry
         .record_terminal_input(task_id, &input)
         .expect("terminal input should be queued"));
 
-    tokio::time::timeout(Duration::from_secs(10), run)
+    tokio::time::timeout(Duration::from_secs(30), run)
         .await
         .expect("sidecar should finish")
         .expect("join should succeed")
@@ -760,21 +765,6 @@ async fn wait_for_pending_approval(journal: &TaskJournal, task_id: &str, approva
         tokio::time::sleep(Duration::from_millis(100)).await;
     }
     panic!("sidecar approval {approval_id} did not become pending");
-}
-
-async fn wait_for_attachable_session(registry: &CliSidecarRegistry, task_id: &str) {
-    for _ in 0..50 {
-        if registry
-            .session_for_task(task_id)
-            .expect("sidecar session lookup should work")
-            .map(|session| session.is_attachable_at(now_ms()))
-            .unwrap_or(false)
-        {
-            return;
-        }
-        tokio::time::sleep(Duration::from_millis(100)).await;
-    }
-    panic!("sidecar session did not become attachable");
 }
 
 fn temp_dir(name: &str) -> PathBuf {

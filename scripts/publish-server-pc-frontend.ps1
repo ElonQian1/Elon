@@ -39,10 +39,26 @@ function Publish-StaticDist {
         return $false
     }
 
-    $swapScript = "rm -rf '$RemoteDir' && mv '$stagingDist' '$RemoteDir'"
+    # Publish hashed assets additively before atomically replacing index.html.
+    # Old HTML can therefore keep loading its old hashes throughout the deploy.
+    # A marker defers the first GC for a full grace window; later runs remove
+    # only assets that have been untouched for at least 14 days.
+    $swapScript = "set -eu; mkdir -p '$RemoteDir/assets'; " +
+        "if [ -f '$RemoteDir/index.html' ]; then { grep -oE 'assets/[A-Za-z0-9._/-]+' '$RemoteDir/index.html' || true; } | " +
+        "sed 's#^assets/##' | while IFS= read -r asset; do [ ! -f '$RemoteDir/assets/'`"`$asset`" ] || touch '$RemoteDir/assets/'`"`$asset`"; done; fi; " +
+        "if [ -d '$stagingDist/assets' ]; then cp -a '$stagingDist/assets/.' '$RemoteDir/assets/'; fi; " +
+        "for item in '$stagingDist'/*; do [ -e `"`$item`" ] || continue; base=`$(basename `"`$item`"); " +
+        "[ `"`$base`" = assets ] && continue; [ `"`$base`" = index.html ] && continue; " +
+        "if [ -f `"`$item`" ]; then cp `"`$item`" '$RemoteDir/.publish-new-'`"`$base`"; mv -f '$RemoteDir/.publish-new-'`"`$base`" '$RemoteDir/'`"`$base`"; fi; done; " +
+        "cp '$stagingDist/index.html' '$RemoteDir/.publish-new-index-$Sha'; " +
+        "mv -f '$RemoteDir/.publish-new-index-$Sha' '$RemoteDir/index.html'; " +
+        "if [ ! -f '$RemoteDir/.atomic-static-retention' ]; then touch '$RemoteDir/.atomic-static-retention'; " +
+        "elif find '$RemoteDir/.atomic-static-retention' -mtime +14 -print -quit | grep -q .; then " +
+        "find '$RemoteDir/assets' -type f -mtime +14 -delete; touch '$RemoteDir/.atomic-static-retention'; fi; " +
+        "rm -rf '$stagingDist'"
     ssh @SshOpts $Server $swapScript 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "   ✅ $Label 上传并替换完成 → $RemoteDir" -ForegroundColor Green
+        Write-Host "   ✅ $Label 原子入口发布完成（旧 hash 保留宽限期）→ $RemoteDir" -ForegroundColor Green
         return $true
     }
 

@@ -42,6 +42,7 @@ import styles from './LocalTasksPage.module.css'
 
 const LIST_POLL_MS = 5_000
 const DETAIL_POLL_MS = 1_600
+const INITIAL_VISIBLE_TASKS = 20
 const EMPTY_EVOLUTION: SelfEvolutionQueue = {
   items: [],
   gates: {
@@ -69,6 +70,8 @@ export default function LocalTasksPage() {
   const [notice, setNotice] = useState('')
   const [evolution, setEvolution] = useState<SelfEvolutionQueue>(EMPTY_EVOLUTION)
   const [publish, setPublish] = useState<GlobalPublishStatus>(EMPTY_PUBLISH)
+  const [visibleTaskCount, setVisibleTaskCount] = useState(INITIAL_VISIBLE_TASKS)
+  const visibleTasks = tasks.slice(0, visibleTaskCount)
 
   const refreshList = useCallback(async (quiet = false) => {
     if (!quiet) setListLoading(true)
@@ -285,8 +288,8 @@ export default function LocalTasksPage() {
             <strong>最近任务</strong>
             <span>{tasks.length}</span>
           </div>
-          <div className={styles.taskList}>
-            {tasks.map((task) => (
+          <div className={styles.taskList} data-testid="local-task-list">
+            {visibleTasks.map((task) => (
               <TaskListItem
                 key={task.id}
                 task={task}
@@ -294,6 +297,16 @@ export default function LocalTasksPage() {
                 onSelect={() => setSelectedId(task.id)}
               />
             ))}
+            {visibleTaskCount < tasks.length && (
+              <button
+                className={styles.loadMore}
+                data-testid="local-task-list-more"
+                type="button"
+                onClick={() => setVisibleTaskCount((count) => Math.min(tasks.length, count + INITIAL_VISIBLE_TASKS))}
+              >
+                再显示 {Math.min(INITIAL_VISIBLE_TASKS, tasks.length - visibleTaskCount)} 个任务
+              </button>
+            )}
             {listLoading && !tasks.length && <p className={styles.listEmpty}>正在读取本机 journal…</p>}
             {!listLoading && !tasks.length && <p className={styles.listEmpty}>还没有本机任务，从上方启动第一个。</p>}
           </div>
@@ -321,7 +334,7 @@ function TaskListItem({
 }) {
   const status = localTaskStatus(task.status)
   return (
-    <button className={styles.taskItem} data-selected={selected} type="button" onClick={onSelect}>
+    <button className={styles.taskItem} data-testid="local-task-row" data-task-id={task.id} data-selected={selected} type="button" onClick={onSelect}>
       <div>
         <strong>{readableTaskTitle(task.prompt)}</strong>
         <span>{task.workspace_path || '本机工作目录'}</span>

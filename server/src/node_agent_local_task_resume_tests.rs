@@ -207,6 +207,7 @@ fn resume_of_resume_reuses_the_platform_recorded_inherited_workspace() {
     )
     .unwrap();
     fixture.contract.root_task_id = Some("local-root".to_string());
+    fixture.parent.workspace_status.as_mut().unwrap()["root_task_id"] = "local-root".into();
     let parent_contract = SupervisionContract {
         protocol: SUPERVISION_PROTOCOL.to_string(),
         supervisor: "codex_desktop".to_string(),
@@ -226,9 +227,12 @@ fn resume_of_resume_reuses_the_platform_recorded_inherited_workspace() {
         fixture.base.to_string_lossy().as_ref(),
     )
     .expect_err("the former single-generation rule should reproduce the rejection");
-    assert!(previous_error
-        .to_string()
-        .contains("缺少可验证的继承监督契约"));
+    assert!(
+        previous_error
+            .to_string()
+            .contains("缺少可验证的继承监督契约"),
+        "unexpected fail-closed reason: {previous_error:#}"
+    );
 
     let resolved = validate_resume_workspace(
         &fixture.contract,

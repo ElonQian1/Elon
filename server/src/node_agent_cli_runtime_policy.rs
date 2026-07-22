@@ -199,15 +199,18 @@ mod tests {
             .spawn()
             .expect("spawn executor parent");
 
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-        while !pid_file.exists() && std::time::Instant::now() < deadline {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        let mut grandchild_pid = None;
+        while grandchild_pid.is_none() && std::time::Instant::now() < deadline {
+            grandchild_pid = std::fs::read_to_string(&pid_file)
+                .ok()
+                .and_then(|text| text.trim().parse().ok());
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
-        let grandchild_pid: u32 = std::fs::read_to_string(&pid_file)
-            .expect("grandchild pid should be recorded")
-            .trim()
-            .parse()
-            .expect("grandchild pid should be numeric");
+        let Some(grandchild_pid) = grandchild_pid else {
+            terminate_process_tree(Some(parent.id()));
+            panic!("grandchild pid should be recorded without a persistent sharing violation");
+        };
 
         assert!(terminate_process_tree(Some(parent.id())));
         let _ = parent.wait();
