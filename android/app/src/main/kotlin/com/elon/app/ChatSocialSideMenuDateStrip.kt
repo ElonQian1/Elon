@@ -61,12 +61,13 @@ private fun socialSidebarDateCell(
     addView(LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
-        addView(socialSidebarDateLabel(context, date.dayOfMonth.toString(), 18f))
+        addView(socialSidebarDateLabel(context, date.dayOfMonth.toString(), 18f, selected))
         addView(
             socialSidebarDateLabel(
                 context,
                 date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH),
-                16f
+                16f,
+                selected
             ).apply { setPadding(0, dp(10), 0, 0) }
         )
     }, FrameLayout.LayoutParams(
@@ -76,11 +77,16 @@ private fun socialSidebarDateCell(
     setOnClickListener { onDateSelected(date) }
 }
 
-private fun socialSidebarDateLabel(context: Context, value: String, size: Float) =
+private fun socialSidebarDateLabel(
+    context: Context,
+    value: String,
+    size: Float,
+    selected: Boolean
+) =
     TextView(context).apply {
         includeFontPadding = false
         gravity = Gravity.CENTER
         text = value
         textSize = size
-        setTextColor(Color.parseColor("#D9D9D9"))
+        setTextColor(Color.parseColor(if (selected) "#464646" else "#D9D9D9"))
     }

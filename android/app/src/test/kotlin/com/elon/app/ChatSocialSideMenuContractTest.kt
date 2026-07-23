@@ -86,6 +86,8 @@ class ChatSocialSideMenuContractTest {
             "android/app/src/main/kotlin/com/elon/app/ChatSocialSideMenuView.kt"
         ) + readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/ChatSocialSideMenuDock.kt"
+        ) + readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/ChatSocialSideMenuDateStrip.kt"
         )
         val controller = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/ChatSideMenuController.kt"
@@ -107,6 +109,7 @@ class ChatSocialSideMenuContractTest {
         assertTrue(view.contains("搜索侧栏消息"))
         assertTrue(view.contains("LinearLayout.LayoutParams(dp(124)"))
         assertTrue(view.contains("LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)"))
+        assertTrue(view.contains("if (selected) \"#464646\" else \"#D9D9D9\""))
         listOf("图片与视频", "文本", "链接", "笔记", "文件", "设置")
             .forEach { assertTrue(view.contains("\"$it\"")) }
         assertTrue(view.contains("SocialTimelineDragPayload"))
