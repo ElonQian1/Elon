@@ -182,110 +182,126 @@ async fn prepare_debug_runtime_inner(
             )
             .await;
     }
-    let _deployment = broker
+    let deployment = broker
         .debug_deployments
         .acquire(device_identity, &package_name)
         .await;
-    let integration_root = broker
-        .debug_integration
-        .materialize(&integration_plan)
-        .context("MERGE 阶段失败")?;
-    if let Some(reporter) = reporter {
-        reporter
-            .evidence("DEPLOYMENT_SLOT", "ACQUIRED", "已取得独占部署时隙")
-            .await;
-    }
-    let reusable_session = if keep_session {
-        broker
-            .runtime_session_for(
-                project_root,
-                device_id,
-                &package_name,
-                device_identity,
-                project_id,
-            )
-            .await
-    } else {
-        None
-    };
-    let reused_session = reusable_session.is_some();
-    let session = match reusable_session {
-        Some(session) => session,
-        None => {
+    // Keep every fallible build/install/handshake step inside this result
+    // boundary. `?` returns from the async block, then the deployment lease is
+    // explicitly released before the failure reaches the preparation reporter
+    // or another MCP request.
+    let outcome = async {
+        let integration_root = broker
+            .debug_integration
+            .materialize(&integration_plan)
+            .context("MERGE 阶段失败")?;
+        if let Some(reporter) = reporter {
+            reporter
+                .evidence("DEPLOYMENT_SLOT", "ACQUIRED", "已取得独占部署时隙")
+                .await;
+        }
+        let reusable_session = if keep_session {
             broker
-                .create_session_with_identity(
-                    device_id.to_string(),
-                    device_identity.to_string(),
-                    package_name.clone(),
-                    Some(project_root.to_string()),
-                    project_id.to_string(),
-                    DEFAULT_DEVICE_PORT,
+                .runtime_session_for(
+                    project_root,
+                    device_id,
+                    &package_name,
+                    device_identity,
+                    project_id,
                 )
                 .await
+        } else {
+            None
+        };
+        let reused_session = reusable_session.is_some();
+        let session = match reusable_session {
+            Some(session) => session,
+            None => {
+                broker
+                    .create_session_with_identity(
+                        device_id.to_string(),
+                        device_identity.to_string(),
+                        package_name.clone(),
+                        Some(project_root.to_string()),
+                        project_id.to_string(),
+                        DEFAULT_DEVICE_PORT,
+                    )
+                    .await
+            }
+        };
+        if let Some(reporter) = reporter {
+            reporter
+                .evidence(
+                    "SESSION",
+                    if reused_session { "REUSED" } else { "CREATED" },
+                    format!(
+                        "sessionId={} device={} package={}",
+                        session.id, session.device_id, session.package_name
+                    ),
+                )
+                .await;
         }
-    };
-    if let Some(reporter) = reporter {
-        reporter
-            .evidence(
-                "SESSION",
-                if reused_session { "REUSED" } else { "CREATED" },
-                format!(
-                    "sessionId={} device={} package={}",
-                    session.id, session.device_id, session.package_name
-                ),
-            )
-            .await;
+        let session_id = session.id.clone();
+        let result = runtime_preparation::run(
+            broker,
+            &session,
+            &integration_root,
+            &suffix,
+            host_port,
+            &integration_plan,
+            reporter,
+        )
+        .await;
+        if let Err(error) = result.as_ref() {
+            let _ = broker
+                .debug_integration
+                .record_runtime_failure(&integration_plan, format!("{error:#}"));
+        }
+        match result {
+            Ok(build) if keep_session => {
+                let integration = broker
+                    .debug_integration
+                    .status(&integration_plan.slot_id)?
+                    .context("合并调试状态丢失")?;
+                Ok(PrepareDebugRuntimeResult {
+                    package_name,
+                    session_id: Some(session_id),
+                    build,
+                    integration,
+                })
+            }
+            Ok(build) => {
+                let _ = stop_runtime(&session).await;
+                broker.remove_session(&session_id).await;
+                let integration = broker
+                    .debug_integration
+                    .status(&integration_plan.slot_id)?
+                    .context("合并调试状态丢失")?;
+                Ok(PrepareDebugRuntimeResult {
+                    package_name,
+                    session_id: None,
+                    build,
+                    integration,
+                })
+            }
+            Err(error) if !keep_session => {
+                let _ = stop_runtime(&session).await;
+                broker.remove_session(&session_id).await;
+                Err(error)
+            }
+            Err(error) => Err(error),
+        }
     }
-    let session_id = session.id.clone();
-    let result = runtime_preparation::run(
-        broker,
-        &session,
-        &integration_root,
-        &suffix,
-        host_port,
-        &integration_plan,
-        reporter,
-    )
     .await;
-    if let Err(error) = result.as_ref() {
-        let _ = broker
-            .debug_integration
-            .record_runtime_failure(&integration_plan, format!("{error:#}"));
-    }
-    match result {
-        Ok(build) if keep_session => {
-            let integration = broker
-                .debug_integration
-                .status(&integration_plan.slot_id)?
-                .context("合并调试状态丢失")?;
-            Ok(PrepareDebugRuntimeResult {
-                package_name,
-                session_id: Some(session_id),
-                build,
-                integration,
-            })
-        }
-        Ok(build) => {
-            let _ = stop_runtime(&session).await;
-            broker.remove_session(&session_id).await;
-            let integration = broker
-                .debug_integration
-                .status(&integration_plan.slot_id)?
-                .context("合并调试状态丢失")?;
-            Ok(PrepareDebugRuntimeResult {
-                package_name,
-                session_id: None,
-                build,
-                integration,
-            })
-        }
-        Err(error) if !keep_session => {
-            let _ = stop_runtime(&session).await;
-            broker.remove_session(&session_id).await;
-            Err(error)
-        }
-        Err(error) => Err(error),
-    }
+    finish_debug_deployment(deployment, outcome)
+}
+
+fn finish_debug_deployment<T>(
+    deployment: tokio::sync::OwnedMutexGuard<()>,
+    outcome: Result<T>,
+) -> Result<T> {
+    drop(deployment);
+    outcome
 }
 
 pub(crate) async fn build_and_verify(

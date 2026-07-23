@@ -254,6 +254,42 @@ fn failed_generation_restart_uses_a_fresh_unoccupied_worktree() {
 }
 
 #[test]
+fn unicode_node_data_root_survives_status_json_and_worktree_materialization() {
+    let repo = RepositoryFixture::new("unicode-source-一龙");
+    let (source, commit) = repo.session("unicode", "unicode.txt", "一龙\n");
+    let integration_root = std::env::temp_dir()
+        .join(format!("一龙-node-data-{}", uuid::Uuid::new_v4()))
+        .join("ElonNodeData")
+        .join("android-debug-integration");
+    let coordinator =
+        DebugIntegrationCoordinator::new(integration_root.clone(), "stable-node".into());
+    let plan = register(
+        &coordinator,
+        &source,
+        &candidate(&repo.base, &commit, "unicode"),
+    );
+    assert!(plan.worktree.to_string_lossy().contains("一龙"));
+    assert!(!plan.worktree.to_string_lossy().contains("u4E00u9F99"));
+
+    let status_path = integration_root.join(&plan.slot_id).join("status.json");
+    let status: super::debug_integration::DebugIntegrationStatus =
+        serde_json::from_slice(&fs::read(&status_path).unwrap()).unwrap();
+    let restored =
+        super::debug_integration_contract::plan_from_status(&integration_root, &source, &status);
+    assert_eq!(restored.worktree, plan.worktree);
+    assert!(restored.worktree.to_string_lossy().contains("一龙"));
+    let materialized = coordinator
+        .materialize(&restored)
+        .expect("native Unicode worktree path must remain usable");
+    assert_eq!(
+        fs::read_to_string(materialized.join("unicode.txt"))
+            .unwrap()
+            .trim(),
+        "一龙"
+    );
+}
+
+#[test]
 fn merge_conflict_fails_closed_and_preserves_last_usable_artifact() {
     let repo = RepositoryFixture::new("conflict");
     let (one_root, one) = repo.session("one", "shared.txt", "from one\n");

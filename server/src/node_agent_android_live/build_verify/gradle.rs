@@ -1,3 +1,4 @@
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
@@ -9,6 +10,7 @@ use super::super::broker::LiveUiSession;
 
 const BUILD_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_BUILD_OUTPUT: usize = 256 * 1024;
+const KOTLIN_IN_PROCESS_ARGUMENT: &str = "-Pkotlin.compiler.execution.strategy=in-process";
 
 pub(super) fn canonical_project_root(session: &LiveUiSession) -> Result<PathBuf> {
     let root = session
@@ -66,23 +68,16 @@ pub(super) async fn run_debug_build(
         };
     command
         .current_dir(gradle_root)
-        .args(["assembleDebug", "--no-daemon"])
+        .args(debug_build_arguments(
+            gradle_root,
+            debug_application_id_suffix,
+            debug_app_label,
+            force_rerun,
+        ))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
-    // Source-parity certification forces every task to run. First-time Runtime
-    // preparation instead keeps Gradle incremental so a previously completed
-    // manual build can be reused without crossing the MCP timeout again.
-    if force_rerun {
-        command.arg("--rerun-tasks");
-    }
-    if let Some(suffix) = debug_application_id_suffix {
-        command.arg(format!("-PELON_DEBUG_APPLICATION_ID_SUFFIX={suffix}"));
-    }
-    if let Some(label) = debug_app_label {
-        command.arg(format!("-PELON_DEBUG_APP_LABEL={label}"));
-    }
     crate::node_agent_exec::hide_tokio_command_window(&mut command);
     let output = tokio::time::timeout(BUILD_TIMEOUT, command.output())
         .await
@@ -96,6 +91,48 @@ pub(super) async fn run_debug_build(
         bail!("Android Debug 构建失败: {message}");
     }
     Ok(())
+}
+
+pub(super) fn debug_build_arguments(
+    gradle_root: &Path,
+    debug_application_id_suffix: Option<&str>,
+    debug_app_label: Option<&str>,
+    force_rerun: bool,
+) -> Vec<OsString> {
+    let mut arguments = vec![
+        OsString::from("assembleDebug"),
+        OsString::from("--no-daemon"),
+    ];
+    // Kotlin's daemon-to-fallback handoff on Windows can stringify a native
+    // Unicode source root as JSON escape text (for example `一龙` becomes the
+    // literal path segment `u4E00u9F99`). Compile inside the single-use Gradle
+    // process whenever the managed checkout path is non-ASCII, so Path/OsStr
+    // values stay native and never cross that lossy text boundary.
+    if path_contains_non_ascii(gradle_root) {
+        arguments.push(OsString::from(KOTLIN_IN_PROCESS_ARGUMENT));
+    }
+    // Source-parity certification forces every task to run. First-time Runtime
+    // preparation instead keeps Gradle incremental so a previously completed
+    // manual build can be reused without crossing the MCP timeout again.
+    if force_rerun {
+        arguments.push(OsString::from("--rerun-tasks"));
+    }
+    if let Some(suffix) = debug_application_id_suffix {
+        arguments.push(OsString::from(format!(
+            "-PELON_DEBUG_APPLICATION_ID_SUFFIX={suffix}"
+        )));
+    }
+    if let Some(label) = debug_app_label {
+        arguments.push(OsString::from(format!("-PELON_DEBUG_APP_LABEL={label}")));
+    }
+    arguments
+}
+
+fn path_contains_non_ascii(path: &Path) -> bool {
+    path.as_os_str()
+        .to_string_lossy()
+        .chars()
+        .any(|ch| !ch.is_ascii())
 }
 
 pub(super) fn validate_debug_application_id_suffix(value: &str) -> Result<&str> {
