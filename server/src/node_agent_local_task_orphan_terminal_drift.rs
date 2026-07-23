@@ -112,15 +112,51 @@ mod tests {
         assert!(
             crate::node_agent_terminal_journal::has_finished_success(&runtime, "finished").unwrap()
         );
-        runtime
-            .task_journal
-            .record_finished_with_outcome("finished", "resume_required", Some("late stale sweep"))
-            .unwrap();
+        overwrite_journal_status(&root, "finished", "resume_required");
+        assert_eq!(
+            runtime
+                .task_journal
+                .record("finished")
+                .unwrap()
+                .unwrap()
+                .status,
+            "resume_required",
+            "the fixture must model a registry overwritten by an older node"
+        );
         assert!(
             crate::node_agent_terminal_journal::has_finished_success(&runtime, "finished").unwrap(),
-            "a later stale sweep must not downgrade an already finished journal"
+            "the immutable success event must recover an old overwritten registry"
         );
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn failed_finished_event_is_not_success_evidence() {
+        let root = unique_root("failed-journal");
+        let runtime = test_runtime(&root);
+        start_journal(&runtime, "failed");
+        runtime
+            .task_journal
+            .record_finished_with_outcome("failed", "failed", Some("test failure"))
+            .unwrap();
+        overwrite_journal_status(&root, "failed", "resume_required");
+        assert!(
+            !crate::node_agent_terminal_journal::has_finished_success(&runtime, "failed").unwrap(),
+            "a failed immutable event must remain fail-closed"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    fn overwrite_journal_status(root: &Path, task_id: &str, status: &str) {
+        let registry_path = root.join("journal").join("registry.json");
+        let mut registry: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&registry_path).unwrap()).unwrap();
+        registry[task_id]["status"] = serde_json::Value::String(status.into());
+        fs::write(
+            &registry_path,
+            serde_json::to_string_pretty(&registry).unwrap(),
+        )
+        .unwrap();
     }
 
     fn test_runtime(root: &Path) -> NodeRuntime {
