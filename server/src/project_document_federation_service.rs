@@ -79,10 +79,15 @@ pub(crate) fn get_federation_index(
 
 /// Catalog responses carry federation totals only; tree nodes have their own paged contract.
 pub(crate) fn strip_catalog_nodes(analysis: &mut Value) {
-    let Some(federation) = analysis
-        .get_mut("document_health")
-        .and_then(|health| health.get_mut("federation"))
-    else {
+    // `ProjectDocumentsSnapshot.analysis` is the document-health object itself,
+    // while bounded MCP responses wrap the same object under `document_health`.
+    // Accept both shapes so every catalog transport drops the full node array.
+    let federation = if analysis.get("document_health").is_some() {
+        analysis.pointer_mut("/document_health/federation")
+    } else {
+        analysis.get_mut("federation")
+    };
+    let Some(federation) = federation else {
         return;
     };
     federation["nodes"] = json!([]);
@@ -132,18 +137,19 @@ mod tests {
         let grandchild = get_federation_index(&root, Some("apps"), None, &first).unwrap();
         assert_eq!(grandchild["nodes"][0]["id"], "android");
 
-        let mut analysis =
-            json!({"document_health":{"federation":{"node_count":4,"nodes":[1,2,3,4]}}});
+        let mut analysis = json!({"federation":{"node_count":4,"nodes":[1,2,3,4]}});
         strip_catalog_nodes(&mut analysis);
+        assert_eq!(analysis["federation"]["nodes"], json!([]));
+        assert_eq!(analysis["federation"]["node_count"], 4);
         assert_eq!(
-            analysis["document_health"]["federation"]["nodes"],
-            json!([])
-        );
-        assert_eq!(analysis["document_health"]["federation"]["node_count"], 4);
-        assert_eq!(
-            analysis["document_health"]["federation"]["nodes_transport"]["mode"],
+            analysis["federation"]["nodes_transport"]["mode"],
             "server_paged"
         );
+
+        let mut wrapped =
+            json!({"document_health":{"federation":{"node_count":4,"nodes":[1,2,3,4]}}});
+        strip_catalog_nodes(&mut wrapped);
+        assert_eq!(wrapped["document_health"]["federation"]["nodes"], json!([]));
         let _ = fs::remove_dir_all(root);
     }
 }
