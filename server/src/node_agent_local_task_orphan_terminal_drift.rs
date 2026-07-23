@@ -109,13 +109,15 @@ mod tests {
         let runtime = test_runtime(&root);
         start_journal(&runtime, "finished");
         runtime.task_journal.record_finished("finished").unwrap();
-        assert!(super::super::journal_has_finished_success(&runtime, "finished").unwrap());
+        assert!(
+            crate::node_agent_terminal_journal::has_finished_success(&runtime, "finished").unwrap()
+        );
         runtime
             .task_journal
             .record_finished_with_outcome("finished", "resume_required", Some("late stale sweep"))
             .unwrap();
         assert!(
-            super::super::journal_has_finished_success(&runtime, "finished").unwrap(),
+            crate::node_agent_terminal_journal::has_finished_success(&runtime, "finished").unwrap(),
             "a later stale sweep must not downgrade an already finished journal"
         );
         let _ = fs::remove_dir_all(root);

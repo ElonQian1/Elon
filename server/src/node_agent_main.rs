@@ -132,6 +132,7 @@ mod node_agent_supervision_protocol;
 mod node_agent_supervision_terminal_lease;
 mod node_agent_supervision_terminal_lease_safety;
 mod node_agent_terminal_finalization;
+mod node_agent_terminal_journal;
 use node_agent_local_llm::discover_models;
 pub use node_agent_local_llm::run_llm_inference;
 mod node_agent_local_pc_frontend;
