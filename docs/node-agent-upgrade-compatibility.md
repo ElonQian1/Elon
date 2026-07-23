@@ -6,6 +6,8 @@
 
 ## Desktop review v3 升级边界
 
+- Windows NodeAgent 默认自动启动 `desktop_review_broker_v1`：RSA-3072 私钥仅驻留当前节点进程内存，更新/重启自动轮换；安装包、`node-agent.env`、诊断包和 helper 均不得出现私钥。broker 只为真实 pipe client PID 能回溯到受保护 Codex Desktop 包且不经过 Elon executor 的进程链签名，同 SID executor 直接调用也必须 fail-closed。
+- `/api/status.desktop_review_broker` 只报告非秘密 pipe 名、可用性和隔离策略。helper 协商到 broker 后无需 StateRoot 或环境变量；broker 连接/身份校验失败不得降级成 PC operator review 或旧共享凭据。
 - 发布包与安装更新只分发 signer、公钥和 nonce 账本路径等非秘密配置；不得复制 Desktop 私钥或 Desktop `StateRoot`。
 - 凭据 `Commit` 默认写入 v3 公钥集合、`ELON_DESKTOP_REVIEW_NONCE_LEDGER` 与 `ELON_DESKTOP_REVIEW_ALLOW_V2=0`。轮换窗口同时保留新旧公钥；确认 Desktop helper 全部升级后移除旧公钥。
 - v2 兼容必须由运维显式设置 `ELON_DESKTOP_REVIEW_ALLOW_V2=1`，且不会重新启用共享 secret v1。v3 公钥存在时任何 v1 ticket 都拒绝。
