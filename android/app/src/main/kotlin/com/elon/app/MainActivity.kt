@@ -768,6 +768,7 @@ class MainActivity : AppCompatActivity() {
         )
     }
     private val chatSideMenuConversationHeaderActions by lazy { ChatSideMenuConversationHeaderActions(this, { conversationActions.createConversationAndOpen() }, { onComplete -> accountActions().syncProjectsFromServer(onComplete) }, { chatSideMenuController.refreshVisibleContent() }) }
+    private val chatSocialSidebarActions by lazy { MainSocialSidebarActions(this, binding, s, { serverUrl }, { friendChatActions }, { groupChatActions }, { projectSpaceController }, ::syncVisibleChatNotificationState) { chatSideMenuController.refreshVisibleContent() } }
     private val chatSideMenuController: ChatSideMenuController by lazy {
         ChatSideMenuController(
             activity = this,
@@ -779,6 +780,7 @@ class MainActivity : AppCompatActivity() {
             renameConversation = { index -> conversationActions.showRenameConversationDialog(index) },
             isConversationWorking = homeListActions::isConversationWorking,
             showProjectShareSideMenu = { friendChatActions.isActive() || groupChatActions.isActive() },
+            socialSideMenu = chatSocialSidebarActions.coordinator,
             projects = { s.projects },
             activeProjectIndex = { s.activeProjectIndex },
             openPersonalProject = { index ->
@@ -805,7 +807,6 @@ class MainActivity : AppCompatActivity() {
             selectableForeground = uiTools::selectableForeground
         )
     }
-
     private val conversationActions: MainConversationActions by lazy {
         MainConversationActions(
             activity = this,
@@ -823,7 +824,6 @@ class MainActivity : AppCompatActivity() {
             onConversationsChanged = { projectSpaceController.renderProjectSpaceLanding() }
         )
     }
-
     private val conversationForkActions: MainConversationForkActions by lazy {
         MainConversationForkActions(
             binding = binding,
@@ -837,7 +837,6 @@ class MainActivity : AppCompatActivity() {
             renderProjectSpace = { projectSpaceController.renderProjectSpaceLanding() }
         )
     }
-
     private val conversationIdentityActions: MainConversationIdentityActions by lazy {
         MainConversationIdentityActions(
             activity = this,
@@ -872,7 +871,6 @@ class MainActivity : AppCompatActivity() {
             selectableForeground = uiTools::selectableForeground
         )
     }
-
     private val conversationOpenActions: MainConversationOpenActions by lazy {
         MainConversationOpenActions(
             binding = binding,
@@ -1369,6 +1367,7 @@ class MainActivity : AppCompatActivity() {
             startMultiSelect = { message -> messageSelectionActions.startSelection(message) },
             revokeProjectShare = { message, share -> chatProjectShareActions.revokePublishedShare(message, share) },
             quoteMessage = { text -> messageActions.quoteMessage(text) },
+            favoriteMessage = chatSocialSidebarActions::favoriteMessage,
             canRequestAiReply = {
                 friendChatActions.isActive() || groupChatActions.isActive()
             },
@@ -1436,6 +1435,7 @@ class MainActivity : AppCompatActivity() {
         val total = s.friends.sumOf { it.unreadCount } + s.groups.sumOf { it.unreadCount }
         navigationController.updateChatTabBadge(total)
         setChatLauncherBadgeCount(this, total)
+        chatSideMenuController.refreshVisibleContent()
     }
 
     private fun showGitProjectDialog() {

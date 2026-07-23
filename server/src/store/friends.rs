@@ -152,6 +152,11 @@ impl Store {
                     lm.recalled_at,
                     lm.recalled_by,
                     lm.created_at,
+                    received.content,
+                    received.attachments_json,
+                    received.recalled_at,
+                    received.recalled_by,
+                    received.created_at,
                     (
                         SELECT COUNT(*)
                         FROM friend_messages unread
@@ -193,6 +198,22 @@ impl Store {
                  ORDER BY latest.created_at DESC
                  LIMIT 1
                )
+             LEFT JOIN friend_messages received
+               ON received.id = (
+                   SELECT newest_received.id
+                   FROM friend_messages newest_received
+                   WHERE (
+                       newest_received.sender_user_id = u.id
+                       AND newest_received.receiver_user_id = ?1
+                   )
+                   OR (
+                       newest_received.sender_user_id = ?2
+                       AND newest_received.receiver_user_id = ?1
+                       AND newest_received.context_user_id = u.id
+                   )
+                   ORDER BY newest_received.created_at DESC, newest_received.id DESC
+                   LIMIT 1
+               )
              WHERE f.user_id = ?1 AND u.status = 'active' AND u.id != ?2
              ORDER BY COALESCE(lm.created_at, f.created_at) DESC",
         )?;
@@ -206,6 +227,10 @@ impl Store {
                 let last_attachments_json: Option<String> = row.get(7)?;
                 let recalled_at: Option<String> = row.get(8)?;
                 let recalled_by: Option<String> = row.get(9)?;
+                let received_content: Option<String> = row.get(11)?;
+                let received_attachments_json: Option<String> = row.get(12)?;
+                let received_recalled_at: Option<String> = row.get(13)?;
+                let received_recalled_by: Option<String> = row.get(14)?;
                 Ok(FriendProfile {
                     id,
                     account,
@@ -221,11 +246,19 @@ impl Store {
                         user_id,
                     )?,
                     last_message_at: row.get(10)?,
-                    unread_count: row.get(11)?,
+                    last_received_message: message_preview_for_viewer(
+                        received_content.as_deref(),
+                        received_attachments_json.as_deref(),
+                        received_recalled_at.as_deref(),
+                        received_recalled_by.as_deref(),
+                        user_id,
+                    )?,
+                    last_received_at: row.get(15)?,
+                    unread_count: row.get(16)?,
                     is_online: false,
-                    presence_status: row.get(12)?,
-                    custom_status: row.get(13)?,
-                    activity: row.get(14)?,
+                    presence_status: row.get(17)?,
+                    custom_status: row.get(18)?,
+                    activity: row.get(19)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -237,6 +270,7 @@ impl Store {
 
 fn social_ai_friend_profile(conn: &Connection, user_id: &str) -> Result<FriendProfile> {
     let latest = latest_direct_social_ai_message(conn, user_id)?;
+    let latest_received = latest_direct_social_ai_received_message(conn, user_id)?;
     let unread_count = direct_social_ai_unread_count(conn, user_id)?;
     Ok(FriendProfile {
         id: SOCIAL_AI_USER_ID.to_string(),
@@ -250,12 +284,50 @@ fn social_ai_friend_profile(conn: &Connection, user_id: &str) -> Result<FriendPr
             .and_then(|(preview, _)| preview.clone())
             .or_else(|| Some(SOCIAL_AI_FRIEND_PREVIEW.to_string())),
         last_message_at: latest.map(|(_, created_at)| created_at),
+        last_received_message: latest_received
+            .as_ref()
+            .and_then(|(preview, _)| preview.clone()),
+        last_received_at: latest_received.map(|(_, created_at)| created_at),
         unread_count,
         is_online: true,
         presence_status: Some("online".to_string()),
         custom_status: None,
         activity: None,
     })
+}
+
+fn latest_direct_social_ai_received_message(
+    conn: &Connection,
+    user_id: &str,
+) -> Result<Option<(Option<String>, String)>> {
+    conn.query_row(
+        "SELECT content, attachments_json, recalled_at, recalled_by, created_at
+         FROM friend_messages
+         WHERE sender_user_id = ?2
+           AND receiver_user_id = ?1
+           AND context_user_id IS NULL
+         ORDER BY created_at DESC, id DESC
+         LIMIT 1",
+        params![user_id, SOCIAL_AI_USER_ID],
+        |row| {
+            let content: String = row.get(0)?;
+            let attachments_json: Option<String> = row.get(1)?;
+            let recalled_at: Option<String> = row.get(2)?;
+            let recalled_by: Option<String> = row.get(3)?;
+            Ok((
+                message_preview_for_viewer(
+                    Some(content.as_str()),
+                    attachments_json.as_deref(),
+                    recalled_at.as_deref(),
+                    recalled_by.as_deref(),
+                    user_id,
+                )?,
+                row.get(4)?,
+            ))
+        },
+    )
+    .optional()
+    .map_err(Into::into)
 }
 
 fn latest_direct_social_ai_message(
@@ -460,6 +532,8 @@ fn friend_profile_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<FriendPr
         friend_since: None,
         last_message: None,
         last_message_at: None,
+        last_received_message: None,
+        last_received_at: None,
         unread_count: 0,
         is_online: false,
         presence_status: None,

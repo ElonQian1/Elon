@@ -29,6 +29,7 @@ internal class MainActionPopups(
     private val startMultiSelect: (ChatMessage) -> Unit,
     private val revokeProjectShare: (ChatMessage, ChatProjectShare) -> Unit,
     private val quoteMessage: (String) -> Unit,
+    private val favoriteMessage: (ChatMessage) -> Unit,
     private val canRequestAiReply: () -> Boolean,
     private val requestAiReply: (ChatMessage) -> Unit,
     private val dp: (Int) -> Int,
@@ -91,7 +92,12 @@ internal class MainActionPopups(
         if (hasText) {
             actions.add(TopAction("复制", R.drawable.ic_msg_copy) { shareActions().copyMessageText(text) })
             actions.add(TopAction("转发", R.drawable.ic_msg_forward) { shareActions().forwardMessageText(text) })
-            actions.add(TopAction("收藏", R.drawable.ic_msg_favorite) { shareActions().toastMessageAction("已收藏") })
+        }
+        if (hasText || !message.attachments.isNullOrEmpty()) {
+            actions.add(TopAction("收藏", R.drawable.ic_msg_favorite) {
+                favoriteMessage(message)
+                shareActions().toastMessageAction("已收藏")
+            })
         }
         actions.add(TopAction("时间", R.drawable.ic_msg_time) { showMessageTime(message) })
         if (canRecallMessage(message)) {

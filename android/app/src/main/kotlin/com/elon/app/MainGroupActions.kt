@@ -27,7 +27,9 @@ internal data class AppGroup(
     val createdAt: Long?,
     val lastMessage: String?,
     val lastMessageAt: Long?,
-    val unreadCount: Int
+    val unreadCount: Int,
+    val lastReceivedMessage: String? = null,
+    val lastReceivedAt: Long? = null
 )
 
 internal data class AppGroupMember(
@@ -312,7 +314,10 @@ internal class MainGroupActions(
             createdAt = parseServerTime(json.optString("created_at", "").trim()),
             lastMessage = json.optString("last_message", "").trim().takeIf { it.isNotEmpty() },
             lastMessageAt = parseServerTime(json.optString("last_message_at", "").trim()),
-            unreadCount = json.optInt("unread_count", 0).coerceAtLeast(0)
+            unreadCount = json.optInt("unread_count", 0).coerceAtLeast(0),
+            lastReceivedMessage = json.optString("last_received_message", "").trim()
+                .takeIf { it.isNotEmpty() },
+            lastReceivedAt = parseServerTime(json.optString("last_received_at", "").trim())
         )
     }
 

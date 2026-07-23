@@ -96,6 +96,29 @@ internal fun chatAttachmentsFromPending(attachments: List<PendingAttachment>): L
     }
 }
 
+internal fun chatAttachmentRefsFromChatAttachments(attachments: List<ChatAttachment>): JsonArray {
+    return JsonArray().apply {
+        attachments.forEach { attachment ->
+            add(JsonObject().apply {
+                attachment.kind?.let { addProperty("kind", it) }
+                attachment.displayName?.let { addProperty("display_name", it) }
+                attachment.fileName?.let { addProperty("file_name", it) }
+                attachment.mimeType?.let { addProperty("mime_type", it) }
+                attachment.url?.let { addProperty("url", it) }
+                attachment.localPath?.let { addProperty("local_path", it) }
+                attachment.sizeBytes?.let { addProperty("size_bytes", it) }
+                attachment.imageWidth?.let { addProperty("image_width", it) }
+                attachment.imageHeight?.let { addProperty("image_height", it) }
+                attachment.durationSeconds?.let { addProperty("duration_seconds", it) }
+                attachment.transcription?.let { addProperty("transcription", it) }
+                if (attachment.annotations.isNotEmpty()) {
+                    add("annotations", chatImageAnnotationsToGsonArray(attachment.annotations))
+                }
+            })
+        }
+    }
+}
+
 internal fun pendingAttachmentsFromChatAttachments(attachments: List<ChatAttachment>): List<PendingAttachment> {
     return attachments.mapNotNull { attachment ->
         val localPath = attachment.localPath?.trim()?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null

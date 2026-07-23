@@ -23,6 +23,11 @@ impl Store {
                     latest.recalled_at,
                     latest.recalled_by,
                     latest.created_at,
+                    received.content,
+                    received.attachments_json,
+                    received.recalled_at,
+                    received.recalled_by,
+                    received.created_at,
                     (
                         SELECT COUNT(*)
                         FROM friend_group_messages unread
@@ -41,6 +46,15 @@ impl Store {
                    FROM friend_group_messages newest
                    WHERE newest.group_id = g.id
                    ORDER BY newest.created_at DESC
+                   LIMIT 1
+               )
+             LEFT JOIN friend_group_messages received
+               ON received.id = (
+                   SELECT newest_received.id
+                   FROM friend_group_messages newest_received
+                   WHERE newest_received.group_id = g.id
+                     AND newest_received.sender_user_id != ?1
+                   ORDER BY newest_received.created_at DESC, newest_received.id DESC
                    LIMIT 1
                )
              WHERE gm.user_id = ?1
@@ -68,7 +82,21 @@ impl Store {
                         )?
                     },
                     last_message_at: row.get(8)?,
-                    unread_count: row.get(9)?,
+                    last_received_message: {
+                        let received_content: Option<String> = row.get(9)?;
+                        let received_attachments_json: Option<String> = row.get(10)?;
+                        let received_recalled_at: Option<String> = row.get(11)?;
+                        let received_recalled_by: Option<String> = row.get(12)?;
+                        message_preview_for_viewer(
+                            received_content.as_deref(),
+                            received_attachments_json.as_deref(),
+                            received_recalled_at.as_deref(),
+                            received_recalled_by.as_deref(),
+                            user_id,
+                        )?
+                    },
+                    last_received_at: row.get(13)?,
+                    unread_count: row.get(14)?,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -136,6 +164,8 @@ impl Store {
             created_at,
             last_message: None,
             last_message_at: None,
+            last_received_message: None,
+            last_received_at: None,
             unread_count: 0,
         })
     }
@@ -146,6 +176,27 @@ impl Store {
         group_id: &str,
         after: Option<&str>,
         limit: i64,
+    ) -> Result<Vec<FriendGroupMessage>> {
+        self.list_friend_group_messages_internal(user_id, group_id, after, limit, true)
+    }
+
+    pub fn peek_friend_group_messages(
+        &self,
+        user_id: &str,
+        group_id: &str,
+        after: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<FriendGroupMessage>> {
+        self.list_friend_group_messages_internal(user_id, group_id, after, limit, false)
+    }
+
+    fn list_friend_group_messages_internal(
+        &self,
+        user_id: &str,
+        group_id: &str,
+        after: Option<&str>,
+        limit: i64,
+        mark_read: bool,
     ) -> Result<Vec<FriendGroupMessage>> {
         self.ensure_group_member(user_id, group_id)?;
         let limit = limit.clamp(1, 200);
@@ -187,7 +238,9 @@ impl Store {
             .collect::<rusqlite::Result<Vec<_>>>()?
         };
         drop(stmt);
-        mark_group_messages_read(&conn, user_id, group_id)?;
+        if mark_read {
+            mark_group_messages_read(&conn, user_id, group_id)?;
+        }
         Ok(messages)
     }
 
@@ -391,6 +444,8 @@ impl Store {
                     members: Vec::new(),
                     last_message: None,
                     last_message_at: None,
+                    last_received_message: None,
+                    last_received_at: None,
                     unread_count: 0,
                 })
             },

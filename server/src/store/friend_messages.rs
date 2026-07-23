@@ -17,6 +17,27 @@ impl Store {
         after: Option<&str>,
         limit: i64,
     ) -> Result<Vec<FriendChatMessage>> {
+        self.list_friend_messages_internal(user_id, friend_id, after, limit, true)
+    }
+
+    pub fn peek_friend_messages(
+        &self,
+        user_id: &str,
+        friend_id: &str,
+        after: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<FriendChatMessage>> {
+        self.list_friend_messages_internal(user_id, friend_id, after, limit, false)
+    }
+
+    fn list_friend_messages_internal(
+        &self,
+        user_id: &str,
+        friend_id: &str,
+        after: Option<&str>,
+        limit: i64,
+        mark_read: bool,
+    ) -> Result<Vec<FriendChatMessage>> {
         self.ensure_friend_pair(user_id, friend_id)?;
         let limit = limit.clamp(1, 200);
         let after = after.map(str::trim).filter(|value| !value.is_empty());
@@ -26,7 +47,9 @@ impl Store {
         } else {
             list_regular_friend_messages(&conn, user_id, friend_id, after, limit)?
         };
-        mark_friend_messages_read(&conn, user_id, friend_id)?;
+        if mark_read {
+            mark_friend_messages_read(&conn, user_id, friend_id)?;
+        }
         Ok(messages)
     }
 

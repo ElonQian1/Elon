@@ -5,12 +5,39 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.view.DragEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import kotlin.math.hypot
 import kotlin.math.max
+
+internal fun handleChatProjectSideMenuDrag(
+    event: DragEvent,
+    isSocialChatActive: Boolean,
+    panelWidth: Int,
+    overlay: FrameLayout,
+    contentContainer: ViewGroup,
+    close: () -> Unit,
+    sendProjectShare: (ChatProjectShare) -> Unit
+): Boolean {
+    if (!isSocialChatActive) return false
+    val share = event.localState as? ChatProjectShare ?: return false
+    return when (event.action) {
+        DragEvent.ACTION_DRAG_STARTED -> true
+        DragEvent.ACTION_DROP -> {
+            if (event.x > panelWidth) {
+                showChatProjectDropRipple(overlay, contentContainer, share, event.x, event.y)
+                close()
+                overlay.postDelayed({ sendProjectShare(share) }, 140L)
+            }
+            true
+        }
+        DragEvent.ACTION_DRAG_ENDED -> true
+        else -> true
+    }
+}
 
 internal fun showChatProjectDropRipple(
     overlay: View,
@@ -26,6 +53,31 @@ internal fun showChatProjectDropRipple(
     val localX = overlayLocation[0] + overlayX - contentLocation[0]
     val localY = overlayLocation[1] + overlayY - contentLocation[1]
     val ripple = ChatProjectDropRippleView(contentContainer.context, projectCardPaletteFor(share.id).first())
+    contentContainer.addView(
+        ripple,
+        FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT
+        )
+    )
+    ripple.start(localX, localY) {
+        (ripple.parent as? ViewGroup)?.removeView(ripple)
+    }
+}
+
+internal fun showChatSocialDropRipple(
+    overlay: View,
+    contentContainer: ViewGroup,
+    overlayX: Float,
+    overlayY: Float
+) {
+    val overlayLocation = IntArray(2)
+    val contentLocation = IntArray(2)
+    overlay.getLocationOnScreen(overlayLocation)
+    contentContainer.getLocationOnScreen(contentLocation)
+    val localX = overlayLocation[0] + overlayX - contentLocation[0]
+    val localY = overlayLocation[1] + overlayY - contentLocation[1]
+    val ripple = ChatProjectDropRippleView(contentContainer.context, Color.parseColor("#4F9DFF"))
     contentContainer.addView(
         ripple,
         FrameLayout.LayoutParams(

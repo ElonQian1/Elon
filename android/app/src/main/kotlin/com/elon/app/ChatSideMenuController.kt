@@ -15,7 +15,6 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
-import android.view.DragEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -40,6 +39,7 @@ internal class ChatSideMenuController(
     private val renameConversation: (Int) -> Unit,
     private val isConversationWorking: (Int) -> Boolean,
     private val showProjectShareSideMenu: () -> Boolean,
+    private val socialSideMenu: ChatSocialSideMenuCoordinator,
     private val projects: () -> List<AppProject>,
     private val activeProjectIndex: () -> Int,
     private val openPersonalProject: (Int) -> Unit,
@@ -114,7 +114,10 @@ internal class ChatSideMenuController(
             elevation = dp(48).toFloat()
             translationZ = dp(48).toFloat()
             setOnClickListener { close() }
-            setOnDragListener { _, event -> handleProjectDrag(event) }
+            setOnDragListener { _, event ->
+                socialSideMenu.handleDrag(event, panel.width, this) { close(animate = true) }
+                    ?: handleChatProjectSideMenuDrag(event, showProjectShareSideMenu(), panel.width, this, binding.contentContainer, { close(animate = true) }, sendProjectShare)
+            }
         }
 
         panel = FrameLayout(activity).apply {
@@ -362,24 +365,6 @@ internal class ChatSideMenuController(
             .start()
     }
 
-    private fun handleProjectDrag(event: DragEvent): Boolean {
-        if (!showProjectShareSideMenu()) return false
-        val share = event.localState as? ChatProjectShare ?: return false
-        return when (event.action) {
-            DragEvent.ACTION_DRAG_STARTED -> true
-            DragEvent.ACTION_DROP -> {
-                if (event.x > panel.width) {
-                    showChatProjectDropRipple(overlay, binding.contentContainer, share, event.x, event.y)
-                    close(animate = true)
-                    overlay.postDelayed({ sendProjectShare(share) }, 140L)
-                }
-                true
-            }
-            DragEvent.ACTION_DRAG_ENDED -> true
-            else -> true
-        }
-    }
-
     private fun buildPanelContent() {
         aiMenuView = ChatAiSideMenuView(
             context = activity,
@@ -430,6 +415,8 @@ internal class ChatSideMenuController(
         )
         projectMenuView.visibility = View.GONE
 
+        socialSideMenu.attach(panel, { animate -> close(animate) }, { toggleSettingsBubble() }, dp, selectableForeground)
+
         settingsBubble = buildSettingsBubble()
         panel.addView(
             settingsBubble,
@@ -442,15 +429,26 @@ internal class ChatSideMenuController(
     }
 
     private fun applyContentMode() {
-        if (showProjectShareSideMenu() || isConversationHomeVisible()) {
-            aiMenuView.visibility = View.GONE
-            aiMenuView.stopAnimations()
-            projectMenuView.visibility = View.VISIBLE
-            projectMenuView.render()
-        } else {
-            projectMenuView.visibility = View.GONE
-            aiMenuView.visibility = View.VISIBLE
-            aiMenuView.render()
+        when {
+            showProjectShareSideMenu() -> {
+                aiMenuView.visibility = View.GONE
+                aiMenuView.stopAnimations()
+                projectMenuView.visibility = View.GONE
+                socialSideMenu.show()
+            }
+            isConversationHomeVisible() -> {
+                aiMenuView.visibility = View.GONE
+                aiMenuView.stopAnimations()
+                socialSideMenu.hide()
+                projectMenuView.visibility = View.VISIBLE
+                projectMenuView.render()
+            }
+            else -> {
+                projectMenuView.visibility = View.GONE
+                socialSideMenu.hide()
+                aiMenuView.visibility = View.VISIBLE
+                aiMenuView.render()
+            }
         }
     }
     private fun isConversationHomeVisible(): Boolean = binding.conversationPage.visibility == View.VISIBLE && binding.chatPage.visibility != View.VISIBLE

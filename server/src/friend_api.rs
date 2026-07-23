@@ -50,6 +50,7 @@ pub struct CreateFriendGroupRequest {
 pub struct FriendMessagesQuery {
     pub after: Option<String>,
     pub limit: Option<i64>,
+    pub preserve_unread: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -67,6 +68,7 @@ pub struct AddGroupMembersRequest {
 pub struct FriendGroupMessagesQuery {
     pub after: Option<String>,
     pub limit: Option<i64>,
+    pub preserve_unread: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -263,14 +265,24 @@ pub async fn list_friend_messages(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    match state.store.list_friend_messages(
-        &user.id,
-        &friend_id,
-        query.after.as_deref(),
-        query.limit.unwrap_or(80),
-    ) {
+    let messages = if query.preserve_unread.unwrap_or(false) {
+        state.store.peek_friend_messages(
+            &user.id,
+            &friend_id,
+            query.after.as_deref(),
+            query.limit.unwrap_or(80),
+        )
+    } else {
+        state.store.list_friend_messages(
+            &user.id,
+            &friend_id,
+            query.after.as_deref(),
+            query.limit.unwrap_or(80),
+        )
+    };
+    match messages {
         Ok(messages) => {
-            if friend_id != SOCIAL_AI_USER_ID {
+            if friend_id != SOCIAL_AI_USER_ID && !query.preserve_unread.unwrap_or(false) {
                 crate::social_ai::spawn_friend_reply_if_needed(
                     state.clone(),
                     user.id.clone(),
@@ -370,18 +382,30 @@ pub async fn list_friend_group_messages(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    match state.store.list_friend_group_messages(
-        &user.id,
-        &group_id,
-        query.after.as_deref(),
-        query.limit.unwrap_or(120),
-    ) {
+    let messages = if query.preserve_unread.unwrap_or(false) {
+        state.store.peek_friend_group_messages(
+            &user.id,
+            &group_id,
+            query.after.as_deref(),
+            query.limit.unwrap_or(120),
+        )
+    } else {
+        state.store.list_friend_group_messages(
+            &user.id,
+            &group_id,
+            query.after.as_deref(),
+            query.limit.unwrap_or(120),
+        )
+    };
+    match messages {
         Ok(messages) => {
-            crate::social_ai::spawn_group_reply_if_needed(
-                state.clone(),
-                user.id.clone(),
-                group_id.clone(),
-            );
+            if !query.preserve_unread.unwrap_or(false) {
+                crate::social_ai::spawn_group_reply_if_needed(
+                    state.clone(),
+                    user.id.clone(),
+                    group_id.clone(),
+                );
+            }
             Json(serde_json::json!({ "messages": messages })).into_response()
         }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),

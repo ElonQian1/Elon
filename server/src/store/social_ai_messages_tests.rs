@@ -50,6 +50,123 @@ fn voice_attachment(seconds: u32) -> ProjectAttachmentRef {
 }
 
 #[test]
+fn social_sidebar_peek_preserves_unread_and_tracks_latest_received_message() {
+    let store = temp_store();
+    let alice = store
+        .create_user(
+            "sidebar-received-alice@example.com",
+            "secret1",
+            Some("Alice"),
+            None,
+        )
+        .expect("alice should be created");
+    let bob = store
+        .create_user(
+            "sidebar-received-bob@example.com",
+            "secret1",
+            Some("Bob"),
+            None,
+        )
+        .expect("bob should be created");
+    store
+        .add_friend(&alice.id, Some("email"), "sidebar-received-bob@example.com")
+        .expect("alice can add bob");
+
+    store
+        .send_friend_message(&alice.id, &bob.id, "incoming friend", None)
+        .expect("incoming friend message should be stored");
+    store
+        .send_friend_message(&bob.id, &alice.id, "newer outgoing friend", None)
+        .expect("outgoing friend message should be stored");
+    let bob_friend_after_outgoing = store
+        .list_friends(&bob.id)
+        .expect("friends should load")
+        .into_iter()
+        .find(|friend| friend.id == alice.id)
+        .expect("alice should be listed");
+    assert_eq!(
+        bob_friend_after_outgoing.last_received_message.as_deref(),
+        Some("incoming friend")
+    );
+    assert!(bob_friend_after_outgoing.last_received_at.is_some());
+    store
+        .send_friend_message(&alice.id, &bob.id, "current incoming friend", None)
+        .expect("current incoming friend message should be stored");
+    let bob_friend = store
+        .list_friends(&bob.id)
+        .expect("friends should load with current incoming")
+        .into_iter()
+        .find(|friend| friend.id == alice.id)
+        .expect("alice should be listed with current incoming");
+    assert_eq!(
+        bob_friend.last_received_message.as_deref(),
+        Some("current incoming friend")
+    );
+    let friend_unread_before_peek = bob_friend.unread_count;
+    assert!(friend_unread_before_peek > 0);
+
+    store
+        .peek_friend_messages(&bob.id, &alice.id, None, 20)
+        .expect("sidebar can peek friend messages");
+    let unread_after_peek = store
+        .list_friends(&bob.id)
+        .expect("friends should load after peek")
+        .into_iter()
+        .find(|friend| friend.id == alice.id)
+        .expect("alice should still be listed")
+        .unread_count;
+    assert_eq!(unread_after_peek, friend_unread_before_peek);
+
+    let group = store
+        .create_friend_group(&alice.id, Some("Sidebar group"), &[bob.id.clone()])
+        .expect("group should be created");
+    store
+        .send_friend_group_message(&alice.id, &group.id, "incoming group", None)
+        .expect("incoming group message should be stored");
+    store
+        .send_friend_group_message(&bob.id, &group.id, "newer outgoing group", None)
+        .expect("outgoing group message should be stored");
+    let bob_group_after_outgoing = store
+        .list_friend_groups(&bob.id)
+        .expect("groups should load")
+        .into_iter()
+        .find(|candidate| candidate.id == group.id)
+        .expect("group should be listed");
+    assert_eq!(
+        bob_group_after_outgoing.last_received_message.as_deref(),
+        Some("incoming group")
+    );
+    assert!(bob_group_after_outgoing.last_received_at.is_some());
+    store
+        .send_friend_group_message(&alice.id, &group.id, "current incoming group", None)
+        .expect("current incoming group message should be stored");
+    let bob_group = store
+        .list_friend_groups(&bob.id)
+        .expect("groups should load with current incoming")
+        .into_iter()
+        .find(|candidate| candidate.id == group.id)
+        .expect("group should be listed with current incoming");
+    assert_eq!(
+        bob_group.last_received_message.as_deref(),
+        Some("current incoming group")
+    );
+    let group_unread_before_peek = bob_group.unread_count;
+    assert!(group_unread_before_peek > 0);
+
+    store
+        .peek_friend_group_messages(&bob.id, &group.id, None, 20)
+        .expect("sidebar can peek group messages");
+    let group_unread_after_peek = store
+        .list_friend_groups(&bob.id)
+        .expect("groups should load after peek")
+        .into_iter()
+        .find(|candidate| candidate.id == group.id)
+        .expect("group should still be listed")
+        .unread_count;
+    assert_eq!(group_unread_after_peek, group_unread_before_peek);
+}
+
+#[test]
 fn friend_image_annotations_are_visible_to_recipient() {
     let store = temp_store();
     let alice = store

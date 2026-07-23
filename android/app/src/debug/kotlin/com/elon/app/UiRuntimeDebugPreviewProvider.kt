@@ -17,10 +17,13 @@ import com.elon.uiruntime.view.UiRuntimePreviewRegistry
 import com.elon.uiruntime.view.UiRuntimePreviewRequest
 import com.elon.uiruntime.view.UiRuntimePreviewScenario
 import com.elon.uiruntime.view.uiNode
+import java.time.LocalDate
+import java.time.ZoneId
 
 class UiRuntimeDebugPreviewProvider : ContentProvider() {
     override fun onCreate(): Boolean {
         UiRuntimePreviewRegistry.register(viewGalleryScenario())
+        UiRuntimePreviewRegistry.register(socialSidebarScenario())
         UiRuntimePreviewRegistry.register(defaultComposeRuntimePreviewScenario())
         return true
     }
@@ -68,6 +71,94 @@ class UiRuntimeDebugPreviewProvider : ContentProvider() {
                     else -> addView(Button(context).apply { text = "主要操作" }.uiNode("preview.view.primary_action"))
                 }
             }
+    }
+
+    private fun socialSidebarScenario() = object : UiRuntimePreviewScenario {
+        override val screenId = "elon.social.sidebar"
+        override val supportedScenarios = setOf("date", "favorites", "drag")
+
+        override fun createView(context: Context, request: UiRuntimePreviewRequest): View {
+            val previewMessages = socialSidebarPreviewMessages()
+            return ChatSocialSideMenuView(
+                context = context,
+                timelineItems = {
+                    previewMessages.mapIndexed { index, message ->
+                        SocialSidebarTimelineItem(
+                            key = SocialSidebarConversationKey(
+                                if (index == 1) {
+                                    SocialSidebarConversationType.GROUP
+                                } else {
+                                    SocialSidebarConversationType.FRIEND
+                                },
+                                "preview-$index"
+                            ),
+                            name = listOf("钱一龙", "产品体验群", "夜云")[index],
+                            avatarDataUrl = null,
+                            summary = previewTextForChatContent(message.content, message.attachments),
+                            lastReceivedAt = message.createdAtMs,
+                            unreadCount = listOf(6, 2, 12)[index],
+                            message = message
+                        )
+                    }
+                },
+                favoriteItems = {
+                    previewMessages.mapIndexed { index, message ->
+                        SocialSidebarFavorite("favorite-$index", message.createdAtMs, message)
+                    }
+                },
+                openConversation = { _ -> },
+                loadTimelineMessage = { item, onDone ->
+                    onDone(Result.success(item.message ?: previewMessages.first()))
+                },
+                openSettings = {},
+                requestClose = { _ -> },
+                dp = { value -> dp(context, value) },
+                selectableForeground = { null },
+                initialTab = if (request.scenario == "favorites") {
+                    SocialSidebarTab.FAVORITES
+                } else {
+                    SocialSidebarTab.DATE
+                }
+            ).apply {
+                render()
+            }.uiNode("social.sidebar.root")
+        }
+    }
+
+    private fun socialSidebarPreviewMessages(): List<ChatMessage> {
+        val now = LocalDate.now()
+            .atTime(13, 23)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        return listOf(
+            ChatMessage(
+                role = "friend",
+                content = "今天看了有趣的灵魂发现很多事情，圣诞节佛爱上对方。",
+                id = "preview-text",
+                createdAtMs = now
+            ),
+            ChatMessage(
+                role = "friend",
+                content = "www.baidu.com",
+                id = "preview-link",
+                createdAtMs = now - 60_000L
+            ),
+            ChatMessage(
+                role = "friend",
+                content = "",
+                attachments = listOf(
+                    ChatAttachment(
+                        kind = "video",
+                        displayName = "侧栏拖拽演示.mp4",
+                        mimeType = "video/mp4",
+                        url = "https://example.invalid/sidebar-preview.mp4"
+                    )
+                ),
+                id = "preview-video",
+                createdAtMs = now - 120_000L
+            )
+        )
     }
 
     companion object {

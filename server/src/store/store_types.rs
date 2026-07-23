@@ -105,6 +105,8 @@ pub struct FriendProfile {
     pub friend_since: Option<String>,
     pub last_message: Option<String>,
     pub last_message_at: Option<String>,
+    pub last_received_message: Option<String>,
+    pub last_received_at: Option<String>,
     pub unread_count: i64,
     /// 当前是否在线（由 API 层在返回前注入，store 层默认 false）
     pub is_online: bool,
@@ -175,6 +177,8 @@ pub struct FriendGroupProfile {
     pub created_at: String,
     pub last_message: Option<String>,
     pub last_message_at: Option<String>,
+    pub last_received_message: Option<String>,
+    pub last_received_at: Option<String>,
     pub unread_count: i64,
 }
 

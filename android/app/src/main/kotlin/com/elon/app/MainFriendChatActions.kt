@@ -211,6 +211,47 @@ internal class MainFriendChatActions(
         return true
     }
 
+    fun trySendForwardedMessage(source: ChatMessage): Boolean {
+        val friend = activeFriend ?: return false
+        val text = source.content.trim()
+        val attachments = source.attachments.orEmpty().map { it.copy() }
+        if (text.isBlank() && attachments.isEmpty()) return true
+
+        val messages = messagesByFriend.getOrPut(friend.id) { mutableListOf() }
+        val pending = ChatMessage(
+            role = "user",
+            content = text,
+            attachments = attachments.takeIf { it.isNotEmpty() },
+            sendStatus = SENDING_STATUS
+        )
+        messages.add(pending)
+        activeAdapter?.notifyItemInserted(messages.lastIndex)
+        binding.chatList.scrollToPosition(messages.lastIndex)
+        collapseInputComposer()
+
+        thread {
+            val result = runCatching {
+                postMessage(friend, text, chatAttachmentRefsFromChatAttachments(attachments))
+            }
+            activity.runOnUiThread {
+                if (activeFriend?.id != friend.id) return@runOnUiThread
+                result.onSuccess { sentMessage ->
+                    val index = messages.indexOf(pending)
+                    if (index >= 0) {
+                        messages[index] = sentMessage
+                        activeAdapter?.notifyMessageUpdated(index)
+                    }
+                    loadMessages(friend, silent = true, scrollToBottom = true, allowPendingRefresh = true)
+                }.onFailure { error ->
+                    pending.sendStatus = error.message ?: "发送失败"
+                    val index = messages.indexOf(pending)
+                    if (index >= 0) activeAdapter?.notifyMessageUpdated(index)
+                }
+            }
+        }
+        return true
+    }
+
     fun requestAiReply(message: ChatMessage) {
         val friend = activeFriend ?: return
         val messageId = message.id?.trim().takeIf { !it.isNullOrEmpty() }
