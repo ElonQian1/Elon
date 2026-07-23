@@ -80,7 +80,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         &parent,
         contract,
     )
-    .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    .map_err(|error| json_error(StatusCode::CONFLICT, resume_error_detail(&error)))?;
     let mut resolved = crate::node_agent_local_task_resume::resolve_resume_workspace(
         contract,
         &parent,
@@ -93,10 +93,10 @@ pub(crate) async fn resolve_supervised_resume_workspace(
     )
     .map_err(resume_workspace_error)?;
     validate_migration_lineage(runtime, &parent, &parent_contract, &resolved)
-        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+        .map_err(|error| json_error(StatusCode::CONFLICT, resume_error_detail(&error)))?;
     validate_orphan_occupancy(runtime, &parent, &parent_contract, &resolved)
         .await
-        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+        .map_err(|error| json_error(StatusCode::CONFLICT, resume_error_detail(&error)))?;
 
     let admission_base = resolved.authorized_workspace_path.clone();
     let admission = tokio::task::spawn_blocking(move || {
@@ -106,7 +106,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
     })
     .await
     .map_err(|error| internal_error(anyhow::Error::from(error)))?
-    .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+    .map_err(|error| json_error(StatusCode::CONFLICT, resume_error_detail(&error)))?;
     resolved = crate::node_agent_local_task_resume::resolve_resume_workspace(
         contract,
         &parent,
@@ -119,13 +119,13 @@ pub(crate) async fn resolve_supervised_resume_workspace(
     )
     .map_err(resume_workspace_error)?;
     validate_migration_lineage(runtime, &parent, &parent_contract, &resolved)
-        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+        .map_err(|error| json_error(StatusCode::CONFLICT, resume_error_detail(&error)))?;
     let orphan_occupancy = validate_orphan_occupancy(runtime, &parent, &parent_contract, &resolved)
         .await
-        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+        .map_err(|error| json_error(StatusCode::CONFLICT, resume_error_detail(&error)))?;
     if resolved.snapshot_continue_required {
         validate_snapshot_continue_safety(runtime, creds, &parent, &journal_snapshot)
-            .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+            .map_err(|error| json_error(StatusCode::CONFLICT, resume_error_detail(&error)))?;
     }
 
     let identity = crate::node_agent_full_access::FullAccessGrantIdentity::new(
@@ -133,7 +133,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         &creds.agent_id,
         &runtime.install_id,
     )
-    .map_err(|error| json_error(StatusCode::FORBIDDEN, error.to_string()))?;
+    .map_err(|error| json_error(StatusCode::FORBIDDEN, resume_error_detail(&error)))?;
     let authorization_context = CliProjectContext {
         project_id: project_id.to_string(),
         conversation_id: parent.conversation_id.clone(),
@@ -157,7 +157,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         inherited_workspace_exists.then_some(&parent),
     )
     .await
-    .map_err(|error| json_error(StatusCode::FORBIDDEN, error.to_string()))?;
+    .map_err(|error| json_error(StatusCode::FORBIDDEN, resume_error_detail(&error)))?;
 
     if !runtime
         .active_cli_prompt_views_for_workspace(FsPath::new(
@@ -196,14 +196,17 @@ pub(crate) async fn resolve_supervised_resume_workspace(
             contract.root_task_id.as_deref(),
             &migration.target_head,
         )
-        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+        .map_err(|error| json_error(StatusCode::CONFLICT, resume_error_detail(&error)))?;
         if let Err(error) = crate::node_agent_local_task_orphan_migration::reclaim_terminal_leases(
             FsPath::new(&resolved.authorized_workspace_path),
             FsPath::new(&prepared.workspace_path),
             occupancy,
         ) {
             rollback_created_migration_workspace(&resolved.authorized_workspace_path, &prepared);
-            return Err(json_error(StatusCode::CONFLICT, error.to_string()));
+            return Err(json_error(
+                StatusCode::CONFLICT,
+                resume_error_detail(&error),
+            ));
         }
         if let Err(error) = runtime
             .local_tasks
@@ -217,7 +220,10 @@ pub(crate) async fn resolve_supervised_resume_workspace(
                 );
             }
             rollback_created_migration_workspace(&resolved.authorized_workspace_path, &prepared);
-            return Err(json_error(StatusCode::CONFLICT, error.to_string()));
+            return Err(json_error(
+                StatusCode::CONFLICT,
+                resume_error_detail(&error),
+            ));
         }
         resolved.inherited_workspace = prepared;
         resolved.derivation =
@@ -252,13 +258,13 @@ pub(crate) async fn resolve_supervised_resume_workspace(
             contract.root_task_id.as_deref(),
             &resolved.git_head,
         )
-        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+        .map_err(|error| json_error(StatusCode::CONFLICT, resume_error_detail(&error)))?;
         resolved.inherited_workspace = prepared;
         resolved.derivation = "missing_active_snapshot_continue_created".to_string();
         resolved.snapshot_continue_required = false;
     }
     commit_validated_lease_migration(&resolved, &admission)
-        .map_err(|error| json_error(StatusCode::CONFLICT, error.to_string()))?;
+        .map_err(|error| json_error(StatusCode::CONFLICT, resume_error_detail(&error)))?;
     resolved.resume_admission = Some(admission);
     Ok(Some(resolved))
 }
@@ -285,11 +291,16 @@ pub(crate) async fn inspect_resume_workspace_status(
         acceptance_criteria: Vec::new(),
         improvement_policy: "after_task_or_unblock".to_string(),
     };
-    let receipt = runtime
-        .update_recovery
-        .receipt_for_resume_parent(parent)
-        .ok()
-        .flatten();
+    let receipt = runtime.update_recovery.receipt_for_resume_parent(parent);
+    let receipt = match receipt {
+        Ok(receipt) => receipt,
+        Err(error) => {
+            return json!({
+                "eligible": false,
+                "reason": resume_error_detail(&error),
+            });
+        }
+    };
     let creds = crate::Credentials {
         owner_user_id: parent.owner_user_id.clone(),
         agent_id: parent.agent_id.clone(),
@@ -308,7 +319,10 @@ pub(crate) async fn inspect_resume_workspace_status(
             &contract,
         )
     {
-        return json!({"eligible": false, "reason": error.to_string()});
+        return json!({
+            "eligible": false,
+            "reason": resume_error_detail(&error),
+        });
     }
     match crate::node_agent_local_task_resume::resolve_resume_workspace(
         &contract,
@@ -324,12 +338,18 @@ pub(crate) async fn inspect_resume_workspace_status(
             if let Err(error) =
                 validate_migration_lineage(runtime, parent, parent_contract, &resolved)
             {
-                return json!({"eligible": false, "reason": error.to_string()});
+                return json!({
+                    "eligible": false,
+                    "reason": resume_error_detail(&error),
+                });
             }
             if let Err(error) =
                 validate_orphan_occupancy(runtime, parent, parent_contract, &resolved).await
             {
-                return json!({"eligible": false, "reason": error.to_string()});
+                return json!({
+                    "eligible": false,
+                    "reason": resume_error_detail(&error),
+                });
             }
             let recorded_workspace_exists =
                 FsPath::new(&resolved.inherited_workspace.workspace_path).exists();
@@ -340,12 +360,22 @@ pub(crate) async fn inspect_resume_workspace_status(
                     ))
                     .await
                     .is_empty();
-            let sidecar_occupied = recorded_workspace_exists
-                && live_sidecar_occupies_workspace(
+            let sidecar_occupied = if recorded_workspace_exists {
+                match live_sidecar_occupies_workspace(
                     runtime,
                     &resolved.inherited_workspace.workspace_path,
-                )
-                .unwrap_or(true);
+                ) {
+                    Ok(occupied) => occupied,
+                    Err(error) => {
+                        return json!({
+                            "eligible": false,
+                            "reason": resume_error_detail(&error),
+                        });
+                    }
+                }
+            } else {
+                false
+            };
             json!({
                 "eligible": !prompt_occupied && !sidecar_occupied,
                 "derivation": resolved.derivation,
@@ -362,7 +392,10 @@ pub(crate) async fn inspect_resume_workspace_status(
                 "orphaned_migration_target_head": resolved.orphaned_migration.as_ref().map(|migration| migration.target_head.as_str()),
             })
         }
-        Err(error) => json!({"eligible": false, "reason": error.to_string()}),
+        Err(error) => json!({
+            "eligible": false,
+            "reason": resume_error_detail(&error),
+        }),
     }
 }
 
@@ -575,7 +608,7 @@ fn json_error(status: StatusCode, message: impl Into<String>) -> Response {
 }
 
 fn resume_workspace_error(error: anyhow::Error) -> Response {
-    let message = error.to_string();
+    let message = resume_error_detail(&error);
     if message.contains("续跑请求只能引用父任务原授权根或其已记录的隔离 worktree")
     {
         return json_error(
@@ -587,7 +620,14 @@ fn resume_workspace_error(error: anyhow::Error) -> Response {
 }
 
 fn internal_error(error: anyhow::Error) -> Response {
-    json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
+    json_error(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        resume_error_detail(&error),
+    )
+}
+
+fn resume_error_detail(error: &anyhow::Error) -> String {
+    crate::node_agent_cli_redaction::redact_text(&format!("{error:#}"))
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 //! Narrow compatibility gate for a supervised task whose durable startup HEAD
 //! predates its own platform-observed terminal commit.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
 
@@ -160,9 +160,14 @@ fn validate_receipt_workspace(
         .filter(|value| !value.is_empty())
         .map(Path::new)
         .ok_or_else(|| anyhow!("更新恢复回执缺少基础仓库路径。"))?;
+    let receipt_base = canonical_directory(receipt_base, "更新恢复回执的基础仓库路径")?;
+    let receipt_active = canonical_directory(
+        Path::new(workspace.workspace_path.trim()),
+        "更新恢复回执的活动 worktree 路径",
+    )?;
     anyhow::ensure!(
-        same_path(receipt_base, base)
-            && same_path(Path::new(&workspace.workspace_path), active)
+        same_path(&receipt_base, base)
+            && same_path(&receipt_active, active)
             && workspace.branch.as_deref() == Some(expected_branch)
             && workspace
                 .git_head
@@ -171,6 +176,17 @@ fn validate_receipt_workspace(
         "更新恢复回执的路径、分支或 HEAD 与当前 worktree 不一致。"
     );
     Ok(())
+}
+
+fn canonical_directory(path: &Path, label: &str) -> Result<PathBuf> {
+    let canonical = std::fs::canonicalize(path)
+        .with_context(|| format!("{label}不存在或不可访问: {}", path.display()))?;
+    anyhow::ensure!(
+        canonical.is_dir(),
+        "{label}不是目录: {}",
+        canonical.display()
+    );
+    Ok(canonical)
 }
 
 fn validate_forward_landed_commit(
