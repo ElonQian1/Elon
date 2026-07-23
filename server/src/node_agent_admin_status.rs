@@ -47,12 +47,28 @@ mod tests {
             "cli_tools": [{"description": "x".repeat(100_000)}],
             "local_ai": {"models": [{"description": "x".repeat(100_000)}], "cli_tools": []},
             "update_recovery": {"install_gate": {"active_foreground_task_ids": ["x".repeat(100_000)]}},
+            "desktop_supervision": {
+                "protocol": "elon.desktop_pc_supervision.v1",
+                "capabilities": ["delta_wait_v1"]
+            },
+            "task_journal_supported": true,
+            "task_journal_schema_version": 1,
             "local_admin_token": "local-secret",
         });
         super::enforce_status_response_limit(&mut payload);
         let bytes = serde_json::to_vec(&payload).unwrap();
         assert!(bytes.len() <= super::ADMIN_STATUS_MAX_BYTES);
         assert_eq!(payload["local_admin_token"], "local-secret");
+        assert_eq!(
+            payload["desktop_supervision"]["protocol"],
+            "elon.desktop_pc_supervision.v1"
+        );
+        assert_eq!(
+            payload["desktop_supervision"]["capabilities"][0],
+            "delta_wait_v1"
+        );
+        assert_eq!(payload["task_journal_supported"], true);
+        assert_eq!(payload["task_journal_schema_version"], 1);
         assert_eq!(
             payload["response_limits"]["max_bytes"],
             super::ADMIN_STATUS_MAX_BYTES
@@ -273,6 +289,10 @@ fn enforce_status_response_limit(payload: &mut serde_json::Value) {
             "restart_recovery": payload.get("restart_recovery").cloned(),
             "update_recovery": payload.get("update_recovery").cloned(),
             "lifecycle": payload.get("lifecycle").cloned(),
+            "desktop_supervision": payload.get("desktop_supervision").cloned(),
+            "task_journal_supported": payload.get("task_journal_supported").cloned(),
+            "task_journal_schema_version": payload.get("task_journal_schema_version").cloned(),
+            "lifecycle_report_schema_version": payload.get("lifecycle_report_schema_version").cloned(),
             "local_admin_token_header": payload.get("local_admin_token_header").cloned(),
             "local_admin_token": payload.get("local_admin_token").cloned(),
             "compacted": true,
@@ -297,6 +317,10 @@ fn enforce_status_response_limit(payload: &mut serde_json::Value) {
             "agent_id": payload.get("agent_id").cloned(),
             "active_cli_prompt_count": payload.get("active_cli_prompt_count").cloned(),
             "update_blocker_count": blocker_count,
+            "desktop_supervision": payload.get("desktop_supervision").cloned(),
+            "task_journal_supported": payload.get("task_journal_supported").cloned(),
+            "task_journal_schema_version": payload.get("task_journal_schema_version").cloned(),
+            "lifecycle_report_schema_version": payload.get("lifecycle_report_schema_version").cloned(),
             "local_admin_token_header": payload.get("local_admin_token_header").cloned(),
             "local_admin_token": payload.get("local_admin_token").cloned(),
             "compacted": true,
