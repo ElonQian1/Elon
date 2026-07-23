@@ -3,7 +3,8 @@
 use anyhow::Result;
 
 use crate::node_agent_update_recovery::{
-    ReleaseIdentity, UpdateRecoveryReceipt, UpdateRecoveryState, UpdateRecoveryStore,
+    ReleaseIdentity, UpdateRecoveryEvent, UpdateRecoveryReceipt, UpdateRecoveryState,
+    UpdateRecoveryStore,
 };
 
 use super::{now_ms, release_identity_matches};
@@ -56,6 +57,19 @@ pub(super) fn superseding_release_evidence(
         }));
     }
 
+    if let Some(observation) = ledger
+        .receipts
+        .iter()
+        .filter(|candidate| same_sidecar_release_observation(receipt, candidate, current_release))
+        .max_by_key(|candidate| (candidate.created_at_ms, candidate.updated_at_ms))
+    {
+        return Ok(Some(SupersedingReleaseEvidence {
+            update_id: observation.update_id.clone(),
+            release: current,
+            source: "same_sidecar_current_release_receipt",
+        }));
+    }
+
     let gate = &ledger.install_gate;
     let task_is_checkpointed = gate
         .active_foreground_task_ids
@@ -73,6 +87,42 @@ pub(super) fn superseding_release_evidence(
         }));
     }
     Ok(None)
+}
+
+fn same_sidecar_release_observation(
+    receipt: &UpdateRecoveryReceipt,
+    candidate: &UpdateRecoveryReceipt,
+    current_release: &str,
+) -> bool {
+    let sidecar_session_id = receipt.sidecar_session_id.as_deref().unwrap_or("").trim();
+    !sidecar_session_id.is_empty()
+        && candidate.update_id != receipt.update_id
+        && candidate.update_id.starts_with("legacy-sidecar-")
+        && !candidate.is_superseded()
+        && candidate.allows_local_reconcile()
+        && candidate.root_task_id == receipt.root_task_id
+        && candidate.parent_task_id == receipt.parent_task_id
+        && candidate.original_task_id == receipt.original_task_id
+        && candidate.active_task_id() == receipt.active_task_id()
+        && candidate.sidecar_session_id.as_deref() == Some(sidecar_session_id)
+        && candidate.created_at_ms > receipt.created_at_ms
+        && candidate.transport.kind == receipt.transport.kind
+        && candidate.transport.protocol == receipt.transport.protocol
+        && candidate.transport.auth_mode == receipt.transport.auth_mode
+        && candidate.safety.journal_event_count >= receipt.safety.journal_event_count
+        && !candidate.to_release.git_sha.trim().is_empty()
+        && candidate.from_release.git_sha == candidate.to_release.git_sha
+        && candidate.to_release.git_sha != receipt.to_release.git_sha
+        && release_identity_matches(&candidate.to_release, current_release)
+        && matches!(
+            candidate.state,
+            UpdateRecoveryState::Applying
+                | UpdateRecoveryState::RuntimeOnline
+                | UpdateRecoveryState::Reattaching
+                | UpdateRecoveryState::ResumeCreated
+                | UpdateRecoveryState::Resumed
+                | UpdateRecoveryState::Verified
+        )
 }
 
 fn exact_release_identity(current: &str) -> Option<ReleaseIdentity> {
@@ -124,23 +174,75 @@ pub(super) fn record_superseded_recovery(
             return Ok(false);
         }
         anyhow::ensure!(
-            current.state == UpdateRecoveryState::Resumed,
-            "only a successfully resumed recovery receipt may be superseded"
+            receipt_may_be_superseded(current),
+            "only a resumed sidecar receipt or the exact historical release-mismatch failure may be superseded"
         );
+        let previous_state = current.state;
         current.superseded_by_update_id = Some(evidence.update_id.clone());
         current.superseded_by_release = Some(evidence.release.clone());
         current.supersede_evidence = Some(evidence.source.to_string());
         current.superseded_at_ms = Some(now_ms());
-        current.transition(
-            UpdateRecoveryState::Verified,
-            Some(&format!(
-                "superseded by {} at {}+{} via {}; no recovery action replayed",
-                evidence.update_id,
-                evidence.release.version,
-                evidence.release.git_sha,
-                evidence.source
-            )),
-        )?;
+        let reason = format!(
+            "superseded by {} at {}+{} via {}; no recovery action replayed",
+            evidence.update_id,
+            evidence.release.version,
+            evidence.release.git_sha,
+            evidence.source
+        );
+        if previous_state == UpdateRecoveryState::Resumed {
+            current.transition(UpdateRecoveryState::Verified, Some(&reason))?;
+        } else {
+            let sequence = current
+                .events
+                .last()
+                .map(|event| event.sequence + 1)
+                .unwrap_or(1);
+            let at_ms = now_ms();
+            current.updated_at_ms = at_ms;
+            current.state_reason = Some(reason.clone());
+            current.events.push(UpdateRecoveryEvent {
+                event_id: format!("{}:{sequence}:superseded", current.update_id),
+                sequence,
+                state: previous_state,
+                at_ms,
+                reason: Some(reason),
+            });
+        }
         Ok(true)
     })
+}
+
+pub(super) fn reconcile_superseded_history(
+    store: &UpdateRecoveryStore,
+    current_release: &str,
+) -> Result<usize> {
+    let receipts = store.load()?.receipts;
+    let mut changed = 0;
+    for receipt in receipts {
+        if receipt.is_superseded() || !receipt_may_be_superseded(&receipt) {
+            continue;
+        }
+        if let Some(evidence) = superseding_release_evidence(store, &receipt, current_release)? {
+            if record_superseded_recovery(store, &receipt, &evidence)? {
+                changed += 1;
+            }
+        }
+    }
+    Ok(changed)
+}
+
+fn receipt_may_be_superseded(receipt: &UpdateRecoveryReceipt) -> bool {
+    if receipt.state == UpdateRecoveryState::Resumed {
+        return matches!(
+            receipt.resume_strategy.as_deref(),
+            Some("sidecar_reattach" | "sidecar_terminal_replay")
+        );
+    }
+    receipt.state == UpdateRecoveryState::Failed
+        && receipt.resume_strategy.as_deref() == Some("sidecar_reattach")
+        && receipt.safety.evidence_complete
+        && receipt.safety.pending_approval_ids.is_empty()
+        && receipt.safety.non_repeatable_action.is_none()
+        && receipt.final_reason.as_deref()
+            == Some("节点更新恢复已熔断：节点发布身份既不是 from_release 也不是目标 release")
 }

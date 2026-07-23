@@ -312,6 +312,97 @@ fn acb3_to_3149_successor_supersedes_resumed_ticket_idempotently() {
         "terminal reconciliation must ignore the superseded generation"
     );
     let _ = std::fs::remove_dir_all(root);
+
+    let historical_root = std::env::temp_dir().join(format!(
+        "elon-update-historical-race-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let historical_store = UpdateRecoveryStore::new(historical_root.join("ledger.json"));
+    let mut failed = UpdateRecoveryReceipt::planned(
+        format!("node-update-{RELEASE_ACB3}"),
+        "root-historical",
+        "task-historical",
+    );
+    failed.created_at_ms = 10;
+    failed.updated_at_ms = 20;
+    failed.from_release = ReleaseIdentity {
+        version: format!("0.3.69+{RELEASE_79BE}"),
+        git_sha: RELEASE_79BE.to_string(),
+    };
+    failed.to_release = ReleaseIdentity {
+        version: String::new(),
+        git_sha: RELEASE_ACB3.to_string(),
+    };
+    failed.sidecar_session_id = Some("sidecar-task-historical".to_string());
+    failed.safety.evidence_complete = true;
+    failed.safety.journal_event_count = 42;
+    failed.resume_strategy = Some("sidecar_reattach".to_string());
+    failed.state = UpdateRecoveryState::Failed;
+    failed.final_reason =
+        Some("节点更新恢复已熔断：节点发布身份既不是 from_release 也不是目标 release".to_string());
+
+    let mut observation = UpdateRecoveryReceipt::planned(
+        format!("legacy-sidecar-task-historical-0.3.69_{RELEASE_3149}"),
+        "root-historical",
+        "task-historical",
+    );
+    observation.created_at_ms = 30;
+    observation.updated_at_ms = 40;
+    observation.from_release = ReleaseIdentity {
+        version: "0.3.69".to_string(),
+        git_sha: RELEASE_3149.to_string(),
+    };
+    observation.to_release = observation.from_release.clone();
+    observation.sidecar_session_id = failed.sidecar_session_id.clone();
+    observation.safety.journal_event_count = 42;
+    observation.state = UpdateRecoveryState::Applying;
+    historical_store.upsert(failed.clone()).unwrap();
+    historical_store.upsert(observation.clone()).unwrap();
+
+    assert!(
+        superseding_release_evidence(&historical_store, &failed, &format!("0.3.69+{UNKNOWN}"))
+            .unwrap()
+            .is_none(),
+        "an arbitrary current release cannot reuse same-sidecar evidence"
+    );
+    assert_eq!(
+        reconcile_superseded_history(&historical_store, &format!("0.3.69+{RELEASE_3149}")).unwrap(),
+        1
+    );
+    assert_eq!(
+        reconcile_superseded_history(&historical_store, &format!("0.3.69+{RELEASE_3149}")).unwrap(),
+        0,
+        "historical convergence is idempotent"
+    );
+    let historical = historical_store.load().unwrap();
+    let saved_failed = historical
+        .receipts
+        .iter()
+        .find(|receipt| receipt.update_id == failed.update_id)
+        .unwrap();
+    assert_eq!(saved_failed.state, UpdateRecoveryState::Failed);
+    assert_eq!(
+        saved_failed.superseded_by_update_id.as_deref(),
+        Some(observation.update_id.as_str())
+    );
+    assert_eq!(
+        saved_failed.supersede_evidence.as_deref(),
+        Some("same_sidecar_current_release_receipt")
+    );
+    assert!(saved_failed
+        .events
+        .last()
+        .and_then(|event| event.reason.as_deref())
+        .is_some_and(|reason| reason.contains("no recovery action replayed")));
+    assert_eq!(
+        historical_store
+            .receipt_for_task("task-historical")
+            .unwrap()
+            .unwrap()
+            .update_id,
+        observation.update_id
+    );
+    let _ = std::fs::remove_dir_all(historical_root);
 }
 
 #[test]

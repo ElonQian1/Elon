@@ -30,9 +30,15 @@ use crate::{
 mod supersede;
 #[cfg(test)]
 use crate::node_agent_update_recovery::ReleaseIdentity;
-use supersede::{record_superseded_recovery, superseding_release_evidence};
+use supersede::{
+    reconcile_superseded_history, record_superseded_recovery, superseding_release_evidence,
+};
 
 pub(crate) async fn reconcile_startup(runtime: Arc<NodeRuntime>) {
+    let current_release = crate::node_agent_release_identity::current();
+    if let Err(error) = reconcile_superseded_history(&runtime.update_recovery, &current_release) {
+        warn!(%error, "启动时收敛历史更新恢复票据失败");
+    }
     let receipts = match runtime.update_recovery.active() {
         Ok(receipts) => receipts,
         Err(error) => {
@@ -54,6 +60,12 @@ pub(crate) async fn reconcile_startup(runtime: Arc<NodeRuntime>) {
             warn!(%error, "启动更新恢复事务失败");
         }
     }
+}
+
+pub(crate) fn reconcile_superseded_history_for_current_release(
+    store: &UpdateRecoveryStore,
+) -> Result<usize> {
+    reconcile_superseded_history(store, &crate::node_agent_release_identity::current())
 }
 
 async fn reconcile_one(runtime: Arc<NodeRuntime>, receipt: UpdateRecoveryReceipt) -> Result<()> {

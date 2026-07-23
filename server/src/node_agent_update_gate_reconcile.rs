@@ -20,6 +20,10 @@ const RESUME_ELIGIBILITY_AUDIT_LIMIT: usize = 4;
 
 pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
     let credentials = runtime.creds().await.context("节点当前没有已绑定身份")?;
+    let superseded_history_count =
+        crate::node_agent_update_reconcile::reconcile_superseded_history_for_current_release(
+            &runtime.update_recovery,
+        )?;
     let receipt_install_gate_enabled = receipt_install_gate_enabled();
     let (orphan_rows_reconciled, orphan_reconcile_error) =
         match crate::node_agent_local_task_orphan_reconcile::reconcile_once(runtime.as_ref()).await
@@ -258,6 +262,7 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         },
         "orphan_rows_reconciled": orphan_rows_reconciled,
         "orphan_reconcile_error": orphan_reconcile_error,
+        "superseded_history_count": superseded_history_count,
         "excluded_terminal_history_count": excluded_count,
         "active_foreground_task_ids": blockers,
         "install_gate": gate,
@@ -376,8 +381,9 @@ fn recovery_receipt_evidence(ledger: &UpdateRecoveryLedger, task_id: &str) -> (u
         .receipts
         .iter()
         .filter(|receipt| {
-            receipt.original_task_id == task_id
-                || receipt.resume_task_id.as_deref() == Some(task_id)
+            !receipt.is_superseded()
+                && (receipt.original_task_id == task_id
+                    || receipt.resume_task_id.as_deref() == Some(task_id))
         })
         .collect::<Vec<_>>();
     let count = matches.len();
