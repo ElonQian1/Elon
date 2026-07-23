@@ -11,6 +11,10 @@ use super::{
         CommitPreviewRequest, CommitPwaStyleRequest, LoadPreviewRequest,
         ResolvePwaStyleBindingRequest,
     },
+    writeback_receipt::{
+        begin_writeback_receipt, complete_writeback_receipt, BeginWritebackReceiptRequest,
+        CompleteWritebackReceiptRequest,
+    },
     writer::commit_changes,
 };
 use crate::NodeRuntime;
@@ -51,6 +55,14 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
         .route(
             "/api/source-preview/capture-pwa-runtime",
             post(capture_pwa_runtime_handler),
+        )
+        .route(
+            "/api/source-preview/writeback-receipts/begin",
+            post(begin_writeback_receipt_handler),
+        )
+        .route(
+            "/api/source-preview/writeback-receipts/complete",
+            post(complete_writeback_receipt_handler),
         )
 }
 
@@ -99,10 +111,28 @@ async fn commit_handler(
     Json(req): Json<CommitPreviewRequest>,
 ) -> Response {
     match commit_changes(&req) {
-        Ok(source_revision) => {
-            Json(json!({ "ok": true, "sourceRevision": source_revision })).into_response()
-        }
+        Ok(result) => Json(result).into_response(),
         Err(error) => error_response(StatusCode::CONFLICT, error),
+    }
+}
+
+async fn begin_writeback_receipt_handler(
+    State(_runtime): State<Arc<NodeRuntime>>,
+    Json(req): Json<BeginWritebackReceiptRequest>,
+) -> Response {
+    match begin_writeback_receipt(req) {
+        Ok(receipt) => Json(receipt).into_response(),
+        Err(error) => error_response(StatusCode::BAD_REQUEST, error),
+    }
+}
+
+async fn complete_writeback_receipt_handler(
+    State(_runtime): State<Arc<NodeRuntime>>,
+    Json(req): Json<CompleteWritebackReceiptRequest>,
+) -> Response {
+    match complete_writeback_receipt(req) {
+        Ok(receipt) => Json(receipt).into_response(),
+        Err(error) => error_response(StatusCode::BAD_REQUEST, error),
     }
 }
 

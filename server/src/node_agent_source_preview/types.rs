@@ -20,6 +20,15 @@ pub(crate) struct CommitPreviewRequest {
     pub changes: BTreeMap<String, String>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CommitPreviewResponse {
+    pub ok: bool,
+    pub source_revision: String,
+    pub changed_files: Vec<String>,
+    pub source_hashes: BTreeMap<String, String>,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum PwaStyleBindingKind {

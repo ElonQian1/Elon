@@ -9,6 +9,8 @@ mod pwa_writer;
 mod resources;
 mod routes;
 mod types;
+mod writeback_receipt;
+mod writeback_receipt_workspace;
 mod writer;
 
 #[cfg(test)]
@@ -17,5 +19,7 @@ mod pwa_resolver_tests;
 mod pwa_verifier_tests;
 #[cfg(test)]
 mod pwa_writer_tests;
+#[cfg(test)]
+mod writeback_receipt_tests;
 
 pub(crate) use routes::routes;

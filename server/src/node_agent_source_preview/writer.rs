@@ -1,10 +1,10 @@
 use super::parser::{canonical_project_root, safe_join};
-use super::types::CommitPreviewRequest;
+use super::types::{CommitPreviewRequest, CommitPreviewResponse};
 use anyhow::{bail, Context, Result};
 use sha2::{Digest, Sha256};
-use std::fs;
+use std::{collections::BTreeMap, fs, path::Path};
 
-pub(crate) fn commit_changes(request: &CommitPreviewRequest) -> Result<String> {
+pub(crate) fn commit_changes(request: &CommitPreviewRequest) -> Result<CommitPreviewResponse> {
     if request.changes.is_empty() || request.changes.len() > 32 {
         bail!("一次写回必须包含 1 到 32 个受支持属性");
     }
@@ -13,6 +13,7 @@ pub(crate) fn commit_changes(request: &CommitPreviewRequest) -> Result<String> {
     }
     let root = canonical_project_root(&request.project_root)?;
     let path = safe_join(&root, &request.layout_file)?;
+    let mut changed_paths = vec![path.clone()];
     let mut content = fs::read_to_string(&path)?;
     let revision = hex::encode(Sha256::digest(content.as_bytes()));
     if revision != request.source_revision {
@@ -33,7 +34,12 @@ pub(crate) fn commit_changes(request: &CommitPreviewRequest) -> Result<String> {
             .or_else(|| current_attribute(current, "android:background"))
             .unwrap_or_else(|| "#FFFFFFFF".to_string());
         let resource_name = generated_drawable_name(&request.node_key);
-        write_shape_drawable(&path, &resource_name, &background, &radius)?;
+        changed_paths.push(write_shape_drawable(
+            &path,
+            &resource_name,
+            &background,
+            &radius,
+        )?);
         updated = replace_attribute(
             &updated,
             "android:background",
@@ -46,7 +52,29 @@ pub(crate) fn commit_changes(request: &CommitPreviewRequest) -> Result<String> {
     }
     content.replace_range(request.start_tag_start..request.start_tag_end, &updated);
     fs::write(&path, &content).with_context(|| format!("写入布局失败: {}", path.display()))?;
-    Ok(hex::encode(Sha256::digest(content.as_bytes())))
+    changed_paths.sort();
+    changed_paths.dedup();
+    let mut changed_files = Vec::with_capacity(changed_paths.len());
+    let mut source_hashes = BTreeMap::new();
+    for changed_path in changed_paths {
+        let relative = changed_path
+            .strip_prefix(&root)
+            .context("写回文件越出项目目录")?
+            .to_string_lossy()
+            .replace('\\', "/");
+        let hash = hex::encode(Sha256::digest(
+            fs::read(&changed_path)
+                .with_context(|| format!("读取写回文件失败: {}", changed_path.display()))?,
+        ));
+        changed_files.push(relative.clone());
+        source_hashes.insert(relative, hash);
+    }
+    Ok(CommitPreviewResponse {
+        ok: true,
+        source_revision: hex::encode(Sha256::digest(content.as_bytes())),
+        changed_files,
+        source_hashes,
+    })
 }
 
 fn generated_drawable_name(node_key: &str) -> String {
@@ -64,11 +92,11 @@ fn generated_drawable_name(node_key: &str) -> String {
 }
 
 fn write_shape_drawable(
-    layout_path: &std::path::Path,
+    layout_path: &Path,
     name: &str,
     background: &str,
     radius: &str,
-) -> Result<()> {
+) -> Result<std::path::PathBuf> {
     let res_dir = layout_path
         .parent()
         .and_then(std::path::Path::parent)
@@ -76,8 +104,9 @@ fn write_shape_drawable(
     let drawable_dir = res_dir.join("drawable");
     fs::create_dir_all(&drawable_dir)?;
     let xml = format!("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<shape xmlns:android=\"http://schemas.android.com/apk/res/android\" android:shape=\"rectangle\">\n    <solid android:color=\"{}\" />\n    <corners android:radius=\"{}\" />\n</shape>\n", escape_xml(background), escape_xml(radius));
-    fs::write(drawable_dir.join(format!("{name}.xml")), xml)?;
-    Ok(())
+    let path = drawable_dir.join(format!("{name}.xml"));
+    fs::write(&path, xml)?;
+    Ok(path)
 }
 
 fn current_attribute(tag: &str, attribute: &str) -> Option<String> {
@@ -181,7 +210,7 @@ mod tests {
             ("borderRadius".into(), "22dp".into()),
             ("paddingStart".into(), "18dp".into()),
         ]);
-        commit_changes(&CommitPreviewRequest {
+        let receipt = commit_changes(&CommitPreviewRequest {
             project_root: target.to_string_lossy().to_string(),
             layout_file: document.selected_layout,
             source_revision: document.source_revision,
@@ -191,6 +220,16 @@ mod tests {
             changes,
         })
         .unwrap();
+        assert_eq!(receipt.changed_files.len(), 2);
+        assert!(receipt
+            .changed_files
+            .iter()
+            .any(|path| path.ends_with("activity_main.xml")));
+        assert!(receipt
+            .changed_files
+            .iter()
+            .any(|path| path.ends_with("yilong_ui_id_action.xml")));
+        assert_eq!(receipt.source_hashes.len(), 2);
         let layout =
             fs::read_to_string(target.join("app/src/main/res/layout/activity_main.xml")).unwrap();
         assert!(layout.contains("android:text=\"确定性写回\""));
