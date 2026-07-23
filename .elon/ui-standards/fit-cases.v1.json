@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T18:04:02.726143500+00:00",
+  "updatedAt": "2026-07-23T18:49:27.878589800+00:00",
   "cases": [
     {
       "schemaVersion": 1,
@@ -1978,6 +1978,108 @@
         "finalDiffArtifactPath": null
       },
       "reviewedAt": "2026-07-20T14:57:31.103320900+00:00",
+      "reviewNote": "FitRun 终止原因: SourceVerified"
+    },
+    {
+      "schemaVersion": 1,
+      "caseId": "case:fit_0415df06186548688e6abacd4fba25b9",
+      "projectRoot": ".",
+      "packageName": "com.elon.app.uituner_0a3014c9",
+      "definitionId": "com.elon.app.MainActivity#com.elon.app.uituner_0a3014c9:id/backButton",
+      "componentKind": "android.image",
+      "propertySet": [
+        "height",
+        "width"
+      ],
+      "environment": {
+        "screenId": "com.elon.app.MainActivity",
+        "scenario": "CHAT_PAGE",
+        "theme": null,
+        "locale": null,
+        "density": 2.625,
+        "fontScale": null,
+        "viewportWidth": null,
+        "viewportHeight": null
+      },
+      "translationFeatures": {
+        "parentLayoutKind": null,
+        "targetWidthRatio": null,
+        "targetHeightRatio": null,
+        "currentWidthRatio": null,
+        "currentHeightRatio": null,
+        "widthScale": 1.0,
+        "heightScale": 1.0,
+        "targetAspectRatio": 1.0,
+        "currentAspectRatio": 1.0
+      },
+      "runPhase": "ACCEPTED",
+      "outcome": "ACCEPTED",
+      "userDecision": "ACCEPTED",
+      "targetScorePassed": true,
+      "sourceParityPassed": true,
+      "promotable": true,
+      "baselineScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.0,
+        "geometryError": 0.0,
+        "colorError": 0.0,
+        "edgeError": 0.0,
+        "hardFailures": []
+      },
+      "finalScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.000553,
+        "geometryError": 0.0,
+        "colorError": 0.000858,
+        "edgeError": 0.00148,
+        "hardFailures": []
+      },
+      "sourceParityLoss": 0.0,
+      "adjustments": [],
+      "trials": [
+        {
+          "trialId": "baseline_90e6ce86b1ea411283a1ebfe82f94a2c",
+          "kind": "BASELINE",
+          "acceptedAsBest": true,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.0,
+            "geometryError": 0.0,
+            "colorError": 0.0,
+            "edgeError": 0.0,
+            "hardFailures": []
+          },
+          "error": null
+        },
+        {
+          "trialId": "build_6dab0e26f36246bba91d8fe0b309d044",
+          "kind": "SOURCE_VERIFY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.000553,
+            "geometryError": 0.0,
+            "colorError": 0.000858,
+            "edgeError": 0.00148,
+            "hardFailures": []
+          },
+          "error": null
+        }
+      ],
+      "provenance": {
+        "runId": "fit_0415df06186548688e6abacd4fba25b9",
+        "targetSha256": "fbd5ae5719f6fdaf17f80249d5aff2c8c8dc59c43e7116aa74815713767aa3df",
+        "sourceRevision": "workspace-sha256:d6bfb85a6d7d7e6ca8d96de8325f4488d78a2f083ba15aae6e0375a240594115",
+        "runtimeBuildId": "1.1.454-uituner_0a3014c9+462",
+        "commitId": null,
+        "trialIds": [
+          "baseline_90e6ce86b1ea411283a1ebfe82f94a2c",
+          "build_6dab0e26f36246bba91d8fe0b309d044"
+        ],
+        "finalScreenshotPath": null,
+        "finalDiffArtifactPath": null
+      },
+      "reviewedAt": "2026-07-23T18:49:27.878085600+00:00",
       "reviewNote": "FitRun 终止原因: SourceVerified"
     }
   ]
