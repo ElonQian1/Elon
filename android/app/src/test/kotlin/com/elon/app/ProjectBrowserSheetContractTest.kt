@@ -63,6 +63,26 @@ class ProjectBrowserSheetContractTest {
     }
 
     @Test
+    fun projectBrowserTemporarilyOwnsTheOnlyBottomNavigationSelection() {
+        val pageDestinations = listOf(
+            MainBottomNavigationDestination.CHAT,
+            MainBottomNavigationDestination.PROJECT,
+            MainBottomNavigationDestination.PROFILE
+        )
+
+        pageDestinations.forEach { currentPage ->
+            assertEquals(
+                MainBottomNavigationDestination.MENU,
+                selectedMainBottomNavigationDestination(currentPage, isProjectBrowserOpen = true)
+            )
+            assertEquals(
+                currentPage,
+                selectedMainBottomNavigationDestination(currentPage, isProjectBrowserOpen = false)
+            )
+        }
+    }
+
+    @Test
     fun androidAndWebUseTheSixOriginalPngAssets() {
         val expected = mapOf(
             "project_view_sheet_background.png" to "747bf7ed29d09582821ad7e36b8894f3a4cc8973ec9b641360ee55896d7d643c",
@@ -98,6 +118,29 @@ class ProjectBrowserSheetContractTest {
         assertTrue(web.contains("grid-template-columns: repeat(4"))
         assertTrue(web.contains("projectBrowserSearchInput.addEventListener('input', renderProjectBrowser)"))
         assertTrue(web.contains("selectProject(project)"))
+    }
+
+    @Test
+    fun androidAndWebKeepProjectBrowserSelectionMutuallyExclusive() {
+        val controller = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/ProjectBrowserSheetController.kt"
+        )
+        val navigation = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainNavigationController.kt"
+        )
+        val web = readRepositoryFile("server/src/assets/web_page.html")
+
+        assertTrue(controller.contains("onOpenChanged(true)"))
+        assertTrue(controller.contains("onOpenChanged(false)"))
+        val navigationState = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainBottomNavigationState.kt"
+        )
+        assertTrue(navigation.contains("MainBottomNavigationSelectionState("))
+        assertTrue(navigationState.contains("selectedMainBottomNavigationDestination("))
+        assertTrue(navigationState.contains("binding.bottomMenuSelection.isSelected = menuSelected"))
+        assertTrue(web.contains("syncProjectBrowserNavigationSelection(true)"))
+        assertTrue(web.contains("syncProjectBrowserNavigationSelection(false)"))
+        assertTrue(web.contains("!isOpen && tab.dataset.tab === currentTab"))
     }
 
     private fun project(

@@ -5493,6 +5493,11 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   let projectBrowserDragDistance = 0;
   let projectBrowserSuppressClick = false;
 
+  function syncProjectBrowserNavigationSelection(isOpen) {
+    tabs.forEach((tab) => tab.classList.toggle('active', !isOpen && tab.dataset.tab === currentTab));
+    if (bottomMenuBtn) bottomMenuBtn.classList.toggle('active', isOpen);
+  }
+
   function projectBrowserClean(value) {
     const text = String(value == null ? '' : value).trim();
     return text && text.toLowerCase() !== 'null' ? text : '';
@@ -5592,7 +5597,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     projectBrowserSheet.style.removeProperty('transform');
     projectBrowserSheet.classList.add('active');
     projectBrowserSheet.setAttribute('aria-hidden', 'false');
-    if (bottomMenuBtn) bottomMenuBtn.classList.add('active');
+    syncProjectBrowserNavigationSelection(true);
     if (!projectBrowserHistoryActive) {
       window.history.pushState({ elonProjectBrowser: true }, '');
       projectBrowserHistoryActive = true;
@@ -5606,7 +5611,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     projectBrowserSheet.style.removeProperty('transform');
     projectBrowserSheet.classList.remove('active');
     projectBrowserSheet.setAttribute('aria-hidden', 'true');
-    if (bottomMenuBtn) bottomMenuBtn.classList.remove('active');
+    syncProjectBrowserNavigationSelection(false);
     if (syncHistory && projectBrowserHistoryActive) {
       projectBrowserHistoryActive = false;
       window.history.back();

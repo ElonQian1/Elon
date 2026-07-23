@@ -26,7 +26,8 @@ internal class ProjectBrowserSheetController(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
     private val dp: (Int) -> Int,
-    private val dependencies: ProjectBrowserSheetDependencies
+    private val dependencies: ProjectBrowserSheetDependencies,
+    private val onOpenChanged: (Boolean) -> Unit
 ) {
     private val root = binding.projectBrowserSheet
     private val groupsContainer = LinearLayout(activity).apply {
@@ -77,7 +78,7 @@ internal class ProjectBrowserSheetController(
         root.alpha = 1f
         root.bringToFront()
         binding.pageTabs.bringToFront()
-        setMenuSelected(true)
+        onOpenChanged(true)
         root.post {
             root.translationY = root.height.toFloat()
             root.animate()
@@ -92,7 +93,7 @@ internal class ProjectBrowserSheetController(
     fun close(animate: Boolean = true) {
         if (!isOpen) return
         searchInput.clearFocus()
-        setMenuSelected(false)
+        onOpenChanged(false)
         if (!animate) {
             root.animate().cancel()
             root.translationY = root.height.toFloat()
@@ -382,11 +383,6 @@ internal class ProjectBrowserSheetController(
 
     private fun space(height: Int): View = View(activity).apply {
         layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(height))
-    }
-
-    private fun setMenuSelected(selected: Boolean) {
-        binding.bottomMenuSelection.isSelected = selected
-        binding.bottomMenuIcon.isSelected = selected
     }
 
     private fun designPx(targetPixels: Int): Int {

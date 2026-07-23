@@ -72,7 +72,8 @@ internal class MainNavigationController(
     private var projectSpaceTitle = "项目空间"
     private var exitConfirmDialog: AlertDialog? = null
     private val designMetrics = MainNavigationDesignMetrics(activity, binding, ::updateBottomTabVisual)
-    private val projectBrowser = ProjectBrowserSheetController(activity, binding, ::dp, projectBrowserDependencies)
+    private val bottomNavigationState = MainBottomNavigationSelectionState(binding, ::updateBottomTabVisual)
+    private val projectBrowser = ProjectBrowserSheetController(activity, binding, ::dp, projectBrowserDependencies, bottomNavigationState::setProjectBrowserOpen)
     private val bottomNavigation = MainBottomNavigationController(activity, binding, { selectBottomTab(it, false) }) { anchor, tab -> projectBrowser.close(false); showHomeActionPopup(anchor, tab) }
     private val homeChrome = HomeChromeController(
         activity, binding, actionPopupProvider, ::dp, ::setNavigationBarColor, bottomNavigation::setVisible,
@@ -237,9 +238,7 @@ internal class MainNavigationController(
             return
         }
         binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
-        listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach {
-            updateBottomTabVisual(it, it == tab)
-        }
+        updateBottomTabSelection(tab)
         binding.conversationPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
         binding.chatPage.visibility = View.GONE
         binding.projectPage.visibility = View.GONE
@@ -1007,9 +1006,7 @@ internal class MainNavigationController(
     }
 
     private fun updateBottomTabSelection(selectedTab: TextView) {
-        listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach { tab ->
-            updateBottomTabVisual(tab, tab == selectedTab)
-        }
+        bottomNavigationState.selectPage(selectedTab)
     }
 
     private fun updateBottomTabVisual(tab: TextView, selected: Boolean) {
