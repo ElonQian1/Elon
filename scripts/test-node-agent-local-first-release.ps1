@@ -143,6 +143,9 @@ try {
     Assert-True ($publishText.Contains('NODE_AGENT_LOCAL_ACTIVATION_STATUS=restart_scheduled')) `
         'publisher must not claim activation before the post-terminal safety gate passes'
     Assert-True ($publishText.Contains('NODE_AGENT_REMOTE_SYNC_STATE=pending')) 'default publish must expose async remote state'
+    Assert-True ($publishText.Contains("'node-agent-remote-publish-v1.lock'") -and `
+        $publishText.Contains("'node-agent-local-publish-v1.lock'")) `
+        'remote retry lane must never hold the local publish lock'
     $validationText = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'validate-node-agent-local-first.ps1')
     Assert-Equal ([regex]::Matches($validationText, "validate-rust\.ps1").Count) 1 `
         'targeted Rust filters must share exactly one validate-rust invocation'

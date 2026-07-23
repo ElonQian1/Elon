@@ -129,8 +129,10 @@ Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -Executa
     "The packaged main client must retain the brand icon"
 Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $PackageUninstall')) `
     "The packaged uninstall copy must retain the brand icon"
-Assert-True ($publishScript.Contains('Enter-NodeAgentPublishLock -Path $PublishLockPath')) `
-    "The publisher must acquire the process-wide release lock before building"
+Assert-True ($publishScript.Contains('Enter-NodeAgentPublishLock -Path $PublishLockPath') -and `
+    $publishScript.Contains('node-agent-local-publish-v1.lock') -and `
+    $publishScript.Contains('node-agent-remote-publish-v1.lock')) `
+    "Local and remote publisher lanes must each acquire their own process-wide build lock"
 Assert-True ($publishScript.Contains('Exit-NodeAgentPublishLock -Lock $PublishLock')) `
     "The publisher must release the process-wide release lock in its finalizer"
 Assert-True (Test-ElonNodeAgentLeaseBootstrapFallback `

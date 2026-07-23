@@ -54,9 +54,10 @@ $PcFrontendDir = Join-Path $RepoRoot "pc-frontend"
 $PcDistDir = Join-Path $PcFrontendDir "dist"
 $DesktopShellManifest = Join-Path $RepoRoot "desktop-shell\src-tauri\Cargo.toml"
 $BrandIcon = Join-Path $RepoRoot "desktop-shell\src-tauri\icons\icon.ico"
+$publishLockName = if ($SynchronousRemote) { 'node-agent-remote-publish-v1.lock' } else { 'node-agent-local-publish-v1.lock' }
 $PublishLockPath = Join-Path `
     ([System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::LocalApplicationData)) `
-    "Elon\locks\node-agent-publish-v1.lock"
+    ("Elon\locks\" + $publishLockName)
 $PublishLock = Enter-NodeAgentPublishLock -Path $PublishLockPath
 $script:NodeReleaseToken = $null
 $script:NodeReleaseOwned = $false
