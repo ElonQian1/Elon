@@ -82,25 +82,37 @@ pub(crate) fn strip_catalog_nodes(analysis: &mut Value) {
     // `ProjectDocumentsSnapshot.analysis` is the document-health object itself,
     // while bounded MCP responses wrap the same object under `document_health`.
     // Accept both shapes so every catalog transport drops the full node array.
-    let federation = if analysis.get("document_health").is_some() {
-        analysis.pointer_mut("/document_health/federation")
-    } else {
+    let federation = if analysis
+        .get("federation")
+        .and_then(Value::as_object)
+        .is_some()
+    {
         analysis.get_mut("federation")
+    } else {
+        analysis
+            .get_mut("document_health")
+            .and_then(|health| health.get_mut("federation"))
     };
-    let Some(federation) = federation else {
+    let Some(federation) = federation.and_then(Value::as_object_mut) else {
         return;
     };
-    federation["nodes"] = json!([]);
-    federation["nodes_transport"] = json!({
-        "mode": "server_paged",
-        "endpoint": "docs/federation",
-        "page_limit": 200,
-    });
+    federation.insert("nodes".to_string(), json!([]));
+    federation.insert(
+        "nodes_transport".to_string(),
+        json!({
+            "mode": "server_paged",
+            "endpoint": "docs/federation",
+            "page_limit": 200,
+        }),
+    );
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::project_docs_scan::{
+        collect_project_documents_with_options, ProjectDocumentScanOptions,
+    };
     use std::fs;
 
     #[test]
@@ -137,12 +149,27 @@ mod tests {
         let grandchild = get_federation_index(&root, Some("apps"), None, &first).unwrap();
         assert_eq!(grandchild["nodes"][0]["id"], "android");
 
-        let mut analysis = json!({"federation":{"node_count":4,"nodes":[1,2,3,4]}});
-        strip_catalog_nodes(&mut analysis);
-        assert_eq!(analysis["federation"]["nodes"], json!([]));
-        assert_eq!(analysis["federation"]["node_count"], 4);
+        let mut snapshot = collect_project_documents_with_options(
+            &root,
+            ProjectDocumentScanOptions {
+                seed_missing_defaults: false,
+                catalog_only: true,
+                include_analysis: true,
+            },
+        )
+        .unwrap();
         assert_eq!(
-            analysis["federation"]["nodes_transport"]["mode"],
+            snapshot.analysis["federation"]["nodes"]
+                .as_array()
+                .unwrap()
+                .len(),
+            4
+        );
+        strip_catalog_nodes(&mut snapshot.analysis);
+        assert_eq!(snapshot.analysis["federation"]["nodes"], json!([]));
+        assert_eq!(snapshot.analysis["federation"]["node_count"], 4);
+        assert_eq!(
+            snapshot.analysis["federation"]["nodes_transport"]["mode"],
             "server_paged"
         );
 
