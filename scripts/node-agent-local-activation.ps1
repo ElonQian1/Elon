@@ -16,7 +16,8 @@ function Get-NodeAgentLocalActivationRoot {
 
 function Read-NodeAgentLocalReleaseState {
     param([Parameter(Mandatory = $true)][string]$StatePath)
-    return (Get-Content -Raw -LiteralPath $StatePath | ConvertFrom-Json)
+    $json = [System.IO.File]::ReadAllText($StatePath, [System.Text.Encoding]::UTF8)
+    return ($json | ConvertFrom-Json)
 }
 
 function Set-NodeAgentLocalReleaseState {

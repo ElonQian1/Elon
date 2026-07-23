@@ -47,21 +47,22 @@ try {
     $outbox = Join-Path $root 'outbox'
 
     $first = Add-NodeAgentRemoteReleaseEvent -OutboxRoot $outbox -GitSha $sha `
-        -Version '0.3.69' -ReleaseIdentity $identity -Changelog 'fixture' `
+        -Version '0.3.69' -ReleaseIdentity $identity -Changelog '中文离线发布 fixture' `
         -WindowsExe $exe -WindowsClientPackage $zip -GitCommonDir (Join-Path $root 'git')
     $duplicate = Add-NodeAgentRemoteReleaseEvent -OutboxRoot $outbox -GitSha $sha `
-        -Version '0.3.69' -ReleaseIdentity $identity -Changelog 'fixture' `
+        -Version '0.3.69' -ReleaseIdentity $identity -Changelog '中文离线发布 fixture' `
         -WindowsExe $exe -WindowsClientPackage $zip -GitCommonDir (Join-Path $root 'git')
     Assert-Equal $first.EventPath $duplicate.EventPath 'duplicate delivery must coalesce by immutable SHA'
     Assert-True (-not $duplicate.Created) 'duplicate delivery must not create a second event'
     Assert-Equal @(Get-ChildItem (Join-Path $outbox 'events') -Directory).Count 1 'outbox must contain one event'
 
-    $raw = Get-Content -Raw -LiteralPath $first.EventPath
+    $raw = [System.IO.File]::ReadAllText($first.EventPath, [System.Text.Encoding]::UTF8)
     foreach ($secret in @('admin_token','authorization','password','credential','bearer')) {
         Assert-True (-not $raw.ToLowerInvariant().Contains($secret)) "outbox must not persist $secret"
     }
     $event = $raw | ConvertFrom-Json
     Assert-Equal $event.sync_state 'pending' 'new event must start pending'
+    Assert-Equal $event.changelog '中文离线发布 fixture' 'PS5.1 must round-trip UTF-8 outbox JSON explicitly'
     Assert-True $event.local_result_independent 'remote state must not own the local activation result'
 
     $blackhole = Complete-NodeAgentRemoteReleaseAttempt -EventPath $first.EventPath `

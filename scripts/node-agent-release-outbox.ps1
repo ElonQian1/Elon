@@ -53,7 +53,8 @@ function Get-NodeAgentFileSha256 {
 function Read-NodeAgentRemoteReleaseEvent {
     param([Parameter(Mandatory = $true)][string]$EventPath)
     if (-not (Test-Path -LiteralPath $EventPath -PathType Leaf)) { throw "Outbox event does not exist: $EventPath" }
-    return (Get-Content -Raw -LiteralPath $EventPath | ConvertFrom-Json)
+    $json = [System.IO.File]::ReadAllText($EventPath, [System.Text.Encoding]::UTF8)
+    return ($json | ConvertFrom-Json)
 }
 
 function Add-NodeAgentRemoteReleaseEvent {

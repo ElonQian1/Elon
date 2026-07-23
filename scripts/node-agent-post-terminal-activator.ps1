@@ -50,7 +50,7 @@ function Expand-VerifiedReleasePackage {
     Expand-Archive -LiteralPath ([string]$Release.package_path) -DestinationPath $applyRoot -Force
     $metadataPath = Join-Path $applyRoot '_internal\node-agent-version.json'
     if (-not (Test-Path -LiteralPath $metadataPath -PathType Leaf)) { throw 'Staged package is missing node-agent-version.json.' }
-    $metadata = Get-Content -Raw -LiteralPath $metadataPath | ConvertFrom-Json
+    $metadata = [System.IO.File]::ReadAllText($metadataPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
     $actualIdentity = "{0}+{1}" -f ([string]$metadata.version), ([string]$metadata.gitSha)
     if ($actualIdentity -ne [string]$Release.release_identity) {
         throw "Staged package identity mismatch: expected=$($Release.release_identity) actual=$actualIdentity"
