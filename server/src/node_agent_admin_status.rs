@@ -59,11 +59,15 @@ mod tests {
             "task_journal_supported": true,
             "task_journal_schema_version": 1,
             "local_admin_token": "local-secret",
+            "owner_user_id": "owner-test",
+            "user_token_configured": false,
         });
         super::enforce_status_response_limit(&mut payload);
         let bytes = serde_json::to_vec(&payload).unwrap();
         assert!(bytes.len() <= super::ADMIN_STATUS_MAX_BYTES);
         assert_eq!(payload["local_admin_token"], "local-secret");
+        assert_eq!(payload["owner_user_id"], "owner-test");
+        assert_eq!(payload["user_token_configured"], false);
         assert_eq!(
             payload["desktop_supervision"]["protocol"],
             "elon.desktop_pc_supervision.v1"
@@ -293,6 +297,8 @@ fn enforce_status_response_limit(payload: &mut serde_json::Value) {
             "connected": payload.get("connected").cloned(),
             "logged_in": payload.get("logged_in").cloned(),
             "agent_id": payload.get("agent_id").cloned(),
+            "owner_user_id": payload.get("owner_user_id").cloned(),
+            "user_token_configured": payload.get("user_token_configured").cloned(),
             "active_cli_prompt_count": payload.get("active_cli_prompt_count").cloned(),
             "active_cli_prompt_task_ids": payload.get("active_cli_prompt_task_ids").cloned(),
             "active_task_runtime": payload.get("active_task_runtime").cloned(),
@@ -326,6 +332,8 @@ fn enforce_status_response_limit(payload: &mut serde_json::Value) {
             "connected": payload.get("connected").cloned(),
             "logged_in": payload.get("logged_in").cloned(),
             "agent_id": payload.get("agent_id").cloned(),
+            "owner_user_id": payload.get("owner_user_id").cloned(),
+            "user_token_configured": payload.get("user_token_configured").cloned(),
             "active_cli_prompt_count": payload.get("active_cli_prompt_count").cloned(),
             "update_blocker_count": blocker_count,
             "desktop_supervision": payload.get("desktop_supervision").cloned(),
