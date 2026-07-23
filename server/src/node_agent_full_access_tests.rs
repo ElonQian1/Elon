@@ -44,7 +44,7 @@ fn task_record(
     }
 }
 
-fn temp_workspace(label: &str) -> PathBuf {
+pub(super) fn temp_workspace(label: &str) -> PathBuf {
     let path = std::env::temp_dir().join(format!(
         "elon_full_access_{label}_{}",
         Uuid::new_v4().simple()
@@ -53,7 +53,7 @@ fn temp_workspace(label: &str) -> PathBuf {
     path
 }
 
-fn grant_file(label: &str) -> PathBuf {
+pub(super) fn grant_file(label: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
         "elon_full_access_grants_{label}_{}.json",
         Uuid::new_v4().simple()
@@ -179,7 +179,11 @@ fn context(project_id: &str) -> CliProjectContext {
     }
 }
 
-fn identity(owner_user_id: &str, agent_id: &str, install_id: &str) -> FullAccessGrantIdentity {
+pub(super) fn identity(
+    owner_user_id: &str,
+    agent_id: &str,
+    install_id: &str,
+) -> FullAccessGrantIdentity {
     FullAccessGrantIdentity::new(owner_user_id, agent_id, install_id).expect("valid grant identity")
 }
 
@@ -396,7 +400,7 @@ async fn legacy_identityless_grants_fail_closed() {
     let _ = std::fs::remove_dir_all(workspace);
 }
 
-fn git(cwd: &Path, args: &[&str]) -> String {
+pub(super) fn git(cwd: &Path, args: &[&str]) -> String {
     let output = crate::git_command_error::git_command()
         .args(args)
         .current_dir(cwd)
@@ -412,7 +416,7 @@ fn git(cwd: &Path, args: &[&str]) -> String {
         .replace('\\', "/")
 }
 
-fn managed_workspace_record(
+pub(super) fn managed_workspace_record(
     label: &str,
 ) -> (
     PathBuf,

@@ -146,18 +146,33 @@ pub(crate) async fn resolve_supervised_resume_workspace(
     } else {
         resolved.authorized_workspace_path.as_str()
     };
-    crate::node_agent_full_access::require_route_a_full_access_grant(
-        &runtime.full_access_grants,
-        &identity,
-        "codex",
-        Some("full_access"),
-        Some(&authorization_context),
-        Some(authorization_path),
-        false,
-        inherited_workspace_exists.then_some(&parent),
-    )
-    .await
-    .map_err(|error| json_error(StatusCode::FORBIDDEN, resume_error_detail(&error)))?;
+    if inherited_workspace_exists {
+        crate::node_agent_full_access::require_route_a_full_access_grant_for_resolved_resume(
+            &runtime.full_access_grants,
+            &identity,
+            "codex",
+            Some("full_access"),
+            Some(&authorization_context),
+            Some(authorization_path),
+            &parent,
+            &resolved,
+        )
+        .await
+        .map_err(|error| json_error(StatusCode::FORBIDDEN, resume_error_detail(&error)))?;
+    } else {
+        crate::node_agent_full_access::require_route_a_full_access_grant(
+            &runtime.full_access_grants,
+            &identity,
+            "codex",
+            Some("full_access"),
+            Some(&authorization_context),
+            Some(authorization_path),
+            false,
+            None,
+        )
+        .await
+        .map_err(|error| json_error(StatusCode::FORBIDDEN, resume_error_detail(&error)))?;
+    }
 
     if !runtime
         .active_cli_prompt_views_for_workspace(FsPath::new(

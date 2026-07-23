@@ -13,6 +13,10 @@ use std::{
 };
 use tokio::sync::RwLock;
 
+#[path = "node_agent_full_access_resume.rs"]
+mod resume_authorization;
+pub(crate) use resume_authorization::require_route_a_full_access_grant_for_resolved_resume;
+
 const ROUTE_A_CLIS: &[&str] = &["codex", "copilot", "claude", "gemini"];
 const ROUTE_BC_APPROVAL_REQUIRED_TOOLS: &[&str] = &["write_file", "apply_patch", "run_command"];
 const ROUTE_BC_HIGH_RISK_GIT_PUSH_DENIED: &[&str] = &[
@@ -254,7 +258,7 @@ pub(crate) async fn require_route_a_full_access_grant_with_inherited_evidence(
         }
         if recorded_workspace_paths(record)
             .iter()
-            .any(|path| same_workspace(path, cwd))
+            .any(|path| workspace_paths_match(path, cwd))
         {
             bail!("ISOLATED_WORKTREE_AUTH_MISSING: 隔离 worktree 缺少有效的平台 provenance、Git 身份或 root lease 证据。")
         }
@@ -372,22 +376,25 @@ fn git_value(cwd: &str, args: &[&str]) -> Option<String> {
 }
 
 fn git_identity_matches(base: &str, active: &str, status: &serde_json::Value) -> bool {
-    let base_common = git_value(
+    let Some(base_common) = git_value(
         base,
         &["rev-parse", "--path-format=absolute", "--git-common-dir"],
-    );
-    let active_common = git_value(
+    ) else {
+        return false;
+    };
+    let Some(active_common) = git_value(
         active,
         &["rev-parse", "--path-format=absolute", "--git-common-dir"],
-    );
-    if base_common.is_none() || base_common != active_common {
+    ) else {
+        return false;
+    };
+    if !same_existing_path(&base_common, &active_common) {
         return false;
     }
     if status
         .get("git_common_dir")
         .and_then(serde_json::Value::as_str)
-        .map(|v| v.replace('\\', "/"))
-        != active_common
+        .is_none_or(|recorded| !same_existing_path(recorded, &active_common))
     {
         return false;
     }
@@ -698,11 +705,32 @@ fn is_full_access(runtime_permission: Option<&str>) -> bool {
 }
 
 fn same_workspace(left: &str, right: &str) -> bool {
-    if cfg!(windows) {
-        left.eq_ignore_ascii_case(right)
-    } else {
-        left == right
+    if let (Some(left), Some(right)) = (
+        canonical_existing_path(left),
+        canonical_existing_path(right),
+    ) {
+        return left == right;
     }
+    normalize_workspace_literal(left) == normalize_workspace_literal(right)
+}
+
+fn workspace_paths_match(left: &str, right: &str) -> bool {
+    same_existing_path(left, right) || same_workspace(left, right)
+}
+
+fn normalize_workspace_literal(value: &str) -> String {
+    let mut value = value.trim().replace('\\', "/");
+    if cfg!(windows) {
+        if let Some(rest) = value.strip_prefix("//?/UNC/") {
+            value = format!("//{rest}");
+        } else if let Some(rest) = value.strip_prefix("//?/") {
+            value = rest.to_string();
+        }
+    }
+    while value.len() > 1 && value.ends_with('/') {
+        value.pop();
+    }
+    normalize_workspace_component(value)
 }
 
 fn now_ms() -> u128 {
@@ -728,6 +756,10 @@ fn json_error(
 #[cfg(test)]
 #[path = "node_agent_full_access_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "node_agent_full_access_resume_tests.rs"]
+mod resume_tests;
 
 #[cfg(test)]
 #[path = "node_agent_full_access_policy_tests.rs"]
