@@ -1,7 +1,234 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-22T09:39:17.921897300+00:00",
+  "updatedAt": "2026-07-23T14:35:25.395871300+00:00",
   "cases": [
+    {
+      "schemaVersion": 1,
+      "caseId": "case:fit_0b6c74e541d848969765ed60bf5b31f4",
+      "projectRoot": ".",
+      "packageName": "com.elon.app.uitest_0a3014c9",
+      "definitionId": "preview.elon.social.sidebar.root",
+      "componentKind": "android.container",
+      "propertySet": [
+        "opacity"
+      ],
+      "environment": {
+        "screenId": "elon.social.sidebar",
+        "scenario": "date",
+        "theme": "dark",
+        "locale": "zh-CN",
+        "density": null,
+        "fontScale": 1.0,
+        "viewportWidth": null,
+        "viewportHeight": null
+      },
+      "translationFeatures": {
+        "parentLayoutKind": null,
+        "targetWidthRatio": null,
+        "targetHeightRatio": null,
+        "currentWidthRatio": null,
+        "currentHeightRatio": null,
+        "widthScale": 1.0,
+        "heightScale": 0.25813544415127526,
+        "targetAspectRatio": 1.839863713798978,
+        "currentAspectRatio": 0.47493403693931396
+      },
+      "runPhase": "CANCELLED",
+      "outcome": "REJECTED",
+      "userDecision": "REJECTED",
+      "targetScorePassed": false,
+      "sourceParityPassed": false,
+      "promotable": false,
+      "baselineScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.372656,
+        "geometryError": 0.556399,
+        "colorError": 0.10134,
+        "edgeError": 0.024616,
+        "hardFailures": [
+          "geometry",
+          "position",
+          "color",
+          "perceptual",
+          "coverage"
+        ]
+      },
+      "finalScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.034552,
+        "geometryError": 0.0,
+        "colorError": 0.055543,
+        "edgeError": 0.05406,
+        "hardFailures": [
+          "color",
+          "perceptual"
+        ]
+      },
+      "sourceParityLoss": null,
+      "adjustments": [],
+      "trials": [
+        {
+          "trialId": "baseline_494f0fa7376547ec89c5d45157c5fbd4",
+          "kind": "BASELINE",
+          "acceptedAsBest": true,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.372656,
+            "geometryError": 0.556399,
+            "colorError": 0.10134,
+            "edgeError": 0.024616,
+            "hardFailures": [
+              "geometry",
+              "position",
+              "color",
+              "perceptual",
+              "coverage"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_7a73a9a65b964fe894c33238ad2fedb9",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": true,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.034552,
+            "geometryError": 0.0,
+            "colorError": 0.055543,
+            "edgeError": 0.05406,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_f19cbec07952471d827d82243bf218c8",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.034552,
+            "geometryError": 0.0,
+            "colorError": 0.055543,
+            "edgeError": 0.05406,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_351aec6920bb47d6b86d9f159af4542c",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.034552,
+            "geometryError": 0.0,
+            "colorError": 0.055543,
+            "edgeError": 0.05406,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_a7445a87c9c24b99a10d03d2ebd7151b",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.034552,
+            "geometryError": 0.0,
+            "colorError": 0.055543,
+            "edgeError": 0.05406,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_2a15f6c89f6849bf858055c20b6a6192",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.034552,
+            "geometryError": 0.0,
+            "colorError": 0.055543,
+            "edgeError": 0.05406,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_74624c4936804793850c5b41e0f0abc6",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.034552,
+            "geometryError": 0.0,
+            "colorError": 0.055543,
+            "edgeError": 0.05406,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_efff9694f78b4145883c509a905404d3",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.034552,
+            "geometryError": 0.0,
+            "colorError": 0.055543,
+            "edgeError": 0.05406,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        }
+      ],
+      "provenance": {
+        "runId": "fit_0b6c74e541d848969765ed60bf5b31f4",
+        "targetSha256": "db84a10f31a701306d8abcbc0f54775d5d690cd4aa5b5fcd25043951f90b1ca9",
+        "sourceRevision": "workspace-sha256:c9c8724b4aa991adcd543d4a70f1fd4a15317a8ff0ca6acafdc9f1beba62d81d",
+        "runtimeBuildId": "1.1.454-uitest_0a3014c9+462",
+        "commitId": null,
+        "trialIds": [
+          "baseline_494f0fa7376547ec89c5d45157c5fbd4",
+          "local_7a73a9a65b964fe894c33238ad2fedb9",
+          "local_f19cbec07952471d827d82243bf218c8",
+          "local_351aec6920bb47d6b86d9f159af4542c",
+          "local_a7445a87c9c24b99a10d03d2ebd7151b",
+          "local_2a15f6c89f6849bf858055c20b6a6192",
+          "local_74624c4936804793850c5b41e0f0abc6",
+          "local_efff9694f78b4145883c509a905404d3"
+        ],
+        "finalScreenshotPath": ".elon/ui-tuner/fit-runs/fit_0b6c74e541d848969765ed60bf5b31f4/frames/local_efff9694f78b4145883c509a905404d3.png",
+        "finalDiffArtifactPath": null
+      },
+      "reviewedAt": "2026-07-23T14:35:25.395527900+00:00",
+      "reviewNote": "FitRun 终止原因: UserCancelled"
+    },
     {
       "schemaVersion": 1,
       "caseId": "case:fit_8d503f1a48ca4924b875ea7078a08078",

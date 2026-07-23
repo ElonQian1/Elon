@@ -105,11 +105,15 @@ internal class ChatSocialSideMenuView(
         ) {
             selectedTab = SocialSidebarTab.DATE
             render()
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+        }, LinearLayout.LayoutParams(dp(124), LinearLayout.LayoutParams.MATCH_PARENT))
         addView(tabText("收藏", selectedTab == SocialSidebarTab.FAVORITES) {
             selectedTab = SocialSidebarTab.FAVORITES
             render()
         }, LinearLayout.LayoutParams(dp(94), LinearLayout.LayoutParams.MATCH_PARENT))
+        addView(
+            View(context),
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+        )
         addView(ImageView(context).apply {
             setImageResource(R.drawable.social_sidebar_search)
             scaleType = ImageView.ScaleType.CENTER_INSIDE

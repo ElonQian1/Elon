@@ -105,6 +105,8 @@ class ChatSocialSideMenuContractTest {
         assertTrue(view.contains("SocialSidebarTab.DATE"))
         assertTrue(view.contains("SocialSidebarTab.FAVORITES"))
         assertTrue(view.contains("搜索侧栏消息"))
+        assertTrue(view.contains("LinearLayout.LayoutParams(dp(124)"))
+        assertTrue(view.contains("LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)"))
         listOf("图片与视频", "文本", "链接", "笔记", "文件", "设置")
             .forEach { assertTrue(view.contains("\"$it\"")) }
         assertTrue(view.contains("SocialTimelineDragPayload"))
