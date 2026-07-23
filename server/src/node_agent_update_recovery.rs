@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 #[path = "node_agent_update_recovery_receipt_merge.rs"]
 mod receipt_merge;
-use receipt_merge::canonical_terminal_receipt;
+use receipt_merge::{canonical_legacy_snapshot_receipt, canonical_terminal_receipt};
 #[path = "node_agent_update_recovery_ledger_lock.rs"]
 mod ledger_lock;
 pub(crate) use ledger_lock::ledger_mutation_guard;
@@ -20,6 +20,8 @@ pub(crate) use reconcile_receipt::UpdateGateReconcileReceipt;
 
 pub(crate) const UPDATE_RECOVERY_PROTOCOL: &str = "elon.node_update_recovery.v1";
 pub(crate) const UPDATE_RECOVERY_SCHEMA_VERSION: u32 = 1;
+pub(crate) const LEGACY_SNAPSHOT_APPLYING_REASON: &str =
+    "runtime restarted before parent completion commit";
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -604,6 +606,31 @@ impl UpdateRecoveryLedger {
             0 => Ok(None),
             1 => Ok(candidates.into_iter().next()),
             _ => canonical_terminal_receipt(&candidates).map(Some),
+        }
+    }
+
+    fn legacy_snapshot_receipt_for_task(
+        &self,
+        task_id: &str,
+    ) -> Result<Option<UpdateRecoveryReceipt>> {
+        let matches = self
+            .receipts
+            .iter()
+            .filter(|receipt| {
+                receipt.original_task_id == task_id
+                    || receipt.resume_task_id.as_deref() == Some(task_id)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        let current = matches
+            .iter()
+            .filter(|receipt| !receipt.is_superseded())
+            .cloned()
+            .collect::<Vec<_>>();
+        let candidates = if current.is_empty() { matches } else { current };
+        match candidates.len() {
+            0 => Ok(None),
+            _ => canonical_legacy_snapshot_receipt(&candidates).map(Some),
         }
     }
 }

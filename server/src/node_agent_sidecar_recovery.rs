@@ -445,7 +445,7 @@ fn ensure_recovery_receipt(
     )?;
     receipt.transition(
         UpdateRecoveryState::Applying,
-        Some("runtime restarted before parent completion commit"),
+        Some(crate::node_agent_update_recovery::LEGACY_SNAPSHOT_APPLYING_REASON),
     )?;
     runtime.update_recovery.upsert(receipt.clone())?;
     Ok(Some(receipt))

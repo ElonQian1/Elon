@@ -117,6 +117,22 @@ impl UpdateRecoveryStore {
         self.load()?.receipt_for_task(task_id)
     }
 
+    pub(crate) fn receipt_for_resume_parent(
+        &self,
+        parent: &crate::node_agent_local_task_store::LocalTaskRecord,
+    ) -> Result<Option<UpdateRecoveryReceipt>> {
+        let ledger = self.load()?;
+        if parent.status == "resume_required"
+            && parent.completion_event_id.is_none()
+            && crate::node_agent_local_task_store::is_orphan_runtime_resume_required_reason(
+                parent.error.as_deref(),
+            )
+        {
+            return ledger.legacy_snapshot_receipt_for_task(&parent.task_id);
+        }
+        ledger.receipt_for_task(&parent.task_id)
+    }
+
     pub(crate) fn receipts_for_task(&self, task_id: &str) -> Result<Vec<UpdateRecoveryReceipt>> {
         Ok(self
             .load()?

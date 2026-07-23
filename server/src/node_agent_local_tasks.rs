@@ -170,7 +170,7 @@ async fn get_task(
         Ok(supervision) => supervision,
         Err(error) => return internal_error(error),
     };
-    let update_recovery = match runtime.update_recovery.receipt_for_task(&record.task_id) {
+    let update_recovery = match runtime.update_recovery.receipt_for_resume_parent(&record) {
         Ok(receipt) => receipt,
         Err(error) => return internal_error(error),
     };

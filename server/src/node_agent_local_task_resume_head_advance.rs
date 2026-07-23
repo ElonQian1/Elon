@@ -42,7 +42,7 @@ pub(super) fn validate(
         receipt.root_task_id == expected_root,
         "更新恢复回执的监督 root identity 不一致。"
     );
-    validate_terminal_binding(parent, receipt)?;
+    validate_parent_binding(parent, receipt)?;
     validate_receipt_workspace(receipt, base, active, expected_branch, current_head)?;
     anyhow::ensure!(
         git_output(
@@ -53,6 +53,16 @@ pub(super) fn validate(
         "父任务活动 worktree 非 clean，拒绝接受 HEAD 前进。"
     );
     validate_forward_landed_commit(base, recorded_head, current_head)
+}
+
+fn validate_parent_binding(
+    parent: &LocalTaskRecord,
+    receipt: &UpdateRecoveryReceipt,
+) -> Result<()> {
+    if parent.completion_event_id.is_some() {
+        return validate_terminal_binding(parent, receipt);
+    }
+    validate_legacy_snapshot_binding(parent, receipt)
 }
 
 fn validate_terminal_binding(
@@ -83,6 +93,48 @@ fn validate_terminal_binding(
             && receipt.safety.pending_approval_ids.is_empty()
             && receipt.safety.non_repeatable_action.is_none(),
         "更新恢复回执缺少完整、可重复的安全证据。"
+    );
+    Ok(())
+}
+
+fn validate_legacy_snapshot_binding(
+    parent: &LocalTaskRecord,
+    receipt: &UpdateRecoveryReceipt,
+) -> Result<()> {
+    anyhow::ensure!(
+        parent.status == "resume_required"
+            && crate::node_agent_local_task_store::is_orphan_runtime_resume_required_reason(
+                parent.error.as_deref(),
+            )
+            && parent
+                .finished_at_ms
+                .is_some_and(|value| u128::try_from(value).is_ok()),
+        "父任务不是明确的过期执行句柄 preserved snapshot。"
+    );
+    anyhow::ensure!(
+        receipt.update_id.starts_with("legacy-sidecar-")
+            && receipt.state == UpdateRecoveryState::Applying
+            && receipt.state_reason.as_deref()
+                == Some(crate::node_agent_update_recovery::LEGACY_SNAPSHOT_APPLYING_REASON)
+            && receipt.completion_event_id.is_none()
+            && receipt.terminal_task_status.is_none()
+            && receipt.terminal_finished_at_ms.is_none()
+            && receipt.terminal_success.is_none()
+            && receipt.terminal_outcome.is_none()
+            && receipt.recovery_policy.allow_snapshot_continue
+            && receipt
+                .sidecar_session_id
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
+            && usize::try_from(receipt.journal_cursor).ok()
+                == Some(receipt.safety.journal_event_count),
+        "legacy 更新恢复回执没有与 preserved snapshot 严格绑定。"
+    );
+    anyhow::ensure!(
+        receipt.safety.evidence_complete
+            && receipt.safety.pending_approval_ids.is_empty()
+            && receipt.safety.non_repeatable_action.is_none(),
+        "legacy 更新恢复回执缺少完整、可重复的安全证据。"
     );
     Ok(())
 }

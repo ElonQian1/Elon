@@ -68,7 +68,7 @@ pub(crate) async fn resolve_supervised_resume_workspace(
         .map_err(internal_error)?;
     let receipt = runtime
         .update_recovery
-        .receipt_for_task(&parent.task_id)
+        .receipt_for_resume_parent(&parent)
         .map_err(internal_error)?;
     crate::node_agent_local_tasks::root_workspace::resolve_resume_authorized_workspace(
         &runtime.local_tasks,
@@ -287,7 +287,7 @@ pub(crate) async fn inspect_resume_workspace_status(
     };
     let receipt = runtime
         .update_recovery
-        .receipt_for_task(&parent.task_id)
+        .receipt_for_resume_parent(parent)
         .ok()
         .flatten();
     let creds = crate::Credentials {

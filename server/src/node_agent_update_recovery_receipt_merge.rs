@@ -1,11 +1,24 @@
 use anyhow::{bail, Context, Result};
 
-use super::UpdateRecoveryReceipt;
+use super::{UpdateRecoveryReceipt, UpdateRecoveryState, LEGACY_SNAPSHOT_APPLYING_REASON};
 
 pub(super) fn canonical_terminal_receipt(
     matches: &[UpdateRecoveryReceipt],
 ) -> Result<UpdateRecoveryReceipt> {
-    match merge_compatible_receipts(matches) {
+    canonical_or_conflict(matches, merge_compatible_terminal_receipts)
+}
+
+pub(super) fn canonical_legacy_snapshot_receipt(
+    matches: &[UpdateRecoveryReceipt],
+) -> Result<UpdateRecoveryReceipt> {
+    canonical_or_conflict(matches, merge_compatible_legacy_snapshot_receipts)
+}
+
+fn canonical_or_conflict(
+    matches: &[UpdateRecoveryReceipt],
+    merge: fn(&[UpdateRecoveryReceipt]) -> Result<UpdateRecoveryReceipt>,
+) -> Result<UpdateRecoveryReceipt> {
+    match merge(matches) {
         Ok(receipt) => Ok(receipt),
         Err(error) => {
             let mut conservative = matches
@@ -21,7 +34,9 @@ pub(super) fn canonical_terminal_receipt(
     }
 }
 
-fn merge_compatible_receipts(matches: &[UpdateRecoveryReceipt]) -> Result<UpdateRecoveryReceipt> {
+fn merge_compatible_terminal_receipts(
+    matches: &[UpdateRecoveryReceipt],
+) -> Result<UpdateRecoveryReceipt> {
     let first = matches.first().context("recovery receipt set is empty")?;
     if matches.iter().any(|receipt| {
         !receipt.state.is_terminal()
@@ -83,6 +98,114 @@ fn merge_compatible_receipts(matches: &[UpdateRecoveryReceipt]) -> Result<Update
             .or_else(|| receipt.completion_event_id.clone());
     }
     Ok(canonical)
+}
+
+fn merge_compatible_legacy_snapshot_receipts(
+    matches: &[UpdateRecoveryReceipt],
+) -> Result<UpdateRecoveryReceipt> {
+    let first = matches.first().context("recovery receipt set is empty")?;
+    ensure_legacy_snapshot_receipt(first)?;
+    for receipt in matches.iter().skip(1) {
+        ensure_legacy_snapshot_receipt(receipt)?;
+        if !legacy_snapshot_facts_match(first, receipt) {
+            bail!("conflicting legacy snapshot recovery receipts target the same task")
+        }
+    }
+    Ok(matches
+        .iter()
+        .max_by_key(|receipt| receipt.updated_at_ms)
+        .expect("non-empty receipt set")
+        .clone())
+}
+
+fn ensure_legacy_snapshot_receipt(receipt: &UpdateRecoveryReceipt) -> Result<()> {
+    if !receipt.update_id.starts_with("legacy-sidecar-")
+        || receipt.is_superseded()
+        || receipt.conflict_detected
+        || receipt.state != UpdateRecoveryState::Applying
+        || receipt.state_reason.as_deref() != Some(LEGACY_SNAPSHOT_APPLYING_REASON)
+        || receipt
+            .sidecar_session_id
+            .as_deref()
+            .is_none_or(|value| value.trim().is_empty())
+        || receipt.completion_event_id.is_some()
+        || receipt.terminal_task_status.is_some()
+        || receipt.terminal_finished_at_ms.is_some()
+        || receipt.terminal_success.is_some()
+        || receipt.terminal_outcome.is_some()
+        || receipt.final_reason.is_some()
+        || receipt.final_review.is_some()
+        || receipt.superseded_by_release.is_some()
+        || receipt.supersede_evidence.is_some()
+        || receipt.superseded_at_ms.is_some()
+        || receipt.conflict_count != 0
+        || receipt.conflict_reason.is_some()
+        || !receipt.recovery_policy.allow_snapshot_continue
+        || !receipt.workspace.isolated
+        || receipt.workspace.git_status_clean != Some(true)
+        || !receipt.safety.evidence_complete
+        || !receipt.safety.pending_approval_ids.is_empty()
+        || receipt.safety.non_repeatable_action.is_some()
+    {
+        bail!("recovery receipt is not an eligible preserved legacy snapshot")
+    }
+    Ok(())
+}
+
+fn legacy_snapshot_facts_match(
+    left: &UpdateRecoveryReceipt,
+    right: &UpdateRecoveryReceipt,
+) -> bool {
+    left.schema_version == right.schema_version
+        && left.protocol == right.protocol
+        && left.root_task_id == right.root_task_id
+        && left.parent_task_id == right.parent_task_id
+        && left.original_task_id == right.original_task_id
+        && left.resume_task_id == right.resume_task_id
+        && left.codex_session_id == right.codex_session_id
+        && left.codex_session_scope == right.codex_session_scope
+        && left.sidecar_session_id == right.sidecar_session_id
+        && left.journal_cursor == right.journal_cursor
+        && left.sidecar_output_offset == right.sidecar_output_offset
+        && left.sidecar_output_sequence == right.sidecar_output_sequence
+        && left.expected_downtime_ms == right.expected_downtime_ms
+        && left.workspace.base_workspace_path == right.workspace.base_workspace_path
+        && left.workspace.workspace_path == right.workspace.workspace_path
+        && left.workspace.isolated == right.workspace.isolated
+        && left.workspace.branch == right.workspace.branch
+        && left.workspace.git_head == right.workspace.git_head
+        && left.workspace.git_status_clean == right.workspace.git_status_clean
+        && left.transport.kind == right.transport.kind
+        && left.transport.protocol == right.transport.protocol
+        && left.transport.capabilities == right.transport.capabilities
+        && left.transport.auth_mode == right.transport.auth_mode
+        && left.transport.lease_id == right.transport.lease_id
+        && left.transport.replay_from_cursor == right.transport.replay_from_cursor
+        && left.recovery_policy.mode == right.recovery_policy.mode
+        && left.recovery_policy.allow_snapshot_continue
+            == right.recovery_policy.allow_snapshot_continue
+        && left.safety == right.safety
+        && left.resume_strategy == right.resume_strategy
+        && left.completion_event_id == right.completion_event_id
+        && left.terminal_task_status == right.terminal_task_status
+        && left.terminal_success == right.terminal_success
+        && left.terminal_outcome == right.terminal_outcome
+        && left.state == right.state
+        && left.state_reason == right.state_reason
+        && left.final_reason == right.final_reason
+        && semantic_events_match(&left.events, &right.events)
+}
+
+fn semantic_events_match(
+    left: &[super::UpdateRecoveryEvent],
+    right: &[super::UpdateRecoveryEvent],
+) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(left, right)| {
+            left.sequence == right.sequence
+                && left.state == right.state
+                && left.reason == right.reason
+        })
 }
 
 fn ensure_optional_terminal_fact_agrees<'a, T>(
