@@ -268,14 +268,9 @@ fn load_revision_event(
             {
                 continue;
             }
-            let Some(value) = event
-                .get("payload")
-                .and_then(|payload| payload.get("contract_revision"))
-            else {
+            let Some(parsed) = parse_revision_event(&event)? else {
                 continue;
             };
-            let parsed: ContractRevisionEvent = serde_json::from_value(value.clone())
-                .context("解析 contract revision journal event")?;
             if found.as_ref().is_some_and(|existing| existing != &parsed) {
                 bail!("同一任务存在冲突的 contract revision 收据。")
             }
@@ -283,6 +278,21 @@ fn load_revision_event(
         }
         Ok(found)
     })
+}
+
+fn parse_revision_event(event: &Value) -> Result<Option<ContractRevisionEvent>> {
+    let Some(value) = event
+        .get("payload")
+        .and_then(|payload| payload.get("contract_revision"))
+    else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    let parsed =
+        serde_json::from_value(value.clone()).context("解析 contract revision journal event")?;
+    Ok(Some(parsed))
 }
 
 pub(crate) fn task_has_revision(runtime: &NodeRuntime, task_id: &str) -> Result<bool> {
@@ -385,5 +395,32 @@ mod tests {
         let receipt = receipt.unwrap();
         assert_eq!(receipt["previous_digest"], base.digest);
         assert_eq!(receipt["effective_digest"], revised.digest);
+    }
+
+    #[test]
+    fn load_revision_event_skips_explicit_null_contract_revision() {
+        let event = json!({
+            "payload": {
+                "contract_revision": null,
+            },
+        });
+
+        assert!(parse_revision_event(&event).unwrap().is_none());
+    }
+
+    #[test]
+    fn load_revision_event_rejects_malformed_non_null_contract_revision() {
+        let event = json!({
+            "payload": {
+                "contract_revision": {
+                    "schema": CONTRACT_REVISION_SCHEMA,
+                },
+            },
+        });
+
+        let error = parse_revision_event(&event).unwrap_err();
+        assert!(error
+            .to_string()
+            .contains("解析 contract revision journal event"));
     }
 }
