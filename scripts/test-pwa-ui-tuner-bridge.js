@@ -116,9 +116,9 @@ class FakeClassList {
 }
 
 class FakeStyle {
-  constructor() { this.values = new Map(); }
+  constructor() { this.values = new Map(); this.setCount = 0; }
   getPropertyValue(property) { return this.values.get(property) || ''; }
-  setProperty(property, value) { this.values.set(property, String(value)); }
+  setProperty(property, value) { this.setCount += 1; this.values.set(property, String(value)); }
   removeProperty(property) { this.values.delete(property); }
 }
 
@@ -202,6 +202,14 @@ function runBridgeBehavior() {
   body.appendChild(chatPage);
   body.appendChild(projectPage);
   const setTitle = (value) => { title.childNodes = [{ nodeType: 3, textContent: value }]; };
+  const findById = (root, id) => {
+    if (root.id === id) return root;
+    for (const child of root.children) {
+      const found = findById(child, id);
+      if (found) return found;
+    }
+    return null;
+  };
   const document = {
     title: '一龙',
     documentElement,
@@ -229,7 +237,7 @@ function runBridgeBehavior() {
       return [];
     },
     querySelector: (selector) => {
-      if (selector === '#topTitle') return title;
+      if (selector.startsWith('#')) return findById(body, selector.slice(1));
       return null;
     },
   };
@@ -373,15 +381,94 @@ function runBridgeBehavior() {
 
   const draft = {
     draftKey: 'project-1|/web|||390x844', revision: 7,
-    elements: [{ selector: '#topTitle', styleDiff: { fontSize: '24px' } }],
+    elements: [{
+      selector: '#topTitle',
+      identity: { key: 'id:topTitle', id: 'topTitle', tag: 'h1' },
+      styleDiff: { fontSize: '24px' },
+    }],
   };
   const acknowledgementsBeforeDraft = posted.filter((message) => message.type === 'draft-applied').length;
   command('apply-draft', draft);
   assert.equal(title.style.getPropertyValue('font-size'), '24px', 'one draft property write must update the selected DOM element');
   assert.equal(posted.filter((message) => message.type === 'draft-applied').length, acknowledgementsBeforeDraft + 1, 'one draft revision should receive one acknowledgement');
-  assert.equal(posted.at(-1).payload.revision, 7, 'the acknowledgement should preserve the applied revision');
+  assert.deepEqual(posted.at(-1).payload, {
+    requestedCount: 1, appliedCount: 1, unresolved: [], complete: true,
+    draftKey: draft.draftKey, revision: 7, attempt: 1, maxAttempts: 8, retrying: false, exhausted: false,
+  }, 'a complete acknowledgement should report real requested and applied counts');
+  const completeDraftSetCount = title.style.setCount;
   command('apply-draft', draft);
-  assert.equal(posted.filter((message) => message.type === 'draft-applied').length, acknowledgementsBeforeDraft + 1, 'a repeated draft revision must not apply or acknowledge twice');
+  assert.equal(posted.filter((message) => message.type === 'draft-applied').length, acknowledgementsBeforeDraft + 2, 'a repeated draft revision should replay its acknowledgement');
+  assert.equal(title.style.setCount, completeDraftSetCount, 'a repeated draft revision must not write inline styles twice');
+
+  const lateTargetDraft = {
+    draftKey: draft.draftKey, revision: 8,
+    elements: [{
+      selector: '#lateTarget',
+      identity: { key: 'id:lateTarget', id: 'lateTarget', tag: 'section' },
+      styleDiff: { borderRadius: '18px' },
+    }],
+  };
+  command('apply-draft', lateTargetDraft);
+  let draftAck = posted.filter((message) => message.type === 'draft-applied').at(-1).payload;
+  assert.equal(draftAck.complete, false, 'an async target missing on first delivery must stay incomplete');
+  assert.equal(draftAck.appliedCount, 0);
+  assert.equal(draftAck.requestedCount, 1);
+  assert.equal(draftAck.unresolved[0].reason, 'target-missing');
+  const lateTarget = new FakeElement('section', 'lateTarget');
+  body.appendChild(lateTarget);
+  screenObserver.callback([{ type: 'childList' }]);
+  flushTimers();
+  draftAck = posted.filter((message) => message.type === 'draft-applied').at(-1).payload;
+  assert.equal(lateTarget.style.getPropertyValue('border-radius'), '18px', 'a target added after the draft must receive its style');
+  assert.equal(draftAck.complete, true, 'the same revision completes only after the async target is applied');
+  assert.equal(draftAck.appliedCount, 1);
+  assert.deepEqual(draftAck.unresolved, []);
+
+  const neverAppearsDraft = {
+    draftKey: draft.draftKey, revision: 9,
+    elements: [{
+      selector: '#neverAppears',
+      identity: { key: 'id:neverAppears', id: 'neverAppears', tag: 'div' },
+      styleDiff: { borderRadius: '18px' },
+    }],
+  };
+  command('apply-draft', neverAppearsDraft);
+  for (let attempt = 0; attempt < 12; attempt += 1) flushTimers();
+  draftAck = posted.filter((message) => message.type === 'draft-applied').at(-1).payload;
+  assert.equal(draftAck.complete, false, 'a target that never appears must not produce false success');
+  assert.equal(draftAck.exhausted, true, 'missing-target retries must stop at the explicit bound');
+  assert.equal(draftAck.attempt, 8);
+  assert.equal(pendingTimers.size, 0, 'exhausted draft retries must leave no infinite timer loop');
+  const acksAfterExhaustion = posted.filter((message) => message.type === 'draft-applied').length;
+  screenObserver.callback([{ type: 'childList' }]);
+  flushTimers();
+  assert.equal(posted.filter((message) => message.type === 'draft-applied').length, acksAfterExhaustion, 'later mutations must not restart an exhausted revision');
+
+  const driftedTarget = new FakeElement('button', 'driftedTarget');
+  body.appendChild(driftedTarget);
+  command('apply-draft', {
+    draftKey: draft.draftKey, revision: 10,
+    elements: [{
+      selector: '#driftedTarget',
+      identity: { key: 'id:originalTarget', id: 'originalTarget', tag: 'button' },
+      styleDiff: { borderRadius: '18px' },
+    }],
+  });
+  draftAck = posted.filter((message) => message.type === 'draft-applied').at(-1).payload;
+  assert.equal(driftedTarget.style.getPropertyValue('border-radius'), '', 'selector drift must never modify the wrong element');
+  assert.equal(draftAck.complete, false);
+  assert.equal(draftAck.unresolved[0].reason, 'identity-mismatch');
+  assert.equal(draftAck.exhausted, true, 'identity mismatch is a terminal safe rejection, not an infinite retry');
+
+  const legacyUnsafeTarget = new FakeElement('div', 'legacyUnsafeTarget');
+  body.appendChild(legacyUnsafeTarget);
+  command('apply-draft', {
+    draftKey: draft.draftKey, revision: 11,
+    elements: [{ selector: '#legacyUnsafeTarget', identity: { tag: 'div' }, styleDiff: { borderRadius: '18px' } }],
+  });
+  draftAck = posted.filter((message) => message.type === 'draft-applied').at(-1).payload;
+  assert.equal(legacyUnsafeTarget.style.getPropertyValue('border-radius'), '', 'a legacy selector without identity evidence must fail closed');
+  assert.equal(draftAck.unresolved[0].reason, 'identity-insufficient');
 
   const verificationsBefore = posted.filter((message) => message.type === 'source-verification').length;
   command('verify-source', {
@@ -401,7 +488,7 @@ function runBridgeBehavior() {
   assert.equal(posted.filter((message) => message.type === 'source-verification').length, verificationsBefore + 1, 'a repeated verification request must not produce a message loop');
   command('apply-draft', draft);
   assert.equal(title.style.getPropertyValue('font-size'), '24px', 'a failed verification can restore the same draft revision');
-  assert.equal(posted.filter((message) => message.type === 'draft-applied').length, acknowledgementsBeforeDraft + 2, 'restoring the same draft revision should acknowledge once after reset');
+  assert.equal(posted.filter((message) => message.type === 'draft-applied').at(-1).payload.complete, true, 'restoring the same draft revision should complete after reset');
 
   const routeCountBeforeScreenSwitch = posted.filter((message) => message.type === 'route-changed').length;
   chatPage.classList.toggle('active', false);

@@ -6,12 +6,17 @@
   const SOURCE = 'elon-pwa-design-bridge';
   const PARENT_SOURCE = 'elon-pc-ui-tuner';
   const PROTOCOL_VERSION = 1;
+  const DRAFT_RETRY_LIMIT = 8;
+  const DRAFT_RETRY_DELAY_MS = 120;
   const originalInlineStyles = new Map();
   let selectedElement = null;
   let selection = null;
   let selecting = false;
   let acceptedSessionToken = '';
-  let appliedDraftRevision = '';
+  let completedDraftRevision = '';
+  let activeDraft = null;
+  let lastDraftAck = null;
+  let draftRetryTimer = 0;
   let routeDebounceTimer = 0;
   let lastRouteSignature = '';
   const editableProperties = [
@@ -378,6 +383,7 @@
       state.path, state.search, state.hash, state.screenKey,
       state.viewport.width + 'x' + state.viewport.height,
     ].join('|');
+    scheduleDraftRetry('route');
     if (signature === lastRouteSignature) return;
     lastRouteSignature = signature;
     post('route-changed', state);
@@ -433,6 +439,19 @@
     if (!originalInlineStyles.has(element)) originalInlineStyles.set(element, element.getAttribute('style'));
   }
 
+  function cancelDraftRetry() {
+    if (!draftRetryTimer) return;
+    window.clearTimeout(draftRetryTimer);
+    draftRetryTimer = 0;
+  }
+
+  function clearDraftTracking() {
+    cancelDraftRetry();
+    completedDraftRevision = '';
+    activeDraft = null;
+    lastDraftAck = null;
+  }
+
   function resolveTarget(payload) {
     if (payload && payload.selector) {
       try { return document.querySelector(payload.selector); } catch (_) { return null; }
@@ -449,11 +468,8 @@
     return String(value).trim();
   }
 
-  function applyStyle(payload, notify) {
-    if (!payload || !payload.style) return;
-    const element = resolveTarget(payload);
-    if (!element || element === selection) return;
-    const style = payload.style;
+  function applyStyleToElement(element, style, notify) {
+    if (!element || element === selection || !style) return false;
     rememberInlineStyles(element);
     editableProperties.forEach((property) => {
       if (style[property] === undefined) return;
@@ -463,6 +479,12 @@
     });
     if (element === selectedElement) drawSelection(element);
     if (notify !== false) post('style-applied', { node: snapshotOf(element) });
+    return true;
+  }
+
+  function applyStyle(payload, notify) {
+    if (!payload || !payload.style) return false;
+    return applyStyleToElement(resolveTarget(payload), payload.style, notify);
   }
 
   function resetStyles(notify) {
@@ -472,7 +494,7 @@
       else element.setAttribute('style', original);
     });
     originalInlineStyles.clear();
-    appliedDraftRevision = '';
+    clearDraftTracking();
     drawSelection(selectedElement);
     if (notify !== false) post('styles-reset', {});
   }
@@ -490,19 +512,148 @@
     post('element-reset', { node: snapshotOf(element) });
   }
 
+  function draftIdentityMatch(element, expected) {
+    if (!expected || typeof expected !== 'object') return { matches: false, reason: 'identity-insufficient' };
+    const actual = identityOf(element);
+    const stableFields = ['stableId', 'testId', 'resourceId', 'sourceSymbol', 'componentPath', 'uiNode', 'id'];
+    const expectedStable = stableFields.filter((field) => String(expected[field] || ''));
+    for (const field of expectedStable) {
+      if (String(actual[field] || '') !== String(expected[field] || '')) {
+        return { matches: false, reason: 'identity-mismatch' };
+      }
+    }
+    if (expectedStable.length) {
+      if (expected.tag && actual.tag !== String(expected.tag).toLowerCase()) {
+        return { matches: false, reason: 'identity-mismatch' };
+      }
+      return { matches: true, reason: '' };
+    }
+    const expectedTag = String(expected.tag || '').toLowerCase();
+    if (!expectedTag) return { matches: false, reason: 'identity-insufficient' };
+    if (actual.tag !== expectedTag) return { matches: false, reason: 'identity-mismatch' };
+    const semanticFields = ['ariaLabel', 'role', 'text'];
+    const expectedSemantic = semanticFields.filter((field) => String(expected[field] || ''));
+    const expectedClasses = Array.isArray(expected.classNames)
+      ? expected.classNames.map((value) => String(value || '')).filter(Boolean).slice(0, 12)
+      : [];
+    if (!expectedSemantic.length && !expectedClasses.length) {
+      return { matches: false, reason: 'identity-insufficient' };
+    }
+    for (const field of expectedSemantic) {
+      if (String(actual[field] || '') !== String(expected[field] || '')) {
+        return { matches: false, reason: 'identity-mismatch' };
+      }
+    }
+    if (expectedClasses.some((name) => !actual.classNames.includes(name))) {
+      return { matches: false, reason: 'identity-mismatch' };
+    }
+    return { matches: true, reason: '' };
+  }
+
+  function draftAck(state, exhausted) {
+    const unresolved = state.entries
+      .filter((entry) => entry.status !== 'applied')
+      .map((entry) => ({
+        index: entry.index,
+        selector: entry.selector,
+        identityKey: String(entry.identity && entry.identity.key || ''),
+        reason: entry.reason || 'target-missing',
+      }));
+    const appliedCount = state.entries.length - unresolved.length;
+    return {
+      requestedCount: state.entries.length,
+      appliedCount,
+      unresolved,
+      complete: appliedCount === state.entries.length,
+      draftKey: state.draftKey,
+      revision: state.revision,
+      attempt: state.attempt,
+      maxAttempts: DRAFT_RETRY_LIMIT,
+      retrying: appliedCount !== state.entries.length && !exhausted,
+      exhausted: appliedCount !== state.entries.length && exhausted,
+    };
+  }
+
+  function scheduleDraftRetry() {
+    if (!activeDraft || draftRetryTimer || activeDraft.attempt >= DRAFT_RETRY_LIMIT) return;
+    const retryable = activeDraft.entries.some((entry) => entry.status === 'pending');
+    if (!retryable) return;
+    draftRetryTimer = window.setTimeout(() => {
+      draftRetryTimer = 0;
+      attemptDraft();
+    }, DRAFT_RETRY_DELAY_MS);
+  }
+
+  function attemptDraft() {
+    const state = activeDraft;
+    if (!state) return;
+    state.attempt += 1;
+    state.entries.forEach((entry) => {
+      if (entry.status !== 'pending') return;
+      let element = null;
+      try { element = entry.selector ? document.querySelector(entry.selector) : null; } catch (_) { /* Invalid selectors stay unresolved. */ }
+      if (!element || element === selection) {
+        entry.reason = 'target-missing';
+        return;
+      }
+      const identity = draftIdentityMatch(element, entry.identity);
+      if (!identity.matches) {
+        entry.status = 'failed';
+        entry.reason = identity.reason;
+        return;
+      }
+      if (applyStyleToElement(element, entry.styleDiff, false)) {
+        entry.status = 'applied';
+        entry.reason = '';
+      }
+    });
+    drawSelection(selectedElement);
+    const hasRetryable = state.entries.some((entry) => entry.status === 'pending');
+    const exhausted = !hasRetryable || state.attempt >= DRAFT_RETRY_LIMIT;
+    const acknowledgement = draftAck(state, exhausted);
+    lastDraftAck = acknowledgement;
+    post('draft-applied', acknowledgement);
+    if (acknowledgement.complete) {
+      completedDraftRevision = state.revisionKey;
+      activeDraft = null;
+      cancelDraftRetry();
+      return;
+    }
+    if (!exhausted) scheduleDraftRetry();
+  }
+
   function applyDraft(payload) {
     const draftKey = String(payload && payload.draftKey || '');
     const revision = Number(payload && payload.revision);
     const revisionKey = draftKey && Number.isInteger(revision) && revision >= 0
       ? draftKey + '@' + revision
       : '';
-    if (revisionKey && revisionKey === appliedDraftRevision) return;
+    if (revisionKey && revisionKey === completedDraftRevision && lastDraftAck) {
+      post('draft-applied', lastDraftAck);
+      return;
+    }
+    if (revisionKey && activeDraft && revisionKey === activeDraft.revisionKey) {
+      post('draft-applied', lastDraftAck || draftAck(activeDraft, false));
+      scheduleDraftRetry();
+      return;
+    }
     resetStyles(false);
     const elements = payload && Array.isArray(payload.elements) ? payload.elements : [];
-    elements.forEach((entry) => applyStyle({ selector: entry.selector, style: entry.styleDiff || {} }, false));
-    drawSelection(selectedElement);
-    appliedDraftRevision = revisionKey;
-    post('draft-applied', { appliedCount: elements.length, draftKey, revision });
+    activeDraft = {
+      draftKey,
+      revision,
+      revisionKey,
+      attempt: 0,
+      entries: elements.map((entry, index) => ({
+        index,
+        selector: String(entry && entry.selector || ''),
+        identity: entry && entry.identity,
+        styleDiff: entry && entry.styleDiff && typeof entry.styleDiff === 'object' ? entry.styleDiff : {},
+        status: 'pending',
+        reason: 'target-missing',
+      })),
+    };
+    attemptDraft();
   }
 
   function handleDesignClick(event) {
@@ -539,6 +690,10 @@
   });
   window.addEventListener('hashchange', () => postRoute('hashchange'));
   window.addEventListener('popstate', () => postRoute('popstate'));
+  window.addEventListener('load', () => scheduleDraftRetry('load'));
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => scheduleDraftRetry('dom-ready'), { once: true });
+  }
   ['pushState', 'replaceState'].forEach((method) => {
     const original = history[method];
     history[method] = function uiTunerHistoryChange() {
@@ -549,7 +704,10 @@
   });
 
   if (typeof MutationObserver === 'function') {
-    const screenObserver = new MutationObserver(() => scheduleRoute('screen-mutation'));
+    const screenObserver = new MutationObserver(() => {
+      scheduleRoute('screen-mutation');
+      scheduleDraftRetry('mutation');
+    });
     screenObserver.observe(document.body, {
       subtree: true,
       childList: true,
