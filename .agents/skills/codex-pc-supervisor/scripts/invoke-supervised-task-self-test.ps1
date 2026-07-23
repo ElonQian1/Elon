@@ -507,7 +507,6 @@ function Invoke-NodeSelectionSelfTest {
         logged_in = $true
         user_token_configured = $false
         agent_id = 'official-node'
-        owner_user_id = 'official-owner'
         desktop_supervision = [pscustomobject]@{
             protocol = $script:SupervisionProtocol
             capabilities = @('delta_wait_v1')
@@ -523,6 +522,7 @@ function Invoke-NodeSelectionSelfTest {
         $taskCandidates[0].BaseUrl -ne 'http://127.0.0.1:7799' -or
         -not $taskCandidates[0].TaskAuthorized -or
         $taskCandidates[0].UserTokenConfigured -or
+        -not [string]::IsNullOrWhiteSpace($taskCandidates[0].OwnerUserId) -or
         $null -eq $probeCandidate -or
         $probeCandidate.BaseUrl -ne 'http://127.0.0.1:7807' -or
         $probeCandidate.TaskAuthorized) {

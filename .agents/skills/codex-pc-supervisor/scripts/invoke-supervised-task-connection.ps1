@@ -12,7 +12,6 @@ function ConvertTo-NodeConnectionCandidate {
     $supervisionProtocol = [string](Get-ObjectField $supervisionStatus 'protocol')
     $taskAuthorized = $loggedIn -and
         -not [string]::IsNullOrWhiteSpace($agentId) -and
-        -not [string]::IsNullOrWhiteSpace($ownerUserId) -and
         $supervisionProtocol -eq $script:SupervisionProtocol
     if ([string]::IsNullOrWhiteSpace($token) -or
         $header.ToLowerInvariant() -ne 'x-elon-local-admin-token' -or
