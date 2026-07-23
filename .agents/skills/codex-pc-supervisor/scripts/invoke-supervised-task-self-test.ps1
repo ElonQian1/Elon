@@ -487,3 +487,50 @@ function Invoke-SupervisionSelfTest {
         )
     })
 }
+
+function Invoke-NodeSelectionSelfTest {
+    $devStatus = [pscustomobject]@{
+        version = '0.3.dev'
+        local_admin_token = 'dev-local-token'
+        local_admin_token_header = 'x-elon-local-admin-token'
+        logged_in = $false
+        user_token_configured = $false
+        desktop_supervision = [pscustomobject]@{
+            protocol = $script:SupervisionProtocol
+            capabilities = @('delta_wait_v1')
+        }
+    }
+    $officialStatus = [pscustomobject]@{
+        version = '0.3.release'
+        local_admin_token = 'official-local-token'
+        local_admin_token_header = 'x-elon-local-admin-token'
+        logged_in = $true
+        user_token_configured = $true
+        agent_id = 'official-node'
+        owner_user_id = 'official-owner'
+        desktop_supervision = [pscustomobject]@{
+            protocol = $script:SupervisionProtocol
+            capabilities = @('delta_wait_v1')
+        }
+    }
+    $taskCandidates = @(@(
+            ConvertTo-NodeConnectionCandidate 'http://127.0.0.1:7807' $devStatus 'Submit'
+            ConvertTo-NodeConnectionCandidate 'http://127.0.0.1:7799' $officialStatus 'Submit'
+        ) | Where-Object { $null -ne $_ })
+    $probeCandidate =
+        ConvertTo-NodeConnectionCandidate 'http://127.0.0.1:7807' $devStatus 'Probe'
+    if ($taskCandidates.Count -ne 1 -or
+        $taskCandidates[0].BaseUrl -ne 'http://127.0.0.1:7799' -or
+        -not $taskCandidates[0].TaskAuthorized -or
+        $null -eq $probeCandidate -or
+        $probeCandidate.BaseUrl -ne 'http://127.0.0.1:7807' -or
+        $probeCandidate.TaskAuthorized) {
+        throw 'Task actions must select the signed-in authorized node while Probe may report an unbound diagnostic node.'
+    }
+    [pscustomobject]@{
+        ok = $true
+        check = 'authorized_task_node_selection'
+        task_node_url = $taskCandidates[0].BaseUrl
+        probe_node_url = $probeCandidate.BaseUrl
+    }
+}

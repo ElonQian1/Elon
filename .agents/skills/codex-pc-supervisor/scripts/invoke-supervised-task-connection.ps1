@@ -1,3 +1,35 @@
+function ConvertTo-NodeConnectionCandidate {
+    param([string]$CandidateUrl, [object]$Status, [string]$RequestedAction)
+    $token = [string](Get-ObjectField $Status 'local_admin_token')
+    $header = [string](Get-ObjectField $Status 'local_admin_token_header')
+    $version = [string](Get-ObjectField $Status 'version')
+    $supervisionStatus = Get-ObjectField $Status 'desktop_supervision'
+    $desktopReviewBroker = Get-ObjectField $Status 'desktop_review_broker'
+    $loggedIn = (Get-ObjectField $Status 'logged_in') -eq $true
+    $userTokenConfigured = (Get-ObjectField $Status 'user_token_configured') -eq $true
+    $supervisionProtocol = [string](Get-ObjectField $supervisionStatus 'protocol')
+    $taskAuthorized = $loggedIn -and $userTokenConfigured -and
+        $supervisionProtocol -eq $script:SupervisionProtocol
+    if ([string]::IsNullOrWhiteSpace($token) -or
+        $header.ToLowerInvariant() -ne 'x-elon-local-admin-token' -or
+        [string]::IsNullOrWhiteSpace($version) -or
+        ($RequestedAction -ne 'Probe' -and -not $taskAuthorized)) {
+        return $null
+    }
+    return [pscustomobject]@{
+        BaseUrl = $CandidateUrl; Header = $header; Token = $token; Version = $version
+        LoggedIn = $loggedIn; UserTokenConfigured = $userTokenConfigured
+        TaskAuthorized = $taskAuthorized
+        AgentId = [string](Get-ObjectField $Status 'agent_id')
+        OwnerUserId = [string](Get-ObjectField $Status 'owner_user_id')
+        SupervisionProtocol = $supervisionProtocol
+        SupervisionCapabilities = @((Get-ObjectField $supervisionStatus 'capabilities') | ForEach-Object { [string]$_ })
+        DesktopReviewBrokerAvailable = [bool](Get-ObjectField $desktopReviewBroker 'available')
+        DesktopReviewBrokerPipe = [string](Get-ObjectField $desktopReviewBroker 'pipe_name')
+        DesktopReviewBrokerStatus = $desktopReviewBroker
+    }
+}
+
 function Get-NodeConnection {
     param([int]$RetrySeconds = 5)
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
@@ -26,37 +58,25 @@ function Get-NodeConnection {
             try {
                 $status = Invoke-Utf8JsonRequest -Method Get -Uri "$candidateUrl/api/status" `
                     -Headers @{ Origin = $candidateUrl } -TimeoutSec 3
-                $token = [string](Get-ObjectField $status 'local_admin_token')
-                $header = [string](Get-ObjectField $status 'local_admin_token_header')
-                $version = [string](Get-ObjectField $status 'version')
-                $supervisionStatus = Get-ObjectField $status 'desktop_supervision'
-                $desktopReviewBroker = Get-ObjectField $status 'desktop_review_broker'
-                if (-not [string]::IsNullOrWhiteSpace($token) -and
-                    $header.ToLowerInvariant() -eq 'x-elon-local-admin-token' -and
-                    -not [string]::IsNullOrWhiteSpace($version)) {
+                $connection = ConvertTo-NodeConnectionCandidate $candidateUrl $status $Action
+                if ($null -ne $connection) {
                     $script:LastNodeAdminUrl = $candidateUrl
                     Save-CachedNodeUrl $candidateUrl
                     $priorityProbeMs += $priorityTimer.ElapsedMilliseconds
-                    return [pscustomobject]@{
-                        BaseUrl = $candidateUrl; Header = $header; Token = $token; Version = $version
-                        SupervisionProtocol = [string](Get-ObjectField $supervisionStatus 'protocol')
-                        SupervisionCapabilities = @((Get-ObjectField $supervisionStatus 'capabilities') | ForEach-Object { [string]$_ })
-                        DesktopReviewBrokerAvailable = [bool](Get-ObjectField $desktopReviewBroker 'available')
-                        DesktopReviewBrokerPipe = [string](Get-ObjectField $desktopReviewBroker 'pipe_name')
-                        DesktopReviewBrokerStatus = $desktopReviewBroker
-                        ProbeMs = $timer.ElapsedMilliseconds; ProbeStrategy = 'cached_or_priority_bounded'
-                        ProbeTimings = [pscustomobject][ordered]@{
-                            candidate_build_ms = $candidateBuildMs
-                            priority_probe_ms = $priorityProbeMs
-                            fallback_probe_ms = $fallbackProbeMs
-                            total_ms = $timer.ElapsedMilliseconds
-                            priority_attempt_count = $priorityAttemptCount
-                            fallback_candidate_count = $fallbackCandidateCount
-                            cache_candidate_present = -not [string]::IsNullOrWhiteSpace($cachedUrl)
-                            persistent_cache_allowed = $script:PersistentNodeUrlCacheAllowed
-                            result_phase = 'priority'
-                        }
-                    }
+                    $connection | Add-Member -NotePropertyName ProbeMs -NotePropertyValue $timer.ElapsedMilliseconds -Force
+                    $connection | Add-Member -NotePropertyName ProbeStrategy -NotePropertyValue 'cached_or_priority_bounded' -Force
+                    $connection | Add-Member -NotePropertyName ProbeTimings -NotePropertyValue ([pscustomobject][ordered]@{
+                        candidate_build_ms = $candidateBuildMs
+                        priority_probe_ms = $priorityProbeMs
+                        fallback_probe_ms = $fallbackProbeMs
+                        total_ms = $timer.ElapsedMilliseconds
+                        priority_attempt_count = $priorityAttemptCount
+                        fallback_candidate_count = $fallbackCandidateCount
+                        cache_candidate_present = -not [string]::IsNullOrWhiteSpace($cachedUrl)
+                        persistent_cache_allowed = $script:PersistentNodeUrlCacheAllowed
+                        result_phase = 'priority'
+                    }) -Force
+                    return $connection
                 }
             } catch { continue }
         }
@@ -64,7 +84,7 @@ function Get-NodeConnection {
         $fallbackCandidates = @($uniqueCandidates | Select-Object -Skip 1)
         $fallbackCandidateCount += $fallbackCandidates.Count
         $fallbackTimer = [System.Diagnostics.Stopwatch]::StartNew()
-        $parallel = Invoke-ParallelNodeProbe $fallbackCandidates 2500
+        $parallel = Invoke-ParallelNodeProbe $fallbackCandidates 2500 $Action
         $fallbackProbeMs += $fallbackTimer.ElapsedMilliseconds
         if ($null -ne $parallel) {
             $script:LastNodeAdminUrl = $parallel.BaseUrl
@@ -90,7 +110,11 @@ function Get-NodeConnection {
 }
 
 function Invoke-ParallelNodeProbe {
-    param([string[]]$CandidateUrls, [int]$TimeoutMs = 2500)
+    param(
+        [string[]]$CandidateUrls,
+        [int]$TimeoutMs = 2500,
+        [string]$RequestedAction = 'Probe'
+    )
     if (@($CandidateUrls).Count -eq 0) { return $null }
     $handler = [System.Net.Http.HttpClientHandler]::new()
     $handler.UseProxy = $false
@@ -115,23 +139,9 @@ function Invoke-ParallelNodeProbe {
                 if (-not $response.IsSuccessStatusCode) { continue }
                 [byte[]]$bytes = $response.Content.ReadAsByteArrayAsync().Result
                 $status = Convert-JsonResponseBytes $bytes ([string]$response.Content.Headers.ContentType)
-                $token = [string](Get-ObjectField $status 'local_admin_token')
-                $header = [string](Get-ObjectField $status 'local_admin_token_header')
-                $version = [string](Get-ObjectField $status 'version')
-                $supervisionStatus = Get-ObjectField $status 'desktop_supervision'
-                $desktopReviewBroker = Get-ObjectField $status 'desktop_review_broker'
-                if (-not [string]::IsNullOrWhiteSpace($token) -and
-                    $header.ToLowerInvariant() -eq 'x-elon-local-admin-token' -and
-                    -not [string]::IsNullOrWhiteSpace($version)) {
-                    return [pscustomobject]@{
-                        BaseUrl = $item.Url; Header = $header; Token = $token; Version = $version
-                        SupervisionProtocol = [string](Get-ObjectField $supervisionStatus 'protocol')
-                        SupervisionCapabilities = @((Get-ObjectField $supervisionStatus 'capabilities') | ForEach-Object { [string]$_ })
-                        DesktopReviewBrokerAvailable = [bool](Get-ObjectField $desktopReviewBroker 'available')
-                        DesktopReviewBrokerPipe = [string](Get-ObjectField $desktopReviewBroker 'pipe_name')
-                        DesktopReviewBrokerStatus = $desktopReviewBroker
-                    }
-                }
+                $connection =
+                    ConvertTo-NodeConnectionCandidate $item.Url $status $RequestedAction
+                if ($null -ne $connection) { return $connection }
             } finally { $response.Dispose() }
         }
     } finally {
