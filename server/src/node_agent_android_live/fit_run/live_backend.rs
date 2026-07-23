@@ -174,7 +174,7 @@ impl LiveFitRunBackend {
         let result = build_and_verify(
             &self.broker,
             &run.session_id,
-            build_verify_request(&run),
+            build_verify_request(&run)?,
             host_port,
         )
         .await?;
@@ -236,7 +236,7 @@ impl LiveFitRunBackend {
         let build = build_and_verify(
             &self.broker,
             &run.session_id,
-            build_verify_request(&run),
+            build_verify_request(&run)?,
             host_port,
         )
         .await?;
@@ -367,21 +367,22 @@ impl LiveFitRunBackend {
 pub(super) fn fresh_runtime_source_candidate(
     run: &FitRunDocument,
     session: &LiveSessionView,
-    workspace_revision: Option<&str>,
+    origin_workspace_revision: Option<&str>,
 ) -> Option<super::model::FitCandidate> {
     let best = run.best.as_ref()?;
     let proof: &LiveSourceProofView = session.source_proof.as_ref()?;
-    let workspace_revision = workspace_revision?;
+    let origin_workspace_revision = origin_workspace_revision?;
     let runtime_build_matches = proof.runtime_build_id == session.runtime_build_id
         && session.runtime_build_id == run.runtime_build_id;
-    let source_revision_matches = proof.source_revision == workspace_revision
-        && run.source_revision.as_deref() == Some(workspace_revision);
+    let source_revision_matches = proof.origin_workspace_revision == origin_workspace_revision
+        && run.source_revision.as_deref() == Some(origin_workspace_revision);
     if !session.connected
         || session.history_count != 0
         || session.redo_count != 0
         || !best.operations.is_empty()
         || !runtime_build_matches
         || !source_revision_matches
+        || proof.generation_revision.trim().is_empty()
         || proof.source_parity_loss > run.thresholds.max_source_parity_loss
         || !best.score.passes(&run.thresholds)
     {
@@ -390,7 +391,7 @@ pub(super) fn fresh_runtime_source_candidate(
     let mut candidate = best.clone();
     candidate.trial_id = new_trial_id("fresh-runtime-source");
     candidate.runtime_build_id = session.runtime_build_id.clone();
-    candidate.source_revision = Some(workspace_revision.to_string());
+    candidate.source_revision = Some(origin_workspace_revision.to_string());
     candidate.source_parity_loss = Some(proof.source_parity_loss);
     candidate.source_parity_verified = true;
     Some(candidate)

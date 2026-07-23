@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 
 use crate::node_agent_android_inspector::adb_capture::launch_app;
 
@@ -40,6 +40,9 @@ pub(super) async fn run(
 ) -> Result<BuildVerifyResult> {
     let project_root = build_project_root.canonicalize()?;
     let project_root_display = project_root.to_string_lossy().to_string();
+    let origin_root = integration_plan.source_root.canonicalize()?;
+    let origin_workspace_revision = workspace_fingerprint(origin_root.to_string_lossy().as_ref())?
+        .context("FIT_SOURCE_PROOF_ORIGIN_MISSING: origin project workspace 缺少可验证 revision")?;
     let gradle_root = find_gradle_root(&project_root)?;
     let wrapper = gradle_wrapper(&gradle_root)?;
     let suffix = validate_debug_application_id_suffix(debug_application_id_suffix)?;
@@ -154,13 +157,15 @@ pub(super) async fn run(
         build_started.elapsed().as_millis()
     };
 
-    let source_revision = workspace_fingerprint(&project_root_display)?;
+    verify_origin_workspace_revision(&origin_root, &origin_workspace_revision)?;
+    let generation_revision = workspace_fingerprint(&project_root_display)?;
     if reused_apk {
         match ensure_live_without_install(
             broker,
             session,
             host_port,
-            source_revision.as_deref(),
+            generation_revision.as_deref(),
+            Some(&origin_workspace_revision),
             reporter,
         )
         .await
@@ -169,6 +174,8 @@ pub(super) async fn run(
                 return finalize_runtime(
                     session,
                     &project_root_display,
+                    origin_root.to_string_lossy().as_ref(),
+                    &origin_workspace_revision,
                     &apk,
                     build_duration_ms,
                     "SKIPPED_RUNTIME_REUSED",
@@ -349,6 +356,8 @@ pub(super) async fn run(
     finalize_runtime(
         session,
         &project_root_display,
+        origin_root.to_string_lossy().as_ref(),
+        &origin_workspace_revision,
         &staged_apk,
         build_duration_ms,
         install.output.trim(),
@@ -365,7 +374,9 @@ pub(super) async fn run(
 
 async fn finalize_runtime(
     session: &LiveUiSession,
-    project_root: &str,
+    generation_root: &str,
+    origin_root: &str,
+    expected_origin_workspace_revision: &str,
     apk: &std::path::Path,
     build_duration_ms: u128,
     install_output: &str,
@@ -386,15 +397,19 @@ async fn finalize_runtime(
     let source_parity_verified = verification_gate.source_parity == VerificationGateState::Passed;
     let runtime_build_id = runtime_view.runtime_build_id.clone();
     if source_parity_verified {
-        if let Some(source_revision) = workspace_fingerprint(project_root)? {
-            session
-                .record_source_proof(
-                    source_revision,
-                    runtime_build_id.clone(),
-                    source_parity_diff.visual_loss,
-                )
-                .await;
-        }
+        let generation_revision = workspace_fingerprint(generation_root)?.context(
+            "FIT_SOURCE_PROOF_GENERATION_MISSING: generation worktree 缺少可验证 revision",
+        )?;
+        let origin_root = std::path::Path::new(origin_root);
+        verify_origin_workspace_revision(origin_root, expected_origin_workspace_revision)?;
+        session
+            .record_source_proof(
+                generation_revision,
+                expected_origin_workspace_revision.to_string(),
+                runtime_build_id.clone(),
+                source_parity_diff.visual_loss,
+            )
+            .await;
     }
     Ok(BuildVerifyResult {
         status: verification_gate.status,
@@ -413,6 +428,17 @@ async fn finalize_runtime(
         verification_gate,
         message: message.to_string(),
     })
+}
+
+fn verify_origin_workspace_revision(origin_root: &Path, expected: &str) -> Result<()> {
+    let current = workspace_fingerprint(origin_root.to_string_lossy().as_ref())?
+        .context("FIT_SOURCE_PROOF_ORIGIN_MISSING: origin project workspace 缺少可验证 revision")?;
+    if current != expected {
+        bail!(
+            "FIT_SOURCE_PROOF_ORIGIN_CHANGED: origin project workspace 在 generation 构建期间发生变化；expected={expected} actual={current}"
+        );
+    }
+    Ok(())
 }
 
 async fn launch_with_retry(session: &LiveUiSession) -> Result<String> {

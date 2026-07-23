@@ -12,16 +12,18 @@ mod model;
 mod orchestrator;
 mod routes;
 mod service;
+mod state_replay;
 mod store;
 mod workspace_revision;
 
 pub(crate) use model::{
     CreateFitRunRequest, FitCommand, FitEnvironment, FitMaskKind, FitMaskRegion, FitRect,
-    FitRunDocument, FitRunPhase, FitScore, FitSessionContext, FitTargetPair, FitTrial,
-    FitVisualMask,
+    FitRunDocument, FitRunPhase, FitScore, FitSessionContext, FitStateReplay, FitTargetPair,
+    FitTrial, FitVisualMask,
 };
 pub(crate) use routes::protected_routes;
 pub(crate) use service::FitRunService;
+pub(crate) use state_replay::replay_after_reinstall;
 pub(crate) use workspace_revision::workspace_fingerprint;
 
 pub(crate) fn durable_runtime_candidates(

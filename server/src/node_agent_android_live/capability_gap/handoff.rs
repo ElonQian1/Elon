@@ -239,7 +239,7 @@ fn validate_live_proof(view: &LiveSessionView, evidence: &BusinessDeliveryEviden
         || view.redo_count != 0
         || view.runtime_build_id.is_none()
         || proof.runtime_build_id != view.runtime_build_id
-        || proof.source_revision != evidence.source_revision
+        || proof.origin_workspace_revision != evidence.source_revision
         || (proof.source_parity_loss - evidence.source_parity_loss).abs() > LOSS_EPSILON
         || proof.source_parity_loss > evidence.max_source_parity_loss
     {
@@ -386,7 +386,8 @@ mod tests {
             history_count: 0,
             redo_count: 0,
             source_proof: Some(LiveSourceProofView {
-                source_revision: "revision-1".into(),
+                generation_revision: "generation-revision-9".into(),
+                origin_workspace_revision: "revision-1".into(),
                 runtime_build_id: Some("build-1".into()),
                 source_parity_loss: 0.01,
                 verified_at: "now".into(),

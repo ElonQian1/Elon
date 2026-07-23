@@ -56,6 +56,8 @@ pub(crate) struct BuildVerifyRequest {
     pub(crate) target_instance_key: Option<String>,
     #[serde(default)]
     pub(crate) visual_mask: VisualMask,
+    #[serde(default)]
+    pub(crate) state_replay: Option<super::fit_run::FitStateReplay>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -323,6 +325,10 @@ async fn build_and_verify_inner(
 ) -> Result<BuildVerifyResult> {
     let session = broker.session(session_id).await?;
     let source_project_root = canonical_project_root(&session)?;
+    let origin_workspace_revision = workspace_fingerprint(
+        source_project_root.to_string_lossy().as_ref(),
+    )?
+    .context("FIT_SOURCE_PROOF_ORIGIN_MISSING: origin project workspace 缺少可验证 revision")?;
     let install_id = broker
         .node_install_id()
         .context("PC 节点缺少稳定安装标识，拒绝部署调试 APK")?;
@@ -393,6 +399,9 @@ async fn build_and_verify_inner(
         true,
     )
     .await?;
+    verify_origin_workspace_revision(&source_project_root, &origin_workspace_revision)?;
+    let generation_revision = workspace_fingerprint(project_root.to_string_lossy().as_ref())?
+        .context("FIT_SOURCE_PROOF_GENERATION_MISSING: generation worktree 缺少可验证 revision")?;
     let build_duration_ms = build_started.elapsed().as_millis();
     let apk = select_fresh_debug_apk(&gradle_root, &session.package_name, artifact_not_before)?;
     let expected_label = session
@@ -442,11 +451,14 @@ async fn build_and_verify_inner(
     // A connected socket with an empty tree is not a verified UI. Always wait
     // for at least one runtime node, including normal Activity verification.
     let preview = request.preview.clone();
+    if preview.is_some() && request.state_replay.is_some() {
+        bail!("FIT_STATE_REPLAY_INVALID: Preview 与页面 stateReplay 不能同时使用");
+    }
     if let Some(preview) = preview.as_ref() {
         open_preview(&session, preview.clone()).await?;
     }
     let expected_screen_id = preview.as_ref().map(|preview| preview.screen_id.as_str());
-    let runtime_view = match wait_for_runtime(
+    let mut runtime_view = match wait_for_runtime(
         broker,
         session_id,
         &session,
@@ -476,6 +488,21 @@ async fn build_and_verify_inner(
             .with_context(|| format!("重新连接 Debug Runtime 失败；首次错误: {first_error:#}"))?
         }
     };
+    if let Some(replay) = request.state_replay.as_ref() {
+        let target_definition_id = request
+            .target_definition_id
+            .as_deref()
+            .context("FIT_STATE_REPLAY_INVALID: 缺少 targetDefinitionId")?;
+        runtime_view = super::fit_run::replay_after_reinstall(
+            broker,
+            session_id,
+            &session,
+            replay,
+            target_definition_id,
+            request.target_instance_key.as_deref(),
+        )
+        .await?;
+    }
     // The Activity can expose its first View tree before async data binding and
     // entrance rendering finish. Comparing that intermediate frame against a
     // stable Live preview creates false BUILD_MISMATCH results. Give the debug
@@ -523,17 +550,15 @@ async fn build_and_verify_inner(
     let source_parity_verified = verification_gate.source_parity == VerificationGateState::Passed;
     let runtime_build_id = runtime_view.runtime_build_id.clone();
     if source_parity_verified {
-        if let Some(source_revision) =
-            workspace_fingerprint(project_root.to_string_lossy().as_ref())?
-        {
-            session
-                .record_source_proof(
-                    source_revision,
-                    runtime_build_id.clone(),
-                    source_parity_diff.visual_loss,
-                )
-                .await;
-        }
+        verify_origin_workspace_revision(&source_project_root, &origin_workspace_revision)?;
+        session
+            .record_source_proof(
+                generation_revision,
+                origin_workspace_revision,
+                runtime_build_id.clone(),
+                source_parity_diff.visual_loss,
+            )
+            .await;
     }
     let status = verification_gate.status;
     let message = match status {
@@ -684,6 +709,17 @@ fn nodes_match_preview(nodes: &[LiveUiNode], expected_screen_id: &str) -> bool {
             || node.definition_id == expected_screen_id
             || node.definition_id.starts_with(&preview_definition_prefix)
     })
+}
+
+fn verify_origin_workspace_revision(origin_root: &std::path::Path, expected: &str) -> Result<()> {
+    let current = workspace_fingerprint(origin_root.to_string_lossy().as_ref())?
+        .context("FIT_SOURCE_PROOF_ORIGIN_MISSING: origin project workspace 缺少可验证 revision")?;
+    if current != expected {
+        bail!(
+            "FIT_SOURCE_PROOF_ORIGIN_CHANGED: origin project workspace 在 generation 构建期间发生变化；expected={expected} actual={current}"
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]

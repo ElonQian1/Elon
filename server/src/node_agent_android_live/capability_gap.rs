@@ -10,8 +10,11 @@ use serde_json::{json, Value};
 use super::broker::LiveUiSession;
 use super::capability_requirements::requested_capabilities;
 
+mod catalog;
 mod handoff;
 mod reconciliation;
+
+use catalog::{KNOWN_PLATFORM_GAPS, SUPPORTED_CAPABILITIES};
 
 #[cfg(test)]
 mod capability_contract_tests;
@@ -20,36 +23,6 @@ pub(crate) use handoff::DelegatedCapabilityGap;
 
 const SCHEMA_VERSION: u32 = 1;
 const MAX_UPGRADE_ROUNDS: u32 = 8;
-const SUPPORTED_CAPABILITIES: &[&str] = &[
-    "DESKTOP_TASK_IMPORT",
-    "PROJECT_UI_PROFILE",
-    "TARGET_DESIGN_BINDING",
-    "ANNOTATION_MAPPING",
-    "NEW_SCREEN_BOOTSTRAP",
-    "REAL_ANDROID_RENDERER",
-    "LIVE_STYLE_PATCH",
-    "LOCAL_VISUAL_SOLVER",
-    "PERSISTENT_FIT_RUN",
-    "DETERMINISTIC_SOURCE_COMMIT",
-    "CODEX_SOURCE_HANDOFF",
-    "PATCH_FREE_BUILD_VERIFY",
-    "WINDOW_INSETS_SEQUENCE_TRACE",
-    "RELATIONAL_LAYOUT_GEOMETRY_TRACE",
-    "CROSS_PLATFORM_STYLE_WRITEBACK",
-    "PWA_CODE_GENERATION",
-    "MCP_LONG_RUNNING_TOOL_COMPLETION",
-    "RESUMABLE_DEBUG_RUNTIME_PREPARATION",
-    "ANDROID_RENDERER_DEVICE_HEALTH_RECOVERY",
-    "ANDROID_LAUNCHER_SURFACE_CAPTURE",
-    "ANDROID_ADAPTIVE_ICON_MASK_VISUAL_DIFF",
-];
-
-const KNOWN_PLATFORM_GAPS: &[&str] = &[
-    "FREEFORM_COMPOSE_REPARENT",
-    "ARBITRARY_COMPOSE_STYLE_REFLECTION",
-    "VECTOR_ASSET_GENERATION",
-    "PLATFORM_TOOL_DEFECT",
-];
 
 pub(crate) async fn check_capabilities(
     session: &LiveUiSession,
@@ -182,6 +155,8 @@ fn runtime_required(capability: &str) -> bool {
             | "LOCAL_VISUAL_SOLVER"
             | "PERSISTENT_FIT_RUN"
             | "PATCH_FREE_BUILD_VERIFY"
+            | "FIT_SOURCE_PROOF_ORIGIN_WORKSPACE_REVISION"
+            | "FIT_SOURCE_VERIFY_NON_ROOT_STATE_REPLAY"
             | "RELATIONAL_LAYOUT_GEOMETRY_TRACE"
     )
 }
@@ -676,6 +651,8 @@ mod tests {
         assert!(SUPPORTED_CAPABILITIES.contains(&"PERSISTENT_FIT_RUN"));
         assert!(SUPPORTED_CAPABILITIES.contains(&"WINDOW_INSETS_SEQUENCE_TRACE"));
         assert!(SUPPORTED_CAPABILITIES.contains(&"RELATIONAL_LAYOUT_GEOMETRY_TRACE"));
+        assert!(SUPPORTED_CAPABILITIES.contains(&"FIT_SOURCE_PROOF_ORIGIN_WORKSPACE_REVISION"));
+        assert!(SUPPORTED_CAPABILITIES.contains(&"FIT_SOURCE_VERIFY_NON_ROOT_STATE_REPLAY"));
         assert!(SUPPORTED_CAPABILITIES.contains(&"CROSS_PLATFORM_STYLE_WRITEBACK"));
         assert!(SUPPORTED_CAPABILITIES.contains(&"PWA_CODE_GENERATION"));
     }

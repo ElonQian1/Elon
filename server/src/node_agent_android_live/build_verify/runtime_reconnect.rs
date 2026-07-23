@@ -17,12 +17,15 @@ pub(super) async fn ensure_live_without_install(
     broker: &LiveUiBroker,
     session: &LiveUiSession,
     host_port: u16,
-    source_revision: Option<&str>,
+    generation_revision: Option<&str>,
+    origin_workspace_revision: Option<&str>,
     reporter: Option<&PreparationReporter>,
 ) -> RuntimeReuse {
     let current = session.view().await;
     let proof_matches = current.source_proof.as_ref().is_some_and(|proof| {
-        source_revision.is_some_and(|revision| proof.source_revision == revision)
+        generation_revision.is_some_and(|revision| proof.generation_revision == revision)
+            && origin_workspace_revision
+                .is_some_and(|revision| proof.origin_workspace_revision == revision)
             && proof.runtime_build_id == current.runtime_build_id
     });
     if current.connected && current.node_count > 0 && proof_matches {
@@ -31,10 +34,11 @@ pub(super) async fn ensure_live_without_install(
             "RUNTIME_RECONNECT",
             "ALREADY_LIVE",
             format!(
-                "runtimeBuildId={} nodeCount={} sourceRevision={}",
+                "runtimeBuildId={} nodeCount={} generationRevision={} originWorkspaceRevision={}",
                 current.runtime_build_id.as_deref().unwrap_or("none"),
                 current.node_count,
-                source_revision.unwrap_or("none")
+                generation_revision.unwrap_or("none"),
+                origin_workspace_revision.unwrap_or("none")
             ),
         )
         .await;

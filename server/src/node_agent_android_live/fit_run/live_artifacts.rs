@@ -33,8 +33,8 @@ pub(super) fn pixel_rect(value: FitRect) -> PixelRect {
     }
 }
 
-pub(super) fn build_verify_request(run: &FitRunDocument) -> BuildVerifyRequest {
-    BuildVerifyRequest {
+pub(super) fn build_verify_request(run: &FitRunDocument) -> Result<BuildVerifyRequest> {
+    Ok(BuildVerifyRequest {
         preview: None,
         debug_application_id_suffix: None,
         lkg_enabled: false,
@@ -44,7 +44,8 @@ pub(super) fn build_verify_request(run: &FitRunDocument) -> BuildVerifyRequest {
         target_definition_id: Some(run.pair.definition_id.clone()),
         target_instance_key: run.pair.instance_key.clone(),
         visual_mask: run.visual_mask.visual_mask(),
-    }
+        state_replay: run.environment.validated_state_replay()?,
+    })
 }
 
 pub(super) fn elapsed_ms(started: Instant) -> u64 {

@@ -469,12 +469,14 @@ impl LiveUiSession {
 
     pub(crate) async fn record_source_proof(
         &self,
-        source_revision: String,
+        generation_revision: String,
+        origin_workspace_revision: String,
         runtime_build_id: Option<String>,
         source_parity_loss: f64,
     ) {
         self.state.write().await.source_proof = Some(LiveSourceProofView {
-            source_revision,
+            generation_revision,
+            origin_workspace_revision,
             runtime_build_id,
             source_parity_loss,
             verified_at: Utc::now().to_rfc3339(),

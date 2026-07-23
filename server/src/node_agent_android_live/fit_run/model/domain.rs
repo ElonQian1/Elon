@@ -1,4 +1,5 @@
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
@@ -138,6 +139,164 @@ pub(crate) struct FitEnvironment {
     pub(crate) font_scale: Option<f32>,
     pub(crate) rotation: Option<i32>,
     pub(crate) insets: Option<FitInsets>,
+    #[serde(default)]
+    pub(crate) state_replay: Option<FitStateReplay>,
+}
+
+impl FitEnvironment {
+    pub(crate) fn validated_state_replay(&self) -> Result<Option<FitStateReplay>> {
+        let scenario = self
+            .scenario
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        let replay = self.state_replay.as_ref();
+        if scenario_requires_state_replay(scenario) && replay.is_none() {
+            bail!(
+                "FIT_STATE_REPLAY_MISSING: 非根页面 scenario={} 缺少持久化 stateReplay trace",
+                scenario.unwrap_or("unknown")
+            );
+        }
+        let Some(replay) = replay else {
+            return Ok(None);
+        };
+        replay.validate(scenario)?;
+        Ok(Some(replay.clone()))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FitStateReplay {
+    #[serde(default = "state_replay_schema_version")]
+    pub(crate) schema_version: u32,
+    pub(crate) scenario_id: String,
+    pub(crate) captured_at: String,
+    pub(crate) expires_at: String,
+    pub(crate) steps: Vec<FitStateReplayStep>,
+}
+
+impl FitStateReplay {
+    fn validate(&self, environment_scenario: Option<&str>) -> Result<()> {
+        if self.schema_version != state_replay_schema_version() {
+            bail!(
+                "FIT_STATE_REPLAY_SCHEMA_UNSUPPORTED: schemaVersion={}",
+                self.schema_version
+            );
+        }
+        validate_identifier(&self.scenario_id, "stateReplay.scenarioId")?;
+        if environment_scenario != Some(self.scenario_id.as_str()) {
+            bail!(
+                "FIT_STATE_REPLAY_SCENARIO_MISMATCH: environment scenario 与 stateReplay.scenarioId 不一致"
+            );
+        }
+        if self.steps.is_empty() || self.steps.len() > 16 {
+            bail!("FIT_STATE_REPLAY_INVALID: steps 数量必须为 1..16");
+        }
+        let captured_at = parse_replay_time(&self.captured_at, "capturedAt")?;
+        let expires_at = parse_replay_time(&self.expires_at, "expiresAt")?;
+        if expires_at <= captured_at {
+            bail!("FIT_STATE_REPLAY_INVALID: expiresAt 必须晚于 capturedAt");
+        }
+        if Utc::now() > expires_at {
+            bail!(
+                "FIT_STATE_REPLAY_EXPIRED: scenario={} expiresAt={}",
+                self.scenario_id,
+                self.expires_at
+            );
+        }
+        for step in &self.steps {
+            step.validate()?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FitStateReplayStep {
+    pub(crate) name: String,
+    pub(crate) action: FitStateReplayAction,
+}
+
+impl FitStateReplayStep {
+    fn validate(&self) -> Result<()> {
+        if self.name.trim().is_empty() || self.name.chars().count() > 80 {
+            bail!("FIT_STATE_REPLAY_INVALID: step.name 必须为 1..80 字");
+        }
+        match &self.action {
+            FitStateReplayAction::ActivateNode {
+                definition_id,
+                instance_key,
+                occurrence,
+            } => {
+                if definition_id.trim().is_empty() || definition_id.chars().count() > 500 {
+                    bail!("FIT_STATE_REPLAY_INVALID: ACTIVATE_NODE definitionId 必须为 1..500 字");
+                }
+                if instance_key
+                    .as_deref()
+                    .is_some_and(|value| value.chars().count() > 500)
+                    || *occurrence > 50
+                {
+                    bail!("FIT_STATE_REPLAY_INVALID: ACTIVATE_NODE instanceKey/occurrence 超限");
+                }
+            }
+            FitStateReplayAction::Back => {}
+            FitStateReplayAction::Wait { duration_ms } => {
+                if !(100..=5_000).contains(duration_ms) {
+                    bail!("FIT_STATE_REPLAY_INVALID: WAIT durationMs 必须为 100..5000");
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
+pub(crate) enum FitStateReplayAction {
+    ActivateNode {
+        #[serde(rename = "definitionId")]
+        definition_id: String,
+        #[serde(rename = "instanceKey")]
+        instance_key: Option<String>,
+        #[serde(default)]
+        occurrence: usize,
+    },
+    Back,
+    Wait {
+        #[serde(rename = "durationMs")]
+        duration_ms: u64,
+    },
+}
+
+fn scenario_requires_state_replay(scenario: Option<&str>) -> bool {
+    let Some(scenario) = scenario else {
+        return false;
+    };
+    !matches!(
+        scenario.trim().to_ascii_uppercase().as_str(),
+        "" | "HOME"
+            | "HOME_PAGE"
+            | "ROOT"
+            | "ROOT_PAGE"
+            | "DEFAULT"
+            | "NORMAL"
+            | "LOADING"
+            | "EMPTY"
+            | "ERROR"
+            | "LAUNCH"
+    )
+}
+
+fn parse_replay_time(value: &str, field: &str) -> Result<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(value)
+        .with_context(|| format!("FIT_STATE_REPLAY_INVALID: {field} 不是 RFC3339 时间"))
+        .map(|value| value.with_timezone(&Utc))
+}
+
+const fn state_replay_schema_version() -> u32 {
+    1
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

@@ -41,6 +41,7 @@ impl CreateFitRunRequest {
         self.budget.validate()?;
         self.thresholds.validate()?;
         self.visual_mask.validate(self.pair.target_rect)?;
+        self.environment.validated_state_replay()?;
         if self.properties.len() > 64
             || self
                 .properties

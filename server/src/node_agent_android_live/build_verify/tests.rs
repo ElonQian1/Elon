@@ -216,6 +216,32 @@ fn exact_process_frames_override_stale_node_geometry() {
     assert!(diff.score_report.target_gate.passed);
 }
 
+#[test]
+fn origin_workspace_revision_must_remain_stable_during_generation_build() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-origin-proof-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    fs::create_dir_all(&root).unwrap();
+    run_git(&root, &["init"]);
+    run_git(&root, &["config", "user.email", "test@example.com"]);
+    run_git(&root, &["config", "user.name", "Test"]);
+    fs::write(root.join("tracked.txt"), "origin").unwrap();
+    run_git(&root, &["add", "tracked.txt"]);
+    run_git(&root, &["commit", "-m", "init"]);
+    let revision = workspace_fingerprint(root.to_str().unwrap())
+        .unwrap()
+        .unwrap();
+
+    verify_origin_workspace_revision(&root, &revision).unwrap();
+    fs::write(root.join("tracked.txt"), "changed while building").unwrap();
+    let error = verify_origin_workspace_revision(&root, &revision)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("FIT_SOURCE_PROOF_ORIGIN_CHANGED"));
+    fs::remove_dir_all(root).unwrap();
+}
+
 fn test_node(runtime_id: &str, instance_key: Option<&str>, left: i32) -> LiveUiNode {
     LiveUiNode {
         runtime_node_id: runtime_id.to_string(),
@@ -245,4 +271,13 @@ fn test_node(runtime_id: &str, instance_key: Option<&str>, left: i32) -> LiveUiN
         properties: BTreeMap::new(),
         capabilities: BTreeMap::new(),
     }
+}
+
+fn run_git(root: &std::path::Path, args: &[&str]) {
+    assert!(crate::git_command_error::git_command()
+        .args(args)
+        .current_dir(root)
+        .status()
+        .unwrap()
+        .success());
 }

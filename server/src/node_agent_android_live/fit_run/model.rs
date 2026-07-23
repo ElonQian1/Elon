@@ -9,7 +9,8 @@ mod trial;
 pub(crate) use command::{FitCommand, FitCommandResult};
 pub(crate) use domain::{
     validate_identifier, FitCodexHandoff, FitEnvironment, FitHandoffStatus, FitRect, FitRunPhase,
-    FitSessionContext, FitStopReason, FitTargetPair,
+    FitSessionContext, FitStateReplay, FitStateReplayAction, FitStateReplayStep, FitStopReason,
+    FitTargetPair,
 };
 pub(crate) use mask::{FitMaskKind, FitMaskRegion, FitVisualMask};
 pub(crate) use run::{CreateFitRunRequest, FitRunDocument};

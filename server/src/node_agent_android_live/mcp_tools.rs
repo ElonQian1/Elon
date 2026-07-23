@@ -1,5 +1,6 @@
 use serde_json::{json, Value};
 
+mod fit_environment_schema;
 pub(crate) fn tool_definitions() -> Vec<Value> {
     let mut definitions = vec![
         tool(
@@ -362,7 +363,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                     "targetRect":rect_value_schema(),
                     "projectedTargetRect":rect_value_schema(),
                     "properties":{"type":"array","items":{"type":"string"},"maxItems":64},
-                    "environment":{"type":"object"},
+                    "environment":fit_environment_schema::fit_environment_schema(),
                     "visualMask":fit_visual_mask_schema()
                 }
             }),
