@@ -1110,7 +1110,10 @@
         ],
         "implementation_refs": [
           "file:server/src/node_agent_project_docs_mcp.rs",
-          "file:server/src/project_document_knowledge_graph.rs"
+          "file:server/src/project_document_federation_service.rs",
+          "file:server/src/project_document_knowledge_graph.rs",
+          "file:server/src/project_document_knowledge_graph_health.rs",
+          "file:server/src/project_document_response.rs"
         ],
         "tags": [
           "document",
@@ -1158,7 +1161,9 @@
         ],
         "implementation_refs": [
           "file:pc-frontend/src/features/project-docs/ProjectDocumentCapabilityMap.tsx",
-          "file:server/src/project_document_knowledge_graph.rs"
+          "file:pc-frontend/src/features/project-docs/ProjectDocumentFederationIndex.tsx",
+          "file:server/src/project_document_knowledge_graph.rs",
+          "file:server/src/project_document_knowledge_graph_health.rs"
         ],
         "tags": [
           "architecture",
@@ -1871,6 +1876,7 @@
         ],
         "implementation_refs": [
           "file:server/src/project_document_git_transaction.rs",
+          "file:server/src/project_document_governance_section_operations.rs",
           "file:server/src/project_document_governance_service.rs"
         ],
         "tags": [

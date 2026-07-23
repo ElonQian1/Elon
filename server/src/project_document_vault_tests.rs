@@ -65,3 +65,29 @@ fn managed_vault_applies_ai_structure_without_conflicting_git_heads() {
     assert!(list_versions(&vault.workspace, 20).unwrap().len() >= 3);
     fs::remove_dir_all(vault.workspace).unwrap();
 }
+
+#[test]
+fn managed_vault_rolls_back_failed_restore_and_has_no_push_remote() {
+    let vault = resolve_or_create(&format!("test-{}", uuid::Uuid::new_v4().simple())).unwrap();
+    let initial = current_head(&vault.workspace).unwrap();
+    fs::write(vault.workspace.join("README.md"), "# Restore rollback\n").unwrap();
+    checkpoint_after_write(&vault.workspace, "README.md").unwrap();
+    let before_restore = current_head(&vault.workspace).unwrap();
+
+    let error = restore_version_with(&vault.workspace, &initial, || {
+        anyhow::bail!("injected restore failure")
+    })
+    .unwrap_err();
+    assert!(error.to_string().contains("已自动回到恢复前检查点"));
+    assert_eq!(current_head(&vault.workspace).unwrap(), before_restore);
+    assert!(fs::read_to_string(vault.workspace.join("README.md"))
+        .unwrap()
+        .contains("Restore rollback"));
+    assert!(git_status(&vault.workspace, &["diff", "--quiet"]).unwrap());
+    let remotes = git(&vault.workspace, &["remote"]).unwrap();
+    assert!(
+        remotes.stdout.is_empty(),
+        "托管私有笔记不得默认配置 push remote"
+    );
+    fs::remove_dir_all(vault.workspace).unwrap();
+}

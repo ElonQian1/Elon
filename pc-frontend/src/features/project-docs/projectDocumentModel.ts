@@ -108,6 +108,8 @@ export interface DocumentHealthAnalysis {
       missing_owners: number
       missing_review_dates: number
       overdue_reviews: number
+      duplicate_titles: number
+      missing_implementation_declarations: number
       implementation_conflicts: number
       external_links_checked: number
       external_links_pending: number

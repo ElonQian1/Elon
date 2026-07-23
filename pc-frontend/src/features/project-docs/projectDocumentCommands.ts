@@ -485,7 +485,7 @@ function normalizeSectionOrders(manifest: DocumentSectionManifest) {
 function emptyKnowledgeMetadata(): DocumentKnowledgeMetadata {
   return {
     id: '', doc_type: '', audience: [], owner: '', owners: [], reviewed_at: '',
-    review_interval_days: 180, implementation_refs: [], version: '', related: [], supersedes: [], relations: [],
+    review_interval_days: 180, implementation_refs: [], version: '', version_status: '', related: [], supersedes: [], relations: [],
     order: 999_999, pinned: false,
   }
 }

@@ -36,6 +36,8 @@ const RELATION_VALUES: &[&str] = &[
     "replaced_by",
     "see_also",
 ];
+const VERSION_STATUS_VALUES: &[&str] =
+    &["current", "draft", "deprecated", "superseded", "archived"];
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct DocumentGovernanceFacets {
@@ -78,6 +80,8 @@ pub(crate) struct DocumentKnowledgeMetadata {
     #[serde(default)]
     pub version: String,
     #[serde(default)]
+    pub version_status: String,
+    #[serde(default)]
     pub related: Vec<String>,
     #[serde(default)]
     pub supersedes: Vec<String>,
@@ -101,6 +105,7 @@ impl Default for DocumentKnowledgeMetadata {
             review_interval_days: default_review_interval_days(),
             implementation_refs: Vec::new(),
             version: String::new(),
+            version_status: String::new(),
             related: Vec::new(),
             supersedes: Vec::new(),
             relations: Vec::new(),
@@ -159,6 +164,8 @@ pub(crate) fn sanitize_knowledge_metadata(
     metadata.review_interval_days = metadata.review_interval_days.clamp(1, 3650);
     metadata.implementation_refs = bounded(metadata.implementation_refs, 32, 500);
     metadata.version = truncate(metadata.version.trim(), 40);
+    metadata.version_status =
+        enum_value(&metadata.version_status, VERSION_STATUS_VALUES, "版本状态")?;
     metadata.related = normalize_paths(metadata.related, 24)?;
     metadata.supersedes = normalize_paths(metadata.supersedes, 24)?;
     metadata.relations = normalize_relations(metadata.relations)?;
@@ -192,6 +199,34 @@ pub(crate) fn effective_facets(
     }
 }
 
+pub(crate) fn effective_facets_with_metadata(
+    document: &ProjectDocumentEntry,
+    configured: Option<&DocumentGovernanceFacets>,
+    metadata: Option<&DocumentKnowledgeMetadata>,
+) -> DocumentGovernanceFacets {
+    let mut facets = effective_facets(document, configured);
+    match metadata.map(|value| value.version_status.as_str()) {
+        Some("draft") => {
+            facets.lifecycle = "draft".to_string();
+            if facets.retrieval == "required" {
+                facets.retrieval = "on_demand".to_string();
+            }
+            if matches!(facets.authority.as_str(), "binding" | "authoritative") {
+                facets.authority = "proposal".to_string();
+            }
+        }
+        Some("deprecated" | "superseded" | "archived") => {
+            facets.lifecycle = metadata
+                .map(|value| value.version_status.clone())
+                .unwrap_or_default();
+            facets.retrieval = "excluded".to_string();
+            facets.authority = "non_authoritative".to_string();
+        }
+        _ => {}
+    }
+    facets
+}
+
 pub(crate) fn quick_view(facets: &DocumentGovernanceFacets) -> &'static str {
     match facets.retrieval.as_str() {
         "required" => return "required",
@@ -209,9 +244,9 @@ pub(crate) fn quick_view(facets: &DocumentGovernanceFacets) -> &'static str {
         "agent_definition" | "prompt_template" | "skill" => "customizations",
         "decision" => "decisions",
         "status" | "report" => "evidence",
-        "discussion" | "note" => "drafts",
         "archive" => "archive",
         _ if facets.lifecycle == "archived" => "archive",
+        "discussion" | "note" => "drafts",
         _ if matches!(facets.lifecycle.as_str(), "draft" | "unclassified") => "drafts",
         _ if facets.authority == "unknown" => "unclassified",
         _ if facets.lifecycle == "active" || facets.lifecycle == "accepted" => "current",
@@ -436,6 +471,33 @@ mod tests {
         let effective = effective_facets(&document, Some(&requested));
         assert_eq!(effective.retrieval, "excluded");
         assert_eq!(effective.lifecycle, "archived");
+        assert_eq!(effective.authority, "non_authoritative");
+    }
+
+    #[test]
+    fn manifest_version_status_can_only_reduce_authority() {
+        let document = ProjectDocumentEntry {
+            path: "docs/current/specs/api.md".into(),
+            title: "API".into(),
+            content: String::new(),
+            truncated: false,
+            byte_len: 0,
+            source: "workspace".into(),
+            metadata: ProjectDocumentMetadata {
+                role: "spec".into(),
+                lifecycle: "active".into(),
+                authority: "normative".into(),
+                default_retrieval: true,
+                ..Default::default()
+            },
+        };
+        let metadata = DocumentKnowledgeMetadata {
+            version_status: "superseded".into(),
+            ..Default::default()
+        };
+        let effective = effective_facets_with_metadata(&document, None, Some(&metadata));
+        assert_eq!(effective.lifecycle, "superseded");
+        assert_eq!(effective.retrieval, "excluded");
         assert_eq!(effective.authority, "non_authoritative");
     }
 }

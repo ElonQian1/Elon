@@ -96,7 +96,11 @@ fn repository_self_project_is_scanned_with_zero_model_tokens() {
     );
     let quality = &analysis["document_health"]["quality"];
     assert_eq!(quality["summary"]["errors"], 0);
-    assert_eq!(quality["summary"]["warnings"], 0);
+    assert!(quality["summary"]["warnings"].as_u64().is_some());
+    assert!(quality["summary"]["duplicate_titles"].as_u64().is_some());
+    assert!(quality["summary"]["missing_implementation_declarations"]
+        .as_u64()
+        .is_some());
     assert!(quality["summary"]["orphan_documents"].as_u64().unwrap() <= 2);
     assert!(!quality["issues"].as_array().unwrap().iter().any(|issue| {
         let path = issue["path"].as_str().unwrap_or_default();

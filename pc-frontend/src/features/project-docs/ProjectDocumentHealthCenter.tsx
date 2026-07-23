@@ -4,6 +4,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { nodeApi } from '../node/localNodeApi'
 import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
 import type { DocumentHealthAnalysis, DocumentHealthIssue } from './projectDocumentModel'
+import ProjectDocumentFederationIndex from './ProjectDocumentFederationIndex'
 import ProjectDocumentVersionHistory from './ProjectDocumentVersionHistory'
 import styles from './ProjectDocumentHealthCenter.module.css'
 
@@ -94,8 +95,7 @@ export default function ProjectDocumentHealthCenter({ analysis, runtime, onRefre
           <div><dt>待处理事件</dt><dd>{analysis.maintenance.pending_events}</dd></div><div><dt>本轮已处理</dt><dd>{analysis.maintenance.processed_events}</dd></div>
           <div><dt>后台复查</dt><dd>{analysis.maintenance.poll_interval_seconds} 秒</dd></div><div><dt>外链待检查</dt><dd>{quality.external_links_pending}</dd></div></dl></section>
         <section className={styles.panel}><header><div><strong>联邦知识架构</strong><small>{analysis.federation.source === 'manifest' ? '显式清单' : '程序推断'} · 最深 {analysis.federation.max_depth} 层</small></div></header>
-          <div className={styles.nodes}>{analysis.federation.nodes.map((node) => <article key={node.id} style={{ marginLeft: Math.min(36, node.parent_id ? 12 : 0) }}>
-            <span><strong>{node.label}</strong><small>{node.scope_path || '项目根'}</small></span><em>{node.document_count} · {node.score}</em></article>)}</div></section>
+          <ProjectDocumentFederationIndex nodes={analysis.federation.nodes} /></section>
         <ProjectDocumentVersionHistory runtime={runtime} onRestored={onRefresh} />
       </aside>
     </div>

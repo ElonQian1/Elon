@@ -18,7 +18,7 @@ use crate::{
     project_document_files::content_revision,
     project_document_governance::{parse_manifest, SECTION_CONFIG_PATH},
     project_document_index::ProjectDocumentIndex,
-    project_document_issue_workflow::{list_filtered, synchronize},
+    project_document_issue_workflow::{list_filtered, list_filtered_page, synchronize},
     project_document_knowledge_graph::build_knowledge_maps,
     project_document_quality::{analyze_document_quality, compact_report},
 };
@@ -97,6 +97,27 @@ pub(crate) fn list_governed_issues(
 ) -> Result<Vec<Value>> {
     let index = ProjectDocumentIndex::open(workspace)?;
     list_filtered(
+        &index,
+        issue_types,
+        statuses,
+        severities,
+        owner,
+        offset,
+        limit,
+    )
+}
+
+pub(crate) fn list_governed_issues_page(
+    workspace: &Path,
+    issue_types: &[String],
+    statuses: &[String],
+    severities: &[String],
+    owner: &str,
+    offset: usize,
+    limit: usize,
+) -> Result<(Vec<Value>, usize)> {
+    let index = ProjectDocumentIndex::open(workspace)?;
+    list_filtered_page(
         &index,
         issue_types,
         statuses,

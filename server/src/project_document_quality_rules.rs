@@ -263,10 +263,11 @@ fn implementation_changed_after_review(workspace: &Path, reference: &str, review
         return false;
     };
     let (kind, value) = reference.split_once(':').unwrap_or(("file", reference));
-    if kind != "file" {
-        return false;
-    }
-    let modified_ms = file_modified_millis(&workspace.join(value.trim_start_matches('/')));
+    let modified_ms = match kind {
+        "file" | "test" => file_modified_millis(&workspace.join(value.trim_start_matches('/'))),
+        "route" | "symbol" => search_source_modified_millis(workspace, value),
+        _ => 0,
+    };
     let reviewed_ms: u64 = reviewed
         .and_hms_opt(23, 59, 59)
         .and_then(|value| value.and_utc().timestamp_millis().try_into().ok())
@@ -291,6 +292,33 @@ fn search_source(workspace: &Path, needle: &str) -> bool {
             fs::metadata(entry.path()).is_ok_and(|metadata| metadata.len() <= 2 * 1024 * 1024)
                 && fs::read_to_string(entry.path()).is_ok_and(|content| content.contains(needle))
         })
+}
+
+fn search_source_modified_millis(workspace: &Path, needle: &str) -> u64 {
+    let needle = needle.trim();
+    if needle.is_empty() {
+        return 0;
+    }
+    WalkBuilder::new(workspace)
+        .hidden(false)
+        .git_ignore(true)
+        .build()
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_type().is_some_and(|kind| kind.is_file()))
+        .filter(|entry| source_extension(entry.path()))
+        .take(5_000)
+        .filter_map(|entry| {
+            let metadata = fs::metadata(entry.path()).ok()?;
+            if metadata.len() > 2 * 1024 * 1024 {
+                return None;
+            }
+            fs::read_to_string(entry.path())
+                .ok()
+                .is_some_and(|content| content.contains(needle))
+                .then(|| file_modified_millis(entry.path()))
+        })
+        .max()
+        .unwrap_or_default()
 }
 
 fn source_extension(path: &Path) -> bool {

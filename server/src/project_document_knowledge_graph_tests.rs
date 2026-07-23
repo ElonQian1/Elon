@@ -96,6 +96,84 @@ fn builds_three_separate_metadata_only_views() {
 }
 
 #[test]
+fn parent_nodes_aggregate_child_documents_and_implementation_evidence() {
+    let root = fixture("aggregate");
+    let snapshot = collect_project_documents_with_options(
+        &root,
+        ProjectDocumentScanOptions {
+            seed_missing_defaults: false,
+            catalog_only: true,
+            include_analysis: false,
+        },
+    )
+    .unwrap();
+    let mut manifest = parse_manifest(Some(
+        &fs::read_to_string(root.join(".elon/document-sections.json")).unwrap(),
+    ))
+    .unwrap();
+    manifest.knowledge_graph.nodes = vec![
+        ProjectKnowledgeNodeConfig {
+            id: "cap-parent".into(),
+            view: "capabilities".into(),
+            label: "父能力".into(),
+            ..Default::default()
+        },
+        ProjectKnowledgeNodeConfig {
+            id: "cap-child".into(),
+            view: "capabilities".into(),
+            label: "子能力".into(),
+            parent_id: "cap-parent".into(),
+            entrypoint: "docs/API.md".into(),
+            document_paths: vec!["docs/API.md".into()],
+            implementation_refs: vec!["file:src/main.rs".into()],
+            ..Default::default()
+        },
+    ];
+    let maps = build_knowledge_maps(&root, &snapshot.documents, &manifest);
+    let parent = maps
+        .capabilities
+        .nodes
+        .iter()
+        .find(|node| node.id == "cap-parent")
+        .unwrap();
+    assert!(parent.document_paths.contains(&"docs/API.md".to_string()));
+    assert_eq!(parent.entrypoint_source, "child_aggregate");
+    assert_eq!(parent.implementation_status, "verified");
+    assert!(!maps
+        .capabilities
+        .diagnostics
+        .findings
+        .iter()
+        .any(|finding| {
+            finding.node_id == "cap-parent"
+                && matches!(
+                    finding.code,
+                    "undocumented_node" | "missing_implementation_evidence"
+                )
+        }));
+
+    manifest
+        .knowledge_graph
+        .nodes
+        .iter_mut()
+        .for_each(|node| node.implementation_refs.clear());
+    let without_evidence = build_knowledge_maps(&root, &snapshot.documents, &manifest);
+    assert_eq!(
+        without_evidence.capabilities.stats.implementation_declared,
+        0
+    );
+    assert_eq!(
+        without_evidence
+            .capabilities
+            .diagnostics
+            .implementation_score,
+        Some(0)
+    );
+    assert!(without_evidence.capabilities.diagnostics.structural_score < 70);
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn graph_model_rejects_cycles_and_unknown_views() {
     let node = |id: &str, parent: &str, view: &str| ProjectKnowledgeNodeConfig {
         id: id.to_string(),
@@ -193,9 +271,14 @@ fn mcp_graph_queries_are_bounded_and_do_not_read_bodies() {
         map["identity"]["knowledge_map_revision"]
     );
 
-    let plan = plan_context(&root, "健康检查", Some("cap-api"), 1_000, 4).unwrap();
+    let plan = plan_context(&root, "健康检查", Some("cap-api"), 1_000, 4, 2_000).unwrap();
     assert_eq!(plan["budget"]["markdown_bodies_read"], 0);
-    assert_eq!(plan["documents"][0]["document"]["path"], "docs/API.md");
+    assert_eq!(
+        plan["relevant_documents"][0]["document"]["path"],
+        "docs/API.md"
+    );
+    assert!(plan["budget"]["rules"].is_object());
+    assert!(plan["budget"]["relevant_content"].is_object());
     fs::remove_dir_all(root).ok();
 }
 
@@ -210,6 +293,37 @@ fn self_project_overview_is_bounded_and_fast_enough_for_interactive_use() {
     let elapsed = started.elapsed();
     assert_eq!(overview["views"].as_array().unwrap().len(), 3);
     assert_eq!(overview["budget"]["markdown_bodies_read"], 0);
+    let context = plan_context(
+        &root,
+        "文档知识架构治理 系统架构 PC监督 MCP 低token",
+        None,
+        12_000,
+        12,
+        6_000,
+    )
+    .unwrap();
+    let paths = context["relevant_documents"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|item| {
+            item.pointer("/document/path")
+                .and_then(serde_json::Value::as_str)
+        })
+        .collect::<Vec<_>>();
+    assert!(paths.contains(&"docs/system-architecture.md"), "{paths:?}");
+    assert!(
+        paths.contains(&"docs/codex-desktop-pc-supervision.md"),
+        "{paths:?}"
+    );
+    assert!(
+        paths.contains(&"docs/project-document-governance-mcp.md"),
+        "{paths:?}"
+    );
+    assert!(!paths.iter().any(|path| {
+        let path = path.to_ascii_lowercase();
+        path.contains("e2e") || path.contains("trace")
+    }));
     assert!(
         elapsed.as_secs() < 10,
         "self project overview took {elapsed:?}"

@@ -49,6 +49,49 @@ fn request(value: Value) -> McpRequest {
 }
 
 #[tokio::test]
+async fn self_project_limit_one_summary_is_bounded_and_reports_exact_bytes() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    let response = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":901,"method":"tools/call",
+            "params":{"name":"project_docs_analyze","arguments":{"offset":0,"limit":1,"projection":"summary"}}
+        })),
+    )
+    .await
+    .unwrap();
+    let structured = &response["result"]["structuredContent"];
+    let bytes = serde_json::to_vec(structured).unwrap().len();
+    let estimated_tokens = bytes.div_ceil(4);
+    println!("SELF_PROJECT_SUMMARY_BYTES={bytes} ESTIMATED_TOKENS={estimated_tokens}");
+    assert_eq!(structured["response_budget"]["serialized_bytes"], bytes);
+    assert_eq!(
+        structured["response_budget"]["estimated_tokens"],
+        estimated_tokens
+    );
+    assert_eq!(
+        structured["response_budget"]["token_estimator"],
+        "utf8_bytes_div_4_ceil"
+    );
+    assert!(
+        bytes < 50_000,
+        "曾为约 488KB 的 summary 回归：{bytes} bytes"
+    );
+    assert_eq!(structured["documents"].as_array().unwrap().len(), 0);
+    assert!(
+        structured["pagination"]["matching_documents"]
+            .as_u64()
+            .unwrap()
+            > 100
+    );
+    assert!(structured["manifest"]["counts"]["sections"].is_number());
+    assert!(structured["manifest"].get("assignments").is_none());
+}
+
+#[tokio::test]
 async fn descriptor_binds_short_lived_session_to_git_workspace() {
     let root = workspace();
     let descriptor = descriptor_for_project(root.to_str().unwrap(), 7799).unwrap();
@@ -104,12 +147,14 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "project_docs_get_node",
             "project_docs_review_map",
             "project_docs_plan_context",
+            "project_docs_get_federation",
             "project_docs_get_status",
             "project_docs_read",
             "project_docs_get_suggestions",
             "project_docs_save_suggestions",
             "project_docs_apply_suggestions",
             "project_docs_apply_file_operations",
+            "project_docs_get_health",
             "project_docs_update_issue",
             "project_docs_get_health_history",
             "project_docs_get_history",
@@ -129,6 +174,8 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     assert!(suggestion_properties.get("proposed_home").is_some());
     assert!(suggestion_properties.get("document_metadata").is_some());
     assert!(suggestion_properties.get("governance_facets").is_some());
+    assert!(suggestion_properties.get("section_operations").is_some());
+    assert_eq!(suggestion_properties["assignments"]["maxItems"], 20_000);
     assert!(suggestion_properties
         .get("proposed_knowledge_graph")
         .is_some());
@@ -162,6 +209,33 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     assert!(
         analyzed["result"]["structuredContent"]["document_health"]["identity"]["manifest_revision"]
             .is_null()
+    );
+    let summary = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":21,"method":"tools/call",
+            "params":{"name":"project_docs_analyze","arguments":{"offset":0,"limit":1,"projection":"summary"}}
+        })),
+    )
+    .await
+    .unwrap();
+    let structured = &summary["result"]["structuredContent"];
+    let serialized_bytes = serde_json::to_vec(structured).unwrap().len();
+    assert_eq!(
+        structured["response_budget"]["serialized_bytes"],
+        serialized_bytes
+    );
+    assert!(
+        serialized_bytes < 50_000,
+        "summary 不得携带全量集合：{serialized_bytes}"
+    );
+    assert_eq!(structured["documents"].as_array().unwrap().len(), 0);
+    assert!(
+        summary["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .len()
+            < 2_000
     );
     let issues = handle_request(
         &root,
@@ -225,6 +299,33 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     );
     assert!(map["result"]["structuredContent"]["identity"]["canonical_workspace"].is_string());
     assert!(map["result"]["structuredContent"]["identity"]["knowledge_map_revision"].is_string());
+    let federation = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":231,"method":"tools/call",
+            "params":{"name":"project_docs_get_federation","arguments":{"limit":1}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        federation["result"]["structuredContent"]["selection"]["lazy"],
+        true
+    );
+    assert_eq!(
+        federation["result"]["structuredContent"]["limits"]["legacy_document_limit_applies"],
+        false
+    );
+    let health = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":232,"method":"tools/call",
+            "params":{"name":"project_docs_get_health","arguments":{"projection":"detail","detail":"issues","limit":1}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert!(health["result"]["structuredContent"]["pagination"]["total_matching"].is_number());
     let root_node_id = map["result"]["structuredContent"]["root_id"]
         .as_str()
         .unwrap();
@@ -254,6 +355,8 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         planned["result"]["structuredContent"]["budget"]["markdown_bodies_read"],
         0
     );
+    assert!(planned["result"]["structuredContent"]["budget"]["rules"].is_object());
+    assert!(planned["result"]["structuredContent"]["budget"]["relevant_content"].is_object());
     let catalog_revision = analyzed["result"]["structuredContent"]["catalog_revision"]
         .as_str()
         .unwrap();
@@ -310,10 +413,7 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     .await
     .unwrap();
     assert_eq!(applied["result"]["structuredContent"]["status"], "applied");
-    assert_eq!(
-        applied["result"]["structuredContent"]["manifest"]["governance_overrides"]["AGENTS.md"],
-        "required"
-    );
+    assert!(applied["result"]["structuredContent"]["manifest"]["counts"].is_object());
     assert_eq!(
         applied["result"]["structuredContent"]["markdown_changed"],
         false

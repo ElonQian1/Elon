@@ -57,6 +57,17 @@ fn frontmatter_can_only_narrow_lifecycle() {
 }
 
 #[test]
+fn frontmatter_version_status_also_narrows_authoritative_paths() {
+    let metadata = classify_project_document(
+        "docs/current/specs/api.md",
+        "---\nversion_status: superseded\n---\n# API\n",
+        52,
+    );
+    assert_eq!(metadata.lifecycle, "superseded");
+    assert!(!metadata.default_retrieval);
+}
+
+#[test]
 fn customization_assets_and_ai_rules_are_not_unknown_notes() {
     let agent =
         classify_project_document(".github/agents/elon-reviewer.agent.md", "# Reviewer\n", 10);

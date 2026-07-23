@@ -22,6 +22,7 @@ pub(crate) fn classify_project_document(
     }
     if let Some(lifecycle) = frontmatter_value(&frontmatter, "lifecycle")
         .or_else(|| frontmatter_value(&frontmatter, "status"))
+        .or_else(|| frontmatter_value(&frontmatter, "version_status"))
     {
         apply_lifecycle_narrowing(&mut metadata, &lifecycle);
     }

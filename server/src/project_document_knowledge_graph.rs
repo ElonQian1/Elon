@@ -8,6 +8,9 @@ use std::{
 
 use crate::{
     project_document_governance::{CustomDocumentSection, DocumentSectionManifest},
+    project_document_knowledge_graph_health::{
+        aggregate_child_knowledge, append_status_findings, score_map, view_needs_implementation,
+    },
     project_document_knowledge_graph_model::{
         KnowledgeMapBudget, KnowledgeMapCoverage, KnowledgeMapDiagnostics, KnowledgeMapEvidence,
         KnowledgeMapFinding, KnowledgeMapStats, ProjectKnowledgeEdgeConfig,
@@ -106,6 +109,17 @@ fn build_from_config(
         node.depth = depths.get(&node.id).copied().unwrap_or(1);
         node.child_count = child_counts.get(&node.id).copied().unwrap_or_default();
     }
+    aggregate_child_knowledge(&mut nodes, &document_by_path, view);
+    findings.retain(|item| {
+        !matches!(
+            item.code,
+            "undocumented_node"
+                | "missing_entrypoint"
+                | "missing_implementation_evidence"
+                | "stale_implementation_evidence"
+        )
+    });
+    append_status_findings(&nodes, &mut findings);
     nodes.sort_by(|left, right| {
         left.depth
             .cmp(&right.depth)
@@ -197,20 +211,7 @@ fn build_from_config(
             "与 AI 讨论后把确认的节点和证据写入共享清单。",
         ));
     }
-    let structural_score = (100_i32
-        - findings
-            .iter()
-            .map(|item| {
-                if item.severity == "warning" {
-                    8
-                } else if item.severity == "error" {
-                    15
-                } else {
-                    2
-                }
-            })
-            .sum::<i32>())
-    .clamp(0, 100) as u8;
+    let score = score_map(&stats, &findings, view);
     ProjectKnowledgeMap {
         version: 1,
         view: view.to_string(),
@@ -221,14 +222,18 @@ fn build_from_config(
         edges,
         stats,
         diagnostics: KnowledgeMapDiagnostics {
-            structural_score,
-            status: if structural_score >= 85 {
+            structural_score: score.structural,
+            status: if score.structural >= 85 {
                 "healthy"
-            } else if structural_score >= 60 {
+            } else if score.structural >= 60 {
                 "review"
             } else {
                 "needs_structure"
             },
+            finding_score: score.finding,
+            documentation_score: score.documentation,
+            implementation_score: score.implementation,
+            score_formula: score.formula,
             findings,
         },
         budget: KnowledgeMapBudget {
@@ -467,7 +472,7 @@ fn infer_documents(
         .collect()
 }
 
-fn coverage_for_paths(
+pub(crate) fn coverage_for_paths(
     paths: &[String],
     by_path: &HashMap<String, &ProjectDocumentEntry>,
     has_entrypoint: bool,
@@ -665,9 +670,6 @@ fn contains(text: &str, terms: &[&str]) -> bool {
 }
 fn normalize(value: &str) -> String {
     value.trim().replace('\\', "/").to_ascii_lowercase()
-}
-fn view_needs_implementation(view: &str) -> bool {
-    matches!(view, "capabilities" | "architecture")
 }
 fn root_label(manifest: &DocumentSectionManifest) -> String {
     if manifest.home.title.is_empty() {

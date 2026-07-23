@@ -105,6 +105,14 @@ pub(crate) fn contains_version(workspace: &Path, commit: &str) -> Result<bool> {
 }
 
 pub(crate) fn restore_version(workspace: &Path, commit: &str) -> Result<String> {
+    restore_version_with(workspace, commit, || Ok(()))
+}
+
+fn restore_version_with(
+    workspace: &Path,
+    commit: &str,
+    before_commit: impl FnOnce() -> Result<()>,
+) -> Result<String> {
     ensure_managed(workspace)?;
     let commit = commit.trim();
     if commit.is_empty()
@@ -116,8 +124,19 @@ pub(crate) fn restore_version(workspace: &Path, commit: &str) -> Result<String> 
         return Ok(commit.to_string());
     }
     checkpoint_after_write(workspace, "恢复前检查点")?;
+    let rollback_head = current_head(workspace)?;
     git(workspace, &["read-tree", "--reset", "-u", commit])?;
-    git(workspace, &["commit", "-m", "chore(notes): 恢复历史版本"])?;
+    let result = before_commit().and_then(|_| {
+        git(workspace, &["commit", "-m", "chore(notes): 恢复历史版本"])?;
+        Ok(())
+    });
+    if let Err(error) = result {
+        git(workspace, &["read-tree", "--reset", "-u", &rollback_head])
+            .with_context(|| format!("恢复历史版本失败且无法回到恢复前检查点 {rollback_head}"))?;
+        return Err(error).context(format!(
+            "恢复历史版本失败；已自动回到恢复前检查点 {rollback_head}"
+        ));
+    }
     current_head(workspace)
 }
 

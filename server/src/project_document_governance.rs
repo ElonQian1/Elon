@@ -18,6 +18,7 @@ use crate::project_document_governance_facets::{
 pub(crate) use crate::project_document_governance_facets::{
     DocumentGovernanceFacets, DocumentKnowledgeMetadata,
 };
+use crate::project_document_governance_section_operations::apply_section_operations;
 use crate::project_document_knowledge_graph_model::{
     merge_graph_config, normalize_graph_config, validate_graph_document_paths,
     ProjectKnowledgeGraphConfig,
@@ -25,8 +26,8 @@ use crate::project_document_knowledge_graph_model::{
 
 pub(crate) const SECTION_CONFIG_PATH: &str = ".elon/document-sections.json";
 pub(crate) const SUGGESTIONS_CONFIG_PATH: &str = ".elon/document-organization-suggestions.json";
-pub(crate) const MAX_PROPOSED_SECTIONS: usize = 16;
-pub(crate) const MAX_SUGGESTED_ASSIGNMENTS: usize = 500;
+pub(crate) const MAX_PROPOSED_SECTIONS: usize = 256;
+pub(crate) const MAX_SUGGESTED_ASSIGNMENTS: usize = 20_000;
 pub(crate) const MAX_SUGGESTED_FILE_OPERATIONS: usize = 100;
 
 const SYSTEM_SECTION_KEYS: &[&str] = &[
@@ -139,6 +140,26 @@ pub(crate) struct SuggestedAssignment {
     pub secondary: bool,
 }
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct SuggestedSectionOperation {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub section_id: String,
+    #[serde(default)]
+    pub target_section_id: String,
+    #[serde(default)]
+    pub parent_id: String,
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub reason: String,
+    #[serde(default)]
+    pub impact: String,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum OrganizationStatus {
@@ -170,6 +191,8 @@ pub(crate) struct DocumentOrganizationSuggestions {
     #[serde(default)]
     pub assignments: Vec<SuggestedAssignment>,
     #[serde(default)]
+    pub section_operations: Vec<SuggestedSectionOperation>,
+    #[serde(default)]
     pub conflicts: Vec<String>,
     #[serde(default)]
     pub move_suggestions: Vec<String>,
@@ -197,6 +220,7 @@ pub(crate) struct ApplySuggestionsResult {
     pub suggestions: DocumentOrganizationSuggestions,
     pub applied_assignments: usize,
     pub skipped_assignments: usize,
+    pub applied_section_operations: usize,
     pub already_applied: bool,
 }
 
@@ -222,19 +246,19 @@ pub(crate) fn normalize_manifest(
     if manifest.version != schema_version() {
         bail!("document-sections.json 仅支持 version=1");
     }
-    if manifest.sections.len() > 64
-        || manifest.assignments.len() > 5_000
-        || manifest.secondary_assignments.len() > 5_000
-        || manifest.governance_overrides.len() > 5_000
-        || manifest.governance_facets.len() > 5_000
-        || manifest.document_metadata.len() > 5_000
+    if manifest.sections.len() > MAX_PROPOSED_SECTIONS
+        || manifest.assignments.len() > MAX_SUGGESTED_ASSIGNMENTS
+        || manifest.secondary_assignments.len() > MAX_SUGGESTED_ASSIGNMENTS
+        || manifest.governance_overrides.len() > MAX_SUGGESTED_ASSIGNMENTS
+        || manifest.governance_facets.len() > MAX_SUGGESTED_ASSIGNMENTS
+        || manifest.document_metadata.len() > MAX_SUGGESTED_ASSIGNMENTS
         || manifest.audit_log.len() > 100
     {
         bail!("项目文档分区配置超过安全上限");
     }
     manifest.profile = sanitize_profile(&manifest.profile);
     manifest.home = sanitize_home(manifest.home)?;
-    manifest.sections = unique_sections(manifest.sections, 64)?;
+    manifest.sections = unique_sections(manifest.sections, MAX_PROPOSED_SECTIONS)?;
     validate_section_tree(&manifest.sections)?;
     let valid_keys = valid_section_keys(&manifest.sections);
     let mut assignments = BTreeMap::new();
@@ -308,6 +332,7 @@ pub(crate) fn normalize_suggestions(
     }
     if suggestions.proposed_sections.len() > MAX_PROPOSED_SECTIONS
         || suggestions.assignments.len() > MAX_SUGGESTED_ASSIGNMENTS
+        || suggestions.section_operations.len() > MAX_PROPOSED_SECTIONS
         || suggestions.conflicts.len() > 100
         || suggestions.move_suggestions.len() > 100
         || suggestions.architecture_findings.len() > 100
@@ -336,6 +361,11 @@ pub(crate) fn normalize_suggestions(
             })
         })
         .collect::<Result<Vec<_>>>()?;
+    suggestions.section_operations = suggestions
+        .section_operations
+        .into_iter()
+        .map(sanitize_section_operation)
+        .collect::<Result<Vec<_>>>()?;
     suggestions.conflicts = bounded_strings(suggestions.conflicts, 100, 1_000);
     suggestions.move_suggestions = bounded_strings(suggestions.move_suggestions, 100, 1_000);
     suggestions.architecture_findings =
@@ -357,6 +387,37 @@ pub(crate) fn normalize_suggestions(
     suggestions.proposed_knowledge_graph =
         normalize_graph_config(suggestions.proposed_knowledge_graph)?;
     Ok(suggestions)
+}
+
+fn sanitize_section_operation(
+    mut operation: SuggestedSectionOperation,
+) -> Result<SuggestedSectionOperation> {
+    operation.id = truncate_chars(operation.id.trim(), 80);
+    operation.kind = match operation.kind.trim().to_ascii_lowercase().as_str() {
+        "create" | "rename" | "move" | "merge" | "delete" => {
+            operation.kind.trim().to_ascii_lowercase()
+        }
+        _ => bail!("AI 分区建议包含未知操作类型"),
+    };
+    operation.section_id = sanitize_section_id(strip_custom_prefix(&operation.section_id));
+    operation.target_section_id =
+        sanitize_section_id(strip_custom_prefix(&operation.target_section_id));
+    operation.parent_id = sanitize_section_id(strip_custom_prefix(&operation.parent_id));
+    operation.label = truncate_chars(operation.label.trim(), 40);
+    operation.reason = truncate_chars(operation.reason.trim(), 500);
+    operation.impact = truncate_chars(operation.impact.trim(), 500);
+    if operation.id.is_empty()
+        || operation.section_id.is_empty()
+        || operation.reason.is_empty()
+        || operation.impact.is_empty()
+    {
+        bail!("AI 分区建议必须包含 id、section_id、reason 和 impact");
+    }
+    Ok(operation)
+}
+
+fn strip_custom_prefix(value: &str) -> &str {
+    value.trim().strip_prefix("custom:").unwrap_or(value.trim())
 }
 
 pub(crate) fn validate_ready_suggestions(
@@ -397,6 +458,7 @@ pub(crate) fn apply_suggestions(
             suggestions,
             applied_assignments: 0,
             skipped_assignments: 0,
+            applied_section_operations: 0,
             already_applied: true,
         });
     }
@@ -404,14 +466,19 @@ pub(crate) fn apply_suggestions(
         bail!("只有 ready 状态的 AI 建议可以应用");
     }
     let known_paths = document_paths(documents);
-    let mut sections = manifest
-        .sections
+    let mut sections = std::mem::take(&mut manifest.sections)
         .into_iter()
         .map(|section| (section.id.clone(), section))
         .collect::<BTreeMap<_, _>>();
     for section in suggestions.proposed_sections.iter().cloned() {
         sections.insert(section.id.clone(), section);
     }
+    let applied_section_operations = apply_section_operations(
+        &mut manifest,
+        &mut sections,
+        &suggestions.section_operations,
+    )?;
+    validate_section_tree(&sections.values().cloned().collect::<Vec<_>>())?;
     if suggestions.proposed_profile != "auto" {
         manifest.profile = suggestions.proposed_profile.clone();
     }
@@ -474,6 +541,7 @@ pub(crate) fn apply_suggestions(
         suggestions,
         applied_assignments: applied,
         skipped_assignments: skipped,
+        applied_section_operations,
         already_applied: false,
     })
 }

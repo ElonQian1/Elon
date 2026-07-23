@@ -46,6 +46,8 @@ pub(crate) struct DocumentQualitySummary {
     pub missing_owners: usize,
     pub missing_review_dates: usize,
     pub overdue_reviews: usize,
+    pub duplicate_titles: usize,
+    pub missing_implementation_declarations: usize,
     pub implementation_conflicts: usize,
     pub external_links_checked: usize,
     pub external_links_pending: usize,
@@ -79,8 +81,18 @@ pub(crate) fn analyze_document_quality(
     let mut inbound = HashMap::<String, usize>::new();
     let mut issues = Vec::new();
     let mut external_urls = HashSet::new();
+    let mut titles = HashMap::<String, Vec<String>>::new();
     for document in documents {
         let path = normalize(&document.path);
+        let title_key = normalize_title(&document.title);
+        if !title_key.is_empty()
+            && !matches!(
+                document.metadata.lifecycle.as_str(),
+                "deprecated" | "superseded" | "archived"
+            )
+        {
+            titles.entry(title_key).or_default().push(path.clone());
+        }
         let Some(document_facts) = facts.get(&path) else {
             continue;
         };
@@ -128,6 +140,18 @@ pub(crate) fn analyze_document_quality(
                 }
             }
         }
+    }
+
+    for paths in titles.values().filter(|paths| paths.len() > 1) {
+        issues.push(make_issue(
+            "duplicate_title",
+            "warning",
+            &paths[0],
+            "多份当前文档使用相同标题，检索结果可能互相冲突".to_string(),
+            format!("冲突路径：{}", paths.join(", ")),
+            "明确主入口并为其他文档改用带范围的标题，或标记版本状态",
+            100,
+        ));
     }
 
     let entrypoints = manifest_entrypoints(manifest);
@@ -178,6 +202,24 @@ pub(crate) fn analyze_document_quality(
                     100,
                 ));
             }
+        }
+        if manifest.document_metadata.contains_key(&path)
+            && metadata.implementation_refs.is_empty()
+            && metadata.version_status != "archived"
+            && matches!(
+                metadata.doc_type.as_str(),
+                "architecture" | "api" | "spec" | "runbook" | "technical_design"
+            )
+        {
+            issues.push(make_issue(
+                "implementation_reference_missing",
+                "warning",
+                &path,
+                "实现型权威文档没有声明代码、API、路由或测试证据".to_string(),
+                format!("doc_type={} implementation_refs=0", metadata.doc_type),
+                "添加 file:/route:/symbol:/test: 实现引用并复查正文",
+                100,
+            ));
         }
         if eligible_for_orphan_check(document)
             && inbound.get(&path).copied().unwrap_or_default() == 0
@@ -242,6 +284,8 @@ pub(crate) fn analyze_document_quality(
             "missing_owner",
             "missing_review_date",
             "overdue_review",
+            "duplicate_title",
+            "implementation_reference_missing",
             "implementation_conflict",
             "implementation_drift",
         ],
@@ -318,10 +362,21 @@ fn summarize(
         missing_owners: count("missing_owner"),
         missing_review_dates: count("missing_review_date"),
         overdue_reviews: count("overdue_review"),
+        duplicate_titles: count("duplicate_title"),
+        missing_implementation_declarations: count("implementation_reference_missing"),
         implementation_conflicts: count("implementation_conflict") + count("implementation_drift"),
         external_links_checked: external_checked.min(external_total),
         external_links_pending: external_total.saturating_sub(external_checked),
     }
+}
+
+fn normalize_title(value: &str) -> String {
+    value
+        .trim()
+        .to_lowercase()
+        .chars()
+        .filter(|character| character.is_alphanumeric())
+        .collect()
 }
 
 fn external_link_owner<'a>(facts: &'a HashMap<String, DocumentQualityFacts>, url: &str) -> &'a str {

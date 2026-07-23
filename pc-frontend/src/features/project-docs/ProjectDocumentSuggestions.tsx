@@ -45,6 +45,7 @@ export default function ProjectDocumentSuggestions({
   const ready = suggestions?.status === 'ready'
   const suggestionCount = (suggestions?.proposed_sections.length ?? 0)
     + (suggestions?.assignments.length ?? 0)
+    + (suggestions?.section_operations.length ?? 0)
     + Object.keys(suggestions?.document_metadata ?? {}).length
     + (suggestions?.proposed_home ? 1 : 0)
     + (suggestions?.proposed_knowledge_graph.nodes.length ?? 0)
@@ -189,6 +190,18 @@ export default function ProjectDocumentSuggestions({
                 {!suggestions.proposed_sections.length && <p>不需要新增主题。</p>}
               </div>
             </section>
+
+            {!!suggestions.section_operations.length && <section>
+              <h3>AI 分区治理建议 <em>{suggestions.section_operations.length}</em></h3>
+              <div className={styles.assignmentList}>
+                {suggestions.section_operations.map((operation) => <article key={operation.id}>
+                  <code>{operation.kind} · {operation.section_id}{operation.target_section_id ? ` → ${operation.target_section_id}` : ''}</code>
+                  <strong>{operation.label || operation.parent_id || '分区结构调整'}</strong>
+                  <span>理由：{operation.reason}；影响：{operation.impact}</span>
+                </article>)}
+              </div>
+              <p className={styles.safetyNote}>删除、覆盖和合并建议必须在整理前 Git 备份后才可执行，并可从版本历史回滚。</p>
+            </section>}
 
             <section>
               <h3>建议归类 <em>{suggestions.assignments.length}</em></h3>

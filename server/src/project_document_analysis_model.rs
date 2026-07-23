@@ -8,7 +8,9 @@ use serde_json::Value;
 use crate::{
     project_document_federation::path_matches_scope,
     project_document_governance::{effective_section, DocumentSectionManifest},
-    project_document_governance_facets::{effective_facets, DocumentGovernanceFacets},
+    project_document_governance_facets::{
+        effective_facets_with_metadata, DocumentGovernanceFacets,
+    },
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -38,6 +40,8 @@ pub(crate) struct CompactDocument<'a> {
     primary_topic: String,
     secondary_topics: Vec<String>,
     governance: DocumentGovernanceFacets,
+    version: String,
+    version_status: String,
 }
 
 pub(crate) fn compact_document<'a>(
@@ -67,7 +71,21 @@ pub(crate) fn compact_document<'a>(
             .get(&path)
             .cloned()
             .unwrap_or_default(),
-        governance: effective_facets(document, manifest.governance_facets.get(&path)),
+        governance: effective_facets_with_metadata(
+            document,
+            manifest.governance_facets.get(&path),
+            manifest.document_metadata.get(&path),
+        ),
+        version: manifest
+            .document_metadata
+            .get(&path)
+            .map(|metadata| metadata.version.clone())
+            .unwrap_or_default(),
+        version_status: manifest
+            .document_metadata
+            .get(&path)
+            .map(|metadata| metadata.version_status.clone())
+            .unwrap_or_default(),
     }
 }
 

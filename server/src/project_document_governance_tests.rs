@@ -5,10 +5,11 @@ use crate::{
     project_document_file_operations::{apply_file_operations, ApplyFileOperationsRequest},
     project_document_files::write_project_document_file,
     project_document_governance::{
-        parse_manifest, to_pretty_json, CustomDocumentSection, DocumentKnowledgeHome,
-        DocumentKnowledgeMetadata, DocumentOrganizationSuggestions, OrganizationStatus,
-        SuggestedAssignment, SuggestedFileOperation, SuggestedFileOperationKind,
-        SuggestedFileOperationStatus, SUGGESTIONS_CONFIG_PATH,
+        apply_suggestions, parse_manifest, to_pretty_json, CustomDocumentSection,
+        DocumentKnowledgeHome, DocumentKnowledgeMetadata, DocumentOrganizationSuggestions,
+        DocumentSectionManifest, OrganizationStatus, SuggestedAssignment, SuggestedFileOperation,
+        SuggestedFileOperationKind, SuggestedFileOperationStatus, SuggestedSectionOperation,
+        SUGGESTIONS_CONFIG_PATH,
     },
     project_document_governance_service::{
         analyze_workspace, apply_saved_suggestions, read_documents, save_suggestions,
@@ -173,6 +174,88 @@ fn section_tree_accepts_four_levels_and_rejects_a_fifth() {
     );
     let error = parse_manifest(Some(&five_levels)).unwrap_err();
     assert!(error.to_string().contains("最多支持 4 层"));
+}
+
+#[test]
+fn ai_section_operations_apply_with_reason_impact_and_audit() {
+    let manifest = parse_manifest(Some(
+        r##"{
+          "version": 1,
+          "sections": [
+            {"id":"inbox","label":"收件箱"},
+            {"id":"keep","label":"保留"},
+            {"id":"child","label":"子主题","parent_id":"inbox"}
+          ],
+          "assignments": {"docs/a.md":"custom:inbox"},
+          "secondary_assignments": {"docs/b.md":["custom:inbox","custom:keep"]}
+        }"##,
+    ))
+    .unwrap();
+    let operation = |id: &str, kind: &str, section_id: &str| SuggestedSectionOperation {
+        id: id.to_string(),
+        kind: kind.to_string(),
+        section_id: section_id.to_string(),
+        reason: "主题边界更清楚".to_string(),
+        impact: "仅改变虚拟分区，Markdown 不删除".to_string(),
+        ..SuggestedSectionOperation::default()
+    };
+    let mut suggestions = DocumentOrganizationSuggestions {
+        version: 1,
+        status: OrganizationStatus::Ready,
+        ..DocumentOrganizationSuggestions::default()
+    };
+    suggestions.section_operations = vec![
+        SuggestedSectionOperation {
+            parent_id: "".to_string(),
+            label: "归档主题".to_string(),
+            ..operation("create-archive", "create", "archive-topic")
+        },
+        SuggestedSectionOperation {
+            label: "当前入口".to_string(),
+            ..operation("rename-keep", "rename", "custom:keep")
+        },
+        SuggestedSectionOperation {
+            parent_id: "archive-topic".to_string(),
+            ..operation("move-child", "move", "child")
+        },
+        SuggestedSectionOperation {
+            target_section_id: "keep".to_string(),
+            ..operation("merge-inbox", "merge", "inbox")
+        },
+        operation("delete-archive", "delete", "archive-topic"),
+    ];
+
+    let result = apply_suggestions(manifest, suggestions, &[]).unwrap();
+    assert_eq!(result.applied_section_operations, 5);
+    assert_eq!(result.manifest.assignments["docs/a.md"], "custom:keep");
+    assert_eq!(
+        result.manifest.secondary_assignments["docs/b.md"],
+        vec!["custom:keep"]
+    );
+    assert_eq!(result.manifest.sections.len(), 1);
+    assert_eq!(result.manifest.sections[0].id, "keep");
+    assert_eq!(result.manifest.sections[0].label, "当前入口");
+    assert_eq!(result.manifest.audit_log.len(), 5);
+    assert!(result
+        .manifest
+        .audit_log
+        .iter()
+        .all(|entry| entry.summary.contains("Markdown 不删除")));
+
+    let empty = DocumentSectionManifest::default();
+    assert!(apply_suggestions(
+        empty,
+        DocumentOrganizationSuggestions {
+            version: 1,
+            status: OrganizationStatus::Ready,
+            section_operations: vec![operation("bad", "rename", "missing")],
+            ..DocumentOrganizationSuggestions::default()
+        },
+        &[],
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("不存在"));
 }
 
 #[test]

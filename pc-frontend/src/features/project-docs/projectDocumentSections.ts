@@ -45,6 +45,7 @@ export interface DocumentKnowledgeMetadata {
   review_interval_days: number
   implementation_refs: string[]
   version: string
+  version_status: '' | 'current' | 'draft' | 'deprecated' | 'superseded' | 'archived'
   related: string[]
   supersedes: string[]
   relations: DocumentRelation[]
@@ -106,6 +107,17 @@ export interface SuggestedFileOperation {
   status: 'proposed' | 'applied'
 }
 
+export interface SuggestedSectionOperation {
+  id: string
+  kind: 'create' | 'rename' | 'move' | 'merge' | 'delete'
+  section_id: string
+  target_section_id: string
+  parent_id: string
+  label: string
+  reason: string
+  impact: string
+}
+
 export type DocumentAutomationMode = 'git_backed_full' | 'trusted_reversible' | 'review_all' | 'suggestions_only'
 
 export interface DocumentOrganizationSuggestions {
@@ -116,6 +128,7 @@ export interface DocumentOrganizationSuggestions {
   proposed_home: DocumentKnowledgeHome | null
   proposed_sections: CustomDocumentSection[]
   assignments: SuggestedAssignment[]
+  section_operations: SuggestedSectionOperation[]
   conflicts: string[]
   move_suggestions: string[]
   architecture_findings: string[]
@@ -188,7 +201,20 @@ export function governanceSectionForDocument(
 ): string {
   const path = normalizedPath(document.path)
   const configured = manifest.governance_facets[path]
-  if (configured) return governanceQuickView(effectiveGovernanceFacets(document, configured))
+  const versionStatus = manifest.document_metadata[path]?.version_status
+  if (configured || versionStatus) {
+    const facets = effectiveGovernanceFacets(document, configured)
+    if (versionStatus === 'draft') {
+      facets.lifecycle = 'draft'
+      if (facets.retrieval === 'required') facets.retrieval = 'on_demand'
+      if (facets.authority === 'binding' || facets.authority === 'authoritative') facets.authority = 'proposal'
+    } else if (versionStatus === 'deprecated' || versionStatus === 'superseded' || versionStatus === 'archived') {
+      facets.lifecycle = versionStatus
+      facets.retrieval = 'excluded'
+      facets.authority = 'non_authoritative'
+    }
+    return governanceQuickView(facets)
+  }
   const assigned = manifest.governance_overrides[path]
   if (assigned && SYSTEM_DOCUMENT_SECTIONS.some((section) => section.key === assigned)) return assigned
   return automaticGovernanceSection(document)
@@ -275,9 +301,9 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
       : 'requested'
     const proposedSections = uniqueSections(Array.isArray(value.proposed_sections)
       ? value.proposed_sections.map(sanitizeCustomSection).filter((section): section is CustomDocumentSection => !!section)
-      : []).slice(0, 16)
+      : []).slice(0, 256)
     const assignments = Array.isArray(value.assignments)
-      ? value.assignments.slice(0, 500).flatMap((assignment) => {
+      ? value.assignments.slice(0, 20_000).flatMap((assignment) => {
         if (!assignment || typeof assignment !== 'object') return []
         const candidate = assignment as Partial<SuggestedAssignment>
         const path = normalizedPath(candidate.path ?? '')
@@ -286,6 +312,24 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
         return [{ path, section_id: sectionId, reason: String(candidate.reason ?? '').slice(0, 500), secondary: candidate.secondary === true }]
       })
       : []
+    const sectionOperations = Array.isArray(value.section_operations)
+      ? value.section_operations.slice(0, 256).flatMap((operation) => {
+        if (!operation || typeof operation !== 'object') return []
+        const candidate = operation as Partial<SuggestedSectionOperation>
+        const kind = ['create', 'rename', 'move', 'merge', 'delete'].includes(candidate.kind ?? '')
+          ? candidate.kind as SuggestedSectionOperation['kind'] : null
+        const id = String(candidate.id ?? '').trim().slice(0, 80)
+        const sectionId = sanitizeSectionId(candidate.section_id ?? '')
+        if (!id || !kind || !sectionId) return []
+        return [{
+          id, kind, section_id: sectionId,
+          target_section_id: sanitizeSectionId(candidate.target_section_id ?? ''),
+          parent_id: sanitizeSectionId(candidate.parent_id ?? ''),
+          label: String(candidate.label ?? '').trim().slice(0, 40),
+          reason: String(candidate.reason ?? '').trim().slice(0, 500),
+          impact: String(candidate.impact ?? '').trim().slice(0, 500),
+        }]
+      }) : []
     const fileOperations = Array.isArray(value.file_operations)
       ? value.file_operations.slice(0, 100).flatMap((operation) => {
         if (!operation || typeof operation !== 'object') return []
@@ -314,6 +358,7 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
       proposed_home: value.proposed_home ? sanitizeKnowledgeHome(value.proposed_home) : null,
       proposed_sections: proposedSections,
       assignments,
+      section_operations: sectionOperations,
       conflicts: stringArray(value.conflicts, 100),
       move_suggestions: stringArray(value.move_suggestions, 100),
       architecture_findings: stringArray(value.architecture_findings, 100),
@@ -370,7 +415,7 @@ export function buildOrganizationPrompt(
   return `<elon-project-docs-task version="1">\n请为项目“${projectName}”执行低 token 文档治理实验。\n\n` +
     `运行 ID：${operationId || '由 MCP 会话生成'}。权限模式：${authorizationMode}。目录 revision：${catalog.revision}；文档 ${catalog.documents.length} 份；歧义 ${ambiguous} 份；当前项目类型：${manifest.profile}；现有主题分区：${customSections}。\n` +
     '如果提供 project_docs_* MCP 工具，必须按以下顺序直接调用，不要用页面点击代替：' +
-    '① project_docs_analyze 获取 classification_model_tokens=0 的紧凑目录和 document_health；大型仓库先按 federation 选择 scope_id；' +
+    '① project_docs_analyze 使用 projection=summary 获取 classification_model_tokens=0 的分类与真实 response_budget；大型仓库用 project_docs_get_federation 分页惰性展开，再按 scope_id/topic 获取 page；' +
     '② project_docs_get_map 获取 overview 后只查询任务命中的 capabilities、architecture 或 topics 局部图；需要判断结构时调用 project_docs_review_map，单节点用 project_docs_get_node；' +
     '③ project_docs_get_issues 按状态/严重度/负责人获取程序证据；既有问题用 project_docs_update_issue，趋势用 project_docs_get_health_history；先 project_docs_plan_context，再只 read 少量歧义文档；' +
     '④ project_docs_save_suggestions 携带当前 authorization_mode 保存 ready 建议；' +
@@ -382,7 +427,7 @@ export function buildOrganizationPrompt(
     `建议只能落到 ${ORGANIZATION_SUGGESTIONS_PATH}；不得删除、覆盖或改写 Markdown，也不得直接改分区配置。` +
     'git_backed_full 会自动完成整理前和整理后两次仅文档 Git 提交；任何模式都不得越界、操作非 Markdown、修改代码或自动 push。' +
     '虚拟分区不改变真实路径的 role、lifecycle、authority 或 default_retrieval；不能借虚拟 current 提升权威性。' +
-    '只为确有改进价值的文档生成 assignments，层级主题最多 16 个，并在 architecture_findings 与 missing_document_types 中记录结构缺口；如实记录实际正文读取数和 token。' +
+    '只为确有改进价值的文档生成 assignments；主题和文档必须分页惰性分析，不能把旧 16 分区/500 文档窗口误认为全集；在 section_operations 给出新增、合并、移动、重命名或删除建议及理由和影响；如实记录实际正文读取数和 token。' +
     '如果当前供应商确实没有 MCP，才使用同一顺序做本地元数据扫描并写建议 JSON；不要全文扫描 docs。'
 }
 
@@ -440,6 +485,8 @@ function sanitizeKnowledgeMetadata(value: unknown): DocumentKnowledgeMetadata | 
     review_interval_days: Math.min(3650, Math.max(1, Math.floor(Number(candidate.review_interval_days) || 180))),
     implementation_refs: stringArray(candidate.implementation_refs, 32).map((entry) => entry.slice(0, 500)),
     version: String(candidate.version ?? '').trim().slice(0, 40),
+    version_status: ['current', 'draft', 'deprecated', 'superseded', 'archived'].includes(candidate.version_status ?? '')
+      ? candidate.version_status as DocumentKnowledgeMetadata['version_status'] : '',
     related: stringArray(candidate.related, 24).map(normalizedPath).filter(Boolean),
     supersedes: stringArray(candidate.supersedes, 24).map(normalizedPath).filter(Boolean),
     relations: sanitizeDocumentRelations(candidate.relations),

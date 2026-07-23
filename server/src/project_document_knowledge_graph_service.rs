@@ -15,6 +15,7 @@ use crate::{
     project_document_analysis_model::compact_document,
     project_document_files::content_revision,
     project_document_governance::{parse_manifest, DocumentSectionManifest, SECTION_CONFIG_PATH},
+    project_document_governance_facets::effective_facets_with_metadata,
     project_document_knowledge_graph::build_knowledge_maps,
     project_document_knowledge_graph_model::{
         ProjectKnowledgeMap, ProjectKnowledgeMapEdge, ProjectKnowledgeMapNode, ProjectKnowledgeMaps,
@@ -177,6 +178,7 @@ pub(crate) fn plan_context(
     node_id: Option<&str>,
     max_tokens: u64,
     max_documents: usize,
+    max_rule_tokens: u64,
 ) -> Result<Value> {
     let query = query.trim();
     if query.is_empty() && node_id.is_none() {
@@ -186,7 +188,13 @@ pub(crate) fn plan_context(
     let maps = build_knowledge_maps(workspace, &snapshot.documents, &manifest);
     let identity = graph_identity(workspace, &snapshot, manifest_revision.as_deref(), &maps)?;
     let all_maps = [&maps.capabilities, &maps.architecture, &maps.topics];
-    let query_lower = query.to_ascii_lowercase();
+    let query_lower = query.to_lowercase();
+    let query_terms = query_lower
+        .split(|character: char| {
+            character.is_whitespace() || matches!(character, ',' | '/' | ':' | '，' | '、')
+        })
+        .filter(|term| term.chars().count() >= 2)
+        .collect::<Vec<_>>();
     let matched_nodes = all_maps
         .iter()
         .flat_map(|map| map.nodes.iter())
@@ -209,10 +217,66 @@ pub(crate) fn plan_context(
         .map(|path| normalize(path))
         .collect::<HashSet<_>>();
     let max_tokens = max_tokens.clamp(200, 12_000);
+    let max_rule_tokens = max_rule_tokens.clamp(200, 6_000);
     let max_documents = max_documents.clamp(1, 24);
+    let historical_requested = ["历史", "旧", "报告", "trace", "e2e", "report", "archive"]
+        .iter()
+        .any(|term| query_lower.contains(term));
+    let mut mandatory_paths = vec![".github/copilot-instructions.md", "AGENTS.md"];
+    if ["文档", "知识", "治理", "authority", "document"]
+        .iter()
+        .any(|term| query_lower.contains(term))
+    {
+        mandatory_paths.push(".github/instructions/document-authority.instructions.md");
+    }
+    let mut mandatory_rules = Vec::new();
+    let mut used_rule_tokens = 0u64;
+    for path in mandatory_paths {
+        let Some(document) = snapshot
+            .documents
+            .iter()
+            .find(|document| normalize(&document.path) == normalize(path))
+        else {
+            continue;
+        };
+        let tokens = document.metadata.token_estimate.max(1);
+        if !mandatory_rules.is_empty() && used_rule_tokens.saturating_add(tokens) > max_rule_tokens
+        {
+            continue;
+        }
+        used_rule_tokens = used_rule_tokens.saturating_add(tokens);
+        mandatory_rules.push(json!({
+            "reason":"shared_minimum_rule_or_task_router",
+            "document":compact_document(document, &manifest),
+        }));
+    }
     let mut candidates = snapshot
         .documents
         .iter()
+        .filter(|document| {
+            !mandatory_rules.iter().any(|rule| {
+                rule.pointer("/document/path").and_then(Value::as_str)
+                    == Some(document.path.as_str())
+            })
+        })
+        .filter(|document| {
+            let normalized_path = normalize(&document.path);
+            if linked.contains(&normalized_path)
+                || contextual_entrypoint_score(&normalized_path, &query_lower) > 0
+            {
+                return true;
+            }
+            if historical_requested {
+                return true;
+            }
+            let path = document.path.replace('\\', "/");
+            let facets = effective_facets_with_metadata(
+                document,
+                manifest.governance_facets.get(&path),
+                manifest.document_metadata.get(&path),
+            );
+            !is_historical_noise(document) && facets.retrieval != "excluded"
+        })
         .map(|document| {
             let text = format!(
                 "{} {} {}",
@@ -220,14 +284,26 @@ pub(crate) fn plan_context(
                 document.title,
                 document.metadata.headings.join(" ")
             )
-            .to_ascii_lowercase();
-            let score = usize::from(linked.contains(&normalize(&document.path))) * 100
-                + usize::from(!query_lower.is_empty() && text.contains(&query_lower)) * 40
-                + usize::from(document.metadata.default_retrieval) * 10
-                + usize::from(!document.metadata.ambiguous) * 3;
+            .to_lowercase();
+            let path = normalize(&document.path);
+            let term_score = query_terms
+                .iter()
+                .filter(|term| text.contains(*term))
+                .count()
+                * 20;
+            let authority_score = usize::from(document.metadata.default_retrieval) * 15
+                + usize::from(matches!(
+                    document.metadata.authority.as_str(),
+                    "binding" | "authoritative"
+                )) * 20;
+            let entrypoint_score = contextual_entrypoint_score(&path, &query_lower);
+            let score = usize::from(linked.contains(&path)) * 100
+                + term_score
+                + authority_score
+                + entrypoint_score;
             (score, document)
         })
-        .filter(|(score, _)| *score > 0)
+        .filter(|(score, _)| *score >= 20)
         .collect::<Vec<_>>();
     candidates.sort_by(|(left_score, left), (right_score, right)| {
         right_score.cmp(left_score).then(left.path.cmp(&right.path))
@@ -236,13 +312,30 @@ pub(crate) fn plan_context(
     let mut used_tokens = 0u64;
     for (score, document) in candidates {
         let tokens = document.metadata.token_estimate.max(1);
+        let authoritative_entrypoint =
+            contextual_entrypoint_score(&normalize(&document.path), &query_lower) > 0;
+        let planned_tokens = if authoritative_entrypoint {
+            tokens.min(1_200)
+        } else {
+            tokens
+        };
         if selected.len() >= max_documents
-            || (!selected.is_empty() && used_tokens.saturating_add(tokens) > max_tokens)
+            || (!selected.is_empty() && used_tokens.saturating_add(planned_tokens) > max_tokens)
         {
             continue;
         }
-        used_tokens = used_tokens.saturating_add(tokens);
-        selected.push(json!({"score":score,"document":compact_document(document, &manifest)}));
+        used_tokens = used_tokens.saturating_add(planned_tokens);
+        selected.push(json!({
+            "score":score,
+            "reason":context_reason(&document.path, score, linked.contains(&normalize(&document.path))),
+            "read_plan":{
+                "mode":if planned_tokens < tokens {"sectional"} else {"full_if_needed"},
+                "estimated_selected_tokens":planned_tokens,
+                "estimated_full_document_tokens":tokens,
+                "max_chars":planned_tokens.saturating_mul(4),
+            },
+            "document":compact_document(document, &manifest)
+        }));
     }
     Ok(json!({
         "catalog_revision": snapshot.revision,
@@ -250,10 +343,75 @@ pub(crate) fn plan_context(
         "query": query,
         "node_id": node_id,
         "matched_nodes": matched_nodes.iter().map(|node| json!({"id":node.id,"view":node.view,"label":node.label,"status":node.documentation_status})).collect::<Vec<_>>(),
-        "documents": selected,
-        "budget": {"max_tokens":max_tokens,"estimated_tokens_selected":used_tokens,"max_documents":max_documents,"documents_selected":selected.len(),"classification_model_tokens":0,"markdown_bodies_read":0},
+        "mandatory_rules": mandatory_rules,
+        "relevant_documents": selected,
+        "budget": {
+            "rules":{"max_tokens":max_rule_tokens,"estimated_tokens_selected":used_rule_tokens,"documents_selected":mandatory_rules.len()},
+            "relevant_content":{"max_tokens":max_tokens,"estimated_tokens_selected":used_tokens,"max_documents":max_documents,"documents_selected":selected.len()},
+            "classification_model_tokens":0,"markdown_bodies_read":0
+        },
         "read_instruction": "按顺序只读取当前任务真正需要的文档；先读标题层级，仍有歧义再调用 project_docs_read。"
     }))
+}
+
+fn is_historical_noise(document: &homecli_proto::ProjectDocumentEntry) -> bool {
+    let path = normalize(&document.path);
+    matches!(
+        document.metadata.lifecycle.as_str(),
+        "deprecated" | "superseded" | "archived"
+    ) || matches!(
+        document.metadata.role.as_str(),
+        "report" | "discussion" | "status" | "archive"
+    ) || ["/reports/", "e2e", "trace", "archive", "history"]
+        .iter()
+        .any(|part| path.contains(part))
+}
+
+fn contextual_entrypoint_score(path: &str, query: &str) -> usize {
+    let mut score = 0;
+    if path == "docs/system-architecture.md"
+        && ["系统", "架构", "system", "architecture"]
+            .iter()
+            .any(|term| query.contains(term))
+    {
+        score += 180;
+    }
+    if path == "docs/codex-desktop-pc-supervision.md"
+        && ["pc", "监督", "supervision", "codex"]
+            .iter()
+            .any(|term| query.contains(term))
+    {
+        score += 170;
+    }
+    if path == "docs/project-document-governance-mcp.md"
+        && ["文档", "知识", "治理", "mcp", "document"]
+            .iter()
+            .any(|term| query.contains(term))
+    {
+        score += 190;
+    }
+    if path == "docs/supervised-pc-project-development.md"
+        && ["pc", "监督", "项目"]
+            .iter()
+            .any(|term| query.contains(term))
+    {
+        score += 120;
+    }
+    score
+}
+
+fn context_reason(path: &str, score: usize, linked: bool) -> Value {
+    let path = normalize(path);
+    json!({
+        "graph_linked":linked,
+        "authoritative_entrypoint":matches!(path.as_str(),
+            "docs/system-architecture.md"
+            | "docs/codex-desktop-pc-supervision.md"
+            | "docs/project-document-governance-mcp.md"
+            | "docs/supervised-pc-project-development.md"
+        ),
+        "ranking_score":score,
+    })
 }
 
 fn load(

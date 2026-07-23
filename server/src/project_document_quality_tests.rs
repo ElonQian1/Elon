@@ -19,6 +19,11 @@ fn quality_report_finds_links_orphans_ownership_and_implementation_conflicts() {
     fs::write(root.join("docs/guide.md"), "# Guide\n\nUseful.\n").unwrap();
     fs::write(root.join("docs/orphan.md"), "# Orphan\n\nHidden.\n").unwrap();
     fs::write(root.join("docs/routed.md"), "# Routed\n\nRouted.\n").unwrap();
+    fs::write(
+        root.join("docs/duplicate.md"),
+        "# Guide\n\nDuplicate title.\n",
+    )
+    .unwrap();
     fs::create_dir_all(root.join(".github/agents")).unwrap();
     fs::write(root.join(".github/agents/example.agent.md"), "# Agent\n").unwrap();
 
@@ -26,6 +31,13 @@ fn quality_report_finds_links_orphans_ownership_and_implementation_conflicts() {
         entry("README.md", "Home", "router", true, vec!["Home"]),
         entry("docs/guide.md", "Guide", "spec", false, vec!["Guide"]),
         entry("docs/orphan.md", "Orphan", "spec", false, vec!["Orphan"]),
+        entry(
+            "docs/duplicate.md",
+            "Guide",
+            "architecture",
+            false,
+            vec!["Guide"],
+        ),
         entry(
             "docs/routed.md",
             "Routed",
@@ -59,6 +71,15 @@ fn quality_report_finds_links_orphans_ownership_and_implementation_conflicts() {
             ..DocumentKnowledgeMetadata::default()
         },
     );
+    manifest.document_metadata.insert(
+        "docs/duplicate.md".to_string(),
+        DocumentKnowledgeMetadata {
+            doc_type: "architecture".to_string(),
+            owner: "architecture-team".to_string(),
+            reviewed_at: "2099-01-01".to_string(),
+            ..DocumentKnowledgeMetadata::default()
+        },
+    );
     let index = ProjectDocumentIndex::open(&root).unwrap();
     let report = analyze_document_quality(&root, &documents, &manifest, &index).unwrap();
     let kinds = report
@@ -73,6 +94,9 @@ fn quality_report_finds_links_orphans_ownership_and_implementation_conflicts() {
     assert!(kinds.contains(&"missing_owner"));
     assert!(kinds.contains(&"missing_review_date"));
     assert!(kinds.contains(&"implementation_conflict"));
+    assert!(kinds.contains(&"duplicate_title"));
+    assert!(kinds.contains(&"implementation_reference_missing"));
+    assert_eq!(report.summary.duplicate_titles, 1);
     assert!(!report.issues.iter().any(|issue| {
         issue.issue_type == "orphan_document"
             && matches!(

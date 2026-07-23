@@ -220,9 +220,9 @@ PC 网页端 → Rust server → node-agent → pipe sidecar → codex exec --js
 
 项目真实目录和 Markdown 始终是内容真源。PC 网页端把知识呈现为四条正交轴：产品功能回答“用户能做什么”，技术架构回答“系统怎样实现”，OneNote 式主题树回答“文档讲什么”，治理总览分别回答“是否读取、是否当前、能否作为事实、是什么类型”。`.elon/document-sections.json` 保存知识首页、主/副主题、四维治理、有类型的文档关系以及功能/技术节点和实现证据；旧的治理分区只作为快捷投影，它不等于实际移动文件。AI 建议单独保存在 `.elon/document-organization-suggestions.json`，按统一权限模式应用。
 
-Windows 节点提供项目绑定、短期令牌保护的标准 Streamable HTTP MCP。`project_docs_analyze` 复用路径权威性分类器并保持零模型 token；图谱和阅读计划工具限制节点数与 token，正文仍只为歧义或缺失入口按需读取。问题工作流工具支持筛选、分派、期限、原因化忽略/延期和趋势；版本工具同时支持普通 Git 项目与托管知识库的文档差异和新提交式恢复。图谱与 PC 页面由 Rust 后端生成同一份机器契约；文档覆盖和实现证据分别计算，不能由前者推断后者。保存和应用均使用 revision 防并发覆盖，默认由整理前/整理后两个仅文档 Git 提交保护。详细契约按需读取 `docs/project-document-governance-mcp.md`。
+Windows 节点提供项目绑定、短期令牌保护的标准 Streamable HTTP MCP。`project_docs_analyze` 复用路径权威性分类器并保持零模型 token；analyze、map、health、context 和建议工具统一支持 summary/page/detail/full 分层与 cursor 分页，并报告最终 JSON 的真实字节/token 预算，summary 不携带全量集合。强制规则预算与相关正文预算分开，旧讨论、旧需求、历史报告和 trace 默认不进入当前上下文。图谱和阅读计划工具限制节点数与 token，正文仍只为歧义或缺失入口按需读取。问题工作流工具支持筛选、分派、期限、原因化忽略/延期和趋势；版本工具同时支持普通 Git 项目与托管知识库的文档差异、新提交式恢复和失败回滚。图谱与 PC 页面由 Rust 后端生成同一份机器契约；父节点聚合子节点证据，但文档覆盖和实现证据仍分别计算，不能由前者推断后者。保存和应用均使用 revision 防并发覆盖，默认由整理前/整理后两个仅文档 Git 提交保护。详细契约按需读取 `docs/project-document-governance-mcp.md`。
 
-持续知识治理由工作区外 SQLite 派生索引、持久变更事件和 60 秒维护轮询组成。质量内核检查链接、孤立文档、owner、复查周期和显式实现引用；问题状态与健康快照同样位于工作区外。服务端把架构、质量、维护、问题工作流和联邦节点合并为目录快照中的 `analysis`，并返回可解释评分组成。大型仓库通过 `.elon/knowledge-federation.json` 的路径与 glob 分层；个人笔记通过 `vaultId` 映射到托管 Git 知识库，每次保存自动提交且可恢复，用户界面不暴露 Git 复杂度。
+持续知识治理由工作区外 SQLite 派生索引、持久变更事件和 60 秒维护轮询组成。质量内核检查失效链接、孤立、重复/冲突标题、owner、复查周期、过期和 file/test/route/symbol/API 实现漂移；每项保留严重度、证据和修复建议。问题状态与健康快照同样位于工作区外，总分返回 finding、文档覆盖和实现证据组件；未声明实现证据时实现分为 0。服务端把架构、质量、维护、问题工作流和联邦节点合并为目录快照中的 `analysis`。大型仓库通过 `.elon/knowledge-federation.json` 的路径与 glob 分层，项目 → 子项目 → 模块/主题按父节点分页惰性展开，不受旧的 16 分区/500 文档窗口影响；个人笔记通过 `vaultId` 映射到无默认 remote 的托管 Git 知识库，初始化、整理前、整理后和恢复都由提交保护，失败时回到操作前 HEAD 和内容，用户界面不暴露 Git 复杂度。
 
 ### 2.6 PWA Runtime 像素证据
 

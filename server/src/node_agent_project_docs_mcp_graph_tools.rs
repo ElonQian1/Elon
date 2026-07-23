@@ -5,8 +5,10 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::path::Path;
 
-use crate::project_document_knowledge_graph_service::{
-    get_map, get_node, plan_context, review_map,
+use crate::{
+    project_document_federation_service::get_federation_index,
+    project_document_knowledge_graph_service::{get_map, get_node, plan_context, review_map},
+    project_document_response::ProjectionRequest,
 };
 
 #[derive(Debug, Deserialize)]
@@ -44,10 +46,20 @@ struct ContextArguments {
     max_tokens: u64,
     #[serde(default = "default_document_limit")]
     max_documents: usize,
+    #[serde(default = "default_rule_token_budget")]
+    max_rule_tokens: u64,
 }
 
-pub(crate) fn definitions() -> [Value; 4] {
-    [
+#[derive(Debug, Deserialize)]
+struct FederationArguments {
+    #[serde(default)]
+    parent_id: Option<String>,
+    #[serde(default)]
+    query: Option<String>,
+}
+
+pub(crate) fn definitions() -> Vec<Value> {
+    vec![
         tool(
             "project_docs_get_map",
             "读取统一项目知识图谱的紧凑局部视图，不读取 Markdown 正文。overview 只返回三种视图摘要；capabilities 表示用户能力，architecture 表示真实技术组件，topics 表示文档主题。支持 root/depth/query/max_nodes 限界。",
@@ -56,7 +68,11 @@ pub(crate) fn definitions() -> [Value; 4] {
                 "root_id":{"type":"string","description":"可选局部根节点；先用 overview 或默认视图发现 id。"},
                 "depth":{"type":"integer","minimum":1,"maximum":6,"default":2},
                 "query":{"type":"string","maxLength":200},
-                "max_nodes":{"type":"integer","minimum":1,"maximum":200,"default":80}
+                "max_nodes":{"type":"integer","minimum":1,"maximum":200,"default":80},
+                "offset":{"type":"integer","minimum":0,"default":0},
+                "limit":{"type":"integer","minimum":1,"maximum":200,"default":80},
+                "cursor":{"type":"string","pattern":"^offset:[0-9]+$"},
+                "projection":{"type":"string","enum":["summary","page","detail","full"],"default":"page"}
             }}),
         ),
         tool(
@@ -80,8 +96,25 @@ pub(crate) fn definitions() -> [Value; 4] {
                 "query":{"type":"string","maxLength":500,"default":""},
                 "node_id":{"type":"string","maxLength":100},
                 "max_tokens":{"type":"integer","minimum":200,"maximum":12000,"default":2400},
-                "max_documents":{"type":"integer","minimum":1,"maximum":24,"default":8}
+                "max_rule_tokens":{"type":"integer","minimum":200,"maximum":6000,"default":1600,"description":"强制规则独立预算，不占相关正文预算。"},
+                "max_documents":{"type":"integer","minimum":1,"maximum":24,"default":8},
+                "offset":{"type":"integer","minimum":0,"default":0},
+                "limit":{"type":"integer","minimum":1,"maximum":200,"default":80},
+                "cursor":{"type":"string","pattern":"^offset:[0-9]+$"},
+                "projection":{"type":"string","enum":["summary","page","detail","full"],"default":"page"}
             },"anyOf":[{"required":["query"]},{"required":["node_id"]}]}),
+        ),
+        tool(
+            "project_docs_get_federation",
+            "分页惰性读取项目→子项目→模块/主题联邦知识索引。默认只返回根或指定 parent_id 的直接子节点，不受旧 16 分区或 500 文档展示上限影响。",
+            json!({"type":"object","properties":{
+                "parent_id":{"type":"string","maxLength":100,"description":"为空时返回联邦根；展开时传父节点 id。"},
+                "query":{"type":"string","maxLength":200},
+                "offset":{"type":"integer","minimum":0,"default":0},
+                "limit":{"type":"integer","minimum":1,"maximum":200,"default":80},
+                "cursor":{"type":"string","pattern":"^offset:[0-9]+$"},
+                "projection":{"type":"string","enum":["summary","page"],"default":"page"}
+            }}),
         ),
     ]
 }
@@ -120,6 +153,7 @@ pub(crate) fn proposal_schema() -> Value {
 }
 
 pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result<Option<Value>> {
+    let projection = ProjectionRequest::from_arguments(&arguments)?;
     let result = match name {
         "project_docs_get_map" => {
             let input: MapArguments = decode(arguments)?;
@@ -129,7 +163,10 @@ pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result
                 input.root_id.as_deref(),
                 input.depth,
                 input.query.as_deref(),
-                input.max_nodes,
+                input
+                    .max_nodes
+                    .max(projection.offset.saturating_add(projection.limit))
+                    .min(200),
             )?
         }
         "project_docs_get_node" => {
@@ -148,6 +185,16 @@ pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result
                 input.node_id.as_deref(),
                 input.max_tokens,
                 input.max_documents,
+                input.max_rule_tokens,
+            )?
+        }
+        "project_docs_get_federation" => {
+            let input: FederationArguments = decode(arguments)?;
+            get_federation_index(
+                workspace,
+                input.parent_id.as_deref(),
+                input.query.as_deref(),
+                &projection,
             )?
         }
         _ => return Ok(None),
@@ -177,4 +224,7 @@ fn default_token_budget() -> u64 {
 }
 fn default_document_limit() -> usize {
     8
+}
+fn default_rule_token_budget() -> u64 {
+    6_000
 }

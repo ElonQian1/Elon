@@ -96,6 +96,10 @@ pub(crate) struct KnowledgeMapStats {
 pub(crate) struct KnowledgeMapDiagnostics {
     pub structural_score: u8,
     pub status: &'static str,
+    pub finding_score: u8,
+    pub documentation_score: u8,
+    pub implementation_score: Option<u8>,
+    pub score_formula: &'static str,
     pub findings: Vec<KnowledgeMapFinding>,
 }
 

@@ -209,7 +209,28 @@ pub(crate) fn list_filtered(
     offset: usize,
     limit: usize,
 ) -> Result<Vec<Value>> {
-    Ok(index
+    Ok(list_filtered_page(
+        index,
+        issue_types,
+        statuses,
+        severities,
+        owner,
+        offset,
+        limit,
+    )?
+    .0)
+}
+
+pub(crate) fn list_filtered_page(
+    index: &ProjectDocumentIndex,
+    issue_types: &[String],
+    statuses: &[String],
+    severities: &[String],
+    owner: &str,
+    offset: usize,
+    limit: usize,
+) -> Result<(Vec<Value>, usize)> {
+    let filtered = index
         .list_issues(issue_types, 0, 100_000)?
         .into_iter()
         .filter(|issue| {
@@ -239,9 +260,16 @@ pub(crate) fn list_filtered(
                     .and_then(Value::as_str)
                     .is_some_and(|value| value.eq_ignore_ascii_case(owner.trim()))
         })
-        .skip(offset.min(100_000))
-        .take(limit.clamp(1, 200))
-        .collect())
+        .collect::<Vec<_>>();
+    let total = filtered.len();
+    Ok((
+        filtered
+            .into_iter()
+            .skip(offset.min(100_000))
+            .take(limit.clamp(1, 200))
+            .collect(),
+        total,
+    ))
 }
 
 pub(crate) fn health_trend(index: &ProjectDocumentIndex, limit: usize) -> Result<Vec<Value>> {

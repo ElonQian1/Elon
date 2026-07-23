@@ -75,7 +75,10 @@ const manifest = parseSectionManifest(JSON.stringify({
   secondary_assignments: { 'docs/research.md': ['custom:operations', 'custom:research'] },
   governance_facets: { 'docs/research.md': { retrieval: 'excluded', lifecycle: 'draft', authority: 'proposal', document_type: 'discussion' } },
   governance_overrides: { 'docs/unknown.md': 'on-demand' },
-  document_metadata: { 'docs/research.md': { order: 7, pinned: true } },
+  document_metadata: {
+    'docs/research.md': { order: 7, pinned: true },
+    'docs/unknown.md': { version: '0.9', version_status: 'archived' },
+  },
   knowledge_graph: { nodes: [{
     id: 'cap-research', view: 'capabilities', label: '研究能力', document_paths: ['docs/research.md'],
   }], edges: [] },
@@ -89,6 +92,7 @@ assert.deepEqual(manifest.secondary_assignments['docs/research.md'], ['custom:op
 assert.equal(manifest.governance_facets['docs/research.md'].authority, 'proposal')
 assert.equal(manifest.document_metadata['docs/research.md'].order, 7)
 assert.equal(manifest.document_metadata['docs/research.md'].pinned, true)
+assert.equal(manifest.document_metadata['docs/unknown.md'].version_status, 'archived')
 assert.equal(manifest.audit_log[0].action, 'test')
 assert.equal(manifest.knowledge_graph.nodes[0].id, 'cap-research')
 const documents = [
@@ -105,7 +109,7 @@ assert.deepEqual(sections, [
   'customizations',
   'on-demand',
   'drafts',
-  'on-demand',
+  'archive',
   'custom:research',
 ])
 assert.equal(sections.length, documents.length, '每份文档必须只属于一个分区')
@@ -118,6 +122,7 @@ const suggestions = parseOrganizationSuggestions(JSON.stringify({
   summary: 'ok',
   proposed_sections: [{ id: 'api', label: 'API', detail: '接口', color: '#abcdef' }],
   assignments: [{ path: 'docs/unknown.md', section_id: 'custom:api', reason: '归类' }],
+  section_operations: [{ id: 'merge-api', kind: 'merge', section_id: 'api', target_section_id: 'research', reason: '主题重叠', impact: 'API 文档归入研究主题' }],
   governance_facets: { 'docs/unknown.md': { retrieval: 'excluded', lifecycle: 'draft', authority: 'proposal', document_type: 'discussion' } },
   conflicts: [],
   move_suggestions: [],
@@ -134,6 +139,7 @@ const suggestions = parseOrganizationSuggestions(JSON.stringify({
 }))
 assert.equal(suggestions.status, 'ready')
 assert.equal(suggestions.assignments.length, 1)
+assert.equal(suggestions.section_operations[0].impact, 'API 文档归入研究主题')
 assert.equal(suggestions.assignments[0].secondary, false)
 assert.equal(suggestions.governance_facets['docs/unknown.md'].lifecycle, 'draft')
 assert.equal(suggestions.file_operations.length, 1)
@@ -150,7 +156,7 @@ const boundedSuggestions = parseOrganizationSuggestions(JSON.stringify({
   })),
 }))
 assert.equal(boundedSuggestions.proposed_sections.length, 12)
-assert.equal(boundedSuggestions.assignments.length, 500)
+assert.equal(boundedSuggestions.assignments.length, 510)
 
 const catalog = {
   project_id: 'test', workspace: 'test', revision: '1', source: 'workspace', documents,
@@ -175,6 +181,9 @@ assert(prompt.includes('project_docs_get_health_history'))
 assert(prompt.includes('project_docs_get_map'))
 assert(prompt.includes('project_docs_review_map'))
 assert(prompt.includes('project_docs_plan_context'))
+assert(prompt.includes('project_docs_get_federation'))
+assert(prompt.includes('section_operations'))
+assert(prompt.includes('16 分区/500 文档'))
 assert(prompt.includes('proposed_knowledge_graph'))
 assert(prompt.includes('权限模式：git_backed_full'))
 assert(prompt.includes('authorization_mode=git_backed_full'))
@@ -516,5 +525,22 @@ assert(commandMenuSource.includes('Shift+F10'))
 assert(commandMenuSource.includes('让 AI 评估提权'))
 assert(commandMenuSource.includes('不突破真实路径的权威上限'))
 assert(commandMenuSource.includes("'ArrowDown', 'ArrowUp', 'Home', 'End'"))
+const federationSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentFederationIndex.tsx',
+), 'utf8')
+assert(federationSource.includes('分页惰性展开'))
+assert(federationSource.includes('加载下一页'))
+assert(federationSource.includes('direct_children'))
+const editorSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentEditorPane.tsx',
+), 'utf8')
+assert(editorSource.includes('Markdown 编辑器'))
+assert(editorSource.includes('<MarkdownContent'))
+const suggestionsSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentSuggestions.tsx',
+), 'utf8')
+assert(suggestionsSource.includes('AI 分区治理建议'))
+assert(suggestionsSource.includes('理由：'))
+assert(suggestionsSource.includes('影响：'))
 
 console.log('project document section model tests passed')

@@ -15,7 +15,7 @@ use crate::{
     },
     project_document_git_transaction::{commit_document_baseline, commit_document_result},
     project_document_governance::{
-        apply_suggestions, parse_manifest, parse_suggestions, to_pretty_json,
+        apply_suggestions, effective_section, parse_manifest, parse_suggestions, to_pretty_json,
         validate_ready_suggestions, DocumentOrganizationSuggestions, DocumentSectionManifest,
         SECTION_CONFIG_PATH, SUGGESTIONS_CONFIG_PATH,
     },
@@ -51,6 +51,17 @@ pub(crate) fn analyze_workspace_scoped(
     ambiguous_only: bool,
     scope_id: Option<&str>,
 ) -> Result<Value> {
+    analyze_workspace_scoped_query(workspace, offset, limit, ambiguous_only, scope_id, None)
+}
+
+pub(crate) fn analyze_workspace_scoped_query(
+    workspace: &Path,
+    offset: usize,
+    limit: usize,
+    ambiguous_only: bool,
+    scope_id: Option<&str>,
+    topic: Option<&str>,
+) -> Result<Value> {
     let snapshot = catalog(workspace)?;
     let manifest = load_manifest(workspace)?;
     let suggestions = load_suggestions(workspace)?;
@@ -68,7 +79,10 @@ pub(crate) fn analyze_workspace_scoped(
     let candidates = scoped_catalog
         .iter()
         .copied()
-        .filter(|document| !ambiguous_only || document.metadata.ambiguous)
+        .filter(|document| {
+            (!ambiguous_only || document.metadata.ambiguous)
+                && document_matches_topic(document, &manifest.value, topic)
+        })
         .collect::<Vec<_>>();
     let documents = candidates
         .iter()
@@ -134,7 +148,7 @@ pub(crate) fn analyze_workspace_scoped(
         },
         "knowledge_architecture": knowledge_architecture,
         "document_health": snapshot.analysis,
-        "scope": {"id": scope_id, "definition": scope},
+        "scope": {"id": scope_id, "topic": topic, "definition": scope},
         "documents": documents,
         "manifest": manifest.value,
         "manifest_revision": manifest.revision,
@@ -151,6 +165,38 @@ pub(crate) fn analyze_workspace_scoped(
         },
         "next": "Use the metadata-only knowledge_architecture diagnostics, read only ambiguous or task-relevant paths, then save topic hierarchy, knowledge home, document relationships and optional safe rename/move operations under the selected authorization mode.",
     }))
+}
+
+fn document_matches_topic(
+    document: &homecli_proto::ProjectDocumentEntry,
+    manifest: &DocumentSectionManifest,
+    topic: Option<&str>,
+) -> bool {
+    let Some(topic) = topic.map(str::trim).filter(|value| !value.is_empty()) else {
+        return true;
+    };
+    let path = document.path.replace('\\', "/");
+    let secondary = manifest
+        .secondary_assignments
+        .get(&path)
+        .map(|values| values.join(" "))
+        .unwrap_or_default();
+    let searchable = format!(
+        "{} {} {} {} {} {} {} {}",
+        path,
+        document.title,
+        document.metadata.role,
+        document.metadata.lifecycle,
+        document.metadata.authority,
+        effective_section(document, manifest),
+        manifest.assignments.get(&path).cloned().unwrap_or_default(),
+        secondary,
+    )
+    .to_lowercase();
+    topic
+        .split(|character: char| character.is_whitespace() || character == ',' || character == '/')
+        .filter(|term| !term.is_empty())
+        .any(|term| searchable.contains(&term.to_lowercase()))
 }
 
 pub(crate) fn read_documents(
@@ -263,7 +309,7 @@ pub(crate) fn get_suggestions(workspace: &Path) -> Result<Value> {
     Ok(json!({
         "suggestions": suggestions.value,
         "suggestions_revision": suggestions.revision,
-        "default_authorization_mode": DocumentAutomationMode::TrustedReversible,
+        "default_authorization_mode": DocumentAutomationMode::GitBackedFull,
         "requires_user_review": false,
     }))
 }
@@ -385,6 +431,7 @@ pub(crate) fn apply_saved_suggestions(
         "manifest_already_applied": manifest_already_applied,
         "applied_assignments": result.applied_assignments,
         "skipped_assignments": result.skipped_assignments,
+        "applied_section_operations": result.applied_section_operations,
         "authorization_mode": authorization.mode,
         "auto_authorized": authorization.auto_authorized,
         "git_baseline_commit": git_baseline_commit,

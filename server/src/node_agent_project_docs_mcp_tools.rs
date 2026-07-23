@@ -8,10 +8,11 @@ use crate::{
     project_document_file_operations::{apply_file_operations, ApplyFileOperationsRequest},
     project_document_governance::DocumentOrganizationSuggestions,
     project_document_governance_service::{
-        analyze_workspace_scoped, apply_saved_suggestions, default_page_size, default_read_chars,
-        get_suggestions, read_documents, save_suggestions,
+        analyze_workspace_scoped_query, apply_saved_suggestions, default_page_size,
+        default_read_chars, get_suggestions, read_documents, save_suggestions,
     },
     project_document_observability::{get_status, record_tool_failure, record_tool_success},
+    project_document_response::{compact_text, project_tool_response, ProjectionRequest},
 };
 
 #[derive(Debug, Deserialize)]
@@ -24,6 +25,8 @@ struct AnalyzeArguments {
     ambiguous_only: bool,
     #[serde(default)]
     scope_id: Option<String>,
+    #[serde(default)]
+    topic: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -89,7 +92,11 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                     "offset":{"type":"integer","minimum":0,"default":0},
                     "limit":{"type":"integer","minimum":1,"maximum":200,"default":80},
                     "ambiguous_only":{"type":"boolean","default":false}
-                    ,"scope_id":{"type":"string","description":"可选联邦知识节点 id；大型项目只返回该节点目录。"}
+                    ,"scope_id":{"type":"string","description":"可选联邦知识节点 id；大型项目只返回该节点目录。"},
+                    "topic":{"type":"string","description":"按路径、标题、权威状态或主题筛选。"},
+                    "cursor":{"type":"string","pattern":"^offset:[0-9]+$"},
+                    "projection":{"type":"string","enum":["summary","page","detail","full"],"default":"page"},
+                    "detail":{"type":"string","description":"detail/full 时指定 document_health、manifest 或 suggestions。"}
                 }
             }),
         ),
@@ -114,7 +121,12 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         tool(
             "project_docs_get_suggestions",
             "读取结构化 AI 整理建议及 revision；不读取 Markdown，不修改文件。",
-            json!({"type":"object","properties":{}}),
+            json!({"type":"object","properties":{
+                "offset":{"type":"integer","minimum":0,"default":0},
+                "limit":{"type":"integer","minimum":1,"maximum":200,"default":80},
+                "cursor":{"type":"string","pattern":"^offset:[0-9]+$"},
+                "projection":{"type":"string","enum":["summary","page","detail","full"],"default":"page"}
+            }}),
         ),
         tool(
             "project_docs_save_suggestions",
@@ -186,6 +198,7 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| json!({}));
+    let projection_arguments = arguments.clone();
     let result = (|| -> Result<Value> {
         match name {
             "project_docs_get_status" => {
@@ -193,13 +206,15 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
                 get_status(workspace, None)
             }
             "project_docs_analyze" => {
+                let projection = ProjectionRequest::from_arguments(&arguments)?;
                 let input: AnalyzeArguments = decode(arguments, name)?;
-                analyze_workspace_scoped(
+                analyze_workspace_scoped_query(
                     workspace,
-                    input.offset,
-                    input.limit,
+                    projection.offset.max(input.offset),
+                    projection.limit.min(input.limit.max(1)),
                     input.ambiguous_only,
                     input.scope_id.as_deref(),
+                    input.topic.as_deref(),
                 )
             }
             "project_docs_read" => {
@@ -211,10 +226,7 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
                     input.expected_catalog_revision.as_deref(),
                 )
             }
-            "project_docs_get_suggestions" => {
-                ensure_empty_object(&arguments, name)?;
-                get_suggestions(workspace)
-            }
+            "project_docs_get_suggestions" => get_suggestions(workspace),
             "project_docs_save_suggestions" => {
                 let input: SaveSuggestionsArguments = decode(arguments, name)?;
                 save_suggestions(
@@ -270,6 +282,7 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
     })();
     let value = match result {
         Ok(value) => {
+            let value = project_tool_response(name, &projection_arguments, value)?;
             record_tool_success(workspace, name, &value);
             value
         }
@@ -279,7 +292,7 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
         }
     };
     Ok(json!({
-        "content": [{ "type": "text", "text": serde_json::to_string_pretty(&value)? }],
+        "content": [{ "type": "text", "text": compact_text(name, &value)? }],
         "structuredContent": value,
         "isError": false,
     }))
@@ -316,7 +329,7 @@ fn suggestions_schema() -> Value {
             "proposed_profile":{"type":"string","enum":["auto","software-platform","software-api","product","research","operations","personal-knowledge"],"default":"auto"},
             "proposed_home":knowledge_home_schema(),
             "proposed_sections":{
-                "type":"array","maxItems":16,
+                "type":"array","maxItems":256,
                 "items":{
                     "type":"object","required":["id","label","detail","color"],
                     "properties":{
@@ -332,7 +345,7 @@ fn suggestions_schema() -> Value {
                 }
             },
             "assignments":{
-                "type":"array","maxItems":500,
+                "type":"array","maxItems":20000,
                 "items":{
                     "type":"object","required":["path","section_id","reason"],
                     "properties":{
@@ -343,16 +356,26 @@ fn suggestions_schema() -> Value {
                     }
                 }
             },
+            "section_operations":{"type":"array","maxItems":256,"items":{"type":"object","required":["id","kind","section_id","reason","impact"],"properties":{
+                "id":{"type":"string","maxLength":80},
+                "kind":{"type":"string","enum":["create","rename","move","merge","delete"]},
+                "section_id":{"type":"string","maxLength":48},
+                "target_section_id":{"type":"string","maxLength":48},
+                "parent_id":{"type":"string","maxLength":48},
+                "label":{"type":"string","maxLength":40},
+                "reason":{"type":"string","maxLength":500},
+                "impact":{"type":"string","maxLength":500}
+            }}},
             "conflicts":{"type":"array","maxItems":100,"items":{"type":"string","maxLength":1000}},
             "move_suggestions":{"type":"array","maxItems":100,"items":{"type":"string","maxLength":1000}},
             "architecture_findings":{"type":"array","maxItems":100,"items":{"type":"string","maxLength":1000}},
             "missing_document_types":{"type":"array","maxItems":100,"items":{"type":"string","maxLength":120}},
             "document_metadata":{
-                "type":"object","maxProperties":500,
+                "type":"object","maxProperties":20000,
                 "additionalProperties":knowledge_metadata_schema()
             },
             "governance_facets":{
-                "type":"object","maxProperties":500,
+                "type":"object","maxProperties":20000,
                 "additionalProperties":{
                     "type":"object","properties":{
                         "retrieval":{"type":"string","enum":["required","on_demand","excluded"]},
@@ -410,6 +433,7 @@ fn knowledge_metadata_schema() -> Value {
             "review_interval_days":{"type":"integer","minimum":1,"maximum":3650,"default":180},
             "implementation_refs":{"type":"array","maxItems":32,"items":{"type":"string","maxLength":500}},
             "version":{"type":"string","maxLength":40},
+            "version_status":{"type":"string","enum":["current","draft","deprecated","superseded","archived"]},
             "related":{"type":"array","maxItems":24,"items":{"type":"string"}},
             "supersedes":{"type":"array","maxItems":24,"items":{"type":"string"}},
             "relations":{"type":"array","maxItems":48,"items":{"type":"object","required":["relation","target"],"properties":{
