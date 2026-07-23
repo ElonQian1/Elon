@@ -19,6 +19,8 @@ use crate::{
 #[path = "node_agent_local_task_resume_recovery.rs"]
 mod recovery;
 pub(crate) use recovery::OrphanedWorkspaceMigration;
+#[path = "node_agent_local_task_resume_head_advance.rs"]
+mod head_advance;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ResumeWorkspaceMode {
@@ -59,6 +61,7 @@ pub(crate) fn resolve_resume_workspace(
         journal_record,
         requested_project_id,
         requested_workspace_path,
+        receipt,
         mode == ResumeWorkspaceMode::Acquire,
     ) {
         Ok(workspace) if workspace.snapshot_continue_required && receipt.is_some() => {
@@ -106,6 +109,7 @@ pub(crate) fn validate_resume_workspace(
         journal_record,
         requested_project_id,
         requested_workspace_path,
+        None,
         true,
     )
 }
@@ -125,6 +129,7 @@ pub(crate) fn inspect_resume_workspace(
         journal_record,
         requested_project_id,
         requested_workspace_path,
+        None,
         false,
     )
 }
@@ -136,6 +141,7 @@ fn resolve_existing_resume_workspace(
     journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
     requested_project_id: &str,
     requested_workspace_path: &str,
+    receipt: Option<&crate::node_agent_update_recovery::UpdateRecoveryReceipt>,
     repair_missing_git_metadata: bool,
 ) -> Result<ResolvedResumeWorkspace> {
     if contract.protocol != SUPERVISION_PROTOCOL || contract.task_role != "resume_original" {
@@ -316,11 +322,21 @@ fn resolve_existing_resume_workspace(
             if let Some(reason) = resume_blocked_reason {
                 bail!("父任务终态工作区快照不可信，禁止 Resume：{reason}");
             }
-            if recorded_head
+            if let Some(recorded) = recorded_head
                 .as_deref()
-                .is_some_and(|recorded| !recorded.eq_ignore_ascii_case(&head))
+                .filter(|recorded| !recorded.eq_ignore_ascii_case(&head))
             {
-                bail!("父任务记录的 git_head 与活动 worktree 当前 HEAD 不一致。");
+                head_advance::validate(
+                    contract,
+                    parent,
+                    receipt,
+                    &authorized_base,
+                    &active,
+                    &expected_branch,
+                    recorded,
+                    &head,
+                )
+                .context("父任务记录的 git_head 与活动 worktree 当前 HEAD 不一致")?;
             }
             head
         }
