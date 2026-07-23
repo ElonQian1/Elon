@@ -505,7 +505,7 @@ function Invoke-NodeSelectionSelfTest {
         local_admin_token = 'official-local-token'
         local_admin_token_header = 'x-elon-local-admin-token'
         logged_in = $true
-        user_token_configured = $true
+        user_token_configured = $false
         agent_id = 'official-node'
         owner_user_id = 'official-owner'
         desktop_supervision = [pscustomobject]@{
@@ -522,6 +522,7 @@ function Invoke-NodeSelectionSelfTest {
     if ($taskCandidates.Count -ne 1 -or
         $taskCandidates[0].BaseUrl -ne 'http://127.0.0.1:7799' -or
         -not $taskCandidates[0].TaskAuthorized -or
+        $taskCandidates[0].UserTokenConfigured -or
         $null -eq $probeCandidate -or
         $probeCandidate.BaseUrl -ne 'http://127.0.0.1:7807' -or
         $probeCandidate.TaskAuthorized) {

@@ -7,8 +7,12 @@ function ConvertTo-NodeConnectionCandidate {
     $desktopReviewBroker = Get-ObjectField $Status 'desktop_review_broker'
     $loggedIn = (Get-ObjectField $Status 'logged_in') -eq $true
     $userTokenConfigured = (Get-ObjectField $Status 'user_token_configured') -eq $true
+    $agentId = [string](Get-ObjectField $Status 'agent_id')
+    $ownerUserId = [string](Get-ObjectField $Status 'owner_user_id')
     $supervisionProtocol = [string](Get-ObjectField $supervisionStatus 'protocol')
-    $taskAuthorized = $loggedIn -and $userTokenConfigured -and
+    $taskAuthorized = $loggedIn -and
+        -not [string]::IsNullOrWhiteSpace($agentId) -and
+        -not [string]::IsNullOrWhiteSpace($ownerUserId) -and
         $supervisionProtocol -eq $script:SupervisionProtocol
     if ([string]::IsNullOrWhiteSpace($token) -or
         $header.ToLowerInvariant() -ne 'x-elon-local-admin-token' -or
@@ -20,8 +24,8 @@ function ConvertTo-NodeConnectionCandidate {
         BaseUrl = $CandidateUrl; Header = $header; Token = $token; Version = $version
         LoggedIn = $loggedIn; UserTokenConfigured = $userTokenConfigured
         TaskAuthorized = $taskAuthorized
-        AgentId = [string](Get-ObjectField $Status 'agent_id')
-        OwnerUserId = [string](Get-ObjectField $Status 'owner_user_id')
+        AgentId = $agentId
+        OwnerUserId = $ownerUserId
         SupervisionProtocol = $supervisionProtocol
         SupervisionCapabilities = @((Get-ObjectField $supervisionStatus 'capabilities') | ForEach-Object { [string]$_ })
         DesktopReviewBrokerAvailable = [bool](Get-ObjectField $desktopReviewBroker 'available')
