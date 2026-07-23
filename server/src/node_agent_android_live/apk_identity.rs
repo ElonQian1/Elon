@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -15,8 +16,18 @@ pub(crate) fn verify_and_stage_apk(
     expected_label: Option<&str>,
     generation: u64,
 ) -> Result<DebugArtifactStatus> {
+    let bytes = fs::read(apk)?;
+    let sha256 = hex::encode(Sha256::digest(&bytes));
+    let tool_apk = ApkToolInput::prepare(apk, &bytes, &sha256)?;
     let aapt = find_sdk_tool(gradle_root, if cfg!(windows) { "aapt.exe" } else { "aapt" })?;
-    let badging = command_output(&aapt, &["dump", "badging", path_arg(apk)?])?;
+    let badging = command_output(
+        &aapt,
+        &[
+            OsStr::new("dump"),
+            OsStr::new("badging"),
+            tool_apk.path().as_os_str(),
+        ],
+    )?;
     let (package_name, version_code, version_name, app_label) = parse_badging(&badging)?;
     if package_name != expected_package {
         bail!("APK_PACKAGE_MISMATCH: 期望 {expected_package}，实际 {package_name}");
@@ -34,10 +45,15 @@ pub(crate) fn verify_and_stage_apk(
             "apksigner"
         },
     )?;
-    let signer_output = command_output(&apksigner, &["verify", "--print-certs", path_arg(apk)?])?;
+    let signer_output = command_output(
+        &apksigner,
+        &[
+            OsStr::new("verify"),
+            OsStr::new("--print-certs"),
+            tool_apk.path().as_os_str(),
+        ],
+    )?;
     let signer_sha256 = parse_signer_sha256(&signer_output)?;
-    let bytes = fs::read(apk)?;
-    let sha256 = hex::encode(Sha256::digest(&bytes));
     fs::create_dir_all(artifact_root)?;
     let staged = artifact_root.join(format!("{sha256}.apk"));
     if !staged.exists() {
@@ -61,6 +77,79 @@ pub(crate) fn verify_and_stage_apk(
         signer_sha256,
         generation,
     })
+}
+
+struct ApkToolInput {
+    path: PathBuf,
+    temporary: bool,
+}
+
+impl ApkToolInput {
+    fn prepare(apk: &Path, bytes: &[u8], sha256: &str) -> Result<Self> {
+        if !cfg!(windows) || is_ascii_path(apk) {
+            return Ok(Self {
+                path: apk.to_path_buf(),
+                temporary: false,
+            });
+        }
+
+        for root in ascii_inspection_roots() {
+            if !is_ascii_path(&root) {
+                continue;
+            }
+            let directory = root.join("elon-apk-identity-v1");
+            if fs::create_dir_all(&directory).is_err() {
+                continue;
+            }
+            let path = directory.join(format!(
+                "{}-{}-{}.apk",
+                std::process::id(),
+                uuid::Uuid::new_v4().simple(),
+                sha256
+            ));
+            if fs::write(&path, bytes).is_ok() {
+                return Ok(Self {
+                    path,
+                    temporary: true,
+                });
+            }
+        }
+
+        bail!("APK_IDENTITY_UNICODE_STAGING_FAILED: 无法创建 ASCII 工具检查副本");
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for ApkToolInput {
+    fn drop(&mut self) {
+        if self.temporary {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+
+fn ascii_inspection_roots() -> Vec<PathBuf> {
+    let mut roots = vec![std::env::temp_dir()];
+    #[cfg(windows)]
+    if let Some(system_root) = std::env::var_os("SystemRoot") {
+        roots.push(PathBuf::from(system_root).join("Temp"));
+    }
+    roots
+}
+
+#[cfg(windows)]
+fn is_ascii_path(path: &Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+
+    path.as_os_str().encode_wide().all(|unit| unit <= 0x7f)
+}
+
+#[cfg(not(windows))]
+fn is_ascii_path(path: &Path) -> bool {
+    path.as_os_str().to_string_lossy().is_ascii()
 }
 
 fn find_sdk_tool(gradle_root: &Path, name: &str) -> Result<PathBuf> {
@@ -92,7 +181,7 @@ fn sdk_dir_from_local_properties(gradle_root: &Path) -> Option<PathBuf> {
     })
 }
 
-fn command_output(program: &Path, args: &[&str]) -> Result<String> {
+fn command_output(program: &Path, args: &[&OsStr]) -> Result<String> {
     let mut command =
         if cfg!(windows) && program.extension().and_then(|value| value.to_str()) == Some("bat") {
             let mut command = Command::new("cmd.exe");
@@ -153,10 +242,6 @@ fn single_quoted(value: &str) -> Option<String> {
     Some(value.strip_prefix('\'')?.strip_suffix('\'')?.to_string())
 }
 
-fn path_arg(path: &Path) -> Result<&str> {
-    path.to_str().context("APK 路径不是有效 UTF-8")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -173,5 +258,30 @@ mod tests {
         )
         .unwrap();
         assert_eq!(signer.len(), 64);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn unicode_node_data_root_stages_apk_for_legacy_identity_tools() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-apk-identity-test-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let unicode_root = root.join("一龙").join("ElonNodeData");
+        fs::create_dir_all(&unicode_root).unwrap();
+        let apk = unicode_root.join("app-debug.apk");
+        let bytes = b"unicode-apk-path";
+        fs::write(&apk, bytes).unwrap();
+        let sha256 = hex::encode(Sha256::digest(bytes));
+
+        let tool_apk = ApkToolInput::prepare(&apk, bytes, &sha256).unwrap();
+        assert_ne!(tool_apk.path(), apk);
+        assert!(is_ascii_path(tool_apk.path()));
+        assert_eq!(fs::read(tool_apk.path()).unwrap(), bytes);
+        let temporary = tool_apk.path().to_path_buf();
+        drop(tool_apk);
+        assert!(!temporary.exists());
+
+        fs::remove_dir_all(root).unwrap();
     }
 }
