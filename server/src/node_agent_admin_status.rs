@@ -51,6 +51,11 @@ mod tests {
                 "protocol": "elon.desktop_pc_supervision.v1",
                 "capabilities": ["delta_wait_v1"]
             },
+            "desktop_review_broker": {
+                "protocol": "elon.desktop_review_broker.v1",
+                "available": true,
+                "pipe_name": "elon-desktop-review-test"
+            },
             "task_journal_supported": true,
             "task_journal_schema_version": 1,
             "local_admin_token": "local-secret",
@@ -66,6 +71,11 @@ mod tests {
         assert_eq!(
             payload["desktop_supervision"]["capabilities"][0],
             "delta_wait_v1"
+        );
+        assert_eq!(payload["desktop_review_broker"]["available"], true);
+        assert_eq!(
+            payload["desktop_review_broker"]["pipe_name"],
+            "elon-desktop-review-test"
         );
         assert_eq!(payload["task_journal_supported"], true);
         assert_eq!(payload["task_journal_schema_version"], 1);
@@ -290,6 +300,7 @@ fn enforce_status_response_limit(payload: &mut serde_json::Value) {
             "update_recovery": payload.get("update_recovery").cloned(),
             "lifecycle": payload.get("lifecycle").cloned(),
             "desktop_supervision": payload.get("desktop_supervision").cloned(),
+            "desktop_review_broker": payload.get("desktop_review_broker").cloned(),
             "task_journal_supported": payload.get("task_journal_supported").cloned(),
             "task_journal_schema_version": payload.get("task_journal_schema_version").cloned(),
             "lifecycle_report_schema_version": payload.get("lifecycle_report_schema_version").cloned(),
@@ -318,6 +329,7 @@ fn enforce_status_response_limit(payload: &mut serde_json::Value) {
             "active_cli_prompt_count": payload.get("active_cli_prompt_count").cloned(),
             "update_blocker_count": blocker_count,
             "desktop_supervision": payload.get("desktop_supervision").cloned(),
+            "desktop_review_broker": payload.get("desktop_review_broker").cloned(),
             "task_journal_supported": payload.get("task_journal_supported").cloned(),
             "task_journal_schema_version": payload.get("task_journal_schema_version").cloned(),
             "lifecycle_report_schema_version": payload.get("lifecycle_report_schema_version").cloned(),
