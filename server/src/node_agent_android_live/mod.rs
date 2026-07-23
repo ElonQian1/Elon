@@ -28,6 +28,7 @@ mod launcher_mask;
 mod launcher_surface;
 mod launcher_xml;
 mod mcp;
+mod mcp_fit_command;
 mod mcp_runtime_preparation;
 mod mcp_tool_contract;
 mod mcp_tools;
