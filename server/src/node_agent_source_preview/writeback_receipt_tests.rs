@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fs, path::Path, process::Command};
+use std::{collections::BTreeMap, fs, path::Path};
 
 use serde_json::json;
 
@@ -180,7 +180,7 @@ fn git_fixture() -> std::path::PathBuf {
 }
 
 fn run_git(root: &Path, args: &[&str]) {
-    assert!(Command::new("git")
+    assert!(crate::git_command_error::git_command()
         .args(args)
         .current_dir(root)
         .status()
