@@ -12,7 +12,6 @@ use super::{
     bootstrap_debug_runtime_with_reporter, PrepareDebugRuntimeRequest, PrepareDebugRuntimeResult,
 };
 use crate::node_agent_android_live::broker::LiveUiBroker;
-use crate::node_agent_android_live::fit_run::workspace_fingerprint;
 
 const MAX_EVIDENCE: usize = 64;
 const MAX_EVIDENCE_DETAIL_CHARS: usize = 1_200;
@@ -42,7 +41,9 @@ pub(crate) struct PrepareDebugRuntimeProgress {
     pub(crate) phase: String,
     pub(crate) retry_after_ms: Option<u64>,
     pub(crate) source_revision: Option<String>,
+    pub(crate) integration_revision: Option<String>,
     pub(crate) generation: u64,
+    pub(crate) commits: Vec<String>,
     pub(crate) evidence: Vec<PreparationEvidence>,
     pub(crate) result: Option<PrepareDebugRuntimeResult>,
     pub(crate) error: Option<String>,
@@ -53,7 +54,9 @@ struct PreparationState {
     status: String,
     phase: String,
     source_revision: Option<String>,
+    integration_revision: Option<String>,
     generation: u64,
+    commits: Vec<String>,
     evidence: Vec<PreparationEvidence>,
     result: Option<PrepareDebugRuntimeResult>,
     error: Option<String>,
@@ -67,7 +70,9 @@ impl PreparationState {
             phase: self.phase.clone(),
             retry_after_ms: (self.status == "IN_PROGRESS").then_some(2_000),
             source_revision: self.source_revision.clone(),
+            integration_revision: self.integration_revision.clone(),
             generation: self.generation,
+            commits: self.commits.clone(),
             evidence: self.evidence.clone(),
             result: self.result.clone(),
             error: self.error.clone(),
@@ -108,6 +113,18 @@ impl PreparationReporter {
             )
             .as_str(),
         );
+        state.source_revision = result
+            .integration
+            .source_revision
+            .clone()
+            .or_else(|| state.source_revision.clone());
+        state.integration_revision = result.integration.integration_revision.clone();
+        state.commits = result
+            .integration
+            .contributions
+            .iter()
+            .map(|contribution| contribution.commit_sha.clone())
+            .collect();
         state.result = Some(result);
         state.error = None;
     }
@@ -135,36 +152,43 @@ impl PreparationRegistry {
         host_port: u16,
         restart: bool,
     ) -> Result<PrepareDebugRuntimeProgress> {
-        let plan = prepare_integration_plan(&broker, &request)?;
-        request.integration_plan = Some(plan.clone());
+        let mut operations = self.operations.lock().await;
+        let mut plan = prepare_integration_plan(&broker, &request)?;
         let key = PreparationKey {
             slot_id: plan.slot_id.clone(),
             package_name: plan.package_name.clone(),
             device_id: request.device_id.trim().to_string(),
             lkg_enabled: plan.lkg_enabled,
         };
-        let source_revision = Some(format!(
-            "generation:{}:{}",
-            plan.generation,
-            plan.contributions.join(",")
-        ));
-        if let Some(existing) = self.operations.lock().await.get(&key).cloned() {
+        if let Some(existing) = operations.get(&key).cloned() {
             let progress = existing.read().await.progress();
+            let source_revision = Some(plan.source_revision.clone());
             let source_unchanged = progress.source_revision == source_revision;
             if progress.generation == plan.generation
                 && (progress.status == "IN_PROGRESS" || (!restart && source_unchanged))
             {
-                return Ok(progress);
+                return observable_progress(&broker, &plan.slot_id, progress);
+            }
+            if should_allocate_restart_generation(
+                &progress,
+                plan.generation,
+                restart,
+                source_unchanged,
+            ) {
+                plan = broker.debug_integration.restart_failed_generation(&plan)?;
             }
         }
 
+        request.integration_plan = Some(plan.clone());
         let operation_id = format!("runtime_prepare_{}", uuid::Uuid::new_v4().simple());
         let state = Arc::new(RwLock::new(PreparationState {
             operation_id,
             status: "IN_PROGRESS".to_string(),
             phase: "QUEUED".to_string(),
-            source_revision,
+            source_revision: Some(plan.source_revision.clone()),
+            integration_revision: plan.integration_revision.clone(),
             generation: plan.generation,
+            commits: plan.contributions.clone(),
             evidence: vec![PreparationEvidence {
                 phase: "QUEUED".to_string(),
                 status: "IN_PROGRESS".to_string(),
@@ -178,7 +202,8 @@ impl PreparationRegistry {
             result: None,
             error: None,
         }));
-        self.operations.lock().await.insert(key, state.clone());
+        operations.insert(key, state.clone());
+        drop(operations);
 
         let reporter = PreparationReporter {
             state: state.clone(),
@@ -199,6 +224,35 @@ impl PreparationRegistry {
         let progress = state.read().await.progress();
         Ok(progress)
     }
+}
+
+fn should_allocate_restart_generation(
+    progress: &PrepareDebugRuntimeProgress,
+    plan_generation: u64,
+    restart: bool,
+    source_unchanged: bool,
+) -> bool {
+    progress.status == "FAILED"
+        && progress.generation == plan_generation
+        && (restart || !source_unchanged)
+}
+
+fn observable_progress(
+    broker: &LiveUiBroker,
+    slot_id: &str,
+    mut progress: PrepareDebugRuntimeProgress,
+) -> Result<PrepareDebugRuntimeProgress> {
+    if let Some(status) = broker.debug_integration.status(slot_id)? {
+        if status.desired_generation == progress.generation {
+            progress.integration_revision = status.integration_revision;
+            progress.commits = status
+                .contributions
+                .into_iter()
+                .map(|contribution| contribution.commit_sha)
+                .collect();
+        }
+    }
+    Ok(progress)
 }
 
 fn prepare_integration_plan(
@@ -276,7 +330,9 @@ mod tests {
             status: "IN_PROGRESS".into(),
             phase: "BUILD".into(),
             source_revision: Some("rev-1".into()),
+            integration_revision: Some("integrated-1".into()),
             generation: 1,
+            commits: vec!["commit-1".into()],
             evidence: Vec::new(),
             result: None,
             error: None,
@@ -293,7 +349,17 @@ mod tests {
         let progress = state.read().await.progress();
         assert_eq!(progress.status, "FAILED");
         assert_eq!(progress.phase, "BUILD");
-        assert!(progress.error.unwrap().contains("phase=BUILD"));
         assert!(progress.evidence.len() <= MAX_EVIDENCE);
+        let observable = serde_json::to_value(&progress).unwrap();
+        assert_eq!(observable["operationId"], "op-1");
+        assert_eq!(observable["sourceRevision"], "rev-1");
+        assert_eq!(observable["integrationRevision"], "integrated-1");
+        assert_eq!(observable["generation"], 1);
+        assert_eq!(observable["commits"], serde_json::json!(["commit-1"]));
+        assert!(should_allocate_restart_generation(&progress, 1, true, true));
+        assert!(!should_allocate_restart_generation(
+            &progress, 1, false, true
+        ));
+        assert!(progress.error.unwrap().contains("phase=BUILD"));
     }
 }

@@ -12,8 +12,7 @@ pub(crate) struct DebugMergeCandidateRequest {
     #[serde(default)]
     pub(crate) ready: bool,
     pub(crate) commit_sha: Option<String>,
-    #[serde(default)]
-    pub(crate) commits: Vec<String>,
+    pub(crate) commits: Option<Vec<String>>,
     pub(crate) base_sha: Option<String>,
     pub(crate) source_task_id: Option<String>,
     pub(crate) source_session_id: Option<String>,
@@ -53,6 +52,10 @@ pub(crate) struct DebugIntegrationStatus {
     pub(crate) package_name: String,
     pub(crate) repository_identity: String,
     pub(crate) base_sha: String,
+    #[serde(default)]
+    pub(crate) source_revision: Option<String>,
+    #[serde(default)]
+    pub(crate) integration_revision: Option<String>,
     pub(crate) desired_generation: u64,
     pub(crate) installed_generation: Option<u64>,
     pub(crate) status: String,
@@ -79,6 +82,8 @@ pub(crate) struct DebugIntegrationPlan {
     pub(crate) lkg_enabled: bool,
     pub(crate) contributions: Vec<String>,
     pub(crate) base_sha: String,
+    pub(crate) source_revision: String,
+    pub(crate) integration_revision: Option<String>,
 }
 
 pub(super) struct RepositoryIdentity {
@@ -89,7 +94,9 @@ pub(super) struct RepositoryIdentity {
 
 pub(super) struct NormalizedCandidate {
     pub(super) commits: Vec<String>,
+    pub(super) commits_explicitly_empty: bool,
     pub(super) base_sha: String,
+    pub(super) source_revision: String,
     pub(super) source_task_id: Option<String>,
     pub(super) source_session_id: Option<String>,
     pub(super) preview_owner: Option<String>,
@@ -142,17 +149,21 @@ pub(super) fn normalized_candidate(
     if candidate.is_some_and(|candidate| !candidate.ready) {
         bail!("DEBUG_CANDIDATE_NOT_READY: 候选尚未明确 ready，拒绝进入节点集成槽");
     }
+    let commits_explicitly_empty =
+        candidate.is_some_and(|value| value.commits.as_ref().is_some_and(Vec::is_empty));
     let mut commits = candidate
-        .map(|value| value.commits.clone())
+        .and_then(|value| value.commits.clone())
         .unwrap_or_default();
     if let Some(commit) = candidate.and_then(|value| value.commit_sha.clone()) {
-        if commits.is_empty() {
+        if candidate.is_some_and(|value| value.commits.is_some()) {
+            if !commits.is_empty() && commits.last() != Some(&commit) {
+                bail!("DEBUG_CANDIDATE_COMMIT_IDENTITY_MISMATCH: commitSha 必须等于显式 commits 最后一项");
+            }
+        } else {
             commits.push(commit);
-        } else if commits.last() != Some(&commit) {
-            bail!("DEBUG_CANDIDATE_COMMIT_IDENTITY_MISMATCH: commitSha 必须等于 commits 最后一项");
         }
     }
-    if commits.is_empty() {
+    if commits.is_empty() && !commits_explicitly_empty {
         commits.push(repo.head.clone());
     }
     for commit in &mut commits {
@@ -160,22 +171,36 @@ pub(super) fn normalized_candidate(
             .trim()
             .to_string();
     }
-    if commits.last() != Some(&repo.head) {
+    if !commits.is_empty() && commits.last() != Some(&repo.head) {
         bail!("DEBUG_CANDIDATE_HEAD_MISMATCH: 候选提交必须是来源 worktree 当前 HEAD，拒绝无来源提交身份");
     }
     let base_sha = match candidate.and_then(|value| value.base_sha.as_deref()) {
         Some(base) => git(&repo.root, &["rev-parse", &format!("{base}^{{commit}}")])?
             .trim()
             .to_string(),
+        None if commits_explicitly_empty => repo.head.clone(),
         None => git(&repo.root, &["rev-parse", "HEAD^"])
             .map(|value| value.trim().to_string())
             .unwrap_or_else(|_| repo.head.clone()),
     };
+    if commits.is_empty()
+        && !is_ancestor(&repo.root, &base_sha, &repo.head)?
+        && !is_ancestor(&repo.root, &repo.head, &base_sha)?
+    {
+        bail!("DEBUG_CANDIDATE_COMMIT_LINEAGE_MISMATCH: 显式空提交序列的 base 与来源 HEAD 必须属于同一历史");
+    }
     for commit in &commits {
-        if !is_ancestor(&repo.root, &base_sha, commit)?
-            || !is_ancestor(&repo.root, commit, &repo.head)?
+        if !is_ancestor(&repo.root, commit, &repo.head)?
+            || (!is_ancestor(&repo.root, &base_sha, commit)?
+                && !is_ancestor(&repo.root, commit, &base_sha)?)
         {
-            bail!("DEBUG_CANDIDATE_COMMIT_LINEAGE_MISMATCH: 候选提交必须位于声明基础 SHA 与来源 worktree HEAD 之间");
+            bail!("DEBUG_CANDIDATE_COMMIT_LINEAGE_MISMATCH: 候选提交必须属于来源 HEAD，且与声明 base 位于同一历史");
+        }
+    }
+    let mut pending_commits = Vec::with_capacity(commits.len());
+    for commit in commits {
+        if !is_ancestor(&repo.root, &commit, &base_sha)? {
+            pending_commits.push(commit);
         }
     }
     let source_task_id = candidate.and_then(|value| clean(value.source_task_id.as_deref()));
@@ -186,8 +211,10 @@ pub(super) fn normalized_candidate(
         bail!("DEBUG_CANDIDATE_SOURCE_MISSING: 候选缺少来源 task 或 session 身份");
     }
     Ok(NormalizedCandidate {
-        commits,
+        commits: pending_commits,
+        commits_explicitly_empty,
         base_sha,
+        source_revision: repo.head.clone(),
         source_task_id,
         source_session_id,
         preview_owner: candidate.and_then(|value| clean(value.preview_owner.as_deref())),
@@ -232,6 +259,11 @@ pub(super) fn plan_from_status(
             .map(|item| item.commit_sha.clone())
             .collect(),
         base_sha: status.base_sha.clone(),
+        source_revision: status
+            .source_revision
+            .clone()
+            .unwrap_or_else(|| status.base_sha.clone()),
+        integration_revision: status.integration_revision.clone(),
     }
 }
 

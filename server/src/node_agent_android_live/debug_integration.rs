@@ -67,30 +67,32 @@ impl DebugIntegrationCoordinator {
             &self.node_fingerprint,
         );
         let _guard = self.state_lock.lock().expect("debug integration lock");
-        let mut status = self
-            .load(&slot_id)?
-            .unwrap_or_else(|| DebugIntegrationStatus {
-                schema: "elon.android_debug_integration.v1".into(),
-                slot_id: slot_id.clone(),
-                node_fingerprint: self.node_fingerprint.clone(),
-                project_id: project_id.trim().to_string(),
-                device_identity: device_identity.trim().to_string(),
-                package_name: package_name.trim().to_string(),
-                repository_identity: repo.identity.clone(),
-                base_sha: candidate.base_sha.clone(),
-                desired_generation: 0,
-                installed_generation: None,
-                status: "EMPTY".into(),
-                lkg_enabled: lkg_enabled.unwrap_or(false),
-                integration_worktree: None,
-                contributions: Vec::new(),
-                conflicts: Vec::new(),
-                legacy_packages: Vec::new(),
-                preview_owner: None,
-                last_error: None,
-                last_usable: None,
-                updated_at: now(),
-            });
+        let loaded = self.load(&slot_id)?;
+        let is_new = loaded.is_none();
+        let mut status = loaded.unwrap_or_else(|| DebugIntegrationStatus {
+            schema: "elon.android_debug_integration.v1".into(),
+            slot_id: slot_id.clone(),
+            node_fingerprint: self.node_fingerprint.clone(),
+            project_id: project_id.trim().to_string(),
+            device_identity: device_identity.trim().to_string(),
+            package_name: package_name.trim().to_string(),
+            repository_identity: repo.identity.clone(),
+            base_sha: candidate.base_sha.clone(),
+            source_revision: Some(candidate.source_revision.clone()),
+            integration_revision: None,
+            desired_generation: 0,
+            installed_generation: None,
+            status: "EMPTY".into(),
+            lkg_enabled: lkg_enabled.unwrap_or(false),
+            integration_worktree: None,
+            contributions: Vec::new(),
+            conflicts: Vec::new(),
+            legacy_packages: Vec::new(),
+            preview_owner: None,
+            last_error: None,
+            last_usable: None,
+            updated_at: now(),
+        });
         validate_slot_identity(
             &status,
             &repo.identity,
@@ -106,11 +108,33 @@ impl DebugIntegrationCoordinator {
                 true
             }
         });
-        if !is_ancestor(&repo.root, &status.base_sha, &repo.head)? {
+        let base_changed = if status.base_sha == candidate.base_sha {
+            false
+        } else if is_ancestor(&repo.root, &status.base_sha, &candidate.base_sha)? {
+            status.base_sha = candidate.base_sha.clone();
+            true
+        } else if is_ancestor(&repo.root, &candidate.base_sha, &status.base_sha)? {
+            false
+        } else {
             bail!(
-                "DEBUG_CANDIDATE_BASE_DIVERGED: 候选提交不是固定集成基础 {} 的后继，拒绝猜测合并",
-                status.base_sha
+                "DEBUG_CANDIDATE_BASE_DIVERGED: 候选 base {} 与固定集成基础 {} 不在同一历史，拒绝猜测合并",
+                candidate.base_sha,
+                status.base_sha,
             );
+        };
+        let prior_contribution_count = status.contributions.len();
+        let mut retained = Vec::with_capacity(prior_contribution_count);
+        for contribution in std::mem::take(&mut status.contributions) {
+            if !is_ancestor(&repo.root, &contribution.commit_sha, &status.base_sha)? {
+                retained.push(contribution);
+            }
+        }
+        status.contributions = retained;
+        let pruned_by_base = status.contributions.len() != prior_contribution_count;
+        let cleared_explicit_sequence =
+            candidate.commits_explicitly_empty && !status.contributions.is_empty();
+        if candidate.commits_explicitly_empty {
+            status.contributions.clear();
         }
         let existing = status
             .contributions
@@ -120,11 +144,27 @@ impl DebugIntegrationCoordinator {
         let additions = candidate
             .commits
             .iter()
+            .filter_map(
+                |commit| match is_ancestor(&repo.root, commit, &status.base_sha) {
+                    Ok(true) => None,
+                    Ok(false) => Some(Ok(commit.clone())),
+                    Err(error) => Some(Err(error)),
+                },
+            )
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
             .filter(|commit| !existing.contains(&commit.as_str()))
-            .cloned()
             .collect::<Vec<_>>();
-        if additions.is_empty() {
-            if policy_changed {
+        let sequence_changed = is_new
+            || base_changed
+            || pruned_by_base
+            || cleared_explicit_sequence
+            || !additions.is_empty();
+        let source_revision_changed =
+            status.source_revision.as_deref() != Some(candidate.source_revision.as_str());
+        status.source_revision = Some(candidate.source_revision.clone());
+        if !sequence_changed {
+            if policy_changed || source_revision_changed {
                 status.updated_at = now();
                 self.save(&status)?;
             }
@@ -138,8 +178,11 @@ impl DebugIntegrationCoordinator {
                 accepted_at: now(),
             });
         }
-        status.desired_generation = status.desired_generation.saturating_add(1);
+        status.desired_generation =
+            self.next_available_generation(&status.slot_id, status.desired_generation)?;
         status.status = "QUEUED".into();
+        status.integration_worktree = None;
+        status.integration_revision = None;
         status.conflicts.clear();
         status.last_error = None;
         status.preview_owner = candidate.preview_owner.clone().or_else(|| {
@@ -153,6 +196,37 @@ impl DebugIntegrationCoordinator {
         Ok(plan_from_status(&self.root, &repo.root, &status))
     }
 
+    pub(crate) fn restart_failed_generation(
+        &self,
+        plan: &DebugIntegrationPlan,
+    ) -> Result<DebugIntegrationPlan> {
+        let _guard = self.state_lock.lock().expect("debug integration lock");
+        let mut status = self.load(&plan.slot_id)?.context("固定调试槽状态不存在")?;
+        if status.desired_generation != plan.generation {
+            return Ok(plan_from_status(&self.root, &plan.source_root, &status));
+        }
+        if !matches!(
+            status.status.as_str(),
+            "FAILED" | "MERGE_CONFLICT" | "SIGNATURE_MISMATCH"
+        ) {
+            bail!(
+                "DEBUG_RESTART_NOT_FAILED: 代次 {} 当前状态 {}，只有 FAILED 代次可以重启",
+                plan.generation,
+                status.status
+            );
+        }
+        status.desired_generation =
+            self.next_available_generation(&status.slot_id, status.desired_generation)?;
+        status.status = "QUEUED".into();
+        status.integration_worktree = None;
+        status.integration_revision = None;
+        status.conflicts.clear();
+        status.last_error = None;
+        status.updated_at = now();
+        self.save(&status)?;
+        Ok(plan_from_status(&self.root, &plan.source_root, &status))
+    }
+
     pub(crate) fn materialize(&self, plan: &DebugIntegrationPlan) -> Result<PathBuf> {
         let current = self.assert_current(plan)?;
         let generation_root = &plan.worktree;
@@ -160,6 +234,14 @@ impl DebugIntegrationCoordinator {
             if current.integration_worktree.as_deref()
                 == Some(generation_root.to_string_lossy().as_ref())
             {
+                if current.integration_revision.is_none() {
+                    let integration_revision = git(generation_root, &["rev-parse", "HEAD"])?
+                        .trim()
+                        .to_string();
+                    self.update(plan, |status| {
+                        status.integration_revision = Some(integration_revision)
+                    })?;
+                }
                 return Ok(generation_root.clone());
             }
             bail!("DEBUG_INTEGRATION_WORKTREE_EXISTS: 代次工作区已存在但不属于当前已验证状态，拒绝覆盖: {}", generation_root.display());
@@ -177,7 +259,7 @@ impl DebugIntegrationCoordinator {
         )
         .context("创建节点托管的临时集成 worktree 失败")?;
         for commit in &plan.contributions {
-            if commit == &plan.base_sha {
+            if is_ancestor(generation_root, commit, "HEAD")? {
                 continue;
             }
             if let Err(error) = git(generation_root, &["cherry-pick", commit]) {
@@ -196,9 +278,13 @@ impl DebugIntegrationCoordinator {
                 return Err(anyhow!("DEBUG_MERGE_CONFLICT: 提交 {commit} 与当前合并序列冲突；{retention}，未猜测解决冲突。{error:#}"));
             }
         }
+        let integration_revision = git(generation_root, &["rev-parse", "HEAD"])?
+            .trim()
+            .to_string();
         self.update(plan, |status| {
             status.status = "MERGED".into();
             status.integration_worktree = Some(generation_root.display().to_string());
+            status.integration_revision = Some(integration_revision);
             status.conflicts.clear();
             status.last_error = None;
         })?;
@@ -376,5 +462,23 @@ impl DebugIntegrationCoordinator {
 
     fn manifest_path(&self, slot_id: &str) -> PathBuf {
         self.root.join(slot_id).join("status.json")
+    }
+
+    fn next_available_generation(&self, slot_id: &str, current: u64) -> Result<u64> {
+        let mut generation = current
+            .checked_add(1)
+            .context("DEBUG_GENERATION_EXHAUSTED: 调试集成 generation 已耗尽")?;
+        while self
+            .root
+            .join(slot_id)
+            .join("generations")
+            .join(format!("generation-{generation}"))
+            .exists()
+        {
+            generation = generation
+                .checked_add(1)
+                .context("DEBUG_GENERATION_EXHAUSTED: 调试集成 generation 已耗尽")?;
+        }
+        Ok(generation)
     }
 }

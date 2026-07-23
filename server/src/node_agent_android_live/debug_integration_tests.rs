@@ -152,6 +152,108 @@ fn three_sessions_merge_committed_candidates_in_audited_order() {
 }
 
 #[test]
+fn commits_already_contained_by_an_advanced_base_are_not_cherry_picked_again() {
+    let repo = RepositoryFixture::new("advanced-base");
+    let (source, first) = repo.session("source", "one.txt", "one\n");
+    fs::write(source.join("two.txt"), "two\n").unwrap();
+    git(&source, &["add", "."]);
+    git(&source, &["commit", "-m", "source two"]);
+    let second = git_output(&source, &["rev-parse", "HEAD"]);
+    fs::write(source.join("three.txt"), "three\n").unwrap();
+    git(&source, &["add", "."]);
+    git(&source, &["commit", "-m", "source three"]);
+    let third = git_output(&source, &["rev-parse", "HEAD"]);
+    let coordinator = coordinator("advanced-base");
+    let mut original = candidate(&repo.base, &third, "source");
+    original.commits = Some(vec![first.clone(), second.clone(), third.clone()]);
+    let first_plan = register(&coordinator, &source, &original);
+    assert_eq!(first_plan.contributions, vec![first, second, third.clone()]);
+
+    git(&repo.root, &["merge", "--ff-only", &third]);
+    fs::write(repo.root.join("base-main.txt"), "new base\n").unwrap();
+    git(&repo.root, &["add", "."]);
+    git(&repo.root, &["commit", "-m", "advance base main"]);
+    let advanced_base = git_output(&repo.root, &["rev-parse", "HEAD"]);
+    let mut already_integrated = candidate(&advanced_base, &third, "source");
+    already_integrated.commits = original.commits.clone();
+
+    let normalized = register(&coordinator, &source, &already_integrated);
+    assert_eq!(normalized.generation, first_plan.generation + 1);
+    assert_eq!(normalized.base_sha, advanced_base);
+    assert!(normalized.contributions.is_empty());
+    let integrated = coordinator
+        .materialize(&normalized)
+        .expect("advanced base should materialize without repeat cherry-picks");
+    assert_eq!(
+        git_output(&integrated, &["rev-parse", "HEAD"]),
+        advanced_base
+    );
+    let status = coordinator.status(&normalized.slot_id).unwrap().unwrap();
+    assert!(status.contributions.is_empty());
+    assert_eq!(
+        status.integration_revision.as_deref(),
+        Some(advanced_base.as_str())
+    );
+    assert_eq!(status.source_revision.as_deref(), Some(third.as_str()));
+}
+
+#[test]
+fn explicit_empty_commits_clear_the_accumulated_sequence() {
+    let repo = RepositoryFixture::new("explicit-empty");
+    let (source, commit) = repo.session("source", "one.txt", "one\n");
+    let coordinator = coordinator("explicit-empty");
+    let first = register(
+        &coordinator,
+        &source,
+        &candidate(&repo.base, &commit, "source"),
+    );
+    assert_eq!(first.contributions, vec![commit.clone()]);
+
+    let empty = DebugMergeCandidateRequest {
+        ready: true,
+        commit_sha: Some(commit.clone()),
+        commits: Some(Vec::new()),
+        base_sha: Some(repo.base.clone()),
+        source_session_id: Some("source".into()),
+        preview_owner: Some("source".into()),
+        ..DebugMergeCandidateRequest::default()
+    };
+    let cleared = register(&coordinator, &source, &empty);
+    assert_eq!(cleared.generation, first.generation + 1);
+    assert!(cleared.contributions.is_empty());
+    let integrated = coordinator.materialize(&cleared).unwrap();
+    assert!(!integrated.join("one.txt").exists());
+    assert_eq!(git_output(&integrated, &["rev-parse", "HEAD"]), repo.base);
+}
+
+#[test]
+fn failed_generation_restart_uses_a_fresh_unoccupied_worktree() {
+    let repo = RepositoryFixture::new("failed-restart");
+    let (source, commit) = repo.session("source", "one.txt", "one\n");
+    let coordinator = coordinator("failed-restart");
+    let failed = register(
+        &coordinator,
+        &source,
+        &candidate(&repo.base, &commit, "source"),
+    );
+    fs::create_dir_all(&failed.worktree).unwrap();
+    coordinator
+        .record_runtime_failure(&failed, "simulated failed operation".into())
+        .unwrap();
+
+    let restarted = coordinator.restart_failed_generation(&failed).unwrap();
+    assert!(restarted.generation > failed.generation);
+    assert_ne!(restarted.worktree, failed.worktree);
+    let integrated = coordinator
+        .materialize(&restarted)
+        .expect("restart must not reuse the failed generation worktree");
+    assert!(integrated.join("one.txt").exists());
+    let status = coordinator.status(&restarted.slot_id).unwrap().unwrap();
+    assert_eq!(status.status, "MERGED");
+    assert_eq!(status.desired_generation, restarted.generation);
+}
+
+#[test]
 fn merge_conflict_fails_closed_and_preserves_last_usable_artifact() {
     let repo = RepositoryFixture::new("conflict");
     let (one_root, one) = repo.session("one", "shared.txt", "from one\n");
