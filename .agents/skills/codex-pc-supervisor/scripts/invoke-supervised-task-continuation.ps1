@@ -1,3 +1,14 @@
+function Get-ContinuationAuthorizationWorkspace {
+    param([object]$ParentRecord)
+    $parentWorkspace = [string](Get-ObjectField $ParentRecord 'workspace_path')
+    $workspaceStatus = Get-ObjectField $ParentRecord 'workspace_status'
+    $recordedBaseWorkspace = [string](Get-ObjectField $workspaceStatus 'base_workspace_path')
+    if (-not [string]::IsNullOrWhiteSpace($recordedBaseWorkspace)) {
+        return $recordedBaseWorkspace
+    }
+    return $parentWorkspace
+}
+
 function New-ResumeTaskBody {
     param(
         [object]$ParentDetail,
@@ -8,7 +19,7 @@ function New-ResumeTaskBody {
     Assert-SafeResumeParentDetail $ParentDetail $RequestedParentTaskId
     $parentRecord = Get-RecordFromDetail $ParentDetail
     $parentProjectId = [string](Get-ObjectField $parentRecord 'project_id')
-    $parentWorkspace = [string](Get-ObjectField $parentRecord 'workspace_path')
+    $parentWorkspace = Get-ContinuationAuthorizationWorkspace $parentRecord
     $rootTask = Get-RootTaskFromDetail $ParentDetail $RequestedParentTaskId
     # The node is the authority for root requirement, lineage, acceptance
     # criteria and workspace identity. Never copy the parent prompt here.
@@ -38,12 +49,7 @@ function New-SupersedeTaskBody {
     }
     $parentRecord = Get-RecordFromDetail $ParentDetail
     $parentProjectId = [string](Get-ObjectField $parentRecord 'project_id')
-    $parentWorkspace = [string](Get-ObjectField $parentRecord 'workspace_path')
-    $workspaceStatus = Get-ObjectField $parentRecord 'workspace_status'
-    $recordedBaseWorkspace = [string](Get-ObjectField $workspaceStatus 'base_workspace_path')
-    if (-not [string]::IsNullOrWhiteSpace($recordedBaseWorkspace)) {
-        $parentWorkspace = $recordedBaseWorkspace
-    }
+    $parentWorkspace = Get-ContinuationAuthorizationWorkspace $parentRecord
     $rootTask = Get-RootTaskFromDetail $ParentDetail $RequestedParentTaskId
     $body = New-SupervisedTaskBody $parentProjectId $parentWorkspace $RevisedPrompt `
         'resume_original' $RequestedParentTaskId $rootTask $BodyCriteria $BodyImprovementPolicy
