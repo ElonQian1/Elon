@@ -24,6 +24,8 @@ const HOME_MENU_ICON_PNG_B64: &str = include_str!("assets/ic_home_menu_custom.b6
 const PROJECT_AI_ICON_PNG_B64: &str = include_str!("assets/ic_project_ai_conversation.b64");
 const PROJECT_DOCUMENT_ICON_PNG_B64: &str = include_str!("assets/ic_project_document.b64");
 const TOP_SEARCH_ICON_PNG_B64: &str = include_str!("assets/ic_top_search_custom.b64");
+const TOOLBAR_BACK_ICON_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_toolbar_back_custom.png");
 const TOP_ADD_BUTTON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-nodpi/ic_top_add_button_new.png");
 const SIDE_MENU_FOLDER_CLOSED_ICON_PNG: &[u8] = include_bytes!(
@@ -184,6 +186,7 @@ fn build_html() -> String {
     let bottom_panel_png_b64 = encode_png(BOTTOM_PANEL_PNG);
     let bottom_mode_pill_png_b64 = encode_png(BOTTOM_MODE_PILL_PNG);
     let top_add_button_png_b64 = encode_png(TOP_ADD_BUTTON_PNG);
+    let toolbar_back_icon_png_b64 = encode_png(TOOLBAR_BACK_ICON_PNG);
     let home_bottom_nav_panel_png_b64 = encode_png(HOME_BOTTOM_NAV_PANEL_PNG);
     let home_bottom_search_pill_png_b64 = encode_png(HOME_BOTTOM_SEARCH_PILL_PNG);
     let bottom_nav_panel_png_b64 = encode_png(BOTTOM_NAV_PANEL_PNG);
@@ -246,6 +249,7 @@ fn build_html() -> String {
             "__TOP_SEARCH_ICON_PNG_B64__",
             TOP_SEARCH_ICON_PNG_B64.trim(),
         )
+        .replace("__TOOLBAR_BACK_ICON_PNG_B64__", &toolbar_back_icon_png_b64)
         .replace("__TOP_ADD_BUTTON_PNG_B64__", &top_add_button_png_b64)
         .replace(
             "__POPUP_NEW_PROJECT_PNG_B64__",
