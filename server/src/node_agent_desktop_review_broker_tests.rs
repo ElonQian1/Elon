@@ -14,7 +14,14 @@ fn trusted_desktop_chain_is_accepted_but_same_sid_executor_chain_is_denied() {
     let desktop = vec![
         process(10, 20, "powershell.exe", None),
         process(20, 30, "codex-code-mode-host.exe", None),
-        process(30, 40, "codex.exe", None),
+        process(
+            30,
+            40,
+            "codex.exe",
+            Some(
+                r"C:\Program Files\WindowsApps\OpenAI.Codex_26.715.1.0_x64__2p2nqsd0c76g0\app\resources\codex.exe",
+            ),
+        ),
         process(
             40,
             1,
@@ -26,14 +33,35 @@ fn trusted_desktop_chain_is_accepted_but_same_sid_executor_chain_is_denied() {
     ];
     assert_eq!(trusted_desktop_ancestry(10, &desktop), Ok(()));
 
-    let executor = vec![
-        process(10, 20, "powershell.exe", None),
-        process(20, 30, "codex.exe", None),
+    let executor_worker = vec![
+        process(10, 30, "powershell.exe", None),
         process(30, 40, "elon-cli-worker.exe", None),
         process(40, 1, "一龙开发平台.exe", None),
     ];
     assert_eq!(
-        trusted_desktop_ancestry(10, &executor),
+        trusted_desktop_ancestry(10, &executor_worker),
+        Err("desktop_review_executor_ancestry_denied")
+    );
+
+    let executor_codex = vec![
+        process(10, 20, "powershell.exe", None),
+        process(
+            20,
+            30,
+            "codex.exe",
+            Some(r"C:\Users\user\AppData\Local\OpenAI\Codex\bin\build\codex.exe"),
+        ),
+        process(
+            30,
+            1,
+            "ChatGPT.exe",
+            Some(
+                r"C:\Program Files\WindowsApps\OpenAI.Codex_26.715.1.0_x64__2p2nqsd0c76g0\app\ChatGPT.exe",
+            ),
+        ),
+    ];
+    assert_eq!(
+        trusted_desktop_ancestry(10, &executor_codex),
         Err("desktop_review_executor_ancestry_denied")
     );
 }

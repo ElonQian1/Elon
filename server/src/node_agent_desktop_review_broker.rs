@@ -225,6 +225,14 @@ fn trusted_desktop_ancestry(
         ) {
             return Err("desktop_review_executor_ancestry_denied");
         }
+        if name == "codex.exe"
+            && !process
+                .image_path
+                .as_deref()
+                .is_some_and(is_trusted_codex_backend_path)
+        {
+            return Err("desktop_review_executor_ancestry_denied");
+        }
         if name == "chatgpt.exe"
             && process
                 .image_path
@@ -242,6 +250,12 @@ fn is_trusted_codex_path(path: &str) -> bool {
     let path = path.replace('/', "\\").to_ascii_lowercase();
     path.contains("\\program files\\windowsapps\\openai.codex_")
         && path.ends_with("\\app\\chatgpt.exe")
+}
+
+fn is_trusted_codex_backend_path(path: &str) -> bool {
+    let path = path.replace('/', "\\").to_ascii_lowercase();
+    path.contains("\\program files\\windowsapps\\openai.codex_")
+        && path.ends_with("\\app\\resources\\codex.exe")
 }
 
 #[cfg(windows)]
@@ -361,7 +375,9 @@ mod windows_pipe {
         let mut ok = unsafe { Process32FirstW(snapshot, &mut entry) };
         while ok != 0 {
             let name = wide_string(&entry.szExeFile);
-            let image_path = if name.eq_ignore_ascii_case("ChatGPT.exe") {
+            let image_path = if name.eq_ignore_ascii_case("ChatGPT.exe")
+                || name.eq_ignore_ascii_case("codex.exe")
+            {
                 query_image_path(entry.th32ProcessID)
             } else {
                 None
