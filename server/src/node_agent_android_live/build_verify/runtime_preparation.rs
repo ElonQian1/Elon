@@ -5,6 +5,7 @@ use anyhow::{anyhow, Context, Result};
 
 use crate::node_agent_android_inspector::adb_capture::launch_app;
 
+use super::device_health::ensure_android_framework_ready;
 use super::gradle::{
     find_gradle_root, gradle_wrapper, run_debug_build, validate_debug_application_id_suffix,
 };
@@ -42,6 +43,36 @@ pub(super) async fn run(
     let gradle_root = find_gradle_root(&project_root)?;
     let wrapper = gradle_wrapper(&gradle_root)?;
     let suffix = validate_debug_application_id_suffix(debug_application_id_suffix)?;
+
+    report_phase(
+        reporter,
+        "ADB_FRAMEWORK_HEALTH",
+        format!(
+            "校验设备 {} 的 boot、package 与 settings framework 服务",
+            session.device_id
+        ),
+    )
+    .await;
+    let health = ensure_android_framework_ready(&session.device_id)
+        .await
+        .context("ADB_FRAMEWORK_HEALTH 阶段失败")?;
+    report_evidence(
+        reporter,
+        "ADB_FRAMEWORK_HEALTH",
+        if health.recovery_action.is_some() {
+            "RECOVERED"
+        } else {
+            "PASSED"
+        },
+        format!(
+            "probeAttempts={} recovery={} recoveryWaitAttempts={} {}",
+            health.probe_attempts,
+            health.recovery_action.unwrap_or("not-needed"),
+            health.recovery_wait_attempts,
+            health.detail
+        ),
+    )
+    .await;
     broker.debug_integration.mark_building(integration_plan)?;
 
     report_phase(reporter, "APK_REUSE_CHECK", "检查已成功生成的 Debug APK").await;

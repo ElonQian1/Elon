@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use anyhow::{anyhow, bail, Error, Result};
 
+use super::device_health::ensure_android_framework_ready;
 use crate::node_agent_android_inspector::adb_capture::wake_device_for_user_interaction;
 use crate::node_agent_android_inspector::adb_command::run_adb_text;
 
@@ -74,6 +75,7 @@ pub(super) async fn list_legacy_debug_packages(
     device_id: &str,
     expected_package: &str,
 ) -> Result<Vec<String>> {
+    ensure_android_framework_ready(device_id).await?;
     let output = run_adb_text(
         &[
             "-s".into(),

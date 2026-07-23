@@ -24,6 +24,7 @@ use super::visual_diff::{
     compare_pngs, compare_target_with_png_projected_masked, PixelRect, VisualDiffResult, VisualMask,
 };
 
+mod device_health;
 mod geometry;
 mod gradle;
 mod install;
@@ -33,6 +34,7 @@ mod runtime_reconnect;
 
 pub(crate) use preparation::PreparationRegistry;
 
+use device_health::ensure_android_framework_ready;
 use geometry::{patched_bounds, patched_bounds_for_nodes, verification_bounds};
 use gradle::{
     canonical_project_root, find_gradle_root, gradle_wrapper, infer_debug_application_id_suffix,

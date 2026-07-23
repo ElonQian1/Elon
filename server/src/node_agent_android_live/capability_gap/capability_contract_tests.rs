@@ -7,6 +7,7 @@ use crate::node_agent_android_live::broker::LiveUiBroker;
 async fn ui_check_capabilities_accepts_resumable_long_running_runtime_preparation() {
     assert!(SUPPORTED_CAPABILITIES.contains(&"MCP_LONG_RUNNING_TOOL_COMPLETION"));
     assert!(SUPPORTED_CAPABILITIES.contains(&"RESUMABLE_DEBUG_RUNTIME_PREPARATION"));
+    assert!(SUPPORTED_CAPABILITIES.contains(&"ANDROID_RENDERER_DEVICE_HEALTH_RECOVERY"));
 
     let broker = LiveUiBroker::new();
     let session = broker
@@ -22,7 +23,8 @@ async fn ui_check_capabilities_accepts_resumable_long_running_runtime_preparatio
         &json!({
             "requiredCapabilities": [
                 "MCP_LONG_RUNNING_TOOL_COMPLETION",
-                "RESUMABLE_DEBUG_RUNTIME_PREPARATION"
+                "RESUMABLE_DEBUG_RUNTIME_PREPARATION",
+                "ANDROID_RENDERER_DEVICE_HEALTH_RECOVERY"
             ]
         }),
     )
@@ -34,4 +36,5 @@ async fn ui_check_capabilities_accepts_resumable_long_running_runtime_preparatio
     let ready = result["ready"].as_array().unwrap();
     assert!(ready.contains(&json!("MCP_LONG_RUNNING_TOOL_COMPLETION")));
     assert!(ready.contains(&json!("RESUMABLE_DEBUG_RUNTIME_PREPARATION")));
+    assert!(ready.contains(&json!("ANDROID_RENDERER_DEVICE_HEALTH_RECOVERY")));
 }
