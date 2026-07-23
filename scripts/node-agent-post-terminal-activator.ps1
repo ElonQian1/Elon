@@ -88,20 +88,34 @@ function Copy-NodeAgentRollbackTree {
         [Parameter(Mandatory = $true)][string]$Source,
         [Parameter(Mandatory = $true)][string]$Destination
     )
+    $clientName = '一龙开发平台.exe'
+    $clientSource = Join-Path $Source $clientName
+    $internalSource = Join-Path $Source '_internal'
+    if (-not (Test-Path -LiteralPath $clientSource -PathType Leaf)) {
+        throw "Rollback source is missing the repair entrypoint: $clientName"
+    }
+    if (-not (Test-Path -LiteralPath $internalSource -PathType Container)) {
+        throw 'Rollback source is missing the stable _internal client tree.'
+    }
+
     New-Item -ItemType Directory -Path $Destination -Force | Out-Null
-    foreach ($item in Get-ChildItem -LiteralPath $Source -Force) {
-        if ($item.PSIsContainer -and $item.Name -eq '_internal') {
-            $internalDestination = Join-Path $Destination $item.Name
-            New-Item -ItemType Directory -Path $internalDestination -Force | Out-Null
-            foreach ($internalItem in Get-ChildItem -LiteralPath $item.FullName -Force) {
-                # The running watchdog owns this process-lifetime lock exclusively.
-                # It is ephemeral and must not make the rollback snapshot unreadable.
-                if ($internalItem.Name -eq 'watchdog.instance.lock') { continue }
-                Copy-Item -LiteralPath $internalItem.FullName -Destination $internalDestination -Recurse -Force
-            }
-            continue
-        }
-        Copy-Item -LiteralPath $item.FullName -Destination $Destination -Recurse -Force
+    Copy-Item -LiteralPath $clientSource -Destination (Join-Path $Destination $clientName) -Force
+    $uninstallerName = '卸载一龙开发平台.exe'
+    $uninstallerSource = Join-Path $Source $uninstallerName
+    if (Test-Path -LiteralPath $uninstallerSource -PathType Leaf) {
+        Copy-Item -LiteralPath $uninstallerSource -Destination (Join-Path $Destination $uninstallerName) -Force
+    }
+
+    $internalDestination = Join-Path $Destination '_internal'
+    New-Item -ItemType Directory -Path $internalDestination -Force | Out-Null
+    foreach ($internalItem in Get-ChildItem -LiteralPath $internalSource -Force) {
+        # Runtime logs and the watchdog lock are regenerable process state. Root-level
+        # receipts and task state are excluded by the stable client-tree allowlist above.
+        if ($internalItem.Name -in @('logs','watchdog.instance.lock')) { continue }
+        Copy-Item -LiteralPath $internalItem.FullName -Destination $internalDestination -Recurse -Force
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $Destination $clientName) -PathType Leaf)) {
+        throw 'Rollback snapshot did not preserve the repair entrypoint.'
     }
 }
 
