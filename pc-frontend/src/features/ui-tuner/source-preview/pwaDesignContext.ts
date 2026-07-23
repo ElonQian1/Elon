@@ -1,6 +1,7 @@
 import type { UiTunerCodexContextPack } from '../contextPack'
 import type { PwaDesignDraft } from './pwaDesignDraft'
 import type { PwaRuntimeCaptureArtifact } from './pwaVerificationModel'
+import type { CrossPlatformWritebackReceipt } from './crossPlatformWritebackReceipt'
 import type {
   PwaCrossPlatformWritebackResult,
   PwaDesignWritebackPlan,
@@ -15,6 +16,7 @@ export function buildPwaDesignContextPack(input: {
   plan: PwaDesignWritebackPlan
   deterministicResult: PwaCrossPlatformWritebackResult
   runtimeCapture?: PwaRuntimeCaptureArtifact
+  writebackReceipt?: CrossPlatformWritebackReceipt
 }): UiTunerCodexContextPack {
   const unresolvedKeys = new Set(input.plan.codexChanges.map((change) => change.elementKey))
   const selected = selectedUnresolvedElement(input.draft, input.selection, unresolvedKeys)
@@ -126,6 +128,15 @@ export function buildPwaDesignContextPack(input: {
         codexReasons: input.plan.codexReasons,
       },
       deterministicResult: deterministicSummary(input.deterministicResult),
+      machineReceipt: input.writebackReceipt ? {
+        receiptId: input.writebackReceipt.receiptId,
+        sourceRevisionBefore: input.writebackReceipt.sourceRevisionBefore,
+        sourceRevision: input.writebackReceipt.sourceRevision,
+        sourceHash: input.writebackReceipt.sourceHash,
+        changedFiles: input.writebackReceipt.changedFiles,
+        targetPlatforms: input.writebackReceipt.targetPlatforms,
+        platformResults: input.writebackReceipt.platformResults,
+      } : undefined,
       contextPolicy: {
         fullRepositoryIncluded: false,
         fullDomIncluded: false,

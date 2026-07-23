@@ -62,6 +62,7 @@ export interface PwaDeterministicWritebackResult {
   applied: number
   sourceRevision: string
   changedFiles: string[]
+  sourceHashes: Record<string, string>
   completed: PwaCompletedWritebackAction[]
   error?: string
   failedAction?: string
@@ -72,6 +73,7 @@ export interface PwaDeterministicPwaWritebackResult {
   applied: number
   changedFiles: string[]
   sourceRevisions: Record<string, string>
+  sourceHashes: Record<string, string>
   completed: PwaCompletedWritebackAction[]
   error?: string
   failedAction?: string
@@ -191,6 +193,7 @@ export async function applyDeterministicAndroidWriteback(input: {
   const commit = input.commit ?? commitSourcePreview
   let sourceRevision = input.sourceRevision
   const changedFiles = new Set<string>()
+  const sourceHashes = new Map<string, string>()
   const completed: PwaCompletedWritebackAction[] = []
   for (const action of plan.deterministic.android) {
     try {
@@ -205,7 +208,8 @@ export async function applyDeterministicAndroidWriteback(input: {
       })
       if (!response.ok || !response.sourceRevision) throw new Error('Android 写回端未返回新 sourceRevision')
       sourceRevision = response.sourceRevision
-      changedFiles.add(action.layoutFile)
+      for (const file of response.changedFiles ?? [action.layoutFile]) changedFiles.add(file)
+      for (const [file, hash] of Object.entries(response.sourceHashes ?? {})) sourceHashes.set(file, hash)
       completed.push({
         elementKey: action.elementKey,
         sourceFile: action.layoutFile,
@@ -217,6 +221,7 @@ export async function applyDeterministicAndroidWriteback(input: {
         applied: completed.length,
         sourceRevision,
         changedFiles: [...changedFiles].sort(),
+        sourceHashes: Object.fromEntries([...sourceHashes.entries()].sort()),
         completed,
         error: error instanceof Error ? error.message : 'Android 确定性写回失败',
         failedAction: `${action.layoutFile}#${action.nodeKey}`,
@@ -224,7 +229,13 @@ export async function applyDeterministicAndroidWriteback(input: {
       }
     }
   }
-  return { applied: completed.length, sourceRevision, changedFiles: [...changedFiles].sort(), completed }
+  return {
+    applied: completed.length,
+    sourceRevision,
+    changedFiles: [...changedFiles].sort(),
+    sourceHashes: Object.fromEntries([...sourceHashes.entries()].sort()),
+    completed,
+  }
 }
 
 export async function applyDeterministicPwaWriteback(input: {
@@ -277,6 +288,7 @@ export async function applyDeterministicPwaWriteback(input: {
     applied: completed.length,
     changedFiles: [...changedFiles].sort(),
     sourceRevisions: Object.fromEntries([...revisions.entries()].sort()),
+    sourceHashes: Object.fromEntries([...revisions.entries()].sort()),
     completed,
   }
 }
@@ -333,6 +345,7 @@ function pwaFailure(
     applied: completed.length,
     changedFiles: [...changedFiles].sort(),
     sourceRevisions: Object.fromEntries([...revisions.entries()].sort()),
+    sourceHashes: Object.fromEntries([...revisions.entries()].sort()),
     completed,
     error,
     failedAction: `${action.binding.sourceFile}#${action.binding.kind}:${action.binding.target}`,

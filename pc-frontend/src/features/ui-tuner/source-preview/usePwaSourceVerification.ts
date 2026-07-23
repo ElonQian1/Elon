@@ -19,7 +19,6 @@ interface UsePwaSourceVerificationOptions {
   post: (type: string, payload: unknown) => void
   reloadSource: () => void
   restoreDraft: () => void
-  clearVerifiedDraft: () => void
   runtimeUrl: string
 }
 
@@ -33,7 +32,6 @@ export function usePwaSourceVerification({
   post,
   reloadSource,
   restoreDraft,
-  clearVerifiedDraft,
   runtimeUrl,
 }: UsePwaSourceVerificationOptions) {
   const [state, setState] = useState<PwaVerificationState>(() => livePwaVerificationState())
@@ -138,7 +136,6 @@ export function usePwaSourceVerification({
     update(next)
     if (next.phase === 'BUILD_VERIFIED') {
       pendingRef.current = null
-      clearVerifiedDraft()
       const capturing = pwaRuntimeCapturePendingState(next)
       update(capturing)
       void capturePwaSourceRuntime(pending.evidence, runtimeUrl).then((capture) => {
@@ -162,7 +159,7 @@ export function usePwaSourceVerification({
       restoreDraft()
     }
     return true
-  }, [clearTimeout, clearVerifiedDraft, restoreDraft, runtimeUrl, update])
+  }, [clearTimeout, restoreDraft, runtimeUrl, update])
 
   const retry = useCallback(() => start(), [start])
 

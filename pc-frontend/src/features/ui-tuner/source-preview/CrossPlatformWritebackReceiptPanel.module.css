@@ -1,0 +1,148 @@
+.panel,
+.empty {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #0b1220;
+  color: #dbeafe;
+  padding: 10px;
+}
+
+.empty {
+  display: grid;
+  gap: 4px;
+}
+
+.empty span,
+.panel header span,
+.platform small,
+.platform > span {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.panel header,
+.panel header > div,
+.platform,
+.platform > div {
+  display: flex;
+}
+
+.panel header {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel header > div,
+.platform {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panel header code {
+  color: #93c5fd;
+  font-size: 10px;
+}
+
+.platformGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 9px;
+}
+
+.platform {
+  min-width: 0;
+  border: 1px solid #273449;
+  border-radius: 8px;
+  background: #111827;
+  padding: 8px;
+}
+
+.platform > div {
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.status {
+  border-radius: 999px;
+  background: #1e293b;
+  color: #bfdbfe;
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+.platform[data-platform-status="BUILD_VERIFIED"] {
+  border-color: #16a34a;
+}
+
+.platform[data-platform-status="FAILED"],
+.platform[data-platform-status="EVIDENCE_MISSING"] {
+  border-color: #dc2626;
+}
+
+.platform p,
+.diagnostics {
+  color: #fca5a5;
+  font-size: 11px;
+  margin: 3px 0 0;
+}
+
+.proof {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 9px 0 0;
+}
+
+.proof div {
+  min-width: 0;
+  border-radius: 7px;
+  background: #111827;
+  padding: 6px;
+}
+
+.proof dt {
+  color: #64748b;
+  font-size: 9px;
+}
+
+.proof dd {
+  overflow: hidden;
+  margin: 2px 0 0;
+  color: #cbd5e1;
+  font: 10px/1.3 ui-monospace, SFMono-Regular, Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel details {
+  margin-top: 8px;
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.panel ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+}
+
+.panel details li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.panel details code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 980px) {
+  .platformGrid,
+  .proof {
+    grid-template-columns: 1fr;
+  }
+}

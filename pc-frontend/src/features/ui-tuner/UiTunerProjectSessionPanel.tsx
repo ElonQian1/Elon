@@ -36,6 +36,7 @@ import {
 import { useFitRunStore } from './fit-run/fitRunStore'
 import { TERMINAL_FIT_RUN_PHASES } from './fit-run/types'
 import { loadAiTaskSettlement } from './fit-run/taskSettlement'
+import { aiWritebackReceiptInstruction } from './source-preview/aiWritebackReceipt'
 import panelStyles from './UiTunerPanels.module.css'
 
 interface UiTunerProjectSessionPanelProps {
@@ -382,6 +383,7 @@ export function UiTunerProjectSessionPanel({
       '为节省 Token，优先使用 Context Artifact 的草稿 diff、局部 DOM、compactSourceBundle、相关裁剪与视觉差异，缺少证据时再按需读取源码。',
       '跳过 deterministicResult 已完成的写回；补充 PWA 来源绑定、结构调整或复杂 TSX/Kotlin。',
       'PWA Runtime DOM 仅是临时证据，最终必须写回源码并同时说明 PWA/APK 两端结果。',
+      aiWritebackReceiptInstruction(),
     ].join('\n') : [
       `继续设计稿自动拟合任务 ${request.runId}。`, artifact,
       `平台期原因：${request.reason}`,

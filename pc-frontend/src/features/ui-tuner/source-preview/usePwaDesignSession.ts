@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObjec
 import { getAuthToken } from '../../../api/client'
 import { listenForFitRunCodexSettled, requestCodexForFitRun } from '../fit-run/fitRunEvents'
 import { buildPwaDesignContextPack } from './pwaDesignContext'
+import { planPwaDesignWriteback } from './pwaDesignWriteback'
 import {
-  applyDeterministicAndroidWriteback,
-  applyDeterministicPwaWriteback,
-  planPwaDesignWriteback,
-  recordDeterministicWriteback,
-  type PwaCrossPlatformWritebackResult,
-} from './pwaDesignWriteback'
+  executeCrossPlatformDeterministicWriteback,
+  mergedPlatformFiles,
+} from './crossPlatformWritebackOrchestrator'
+import {
+  type CrossPlatformWritebackReceipt,
+  type PlatformReceiptUpdate,
+} from './crossPlatformWritebackReceipt'
 import { matchPwaSourceNode, pwaSourceBinding } from './pwaNodeMapping'
 import {
   beginPwaDraftRestore,
@@ -34,8 +36,14 @@ import {
 import { PwaDesignSessionModel } from './pwaDesignSessionModel'
 import { resolvePwaStyleBinding } from './sourcePreviewApi'
 import { sourceSavedEvidenceFromDraft, type PwaBridgeVerificationSnapshot, type PwaVerificationState } from './pwaVerificationModel'
+import {
+  useCrossPlatformWritebackReceipt,
+  type AndroidWritebackVerification,
+} from './useCrossPlatformWritebackReceipt'
 import { usePwaSourceVerification } from './usePwaSourceVerification'
 import type { SourcePreviewNode } from './types'
+
+export type { AndroidWritebackVerification } from './useCrossPlatformWritebackReceipt'
 
 const BRIDGE_SOURCE = 'elon-pwa-design-bridge'
 const PARENT_SOURCE = 'elon-pc-ui-tuner'
@@ -63,6 +71,7 @@ interface UsePwaDesignSessionOptions {
   root: SourcePreviewNode | null
   onSelect: (key: string) => void
   runtimeUrl: string
+  androidVerification?: AndroidWritebackVerification
 }
 
 export interface PwaDesignSession {
@@ -78,6 +87,7 @@ export interface PwaDesignSession {
   canRedo: boolean
   saveLabel: string
   syncState: PwaVerificationState
+  writebackReceipt: CrossPlatformWritebackReceipt | null
   reloadKey: number
   writebackPlan: ReturnType<typeof planPwaDesignWriteback>
   setMode: (mode: 'select' | 'interact') => void
@@ -133,6 +143,7 @@ export function usePwaDesignSession({
   root,
   onSelect,
   runtimeUrl,
+  androidVerification,
 }: UsePwaDesignSessionOptions): PwaDesignSession {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [ready, setReady] = useState(false)
@@ -215,7 +226,19 @@ export function usePwaDesignSession({
     setSaveLabel('真实源码与构建已验证，临时草稿已清除')
   }, [model])
 
-  const verification = usePwaSourceVerification({ post, reloadSource, restoreDraft, clearVerifiedDraft, runtimeUrl })
+  const verification = usePwaSourceVerification({ post, reloadSource, restoreDraft, runtimeUrl })
+  const receiptFlow = useCrossPlatformWritebackReceipt({
+    androidVerification,
+    pwaState: verification.state,
+    onComplete: clearVerifiedDraft,
+    onError: verification.fail,
+    onStatus: setSaveLabel,
+  })
+  const writebackReceipt = receiptFlow.receipt
+  const writebackReceiptRef = receiptFlow.receiptRef
+  const rememberReceipt = receiptFlow.remember
+  const updateReceipt = receiptFlow.update
+  const verifyAndroidReceipt = receiptFlow.verifyAndroid
 
   const applyDraftState = useCallback((value: PwaDesignDraft, sync = true) => {
     setDraft(value)
@@ -234,13 +257,46 @@ export function usePwaDesignSession({
   useEffect(() => listenForFitRunCodexSettled((detail) => {
     if (!syncTaskIdRef.current || detail.taskId !== syncTaskIdRef.current) return
     if (detail.succeeded) {
-      verification.markLive('AI 任务已完成；尚未取得 changed files 与源码哈希，因此不会误报“源码已保存”')
-      setSaveLabel('AI 任务已结束；草稿仍保留，等待刷新源码证据后再做真实构建验证')
+      const currentReceipt = writebackReceiptRef.current
+      if (!detail.receipt || !currentReceipt) {
+        verification.fail('AI 任务已结束但缺少机器回执；没有 changedFiles、sourceHash/sourceRevision 与分端结果，不能显示源码已保存')
+        setSaveLabel('AI 缺少机器回执；草稿与现有分端状态已保留')
+      } else if (detail.receipt.sourceRevisionBefore !== currentReceipt.sourceRevision) {
+        verification.fail('AI 回执的 sourceRevisionBefore 与确定性写回 checkpoint 不一致；已拒绝陈旧回执')
+        setSaveLabel('AI 回执 revision 已过期；请刷新源码后重试')
+      } else {
+        const updates: Partial<Record<'pwa' | 'apk', PlatformReceiptUpdate>> = {}
+        for (const platform of detail.receipt.targetPlatforms) {
+          const result = detail.receipt.platformResults[platform]
+          if (!result) continue
+          const previous = currentReceipt.platformResults[platform]
+          updates[platform] = {
+            status: result.status,
+            method: previous.changedFiles.length ? 'MIXED' : 'CODEX',
+            changedFiles: mergedPlatformFiles(currentReceipt, platform, result.changedFiles),
+            sourceRevisions: {
+              ...previous.sourceRevisions,
+              ...Object.fromEntries(result.changedFiles.map((file) => [file, result.sourceRevision])),
+            },
+            expectedSourceRevisionBefore: detail.receipt.sourceRevisionBefore,
+            aiTaskId: detail.taskId,
+            error: result.error,
+          }
+        }
+        void updateReceipt(updates).then((receipt) => {
+          verification.markSourceSaved(undefined, 'AI 机器回执已复核；请刷新局部绑定后执行分端构建验证')
+          setSaveLabel(receipt.status === 'PARTIAL'
+            ? 'AI 已部分写回；单端失败已保留在回执'
+            : 'AI 源码回执已保存；等待 PWA/APK 独立构建证据')
+        }).catch((error) => {
+          verification.fail(error instanceof Error ? error.message : 'AI 机器回执复核失败')
+        })
+      }
     } else {
       verification.fail(`跨端 Codex 写回失败：${detail.error || '任务未完成'}；草稿已保留，可直接重试`)
     }
     syncTaskIdRef.current = ''
-  }), [verification.fail, verification.markLive])
+  }), [updateReceipt, verification.fail, verification.markSourceSaved])
 
   useEffect(() => {
     if (!selection || selection.sourceBinding || !sourceSelectorKey || !workspaceIdentity) return
@@ -282,8 +338,26 @@ export function usePwaDesignSession({
     return () => { cancelled = true }
   }, [model, root, selection?.identity.key, selection?.sourceBinding, sourceSelectorKey, workspaceIdentity])
 
-  const bridgeContextRef = useRef({ model, onSelect, post, project, root, syncDraft, verification })
-  bridgeContextRef.current = { model, onSelect, post, project, root, syncDraft, verification }
+  const bridgeContextRef = useRef({
+    model,
+    onSelect,
+    post,
+    project,
+    resetReceipt: receiptFlow.reset,
+    root,
+    syncDraft,
+    verification,
+  })
+  bridgeContextRef.current = {
+    model,
+    onSelect,
+    post,
+    project,
+    resetReceipt: receiptFlow.reset,
+    root,
+    syncDraft,
+    verification,
+  }
 
   useEffect(() => {
     const receive = (event: MessageEvent) => {
@@ -311,6 +385,7 @@ export function usePwaDesignSession({
         routeRef.current = nextRoute
         setRoute(nextRoute)
         if (changed) {
+          context.resetReceipt()
           const { draft: restored, restored: didRestore } = context.model.restore(context.project, nextRoute)
           setDraft(restored)
           setHistoryVersion((value) => value + 1)
@@ -452,43 +527,62 @@ export function usePwaDesignSession({
     verification.markLive(writebackPlan.requiresCodex
       ? '正在保存草稿；确定性绑定先写回，未绑定属性随后交给 AI…'
       : '正在保存草稿并执行确定性源码写回…')
-    const androidResult = await applyDeterministicAndroidWriteback({
-      draft: current,
-      root,
-      projectRoot: current.project.workspaceIdentity,
-      sourceRevision: current.project.sourceRevision,
-    })
-    let deterministicResult: PwaCrossPlatformWritebackResult = {
-      android: androidResult,
-      pwa: { applied: 0, changedFiles: [], sourceRevisions: {}, completed: [] },
-    }
-    let latest = recordDeterministicWriteback(current, deterministicResult)
-    if (androidResult.applied) {
-      latest = { ...latest, project: { ...latest.project, sourceRevision: androidResult.sourceRevision } }
-    }
-    if (androidResult.error) {
-      if (latest !== current) applyDraftState(model.replace(latest), false)
-      verification.fail(`APK 确定性写回已停止：${androidResult.error}。源码冲突不会交给 AI 静默覆盖。`)
+    let deterministic
+    try {
+      deterministic = await executeCrossPlatformDeterministicWriteback({
+        draft: current,
+        root,
+        onReceipt: rememberReceipt,
+      })
+    } catch (error) {
+      verification.fail(error instanceof Error ? error.message : '无法建立机器回执，已停止源码写回')
       return
     }
-    const pwaResult = await applyDeterministicPwaWriteback({
-      draft: latest,
-      root,
-      projectRoot: latest.project.workspaceIdentity,
-    })
-    deterministicResult = { android: androidResult, pwa: pwaResult }
-    latest = recordDeterministicWriteback(latest, { ...deterministicResult, android: { ...androidResult, completed: [] } })
+    const { draft: latest, result: deterministicResult, receipt, plan } = deterministic
+    rememberReceipt(receipt)
     if (latest !== current) applyDraftState(model.replace(latest), false)
-    if (pwaResult.error) {
-      verification.fail(`PWA 确定性写回已停止：${pwaResult.error}。请刷新源码绑定后重试。`)
+    const evidence = sourceSavedEvidenceFromDraft(latest, `pwa-source-${Date.now()}`) ?? undefined
+    const pwaSaved = receipt.platformResults.pwa.status === 'SAVED'
+    const apkSaved = receipt.platformResults.apk.status === 'SAVED'
+    if (deterministic.conflict) {
+      setSaveLabel(`双端写回出现部分失败：PWA ${receipt.platformResults.pwa.status} · APK ${receipt.platformResults.apk.status}`)
+      if (pwaSaved && evidence) {
+        await updateReceipt({
+          pwa: {
+            status: 'BUILD_VERIFYING',
+            method: receipt.platformResults.pwa.method,
+            changedFiles: receipt.platformResults.pwa.changedFiles,
+            sourceRevisions: receipt.platformResults.pwa.sourceRevisions,
+          },
+        })
+        verification.markSourceSaved(evidence, 'PWA 已保存；另一端失败不阻断本端真实重载验证')
+        await verification.start(evidence)
+      } else {
+        verification.fail('双端写回存在源码冲突；成功端状态已保留，失败端不会交给 AI 静默覆盖')
+      }
+      if (apkSaved) void verifyAndroidReceipt(receipt)
       return
     }
-    const plan = planPwaDesignWriteback(latest, root)
-    const evidence = sourceSavedEvidenceFromDraft(latest, `pwa-source-${Date.now()}`) ?? undefined
     if (!plan.requiresCodex) {
-      verification.markSourceSaved(evidence, `源码已保存：APK ${androidResult.applied} 个节点，PWA ${pwaResult.applied} 个绑定；尚未验证`)
-      setSaveLabel('源码已保存，正在准备真实构建与画面验证')
-      await verification.start(evidence)
+      if (pwaSaved && evidence) {
+        await updateReceipt({
+          pwa: {
+            status: 'BUILD_VERIFYING',
+            method: receipt.platformResults.pwa.method,
+            changedFiles: receipt.platformResults.pwa.changedFiles,
+            sourceRevisions: receipt.platformResults.pwa.sourceRevisions,
+          },
+        })
+        verification.markSourceSaved(
+          evidence,
+          `源码已保存：APK ${deterministicResult.android.applied} 个节点，PWA ${deterministicResult.pwa.applied} 个绑定；正在分端验证`,
+        )
+        await verification.start(evidence)
+      } else {
+        verification.fail('PWA 写回缺少 changedFiles/sourceRevision，不能开始真实重载验证')
+      }
+      if (apkSaved) void verifyAndroidReceipt(receipt)
+      setSaveLabel('双端源码回执已保存；PWA 与 APK 正在独立构建验证')
       return
     }
     const contextPack = buildPwaDesignContextPack({
@@ -498,6 +592,7 @@ export function usePwaDesignSession({
       plan,
       deterministicResult,
       runtimeCapture: verification.state.runtimeCapture,
+      writebackReceipt: receipt,
     })
     try {
       const handoffId = `pwa_${Date.now()}`
@@ -510,13 +605,28 @@ export function usePwaDesignSession({
         reason: plan.codexReasons.join('；'),
       })
       syncTaskIdRef.current = taskId
-      verification.markAiWriting(taskId, androidResult.applied || pwaResult.applied
-        ? `确定性部分已保存 ${androidResult.applied + pwaResult.applied} 个绑定；AI 正在补未绑定属性或结构修改`
+      verification.markAiWriting(taskId, deterministicResult.android.applied || deterministicResult.pwa.applied
+        ? `确定性部分已保存 ${deterministicResult.android.applied + deterministicResult.pwa.applied} 个绑定；AI 正在补未绑定属性或结构修改`
         : 'AI 正在处理未绑定属性或结构修改；草稿仍保留，当前不算源码已保存')
     } catch (error) {
       verification.fail(error instanceof Error ? error.message : '跨端同步任务启动失败')
     }
-  }, [applyDraftState, model, root, selection, setMode, verification.fail, verification.markAiWriting, verification.markLive, verification.markSourceSaved, verification.start])
+  }, [
+    applyDraftState,
+    model,
+    rememberReceipt,
+    root,
+    selection,
+    setMode,
+    updateReceipt,
+    verification.fail,
+    verification.markAiWriting,
+    verification.markLive,
+    verification.markSourceSaved,
+    verification.start,
+    verifyAndroidReceipt,
+    writebackPlan.requiresCodex,
+  ])
 
   const copyCliPackage = useCallback(async () => {
     const current = model.draft
@@ -560,6 +670,7 @@ export function usePwaDesignSession({
     canRedo: model.canRedo && historyVersion >= 0,
     saveLabel,
     syncState: verification.state,
+    writebackReceipt,
     reloadKey,
     writebackPlan,
     setMode,

@@ -1,3 +1,6 @@
+import type { UiTunerCodexContextPack } from '../contextPack'
+import type { AiWritebackReceipt } from '../source-preview/aiWritebackReceipt'
+
 export const FIT_RUN_CODEX_REQUEST_EVENT = 'elon:ui-fit-run-codex-request'
 export const FIT_RUN_CODEX_SETTLED_EVENT = 'elon:ui-fit-run-codex-settled'
 
@@ -43,6 +46,7 @@ interface FitRunCodexRequestDetail extends FitRunCodexRequest {
 export interface FitRunCodexSettledDetail {
   taskId: string
   succeeded: boolean
+  receipt?: AiWritebackReceipt
   error?: string
   settledAt?: string
 }
@@ -213,4 +217,3 @@ function writeLaunches(items: FitRunCodexLaunchRecord[]) {
 function normalizeWorkspacePath(value: string) {
   return value.trim().replace(/\//g, '\\').replace(/\\+$/, '').toLocaleLowerCase('en-US')
 }
-import type { UiTunerCodexContextPack } from '../contextPack'

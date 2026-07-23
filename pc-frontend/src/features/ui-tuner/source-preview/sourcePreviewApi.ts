@@ -56,7 +56,12 @@ export async function commitSourcePreview(input: {
   startTagStart: number
   startTagEnd: number
   changes: Record<string, string>
-}): Promise<{ ok: boolean; sourceRevision: string }> {
+}): Promise<{
+  ok: boolean
+  sourceRevision: string
+  changedFiles?: string[]
+  sourceHashes?: Record<string, string>
+}> {
   return nodeApi(sourcePreviewAdminUrl(), '/api/source-preview/commit', {
     method: 'POST',
     body: JSON.stringify(input),

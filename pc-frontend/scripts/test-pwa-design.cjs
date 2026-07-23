@@ -51,6 +51,38 @@ try {
     stablePwaIdentityKey,
   } = require(output)
 
+  const aiReceiptOutput = compile(
+    'src/features/ui-tuner/source-preview/aiWritebackReceipt.ts',
+    'source-preview/aiWritebackReceipt.js',
+  )
+  const { parseAiWritebackReceipt } = require(aiReceiptOutput)
+  const aiReceipt = parseAiWritebackReceipt(`完成。\nELON_UI_WRITEBACK_RECEIPT_V1
+{
+  "schemaVersion": 1,
+  "changedFiles": ["web/button.css", "app/src/main/res/layout/pay.xml"],
+  "sourceHash": "sha256:after",
+  "sourceRevisionBefore": "workspace-sha256:before",
+  "sourceRevision": "workspace-sha256:after",
+  "targetPlatforms": ["pwa", "apk"],
+  "platformResults": {
+    "pwa": {"status":"SAVED","changedFiles":["web/button.css"],"sourceRevision":"pwa-r2"},
+    "apk": {"status":"SAVED","changedFiles":["app/src/main/res/layout/pay.xml"],"sourceRevision":"apk-r2"}
+  }
+}
+后续由工作台验证。`)
+  assert.equal(aiReceipt.sourceHash, 'sha256:after')
+  assert.deepEqual(aiReceipt.targetPlatforms, ['pwa', 'apk'])
+  assert.equal(parseAiWritebackReceipt('任务完成但没有机器回执'), null)
+  assert.equal(parseAiWritebackReceipt(`ELON_UI_WRITEBACK_RECEIPT_V1 {
+    "schemaVersion":1,
+    "changedFiles":["../escape.css"],
+    "sourceHash":"sha256:x",
+    "sourceRevisionBefore":"r1",
+    "sourceRevision":"r2",
+    "targetPlatforms":["pwa"],
+    "platformResults":{"pwa":{"status":"SAVED","changedFiles":["../escape.css"],"sourceRevision":"r2"}}
+  }`), null, 'AI 回执不得包含越界路径')
+
   const restoreAckOutput = compile(
     'src/features/ui-tuner/source-preview/pwaDraftRestoreAck.ts',
     'source-preview/pwaDraftRestoreAck.js',
@@ -644,6 +676,15 @@ try {
   assert.match(inspectorSource, /需要 AI 建立绑定\/结构修改/)
   assert.match(inspectorSource, /PWA：/)
   assert.match(inspectorSource, /APK：/)
+  assert.match(inspectorSource, /CrossPlatformWritebackReceiptPanel/)
+  const receiptPanelSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/CrossPlatformWritebackReceiptPanel.tsx'),
+    'utf8',
+  )
+  for (const label of ['sourceRevision', 'sourceHash', 'changedFiles', 'targetPlatforms', 'build-verified']) {
+    assert.match(receiptPanelSource, new RegExp(label), `机器回执界面必须显示 ${label}`)
+  }
+  assert.match(receiptPanelSource, /data-platform-status=/)
 
   const previewSurfaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'),
@@ -656,6 +697,18 @@ try {
   const sessionSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/usePwaDesignSession.ts'),
     'utf8',
+  )
+  const orchestratorSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/crossPlatformWritebackOrchestrator.ts'),
+    'utf8',
+  )
+  const androidWriteIndex = orchestratorSource.indexOf('applyDeterministicAndroidWriteback')
+  const pwaWriteIndex = orchestratorSource.indexOf('applyDeterministicPwaWriteback')
+  assert.ok(androidWriteIndex >= 0 && pwaWriteIndex > androidWriteIndex)
+  assert.doesNotMatch(
+    orchestratorSource.slice(androidWriteIndex, pwaWriteIndex),
+    /if\s*\([^)]*android\.error[^)]*\)\s*(?:\{[^}]*\})?\s*return/,
+    'APK 单端失败不得提前阻断 PWA 写回',
   )
   assert.match(previewSurfaceSource, /当前画面：\{route\.screenTitle/)
   assert.match(bridgeSource, /document\.querySelectorAll\('\.page\.active\[id\]'\)/)

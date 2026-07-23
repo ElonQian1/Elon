@@ -1,6 +1,7 @@
 import { Bot, Copy, Download, Redo2, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
 import type { PwaStyleProperty } from './pwaDesignDraft'
 import type { PwaDesignSession, PwaSelection } from './usePwaDesignSession'
+import { CrossPlatformWritebackReceiptPanel } from './CrossPlatformWritebackReceiptPanel'
 import styles from './SourcePreview.module.css'
 
 interface Props {
@@ -137,6 +138,7 @@ export function PwaStyleInspector({ session }: Props) {
               : '写回源码并验证 APK 与 PWA'}
         </button>
         <p className={styles.pwaSyncStatus}>{session.syncState.message}</p>
+        <CrossPlatformWritebackReceiptPanel receipt={session.writebackReceipt} />
         {session.syncState.runtimeCapture && <p className={styles.pwaSyncStatus}>
           PNG 证据：{session.syncState.runtimeCapture.width}×{session.syncState.runtimeCapture.height}
           {' · '}<code>{session.syncState.runtimeCapture.sha256.slice(0, 16)}</code>

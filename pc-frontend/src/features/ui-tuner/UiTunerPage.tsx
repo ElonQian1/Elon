@@ -618,6 +618,11 @@ export default function UiTunerPage() {
       onModeChange={changeWorkspaceMode}
       selectionHint={workspaceSelection.sourceHint}
       onSelectionHintChange={workspaceSelection.onSourceSelection}
+      androidVerification={liveUi.session && selectedDeviceId ? {
+        sessionId: liveUi.session.id,
+        deviceId: selectedDeviceId,
+        verify: () => liveUi.buildVerify(),
+      } : undefined}
     />
     <div
       className={[

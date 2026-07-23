@@ -143,6 +143,15 @@ export interface UiTunerCodexContextPack {
     }
     writebackPlan: unknown
     deterministicResult: unknown
+    machineReceipt?: {
+      receiptId: string
+      sourceRevisionBefore: string
+      sourceRevision: string
+      sourceHash: string
+      changedFiles: string[]
+      targetPlatforms: string[]
+      platformResults: Record<string, unknown>
+    }
     contextPolicy: {
       fullRepositoryIncluded: false
       fullDomIncluded: false

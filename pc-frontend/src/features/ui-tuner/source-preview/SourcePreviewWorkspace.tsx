@@ -13,7 +13,10 @@ import { SourcePreviewInspector } from './SourcePreviewInspector'
 import { SourcePreviewModeBar } from './SourcePreviewModeBar'
 import { SourcePreviewTreePanel } from './SourcePreviewTreePanel'
 import { useSourcePreviewSession } from './useSourcePreviewSession'
-import { usePwaDesignSession } from './usePwaDesignSession'
+import {
+  usePwaDesignSession,
+  type AndroidWritebackVerification,
+} from './usePwaDesignSession'
 import type { SourcePreviewMode } from './types'
 
 interface Props {
@@ -23,9 +26,18 @@ interface Props {
   onModeChange: (mode: SourcePreviewMode) => void
   selectionHint?: UiWorkspaceSelectionHint | null
   onSelectionHintChange?: (hint: UiWorkspaceSelectionHint) => void
+  androidVerification?: AndroidWritebackVerification
 }
 
-export function SourcePreviewWorkspace({ initialProjectRoot, projectId, active = true, onModeChange, selectionHint, onSelectionHintChange }: Props) {
+export function SourcePreviewWorkspace({
+  initialProjectRoot,
+  projectId,
+  active = true,
+  onModeChange,
+  selectionHint,
+  onSelectionHintChange,
+  androidVerification,
+}: Props) {
   const rememberedRoot = window.localStorage.getItem('elon.uiTuner.sourceProjectRoot') ?? ''
   const session = useSourcePreviewSession(initialProjectRoot || rememberedRoot)
   const [zoom, setZoom] = useState(.82)
@@ -36,6 +48,7 @@ export function SourcePreviewWorkspace({ initialProjectRoot, projectId, active =
     root: session.document?.root ?? null,
     onSelect: session.setSelectedKey,
     runtimeUrl: session.renderer.capabilities?.pwaPreview.url ?? '',
+    androidVerification,
   })
   const pwaPreviewActive = Boolean(
     session.document
