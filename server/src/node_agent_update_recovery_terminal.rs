@@ -27,7 +27,7 @@ impl UpdateRecoveryStore {
             .load()?
             .receipts
             .into_iter()
-            .filter(|receipt| receipt.active_task_id() == task_id)
+            .filter(|receipt| receipt.active_task_id() == task_id && !receipt.is_superseded())
             .collect::<Vec<_>>();
         match matches.len() {
             0 => Ok(None),
@@ -79,7 +79,7 @@ impl UpdateRecoveryStore {
         let matches = ledger
             .receipts
             .iter_mut()
-            .filter(|receipt| receipt.active_task_id() == task_id)
+            .filter(|receipt| receipt.active_task_id() == task_id && !receipt.is_superseded())
             .collect::<Vec<_>>();
         if matches.is_empty() {
             return match expected {

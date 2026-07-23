@@ -329,6 +329,16 @@ pub(crate) struct UpdateRecoveryReceipt {
     pub(crate) terminal_success: Option<bool>,
     #[serde(default)]
     pub(crate) terminal_outcome: Option<String>,
+    /// A later, explicitly targeted node update made this recovery generation
+    /// historical. The original receipt and its events stay in the ledger.
+    #[serde(default)]
+    pub(crate) superseded_by_update_id: Option<String>,
+    #[serde(default)]
+    pub(crate) superseded_by_release: Option<ReleaseIdentity>,
+    #[serde(default)]
+    pub(crate) supersede_evidence: Option<String>,
+    #[serde(default)]
+    pub(crate) superseded_at_ms: Option<u128>,
     /// Multiple receipts matched this task but could not be losslessly merged.
     #[serde(default)]
     pub(crate) conflict_detected: bool,
@@ -385,6 +395,10 @@ impl UpdateRecoveryReceipt {
             terminal_finished_at_ms: None,
             terminal_success: None,
             terminal_outcome: None,
+            superseded_by_update_id: None,
+            superseded_by_release: None,
+            supersede_evidence: None,
+            superseded_at_ms: None,
             conflict_detected: false,
             conflict_count: 0,
             conflict_reason: None,
@@ -403,6 +417,10 @@ impl UpdateRecoveryReceipt {
         self.resume_task_id
             .as_deref()
             .unwrap_or(&self.original_task_id)
+    }
+
+    pub(crate) fn is_superseded(&self) -> bool {
+        self.superseded_by_update_id.is_some()
     }
 
     pub(crate) fn allows_local_reconcile(&self) -> bool {

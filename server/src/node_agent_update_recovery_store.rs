@@ -115,10 +115,16 @@ impl UpdateRecoveryStore {
 
     pub(crate) fn receipt_for_task(&self, task_id: &str) -> Result<Option<UpdateRecoveryReceipt>> {
         let matches = self.receipts_for_task(task_id)?;
-        match matches.len() {
+        let current = matches
+            .iter()
+            .filter(|receipt| !receipt.is_superseded())
+            .cloned()
+            .collect::<Vec<_>>();
+        let candidates = if current.is_empty() { matches } else { current };
+        match candidates.len() {
             0 => Ok(None),
-            1 => Ok(matches.into_iter().next()),
-            _ => canonical_terminal_receipt(&matches).map(Some),
+            1 => Ok(candidates.into_iter().next()),
+            _ => canonical_terminal_receipt(&candidates).map(Some),
         }
     }
 
