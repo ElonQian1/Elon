@@ -26,6 +26,12 @@ use crate::{
     NodeRuntime,
 };
 
+#[path = "node_agent_update_reconcile_supersede.rs"]
+mod supersede;
+#[cfg(test)]
+use crate::node_agent_update_recovery::ReleaseIdentity;
+use supersede::{record_superseded_recovery, superseding_release_evidence};
+
 pub(crate) async fn reconcile_startup(runtime: Arc<NodeRuntime>) {
     let receipts = match runtime.update_recovery.active() {
         Ok(receipts) => receipts,
@@ -67,7 +73,8 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, receipt: UpdateRecoveryReceipt
             .await?;
         return Ok(());
     }
-    match release_relation(&receipt, &crate::node_agent_release_identity::current()) {
+    let current_release = crate::node_agent_release_identity::current();
+    match release_relation(&receipt, &current_release) {
         ReleaseRelation::Target => {}
         ReleaseRelation::From => {
             // The old process can briefly win the restart race before the
@@ -76,6 +83,40 @@ async fn reconcile_one(runtime: Arc<NodeRuntime>, receipt: UpdateRecoveryReceipt
             return Ok(());
         }
         ReleaseRelation::Other => {
+            if let Some(evidence) =
+                superseding_release_evidence(&runtime.update_recovery, &receipt, &current_release)?
+            {
+                if let Err(error) = validate_superseded_recovery(&runtime, &task, &receipt).await {
+                    let reason = format!("节点更新恢复已熔断：后继版本收敛证据不完整：{error}");
+                    runtime
+                        .local_tasks
+                        .mark_recovery_blocked(&active_task_id, &reason)?;
+                    return set_recovery_state(
+                        &runtime.update_recovery,
+                        &update_id,
+                        &original_task_id,
+                        UpdateRecoveryState::Failed,
+                        &reason,
+                    );
+                }
+                let changed =
+                    record_superseded_recovery(&runtime.update_recovery, &receipt, &evidence)?;
+                if changed {
+                    record_supervision_event(
+                        &runtime.task_journal,
+                        &active_task_id,
+                        "supervision_update_recovery_superseded",
+                        serde_json::json!({
+                            "old_update_id": update_id,
+                            "superseded_by_update_id": evidence.update_id,
+                            "current_release": current_release,
+                            "evidence": evidence.source,
+                            "non_repeatable_actions_replayed": false,
+                        }),
+                    )?;
+                }
+                return Ok(());
+            }
             let reason = "节点更新恢复已熔断：节点发布身份既不是 from_release 也不是目标 release";
             runtime
                 .local_tasks
@@ -250,6 +291,32 @@ async fn validate_local_recovery(
             &runtime.install_id,
         ),
         "任务 owner/agent/install 身份不匹配"
+    );
+    Ok(())
+}
+
+async fn validate_superseded_recovery(
+    runtime: &NodeRuntime,
+    task: &LocalTaskRecord,
+    receipt: &UpdateRecoveryReceipt,
+) -> Result<()> {
+    anyhow::ensure!(
+        receipt.state == UpdateRecoveryState::Resumed
+            && receipt.resume_strategy.as_deref() == Some("sidecar_reattach"),
+        "后继版本目标存在，但旧恢复票据尚未完成 sidecar reattach"
+    );
+    validate_local_recovery(runtime, task, receipt).await?;
+    anyhow::ensure!(
+        receipt.safety.evidence_complete,
+        "后继版本目标存在，但旧恢复票据缺少完整安全证据"
+    );
+    anyhow::ensure!(
+        fingerprint_workspace(Path::new(&receipt.workspace.workspace_path)) == receipt.workspace,
+        "后继版本目标存在，但工作区或 Git 指纹已漂移"
+    );
+    anyhow::ensure!(
+        recovery_sidecar(runtime, receipt, receipt.active_task_id())?.is_some(),
+        "后继版本目标存在，但结构化 sidecar 已不可验证"
     );
     Ok(())
 }

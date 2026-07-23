@@ -217,3 +217,156 @@ fn from_release_restart_is_deferred_instead_of_target_mismatch_failure() {
         ReleaseRelation::Other
     );
 }
+
+#[test]
+fn acb3_to_3149_successor_supersedes_resumed_ticket_idempotently() {
+    const RELEASE_79BE: &str = "79be8937cb13fd1dbd64c9b61a5444752b500f0f";
+    const RELEASE_ACB3: &str = "acb3fb4f032943c0acc99e7aade38d550f2ecf59";
+    const RELEASE_3149: &str = "3149557e92b93d70ef6ddaf3a03ef0828a0d061d";
+    const UNKNOWN: &str = "22903fbe2db5d7ad0535683c956e8d37dc49b207";
+
+    let root = std::env::temp_dir().join(format!(
+        "elon-update-successor-race-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let store = UpdateRecoveryStore::new(root.join("ledger.json"));
+    let mut old = UpdateRecoveryReceipt::planned(
+        format!("node-update-{RELEASE_ACB3}"),
+        "root-real-upgrade",
+        "task-real-upgrade",
+    );
+    old.created_at_ms = 10;
+    old.updated_at_ms = 20;
+    old.from_release = ReleaseIdentity {
+        version: format!("0.3.69+{RELEASE_79BE}"),
+        git_sha: RELEASE_79BE.to_string(),
+    };
+    old.to_release = ReleaseIdentity {
+        version: String::new(),
+        git_sha: RELEASE_ACB3.to_string(),
+    };
+    old.state = UpdateRecoveryState::Resumed;
+    old.resume_strategy = Some("sidecar_reattach".to_string());
+
+    let mut successor = UpdateRecoveryReceipt::planned(
+        format!("node-update-{RELEASE_3149}"),
+        "root-real-upgrade",
+        "task-real-upgrade",
+    );
+    successor.created_at_ms = 30;
+    successor.updated_at_ms = 40;
+    successor.from_release = ReleaseIdentity {
+        version: format!("0.3.69+{RELEASE_ACB3}"),
+        git_sha: RELEASE_ACB3.to_string(),
+    };
+    successor.to_release = ReleaseIdentity {
+        version: String::new(),
+        git_sha: RELEASE_3149.to_string(),
+    };
+    successor.state = UpdateRecoveryState::Applying;
+    store.upsert(old.clone()).unwrap();
+    store.upsert(successor.clone()).unwrap();
+
+    let current = format!("0.3.69+{RELEASE_3149}");
+    let evidence = superseding_release_evidence(&store, &old, &current)
+        .unwrap()
+        .expect("the exact chained successor is auditable");
+    assert_eq!(evidence.update_id, successor.update_id);
+    assert_eq!(evidence.source, "successor_update_receipt");
+    assert!(
+        superseding_release_evidence(&store, &old, &format!("0.3.69+{UNKNOWN}"))
+            .unwrap()
+            .is_none(),
+        "an unknown runtime must remain fail-closed"
+    );
+
+    assert!(record_superseded_recovery(&store, &old, &evidence).unwrap());
+    assert!(!record_superseded_recovery(&store, &old, &evidence).unwrap());
+    let ledger = store.load().unwrap();
+    let saved_old = ledger
+        .receipts
+        .iter()
+        .find(|receipt| receipt.update_id == old.update_id)
+        .unwrap();
+    assert_eq!(saved_old.state, UpdateRecoveryState::Verified);
+    assert_eq!(
+        saved_old.superseded_by_update_id.as_deref(),
+        Some(successor.update_id.as_str())
+    );
+    assert_eq!(
+        saved_old.supersede_evidence.as_deref(),
+        Some("successor_update_receipt")
+    );
+    assert!(saved_old
+        .events
+        .last()
+        .and_then(|event| event.reason.as_deref())
+        .is_some_and(|reason| reason.contains("no recovery action replayed")));
+    assert_eq!(
+        store
+            .receipt_for_task("task-real-upgrade")
+            .unwrap()
+            .unwrap()
+            .update_id,
+        successor.update_id,
+        "terminal reconciliation must ignore the superseded generation"
+    );
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn task_bound_install_gate_accepts_only_its_exact_release() {
+    const RELEASE_ACB3: &str = "acb3fb4f032943c0acc99e7aade38d550f2ecf59";
+    const RELEASE_3149: &str = "3149557e92b93d70ef6ddaf3a03ef0828a0d061d";
+    const UNKNOWN: &str = "22903fbe2db5d7ad0535683c956e8d37dc49b207";
+
+    let root = std::env::temp_dir().join(format!(
+        "elon-update-gate-race-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let store = UpdateRecoveryStore::new(root.join("ledger.json"));
+    let mut old = UpdateRecoveryReceipt::planned(
+        format!("node-update-{RELEASE_ACB3}"),
+        "root-gate",
+        "task-gate",
+    );
+    old.state = UpdateRecoveryState::Resumed;
+    old.resume_strategy = Some("sidecar_reattach".to_string());
+    store.upsert(old.clone()).unwrap();
+    store
+        .update_install_gate(crate::node_agent_update_recovery::UpdateInstallGate {
+            phase: "checkpoint_saved".to_string(),
+            target_git_sha: RELEASE_3149.to_string(),
+            active_foreground_task_ids: vec!["task-gate".to_string()],
+            safe_checkpoint_count: 1,
+            ..Default::default()
+        })
+        .unwrap();
+
+    let evidence = superseding_release_evidence(&store, &old, &format!("0.3.69+{RELEASE_3149}"))
+        .unwrap()
+        .expect("the exact task-bound install gate is auditable");
+    assert_eq!(evidence.source, "task_bound_install_gate");
+    assert!(
+        superseding_release_evidence(&store, &old, &format!("0.3.69+{UNKNOWN}"))
+            .unwrap()
+            .is_none()
+    );
+
+    store
+        .update_install_gate(crate::node_agent_update_recovery::UpdateInstallGate {
+            phase: "checkpoint_saved".to_string(),
+            target_git_sha: RELEASE_3149.to_string(),
+            active_foreground_task_ids: vec!["different-task".to_string()],
+            safe_checkpoint_count: 1,
+            ..Default::default()
+        })
+        .unwrap();
+    assert!(
+        superseding_release_evidence(&store, &old, &format!("0.3.69+{RELEASE_3149}"))
+            .unwrap()
+            .is_none(),
+        "an unbound global target cannot authorize this task"
+    );
+    let _ = std::fs::remove_dir_all(root);
+}

@@ -1,0 +1,146 @@
+//! Safe convergence of historical recovery receipts after a later node update.
+
+use anyhow::Result;
+
+use crate::node_agent_update_recovery::{
+    ReleaseIdentity, UpdateRecoveryReceipt, UpdateRecoveryState, UpdateRecoveryStore,
+};
+
+use super::{now_ms, release_identity_matches};
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct SupersedingReleaseEvidence {
+    pub(super) update_id: String,
+    pub(super) release: ReleaseIdentity,
+    pub(super) source: &'static str,
+}
+
+pub(super) fn superseding_release_evidence(
+    store: &UpdateRecoveryStore,
+    receipt: &UpdateRecoveryReceipt,
+    current_release: &str,
+) -> Result<Option<SupersedingReleaseEvidence>> {
+    let Some(current) = exact_release_identity(current_release) else {
+        return Ok(None);
+    };
+    let ledger = store.load()?;
+    if let Some(successor) = ledger
+        .receipts
+        .iter()
+        .filter(|candidate| {
+            candidate.update_id != receipt.update_id
+                && !candidate.is_superseded()
+                && candidate.allows_local_reconcile()
+                && candidate.root_task_id == receipt.root_task_id
+                && candidate.original_task_id == receipt.original_task_id
+                && candidate.active_task_id() == receipt.active_task_id()
+                && candidate.created_at_ms >= receipt.created_at_ms
+                && chained_release_identity(&receipt.to_release, &candidate.from_release)
+                && release_identity_matches(&candidate.to_release, current_release)
+                && matches!(
+                    candidate.state,
+                    UpdateRecoveryState::Applying
+                        | UpdateRecoveryState::RuntimeOnline
+                        | UpdateRecoveryState::Reattaching
+                        | UpdateRecoveryState::ResumeCreated
+                        | UpdateRecoveryState::Resumed
+                        | UpdateRecoveryState::Verified
+                )
+        })
+        .max_by_key(|candidate| (candidate.created_at_ms, candidate.updated_at_ms))
+    {
+        return Ok(Some(SupersedingReleaseEvidence {
+            update_id: successor.update_id.clone(),
+            release: current,
+            source: "successor_update_receipt",
+        }));
+    }
+
+    let gate = &ledger.install_gate;
+    let task_is_checkpointed = gate
+        .active_foreground_task_ids
+        .iter()
+        .any(|task_id| task_id == receipt.active_task_id() || task_id == &receipt.original_task_id);
+    if gate.target_git_sha.trim() == current.git_sha
+        && matches!(gate.phase.as_str(), "checkpoint_saved" | "runtime_online")
+        && gate.safe_checkpoint_count > 0
+        && task_is_checkpointed
+    {
+        return Ok(Some(SupersedingReleaseEvidence {
+            update_id: format!("node-update-{}", current.git_sha),
+            release: current,
+            source: "task_bound_install_gate",
+        }));
+    }
+    Ok(None)
+}
+
+fn exact_release_identity(current: &str) -> Option<ReleaseIdentity> {
+    let (version, git_sha) = current.trim().rsplit_once('+')?;
+    let version = version.trim();
+    let git_sha = git_sha.trim();
+    if version.is_empty()
+        || git_sha.len() < 7
+        || !git_sha.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        return None;
+    }
+    Some(ReleaseIdentity {
+        version: version.to_string(),
+        git_sha: git_sha.to_string(),
+    })
+}
+
+fn chained_release_identity(
+    previous_target: &ReleaseIdentity,
+    successor_from: &ReleaseIdentity,
+) -> bool {
+    let previous_sha = previous_target.git_sha.trim();
+    let successor_sha = successor_from.git_sha.trim();
+    !previous_sha.is_empty()
+        && previous_sha == successor_sha
+        && (previous_target.version.trim().is_empty()
+            || successor_from.version.trim().is_empty()
+            || previous_target.version.trim() == successor_from.version.trim()
+            || successor_from
+                .version
+                .trim()
+                .starts_with(&format!("{}+", previous_target.version.trim())))
+}
+
+pub(super) fn record_superseded_recovery(
+    store: &UpdateRecoveryStore,
+    receipt: &UpdateRecoveryReceipt,
+    evidence: &SupersedingReleaseEvidence,
+) -> Result<bool> {
+    store.update(&receipt.update_id, &receipt.original_task_id, |current| {
+        if current.is_superseded() {
+            anyhow::ensure!(
+                current.superseded_by_update_id.as_deref() == Some(&evidence.update_id)
+                    && current.superseded_by_release.as_ref() == Some(&evidence.release)
+                    && current.supersede_evidence.as_deref() == Some(evidence.source),
+                "update recovery receipt has conflicting supersede evidence"
+            );
+            return Ok(false);
+        }
+        anyhow::ensure!(
+            current.state == UpdateRecoveryState::Resumed,
+            "only a successfully resumed recovery receipt may be superseded"
+        );
+        current.superseded_by_update_id = Some(evidence.update_id.clone());
+        current.superseded_by_release = Some(evidence.release.clone());
+        current.supersede_evidence = Some(evidence.source.to_string());
+        current.superseded_at_ms = Some(now_ms());
+        current.transition(
+            UpdateRecoveryState::Verified,
+            Some(&format!(
+                "superseded by {} at {}+{} via {}; no recovery action replayed",
+                evidence.update_id,
+                evidence.release.version,
+                evidence.release.git_sha,
+                evidence.source
+            )),
+        )?;
+        Ok(true)
+    })
+}
