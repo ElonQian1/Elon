@@ -248,7 +248,14 @@ function Get-NodeUrlCachePath {
     return Join-Path $root 'supervisor-node-url.txt'
 }
 
+function Test-PersistentNodeUrlCacheAllowed {
+    param([string]$ActionName)
+    return $ActionName -notin @('Probe', 'Projects', 'Inspect', 'Wait')
+}
+$script:PersistentNodeUrlCacheAllowed = Test-PersistentNodeUrlCacheAllowed $Action
+
 function Get-CachedNodeUrl {
+    if (-not $script:PersistentNodeUrlCacheAllowed) { return '' }
     $path = Get-NodeUrlCachePath
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return '' }
     try {
@@ -263,6 +270,7 @@ function Get-CachedNodeUrl {
 
 function Save-CachedNodeUrl {
     param([string]$Url)
+    if (-not $script:PersistentNodeUrlCacheAllowed) { return }
     if ($Url -notmatch '^http://127\.0\.0\.1:(7799|78(?:0[0-9]|1[0-9]))$') { return }
     if ($script:CachedNodeAdminUrl -eq $Url) { return }
     try {

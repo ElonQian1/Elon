@@ -53,6 +53,7 @@ function Get-NodeConnection {
                             priority_attempt_count = $priorityAttemptCount
                             fallback_candidate_count = $fallbackCandidateCount
                             cache_candidate_present = -not [string]::IsNullOrWhiteSpace($cachedUrl)
+                            persistent_cache_allowed = $script:PersistentNodeUrlCacheAllowed
                             result_phase = 'priority'
                         }
                     }
@@ -78,6 +79,7 @@ function Get-NodeConnection {
                 priority_attempt_count = $priorityAttemptCount
                 fallback_candidate_count = $fallbackCandidateCount
                 cache_candidate_present = -not [string]::IsNullOrWhiteSpace($cachedUrl)
+                persistent_cache_allowed = $script:PersistentNodeUrlCacheAllowed
                 result_phase = 'parallel_fallback'
             }) -Force
             return $parallel

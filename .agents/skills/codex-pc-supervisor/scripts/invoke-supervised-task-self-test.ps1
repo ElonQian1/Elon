@@ -401,6 +401,13 @@ function Invoke-SupervisionSelfTest {
         desktop_review_requires_v3_capability = $legacyDesktopCapabilityRejected -and
             $script:DesktopReviewCapability -eq 'desktop_review_ticket_v3' -and
             $script:DesktopReviewBrokerCapability -eq 'desktop_review_broker_v1'
+        readonly_connection_has_no_persistent_cache =
+            -not (Test-PersistentNodeUrlCacheAllowed 'Probe') -and
+            -not (Test-PersistentNodeUrlCacheAllowed 'Projects') -and
+            -not (Test-PersistentNodeUrlCacheAllowed 'Inspect') -and
+            -not (Test-PersistentNodeUrlCacheAllowed 'Wait') -and
+            (Test-PersistentNodeUrlCacheAllowed 'Submit') -and
+            (Test-PersistentNodeUrlCacheAllowed 'Review')
         cloud_projects_path = $testProjectsPath -eq '/api/cloud-projects?include_system=true'
         project_binding_body = $testBindingBody.project_id -eq 'elon-self' -and
             $testBindingBody.workspace_path -ceq [System.IO.Path]::GetFullPath($testWorkspace) -and
@@ -457,7 +464,7 @@ function Invoke-SupervisionSelfTest {
             'utf8_request_bytes', 'utf8_response_decode', 'invalid_utf8_rejected', 'non_ascii_workspace',
             'non_ascii_prompt', 'acceptance_criteria', 'ordinary_post_stable_idempotency',
             'ordinary_post_timeout_retry_reuses_binding',
-            'review_summary', 'review_public_dto',
+            'review_summary', 'review_public_dto', 'readonly_connection_has_no_persistent_cache',
             'improve_inherited_path', 'resume_inherited_path', 'resume_parent_guard',
             'resume_parent_role_requirement', 'resume_parent_role_resume_original',
             'resume_parent_role_reject_matrix',

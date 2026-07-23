@@ -141,7 +141,7 @@
 
 ## 桌面端操作入口
 
-仓库级 Skill 位于 `.agents/skills/codex-pc-supervisor/`。辅助脚本兼容 Windows PowerShell 5.1 和 pwsh 7。节点发现依次尝试显式 URL、当前进程/最近成功的无 token URL、7799 快路径，只有失败才扫描 7800–7819；每次都从受信 Origin 重新取得 admin token，缓存和输出均不包含 token。
+仓库级 Skill 位于 `.agents/skills/codex-pc-supervisor/`。辅助脚本兼容 Windows PowerShell 5.1 和 pwsh 7。节点发现依次尝试显式 URL、当前进程最近成功的 URL、7799 快路径，只有失败才扫描 7800–7819；每次都从受信 Origin 重新取得 admin token，输出不包含 token。`Probe`、`Projects`、`Inspect`、`Wait` 不读取或写入工作区外的持久 URL 缓存，重复连接优先使用同进程地址或显式 `ELON_NODE_ADMIN_URL`，避免只读监督触发 Command approval；其它动作保存的最近 URL 仍只包含 loopback 地址，不含 token。
 
 ```powershell
 $helper = '.agents\skills\codex-pc-supervisor\scripts\invoke-supervised-task.ps1'
