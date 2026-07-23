@@ -13,7 +13,7 @@
 - `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主主题 `assignments`、副主题 `secondary_assignments`、四维 `governance_facets`、兼容 `governance_overrides`、有类型的文档语义关系、`knowledge_graph` 节点/关系/文档引用/实现证据和最近 100 条结构操作审计，不移动实际文件、不复制 Markdown 正文。
 - 主题树只改变 OneNote 式浏览位置，不改变 `role`、`lifecycle`、`authority` 或 `default_retrieval`；AI 检索仍以真实路径元数据为准。
 - `.elon/document-organization-suggestions.json` 保存待审核或已应用的 AI 建议，不是当前规则真源。
-- `.elon/knowledge-federation.json` 可为大型仓库声明“项目根 → 子项目 → 模块/主题”的知识节点；每个节点可用 `scope_path` 表示主目录、`include_globs` 纳入目录外的模块文档、`exclude_globs` 排除局部材料，并有独立 owner、项目类型、知识首页和健康度，最多 256 个节点、六层。MCP 和网页端按 `parent_id + cursor/offset + limit` 惰性展开；旧的 16 分区或 500 文档窗口不参与联邦完整性判断。
+- `.elon/knowledge-federation.json` 可为大型仓库声明“项目根 → 子项目 → 模块/主题”的知识节点；每个节点可用 `scope_path` 表示主目录、`include_globs` 纳入目录外的模块文档、`exclude_globs` 排除局部材料，并有独立 owner、项目类型、知识首页和健康度，最多 4096 个节点、六层。MCP 和网页端按 `parent_id + cursor/offset + limit` 惰性展开；旧的 16 分区或 500 文档窗口不参与联邦完整性判断。
 - “AI 整理建议”是独立虚拟分区；建议进入这里不代表已经采用。
 
 因此同一份项目可以在网页端按 OneNote 分区浏览，同时保留适合 Git、IDE 和所有 AI 供应商读取的普通目录结构。
