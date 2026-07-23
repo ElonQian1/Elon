@@ -109,6 +109,8 @@ class ChatSocialSideMenuContractTest {
         assertTrue(view.contains("搜索侧栏消息"))
         assertTrue(view.contains("LinearLayout.LayoutParams(dp(124)"))
         assertTrue(view.contains("LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)"))
+        assertTrue(view.contains("setPadding(dp(14), dp(15), dp(14), dp(15))"))
+        assertTrue(view.contains("FrameLayout.LayoutParams(dp(47), dp(90))"))
         assertTrue(view.contains("if (selected) \"#464646\" else \"#D9D9D9\""))
         listOf("图片与视频", "文本", "链接", "笔记", "文件", "设置")
             .forEach { assertTrue(view.contains("\"$it\"")) }

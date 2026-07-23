@@ -120,7 +120,7 @@ internal class ChatSocialSideMenuView(
             contentDescription = "搜索侧栏消息"
             isClickable = true
             foreground = selectableForeground()
-            setPadding(dp(10), dp(10), dp(10), dp(10))
+            setPadding(dp(14), dp(15), dp(14), dp(15))
             setOnClickListener {
                 searchVisible = !searchVisible
                 if (!searchVisible) searchQuery = ""

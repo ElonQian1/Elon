@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T15:11:05.296334+00:00",
+  "updatedAt": "2026-07-23T15:27:29.395670300+00:00",
   "cases": [
     {
       "schemaVersion": 1,
@@ -258,7 +258,7 @@
         "widthScale": 1.0,
         "heightScale": 0.25813544415127526,
         "targetAspectRatio": 1.839863713798978,
-        "currentAspectRatio": 0.47493403693931396
+        "currentAspectRatio": 0.4749340369393139
       },
       "runPhase": "CANCELLED",
       "outcome": "REJECTED",
@@ -454,6 +454,233 @@
         "finalDiffArtifactPath": null
       },
       "reviewedAt": "2026-07-23T15:11:05.295875800+00:00",
+      "reviewNote": "FitRun 终止原因: UserCancelled"
+    },
+    {
+      "schemaVersion": 1,
+      "caseId": "case:fit_3922f7f188fe4e748509c9be4df9c8d3",
+      "projectRoot": ".",
+      "packageName": "com.elon.app.uitest_0a3014c9",
+      "definitionId": "preview.elon.social.sidebar.root",
+      "componentKind": "android.container",
+      "propertySet": [
+        "opacity"
+      ],
+      "environment": {
+        "screenId": "elon.social.sidebar",
+        "scenario": "date",
+        "theme": "dark",
+        "locale": "zh-CN",
+        "density": null,
+        "fontScale": 1.0,
+        "viewportWidth": null,
+        "viewportHeight": null
+      },
+      "translationFeatures": {
+        "parentLayoutKind": null,
+        "targetWidthRatio": null,
+        "targetHeightRatio": null,
+        "currentWidthRatio": null,
+        "currentHeightRatio": null,
+        "widthScale": 1.0,
+        "heightScale": 0.25813544415127526,
+        "targetAspectRatio": 1.839863713798978,
+        "currentAspectRatio": 0.4749340369393139
+      },
+      "runPhase": "CANCELLED",
+      "outcome": "REJECTED",
+      "userDecision": "REJECTED",
+      "targetScorePassed": false,
+      "sourceParityPassed": false,
+      "promotable": false,
+      "baselineScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.373841,
+        "geometryError": 0.556399,
+        "colorError": 0.088617,
+        "edgeError": 0.049596,
+        "hardFailures": [
+          "geometry",
+          "position",
+          "color",
+          "perceptual",
+          "coverage"
+        ]
+      },
+      "finalScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.03366,
+        "geometryError": 0.0,
+        "colorError": 0.053997,
+        "edgeError": 0.051919,
+        "hardFailures": [
+          "color",
+          "perceptual"
+        ]
+      },
+      "sourceParityLoss": null,
+      "adjustments": [],
+      "trials": [
+        {
+          "trialId": "baseline_347bb72e50ab4cef8e2c2a552be575a9",
+          "kind": "BASELINE",
+          "acceptedAsBest": true,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.373841,
+            "geometryError": 0.556399,
+            "colorError": 0.088617,
+            "edgeError": 0.049596,
+            "hardFailures": [
+              "geometry",
+              "position",
+              "color",
+              "perceptual",
+              "coverage"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_b9772cee1f594fb99264900a6b2b38ad",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": true,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.03366,
+            "geometryError": 0.0,
+            "colorError": 0.053997,
+            "edgeError": 0.051919,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_ebfd52004ece4c278124d49222a1c3e2",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.03366,
+            "geometryError": 0.0,
+            "colorError": 0.053997,
+            "edgeError": 0.051919,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_901cf715d81041d3b91a3ce5d6284b68",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.03366,
+            "geometryError": 0.0,
+            "colorError": 0.053997,
+            "edgeError": 0.051919,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_ae70276a2bc049bfaef82818e6e040e3",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.03366,
+            "geometryError": 0.0,
+            "colorError": 0.053997,
+            "edgeError": 0.051919,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_de8829a974d949beb58a34f85e97f046",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.03366,
+            "geometryError": 0.0,
+            "colorError": 0.053997,
+            "edgeError": 0.051919,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_71bb1c8e1ad64652af6fb1c0267449e9",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.03366,
+            "geometryError": 0.0,
+            "colorError": 0.053997,
+            "edgeError": 0.051919,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_05d03e463f4140abaf3aa6da7ec6acf2",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.03366,
+            "geometryError": 0.0,
+            "colorError": 0.053997,
+            "edgeError": 0.051919,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        }
+      ],
+      "provenance": {
+        "runId": "fit_3922f7f188fe4e748509c9be4df9c8d3",
+        "targetSha256": "db84a10f31a701306d8abcbc0f54775d5d690cd4aa5b5fcd25043951f90b1ca9",
+        "sourceRevision": "workspace-sha256:8962bce020745e2007bdc3ac6cd1f8d2f3ddfd5bf486919b1b5e2c32f5c889d8",
+        "runtimeBuildId": "1.1.454-uitest_0a3014c9+462",
+        "commitId": null,
+        "trialIds": [
+          "baseline_347bb72e50ab4cef8e2c2a552be575a9",
+          "local_b9772cee1f594fb99264900a6b2b38ad",
+          "local_ebfd52004ece4c278124d49222a1c3e2",
+          "local_901cf715d81041d3b91a3ce5d6284b68",
+          "local_ae70276a2bc049bfaef82818e6e040e3",
+          "local_de8829a974d949beb58a34f85e97f046",
+          "local_71bb1c8e1ad64652af6fb1c0267449e9",
+          "local_05d03e463f4140abaf3aa6da7ec6acf2"
+        ],
+        "finalScreenshotPath": ".elon/ui-tuner/fit-runs/fit_3922f7f188fe4e748509c9be4df9c8d3/frames/local_05d03e463f4140abaf3aa6da7ec6acf2.png",
+        "finalDiffArtifactPath": null
+      },
+      "reviewedAt": "2026-07-23T15:24:04.655742300+00:00",
       "reviewNote": "FitRun 终止原因: UserCancelled"
     },
     {
@@ -880,6 +1107,316 @@
       },
       "reviewedAt": "2026-07-22T09:39:17.921618400+00:00",
       "reviewNote": "FitRun 终止原因: SourceVerified"
+    },
+    {
+      "schemaVersion": 1,
+      "caseId": "case:fit_b7f3492c847e4718b31e6d4cb14e78f3",
+      "projectRoot": ".",
+      "packageName": "com.elon.app.uitest_0a3014c9",
+      "definitionId": "preview.elon.social.sidebar.root",
+      "componentKind": "android.container",
+      "propertySet": [
+        "opacity"
+      ],
+      "environment": {
+        "screenId": "elon.social.sidebar",
+        "scenario": "date",
+        "theme": "dark",
+        "locale": "zh-CN",
+        "density": null,
+        "fontScale": 1.0,
+        "viewportWidth": null,
+        "viewportHeight": null
+      },
+      "translationFeatures": {
+        "parentLayoutKind": null,
+        "targetWidthRatio": null,
+        "targetHeightRatio": null,
+        "currentWidthRatio": null,
+        "currentHeightRatio": null,
+        "widthScale": 0.10092592592592593,
+        "heightScale": 0.10158311345646438,
+        "targetAspectRatio": 0.47186147186147187,
+        "currentAspectRatio": 0.47493403693931396
+      },
+      "runPhase": "CANCELLED",
+      "outcome": "REJECTED",
+      "userDecision": "REJECTED",
+      "targetScorePassed": false,
+      "sourceParityPassed": false,
+      "promotable": false,
+      "baselineScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.583985,
+        "geometryError": 0.452607,
+        "colorError": 0.651509,
+        "edgeError": 0.043061,
+        "hardFailures": [
+          "geometry",
+          "position",
+          "color",
+          "perceptual",
+          "coverage"
+        ]
+      },
+      "finalScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.049371,
+        "geometryError": 0.0,
+        "colorError": 0.088373,
+        "edgeError": 0.089387,
+        "hardFailures": [
+          "color",
+          "perceptual"
+        ]
+      },
+      "sourceParityLoss": null,
+      "adjustments": [],
+      "trials": [
+        {
+          "trialId": "baseline_899a8265acff427f916b8f5b276a7dd9",
+          "kind": "BASELINE",
+          "acceptedAsBest": true,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.583985,
+            "geometryError": 0.452607,
+            "colorError": 0.651509,
+            "edgeError": 0.043061,
+            "hardFailures": [
+              "geometry",
+              "position",
+              "color",
+              "perceptual",
+              "coverage"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_a5fe27fa3ab445ccbc7be9cd93bf7d09",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": true,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.049371,
+            "geometryError": 0.0,
+            "colorError": 0.088373,
+            "edgeError": 0.089387,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_7948274008a74a47a78806eec0757033",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.049371,
+            "geometryError": 0.0,
+            "colorError": 0.088373,
+            "edgeError": 0.089387,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_075516f665ef4748a985816de83f44ff",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.049371,
+            "geometryError": 0.0,
+            "colorError": 0.088373,
+            "edgeError": 0.089387,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        }
+      ],
+      "provenance": {
+        "runId": "fit_b7f3492c847e4718b31e6d4cb14e78f3",
+        "targetSha256": "db84a10f31a701306d8abcbc0f54775d5d690cd4aa5b5fcd25043951f90b1ca9",
+        "sourceRevision": "workspace-sha256:d9d9b5a210e3a573e8c3ae484e8e69d9a193111f7bc0ef3f15f31ccc22612a59",
+        "runtimeBuildId": "1.1.454-uitest_0a3014c9+462",
+        "commitId": null,
+        "trialIds": [
+          "baseline_899a8265acff427f916b8f5b276a7dd9",
+          "local_a5fe27fa3ab445ccbc7be9cd93bf7d09",
+          "local_7948274008a74a47a78806eec0757033",
+          "local_075516f665ef4748a985816de83f44ff"
+        ],
+        "finalScreenshotPath": ".elon/ui-tuner/fit-runs/fit_b7f3492c847e4718b31e6d4cb14e78f3/frames/local_075516f665ef4748a985816de83f44ff.png",
+        "finalDiffArtifactPath": null
+      },
+      "reviewedAt": "2026-07-23T15:27:29.395070300+00:00",
+      "reviewNote": "FitRun 终止原因: UserCancelled"
+    },
+    {
+      "schemaVersion": 1,
+      "caseId": "case:fit_daf25e6202d844cfb9bba56f254c5699",
+      "projectRoot": ".",
+      "packageName": "com.elon.app.uitest_0a3014c9",
+      "definitionId": "preview.elon.social.sidebar.root",
+      "componentKind": "android.container",
+      "propertySet": [
+        "opacity"
+      ],
+      "environment": {
+        "screenId": "elon.social.sidebar",
+        "scenario": "date",
+        "theme": "dark",
+        "locale": "zh-CN",
+        "density": null,
+        "fontScale": 1.0,
+        "viewportWidth": null,
+        "viewportHeight": null
+      },
+      "translationFeatures": {
+        "parentLayoutKind": null,
+        "targetWidthRatio": null,
+        "targetHeightRatio": null,
+        "currentWidthRatio": null,
+        "currentHeightRatio": null,
+        "widthScale": 0.925925925925926,
+        "heightScale": 0.11653474054529464,
+        "targetAspectRatio": 3.7735849056603774,
+        "currentAspectRatio": 0.4749340369393139
+      },
+      "runPhase": "CANCELLED",
+      "outcome": "REJECTED",
+      "userDecision": "REJECTED",
+      "targetScorePassed": false,
+      "sourceParityPassed": false,
+      "promotable": false,
+      "baselineScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.441874,
+        "geometryError": 0.676456,
+        "colorError": 0.179512,
+        "edgeError": 0.049081,
+        "hardFailures": [
+          "geometry",
+          "position",
+          "color",
+          "perceptual",
+          "coverage"
+        ]
+      },
+      "finalScore": {
+        "scorerVersion": "visual-score-v1+projected-geometry-v1",
+        "overallLoss": 0.050322,
+        "geometryError": 0.0,
+        "colorError": 0.100293,
+        "edgeError": 0.078512,
+        "hardFailures": [
+          "color",
+          "perceptual"
+        ]
+      },
+      "sourceParityLoss": null,
+      "adjustments": [],
+      "trials": [
+        {
+          "trialId": "baseline_ca6c33920dbd4be199b814ff8a42fe22",
+          "kind": "BASELINE",
+          "acceptedAsBest": true,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.441874,
+            "geometryError": 0.676456,
+            "colorError": 0.179512,
+            "edgeError": 0.049081,
+            "hardFailures": [
+              "geometry",
+              "position",
+              "color",
+              "perceptual",
+              "coverage"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_361fa6c2ada645ac92fb65eba6cb087c",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": true,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.050322,
+            "geometryError": 0.0,
+            "colorError": 0.100293,
+            "edgeError": 0.078512,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_b060d2ce23c243d8acedc557dd723dda",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.050322,
+            "geometryError": 0.0,
+            "colorError": 0.100293,
+            "edgeError": 0.078512,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        },
+        {
+          "trialId": "local_f1c6405b2189450ba43b21c097e37267",
+          "kind": "LIVE_APPLY",
+          "acceptedAsBest": false,
+          "score": {
+            "scorerVersion": "visual-score-v1+projected-geometry-v1",
+            "overallLoss": 0.050322,
+            "geometryError": 0.0,
+            "colorError": 0.100293,
+            "edgeError": 0.078512,
+            "hardFailures": [
+              "color",
+              "perceptual"
+            ]
+          },
+          "error": null
+        }
+      ],
+      "provenance": {
+        "runId": "fit_daf25e6202d844cfb9bba56f254c5699",
+        "targetSha256": "db84a10f31a701306d8abcbc0f54775d5d690cd4aa5b5fcd25043951f90b1ca9",
+        "sourceRevision": "workspace-sha256:45dc9b2e31449912d5362e37db58b445720e7c2114e983e4ccaa31c1749fc1bc",
+        "runtimeBuildId": "1.1.454-uitest_0a3014c9+462",
+        "commitId": null,
+        "trialIds": [
+          "baseline_ca6c33920dbd4be199b814ff8a42fe22",
+          "local_361fa6c2ada645ac92fb65eba6cb087c",
+          "local_b060d2ce23c243d8acedc557dd723dda",
+          "local_f1c6405b2189450ba43b21c097e37267"
+        ],
+        "finalScreenshotPath": ".elon/ui-tuner/fit-runs/fit_daf25e6202d844cfb9bba56f254c5699/frames/local_f1c6405b2189450ba43b21c097e37267.png",
+        "finalDiffArtifactPath": null
+      },
+      "reviewedAt": "2026-07-23T15:25:59.117176300+00:00",
+      "reviewNote": "FitRun 终止原因: UserCancelled"
     },
     {
       "schemaVersion": 1,

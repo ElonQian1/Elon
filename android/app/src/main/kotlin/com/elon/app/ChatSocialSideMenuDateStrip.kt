@@ -57,7 +57,7 @@ private fun socialSidebarDateCell(
         setImageResource(R.drawable.social_sidebar_date_pill)
         scaleType = ImageView.ScaleType.FIT_XY
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-    }, FrameLayout.LayoutParams(dp(42), dp(88)).apply { gravity = Gravity.CENTER })
+    }, FrameLayout.LayoutParams(dp(47), dp(90)).apply { gravity = Gravity.CENTER })
     addView(LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
