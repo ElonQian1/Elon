@@ -583,6 +583,31 @@ impl Default for UpdateRecoveryLedger {
     }
 }
 
+impl UpdateRecoveryLedger {
+    pub(crate) fn receipt_for_task(&self, task_id: &str) -> Result<Option<UpdateRecoveryReceipt>> {
+        let matches = self
+            .receipts
+            .iter()
+            .filter(|receipt| {
+                receipt.original_task_id == task_id
+                    || receipt.resume_task_id.as_deref() == Some(task_id)
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        let current = matches
+            .iter()
+            .filter(|receipt| !receipt.is_superseded())
+            .cloned()
+            .collect::<Vec<_>>();
+        let candidates = if current.is_empty() { matches } else { current };
+        match candidates.len() {
+            0 => Ok(None),
+            1 => Ok(candidates.into_iter().next()),
+            _ => canonical_terminal_receipt(&candidates).map(Some),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct UpdateRecoveryStore {
     path: PathBuf,

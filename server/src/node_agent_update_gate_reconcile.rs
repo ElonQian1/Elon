@@ -16,6 +16,7 @@ use crate::{
 };
 
 const UPDATE_RECEIPT_INSTALL_GATE_ENV: &str = "ELON_ENABLE_UPDATE_RECEIPT_INSTALL_GATE";
+const RESUME_ELIGIBILITY_AUDIT_LIMIT: usize = 4;
 
 pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
     let credentials = runtime.creds().await.context("节点当前没有已绑定身份")?;
@@ -34,15 +35,32 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         .filter(|handle| handle.control_handle_live)
         .map(|handle| handle.req_id)
         .collect::<HashSet<_>>();
-    let recovery_ledger = runtime.update_recovery.load()?;
+    let recovery_store = runtime.update_recovery.clone();
+    let local_tasks = runtime.local_tasks.clone();
+    let (recovery_ledger, tasks) = tokio::task::spawn_blocking(move || -> Result<_> {
+        Ok((
+            recovery_store.load()?,
+            local_tasks.list_update_install_candidates()?,
+        ))
+    })
+    .await
+    .context("update reconcile durable candidate scan task failed")??;
     let mut classifications = Vec::new();
-    let tasks = runtime.local_tasks.list_update_install_candidates()?;
     let task_ids = tasks
         .iter()
         .map(|task| task.task_id.clone())
         .collect::<HashSet<_>>();
-    let mut snapshots = runtime.task_journal.snapshots(&task_ids, 10_000)?;
-    let contracts = load_supervision_contracts(&runtime.task_journal, &task_ids)?;
+    let journal = runtime.task_journal.clone();
+    let (mut snapshots, contracts) = tokio::task::spawn_blocking(move || -> Result<_> {
+        Ok((
+            journal.snapshots(&task_ids, 10_000)?,
+            load_supervision_contracts(&journal, &task_ids)?,
+        ))
+    })
+    .await
+    .context("update reconcile journal projection task failed")??;
+    let mut resume_eligibility_inspected = 0;
+    let mut resume_eligibility_deferred = 0;
     for task in tasks {
         if task.owner_user_id != credentials.owner_user_id
             || task.agent_id != credentials.agent_id
@@ -71,30 +89,10 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         let (recovery_receipt_count, terminal_recovery_receipt_count, terminal_recovery_receipt) =
             recovery_receipt_evidence(&recovery_ledger, &task.task_id);
         let mut ambiguous_recovery_receipts = recovery_receipt_count > 1
-            && runtime
-                .update_recovery
+            && recovery_ledger
                 .receipt_for_task(&task.task_id)?
                 .is_some_and(|receipt| receipt.conflict_detected);
         let contract = contracts.get(&task.task_id).and_then(Option::as_ref);
-        let resume = crate::node_agent_local_task_resume_routes::inspect_resume_workspace_status(
-            &runtime,
-            &task,
-            snapshot.record.as_ref(),
-            contract,
-        )
-        .await;
-        let resume_eligible = resume.get("eligible").and_then(Value::as_bool);
-        let resume_ineligibility_proof = (resume_eligible == Some(false))
-            .then(|| {
-                task.workspace_status
-                    .as_ref()
-                    .and_then(|status| status.get("resume_blocked_reason"))
-                    .and_then(Value::as_str)
-                    .map(str::trim)
-                    .filter(|reason| !reason.is_empty())
-                    .map(str::to_string)
-            })
-            .flatten();
         let fresh_runtime_handle = fresh_handles.contains(&task.task_id);
         let live_journal_process = snapshot
             .record
@@ -119,6 +117,39 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         let persisted_inactive = resumable_checkpoint || durable_cancelled;
         let no_execution_owner =
             !fresh_runtime_handle && !live_sidecar && !replayable_sidecar && !live_journal_process;
+        let (resume_eligible, resume_ineligibility_proof) = if claim_resume_eligibility_audit(
+            &task.status,
+            no_execution_owner,
+            &mut resume_eligibility_inspected,
+        ) {
+            let resume =
+                crate::node_agent_local_task_resume_routes::inspect_resume_workspace_status(
+                    &runtime,
+                    &task,
+                    snapshot.record.as_ref(),
+                    contract,
+                )
+                .await;
+            let eligible = resume.get("eligible").and_then(Value::as_bool);
+            let proof = (eligible == Some(false))
+                .then(|| {
+                    task.workspace_status
+                        .as_ref()
+                        .and_then(|status| status.get("resume_blocked_reason"))
+                        .and_then(Value::as_str)
+                        .or_else(|| resume.get("reason").and_then(Value::as_str))
+                        .map(str::trim)
+                        .filter(|reason| !reason.is_empty())
+                        .map(str::to_string)
+                })
+                .flatten();
+            (eligible, proof)
+        } else {
+            if task.status == "resume_required" && no_execution_owner {
+                resume_eligibility_deferred += 1;
+            }
+            (None, None)
+        };
         let no_unsafe_wait = pending_approval_ids.is_empty()
             && (non_repeatable_action.is_none()
                 || non_repeatable_action.as_deref() == Some("journal_exceeds_audit_limit"));
@@ -219,6 +250,12 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         "reconcile_id": reconcile_id,
         "install_may_proceed": blockers.is_empty(),
         "receipt_install_gate_enabled": receipt_install_gate_enabled,
+        "resume_eligibility_audit": {
+            "limit": RESUME_ELIGIBILITY_AUDIT_LIMIT,
+            "inspected": resume_eligibility_inspected,
+            "deferred": resume_eligibility_deferred,
+            "deferred_semantics": "unknown_not_eligible",
+        },
         "orphan_rows_reconciled": orphan_rows_reconciled,
         "orphan_reconcile_error": orphan_reconcile_error,
         "excluded_terminal_history_count": excluded_count,
@@ -237,6 +274,21 @@ fn blocked_identity(
         reason: "task owner/agent/install identity does not match this runtime".to_string(),
         ..UpdateGateTaskClassification::default()
     }
+}
+
+fn claim_resume_eligibility_audit(
+    status: &str,
+    no_execution_owner: bool,
+    inspected: &mut usize,
+) -> bool {
+    if status != "resume_required"
+        || !no_execution_owner
+        || *inspected >= RESUME_ELIGIBILITY_AUDIT_LIMIT
+    {
+        return false;
+    }
+    *inspected += 1;
+    true
 }
 
 fn classification_reason(
@@ -355,8 +407,9 @@ fn stable_reconcile_id(
 #[cfg(test)]
 mod tests {
     use super::{
-        can_exclude_from_install, classification_reason, receipt_install_gate_enabled_from,
-        recovery_receipt_evidence, stable_reconcile_id,
+        can_exclude_from_install, claim_resume_eligibility_audit, classification_reason,
+        receipt_install_gate_enabled_from, recovery_receipt_evidence, stable_reconcile_id,
+        RESUME_ELIGIBILITY_AUDIT_LIMIT,
     };
     use crate::node_agent_update_recovery::{
         UpdateGateTaskClassification, UpdateRecoveryLedger, UpdateRecoveryReceipt,
@@ -369,6 +422,34 @@ mod tests {
             false, false, false, false, true, true, false, false, false, None
         )
         .contains("does not prove"));
+    }
+
+    #[test]
+    fn resume_eligibility_audit_is_bounded_and_skips_live_owners() {
+        let mut inspected = 0;
+        assert!(!claim_resume_eligibility_audit(
+            "running",
+            true,
+            &mut inspected
+        ));
+        assert!(!claim_resume_eligibility_audit(
+            "resume_required",
+            false,
+            &mut inspected
+        ));
+        for _ in 0..RESUME_ELIGIBILITY_AUDIT_LIMIT {
+            assert!(claim_resume_eligibility_audit(
+                "resume_required",
+                true,
+                &mut inspected
+            ));
+        }
+        assert!(!claim_resume_eligibility_audit(
+            "resume_required",
+            true,
+            &mut inspected
+        ));
+        assert_eq!(inspected, RESUME_ELIGIBILITY_AUDIT_LIMIT);
     }
 
     #[test]

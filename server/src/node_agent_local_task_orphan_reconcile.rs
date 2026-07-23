@@ -17,6 +17,8 @@ use crate::NodeRuntime;
 mod cancel;
 #[path = "node_agent_local_task_ghost_convergence.rs"]
 mod ghost_convergence;
+#[path = "node_agent_local_task_orphan_history_scan.rs"]
+mod history_scan;
 #[path = "node_agent_local_task_orphan_runtime_evidence.rs"]
 mod runtime_evidence;
 #[path = "node_agent_local_task_orphan_terminal_drift.rs"]
@@ -100,10 +102,7 @@ async fn reconcile_with_stale_after(runtime: &NodeRuntime, stale_after_ms: u128)
         .filter(|task| is_platform_supervised(task))
         .map(|task| task.task_id.clone())
         .collect::<HashSet<_>>();
-    let contracts = crate::node_agent_local_task_supervision::load_supervision_contracts(
-        &runtime.task_journal,
-        &supervised_ids,
-    )?;
+    let contracts = history_scan::contracts(&runtime.task_journal, &supervised_ids).await?;
     for candidate in candidates {
         let contract = contracts.get(&candidate.task_id).and_then(Option::as_ref);
         match reconcile_candidate(
@@ -139,10 +138,7 @@ async fn repair_historical_terminal_candidates(runtime: &NodeRuntime) -> Result<
         .iter()
         .map(|candidate| candidate.task_id.clone())
         .collect::<HashSet<_>>();
-    let contracts = crate::node_agent_local_task_supervision::load_supervision_contracts(
-        &runtime.task_journal,
-        &task_ids,
-    )?;
+    let contracts = history_scan::contracts(&runtime.task_journal, &task_ids).await?;
     let mut repaired = 0;
     for candidate in candidates {
         let contract = contracts.get(&candidate.task_id).and_then(Option::as_ref);

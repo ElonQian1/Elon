@@ -3,8 +3,8 @@
 use anyhow::{Context, Result};
 
 use super::{
-    canonical_terminal_receipt, now_ms, UpdateRecoveryLedger, UpdateRecoveryReceipt,
-    UpdateRecoveryReview, UpdateRecoveryState, UpdateRecoveryStore,
+    now_ms, UpdateRecoveryLedger, UpdateRecoveryReceipt, UpdateRecoveryReview, UpdateRecoveryState,
+    UpdateRecoveryStore,
 };
 
 impl UpdateRecoveryStore {
@@ -114,18 +114,7 @@ impl UpdateRecoveryStore {
     }
 
     pub(crate) fn receipt_for_task(&self, task_id: &str) -> Result<Option<UpdateRecoveryReceipt>> {
-        let matches = self.receipts_for_task(task_id)?;
-        let current = matches
-            .iter()
-            .filter(|receipt| !receipt.is_superseded())
-            .cloned()
-            .collect::<Vec<_>>();
-        let candidates = if current.is_empty() { matches } else { current };
-        match candidates.len() {
-            0 => Ok(None),
-            1 => Ok(candidates.into_iter().next()),
-            _ => canonical_terminal_receipt(&candidates).map(Some),
-        }
+        self.load()?.receipt_for_task(task_id)
     }
 
     pub(crate) fn receipts_for_task(&self, task_id: &str) -> Result<Vec<UpdateRecoveryReceipt>> {

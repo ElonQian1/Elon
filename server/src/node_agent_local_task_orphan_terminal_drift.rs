@@ -1,6 +1,8 @@
 //! Align durable terminal local rows with stale nonterminal journal records.
 
-use anyhow::Result;
+use std::collections::HashSet;
+
+use anyhow::{Context, Result};
 use tracing::{info, warn};
 
 use crate::NodeRuntime;
@@ -9,9 +11,17 @@ pub(super) async fn sync(runtime: &NodeRuntime, now: u128, limit: usize) -> Resu
     let candidates = runtime
         .local_tasks
         .list_terminal_journal_drift_candidates(limit)?;
+    let task_ids = candidates
+        .iter()
+        .map(|task| task.task_id.clone())
+        .collect::<HashSet<_>>();
+    let journal = runtime.task_journal.clone();
+    let records = tokio::task::spawn_blocking(move || journal.records(&task_ids))
+        .await
+        .context("terminal journal drift registry scan task failed")??;
     let mut changed = 0;
     for task in candidates {
-        let result = sync_one(runtime, &task.task_id, now).await;
+        let result = sync_one(runtime, &task.task_id, records.get(&task.task_id), now).await;
         match result {
             Ok(true) => {
                 changed += 1;
@@ -28,7 +38,12 @@ pub(super) async fn sync(runtime: &NodeRuntime, now: u128, limit: usize) -> Resu
     Ok(changed)
 }
 
-async fn sync_one(runtime: &NodeRuntime, task_id: &str, now: u128) -> Result<bool> {
+async fn sync_one(
+    runtime: &NodeRuntime,
+    task_id: &str,
+    record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
+    now: u128,
+) -> Result<bool> {
     if runtime
         .active_cli_prompt_view(task_id)
         .await
@@ -41,7 +56,7 @@ async fn sync_one(runtime: &NodeRuntime, task_id: &str, now: u128) -> Result<boo
             return Ok(false);
         }
     }
-    let Some(record) = runtime.task_journal.record(task_id)? else {
+    let Some(record) = record else {
         return Ok(false);
     };
     if !matches!(

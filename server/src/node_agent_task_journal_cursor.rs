@@ -88,6 +88,28 @@ impl TaskJournal {
         with_task_journal_io_lock(|| Ok(self.load_registry()?.get(task_id).cloned()))
     }
 
+    /// Loads selected registry records through one bounded registry read.
+    /// Recovery sweeps must not reload the complete durable registry once for
+    /// every candidate because that turns historical reconciliation into an
+    /// O(candidates * registry) operation.
+    pub(crate) fn records(
+        &self,
+        task_ids: &HashSet<String>,
+    ) -> Result<HashMap<String, super::TaskJournalRecord>> {
+        with_task_journal_io_lock(|| {
+            let registry = self.load_registry()?;
+            Ok(task_ids
+                .iter()
+                .filter_map(|task_id| {
+                    registry
+                        .get(task_id)
+                        .cloned()
+                        .map(|record| (task_id.clone(), record))
+                })
+                .collect())
+        })
+    }
+
     /// Projects several task snapshots from one append-only journal scan.
     /// Update/recovery audits frequently inspect a small candidate set; scanning
     /// the entire shared journal once per task grows quadratically with history.
