@@ -43,6 +43,9 @@ pub(crate) struct LiveSessionView {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LiveSourceProofView {
+    pub generation: u64,
+    pub integration_revision: String,
+    pub source_revision: String,
     pub generation_revision: String,
     pub origin_workspace_revision: String,
     pub runtime_build_id: Option<String>,

@@ -386,6 +386,9 @@ mod tests {
             history_count: 0,
             redo_count: 0,
             source_proof: Some(LiveSourceProofView {
+                generation: 9,
+                integration_revision: "integration-9".into(),
+                source_revision: "source-git-1".into(),
                 generation_revision: "generation-revision-9".into(),
                 origin_workspace_revision: "revision-1".into(),
                 runtime_build_id: Some("build-1".into()),

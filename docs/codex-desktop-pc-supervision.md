@@ -1,6 +1,6 @@
 # Codex 桌面监督与 PC 本机执行
 
-最后更新：2026-07-22
+最后更新：2026-07-24
 
 ## 目标
 
@@ -74,6 +74,8 @@
 - PC 操作审查使用 `pc_operator:<owner>` 和 `local_pc_ui`，不得冒充 `codex_desktop`；Desktop 辅助脚本必须显式发送 `codex_desktop_helper`。只有真实更新任务才要求 recovery receipt，普通监督任务不因没有更新回执而拒绝审查。
 
 ## 证据与验收
+
+UI 平台能力修复的恢复通知必须携带可复核身份，不只写“已发布”：Debug Runtime proof 绑定原业务 worktree Git/workspace revision 与合成 integration generation/revision；隔离模拟器 FitRun 只有在 generation、integration HEAD、业务 Git revision、runtimeBuildId 和零 Patch 同源时才可 `ACCEPT_BEST`。跨端能力若业务仓库确无 Web 对应功能，使用 `NO_WEB_COUNTERPART` 仓库扫描证据；它必须列出 Android 跟踪来源、Web 跟踪源码根、在 Android 来源中出现的搜索词与零 Web 匹配摘要，不生成或要求伪造 Web 截图。
 
 `GET /api/local-tasks/:task_id` 返回：
 

@@ -40,6 +40,7 @@ mod routes;
 mod runtime_binding;
 mod source_commit;
 mod source_json;
+mod source_proof_identity;
 mod source_xml;
 mod style_codegen;
 mod target_design_attachment;

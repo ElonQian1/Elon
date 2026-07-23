@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -19,6 +20,7 @@ use super::store::FitRunStore;
 use super::workspace_revision::workspace_fingerprint;
 use crate::node_agent_android_live::broker::LiveUiBroker;
 use crate::node_agent_android_live::build_verify::build_and_verify;
+use crate::node_agent_android_live::debug_integration::DebugIntegrationStatus;
 use crate::node_agent_android_live::fit_learning::top_k_for_run;
 use crate::node_agent_android_live::protocol::{
     LivePatchOperation, LivePatchTarget, LiveSessionView, LiveSourceProofView, LiveStylePatch,
@@ -195,9 +197,23 @@ impl LiveFitRunBackend {
         let session = self.broker.session(&run.session_id).await?;
         let source_revision = workspace_fingerprint(&run.project_root)?;
         let session_view = session.view().await;
-        if let Some(candidate) =
-            fresh_runtime_source_candidate(&run, &session_view, source_revision.as_deref())
-        {
+        let integration = self.broker.debug_integration.status_for(
+            &run.project_root,
+            &session.debug_project_id,
+            &session.device_identity,
+        )?;
+        let (generation_revision, generation_git_revision) =
+            current_generation_revisions(integration.as_ref())?;
+        let origin_git_revision = git_revision(Path::new(&run.project_root))?;
+        if let Some(candidate) = fresh_runtime_source_candidate(
+            &run,
+            &session_view,
+            source_revision.as_deref(),
+            origin_git_revision.as_deref(),
+            integration.as_ref(),
+            generation_revision.as_deref(),
+            generation_git_revision.as_deref(),
+        ) {
             return Ok(FitSourceVerifyResult {
                 candidate,
                 duration_ms: elapsed_ms(started),
@@ -368,20 +384,36 @@ pub(super) fn fresh_runtime_source_candidate(
     run: &FitRunDocument,
     session: &LiveSessionView,
     origin_workspace_revision: Option<&str>,
+    origin_git_revision: Option<&str>,
+    integration: Option<&DebugIntegrationStatus>,
+    current_generation_revision: Option<&str>,
+    current_generation_git_revision: Option<&str>,
 ) -> Option<super::model::FitCandidate> {
     let best = run.best.as_ref()?;
     let proof: &LiveSourceProofView = session.source_proof.as_ref()?;
     let origin_workspace_revision = origin_workspace_revision?;
+    let origin_git_revision = origin_git_revision?;
+    let integration = integration?;
     let runtime_build_matches = proof.runtime_build_id == session.runtime_build_id
         && session.runtime_build_id == run.runtime_build_id;
     let source_revision_matches = proof.origin_workspace_revision == origin_workspace_revision
-        && run.source_revision.as_deref() == Some(origin_workspace_revision);
+        && run.source_revision.as_deref() == Some(origin_workspace_revision)
+        && proof.source_revision == origin_git_revision
+        && integration.source_revision.as_deref() == Some(origin_git_revision);
+    let integration_revision_matches = integration.status == "DEPLOYED"
+        && integration.package_name == session.package_name
+        && integration.installed_generation == Some(integration.desired_generation)
+        && proof.generation == integration.desired_generation
+        && integration.integration_revision.as_deref() == Some(proof.integration_revision.as_str())
+        && current_generation_git_revision == Some(proof.integration_revision.as_str())
+        && current_generation_revision == Some(proof.generation_revision.as_str());
     if !session.connected
         || session.history_count != 0
         || session.redo_count != 0
         || !best.operations.is_empty()
         || !runtime_build_matches
         || !source_revision_matches
+        || !integration_revision_matches
         || proof.generation_revision.trim().is_empty()
         || proof.source_parity_loss > run.thresholds.max_source_parity_loss
         || !best.score.passes(&run.thresholds)
@@ -395,6 +427,34 @@ pub(super) fn fresh_runtime_source_candidate(
     candidate.source_parity_loss = Some(proof.source_parity_loss);
     candidate.source_parity_verified = true;
     Some(candidate)
+}
+
+fn current_generation_revisions(
+    integration: Option<&DebugIntegrationStatus>,
+) -> Result<(Option<String>, Option<String>)> {
+    let Some(root) = integration
+        .and_then(|status| status.integration_worktree.as_deref())
+        .map(Path::new)
+    else {
+        return Ok((None, None));
+    };
+    Ok((
+        workspace_fingerprint(root.to_string_lossy().as_ref())?,
+        git_revision(root)?,
+    ))
+}
+
+fn git_revision(root: &Path) -> Result<Option<String>> {
+    let output = crate::git_command_error::git_command()
+        .current_dir(root)
+        .args(["rev-parse", "--verify", "HEAD"])
+        .output()?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    Ok(Some(
+        String::from_utf8_lossy(&output.stdout).trim().to_string(),
+    ))
 }
 
 fn prior_seed_deltas(

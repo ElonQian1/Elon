@@ -374,28 +374,8 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "ui_write_cross_platform_verification",
-            "把真实 Android/Web 截图复制进当前任务目录，绑定当前 Git revision，校验视觉 loss、源码写回与无补丁构建后原子生成 cross-platform-verification.json。",
-            json!({
-                "type":"object",
-                "required":[
-                    "taskId",
-                    "androidArtifact",
-                    "webArtifact",
-                    "visualLoss",
-                    "maxVisualLoss",
-                    "sourceWritebackVerified",
-                    "patchFreeBuildVerified"
-                ],
-                "properties":{
-                    "taskId":{"type":"string","minLength":1,"maxLength":128},
-                    "androidArtifact":{"type":"string","minLength":1,"maxLength":4000},
-                    "webArtifact":{"type":"string","minLength":1,"maxLength":4000},
-                    "visualLoss":{"type":"number","minimum":0,"maximum":1},
-                    "maxVisualLoss":{"type":"number","minimum":0,"maximum":1},
-                    "sourceWritebackVerified":{"const":true},
-                    "patchFreeBuildVerified":{"const":true}
-                }
-            }),
+            "绑定当前 Git revision 原子生成跨端验收工件。VISUAL_PARITY 必须使用独立真实 Android/Web 截图；NO_WEB_COUNTERPART 必须使用可复核的 Android 来源文件、Web 跟踪源码根和搜索词证明仓库中没有对应功能，禁止伪造 Web 截图。",
+            super::cross_platform_verification::tool_input_schema(),
         ),
         tool(
             "ui_report_capability_gap",

@@ -1,6 +1,6 @@
 # Windows 节点升级兼容与事故处置
 
-最后更新：2026-07-23
+最后更新：2026-07-24
 
 本文是 Windows EXE 节点升级时按需读取的兼容门禁。项目数据架构合同见 `docs/pc-node-data-root.md`；发布命令引用 Git/发布手册，不在这里重复。
 
@@ -41,6 +41,9 @@
 12. 取消事件向后兼容地保留 `requested_by`、`source`、`reason`、`requested_at_ms` 四元组；系统中断另带可空的可信枚举 `interruption_source`。sidecar/journal 审计必须先于取消且写失败时拒绝取消；升级读取旧记录不得因缺少新字段而失败。
 13. 三端发布共享同一个 `batch_id + immutable SHA`；server、PC 前端和 Windows 节点阶段必须有持久 heartbeat/attempt/owner/error 记录。损坏 ledger、未知阶段状态、过期 owner 或批次 SHA 漂移都 fail-closed；崩溃后的同批次接管幂等且不能破坏 FIFO 防饿死。
 14. `node.json` 的 `install_id` 同时锚定真机唯一调试包 `com.elon.app.uituner_<节点指纹>`；首次升级可幂等补写 `debug_package_fingerprint`，后续更新和重启必须保持一致。已有指纹与当前安装身份不符时拒绝调试部署并保留原状态，不能换用 `.uitest`、`.uitest_anim` 或新随机身份创建第二套 Launcher 包，也不能自动卸载手机应用。
+15. Debug Runtime source proof 必须同时记录固定集成槽 generation、已部署 integration Git revision、原业务 worktree Git revision、generation 内容指纹、原业务 workspace 内容指纹和 runtimeBuildId。创建证明时先核对项目、物理设备、包、期望/已安装代次与 `DEPLOYED` 状态；FitRun 复用时再回查当前槽状态、generation worktree HEAD/内容指纹和原业务 HEAD。任一身份漂移或非零 Patch 都 fail-closed，不能要求两个因 HEAD 不同而必然不同的 workspace fingerprint 直接相等。
+16. 显式隔离模拟器包可以复用零 Patch 的新鲜 Runtime source proof，但只在 generation、installed generation、integration revision、generation HEAD/内容指纹、原业务 Git/workspace revision、包和 runtimeBuildId 全部一致时允许 FitRun `ACCEPT_BEST`；这不放宽真机固定包、签名、物理设备或来源 worktree 校验。
+17. `CROSS_PLATFORM_STYLE_WRITEBACK` 支持 `NO_WEB_COUNTERPART` 正式分支：仍需真实 Android 工件、当前 source revision、源码写回和无 Patch 构建；Web 侧改为扫描调用者声明的仓库内 Android 跟踪来源、Web 跟踪源码根和在 Android 来源中实际出现的搜索词。只有检查到 Web 跟踪文件且零匹配时通过；若存在匹配、证据越界、非跟踪来源或空扫描则拒绝，禁止用伪造 Web 截图代替。
 
 ## 配置与缓存迁移合同
 
@@ -71,6 +74,8 @@
 - 远程监督 v1 的身份、能力、live lease 和断线恢复 fail-closed fixture；本地可信任务优先，远程证据缺失不得降级绕过。
 - PWA Runtime 捕获的 Windows Edge/Chrome 标准路径与 `ELON_PWA_BROWSER_PATH` 探测、浏览器缺失诊断、真实 loopback HTML/PWA fixture 精确 viewport PNG、SHA-256/route/revision 元数据、认证失败不误报、SSRF/秘密门禁，以及成功/超时/启动失败后的浏览器进程树和临时 profile 回收。发布包不得新增 Desktop Browser 或人工可见浏览器依赖。
 - Android 调试身份 fixture：旧 `node.json` 首次补写、连续更新/重启包名不变、身份漂移 fail-closed、三个会话按序合并、新代次淘汰旧构建、USB/无线端点共用物理设备部署锁、所有兼容后缀无法绕过固定真机包、正式包不受影响、历史杂包仅报告不自动卸载；另须覆盖 LKG 缺字段/默认关闭时不记录且不阻塞安装，以及任务显式启用后仍保留同文件冲突保护、最近成功 APK 保留和签名钉扎语义。
+- Debug Runtime/FitRun fixture：原业务 Git/workspace revision 到合成 integration revision 的映射可复核；隔离模拟器包仅在 generation、integration、Git、runtimeBuildId 与零 Patch 全匹配时接受；generation、installed generation、integration HEAD、业务 HEAD、包、Runtime 或 Patch 任一漂移都拒绝。
+- 跨端验收 fixture：真实 Android/Web 视觉分支继续要求独立截图与 loss 阈值；`NO_WEB_COUNTERPART` 使用跟踪仓库来源与零匹配扫描通过，存在 Web 匹配、非跟踪 Android 来源、空 Web 根或伪造 Web 截图均拒绝。
 - 无新 capability 的旧节点执行已有项目 CLI/Exec；有新 capability 的节点创建托管 workspace。
 - 外部项目、托管项目、只读任务、普通写任务和真实构建分别验证路径与环境策略。
 - 超容量建议、项目数建议和无法读取磁盘空间时仍可派单；无自动压力清理。

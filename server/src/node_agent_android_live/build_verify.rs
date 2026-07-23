@@ -551,14 +551,19 @@ async fn build_and_verify_inner(
     let runtime_build_id = runtime_view.runtime_build_id.clone();
     if source_parity_verified {
         verify_origin_workspace_revision(&source_project_root, &origin_workspace_revision)?;
-        session
-            .record_source_proof(
-                generation_revision,
-                origin_workspace_revision,
-                runtime_build_id.clone(),
-                source_parity_diff.visual_loss,
-            )
-            .await;
+        let integration_status = broker
+            .debug_integration
+            .status(&integration_plan.slot_id)?
+            .context("FIT_SOURCE_PROOF_INTEGRATION_STATUS_MISSING")?;
+        let proof = super::source_proof_identity::verified_proof(
+            &integration_status,
+            &session,
+            generation_revision,
+            origin_workspace_revision,
+            runtime_build_id.clone(),
+            source_parity_diff.visual_loss,
+        )?;
+        session.record_source_proof(proof).await;
     }
     let status = verification_gate.status;
     let message = match status {

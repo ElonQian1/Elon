@@ -480,20 +480,8 @@ impl LiveUiSession {
         self.state.read().await.runtime_stage.clone()
     }
 
-    pub(crate) async fn record_source_proof(
-        &self,
-        generation_revision: String,
-        origin_workspace_revision: String,
-        runtime_build_id: Option<String>,
-        source_parity_loss: f64,
-    ) {
-        self.state.write().await.source_proof = Some(LiveSourceProofView {
-            generation_revision,
-            origin_workspace_revision,
-            runtime_build_id,
-            source_parity_loss,
-            verified_at: Utc::now().to_rfc3339(),
-        });
+    pub(crate) async fn record_source_proof(&self, proof: LiveSourceProofView) {
+        self.state.write().await.source_proof = Some(proof);
     }
 
     pub(crate) async fn commit_snapshot(&self) -> LiveCommitSnapshot {

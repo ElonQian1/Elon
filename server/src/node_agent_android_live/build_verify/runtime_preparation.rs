@@ -172,7 +172,9 @@ pub(super) async fn run(
         {
             RuntimeReuse::Live(runtime_view) => {
                 return finalize_runtime(
+                    broker,
                     session,
+                    integration_plan,
                     &project_root_display,
                     origin_root.to_string_lossy().as_ref(),
                     &origin_workspace_revision,
@@ -354,7 +356,9 @@ pub(super) async fn run(
     let runtime_view = runtime_view.expect("bounded handshake loop either connects or returns");
 
     finalize_runtime(
+        broker,
         session,
+        integration_plan,
         &project_root_display,
         origin_root.to_string_lossy().as_ref(),
         &origin_workspace_revision,
@@ -373,7 +377,9 @@ pub(super) async fn run(
 }
 
 async fn finalize_runtime(
+    broker: &LiveUiBroker,
     session: &LiveUiSession,
+    integration_plan: &DebugIntegrationPlan,
     generation_root: &str,
     origin_root: &str,
     expected_origin_workspace_revision: &str,
@@ -402,14 +408,19 @@ async fn finalize_runtime(
         )?;
         let origin_root = std::path::Path::new(origin_root);
         verify_origin_workspace_revision(origin_root, expected_origin_workspace_revision)?;
-        session
-            .record_source_proof(
-                generation_revision,
-                expected_origin_workspace_revision.to_string(),
-                runtime_build_id.clone(),
-                source_parity_diff.visual_loss,
-            )
-            .await;
+        let integration_status = broker
+            .debug_integration
+            .status(&integration_plan.slot_id)?
+            .context("FIT_SOURCE_PROOF_INTEGRATION_STATUS_MISSING")?;
+        let proof = crate::node_agent_android_live::source_proof_identity::verified_proof(
+            &integration_status,
+            session,
+            generation_revision,
+            expected_origin_workspace_revision.to_string(),
+            runtime_build_id.clone(),
+            source_parity_diff.visual_loss,
+        )?;
+        session.record_source_proof(proof).await;
     }
     Ok(BuildVerifyResult {
         status: verification_gate.status,

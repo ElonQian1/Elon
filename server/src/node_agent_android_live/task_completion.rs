@@ -189,7 +189,11 @@ pub(crate) async fn verify(
         match cross_platform_evidence(&evidence_path, &task_id, source_revision.as_deref()) {
             Ok(evidence) => gates.push(json!({
                 "gate":"CROSS_PLATFORM_VISUAL_PARITY",
-                "status":"PASSED",
+                "status": if evidence["verificationMode"] == "NO_WEB_COUNTERPART" {
+                    "PASSED_NO_WEB_COUNTERPART"
+                } else {
+                    "PASSED"
+                },
                 "evidence":evidence,
             })),
             Err(error) => {
@@ -290,7 +294,13 @@ fn completion_result(
 fn strict_gate_passed(gate: &Value) -> bool {
     matches!(
         gate.get("status").and_then(Value::as_str),
-        Some("PASSED" | "NOT_APPLICABLE" | "NOT_REQUIRED" | "NOT_REQUIRED_WITHOUT_CLEAN_TARGET")
+        Some(
+            "PASSED"
+                | "PASSED_NO_WEB_COUNTERPART"
+                | "NOT_APPLICABLE"
+                | "NOT_REQUIRED"
+                | "NOT_REQUIRED_WITHOUT_CLEAN_TARGET"
+        )
     )
 }
 
@@ -398,35 +408,78 @@ pub(crate) fn cross_platform_evidence(
     let evidence: Value = serde_json::from_slice(&fs::read(path)?)?;
     let schema_version = evidence["schemaVersion"].as_u64();
     let evidence_task_id = evidence["taskId"].as_str();
-    let visual_loss = evidence["visualLoss"].as_f64();
-    let max_visual_loss = evidence["maxVisualLoss"].as_f64();
-    let artifacts_present = ["androidArtifact", "webArtifact"]
-        .iter()
-        .all(|field| artifact_file_exists(path, evidence[*field].as_str()));
+    let verification_mode = evidence["verificationMode"]
+        .as_str()
+        .unwrap_or("VISUAL_PARITY");
+    let android_present = artifact_file_exists(path, evidence["androidArtifact"].as_str());
     let source_revision_matches = expected_source_revision.is_none_or(|expected| {
         evidence["sourceRevision"]
             .as_str()
             .is_some_and(|actual| actual == expected)
     });
-    if schema_version != Some(1)
+    let common_invalid = !matches!(schema_version, Some(1 | 2))
         || evidence_task_id != Some(task_id)
-        || !artifacts_present
         || !source_revision_matches
-        || visual_loss.is_none()
-        || max_visual_loss.is_none()
-        || visual_loss
-            .zip(max_visual_loss)
-            .is_none_or(|(loss, limit)| {
-                !loss.is_finite() || !limit.is_finite() || limit < 0.0 || loss > limit
-            })
+        || !android_present
         || evidence["sourceWritebackVerified"].as_bool() != Some(true)
-        || evidence["patchFreeBuildVerified"].as_bool() != Some(true)
-    {
+        || evidence["patchFreeBuildVerified"].as_bool() != Some(true);
+    let mode_valid = match verification_mode {
+        "VISUAL_PARITY" => {
+            let visual_loss = evidence["visualLoss"].as_f64();
+            let max_visual_loss = evidence["maxVisualLoss"].as_f64();
+            artifact_file_exists(path, evidence["webArtifact"].as_str())
+                && visual_loss
+                    .zip(max_visual_loss)
+                    .is_some_and(|(loss, limit)| {
+                        loss.is_finite() && limit.is_finite() && limit >= 0.0 && loss <= limit
+                    })
+        }
+        "NO_WEB_COUNTERPART" => {
+            schema_version == Some(2)
+                && evidence.get("webArtifact").is_none()
+                && evidence
+                    .pointer("/repositoryEvidence/kind")
+                    .and_then(Value::as_str)
+                    == Some("NO_WEB_COUNTERPART")
+                && evidence
+                    .pointer("/repositoryEvidence/repositoryGitRevision")
+                    .and_then(Value::as_str)
+                    .is_some_and(|value| valid_hex(value, &[40, 64]))
+                && evidence
+                    .pointer("/repositoryEvidence/androidSources")
+                    .and_then(Value::as_array)
+                    .is_some_and(|values| {
+                        !values.is_empty()
+                            && values.iter().all(|value| {
+                                value["path"]
+                                    .as_str()
+                                    .is_some_and(|path| !path.trim().is_empty())
+                                    && value["sha256"]
+                                        .as_str()
+                                        .is_some_and(|hash| valid_hex(hash, &[64]))
+                            })
+                    })
+                && evidence
+                    .pointer("/repositoryEvidence/inspectedWebFileCount")
+                    .and_then(Value::as_u64)
+                    .is_some_and(|value| value > 0)
+                && evidence
+                    .pointer("/repositoryEvidence/matchingWebFiles")
+                    .and_then(Value::as_array)
+                    .is_some_and(Vec::is_empty)
+        }
+        _ => false,
+    };
+    if common_invalid || !mode_valid {
         return Err(anyhow!(
-            "跨端验收工件必须包含同一 taskId、当前 sourceRevision、真实存在的 Android/Web 截图、通过阈值的 visualLoss 以及源码写回/无补丁构建证据"
+            "跨端验收工件必须包含同一 taskId、当前 sourceRevision、真实 Android 证据、源码写回/无补丁构建证据，并满足 VISUAL_PARITY 或 NO_WEB_COUNTERPART 的严格身份门禁"
         ));
     }
     Ok(evidence)
+}
+
+fn valid_hex(value: &str, lengths: &[usize]) -> bool {
+    lengths.contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn artifact_file_exists(evidence_path: &Path, value: Option<&str>) -> bool {
@@ -486,6 +539,36 @@ mod tests {
         assert!(cross_platform_evidence(&path, "task-1", Some("source-1")).is_ok());
         assert!(cross_platform_evidence(&path, "task-2", Some("source-1")).is_err());
         assert!(cross_platform_evidence(&path, "task-1", Some("source-2")).is_err());
+        fs::write(
+            &path,
+            serde_json::to_vec(&json!({
+                "schemaVersion":2,
+                "taskId":"task-1",
+                "verificationMode":"NO_WEB_COUNTERPART",
+                "androidArtifact":"android.png",
+                "sourceRevision":"source-1",
+                "sourceWritebackVerified":true,
+                "patchFreeBuildVerified":true,
+                "repositoryEvidence":{
+                    "kind":"NO_WEB_COUNTERPART",
+                    "repositoryGitRevision":"1111111111111111111111111111111111111111",
+                    "androidSources":[{
+                        "path":"android/Friend.kt",
+                        "sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                    }],
+                    "inspectedWebFileCount":12,
+                    "matchingWebFiles":[]
+                }
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(cross_platform_evidence(&path, "task-1", Some("source-1")).is_ok());
+        let mut drifted: serde_json::Value =
+            serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        drifted["repositoryEvidence"]["matchingWebFiles"] = json!(["web/Friend.tsx"]);
+        fs::write(&path, serde_json::to_vec(&drifted).unwrap()).unwrap();
+        assert!(cross_platform_evidence(&path, "task-1", Some("source-1")).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 
