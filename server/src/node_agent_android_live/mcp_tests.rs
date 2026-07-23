@@ -1,8 +1,11 @@
 use serde_json::json;
 
 use super::broker::LiveUiBroker;
-use super::fit_run::FitRunService;
+use super::fit_run::{
+    CreateFitRunRequest, FitEnvironment, FitRect, FitRunService, FitSessionContext, FitTargetPair,
+};
 use super::mcp::{handle_request, McpRequest};
+use super::protocol::{LiveGeometry, LiveRect, LiveUiNode};
 
 #[tokio::test]
 async fn launcher_icon_capabilities_are_declared_ready_without_live_runtime() {
@@ -216,6 +219,144 @@ async fn mcp_lists_compact_ui_tools() {
         .expect("PWA runtime capture tool must be discoverable");
     assert_eq!(pwa_capture["annotations"]["openWorldHint"], false);
     assert_eq!(pwa_capture["inputSchema"]["additionalProperties"], false);
+}
+
+#[tokio::test]
+async fn mcp_attaches_explicit_state_replay_to_an_existing_fit_run() {
+    let root = std::env::temp_dir().join(format!(
+        "elon-mcp-fit-replay-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let broker = std::sync::Arc::new(LiveUiBroker::new());
+    let session = broker
+        .create_session(
+            "device-1".into(),
+            "com.example.debug".into(),
+            Some(root.display().to_string()),
+            38917,
+        )
+        .await;
+    let target = LiveUiNode {
+        runtime_node_id: "runtime-chat-composer".into(),
+        definition_id: "chat.message.composer".into(),
+        instance_key: Some("primary".into()),
+        parent_runtime_node_id: None,
+        screen_id: "chat".into(),
+        kind: "text-field".into(),
+        text: None,
+        resource_id: None,
+        class_name: "EditText".into(),
+        source: None,
+        geometry: LiveGeometry {
+            bounds_in_display_px: LiveRect {
+                left: 0,
+                top: 100,
+                right: 200,
+                bottom: 150,
+                width: 200,
+                height: 50,
+            },
+            density: 1.0,
+            font_scale: 1.0,
+            rotation: 0,
+            visible: true,
+        },
+        properties: Default::default(),
+        capabilities: Default::default(),
+    };
+    session
+        .set_runtime_state_for_test(vec![target], Some("build-1".into()))
+        .await;
+    let fit_runs = FitRunService::live(broker.clone());
+    let run = fit_runs
+        .create_run(
+            FitSessionContext {
+                session_id: session.id.clone(),
+                project_root: root.display().to_string(),
+                package_name: session.package_name.clone(),
+                device_id: session.device_id.clone(),
+                runtime_build_id: Some("build-1".into()),
+                tree_revision: 1,
+                source_revision: None,
+            },
+            CreateFitRunRequest {
+                task_id: Some("task-mcp-replay".into()),
+                pair: FitTargetPair {
+                    target_design_id: "design-chat".into(),
+                    target_sha256: "abc123".into(),
+                    target_rect: FitRect {
+                        left: 0,
+                        top: 0,
+                        right: 200,
+                        bottom: 50,
+                    },
+                    runtime_node_id: "runtime-chat-composer".into(),
+                    definition_id: "chat.message.composer".into(),
+                    component_kind: Some("text-field".into()),
+                    parent_layout_kind: Some("column".into()),
+                    instance_key: Some("primary".into()),
+                    current_rect: FitRect {
+                        left: 0,
+                        top: 100,
+                        right: 200,
+                        bottom: 150,
+                    },
+                    projected_target_rect: FitRect {
+                        left: 0,
+                        top: 100,
+                        right: 200,
+                        bottom: 150,
+                    },
+                    calibration_id: None,
+                    confidence: Some(1.0),
+                },
+                environment: FitEnvironment::default(),
+                properties: Vec::new(),
+                budget: Default::default(),
+                thresholds: Default::default(),
+                visual_mask: Default::default(),
+                auto_start: false,
+            },
+        )
+        .await
+        .unwrap();
+    let captured_at = chrono::Utc::now();
+    let request: McpRequest = serde_json::from_value(json!({
+        "jsonrpc":"2.0","id":4,"method":"tools/call","params":{
+            "name":"ui_control_fit_run",
+            "arguments":{
+                "runId":run.run_id,
+                "action":"ATTACH_STATE_REPLAY",
+                "projectRoot":root.display().to_string(),
+                "scenario":"CHAT_PAGE",
+                "targetRuntimeNodeId":"runtime-chat-composer",
+                "targetDefinitionId":"chat.message.composer",
+                "targetInstanceKey":"primary",
+                "stateReplay":{
+                    "scenarioId":"CHAT_PAGE",
+                    "capturedAt":captured_at.to_rfc3339(),
+                    "expiresAt":(captured_at + chrono::Duration::minutes(10)).to_rfc3339(),
+                    "steps":[
+                        {"name":"open-chat","action":{"type":"ACTIVATE_NODE","definitionId":"home.navigation.chat","occurrence":0}},
+                        {"name":"settle","action":{"type":"WAIT","durationMs":500}}
+                    ]
+                }
+            }
+        }
+    }))
+    .unwrap();
+    let response = handle_request(&broker, &fit_runs, &session.id, request)
+        .await
+        .expect("ATTACH_STATE_REPLAY response");
+    let result = &response["result"]["structuredContent"]["result"];
+    assert_eq!(result["idempotent"], false, "{response:#}");
+    assert_eq!(result["run"]["environment"]["scenario"], "CHAT_PAGE");
+    assert_eq!(
+        result["run"]["auditEvents"][0]["outcome"], "ATTACHED",
+        "{response:#}"
+    );
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[tokio::test]

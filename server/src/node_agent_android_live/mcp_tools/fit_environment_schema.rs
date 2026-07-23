@@ -1,6 +1,6 @@
 use serde_json::{json, Value};
 
-pub(super) fn fit_environment_schema() -> Value {
+pub(super) fn state_replay_schema() -> Value {
     let action = json!({
         "oneOf":[
             {
@@ -32,7 +32,7 @@ pub(super) fn fit_environment_schema() -> Value {
             "action":action
         }
     });
-    let state_replay = json!({
+    json!({
         "type":"object",
         "description":"非根页面 patch-free 重装后使用的受控、限时、可持久化页面 trace；scenarioId 必须与 environment.scenario 一致。",
         "required":["scenarioId","capturedAt","expiresAt","steps"],
@@ -43,7 +43,10 @@ pub(super) fn fit_environment_schema() -> Value {
             "expiresAt":{"type":"string","format":"date-time"},
             "steps":{"type":"array","minItems":1,"maxItems":16,"items":step}
         }
-    });
+    })
+}
+
+pub(super) fn fit_environment_schema() -> Value {
     json!({
         "type":"object",
         "properties":{
@@ -51,7 +54,7 @@ pub(super) fn fit_environment_schema() -> Value {
             "scenario":{"type":"string","maxLength":128},
             "theme":{"type":"string","maxLength":128},
             "locale":{"type":"string","maxLength":128},
-            "stateReplay":state_replay
+            "stateReplay":state_replay_schema()
         }
     })
 }

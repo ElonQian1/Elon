@@ -8,10 +8,11 @@ use std::sync::Arc;
 use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify::{build_and_verify, BuildVerifyRequest};
 use super::fit_run::{
-    workspace_fingerprint, CreateFitRunRequest, FitCommand, FitEnvironment, FitRect, FitRunService,
-    FitSessionContext, FitTargetPair,
+    workspace_fingerprint, AttachStateReplayRequest, CreateFitRunRequest, FitEnvironment, FitRect,
+    FitRunService, FitSessionContext, FitStateReplay, FitTargetPair,
 };
 use super::frame_artifact::{capture_latest_frame_artifact, persist_target_crop_artifact};
+use super::mcp_fit_command::fit_command;
 use super::mcp_tools::tool_definitions;
 use super::protocol::{LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch};
 use super::source_commit::{build_source_commit_plan, commit_source, SourceCommitRequest};
@@ -422,9 +423,14 @@ async fn call_tool(
                 .get("action")
                 .and_then(Value::as_str)
                 .ok_or_else(|| anyhow!("缺少 action"))?;
-            let command = fit_command(action, &arguments)?;
             let context = fit_session_context(broker, &session_id).await?;
-            json!({ "result": fit_runs.command(context, run_id, command).await? })
+            if action.trim().eq_ignore_ascii_case("ATTACH_STATE_REPLAY") {
+                let request = attach_state_replay_request(&arguments)?;
+                json!({ "result": fit_runs.attach_state_replay(context, run_id, request).await? })
+            } else {
+                let command = fit_command(action, &arguments)?;
+                json!({ "result": fit_runs.command(context, run_id, command).await? })
+            }
         }
         "ui_check_capabilities" => {
             let session = broker.session(&session_id).await?;
@@ -515,47 +521,33 @@ fn fit_rect(value: Option<&Value>) -> Result<FitRect> {
     rect.validate("FitRun rect")?;
     Ok(rect)
 }
-fn fit_command(action: &str, arguments: &Value) -> Result<FitCommand> {
-    let command_id = format!("mcp_{}", uuid::Uuid::new_v4().simple());
+fn attach_state_replay_request(arguments: &Value) -> Result<AttachStateReplayRequest> {
     let required = |key: &str| -> Result<String> {
         arguments
             .get(key)
             .and_then(Value::as_str)
             .map(ToOwned::to_owned)
-            .ok_or_else(|| anyhow!("{action} 缺少 {key}"))
+            .ok_or_else(|| anyhow!("ATTACH_STATE_REPLAY 缺少 {key}"))
     };
-    let value = match action.trim().to_ascii_uppercase().as_str() {
-        "START" | "PAUSE" | "RESUME" | "CANCEL" | "ACCEPT_BEST" => json!({
-            "type": action.trim().to_ascii_uppercase(),
-            "commandId": command_id,
-        }),
-        "REBIND_SESSION" => json!({
-            "type":"REBIND_SESSION", "commandId":command_id,
-            "newSessionId":required("newSessionId")?,
-            "newRuntimeNodeId":arguments.get("newRuntimeNodeId").cloned(),
-            "newCurrentRect":arguments.get("newCurrentRect").cloned(),
-        }),
-        "CODEX_STARTED" => json!({
-            "type":"CODEX_STARTED", "commandId":command_id,
-            "handoffId":required("handoffId")?, "taskId":required("taskId")?,
-        }),
-        "CODEX_COMPLETED" => json!({
-            "type":"CODEX_COMPLETED", "commandId":command_id,
-            "handoffId":required("handoffId")?,
-            "taskId":arguments.get("taskId").cloned(),
-            "sourceRevisionBefore":arguments.get("sourceRevisionBefore").cloned(),
-            "sourceRevisionAfter":required("sourceRevisionAfter")?,
-            "changedFiles":arguments.get("changedFiles").cloned().unwrap_or_else(|| json!([])),
-            "commitId":arguments.get("commitId").cloned(),
-            "tokenUsage":arguments.get("tokenUsage").cloned(),
-        }),
-        "CODEX_FAILED" => json!({
-            "type":"CODEX_FAILED", "commandId":command_id,
-            "handoffId":required("handoffId")?, "error":required("error")?,
-        }),
-        _ => bail!("不支持 FitRun action: {action}"),
-    };
-    serde_json::from_value(value).context("FitRun 控制命令无效")
+    let state_replay: FitStateReplay = serde_json::from_value(
+        arguments
+            .get("stateReplay")
+            .cloned()
+            .ok_or_else(|| anyhow!("ATTACH_STATE_REPLAY 缺少 stateReplay"))?,
+    )
+    .context("ATTACH_STATE_REPLAY stateReplay 参数无效")?;
+    Ok(AttachStateReplayRequest {
+        command_id: format!("mcp_{}", uuid::Uuid::new_v4().simple()),
+        project_root: required("projectRoot")?,
+        scenario: required("scenario")?,
+        state_replay,
+        target_runtime_node_id: required("targetRuntimeNodeId")?,
+        target_definition_id: required("targetDefinitionId")?,
+        target_instance_key: arguments
+            .get("targetInstanceKey")
+            .and_then(Value::as_str)
+            .map(ToOwned::to_owned),
+    })
 }
 
 fn find_node<'a>(

@@ -443,6 +443,19 @@ enum JournalMode {
 }
 
 impl LiveUiSession {
+    #[cfg(test)]
+    pub(crate) async fn set_runtime_state_for_test(
+        &self,
+        nodes: Vec<LiveUiNode>,
+        runtime_build_id: Option<String>,
+    ) {
+        let mut state = self.state.write().await;
+        state.connected = true;
+        state.runtime_build_id = runtime_build_id;
+        state.tree_revision = state.tree_revision.saturating_add(1);
+        state.nodes = nodes;
+    }
+
     pub(crate) async fn reset_for_redeploy(&self) {
         *self.runtime_tx.write().await = None;
         self.pending.lock().await.clear();

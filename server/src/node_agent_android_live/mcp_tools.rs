@@ -1,6 +1,7 @@
 use serde_json::{json, Value};
 
 mod fit_environment_schema;
+mod fit_run_tools;
 pub(crate) fn tool_definitions() -> Vec<Value> {
     let mut definitions = vec![
         tool(
@@ -350,56 +351,6 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             }),
         ),
         tool(
-            "ui_start_fit_run",
-            "创建并立即启动可恢复的自动拟合任务。它会持久化每次试验、预算、最佳结果和学习案例；达到候选后再确认写回源码。",
-            json!({
-                "type":"object",
-                "required":["targetRect","projectedTargetRect"],
-                "anyOf":[{"required":["runtimeNodeId"]},{"required":["selector"]}],
-                "properties":{
-                    "taskId":{"type":"string","maxLength":128,"description":"可选；默认绑定当前结构化 UI 任务"},
-                    "runtimeNodeId":{"type":"string"},
-                    "selector":stable_selector_value_schema(),
-                    "targetRect":rect_value_schema(),
-                    "projectedTargetRect":rect_value_schema(),
-                    "properties":{"type":"array","items":{"type":"string"},"maxItems":64},
-                    "environment":fit_environment_schema::fit_environment_schema(),
-                    "visualMask":fit_visual_mask_schema()
-                }
-            }),
-        ),
-        tool(
-            "ui_get_fit_run",
-            "读取一个持久化拟合任务；不传 runId 时列出当前项目最近任务。",
-            json!({
-                "type":"object",
-                "properties":{"runId":{"type":"string"}}
-            }),
-        ),
-        tool(
-            "ui_control_fit_run",
-            "控制持久化拟合任务。CANDIDATE_READY 使用 ACCEPT_BEST；AWAITING_CODEX 时按 handoff 完成小范围源码修改后报告 CODEX_COMPLETED。",
-            json!({
-                "type":"object",
-                "required":["runId","action"],
-                "properties":{
-                    "runId":{"type":"string"},
-                    "action":{"enum":["START","PAUSE","RESUME","CANCEL","REBIND_SESSION","ACCEPT_BEST","CODEX_STARTED","CODEX_COMPLETED","CODEX_FAILED"]},
-                    "newSessionId":{"type":"string","minLength":1,"maxLength":256},
-                    "newRuntimeNodeId":{"type":"string","minLength":1,"maxLength":256},
-                    "newCurrentRect":rect_value_schema(),
-                    "handoffId":{"type":"string"},
-                    "taskId":{"type":"string"},
-                    "sourceRevisionBefore":{"type":"string"},
-                    "sourceRevisionAfter":{"type":"string"},
-                    "changedFiles":{"type":"array","items":{"type":"string"}},
-                    "commitId":{"type":"string"},
-                    "tokenUsage":{"type":"integer","minimum":0},
-                    "error":{"type":"string"}
-                }
-            }),
-        ),
-        tool(
             "ui_check_capabilities",
             "在编辑源码前检查当前一龙 UI 平台能否完成任务；系统会从结构化任务和项目规则推导必需能力，requiredCapabilities 只能追加而不能削弱。",
             json!({
@@ -581,6 +532,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         "读取当前项目指定设备的固定调试槽、贡献提交、冲突、代次，以及最近成功版本是否显式启用。",
         json!({"type":"object","required":["deviceId"],"properties":{"deviceId":{"type":"string"},"projectId":{"type":"string"}}})));
     definitions.push(crate::node_agent_pwa_runtime::tool_definition());
+    definitions.extend(fit_run_tools::definitions());
     definitions
 }
 
@@ -686,7 +638,7 @@ mod annotation_tests {
     }
 
     #[test]
-    fn fit_run_control_schema_exposes_explicit_session_rebind() {
+    fn fit_run_control_schema_exposes_rebind_and_state_replay_attachment() {
         let tools = tool_definitions();
         let tool = tools
             .iter()
@@ -698,6 +650,16 @@ mod annotation_tests {
             .is_some_and(|values| values.iter().any(|value| value == "REBIND_SESSION")));
         assert_eq!(schema["properties"]["newSessionId"]["minLength"], 1);
         assert!(schema["properties"]["newCurrentRect"].is_object());
+        assert!(schema["properties"]["action"]["enum"]
+            .as_array()
+            .is_some_and(|values| values.iter().any(|value| value == "ATTACH_STATE_REPLAY")));
+        assert_eq!(
+            schema["properties"]["stateReplay"]["properties"]["steps"]["minItems"],
+            1
+        );
+        assert!(schema["allOf"][0]["then"]["required"]
+            .as_array()
+            .is_some_and(|values| values.iter().any(|value| value == "projectRoot")));
     }
 }
 

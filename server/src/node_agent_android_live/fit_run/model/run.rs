@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::transitions::legal_transition;
 use super::{
     validate_identifier, FitBudget, FitBudgetUsage, FitCandidate, FitCodexHandoff, FitEnvironment,
-    FitRunPhase, FitSessionContext, FitStopReason, FitTargetPair, FitThresholds,
+    FitRunAuditEvent, FitRunPhase, FitSessionContext, FitStopReason, FitTargetPair, FitThresholds,
     FitTrialCheckpoint, FitVisualMask,
 };
 
@@ -89,6 +89,8 @@ pub(crate) struct FitRunDocument {
     pub(crate) last_error: Option<String>,
     #[serde(default)]
     pub(crate) processed_commands: Vec<String>,
+    #[serde(default)]
+    pub(crate) audit_events: Vec<FitRunAuditEvent>,
 }
 
 impl FitRunDocument {
@@ -128,6 +130,7 @@ impl FitRunDocument {
             last_sequence: 0,
             last_error: None,
             processed_commands: Vec::new(),
+            audit_events: Vec::new(),
         })
     }
 

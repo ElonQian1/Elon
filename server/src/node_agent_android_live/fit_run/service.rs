@@ -18,6 +18,7 @@ mod batch_accept;
 #[cfg(test)]
 mod batch_accept_tests;
 mod command_application;
+mod state_replay_attachment;
 
 pub(crate) use batch_accept::{BatchAcceptRequest, BatchAcceptResult};
 use command_application::apply_command;

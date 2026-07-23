@@ -17,9 +17,9 @@ mod store;
 mod workspace_revision;
 
 pub(crate) use model::{
-    CreateFitRunRequest, FitCommand, FitEnvironment, FitMaskKind, FitMaskRegion, FitRect,
-    FitRunDocument, FitRunPhase, FitScore, FitSessionContext, FitStateReplay, FitTargetPair,
-    FitTrial, FitVisualMask,
+    AttachStateReplayRequest, AttachStateReplayResult, CreateFitRunRequest, FitCommand,
+    FitEnvironment, FitMaskKind, FitMaskRegion, FitRect, FitRunDocument, FitRunPhase, FitScore,
+    FitSessionContext, FitStateReplay, FitTargetPair, FitTrial, FitVisualMask,
 };
 pub(crate) use routes::protected_routes;
 pub(crate) use service::FitRunService;

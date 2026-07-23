@@ -165,7 +165,7 @@ impl FitEnvironment {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct FitStateReplay {
     #[serde(default = "state_replay_schema_version")]
@@ -177,7 +177,7 @@ pub(crate) struct FitStateReplay {
 }
 
 impl FitStateReplay {
-    fn validate(&self, environment_scenario: Option<&str>) -> Result<()> {
+    pub(crate) fn validate(&self, environment_scenario: Option<&str>) -> Result<()> {
         if self.schema_version != state_replay_schema_version() {
             bail!(
                 "FIT_STATE_REPLAY_SCHEMA_UNSUPPORTED: schemaVersion={}",
@@ -198,6 +198,12 @@ impl FitStateReplay {
         if expires_at <= captured_at {
             bail!("FIT_STATE_REPLAY_INVALID: expiresAt 必须晚于 capturedAt");
         }
+        if captured_at > Utc::now() {
+            bail!(
+                "FIT_STATE_REPLAY_INVALID: capturedAt 不能晚于当前时间: {}",
+                self.captured_at
+            );
+        }
         if Utc::now() > expires_at {
             bail!(
                 "FIT_STATE_REPLAY_EXPIRED: scenario={} expiresAt={}",
@@ -212,7 +218,7 @@ impl FitStateReplay {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct FitStateReplayStep {
     pub(crate) name: String,
@@ -252,7 +258,7 @@ impl FitStateReplayStep {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "SCREAMING_SNAKE_CASE")]
 pub(crate) enum FitStateReplayAction {
     ActivateNode {
