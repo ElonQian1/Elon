@@ -102,15 +102,15 @@ try {
     restoreState,
     '重复 complete ack 必须保持已完成状态且无重复副作用',
   )
-  const mismatchState = consumePwaDraftAppliedAck(beginPwaDraftRestore('project-1|screen-a', 8, 1), {
+  const restoreMismatchState = consumePwaDraftAppliedAck(beginPwaDraftRestore('project-1|screen-a', 8, 1), {
     ...pendingAck,
     draftKey: 'project-1|screen-a',
     revision: 8,
     unresolved: [{ index: 0, selector: '#wrong', identityKey: 'id:right', reason: 'identity-mismatch' }],
     exhausted: true,
   })
-  assert.equal(mismatchState.phase, 'failed')
-  assert.match(pwaDraftRestoreLabel(mismatchState), /身份不匹配，已拒绝修改/)
+  assert.equal(restoreMismatchState.phase, 'failed')
+  assert.match(pwaDraftRestoreLabel(restoreMismatchState), /身份不匹配，已拒绝修改/)
   const invalidSuccessState = consumePwaDraftAppliedAck(beginPwaDraftRestore('project-1|screen-a', 9, 1), {
     ...pendingAck,
     draftKey: 'project-1|screen-a',
