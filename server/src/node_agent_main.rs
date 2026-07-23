@@ -102,6 +102,7 @@ mod node_agent_exec;
 use node_agent_exec::hide_tokio_command_window;
 pub use node_agent_exec::run_exec;
 mod node_agent_desktop_review_auth;
+mod node_agent_desktop_review_broker;
 mod node_agent_file_info;
 mod node_agent_file_range;
 mod node_agent_full_access;
@@ -458,6 +459,7 @@ async fn run_agent_runtime() -> Result<()> {
         node_data_root,
         install_id,
     ));
+    runtime.desktop_review_broker.spawn();
     // Bind the local management endpoint before any startup reconciliation.
     // Large stale-task inventories must not make the watchdog mistake a
     // healthy new runtime for a failed launch.

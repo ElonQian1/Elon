@@ -74,3 +74,11 @@ aes-gcm = "0.10"
 # 实时语音管线（方案 B：连接 OpenAI Realtime Transcription WSS）
 # rustls 与 reqwest 保持一致，避免 musl 交叉编译时需要 OpenSSL
 tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }

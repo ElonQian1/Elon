@@ -218,6 +218,10 @@ pub(super) async fn admin_status(
             super::node_agent_supervision_protocol::status_payload(),
         );
         object.insert(
+            "desktop_review_broker".to_string(),
+            rt.desktop_review_broker.status_payload(),
+        );
+        object.insert(
             "build_git_sha".to_string(),
             serde_json::json!(super::node_agent_release_identity::git_sha()),
         );

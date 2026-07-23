@@ -58,23 +58,32 @@ pub(crate) enum DesktopReviewAuthError {
 }
 
 impl DesktopReviewAuth {
-    pub(crate) fn from_env() -> Self {
+    pub(crate) fn from_env_with_broker(
+        broker_key: Option<(String, RsaPublicKey)>,
+        broker_nonce_ledger: Option<PathBuf>,
+    ) -> Self {
         let credential = std::env::var(DESKTOP_REVIEW_CREDENTIAL_ENV)
             .ok()
             .map(|v| v.trim().as_bytes().to_vec())
             .filter(|v| v.len() >= 32)
             .map(Arc::<[u8]>::from);
-        let public_keys = std::env::var(DESKTOP_REVIEW_PUBLIC_KEYS_ENV)
+        let mut public_keys = std::env::var(DESKTOP_REVIEW_PUBLIC_KEYS_ENV)
             .ok()
             .map(|v| parse_public_keys(&v))
             .unwrap_or_default();
+        if let Some((key_id, public_key)) = broker_key {
+            public_keys.retain(|(existing, _)| !existing.eq_ignore_ascii_case(&key_id));
+            public_keys.push((key_id, public_key));
+        }
         let nonce_ledger = std::env::var(DESKTOP_REVIEW_NONCE_LEDGER_ENV)
             .ok()
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty())
-            .map(|v| {
+            .map(PathBuf::from)
+            .or(broker_nonce_ledger)
+            .map(|path| {
                 Arc::new(NonceLedger {
-                    path: PathBuf::from(v),
+                    path,
                     lock: Mutex::new(()),
                 })
             });
@@ -98,9 +107,18 @@ impl DesktopReviewAuth {
 
     #[cfg(test)]
     pub(crate) fn for_v3_route_test(public_key: RsaPublicKey, ledger_path: PathBuf) -> Self {
+        Self::for_v3_test_key("0000000000000000", public_key, ledger_path)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn for_v3_test_key(
+        key_id: &str,
+        public_key: RsaPublicKey,
+        ledger_path: PathBuf,
+    ) -> Self {
         Self {
             credential: None,
-            public_keys: Arc::new(vec![("0000000000000000".to_string(), public_key)]),
+            public_keys: Arc::new(vec![(key_id.to_string(), public_key)]),
             allow_v2: false,
             nonce_ledger: Some(Arc::new(NonceLedger {
                 path: ledger_path,
@@ -349,7 +367,7 @@ pub(crate) fn endpoint_path(task_id: &str) -> String {
         });
     format!("/api/local-tasks/{encoded}/supervision/desktop-review")
 }
-fn ticket_message_v3(
+pub(crate) fn ticket_message_v3(
     owner: &str,
     task: &str,
     method: &str,

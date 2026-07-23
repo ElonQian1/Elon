@@ -277,6 +277,7 @@ function Invoke-SupervisionSelfTest {
     $priorStateRoot = $env:ELON_DESKTOP_REVIEW_STATE_ROOT
     $priorInstallRoot = $env:ELON_DESKTOP_REVIEW_INSTALL_ROOT
     $desktopPathsRejected = $false
+    $desktopBrokerUnavailableDiagnosed = $false
     $legacyDesktopCapabilityRejected = $false
     try {
         Assert-NodeSupervisionCapability ([pscustomobject]@{
@@ -292,6 +293,23 @@ function Invoke-SupervisionSelfTest {
         $null = New-DesktopReviewTicket 'owner-self-test' 'local-self-test' 'POST' '/api/local-tasks/local-self-test/supervision/desktop-review' $reviewBytes
     } catch {
         $desktopPathsRejected = $_.Exception.Message -like 'desktop_review_paths_not_configured:*'
+    } finally {
+        $env:ELON_DESKTOP_REVIEW_STATE_ROOT = $priorStateRoot
+        $env:ELON_DESKTOP_REVIEW_INSTALL_ROOT = $priorInstallRoot
+    }
+    try {
+        $env:ELON_DESKTOP_REVIEW_STATE_ROOT = ''
+        $env:ELON_DESKTOP_REVIEW_INSTALL_ROOT = ''
+        $null = New-DesktopReviewTicket 'owner-self-test' 'local-self-test' 'POST' `
+            '/api/local-tasks/local-self-test/supervision/desktop-review' $reviewBytes `
+            ([pscustomobject]@{
+                SupervisionCapabilities = @($script:DesktopReviewBrokerCapability)
+                DesktopReviewBrokerAvailable = $false
+                DesktopReviewBrokerPipe = ''
+            })
+    } catch {
+        $desktopBrokerUnavailableDiagnosed =
+            $_.Exception.Message -like 'desktop_review_broker_unavailable:*'
     } finally {
         $env:ELON_DESKTOP_REVIEW_STATE_ROOT = $priorStateRoot
         $env:ELON_DESKTOP_REVIEW_INSTALL_ROOT = $priorInstallRoot
@@ -367,8 +385,10 @@ function Invoke-SupervisionSelfTest {
         detail_path = $testDetailPath -eq '/api/local-tasks/local-test%3Fid?limit=200'
         expected_cursor_epoch_path = $testEpochPath -eq '/api/local-tasks/local-test%3Fid?since=42&limit=25&expected_cursor_epoch=journal%3Aa%2Fb%3Fc'
         desktop_review_paths_fail_closed = $desktopPathsRejected
+        desktop_review_broker_unavailable_diagnosed = $desktopBrokerUnavailableDiagnosed
         desktop_review_requires_v3_capability = $legacyDesktopCapabilityRejected -and
-            $script:DesktopReviewCapability -eq 'desktop_review_ticket_v3'
+            $script:DesktopReviewCapability -eq 'desktop_review_ticket_v3' -and
+            $script:DesktopReviewBrokerCapability -eq 'desktop_review_broker_v1'
         cloud_projects_path = $testProjectsPath -eq '/api/cloud-projects?include_system=true'
         project_binding_body = $testBindingBody.project_id -eq 'elon-self' -and
             $testBindingBody.workspace_path -ceq [System.IO.Path]::GetFullPath($testWorkspace) -and
@@ -433,7 +453,7 @@ function Invoke-SupervisionSelfTest {
             'project_binding_body_without_token',
             'authoritative_full_access_grant_without_token',
             'expected_cursor_epoch_handshake', 'desktop_review_paths_fail_closed',
-            'desktop_review_requires_v3_capability',
+            'desktop_review_broker_unavailable_diagnosed', 'desktop_review_requires_v3_capability',
             'inspect_wait_active_runtime', 'compact_delta_evidence_digest',
             'compact_delta_no_loss_or_duplicate', 'compact_delta_invalid_epoch_rejected',
             'compact_delta_omits_unchanged_state_and_evidence',

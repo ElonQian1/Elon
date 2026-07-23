@@ -30,6 +30,7 @@ function Get-NodeConnection {
                 $header = [string](Get-ObjectField $status 'local_admin_token_header')
                 $version = [string](Get-ObjectField $status 'version')
                 $supervisionStatus = Get-ObjectField $status 'desktop_supervision'
+                $desktopReviewBroker = Get-ObjectField $status 'desktop_review_broker'
                 if (-not [string]::IsNullOrWhiteSpace($token) -and
                     $header.ToLowerInvariant() -eq 'x-elon-local-admin-token' -and
                     -not [string]::IsNullOrWhiteSpace($version)) {
@@ -40,6 +41,9 @@ function Get-NodeConnection {
                         BaseUrl = $candidateUrl; Header = $header; Token = $token; Version = $version
                         SupervisionProtocol = [string](Get-ObjectField $supervisionStatus 'protocol')
                         SupervisionCapabilities = @((Get-ObjectField $supervisionStatus 'capabilities') | ForEach-Object { [string]$_ })
+                        DesktopReviewBrokerAvailable = [bool](Get-ObjectField $desktopReviewBroker 'available')
+                        DesktopReviewBrokerPipe = [string](Get-ObjectField $desktopReviewBroker 'pipe_name')
+                        DesktopReviewBrokerStatus = $desktopReviewBroker
                         ProbeMs = $timer.ElapsedMilliseconds; ProbeStrategy = 'cached_or_priority_bounded'
                         ProbeTimings = [pscustomobject][ordered]@{
                             candidate_build_ms = $candidateBuildMs
@@ -113,6 +117,7 @@ function Invoke-ParallelNodeProbe {
                 $header = [string](Get-ObjectField $status 'local_admin_token_header')
                 $version = [string](Get-ObjectField $status 'version')
                 $supervisionStatus = Get-ObjectField $status 'desktop_supervision'
+                $desktopReviewBroker = Get-ObjectField $status 'desktop_review_broker'
                 if (-not [string]::IsNullOrWhiteSpace($token) -and
                     $header.ToLowerInvariant() -eq 'x-elon-local-admin-token' -and
                     -not [string]::IsNullOrWhiteSpace($version)) {
@@ -120,6 +125,9 @@ function Invoke-ParallelNodeProbe {
                         BaseUrl = $item.Url; Header = $header; Token = $token; Version = $version
                         SupervisionProtocol = [string](Get-ObjectField $supervisionStatus 'protocol')
                         SupervisionCapabilities = @((Get-ObjectField $supervisionStatus 'capabilities') | ForEach-Object { [string]$_ })
+                        DesktopReviewBrokerAvailable = [bool](Get-ObjectField $desktopReviewBroker 'available')
+                        DesktopReviewBrokerPipe = [string](Get-ObjectField $desktopReviewBroker 'pipe_name')
+                        DesktopReviewBrokerStatus = $desktopReviewBroker
                     }
                 }
             } finally { $response.Dispose() }

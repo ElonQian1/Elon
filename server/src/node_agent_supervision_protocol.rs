@@ -7,6 +7,8 @@ pub(crate) const RESUME_CONTEXT_V1: &str = "resume_context_v1";
 pub(crate) const CONTRACT_SUPERSEDE_V1: &str = "contract_supersede_v1";
 pub(crate) const DESKTOP_REVIEW_TICKET_V2: &str = "desktop_review_ticket_v2";
 pub(crate) const DESKTOP_REVIEW_TICKET_V3: &str = "desktop_review_ticket_v3";
+pub(crate) const DESKTOP_REVIEW_BROKER_V1: &str =
+    crate::node_agent_desktop_review_broker::CAPABILITY;
 pub(crate) const CODEX_TERMINAL_HINT_V1: &str = "codex_terminal_hint_v1";
 
 const CAPABILITIES: &[&str] = &[
@@ -15,6 +17,7 @@ const CAPABILITIES: &[&str] = &[
     CONTRACT_SUPERSEDE_V1,
     DESKTOP_REVIEW_TICKET_V2,
     DESKTOP_REVIEW_TICKET_V3,
+    DESKTOP_REVIEW_BROKER_V1,
     CODEX_TERMINAL_HINT_V1,
 ];
 
@@ -46,6 +49,7 @@ mod tests {
             CONTRACT_SUPERSEDE_V1,
             DESKTOP_REVIEW_TICKET_V2,
             DESKTOP_REVIEW_TICKET_V3,
+            DESKTOP_REVIEW_BROKER_V1,
             CODEX_TERMINAL_HINT_V1,
         ] {
             assert!(capabilities.iter().any(|value| value == required));

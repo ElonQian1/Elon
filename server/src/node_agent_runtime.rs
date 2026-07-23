@@ -82,6 +82,7 @@ pub(crate) struct NodeRuntime {
     pub(crate) ui_fit_runs: std::sync::Arc<crate::node_agent_android_live::fit_run::FitRunService>,
     pub(crate) wake: Notify,
     pub(crate) desktop_review_auth: crate::node_agent_desktop_review_auth::DesktopReviewAuth,
+    pub(crate) desktop_review_broker: crate::node_agent_desktop_review_broker::DesktopReviewBroker,
     local_admin_token: String,
 }
 
@@ -117,6 +118,16 @@ impl NodeRuntime {
         if let Err(error) = update_recovery.interrupt_incomplete_reconciles() {
             tracing::warn!(error = %error, "无法收敛上次重启中断的 update-gate reconcile 回执");
         }
+        let desktop_review_broker =
+            crate::node_agent_desktop_review_broker::DesktopReviewBroker::initialize(&install_id);
+        let desktop_review_nonce_ledger = crate::node_agent_config::state_path()
+            .parent()
+            .map(|root| root.join("desktop-review-broker-nonces.json"));
+        let desktop_review_auth =
+            crate::node_agent_desktop_review_auth::DesktopReviewAuth::from_env_with_broker(
+                desktop_review_broker.verifier(),
+                desktop_review_nonce_ledger,
+            );
         Self {
             cfg,
             install_id,
@@ -148,8 +159,8 @@ impl NodeRuntime {
             live_ui,
             ui_fit_runs,
             wake: Notify::new(),
-            desktop_review_auth: crate::node_agent_desktop_review_auth::DesktopReviewAuth::from_env(
-            ),
+            desktop_review_auth,
+            desktop_review_broker,
             local_admin_token: node_agent_local_admin::generate_local_admin_token(),
         }
     }
