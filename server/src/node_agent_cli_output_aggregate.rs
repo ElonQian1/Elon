@@ -79,7 +79,7 @@ impl CliOutputJournalAggregate {
         stream: &str,
         text: &str,
     ) -> RuntimeObservation {
-        if let Some((event, observation)) = codex_json_event(req_id, stream, text) {
+        if let Some((event, observation)) = codex_json_event_at(req_id, stream, text, now_ms()) {
             let _ = journal.append_event(event);
             return observation;
         }
@@ -112,7 +112,7 @@ impl CliOutputJournalAggregate {
 }
 
 pub(crate) fn progress_observation(text: &str) -> RuntimeObservation {
-    codex_json_event("", "stdout", text)
+    codex_json_event_at("", "stdout", text, now_ms())
         .map(|(_, observation)| observation)
         .unwrap_or_else(|| RuntimeObservation {
             phase: Some("reasoning".to_string()),
@@ -121,7 +121,12 @@ pub(crate) fn progress_observation(text: &str) -> RuntimeObservation {
         })
 }
 
-fn codex_json_event(req_id: &str, stream: &str, text: &str) -> Option<(Value, RuntimeObservation)> {
+pub(crate) fn codex_json_event_at(
+    req_id: &str,
+    stream: &str,
+    text: &str,
+    at_ms: u128,
+) -> Option<(Value, RuntimeObservation)> {
     let parsed: Value = serde_json::from_str(text.trim()).ok()?;
     let event_type = parsed.get("type").and_then(Value::as_str)?;
     if !matches!(event_type, "item.started" | "item.completed") {
@@ -149,7 +154,7 @@ fn codex_json_event(req_id: &str, stream: &str, text: &str) -> Option<(Value, Ru
         "stream": if stream.eq_ignore_ascii_case("stderr") { "stderr" } else { "stdout" },
         "lifecycle": lifecycle,
         "item": bounded_item,
-        "at_ms": now_ms(),
+        "at_ms": at_ms,
     });
     Some((
         event,
@@ -361,7 +366,7 @@ mod tests {
             }
         }))
         .unwrap();
-        let (event, observation) = codex_json_event("task-1", "stdout", &raw).unwrap();
+        let (event, observation) = codex_json_event_at("task-1", "stdout", &raw, 1).unwrap();
         assert_eq!(event["item"]["exit_code"], 2);
         assert_eq!(event["item"]["output"]["raw_line_count"], 100);
         assert_eq!(event["item"]["output"]["truncated"], true);

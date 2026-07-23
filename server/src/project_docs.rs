@@ -11,6 +11,7 @@ use axum::{
 };
 use homecli_proto::{ProjectDocumentEntry, ProjectDocumentMetadata};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{collections::HashMap, sync::Arc};
 
 use crate::{
@@ -52,6 +53,15 @@ impl From<ProjectDocumentEntry> for ProjectDocument {
 #[derive(Deserialize)]
 pub struct ProjectDocumentPathQuery {
     path: String,
+}
+
+#[derive(Deserialize)]
+pub struct ProjectDocumentFederationQuery {
+    parent_id: Option<String>,
+    query: Option<String>,
+    offset: Option<usize>,
+    limit: Option<usize>,
+    cursor: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -146,6 +156,77 @@ pub async fn get_project_document_catalog(
         }
     }))
     .into_response()
+}
+
+pub async fn get_project_document_federation(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Query(query): Query<ProjectDocumentFederationQuery>,
+) -> Response {
+    let (_, access) = match authorized_project(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let arguments = json!({
+        "projection": "page",
+        "offset": query.offset.unwrap_or_default(),
+        "limit": query.limit.unwrap_or(8),
+        "cursor": query.cursor,
+    });
+    let request =
+        match crate::project_document_response::ProjectionRequest::from_arguments(&arguments) {
+            Ok(request) => request,
+            Err(error) => return json_error(StatusCode::BAD_REQUEST, error.to_string()),
+        };
+    if let (Some(node_id), Some(workspace_path)) = (
+        access
+            .node_id
+            .as_deref()
+            .filter(|value| !value.trim().is_empty()),
+        access
+            .workspace_path
+            .as_deref()
+            .filter(|value| !value.trim().is_empty()),
+    ) {
+        return match state
+            .agent_manager
+            .dispatch_project_document_federation_read(
+                node_id,
+                workspace_path.to_string(),
+                query.parent_id,
+                query.query,
+                request.offset,
+                request.limit,
+                arguments["cursor"].as_str().map(str::to_string),
+            )
+            .await
+        {
+            Ok(homecli_proto::AgentToServer::ProjectDocumentFederationRead { page, .. }) => {
+                Json(page).into_response()
+            }
+            Ok(homecli_proto::AgentToServer::ProjectDocumentFederationReadError {
+                message,
+                ..
+            }) => json_error(StatusCode::BAD_GATEWAY, message),
+            Ok(other) => json_error(
+                StatusCode::BAD_GATEWAY,
+                format!("PC 节点返回了非联邦分页响应：{other:?}"),
+            ),
+            Err(error) => json_error(StatusCode::SERVICE_UNAVAILABLE, error.to_string()),
+        };
+    }
+    let workspace =
+        state.resolve_project_workspace(&access.workspace_key, access.workspace_path.as_deref());
+    match crate::project_document_federation_service::get_federation_index(
+        &workspace,
+        query.parent_id.as_deref(),
+        query.query.as_deref(),
+        &request,
+    ) {
+        Ok(page) => Json(page).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    }
 }
 
 pub async fn get_project_document_file(

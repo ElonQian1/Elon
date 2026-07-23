@@ -70,11 +70,11 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         };
         let (recovery_receipt_count, terminal_recovery_receipt_count, terminal_recovery_receipt) =
             recovery_receipt_evidence(&recovery_ledger, &task.task_id);
-        let ambiguous_recovery_receipts = recovery_receipt_count > 1
+        let mut ambiguous_recovery_receipts = recovery_receipt_count > 1
             && runtime
                 .update_recovery
-                .receipt_for_task(&task.task_id)
-                .is_err();
+                .receipt_for_task(&task.task_id)?
+                .is_some_and(|receipt| receipt.conflict_detected);
         let contract = contracts.get(&task.task_id).and_then(Option::as_ref);
         let resume = crate::node_agent_local_task_resume_routes::inspect_resume_workspace_status(
             &runtime,
@@ -122,6 +122,22 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         let no_unsafe_wait = pending_approval_ids.is_empty()
             && (non_repeatable_action.is_none()
                 || non_repeatable_action.as_deref() == Some("journal_exceeds_audit_limit"));
+        if ambiguous_recovery_receipts && no_execution_owner && no_unsafe_wait {
+            let active_workspace = task
+                .workspace_status
+                .as_ref()
+                .and_then(|status| status.get("active_workspace_path"))
+                .and_then(Value::as_str)
+                .map(std::path::Path::new)
+                .unwrap_or_else(|| std::path::Path::new(&task.workspace_path));
+            if crate::node_agent_local_task_orphan_reconcile::receipt_conflict_is_audit_only(
+                runtime.as_ref(),
+                &task,
+                active_workspace,
+            )? {
+                ambiguous_recovery_receipts = false;
+            }
+        }
         let excluded = can_exclude_from_install(
             persisted_inactive,
             durable_cancelled,

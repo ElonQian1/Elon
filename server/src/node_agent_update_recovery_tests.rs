@@ -225,7 +225,7 @@ fn compatible_terminal_receipts_are_canonicalized_without_losing_raw_audit() {
 }
 
 #[test]
-fn conflicting_terminal_receipts_remain_fail_closed() {
+fn conflicting_terminal_receipts_are_readable_and_remain_fail_closed() {
     let (root, store) = temp_store();
     let mut first =
         UpdateRecoveryReceipt::planned("update-conflict-a", "root-conflict", "task-conflict");
@@ -238,10 +238,21 @@ fn conflicting_terminal_receipts_remain_fail_closed() {
     store.upsert(first).unwrap();
     store.upsert(second).unwrap();
 
-    let error = store
+    let canonical = store
         .receipt_for_task("task-conflict")
-        .expect_err("different completion facts must not be merged");
-    assert!(error.to_string().contains("terminal_task_status"));
+        .expect("conflict must not make task detail fail")
+        .expect("canonical conservative receipt");
+    assert!(canonical.conflict_detected);
+    assert_eq!(canonical.conflict_count, 2);
+    assert!(canonical
+        .conflict_reason
+        .as_deref()
+        .unwrap_or_default()
+        .contains("terminal_task_status"));
+    assert!(
+        !canonical.state.is_terminal() || canonical.terminal_task_status.is_some(),
+        "conflict view must preserve a real receipt rather than invent terminal facts"
+    );
     assert_eq!(store.receipts_for_task("task-conflict").unwrap().len(), 2);
     let _ = std::fs::remove_dir_all(root);
 }

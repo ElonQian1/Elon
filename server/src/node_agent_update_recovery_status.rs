@@ -76,6 +76,8 @@ impl UpdateRecoveryStore {
             "next_cursor": (end < receipt_count).then_some(end),
             "has_more": end < receipt_count,
             "receipts": page,
+            "reconcile_receipt_count": ledger.reconcile_receipts.len(),
+            "latest_reconcile_receipt": ledger.reconcile_receipts.last(),
         }))
     }
 }

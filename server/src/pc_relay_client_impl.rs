@@ -336,6 +336,35 @@ pub(super) async fn run_relay_session(
                     let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
                 });
             }
+            ServerToAgent::ReadProjectDocumentFederation { req_id, request } => {
+                let tx = out_tx.clone();
+                tokio::spawn(async move {
+                    let arguments = serde_json::json!({"projection":"page","offset":request.offset,"limit":request.limit,"cursor":request.cursor});
+                    let response =
+                        crate::project_document_response::ProjectionRequest::from_arguments(
+                            &arguments,
+                        )
+                        .and_then(|projection| {
+                            crate::project_document_federation_service::get_federation_index(
+                                std::path::Path::new(&request.workspace_path),
+                                request.parent_id.as_deref(),
+                                request.query.as_deref(),
+                                &projection,
+                            )
+                        })
+                        .map(|page| AgentToServer::ProjectDocumentFederationRead {
+                            req_id: req_id.clone(),
+                            page,
+                        })
+                        .unwrap_or_else(|error| {
+                            AgentToServer::ProjectDocumentFederationReadError {
+                                req_id,
+                                message: error.to_string(),
+                            }
+                        });
+                    let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+                });
+            }
             ServerToAgent::ReadProjectDocumentFile {
                 req_id,
                 workspace_path,

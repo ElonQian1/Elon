@@ -8,7 +8,7 @@ use anyhow::{anyhow, Context, Result};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{
     AgentToServer, CliCompletionProducerIdentity, ServerToAgent, CAP_ANDROID_DEVICE_HOST_V1,
-    CAP_PROJECT_BUILD_CACHE_V1, PROTO_VERSION,
+    CAP_PROJECT_BUILD_CACHE_V1, CAP_PROJECT_DOCUMENT_FEDERATION_V1, PROTO_VERSION,
 };
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
@@ -169,6 +169,7 @@ pub(super) async fn run_session(
         capabilities: vec![
             CAP_PROJECT_BUILD_CACHE_V1.to_string(),
             CAP_ANDROID_DEVICE_HOST_V1.to_string(),
+            CAP_PROJECT_DOCUMENT_FEDERATION_V1.to_string(),
         ],
         allowed_clis: available_clis.clone(),
         allowed_cwds: vec![],
@@ -431,6 +432,13 @@ pub(super) async fn run_session(
                         } => {
                             info!("📚 ReadProjectDocuments: {}", req_id);
                             crate::node_agent_project_documents::spawn_catalog_response(req_id, workspace_path, seed_defaults, catalog_only, out_tx_r.clone());
+                        }
+                        ServerToAgent::ReadProjectDocumentFederation { req_id, request } => {
+                            info!("🕸️ ReadProjectDocumentFederation: {}", req_id);
+                            crate::node_agent_project_documents::spawn_federation_response(
+                                req_id, request.workspace_path, request.parent_id, request.query,
+                                request.offset, request.limit, request.cursor, out_tx_r.clone(),
+                            );
                         }
                         ServerToAgent::ReadProjectDocumentFile {
                             req_id,

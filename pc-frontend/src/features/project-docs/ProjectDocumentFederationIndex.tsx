@@ -1,20 +1,53 @@
-import { ChevronDown, ChevronRight } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 
-import type { DocumentHealthAnalysis } from './projectDocumentModel'
+import { api } from '../../api/client'
+import { projectDocumentErrorMessage } from './projectDocumentWorkspaceHelpers'
+import {
+  acceptFederationPage, beginFederationPage, rejectFederationPage,
+  type FederationPage, type FederationPagingState,
+} from './projectDocumentFederationPaging'
 import styles from './ProjectDocumentHealthCenter.module.css'
 
-type FederationNode = DocumentHealthAnalysis['federation']['nodes'][number]
 const PAGE_SIZE = 8
 
-export default function ProjectDocumentFederationIndex({ nodes }: { nodes: FederationNode[] }) {
+export default function ProjectDocumentFederationIndex({ projectId }: { projectId: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
-  const [visibleCounts, setVisibleCounts] = useState<Record<string, number>>({ '': PAGE_SIZE })
-  const children = useMemo(() => nodes.reduce<Record<string, FederationNode[]>>((output, node) => {
-    const parent = node.parent_id || ''
-    ;(output[parent] ??= []).push(node)
-    return output
-  }, {}), [nodes])
+  const [branches, setBranches] = useState<FederationPagingState>({})
+  const branchesRef = useRef<FederationPagingState>({})
+  const requestSequence = useRef(0)
+
+  const load = useCallback(async (parentId: string, append = false) => {
+    const requestId = ++requestSequence.current
+    const cursor = append ? branchesRef.current[parentId]?.nextCursor ?? null : null
+    setBranches((current) => {
+      const next = beginFederationPage(current, parentId, requestId, append)
+      branchesRef.current = next
+      return next
+    })
+    const search = new URLSearchParams({ parent_id: parentId, limit: String(PAGE_SIZE) })
+    if (cursor) search.set('cursor', cursor)
+    try {
+      const page = await api.get<FederationPage>(
+        `/api/projects/${encodeURIComponent(projectId)}/docs/federation?${search}`,
+      )
+      setBranches((current) => {
+        const next = acceptFederationPage(current, parentId, requestId, page, append)
+        branchesRef.current = next
+        return next
+      })
+    } catch (error) {
+      setBranches((current) => {
+        const next = rejectFederationPage(
+          current, parentId, requestId, projectDocumentErrorMessage(error, '读取联邦节点失败'),
+        )
+        branchesRef.current = next
+        return next
+      })
+    }
+  }, [projectId])
+
+  useEffect(() => { branchesRef.current = {}; setBranches({}); setExpanded(new Set()); void load('') }, [load])
 
   function toggle(id: string) {
     setExpanded((current) => {
@@ -22,15 +55,14 @@ export default function ProjectDocumentFederationIndex({ nodes }: { nodes: Feder
       if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
-    setVisibleCounts((current) => ({ ...current, [id]: current[id] ?? PAGE_SIZE }))
+    if (!branches[id]) void load(id)
   }
 
-  function branch(parentId: string, depth: number) {
-    const all = children[parentId] ?? []
-    const visible = all.slice(0, visibleCounts[parentId] ?? PAGE_SIZE)
+  function branch(parentId: string, depth: number): ReactNode {
+    const state = branches[parentId]
     return <>
-      {visible.map((node) => {
-        const hasChildren = (children[node.id]?.length ?? 0) > 0 || node.direct_children > 0
+      {state?.nodes.map((node) => {
+        const hasChildren = node.direct_children > 0
         const isExpanded = expanded.has(node.id)
         return <div key={node.id}>
           <article style={{ marginLeft: Math.min(48, depth * 12) }}>
@@ -43,14 +75,14 @@ export default function ProjectDocumentFederationIndex({ nodes }: { nodes: Feder
           {isExpanded && branch(node.id, depth + 1)}
         </div>
       })}
-      {visible.length < all.length && <button className={styles.moreNodes} type="button" onClick={() => setVisibleCounts((current) => ({
-        ...current, [parentId]: (current[parentId] ?? PAGE_SIZE) + PAGE_SIZE,
-      }))}>加载下一页（{all.length - visible.length}）</button>}
+      {state?.loading && <small>正在读取这一页…</small>}
+      {state?.error && <button className={styles.moreNodes} type="button" onClick={() => void load(parentId)}><RefreshCw size={12} />{state.error}，重试</button>}
+      {state?.hasMore && !state.loading && <button className={styles.moreNodes} type="button" onClick={() => void load(parentId, true)}>加载下一页（已载入 {state.nodes.length}/{state.total}）</button>}
     </>
   }
 
-  return <div className={styles.nodes} data-pagination="lazy">
-    <small>分页惰性展开 · 每页 {PAGE_SIZE} 个节点</small>
+  return <div className={styles.nodes} data-pagination="server">
+    <small>服务端分页惰性展开 · 每个父节点独立翻页</small>
     {branch('', 0)}
   </div>
 }

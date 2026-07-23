@@ -28,9 +28,41 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
 }
 
 async fn reconcile_update_gate(State(runtime): State<Arc<NodeRuntime>>) -> Response {
-    match crate::node_agent_update_gate_reconcile::reconcile(runtime).await {
-        Ok(payload) => Json(payload).into_response(),
-        Err(error) => json_error(StatusCode::CONFLICT, error.to_string()),
+    let receipt = match runtime.update_recovery.begin_reconcile() {
+        Ok(receipt) => receipt,
+        Err(error) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+    };
+    let operation_id = receipt.operation_id.clone();
+    let worker_runtime = runtime.clone();
+    let worker = tokio::spawn(async move {
+        let result =
+            crate::node_agent_update_gate_reconcile::reconcile(worker_runtime.clone()).await;
+        let persisted = worker_runtime.update_recovery.finish_reconcile(
+            &operation_id,
+            result
+                .as_ref()
+                .map(Clone::clone)
+                .map_err(ToString::to_string),
+        );
+        (result, persisted)
+    });
+    match worker.await {
+        Ok((Ok(mut payload), Ok(persisted))) => {
+            payload["reconciliation_receipt"] = json!(persisted);
+            Json(payload).into_response()
+        }
+        Ok((Err(error), Ok(persisted))) => (
+            StatusCode::CONFLICT,
+            Json(json!({
+                "ok": false, "error": error.to_string(), "reconciliation_receipt": persisted,
+            })),
+        )
+            .into_response(),
+        Ok((_, Err(error))) => json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+        Err(error) => json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("reconcile worker failed: {error}"),
+        ),
     }
 }
 

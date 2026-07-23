@@ -1,5 +1,5 @@
 function Get-NodeConnection {
-    param([int]$RetrySeconds = 2)
+    param([int]$RetrySeconds = 5)
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
     $candidateUrls = New-Object System.Collections.Generic.List[string]
     if (-not [string]::IsNullOrWhiteSpace($env:ELON_NODE_ADMIN_URL)) {
@@ -25,7 +25,7 @@ function Get-NodeConnection {
             $priorityAttemptCount++
             try {
                 $status = Invoke-Utf8JsonRequest -Method Get -Uri "$candidateUrl/api/status" `
-                    -Headers @{ Origin = $candidateUrl } -TimeoutSec 1
+                    -Headers @{ Origin = $candidateUrl } -TimeoutSec 3
                 $token = [string](Get-ObjectField $status 'local_admin_token')
                 $header = [string](Get-ObjectField $status 'local_admin_token_header')
                 $version = [string](Get-ObjectField $status 'version')
@@ -59,7 +59,7 @@ function Get-NodeConnection {
         $fallbackCandidates = @($uniqueCandidates | Select-Object -Skip 1)
         $fallbackCandidateCount += $fallbackCandidates.Count
         $fallbackTimer = [System.Diagnostics.Stopwatch]::StartNew()
-        $parallel = Invoke-ParallelNodeProbe $fallbackCandidates 1200
+        $parallel = Invoke-ParallelNodeProbe $fallbackCandidates 2500
         $fallbackProbeMs += $fallbackTimer.ElapsedMilliseconds
         if ($null -ne $parallel) {
             $script:LastNodeAdminUrl = $parallel.BaseUrl
@@ -84,7 +84,7 @@ function Get-NodeConnection {
 }
 
 function Invoke-ParallelNodeProbe {
-    param([string[]]$CandidateUrls, [int]$TimeoutMs = 1200)
+    param([string[]]$CandidateUrls, [int]$TimeoutMs = 2500)
     if (@($CandidateUrls).Count -eq 0) { return $null }
     $handler = [System.Net.Http.HttpClientHandler]::new()
     $handler.UseProxy = $false

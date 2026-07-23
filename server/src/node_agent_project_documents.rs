@@ -20,12 +20,56 @@ pub(crate) fn spawn_catalog_response(
                 include_analysis: true,
             },
         ) {
-            Ok(snapshot) => AgentToServer::ProjectDocumentsRead { req_id, snapshot },
+            Ok(mut snapshot) => {
+                if catalog_only {
+                    crate::project_document_federation_service::strip_catalog_nodes(
+                        &mut snapshot.analysis,
+                    );
+                }
+                AgentToServer::ProjectDocumentsRead { req_id, snapshot }
+            }
             Err(error) => AgentToServer::ProjectDocumentsReadError {
                 req_id,
                 message: error.to_string(),
             },
         };
+        let _ = output.send(ws_text(&response));
+    });
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn spawn_federation_response(
+    req_id: String,
+    workspace_path: String,
+    parent_id: Option<String>,
+    query: Option<String>,
+    offset: usize,
+    limit: usize,
+    cursor: Option<String>,
+    output: UnboundedSender<Message>,
+) {
+    tokio::spawn(async move {
+        let arguments = serde_json::json!({
+            "projection": "page", "offset": offset, "limit": limit, "cursor": cursor,
+        });
+        let response =
+            crate::project_document_response::ProjectionRequest::from_arguments(&arguments)
+                .and_then(|request| {
+                    crate::project_document_federation_service::get_federation_index(
+                        std::path::Path::new(&workspace_path),
+                        parent_id.as_deref(),
+                        query.as_deref(),
+                        &request,
+                    )
+                })
+                .map(|page| AgentToServer::ProjectDocumentFederationRead {
+                    req_id: req_id.clone(),
+                    page,
+                })
+                .unwrap_or_else(|error| AgentToServer::ProjectDocumentFederationReadError {
+                    req_id,
+                    message: error.to_string(),
+                });
         let _ = output.send(ws_text(&response));
     });
 }

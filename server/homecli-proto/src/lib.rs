@@ -9,6 +9,12 @@ mod android_device_host;
 pub use android_device_host::{AndroidDeviceHostRequest, CAP_ANDROID_DEVICE_HOST_V1};
 mod cancel;
 pub use cancel::{CancelRequestAudit, InterruptionSource};
+mod node_profiles;
+pub use node_profiles::{ModelCapability, NodeHardwareProfile};
+mod project_document_federation;
+pub use project_document_federation::{
+    ProjectDocumentFederationPageRequest, CAP_PROJECT_DOCUMENT_FEDERATION_V1,
+};
 pub const PROTO_VERSION: u32 = 7;
 /// The node applies project-scoped build-cache routing, admission, leases, and cleanup.
 pub const CAP_PROJECT_BUILD_CACHE_V1: &str = "project_build_cache_v1";
@@ -16,42 +22,6 @@ mod project_workspace_status;
 pub use project_workspace_status::{
     ProjectGitWorktreeAudit, ProjectGitWorktreeEntry, ProjectWorkspaceInspectStatus,
 };
-
-/// PC 节点上报的单个模型能力描述
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelCapability {
-    /// 模型唯一 ID，如 "llama3:8b" 或 "lm_studio/qwen2"
-    pub model_id: String,
-    /// 用户可见显示名称
-    pub display_name: String,
-    /// 上下文长度（token 数）
-    pub context_len: u32,
-    /// 提供方："ollama" | "lm_studio" | "custom"
-    pub provider: String,
-    /// 每 1000 tokens 消耗的平台积分（节点所有者自定义）
-    pub price_per_1k_credits: f64,
-}
-
-/// PC 节点硬件画像。所有字段都是可选的，便于旧节点/受限环境渐进上报。
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct NodeHardwareProfile {
-    #[serde(default)]
-    pub os: Option<String>,
-    #[serde(default)]
-    pub arch: Option<String>,
-    #[serde(default)]
-    pub cpu_brand: Option<String>,
-    #[serde(default)]
-    pub cpu_cores: Option<u32>,
-    #[serde(default)]
-    pub memory_total_bytes: Option<u64>,
-    #[serde(default)]
-    pub gpu_names: Vec<String>,
-    #[serde(default)]
-    pub gpu_memory_total_bytes: Option<u64>,
-    #[serde(default)]
-    pub disk_free_bytes: Option<u64>,
-}
 
 /// PC 节点提供的项目代码硬盘服务能力。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -359,6 +329,11 @@ pub enum ServerToAgent {
         #[serde(default)]
         catalog_only: bool,
     },
+    /// Read one bounded page of the project-document federation index.
+    ReadProjectDocumentFederation {
+        req_id: String,
+        request: ProjectDocumentFederationPageRequest,
+    },
     /// Read one Markdown document on the PC that owns the project workspace.
     ReadProjectDocumentFile {
         req_id: String,
@@ -654,6 +629,16 @@ pub enum AgentToServer {
         req_id: String,
         message: String,
     },
+    /// PC node returned one bounded federation page.
+    ProjectDocumentFederationRead {
+        req_id: String,
+        page: serde_json::Value,
+    },
+    /// PC node failed to read a bounded federation page.
+    ProjectDocumentFederationReadError {
+        req_id: String,
+        message: String,
+    },
     /// PC 节点返回单篇项目文档。
     ProjectDocumentFileRead {
         req_id: String,
@@ -743,6 +728,8 @@ impl AgentToServer {
             | Self::ProjectGitWorktreeAuditError { .. }
             | Self::ProjectDocumentsRead { .. }
             | Self::ProjectDocumentsReadError { .. }
+            | Self::ProjectDocumentFederationRead { .. }
+            | Self::ProjectDocumentFederationReadError { .. }
             | Self::ProjectDocumentFileRead { .. }
             | Self::ProjectDocumentFileReadError { .. }
             | Self::ProjectDocumentFileWritten { .. }
@@ -775,6 +762,8 @@ impl AgentToServer {
             | Self::ProjectGitWorktreeAuditError { req_id, .. }
             | Self::ProjectDocumentsRead { req_id, .. }
             | Self::ProjectDocumentsReadError { req_id, .. }
+            | Self::ProjectDocumentFederationRead { req_id, .. }
+            | Self::ProjectDocumentFederationReadError { req_id, .. }
             | Self::ProjectDocumentFileRead { req_id, .. }
             | Self::ProjectDocumentFileReadError { req_id, .. }
             | Self::ProjectDocumentFileWritten { req_id, .. }

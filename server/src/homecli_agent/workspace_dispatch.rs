@@ -191,6 +191,63 @@ impl AgentManager {
         outcome
     }
 
+    /// Ask the workspace-owning node for one independently pageable federation branch.
+    pub async fn dispatch_project_document_federation_read(
+        &self,
+        agent_id: &str,
+        workspace_path: String,
+        parent_id: Option<String>,
+        query: Option<String>,
+        offset: usize,
+        limit: usize,
+        cursor: Option<String>,
+    ) -> Result<AgentToServer> {
+        let req_id = Uuid::new_v4().to_string();
+        let agents = self.agents.read().await;
+        let agent = agents
+            .get(agent_id)
+            .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
+        if !agent
+            .capabilities
+            .iter()
+            .any(|item| item == homecli_proto::CAP_PROJECT_DOCUMENT_FEDERATION_V1)
+        {
+            return Err(anyhow!("PC 节点版本过旧，不支持项目文档联邦分页"));
+        }
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        let pending = agent.pending.clone();
+        pending.lock().await.insert(req_id.clone(), tx);
+        agent
+            .cmd_tx
+            .send(
+                homecli_proto::ServerToAgent::ReadProjectDocumentFederation {
+                    req_id: req_id.clone(),
+                    request: homecli_proto::ProjectDocumentFederationPageRequest {
+                        workspace_path,
+                        parent_id,
+                        query,
+                        offset,
+                        limit,
+                        cursor,
+                    },
+                },
+            )
+            .map_err(|_| anyhow!("agent writer closed"))?;
+        drop(agents);
+
+        let outcome = match tokio::time::timeout(Duration::from_secs(8), rx.recv()).await {
+            Ok(Some(msg)) => Ok(msg),
+            Ok(None) => Err(anyhow!(
+                "agent disconnected before federation page response"
+            )),
+            Err(_) => Err(anyhow!("project document federation read timeout (8s)")),
+        };
+        if outcome.is_err() {
+            pending.lock().await.remove(&req_id);
+        }
+        outcome
+    }
+
     pub async fn dispatch_project_document_file_read(
         &self,
         agent_id: &str,

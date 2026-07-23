@@ -150,7 +150,7 @@ export interface DocumentHealthAnalysis {
     aggregated_score: number
     unhealthy_nodes: number
     max_depth: number
-    nodes: Array<{
+    nodes?: Array<{
       id: string
       label: string
       parent_id: string

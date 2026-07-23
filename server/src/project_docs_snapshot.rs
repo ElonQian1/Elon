@@ -98,15 +98,22 @@ async fn load_project_documents_snapshot_mode(
         }
     }
 
-    collect_project_documents_with_options(&workspace, scan_options(seed_defaults, catalog_only))
-        .unwrap_or_else(|error| {
-            build_snapshot(
-                workspace.to_string_lossy().to_string(),
-                "read_error",
-                Vec::new(),
-                vec![format!("读取项目文档失败：{error}")],
-            )
-        })
+    let mut snapshot = collect_project_documents_with_options(
+        &workspace,
+        scan_options(seed_defaults, catalog_only),
+    )
+    .unwrap_or_else(|error| {
+        build_snapshot(
+            workspace.to_string_lossy().to_string(),
+            "read_error",
+            Vec::new(),
+            vec![format!("读取项目文档失败：{error}")],
+        )
+    });
+    if catalog_only {
+        crate::project_document_federation_service::strip_catalog_nodes(&mut snapshot.analysis);
+    }
+    snapshot
 }
 
 fn normalize_remote_snapshot(snapshot: &mut ProjectDocumentsSnapshot, catalog_only: bool) {
@@ -122,6 +129,9 @@ fn normalize_remote_snapshot(snapshot: &mut ProjectDocumentsSnapshot, catalog_on
             document.content.clear();
             document.truncated = false;
         }
+    }
+    if catalog_only {
+        crate::project_document_federation_service::strip_catalog_nodes(&mut snapshot.analysis);
     }
 }
 

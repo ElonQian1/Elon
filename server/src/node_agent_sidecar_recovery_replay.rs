@@ -15,7 +15,7 @@ use anyhow::{Context, Result};
 use serde_json::Value;
 
 use crate::{
-    node_agent_cli_output_aggregate::progress_observation,
+    node_agent_cli_output_aggregate::{codex_json_event_at, progress_observation},
     node_agent_cli_sidecar_io::{read_new_output_records, CliSidecarOutputRecord},
     node_agent_cli_sidecar_runner::CliSidecarReplayCursor,
     node_agent_local_task_store::LocalTaskStore,
@@ -111,12 +111,12 @@ pub(crate) fn persist_batch_before_cursor(
             if record.record_type != "chunk" || persisted.contains(&sequence) {
                 continue;
             }
-            let Some(mut event) = cli_chunk_event(
-                task_id,
-                record.stream.as_deref().unwrap_or("stdout"),
-                record.text.as_deref().unwrap_or_default(),
-                record.at_ms,
-            ) else {
+            let stream = record.stream.as_deref().unwrap_or("stdout");
+            let text = record.text.as_deref().unwrap_or_default();
+            let event = codex_json_event_at(task_id, stream, text, record.at_ms)
+                .map(|(event, _)| event)
+                .or_else(|| cli_chunk_event(task_id, stream, text, record.at_ms));
+            let Some(mut event) = event else {
                 continue;
             };
             event["sidecar_session_id"] = Value::String(session_id.to_string());
@@ -361,6 +361,37 @@ mod tests {
         .unwrap();
 
         assert!(cursor_observed.get());
+        let _ = fs::remove_dir_all(temp);
+    }
+
+    #[test]
+    fn replayed_large_codex_item_stays_structured_and_parseable() {
+        let temp = test_root("structured-large-item");
+        let journal = TaskJournal::new(temp.join("journal"));
+        let raw = serde_json::json!({
+            "type":"item.completed",
+            "item":{"id":"large","type":"command_execution","status":"completed","exit_code":0,
+                "command":"cargo test","aggregated_output":"x".repeat(40_000)}
+        })
+        .to_string();
+        let records = vec![CliSidecarOutputRecord::chunk("stdout", &raw)];
+        persist_batch_before_cursor(
+            &journal,
+            "task-1",
+            "session-1",
+            &records,
+            CliSidecarReplayCursor {
+                offset: raw.len() as u64,
+                sequence: 1,
+            },
+            |_| Ok(()),
+        )
+        .unwrap();
+        let event = &journal.snapshot("task-1", 0, 10).unwrap().events[0].event;
+        assert_eq!(event["type"], "codex_item");
+        assert_eq!(event["item"]["output"]["raw_byte_count"], 40_000);
+        assert_eq!(event["item"]["output"]["truncated"], true);
+        assert!(serde_json::from_str::<serde_json::Value>(&event.to_string()).is_ok());
         let _ = fs::remove_dir_all(temp);
     }
 

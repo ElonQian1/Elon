@@ -72,7 +72,78 @@ pub(crate) fn get_federation_index(
         "selection": {"parent_id":normalized_parent,"query":query,"lazy":true},
         "nodes": page,
         "pagination": pagination(request.offset, request.limit, filtered.len(), returned),
-        "limits": {"manifest_nodes":256,"transport_page":200,"legacy_section_limit_applies":false,"legacy_document_limit_applies":false},
+        "limits": {"indexed_nodes":4096,"transport_page":200,"legacy_section_limit_applies":false,"legacy_document_limit_applies":false},
         "projection": {"mode":request.projection,"detail":request.detail},
     }))
+}
+
+/// Catalog responses carry federation totals only; tree nodes have their own paged contract.
+pub(crate) fn strip_catalog_nodes(analysis: &mut Value) {
+    let Some(federation) = analysis
+        .get_mut("document_health")
+        .and_then(|health| health.get_mut("federation"))
+    else {
+        return;
+    };
+    federation["nodes"] = json!([]);
+    federation["nodes_transport"] = json!({
+        "mode": "server_paged",
+        "endpoint": "docs/federation",
+        "page_limit": 200,
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn parent_cursor_pages_are_independent_and_catalog_is_summary_only() {
+        let root =
+            std::env::temp_dir().join(format!("elon-federation-page-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(root.join(".elon")).unwrap();
+        fs::write(root.join("AGENTS.md"), "# Root").unwrap();
+        fs::write(
+            root.join(crate::project_document_federation::FEDERATION_CONFIG_PATH),
+            r#"{
+          "version":1,"nodes":[
+            {"id":"root","label":"Root"},
+            {"id":"apps","label":"Apps","parent_id":"root"},
+            {"id":"docs","label":"Docs","parent_id":"root"},
+            {"id":"android","label":"Android","parent_id":"apps"}
+          ]
+        }"#,
+        )
+        .unwrap();
+        let first =
+            ProjectionRequest::from_arguments(&json!({"projection":"page","limit":1})).unwrap();
+        let root_page = get_federation_index(&root, None, None, &first).unwrap();
+        assert_eq!(root_page["nodes"][0]["id"], "root");
+        let children = get_federation_index(&root, Some("root"), None, &first).unwrap();
+        assert_eq!(children["nodes"][0]["id"], "apps");
+        assert_eq!(children["pagination"]["has_more"], true);
+        let next = ProjectionRequest::from_arguments(&json!({
+            "projection":"page","limit":1,"cursor":children["pagination"]["next_cursor"]
+        }))
+        .unwrap();
+        let second_child = get_federation_index(&root, Some("root"), None, &next).unwrap();
+        assert_eq!(second_child["nodes"][0]["id"], "docs");
+        let grandchild = get_federation_index(&root, Some("apps"), None, &first).unwrap();
+        assert_eq!(grandchild["nodes"][0]["id"], "android");
+
+        let mut analysis =
+            json!({"document_health":{"federation":{"node_count":4,"nodes":[1,2,3,4]}}});
+        strip_catalog_nodes(&mut analysis);
+        assert_eq!(
+            analysis["document_health"]["federation"]["nodes"],
+            json!([])
+        );
+        assert_eq!(analysis["document_health"]["federation"]["node_count"], 4);
+        assert_eq!(
+            analysis["document_health"]["federation"]["nodes_transport"]["mode"],
+            "server_paged"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
 }

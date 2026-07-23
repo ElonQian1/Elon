@@ -9,6 +9,7 @@ import ProjectDocumentVersionHistory from './ProjectDocumentVersionHistory'
 import styles from './ProjectDocumentHealthCenter.module.css'
 
 interface Props {
+  projectId: string
   analysis?: DocumentHealthAnalysis
   runtime: DocumentOrganizationTrackingRuntime
   onRefresh: () => void
@@ -19,7 +20,7 @@ interface Props {
 interface IssueFilters { severity: string; status: string; owner: string; topic: string; scope: string }
 const emptyFilters: IssueFilters = { severity: '', status: '', owner: '', topic: '', scope: '' }
 
-export default function ProjectDocumentHealthCenter({ analysis, runtime, onRefresh, onOpenSuggestions, onRunAi }: Props) {
+export default function ProjectDocumentHealthCenter({ projectId, analysis, runtime, onRefresh, onOpenSuggestions, onRunAi }: Props) {
   const [filters, setFilters] = useState(emptyFilters)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [editing, setEditing] = useState<DocumentHealthIssue | null>(null)
@@ -95,7 +96,7 @@ export default function ProjectDocumentHealthCenter({ analysis, runtime, onRefre
           <div><dt>待处理事件</dt><dd>{analysis.maintenance.pending_events}</dd></div><div><dt>本轮已处理</dt><dd>{analysis.maintenance.processed_events}</dd></div>
           <div><dt>后台复查</dt><dd>{analysis.maintenance.poll_interval_seconds} 秒</dd></div><div><dt>外链待检查</dt><dd>{quality.external_links_pending}</dd></div></dl></section>
         <section className={styles.panel}><header><div><strong>联邦知识架构</strong><small>{analysis.federation.source === 'manifest' ? '显式清单' : '程序推断'} · 最深 {analysis.federation.max_depth} 层</small></div></header>
-          <ProjectDocumentFederationIndex nodes={analysis.federation.nodes} /></section>
+          <ProjectDocumentFederationIndex projectId={projectId} /></section>
         <ProjectDocumentVersionHistory runtime={runtime} onRestored={onRefresh} />
       </aside>
     </div>

@@ -11,7 +11,8 @@ use crate::{
 };
 
 pub(crate) const FEDERATION_CONFIG_PATH: &str = ".elon/knowledge-federation.json";
-const MAX_NODES: usize = 256;
+// This is an indexing guard, not a transport/display limit. Pages remain capped separately.
+const MAX_NODES: usize = 4_096;
 const MAX_DEPTH: usize = 6;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]

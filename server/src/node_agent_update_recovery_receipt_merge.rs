@@ -5,6 +5,23 @@ use super::UpdateRecoveryReceipt;
 pub(super) fn canonical_terminal_receipt(
     matches: &[UpdateRecoveryReceipt],
 ) -> Result<UpdateRecoveryReceipt> {
+    match merge_compatible_receipts(matches) {
+        Ok(receipt) => Ok(receipt),
+        Err(error) => {
+            let mut conservative = matches
+                .iter()
+                .max_by_key(|receipt| receipt.updated_at_ms)
+                .context("recovery receipt set is empty")?
+                .clone();
+            conservative.conflict_detected = true;
+            conservative.conflict_count = matches.len();
+            conservative.conflict_reason = Some(error.to_string());
+            Ok(conservative)
+        }
+    }
+}
+
+fn merge_compatible_receipts(matches: &[UpdateRecoveryReceipt]) -> Result<UpdateRecoveryReceipt> {
     let first = matches.first().context("recovery receipt set is empty")?;
     if matches.iter().any(|receipt| {
         !receipt.state.is_terminal()

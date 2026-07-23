@@ -601,8 +601,21 @@ switch ($Action) {
         # Reconcile performs a complete, fail-closed audit of historical task
         # ownership and worktree evidence. Keep ordinary task reads at 15s,
         # but give this explicit maintenance operation a bounded 120s window.
-        $response = Invoke-NodeApi $nodeConnection 'Post' '/api/update-recovery/reconcile' @{} `
-            -TimeoutSec 120
+        $recoveredInterruptedReceipt = $null
+        try {
+            $response = Invoke-NodeApi $nodeConnection 'Post' '/api/update-recovery/reconcile' @{} `
+                -TimeoutSec 120
+        } catch {
+            # A self-update may terminate the HTTP request with the old runtime.
+            # Reconnect, read its durable terminal receipt, then retry idempotently.
+            $nodeConnection = Get-NodeConnection -RetrySeconds 20
+            $recovery = Invoke-NodeApi $nodeConnection 'Get' '/api/update-recovery?limit=1'
+            $recoveredInterruptedReceipt = Get-ObjectField $recovery 'latest_reconcile_receipt'
+            $status = [string](Get-ObjectField $recoveredInterruptedReceipt 'status')
+            if ($status -notin @('interrupted', 'failed', 'completed')) { throw }
+            $response = Invoke-NodeApi $nodeConnection 'Post' '/api/update-recovery/reconcile' @{} `
+                -TimeoutSec 120
+        }
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'ReconcileUpdate'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl
@@ -613,6 +626,8 @@ switch ($Action) {
             orphan_rows_reconciled = Get-ObjectField $response 'orphan_rows_reconciled'
             orphan_reconcile_error = Get-ObjectField $response 'orphan_reconcile_error'
             install_gate = Get-ObjectField $response 'install_gate'
+            reconciliation_receipt = Get-ObjectField $response 'reconciliation_receipt'
+            recovered_interrupted_receipt = $recoveredInterruptedReceipt
         })
     }
     'Submit' {

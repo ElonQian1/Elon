@@ -14,11 +14,14 @@ use crate::NodeRuntime;
 
 #[path = "node_agent_local_task_orphan_cancel.rs"]
 mod cancel;
+#[path = "node_agent_local_task_ghost_convergence.rs"]
+mod ghost_convergence;
 #[path = "node_agent_local_task_orphan_runtime_evidence.rs"]
 mod runtime_evidence;
 #[path = "node_agent_local_task_orphan_terminal_drift.rs"]
 mod terminal_drift;
 
+pub(crate) use ghost_convergence::receipt_conflict_is_audit_only;
 pub(crate) use runtime_evidence::recorded_process_is_live;
 use runtime_evidence::{exact_runtime_protects, journal_record_protects, sidecar_record_protects};
 
@@ -312,6 +315,11 @@ async fn reconcile_candidate(
         .and_then(serde_json::Value::as_str)
         .map(Path::new)
         .unwrap_or_else(|| Path::new(&task.workspace_path));
+    if !exact_runtime_protects(runtime, &task, active_workspace, now, stale_after_ms).await?
+        && ghost_convergence::converge_verified_history(runtime, &task, active_workspace, cutoff)?
+    {
+        return Ok(true);
+    }
     if candidate_runtime_protects(
         runtime,
         &task,

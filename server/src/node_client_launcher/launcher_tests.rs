@@ -128,6 +128,17 @@ fn watchdog_election_keeps_only_lowest_pid_for_same_client() {
 
 #[cfg(windows)]
 #[test]
+fn watchdog_process_lifetime_lock_allows_exactly_one_owner() {
+    let root = std::env::temp_dir().join(format!("elon-watchdog-lock-{}", uuid::Uuid::new_v4()));
+    let first = super::watchdog::acquire_watchdog_lock(&root).expect("first watchdog owns lock");
+    assert!(super::watchdog::acquire_watchdog_lock(&root).is_err());
+    drop(first);
+    super::watchdog::acquire_watchdog_lock(&root).expect("lock is reusable after owner exits");
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[cfg(windows)]
+#[test]
 fn watchdog_stop_terminates_only_other_watchdog_processes() {
     let script =
         super::watchdog::watchdog_stop_script(Path::new(r"C:\ElonNode\一龙开发平台.exe"), 1234);

@@ -322,6 +322,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(project_docs::get_project_document_catalog),
         )
         .route(
+            "/api/projects/:project_id/docs/federation",
+            get(project_docs::get_project_document_federation),
+        )
+        .route(
             "/api/projects/:project_id/docs/file",
             get(project_docs::get_project_document_file)
                 .put(project_docs::put_project_document_file),

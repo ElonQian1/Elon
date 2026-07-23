@@ -4,6 +4,21 @@ use super::{
 };
 
 #[test]
+fn federation_page_protocol_keeps_parent_cursor_and_offset() {
+    let raw = r#"{"type":"read_project_document_federation","req_id":"page-1","request":{"workspace_path":"C:/repo","parent_id":"apps","offset":8,"limit":8,"cursor":"offset:8"}}"#;
+    let decoded: ServerToAgent = serde_json::from_str(raw).expect("decode federation page");
+    match decoded {
+        ServerToAgent::ReadProjectDocumentFederation { request, .. } => {
+            assert_eq!(request.parent_id.as_deref(), Some("apps"));
+            assert_eq!(request.offset, 8);
+            assert_eq!(request.limit, 8);
+            assert_eq!(request.cursor.as_deref(), Some("offset:8"));
+        }
+        other => panic!("expected federation page request, got {other:?}"),
+    }
+}
+
+#[test]
 fn old_project_document_snapshot_without_metadata_still_decodes() {
     let json = r##"{
         "type": "project_documents_read",

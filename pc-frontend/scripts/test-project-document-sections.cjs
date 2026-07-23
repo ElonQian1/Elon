@@ -528,9 +528,31 @@ assert(commandMenuSource.includes("'ArrowDown', 'ArrowUp', 'Home', 'End'"))
 const federationSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentFederationIndex.tsx',
 ), 'utf8')
-assert(federationSource.includes('分页惰性展开'))
+assert(federationSource.includes('/docs/federation?'))
+assert(federationSource.includes('data-pagination="server"'))
 assert(federationSource.includes('加载下一页'))
 assert(federationSource.includes('direct_children'))
+assert(!federationSource.includes('.slice('), '联邦节点不得在 catalog 全量数组上客户端切片')
+
+const pagingPath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentFederationPaging.ts')
+const pagingOutput = ts.transpileModule(fs.readFileSync(pagingPath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const pagingLoaded = { exports: {} }
+new Function('module', 'exports', 'require', pagingOutput)(pagingLoaded, pagingLoaded.exports, require)
+const paging = pagingLoaded.exports
+const node = (id) => ({ id, label: id, parent_id: '', scope_path: '', profile: '', owner: '', document_count: 1, direct_children: 0, score: 100, status: 'healthy', home_configured: true })
+let pages = paging.beginFederationPage({}, '', 1, false)
+pages = paging.acceptFederationPage(pages, '', 1, { nodes: [node('root')], pagination: { returned: 1, total_matching: 2, has_more: true, next_cursor: 'offset:1' } }, false)
+pages = paging.beginFederationPage(pages, '', 2, true)
+const stale = paging.acceptFederationPage(pages, '', 1, { nodes: [node('stale')], pagination: { returned: 1, total_matching: 2, has_more: false } }, true)
+assert.deepEqual(stale[''].nodes.map((entry) => entry.id), ['root'], '旧请求不得覆盖同一分支的新请求')
+pages = paging.acceptFederationPage(stale, '', 2, { nodes: [node('child')], pagination: { returned: 1, total_matching: 2, has_more: false } }, true)
+assert.deepEqual(pages[''].nodes.map((entry) => entry.id), ['root', 'child'])
+pages = paging.beginFederationPage(pages, 'root', 3, false)
+pages = paging.rejectFederationPage(pages, 'root', 3, 'network failed')
+assert.equal(pages.root.error, 'network failed')
+assert.equal(pages[''].error, '', '子分支错误不得污染根分页')
 const editorSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentEditorPane.tsx',
 ), 'utf8')

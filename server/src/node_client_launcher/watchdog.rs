@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use std::{
+    fs::{File, OpenOptions},
     path::Path,
     time::{Duration, Instant},
 };
@@ -69,6 +70,20 @@ pub(crate) fn run_loop(install_dir: &Path) -> Result<()> {
     }
 
     #[cfg(windows)]
+    let _instance_lock = match acquire_watchdog_lock(install_dir) {
+        Ok(lock) => lock,
+        Err(error) => {
+            log_file::record_event(
+                install_dir,
+                "watchdog_duplicate_skipped",
+                true,
+                &format!("another watchdog owns the process-lifetime lock: {error}"),
+            );
+            return Ok(());
+        }
+    };
+
+    #[cfg(windows)]
     if !watchdog_elected(install_dir) {
         log_file::record_event(
             install_dir,
@@ -103,6 +118,26 @@ pub(crate) fn run_loop(install_dir: &Path) -> Result<()> {
             std::thread::sleep(interval - elapsed);
         }
     }
+}
+
+#[cfg(windows)]
+pub(super) struct WatchdogInstanceLock {
+    _file: File,
+}
+
+#[cfg(windows)]
+pub(super) fn acquire_watchdog_lock(install_dir: &Path) -> std::io::Result<WatchdogInstanceLock> {
+    use std::os::windows::fs::OpenOptionsExt;
+
+    let internal = paths::internal_dir(install_dir);
+    std::fs::create_dir_all(&internal)?;
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .share_mode(0)
+        .open(internal.join("watchdog.instance.lock"))?;
+    Ok(WatchdogInstanceLock { _file: file })
 }
 
 fn check_once(install_dir: &Path, client: &Path, state: &mut WatchdogState) -> Result<()> {

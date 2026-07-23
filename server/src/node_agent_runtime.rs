@@ -113,6 +113,10 @@ impl NodeRuntime {
         ));
         let ui_fit_runs =
             Arc::new(crate::node_agent_android_live::fit_run::FitRunService::live(live_ui.clone()));
+        let update_recovery = crate::node_agent_update_recovery::UpdateRecoveryStore::default();
+        if let Err(error) = update_recovery.interrupt_incomplete_reconciles() {
+            tracing::warn!(error = %error, "无法收敛上次重启中断的 update-gate reconcile 回执");
+        }
         Self {
             cfg,
             install_id,
@@ -137,7 +141,7 @@ impl NodeRuntime {
             completion_outbox: node_agent_completion_outbox::CliCompletionOutbox::default(),
             local_tasks: node_agent_local_task_store::LocalTaskStore::default(),
             self_evolution: crate::node_agent_self_evolution::SelfEvolutionCoordinator::default(),
-            update_recovery: crate::node_agent_update_recovery::UpdateRecoveryStore::default(),
+            update_recovery,
             lifecycle: node_agent_lifecycle::NodeLifecycleTracker::start(env!("CARGO_PKG_VERSION")),
             tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
             full_access_grants: node_agent_full_access::FullAccessGrantState::load_default(),

@@ -648,7 +648,7 @@ export default function ProjectDocumentsWorkspace({
             onOpenSection={setActiveSection} onAiOrganize={organizeCapability} onAiReview={reviewKnowledgeMap} />
         </Suspense>
       ) : activeSection === DOCUMENT_HEALTH_SECTION ? (
-        <ProjectDocumentHealthCenter analysis={catalog?.analysis} runtime={organizationTracking} onRefresh={loadCatalog}
+        <ProjectDocumentHealthCenter projectId={projectId} analysis={catalog?.analysis} runtime={organizationTracking} onRefresh={loadCatalog}
           onOpenSuggestions={() => setActiveSection('suggestions')} onRunAi={(instruction) => { void startAiOrganize(instruction) }} />
       ) : activeSection === GOVERNANCE_OVERVIEW_SECTION.key ? (
         <ProjectDocumentGovernanceOverview catalog={catalog} manifest={organization.manifest}

@@ -11,6 +11,9 @@ use serde::{Deserialize, Serialize};
 #[path = "node_agent_update_recovery_receipt_merge.rs"]
 mod receipt_merge;
 use receipt_merge::canonical_terminal_receipt;
+#[path = "node_agent_update_reconcile_receipt.rs"]
+mod reconcile_receipt;
+pub(crate) use reconcile_receipt::UpdateGateReconcileReceipt;
 
 pub(crate) const UPDATE_RECOVERY_PROTOCOL: &str = "elon.node_update_recovery.v1";
 pub(crate) const UPDATE_RECOVERY_SCHEMA_VERSION: u32 = 1;
@@ -323,6 +326,13 @@ pub(crate) struct UpdateRecoveryReceipt {
     pub(crate) terminal_success: Option<bool>,
     #[serde(default)]
     pub(crate) terminal_outcome: Option<String>,
+    /// Multiple receipts matched this task but could not be losslessly merged.
+    #[serde(default)]
+    pub(crate) conflict_detected: bool,
+    #[serde(default)]
+    pub(crate) conflict_count: usize,
+    #[serde(default)]
+    pub(crate) conflict_reason: Option<String>,
     #[serde(default)]
     pub(crate) state: UpdateRecoveryState,
     #[serde(default)]
@@ -372,6 +382,9 @@ impl UpdateRecoveryReceipt {
             terminal_finished_at_ms: None,
             terminal_success: None,
             terminal_outcome: None,
+            conflict_detected: false,
+            conflict_count: 0,
+            conflict_reason: None,
             state: UpdateRecoveryState::Planned,
             state_reason: None,
             final_reason: None,
@@ -533,6 +546,8 @@ pub(crate) struct UpdateRecoveryLedger {
     pub(crate) install_gate: UpdateInstallGate,
     #[serde(default)]
     pub(crate) receipts: Vec<UpdateRecoveryReceipt>,
+    #[serde(default)]
+    pub(crate) reconcile_receipts: Vec<UpdateGateReconcileReceipt>,
 }
 
 impl Default for UpdateRecoveryLedger {
@@ -542,6 +557,7 @@ impl Default for UpdateRecoveryLedger {
             protocol: UPDATE_RECOVERY_PROTOCOL.to_string(),
             install_gate: UpdateInstallGate::default(),
             receipts: Vec::new(),
+            reconcile_receipts: Vec::new(),
         }
     }
 }
