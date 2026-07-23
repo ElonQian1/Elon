@@ -1,4 +1,4 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 
 if (-not (Get-Command Write-NodeAgentReleaseJsonAtomic -ErrorAction SilentlyContinue)) {
     . (Join-Path $PSScriptRoot 'node-agent-release-outbox.ps1')

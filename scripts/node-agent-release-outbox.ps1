@@ -1,4 +1,4 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 
 function Get-NodeAgentReleaseOutboxRoot {
     param([string]$ExplicitRoot = '')

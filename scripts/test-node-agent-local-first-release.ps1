@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -15,6 +15,22 @@ function Assert-Equal {
     if ($Actual -ne $Expected) {
         throw "$Message (actual=$Actual expected=$Expected)"
     }
+}
+
+foreach ($moduleName in @(
+    'publish-node-agent.ps1',
+    'node-agent-publish-handshake.ps1',
+    'node-agent-release-outbox.ps1',
+    'node-agent-remote-release-worker.ps1',
+    'node-agent-local-activation.ps1',
+    'node-agent-post-terminal-activator.ps1'
+)) {
+    $tokens = $null
+    $parseErrors = $null
+    [System.Management.Automation.Language.Parser]::ParseFile(
+        (Join-Path $PSScriptRoot $moduleName), [ref]$tokens, [ref]$parseErrors
+    ) | Out-Null
+    Assert-Equal $parseErrors.Count 0 "PowerShell parser must accept $moduleName in the current runtime"
 }
 
 $root = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-local-first-release-test-" + [Guid]::NewGuid().ToString('N'))

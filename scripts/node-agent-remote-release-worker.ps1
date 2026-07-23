@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)][string]$OutboxRoot,
     [int]$AttemptTimeoutSeconds = 3600,
     [int]$IdleTimeoutSeconds = 21600,
