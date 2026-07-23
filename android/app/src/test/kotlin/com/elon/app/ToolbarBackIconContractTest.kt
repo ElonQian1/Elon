@@ -13,14 +13,14 @@ import org.junit.Test
 
 class ToolbarBackIconContractTest {
     @Test
-    fun suppliedBackIconIsTrackedWithoutAlteration() {
+    fun suppliedBackIconIsTrackedAsSemanticBackDirection() {
         val path = repositoryRoot()
             .resolve("android/app/src/main/res/drawable-nodpi/ic_toolbar_back_custom.png")
 
         assertTrue("missing toolbar back icon", Files.isRegularFile(path))
         assertEquals(43 to 43, readPngDimensions(path))
         assertEquals(
-            "3147797D74D7EE606612A79224216210865D6B783273FC3166EB332F3ED37275",
+            "23AB79091F1F1CAE2CC99C14367FB78ACAC1621E87A47958BC0AF502942B4756",
             sha256(path)
         )
     }
@@ -37,7 +37,7 @@ class ToolbarBackIconContractTest {
         assertTrue(backButton.contains("android:layout_height=\"50dp\""))
         assertTrue(backButton.contains("android:padding=\"14dp\""))
         assertTrue(backButton.contains("android:scaleType=\"fitCenter\""))
-        assertTrue(backButton.contains("android:scaleX=\"-1\""))
+        assertTrue(!backButton.contains("android:scaleX="))
         assertTrue(backButton.contains("android:src=\"@drawable/ic_toolbar_back_custom\""))
         assertTrue(backButton.contains("android:contentDescription=\"返回\""))
     }
@@ -51,7 +51,7 @@ class ToolbarBackIconContractTest {
         assertTrue(web.contains("__TOOLBAR_BACK_ICON_PNG_B64__"))
         assertTrue(web.contains("#backBtn {"))
         assertTrue(web.contains("padding: 13px;"))
-        assertTrue(web.contains("#backBtn img { transform: scaleX(-1); }"))
+        assertTrue(!web.contains("#backBtn img { transform: scaleX(-1); }"))
         assertTrue(server.contains("ic_toolbar_back_custom.png"))
         assertTrue(server.contains("\"__TOOLBAR_BACK_ICON_PNG_B64__\""))
     }
