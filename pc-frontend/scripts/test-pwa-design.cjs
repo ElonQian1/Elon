@@ -51,6 +51,78 @@ try {
     stablePwaIdentityKey,
   } = require(output)
 
+  const restoreAckOutput = compile(
+    'src/features/ui-tuner/source-preview/pwaDraftRestoreAck.ts',
+    'source-preview/pwaDraftRestoreAck.js',
+  )
+  const {
+    beginPwaDraftRestore,
+    consumePwaDraftAppliedAck,
+    pwaDraftRestoreLabel,
+  } = require(restoreAckOutput)
+  let restoreState = beginPwaDraftRestore('project-1|screen-a', 7, 1)
+  assert.match(pwaDraftRestoreLabel(restoreState), /正在恢复本页草稿/)
+  const pendingAck = {
+    requestedCount: 1,
+    appliedCount: 0,
+    unresolved: [{ index: 0, selector: '#late', identityKey: 'id:late', reason: 'target-missing' }],
+    complete: false,
+    draftKey: 'project-1|screen-a',
+    revision: 7,
+    attempt: 1,
+    maxAttempts: 8,
+    retrying: true,
+    exhausted: false,
+  }
+  restoreState = consumePwaDraftAppliedAck(restoreState, pendingAck)
+  assert.equal(restoreState.phase, 'pending')
+  assert.match(pwaDraftRestoreLabel(restoreState), /草稿恢复待处理/)
+  assert.equal(
+    consumePwaDraftAppliedAck(restoreState, pendingAck),
+    restoreState,
+    '重复 pending ack 必须幂等，不得重复改变宿主状态',
+  )
+  assert.equal(
+    consumePwaDraftAppliedAck(restoreState, { ...pendingAck, draftKey: 'stale-screen', complete: true }),
+    restoreState,
+    '过期 draftKey 的 ack 必须被忽略',
+  )
+  restoreState = consumePwaDraftAppliedAck(restoreState, {
+    ...pendingAck,
+    appliedCount: 1,
+    unresolved: [],
+    complete: true,
+    attempt: 2,
+    retrying: false,
+  })
+  assert.equal(restoreState.phase, 'complete')
+  assert.equal(pwaDraftRestoreLabel(restoreState), '已恢复本页草稿 · r7')
+  assert.equal(
+    consumePwaDraftAppliedAck(restoreState, { ...pendingAck, appliedCount: 1, unresolved: [], complete: true, attempt: 2 }),
+    restoreState,
+    '重复 complete ack 必须保持已完成状态且无重复副作用',
+  )
+  const mismatchState = consumePwaDraftAppliedAck(beginPwaDraftRestore('project-1|screen-a', 8, 1), {
+    ...pendingAck,
+    draftKey: 'project-1|screen-a',
+    revision: 8,
+    unresolved: [{ index: 0, selector: '#wrong', identityKey: 'id:right', reason: 'identity-mismatch' }],
+    exhausted: true,
+  })
+  assert.equal(mismatchState.phase, 'failed')
+  assert.match(pwaDraftRestoreLabel(mismatchState), /身份不匹配，已拒绝修改/)
+  const invalidSuccessState = consumePwaDraftAppliedAck(beginPwaDraftRestore('project-1|screen-a', 9, 1), {
+    ...pendingAck,
+    draftKey: 'project-1|screen-a',
+    revision: 9,
+    requestedCount: 1,
+    appliedCount: 0,
+    unresolved: [],
+    complete: true,
+  })
+  assert.equal(invalidSuccessState.phase, 'failed', '计数不闭合的 success ack 绝不能显示恢复成功')
+  assert.match(pwaDraftRestoreLabel(invalidSuccessState), /回执计数不一致/)
+
   const project = { id: 'project-1', workspaceIdentity: 'D:/project', sourceRevision: 'abc123' }
   const route = {
     path: '/web/project/1',
@@ -594,6 +666,9 @@ try {
   assert.match(sessionSource, /verification\.markSourceSaved\(evidence/, '确定性源码写回后必须先标记 SOURCE_SAVED')
   assert.match(sessionSource, /await verification\.start\(evidence\)/, '确定性绑定才自动运行真实验证')
   assert.match(sessionSource, /verification\.markAiWriting\(taskId,[\s\S]*AI 正在补未绑定属性或结构修改/, 'AI fallback 不得伪造可验证的确定性回执')
+  assert.match(sessionSource, /message\.type === 'draft-applied'/, '宿主必须消费 iframe 的真实草稿应用回执')
+  assert.match(sessionSource, /identity: \{ \.\.\.element\.identity, key: stablePwaIdentityKey/, '草稿桥接条目必须携带稳定身份指纹')
+  assert.doesNotMatch(sessionSource, /setSaveLabel\(didRestore[^\n]*已恢复本页草稿/, '读取本地草稿后不得在真实 ack 前显示已恢复')
   assert.doesNotMatch(sessionSource, /phase:\s*'completed'/, '旧 completed 状态不得继续冒充验证')
   assert.match(bridgeSource, /window\.setTimeout\(\(\) => \{[\s\S]*?postRoute\(reason\);[\s\S]*?\}, 80\);/, '画面 Mutation 必须防抖')
   const observerAttributeFilter = bridgeSource.match(/attributeFilter:\s*\[[^\]]*\]/)?.[0] ?? ''

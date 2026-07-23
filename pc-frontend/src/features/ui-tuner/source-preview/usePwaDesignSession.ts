@@ -11,6 +11,13 @@ import {
 } from './pwaDesignWriteback'
 import { matchPwaSourceNode, pwaSourceBinding } from './pwaNodeMapping'
 import {
+  beginPwaDraftRestore,
+  consumePwaDraftAppliedAck,
+  pwaDraftRestoreLabel,
+  type PwaDraftAppliedAck,
+  type PwaDraftRestoreState,
+} from './pwaDraftRestoreAck'
+import {
   normalizePwaRoute,
   removePwaDesignDraft,
   stringifyPwaDraftCliPackage,
@@ -90,6 +97,7 @@ export interface PwaDesignSession {
 function bridgeElements(draft: PwaDesignDraft) {
   return Object.values(draft.elements).map((element) => ({
     selector: element.identity.selector,
+    identity: { ...element.identity, key: stablePwaIdentityKey(element.identity) },
     styleDiff: element.styleDiff,
   }))
 }
@@ -141,6 +149,7 @@ export function usePwaDesignSession({
   const routeRef = useRef<PwaRouteState | null>(null)
   const modeRef = useRef(modeState)
   const syncTaskIdRef = useRef('')
+  const draftRestoreRef = useRef<PwaDraftRestoreState | null>(null)
   const modelRef = useRef<PwaDesignSessionModel | null>(null)
   if (!modelRef.current) modelRef.current = new PwaDesignSessionModel()
   const model = modelRef.current
@@ -160,6 +169,14 @@ export function usePwaDesignSession({
   }, [])
 
   const syncDraft = useCallback((value: PwaDesignDraft | null) => {
+    const requestedCount = value ? Object.keys(value.elements).length : 0
+    if (value && requestedCount) {
+      const pending = beginPwaDraftRestore(bridgeDraftKey(value), value.revision, requestedCount)
+      draftRestoreRef.current = pending
+      setSaveLabel(pwaDraftRestoreLabel(pending))
+    } else {
+      draftRestoreRef.current = null
+    }
     post('apply-draft', value ? {
       draftKey: bridgeDraftKey(value),
       revision: value.revision,
@@ -168,6 +185,7 @@ export function usePwaDesignSession({
   }, [post])
 
   const reloadSource = useCallback(() => {
+    draftRestoreRef.current = null
     modeRef.current = 'interact'
     setModeState('interact')
     setReady(false)
@@ -179,8 +197,10 @@ export function usePwaDesignSession({
 
   const restoreDraft = useCallback(() => {
     const current = model.draft
-    if (current) syncDraft(current)
-    setSaveLabel('真实验证未通过，临时草稿已恢复，可修改后重试')
+    if (current) {
+      setSaveLabel('真实验证未通过，正在恢复临时草稿')
+      syncDraft(current)
+    }
   }, [model, syncDraft])
 
   const clearVerifiedDraft = useCallback(() => {
@@ -200,9 +220,9 @@ export function usePwaDesignSession({
   const applyDraftState = useCallback((value: PwaDesignDraft, sync = true) => {
     setDraft(value)
     if (sync) syncDraft(value)
-    if (Object.keys(value.elements).length) {
+    if (!sync && Object.keys(value.elements).length) {
       setSaveLabel(`已自动保存 · r${value.revision}`)
-    } else {
+    } else if (!Object.keys(value.elements).length) {
       setSaveLabel('本页暂无样式草稿')
     }
     setHistoryVersion((version) => version + 1)
@@ -272,7 +292,7 @@ export function usePwaDesignSession({
         source?: string
         protocolVersion?: number
         type?: string
-        payload?: Partial<PwaRouteState> & Partial<PwaBridgeVerificationSnapshot> & { node?: PwaSelection }
+        payload?: Partial<PwaRouteState> & Partial<PwaBridgeVerificationSnapshot> & Partial<PwaDraftAppliedAck> & { node?: PwaSelection }
       }
       if (message.source !== BRIDGE_SOURCE || message.protocolVersion !== PROTOCOL_VERSION) return
       const context = bridgeContextRef.current
@@ -297,10 +317,25 @@ export function usePwaDesignSession({
           setSelection(null)
           setMappedNodeKey(null)
           setUnboundLabel('')
-          setSaveLabel(didRestore && Object.keys(restored.elements).length ? `已恢复本页草稿 · r${restored.revision}` : '本页暂无样式草稿')
           context.verification.markLive()
-          context.syncDraft(restored)
+          if (didRestore && Object.keys(restored.elements).length) {
+            setSaveLabel(`已找到本页草稿 · r${restored.revision}，正在恢复`)
+            context.syncDraft(restored)
+          } else {
+            draftRestoreRef.current = null
+            setSaveLabel('本页暂无样式草稿')
+            context.syncDraft(restored)
+          }
         }
+        return
+      }
+      if (message.type === 'draft-applied' && message.payload) {
+        const current = draftRestoreRef.current
+        if (!current) return
+        const next = consumePwaDraftAppliedAck(current, message.payload as Partial<PwaDraftAppliedAck>)
+        if (next === current) return
+        draftRestoreRef.current = next
+        setSaveLabel(pwaDraftRestoreLabel(next))
         return
       }
       if (message.type === 'source-verification' && message.payload?.requestId) {
@@ -401,7 +436,10 @@ export function usePwaDesignSession({
   const saveNow = useCallback(() => {
     const current = model.save()
     if (!current) return
-    setSaveLabel(Object.keys(current.elements).length ? `草稿已保存 · r${current.revision}` : '本页暂无样式草稿')
+    const restoring = draftRestoreRef.current
+    setSaveLabel(restoring && restoring.phase !== 'complete'
+      ? pwaDraftRestoreLabel(restoring)
+      : Object.keys(current.elements).length ? `草稿已保存 · r${current.revision}` : '本页暂无样式草稿')
   }, [model])
 
   const writebackPlan = useMemo(() => planPwaDesignWriteback(draft, root), [draft, root])
