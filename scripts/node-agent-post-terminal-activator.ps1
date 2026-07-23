@@ -83,6 +83,28 @@ function Wait-ExactNodeHealth {
     return $false
 }
 
+function Copy-NodeAgentRollbackTree {
+    param(
+        [Parameter(Mandatory = $true)][string]$Source,
+        [Parameter(Mandatory = $true)][string]$Destination
+    )
+    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    foreach ($item in Get-ChildItem -LiteralPath $Source -Force) {
+        if ($item.PSIsContainer -and $item.Name -eq '_internal') {
+            $internalDestination = Join-Path $Destination $item.Name
+            New-Item -ItemType Directory -Path $internalDestination -Force | Out-Null
+            foreach ($internalItem in Get-ChildItem -LiteralPath $item.FullName -Force) {
+                # The running watchdog owns this process-lifetime lock exclusively.
+                # It is ephemeral and must not make the rollback snapshot unreadable.
+                if ($internalItem.Name -eq 'watchdog.instance.lock') { continue }
+                Copy-Item -LiteralPath $internalItem.FullName -Destination $internalDestination -Recurse -Force
+            }
+            continue
+        }
+        Copy-Item -LiteralPath $item.FullName -Destination $Destination -Recurse -Force
+    }
+}
+
 $lockPath = Join-Path $StateRoot 'post-terminal-activator.lock'
 New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
 $lock = $null
@@ -132,7 +154,7 @@ try {
                 $expanded = Expand-VerifiedReleasePackage -Release $target
                 if (Test-Path -LiteralPath $installRoot -PathType Container) {
                     New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
-                    Copy-Item -LiteralPath $installRoot -Destination (Join-Path $backupRoot 'ElonNode') -Recurse -Force
+                    Copy-NodeAgentRollbackTree -Source $installRoot -Destination (Join-Path $backupRoot 'ElonNode')
                 }
                 Invoke-HiddenRepair -ClientPath $expanded.Client
                 return [pscustomobject]@{ Backup = (Join-Path $backupRoot 'ElonNode'); PriorIdentity = $priorIdentity }
