@@ -155,6 +155,8 @@ try {
         'each remote attempt must have a finite process timeout'
     Assert-True ($workerText.Contains('Resolve-EventSourceWorktree')) `
         'worker restart must reconstruct the immutable source worktree from durable state'
+    Assert-True ($workerText.Contains('$gitExit = $LASTEXITCODE')) `
+        'PS5.1 worker must judge git worktree recovery by exit code instead of stderr progress'
 
     Write-Host 'NODE_AGENT_LOCAL_FIRST_TESTS=passed'
 } finally {

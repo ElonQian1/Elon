@@ -31,8 +31,15 @@ function Resolve-EventSourceWorktree {
     New-Item -ItemType Directory -Path $parent -Force | Out-Null
     $gitDir = [string]$Event.git_common_dir
     if (-not (Test-Path -LiteralPath $gitDir -PathType Container)) { throw 'Durable Git common directory is unavailable.' }
-    & git --git-dir=$gitDir worktree add --detach $sourceRoot ([string]$Event.git_sha) 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'Could not reconstruct the immutable remote release source worktree.' }
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & git --git-dir=$gitDir worktree add --detach $sourceRoot ([string]$Event.git_sha) 2>&1 | Out-Null
+        $gitExit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if ($gitExit -ne 0) { throw 'Could not reconstruct the immutable remote release source worktree.' }
     return $sourceRoot
 }
 
