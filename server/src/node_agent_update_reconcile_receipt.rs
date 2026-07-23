@@ -23,6 +23,7 @@ pub(crate) struct UpdateGateReconcileReceipt {
 
 impl UpdateRecoveryStore {
     pub(crate) fn begin_reconcile(&self) -> Result<UpdateGateReconcileReceipt> {
+        let _guard = super::ledger_mutation_guard();
         let now = now_ms();
         let receipt = UpdateGateReconcileReceipt {
             operation_id: format!("reconcile-request-{now}-{}", std::process::id()),
@@ -47,6 +48,7 @@ impl UpdateRecoveryStore {
         operation_id: &str,
         result: Result<Value, String>,
     ) -> Result<UpdateGateReconcileReceipt> {
+        let _guard = super::ledger_mutation_guard();
         let mut ledger = self.load()?;
         let receipt = ledger
             .reconcile_receipts
@@ -73,6 +75,7 @@ impl UpdateRecoveryStore {
     }
 
     pub(crate) fn interrupt_incomplete_reconciles(&self) -> Result<usize> {
+        let _guard = super::ledger_mutation_guard();
         let mut ledger = self.load()?;
         let mut changed = 0;
         for receipt in &mut ledger.reconcile_receipts {
@@ -94,6 +97,8 @@ impl UpdateRecoveryStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::node_agent_update_recovery::UpdateRecoveryReceipt;
+    use std::sync::{Arc, Barrier};
 
     #[test]
     fn restart_marks_unfinished_reconcile_as_readable_interrupted_receipt() {
@@ -109,6 +114,57 @@ mod tests {
             .unwrap();
         assert_eq!(recovered.status, "interrupted");
         assert!(recovered.finished_at_ms.is_some());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn concurrent_recovery_writes_cannot_overwrite_completed_reconcile_receipt() {
+        const WRITERS: usize = 8;
+        const RECEIPTS_PER_WRITER: usize = 24;
+
+        let root = std::env::temp_dir().join(format!(
+            "elon-reconcile-concurrency-{}-{}",
+            std::process::id(),
+            now_ms()
+        ));
+        let store = Arc::new(UpdateRecoveryStore::new(root.join("recovery.json")));
+        let running = store.begin_reconcile().unwrap();
+        let barrier = Arc::new(Barrier::new(WRITERS + 1));
+        let mut writers = Vec::new();
+        for writer in 0..WRITERS {
+            let store = Arc::clone(&store);
+            let barrier = Arc::clone(&barrier);
+            writers.push(std::thread::spawn(move || {
+                barrier.wait();
+                for receipt in 0..RECEIPTS_PER_WRITER {
+                    let id = format!("writer-{writer}-receipt-{receipt}");
+                    store
+                        .upsert(UpdateRecoveryReceipt::planned(
+                            id.clone(),
+                            format!("root-{writer}"),
+                            id,
+                        ))
+                        .unwrap();
+                }
+            }));
+        }
+
+        barrier.wait();
+        store
+            .finish_reconcile(&running.operation_id, Ok(serde_json::json!({ "ok": true })))
+            .unwrap();
+        for writer in writers {
+            writer.join().unwrap();
+        }
+
+        let ledger = store.load().unwrap();
+        let completed = ledger
+            .reconcile_receipts
+            .iter()
+            .find(|item| item.operation_id == running.operation_id)
+            .unwrap();
+        assert_eq!(completed.status, "completed");
+        assert_eq!(ledger.receipts.len(), WRITERS * RECEIPTS_PER_WRITER);
         let _ = std::fs::remove_dir_all(root);
     }
 }

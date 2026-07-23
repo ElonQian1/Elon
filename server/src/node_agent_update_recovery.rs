@@ -11,6 +11,9 @@ use serde::{Deserialize, Serialize};
 #[path = "node_agent_update_recovery_receipt_merge.rs"]
 mod receipt_merge;
 use receipt_merge::canonical_terminal_receipt;
+#[path = "node_agent_update_recovery_ledger_lock.rs"]
+mod ledger_lock;
+pub(crate) use ledger_lock::ledger_mutation_guard;
 #[path = "node_agent_update_reconcile_receipt.rs"]
 mod reconcile_receipt;
 pub(crate) use reconcile_receipt::UpdateGateReconcileReceipt;
@@ -592,6 +595,7 @@ impl UpdateRecoveryStore {
     }
 
     pub(crate) fn upsert(&self, receipt: UpdateRecoveryReceipt) -> Result<()> {
+        let _guard = ledger_mutation_guard();
         let mut ledger = self.load()?;
         match ledger.receipts.iter_mut().find(|current| {
             current.update_id == receipt.update_id
@@ -607,6 +611,7 @@ impl UpdateRecoveryStore {
         &self,
         receipt: UpdateRecoveryReceipt,
     ) -> Result<UpdateRecoveryReceipt> {
+        let _guard = ledger_mutation_guard();
         let mut ledger = self.load()?;
         if let Some(current) = ledger.receipts.iter().find(|current| {
             current.update_id == receipt.update_id
@@ -625,6 +630,7 @@ impl UpdateRecoveryStore {
         original_task_id: &str,
         update: impl FnOnce(&mut UpdateRecoveryReceipt) -> Result<R>,
     ) -> Result<R> {
+        let _guard = ledger_mutation_guard();
         let mut ledger = self.load()?;
         let receipt = ledger
             .receipts
@@ -645,6 +651,7 @@ impl UpdateRecoveryStore {
         next: UpdateRecoveryState,
         reason: Option<&str>,
     ) -> Result<bool> {
+        let _guard = ledger_mutation_guard();
         let mut ledger = self.load()?;
         let receipt = ledger
             .receipts
@@ -690,20 +697,6 @@ impl UpdateRecoveryStore {
             .collect())
     }
 
-    pub(crate) fn update_install_gate(&self, gate: UpdateInstallGate) -> Result<()> {
-        let mut ledger = self.load()?;
-        ledger.install_gate = gate;
-        self.save(&ledger)
-    }
-
-    pub(crate) fn set_install_gate_phase(&self, phase: &str, reason: Option<&str>) -> Result<()> {
-        let mut ledger = self.load()?;
-        ledger.install_gate.phase = phase.to_string();
-        ledger.install_gate.reason = reason.map(str::to_string);
-        ledger.install_gate.updated_at_ms = now_ms();
-        self.save(&ledger)
-    }
-
     pub(crate) fn record_sidecar_cursor(
         &self,
         update_id: &str,
@@ -724,6 +717,7 @@ impl UpdateRecoveryStore {
         task_id: &str,
         review: UpdateRecoveryReview,
     ) -> Result<bool> {
+        let _guard = ledger_mutation_guard();
         let mut ledger = self.load()?;
         let Some(receipt) = ledger
             .receipts

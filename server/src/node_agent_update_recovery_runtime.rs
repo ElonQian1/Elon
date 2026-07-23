@@ -6,6 +6,7 @@ use super::{now_ms, ReleaseIdentity, UpdateRecoveryState, UpdateRecoveryStore};
 
 impl UpdateRecoveryStore {
     pub(crate) fn mark_runtime_online_if_target(&self, current_release: &str) -> Result<bool> {
+        let _guard = super::ledger_mutation_guard();
         let mut ledger = self.load()?;
         if ledger.receipts.iter().any(|receipt| {
             receipt.state == UpdateRecoveryState::Applying

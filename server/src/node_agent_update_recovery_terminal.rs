@@ -74,6 +74,7 @@ impl UpdateRecoveryStore {
         success: bool,
         outcome: Option<&str>,
     ) -> Result<TerminalRecoveryDisposition> {
+        let _guard = crate::node_agent_update_recovery::ledger_mutation_guard();
         let mut ledger = self.load()?;
         let matches = ledger
             .receipts
