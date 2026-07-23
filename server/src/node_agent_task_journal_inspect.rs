@@ -83,6 +83,10 @@ pub(crate) async fn inspect_cli_task_journal(
                 "resume": resume,
                 "approval_state": approval_state,
                 "runtime": runtime_status,
+                "performance_timing": crate::node_agent_task_performance_timing::payload(
+                    &runtime.task_journal,
+                    snapshot.record.as_ref(),
+                ),
             });
             AgentToServer::CliTaskJournalSnapshot {
                 req_id,

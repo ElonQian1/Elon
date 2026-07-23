@@ -87,13 +87,16 @@ function Ensure-SubmitFullAccessGrant {
 
 function Submit-Body {
     param([object]$Connection, [object]$Body, [string]$ResultAction, [object]$PathResolution = $null)
+    $submitWatch = [System.Diagnostics.Stopwatch]::StartNew()
     $submission = Invoke-IdempotentNodePost $Connection '/api/local-tasks' $Body
+    $submitWatch.Stop()
     $response = $submission.Response
     $Connection = $submission.Connection
     Convert-ToJsonResult ([ordered]@{
         ok = $true; action = $ResultAction; protocol = $script:SupervisionProtocol
         node_url = $Connection.BaseUrl; node_version = $Connection.Version
         task_id = [string](Get-ObjectField $response 'task_id')
+        submit_ms = $submitWatch.ElapsedMilliseconds
         path_resolution = $PathResolution; response = $response
     })
 }

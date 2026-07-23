@@ -204,6 +204,18 @@ function Invoke-SupervisionSelfTest {
                 })
             }
         }
+        performance_timing = [ordered]@{
+            schema = 'elon.supervision_performance_timing.v1'
+            terminal = $false
+            segments = [ordered]@{
+                queue_ms = 2000
+                cli_startup_ms = 5000
+                active_execution_ms = 250
+                recovery_ms = 100
+                external_or_unattributed_wait_ms = 9000
+            }
+            accounting = [ordered]@{ heartbeat_wait_counted_as_active_execution = $false }
+        }
         supervision = [ordered]@{ evidence = [ordered]@{
             event_count = 99
             tool_calls = 12
@@ -402,6 +414,8 @@ function Invoke-SupervisionSelfTest {
         inspect_wait_active = $activeCompact.record.status -eq 'running' -and
             $activeCompact.runtime.phase -eq 'verification' -and
             $activeCompact.runtime.dispatch.stage -eq 'active' -and
+            $activeCompact.performance_timing.segments.cli_startup_ms -eq 5000 -and
+            -not $activeCompact.performance_timing.accounting.heartbeat_wait_counted_as_active_execution -and
             $activeCompact.last_event_seq -eq 42 -and
             $activeCompact.events[0].type -eq 'recovery_running'
         compact_delta_omits_repeated_evidence_arrays = $null -eq $activeCompact.terminal_evidence -and
@@ -410,7 +424,8 @@ function Invoke-SupervisionSelfTest {
             $activeCompact.state_digest -match '^[0-9a-f]{64}$'
         compact_delta_omits_unchanged_state_and_evidence = -not $unchangedCompact.state_changed -and
             -not $unchangedCompact.evidence_changed -and $null -eq $unchangedCompact.record -and
-            $null -eq $unchangedCompact.runtime -and $null -eq $unchangedCompact.evidence_totals
+            $null -eq $unchangedCompact.runtime -and $null -eq $unchangedCompact.performance_timing -and
+            $null -eq $unchangedCompact.evidence_totals
         compact_delta_ignores_volatile_liveness = $volatileCompact.state_digest -eq $activeCompact.state_digest
         compact_delta_omits_unchanged_terminal_evidence = $null -eq $unchangedTerminalCompact.terminal_evidence
         compact_delta_dictionary_field_access = $dictionaryFieldAccess

@@ -61,6 +61,7 @@ function Convert-ToCompactTaskDetail {
     $supervision = Get-ObjectField $Detail 'supervision'
     $evidence = Get-ObjectField $supervision 'evidence'
     $runtime = Get-ObjectField $Detail 'runtime'
+    $performanceTiming = Get-ObjectField $Detail 'performance_timing'
     $approvalState = Get-ObjectField $Detail 'approval_state'
     $sourceEvents = if ($null -eq $EventViews) { @(Get-ObjectField $Detail 'events') } else { @($EventViews) }
     $events = @($sourceEvents | ForEach-Object {
@@ -95,6 +96,14 @@ function Convert-ToCompactTaskDetail {
         phase = Get-ObjectField $runtime 'phase'; current_command = Get-ObjectField $runtime 'current_command'
         last_progress = Get-ObjectField $runtime 'last_progress'; heartbeat = Get-ObjectField $runtime 'heartbeat'
         idle_duration = Get-ObjectField $runtime 'idle_duration'; timeout_policy = Get-ObjectField $runtime 'timeout_policy'
+        observed_at_ms = Get-ObjectField $runtime 'observed_at_ms'
+        terminal_at_ms = Get-ObjectField $runtime 'terminal_at_ms'
+        elapsed_ms = Get-ObjectField $runtime 'elapsed_ms'
+        queue_ms = Get-ObjectField $runtime 'queue_ms'
+        execution_ms = Get-ObjectField $runtime 'execution_ms'
+        phase_elapsed_ms = Get-ObjectField $runtime 'phase_elapsed_ms'
+        remaining_before_timeout_ms = Get-ObjectField $runtime 'remaining_before_timeout_ms'
+        timeout_reason = Get-ObjectField $runtime 'timeout_reason'
         dispatch = Get-ObjectField $runtime 'dispatch'
     }
     # heartbeat and idle_duration are liveness observations derived from time.
@@ -109,6 +118,9 @@ function Convert-ToCompactTaskDetail {
     return [ordered]@{
         record = $recordSnapshot
         runtime = $runtimeSnapshot
+        performance_timing = $performanceTiming
+        recovery_timing = Get-ObjectField $Detail 'recovery_timing'
+        update_recovery = Get-ObjectField $Detail 'update_recovery'
         approval_state = $approvalState
         evidence_totals = $evidenceTotals
         evidence_digest = Get-ObjectDigest $evidence
@@ -136,6 +148,9 @@ function Select-TaskDeltaChanges {
     if (-not $stateChanged) {
         $Compact.record = $null
         $Compact.runtime = $null
+        $Compact.performance_timing = $null
+        $Compact.recovery_timing = $null
+        $Compact.update_recovery = $null
         $Compact.approval_state = $null
     }
     if (-not $evidenceChanged) {

@@ -182,6 +182,7 @@ mod node_agent_task_journal_recovery_tests;
 mod node_agent_task_lifecycle_pressure_test_support;
 #[cfg(test)]
 mod node_agent_task_lifecycle_pressure_tests;
+mod node_agent_task_performance_timing;
 mod node_agent_task_resume;
 mod node_agent_task_resume_sidecar;
 #[cfg(test)]

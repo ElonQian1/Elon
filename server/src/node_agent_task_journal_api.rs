@@ -55,6 +55,7 @@ struct LocalTaskJournalResponse {
     resume: TaskResumeContract,
     approval_state: TaskApprovalStateSnapshot,
     runtime: serde_json::Value,
+    performance_timing: serde_json::Value,
 }
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
@@ -128,6 +129,10 @@ async fn get_task_journal(
             if approval_state.actionable_count > 0 {
                 runtime_status["phase"] = serde_json::Value::String("approval".to_string());
             }
+            let performance_timing = crate::node_agent_task_performance_timing::payload(
+                &runtime.task_journal,
+                snapshot.record.as_ref(),
+            );
             Json(LocalTaskJournalResponse {
                 ok: true,
                 task_id: snapshot.task_id,
@@ -148,6 +153,7 @@ async fn get_task_journal(
                 resume,
                 approval_state,
                 runtime: runtime_status,
+                performance_timing,
             })
             .into_response()
         }

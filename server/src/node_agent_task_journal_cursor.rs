@@ -1,7 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fs::{self, File},
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Seek, SeekFrom},
     path::Path,
 };
 
@@ -12,6 +12,78 @@ use super::{TaskJournal, TaskJournalEventScan, TaskJournalEventView, TaskJournal
 use crate::node_agent_task_journal_lock::with_task_journal_io_lock;
 
 impl TaskJournal {
+    pub(crate) fn task_events(&self, task_id: &str) -> Result<Vec<TaskJournalEventView>> {
+        with_task_journal_io_lock(|| self.cached_task_events(task_id).map(|value| value.0))
+    }
+
+    pub(super) fn cached_task_events(
+        &self,
+        task_id: &str,
+    ) -> Result<(Vec<TaskJournalEventView>, usize)> {
+        let path = self.events_path();
+        if !path.exists() {
+            return Ok((Vec::new(), 0));
+        }
+        let cursor_epoch = self.cursor_epoch()?;
+        let file_len = fs::metadata(&path)
+            .with_context(|| format!("读取 {:?} 元数据", path))?
+            .len();
+        let mut cache = self
+            .event_cache
+            .lock()
+            .map_err(|_| anyhow::anyhow!("task event cache lock poisoned"))?;
+        let entry = cache.entry(task_id.to_string()).or_default();
+        if entry.cursor_epoch != cursor_epoch || entry.scanned_bytes > file_len {
+            *entry = super::CachedTaskEvents {
+                cursor_epoch: cursor_epoch.clone(),
+                ..Default::default()
+            };
+        }
+        if entry.cursor_epoch.is_empty() {
+            entry.cursor_epoch = cursor_epoch;
+        }
+        if entry.scanned_bytes < file_len {
+            let mut file = File::open(&path).with_context(|| format!("打开 {:?}", path))?;
+            file.seek(SeekFrom::Start(entry.scanned_bytes))
+                .with_context(|| format!("定位 {:?}", path))?;
+            let mut reader = BufReader::new(file);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                let bytes = reader
+                    .read_line(&mut line)
+                    .with_context(|| format!("读取 {:?}", path))?;
+                if bytes == 0 {
+                    break;
+                }
+                entry.scanned_last_seq = entry.scanned_last_seq.saturating_add(1);
+                if line.trim().is_empty() {
+                    continue;
+                }
+                let event: serde_json::Value = match serde_json::from_str(&line) {
+                    Ok(event) => event,
+                    Err(error) => {
+                        tracing::warn!(
+                            path = %path.display(),
+                            seq = entry.scanned_last_seq,
+                            error = %error,
+                            "skipping corrupt cached task journal event line"
+                        );
+                        continue;
+                    }
+                };
+                if super::event_belongs_to_task(&event, task_id) {
+                    entry.events.push(TaskJournalEventView {
+                        seq: entry.scanned_last_seq,
+                        event,
+                    });
+                }
+            }
+            entry.scanned_bytes = file_len;
+        }
+        Ok((entry.events.clone(), entry.scanned_last_seq))
+    }
+
     pub(crate) fn record(&self, task_id: &str) -> Result<Option<super::TaskJournalRecord>> {
         with_task_journal_io_lock(|| Ok(self.load_registry()?.get(task_id).cloned()))
     }
@@ -169,7 +241,7 @@ impl TaskJournal {
         })
     }
 
-    fn cursor_epoch(&self) -> Result<String> {
+    pub(super) fn cursor_epoch(&self) -> Result<String> {
         let path = self.events_path();
         let source_identity = match fs::metadata(&path) {
             Ok(metadata) => event_file_identity(&path, &metadata)?,

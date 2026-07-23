@@ -168,6 +168,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Action Supersede -T
 
 Codex JSON 的 `item.started/item.completed` 会以有界 `codex_item` 写入 journal：`command_execution` 保留脱敏命令、退出码和输出首尾摘要，`file_change` 保留文件路径，`agent_message` 只保留有界文本。非结构化 stdout/stderr 整体聚合为每流一个 `cli_output_summary`，记录原始行数/字节数、首尾、保留行数和 `truncated`，避免一次高输出 `rg` 生成数百 journal 事件。PC 任务详情显示 phase、脱敏 current command、最近进展、heartbeat、idle duration 和 timeout policy。
 
+任务详情同时返回 `elon.supervision_performance_timing.v1`。它从 task journal 的持久事件拆分 `queue`、`cli_startup`、首次结构化输出、首次有效进展、`active_execution`、`recovery`、重复进程派发、外部/未归因等待和 `supervisor_review`；helper 另报告单次 `submit_ms`、`inspect_ms`、`review_ms`。`active_execution` 只累计可配对的 `codex_item started/completed` 区间，纯 heartbeat 等待只推进持久观测上界并归入外部/未归因等待，不能冒充 CLI 有效执行。done、failed、canceled、resume_required 的 runtime 观测以 journal 持久终态更新时间封顶，终态不再返回 timeout deadline、remaining 或 timeout reason。历史 journal 没有新字段时同样使用既有持久 `updated_at_ms`，读取不会把终态后的墙钟时间计入 execution、idle 或 phase。
+
 节点更新默认先检查活跃监督任务：有任务时写 `elon.local_supervision_restart.v1` 检查点并排空，安全终态后自动更新；无任务才立即应用。新进程把 recovery v1 回执、restart checkpoint 和任务 journal 合并为单调恢复事务：安全任务自动回到 `running`，继续增长游标并到正常终态，不需要手动 `Resume`。只有身份、租约、工作区或恢复回执无法闭合时，任务和 worktree 才保留为 `resume_required`，`/api/status` 与维护 API 返回不含 token 的 `resume_actions`；该状态不能覆盖已经确认的 `resumed` 或任务终态。
 
 ## 阻塞恢复顺序

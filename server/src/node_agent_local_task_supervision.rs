@@ -17,8 +17,6 @@ pub(crate) use contract_batch::{load_supervision_contract, load_supervision_cont
 
 use std::{
     collections::BTreeSet,
-    fs::File,
-    io::{BufRead, BufReader},
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -314,48 +312,7 @@ pub(crate) fn load_supervision_state(
     journal: &TaskJournal,
     task_id: &str,
 ) -> anyhow::Result<SupervisionState> {
-    with_task_journal_io_lock(|| {
-        let path = journal.events_path();
-        if !path.exists() {
-            return Ok(finish_state(
-                None,
-                None,
-                SupervisionEvidence::default(),
-                BTreeSet::new(),
-            ));
-        }
-        let file = File::open(&path).with_context(|| format!("打开 {:?}", path))?;
-        let mut contract = None;
-        let mut review = None;
-        let mut evidence = SupervisionEvidence::default();
-        let mut changed_files = BTreeSet::new();
-        for (index, line) in BufReader::new(file).lines().enumerate() {
-            let line = line.with_context(|| format!("读取 {:?}", path))?;
-            let event: Value = match serde_json::from_str(&line) {
-                Ok(event) => event,
-                Err(error) => {
-                    tracing::warn!(
-                        path = %path.display(),
-                        seq = index + 1,
-                        %error,
-                        "skipping corrupt supervision journal event line"
-                    );
-                    continue;
-                }
-            };
-            if event.get("req_id").and_then(Value::as_str) != Some(task_id) {
-                continue;
-            }
-            observe_event(
-                &event,
-                &mut contract,
-                &mut review,
-                &mut evidence,
-                &mut changed_files,
-            );
-        }
-        Ok(finish_state(contract, review, evidence, changed_files))
-    })
+    Ok(supervision_state(&journal.task_events(task_id)?))
 }
 
 async fn review_task(

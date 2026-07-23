@@ -204,6 +204,7 @@ async fn get_task(
         "sidecar_update_epoch": snapshot.sidecar_update_epoch,
         "approval_state": approval_state,
         "runtime": runtime_status,
+        "performance_timing": crate::node_agent_task_performance_timing::payload(&runtime.task_journal, snapshot.record.as_ref()),
         "supervision": supervision,
         "update_recovery": update_recovery,
         "update_recovery_receipts": update_recovery_receipts,

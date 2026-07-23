@@ -106,6 +106,7 @@ async fn response_if_recoverable(
             "resume_cursor": snapshot.resume_cursor,
             "sidecar_update_epoch": snapshot.sidecar_update_epoch,
             "runtime": runtime_status,
+            "performance_timing": crate::node_agent_task_performance_timing::payload(&runtime.task_journal, Some(journal_record)),
             "attach": attach,
             "resume": resume,
             "supervision": supervision,

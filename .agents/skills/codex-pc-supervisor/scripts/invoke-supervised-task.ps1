@@ -630,7 +630,9 @@ switch ($Action) {
         if ($Compact) {
             Assert-NodeSupervisionCapability $nodeConnection $script:DeltaWaitCapability 'Compact Inspect'
         }
+        $inspectWatch = [System.Diagnostics.Stopwatch]::StartNew()
         $detail = Get-TaskDetail $nodeConnection $TaskId $Limit $Since $ExpectedCursorEpoch
+        $inspectWatch.Stop()
         $nextCursor = Resolve-MonotonicTaskCursor $Since `
             ([int](Get-ObjectField $detail 'last_event_seq')) `
             ([bool](Get-ObjectField $detail 'cursor_reset')) `
@@ -647,6 +649,7 @@ switch ($Action) {
             ok = $true; action = 'Inspect'; protocol = $script:SupervisionProtocol
             node_url = $nodeConnection.BaseUrl; task_id = $TaskId
             since = $Since; limit = $Limit; next_cursor = $nextCursor; detail = $resultDetail
+            inspect_ms = $inspectWatch.ElapsedMilliseconds
             cursor_reset = [bool](Get-ObjectField $detail 'cursor_reset')
             requested_cursor = Get-ObjectField $detail 'requested_cursor'
             old_cursor = Get-ObjectField $detail 'old_cursor'
@@ -676,15 +679,18 @@ switch ($Action) {
         [byte[]]$reviewBytes = Convert-ToUtf8JsonBytes $reviewBody
         $encodedTaskId = [uri]::EscapeDataString($TaskId.Trim())
         $reviewPath = "/api/local-tasks/$encodedTaskId/supervision/desktop-review"
+        $reviewWatch = [System.Diagnostics.Stopwatch]::StartNew()
         $detail = Get-TaskDetail $nodeConnection $TaskId 1
         $record = Get-RecordFromDetail $detail
         $ownerUserId = [string](Get-ObjectField $record 'owner_user_id')
         $ticket = New-DesktopReviewTicket $ownerUserId $TaskId.Trim() 'POST' $reviewPath $reviewBytes $nodeConnection
         $response = Invoke-NodeApi -Connection $nodeConnection -Method 'Post' -Path $reviewPath `
             -BodyBytes $reviewBytes -ExtraHeaders @{ 'x-elon-desktop-review-ticket' = $ticket }
+        $reviewWatch.Stop()
         Convert-ToJsonResult ([ordered]@{
             ok = $true; action = 'Review'; protocol = $script:SupervisionProtocol
-            node_url = $nodeConnection.BaseUrl; task_id = $TaskId; verdict = $Verdict; response = $response
+            node_url = $nodeConnection.BaseUrl; task_id = $TaskId; verdict = $Verdict
+            review_ms = $reviewWatch.ElapsedMilliseconds; response = $response
         })
     }
     'Improve' {

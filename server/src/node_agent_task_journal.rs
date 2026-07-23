@@ -25,7 +25,7 @@ use std::{
     io::{BufRead, BufReader, ErrorKind, Write},
     path::{Path, PathBuf},
     process,
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -46,6 +46,15 @@ pub(crate) use dispatch::TaskDispatchProgress;
 pub(crate) struct TaskJournal {
     dir: PathBuf,
     instance_epoch: Arc<str>,
+    event_cache: Arc<Mutex<BTreeMap<String, CachedTaskEvents>>>,
+}
+
+#[derive(Debug, Default)]
+struct CachedTaskEvents {
+    cursor_epoch: String,
+    scanned_bytes: u64,
+    scanned_last_seq: usize,
+    events: Vec<TaskJournalEventView>,
 }
 
 #[derive(Debug)]
@@ -169,6 +178,7 @@ impl TaskJournal {
         Self {
             dir: dir.into(),
             instance_epoch: Arc::from(uuid::Uuid::new_v4().simple().to_string()),
+            event_cache: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -613,45 +623,20 @@ impl TaskJournal {
         since: usize,
         event_limit: usize,
     ) -> Result<TaskJournalEventScan> {
-        let path = self.events_path();
-        if !path.exists() {
-            return Ok(TaskJournalEventScan::default());
-        }
-        let file = File::open(&path).with_context(|| format!("打开 {:?}", path))?;
-        let reader = BufReader::new(file);
+        let (events, scanned_last_seq) = self.cached_task_events(task_id)?;
         let mut scan = TaskJournalEventScan::default();
-        for (index, line) in reader.lines().enumerate() {
-            let seq = index + 1;
-            scan.scanned_last_seq = scan.scanned_last_seq.max(seq);
-            let line = line.with_context(|| format!("读取 {:?}", path))?;
-            if line.trim().is_empty() {
-                continue;
-            }
-            let event = match serde_json::from_str(&line) {
-                Ok(event) => event,
-                Err(error) => {
-                    tracing::warn!(
-                        path = %path.display(),
-                        seq,
-                        error = %error,
-                        "skipping corrupt task journal event line"
-                    );
-                    continue;
-                }
-            };
-            if !event_belongs_to_task(&event, task_id) {
-                continue;
-            }
-            scan.approval_tracker.observe_event(seq, &event);
-            if seq <= since {
+        scan.scanned_last_seq = scanned_last_seq;
+        for view in events {
+            scan.approval_tracker.observe_event(view.seq, &view.event);
+            if view.seq <= since {
                 continue;
             }
             if scan.events.len() >= event_limit {
                 scan.has_more = true;
                 continue;
             }
-            scan.last_event_seq = seq;
-            scan.events.push(TaskJournalEventView { seq, event });
+            scan.last_event_seq = view.seq;
+            scan.events.push(view);
         }
         if scan.last_event_seq == 0 && scan.scanned_last_seq > since {
             scan.last_event_seq = scan.scanned_last_seq;
@@ -746,6 +731,9 @@ fn now_ms() -> u128 {
         .unwrap_or_default()
 }
 
+#[cfg(test)]
+#[path = "node_agent_task_journal_cache_tests.rs"]
+mod cache_tests;
 #[cfg(test)]
 #[path = "node_agent_task_journal_tests.rs"]
 mod tests;
