@@ -343,10 +343,7 @@ fn historical_completion_with_root(
         );
     }
     anyhow::ensure!(
-        matches!(
-            task.status.as_str(),
-            "running" | "recovering" | "reattaching" | "resume_required" | "done"
-        ) && task.error.is_none(),
+        historical_completion_state_allowed(&task.status, task.error.as_deref()),
         "historical completed receipt conflicts with local task status or error"
     );
     let completed_at = receipt
@@ -395,6 +392,12 @@ fn historical_completion_with_root(
         workspace_status: None,
         created_at_ms,
     }))
+}
+
+fn historical_completion_state_allowed(status: &str, error: Option<&str>) -> bool {
+    (matches!(status, "running" | "recovering" | "reattaching" | "done") && error.is_none())
+        || (status == "resume_required"
+            && crate::node_agent_local_task_store::is_orphan_runtime_resume_required_reason(error))
 }
 
 #[cfg(test)]
@@ -764,4 +767,28 @@ fn lower_hex(value: &str, len: usize) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+#[cfg(test)]
+mod state_tests {
+    use super::*;
+
+    #[test]
+    fn only_exact_orphan_misclassification_may_recover_from_completed_receipt() {
+        assert!(historical_completion_state_allowed("running", None));
+        assert!(historical_completion_state_allowed("done", None));
+        assert!(historical_completion_state_allowed(
+            "resume_required",
+            Some(crate::node_agent_local_task_store::ORPHAN_RUNTIME_RESUME_REQUIRED_REASON)
+        ));
+        assert!(!historical_completion_state_allowed(
+            "resume_required",
+            Some("identity could not be proven")
+        ));
+        assert!(!historical_completion_state_allowed("failed", None));
+        assert!(!historical_completion_state_allowed(
+            "running",
+            Some("runtime failed")
+        ));
+    }
 }

@@ -11,6 +11,9 @@ use std::path::PathBuf;
 pub(crate) mod idempotency;
 #[path = "node_agent_local_task_store_orphan.rs"]
 mod orphan;
+pub(crate) use orphan::{
+    is_orphan_runtime_resume_required_reason, ORPHAN_RUNTIME_RESUME_REQUIRED_REASON,
+};
 #[path = "node_agent_local_task_store_reconcile.rs"]
 pub(crate) mod reconcile;
 #[path = "node_agent_local_task_store_safety.rs"]

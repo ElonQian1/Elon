@@ -30,14 +30,21 @@ impl LocalTaskStore {
     ) -> Result<Vec<LocalTaskRecord>> {
         let conn = self.open()?;
         let mut stmt = conn.prepare(&format!(
-            "{} WHERE status = 'done' AND completion_event_id IS NOT NULL
+            "{} WHERE ((status = 'done' AND completion_event_id IS NOT NULL)
+                    OR (status = 'resume_required' AND completion_event_id IS NULL AND error = ?2))
                  AND sync_state IN ('local_only','pending','retrying','rejected')
              ORDER BY COALESCE(finished_at_ms, started_at_ms) DESC, task_id DESC
              LIMIT ?1",
             select_sql()
         ))?;
         let records = stmt
-            .query_map(params![limit.clamp(1, 1_000) as i64], read_record)?
+            .query_map(
+                params![
+                    limit.clamp(1, 1_000) as i64,
+                    super::ORPHAN_RUNTIME_RESUME_REQUIRED_REASON
+                ],
+                read_record,
+            )?
             .collect::<rusqlite::Result<Vec<_>>>()
             .map_err(anyhow::Error::from)?;
         Ok(records)
@@ -451,6 +458,38 @@ mod tests {
             .unwrap()
             .is_some()
         );
+    }
+
+    #[test]
+    fn orphan_resume_required_is_a_terminal_repair_candidate_but_other_resume_is_not() {
+        let fixture = Fixture::new("orphan-terminal-repair-candidate");
+        assert!(fixture
+            .store
+            .mark_one_stale_without_runtime("task", i64::MAX)
+            .unwrap());
+        let candidates = fixture.store.list_terminal_repair_candidates(10).unwrap();
+        assert_eq!(
+            candidates
+                .iter()
+                .map(|record| record.task_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["task"]
+        );
+
+        fixture
+            .store
+            .open()
+            .unwrap()
+            .execute(
+                "UPDATE local_tasks SET error = 'manual resume still required' WHERE task_id = 'task'",
+                [],
+            )
+            .unwrap();
+        assert!(fixture
+            .store
+            .list_terminal_repair_candidates(10)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]

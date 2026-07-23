@@ -103,6 +103,24 @@ mod tests {
         let _ = fs::remove_dir_all(root);
     }
 
+    #[test]
+    fn finished_success_journal_is_monotonic_terminal_evidence() {
+        let root = unique_root("finished-journal");
+        let runtime = test_runtime(&root);
+        start_journal(&runtime, "finished");
+        runtime.task_journal.record_finished("finished").unwrap();
+        assert!(super::super::journal_has_finished_success(&runtime, "finished").unwrap());
+        runtime
+            .task_journal
+            .record_finished_with_outcome("finished", "resume_required", Some("late stale sweep"))
+            .unwrap();
+        assert!(
+            super::super::journal_has_finished_success(&runtime, "finished").unwrap(),
+            "a later stale sweep must not downgrade an already finished journal"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
     fn test_runtime(root: &Path) -> NodeRuntime {
         let mut runtime = NodeRuntime::new(
             crate::node_agent_config::NodeConfig {

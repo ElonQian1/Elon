@@ -162,6 +162,17 @@ async fn repair_historical_terminal_candidate(
     candidate: &crate::node_agent_local_task_store::LocalTaskRecord,
     contract: Option<&crate::node_agent_local_task_supervision::SupervisionContract>,
 ) -> Result<bool> {
+    let candidate_repairable_orphan = candidate.status == "resume_required"
+        && candidate.completion_event_id.is_none()
+        && crate::node_agent_local_task_store::is_orphan_runtime_resume_required_reason(
+            candidate.error.as_deref(),
+        )
+        && journal_has_finished_success(runtime, &candidate.task_id)?;
+    let candidate_repairable_done =
+        candidate.status == "done" && candidate.completion_event_id.is_some();
+    if !candidate_repairable_done && !candidate_repairable_orphan {
+        return Ok(false);
+    }
     let snapshot_trusted = candidate.workspace_status.as_ref().is_some_and(|status| {
         status
             .get("terminal_snapshot_status")
@@ -194,7 +205,14 @@ async fn repair_historical_terminal_candidate(
         .local_tasks
         .get(&candidate.task_id)?
         .context("historical terminal task disappeared after admission")?;
-    if task.status != "done" || task.sync_state == "synced" || task.completion_event_id.is_none() {
+    let repairable_done = task.status == "done" && task.completion_event_id.is_some();
+    let repairable_orphan = task.status == "resume_required"
+        && task.completion_event_id.is_none()
+        && crate::node_agent_local_task_store::is_orphan_runtime_resume_required_reason(
+            task.error.as_deref(),
+        )
+        && journal_has_finished_success(runtime, &task.task_id)?;
+    if (!repairable_done && !repairable_orphan) || task.sync_state == "synced" {
         return Ok(false);
     }
     let active = task
@@ -335,7 +353,7 @@ async fn reconcile_candidate(
     if is_platform_supervised(&task) {
         let contract =
             contract.context("supervised orphan contract disappeared under admission")?;
-        if !active_workspace.is_dir() {
+        if !active_workspace.is_dir() || journal_has_finished_success(runtime, task_id)? {
             if let Some(completion) =
                 crate::node_agent_terminal_finalization::historical_completion(&task, contract)?
             {
@@ -377,6 +395,13 @@ async fn reconcile_candidate(
         )?;
     }
     Ok(changed)
+}
+
+fn journal_has_finished_success(runtime: &NodeRuntime, task_id: &str) -> Result<bool> {
+    Ok(runtime
+        .task_journal
+        .record(task_id)?
+        .is_some_and(|record| record.status == "finished" && record.phase == "done"))
 }
 
 async fn candidate_runtime_protects(

@@ -7,11 +7,15 @@ use rusqlite::params;
 
 use super::{now_ms, LocalTaskStore};
 
-const ORPHAN_RESUME_REQUIRED_REASON: &str = "本机执行句柄、进程、sidecar 与 heartbeat 均已过期：工作区、journal 和 completion outbox 已保留，请点击 Resume 检查现场后续跑";
+pub(crate) const ORPHAN_RUNTIME_RESUME_REQUIRED_REASON: &str = "本机执行句柄、进程、sidecar 与 heartbeat 均已过期：工作区、journal 和 completion outbox 已保留，请点击 Resume 检查现场后续跑";
 const ORPHAN_CANCEL_CONFIRMED_REASON: &str =
     "取消请求已持久化，且执行句柄、进程、sidecar 与 heartbeat 均已过期；节点已确认任务停止";
 const ORPHAN_CANCEL_UNVERIFIED_REASON: &str =
     "历史取消中任务缺少可验证的取消意图，且执行器已经离线；现场已保留，请检查后继续";
+
+pub(crate) fn is_orphan_runtime_resume_required_reason(reason: Option<&str>) -> bool {
+    reason == Some(ORPHAN_RUNTIME_RESUME_REQUIRED_REASON)
+}
 
 impl LocalTaskStore {
     /// Legacy bulk entry retained for callers that already hold a complete
@@ -53,7 +57,7 @@ impl LocalTaskStore {
                     now_ms(),
                     task_id,
                     started_before_ms,
-                    ORPHAN_RESUME_REQUIRED_REASON
+                    ORPHAN_RUNTIME_RESUME_REQUIRED_REASON
                 ],
             )?;
         }
@@ -76,7 +80,7 @@ impl LocalTaskStore {
                 AND started_at_ms <= ?4",
             params![
                 task_id,
-                ORPHAN_RESUME_REQUIRED_REASON,
+                ORPHAN_RUNTIME_RESUME_REQUIRED_REASON,
                 now_ms(),
                 started_before_ms
             ],
@@ -112,7 +116,7 @@ impl LocalTaskStore {
                 SET status = 'running', error = NULL, finished_at_ms = NULL
               WHERE task_id = ?1 AND status = 'resume_required'
                 AND completion_event_id IS NULL AND error = ?2",
-            params![task_id, ORPHAN_RESUME_REQUIRED_REASON],
+            params![task_id, ORPHAN_RUNTIME_RESUME_REQUIRED_REASON],
         )? > 0)
     }
 }
