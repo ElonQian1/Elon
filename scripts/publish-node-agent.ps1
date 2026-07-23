@@ -6,10 +6,9 @@
     构建并上传一龙 PC 节点客户端可执行文件到服务器。
 
 .DESCRIPTION
-    1. 交叉编译 Linux musl 版本（x86_64-unknown-linux-musl）
-    2. 编译 Windows 版本
-    3. 通过 SCP 上传到服务器 /opt/elon/data/downloads/（与服务端 data_dir 一致）
-    4. 验证下载地址可访问
+    默认只完成本机 Windows 构建、验证、持久化安装候选与 post-terminal 激活安排，
+    然后把 Linux 构建、跨平台上传、广播和握手交给持久异步 outbox。
+    -SynchronousRemote 仅供 outbox worker 执行远端阶段。
 
 .EXAMPLE
     .\scripts\publish-node-agent.ps1
@@ -22,7 +21,11 @@ param(
     [string]$Changelog = "",
     [int]$HandshakeWaitSec = 90,
     [switch]$SkipHandshakeWait,
-    [switch]$RequireAllOnlineTargetBuild, [string]$ReplayPublishedSha = ""
+    [switch]$RequireAllOnlineTargetBuild,
+    [string]$ReplayPublishedSha = "",
+    [switch]$SynchronousRemote,
+    [string]$RemoteOutboxEventPath = "",
+    [switch]$SkipLocalActivation
 )
 
 Set-StrictMode -Version Latest
@@ -34,6 +37,9 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot "release-publish-lease.ps1")
 . (Join-Path $PSScriptRoot "node-agent-publish-http.ps1")
 . (Join-Path $PSScriptRoot "node-agent-publish-replay.ps1")
+. (Join-Path $PSScriptRoot "node-agent-release-outbox.ps1")
+. (Join-Path $PSScriptRoot "node-agent-local-activation.ps1")
+. (Join-Path $PSScriptRoot "node-agent-publish-handshake.ps1")
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
@@ -59,6 +65,13 @@ $script:NodeReleaseBatchId = ''
 $script:NodeReleaseActiveStage = 'windows_node'
 $script:NodeReleaseHeartbeat = $null
 $script:NodeReleaseContext = $null
+
+function Set-NodeAgentPublishPhase {
+    param([string]$Phase, [string]$Status)
+    if ($SynchronousRemote -and $null -ne $script:NodeReleaseContext) {
+        Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $Phase -Status $Status
+    }
+}
 
 try {
     Import-ElonLocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
@@ -128,7 +141,7 @@ function Invoke-RemoteBashRaw {
     $oldPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $output = ssh -o ProxyCommand=none $Server $remoteCommand 2>&1
+        $output = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server $remoteCommand 2>&1
         $exitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $oldPreference
@@ -237,115 +250,6 @@ function Invoke-NodePublicDevHandshakeStatus {
     }
 
     return $null
-}
-
-function Wait-NodePublicDevHandshake {
-    param(
-        [string]$Token,
-        [bool]$UseRemoteToken,
-        [int]$TimeoutSec,
-        [Parameter(Mandatory = $true)][string]$TargetReleaseIdentity
-    )
-
-    if ($SkipHandshakeWait) {
-        Write-Host "  已按 -SkipHandshakeWait 跳过公开开发握手等待。" -ForegroundColor Yellow
-        return
-    }
-    if ($TimeoutSec -le 0) {
-        Write-Host "  HandshakeWaitSec <= 0，跳过公开开发握手等待。" -ForegroundColor Yellow
-        return
-    }
-
-    Write-Host "  等待在线公开开发节点重连并完成握手（最多 ${TimeoutSec}s）..." -ForegroundColor Yellow
-    $deadline = (Get-Date).AddSeconds($TimeoutSec)
-    $lastReport = $null
-    while ($true) {
-        try {
-            $status = Invoke-NodePublicDevHandshakeStatus -Token $Token -UseRemoteToken $UseRemoteToken
-            if ($null -eq $status -or $null -eq $status.public_dev_handshake) {
-                throw "服务器未返回公开开发握手诊断，无法确认目标构建已生效。"
-            }
-            $report = $status.public_dev_handshake
-            $lastReport = $report
-            $summary = $report.summary
-            $onlineNodes = @($report.nodes | Where-Object {
-                $_.public_dev_enabled -and $_.online
-            })
-            $targetReadyNodes = @($onlineNodes | Where-Object {
-                Test-NodeAgentPublishHandshakeReady `
-                    -Node $_ `
-                    -TargetReleaseIdentity $TargetReleaseIdentity
-            })
-            Write-Host ("  目标构建握手：ready {0}/{1}，平台握手 ready {2}/{3}，offline {4}" -f `
-                $targetReadyNodes.Count, `
-                $onlineNodes.Count, `
-                $summary.ready_public_dev, `
-                $summary.public_dev_enabled, `
-                $summary.offline_public_dev) -ForegroundColor DarkGray
-
-            $pending = @($onlineNodes | Where-Object {
-                -not (Test-NodeAgentPublishHandshakeReady `
-                    -Node $_ `
-                    -TargetReleaseIdentity $TargetReleaseIdentity)
-            })
-            if ($pending.Count -eq 0) {
-                Write-Host "  在线公开开发节点均已运行目标构建并完成握手。" -ForegroundColor Green
-                Write-Output "NODE_AGENT_TARGET_BUILD_STATUS=ready"
-                Write-Output "NODE_AGENT_TARGET_BUILD_READY=$($targetReadyNodes.Count)"
-                Write-Output "NODE_AGENT_TARGET_BUILD_PENDING=0"
-                return
-            }
-
-            $sample = @($pending | Select-Object -First 5 | ForEach-Object {
-                $owner = if ($_.owner_nickname) { $_.owner_nickname } elseif ($_.owner_account) { $_.owner_account } else { $_.owner_user_id }
-                $reported = if ($_.agent_version) { $_.agent_version } else { "unknown-build" }
-                "$($_.display_name)/$owner/$($_.public_dev_handshake_status)/$reported"
-            })
-            if ($sample.Count -gt 0) {
-                Write-Host ("  待握手节点：" + ($sample -join "；")) -ForegroundColor DarkYellow
-            }
-        } catch {
-            if ($RequireAllOnlineTargetBuild) {
-                throw "公开开发握手诊断失败：$($_.Exception.Message)"
-            }
-            Write-Host "  公开开发握手诊断不可用；发布产物已上传，但目标构建切换状态未验证：$($_.Exception.Message)" -ForegroundColor DarkYellow
-            Write-Output "NODE_AGENT_TARGET_BUILD_STATUS=unverified"
-            return
-        }
-
-        if ((Get-Date) -ge $deadline) { break }
-        Start-Sleep -Seconds 5
-    }
-
-    if ($null -ne $lastReport) {
-        $pending = @($lastReport.nodes | Where-Object {
-            $_.public_dev_enabled -and $_.online -and -not (
-                Test-NodeAgentPublishHandshakeReady `
-                    -Node $_ `
-                    -TargetReleaseIdentity $TargetReleaseIdentity
-            )
-        })
-        if ($pending.Count -gt 0) {
-            $onlineCount = @($lastReport.nodes | Where-Object {
-                $_.public_dev_enabled -and $_.online
-            }).Count
-            $readyCount = $onlineCount - $pending.Count
-            Write-Output "NODE_AGENT_TARGET_BUILD_STATUS=partial"
-            Write-Output "NODE_AGENT_TARGET_BUILD_READY=$readyCount"
-            Write-Output "NODE_AGENT_TARGET_BUILD_PENDING=$($pending.Count)"
-            if ($RequireAllOnlineTargetBuild) {
-                throw "公开开发握手等待超时，仍有 $($pending.Count) 个在线节点未运行目标构建或未完成握手；请查看 PC 节点页或 admin 诊断接口。"
-            }
-            Write-Host "  目标构建已在 $readyCount/$onlineCount 个在线节点生效；其余 $($pending.Count) 个节点延期更新，不阻断本次发布收尾。" -ForegroundColor Yellow
-            return
-        }
-    } else {
-        if ($RequireAllOnlineTargetBuild) {
-            throw "公开开发握手等待超时，未拿到诊断报告。"
-        }
-        Write-Output "NODE_AGENT_TARGET_BUILD_STATUS=unverified"
-        Write-Host "  公开开发握手等待超时且未拿到诊断报告；发布产物已上传，节点切换状态待后续确认。" -ForegroundColor Yellow
-    }
 }
 
 function Resolve-NodeAgentTargetDir {
@@ -461,53 +365,78 @@ foreach ($requiredPath in @(
     }
 }
 Assert-NodeAgentBackgroundGitLaunchPolicy -RepoRoot $RepoRoot
-$BroadcastAdminToken = Resolve-NodeAgentAdminToken -ExplicitToken $AdminToken
+$BroadcastAdminToken = ''
 $UseRemoteAdminToken = $false
-if (-not $SkipBroadcast -and [string]::IsNullOrWhiteSpace($BroadcastAdminToken)) {
-    if (Test-RemoteNodeAgentAdminToken) {
-        $UseRemoteAdminToken = $true
-        Write-Host "  本机未设置 ADMIN_TOKEN，将通过服务器本机环境广播更新（token 不回传）。" -ForegroundColor DarkGray
-    } else {
-        throw "缺少 ADMIN_TOKEN 或 ELON_ADMIN_TOKEN，且服务器环境未找到 ADMIN_TOKEN。若只想上传文件请显式传 -SkipBroadcast。"
+if ($SynchronousRemote) {
+    $BroadcastAdminToken = Resolve-NodeAgentAdminToken -ExplicitToken $AdminToken
+    if (-not $SkipBroadcast -and [string]::IsNullOrWhiteSpace($BroadcastAdminToken)) {
+        if (Test-RemoteNodeAgentAdminToken) {
+            $UseRemoteAdminToken = $true
+            Write-Host "  本机未设置 ADMIN_TOKEN，将通过服务器本机环境广播更新（token 不回传）。" -ForegroundColor DarkGray
+        } else {
+            throw "缺少 ADMIN_TOKEN 或 ELON_ADMIN_TOKEN，且服务器环境未找到 ADMIN_TOKEN。若只想上传文件请显式传 -SkipBroadcast。"
+        }
     }
 }
 
 # 解析真实 target 目录（可能被全局 .cargo/config.toml 的 target-dir 重定向到共享目录）
-$meta = cargo metadata --manifest-path $ServerManifest --no-deps --format-version 1 | ConvertFrom-Json
+$meta = cargo metadata --manifest-path $ServerManifest --no-deps --format-version 1 --locked | ConvertFrom-Json
 $TargetDir = $meta.target_directory
 if (-not $TargetDir) { throw "无法解析 cargo target 目录" }
 $PackageVersion = ($meta.packages | Where-Object { $_.name -eq "elon-server" } | Select-Object -First 1).version
 if (-not $PackageVersion) { throw "无法解析一龙 PC 节点版本号" }
 $ReplayOnlyRequested = -not [string]::IsNullOrWhiteSpace($ReplayPublishedSha)
-$GitSha = Resolve-NodeAgentPublishSha -RepoRoot $RepoRoot -ReplayPublishedSha $ReplayPublishedSha
+if (-not $SynchronousRemote -and $ReplayOnlyRequested) {
+    throw 'ReplayPublishedSha is a remote operation and requires -SynchronousRemote.'
+}
+if ($SynchronousRemote -and -not [string]::IsNullOrWhiteSpace($RemoteOutboxEventPath)) {
+    $remoteEvent = Read-NodeAgentRemoteReleaseEvent -EventPath $RemoteOutboxEventPath
+    $GitSha = [string]$remoteEvent.git_sha
+    if ($GitSha -notmatch '^[0-9a-f]{40}$') { throw 'Remote outbox event has an invalid Git SHA.' }
+    $headSha = (git -C $RepoRoot rev-parse HEAD).Trim()
+    if ($headSha -ne $GitSha) { throw "Remote worker source identity mismatch: head=$headSha event=$GitSha" }
+} elseif ($SynchronousRemote) {
+    $GitSha = Resolve-NodeAgentPublishSha -RepoRoot $RepoRoot -ReplayPublishedSha $ReplayPublishedSha
+} else {
+    $GitSha = (git -C $RepoRoot rev-parse HEAD).Trim().ToLowerInvariant()
+    $cachedMain = (git -C $RepoRoot rev-parse origin/main).Trim().ToLowerInvariant()
+    if ($GitSha -ne $cachedMain) {
+        throw "本机发布只接受已推送的缓存 origin/main：HEAD=$GitSha origin/main=$cachedMain。"
+    }
+    $dirty = @(git -C $RepoRoot status --porcelain=v1 --untracked-files=all)
+    if ($dirty.Count -gt 0) { throw '本机发布要求任务 worktree clean，避免构建未提交身份。' }
+}
 $script:NodeReleaseBatchId = Get-ElonReleaseBatchId -Sha $GitSha
 $ReleaseIdentity = Get-NodeAgentReleaseIdentity -Version $PackageVersion -GitSha $GitSha
 $ReleaseChangelog = Resolve-NodeAgentChangelog -Explicit $Changelog -Sha $GitSha
+$UseOutboxArtifacts = $SynchronousRemote -and -not [string]::IsNullOrWhiteSpace($RemoteOutboxEventPath)
 $nodeBuilderId = "$env:COMPUTERNAME-$env:USERNAME"
 if ([string]::IsNullOrWhiteSpace($nodeBuilderId) -or $nodeBuilderId -eq '-') {
     $nodeBuilderId = "unknown-node-builder-$([Guid]::NewGuid().ToString('N').Substring(0, 8))" }
-$nodeClaim = Enter-ElonNodeAgentPublishLease -ReleaseApiBase "$BaseUrl/api/release" `
-    -Sha $GitSha -VersionName $PackageVersion -BuilderId $nodeBuilderId
-if (-not $nodeClaim) { return }
-$claimIsReplay = $nodeClaim.PSObject.Properties.Name -contains 'replayOnly' -and $nodeClaim.replayOnly
-if ($ReplayOnlyRequested -and -not $claimIsReplay) {
-    throw 'ReplayPublishedSha was not already published/coalesced; refusing to build or upload.'
+if ($SynchronousRemote) {
+    $nodeClaim = Enter-ElonNodeAgentPublishLease -ReleaseApiBase "$BaseUrl/api/release" `
+        -Sha $GitSha -VersionName $PackageVersion -BuilderId $nodeBuilderId
+    if (-not $nodeClaim) { return }
+    $claimIsReplay = $nodeClaim.PSObject.Properties.Name -contains 'replayOnly' -and $nodeClaim.replayOnly
+    if ($ReplayOnlyRequested -and -not $claimIsReplay) {
+        throw 'ReplayPublishedSha was not already published/coalesced; refusing to build or upload.'
+    }
+    $script:NodeReleaseToken = [string]$nodeClaim.token
+    $script:NodeReleaseOwned = -not [string]::IsNullOrWhiteSpace($script:NodeReleaseToken)
+    if ($nodeClaim.PSObject.Properties.Name -contains 'batchId' -and -not [string]::IsNullOrWhiteSpace([string]$nodeClaim.batchId)) {
+        $script:NodeReleaseBatchId = [string]$nodeClaim.batchId
+    }
+    if ($claimIsReplay) {
+        Invoke-NodeAgentPublishReplay -GitSha $GitSha -PackageVersion $PackageVersion `
+            -BatchId $script:NodeReleaseBatchId -ReleaseIdentity $ReleaseIdentity `
+            -SkipBroadcast $SkipBroadcast -BroadcastAdminToken $BroadcastAdminToken `
+            -UseRemoteAdminToken $UseRemoteAdminToken -HandshakeWaitSec $HandshakeWaitSec -BaseUrl $BaseUrl
+        $script:NodeReleaseFinished = $true
+        return
+    }
+    $script:NodeReleaseContext = New-ElonReleaseStageContext -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Sha $GitSha -Stage 'windows_node'
+    $script:NodeReleaseHeartbeat = Start-ElonReleaseContextHeartbeat -Context $script:NodeReleaseContext
 }
-$script:NodeReleaseToken = [string]$nodeClaim.token
-$script:NodeReleaseOwned = -not [string]::IsNullOrWhiteSpace($script:NodeReleaseToken)
-if ($nodeClaim.PSObject.Properties.Name -contains 'batchId' -and -not [string]::IsNullOrWhiteSpace([string]$nodeClaim.batchId)) {
-    $script:NodeReleaseBatchId = [string]$nodeClaim.batchId
-}
-if ($claimIsReplay) {
-    Invoke-NodeAgentPublishReplay -GitSha $GitSha -PackageVersion $PackageVersion `
-        -BatchId $script:NodeReleaseBatchId -ReleaseIdentity $ReleaseIdentity `
-        -SkipBroadcast $SkipBroadcast -BroadcastAdminToken $BroadcastAdminToken `
-        -UseRemoteAdminToken $UseRemoteAdminToken -HandshakeWaitSec $HandshakeWaitSec -BaseUrl $BaseUrl
-    $script:NodeReleaseFinished = $true
-    return
-}
-$script:NodeReleaseContext = New-ElonReleaseStageContext -ReleaseApiBase "$BaseUrl/api/release" -Kind 'node_agent' -Token $script:NodeReleaseToken -BatchId $script:NodeReleaseBatchId -Sha $GitSha -Stage 'windows_node'
-$script:NodeReleaseHeartbeat = Start-ElonReleaseContextHeartbeat -Context $script:NodeReleaseContext
 Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
 Write-Host "  发布基线: origin/main@$($GitSha.Substring(0, 7))" -ForegroundColor DarkGray
 Write-Host "  发布身份: $ReleaseIdentity" -ForegroundColor DarkGray
@@ -515,45 +444,72 @@ if (-not [string]::IsNullOrWhiteSpace($ReleaseChangelog)) {
     Write-Host "  更新内容: $ReleaseChangelog" -ForegroundColor DarkGray
 }
 
-# ── 1. 交叉编译 Linux musl 版本 ───────────────────────────────────────────────
-Write-Host "[1/5] 交叉编译 Linux x86_64-musl..." -ForegroundColor Yellow
-$script:NodeReleaseActiveStage = 'linux_build'
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
-$PreviousNodeAgentGitSha = $env:ELON_NODE_AGENT_GIT_SHA
-try {
-    # musl 交叉编译需要 C 工具链（ring 依赖 gcc）；用 cargo-zigbuild 提供 zig cc，
-    # 与 publish-server.ps1 同方案，避免缺少 x86_64-linux-musl-gcc 时编译失败。
-    $hasZigbuild = $null -ne (Get-Command "cargo-zigbuild" -ErrorAction SilentlyContinue)
-    if (-not $hasZigbuild) { $hasZigbuild = $null -ne (cargo zigbuild --version 2>$null) }
-    if (-not $hasZigbuild) {
-        Write-Host "  安装 cargo-zigbuild..." -ForegroundColor Yellow
-        cargo install cargo-zigbuild
-        if ($LASTEXITCODE -ne 0) { throw "cargo-zigbuild 安装失败（需先安装 zig 并加入 PATH）" }
+$LinuxBin = ''
+$LinuxSha256 = ''
+if ($SynchronousRemote) {
+    # ── 1. 交叉编译 Linux musl 版本（只在异步 worker）────────────────────────
+    Write-Host "[remote 1/5] 交叉编译 Linux x86_64-musl..." -ForegroundColor Yellow
+    $script:NodeReleaseActiveStage = 'linux_build'
+    Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running'
+    $PreviousNodeAgentGitSha = $env:ELON_NODE_AGENT_GIT_SHA
+    try {
+        $hasZigbuild = $null -ne (Get-Command "cargo-zigbuild" -ErrorAction SilentlyContinue)
+        if (-not $hasZigbuild) { $hasZigbuild = $null -ne (cargo zigbuild --version 2>$null) }
+        if (-not $hasZigbuild) {
+            Write-Host "  安装 cargo-zigbuild..." -ForegroundColor Yellow
+            cargo install cargo-zigbuild
+            if ($LASTEXITCODE -ne 0) { throw "cargo-zigbuild 安装失败（需先安装 zig 并加入 PATH）" }
+        }
+        $unitSeparator = [char]0x1f
+        $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
+        $env:ELON_NODE_AGENT_GIT_SHA = $GitSha
+        cargo zigbuild --manifest-path $ServerManifest --release --locked --bin $Bin --target x86_64-unknown-linux-musl
+        if ($LASTEXITCODE -ne 0) { throw "Linux 编译失败" }
+    } finally {
+        Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
+        if ($null -eq $PreviousNodeAgentGitSha) {
+            Remove-Item Env:\ELON_NODE_AGENT_GIT_SHA -ErrorAction SilentlyContinue
+        } else {
+            $env:ELON_NODE_AGENT_GIT_SHA = $PreviousNodeAgentGitSha
+        }
     }
-    # 强制通用 CPU，避免全局 target-cpu=native 产出服务器/他人机器无法运行的指令
-    $unitSeparator = [char]0x1f
-    $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
-    $env:ELON_NODE_AGENT_GIT_SHA = $GitSha
-    cargo zigbuild --manifest-path $ServerManifest --release --bin $Bin --target x86_64-unknown-linux-musl
-    if ($LASTEXITCODE -ne 0) { throw "Linux 编译失败" }
-} finally {
-    Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
-    if ($null -eq $PreviousNodeAgentGitSha) {
-        Remove-Item Env:\ELON_NODE_AGENT_GIT_SHA -ErrorAction SilentlyContinue
-    } else {
-        $env:ELON_NODE_AGENT_GIT_SHA = $PreviousNodeAgentGitSha
-    }
+    $LinuxBin = Join-Path $TargetDir "x86_64-unknown-linux-musl\release\$Bin"
+    if (-not (Test-Path $LinuxBin)) { throw "Linux 二进制不存在：$LinuxBin" }
+    $LinuxSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $LinuxBin).Hash.ToLowerInvariant()
+    Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
+} else {
+    Write-Host '[local 1/4] 默认本机路径跳过 Linux；已交给持久异步 outbox。' -ForegroundColor DarkGray
 }
 
-$LinuxBin = Join-Path $TargetDir "x86_64-unknown-linux-musl\release\$Bin"
-if (-not (Test-Path $LinuxBin)) { throw "Linux 二进制不存在：$LinuxBin" }
-$LinuxSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $LinuxBin).Hash.ToLowerInvariant()
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
-
+if ($UseOutboxArtifacts) {
+    Write-Host '[remote 2/5] 复用本机已验证的不可变 Windows 产物...' -ForegroundColor Yellow
+    $LinuxDownloadUrl = "$BaseUrl/api/node-agent/download/linux"
+    $WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
+    $WindowsClientDownloadUrl = "$BaseUrl/api/node-agent/download/windows-client"
+    $RipgrepDownloadUrl = "$BaseUrl/api/node-agent/download/ripgrep-windows"
+    $WinBin = [string]$remoteEvent.artifacts.windows_exe
+    $WindowsClientPackage = [string]$remoteEvent.artifacts.windows_client
+    $RipgrepPackage = [string]$remoteEvent.artifacts.ripgrep
+    $WinSha256 = Get-NodeAgentFileSha256 -Path $WinBin
+    $WindowsClientSha256 = Get-NodeAgentFileSha256 -Path $WindowsClientPackage
+    if ($WinSha256 -ne [string]$remoteEvent.artifacts.windows_exe_sha256 -or
+        $WindowsClientSha256 -ne [string]$remoteEvent.artifacts.windows_client_sha256) {
+        throw 'Remote worker durable Windows artifacts failed immutable SHA-256 verification.'
+    }
+    $RipgrepZipSha256 = ''
+    $RipgrepZipFileSize = 0
+    if (-not [string]::IsNullOrWhiteSpace($RipgrepPackage)) {
+        $RipgrepZipSha256 = Get-NodeAgentFileSha256 -Path $RipgrepPackage
+        if ($RipgrepZipSha256 -ne [string]$remoteEvent.artifacts.ripgrep_sha256) {
+            throw 'Remote worker durable ripgrep artifact failed immutable SHA-256 verification.'
+        }
+        $RipgrepZipFileSize = (Get-Item -LiteralPath $RipgrepPackage).Length
+    }
+} else {
 # ── 2. 编译 Windows 版本 ─────────────────────────────────────────────────────
 Write-Host "[2/5] 编译 Windows 版本..." -ForegroundColor Yellow
 $script:NodeReleaseActiveStage = 'windows_build'
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running'
 $PreviousNodeAgentGitSha = $env:ELON_NODE_AGENT_GIT_SHA
 try {
     # 强制通用 CPU，避免全局 target-cpu=native 产出用户机器无法运行的指令。
@@ -561,7 +517,7 @@ try {
     $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
     $env:ELON_NODE_AGENT_GIT_SHA = $GitSha
     Write-Host "  Windows release rustflags: -C target-cpu=x86-64" -ForegroundColor DarkGray
-    cargo build --manifest-path $ServerManifest --release --bin $Bin
+    cargo build --manifest-path $ServerManifest --release --locked --bin $Bin
     if ($LASTEXITCODE -ne 0) { throw "Windows 编译失败" }
 } finally {
     Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
@@ -576,28 +532,28 @@ $WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
 Assert-WindowsExecutableBrandIcon -ExecutablePath $WinBin -ExpectedIconPath $BrandIcon | Out-Null
 $WinSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WinBin).Hash.ToLowerInvariant()
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 2.2 编译一龙桌面壳（elon-desktop，独立 Tauri crate）──────────────────────
 Write-Host "[2.2/5] 编译一龙桌面壳 (elon-desktop)..." -ForegroundColor Yellow
 $script:NodeReleaseActiveStage = 'desktop_shell_build'
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running'
 try {
     $unitSeparator = [char]0x1f
     $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
-    cargo build --manifest-path $DesktopShellManifest --release --bin elon-desktop
+    cargo build --manifest-path $DesktopShellManifest --release --locked --bin elon-desktop
     if ($LASTEXITCODE -ne 0) { throw "elon-desktop 编译失败" }
 } finally {
     Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
 }
 $DesktopShellBin = Join-Path $TargetDir "release\elon-desktop.exe"
 if (-not (Test-Path $DesktopShellBin)) { throw "elon-desktop 二进制不存在：$DesktopShellBin" }
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 $script:NodeReleaseActiveStage = 'pc_frontend_bundle'
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running'
 Invoke-NodeAgentPcFrontendBuild
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 2.5 打包 Windows 客户端 ──────────────────────────────────────────────────
 Write-Host "[2.5/5] 打包 Windows 客户端..." -ForegroundColor Yellow
@@ -668,35 +624,72 @@ try {
 }
 if (-not (Test-Path $WindowsClientPackage)) { throw "Windows 客户端压缩包不存在：$WindowsClientPackage" }
 $WindowsClientSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WindowsClientPackage).Hash.ToLowerInvariant()
+}
+
+if (-not $SynchronousRemote) {
+    $commonDir = (git -C $RepoRoot rev-parse --git-common-dir).Trim()
+    if (-not [System.IO.Path]::IsPathRooted($commonDir)) {
+        $commonDir = Join-Path $RepoRoot $commonDir
+    }
+    $commonDir = [System.IO.Path]::GetFullPath($commonDir)
+    $outboxRoot = Get-NodeAgentReleaseOutboxRoot
+    $outboxEvent = Add-NodeAgentRemoteReleaseEvent -OutboxRoot $outboxRoot -GitSha $GitSha `
+        -Version $PackageVersion -ReleaseIdentity $ReleaseIdentity -Changelog $ReleaseChangelog `
+        -WindowsExe $WinBin -WindowsClientPackage $WindowsClientPackage `
+        -RipgrepPackage $(if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) { $RipgrepPackage } else { '' }) `
+        -GitCommonDir $commonDir
+    $activationRoot = Get-NodeAgentLocalActivationRoot
+    $localRelease = Register-NodeAgentVerifiedLocalRelease -StateRoot $activationRoot `
+        -GitSha $GitSha -Version $PackageVersion -ReleaseIdentity $ReleaseIdentity `
+        -WindowsClientPackage $WindowsClientPackage -WindowsClientSha256 $WindowsClientSha256
+    $activatorPid = $null
+    if (-not $SkipLocalActivation) {
+        $activatorPid = Start-NodeAgentPostTerminalActivator -StateRoot $activationRoot
+    }
+    $workerPid = Start-NodeAgentRemoteReleaseWorker -OutboxRoot $outboxRoot
+    Write-Host ''
+    Write-Host '✅ 本机 Windows release 已验证并进入安全激活队列；远端阶段异步执行。' -ForegroundColor Green
+    Write-Output 'NODE_AGENT_LOCAL_PREPARE_STATUS=complete'
+    Write-Output 'NODE_AGENT_LOCAL_ACTIVATION_STATUS=restart_scheduled'
+    Write-Output "NODE_AGENT_LOCAL_RELEASE_IDENTITY=$ReleaseIdentity"
+    Write-Output "NODE_AGENT_LOCAL_RELEASE_STATE=$($localRelease.StatePath)"
+    Write-Output "NODE_AGENT_LOCAL_ACTIVATOR_PID=$activatorPid"
+    Write-Output 'NODE_AGENT_REMOTE_SYNC_STATE=pending'
+    Write-Output "NODE_AGENT_REMOTE_OUTBOX_EVENT=$($outboxEvent.EventPath)"
+    Write-Output "NODE_AGENT_REMOTE_WORKER_PID=$workerPid"
+    Write-Output 'NODE_AGENT_LOCAL_SERVER_DEPENDENCY=none'
+    $script:NodeReleaseFinished = $true
+    return
+}
 
 # ── 3. 上传到服务器 ───────────────────────────────────────────────────────────
 Write-Host "[3/5] 上传到服务器..." -ForegroundColor Yellow
 $script:NodeReleaseActiveStage = 'artifact_upload'
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running'
 $currentReleaseSha = (git -C $RepoRoot rev-parse HEAD).Trim()
 if ($currentReleaseSha -ne $GitSha) {
     throw "上传前当前 worktree HEAD 已改变：claim=$GitSha, current=$currentReleaseSha。不可替换固定发布 SHA。"
 }
-ssh -o ProxyCommand=none $Server "mkdir -p $RemoteDir"
-scp -o ProxyCommand=none $LinuxBin "${Server}:${RemoteDir}/${Bin}"
-ssh -o ProxyCommand=none $Server "chmod +x ${RemoteDir}/${Bin}"
-scp -o ProxyCommand=none $WinBin "${Server}:${RemoteDir}/${Bin}.exe"
-scp -o ProxyCommand=none $WindowsClientPackage "${Server}:${RemoteDir}/${WindowsClientPackageName}"
+ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "mkdir -p $RemoteDir"
+scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $LinuxBin "${Server}:${RemoteDir}/${Bin}"
+ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "chmod +x ${RemoteDir}/${Bin}"
+scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $WinBin "${Server}:${RemoteDir}/${Bin}.exe"
+scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $WindowsClientPackage "${Server}:${RemoteDir}/${WindowsClientPackageName}"
 if ($LASTEXITCODE -ne 0) { throw "上传失败" }
 if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
-    scp -o ProxyCommand=none $RipgrepPackage "${Server}:${RemoteDir}/${RipgrepPackageName}"
+    scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $RipgrepPackage "${Server}:${RemoteDir}/${RipgrepPackageName}"
     if ($LASTEXITCODE -ne 0) { throw "上传 ripgrep 绿色包失败" }
 }
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 4. 验证下载地址 ──────────────────────────────────────────────────────────
 Write-Host "[4/5] 验证下载地址..." -ForegroundColor Yellow
 
-$size    = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${Bin}"
-$sizeWin = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${Bin}.exe"
-$sizeWinClient = ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${WindowsClientPackageName}"
+$size    = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${Bin}"
+$sizeWin = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${Bin}.exe"
+$sizeWinClient = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${WindowsClientPackageName}"
 if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
-    $RipgrepZipFileSize = [int64](ssh -o ProxyCommand=none $Server "stat -c '%s' ${RemoteDir}/${RipgrepPackageName}")
+    $RipgrepZipFileSize = [int64](ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${RipgrepPackageName}")
 }
 $VersionInfo = [ordered]@{
     version = $PackageVersion
@@ -720,7 +713,7 @@ $VersionInfo = [ordered]@{
 $VersionFile = New-TemporaryFile
 try {
     Write-Utf8NoBom -Path $VersionFile -Content ($VersionInfo | ConvertTo-Json -Depth 4)
-    scp -o ProxyCommand=none $VersionFile "${Server}:${RemoteDir}/node-agent-version.json"
+    scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $VersionFile "${Server}:${RemoteDir}/node-agent-version.json"
     if ($LASTEXITCODE -ne 0) { throw "版本信息上传失败" }
 } finally {
     Remove-Item -LiteralPath $VersionFile -Force -ErrorAction SilentlyContinue
@@ -739,7 +732,7 @@ Write-Host "  Version info gitSha = $GitSha" -ForegroundColor Green
 # ── 5. 推送在线 Windows 节点更新 ──────────────────────────────────────────────
 Write-Host "[5/5] 推送在线 Windows 节点更新..." -ForegroundColor Yellow
 $script:NodeReleaseActiveStage = 'target_handshake'
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'running'
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running'
 if ($SkipBroadcast) {
     Write-Host "  已按 -SkipBroadcast 跳过在线节点推送；离线/重启客户端仍会通过版本接口自动更新。" -ForegroundColor Yellow
 } elseif (-not [string]::IsNullOrWhiteSpace($BroadcastAdminToken)) {
@@ -772,7 +765,7 @@ if (-not $SkipBroadcast) {
         -TimeoutSec $HandshakeWaitSec `
         -TargetReleaseIdentity $ReleaseIdentity
 }
-Set-ElonReleasePhase -Context $script:NodeReleaseContext -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
+Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 Write-Host ""
 Write-Host "✅ 一龙 PC 节点客户端发布完成" -ForegroundColor Green

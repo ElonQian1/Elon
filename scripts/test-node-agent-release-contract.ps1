@@ -82,6 +82,8 @@ Assert-True ($brandIconSha256 -match '^[0-9a-f]{64}$') `
     "The checked-in Windows brand ICO must produce a stable 32px bitmap hash"
 
 $publishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-node-agent.ps1") -Raw
+$handshakeHelper = Get-Content -LiteralPath (Join-Path $PSScriptRoot "node-agent-publish-handshake.ps1") -Raw
+$publishContractText = $publishScript + "`n" + $handshakeHelper
 $replayHelper = Get-Content -LiteralPath (Join-Path $PSScriptRoot "node-agent-publish-replay.ps1") -Raw
 $leaseHelper = Get-Content -LiteralPath (Join-Path $PSScriptRoot "release-publish-lease.ps1") -Raw
 $serverPublishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-server.ps1") -Raw
@@ -114,10 +116,13 @@ Assert-True ($publishScript.Contains('ReplayPublishedSha was not already publish
     "Explicit replay must fail closed instead of rebuilding an unknown SHA"
 Assert-True ($replayHelper.Contains('merge-base --is-ancestor $sha origin/main')) `
     "Explicit replay must only accept a SHA retained by immutable origin/main history"
-Assert-True ($publishScript.Contains('NODE_AGENT_TARGET_BUILD_STATUS=partial')) `
+Assert-True ($publishContractText.Contains('NODE_AGENT_TARGET_BUILD_STATUS=partial')) `
     "The publisher must report partial rollout without claiming ready"
-Assert-True ($publishScript.Contains('if ($RequireAllOnlineTargetBuild)')) `
+Assert-True ($publishContractText.Contains('if ($RequireAllOnlineTargetBuild)')) `
     "Strict rollout must remain available when every online node is required"
+Assert-True ($publishScript.Contains('[switch]$SynchronousRemote') -and `
+    $publishScript.Contains('NODE_AGENT_LOCAL_SERVER_DEPENDENCY=none')) `
+    "The default publisher must finish locally while remote release requires worker mode"
 Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $WinBin')) `
     "The Windows release build must verify its extracted AssociatedIcon"
 Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $PackageClient')) `

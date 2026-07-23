@@ -1,0 +1,162 @@
+param(
+    [Parameter(Mandatory = $true)][string]$StateRoot,
+    [int]$PollSeconds = 3,
+    [int]$WaitTimeoutSeconds = 21600
+)
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'node-agent-release-outbox.ps1')
+. (Join-Path $PSScriptRoot 'node-agent-local-activation.ps1')
+
+function Write-ActivatorLog {
+    param([string]$Message)
+    $logDir = Join-Path $StateRoot 'logs'
+    New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+    $line = "{0} {1}`r`n" -f [DateTime]::UtcNow.ToString('o'), $Message
+    [System.IO.File]::AppendAllText((Join-Path $logDir 'post-terminal-activator.log'), $line, (New-Object System.Text.UTF8Encoding($false)))
+}
+
+function Get-LoopbackNodeStatus {
+    $ports = @(7800,7799) + @(7801..7819)
+    foreach ($port in $ports) {
+        try {
+            $request = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$port/api/status")
+            $request.Proxy = $null
+            $request.Timeout = 1200
+            $request.ReadWriteTimeout = 1200
+            $response = $request.GetResponse()
+            try {
+                $reader = New-Object System.IO.StreamReader($response.GetResponseStream(), [System.Text.Encoding]::UTF8)
+                $value = $reader.ReadToEnd() | ConvertFrom-Json
+                if ($value.PSObject.Properties.Name -contains 'release_identity') {
+                    return [pscustomobject]@{ Port = $port; Status = $value }
+                }
+            } finally {
+                $response.Dispose()
+            }
+        } catch {}
+    }
+    return $null
+}
+
+function Expand-VerifiedReleasePackage {
+    param($Release)
+    $actual = Get-NodeAgentFileSha256 -Path ([string]$Release.package_path)
+    if ($actual -ne [string]$Release.package_sha256) { throw 'Staged package SHA-256 changed after verification.' }
+    $applyRoot = Join-Path $StateRoot (Join-Path 'apply' ([string]$Release.git_sha))
+    if (Test-Path -LiteralPath $applyRoot) { Remove-Item -LiteralPath $applyRoot -Recurse -Force }
+    New-Item -ItemType Directory -Path $applyRoot -Force | Out-Null
+    Expand-Archive -LiteralPath ([string]$Release.package_path) -DestinationPath $applyRoot -Force
+    $metadataPath = Join-Path $applyRoot '_internal\node-agent-version.json'
+    if (-not (Test-Path -LiteralPath $metadataPath -PathType Leaf)) { throw 'Staged package is missing node-agent-version.json.' }
+    $metadata = Get-Content -Raw -LiteralPath $metadataPath | ConvertFrom-Json
+    $actualIdentity = "{0}+{1}" -f ([string]$metadata.version), ([string]$metadata.gitSha)
+    if ($actualIdentity -ne [string]$Release.release_identity) {
+        throw "Staged package identity mismatch: expected=$($Release.release_identity) actual=$actualIdentity"
+    }
+    $client = Join-Path $applyRoot '一龙开发平台.exe'
+    if (-not (Test-Path -LiteralPath $client -PathType Leaf)) { throw 'Staged package is missing the repair entrypoint.' }
+    return [pscustomobject]@{ Root = $applyRoot; Client = $client }
+}
+
+function Invoke-HiddenRepair {
+    param([Parameter(Mandatory = $true)][string]$ClientPath, [int]$TimeoutSeconds = 180)
+    $process = Start-Process -FilePath $ClientPath -ArgumentList '--repair-background' `
+        -WorkingDirectory (Split-Path -Parent $ClientPath) -WindowStyle Hidden -PassThru
+    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        # Do not kill it: the installer may be in an atomic replace window. The health
+        # check below will fail closed and rollback only after the process exits.
+        throw "Repair entrypoint exceeded its bounded ${TimeoutSeconds}s wait."
+    }
+    if ($process.ExitCode -ne 0) { throw "Repair entrypoint failed with exit code $($process.ExitCode)." }
+}
+
+function Wait-ExactNodeHealth {
+    param([string]$ReleaseIdentity, [int]$TimeoutSeconds = 90)
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $node = Get-LoopbackNodeStatus
+        if ($node -and [string]$node.Status.release_identity -eq $ReleaseIdentity) { return $true }
+        Start-Sleep -Milliseconds 500
+    } while ([DateTime]::UtcNow -lt $deadline)
+    return $false
+}
+
+$lockPath = Join-Path $StateRoot 'post-terminal-activator.lock'
+New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
+$lock = $null
+try {
+    try {
+        $lock = New-Object System.IO.FileStream($lockPath, [System.IO.FileMode]::OpenOrCreate, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+    } catch {
+        Write-ActivatorLog 'another post-terminal activator owns the durable lock; exiting'
+        exit 0
+    }
+    $deadline = [DateTime]::UtcNow.AddSeconds($WaitTimeoutSeconds)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        $release = Get-LatestNodeAgentVerifiedLocalRelease -StateRoot $StateRoot
+        if ($null -eq $release) {
+            Write-ActivatorLog 'no verified scheduled release remains; exiting'
+            exit 0
+        }
+        $node = Get-LoopbackNodeStatus
+        if ($null -eq $node) {
+            Write-ActivatorLog 'node status unavailable; activation remains fail-closed'
+            Start-Sleep -Seconds $PollSeconds
+            continue
+        }
+        if ([string]$node.Status.release_identity -eq [string]$release.release_identity) {
+            Save-NodeAgentActivationResult -Release $release -State 'activated'
+            Write-ActivatorLog "target already active: $($release.release_identity)"
+            exit 0
+        }
+        $gate = Test-NodeAgentActivationOwnerGate -Status $node.Status
+        if (-not $gate.Safe) {
+            Save-NodeAgentActivationResult -Release $release -State 'waiting_for_terminal'
+            Write-ActivatorLog ("waiting for live owners: " + (@($gate.ActiveTaskIds) -join ','))
+            Start-Sleep -Seconds $PollSeconds
+            continue
+        }
+
+        # Re-read after the gate so a newer verified target supersedes this one before apply.
+        $latest = Get-LatestNodeAgentVerifiedLocalRelease -StateRoot $StateRoot
+        if ($null -eq $latest -or [string]$latest.release_identity -ne [string]$release.release_identity) { continue }
+        $priorIdentity = [string]$node.Status.release_identity
+        $installRoot = Join-Path ([System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::LocalApplicationData)) 'ElonNode'
+        $backupRoot = Join-Path $StateRoot (Join-Path 'rollback' ((Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmssfff')))
+        $result = Invoke-NodeAgentActivationTransaction -Release $latest `
+            -OwnerGate { Test-NodeAgentActivationOwnerGate -Status (Get-LoopbackNodeStatus).Status } `
+            -Apply {
+                param($target)
+                $expanded = Expand-VerifiedReleasePackage -Release $target
+                if (Test-Path -LiteralPath $installRoot -PathType Container) {
+                    New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+                    Copy-Item -LiteralPath $installRoot -Destination (Join-Path $backupRoot 'ElonNode') -Recurse -Force
+                }
+                Invoke-HiddenRepair -ClientPath $expanded.Client
+                return [pscustomobject]@{ Backup = (Join-Path $backupRoot 'ElonNode'); PriorIdentity = $priorIdentity }
+            } `
+            -Health { param($target) Wait-ExactNodeHealth -ReleaseIdentity ([string]$target.release_identity) } `
+            -Rollback {
+                param($target, $applyResult)
+                if ($null -eq $applyResult -or -not (Test-Path -LiteralPath ([string]$applyResult.Backup) -PathType Container)) {
+                    throw 'No verified rollback client tree is available.'
+                }
+                $rollbackClient = Join-Path ([string]$applyResult.Backup) '一龙开发平台.exe'
+                Invoke-HiddenRepair -ClientPath $rollbackClient
+                if (-not (Wait-ExactNodeHealth -ReleaseIdentity ([string]$applyResult.PriorIdentity))) {
+                    throw 'Rollback runtime failed its exact-release health check.'
+                }
+            }
+        Write-ActivatorLog ("activation result: " + ($result | ConvertTo-Json -Compress))
+        if ([string]$result.activation_state -in @('activated','rolled_back','failed')) { exit 0 }
+    }
+    Write-ActivatorLog 'wait timeout elapsed; release remains scheduled without touching a live owner'
+    exit 2
+} catch {
+    Write-ActivatorLog ("fatal activator error: " + $_.Exception.Message)
+    exit 1
+} finally {
+    if ($null -ne $lock) { $lock.Dispose() }
+}
