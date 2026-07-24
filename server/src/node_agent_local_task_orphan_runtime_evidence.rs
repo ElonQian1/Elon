@@ -108,3 +108,7 @@ pub(super) fn sidecar_record_protects(
     }
     Ok(false)
 }
+
+#[cfg(test)]
+#[path = "node_agent_local_task_orphan_resume_receipt_tests.rs"]
+mod resume_receipt_tests;

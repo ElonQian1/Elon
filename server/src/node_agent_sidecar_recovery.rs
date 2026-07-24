@@ -367,6 +367,21 @@ fn codex_terminal_outcome(output: &str) -> Option<bool> {
     }
 }
 
+/// Persist the same fail-closed snapshot proof used by startup recovery before
+/// the periodic orphan reconciler turns a supervised task into
+/// `resume_required`. Without this, a task that committed and pushed its own
+/// terminal HEAD could be resumable only after a later node restart happened
+/// to rediscover the stale sidecar.
+pub(crate) fn persist_orphan_resume_receipt(
+    runtime: &NodeRuntime,
+    task: &LocalTaskRecord,
+) -> Result<Option<UpdateRecoveryReceipt>> {
+    let Some(session) = runtime.cli_sidecars.session_for_task(&task.task_id)? else {
+        return Ok(None);
+    };
+    ensure_recovery_receipt(runtime, task, &session)
+}
+
 fn ensure_recovery_receipt(
     runtime: &NodeRuntime,
     task: &LocalTaskRecord,

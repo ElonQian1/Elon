@@ -380,6 +380,8 @@ async fn reconcile_candidate(
                 return Ok(true);
             }
         }
+        crate::node_agent_sidecar_recovery::persist_orphan_resume_receipt(runtime, &task)
+            .context("persist supervised orphan resume receipt")?;
     }
     let changed = runtime
         .local_tasks

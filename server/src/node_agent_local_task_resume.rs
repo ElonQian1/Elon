@@ -329,6 +329,7 @@ fn resolve_existing_resume_workspace(
                 head_advance::validate(
                     contract,
                     parent,
+                    journal_record,
                     receipt,
                     &authorized_base,
                     &active,

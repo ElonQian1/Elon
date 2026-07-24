@@ -17,6 +17,7 @@ use crate::{
 pub(super) fn validate(
     contract: &SupervisionContract,
     parent: &LocalTaskRecord,
+    journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
     receipt: Option<&UpdateRecoveryReceipt>,
     base: &Path,
     active: &Path,
@@ -42,6 +43,7 @@ pub(super) fn validate(
         receipt.root_task_id == expected_root,
         "更新恢复回执的监督 root identity 不一致。"
     );
+    validate_terminal_journal_binding(parent, journal_record)?;
     validate_parent_binding(parent, receipt)?;
     validate_receipt_workspace(receipt, base, active, expected_branch, current_head)?;
     anyhow::ensure!(
@@ -53,6 +55,24 @@ pub(super) fn validate(
         "父任务活动 worktree 非 clean，拒绝接受 HEAD 前进。"
     );
     validate_forward_landed_commit(base, recorded_head, current_head)
+}
+
+fn validate_terminal_journal_binding(
+    parent: &LocalTaskRecord,
+    journal_record: Option<&crate::node_agent_task_journal::TaskJournalRecord>,
+) -> Result<()> {
+    let journal = journal_record.ok_or_else(|| anyhow!("父任务缺少可验证的终态 journal 记录。"))?;
+    let finished_at_ms = parent
+        .finished_at_ms
+        .and_then(|value| u128::try_from(value).ok())
+        .ok_or_else(|| anyhow!("父任务缺少有效终态时间。"))?;
+    anyhow::ensure!(
+        journal.req_id == parent.task_id
+            && journal.status == parent.status
+            && journal.updated_at_ms >= finished_at_ms,
+        "父任务 local terminal row 与 journal 终态未严格绑定。"
+    );
+    Ok(())
 }
 
 fn validate_parent_binding(
