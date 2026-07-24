@@ -116,6 +116,8 @@ Assert-True ($publishScript.Contains('NODE_AGENT_LINUX_PUBLISH_STATUS=skipped_de
     "A default Windows release must report that Linux was not published"
 Assert-True ($publishScript.Contains("Invoke-RustCacheCargo -ProjectRoot `$RepoRoot -Domain 'node-agent-release'")) `
     "Node release builds must enter the managed shared Rust cache"
+Assert-True (-not $publishScript.Contains('Get-FileHash')) `
+    "The long-lived publisher must use the .NET-backed release hash helper instead of module-autoloaded Get-FileHash"
 Assert-True ($publishScript.Contains('[string]$ReplayPublishedSha')) `
     "The publisher must expose an explicit immutable same-SHA replay mode"
 Assert-True ($publishScript.Contains('ReplayPublishedSha was not already published/coalesced')) `

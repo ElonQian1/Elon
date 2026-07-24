@@ -414,7 +414,7 @@ if ($SynchronousRemote -and $IncludeLinux) {
     }
     $LinuxBin = Join-Path $TargetDir "x86_64-unknown-linux-musl\release\$Bin"
     if (-not (Test-Path $LinuxBin)) { throw "Linux 二进制不存在：$LinuxBin" }
-    $LinuxSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $LinuxBin).Hash.ToLowerInvariant()
+    $LinuxSha256 = Get-NodeAgentFileSha256 -Path $LinuxBin
     Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 } elseif ($IncludeLinux) {
     Write-Host '[local 1/4] 本机路径记录 Linux 显式发布请求；由持久异步 outbox 构建。' -ForegroundColor DarkGray
@@ -475,7 +475,7 @@ try {
 $WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
 Assert-WindowsExecutableBrandIcon -ExecutablePath $WinBin -ExpectedIconPath $BrandIcon | Out-Null
-$WinSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WinBin).Hash.ToLowerInvariant()
+$WinSha256 = Get-NodeAgentFileSha256 -Path $WinBin
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 2.2 编译一龙桌面壳（elon-desktop，独立 Tauri crate）──────────────────────
@@ -537,7 +537,7 @@ if ($RipgrepExe) {
     try {
         Copy-Item -LiteralPath $RipgrepExe -Destination (Join-Path $RipgrepBinDir "rg.exe") -Force
         Compress-ArchiveWithRetry -Path (Join-Path $RipgrepRoot "*") -DestinationPath $RipgrepPackage
-        $RipgrepZipSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $RipgrepPackage).Hash.ToLowerInvariant()
+        $RipgrepZipSha256 = Get-NodeAgentFileSha256 -Path $RipgrepPackage
         $RipgrepZipFileSize = (Get-Item -LiteralPath $RipgrepPackage).Length
         Write-Host "  ripgrep package sha256 = $RipgrepZipSha256" -ForegroundColor DarkGray
     } finally {
@@ -583,7 +583,7 @@ try {
     Remove-Item -LiteralPath $PackageRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 if (-not (Test-Path $WindowsClientPackage)) { throw "Windows 客户端压缩包不存在：$WindowsClientPackage" }
-$WindowsClientSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WindowsClientPackage).Hash.ToLowerInvariant()
+$WindowsClientSha256 = Get-NodeAgentFileSha256 -Path $WindowsClientPackage
 }
 
 if (-not $SynchronousRemote) {

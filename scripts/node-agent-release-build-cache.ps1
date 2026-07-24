@@ -17,7 +17,7 @@ function Invoke-NodeAgentPcFrontendBuild {
         $nmDir = Join-Path $PcFrontendDir 'node_modules'
         $nmInstalled = Join-Path $nmDir '.npm-installed-sha'
         $lockHash = if (Test-Path $lockFile) {
-            (Get-FileHash $lockFile -Algorithm MD5).Hash
+            Get-NodeAgentFileSha256 -Path $lockFile
         } else { '' }
         $prevHash = if (Test-Path $nmInstalled) { Get-Content $nmInstalled -Raw } else { '' }
         if ((-not (Test-Path $nmDir)) -or ($lockHash -ne $prevHash.Trim())) {
