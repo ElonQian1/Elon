@@ -70,7 +70,10 @@ pub(super) fn prepare_auth(
             cookies: Vec::new(),
             headers: BTreeMap::new(),
             local_storage: BTreeMap::new(),
-            ready_selector,
+            // A project may declare the selector for authenticated production
+            // routes while still capturing an unauthenticated localhost fixture.
+            // Without an active profile there is no authentication state to gate.
+            ready_selector: None,
         });
     };
     if !valid_profile(&profile) {

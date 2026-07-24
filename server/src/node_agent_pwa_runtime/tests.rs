@@ -249,6 +249,14 @@ async fn temporary_profile_cleanup_backoff_is_cancellable() {
 #[tokio::test]
 async fn real_headless_http_200_fixture_ignores_long_lived_channel_and_captures_png() {
     let root = project_root("e2e");
+    fs::create_dir_all(root.join(".elon")).unwrap();
+    fs::write(
+        root.join(".elon/ui-pwa-runtime.json"),
+        r##"{
+          "authenticatedReadySelector": "#authenticated-app:not(.hidden)"
+        }"##,
+    )
+    .unwrap();
     let (url, server) = fixture(
         r#"<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;background:#14324a}#ready{width:120px;height:80px;background:#f2c94c}</style><main id="ready">PWA runtime proof</main><script>window.channel = new EventSource('/events')</script>"#,
     )
