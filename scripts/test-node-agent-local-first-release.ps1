@@ -6,6 +6,7 @@ $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 . (Join-Path $PSScriptRoot 'node-agent-local-activation.ps1')
 . (Join-Path $PSScriptRoot 'node-agent-release-build-cache.ps1')
 . (Join-Path $PSScriptRoot 'node-agent-local-rollback.ps1')
+. (Join-Path $PSScriptRoot 'node-agent-release-contract.ps1')
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -55,6 +56,12 @@ foreach ($moduleName in @(
 $root = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-local-first-release-test-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root | Out-Null
 try {
+    $metadata = Get-NodeAgentCargoMetadata -ManifestPath (Join-Path $RepoRoot 'server\Cargo.toml')
+    Assert-Equal $metadata.packages[0].name 'elon-server' `
+        'cargo metadata must remain valid UTF-8 JSON under a non-ASCII repository path'
+    Assert-True ([string]$metadata.target_directory -ne '') `
+        'UTF-8 cargo metadata must expose the resolved target directory'
+
     $artifactRoot = Join-Path $root 'input'
     New-Item -ItemType Directory -Path $artifactRoot | Out-Null
     $exe = Join-Path $artifactRoot 'elon-pc-node.exe'

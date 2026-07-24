@@ -40,6 +40,53 @@ function Exit-NodeAgentPublishLock {
     }
 }
 
+function Get-NodeAgentCargoMetadata {
+    param(
+        [Parameter(Mandatory = $true)][string]$ManifestPath
+    )
+
+    $resolvedManifest = [System.IO.Path]::GetFullPath($ManifestPath)
+    if ($resolvedManifest.Contains('"')) {
+        throw "Cargo manifest path contains an unsupported quote: $resolvedManifest"
+    }
+
+    $cargo = Get-Command cargo -ErrorAction Stop
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $cargo.Source
+    $startInfo.Arguments = 'metadata --manifest-path "' + $resolvedManifest +
+        '" --no-deps --format-version 1 --locked'
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
+    $startInfo.StandardOutputEncoding = $utf8
+    $startInfo.StandardErrorEncoding = $utf8
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw 'cargo metadata process failed to start.'
+        }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            throw "cargo metadata failed ($($process.ExitCode)): $stderr"
+        }
+        try {
+            return ($stdout | ConvertFrom-Json -ErrorAction Stop)
+        } catch {
+            throw "cargo metadata returned invalid UTF-8 JSON: $($_.Exception.Message)"
+        }
+    } finally {
+        $process.Dispose()
+    }
+}
+
 function Compress-ArchiveWithRetry {
     param(
         [Parameter(Mandatory = $true)][string]$Path,

@@ -310,7 +310,7 @@ if ($SynchronousRemote) {
 }
 
 # 解析真实 target 目录（可能被全局 .cargo/config.toml 的 target-dir 重定向到共享目录）
-$meta = cargo metadata --manifest-path $ServerManifest --no-deps --format-version 1 --locked | ConvertFrom-Json
+$meta = Get-NodeAgentCargoMetadata -ManifestPath $ServerManifest
 $TargetDir = $meta.target_directory
 if (-not $TargetDir) { throw "无法解析 cargo target 目录" }
 $PackageVersion = ($meta.packages | Where-Object { $_.name -eq "elon-server" } | Select-Object -First 1).version
