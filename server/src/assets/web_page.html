@@ -3581,13 +3581,7 @@
       left: 5px;
       transform: translateY(-50%);
     }
-    .tabs-panel > .bottom-menu-tab:last-child .tab-selection {
-      left: auto;
-      right: 5px;
-      transform: translateY(-50%);
-    }
-    .tab.active .tab-selection,
-    .bottom-menu-tab.active .tab-selection { display: block; }
+    .tab.active .tab-selection { display: block; }
     .tab .ic,
     .bottom-menu-tab .ic {
       position: relative;
@@ -3599,11 +3593,11 @@
     .tab .ic img,
     .bottom-menu-tab .ic img { width: 100%; height: 100%; object-fit: contain; }
     .tab .active-icon,
-    .bottom-menu-tab .active-icon { display: none; }
+    .bottom-menu-tab .drawer-open-icon { display: none; }
     .tab.active .inactive-icon,
-    .bottom-menu-tab.active .inactive-icon { display: none; }
+    .bottom-menu-tab.drawer-open .inactive-icon { display: none; }
     .tab.active .active-icon,
-    .bottom-menu-tab.active .active-icon { display: block; }
+    .bottom-menu-tab.drawer-open .drawer-open-icon { display: block; }
     .bottom-compose-button {
       position: relative;
       flex: 0 0 56px;
@@ -4896,11 +4890,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           <img class="active-icon" src="data:image/png;base64,__BOTTOM_NAV_PROFILE_ACTIVE_PNG_B64__" alt="" aria-hidden="true" />
         </span>
       </button>
-      <button class="bottom-menu-tab" id="bottomMenuBtn" type="button" aria-label="主菜单">
-        <img class="tab-selection" src="data:image/png;base64,__BOTTOM_NAV_SELECTED_PNG_B64__" alt="" aria-hidden="true" />
+      <button class="bottom-menu-tab" id="bottomMenuBtn" type="button" aria-label="主菜单" aria-expanded="false">
         <span class="ic">
           <img class="inactive-icon" src="data:image/png;base64,__BOTTOM_NAV_MENU_PNG_B64__" alt="" aria-hidden="true" />
-          <img class="active-icon" src="data:image/png;base64,__BOTTOM_NAV_MENU_ACTIVE_PNG_B64__" alt="" aria-hidden="true" />
+          <img class="drawer-open-icon" src="data:image/png;base64,__BOTTOM_NAV_MENU_ACTIVE_PNG_B64__" alt="" aria-hidden="true" />
         </span>
       </button>
     </div>
@@ -5492,9 +5485,12 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   let projectBrowserDragDistance = 0;
   let projectBrowserSuppressClick = false;
 
-  function syncProjectBrowserNavigationSelection(isOpen) {
-    tabs.forEach((tab) => tab.classList.toggle('active', !isOpen && tab.dataset.tab === currentTab));
-    if (bottomMenuBtn) bottomMenuBtn.classList.toggle('active', isOpen);
+  function syncProjectBrowserNavigationState(isOpen) {
+    tabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.tab === currentTab));
+    if (bottomMenuBtn) {
+      bottomMenuBtn.classList.toggle('drawer-open', isOpen);
+      bottomMenuBtn.setAttribute('aria-expanded', String(isOpen));
+    }
   }
 
   function projectBrowserClean(value) {
@@ -5596,7 +5592,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     projectBrowserSheet.style.removeProperty('transform');
     projectBrowserSheet.classList.add('active');
     projectBrowserSheet.setAttribute('aria-hidden', 'false');
-    syncProjectBrowserNavigationSelection(true);
+    syncProjectBrowserNavigationState(true);
     if (!projectBrowserHistoryActive) {
       window.history.pushState({ elonProjectBrowser: true }, '');
       projectBrowserHistoryActive = true;
@@ -5610,7 +5606,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     projectBrowserSheet.style.removeProperty('transform');
     projectBrowserSheet.classList.remove('active');
     projectBrowserSheet.setAttribute('aria-hidden', 'true');
-    syncProjectBrowserNavigationSelection(false);
+    syncProjectBrowserNavigationState(false);
     if (syncHistory && projectBrowserHistoryActive) {
       projectBrowserHistoryActive = false;
       window.history.back();

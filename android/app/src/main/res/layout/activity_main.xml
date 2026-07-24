@@ -1440,16 +1440,6 @@
                         android:foreground="?attr/selectableItemBackgroundBorderless">
 
                         <ImageView
-                            android:id="@+id/bottomMenuSelection"
-                            android:layout_width="@dimen/main_bottom_menu_selection_width"
-                            android:layout_height="@dimen/main_bottom_menu_selection_height"
-                            android:layout_gravity="end|center_vertical"
-                            android:layout_marginEnd="@dimen/main_bottom_menu_selection_inset"
-                            android:contentDescription="@null"
-                            android:scaleType="fitXY"
-                            android:src="@drawable/bg_bottom_nav_item_selector" />
-
-                        <ImageView
                             android:id="@+id/bottomMenuIcon"
                             android:layout_width="28dp"
                             android:layout_height="28dp"

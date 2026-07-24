@@ -63,7 +63,7 @@ class ProjectBrowserSheetContractTest {
     }
 
     @Test
-    fun projectBrowserTemporarilyOwnsTheOnlyBottomNavigationSelection() {
+    fun projectBrowserKeepsTheCurrentPageSelectionAndActivatesOnlyItsMenuIcon() {
         val pageDestinations = listOf(
             MainBottomNavigationDestination.CHAT,
             MainBottomNavigationDestination.PROJECT,
@@ -71,15 +71,31 @@ class ProjectBrowserSheetContractTest {
         )
 
         pageDestinations.forEach { currentPage ->
-            assertEquals(
-                MainBottomNavigationDestination.MENU,
-                selectedMainBottomNavigationDestination(currentPage, isProjectBrowserOpen = true)
-            )
-            assertEquals(
-                currentPage,
-                selectedMainBottomNavigationDestination(currentPage, isProjectBrowserOpen = false)
-            )
+            val open = mainBottomNavigationRenderState(currentPage, isProjectBrowserOpen = true)
+            assertEquals(currentPage, open.selectedPage)
+            assertTrue(open.isMenuActivated)
+
+            val closed = mainBottomNavigationRenderState(currentPage, isProjectBrowserOpen = false)
+            assertEquals(currentPage, closed.selectedPage)
+            assertTrue(!closed.isMenuActivated)
         }
+    }
+
+    @Test
+    fun userProvidedOpenMenuIconIsARepositoryAssetSharedByAndroidAndWeb() {
+        val expectedSha256 = "af213061995ec376ef957574a9ae2e41d5ce47bd745611ede56cfed91b3ab427"
+        assertEquals(
+            expectedSha256,
+            fileSha256(repositoryPath("android/app/src/main/res/drawable-nodpi/ic_bottom_nav_menu_active.png"))
+        )
+
+        val selector = readRepositoryFile(
+            "android/app/src/main/res/drawable/ic_bottom_nav_menu_selector.xml"
+        )
+        val web = readRepositoryFile("server/src/assets/web_page.html")
+        assertTrue(selector.contains("android:state_activated=\"true\""))
+        assertTrue(web.contains("__BOTTOM_NAV_MENU_ACTIVE_PNG_B64__"))
+        assertTrue(web.contains("bottom-menu-tab.drawer-open .drawer-open-icon"))
     }
 
     @Test
@@ -121,7 +137,7 @@ class ProjectBrowserSheetContractTest {
     }
 
     @Test
-    fun androidAndWebKeepProjectBrowserSelectionMutuallyExclusive() {
+    fun androidAndWebKeepProjectBrowserStateIndependentFromPageSelection() {
         val controller = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/ProjectBrowserSheetController.kt"
         )
@@ -136,11 +152,16 @@ class ProjectBrowserSheetContractTest {
             "android/app/src/main/kotlin/com/elon/app/MainBottomNavigationState.kt"
         )
         assertTrue(navigation.contains("MainBottomNavigationSelectionState("))
-        assertTrue(navigationState.contains("selectedMainBottomNavigationDestination("))
-        assertTrue(navigationState.contains("binding.bottomMenuSelection.isSelected = menuSelected"))
-        assertTrue(web.contains("syncProjectBrowserNavigationSelection(true)"))
-        assertTrue(web.contains("syncProjectBrowserNavigationSelection(false)"))
-        assertTrue(web.contains("!isOpen && tab.dataset.tab === currentTab"))
+        assertTrue(navigationState.contains("mainBottomNavigationRenderState("))
+        assertTrue(navigationState.contains("binding.bottomMenuButton.isSelected = false"))
+        assertTrue(navigationState.contains("binding.bottomMenuIcon.isActivated = state.isMenuActivated"))
+        assertTrue(!navigationState.contains("MainBottomNavigationDestination.MENU"))
+        assertTrue(!navigationState.contains("binding.bottomMenuSelection"))
+        assertTrue(web.contains("syncProjectBrowserNavigationState(true)"))
+        assertTrue(web.contains("syncProjectBrowserNavigationState(false)"))
+        assertTrue(web.contains("tab.dataset.tab === currentTab"))
+        assertTrue(web.contains("bottomMenuBtn.classList.toggle('drawer-open', isOpen)"))
+        assertTrue(!web.contains("bottomMenuBtn.classList.toggle('active', isOpen)"))
     }
 
     private fun project(

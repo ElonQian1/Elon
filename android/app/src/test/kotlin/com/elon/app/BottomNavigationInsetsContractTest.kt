@@ -19,8 +19,7 @@ class BottomNavigationInsetsContractTest {
         listOf(
             "tabChatSelection",
             "tabProjectSelection",
-            "tabProfileSelection",
-            "bottomMenuSelection"
+            "tabProfileSelection"
         ).forEach { id ->
             val block = imageViewBlock(layout, id)
             assertTrue(block.contains("android:layout_width=\"@dimen/main_bottom_menu_selection_width\""))
@@ -31,10 +30,7 @@ class BottomNavigationInsetsContractTest {
             imageViewBlock(layout, "tabChatSelection")
                 .contains("android:layout_marginStart=\"@dimen/main_bottom_menu_selection_inset\"")
         )
-        assertTrue(
-            imageViewBlock(layout, "bottomMenuSelection")
-                .contains("android:layout_marginEnd=\"@dimen/main_bottom_menu_selection_inset\"")
-        )
+        assertTrue(!layout.contains("android:id=\"@+id/bottomMenuSelection\""))
     }
 
     @Test
@@ -48,10 +44,12 @@ class BottomNavigationInsetsContractTest {
             Regex("""\.tabs-panel\s*>\s*\.tab:first-child\s+\.tab-selection\s*\{[^}]*left:\s*5px;""", RegexOption.DOT_MATCHES_ALL)
                 .containsMatchIn(web)
         )
-        assertTrue(
-            Regex("""\.tabs-panel\s*>\s*\.bottom-menu-tab:last-child\s+\.tab-selection\s*\{[^}]*right:\s*5px;""", RegexOption.DOT_MATCHES_ALL)
-                .containsMatchIn(web)
-        )
+        val menuButton = Regex(
+            """<button class="bottom-menu-tab"[^>]*>.*?</button>""",
+            RegexOption.DOT_MATCHES_ALL
+        ).find(web)?.value ?: error("Missing bottom menu button")
+        assertTrue(!web.contains(".bottom-menu-tab.active .tab-selection"))
+        assertTrue(!menuButton.contains("tab-selection"))
     }
 
     private fun imageViewBlock(layout: String, id: String): String {

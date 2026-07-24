@@ -6,20 +6,21 @@ import com.elon.app.databinding.ActivityMainBinding
 internal enum class MainBottomNavigationDestination {
     CHAT,
     PROJECT,
-    PROFILE,
-    MENU
+    PROFILE
 }
 
-internal fun selectedMainBottomNavigationDestination(
+internal data class MainBottomNavigationRenderState(
+    val selectedPage: MainBottomNavigationDestination,
+    val isMenuActivated: Boolean
+)
+
+internal fun mainBottomNavigationRenderState(
     currentPage: MainBottomNavigationDestination,
     isProjectBrowserOpen: Boolean
-): MainBottomNavigationDestination {
-    return if (isProjectBrowserOpen) {
-        MainBottomNavigationDestination.MENU
-    } else {
-        currentPage
-    }
-}
+) = MainBottomNavigationRenderState(
+    selectedPage = currentPage,
+    isMenuActivated = isProjectBrowserOpen
+)
 
 internal class MainBottomNavigationSelectionState(
     private val binding: ActivityMainBinding,
@@ -43,17 +44,16 @@ internal class MainBottomNavigationSelectionState(
     }
 
     private fun render() {
-        val selected = selectedMainBottomNavigationDestination(currentPage, isProjectBrowserOpen)
+        val state = mainBottomNavigationRenderState(currentPage, isProjectBrowserOpen)
         listOf(
             binding.tabChat to MainBottomNavigationDestination.CHAT,
             binding.tabProject to MainBottomNavigationDestination.PROJECT,
             binding.tabProfile to MainBottomNavigationDestination.PROFILE
         ).forEach { (tab, destination) ->
-            updateTabVisual(tab, destination == selected)
+            updateTabVisual(tab, destination == state.selectedPage)
         }
-        val menuSelected = selected == MainBottomNavigationDestination.MENU
-        binding.bottomMenuButton.isSelected = menuSelected
-        binding.bottomMenuSelection.isSelected = menuSelected
-        binding.bottomMenuIcon.isSelected = menuSelected
+        binding.bottomMenuButton.isSelected = false
+        binding.bottomMenuButton.isActivated = state.isMenuActivated
+        binding.bottomMenuIcon.isActivated = state.isMenuActivated
     }
 }
