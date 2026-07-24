@@ -61,6 +61,11 @@ try {
         'cargo metadata must remain valid UTF-8 JSON under a non-ASCII repository path'
     Assert-True ([string]$metadata.target_directory -ne '') `
         'UTF-8 cargo metadata must expose the resolved target directory'
+    $gitCommonDir = Get-NodeAgentGitCommonDir -RepoRoot $RepoRoot
+    Assert-True (Test-Path -LiteralPath $gitCommonDir -PathType Container) `
+        'Git common directory must remain a valid path under a non-ASCII repository path'
+    Assert-True ($gitCommonDir.EndsWith('.git', [System.StringComparison]::OrdinalIgnoreCase)) `
+        'Git common directory must resolve to the shared repository metadata root'
 
     $artifactRoot = Join-Path $root 'input'
     New-Item -ItemType Directory -Path $artifactRoot | Out-Null

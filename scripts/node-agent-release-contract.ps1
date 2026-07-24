@@ -87,6 +87,56 @@ function Get-NodeAgentCargoMetadata {
     }
 }
 
+function Get-NodeAgentGitCommonDir {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
+
+    $resolvedRepoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
+    if ($resolvedRepoRoot.Contains('"')) {
+        throw "Git repository path contains an unsupported quote: $resolvedRepoRoot"
+    }
+
+    $git = Get-Command git -ErrorAction Stop
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $git.Source
+    $startInfo.Arguments = '-C "' + $resolvedRepoRoot + '" rev-parse --git-common-dir'
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
+    $startInfo.StandardOutputEncoding = $utf8
+    $startInfo.StandardErrorEncoding = $utf8
+
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo = $startInfo
+    try {
+        if (-not $process.Start()) {
+            throw 'git rev-parse process failed to start.'
+        }
+        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+        $stderrTask = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+        $stdout = $stdoutTask.GetAwaiter().GetResult()
+        $stderr = $stderrTask.GetAwaiter().GetResult()
+        if ($process.ExitCode -ne 0) {
+            throw "git rev-parse --git-common-dir failed ($($process.ExitCode)): $stderr"
+        }
+
+        $commonDir = $stdout.Trim()
+        if ([string]::IsNullOrWhiteSpace($commonDir) -or $commonDir.Contains("`n") -or $commonDir.Contains("`r")) {
+            throw 'git rev-parse --git-common-dir returned an invalid path.'
+        }
+        if (-not [System.IO.Path]::IsPathRooted($commonDir)) {
+            $commonDir = Join-Path $resolvedRepoRoot $commonDir
+        }
+        return [System.IO.Path]::GetFullPath($commonDir)
+    } finally {
+        $process.Dispose()
+    }
+}
+
 function Compress-ArchiveWithRetry {
     param(
         [Parameter(Mandatory = $true)][string]$Path,

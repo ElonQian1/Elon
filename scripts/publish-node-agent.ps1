@@ -587,11 +587,7 @@ $WindowsClientSha256 = Get-NodeAgentFileSha256 -Path $WindowsClientPackage
 }
 
 if (-not $SynchronousRemote) {
-    $commonDir = (git -C $RepoRoot rev-parse --git-common-dir).Trim()
-    if (-not [System.IO.Path]::IsPathRooted($commonDir)) {
-        $commonDir = Join-Path $RepoRoot $commonDir
-    }
-    $commonDir = [System.IO.Path]::GetFullPath($commonDir)
+    $commonDir = Get-NodeAgentGitCommonDir -RepoRoot $RepoRoot
     $outboxRoot = Get-NodeAgentReleaseOutboxRoot
     $outboxEvent = Add-NodeAgentRemoteReleaseEvent -OutboxRoot $outboxRoot -GitSha $GitSha `
         -Version $PackageVersion -ReleaseIdentity $ReleaseIdentity -Changelog $ReleaseChangelog `
