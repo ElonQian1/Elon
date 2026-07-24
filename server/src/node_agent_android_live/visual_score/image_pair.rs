@@ -46,7 +46,8 @@ pub(super) fn prepare_pair(
 
     let target = letterbox(target, scaled_target, canvas_width, canvas_height);
     let current = letterbox(current, scaled_current, canvas_width, canvas_height);
-    let eligible = build_eligibility(canvas_width, canvas_height, mask, scale);
+    let mut eligible = build_eligibility(canvas_width, canvas_height, mask, scale);
+    apply_target_alpha_eligibility(&target, &mut eligible);
     Ok(PreparedImagePair {
         target,
         current,
@@ -124,4 +125,14 @@ fn build_eligibility(width: u32, height: u32, mask: &VisualMask, scale: f64) -> 
         }
     }
     eligible
+}
+
+fn apply_target_alpha_eligibility(target: &RgbaImage, eligible: &mut [bool]) {
+    for (index, pixel) in target.pixels().enumerate() {
+        if pixel[3] == 0 {
+            if let Some(value) = eligible.get_mut(index) {
+                *value = false;
+            }
+        }
+    }
 }

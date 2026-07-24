@@ -20,6 +20,103 @@ fn identical_images_pass_every_hard_gate() {
 }
 
 #[test]
+fn transparent_target_compares_only_effective_alpha_pixels() {
+    let mut target = RgbaImage::from_pixel(40, 40, Rgba([255, 255, 255, 0]));
+    let mut current = RgbaImage::from_pixel(40, 40, Rgba([16, 24, 32, 255]));
+    for y in 10..30 {
+        for x in 10..30 {
+            target.put_pixel(x, y, Rgba([40, 120, 220, 255]));
+            current.put_pixel(x, y, Rgba([40, 120, 220, 255]));
+        }
+    }
+
+    let result = compare_dynamic_images(
+        &DynamicImage::ImageRgba8(target),
+        &DynamicImage::ImageRgba8(current),
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(result.mean_absolute_color_error, 0.0);
+    assert_eq!(result.edge_error, 0.0);
+    assert_eq!(result.score_report.coverage.eligible_pixels, 400);
+    assert_eq!(result.score_report.coverage.compared_pixels, 400);
+    assert_eq!(result.score_report.coverage.ratio, 1.0);
+    assert!(result.score_report.target_gate.passed);
+}
+
+#[test]
+fn transparent_target_keeps_coverage_failure_for_missing_effective_pixels() {
+    let mut target = RgbaImage::from_pixel(20, 20, Rgba([0, 0, 0, 0]));
+    for y in 5..15 {
+        for x in 5..15 {
+            target.put_pixel(x, y, Rgba([80, 160, 240, 255]));
+        }
+    }
+    let current = RgbaImage::from_pixel(20, 20, Rgba([0, 0, 0, 0]));
+
+    let result = compare_dynamic_images(
+        &DynamicImage::ImageRgba8(target),
+        &DynamicImage::ImageRgba8(current),
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(result.score_report.coverage.eligible_pixels, 100);
+    assert_eq!(result.score_report.coverage.compared_pixels, 0);
+    assert_eq!(result.score_report.coverage.ratio, 0.0);
+    assert!(!result.score_report.target_gate.coverage_passed);
+    assert!(!result.score_report.target_gate.passed);
+}
+
+#[test]
+fn antialiased_target_pixels_accept_a_valid_background_composite() {
+    let background = [24_u8, 32_u8, 40_u8];
+    let mut target = RgbaImage::from_pixel(20, 20, Rgba([0, 0, 0, 0]));
+    let mut current = RgbaImage::from_pixel(
+        20,
+        20,
+        Rgba([background[0], background[1], background[2], 255]),
+    );
+    for y in 5..15 {
+        for x in 5..15 {
+            let alpha = if matches!(x, 5 | 14) || matches!(y, 5 | 14) {
+                128
+            } else {
+                255
+            };
+            let foreground = [80_u8, 160_u8, 240_u8];
+            target.put_pixel(
+                x,
+                y,
+                Rgba([foreground[0], foreground[1], foreground[2], alpha]),
+            );
+            let blend = |channel: usize| {
+                let value = u16::from(foreground[channel]) * u16::from(alpha)
+                    + u16::from(background[channel]) * u16::from(255 - alpha);
+                ((value + 127) / 255) as u8
+            };
+            current.put_pixel(x, y, Rgba([blend(0), blend(1), blend(2), 255]));
+        }
+    }
+
+    let result = compare_dynamic_images(
+        &DynamicImage::ImageRgba8(target),
+        &DynamicImage::ImageRgba8(current),
+        None,
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(result.visual_loss, 0.0);
+    assert_eq!(result.score_report.coverage.eligible_pixels, 100);
+    assert_eq!(result.score_report.coverage.ratio, 1.0);
+    assert!(result.score_report.target_gate.passed);
+}
+
+#[test]
 fn letterbox_preserves_aspect_ratio_instead_of_stretching_to_a_square() {
     let target = solid(200, 40, [40, 80, 120, 255]);
     let current = solid(100, 40, [40, 80, 120, 255]);

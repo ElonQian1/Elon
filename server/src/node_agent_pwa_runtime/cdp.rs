@@ -187,7 +187,7 @@ pub(super) fn number(value: &Value, key: &str) -> Result<f64, CaptureDiagnostic>
 }
 
 pub(super) struct NetworkState {
-    pub(super) inflight: HashSet<String>,
+    pub(super) inflight: BTreeMap<String, String>,
     pub(super) document_status: Option<u16>,
     pub(super) last_activity: Instant,
 }
@@ -195,7 +195,7 @@ pub(super) struct NetworkState {
 impl NetworkState {
     pub(super) fn new() -> Self {
         Self {
-            inflight: HashSet::new(),
+            inflight: BTreeMap::new(),
             document_status: None,
             last_activity: Instant::now(),
         }
@@ -206,28 +206,46 @@ impl NetworkState {
             match event.get("method").and_then(Value::as_str) {
                 Some("Network.requestWillBeSent") => {
                     if let Some(id) = event.pointer("/params/requestId").and_then(Value::as_str) {
-                        self.inflight.insert(id.to_string());
+                        let resource_type = event
+                            .pointer("/params/type")
+                            .and_then(Value::as_str)
+                            .unwrap_or("Unknown");
+                        if !matches!(resource_type, "WebSocket" | "EventSource") {
+                            self.inflight
+                                .insert(id.to_string(), resource_type.to_string());
+                            self.last_activity = Instant::now();
+                        }
                     }
-                    self.last_activity = Instant::now();
                 }
                 Some("Network.loadingFinished" | "Network.loadingFailed") => {
                     if let Some(id) = event.pointer("/params/requestId").and_then(Value::as_str) {
-                        self.inflight.remove(id);
+                        if self.inflight.remove(id).is_some() {
+                            self.last_activity = Instant::now();
+                        }
                     }
-                    self.last_activity = Instant::now();
                 }
                 Some("Network.responseReceived") => {
-                    if event.pointer("/params/type").and_then(Value::as_str) == Some("Document") {
+                    let resource_type = event.pointer("/params/type").and_then(Value::as_str);
+                    if resource_type == Some("Document") {
                         self.document_status = event
                             .pointer("/params/response/status")
                             .and_then(Value::as_f64)
                             .map(|value| value as u16);
                     }
-                    self.last_activity = Instant::now();
+                    if !matches!(resource_type, Some("WebSocket" | "EventSource")) {
+                        self.last_activity = Instant::now();
+                    }
                 }
                 _ => {}
             }
         }
+    }
+
+    pub(super) fn pending_types(&self) -> Vec<String> {
+        let mut values = self.inflight.values().cloned().collect::<Vec<_>>();
+        values.sort();
+        values.dedup();
+        values
     }
 }
 

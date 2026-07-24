@@ -72,19 +72,26 @@ pub(super) async fn render(
             "缩短页面等待、修复卡住的本机 PWA，或在 500..120000ms 内调整 timeoutMs",
         ))
     });
-    let cleanup = browser.shutdown(&mut cdp).await;
+    let (cleanup, browser_stderr) = browser.shutdown(&mut cdp).await;
     if !cleanup.browser_process_reaped || !cleanup.temporary_profile_removed {
         return Err(CaptureDiagnostic::new(
             "BROWSER_CLEANUP_FAILED",
             "无头浏览器进程或临时会话目录未能完整回收",
             true,
             "确认安全软件未锁定临时目录后重试；不要复用本次 authProfile 会话",
-        ));
+        )
+        .with_detail("browserStderr", json!(&browser_stderr))
+        .with_detail("processCleanup", json!(&cleanup)));
     }
-    result.map(|mut rendered| {
-        rendered.process_cleanup = cleanup;
-        rendered
-    })
+    match result {
+        Ok(mut rendered) => {
+            rendered.process_cleanup = cleanup;
+            Ok(rendered)
+        }
+        Err(diagnostic) => Err(diagnostic
+            .with_detail("browserStderr", json!(&browser_stderr))
+            .with_detail("processCleanup", json!(&cleanup))),
+    }
 }
 
 async fn render_page(
@@ -292,9 +299,10 @@ async fn wait_for_page(
         }})()"#
     );
     let mut network = NetworkState::new();
+    let mut snapshot = PageWaitSnapshot::default();
     loop {
         if Instant::now() >= deadline {
-            return Err(wait_timeout(prepared));
+            return Err(wait_timeout(prepared, &snapshot, &network));
         }
         let result = cdp
             .command(
@@ -321,6 +329,10 @@ async fn wait_for_page(
             .get("readyState")
             .and_then(Value::as_str)
             .unwrap_or_default();
+        snapshot.final_url = sanitized_final_url(href);
+        snapshot.ready_state = ready_state.to_string();
+        snapshot.wait_selector_found = value.get("waitFound").and_then(Value::as_bool);
+        snapshot.auth_selector_found = value.get("authReady").and_then(Value::as_bool);
         let ready = match prepared.wait_for.condition.as_str() {
             "domcontentloaded" => matches!(ready_state, "interactive" | "complete"),
             "load" => ready_state == "complete",
@@ -475,14 +487,53 @@ fn auth_failure(prepared: &PreparedCapture) -> CaptureDiagnostic {
     }
 }
 
-fn wait_timeout(prepared: &PreparedCapture) -> CaptureDiagnostic {
+#[derive(Default)]
+struct PageWaitSnapshot {
+    final_url: Option<String>,
+    ready_state: String,
+    wait_selector_found: Option<bool>,
+    auth_selector_found: Option<bool>,
+}
+
+fn sanitized_final_url(href: &str) -> Option<String> {
+    reqwest::Url::parse(href)
+        .ok()
+        .and_then(|url| security::sanitize_url(&url).ok())
+        .map(|route| route.sanitized_url)
+}
+
+fn wait_timeout(
+    prepared: &PreparedCapture,
+    snapshot: &PageWaitSnapshot,
+    network: &NetworkState,
+) -> CaptureDiagnostic {
+    let final_url = snapshot.final_url.clone().or_else(|| {
+        security::sanitize_url(&prepared.url)
+            .ok()
+            .map(|route| route.sanitized_url)
+    });
+    let details = json!({
+        "finalUrl": final_url,
+        "documentReadyState": snapshot.ready_state,
+        "selectorResult": {
+            "waitSelector": prepared.wait_for.selector,
+            "waitSelectorFound": snapshot.wait_selector_found,
+            "authenticatedReadySelector": prepared.auth.ready_selector,
+            "authenticatedReadySelectorFound": snapshot.auth_selector_found,
+        },
+        "waitCondition": prepared.wait_for.condition,
+        "documentStatus": network.document_status,
+        "pendingRequestCount": network.inflight.len(),
+        "pendingRequestTypes": network.pending_types(),
+    });
     if prepared.auth.ready_selector.is_some() && prepared.auth.profile.is_some() {
         return CaptureDiagnostic::new(
             "AUTHENTICATION_FAILED",
             "认证就绪 selector 在超时前未出现",
             false,
             "刷新本机会话 profile，或修正 authenticatedReadySelector",
-        );
+        )
+        .with_detail("pageState", details);
     }
     CaptureDiagnostic::new(
         "WAIT_TIMEOUT",
@@ -490,6 +541,7 @@ fn wait_timeout(prepared: &PreparedCapture) -> CaptureDiagnostic {
         true,
         "检查本机 PWA 状态、等待 selector 和网络请求后重试",
     )
+    .with_detail("pageState", details)
 }
 
 fn output_limit() -> CaptureDiagnostic {

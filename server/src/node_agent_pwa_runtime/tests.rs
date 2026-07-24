@@ -247,10 +247,10 @@ async fn temporary_profile_cleanup_backoff_is_cancellable() {
 }
 
 #[tokio::test]
-async fn real_headless_fixture_produces_exact_decodable_png_and_cleans_process() {
+async fn real_headless_http_200_fixture_ignores_long_lived_channel_and_captures_png() {
     let root = project_root("e2e");
     let (url, server) = fixture(
-        r#"<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;background:#14324a}#ready{width:120px;height:80px;background:#f2c94c}</style><main id="ready">PWA runtime proof</main>"#,
+        r#"<!doctype html><meta charset="utf-8"><style>html,body{margin:0;width:100%;height:100%;background:#14324a}#ready{width:120px;height:80px;background:#f2c94c}</style><main id="ready">PWA runtime proof</main><script>window.channel = new EventSource('/events')</script>"#,
     )
     .await;
     let mut capture_input = input(url);
@@ -305,6 +305,26 @@ async fn real_headless_fixture_reports_timeout_and_auth_without_false_png() {
         return;
     }
     assert_eq!(timeout["diagnostic"]["code"], "WAIT_TIMEOUT", "{timeout:#}");
+    assert_eq!(
+        timeout["diagnostic"]["details"]["pageState"]["documentReadyState"],
+        "complete"
+    );
+    assert_eq!(
+        timeout["diagnostic"]["details"]["pageState"]["documentStatus"],
+        200
+    );
+    assert_eq!(
+        timeout["diagnostic"]["details"]["pageState"]["selectorResult"]["waitSelectorFound"],
+        false
+    );
+    assert!(timeout["diagnostic"]["details"]["pageState"]["finalUrl"]
+        .as_str()
+        .unwrap()
+        .starts_with("http://127.0.0.1:"));
+    assert_eq!(
+        timeout["diagnostic"]["details"]["browserStderr"]["captured"],
+        true
+    );
     assert!(timeout.get("artifact").is_none());
     server.abort();
 

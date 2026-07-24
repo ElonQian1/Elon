@@ -1,7 +1,9 @@
 use super::{cdp::CdpClient, cdp::CdpSocket, CaptureDiagnostic};
+use serde::Serialize;
 use serde_json::json;
 use std::{
     fs,
+    io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
     process::Stdio,
     time::{Duration, Instant},
@@ -13,10 +15,20 @@ use super::browser::ProcessCleanup;
 const PROFILE_CLEANUP_TIMEOUT: Duration = Duration::from_secs(5);
 const PROFILE_CLEANUP_INITIAL_BACKOFF: Duration = Duration::from_millis(50);
 const PROFILE_CLEANUP_MAX_BACKOFF: Duration = Duration::from_millis(500);
+const STDERR_TAIL_BYTES: u64 = 8 * 1024;
 
 pub(super) struct BrowserProcess {
     child: Child,
     profile_dir: PathBuf,
+    stderr_path: PathBuf,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct BrowserStderrDiagnostic {
+    captured: bool,
+    truncated: bool,
+    tail: Vec<String>,
 }
 
 impl BrowserProcess {
@@ -25,6 +37,14 @@ impl BrowserProcess {
             .join("elon-pwa-runtime")
             .join(uuid::Uuid::new_v4().simple().to_string());
         fs::create_dir_all(&profile_dir).map_err(|_| launch_error())?;
+        let stderr_path = profile_dir.join("browser.stderr.log");
+        let stderr = match fs::File::create(&stderr_path) {
+            Ok(stderr) => stderr,
+            Err(_) => {
+                let _ = fs::remove_dir_all(&profile_dir);
+                return Err(launch_error());
+            }
+        };
         let mut command = tokio::process::Command::new(executable);
         command
             .args([
@@ -42,7 +62,7 @@ impl BrowserProcess {
             .arg(format!("--user-data-dir={}", profile_dir.display()))
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null());
+            .stderr(Stdio::from(stderr));
         crate::node_agent_exec::hide_tokio_command_window(&mut command);
         let child = match command.spawn() {
             Ok(child) => child,
@@ -51,7 +71,11 @@ impl BrowserProcess {
                 return Err(launch_error());
             }
         };
-        let mut process = Self { child, profile_dir };
+        let mut process = Self {
+            child,
+            profile_dir,
+            stderr_path,
+        };
         let active_port = process.profile_dir.join("DevToolsActivePort");
         let started = Instant::now();
         let content = loop {
@@ -87,7 +111,10 @@ impl BrowserProcess {
         Ok((process, socket))
     }
 
-    pub(super) async fn shutdown(&mut self, cdp: &mut CdpClient) -> ProcessCleanup {
+    pub(super) async fn shutdown(
+        &mut self,
+        cdp: &mut CdpClient,
+    ) -> (ProcessCleanup, BrowserStderrDiagnostic) {
         let deadline = Instant::now() + Duration::from_secs(2);
         let _ = cdp
             .command("Browser.close", json!({}), None, deadline)
@@ -102,11 +129,15 @@ impl BrowserProcess {
                 .await
                 .is_ok();
         }
+        let stderr = read_stderr_diagnostic(&self.stderr_path, &self.profile_dir);
         let removed = remove_temporary_profile(&self.profile_dir).await;
-        ProcessCleanup {
-            browser_process_reaped: reaped,
-            temporary_profile_removed: removed,
-        }
+        (
+            ProcessCleanup {
+                browser_process_reaped: reaped,
+                temporary_profile_removed: removed,
+            },
+            stderr,
+        )
     }
 
     async fn abort_launch(&mut self) {
@@ -114,6 +145,62 @@ impl BrowserProcess {
         let _ = tokio::time::timeout(Duration::from_secs(5), self.child.wait()).await;
         let _ = remove_temporary_profile(&self.profile_dir).await;
     }
+}
+
+fn read_stderr_diagnostic(path: &Path, profile_dir: &Path) -> BrowserStderrDiagnostic {
+    let Ok(mut file) = fs::File::open(path) else {
+        return BrowserStderrDiagnostic {
+            captured: false,
+            truncated: false,
+            tail: Vec::new(),
+        };
+    };
+    let length = file.metadata().map(|value| value.len()).unwrap_or(0);
+    let truncated = length > STDERR_TAIL_BYTES;
+    if truncated
+        && file
+            .seek(SeekFrom::End(-(STDERR_TAIL_BYTES as i64)))
+            .is_err()
+    {
+        return BrowserStderrDiagnostic {
+            captured: false,
+            truncated,
+            tail: Vec::new(),
+        };
+    }
+    let mut bytes = Vec::new();
+    if file.read_to_end(&mut bytes).is_err() {
+        return BrowserStderrDiagnostic {
+            captured: false,
+            truncated,
+            tail: Vec::new(),
+        };
+    }
+    let text = String::from_utf8_lossy(&bytes)
+        .replace(&profile_dir.display().to_string(), "<temporary-profile>");
+    BrowserStderrDiagnostic {
+        captured: true,
+        truncated,
+        tail: text
+            .lines()
+            .map(redact_stderr_urls)
+            .filter(|line| !line.trim().is_empty())
+            .take(40)
+            .collect(),
+    }
+}
+
+fn redact_stderr_urls(line: &str) -> String {
+    line.split_whitespace()
+        .map(|token| {
+            if token.contains("http://") || token.contains("https://") {
+                "<url-redacted>"
+            } else {
+                token
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 async fn remove_temporary_profile(profile_dir: &Path) -> bool {

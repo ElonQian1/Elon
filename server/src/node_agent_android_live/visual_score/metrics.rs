@@ -76,29 +76,33 @@ pub(super) fn pixel_metrics(
             continue;
         }
         eligible_pixels += 1;
-        if left[3] == 0 || right[3] == 0 {
+        // Target alpha=0 pixels are removed from `eligible` while preparing the
+        // pair. A missing current pixel must still reduce coverage, so only the
+        // current side is skipped here.
+        if right[3] == 0 {
             continue;
         }
-        let normalized_text_aa = cross_renderer_text_aa_pair(left, right);
+        let expected = alpha_aware_target_pixel(left, right);
+        let normalized_text_aa = cross_renderer_text_aa_pair(&expected, right);
         let pixel_error = if normalized_text_aa {
-            (luminance(left) - luminance(right)).abs()
+            (luminance(&expected) - luminance(right)).abs()
         } else {
-            (left[0].abs_diff(right[0]) as f64
-                + left[1].abs_diff(right[1]) as f64
-                + left[2].abs_diff(right[2]) as f64)
+            (expected[0].abs_diff(right[0]) as f64
+                + expected[1].abs_diff(right[1]) as f64
+                + expected[2].abs_diff(right[2]) as f64)
                 / (3.0 * 255.0)
         };
         color_errors.push(pixel_error);
         color_sum += pixel_error;
         let delta_e = if normalized_text_aa {
-            (luminance(left) - luminance(right)).abs() * 100.0
+            (luminance(&expected) - luminance(right)).abs() * 100.0
         } else {
-            delta_e_76(srgb_to_lab(left), srgb_to_lab(right))
+            delta_e_76(srgb_to_lab(&expected), srgb_to_lab(right))
         };
         delta_errors.push(delta_e);
         delta_sum += delta_e;
-        alpha_sum += left[3].abs_diff(right[3]) as f64 / 255.0;
-        luminance_sum += (luminance(left) - luminance(right)).abs();
+        alpha_sum += expected[3].abs_diff(right[3]) as f64 / 255.0;
+        luminance_sum += (luminance(&expected) - luminance(right)).abs();
         compared += 1;
     }
 
@@ -140,8 +144,8 @@ pub(super) fn pixel_metrics(
 }
 
 fn edge_metrics(target: &RgbaImage, current: &RgbaImage, eligible: &[bool]) -> (f64, f64) {
-    let left = edge_map(target);
-    let right = edge_map(current);
+    let left = alpha_aware_target_edge_map(target, current, eligible);
+    let right = edge_map(current, eligible);
     let mut error_sum = 0.0;
     let mut compared = 0_u64;
     for index in 0..left.len().min(right.len()) {
@@ -155,12 +159,47 @@ fn edge_metrics(target: &RgbaImage, current: &RgbaImage, eligible: &[bool]) -> (
     (1.0 - error, error)
 }
 
-fn edge_map(image: &RgbaImage) -> Vec<u8> {
+fn alpha_aware_target_edge_map(
+    target: &RgbaImage,
+    current: &RgbaImage,
+    eligible: &[bool],
+) -> Vec<u8> {
+    let mut composited = target.clone();
+    for (index, (left, right)) in target.pixels().zip(current.pixels()).enumerate() {
+        if eligible.get(index).copied().unwrap_or(false) {
+            composited.put_pixel(
+                index as u32 % target.width(),
+                index as u32 / target.width(),
+                alpha_aware_target_pixel(left, right),
+            );
+        }
+    }
+    edge_map(&composited, eligible)
+}
+
+fn alpha_aware_target_pixel(
+    target: &image::Rgba<u8>,
+    current: &image::Rgba<u8>,
+) -> image::Rgba<u8> {
+    let alpha = f64::from(target[3]) / 255.0;
+    let mut expected = *target;
+    for channel in 0..3 {
+        let lower = f64::from(target[channel]) * alpha;
+        let upper = lower + 255.0 * (1.0 - alpha);
+        expected[channel] = f64::from(current[channel]).clamp(lower, upper).round() as u8;
+    }
+    // A target design with transparency describes foreground coverage, while
+    // the Android process frame describes the already-composited output.
+    expected[3] = current[3];
+    expected
+}
+
+fn edge_map(image: &RgbaImage, eligible: &[bool]) -> Vec<u8> {
     let width = image.width() as usize;
     let height = image.height() as usize;
     let mut gray = vec![0_u8; width * height];
     for (index, pixel) in image.pixels().enumerate() {
-        if pixel[3] != 0 {
+        if eligible.get(index).copied().unwrap_or(false) && pixel[3] != 0 {
             gray[index] = (luminance(pixel) * 255.0).round() as u8;
         }
     }

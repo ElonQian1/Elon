@@ -109,6 +109,8 @@ pub(crate) struct CaptureDiagnostic {
     pub(crate) message: String,
     pub(crate) retryable: bool,
     pub(crate) next_step: String,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub(crate) details: BTreeMap<String, Value>,
 }
 
 impl CaptureDiagnostic {
@@ -123,7 +125,13 @@ impl CaptureDiagnostic {
             message: message.into(),
             retryable,
             next_step: next_step.into(),
+            details: BTreeMap::new(),
         }
+    }
+
+    pub(crate) fn with_detail(mut self, key: &str, value: Value) -> Self {
+        self.details.insert(key.to_string(), value);
+        self
     }
 
     fn response(self) -> Value {
