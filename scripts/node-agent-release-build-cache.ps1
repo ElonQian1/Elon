@@ -85,11 +85,23 @@ function Get-NodeAgentReleaseInputHash {
 
     $parts = New-Object System.Collections.Generic.List[string]
     foreach ($path in $GitPaths) {
-        $identity = (& git -C $RepoRoot rev-parse "$GitSha`:$path" 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace([string]$identity)) {
+        # Windows PowerShell 5.1 does not reliably propagate LASTEXITCODE from a
+        # native command wrapped inside a parenthesized pipeline. Capture the
+        # command and its exit code first, then select the bounded output.
+        $previousPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $identityLines = @(& git -C $RepoRoot rev-parse "$GitSha`:$path" 2>$null)
+            $gitExit = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousPreference
+        }
+        $identity = @($identityLines | Select-Object -First 1)
+        $identityText = if ($identity.Count -gt 0) { [string]$identity[0] } else { '' }
+        if ($gitExit -ne 0 -or [string]::IsNullOrWhiteSpace($identityText)) {
             throw "Cannot calculate release cache input: $GitSha`:$path"
         }
-        $parts.Add("git:$path=$(([string]$identity).Trim())")
+        $parts.Add("git:$path=$($identityText.Trim())")
     }
     foreach ($version in $ToolVersions) {
         $parts.Add("tool=$(([string]$version).Trim())")

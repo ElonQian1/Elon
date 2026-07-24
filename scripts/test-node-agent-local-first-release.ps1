@@ -95,6 +95,20 @@ try {
     }
     Assert-True $linuxIntentConflict 'an immutable outbox event must not silently change Linux intent'
 
+    $headSha = [string](& git -C $RepoRoot rev-parse HEAD)
+    & cmd.exe /d /c exit 9
+    Assert-Equal $LASTEXITCODE 9 'fixture must seed a stale native exit code'
+    $desktopTreeHash = Get-NodeAgentReleaseInputHash -RepoRoot $RepoRoot -GitSha $headSha.Trim() `
+        -GitPaths @('desktop-shell/src-tauri') -ToolVersions @('rustc fixture') `
+        -EnvironmentValues @('ELON_FIXTURE=1')
+    Assert-True ($desktopTreeHash -match '^[0-9a-f]{64}$') `
+        'PS5.1 must replace a stale LASTEXITCODE when hashing a valid Git tree'
+    Assert-Throws {
+        Get-NodeAgentReleaseInputHash -RepoRoot $RepoRoot -GitSha $headSha.Trim() `
+            -GitPaths @('missing-release-cache-fixture') | Out-Null
+    } 'Cannot calculate release cache input' `
+        'release cache input hashing must still fail closed for a missing Git path'
+
     $cacheRoot = Join-Path $root 'build-cache'
     $cachedFileOutput = Join-Path $root 'build-output\desktop.exe'
     $script:fileBuildCount = 0
