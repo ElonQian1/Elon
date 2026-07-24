@@ -194,7 +194,19 @@ if [ -z "${ADMIN_TOKEN:-}" ]; then
   echo "ADMIN_TOKEN missing on server" >&2
   exit 2
 fi
-json=$(curl --noproxy '*' -fsS -X POST 'http://127.0.0.1:8080/api/admin/nodes/push-update' -H "Authorization: Bearer ${ADMIN_TOKEN}" -H 'Content-Type: application/json' --data '{}')
+set +e
+json=$(curl --noproxy '*' --connect-timeout 5 --max-time 20 -fsS -X POST 'http://127.0.0.1:8080/api/admin/nodes/push-update' -H "Authorization: Bearer ${ADMIN_TOKEN}" -H 'Content-Type: application/json' --data '{}' 2>/dev/null)
+curl_status=$?
+set -e
+if [ "$curl_status" -eq 28 ]; then
+  # The POST may have reached the local server. Let the bounded handshake
+  # determine whether activation won instead of replaying a non-repeatable call.
+  exit 0
+fi
+if [ "$curl_status" -ne 0 ]; then
+  echo "push-update request failed with curl status $curl_status" >&2
+  exit "$curl_status"
+fi
 printf '%s' "$json" | base64 | tr -d '\n'
 '@
     $raw = Invoke-RemoteBash -Script $script
@@ -222,7 +234,7 @@ if [ -z "${ADMIN_TOKEN:-}" ]; then
   echo "ADMIN_TOKEN missing on server" >&2
   exit 2
 fi
-json=$(curl --noproxy '*' -fsS 'http://127.0.0.1:8080/api/admin/nodes/public-dev-handshake' -H "Authorization: Bearer ${ADMIN_TOKEN}")
+json=$(curl --noproxy '*' --connect-timeout 5 --max-time 15 -fsS 'http://127.0.0.1:8080/api/admin/nodes/public-dev-handshake' -H "Authorization: Bearer ${ADMIN_TOKEN}")
 printf '%s' "$json" | base64 | tr -d '\n'
 '@
     $raw = Invoke-RemoteBash -Script $script

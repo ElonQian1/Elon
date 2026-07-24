@@ -411,6 +411,12 @@ try {
     $workerText = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'node-agent-remote-release-worker.ps1')
     Assert-True ($workerText.Contains('WaitForExit($AttemptTimeoutSeconds * 1000)')) `
         'each remote attempt must have a finite process timeout'
+    Assert-True ($workerText.Contains('[int]$AttemptTimeoutSeconds = 600')) `
+        'one stalled remote attempt must not serialize the durable outbox for an hour'
+    Assert-True ($publishText.Contains("--connect-timeout 5 --max-time 20 -fsS -X POST")) `
+        'remote update broadcast must have a bounded response window'
+    Assert-True ($publishText.Contains('if [ "$curl_status" -eq 28 ]')) `
+        'a timed-out non-repeatable broadcast must continue to bounded handshake verification'
     Assert-True ($workerText.Contains('Resolve-EventSourceWorktree')) `
         'worker restart must reconstruct the immutable source worktree from durable state'
     Assert-True ($workerText.Contains("`$arguments += '-IncludeLinux'")) `
