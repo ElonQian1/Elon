@@ -282,18 +282,22 @@ pub(crate) fn recover_checkpoint_after_startup(runtime: Arc<NodeRuntime>) {
                 .map(|receipt| (task_id.clone(), receipt.active_task_id().to_string()))
         })
         .collect::<std::collections::HashMap<_, _>>();
-    if !recover_checkpoint_state(
+    let changed = recover_checkpoint_state(
         &mut checkpoint,
         &recovered,
         &crate::node_agent_release_identity::current(),
-    ) {
-        return;
+    );
+    if changed {
+        let _ = save_checkpoint(&checkpoint);
     }
     let update_id = checkpoint.update_id.clone();
-    let _ = save_checkpoint(&checkpoint);
-    if checkpoint.state == "resume_required" {
+    if checkpoint_needs_startup_reconciler(&checkpoint) {
         spawn_startup_checkpoint_reconciler(runtime, update_id);
     }
+}
+
+fn checkpoint_needs_startup_reconciler(checkpoint: &RestartCheckpoint) -> bool {
+    checkpoint.state == "resume_required"
 }
 
 fn auto_resume_state(state: crate::node_agent_update_recovery::UpdateRecoveryState) -> bool {
@@ -614,6 +618,20 @@ mod tests {
             startup_checkpoint_disposition(Some("done"), true),
             StartupCheckpointDisposition::Blocking
         );
+    }
+
+    #[test]
+    fn persisted_resume_required_checkpoint_still_needs_startup_reconciliation() {
+        let mut checkpoint =
+            RestartCheckpoint::draining("test", vec!["old-task".to_string()], None, None);
+        checkpoint.transition("resume_required", "old state");
+
+        assert!(!recover_checkpoint_state(
+            &mut checkpoint,
+            &Default::default(),
+            "test-release"
+        ));
+        assert!(checkpoint_needs_startup_reconciler(&checkpoint));
     }
 
     #[test]
