@@ -407,11 +407,7 @@ fn display_path(path: &Path) -> String {
 }
 
 fn same_path(left: &Path, right: &Path) -> bool {
-    if cfg!(windows) {
-        display_path(left).eq_ignore_ascii_case(&display_path(right))
-    } else {
-        left == right
-    }
+    crate::node_agent_update_checkpoint::same_path(left, right)
 }
 
 fn same_component(left: &str, right: &str) -> bool {

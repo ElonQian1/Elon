@@ -138,6 +138,58 @@ fn inspect_reports_rebuild_without_mutating_path() {
     assert!(!fixture.active.exists());
 }
 
+#[cfg(windows)]
+#[test]
+fn recycled_resume_accepts_extended_length_receipt_path_but_rejects_another_path() {
+    let mut fixture = Fixture::new();
+    fixture.receipt.workspace.workspace_path = format!(r"\\?\{}", fixture.active.to_string_lossy());
+
+    let resolved = resolve_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        None,
+        None,
+        "project-a",
+        path(&fixture.base),
+        Some(&fixture.receipt),
+        ResumeWorkspaceMode::Inspect,
+    )
+    .expect("the Windows extended-length spelling must retain the recorded workspace identity");
+
+    assert!(resolved.requires_recreation);
+    assert_eq!(
+        resolved.inherited_workspace.workspace_path,
+        fixture.active.to_string_lossy()
+    );
+    assert!(!fixture.active.exists());
+
+    fixture.receipt.workspace.workspace_path = format!(
+        r"\\?\{}",
+        fixture
+            .active
+            .parent()
+            .unwrap()
+            .join("another-conversation")
+            .to_string_lossy()
+    );
+    let error = resolve_resume_workspace(
+        &fixture.contract,
+        &fixture.parent,
+        None,
+        None,
+        "project-a",
+        path(&fixture.base),
+        Some(&fixture.receipt),
+        ResumeWorkspaceMode::Inspect,
+    )
+    .expect_err("a different extended-length path must remain fail-closed");
+
+    assert!(
+        format!("{error:#}").contains("receipt workspace path does not match the parent record")
+    );
+    assert!(!fixture.active.exists());
+}
+
 #[test]
 fn recycled_resume_of_resume_keeps_the_recorded_inherited_identity() {
     let mut fixture = Fixture::new();
