@@ -37,6 +37,12 @@ pub(super) enum DrainTaskDisposition {
     SafeStaleCancel,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub(super) enum StartupCheckpointDisposition {
+    Blocking,
+    Recoverable,
+}
+
 pub(super) fn drain_task_disposition(
     status: &str,
     exact_target_bound: bool,
@@ -142,6 +148,79 @@ pub(super) async fn classify_supervised_tasks(
         .stale_cancel_proofs
         .sort_by(|left, right| left.task_id.cmp(&right.task_id));
     Ok(result)
+}
+
+#[derive(Default)]
+pub(super) struct StartupCheckpointClassification {
+    pub(super) blocking: Vec<String>,
+    pub(super) recoverable: Vec<String>,
+}
+
+pub(super) async fn classify_startup_checkpoint_tasks(
+    runtime: &NodeRuntime,
+    task_ids: &[String],
+) -> anyhow::Result<StartupCheckpointClassification> {
+    let now = super::now_ms();
+    let fresh_handles = runtime
+        .active_cli_prompts
+        .views_without_approvals()
+        .await
+        .into_iter()
+        .filter(|handle| {
+            handle.control_handle_live
+                && now.saturating_sub(handle.last_heartbeat_ms) <= ACTIVE_HANDLE_STALE_AFTER_MS
+        })
+        .map(|handle| handle.req_id)
+        .collect::<HashSet<_>>();
+    let mut result = StartupCheckpointClassification::default();
+    for task_id in task_ids {
+        let task = runtime.local_tasks.get(task_id)?;
+        let mut has_execution_owner = fresh_handles.contains(task_id);
+        if !has_execution_owner {
+            has_execution_owner = runtime
+                .cli_sidecars
+                .session_for_task(task_id)?
+                .is_some_and(|session| session.protects_startup_reconcile_at(now));
+        }
+        if !has_execution_owner {
+            has_execution_owner = runtime.task_journal.record(task_id)?.is_some_and(|record| {
+                if !matches!(
+                    record.status.as_str(),
+                    "running" | "recovering" | "reattaching" | "cancel_requested"
+                ) {
+                    return false;
+                }
+                let heartbeat = record.heartbeat_at_ms.unwrap_or(record.updated_at_ms);
+                if heartbeat <= now && now.saturating_sub(heartbeat) <= ACTIVE_HANDLE_STALE_AFTER_MS
+                {
+                    return true;
+                }
+                crate::node_agent_local_task_orphan_reconcile::recorded_process_is_live(&record)
+                    .unwrap_or(true)
+            });
+        }
+        match startup_checkpoint_disposition(
+            task.as_ref().map(|task| task.status.as_str()),
+            has_execution_owner,
+        ) {
+            StartupCheckpointDisposition::Blocking => result.blocking.push(task_id.clone()),
+            StartupCheckpointDisposition::Recoverable => result.recoverable.push(task_id.clone()),
+        }
+    }
+    result.blocking.sort();
+    result.recoverable.sort();
+    Ok(result)
+}
+
+pub(super) fn startup_checkpoint_disposition(
+    _status: Option<&str>,
+    has_execution_owner: bool,
+) -> StartupCheckpointDisposition {
+    if has_execution_owner {
+        StartupCheckpointDisposition::Blocking
+    } else {
+        StartupCheckpointDisposition::Recoverable
+    }
 }
 
 #[derive(Debug, Clone)]

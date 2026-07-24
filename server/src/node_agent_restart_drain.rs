@@ -14,13 +14,18 @@ use crate::NodeRuntime;
 
 mod admission;
 mod classification;
+mod startup;
 use admission::admit_running_update;
 #[cfg(test)]
 use admission::{exact_target_identity as admission_exact_target, update_request_matches};
 use classification::classify_supervised_tasks;
 use classification::StaleCancelProof;
 #[cfg(test)]
-use classification::{drain_task_disposition, load_drain_candidates, DrainTaskDisposition};
+use classification::{
+    drain_task_disposition, load_drain_candidates, startup_checkpoint_disposition,
+    DrainTaskDisposition, StartupCheckpointDisposition,
+};
+use startup::spawn_startup_checkpoint_reconciler;
 
 const CHECKPOINT_PROTOCOL: &str = "elon.local_supervision_restart.v1";
 const DRAIN_POLL_SECS: u64 = 3;
@@ -260,9 +265,7 @@ pub(crate) async fn schedule_update(
     }))
 }
 
-pub(crate) fn recover_checkpoint_after_startup(
-    update_recovery: &crate::node_agent_update_recovery::UpdateRecoveryStore,
-) {
+pub(crate) fn recover_checkpoint_after_startup(runtime: Arc<NodeRuntime>) {
     let Ok(Some(mut checkpoint)) = load_checkpoint() else {
         return;
     };
@@ -270,7 +273,8 @@ pub(crate) fn recover_checkpoint_after_startup(
         .active_task_ids
         .iter()
         .filter_map(|task_id| {
-            update_recovery
+            runtime
+                .update_recovery
                 .receipt_for_task(task_id)
                 .ok()
                 .flatten()
@@ -285,7 +289,11 @@ pub(crate) fn recover_checkpoint_after_startup(
     ) {
         return;
     }
+    let update_id = checkpoint.update_id.clone();
     let _ = save_checkpoint(&checkpoint);
+    if checkpoint.state == "resume_required" {
+        spawn_startup_checkpoint_reconciler(runtime, update_id);
+    }
 }
 
 fn auto_resume_state(state: crate::node_agent_update_recovery::UpdateRecoveryState) -> bool {
@@ -582,6 +590,30 @@ mod tests {
         assert_eq!(checkpoint.active_task_ids, ["local-resume-generation-2"]);
         assert_eq!(checkpoint.payload()["resume_actions"], json!([]));
         assert!(checkpoint.message.contains("无需手动 Resume"));
+    }
+
+    #[test]
+    fn startup_checkpoint_requires_execution_ownership_not_a_stale_running_label() {
+        assert_eq!(
+            startup_checkpoint_disposition(Some("running"), false),
+            StartupCheckpointDisposition::Recoverable
+        );
+        assert_eq!(
+            startup_checkpoint_disposition(Some("resume_required"), false),
+            StartupCheckpointDisposition::Recoverable
+        );
+        assert_eq!(
+            startup_checkpoint_disposition(None, false),
+            StartupCheckpointDisposition::Recoverable
+        );
+        assert_eq!(
+            startup_checkpoint_disposition(Some("running"), true),
+            StartupCheckpointDisposition::Blocking
+        );
+        assert_eq!(
+            startup_checkpoint_disposition(Some("done"), true),
+            StartupCheckpointDisposition::Blocking
+        );
     }
 
     #[test]

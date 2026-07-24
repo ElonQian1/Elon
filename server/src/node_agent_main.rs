@@ -476,7 +476,7 @@ async fn run_agent_runtime() -> Result<()> {
     }
     node_agent_sidecar_recovery::reconcile_surviving_sidecars(runtime.clone()).await;
     node_agent_update_reconcile::reconcile_startup(runtime.clone()).await;
-    node_agent_restart_drain::recover_checkpoint_after_startup(&runtime.update_recovery);
+    node_agent_restart_drain::recover_checkpoint_after_startup(runtime.clone());
     match runtime
         .update_recovery
         .mark_runtime_online_if_target(&node_agent_release_identity::current())
