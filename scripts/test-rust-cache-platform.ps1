@@ -66,6 +66,8 @@ try {
 
     $release = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -CargoArgs @("build", "--release") -ToolchainEpoch "rustc-test"
     Assert-True $release.release "release invocation should be detected"
+    $sharedRelease = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "node-agent-release" -CargoArgs @("build", "--release") -ToolchainEpoch "rustc-test" -SharedBuildPartition "node-agent-windows"
+    Assert-True ($sharedRelease.build_dir -like "*\build\rustc-test\test-project\node-agent-release\shared-node-agent-windows") "explicit release partition should be stable across isolated worktrees"
     $missingReadiness = Get-RustCacheSccacheReadiness -Disabled
     Assert-Equal "unavailable" $missingReadiness.status "disabled sccache must be explicit"
     Assert-Equal "disabled_by_caller" $missingReadiness.reason "sccache degradation reason"

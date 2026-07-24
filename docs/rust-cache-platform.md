@@ -12,13 +12,15 @@
 
 `bb64a` 和 `elon cli` 是首批参考接入项目，不是平台边界。任何项目都可通过根目录的 `rust-cache.project.json` 注册。
 
+NodeAgent 发布为 Windows、显式 Linux 和 Desktop 壳分别使用稳定命名分区，并由同一分区锁串行化。这样即使 `sccache` 暂时不可用，依赖编译产物也能跨 worktree 复用；普通开发构建仍保持 worktree 隔离。
+
 ## 分层合同
 
 | 层 | 共享范围 | 生命周期 |
 |---|---|---|
 | Cargo registry/git | 当前用户所有 Rust 项目 | Cargo 自身管理 |
 | sccache | 所有兼容 rustc 调用 | 内容寻址、LRU，独立容量设置 |
-| Cargo build-dir | 工具链 + 项目 + domain + workspace hash | 平台磁盘水位、LRU/TTL 治理 |
+| Cargo build-dir | 默认：工具链 + 项目 + domain + workspace hash；串行发布可显式使用命名共享分区 | 平台磁盘水位、LRU/TTL 治理 |
 | Cargo target-dir | 当前 workspace，发布脚本可显式覆盖 | 只承载最终产物，不作为全局缓存池 |
 | 历史 target | 外部 legacy | 只读登记；不会被平台自动删除 |
 

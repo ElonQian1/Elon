@@ -56,7 +56,8 @@ function Resolve-RustCacheInvocation {
         [string]$TargetDir,
         [string]$CacheRoot,
         [string[]]$CargoArgs = @(),
-        [string]$ToolchainEpoch
+        [string]$ToolchainEpoch,
+        [string]$SharedBuildPartition
     )
 
     $project = [System.IO.Path]::GetFullPath($ProjectRoot)
@@ -67,7 +68,12 @@ function Resolve-RustCacheInvocation {
     $workspaceHash = Get-RustCacheWorkspaceHash -WorkspaceRoot $workspace
     $epoch = if ([string]::IsNullOrWhiteSpace($ToolchainEpoch)) { Get-RustCacheToolchainEpoch } else { ConvertTo-RustCacheSlug $ToolchainEpoch }
     if ($manifest.registered) {
-        $buildDir = Join-Path $root "build\$epoch\$($manifest.project_id)\$resolvedDomain\$workspaceHash"
+        $partition = if ([string]::IsNullOrWhiteSpace($SharedBuildPartition)) {
+            $workspaceHash
+        } else {
+            "shared-" + (ConvertTo-RustCacheSlug $SharedBuildPartition)
+        }
+        $buildDir = Join-Path $root "build\$epoch\$($manifest.project_id)\$resolvedDomain\$partition"
     } else {
         $buildDir = Join-Path $root "quarantine\$workspaceHash"
     }
@@ -216,10 +222,11 @@ function Set-RustCacheBuildEnvironment {
         [string]$CacheRoot,
         [switch]$DisableSccache,
         [string]$ToolchainEpoch,
+        [string]$SharedBuildPartition,
         [string[]]$CargoArgs = @()
     )
 
-    $context = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -CargoArgs $CargoArgs -ToolchainEpoch $ToolchainEpoch
+    $context = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -CargoArgs $CargoArgs -ToolchainEpoch $ToolchainEpoch -SharedBuildPartition $SharedBuildPartition
     New-Item -ItemType Directory -Force -Path $context.build_dir, $context.target_dir | Out-Null
     $env:CARGO_BUILD_BUILD_DIR = $context.build_dir
     $env:CARGO_TARGET_DIR = $context.target_dir
@@ -278,10 +285,11 @@ function Invoke-RustCacheCargo {
         [int]$LockTimeoutSeconds = 3600,
         [string]$CargoCommand = "cargo",
         [string]$ToolchainEpoch,
+        [string]$SharedBuildPartition,
         [Parameter(Mandatory)][string[]]$CargoArgs
     )
 
-    $context = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -CargoArgs $CargoArgs -ToolchainEpoch $ToolchainEpoch
+    $context = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -CargoArgs $CargoArgs -ToolchainEpoch $ToolchainEpoch -SharedBuildPartition $SharedBuildPartition
     New-Item -ItemType Directory -Force -Path $context.build_dir | Out-Null
     $lockPath = $null
     $locationPushed = $false
@@ -293,7 +301,7 @@ function Invoke-RustCacheCargo {
             $lockPath = Enter-RustCacheLock -CacheRoot $context.cache_root -BuildDir $context.build_dir -WorkspaceRoot $context.workspace_root -TimeoutSeconds $LockTimeoutSeconds
         }
 
-        $context = Set-RustCacheBuildEnvironment -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -DisableSccache:$DisableSccache -ToolchainEpoch $ToolchainEpoch -CargoArgs $CargoArgs
+        $context = Set-RustCacheBuildEnvironment -ProjectRoot $ProjectRoot -Domain $Domain -TargetDir $TargetDir -CacheRoot $CacheRoot -DisableSccache:$DisableSccache -ToolchainEpoch $ToolchainEpoch -SharedBuildPartition $SharedBuildPartition -CargoArgs $CargoArgs
         $sccache = if ($DisableSccache) { $null } else { Get-Command sccache -ErrorAction SilentlyContinue }
         $readiness = Get-RustCacheSccacheReadiness -Disabled:$DisableSccache
 

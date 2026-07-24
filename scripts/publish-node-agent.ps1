@@ -411,6 +411,7 @@ if ($SynchronousRemote -and $IncludeLinux) {
         $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
         $env:ELON_NODE_AGENT_GIT_SHA = $GitSha
         Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain 'node-agent-release' `
+            -SharedBuildPartition 'node-agent-linux' `
             -TargetDir $env:CARGO_TARGET_DIR -CargoArgs @(
                 'zigbuild', '--manifest-path', $ServerManifest, '--release', '--locked',
                 '--bin', $Bin, '--target', 'x86_64-unknown-linux-musl'
@@ -471,6 +472,7 @@ try {
     $env:ELON_NODE_AGENT_GIT_SHA = $GitSha
     Write-Host "  Windows release rustflags: -C target-cpu=x86-64" -ForegroundColor DarkGray
     Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain 'node-agent-release' `
+        -SharedBuildPartition 'node-agent-windows' `
         -TargetDir $env:CARGO_TARGET_DIR -CargoArgs @(
             'build', '--manifest-path', $ServerManifest, '--release', '--locked', '--bin', $Bin
         )
@@ -505,6 +507,7 @@ Invoke-NodeAgentCachedFileBuild -Kind 'desktop-shell' -InputHash $desktopInputHa
             $unitSeparator = [char]0x1f
             $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
             Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain 'node-agent-release' `
+                -SharedBuildPartition 'node-agent-desktop' `
                 -TargetDir $env:CARGO_TARGET_DIR -CargoArgs @(
                     'build', '--manifest-path', $DesktopShellManifest, '--release', '--locked',
                     '--bin', 'elon-desktop'
