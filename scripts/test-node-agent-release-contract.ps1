@@ -123,6 +123,8 @@ Assert-True ($publishScript.Contains("Invoke-RustCacheCargo -ProjectRoot `$RepoR
     "Node release builds must enter the managed shared Rust cache"
 Assert-True (-not $publishScript.Contains('Get-FileHash')) `
     "The long-lived publisher must use the .NET-backed release hash helper instead of module-autoloaded Get-FileHash"
+Assert-True (-not $publishScript.Contains('New-TemporaryFile')) `
+    "The long-lived publisher must not depend on a PowerShell 7-only temporary-file command"
 Assert-True ($publishScript.Contains('[string]$ReplayPublishedSha')) `
     "The publisher must expose an explicit immutable same-SHA replay mode"
 Assert-True ($publishScript.Contains('ReplayPublishedSha was not already published/coalesced')) `

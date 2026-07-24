@@ -689,7 +689,7 @@ if ($IncludeLinux) {
     $VersionInfo.linuxSha256 = $LinuxSha256
     $VersionInfo.linuxFileSize = [int64]$size
 }
-$VersionFile = New-TemporaryFile
+$VersionFile = [System.IO.Path]::GetTempFileName()
 try {
     Write-Utf8NoBom -Path $VersionFile -Content ($VersionInfo | ConvertTo-Json -Depth 4)
     scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $VersionFile "${Server}:${RemoteDir}/node-agent-version.json"
