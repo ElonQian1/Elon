@@ -5,6 +5,7 @@ $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 . (Join-Path $PSScriptRoot 'node-agent-release-outbox.ps1')
 . (Join-Path $PSScriptRoot 'node-agent-local-activation.ps1')
 . (Join-Path $PSScriptRoot 'node-agent-release-build-cache.ps1')
+. (Join-Path $PSScriptRoot 'node-agent-local-rollback.ps1')
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -18,6 +19,21 @@ function Assert-Equal {
     }
 }
 
+function Assert-Throws {
+    param([scriptblock]$Action, [string]$Pattern, [string]$Message)
+    $caught = $null
+    try {
+        & $Action
+    } catch {
+        $caught = $_
+    }
+    if ($null -eq $caught) { throw "$Message (no exception was thrown)" }
+    if (-not [string]::IsNullOrWhiteSpace($Pattern) -and
+        $caught.Exception.Message -notmatch $Pattern) {
+        throw "$Message (actual=$($caught.Exception.Message) expected_pattern=$Pattern)"
+    }
+}
+
 foreach ($moduleName in @(
     'publish-node-agent.ps1',
     'node-agent-publish-handshake.ps1',
@@ -25,6 +41,7 @@ foreach ($moduleName in @(
     'node-agent-release-build-cache.ps1',
     'node-agent-remote-release-worker.ps1',
     'node-agent-local-activation.ps1',
+    'node-agent-local-rollback.ps1',
     'node-agent-post-terminal-activator.ps1'
 )) {
     $tokens = $null
@@ -162,6 +179,76 @@ try {
     $selected = Get-LatestNodeAgentVerifiedLocalRelease -StateRoot $activationRoot
     Assert-Equal $selected.release_identity $new.ReleaseIdentity 'activator must select latest verified identity'
 
+    $installRoot = Join-Path $root 'installed\ElonNode'
+    $internalRoot = Join-Path $installRoot '_internal'
+    $pcAssetRoot = Join-Path $internalRoot 'pc-next-dist\assets'
+    New-Item -ItemType Directory -Path $pcAssetRoot -Force | Out-Null
+    $stableFiles = [ordered]@{
+        '一龙开发平台.exe' = 'old-client'
+        '卸载一龙开发平台.exe' = 'old-uninstaller'
+        '_internal\elon-desktop.exe' = 'old-node'
+        '_internal\node-agent-version.json' = '{"release_identity":"old"}'
+        '_internal\node-agent.env' = 'ELON_DESKTOP_REVIEW_PUBLIC_KEYS_JSON=[]'
+        '_internal\README.txt' = 'old-readme'
+        '_internal\pc-next-dist\index.html' = '<html>old</html>'
+        '_internal\pc-next-dist\assets\app.js' = 'old-app'
+    }
+    foreach ($relative in $stableFiles.Keys) {
+        $path = Join-Path $installRoot $relative
+        New-Item -ItemType Directory -Path (Split-Path -Parent $path) -Force | Out-Null
+        [System.IO.File]::WriteAllText($path, [string]$stableFiles[$relative], [System.Text.Encoding]::UTF8)
+    }
+    $deepRuntime = Join-Path $installRoot (
+        'terminal-finalization-receipts-v1\' +
+        ('receipt-segment-' * 4) +
+        '\receipt.json'
+    )
+    New-Item -ItemType Directory -Path (Split-Path -Parent $deepRuntime) -Force | Out-Null
+    [System.IO.File]::WriteAllText($deepRuntime, '{"runtime":"must-not-copy"}', [System.Text.Encoding]::UTF8)
+    $finishContract = Join-Path $installRoot 'ai-finish-contracts-v1\active\contract.json'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $finishContract) -Force | Out-Null
+    [System.IO.File]::WriteAllText($finishContract, '{"runtime":"must-not-copy"}', [System.Text.Encoding]::UTF8)
+    $runtimeLog = Join-Path $internalRoot 'logs\nested\client-launcher.jsonl'
+    New-Item -ItemType Directory -Path (Split-Path -Parent $runtimeLog) -Force | Out-Null
+    [System.IO.File]::WriteAllText($runtimeLog, 'runtime-log', [System.Text.Encoding]::UTF8)
+    [System.IO.File]::WriteAllText(
+        (Join-Path $installRoot 'supervisor-node-url.txt'),
+        'http://127.0.0.1:7800',
+        [System.Text.Encoding]::UTF8
+    )
+    [System.IO.File]::WriteAllBytes((Join-Path $internalRoot 'watchdog.instance.lock'), [byte[]]@())
+
+    $snapshotRoot = Join-Path $activationRoot 'rollback\fixture-valid'
+    $snapshot = New-NodeAgentRollbackSnapshot -InstallRoot $installRoot `
+        -SnapshotRoot $snapshotRoot -PriorReleaseIdentity ("0.3.69+" + ('b' * 40))
+    Assert-Equal $snapshot.FileCount $stableFiles.Count 'snapshot must contain every stable allowlisted file'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $snapshot.ClientRoot 'terminal-finalization-receipts-v1'))) `
+        'deep terminal receipts must never enter the rollback client tree'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $snapshot.ClientRoot 'ai-finish-contracts-v1'))) `
+        'finish contracts must never enter the rollback client tree'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $snapshot.ClientRoot '_internal\logs'))) `
+        'runtime logs must never enter the rollback client tree'
+    $verifiedSnapshot = Test-NodeAgentRollbackSnapshot -SnapshotRoot $snapshotRoot `
+        -ExpectedPriorReleaseIdentity ("0.3.69+" + ('b' * 40))
+    Assert-Equal $verifiedSnapshot.ManifestSha256 $snapshot.ManifestSha256 `
+        'snapshot must verify against its durable manifest hash'
+
+    $corruptPath = Join-Path $snapshot.ClientRoot '_internal\elon-desktop.exe'
+    [System.IO.File]::AppendAllText($corruptPath, 'corrupt', [System.Text.Encoding]::UTF8)
+    Assert-Throws {
+        Test-NodeAgentRollbackSnapshot -SnapshotRoot $snapshotRoot `
+            -ExpectedPriorReleaseIdentity ("0.3.69+" + ('b' * 40)) | Out-Null
+    } 'mismatch' 'corrupt rollback client content must fail closed'
+
+    $unknownPath = Join-Path $internalRoot 'unexpected-client-runtime.dll'
+    [System.IO.File]::WriteAllText($unknownPath, 'unknown', [System.Text.Encoding]::UTF8)
+    Assert-Throws {
+        New-NodeAgentRollbackSnapshot -InstallRoot $installRoot `
+            -SnapshotRoot (Join-Path $activationRoot 'rollback\fixture-unknown') `
+            -PriorReleaseIdentity ("0.3.69+" + ('b' * 40)) | Out-Null
+    } 'unclassified' 'unknown stable client files must require an explicit allowlist decision'
+    Remove-Item -LiteralPath $unknownPath -Force
+
     $gate = Test-NodeAgentActivationOwnerGate -Status ([pscustomobject]@{
         active_cli_prompt_count = 1
         active_cli_prompt_task_ids = @('local-live')
@@ -175,19 +262,88 @@ try {
 
     $success = Invoke-NodeAgentActivationTransaction -Release $selected `
         -OwnerGate { [pscustomobject]@{ Safe = $true; Reason = 'fixture' } } `
-        -Apply { param($release) [pscustomobject]@{ Applied = $true; Backup = 'fixture-backup' } } `
+        -Prepare {
+            param($release)
+            [pscustomobject]@{
+                SnapshotRoot = $snapshotRoot
+                SnapshotManifestSha256 = $snapshot.ManifestSha256
+            }
+        } `
+        -Apply { param($release, $prepared) [pscustomobject]@{ Applied = $true } } `
         -Health { param($release) $true } `
-        -Rollback { throw 'rollback must not run on success' }
+        -Rollback { throw 'rollback must not run on success' } `
+        -PriorReleaseIdentity ("0.3.69+" + ('b' * 40))
     Assert-Equal $success.activation_state 'activated' 'healthy activation must commit'
+    Assert-Equal $success.receipt.snapshot_manifest_sha256 $snapshot.ManifestSha256 `
+        'activation receipt must bind the verified rollback manifest'
+    $receiptPath = Join-Path (Split-Path -Parent $selected.state_path) 'activation-receipt.json'
+    Assert-True (Test-Path -LiteralPath $receiptPath -PathType Leaf) `
+        'activation result must persist a standalone receipt'
+    $persistedReceipt = [System.IO.File]::ReadAllText($receiptPath, [System.Text.Encoding]::UTF8) | ConvertFrom-Json
+    Assert-Equal $persistedReceipt.outcome 'activated' 'standalone activation receipt must preserve the outcome'
 
     $rolledBack = $false
     $rollback = Invoke-NodeAgentActivationTransaction -Release $selected `
         -OwnerGate { [pscustomobject]@{ Safe = $true; Reason = 'fixture' } } `
-        -Apply { param($release) [pscustomobject]@{ Applied = $true; Backup = 'fixture-backup' } } `
+        -Prepare {
+            param($release)
+            [pscustomobject]@{
+                SnapshotRoot = $snapshotRoot
+                SnapshotManifestSha256 = $snapshot.ManifestSha256
+            }
+        } `
+        -Apply { param($release, $prepared) [pscustomobject]@{ Applied = $true } } `
         -Health { param($release) $false } `
-        -Rollback { param($release, $applyResult) $script:rolledBack = $true }
+        -Rollback {
+            param($release, $prepared, $applyResult)
+            Assert-Equal $prepared.SnapshotManifestSha256 $snapshot.ManifestSha256 `
+                'rollback must receive the verified pre-apply context'
+            $script:rolledBack = $true
+        } `
+        -PriorReleaseIdentity ("0.3.69+" + ('b' * 40))
     Assert-Equal $rollback.activation_state 'rolled_back' 'health failure must roll back'
     Assert-True $script:rolledBack 'rollback callback must run'
+    Assert-Equal $rollback.receipt.rollback_state 'succeeded' `
+        'rollback receipt must record a verified successful rollback'
+
+    $applyRollback = $false
+    $applyFailure = Invoke-NodeAgentActivationTransaction -Release $selected `
+        -OwnerGate { [pscustomobject]@{ Safe = $true; Reason = 'fixture' } } `
+        -Prepare {
+            param($release)
+            [pscustomobject]@{
+                SnapshotRoot = $snapshotRoot
+                SnapshotManifestSha256 = $snapshot.ManifestSha256
+            }
+        } `
+        -Apply { param($release, $prepared) throw 'fixture repair failed after snapshot' } `
+        -Health { param($release) throw 'health must not run after apply failure' } `
+        -Rollback {
+            param($release, $prepared, $applyResult)
+            Assert-Equal $prepared.SnapshotRoot $snapshotRoot `
+                'apply failure must retain the verified rollback context'
+            $script:applyRollback = $true
+        } `
+        -PriorReleaseIdentity ("0.3.69+" + ('b' * 40))
+    Assert-Equal $applyFailure.activation_state 'rolled_back' `
+        'repair entrypoint failure after snapshot must roll back'
+    Assert-True $script:applyRollback 'repair entrypoint failure must invoke rollback'
+
+    $prepareApplied = $false
+    $prepareRolledBack = $false
+    $prepareFailure = Invoke-NodeAgentActivationTransaction -Release $selected `
+        -OwnerGate { [pscustomobject]@{ Safe = $true; Reason = 'fixture' } } `
+        -Prepare { throw 'fixture snapshot verification failed' } `
+        -Apply { $script:prepareApplied = $true } `
+        -Health { $true } `
+        -Rollback { $script:prepareRolledBack = $true } `
+        -PriorReleaseIdentity ("0.3.69+" + ('b' * 40))
+    Assert-Equal $prepareFailure.activation_state 'failed' `
+        'snapshot preparation failure must stop before mutation'
+    Assert-Equal $prepareFailure.receipt.rollback_state 'not_required' `
+        'pre-apply failure must not pretend to roll back'
+    Assert-True (-not $script:prepareApplied) 'pre-apply failure must not run the installer'
+    Assert-True (-not $script:prepareRolledBack) 'pre-apply failure must not restart the old client'
 
     $publishText = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'publish-node-agent.ps1')
     Assert-True ($publishText.Contains('[switch]$SynchronousRemote')) 'remote work must require explicit worker mode'

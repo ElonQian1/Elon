@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot 'node-agent-release-outbox.ps1')
 . (Join-Path $PSScriptRoot 'node-agent-local-activation.ps1')
+. (Join-Path $PSScriptRoot 'node-agent-local-rollback.ps1')
 
 function Write-ActivatorLog {
     param([string]$Message)
@@ -83,42 +84,6 @@ function Wait-ExactNodeHealth {
     return $false
 }
 
-function Copy-NodeAgentRollbackTree {
-    param(
-        [Parameter(Mandatory = $true)][string]$Source,
-        [Parameter(Mandatory = $true)][string]$Destination
-    )
-    $clientName = '一龙开发平台.exe'
-    $clientSource = Join-Path $Source $clientName
-    $internalSource = Join-Path $Source '_internal'
-    if (-not (Test-Path -LiteralPath $clientSource -PathType Leaf)) {
-        throw "Rollback source is missing the repair entrypoint: $clientName"
-    }
-    if (-not (Test-Path -LiteralPath $internalSource -PathType Container)) {
-        throw 'Rollback source is missing the stable _internal client tree.'
-    }
-
-    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
-    Copy-Item -LiteralPath $clientSource -Destination (Join-Path $Destination $clientName) -Force
-    $uninstallerName = '卸载一龙开发平台.exe'
-    $uninstallerSource = Join-Path $Source $uninstallerName
-    if (Test-Path -LiteralPath $uninstallerSource -PathType Leaf) {
-        Copy-Item -LiteralPath $uninstallerSource -Destination (Join-Path $Destination $uninstallerName) -Force
-    }
-
-    $internalDestination = Join-Path $Destination '_internal'
-    New-Item -ItemType Directory -Path $internalDestination -Force | Out-Null
-    foreach ($internalItem in Get-ChildItem -LiteralPath $internalSource -Force) {
-        # Runtime logs and the watchdog lock are regenerable process state. Root-level
-        # receipts and task state are excluded by the stable client-tree allowlist above.
-        if ($internalItem.Name -in @('logs','watchdog.instance.lock')) { continue }
-        Copy-Item -LiteralPath $internalItem.FullName -Destination $internalDestination -Recurse -Force
-    }
-    if (-not (Test-Path -LiteralPath (Join-Path $Destination $clientName) -PathType Leaf)) {
-        throw 'Rollback snapshot did not preserve the repair entrypoint.'
-    }
-}
-
 $lockPath = Join-Path $StateRoot 'post-terminal-activator.lock'
 New-Item -ItemType Directory -Path $StateRoot -Force | Out-Null
 $lock = $null
@@ -160,31 +125,46 @@ try {
         if ($null -eq $latest -or [string]$latest.release_identity -ne [string]$release.release_identity) { continue }
         $priorIdentity = [string]$node.Status.release_identity
         $installRoot = Join-Path ([System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::LocalApplicationData)) 'ElonNode'
-        $backupRoot = Join-Path $StateRoot (Join-Path 'rollback' ((Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmssfff')))
+        $backupName = "{0}-{1}" -f (
+            (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmssfff'),
+            [Guid]::NewGuid().ToString('N').Substring(0, 8)
+        )
+        $backupRoot = Join-Path $StateRoot (Join-Path 'rollback' $backupName)
         $result = Invoke-NodeAgentActivationTransaction -Release $latest `
             -OwnerGate { Test-NodeAgentActivationOwnerGate -Status (Get-LoopbackNodeStatus).Status } `
-            -Apply {
+            -Prepare {
                 param($target)
                 $expanded = Expand-VerifiedReleasePackage -Release $target
-                if (Test-Path -LiteralPath $installRoot -PathType Container) {
-                    New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
-                    Copy-NodeAgentRollbackTree -Source $installRoot -Destination (Join-Path $backupRoot 'ElonNode')
+                $snapshot = New-NodeAgentRollbackSnapshot -InstallRoot $installRoot `
+                    -SnapshotRoot $backupRoot -PriorReleaseIdentity $priorIdentity
+                return [pscustomobject]@{
+                    ExpandedClient = $expanded.Client
+                    SnapshotRoot = $snapshot.SnapshotRoot
+                    SnapshotManifestSha256 = $snapshot.ManifestSha256
+                    PriorIdentity = $priorIdentity
                 }
-                Invoke-HiddenRepair -ClientPath $expanded.Client
-                return [pscustomobject]@{ Backup = (Join-Path $backupRoot 'ElonNode'); PriorIdentity = $priorIdentity }
+            } `
+            -Apply {
+                param($target, $prepared)
+                if ($null -eq $prepared) { throw 'Verified rollback preparation context is unavailable.' }
+                Invoke-HiddenRepair -ClientPath ([string]$prepared.ExpandedClient)
+                return [pscustomobject]@{ RepairCompleted = $true }
             } `
             -Health { param($target) Wait-ExactNodeHealth -ReleaseIdentity ([string]$target.release_identity) } `
             -Rollback {
-                param($target, $applyResult)
-                if ($null -eq $applyResult -or -not (Test-Path -LiteralPath ([string]$applyResult.Backup) -PathType Container)) {
+                param($target, $prepared, $applyResult)
+                if ($null -eq $prepared -or
+                    -not ($prepared.PSObject.Properties.Name -contains 'SnapshotRoot')) {
                     throw 'No verified rollback client tree is available.'
                 }
-                $rollbackClient = Join-Path ([string]$applyResult.Backup) '一龙开发平台.exe'
-                Invoke-HiddenRepair -ClientPath $rollbackClient
-                if (-not (Wait-ExactNodeHealth -ReleaseIdentity ([string]$applyResult.PriorIdentity))) {
+                $verified = Test-NodeAgentRollbackSnapshot -SnapshotRoot ([string]$prepared.SnapshotRoot) `
+                    -ExpectedPriorReleaseIdentity ([string]$prepared.PriorIdentity)
+                Invoke-HiddenRepair -ClientPath ([string]$verified.ClientPath)
+                if (-not (Wait-ExactNodeHealth -ReleaseIdentity ([string]$prepared.PriorIdentity))) {
                     throw 'Rollback runtime failed its exact-release health check.'
                 }
-            }
+            } `
+            -PriorReleaseIdentity $priorIdentity
         Write-ActivatorLog ("activation result: " + ($result | ConvertTo-Json -Compress))
         if ([string]$result.activation_state -in @('activated','rolled_back','failed')) { exit 0 }
     }

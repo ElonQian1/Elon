@@ -136,8 +136,44 @@ function Test-NodeAgentActivationOwnerGate {
     return [pscustomobject]@{ Safe = $true; Reason = 'no_live_owner'; ActiveTaskIds = @() }
 }
 
+function New-NodeAgentActivationReceipt {
+    param(
+        [Parameter(Mandatory = $true)]$Release,
+        [Parameter(Mandatory = $true)][string]$Outcome,
+        [Parameter(Mandatory = $true)][long]$StartedAtMs,
+        [Parameter(Mandatory = $true)][string]$RollbackState,
+        [string]$FailurePhase = '',
+        [string]$ErrorMessage = '',
+        [string]$PriorReleaseIdentity = '',
+        $PrepareResult = $null
+    )
+    $snapshotHash = $null
+    $snapshotDirectory = $null
+    if ($null -ne $PrepareResult) {
+        if ($PrepareResult.PSObject.Properties.Name -contains 'SnapshotManifestSha256') {
+            $snapshotHash = [string]$PrepareResult.SnapshotManifestSha256
+        }
+        if ($PrepareResult.PSObject.Properties.Name -contains 'SnapshotRoot') {
+            $snapshotDirectory = Split-Path -Leaf ([string]$PrepareResult.SnapshotRoot)
+        }
+    }
+    return [pscustomobject][ordered]@{
+        schema = 'elon.node_local_activation_receipt.v1'
+        target_release_identity = [string]$Release.release_identity
+        prior_release_identity = if ([string]::IsNullOrWhiteSpace($PriorReleaseIdentity)) { $null } else { $PriorReleaseIdentity }
+        outcome = $Outcome
+        failure_phase = if ([string]::IsNullOrWhiteSpace($FailurePhase)) { $null } else { $FailurePhase }
+        rollback_state = $RollbackState
+        snapshot_manifest_sha256 = $snapshotHash
+        snapshot_directory = $snapshotDirectory
+        error = if ([string]::IsNullOrWhiteSpace($ErrorMessage)) { $null } else { $ErrorMessage }
+        started_at_ms = $StartedAtMs
+        finished_at_ms = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    }
+}
+
 function Save-NodeAgentActivationResult {
-    param($Release, [string]$State, [string]$ErrorMessage = '')
+    param($Release, [string]$State, [string]$ErrorMessage = '', $Receipt = $null)
     if (-not ($Release.PSObject.Properties.Name -contains 'state_path')) { return }
     $persisted = Read-NodeAgentLocalReleaseState -StatePath ([string]$Release.state_path)
     $persisted.activation_state = $State
@@ -150,6 +186,14 @@ function Save-NodeAgentActivationResult {
         $persisted.local_terminal_state = 'failed'
     }
     $persisted.last_error = if ([string]::IsNullOrWhiteSpace($ErrorMessage)) { $null } else { $ErrorMessage }
+    if ($null -ne $Receipt) {
+        $receiptPath = Join-Path (Split-Path -Parent ([string]$Release.state_path)) 'activation-receipt.json'
+        Write-NodeAgentReleaseJsonAtomic -Path $receiptPath -Value $Receipt
+        $receiptHash = Get-NodeAgentFileSha256 -Path $receiptPath
+        $persisted | Add-Member -NotePropertyName activation_receipt -NotePropertyValue $Receipt -Force
+        $persisted | Add-Member -NotePropertyName activation_receipt_path -NotePropertyValue $receiptPath -Force
+        $persisted | Add-Member -NotePropertyName activation_receipt_sha256 -NotePropertyValue $receiptHash -Force
+    }
     Set-NodeAgentLocalReleaseState -StatePath ([string]$Release.state_path) -State $persisted
 }
 
@@ -157,31 +201,83 @@ function Invoke-NodeAgentActivationTransaction {
     param(
         [Parameter(Mandatory = $true)]$Release,
         [Parameter(Mandatory = $true)][scriptblock]$OwnerGate,
+        [scriptblock]$Prepare = $null,
         [Parameter(Mandatory = $true)][scriptblock]$Apply,
         [Parameter(Mandatory = $true)][scriptblock]$Health,
-        [Parameter(Mandatory = $true)][scriptblock]$Rollback
+        [Parameter(Mandatory = $true)][scriptblock]$Rollback,
+        [string]$PriorReleaseIdentity = ''
     )
+    $startedAtMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $gate = & $OwnerGate
     if (-not $gate.Safe) {
         Save-NodeAgentActivationResult -Release $Release -State 'waiting_for_terminal'
         return [pscustomobject]@{ activation_state = 'waiting_for_terminal'; reason = [string]$gate.Reason }
     }
+    $prepareResult = $null
+    if ($null -ne $Prepare) {
+        try {
+            $prepareResult = & $Prepare $Release
+        } catch {
+            $preparationError = $_.Exception.Message
+            $receipt = New-NodeAgentActivationReceipt -Release $Release -Outcome 'failed' `
+                -StartedAtMs $startedAtMs -RollbackState 'not_required' -FailurePhase 'prepare' `
+                -ErrorMessage $preparationError -PriorReleaseIdentity $PriorReleaseIdentity
+            Save-NodeAgentActivationResult -Release $Release -State 'failed' `
+                -ErrorMessage $preparationError -Receipt $receipt
+            return [pscustomobject]@{
+                activation_state = 'failed'
+                phase = 'prepare'
+                error = $preparationError
+                receipt = $receipt
+            }
+        }
+    }
     $applyResult = $null
+    $failurePhase = 'apply'
     try {
-        $applyResult = & $Apply $Release
+        $applyResult = & $Apply $Release $prepareResult
+        $failurePhase = 'health'
         if (-not (& $Health $Release)) { throw 'The newly activated node failed its exact-release health check.' }
-        Save-NodeAgentActivationResult -Release $Release -State 'activated'
-        return [pscustomobject]@{ activation_state = 'activated'; release_identity = [string]$Release.release_identity }
+        $receipt = New-NodeAgentActivationReceipt -Release $Release -Outcome 'activated' `
+            -StartedAtMs $startedAtMs -RollbackState 'not_required' `
+            -PriorReleaseIdentity $PriorReleaseIdentity -PrepareResult $prepareResult
+        Save-NodeAgentActivationResult -Release $Release -State 'activated' -Receipt $receipt
+        return [pscustomobject]@{
+            activation_state = 'activated'
+            release_identity = [string]$Release.release_identity
+            receipt = $receipt
+        }
     } catch {
         $activationError = $_.Exception.Message
         try {
-            & $Rollback $Release $applyResult
-            Save-NodeAgentActivationResult -Release $Release -State 'rolled_back' -ErrorMessage $activationError
-            return [pscustomobject]@{ activation_state = 'rolled_back'; error = $activationError }
+            & $Rollback $Release $prepareResult $applyResult
+            $receipt = New-NodeAgentActivationReceipt -Release $Release -Outcome 'rolled_back' `
+                -StartedAtMs $startedAtMs -RollbackState 'succeeded' -FailurePhase $failurePhase `
+                -ErrorMessage $activationError -PriorReleaseIdentity $PriorReleaseIdentity `
+                -PrepareResult $prepareResult
+            Save-NodeAgentActivationResult -Release $Release -State 'rolled_back' `
+                -ErrorMessage $activationError -Receipt $receipt
+            return [pscustomobject]@{
+                activation_state = 'rolled_back'
+                phase = $failurePhase
+                error = $activationError
+                receipt = $receipt
+            }
         } catch {
             $rollbackError = $_.Exception.Message
-            Save-NodeAgentActivationResult -Release $Release -State 'failed' -ErrorMessage "$activationError; rollback: $rollbackError"
-            return [pscustomobject]@{ activation_state = 'failed'; error = "$activationError; rollback: $rollbackError" }
+            $combinedError = "$activationError; rollback: $rollbackError"
+            $receipt = New-NodeAgentActivationReceipt -Release $Release -Outcome 'failed' `
+                -StartedAtMs $startedAtMs -RollbackState 'failed' -FailurePhase $failurePhase `
+                -ErrorMessage $combinedError -PriorReleaseIdentity $PriorReleaseIdentity `
+                -PrepareResult $prepareResult
+            Save-NodeAgentActivationResult -Release $Release -State 'failed' `
+                -ErrorMessage $combinedError -Receipt $receipt
+            return [pscustomobject]@{
+                activation_state = 'failed'
+                phase = 'rollback'
+                error = $combinedError
+                receipt = $receipt
+            }
         }
     }
 }
@@ -195,7 +291,12 @@ function Start-NodeAgentPostTerminalActivator {
     $root = Get-NodeAgentLocalActivationRoot -ExplicitRoot $StateRoot
     $runtimeDir = Join-Path $root 'runtime'
     New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
-    foreach ($name in @('node-agent-release-outbox.ps1','node-agent-local-activation.ps1','node-agent-post-terminal-activator.ps1')) {
+    foreach ($name in @(
+        'node-agent-release-outbox.ps1',
+        'node-agent-local-activation.ps1',
+        'node-agent-local-rollback.ps1',
+        'node-agent-post-terminal-activator.ps1'
+    )) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $runtimeDir $name) -Force
     }
     $script = Join-Path $runtimeDir 'node-agent-post-terminal-activator.ps1'
