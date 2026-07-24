@@ -42,11 +42,29 @@ pub(crate) async fn reconcile_surviving_sidecars(runtime: Arc<NodeRuntime>) {
             return;
         }
     };
-    for session in sessions {
+    let now = now_ms();
+    let (startup_critical, historical): (Vec<_>, Vec<_>) = sessions
+        .into_iter()
+        .partition(|session| sidecar_requires_startup_reconcile(session, now));
+    for session in startup_critical {
         if let Err(error) = reconcile_one(runtime.clone(), session).await {
             warn!(%error, "启动时补账 sidecar 终态失败");
         }
     }
+    if historical.is_empty() {
+        return;
+    }
+    tokio::spawn(async move {
+        for session in historical {
+            if let Err(error) = reconcile_one(runtime.clone(), session).await {
+                warn!(%error, "后台补账历史 sidecar 终态失败");
+            }
+        }
+    });
+}
+
+fn sidecar_requires_startup_reconcile(session: &CliSidecarSessionRecord, now_ms: u128) -> bool {
+    session.protects_startup_reconcile_at(now_ms) || session.can_replay_after_restart_at(now_ms)
 }
 
 async fn reconcile_one(runtime: Arc<NodeRuntime>, session: CliSidecarSessionRecord) -> Result<()> {

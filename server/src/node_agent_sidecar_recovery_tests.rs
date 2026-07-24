@@ -114,3 +114,45 @@ fn only_complete_evidence_with_no_live_handle_allows_resume_required() {
         Some(&receipt)
     ));
 }
+
+#[test]
+fn startup_only_waits_for_sidecars_that_can_still_own_execution() {
+    let now = now_ms();
+    let mut session = CliSidecarSessionRecord {
+        session_id: "sidecar".to_string(),
+        task_id: "task".to_string(),
+        cli_name: "codex".to_string(),
+        route: "route_a_external_cli".to_string(),
+        cwd: None,
+        state: "running".to_string(),
+        transport: "managed_pipe_json_sidecar".to_string(),
+        endpoint: Some("output.jsonl".to_string()),
+        sidecar_pid: None,
+        sidecar_process_identity: None,
+        child_pid: None,
+        child_process_identity: None,
+        worker_path: None,
+        worker_release: None,
+        worker_sha256: None,
+        output_offset: 0,
+        output_sequence: 0,
+        started_at_ms: now,
+        last_seen_at_ms: now,
+        capabilities: crate::node_agent_cli_sidecar::CliSidecarCapabilities {
+            terminal_attach: false,
+            output_stream_replay: true,
+            terminal_input: false,
+            terminal_resize: false,
+            tool_approval_recovery: false,
+            cancel: true,
+        },
+    };
+    assert!(sidecar_requires_startup_reconcile(&session, now));
+
+    session.started_at_ms = now.saturating_sub(2_000_000);
+    session.last_seen_at_ms = now.saturating_sub(2_000_000);
+    assert!(!sidecar_requires_startup_reconcile(&session, now));
+
+    session.state = "finished".to_string();
+    assert!(!sidecar_requires_startup_reconcile(&session, now));
+}

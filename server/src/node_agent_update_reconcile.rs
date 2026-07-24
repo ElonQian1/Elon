@@ -36,9 +36,6 @@ use supersede::{
 
 pub(crate) async fn reconcile_startup(runtime: Arc<NodeRuntime>) {
     let current_release = crate::node_agent_release_identity::current();
-    if let Err(error) = reconcile_superseded_history(&runtime.update_recovery, &current_release) {
-        warn!(%error, "启动时收敛历史更新恢复票据失败");
-    }
     let receipts = match runtime.update_recovery.active() {
         Ok(receipts) => receipts,
         Err(error) => {
@@ -46,20 +43,58 @@ pub(crate) async fn reconcile_startup(runtime: Arc<NodeRuntime>) {
             return;
         }
     };
-    for receipt in receipts {
-        if matches!(
-            receipt.state,
-            UpdateRecoveryState::Paused
-                | UpdateRecoveryState::ApprovalRequired
-                | UpdateRecoveryState::Conflict
-                | UpdateRecoveryState::Timeout
-        ) {
-            continue;
-        }
+    let now = now_ms();
+    let live_sidecar_task_ids = runtime
+        .cli_sidecars
+        .all_sessions()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|session| {
+            session.protects_startup_reconcile_at(now) || session.can_replay_after_restart_at(now)
+        })
+        .map(|session| session.task_id)
+        .collect::<std::collections::HashSet<_>>();
+    let (startup_critical, historical): (Vec<_>, Vec<_>) = receipts
+        .into_iter()
+        .filter(|receipt| {
+            !matches!(
+                receipt.state,
+                UpdateRecoveryState::Paused
+                    | UpdateRecoveryState::ApprovalRequired
+                    | UpdateRecoveryState::Conflict
+                    | UpdateRecoveryState::Timeout
+            )
+        })
+        .partition(|receipt| {
+            receipt_requires_startup_reconcile(receipt, &current_release, &live_sidecar_task_ids)
+        });
+    for receipt in startup_critical {
         if let Err(error) = reconcile_one(runtime.clone(), receipt).await {
             warn!(%error, "启动更新恢复事务失败");
         }
     }
+    tokio::spawn(async move {
+        if let Err(error) = reconcile_superseded_history(&runtime.update_recovery, &current_release)
+        {
+            warn!(%error, "后台收敛历史更新恢复票据失败");
+        }
+        for receipt in historical {
+            if let Err(error) = reconcile_one(runtime.clone(), receipt).await {
+                warn!(%error, "后台收敛历史更新恢复事务失败");
+            }
+        }
+    });
+}
+
+fn receipt_requires_startup_reconcile(
+    receipt: &UpdateRecoveryReceipt,
+    current_release: &str,
+    live_sidecar_task_ids: &std::collections::HashSet<String>,
+) -> bool {
+    matches!(
+        release_relation(receipt, current_release),
+        ReleaseRelation::Target
+    ) || live_sidecar_task_ids.contains(receipt.active_task_id())
 }
 
 pub(crate) fn reconcile_superseded_history_for_current_release(

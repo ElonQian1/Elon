@@ -77,6 +77,45 @@ fn recovery_state_keeps_restart_and_pause_paths_explicit() {
 }
 
 #[test]
+fn startup_reconcile_only_waits_for_current_targets_or_live_sidecars() {
+    let current = "0.3.69+current";
+    let current_target_release = ReleaseIdentity {
+        version: "0.3.69".to_string(),
+        git_sha: "current".to_string(),
+    };
+    let mut current_target = UpdateRecoveryReceipt::planned("update-current", "root", "task");
+    current_target.to_release = current_target_release;
+    let mut historical = UpdateRecoveryReceipt::planned("update-old", "root-old", "task-old");
+    historical.from_release = ReleaseIdentity {
+        version: "0.3.68".to_string(),
+        git_sha: "old-from".to_string(),
+    };
+    historical.to_release = ReleaseIdentity {
+        version: "0.3.68".to_string(),
+        git_sha: "old-target".to_string(),
+    };
+    let mut live = std::collections::HashSet::new();
+
+    assert!(receipt_requires_startup_reconcile(
+        &current_target,
+        current,
+        &live
+    ));
+    assert!(!receipt_requires_startup_reconcile(
+        &historical,
+        current,
+        &live
+    ));
+
+    live.insert(historical.active_task_id().to_string());
+    assert!(receipt_requires_startup_reconcile(
+        &historical,
+        current,
+        &live
+    ));
+}
+
+#[test]
 fn repeated_runtime_restart_can_reattach_same_resume_identity() {
     let mut receipt = UpdateRecoveryReceipt::planned("update-d", "root-d", "task-d");
     receipt.state = UpdateRecoveryState::Resumed;
