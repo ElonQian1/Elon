@@ -110,32 +110,20 @@ pub(super) async fn run(
             let apk = match select_reusable_debug_apk(&gradle_root, &session.package_name)? {
                 Some(apk) => apk,
                 None => {
-                    report_evidence(
-                        reporter,
-                        "BUILD",
-                        "RETRY",
-                        "增量构建没有刷新 APK；执行一次 --rerun-tasks 以排除陈旧产物",
-                    )
-                    .await;
-                    run_debug_build(
-                        &gradle_root,
-                        &wrapper,
-                        Some(suffix),
-                        broker.fixed_debug_label().as_deref(),
-                        true,
-                    )
-                    .await
-                    .context("BUILD 强制刷新阶段失败")?;
+                    // A successful Gradle invocation is the authoritative input
+                    // proof even when the shared build cache restores an APK
+                    // with its original timestamp. Do not defeat the cache with
+                    // a second full --rerun-tasks build.
                     let apk = select_debug_apk_after_successful_build(
                         &gradle_root,
                         &session.package_name,
                     )
-                    .context("强制 Gradle 构建后的 APK 选择失败")?;
+                    .context("Gradle 构建后的 APK 选择失败")?;
                     report_evidence(
                         reporter,
                         "BUILD",
                         "CACHE_OUTPUT_ACCEPTED",
-                        "强制 Gradle 构建成功；接受 applicationId 精确匹配的时间戳保留缓存产物",
+                        "Gradle 构建成功；接受 applicationId 精确匹配的时间戳保留缓存产物",
                     )
                     .await;
                     apk

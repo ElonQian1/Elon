@@ -80,6 +80,7 @@ impl LiveUiBroker {
         Self {
             debug_deployments: super::deployment_serialization::DebugDeploymentRegistry::for_node(
                 install_id,
+                integration_root.clone(),
             ),
             debug_integration: super::debug_integration::DebugIntegrationCoordinator::new(
                 integration_root,

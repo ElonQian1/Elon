@@ -215,6 +215,18 @@ impl DebugIntegrationCoordinator {
                 status.status
             );
         }
+        // A runtime/build/install failure does not change the candidate source.
+        // Keep the verified generation worktree so Gradle can reuse its partial
+        // or completed outputs. Allocating a new generation here previously
+        // converted every timeout into a cold 125-task rebuild.
+        if status.status == "FAILED" && generation_is_clean_and_owned(&status, &plan.worktree)? {
+            status.status = "MERGED".into();
+            status.conflicts.clear();
+            status.last_error = None;
+            status.updated_at = now();
+            self.save(&status)?;
+            return Ok(plan_from_status(&self.root, &plan.source_root, &status));
+        }
         status.desired_generation =
             self.next_available_generation(&status.slot_id, status.desired_generation)?;
         status.status = "QUEUED".into();
@@ -481,4 +493,32 @@ impl DebugIntegrationCoordinator {
         }
         Ok(generation)
     }
+}
+
+fn generation_is_clean_and_owned(
+    status: &DebugIntegrationStatus,
+    expected_worktree: &std::path::Path,
+) -> Result<bool> {
+    let Some(recorded_worktree) = status.integration_worktree.as_deref() else {
+        return Ok(false);
+    };
+    let recorded_worktree = PathBuf::from(recorded_worktree);
+    if !recorded_worktree.exists()
+        || recorded_worktree.canonicalize()? != expected_worktree.canonicalize()?
+    {
+        return Ok(false);
+    }
+    let Some(expected_revision) = status.integration_revision.as_deref() else {
+        return Ok(false);
+    };
+    let actual_revision = git(&recorded_worktree, &["rev-parse", "HEAD"])?;
+    if actual_revision.trim() != expected_revision {
+        return Ok(false);
+    }
+    Ok(git(
+        &recorded_worktree,
+        &["status", "--porcelain", "--untracked-files=no"],
+    )?
+    .trim()
+    .is_empty())
 }

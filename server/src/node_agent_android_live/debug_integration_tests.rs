@@ -227,7 +227,7 @@ fn explicit_empty_commits_clear_the_accumulated_sequence() {
 }
 
 #[test]
-fn failed_generation_restart_uses_a_fresh_unoccupied_worktree() {
+fn failed_generation_restart_reuses_the_clean_owned_worktree() {
     let repo = RepositoryFixture::new("failed-restart");
     let (source, commit) = repo.session("source", "one.txt", "one\n");
     let coordinator = coordinator("failed-restart");
@@ -236,21 +236,55 @@ fn failed_generation_restart_uses_a_fresh_unoccupied_worktree() {
         &source,
         &candidate(&repo.base, &commit, "source"),
     );
-    fs::create_dir_all(&failed.worktree).unwrap();
+    let integrated = coordinator
+        .materialize(&failed)
+        .expect("failed generation must first be owned and materialized");
+    fs::create_dir_all(integrated.join("android/app/build")).unwrap();
+    fs::write(
+        integrated.join("android/app/build/partial-output.bin"),
+        b"preserve incremental output",
+    )
+    .unwrap();
     coordinator
         .record_runtime_failure(&failed, "simulated failed operation".into())
         .unwrap();
 
     let restarted = coordinator.restart_failed_generation(&failed).unwrap();
-    assert!(restarted.generation > failed.generation);
-    assert_ne!(restarted.worktree, failed.worktree);
+    assert_eq!(restarted.generation, failed.generation);
+    assert_eq!(restarted.worktree, failed.worktree);
     let integrated = coordinator
         .materialize(&restarted)
-        .expect("restart must not reuse the failed generation worktree");
+        .expect("restart must reuse the verified generation worktree");
     assert!(integrated.join("one.txt").exists());
+    assert!(integrated
+        .join("android/app/build/partial-output.bin")
+        .exists());
     let status = coordinator.status(&restarted.slot_id).unwrap().unwrap();
     assert_eq!(status.status, "MERGED");
     assert_eq!(status.desired_generation, restarted.generation);
+}
+
+#[test]
+fn unowned_failed_generation_still_allocates_a_fresh_worktree() {
+    let repo = RepositoryFixture::new("unowned-failed-restart");
+    let (source, commit) = repo.session("source", "one.txt", "one\n");
+    let coordinator = coordinator("unowned-failed-restart");
+    let failed = register(
+        &coordinator,
+        &source,
+        &candidate(&repo.base, &commit, "source"),
+    );
+    fs::create_dir_all(&failed.worktree).unwrap();
+    coordinator
+        .record_runtime_failure(&failed, "failed before materialization".into())
+        .unwrap();
+
+    let restarted = coordinator.restart_failed_generation(&failed).unwrap();
+    assert!(restarted.generation > failed.generation);
+    assert_ne!(restarted.worktree, failed.worktree);
+    coordinator
+        .materialize(&restarted)
+        .expect("unowned worktree must never be resumed");
 }
 
 #[test]

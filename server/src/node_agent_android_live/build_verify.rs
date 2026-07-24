@@ -193,7 +193,7 @@ async fn prepare_debug_runtime_inner(
     let deployment = broker
         .debug_deployments
         .acquire(device_identity, &package_name)
-        .await;
+        .await?;
     // Keep every fallible build/install/handshake step inside this result
     // boundary. `?` returns from the async block, then the deployment lease is
     // explicitly released before the failure reaches the preparation reporter
@@ -305,7 +305,7 @@ async fn prepare_debug_runtime_inner(
 }
 
 fn finish_debug_deployment<T>(
-    deployment: tokio::sync::OwnedMutexGuard<()>,
+    deployment: super::deployment_serialization::DebugDeploymentLease,
     outcome: Result<T>,
 ) -> Result<T> {
     drop(deployment);
@@ -370,7 +370,7 @@ async fn build_and_verify_inner(
     let _deployment = broker
         .debug_deployments
         .acquire(&session.device_identity, &session.package_name)
-        .await;
+        .await?;
     let integration_root = broker.debug_integration.materialize(&integration_plan)?;
     let target_path = load_or_build_ui_ir(broker, session_id)
         .await
