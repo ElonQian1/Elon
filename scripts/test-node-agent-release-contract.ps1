@@ -20,6 +20,11 @@ Assert-True ($target -eq "0.3.69+c97f4b6fd9c5c9ce0e54564663f6677b7b6b8fb2") `
 Assert-True ((Get-NodeAgentReleaseIdentity -Version "0.3.69") -eq "0.3.69") `
     "Development identity must keep the Cargo version"
 
+$utf8RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$utf8CommonDir = Get-NodeAgentGitCommonDir -RepoRoot $utf8RepoRoot
+Assert-True (Test-Path -LiteralPath $utf8CommonDir -PathType Container) `
+    "Git common directory must remain a valid path under a non-ASCII repository root"
+
 $unicodeOwner = -join ([char]0x94b1, [char]0x4e00, [char]0x9f99)
 $unicodeDevice = (-join ([char]0x4e00, [char]0x9f99)) + '4060'
 $unicodeHandshakeFixture = @{

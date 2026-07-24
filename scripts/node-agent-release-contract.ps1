@@ -40,21 +40,17 @@ function Exit-NodeAgentPublishLock {
     }
 }
 
-function Get-NodeAgentCargoMetadata {
+function Invoke-NodeAgentUtf8Process {
     param(
-        [Parameter(Mandatory = $true)][string]$ManifestPath
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [Parameter(Mandatory = $true)][string]$Arguments,
+        [Parameter(Mandatory = $true)][string]$Operation
     )
 
-    $resolvedManifest = [System.IO.Path]::GetFullPath($ManifestPath)
-    if ($resolvedManifest.Contains('"')) {
-        throw "Cargo manifest path contains an unsupported quote: $resolvedManifest"
-    }
-
-    $cargo = Get-Command cargo -ErrorAction Stop
+    $command = Get-Command $FilePath -ErrorAction Stop
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $startInfo.FileName = $cargo.Source
-    $startInfo.Arguments = 'metadata --manifest-path "' + $resolvedManifest +
-        '" --no-deps --format-version 1 --locked'
+    $startInfo.FileName = $command.Source
+    $startInfo.Arguments = $Arguments
     $startInfo.UseShellExecute = $false
     $startInfo.CreateNoWindow = $true
     $startInfo.RedirectStandardOutput = $true
@@ -67,7 +63,7 @@ function Get-NodeAgentCargoMetadata {
     $process.StartInfo = $startInfo
     try {
         if (-not $process.Start()) {
-            throw 'cargo metadata process failed to start.'
+            throw "$Operation process failed to start."
         }
         $stdoutTask = $process.StandardOutput.ReadToEndAsync()
         $stderrTask = $process.StandardError.ReadToEndAsync()
@@ -75,15 +71,31 @@ function Get-NodeAgentCargoMetadata {
         $stdout = $stdoutTask.GetAwaiter().GetResult()
         $stderr = $stderrTask.GetAwaiter().GetResult()
         if ($process.ExitCode -ne 0) {
-            throw "cargo metadata failed ($($process.ExitCode)): $stderr"
+            throw "$Operation failed ($($process.ExitCode)): $stderr"
         }
-        try {
-            return ($stdout | ConvertFrom-Json -ErrorAction Stop)
-        } catch {
-            throw "cargo metadata returned invalid UTF-8 JSON: $($_.Exception.Message)"
-        }
+        return $stdout
     } finally {
         $process.Dispose()
+    }
+}
+
+function Get-NodeAgentCargoMetadata {
+    param(
+        [Parameter(Mandatory = $true)][string]$ManifestPath
+    )
+
+    $resolvedManifest = [System.IO.Path]::GetFullPath($ManifestPath)
+    if ($resolvedManifest.Contains('"')) {
+        throw "Cargo manifest path contains an unsupported quote: $resolvedManifest"
+    }
+    $stdout = Invoke-NodeAgentUtf8Process -FilePath 'cargo' `
+        -Arguments ('metadata --manifest-path "' + $resolvedManifest +
+            '" --no-deps --format-version 1 --locked') `
+        -Operation 'cargo metadata'
+    try {
+        return ($stdout | ConvertFrom-Json -ErrorAction Stop)
+    } catch {
+        throw "cargo metadata returned invalid UTF-8 JSON: $($_.Exception.Message)"
     }
 }
 
@@ -96,45 +108,17 @@ function Get-NodeAgentGitCommonDir {
     if ($resolvedRepoRoot.Contains('"')) {
         throw "Git repository path contains an unsupported quote: $resolvedRepoRoot"
     }
-
-    $git = Get-Command git -ErrorAction Stop
-    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $startInfo.FileName = $git.Source
-    $startInfo.Arguments = '-C "' + $resolvedRepoRoot + '" rev-parse --git-common-dir'
-    $startInfo.UseShellExecute = $false
-    $startInfo.CreateNoWindow = $true
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-    $utf8 = New-Object System.Text.UTF8Encoding($false, $true)
-    $startInfo.StandardOutputEncoding = $utf8
-    $startInfo.StandardErrorEncoding = $utf8
-
-    $process = New-Object System.Diagnostics.Process
-    $process.StartInfo = $startInfo
-    try {
-        if (-not $process.Start()) {
-            throw 'git rev-parse process failed to start.'
-        }
-        $stdoutTask = $process.StandardOutput.ReadToEndAsync()
-        $stderrTask = $process.StandardError.ReadToEndAsync()
-        $process.WaitForExit()
-        $stdout = $stdoutTask.GetAwaiter().GetResult()
-        $stderr = $stderrTask.GetAwaiter().GetResult()
-        if ($process.ExitCode -ne 0) {
-            throw "git rev-parse --git-common-dir failed ($($process.ExitCode)): $stderr"
-        }
-
-        $commonDir = $stdout.Trim()
-        if ([string]::IsNullOrWhiteSpace($commonDir) -or $commonDir.Contains("`n") -or $commonDir.Contains("`r")) {
-            throw 'git rev-parse --git-common-dir returned an invalid path.'
-        }
-        if (-not [System.IO.Path]::IsPathRooted($commonDir)) {
-            $commonDir = Join-Path $resolvedRepoRoot $commonDir
-        }
-        return [System.IO.Path]::GetFullPath($commonDir)
-    } finally {
-        $process.Dispose()
+    $commonDir = (Invoke-NodeAgentUtf8Process -FilePath 'git' `
+        -Arguments ('-C "' + $resolvedRepoRoot + '" rev-parse --git-common-dir') `
+        -Operation 'git rev-parse --git-common-dir').Trim()
+    if ([string]::IsNullOrWhiteSpace($commonDir) -or
+        $commonDir.Contains("`n") -or $commonDir.Contains("`r")) {
+        throw 'git rev-parse --git-common-dir returned an invalid path.'
     }
+    if (-not [System.IO.Path]::IsPathRooted($commonDir)) {
+        $commonDir = Join-Path $resolvedRepoRoot $commonDir
+    }
+    return [System.IO.Path]::GetFullPath($commonDir)
 }
 
 function Compress-ArchiveWithRetry {
