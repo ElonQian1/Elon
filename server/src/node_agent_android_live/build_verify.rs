@@ -28,10 +28,13 @@ mod device_health;
 mod geometry;
 mod gradle;
 mod install;
+mod operation;
 mod preparation;
 mod runtime_preparation;
 mod runtime_reconnect;
+mod source_parity;
 
+pub(crate) use operation::{BuildVerifyOperationProgress, BuildVerifyOperationRegistry};
 pub(crate) use preparation::PreparationRegistry;
 
 use device_health::ensure_android_framework_ready;
@@ -41,6 +44,7 @@ use gradle::{
     run_debug_build, validate_debug_application_id_suffix, validate_package_name,
 };
 use install::{install_debug_apk, list_legacy_debug_packages};
+use source_parity::{compare_source_parity, target_comparison_current_rect};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -314,7 +318,17 @@ pub(crate) async fn build_and_verify(
     request: BuildVerifyRequest,
     host_port: u16,
 ) -> Result<BuildVerifyResult> {
-    build_and_verify_inner(broker, session_id, request, host_port).await
+    build_and_verify_inner(broker, session_id, request, host_port, None).await
+}
+
+async fn build_and_verify_with_reporter(
+    broker: &LiveUiBroker,
+    session_id: &str,
+    request: BuildVerifyRequest,
+    host_port: u16,
+    reporter: &operation::BuildVerifyOperationReporter,
+) -> Result<BuildVerifyResult> {
+    build_and_verify_inner(broker, session_id, request, host_port, Some(reporter)).await
 }
 
 async fn build_and_verify_inner(
@@ -322,7 +336,14 @@ async fn build_and_verify_inner(
     session_id: &str,
     request: BuildVerifyRequest,
     host_port: u16,
+    reporter: Option<&operation::BuildVerifyOperationReporter>,
 ) -> Result<BuildVerifyResult> {
+    operation::report_phase(
+        reporter,
+        "SNAPSHOT",
+        "正在读取当前 Runtime、源码 revision 与 Live 画面",
+    )
+    .await;
     let session = broker.session(session_id).await?;
     let source_project_root = canonical_project_root(&session)?;
     let origin_workspace_revision = workspace_fingerprint(
@@ -367,6 +388,17 @@ async fn build_and_verify_inner(
     )?
     .or_else(|| patched_bounds(&live_snapshot, true));
     let live_preview = (frame.bytes, rect);
+    operation::report_evidence(
+        reporter,
+        "SNAPSHOT",
+        format!(
+            "sourceRevision={origin_workspace_revision} treeRevision={} nodeCount={}",
+            session.view().await.tree_revision,
+            live_snapshot.nodes.len()
+        ),
+    )
+    .await;
+    operation::report_phase(reporter, "BUILD", "正在受控构建新的 Debug APK 工件").await;
 
     broker.debug_integration.mark_building(&integration_plan)?;
     let build_started = Instant::now();
@@ -404,6 +436,15 @@ async fn build_and_verify_inner(
         .context("FIT_SOURCE_PROOF_GENERATION_MISSING: generation worktree 缺少可验证 revision")?;
     let build_duration_ms = build_started.elapsed().as_millis();
     let apk = select_fresh_debug_apk(&gradle_root, &session.package_name, artifact_not_before)?;
+    operation::report_evidence(
+        reporter,
+        "BUILD",
+        format!(
+            "Gradle 构建完成 durationMs={build_duration_ms} apk={}",
+            apk.display()
+        ),
+    )
+    .await;
     let expected_label = session
         .package_name
         .starts_with("com.elon.app.uituner_")
@@ -432,6 +473,7 @@ async fn build_and_verify_inner(
         .debug_integration
         .record_legacy_packages(&integration_plan, legacy_packages)?;
 
+    operation::report_phase(reporter, "INSTALL", "正在安装已校验身份和签名的 Debug APK").await;
     let install_output = install_debug_apk(
         &session.device_id,
         &session.package_name,
@@ -445,6 +487,13 @@ async fn build_and_verify_inner(
     broker
         .debug_integration
         .record_deployed(&integration_plan)?;
+    operation::report_evidence(reporter, "INSTALL", install_output.trim()).await;
+    operation::report_phase(
+        reporter,
+        "RETURN_TO_PREVIEW",
+        "正在回到 Runtime 页面并重新激活请求的 PreviewHost 场景",
+    )
+    .await;
 
     session.reset_for_redeploy().await;
     let start_evidence = start_runtime(&session, host_port).await?;
@@ -457,6 +506,26 @@ async fn build_and_verify_inner(
     if let Some(preview) = preview.as_ref() {
         open_preview(&session, preview.clone()).await?;
     }
+    operation::report_evidence(
+        reporter,
+        "RETURN_TO_PREVIEW",
+        preview
+            .as_ref()
+            .map(|preview| {
+                format!(
+                    "PreviewHost screenId={} scenario={}",
+                    preview.screen_id, preview.scenario
+                )
+            })
+            .unwrap_or_else(|| "已返回 Debug Runtime 默认页面".to_string()),
+    )
+    .await;
+    operation::report_phase(
+        reporter,
+        "RUNTIME_RECONNECT",
+        "正在等待 Runtime WebSocket 重新连接",
+    )
+    .await;
     let expected_screen_id = preview.as_ref().map(|preview| preview.screen_id.as_str());
     let mut runtime_view = match wait_for_runtime(
         broker,
@@ -488,6 +557,16 @@ async fn build_and_verify_inner(
             .with_context(|| format!("重新连接 Debug Runtime 失败；首次错误: {first_error:#}"))?
         }
     };
+    operation::report_evidence(
+        reporter,
+        "RUNTIME_RECONNECT",
+        format!(
+            "connected={} runtimeBuildId={}",
+            runtime_view.connected,
+            runtime_view.runtime_build_id.as_deref().unwrap_or("none")
+        ),
+    )
+    .await;
     if let Some(replay) = request.state_replay.as_ref() {
         let target_definition_id = request
             .target_definition_id
@@ -508,11 +587,29 @@ async fn build_and_verify_inner(
     // stable Live preview creates false BUILD_MISMATCH results. Give the debug
     // renderer a deterministic settle window, then require consecutive frames.
     tokio::time::sleep(Duration::from_millis(2_200)).await;
+    operation::report_phase(reporter, "SCREENSHOT", "正在捕获稳定的最终 Runtime 截图").await;
     let source_frame = capture_stable_runtime_frame(&session).await?;
     let screenshot_width = source_frame.width;
     let screenshot_height = source_frame.height;
     let screenshot = source_frame.bytes;
+    operation::report_evidence(
+        reporter,
+        "SCREENSHOT",
+        format!("captured={}x{}", screenshot_width, screenshot_height),
+    )
+    .await;
+    operation::report_phase(reporter, "TREE_REFRESH", "正在读取回页后的最终节点树").await;
     let (_, redeployed_nodes) = broker.tree(session_id).await?;
+    operation::report_evidence(
+        reporter,
+        "TREE_REFRESH",
+        format!(
+            "treeRevision={} nodeCount={}",
+            runtime_view.tree_revision,
+            redeployed_nodes.len()
+        ),
+    )
+    .await;
     let source_rect = verification_bounds(
         &redeployed_nodes,
         request.target_definition_id.as_deref(),
@@ -603,51 +700,6 @@ async fn build_and_verify_inner(
 /// Exact encoded-frame equality is stronger evidence than any crop comparison.
 /// When even one frame byte differs we retain the strict target-node crop gate,
 /// so unrelated dynamic pixels cannot hide a real component mismatch.
-fn compare_source_parity(
-    live_frame: &[u8],
-    source_frame: &[u8],
-    live_rect: Option<PixelRect>,
-    source_rect: Option<PixelRect>,
-) -> Result<(VisualDiffResult, &'static str)> {
-    if live_frame == source_frame {
-        let mut diff = compare_pngs(live_frame, source_frame, None, None)?;
-        // Transparent or letterboxed frames can have zero eligible foreground
-        // pixels, which makes the generic design scorer fail its coverage gate.
-        // Byte-for-byte process frames are stronger evidence than that derived
-        // coverage heuristic, so normalize the exact-match result explicitly.
-        diff.mean_absolute_color_error = 0.0;
-        diff.edge_error = 0.0;
-        diff.alpha_error = 0.0;
-        diff.geometry_error = 0.0;
-        diff.visual_loss = 0.0;
-        diff.score_report.optimization_score = 0.0;
-        diff.score_report.target_gate.passed = true;
-        diff.score_report.target_gate.geometry_passed = true;
-        diff.score_report.target_gate.position_passed = true;
-        diff.score_report.target_gate.color_passed = true;
-        diff.score_report.target_gate.edge_passed = true;
-        diff.score_report.target_gate.perceptual_passed = true;
-        diff.score_report.target_gate.coverage_passed = true;
-        diff.score_report.target_gate.failed_metrics.clear();
-        return Ok((diff, "PROCESS_FRAME_EXACT"));
-    }
-    Ok((
-        compare_pngs(live_frame, source_frame, live_rect, source_rect)?,
-        "TARGET_NODE_CROP",
-    ))
-}
-
-fn target_comparison_current_rect(
-    projected_current_rect: Option<PixelRect>,
-    verified_current_rect: Option<PixelRect>,
-) -> Option<PixelRect> {
-    // 目标设计图的 targetRect 位于设计坐标系；projectedCurrentRect 是它
-    // 校准到 Android 显示坐标后的同一屏幕区域。目标门禁必须裁剪这个
-    // 区域，不能拿 TextView 等节点的语义 bounds 代替，否则字形溢出会
-    // 让完全相同的画面仍产生误差。节点边界仍用于独立 Source Parity。
-    projected_current_rect.or(verified_current_rect)
-}
-
 pub(super) async fn capture_stable_runtime_frame(
     session: &LiveUiSession,
 ) -> Result<RuntimeFrameImage> {
@@ -729,36 +781,3 @@ fn verify_origin_workspace_revision(origin_root: &std::path::Path, expected: &st
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod target_comparison_rect_tests {
-    use super::*;
-
-    fn rect(left: i32, top: i32, right: i32, bottom: i32) -> PixelRect {
-        PixelRect {
-            left,
-            top,
-            right,
-            bottom,
-        }
-    }
-
-    #[test]
-    fn projected_design_region_wins_over_node_semantic_bounds() {
-        let projected = rect(488, 134, 592, 266);
-        let node_bounds = rect(498, 134, 582, 266);
-        assert_eq!(
-            target_comparison_current_rect(Some(projected), Some(node_bounds)),
-            Some(projected)
-        );
-    }
-
-    #[test]
-    fn node_bounds_remain_fallback_without_calibration() {
-        let node_bounds = rect(498, 134, 582, 266);
-        assert_eq!(
-            target_comparison_current_rect(None, Some(node_bounds)),
-            Some(node_bounds)
-        );
-    }
-}

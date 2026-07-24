@@ -131,6 +131,35 @@ async fn mcp_lists_compact_ui_tools() {
         .iter()
         .any(|tool| tool["name"] == "ui_commit_bound_styles"));
     assert!(tools.iter().any(|tool| tool["name"] == "ui_start_fit_run"));
+    let activate_preview = tools
+        .iter()
+        .find(|tool| tool["name"] == "ui_activate_preview_scenario")
+        .expect("preview scenario activation tool must be discoverable");
+    assert_eq!(
+        activate_preview["inputSchema"]["properties"]["scenario"]["type"],
+        "string"
+    );
+    assert!(
+        activate_preview["inputSchema"]["properties"]["scenario"]["enum"].is_null(),
+        "registered preview scenarios must not be frozen in the MCP schema"
+    );
+    let build_verify = tools
+        .iter()
+        .find(|tool| tool["name"] == "ui_build_and_verify")
+        .expect("background build verification tool must be discoverable");
+    assert_eq!(
+        build_verify["inputSchema"]["properties"]["operationId"]["type"],
+        "string"
+    );
+    assert_eq!(
+        build_verify["inputSchema"]["properties"]["preview"]["properties"]["scenario"]["type"],
+        "string"
+    );
+    assert!(
+        build_verify["inputSchema"]["properties"]["preview"]["properties"]["scenario"]["enum"]
+            .is_null(),
+        "ui_build_and_verify must accept every runtime-registered scenario"
+    );
     assert!(tools
         .iter()
         .any(|tool| tool["name"] == "ui_create_android_screen_scaffold"));
@@ -219,6 +248,33 @@ async fn mcp_lists_compact_ui_tools() {
         .expect("PWA runtime capture tool must be discoverable");
     assert_eq!(pwa_capture["annotations"]["openWorldHint"], false);
     assert_eq!(pwa_capture["inputSchema"]["additionalProperties"], false);
+}
+
+#[tokio::test]
+async fn build_verify_polling_rejects_untrusted_operation_ids_without_starting_work() {
+    let broker = std::sync::Arc::new(LiveUiBroker::new());
+    let session = broker
+        .create_session(
+            "device-1".to_string(),
+            "com.example.debug".to_string(),
+            None,
+            38917,
+        )
+        .await;
+    let request: McpRequest = serde_json::from_value(json!({
+        "jsonrpc":"2.0","id":5,"method":"tools/call","params":{
+            "name":"ui_build_and_verify",
+            "arguments":{"operationId":"ui_build_verify_../../escape"}
+        }
+    }))
+    .unwrap();
+    let fit_runs = FitRunService::live(broker.clone());
+    let response = handle_request(&broker, &fit_runs, &session.id, request)
+        .await
+        .expect("invalid operation polling must return a JSON-RPC error");
+    assert!(response["error"]["message"]
+        .as_str()
+        .is_some_and(|message| message.contains("operationId 格式无效")));
 }
 
 #[tokio::test]

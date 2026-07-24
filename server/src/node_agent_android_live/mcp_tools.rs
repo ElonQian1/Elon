@@ -483,11 +483,31 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
             }),
         ),
         tool(
+            "ui_activate_preview_scenario",
+            "无需重建 APK，正式激活已安装 Debug Runtime 注册的 Preview 场景；节点端由 UiRuntimePreviewRegistry.supportedScenarios 校验，并完成 PreviewHost 回页、Runtime 重连、节点树刷新与截图取证。",
+            json!({
+                "type":"object",
+                "required":["screenId","scenario"],
+                "properties":{
+                    "screenId":{"type":"string","minLength":1,"maxLength":180},
+                    "scenario":{"type":"string","minLength":1,"maxLength":80},
+                    "theme":{"enum":["system","light","dark"],"default":"system"},
+                    "fontScale":{"type":"number","minimum":0.5,"maximum":2.0,"default":1.0},
+                    "locale":{"type":"string","minLength":1,"maxLength":40,"default":"zh-CN"}
+                }
+            }),
+        ),
+        tool(
             "ui_build_and_verify",
-            "请求构建、安装、清 Patch、回页和真机验收。",
+            "后台执行构建、安装、清 Patch、回页和真机验收。首次调用立即返回 operationId/IN_PROGRESS；后续只传 operationId 轮询安装、回页、节点树刷新和截图终态，客户端窗口结束不会取消后台操作。",
             json!({
                 "type":"object",
                 "properties":{
+                    "operationId":{
+                        "type":"string",
+                        "pattern":"^ui_build_verify_[a-f0-9]{32}$",
+                        "description":"轮询既有后台操作时只需传此字段"
+                    },
                     "debugApplicationIdSuffix":{
                         "type":"string",
                         "pattern":"^\\.[A-Za-z0-9._]{1,39}$",
@@ -498,7 +518,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                         "required":["screenId","scenario","theme","fontScale","locale"],
                         "properties":{
                             "screenId":{"type":"string"},
-                            "scenario":{"enum":["normal","loading","empty","error"]},
+                            "scenario":{"type":"string","minLength":1,"maxLength":80},
                             "theme":{"enum":["system","light","dark"]},
                             "fontScale":{"type":"number","minimum":0.5,"maximum":2.0},
                             "locale":{"type":"string"}

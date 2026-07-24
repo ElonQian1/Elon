@@ -6,14 +6,15 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::broker::{LiveUiBroker, LiveUiSession};
-use super::build_verify::{build_and_verify, BuildVerifyRequest};
+use super::build_verify::BuildVerifyRequest;
 use super::fit_run::{
-    workspace_fingerprint, AttachStateReplayRequest, CreateFitRunRequest, FitEnvironment, FitRect,
-    FitRunService, FitSessionContext, FitStateReplay, FitTargetPair,
+    workspace_fingerprint, AttachStateReplayRequest, FitRunService, FitSessionContext,
+    FitStateReplay,
 };
 use super::frame_artifact::{capture_latest_frame_artifact, persist_target_crop_artifact};
 use super::mcp_fit_command::fit_command;
 use super::mcp_tools::tool_definitions;
+use super::preview::{activate_preview_scenario, PreviewOpenRequest};
 use super::protocol::{LivePatchOperation, LivePatchTarget, LivePropertyValue, LiveStylePatch};
 use super::source_commit::{build_source_commit_plan, commit_source, SourceCommitRequest};
 use super::ui_ir::{
@@ -344,67 +345,7 @@ async fn call_tool(
             json!({ "result": solve_visual_style(broker, &session_id, request).await? })
         }
         "ui_start_fit_run" => {
-            let ir = load_or_build_ui_ir(broker, &session_id).await?;
-            let target = ir
-                .target_design
-                .as_ref()
-                .ok_or_else(|| anyhow!("尚未绑定 TARGET_DESIGN，不能启动 FitRun"))?;
-            let node = find_node(&ir, &arguments)?;
-            let current = &node.geometry.bounds_in_display_px;
-            let environment: FitEnvironment = serde_json::from_value(
-                arguments
-                    .get("environment")
-                    .cloned()
-                    .unwrap_or_else(|| json!({ "screenId": node.screen_id })),
-            )
-            .context("environment 参数无效")?;
-            let session = broker.session(&session_id).await?;
-            let request = CreateFitRunRequest {
-                task_id: super::design_bootstrap::design_task_id(&session, &arguments),
-                pair: FitTargetPair {
-                    target_design_id: target.id.clone(),
-                    target_sha256: target.sha256.clone(),
-                    target_rect: fit_rect(arguments.get("targetRect"))?,
-                    runtime_node_id: node.runtime_node_id.clone(),
-                    definition_id: node.definition_id.clone(),
-                    component_kind: Some(node.kind.clone()),
-                    parent_layout_kind: None,
-                    instance_key: node.instance_key.clone(),
-                    current_rect: FitRect {
-                        left: current.left,
-                        top: current.top,
-                        right: current.right,
-                        bottom: current.bottom,
-                    },
-                    projected_target_rect: fit_rect(arguments.get("projectedTargetRect"))?,
-                    calibration_id: None,
-                    confidence: Some(1.0),
-                },
-                environment,
-                properties: arguments
-                    .get("properties")
-                    .and_then(Value::as_array)
-                    .map(|values| {
-                        values
-                            .iter()
-                            .filter_map(Value::as_str)
-                            .map(ToOwned::to_owned)
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-                budget: Default::default(),
-                thresholds: Default::default(),
-                visual_mask: serde_json::from_value(
-                    arguments
-                        .get("visualMask")
-                        .cloned()
-                        .unwrap_or_else(|| json!({})),
-                )
-                .context("visualMask 参数无效")?,
-                auto_start: true,
-            };
-            let context = fit_session_context(broker, &session_id).await?;
-            json!({ "run": fit_runs.create_run(context, request).await? })
+            super::mcp_fit_start::start(broker, fit_runs, &session_id, &arguments).await?
         }
         "ui_get_fit_run" => {
             let context = fit_session_context(broker, &session_id).await?;
@@ -478,11 +419,31 @@ async fn call_tool(
                 "result": commit_source(session, SourceCommitRequest { source_revision }).await?
             })
         }
-        "ui_build_and_verify" => {
-            let request: BuildVerifyRequest =
-                serde_json::from_value(arguments).context("构建验收参数无效")?;
+        "ui_activate_preview_scenario" => {
+            let request: PreviewOpenRequest =
+                serde_json::from_value(arguments).context("Preview 场景激活参数无效")?;
             let host_port = crate::node_agent_admin_open::admin_port_from_env();
-            json!({ "result": build_and_verify(broker, &session_id, request, host_port).await? })
+            json!({
+                "result": activate_preview_scenario(broker, &session_id, request, host_port).await?
+            })
+        }
+        "ui_build_and_verify" => {
+            let progress =
+                if let Some(operation_id) = arguments.get("operationId").and_then(Value::as_str) {
+                    broker
+                        .build_verifications
+                        .poll(&session_id, operation_id)
+                        .await?
+                } else {
+                    let request: BuildVerifyRequest =
+                        serde_json::from_value(arguments).context("构建验收参数无效")?;
+                    let host_port = crate::node_agent_admin_open::admin_port_from_env();
+                    broker
+                        .build_verifications
+                        .start(broker.clone(), session_id.clone(), request, host_port)
+                        .await?
+                };
+            json!({ "result": progress })
         }
         crate::node_agent_pwa_runtime::TOOL_NAME => {
             let session = broker.session(&session_id).await?;
@@ -497,7 +458,10 @@ async fn call_tool(
         "isError": false,
     }))
 }
-async fn fit_session_context(broker: &LiveUiBroker, session_id: &str) -> Result<FitSessionContext> {
+pub(super) async fn fit_session_context(
+    broker: &LiveUiBroker,
+    session_id: &str,
+) -> Result<FitSessionContext> {
     let session = broker.session(session_id).await?;
     let view = session.view().await;
     let project_root = session
@@ -514,12 +478,6 @@ async fn fit_session_context(broker: &LiveUiBroker, session_id: &str) -> Result<
         tree_revision: view.tree_revision,
         source_revision,
     })
-}
-fn fit_rect(value: Option<&Value>) -> Result<FitRect> {
-    let rect: FitRect = serde_json::from_value(value.cloned().unwrap_or(Value::Null))
-        .context("FitRun 矩形参数无效")?;
-    rect.validate("FitRun rect")?;
-    Ok(rect)
 }
 fn attach_state_replay_request(arguments: &Value) -> Result<AttachStateReplayRequest> {
     let required = |key: &str| -> Result<String> {

@@ -23,6 +23,7 @@ pub(crate) struct LiveUiBroker {
     sessions: RwLock<HashMap<String, Arc<LiveUiSession>>>,
     pub(crate) debug_deployments: super::deployment_serialization::DebugDeploymentRegistry,
     pub(crate) debug_runtime_preparations: super::build_verify::PreparationRegistry,
+    pub(crate) build_verifications: super::build_verify::BuildVerifyOperationRegistry,
     pub(crate) debug_integration: super::debug_integration::DebugIntegrationCoordinator,
 }
 

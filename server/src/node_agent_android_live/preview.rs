@@ -7,7 +7,10 @@ use crate::node_agent_android_inspector::adb_command::{
     run_adb_text, validate_device_id, validate_package_name,
 };
 
-use super::broker::LiveUiSession;
+use super::adb_session::start_runtime;
+use super::broker::{LiveUiBroker, LiveUiSession};
+use super::frame_artifact::{capture_latest_frame_artifact, LiveFrameArtifact};
+use super::ui_ir::load_or_build_ui_ir;
 
 const PREVIEW_ACTIVITY: &str = "com.elon.uiruntime.view.UiRuntimePreviewHostActivity";
 
@@ -34,6 +37,57 @@ pub(crate) struct PreviewOpenResult {
     font_scale: f32,
     locale: String,
     adb_output: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PreviewActivationResult {
+    preview: PreviewOpenResult,
+    runtime_connected: bool,
+    runtime_build_id: Option<String>,
+    tree_revision: u64,
+    node_count: usize,
+    root_definition_ids: Vec<String>,
+    screenshot: LiveFrameArtifact,
+}
+
+pub(crate) async fn activate_preview_scenario(
+    broker: &LiveUiBroker,
+    session_id: &str,
+    request: PreviewOpenRequest,
+    host_port: u16,
+) -> Result<PreviewActivationResult> {
+    let session = broker.session(session_id).await?;
+    validate_request(&request)?;
+    session.reset_for_redeploy().await;
+    let start_evidence = start_runtime(&session, host_port).await?;
+    let expected_screen_id = request.screen_id.clone();
+    let preview = open_preview(&session, request).await?;
+    let runtime = super::build_verify::wait_for_runtime(
+        broker,
+        session_id,
+        &session,
+        Some(&expected_screen_id),
+        &start_evidence,
+    )
+    .await?;
+    let ir = load_or_build_ui_ir(broker, session_id).await?;
+    let root_definition_ids = ir
+        .nodes
+        .iter()
+        .filter(|node| node.parent_runtime_node_id.is_none())
+        .map(|node| node.definition_id.clone())
+        .collect();
+    let screenshot = capture_latest_frame_artifact(&session, None).await?;
+    Ok(PreviewActivationResult {
+        preview,
+        runtime_connected: runtime.connected,
+        runtime_build_id: runtime.runtime_build_id,
+        tree_revision: runtime.tree_revision,
+        node_count: ir.nodes.len(),
+        root_definition_ids,
+        screenshot,
+    })
 }
 
 pub(crate) async fn open_preview(

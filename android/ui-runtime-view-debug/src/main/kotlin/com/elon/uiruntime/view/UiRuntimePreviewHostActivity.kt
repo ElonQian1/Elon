@@ -38,7 +38,9 @@ class UiRuntimePreviewHostActivity : ComponentActivity() {
             }
             scenario.createView(configuredContext, request)
         }
-        view.setTag(R.id.yilong_ui_node_id, "preview.${request.screenId}.root")
+        if (view.getTag(R.id.yilong_ui_node_id) == null) {
+            view.setTag(R.id.yilong_ui_node_id, "preview.${request.screenId}.root")
+        }
         setContentView(view)
     }
 

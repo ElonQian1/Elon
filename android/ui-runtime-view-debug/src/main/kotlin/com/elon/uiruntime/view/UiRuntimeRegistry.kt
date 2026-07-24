@@ -50,7 +50,15 @@ internal class UiRuntimeRegistry(
         viewsByRuntimeId.clear()
         definitionByRuntimeId.clear()
         instanceByRuntimeId.clear()
-        val screenId = activity.componentName.className
+        val screenId = if (activity is UiRuntimePreviewHostActivity) {
+            activity.intent
+                ?.getStringExtra(UiRuntimePreviewHostActivity.EXTRA_SCREEN_ID)
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?: activity.componentName.className
+        } else {
+            activity.componentName.className
+        }
         val nodes = ArrayList<LiveUiNode>()
         visit(
             view = root,

@@ -53,6 +53,7 @@ pub(super) fn fit_environment_schema() -> Value {
             "screenId":{"type":"string","maxLength":500},
             "scenario":{"type":"string","maxLength":128},
             "theme":{"type":"string","maxLength":128},
+            "fontScale":{"type":"number","minimum":0.5,"maximum":2.0},
             "locale":{"type":"string","maxLength":128},
             "stateReplay":state_replay_schema()
         }
