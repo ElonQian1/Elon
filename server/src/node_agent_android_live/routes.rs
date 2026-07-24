@@ -362,10 +362,15 @@ async fn reconnect_session_handler(
         Err(error) => return json_error(StatusCode::NOT_FOUND, format!("{error:#}")),
     };
     let host_port = crate::node_agent_admin_open::admin_port_from_env();
-    match start_runtime(&session, host_port).await {
-        Ok(output) => Json(json!({
+    match super::runtime_binding::reconnect_or_rebind(&runtime.live_ui, &session, host_port).await {
+        Ok((active_session, output, rebound)) => Json(json!({
             "ok": true,
-            "session": session.view().await,
+            "session": active_session.view().await,
+            "rebound": rebound,
+            "previousSessionId": session.id,
+            "previousDeviceId": session.device_id,
+            "effectiveSessionId": active_session.id,
+            "effectiveDeviceId": active_session.device_id,
             "adbOutput": output,
         }))
         .into_response(),

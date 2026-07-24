@@ -69,6 +69,39 @@ async fn real_runtime_selection_fails_closed_for_missing_pseudo_or_ambiguous_ses
 }
 
 #[tokio::test]
+async fn direct_mcp_session_follows_a_rebound_emulator_for_the_same_project() {
+    let broker = LiveUiBroker::new();
+    let root =
+        std::env::temp_dir().join(format!("runtime-rebind-{}", uuid::Uuid::new_v4().simple()));
+    std::fs::create_dir_all(&root).unwrap();
+    let root_path = root.clone();
+    let root = root.to_string_lossy().to_string();
+    let offline = broker
+        .create_session(
+            "offline-phone".into(),
+            "com.elon.app.uitest".into(),
+            Some(root.clone()),
+            1,
+        )
+        .await;
+    let emulator = broker
+        .create_session(
+            "emulator-5554".into(),
+            "com.elon.app.uitest".into(),
+            Some(root),
+            1,
+        )
+        .await;
+    mark_real_runtime(&emulator).await;
+
+    assert_eq!(
+        broker.effective_session_id(&offline.id).await.unwrap(),
+        emulator.id
+    );
+    std::fs::remove_dir_all(root_path).unwrap();
+}
+
+#[tokio::test]
 async fn frame_request_retries_once_on_replacement_connection() {
     let broker = LiveUiBroker::new();
     let session = broker

@@ -8,6 +8,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use super::adb_session::RuntimeStartEvidence;
 use super::broker::{LiveUiBroker, LiveUiSession};
 use super::build_verify::wait_for_runtime;
 use super::fit_run::workspace_fingerprint;
@@ -25,6 +26,11 @@ pub(crate) struct DurableRuntimeBinding {
     pub source_revision: String,
     pub root_task_id: String,
     pub updated_at: String,
+}
+
+pub(crate) enum RuntimeBindingSelection {
+    Bound(DurableRuntimeBinding, bool),
+    Control { diagnostic: String },
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -105,12 +111,11 @@ pub(crate) fn persist_verified(session: &LiveUiSession) -> Result<DurableRuntime
         .map_err(|_| anyhow::anyhow!("Runtime 绑定锁已损坏"))?;
     let path = store_path();
     let mut file = read(&path)?;
-    file.bindings.retain(|item| {
-        !(same_root(&item.project_root, &binding.project_root)
-            && item.device_id == binding.device_id
-            && item.package_name == binding.package_name
-            && item.root_task_id == binding.root_task_id)
-    });
+    // A project/root/source tuple has exactly one active Runtime device. Rebinding
+    // from an offline phone to an online emulator must replace the old candidate;
+    // retaining both would make the next bootstrap fail as ambiguous.
+    file.bindings
+        .retain(|item| !same_binding_scope(item, &binding));
     file.bindings.push(binding.clone());
     file.bindings
         .sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
@@ -246,6 +251,135 @@ fn same_root(left: &str, right: &str) -> bool {
         .eq_ignore_ascii_case(right.trim_end_matches(['/', '\\']))
 }
 
+fn same_binding_scope(left: &DurableRuntimeBinding, right: &DurableRuntimeBinding) -> bool {
+    same_root(&left.project_root, &right.project_root)
+        && left.source_revision == right.source_revision
+        && left.root_task_id == right.root_task_id
+}
+
+pub(crate) async fn reconnect_or_rebind(
+    broker: &LiveUiBroker,
+    current: &std::sync::Arc<LiveUiSession>,
+    host_port: u16,
+) -> Result<(std::sync::Arc<LiveUiSession>, RuntimeStartEvidence, bool)> {
+    let devices = crate::node_agent_android_inspector::adb_command::run_adb_text(
+        &["devices".into()],
+        Duration::from_secs(5),
+        64 * 1024,
+    )
+    .await
+    .context("RUNTIME_REBIND_DEVICE_SCAN_FAILED")?;
+    let candidates = reconnect_device_candidates(&current.device_id, &devices);
+    if candidates.is_empty() {
+        bail!(
+            "RUNTIME_REBIND_DEVICE_MISSING: 当前绑定 {} 离线，且没有在线 Android 设备",
+            current.device_id
+        );
+    }
+
+    let mut failures = Vec::new();
+    for device_id in candidates {
+        if !package_is_installed(&device_id, &current.package_name).await {
+            failures.push(format!("{device_id}:PACKAGE_MISSING"));
+            continue;
+        }
+        let rebound = device_id != current.device_id;
+        let session = if rebound {
+            broker
+                .create_session_with_identity(
+                    device_id.clone(),
+                    device_id.clone(),
+                    current.package_name.clone(),
+                    current.project_root.clone(),
+                    current.debug_project_id.clone(),
+                    current.device_port,
+                )
+                .await
+        } else {
+            current.clone()
+        };
+        session.reset_for_redeploy().await;
+        let start = match super::adb_session::start_runtime(&session, host_port).await {
+            Ok(start) => start,
+            Err(error) => {
+                failures.push(format!("{device_id}:START_FAILED:{error:#}"));
+                if rebound {
+                    broker.remove_session(&session.id).await;
+                }
+                continue;
+            }
+        };
+        match tokio::time::timeout(
+            Duration::from_secs(20),
+            wait_for_runtime(broker, &session.id, &session, None, &start),
+        )
+        .await
+        {
+            Ok(Ok(view)) if view.connected && view.node_count > 0 => {
+                persist_verified(&session).context(
+                    "RUNTIME_REBIND_PERSIST_FAILED: 新 Runtime 已 LIVE，但绑定持久化失败",
+                )?;
+                return Ok((session, start, rebound));
+            }
+            Ok(Ok(view)) => failures.push(format!(
+                "{device_id}:HANDSHAKE_INCOMPLETE:connected={} nodeCount={}",
+                view.connected, view.node_count
+            )),
+            Ok(Err(error)) => failures.push(format!("{device_id}:HANDSHAKE_FAILED:{error:#}")),
+            Err(_) => failures.push(format!("{device_id}:HANDSHAKE_TIMEOUT")),
+        }
+        if rebound {
+            broker.remove_session(&session.id).await;
+        }
+    }
+    bail!(
+        "RUNTIME_REBIND_FAILED: 当前绑定={} package={}；候选失败={}",
+        current.device_id,
+        current.package_name,
+        failures.join(" | ")
+    )
+}
+
+fn reconnect_device_candidates(current_device_id: &str, adb_devices: &str) -> Vec<String> {
+    let mut online = adb_devices
+        .lines()
+        .filter_map(|line| line.split_once('\t'))
+        .filter(|(_, state)| state.split_whitespace().next() == Some("device"))
+        .map(|(id, _)| id.trim().to_string())
+        .filter(|id| !id.is_empty())
+        .collect::<Vec<_>>();
+    online.sort_by_key(|id| {
+        (
+            id != current_device_id,
+            !id.starts_with("emulator-"),
+            id.clone(),
+        )
+    });
+    online.dedup();
+    online
+}
+
+async fn package_is_installed(device_id: &str, package_name: &str) -> bool {
+    crate::node_agent_android_inspector::adb_command::run_adb_text(
+        &[
+            "-s".into(),
+            device_id.to_string(),
+            "shell".into(),
+            "pm".into(),
+            "path".into(),
+            package_name.to_string(),
+        ],
+        Duration::from_secs(8),
+        64 * 1024,
+    )
+    .await
+    .is_ok_and(|output| {
+        output
+            .lines()
+            .any(|line| line.trim_start().starts_with("package:"))
+    })
+}
+
 pub(crate) async fn restore_unique(
     broker: &LiveUiBroker,
     project_root: &str,
@@ -323,41 +457,58 @@ pub(crate) async fn select_or_control(
     broker: &LiveUiBroker,
     project_root: &str,
     host_port: u16,
-) -> Result<(
-    std::sync::Arc<LiveUiSession>,
-    Option<(DurableRuntimeBinding, bool)>,
-)> {
+) -> Result<(std::sync::Arc<LiveUiSession>, RuntimeBindingSelection)> {
     match select_or_restore(broker, project_root, host_port).await {
-        Ok((session, binding, restored)) => Ok((session, Some((binding, restored)))),
-        Err(error) if error.to_string().contains("RUNTIME_BINDING_MISSING") => Ok((
-            broker
-                .create_session(
-                    "ui-design-bootstrap".to_string(),
-                    "ui.design.bootstrap".to_string(),
-                    Some(project_root.to_string()),
-                    super::adb_session::DEFAULT_DEVICE_PORT,
-                )
-                .await,
-            None,
-        )),
+        Ok((session, binding, restored)) => {
+            Ok((session, RuntimeBindingSelection::Bound(binding, restored)))
+        }
+        Err(error) if recoverable_control_diagnostic(&error).is_some() => {
+            let diagnostic = recoverable_control_diagnostic(&error).expect("checked above");
+            Ok((
+                broker
+                    .create_session(
+                        "ui-design-bootstrap".to_string(),
+                        "ui.design.bootstrap".to_string(),
+                        Some(project_root.to_string()),
+                        super::adb_session::DEFAULT_DEVICE_PORT,
+                    )
+                    .await,
+                RuntimeBindingSelection::Control { diagnostic },
+            ))
+        }
         Err(error) => Err(error),
     }
 }
 
-pub(crate) fn descriptor_view(
-    project_root: &str,
-    binding: Option<(DurableRuntimeBinding, bool)>,
-) -> Value {
+fn recoverable_control_diagnostic(error: &anyhow::Error) -> Option<String> {
+    let message = format!("{error:#}");
+    [
+        "RUNTIME_BINDING_MISSING",
+        "RUNTIME_BINDING_STALE",
+        "RUNTIME_BINDING_DEVICE_MISSING",
+        "RUNTIME_BINDING_PACKAGE_MISSING",
+        "RUNTIME_REBOOTSTRAP_START_FAILED",
+        "RUNTIME_REBOOTSTRAP_EMPTY_TREE",
+        "RUNTIME_REBOOTSTRAP_FAILED",
+        "RUNTIME_REBOOTSTRAP_TIMEOUT",
+    ]
+    .into_iter()
+    .find(|code| message.contains(code))
+    .map(str::to_string)
+}
+
+pub(crate) fn descriptor_view(project_root: &str, binding: RuntimeBindingSelection) -> Value {
     match binding {
-        Some((binding, restored)) => json!({
+        RuntimeBindingSelection::Bound(binding, restored) => json!({
             "status": "BOUND", "projectRoot": binding.project_root,
             "deviceId": binding.device_id, "packageName": binding.package_name,
             "sourceRevision": binding.source_revision, "rootTaskId": binding.root_task_id,
             "restoredAfterRestart": restored,
         }),
-        None => json!({
+        RuntimeBindingSelection::Control { diagnostic } => json!({
             "status": "UNAVAILABLE", "projectRoot": project_root,
-            "diagnostic": "RUNTIME_BINDING_MISSING", "controlPlaneAvailable": true,
+            "diagnostic": diagnostic, "controlPlaneAvailable": true,
+            "rebindAvailable": true,
         }),
     }
 }
@@ -495,5 +646,76 @@ mod tests {
         assert_eq!(selected.len(), 1);
         assert_eq!(selected[0].device_id, "device-1");
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn stale_and_offline_bindings_keep_the_project_control_plane_recoverable() {
+        for (message, expected) in [
+            (
+                "RUNTIME_BINDING_STALE: source revision 已变化",
+                "RUNTIME_BINDING_STALE",
+            ),
+            (
+                "outer: RUNTIME_BINDING_DEVICE_MISSING: 绑定设备 offline 不在线",
+                "RUNTIME_BINDING_DEVICE_MISSING",
+            ),
+            (
+                "RUNTIME_REBOOTSTRAP_TIMEOUT: 20 秒内未恢复真实 Runtime",
+                "RUNTIME_REBOOTSTRAP_TIMEOUT",
+            ),
+        ] {
+            let error = anyhow::anyhow!(message);
+            assert_eq!(
+                recoverable_control_diagnostic(&error).as_deref(),
+                Some(expected)
+            );
+        }
+        assert!(
+            recoverable_control_diagnostic(&anyhow::anyhow!("RUNTIME_BINDING_AMBIGUOUS")).is_none()
+        );
+    }
+
+    #[test]
+    fn a_verified_rebind_replaces_the_old_device_candidate() {
+        let mut file = BindingFile {
+            schema_version: SCHEMA_VERSION,
+            bindings: vec![
+                binding("C:/project", "offline-phone", "rev-1"),
+                binding("C:/other", "other-device", "rev-1"),
+            ],
+        };
+        let replacement = binding("c:/PROJECT/", "emulator-5554", "rev-1");
+        file.bindings
+            .retain(|item| !same_binding_scope(item, &replacement));
+        file.bindings.push(replacement);
+        assert_eq!(file.bindings.len(), 2);
+        assert!(file
+            .bindings
+            .iter()
+            .any(|item| item.device_id == "emulator-5554"));
+        assert!(!file
+            .bindings
+            .iter()
+            .any(|item| item.device_id == "offline-phone"));
+    }
+
+    #[test]
+    fn reconnect_prefers_current_then_online_emulator_for_an_offline_binding() {
+        let devices = "List of devices attached\n\
+            offline-phone\toffline\n\
+            wifi-device\tdevice product:phone\n\
+            emulator-5554\tdevice product:sdk\n";
+        assert_eq!(
+            reconnect_device_candidates("offline-phone", devices),
+            ["emulator-5554", "wifi-device"]
+        );
+
+        let current_online = "List of devices attached\n\
+            emulator-5554\tdevice product:sdk\n\
+            wifi-device\tdevice product:phone\n";
+        assert_eq!(
+            reconnect_device_candidates("wifi-device", current_online),
+            ["wifi-device", "emulator-5554"]
+        );
     }
 }

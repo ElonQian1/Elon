@@ -267,6 +267,9 @@ async fn prepare_debug_runtime_inner(
         }
         match result {
             Ok(build) if keep_session => {
+                super::runtime_binding::persist_verified(&session).context(
+                    "RUNTIME_REBIND_PERSIST_FAILED: Debug Runtime 已 LIVE，但绑定持久化失败",
+                )?;
                 let integration = broker
                     .debug_integration
                     .status(&integration_plan.slot_id)?

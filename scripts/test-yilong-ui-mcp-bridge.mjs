@@ -65,6 +65,7 @@ try {
   })
   const recovered = await client.next((message) => message.id === 4)
   assert.equal(recovered.result.structuredContent.connected, true)
+  assert.equal(recovered.result.structuredContent.sessionId, 'live_rebound_emulator')
   const listChanged = await client.next(
     (message) => message.method === 'notifications/tools/list_changed',
   )
@@ -80,12 +81,19 @@ try {
     method: 'tools/call',
     params: {
       name: 'ui_bridge_proxy',
-      arguments: { name: 'ui_check_capabilities', arguments: { taskId: 'task_1' } },
+      arguments: {
+        name: 'ui_check_capabilities',
+        arguments: { taskId: 'task_1', request: '离线手机切换到在线模拟器' },
+      },
     },
   })
   const proxied = await client.next((message) => message.id === 6)
   assert.equal(proxied.result.structuredContent.tool, 'ui_check_capabilities')
   assert.equal(proxied.result.structuredContent.arguments.taskId, 'task_1')
+  assert.equal(
+    proxied.result.structuredContent.arguments.request,
+    '离线手机切换到在线模拟器',
+  )
 
   const unicodeArgumentsPath = path.join(tempRoot, '中文参数.json')
   const unicodeArguments = {
@@ -104,7 +112,7 @@ try {
   assert.equal(scannedInitialize.result.serverInfo.name, 'fake-yilong-ui-live')
 
   process.stdout.write(
-    'PASS: offline bootstrap, port discovery, runtime recovery, tool refresh, proxy fallback, and UTF-8 one-shot calls\n',
+    'PASS: offline bootstrap, stale-binding reconnect, port discovery, emulator recovery, tool refresh, UTF-8 proxy fallback, and UTF-8 one-shot calls\n',
   )
 } finally {
   for (const bridge of bridges) if (!bridge.killed) bridge.kill()
@@ -213,14 +221,21 @@ function startBridge(adminUrl, scanPort = null) {
 }
 
 function createFakeNode(configPath) {
+  let bootstrapAttempts = 0
   return http.createServer(async (request, response) => {
     if (request.method === 'GET' && request.url === '/api/status') {
       return json(response, 200, { ok: true, local_admin_token_header: 'x-elon-local-token' })
     }
     if (request.method === 'POST' && request.url === '/api/android-live/project-mcp/bootstrap') {
+      bootstrapAttempts += 1
+      if (bootstrapAttempts === 1) {
+        return json(response, 409, {
+          error: 'RUNTIME_BINDING_STALE: offline-phone is no longer available',
+        })
+      }
       return json(response, 200, {
         ok: true,
-        mcp: { configPath, sessionId: 'live_test' },
+        mcp: { configPath, sessionId: 'live_rebound_emulator' },
       })
     }
     if (request.method === 'POST' && request.url?.startsWith('/api/android-live/mcp/live_test')) {

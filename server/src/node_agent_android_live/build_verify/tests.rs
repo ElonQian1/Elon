@@ -102,7 +102,8 @@ async fn failed_debug_runtime_releases_deployment_and_keeps_status_tools_respons
     let deployment = broker
         .debug_deployments
         .acquire("device-a", "com.elon.app.uituner_test")
-        .await;
+        .await
+        .expect("fixture deployment lease");
     let failed =
         finish_debug_deployment::<()>(deployment, Err(anyhow::anyhow!("simulated Gradle failure")));
     assert!(failed.is_err());
@@ -114,7 +115,8 @@ async fn failed_debug_runtime_releases_deployment_and_keeps_status_tools_respons
             .acquire("device-a", "com.elon.app.uituner_test"),
     )
     .await
-    .expect("failed debug build must release the deployment lease");
+    .expect("failed debug build must release the deployment lease")
+    .expect("fixture reacquires the released deployment lease");
     let view = tokio::time::timeout(Duration::from_millis(100), session.view())
         .await
         .expect("ui_get_runtime_status must remain responsive");
