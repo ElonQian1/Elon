@@ -26,11 +26,9 @@ pub(crate) struct UpdateCheckpointDecision {
 
 impl UpdateCheckpointDecision {
     pub(crate) fn install_may_proceed(&self) -> bool {
-        self.live_execution_task_ids.is_empty()
-            && self
-                .active_foreground_task_ids
-                .iter()
-                .all(|task_id| self.checkpointed_task_ids.contains(task_id))
+        self.active_foreground_task_ids
+            .iter()
+            .all(|task_id| self.checkpointed_task_ids.contains(task_id))
     }
 }
 
@@ -91,11 +89,7 @@ pub(crate) fn checkpoint_downloaded_update(
         safe_checkpoint_count: decision.checkpointed_task_ids.len(),
         capability: "local_update_gate_v1".to_string(),
         reason: (!may_proceed).then(|| {
-            if decision.live_execution_task_ids.is_empty() {
-                "active foreground task has no complete durable recovery checkpoint".to_string()
-            } else {
-                "active sidecar or fresh runtime handle still owns an update candidate".to_string()
-            }
+            "one or more active tasks have no complete durable recovery checkpoint".to_string()
         }),
         updated_at_ms: crate::node_agent_cli_sidecar::now_ms(),
         excluded_terminal_history_count: preserved_audit.excluded_terminal_history_count,
@@ -187,7 +181,6 @@ fn checkpoint_active_update_transactions(
             .transpose()?
             .unwrap_or(false);
         let live_execution = live_sidecar
-            || replayable_sidecar
             || journal_process_live
             || fresh_runtime_handle_task_ids.contains(&task.task_id);
         if live_execution {
@@ -455,9 +448,20 @@ pub(crate) fn incomplete_non_repeatable_action(
                         .and_then(serde_json::Value::as_bool)
                         == Some(true);
                 if explicit
-                    || ["publish", "deploy", "release", "migration", "delete"]
-                        .iter()
-                        .any(|needle| tool.contains(needle))
+                    || [
+                        "publish",
+                        "deploy",
+                        "release",
+                        "migration",
+                        "delete",
+                        "ui_build_and_verify",
+                        "ui_prepare_debug_runtime",
+                        "ui_activate_preview_scenario",
+                        "ui_start_fit_run",
+                        "ui_apply_live_patch",
+                    ]
+                    .iter()
+                    .any(|needle| tool.contains(needle))
                 {
                     pending.insert((id.to_string(), tool));
                 }

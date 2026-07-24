@@ -48,6 +48,9 @@ function Invoke-RemoteReleaseAttemptProcess {
     $source = Resolve-EventSourceWorktree -Event $Event
     $script = Join-Path $source 'scripts\publish-node-agent.ps1'
     $arguments = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$script,'-SynchronousRemote','-RemoteOutboxEventPath',$EventPath)
+    if ($Event.PSObject.Properties.Name -contains 'include_linux' -and [bool]$Event.include_linux) {
+        $arguments += '-IncludeLinux'
+    }
     $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WorkingDirectory $source `
         -WindowStyle Hidden -PassThru
     if (-not $process.WaitForExit($AttemptTimeoutSeconds * 1000)) {

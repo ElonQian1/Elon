@@ -7,7 +7,8 @@
 
 .DESCRIPTION
     默认只完成本机 Windows 构建、验证、持久化安装候选与 post-terminal 激活安排，
-    然后把 Linux 构建、跨平台上传、广播和握手交给持久异步 outbox。
+    然后把 Windows 远端上传、广播和握手交给持久异步 outbox。
+    Linux PC 节点没有默认客户，只有显式传入 -IncludeLinux 才构建和发布。
     -SynchronousRemote 仅供 outbox worker 执行远端阶段。
 
 .EXAMPLE
@@ -22,6 +23,7 @@ param(
     [int]$HandshakeWaitSec = 90,
     [switch]$SkipHandshakeWait,
     [switch]$RequireAllOnlineTargetBuild,
+    [switch]$IncludeLinux,
     [string]$ReplayPublishedSha = "",
     [switch]$SynchronousRemote,
     [string]$RemoteOutboxEventPath = "",
@@ -40,6 +42,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot "node-agent-release-outbox.ps1")
 . (Join-Path $PSScriptRoot "node-agent-local-activation.ps1")
 . (Join-Path $PSScriptRoot "node-agent-publish-handshake.ps1")
+. (Join-Path $PSScriptRoot "node-agent-release-build-cache.ps1")
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
@@ -276,80 +279,6 @@ function Resolve-NodeAgentTargetDir {
     throw "无法解析无空格的 PC 节点 target 目录；请设置 ELON_NODE_AGENT_TARGET_DIR 为无空格路径。"
 }
 
-function Invoke-NodeAgentPcFrontendBuild {
-    if (-not (Test-Path (Join-Path $PcFrontendDir "package.json"))) {
-        throw "缺少 PC 前端工程：$PcFrontendDir"
-    }
-    if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
-        throw "npm 不在 PATH，无法构建节点包内置 PC 工作台"
-    }
-
-    Write-Host "[2.4/4] 构建节点包内置 PC 工作台..." -ForegroundColor Yellow
-    Push-Location $PcFrontendDir
-    try {
-        $lockFile = Join-Path $PcFrontendDir "package-lock.json"
-        $nmDir = Join-Path $PcFrontendDir "node_modules"
-        $nmInstalled = Join-Path $nmDir ".npm-installed-sha"
-        $lockHash = if (Test-Path $lockFile) {
-            (Get-FileHash $lockFile -Algorithm MD5).Hash
-        } else { '' }
-        $prevHash = if (Test-Path $nmInstalled) { Get-Content $nmInstalled -Raw } else { '' }
-        $needInstall = (-not (Test-Path $nmDir)) -or ($lockHash -ne $prevHash.Trim())
-        if ($needInstall) {
-            Write-Host "   安装/更新前端依赖（npm ci）..." -ForegroundColor Gray
-            $installExit = Invoke-LoggedCmd -Command "npm ci"
-            if ($installExit -ne 0) { throw "npm ci 失败，exit=$installExit" }
-            $lockHash | Set-Content $nmInstalled -NoNewline
-        }
-        Reset-PcFrontendBuildArtifacts -FrontendDir $PcFrontendDir
-        $buildExit = Invoke-LoggedCmd -Command "npm run build"
-        if ($buildExit -ne 0) { throw "npm run build 失败，exit=$buildExit" }
-    } catch {
-        $primaryBuildError = $_
-        try {
-            Reset-PcFrontendBuildArtifacts -FrontendDir $PcFrontendDir
-            Invoke-PcFrontendLocalBuild -FrontendDir $PcFrontendDir
-        } catch {
-            try {
-                Invoke-PcFrontendPnpmBuild -FrontendDir $PcFrontendDir
-            } catch {
-                throw "PC 前端构建失败：$primaryBuildError；fallback: $_"
-            }
-        }
-    } finally {
-        Pop-Location
-    }
-    if (-not (Test-Path (Join-Path $PcDistDir "index.html"))) {
-        throw "PC 前端 dist 缺少 index.html：$PcDistDir"
-    }
-    Write-Host "   PC 工作台 dist 就绪: $PcDistDir" -ForegroundColor Green
-}
-
-function Resolve-RipgrepExe {
-    $candidates = @()
-    $cmd = Get-Command rg -ErrorAction SilentlyContinue
-    if ($cmd -and $cmd.Source) { $candidates += $cmd.Source }
-    if ($env:LOCALAPPDATA) {
-        $candidates += Join-Path $env:LOCALAPPDATA "ElonNode\tools\ripgrep\bin\rg.exe"
-        $roots = @(
-            (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\bin"),
-            (Join-Path $env:LOCALAPPDATA "ElonNode\tools\ripgrep")
-        )
-        foreach ($root in $roots) {
-            if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
-            Get-ChildItem -LiteralPath $root -Recurse -Filter "rg.exe" -File -ErrorAction SilentlyContinue |
-                ForEach-Object { $candidates += $_.FullName }
-        }
-    }
-    foreach ($candidate in $candidates) {
-        if (-not [string]::IsNullOrWhiteSpace($candidate) -and
-            (Test-Path -LiteralPath $candidate -PathType Leaf)) {
-            return [System.IO.Path]::GetFullPath($candidate)
-        }
-    }
-    return $null
-}
-
 $env:CARGO_TARGET_DIR = Resolve-NodeAgentTargetDir
 
 foreach ($requiredPath in @(
@@ -392,6 +321,11 @@ if (-not $SynchronousRemote -and $ReplayOnlyRequested) {
 }
 if ($SynchronousRemote -and -not [string]::IsNullOrWhiteSpace($RemoteOutboxEventPath)) {
     $remoteEvent = Read-NodeAgentRemoteReleaseEvent -EventPath $RemoteOutboxEventPath
+    $eventIncludesLinux = $remoteEvent.PSObject.Properties.Name -contains 'include_linux' -and
+        [bool]$remoteEvent.include_linux
+    if ([bool]$IncludeLinux -ne [bool]$eventIncludesLinux) {
+        throw 'Remote worker Linux intent differs from the immutable outbox event.'
+    }
     $GitSha = [string]$remoteEvent.git_sha
     if ($GitSha -notmatch '^[0-9a-f]{40}$') { throw 'Remote outbox event has an invalid Git SHA.' }
     $headSha = (git -C $RepoRoot rev-parse HEAD).Trim()
@@ -447,7 +381,7 @@ if (-not [string]::IsNullOrWhiteSpace($ReleaseChangelog)) {
 
 $LinuxBin = ''
 $LinuxSha256 = ''
-if ($SynchronousRemote) {
+if ($SynchronousRemote -and $IncludeLinux) {
     # ── 1. 交叉编译 Linux musl 版本（只在异步 worker）────────────────────────
     Write-Host "[remote 1/5] 交叉编译 Linux x86_64-musl..." -ForegroundColor Yellow
     $script:NodeReleaseActiveStage = 'linux_build'
@@ -464,7 +398,11 @@ if ($SynchronousRemote) {
         $unitSeparator = [char]0x1f
         $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
         $env:ELON_NODE_AGENT_GIT_SHA = $GitSha
-        cargo zigbuild --manifest-path $ServerManifest --release --locked --bin $Bin --target x86_64-unknown-linux-musl
+        Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain 'node-agent-release' `
+            -TargetDir $env:CARGO_TARGET_DIR -CargoArgs @(
+                'zigbuild', '--manifest-path', $ServerManifest, '--release', '--locked',
+                '--bin', $Bin, '--target', 'x86_64-unknown-linux-musl'
+            )
         if ($LASTEXITCODE -ne 0) { throw "Linux 编译失败" }
     } finally {
         Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
@@ -478,13 +416,15 @@ if ($SynchronousRemote) {
     if (-not (Test-Path $LinuxBin)) { throw "Linux 二进制不存在：$LinuxBin" }
     $LinuxSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $LinuxBin).Hash.ToLowerInvariant()
     Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
+} elseif ($IncludeLinux) {
+    Write-Host '[local 1/4] 本机路径记录 Linux 显式发布请求；由持久异步 outbox 构建。' -ForegroundColor DarkGray
 } else {
-    Write-Host '[local 1/4] 默认本机路径跳过 Linux；已交给持久异步 outbox。' -ForegroundColor DarkGray
+    Write-Host '[local 1/4] Linux PC 节点默认关闭；未构建、未上传。' -ForegroundColor DarkGray
 }
 
 if ($UseOutboxArtifacts) {
     Write-Host '[remote 2/5] 复用本机已验证的不可变 Windows 产物...' -ForegroundColor Yellow
-    $LinuxDownloadUrl = "$BaseUrl/api/node-agent/download/linux"
+    $LinuxDownloadUrl = if ($IncludeLinux) { "$BaseUrl/api/node-agent/download/linux" } else { '' }
     $WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
     $WindowsClientDownloadUrl = "$BaseUrl/api/node-agent/download/windows-client"
     $RipgrepDownloadUrl = "$BaseUrl/api/node-agent/download/ripgrep-windows"
@@ -518,7 +458,10 @@ try {
     $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
     $env:ELON_NODE_AGENT_GIT_SHA = $GitSha
     Write-Host "  Windows release rustflags: -C target-cpu=x86-64" -ForegroundColor DarkGray
-    cargo build --manifest-path $ServerManifest --release --locked --bin $Bin
+    Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain 'node-agent-release' `
+        -TargetDir $env:CARGO_TARGET_DIR -CargoArgs @(
+            'build', '--manifest-path', $ServerManifest, '--release', '--locked', '--bin', $Bin
+        )
     if ($LASTEXITCODE -ne 0) { throw "Windows 编译失败" }
 } finally {
     Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
@@ -536,29 +479,45 @@ $WinSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $WinBin).Hash.ToLowerI
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 2.2 编译一龙桌面壳（elon-desktop，独立 Tauri crate）──────────────────────
-Write-Host "[2.2/5] 编译一龙桌面壳 (elon-desktop)..." -ForegroundColor Yellow
+Write-Host "[2.2/5] 准备一龙桌面壳 (elon-desktop)..." -ForegroundColor Yellow
 $script:NodeReleaseActiveStage = 'desktop_shell_build'
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running'
-try {
-    $unitSeparator = [char]0x1f
-    $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
-    cargo build --manifest-path $DesktopShellManifest --release --locked --bin elon-desktop
-    if ($LASTEXITCODE -ne 0) { throw "elon-desktop 编译失败" }
-} finally {
-    Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
-}
 $DesktopShellBin = Join-Path $TargetDir "release\elon-desktop.exe"
-if (-not (Test-Path $DesktopShellBin)) { throw "elon-desktop 二进制不存在：$DesktopShellBin" }
+$releaseArtifactCache = Join-Path $TargetDir 'release-input-cache'
+$desktopInputHash = Get-NodeAgentReleaseInputHash -RepoRoot $RepoRoot -GitSha $GitSha `
+    -GitPaths @('desktop-shell/src-tauri') `
+    -ToolVersions @((rustc -vV | Out-String), (cargo -V | Out-String), 'target-cpu=x86-64')
+Invoke-NodeAgentCachedFileBuild -Kind 'desktop-shell' -InputHash $desktopInputHash `
+    -CacheRoot $releaseArtifactCache -OutputPath $DesktopShellBin -Build {
+        try {
+            $unitSeparator = [char]0x1f
+            $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
+            Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain 'node-agent-release' `
+                -TargetDir $env:CARGO_TARGET_DIR -CargoArgs @(
+                    'build', '--manifest-path', $DesktopShellManifest, '--release', '--locked',
+                    '--bin', 'elon-desktop'
+                )
+            if ($LASTEXITCODE -ne 0) { throw "elon-desktop 编译失败" }
+        } finally {
+            Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
+        }
+    } | Out-Host
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 $script:NodeReleaseActiveStage = 'pc_frontend_bundle'
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'running'
-Invoke-NodeAgentPcFrontendBuild
+$pcFrontendInputHash = Get-NodeAgentReleaseInputHash -RepoRoot $RepoRoot -GitSha $GitSha `
+    -GitPaths @('pc-frontend') `
+    -ToolVersions @((& node --version | Out-String), (& npm --version | Out-String)) `
+    -EnvironmentValues (Get-NodeAgentReleaseEnvironmentValues -Prefix 'VITE_')
+Invoke-NodeAgentCachedDirectoryBuild -Kind 'pc-frontend' -InputHash $pcFrontendInputHash `
+    -CacheRoot $releaseArtifactCache -OutputDirectory $PcDistDir -RequiredRelativePath 'index.html' `
+    -Build { Invoke-NodeAgentPcFrontendBuild } | Out-Host
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
 # ── 2.5 打包 Windows 客户端 ──────────────────────────────────────────────────
 Write-Host "[2.5/5] 打包 Windows 客户端..." -ForegroundColor Yellow
-$LinuxDownloadUrl = "$BaseUrl/api/node-agent/download/linux"
+$LinuxDownloadUrl = if ($IncludeLinux) { "$BaseUrl/api/node-agent/download/linux" } else { '' }
 $WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
 $WindowsClientDownloadUrl = "$BaseUrl/api/node-agent/download/windows-client"
 $RipgrepDownloadUrl = "$BaseUrl/api/node-agent/download/ripgrep-windows"
@@ -607,11 +566,11 @@ try {
         changelog = $ReleaseChangelog
         updated_at = (Get-Date).ToString("o")
         downloadUrl = $WindowsDownloadUrl
-        linuxDownloadUrl = $LinuxDownloadUrl
         windowsClientDownloadUrl = $WindowsClientDownloadUrl
         sha256 = $WinSha256
         fileSha256 = $WinSha256
-        linuxSha256 = $LinuxSha256
+        linuxPublished = $false
+        linuxPublishRequested = [bool]$IncludeLinux
         ripgrepZipUrl = $RipgrepDownloadUrl
         ripgrepZipSha256 = $RipgrepZipSha256
         ripgrepZipFileSize = [int64]$RipgrepZipFileSize
@@ -638,7 +597,7 @@ if (-not $SynchronousRemote) {
         -Version $PackageVersion -ReleaseIdentity $ReleaseIdentity -Changelog $ReleaseChangelog `
         -WindowsExe $WinBin -WindowsClientPackage $WindowsClientPackage `
         -RipgrepPackage $(if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) { $RipgrepPackage } else { '' }) `
-        -GitCommonDir $commonDir
+        -GitCommonDir $commonDir -IncludeLinux:$IncludeLinux
     $activationRoot = Get-NodeAgentLocalActivationRoot
     $localRelease = Register-NodeAgentVerifiedLocalRelease -StateRoot $activationRoot `
         -GitSha $GitSha -Version $PackageVersion -ReleaseIdentity $ReleaseIdentity `
@@ -656,6 +615,7 @@ if (-not $SynchronousRemote) {
     Write-Output "NODE_AGENT_LOCAL_RELEASE_STATE=$($localRelease.StatePath)"
     Write-Output "NODE_AGENT_LOCAL_ACTIVATOR_PID=$activatorPid"
     Write-Output 'NODE_AGENT_REMOTE_SYNC_STATE=pending'
+    Write-Output "NODE_AGENT_LINUX_PUBLISH_REQUESTED=$([bool]$IncludeLinux)"
     Write-Output "NODE_AGENT_REMOTE_OUTBOX_EVENT=$($outboxEvent.EventPath)"
     Write-Output "NODE_AGENT_REMOTE_WORKER_PID=$workerPid"
     Write-Output 'NODE_AGENT_LOCAL_SERVER_DEPENDENCY=none'
@@ -672,8 +632,12 @@ if ($currentReleaseSha -ne $GitSha) {
     throw "上传前当前 worktree HEAD 已改变：claim=$GitSha, current=$currentReleaseSha。不可替换固定发布 SHA。"
 }
 ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "mkdir -p $RemoteDir"
-scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $LinuxBin "${Server}:${RemoteDir}/${Bin}"
-ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "chmod +x ${RemoteDir}/${Bin}"
+if ($IncludeLinux) {
+    scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $LinuxBin "${Server}:${RemoteDir}/${Bin}"
+    if ($LASTEXITCODE -ne 0) { throw "上传 Linux 节点失败" }
+    ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "chmod +x ${RemoteDir}/${Bin}"
+    if ($LASTEXITCODE -ne 0) { throw "设置 Linux 节点执行权限失败" }
+}
 scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $WinBin "${Server}:${RemoteDir}/${Bin}.exe"
 scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $WindowsClientPackage "${Server}:${RemoteDir}/${WindowsClientPackageName}"
 if ($LASTEXITCODE -ne 0) { throw "上传失败" }
@@ -686,7 +650,10 @@ Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeed
 # ── 4. 验证下载地址 ──────────────────────────────────────────────────────────
 Write-Host "[4/5] 验证下载地址..." -ForegroundColor Yellow
 
-$size    = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${Bin}"
+$size = 0
+if ($IncludeLinux) {
+    $size = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${Bin}"
+}
 $sizeWin = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${Bin}.exe"
 $sizeWinClient = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${WindowsClientPackageName}"
 if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
@@ -698,18 +665,21 @@ $VersionInfo = [ordered]@{
     changelog = $ReleaseChangelog
     updated_at = (Get-Date).ToString("o")
     downloadUrl = $WindowsDownloadUrl
-    linuxDownloadUrl = $LinuxDownloadUrl
     windowsClientDownloadUrl = $WindowsClientDownloadUrl
     ripgrepZipUrl = $RipgrepDownloadUrl
     sha256 = $WinSha256
     fileSha256 = $WinSha256
-    linuxSha256 = $LinuxSha256
+    linuxPublished = [bool]$IncludeLinux
     windowsClientSha256 = $WindowsClientSha256
     ripgrepZipSha256 = $RipgrepZipSha256
     fileSize = [int64]$sizeWin
-    linuxFileSize = [int64]$size
     windowsClientFileSize = [int64]$sizeWinClient
     ripgrepZipFileSize = [int64]$RipgrepZipFileSize
+}
+if ($IncludeLinux) {
+    $VersionInfo.linuxDownloadUrl = $LinuxDownloadUrl
+    $VersionInfo.linuxSha256 = $LinuxSha256
+    $VersionInfo.linuxFileSize = [int64]$size
 }
 $VersionFile = New-TemporaryFile
 try {
@@ -719,8 +689,13 @@ try {
 } finally {
     Remove-Item -LiteralPath $VersionFile -Force -ErrorAction SilentlyContinue
 }
-Write-Host "  Linux  $Bin size = $size bytes" -ForegroundColor Green
-Write-Host "  Linux  $Bin sha256 = $LinuxSha256" -ForegroundColor DarkGray
+if ($IncludeLinux) {
+    Write-Host "  Linux  $Bin size = $size bytes" -ForegroundColor Green
+    Write-Host "  Linux  $Bin sha256 = $LinuxSha256" -ForegroundColor DarkGray
+    Write-Output 'NODE_AGENT_LINUX_PUBLISH_STATUS=published'
+} else {
+    Write-Output 'NODE_AGENT_LINUX_PUBLISH_STATUS=skipped_default'
+}
 Write-Host "  Windows $Bin.exe size = $sizeWin bytes" -ForegroundColor Green
 Write-Host "  Windows $Bin.exe sha256 = $WinSha256" -ForegroundColor DarkGray
 Write-Host "  Windows client package size = $sizeWinClient bytes" -ForegroundColor Green
@@ -770,7 +745,9 @@ Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeed
 
 Write-Host ""
 Write-Host "✅ 一龙 PC 节点客户端发布完成" -ForegroundColor Green
-Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
+if ($IncludeLinux) {
+    Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
+}
 Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"
 Write-Host "   客户端包（Windows）: $WindowsClientDownloadUrl"
 Write-Host "   ripgrep 绿色包:      $RipgrepDownloadUrl"

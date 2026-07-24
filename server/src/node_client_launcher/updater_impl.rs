@@ -165,9 +165,9 @@ fn wait_for_safe_update_checkpoint(
 ) -> Result<()> {
     let max_wait_secs = env_u64(
         "NODE_AGENT_UPDATE_DEFER_MAX_SECS",
-        24 * 60 * 60,
+        DEFAULT_UPDATE_DEFER_MAX_SECS,
         30,
-        7 * 24 * 60 * 60,
+        60 * 60,
     );
     let started = std::time::Instant::now();
     loop {
@@ -193,9 +193,18 @@ fn wait_for_safe_update_checkpoint(
             ),
         );
         if started.elapsed() >= Duration::from_secs(max_wait_secs) {
+            let blockers = decision
+                .active_foreground_task_ids
+                .iter()
+                .filter(|task_id| !decision.checkpointed_task_ids.contains(task_id))
+                .take(8)
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(",");
             anyhow::bail!(
-                "节点更新已安全延迟 {} 秒；前台任务仍无完整恢复检查点，保持旧 runtime 继续运行",
-                max_wait_secs
+                "节点更新等待 {} 秒后结束本次尝试；以下任务仍无完整恢复检查点：{}。保持旧 runtime 运行，远端队列稍后自动重试",
+                max_wait_secs,
+                blockers
             );
         }
         std::thread::sleep(Duration::from_secs(2));

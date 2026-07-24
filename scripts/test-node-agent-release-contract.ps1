@@ -110,6 +110,12 @@ Assert-True (-not $publishScript.Contains('-Stage $script:NodeReleaseActiveStage
     "Node internal phases must never write arbitrary top-level stages"
 Assert-True ($publishScript.Contains('[switch]$RequireAllOnlineTargetBuild')) `
     "The publisher must expose an explicit strict rollout switch"
+Assert-True ($publishScript.Contains('[switch]$IncludeLinux')) `
+    "Linux node publishing must be an explicit opt-in"
+Assert-True ($publishScript.Contains('NODE_AGENT_LINUX_PUBLISH_STATUS=skipped_default')) `
+    "A default Windows release must report that Linux was not published"
+Assert-True ($publishScript.Contains("Invoke-RustCacheCargo -ProjectRoot `$RepoRoot -Domain 'node-agent-release'")) `
+    "Node release builds must enter the managed shared Rust cache"
 Assert-True ($publishScript.Contains('[string]$ReplayPublishedSha')) `
     "The publisher must expose an explicit immutable same-SHA replay mode"
 Assert-True ($publishScript.Contains('ReplayPublishedSha was not already published/coalesced')) `

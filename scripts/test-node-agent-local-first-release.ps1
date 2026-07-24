@@ -4,6 +4,7 @@ Set-StrictMode -Version Latest
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 . (Join-Path $PSScriptRoot 'node-agent-release-outbox.ps1')
 . (Join-Path $PSScriptRoot 'node-agent-local-activation.ps1')
+. (Join-Path $PSScriptRoot 'node-agent-release-build-cache.ps1')
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -21,6 +22,7 @@ foreach ($moduleName in @(
     'publish-node-agent.ps1',
     'node-agent-publish-handshake.ps1',
     'node-agent-release-outbox.ps1',
+    'node-agent-release-build-cache.ps1',
     'node-agent-remote-release-worker.ps1',
     'node-agent-local-activation.ps1',
     'node-agent-post-terminal-activator.ps1'
@@ -62,8 +64,58 @@ try {
     }
     $event = $raw | ConvertFrom-Json
     Assert-Equal $event.sync_state 'pending' 'new event must start pending'
+    Assert-True (-not [bool]$event.include_linux) 'Linux release must be opt-in'
     Assert-Equal $event.changelog '中文离线发布 fixture' 'PS5.1 must round-trip UTF-8 outbox JSON explicitly'
     Assert-True $event.local_result_independent 'remote state must not own the local activation result'
+    $linuxIntentConflict = $false
+    try {
+        Add-NodeAgentRemoteReleaseEvent -OutboxRoot $outbox -GitSha $sha `
+            -Version '0.3.69' -ReleaseIdentity $identity -Changelog '中文离线发布 fixture' `
+            -WindowsExe $exe -WindowsClientPackage $zip -GitCommonDir (Join-Path $root 'git') `
+            -IncludeLinux | Out-Null
+    } catch {
+        $linuxIntentConflict = $_.Exception.Message.Contains('different immutable identity')
+    }
+    Assert-True $linuxIntentConflict 'an immutable outbox event must not silently change Linux intent'
+
+    $cacheRoot = Join-Path $root 'build-cache'
+    $cachedFileOutput = Join-Path $root 'build-output\desktop.exe'
+    $script:fileBuildCount = 0
+    $firstFileCache = @(Invoke-NodeAgentCachedFileBuild -Kind 'desktop' -InputHash ('1' * 64) `
+        -CacheRoot $cacheRoot -OutputPath $cachedFileOutput -Build {
+            $script:fileBuildCount += 1
+            New-Item -ItemType Directory -Force -Path (Split-Path $cachedFileOutput -Parent) | Out-Null
+            [System.IO.File]::WriteAllBytes($cachedFileOutput, [byte[]](9,8,7))
+        })
+    Remove-Item -LiteralPath $cachedFileOutput -Force
+    $secondFileCache = @(Invoke-NodeAgentCachedFileBuild -Kind 'desktop' -InputHash ('1' * 64) `
+        -CacheRoot $cacheRoot -OutputPath $cachedFileOutput -Build {
+            $script:fileBuildCount += 1
+            throw 'cache hit must not rebuild'
+        })
+    Assert-Equal $script:fileBuildCount 1 'same immutable desktop inputs must build exactly once'
+    Assert-True ($secondFileCache -contains 'NODE_AGENT_BUILD_CACHE_HIT=true') `
+        'desktop cache hit must emit machine-readable evidence'
+
+    $cachedDirectoryOutput = Join-Path $root 'pc-dist'
+    $script:directoryBuildCount = 0
+    Invoke-NodeAgentCachedDirectoryBuild -Kind 'pc-frontend' -InputHash ('2' * 64) `
+        -CacheRoot $cacheRoot -OutputDirectory $cachedDirectoryOutput -RequiredRelativePath 'index.html' `
+        -Build {
+            $script:directoryBuildCount += 1
+            New-Item -ItemType Directory -Force -Path $cachedDirectoryOutput | Out-Null
+            [System.IO.File]::WriteAllText((Join-Path $cachedDirectoryOutput 'index.html'), 'cached')
+        } | Out-Null
+    Remove-Item -LiteralPath $cachedDirectoryOutput -Recurse -Force
+    $directoryHit = @(Invoke-NodeAgentCachedDirectoryBuild -Kind 'pc-frontend' -InputHash ('2' * 64) `
+        -CacheRoot $cacheRoot -OutputDirectory $cachedDirectoryOutput -RequiredRelativePath 'index.html' `
+        -Build {
+            $script:directoryBuildCount += 1
+            throw 'cache hit must not rebuild'
+        })
+    Assert-Equal $script:directoryBuildCount 1 'same immutable PC frontend inputs must build exactly once'
+    Assert-True ($directoryHit -contains 'NODE_AGENT_BUILD_CACHE_HIT=true') `
+        'PC frontend cache hit must emit machine-readable evidence'
 
     $blackhole = Complete-NodeAgentRemoteReleaseAttempt -EventPath $first.EventPath `
         -Outcome retry -ErrorCode 'timeout' -NowMs 1000 -MaxAttempts 4
@@ -139,6 +191,11 @@ try {
 
     $publishText = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'publish-node-agent.ps1')
     Assert-True ($publishText.Contains('[switch]$SynchronousRemote')) 'remote work must require explicit worker mode'
+    Assert-True ($publishText.Contains('[switch]$IncludeLinux')) 'Linux publishing must require an explicit switch'
+    Assert-True ($publishText.Contains("if (`$SynchronousRemote -and `$IncludeLinux)")) `
+        'remote outbox must not build Linux unless explicitly requested'
+    Assert-True ($publishText.Contains("Invoke-RustCacheCargo -ProjectRoot `$RepoRoot -Domain 'node-agent-release'")) `
+        'release Cargo builds must use the managed shared-cache runtime'
     Assert-True ($publishText.Contains('NODE_AGENT_LOCAL_PREPARE_STATUS=complete')) 'default publish must expose completed local preparation'
     Assert-True ($publishText.Contains('NODE_AGENT_LOCAL_ACTIVATION_STATUS=restart_scheduled')) `
         'publisher must not claim activation before the post-terminal safety gate passes'
@@ -158,6 +215,8 @@ try {
         'each remote attempt must have a finite process timeout'
     Assert-True ($workerText.Contains('Resolve-EventSourceWorktree')) `
         'worker restart must reconstruct the immutable source worktree from durable state'
+    Assert-True ($workerText.Contains("`$arguments += '-IncludeLinux'")) `
+        'the worker must preserve explicit Linux intent from the durable event'
     Assert-True ($workerText.Contains('$gitExit = $LASTEXITCODE')) `
         'PS5.1 worker must judge git worktree recovery by exit code instead of stderr progress'
 

@@ -15,7 +15,7 @@ fn missing_windows_paths_compare_across_separator_and_long_path_prefix_forms() {
 use crate::node_agent_local_task_store::LocalTaskStart;
 
 #[test]
-fn install_gate_requires_a_checkpoint_for_every_foreground_task() {
+fn install_gate_requires_a_checkpoint_but_not_an_idle_runtime() {
     let safe = UpdateCheckpointDecision {
         active_foreground_task_ids: vec!["task-a".into(), "task-b".into()],
         checkpointed_task_ids: vec!["task-b".into(), "task-a".into()],
@@ -31,7 +31,10 @@ fn install_gate_requires_a_checkpoint_for_every_foreground_task() {
         live_execution_task_ids: vec!["task-a".into()],
         ..safe
     };
-    assert!(!live.install_may_proceed());
+    assert!(
+        live.install_may_proceed(),
+        "a live task with a complete durable checkpoint must reconnect after update"
+    );
 }
 
 #[test]
@@ -112,6 +115,20 @@ fn incomplete_non_repeatable_action_blocks_until_its_result_is_durable() {
         event: serde_json::json!({"event": {"type": "tool_result", "call_id": "publish-1"}}),
     };
     assert!(incomplete_non_repeatable_action(&[call, result]).is_none());
+
+    let fit_run = crate::node_agent_task_journal::TaskJournalEventView {
+        seq: 3,
+        event: serde_json::json!({"event": {
+            "type": "tool_call",
+            "call_id": "fit-1",
+            "tool": "ui_start_fit_run"
+        }}),
+    };
+    assert_eq!(
+        incomplete_non_repeatable_action(std::slice::from_ref(&fit_run)).as_deref(),
+        Some("ui_start_fit_run:fit-1"),
+        "an in-flight real-renderer operation must keep update fail-closed"
+    );
 }
 
 #[test]

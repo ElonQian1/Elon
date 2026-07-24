@@ -13,6 +13,7 @@ use super::{
 const DEFAULT_UPDATE_CONNECT_TIMEOUT_SECS: u64 = 20;
 const DEFAULT_UPDATE_DOWNLOAD_TIMEOUT_SECS: u64 = 15 * 60;
 const DEFAULT_UPDATE_DOWNLOAD_RETRIES: usize = 3;
+const DEFAULT_UPDATE_DEFER_MAX_SECS: u64 = 90;
 
 pub(crate) fn update_client_if_needed(install_dir: &Path) -> Result<bool> {
     match try_update_client_if_needed(install_dir) {

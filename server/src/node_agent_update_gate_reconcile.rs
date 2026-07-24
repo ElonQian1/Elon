@@ -119,8 +119,10 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
             task.status == "resume_required" && task.finished_at_ms.is_some();
         let durable_cancelled = task.status == "cancel_requested" && cancel_intent_persisted;
         let persisted_inactive = resumable_checkpoint || durable_cancelled;
-        let no_execution_owner =
-            !fresh_runtime_handle && !live_sidecar && !replayable_sidecar && !live_journal_process;
+        // A fresh replay marker is recovery evidence, not executor ownership.
+        // Only a verified process identity, runtime handle, or journal process
+        // may keep an otherwise durable checkpoint in the install blocker set.
+        let no_execution_owner = !fresh_runtime_handle && !live_sidecar && !live_journal_process;
         let (resume_eligible, resume_ineligibility_proof) = if claim_resume_eligibility_audit(
             &task.status,
             no_execution_owner,
@@ -333,7 +335,7 @@ fn classification_reason(
         .to_string();
     }
     if !no_execution_owner {
-        return "fresh runtime handle or live/replayable sidecar still owns the task".to_string();
+        return "fresh runtime handle or verified live process still owns the task".to_string();
     }
     if !no_unsafe_wait {
         return "pending approval, incomplete audit, or non-repeatable action remains".to_string();
@@ -472,7 +474,7 @@ mod tests {
             true,
             Some(false)
         )
-        .contains("sidecar"));
+        .contains("verified live process"));
     }
 
     #[test]

@@ -77,7 +77,8 @@ function Add-NodeAgentRemoteReleaseEvent {
         [Parameter(Mandatory = $true)][string]$WindowsExe,
         [Parameter(Mandatory = $true)][string]$WindowsClientPackage,
         [string]$RipgrepPackage = '',
-        [Parameter(Mandatory = $true)][string]$GitCommonDir
+        [Parameter(Mandatory = $true)][string]$GitCommonDir,
+        [switch]$IncludeLinux
     )
     $sha = $GitSha.Trim().ToLowerInvariant()
     if ($sha -notmatch '^[0-9a-f]{40}$') { throw 'GitSha must be a full 40-character SHA.' }
@@ -93,10 +94,13 @@ function Add-NodeAgentRemoteReleaseEvent {
 
     if (Test-Path -LiteralPath $eventPath -PathType Leaf) {
         $existing = Read-NodeAgentRemoteReleaseEvent -EventPath $eventPath
+        $existingIncludeLinux = $existing.PSObject.Properties.Name -contains 'include_linux' -and
+            [bool]$existing.include_linux
         if ([string]$existing.git_sha -ne $sha -or
             [string]$existing.release_identity -ne $ReleaseIdentity -or
             [string]$existing.artifacts.windows_exe_sha256 -ne $winSha -or
-            [string]$existing.artifacts.windows_client_sha256 -ne $clientSha) {
+            [string]$existing.artifacts.windows_client_sha256 -ne $clientSha -or
+            [bool]$existingIncludeLinux -ne [bool]$IncludeLinux) {
             throw 'An outbox event already exists for this SHA with different immutable identity or artifacts.'
         }
         return [pscustomobject]@{ EventPath = $eventPath; Created = $false; Event = $existing }
@@ -126,6 +130,7 @@ function Add-NodeAgentRemoteReleaseEvent {
         version = $Version
         release_identity = $ReleaseIdentity
         changelog = $Changelog
+        include_linux = [bool]$IncludeLinux
         local_result_independent = $true
         sync_state = 'pending'
         attempt_count = 0

@@ -195,6 +195,11 @@ fn runtime_handle_probe_failure_is_fail_closed() {
 }
 
 #[test]
+fn update_checkpoint_wait_is_bounded_for_automatic_retry() {
+    assert_eq!(super::DEFAULT_UPDATE_DEFER_MAX_SECS, 90);
+}
+
+#[test]
 fn update_download_bypasses_system_proxy_by_default() {
     let env_values = std::collections::HashMap::new();
 
