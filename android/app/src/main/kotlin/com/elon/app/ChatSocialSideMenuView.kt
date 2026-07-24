@@ -48,10 +48,11 @@ internal class ChatSocialSideMenuView(
     private val requestClose: (Boolean) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?,
-    initialTab: SocialSidebarTab = SocialSidebarTab.DATE
+    initialTab: SocialSidebarTab = SocialSidebarTab.DATE,
+    initialDate: LocalDate = LocalDate.now()
 ) : FrameLayout(context) {
     private var selectedTab = initialTab
-    private var selectedDate = LocalDate.now()
+    private var selectedDate = initialDate
     private var selectedFilter = SocialSidebarContentType.ALL
     private var searchVisible = false
     private var searchQuery = ""
@@ -59,7 +60,7 @@ internal class ChatSocialSideMenuView(
         mutableMapOf<SocialSidebarConversationKey, LoadedSocialTimelineMessage>()
     private val root = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(dp(28), dp(42), dp(22), dp(18))
+        setPadding(dp(22), dp(36), dp(18), dp(18))
         setBackgroundColor(Color.parseColor("#0D0D0D"))
     }
 
@@ -96,7 +97,7 @@ internal class ChatSocialSideMenuView(
     }
 
     private fun topTabs(): LinearLayout = LinearLayout(context).apply {
-        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(54))
+        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(48))
         gravity = Gravity.CENTER_VERTICAL
         orientation = LinearLayout.HORIZONTAL
         addView(tabText(
@@ -105,11 +106,11 @@ internal class ChatSocialSideMenuView(
         ) {
             selectedTab = SocialSidebarTab.DATE
             render()
-        }, LinearLayout.LayoutParams(dp(124), LinearLayout.LayoutParams.MATCH_PARENT))
+        }, LinearLayout.LayoutParams(dp(110), LinearLayout.LayoutParams.MATCH_PARENT))
         addView(tabText("收藏", selectedTab == SocialSidebarTab.FAVORITES) {
             selectedTab = SocialSidebarTab.FAVORITES
             render()
-        }, LinearLayout.LayoutParams(dp(94), LinearLayout.LayoutParams.MATCH_PARENT))
+        }, LinearLayout.LayoutParams(dp(82), LinearLayout.LayoutParams.MATCH_PARENT))
         addView(
             View(context),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
@@ -120,13 +121,13 @@ internal class ChatSocialSideMenuView(
             contentDescription = "搜索侧栏消息"
             isClickable = true
             foreground = selectableForeground()
-            setPadding(dp(14), dp(15), dp(14), dp(15))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
             setOnClickListener {
                 searchVisible = !searchVisible
                 if (!searchVisible) searchQuery = ""
                 render()
             }
-        }, LinearLayout.LayoutParams(dp(52), dp(52)))
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
     }
 
     private fun tabText(title: String, selected: Boolean, onClick: () -> Unit) =
@@ -134,7 +135,8 @@ internal class ChatSocialSideMenuView(
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
             includeFontPadding = false
             text = title
-            textSize = 25f
+            textSize = 18f
+            setSingleLine(true)
             setTypeface(typeface, Typeface.NORMAL)
             setTextColor(Color.parseColor(if (selected) "#4F9DFF" else "#D9D9D9"))
             isClickable = true
@@ -185,9 +187,9 @@ internal class ChatSocialSideMenuView(
                 addView(TextView(context).apply {
                     gravity = Gravity.CENTER
                     text = if (selectedTab == SocialSidebarTab.DATE) "这一天暂无其他会话消息" else "暂无收藏内容"
-                    textSize = 15f
+                    textSize = 14f
                     setTextColor(Color.parseColor("#777777"))
-                }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(160)))
+                }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(140)))
             } else {
                 items.forEach { item ->
                     addView(if (selectedTab == SocialSidebarTab.DATE) dateTimelineRow(item) else favoriteTimelineRow(item))

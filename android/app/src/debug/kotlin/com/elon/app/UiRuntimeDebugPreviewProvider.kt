@@ -118,7 +118,8 @@ class UiRuntimeDebugPreviewProvider : ContentProvider() {
                     SocialSidebarTab.FAVORITES
                 } else {
                     SocialSidebarTab.DATE
-                }
+                },
+                initialDate = SOCIAL_SIDEBAR_PREVIEW_DATE
             ).apply {
                 render()
             }.uiNode("social.sidebar.root")
@@ -126,7 +127,7 @@ class UiRuntimeDebugPreviewProvider : ContentProvider() {
     }
 
     private fun socialSidebarPreviewMessages(): List<ChatMessage> {
-        val now = LocalDate.now()
+        val now = SOCIAL_SIDEBAR_PREVIEW_DATE
             .atTime(13, 23)
             .atZone(ZoneId.systemDefault())
             .toInstant()
@@ -163,6 +164,7 @@ class UiRuntimeDebugPreviewProvider : ContentProvider() {
 
     companion object {
         private val SCENARIOS = setOf("normal", "loading", "empty", "error")
+        private val SOCIAL_SIDEBAR_PREVIEW_DATE = LocalDate.of(2026, 7, 23)
         private fun dp(context: Context, value: Int): Int =
             (value * context.resources.displayMetrics.density).toInt()
     }

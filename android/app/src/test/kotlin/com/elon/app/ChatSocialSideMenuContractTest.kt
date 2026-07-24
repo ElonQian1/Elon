@@ -103,14 +103,18 @@ class ChatSocialSideMenuContractTest {
         val loader = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/ChatSocialSidebarMessageLoader.kt"
         )
+        val preview = readRepositoryFile(
+            "android/app/src/debug/kotlin/com/elon/app/UiRuntimeDebugPreviewProvider.kt"
+        )
 
         assertTrue(view.contains("SocialSidebarTab.DATE"))
         assertTrue(view.contains("SocialSidebarTab.FAVORITES"))
         assertTrue(view.contains("搜索侧栏消息"))
-        assertTrue(view.contains("LinearLayout.LayoutParams(dp(124)"))
+        assertTrue(view.contains("LinearLayout.LayoutParams(dp(110)"))
         assertTrue(view.contains("LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)"))
-        assertTrue(view.contains("setPadding(dp(14), dp(15), dp(14), dp(15))"))
-        assertTrue(view.contains("FrameLayout.LayoutParams(dp(47), dp(90))"))
+        assertTrue(view.contains("setPadding(dp(12), dp(12), dp(12), dp(12))"))
+        assertTrue(view.contains("FrameLayout.LayoutParams(dp(41), dp(78))"))
+        assertTrue(view.contains("setSingleLine(true)"))
         assertTrue(view.contains("if (selected) \"#464646\" else \"#D9D9D9\""))
         listOf("图片与视频", "文本", "链接", "笔记", "文件", "设置")
             .forEach { assertTrue(view.contains("\"$it\"")) }
@@ -120,6 +124,9 @@ class ChatSocialSideMenuContractTest {
         assertTrue(activityActions.contains("trySendForwardedMessage(message)"))
         assertTrue(loader.contains("preserve_unread=true"))
         assertTrue(view.contains("current?.lastReceivedAt == item.lastReceivedAt"))
+        assertTrue(preview.contains("setOf(\"date\", \"favorites\", \"drag\")"))
+        assertTrue(preview.contains("LocalDate.of(2026, 7, 23)"))
+        assertTrue(preview.contains("initialDate = SOCIAL_SIDEBAR_PREVIEW_DATE"))
         assertEquals(3, "refreshChatTabBadge\\(\\)".toRegex()
             .findAll(activity.substringAfter("private val friendActions"))
             .count())

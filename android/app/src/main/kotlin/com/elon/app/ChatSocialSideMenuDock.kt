@@ -33,7 +33,7 @@ internal fun createSocialSidebarFilterDock(
                 LinearLayout.LayoutParams(
                     0,
                     dp(48),
-                    if (type == SocialSidebarContentType.MEDIA) 1.45f else 1f
+                    if (type == SocialSidebarContentType.MEDIA) 1.65f else 1f
                 )
             )
         }
@@ -42,7 +42,8 @@ internal fun createSocialSidebarFilterDock(
         gravity = Gravity.CENTER_VERTICAL or Gravity.START
         includeFontPadding = false
         text = "设置"
-        textSize = 17f
+        textSize = 15f
+        setSingleLine(true)
         setTextColor(Color.parseColor("#D9D9D9"))
         isClickable = true
         foreground = selectableForeground()
@@ -62,7 +63,8 @@ private fun socialSidebarFilterText(
     gravity = Gravity.CENTER
     includeFontPadding = false
     text = label
-    textSize = 14.5f
+    textSize = 13f
+    setSingleLine(true)
     setTextColor(Color.parseColor(if (selectedFilter == type) "#4F9DFF" else "#D9D9D9"))
     isClickable = true
     foreground = selectableForeground()
