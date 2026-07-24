@@ -45,19 +45,34 @@ function Assert-NodeAgentOutboxTextSafe {
 }
 
 function Get-NodeAgentFileSha256 {
-    param([Parameter(Mandatory = $true)][string]$Path)
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [ValidateRange(1, 40)][int]$Attempts = 12,
+        [ValidateRange(0, 5000)][int]$RetryDelayMilliseconds = 250
+    )
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Release artifact does not exist: $Path" }
-    $stream = [System.IO.File]::OpenRead($Path)
-    try {
-        $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    $lastError = ''
+    for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
         try {
-            return ([System.BitConverter]::ToString($sha256.ComputeHash($stream))).Replace('-', '').ToLowerInvariant()
-        } finally {
-            $sha256.Dispose()
+            $stream = [System.IO.File]::OpenRead($Path)
+            try {
+                $sha256 = [System.Security.Cryptography.SHA256]::Create()
+                try {
+                    return ([System.BitConverter]::ToString($sha256.ComputeHash($stream))).Replace('-', '').ToLowerInvariant()
+                } finally {
+                    $sha256.Dispose()
+                }
+            } finally {
+                $stream.Dispose()
+            }
+        } catch {
+            $lastError = $_.Exception.Message
+            if ($attempt -lt $Attempts -and $RetryDelayMilliseconds -gt 0) {
+                Start-Sleep -Milliseconds $RetryDelayMilliseconds
+            }
         }
-    } finally {
-        $stream.Dispose()
     }
+    throw "Release artifact could not be hashed after $Attempts bounded attempts: $Path; $lastError"
 }
 
 function Read-NodeAgentRemoteReleaseEvent {

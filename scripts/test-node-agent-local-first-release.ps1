@@ -82,6 +82,22 @@ try {
     Assert-True (-not $duplicate.Created) 'duplicate delivery must not create a second event'
     Assert-Equal @(Get-ChildItem (Join-Path $outbox 'events') -Directory).Count 1 'outbox must contain one event'
 
+    $lockedArtifact = New-Object System.IO.FileStream(
+        $exe,
+        [System.IO.FileMode]::Open,
+        [System.IO.FileAccess]::ReadWrite,
+        [System.IO.FileShare]::None
+    )
+    try {
+        Assert-Throws {
+            Get-NodeAgentFileSha256 -Path $exe -Attempts 2 -RetryDelayMilliseconds 5 | Out-Null
+        } 'bounded attempts' 'an exclusively locked release artifact must fail after a bounded retry window'
+    } finally {
+        $lockedArtifact.Dispose()
+    }
+    Assert-True ((Get-NodeAgentFileSha256 -Path $exe) -match '^[0-9a-f]{64}$') `
+        'release artifact hashing must recover after a transient Windows lock is released'
+
     $raw = [System.IO.File]::ReadAllText($first.EventPath, [System.Text.Encoding]::UTF8)
     foreach ($secret in @('admin_token','authorization','password','credential','bearer')) {
         Assert-True (-not $raw.ToLowerInvariant().Contains($secret)) "outbox must not persist $secret"
