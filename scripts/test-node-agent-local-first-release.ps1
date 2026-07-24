@@ -413,6 +413,9 @@ try {
         'each remote attempt must have a finite process timeout'
     Assert-True ($workerText.Contains('[int]$AttemptTimeoutSeconds = 600')) `
         'one stalled remote attempt must not serialize the durable outbox for an hour'
+    $outboxText = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'node-agent-release-outbox.ps1')
+    Assert-True ($outboxText.Contains('[int]$AttemptTimeoutSeconds = 600')) `
+        'the outbox launcher must not override the worker with the legacy one-hour timeout'
     Assert-True ($publishText.Contains("--connect-timeout 5 --max-time 20 -fsS -X POST")) `
         'remote update broadcast must have a bounded response window'
     Assert-True ($publishText.Contains('if [ "$curl_status" -eq 28 ]')) `

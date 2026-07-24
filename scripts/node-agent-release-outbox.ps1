@@ -225,7 +225,7 @@ function Get-DueNodeAgentRemoteReleaseEvents {
 function Start-NodeAgentRemoteReleaseWorker {
     param(
         [Parameter(Mandatory = $true)][string]$OutboxRoot,
-        [int]$AttemptTimeoutSeconds = 3600,
+        [int]$AttemptTimeoutSeconds = 600,
         [int]$IdleTimeoutSeconds = 21600
     )
     $root = Get-NodeAgentReleaseOutboxRoot -ExplicitRoot $OutboxRoot
