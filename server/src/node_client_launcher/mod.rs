@@ -27,6 +27,7 @@ pub(crate) const INTERNAL_DIR_NAME: &str = "_internal";
 pub(crate) const AGENT_RUNTIME_ARG: &str = "--agent-runtime";
 pub(crate) const BACKGROUND_START_ARG: &str = "--background";
 pub(crate) const BACKGROUND_REPAIR_ARG: &str = "--repair-background";
+pub(crate) const BACKGROUND_UPDATE_ARG: &str = "--update-background";
 pub(crate) const WATCHDOG_ARG: &str = "--watchdog";
 pub(crate) const DEFAULT_BASE_URL: &str = "http://43.139.149.158:8080";
 pub(crate) const DEFAULT_ADMIN_PORT: u16 = 7799;
@@ -46,6 +47,7 @@ enum ClientCommand {
     InstallBackground,
     Uninstall,
     Update,
+    BackgroundUpdate,
     ExportDiagnostics,
     OpenMaintenance(maintenance_protocol::MaintenanceProtocolTarget),
 }
@@ -113,23 +115,36 @@ pub(crate) fn desktop_shell_exe_path() -> Option<PathBuf> {
 #[cfg(windows)]
 pub(crate) fn open_workbench_url(url: &str) -> Result<()> {
     if let Some(desktop_exe) = desktop_shell_exe_path() {
-        match std::process::Command::new(&desktop_exe)
-            .env("ELON_DESKTOP_URL", url)
-            .spawn()
-        {
-            Ok(_) => return Ok(()),
-            Err(error) => {
-                if let Ok(install_dir) = paths::install_dir() {
-                    log_file::record_event(
-                        &install_dir,
-                        "desktop_shell_launch_failed",
-                        false,
-                        &format!(
-                            "path={}; error={error:#}; falling back to system browser",
-                            desktop_exe.display()
-                        ),
-                    );
+        let install_dir = paths::install_dir()?;
+        match updater::try_acquire_apply_lock(&install_dir) {
+            Ok(_launch_guard) => {
+                match std::process::Command::new(&desktop_exe)
+                    .env("ELON_DESKTOP_URL", url)
+                    .spawn()
+                {
+                    Ok(_) => return Ok(()),
+                    Err(error) => {
+                        log_file::record_event(
+                            &install_dir,
+                            "desktop_shell_launch_failed",
+                            false,
+                            &format!(
+                                "path={}; error={error:#}; falling back to system browser",
+                                desktop_exe.display()
+                            ),
+                        );
+                    }
                 }
+            }
+            Err(error) => {
+                log_file::record_event(
+                    &install_dir,
+                    "desktop_shell_launch_deferred_update_apply",
+                    true,
+                    &format!(
+                        "update apply owns the desktop launch lock: {error}; falling back to browser"
+                    ),
+                );
             }
         }
     }
@@ -203,23 +218,19 @@ fn run_command(command: ClientCommand) -> Result<()> {
     match command {
         ClientCommand::Start => {
             let install_dir = installer::ensure_installed()?;
-            if updater::update_client_if_needed(&install_dir)? {
-                // 自动更新脚本会重启后台 runtime；不要在这里主动打开浏览器，
-                // 避免已有 /pc 工作页重连时又被插入一个重复 tab。
-                return Ok(());
-            }
+            // 用户点击的首要结果是打开或聚焦窗口。更新检查、下载、恢复门禁
+            // 与安装重试全部交给 single-flight 后台 owner，不能占用开窗路径。
             let start_result = process::start_or_open(&install_dir);
             let watchdog_result = watchdog::ensure_running(&install_dir);
+            updater::ensure_background_update(&install_dir);
             start_result?;
             watchdog_result?;
         }
         ClientCommand::BackgroundStart => {
             let install_dir = installer::ensure_installed()?;
-            if updater::update_client_if_needed(&install_dir)? {
-                return Ok(());
-            }
             let start_result = process::start_background(&install_dir);
             let watchdog_result = watchdog::ensure_running(&install_dir);
+            updater::ensure_background_update(&install_dir);
             start_result?;
             watchdog_result?;
         }
@@ -229,17 +240,14 @@ fn run_command(command: ClientCommand) -> Result<()> {
         }
         ClientCommand::Install => {
             let install_dir = installer::install_or_repair()?;
-            if updater::update_client_if_needed(&install_dir)? {
-                // 旧安装包触发自更新时保持浏览器不动，更新脚本负责重启 runtime。
-                return Ok(());
-            }
             let launch_result = process::launch_installed_client(&install_dir);
             let watchdog_result = watchdog::ensure_running(&install_dir);
+            updater::ensure_background_update(&install_dir);
             launch_result?;
             watchdog_result?;
         }
         ClientCommand::InstallBackground => {
-            let install_dir = installer::install_or_repair()?;
+            let install_dir = installer::install_or_repair_background()?;
             // This entrypoint is launched from an already downloaded and verified
             // package. Rechecking updates here can recursively schedule a second
             // replacement before the first runtime has recovered.
@@ -256,7 +264,11 @@ fn run_command(command: ClientCommand) -> Result<()> {
         ClientCommand::Uninstall => installer::uninstall()?,
         ClientCommand::Update => {
             let install_dir = paths::install_dir()?;
-            let _ = updater::update_client_if_needed(&install_dir)?;
+            let _ = updater::run_update_owner(&install_dir)?;
+        }
+        ClientCommand::BackgroundUpdate => {
+            let install_dir = paths::install_dir()?;
+            let _ = updater::run_update_owner(&install_dir)?;
         }
         ClientCommand::ExportDiagnostics => {
             crate::node_agent_client_diagnostics::export_diagnostics_file()
@@ -282,6 +294,9 @@ impl ClientCommand {
         }
         if args.iter().any(|arg| arg == WATCHDOG_ARG) {
             return Self::Watchdog;
+        }
+        if args.iter().any(|arg| arg == BACKGROUND_UPDATE_ARG) {
+            return Self::BackgroundUpdate;
         }
         if args.iter().any(|arg| arg == BACKGROUND_REPAIR_ARG) {
             return Self::InstallBackground;
@@ -326,6 +341,7 @@ impl ClientCommand {
             Self::InstallBackground => "install_background",
             Self::Uninstall => "uninstall",
             Self::Update => "update",
+            Self::BackgroundUpdate => "background_update",
             Self::ExportDiagnostics => "export_diagnostics",
             Self::OpenMaintenance(target) => target.action_name(),
         }

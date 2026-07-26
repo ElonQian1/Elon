@@ -69,22 +69,25 @@ fn cloud_pc_url_carries_selected_local_admin_port() {
 }
 
 #[test]
-fn cloud_probe_timeout_is_bounded() {
-    let mut env_values = HashMap::new();
-    env_values.insert(
-        "NODE_AGENT_CLOUD_PROBE_TIMEOUT_MS".to_string(),
-        "10".to_string(),
-    );
-    assert_eq!(cloud_probe_timeout(&env_values), Duration::from_millis(300));
+fn smart_workbench_uses_loopback_without_a_remote_probe() {
+    let source = include_str!("process.rs");
+    let smart_branch = source
+        .split("OpenTarget::SmartWorkbench =>")
+        .nth(1)
+        .unwrap()
+        .lines()
+        .next()
+        .unwrap();
 
-    env_values.insert(
-        "NODE_AGENT_CLOUD_PROBE_TIMEOUT_MS".to_string(),
-        "50000".to_string(),
+    assert!(smart_branch.contains("local_workbench_url"));
+    assert!(!source.contains("cloud_workbench_reachable"));
+    assert!(
+        source.find("let open_result = open_pc_web_page").unwrap()
+            < source.find("agent_runtime_running(install_dir)").unwrap()
     );
-    assert_eq!(
-        cloud_probe_timeout(&env_values),
-        Duration::from_millis(10_000)
-    );
+    assert_eq!(HEALTHY_DESKTOP_OPEN_TARGET, Duration::from_secs(3));
+    assert!(source.contains("\"launcher_desktop_open_requested\""));
+    assert!(source.contains("target_ms={}"));
 }
 
 #[test]
@@ -190,13 +193,30 @@ fn stop_installed_client_processes_excludes_current_pid() {
         Path::new(r"C:\ElonNode\一龙开发平台.exe"),
         Path::new(r"C:\ElonNode\_internal\elon-desktop.exe"),
         1234,
+        true,
     );
 
     assert!(script.contains(r"C:\ElonNode\一龙开发平台.exe"));
     assert!(script.contains(r"C:\ElonNode\_internal\elon-desktop.exe"));
     assert!(script.contains("$matchesDesktopShell"));
+    assert!(script.contains("$includeDesktopShell = $true"));
     assert!(script.contains("$currentPid = 1234"));
     assert!(script.contains("ProcessId -ne"));
     assert!(script.contains("elon-node-agent.exe"));
     assert!(script.contains("Terminate"));
+}
+
+#[cfg(windows)]
+#[test]
+fn background_repair_never_selects_the_desktop_shell_for_termination() {
+    let script = stop_installed_client_processes_script(
+        Path::new(r"C:\ElonNode\一龙开发平台.exe"),
+        Path::new(r"C:\ElonNode\_internal\elon-desktop.exe"),
+        1234,
+        false,
+    );
+
+    assert!(script.contains("$includeDesktopShell = $false"));
+    assert!(script.contains("$includeDesktopShell -and $matchesDesktopShell"));
+    assert!(!script.contains("$matchesClient -or $matchesDesktopShell"));
 }

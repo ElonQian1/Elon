@@ -38,14 +38,14 @@ fn install_gate_requires_a_checkpoint_but_not_an_idle_runtime() {
 }
 
 #[test]
-fn reconciled_duplicate_receipts_follow_the_opt_in_install_gate() {
+fn reconciled_ambiguous_or_incomplete_evidence_is_always_fail_closed() {
     let classification = crate::node_agent_update_recovery::UpdateGateTaskClassification {
         ambiguous_recovery_receipts: true,
         excluded_from_install_blockers: true,
         non_repeatable_action: Some("journal_exceeds_audit_limit".to_string()),
         ..Default::default()
     };
-    assert!(reconciled_classification_allows_install(
+    assert!(!reconciled_classification_allows_install(
         &classification,
         false,
         true,
@@ -65,6 +65,25 @@ fn reconciled_duplicate_receipts_follow_the_opt_in_install_gate() {
         true,
         &["approval-1".to_string()],
         None,
+    ));
+
+    let complete = crate::node_agent_update_recovery::UpdateGateTaskClassification {
+        excluded_from_install_blockers: true,
+        ..Default::default()
+    };
+    assert!(reconciled_classification_allows_install(
+        &complete,
+        false,
+        false,
+        &[],
+        None,
+    ));
+    assert!(!reconciled_classification_allows_install(
+        &complete,
+        false,
+        false,
+        &[],
+        Some("uncommitted_action"),
     ));
 }
 
@@ -610,5 +629,102 @@ fn reconciled_terminal_history_is_excluded_but_fresh_ownership_still_blocks() {
     assert!(resumable.install_may_proceed());
     assert!(resumable.live_execution_task_ids.is_empty());
     assert!(resumable.active_foreground_task_ids.is_empty());
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn many_historical_resume_records_are_audited_without_hiding_one_live_owner() {
+    const HISTORY_COUNT: usize = 64;
+    let root = std::env::temp_dir().join(format!(
+        "elon-update-large-history-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let local_tasks =
+        crate::node_agent_local_task_store::LocalTaskStore::new(root.join("tasks.db"));
+    let mut classifications = Vec::new();
+    for index in 0..HISTORY_COUNT {
+        let task_id = format!("historical-resume-{index:03}");
+        local_tasks
+            .create(LocalTaskStart {
+                task_id: &task_id,
+                owner_user_id: "owner",
+                agent_id: "agent",
+                install_id: "install",
+                project_id: "project",
+                channel_id: None,
+                conversation_id: &task_id,
+                workspace_path: root.to_string_lossy().as_ref(),
+                prompt: "historical resume",
+                cli: "codex",
+                runtime_permission: "full_access",
+            })
+            .unwrap();
+        local_tasks
+            .mark_recovery_blocked(&task_id, "durable historical checkpoint")
+            .unwrap();
+        let task = local_tasks.get(&task_id).unwrap().unwrap();
+        classifications.push(
+            crate::node_agent_update_recovery::UpdateGateTaskClassification {
+                task_id,
+                status: task.status,
+                finished_at_ms: task.finished_at_ms,
+                excluded_from_install_blockers: true,
+                reason:
+                    "resume_required checkpoint has no execution owner or unsafe wait and remains auditable"
+                        .to_string(),
+                ..Default::default()
+            },
+        );
+    }
+    local_tasks
+        .create(LocalTaskStart {
+            task_id: "real-live-task",
+            owner_user_id: "owner",
+            agent_id: "agent",
+            install_id: "install",
+            project_id: "project",
+            channel_id: None,
+            conversation_id: "live",
+            workspace_path: root.to_string_lossy().as_ref(),
+            prompt: "real active foreground",
+            cli: "codex",
+            runtime_permission: "full_access",
+        })
+        .unwrap();
+
+    let store = UpdateRecoveryStore::new(root.join("recovery.json"));
+    store
+        .update_install_gate(UpdateInstallGate {
+            target_git_sha: "new".to_string(),
+            excluded_terminal_history_count: HISTORY_COUNT,
+            reconcile_id: Some("reconcile-large-history".to_string()),
+            classifications,
+            ..Default::default()
+        })
+        .unwrap();
+    let decision = checkpoint_active_update_transactions(
+        &store,
+        &local_tasks,
+        &crate::node_agent_task_journal::TaskJournal::new(root.join("journal")),
+        &crate::node_agent_cli_sidecar::CliSidecarRegistry::new(root.join("sidecars")),
+        "old",
+        "new",
+        &HashSet::new(),
+        &HashSet::from(["real-live-task".to_string()]),
+    )
+    .unwrap();
+
+    assert_eq!(decision.active_foreground_task_ids, ["real-live-task"]);
+    assert_eq!(decision.live_execution_task_ids, ["real-live-task"]);
+    assert!(!decision.install_may_proceed());
+    assert_eq!(
+        local_tasks.list_update_install_candidates().unwrap().len(),
+        HISTORY_COUNT + 1,
+        "classification is audit-only and must not delete historical rows"
+    );
+    let gate = store.load().unwrap().install_gate;
+    assert_eq!(gate.excluded_terminal_history_count, HISTORY_COUNT);
+    assert_eq!(gate.classifications.len(), HISTORY_COUNT);
     let _ = std::fs::remove_dir_all(root);
 }

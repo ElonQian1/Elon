@@ -1,6 +1,13 @@
 //! Audited, fail-closed repair of update blockers left by terminal local tasks.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{
+    collections::HashSet,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 use serde_json::{json, Value};
@@ -17,6 +24,80 @@ use crate::{
 
 const UPDATE_RECEIPT_INSTALL_GATE_ENV: &str = "ELON_ENABLE_UPDATE_RECEIPT_INSTALL_GATE";
 const RESUME_ELIGIBILITY_AUDIT_LIMIT: usize = 4;
+const AUTOMATIC_RECONCILE_INTERVAL: Duration = Duration::from_secs(2);
+const AUTOMATIC_RECONCILE_REFRESH_MS: u128 = 10_000;
+static AUTOMATIC_RECONCILE_RUNNING: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn spawn_install_gate_reconciler(runtime: Arc<NodeRuntime>) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(AUTOMATIC_RECONCILE_INTERVAL);
+        loop {
+            interval.tick().await;
+            let gate = match runtime.update_recovery.load() {
+                Ok(ledger) => ledger.install_gate,
+                Err(error) => {
+                    tracing::warn!(%error, "读取自动更新历史分类门禁失败，保持 fail-closed");
+                    continue;
+                }
+            };
+            if !should_automatically_reconcile(&gate, crate::node_agent_cli_sidecar::now_ms())
+                || AUTOMATIC_RECONCILE_RUNNING
+                    .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                    .is_err()
+            {
+                continue;
+            }
+            let _reset = AutomaticReconcileReset;
+            let receipt = match runtime.update_recovery.begin_reconcile() {
+                Ok(receipt) => receipt,
+                Err(error) => {
+                    tracing::warn!(%error, "创建自动更新历史分类审计回执失败，保持 fail-closed");
+                    continue;
+                }
+            };
+            let result = reconcile(runtime.clone()).await;
+            if let Err(error) = runtime.update_recovery.finish_reconcile(
+                &receipt.operation_id,
+                result
+                    .as_ref()
+                    .map(Clone::clone)
+                    .map_err(ToString::to_string),
+            ) {
+                tracing::warn!(%error, "持久化自动更新历史分类审计回执失败，保持 fail-closed");
+            }
+            match result {
+                Ok(payload) => tracing::info!(
+                    target = %gate.target_git_sha,
+                    excluded = payload["excluded_terminal_history_count"].as_u64().unwrap_or(0),
+                    blockers = payload["active_foreground_task_ids"].as_array().map(Vec::len).unwrap_or(0),
+                    "自动更新历史恢复记录分类完成"
+                ),
+                Err(error) => {
+                    tracing::warn!(%error, target = %gate.target_git_sha, "自动更新历史恢复记录分类失败，保持 fail-closed")
+                }
+            }
+        }
+    });
+}
+
+struct AutomaticReconcileReset;
+
+impl Drop for AutomaticReconcileReset {
+    fn drop(&mut self) {
+        AUTOMATIC_RECONCILE_RUNNING.store(false, Ordering::Release);
+    }
+}
+
+fn should_automatically_reconcile(gate: &UpdateInstallGate, now_ms: u128) -> bool {
+    if gate.phase != "deferred_active_foreground" || gate.target_git_sha.trim().is_empty() {
+        return false;
+    }
+    gate.classifications.is_empty()
+        || gate
+            .reconciled_at_ms
+            .map(|last| now_ms.saturating_sub(last) >= AUTOMATIC_RECONCILE_REFRESH_MS)
+            .unwrap_or(true)
+}
 
 pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
     let credentials = runtime.creds().await.context("节点当前没有已绑定身份")?;
@@ -156,9 +237,7 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
             }
             (None, None)
         };
-        let no_unsafe_wait = pending_approval_ids.is_empty()
-            && (non_repeatable_action.is_none()
-                || non_repeatable_action.as_deref() == Some("journal_exceeds_audit_limit"));
+        let no_unsafe_wait = pending_approval_ids.is_empty() && non_repeatable_action.is_none();
         if ambiguous_recovery_receipts && no_execution_owner && no_unsafe_wait {
             let active_workspace = task
                 .workspace_status
@@ -178,10 +257,10 @@ pub(crate) async fn reconcile(runtime: Arc<NodeRuntime>) -> Result<Value> {
         let excluded = can_exclude_from_install(
             persisted_inactive,
             durable_cancelled,
+            cancel_side_effect_committed,
             no_execution_owner,
             no_unsafe_wait,
             ambiguous_recovery_receipts,
-            receipt_install_gate_enabled,
         );
         let reason = classification_reason(
             excluded,
@@ -306,20 +385,13 @@ fn classification_reason(
     no_execution_owner: bool,
     no_unsafe_wait: bool,
     ambiguous_recovery_receipts: bool,
-    receipt_install_gate_enabled: bool,
+    _receipt_install_gate_enabled: bool,
     terminal_receipt: bool,
     resume_eligible: Option<bool>,
 ) -> String {
     if excluded {
-        if ambiguous_recovery_receipts && !receipt_install_gate_enabled {
-            return "duplicate historical recovery receipts remain audit-only because the receipt install gate is disabled; no execution owner remains".to_string();
-        }
         return if durable_cancelled {
-            if cancel_side_effect_committed {
-                "durable cancel side effect is committed and no execution owner or unsafe wait remains"
-            } else {
-                "durable cancel intent has no remaining execution owner or unsafe wait"
-            }
+            "durable cancel side effect is committed and no execution owner or unsafe wait remains"
         } else if terminal_receipt {
             "resume_required checkpoint has compatible terminal recovery receipts and no execution owner or unsafe wait remains"
         } else {
@@ -340,7 +412,10 @@ fn classification_reason(
     if !no_unsafe_wait {
         return "pending approval, incomplete audit, or non-repeatable action remains".to_string();
     }
-    if ambiguous_recovery_receipts && receipt_install_gate_enabled {
+    if durable_cancelled && !cancel_side_effect_committed {
+        return "durable cancel intent exists but its side effect is not committed".to_string();
+    }
+    if ambiguous_recovery_receipts {
         return "multiple update recovery receipts target the task; terminal proof is ambiguous"
             .to_string();
     }
@@ -350,15 +425,16 @@ fn classification_reason(
 fn can_exclude_from_install(
     persisted_inactive: bool,
     durable_cancelled: bool,
+    cancel_side_effect_committed: bool,
     no_execution_owner: bool,
     no_unsafe_wait: bool,
     ambiguous_recovery_receipts: bool,
-    receipt_install_gate_enabled: bool,
 ) -> bool {
     persisted_inactive
         && no_execution_owner
-        && (no_unsafe_wait || durable_cancelled)
-        && (!receipt_install_gate_enabled || !ambiguous_recovery_receipts)
+        && no_unsafe_wait
+        && (!durable_cancelled || cancel_side_effect_committed)
+        && !ambiguous_recovery_receipts
 }
 
 pub(crate) fn receipt_install_gate_enabled() -> bool {
@@ -416,12 +492,13 @@ fn stable_reconcile_id(
 mod tests {
     use super::{
         can_exclude_from_install, claim_resume_eligibility_audit, classification_reason,
-        receipt_install_gate_enabled_from, recovery_receipt_evidence, stable_reconcile_id,
+        receipt_install_gate_enabled_from, recovery_receipt_evidence,
+        should_automatically_reconcile, stable_reconcile_id, AUTOMATIC_RECONCILE_REFRESH_MS,
         RESUME_ELIGIBILITY_AUDIT_LIMIT,
     };
     use crate::node_agent_update_recovery::{
-        UpdateGateTaskClassification, UpdateRecoveryLedger, UpdateRecoveryReceipt,
-        UpdateRecoveryState,
+        UpdateGateTaskClassification, UpdateInstallGate, UpdateRecoveryLedger,
+        UpdateRecoveryReceipt, UpdateRecoveryState,
     };
 
     #[test]
@@ -430,6 +507,36 @@ mod tests {
             false, false, false, false, true, true, false, false, false, None
         )
         .contains("does not prove"));
+    }
+
+    #[test]
+    fn automatic_history_reconcile_is_target_bound_bounded_and_refreshable() {
+        let mut gate = UpdateInstallGate {
+            phase: "deferred_active_foreground".to_string(),
+            target_git_sha: "release-a".to_string(),
+            ..Default::default()
+        };
+        assert!(should_automatically_reconcile(&gate, 1));
+
+        gate.classifications.push(UpdateGateTaskClassification {
+            task_id: "historical".to_string(),
+            status: "resume_required".to_string(),
+            reason: "audited".to_string(),
+            excluded_from_install_blockers: true,
+            ..Default::default()
+        });
+        gate.reconciled_at_ms = Some(100);
+        assert!(!should_automatically_reconcile(
+            &gate,
+            100 + AUTOMATIC_RECONCILE_REFRESH_MS - 1
+        ));
+        assert!(should_automatically_reconcile(
+            &gate,
+            100 + AUTOMATIC_RECONCILE_REFRESH_MS
+        ));
+
+        gate.target_git_sha.clear();
+        assert!(!should_automatically_reconcile(&gate, u128::MAX));
     }
 
     #[test]
@@ -478,20 +585,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_recovery_receipts_are_audit_only_unless_gate_is_enabled() {
-        assert!(classification_reason(
-            true,
-            true,
-            false,
-            false,
-            true,
-            true,
-            true,
-            false,
-            false,
-            Some(false)
-        )
-        .contains("audit-only"));
+    fn ambiguous_recovery_receipts_remain_fail_closed_for_every_gate_mode() {
         assert!(classification_reason(
             false,
             true,
@@ -505,11 +599,8 @@ mod tests {
             Some(false)
         )
         .contains("ambiguous"));
-        assert!(can_exclude_from_install(
-            true, false, true, true, true, false
-        ));
         assert!(!can_exclude_from_install(
-            true, false, true, true, true, true
+            true, false, false, true, true, true
         ));
         assert!(!receipt_install_gate_enabled_from(None));
         assert!(!receipt_install_gate_enabled_from(Some("disabled")));
@@ -528,30 +619,33 @@ mod tests {
     }
 
     #[test]
-    fn durable_cancel_intent_is_excluded_after_execution_ownership_is_gone() {
+    fn durable_cancel_requires_a_committed_side_effect_and_no_unsafe_wait() {
         assert!(classification_reason(
             true, true, true, true, true, true, false, false, false, None
         )
         .contains("cancel side effect"));
         assert!(classification_reason(
-            true, true, true, false, true, true, false, false, false, None
+            false, true, true, false, true, true, false, false, false, None
         )
-        .contains("cancel intent"));
+        .contains("not committed"));
         assert!(classification_reason(
             false, false, false, false, true, true, false, false, false, None
         )
         .contains("does not prove"));
         assert!(can_exclude_from_install(
-            true, true, true, false, false, false
+            true, true, true, true, true, false
         ));
         assert!(!can_exclude_from_install(
-            true, true, false, false, false, false
+            true, true, false, true, true, false
         ));
         assert!(!can_exclude_from_install(
-            true, true, true, false, true, true
+            true, true, true, false, true, false
         ));
         assert!(!can_exclude_from_install(
-            true, false, true, false, false, false
+            true, true, true, true, false, false
+        ));
+        assert!(!can_exclude_from_install(
+            true, false, false, true, true, true
         ));
     }
 

@@ -17,7 +17,10 @@ fn self_replace_script_stops_on_failure_before_restart() {
     ));
     assert!(script.contains("Stop-ElonNodeClientProcesses -Client $client"));
     assert!(script.contains("_internal\\elon-desktop.exe"));
-    assert!(script.contains("$matchesDesktopShell"));
+    assert!(script.contains("Assert-ElonDesktopShellNotRunning -Client $client"));
+    assert!(script.contains("Enter-ElonNodeUpdateApplyLock -InstallDir $installDir"));
+    assert!(script.contains("update.apply.lock"));
+    assert!(!script.contains("$matchesDesktopShell"));
     assert!(script.contains("$matchesCliSidecar"));
     assert!(script.contains("(-not $matchesCliSidecar)"));
     assert!(script.contains("Move-ElonNodeFileWithRetry -Source $tmpExe"));
@@ -62,6 +65,9 @@ fn package_replace_script_updates_full_client_layout() {
     assert!(script.contains("Copy-Item -LiteralPath $zip -Destination $archivePath"));
     assert!(script.contains("Expand-Archive -LiteralPath $archivePath"));
     assert!(script.contains("Stop-ElonNodeClientProcesses -Client $client"));
+    assert!(script.contains("Assert-ElonDesktopShellNotRunning -Client $client"));
+    assert!(script.contains("Enter-ElonNodeUpdateApplyLock -InstallDir $installDir"));
+    assert!(!script.contains("$matchesDesktopShell"));
     assert!(script.contains("$matchesCliSidecar"));
     assert!(script.contains("(-not $matchesCliSidecar)"));
     assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $packageClient"));
@@ -116,6 +122,9 @@ fn package_self_update_uses_extracted_repair_entrypoint() {
     assert!(script.contains("Copy-Item -LiteralPath $zip -Destination $archivePath"));
     assert!(script.contains("Expand-Archive -LiteralPath $archivePath"));
     assert!(script.contains("Stop-ElonNodeClientProcesses -Client $installedClient"));
+    assert!(script.contains("Assert-ElonDesktopShellNotRunning -Client $installedClient"));
+    assert!(script.contains("Enter-ElonNodeUpdateApplyLock -InstallDir $installDir"));
+    assert!(!script.contains("$matchesDesktopShell"));
     assert!(script.contains("$matchesCliSidecar"));
     assert!(script.contains("(-not $matchesCliSidecar)"));
     assert!(script
@@ -192,6 +201,31 @@ fn runtime_handle_probe_failure_is_fail_closed() {
         .expect_err("an unavailable loopback runtime probe must refuse the install window");
     assert!(error.to_string().contains("拒绝进入安装窗口"));
     let _ = std::fs::remove_dir_all(root);
+}
+
+#[test]
+fn desktop_shell_probe_is_bound_to_the_exact_install_path() {
+    let script = super::process::desktop_shell_query_script(std::path::Path::new(
+        r"C:\ElonNode\_internal\elon-desktop.exe",
+    ));
+
+    assert!(script.contains(r"C:\ElonNode\_internal\elon-desktop.exe"));
+    assert!(script.contains("ExecutablePath"));
+    assert!(script.contains("OrdinalIgnoreCase"));
+    assert!(!script.contains("Terminate"));
+}
+
+#[test]
+fn expected_update_deferrals_keep_the_old_runtime_available() {
+    assert!(super::UpdateDeferred::DesktopInUse
+        .to_string()
+        .contains("不关闭当前窗口"));
+    assert!(super::UpdateDeferred::ActiveForeground {
+        wait_secs: 90,
+        blockers: "active-task".to_string(),
+    }
+    .to_string()
+    .contains("保持旧 runtime"));
 }
 
 #[test]

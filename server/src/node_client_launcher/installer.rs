@@ -77,15 +77,29 @@ pub(crate) fn ensure_installed() -> Result<PathBuf> {
 }
 
 pub(crate) fn install_or_repair() -> Result<PathBuf> {
+    install_or_repair_with_desktop_policy(true)
+}
+
+pub(crate) fn install_or_repair_background() -> Result<PathBuf> {
+    install_or_repair_with_desktop_policy(false)
+}
+
+fn install_or_repair_with_desktop_policy(stop_desktop_shell: bool) -> Result<PathBuf> {
     let install_dir = paths::install_dir()?;
     let internal_dir = paths::internal_dir(&install_dir);
     std::fs::create_dir_all(&internal_dir)
         .with_context(|| format!("无法创建安装目录 {}", internal_dir.display()))?;
 
+    if !stop_desktop_shell && process::desktop_shell_running(&install_dir)? {
+        anyhow::bail!(
+            "一龙桌面工作台正在使用；后台更新拒绝关闭窗口并延期修复：{}",
+            paths::desktop_shell_exe(&install_dir).display()
+        );
+    }
     let previous_port = configured_admin_port(&install_dir);
     watchdog::stop_running(&install_dir);
     process::stop_agent();
-    process::stop_installed_client_processes(&install_dir);
+    process::stop_installed_client_processes(&install_dir, stop_desktop_shell);
     process::wait_for_port_closed(previous_port, Duration::from_secs(5));
 
     let current_exe = std::env::current_exe().context("无法定位当前客户端 exe")?;

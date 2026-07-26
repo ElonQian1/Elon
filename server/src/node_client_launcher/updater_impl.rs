@@ -47,6 +47,7 @@ pub(super) fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
         &env_values,
     ) {
         Ok(updated) => return Ok(updated),
+        Err(error) if error.downcast_ref::<UpdateDeferred>().is_some() => return Err(error),
         Err(error) => {
             super::log_file::record_event(
                 install_dir,
@@ -85,20 +86,26 @@ pub(super) fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
     std::fs::write(&tmp_version, &remote_text)
         .with_context(|| format!("无法写入 {}", tmp_version.display()))?;
 
-    wait_for_safe_update_checkpoint(install_dir, &version_file, &remote_text)?;
+    checkpoint_gate::wait_for_safe_update_checkpoint(install_dir, &version_file, &remote_text)?;
     crate::node_agent_update_recovery::UpdateRecoveryStore::default().set_install_gate_phase(
         "applying",
         Some("stopping old runtime after durable checkpoint"),
     )?;
 
-    watchdog::stop_running(install_dir);
-    process::stop_agent();
     let client = paths::client_exe(install_dir);
     let uninstall = paths::uninstall_exe(install_dir);
     if running_from_path(&client) {
         schedule_self_replace(&tmp_exe, &client, &uninstall, &tmp_version, &version_file)?;
         Ok(true)
     } else {
+        let _apply_guard = singleflight::try_acquire_apply_lock(install_dir)
+            .context("更新 apply 已由另一进程持有；保留旧 runtime")?;
+        anyhow::ensure!(
+            !runtime_gate::desktop_shell_running(install_dir)?,
+            "桌面壳在 apply 门禁建立后变为活动状态；保留旧 runtime"
+        );
+        watchdog::stop_running(install_dir);
+        process::stop_agent();
         replace_client_files(&tmp_exe, &client, &uninstall, &tmp_version, &version_file)?;
         runtime_gate::restart_installed_runtime_and_watchdog(install_dir)?;
         Ok(true)
@@ -140,74 +147,27 @@ pub(super) fn try_update_from_client_package(
     std::fs::write(&tmp_version, remote_text)
         .with_context(|| format!("无法写入 {}", tmp_version.display()))?;
 
-    wait_for_safe_update_checkpoint(install_dir, &version_file, remote_text)?;
+    checkpoint_gate::wait_for_safe_update_checkpoint(install_dir, &version_file, remote_text)?;
     crate::node_agent_update_recovery::UpdateRecoveryStore::default().set_install_gate_phase(
         "applying",
         Some("stopping old runtime after durable checkpoint"),
     )?;
 
-    watchdog::stop_running(install_dir);
-    process::stop_agent();
     let client = paths::client_exe(install_dir);
     if running_from_path(&client) {
         schedule_self_replace_package(&tmp_zip, install_dir, &tmp_version, &version_file)?;
         Ok(true)
     } else {
+        let _apply_guard = singleflight::try_acquire_apply_lock(install_dir)
+            .context("更新 apply 已由另一进程持有；保留旧 runtime")?;
+        anyhow::ensure!(
+            !runtime_gate::desktop_shell_running(install_dir)?,
+            "桌面壳在 apply 门禁建立后变为活动状态；保留旧 runtime"
+        );
+        watchdog::stop_running(install_dir);
+        process::stop_agent();
         replace_client_package(&tmp_zip, install_dir, &tmp_version, &version_file)?;
         Ok(true)
-    }
-}
-
-fn wait_for_safe_update_checkpoint(
-    install_dir: &Path,
-    version_file: &Path,
-    remote_text: &str,
-) -> Result<()> {
-    let max_wait_secs = env_u64(
-        "NODE_AGENT_UPDATE_DEFER_MAX_SECS",
-        DEFAULT_UPDATE_DEFER_MAX_SECS,
-        30,
-        60 * 60,
-    );
-    let started = std::time::Instant::now();
-    loop {
-        let fresh_runtime_handles = runtime_gate::fresh_runtime_handle_task_ids(install_dir)?;
-        let decision = crate::node_agent_update_checkpoint::checkpoint_downloaded_update(
-            version_file,
-            remote_text,
-            &fresh_runtime_handles,
-        )?;
-        if decision.install_may_proceed() {
-            return Ok(());
-        }
-        super::log_file::record_event(
-            install_dir,
-            "update_deferred_active_foreground",
-            true,
-            &format!(
-                "等待 {} 个无安全 checkpoint 的前台任务结束后再安装更新",
-                decision
-                    .active_foreground_task_ids
-                    .len()
-                    .saturating_sub(decision.checkpointed_task_ids.len())
-            ),
-        );
-        if started.elapsed() >= Duration::from_secs(max_wait_secs) {
-            let blockers = decision
-                .active_foreground_task_ids
-                .iter()
-                .filter(|task_id| !decision.checkpointed_task_ids.contains(task_id))
-                .take(8)
-                .cloned()
-                .collect::<Vec<_>>()
-                .join(",");
-            anyhow::bail!(
-                "节点更新等待 {} 秒后结束本次尝试；以下任务仍无完整恢复检查点：{}。保持旧 runtime 运行，远端队列稍后自动重试",
-                max_wait_secs,
-                blockers
-            );
-        }
-        std::thread::sleep(Duration::from_secs(2));
     }
 }
 
@@ -384,16 +344,20 @@ function Write-ElonNodeUpdateLog {{
   }} catch {{}}
 }}
 {replace_helpers}
+$installedClient = Join-Path $installDir '一龙开发平台.exe'
+$applyLock = $null
 try {{
   Write-ElonNodeUpdateLog "scheduled package repair update from $zip"
   Wait-Process -Id $pidToWait -ErrorAction SilentlyContinue
+  Assert-ElonDesktopShellNotRunning -Client $installedClient
+  $applyLock = Enter-ElonNodeUpdateApplyLock -InstallDir $installDir
+  Assert-ElonDesktopShellNotRunning -Client $installedClient
   New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
   Copy-Item -LiteralPath $zip -Destination $archivePath -Force
   Expand-Archive -LiteralPath $archivePath -DestinationPath $extractDir -Force
   $packageClient = Join-Path $extractDir '一龙开发平台.exe'
   if (-not (Test-Path -LiteralPath $packageClient)) {{ $packageClient = Join-Path $extractDir '一龙PC节点.exe' }}
   if (!(Test-Path -LiteralPath $packageClient)) {{ throw '完整客户端包缺少主程序' }}
-  $installedClient = Join-Path $installDir '一龙开发平台.exe'
   Stop-ElonNodeClientProcesses -Client $installedClient -TimeoutSeconds 30
   $repair = Start-Process -FilePath $packageClient -ArgumentList '--repair-background' -WorkingDirectory $extractDir -WindowStyle Hidden -PassThru
   if ($null -eq $repair) {{ throw 'Start-Process did not return a repair process handle' }}
@@ -412,6 +376,7 @@ try {{
   Write-ElonNodeUpdateLog ("package repair update failed: " + ($_ | Out-String))
   throw
 }} finally {{
+  if ($null -ne $applyLock) {{ $applyLock.Dispose() }}
   Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
@@ -451,7 +416,11 @@ $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-node-agent-upda
 $archivePath = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-node-agent-update-' + [Guid]::NewGuid().ToString('N') + '.zip')
 {replace_helpers}
 New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+$applyLock = $null
 try {{
+  Assert-ElonDesktopShellNotRunning -Client $client
+  $applyLock = Enter-ElonNodeUpdateApplyLock -InstallDir $installDir
+  Assert-ElonDesktopShellNotRunning -Client $client
   Copy-Item -LiteralPath $zip -Destination $archivePath -Force
   Expand-Archive -LiteralPath $archivePath -DestinationPath $extractDir -Force
   # 支持新旧包名称（新：一龙开发平台，旧：一龙PC节点）
@@ -473,6 +442,7 @@ try {{
   }}
   Move-ElonNodeFileWithRetry -Source $tmpVersion -Destination $versionFile
 }} finally {{
+  if ($null -ne $applyLock) {{ $applyLock.Dispose() }}
   Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $archivePath -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
@@ -557,11 +527,19 @@ $versionFile = '{version_file}'
 $installDir = [System.IO.Path]::GetDirectoryName($client)
 {replace_helpers}
 Wait-Process -Id $pidToWait -ErrorAction SilentlyContinue
-Stop-ElonNodeClientProcesses -Client $client
-Move-ElonNodeFileWithRetry -Source $tmpExe -Destination $client
-Copy-ElonNodeFileWithRetry -Source $client -Destination $uninstall
-Move-ElonNodeFileWithRetry -Source $tmpVersion -Destination $versionFile
-{restart}
+$applyLock = $null
+try {{
+  Assert-ElonDesktopShellNotRunning -Client $client
+  $applyLock = Enter-ElonNodeUpdateApplyLock -InstallDir $installDir
+  Assert-ElonDesktopShellNotRunning -Client $client
+  Stop-ElonNodeClientProcesses -Client $client
+  Move-ElonNodeFileWithRetry -Source $tmpExe -Destination $client
+  Copy-ElonNodeFileWithRetry -Source $client -Destination $uninstall
+  Move-ElonNodeFileWithRetry -Source $tmpVersion -Destination $versionFile
+  {restart}
+}} finally {{
+  if ($null -ne $applyLock) {{ $applyLock.Dispose() }}
+}}
 "#,
         pid = std::process::id(),
         tmp_exe = launcher_command::ps_single_quote(&tmp_exe.to_string_lossy()),
@@ -579,21 +557,52 @@ const UPDATE_REPLACE_HELPERS: &str = r#"
 function Get-ElonNodeClientProcesses {
   param([Parameter(Mandatory = $true)][string]$Client)
   $fullClient = [System.IO.Path]::GetFullPath($Client)
-  $desktopShell = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $fullClient) '_internal\elon-desktop.exe'))
   Get-CimInstance Win32_Process | Where-Object {
     $matchesClient = $false
-    $matchesDesktopShell = $false
     $matchesCliSidecar = ([string]$_.CommandLine) -match '(?i)--cli-(?:pipe-)?sidecar'
     if ($_.ExecutablePath) {
       try {
         $fullExecutable = [System.IO.Path]::GetFullPath($_.ExecutablePath)
         $matchesClient = ($fullExecutable -ieq $fullClient)
-        $matchesDesktopShell = ($fullExecutable -ieq $desktopShell)
       } catch {}
     }
     (-not $matchesCliSidecar) -and (
-      $matchesClient -or $matchesDesktopShell -or ($_.Name -eq 'elon-node-agent.exe')
+      $matchesClient -or ($_.Name -eq 'elon-node-agent.exe')
     )
+  }
+}
+
+function Enter-ElonNodeUpdateApplyLock {
+  param([Parameter(Mandatory = $true)][string]$InstallDir)
+  $internal = Join-Path $InstallDir '_internal'
+  New-Item -ItemType Directory -Force -Path $internal | Out-Null
+  $path = Join-Path $internal 'update.apply.lock'
+  return [System.IO.File]::Open(
+    $path,
+    [System.IO.FileMode]::OpenOrCreate,
+    [System.IO.FileAccess]::ReadWrite,
+    [System.IO.FileShare]::None
+  )
+}
+
+function Assert-ElonDesktopShellNotRunning {
+  param([Parameter(Mandatory = $true)][string]$Client)
+  $desktopShell = [System.IO.Path]::GetFullPath(
+    (Join-Path (Split-Path -Parent $Client) '_internal\elon-desktop.exe')
+  )
+  $running = @(Get-CimInstance Win32_Process | Where-Object {
+    if (-not $_.ExecutablePath) { return $false }
+    try {
+      [System.IO.Path]::GetFullPath($_.ExecutablePath).Equals(
+        $desktopShell,
+        [StringComparison]::OrdinalIgnoreCase
+      )
+    } catch {
+      $false
+    }
+  })
+  if ($running.Count -gt 0) {
+    throw "一龙桌面工作台正在使用，更新保持旧 runtime 在线并延期安装: $desktopShell"
   }
 }
 

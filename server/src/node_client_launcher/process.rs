@@ -6,7 +6,7 @@ use std::{
     io::{Read, Write},
     net::TcpStream,
     path::{Path, PathBuf},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use super::{
@@ -21,7 +21,7 @@ const ADMIN_LOCAL_RETRY_WAIT: Duration = Duration::from_secs(10);
 const BACKGROUND_REPAIR_READY_WAIT: Duration = Duration::from_secs(25);
 const ADMIN_PORT_FALLBACK_LIMIT: u16 = 20;
 const ADMIN_HEALTH_READ_LIMIT: usize = 16 * 1024;
-const CLOUD_WORKBENCH_PROBE_TIMEOUT: Duration = Duration::from_millis(2200);
+const HEALTHY_DESKTOP_OPEN_TARGET: Duration = Duration::from_secs(3);
 
 pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
     let client = paths::client_exe(install_dir);
@@ -31,6 +31,27 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
 
     let env_values = env_file::read_env_file(&paths::env_file(install_dir))?;
     let port = admin_port_from_env_values(&env_values);
+    // Create or focus the desktop experience before any WMI query, runtime
+    // recovery wait, watchdog election, update download, or checkpoint scan.
+    let open_started = Instant::now();
+    let open_result = open_pc_web_page(port, &env_values);
+    let open_elapsed = open_started.elapsed();
+    let within_target = open_elapsed <= HEALTHY_DESKTOP_OPEN_TARGET;
+    log_file::record_event(
+        install_dir,
+        "launcher_desktop_open_requested",
+        open_result.is_ok() && within_target,
+        &format!(
+            "elapsed_ms={}; target_ms={}; within_target={within_target}; result={}",
+            open_elapsed.as_millis(),
+            HEALTHY_DESKTOP_OPEN_TARGET.as_millis(),
+            if open_result.is_ok() {
+                "requested"
+            } else {
+                "failed"
+            }
+        ),
+    );
     let runtime_already_running = agent_runtime_running(install_dir);
     let port = select_admin_port_for_runtime(port, runtime_already_running);
 
@@ -84,7 +105,7 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
         }
     }
 
-    open_pc_web_page(port, &env_values)
+    open_result
 }
 
 pub(crate) fn start_background(install_dir: &Path) -> Result<u16> {
@@ -293,20 +314,56 @@ do {{
     }
 }
 
-pub(crate) fn stop_installed_client_processes(install_dir: &Path) {
+pub(crate) fn stop_installed_client_processes(install_dir: &Path, include_desktop_shell: bool) {
     #[cfg(windows)]
     {
         let client = paths::client_exe(install_dir);
         let desktop_shell = paths::desktop_shell_exe(install_dir);
-        let script =
-            stop_installed_client_processes_script(&client, &desktop_shell, std::process::id());
+        let script = stop_installed_client_processes_script(
+            &client,
+            &desktop_shell,
+            std::process::id(),
+            include_desktop_shell,
+        );
         let mut ps = launcher_command::powershell_hidden_command(&script);
         let _ = launcher_command::status_hidden(&mut ps);
     }
     #[cfg(not(windows))]
     {
-        let _ = install_dir;
+        let _ = (install_dir, include_desktop_shell);
     }
+}
+
+pub(crate) fn desktop_shell_running(install_dir: &Path) -> Result<bool> {
+    let script = desktop_shell_query_script(&paths::desktop_shell_exe(install_dir));
+    let mut command = launcher_command::powershell_hidden_command(&script);
+    let output = launcher_command::output_hidden(&mut command)
+        .context("无法核对桌面壳执行身份；拒绝自动关闭用户窗口")?;
+    anyhow::ensure!(
+        output.status.success(),
+        "桌面壳执行身份探针失败；拒绝自动关闭用户窗口"
+    );
+    Ok(String::from_utf8_lossy(&output.stdout).contains("running"))
+}
+
+#[cfg(any(windows, test))]
+pub(super) fn desktop_shell_query_script(desktop_shell: &Path) -> String {
+    format!(
+        r#"
+$target = [System.IO.Path]::GetFullPath('{}')
+$matches = Get-CimInstance Win32_Process | Where-Object {{
+  $exe = if ($_.ExecutablePath) {{ [string]$_.ExecutablePath }} else {{ '' }}
+  if (-not $exe) {{ return $false }}
+  try {{
+    [System.IO.Path]::GetFullPath($exe).Equals($target, [StringComparison]::OrdinalIgnoreCase)
+  }} catch {{
+    $false
+  }}
+}}
+if ($matches) {{ Write-Output 'running' }}
+"#,
+        launcher_command::ps_single_quote(&desktop_shell.to_string_lossy())
+    )
 }
 
 #[cfg(any(windows, test))]
@@ -314,12 +371,14 @@ fn stop_installed_client_processes_script(
     client: &Path,
     desktop_shell: &Path,
     current_pid: u32,
+    include_desktop_shell: bool,
 ) -> String {
     format!(
         r#"
 $target = [System.IO.Path]::GetFullPath('{client}')
 $desktopShell = [System.IO.Path]::GetFullPath('{desktop_shell}')
 $currentPid = {current_pid}
+$includeDesktopShell = {include_desktop_shell}
 $deadline = (Get-Date).AddSeconds(20)
 do {{
   $targets = @(Get-CimInstance Win32_Process | Where-Object {{
@@ -335,7 +394,7 @@ do {{
         $matchesDesktopShell = $false
       }}
     }}
-    ([uint32]$_.ProcessId -ne [uint32]$currentPid) -and ($matchesClient -or $matchesDesktopShell -or ($_.Name -eq 'elon-node-agent.exe'))
+    ([uint32]$_.ProcessId -ne [uint32]$currentPid) -and ($matchesClient -or ($includeDesktopShell -and $matchesDesktopShell) -or ($_.Name -eq 'elon-node-agent.exe'))
   }})
   foreach ($targetProcess in $targets) {{
     try {{ Invoke-CimMethod -InputObject $targetProcess -MethodName Terminate | Out-Null }} catch {{}}
@@ -346,7 +405,12 @@ do {{
 "#,
         client = launcher_command::ps_single_quote(&client.to_string_lossy()),
         desktop_shell = launcher_command::ps_single_quote(&desktop_shell.to_string_lossy()),
-        current_pid = current_pid
+        current_pid = current_pid,
+        include_desktop_shell = if include_desktop_shell {
+            "$true"
+        } else {
+            "$false"
+        }
     )
 }
 
@@ -367,17 +431,10 @@ pub(crate) fn open_pc_web_page(port: u16, env_values: &HashMap<String, String>) 
     let local_workbench_url = format!("http://127.0.0.1:{port}/pc");
     let legacy_local_admin_url = format!("http://127.0.0.1:{port}/local-admin");
     let url = match open_target_from_env_values(env_values) {
-        OpenTarget::SmartWorkbench => {
-            let cloud_url = cloud_pc_url(port, env_values);
-            if cloud_workbench_reachable(env_values) {
-                cloud_url
-            } else {
-                if !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
-                    let _ = wait_for_admin_ready(port, ADMIN_LOCAL_RETRY_WAIT);
-                }
-                local_workbench_url
-            }
-        }
+        // The packaged /pc route already reconnects to cloud services. Keeping
+        // launcher navigation on loopback removes the remote probe from the
+        // visible-window critical path and also gives offline recovery a page.
+        OpenTarget::SmartWorkbench => local_workbench_url,
         OpenTarget::LocalWorkbench => local_workbench_url,
         OpenTarget::LocalAdmin => legacy_local_admin_url,
         OpenTarget::CloudPc => cloud_pc_url(port, env_values),
@@ -425,34 +482,6 @@ fn open_target_from_env_values(env_values: &HashMap<String, String>) -> OpenTarg
         Some("local_admin") => OpenTarget::LocalAdmin,
         _ => OpenTarget::SmartWorkbench,
     }
-}
-
-fn cloud_workbench_reachable(env_values: &HashMap<String, String>) -> bool {
-    let health_url = format!("{}/health", web_base_url(env_values).trim_end_matches('/'));
-    let timeout = cloud_probe_timeout(env_values);
-    let client = match reqwest::blocking::Client::builder()
-        .connect_timeout(timeout)
-        .timeout(timeout)
-        .build()
-    {
-        Ok(client) => client,
-        Err(_) => return false,
-    };
-    client
-        .get(health_url)
-        .header(reqwest::header::CACHE_CONTROL, "no-cache")
-        .send()
-        .map(|response| response.status().is_success())
-        .unwrap_or(false)
-}
-
-fn cloud_probe_timeout(env_values: &HashMap<String, String>) -> Duration {
-    let millis = env_values
-        .get("NODE_AGENT_CLOUD_PROBE_TIMEOUT_MS")
-        .and_then(|value| value.trim().parse::<u64>().ok())
-        .unwrap_or(CLOUD_WORKBENCH_PROBE_TIMEOUT.as_millis() as u64)
-        .clamp(300, 10_000);
-    Duration::from_millis(millis)
 }
 
 fn web_base_url(env_values: &HashMap<String, String>) -> String {

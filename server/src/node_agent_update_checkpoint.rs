@@ -343,20 +343,17 @@ fn checkpoint_active_update_transactions(
 
 fn reconciled_classification_allows_install(
     classification: &crate::node_agent_update_recovery::UpdateGateTaskClassification,
-    receipt_install_gate_enabled: bool,
+    _receipt_install_gate_enabled: bool,
     audit_has_more: bool,
     pending_approval_ids: &[String],
     incomplete_action: Option<&str>,
 ) -> bool {
     if !classification.excluded_from_install_blockers
-        || (classification.ambiguous_recovery_receipts && receipt_install_gate_enabled)
+        || classification.ambiguous_recovery_receipts
         || !pending_approval_ids.is_empty()
+        || audit_has_more
     {
         return false;
-    }
-    if audit_has_more {
-        return classification.non_repeatable_action.as_deref()
-            == Some("journal_exceeds_audit_limit");
     }
     incomplete_action.is_none()
 }

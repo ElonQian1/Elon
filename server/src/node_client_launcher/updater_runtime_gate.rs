@@ -2,6 +2,10 @@
 
 use super::*;
 
+pub(super) fn desktop_shell_running(install_dir: &Path) -> Result<bool> {
+    process::desktop_shell_running(install_dir)
+}
+
 pub(super) fn fresh_runtime_handle_task_ids(
     install_dir: &Path,
 ) -> Result<std::collections::HashSet<String>> {

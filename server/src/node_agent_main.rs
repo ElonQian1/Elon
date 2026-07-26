@@ -490,6 +490,7 @@ async fn run_agent_runtime() -> Result<()> {
     // update reattach/Resume and runtime-online state must be visible first.
     runtime.reconcile_local_completion_outbox().await;
     node_agent_local_task_orphan_reconcile::spawn_reconciler(runtime.clone());
+    node_agent_update_gate_reconcile::spawn_install_gate_reconciler(runtime.clone());
     runtime.spawn_lifecycle_heartbeat();
     node_agent_cancel_saga::spawn_reconciler(runtime.clone());
     node_agent_self_evolution::spawn_scheduler(runtime.clone());

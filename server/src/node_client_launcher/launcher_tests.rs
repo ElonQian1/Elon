@@ -23,6 +23,10 @@ fn client_command_accepts_productized_maintenance_aliases() {
         ClientCommand::Watchdog
     ));
     assert!(matches!(
+        ClientCommand::from_args(&["--update-background".to_string()], false),
+        ClientCommand::BackgroundUpdate
+    ));
+    assert!(matches!(
         ClientCommand::from_args(&["--repair".to_string()], false),
         ClientCommand::Install
     ));
@@ -57,14 +61,67 @@ fn uninstall_exe_name_still_routes_to_uninstall() {
 }
 
 #[test]
-fn scheduled_update_paths_do_not_open_browser_tabs() {
+fn foreground_start_opens_before_scheduling_single_flight_update() {
     let source = include_str!("mod.rs");
+    let start_branch = source
+        .split("ClientCommand::Start =>")
+        .nth(1)
+        .unwrap()
+        .split("ClientCommand::BackgroundStart =>")
+        .next()
+        .unwrap();
 
-    assert!(source.contains("避免已有 /pc 工作页重连时又被插入一个重复 tab"));
+    assert!(
+        start_branch.find("process::start_or_open").unwrap()
+            < start_branch
+                .find("updater::ensure_background_update")
+                .unwrap()
+    );
+    assert!(!start_branch.contains("update_client_if_needed"));
+    assert!(source.contains("ClientCommand::BackgroundUpdate"));
+    assert!(source.contains("updater::run_update_owner"));
     assert!(source.contains("ClientCommand::InstallBackground"));
+    assert!(source.contains("installer::install_or_repair_background()"));
     assert!(source.contains("let port = process::start_background(&install_dir)"));
     assert!(source.contains("process::verify_background_ready(port)"));
     assert!(source.contains("Rechecking updates here can recursively schedule a second"));
+}
+
+#[test]
+fn background_package_repair_checks_desktop_before_stopping_runtime() {
+    let source = include_str!("installer.rs");
+    let guard = source
+        .find("process::desktop_shell_running(&install_dir)")
+        .unwrap();
+    let stop = source.find("watchdog::stop_running(&install_dir)").unwrap();
+
+    assert!(guard < stop);
+    assert!(source.contains("stop_installed_client_processes(&install_dir, stop_desktop_shell)"));
+}
+
+#[test]
+fn desktop_launch_uses_apply_lock_and_fast_browser_fallback() {
+    let source = include_str!("mod.rs");
+
+    assert!(source.contains("updater::try_acquire_apply_lock"));
+    assert!(source.contains("desktop_shell_launch_deferred_update_apply"));
+    assert!(source.contains("falling back to browser"));
+}
+
+#[test]
+fn desktop_shell_repeated_start_focuses_the_existing_window() {
+    let source = include_str!("../../../desktop-shell/src-tauri/src/main.rs");
+    let single_instance = source
+        .find("tauri_plugin_single_instance::init")
+        .expect("desktop shell must retain its single-instance owner");
+    let later_plugin = source[single_instance..]
+        .find(".plugin(")
+        .expect("single-instance plugin must be registered before other plugins");
+    let focus_callback = &source[single_instance..single_instance + later_plugin];
+
+    assert!(focus_callback.contains("show_main_window(app)"));
+    assert!(source.contains("let _ = window.show();"));
+    assert!(source.contains("let _ = window.set_focus();"));
 }
 
 #[test]
