@@ -294,6 +294,15 @@ pub(crate) fn plan_context(
             if is_task_specific_customization(document) && !customizations_requested {
                 return false;
             }
+            let manifest_path = document.path.replace('\\', "/");
+            let facets = effective_facets_with_metadata(
+                document,
+                manifest.governance_facets.get(&manifest_path),
+                manifest.document_metadata.get(&manifest_path),
+            );
+            if facets.retrieval == "excluded" && !historical_requested {
+                return false;
+            }
             let entrypoint_score =
                 manifest_entrypoint_score(&normalized_path, &query_terms, &manifest);
             if linked.contains(&normalized_path) || entrypoint_score > 0 {
@@ -302,13 +311,7 @@ pub(crate) fn plan_context(
             if historical_requested {
                 return true;
             }
-            let path = document.path.replace('\\', "/");
-            let facets = effective_facets_with_metadata(
-                document,
-                manifest.governance_facets.get(&path),
-                manifest.document_metadata.get(&path),
-            );
-            !is_historical_noise(document) && facets.retrieval != "excluded"
+            !is_historical_noise(document)
         })
         .map(|document| {
             let text = format!(

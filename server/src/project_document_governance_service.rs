@@ -19,6 +19,7 @@ use crate::{
         validate_ready_suggestions, DocumentOrganizationSuggestions, DocumentSectionManifest,
         SECTION_CONFIG_PATH, SUGGESTIONS_CONFIG_PATH,
     },
+    project_document_governance_facets::effective_facets_with_metadata,
     project_document_vault::{current_version, is_managed_vault},
 };
 
@@ -101,7 +102,15 @@ pub(crate) fn analyze_workspace_scoped_query(
         .sum::<u64>();
     let ambiguous_documents = scoped_catalog
         .iter()
-        .filter(|document| document.metadata.ambiguous)
+        .filter(|document| {
+            let path = document.path.replace('\\', "/");
+            let facets = effective_facets_with_metadata(
+                document,
+                manifest.value.governance_facets.get(&path),
+                manifest.value.document_metadata.get(&path),
+            );
+            facets.lifecycle == "unclassified" || facets.authority == "unknown"
+        })
         .count();
     let excluded_by_default = scoped_catalog
         .iter()

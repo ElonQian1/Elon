@@ -109,6 +109,10 @@ fn repository_self_project_is_scanned_with_zero_model_tokens() {
     assert!(quality["summary"]["missing_implementation_declarations"]
         .as_u64()
         .is_some());
+    assert_eq!(
+        analysis["budget"]["ambiguous_documents"],
+        health["ambiguous_documents"]
+    );
     assert!(quality["summary"]["orphan_documents"].as_u64().unwrap() <= 2);
     assert!(!quality["issues"].as_array().unwrap().iter().any(|issue| {
         let path = issue["path"].as_str().unwrap_or_default();

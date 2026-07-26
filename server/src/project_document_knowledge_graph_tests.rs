@@ -340,6 +340,11 @@ fn self_project_overview_is_bounded_and_fast_enough_for_interactive_use() {
         paths.contains(&"docs/project-document-governance-mcp.md"),
         "{paths:?}"
     );
+    assert!(context["relevant_documents"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|item| item["document"]["default_retrieval"] == true));
     assert!(!paths.iter().any(|path| {
         let path = path.to_ascii_lowercase();
         path.contains("e2e") || path.contains("trace")

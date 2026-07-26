@@ -398,6 +398,12 @@
       "authority": "authoritative",
       "document_type": "guide"
     },
+    "docs/supervised-pc-project-development.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "runbook"
+    },
     "docs/system-architecture.md": {
       "retrieval": "on_demand",
       "lifecycle": "active",
