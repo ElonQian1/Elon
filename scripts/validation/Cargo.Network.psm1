@@ -88,22 +88,25 @@ function Write-CargoAttemptFailureEvidence {
     )
     if ($Result.exit_code -eq 0) { return }
 
-    $lines = @()
-    foreach ($path in @($Result.stdout_path, $Result.stderr_path) | Where-Object { $_ }) {
-        if (Test-Path -LiteralPath $path) {
-            $lines += @(Get-Content -LiteralPath $path -ErrorAction SilentlyContinue)
-        }
-    }
-    $tail = @($lines | Where-Object { $_ -and $_.Trim() } | Select-Object -Last $MaximumLines)
-    if ($tail.Count -eq 0) { return }
+    $streams = @(
+        [pscustomobject]@{ name = 'stdout'; path = $Result.stdout_path },
+        [pscustomobject]@{ name = 'stderr'; path = $Result.stderr_path }
+    )
+    foreach ($stream in $streams) {
+        if (-not $stream.path -or -not (Test-Path -LiteralPath $stream.path)) { continue }
+        $tail = @(Get-Content -LiteralPath $stream.path -ErrorAction SilentlyContinue |
+            Where-Object { $_ -and $_.Trim() } |
+            Select-Object -Last $MaximumLines)
+        if ($tail.Count -eq 0) { continue }
 
-    Write-Host "CARGO_ATTEMPT_LOG_BEGIN stage=$Stage lines=$($tail.Count)"
-    foreach ($line in $tail) {
-        # Prefix every line so captured tool output cannot be interpreted as a GitHub Actions command.
-        $safeLine = ([string]$line).Replace("`0", '').Replace("`r", '').Replace("`n", ' ')
-        Write-Host "CARGO_ATTEMPT_LOG $safeLine"
+        Write-Host "CARGO_ATTEMPT_LOG_BEGIN stage=$Stage stream=$($stream.name) lines=$($tail.Count)"
+        foreach ($line in $tail) {
+            # Prefix every line so captured tool output cannot be interpreted as a GitHub Actions command.
+            $safeLine = ([string]$line).Replace("`0", '').Replace("`r", '').Replace("`n", ' ')
+            Write-Host "CARGO_ATTEMPT_LOG $safeLine"
+        }
+        Write-Host "CARGO_ATTEMPT_LOG_END stage=$Stage stream=$($stream.name) lines=$($tail.Count)"
     }
-    Write-Host "CARGO_ATTEMPT_LOG_END stage=$Stage lines=$($tail.Count)"
 }
 
 function Invoke-CargoNetworkValidation {
