@@ -212,25 +212,38 @@ pub(crate) fn plan_context(
             .then(left.order.cmp(&right.order))
             .then(left.id.cmp(&right.id))
     });
-    let matched_nodes = scored_nodes
-        .into_iter()
-        .take(12)
-        .map(|(_, node)| node)
-        .collect::<Vec<_>>();
+    let matched_nodes = scored_nodes.into_iter().take(12).collect::<Vec<_>>();
     if let Some(id) = node_id {
-        if !matched_nodes.iter().any(|node| node.id == id) {
+        if !matched_nodes.iter().any(|(_, node)| node.id == id) {
             bail!("未知知识图谱节点：{id}");
         }
     }
     let linked = matched_nodes
         .iter()
-        .flat_map(|node| node.document_paths.iter())
+        .flat_map(|(_, node)| node.document_paths.iter())
         .map(|path| normalize(path))
         .collect::<HashSet<_>>();
-    let linked_entrypoints = matched_nodes
-        .iter()
-        .filter(|node| !node.entrypoint.is_empty())
-        .map(|node| normalize(&node.entrypoint))
+    let linked_entrypoint_scores = matched_nodes.iter().fold(
+        HashMap::<String, usize>::new(),
+        |mut scores, (score, node)| {
+            if !node.entrypoint.is_empty() {
+                let relevance = if *score == usize::MAX {
+                    12
+                } else {
+                    (*score).min(12)
+                };
+                let boost = 80 + relevance * 40;
+                scores
+                    .entry(normalize(&node.entrypoint))
+                    .and_modify(|current| *current = (*current).max(boost))
+                    .or_insert(boost);
+            }
+            scores
+        },
+    );
+    let linked_entrypoints = linked_entrypoint_scores
+        .keys()
+        .cloned()
         .collect::<HashSet<_>>();
     let max_tokens = max_tokens.clamp(200, 12_000);
     let max_rule_tokens = max_rule_tokens.clamp(200, 6_000);
@@ -340,6 +353,7 @@ pub(crate) fn plan_context(
                 )) * 20;
             let entrypoint_score = manifest_entrypoint_score(&path, &query_terms, &manifest);
             let score = usize::from(linked.contains(&path)) * 100
+                + linked_entrypoint_scores.get(&path).copied().unwrap_or(0)
                 + term_score
                 + authority_score
                 + entrypoint_score;
@@ -363,13 +377,22 @@ pub(crate) fn plan_context(
             manifest.governance_facets.get(&manifest_path),
             manifest.document_metadata.get(&manifest_path),
         );
-        let planned_tokens = if knowledge_entrypoint {
+        let base_planned_tokens = if knowledge_entrypoint {
             tokens.min(1_200)
         } else {
             tokens
         };
+        let remaining_tokens = max_tokens.saturating_sub(used_tokens);
+        let planned_tokens = if knowledge_entrypoint
+            && base_planned_tokens > remaining_tokens
+            && remaining_tokens >= 200
+        {
+            remaining_tokens
+        } else {
+            base_planned_tokens
+        };
         if selected.len() >= max_documents
-            || (!selected.is_empty() && used_tokens.saturating_add(planned_tokens) > max_tokens)
+            || used_tokens.saturating_add(planned_tokens) > max_tokens
         {
             continue;
         }
@@ -396,7 +419,7 @@ pub(crate) fn plan_context(
         "identity": identity,
         "query": query,
         "node_id": node_id,
-        "matched_nodes": matched_nodes.iter().map(|node| json!({"id":node.id,"view":node.view,"label":node.label,"status":node.documentation_status})).collect::<Vec<_>>(),
+        "matched_nodes": matched_nodes.iter().map(|(_, node)| json!({"id":node.id,"view":node.view,"label":node.label,"status":node.documentation_status})).collect::<Vec<_>>(),
         "mandatory_rules": mandatory_rules,
         "relevant_documents": selected,
         "budget": {

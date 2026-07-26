@@ -354,6 +354,40 @@ fn self_project_overview_is_bounded_and_fast_enough_for_interactive_use() {
         || path.starts_with(".github/skills/")
         || path.starts_with(".github/instructions/")
         || matches!(*path, "AI_RULES.md" | "AI_TASK_TEMPLATE.md")));
+
+    let bounded = plan_context(
+        &root,
+        "Codex 桌面通过 PC 节点协作开发与项目文档治理",
+        None,
+        2_400,
+        10,
+        1_600,
+    )
+    .unwrap();
+    let bounded_paths = bounded["relevant_documents"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|item| {
+            item.pointer("/document/path")
+                .and_then(serde_json::Value::as_str)
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        bounded_paths.contains(&"docs/supervised-pc-project-development.md"),
+        "{bounded_paths:?}"
+    );
+    assert!(
+        !bounded_paths.contains(&"docs/windows-client-defender.md"),
+        "{bounded_paths:?}"
+    );
+    assert!(
+        bounded["budget"]["relevant_content"]["estimated_tokens_selected"]
+            .as_u64()
+            .unwrap()
+            <= 2_400
+    );
+    assert_eq!(bounded["budget"]["markdown_bodies_read"], 0);
     assert!(
         elapsed.as_secs() < 10,
         "self project overview took {elapsed:?}"
