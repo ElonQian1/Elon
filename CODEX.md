@@ -1,6 +1,6 @@
 ﻿# CODEX Project Entry
 
-Last updated: 2026-07-18
+Last updated: 2026-07-26
 
 Codex-specific overlay. All shared rules live in `copilot-instructions.md` — do not duplicate them here.
 
@@ -12,7 +12,7 @@ By the time you read this, you have already read `AGENTS.md` → `.github/copilo
 |---|---|
 | Server runtime prompt or APK-triggered Codex CLI behavior | `server/src/ai_cli_prompts.rs`, `server/src/ai_cli_tests.rs` |
 | Source-size preflight behavior | `server/src/source_hygiene.rs` |
-| Desktop supervisor -> local PC executor workflow | `.agents/skills/codex-pc-supervisor/SKILL.md`, `docs/codex-desktop-pc-supervision.md` |
+| Desktop supervisor -> local PC executor workflow | Paused since 2026-07-26. Read `.agents/skills/codex-pc-supervisor/SKILL.md` and `docs/codex-desktop-pc-supervision.md`; do not dispatch or resume supervised tasks while paused. |
 
 ## Script Output Priority
 

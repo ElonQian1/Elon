@@ -57,6 +57,8 @@ Android APK / Web UI
 
 ### Codex 桌面监督与 PC 执行闭环
 
+> 当前状态：自 2026-07-26 起暂停使用。暂停期间不得新建或自动续跑监督任务；实现与下述架构说明保留为历史和恢复参考。当前项目任务由当前代理直接按照目标仓库规则完成。
+
 Codex 桌面端讨论本项目并需要实际改动时，可以通过仓库级 `codex-pc-supervisor` Skill 把需求交给本机 `/api/local-tasks`。PC 节点启动 Codex CLI，在项目隔离 worktree 内修改、验证、提交、发布和收尾；桌面端保留监督者角色，独立检查 journal、diff、测试、产物与 `FINALIZABLE`，再写入验收结论。协议和操作手册见 `docs/codex-desktop-pc-supervision.md`。
 
 ```text

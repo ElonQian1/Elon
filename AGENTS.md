@@ -1,6 +1,6 @@
 # 一龙项目 AI 工作入口
 
-最后更新：2026-07-18
+最后更新：2026-07-26
 
 本文件是 Codex、Codex CLI、Copilot、Copilot CLI 等工具的共享路由层。
 
@@ -24,10 +24,10 @@
 | PowerShell 版本兼容 | `docs/powershell-version-policy.md` |
 | 模块化、拆文件、巨型文件 | `.github/instructions/modular-architecture.instructions.md` |
 | 后端架构、API、数据流 | `docs/system-architecture.md` 和相关源码 |
-| Codex 桌面监督、PC 节点执行、外部项目双闭环改进 | `docs/supervised-pc-project-development.md`；实现边界再读 `docs/system-architecture.md`、`docs/user-project-system.md` |
+| Codex 桌面监督、PC 节点执行、外部项目双闭环改进 | **2026-07-26 起暂停**；只读 `docs/supervised-pc-project-development.md`，不得派发或续跑 |
 | PC 工作台、`/pc`、React/Vite/TypeScript | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md`、`AI_INDEX.md` |
 | Windows PC 节点客户端、自更新、推送更新 | `docs/node-agent-upgrade-compatibility.md`、Git/发布手册和相关源码 |
-| Codex 桌面监督、PC 本机执行、能力修复后续跑 | `.agents/skills/codex-pc-supervisor/SKILL.md`、`docs/codex-desktop-pc-supervision.md` |
+| Codex 桌面监督、PC 本机执行、能力修复后续跑 | **2026-07-26 起暂停**；读 Skill 和 `docs/codex-desktop-pc-supervision.md` 的暂停规则 |
 | 完整开发流程、复杂发布或任务卡住 | `docs/ai-agent-workflow.md` |
 | Android APK 发布 | Git/发布手册的发布入口；环境异常再读 `docs/android-setup.md` |
 | APP UI、主题、颜色、导航、卡片 | `docs/Design.md`、`docs/APP 颜色规范.md`；涉及 APK/网页同步再读 `.github/instructions/apk-web-ui-sync.instructions.md` |

@@ -1,9 +1,20 @@
 ---
 name: codex-pc-supervisor
-description: Use the Yilong PC local node as the coding executor while Codex Desktop acts as an independent supervisor. Trigger when the user asks Codex Desktop to dispatch, supervise, inspect, improve, repair, or resume a project task through the PC node or Codex CLI, including the project's “双重自进化” workflow. Do not trigger when the request is already marked as a PC executor prompt; that agent must complete the work directly.
+description: PAUSED since 2026-07-26. Read this skill when a request concerns the Yilong PC supervision workflow, but do not dispatch, supervise, improve, resume, or otherwise operate that workflow unless the user explicitly lifts the pause.
 ---
 
 # Codex PC Supervisor
+
+## Current status: paused
+
+Starting 2026-07-26, the Desktop supervisor -> Yilong PC executor workflow is paused.
+
+- Do not call `Submit`, `Wait`, `Inspect`, `Review`, `Improve`, `Resume`, or `Supersede` as part of the normal project workflow.
+- Do not automatically continue or cancel an existing supervised task. Preserve its task record, journal, worktree lease, and audit evidence until the user gives an explicit disposition.
+- Complete ordinary project work directly in the current agent environment under the target repository's own rules.
+- Keep the implementation and the remainder of this document as historical and recovery reference. Resume use only after the user explicitly lifts the pause and the repository records that policy change.
+
+The instructions below describe the retained, currently inactive workflow.
 
 Use Codex Desktop for planning, independent evidence review, and improvement decisions. Use the existing Yilong PC node and its Codex CLI for repository writes, tests, commits, publishing, and project-specific finish rules.
 
