@@ -461,12 +461,9 @@ mod tests {
     async fn idle_peer_event_replies_to_ping() {
         let (mut sink_tx, mut sink_rx) = futures_mpsc::channel::<Message>(4);
 
-        handle_idle_peer_event(
-            Some(PeerWsEvent::Ping(b"nonce".to_vec())),
-            &mut sink_tx,
-        )
-        .await
-        .unwrap();
+        handle_idle_peer_event(Some(PeerWsEvent::Ping(b"nonce".to_vec())), &mut sink_tx)
+            .await
+            .unwrap();
 
         match sink_rx.next().await {
             Some(Message::Pong(payload)) => assert_eq!(payload, b"nonce".to_vec()),
