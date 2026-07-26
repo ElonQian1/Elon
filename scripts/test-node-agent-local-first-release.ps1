@@ -279,6 +279,17 @@ try {
         )
     }
     [System.IO.File]::WriteAllBytes((Join-Path $internalRoot 'watchdog.instance.lock'), [byte[]]@())
+    foreach ($runtimeStateName in @(
+        'update-background-state.json',
+        'update.apply.lock',
+        'update.owner.lock'
+    )) {
+        [System.IO.File]::WriteAllText(
+            (Join-Path $internalRoot $runtimeStateName),
+            '{"runtime":"must-not-copy"}',
+            [System.Text.Encoding]::UTF8
+        )
+    }
 
     $snapshotRoot = Join-Path $activationRoot 'rollback\fixture-valid'
     $snapshot = New-NodeAgentRollbackSnapshot -InstallRoot $installRoot `
@@ -290,6 +301,15 @@ try {
         'finish contracts must never enter the rollback client tree'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $snapshot.ClientRoot '_internal\logs'))) `
         'runtime logs must never enter the rollback client tree'
+    foreach ($runtimeStateName in @(
+        'update-background-state.json',
+        'update.apply.lock',
+        'update.owner.lock'
+    )) {
+        Assert-True (-not (Test-Path -LiteralPath (
+            Join-Path $snapshot.ClientRoot "_internal\$runtimeStateName"
+        ))) "runtime update state must never enter rollback: $runtimeStateName"
+    }
     Assert-True (-not (Test-Path -LiteralPath (
         Join-Path $snapshot.ClientRoot 'supervisor-node-url.bootstrap-backup'
     ))) 'supervisor bootstrap backup must be preserved in place, not copied into rollback'

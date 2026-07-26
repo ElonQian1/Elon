@@ -27,6 +27,9 @@ $script:NodeAgentRollbackIgnoredRootItems = @(
 )
 $script:NodeAgentRollbackIgnoredInternalItems = @(
     'logs',
+    'update-background-state.json',
+    'update.apply.lock',
+    'update.owner.lock',
     'watchdog.instance.lock'
 )
 
