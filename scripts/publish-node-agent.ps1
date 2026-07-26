@@ -44,6 +44,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot "node-agent-local-activation.ps1")
 . (Join-Path $PSScriptRoot "node-agent-publish-handshake.ps1")
 . (Join-Path $PSScriptRoot "node-agent-release-build-cache.ps1")
+. (Join-Path $PSScriptRoot "node-agent-release-packaging.ps1")
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
@@ -538,68 +539,19 @@ $WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
 $WindowsClientDownloadUrl = "$BaseUrl/api/node-agent/download/windows-client"
 $RipgrepDownloadUrl = "$BaseUrl/api/node-agent/download/ripgrep-windows"
 $LauncherDir = Join-Path $PSScriptRoot "node-agent-launcher"
-$PackageRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-node-agent-windows-" + [Guid]::NewGuid().ToString("N"))
-$PackageInternal = Join-Path $PackageRoot "_internal"
-$WindowsClientPackage = Join-Path $TargetDir "release\$WindowsClientPackageName"
-$RipgrepPackage = Join-Path $TargetDir "release\$RipgrepPackageName"
-$RipgrepZipSha256 = ""
-$RipgrepZipFileSize = 0
-Write-Host "  打包可选绿色 ripgrep..." -ForegroundColor DarkGray
-$RipgrepExe = Resolve-RipgrepExe
-if ($RipgrepExe) {
-    $RipgrepRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-ripgrep-windows-" + [Guid]::NewGuid().ToString("N"))
-    $RipgrepBinDir = Join-Path $RipgrepRoot "bin"
-    New-Item -ItemType Directory -Force -Path $RipgrepBinDir | Out-Null
-    try {
-        Copy-Item -LiteralPath $RipgrepExe -Destination (Join-Path $RipgrepBinDir "rg.exe") -Force
-        Compress-ArchiveWithRetry -Path (Join-Path $RipgrepRoot "*") -DestinationPath $RipgrepPackage
-        $RipgrepZipSha256 = Get-NodeAgentFileSha256 -Path $RipgrepPackage
-        $RipgrepZipFileSize = (Get-Item -LiteralPath $RipgrepPackage).Length
-        Write-Host "  ripgrep package sha256 = $RipgrepZipSha256" -ForegroundColor DarkGray
-    } finally {
-        Remove-Item -LiteralPath $RipgrepRoot -Recurse -Force -ErrorAction SilentlyContinue
-    }
-} else {
-    Write-Host "  未找到 rg.exe，跳过绿色 ripgrep 包；客户端修复时会 fallback 到 winget。" -ForegroundColor DarkYellow
-}
-New-Item -ItemType Directory -Force -Path $PackageRoot, $PackageInternal | Out-Null
-try {
-    $PackageClient = Join-Path $PackageRoot "一龙开发平台.exe"
-    $PackageUninstall = Join-Path $PackageRoot "卸载一龙开发平台.exe"
-    Copy-Item -LiteralPath $WinBin -Destination $PackageClient -Force
-    Copy-Item -LiteralPath $WinBin -Destination $PackageUninstall -Force
-    Assert-WindowsExecutableBrandIcon -ExecutablePath $PackageClient -ExpectedIconPath $BrandIcon | Out-Null
-    Assert-WindowsExecutableBrandIcon -ExecutablePath $PackageUninstall -ExpectedIconPath $BrandIcon | Out-Null
-    Copy-Item -LiteralPath $DesktopShellBin -Destination (Join-Path $PackageInternal "elon-desktop.exe") -Force
-    foreach ($name in @('node-agent.env.example','README.txt')) { Copy-Item -LiteralPath (Join-Path $LauncherDir $name) -Destination (Join-Path $PackageInternal $name) -Force }
-    foreach ($name in @('desktop-review-credential.ps1','new-desktop-review-ticket.ps1')) { Copy-Item -LiteralPath (Join-Path $RepoRoot "scripts\$name") -Destination (Join-Path $PackageInternal $name) -Force }
-    $PackagePcDist = Join-Path $PackageInternal "pc-next-dist"
-    New-Item -ItemType Directory -Force -Path $PackagePcDist | Out-Null
-    Copy-Item -Path (Join-Path $PcDistDir "*") -Destination $PackagePcDist -Recurse -Force
-    $PackageVersionInfo = [ordered]@{
-        version = $PackageVersion
-        gitSha = $GitSha
-        changelog = $ReleaseChangelog
-        updated_at = (Get-Date).ToString("o")
-        downloadUrl = $WindowsDownloadUrl
-        windowsClientDownloadUrl = $WindowsClientDownloadUrl
-        sha256 = $WinSha256
-        fileSha256 = $WinSha256
-        linuxPublished = $false
-        linuxPublishRequested = [bool]$IncludeLinux
-        ripgrepZipUrl = $RipgrepDownloadUrl
-        ripgrepZipSha256 = $RipgrepZipSha256
-        ripgrepZipFileSize = [int64]$RipgrepZipFileSize
-    }
-    Write-Utf8NoBom `
-        -Path (Join-Path $PackageInternal "node-agent-version.json") `
-        -Content ($PackageVersionInfo | ConvertTo-Json -Depth 4)
-    Compress-ArchiveWithRetry -Path (Join-Path $PackageRoot "*") -DestinationPath $WindowsClientPackage
-} finally {
-    Remove-Item -LiteralPath $PackageRoot -Recurse -Force -ErrorAction SilentlyContinue
-}
-if (-not (Test-Path $WindowsClientPackage)) { throw "Windows 客户端压缩包不存在：$WindowsClientPackage" }
-$WindowsClientSha256 = Get-NodeAgentFileSha256 -Path $WindowsClientPackage
+$packaging = New-NodeAgentWindowsClientPackage -RepoRoot $RepoRoot -TargetDir $TargetDir `
+    -PackageVersion $PackageVersion -GitSha $GitSha -ReleaseChangelog $ReleaseChangelog `
+    -WindowsDownloadUrl $WindowsDownloadUrl -WindowsClientDownloadUrl $WindowsClientDownloadUrl `
+    -RipgrepDownloadUrl $RipgrepDownloadUrl -WinBin $WinBin -WinSha256 $WinSha256 `
+    -DesktopShellBin $DesktopShellBin -BrandIcon $BrandIcon -PcDistDir $PcDistDir `
+    -LauncherDir $LauncherDir -WindowsClientPackageName $WindowsClientPackageName `
+    -RipgrepPackageName $RipgrepPackageName -ClientFileName "一龙开发平台.exe" `
+    -UninstallFileName "卸载一龙开发平台.exe" -IncludeLinux:$IncludeLinux
+$WindowsClientPackage = $packaging.WindowsClientPackage
+$WindowsClientSha256 = $packaging.WindowsClientSha256
+$RipgrepPackage = $packaging.RipgrepPackage
+$RipgrepZipSha256 = $packaging.RipgrepZipSha256
+$RipgrepZipFileSize = [int64]$packaging.RipgrepZipFileSize
 }
 
 if (-not $SynchronousRemote) {

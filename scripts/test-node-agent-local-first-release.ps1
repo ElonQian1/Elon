@@ -40,6 +40,7 @@ foreach ($moduleName in @(
     'node-agent-publish-handshake.ps1',
     'node-agent-release-outbox.ps1',
     'node-agent-release-build-cache.ps1',
+    'node-agent-release-packaging.ps1',
     'node-agent-remote-release-worker.ps1',
     'node-agent-local-activation.ps1',
     'node-agent-local-rollback.ps1',
