@@ -26,10 +26,13 @@ $script:NodeAgentRollbackIgnoredRootItems = @(
     'tools'
 )
 $script:NodeAgentRollbackIgnoredInternalItems = @(
+    'elon-node-agent-windows.zip.new',
     'logs',
+    'node-agent-version.json.new',
     'update-background-state.json',
     'update.apply.lock',
     'update.owner.lock',
+    'update.spawn.lock',
     'watchdog.instance.lock'
 )
 

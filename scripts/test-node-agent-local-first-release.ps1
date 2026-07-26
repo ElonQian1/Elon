@@ -330,9 +330,12 @@ try {
     }
     [System.IO.File]::WriteAllBytes((Join-Path $internalRoot 'watchdog.instance.lock'), [byte[]]@())
     foreach ($runtimeStateName in @(
+        'elon-node-agent-windows.zip.new',
+        'node-agent-version.json.new',
         'update-background-state.json',
         'update.apply.lock',
-        'update.owner.lock'
+        'update.owner.lock',
+        'update.spawn.lock'
     )) {
         [System.IO.File]::WriteAllText(
             (Join-Path $internalRoot $runtimeStateName),
@@ -352,9 +355,12 @@ try {
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $snapshot.ClientRoot '_internal\logs'))) `
         'runtime logs must never enter the rollback client tree'
     foreach ($runtimeStateName in @(
+        'elon-node-agent-windows.zip.new',
+        'node-agent-version.json.new',
         'update-background-state.json',
         'update.apply.lock',
-        'update.owner.lock'
+        'update.owner.lock',
+        'update.spawn.lock'
     )) {
         Assert-True (-not (Test-Path -LiteralPath (
             Join-Path $snapshot.ClientRoot "_internal\$runtimeStateName"
