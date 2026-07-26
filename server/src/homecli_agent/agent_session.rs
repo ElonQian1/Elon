@@ -15,7 +15,11 @@ use uuid::Uuid;
 
 use sha2::Digest as _;
 
-use crate::types::AppState;
+use crate::{
+    realtime_metrics::{self, RealtimeChannel},
+    types::AppState,
+    ws_transport::try_json_text_message,
+};
 
 use super::public_dev_handshake::record_node_public_dev_handshake;
 use super::{
@@ -24,6 +28,44 @@ use super::{
     PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV, PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV,
     TOOL_APPROVAL_ACK_TIMEOUT,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AgentSessionCloseReason {
+    ReaderShutdown,
+    ReaderClosed,
+    ReaderTimeout,
+    ReaderError,
+    WriterClosed,
+}
+
+impl AgentSessionCloseReason {
+    pub(super) fn as_str(self) -> &'static str {
+        match self {
+            Self::ReaderShutdown => "reader_shutdown",
+            Self::ReaderClosed => "reader_closed",
+            Self::ReaderTimeout => "reader_timeout",
+            Self::ReaderError => "reader_error",
+            Self::WriterClosed => "writer_closed",
+        }
+    }
+
+    fn pending_failure_message(self) -> &'static str {
+        match self {
+            Self::ReaderTimeout => {
+                "PC 节点通信临时中断：节点连接读超时，可能是网络中断或节点假在线；系统会等待节点重新连接并尝试恢复。"
+            }
+            Self::WriterClosed => {
+                "PC 节点通信临时中断：服务器向节点发送消息失败，可能是节点已断线或正在重启；系统会等待节点重新连接并尝试恢复。"
+            }
+            Self::ReaderError => {
+                "PC 节点通信临时中断：服务器读取节点连接失败，可能是网络中断或节点正在重启；系统会等待节点重新连接并尝试恢复。"
+            }
+            Self::ReaderShutdown | Self::ReaderClosed => {
+                "PC 节点通信临时中断：服务器正在更新升级或 Win 端正在更新升级/重启时会临时断开；系统会等待节点重新连接并尝试恢复。"
+            }
+        }
+    }
+}
 
 pub(super) async fn run_agent_session(
     socket: WebSocket,
@@ -307,31 +349,44 @@ pub(super) async fn run_agent_session(
 
     // Writer: drain cmd_rx → ws_tx.
     let mut writer_shutdown_rx = session_shutdown_rx.clone();
+    let writer_session_shutdown = session_shutdown.clone();
     let writer = tokio::spawn(async move {
+        let mut close_reason = None;
         loop {
             let outbound = tokio::select! {
                 biased;
                 _ = writer_shutdown_rx.changed() => break,
                 control = control_rx.recv() => match control {
                     Some(msg) => msg,
-                    None => break,
+                    None => {
+                        close_reason = Some(AgentSessionCloseReason::WriterClosed);
+                        let _ = writer_session_shutdown.send(true);
+                        break;
+                    }
                 },
                 msg = cmd_rx.recv() => match msg {
-                    Some(msg) => match serde_json::to_string(&msg) {
-                        Ok(text) => Message::Text(text),
+                    Some(msg) => match try_json_text_message(&msg) {
+                        Ok(frame) => frame,
                         Err(e) => {
                             tracing::error!("serialize ServerToAgent: {e}");
                             continue;
                         }
                     },
-                    None => break,
+                    None => {
+                        close_reason = Some(AgentSessionCloseReason::WriterClosed);
+                        let _ = writer_session_shutdown.send(true);
+                        break;
+                    }
                 },
             };
             if ws_tx.send(outbound).await.is_err() {
+                close_reason = Some(AgentSessionCloseReason::WriterClosed);
+                let _ = writer_session_shutdown.send(true);
                 break;
             }
         }
         let _ = ws_tx.close().await;
+        close_reason
     });
 
     // Reader: route AgentToServer events to the right pending task.
@@ -340,18 +395,29 @@ pub(super) async fn run_agent_session(
     let approval_acks_r = approval_acks.clone();
     let ping_acks_r = ping_acks.clone();
     let mut reader_shutdown_rx = session_shutdown_rx.clone();
-    let read_result: Result<()> = async {
-        loop {
+    let (read_result, mut close_reason): (Result<()>, AgentSessionCloseReason) = async {
+        let close_reason = loop {
             let frame = tokio::select! {
-                _ = reader_shutdown_rx.changed() => break,
+                _ = reader_shutdown_rx.changed() => {
+                    break AgentSessionCloseReason::ReaderShutdown;
+                }
                 maybe_frame = tokio::time::timeout(AGENT_WS_READ_TIMEOUT, ws_rx.next()) => {
                     match maybe_frame {
-                        Ok(Some(frame)) => frame.map_err(|e| anyhow!("ws read: {e}"))?,
-                        Ok(None) => break,
-                        Err(_) => return Err(anyhow!(
-                            "agent ws read timeout ({}s)",
-                            AGENT_WS_READ_TIMEOUT.as_secs()
-                        )),
+                        Ok(Some(frame)) => match frame {
+                            Ok(frame) => frame,
+                            Err(error) => return (
+                                Err(anyhow!("ws read: {error}")),
+                                AgentSessionCloseReason::ReaderError,
+                            ),
+                        },
+                        Ok(None) => break AgentSessionCloseReason::ReaderClosed,
+                        Err(_) => return (
+                            Err(anyhow!(
+                                "agent ws read timeout ({}s)",
+                                AGENT_WS_READ_TIMEOUT.as_secs()
+                            )),
+                            AgentSessionCloseReason::ReaderTimeout,
+                        ),
                     }
                 }
             };
@@ -383,7 +449,10 @@ pub(super) async fn run_agent_session(
                                 );
                             }
                             if cmd_tx.send(ack).is_err() {
-                                return Err(anyhow!("agent writer closed before completion ACK"));
+                                return (
+                                    Err(anyhow!("agent writer closed before completion ACK")),
+                                    AgentSessionCloseReason::WriterClosed,
+                                );
                             }
                             continue;
                         }
@@ -519,17 +588,17 @@ pub(super) async fn run_agent_session(
                 Message::Ping(payload) => {
                     state.node_registry.touch(&agent_id).await;
                     if control_tx.send(Message::Pong(payload)).is_err() {
-                        break;
+                        break AgentSessionCloseReason::WriterClosed;
                     }
                 }
                 Message::Pong(_) => {
                     state.node_registry.touch(&agent_id).await;
                 }
-                Message::Close(_) => break,
+                Message::Close(_) => break AgentSessionCloseReason::ReaderClosed,
                 Message::Binary(_) => {}
             }
-        }
-        Ok(())
+        };
+        (Ok(()), close_reason)
     }
     .await;
 
@@ -559,11 +628,20 @@ pub(super) async fn run_agent_session(
 
     // CLI receiver stays alive through a bounded reconnect window; all other
     // request types retain the historical fail-fast behavior.
+    let _ = session_shutdown.send(true);
+    drop(cmd_tx);
+    let writer_close_reason = writer.await.ok().flatten();
+    if matches!(close_reason, AgentSessionCloseReason::ReaderShutdown) {
+        if let Some(reason) = writer_close_reason {
+            close_reason = reason;
+        }
+    }
+
     state.agent_manager.recover_session_pending(
         &agent_id,
         &pending,
         &cli_pending_ids,
-        "PC 节点通信临时中断：服务器正在更新升级或 Win 端正在更新升级/重启时会临时断开；系统会等待节点重新连接并尝试恢复。",
+        close_reason.pending_failure_message(),
     ).await;
     {
         fail_pending_approvals(&approval_acks).await;
@@ -572,9 +650,13 @@ pub(super) async fn run_agent_session(
         fail_pending_pings(&ping_acks).await;
     }
 
-    drop(cmd_tx);
-    let _ = writer.await;
-    tracing::info!(%agent_id, "agent disconnected");
+    let close_reason_name = close_reason.as_str();
+    realtime_metrics::record_close_with_store(
+        &state.store,
+        RealtimeChannel::HomecliAgent,
+        close_reason_name,
+    );
+    tracing::info!(%agent_id, close_reason = close_reason_name, "agent disconnected");
     read_result
 }
 
