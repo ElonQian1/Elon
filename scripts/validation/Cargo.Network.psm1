@@ -80,6 +80,39 @@ function New-CargoAttemptRecord {
     [pscustomobject]@{source_id=$SourceId;stage=$Stage;code=[string]$Diagnostic.code;retryable=[bool]$Diagnostic.retryable;exit_code=$ExitCode;duration_ms=$DurationMs;evidence_path=$EvidencePath;health_cached=$Cached}
 }
 
+function Write-CargoAttemptTestFailureContext {
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Lines,
+        [Parameter(Mandatory)][string]$Stage,
+        [Parameter(Mandatory)][string]$Stream,
+        [int]$MaximumLines = 100
+    )
+    $testFailureIndex = -1
+    $fallbackIndex = -1
+    for ($index = 0; $index -lt $Lines.Count; $index++) {
+        $plain = ([string]$Lines[$index]) -replace "`e\[[0-9;?]*[ -/]*[@-~]", ''
+        if ($plain -match '^\s*test\s+.+?\s+\.\.\.\s+FAILED\b') {
+            $testFailureIndex = $index
+        } elseif ($plain -match '^\s*failures:\s*$|panicked at|assertion .* failed') {
+            $fallbackIndex = $index
+        }
+    }
+    $matchIndex = if ($testFailureIndex -ge 0) { $testFailureIndex } else { $fallbackIndex }
+    if ($matchIndex -lt 0) { return }
+
+    $start = [Math]::Max(0, $matchIndex - 12)
+    $end = [Math]::Min($Lines.Count - 1, $start + $MaximumLines - 1)
+    $context = @($Lines[$start..$end] | Where-Object { $_ -and $_.Trim() })
+    if ($context.Count -eq 0) { return }
+
+    Write-Host "CARGO_ATTEMPT_TEST_FAILURE_CONTEXT_BEGIN stage=$Stage stream=$Stream lines=$($context.Count)"
+    foreach ($line in $context) {
+        $safeLine = ([string]$line).Replace("`0", '').Replace("`r", '').Replace("`n", ' ')
+        Write-Host "CARGO_ATTEMPT_TEST_FAILURE_CONTEXT $safeLine"
+    }
+    Write-Host "CARGO_ATTEMPT_TEST_FAILURE_CONTEXT_END stage=$Stage stream=$Stream lines=$($context.Count)"
+}
+
 function Write-CargoAttemptFailureEvidence {
     param(
         [Parameter(Mandatory)]$Result,
@@ -94,7 +127,9 @@ function Write-CargoAttemptFailureEvidence {
     )
     foreach ($stream in $streams) {
         if (-not $stream.path -or -not (Test-Path -LiteralPath $stream.path)) { continue }
-        $tail = @(Get-Content -LiteralPath $stream.path -ErrorAction SilentlyContinue |
+        $lines = @(Get-Content -LiteralPath $stream.path -ErrorAction SilentlyContinue)
+        Write-CargoAttemptTestFailureContext $lines $Stage $stream.name
+        $tail = @($lines |
             Where-Object { $_ -and $_.Trim() } |
             Select-Object -Last $MaximumLines)
         if ($tail.Count -eq 0) { continue }
