@@ -10,17 +10,37 @@ function Invoke-ElonPublishCurl {
     param([Parameter(Mandatory = $true)][string[]]$Arguments)
 
     $curl = Resolve-ElonPublishCurl
+    $outputPath = [System.IO.Path]::GetTempFileName()
+    $errorPath = [System.IO.Path]::GetTempFileName()
+    $exitCode = -1
+    $text = ""
+    $errorText = ""
     $oldPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        $output = & $curl @Arguments 2>&1
+        # Windows PowerShell 5.1 decodes native stdout with the active OEM
+        # code page. A UTF-8 JSON response containing Chinese can therefore
+        # become malformed before ConvertFrom-Json sees it. Let curl persist
+        # the response bytes, then decode them explicitly as UTF-8.
+        $curlArguments = @($Arguments) + @("--output", $outputPath)
+        & $curl @curlArguments 2> $errorPath
         $exitCode = $LASTEXITCODE
+        $text = [System.IO.File]::ReadAllText(
+            $outputPath,
+            (New-Object System.Text.UTF8Encoding($false, $true))
+        ).Trim()
+        $errorText = if ((Get-Item -LiteralPath $errorPath).Length -gt 0) {
+            (Get-Content -Raw -LiteralPath $errorPath).Trim()
+        } else {
+            ""
+        }
     } finally {
         $ErrorActionPreference = $oldPreference
+        Remove-Item -LiteralPath $outputPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $errorPath -Force -ErrorAction SilentlyContinue
     }
-    $text = ($output -join "`n").Trim()
     if ($exitCode -ne 0) {
-        throw "curl failed, exit=$exitCode, output=$text"
+        throw "curl failed, exit=$exitCode, output=$errorText"
     }
     return $text
 }

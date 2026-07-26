@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot "node-agent-release-contract.ps1")
 . (Join-Path $PSScriptRoot "release-publish-lease.ps1")
 . (Join-Path $PSScriptRoot "node-agent-publish-replay.ps1")
+. (Join-Path $PSScriptRoot "publish-health-checks.ps1")
 
 function Assert-True {
     param([bool]$Condition, [string]$Message)
@@ -53,6 +54,23 @@ try {
 }
 Assert-True $invalidRemoteJsonRejected `
     "Invalid remote Base64 JSON must fail closed"
+
+$publishJsonFixture = Join-Path (
+    [System.IO.Path]::GetTempPath()
+) ("elon-publish-utf8-" + [Guid]::NewGuid().ToString("N") + ".json")
+try {
+    [System.IO.File]::WriteAllText(
+        $publishJsonFixture,
+        ('{"changelog":"' + $unicodeOwner + '修复中文发布验证"}'),
+        (New-Object System.Text.UTF8Encoding($false))
+    )
+    $fixtureUri = "file:///" + $publishJsonFixture.Replace('\', '/')
+    $publishJson = Invoke-ElonPublishJsonGet -Uri $fixtureUri
+    Assert-True ($publishJson.changelog -eq ($unicodeOwner + '修复中文发布验证')) `
+        "PowerShell 5.1 publish smoke must decode curl response bytes as UTF-8"
+} finally {
+    Remove-Item -LiteralPath $publishJsonFixture -Force -ErrorAction SilentlyContinue
+}
 
 $oldReadyNode = [pscustomobject]@{
     public_dev_handshake_ready = $true
