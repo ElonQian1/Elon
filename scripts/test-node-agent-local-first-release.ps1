@@ -268,6 +268,16 @@ try {
         'http://127.0.0.1:7800',
         [System.Text.Encoding]::UTF8
     )
+    foreach ($backupName in @(
+        'supervisor-node-url.bootstrap-backup',
+        'supervisor-node-url.cold-probe-backup'
+    )) {
+        [System.IO.File]::WriteAllText(
+            (Join-Path $installRoot $backupName),
+            'http://127.0.0.1:7807',
+            [System.Text.Encoding]::UTF8
+        )
+    }
     [System.IO.File]::WriteAllBytes((Join-Path $internalRoot 'watchdog.instance.lock'), [byte[]]@())
 
     $snapshotRoot = Join-Path $activationRoot 'rollback\fixture-valid'
@@ -280,6 +290,12 @@ try {
         'finish contracts must never enter the rollback client tree'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $snapshot.ClientRoot '_internal\logs'))) `
         'runtime logs must never enter the rollback client tree'
+    Assert-True (-not (Test-Path -LiteralPath (
+        Join-Path $snapshot.ClientRoot 'supervisor-node-url.bootstrap-backup'
+    ))) 'supervisor bootstrap backup must be preserved in place, not copied into rollback'
+    Assert-True (-not (Test-Path -LiteralPath (
+        Join-Path $snapshot.ClientRoot 'supervisor-node-url.cold-probe-backup'
+    ))) 'supervisor cold-probe backup must be preserved in place, not copied into rollback'
     $verifiedSnapshot = Test-NodeAgentRollbackSnapshot -SnapshotRoot $snapshotRoot `
         -ExpectedPriorReleaseIdentity ("0.3.69+" + ('b' * 40))
     Assert-Equal $verifiedSnapshot.ManifestSha256 $snapshot.ManifestSha256 `

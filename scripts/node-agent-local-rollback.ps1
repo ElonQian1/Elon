@@ -19,6 +19,8 @@ $script:NodeAgentRollbackInternalFiles = @(
 )
 $script:NodeAgentRollbackIgnoredRootItems = @(
     'ai-finish-contracts-v1',
+    'supervisor-node-url.bootstrap-backup',
+    'supervisor-node-url.cold-probe-backup',
     'supervisor-node-url.txt',
     'terminal-finalization-receipts-v1',
     'tools'
