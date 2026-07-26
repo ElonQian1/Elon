@@ -9,7 +9,6 @@ use std::{
     collections::{HashMap, HashSet},
     fs,
     path::{Component, Path, PathBuf},
-    process::Command,
 };
 
 use crate::{
@@ -361,7 +360,7 @@ fn search_source_paths(workspace: &Path, needle: &str) -> Vec<PathBuf> {
 }
 
 fn git_dirty_paths(workspace: &Path) -> HashSet<String> {
-    let Ok(output) = Command::new("git")
+    let Ok(output) = crate::git_command_error::git_command()
         .arg("-C")
         .arg(workspace)
         .args(["status", "--porcelain=v1", "--untracked-files=all"])
@@ -386,7 +385,7 @@ fn git_dirty_paths(workspace: &Path) -> HashSet<String> {
 }
 
 fn git_last_modified_millis(workspace: &Path, path: &str) -> Option<u64> {
-    let output = Command::new("git")
+    let output = crate::git_command_error::git_command()
         .arg("-C")
         .arg(workspace)
         .args(["log", "-1", "--format=%ct", "--"])

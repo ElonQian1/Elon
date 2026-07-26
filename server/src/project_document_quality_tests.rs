@@ -1,6 +1,6 @@
 use super::*;
 use homecli_proto::{ProjectDocumentEntry, ProjectDocumentMetadata};
-use std::{fs, process::Command};
+use std::fs;
 
 use crate::{
     project_document_governance::{DocumentKnowledgeHome, DocumentKnowledgeMetadata},
@@ -121,7 +121,7 @@ fn implementation_drift_uses_git_history_and_groups_dirty_evidence_per_document(
     git(&root, &["config", "user.email", "tests@example.com"]);
     git(&root, &["config", "user.name", "Tests"]);
     git(&root, &["add", "."]);
-    let status = Command::new("git")
+    let status = crate::git_command_error::git_command()
         .arg("-C")
         .arg(&root)
         .args(["commit", "-m", "old baseline"])
@@ -217,7 +217,7 @@ fn workspace(label: &str) -> std::path::PathBuf {
 }
 
 fn git(root: &std::path::Path, arguments: &[&str]) {
-    let status = Command::new("git")
+    let status = crate::git_command_error::git_command()
         .arg("-C")
         .arg(root)
         .args(arguments)
