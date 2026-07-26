@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use quick_xml::{events::Event, Reader};
+use quick_xml::{events::Event, Reader, XmlVersion};
 
 use super::visual_diff::PixelRect;
 
@@ -42,7 +42,9 @@ pub(super) fn parse_nodes(xml: &str) -> Result<Vec<LauncherNode>> {
                 };
                 let mut bounds = String::new();
                 for attribute in event.attributes().flatten() {
-                    let value = attribute.unescape_value()?.into_owned();
+                    let value = attribute
+                        .normalized_value(XmlVersion::Implicit1_0)?
+                        .into_owned();
                     match attribute.key.as_ref() {
                         b"text" => node.text = value,
                         b"content-desc" => node.content_desc = value,

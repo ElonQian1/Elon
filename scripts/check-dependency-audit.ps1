@@ -3,6 +3,8 @@ param(
     [string]$Mode = "Report",
     [string]$NpmProjectDir = "pc-frontend",
     [string]$RustManifestPath = "server\Cargo.toml",
+    [string]$NpmExceptionsPath = ".github\dependency-audit-exceptions.json",
+    [string]$RustExceptionsPath = ".github\dependency-audit-exceptions.json",
     [switch]$SkipNpm,
     [switch]$SkipRust,
     [switch]$RequireRustAudit,
@@ -93,8 +95,206 @@ function Get-PropertyText {
     return [string]$property.Value
 }
 
-function Invoke-NpmDependencyAudit {
+function Get-NpmAuditExceptions {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return @()
+    }
+
+    $config = ConvertFrom-JsonText -Text (Get-Content -LiteralPath $Path -Raw) -Label "npm audit exceptions"
+    if ((Get-PropertyText $config "version") -ne "1") {
+        Stop-DependencyAudit "npm audit exceptions must declare version=1: $Path"
+    }
+    if ($null -eq $config.npm) {
+        return @()
+    }
+
+    $today = (Get-Date).Date
+    foreach ($entry in @($config.npm)) {
+        $name = Get-PropertyText $entry "name"
+        $packageVersion = Get-PropertyText $entry "packageVersion"
+        $source = Get-PropertyText $entry "source"
+        $expiresOn = Get-PropertyText $entry "expiresOn"
+        $reason = Get-PropertyText $entry "reason"
+        if ([string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($packageVersion) -or $source -notmatch '^\d+$' -or [string]::IsNullOrWhiteSpace($expiresOn) -or [string]::IsNullOrWhiteSpace($reason)) {
+            Stop-DependencyAudit "npm audit exception is missing name, packageVersion, numeric source, expiresOn, or reason: $Path"
+        }
+        try {
+            $expiresAt = [datetime]::ParseExact($expiresOn, "yyyy-MM-dd", [Globalization.CultureInfo]::InvariantCulture)
+        } catch {
+            Stop-DependencyAudit "npm audit exception has invalid expiresOn '$expiresOn' (expected yyyy-MM-dd): $Path"
+        }
+        if ($expiresAt.Date -lt $today) {
+            Stop-DependencyAudit "npm audit exception expired on $expiresOn for $name@$packageVersion source=${source}: $Path"
+        }
+    }
+    return @($config.npm)
+}
+
+function Get-RustAuditExceptions {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return @()
+    }
+
+    $config = ConvertFrom-JsonText -Text (Get-Content -LiteralPath $Path -Raw) -Label "RustSec audit exceptions"
+    if ((Get-PropertyText $config "version") -ne "1") {
+        Stop-DependencyAudit "RustSec audit exceptions must declare version=1: $Path"
+    }
+    if ($null -eq $config.rust) {
+        return @()
+    }
+
+    $today = (Get-Date).Date
+    $keys = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($entry in @($config.rust)) {
+        $id = Get-PropertyText $entry "id"
+        $name = Get-PropertyText $entry "name"
+        $packageVersion = Get-PropertyText $entry "packageVersion"
+        $expiresOn = Get-PropertyText $entry "expiresOn"
+        $reason = Get-PropertyText $entry "reason"
+        if ($id -notmatch '^RUSTSEC-\d{4}-\d{4}$' -or [string]::IsNullOrWhiteSpace($name) -or [string]::IsNullOrWhiteSpace($packageVersion) -or [string]::IsNullOrWhiteSpace($expiresOn) -or [string]::IsNullOrWhiteSpace($reason)) {
+            Stop-DependencyAudit "RustSec audit exception is missing a valid id, name, packageVersion, expiresOn, or reason: $Path"
+        }
+        try {
+            $expiresAt = [datetime]::ParseExact($expiresOn, "yyyy-MM-dd", [Globalization.CultureInfo]::InvariantCulture)
+        } catch {
+            Stop-DependencyAudit "RustSec audit exception has invalid expiresOn '$expiresOn' (expected yyyy-MM-dd): $Path"
+        }
+        if ($expiresAt.Date -lt $today) {
+            Stop-DependencyAudit "RustSec audit exception expired on $expiresOn for $id ${name}@${packageVersion}: $Path"
+        }
+        $key = "$id|$name|$packageVersion"
+        if (-not $keys.Add($key)) {
+            Stop-DependencyAudit "RustSec audit exception is duplicated for $id ${name}@${packageVersion}: $Path"
+        }
+    }
+    return @($config.rust)
+}
+
+function Get-NpmPackageLockVersions {
     param([string]$ProjectDir)
+
+    $packageLock = Join-Path $ProjectDir "package-lock.json"
+    $node = Resolve-ApplicationPath "node"
+    if ([string]::IsNullOrWhiteSpace($node)) {
+        Stop-DependencyAudit "node is required to parse package-lock.json for npm audit exceptions."
+    }
+    # npm lockfiles can contain an empty dependency key, which Windows
+    # PowerShell 5.1's JSON object conversion cannot represent. Node parses
+    # npm's own JSON faithfully and returns the small version map we need.
+    $nodeScript = @'
+const fs = require('fs');
+const lock = JSON.parse(fs.readFileSync(process.argv[1], 'utf8'));
+const versions = {};
+for (const [path, entry] of Object.entries(lock.packages || {})) {
+  if (path.startsWith('node_modules/') && typeof entry.version === 'string') {
+    versions[path.slice('node_modules/'.length)] = entry.version;
+  }
+}
+process.stdout.write(JSON.stringify(versions));
+'@
+    $result = Invoke-ExternalCapture -FilePath $node -Arguments @("-e", $nodeScript, $packageLock)
+    if ($result.ExitCode -ne 0) {
+        Stop-DependencyAudit "package-lock version extraction failed: $($result.Error)"
+    }
+    $lockVersions = ConvertFrom-JsonText -Text $result.Output -Label "package-lock version map"
+    $versions = @{}
+    foreach ($property in @($lockVersions.PSObject.Properties)) {
+        $version = [string]$property.Value
+        if ([string]::IsNullOrWhiteSpace($version)) { continue }
+        $versions[$property.Name] = $version
+    }
+    return $versions
+}
+
+function Get-NpmAuditSourceIds {
+    param([object]$Vulnerability)
+
+    $sources = New-Object System.Collections.Generic.List[string]
+    foreach ($via in @($Vulnerability.via)) {
+        if ($via -is [string]) { continue }
+        $source = Get-PropertyText $via "source"
+        if ($source -match '^\d+$' -and -not $sources.Contains($source)) {
+            $sources.Add($source)
+        }
+    }
+    return $sources.ToArray()
+}
+
+function Get-NpmAuditViaPackages {
+    param([object]$Vulnerability)
+
+    $packages = New-Object System.Collections.Generic.List[string]
+    foreach ($via in @($Vulnerability.via)) {
+        if ($via -is [string] -and -not [string]::IsNullOrWhiteSpace($via) -and -not $packages.Contains($via)) {
+            $packages.Add($via)
+        }
+    }
+    return $packages.ToArray()
+}
+
+function Test-NpmAuditException {
+    param(
+        [object]$Vulnerability,
+        [hashtable]$VulnerabilitiesByName,
+        [hashtable]$PackageVersions,
+        [object[]]$Exceptions,
+        [string[]]$Visited = @()
+    )
+
+    $name = Get-PropertyText $Vulnerability "name"
+    if ([string]::IsNullOrWhiteSpace($name) -or $Visited -contains $name) {
+        return [pscustomobject]@{ Excepted = $false; Entries = @() }
+    }
+    $version = if ($PackageVersions.ContainsKey($name)) { [string]$PackageVersions[$name] } else { "" }
+    $nextVisited = @($Visited + $name)
+    $sources = @(Get-NpmAuditSourceIds -Vulnerability $Vulnerability)
+
+    if ($sources.Count -gt 0) {
+        $matchedEntries = New-Object System.Collections.Generic.List[object]
+        foreach ($source in $sources) {
+            $match = @($Exceptions | Where-Object {
+                (Get-PropertyText $_ "name") -eq $name -and
+                (Get-PropertyText $_ "packageVersion") -eq $version -and
+                (Get-PropertyText $_ "source") -eq $source
+            })
+            if ($match.Count -ne 1) {
+                return [pscustomobject]@{ Excepted = $false; Entries = @() }
+            }
+            $matchedEntries.Add($match[0])
+        }
+        return [pscustomobject]@{ Excepted = $true; Entries = $matchedEntries.ToArray() }
+    }
+
+    $viaPackages = @(Get-NpmAuditViaPackages -Vulnerability $Vulnerability)
+    if ($viaPackages.Count -eq 0) {
+        return [pscustomobject]@{ Excepted = $false; Entries = @() }
+    }
+
+    $inheritedEntries = New-Object System.Collections.Generic.List[object]
+    foreach ($viaPackage in $viaPackages) {
+        if (-not $VulnerabilitiesByName.ContainsKey($viaPackage)) {
+            return [pscustomobject]@{ Excepted = $false; Entries = @() }
+        }
+        $parent = Test-NpmAuditException -Vulnerability $VulnerabilitiesByName[$viaPackage] -VulnerabilitiesByName $VulnerabilitiesByName -PackageVersions $PackageVersions -Exceptions $Exceptions -Visited $nextVisited
+        if (-not $parent.Excepted) {
+            return [pscustomobject]@{ Excepted = $false; Entries = @() }
+        }
+        foreach ($entry in @($parent.Entries)) {
+            $inheritedEntries.Add($entry)
+        }
+    }
+    return [pscustomobject]@{ Excepted = $true; Entries = $inheritedEntries.ToArray() }
+}
+
+function Invoke-NpmDependencyAudit {
+    param(
+        [string]$ProjectDir,
+        [string]$ExceptionsPath
+    )
 
     $npm = Resolve-ApplicationPath "npm"
     if ([string]::IsNullOrWhiteSpace($npm)) {
@@ -118,14 +318,43 @@ function Invoke-NpmDependencyAudit {
     $low = [int](Get-PropertyText $counts "low" "0")
     $info = [int](Get-PropertyText $counts "info" "0")
 
-    Write-Host "DEPENDENCY_AUDIT_NPM=reported project=$ProjectDir total=$total critical=$critical high=$high moderate=$moderate low=$low info=$info audit_exit=$($result.ExitCode)"
-
     $vulnerabilities = @()
     if ($null -ne $json.vulnerabilities) {
         $vulnerabilities = @($json.vulnerabilities.PSObject.Properties | ForEach-Object { $_.Value })
     }
+    $exceptions = @(Get-NpmAuditExceptions -Path $ExceptionsPath)
+    $packageVersions = Get-NpmPackageLockVersions -ProjectDir $ProjectDir
+    $vulnerabilitiesByName = @{}
+    foreach ($vulnerability in $vulnerabilities) {
+        $vulnerabilitiesByName[(Get-PropertyText $vulnerability "name")] = $vulnerability
+    }
+
+    $blocking = New-Object System.Collections.Generic.List[object]
+    $exceptionLabels = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($vulnerability in $vulnerabilities) {
+        $exception = Test-NpmAuditException -Vulnerability $vulnerability -VulnerabilitiesByName $vulnerabilitiesByName -PackageVersions $packageVersions -Exceptions $exceptions
+        if (-not $exception.Excepted) {
+            $blocking.Add($vulnerability)
+            continue
+        }
+        foreach ($entry in @($exception.Entries)) {
+            $label = "$(Get-PropertyText $entry 'name')@$(Get-PropertyText $entry 'packageVersion') source=$(Get-PropertyText $entry 'source') expires=$(Get-PropertyText $entry 'expiresOn')"
+            if ($exceptionLabels.Add($label)) {
+                Write-Host "DEPENDENCY_AUDIT_NPM_EXCEPTION=$label"
+            }
+        }
+    }
+
+    foreach ($entry in $exceptions) {
+        $label = "$(Get-PropertyText $entry 'name')@$(Get-PropertyText $entry 'packageVersion') source=$(Get-PropertyText $entry 'source') expires=$(Get-PropertyText $entry 'expiresOn')"
+        if (-not $exceptionLabels.Contains($label)) {
+            Stop-DependencyAudit "npm audit exception is not matched by the current report and must be removed or corrected: $label"
+        }
+    }
+
+    Write-Host "DEPENDENCY_AUDIT_NPM=reported project=$ProjectDir total=$total critical=$critical high=$high moderate=$moderate low=$low info=$info blocking=$($blocking.Count) exceptions=$($exceptionLabels.Count) audit_exit=$($result.ExitCode)"
     $rank = @{ critical = 4; high = 3; moderate = 2; low = 1; info = 0 }
-    foreach ($vulnerability in ($vulnerabilities | Sort-Object -Property @{ Expression = { -1 * [int]$rank[[string]$_.severity] } }, name | Select-Object -First 10)) {
+    foreach ($vulnerability in ($blocking | Sort-Object -Property @{ Expression = { -1 * [int]$rank[[string]$_.severity] } }, name | Select-Object -First 10)) {
         $fix = Get-PropertyText $vulnerability "fixAvailable" ""
         if ($vulnerability.fixAvailable -is [bool]) {
             $fix = [string]$vulnerability.fixAvailable
@@ -137,7 +366,7 @@ function Invoke-NpmDependencyAudit {
         }
         Write-Host "DEPENDENCY_AUDIT_NPM_FINDING name=$($vulnerability.name) severity=$($vulnerability.severity) direct=$($vulnerability.isDirect) fix=$fix"
     }
-    return $total
+    return $blocking.Count
 }
 
 function Test-CargoAuditAvailable {
@@ -187,6 +416,31 @@ function Get-CargoAuditWarningCount {
     return $total
 }
 
+function Get-RustAuditExceptionKey {
+    param([object]$Entry)
+    return "$(Get-PropertyText $Entry 'id')|$(Get-PropertyText $Entry 'name')|$(Get-PropertyText $Entry 'packageVersion')"
+}
+
+function Test-RustAuditException {
+    param(
+        [object]$Vulnerability,
+        [object[]]$Exceptions
+    )
+
+    $id = Get-PropertyText $Vulnerability.advisory "id"
+    $name = Get-PropertyText $Vulnerability.package "name"
+    $packageVersion = Get-PropertyText $Vulnerability.package "version"
+    $matches = @($Exceptions | Where-Object {
+        (Get-PropertyText $_ "id") -eq $id -and
+        (Get-PropertyText $_ "name") -eq $name -and
+        (Get-PropertyText $_ "packageVersion") -eq $packageVersion
+    })
+    if ($matches.Count -ne 1) {
+        return $null
+    }
+    return $matches[0]
+}
+
 function Invoke-CargoAuditJson {
     param(
         [string]$CargoPath,
@@ -206,6 +460,7 @@ function Invoke-CargoAuditJson {
 function Invoke-RustDependencyAudit {
     param(
         [string]$ManifestPath,
+        [string]$ExceptionsPath,
         [switch]$RequireAuditTool,
         [switch]$AllowStaleAdvisoryDb
     )
@@ -240,15 +495,40 @@ function Invoke-RustDependencyAudit {
     $json = ConvertFrom-JsonText -Text $result.Output -Label "cargo audit"
     $count = Get-CargoAuditVulnerabilityCount -AuditJson $json
     $warningCount = Get-CargoAuditWarningCount -AuditJson $json
-    Write-Host "DEPENDENCY_AUDIT_RUST=reported manifest=$ManifestPath vulnerabilities=$count warnings=$warningCount packages=$packageCount audit_exit=$($result.ExitCode)"
-
+    $vulnerabilities = @()
     if ($null -ne $json.vulnerabilities.list) {
-        foreach ($item in @($json.vulnerabilities.list | Select-Object -First 10)) {
+        $vulnerabilities = @($json.vulnerabilities.list)
+    }
+    if ($count -ne $vulnerabilities.Count) {
+        Stop-DependencyAudit "cargo audit reported vulnerabilities=$count but did not provide a matching vulnerability list for exception evaluation."
+    }
+    $exceptions = @(Get-RustAuditExceptions -Path $ExceptionsPath)
+    $blocking = New-Object System.Collections.Generic.List[object]
+    $matchedExceptionKeys = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($item in $vulnerabilities) {
+        $exception = Test-RustAuditException -Vulnerability $item -Exceptions $exceptions
+        if ($null -eq $exception) {
+            $blocking.Add($item)
+            continue
+        }
+        $key = Get-RustAuditExceptionKey -Entry $exception
+        if ($matchedExceptionKeys.Add($key)) {
+            Write-Host "DEPENDENCY_AUDIT_RUST_EXCEPTION=id=$(Get-PropertyText $exception 'id') package=$(Get-PropertyText $exception 'name')@$(Get-PropertyText $exception 'packageVersion') expires=$(Get-PropertyText $exception 'expiresOn')"
+        }
+    }
+    foreach ($exception in $exceptions) {
+        $key = Get-RustAuditExceptionKey -Entry $exception
+        if (-not $matchedExceptionKeys.Contains($key)) {
+            Stop-DependencyAudit "RustSec audit exception is not matched by the current report and must be removed or corrected: $key"
+        }
+    }
+    Write-Host "DEPENDENCY_AUDIT_RUST=reported manifest=$ManifestPath vulnerabilities=$count blocking=$($blocking.Count) exceptions=$($matchedExceptionKeys.Count) warnings=$warningCount packages=$packageCount audit_exit=$($result.ExitCode)"
+
+    foreach ($item in @($blocking | Select-Object -First 10)) {
             $advisoryId = Get-PropertyText $item.advisory "id" ""
             $packageName = Get-PropertyText $item.package "name" ""
             $title = Get-PropertyText $item.advisory "title" ""
             Write-Host "DEPENDENCY_AUDIT_RUST_FINDING id=$advisoryId package=$packageName title=$title"
-        }
     }
     if ($null -ne $json.warnings) {
         foreach ($warningGroup in @($json.warnings.PSObject.Properties | Select-Object -First 10)) {
@@ -266,7 +546,7 @@ function Invoke-RustDependencyAudit {
             }
         }
     }
-    return $count
+    return $blocking.Count
 }
 
 $repoRoot = Get-RepoRoot
@@ -274,16 +554,18 @@ Set-Location $repoRoot
 
 $npmProjectFullPath = Join-Path $repoRoot $NpmProjectDir
 $rustManifestFullPath = Join-Path $repoRoot $RustManifestPath
+$npmExceptionsFullPath = Join-Path $repoRoot $NpmExceptionsPath
+$rustExceptionsFullPath = Join-Path $repoRoot $RustExceptionsPath
 
 Write-Host "DEPENDENCY_AUDIT_MODE=$Mode"
 $npmIssues = 0
 $rustIssues = 0
 
 if (-not $SkipNpm) {
-    $npmIssues = Invoke-NpmDependencyAudit -ProjectDir $npmProjectFullPath
+    $npmIssues = Invoke-NpmDependencyAudit -ProjectDir $npmProjectFullPath -ExceptionsPath $npmExceptionsFullPath
 }
 if (-not $SkipRust) {
-    $rustIssues = Invoke-RustDependencyAudit -ManifestPath $rustManifestFullPath -RequireAuditTool:$RequireRustAudit -AllowStaleAdvisoryDb:$AllowStaleRustAdvisoryDb
+    $rustIssues = Invoke-RustDependencyAudit -ManifestPath $rustManifestFullPath -ExceptionsPath $rustExceptionsFullPath -RequireAuditTool:$RequireRustAudit -AllowStaleAdvisoryDb:$AllowStaleRustAdvisoryDb
 }
 
 if ($Mode -eq "Strict" -and (($npmIssues + $rustIssues) -gt 0)) {
@@ -291,3 +573,4 @@ if ($Mode -eq "Strict" -and (($npmIssues + $rustIssues) -gt 0)) {
 }
 
 Write-Host "DEPENDENCY_AUDIT=passed mode=$Mode npm=$npmIssues rust=$rustIssues"
+exit 0

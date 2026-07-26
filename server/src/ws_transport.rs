@@ -214,8 +214,7 @@ mod tests {
     async fn receive_data_or_control_replies_to_ping() {
         let (mut tx, mut rx) = mpsc::unbounded();
 
-        let result =
-            receive_data_or_control(Some(Ok(Message::Ping(vec![9, 8]))), &mut tx).await;
+        let result = receive_data_or_control(Some(Ok(Message::Ping(vec![9, 8]))), &mut tx).await;
 
         assert_eq!(result, WsIncoming::Continue);
         let Some(Message::Pong(payload)) = rx.next().await else {

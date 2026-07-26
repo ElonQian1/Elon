@@ -637,12 +637,15 @@ pub(super) async fn run_agent_session(
         }
     }
 
-    state.agent_manager.recover_session_pending(
-        &agent_id,
-        &pending,
-        &cli_pending_ids,
-        close_reason.pending_failure_message(),
-    ).await;
+    state
+        .agent_manager
+        .recover_session_pending(
+            &agent_id,
+            &pending,
+            &cli_pending_ids,
+            close_reason.pending_failure_message(),
+        )
+        .await;
     {
         fail_pending_approvals(&approval_acks).await;
     }

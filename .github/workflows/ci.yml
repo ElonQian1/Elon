@@ -1,0 +1,122 @@
+name: Quality Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-gates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-server:
+    name: Rust Server
+    runs-on: windows-latest
+    env:
+      RUST_TEST_THREADS: 1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.0
+          components: rustfmt
+
+      - name: Source Size Guard
+        shell: pwsh
+        run: scripts\check-source-size.ps1
+
+      - name: Release Runbook Guard
+        shell: pwsh
+        run: scripts\check-release-runbook.ps1
+
+      - name: CI Quality Gates Guard
+        shell: pwsh
+        run: scripts\check-ci-quality-gates.ps1
+
+      - name: Realtime Runbook Guard
+        shell: pwsh
+        run: scripts\check-realtime-runbook.ps1
+
+      - name: Realtime Ownership Guard
+        shell: pwsh
+        run: scripts\check-realtime-ownership.ps1
+
+      - name: Realtime Diagnostics Snapshot Guard
+        shell: pwsh
+        run: scripts\check-realtime-diagnostics-snapshot.ps1
+
+      - name: Cache Cargo Audit
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.cargo\bin\cargo-audit.exe
+            ~\.cargo\advisory-db
+          key: cargo-audit-windows-0.22.2-${{ runner.arch }}
+
+      - name: Install Cargo Audit
+        shell: pwsh
+        run: scripts\install-cargo-audit.ps1 -Version 0.22.2
+
+      - name: Dependency Audit Report
+        shell: pwsh
+        run: scripts\check-dependency-audit.ps1 -Mode Strict -SkipNpm -RequireRustAudit -AllowStaleRustAdvisoryDb
+
+      - name: Rust Warning Budget
+        shell: pwsh
+        run: scripts\check-rust-warning-budget.ps1 -MaxWarnings 0
+
+      - name: Cargo Test
+        shell: pwsh
+        run: scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml
+
+  pc-frontend:
+    name: PC Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: pc-frontend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+          cache-dependency-path: pc-frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Dependency Audit Report
+        shell: pwsh
+        run: ../scripts/check-dependency-audit.ps1 -Mode Strict -SkipRust
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Bundle Budget
+        run: npm run check:bundle-budget
+
+      - name: Message Flow Tests
+        run: npm run test:message-flow
+
+      - name: Workspace Access Tests
+        run: npm run test:workspace-access
+
+      - name: Admin Realtime Smoke
+        run: npm run test:admin-realtime

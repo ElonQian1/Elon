@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use quick_xml::{events::Event, Reader};
+use quick_xml::{escape::unescape, events::Event, Reader};
 use std::{collections::HashMap, fs, path::Path};
 
 #[derive(Default)]
@@ -51,10 +51,13 @@ impl AndroidResources {
 
     fn read_values_file(&mut self, path: &Path) -> Result<()> {
         let content = fs::read_to_string(path)?;
+        self.read_values_xml(&content)
+    }
+
+    fn read_values_xml(&mut self, content: &str) -> Result<()> {
         let mut reader = Reader::from_str(&content);
-        reader.config_mut().trim_text(true);
         let mut buf = Vec::new();
-        let mut active: Option<(String, String)> = None;
+        let mut active: Option<(String, String, String)> = None;
         loop {
             match reader.read_event_into(&mut buf)? {
                 Event::Start(event) => {
@@ -64,13 +67,31 @@ impl AndroidResources {
                             .then(|| String::from_utf8_lossy(&attribute.value).to_string())
                     });
                     if let Some(name) = name {
-                        active = Some((tag, name));
+                        active = Some((tag, name, String::new()));
                     }
                 }
                 Event::Text(text) => {
-                    if let Some((kind, name)) = active.take() {
-                        let value = text.unescape()?.into_owned();
-                        self.values.insert(format!("@{kind}/{name}"), value);
+                    if let Some((_, _, value)) = active.as_mut() {
+                        value.push_str(text.decode()?.as_ref());
+                    }
+                }
+                Event::CData(text) => {
+                    if let Some((_, _, value)) = active.as_mut() {
+                        value.push_str(text.decode()?.as_ref());
+                    }
+                }
+                Event::GeneralRef(reference) => {
+                    if let Some((_, _, value)) = active.as_mut() {
+                        let entity = format!("&{};", reference.decode()?);
+                        value.push_str(unescape(&entity)?.as_ref());
+                    }
+                }
+                Event::End(event) => {
+                    let tag = String::from_utf8_lossy(event.name().as_ref()).into_owned();
+                    if active.as_ref().is_some_and(|(kind, _, _)| kind == &tag) {
+                        let (kind, name, value) = active.take().expect("active value exists");
+                        self.values
+                            .insert(format!("@{kind}/{name}"), value.trim().to_string());
                     }
                 }
                 Event::Eof => break,
@@ -139,4 +160,19 @@ pub(crate) fn scalar(raw: &str) -> f32 {
         .trim_end_matches("px")
         .parse()
         .unwrap_or(0.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decodes_escaped_android_string_values() {
+        let mut resources = AndroidResources::default();
+        resources
+            .read_values_xml(r#"<resources><string name="label">A &amp; B</string></resources>"#)
+            .unwrap();
+
+        assert_eq!(resources.resolve("@string/label"), "A & B");
+    }
 }

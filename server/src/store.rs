@@ -77,15 +77,15 @@ mod project_ops;
 mod project_query;
 pub(crate) mod project_releases;
 mod project_roles;
-mod realtime_close_events;
-#[cfg(test)]
-mod realtime_close_events_tests;
 mod project_runtime_permissions;
 mod project_space;
 mod project_storage;
 mod project_workspace_health_snapshots;
 mod projects;
 mod projects_members;
+mod realtime_close_events;
+#[cfg(test)]
+mod realtime_close_events_tests;
 pub(crate) mod route_c_budget;
 mod social_ai_messages;
 mod social_ai_pending;
@@ -159,12 +159,12 @@ pub use project_roles::{
     PERMISSION_MANAGE_ROLES, PERMISSION_MODERATE_MEMBERS, PERMISSION_SEND_MESSAGES,
     PERMISSION_VIEW_AUDIT_LOG, PERMISSION_VIEW_MEMBERS,
 };
-pub use realtime_close_events::RealtimeCloseMetricRow;
 pub use project_space::{
     CHANNEL_PERMISSION_MANAGE, CHANNEL_PERMISSION_SEND, CHANNEL_PERMISSION_START_AI,
     CHANNEL_PERMISSION_VIEW,
 };
 pub use project_workspace_health_snapshots::ProjectWorkspaceHealthSnapshotWrite;
+pub use realtime_close_events::RealtimeCloseMetricRow;
 pub(crate) use social_ai_messages::{
     SocialAiHistoryMessage, SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_FRIEND_ACCOUNT,
     SOCIAL_AI_FRIEND_NAME, SOCIAL_AI_FRIEND_PREVIEW, SOCIAL_AI_USER_ID,
