@@ -212,6 +212,107 @@ function Complete-NodeAgentRemoteReleaseAttempt {
     return (Read-NodeAgentRemoteReleaseEvent -EventPath $EventPath)
 }
 
+function Test-NodeAgentReleaseGitAncestor {
+    param(
+        [Parameter(Mandatory = $true)][string]$GitCommonDir,
+        [Parameter(Mandatory = $true)][string]$AncestorSha,
+        [Parameter(Mandatory = $true)][string]$DescendantSha
+    )
+    if (-not (Test-Path -LiteralPath $GitCommonDir -PathType Container)) {
+        throw 'Durable Git common directory is unavailable for release supersession proof.'
+    }
+    $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & git "--git-dir=$GitCommonDir" merge-base --is-ancestor $AncestorSha $DescendantSha 2>$null
+        $gitExit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if ($gitExit -eq 0) { return $true }
+    if ($gitExit -eq 1) { return $false }
+    throw "Git could not prove release ancestry (exit=$gitExit)."
+}
+
+function Complete-NodeAgentRemoteReleaseSuperseded {
+    param(
+        [Parameter(Mandatory = $true)][string]$EventPath,
+        [Parameter(Mandatory = $true)][string]$SupersedingEventPath,
+        [long]$NowMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds(),
+        [scriptblock]$IsAncestor = $null
+    )
+    $event = Read-NodeAgentRemoteReleaseEvent -EventPath $EventPath
+    $newer = Read-NodeAgentRemoteReleaseEvent -EventPath $SupersedingEventPath
+    if ([string]$event.sync_state -eq 'superseded') { return $event }
+    if ([string]$event.sync_state -notin @('pending','retrying')) {
+        throw "Only pending or retrying releases can be superseded; state=$($event.sync_state)."
+    }
+    if ([string]$newer.sync_state -ne 'synced') {
+        throw 'A release can only be superseded by a durably synced descendant.'
+    }
+    if ([long]$newer.created_at_ms -le [long]$event.created_at_ms) {
+        throw 'Superseding release must have a later durable creation timestamp.'
+    }
+    $eventGitDir = [System.IO.Path]::GetFullPath([string]$event.git_common_dir)
+    $newerGitDir = [System.IO.Path]::GetFullPath([string]$newer.git_common_dir)
+    if (-not $eventGitDir.Equals($newerGitDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Release supersession requires the same durable Git common directory.'
+    }
+    $ancestor = if ($null -ne $IsAncestor) {
+        [bool](& $IsAncestor $eventGitDir ([string]$event.git_sha) ([string]$newer.git_sha))
+    } else {
+        Test-NodeAgentReleaseGitAncestor -GitCommonDir $eventGitDir `
+            -AncestorSha ([string]$event.git_sha) -DescendantSha ([string]$newer.git_sha)
+    }
+    if (-not $ancestor) {
+        throw 'Synced release is not a proven Git descendant; refusing to supersede.'
+    }
+    if (-not [bool]$event.local_result_independent -or -not [bool]$newer.local_result_independent) {
+        throw 'Outbox local-result independence marker was corrupted; refusing supersession.'
+    }
+    $event.sync_state = 'superseded'
+    $event.updated_at_ms = $NowMs
+    $event.next_attempt_at_ms = $null
+    $event.last_error_code = 'superseded_by_synced_descendant'
+    $event | Add-Member -NotePropertyName superseded_by -NotePropertyValue ([string]$newer.release_identity) -Force
+    $event | Add-Member -NotePropertyName superseded_at_ms -NotePropertyValue $NowMs -Force
+    Write-NodeAgentReleaseJsonAtomic -Path $EventPath -Value $event
+    return (Read-NodeAgentRemoteReleaseEvent -EventPath $EventPath)
+}
+
+function Find-NodeAgentRemoteReleaseSupersedingEvent {
+    param(
+        [Parameter(Mandatory = $true)][string]$OutboxRoot,
+        [Parameter(Mandatory = $true)][string]$EventPath
+    )
+    $event = Read-NodeAgentRemoteReleaseEvent -EventPath $EventPath
+    if ([string]$event.sync_state -notin @('pending','retrying')) { return $null }
+    $eventsRoot = Join-Path (Get-NodeAgentReleaseOutboxRoot -ExplicitRoot $OutboxRoot) 'events'
+    $candidates = @(Get-ChildItem -LiteralPath $eventsRoot -Filter 'event.json' -File -Recurse `
+        -ErrorAction SilentlyContinue | ForEach-Object {
+            try {
+                $candidate = Read-NodeAgentRemoteReleaseEvent -EventPath $_.FullName
+                if ([string]$candidate.sync_state -eq 'synced' -and
+                    [long]$candidate.created_at_ms -gt [long]$event.created_at_ms) {
+                    [pscustomobject]@{ Path = $_.FullName; Event = $candidate }
+                }
+            } catch {}
+        } | Sort-Object { [long]$_.Event.created_at_ms } -Descending)
+    foreach ($candidate in $candidates) {
+        $candidateGitDir = [System.IO.Path]::GetFullPath([string]$candidate.Event.git_common_dir)
+        $eventGitDir = [System.IO.Path]::GetFullPath([string]$event.git_common_dir)
+        if (-not $candidateGitDir.Equals($eventGitDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+            continue
+        }
+        if (Test-NodeAgentReleaseGitAncestor -GitCommonDir $eventGitDir `
+                -AncestorSha ([string]$event.git_sha) `
+                -DescendantSha ([string]$candidate.Event.git_sha)) {
+            return $candidate
+        }
+    }
+    return $null
+}
+
 function Get-DueNodeAgentRemoteReleaseEvents {
     param([Parameter(Mandatory = $true)][string]$OutboxRoot, [long]$NowMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
     $eventsRoot = Join-Path (Get-NodeAgentReleaseOutboxRoot -ExplicitRoot $OutboxRoot) 'events'

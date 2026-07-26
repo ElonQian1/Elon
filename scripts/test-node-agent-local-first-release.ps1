@@ -206,6 +206,56 @@ try {
     Assert-Equal $recovered.sync_state 'synced' 'network recovery must converge to synced'
     Assert-Equal $recovered.attempt_count 2 'recovery must preserve attempt history'
 
+    $supersededPath = Join-Path $outbox 'events\superseded\event.json'
+    $syncedDescendantPath = Join-Path $outbox 'events\synced-descendant\event.json'
+    New-Item -ItemType Directory -Path (Split-Path $supersededPath) -Force | Out-Null
+    New-Item -ItemType Directory -Path (Split-Path $syncedDescendantPath) -Force | Out-Null
+    Copy-Item -LiteralPath $first.EventPath -Destination $supersededPath
+    Copy-Item -LiteralPath $first.EventPath -Destination $syncedDescendantPath
+    $supersededFixture = Read-NodeAgentRemoteReleaseEvent -EventPath $supersededPath
+    $supersededFixture.git_sha = 'b' * 40
+    $supersededFixture.release_identity = "0.3.69+$('b' * 40)"
+    $supersededFixture.sync_state = 'retrying'
+    $supersededFixture.created_at_ms = 100
+    $supersededFixture.next_attempt_at_ms = 101
+    Write-NodeAgentReleaseJsonAtomic -Path $supersededPath -Value $supersededFixture
+    $descendantFixture = Read-NodeAgentRemoteReleaseEvent -EventPath $syncedDescendantPath
+    $descendantFixture.git_sha = 'c' * 40
+    $descendantFixture.release_identity = "0.3.69+$('c' * 40)"
+    $descendantFixture.sync_state = 'synced'
+    $descendantFixture.created_at_ms = 200
+    $descendantFixture.next_attempt_at_ms = $null
+    Write-NodeAgentReleaseJsonAtomic -Path $syncedDescendantPath -Value $descendantFixture
+    $superseded = Complete-NodeAgentRemoteReleaseSuperseded -EventPath $supersededPath `
+        -SupersedingEventPath $syncedDescendantPath -NowMs 300 `
+        -IsAncestor { param($gitDir, $ancestor, $descendant) $ancestor -eq ('b' * 40) -and $descendant -eq ('c' * 40) }
+    Assert-Equal $superseded.sync_state 'superseded' `
+        'a retrying ancestor must converge when a later descendant is durably synced'
+    Assert-Equal $superseded.superseded_by $descendantFixture.release_identity `
+        'supersession audit must retain the exact descendant release identity'
+    Assert-Equal $superseded.last_error_code 'superseded_by_synced_descendant' `
+        'supersession must remain distinguishable from successful publication'
+    Assert-Equal $superseded.attempt_count $supersededFixture.attempt_count `
+        'supersession must not fabricate a remote attempt'
+    Assert-Equal @(Get-DueNodeAgentRemoteReleaseEvents -OutboxRoot $outbox -NowMs 1000 |
+        Where-Object { $_.Path -eq $supersededPath }).Count 0 `
+        'superseded release must never be selected for another upload'
+    $nonAncestorPath = Join-Path $outbox 'events\non-ancestor\event.json'
+    New-Item -ItemType Directory -Path (Split-Path $nonAncestorPath) -Force | Out-Null
+    Copy-Item -LiteralPath $supersededPath -Destination $nonAncestorPath
+    $nonAncestorFixture = Read-NodeAgentRemoteReleaseEvent -EventPath $nonAncestorPath
+    $nonAncestorFixture.sync_state = 'retrying'
+    $nonAncestorFixture.next_attempt_at_ms = 301
+    Write-NodeAgentReleaseJsonAtomic -Path $nonAncestorPath -Value $nonAncestorFixture
+    Assert-Throws {
+        Complete-NodeAgentRemoteReleaseSuperseded -EventPath $nonAncestorPath `
+            -SupersedingEventPath $syncedDescendantPath `
+            -IsAncestor { $false } | Out-Null
+    } 'not a proven Git descendant' `
+        'an unrelated synced release must not suppress a retrying event'
+    Assert-Equal (Read-NodeAgentRemoteReleaseEvent -EventPath $nonAncestorPath).sync_state `
+        'retrying' 'failed ancestry proof must preserve the original retry state'
+
     $failedPath = Join-Path $outbox 'events\failed\event.json'
     New-Item -ItemType Directory -Path (Split-Path $failedPath) -Force | Out-Null
     Copy-Item -LiteralPath $first.EventPath -Destination $failedPath
@@ -468,6 +518,16 @@ try {
         'a timed-out non-repeatable broadcast must continue to bounded handshake verification'
     Assert-True ($workerText.Contains('Resolve-EventSourceWorktree')) `
         'worker restart must reconstruct the immutable source worktree from durable state'
+    Assert-True ($workerText.Contains('Find-NodeAgentRemoteReleaseSupersedingEvent')) `
+        'worker must classify proven ancestors before they can overwrite a synced descendant'
+    Assert-True ($workerText.Contains('Complete-NodeAgentRemoteReleaseSuperseded')) `
+        'worker must preserve superseded events as an explicit auditable terminal state'
+    Assert-True ($workerText.Contains('Close-ExactTimedOutRemoteReleaseLease')) `
+        'worker timeout must close its exact server lease instead of leaving a four-hour owner'
+    Assert-True ($workerText.Contains('bounded_attempt_timeout_lease_closed')) `
+        'timeout recovery must remain distinguishable and auditable in durable event state'
+    Assert-True ($workerText.Contains('taskkill.exe /PID $process.Id /T /F')) `
+        'timeout recovery must stop the exact attempt process tree before releasing its lease'
     Assert-True ($workerText.Contains("`$arguments += '-IncludeLinux'")) `
         'the worker must preserve explicit Linux intent from the durable event'
     Assert-True ($workerText.Contains('$gitExit = $LASTEXITCODE')) `

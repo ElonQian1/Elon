@@ -43,6 +43,47 @@ function Resolve-EventSourceWorktree {
     return $sourceRoot
 }
 
+function Close-ExactTimedOutRemoteReleaseLease {
+    param([Parameter(Mandatory = $true)]$Event, [Parameter(Mandatory = $true)][string]$SourceRoot)
+    . (Join-Path $SourceRoot 'scripts\release-publish-lease.ps1')
+    $api = 'http://43.139.149.158:8080/api/release'
+    $builderId = "$env:COMPUTERNAME-$env:USERNAME"
+    if ([string]::IsNullOrWhiteSpace($builderId) -or $builderId -eq '-') {
+        throw 'Timed-out lease recovery cannot reconstruct the exact builder identity.'
+    }
+    $sha = [string]$Event.git_sha
+    $batchId = "release-$sha"
+    $claim = Invoke-ElonReleaseLeaseRequest -Uri "$api/claim" -Method POST -Body @{
+        kind = 'node_agent'
+        sha = $sha
+        builderId = $builderId
+        builderLabel = "publish-node-agent.ps1 @ $builderId"
+        currentVersionName = [string]$Event.version
+        leaseSecs = 14400
+        batchId = $batchId
+        stage = 'windows_node'
+    }
+    if ([string]$claim.sha -ne $sha -or [string]$claim.batchId -ne $batchId -or
+        [string]$claim.stage -ne 'windows_node') {
+        throw 'Timed-out lease recovery received a different immutable release identity.'
+    }
+    if ([string]$claim.action -eq 'coalesced') {
+        return [pscustomobject]@{ Outcome = 'success'; ErrorCode = '' }
+    }
+    if ([string]$claim.action -notin @('build','wait') -or
+        [string]::IsNullOrWhiteSpace([string]$claim.token)) {
+        throw "Timed-out lease recovery received an unsupported action: $($claim.action)"
+    }
+    Complete-ElonReleaseLease -ReleaseApiBase $api -Kind 'node_agent' `
+        -Token ([string]$claim.token) -Success $false -Sha $sha -BatchId $batchId `
+        -Stage 'windows_node' `
+        -ErrorMessage 'bounded outbox process exited; exact lease closed by durable worker'
+    return [pscustomobject]@{
+        Outcome = 'retry'
+        ErrorCode = 'bounded_attempt_timeout_lease_closed'
+    }
+}
+
 function Invoke-RemoteReleaseAttemptProcess {
     param([string]$EventPath, $Event)
     $source = Resolve-EventSourceWorktree -Event $Event
@@ -54,8 +95,21 @@ function Invoke-RemoteReleaseAttemptProcess {
     $process = Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WorkingDirectory $source `
         -WindowStyle Hidden -PassThru
     if (-not $process.WaitForExit($AttemptTimeoutSeconds * 1000)) {
-        try { $process.Kill() } catch {}
-        return [pscustomobject]@{ Outcome = 'retry'; ErrorCode = 'bounded_attempt_timeout' }
+        try {
+            & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null
+        } catch {}
+        try {
+            if (-not $process.WaitForExit(10000)) { $process.Kill() }
+        } catch {}
+        try {
+            return Close-ExactTimedOutRemoteReleaseLease -Event $Event -SourceRoot $source
+        } catch {
+            Write-OutboxWorkerLog "$($Event.event_id) timeout_lease_close_failed=$($_.Exception.Message)"
+            return [pscustomobject]@{
+                Outcome = 'retry'
+                ErrorCode = 'bounded_attempt_timeout_lease_close_failed'
+            }
+        }
     }
     if ($process.ExitCode -eq 0) { return [pscustomobject]@{ Outcome = 'success'; ErrorCode = '' } }
     return [pscustomobject]@{ Outcome = 'retry'; ErrorCode = "remote_process_exit_$($process.ExitCode)" }
@@ -83,6 +137,14 @@ try {
         }
         foreach ($item in $due) {
             try {
+                $superseding = Find-NodeAgentRemoteReleaseSupersedingEvent `
+                    -OutboxRoot $OutboxRoot -EventPath $item.Path
+                if ($null -ne $superseding) {
+                    $superseded = Complete-NodeAgentRemoteReleaseSuperseded `
+                        -EventPath $item.Path -SupersedingEventPath $superseding.Path
+                    Write-OutboxWorkerLog "$($item.Event.event_id) outcome=superseded by=$($superseded.superseded_by)"
+                    continue
+                }
                 $result = Invoke-RemoteReleaseAttemptProcess -EventPath $item.Path -Event $item.Event
                 Complete-NodeAgentRemoteReleaseAttempt -EventPath $item.Path -Outcome $result.Outcome `
                     -ErrorCode $result.ErrorCode -MaxAttempts $MaxAttempts | Out-Null
