@@ -87,6 +87,9 @@ Assert-True ($brandIconSha256 -match '^[0-9a-f]{64}$') `
     "The checked-in Windows brand ICO must produce a stable 32px bitmap hash"
 
 $publishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-node-agent.ps1") -Raw
+$packagingScript = Get-Content -LiteralPath (
+    Join-Path $PSScriptRoot "node-agent-release-packaging.ps1"
+) -Raw
 $handshakeHelper = Get-Content -LiteralPath (Join-Path $PSScriptRoot "node-agent-publish-handshake.ps1") -Raw
 $publishContractText = $publishScript + "`n" + $handshakeHelper
 $replayHelper = Get-Content -LiteralPath (Join-Path $PSScriptRoot "node-agent-publish-replay.ps1") -Raw
@@ -140,9 +143,13 @@ Assert-True ($publishScript.Contains('[switch]$SynchronousRemote') -and `
     "The default publisher must finish locally while remote release requires worker mode"
 Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $WinBin')) `
     "The Windows release build must verify its extracted AssociatedIcon"
-Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $PackageClient')) `
+Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $WindowsInstallerStub')) `
+    "The Windows installer stub must retain the checked-in brand icon"
+Assert-True ($publishScript.Contains('-WindowsInstallerPackage $WindowsInstallerPackage')) `
+    "The durable remote outbox must receive the immutable Windows installer"
+Assert-True ($packagingScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $packageClient')) `
     "The packaged main client must retain the brand icon"
-Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $PackageUninstall')) `
+Assert-True ($packagingScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $packageUninstall')) `
     "The packaged uninstall copy must retain the brand icon"
 Assert-True ($publishScript.Contains('Enter-NodeAgentPublishLock -Path $PublishLockPath') -and `
     $publishScript.Contains('node-agent-local-publish-v1.lock') -and `
@@ -164,16 +171,29 @@ Assert-True ($replayHelper.Contains('NODE_AGENT_REPLAY_EXE_SHA256=')) `
     "Replay evidence must report the exact EXE SHA-256"
 Assert-True ($replayHelper.Contains('NODE_AGENT_REPLAY_CLIENT_SHA256=')) `
     "Replay evidence must report the exact Windows client package SHA-256"
+Assert-True ($replayHelper.Contains('NODE_AGENT_REPLAY_INSTALLER_SHA256=')) `
+    "Replay evidence must report the exact Windows installer SHA-256"
 Assert-True ($replayHelper.Contains("if ([string]`$metadata.sha256 -ne `$Identity.ExeSha256")) `
     "Artifact mismatch must fail closed before a replay broadcast"
 $replayFixture = [pscustomobject]@{
     Metadata = [pscustomobject]@{
         gitSha = 'same-sha'; sha256 = ('a' * 64); windowsClientSha256 = ('b' * 64)
+        windowsInstallerSha256 = ('d' * 64)
     }
     ExeSha256 = ('a' * 64)
     ClientSha256 = ('b' * 64)
+    InstallerSha256 = ('d' * 64)
 }
 Assert-RemoteNodeAgentReplayIdentity -Identity $replayFixture -ExpectedGitSha 'same-sha'
+$legacyReplayFixture = [pscustomobject]@{
+    Metadata = [pscustomobject]@{
+        gitSha = 'legacy-sha'; sha256 = ('a' * 64); windowsClientSha256 = ('b' * 64)
+    }
+    ExeSha256 = ('a' * 64)
+    ClientSha256 = ('b' * 64)
+    InstallerSha256 = ''
+}
+Assert-RemoteNodeAgentReplayIdentity -Identity $legacyReplayFixture -ExpectedGitSha 'legacy-sha'
 $staleReplayRejected = $false
 $replayFixture.Metadata.sha256 = ('c' * 64)
 try {
@@ -206,6 +226,8 @@ try {
 $buildScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\server\build.rs") -Raw
 Assert-True ($buildScript.Contains('compile_for(&["elon-pc-node"])')) `
     "The Windows resource must be scoped to the node client binary"
+Assert-True ($buildScript.Contains('compile_for(&["elon-node-installer"])')) `
+    "The Windows installer must receive its own branded resource metadata"
 Assert-True ($buildScript.Contains('desktop-shell/src-tauri/icons/icon.ico')) `
     "The node client must reuse the checked-in desktop brand ICO"
 

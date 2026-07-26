@@ -46,7 +46,7 @@ export default function LocalNodeOfflineCard({ onLaunch, onRetry }: Props) {
         </div>
 
         <div className={styles.stepList}>
-          <div className={styles.step}><strong>1</strong><span>如果还没安装，下载压缩包并双击「一龙开发平台.exe」。</span></div>
+          <div className={styles.step}><strong>1</strong><span>如果还没安装，下载并双击「Elon-Windows-Setup.exe」。</span></div>
           <div className={styles.step}><strong>2</strong><span>如果已安装，点击“启动 Win 端”；后台守护层会继续拉起或重启节点。</span></div>
           <div className={styles.step}><strong>3</strong><span>如果多次失败，点击“导出诊断”，把生成的脱敏文件发给客服或开发者。</span></div>
         </div>

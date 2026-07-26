@@ -20,7 +20,9 @@ fn clean_layout_reports_manifest_sha() {
         serde_json::to_string(&json!({
             "version": "0.3.68",
             "gitSha": "abc123",
-            "windowsClientDownloadUrl": "http://example.test/client.zip"
+            "windowsClientDownloadUrl": "http://example.test/client.zip",
+            "windowsInstallerDownloadUrl": "https://example.test/client-setup.exe",
+            "windowsInstallerFileSize": 123456
         }))
         .unwrap(),
     )
@@ -37,6 +39,14 @@ fn clean_layout_reports_manifest_sha() {
     assert_eq!(status["layout_status"], "clean");
     assert_eq!(status["start_menu"]["status"], "clean");
     assert_eq!(status["installed_git_sha"], "abc123");
+    assert_eq!(
+        status["version_manifest"]["windowsInstallerDownloadUrl"],
+        "https://example.test/client-setup.exe"
+    );
+    assert_eq!(
+        status["version_manifest"]["windowsInstallerFileSize"],
+        123456
+    );
     assert_eq!(status["running_from_install_dir"], true);
     assert_eq!(status["product_status"]["status"], "ready");
     assert_eq!(status["product_status"]["missing_entry_count"], 0);

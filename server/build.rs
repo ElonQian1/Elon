@@ -24,4 +24,11 @@ fn main() {
         .set("OriginalFilename", "一龙开发平台.exe")
         .compile_for(&["elon-pc-node"])
         .expect("failed to embed the Windows brand icon");
+    tauri_winres::WindowsResource::new()
+        .set_icon(icon)
+        .set("ProductName", "一龙开发平台")
+        .set("FileDescription", "一龙开发平台 Windows 安装程序")
+        .set("OriginalFilename", "Elon-Windows-Setup.exe")
+        .compile_for(&["elon-node-installer"])
+        .expect("failed to embed the Windows installer brand icon");
 }

@@ -23,14 +23,24 @@ test -f elon-node-agent-windows.zip
 printf '%s\n' "$(base64 < node-agent-version.json | tr -d '\n')"
 sha256sum elon-pc-node.exe | awk '{print $1}'
 sha256sum elon-node-agent-windows.zip | awk '{print $1}'
+if test -f elon-node-agent-windows-setup.exe; then
+  sha256sum elon-node-agent-windows-setup.exe | awk '{print $1}'
+else
+  printf '%s\n' legacy-none
+fi
 '@
     $raw = Invoke-RemoteBash -Script $script
     $lines = @($raw -split "`n")
-    if ($lines.Count -lt 3) { throw 'Remote node artifact identity is incomplete; replay refused.' }
+    if ($lines.Count -lt 4) { throw 'Remote node artifact identity is incomplete; replay refused.' }
     [pscustomobject]@{
         Metadata = ConvertFrom-NodeAgentUtf8Base64Json -Value $lines[0]
         ExeSha256 = ([string]$lines[1]).Trim().ToLowerInvariant()
         ClientSha256 = ([string]$lines[2]).Trim().ToLowerInvariant()
+        InstallerSha256 = if (([string]$lines[3]).Trim() -eq 'legacy-none') {
+            ''
+        } else {
+            ([string]$lines[3]).Trim().ToLowerInvariant()
+        }
     }
 }
 
@@ -40,9 +50,15 @@ function Assert-RemoteNodeAgentReplayIdentity {
     if ([string]$metadata.gitSha -ne $ExpectedGitSha) {
         throw "Remote artifact gitSha=$($metadata.gitSha) differs from replay SHA=$ExpectedGitSha; broadcast refused."
     }
+    $metadataInstallerSha256 = ''
+    if ($metadata.PSObject.Properties.Name -contains 'windowsInstallerSha256') {
+        $metadataInstallerSha256 = [string]$metadata.windowsInstallerSha256
+    }
     if ([string]$metadata.sha256 -ne $Identity.ExeSha256 -or
-        [string]$metadata.windowsClientSha256 -ne $Identity.ClientSha256) {
-        throw 'Remote metadata differs from actual EXE/client SHA-256; stale artifact broadcast refused.'
+        [string]$metadata.windowsClientSha256 -ne $Identity.ClientSha256 -or
+        (-not [string]::IsNullOrWhiteSpace($metadataInstallerSha256) -and
+            $metadataInstallerSha256 -ne $Identity.InstallerSha256)) {
+        throw 'Remote metadata differs from actual EXE/client/installer SHA-256; stale artifact broadcast refused.'
     }
 }
 
@@ -71,4 +87,5 @@ function Invoke-NodeAgentPublishReplay {
     Write-Host "NODE_AGENT_REPLAY_GIT_SHA=$GitSha"
     Write-Host "NODE_AGENT_REPLAY_EXE_SHA256=$($identity.ExeSha256)"
     Write-Host "NODE_AGENT_REPLAY_CLIENT_SHA256=$($identity.ClientSha256)"
+    Write-Host "NODE_AGENT_REPLAY_INSTALLER_SHA256=$($identity.InstallerSha256)"
 }

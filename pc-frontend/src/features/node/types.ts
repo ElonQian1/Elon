@@ -75,15 +75,18 @@ export interface NodeAgentVersion {
   downloadUrl?: string
   linuxDownloadUrl?: string
   windowsClientDownloadUrl?: string
+  windowsInstallerDownloadUrl?: string
   ripgrepZipUrl?: string
   sha256?: string
   fileSha256?: string
   linuxSha256?: string
   windowsClientSha256?: string
+  windowsInstallerSha256?: string
   ripgrepZipSha256?: string
   fileSize?: number
   linuxFileSize?: number
   windowsClientFileSize?: number
+  windowsInstallerFileSize?: number
   ripgrepZipFileSize?: number
 }
 

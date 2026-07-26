@@ -381,8 +381,10 @@ fn version_manifest_summary(path: &Path) -> Value {
         "downloadUrl": value.get("downloadUrl").and_then(Value::as_str),
         "linuxDownloadUrl": value.get("linuxDownloadUrl").and_then(Value::as_str),
         "windowsClientDownloadUrl": value.get("windowsClientDownloadUrl").and_then(Value::as_str),
+        "windowsInstallerDownloadUrl": value.get("windowsInstallerDownloadUrl").and_then(Value::as_str),
         "fileSize": value.get("fileSize").and_then(Value::as_u64),
         "windowsClientFileSize": value.get("windowsClientFileSize").and_then(Value::as_u64),
+        "windowsInstallerFileSize": value.get("windowsInstallerFileSize").and_then(Value::as_u64),
     })
 }
 

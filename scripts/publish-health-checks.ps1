@@ -127,6 +127,7 @@ function Invoke-ElonNodeAgentPostUploadSmoke {
         [string]$ExpectedWindowsSha256 = "",
         [string]$ExpectedLinuxSha256 = "",
         [string]$ExpectedWindowsClientSha256 = "",
+        [string]$ExpectedWindowsInstallerSha256 = "",
         [switch]$IncludeRipgrep,
         [int]$TimeoutSec = 20
     )
@@ -139,11 +140,13 @@ function Invoke-ElonNodeAgentPostUploadSmoke {
     Assert-ElonValue -Label "windows sha256" -Actual ([string]$version.sha256) -Expected $ExpectedWindowsSha256
     Assert-ElonValue -Label "linux sha256" -Actual ([string]$version.linuxSha256) -Expected $ExpectedLinuxSha256
     Assert-ElonValue -Label "windows client sha256" -Actual ([string]$version.windowsClientSha256) -Expected $ExpectedWindowsClientSha256
+    Assert-ElonValue -Label "windows installer sha256" -Actual ([string]$version.windowsInstallerSha256) -Expected $ExpectedWindowsInstallerSha256
 
     $downloads = @(
         @{ Label = "linux"; Uri = "$base/api/node-agent/download/linux" },
         @{ Label = "windows"; Uri = "$base/api/node-agent/download/windows" },
         @{ Label = "windows-client"; Uri = "$base/api/node-agent/download/windows-client" }
+        @{ Label = "windows-installer"; Uri = "$base/api/node-agent/download/windows-installer" }
     )
     if ($IncludeRipgrep) {
         $downloads += @{ Label = "ripgrep-windows"; Uri = "$base/api/node-agent/download/ripgrep-windows" }

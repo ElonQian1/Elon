@@ -23,6 +23,10 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/api/node-agent/download/windows-client",
             get(node_api::download_node_agent_windows_client),
         )
+        .route(
+            "/api/node-agent/download/windows-installer",
+            get(node_api::download_node_agent_windows_installer),
+        )
         .route("/api/node-agent/download/ripgrep-windows", get(rg_win))
         .route(
             "/api/node-agent/download/linux",

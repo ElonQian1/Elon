@@ -346,9 +346,14 @@ if ($Kind -eq "NodeAgent") {
     if ([string]::IsNullOrWhiteSpace($windowsExeUrl)) {
         $windowsExeUrl = "$ServerUrl/api/node-agent/download/windows"
     }
+    $windowsInstallerUrl = [string]$nodeVersion.windowsInstallerDownloadUrl
+    if ([string]::IsNullOrWhiteSpace($windowsInstallerUrl)) {
+        $windowsInstallerUrl = "$ServerUrl/api/node-agent/download/windows-installer"
+    }
 
     $clientStatus = Test-DownloadUrl -Url $windowsClientUrl -Label "Windows client package"
     $exeStatus = Test-DownloadUrl -Url $windowsExeUrl -Label "Windows node exe"
+    $installerStatus = Test-DownloadUrl -Url $windowsInstallerUrl -Label "Windows installer"
 
     Write-Host "Node agent completion check passed:" -ForegroundColor Green
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
@@ -360,6 +365,7 @@ if ($Kind -eq "NodeAgent") {
     Write-Host "  version:     v$($nodeVersion.version)"
     Write-Host "  gitSha:      $nodeGitSha"
     Write-Host "  client zip:  $windowsClientUrl (HTTP $clientStatus)"
+    Write-Host "  installer:   $windowsInstallerUrl (HTTP $installerStatus)"
     Write-Host "  exe:         $windowsExeUrl (HTTP $exeStatus)"
     exit 0
 }

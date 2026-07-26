@@ -9,6 +9,7 @@ function New-NodeAgentWindowsClientPackage {
         [Parameter(Mandatory = $true)][string]$ReleaseChangelog,
         [Parameter(Mandatory = $true)][string]$WindowsDownloadUrl,
         [Parameter(Mandatory = $true)][string]$WindowsClientDownloadUrl,
+        [Parameter(Mandatory = $true)][string]$WindowsInstallerDownloadUrl,
         [Parameter(Mandatory = $true)][string]$RipgrepDownloadUrl,
         [Parameter(Mandatory = $true)][string]$WinBin,
         [Parameter(Mandatory = $true)][string]$WinSha256,
@@ -17,6 +18,8 @@ function New-NodeAgentWindowsClientPackage {
         [Parameter(Mandatory = $true)][string]$PcDistDir,
         [Parameter(Mandatory = $true)][string]$LauncherDir,
         [Parameter(Mandatory = $true)][string]$WindowsClientPackageName,
+        [Parameter(Mandatory = $true)][string]$WindowsInstallerPackageName,
+        [Parameter(Mandatory = $true)][string]$WindowsInstallerStub,
         [Parameter(Mandatory = $true)][string]$RipgrepPackageName,
         [Parameter(Mandatory = $true)][string]$ClientFileName,
         [Parameter(Mandatory = $true)][string]$UninstallFileName,
@@ -28,6 +31,7 @@ function New-NodeAgentWindowsClientPackage {
     )
     $packageInternal = Join-Path $packageRoot '_internal'
     $windowsClientPackage = Join-Path $TargetDir "release\$WindowsClientPackageName"
+    $windowsInstallerPackage = Join-Path $TargetDir "release\$WindowsInstallerPackageName"
     $ripgrepPackage = Join-Path $TargetDir "release\$RipgrepPackageName"
     $ripgrepZipSha256 = ''
     $ripgrepZipFileSize = 0
@@ -84,6 +88,7 @@ function New-NodeAgentWindowsClientPackage {
             updated_at = (Get-Date).ToString('o')
             downloadUrl = $WindowsDownloadUrl
             windowsClientDownloadUrl = $WindowsClientDownloadUrl
+            windowsInstallerDownloadUrl = $WindowsInstallerDownloadUrl
             sha256 = $WinSha256
             fileSha256 = $WinSha256
             linuxPublished = $false
@@ -102,10 +107,16 @@ function New-NodeAgentWindowsClientPackage {
     if (-not (Test-Path -LiteralPath $windowsClientPackage -PathType Leaf)) {
         throw "Windows client package does not exist: $windowsClientPackage"
     }
+    $windowsClientSha256 = Get-NodeAgentFileSha256 -Path $windowsClientPackage
+    $installer = New-NodeAgentWindowsInstallerPackage -StubPath $WindowsInstallerStub `
+        -PayloadPath $windowsClientPackage -OutputPath $windowsInstallerPackage
 
     [pscustomobject]@{
         WindowsClientPackage = $windowsClientPackage
-        WindowsClientSha256 = Get-NodeAgentFileSha256 -Path $windowsClientPackage
+        WindowsClientSha256 = $windowsClientSha256
+        WindowsInstallerPackage = $windowsInstallerPackage
+        WindowsInstallerSha256 = Get-NodeAgentFileSha256 -Path $windowsInstallerPackage
+        WindowsInstallerFileSize = [int64]$installer.FileSize
         RipgrepPackage = $ripgrepPackage
         RipgrepZipSha256 = $ripgrepZipSha256
         RipgrepZipFileSize = [int64]$ripgrepZipFileSize

@@ -200,7 +200,7 @@ Codex 会话继续在独立 conversation worktree 开发和自行编译，真机
 Win 端启动和更新的产品闭环如下：
 
 1. PC 网页端只负责提示和触发：节点未运行时展示“启动 Win 端 / 下载 / 节点设置”；节点已运行但版本落后时展示“Win 端可更新 / 下载新版 / 节点设置”。
-2. 浏览器通过 `elon-node://open` 拉起本机 Win 端；如果协议未注册或本机未安装，用户走标准下载地址 `/api/node-agent/download/windows-client`。
+2. 浏览器通过 `elon-node://open` 拉起本机 Win 端；如果协议未注册或本机未安装，用户走标准安装程序地址 `/api/node-agent/download/windows-installer`，下载单文件 `Elon-Windows-Setup.exe` 后直接双击安装。`/api/node-agent/download/windows-client` 保留为 Win 端自动更新使用的 ZIP 载荷，不再作为首次安装入口。
 3. 节点设置页读取 `/api/node-agent/version` 和本机 `/api/client-maintenance`，用服务器版本、包大小、本机安装状态判断“未知 / 最新 / 可更新”。
 4. 用户点击“更新并重启 Win 端”或云端广播更新时，节点先检测活跃监督任务。有任务则持久化 `elon.local_supervision_restart.v1` 并 drain 到安全终态，无任务才下载替换；计划重启恢复为 `runtime_online`，意外重启留下 `resume_required` 与无 token 的 Resume 动作。网页端轮询 `/api/status.restart_recovery` 确认排空、重启和恢复状态。
 5. 服务器更新频繁时，网页端不能把“服务端有新版本”误报成任务失败；任务页继续展示当前 CLI 公开过程，节点/设置页单独提示客户端版本维护。长期目标是在 Win 端启动时主动比对服务器版本并提示/自动维护，但用户可见入口仍保持在节点设置页。

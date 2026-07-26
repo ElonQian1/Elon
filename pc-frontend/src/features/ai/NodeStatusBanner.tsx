@@ -9,6 +9,7 @@
  */
 import { useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
+import { WIN_CLIENT_DOWNLOAD_URL } from '../node/launchWinClient'
 import styles from './NodeStatusBanner.module.css'
 
 interface NodeInfo {
@@ -116,24 +117,24 @@ export default function NodeStatusBanner({ onlineNodeId: extNodeId, onlineNodeNa
         <div className={[styles.step, step >= 1 ? styles.stepActive : ''].join(' ')}>
           <span className={styles.stepNum}>1</span>
           <div className={styles.stepBody}>
-            <strong>下载安裃程序</strong>
-            <small>下载后双击运行，自动安裃并注册到你的账号</small>
+            <strong>下载安装程序</strong>
+            <small>下载后双击运行，自动安装并注册到你的账号</small>
           </div>
           <a
             className={styles.stepBtn}
-            href="/api/node-agent/download/windows"
+            href={WIN_CLIENT_DOWNLOAD_URL}
             download
             onClick={() => setStep(2)}
           >
-            下载 .exe
+            下载 Setup.exe
           </a>
         </div>
 
         <div className={[styles.step, step >= 2 ? styles.stepActive : styles.stepDimmed].join(' ')}>
           <span className={styles.stepNum}>2</span>
           <div className={styles.stepBody}>
-            <strong>双击运行安裃</strong>
-            <small>双击「一龙开发平台.exe」，它会自动安裃并在后台运行</small>
+            <strong>双击运行安装</strong>
+            <small>双击「Elon-Windows-Setup.exe」，它会自动安装并启动一龙开发平台</small>
           </div>
           <button className={styles.stepBtn} type="button" onClick={() => setStep(3)}>
             已运行

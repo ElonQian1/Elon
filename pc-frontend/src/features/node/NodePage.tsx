@@ -135,8 +135,9 @@ function LocalNodePanel({ adminUrl, view = 'overview' }: { adminUrl: string; vie
     doProbe()
     fetchNodeAgentVersion()
       .then((d) => {
-        const size = d.windowsClientFileSize
-          ? ` · ${(d.windowsClientFileSize / 1024 / 1024).toFixed(1)} MB` : ''
+        const sizeBytes = d.windowsInstallerFileSize ?? d.windowsClientFileSize
+        const size = sizeBytes
+          ? ` · ${(sizeBytes / 1024 / 1024).toFixed(1)} MB` : ''
         setVersion(`最新 Win 端：v${d.version ?? 'latest'}${size}`)
       })
       .catch(() => setVersion('Win 端下载包暂时无法读取版本。'))

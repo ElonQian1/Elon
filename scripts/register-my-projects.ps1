@@ -74,8 +74,8 @@ foreach ($proj in $projects) {
         Write-Host "  ❌ $($proj.name)  HTTP $status : $errBody" -ForegroundColor Red
         if ($status -eq 400 -and $errBody -match "没有在线 PC CLI 节点") {
             Write-Host "  ⚠️  提示：服务器找不到在线的 PC 节点来接管本地路径。" -ForegroundColor Yellow
-            Write-Host "     解决方案：先下载 Windows 客户端包，解压后双击「一龙开发平台.exe」并登录，再重跑本脚本。" -ForegroundColor Yellow
-            Write-Host "     下载地址: http://43.139.149.158:8080/api/node-agent/download/windows-client" -ForegroundColor Yellow
+            Write-Host "     解决方案：先下载 Windows 安装程序，双击运行并登录，再重跑本脚本。" -ForegroundColor Yellow
+            Write-Host "     下载地址: http://43.139.149.158:8080/api/node-agent/download/windows-installer" -ForegroundColor Yellow
         }
     }
 }

@@ -91,6 +91,7 @@ function Add-NodeAgentRemoteReleaseEvent {
         [string]$Changelog = '',
         [Parameter(Mandatory = $true)][string]$WindowsExe,
         [Parameter(Mandatory = $true)][string]$WindowsClientPackage,
+        [Parameter(Mandatory = $true)][string]$WindowsInstallerPackage,
         [string]$RipgrepPackage = '',
         [Parameter(Mandatory = $true)][string]$GitCommonDir,
         [switch]$IncludeLinux
@@ -105,6 +106,7 @@ function Add-NodeAgentRemoteReleaseEvent {
     $eventPath = Join-Path $eventDir 'event.json'
     $winSha = Get-NodeAgentFileSha256 -Path $WindowsExe
     $clientSha = Get-NodeAgentFileSha256 -Path $WindowsClientPackage
+    $installerSha = Get-NodeAgentFileSha256 -Path $WindowsInstallerPackage
     $ripgrepSha = if ([string]::IsNullOrWhiteSpace($RipgrepPackage)) { '' } else { Get-NodeAgentFileSha256 -Path $RipgrepPackage }
 
     if (Test-Path -LiteralPath $eventPath -PathType Leaf) {
@@ -115,6 +117,7 @@ function Add-NodeAgentRemoteReleaseEvent {
             [string]$existing.release_identity -ne $ReleaseIdentity -or
             [string]$existing.artifacts.windows_exe_sha256 -ne $winSha -or
             [string]$existing.artifacts.windows_client_sha256 -ne $clientSha -or
+            [string]$existing.artifacts.windows_installer_sha256 -ne $installerSha -or
             [bool]$existingIncludeLinux -ne [bool]$IncludeLinux) {
             throw 'An outbox event already exists for this SHA with different immutable identity or artifacts.'
         }
@@ -125,15 +128,18 @@ function Add-NodeAgentRemoteReleaseEvent {
     New-Item -ItemType Directory -Path $artifactDir -Force | Out-Null
     $winCopy = Join-Path $artifactDir 'elon-pc-node.exe'
     $clientCopy = Join-Path $artifactDir 'elon-node-agent-windows.zip'
+    $installerCopy = Join-Path $artifactDir 'elon-node-agent-windows-setup.exe'
     Copy-Item -LiteralPath $WindowsExe -Destination $winCopy -Force
     Copy-Item -LiteralPath $WindowsClientPackage -Destination $clientCopy -Force
+    Copy-Item -LiteralPath $WindowsInstallerPackage -Destination $installerCopy -Force
     $ripgrepCopy = ''
     if (-not [string]::IsNullOrWhiteSpace($RipgrepPackage)) {
         $ripgrepCopy = Join-Path $artifactDir 'ripgrep-windows.zip'
         Copy-Item -LiteralPath $RipgrepPackage -Destination $ripgrepCopy -Force
     }
     if ((Get-NodeAgentFileSha256 -Path $winCopy) -ne $winSha -or
-        (Get-NodeAgentFileSha256 -Path $clientCopy) -ne $clientSha) {
+        (Get-NodeAgentFileSha256 -Path $clientCopy) -ne $clientSha -or
+        (Get-NodeAgentFileSha256 -Path $installerCopy) -ne $installerSha) {
         throw 'Durable outbox artifact copy failed SHA-256 verification.'
     }
 
@@ -159,6 +165,8 @@ function Add-NodeAgentRemoteReleaseEvent {
             windows_exe_sha256 = $winSha
             windows_client = $clientCopy
             windows_client_sha256 = $clientSha
+            windows_installer = $installerCopy
+            windows_installer_sha256 = $installerSha
             ripgrep = $ripgrepCopy
             ripgrep_sha256 = $ripgrepSha
         }

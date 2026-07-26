@@ -41,6 +41,7 @@ foreach ($moduleName in @(
     'node-agent-release-outbox.ps1',
     'node-agent-release-build-cache.ps1',
     'node-agent-release-packaging.ps1',
+    'node-agent-windows-installer.ps1',
     'node-agent-remote-release-worker.ps1',
     'node-agent-local-activation.ps1',
     'node-agent-local-rollback.ps1',
@@ -72,18 +73,22 @@ try {
     New-Item -ItemType Directory -Path $artifactRoot | Out-Null
     $exe = Join-Path $artifactRoot 'elon-pc-node.exe'
     $zip = Join-Path $artifactRoot 'elon-node-agent-windows.zip'
+    $installer = Join-Path $artifactRoot 'elon-node-agent-windows-setup.exe'
     [System.IO.File]::WriteAllBytes($exe, [byte[]](1,2,3,4))
     [System.IO.File]::WriteAllBytes($zip, [byte[]](5,6,7,8))
+    [System.IO.File]::WriteAllBytes($installer, [byte[]](9,10,11,12))
     $sha = 'a' * 40
     $identity = "0.3.69+$sha"
     $outbox = Join-Path $root 'outbox'
 
     $first = Add-NodeAgentRemoteReleaseEvent -OutboxRoot $outbox -GitSha $sha `
         -Version '0.3.69' -ReleaseIdentity $identity -Changelog '中文离线发布 fixture' `
-        -WindowsExe $exe -WindowsClientPackage $zip -GitCommonDir (Join-Path $root 'git')
+        -WindowsExe $exe -WindowsClientPackage $zip -WindowsInstallerPackage $installer `
+        -GitCommonDir (Join-Path $root 'git')
     $duplicate = Add-NodeAgentRemoteReleaseEvent -OutboxRoot $outbox -GitSha $sha `
         -Version '0.3.69' -ReleaseIdentity $identity -Changelog '中文离线发布 fixture' `
-        -WindowsExe $exe -WindowsClientPackage $zip -GitCommonDir (Join-Path $root 'git')
+        -WindowsExe $exe -WindowsClientPackage $zip -WindowsInstallerPackage $installer `
+        -GitCommonDir (Join-Path $root 'git')
     Assert-Equal $first.EventPath $duplicate.EventPath 'duplicate delivery must coalesce by immutable SHA'
     Assert-True (-not $duplicate.Created) 'duplicate delivery must not create a second event'
     Assert-Equal @(Get-ChildItem (Join-Path $outbox 'events') -Directory).Count 1 'outbox must contain one event'
@@ -113,11 +118,15 @@ try {
     Assert-True (-not [bool]$event.include_linux) 'Linux release must be opt-in'
     Assert-Equal $event.changelog '中文离线发布 fixture' 'PS5.1 must round-trip UTF-8 outbox JSON explicitly'
     Assert-True $event.local_result_independent 'remote state must not own the local activation result'
+    Assert-Equal $event.artifacts.windows_installer_sha256 `
+        (Get-NodeAgentFileSha256 -Path $installer) `
+        'outbox must persist the immutable Windows installer SHA-256'
     $linuxIntentConflict = $false
     try {
         Add-NodeAgentRemoteReleaseEvent -OutboxRoot $outbox -GitSha $sha `
             -Version '0.3.69' -ReleaseIdentity $identity -Changelog '中文离线发布 fixture' `
-            -WindowsExe $exe -WindowsClientPackage $zip -GitCommonDir (Join-Path $root 'git') `
+            -WindowsExe $exe -WindowsClientPackage $zip -WindowsInstallerPackage $installer `
+            -GitCommonDir (Join-Path $root 'git') `
             -IncludeLinux | Out-Null
     } catch {
         $linuxIntentConflict = $_.Exception.Message.Contains('different immutable identity')

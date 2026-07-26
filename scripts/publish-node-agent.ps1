@@ -45,12 +45,15 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot "node-agent-publish-handshake.ps1")
 . (Join-Path $PSScriptRoot "node-agent-release-build-cache.ps1")
 . (Join-Path $PSScriptRoot "node-agent-release-packaging.ps1")
+. (Join-Path $PSScriptRoot "node-agent-windows-installer.ps1")
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
 $RemoteDir = "/opt/elon/data/downloads"
 $Bin = "elon-pc-node"
+$WindowsInstallerBin = "elon-node-installer"
 $WindowsClientPackageName = "elon-node-agent-windows.zip"
+$WindowsInstallerPackageName = "elon-node-agent-windows-setup.exe"
 $RipgrepPackageName = "ripgrep-windows.zip"
 $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $ServerDir = Join-Path $RepoRoot "server"
@@ -442,16 +445,23 @@ if ($UseOutboxArtifacts) {
     $LinuxDownloadUrl = if ($IncludeLinux) { "$BaseUrl/api/node-agent/download/linux" } else { '' }
     $WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
     $WindowsClientDownloadUrl = "$BaseUrl/api/node-agent/download/windows-client"
+    $WindowsInstallerDownloadUrl = "$BaseUrl/api/node-agent/download/windows-installer"
     $RipgrepDownloadUrl = "$BaseUrl/api/node-agent/download/ripgrep-windows"
     $WinBin = [string]$remoteEvent.artifacts.windows_exe
     $WindowsClientPackage = [string]$remoteEvent.artifacts.windows_client
+    $WindowsInstallerPackage = [string]$remoteEvent.artifacts.windows_installer
     $RipgrepPackage = [string]$remoteEvent.artifacts.ripgrep
     $WinSha256 = Get-NodeAgentFileSha256 -Path $WinBin
     $WindowsClientSha256 = Get-NodeAgentFileSha256 -Path $WindowsClientPackage
+    $WindowsInstallerSha256 = Get-NodeAgentFileSha256 -Path $WindowsInstallerPackage
     if ($WinSha256 -ne [string]$remoteEvent.artifacts.windows_exe_sha256 -or
-        $WindowsClientSha256 -ne [string]$remoteEvent.artifacts.windows_client_sha256) {
+        $WindowsClientSha256 -ne [string]$remoteEvent.artifacts.windows_client_sha256 -or
+        $WindowsInstallerSha256 -ne [string]$remoteEvent.artifacts.windows_installer_sha256) {
         throw 'Remote worker durable Windows artifacts failed immutable SHA-256 verification.'
     }
+    $WindowsInstallerFileSize = (Get-Item -LiteralPath $WindowsInstallerPackage).Length
+    Test-NodeAgentWindowsInstallerPackage -Path $WindowsInstallerPackage `
+        -ExpectedPayloadSha256 $WindowsClientSha256 | Out-Null
     $RipgrepZipSha256 = ''
     $RipgrepZipFileSize = 0
     if (-not [string]::IsNullOrWhiteSpace($RipgrepPackage)) {
@@ -476,7 +486,8 @@ try {
     Invoke-RustCacheCargo -ProjectRoot $RepoRoot -Domain 'node-agent-release' `
         -SharedBuildPartition 'node-agent-windows' `
         -TargetDir $env:CARGO_TARGET_DIR -CargoArgs @(
-            'build', '--manifest-path', $ServerManifest, '--release', '--locked', '--bin', $Bin
+            'build', '--manifest-path', $ServerManifest, '--release', '--locked',
+            '--bin', $Bin, '--bin', $WindowsInstallerBin
         )
     if ($LASTEXITCODE -ne 0) { throw "Windows 编译失败" }
 } finally {
@@ -489,8 +500,12 @@ try {
 }
 
 $WinBin = Join-Path $TargetDir "release\$Bin.exe"
+$WindowsInstallerStub = Join-Path $TargetDir "release\$WindowsInstallerBin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
+if (-not (Test-Path $WindowsInstallerStub)) { throw "Windows 安装器入口不存在：$WindowsInstallerStub" }
 Assert-WindowsExecutableBrandIcon -ExecutablePath $WinBin -ExpectedIconPath $BrandIcon | Out-Null
+Assert-WindowsExecutableBrandIcon -ExecutablePath $WindowsInstallerStub `
+    -ExpectedIconPath $BrandIcon | Out-Null
 $WinSha256 = Get-NodeAgentFileSha256 -Path $WinBin
 Set-NodeAgentPublishPhase -Phase $script:NodeReleaseActiveStage -Status 'succeeded'
 
@@ -537,18 +552,25 @@ Write-Host "[2.5/5] 打包 Windows 客户端..." -ForegroundColor Yellow
 $LinuxDownloadUrl = if ($IncludeLinux) { "$BaseUrl/api/node-agent/download/linux" } else { '' }
 $WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
 $WindowsClientDownloadUrl = "$BaseUrl/api/node-agent/download/windows-client"
+$WindowsInstallerDownloadUrl = "$BaseUrl/api/node-agent/download/windows-installer"
 $RipgrepDownloadUrl = "$BaseUrl/api/node-agent/download/ripgrep-windows"
 $LauncherDir = Join-Path $PSScriptRoot "node-agent-launcher"
 $packaging = New-NodeAgentWindowsClientPackage -RepoRoot $RepoRoot -TargetDir $TargetDir `
     -PackageVersion $PackageVersion -GitSha $GitSha -ReleaseChangelog $ReleaseChangelog `
     -WindowsDownloadUrl $WindowsDownloadUrl -WindowsClientDownloadUrl $WindowsClientDownloadUrl `
+    -WindowsInstallerDownloadUrl $WindowsInstallerDownloadUrl `
     -RipgrepDownloadUrl $RipgrepDownloadUrl -WinBin $WinBin -WinSha256 $WinSha256 `
     -DesktopShellBin $DesktopShellBin -BrandIcon $BrandIcon -PcDistDir $PcDistDir `
     -LauncherDir $LauncherDir -WindowsClientPackageName $WindowsClientPackageName `
+    -WindowsInstallerPackageName $WindowsInstallerPackageName `
+    -WindowsInstallerStub $WindowsInstallerStub `
     -RipgrepPackageName $RipgrepPackageName -ClientFileName "一龙开发平台.exe" `
     -UninstallFileName "卸载一龙开发平台.exe" -IncludeLinux:$IncludeLinux
 $WindowsClientPackage = $packaging.WindowsClientPackage
 $WindowsClientSha256 = $packaging.WindowsClientSha256
+$WindowsInstallerPackage = $packaging.WindowsInstallerPackage
+$WindowsInstallerSha256 = $packaging.WindowsInstallerSha256
+$WindowsInstallerFileSize = [int64]$packaging.WindowsInstallerFileSize
 $RipgrepPackage = $packaging.RipgrepPackage
 $RipgrepZipSha256 = $packaging.RipgrepZipSha256
 $RipgrepZipFileSize = [int64]$packaging.RipgrepZipFileSize
@@ -560,6 +582,7 @@ if (-not $SynchronousRemote) {
     $outboxEvent = Add-NodeAgentRemoteReleaseEvent -OutboxRoot $outboxRoot -GitSha $GitSha `
         -Version $PackageVersion -ReleaseIdentity $ReleaseIdentity -Changelog $ReleaseChangelog `
         -WindowsExe $WinBin -WindowsClientPackage $WindowsClientPackage `
+        -WindowsInstallerPackage $WindowsInstallerPackage `
         -RipgrepPackage $(if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) { $RipgrepPackage } else { '' }) `
         -GitCommonDir $commonDir -IncludeLinux:$IncludeLinux
     $activationRoot = Get-NodeAgentLocalActivationRoot
@@ -604,6 +627,7 @@ if ($IncludeLinux) {
 }
 scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $WinBin "${Server}:${RemoteDir}/${Bin}.exe"
 scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $WindowsClientPackage "${Server}:${RemoteDir}/${WindowsClientPackageName}"
+scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $WindowsInstallerPackage "${Server}:${RemoteDir}/${WindowsInstallerPackageName}"
 if ($LASTEXITCODE -ne 0) { throw "上传失败" }
 if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
     scp -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $RipgrepPackage "${Server}:${RemoteDir}/${RipgrepPackageName}"
@@ -620,6 +644,7 @@ if ($IncludeLinux) {
 }
 $sizeWin = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${Bin}.exe"
 $sizeWinClient = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${WindowsClientPackageName}"
+$sizeWinInstaller = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${WindowsInstallerPackageName}"
 if (Test-Path -LiteralPath $RipgrepPackage -PathType Leaf) {
     $RipgrepZipFileSize = [int64](ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 $Server "stat -c '%s' ${RemoteDir}/${RipgrepPackageName}")
 }
@@ -630,14 +655,17 @@ $VersionInfo = [ordered]@{
     updated_at = (Get-Date).ToString("o")
     downloadUrl = $WindowsDownloadUrl
     windowsClientDownloadUrl = $WindowsClientDownloadUrl
+    windowsInstallerDownloadUrl = $WindowsInstallerDownloadUrl
     ripgrepZipUrl = $RipgrepDownloadUrl
     sha256 = $WinSha256
     fileSha256 = $WinSha256
     linuxPublished = [bool]$IncludeLinux
     windowsClientSha256 = $WindowsClientSha256
+    windowsInstallerSha256 = $WindowsInstallerSha256
     ripgrepZipSha256 = $RipgrepZipSha256
     fileSize = [int64]$sizeWin
     windowsClientFileSize = [int64]$sizeWinClient
+    windowsInstallerFileSize = [int64]$sizeWinInstaller
     ripgrepZipFileSize = [int64]$RipgrepZipFileSize
 }
 if ($IncludeLinux) {
@@ -664,11 +692,17 @@ Write-Host "  Windows $Bin.exe size = $sizeWin bytes" -ForegroundColor Green
 Write-Host "  Windows $Bin.exe sha256 = $WinSha256" -ForegroundColor DarkGray
 Write-Host "  Windows client package size = $sizeWinClient bytes" -ForegroundColor Green
 Write-Host "  Windows client package sha256 = $WindowsClientSha256" -ForegroundColor DarkGray
+Write-Host "  Windows installer size = $sizeWinInstaller bytes" -ForegroundColor Green
+Write-Host "  Windows installer sha256 = $WindowsInstallerSha256" -ForegroundColor DarkGray
 if ($RipgrepZipFileSize -gt 0) {
     Write-Host "  ripgrep package size = $RipgrepZipFileSize bytes" -ForegroundColor Green
 }
 Write-Host "  Version info gitSha = $GitSha" -ForegroundColor Green
-Invoke-ElonNodeAgentPostUploadSmoke -BaseUrl $BaseUrl -ExpectedVersion $PackageVersion -ExpectedGitSha $GitSha -ExpectedWindowsSha256 $WinSha256 -ExpectedLinuxSha256 $LinuxSha256 -ExpectedWindowsClientSha256 $WindowsClientSha256 -IncludeRipgrep:($RipgrepZipFileSize -gt 0) | Out-Null
+Invoke-ElonNodeAgentPostUploadSmoke -BaseUrl $BaseUrl -ExpectedVersion $PackageVersion `
+    -ExpectedGitSha $GitSha -ExpectedWindowsSha256 $WinSha256 `
+    -ExpectedLinuxSha256 $LinuxSha256 -ExpectedWindowsClientSha256 $WindowsClientSha256 `
+    -ExpectedWindowsInstallerSha256 $WindowsInstallerSha256 `
+    -IncludeRipgrep:($RipgrepZipFileSize -gt 0) | Out-Null
 
 # ── 5. 推送在线 Windows 节点更新 ──────────────────────────────────────────────
 Write-Host "[5/5] 推送在线 Windows 节点更新..." -ForegroundColor Yellow
@@ -714,6 +748,7 @@ if ($IncludeLinux) {
     Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
 }
 Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"
+Write-Host "   安装程序（Windows）: $WindowsInstallerDownloadUrl"
 Write-Host "   客户端包（Windows）: $WindowsClientDownloadUrl"
 Write-Host "   ripgrep 绿色包:      $RipgrepDownloadUrl"
 if ($script:NodeReleaseOwned) {

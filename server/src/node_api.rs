@@ -429,6 +429,19 @@ pub async fn download_node_agent_windows_client(
     .await
 }
 
+/// GET /api/node-agent/download/windows-installer — 下载 Windows 单文件安装程序
+/// ZIP 继续保留给既有客户端自动更新，浏览器首次安装使用此入口。
+pub async fn download_node_agent_windows_installer(
+    State(state): State<Arc<AppState>>,
+) -> impl IntoResponse {
+    download_node_agent_binary(
+        state,
+        "elon-node-agent-windows-setup.exe",
+        "Elon-Windows-Setup.exe",
+    )
+    .await
+}
+
 /// GET /api/node-agent/download/linux — 下载最新 Linux 可执行文件
 /// 不需要登录（执行文件不含敏感信息）
 pub async fn download_node_agent_linux(State(state): State<Arc<AppState>>) -> impl IntoResponse {
