@@ -87,6 +87,7 @@ Assert-True ($brandIconSha256 -match '^[0-9a-f]{64}$') `
     "The checked-in Windows brand ICO must produce a stable 32px bitmap hash"
 
 $publishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-node-agent.ps1") -Raw
+$healthScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-health-checks.ps1") -Raw
 $packagingScript = Get-Content -LiteralPath (
     Join-Path $PSScriptRoot "node-agent-release-packaging.ps1"
 ) -Raw
@@ -141,6 +142,11 @@ Assert-True ($publishContractText.Contains('if ($RequireAllOnlineTargetBuild)'))
 Assert-True ($publishScript.Contains('[switch]$SynchronousRemote') -and `
     $publishScript.Contains('NODE_AGENT_LOCAL_SERVER_DEPENDENCY=none')) `
     "The default publisher must finish locally while remote release requires worker mode"
+Assert-True ($publishScript.Contains('$Changelog = [string]$remoteEvent.changelog')) `
+    "The remote worker must preserve the immutable outbox changelog"
+Assert-True ($healthScript.Contains(
+    'if (-not [string]::IsNullOrWhiteSpace($ExpectedLinuxSha256))'
+)) "Windows-only publication must not require a missing Linux manifest field"
 Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $WinBin')) `
     "The Windows release build must verify its extracted AssociatedIcon"
 Assert-True ($publishScript.Contains('Assert-WindowsExecutableBrandIcon -ExecutablePath $WindowsInstallerStub')) `

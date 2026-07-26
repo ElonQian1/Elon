@@ -347,6 +347,7 @@ if ($SynchronousRemote -and -not [string]::IsNullOrWhiteSpace($RemoteOutboxEvent
     if ($GitSha -notmatch '^[0-9a-f]{40}$') { throw 'Remote outbox event has an invalid Git SHA.' }
     $headSha = (git -C $RepoRoot rev-parse HEAD).Trim()
     if ($headSha -ne $GitSha) { throw "Remote worker source identity mismatch: head=$headSha event=$GitSha" }
+    $Changelog = [string]$remoteEvent.changelog
 } elseif ($SynchronousRemote) {
     $GitSha = Resolve-NodeAgentPublishSha -RepoRoot $RepoRoot -ReplayPublishedSha $ReplayPublishedSha
 } else {

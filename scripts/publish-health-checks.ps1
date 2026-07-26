@@ -138,7 +138,9 @@ function Invoke-ElonNodeAgentPostUploadSmoke {
     Assert-ElonValue -Label "node-agent version" -Actual ([string]$version.version) -Expected $ExpectedVersion
     Assert-ElonValue -Label "node-agent gitSha" -Actual ([string]$version.gitSha) -Expected $ExpectedGitSha
     Assert-ElonValue -Label "windows sha256" -Actual ([string]$version.sha256) -Expected $ExpectedWindowsSha256
-    Assert-ElonValue -Label "linux sha256" -Actual ([string]$version.linuxSha256) -Expected $ExpectedLinuxSha256
+    if (-not [string]::IsNullOrWhiteSpace($ExpectedLinuxSha256)) {
+        Assert-ElonValue -Label "linux sha256" -Actual ([string]$version.linuxSha256) -Expected $ExpectedLinuxSha256
+    }
     Assert-ElonValue -Label "windows client sha256" -Actual ([string]$version.windowsClientSha256) -Expected $ExpectedWindowsClientSha256
     Assert-ElonValue -Label "windows installer sha256" -Actual ([string]$version.windowsInstallerSha256) -Expected $ExpectedWindowsInstallerSha256
 
