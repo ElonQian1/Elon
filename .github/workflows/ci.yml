@@ -55,6 +55,7 @@ jobs:
         run: scripts\check-realtime-diagnostics-snapshot.ps1
 
       - name: Cache Cargo Audit
+        id: cargo-audit-cache
         uses: actions/cache@v4
         with:
           path: |
@@ -65,6 +66,15 @@ jobs:
       - name: Install Cargo Audit
         shell: pwsh
         run: scripts\install-cargo-audit.ps1 -Version 0.22.2
+
+      - name: Save Cargo Audit
+        if: steps.cargo-audit-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~\.cargo\bin\cargo-audit.exe
+            ~\.cargo\advisory-db
+          key: cargo-audit-windows-0.22.2-${{ runner.arch }}
 
       - name: Dependency Audit Report
         shell: pwsh
