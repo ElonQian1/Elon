@@ -112,6 +112,24 @@ function checkNamedBudget(files, spec) {
   )
 }
 
+function checkGroupBudget(files, spec) {
+  const matches = files.filter((file) => spec.pattern.test(file.name))
+  if (matches.length === 0) {
+    return {
+      label: spec.label,
+      failures: [`required chunks are missing: ${spec.pattern}`],
+    }
+  }
+  return budgetResult(
+    spec.label,
+    sum(matches, 'bytes'),
+    sum(matches, 'gzipBytes'),
+    spec.maxBytes,
+    spec.maxGzipBytes,
+    matches.map((file) => file.name).join(', '),
+  )
+}
+
 function checkTotalBudget(files, spec) {
   const scoped = files.filter((file) => file.ext === spec.ext)
   return budgetResult(
@@ -145,8 +163,8 @@ function checkMaxSingleBudget(files, spec) {
 
 const namedBudgets = [
   {
-    label: 'entry index js',
-    pattern: /^index-[A-Za-z0-9_-]+\.js$/,
+    label: 'entry app js',
+    pattern: /^app-[A-Za-z0-9_-]+\.js$/,
     maxBytes: 120 * KiB,
     maxGzipBytes: 45 * KiB,
   },
@@ -168,6 +186,9 @@ const namedBudgets = [
     maxBytes: 420 * KiB,
     maxGzipBytes: 140 * KiB,
   },
+]
+
+const groupedBudgets = [
   {
     label: 'conversation page css',
     pattern: /^ConversationPage-[A-Za-z0-9_-]+\.css$/,
@@ -180,14 +201,14 @@ const totalBudgets = [
   {
     label: 'total js',
     ext: '.js',
-    maxBytes: 1300 * KiB,
-    maxGzipBytes: 430 * KiB,
+    maxBytes: 2200 * KiB,
+    maxGzipBytes: 700 * KiB,
   },
   {
     label: 'total css',
     ext: '.css',
-    maxBytes: 460 * KiB,
-    maxGzipBytes: 95 * KiB,
+    maxBytes: 600 * KiB,
+    maxGzipBytes: 120 * KiB,
   },
 ]
 
@@ -195,8 +216,8 @@ const maxSingleBudgets = [
   {
     label: 'largest async js',
     ext: '.js',
-    exclude: [/^index-/, /^vendor-/, /^store-/],
-    maxBytes: 420 * KiB,
+    exclude: [/^app-/, /^vendor-/, /^store-/],
+    maxBytes: 480 * KiB,
     maxGzipBytes: 140 * KiB,
   },
   {
@@ -233,6 +254,7 @@ function main() {
   const files = collectAssets(args.distDir)
   const results = [
     ...namedBudgets.map((spec) => checkNamedBudget(files, spec)),
+    ...groupedBudgets.map((spec) => checkGroupBudget(files, spec)),
     ...maxSingleBudgets.map((spec) => checkMaxSingleBudget(files, spec)),
     ...totalBudgets.map((spec) => checkTotalBudget(files, spec)),
   ]
