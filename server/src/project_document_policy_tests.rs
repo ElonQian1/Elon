@@ -89,4 +89,14 @@ fn customization_assets_and_ai_rules_are_not_unknown_notes() {
     let bridge = classify_project_document("AI_RULES.md", "# Bridge\n", 9);
     assert_eq!(bridge.role, "project_guide");
     assert!(!bridge.ambiguous);
+
+    let project_template = classify_project_document(
+        "default-project-docs/files/github/instructions/document-authority.instructions.md",
+        "# Template\n",
+        12,
+    );
+    assert_eq!(project_template.role, "project_template");
+    assert_eq!(project_template.authority, "customization");
+    assert!(!project_template.default_retrieval);
+    assert!(!project_template.ambiguous);
 }

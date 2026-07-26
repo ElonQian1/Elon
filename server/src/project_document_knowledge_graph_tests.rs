@@ -38,6 +38,14 @@ fn fixture(label: &str) -> PathBuf {
                 {"id":"reference","label":"接口","detail":"API","color":"#4FA9B8","entrypoint":"docs/API.md"}
             ],
             "assignments": {"docs/README.md":"custom:overview","docs/API.md":"custom:reference"},
+            "governance_facets": {
+                "docs/README.md": {"retrieval":"on_demand","lifecycle":"active","authority":"authoritative","document_type":"overview"},
+                "docs/API.md": {"retrieval":"on_demand","lifecycle":"active","authority":"authoritative","document_type":"api_reference"}
+            },
+            "document_metadata": {
+                "docs/README.md": {"doc_type":"overview","owner":"docs-team","reviewed_at":"2026-07-20"},
+                "docs/API.md": {"doc_type":"api-reference","owner":"api-team","reviewed_at":"2026-07-20"}
+            },
             "knowledge_graph": {
                 "nodes": [
                     {"id":"cap-api","view":"capabilities","kind":"capability","label":"健康检查","detail":"公开健康接口","color":"#4FA9B8","entrypoint":"docs/API.md","document_paths":["docs/API.md"],"implementation_refs":["file:src/main.rs"]},
@@ -277,6 +285,18 @@ fn mcp_graph_queries_are_bounded_and_do_not_read_bodies() {
         plan["relevant_documents"][0]["document"]["path"],
         "docs/API.md"
     );
+    assert_eq!(
+        plan["relevant_documents"][0]["document"]["authority"],
+        "authoritative"
+    );
+    assert_eq!(
+        plan["relevant_documents"][0]["document"]["default_retrieval"],
+        true
+    );
+    assert_eq!(
+        plan["relevant_documents"][0]["reason"]["authoritative_entrypoint"],
+        true
+    );
     assert!(plan["budget"]["rules"].is_object());
     assert!(plan["budget"]["relevant_content"].is_object());
     fs::remove_dir_all(root).ok();
@@ -313,7 +333,7 @@ fn self_project_overview_is_bounded_and_fast_enough_for_interactive_use() {
         .collect::<Vec<_>>();
     assert!(paths.contains(&"docs/system-architecture.md"), "{paths:?}");
     assert!(
-        paths.contains(&"docs/codex-desktop-pc-supervision.md"),
+        paths.contains(&"docs/supervised-pc-project-development.md"),
         "{paths:?}"
     );
     assert!(
@@ -324,6 +344,11 @@ fn self_project_overview_is_bounded_and_fast_enough_for_interactive_use() {
         let path = path.to_ascii_lowercase();
         path.contains("e2e") || path.contains("trace")
     }));
+    assert!(!paths.iter().any(|path| path.starts_with(".github/agents/")
+        || path.starts_with(".github/prompts/")
+        || path.starts_with(".github/skills/")
+        || path.starts_with(".github/instructions/")
+        || matches!(*path, "AI_RULES.md" | "AI_TASK_TEMPLATE.md")));
     assert!(
         elapsed.as_secs() < 10,
         "self project overview took {elapsed:?}"

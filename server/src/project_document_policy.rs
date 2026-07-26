@@ -122,6 +122,18 @@ fn path_defaults(path: &str, file_name: &str) -> ProjectDocumentMetadata {
                 "high",
                 "项目 AI 导航文档",
             )
+        } else if path.starts_with("default-project-docs/")
+            || path.starts_with("group-chat-project-docs/")
+        {
+            (
+                "project_template",
+                "active",
+                "customization",
+                false,
+                false,
+                "high",
+                "新项目或群聊项目的初始化模板，不代表当前仓库事实",
+            )
         } else if is_historical_path(path) {
             (
                 "archive",

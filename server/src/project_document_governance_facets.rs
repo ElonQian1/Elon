@@ -204,7 +204,15 @@ pub(crate) fn effective_facets_with_metadata(
     configured: Option<&DocumentGovernanceFacets>,
     metadata: Option<&DocumentKnowledgeMetadata>,
 ) -> DocumentGovernanceFacets {
-    let mut facets = effective_facets(document, configured);
+    let mut facets = if manifest_can_classify_generic_document(document, configured, metadata) {
+        curated_generic_facets(
+            document,
+            configured.expect("checked configured facets"),
+            metadata,
+        )
+    } else {
+        effective_facets(document, configured)
+    };
     match metadata.map(|value| value.version_status.as_str()) {
         Some("draft") => {
             facets.lifecycle = "draft".to_string();
@@ -227,6 +235,77 @@ pub(crate) fn effective_facets_with_metadata(
     facets
 }
 
+/// A generic `docs/` path is not automatically authoritative, but it also is
+/// not a permanent zero-authority ceiling. A versioned project manifest may
+/// classify it when three independent curation signals agree: explicit
+/// governance facets, an owner, and a review date. Negative path classes such
+/// as drafts, reports, discussions, and archives are never eligible.
+fn manifest_can_classify_generic_document(
+    document: &ProjectDocumentEntry,
+    configured: Option<&DocumentGovernanceFacets>,
+    metadata: Option<&DocumentKnowledgeMetadata>,
+) -> bool {
+    let Some(configured) = configured else {
+        return false;
+    };
+    let Some(metadata) = metadata else {
+        return false;
+    };
+    let path = document.path.replace('\\', "/").to_ascii_lowercase();
+    let generic_path_class = path.starts_with("docs/")
+        && matches!(
+            document.metadata.authority.as_str(),
+            "unknown" | "informative"
+        )
+        && matches!(document.metadata.role.as_str(), "note" | "guide")
+        && matches!(
+            document.metadata.lifecycle.as_str(),
+            "unclassified" | "active"
+        );
+    let curated = (!metadata.owner.trim().is_empty() || !metadata.owners.is_empty())
+        && !metadata.reviewed_at.trim().is_empty()
+        && !metadata.doc_type.trim().is_empty()
+        && matches!(configured.lifecycle.as_str(), "active" | "accepted")
+        && matches!(
+            configured.authority.as_str(),
+            "binding" | "authoritative" | "guidance" | "evidence" | "proposal"
+        );
+    generic_path_class && curated
+}
+
+fn curated_generic_facets(
+    document: &ProjectDocumentEntry,
+    configured: &DocumentGovernanceFacets,
+    metadata: Option<&DocumentKnowledgeMetadata>,
+) -> DocumentGovernanceFacets {
+    let base = inferred_facets(document);
+    let authority = match configured.authority.as_str() {
+        // Repository/domain rules are the only documents allowed to be
+        // binding. A curated ordinary document is capped at authoritative.
+        "binding" => "authoritative",
+        value => value,
+    };
+    DocumentGovernanceFacets {
+        // Ordinary project documents are always task-routed. They cannot
+        // become mandatory rules through the manifest.
+        retrieval: match configured.retrieval.as_str() {
+            "excluded" => "excluded",
+            _ => "on_demand",
+        }
+        .to_string(),
+        lifecycle: configured.lifecycle.clone(),
+        authority: authority.to_string(),
+        document_type: if configured.document_type.trim().is_empty() {
+            metadata
+                .map(|value| value.doc_type.clone())
+                .filter(|value| !value.is_empty())
+                .unwrap_or(base.document_type)
+        } else {
+            configured.document_type.clone()
+        },
+    }
+}
+
 pub(crate) fn quick_view(facets: &DocumentGovernanceFacets) -> &'static str {
     match facets.retrieval.as_str() {
         "required" => return "required",
@@ -241,7 +320,7 @@ pub(crate) fn quick_view(facets: &DocumentGovernanceFacets) -> &'static str {
         _ => {}
     }
     match facets.document_type.as_str() {
-        "agent_definition" | "prompt_template" | "skill" => "customizations",
+        "agent_definition" | "prompt_template" | "skill" | "project_template" => "customizations",
         "decision" => "decisions",
         "status" | "report" => "evidence",
         "archive" => "archive",
@@ -270,7 +349,7 @@ fn inferred_facets(document: &ProjectDocumentEntry) -> DocumentGovernanceFacets 
         "draft" | "deprecated" | "superseded" | "archived" | "unclassified"
     ) || matches!(
         role,
-        "archive" | "discussion" | "note" | "status" | "report"
+        "archive" | "discussion" | "note" | "status" | "report" | "project_template"
     );
     DocumentGovernanceFacets {
         retrieval: if matches!(role, "policy" | "router") {
@@ -498,6 +577,57 @@ mod tests {
         let effective = effective_facets_with_metadata(&document, None, Some(&metadata));
         assert_eq!(effective.lifecycle, "superseded");
         assert_eq!(effective.retrieval, "excluded");
+        assert_eq!(effective.authority, "non_authoritative");
+    }
+
+    #[test]
+    fn reviewed_manifest_can_classify_generic_docs_without_promoting_negative_paths() {
+        let generic = ProjectDocumentEntry {
+            path: "docs/system-guide.md".into(),
+            title: "Guide".into(),
+            content: String::new(),
+            truncated: false,
+            byte_len: 0,
+            source: "workspace".into(),
+            metadata: ProjectDocumentMetadata {
+                role: "note".into(),
+                lifecycle: "unclassified".into(),
+                authority: "unknown".into(),
+                ambiguous: true,
+                ..Default::default()
+            },
+        };
+        let requested = DocumentGovernanceFacets {
+            retrieval: "required".into(),
+            lifecycle: "active".into(),
+            authority: "binding".into(),
+            document_type: "architecture".into(),
+        };
+        let reviewed = DocumentKnowledgeMetadata {
+            owner: "architecture-team".into(),
+            reviewed_at: "2026-07-20".into(),
+            doc_type: "architecture".into(),
+            ..Default::default()
+        };
+        let effective = effective_facets_with_metadata(&generic, Some(&requested), Some(&reviewed));
+        assert_eq!(effective.retrieval, "on_demand");
+        assert_eq!(effective.lifecycle, "active");
+        assert_eq!(effective.authority, "authoritative");
+
+        let archived = ProjectDocumentEntry {
+            path: "docs/archive/system-guide.md".into(),
+            metadata: ProjectDocumentMetadata {
+                role: "archive".into(),
+                lifecycle: "archived".into(),
+                authority: "historical".into(),
+                ..Default::default()
+            },
+            ..generic
+        };
+        let effective =
+            effective_facets_with_metadata(&archived, Some(&requested), Some(&reviewed));
+        assert_eq!(effective.retrieval, "excluded");
+        assert_eq!(effective.lifecycle, "archived");
         assert_eq!(effective.authority, "non_authoritative");
     }
 }

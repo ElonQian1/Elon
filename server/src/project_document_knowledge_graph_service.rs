@@ -189,22 +189,33 @@ pub(crate) fn plan_context(
     let identity = graph_identity(workspace, &snapshot, manifest_revision.as_deref(), &maps)?;
     let all_maps = [&maps.capabilities, &maps.architecture, &maps.topics];
     let query_lower = query.to_lowercase();
-    let query_terms = query_lower
-        .split(|character: char| {
-            character.is_whitespace() || matches!(character, ',' | '/' | ':' | '，' | '、')
-        })
-        .filter(|term| term.chars().count() >= 2)
-        .collect::<Vec<_>>();
-    let matched_nodes = all_maps
+    let query_terms = context_query_terms(&query_lower);
+    let mut scored_nodes = all_maps
         .iter()
         .flat_map(|map| map.nodes.iter())
-        .filter(|node| {
-            node_id.is_some_and(|id| id == node.id)
-                || (!query_lower.is_empty()
-                    && format!("{} {} {}", node.label, node.detail, node.tags.join(" "))
-                        .to_ascii_lowercase()
-                        .contains(&query_lower))
+        .filter_map(|node| {
+            if let Some(id) = node_id {
+                return (id == node.id).then_some((usize::MAX, node));
+            }
+            let text =
+                format!("{} {} {}", node.label, node.detail, node.tags.join(" ")).to_lowercase();
+            let score = query_terms
+                .iter()
+                .filter(|term| text.contains(term.as_str()))
+                .count();
+            (score > 0).then_some((score, node))
         })
+        .collect::<Vec<_>>();
+    scored_nodes.sort_by(|(left_score, left), (right_score, right)| {
+        right_score
+            .cmp(left_score)
+            .then(left.order.cmp(&right.order))
+            .then(left.id.cmp(&right.id))
+    });
+    let matched_nodes = scored_nodes
+        .into_iter()
+        .take(12)
+        .map(|(_, node)| node)
         .collect::<Vec<_>>();
     if let Some(id) = node_id {
         if !matched_nodes.iter().any(|node| node.id == id) {
@@ -216,12 +227,31 @@ pub(crate) fn plan_context(
         .flat_map(|node| node.document_paths.iter())
         .map(|path| normalize(path))
         .collect::<HashSet<_>>();
+    let linked_entrypoints = matched_nodes
+        .iter()
+        .filter(|node| !node.entrypoint.is_empty())
+        .map(|node| normalize(&node.entrypoint))
+        .collect::<HashSet<_>>();
     let max_tokens = max_tokens.clamp(200, 12_000);
     let max_rule_tokens = max_rule_tokens.clamp(200, 6_000);
     let max_documents = max_documents.clamp(1, 24);
     let historical_requested = ["历史", "旧", "报告", "trace", "e2e", "report", "archive"]
         .iter()
         .any(|term| query_lower.contains(term));
+    let customizations_requested = [
+        "指令",
+        "规则",
+        "定制",
+        "提示词",
+        "代理",
+        "agent",
+        "prompt",
+        "skill",
+        "instruction",
+        "policy",
+    ]
+    .iter()
+    .any(|term| query_lower.contains(term));
     let mut mandatory_paths = vec![".github/copilot-instructions.md", "AGENTS.md"];
     if ["文档", "知识", "治理", "authority", "document"]
         .iter()
@@ -261,9 +291,12 @@ pub(crate) fn plan_context(
         })
         .filter(|document| {
             let normalized_path = normalize(&document.path);
-            if linked.contains(&normalized_path)
-                || contextual_entrypoint_score(&normalized_path, &query_lower) > 0
-            {
+            if is_task_specific_customization(document) && !customizations_requested {
+                return false;
+            }
+            let entrypoint_score =
+                manifest_entrypoint_score(&normalized_path, &query_terms, &manifest);
+            if linked.contains(&normalized_path) || entrypoint_score > 0 {
                 return true;
             }
             if historical_requested {
@@ -286,17 +319,23 @@ pub(crate) fn plan_context(
             )
             .to_lowercase();
             let path = normalize(&document.path);
+            let manifest_path = document.path.replace('\\', "/");
             let term_score = query_terms
                 .iter()
-                .filter(|term| text.contains(*term))
+                .filter(|term| text.contains(term.as_str()))
                 .count()
                 * 20;
-            let authority_score = usize::from(document.metadata.default_retrieval) * 15
+            let facets = effective_facets_with_metadata(
+                document,
+                manifest.governance_facets.get(&manifest_path),
+                manifest.document_metadata.get(&manifest_path),
+            );
+            let authority_score = usize::from(facets.retrieval != "excluded") * 15
                 + usize::from(matches!(
-                    document.metadata.authority.as_str(),
+                    facets.authority.as_str(),
                     "binding" | "authoritative"
                 )) * 20;
-            let entrypoint_score = contextual_entrypoint_score(&path, &query_lower);
+            let entrypoint_score = manifest_entrypoint_score(&path, &query_terms, &manifest);
             let score = usize::from(linked.contains(&path)) * 100
                 + term_score
                 + authority_score
@@ -312,9 +351,16 @@ pub(crate) fn plan_context(
     let mut used_tokens = 0u64;
     for (score, document) in candidates {
         let tokens = document.metadata.token_estimate.max(1);
-        let authoritative_entrypoint =
-            contextual_entrypoint_score(&normalize(&document.path), &query_lower) > 0;
-        let planned_tokens = if authoritative_entrypoint {
+        let path = normalize(&document.path);
+        let manifest_path = document.path.replace('\\', "/");
+        let knowledge_entrypoint = linked_entrypoints.contains(&path)
+            || manifest_entrypoint_score(&path, &query_terms, &manifest) > 0;
+        let facets = effective_facets_with_metadata(
+            document,
+            manifest.governance_facets.get(&manifest_path),
+            manifest.document_metadata.get(&manifest_path),
+        );
+        let planned_tokens = if knowledge_entrypoint {
             tokens.min(1_200)
         } else {
             tokens
@@ -327,7 +373,12 @@ pub(crate) fn plan_context(
         used_tokens = used_tokens.saturating_add(planned_tokens);
         selected.push(json!({
             "score":score,
-            "reason":context_reason(&document.path, score, linked.contains(&normalize(&document.path))),
+            "reason":context_reason(
+                score,
+                linked.contains(&path),
+                knowledge_entrypoint,
+                matches!(facets.authority.as_str(), "binding" | "authoritative"),
+            ),
             "read_plan":{
                 "mode":if planned_tokens < tokens {"sectional"} else {"full_if_needed"},
                 "estimated_selected_tokens":planned_tokens,
@@ -367,51 +418,114 @@ fn is_historical_noise(document: &homecli_proto::ProjectDocumentEntry) -> bool {
         .any(|part| path.contains(part))
 }
 
-fn contextual_entrypoint_score(path: &str, query: &str) -> usize {
-    let mut score = 0;
-    if path == "docs/system-architecture.md"
-        && ["系统", "架构", "system", "architecture"]
-            .iter()
-            .any(|term| query.contains(term))
-    {
-        score += 180;
-    }
-    if path == "docs/codex-desktop-pc-supervision.md"
-        && ["pc", "监督", "supervision", "codex"]
-            .iter()
-            .any(|term| query.contains(term))
-    {
-        score += 170;
-    }
-    if path == "docs/project-document-governance-mcp.md"
-        && ["文档", "知识", "治理", "mcp", "document"]
-            .iter()
-            .any(|term| query.contains(term))
-    {
-        score += 190;
-    }
-    if path == "docs/supervised-pc-project-development.md"
-        && ["pc", "监督", "项目"]
-            .iter()
-            .any(|term| query.contains(term))
-    {
-        score += 120;
-    }
-    score
+fn is_task_specific_customization(document: &homecli_proto::ProjectDocumentEntry) -> bool {
+    let path = normalize(&document.path);
+    matches!(
+        document.metadata.role.as_str(),
+        "instruction"
+            | "agent_definition"
+            | "prompt_template"
+            | "skill"
+            | "provider_adapter"
+            | "project_template"
+    ) || matches!(path.as_str(), "ai_rules.md" | "ai_task_template.md")
 }
 
-fn context_reason(path: &str, score: usize, linked: bool) -> Value {
-    let path = normalize(path);
+fn manifest_entrypoint_score(
+    path: &str,
+    query_terms: &[String],
+    manifest: &DocumentSectionManifest,
+) -> usize {
+    let home_text = format!("{} {}", manifest.home.title, manifest.home.summary).to_lowercase();
+    let home_matches = query_terms
+        .iter()
+        .filter(|term| home_text.contains(term.as_str()))
+        .count();
+    if home_matches > 0 && normalize(&manifest.home.entrypoint) == path {
+        return 60 + home_matches * 30;
+    }
+    if home_matches > 0
+        && manifest
+            .home
+            .start_here
+            .iter()
+            .any(|candidate| normalize(candidate) == path)
+    {
+        return 40 + home_matches * 20;
+    }
+    manifest
+        .sections
+        .iter()
+        .filter(|section| normalize(&section.entrypoint) == path)
+        .map(|section| {
+            let text = format!("{} {}", section.label, section.detail).to_lowercase();
+            let matches = query_terms
+                .iter()
+                .filter(|term| text.contains(term.as_str()))
+                .count();
+            if matches == 0 {
+                0
+            } else {
+                60 + matches * 30
+            }
+        })
+        .max()
+        .unwrap_or_default()
+}
+
+fn context_reason(
+    score: usize,
+    linked: bool,
+    knowledge_entrypoint: bool,
+    authoritative: bool,
+) -> Value {
     json!({
         "graph_linked":linked,
-        "authoritative_entrypoint":matches!(path.as_str(),
-            "docs/system-architecture.md"
-            | "docs/codex-desktop-pc-supervision.md"
-            | "docs/project-document-governance-mcp.md"
-            | "docs/supervised-pc-project-development.md"
-        ),
+        "knowledge_entrypoint":knowledge_entrypoint,
+        "authoritative_entrypoint":knowledge_entrypoint && authoritative,
         "ranking_score":score,
     })
+}
+
+fn context_query_terms(query: &str) -> Vec<String> {
+    let mut terms = query
+        .split(|character: char| {
+            character.is_whitespace()
+                || matches!(character, ',' | '/' | ':' | '，' | '、' | '；' | ';')
+        })
+        .flat_map(split_ascii_cjk_boundaries)
+        .filter(|term| term.chars().count() >= 2)
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    for keyword in [
+        "文档", "知识", "治理", "架构", "系统", "监督", "项目", "权限", "发布", "节点", "检索",
+        "健康", "mcp", "token", "android", "pc",
+    ] {
+        if query.contains(keyword) && !terms.iter().any(|term| term == keyword) {
+            terms.push(keyword.to_string());
+        }
+    }
+    terms.sort();
+    terms.dedup();
+    terms
+}
+
+fn split_ascii_cjk_boundaries(value: &str) -> Vec<&str> {
+    let mut boundaries = vec![0usize];
+    let mut previous_ascii = None;
+    for (index, character) in value.char_indices() {
+        let ascii = character.is_ascii_alphanumeric();
+        if previous_ascii.is_some_and(|previous| previous != ascii) {
+            boundaries.push(index);
+        }
+        previous_ascii = Some(ascii);
+    }
+    boundaries.push(value.len());
+    boundaries
+        .windows(2)
+        .filter_map(|range| value.get(range[0]..range[1]))
+        .filter(|part| !part.is_empty())
+        .collect()
 }
 
 fn load(

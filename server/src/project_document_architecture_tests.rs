@@ -15,6 +15,14 @@ fn document(path: &str, title: &str, role: &str, ambiguous: bool) -> ProjectDocu
         metadata: ProjectDocumentMetadata {
             role: role.to_string(),
             lifecycle: if ambiguous { "unclassified" } else { "active" }.to_string(),
+            authority: if ambiguous {
+                "unknown"
+            } else if role == "guide" {
+                "informative"
+            } else {
+                "normative"
+            }
+            .to_string(),
             ambiguous,
             ..ProjectDocumentMetadata::default()
         },

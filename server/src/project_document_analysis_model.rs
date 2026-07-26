@@ -26,13 +26,13 @@ pub(crate) struct CompactDocument<'a> {
     title: &'a str,
     size_bytes: u64,
     role: &'a str,
-    lifecycle: &'a str,
-    authority: &'a str,
+    lifecycle: String,
+    authority: String,
     scope: &'a str,
     default_retrieval: bool,
     ambiguous: bool,
     confidence: &'a str,
-    reason: &'a str,
+    reason: String,
     token_estimate: u64,
     content_hash: &'a str,
     headings: &'a [String],
@@ -49,18 +49,33 @@ pub(crate) fn compact_document<'a>(
     manifest: &DocumentSectionManifest,
 ) -> CompactDocument<'a> {
     let path = document.path.replace('\\', "/");
+    let governance = effective_facets_with_metadata(
+        document,
+        manifest.governance_facets.get(&path),
+        manifest.document_metadata.get(&path),
+    );
+    let manifest_classified = document.metadata.ambiguous
+        && governance.lifecycle != "unclassified"
+        && governance.authority != "unknown";
     CompactDocument {
         path: &document.path,
         title: &document.title,
         size_bytes: document.byte_len,
         role: &document.metadata.role,
-        lifecycle: &document.metadata.lifecycle,
-        authority: &document.metadata.authority,
+        lifecycle: governance.lifecycle.clone(),
+        authority: governance.authority.clone(),
         scope: &document.metadata.scope,
-        default_retrieval: document.metadata.default_retrieval,
-        ambiguous: document.metadata.ambiguous,
+        default_retrieval: governance.retrieval != "excluded",
+        ambiguous: document.metadata.ambiguous && !manifest_classified,
         confidence: &document.metadata.confidence,
-        reason: &document.metadata.reason,
+        reason: if manifest_classified {
+            format!(
+                "{}；受控知识清单以 owner、复查日期和治理属性完成分类",
+                document.metadata.reason
+            )
+        } else {
+            document.metadata.reason.clone()
+        },
         token_estimate: document.metadata.token_estimate,
         content_hash: &document.metadata.content_hash,
         headings: &document.metadata.headings,
@@ -71,11 +86,7 @@ pub(crate) fn compact_document<'a>(
             .get(&path)
             .cloned()
             .unwrap_or_default(),
-        governance: effective_facets_with_metadata(
-            document,
-            manifest.governance_facets.get(&path),
-            manifest.document_metadata.get(&path),
-        ),
+        governance,
         version: manifest
             .document_metadata
             .get(&path)

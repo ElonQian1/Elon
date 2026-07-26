@@ -4,7 +4,10 @@ use homecli_proto::ProjectDocumentEntry;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 
-use crate::project_document_governance::DocumentSectionManifest;
+use crate::{
+    project_document_governance::DocumentSectionManifest,
+    project_document_governance_facets::effective_facets_with_metadata,
+};
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub(crate) struct RecommendedKnowledgeSection {
@@ -80,7 +83,15 @@ pub(crate) fn analyze_knowledge_architecture(
     let topic_unassigned_documents = 0;
     let ambiguous_documents = documents
         .iter()
-        .filter(|document| document.metadata.ambiguous)
+        .filter(|document| {
+            let path = document.path.replace('\\', "/");
+            let facets = effective_facets_with_metadata(
+                document,
+                manifest.governance_facets.get(&path),
+                manifest.document_metadata.get(&path),
+            );
+            facets.lifecycle == "unclassified" || facets.authority == "unknown"
+        })
         .count();
     let outdated_documents = documents
         .iter()
@@ -91,7 +102,7 @@ pub(crate) fn analyze_knowledge_architecture(
             )
         })
         .count();
-    let duplicate_titles = duplicate_title_count(documents);
+    let duplicate_titles = duplicate_title_count(documents, manifest);
     let home_configured = !manifest.home.title.is_empty()
         && !manifest.home.summary.is_empty()
         && (!manifest.home.entrypoint.is_empty() || !manifest.home.start_here.is_empty());
@@ -226,38 +237,76 @@ fn foundation_is_covered(
     doc_type: &str,
     aliases: &[&str],
 ) -> bool {
-    if manifest
-        .document_metadata
-        .values()
-        .any(|metadata| metadata.doc_type == doc_type)
-    {
-        return true;
-    }
-    if manifest.sections.iter().any(|section| {
-        aliases.iter().any(|alias| {
-            section.id.contains(alias)
-                || section.label.to_ascii_lowercase().contains(alias)
-                || section.entrypoint.to_ascii_lowercase().contains(alias)
-        })
+    if manifest.document_metadata.iter().any(|(path, metadata)| {
+        metadata.doc_type == doc_type
+            && documents
+                .iter()
+                .find(|document| normalize(&document.path) == normalize(path))
+                .is_some_and(|document| current_for_architecture(document, manifest))
     }) {
         return true;
     }
-    documents.iter().any(|document| {
-        let searchable = format!("{} {}", document.path, document.title).to_ascii_lowercase();
-        aliases.iter().any(|alias| searchable.contains(alias))
-            || match doc_type {
-                "architecture" => document.metadata.role == "architecture",
-                "operations" => document.metadata.role == "runbook",
-                "requirements" => document.metadata.role == "requirement",
-                "decisions" => document.metadata.role == "decision",
-                _ => false,
-            }
-    })
+    if manifest.sections.iter().any(|section| {
+        !section.entrypoint.is_empty()
+            && aliases.iter().any(|alias| {
+                section.id.contains(alias)
+                    || section.label.to_ascii_lowercase().contains(alias)
+                    || section.entrypoint.to_ascii_lowercase().contains(alias)
+            })
+            && documents
+                .iter()
+                .find(|document| normalize(&document.path) == normalize(&section.entrypoint))
+                .is_some_and(|document| current_for_architecture(document, manifest))
+    }) {
+        return true;
+    }
+    documents
+        .iter()
+        .filter(|document| current_for_architecture(document, manifest))
+        .any(|document| {
+            let searchable = format!("{} {}", document.path, document.title).to_ascii_lowercase();
+            aliases.iter().any(|alias| searchable.contains(alias))
+                || match doc_type {
+                    "architecture" => document.metadata.role == "architecture",
+                    "operations" => document.metadata.role == "runbook",
+                    "requirements" => document.metadata.role == "requirement",
+                    "decisions" => document.metadata.role == "decision",
+                    _ => false,
+                }
+        })
 }
 
-fn duplicate_title_count(documents: &[ProjectDocumentEntry]) -> usize {
+fn current_for_architecture(
+    document: &ProjectDocumentEntry,
+    manifest: &DocumentSectionManifest,
+) -> bool {
+    let path = document.path.replace('\\', "/");
+    let facets = effective_facets_with_metadata(
+        document,
+        manifest.governance_facets.get(&path),
+        manifest.document_metadata.get(&path),
+    );
+    facets.retrieval != "excluded"
+        && matches!(facets.lifecycle.as_str(), "active" | "accepted" | "current")
+}
+
+fn duplicate_title_count(
+    documents: &[ProjectDocumentEntry],
+    manifest: &DocumentSectionManifest,
+) -> usize {
     let mut counts = HashMap::new();
     for document in documents {
+        let path = document.path.replace('\\', "/");
+        let facets = effective_facets_with_metadata(
+            document,
+            manifest.governance_facets.get(&path),
+            manifest.document_metadata.get(&path),
+        );
+        if facets.retrieval == "excluded"
+            || !matches!(facets.lifecycle.as_str(), "active" | "accepted" | "current")
+        {
+            continue;
+        }
         let title = document
             .title
             .to_ascii_lowercase()

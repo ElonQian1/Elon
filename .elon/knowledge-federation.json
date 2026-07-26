@@ -22,7 +22,12 @@
       "profile": "software-platform",
       "owner": "项目维护者",
       "include_globs": ["docs/README.md", "AI_PROJECT.md", "AI_ARCHITECTURE.md", "AI_INDEX.md", "docs/system-architecture.md"],
-      "home": { "entrypoint": "docs/README.md", "start_here": ["AI_PROJECT.md", "AI_ARCHITECTURE.md"] }
+      "home": {
+        "title": "平台总览与核心架构",
+        "summary": "从平台定位、模块边界和推荐阅读入口理解一龙整体系统。",
+        "entrypoint": "docs/README.md",
+        "start_here": ["AI_PROJECT.md", "AI_ARCHITECTURE.md"]
+      }
     },
     {
       "id": "server",
@@ -32,7 +37,12 @@
       "profile": "software-api",
       "owner": "平台后端",
       "include_globs": ["AI_INDEX.md", "docs/system-architecture.md", "docs/intent-routing.md", "docs/route-c-sdk-mvp.md", "docs/project-document-governance-mcp.md"],
-      "home": { "entrypoint": "docs/system-architecture.md", "start_here": ["AI_INDEX.md"] }
+      "home": {
+        "title": "服务端知识首页",
+        "summary": "服务端架构、公共 API、意图路由和项目文档能力入口。",
+        "entrypoint": "docs/system-architecture.md",
+        "start_here": ["AI_INDEX.md"]
+      }
     },
     {
       "id": "document-platform",
@@ -42,7 +52,12 @@
       "profile": "software-api",
       "owner": "项目知识平台",
       "include_globs": ["docs/project-document-governance-mcp.md", ".github/instructions/document-authority.instructions.md"],
-      "home": { "entrypoint": "docs/project-document-governance-mcp.md", "start_here": [".github/instructions/document-authority.instructions.md"] }
+      "home": {
+        "title": "项目文档治理模块",
+        "summary": "文档权威性、低 token 检索、知识图谱、健康治理和供应商无关 MCP。",
+        "entrypoint": "docs/project-document-governance-mcp.md",
+        "start_here": [".github/instructions/document-authority.instructions.md"]
+      }
     },
     {
       "id": "ai-runtime",
@@ -52,7 +67,12 @@
       "profile": "software-platform",
       "owner": "AI 平台",
       "include_globs": ["AGENTS.md", "AI_RULES.md", "AI_TASK_TEMPLATE.md", "CODEX.md", ".github/copilot-instructions.md", "docs/ai-agent-workflow.md", "docs/ai-to-ai-*.md", "docs/记忆系统.md"],
-      "home": { "entrypoint": "AGENTS.md", "start_here": ["AI_ARCHITECTURE.md", "AI_TASK_TEMPLATE.md"] }
+      "home": {
+        "title": "AI 运行与上下文模块",
+        "summary": "多供应商任务入口、上下文编译、RAG、工作流和代理定制资产。",
+        "entrypoint": "AGENTS.md",
+        "start_here": ["AI_ARCHITECTURE.md", "AI_TASK_TEMPLATE.md"]
+      }
     },
     {
       "id": "project-system",
@@ -62,7 +82,12 @@
       "profile": "product",
       "owner": "项目系统",
       "include_globs": ["docs/user-project-system.md", "docs/project-store-architecture.md", "docs/project-landing-manifest.md", "docs/群体ai开发/*"],
-      "home": { "entrypoint": "docs/user-project-system.md", "start_here": ["docs/project-store-architecture.md"] }
+      "home": {
+        "title": "用户与项目系统",
+        "summary": "项目、频道、成员、Git 工作区和协作数据模型的产品与技术入口。",
+        "entrypoint": "docs/user-project-system.md",
+        "start_here": ["docs/project-store-architecture.md"]
+      }
     },
     {
       "id": "pc-web",
@@ -72,7 +97,12 @@
       "profile": "software-platform",
       "owner": "PC 客户端",
       "include_globs": ["docs/pc-*.md", "docs/project-document-governance-mcp.md"],
-      "home": { "entrypoint": "docs/pc-frontend-migration.md", "start_here": ["docs/project-document-governance-mcp.md"] }
+      "home": {
+        "title": "PC Web 工作台",
+        "summary": "React/Vite PC 工作台、项目协作界面和文档工作台入口。",
+        "entrypoint": "docs/pc-frontend-migration.md",
+        "start_here": ["docs/project-document-governance-mcp.md"]
+      }
     },
     {
       "id": "pc-document-workbench",
@@ -82,7 +112,11 @@
       "profile": "software-platform",
       "owner": "项目知识平台",
       "include_globs": ["docs/pc-frontend-migration.md", "docs/project-document-governance-mcp.md"],
-      "home": { "entrypoint": "docs/project-document-governance-mcp.md" }
+      "home": {
+        "title": "PC 文档工作台",
+        "summary": "OneNote 式文档编辑、知识架构、治理视图、AI 整理与版本恢复。",
+        "entrypoint": "docs/project-document-governance-mcp.md"
+      }
     },
     {
       "id": "windows-node",
@@ -92,7 +126,12 @@
       "profile": "operations",
       "owner": "平台后端",
       "include_globs": ["docs/node-agent-*.md", "docs/pc-node-*.md", "docs/win-node-*.md", "docs/windows-client-*.md", "docs/codex-vault-*.md"],
-      "home": { "entrypoint": "docs/node-agent-upgrade-compatibility.md", "start_here": ["docs/pc-node-offline-resilience.md"] }
+      "home": {
+        "title": "Windows 节点",
+        "summary": "本机节点运行、升级、离线韧性、工具箱和安全恢复入口。",
+        "entrypoint": "docs/node-agent-upgrade-compatibility.md",
+        "start_here": ["docs/pc-node-offline-resilience.md"]
+      }
     },
     {
       "id": "android",
@@ -102,7 +141,12 @@
       "profile": "software-platform",
       "owner": "Android 客户端",
       "include_globs": ["docs/android-*.md", "docs/shared-android-*.md", "docs/Design.md", "docs/APP 颜色规范.md", "docs/app-version-memory.md"],
-      "home": { "entrypoint": "docs/android-setup.md", "start_here": ["docs/Design.md", "docs/android-real-renderer-ui-workflow.md"] }
+      "home": {
+        "title": "Android 客户端",
+        "summary": "Android 构建、Compose UI、真实渲染、共享设备和发布入口。",
+        "entrypoint": "docs/android-setup.md",
+        "start_here": ["docs/Design.md", "docs/android-real-renderer-ui-workflow.md"]
+      }
     },
     {
       "id": "fb2",
@@ -112,7 +156,12 @@
       "profile": "software-api",
       "owner": "fb2 项目维护者",
       "include_globs": ["docs/fb2-*.md"],
-      "home": { "entrypoint": "docs/fb2-ai-center/README.md", "start_here": ["docs/fb2-ai-center/contracts.md", "docs/fb2-ai-center/handoff.md"] }
+      "home": {
+        "title": "fb2 AI 中心",
+        "summary": "fb2 子项目的集成契约、SDK、计费、交接和验收资料入口。",
+        "entrypoint": "docs/fb2-ai-center/README.md",
+        "start_here": ["docs/fb2-ai-center/contracts.md", "docs/fb2-ai-center/handoff.md"]
+      }
     }
   ]
 }

@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     fs,
-    path::{Component, Path},
+    path::{Component, Path, PathBuf},
+    process::Command,
 };
 
 use crate::{
@@ -29,6 +30,60 @@ pub(super) struct DocumentQualityFacts {
 }
 
 const QUALITY_FACTS_SCHEMA_VERSION: u8 = 2;
+
+pub(super) struct ImplementationEvidenceCache<'a> {
+    workspace: &'a Path,
+    reference_paths: HashMap<String, Vec<PathBuf>>,
+    modified_millis: HashMap<String, u64>,
+    dirty_paths: HashSet<String>,
+}
+
+impl<'a> ImplementationEvidenceCache<'a> {
+    pub(super) fn new(workspace: &'a Path) -> Self {
+        Self {
+            workspace,
+            reference_paths: HashMap::new(),
+            modified_millis: HashMap::new(),
+            dirty_paths: git_dirty_paths(workspace),
+        }
+    }
+
+    fn evaluate(&mut self, reference: &str) -> (bool, u64) {
+        let paths = self
+            .reference_paths
+            .entry(reference.to_string())
+            .or_insert_with(|| implementation_reference_paths(self.workspace, reference))
+            .clone();
+        if paths.is_empty() {
+            return (false, 0);
+        }
+        let modified_millis = paths
+            .iter()
+            .map(|path| self.path_modified_millis(path))
+            .max()
+            .unwrap_or_default();
+        (true, modified_millis)
+    }
+
+    fn path_modified_millis(&mut self, path: &Path) -> u64 {
+        let relative = path
+            .strip_prefix(self.workspace)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        if let Some(value) = self.modified_millis.get(&relative) {
+            return *value;
+        }
+        let value = if self.dirty_paths.contains(&relative) {
+            file_modified_millis(path)
+        } else {
+            git_last_modified_millis(self.workspace, &relative)
+                .unwrap_or_else(|| file_modified_millis(path))
+        };
+        self.modified_millis.insert(relative, value);
+        value
+    }
+}
 
 pub(super) fn load_facts(
     workspace: &Path,
@@ -80,16 +135,15 @@ pub(super) fn resolve_link_target(source_path: &str, raw: &str) -> (String, Stri
 }
 
 pub(super) fn check_implementation_refs(
-    workspace: &Path,
     path: &str,
     metadata: &DocumentKnowledgeMetadata,
-    cache: &mut HashMap<String, bool>,
+    cache: &mut ImplementationEvidenceCache<'_>,
     issues: &mut Vec<DocumentQualityIssue>,
 ) {
+    let reviewed_ms = reviewed_at_millis(&metadata.reviewed_at);
+    let mut drifted = Vec::new();
     for reference in &metadata.implementation_refs {
-        let exists = *cache
-            .entry(reference.clone())
-            .or_insert_with(|| implementation_reference_exists(workspace, reference));
+        let (exists, implementation_modified_ms) = cache.evaluate(reference);
         if !exists {
             issues.push(make_issue(
                 "implementation_conflict",
@@ -100,17 +154,29 @@ pub(super) fn check_implementation_refs(
                 "核对实现路径；需要语义判断时再交给 AI 阅读证据",
                 95,
             ));
-        } else if implementation_changed_after_review(workspace, reference, &metadata.reviewed_at) {
-            issues.push(make_issue(
-                "implementation_drift",
-                "info",
-                path,
-                format!("关联实现晚于文档复查时间：{reference}"),
-                format!("文档上次复查：{}", metadata.reviewed_at),
-                "按需让 AI 对照文档片段和实现证据复核",
-                80,
-            ));
+        } else if reviewed_ms > 0 && implementation_modified_ms > reviewed_ms {
+            drifted.push(reference.as_str());
         }
+    }
+    if !drifted.is_empty() {
+        issues.push(make_issue(
+            "implementation_drift",
+            "info",
+            path,
+            format!("{} 项关联实现晚于文档复查时间", drifted.len()),
+            format!(
+                "文档上次复查：{}；实现证据：{}",
+                metadata.reviewed_at,
+                drifted
+                    .iter()
+                    .take(8)
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            "按需让 AI 对照文档片段和实现证据复核",
+            80,
+        ));
     }
 }
 
@@ -150,6 +216,7 @@ pub(super) fn eligible_for_orphan_check(document: &ProjectDocumentEntry) -> bool
             | "agent_definition"
             | "prompt_template"
             | "skill"
+            | "project_template"
     )
 }
 
@@ -249,55 +316,33 @@ fn markdown_anchor(value: &str) -> String {
         .to_string()
 }
 
-fn implementation_reference_exists(workspace: &Path, reference: &str) -> bool {
+fn implementation_reference_paths(workspace: &Path, reference: &str) -> Vec<PathBuf> {
     let (kind, value) = reference.split_once(':').unwrap_or(("file", reference));
     match kind {
-        "file" => workspace.join(value.trim_start_matches('/')).exists(),
-        "route" | "symbol" => search_source(workspace, value),
-        _ => workspace.join(reference).exists(),
+        "file" | "test" => existing_path(workspace.join(value.trim_start_matches('/'))),
+        "route" | "symbol" => search_source_paths(workspace, value),
+        _ => existing_path(workspace.join(reference)),
     }
 }
 
-fn implementation_changed_after_review(workspace: &Path, reference: &str, reviewed: &str) -> bool {
+fn reviewed_at_millis(reviewed: &str) -> u64 {
     let Ok(reviewed) = NaiveDate::parse_from_str(reviewed, "%Y-%m-%d") else {
-        return false;
+        return 0;
     };
-    let (kind, value) = reference.split_once(':').unwrap_or(("file", reference));
-    let modified_ms = match kind {
-        "file" | "test" => file_modified_millis(&workspace.join(value.trim_start_matches('/'))),
-        "route" | "symbol" => search_source_modified_millis(workspace, value),
-        _ => 0,
-    };
-    let reviewed_ms: u64 = reviewed
+    reviewed
         .and_hms_opt(23, 59, 59)
         .and_then(|value| value.and_utc().timestamp_millis().try_into().ok())
-        .unwrap_or_default();
-    modified_ms > reviewed_ms
+        .unwrap_or_default()
 }
 
-fn search_source(workspace: &Path, needle: &str) -> bool {
-    let needle = needle.trim();
-    if needle.is_empty() {
-        return false;
-    }
-    WalkBuilder::new(workspace)
-        .hidden(false)
-        .git_ignore(true)
-        .build()
-        .filter_map(|entry| entry.ok())
-        .filter(|entry| entry.file_type().is_some_and(|kind| kind.is_file()))
-        .filter(|entry| source_extension(entry.path()))
-        .take(5_000)
-        .any(|entry| {
-            fs::metadata(entry.path()).is_ok_and(|metadata| metadata.len() <= 2 * 1024 * 1024)
-                && fs::read_to_string(entry.path()).is_ok_and(|content| content.contains(needle))
-        })
+fn existing_path(path: PathBuf) -> Vec<PathBuf> {
+    path.exists().then_some(path).into_iter().collect()
 }
 
-fn search_source_modified_millis(workspace: &Path, needle: &str) -> u64 {
+fn search_source_paths(workspace: &Path, needle: &str) -> Vec<PathBuf> {
     let needle = needle.trim();
     if needle.is_empty() {
-        return 0;
+        return Vec::new();
     }
     WalkBuilder::new(workspace)
         .hidden(false)
@@ -308,17 +353,54 @@ fn search_source_modified_millis(workspace: &Path, needle: &str) -> u64 {
         .filter(|entry| source_extension(entry.path()))
         .take(5_000)
         .filter_map(|entry| {
-            let metadata = fs::metadata(entry.path()).ok()?;
-            if metadata.len() > 2 * 1024 * 1024 {
-                return None;
-            }
-            fs::read_to_string(entry.path())
-                .ok()
-                .is_some_and(|content| content.contains(needle))
-                .then(|| file_modified_millis(entry.path()))
+            (fs::metadata(entry.path()).is_ok_and(|metadata| metadata.len() <= 2 * 1024 * 1024)
+                && fs::read_to_string(entry.path()).is_ok_and(|content| content.contains(needle)))
+            .then(|| entry.path().to_path_buf())
         })
-        .max()
-        .unwrap_or_default()
+        .collect()
+}
+
+fn git_dirty_paths(workspace: &Path) -> HashSet<String> {
+    let Ok(output) = Command::new("git")
+        .arg("-C")
+        .arg(workspace)
+        .args(["status", "--porcelain=v1", "--untracked-files=all"])
+        .output()
+    else {
+        return HashSet::new();
+    };
+    if !output.status.success() {
+        return HashSet::new();
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| line.get(3..))
+        .map(|path| {
+            path.rsplit_once(" -> ")
+                .map(|(_, target)| target)
+                .unwrap_or(path)
+                .trim_matches('"')
+                .replace('\\', "/")
+        })
+        .collect()
+}
+
+fn git_last_modified_millis(workspace: &Path, path: &str) -> Option<u64> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(workspace)
+        .args(["log", "-1", "--format=%ct", "--"])
+        .arg(path)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .map(|seconds| seconds.saturating_mul(1_000))
 }
 
 fn source_extension(path: &Path) -> bool {

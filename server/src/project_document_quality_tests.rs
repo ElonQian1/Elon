@@ -1,6 +1,6 @@
 use super::*;
 use homecli_proto::{ProjectDocumentEntry, ProjectDocumentMetadata};
-use std::fs;
+use std::{fs, process::Command};
 
 use crate::{
     project_document_governance::{DocumentKnowledgeHome, DocumentKnowledgeMetadata},
@@ -109,6 +109,78 @@ fn quality_report_finds_links_orphans_ownership_and_implementation_conflicts() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[test]
+fn implementation_drift_uses_git_history_and_groups_dirty_evidence_per_document() {
+    let root = workspace("git-change-clock");
+    fs::create_dir_all(root.join("docs")).unwrap();
+    fs::create_dir_all(root.join("src")).unwrap();
+    fs::write(root.join("docs/architecture.md"), "# Architecture\n").unwrap();
+    fs::write(root.join("src/main.rs"), "fn main() {}\n").unwrap();
+    fs::write(root.join("src/lib.rs"), "pub fn ready() -> bool { true }\n").unwrap();
+    git(&root, &["init"]);
+    git(&root, &["config", "user.email", "tests@example.com"]);
+    git(&root, &["config", "user.name", "Tests"]);
+    git(&root, &["add", "."]);
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(&root)
+        .args(["commit", "-m", "old baseline"])
+        .env("GIT_AUTHOR_DATE", "2020-01-01T00:00:00Z")
+        .env("GIT_COMMITTER_DATE", "2020-01-01T00:00:00Z")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let documents = vec![entry(
+        "docs/architecture.md",
+        "Architecture",
+        "architecture",
+        false,
+        vec!["Architecture"],
+    )];
+    let mut manifest = DocumentSectionManifest::default();
+    manifest.document_metadata.insert(
+        "docs/architecture.md".to_string(),
+        DocumentKnowledgeMetadata {
+            doc_type: "architecture".to_string(),
+            owner: "architecture-team".to_string(),
+            reviewed_at: "2026-01-01".to_string(),
+            implementation_refs: vec![
+                "file:src/main.rs".to_string(),
+                "file:src/lib.rs".to_string(),
+            ],
+            ..DocumentKnowledgeMetadata::default()
+        },
+    );
+    let index = ProjectDocumentIndex::open(&root).unwrap();
+    let clean = analyze_document_quality(&root, &documents, &manifest, &index).unwrap();
+    assert!(!clean
+        .issues
+        .iter()
+        .any(|issue| issue.issue_type == "implementation_drift"));
+
+    fs::write(
+        root.join("src/main.rs"),
+        "fn main() { println!(\"changed\"); }\n",
+    )
+    .unwrap();
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub fn ready() -> bool { false }\n",
+    )
+    .unwrap();
+    let dirty = analyze_document_quality(&root, &documents, &manifest, &index).unwrap();
+    let drift = dirty
+        .issues
+        .iter()
+        .filter(|issue| issue.issue_type == "implementation_drift")
+        .collect::<Vec<_>>();
+    assert_eq!(drift.len(), 1);
+    assert!(drift[0].message.contains("2 项"));
+    drop(index);
+    fs::remove_dir_all(root).unwrap();
+}
+
 fn entry(
     path: &str,
     title: &str,
@@ -142,4 +214,14 @@ fn workspace(label: &str) -> std::path::PathBuf {
     ));
     fs::create_dir_all(&root).unwrap();
     root
+}
+
+fn git(root: &std::path::Path, arguments: &[&str]) {
+    let status = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(arguments)
+        .status()
+        .unwrap();
+    assert!(status.success(), "git {arguments:?} failed");
 }

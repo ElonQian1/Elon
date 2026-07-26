@@ -12,11 +12,12 @@ use std::{
 
 use crate::{
     project_document_governance::DocumentSectionManifest,
+    project_document_governance_facets::effective_facets_with_metadata,
     project_document_index::ProjectDocumentIndex,
     project_document_quality_rules::{
         check_implementation_refs, eligible_for_governance, eligible_for_orphan_check, load_facts,
         manifest_entrypoints, normalize, resolve_link_target, review_is_overdue,
-        DocumentQualityFacts,
+        DocumentQualityFacts, ImplementationEvidenceCache,
     },
 };
 
@@ -85,12 +86,12 @@ pub(crate) fn analyze_document_quality(
     for document in documents {
         let path = normalize(&document.path);
         let title_key = normalize_title(&document.title);
-        if !title_key.is_empty()
-            && !matches!(
-                document.metadata.lifecycle.as_str(),
-                "deprecated" | "superseded" | "archived"
-            )
-        {
+        let facets = effective_facets_with_metadata(
+            document,
+            manifest.governance_facets.get(&path),
+            manifest.document_metadata.get(&path),
+        );
+        if !title_key.is_empty() && current_retrievable_title(&facets) {
             titles.entry(title_key).or_default().push(path.clone());
         }
         let Some(document_facts) = facts.get(&path) else {
@@ -155,7 +156,7 @@ pub(crate) fn analyze_document_quality(
     }
 
     let entrypoints = manifest_entrypoints(manifest);
-    let mut implementation_cache = HashMap::new();
+    let mut implementation_cache = ImplementationEvidenceCache::new(workspace);
     for document in documents {
         let path = normalize(&document.path);
         let metadata = manifest
@@ -237,13 +238,7 @@ pub(crate) fn analyze_document_quality(
                 95,
             ));
         }
-        check_implementation_refs(
-            workspace,
-            &path,
-            &metadata,
-            &mut implementation_cache,
-            &mut issues,
-        );
+        check_implementation_refs(&path, &metadata, &mut implementation_cache, &mut issues);
     }
 
     for url in &external_urls {
@@ -377,6 +372,25 @@ fn normalize_title(value: &str) -> String {
         .chars()
         .filter(|character| character.is_alphanumeric())
         .collect()
+}
+
+fn current_retrievable_title(
+    facets: &crate::project_document_governance_facets::DocumentGovernanceFacets,
+) -> bool {
+    facets.retrieval != "excluded"
+        && matches!(facets.lifecycle.as_str(), "active" | "accepted" | "current")
+        && !matches!(
+            facets.document_type.as_str(),
+            "report"
+                | "status"
+                | "archive"
+                | "discussion"
+                | "note"
+                | "agent_definition"
+                | "prompt_template"
+                | "skill"
+                | "project_template"
+        )
 }
 
 fn external_link_owner<'a>(facts: &'a HashMap<String, DocumentQualityFacts>, url: &str) -> &'a str {
