@@ -34,6 +34,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot "direct-network.ps1")
 . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
+. (Join-Path $PSScriptRoot "publish-health-checks.ps1")
 . (Join-Path $PSScriptRoot "local-env.ps1")
 . (Join-Path $PSScriptRoot "node-agent-release-contract.ps1")
 . (Join-Path $PSScriptRoot "release-publish-lease.ps1")
@@ -715,6 +716,7 @@ if ($RipgrepZipFileSize -gt 0) {
     Write-Host "  ripgrep package size = $RipgrepZipFileSize bytes" -ForegroundColor Green
 }
 Write-Host "  Version info gitSha = $GitSha" -ForegroundColor Green
+Invoke-ElonNodeAgentPostUploadSmoke -BaseUrl $BaseUrl -ExpectedVersion $PackageVersion -ExpectedGitSha $GitSha -ExpectedWindowsSha256 $WinSha256 -ExpectedLinuxSha256 $LinuxSha256 -ExpectedWindowsClientSha256 $WindowsClientSha256 -IncludeRipgrep:($RipgrepZipFileSize -gt 0) | Out-Null
 
 # ── 5. 推送在线 Windows 节点更新 ──────────────────────────────────────────────
 Write-Host "[5/5] 推送在线 Windows 节点更新..." -ForegroundColor Yellow

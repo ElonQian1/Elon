@@ -1,8 +1,8 @@
 use crate::types::AppState;
 use crate::{
     admin, admin_quota, admin_token_stats, billing_admin, billing_api, billing_pay,
-    context_compiler, external_app_tool_report_api, speech_translate, token_usage_api, user_api,
-    voice_asr_upload, voice_tts_api,
+    context_compiler, external_app_tool_report_api, realtime_metrics, speech_translate,
+    token_usage_api, user_api, voice_asr_upload, voice_tts_api,
 };
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{delete, get, post};
@@ -65,6 +65,14 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/token-stats/compute-meter-events",
             get(admin_token_stats::get_compute_meter_events),
+        )
+        .route(
+            "/api/admin/realtime/close-metrics",
+            get(realtime_metrics::admin_close_metrics),
+        )
+        .route(
+            "/api/admin/realtime/diagnostics",
+            get(realtime_metrics::admin_diagnostics),
         )
         .route(
             "/api/admin/external-apps/tool-executions",

@@ -23,13 +23,14 @@ use axum::{
 use futures::{
     future::BoxFuture,
     stream::{SplitSink, SplitStream},
-    SinkExt, StreamExt,
+    StreamExt,
 };
 use std::{collections::HashMap, sync::Arc};
 use tracing::{info, warn};
 
 use crate::{
     project_auth::{auth_from_headers_or_query, json_error},
+    realtime_metrics::{self, RealtimeChannel},
     types::AppState,
     voice_audio_format::{check_format_declaration, check_pcm16_frame, PcmCheck},
     voice_config::{RealtimeTranscribeConfig, MAX_BUFFERED_BYTES},
@@ -37,6 +38,7 @@ use crate::{
     voice_protocol::{resolve_authenticated_voice_user, ClientControl, ServerEvent},
     voice_to_cli::{dispatch_transcript, DispatchTarget},
     voice_whisper_local, voice_whisper_rest,
+    ws_transport::{receive_data_or_control, send_json, send_text, WsCloseReason, WsIncoming},
 };
 
 pub async fn ws_transcribe_handler(

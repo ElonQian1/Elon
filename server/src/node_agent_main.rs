@@ -255,6 +255,7 @@ mod project_landing;
 mod project_workspace_inspect;
 mod tools_patch;
 mod windows_doctor;
+mod ws_client_transport;
 
 mod node_agent_runtime;
 mod node_agent_session_completion_ack;

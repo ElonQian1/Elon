@@ -6,6 +6,22 @@ const apiProxyTarget = process.env.VITE_API_PROXY_TARGET
   || process.env.PC_API_PROXY_TARGET
   || 'http://localhost:8080'
 
+function manualChunks(id: string) {
+  const normalized = id.replace(/\\/g, '/')
+  if (!normalized.includes('/node_modules/')) return undefined
+  if (
+    normalized.includes('/node_modules/react/')
+    || normalized.includes('/node_modules/react-dom/')
+    || normalized.includes('/node_modules/react-router-dom/')
+  ) {
+    return 'vendor'
+  }
+  if (normalized.includes('/node_modules/zustand/')) {
+    return 'store'
+  }
+  return undefined
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -21,10 +37,7 @@ export default defineConfig({
       },
       output: {
         // 按模块分 chunk，便于长期缓存
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          store: ['zustand'],
-        },
+        manualChunks,
       },
     },
   },

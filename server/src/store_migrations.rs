@@ -140,7 +140,25 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (103, "开发期新项目默认完全访问", crate::project_runtime_permission_migration::migration_v103),
     (104, "恢复新项目默认 full_access 并保留全部显式选择", crate::project_runtime_permission_migration::migration_v104),
     (105, "修复已记录 v104 安装的运行权限默认值", crate::project_runtime_permission_migration::migration_v105),
+    (106, "实时 WebSocket 断开事件窗口统计", migration_v106),
 ];
+
+pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS realtime_close_events (
+           id              INTEGER PRIMARY KEY AUTOINCREMENT,
+           channel         TEXT    NOT NULL,
+           close_reason    TEXT    NOT NULL,
+           created_at      TEXT    NOT NULL,
+           created_at_unix INTEGER NOT NULL
+         );
+         CREATE INDEX IF NOT EXISTS idx_realtime_close_events_window
+           ON realtime_close_events(created_at_unix, channel, close_reason);
+         CREATE INDEX IF NOT EXISTS idx_realtime_close_events_channel_reason
+           ON realtime_close_events(channel, close_reason);",
+    )?;
+    Ok(())
+}
 
 // ── 内部工具 ───────────────────────────────────────────────────────────────────
 

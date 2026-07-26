@@ -23,9 +23,11 @@ use crate::{
         is_terminal_project_ws_message, parse_project_message, project_client_request_id,
         task_control_event,
     },
+    realtime_metrics::{self, RealtimeChannel},
     store::{ProjectAccess, PublicUser},
     types::{AppState, WsMessage},
     ui_design_tasks::{append_ui_design_task_context, resolve_ui_route_task},
+    ws_transport::WsCloseReason,
 };
 
 /// 单个已升级的 WebSocket 连接的完整会话循环。
@@ -41,11 +43,13 @@ pub(crate) async fn handle_project_ws(
 ) {
     let (mut sender, mut receiver) = socket.split();
     let mut update_rx = crate::app_update::subscribe();
+    let mut close_reason = WsCloseReason::ReaderEnded;
 
     if let Some(event) =
         crate::app_update::latest_update_event_for_client(&state, client_version_code).await
     {
         if sender.send(Message::Text(event)).await.is_err() {
+            record_project_ws_close(&state, WsCloseReason::WriteFailed);
             return;
         }
     }
@@ -57,6 +61,7 @@ pub(crate) async fn handle_project_ws(
     }
     .to_json();
     if sender.send(Message::Text(hello)).await.is_err() {
+        record_project_ws_close(&state, WsCloseReason::WriteFailed);
         return;
     }
 
@@ -67,6 +72,7 @@ pub(crate) async fn handle_project_ws(
                     if crate::app_update::is_newer_for_client(&event, client_version_code)
                         && sender.send(Message::Text(event)).await.is_err()
                     {
+                        close_reason = WsCloseReason::WriteFailed;
                         break;
                     }
                 }
@@ -77,14 +83,25 @@ pub(crate) async fn handle_project_ws(
                     Some(Ok(Message::Text(text))) => text,
                     Some(Ok(Message::Ping(payload))) => {
                         if sender.send(Message::Pong(payload)).await.is_err() {
+                            close_reason = WsCloseReason::PongWriteFailed;
                             break;
                         }
                         continue;
                     }
                     Some(Ok(Message::Pong(_))) => continue,
-                    Some(Ok(Message::Close(_))) | None => break,
+                    Some(Ok(Message::Close(_))) => {
+                        close_reason = WsCloseReason::PeerClosed;
+                        break;
+                    }
+                    None => {
+                        close_reason = WsCloseReason::ReaderEnded;
+                        break;
+                    }
                     Some(Ok(Message::Binary(_))) => continue,
-                    Some(Err(_)) => break,
+                    Some(Err(_)) => {
+                        close_reason = WsCloseReason::ReadError;
+                        break;
+                    }
                 }
             }
         };
@@ -127,6 +144,7 @@ pub(crate) async fn handle_project_ws(
                 ),
             };
             if sender.send(Message::Text(payload)).await.is_err() {
+                close_reason = WsCloseReason::WriteFailed;
                 break;
             }
             continue;
@@ -147,6 +165,7 @@ pub(crate) async fn handle_project_ws(
                     .await
                     .is_err()
                 {
+                    close_reason = WsCloseReason::WriteFailed;
                     break;
                 }
                 continue;
@@ -190,6 +209,7 @@ pub(crate) async fn handle_project_ws(
                                 .await
                                 .is_err()
                             {
+                                close_reason = WsCloseReason::WriteFailed;
                                 break;
                             }
                             continue;
@@ -226,6 +246,7 @@ pub(crate) async fn handle_project_ws(
                     .await
                     .is_err()
                 {
+                    close_reason = WsCloseReason::WriteFailed;
                     break;
                 }
                 continue;
@@ -297,6 +318,7 @@ pub(crate) async fn handle_project_ws(
             .await
             .is_err()
         {
+            close_reason = WsCloseReason::WriteFailed;
             break;
         }
 
@@ -314,6 +336,7 @@ pub(crate) async fn handle_project_ws(
                     &job.task_id,
                 );
                 replay_failed = true;
+                close_reason = WsCloseReason::WriteFailed;
                 break;
             }
             record_server_transport(
@@ -350,6 +373,7 @@ pub(crate) async fn handle_project_ws(
                                     &job.task_id,
                                 );
                                 client_disconnected = true;
+                                close_reason = WsCloseReason::WriteFailed;
                                 break;
                             }
                             record_server_transport(
@@ -405,17 +429,25 @@ pub(crate) async fn handle_project_ws(
                         Some(Ok(Message::Ping(payload))) => {
                             if sender.send(Message::Pong(payload)).await.is_err() {
                                 client_disconnected = true;
+                                close_reason = WsCloseReason::PongWriteFailed;
                                 break;
                             }
                         }
                         Some(Ok(Message::Pong(_))) => {}
-                        Some(Ok(Message::Close(_))) | None => {
+                        Some(Ok(Message::Close(_))) => {
                             client_disconnected = true;
+                            close_reason = WsCloseReason::PeerClosed;
+                            break;
+                        }
+                        None => {
+                            client_disconnected = true;
+                            close_reason = WsCloseReason::ReaderEnded;
                             break;
                         }
                         Some(Ok(Message::Binary(_))) => {}
                         Some(Err(_)) => {
                             client_disconnected = true;
+                            close_reason = WsCloseReason::ReadError;
                             break;
                         }
                     }
@@ -426,6 +458,7 @@ pub(crate) async fn handle_project_ws(
                             && sender.send(Message::Text(event)).await.is_err()
                         {
                             client_disconnected = true;
+                            close_reason = WsCloseReason::WriteFailed;
                             break;
                         }
                     }
@@ -448,6 +481,16 @@ pub(crate) async fn handle_project_ws(
             break;
         }
     }
+
+    record_project_ws_close(&state, close_reason);
+}
+
+fn record_project_ws_close(state: &AppState, close_reason: WsCloseReason) {
+    realtime_metrics::record_close_with_store(
+        &state.store,
+        RealtimeChannel::ProjectWs,
+        close_reason.as_str(),
+    );
 }
 
 fn summarize_runtime_note(value: &str) -> String {

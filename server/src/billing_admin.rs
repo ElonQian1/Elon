@@ -290,6 +290,9 @@ pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) 
         "external_app_fb2_trial_credit_fen": config_int("external_app_fb2_trial_credit_fen", 100),
         "external_app_bb64a_trial_credit_fen": config_int("external_app_bb64a_trial_credit_fen", 100),
         "billing_open_reservation_alert_threshold": config_int("billing_open_reservation_alert_threshold", 100),
+        "realtime_close_read_error_alert_threshold_1h": config_int("realtime_close_read_error_alert_threshold_1h", 20),
+        "realtime_close_write_failure_alert_threshold_1h": config_int("realtime_close_write_failure_alert_threshold_1h", 20),
+        "realtime_close_timeout_alert_threshold_1h": config_int("realtime_close_timeout_alert_threshold_1h", 5),
         "node_provider_revenue_share_x1000": config_int("node_provider_revenue_share_x1000", 800),
         "node_payout_min_fen": config_int("node_payout_min_fen", 100),
         "note": {
@@ -305,6 +308,9 @@ pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) 
             "new_user_trial_credit_fen": "普通新用户首次 AI 调用自动赠送的试用余额（分），设为 0 可关闭",
             "external_app_fb2_trial_credit_fen": "fb2 用户首次创建外部应用会话时赠送的 AI 回复试用余额（分），ASR/TTS 不消耗此额度",
             "billing_open_reservation_alert_threshold": "冻结中预授权数量超过该值时产生对账告警",
+            "realtime_close_read_error_alert_threshold_1h": "最近 1 小时实时通道读错误超过该值时产生 Realtime 告警",
+            "realtime_close_write_failure_alert_threshold_1h": "最近 1 小时实时通道写失败超过该值时产生 Realtime 告警",
+            "realtime_close_timeout_alert_threshold_1h": "最近 1 小时实时通道读超时超过该值时产生 Realtime 告警",
             "node_provider_revenue_share_x1000": "节点提供者分账比例×1000，800 = 消费者真实扣费的 80%",
             "node_payout_min_fen": "节点收益最低提现金额（分），100 = 1 元"
         }
@@ -334,6 +340,9 @@ const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "external_app_fb2_trial_credit_fen",
     "external_app_bb64a_trial_credit_fen",
     "billing_open_reservation_alert_threshold",
+    "realtime_close_read_error_alert_threshold_1h",
+    "realtime_close_write_failure_alert_threshold_1h",
+    "realtime_close_timeout_alert_threshold_1h",
     "node_provider_revenue_share_x1000",
     "node_payout_min_fen",
 ];

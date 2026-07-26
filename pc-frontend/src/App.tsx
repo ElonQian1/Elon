@@ -1,49 +1,60 @@
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Routes, Route } from 'react-router-dom'
 import Shell from './features/shell/Shell'
-import LoginPage from './features/auth/LoginPage'
-import ConversationPage from './features/conversation/ConversationPage'
-import ProjectsPage from './features/projects/ProjectsPage'
-import ProjectDetailPage from './features/projects/ProjectDetailPage'
-import AiChatPage from './features/ai/AiChatPage'
-import FriendsPage from './features/friends/FriendsPage'
-import PlazaPage from './features/plaza/PlazaPage'
-import AccountPage from './features/account/AccountPage'
-import UserProfilePage from './features/users/UserProfilePage'
-import DoctorPage from './features/doctor/DoctorPage'
-import VoicePage from './features/voice/VoicePage'
-import NodePage from './features/node/NodePage'
-import PublicDevSmokePage from './features/node/PublicDevSmokePage'
-import DevTasksPage from './features/dev/DevTasksPage'
-import GitWorktreesPage from './features/git-worktrees/GitWorktreesPage'
-import UiTunerPage from './features/ui-tuner/UiTunerPage'
-import LocalTasksPage from './features/local-tasks/LocalTasksPage'
 import { isLocalWorkbench } from './api/runtime'
+import styles from './App.module.css'
+
+const LoginPage = lazy(() => import('./features/auth/LoginPage'))
+const ConversationPage = lazy(() => import('./features/conversation/ConversationPage'))
+const ProjectsPage = lazy(() => import('./features/projects/ProjectsPage'))
+const ProjectDetailPage = lazy(() => import('./features/projects/ProjectDetailPage'))
+const AiChatPage = lazy(() => import('./features/ai/AiChatPage'))
+const FriendsPage = lazy(() => import('./features/friends/FriendsPage'))
+const PlazaPage = lazy(() => import('./features/plaza/PlazaPage'))
+const AccountPage = lazy(() => import('./features/account/AccountPage'))
+const UserProfilePage = lazy(() => import('./features/users/UserProfilePage'))
+const DoctorPage = lazy(() => import('./features/doctor/DoctorPage'))
+const VoicePage = lazy(() => import('./features/voice/VoicePage'))
+const NodePage = lazy(() => import('./features/node/NodePage'))
+const PublicDevSmokePage = lazy(() => import('./features/node/PublicDevSmokePage'))
+const DevTasksPage = lazy(() => import('./features/dev/DevTasksPage'))
+const GitWorktreesPage = lazy(() => import('./features/git-worktrees/GitWorktreesPage'))
+const UiTunerPage = lazy(() => import('./features/ui-tuner/UiTunerPage'))
+const LocalTasksPage = lazy(() => import('./features/local-tasks/LocalTasksPage'))
+
+function RouteFallback() {
+  return <div className={styles.routeFallback} role="status" aria-label="正在加载页面" />
+}
+
+function lazyRoute(element: ReactNode) {
+  return <Suspense fallback={<RouteFallback />}>{element}</Suspense>
+}
 
 export default function App() {
   const defaultPath = isLocalWorkbench() ? '/local-tasks' : '/ai'
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
+      <Route path="/login" element={lazyRoute(<LoginPage />)} />
       <Route path="/*" element={<Shell />}>
         {/* 首页：一龙 AI 工作台 */}
         <Route index element={<Navigate to={defaultPath} replace />} />
-        <Route path="ai" element={<AiChatPage />} />
-        <Route path="workspace" element={<ConversationPage />} />
-        <Route path="friends" element={<FriendsPage />} />
-        <Route path="plaza" element={<PlazaPage />} />
-        <Route path="account" element={<AccountPage />} />
-        <Route path="users/:userId" element={<UserProfilePage />} />
-        <Route path="projects" element={<ProjectsPage />} />
-        <Route path="projects/:id" element={<ProjectDetailPage />} />
-        <Route path="projects/:id/members" element={<ProjectDetailPage />} />
-        <Route path="dev-tasks" element={<DevTasksPage />} />
-        <Route path="git-worktrees" element={<GitWorktreesPage />} />
-        <Route path="ui-tuner" element={<UiTunerPage />} />
-        <Route path="local-tasks" element={<LocalTasksPage />} />
-        <Route path="voice" element={<VoicePage />} />
-        <Route path="doctor" element={<DoctorPage />} />
-        <Route path="node/public-dev-smoke" element={<PublicDevSmokePage />} />
-        <Route path="node" element={<NodePage />} />
+        <Route path="ai" element={lazyRoute(<AiChatPage />)} />
+        <Route path="workspace" element={lazyRoute(<ConversationPage />)} />
+        <Route path="friends" element={lazyRoute(<FriendsPage />)} />
+        <Route path="plaza" element={lazyRoute(<PlazaPage />)} />
+        <Route path="account" element={lazyRoute(<AccountPage />)} />
+        <Route path="users/:userId" element={lazyRoute(<UserProfilePage />)} />
+        <Route path="projects" element={lazyRoute(<ProjectsPage />)} />
+        <Route path="projects/:id" element={lazyRoute(<ProjectDetailPage />)} />
+        <Route path="projects/:id/members" element={lazyRoute(<ProjectDetailPage />)} />
+        <Route path="dev-tasks" element={lazyRoute(<DevTasksPage />)} />
+        <Route path="git-worktrees" element={lazyRoute(<GitWorktreesPage />)} />
+        <Route path="ui-tuner" element={lazyRoute(<UiTunerPage />)} />
+        <Route path="local-tasks" element={lazyRoute(<LocalTasksPage />)} />
+        <Route path="voice" element={lazyRoute(<VoicePage />)} />
+        <Route path="doctor" element={lazyRoute(<DoctorPage />)} />
+        <Route path="node/public-dev-smoke" element={lazyRoute(<PublicDevSmokePage />)} />
+        <Route path="node" element={lazyRoute(<NodePage />)} />
       </Route>
     </Routes>
   )

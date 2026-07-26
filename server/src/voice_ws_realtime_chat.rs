@@ -15,6 +15,7 @@ use tracing::{info, warn};
 use crate::{
     billing, friend_events,
     project_auth::{auth_from_headers_or_query, json_error},
+    realtime_metrics::{self, RealtimeChannel},
     social_ai::realtime_social_ai_prompt,
     store::{SOCIAL_AI_DISPLAY_NAME, SOCIAL_AI_USER_ID},
     types::AppState,
@@ -25,6 +26,7 @@ use crate::{
         resolve_authenticated_voice_user, ClientControl, ServerEvent, VOICE_TARGET_PHONE_CONTROL,
         VOICE_TARGET_SOCIAL_AI_DIRECT,
     },
+    ws_transport::{receive_data_or_control, send_json, WsCloseReason, WsIncoming},
 };
 
 pub async fn ws_realtime_chat_handler(

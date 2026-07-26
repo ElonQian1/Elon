@@ -227,6 +227,7 @@ mod project_ws_job;
 mod project_ws_protocol;
 mod project_ws_session;
 mod read_receipt_events;
+mod realtime_metrics;
 mod release_batch;
 mod release_claim;
 mod release_manager;
@@ -294,7 +295,9 @@ mod voice_ws_transcribe;
 mod voice_ws_virtual_mic;
 mod web;
 mod wechat_pay;
+mod ws_client_transport;
 mod ws_message;
+mod ws_transport;
 
 pub use types::AppState;
 

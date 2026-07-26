@@ -8,6 +8,8 @@ use std::{
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
 
+use crate::ws_client_transport::try_send_json;
+
 #[cfg(not(windows))]
 use std::process::Command;
 
@@ -72,7 +74,7 @@ pub fn spawn_workspace_inspect_response(
     tracing::info!("InspectProjectWorkspace: {}", req_id);
     tokio::spawn(async move {
         let response = workspace_inspect_response(req_id, &workspace_path);
-        let _ = tx.send(Message::Text(serde_json::to_string(&response).unwrap()));
+        let _ = try_send_json(&tx, &response);
     });
 }
 
