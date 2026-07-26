@@ -28,6 +28,7 @@ pub(crate) struct ProjectDocumentIndex {
     pub(crate) conn: Connection,
     run_id: String,
     changed_documents: usize,
+    classifier_version_current: bool,
 }
 
 impl ProjectDocumentIndex {
@@ -41,10 +42,13 @@ impl ProjectDocumentIndex {
             .with_context(|| format!("打开文档索引失败：{}", database.display()))?;
         initialize_schema(&conn)?;
         crate::project_document_issue_workflow::initialize_schema(&conn)?;
+        let classifier_version_current = metadata_value(&conn, "classifier_version")?.as_deref()
+            == Some(crate::project_document_policy::CLASSIFIER_VERSION);
         Ok(Self {
             conn,
             run_id: format!("{}-{}", now_millis(), uuid::Uuid::new_v4().simple()),
             changed_documents: 0,
+            classifier_version_current,
         })
     }
 
@@ -54,6 +58,9 @@ impl ProjectDocumentIndex {
         size_bytes: u64,
         modified_at_ms: u64,
     ) -> Result<Option<ProjectDocumentEntry>> {
+        if !self.classifier_version_current {
+            return Ok(None);
+        }
         let cached = self
             .conn
             .query_row(
@@ -134,6 +141,12 @@ impl ProjectDocumentIndex {
                 .execute("DELETE FROM quality_cache WHERE path=?1", params![path])?;
             self.changed_documents += 1;
         }
+        self.conn.execute(
+            "INSERT INTO metadata(key,value) VALUES('classifier_version',?1)
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            params![crate::project_document_policy::CLASSIFIER_VERSION],
+        )?;
+        self.classifier_version_current = true;
         Ok(())
     }
 
@@ -284,7 +297,7 @@ impl ProjectDocumentIndex {
             params![now_millis().to_string()],
         )?;
         Ok(DocumentMaintenanceState {
-            index_version: 1,
+            index_version: 2,
             durable_queue: true,
             poll_interval_seconds: 60,
             changed_documents: self.changed_documents,
@@ -306,7 +319,7 @@ impl ProjectDocumentIndex {
             .and_then(|value| value.parse().ok())
             .unwrap_or_default();
         Ok(DocumentMaintenanceState {
-            index_version: 1,
+            index_version: 2,
             durable_queue: true,
             poll_interval_seconds: 60,
             changed_documents: self.changed_documents,
@@ -378,6 +391,16 @@ fn initialize_schema(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn metadata_value(conn: &Connection, key: &str) -> Result<Option<String>> {
+    conn.query_row(
+        "SELECT value FROM metadata WHERE key=?1",
+        params![key],
+        |row| row.get::<_, String>(0),
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
 fn index_path(workspace: &Path) -> Result<PathBuf> {
     let canonical = workspace
         .canonicalize()
@@ -442,12 +465,61 @@ mod tests {
         };
         let mut first = ProjectDocumentIndex::open(&root).unwrap();
         first.observe_document(&entry, 1).unwrap();
+        first
+            .finish_scan(&HashSet::from(["README.md".to_string()]))
+            .unwrap();
         assert_eq!(first.state().unwrap().changed_documents, 1);
         drop(first);
 
         let mut second = ProjectDocumentIndex::open(&root).unwrap();
+        assert!(second
+            .cached_document("README.md", entry.byte_len, 1)
+            .unwrap()
+            .is_some());
         second.observe_document(&entry, 1).unwrap();
         assert_eq!(second.state().unwrap().changed_documents, 0);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn classifier_version_invalidates_unchanged_catalog_metadata() {
+        let root = std::env::temp_dir().join(format!(
+            "elon_document_classifier_version_{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let entry = ProjectDocumentEntry {
+            path: "default-project-docs/README.md".to_string(),
+            title: "Template".to_string(),
+            content: String::new(),
+            truncated: false,
+            byte_len: 10,
+            source: "workspace".to_string(),
+            metadata: ProjectDocumentMetadata {
+                role: "project_template".to_string(),
+                content_hash: "same-content".to_string(),
+                ..ProjectDocumentMetadata::default()
+            },
+        };
+        let mut first = ProjectDocumentIndex::open(&root).unwrap();
+        first.observe_document(&entry, 7).unwrap();
+        first
+            .finish_scan(&HashSet::from([entry.path.clone()]))
+            .unwrap();
+        first
+            .conn
+            .execute(
+                "UPDATE metadata SET value='legacy' WHERE key='classifier_version'",
+                [],
+            )
+            .unwrap();
+        drop(first);
+
+        let stale = ProjectDocumentIndex::open(&root).unwrap();
+        assert!(stale
+            .cached_document(&entry.path, entry.byte_len, 7)
+            .unwrap()
+            .is_none());
         fs::remove_dir_all(root).unwrap();
     }
 }

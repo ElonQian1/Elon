@@ -6,6 +6,11 @@
 use homecli_proto::ProjectDocumentMetadata;
 use sha2::{Digest, Sha256};
 
+/// Increment whenever deterministic path/frontmatter classification semantics
+/// change. Persistent catalog entries are derived data and must be rebuilt
+/// even when the Markdown file size and mtime are unchanged.
+pub(crate) const CLASSIFIER_VERSION: &str = "2";
+
 pub(crate) fn classify_project_document(
     path: &str,
     content: &str,
