@@ -126,12 +126,20 @@ impl Store {
                c.project_id,
                c.user_id,
                c.title,
-               (SELECT t0.message FROM tasks t0
-                WHERE t0.project_id = c.project_id
-                  AND t0.user_id = c.user_id
-                  AND t0.conversation_id = c.id
-                  AND t0.client_request_id LIKE 'pc_offline:%'
-                ORDER BY t0.created_at, t0.id LIMIT 1) AS local_task_prompt,
+               COALESCE(
+                (SELECT t0.message FROM tasks t0
+                 WHERE t0.project_id = c.project_id
+                   AND t0.user_id = c.user_id
+                   AND t0.conversation_id = c.id
+                   AND t0.client_request_id LIKE 'pc_offline:%'
+                 ORDER BY t0.created_at, t0.id LIMIT 1),
+                (SELECT m0.content FROM messages m0
+                 WHERE m0.project_id = c.project_id
+                   AND m0.conversation_id = c.id
+                   AND m0.user_id = c.user_id
+                   AND m0.role = 'user'
+                 ORDER BY m0.created_at, m0.id LIMIT 1)
+               ) AS local_task_prompt,
                c.status,
                (SELECT COUNT(*) FROM messages m
                 WHERE m.project_id = c.project_id

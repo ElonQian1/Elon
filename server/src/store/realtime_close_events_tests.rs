@@ -78,6 +78,13 @@ fn realtime_close_alerts_are_scoped_to_realtime_view() {
             .all(|alert| alert.fingerprint.starts_with("billing:")),
         "billing alert list must not include realtime alerts"
     );
+    let billing_history = store.billing_list_alerts(true, 100).unwrap();
+    assert!(
+        billing_history
+            .iter()
+            .all(|alert| alert.fingerprint.starts_with("billing:")),
+        "billing alert history must not include realtime alerts"
+    );
 
     let _ = std::fs::remove_file(path);
 }

@@ -1,6 +1,7 @@
 use rusqlite::params;
 
 use super::{PcCliTaskCompletionApply, Store};
+use crate::task_title::LOCAL_TASK_PLACEHOLDER_TITLE;
 
 fn temp_store() -> Store {
     let path = std::env::temp_dir().join(format!(
@@ -86,9 +87,9 @@ fn local_completion_creates_readable_title_and_repairs_only_exact_placeholder() 
         .conn()
         .unwrap()
         .execute(
-            "UPDATE conversations SET title = '本机离线任务'
-              WHERE project_id = ?1 AND user_id = ?2 AND id = 'offline-readable-title'",
-            params![project_id, user_id],
+            "UPDATE conversations SET title = ?1
+              WHERE project_id = ?2 AND user_id = ?3 AND id = 'offline-readable-title'",
+            params![LOCAL_TASK_PLACEHOLDER_TITLE, project_id, user_id],
         )
         .unwrap();
 
@@ -106,6 +107,39 @@ fn local_completion_creates_readable_title_and_repairs_only_exact_placeholder() 
         member_list[0].title.as_deref(),
         Some("适合人阅读且可区分的任务标题")
     );
+
+    store
+        .conn()
+        .unwrap()
+        .execute(
+            "UPDATE tasks SET client_request_id = 'legacy-task-title'
+              WHERE project_id = ?1 AND user_id = ?2 AND conversation_id = 'offline-readable-title'",
+            params![project_id, user_id],
+        )
+        .unwrap();
+    let legacy_own_list = store
+        .list_user_conversations(&project_id, &user_id, 10)
+        .unwrap();
+    assert_eq!(
+        legacy_own_list[0].title.as_deref(),
+        Some("适合人阅读且可区分的任务标题")
+    );
+    let legacy_member_list = store
+        .list_project_member_conversations(&user_id, &project_id, &user_id, 10)
+        .unwrap();
+    assert_eq!(
+        legacy_member_list[0].title.as_deref(),
+        Some("适合人阅读且可区分的任务标题")
+    );
+    store
+        .conn()
+        .unwrap()
+        .execute(
+            "UPDATE tasks SET client_request_id = 'pc_offline:event-readable-title'
+              WHERE project_id = ?1 AND user_id = ?2 AND conversation_id = 'offline-readable-title'",
+            params![project_id, user_id],
+        )
+        .unwrap();
     assert_eq!(stored_title(&store, &project_id, &user_id), "本机离线任务");
 
     replay_local_task(&store, &user_id, &project_id, &channel_id, prompt);
