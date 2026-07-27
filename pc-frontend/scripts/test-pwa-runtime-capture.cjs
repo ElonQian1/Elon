@@ -80,11 +80,12 @@ async function testTemporaryAuthLifecycle() {
   const profile = 'pc_ui_tuner_0123456789abcdef0123456789abcdef'
   const secret = 'frontend-secret-must-not-enter-capture'
   const calls = []
-  const captured = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', secret, {
-    prepare: async (projectRoot, token) => {
+  const captured = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', secret, '夜云', {
+    prepare: async (projectRoot, token, accountLabel) => {
       calls.push(['prepare', projectRoot])
       assert.equal(token, secret)
-      return { profile, expiresAt: '2026-07-23T00:10:00Z' }
+      assert.equal(accountLabel, '夜云')
+      return { profile, expiresAt: '2026-07-23T00:10:00Z', remembered: true, accountLabel }
     },
     capture: async (preparedProfile) => {
       calls.push(['capture', preparedProfile])
@@ -103,17 +104,20 @@ async function testTemporaryAuthLifecycle() {
   assert.doesNotMatch(JSON.stringify(calls.slice(1)), new RegExp(secret))
 
   let missingTokenCalls = 0
-  const missing = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', null, {
-    prepare: async () => { missingTokenCalls += 1 },
+  const missing = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', null, null, {
+    prepare: async () => {
+      missingTokenCalls += 1
+      throw new Error('no remembered credential')
+    },
     capture: async () => { missingTokenCalls += 1 },
     cleanup: async () => { missingTokenCalls += 1 },
   })
   assert.equal(missing.diagnostic.code, 'AUTHENTICATION_REQUIRED')
-  assert.equal(missingTokenCalls, 0)
+  assert.equal(missingTokenCalls, 1)
 
   let expiredCleaned = false
-  const expired = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', secret, {
-    prepare: async () => ({ profile, expiresAt: '2026-07-23T00:10:00Z' }),
+  const expired = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', secret, '夜云', {
+    prepare: async () => ({ profile, expiresAt: '2026-07-23T00:10:00Z', remembered: true }),
     capture: async () => ({
       ok: false, status: 'CAPTURE_FAILED', base64Embedded: false,
       diagnostic: { code: 'AUTHENTICATION_REQUIRED', message: 'expired', retryable: false, nextStep: 'login' },
@@ -123,8 +127,8 @@ async function testTemporaryAuthLifecycle() {
   assert.equal(expired.diagnostic.code, 'AUTHENTICATION_REQUIRED')
   assert.equal(expiredCleaned, true)
 
-  const cleanupFailed = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', secret, {
-    prepare: async () => ({ profile, expiresAt: '2026-07-23T00:10:00Z' }),
+  const cleanupFailed = await runtimeAuth.captureWithTemporaryPwaAuthProfile('C:\\project', secret, '夜云', {
+    prepare: async () => ({ profile, expiresAt: '2026-07-23T00:10:00Z', remembered: true }),
     capture: async () => ({ ok: true, status: 'CAPTURED', artifact, base64Embedded: false }),
     cleanup: async () => { throw new Error('simulated cleanup failure') },
   })

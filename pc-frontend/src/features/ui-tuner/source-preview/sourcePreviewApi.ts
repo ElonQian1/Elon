@@ -1,5 +1,5 @@
 import { safeNodeAdminUrl } from '../../../lib/utils'
-import { getAuthToken } from '../../../api/client'
+import { getAuthIdentityLabel, getAuthToken } from '../../../api/client'
 import { nodeApi, probeLocalNode } from '../../node/localNodeApi'
 import type { ComposePreviewEntry, ComposePreviewRender, SourcePreviewDocument, SourceRendererCapabilities } from './types'
 import type { PwaExplicitStyleBinding } from './pwaDesignDraft'
@@ -123,11 +123,20 @@ export async function capturePwaSourceRuntime(
   const url = target.toString()
   const adminUrl = sourcePreviewAdminUrl()
   const token = getAuthToken()
-  return captureWithTemporaryPwaAuthProfile(evidence.projectRoot, token, {
-    prepare: (projectRoot, currentToken) => nodeApi<PreparedPwaAuthProfile>(
+  const accountLabel = getAuthIdentityLabel()
+  return captureWithTemporaryPwaAuthProfile(evidence.projectRoot, token, accountLabel, {
+    prepare: (projectRoot, currentToken, currentAccountLabel) => nodeApi<PreparedPwaAuthProfile>(
       adminUrl,
       '/api/source-preview/pwa-auth-profile/prepare',
-      { method: 'POST', body: JSON.stringify({ projectRoot, token: currentToken }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          projectRoot,
+          token: currentToken || undefined,
+          remember: true,
+          accountLabel: currentAccountLabel || undefined,
+        }),
+      },
       15_000,
     ),
     capture: (profile) => nodeApi<PwaRuntimeCaptureResult>(

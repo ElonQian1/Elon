@@ -392,6 +392,40 @@ mod tests {
         assert_eq!(mode, "danger_full_access");
     }
 
+    #[test]
+    fn migration_v107_adds_opt_in_trusted_device_sessions() {
+        let conn = Connection::open_in_memory().expect("in-memory db should open");
+        migration_v1(&conn).expect("base schema should apply");
+        migration_v107(&conn).expect("trusted device column should apply");
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES ('usr_trusted_pc', NULL, 'trusted@example.invalid', 'hash', 'Trusted', 'user', 'active', 'now', 'now')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at)
+             VALUES ('ses_default', 'usr_trusted_pc', 'hash-default', 'later', 'now')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO sessions (
+                id, user_id, token_hash, expires_at, created_at, trusted_device
+             ) VALUES ('ses_pc', 'usr_trusted_pc', 'hash-pc', 'later', 'now', 1)",
+            [],
+        )
+        .unwrap();
+        let values = conn
+            .prepare("SELECT trusted_device FROM sessions ORDER BY id")
+            .unwrap()
+            .query_map([], |row| row.get::<_, i64>(0))
+            .unwrap()
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(values, vec![0, 1]);
+    }
+
     fn insert_project(conn: &Connection, id: &str, name: &str, created_by: &str) {
         conn.execute(
             "INSERT INTO projects (id, name, description, workspace_key, template, source_type, status, created_by, created_at, updated_at)

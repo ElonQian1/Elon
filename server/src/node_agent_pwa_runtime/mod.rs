@@ -8,6 +8,7 @@ mod artifact;
 mod auth;
 mod browser;
 mod cdp;
+mod fixture;
 mod process;
 mod security;
 
@@ -31,7 +32,38 @@ pub(crate) struct PwaCaptureInput {
     pub(crate) capture: CaptureScope,
     #[serde(default)]
     pub(crate) auth_profile: Option<String>,
+    #[serde(default)]
+    pub(crate) fixture_profile: Option<String>,
+    #[serde(default)]
+    pub(crate) steps: Vec<CaptureInteractionStep>,
     pub(crate) evidence: CaptureEvidenceInput,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "action", rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) enum CaptureInteractionStep {
+    Click {
+        selector: String,
+    },
+    WaitFor {
+        selector: String,
+        #[serde(default = "default_interaction_state")]
+        state: String,
+        #[serde(default = "default_interaction_timeout_ms")]
+        timeout_ms: u64,
+    },
+    AssertText {
+        selector: String,
+        text: String,
+    },
+}
+
+fn default_interaction_state() -> String {
+    "visible".to_string()
+}
+
+fn default_interaction_timeout_ms() -> u64 {
+    10_000
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -179,6 +211,42 @@ pub(crate) fn tool_definition() -> Value {
                     }
                 },
                 "authProfile":{"type":"string","pattern":"^[A-Za-z0-9_-]{1,64}$","description":"只传 profile 名；秘密保存在项目 .elon/ui-tuner/pwa-sessions/<profile>.json"},
+                "fixtureProfile":{"type":"string","pattern":"^[A-Za-z0-9_-]{1,64}$","description":"引用 .elon/ui-tuner/pwa-fixtures/<profile>.json 的非秘密确定性测试数据"},
+                "steps":{
+                    "type":"array","maxItems":32,
+                    "description":"可复现的安全交互重放；仅允许 click、waitFor 和 assertText，不执行任意脚本或输入秘密",
+                    "items":{
+                        "oneOf":[
+                            {
+                                "type":"object","additionalProperties":false,
+                                "required":["action","selector"],
+                                "properties":{
+                                    "action":{"const":"click"},
+                                    "selector":{"type":"string","minLength":1,"maxLength":1000}
+                                }
+                            },
+                            {
+                                "type":"object","additionalProperties":false,
+                                "required":["action","selector"],
+                                "properties":{
+                                    "action":{"const":"waitFor"},
+                                    "selector":{"type":"string","minLength":1,"maxLength":1000},
+                                    "state":{"enum":["attached","visible","hidden"],"default":"visible"},
+                                    "timeoutMs":{"type":"integer","minimum":100,"maximum":30000,"default":10000}
+                                }
+                            },
+                            {
+                                "type":"object","additionalProperties":false,
+                                "required":["action","selector","text"],
+                                "properties":{
+                                    "action":{"const":"assertText"},
+                                    "selector":{"type":"string","minLength":1,"maxLength":1000},
+                                    "text":{"type":"string","minLength":1,"maxLength":500}
+                                }
+                            }
+                        ]
+                    }
+                },
                 "evidence": {
                     "type":"object","additionalProperties":false,"required":["routeRevision"],
                     "properties": {
@@ -247,6 +315,8 @@ pub(crate) async fn capture(project_root: &str, input: PwaCaptureInput) -> Value
                 "viewport": result.viewport,
                 "networkPolicy": result.network_policy,
                 "authentication": {"mode": prepared.auth.mode, "profile": prepared.auth.profile},
+                "testData": {"fixtureProfile": prepared.fixture.profile},
+                "interaction": {"executedStepCount": result.executed_step_count},
                 "processCleanup": result.process_cleanup,
                 "contextPackReference": {
                     "path": context_path,

@@ -13,6 +13,9 @@ use super::{
     PublicUser, Store,
 };
 
+const STANDARD_SESSION_DAYS: i64 = 30;
+const TRUSTED_DEVICE_SESSION_DAYS: i64 = 3650;
+
 impl Store {
     pub fn create_user(
         &self,
@@ -105,15 +108,28 @@ impl Store {
         device_name: Option<&str>,
         apk_version: Option<&str>,
     ) -> Result<(String, String)> {
+        self.create_session_with_trust(user_id, device_name, apk_version, false)
+    }
+
+    pub fn create_session_with_trust(
+        &self,
+        user_id: &str,
+        device_name: Option<&str>,
+        apk_version: Option<&str>,
+        trusted_device: bool,
+    ) -> Result<(String, String)> {
         let token = format!("tok_{}", Uuid::new_v4().simple());
         let token_hash = hash_token(&token);
         let session_id = new_id("ses");
         let created_at = now();
-        let expires_at = (Utc::now() + Duration::days(30)).to_rfc3339();
+        let expires_at =
+            (Utc::now() + Duration::days(session_lifetime_days(trusted_device))).to_rfc3339();
 
         self.conn()?.execute(
-            "INSERT INTO sessions (id, user_id, token_hash, device_name, apk_version, expires_at, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO sessions (
+                id, user_id, token_hash, device_name, apk_version, expires_at, created_at,
+                trusted_device
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
             params![
                 session_id,
                 user_id,
@@ -121,11 +137,39 @@ impl Store {
                 clean_optional(device_name),
                 clean_optional(apk_version),
                 expires_at,
-                created_at
+                created_at,
+                i64::from(trusted_device),
             ],
         )?;
 
         Ok((token, expires_at))
+    }
+
+    pub fn trust_session(&self, token: &str, device_name: Option<&str>) -> Result<String> {
+        let token = token.trim();
+        if token.is_empty() {
+            return Err(anyhow!("缺少登录 token"));
+        }
+
+        let expires_at = (Utc::now() + Duration::days(session_lifetime_days(true))).to_rfc3339();
+        let updated = self.conn()?.execute(
+            "UPDATE sessions
+             SET trusted_device = 1,
+                 expires_at = ?1,
+                 device_name = COALESCE(?2, device_name)
+             WHERE token_hash = ?3
+               AND expires_at > ?4",
+            params![
+                expires_at,
+                clean_optional(device_name),
+                hash_token(token),
+                now(),
+            ],
+        )?;
+        if updated == 0 {
+            return Err(anyhow!("登录已过期，请重新登录"));
+        }
+        Ok(expires_at)
     }
 
     pub fn authenticate_token(&self, token: &str) -> Result<PublicUser> {
@@ -349,5 +393,66 @@ impl Store {
             )
             .optional()?;
         Ok(result.flatten())
+    }
+}
+
+fn session_lifetime_days(trusted_device: bool) -> i64 {
+    if trusted_device {
+        TRUSTED_DEVICE_SESSION_DAYS
+    } else {
+        STANDARD_SESSION_DAYS
+    }
+}
+
+#[cfg(test)]
+mod trusted_device_session_tests {
+    use super::*;
+
+    #[test]
+    fn trusted_pc_is_long_lived_but_still_revocable() {
+        assert_eq!(session_lifetime_days(false), 30);
+        assert_eq!(session_lifetime_days(true), 3650);
+    }
+
+    #[test]
+    fn current_session_can_be_upgraded_without_rotating_its_token() {
+        let path = std::env::temp_dir().join(format!(
+            "elon_trusted_session_{}.db",
+            Uuid::new_v4().simple()
+        ));
+        let store = Store::open(&path).expect("store should open");
+        let user = store
+            .create_user("trusted-pc@example.com", "secret1", Some("夜云"), None)
+            .expect("user should be created");
+        let (token, _) = store
+            .create_session(&user.id, Some("旧 PC"), None)
+            .expect("session should be created");
+
+        let expires_at = store
+            .trust_session(&token, Some("PC Web"))
+            .expect("current session should become trusted");
+        assert_eq!(
+            store
+                .authenticate_token(&token)
+                .expect("same token remains valid")
+                .id,
+            user.id
+        );
+        let (trusted_device, device_name): (i64, Option<String>) = store
+            .conn()
+            .unwrap()
+            .query_row(
+                "SELECT trusted_device, device_name FROM sessions WHERE token_hash = ?1",
+                params![hash_token(&token)],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(trusted_device, 1);
+        assert_eq!(device_name.as_deref(), Some("PC Web"));
+        let expiry = chrono::DateTime::parse_from_rfc3339(&expires_at).unwrap();
+        assert!(expiry > Utc::now() + Duration::days(3600));
+
+        drop(store);
+        let _ = std::fs::remove_file(path);
     }
 }

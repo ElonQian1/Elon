@@ -70,6 +70,8 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                 "properties":{
                     "basePackageName":{"type":"string","description":"可选；默认使用项目 UI Profile 预提取的 applicationId"},
                     "deviceId":{"type":"string","description":"可选；不填时优先选择在线模拟器"},
+                    "autoStartEmulator":{"type":"boolean","default":true,"description":"没有在线设备时自动启动 ELON_ANDROID_AVD 或排序后的首个 AVD"},
+                    "fallbackToEmulator":{"type":"boolean","default":true,"description":"显式真机不在线时回退到模拟器，并在结果中标记 deviceSelection.source"},
                     "debugApplicationIdSuffix":{"type":"string","default":".uitest"},
                     "isolatedEmulatorPackage":{"type":"boolean","default":false,"description":"仅模拟器可显式启用；真机一律使用节点固定 .uituner_<指纹> 包"}, "lkgEnabled":{"type":"boolean","default":false,"description":"本次调试任务显式启用最近成功版本；默认关闭，不参与构建、安装或收尾门禁"},
                     "candidate":super::debug_integration_contract::debug_candidate_schema(),
@@ -512,7 +514,9 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
                         "type":"string",
                         "pattern":"^\\.[A-Za-z0-9._]{1,39}$",
                         "description":"可选；仅用于并行安装 Debug 验收包，例如 .uitest"
-                    }, "lkgEnabled":{"type":"boolean","default":false,"description":"本次构建验收显式启用最近成功版本；默认关闭"},
+                    },
+                    "forceRerun":{"type":"boolean","default":false,"description":"默认复用 Gradle 增量和构建缓存；仅诊断缓存污染时显式启用 --rerun-tasks"},
+                    "lkgEnabled":{"type":"boolean","default":false,"description":"本次构建验收显式启用最近成功版本；默认关闭"},
                     "preview":{
                         "type":"object",
                         "required":["screenId","scenario","theme","fontScale","locale"],
@@ -532,6 +536,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         "读取当前项目指定设备的固定调试槽、贡献提交、冲突、代次，以及最近成功版本是否显式启用。",
         json!({"type":"object","required":["deviceId"],"properties":{"deviceId":{"type":"string"},"projectId":{"type":"string"}}})));
     definitions.push(crate::node_agent_pwa_runtime::tool_definition());
+    definitions.push(super::verification_workflow::tool_definition());
     definitions.extend(fit_run_tools::definitions());
     definitions
 }

@@ -1,9 +1,9 @@
 use crate::{node_agent_atomic_file, NodeRuntime};
 use axum::{
-    extract::rejection::JsonRejection,
+    extract::{rejection::JsonRejection, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::post,
+    routing::{get, post},
     Json, Router,
 };
 use chrono::{DateTime, Utc};
@@ -16,6 +16,8 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+mod secure_store;
+
 const AUTO_PROFILE_PREFIX: &str = "pc_ui_tuner_";
 const AUTO_PROFILE_ID_LEN: usize = 32;
 const PROFILE_TTL: Duration = Duration::from_secs(10 * 60);
@@ -26,7 +28,12 @@ const MAX_TOKEN_BYTES: usize = 8_192 - "Bearer ".len();
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct PrepareRequest {
     project_root: String,
-    token: String,
+    #[serde(default)]
+    token: Option<String>,
+    #[serde(default)]
+    remember: bool,
+    #[serde(default)]
+    account_label: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -41,12 +48,22 @@ struct CleanupRequest {
 struct PrepareResponse {
     profile: String,
     expires_at: DateTime<Utc>,
+    remembered: bool,
+    account_label: Option<String>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CleanupResponse {
     cleaned: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RememberedStatusResponse {
+    remembered: bool,
+    account_label: Option<String>,
+    protection: &'static str,
 }
 
 #[derive(Debug)]
@@ -92,9 +109,16 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/source-preview/pwa-auth-profile/cleanup",
             post(cleanup_handler),
         )
+        .route(
+            "/api/source-preview/pwa-auth-profile/remembered",
+            get(remembered_status_handler).delete(forget_handler),
+        )
 }
 
-async fn prepare_handler(payload: Result<Json<PrepareRequest>, JsonRejection>) -> Response {
+async fn prepare_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    payload: Result<Json<PrepareRequest>, JsonRejection>,
+) -> Response {
     let Json(request) = match payload {
         Ok(request) => request,
         Err(_) => {
@@ -105,7 +129,7 @@ async fn prepare_handler(payload: Result<Json<PrepareRequest>, JsonRejection>) -
             .response()
         }
     };
-    match prepare_profile(request) {
+    match prepare_profile(&runtime, request).await {
         Ok(response) => Json(response).into_response(),
         Err(error) => error.response(),
     }
@@ -128,9 +152,102 @@ async fn cleanup_handler(payload: Result<Json<CleanupRequest>, JsonRejection>) -
     }
 }
 
-fn prepare_profile(request: PrepareRequest) -> Result<PrepareResponse, ProfileError> {
-    validate_token(&request.token)?;
-    let project_root = canonical_project_root(&request.project_root)?;
+async fn remembered_status_handler() -> Response {
+    match secure_store::account_label() {
+        Ok(account_label) => Json(RememberedStatusResponse {
+            remembered: account_label.is_some(),
+            account_label,
+            protection: "WINDOWS_DPAPI_CURRENT_USER",
+        })
+        .into_response(),
+        Err(error) => ProfileError::internal(
+            "PWA_REMEMBERED_AUTH_READ_FAILED",
+            leak_safe_store_message(&error),
+        )
+        .response(),
+    }
+}
+
+async fn forget_handler() -> Response {
+    match secure_store::forget() {
+        Ok(cleaned) => Json(CleanupResponse { cleaned }).into_response(),
+        Err(_) => ProfileError::internal(
+            "PWA_REMEMBERED_AUTH_FORGET_FAILED",
+            "无法清除 Windows 保护的 PWA 长期登录态",
+        )
+        .response(),
+    }
+}
+
+async fn prepare_profile(
+    runtime: &NodeRuntime,
+    request: PrepareRequest,
+) -> Result<PrepareResponse, ProfileError> {
+    let supplied_token = request
+        .token
+        .as_deref()
+        .map(str::trim)
+        .filter(|token| !token.is_empty());
+    if let Some(token) = supplied_token {
+        validate_token(token)?;
+    }
+    let remembered = if supplied_token.is_none() {
+        secure_store::load().map_err(|error| {
+            ProfileError::internal(
+                "PWA_REMEMBERED_AUTH_READ_FAILED",
+                leak_safe_store_message(&error),
+            )
+        })?
+    } else {
+        None
+    };
+    let runtime_token = if supplied_token.is_none() && remembered.is_none() {
+        runtime.user_token().await
+    } else {
+        None
+    };
+    let token = supplied_token
+        .map(str::to_string)
+        .or_else(|| {
+            remembered
+                .as_ref()
+                .map(|credential| credential.token.clone())
+        })
+        .or(runtime_token)
+        .ok_or_else(|| {
+            ProfileError::invalid(
+                "PWA_AUTHENTICATION_REQUIRED",
+                "当前 PC 没有可复用的一龙登录态，请先登录一次",
+            )
+        })?;
+    validate_token(&token)?;
+    let remembered_label = if request.remember {
+        let account_label = request.account_label.as_deref().or_else(|| {
+            remembered
+                .as_ref()
+                .map(|credential| credential.account_label.as_str())
+        });
+        Some(secure_store::save(&token, account_label).map_err(|error| {
+            ProfileError::internal(
+                "PWA_REMEMBERED_AUTH_WRITE_FAILED",
+                leak_safe_store_message(&error),
+            )
+        })?)
+    } else {
+        remembered
+            .as_ref()
+            .map(|credential| credential.account_label.clone())
+    };
+    write_ephemeral_profile(&request.project_root, &token, remembered_label)
+}
+
+fn write_ephemeral_profile(
+    project_root: &str,
+    token: &str,
+    remembered_label: Option<String>,
+) -> Result<PrepareResponse, ProfileError> {
+    validate_token(token)?;
+    let project_root = canonical_project_root(project_root)?;
     let session_dir = scoped_session_dir(&project_root, true)?.ok_or_else(|| {
         ProfileError::internal(
             "PWA_AUTH_PROFILE_DIRECTORY_FAILED",
@@ -146,8 +263,8 @@ fn prepare_profile(request: PrepareRequest) -> Result<PrepareResponse, ProfileEr
     let bytes = serde_json::to_vec(&json!({
         "version": 1,
         "cookies": [],
-        "headers": { "Authorization": format!("Bearer {}", request.token) },
-        "localStorage": { "lodex_token": request.token },
+        "headers": { "Authorization": format!("Bearer {token}") },
+        "localStorage": { "lodex_token": token },
     }))
     .map_err(|_| {
         ProfileError::internal("PWA_AUTH_PROFILE_WRITE_FAILED", "无法准备临时 PWA 登录态")
@@ -166,7 +283,17 @@ fn prepare_profile(request: PrepareRequest) -> Result<PrepareResponse, ProfileEr
     Ok(PrepareResponse {
         profile,
         expires_at,
+        remembered: remembered_label.is_some(),
+        account_label: remembered_label,
     })
+}
+
+fn leak_safe_store_message(error: &anyhow::Error) -> &'static str {
+    if error.to_string().contains("UNAVAILABLE") {
+        "当前节点不支持 Windows 当前用户凭据保护"
+    } else {
+        "Windows 保护的 PWA 长期登录态不可用、已损坏或属于其他系统用户"
+    }
 }
 
 fn cleanup_profile(request: CleanupRequest) -> Result<bool, ProfileError> {
@@ -377,11 +504,9 @@ mod tests {
     fn prepare_and_cleanup_keep_the_secret_out_of_responses() {
         let root = fixture_root("round-trip");
         let secret = "test-secret-that-must-not-leak";
-        let prepared = prepare_profile(PrepareRequest {
-            project_root: root.display().to_string(),
-            token: secret.to_string(),
-        })
-        .unwrap();
+        let prepared =
+            write_ephemeral_profile(&root.display().to_string(), secret, Some("夜云".into()))
+                .unwrap();
         assert!(valid_auto_profile(&prepared.profile));
         let response = serde_json::to_string(&prepared).unwrap();
         assert!(!response.contains(secret));
@@ -406,11 +531,7 @@ mod tests {
     fn invalid_values_are_rejected_without_echoing_the_secret() {
         let root = fixture_root("invalid");
         let secret = "secret\nshould-not-appear";
-        let error = prepare_profile(PrepareRequest {
-            project_root: root.display().to_string(),
-            token: secret.to_string(),
-        })
-        .unwrap_err();
+        let error = write_ephemeral_profile(&root.display().to_string(), secret, None).unwrap_err();
         let response = serde_json::to_string(&json!({
             "code": error.code,
             "error": error.message,

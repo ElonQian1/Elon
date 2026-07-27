@@ -22,19 +22,21 @@ pub(super) async fn prepare_debug_runtime(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned);
-    let device_id = match requested_device_id {
-        Some(device_id) => device_id,
-        None => {
-            let devices =
-                crate::node_agent_android_inspector::adb_wireless::list_device_inventory().await?;
-            devices
-                .iter()
-                .find(|device| device.state == "device" && device.serial.starts_with("emulator-"))
-                .or_else(|| devices.iter().find(|device| device.state == "device"))
-                .map(|device| device.serial.clone())
-                .ok_or_else(|| anyhow!("没有可用 Android 设备或模拟器"))?
-        }
-    };
+    let auto_start_emulator = arguments
+        .get("autoStartEmulator")
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+    let fallback_to_emulator = arguments
+        .get("fallbackToEmulator")
+        .and_then(Value::as_bool)
+        .unwrap_or(true);
+    let device_selection = super::emulator_start::select_or_start(
+        requested_device_id,
+        auto_start_emulator,
+        fallback_to_emulator,
+    )
+    .await?;
+    let device_id = device_selection.device_id.clone();
     let profile = super::design_bootstrap::project_profile(&bootstrap_session)?;
     let base_package_name = arguments
         .get("basePackageName")
@@ -93,7 +95,11 @@ pub(super) async fn prepare_debug_runtime(
         "FAILED" => "RETRY_WITH_RESTART",
         _ => "POLL_PREPARATION",
     };
-    Ok(json!({ "result": progress, "nextPhase": next_phase }))
+    Ok(json!({
+        "result": progress,
+        "nextPhase": next_phase,
+        "deviceSelection": device_selection,
+    }))
 }
 
 pub(super) async fn debug_integration_status(

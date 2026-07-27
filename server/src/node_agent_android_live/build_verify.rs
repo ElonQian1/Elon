@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use super::adb_session::{
     DEFAULT_DEVICE_PORT,
 };
 use super::broker::{LiveUiBroker, LiveUiSession};
-use super::build_verify_apk::select_fresh_debug_apk;
+use super::build_verify_apk::select_debug_apk_after_successful_build;
 use super::fit_run::workspace_fingerprint;
 use super::frame::{capture_runtime_frame_image, RuntimeFrameImage};
 use super::preview::{open_preview, PreviewOpenRequest};
@@ -62,6 +62,8 @@ pub(crate) struct BuildVerifyRequest {
     pub(crate) visual_mask: VisualMask,
     #[serde(default)]
     pub(crate) state_replay: Option<super::fit_run::FitStateReplay>,
+    #[serde(default)]
+    pub(crate) force_rerun: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -405,9 +407,6 @@ async fn build_and_verify_inner(
 
     broker.debug_integration.mark_building(&integration_plan)?;
     let build_started = Instant::now();
-    let artifact_not_before = SystemTime::now()
-        .checked_sub(Duration::from_secs(2))
-        .unwrap_or(SystemTime::UNIX_EPOCH);
     let explicit_debug_application_id_suffix = request
         .debug_application_id_suffix
         .as_deref()
@@ -431,14 +430,14 @@ async fn build_and_verify_inner(
         &wrapper,
         debug_application_id_suffix.as_deref(),
         broker.fixed_debug_label().as_deref(),
-        true,
+        request.force_rerun,
     )
     .await?;
     verify_origin_workspace_revision(&source_project_root, &origin_workspace_revision)?;
     let generation_revision = workspace_fingerprint(project_root.to_string_lossy().as_ref())?
         .context("FIT_SOURCE_PROOF_GENERATION_MISSING: generation worktree 缺少可验证 revision")?;
     let build_duration_ms = build_started.elapsed().as_millis();
-    let apk = select_fresh_debug_apk(&gradle_root, &session.package_name, artifact_not_before)?;
+    let apk = select_debug_apk_after_successful_build(&gradle_root, &session.package_name)?;
     operation::report_evidence(
         reporter,
         "BUILD",

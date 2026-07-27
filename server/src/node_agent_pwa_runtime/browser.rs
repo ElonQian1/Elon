@@ -2,7 +2,7 @@ use super::{
     cdp::{number, safe_browser_field, short_pause, CdpClient, NetworkState},
     process::{locate_browser, BrowserProcess},
     security::{self, PreparedCapture, SanitizedRoute},
-    CaptureDiagnostic,
+    CaptureDiagnostic, CaptureInteractionStep,
 };
 use base64::Engine as _;
 use serde::Serialize;
@@ -20,6 +20,7 @@ pub(super) struct RenderedCapture {
     pub(super) css_width: f64,
     pub(super) css_height: f64,
     pub(super) blocked_request_count: u32,
+    pub(super) executed_step_count: usize,
     pub(super) process_cleanup: ProcessCleanup,
 }
 
@@ -58,9 +59,14 @@ pub(super) async fn render(
         security::origin(&prepared.url)?,
         prepared.auth.headers.clone(),
     );
-    let deadline = Instant::now() + Duration::from_millis(prepared.wait_for.timeout_ms + 10_000);
+    let total_timeout_ms = prepared
+        .wait_for
+        .timeout_ms
+        .saturating_add(prepared.interaction_timeout_ms)
+        .saturating_add(10_000);
+    let deadline = Instant::now() + Duration::from_millis(total_timeout_ms);
     let result = tokio::time::timeout(
-        Duration::from_millis(prepared.wait_for.timeout_ms + 10_000),
+        Duration::from_millis(total_timeout_ms),
         render_page(prepared, &mut cdp, deadline, executable_name),
     )
     .await
@@ -140,8 +146,10 @@ async fn render_page(
         cdp.command(method, json!({}), Some(&session), deadline)
             .await?;
     }
-    if !prepared.auth.local_storage.is_empty() {
-        let values = serde_json::to_string(&prepared.auth.local_storage)
+    if !prepared.auth.local_storage.is_empty() || !prepared.fixture.local_storage.is_empty() {
+        let mut storage = prepared.fixture.local_storage.clone();
+        storage.extend(prepared.auth.local_storage.clone());
+        let values = serde_json::to_string(&storage)
             .map_err(|_| protocol_error("无法序列化 authProfile localStorage"))?;
         let target_origin = serde_json::to_string(&security::origin(&prepared.url)?)
             .map_err(|_| protocol_error("无法序列化 PWA origin"))?;
@@ -222,7 +230,11 @@ async fn render_page(
         ));
     }
     let wait_deadline = Instant::now() + Duration::from_millis(prepared.wait_for.timeout_ms);
-    let final_url = wait_for_page(prepared, cdp, &session, wait_deadline).await?;
+    let mut final_url = wait_for_page(prepared, cdp, &session, wait_deadline).await?;
+    let executed_step_count = execute_steps(prepared, cdp, &session, deadline).await?;
+    if executed_step_count > 0 {
+        final_url = wait_for_page(prepared, cdp, &session, deadline).await?;
+    }
     let final_url =
         reqwest::Url::parse(&final_url).map_err(|_| protocol_error("页面返回了无效最终 URL"))?;
     if !prepared
@@ -269,11 +281,120 @@ async fn render_page(
         css_width,
         css_height,
         blocked_request_count: cdp.blocked_request_count,
+        executed_step_count,
         process_cleanup: ProcessCleanup {
             browser_process_reaped: false,
             temporary_profile_removed: false,
         },
     })
+}
+
+async fn execute_steps(
+    prepared: &PreparedCapture,
+    cdp: &mut CdpClient,
+    session: &str,
+    deadline: Instant,
+) -> Result<usize, CaptureDiagnostic> {
+    for (index, step) in prepared.steps.iter().enumerate() {
+        match step {
+            CaptureInteractionStep::Click { selector } => {
+                let selector = serde_json::to_string(selector)
+                    .map_err(|_| interaction_error(index, "无法序列化 click selector"))?;
+                let expression = format!(
+                    r#"(() => {{ try {{ const element = document.querySelector({selector}); if (!element) return "missing"; element.click(); return "clicked"; }} catch (_) {{ return "invalid"; }} }})()"#
+                );
+                let value = evaluate_value(cdp, session, &expression, deadline).await?;
+                match value.as_str() {
+                    Some("clicked") => {}
+                    Some("missing") => {
+                        return Err(interaction_error(index, "click selector 在页面中不存在"))
+                    }
+                    _ => return Err(interaction_error(index, "click selector 无效")),
+                }
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+            CaptureInteractionStep::WaitFor {
+                selector,
+                state,
+                timeout_ms,
+            } => {
+                let selector = serde_json::to_string(selector)
+                    .map_err(|_| interaction_error(index, "无法序列化 waitFor selector"))?;
+                let state = serde_json::to_string(state)
+                    .map_err(|_| interaction_error(index, "无法序列化 waitFor state"))?;
+                let expression = format!(
+                    r#"(() => {{ try {{ const element = document.querySelector({selector}); const state = {state}; if (state === "hidden") return !element || getComputedStyle(element).display === "none" || getComputedStyle(element).visibility === "hidden" || element.getBoundingClientRect().width <= 0 || element.getBoundingClientRect().height <= 0; if (state === "attached") return !!element; return !!element && getComputedStyle(element).display !== "none" && getComputedStyle(element).visibility !== "hidden" && element.getBoundingClientRect().width > 0 && element.getBoundingClientRect().height > 0; }} catch (_) {{ return null; }} }})()"#
+                );
+                let step_deadline =
+                    (Instant::now() + Duration::from_millis(*timeout_ms)).min(deadline);
+                loop {
+                    let value = evaluate_value(cdp, session, &expression, step_deadline).await?;
+                    if value.is_null() {
+                        return Err(interaction_error(index, "waitFor selector 无效"));
+                    }
+                    if value.as_bool() == Some(true) {
+                        break;
+                    }
+                    if Instant::now() >= step_deadline {
+                        return Err(interaction_error(index, "waitFor 条件超时"));
+                    }
+                    short_pause().await;
+                }
+            }
+            CaptureInteractionStep::AssertText { selector, text } => {
+                let selector = serde_json::to_string(selector)
+                    .map_err(|_| interaction_error(index, "无法序列化 assertText selector"))?;
+                let expected = serde_json::to_string(text)
+                    .map_err(|_| interaction_error(index, "无法序列化 assertText 文本"))?;
+                let expression = format!(
+                    r#"(() => {{ try {{ const element = document.querySelector({selector}); if (!element) return "missing"; return (element.textContent || "").includes({expected}) ? "matched" : "mismatch"; }} catch (_) {{ return "invalid"; }} }})()"#
+                );
+                let value = evaluate_value(cdp, session, &expression, deadline).await?;
+                match value.as_str() {
+                    Some("matched") => {}
+                    Some("missing") => {
+                        return Err(interaction_error(
+                            index,
+                            "assertText selector 在页面中不存在",
+                        ))
+                    }
+                    Some("mismatch") => {
+                        return Err(interaction_error(index, "assertText 文本断言不匹配"))
+                    }
+                    _ => return Err(interaction_error(index, "assertText selector 无效")),
+                }
+            }
+        }
+    }
+    Ok(prepared.steps.len())
+}
+
+async fn evaluate_value(
+    cdp: &mut CdpClient,
+    session: &str,
+    expression: &str,
+    deadline: Instant,
+) -> Result<Value, CaptureDiagnostic> {
+    cdp.command(
+        "Runtime.evaluate",
+        json!({"expression":expression,"returnByValue":true}),
+        Some(session),
+        deadline,
+    )
+    .await?
+    .pointer("/result/value")
+    .cloned()
+    .ok_or_else(|| protocol_error("PWA 交互没有返回可验证结果"))
+}
+
+fn interaction_error(index: usize, message: &str) -> CaptureDiagnostic {
+    CaptureDiagnostic::new(
+        "INTERACTION_STEP_FAILED",
+        format!("PWA 交互步骤 {} 失败：{message}", index + 1),
+        true,
+        "检查稳定 selector、页面初始数据和步骤顺序后重试；不要改用任意脚本绕过",
+    )
+    .with_detail("stepIndex", json!(index))
 }
 
 async fn wait_for_page(

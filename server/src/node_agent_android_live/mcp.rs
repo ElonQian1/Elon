@@ -450,6 +450,9 @@ async fn call_tool(
             crate::node_agent_pwa_runtime::capture_tool(session.project_root.as_deref(), arguments)
                 .await
         }
+        super::verification_workflow::TOOL_NAME => {
+            super::verification_workflow::verify(broker, &session_id, &arguments).await?
+        }
         _ => bail!("未知 UI MCP 工具: {name}"),
     };
     Ok(json!({

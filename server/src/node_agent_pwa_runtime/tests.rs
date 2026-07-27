@@ -42,12 +42,48 @@ fn input(url: String) -> PwaCaptureInput {
         },
         capture: CaptureScope::default(),
         auth_profile: None,
+        fixture_profile: None,
+        steps: Vec::new(),
         evidence: CaptureEvidenceInput {
             source_revision: Some(format!("fixture-sha256:{}", "a".repeat(64))),
             source_revisions: Default::default(),
             route_revision: "fixture-route-r1".to_string(),
         },
     }
+}
+
+#[tokio::test]
+async fn real_headless_fixture_replays_click_and_text_assertion() {
+    let root = project_root("interaction-replay");
+    let (url, server) = fixture(
+        r#"<!doctype html><body><button id="toggle" onclick="document.querySelector('#detail').hidden=false">展开</button><main id="ready">ready</main><p id="detail" hidden>第三行已展开</p></body>"#,
+    )
+    .await;
+    let mut capture_input = input(url);
+    capture_input.steps = vec![
+        CaptureInteractionStep::Click {
+            selector: "#toggle".into(),
+        },
+        CaptureInteractionStep::WaitFor {
+            selector: "#detail".into(),
+            state: "visible".into(),
+            timeout_ms: 2_000,
+        },
+        CaptureInteractionStep::AssertText {
+            selector: "#detail".into(),
+            text: "第三行已展开".into(),
+        },
+    ];
+    let result = capture(root.to_str().unwrap(), capture_input).await;
+    if result.pointer("/diagnostic/code").and_then(Value::as_str) == Some("BROWSER_NOT_FOUND") {
+        server.abort();
+        fs::remove_dir_all(root).unwrap();
+        return;
+    }
+    assert_eq!(result["ok"], true, "{result:#}");
+    assert_eq!(result["interaction"]["executedStepCount"], 3);
+    server.abort();
+    fs::remove_dir_all(root).unwrap();
 }
 
 async fn fixture(html: &'static str) -> (String, JoinHandle<()>) {

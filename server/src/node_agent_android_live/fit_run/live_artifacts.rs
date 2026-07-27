@@ -45,6 +45,7 @@ pub(super) fn build_verify_request(run: &FitRunDocument) -> Result<BuildVerifyRe
         target_instance_key: run.pair.instance_key.clone(),
         visual_mask: run.visual_mask.visual_mask(),
         state_replay: run.environment.validated_state_replay()?,
+        force_rerun: false,
     })
 }
 

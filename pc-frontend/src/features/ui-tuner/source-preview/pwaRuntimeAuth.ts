@@ -3,10 +3,16 @@ import type { PwaRuntimeCaptureResult } from './pwaVerificationModel'
 export interface PreparedPwaAuthProfile {
   profile: string
   expiresAt: string
+  remembered: boolean
+  accountLabel?: string | null
 }
 
 export interface PwaRuntimeAuthTransport {
-  prepare: (projectRoot: string, token: string) => Promise<PreparedPwaAuthProfile>
+  prepare: (
+    projectRoot: string,
+    token: string | null,
+    accountLabel: string | null,
+  ) => Promise<PreparedPwaAuthProfile>
   capture: (profile: string) => Promise<PwaRuntimeCaptureResult>
   cleanup: (projectRoot: string, profile: string) => Promise<unknown>
 }
@@ -30,18 +36,23 @@ function failed(
 export async function captureWithTemporaryPwaAuthProfile(
   projectRoot: string,
   token: string | null,
+  accountLabel: string | null,
   transport: PwaRuntimeAuthTransport,
 ): Promise<PwaRuntimeCaptureResult> {
-  if (!token) {
-    return failed(
-      'AUTHENTICATION_REQUIRED',
-      '当前一龙登录态缺失，无法捕获需要登录的真实 PWA',
-      false,
-      '重新登录一龙后再执行真实 PWA PNG 捕获',
-    )
+  let prepared: PreparedPwaAuthProfile
+  try {
+    prepared = await transport.prepare(projectRoot, token, accountLabel)
+  } catch (error) {
+    if (!token) {
+      return failed(
+        'AUTHENTICATION_REQUIRED',
+        '当前浏览器和 Windows 节点都没有可复用的一龙登录态',
+        false,
+        '在这台 PC 登录一次；后续 PWA 验证会复用 Windows 当前用户保护的登录态',
+      )
+    }
+    throw error
   }
-
-  const prepared = await transport.prepare(projectRoot, token)
   if (!AUTO_PROFILE_PATTERN.test(prepared.profile)) {
     return failed(
       'AUTH_PROFILE_PREPARE_FAILED',

@@ -3,6 +3,7 @@
 //! 路由（在 router.rs 注册）：
 //!   POST /api/auth/login    → 密码登录，返回 JWT token
 //!   POST /api/auth/register → 注册新账号
+//!   POST /api/auth/trust-current-device → 将当前网页登录态升级为可信 PC 会话
 //!   GET  /api/me            → 获取当前登录用户信息
 
 use axum::{
@@ -16,7 +17,8 @@ use std::sync::Arc;
 use crate::{
     external_app_registry::{external_app_by_id, public_external_app_config},
     project_auth::{
-        auth_from_headers, json_error, login_inner, register_inner, LoginRequest, RegisterRequest,
+        auth_from_headers, bearer_token, json_error, login_inner, register_inner, LoginRequest,
+        RegisterRequest,
     },
     types::AppState,
 };
@@ -87,6 +89,35 @@ pub async fn register(
 pub async fn me(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     match auth_from_headers(&state, &headers) {
         Ok(user) => Json(serde_json::json!({ "user": user })).into_response(),
+        Err(e) => json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    }
+}
+
+pub async fn trust_current_device(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(e) = auth_from_headers(&state, &headers) {
+        return json_error(StatusCode::UNAUTHORIZED, e.to_string());
+    }
+    let Some(token) = bearer_token(&headers) else {
+        return json_error(StatusCode::UNAUTHORIZED, "缺少 Authorization token");
+    };
+    if state.owner_token.as_deref() == Some(token) {
+        return Json(serde_json::json!({
+            "trusted": true,
+            "owner_token": true,
+            "expires_at": null,
+        }))
+        .into_response();
+    }
+    match state.store.trust_session(token, Some("PC Web")) {
+        Ok(expires_at) => Json(serde_json::json!({
+            "trusted": true,
+            "owner_token": false,
+            "expires_at": expires_at,
+        }))
+        .into_response(),
         Err(e) => json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     }
 }

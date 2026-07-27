@@ -1,7 +1,7 @@
 use super::auth::PreparedAuth;
 use super::{
-    CaptureDiagnostic, CaptureEvidenceInput, CaptureScope, CaptureViewport, CaptureWait,
-    PwaCaptureInput,
+    CaptureDiagnostic, CaptureEvidenceInput, CaptureInteractionStep, CaptureScope, CaptureViewport,
+    CaptureWait, PwaCaptureInput,
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,10 @@ pub(super) struct PreparedCapture {
     pub(super) viewport: CaptureViewport,
     pub(super) wait_for: CaptureWait,
     pub(super) capture: CaptureScope,
+    pub(super) steps: Vec<CaptureInteractionStep>,
+    pub(super) interaction_timeout_ms: u64,
     pub(super) auth: PreparedAuth,
+    pub(super) fixture: super::fixture::PreparedFixture,
     pub(super) evidence: CaptureEvidence,
 }
 
@@ -52,6 +55,8 @@ struct ProjectRuntimeConfig {
     #[serde(default)]
     default_auth_profile: Option<String>,
     #[serde(default)]
+    default_fixture_profile: Option<String>,
+    #[serde(default)]
     authenticated_ready_selector: Option<String>,
 }
 
@@ -68,6 +73,7 @@ pub(super) fn prepare(
     validate_viewport(&input.viewport)?;
     validate_wait(&input.wait_for)?;
     validate_capture(&input.capture)?;
+    let interaction_timeout_ms = validate_steps(&input.steps)?;
     let config = read_config(&project_root)?;
     let (url, allowed_origins) = validate_url(&input.url, &config.allowed_origins)?;
     let auth = super::auth::prepare_auth(
@@ -76,6 +82,20 @@ pub(super) fn prepare(
         config.authenticated_ready_selector,
         &url,
     )?;
+    let fixture = super::fixture::prepare_fixture(
+        &project_root,
+        input.fixture_profile.or(config.default_fixture_profile),
+    )?;
+    if fixture
+        .local_storage
+        .keys()
+        .any(|key| auth.local_storage.contains_key(key))
+    {
+        return Err(invalid(
+            "FIXTURE_PROFILE_CONFLICT",
+            "fixtureProfile 与 authProfile 使用了相同 localStorage key",
+        ));
+    }
     let evidence = validate_evidence(input.evidence)?;
     Ok(PreparedCapture {
         project_root,
@@ -84,9 +104,59 @@ pub(super) fn prepare(
         viewport: input.viewport,
         wait_for: input.wait_for,
         capture: input.capture,
+        steps: input.steps,
+        interaction_timeout_ms,
         auth,
+        fixture,
         evidence,
     })
+}
+
+fn validate_steps(steps: &[CaptureInteractionStep]) -> Result<u64, CaptureDiagnostic> {
+    if steps.len() > 32 {
+        return Err(invalid(
+            "INTERACTION_STEPS_INVALID",
+            "PWA 交互步骤最多允许 32 项",
+        ));
+    }
+    let mut timeout_ms = 0_u64;
+    for step in steps {
+        match step {
+            CaptureInteractionStep::Click { selector } => validate_selector(Some(selector))?,
+            CaptureInteractionStep::WaitFor {
+                selector,
+                state,
+                timeout_ms: step_timeout,
+            } => {
+                validate_selector(Some(selector))?;
+                if !matches!(state.as_str(), "attached" | "visible" | "hidden")
+                    || !(100..=30_000).contains(step_timeout)
+                {
+                    return Err(invalid(
+                        "INTERACTION_STEPS_INVALID",
+                        "waitFor state 或 timeoutMs 超出允许范围",
+                    ));
+                }
+                timeout_ms = timeout_ms.saturating_add(*step_timeout);
+            }
+            CaptureInteractionStep::AssertText { selector, text } => {
+                validate_selector(Some(selector))?;
+                if text.is_empty() || text.chars().count() > 500 || text.contains(['\r', '\0']) {
+                    return Err(invalid(
+                        "INTERACTION_STEPS_INVALID",
+                        "assertText 文本为空、过长或包含控制字符",
+                    ));
+                }
+            }
+        }
+    }
+    if timeout_ms > 120_000 {
+        return Err(invalid(
+            "INTERACTION_STEPS_INVALID",
+            "PWA 交互等待总时长不能超过 120 秒",
+        ));
+    }
+    Ok(timeout_ms)
 }
 
 fn validate_viewport(viewport: &CaptureViewport) -> Result<(), CaptureDiagnostic> {
@@ -199,6 +269,16 @@ fn read_config(root: &Path) -> Result<ProjectRuntimeConfig, CaptureDiagnostic> {
         return Err(invalid(
             "RUNTIME_CONFIG_INVALID",
             "defaultAuthProfile 名称无效",
+        ));
+    }
+    if config
+        .default_fixture_profile
+        .as_deref()
+        .is_some_and(|value| !valid_profile(value))
+    {
+        return Err(invalid(
+            "RUNTIME_CONFIG_INVALID",
+            "defaultFixtureProfile 名称无效",
         ));
     }
     Ok(config)

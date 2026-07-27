@@ -20,6 +20,7 @@ pub(super) struct PersistedCapture {
     pub(super) viewport: CaptureViewportMetadata,
     pub(super) network_policy: NetworkPolicyMetadata,
     pub(super) process_cleanup: ProcessCleanup,
+    pub(super) executed_step_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -69,6 +70,8 @@ struct CaptureManifest<'a> {
     network_policy: &'a NetworkPolicyMetadata,
     process_cleanup: &'a ProcessCleanup,
     authentication_mode: &'static str,
+    fixture_profile: Option<&'a str>,
+    executed_step_count: usize,
     base64_embedded: bool,
 }
 
@@ -162,6 +165,8 @@ pub(super) fn persist(
         network_policy: &network_policy,
         process_cleanup: &rendered.process_cleanup,
         authentication_mode: prepared.auth.mode,
+        fixture_profile: prepared.fixture.profile.as_deref(),
+        executed_step_count: rendered.executed_step_count,
         base64_embedded: false,
     };
     if fs::write(
@@ -185,6 +190,7 @@ pub(super) fn persist(
         viewport,
         network_policy,
         process_cleanup: rendered.process_cleanup,
+        executed_step_count: rendered.executed_step_count,
     })
 }
 

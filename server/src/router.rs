@@ -232,6 +232,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route("/api/auth/login", post(auth_api::login))
         .route("/api/auth/register", post(auth_api::register))
+        .route(
+            "/api/auth/trust-current-device",
+            post(auth_api::trust_current_device),
+        )
         .route("/api/me", get(auth_api::me))
         .merge(codex_vault_api::routes())
         .merge(ui_tuner_api::routes())

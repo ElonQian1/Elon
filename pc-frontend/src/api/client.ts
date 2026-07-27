@@ -13,6 +13,21 @@ export function getAuthToken(): string | null {
   }
 }
 
+export function getAuthIdentityLabel(): string | null {
+  try {
+    const raw = localStorage.getItem('elon_auth')
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as {
+      user?: { nickname?: string; account?: string }
+      state?: { user?: { nickname?: string; account?: string } }
+    }
+    const user = parsed.user ?? parsed.state?.user
+    return user?.nickname?.trim() || user?.account?.trim() || null
+  } catch {
+    return null
+  }
+}
+
 export interface ApiError {
   status: number
   message: string

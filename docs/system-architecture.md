@@ -230,11 +230,17 @@ Windows 节点提供项目绑定、短期令牌保护的标准 Streamable HTTP M
 
 Windows 节点复用 `yilong_ui_live` Streamable HTTP MCP，通过 `ui_capture_pwa_runtime` 在本机启动受控的无头 Edge、Chrome 或 Chromium。它使用浏览器 CDP 渲染真实 http(s) 页面并生成 PNG，不依赖 Codex Desktop Browser、可见浏览器、桌面点击或 DOM/CSS 摘要。MCP 会话必须绑定项目 `EDIT_ROOT`；同一内核也由 `/api/source-preview/capture-pwa-runtime` 调用，因此 PC 画面模块、Codex CLI 与 MCP 共用 URL、认证、浏览器、工件和脱敏策略，旧 Android Renderer 工具保持不变。
 
-默认只允许 `localhost` 和 loopback URL，导航及所有 http(s) 子请求都受 origin allowlist 拦截。项目若确需同一受信部署源，可在 `.elon/ui-pwa-runtime.json` 中显式登记最多 16 个 `allowedOrigins`，并可设置 `defaultAuthProfile` 与 `authenticatedReadySelector`；该文件不得保存秘密。认证材料只能放在本机项目 `.elon/ui-tuner/pwa-sessions/<profile>.json`，由 MCP 参数中的安全 profile 名引用；显式准备合同是 `{"version":1,"cookies":[{"name":"session","value":"<local-only>","path":"/","httpOnly":true,"secure":true}],"headers":{},"localStorage":{}}`，也只允许 `Authorization` 或 `X-*` header 以及最多 16 个受限 localStorage 键值。localStorage 只在目标 origin 新文档启动前注入到浏览器一次性用户目录，浏览器结束后连同临时 profile 一并回收；目录已被 Git 忽略。URL userinfo、疑似 token/secret/session/signature 的 query、直接 Cookie/Authorization 参数、链接/重解析点越界、超限 viewport/等待/PNG 都会返回机器可读诊断；登录表单、401/403 或认证就绪 selector 未出现不会被误报为成功画面。
+默认只允许 `localhost` 和 loopback URL，导航及所有 http(s) 子请求都受 origin allowlist 拦截。项目若确需同一受信部署源，可在 `.elon/ui-pwa-runtime.json` 中显式登记最多 16 个 `allowedOrigins`，并可设置 `defaultAuthProfile`、`defaultFixtureProfile` 与 `authenticatedReadySelector`；该文件不得保存秘密。PC 工作台首次捕获时可把当前一龙 token 保存为 `%APPDATA%/elon-node-agent/pwa-remembered-auth.v1.json`，文件内容只包含 Windows DPAPI 当前用户密文和非秘密账号标识；节点重启、浏览器重启或工作树切换后可继续使用，退出/撤销时通过本机 remembered API 删除。每次真实捕获仍只生成 `.elon/ui-tuner/pwa-sessions/<profile>.json` 的十分钟一次性明文会话，捕获后立即清理；项目目录和 MCP 参数都不保存长期秘密。
+
+`ui_capture_pwa_runtime.steps` 提供最多 32 步的受限交互重放，只允许稳定 selector 的 `click`、`waitFor` 和 `assertText`，不接受任意 JavaScript、密码或 token 输入。确定性项目数据放在可审查的 `.elon/ui-tuner/pwa-fixtures/<profile>.json`，仅允许非秘密 localStorage 键值；疑似 token、session、password、authorization 或 signature 的键会 fail-closed。捕获 manifest 记录 fixture 名和实际执行步骤数，紧凑响应只返回工件路径、哈希、尺寸、route 和步骤数，不嵌入 Base64。
 
 节点依次探测 `ELON_PWA_BROWSER_PATH`、标准 Edge/Chrome 安装路径和 `PATH`。每次捕获使用独立临时 profile、随机 CDP 端口和隐藏窗口；成功、超时、协议错误或启动失败都回收浏览器进程树和临时目录。`BROWSER_NOT_FOUND` 时安装 Microsoft Edge/Google Chrome，或把受信浏览器绝对路径写入 `ELON_PWA_BROWSER_PATH` 后重启节点；`URL_ORIGIN_NOT_ALLOWED`、`AUTHENTICATION_REQUIRED`/`AUTHENTICATION_FAILED` 和 `BROWSER_CLEANUP_FAILED` 的 `nextStep` 是 CLI/PC UI 的权威恢复提示。
 
 成功结果保存到项目 `.elon/ui-tuner/pwa-runtime/captures/`，返回 PNG 与 manifest 的绝对路径、SHA-256、实际像素尺寸、媒体类型、采集时间、脱敏 route、浏览器版本、viewport、网络门禁、进程回收和 source/route revision。PWA 源码闭环仍先完成构建、资源、真实 iframe route/source revision 校验，再安全自动请求 PNG；无法自动捕获时保留源码验收成功并显示明确下一步。Codex context pack 只引用工件路径、哈希和尺寸，`screenshotsEmbeddedAsBase64=false`，默认不嵌入图片 Base64。
+
+跨端验证默认调用 `ui_verify_with_fallback`：共享 Web/普通布局交互先走 PWA；PWA 不适合或认证、浏览器、导航、交互运行失败时，自动进入 Android Renderer。进入 Android 准备后的轮询传 `resumeAndroid=true`，避免重复打开浏览器和生成 PWA 截图。没有在线设备时节点启动 `ELON_ANDROID_AVD`，未配置则选择排序后的首个 AVD；显式真机不在线时默认回退模拟器，并把证据标为 emulator fallback。可用替代渲染器会返回 `capabilityGapRequired=false` 和明确的 gap disposition，避免把“已成功回退”误留成平台阻塞缺口；只有替代路径也失败且能力确实无法提供时才报告平台 gap。OEM、权限、软键盘、启动器、硬件和性能专项仍要求真机，模拟器结果只能是 provisional。`ui_build_and_verify` 默认保留 Gradle 增量与 build cache，成功后仍校验精确 applicationId、APK 身份、源码 revision、安装与纯源码画面；只有诊断缓存污染时才显式 `forceRerun=true` 使用 `--rerun-tasks`。非首页继续复用 FitRun 的持久化 `stateReplay`，重新安装后重放到目标节点再截图，不能把默认首页当成源码不一致。
+
+PC 网页登录的 `remember_device=true` 只用于用户主动登录的可信 PC：服务端发放十年有效、仍可注销或管理员撤销的长期 session；已登录的旧 PC session 会在 `/api/me` 成功后通过 `/api/auth/trust-current-device` 原位升级，不要求重新输入密码或轮换 token。普通客户端与旧调用保持 30 天。这里的“长期记住”不是保存密码，也不是不可撤销的永久凭据；PC 主动退出时同时尽力删除 Windows DPAPI 保存的 PWA 凭据。
 
 ## 3. 代码仓库结构（目标结构）
 

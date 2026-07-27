@@ -17,6 +17,8 @@ pub struct LoginRequest {
     pub password: String,
     pub device_name: Option<String>,
     pub apk_version: Option<String>,
+    #[serde(default)]
+    pub remember_device: bool,
 }
 
 #[derive(Deserialize)]
@@ -26,6 +28,8 @@ pub struct RegisterRequest {
     pub nickname: Option<String>,
     pub device_name: Option<String>,
     pub apk_version: Option<String>,
+    #[serde(default)]
+    pub remember_device: bool,
 }
 
 pub fn login_inner(
@@ -35,10 +39,11 @@ pub fn login_inner(
     let user = state
         .store
         .authenticate_password(&req.account, &req.password)?;
-    let (token, expires_at) = state.store.create_session(
+    let (token, expires_at) = state.store.create_session_with_trust(
         &user.id,
         req.device_name.as_deref(),
         req.apk_version.as_deref(),
+        req.remember_device,
     )?;
     Ok((token, expires_at, user))
 }
@@ -53,10 +58,11 @@ pub fn register_inner(
         req.nickname.as_deref(),
         Some("user"),
     )?;
-    let (token, expires_at) = state.store.create_session(
+    let (token, expires_at) = state.store.create_session_with_trust(
         &user.id,
         req.device_name.as_deref(),
         req.apk_version.as_deref(),
+        req.remember_device,
     )?;
     Ok((token, expires_at, user))
 }
@@ -151,7 +157,7 @@ pub fn json_error(status: StatusCode, message: impl ToString) -> Response {
         .into_response()
 }
 
-fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+pub(crate) fn bearer_token(headers: &HeaderMap) -> Option<&str> {
     headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
