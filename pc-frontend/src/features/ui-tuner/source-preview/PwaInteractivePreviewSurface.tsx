@@ -59,7 +59,7 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Pr
         <span>{modeDetail(design)}</span>
         {design.mode === 'interact' && !design.selection && (
           <button type="button" disabled={!design.ready} onClick={() => design.setMode('select')}>
-            <MousePointer2 size={14} /> 到达目标页后选择组件
+            <MousePointer2 size={14} /> 开始设计/修改页面
           </button>
         )}
         {design.mode === 'select' && (

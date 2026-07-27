@@ -345,6 +345,17 @@ try {
   const cliPackage = buildPwaDraftCliPackage(migrated)
   assert.equal(cliPackage.kind, 'elon_ui_tuner_pwa_cli_package')
   assert.equal(cliPackage.capabilities.PWA_CODE_GENERATION, true)
+  assert.equal(cliPackage.compactHandoff.purpose, 'low-token-ui-style-writeback')
+  assert.equal(cliPackage.compactHandoff.tokenPolicy.fullRepositoryIncluded, false)
+  assert.equal(cliPackage.compactHandoff.tokenPolicy.fullDomIncluded, false)
+  assert.equal(cliPackage.compactHandoff.tokenPolicy.screenshotsEmbeddedAsBase64, false)
+  assert.equal(cliPackage.compactHandoff.elements.length, 1)
+  assert.deepEqual(
+    cliPackage.compactHandoff.elements[0].changedProperties.map((change) => `${change.property}:${change.after}`),
+    ['height:48px', 'borderRadius:12px'],
+    'CLI 紧凑包必须直接列出待写回样式，不要求 Codex 重新理解整棵 DOM',
+  )
+  assert.match(cliPackage.instructions.join('\n'), /优先读取 compactHandoff/)
   assert.equal(JSON.stringify(cliPackage).includes('base64,'), false, 'CLI 包不得内嵌截图 Base64')
 
   compile(

@@ -166,8 +166,50 @@ export interface PwaDraftCliPackage {
     deterministicStyleWriteback: true
     codexStructuralFallback: true
   }
+  compactHandoff: PwaDraftCliCompactHandoff
   artifact: PwaDesignDraft
   instructions: string[]
+}
+
+export interface PwaDraftCliCompactElement {
+  elementKey: string
+  label: string
+  selector: string
+  stableIdentity: Pick<PwaElementIdentity,
+    'strategy' | 'confidence' | 'confidenceScore' | 'stableId' | 'testId' | 'resourceId' | 'sourceSymbol' | 'componentPath' | 'uiNode' | 'id' | 'role' | 'tag'
+  >
+  changedProperties: Array<{
+    property: PwaStyleProperty
+    before: string
+    after: string
+  }>
+  sourceCandidates: {
+    pwa: PwaSourceCandidate[]
+    android: PwaSourceCandidate[]
+  }
+  binding: {
+    status: PwaSourceBinding['status']
+    needsBinding: boolean
+    pwaMappedProperties: PwaStyleProperty[]
+    androidCandidateFiles: string[]
+  }
+}
+
+export interface PwaDraftCliCompactHandoff {
+  version: 1
+  purpose: 'low-token-ui-style-writeback'
+  route: PwaDesignDraft['route']
+  viewport: PwaDesignDraft['viewport']
+  sourceRevision: string
+  tokenPolicy: {
+    fullRepositoryIncluded: false
+    fullDomIncluded: false
+    screenshotsEmbeddedAsBase64: false
+    preferThisSummaryBeforeArtifact: true
+  }
+  nextActions: string[]
+  sourceFilesToInspect: string[]
+  elements: PwaDraftCliCompactElement[]
 }
 
 const PWA_STYLE_PROPERTIES = new Set<PwaStyleProperty>([
@@ -381,8 +423,10 @@ export function buildPwaDraftCliPackage(draft: PwaDesignDraft): PwaDraftCliPacka
       deterministicStyleWriteback: true,
       codexStructuralFallback: true,
     },
+    compactHandoff: buildPwaDraftCliCompactHandoff(draft),
     artifact: draft,
     instructions: [
+      '优先读取 compactHandoff；只有 compactHandoff 指向的候选不足时才展开 artifact。',
       '只读取 artifact 中的样式 diff、稳定身份、局部 DOM 上下文和来源候选，不默认扫描整仓库。',
       '先对明确绑定的 token、Style JSON、资源或属性执行确定性写回。',
       '只有结构调整、PWA 源码未绑定或复杂 Kotlin/TSX 才交给 Codex；Runtime DOM 不是源码真相。',
@@ -393,6 +437,84 @@ export function buildPwaDraftCliPackage(draft: PwaDesignDraft): PwaDraftCliPacka
 
 export function stringifyPwaDraftCliPackage(draft: PwaDesignDraft): string {
   return JSON.stringify(buildPwaDraftCliPackage(draft), null, 2)
+}
+
+function buildPwaDraftCliCompactHandoff(draft: PwaDesignDraft): PwaDraftCliCompactHandoff {
+  const elements = Object.entries(draft.elements)
+    .filter(([, element]) => Object.keys(element.styleDiff).length > 0)
+    .slice(0, 24)
+    .map(([elementKey, element]) => compactElement(elementKey, element))
+  const files = new Set<string>()
+  for (const element of elements) {
+    for (const candidate of [...element.sourceCandidates.pwa, ...element.sourceCandidates.android]) {
+      if (candidate.file) files.add(candidate.file)
+    }
+    for (const file of element.binding.androidCandidateFiles) files.add(file)
+  }
+  return {
+    version: 1,
+    purpose: 'low-token-ui-style-writeback',
+    route: draft.route,
+    viewport: draft.viewport,
+    sourceRevision: draft.project.sourceRevision,
+    tokenPolicy: {
+      fullRepositoryIncluded: false,
+      fullDomIncluded: false,
+      screenshotsEmbeddedAsBase64: false,
+      preferThisSummaryBeforeArtifact: true,
+    },
+    nextActions: [
+      '先按 elements[].changedProperties 执行样式写回，不要重新理解整页 UI。',
+      '只打开 sourceFilesToInspect 中的候选文件；缺失绑定时先建立稳定样式绑定。',
+      'PWA 与 APK 都完成后再用真实运行画面验证，不要把 Runtime 草稿当作源码成功。',
+    ],
+    sourceFilesToInspect: [...files].sort().slice(0, 16),
+    elements,
+  }
+}
+
+function compactElement(elementKey: string, element: PwaDraftElement): PwaDraftCliCompactElement {
+  const pwaMappedProperties = Object.keys(element.binding.pwaStyle?.propertyMap ?? {}) as PwaStyleProperty[]
+  const androidCandidateFiles = compactCandidateFiles(element.binding.androidCandidates)
+  return {
+    elementKey,
+    label: element.identity.ariaLabel || element.identity.text || element.identity.id || element.identity.tag || elementKey,
+    selector: element.identity.selector,
+    stableIdentity: {
+      strategy: element.identity.strategy,
+      confidence: element.identity.confidence,
+      confidenceScore: element.identity.confidenceScore,
+      stableId: element.identity.stableId,
+      testId: element.identity.testId,
+      resourceId: element.identity.resourceId,
+      sourceSymbol: element.identity.sourceSymbol,
+      componentPath: element.identity.componentPath,
+      uiNode: element.identity.uiNode,
+      id: element.identity.id,
+      role: element.identity.role,
+      tag: element.identity.tag,
+    },
+    changedProperties: (Object.entries(element.styleDiff) as [PwaStyleProperty, string][])
+      .map(([property, after]) => ({
+        property,
+        before: element.originalStyle.authored[property] ?? element.originalStyle.computed[property] ?? '',
+        after,
+      })),
+    sourceCandidates: {
+      pwa: element.binding.pwaCandidates.slice(0, 3),
+      android: element.binding.androidCandidates.slice(0, 3),
+    },
+    binding: {
+      status: element.binding.status,
+      needsBinding: element.binding.needsBinding,
+      pwaMappedProperties,
+      androidCandidateFiles,
+    },
+  }
+}
+
+function compactCandidateFiles(candidates: PwaSourceCandidate[]): string[] {
+  return [...new Set(candidates.map((candidate) => candidate.file).filter((file): file is string => Boolean(file)))].slice(0, 3)
 }
 
 function migrateDraftV1(value: Record<string, unknown>): PwaDesignDraft {
