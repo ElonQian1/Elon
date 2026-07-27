@@ -145,6 +145,7 @@ function DiscussionMapSurface({
     }
   }), [selection.edges])
   const roots = discussionRoots(graph)
+  const activeRoot = roots.find((root) => root.id === rootId)
   const selectedNode = graph.nodes.find((node) => node.id === selectedId)
   const visibleKey = selection.nodes.map((node) => node.id).join('|')
 
@@ -196,7 +197,7 @@ function DiscussionMapSurface({
   return (
     <main className={styles.mapShell}>
       <header className={styles.toolbar}>
-        <div className={styles.title}><span><Network size={18} /></span><div><strong>讨论推理图</strong><small>来源 → 分支 → 决策 → 功能与文档</small></div></div>
+        <div className={styles.title}><span><Network size={18} /></span><div><strong>讨论推理图</strong><small>{activeRoot?.title || '来源 → 分支 → 决策 → 功能与文档'}</small></div></div>
         <select value={rootId} onChange={(event) => { setRootId(event.target.value); setSelectedId(event.target.value) }} aria-label="讨论主题">
           {!roots.length && <option value="">暂无讨论主题</option>}
           {roots.map((root) => <option key={root.id} value={root.id}>{root.title}</option>)}

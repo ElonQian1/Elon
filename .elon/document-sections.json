@@ -125,6 +125,16 @@
       "entrypoint": "docs/user-project-system.md"
     },
     {
+      "id": "open-commerce-network",
+      "label": "开放商业网络",
+      "detail": "共市构想、数据权利、商户 AI、商业模式与演进路线",
+      "color": "#C78B55",
+      "parent_id": "project-system",
+      "order": 10,
+      "icon": "network",
+      "entrypoint": "docs/drafts/requirements/open-commerce-network.md"
+    },
+    {
       "id": "security",
       "label": "安全与权限",
       "detail": "权限、密钥、隐私、凭据与安全边界",
@@ -190,7 +200,10 @@
     "docs/cli会话问题/单纯Codex cli上下文会话.md": "custom:external-tools",
     "docs/cli会话问题/纯Codex cli图片会话.md": "custom:external-tools",
     "docs/codex-vault-sharing-runbook.md": "custom:security",
+    "docs/decisions/open-commerce-network-principles.md": "custom:open-commerce-network",
     "docs/discussion-knowledge-compiler.md": "custom:pc-workbench",
+    "docs/drafts/open-commerce-network-roadmap.md": "custom:open-commerce-network",
+    "docs/drafts/requirements/open-commerce-network.md": "custom:open-commerce-network",
     "docs/fb2-ai-center/PLAN.md": "custom:fb2-project",
     "docs/fb2-ai-center/PROGRESS.md": "custom:fb2-project",
     "docs/fb2-ai-center/README.md": "custom:fb2-project",
@@ -207,6 +220,7 @@
     "docs/fb2-business-context-pack.md": "custom:fb2-project",
     "docs/fb2-chat-voice-kit-integration.md": "custom:fb2-project",
     "docs/group-chat-summary-system.md": "custom:ai-context",
+    "docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md": "custom:open-commerce-network",
     "docs/intent-routing.md": "custom:backend-api",
     "docs/node-agent-upgrade-compatibility.md": "custom:windows-node",
     "docs/pc-frontend-migration.md": "custom:pc-workbench",

@@ -97,6 +97,7 @@ pub(crate) fn compact_text(tool: &str, value: &Value) -> Result<String> {
         "severity_counts",
         "safe_repair_count",
         "promoted_documents",
+        "assigned_promoted_documents",
         "pagination",
         "response_budget",
         "git_baseline_commit",

@@ -75,7 +75,7 @@ implementation_refs:
 4. AI 用 `project_docs_plan_context` 规划范围，只对本次导入的来源调用 `project_docs_read`。
 5. AI 生成增量来源、节点、边和可选晋升项，调用 `project_discussions_save_proposal`。校验器拒绝未知来源、循环父子关系、无效路径和越界晋升。
 6. 修改前调用 `project_discussions_review_graph`。程序只修正 root 等确定性错误；权威性、采纳状态、重复观点和未解决异议必须根据命中来源判断。
-7. 根据统一权限模式调用 `project_discussions_apply`。所有可应用模式都为普通 Git 项目保存整理前和整理后提交；托管笔记库创建对应版本。授权模式控制“能否应用”，不再控制“是否保留历史”。
+7. 根据统一权限模式调用 `project_discussions_apply`。所有可应用模式都为普通 Git 项目保存整理前和整理后提交；托管笔记库创建对应版本。晋升项声明的 `section_id`（未声明时使用来源节点的 `section_id`）若命中现有知识主题，系统会同时写入 `.elon/document-sections.json`，避免“生成了文档却在知识架构里找不到”；已有人工主题分配不会被覆盖。授权模式控制“能否应用”，不再控制“是否保留历史”。
 8. PC 页面刷新讨论图。用户可从任意节点继续、分叉或要求晋升，AI 先用 `project_discussions_get_node` 获取该节点的局部上下文。
 9. 应用后调用 `project_discussions_get_history` 和 `project_discussions_review_graph`；需要解释变化时用语义比较，不重读原聊天。
 

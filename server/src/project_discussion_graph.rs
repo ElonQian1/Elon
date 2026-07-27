@@ -3,7 +3,7 @@
 use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 use crate::{
     project_discussion_graph_model::{
@@ -16,6 +16,7 @@ use crate::{
     project_document_authorization::{authorize_document_apply, DocumentAutomationMode},
     project_document_files::{read_project_document_file, write_project_document_file},
     project_document_git_transaction::{commit_document_baseline, commit_document_result},
+    project_document_governance::{parse_manifest, DocumentSectionManifest, SECTION_CONFIG_PATH},
     project_document_vault::{current_version, is_managed_vault},
 };
 
@@ -127,6 +128,8 @@ pub(crate) fn apply_proposal(
         Some(commit_document_baseline(workspace)?)
     };
     let promoted = write_promotions(workspace, &proposal.promotions)?;
+    let assigned_promotions =
+        write_promotion_section_assignments(workspace, &proposal.promotions, &merged)?;
     let graph_saved = write_project_document_file(
         workspace,
         DISCUSSION_GRAPH_PATH,
@@ -157,6 +160,7 @@ pub(crate) fn apply_proposal(
         "suggestions_revision": proposal_saved.revision,
         "counts": counts(&merged, proposal.promotions.len()),
         "promoted_documents": promoted,
+        "assigned_promoted_documents": assigned_promotions,
         "authorization_mode": authorization.mode,
         "auto_authorized": authorization.auto_authorized,
         "git_baseline_commit": baseline,
@@ -177,6 +181,68 @@ fn write_promotions(workspace: &Path, promotions: &[DiscussionPromotion]) -> Res
         paths.push(promotion.path.clone());
     }
     Ok(paths)
+}
+
+fn write_promotion_section_assignments(
+    workspace: &Path,
+    promotions: &[DiscussionPromotion],
+    graph: &DiscussionGraph,
+) -> Result<Vec<String>> {
+    let Some(file) = read_optional(workspace, SECTION_CONFIG_PATH)? else {
+        return Ok(Vec::new());
+    };
+    let mut manifest = parse_manifest(Some(&file.content))?;
+    let assigned = apply_promotion_section_assignments(&mut manifest, promotions, graph);
+    if !assigned.is_empty() {
+        write_project_document_file(
+            workspace,
+            SECTION_CONFIG_PATH,
+            &pretty(&manifest)?,
+            Some(&file.revision),
+        )
+        .map_err(|error| anyhow!(error.message))?;
+    }
+    Ok(assigned)
+}
+
+fn apply_promotion_section_assignments(
+    manifest: &mut DocumentSectionManifest,
+    promotions: &[DiscussionPromotion],
+    graph: &DiscussionGraph,
+) -> Vec<String> {
+    let sections = manifest
+        .sections
+        .iter()
+        .map(|section| section.id.as_str())
+        .collect::<std::collections::HashSet<_>>();
+    let node_sections = graph
+        .nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node.section_id.as_str()))
+        .collect::<HashMap<_, _>>();
+    let mut assigned = Vec::new();
+    for promotion in promotions {
+        if manifest.assignments.contains_key(&promotion.path) {
+            continue;
+        }
+        let requested = if promotion.section_id.is_empty() {
+            node_sections
+                .get(promotion.node_id.as_str())
+                .copied()
+                .unwrap_or_default()
+        } else {
+            promotion.section_id.as_str()
+        };
+        let section_id = requested.strip_prefix("custom:").unwrap_or(requested);
+        if section_id.is_empty() || !sections.contains(section_id) {
+            continue;
+        }
+        manifest
+            .assignments
+            .insert(promotion.path.clone(), format!("custom:{section_id}"));
+        assigned.push(promotion.path.clone());
+    }
+    assigned
 }
 
 fn load_optional<T>(
@@ -222,4 +288,75 @@ fn verify_revision(label: &str, current: Option<&str>, expected: Option<&str>) -
 
 fn pretty(value: &impl Serialize) -> Result<String> {
     Ok(format!("{}\n", serde_json::to_string_pretty(value)?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::project_document_governance::CustomDocumentSection;
+
+    fn section(id: &str) -> CustomDocumentSection {
+        CustomDocumentSection {
+            id: id.to_string(),
+            label: id.to_string(),
+            ..Default::default()
+        }
+    }
+
+    fn promotion(id: &str, node_id: &str, path: &str, section_id: &str) -> DiscussionPromotion {
+        DiscussionPromotion {
+            id: id.to_string(),
+            node_id: node_id.to_string(),
+            path: path.to_string(),
+            title: id.to_string(),
+            content: format!("# {id}\n"),
+            section_id: section_id.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn promoted_documents_are_assigned_to_explicit_or_node_topic() {
+        let mut manifest = DocumentSectionManifest {
+            sections: vec![section("project-system"), section("overview")],
+            ..Default::default()
+        };
+        manifest
+            .assignments
+            .insert("docs/already.md".into(), "custom:overview".into());
+        let graph = DiscussionGraph {
+            nodes: vec![
+                crate::project_discussion_graph_model::DiscussionNode {
+                    id: "root".into(),
+                    section_id: "project-system".into(),
+                    title: "Root".into(),
+                    ..Default::default()
+                },
+                crate::project_discussion_graph_model::DiscussionNode {
+                    id: "unknown".into(),
+                    section_id: "missing".into(),
+                    title: "Unknown".into(),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let promotions = vec![
+            promotion("fallback", "root", "docs/fallback.md", ""),
+            promotion("explicit", "root", "docs/explicit.md", "custom:overview"),
+            promotion("unknown", "unknown", "docs/unknown.md", ""),
+            promotion("existing", "root", "docs/already.md", "project-system"),
+        ];
+
+        let assigned = apply_promotion_section_assignments(&mut manifest, &promotions, &graph);
+
+        assert_eq!(assigned, vec!["docs/fallback.md", "docs/explicit.md"]);
+        assert_eq!(
+            manifest.assignments["docs/fallback.md"],
+            "custom:project-system"
+        );
+        assert_eq!(manifest.assignments["docs/explicit.md"], "custom:overview");
+        assert_eq!(manifest.assignments["docs/already.md"], "custom:overview");
+        assert!(!manifest.assignments.contains_key("docs/unknown.md"));
+    }
 }
