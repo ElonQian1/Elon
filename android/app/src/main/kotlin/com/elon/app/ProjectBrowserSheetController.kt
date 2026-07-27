@@ -263,7 +263,6 @@ internal class ProjectBrowserSheetController(
         toggle: () -> Unit
     ) {
         groupsContainer.addView(sectionHeader(title, expanded, toggle))
-        if (!expanded) return
         if (entries.isEmpty()) {
             groupsContainer.addView(statusRow(
                 if (searchInput.text.isNullOrBlank()) "暂无$title" else "没有匹配的$title"

@@ -150,6 +150,7 @@ class ProjectBrowserSheetContractTest {
         assertTrue(controller.contains("dp(48)"))
         assertTrue(controller.contains("textSize = 13f"))
         assertTrue(controller.contains("visibleProjectBrowserEntries(entries, expanded)"))
+        assertTrue(!controller.contains("if (!expanded) return"))
         assertTrue(controller.contains("personalExpanded = false"))
         assertTrue(controller.contains("jointExpanded = false"))
         assertTrue(controller.contains("rotation = if (expanded) 90f else 0f"))
