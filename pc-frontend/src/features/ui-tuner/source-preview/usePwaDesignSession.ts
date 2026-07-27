@@ -366,7 +366,7 @@ export function usePwaDesignSession({
         source?: string
         protocolVersion?: number
         type?: string
-        payload?: Partial<PwaRouteState> & Partial<PwaBridgeVerificationSnapshot> & Partial<PwaDraftAppliedAck> & { node?: PwaSelection }
+        payload?: Partial<PwaRouteState> & Partial<PwaBridgeVerificationSnapshot> & Partial<PwaDraftAppliedAck> & { node?: PwaSelection; mode?: string }
       }
       if (message.source !== BRIDGE_SOURCE || message.protocolVersion !== PROTOCOL_VERSION) return
       const context = bridgeContextRef.current
