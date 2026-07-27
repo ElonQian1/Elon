@@ -65,7 +65,13 @@ pub(crate) fn codex_child_env_overrides(
     codex_program: &Path,
     current_path: Option<OsString>,
 ) -> Vec<(String, String)> {
-    let tools = resolve_codex_tools(Some(codex_program));
+    codex_child_env_overrides_from_tools(resolve_codex_tools(Some(codex_program)), current_path)
+}
+
+fn codex_child_env_overrides_from_tools(
+    tools: Vec<ResolvedTool>,
+    current_path: Option<OsString>,
+) -> Vec<(String, String)> {
     let dirs = tools
         .iter()
         .filter_map(|tool| tool.path.parent().map(Path::to_path_buf))
@@ -89,13 +95,30 @@ pub(crate) fn codex_toolbox_status(codex_program: Option<&Path>) -> Value {
 }
 
 fn resolve_codex_tools(codex_program: Option<&Path>) -> Vec<ResolvedTool> {
+    resolve_codex_tools_with_candidates(
+        codex_program,
+        &elon_pc_dev_runtime::command_candidates,
+        true,
+    )
+}
+
+fn resolve_codex_tools_with_candidates(
+    codex_program: Option<&Path>,
+    command_candidates: &dyn Fn(&str) -> Vec<PathBuf>,
+    include_platform_candidates: bool,
+) -> Vec<ResolvedTool> {
     codex_tool_catalog()
         .iter()
         .filter_map(|spec| {
-            candidate_tool_paths(spec, codex_program)
-                .into_iter()
-                .next()
-                .map(|path| ResolvedTool { spec, path })
+            candidate_tool_paths_with_candidates(
+                spec,
+                codex_program,
+                command_candidates,
+                include_platform_candidates,
+            )
+            .into_iter()
+            .next()
+            .map(|path| ResolvedTool { spec, path })
         })
         .collect()
 }
@@ -146,6 +169,20 @@ fn codex_tool_catalog() -> &'static [ToolSpec] {
 }
 
 fn candidate_tool_paths(spec: &'static ToolSpec, codex_program: Option<&Path>) -> Vec<PathBuf> {
+    candidate_tool_paths_with_candidates(
+        spec,
+        codex_program,
+        &elon_pc_dev_runtime::command_candidates,
+        true,
+    )
+}
+
+fn candidate_tool_paths_with_candidates(
+    spec: &'static ToolSpec,
+    codex_program: Option<&Path>,
+    command_candidates: &dyn Fn(&str) -> Vec<PathBuf>,
+    include_platform_candidates: bool,
+) -> Vec<PathBuf> {
     let mut paths = Vec::new();
 
     if can_borrow_from_codex_runtime(spec) {
@@ -154,13 +191,15 @@ fn candidate_tool_paths(spec: &'static ToolSpec, codex_program: Option<&Path>) -
         }
     }
 
-    push_command_candidates(&mut paths, spec.primary_bin);
+    push_command_candidates(&mut paths, spec.primary_bin, command_candidates);
     for alias in spec.aliases {
-        push_command_candidates(&mut paths, alias);
+        push_command_candidates(&mut paths, alias, command_candidates);
     }
 
     #[cfg(windows)]
-    push_windows_common_tool_paths(&mut paths, spec);
+    if include_platform_candidates {
+        push_windows_common_tool_paths(&mut paths, spec);
+    }
 
     paths
 }
@@ -169,8 +208,12 @@ fn can_borrow_from_codex_runtime(spec: &ToolSpec) -> bool {
     spec.tier == ToolTier::Core && spec.install_policy == InstallPolicy::AutoSmall
 }
 
-fn push_command_candidates(paths: &mut Vec<PathBuf>, name: &str) {
-    for path in elon_pc_dev_runtime::command_candidates(name) {
+fn push_command_candidates(
+    paths: &mut Vec<PathBuf>,
+    name: &str,
+    command_candidates: &dyn Fn(&str) -> Vec<PathBuf>,
+) {
+    for path in command_candidates(name) {
         push_existing_path(paths, path);
     }
 }

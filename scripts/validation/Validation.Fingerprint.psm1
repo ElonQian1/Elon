@@ -68,12 +68,38 @@ function Get-ValidationGitSnapshot {
     if(-not $process.Start()){throw 'Unable to start git hash-object.'}
     $stdoutTask=$process.StandardOutput.ReadToEndAsync();$stderrTask=$process.StandardError.ReadToEndAsync()
     $writer=New-Object IO.StreamWriter($process.StandardInput.BaseStream,(New-Object Text.UTF8Encoding($false)))
-    foreach($relative in $existing){$writer.WriteLine(([string]$relative).Replace('\','/'))}
-    $writer.Close();$process.WaitForExit()
+    $batchWriteError = ''
+    try {
+        foreach($relative in $existing){$writer.WriteLine(([string]$relative).Replace('\','/'))}
+    } catch {
+        $batchWriteError = $_.Exception.Message
+    }
+    try { $writer.Close() } catch { if ([string]::IsNullOrWhiteSpace($batchWriteError)) { $batchWriteError = $_.Exception.Message } }
+    $process.WaitForExit()
     $stdout=$stdoutTask.GetAwaiter().GetResult();$stderr=$stderrTask.GetAwaiter().GetResult()
-    $hashes=@($stdout -split "`r?`n"|Where-Object{$_})
-    if($process.ExitCode -ne 0 -or $hashes.Count -ne $existing.Count){throw "Unable to hash validation workspace inputs: $stderr"}
+    $batchHashes=@($stdout -split "`r?`n"|Where-Object{$_})
+    $useHashFallback = -not [string]::IsNullOrWhiteSpace($batchWriteError) -or $process.ExitCode -ne 0 -or $batchHashes.Count -ne $existing.Count
     $process.Dispose()
+    if ($useHashFallback) {
+        # Some Windows Git builds can exit while accepting a large stdin path list.
+        # Preserve the exact input set and provide a path-level failure if retrying fails.
+        Write-Host "VALIDATION_GIT_HASH_FALLBACK=enabled"
+        $hashes = New-Object System.Collections.Generic.List[string]
+        foreach ($relative in $existing) {
+            $hashOutput = @(& git -C $RepoRoot hash-object -- $relative)
+            if ($LASTEXITCODE -ne 0) {
+                throw "Unable to hash validation workspace input '$relative'."
+            }
+            $hash = (($hashOutput -join "`n").Trim())
+            if ($hash -notmatch '^[0-9a-f]{40,64}$') {
+                throw "Invalid validation workspace hash for '$relative': $hash"
+            }
+            $hashes.Add($hash)
+        }
+        $hashes = $hashes.ToArray()
+    } else {
+        $hashes = $batchHashes
+    }
     if ($hashes.Count -ne $existing.Count) { throw "Unable to hash validation workspace inputs." }
     for($i=0;$i -lt $existing.Count;$i++){$records.Add("$($existing[$i].Replace('\','/'))`t$($hashes[$i].Trim())")}
     foreach($relative in @($all|Where-Object{-not (Test-Path -LiteralPath (Join-Path $RepoRoot $_) -PathType Leaf)})){$records.Add("$($relative.Replace('\','/'))`tdeleted")}

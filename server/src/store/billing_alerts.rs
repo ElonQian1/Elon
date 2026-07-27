@@ -242,6 +242,7 @@ impl Store {
             "SELECT id, fingerprint, severity, status, title, detail, metric_value,
                     first_seen_at, updated_at, resolved_at
              FROM billing_alerts
+             WHERE fingerprint NOT LIKE 'realtime:%'
              ORDER BY
                CASE status WHEN 'open' THEN 0 ELSE 1 END,
                CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
@@ -252,6 +253,7 @@ impl Store {
                     first_seen_at, updated_at, resolved_at
              FROM billing_alerts
              WHERE status = 'open'
+               AND fingerprint NOT LIKE 'realtime:%'
              ORDER BY
                CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
                updated_at DESC

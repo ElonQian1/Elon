@@ -20,7 +20,7 @@
     "test:message-actions": "node scripts/test-message-actions-hover.cjs",
     "check:bundle-budget": "node ../scripts/check-pc-frontend-bundle-budget.js",
     "test:admin-realtime": "node ../scripts/test-admin-realtime-health.js",
-    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "lint": "eslint src --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
     "@types/uuid": "^10.0.0",
@@ -29,7 +29,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
-    "react-router-dom": "^6.26.0",
+    "react-router-dom": "7.18.1",
     "remark-gfm": "^4.0.1",
     "uuid": "^14.0.1",
     "zustand": "^4.5.4"
@@ -37,13 +37,14 @@
   "devDependencies": {
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@typescript-eslint/eslint-plugin": "^7.15.0",
-    "@typescript-eslint/parser": "^7.15.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "eslint": "^8.57.0",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "eslint-plugin-react-refresh": "^0.4.7",
+    "@typescript-eslint/eslint-plugin": "^8.65.0",
+    "@typescript-eslint/parser": "^8.65.0",
+    "@vitejs/plugin-react": "^6.0.4",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.3",
+    "globals": "^17.7.0",
     "typescript": "^5.5.3",
-    "vite": "^5.3.4"
+    "vite": "^8.1.5"
   }
 }

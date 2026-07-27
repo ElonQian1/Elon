@@ -80,6 +80,79 @@ function New-CargoAttemptRecord {
     [pscustomobject]@{source_id=$SourceId;stage=$Stage;code=[string]$Diagnostic.code;retryable=[bool]$Diagnostic.retryable;exit_code=$ExitCode;duration_ms=$DurationMs;evidence_path=$EvidencePath;health_cached=$Cached}
 }
 
+function Write-CargoAttemptTestFailureContext {
+    param(
+        [Parameter(Mandatory)][AllowEmptyCollection()][AllowEmptyString()][string[]]$Lines,
+        [Parameter(Mandatory)][string]$Stage,
+        [Parameter(Mandatory)][string]$Stream,
+        [int]$MaximumLines = 100
+    )
+    $plainLines = @($Lines | ForEach-Object {
+        ([string]$_) -replace "`e\[[0-9;?]*[ -/]*[@-~]", ''
+    })
+    $testFailureIndex = -1
+    $testFailureSummary = $null
+    $fallbackIndex = -1
+    for ($index = 0; $index -lt $plainLines.Count; $index++) {
+        $end = [Math]::Min($plainLines.Count - 1, $index + 4)
+        $window = $plainLines[$index..$end] -join ' '
+        if ($window -match '\btest\s+.+?\s+\.\s*\.\s*\.\s+FAILED\b') {
+            $testFailureIndex = $index
+            $testFailureSummary = (($Matches[0] -replace '\s+', ' ') -replace '\.\s*\.\s*\.', '...').Trim()
+        } elseif ($plainLines[$index] -match '^\s*failures:\s*$|panicked at|assertion .* failed') {
+            $fallbackIndex = $index
+        }
+    }
+    $matchIndex = if ($testFailureIndex -ge 0) { $testFailureIndex } else { $fallbackIndex }
+    if ($matchIndex -lt 0) { return }
+
+    $start = [Math]::Max(0, $matchIndex - 12)
+    $end = [Math]::Min($Lines.Count - 1, $start + $MaximumLines - 1)
+    $context = @($Lines[$start..$end] | Where-Object { $_ -and $_.Trim() })
+    if ($context.Count -eq 0) { return }
+
+    if ($testFailureSummary) {
+        Write-Host "CARGO_ATTEMPT_TEST_FAILURE_SUMMARY stage=$Stage stream=$Stream $testFailureSummary"
+    }
+    Write-Host "CARGO_ATTEMPT_TEST_FAILURE_CONTEXT_BEGIN stage=$Stage stream=$Stream lines=$($context.Count)"
+    foreach ($line in $context) {
+        $safeLine = ([string]$line).Replace("`0", '').Replace("`r", '').Replace("`n", ' ')
+        Write-Host "CARGO_ATTEMPT_TEST_FAILURE_CONTEXT $safeLine"
+    }
+    Write-Host "CARGO_ATTEMPT_TEST_FAILURE_CONTEXT_END stage=$Stage stream=$Stream lines=$($context.Count)"
+}
+
+function Write-CargoAttemptFailureEvidence {
+    param(
+        [Parameter(Mandatory)]$Result,
+        [Parameter(Mandatory)][string]$Stage,
+        [int]$MaximumLines = 80
+    )
+    if ($Result.exit_code -eq 0) { return }
+
+    $streams = @(
+        [pscustomobject]@{ name = 'stdout'; path = $Result.stdout_path },
+        [pscustomobject]@{ name = 'stderr'; path = $Result.stderr_path }
+    )
+    foreach ($stream in $streams) {
+        if (-not $stream.path -or -not (Test-Path -LiteralPath $stream.path)) { continue }
+        $lines = @(Get-Content -LiteralPath $stream.path -ErrorAction SilentlyContinue)
+        Write-CargoAttemptTestFailureContext $lines $Stage $stream.name
+        $tail = @($lines |
+            Where-Object { $_ -and $_.Trim() } |
+            Select-Object -Last $MaximumLines)
+        if ($tail.Count -eq 0) { continue }
+
+        Write-Host "CARGO_ATTEMPT_LOG_BEGIN stage=$Stage stream=$($stream.name) lines=$($tail.Count)"
+        foreach ($line in $tail) {
+            # Prefix every line so captured tool output cannot be interpreted as a GitHub Actions command.
+            $safeLine = ([string]$line).Replace("`0", '').Replace("`r", '').Replace("`n", ' ')
+            Write-Host "CARGO_ATTEMPT_LOG $safeLine"
+        }
+        Write-Host "CARGO_ATTEMPT_LOG_END stage=$Stage stream=$($stream.name) lines=$($tail.Count)"
+    }
+}
+
 function Invoke-CargoNetworkValidation {
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
@@ -117,6 +190,7 @@ function Invoke-CargoNetworkValidation {
             Write-CargoNetworkReport $reportPath $report|Out-Null; Write-Host "CARGO_NETWORK_REPORT=$reportPath"; return [pscustomobject]@{exit_code=0;status='success';source='local-cache';report_path=$reportPath;attempts=$attempts.ToArray()}
         }
         if($result.diagnostic.code -ne 'CARGO_OFFLINE_MISSING'){
+            Write-CargoAttemptFailureEvidence $result 'locked_offline_check'
             $report=[ordered]@{schema='elon.cargo_network_report.v1';status='failed';strategy='locked_offline';started_utc=$started.ToString('o');finished_utc=[DateTime]::UtcNow.ToString('o');attempts=$attempts.ToArray();final_diagnostic=$result.diagnostic}
             Write-CargoNetworkReport $reportPath $report|Out-Null; Write-Host "CARGO_NETWORK_REPORT=$reportPath"; return [pscustomobject]@{exit_code=$result.exit_code;status='failed';source='local-cache';report_path=$reportPath;diagnostic=$result.diagnostic;attempts=$attempts.ToArray()}
         }
@@ -144,14 +218,14 @@ function Invoke-CargoNetworkValidation {
         $fetchTimeout=[Math]::Max(1,[Math]::Min([int]$policy.fetch_timeout_seconds,$remaining))
         $fetch=Invoke-CargoManagedAttempt $RepoRoot $CargoDevPath (Join-Path $ReportRoot ("fetch-"+$source.id)) (Get-CargoFetchArguments $RepoRoot $locked) $ResolvedCacheRoot $Domain $TargetDir $sourceHome $fetchTimeout -DisableSccache
         $attempts.Add((New-CargoAttemptRecord ([string]$source.id) 'locked_fetch' $fetch.diagnostic $fetch.exit_code $fetch.duration_ms $fetch.stderr_path $fresh))
-        if($fetch.exit_code -ne 0){Update-CargoSourceHealthState $healthPath ([string]$source.id) $false $fetch.diagnostic.code ([int]$policy.circuit_failure_threshold) ([int]$policy.circuit_open_seconds)|Out-Null;$health=Get-CargoSourceHealthState $healthPath;if(-not $fetch.diagnostic.retryable){break};continue}
+        if($fetch.exit_code -ne 0){Write-CargoAttemptFailureEvidence $fetch ("locked_fetch_"+[string]$source.id);Update-CargoSourceHealthState $healthPath ([string]$source.id) $false $fetch.diagnostic.code ([int]$policy.circuit_failure_threshold) ([int]$policy.circuit_open_seconds)|Out-Null;$health=Get-CargoSourceHealthState $healthPath;if(-not $fetch.diagnostic.retryable){break};continue}
         Update-CargoSourceHealthState $healthPath ([string]$source.id) $true 'CARGO_SOURCE_HEALTHY' ([int]$policy.circuit_failure_threshold) ([int]$policy.circuit_open_seconds)|Out-Null
         $check=Invoke-CargoManagedAttempt $RepoRoot $CargoDevPath (Join-Path $ReportRoot ("check-"+$source.id)) (Add-CargoArgumentOnce $locked '--offline') $ResolvedCacheRoot $Domain $TargetDir $sourceHome $CompileTimeoutSeconds -DisableSccache:$DisableSccache
         $attempts.Add((New-CargoAttemptRecord ([string]$source.id) 'locked_offline_check_after_fetch' $check.diagnostic $check.exit_code $check.duration_ms $check.stderr_path))
         Write-CargoMachineStatus $check.diagnostic
         if($check.exit_code -eq 0){$report=[ordered]@{schema='elon.cargo_network_report.v1';status='success';strategy='trusted_failover';started_utc=$started.ToString('o');finished_utc=[DateTime]::UtcNow.ToString('o');attempts=$attempts.ToArray();selected_source=[string]$source.id};Write-CargoNetworkReport $reportPath $report|Out-Null;Write-Host "CARGO_SOURCE_SELECTED=$($source.id)";Write-Host "CARGO_NETWORK_REPORT=$reportPath";return [pscustomobject]@{exit_code=0;status='success';source=[string]$source.id;report_path=$reportPath;attempts=$attempts.ToArray()}
         }
-        if($check.diagnostic.code -ne 'CARGO_OFFLINE_MISSING'){$report=[ordered]@{schema='elon.cargo_network_report.v1';status='failed';strategy='trusted_failover';started_utc=$started.ToString('o');finished_utc=[DateTime]::UtcNow.ToString('o');attempts=$attempts.ToArray();final_diagnostic=$check.diagnostic};Write-CargoNetworkReport $reportPath $report|Out-Null;return [pscustomobject]@{exit_code=$check.exit_code;status='failed';source=[string]$source.id;report_path=$reportPath;diagnostic=$check.diagnostic;attempts=$attempts.ToArray()}}
+        if($check.diagnostic.code -ne 'CARGO_OFFLINE_MISSING'){Write-CargoAttemptFailureEvidence $check ("locked_offline_check_"+[string]$source.id);$report=[ordered]@{schema='elon.cargo_network_report.v1';status='failed';strategy='trusted_failover';started_utc=$started.ToString('o');finished_utc=[DateTime]::UtcNow.ToString('o');attempts=$attempts.ToArray();final_diagnostic=$check.diagnostic};Write-CargoNetworkReport $reportPath $report|Out-Null;return [pscustomobject]@{exit_code=$check.exit_code;status='failed';source=[string]$source.id;report_path=$reportPath;diagnostic=$check.diagnostic;attempts=$attempts.ToArray()}}
     }
     $repair=[ordered]@{schema='elon.cargo_source_repair.v1';status='CARGO_SOURCE_REPAIR_REQUIRED';generated_utc=[DateTime]::UtcNow.ToString('o');trusted_policy=$PolicyPath;attempts=$attempts.ToArray();ai_handoff=[ordered]@{protocol='elon.ai.cargo_source_repair.v1';allowed_actions=@('search_official_or_operator_pages','test_https_candidate_temporarily','continue_with_isolated_locked_cache');forbidden_actions=@('trust_random_web_mirror','write_user_global_cargo_config','send_credentials');candidate_requirements=@('https','bounded_redirects','valid_config_json','https_download_endpoint','operator_evidence','cargo_lock_checksum','isolated_locked_fetch_and_check');permanent_addition='commit cargo-sources.json plus offline fault-injection tests'};repair_command='powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-source-repair.ps1 -Index sparse+https://HOST/PATH/ -Evidence https://OPERATOR/OFFICIAL-DOC'}
     $repairPath=Join-Path $ReportRoot 'cargo-source-repair-required.json';Write-CargoNetworkReport $repairPath $repair|Out-Null

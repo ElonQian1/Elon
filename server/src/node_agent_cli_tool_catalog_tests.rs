@@ -39,7 +39,8 @@ fn optional_missing_tools_do_not_add_env_vars() {
     let codex = root.join(executable_name("codex"));
     fs::write(&codex, b"").unwrap();
 
-    let envs = codex_child_env_overrides(&codex, Some(OsString::new()));
+    let tools = resolve_codex_tools_with_candidates(Some(&codex), &|_| Vec::new(), false);
+    let envs = codex_child_env_overrides_from_tools(tools, Some(OsString::new()));
 
     assert!(!envs.iter().any(|(key, _)| key == "ELON_CODEX_JQ_PATH"));
     assert!(!envs.iter().any(|(key, _)| key == "ELON_CODEX_7Z_PATH"));

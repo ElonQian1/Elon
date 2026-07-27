@@ -98,7 +98,7 @@
 - Android APK 发布路径已纳入 release runbook 和静态门禁，`AndroidFeature` 完成验收与 `publish-apk.ps1` 发布脚本引用会被 CI 校验。
 - 依赖安全审计进入报告模式：新增 `check-dependency-audit.ps1` 与 `docs/dependency-security-audit.md`，CI 输出 npm audit 与 Rust 依赖审计概况，当前不因既有风险阻断合入。
 - Rust 依赖审计已升级为 CI 固定安装 `cargo-audit@0.22.2` 后运行，新增 `install-cargo-audit.ps1`、`check-dependency-audit.ps1 -RequireRustAudit` 与 stale advisory-db fallback，并将 npm/RustSec vulnerabilities 切到 Strict 阻断，避免检查在 CI 中静默 skipped 或把拉库失败误报为 0 漏洞。
-- 微信支付 RSA-SHA256 签名已从 RustSec 无补丁的 `rsa` crate 迁移到 `ring`，清理 `RUSTSEC-2023-0071`；RustSec 漏洞基线降为 0。
+- `quick-xml` 已升级至 `0.41.0`，清理 `RUSTSEC-2026-0194` 和 `RUSTSEC-2026-0195`；`rsa@0.9.10` 的无补丁 `RUSTSEC-2023-0071` 仅以精确 advisory/package/version/到期日例外受控放行，例外失效、过期或出现其他 RustSec 漏洞均会阻断 CI。
 - Rust web 框架链路升级到 `axum@0.8` / `tower@0.5` / `tower-http@0.6`，WebSocket 文本发送迁移到 `Message::text(...)`，并通过跟踪 `server/Cargo.lock` 将 `spin` 刷新到 `0.9.9`，RustSec warning 基线降为 0。
 - 实时通道收敛已建立第一层公共传输基座：新增 `ws_transport.rs`，集中 Axum WebSocket 文本帧构造、JSON 文本帧序列化兜底、严格 JSON 文本帧构造和 `type` 字段解析；`/ws/app`、旧 `/ws/notify`、项目任务 WebSocket、语音 WebSocket 与 HomeCLI agent 发送路径已接入公共层，为后续统一鉴权、错误码、限流、指标和连接生命周期治理打底。
 - Axum WebSocket 生命周期控制已开始统一：`ws_transport::receive_data_or_control` 集中处理文本帧、二进制帧、Ping 自动回 Pong、Pong 忽略、Close/读错/断流关闭；旧 `/ws/notify`、`/ws/app`、项目任务 WebSocket 和三条语音 WebSocket 主循环已接入，减少各入口重复维护 ping/pong/close 细节。
