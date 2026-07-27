@@ -32,6 +32,19 @@ function modeDetail(design: PwaDesignSession): string {
   return '先登录和点击到目标页面；需要修改时点“选择一个组件”。'
 }
 
+function selectedLabel(design: PwaDesignSession): string {
+  const identity = design.selection?.identity
+  if (!identity) return ''
+  return identity.ariaLabel || identity.text || identity.id || identity.stableId || identity.tag || '已选中组件'
+}
+
+function selectedConfidenceLabel(design: PwaDesignSession): string {
+  const confidence = design.selection?.identity.confidence
+  if (confidence === 'high') return '稳定映射'
+  if (confidence === 'medium') return '候选映射'
+  return 'DOM 路径'
+}
+
 export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Props) {
   const viewportWidth = Math.max(320, Math.min(430, Math.round(document.canvas.width / 3)))
   const viewportHeight = Math.max(640, Math.min(932, Math.round(document.canvas.height / 3)))
@@ -72,6 +85,15 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Pr
         当前画面：{route.screenTitle || '未识别画面'}
         {route.screenKey && <> · <code>{route.screenKey}</code></>}
         {' · '}{route.path}{route.search}{route.hash} · {route.viewport.width}×{route.viewport.height}
+      </div>}
+      {design.selection && <div className={styles.pwaSelectedCanvasSummary} data-confidence={design.selection.identity.confidence}>
+        <div>
+          <strong>已选中：{selectedLabel(design)}</strong>
+          <span>{selectedConfidenceLabel(design)} · 右侧可直接改尺寸、间距、圆角、字体和颜色</span>
+          <code>{design.selection.identity.selector}</code>
+        </div>
+        <button type="button" onClick={() => design.setMode('select')}><MousePointer2 size={14} />继续选组件</button>
+        <button type="button" onClick={() => design.setMode('interact')}><Smartphone size={14} />操作页面</button>
       </div>}
       {design.mode === 'select' && <div className={styles.pwaBindingNotice}>选择模式只拦截下一次点击；选中后会自动回到正常操作页面。</div>}
       {design.mode !== 'select' && design.unboundLabel && <div className={styles.pwaBindingNotice}>已选中“{design.unboundLabel}”；当前用可解释 DOM 路径保存，尚未假定它已绑定 Android 源码。</div>}
