@@ -47,12 +47,12 @@ export function useAutomaticDesignSetup({
       return undefined
     }
 
-    if (runtimeReady && runtimeAttemptRef.current !== setupKey) {
+    if (runtimeAttemptRef.current !== setupKey) {
       runtimeAttemptRef.current = setupKey
       prepareRuntimeRef.current()
     }
 
-    const waitingForRuntime = runtimeBusy || runtimeAttemptRef.current === setupKey
+    const waitingForRuntime = runtimeReady || runtimeBusy || runtimeAttemptRef.current === setupKey
     const fallbackTimer = window.setTimeout(() => {
       fallbackToDraft()
     }, waitingForRuntime ? RUNTIME_BACKGROUND_FALLBACK_MS : DRAFT_FALLBACK_DELAY_MS)
