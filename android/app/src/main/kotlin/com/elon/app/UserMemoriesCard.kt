@@ -159,7 +159,7 @@ internal class UserMemoriesCard(
                 isClickable = true
                 isFocusable = true
                 contentDescription = "展开 AI 记忆"
-                setPadding(dp(36), 0, dp(18), 0)
+                setPadding(dp(16), 0, dp(10), 0)
                 setOnClickListener {
                     memoryExpanded = !memoryExpanded
                     detailBody.visibility = if (memoryExpanded) View.VISIBLE else View.GONE

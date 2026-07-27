@@ -151,7 +151,7 @@ internal object UserProfileViews {
             )
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(context.dp(20), context.dp(12), context.dp(18), context.dp(12))
+            setPadding(context.dp(16), context.dp(12), context.dp(10), context.dp(12))
             setBackgroundResource(R.drawable.profile_panel_identity)
             isClickable = true
             foreground = selectableForeground(context)

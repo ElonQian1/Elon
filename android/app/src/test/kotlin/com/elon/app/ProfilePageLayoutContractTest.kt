@@ -11,8 +11,19 @@ class ProfilePageLayoutContractTest {
     @Test
     fun androidProfileUsesTheProvidedPanelAndActionAssets() {
         val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
+        val profileViews = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/UserProfileViews.kt"
+        )
+        val memoriesCard = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/UserMemoriesCard.kt"
+        )
         assertTrue(layout.contains("android:id=\"@+id/profilePageContent\""))
         assertTrue(layout.contains("android:paddingStart=\"20dp\""))
+        assertTrue(profileViews.contains("setPadding(context.dp(16), context.dp(12), context.dp(10), context.dp(12))"))
+        assertTrue(memoriesCard.contains("setPadding(dp(16), 0, dp(10), 0)"))
+        assertTrue(layout.contains("android:paddingStart=\"16dp\""))
+        assertTrue(layout.contains("android:paddingEnd=\"10dp\""))
+        assertTrue(!layout.contains("android:paddingStart=\"36dp\""))
         assertTrue(layout.contains("android:background=\"@drawable/profile_panel_primary_actions\""))
         assertTrue(layout.contains("android:background=\"@drawable/profile_panel_support_actions\""))
         listOf(
@@ -41,6 +52,8 @@ class ProfilePageLayoutContractTest {
         assertTrue(web.contains("min-height: 284px"))
         assertTrue(web.contains("grid-template-columns: repeat(3"))
         assertTrue(web.contains("class=\"usage-gauge-progress\""))
+        assertTrue(web.contains("padding: 12px 10px 12px 16px"))
+        assertTrue(web.contains("padding: 0 10px 0 16px"))
         listOf("PC 节点", "AI 记忆", "AI 代理设置", "Agent 自动化", "分享推广", "检测更新")
             .forEach { label -> assertTrue(web.contains(label)) }
     }
