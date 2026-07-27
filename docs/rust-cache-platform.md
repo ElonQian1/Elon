@@ -80,7 +80,9 @@ domain 应描述构建用途和兼容性，例如：
 复制一套依赖中间产物。一龙项目把未知 domain 收敛到 `agent-validation`；发布入口
 仍必须显式使用 `node-agent-release` 等已登记稳定域。GC 会把当前项目中不再位于
 白名单的旧 domain 标记为 `retired-domain`，即使它尚未达到常规 TTL 也会优先回收；
-带锁分区和正在运行的 Cargo/rustc 仍受原有安全保护。
+带锁分区和正在运行的 Cargo/rustc 仍受原有安全保护。实际删除前，GC 会取得与 Cargo
+相同的分区锁并将目录原子移入受管 `trash`；若锁在扫描后出现则保留该分区，因此新
+构建无法在并发窗口中被误删。
 
 ## 使用入口
 

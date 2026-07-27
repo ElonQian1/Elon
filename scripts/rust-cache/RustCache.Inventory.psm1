@@ -73,6 +73,41 @@ function Remove-RustCachePartition {
     throw $lastError
 }
 
+function Move-RustCachePartitionToTrash {
+    param(
+        [Parameter(Mandatory)][string]$CacheRoot,
+        [Parameter(Mandatory)][string]$Path
+    )
+
+    Assert-RustCacheManagedPath -CacheRoot $CacheRoot -CandidatePath $Path
+    $trashRoot = Join-Path $CacheRoot "trash"
+    New-Item -ItemType Directory -Force -Path $trashRoot | Out-Null
+    $trashPath = Join-Path $trashRoot ([Guid]::NewGuid().ToString("N"))
+    Assert-RustCacheManagedPath -CacheRoot $CacheRoot -CandidatePath $trashPath
+    $sourcePath = if ($env:OS -eq "Windows_NT" -and -not $Path.StartsWith('\\?\')) { "\\?\$Path" } else { $Path }
+    $destinationPath = if ($env:OS -eq "Windows_NT" -and -not $trashPath.StartsWith('\\?\')) { "\\?\$trashPath" } else { $trashPath }
+    [System.IO.Directory]::Move($sourcePath, $destinationPath)
+    return $trashPath
+}
+
+function Remove-RustCachePartitionSafely {
+    param(
+        [Parameter(Mandatory)][string]$CacheRoot,
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$WorkspaceRoot
+    )
+
+    $lockPath = $null
+    try {
+        $lockPath = Enter-RustCacheLock -CacheRoot $CacheRoot -BuildDir $Path -WorkspaceRoot $WorkspaceRoot -TimeoutSeconds 0
+        $trashPath = Move-RustCachePartitionToTrash -CacheRoot $CacheRoot -Path $Path
+        $lockPath = $null
+        Remove-RustCachePartition -Path $trashPath
+    } finally {
+        if ($lockPath) { Exit-RustCacheLock -LockPath $lockPath }
+    }
+}
+
 function Get-RustCachePartitionLastUsed {
     param([Parameter(Mandatory)][System.IO.DirectoryInfo]$Directory)
 
@@ -275,7 +310,17 @@ function Invoke-RustCacheGc {
         $partition.action = if ($Apply) { "delete" } else { "would-delete" }
         if ($Apply) {
             Assert-RustCacheManagedPath -CacheRoot $root -CandidatePath $partition.path
-            Remove-RustCachePartition -Path $partition.path
+            try {
+                Remove-RustCachePartitionSafely -CacheRoot $root -Path $partition.path -WorkspaceRoot $RepoRoot
+            } catch {
+                if ($_.Exception.Message -like "Timed out waiting for Rust cache lock:*") {
+                    $partition.selected = $false
+                    $partition.action = "preserve"
+                    $partition.reason = "lock-appeared"
+                    continue
+                }
+                throw
+            }
         }
         $estimatedFree += [int64]$partition.size_bytes
     }

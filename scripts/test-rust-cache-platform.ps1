@@ -200,6 +200,14 @@ exit /b 0
     Assert-True ($null -ne $inventoryModule) "inventory module should be loaded for partition removal regression"
     & $inventoryModule { param($PartitionPath) Remove-RustCachePartition -Path $PartitionPath } $deletionPartition
     Assert-True (-not (Test-Path -LiteralPath $deletionPartition)) "managed long-path partition removal should tolerate PowerShell traversal failures"
+    $atomicPartition = Join-Path $CacheRoot "build\rustc-test\test-project\one-off-atomic\dddddddddddddddd"
+    New-Item -ItemType Directory -Force -Path $atomicPartition | Out-Null
+    Set-Content -LiteralPath (Join-Path $atomicPartition "artifact.bin") -Value "atomic"
+    & $inventoryModule {
+        param($Root, $PartitionPath, $WorkspaceRoot)
+        Remove-RustCachePartitionSafely -CacheRoot $Root -Path $PartitionPath -WorkspaceRoot $WorkspaceRoot
+    } $CacheRoot $atomicPartition $ProjectRoot
+    Assert-True (-not (Test-Path -LiteralPath $atomicPartition)) "GC should atomically detach a locked partition before deletion"
     $quarantineLeaf = Join-Path $CacheRoot "quarantine\ab\cdef0123456789"
     New-Item -ItemType Directory -Force -Path $quarantineLeaf | Out-Null
     Set-Content -LiteralPath (Join-Path $quarantineLeaf "artifact.bin") -Value "quarantine"
