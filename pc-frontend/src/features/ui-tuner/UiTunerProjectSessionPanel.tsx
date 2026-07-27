@@ -30,6 +30,7 @@ import type { UiTunerConversationMode } from './uiTunerConversation'
 import {
   listenForFitRunCodexRequests,
   notifyFitRunCodexSettled,
+  persistFitRunCodexLaunch,
   readFitRunCodexLaunch,
   resolveFitRunWorkspace,
 } from './fit-run/fitRunEvents'
@@ -345,6 +346,12 @@ export function UiTunerProjectSessionPanel({
           : [{ ...session, taskId, status: 'running' }, ...previous.sessions],
       } : previous)
       if (options?.fitRun) {
+        persistFitRunCodexLaunch({
+          ...options.fitRun,
+          taskId,
+          handoffKind: options.handoffKind,
+          createdAt: new Date().toISOString(),
+        })
         setFitRunTask({ ...options.fitRun, taskId, kind: options.handoffKind })
         setStatus(options.handoffKind === 'PWA_DRAFT'
           ? '跨端草稿已进入持续项目 Codex CLI 会话'

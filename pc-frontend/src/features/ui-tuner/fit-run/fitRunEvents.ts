@@ -59,6 +59,7 @@ export interface FitRunCodexLaunchRecord {
   runId: string
   handoffId: string
   taskId: string
+  handoffKind?: FitRunCodexRequest['handoffKind']
   createdAt: string
 }
 
@@ -142,6 +143,17 @@ export function fitRunStartCommandId(runId: string, handoffId: string, taskId: s
 
 export function readFitRunCodexLaunch(runId: string, handoffId: string) {
   return readLaunches().find((item) => item.runId === runId && item.handoffId === handoffId) ?? null
+}
+
+export function readFitRunCodexLaunchByRun(
+  runId: string,
+  handoffKind?: FitRunCodexRequest['handoffKind'],
+) {
+  const matches = readLaunches().filter((item) => (
+    item.runId === runId
+    && (!handoffKind || !item.handoffKind || item.handoffKind === handoffKind)
+  ))
+  return matches.length ? matches[matches.length - 1] : null
 }
 
 export function persistFitRunCodexLaunch(record: FitRunCodexLaunchRecord) {

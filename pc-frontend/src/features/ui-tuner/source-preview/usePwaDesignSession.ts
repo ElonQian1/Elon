@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import { getAuthToken } from '../../../api/client'
-import { listenForFitRunCodexSettled, requestCodexForFitRun } from '../fit-run/fitRunEvents'
+import {
+  listenForFitRunCodexSettled,
+  readFitRunCodexLaunchByRun,
+  readFitRunCodexSettlement,
+  requestCodexForFitRun,
+  type FitRunCodexSettledDetail,
+} from '../fit-run/fitRunEvents'
 import { buildPwaDesignContextPack } from './pwaDesignContext'
 import { planPwaDesignWriteback } from './pwaDesignWriteback'
 import {
@@ -246,21 +252,7 @@ export function usePwaDesignSession({
   const updateReceipt = receiptFlow.update
   const verifyAndroidReceipt = receiptFlow.verifyAndroid
 
-  const applyDraftState = useCallback((value: PwaDesignDraft, sync = true) => {
-    setDraft(value)
-    if (sync) syncDraft(value)
-    if (!sync && Object.keys(value.elements).length) {
-      setSaveLabel(`已自动保存 · r${value.revision}`)
-    } else if (!Object.keys(value.elements).length) {
-      setSaveLabel('本页暂无样式草稿')
-    }
-    setHistoryVersion((version) => version + 1)
-    verification.markLive('草稿已变更，当前仅为临时实时预览')
-  }, [syncDraft, verification.markLive])
-
-  useEffect(() => () => model.dispose(), [model])
-
-  useEffect(() => listenForFitRunCodexSettled((detail) => {
+  const handleCodexSettlement = useCallback((detail: FitRunCodexSettledDetail) => {
     if (!syncTaskIdRef.current || detail.taskId !== syncTaskIdRef.current) return
     if (detail.succeeded) {
       const currentReceipt = writebackReceiptRef.current
@@ -332,7 +324,38 @@ export function usePwaDesignSession({
       verification.fail(`跨端 Codex 写回失败：${detail.error || '任务未完成'}；草稿已保留，可直接重试`)
     }
     syncTaskIdRef.current = ''
-  }), [model, updateReceipt, verification.fail, verification.markSourceSaved, verification.start, verifyAndroidReceipt])
+  }, [model, updateReceipt, verification.fail, verification.markSourceSaved, verification.start, verifyAndroidReceipt, writebackReceiptRef])
+
+  const applyDraftState = useCallback((value: PwaDesignDraft, sync = true) => {
+    setDraft(value)
+    if (sync) syncDraft(value)
+    if (!sync && Object.keys(value.elements).length) {
+      setSaveLabel(`已自动保存 · r${value.revision}`)
+    } else if (!Object.keys(value.elements).length) {
+      setSaveLabel('本页暂无样式草稿')
+    }
+    setHistoryVersion((version) => version + 1)
+    verification.markLive('草稿已变更，当前仅为临时实时预览')
+  }, [syncDraft, verification.markLive])
+
+  useEffect(() => () => model.dispose(), [model])
+
+  useEffect(() => listenForFitRunCodexSettled(handleCodexSettlement), [handleCodexSettlement])
+
+  useEffect(() => {
+    if (!draft || syncTaskIdRef.current || verification.state.phase !== 'LIVE_PREVIEW') return
+    const runId = `pwa:${draft.project.id}:${draft.revision}`
+    const launch = readFitRunCodexLaunchByRun(runId, 'PWA_DRAFT')
+    if (!launch?.taskId) return
+    syncTaskIdRef.current = launch.taskId
+    const settlement = readFitRunCodexSettlement(launch.taskId)
+    if (settlement) {
+      handleCodexSettlement(settlement)
+      return
+    }
+    verification.markAiWriting(launch.taskId, '已恢复上次 PWA 草稿 AI 写回任务；等待 Codex CLI 机器回执后自动验证')
+    setSaveLabel('已恢复 PWA 草稿 AI 写回任务；等待后台结算')
+  }, [draft, handleCodexSettlement, verification.markAiWriting, verification.state.phase])
 
   useEffect(() => {
     if (!selection || selection.sourceBinding || !sourceSelectorKey || !workspaceIdentity) return

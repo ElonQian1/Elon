@@ -33,7 +33,13 @@ windowTarget.localStorage = {
 global.window = windowTarget
 global.CustomEvent = TestCustomEvent
 
-const { listenForFitRunCodexRequests, requestCodexForFitRun, resolveFitRunWorkspace } = require(outputFile)
+const {
+  listenForFitRunCodexRequests,
+  persistFitRunCodexLaunch,
+  readFitRunCodexLaunchByRun,
+  requestCodexForFitRun,
+  resolveFitRunWorkspace,
+} = require(outputFile)
 const request = { runId: 'run-1', handoffId: 'handoff-1', reason: '测试 AI 接力' }
 
 ;(async () => {
@@ -67,6 +73,19 @@ const request = { runId: 'run-1', handoffId: 'handoff-1', reason: '测试 AI 接
   })
   assert.deepEqual(await requestCodexForFitRun(request, 100), { taskId: 'task-1' })
   disposeSuccess()
+
+  persistFitRunCodexLaunch({
+    runId: 'pwa:project-1:7',
+    handoffId: 'pwa_1',
+    taskId: 'task-pwa-1',
+    handoffKind: 'PWA_DRAFT',
+    createdAt: '2026-07-28T00:00:00.000Z',
+  })
+  assert.equal(
+    readFitRunCodexLaunchByRun('pwa:project-1:7', 'PWA_DRAFT').taskId,
+    'task-pwa-1',
+    '刷新后 PWA 草稿必须能按 runId 恢复上次 Codex 写回任务',
+  )
 
   const disposeTimeout = listenForFitRunCodexRequests(() => undefined)
   await assert.rejects(
