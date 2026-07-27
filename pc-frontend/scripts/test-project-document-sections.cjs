@@ -116,6 +116,19 @@ assert.equal(sections.length, documents.length, '每份文档必须只属于一�
 assert(buildDocumentSections(manifest).some((section) => section.key === 'custom:research'))
 assert(buildDocumentSections(manifest).some((section) => section.key === 'suggestions'))
 
+const importedConversation = document(
+  'docs/inbox/conversations/provider-chat.md',
+  'discussion',
+  'source_material',
+)
+importedConversation.metadata.authority = 'none'
+importedConversation.metadata.default_retrieval = false
+const importedFacets = governanceLoaded.exports.effectiveGovernanceFacets(importedConversation)
+assert.equal(importedFacets.retrieval, 'excluded')
+assert.equal(importedFacets.lifecycle, 'source_material')
+assert.equal(importedFacets.authority, 'none')
+assert.equal(governanceLoaded.exports.governanceQuickView(importedFacets), 'drafts')
+
 const suggestions = parseOrganizationSuggestions(JSON.stringify({
   version: 1,
   status: 'ready',

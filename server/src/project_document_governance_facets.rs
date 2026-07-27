@@ -11,6 +11,7 @@ const RETRIEVAL_VALUES: &[&str] = &["required", "on_demand", "excluded"];
 const LIFECYCLE_VALUES: &[&str] = &[
     "active",
     "accepted",
+    "source_material",
     "draft",
     "deprecated",
     "superseded",
@@ -24,6 +25,7 @@ const AUTHORITY_VALUES: &[&str] = &[
     "evidence",
     "proposal",
     "non_authoritative",
+    "none",
     "unknown",
 ];
 const RELATION_VALUES: &[&str] = &[
@@ -402,12 +404,13 @@ fn clamp_authority(base: &str, requested: &str) -> String {
         return base.to_string();
     }
     let rank = |value: &str| match value {
-        "binding" => 6,
-        "authoritative" => 5,
-        "guidance" => 4,
-        "evidence" => 3,
-        "proposal" => 2,
-        "non_authoritative" => 1,
+        "binding" => 7,
+        "authoritative" => 6,
+        "guidance" => 5,
+        "evidence" => 4,
+        "proposal" => 3,
+        "non_authoritative" => 2,
+        "unknown" => 1,
         _ => 0,
     };
     if rank(requested) > rank(base) {
@@ -423,6 +426,7 @@ fn authority_level(value: &str) -> &'static str {
         "normative" | "approved" | "operational" | "decision_record" => "authoritative",
         "evidence" => "evidence",
         "proposal" => "proposal",
+        "none" => "none",
         "historical" | "customization" => "non_authoritative",
         "provider_routing" | "project_guidance" | "informative" => "guidance",
         _ => "unknown",
@@ -629,5 +633,31 @@ mod tests {
         assert_eq!(effective.retrieval, "excluded");
         assert_eq!(effective.lifecycle, "archived");
         assert_eq!(effective.authority, "non_authoritative");
+    }
+
+    #[test]
+    fn imported_conversation_keeps_explicit_zero_authority() {
+        let document = ProjectDocumentEntry {
+            path: "docs/inbox/conversations/chat.md".into(),
+            title: "Chat".into(),
+            content: String::new(),
+            truncated: false,
+            byte_len: 0,
+            source: "workspace".into(),
+            metadata: ProjectDocumentMetadata {
+                role: "discussion".into(),
+                lifecycle: "source_material".into(),
+                authority: "none".into(),
+                default_retrieval: false,
+                ambiguous: false,
+                ..Default::default()
+            },
+        };
+
+        let effective = effective_facets(&document, None);
+        assert_eq!(effective.retrieval, "excluded");
+        assert_eq!(effective.lifecycle, "source_material");
+        assert_eq!(effective.authority, "none");
+        assert_eq!(quick_view(&effective), "drafts");
     }
 }

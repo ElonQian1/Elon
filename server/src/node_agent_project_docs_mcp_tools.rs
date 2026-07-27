@@ -390,8 +390,8 @@ fn suggestions_schema() -> Value {
                 "additionalProperties":{
                     "type":"object","properties":{
                         "retrieval":{"type":"string","enum":["required","on_demand","excluded"]},
-                        "lifecycle":{"type":"string","enum":["active","accepted","draft","deprecated","superseded","archived","unclassified"]},
-                        "authority":{"type":"string","enum":["binding","authoritative","guidance","evidence","proposal","non_authoritative","unknown"]},
+                        "lifecycle":{"type":"string","enum":["active","accepted","source_material","draft","deprecated","superseded","archived","unclassified"]},
+                        "authority":{"type":"string","enum":["binding","authoritative","guidance","evidence","proposal","non_authoritative","none","unknown"]},
                         "document_type":{"type":"string","maxLength":64}
                     }
                 }

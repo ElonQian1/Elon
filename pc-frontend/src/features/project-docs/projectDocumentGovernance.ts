@@ -1,8 +1,8 @@
 import type { ProjectDocumentEntry } from './projectDocumentModel'
 
 export type RetrievalPolicy = 'required' | 'on_demand' | 'excluded'
-export type GovernanceLifecycle = 'active' | 'accepted' | 'draft' | 'deprecated' | 'superseded' | 'archived' | 'unclassified'
-export type AuthorityLevel = 'binding' | 'authoritative' | 'guidance' | 'evidence' | 'proposal' | 'non_authoritative' | 'unknown'
+export type GovernanceLifecycle = 'active' | 'accepted' | 'source_material' | 'draft' | 'deprecated' | 'superseded' | 'archived' | 'unclassified'
+export type AuthorityLevel = 'binding' | 'authoritative' | 'guidance' | 'evidence' | 'proposal' | 'non_authoritative' | 'none' | 'unknown'
 
 export interface DocumentGovernanceFacets {
   retrieval: RetrievalPolicy | ''
@@ -31,6 +31,7 @@ export const RETRIEVAL_OPTIONS: GovernanceFacetOption[] = [
 export const LIFECYCLE_OPTIONS: GovernanceFacetOption[] = [
   { key: 'active', label: '当前有效', detail: '仍适用于当前实现' },
   { key: 'accepted', label: '已接受', detail: '已接受决策或基线' },
+  { key: 'source_material', label: '原始来源', detail: '聊天或导入材料，只用于追溯和再整理' },
   { key: 'draft', label: '草稿', detail: '尚未批准' },
   { key: 'deprecated', label: '已弃用', detail: '仍可追溯但不再推荐' },
   { key: 'superseded', label: '已替代', detail: '存在新的权威来源' },
@@ -45,6 +46,7 @@ export const AUTHORITY_OPTIONS: GovernanceFacetOption[] = [
   { key: 'evidence', label: '证据性', detail: '证明结果但不定义需求' },
   { key: 'proposal', label: '提案', detail: '未批准方案或需求' },
   { key: 'non_authoritative', label: '非权威', detail: '工具笔记、定制资产或历史材料' },
+  { key: 'none', label: '无权威性', detail: '明确仅为原始来源，不能定义当前事实' },
   { key: 'unknown', label: '未知', detail: '需要用户或 AI 复核' },
 ]
 
@@ -161,6 +163,7 @@ function authorityLevel(value: string): AuthorityLevel {
   if (['normative', 'approved', 'operational', 'decision_record'].includes(value)) return 'authoritative'
   if (value === 'evidence') return 'evidence'
   if (value === 'proposal') return 'proposal'
+  if (value === 'none') return 'none'
   if (['historical', 'customization'].includes(value)) return 'non_authoritative'
   if (['provider_routing', 'project_guidance', 'informative'].includes(value)) return 'guidance'
   return 'unknown'
@@ -181,7 +184,7 @@ function clampLifecycle(base: GovernanceLifecycle | '', requested?: string) {
 
 function clampAuthority(base: AuthorityLevel | '', requested?: string) {
   if (!requested || !authorityValues.has(requested)) return base
-  const rank = ['unknown', 'non_authoritative', 'proposal', 'evidence', 'guidance', 'authoritative', 'binding']
+  const rank = ['none', 'unknown', 'non_authoritative', 'proposal', 'evidence', 'guidance', 'authoritative', 'binding']
   return rank.indexOf(requested) > rank.indexOf(base) ? base : requested as AuthorityLevel
 }
 
