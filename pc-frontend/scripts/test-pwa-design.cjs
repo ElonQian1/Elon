@@ -717,6 +717,10 @@ try {
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/usePwaDesignSession.ts'),
     'utf8',
   )
+  const projectSessionSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/UiTunerProjectSessionPanel.tsx'),
+    'utf8',
+  )
   const orchestratorSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/crossPlatformWritebackOrchestrator.ts'),
     'utf8',
@@ -738,6 +742,10 @@ try {
   assert.match(sessionSource, /verification\.markSourceSaved\(evidence/, '确定性源码写回后必须先标记 SOURCE_SAVED')
   assert.match(sessionSource, /await verification\.start\(evidence\)/, '确定性绑定才自动运行真实验证')
   assert.match(sessionSource, /verification\.markAiWriting\(taskId,[\s\S]*AI 正在补未绑定属性或结构修改/, 'AI fallback 不得伪造可验证的确定性回执')
+  assert.match(projectSessionSource, /pwaDesign\.compactHandoff/, 'PWA_DRAFT 自动任务必须优先让 Codex 读取紧凑交接包')
+  assert.match(projectSessionSource, /elements\[\]\.changedProperties/, 'PWA_DRAFT 自动任务必须按低 token 摘要里的属性清单写回')
+  assert.match(projectSessionSource, /sourceFilesToInspect/, 'PWA_DRAFT 自动任务必须优先打开候选源码文件')
+  assert.match(projectSessionSource, /不要默认读取整仓库或整棵 DOM/, 'PWA_DRAFT 自动任务必须明确禁止默认全量读取')
   assert.match(sessionSource, /message\.type === 'draft-applied'/, '宿主必须消费 iframe 的真实草稿应用回执')
   assert.match(sessionSource, /identity: \{ \.\.\.element\.identity, key: stablePwaIdentityKey/, '草稿桥接条目必须携带稳定身份指纹')
   assert.doesNotMatch(sessionSource, /setSaveLabel\(didRestore[^\n]*已恢复本页草稿/, '读取本地草稿后不得在真实 ack 前显示已恢复')
