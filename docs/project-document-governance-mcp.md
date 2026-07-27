@@ -89,11 +89,13 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 - `project_discussions_get_graph` 分页读取已有来源、节点、分支、计数和 revision，不读取聊天正文；
 - `project_discussions_get_node` 只返回一个节点的父节点、直接子节点、相邻关系、来源、文档和功能引用；
+- `project_discussions_get_history`、`get_graph_at_version`、`compare_versions` 和 `trace_node` 从 Git 快照生成语义时间轴、旧版图、版本变化和节点生命周期，不读取原聊天；
+- `project_discussions_review_graph` 以零模型 token 检查来源、权威性、失效引用、重复节点、未解决异议和演化链；`prepare_safe_repair` 只生成无歧义结构修正 proposal；
 - `project_discussions_get_suggestions` 读取待应用建议，默认只返回摘要和计数；
 - `project_discussions_save_proposal` 保存增量来源、节点、关系和文档晋升建议；
 - `project_discussions_apply` 按统一权限应用讨论图，并只创建明确晋升且目标未占用的新 Markdown。
 
-讨论工具与普通文档工具共用 MCP 会话、短期令牌、revision、观测时间线和 `authorization_mode`。`git_backed_full` 同样执行整理前/后文档提交。节点类型必须区分事实、假设、方案、反对意见、证据、风险、决策、需求、功能、任务和结果；开放节点不能自动晋升为当前项目事实。
+讨论工具与普通文档工具共用 MCP 会话、短期令牌、revision、观测时间线和 `authorization_mode`。所有允许应用的模式都执行整理前/后版本提交，保证修正不会覆盖旧脑图；权限模式只决定是否可自动应用。节点类型必须区分事实、假设、方案、反对意见、证据、风险、决策、需求、功能、任务和结果；开放节点不能自动晋升为当前项目事实。
 
 ### `project_docs_plan_context`
 
@@ -189,6 +191,8 @@ POST /api/projects/:project_id/docs/organization/apply
 项目图谱使用确定性树/关系布局，顶部切换产品功能、技术架构和文档主题。默认只展开一级以保持节点可读，支持展开/折叠、缩放/平移、缩略图、节点/文档/实现证据搜索和文档覆盖筛选。详情区把“Markdown 覆盖”和“实现证据”分开显示；`topics` 节点可回到对应 OneNote 分区。图级“与 AI 评审此图”和节点级“与 AI 讨论此节点”会在同一整理任务中要求代理直接调用图谱 MCP，并把确认有价值的变更写入 `proposed_knowledge_graph`，不靠页面点击，也不为凑指标生成重复文档。
 
 “讨论推理”是另一张独立图，不混入产品功能图。用户可导入聊天、按根主题浏览、搜索节点，并从任一节点继续讨论、创建备选分支或发起正式文档晋升。页面先保存原始聊天，再让当前 Windows 登录账号选择的 AI CLI 调用 `project_discussions_*`；UI 不点击代替 MCP，也不在浏览器中自行拆分聊天。
+
+讨论推理页从本机 loopback API 读取同一 Rust 版本与审查服务，显示横向版本时间轴、旧版只读脑图、与当前版的语义差异、所选节点生命周期和治理问题。用户发起修正时，页面只向 Win 端 AI 传递问题范围；AI 仍直接调用 MCP 完成 review、proposal、apply 和版本确认。页面不会在浏览器里生成或合并另一份图。
 
 显示排序和项目结构分开保存：按名称、数量、路径或权威性的个人查看偏好只留在浏览器；手工分区顺序、文档固定/顺序、入口和归类属于项目共同知识架构，写 `.elon/document-sections.json`。其中 `document_metadata.order` 与 `document_metadata.pinned` 保存共享文档顺序，`audit_log` 保存最近 100 条结构操作。前端对清单写入使用 revision 防并发覆盖，并提供最多 20 步会话内撤销；Git 仍是跨会话恢复和 AI 实体整理的最终历史。
 

@@ -115,6 +115,14 @@ const DEFAULT_PROJECT_FILES: &[DefaultProjectFile] = &[
         )),
     },
     DefaultProjectFile {
+        path: ".github/instructions/discussion-knowledge.instructions.md",
+        title: Some("讨论知识与脑图演化"),
+        content: include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../default-project-docs/files/github/instructions/discussion-knowledge.instructions.md"
+        )),
+    },
+    DefaultProjectFile {
         path: ".github/instructions/git-workflow.instructions.md",
         title: Some("Git 与发布流程"),
         content: include_str!(concat!(

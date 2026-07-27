@@ -58,6 +58,7 @@ applyTo: "**/*.md"
 
 ## 供应商无关 MCP 顺序
 
+- 长聊天导入、讨论拆分、脑图分叉、历史回看或修正任务，先按需读取 `.github/instructions/discussion-knowledge.instructions.md`；普通文档分类不加载讨论工具说明。
 - 当运行环境提供 `project_docs_*` MCP 工具时，先调用 `project_docs_analyze`；它只返回路径和元数据以及服务端统一 `document_health`，`classification_model_tokens=0`。大型仓库优先传 `scope_id`。
 - 需要理解项目时调用 `project_docs_get_map`：先取 `overview`，再按任务只查 `capabilities`、`architecture` 或 `topics` 的局部图；单节点用 `project_docs_get_node`，讨论结构是否合理用 `project_docs_review_map`。
 - 在读取正文前先用 `project_docs_plan_context` 按任务、节点和 token 预算生成推荐阅读计划；不得把图谱查询退化为全库正文读取。

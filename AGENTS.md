@@ -19,6 +19,7 @@
 |---|---|
 | 项目定位、架构、模块入口、任务模板 | `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
 | 项目文档、笔记、权威性、归档、低 token 整理 | `.github/instructions/document-authority.instructions.md` |
+| 长聊天拆分、讨论分叉、脑图版本与修正 | `.github/instructions/discussion-knowledge.instructions.md`；架构细节再读 `docs/discussion-knowledge-compiler.md` |
 | Git、worktree、提交、push、部署、发布 | `.github/instructions/git-deploy-workflow.instructions.md` |
 | Rust/Cargo 验证 | Git/发布手册；入口 `scripts/validate-rust.ps1` |
 | PowerShell 版本兼容 | `docs/powershell-version-policy.md` |

@@ -49,5 +49,6 @@
 
 - 知道关键词时先用 `rg`。
 - 不知道文件名时先读本索引和 `AI_PROJECT.md`。
+- 整理长聊天、讨论分叉或脑图历史时，按需读取 `.github/instructions/discussion-knowledge.instructions.md`。
 - 修改公共接口时同步查调用方和测试。
 - 修改后必须运行项目指定验证命令。

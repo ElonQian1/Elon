@@ -21,6 +21,7 @@
 | Windows 节点 | `docs/node-agent-upgrade-compatibility.md` | 本机节点、数据目录、升级和离线行为 |
 | Android 客户端 | `docs/android-setup.md` | APK、Compose、真机渲染与发布 |
 | AI 与上下文 | `AGENTS.md` | 跨供应商入口、按需指令、Prompt/Agent/Skill |
+| 讨论知识与脑图演化 | `docs/discussion-knowledge-compiler.md` | 长聊天拆分、分叉、节点晋升、版本回看与修正 |
 | 用户与项目系统 | `docs/user-project-system.md` | 用户项目、频道、Git 工作区与文档知识库 |
 | 监督式 PC 项目开发 | `docs/supervised-pc-project-development.md` | Codex 桌面监督、PC 节点执行、证据验收和平台改进续跑 |
 | Codex 桌面工作流效率 | `docs/codex-desktop-workflow-efficiency.md` | 增量 Wait、权威 Resume、终态、Runtime、收尾契约与 A/B 度量 |

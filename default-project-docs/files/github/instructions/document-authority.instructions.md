@@ -51,6 +51,8 @@ AI 首轮只根据路径和元数据形成分类、冲突和迁移建议，不�
 
 ## 供应商无关 MCP 顺序
 
+长聊天导入、讨论拆分、脑图分叉、历史回看或修正任务，先按需读取 `.github/instructions/discussion-knowledge.instructions.md`；普通文档分类不加载讨论工具说明。
+
 1. `project_docs_analyze` 只读路径和元数据，并返回零模型 token 的服务端统一 `document_health`；大型项目优先传 `scope_id`。
 2. 需要理解项目时，`project_docs_get_map` 先取 overview，再只查任务命中的 capabilities、architecture 或 topics；单节点用 `project_docs_get_node`，结构评审用 `project_docs_review_map`。
 3. `project_docs_get_issues` 按页返回链接、孤立文档、owner/复查和实现引用问题；可按严重度、状态和负责人筛选。用 `project_docs_update_issue` 分派、设期限、解决，或在填写原因后忽略/延期；用 `project_docs_get_health_history` 查看可解释的健康趋势。

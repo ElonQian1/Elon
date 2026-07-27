@@ -18,6 +18,7 @@
 |---|---|
 | 项目定位、架构、模块入口、AI 任务模板 | `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
 | 项目文档、笔记、权威性、归档、低 token 整理 | `.github/instructions/document-authority.instructions.md` |
+| 长聊天拆分、讨论分叉、脑图版本与修正 | `.github/instructions/discussion-knowledge.instructions.md` |
 | Git、提交、分支、发布、回滚 | `.github/instructions/git-workflow.instructions.md` |
 | Android、APK、Gradle、移动端构建 | `.github/instructions/android.instructions.md` |
 | UI、交互、样式、移动端页面 | `.github/instructions/ui.instructions.md` |
