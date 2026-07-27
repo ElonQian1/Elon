@@ -525,6 +525,14 @@ try {
   assert.match(pwaSurfaceSource, /开始设计\/修改页面/)
   assert.match(pwaSurfaceSource, /正常使用/)
   assert.match(pwaSurfaceSource, /pwaDeviceFrame/)
+  const pwaInspectorSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaStyleInspector.tsx'),
+    'utf8',
+  )
+  assert.match(pwaInspectorSource, /操作模式：像手机一样正常使用/)
+  assert.match(pwaInspectorSource, /选择模式：下一次点击会选中组件/)
+  assert.match(pwaInspectorSource, /设计模式：正在修改选中组件/)
+  assert.match(pwaInspectorSource, /className=\{styles\.pwaDesignModeCard\}/)
   const sourceWorkspaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewWorkspace.tsx'),
     'utf8',

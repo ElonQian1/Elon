@@ -150,6 +150,20 @@ function writebackTargetLabel(status: 'DETERMINISTIC' | 'DETERMINISTIC_PARTIAL' 
   return '需要 AI 建立绑定/结构修改'
 }
 
+function designModeTitle(session: PwaDesignSession): string {
+  if (!session.ready) return '正在连接真实 PWA'
+  if (session.mode === 'select') return '选择模式：下一次点击会选中组件'
+  if (session.selection) return '设计模式：正在修改选中组件'
+  return '操作模式：像手机一样正常使用'
+}
+
+function designModeHint(session: PwaDesignSession): string {
+  if (!session.ready) return '连接后先登录、点击和滚动到目标页面；草稿工具不会覆盖真实页面。'
+  if (session.mode === 'select') return '点击页面里的按钮、卡片、文字或图片；选中后自动回到正常操作，右侧会显示可调样式。'
+  if (session.selection) return '修改下面的尺寸、间距、圆角、文字和颜色会即时作用到 PWA 页面；确认后再写回 APK/PWA 源码。'
+  return '先到目标页面；需要改样式时点击“选择组件”，系统只拦截一次点击。'
+}
+
 function WritebackPlanSummary({ session }: Props) {
   const plan = session.writebackPlan
   const deterministicCount = plan.deterministic.pwa.length + plan.deterministic.android.length
@@ -211,6 +225,21 @@ export function PwaStyleInspector({ session }: Props) {
         <button type="button" disabled={!session.draft} onClick={session.saveNow}><Save size={15} />保存草稿</button>
       </div>
       <p className={styles.pwaSaveStatus}>{session.saveLabel}</p>
+
+      <section className={styles.pwaDesignModeCard} data-mode={session.mode} data-selected={session.selection ? 'true' : 'false'}>
+        <div>
+          <strong>{designModeTitle(session)}</strong>
+          <span>{designModeHint(session)}</span>
+        </div>
+        <div className={styles.pwaDesignModeActions}>
+          <button type="button" disabled={!session.ready || session.mode === 'interact'} onClick={() => session.setMode('interact')}>
+            <Smartphone size={14} />操作页面
+          </button>
+          <button type="button" disabled={!session.ready || session.mode === 'select'} onClick={() => session.setMode('select')}>
+            <MousePointer2 size={14} />选择组件
+          </button>
+        </div>
+      </section>
 
       <section className={styles.pwaSyncCard} data-sync-phase={session.syncState.phase}>
         <strong>{session.syncState.phase}</strong>
