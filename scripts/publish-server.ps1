@@ -36,7 +36,8 @@
          多个 Rust 后端项目共享同一份 musl 增量编译产物，设置一次全局生效。
       2. 仓库根 .env.local 中 ELON_BUILD_TARGET_DIR=D:\rust\shared（父目录）
          脚本追加固定子目录名 elon-server-musl，适合只有本项目需要自定义的场景。
-      3. 未设置时：%LOCALAPPDATA%\Elon\build-target\elon-server-musl（Windows 默认）
+      3. 未设置时：已验证节点数据根\cache\release-targets\elon-server-musl。
+      4. 节点数据根不可用时：%LOCALAPPDATA%\Elon\build-target\elon-server-musl。
 
     并发安全模型（出现中止提示时参考）：
       T0  git fetch origin main + fast-forward ← 基于最新 main 编译
@@ -74,6 +75,7 @@ param(
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'release-publish-lease.ps1')
 . (Join-Path $PSScriptRoot 'local-env.ps1')
+. (Join-Path $PSScriptRoot 'node-storage-paths.ps1')
 
 . (Join-Path $PSScriptRoot "direct-network.ps1")
 . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
@@ -113,62 +115,6 @@ try {
 
 if (-not (Test-Path (Join-Path $ServerDir "Cargo.toml"))) {
     Write-Error "❌ 找不到 $ServerDir/Cargo.toml，请确认仓库结构。"
-}
-
-function Resolve-BuildTargetRoot {
-    param([string]$RepoRoot)
-
-    if (-not [string]::IsNullOrWhiteSpace($env:ELON_BUILD_TARGET_DIR)) {
-        $root = $env:ELON_BUILD_TARGET_DIR.Trim()
-    } elseif (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-        $root = Join-Path $env:LOCALAPPDATA "Elon\build-target"
-    } else {
-        $root = Join-Path (Split-Path $RepoRoot -Parent) ".elon-build-target"
-    }
-
-    if (-not [System.IO.Path]::IsPathRooted($root)) {
-        Write-Error "❌ ELON_BUILD_TARGET_DIR 必须是绝对路径，当前值: $root"
-    }
-
-    $fullPath = [System.IO.Path]::GetFullPath($root)
-    $pathRoot = [System.IO.Path]::GetPathRoot($fullPath)
-    if ($pathRoot -and -not (Test-Path $pathRoot)) {
-        Write-Error "❌ 构建缓存目录所在盘符不存在: $fullPath。请在 .env.local 或环境变量中设置 ELON_BUILD_TARGET_DIR。"
-    }
-
-    New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
-    return $fullPath
-}
-
-function Resolve-ServerMuslTargetDir {
-    param([string]$RepoRoot)
-
-    $targetVarName = $null
-    $targetDir = $null
-    if (-not [string]::IsNullOrWhiteSpace($env:RUST_SERVER_MUSL_TARGET_DIR)) {
-        $targetVarName = "RUST_SERVER_MUSL_TARGET_DIR"
-        $targetDir = $env:RUST_SERVER_MUSL_TARGET_DIR.Trim()
-    } elseif (-not [string]::IsNullOrWhiteSpace($env:RUST_MUSL_TARGET_DIR)) {
-        $targetVarName = "RUST_MUSL_TARGET_DIR"
-        $targetDir = $env:RUST_MUSL_TARGET_DIR.Trim()
-    }
-
-    if ($targetDir) {
-        if (-not [System.IO.Path]::IsPathRooted($targetDir)) {
-            Write-Error "❌ $targetVarName 必须是绝对路径，当前值: $targetDir"
-        }
-
-        $fullPath = [System.IO.Path]::GetFullPath($targetDir)
-        $pathRoot = [System.IO.Path]::GetPathRoot($fullPath)
-        if ($pathRoot -and -not (Test-Path $pathRoot)) {
-            Write-Error "❌ server musl 构建缓存目录所在盘符不存在: $fullPath"
-        }
-
-        New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
-        return $fullPath
-    }
-
-    return (Join-Path (Resolve-BuildTargetRoot -RepoRoot $RepoRoot) "elon-server-musl")
 }
 
 function Get-CargoConfigCandidates {
@@ -630,8 +576,8 @@ $TmpWorktreeRunId = ([Guid]::NewGuid().ToString("N")).Substring(0, 8)
 # 同一 SHA 可能被多个会话同时发布；临时 worktree 必须按进程隔离，避免先 claim 版本后撞目录失败。
 $TmpWorktree  = Join-Path (Split-Path $RepoRoot -Parent) "elon-build-$Sha-$PID-$TmpWorktreeRunId"
 # 优先使用机器级中性目录，让多个 Rust 后端共享同一份 server-musl target。
-# 未配置 RUST_SERVER_MUSL_TARGET_DIR/RUST_MUSL_TARGET_DIR 时，保留旧的 ELON_BUILD_TARGET_DIR/elon-server-musl 兼容路径。
-$BuildTargetDir = Resolve-ServerMuslTargetDir -RepoRoot $RepoRoot
+# 未显式配置时优先使用节点数据根；数据根不可用才回退旧 LOCALAPPDATA 路径。
+$BuildTargetDir = Resolve-ElonServerMuslTargetDir -RepoRoot $RepoRoot
 $BuildTargetRoot = Split-Path $BuildTargetDir -Parent
 $BuildBinDir  = [System.IO.Path]::Combine($BuildTargetDir, $Target, "release")
 $Binary       = Join-Path $BuildBinDir "elon-server"

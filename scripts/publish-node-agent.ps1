@@ -46,6 +46,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot "node-agent-release-build-cache.ps1")
 . (Join-Path $PSScriptRoot "node-agent-release-packaging.ps1")
 . (Join-Path $PSScriptRoot "node-agent-windows-installer.ps1")
+. (Join-Path $PSScriptRoot "node-storage-paths.ps1")
 $Server = "root@43.139.149.158"
 $BaseUrl = "http://43.139.149.158:8080"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
@@ -273,30 +274,7 @@ function Invoke-NodePublicDevHandshakeStatus {
     return $null
 }
 
-function Resolve-NodeAgentTargetDir {
-    $candidates = @()
-    if ($env:ELON_NODE_AGENT_TARGET_DIR) {
-        $candidates += $env:ELON_NODE_AGENT_TARGET_DIR
-    }
-    if ($env:LOCALAPPDATA) {
-        $candidates += (Join-Path $env:LOCALAPPDATA "Elon\build-target\elon-node-agent")
-    }
-    if ($env:PUBLIC) {
-        $candidates += (Join-Path $env:PUBLIC "Elon\build-target\elon-node-agent")
-    }
-
-    foreach ($candidate in $candidates) {
-        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
-        $fullPath = [System.IO.Path]::GetFullPath($candidate)
-        if ($fullPath -match "\s") { continue }
-        New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
-        return $fullPath
-    }
-
-    throw "无法解析无空格的 PC 节点 target 目录；请设置 ELON_NODE_AGENT_TARGET_DIR 为无空格路径。"
-}
-
-$env:CARGO_TARGET_DIR = Resolve-NodeAgentTargetDir
+$env:CARGO_TARGET_DIR = Resolve-ElonNodeAgentTargetDir
 
 foreach ($requiredPath in @(
     $ServerManifest,
