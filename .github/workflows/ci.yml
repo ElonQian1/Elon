@@ -85,11 +85,12 @@ jobs:
         run: scripts\check-rust-warning-budget.ps1 -MaxWarnings 0
 
       - name: Cargo Test
+        id: cargo-test
         shell: pwsh
         run: scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml
 
       - name: Upload Rust Validation Evidence
-        if: failure()
+        if: failure() && steps.cargo-test.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: rust-validation-evidence-${{ github.run_id }}
