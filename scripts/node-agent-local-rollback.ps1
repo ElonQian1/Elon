@@ -26,6 +26,11 @@ $script:NodeAgentRollbackIgnoredRootItems = @(
     'tools'
 )
 $script:NodeAgentRollbackIgnoredInternalItems = @(
+    'elon-node-agent.exe.new',
+    'elon-node-client.exe.new',
+    'elon-pc-node.exe.new',
+    '一龙PC节点.exe.new',
+    '一龙开发平台.exe.new',
     'elon-node-agent-windows.zip.new',
     'logs',
     'node-agent-version.json.new',
