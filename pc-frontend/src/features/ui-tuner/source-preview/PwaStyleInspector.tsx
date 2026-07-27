@@ -1,5 +1,5 @@
 import { Bot, Copy, Download, MousePointer2, Redo2, RotateCcw, Save, Smartphone, Trash2, Undo2 } from 'lucide-react'
-import type { PwaStyleProperty } from './pwaDesignDraft'
+import { buildPwaDraftCliCompactHandoff, type PwaStyleProperty } from './pwaDesignDraft'
 import type { PwaDesignSession, PwaSelection } from './usePwaDesignSession'
 import { CrossPlatformWritebackReceiptPanel } from './CrossPlatformWritebackReceiptPanel'
 import styles from './SourcePreview.module.css'
@@ -179,6 +179,24 @@ function WritebackPlanSummary({ session }: Props) {
   )
 }
 
+function HandoffSummary({ session }: Props) {
+  if (!session.draft) return null
+  const handoff = buildPwaDraftCliCompactHandoff(session.draft)
+  const changedPropertyCount = handoff.elements.reduce((total, element) => total + element.changedProperties.length, 0)
+  const bindingGapCount = handoff.elements.filter((element) => element.binding.needsBinding).length
+  return (
+    <div className={styles.pwaHandoffSummary} data-testid="pwa-low-token-handoff">
+      <strong>低 Token 交接</strong>
+      <span>改动元素 {handoff.elements.length} 个</span>
+      <span>样式属性 {changedPropertyCount} 项</span>
+      <span>候选源码 {handoff.sourceFilesToInspect.length} 个</span>
+      <small>{bindingGapCount > 0
+        ? `AI 只补 ${bindingGapCount} 个绑定缺口，优先读取 compactHandoff。`
+        : 'AI 优先按 compactHandoff 写回，不默认读取整仓库、整 DOM 或 Base64 截图。'}</small>
+    </div>
+  )
+}
+
 function StylePresetBar({ session }: Props) {
   return (
     <section className={styles.pwaPresetSection}>
@@ -265,6 +283,7 @@ export function PwaStyleInspector({ session }: Props) {
               : '写回源码并验证 APK 与 PWA'}
         </button>
         <p className={styles.pwaSyncStatus}>{session.syncState.message}</p>
+        <HandoffSummary session={session} />
         <CrossPlatformWritebackReceiptPanel receipt={session.writebackReceipt} />
         {session.syncState.runtimeCapture && <p className={styles.pwaSyncStatus}>
           PNG 证据：{session.syncState.runtimeCapture.width}×{session.syncState.runtimeCapture.height}

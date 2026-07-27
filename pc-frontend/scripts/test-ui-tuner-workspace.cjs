@@ -533,6 +533,15 @@ try {
   assert.match(pwaInspectorSource, /选择模式：下一次点击会选中组件/)
   assert.match(pwaInspectorSource, /设计模式：正在修改选中组件/)
   assert.match(pwaInspectorSource, /className=\{styles\.pwaDesignModeCard\}/)
+  assert.match(pwaInspectorSource, /buildPwaDraftCliCompactHandoff/)
+  assert.match(pwaInspectorSource, /低 Token 交接/)
+  assert.match(pwaInspectorSource, /data-testid="pwa-low-token-handoff"/)
+  assert.match(pwaInspectorSource, /优先读取 compactHandoff/)
+  const sourcePreviewCss = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreview.module.css'),
+    'utf8',
+  )
+  assert.match(sourcePreviewCss, /\.pwaHandoffSummary/)
   const sourceWorkspaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewWorkspace.tsx'),
     'utf8',
