@@ -667,6 +667,14 @@ try {
   assert.equal(contextPack.pwaDesign.contextPolicy.fullRepositoryIncluded, false)
   assert.equal(contextPack.pwaDesign.contextPolicy.fullDomIncluded, false)
   assert.ok(contextPack.pwaDesign.compactSourceBundle.length <= 16)
+  assert.equal(contextPack.pwaDesign.compactHandoff.purpose, 'low-token-ui-style-writeback')
+  assert.equal(contextPack.pwaDesign.compactHandoff.tokenPolicy.preferThisSummaryBeforeArtifact, true)
+  assert.deepEqual(
+    contextPack.pwaDesign.compactHandoff.elements
+      .flatMap((element) => element.changedProperties.map((change) => `${change.property}:${change.after}`)),
+    ['height:48px', 'borderRadius:12px'],
+    'AI 自动接力也必须拿到低 token 样式摘要',
+  )
   assert.deepEqual(contextPack.requestedAdjustments.map((change) => change.property), ['pwa.borderRadius'])
   assert.equal(contextPack.pwaDesign.changes.length, 1)
   assert.equal(contextPack.pwaDesign.bindingSummary.length, 1)

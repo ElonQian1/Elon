@@ -4,16 +4,27 @@ const path = require('node:path')
 const ts = require('typescript')
 
 const projectRoot = path.resolve(__dirname, '..')
+const moduleCache = new Map()
 
 function loadTypescriptModule(relativePath) {
+  if (moduleCache.has(relativePath)) return moduleCache.get(relativePath)
   const filename = path.join(projectRoot, relativePath)
   const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
     fileName: filename,
   }).outputText
   const loaded = { exports: {} }
+  moduleCache.set(relativePath, loaded.exports)
+  const localRequire = (request) => {
+    if (request.startsWith('./') || request.startsWith('../')) {
+      const resolved = path.normalize(path.join(path.dirname(relativePath), request))
+      const withTs = `${resolved}.ts`.replace(/\\/g, '/')
+      if (fs.existsSync(path.join(projectRoot, withTs))) return loadTypescriptModule(withTs)
+    }
+    return require(request)
+  }
   Function('require', 'module', 'exports', '__filename', '__dirname', output)(
-    require, loaded, loaded.exports, filename, path.dirname(filename),
+    localRequire, loaded, loaded.exports, filename, path.dirname(filename),
   )
   return loaded.exports
 }

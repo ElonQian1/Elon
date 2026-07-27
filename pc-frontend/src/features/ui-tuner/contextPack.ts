@@ -7,6 +7,7 @@ import { UI_TUNER_CLOSURE_PRIORITIES } from './closurePriorities'
 import type { UiTunerRepeatGroup } from './runtime/repeatComponents'
 import type { UiTunerSelectionVisualContext } from './runtime/selectionArtifact'
 import type { FitRunDocument } from './fit-run/types'
+import type { PwaDraftCliCompactHandoff } from './source-preview/pwaDesignDraft'
 
 export interface UiTunerCodexContextPack {
   version: 4
@@ -124,6 +125,7 @@ export interface UiTunerCodexContextPack {
     sourceRevision: string
     route: { path: string; search: string; hash: string }
     viewport: { width: number; height: number }
+    compactHandoff: PwaDraftCliCompactHandoff
     changes: unknown[]
     compactSourceBundle: Array<Record<string, unknown>>
     bindingSummary: Array<Record<string, unknown>>
