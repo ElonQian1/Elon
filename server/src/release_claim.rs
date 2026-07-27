@@ -169,6 +169,7 @@ pub struct FinishResponse {
 pub struct StatusQuery {
     pub kind: Option<String>,
     pub token: Option<String>,
+    pub compact: Option<bool>,
 }
 
 // ===== Handlers =====
@@ -457,6 +458,20 @@ pub async fn status_handler(
     sweep_expired(&mut candidate.node_agent, now);
     sweep_global_expired(&mut candidate, now);
 
+    if q.compact.unwrap_or(false) {
+        let token = q.token.as_deref().ok_or_else(|| {
+            err(
+                StatusCode::BAD_REQUEST,
+                "compact-token-required",
+                "compact release status requires a token",
+            )
+        })?;
+        let body = compact_token_status(&candidate, token, now);
+        commit_candidate(&mgr, &mut guard, candidate).await?;
+        drop(guard);
+        return Ok(Json(body));
+    }
+
     let render = |lane: &LaneState, name: &str| -> Value {
         json!({
             "kind": name,
@@ -498,6 +513,18 @@ pub async fn status_handler(
     commit_candidate(&mgr, &mut guard, candidate).await?;
     drop(guard);
     Ok(Json(body))
+}
+
+fn compact_token_status(
+    state: &crate::release_manager::ReleaseStateFile,
+    token: &str,
+    now: i64,
+) -> Value {
+    json!({
+        "tokenStatus": publish_token_status(state, token),
+        "stateHealth": "healthy",
+        "now": now,
+    })
 }
 
 #[cfg(test)]
@@ -580,5 +607,26 @@ mod tests {
             .expect("public lease should serialize");
         assert!(lease_json.get("token").is_none());
         assert!(!lease_json.to_string().contains("secret-lease-token"));
+    }
+
+    #[test]
+    fn compact_token_status_omits_unbounded_release_history() {
+        let mut state = crate::release_manager::ReleaseStateFile::default();
+        state
+            .release_batches
+            .push(crate::release_batch::ReleaseBatchLedger {
+                batch_id: "large-history".into(),
+                sha: "old-sha".into(),
+                expected_stages: vec!["server".into()],
+                stages: Vec::new(),
+                status: "in_progress".into(),
+                created_at: 1,
+                updated_at: 1,
+            });
+        let body = compact_token_status(&state, "unknown-token", 42);
+        assert_eq!(body["tokenStatus"]["action"], "unknown");
+        assert_eq!(body["now"], 42);
+        assert!(body.get("releaseBatches").is_none());
+        assert!(body.get("globalPublish").is_none());
     }
 }

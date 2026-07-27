@@ -62,7 +62,7 @@ function Wait-ElonGlobalPublishLease {
         Write-Host "   Global publish lease waiting (FIFO $($Claim.queuePosition)); heartbeat active..." -ForegroundColor Yellow
         Start-Sleep -Seconds 5
         $escapedToken = [Uri]::EscapeDataString([string]$Claim.token)
-        $status = Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/status?token=$escapedToken"
+        $status = Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/status?token=$escapedToken&compact=true" -TimeoutSec 60
         $tokenStatus = $status.tokenStatus
         if (-not $tokenStatus) { throw 'release/status did not return tokenStatus' }
         switch ([string]$tokenStatus.action) {
@@ -87,7 +87,7 @@ function Wait-ElonGlobalPublishLease {
                     # The previous owner may finish between status and heartbeat. In that race the
                     # server promotes this token to owner/running, so re-read instead of regressing
                     # the durable stage to queued or failing a valid publication.
-                    $status = Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/status?token=$escapedToken"
+                    $status = Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/status?token=$escapedToken&compact=true" -TimeoutSec 60
                     $tokenStatus = $status.tokenStatus
                     if (-not $tokenStatus) { throw 'release/status did not return tokenStatus after promotion race' }
                     if ([string]$tokenStatus.action -eq 'build') { return $tokenStatus }
