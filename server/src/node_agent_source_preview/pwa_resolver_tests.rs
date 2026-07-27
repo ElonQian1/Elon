@@ -46,3 +46,41 @@ fn refuses_ambiguous_rules() {
     assert_eq!(response.candidate_count, 2);
     fs::remove_dir_all(root).ok();
 }
+
+#[test]
+fn prefers_unique_specific_selector_over_generic_rule() {
+    let root = workspace();
+    fs::write(
+        root.join("src/styles.css"),
+        ".button { color: white; }\n#payButton { border-radius: 16px; }",
+    )
+    .expect("write styles");
+    let response = resolve_pwa_style_binding(&ResolvePwaStyleBindingRequest {
+        project_root: root.to_string_lossy().into_owned(),
+        selectors: vec!["#payButton".into(), ".button".into()],
+    })
+    .expect("resolve prioritized binding");
+    let binding = response.binding.expect("specific binding");
+    assert_eq!(binding.target, "#payButton");
+    assert_eq!(response.candidate_count, 1);
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn refuses_ambiguous_high_priority_selector_instead_of_falling_back() {
+    let root = workspace();
+    fs::write(
+        root.join("src/a.css"),
+        "#payButton { color: white; }\n.button { border-radius: 16px; }",
+    )
+    .expect("write a");
+    fs::write(root.join("src/b.css"), "#payButton { color: black; }").expect("write b");
+    let response = resolve_pwa_style_binding(&ResolvePwaStyleBindingRequest {
+        project_root: root.to_string_lossy().into_owned(),
+        selectors: vec!["#payButton".into(), ".button".into()],
+    })
+    .expect("resolve ambiguous priority");
+    assert!(response.binding.is_none());
+    assert_eq!(response.candidate_count, 2);
+    fs::remove_dir_all(root).ok();
+}

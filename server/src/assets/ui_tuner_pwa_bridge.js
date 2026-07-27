@@ -281,6 +281,14 @@
     return property.replace(/[A-Z]/g, (match) => '-' + match.toLowerCase());
   }
 
+  function sourceSelectorPriority(selector) {
+    const stableAttributes = (selector.match(/\[(?:data-ui-node|data-testid|data-test-id|data-resource-id|aria-label)\b/gi) || []).length;
+    const ids = (selector.match(/#[a-zA-Z_][\w-]*/g) || []).length;
+    const classesAndAttributes = (selector.match(/\.[a-zA-Z_][\w-]*|\[[^\]]+\]/g) || []).length;
+    const transient = /:(?:hover|active|focus|focus-visible|focus-within|visited|target|checked|disabled|enabled)\b/i.test(selector);
+    return stableAttributes * 1000000 + ids * 100000 + classesAndAttributes * 100 - (transient ? 10000000 : 0);
+  }
+
   function inspectAuthoredStyles(element) {
     const values = {};
     const selectors = [];
@@ -313,6 +321,7 @@
       const inlineValue = element.style.getPropertyValue(kebabCase(property));
       if (inlineValue) values[property] = inlineValue;
     });
+    selectors.sort((left, right) => sourceSelectorPriority(right) - sourceSelectorPriority(left));
     return { values, selectors };
   }
 

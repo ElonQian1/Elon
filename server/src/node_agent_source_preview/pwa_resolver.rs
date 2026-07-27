@@ -40,7 +40,11 @@ pub(crate) fn resolve_pwa_style_binding(
     }
     let root = root_path.canonicalize().context("无法解析 PWA 项目目录")?;
     let selectors = normalized_selectors(&request.selectors)?;
-    let mut bindings = Vec::new();
+    let mut bindings = selectors
+        .iter()
+        .map(|_| Vec::<PwaExplicitStyleBinding>::new())
+        .collect::<Vec<_>>();
+    let mut candidate_counts = vec![0usize; selectors.len()];
     let mut scanned_files = 0usize;
     let walker = WalkBuilder::new(&root)
         .hidden(false)
@@ -51,7 +55,7 @@ pub(crate) fn resolve_pwa_style_binding(
         .filter_entry(|entry| !ignored_directory(entry.path()))
         .build();
     for entry in walker.filter_map(|entry| entry.ok()) {
-        if bindings.len() > 1 || scanned_files >= MAX_SCANNED_FILES {
+        if scanned_files >= MAX_SCANNED_FILES {
             break;
         }
         let path = entry.path();
@@ -70,40 +74,42 @@ pub(crate) fn resolve_pwa_style_binding(
             Ok(value) => value,
             Err(_) => continue,
         };
-        for selector in &selectors {
+        for (selector_index, selector) in selectors.iter().enumerate() {
             for (start, end, target) in find_rules(&content, selector, is_html(path)) {
                 let relative = path
                     .strip_prefix(&root)
                     .context("PWA 样式候选越出项目目录")?
                     .to_string_lossy()
                     .replace('\\', "/");
-                bindings.push(PwaExplicitStyleBinding {
-                    version: 1,
-                    source_file: relative,
-                    source_revision: sha256(&content),
-                    kind: PwaStyleBindingKind::CssRule,
-                    target,
-                    range: PwaSourceRange { start, end },
-                    property_map: STYLE_PROPERTIES
-                        .iter()
-                        .map(|(property, source)| ((*property).to_string(), (*source).to_string()))
-                        .collect::<BTreeMap<_, _>>(),
-                });
-                if bindings.len() > 1 {
-                    break;
+                candidate_counts[selector_index] += 1;
+                if bindings[selector_index].is_empty() {
+                    bindings[selector_index].push(PwaExplicitStyleBinding {
+                        version: 1,
+                        source_file: relative,
+                        source_revision: sha256(&content),
+                        kind: PwaStyleBindingKind::CssRule,
+                        target,
+                        range: PwaSourceRange { start, end },
+                        property_map: STYLE_PROPERTIES
+                            .iter()
+                            .map(|(property, source)| {
+                                ((*property).to_string(), (*source).to_string())
+                            })
+                            .collect::<BTreeMap<_, _>>(),
+                    });
                 }
-            }
-            if bindings.len() > 1 {
-                break;
             }
         }
     }
-    let candidate_count = bindings.len();
-    let binding = (candidate_count == 1).then(|| bindings.remove(0));
+    let selected_index = candidate_counts.iter().position(|count| *count > 0);
+    let candidate_count = selected_index.map_or(0, |index| candidate_counts[index]);
+    let binding = selected_index
+        .filter(|index| candidate_counts[*index] == 1)
+        .and_then(|index| bindings[index].pop());
     let detail = match candidate_count {
         0 => "没有找到与真实 DOM 匹配的静态 CSS 规则，需要 AI 按需建立绑定",
-        1 => "已找到唯一静态 CSS 规则，可确定性写回",
-        _ => "找到多个同名 CSS 规则，为避免误改已停止自动绑定",
+        1 => "已按真实 DOM 的专用选择器找到唯一静态 CSS 规则，可确定性写回",
+        _ => "最高优先级选择器对应多个 CSS 规则，为避免误改已停止自动绑定",
     };
     Ok(ResolvePwaStyleBindingResponse {
         ok: true,

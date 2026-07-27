@@ -169,7 +169,11 @@ class FakeElement {
   }
   matches(selector) {
     this.matchesCount += 1;
-    return selector === '.page-title' && this.id === 'topTitle';
+    return this.id === 'topTitle' && [
+      '.page-title',
+      '#topTitle',
+      '[data-ui-node="home.title"]',
+    ].includes(selector);
   }
   getBoundingClientRect() { return { left: 12, top: 24, width: 180, height: 48 }; }
   querySelectorAll(selector) {
@@ -191,6 +195,7 @@ function runBridgeBehavior() {
   const body = new FakeElement('body');
   const title = new FakeElement('h1', 'topTitle');
   title.childNodes.push({ nodeType: 3, textContent: '好友' });
+  title.setAttribute('data-ui-node', 'home.title');
   title.setAttribute('data-ui-style-binding', JSON.stringify({
     version: 1,
     sourceFile: 'src/styles/title.css',
@@ -248,10 +253,20 @@ function runBridgeBehavior() {
     },
   };
   document.styleSheets.push({
-    cssRules: [{
-      selectorText: '.page-title',
-      style: { getPropertyValue: (property) => property === 'font-size' ? '18px' : '' },
-    }],
+    cssRules: [
+      {
+        selectorText: '.page-title',
+        style: { getPropertyValue: (property) => property === 'font-size' ? '18px' : '' },
+      },
+      {
+        selectorText: '#topTitle',
+        style: { getPropertyValue: (property) => property === 'color' ? 'white' : '' },
+      },
+      {
+        selectorText: '[data-ui-node="home.title"]',
+        style: { getPropertyValue: (property) => property === 'line-height' ? '24px' : '' },
+      },
+    ],
   });
   const computedStyle = {
     width: '180px', height: '48px', paddingTop: '0px', paddingRight: '0px',
@@ -370,14 +385,14 @@ function runBridgeBehavior() {
   command('set-mode', { mode: 'select' });
   const matchesBeforeTitleSelection = title.matchesCount;
   dispatchClick(title);
-  assert.equal(title.matchesCount - matchesBeforeTitleSelection, 1, 'one selection should scan each stylesheet rule once instead of once per editable property');
+  assert.equal(title.matchesCount - matchesBeforeTitleSelection, 3, 'one selection should scan each stylesheet rule once instead of once per editable property');
   const titleBinding = posted.filter((message) => message.type === 'selection').at(-1).payload.node.sourceBinding;
   assert.equal(titleBinding.sourceFile, 'src/styles/title.css', 'selection should carry the explicit safe source file');
   assert.deepEqual(titleBinding.propertyMap, { fontSize: 'font-size', color: 'color' });
   assert.deepEqual(
     posted.filter((message) => message.type === 'selection').at(-1).payload.node.sourceSelectors,
-    ['.page-title'],
-    'selection should expose the actual matching CSS rule for local deterministic resolution',
+    ['[data-ui-node="home.title"]', '#topTitle', '.page-title'],
+    'selection should expose matching CSS rules with stable component selectors first',
   );
 
   const messagesBeforeStyle = posted.length;
