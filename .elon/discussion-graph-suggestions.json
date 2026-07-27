@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "status": "ready",
+  "status": "applied",
   "summary": "确定性修正 1 个节点的根主题引用",
   "change_kind": "repair",
   "actor": "yilong-graph-review",
