@@ -3,11 +3,13 @@ import styles from './UiDesignGateway.module.css'
 interface UiDesignGatewayProps {
   runtimeReady: boolean
   runtimeBusy: boolean
+  onUseDraftNow: () => void
 }
 
 export function UiDesignGateway({
   runtimeReady,
   runtimeBusy,
+  onUseDraftNow,
 }: UiDesignGatewayProps) {
   const preparingRuntime = runtimeReady || runtimeBusy
   return (
@@ -29,6 +31,9 @@ export function UiDesignGateway({
         <li className={styles.active}>自动选择最准确的编辑引擎</li>
         <li>连接较慢时先进入草稿，不阻塞设计</li>
       </ol>
+      <button type="button" className={styles.primaryAction} onClick={onUseDraftNow}>
+        先进入 PWA / 本地草稿设计
+      </button>
       <small>你不需要等待 Runtime；后台准备完成后，系统仍会用 Android 真帧校准写回结果。</small>
     </section>
   )

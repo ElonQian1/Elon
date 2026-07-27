@@ -68,6 +68,21 @@
 .steps .active { color: #d9efff; }
 .steps .active::before { background: #38bdf8; box-shadow: 0 0 0 4px rgb(56 189 248 / 12%); }
 
+.primaryAction {
+  min-height: 38px;
+  border: 1px solid #38bdf8;
+  border-radius: 10px;
+  background: #0369a1;
+  color: #f0f9ff;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primaryAction:hover {
+  background: #0284c7;
+}
+
 @keyframes setup-spin {
   to { transform: rotate(360deg); }
 }

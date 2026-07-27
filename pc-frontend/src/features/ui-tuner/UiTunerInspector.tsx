@@ -127,6 +127,7 @@ export function UiTunerInspector({
             <UiDesignGateway
               runtimeReady={livePrepareReady}
               runtimeBusy={livePrepareBusy}
+              onUseDraftNow={onSwitchToDraft}
             />
           ) : runtimeEditable ? (
             <LiveDesignPanel
