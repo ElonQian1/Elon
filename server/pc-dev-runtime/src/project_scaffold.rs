@@ -168,6 +168,16 @@ mod tests {
             .join("npm.cmd")
             .exists());
         assert!(root.join("docs").join("download-router.md").exists());
+        let router =
+            std::fs::read_to_string(root.join("scripts").join("elon-tool-router.ps1")).unwrap();
+        assert!(router.contains("$handler.UseProxy = $false"));
+        assert!(router.contains("probePolicy = 'explicit_direct_no_proxy'"));
+        assert!(router.contains("$cached.routerVersion -eq $RouterVersion"));
+        assert!(router.contains("'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy'"));
+        assert!(router.contains("if ($Choice.route -eq 'direct') { '*' } else { '' }"));
+        let router_doc =
+            std::fs::read_to_string(root.join("docs").join("download-router.md")).unwrap();
+        assert!(router_doc.contains("never treats an ambient proxy request as a direct CDN result"));
         assert!(root.join("scripts").join("elon-agent.ps1").exists());
         assert!(root.join("scripts").join("elon-dev-check.ps1").exists());
         assert!(root.join("scripts").join("elon-new-task.ps1").exists());

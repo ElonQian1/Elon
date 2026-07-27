@@ -64,6 +64,8 @@ This project includes a local command router for AI-driven builds and installs.
 
 The router prepends `scripts\tool-router-bin` to the process `PATH`. When an AI runs common tools such as `npm`, `rustup`, `cargo`, `curl`, or `gradle`, the wrapper picks a faster verified source or proxy setting, records a trace, and then delegates to the real tool.
 
+CDN doctor probes are explicit direct connections and report `route=direct`. For generic downloads such as GitHub, automatic mode compares explicit direct and `system_proxy` routes when a system proxy is configured. A selected direct route clears inherited proxy variables for the child tool, so the router never treats an ambient proxy request as a direct CDN result.
+
 It is fail-open by default. If routing logic fails, it prints a diagnostic line and falls back to the original command.
 
 Useful commands:
@@ -94,7 +96,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$RouterVersion = '0.1'
+$RouterVersion = '0.3'
 $ProjectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 $RouterHome = Join-Path $ProjectRoot '.elon\tool-router'
 $ProjectProfilePath = Join-Path $RouterHome 'profile.json'
@@ -199,47 +201,97 @@ function Get-SystemProxyUrl {
     return ''
 }
 
+function Get-SafeProxyDisplay {
+    param([string]$ProxyUrl)
+    if (-not $ProxyUrl) { return '' }
+    try {
+        $uri = [Uri]$ProxyUrl
+        if (-not $uri.IsAbsoluteUri -or -not $uri.Host) { return 'configured' }
+        return '{0}://{1}:{2}' -f $uri.Scheme, $uri.Host, $uri.Port
+    } catch {
+        return 'configured'
+    }
+}
+
 function Invoke-Probe {
     param([string]$Name, [string]$Url, [string]$ProxyUrl)
     $started = Get-Date
     $ok = $false
+    $status = 0
     $err = ''
+    $route = if ($ProxyUrl) { 'system_proxy' } else { 'direct' }
+    $handler = $null
+    $client = $null
+    $request = $null
+    $response = $null
     try {
-        $args = @{
-            Uri = $Url
-            Method = 'GET'
-            TimeoutSec = 8
-            UseBasicParsing = $true
-            Headers = @{ Range = 'bytes=0-65535' }
+        Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
+        $handler = [System.Net.Http.HttpClientHandler]::new()
+        $handler.AllowAutoRedirect = $true
+        if ($ProxyUrl) {
+            $handler.UseProxy = $true
+            $handler.Proxy = [System.Net.WebProxy]::new($ProxyUrl)
+        } else {
+            $handler.UseProxy = $false
         }
-        if ($ProxyUrl) { $args.Proxy = $ProxyUrl }
-        $resp = Invoke-WebRequest @args
-        $ok = [int]$resp.StatusCode -ge 200 -and [int]$resp.StatusCode -lt 400
+        $client = [System.Net.Http.HttpClient]::new($handler)
+        $client.Timeout = [TimeSpan]::FromSeconds(8)
+        $request = [System.Net.Http.HttpRequestMessage]::new(
+            [System.Net.Http.HttpMethod]::Get,
+            $Url
+        )
+        $null = $request.Headers.TryAddWithoutValidation('Range', 'bytes=0-65535')
+        $response = $client.SendAsync(
+            $request,
+            [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead
+        ).GetAwaiter().GetResult()
+        $status = [int]$response.StatusCode
+        $ok = $status -ge 200 -and $status -lt 400
     } catch {
         $err = $_.Exception.Message
+    } finally {
+        if ($response) { $response.Dispose() }
+        if ($request) { $request.Dispose() }
+        if ($client) { $client.Dispose() }
+        if ($handler) { $handler.Dispose() }
     }
     $elapsed = [int]((Get-Date) - $started).TotalMilliseconds
-    [pscustomobject]@{ name = $Name; url = $Url; proxy = $ProxyUrl; ok = $ok; elapsedMs = $elapsed; error = $err }
+    [pscustomobject]@{
+        name = $Name
+        url = $Url
+        route = $route
+        proxy = (Get-SafeProxyDisplay $ProxyUrl)
+        ok = $ok
+        status = $status
+        elapsedMs = $elapsed
+        error = $err
+    }
 }
 
 function Candidate-List {
     param([string]$Kind, [string]$ProxyUrl)
     if ($Kind -eq 'rust') {
         return @(
-            [pscustomobject]@{ name='rsproxy'; probe='https://rsproxy.cn/dist/channel-rust-stable.toml'; env=@{ RUSTUP_DIST_SERVER='https://rsproxy.cn'; RUSTUP_UPDATE_ROOT='https://rsproxy.cn/rustup' } },
-            [pscustomobject]@{ name='tuna'; probe='https://mirrors.tuna.tsinghua.edu.cn/rustup/dist/channel-rust-stable.toml'; env=@{ RUSTUP_DIST_SERVER='https://mirrors.tuna.tsinghua.edu.cn/rustup'; RUSTUP_UPDATE_ROOT='https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup' } },
-            [pscustomobject]@{ name='ustc'; probe='https://mirrors.ustc.edu.cn/rust-static/dist/channel-rust-stable.toml'; env=@{ RUSTUP_DIST_SERVER='https://mirrors.ustc.edu.cn/rust-static'; RUSTUP_UPDATE_ROOT='https://mirrors.ustc.edu.cn/rust-static/rustup' } },
-            [pscustomobject]@{ name='official'; probe='https://static.rust-lang.org/dist/channel-rust-stable.toml'; env=@{ RUSTUP_DIST_SERVER='https://static.rust-lang.org'; RUSTUP_UPDATE_ROOT='https://static.rust-lang.org/rustup' } }
+            [pscustomobject]@{ name='rsproxy'; route='direct'; probe='https://rsproxy.cn/dist/channel-rust-stable.toml'; env=@{ RUSTUP_DIST_SERVER='https://rsproxy.cn'; RUSTUP_UPDATE_ROOT='https://rsproxy.cn/rustup' } },
+            [pscustomobject]@{ name='tuna'; route='direct'; probe='https://mirrors.tuna.tsinghua.edu.cn/rustup/dist/channel-rust-stable.toml'; env=@{ RUSTUP_DIST_SERVER='https://mirrors.tuna.tsinghua.edu.cn/rustup'; RUSTUP_UPDATE_ROOT='https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup' } },
+            [pscustomobject]@{ name='ustc'; route='direct'; probe='https://mirrors.ustc.edu.cn/rust-static/dist/channel-rust-stable.toml'; env=@{ RUSTUP_DIST_SERVER='https://mirrors.ustc.edu.cn/rust-static'; RUSTUP_UPDATE_ROOT='https://mirrors.ustc.edu.cn/rust-static/rustup' } },
+            [pscustomobject]@{ name='official'; route='direct'; probe='https://static.rust-lang.org/dist/channel-rust-stable.toml'; env=@{ RUSTUP_DIST_SERVER='https://static.rust-lang.org'; RUSTUP_UPDATE_ROOT='https://static.rust-lang.org/rustup' } }
         )
     }
     if ($Kind -eq 'npm') {
         return @(
-            [pscustomobject]@{ name='npmmirror'; probe='https://registry.npmmirror.com/npm'; env=@{ npm_config_registry='https://registry.npmmirror.com' } },
-            [pscustomobject]@{ name='official'; probe='https://registry.npmjs.org/npm'; env=@{ npm_config_registry='https://registry.npmjs.org' } }
+            [pscustomobject]@{ name='npmmirror'; route='direct'; probe='https://registry.npmmirror.com/npm'; env=@{ npm_config_registry='https://registry.npmmirror.com' } },
+            [pscustomobject]@{ name='official'; route='direct'; probe='https://registry.npmjs.org/npm'; env=@{ npm_config_registry='https://registry.npmjs.org' } }
         )
     }
     if ($Kind -eq 'generic' -and $ProxyUrl) {
-        return @([pscustomobject]@{ name='system_proxy'; probe='https://github.com'; env=@{ HTTP_PROXY=$ProxyUrl; HTTPS_PROXY=$ProxyUrl } })
+        return @(
+            [pscustomobject]@{ name='direct'; route='direct'; probe='https://github.com'; proxy=''; env=@{} },
+            [pscustomobject]@{ name='system_proxy'; route='system_proxy'; probe='https://github.com'; proxy=$ProxyUrl; env=@{} }
+        )
+    }
+    if ($Kind -eq 'generic') {
+        return @([pscustomobject]@{ name='direct'; route='direct'; probe='https://github.com'; proxy=''; env=@{} })
     }
     return @()
 }
@@ -260,26 +312,36 @@ function Select-Route {
     $cache = Read-Cache
     $key = $Kind
     $cached = $cache.$key
-    if ($cached -and ([int64]$cached.expiresAtMs -gt (Now-Millis))) { return $cached.choice }
     $proxyUrl = Get-SystemProxyUrl
+    $proxyDisplay = Get-SafeProxyDisplay $proxyUrl
+    if ($cached -and
+        $cached.routerVersion -eq $RouterVersion -and
+        $cached.mode -eq $Profile.mode -and
+        $cached.proxy -eq $proxyDisplay -and
+        ([int64]$cached.expiresAtMs -gt (Now-Millis))) {
+        return $cached.choice
+    }
     $candidates = Candidate-List $Kind $proxyUrl
     if ($candidates.Count -eq 0) { return $null }
     if ($Profile.mode -eq 'direct') {
-        $choice = $candidates | Select-Object -First 1
+        $choice = $candidates | Where-Object { -not $_.proxy } | Select-Object -First 1
     } elseif ($Profile.mode -eq 'system_proxy' -and $proxyUrl) {
-        $choice = [pscustomobject]@{ name='system_proxy'; env=@{ HTTP_PROXY=$proxyUrl; HTTPS_PROXY=$proxyUrl } }
+        $choice = [pscustomobject]@{ name='system_proxy'; route='system_proxy'; proxy=$proxyUrl; env=@{} }
     } else {
         $results = foreach ($candidate in $candidates) {
-            Invoke-Probe $candidate.name $candidate.probe ''
+            Invoke-Probe $candidate.name $candidate.probe ([string]$candidate.proxy)
         }
         $winner = $results | Where-Object { $_.ok } | Sort-Object elapsedMs | Select-Object -First 1
         if ($winner) { $choice = $candidates | Where-Object { $_.name -eq $winner.name } | Select-Object -First 1 }
         else { $choice = $null }
-        Write-RouterTrace $Kind 'probe' ([ordered]@{ mode=$Profile.mode; proxy=$proxyUrl; results=$results })
+        Write-RouterTrace $Kind 'probe' ([ordered]@{ mode=$Profile.mode; proxy=(Get-SafeProxyDisplay $proxyUrl); results=$results })
     }
     if ($choice) {
         $cache | Add-Member -NotePropertyName $key -NotePropertyValue ([pscustomobject]@{
             choice = $choice
+            routerVersion = $RouterVersion
+            mode = $Profile.mode
+            proxy = $proxyDisplay
             expiresAtMs = (Now-Millis) + ([int]$Profile.cacheMinutes * 60000)
         }) -Force
         Save-Cache $cache
@@ -289,7 +351,16 @@ function Select-Route {
 
 function Apply-Choice {
     param($Choice)
-    if (-not $Choice -or -not $Choice.env) { return }
+    if (-not $Choice) { return }
+    $proxyValue = if ($Choice.route -eq 'system_proxy') { [string]$Choice.proxy } else { '' }
+    foreach ($name in @('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy')) {
+        [Environment]::SetEnvironmentVariable($name, $proxyValue, 'Process')
+    }
+    $noProxyValue = if ($Choice.route -eq 'direct') { '*' } else { '' }
+    foreach ($name in @('NO_PROXY', 'no_proxy')) {
+        [Environment]::SetEnvironmentVariable($name, $noProxyValue, 'Process')
+    }
+    if (-not $Choice.env) { return }
     if ($Choice.env -is [System.Collections.IDictionary]) {
         foreach ($key in $Choice.env.Keys) {
             [Environment]::SetEnvironmentVariable([string]$key, [string]$Choice.env[$key], 'Process')
@@ -383,7 +454,8 @@ function Invoke-Doctor {
         profilePath = $ProjectProfilePath
         globalProfilePath = $GlobalProfilePath
         wrapperBin = (Join-Path $PSScriptRoot 'tool-router-bin')
-        systemProxy = $proxy
+        systemProxy = (Get-SafeProxyDisplay $proxy)
+        probePolicy = 'explicit_direct_no_proxy'
         rust = $rust
         npm = $npm
         traceDir = $TraceDir

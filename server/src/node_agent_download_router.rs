@@ -12,7 +12,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const ROUTER_VERSION: &str = "0.1";
+const ROUTER_VERSION: &str = "0.3";
 const DEFAULT_CACHE_MINUTES: u64 = 60;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,6 +178,7 @@ fn doctor_payload() -> Value {
         "profile": profile,
         "profilePath": profile_path().display().to_string(),
         "systemProxy": proxy,
+        "probePolicy": "explicit_direct_no_proxy",
         "probes": probes,
         "recommendation": {
             "mode": "auto",
@@ -195,6 +196,7 @@ fn doctor_payload() -> Value {
 fn probe(target: ProbeTarget) -> Value {
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(6))
+        .no_proxy()
         .build()
         .unwrap_or_default();
     let started = Instant::now();
@@ -203,6 +205,7 @@ fn probe(target: ProbeTarget) -> Value {
             "group": target.group,
             "name": target.name,
             "url": target.url,
+            "route": "direct",
             "ok": response.status().is_success(),
             "status": response.status().as_u16(),
             "elapsedMs": started.elapsed().as_millis() as u64,
@@ -211,6 +214,7 @@ fn probe(target: ProbeTarget) -> Value {
             "group": target.group,
             "name": target.name,
             "url": target.url,
+            "route": "direct",
             "ok": false,
             "error": error.to_string(),
             "elapsedMs": started.elapsed().as_millis() as u64,
