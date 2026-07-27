@@ -37,7 +37,9 @@ try {
 {
   "schema_version": 1,
   "project_id": "test-project",
-  "default_domain": "dev-host"
+  "default_domain": "dev-host",
+  "allowed_domains": ["dev-host", "agent-validation", "node-agent-release", "release-host"],
+  "unknown_domain_fallback": "agent-validation"
 }
 '@ | Set-Content -LiteralPath (Join-Path $ProjectRoot "rust-cache.project.json") -Encoding UTF8
     "[package]`nname='test-project'`nversion='0.1.0'`nedition='2021'`n" | Set-Content -LiteralPath (Join-Path $ProjectRoot "Cargo.toml") -Encoding UTF8
@@ -47,6 +49,9 @@ try {
     Assert-Equal "test-project" $context.project_id "registered project id"
     Assert-True ($context.build_dir -like "*\build\rustc-test\test-project\dev-host\*") "registered build path should be compatibility-scoped"
     Assert-Equal (Join-Path $context.project_root "target") $context.target_dir "final artifacts should remain workspace-local by default"
+    $unknownDomain = Resolve-RustCacheInvocation -ProjectRoot $ProjectRoot -CacheRoot $CacheRoot -Domain "one-off-task-name" -CargoArgs @("check") -ToolchainEpoch "rustc-test"
+    Assert-Equal "agent-validation" $unknownDomain.domain "managed build paths should use the canonical fallback domain"
+    Assert-True $unknownDomain.domain_fallback "domain fallback should be observable"
 
     $unknown = Resolve-RustCacheInvocation -ProjectRoot $UnknownRoot -CacheRoot $CacheRoot -CargoArgs @("check") -ToolchainEpoch "rustc-test"
     Assert-True (-not $unknown.registered) "unknown project should not enter the registered pool"
@@ -174,6 +179,13 @@ exit /b 0
     $oldAction = $gc.actions | Where-Object { $_.path -eq $oldPartition } | Select-Object -First 1
     Assert-Equal "would-delete" $oldAction.action "dry-run GC should select an old toolchain partition"
     Assert-True (Test-Path -LiteralPath $oldPartition) "dry-run GC must not delete files"
+    $retiredDomainPartition = Join-Path $CacheRoot "build\rustc-test\test-project\one-off-task\cccccccccccccccc"
+    New-Item -ItemType Directory -Force -Path $retiredDomainPartition | Out-Null
+    '{"last_used_utc":"2099-01-01T00:00:00Z"}' | Set-Content -LiteralPath (Join-Path $retiredDomainPartition ".last-used.json") -Encoding UTF8
+    $domainGc = Invoke-RustCacheGc -CacheRoot $CacheRoot -RepoRoot $ProjectRoot
+    $retiredDomainAction = $domainGc.actions | Where-Object { $_.path -eq $retiredDomainPartition } | Select-Object -First 1
+    Assert-Equal "would-delete" $retiredDomainAction.action "GC should retire a current-epoch domain outside the project allowlist"
+    Assert-Equal "retired-domain" $retiredDomainAction.reason "retired domains should have an explicit reason"
     Assert-Equal 0 (Get-RustCacheDirectorySize -Path (Join-Path $CacheRoot "missing-partition")) "a concurrently removed partition should have advisory size zero"
     $deletionPartition = Join-Path $CacheRoot "build\rustc-old\test-project\delete-host\bbbbbbbbbbbbbbbb"
     $longSegment = "incremental-" + ("x" * 120)

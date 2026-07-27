@@ -125,7 +125,11 @@ function Sync-RustCacheSccacheConfiguration {
         if ($activeBuilds.Count -gt 0) {
             $pending = $true
         } else {
-            & $sccache.Source --stop-server *> $null
+            try {
+                & $sccache.Source --stop-server 2>$null | Out-Null
+            } catch {
+                # A first-time install has no server to stop.
+            }
             & $sccache.Source --start-server | Out-Null
             if ($LASTEXITCODE -ne 0) { throw "sccache failed to start with managed config: $configPath" }
             $restarted = $true

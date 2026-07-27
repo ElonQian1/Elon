@@ -74,6 +74,14 @@ domain 应描述构建用途和兼容性，例如：
 
 不要把 feature 列表或 Git SHA 拼进 domain。Cargo 与 sccache 已负责精确指纹；domain 只负责隔离明显不兼容的构建类别。
 
+注册项目可以在 `rust-cache.project.json` 中声明 `allowed_domains` 和
+`unknown_domain_fallback`。这样外部代理误把任务名、会话名或一次性验证名传给
+`-Domain` 时，会在验证指纹和 build-dir 路由前收敛到稳定兼容域，避免每个任务
+复制一套依赖中间产物。一龙项目把未知 domain 收敛到 `agent-validation`；发布入口
+仍必须显式使用 `node-agent-release` 等已登记稳定域。GC 会把当前项目中不再位于
+白名单的旧 domain 标记为 `retired-domain`，即使它尚未达到常规 TTL 也会优先回收；
+带锁分区和正在运行的 Cargo/rustc 仍受原有安全保护。
+
 ## 使用入口
 
 状态与真实大小：

@@ -213,21 +213,30 @@ function Invoke-RustCacheGc {
     $lowDisk = $volumeBefore.free_percent -lt [double]$policy.warning_free_percent
     $criticalDisk = $volumeBefore.free_percent -lt [double]$policy.critical_free_percent
     $partitions = @(Get-RustCachePartitions -CacheRoot $root)
+    $projectManifest = if ($RepoRoot) { Get-RustCacheProjectManifest -ProjectRoot $RepoRoot } else { $null }
+    $allowedDomains = if ($projectManifest -and $projectManifest.registered) { @($projectManifest.allowed_domains) } else { @() }
 
     foreach ($partition in $partitions) {
         $ageDays = ($now - ([DateTime]$partition.last_used_utc)).TotalDays
         $oldEpoch = $partition.kind -eq "registered" -and $partition.toolchain_epoch -ne $currentEpoch
         $expired = $ageDays -ge [double]$policy.partition_ttl_days
         $oldEpochExpired = $oldEpoch -and $ageDays -ge [double]$policy.old_epoch_ttl_days
+        $retiredDomain = $allowedDomains.Count -gt 0 -and
+            $partition.kind -eq "registered" -and
+            $partition.project_id -eq $projectManifest.project_id -and
+            $partition.domain -notin $allowedDomains
         $partition | Add-Member -NotePropertyName age_days -NotePropertyValue ([math]::Round($ageDays, 2))
         $partition | Add-Member -NotePropertyName old_epoch -NotePropertyValue $oldEpoch
-        $partition | Add-Member -NotePropertyName selected -NotePropertyValue ($oldEpochExpired -or (($lowDisk -or $ForceAged) -and $expired))
+        $partition | Add-Member -NotePropertyName retired_domain -NotePropertyValue $retiredDomain
+        $partition | Add-Member -NotePropertyName selected -NotePropertyValue ($retiredDomain -or $oldEpochExpired -or (($lowDisk -or $ForceAged) -and $expired))
         $partition | Add-Member -NotePropertyName size_bytes -NotePropertyValue ([int64]0)
         $partition | Add-Member -NotePropertyName action -NotePropertyValue "preserve"
         $partition | Add-Member -NotePropertyName reason -NotePropertyValue "active-or-recent"
         if ($partition.locked) {
             $partition.selected = $false
             $partition.reason = "lock-present"
+        } elseif ($retiredDomain) {
+            $partition.reason = "retired-domain"
         } elseif ($oldEpochExpired) {
             $partition.reason = "old-toolchain-epoch"
         } elseif ($partition.selected) {
@@ -250,7 +259,7 @@ function Invoke-RustCacheGc {
         throw "Refusing Rust cache GC while Cargo/rustc processes are active: $summary"
     }
 
-    $selected = @($partitions | Where-Object { $_.selected } | Sort-Object @{ Expression = { if ($_.old_epoch) { 0 } elseif ($_.kind -eq "quarantine") { 1 } else { 2 } } }, last_used_utc)
+    $selected = @($partitions | Where-Object { $_.selected } | Sort-Object @{ Expression = { if ($_.retired_domain) { 0 } elseif ($_.old_epoch) { 1 } elseif ($_.kind -eq "quarantine") { 2 } else { 3 } } }, last_used_utc)
     foreach ($partition in $selected) {
         $partition.size_bytes = Get-RustCacheDirectorySize -Path $partition.path
     }

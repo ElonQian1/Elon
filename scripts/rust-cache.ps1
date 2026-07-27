@@ -6,7 +6,7 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 status -IncludeSizes
 
 .EXAMPLE
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 run -ProjectRoot . -Domain dev-host check --manifest-path server\Cargo.toml
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\rust-cache.ps1 run -ProjectRoot . -Domain dev-windows-msvc check --manifest-path server\Cargo.toml
 #>
 [CmdletBinding()]
 param(
