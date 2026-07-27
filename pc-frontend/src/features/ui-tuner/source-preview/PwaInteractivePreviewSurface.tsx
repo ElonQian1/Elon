@@ -18,6 +18,20 @@ function pwaUrl(value: string, reloadKey: number): string {
   return `${url.pathname}${url.search}${url.hash}`
 }
 
+function modeTitle(design: PwaDesignSession): string {
+  if (!design.ready) return '正在连接真实 PWA 页面'
+  if (design.mode === 'select') return '选择一个组件'
+  if (design.selection) return '正在编辑选中组件'
+  return '正常使用页面'
+}
+
+function modeDetail(design: PwaDesignSession): string {
+  if (!design.ready) return '连接完成后可先像手机一样正常操作；到达目标页后再切换为选择组件。'
+  if (design.mode === 'select') return '下一次点击只用于选中组件，选中后会自动回到正常操作，不会长期拦截页面。'
+  if (design.selection) return '右侧已经显示尺寸、间距、圆角、字体、颜色等草稿属性；修改会先作用在 PWA 真实页面。'
+  return '先登录和点击到目标页面；需要修改时点“选择一个组件”。'
+}
+
 export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Props) {
   const viewportWidth = Math.max(320, Math.min(430, Math.round(document.canvas.width / 3)))
   const viewportHeight = Math.max(640, Math.min(932, Math.round(document.canvas.height / 3)))
@@ -39,6 +53,20 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Pr
           <button className={design.mode === 'select' ? styles.activePwaMode : ''} type="button" disabled={!design.ready} onClick={() => design.setMode('select')}><MousePointer2 size={14} />选择一个组件</button>
         </div>
         <button type="button" title="重新载入 PWA（已保存草稿会自动恢复）" onClick={design.prepareReload}><RefreshCw size={14} /></button>
+      </div>
+      <div className={styles.pwaModeGuide} data-mode={design.mode} data-ready={design.ready ? 'true' : 'false'}>
+        <strong>{modeTitle(design)}</strong>
+        <span>{modeDetail(design)}</span>
+        {design.mode === 'interact' && !design.selection && (
+          <button type="button" disabled={!design.ready} onClick={() => design.setMode('select')}>
+            <MousePointer2 size={14} /> 到达目标页后选择组件
+          </button>
+        )}
+        {design.mode === 'select' && (
+          <button type="button" onClick={() => design.setMode('interact')}>
+            <Smartphone size={14} /> 取消选择，继续操作页面
+          </button>
+        )}
       </div>
       {route && <div className={styles.pwaRouteStatus}>
         当前画面：{route.screenTitle || '未识别画面'}
