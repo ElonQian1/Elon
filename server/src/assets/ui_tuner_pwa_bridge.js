@@ -652,6 +652,7 @@
     event.preventDefault();
     event.stopImmediatePropagation();
     selectElement(target, 'click');
+    setSelecting(false);
   }
 
   function setSelecting(enabled) {

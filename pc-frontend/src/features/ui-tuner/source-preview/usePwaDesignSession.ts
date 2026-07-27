@@ -413,6 +413,12 @@ export function usePwaDesignSession({
         setSaveLabel(pwaDraftRestoreLabel(next))
         return
       }
+      if (message.type === 'mode-changed' && message.payload?.mode) {
+        const nextMode = message.payload.mode === 'select' ? 'select' : 'interact'
+        modeRef.current = nextMode
+        setModeState(nextMode)
+        return
+      }
       if (message.type === 'source-verification' && message.payload?.requestId) {
         context.verification.handleSnapshot(message.payload as PwaBridgeVerificationSnapshot)
         return

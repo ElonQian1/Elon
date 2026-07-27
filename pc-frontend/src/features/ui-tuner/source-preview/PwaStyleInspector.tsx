@@ -161,8 +161,8 @@ export function PwaStyleInspector({ session }: Props) {
 
       {!session.selection && (
         <div className={styles.pwaInspectorEmpty}>
-          <strong>{session.mode === 'interact' ? '先在左侧正常使用 PWA' : '请点击页面中的真实元素'}</strong>
-          <span>{session.mode === 'interact' ? '到达目标页面后点击“开始设计/修改页面”。' : '选中后即可调整尺寸、间距、文字和颜色。'}</span>
+          <strong>{session.mode === 'interact' ? '先正常使用 PWA 到目标页面' : '点击左侧页面中的真实组件'}</strong>
+          <span>{session.mode === 'interact' ? '到达目标页面后点击“选择一个组件”，系统只拦截下一次点击；选中后这里会变成样式面板。' : '选中后自动回到正常操作模式，右侧可调尺寸、间距、圆角、字体和颜色。'}</span>
         </div>
       )}
 
