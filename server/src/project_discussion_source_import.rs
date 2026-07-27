@@ -100,9 +100,8 @@ fn choose_target_path(
     suggested_filename: &str,
 ) -> Result<TargetPath> {
     let digest = format!("{:x}", Sha256::digest(content.as_bytes()));
-    let suggested = suggested_filename
-        .trim()
-        .replace('\\', "/")
+    let normalized_filename = suggested_filename.trim().replace('\\', "/");
+    let suggested = normalized_filename
         .rsplit('/')
         .next()
         .unwrap_or_default()
@@ -137,10 +136,7 @@ fn source_markdown(title: &str, body: &str, source_reference: &str) -> Result<St
     let title_yaml = serde_json::to_string(title)?;
     let source_yaml = serde_json::to_string(source_reference)?;
     let reviewed_at = Utc::now().format("%Y-%m-%d");
-    let heading = if body
-        .lines()
-        .any(|line| line.trim_start().starts_with("# "))
-    {
+    let heading = if body.lines().any(|line| line.trim_start().starts_with("# ")) {
         String::new()
     } else {
         format!("# {title}\n\n")
