@@ -208,6 +208,26 @@ function designModeHint(session: PwaDesignSession): string {
   return '先到目标页面；需要改样式时点击“选择组件”，系统只拦截一次点击。'
 }
 
+function BridgeHealthCard({ session }: Props) {
+  const health = session.bridgeHealth
+  return (
+    <section className={styles.pwaBridgeHealthCard} data-ready={health?.ready ? 'true' : 'false'} aria-label="PWA 草稿链路自检">
+      <div>
+        <strong>{health?.ready ? 'PWA 草稿链路已连接' : '等待 PWA 草稿链路'}</strong>
+        <span>{health
+          ? `${health.mode === 'select' ? '选择组件' : '正常操作'} · 可编辑 ${health.editablePropertyCount} 类样式`
+          : 'iframe 连接后会自动检测是否能接收草稿、回写验证和样式编辑命令。'}</span>
+      </div>
+      {health && <dl>
+        <div><dt>草稿命令</dt><dd>{health.canApplyDraft ? '可用' : '不可用'}</dd></div>
+        <div><dt>源码验证</dt><dd>{health.canVerifySource ? '可用' : '待后端注入'}</dd></div>
+        <div><dt>选中组件</dt><dd>{health.selected ? '有' : '无'}</dd></div>
+        <div><dt>草稿应用</dt><dd>{health.draft ? `${health.draft.appliedCount}/${health.draft.requestedCount}` : '无草稿'}</dd></div>
+      </dl>}
+    </section>
+  )
+}
+
 function WritebackPlanSummary({ session }: Props) {
   const plan = session.writebackPlan
   const deterministicCount = plan.deterministic.pwa.length + plan.deterministic.android.length
@@ -318,6 +338,8 @@ export function PwaStyleInspector({ session }: Props) {
         <button type="button" disabled={!session.draft} onClick={session.saveNow}><Save size={15} />保存草稿</button>
       </div>
       <p className={styles.pwaSaveStatus}>{session.saveLabel}</p>
+
+      <BridgeHealthCard session={session} />
 
       <section className={styles.pwaDesignModeCard} data-mode={session.mode} data-selected={session.selection ? 'true' : 'false'}>
         <div>

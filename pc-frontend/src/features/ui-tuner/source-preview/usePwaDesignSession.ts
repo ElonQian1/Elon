@@ -53,6 +53,7 @@ import {
   type AndroidWritebackVerification,
 } from './useCrossPlatformWritebackReceipt'
 import { usePwaSourceVerification } from './usePwaSourceVerification'
+import type { PwaBridgeHealth } from './pwaBridgeHealth'
 import type { SourcePreviewNode } from './types'
 
 export type { AndroidWritebackVerification } from './useCrossPlatformWritebackReceipt'
@@ -92,6 +93,7 @@ export interface PwaDesignSession {
   mode: 'select' | 'interact'
   selection: PwaSelection | null
   route: PwaRouteState | null
+  bridgeHealth: PwaBridgeHealth | null
   draft: PwaDesignDraft | null
   mappedNodeKey: string | null
   unboundLabel: string
@@ -163,6 +165,7 @@ export function usePwaDesignSession({
   const [modeState, setModeState] = useState<'select' | 'interact'>('interact')
   const [selection, setSelection] = useState<PwaSelection | null>(null)
   const [route, setRoute] = useState<PwaRouteState | null>(null)
+  const [bridgeHealth, setBridgeHealth] = useState<PwaBridgeHealth | null>(null)
   const [draft, setDraft] = useState<PwaDesignDraft | null>(null)
   const [mappedNodeKey, setMappedNodeKey] = useState<string | null>(null)
   const [unboundLabel, setUnboundLabel] = useState('')
@@ -432,7 +435,7 @@ export function usePwaDesignSession({
         source?: string
         protocolVersion?: number
         type?: string
-        payload?: Partial<PwaRouteState> & Partial<PwaBridgeVerificationSnapshot> & Partial<PwaDraftAppliedAck> & { node?: PwaSelection; mode?: string; message?: string }
+        payload?: Partial<PwaRouteState> & Partial<PwaBridgeHealth> & Partial<PwaBridgeVerificationSnapshot> & Partial<PwaDraftAppliedAck> & { node?: PwaSelection; mode?: string; message?: string }
       }
       if (message.source !== BRIDGE_SOURCE || message.protocolVersion !== PROTOCOL_VERSION) return
       const context = bridgeContextRef.current
@@ -441,6 +444,7 @@ export function usePwaDesignSession({
         const token = getAuthToken()
         if (token) context.post('set-session-auth', { token })
         context.post('set-mode', { mode: modeRef.current })
+        context.post('health-check', { reason: 'parent-ready' })
         if (!context.verification.onIframeReady() && context.model.draft) context.syncDraft(context.model.draft)
         return
       }
@@ -489,6 +493,10 @@ export function usePwaDesignSession({
         setSaveLabel(String(message.payload.message))
         return
       }
+      if (message.type === 'health' && message.payload) {
+        setBridgeHealth(message.payload as PwaBridgeHealth)
+        return
+      }
       if (message.type === 'source-verification' && message.payload?.requestId) {
         context.verification.handleSnapshot(message.payload as PwaBridgeVerificationSnapshot)
         return
@@ -517,6 +525,7 @@ export function usePwaDesignSession({
     modeRef.current = nextMode
     setModeState(nextMode)
     post('set-mode', { mode: nextMode })
+    post('health-check', { reason: `parent-mode-${nextMode}` })
   }, [post])
 
   useEffect(() => {
@@ -525,6 +534,7 @@ export function usePwaDesignSession({
       modeRef.current = 'interact'
       setModeState('interact')
       post('set-mode', { mode: 'interact' })
+      post('health-check', { reason: 'parent-escape' })
       setSaveLabel('已退出选择组件模式；页面恢复正常操作')
     }
     window.addEventListener('keydown', cancelSelection)
@@ -757,6 +767,7 @@ export function usePwaDesignSession({
     mode: modeState,
     selection,
     route,
+    bridgeHealth,
     draft,
     mappedNodeKey,
     unboundLabel,

@@ -32,6 +32,29 @@
     window.parent.postMessage({ source: SOURCE, protocolVersion: PROTOCOL_VERSION, type, payload }, window.location.origin);
   }
 
+  function postHealth(reason) {
+    const ack = activeDraft ? draftAck(activeDraft, false) : lastDraftAck;
+    post('health', {
+      reason: reason || 'manual',
+      ready: true,
+      mode: selecting ? 'select' : 'interact',
+      selected: Boolean(selectedElement && selectedElement.isConnected),
+      editablePropertyCount: editableProperties.length,
+      canApplyDraft: true,
+      canVerifySource: typeof window.__ELON_UI_TUNER_VERIFY_SOURCE__ === 'function',
+      draft: ack ? {
+        requestedCount: ack.requestedCount,
+        appliedCount: ack.appliedCount,
+        unresolvedCount: Array.isArray(ack.unresolved) ? ack.unresolved.length : 0,
+        complete: Boolean(ack.complete),
+        revision: ack.revision,
+        retrying: Boolean(ack.retrying),
+        exhausted: Boolean(ack.exhausted),
+      } : null,
+      route: routeState('health'),
+    });
+  }
+
   function compactText(element) {
     const directText = Array.from(element.childNodes || [])
       .filter((node) => node.nodeType === Node.TEXT_NODE)
@@ -604,6 +627,7 @@
     const acknowledgement = draftAck(state, exhausted);
     lastDraftAck = acknowledgement;
     post('draft-applied', acknowledgement);
+    postHealth('draft-applied');
     if (acknowledgement.complete) {
       completedDraftRevision = state.revisionKey;
       activeDraft = null;
@@ -736,6 +760,7 @@
     if (message.type === 'set-mode') {
       setSelecting(Boolean(message.payload && message.payload.mode !== 'interact'));
       post('mode-changed', { mode: selecting ? 'select' : 'interact' });
+      postHealth('mode-changed');
     } else if (message.type === 'set-session-auth') {
       const sessionToken = String(message.payload && message.payload.token || '');
       if (!sessionToken || sessionToken.length > 8192) return;
@@ -749,6 +774,8 @@
       applyStyle(message.payload, true);
     } else if (message.type === 'apply-draft') {
       applyDraft(message.payload);
+    } else if (message.type === 'health-check') {
+      postHealth('health-check');
     } else if (message.type === 'reset-element') {
       resetElement(message.payload);
     } else if (message.type === 'reset-styles') {
@@ -767,4 +794,5 @@
     mode: 'interact',
   });
   postRoute('ready');
+  postHealth('ready');
 })();

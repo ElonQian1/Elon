@@ -555,6 +555,9 @@ try {
   assert.match(pwaInspectorSource, /designer:primary/)
   assert.match(pwaInspectorSource, /designer:ghost/)
   assert.match(pwaInspectorSource, /直接改 iframe 内真实 PWA DOM/)
+  assert.match(pwaInspectorSource, /PWA 草稿链路自检/)
+  assert.match(pwaInspectorSource, /PWA 草稿链路已连接/)
+  assert.match(pwaInspectorSource, /草稿命令/)
   const sourcePreviewCss = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreview.module.css'),
     'utf8',
@@ -564,6 +567,7 @@ try {
   assert.match(sourcePreviewCss, /data-step-state="failed"/)
   assert.match(sourcePreviewCss, /\.pwaDesignerQuickSection/)
   assert.match(sourcePreviewCss, /\.pwaDesignerQuickGrid/)
+  assert.match(sourcePreviewCss, /\.pwaBridgeHealthCard/)
   const pwaBridgeSource = fs.readFileSync(
     path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
     'utf8',
@@ -572,11 +576,16 @@ try {
   assert.match(pwaBridgeSource, /15000/)
   assert.match(pwaBridgeSource, /bridge-notice/)
   assert.match(pwaBridgeSource, /event\.key !== 'Escape'/)
+  assert.match(pwaBridgeSource, /function postHealth/)
+  assert.match(pwaBridgeSource, /health-check/)
+  assert.match(pwaBridgeSource, /editablePropertyCount/)
   const pwaSessionSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/usePwaDesignSession.ts'),
     'utf8',
   )
   assert.match(pwaSessionSource, /bridge-notice/)
+  assert.match(pwaSessionSource, /PwaBridgeHealth/)
+  assert.match(pwaSessionSource, /setBridgeHealth/)
   assert.match(pwaSessionSource, /已退出选择组件模式；页面恢复正常操作/)
   const sourceWorkspaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewWorkspace.tsx'),
