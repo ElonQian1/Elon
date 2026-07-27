@@ -45,7 +45,13 @@ function Get-GitFileLineCount {
     $ErrorActionPreference = "Continue"
     try {
         $output = & git show $spec 2>$null
-        if ($LASTEXITCODE -ne 0) { return $null }
+        if ($LASTEXITCODE -ne 0) {
+            # A missing blob is the expected case for a newly added file.
+            # Clear the native probe's nonzero code so a dot-sourced guard
+            # cannot make its host fail after reporting success.
+            $global:LASTEXITCODE = 0
+            return $null
+        }
         return Get-LineCountFromText $output
     } finally {
         $ErrorActionPreference = $oldPreference
@@ -184,7 +190,9 @@ function Invoke-SelfTestCase {
     $oldPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
-        & powershell -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -BaseRef $Base *> $null
+        $escapedScript = $PSCommandPath.Replace("'", "''")
+        $escapedBase = $Base.Replace("'", "''")
+        & pwsh -NoProfile -Command ". '$escapedScript' -BaseRef '$escapedBase'" *> $null
         return $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $oldPreference
@@ -225,6 +233,12 @@ function Invoke-SelfTest {
         git add src/legacy.rs
         git commit -m "shrink red file" *> $null
         if ((Invoke-SelfTestCase $root $base) -ne 0) { Stop-Guard "SelfTest failed: red shrink was blocked." }
+
+        git reset --hard $base *> $null
+        Set-Content -Path "src/new_small.rs" -Value ("fn new_small() {}" + [Environment]::NewLine)
+        git add src/new_small.rs
+        git commit -m "add small source file" *> $null
+        if ((Invoke-SelfTestCase $root $base) -ne 0) { Stop-Guard "SelfTest failed: new small source file was blocked." }
 
         git reset --hard $base *> $null
         Set-Content -Path "src/new_big.rs" -Value (("fn new_big() {}" + [Environment]::NewLine) * 801) -NoNewline
