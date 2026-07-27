@@ -528,6 +528,8 @@ try {
   assert.match(pwaSurfaceSource, /已选中：/)
   assert.match(pwaSurfaceSource, /继续选组件/)
   assert.match(pwaSurfaceSource, /右侧可直接改尺寸、间距、圆角、字体和颜色/)
+  assert.match(pwaSurfaceSource, /按 Esc 退出/)
+  assert.match(pwaSurfaceSource, /15 秒不操作会自动恢复/)
   assert.match(pwaSurfaceSource, /pwaCanvasQuickTune/)
   assert.match(pwaSurfaceSource, /canvas:compact/)
   assert.match(pwaSurfaceSource, /圆角 \+/)
@@ -556,6 +558,20 @@ try {
   assert.match(sourcePreviewCss, /\.pwaHandoffSummary/)
   assert.match(sourcePreviewCss, /\.pwaSyncProgress/)
   assert.match(sourcePreviewCss, /data-step-state="failed"/)
+  const pwaBridgeSource = fs.readFileSync(
+    path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
+    'utf8',
+  )
+  assert.match(pwaBridgeSource, /selectingTimeoutTimer/)
+  assert.match(pwaBridgeSource, /15000/)
+  assert.match(pwaBridgeSource, /bridge-notice/)
+  assert.match(pwaBridgeSource, /event\.key !== 'Escape'/)
+  const pwaSessionSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/usePwaDesignSession.ts'),
+    'utf8',
+  )
+  assert.match(pwaSessionSource, /bridge-notice/)
+  assert.match(pwaSessionSource, /已退出选择组件模式；页面恢复正常操作/)
   const sourceWorkspaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewWorkspace.tsx'),
     'utf8',

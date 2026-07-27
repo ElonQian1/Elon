@@ -28,7 +28,7 @@ function modeTitle(design: PwaDesignSession): string {
 
 function modeDetail(design: PwaDesignSession): string {
   if (!design.ready) return '连接完成后可先像手机一样正常操作；到达目标页后再切换为选择组件。'
-  if (design.mode === 'select') return '下一次点击只用于选中组件，选中后会自动回到正常操作，不会长期拦截页面。'
+  if (design.mode === 'select') return '下一次点击只用于选中组件，选中后会自动回到正常操作；也可以按 Esc 退出，15 秒不操作会自动恢复。'
   if (design.selection) return '右侧已经显示尺寸、间距、圆角、字体、颜色等草稿属性；修改会先作用在 PWA 真实页面。'
   return '先登录和点击到目标页面；需要修改时点“选择一个组件”。'
 }
@@ -124,7 +124,7 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Pr
         <button type="button" onClick={() => design.setMode('select')}><MousePointer2 size={14} />继续选组件</button>
         <button type="button" onClick={() => design.setMode('interact')}><Smartphone size={14} />操作页面</button>
       </div>}
-      {design.mode === 'select' && <div className={styles.pwaBindingNotice}>选择模式只拦截下一次点击；选中后会自动回到正常操作页面。</div>}
+      {design.mode === 'select' && <div className={styles.pwaBindingNotice}>选择模式只拦截下一次点击；选中后自动恢复。按 Esc 或等待 15 秒也会退出，避免页面卡在不能操作。</div>}
       {design.mode !== 'select' && design.unboundLabel && <div className={styles.pwaBindingNotice}>已选中“{design.unboundLabel}”；当前用可解释 DOM 路径保存，尚未假定它已绑定 Android 源码。</div>}
       <div className={styles.pwaDraftBadge}>真实 PWA 页面 · 手工草稿</div>
       <div className={styles.pwaDeviceViewport} style={{ width: viewportWidth * scale, height: viewportHeight * scale }}>

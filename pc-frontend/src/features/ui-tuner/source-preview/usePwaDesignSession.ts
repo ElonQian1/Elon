@@ -432,7 +432,7 @@ export function usePwaDesignSession({
         source?: string
         protocolVersion?: number
         type?: string
-        payload?: Partial<PwaRouteState> & Partial<PwaBridgeVerificationSnapshot> & Partial<PwaDraftAppliedAck> & { node?: PwaSelection; mode?: string }
+        payload?: Partial<PwaRouteState> & Partial<PwaBridgeVerificationSnapshot> & Partial<PwaDraftAppliedAck> & { node?: PwaSelection; mode?: string; message?: string }
       }
       if (message.source !== BRIDGE_SOURCE || message.protocolVersion !== PROTOCOL_VERSION) return
       const context = bridgeContextRef.current
@@ -485,6 +485,10 @@ export function usePwaDesignSession({
         setModeState(nextMode)
         return
       }
+      if (message.type === 'bridge-notice' && message.payload?.message) {
+        setSaveLabel(String(message.payload.message))
+        return
+      }
       if (message.type === 'source-verification' && message.payload?.requestId) {
         context.verification.handleSnapshot(message.payload as PwaBridgeVerificationSnapshot)
         return
@@ -513,6 +517,18 @@ export function usePwaDesignSession({
     modeRef.current = nextMode
     setModeState(nextMode)
     post('set-mode', { mode: nextMode })
+  }, [post])
+
+  useEffect(() => {
+    const cancelSelection = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || modeRef.current !== 'select') return
+      modeRef.current = 'interact'
+      setModeState('interact')
+      post('set-mode', { mode: 'interact' })
+      setSaveLabel('已退出选择组件模式；页面恢复正常操作')
+    }
+    window.addEventListener('keydown', cancelSelection)
+    return () => window.removeEventListener('keydown', cancelSelection)
   }, [post])
 
   const updateStyles = useCallback((label: string, styles: Partial<Record<PwaStyleProperty, string>>) => {

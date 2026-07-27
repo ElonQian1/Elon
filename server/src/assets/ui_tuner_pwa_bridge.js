@@ -19,6 +19,7 @@
   let draftRetryTimer = 0;
   let routeDebounceTimer = 0;
   let lastRouteSignature = '';
+  let selectingTimeoutTimer = 0;
   const editableProperties = [
     'width', 'height',
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
@@ -655,19 +656,32 @@
     setSelecting(false);
   }
 
+  function clearSelectingTimeout() {
+    if (!selectingTimeoutTimer) return;
+    window.clearTimeout(selectingTimeoutTimer);
+    selectingTimeoutTimer = 0;
+  }
+
   function setSelecting(enabled) {
     if (selecting === enabled) return;
     selecting = enabled;
     if (selecting) {
+      clearSelectingTimeout();
       selection = document.createElement('div');
       selection.id = 'uiTunerPreviewSelection';
       selection.setAttribute('aria-hidden', 'true');
       document.body.appendChild(selection);
       document.body.classList.add('ui-tuner-preview-active', 'ui-tuner-preview-selecting');
       document.addEventListener('click', handleDesignClick, true);
+      selectingTimeoutTimer = window.setTimeout(() => {
+        if (!selecting) return;
+        setSelecting(false);
+        post('bridge-notice', { level: 'info', message: '选择组件已超时取消；页面已恢复正常操作' });
+      }, 15000);
       drawSelection(selectedElement);
       return;
     }
+    clearSelectingTimeout();
     document.removeEventListener('click', handleDesignClick, true);
     if (selection) selection.remove();
     selection = null;
@@ -679,6 +693,13 @@
     drawSelection(selectedElement);
     scheduleRoute('resize');
   });
+  window.addEventListener('keydown', (event) => {
+    if (!selecting || event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    setSelecting(false);
+    post('bridge-notice', { level: 'info', message: '已退出选择组件模式；页面恢复正常操作' });
+  }, true);
   window.addEventListener('hashchange', () => postRoute('hashchange'));
   window.addEventListener('popstate', () => postRoute('popstate'));
   window.addEventListener('load', () => scheduleDraftRetry('load'));
