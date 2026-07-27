@@ -35,7 +35,12 @@ import {
 } from './pwaDesignDraft'
 import { PwaDesignSessionModel } from './pwaDesignSessionModel'
 import { resolvePwaStyleBinding } from './sourcePreviewApi'
-import { sourceSavedEvidenceFromDraft, type PwaBridgeVerificationSnapshot, type PwaVerificationState } from './pwaVerificationModel'
+import {
+  sourceSavedEvidenceFromAiReceipt,
+  sourceSavedEvidenceFromDraft,
+  type PwaBridgeVerificationSnapshot,
+  type PwaVerificationState,
+} from './pwaVerificationModel'
 import {
   useCrossPlatformWritebackReceipt,
   type AndroidWritebackVerification,
@@ -259,9 +264,22 @@ export function usePwaDesignSession({
     if (!syncTaskIdRef.current || detail.taskId !== syncTaskIdRef.current) return
     if (detail.succeeded) {
       const currentReceipt = writebackReceiptRef.current
-      if (!detail.receipt || !currentReceipt) {
+      const currentDraft = model.draft
+      const aiEvidence = detail.receipt && currentDraft
+        ? sourceSavedEvidenceFromAiReceipt(currentDraft, detail.receipt, `pwa-ai-source-${Date.now()}`)
+        : null
+      if (!detail.receipt) {
         verification.fail('AI 任务已结束但缺少机器回执；没有 changedFiles、sourceHash/sourceRevision 与分端结果，不能显示源码已保存')
         setSaveLabel('AI 缺少机器回执；草稿与现有分端状态已保留')
+      } else if (!currentReceipt) {
+        if (aiEvidence) {
+          verification.markSourceSaved(aiEvidence, 'AI 已写回 PWA 源码；正在用真实源码重载验证，不再停留在 AI 写作状态', detail.taskId)
+          void verification.start(aiEvidence)
+          setSaveLabel('AI 已返回 PWA 机器回执；正在执行真实 PWA 构建与画面验证')
+        } else {
+          verification.fail('AI 回执没有可验证的 PWA changedFiles/sourceRevision 或当前草稿缺少目标样式；草稿已保留')
+          setSaveLabel('AI 回执不能转换为 PWA 验证证据；请检查回执或重试')
+        }
       } else if (detail.receipt.sourceRevisionBefore !== currentReceipt.sourceRevision) {
         verification.fail('AI 回执的 sourceRevisionBefore 与确定性写回 checkpoint 不一致；已拒绝陈旧回执')
         setSaveLabel('AI 回执 revision 已过期；请刷新源码后重试')
@@ -285,7 +303,24 @@ export function usePwaDesignSession({
           }
         }
         void updateReceipt(updates).then((receipt) => {
-          verification.markSourceSaved(undefined, 'AI 机器回执已复核；请刷新局部绑定后执行分端构建验证')
+          const pwaStatus = receipt.platformResults.pwa.status
+          if (aiEvidence && ['SAVED', 'BUILD_VERIFYING'].includes(pwaStatus)) {
+            verification.markSourceSaved(aiEvidence, 'AI 机器回执已复核；正在执行 PWA 真实构建与画面验证', detail.taskId)
+            void updateReceipt({
+              pwa: {
+                status: 'BUILD_VERIFYING',
+                method: receipt.platformResults.pwa.method,
+                changedFiles: receipt.platformResults.pwa.changedFiles,
+                sourceRevisions: receipt.platformResults.pwa.sourceRevisions,
+              },
+            }).catch((error) => {
+              verification.fail(error instanceof Error ? error.message : 'PWA AI 回执进入构建验证失败')
+            })
+            void verification.start(aiEvidence)
+          } else {
+            verification.markSourceSaved(undefined, 'AI 机器回执已复核；请刷新局部绑定后执行分端构建验证')
+          }
+          if (receipt.platformResults.apk.status === 'SAVED') void verifyAndroidReceipt(receipt)
           setSaveLabel(receipt.status === 'PARTIAL'
             ? 'AI 已部分写回；单端失败已保留在回执'
             : 'AI 源码回执已保存；等待 PWA/APK 独立构建证据')
@@ -297,7 +332,7 @@ export function usePwaDesignSession({
       verification.fail(`跨端 Codex 写回失败：${detail.error || '任务未完成'}；草稿已保留，可直接重试`)
     }
     syncTaskIdRef.current = ''
-  }), [updateReceipt, verification.fail, verification.markSourceSaved])
+  }), [model, updateReceipt, verification.fail, verification.markSourceSaved, verification.start, verifyAndroidReceipt])
 
   useEffect(() => {
     if (!selection || selection.sourceBinding || !sourceSelectorKey || !workspaceIdentity) return

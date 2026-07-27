@@ -596,12 +596,26 @@ try {
     livePwaVerificationState,
     pwaBuildVerifyingState,
     pwaSourceSavedState,
+    sourceSavedEvidenceFromAiReceipt,
     sourceSavedEvidenceFromDraft,
   } = require(verificationOutput)
   const evidence = sourceSavedEvidenceFromDraft(completedDraft, 'verify-r7')
   assert.ok(evidence, '确定性回执应生成小范围 changed-files 验证证据')
   assert.deepEqual(evidence.changedFiles, [pwaSourceFile])
   assert.deepEqual(evidence.expectedValues, ['48px'])
+  const aiEvidence = sourceSavedEvidenceFromAiReceipt(completedDraft, {
+    schemaVersion: 1, changedFiles: [pwaSourceFile], sourceHash: `sha256:${'c'.repeat(64)}`,
+    sourceRevisionBefore: 'workspace-before', sourceRevision: 'workspace-after', targetPlatforms: ['pwa'],
+    platformResults: { pwa: { status: 'SAVED', changedFiles: [pwaSourceFile], sourceRevision: 'b'.repeat(64) } },
+  }, 'verify-ai-r7')
+  assert.ok(aiEvidence, 'AI 机器回执应能和草稿合成真实 PWA 验证证据')
+  assert.deepEqual(aiEvidence.changedFiles, [pwaSourceFile])
+  assert.deepEqual(aiEvidence.sourceRevisions, { [pwaSourceFile]: 'b'.repeat(64) })
+  assert.deepEqual(
+    aiEvidence.checks.flatMap((check) => Object.entries(check.styles).map(([property, value]) => `${property}:${value}`)).sort(),
+    ['borderRadius:12px', 'height:48px'],
+    'AI 回执验证必须覆盖草稿中的目标样式，而不是只相信 Codex 文案',
+  )
   const liveState = livePwaVerificationState()
   assert.equal(liveState.phase, 'LIVE_PREVIEW')
   const savedState = pwaSourceSavedState(liveState, evidence)
@@ -742,6 +756,9 @@ try {
   assert.match(sessionSource, /verification\.markSourceSaved\(evidence/, '确定性源码写回后必须先标记 SOURCE_SAVED')
   assert.match(sessionSource, /await verification\.start\(evidence\)/, '确定性绑定才自动运行真实验证')
   assert.match(sessionSource, /verification\.markAiWriting\(taskId,[\s\S]*AI 正在补未绑定属性或结构修改/, 'AI fallback 不得伪造可验证的确定性回执')
+  assert.match(sessionSource, /sourceSavedEvidenceFromAiReceipt/, 'AI 回执必须转换成真实 PWA 验证证据')
+  assert.match(sessionSource, /verification\.start\(aiEvidence\)/, 'AI PWA 写回后必须自动进入真实构建与画面验证')
+  assert.match(sessionSource, /AI 已写回 PWA 源码；正在用真实源码重载验证/, 'AI 成功回执不得让界面停留在 AI_WRITING')
   assert.match(projectSessionSource, /pwaDesign\.compactHandoff/, 'PWA_DRAFT 自动任务必须优先让 Codex 读取紧凑交接包')
   assert.match(projectSessionSource, /elements\[\]\.changedProperties/, 'PWA_DRAFT 自动任务必须按低 token 摘要里的属性清单写回')
   assert.match(projectSessionSource, /sourceFilesToInspect/, 'PWA_DRAFT 自动任务必须优先打开候选源码文件')

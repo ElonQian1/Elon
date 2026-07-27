@@ -1,4 +1,5 @@
 import type { PwaDesignDraft, PwaStyleProperty } from './pwaDesignDraft'
+import type { AiWritebackReceipt } from './aiWritebackReceipt'
 
 export type PwaVerificationPhase =
   | 'LIVE_PREVIEW'
@@ -277,6 +278,43 @@ export function sourceSavedEvidenceFromDraft(
     viewport: draft.viewport,
     changedFiles,
     sourceRevisions: Object.fromEntries(changedFiles.map((file) => [file, revisions[file]])),
+    expectedValues: [...expectedValues].sort(),
+    checks,
+  }
+}
+
+export function sourceSavedEvidenceFromAiReceipt(
+  draft: PwaDesignDraft,
+  receipt: AiWritebackReceipt,
+  requestId: string,
+): PwaSourceSavedEvidence | null {
+  const pwaResult = receipt.platformResults.pwa
+  if (!receipt.targetPlatforms.includes('pwa') || !pwaResult || pwaResult.status !== 'SAVED') return null
+  const changedFiles = [...pwaResult.changedFiles].sort()
+  if (!changedFiles.length || !pwaResult.sourceRevision) return null
+  const checks: PwaVerificationCheck[] = []
+  const expectedValues = new Set<string>()
+  for (const [elementKey, element] of Object.entries(draft.elements)) {
+    const styles: Partial<Record<PwaStyleProperty, string>> = {}
+    for (const [propertyValue, value] of Object.entries(element.styleDiff)) {
+      const property = propertyValue as PwaStyleProperty
+      if (!value) continue
+      styles[property] = value
+      expectedValues.add(value)
+    }
+    if (!Object.keys(styles).length) continue
+    checks.push({ elementKey, selector: element.identity.selector, styles })
+  }
+  if (!checks.length || !expectedValues.size) return null
+  checks.sort((left, right) => left.elementKey.localeCompare(right.elementKey))
+  return {
+    requestId,
+    projectRoot: draft.project.workspaceIdentity,
+    draftRevision: draft.revision,
+    route: draft.route,
+    viewport: draft.viewport,
+    changedFiles,
+    sourceRevisions: Object.fromEntries(changedFiles.map((file) => [file, pwaResult.sourceRevision])),
     expectedValues: [...expectedValues].sort(),
     checks,
   }
