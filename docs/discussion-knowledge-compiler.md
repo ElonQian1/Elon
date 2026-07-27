@@ -7,6 +7,7 @@ authority: authoritative
 default_retrieval: false
 implementation_refs:
   - file:server/src/project_discussion_graph_model.rs
+  - file:server/src/project_discussion_source_import.rs
   - file:server/src/node_agent_project_docs_mcp_discussion_tools.rs
   - file:server/src/project_discussion_graph_history.rs
   - file:server/src/project_discussion_graph_review.rs
@@ -68,7 +69,7 @@ implementation_refs:
 
 ## 低 token 编译流程
 
-1. PC 页面先把原始聊天保存为项目文档来源，避免模型整理失败后丢失原文。
+1. PC 页面可先把上传文件保存为项目文档来源；没有页面交互时，任意 AI 供应商直接调用 `project_discussions_import_source` 传入标题、正文和原会话引用。该工具固定低权重 frontmatter、不覆盖已有来源，并为普通 Git 项目或托管笔记库创建导入前后版本。
 2. Windows 节点给当前登录账号选择的 Codex、Copilot、Claude 或 Gemini CLI 注入同一项目文档 MCP；普通开发任务不加载这组工具。
 3. AI 先调用 `project_discussions_get_graph` 读取已有节点和 revision，不读聊天正文。
 4. AI 用 `project_docs_plan_context` 规划范围，只对本次导入的来源调用 `project_docs_read`。
@@ -79,6 +80,8 @@ implementation_refs:
 9. 应用后调用 `project_discussions_get_history` 和 `project_discussions_review_graph`；需要解释变化时用语义比较，不重读原聊天。
 
 `classification_model_tokens=0` 只代表读取现有讨论图和目录不调用模型。首次理解聊天正文仍会消耗模型 token，但只读当前来源；后续围绕节点工作不需要重复读取整段聊天。
+
+`project_discussions_import_source` 是 MCP 原生入口，不要求 AI 操作网页或直接拼写 frontmatter。相同标题、正文和建议文件名重复导入时返回已有来源；同名不同内容自动分配新文件名，永不覆盖旧聊天。
 
 ## 版本与演化回看
 
@@ -145,7 +148,7 @@ OneNote 式文档侧边栏中的“讨论推理”是独立虚拟分区：
 - 版本时间轴可回看过去脑图、与当前版比较，并查看单节点如何发展到今天；
 - 质量面板显示确定性问题，并可让当前 Windows 登录账号选择的 AI CLI 生成修正版。
 
-UI 只负责导入、展示和发起带范围的 AI 任务。拆分、校验、revision、权限、Git 备份和应用均由 Windows 节点上的供应商无关 MCP 完成，网页不另建一套整理算法。
+UI 只负责上传、展示和发起带范围的 AI 任务。没有 UI 时，AI 可通过 `project_discussions_import_source` 完成同一导入。拆分、校验、revision、权限、Git 备份和应用均由 Windows 节点上的供应商无关 MCP 完成，网页不另建一套整理算法。
 
 ## 可迁移性
 

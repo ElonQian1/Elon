@@ -52,6 +52,20 @@ struct ApplyArguments {
     expected_suggestions_revision: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct ImportSourceArguments {
+    title: String,
+    content: String,
+    #[serde(default)]
+    source_reference: String,
+    #[serde(default)]
+    suggested_filename: String,
+    #[serde(default)]
+    authorization_mode: DocumentAutomationMode,
+    #[serde(default)]
+    reviewed: bool,
+}
+
 pub(crate) fn definitions() -> Vec<Value> {
     let mut definitions = vec![
         tool(
@@ -73,6 +87,18 @@ pub(crate) fn definitions() -> Vec<Value> {
             "读取一个讨论节点、直接父子节点、相邻分叉、来源锚点、关联文档和功能节点；不读取聊天或 Markdown 正文。",
             json!({"type":"object","required":["node_id"],"properties":{
                 "node_id":{"type":"string","maxLength":100}
+            }}),
+        ),
+        tool(
+            "project_discussions_import_source",
+            "把任意供应商的聊天正文直接保存为 docs/inbox/conversations 下的低权重原始来源；固定 authority=none、lifecycle=source_material、default_retrieval=false，不覆盖同名内容，并创建整理前后 Git 版本。导入后再调用讨论图工具编译。",
+            json!({"type":"object","required":["title","content"],"properties":{
+                "title":{"type":"string","minLength":1,"maxLength":160},
+                "content":{"type":"string","minLength":1,"maxLength":2097152},
+                "source_reference":{"type":"string","maxLength":1000,"description":"可选原会话 URL、任务 id 或其他可追溯引用。"},
+                "suggested_filename":{"type":"string","maxLength":120,"description":"可选文件名提示；只取安全 slug，不接受目录。"},
+                "authorization_mode":{"type":"string","enum":["git_backed_full","trusted_reversible","review_all","suggestions_only"],"default":"git_backed_full"},
+                "reviewed":{"type":"boolean","default":false}
             }}),
         ),
         tool(
@@ -98,7 +124,7 @@ pub(crate) fn definitions() -> Vec<Value> {
     ];
     let mut read_tools = crate::node_agent_project_docs_mcp_discussion_history_tools::definitions();
     read_tools.extend(crate::node_agent_project_docs_mcp_discussion_review_tools::definitions());
-    definitions.splice(2..2, read_tools);
+    definitions.splice(3..3, read_tools);
     definitions
 }
 
@@ -126,6 +152,18 @@ pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result
         "project_discussions_get_node" => {
             let input: NodeArguments = decode(arguments)?;
             get_node(workspace, &input.node_id)?
+        }
+        "project_discussions_import_source" => {
+            let input: ImportSourceArguments = decode(arguments)?;
+            crate::project_discussion_source_import::import_conversation_source(
+                workspace,
+                &input.title,
+                &input.content,
+                &input.source_reference,
+                &input.suggested_filename,
+                input.authorization_mode,
+                input.reviewed,
+            )?
         }
         "project_discussions_get_suggestions" => get_suggestions(workspace)?,
         "project_discussions_save_proposal" => {

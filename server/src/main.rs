@@ -158,6 +158,7 @@ mod project_discussion_graph_history;
 mod project_discussion_graph_model;
 mod project_discussion_graph_review;
 mod project_discussion_graph_validation;
+mod project_discussion_source_import;
 mod project_docs;
 mod project_docs_channel;
 mod project_docs_scan;

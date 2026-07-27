@@ -16,12 +16,13 @@ applyTo: ".elon/discussion-graph*.json,docs/inbox/conversations/**"
 
 ## 低 Token 顺序
 
-1. 先 `project_discussions_get_graph` 或 `get_node`，不读聊天正文。
-2. 需要回看时用 `get_history`、`get_graph_at_version`、`compare_versions` 或 `trace_node`；禁止为了了解版本重新读取整段聊天。
-3. 只有新增或语义不明的来源，才用 `project_docs_plan_context` 后按需 `project_docs_read`；不得全库读取。
-4. 保存增量时使用稳定节点 ID、来源锚点和明确的 `change_kind`，调用 `save_proposal`。
-5. 修改前调用 `review_graph`。`prepare_safe_repair` 只处理可无歧义修正的结构问题；采纳、否决、合并和权威性由 AI 根据命中来源形成 proposal。
-6. `apply` 后回读当前图、历史和审查结果。每次应用都必须创建新版本，不能重写旧 Git 历史。
+1. 若原始聊天尚未进入项目，先调用 `project_discussions_import_source`；不得要求用户代替 AI 点击页面，也不得手写成高权威文档。
+2. 先 `project_discussions_get_graph` 或 `get_node`，不读聊天正文。
+3. 需要回看时用 `get_history`、`get_graph_at_version`、`compare_versions` 或 `trace_node`；禁止为了了解版本重新读取整段聊天。
+4. 只有新增或语义不明的来源，才用 `project_docs_plan_context` 后按需 `project_docs_read`；不得全库读取。
+5. 保存增量时使用稳定节点 ID、来源锚点和明确的 `change_kind`，调用 `save_proposal`。
+6. 修改前调用 `review_graph`。`prepare_safe_repair` 只处理可无歧义修正的结构问题；采纳、否决、合并和权威性由 AI 根据命中来源形成 proposal。
+7. `apply` 后回读当前图、历史和审查结果。每次应用都必须创建新版本，不能重写旧 Git 历史。
 
 所有元数据查询必须报告 `chat_bodies_read=0`；首次理解新聊天会消耗模型 Token，但只读本次来源。后续围绕稳定节点工作不应重复读取原聊天。
 
