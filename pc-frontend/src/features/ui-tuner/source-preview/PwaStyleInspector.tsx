@@ -1,4 +1,4 @@
-import { Bot, Copy, Download, Redo2, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
+import { Bot, Copy, Download, MousePointer2, Redo2, RotateCcw, Save, Smartphone, Trash2, Undo2 } from 'lucide-react'
 import type { PwaStyleProperty } from './pwaDesignDraft'
 import type { PwaDesignSession, PwaSelection } from './usePwaDesignSession'
 import { CrossPlatformWritebackReceiptPanel } from './CrossPlatformWritebackReceiptPanel'
@@ -200,6 +200,17 @@ export function PwaStyleInspector({ session }: Props) {
         <div className={styles.pwaInspectorEmpty}>
           <strong>{session.mode === 'interact' ? '先正常使用 PWA 到目标页面' : '点击左侧页面中的真实组件'}</strong>
           <span>{session.mode === 'interact' ? '到达目标页面后点击“选择一个组件”，系统只拦截下一次点击；选中后这里会变成样式面板。' : '选中后自动回到正常操作模式，右侧可调尺寸、间距、圆角、字体和颜色。'}</span>
+          <button
+            type="button"
+            className={styles.pwaEmptyPrimaryAction}
+            disabled={!session.ready}
+            onClick={() => session.setMode(session.mode === 'interact' ? 'select' : 'interact')}
+          >
+            {session.mode === 'interact'
+              ? <><MousePointer2 size={15} />开始选择组件</>
+              : <><Smartphone size={15} />返回正常操作</>}
+          </button>
+          {!session.ready && <small>真实 PWA 连接完成后会自动启用选择。</small>}
         </div>
       )}
 
