@@ -4,20 +4,24 @@ pub use project_workspace::*;
 mod cli_durable_types;
 pub use cli_durable_types::{
     CliCodexCredentialBinding, CliCompletionEnvelope, CliCompletionProducerIdentity,
+    CliLocalTaskSnapshot,
 };
 mod android_device_host;
 pub use android_device_host::{AndroidDeviceHostRequest, CAP_ANDROID_DEVICE_HOST_V1};
 mod cancel;
 pub use cancel::{CancelRequestAudit, InterruptionSource};
 mod node_profiles;
-pub use node_profiles::{ModelCapability, NodeHardwareProfile};
+pub use node_profiles::{DevToolchainStatus, ModelCapability, NodeHardwareProfile};
 mod project_document_federation;
 pub use project_document_federation::{
     ProjectDocumentFederationPageRequest, CAP_PROJECT_DOCUMENT_FEDERATION_V1,
 };
-pub const PROTO_VERSION: u32 = 7;
+pub const PROTO_VERSION: u32 = 8;
 /// The node applies project-scoped build-cache routing, admission, leases, and cleanup.
 pub const CAP_PROJECT_BUILD_CACHE_V1: &str = "project_build_cache_v1";
+/// The node mirrors locally-admitted Codex tasks into the owner's project
+/// conversation while they are still running.
+pub const CAP_LOCAL_TASK_PROJECT_SYNC_V1: &str = "local_task_project_sync_v1";
 mod project_workspace_status;
 pub use project_workspace_status::{
     ProjectGitWorktreeAudit, ProjectGitWorktreeEntry, ProjectWorkspaceInspectStatus,
@@ -145,17 +149,6 @@ pub struct NodeDevRuntimeToolContract {
     pub recovery_policy: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct DevToolchainStatus {
-    pub name: String,
-    #[serde(default)]
-    pub available: bool,
-    #[serde(default)]
-    pub version: Option<String>,
-    #[serde(default)]
-    pub path: Option<String>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerToAgent {
@@ -199,6 +192,18 @@ pub enum ServerToAgent {
         /// A rejected completion should remain pending only when this is true.
         #[serde(default)]
         retryable: bool,
+        #[serde(default)]
+        error: Option<String>,
+    },
+    /// The cloud has materialized the exact local-task snapshot revision.
+    CliLocalTaskSyncAck {
+        task_id: String,
+        revision: String,
+        accepted: bool,
+        #[serde(default)]
+        retryable: bool,
+        #[serde(default)]
+        cloud_task_id: Option<String>,
         #[serde(default)]
         error: Option<String>,
     },
@@ -505,6 +510,11 @@ pub enum AgentToServer {
     CliCompletionReplay {
         completion: CliCompletionEnvelope,
     },
+    /// Mirror a node-local task into the owner's cloud project conversation
+    /// before terminal completion replay.
+    CliLocalTaskSync {
+        snapshot: CliLocalTaskSnapshot,
+    },
     /// PC 节点返回某个本机 CLI 任务的 journal / sidecar 恢复快照。
     CliTaskJournalSnapshot {
         req_id: String,
@@ -712,6 +722,7 @@ impl AgentToServer {
             | Self::CliChunk { .. }
             | Self::CliDone { .. }
             | Self::CliCompletionReplay { .. }
+            | Self::CliLocalTaskSync { .. }
             | Self::CliTaskJournalSnapshot { .. }
             | Self::ToolApprovalDecisionAck { .. }
             | Self::RegisterCapabilities { .. }

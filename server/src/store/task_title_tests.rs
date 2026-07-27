@@ -38,6 +38,7 @@ fn replay_local_task(
         .apply_pc_cli_task_completion(PcCliTaskCompletionApply {
             completion_event_id: "event-readable-title",
             task_id: None,
+            local_request_id: Some("local-readable-title"),
             project_id,
             channel_id: Some(channel_id),
             conversation_id: "offline-readable-title",

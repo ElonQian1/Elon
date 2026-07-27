@@ -208,6 +208,11 @@ export function normalizeLocalTaskRecord(payload: unknown): LocalTaskRecord {
     sync_state: textValue(root.sync_state ?? root.accounting_sync_state) || 'local_only',
     final_reply: textValue(root.final_reply ?? root.reply ?? root.result),
     error: textValue(root.error ?? root.error_message),
+    codex_session_id: textValue(root.codex_session_id ?? root.codex_thread_id),
+    codex_thread_uri: textValue(root.codex_thread_uri)
+      || (textValue(root.codex_session_id ?? root.codex_thread_id)
+        ? `codex://threads/${textValue(root.codex_session_id ?? root.codex_thread_id)}`
+        : ''),
     started_at_ms: timestampValue(root.started_at_ms ?? root.started_at),
     updated_at_ms: timestampValue(root.updated_at_ms ?? root.updated_at ?? root.finished_at_ms ?? root.finished_at),
     finished_at_ms: timestampValue(root.finished_at_ms ?? root.finished_at),

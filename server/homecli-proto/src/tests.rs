@@ -1,6 +1,6 @@
 use super::{
-    AgentToServer, CliCompletionEnvelope, CliCompletionProducerIdentity, CliProjectContext,
-    CliWorkspaceStatus, ServerToAgent, PROTO_VERSION,
+    AgentToServer, CliCompletionEnvelope, CliCompletionProducerIdentity, CliLocalTaskSnapshot,
+    CliProjectContext, CliWorkspaceStatus, ServerToAgent, PROTO_VERSION,
 };
 
 #[test]
@@ -194,8 +194,49 @@ fn completion_fixture() -> CliCompletionEnvelope {
 }
 
 #[test]
-fn durable_completion_protocol_version_is_advertised() {
-    assert!(PROTO_VERSION >= 7);
+fn local_task_project_sync_protocol_version_is_advertised() {
+    assert!(PROTO_VERSION >= 8);
+}
+
+#[test]
+fn local_task_snapshot_round_trips_codex_thread_identity() {
+    let message = AgentToServer::CliLocalTaskSync {
+        snapshot: CliLocalTaskSnapshot {
+            task_id: "local-a".to_string(),
+            revision: "running:thread-a".to_string(),
+            cli: "codex".to_string(),
+            producer_identity: CliCompletionProducerIdentity {
+                owner_user_id: "owner-a".to_string(),
+                agent_id: "node-a".to_string(),
+                install_id: "install-a".to_string(),
+            },
+            project_context: CliProjectContext {
+                project_id: "project-a".to_string(),
+                conversation_id: "desktop-supervised-a".to_string(),
+                runtime_permission: Some("full_access".to_string()),
+            },
+            channel_id: None,
+            prompt: "修复项目".to_string(),
+            workspace_path: "D:\\repo".to_string(),
+            status: "running".to_string(),
+            session_id: Some("thread-a".to_string()),
+            started_at_ms: 10,
+            updated_at_ms: 20,
+        },
+    };
+    let json = serde_json::to_string(&message).unwrap();
+    let decoded: AgentToServer = serde_json::from_str(&json).unwrap();
+    match decoded {
+        AgentToServer::CliLocalTaskSync { snapshot } => {
+            assert_eq!(snapshot.task_id, "local-a");
+            assert_eq!(snapshot.session_id.as_deref(), Some("thread-a"));
+            assert_eq!(
+                snapshot.project_context.conversation_id,
+                "desktop-supervised-a"
+            );
+        }
+        other => panic!("expected local task sync, got {other:?}"),
+    }
 }
 
 #[test]

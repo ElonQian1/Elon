@@ -10,6 +10,17 @@ pub struct ModelCapability {
     pub price_per_1k_credits: f64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DevToolchainStatus {
+    pub name: String,
+    #[serde(default)]
+    pub available: bool,
+    #[serde(default)]
+    pub version: Option<String>,
+    #[serde(default)]
+    pub path: Option<String>,
+}
+
 /// PC 节点硬件画像。所有字段都是可选的，便于旧节点/受限环境渐进上报。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NodeHardwareProfile {

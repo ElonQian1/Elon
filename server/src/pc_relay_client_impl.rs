@@ -143,7 +143,7 @@ pub(super) async fn run_relay_session(
         };
 
         match msg {
-            ServerToAgent::CliCompletionAck { .. } => {
+            ServerToAgent::CliCompletionAck { .. } | ServerToAgent::CliLocalTaskSyncAck { .. } => {
                 // The legacy relay has no durable completion outbox.
             }
             ServerToAgent::HttpRequest {

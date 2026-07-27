@@ -95,6 +95,7 @@ mod store_types_project;
 mod system_projects;
 mod task_completion_replay;
 mod task_recovery;
+mod task_start_sync;
 #[cfg(test)]
 mod task_title_tests;
 mod tasks;
@@ -179,6 +180,7 @@ pub(crate) use system_projects::{
 };
 pub(crate) use task_completion_replay::is_automatic_communication_failure;
 pub use task_completion_replay::{PcCliTaskCompletionApply, PcCliTaskCompletionOutcome};
+pub use task_start_sync::{PcLocalTaskStartApply, PcLocalTaskStartOutcome};
 pub use token_usage::{
     TokenUsageAccountingResult, TokenUsageBillingCharge, TokenUsageRecord, UsageDayRow,
     UsageFeatureRow, UsageModeRow, UsageQuota, UsageStats, UsageTotals,

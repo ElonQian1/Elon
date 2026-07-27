@@ -162,6 +162,8 @@ sidecar `sessions.json` 使用进程间互斥和同目录唯一临时文件原�
 
 本机任务 API 可选接受 `supervision`，协议版本为 `elon.desktop_pc_supervision.v1`。契约记录 `task_role`、父/根任务、验收条件和改进策略；node-agent 把契约及桌面验收作为 append-only journal 事件保存，不改变旧任务的数据库结构，也不影响未传 `supervision` 的调用方。
 
+本机任务一经持久化，node-agent 就通过 `local_task_project_sync_v1` 把任务身份、登录 owner、项目、AI 开发频道、conversation、原始 prompt、工作区和当前 Codex thread ID 同步到云端，不再等待 terminal completion 才创建项目会话。同步按 `task_id + revision` ACK 幂等重放；云端用稳定的 `pc_local_task:<task_id>` 请求键建任务，因而开始帧与 completion 无论到达顺序如何都只对应一个项目会话任务。云端任务同时写入 `pc_dispatch_started`，项目会话的任务快照可直接按本机 task ID 读取 journal 过程。Codex `thread.started.thread_id` 使用任务级 scope 实时落盘，并同步到 `tasks.codex_thread_id`、`agent_native_sessions.native_session_id` 和会话 identity API；Codex Desktop 可按该 ID 直接读取任务，不依赖桌面 UI 点击或屏幕操控。
+
 节点从 Codex JSON `item.started/item.completed` 的 `command_execution`、`file_change`、`agent_message` 生成确定性 `supervision.evidence`，包括工具调用/结果、失败工具、命令退出码与失败摘要、文件变更、agent message 和终态。高输出 stdout/stderr 按流聚合，只保存原始行/字节计数、首尾和截断标记，不让一次 `rg` 膨胀成数百 journal 事件。桌面端仍需结合 Git、测试和发布事实做独立判断，然后调用 `/api/local-tasks/:task_id/supervision/review` 写入结论。PC 工作台同时展示 phase、脱敏 current command、last progress、heartbeat、idle duration 和 timeout policy。
 
 `task_role` 形成可追溯任务树：`requirement` 是原需求，`capability_repair` 是阻塞能力修复，`resume_original` 是修复后的原任务续跑，`post_task_improvement` 是任务完成后的非阻塞增强。节点给执行 CLI 注入防递归标记，避免桌面监督与本机执行相互重复派发。完整安全边界、API 示例和日常流程见 `docs/codex-desktop-pc-supervision.md`。

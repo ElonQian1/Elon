@@ -52,6 +52,8 @@ export interface LocalTaskRecord {
   sync_state: string
   final_reply: string
   error: string
+  codex_session_id: string
+  codex_thread_uri: string
   started_at_ms?: number
   updated_at_ms?: number
   finished_at_ms?: number

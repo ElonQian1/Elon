@@ -30,8 +30,12 @@ use crate::{
     types::AppState,
 };
 
+#[path = "pc_local_task_sync.rs"]
+mod local_task_sync;
 #[path = "pc_completion_replay_support.rs"]
 mod support;
+
+pub(crate) use local_task_sync::handle as handle_pc_local_task_sync;
 
 use support::{
     billing_context_from_run, classify_replay_accounting_error, completion_ack, completion_display,
@@ -292,6 +296,7 @@ fn apply_receipt(
             .apply_pc_cli_task_completion(PcCliTaskCompletionApply {
                 completion_event_id: &completion.event_id,
                 task_id: None,
+                local_request_id: Some(&completion.req_id),
                 project_id: &project_context.project_id,
                 channel_id: binding.local_channel_id.as_deref(),
                 conversation_id: &project_context.conversation_id,
@@ -325,6 +330,7 @@ fn apply_receipt(
                 .apply_pc_cli_task_completion(PcCliTaskCompletionApply {
                     completion_event_id: &completion.event_id,
                     task_id: Some(task_id),
+                    local_request_id: None,
                     project_id: &session.project_id,
                     channel_id: None,
                     conversation_id: &session.conversation_id,

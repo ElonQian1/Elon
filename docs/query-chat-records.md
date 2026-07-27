@@ -102,6 +102,8 @@ Android 端日志只包含 UI 渲染和网络状态，**不含服务器消息文
 
 > 用途：找到某个 project+conversation 对应的 Codex thread UUID，进而定位 JSONL 文件。
 
+Win 端本机任务现在会在任务开始时同步这一身份：`GET /api/projects/:project_id/conversations/:conversation_id/identity` 返回 `codex_thread_id` 和 `codex_thread_uri`，本机 `/api/local-tasks/:task_id` 的 `record.codex_session_id` 返回同一个 ID。Codex Desktop 已知该 ID 后可直接读取对应任务，无需通过桌面 UI 搜索或点击会话。
+
 ---
 
 ## 3. SSH 连接与查询方法

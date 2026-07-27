@@ -90,7 +90,11 @@ async fn list_tasks(
         .local_tasks
         .list_for_owner(&creds.owner_user_id, query.limit.unwrap_or(50))
     {
-        Ok(tasks) => {
+        Ok(mut tasks) => {
+            crate::node_agent_local_task_session_view::enrich_list(
+                &runtime.task_journal,
+                &mut tasks,
+            );
             let pending_sync_count = runtime
                 .local_tasks
                 .pending_count(&creds.owner_user_id)
@@ -116,7 +120,7 @@ async fn get_task(
         Ok(creds) => creds,
         Err(response) => return response,
     };
-    let record = match runtime
+    let mut record = match runtime
         .local_tasks
         .get_for_owner(&creds.owner_user_id, task_id.trim())
     {
@@ -142,6 +146,7 @@ async fn get_task(
         Ok(snapshot) => snapshot,
         Err(error) => return internal_error(error),
     };
+    crate::node_agent_local_task_session_view::enrich(&mut record, snapshot.record.as_ref());
     let task_status = snapshot
         .record
         .as_ref()

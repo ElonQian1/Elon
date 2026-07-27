@@ -12,6 +12,7 @@ import TaskTimeline, { taskTimelineHasVisibleDetails } from './TaskTimeline'
 import TaskProgressCard from './TaskProgressCard'
 import TaskCompletionMeta from './TaskCompletionMeta'
 import TaskTerminalActions from './TaskTerminalActions'
+import CodexThreadBadge from './CodexThreadBadge'
 import {
   TaskProgressHighlights,
   progressFlowSurfaceItems,
@@ -57,6 +58,7 @@ function DevTaskGroup({
   onApprove,
 }: Props) {
   const taskId  = taskIdForGroup(messages)
+  const codexThreadId = codexThreadIdForGroup(messages)
   const task    = taskId ? (taskContext.tasks.get(taskId) ?? null) : null
   const userMsg = firstMessageMatching(messages, isUserTaskMessage)
   const terminalAssistantMsg = latestMessageMatching(messages, isTerminalAssistantTaskMessage)
@@ -282,6 +284,7 @@ function DevTaskGroup({
                   </button>
                 )}
               </div>
+              <CodexThreadBadge threadId={codexThreadId} />
               {visiblePublicSurfaceItems.length > 0 && (
                 <TaskProgressHighlights
                   items={visiblePublicSurfaceItems}
@@ -326,6 +329,7 @@ function DevTaskGroup({
             label={replyLabelForTone(tone)}
             reason={terminalReason}
             time={assistantProcessTime}
+            codexThreadId={codexThreadId}
             beforeReply={showProgressPanel ? renderProgressPanel(true, 'beforeReply') : null}
             afterReply={(
               <>
@@ -373,12 +377,13 @@ function progressStatusForStage(
   return status
 }
 
-function TaskAssistantReply({ message, tone, label, reason, time: fallbackTime, beforeReply, afterReply }: {
+function TaskAssistantReply({ message, tone, label, reason, time: fallbackTime, codexThreadId, beforeReply, afterReply }: {
   message: ChatMessage
   tone: TaskTone
   label: string
   reason?: string
   time?: string
+  codexThreadId?: string
   beforeReply?: ReactNode
   afterReply?: ReactNode
 }) {
@@ -399,6 +404,7 @@ function TaskAssistantReply({ message, tone, label, reason, time: fallbackTime, 
           {label && <span>{label}</span>}
           {time && <span>{time}</span>}
         </div>
+        <CodexThreadBadge threadId={codexThreadId} />
         {beforeReply}
         <div
           className={[styles.assistantReply, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}
@@ -454,6 +460,15 @@ function taskIdForGroup(messages: ChatMessage[]): string {
   for (const message of messages) {
     const taskId = taskIdOf(message) || clean(message.source_task_id ?? message.sourceTaskId ?? '')
     if (taskId) return taskId
+  }
+  return ''
+}
+
+function codexThreadIdForGroup(messages: ChatMessage[]): string {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    const threadId = clean(message.task_codex_thread_id ?? message.taskCodexThreadId ?? '')
+    if (threadId) return threadId
   }
   return ''
 }

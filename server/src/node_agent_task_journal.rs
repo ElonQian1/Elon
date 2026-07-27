@@ -20,7 +20,7 @@ use homecli_proto::CancelRequestAudit;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, ErrorKind, Write},
     path::{Path, PathBuf},
@@ -438,6 +438,25 @@ impl TaskJournal {
 
     pub(crate) fn latest_records(&self, limit: usize) -> Result<Vec<TaskJournalRecord>> {
         self.latest_records_matching(limit, |_| true)
+    }
+
+    pub(crate) fn records_for_req_ids(
+        &self,
+        req_ids: &[String],
+    ) -> Result<BTreeMap<String, TaskJournalRecord>> {
+        let requested = req_ids
+            .iter()
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .collect::<BTreeSet<_>>();
+        with_task_journal_io_lock(|| {
+            Ok(self
+                .load_registry()?
+                .into_iter()
+                .filter(|(req_id, _)| requested.contains(req_id))
+                .collect())
+        })
     }
 
     pub(crate) fn latest_records_for_workspace(

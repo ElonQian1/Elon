@@ -8,7 +8,8 @@ use anyhow::{anyhow, Context, Result};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{
     AgentToServer, CliCompletionProducerIdentity, ServerToAgent, CAP_ANDROID_DEVICE_HOST_V1,
-    CAP_PROJECT_BUILD_CACHE_V1, CAP_PROJECT_DOCUMENT_FEDERATION_V1, PROTO_VERSION,
+    CAP_LOCAL_TASK_PROJECT_SYNC_V1, CAP_PROJECT_BUILD_CACHE_V1, CAP_PROJECT_DOCUMENT_FEDERATION_V1,
+    PROTO_VERSION,
 };
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
@@ -170,6 +171,7 @@ pub(super) async fn run_session(
             CAP_PROJECT_BUILD_CACHE_V1.to_string(),
             CAP_ANDROID_DEVICE_HOST_V1.to_string(),
             CAP_PROJECT_DOCUMENT_FEDERATION_V1.to_string(),
+            CAP_LOCAL_TASK_PROJECT_SYNC_V1.to_string(),
         ],
         allowed_clis: available_clis.clone(),
         allowed_cwds: vec![],
@@ -198,6 +200,15 @@ pub(super) async fn run_session(
         agent_id: creds.agent_id.clone(),
         install_id: runtime.install_id.clone(),
     };
+    let local_task_sync_acks =
+        crate::node_agent_local_task_cloud_sync::LocalTaskSyncAcks::default();
+    let mut local_task_sync_task = crate::node_agent_local_task_cloud_sync::spawn(
+        runtime.clone(),
+        out_tx.clone(),
+        session_producer_identity.clone(),
+        local_task_sync_acks.clone(),
+        session_stop_rx.clone(),
+    );
 
     // Durable completion replay runs for the entire connected session. It covers
     // both rows left by a previous process/session and new rows produced while this
@@ -324,6 +335,35 @@ pub(super) async fn run_session(
                                 error.as_deref(),
                             ).await {
                                 warn!(%event_id, %req_id, error = %ack_error, "应用 CLI completion ACK 失败，保留本机持久记录供重试或诊断");
+                            }
+                        }
+                        ServerToAgent::CliLocalTaskSyncAck {
+                            task_id,
+                            revision,
+                            accepted,
+                            retryable,
+                            cloud_task_id,
+                            error,
+                        } => {
+                            local_task_sync_acks.settle(
+                                &task_id,
+                                &revision,
+                                accepted,
+                                retryable,
+                            );
+                            if accepted {
+                                tracing::debug!(
+                                    %task_id,
+                                    cloud_task_id = ?cloud_task_id,
+                                    "本机任务已同步到项目会话"
+                                );
+                            } else {
+                                warn!(
+                                    %task_id,
+                                    retryable,
+                                    error = error.as_deref().unwrap_or("unknown"),
+                                    "本机任务同步到项目会话失败"
+                                );
                             }
                         }
                         ServerToAgent::LlmStreamRequest {
@@ -669,6 +709,12 @@ pub(super) async fn run_session(
     shutdown_session_task(
         "completion replay",
         &mut replay_task,
+        SESSION_TASK_SHUTDOWN_TIMEOUT,
+    )
+    .await;
+    shutdown_session_task(
+        "local task project sync",
+        &mut local_task_sync_task,
         SESSION_TASK_SHUTDOWN_TIMEOUT,
     )
     .await;

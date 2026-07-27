@@ -120,6 +120,13 @@ export default function LocalTaskDetailPanel({
             <div><dt>工作目录</dt><dd>{task.workspace_path || '-'}</dd></div>
             <div><dt>项目 / 频道</dt><dd>{task.project_id || '-'} / {task.channel_id || '联网后自动匹配 AI开发频道'}</dd></div>
             <div><dt>会话</dt><dd>{task.conversation_id || '-'}</dd></div>
+            <div>
+              <dt>Codex 本机会话 ID</dt>
+              <dd>{task.codex_session_id
+                ? <code title={task.codex_thread_uri}>{task.codex_session_id}</code>
+                : '等待 Codex thread.started'}
+              </dd>
+            </div>
           </dl>
         </section>
 

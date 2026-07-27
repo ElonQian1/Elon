@@ -253,6 +253,8 @@ export interface Message {
   taskError?: string
   task_apk_url?: string
   taskApkUrl?: string
+  task_codex_thread_id?: string
+  taskCodexThreadId?: string
   [key: string]: unknown
 }
 

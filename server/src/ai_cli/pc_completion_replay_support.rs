@@ -137,7 +137,10 @@ pub(super) fn validate_local_offline_scope(
         .project_context
         .as_ref()
         .ok_or_else(|| ReplayFailure::reject("本机离线 completion 缺少项目上下文"))?;
-    if context.runtime_permission.as_deref() != Some("full_access") {
+    if !matches!(
+        context.runtime_permission.as_deref(),
+        Some("full_access" | "danger_full_access")
+    ) {
         return Err(ReplayFailure::reject(
             "本机离线 completion 必须来自显式 full_access 授权",
         ));

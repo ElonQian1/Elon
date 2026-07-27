@@ -1,6 +1,7 @@
 use super::node_agent_cli_prompt_runner::{
     cli_prompt_delivery, cli_prompt_timeout_secs_with_config, codex_exec_args,
-    write_and_close_cli_stdin, DEFAULT_SUPERVISED_CODEX_TIMEOUT_SECS,
+    codex_session_scope_key_for_task, write_and_close_cli_stdin,
+    DEFAULT_SUPERVISED_CODEX_TIMEOUT_SECS,
 };
 use super::{
     node_agent_cli_pty::{default_cols, default_rows},
@@ -89,6 +90,31 @@ fn codex_multiline_supervision_prompt_is_preserved_for_stdin() {
     assert_eq!(delivery.args, vec!["-"]);
     assert_eq!(delivery.stdin_payload.as_deref(), Some(prompt));
     assert!(!delivery.stdin_piped_empty);
+}
+
+#[test]
+fn local_codex_task_always_gets_a_persisted_session_scope() {
+    assert_eq!(
+        codex_session_scope_key_for_task(
+            "codex",
+            "local-task-a",
+            &[],
+            Some("danger_full_access"),
+            Some("D:\\repo"),
+        )
+        .as_deref(),
+        Some("task:local-task-a")
+    );
+    assert_eq!(
+        codex_session_scope_key_for_task(
+            "copilot",
+            "local-task-a",
+            &[],
+            Some("danger_full_access"),
+            Some("D:\\repo"),
+        ),
+        None
+    );
 }
 
 #[test]

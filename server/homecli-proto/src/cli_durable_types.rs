@@ -12,6 +12,28 @@ pub struct CliCompletionProducerIdentity {
     pub install_id: String,
 }
 
+/// Durable identity and latest public state of a task admitted by the
+/// node-local control plane. The node periodically replays this snapshot until
+/// the cloud acknowledges the exact revision, so a task becomes visible in the
+/// owner's project conversation before its terminal completion exists.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CliLocalTaskSnapshot {
+    pub task_id: String,
+    pub revision: String,
+    pub cli: String,
+    pub producer_identity: CliCompletionProducerIdentity,
+    pub project_context: CliProjectContext,
+    #[serde(default)]
+    pub channel_id: Option<String>,
+    pub prompt: String,
+    pub workspace_path: String,
+    pub status: String,
+    #[serde(default)]
+    pub session_id: Option<String>,
+    pub started_at_ms: u64,
+    pub updated_at_ms: u64,
+}
+
 /// Server-authorized Codex credential source for one cloud dispatch. Managed
 /// vault tasks bind an exact lease; all other Codex work must use an unmanaged
 /// local login so a stale borrowed slot cannot escape billing policy.

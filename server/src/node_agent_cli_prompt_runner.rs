@@ -55,6 +55,23 @@ pub(crate) fn cli_prompt_delivery(cli_name: &str, prompt: &str) -> CliPromptDeli
     }
 }
 
+pub(crate) fn codex_session_scope_key_for_task(
+    cli_name: &str,
+    req_id: &str,
+    extra_args: &[String],
+    runtime_permission: Option<&str>,
+    cwd: Option<&str>,
+) -> Option<String> {
+    if cli_name != "codex" {
+        return None;
+    }
+    node_agent_cli_security::codex_session_scope_key(extra_args, runtime_permission, cwd)
+        // Locally-created tasks do not carry the legacy --session-id hint.
+        // They still need a task-scoped slot so thread.started is persisted
+        // immediately and the same durable request can resume after recovery.
+        .or_else(|| Some(format!("task:{req_id}")))
+}
+
 pub(crate) fn codex_exec_args(
     session_id: Option<&str>,
     last_message_path: Option<&std::path::Path>,
@@ -450,15 +467,13 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         .unwrap_or(bin);
     let full_access = cli_prompt_full_access(runtime_permission.as_deref());
     let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
-    let codex_scope_key = if cli_name == "codex" {
-        node_agent_cli_security::codex_session_scope_key(
-            &extra_args,
-            runtime_permission.as_deref(),
-            cwd.as_deref(),
-        )
-    } else {
-        None
-    };
+    let codex_scope_key = codex_session_scope_key_for_task(
+        cli_name,
+        &req_id,
+        &extra_args,
+        runtime_permission.as_deref(),
+        cwd.as_deref(),
+    );
     let codex_plan = if cli_name == "codex" {
         node_agent_codex_session::load_session_plan(
             &task_journal,

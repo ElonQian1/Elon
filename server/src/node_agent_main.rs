@@ -136,6 +136,8 @@ mod node_agent_terminal_journal;
 use node_agent_local_llm::discover_models;
 pub use node_agent_local_llm::run_llm_inference;
 mod node_agent_local_pc_frontend;
+mod node_agent_local_task_cloud_sync;
+mod node_agent_local_task_session_view;
 mod node_agent_program_resolver;
 mod node_agent_project_agent_recovery;
 mod node_agent_project_agent_runs;

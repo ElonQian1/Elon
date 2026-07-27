@@ -456,6 +456,22 @@ pub(super) async fn run_agent_session(
                             }
                             continue;
                         }
+                        if let AgentToServer::CliLocalTaskSync { snapshot } = &msg {
+                            let ack = crate::ai_cli::pc_completion_replay::handle_pc_local_task_sync(
+                                state.as_ref(),
+                                &agent_id,
+                                resolved_owner_user_id.as_deref(),
+                                install_id.as_deref(),
+                                snapshot.clone(),
+                            );
+                            if cmd_tx.send(ack).is_err() {
+                                return (
+                                    Err(anyhow!("agent writer closed before local task sync ACK")),
+                                    AgentSessionCloseReason::WriterClosed,
+                                );
+                            }
+                            continue;
+                        }
                         if let AgentToServer::ToolApprovalDecisionAck {
                             req_id,
                             approval_id,

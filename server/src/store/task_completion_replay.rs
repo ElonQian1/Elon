@@ -8,6 +8,9 @@ use super::{clean_optional, new_id, now, safe_external_id, Store};
 pub struct PcCliTaskCompletionApply<'a> {
     pub completion_event_id: &'a str,
     pub task_id: Option<&'a str>,
+    /// Stable node-local request id. New local starts and their later terminal
+    /// completion use the same client request key, regardless of arrival order.
+    pub local_request_id: Option<&'a str>,
     pub project_id: &'a str,
     pub channel_id: Option<&'a str>,
     pub conversation_id: &'a str,
@@ -45,11 +48,11 @@ struct TaskTarget {
 }
 
 impl Store {
-    /// Apply a replayed terminal result exactly once. Locally-created work is
-    /// first turned into a normal cloud task using the completion event as its
-    /// idempotency key. A real late result may repair communication-generated
-    /// interruption states, but it never overwrites a user cancellation or an
-    /// unrelated business failure.
+    /// Apply a replayed terminal result exactly once. Node-local work uses its
+    /// stable local request id when available, so start snapshots and terminal
+    /// completions converge on one cloud task in either arrival order. A real
+    /// late result may repair communication-generated interruption states, but
+    /// it never overwrites a user cancellation or unrelated business failure.
     pub fn apply_pc_cli_task_completion(
         &self,
         input: PcCliTaskCompletionApply<'_>,
@@ -193,7 +196,9 @@ fn create_or_load_local_target(
         .ok_or_else(|| anyhow!("local_offline completion 缺少 channel_id"))?;
     let prompt = clean_optional(input.prompt)
         .ok_or_else(|| anyhow!("local_offline completion 缺少 prompt"))?;
-    let client_request_id = format!("pc_offline:{}", input.completion_event_id);
+    let client_request_id = clean_optional(input.local_request_id)
+        .map(|request_id| format!("pc_local_task:{request_id}"))
+        .unwrap_or_else(|| format!("pc_offline:{}", input.completion_event_id));
     let conversation_title = crate::task_title::readable_task_title(prompt);
 
     tx.execute(
@@ -565,6 +570,7 @@ mod tests {
             .apply_pc_cli_task_completion(PcCliTaskCompletionApply {
                 completion_event_id: event_id,
                 task_id,
+                local_request_id: task_id.is_none().then_some(event_id),
                 project_id,
                 channel_id: Some(channel_id),
                 conversation_id: "conversation-a",
@@ -775,7 +781,7 @@ mod tests {
             .conn()
             .unwrap()
             .query_row(
-                "SELECT COUNT(*) FROM tasks WHERE client_request_id = 'pc_offline:event-local'",
+                "SELECT COUNT(*) FROM tasks WHERE client_request_id = 'pc_local_task:event-local'",
                 [],
                 |row| row.get(0),
             )
