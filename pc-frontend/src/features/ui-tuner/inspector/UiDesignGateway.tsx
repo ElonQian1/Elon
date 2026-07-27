@@ -3,26 +3,37 @@ import styles from './UiDesignGateway.module.css'
 interface UiDesignGatewayProps {
   runtimeReady: boolean
   runtimeBusy: boolean
+  runtimeError?: string
   onUseDraftNow: () => void
 }
 
 export function UiDesignGateway({
   runtimeReady,
   runtimeBusy,
+  runtimeError,
   onUseDraftNow,
 }: UiDesignGatewayProps) {
   const preparingRuntime = runtimeReady || runtimeBusy
+  const hasRuntimeError = Boolean(runtimeError)
   return (
     <section className={styles.gateway} data-testid="automatic-design-setup">
       <div className={styles.heading}>
         <span className={styles.spinner} aria-hidden="true" />
         <div>
           <span className={styles.eyebrow}>正在自动准备 · 无需选择模式</span>
-          <strong>{preparingRuntime ? '正在连接真实 Android 编辑环境' : '正在建立本地可编辑草稿'}</strong>
+          <strong>
+            {hasRuntimeError
+              ? '真实 Runtime 暂不可用，正在切到 PWA 草稿'
+              : preparingRuntime
+                ? '正在连接真实 Android 编辑环境'
+                : '正在建立本地可编辑草稿'}
+          </strong>
         </div>
       </div>
       <p>
-        {preparingRuntime
+        {hasRuntimeError
+          ? '你仍然可以先在 PC 端真实 PWA 页面上修改样式；Android 真机稍后作为校准和写回验收，不会阻塞设计。'
+          : preparingRuntime
           ? '系统会自动连接当前手机；如果连接较慢，会先打开本地草稿，真实 Android 在后台继续准备。'
           : '系统正在读取项目源码；准备完成后会直接进入可编辑画布。'}
       </p>
