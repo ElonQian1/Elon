@@ -49,7 +49,7 @@ pub(crate) enum CaptureInteractionStep {
         selector: String,
         #[serde(default = "default_interaction_state")]
         state: String,
-        #[serde(default = "default_interaction_timeout_ms")]
+        #[serde(rename = "timeoutMs", default = "default_interaction_timeout_ms")]
         timeout_ms: u64,
     },
     AssertText {

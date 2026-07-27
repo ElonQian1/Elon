@@ -52,6 +52,32 @@ fn input(url: String) -> PwaCaptureInput {
     }
 }
 
+#[test]
+fn interaction_wait_step_accepts_documented_camel_case_timeout() {
+    let parsed: PwaCaptureInput = serde_json::from_value(json!({
+        "url":"http://127.0.0.1:3000/",
+        "viewport":{"width":360,"height":640},
+        "steps":[{
+            "action":"waitFor",
+            "selector":"#ready",
+            "state":"visible",
+            "timeoutMs":2000
+        }],
+        "evidence":{
+            "sourceRevision":format!("fixture-sha256:{}", "a".repeat(64)),
+            "routeRevision":"fixture-route-r1"
+        }
+    }))
+    .expect("tools/list schema should deserialize without field-name drift");
+    assert!(matches!(
+        parsed.steps.as_slice(),
+        [CaptureInteractionStep::WaitFor {
+            timeout_ms: 2_000,
+            ..
+        }]
+    ));
+}
+
 #[tokio::test]
 async fn real_headless_fixture_replays_click_and_text_assertion() {
     let root = project_root("interaction-replay");
