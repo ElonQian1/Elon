@@ -15,6 +15,21 @@ type EditorAction =
 
 const EMPTY_EDITOR: EditorState = { document: null, pending: {}, history: { past: [], future: [] } }
 
+function isTransientLoadFailure(reason: unknown): boolean {
+  const message = reason instanceof Error ? reason.message : String(reason)
+  return /abort|failed to fetch|networkerror|network request failed/i.test(message)
+}
+
+async function loadWithReconnectRetry(projectRoot: string, layoutFile?: string) {
+  try {
+    return await loadSourcePreview(projectRoot, layoutFile)
+  } catch (reason) {
+    if (!isTransientLoadFailure(reason)) throw reason
+    await new Promise((resolve) => window.setTimeout(resolve, 350))
+    return loadSourcePreview(projectRoot, layoutFile)
+  }
+}
+
 function editorReducer(state: EditorState, action: EditorAction): EditorState {
   if (action.type === 'load') return { document: action.document, pending: {}, history: { past: [], future: [] } }
   if (action.type === 'undo') {
@@ -61,13 +76,14 @@ export function useSourcePreviewSession(initialProjectRoot: string) {
     if (!root) { setError('请先选择或输入本机 Android 项目目录'); return }
     setLoading(true); setError('')
     try {
-      const next = await loadSourcePreview(root, layoutFile)
+      const next = await loadWithReconnectRetry(root, layoutFile)
       dispatch({ type: 'load', document: next })
       setSelectedKey(next.root.key)
       setSaveState('preview')
       setProjectRoot(next.projectRoot)
       window.localStorage.setItem('elon.uiTuner.sourceProjectRoot', next.projectRoot)
-      await renderer.refresh(next.projectRoot)
+      setLoading(false)
+      void renderer.refresh(next.projectRoot)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally { setLoading(false) }

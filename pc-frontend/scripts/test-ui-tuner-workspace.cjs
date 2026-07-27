@@ -90,15 +90,15 @@ try {
     androidProjectRootCandidates('D:\\projects\\elon-task-20260718-014941-19416-daa8ba21'),
     [
       'D:\\projects\\elon-task-20260718-014941-19416-daa8ba21',
+      'D:\\projects\\elon',
       'D:\\projects\\elon-task-20260718-014941-19416-daa8ba21\\android\\app',
       'D:\\projects\\elon-task-20260718-014941-19416-daa8ba21\\android',
       'D:\\projects\\elon-task-20260718-014941-19416-daa8ba21\\app',
-      'D:\\projects\\elon',
       'D:\\projects\\elon\\android\\app',
       'D:\\projects\\elon\\android',
       'D:\\projects\\elon\\app',
     ],
-    '已收尾的 task worktree 路径应自动回退主项目，避免草稿入口永久卡死',
+    '已收尾的 task worktree 路径应优先回退主项目，避免无效子目录拖慢草稿入口',
   )
 
   compile(
@@ -530,6 +530,15 @@ try {
     'utf8',
   )
   assert.match(sourceWorkspaceSource, /renderer\.beginLocalDraft\(\); session\.apply\(patch\)/)
+  const sourceSessionSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/useSourcePreviewSession.ts'),
+    'utf8',
+  )
+  assert.match(
+    sourceSessionSource,
+    /isTransientLoadFailure[\s\S]*loadWithReconnectRetry[\s\S]*setLoading\(false\)[\s\S]*void renderer\.refresh\(next\.projectRoot\)/,
+    '源码文档加载必须自动救援瞬时断线，并且不得被可选渲染器探测阻塞',
+  )
   const focusExitSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/workspace/FocusModeExitButton.tsx'),
     'utf8',
