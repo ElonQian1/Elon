@@ -541,6 +541,10 @@ try {
   assert.match(pwaInspectorSource, /选择模式：下一次点击会选中组件/)
   assert.match(pwaInspectorSource, /设计模式：正在修改选中组件/)
   assert.match(pwaInspectorSource, /className=\{styles\.pwaDesignModeCard\}/)
+  assert.match(pwaInspectorSource, /PWA 到 APK 写回验证进度/)
+  assert.match(pwaInspectorSource, /草稿实时预览/)
+  assert.match(pwaInspectorSource, /真实构建验证/)
+  assert.match(pwaInspectorSource, /验证失败/)
   assert.match(pwaInspectorSource, /buildPwaDraftCliCompactHandoff/)
   assert.match(pwaInspectorSource, /低 Token 交接/)
   assert.match(pwaInspectorSource, /data-testid="pwa-low-token-handoff"/)
@@ -550,6 +554,8 @@ try {
     'utf8',
   )
   assert.match(sourcePreviewCss, /\.pwaHandoffSummary/)
+  assert.match(sourcePreviewCss, /\.pwaSyncProgress/)
+  assert.match(sourcePreviewCss, /data-step-state="failed"/)
   const sourceWorkspaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewWorkspace.tsx'),
     'utf8',

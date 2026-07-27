@@ -150,6 +150,50 @@ function writebackTargetLabel(status: 'DETERMINISTIC' | 'DETERMINISTIC_PARTIAL' 
   return '需要 AI 建立绑定/结构修改'
 }
 
+function syncPhaseLabel(phase: PwaDesignSession['syncState']['phase']): string {
+  if (phase === 'LIVE_PREVIEW') return '临时预览'
+  if (phase === 'AI_WRITING') return 'AI 写源码'
+  if (phase === 'SOURCE_SAVED') return '源码已保存'
+  if (phase === 'BUILD_VERIFYING') return '真实构建验证'
+  if (phase === 'BUILD_VERIFIED') return '验证通过'
+  return '验证失败'
+}
+
+function syncStepState(phase: PwaDesignSession['syncState']['phase'], step: 'preview' | 'source' | 'verify' | 'done'): 'done' | 'active' | 'pending' | 'failed' {
+  if (phase === 'VERIFY_FAILED') return step === 'verify' ? 'failed' : step === 'done' ? 'pending' : 'done'
+  if (step === 'preview') return 'done'
+  if (step === 'source') {
+    if (phase === 'AI_WRITING' || phase === 'SOURCE_SAVED') return 'active'
+    if (phase === 'BUILD_VERIFYING' || phase === 'BUILD_VERIFIED') return 'done'
+    return 'pending'
+  }
+  if (step === 'verify') {
+    if (phase === 'BUILD_VERIFYING') return 'active'
+    if (phase === 'BUILD_VERIFIED') return 'done'
+    return 'pending'
+  }
+  return phase === 'BUILD_VERIFIED' ? 'done' : 'pending'
+}
+
+function SyncProgress({ session }: Props) {
+  const steps = [
+    { key: 'preview', label: '草稿实时预览', hint: 'PWA 页面已临时变化' },
+    { key: 'source', label: '写入源码', hint: session.writebackPlan.requiresCodex ? 'AI 只补绑定/结构缺口' : '确定性写回优先' },
+    { key: 'verify', label: '真实构建验证', hint: '重载 PWA/APK 证明源码生效' },
+    { key: 'done', label: '完成交付', hint: '无 Runtime Patch 也一致' },
+  ] as const
+  return (
+    <ol className={styles.pwaSyncProgress} aria-label="PWA 到 APK 写回验证进度">
+      {steps.map((step) => (
+        <li key={step.key} data-step-state={syncStepState(session.syncState.phase, step.key)}>
+          <strong>{step.label}</strong>
+          <span>{step.hint}</span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 function designModeTitle(session: PwaDesignSession): string {
   if (!session.ready) return '正在连接真实 PWA'
   if (session.mode === 'select') return '选择模式：下一次点击会选中组件'
@@ -260,7 +304,8 @@ export function PwaStyleInspector({ session }: Props) {
       </section>
 
       <section className={styles.pwaSyncCard} data-sync-phase={session.syncState.phase}>
-        <strong>{session.syncState.phase}</strong>
+        <strong>{syncPhaseLabel(session.syncState.phase)}</strong>
+        <SyncProgress session={session} />
         <div className={styles.pwaSyncTargets}>
           <span>PWA：{writebackTargetLabel(session.writebackPlan.targets.pwa)}</span>
           <span>APK：{writebackTargetLabel(session.writebackPlan.targets.android)}</span>
