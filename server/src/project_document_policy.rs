@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 /// Increment whenever deterministic path/frontmatter classification semantics
 /// change. Persistent catalog entries are derived data and must be rebuilt
 /// even when the Markdown file size and mtime are unchanged.
-pub(crate) const CLASSIFIER_VERSION: &str = "2";
+pub(crate) const CLASSIFIER_VERSION: &str = "3";
 
 pub(crate) fn classify_project_document(
     path: &str,
@@ -238,6 +238,16 @@ fn path_defaults(path: &str, file_name: &str) -> ProjectDocumentMetadata {
                 false,
                 "high",
                 "讨论和草稿默认不参与实现检索",
+            )
+        } else if path.starts_with("docs/inbox/conversations/") {
+            (
+                "discussion",
+                "source_material",
+                "none",
+                false,
+                false,
+                "high",
+                "导入聊天只作为讨论来源，不参与当前事实检索",
             )
         } else if path.starts_with("docs/inbox/") {
             (

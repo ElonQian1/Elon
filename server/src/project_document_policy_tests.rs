@@ -45,6 +45,20 @@ fn flat_discussion_is_excluded_and_unknown_note_is_ambiguous() {
 }
 
 #[test]
+fn imported_conversation_is_non_authoritative_source_material() {
+    let conversation = classify_project_document(
+        "docs/inbox/conversations/open-commerce-chat.md",
+        "---\nrole: discussion\nlifecycle: source_material\nauthority: none\ndefault_retrieval: false\n---\n# Chat\n",
+        104,
+    );
+    assert_eq!(conversation.role, "discussion");
+    assert_eq!(conversation.lifecycle, "source_material");
+    assert_eq!(conversation.authority, "none");
+    assert!(!conversation.default_retrieval);
+    assert!(!conversation.ambiguous);
+}
+
+#[test]
 fn frontmatter_can_only_narrow_lifecycle() {
     let metadata = classify_project_document(
         "docs/current/specs/api.md",
