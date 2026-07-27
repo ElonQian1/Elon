@@ -14,6 +14,9 @@ import ProjectDocumentCommandMenu, {
 import type { ProjectCapabilityNode } from './projectDocumentCapabilityGraph'
 import type { ProjectKnowledgeMapView } from './projectDocumentKnowledgeGraphModel'
 import {
+  discussionApplyInstruction,
+  discussionNodeInstruction,
+  discussionSourceInstruction,
   knowledgeMapReviewInstruction,
   knowledgeNodeReviewInstruction,
 } from './projectDocumentKnowledgeMapPrompts'
@@ -34,6 +37,7 @@ import {
   analyzeKnowledgeArchitecture,
   CAPABILITY_MAP_SECTION,
   DOCUMENT_HEALTH_SECTION,
+  DISCUSSION_MAP_SECTION,
   KNOWLEDGE_HOME_SECTION,
   knowledgeSectionCounts,
   serverArchitectureHealth,
@@ -74,6 +78,7 @@ import { useProjectDocumentNavigation } from './useProjectDocumentNavigation'
 import { menuPointForButton, type ProjectDocumentMenuPoint } from './useProjectDocumentMenuTrigger'
 
 const ProjectDocumentCapabilityMap = lazy(() => import('./ProjectDocumentCapabilityMap'))
+const ProjectDocumentDiscussionMap = lazy(() => import('./ProjectDocumentDiscussionMap'))
 
 interface Props {
   projectId: string
@@ -646,6 +651,14 @@ export default function ProjectDocumentsWorkspace({
             manifestRevision={organization.manifestRevision} expectedWorkspace={organizationTracking.projectRoot} onRefresh={loadCatalog}
             canStartAi={canStartAi} organizing={organizing} onOpenDocument={openDocumentFromHome}
             onOpenSection={setActiveSection} onAiOrganize={organizeCapability} onAiReview={reviewKnowledgeMap} />
+        </Suspense>
+      ) : activeSection === DISCUSSION_MAP_SECTION ? (
+        <Suspense fallback={<div className={styles.capabilityLoading}>正在加载讨论推理图…</div>}>
+          <ProjectDocumentDiscussionMap projectId={projectId} canEdit={!!catalog?.can_edit}
+            canStartAi={canStartAi} organizing={organizing} onOpenDocument={openDocumentFromHome}
+            onStructureSource={(path) => { void loadCatalog(); void startAiOrganize(discussionSourceInstruction(path)) }}
+            onDiscussNode={(node, mode) => { void startAiOrganize(discussionNodeInstruction(node, mode)) }}
+            onApplyPending={() => { void startAiOrganize(discussionApplyInstruction()) }} />
         </Suspense>
       ) : activeSection === DOCUMENT_HEALTH_SECTION ? (
         <ProjectDocumentHealthCenter projectId={projectId} analysis={catalog?.analysis} runtime={organizationTracking} onRefresh={loadCatalog}

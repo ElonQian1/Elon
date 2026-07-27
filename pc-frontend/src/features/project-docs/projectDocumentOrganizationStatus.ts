@@ -30,6 +30,7 @@ export interface DocumentOrganizationTrace {
   session_id?: string
   catalog_revision?: string
   manifest_revision?: string
+  discussion_graph_revision?: string
   suggestions_revision?: string
   git_baseline_commit?: string
   git_result_commit?: string
@@ -69,6 +70,7 @@ export function parseDocumentOrganizationTrace(value: unknown): DocumentOrganiza
     session_id: optionalText(candidate.session_id),
     catalog_revision: optionalText(candidate.catalog_revision),
     manifest_revision: optionalText(candidate.manifest_revision),
+    discussion_graph_revision: optionalText(candidate.discussion_graph_revision),
     suggestions_revision: optionalText(candidate.suggestions_revision),
     git_baseline_commit: optionalText(candidate.git_baseline_commit),
     git_result_commit: optionalText(candidate.git_result_commit),

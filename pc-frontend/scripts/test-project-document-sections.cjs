@@ -182,6 +182,7 @@ assert(prompt.includes('project_docs_get_map'))
 assert(prompt.includes('project_docs_review_map'))
 assert(prompt.includes('project_docs_plan_context'))
 assert(prompt.includes('project_docs_get_federation'))
+assert(prompt.includes('project_discussions_get_graph'))
 assert(prompt.includes('section_operations'))
 assert(prompt.includes('16 分区/500 文档'))
 assert(prompt.includes('proposed_knowledge_graph'))
@@ -212,6 +213,7 @@ assert(architectureSource.includes("id: 'unassigned-topic'"))
 assert(!architectureSource.includes('sharedWorkspace'))
 assert(architectureSource.includes('const topics = [...templateSections, ...customSections]'))
 assert(architectureSource.includes("CAPABILITY_MAP_SECTION = 'capability-map'"))
+assert(architectureSource.includes("DISCUSSION_MAP_SECTION = 'discussion-map'"))
 
 const architectureOutput = ts.transpileModule(architectureSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },

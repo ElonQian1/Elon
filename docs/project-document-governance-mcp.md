@@ -1,6 +1,6 @@
 # 项目文档治理 MCP
 
-最后更新：2026-07-23
+最后更新：2026-07-27
 
 本文是接入或诊断项目文档治理 MCP 时才读取的按需手册。日常文档任务先遵循 `.github/instructions/document-authority.instructions.md`，不要把本文复制到 Codex、Claude、Gemini 或 Copilot 的私有桥接文件。
 
@@ -14,6 +14,7 @@
 - 主题树只改变 OneNote 式浏览位置，不改变 `role`、`lifecycle`、`authority` 或 `default_retrieval`；AI 检索仍以真实路径元数据为准。
 - `.elon/document-organization-suggestions.json` 保存待审核或已应用的 AI 建议，不是当前规则真源。
 - `.elon/knowledge-federation.json` 可为大型仓库声明“项目根 → 子项目 → 模块/主题”的知识节点；每个节点可用 `scope_path` 表示主目录、`include_globs` 纳入目录外的模块文档、`exclude_globs` 排除局部材料，并有独立 owner、项目类型、知识首页和健康度，最多 4096 个节点、六层。MCP 和网页端按 `parent_id + cursor/offset + limit` 惰性展开；旧的 16 分区或 500 文档窗口不参与联邦完整性判断。
+- `.elon/discussion-graph.json` 保存聊天编译后的讨论节点、来源和分叉关系；`.elon/discussion-graph-suggestions.json` 保存待应用增量。原始聊天位于 `docs/inbox/conversations/`，固定为无权威、默认不检索的来源材料。完整模型与晋升规则见 `docs/discussion-knowledge-compiler.md`。
 - “AI 整理建议”是独立虚拟分区；建议进入这里不代表已经采用。
 
 因此同一份项目可以在网页端按 OneNote 分区浏览，同时保留适合 Git、IDE 和所有 AI 供应商读取的普通目录结构。
@@ -81,6 +82,18 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 图谱响应始终包含 `classification_model_tokens=0`、`markdown_bodies_read=0`。父节点自底向上聚合子节点文档和实现证据，但聚合来源会保留为可解释证据。有文档只证明覆盖，不能据此声称功能已经实现；实现状态单独由 `file:`、`test:` 的存在性和 `route:`、`symbol:` 等声明证据表达。`implementation_declared=0` 时实现分固定为 0，不能靠文档覆盖得到高健康分；总分同时返回文档、实现和 finding 三个组件及公式。
 图谱查询复用目录增量索引，但不会为每次节点讨论重复执行链接、owner、复查周期和联邦等完整健康分析；完整健康仍由 `project_docs_analyze` 和 PC 目录快照维护。
+
+### `project_discussions_*`
+
+这组工具把任意供应商的长聊天编译为独立讨论推理图：
+
+- `project_discussions_get_graph` 分页读取已有来源、节点、分支、计数和 revision，不读取聊天正文；
+- `project_discussions_get_node` 只返回一个节点的父节点、直接子节点、相邻关系、来源、文档和功能引用；
+- `project_discussions_get_suggestions` 读取待应用建议，默认只返回摘要和计数；
+- `project_discussions_save_proposal` 保存增量来源、节点、关系和文档晋升建议；
+- `project_discussions_apply` 按统一权限应用讨论图，并只创建明确晋升且目标未占用的新 Markdown。
+
+讨论工具与普通文档工具共用 MCP 会话、短期令牌、revision、观测时间线和 `authorization_mode`。`git_backed_full` 同样执行整理前/后文档提交。节点类型必须区分事实、假设、方案、反对意见、证据、风险、决策、需求、功能、任务和结果；开放节点不能自动晋升为当前项目事实。
 
 ### `project_docs_plan_context`
 
@@ -175,6 +188,8 @@ POST /api/projects/:project_id/docs/organization/apply
 
 项目图谱使用确定性树/关系布局，顶部切换产品功能、技术架构和文档主题。默认只展开一级以保持节点可读，支持展开/折叠、缩放/平移、缩略图、节点/文档/实现证据搜索和文档覆盖筛选。详情区把“Markdown 覆盖”和“实现证据”分开显示；`topics` 节点可回到对应 OneNote 分区。图级“与 AI 评审此图”和节点级“与 AI 讨论此节点”会在同一整理任务中要求代理直接调用图谱 MCP，并把确认有价值的变更写入 `proposed_knowledge_graph`，不靠页面点击，也不为凑指标生成重复文档。
 
+“讨论推理”是另一张独立图，不混入产品功能图。用户可导入聊天、按根主题浏览、搜索节点，并从任一节点继续讨论、创建备选分支或发起正式文档晋升。页面先保存原始聊天，再让当前 Windows 登录账号选择的 AI CLI 调用 `project_discussions_*`；UI 不点击代替 MCP，也不在浏览器中自行拆分聊天。
+
 显示排序和项目结构分开保存：按名称、数量、路径或权威性的个人查看偏好只留在浏览器；手工分区顺序、文档固定/顺序、入口和归类属于项目共同知识架构，写 `.elon/document-sections.json`。其中 `document_metadata.order` 与 `document_metadata.pinned` 保存共享文档顺序，`audit_log` 保存最近 100 条结构操作。前端对清单写入使用 revision 防并发覆盖，并提供最多 20 步会话内撤销；Git 仍是跨会话恢复和 AI 实体整理的最终历史。
 
 手工新建分区、删除主题子树和主题/治理归类只修改虚拟知识架构，不会自动创建、移动或删除实际目录与 Markdown。治理覆盖只是检索与工作台标记，不能突破真实路径权威上限。AI 可以提出新的项目模板、首页、分区、缺失文档和关系建议；是否自动应用由统一权限模式决定。
@@ -191,7 +206,7 @@ POST /api/projects/:project_id/docs/organization/apply
 
 ## 6. 验证入口
 
-Rust 单元测试覆盖：summary 响应字节预算与集合不泄露、多维治理与副主题、功能/架构/主题分离、父子图谱聚合、实现证据评分、局部图与分离 token 阅读预算、增量索引和事件去重、链接/孤立/重复标题/owner/复查/实现漂移、问题处理状态与趋势、联邦 glob 与惰性分页、普通项目和托管库的版本差异/失败恢复、分页与字符预算、路径越界、授权模式、revision 冲突、安全重命名/移动、短期会话鉴权、`tools/list` 和直接 `tools/call`。PC 前端合约测试覆盖自定义分区 CRUD、AI 分区建议、Markdown 编辑/渲染和联邦展开。
+Rust 单元测试覆盖：summary 响应字节预算与集合不泄露、多维治理与副主题、功能/架构/主题分离、父子图谱聚合、讨论图来源/循环/关系校验、实现证据评分、局部图与分离 token 阅读预算、增量索引和事件去重、链接/孤立/重复标题/owner/复查/实现漂移、问题处理状态与趋势、联邦 glob 与惰性分页、普通项目和托管库的版本差异/失败恢复、分页与字符预算、路径越界、授权模式、revision 冲突、安全重命名/移动、短期会话鉴权、`tools/list` 和直接 `tools/call`。PC 前端合约测试覆盖自定义分区 CRUD、AI 分区建议、讨论图解析/局部选择/布局、Markdown 编辑/渲染和联邦展开。
 
 发布前至少运行：
 

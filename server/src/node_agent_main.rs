@@ -1,5 +1,6 @@
 // server/src/node_agent_main.rs
 
+#![recursion_limit = "256"]
 #![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
 
 use anyhow::Result;
@@ -143,6 +144,7 @@ mod node_agent_project_agent_recovery;
 mod node_agent_project_agent_runs;
 mod node_agent_project_data_policy;
 mod node_agent_project_docs_mcp;
+mod node_agent_project_docs_mcp_discussion_tools;
 mod node_agent_project_docs_mcp_graph_tools;
 mod node_agent_project_docs_mcp_knowledge_tools;
 mod node_agent_project_docs_mcp_tools;
@@ -217,6 +219,9 @@ mod pc_storage_repo;
 mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;
 mod project_default_docs;
+mod project_discussion_graph;
+mod project_discussion_graph_model;
+mod project_discussion_graph_validation;
 mod project_docs_scan;
 mod project_document_analysis_model;
 mod project_document_architecture;

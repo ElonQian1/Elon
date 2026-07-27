@@ -9,6 +9,8 @@ const PROJECT_DOCUMENT_CONFIG_PATHS: &[&str] = &[
     ".elon/document-sections.json",
     ".elon/document-organization-suggestions.json",
     ".elon/knowledge-federation.json",
+    ".elon/discussion-graph.json",
+    ".elon/discussion-graph-suggestions.json",
 ];
 
 #[derive(Debug)]
@@ -336,6 +338,14 @@ mod tests {
             suggestions.path,
             ".elon/document-organization-suggestions.json"
         );
+        let discussion = write_project_document_file(
+            &root,
+            ".elon/discussion-graph.json",
+            "{\"version\":1}\n",
+            None,
+        )
+        .unwrap();
+        assert_eq!(discussion.path, ".elon/discussion-graph.json");
         assert!(write_project_document_file(&root, ".elon/untrusted.json", "{}", None,).is_err());
         let _ = std::fs::remove_dir_all(root);
     }

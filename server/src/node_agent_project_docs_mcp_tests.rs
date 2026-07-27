@@ -148,6 +148,11 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "project_docs_review_map",
             "project_docs_plan_context",
             "project_docs_get_federation",
+            "project_discussions_get_graph",
+            "project_discussions_get_node",
+            "project_discussions_get_suggestions",
+            "project_discussions_save_proposal",
+            "project_discussions_apply",
             "project_docs_get_status",
             "project_docs_read",
             "project_docs_get_suggestions",
@@ -466,6 +471,82 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     );
     assert!(root.join("AI_AGENT.md").is_file());
     assert!(!root.join("AGENTS.md").exists());
+    let empty_discussions = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":60,"method":"tools/call",
+            "params":{"name":"project_discussions_get_graph","arguments":{"projection":"summary"}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        empty_discussions["result"]["structuredContent"]["counts"]["nodes"],
+        0
+    );
+    let discussion_saved = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":61,"method":"tools/call",
+            "params":{"name":"project_discussions_save_proposal","arguments":{
+                "authorization_mode":"trusted_reversible",
+                "proposal":{
+                    "version":1,"status":"ready","summary":"把聊天拆成可追溯决策",
+                    "documents_read":1,"estimated_tokens_used":120,
+                    "graph":{
+                        "sources":[{"id":"chat","title":"产品讨论","kind":"chat","reference":"AI_AGENT.md"}],
+                        "nodes":[{"id":"root","title":"产品讨论","kind":"topic","status":"accepted","authority":"source","source_refs":["chat#1"]}],
+                        "edges":[]
+                    },
+                    "promotions":[{
+                        "id":"promote-decision","node_id":"root","path":"docs/discussion-decision.md",
+                        "title":"讨论决策","document_type":"decision",
+                        "content":"# 讨论决策\n\n来源：`AI_AGENT.md`\n"
+                    }]
+                }
+            }}
+        })),
+    )
+    .await
+    .unwrap();
+    let discussion_suggestions_revision = discussion_saved["result"]["structuredContent"]
+        ["suggestions_revision"]
+        .as_str()
+        .unwrap();
+    let discussion_applied = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":62,"method":"tools/call",
+            "params":{"name":"project_discussions_apply","arguments":{
+                "authorization_mode":"trusted_reversible",
+                "expected_suggestions_revision":discussion_suggestions_revision
+            }}
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        discussion_applied["result"]["structuredContent"]["status"],
+        "applied"
+    );
+    assert_eq!(
+        discussion_applied["result"]["structuredContent"]["counts"]["nodes"],
+        1
+    );
+    assert!(root.join("docs/discussion-decision.md").is_file());
+    let discussion_node = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":63,"method":"tools/call",
+            "params":{"name":"project_discussions_get_node","arguments":{"node_id":"root"}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        discussion_node["result"]["structuredContent"]["node"]["title"],
+        "产品讨论"
+    );
     fs::remove_dir_all(root).unwrap();
 }
 

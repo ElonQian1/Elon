@@ -31,6 +31,8 @@ pub(crate) struct DocumentOrganizationTrace {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manifest_revision: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discussion_graph_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suggestions_revision: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git_baseline_commit: Option<String>,
@@ -88,6 +90,7 @@ pub(crate) fn start_operation(workspace: &Path, operation_id: Option<&str>) -> R
             session_id: None,
             catalog_revision: None,
             manifest_revision: None,
+            discussion_graph_revision: None,
             suggestions_revision: None,
             git_baseline_commit: None,
             git_result_commit: None,
@@ -210,6 +213,64 @@ pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
                 "已读取建议 revision，没有读取 Markdown 正文。",
             ),
             "project_docs_get_suggestions" => {}
+            "project_discussions_get_graph"
+            | "project_discussions_get_node"
+            | "project_discussions_get_suggestions"
+                if can_advance_work(&trace) =>
+            {
+                advance(
+                    &mut trace,
+                    "discussion_graph_inspected",
+                    "running",
+                    "讨论推理图已检查",
+                    "只读取讨论节点、来源锚点和关系元数据；没有展开原始聊天正文。",
+                )
+            }
+            "project_discussions_get_graph"
+            | "project_discussions_get_node"
+            | "project_discussions_get_suggestions" => {}
+            "project_discussions_save_proposal" => {
+                trace.suggestions_revision = string_field(value, "suggestions_revision");
+                match value["authorization_mode"]
+                    .as_str()
+                    .unwrap_or("git_backed_full")
+                {
+                    "review_all" => advance(
+                        &mut trace,
+                        "awaiting_discussion_review",
+                        "awaiting_review",
+                        "讨论图建议已生成",
+                        "等待用户审核节点、分支和拟晋升文档。",
+                    ),
+                    "suggestions_only" => advance(
+                        &mut trace,
+                        "discussion_suggestions_saved",
+                        "succeeded",
+                        "讨论图建议已生成",
+                        "当前为仅建议模式，没有修改讨论图或创建文档。",
+                    ),
+                    _ => advance(
+                        &mut trace,
+                        "discussion_suggestions_ready",
+                        "running",
+                        "讨论图建议已生成",
+                        "来源、节点、分支和晋升建议已校验，继续执行可逆应用。",
+                    ),
+                }
+            }
+            "project_discussions_apply" => {
+                trace.discussion_graph_revision = string_field(value, "graph_revision");
+                trace.suggestions_revision = string_field(value, "suggestions_revision");
+                trace.git_baseline_commit = string_field(value, "git_baseline_commit");
+                trace.git_result_commit = string_field(value, "git_result_commit");
+                advance(
+                    &mut trace,
+                    "discussion_graph_applied",
+                    "succeeded",
+                    "讨论推理图已应用",
+                    "讨论节点和分支已更新；确认晋升的文档已创建，并保存可用的版本记录。",
+                );
+            }
             "project_docs_save_suggestions" => {
                 trace.catalog_revision = string_field(value, "catalog_revision");
                 trace.suggestions_revision = string_field(value, "suggestions_revision");
@@ -319,9 +380,24 @@ pub(crate) fn record_tool_failure(workspace: &Path, tool: &str, error: &anyhow::
         "project_docs_apply_file_operations" => {
             "重新 analyze 获取最新文件哈希和目录 revision，确认目标未占用后重试。"
         }
+        "project_discussions_get_graph"
+        | "project_discussions_get_node"
+        | "project_discussions_get_suggestions" => {
+            "刷新讨论图 revision，确认 root_id 或 node_id 存在后重试。"
+        }
+        "project_discussions_save_proposal" => {
+            "重新读取讨论图和建议 revision，修正未知来源、循环父子关系或无效晋升目标后重试。"
+        }
+        "project_discussions_apply" => {
+            "重新读取讨论图建议；确认权限、revision 和晋升文档目标未被占用后重试。"
+        }
         _ => "查看错误详情并重试当前步骤。",
     };
-    let code = format!("{}_failed", tool.trim_start_matches("project_docs_"));
+    let code = format!(
+        "{}_failed",
+        tool.trim_start_matches("project_docs_")
+            .trim_start_matches("project_discussions_")
+    );
     let _ = mark_failure(workspace, None, &code, &format!("{error:#}"), recovery);
 }
 
@@ -461,6 +537,7 @@ fn new_direct_trace() -> DocumentOrganizationTrace {
         session_id: None,
         catalog_revision: None,
         manifest_revision: None,
+        discussion_graph_revision: None,
         suggestions_revision: None,
         git_baseline_commit: None,
         git_result_commit: None,

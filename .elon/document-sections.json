@@ -190,6 +190,7 @@
     "docs/cli会话问题/单纯Codex cli上下文会话.md": "custom:external-tools",
     "docs/cli会话问题/纯Codex cli图片会话.md": "custom:external-tools",
     "docs/codex-vault-sharing-runbook.md": "custom:security",
+    "docs/discussion-knowledge-compiler.md": "custom:pc-workbench",
     "docs/fb2-ai-center/PLAN.md": "custom:fb2-project",
     "docs/fb2-ai-center/PROGRESS.md": "custom:fb2-project",
     "docs/fb2-ai-center/README.md": "custom:fb2-project",
@@ -253,6 +254,10 @@
       "custom:ai-context",
       "custom:project-system"
     ],
+    "docs/discussion-knowledge-compiler.md": [
+      "custom:ai-context",
+      "custom:project-system"
+    ],
     "docs/system-architecture.md": [
       "custom:backend-api",
       "custom:project-system"
@@ -269,6 +274,7 @@
     "docs/app-version-memory.md": "on-demand",
     "docs/codex-mcp-native-git-push-20260701-171812.md": "evidence",
     "docs/codex-vault-sharing-runbook.md": "on-demand",
+    "docs/discussion-knowledge-compiler.md": "on-demand",
     "docs/codex-vault-usage-estimation.md": "on-demand",
     "docs/fb2-ai-center/PLAN.md": "drafts",
     "docs/fb2-ai-center/PROGRESS.md": "evidence",
@@ -391,6 +397,12 @@
       "lifecycle": "active",
       "authority": "guidance",
       "document_type": "guide"
+    },
+    "docs/discussion-knowledge-compiler.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture"
     },
     "docs/project-document-governance-mcp.md": {
       "retrieval": "on_demand",
@@ -1112,10 +1124,13 @@
         "color": "#58A8DF",
         "entrypoint": "docs/project-document-governance-mcp.md",
         "document_paths": [
+          "docs/discussion-knowledge-compiler.md",
           "docs/project-document-governance-mcp.md"
         ],
         "implementation_refs": [
+          "file:server/src/node_agent_project_docs_mcp_discussion_tools.rs",
           "file:server/src/node_agent_project_docs_mcp.rs",
+          "file:server/src/project_discussion_graph.rs",
           "file:server/src/project_document_federation_service.rs",
           "file:server/src/project_document_knowledge_graph.rs",
           "file:server/src/project_document_knowledge_graph_health.rs",
@@ -1175,6 +1190,33 @@
           "architecture",
           "graph",
           "map"
+        ]
+      },
+      {
+        "id": "cap-discussion-compiler",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "聊天讨论编译与分叉",
+        "detail": "把长聊天拆成可追溯推理节点，支持继续、备选分支和正式知识晋升",
+        "parent_id": "cap-knowledge",
+        "order": 50,
+        "color": "#D39A5A",
+        "entrypoint": "docs/discussion-knowledge-compiler.md",
+        "document_paths": [
+          "docs/discussion-knowledge-compiler.md",
+          "docs/project-document-governance-mcp.md"
+        ],
+        "implementation_refs": [
+          "file:pc-frontend/src/features/project-docs/ProjectDocumentDiscussionMap.tsx",
+          "file:server/src/node_agent_project_docs_mcp_discussion_tools.rs",
+          "file:server/src/project_discussion_graph.rs",
+          "test:server/src/node_agent_project_docs_mcp_tests.rs"
+        ],
+        "tags": [
+          "conversation",
+          "discussion",
+          "graph",
+          "knowledge"
         ]
       },
       {

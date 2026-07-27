@@ -417,6 +417,7 @@ export function buildOrganizationPrompt(
     '如果提供 project_docs_* MCP 工具，必须按以下顺序直接调用，不要用页面点击代替：' +
     '① project_docs_analyze 使用 projection=summary 获取 classification_model_tokens=0 的分类与真实 response_budget；大型仓库用 project_docs_get_federation 分页惰性展开，再按 scope_id/topic 获取 page；' +
     '② project_docs_get_map 获取 overview 后只查询任务命中的 capabilities、architecture 或 topics 局部图；需要判断结构时调用 project_docs_review_map，单节点用 project_docs_get_node；' +
+    '若本次输入是聊天记录或讨论节点，改用 project_discussions_get_graph/get_node，保存增量 proposal 后再按权限 apply；讨论来源默认无权威性，只有稳定结论才可晋升为文档；' +
     '③ project_docs_get_issues 按状态/严重度/负责人获取程序证据；既有问题用 project_docs_update_issue，趋势用 project_docs_get_health_history；先 project_docs_plan_context，再只 read 少量歧义文档；' +
     '④ project_docs_save_suggestions 携带当前 authorization_mode 保存 ready 建议；' +
     `④ 保存后按当前权限继续；${authorizationInstruction}` +

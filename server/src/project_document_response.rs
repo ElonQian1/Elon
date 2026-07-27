@@ -59,9 +59,12 @@ pub(crate) fn project_tool_response(
         "project_docs_get_health" => project_health(value, &request),
         "project_docs_get_issues" => project_issues(value, &request),
         "project_docs_get_suggestions" => project_suggestions(value, &request),
+        "project_discussions_get_suggestions" => discussion_suggestions(value, &request),
         "project_docs_save_suggestions"
         | "project_docs_apply_suggestions"
-        | "project_docs_apply_file_operations" => project_mutation(value, &request),
+        | "project_docs_apply_file_operations"
+        | "project_discussions_save_proposal"
+        | "project_discussions_apply" => project_mutation(value, &request),
         _ => value,
     };
     attach_response_budget(&mut value)?;
@@ -88,6 +91,9 @@ pub(crate) fn compact_text(tool: &str, value: &Value) -> Result<String> {
         "catalog_revision",
         "manifest_revision",
         "suggestions_revision",
+        "graph_revision",
+        "counts",
+        "promoted_documents",
         "pagination",
         "response_budget",
         "git_baseline_commit",
@@ -335,6 +341,31 @@ fn project_mutation(mut value: Value, request: &ProjectionRequest) -> Value {
     }
     value["projection"] =
         json!({"mode":"summary","reason":"mutation responses default to receipts and revisions"});
+    value
+}
+
+fn discussion_suggestions(mut value: Value, request: &ProjectionRequest) -> Value {
+    if request.is_full() {
+        return value;
+    }
+    let summarized = {
+        let suggestions = &value["suggestions"];
+        if suggestions.is_null() {
+            Value::Null
+        } else {
+            json!({
+                "version": suggestions["version"],
+                "status": suggestions["status"],
+                "summary": suggestions["summary"],
+                "documents_read": suggestions["documents_read"],
+                "estimated_tokens_used": suggestions["estimated_tokens_used"],
+                "counts": value["counts"],
+            })
+        }
+    };
+    value["suggestions"] = summarized;
+    value["projection"] =
+        json!({"mode":"summary","reason":"discussion suggestions default to receipts and counts"});
     value
 }
 
