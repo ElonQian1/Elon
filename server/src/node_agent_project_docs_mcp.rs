@@ -200,7 +200,7 @@ pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Opt
             "protocolVersion": MCP_PROTOCOL_VERSION,
             "capabilities": { "tools": { "listChanged": false } },
             "serverInfo": { "name": "yilong-project-docs", "version": "1.0.0" },
-            "instructions": "先调用 project_docs_analyze；再按任务局部查询图谱、节点和 token 阅读计划。大型项目按 federation scope_id 分页。目录与图谱预分类不读正文且 classification_model_tokens=0；用 project_docs_get_issues 取得质量证据，只用 project_docs_read 按需读歧义文档。聊天整理使用 project_discussions_get_graph/get_node 先看已有讨论结构，只读取当前来源；save_proposal 保存来源、分支和晋升建议，apply 才更新讨论图和创建新文档。讨论来源默认无权威性，假设、意见、证据、决策和当前事实必须分开。authorization_mode 默认 git_backed_full：普通文档建议和讨论图应用均创建整理前后提交。普通 Git 与托管知识库均可 get_history/get_version_diff；restore 只创建新提交并拒绝混合代码版本。review_all 必须用户审核；suggestions_only 只保存建议。禁止覆盖、越界、修改代码或自动 push。"
+            "instructions": "先调用 project_docs_analyze；再按任务局部查询图谱、节点和 token 阅读计划。大型项目按 federation scope_id 分页。目录与图谱预分类不读正文且 classification_model_tokens=0；用 project_docs_get_issues 取得质量证据，只用 project_docs_read 按需读歧义文档。聊天整理使用 project_discussions_get_graph/get_node 先看已有讨论结构；回顾演化优先使用 project_discussions_get_history/get_graph_at_version/compare_versions/trace_node，禁止为了看版本而重读聊天正文。只读取当前来源；save_proposal 保存来源、分支和晋升建议，apply 才更新讨论图和创建新文档。讨论来源默认无权威性，假设、意见、证据、决策和当前事实必须分开。authorization_mode 默认 git_backed_full：普通文档建议和讨论图应用均创建整理前后提交。普通 Git 与托管知识库均可 get_history/get_version_diff；restore 只创建新提交并拒绝混合代码版本。review_all 必须用户审核；suggestions_only 只保存建议。禁止覆盖、越界、修改代码或自动 push。"
         })),
         "notifications/initialized" => return None,
         "tools/list" => Ok(json!({ "tools": tool_definitions() })),

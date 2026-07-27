@@ -154,6 +154,7 @@ mod project_conversation_workspace;
 mod project_default_docs;
 mod project_deletion;
 mod project_discussion_graph;
+mod project_discussion_graph_history;
 mod project_discussion_graph_model;
 mod project_discussion_graph_validation;
 mod project_docs;

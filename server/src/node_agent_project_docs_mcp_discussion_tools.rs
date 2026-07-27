@@ -53,7 +53,7 @@ struct ApplyArguments {
 }
 
 pub(crate) fn definitions() -> Vec<Value> {
-    vec![
+    let mut definitions = vec![
         tool(
             "project_discussions_get_graph",
             "分页读取独立讨论推理图；返回显式讨论节点、来源锚点和分叉关系，不读取原始聊天正文。长聊天整理先调用它增量了解已有结构。",
@@ -95,10 +95,24 @@ pub(crate) fn definitions() -> Vec<Value> {
                 "expected_suggestions_revision":{"type":"string"}
             }}),
         ),
-    ]
+    ];
+    definitions.splice(
+        2..2,
+        crate::node_agent_project_docs_mcp_discussion_history_tools::definitions(),
+    );
+    definitions
 }
 
 pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result<Option<Value>> {
+    if let Some(value) =
+        crate::node_agent_project_docs_mcp_discussion_history_tools::try_call(
+            workspace,
+            name,
+            arguments.clone(),
+        )?
+    {
+        return Ok(Some(value));
+    }
     let value = match name {
         "project_discussions_get_graph" => {
             let projection = ProjectionRequest::from_arguments(&arguments)?;

@@ -150,6 +150,10 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "project_docs_get_federation",
             "project_discussions_get_graph",
             "project_discussions_get_node",
+            "project_discussions_get_history",
+            "project_discussions_get_graph_at_version",
+            "project_discussions_compare_versions",
+            "project_discussions_trace_node",
             "project_discussions_get_suggestions",
             "project_discussions_save_proposal",
             "project_discussions_apply",
@@ -489,7 +493,7 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         request(json!({
             "jsonrpc":"2.0","id":61,"method":"tools/call",
             "params":{"name":"project_discussions_save_proposal","arguments":{
-                "authorization_mode":"trusted_reversible",
+                "authorization_mode":"git_backed_full",
                 "proposal":{
                     "version":1,"status":"ready","summary":"把聊天拆成可追溯决策",
                     "documents_read":1,"estimated_tokens_used":120,
@@ -518,7 +522,7 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         request(json!({
             "jsonrpc":"2.0","id":62,"method":"tools/call",
             "params":{"name":"project_discussions_apply","arguments":{
-                "authorization_mode":"trusted_reversible",
+                "authorization_mode":"git_backed_full",
                 "expected_suggestions_revision":discussion_suggestions_revision
             }}
         })),
@@ -547,6 +551,51 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         discussion_node["result"]["structuredContent"]["node"]["title"],
         "产品讨论"
     );
+    let discussion_history = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":64,"method":"tools/call",
+            "params":{"name":"project_discussions_get_history","arguments":{"limit":10}}
+        })),
+    )
+    .await
+    .unwrap();
+    let discussion_commit = discussion_history["result"]["structuredContent"]["versions"][0]
+        ["commit"]
+        .as_str()
+        .unwrap();
+    assert_eq!(
+        discussion_history["result"]["structuredContent"]["budget"]["chat_bodies_read"],
+        0
+    );
+    let historical_graph = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":65,"method":"tools/call",
+            "params":{"name":"project_discussions_get_graph_at_version","arguments":{
+                "commit":discussion_commit,"projection":"page"
+            }}
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        historical_graph["result"]["structuredContent"]["nodes"][0]["id"],
+        "root"
+    );
+    let node_trace = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":66,"method":"tools/call",
+            "params":{"name":"project_discussions_trace_node","arguments":{"node_id":"root"}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert!(!node_trace["result"]["structuredContent"]["events"]
+        .as_array()
+        .unwrap()
+        .is_empty());
     fs::remove_dir_all(root).unwrap();
 }
 
