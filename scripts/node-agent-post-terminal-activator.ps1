@@ -41,6 +41,18 @@ function Get-LoopbackNodeStatus {
     return $null
 }
 
+function Test-LoopbackNodeActivationOwnerGate {
+    $node = Get-LoopbackNodeStatus
+    if ($null -eq $node) {
+        return [pscustomobject]@{
+            Safe = $false
+            Reason = 'status_unavailable'
+            ActiveTaskIds = @()
+        }
+    }
+    return Test-NodeAgentActivationOwnerGate -Status $node.Status
+}
+
 function Expand-VerifiedReleasePackage {
     param($Release)
     $actual = Get-NodeAgentFileSha256 -Path ([string]$Release.package_path)
@@ -131,7 +143,7 @@ try {
         )
         $backupRoot = Join-Path $StateRoot (Join-Path 'rollback' $backupName)
         $result = Invoke-NodeAgentActivationTransaction -Release $latest `
-            -OwnerGate { Test-NodeAgentActivationOwnerGate -Status (Get-LoopbackNodeStatus).Status } `
+            -OwnerGate { Test-LoopbackNodeActivationOwnerGate } `
             -Prepare {
                 param($target)
                 $expanded = Expand-VerifiedReleasePackage -Release $target

@@ -55,6 +55,15 @@ foreach ($moduleName in @(
     Assert-Equal $parseErrors.Count 0 "PowerShell parser must accept $moduleName in the current runtime"
 }
 
+$activatorSource = [System.IO.File]::ReadAllText(
+    (Join-Path $PSScriptRoot 'node-agent-post-terminal-activator.ps1'),
+    [System.Text.Encoding]::UTF8
+)
+Assert-True $activatorSource.Contains('function Test-LoopbackNodeActivationOwnerGate') `
+    'post-terminal activation must handle a node disappearing between owner-gate checks'
+Assert-True (-not $activatorSource.Contains('(Get-LoopbackNodeStatus).Status')) `
+    'post-terminal activation must not dereference a missing loopback node under StrictMode'
+
 $root = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-local-first-release-test-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root | Out-Null
 try {
