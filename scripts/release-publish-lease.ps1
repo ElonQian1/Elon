@@ -61,11 +61,6 @@ function Wait-ElonGlobalPublishLease {
     while ($Claim.action -eq 'wait') {
         Write-Host "   Global publish lease waiting (FIFO $($Claim.queuePosition)); heartbeat active..." -ForegroundColor Yellow
         Start-Sleep -Seconds 5
-        Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/heartbeat" -Method POST -Body @{
-            kind = $Kind; token = [string]$Claim.token; leaseSecs = $LeaseSecs
-            sha = [string]$Claim.sha; batchId = [string]$Claim.batchId
-            stage = [string]$Claim.stage; stageStatus = 'queued'
-        } | Out-Null
         $escapedToken = [Uri]::EscapeDataString([string]$Claim.token)
         $status = Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/status?token=$escapedToken"
         $tokenStatus = $status.tokenStatus
@@ -77,7 +72,32 @@ function Wait-ElonGlobalPublishLease {
                 if ($tokenStatus.success) { return $tokenStatus }
                 throw "queued publish failed: $($tokenStatus.errorMessage)"
             }
-            'wait' { $Claim.queuePosition = [int]$tokenStatus.queuePosition }
+            'wait' {
+                $Claim.queuePosition = [int]$tokenStatus.queuePosition
+                try {
+                    Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/heartbeat" -Method POST -Body @{
+                        kind = $Kind; token = [string]$Claim.token; leaseSecs = $LeaseSecs
+                        sha = [string]$Claim.sha; batchId = [string]$Claim.batchId
+                        stage = [string]$Claim.stage; stageStatus = 'queued'
+                    } | Out-Null
+                } catch {
+                    if (-not $_.Exception.Message.Contains('running release stage cannot return to queued')) {
+                        throw
+                    }
+                    # The previous owner may finish between status and heartbeat. In that race the
+                    # server promotes this token to owner/running, so re-read instead of regressing
+                    # the durable stage to queued or failing a valid publication.
+                    $status = Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/status?token=$escapedToken"
+                    $tokenStatus = $status.tokenStatus
+                    if (-not $tokenStatus) { throw 'release/status did not return tokenStatus after promotion race' }
+                    if ([string]$tokenStatus.action -eq 'build') { return $tokenStatus }
+                    if ([string]$tokenStatus.action -eq 'coalesced') { return $tokenStatus }
+                    if ([string]$tokenStatus.action -eq 'finished' -and $tokenStatus.success) {
+                        return $tokenStatus
+                    }
+                    throw
+                }
+            }
             default { throw "publish lease became invalid: $($tokenStatus | ConvertTo-Json -Compress)" }
         }
     }
