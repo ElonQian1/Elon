@@ -88,6 +88,15 @@ jobs:
         shell: pwsh
         run: scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml
 
+      - name: Upload Rust Validation Evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-validation-evidence-${{ github.run_id }}
+          path: ~\AppData\Local\Elon\rust-cache-v2\validation-v1\evidence
+          if-no-files-found: error
+          retention-days: 7
+
   pc-frontend:
     name: PC Frontend
     runs-on: ubuntu-latest
