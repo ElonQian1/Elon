@@ -70,6 +70,8 @@ function Get-RustCacheProjectManifest {
             schema_version = 1
             project_id = "quarantine-$(Get-RustCacheWorkspaceHash -WorkspaceRoot $ProjectRoot)"
             default_domain = "unregistered"
+            allowed_domains = @()
+            unknown_domain_fallback = "unregistered"
             registered = $false
             manifest_path = $null
         }
@@ -87,13 +89,59 @@ function Get-RustCacheProjectManifest {
         throw "rust-cache.project.json must define a non-empty project_id: $manifestPath"
     }
     $domain = ConvertTo-RustCacheSlug ([string]$manifest.default_domain)
+    $allowedDomains = @()
+    if ($null -ne $manifest.PSObject.Properties["allowed_domains"]) {
+        $allowedDomains = @($manifest.allowed_domains |
+            ForEach-Object { ConvertTo-RustCacheSlug ([string]$_) } |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and $_ -ne "unknown" } |
+            Sort-Object -Unique)
+    }
+    $fallbackDomain = if ($null -ne $manifest.PSObject.Properties["unknown_domain_fallback"]) {
+        ConvertTo-RustCacheSlug ([string]$manifest.unknown_domain_fallback)
+    } else {
+        $domain
+    }
+    if ($allowedDomains.Count -gt 0) {
+        if ($domain -notin $allowedDomains) {
+            throw "rust-cache.project.json default_domain must be listed in allowed_domains: $manifestPath"
+        }
+        if ($fallbackDomain -notin $allowedDomains) {
+            throw "rust-cache.project.json unknown_domain_fallback must be listed in allowed_domains: $manifestPath"
+        }
+    }
     return [pscustomobject]@{
         schema_version = 1
         project_id = $projectId
         default_domain = $domain
+        allowed_domains = $allowedDomains
+        unknown_domain_fallback = $fallbackDomain
         registered = $true
         manifest_path = $manifestPath
     }
+}
+
+function Resolve-RustCacheDomain {
+    param(
+        [Parameter(Mandatory)][string]$ProjectRoot,
+        [string]$Domain,
+        [AllowNull()]$Manifest
+    )
+
+    $projectManifest = if ($null -eq $Manifest) {
+        Get-RustCacheProjectManifest -ProjectRoot $ProjectRoot
+    } else {
+        $Manifest
+    }
+    $requested = if ([string]::IsNullOrWhiteSpace($Domain)) {
+        [string]$projectManifest.default_domain
+    } else {
+        ConvertTo-RustCacheSlug $Domain
+    }
+    $allowed = @($projectManifest.allowed_domains)
+    if (-not $projectManifest.registered -or $allowed.Count -eq 0 -or $requested -in $allowed) {
+        return $requested
+    }
+    return [string]$projectManifest.unknown_domain_fallback
 }
 
 function Add-RustCacheLegacyRecord {
@@ -129,4 +177,4 @@ function Add-RustCacheLegacyRecord {
     return $policyPath
 }
 
-Export-ModuleMember -Function Get-DefaultRustCachePolicy, Get-RustCachePolicyPath, Initialize-RustCachePolicy, Get-RustCachePolicy, Get-RustCacheProjectManifest, Add-RustCacheLegacyRecord
+Export-ModuleMember -Function Get-DefaultRustCachePolicy, Get-RustCachePolicyPath, Initialize-RustCachePolicy, Get-RustCachePolicy, Get-RustCacheProjectManifest, Resolve-RustCacheDomain, Add-RustCacheLegacyRecord

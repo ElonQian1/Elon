@@ -3,6 +3,10 @@ param([string]$CacheRoot,[switch]$ReceiptOnly,[switch]$DisableSccache,[switch]$S
 $ErrorActionPreference='Stop'
 $repoRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $modules=Join-Path $PSScriptRoot 'validation'
+Import-Module (Join-Path $PSScriptRoot 'rust-cache\RustCache.Policy.psm1') -Force -DisableNameChecking
+$requestedDomain=$Domain
+$Domain=Resolve-RustCacheDomain -ProjectRoot $repoRoot -Domain $Domain
+if($requestedDomain -ne $Domain){Write-Host "RUST_CACHE_DOMAIN_CANONICALIZED=$requestedDomain->$Domain"}
 Import-Module (Join-Path $modules 'Validation.Receipt.psm1') -Force -DisableNameChecking
 Import-Module (Join-Path $modules 'Validation.Fingerprint.psm1') -Force -DisableNameChecking
 Import-Module (Join-Path $PSScriptRoot 'rust-cache\RustCache.Paths.psm1') -Force -DisableNameChecking

@@ -1,5 +1,12 @@
 {
   "schema_version": 1,
   "project_id": "elon-cli",
-  "default_domain": "dev-windows-msvc"
+  "default_domain": "dev-windows-msvc",
+  "allowed_domains": [
+    "dev-windows-msvc",
+    "agent-validation",
+    "node-agent-release",
+    "node-agent-local-first-v1"
+  ],
+  "unknown_domain_fallback": "agent-validation"
 }

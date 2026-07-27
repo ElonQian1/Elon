@@ -34,6 +34,10 @@ $RepoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Current script is not inside a Git repository."
 }
+$requestedDomain = $Domain
+Import-Module (Join-Path $RepoRoot "scripts\rust-cache\RustCache.Policy.psm1") -Force -DisableNameChecking
+$Domain = Resolve-RustCacheDomain -ProjectRoot $RepoRoot -Domain $Domain
+if ($requestedDomain -ne $Domain) { Write-Host "RUST_CACHE_DOMAIN_CANONICALIZED=$requestedDomain->$Domain" }
 
 if (-not $BypassValidationOrchestrator) {
     $validationArgs = @("-Domain", $Domain)

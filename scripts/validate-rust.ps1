@@ -9,6 +9,10 @@ $parsed = Split-ValidationCargoArguments -Arguments $args -ValueOptions @{
 } -SwitchOptions @('-Force','-DisableSccache','-SkipCheapGates')
 $CacheRoot = $parsed.wrapper.CacheRoot
 $Domain = if ($parsed.wrapper.Domain) { $parsed.wrapper.Domain } else { 'agent-validation' }
+$requestedDomain = $Domain
+Import-Module (Join-Path $RepoRoot "scripts\rust-cache\RustCache.Policy.psm1") -Force -DisableNameChecking
+$Domain = Resolve-RustCacheDomain -ProjectRoot $RepoRoot -Domain $Domain
+if ($requestedDomain -ne $Domain) { Write-Host "RUST_CACHE_DOMAIN_CANONICALIZED=$requestedDomain->$Domain" }
 $TargetDir = $parsed.wrapper.TargetDir
 $WaitTimeoutSeconds = if ($parsed.wrapper.WaitTimeoutSeconds) { [int]$parsed.wrapper.WaitTimeoutSeconds } else { 3600 }
 $LightSlots = if ($parsed.wrapper.LightSlots) { [int]$parsed.wrapper.LightSlots } else { 2 }

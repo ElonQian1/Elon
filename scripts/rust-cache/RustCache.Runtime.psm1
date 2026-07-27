@@ -63,7 +63,8 @@ function Resolve-RustCacheInvocation {
     $project = [System.IO.Path]::GetFullPath($ProjectRoot)
     $root = Resolve-RustCacheRoot -ExplicitRoot $CacheRoot -RepoRoot $project
     $manifest = Get-RustCacheProjectManifest -ProjectRoot $project
-    $resolvedDomain = if ([string]::IsNullOrWhiteSpace($Domain)) { $manifest.default_domain } else { ConvertTo-RustCacheSlug $Domain }
+    $requestedDomain = if ([string]::IsNullOrWhiteSpace($Domain)) { $manifest.default_domain } else { ConvertTo-RustCacheSlug $Domain }
+    $resolvedDomain = Resolve-RustCacheDomain -ProjectRoot $project -Domain $Domain -Manifest $manifest
     $workspace = Resolve-RustCacheWorkspaceRoot -ProjectRoot $project -CargoArgs $CargoArgs
     $workspaceHash = Get-RustCacheWorkspaceHash -WorkspaceRoot $workspace
     $epoch = if ([string]::IsNullOrWhiteSpace($ToolchainEpoch)) { Get-RustCacheToolchainEpoch } else { ConvertTo-RustCacheSlug $ToolchainEpoch }
@@ -91,7 +92,9 @@ function Resolve-RustCacheInvocation {
         project_root = $project
         workspace_root = $workspace
         workspace_hash = $workspaceHash
+        requested_domain = $requestedDomain
         domain = $resolvedDomain
+        domain_fallback = $requestedDomain -ne $resolvedDomain
         toolchain_epoch = $epoch
         build_dir = $buildDir
         target_dir = $resolvedTarget
@@ -306,7 +309,9 @@ function Invoke-RustCacheCargo {
         $readiness = Get-RustCacheSccacheReadiness -Disabled:$DisableSccache
 
         Write-Host "RUST_CACHE_PROJECT=$($context.project_id)"
+        Write-Host "RUST_CACHE_DOMAIN_REQUESTED=$($context.requested_domain)"
         Write-Host "RUST_CACHE_DOMAIN=$($context.domain)"
+        Write-Host "RUST_CACHE_DOMAIN_FALLBACK=$($context.domain_fallback)"
         Write-Host "CARGO_BUILD_BUILD_DIR=$($context.build_dir)"
         Write-Host "CARGO_TARGET_DIR=$($context.target_dir)"
         $alternative = if ($env:ELON_NODE_DATA_ROOT) { Join-Path $env:ELON_NODE_DATA_ROOT "cache\rust-cache-v2" } else { $null }
