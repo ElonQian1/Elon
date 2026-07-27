@@ -11,6 +11,11 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::{mpsc, oneshot};
 use uuid::Uuid;
 
+// A cold metadata scan also evaluates document health and can exceed the
+// lightweight request timeout on real repositories. Keep one full first-load
+// window so the web workspace does not fall back to an incomplete server copy.
+const PROJECT_DOCUMENT_CATALOG_TIMEOUT: Duration = Duration::from_secs(30);
+
 impl AgentManager {
     pub async fn dispatch_project_workspace_provision(
         &self,
@@ -180,10 +185,14 @@ impl AgentManager {
             .map_err(|_| anyhow!("agent writer closed"))?;
         drop(agents);
 
-        let outcome = match tokio::time::timeout(Duration::from_secs(8), rx.recv()).await {
+        let timeout = PROJECT_DOCUMENT_CATALOG_TIMEOUT;
+        let outcome = match tokio::time::timeout(timeout, rx.recv()).await {
             Ok(Some(msg)) => Ok(msg),
             Ok(None) => Err(anyhow!("agent disconnected before project docs response")),
-            Err(_) => Err(anyhow!("project docs read timeout (8s)")),
+            Err(_) => Err(anyhow!(
+                "project docs read timeout ({}s)",
+                timeout.as_secs()
+            )),
         };
         if outcome.is_err() {
             pending.lock().await.remove(&req_id);
