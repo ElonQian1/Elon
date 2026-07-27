@@ -50,7 +50,25 @@ function Test-LoopbackNodeActivationOwnerGate {
             ActiveTaskIds = @()
         }
     }
-    return Test-NodeAgentActivationOwnerGate -Status $node.Status
+    $gate = Test-NodeAgentActivationOwnerGate -Status $node.Status
+    if (-not $gate.Safe) { return $gate }
+    $desktopPath = Join-Path ([System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::LocalApplicationData)) 'ElonNode\_internal\elon-desktop.exe'
+    $desktopRunning = @(Get-Process -Name 'elon-desktop' -ErrorAction SilentlyContinue | Where-Object {
+        try {
+            -not [string]::IsNullOrWhiteSpace($_.Path) -and
+                ([System.IO.Path]::GetFullPath($_.Path)).Equals([System.IO.Path]::GetFullPath($desktopPath), [System.StringComparison]::OrdinalIgnoreCase)
+        } catch {
+            $false
+        }
+    })
+    if ($desktopRunning.Count -gt 0) {
+        return [pscustomobject]@{
+            Safe = $false
+            Reason = 'desktop_shell_running'
+            ActiveTaskIds = @()
+        }
+    }
+    return $gate
 }
 
 function Expand-VerifiedReleasePackage {

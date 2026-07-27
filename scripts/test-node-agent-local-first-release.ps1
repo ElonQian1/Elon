@@ -63,6 +63,8 @@ Assert-True $activatorSource.Contains('function Test-LoopbackNodeActivationOwner
     'post-terminal activation must handle a node disappearing between owner-gate checks'
 Assert-True (-not $activatorSource.Contains('(Get-LoopbackNodeStatus).Status')) `
     'post-terminal activation must not dereference a missing loopback node under StrictMode'
+Assert-True $activatorSource.Contains('desktop_shell_running') `
+    'post-terminal activation must wait while the desktop shell keeps the package repair entrypoint from closing the UI'
 
 $root = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-local-first-release-test-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root | Out-Null
