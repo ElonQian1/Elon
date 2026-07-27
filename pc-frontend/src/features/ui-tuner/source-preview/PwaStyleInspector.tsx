@@ -44,6 +44,29 @@ const TYPE_FIELDS: FieldSpec[] = [
   { property: 'borderRadius', label: '圆角', placeholder: '8px / 50%', quickStep: 2, quickUnit: 'px', min: 0 },
 ]
 
+const STYLE_PRESETS = [
+  {
+    label: '紧凑',
+    hint: '小按钮/列表项',
+    styles: { paddingTop: '6px', paddingRight: '10px', paddingBottom: '6px', paddingLeft: '10px', borderRadius: '10px', fontSize: '13px' },
+  },
+  {
+    label: '标准',
+    hint: '常规移动端',
+    styles: { paddingTop: '10px', paddingRight: '14px', paddingBottom: '10px', paddingLeft: '14px', borderRadius: '14px', fontSize: '14px' },
+  },
+  {
+    label: '舒展',
+    hint: '主操作/卡片',
+    styles: { paddingTop: '14px', paddingRight: '18px', paddingBottom: '14px', paddingLeft: '18px', borderRadius: '18px', fontSize: '15px' },
+  },
+  {
+    label: '胶囊',
+    hint: '圆润按钮',
+    styles: { borderRadius: '999px', paddingLeft: '18px', paddingRight: '18px' },
+  },
+] satisfies Array<{ label: string; hint: string; styles: Partial<Record<PwaStyleProperty, string>> }>
+
 function originalValue(selection: PwaSelection, property: PwaStyleProperty): string {
   return selection.originalStyle.authored[property]
     || selection.originalStyle.computed[property]
@@ -139,6 +162,28 @@ function WritebackPlanSummary({ session }: Props) {
       {plan.codexReasons.slice(0, 2).map((reason) => <small key={reason}>{reason}</small>)}
       {plan.codexReasons.length > 2 && <small>还有 {plan.codexReasons.length - 2} 个绑定缺口会放入 CLI 包。</small>}
     </div>
+  )
+}
+
+function StylePresetBar({ session }: Props) {
+  return (
+    <section className={styles.pwaPresetSection}>
+      <h3>快速草稿</h3>
+      <div className={styles.pwaPresetGrid}>
+        {STYLE_PRESETS.map((preset) => (
+          <button
+            key={preset.label}
+            type="button"
+            title={preset.hint}
+            onClick={() => session.updateStyles(`preset:${preset.label}`, preset.styles)}
+          >
+            <strong>{preset.label}</strong>
+            <span>{preset.hint}</span>
+          </button>
+        ))}
+      </div>
+      <small>预设只写入当前选中元素的草稿；确认后再走 PWA/APK 写回与验证。</small>
+    </section>
   )
 }
 
@@ -241,6 +286,8 @@ export function PwaStyleInspector({ session }: Props) {
           <p>PWA 候选 {selectedDraft?.binding.pwaCandidates.length ?? 0} 个 · Android 候选 {selectedDraft?.binding.androidCandidates.length ?? 0} 个</p>
           {(selectedDraft?.binding.needsBinding ?? session.selection.identity.needsBinding) && <p>需要 AI 建立绑定；selector 只作为本次 Runtime 定位证据，不会成为长期源码身份。</p>}
         </section>
+
+        <StylePresetBar session={session} />
 
         <section className={styles.pwaStyleSection}>
           <h3>尺寸</h3>

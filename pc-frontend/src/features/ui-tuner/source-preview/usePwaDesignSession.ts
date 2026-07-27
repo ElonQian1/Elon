@@ -92,6 +92,7 @@ export interface PwaDesignSession {
   writebackPlan: ReturnType<typeof planPwaDesignWriteback>
   setMode: (mode: 'select' | 'interact') => void
   updateStyle: (property: PwaStyleProperty, value: string) => void
+  updateStyles: (label: string, styles: Partial<Record<PwaStyleProperty, string>>) => void
   resetCurrent: () => void
   clearPage: () => void
   undo: () => void
@@ -449,18 +450,20 @@ export function usePwaDesignSession({
     post('set-mode', { mode: nextMode })
   }, [post])
 
-  const updateStyle = useCallback((property: PwaStyleProperty, input: string) => {
+  const updateStyles = useCallback((label: string, styles: Partial<Record<PwaStyleProperty, string>>) => {
     const current = model.draft
     if (!current || !selection) return
     const stableKey = stablePwaIdentityKey(selection.identity)
     const found = draftEntry(current, selection.identity)
     const existing = found?.element
     const originalStyle = existing?.originalStyle ?? selection.originalStyle
-    const originalValue = originalStyle.authored[property] || originalStyle.computed[property] || ''
     const styleDiff = { ...(existing?.styleDiff ?? {}) }
-    const value = input.trim()
-    if (!value || value === originalValue) delete styleDiff[property]
-    else styleDiff[property] = value
+    for (const [property, input] of Object.entries(styles) as [PwaStyleProperty, string | undefined][]) {
+      const originalValue = originalStyle.authored[property] || originalStyle.computed[property] || ''
+      const value = String(input ?? '').trim()
+      if (!value || value === originalValue) delete styleDiff[property]
+      else styleDiff[property] = value
+    }
     const elements = { ...current.elements }
     if (Object.keys(styleDiff).length) {
       const revision = (existing?.revision ?? 0) + 1
@@ -482,9 +485,13 @@ export function usePwaDesignSession({
     } else {
       if (found) delete elements[found.key]
     }
-    const next = model.update(`${stableKey}:${property}`, () => elements)
+    const next = model.update(`${stableKey}:${label}`, () => elements)
     if (next) applyDraftState(next)
   }, [applyDraftState, model, root, selection])
+
+  const updateStyle = useCallback((property: PwaStyleProperty, input: string) => {
+    updateStyles(property, { [property]: input })
+  }, [updateStyles])
 
   const resetCurrent = useCallback(() => {
     const current = model.draft
@@ -681,6 +688,7 @@ export function usePwaDesignSession({
     writebackPlan,
     setMode,
     updateStyle,
+    updateStyles,
     resetCurrent,
     clearPage,
     undo,
