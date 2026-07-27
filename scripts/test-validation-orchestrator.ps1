@@ -160,7 +160,9 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot "fake-cargo.ps1") -Encodi
     $env:PATH = "$BinRoot;$originalPath"
     $validator = Join-Path $PSScriptRoot "validate-rust.ps1"
     $stdout1 = Join-Path $TempRoot "one.out"; $stderr1 = Join-Path $TempRoot "one.err"; $stdout2 = Join-Path $TempRoot "two.out"; $stderr2 = Join-Path $TempRoot "two.err"
-    $common = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$validator,"-CacheRoot",$CacheRoot,"-SkipCheapGates","-DisableSccache","check","--manifest-path","server\Cargo.toml")
+    $quotedValidator = '"{0}"' -f $validator
+    $quotedCacheRoot = '"{0}"' -f $CacheRoot
+    $common = @("-NoProfile","-ExecutionPolicy","Bypass","-File",$quotedValidator,"-CacheRoot",$quotedCacheRoot,"-SkipCheapGates","-DisableSccache","check","--manifest-path","server\Cargo.toml")
     $p1 = Start-Process powershell -ArgumentList $common -PassThru -NoNewWindow -RedirectStandardOutput $stdout1 -RedirectStandardError $stderr1
     $children += $p1; $null = $p1.Handle
     if(-not $ready.WaitOne([TimeSpan]::FromSeconds(30))){ throw "first validation did not reach cargo: exited=$($p1.HasExited) stdout=$((Get-Content -Raw $stdout1 -ErrorAction SilentlyContinue)) stderr=$((Get-Content -Raw $stderr1 -ErrorAction SilentlyContinue))" }
@@ -193,12 +195,14 @@ exit 0' | Set-Content -LiteralPath (Join-Path $BinRoot "fake-cargo.ps1") -Encodi
     Assert-True ($validatorText -match 'Add-CargoArgumentOnce \$CargoArgs ''--locked''') "validator must enforce locked Cargo checks"
     $hookText=Get-Content -Raw (Join-Path $RepoRoot '.githooks\pre-push')
     Assert-True ($hookText -match 'prepare-push\.ps1') "pre-push must use the formal receipt preparation flow"
+    $preparePushText=Get-Content -Raw (Join-Path $PSScriptRoot 'prepare-push.ps1')
+    Assert-True ($preparePushText -match 'Resolve-RustCacheDomain') "prepare-push must fingerprint the canonical cache domain"
     Assert-True ($validatorText -match 'timed_out=\[bool\]\$result\.timed_out') "validator terminal summary must persist the timeout flag"
     Assert-True ($validatorText -match 'Invoke-ValidationCapturedProcess[^\r\n]+-TimeoutSeconds \$WaitTimeoutSeconds') "validator must apply its bound to the captured child"
     $failureOut=Join-Path $TempRoot 'failure.out'; $failureErr=Join-Path $TempRoot 'failure.err'
     $systemPowerShell=Join-Path $PSHOME 'powershell.exe'
     $env:ELON_TEST_VALIDATION_CAPTURE_EXCEPTION='1'
-    $failureProcess=Start-Process $systemPowerShell -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',$validator,'-CacheRoot',$CacheRoot,'-SkipCheapGates','-DisableSccache','-Force','check','--manifest-path','server\Cargo.toml','--features','capture-exception') -PassThru -NoNewWindow -RedirectStandardOutput $failureOut -RedirectStandardError $failureErr
+    $failureProcess=Start-Process $systemPowerShell -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',$quotedValidator,'-CacheRoot',$quotedCacheRoot,'-SkipCheapGates','-DisableSccache','-Force','check','--manifest-path','server\Cargo.toml','--features','capture-exception') -PassThru -NoNewWindow -RedirectStandardOutput $failureOut -RedirectStandardError $failureErr
     Wait-TestProcess $failureProcess 20 'capture exception validation'; Assert-True ($failureProcess.ExitCode -ne 0) "capture exception validation must fail"
     $failureEvidence=[regex]::Match((Get-Content -Raw $failureOut),'VALIDATION_EVIDENCE=(.+)').Groups[1].Value.Trim()
     Assert-True (Test-Path -LiteralPath $failureEvidence) "capture exception must publish its summary path"
