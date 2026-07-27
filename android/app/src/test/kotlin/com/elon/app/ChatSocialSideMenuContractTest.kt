@@ -113,7 +113,15 @@ class ChatSocialSideMenuContractTest {
         assertTrue(view.contains("LinearLayout.LayoutParams(dp(110)"))
         assertTrue(view.contains("LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)"))
         assertTrue(view.contains("setPadding(dp(12), dp(12), dp(12), dp(12))"))
-        assertTrue(view.contains("FrameLayout.LayoutParams(dp(41), dp(78))"))
+        assertTrue(view.contains("LinearLayout.LayoutParams.MATCH_PARENT, dp(84)"))
+        assertTrue(view.contains("LinearLayout.LayoutParams(0, dp(76), 1f)"))
+        assertTrue(view.contains("FrameLayout.LayoutParams(dp(35), dp(67))"))
+        assertTrue(view.contains("date.dayOfMonth.toString(), 14f, selected"))
+        assertTrue(
+            "TextStyle.SHORT, Locale.ENGLISH\\),\\s+14f,\\s+selected"
+                .toRegex()
+                .containsMatchIn(view)
+        )
         assertTrue(view.contains("setSingleLine(true)"))
         assertTrue(view.contains("if (selected) \"#464646\" else \"#D9D9D9\""))
         listOf("图片与视频", "文本", "链接", "笔记", "文件", "设置")

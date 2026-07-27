@@ -20,9 +20,9 @@ internal fun createSocialSidebarDateStrip(
     dp: (Int) -> Int,
     selectableForeground: () -> Drawable?
 ): LinearLayout = LinearLayout(context).apply {
-    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(96)).apply {
+    layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(84)).apply {
         topMargin = dp(4)
-        bottomMargin = dp(10)
+        bottomMargin = dp(8)
     }
     gravity = Gravity.CENTER
     orientation = LinearLayout.HORIZONTAL
@@ -37,7 +37,7 @@ internal fun createSocialSidebarDateStrip(
                 dp = dp,
                 selectableForeground = selectableForeground
             ),
-            LinearLayout.LayoutParams(0, dp(88), 1f)
+            LinearLayout.LayoutParams(0, dp(76), 1f)
         )
     }
 }
@@ -57,16 +57,16 @@ private fun socialSidebarDateCell(
         setImageResource(R.drawable.social_sidebar_date_pill)
         scaleType = ImageView.ScaleType.FIT_XY
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-    }, FrameLayout.LayoutParams(dp(41), dp(78)).apply { gravity = Gravity.CENTER })
+    }, FrameLayout.LayoutParams(dp(35), dp(67)).apply { gravity = Gravity.CENTER })
     addView(LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER
-        addView(socialSidebarDateLabel(context, date.dayOfMonth.toString(), 15f, selected))
+        addView(socialSidebarDateLabel(context, date.dayOfMonth.toString(), 14f, selected))
         addView(
             socialSidebarDateLabel(
                 context,
                 date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH),
-                15f,
+                14f,
                 selected
             ).apply { setPadding(0, dp(6), 0, 0) }
         )
