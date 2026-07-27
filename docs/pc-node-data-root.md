@@ -60,7 +60,10 @@ ELON_NODE_DATA_ROOT=D:\ElonNodeData
 │  ├─ gradle-home\
 │  ├─ npm\
 │  ├─ pnpm-store\
-│  └─ yarn\
+│  ├─ yarn\
+│  └─ release-targets\
+│     ├─ elon-node-agent\
+│     └─ elon-server-musl\
 └─ temp\<task-id>\
 ```
 
@@ -70,6 +73,11 @@ ELON_NODE_DATA_ROOT=D:\ElonNodeData
 - 首次认领必须是空目录或带当前 `install_id` marker 的既有根；拒绝文件、符号链接、junction、重解析点和其他节点 marker。
 - 先完成路径和 marker 校验，再原子持久化 `node.json`，最后更新内存状态；失败保留旧配置。
 - 凭证、登录 token 和小体积节点配置仍在既有安全位置，它们不是构建缓存。
+- Windows 节点与服务器发布 target 在未显式配置时优先使用已验证的数据根
+  `cache\release-targets`；只有数据根缺失、损坏或所有权不匹配时才回退
+  `%LOCALAPPDATA%\Elon\build-target`。显式的
+  `ELON_NODE_AGENT_TARGET_DIR`、`RUST_SERVER_MUSL_TARGET_DIR` 和
+  `ELON_BUILD_TARGET_DIR` 仍保持最高优先级。
 
 ## 6. 五类缓存的体检规则
 
@@ -156,7 +164,22 @@ Content-Type: application/json
 6. **观察**：完成真实 check/test/build/publish 验证，保留旧缓存观察期。
 7. **清理**：再次预览并由用户确认；外部缓存即使已迁移也不自动删除。
 
-## 11. 发布回归要求
+## 11. Windows 本机维护入口
+
+`scripts\inspect-node-disk-usage.ps1` 默认只预览高置信旧缓存：
+
+- 已由 `rust-cache-v2` 取代的 `elon-dev-cargo`；
+- 超过保留期、严格匹配 `elon-build-*` 且带 Rust target 标记的一次性构建目录；
+- 当前写入根已位于其他磁盘时遗留的 `%LOCALAPPDATA%\Elon\rust-cache-v2`。
+
+仍在用但可重建的节点/服务器发布 target 必须显式传
+`-IncludeActiveBuildCaches`；过期临时文件和已终止发布历史分别要求
+`-IncludeExpiredTemp`、`-IncludeReleaseHistory`。所有类别默认 dry-run，
+只有追加 `-Apply` 才执行；检测到 Cargo/rustc 时跳过 Rust 目录。发布历史保留最新
+`-ReleaseKeepNewest` 份，outbox 源码快照只通过 `git worktree remove` 回收。
+锁定的监督任务 worktree、journal、租约和审计证据不属于此脚本的自动清理范围。
+
+## 12. 发布回归要求
 
 每次修改数据根、节点握手、任务派发、构建环境或缓存清理时，至少覆盖：
 

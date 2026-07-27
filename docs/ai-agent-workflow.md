@@ -258,11 +258,12 @@ RUST_SERVER_MUSL_TARGET_DIR=D:\rust\shared\server-musl-target
 
 Windows / Linux / macOS 发布脚本都会优先读取这个变量，并直接把它作为 `CARGO_TARGET_DIR`。旧名 `RUST_MUSL_TARGET_DIR` 仍兼容。这样 bb64a、一龙等技术栈相近的 Rust 服务端项目可以复用相同 target triple/profile/features 下的依赖编译产物。
 
-旧的 `ELON_BUILD_TARGET_DIR` 仍然兼容：脚本会在其下创建**固定名子目录 `elon-server-musl/`**（不含 SHA）。如果两个变量都未配置，默认路径为：
+旧的 `ELON_BUILD_TARGET_DIR` 仍然兼容：脚本会在其下创建**固定名子目录 `elon-server-musl/`**（不含 SHA）。如果这些变量都未配置，Windows 优先使用已验证节点数据根中的发布 target；节点数据根不可用时才回退旧路径：
 
 | 系统 | 默认缓存路径 |
 |---|---|
-| Windows | `%LOCALAPPDATA%\Elon\build-target\elon-server-musl\` |
+| Windows（已配置节点数据根） | `<ELON_NODE_DATA_ROOT>\cache\release-targets\elon-server-musl\` |
+| Windows（兼容回退） | `%LOCALAPPDATA%\Elon\build-target\elon-server-musl\` |
 | Linux / macOS (Ubuntu Codex) | `~/.cache/elon/build/elon-server-musl/` (XDG 标准) |
 
 两者都跨 session 持久化。**同一台机器首次全量编译约 10 分钟，后续只改业务代码约 30 秒**。CI 或远程 Codex 也可以通过进程环境变量传入 `RUST_SERVER_MUSL_TARGET_DIR` 或 `ELON_BUILD_TARGET_DIR` 指向持久卷。**禁止**把 `CARGO_TARGET_DIR` 手动设为含 SHA 的路径，那样会让每次都全量重编。
