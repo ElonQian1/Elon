@@ -29,6 +29,7 @@ import UiTunerConversationDrawer from './UiTunerConversationDrawer'
 import type { UiTunerConversationMode } from './uiTunerConversation'
 import {
   listenForFitRunCodexRequests,
+  listenForFitRunCodexTracking,
   notifyFitRunCodexSettled,
   persistFitRunCodexLaunch,
   readFitRunCodexLaunch,
@@ -219,6 +220,17 @@ export function UiTunerProjectSessionPanel({
     const timer = window.setInterval(() => { void refreshWorkspace(false) }, 4_000)
     return () => window.clearInterval(timer)
   }, [refreshWorkspace, selectedSession])
+
+  useEffect(() => listenForFitRunCodexTracking((detail) => {
+    if (detail.handoffKind !== 'PWA_DRAFT') return
+    setFitRunTask({
+      runId: detail.runId,
+      handoffId: detail.handoffId,
+      taskId: detail.taskId,
+      kind: detail.handoffKind,
+    })
+    setStatus('已接管恢复的 PWA 草稿 AI 写回任务；正在后台等待机器回执')
+  }), [])
 
   useEffect(() => {
     const taskId = clean(trackedFitRunTask?.taskId)

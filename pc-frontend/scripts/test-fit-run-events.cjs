@@ -35,8 +35,10 @@ global.CustomEvent = TestCustomEvent
 
 const {
   listenForFitRunCodexRequests,
+  listenForFitRunCodexTracking,
   persistFitRunCodexLaunch,
   readFitRunCodexLaunchByRun,
+  requestFitRunCodexTracking,
   requestCodexForFitRun,
   resolveFitRunWorkspace,
 } = require(outputFile)
@@ -86,6 +88,11 @@ const request = { runId: 'run-1', handoffId: 'handoff-1', reason: '测试 AI 接
     'task-pwa-1',
     '刷新后 PWA 草稿必须能按 runId 恢复上次 Codex 写回任务',
   )
+  let tracked = null
+  const disposeTracking = listenForFitRunCodexTracking((detail) => { tracked = detail })
+  requestFitRunCodexTracking({ runId: 'pwa:project-1:7', handoffId: 'pwa_1', taskId: 'task-pwa-1', handoffKind: 'PWA_DRAFT' })
+  disposeTracking()
+  assert.equal(tracked.taskId, 'task-pwa-1', '恢复的 PWA 草稿必须通知 headless 项目面板继续轮询结算')
 
   const disposeTimeout = listenForFitRunCodexRequests(() => undefined)
   await assert.rejects(

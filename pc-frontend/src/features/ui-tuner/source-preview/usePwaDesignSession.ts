@@ -4,6 +4,7 @@ import {
   listenForFitRunCodexSettled,
   readFitRunCodexLaunchByRun,
   readFitRunCodexSettlement,
+  requestFitRunCodexTracking,
   requestCodexForFitRun,
   type FitRunCodexSettledDetail,
 } from '../fit-run/fitRunEvents'
@@ -348,6 +349,12 @@ export function usePwaDesignSession({
     const launch = readFitRunCodexLaunchByRun(runId, 'PWA_DRAFT')
     if (!launch?.taskId) return
     syncTaskIdRef.current = launch.taskId
+    requestFitRunCodexTracking({
+      runId,
+      handoffId: launch.handoffId,
+      taskId: launch.taskId,
+      handoffKind: 'PWA_DRAFT',
+    })
     const settlement = readFitRunCodexSettlement(launch.taskId)
     if (settlement) {
       handleCodexSettlement(settlement)

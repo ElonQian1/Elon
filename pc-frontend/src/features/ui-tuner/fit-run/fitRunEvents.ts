@@ -3,6 +3,7 @@ import type { AiWritebackReceipt } from '../source-preview/aiWritebackReceipt'
 
 export const FIT_RUN_CODEX_REQUEST_EVENT = 'elon:ui-fit-run-codex-request'
 export const FIT_RUN_CODEX_SETTLED_EVENT = 'elon:ui-fit-run-codex-settled'
+export const FIT_RUN_CODEX_TRACK_EVENT = 'elon:ui-fit-run-codex-track'
 
 export interface FitRunCodexRequest {
   runId: string
@@ -61,6 +62,13 @@ export interface FitRunCodexLaunchRecord {
   taskId: string
   handoffKind?: FitRunCodexRequest['handoffKind']
   createdAt: string
+}
+
+export interface FitRunCodexTrackDetail {
+  runId: string
+  handoffId: string
+  taskId: string
+  handoffKind?: FitRunCodexRequest['handoffKind']
 }
 
 export function requestCodexForFitRun(request: FitRunCodexRequest, timeoutMs = 30_000) {
@@ -167,6 +175,23 @@ export function clearFitRunCodexLaunch(runId: string, handoffId: string) {
   writeLaunches(readLaunches().filter((item) => (
     item.runId !== runId || item.handoffId !== handoffId
   )))
+}
+
+export function requestFitRunCodexTracking(detail: FitRunCodexTrackDetail) {
+  window.dispatchEvent(new CustomEvent<FitRunCodexTrackDetail>(
+    FIT_RUN_CODEX_TRACK_EVENT,
+    { detail },
+  ))
+}
+
+export function listenForFitRunCodexTracking(
+  listener: (detail: FitRunCodexTrackDetail) => void,
+) {
+  const handler = (event: Event) => listener(
+    (event as CustomEvent<FitRunCodexTrackDetail>).detail,
+  )
+  window.addEventListener(FIT_RUN_CODEX_TRACK_EVENT, handler)
+  return () => window.removeEventListener(FIT_RUN_CODEX_TRACK_EVENT, handler)
 }
 
 export function listenForFitRunCodexSettled(
