@@ -209,7 +209,9 @@ pub(crate) fn canonical_project_root(raw: &str) -> Result<PathBuf> {
 
 pub(crate) fn safe_join(root: &Path, relative: &str) -> Result<PathBuf> {
     let normalized = relative.replace('\\', "/");
-    if !normalized.contains("/src/main/res/layout/") || !normalized.ends_with(".xml") {
+    let inside_layout_directory = normalized.starts_with("src/main/res/layout/")
+        || normalized.contains("/src/main/res/layout/");
+    if !inside_layout_directory || !normalized.ends_with(".xml") {
         bail!("只允许访问项目 src/main/res/layout 下的 XML 布局");
     }
     let candidate = root
@@ -494,6 +496,18 @@ mod tests {
         assert_eq!(document.root.children[1].style.border_radius, 14.0);
         assert!(document.fidelity.safe_for_default_preview);
         assert_eq!(document.fidelity.level, "high");
+    }
+
+    #[test]
+    fn loads_preview_when_android_app_is_selected_as_project_root() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("src/node_agent_source_preview/testdata/app");
+        let document = load_document(root.to_str().unwrap(), None).unwrap();
+        assert_eq!(
+            document.selected_layout,
+            "src/main/res/layout/activity_main.xml"
+        );
+        assert_eq!(document.root.children[0].style.text, "动态设计标题");
     }
 
     #[test]
