@@ -484,6 +484,7 @@ fn recoverable_control_diagnostic(error: &anyhow::Error) -> Option<String> {
     let message = format!("{error:#}");
     [
         "RUNTIME_BINDING_MISSING",
+        "RUNTIME_BINDING_AMBIGUOUS_ROOT",
         "RUNTIME_BINDING_STALE",
         "RUNTIME_BINDING_DEVICE_MISSING",
         "RUNTIME_BINDING_PACKAGE_MISSING",
@@ -662,6 +663,10 @@ mod tests {
             (
                 "RUNTIME_REBOOTSTRAP_TIMEOUT: 20 秒内未恢复真实 Runtime",
                 "RUNTIME_REBOOTSTRAP_TIMEOUT",
+            ),
+            (
+                "RUNTIME_BINDING_AMBIGUOUS_ROOT: 暂停的历史任务包含多个 root identity",
+                "RUNTIME_BINDING_AMBIGUOUS_ROOT",
             ),
         ] {
             let error = anyhow::anyhow!(message);
