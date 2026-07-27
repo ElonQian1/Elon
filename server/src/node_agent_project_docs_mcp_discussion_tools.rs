@@ -96,30 +96,25 @@ pub(crate) fn definitions() -> Vec<Value> {
             }}),
         ),
     ];
-    let mut read_tools =
-        crate::node_agent_project_docs_mcp_discussion_history_tools::definitions();
+    let mut read_tools = crate::node_agent_project_docs_mcp_discussion_history_tools::definitions();
     read_tools.extend(crate::node_agent_project_docs_mcp_discussion_review_tools::definitions());
     definitions.splice(2..2, read_tools);
     definitions
 }
 
 pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result<Option<Value>> {
-    if let Some(value) =
-        crate::node_agent_project_docs_mcp_discussion_history_tools::try_call(
-            workspace,
-            name,
-            arguments.clone(),
-        )?
-    {
+    if let Some(value) = crate::node_agent_project_docs_mcp_discussion_history_tools::try_call(
+        workspace,
+        name,
+        arguments.clone(),
+    )? {
         return Ok(Some(value));
     }
-    if let Some(value) =
-        crate::node_agent_project_docs_mcp_discussion_review_tools::try_call(
-            workspace,
-            name,
-            arguments.clone(),
-        )?
-    {
+    if let Some(value) = crate::node_agent_project_docs_mcp_discussion_review_tools::try_call(
+        workspace,
+        name,
+        arguments.clone(),
+    )? {
         return Ok(Some(value));
     }
     let value = match name {

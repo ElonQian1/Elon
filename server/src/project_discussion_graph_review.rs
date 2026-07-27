@@ -10,9 +10,7 @@ use std::{
 
 use crate::{
     project_discussion_graph::{load_graph, load_proposal},
-    project_discussion_graph_model::{
-        DiscussionGraph, DiscussionGraphProposal, DiscussionNode,
-    },
+    project_discussion_graph_model::{DiscussionGraph, DiscussionGraphProposal, DiscussionNode},
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -59,7 +57,10 @@ pub(crate) fn review_discussion_graph(workspace: &Path) -> Result<DiscussionGrap
     review_duplicates(graph, &mut issues);
     review_unresolved_decisions(graph, &mut issues);
     review_superseded_relations(graph, &mut issues);
-    let errors = issues.iter().filter(|item| item.severity == "error").count();
+    let errors = issues
+        .iter()
+        .filter(|item| item.severity == "error")
+        .count();
     let warnings = issues
         .iter()
         .filter(|item| item.severity == "warning")
@@ -161,7 +162,10 @@ fn review_nodes(
         counts
     });
     for node in &graph.nodes {
-        if roots.get(node.id.as_str()).is_some_and(|root| node.root_id != *root) {
+        if roots
+            .get(node.id.as_str())
+            .is_some_and(|root| node.root_id != *root)
+        {
             issue(
                 issues,
                 &format!("root-mismatch:{}", node.id),
@@ -289,16 +293,16 @@ fn review_duplicates(graph: &DiscussionGraph, issues: &mut Vec<DiscussionReviewI
             issues,
             &format!(
                 "duplicate-title:{}",
-                nodes.iter().map(|node| node.id.as_str()).collect::<Vec<_>>().join(",")
+                nodes
+                    .iter()
+                    .map(|node| node.id.as_str())
+                    .collect::<Vec<_>>()
+                    .join(",")
             ),
             "node.duplicate_title",
             "warning",
             "同一主题下存在近似重复节点",
-            &format!(
-                "{} 个节点使用标题“{}”。",
-                nodes.len(),
-                nodes[0].title
-            ),
+            &format!("{} 个节点使用标题“{}”。", nodes.len(), nodes[0].title),
             &nodes.iter().map(|node| node.id.clone()).collect::<Vec<_>>(),
             "由 AI 比较摘要和来源：相同观点用 merged_into，相互演化用 supersedes。",
             false,
@@ -306,10 +310,7 @@ fn review_duplicates(graph: &DiscussionGraph, issues: &mut Vec<DiscussionReviewI
     }
 }
 
-fn review_unresolved_decisions(
-    graph: &DiscussionGraph,
-    issues: &mut Vec<DiscussionReviewIssue>,
-) {
+fn review_unresolved_decisions(graph: &DiscussionGraph, issues: &mut Vec<DiscussionReviewIssue>) {
     for decision in graph
         .nodes
         .iter()
@@ -342,11 +343,12 @@ fn review_unresolved_decisions(
     }
 }
 
-fn review_superseded_relations(
-    graph: &DiscussionGraph,
-    issues: &mut Vec<DiscussionReviewIssue>,
-) {
-    for node in graph.nodes.iter().filter(|node| node.status == "superseded") {
+fn review_superseded_relations(graph: &DiscussionGraph, issues: &mut Vec<DiscussionReviewIssue>) {
+    for node in graph
+        .nodes
+        .iter()
+        .filter(|node| node.status == "superseded")
+    {
         let linked = graph.edges.iter().any(|edge| {
             matches!(edge.relation.as_str(), "supersedes" | "merged_into")
                 && (edge.source == node.id || edge.target == node.id)

@@ -624,10 +624,7 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         .as_array()
         .unwrap();
     assert!(discussion_versions.len() >= 2);
-    let discussion_commit = discussion_versions[0]
-        ["commit"]
-        .as_str()
-        .unwrap();
+    let discussion_commit = discussion_versions[0]["commit"].as_str().unwrap();
     assert_eq!(
         discussion_history["result"]["structuredContent"]["budget"]["chat_bodies_read"],
         0

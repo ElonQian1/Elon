@@ -188,10 +188,7 @@ fn source_receipt(source: &DiscussionSource) -> Value {
     })
 }
 
-fn by_id<'a, T>(
-    items: &'a [T],
-    id: impl Fn(&'a T) -> &'a String,
-) -> HashMap<&'a str, &'a T> {
+fn by_id<'a, T>(items: &'a [T], id: impl Fn(&'a T) -> &'a String) -> HashMap<&'a str, &'a T> {
     items.iter().map(|item| (id(item).as_str(), item)).collect()
 }
 

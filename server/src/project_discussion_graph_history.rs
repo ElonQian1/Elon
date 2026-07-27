@@ -3,11 +3,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::{
-    collections::HashMap,
-    path::Path,
-    process::Output,
-};
+use std::{collections::HashMap, path::Path, process::Output};
 
 use crate::{
     project_discussion_graph::load_graph,
@@ -91,7 +87,9 @@ pub(crate) fn compare_discussion_versions(
     let base_commit = verified_commit(workspace, base_commit, false)?;
     let target_commit = verified_commit(
         workspace,
-        target_commit.filter(|value| !value.trim().is_empty()).unwrap_or("HEAD"),
+        target_commit
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or("HEAD"),
         true,
     )?;
     let base = graph_at_resolved(workspace, &base_commit)?;
@@ -205,8 +203,12 @@ fn push_node_event(
             Vec::new(),
         ),
         (Some(_), None) => ("removed", Vec::new()),
-        (Some(before), Some(after)) if before != after => ("updated", node_changed_fields(before, after)),
-        _ if !edge_added.is_empty() || !edge_removed.is_empty() => ("relations_changed", Vec::new()),
+        (Some(before), Some(after)) if before != after => {
+            ("updated", node_changed_fields(before, after))
+        }
+        _ if !edge_added.is_empty() || !edge_removed.is_empty() => {
+            ("relations_changed", Vec::new())
+        }
         _ => return,
     };
     events.push(json!({
@@ -291,9 +293,7 @@ fn verified_commit(workspace: &Path, value: &str, allow_head: bool) -> Result<St
     ensure_git(workspace)?;
     let value = value.trim();
     if value != "HEAD"
-        && (value.len() < 7
-            || value.len() > 64
-            || !value.chars().all(|ch| ch.is_ascii_hexdigit()))
+        && (value.len() < 7 || value.len() > 64 || !value.chars().all(|ch| ch.is_ascii_hexdigit()))
     {
         bail!("讨论图版本提交格式无效");
     }

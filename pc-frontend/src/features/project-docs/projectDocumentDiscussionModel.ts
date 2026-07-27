@@ -221,7 +221,7 @@ export function layoutDiscussionNodes(nodes: DiscussionNode[]) {
     positions.set(node.id, { x: depth * 310, y })
     return y
   }
-  ;(byParent.get('') ?? []).forEach((node) => visit(node, 0))
+  (byParent.get('') ?? []).forEach((node) => visit(node, 0))
   nodes.filter((node) => !positions.has(node.id)).forEach((node) => {
     positions.set(node.id, { x: 0, y: row++ * 150 })
   })

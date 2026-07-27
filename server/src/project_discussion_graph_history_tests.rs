@@ -35,8 +35,7 @@ fn exposes_semantic_history_diff_and_node_trace_without_reading_sources() {
     assert_eq!(history["budget"]["chat_bodies_read"], 0);
     let snapshot = load_discussion_graph_version(&root, &first_commit).unwrap();
     assert_eq!(snapshot.graph.nodes[0].status, "open");
-    let diff =
-        compare_discussion_versions(&root, &first_commit, Some(&second_commit)).unwrap();
+    let diff = compare_discussion_versions(&root, &first_commit, Some(&second_commit)).unwrap();
     assert_eq!(diff["counts"]["nodes_changed"], 1);
     assert_eq!(
         diff["nodes"]["changed"][0]["from_status"],
@@ -97,12 +96,10 @@ fn commit(root: &Path, message: &str) -> String {
 }
 
 fn git(root: &Path, args: &[&str]) {
-    assert!(
-        crate::git_command_error::git_command()
-            .current_dir(root)
-            .args(args)
-            .status()
-            .unwrap()
-            .success()
-    );
+    assert!(crate::git_command_error::git_command()
+        .current_dir(root)
+        .args(args)
+        .status()
+        .unwrap()
+        .success());
 }

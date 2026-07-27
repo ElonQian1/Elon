@@ -10,9 +10,7 @@ use crate::{
         compare_discussion_versions, list_discussion_versions, load_discussion_graph_version,
         trace_discussion_node,
     },
-    project_discussion_graph_review::{
-        prepare_safe_discussion_repair, review_discussion_graph,
-    },
+    project_discussion_graph_review::{prepare_safe_discussion_repair, review_discussion_graph},
     project_document_index::ProjectDocumentIndex,
     project_document_issue_workflow::{health_trend, update_issue, IssueWorkflowUpdate},
     project_document_maintenance::list_governed_issues,
@@ -187,7 +185,11 @@ async fn discussion_history_handler(
 ) -> axum::response::Response {
     response(list_discussion_versions(
         workspace(&request),
-        if request.limit == 0 { 30 } else { request.limit },
+        if request.limit == 0 {
+            30
+        } else {
+            request.limit
+        },
     ))
 }
 
@@ -216,7 +218,11 @@ async fn discussion_trace_handler(
     response(trace_discussion_node(
         workspace(&request),
         &request.node_id,
-        if request.limit == 0 { 50 } else { request.limit },
+        if request.limit == 0 {
+            50
+        } else {
+            request.limit
+        },
     ))
 }
 
