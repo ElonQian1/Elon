@@ -655,10 +655,11 @@ export default function ProjectDocumentsWorkspace({
       ) : activeSection === DISCUSSION_MAP_SECTION ? (
         <Suspense fallback={<div className={styles.capabilityLoading}>正在加载讨论推理图…</div>}>
           <ProjectDocumentDiscussionMap projectId={projectId} canEdit={!!catalog?.can_edit}
-            canStartAi={canStartAi} organizing={organizing} onOpenDocument={openDocumentFromHome}
+            canStartAi={canStartAi} organizing={organizing} runtime={organizationTracking} onOpenDocument={openDocumentFromHome}
             onStructureSource={(path) => { void loadCatalog(); void startAiOrganize(discussionSourceInstruction(path)) }}
             onDiscussNode={(node, mode) => { void startAiOrganize(discussionNodeInstruction(node, mode)) }}
-            onApplyPending={() => { void startAiOrganize(discussionApplyInstruction()) }} />
+            onApplyPending={() => { void startAiOrganize(discussionApplyInstruction()) }}
+            onRunAi={(instruction) => { void startAiOrganize(instruction) }} />
         </Suspense>
       ) : activeSection === DOCUMENT_HEALTH_SECTION ? (
         <ProjectDocumentHealthCenter projectId={projectId} analysis={catalog?.analysis} runtime={organizationTracking} onRefresh={loadCatalog}

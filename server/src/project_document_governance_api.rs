@@ -6,6 +6,13 @@ use serde_json::{json, Value};
 use std::{path::Path, sync::Arc};
 
 use crate::{
+    project_discussion_graph_history::{
+        compare_discussion_versions, list_discussion_versions, load_discussion_graph_version,
+        trace_discussion_node,
+    },
+    project_discussion_graph_review::{
+        prepare_safe_discussion_repair, review_discussion_graph,
+    },
     project_document_index::ProjectDocumentIndex,
     project_document_issue_workflow::{health_trend, update_issue, IssueWorkflowUpdate},
     project_document_maintenance::list_governed_issues,
@@ -44,6 +51,12 @@ struct GovernanceRequest {
     commit: String,
     #[serde(default)]
     path: String,
+    #[serde(default)]
+    base_commit: String,
+    #[serde(default)]
+    target_commit: String,
+    #[serde(default)]
+    node_id: String,
 }
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
@@ -62,6 +75,30 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
         .route(
             "/api/project-docs/governance/restore",
             post(restore_handler),
+        )
+        .route(
+            "/api/project-docs/discussions/history",
+            post(discussion_history_handler),
+        )
+        .route(
+            "/api/project-docs/discussions/version",
+            post(discussion_version_handler),
+        )
+        .route(
+            "/api/project-docs/discussions/compare",
+            post(discussion_compare_handler),
+        )
+        .route(
+            "/api/project-docs/discussions/trace",
+            post(discussion_trace_handler),
+        )
+        .route(
+            "/api/project-docs/discussions/review",
+            post(discussion_review_handler),
+        )
+        .route(
+            "/api/project-docs/discussions/repair",
+            post(discussion_repair_handler),
         )
 }
 
@@ -143,6 +180,59 @@ async fn restore_handler(Json(request): Json<GovernanceRequest>) -> axum::respon
         workspace(&request),
         &request.commit,
     ))
+}
+
+async fn discussion_history_handler(
+    Json(request): Json<GovernanceRequest>,
+) -> axum::response::Response {
+    response(list_discussion_versions(
+        workspace(&request),
+        if request.limit == 0 { 30 } else { request.limit },
+    ))
+}
+
+async fn discussion_version_handler(
+    Json(request): Json<GovernanceRequest>,
+) -> axum::response::Response {
+    response(
+        load_discussion_graph_version(workspace(&request), &request.commit)
+            .and_then(|snapshot| serde_json::to_value(snapshot).map_err(Into::into)),
+    )
+}
+
+async fn discussion_compare_handler(
+    Json(request): Json<GovernanceRequest>,
+) -> axum::response::Response {
+    response(compare_discussion_versions(
+        workspace(&request),
+        &request.base_commit,
+        (!request.target_commit.trim().is_empty()).then_some(request.target_commit.as_str()),
+    ))
+}
+
+async fn discussion_trace_handler(
+    Json(request): Json<GovernanceRequest>,
+) -> axum::response::Response {
+    response(trace_discussion_node(
+        workspace(&request),
+        &request.node_id,
+        if request.limit == 0 { 50 } else { request.limit },
+    ))
+}
+
+async fn discussion_review_handler(
+    Json(request): Json<GovernanceRequest>,
+) -> axum::response::Response {
+    response(
+        review_discussion_graph(workspace(&request))
+            .and_then(|review| serde_json::to_value(review).map_err(Into::into)),
+    )
+}
+
+async fn discussion_repair_handler(
+    Json(request): Json<GovernanceRequest>,
+) -> axum::response::Response {
+    response(prepare_safe_discussion_repair(workspace(&request)))
 }
 
 fn workspace(request: &GovernanceRequest) -> &Path {

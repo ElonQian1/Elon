@@ -15,6 +15,7 @@ import '@xyflow/react/dist/style.css'
 
 import { api } from '../../api/client'
 import ProjectDocumentDiscussionNode, { type DiscussionFlowNode } from './ProjectDocumentDiscussionNode'
+import ProjectDocumentDiscussionTimeline, { type DiscussionVersion } from './ProjectDocumentDiscussionTimeline'
 import {
   discussionKindLabel,
   discussionRoots,
@@ -27,6 +28,7 @@ import {
   type DiscussionNode,
 } from './projectDocumentDiscussionModel'
 import type { DocumentFile } from './projectDocumentModel'
+import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
 import { projectDocumentErrorMessage } from './projectDocumentWorkspaceHelpers'
 import styles from './ProjectDocumentDiscussionMap.module.css'
 
@@ -40,10 +42,12 @@ interface Props {
   canEdit: boolean
   canStartAi: boolean
   organizing: boolean
+  runtime: DocumentOrganizationTrackingRuntime
   onOpenDocument: (path: string) => void
   onStructureSource: (path: string) => void
   onDiscussNode: (node: DiscussionNode, mode: 'continue' | 'fork' | 'promote') => void
   onApplyPending: () => void
+  onRunAi: (instruction: string) => void
 }
 
 export default function ProjectDocumentDiscussionMap(props: Props) {
@@ -59,12 +63,16 @@ function DiscussionMapSurface({
   canEdit,
   canStartAi,
   organizing,
+  runtime,
   onOpenDocument,
   onStructureSource,
   onDiscussNode,
   onApplyPending,
+  onRunAi,
 }: Props) {
   const [graph, setGraph] = useState<DiscussionGraph>(EMPTY_DISCUSSION_GRAPH)
+  const [currentGraph, setCurrentGraph] = useState<DiscussionGraph>(EMPTY_DISCUSSION_GRAPH)
+  const [activeVersion, setActiveVersion] = useState<DiscussionVersion | null>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [query, setQuery] = useState('')
@@ -73,6 +81,12 @@ function DiscussionMapSurface({
   const [pending, setPending] = useState<{ summary: string; nodes: number; promotions: number } | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const { fitView } = useReactFlow()
+
+  const showGraph = useCallback((next: DiscussionGraph) => {
+    setGraph(next)
+    setRootId((current) => next.nodes.some((node) => node.id === current) ? current : discussionRoots(next)[0]?.id ?? '')
+    setSelectedId((current) => next.nodes.some((node) => node.id === current) ? current : discussionRoots(next)[0]?.id ?? '')
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -83,10 +97,11 @@ function DiscussionMapSurface({
     const [graphFile, proposalFile] = await Promise.allSettled([read(GRAPH_PATH), read(SUGGESTIONS_PATH)])
     if (graphFile.status === 'fulfilled') {
       const next = parseDiscussionGraph(graphFile.value.content)
-      setGraph(next)
-      setRootId((current) => next.nodes.some((node) => node.id === current) ? current : discussionRoots(next)[0]?.id ?? '')
-      setSelectedId((current) => next.nodes.some((node) => node.id === current) ? current : discussionRoots(next)[0]?.id ?? '')
+      setCurrentGraph(next)
+      setActiveVersion(null)
+      showGraph(next)
     } else {
+      setCurrentGraph(EMPTY_DISCUSSION_GRAPH)
       setGraph(EMPTY_DISCUSSION_GRAPH)
       setRootId('')
       setSelectedId('')
@@ -94,7 +109,7 @@ function DiscussionMapSurface({
     if (proposalFile.status === 'fulfilled') setPending(parsePendingProposal(proposalFile.value.content))
     else setPending(null)
     setLoading(false)
-  }, [projectId])
+  }, [projectId, showGraph])
 
   useEffect(() => { void load() }, [load])
 
@@ -190,17 +205,29 @@ function DiscussionMapSurface({
         <button type="button" title="刷新讨论图" onClick={() => { void load() }}><RefreshCw size={14} /></button>
         <input ref={inputRef} hidden type="file" accept=".md,.txt,.json,text/plain,text/markdown,application/json"
           onChange={(event) => { const file = event.target.files?.[0]; if (file) void importConversation(file) }} />
-        <button className={styles.importButton} type="button" disabled={!canEdit || organizing} onClick={() => inputRef.current?.click()}>
+        <button className={styles.importButton} type="button" disabled={!canEdit || organizing || !!activeVersion} onClick={() => inputRef.current?.click()}>
           <FileInput size={14} />导入聊天并整理
         </button>
       </header>
       <div className={styles.notice}>
         <span>{loading ? '正在读取讨论图…' : `${graph.sources.length} 个来源 · ${graph.nodes.length} 个节点 · ${roots.length} 个主题`}</span>
-        <small>{message || '原文保留且默认不检索；AI 只读取当前来源和命中节点，稳定结论才晋升。'}</small>
-        {pending && <button type="button" title={pending.summary} disabled={!canStartAi || organizing} onClick={onApplyPending}>
+        <small>{activeVersion
+          ? `历史版本只读 · ${activeVersion.summary || activeVersion.commit.slice(0, 8)}`
+          : message || graph.evolution.summary || '原文保留且默认不检索；AI 只读取当前来源和命中节点，稳定结论才晋升。'}</small>
+        {pending && !activeVersion && <button type="button" title={pending.summary} disabled={!canStartAi || organizing} onClick={onApplyPending}>
           待审核：{pending.nodes} 节点 / {pending.promotions} 文档
         </button>}
       </div>
+      <ProjectDocumentDiscussionTimeline
+        runtime={runtime}
+        activeVersion={activeVersion}
+        selectedNodeId={selectedId}
+        canStartAi={canStartAi}
+        organizing={organizing}
+        onSelectVersion={(next, version) => { setActiveVersion(version); showGraph(next) }}
+        onSelectCurrent={() => { setActiveVersion(null); showGraph(currentGraph) }}
+        onRunAi={onRunAi}
+      />
       <div className={styles.content}>
         <div className={styles.canvas}>
           {flowNodes.length ? (
@@ -218,7 +245,7 @@ function DiscussionMapSurface({
               <GitFork size={28} />
               <strong>还没有讨论知识图</strong>
               <p>导入 ChatGPT、Codex 或其他供应商的聊天导出文件。原文先保存，再由 Windows 节点上的登录 AI CLI 拆成可追溯节点。</p>
-              <button type="button" disabled={!canEdit || organizing} onClick={() => inputRef.current?.click()}><FileInput size={14} />选择聊天文件</button>
+              <button type="button" disabled={!canEdit || organizing || !!activeVersion} onClick={() => inputRef.current?.click()}><FileInput size={14} />选择聊天文件</button>
             </div>
           )}
           {selection.truncated && <div className={styles.truncated}>当前只显示前 400 个节点，请选择根主题或搜索。</div>}
@@ -244,9 +271,9 @@ function DiscussionMapSurface({
                 {selectedNode.document_paths.map((path) => <button key={path} type="button" onClick={() => onOpenDocument(path)}><FileText size={13} /><span>{path}</span></button>)}
               </section>}
               <div className={styles.actions}>
-                <button type="button" disabled={!canStartAi || organizing} onClick={() => onDiscussNode(selectedNode, 'continue')}><Sparkles size={14} />继续讨论</button>
-                <button type="button" disabled={!canStartAi || organizing} onClick={() => onDiscussNode(selectedNode, 'fork')}><GitFork size={14} />创建备选分支</button>
-                <button type="button" disabled={!canStartAi || organizing} onClick={() => onDiscussNode(selectedNode, 'promote')}><FileText size={14} />晋升为正式文档</button>
+                <button type="button" disabled={!canStartAi || organizing || !!activeVersion} onClick={() => onDiscussNode(selectedNode, 'continue')}><Sparkles size={14} />继续讨论</button>
+                <button type="button" disabled={!canStartAi || organizing || !!activeVersion} onClick={() => onDiscussNode(selectedNode, 'fork')}><GitFork size={14} />创建备选分支</button>
+                <button type="button" disabled={!canStartAi || organizing || !!activeVersion} onClick={() => onDiscussNode(selectedNode, 'promote')}><FileText size={14} />晋升为正式文档</button>
               </div>
             </>
           ) : <p className={styles.inspectorEmpty}>选择一个节点查看来源、分支和晋升状态。</p>}

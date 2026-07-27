@@ -45,6 +45,15 @@ export interface DiscussionGraph {
   sources: DiscussionSource[]
   nodes: DiscussionNode[]
   edges: DiscussionEdge[]
+  evolution: DiscussionGraphEvolution
+}
+
+export interface DiscussionGraphEvolution {
+  kind: string
+  summary: string
+  actor: string
+  changed_at: string
+  previous_revision: string
 }
 
 export const EMPTY_DISCUSSION_GRAPH: DiscussionGraph = {
@@ -52,6 +61,7 @@ export const EMPTY_DISCUSSION_GRAPH: DiscussionGraph = {
   sources: [],
   nodes: [],
   edges: [],
+  evolution: { kind: '', summary: '', actor: '', changed_at: '', previous_revision: '' },
 }
 
 const kinds = new Set<DiscussionNodeKind>([
@@ -141,6 +151,7 @@ export function sanitizeDiscussionGraph(value: unknown): DiscussionGraph {
     sources: unique(sources, (item) => item.id),
     nodes: unique(nodes, (item) => item.id),
     edges: unique(edges, (item) => item.id),
+    evolution: sanitizeEvolution(source.evolution),
   }
 }
 
@@ -262,4 +273,15 @@ function number(value: unknown) {
 
 function unique<T>(items: T[], key: (item: T) => string) {
   return [...new Map(items.map((item) => [key(item), item])).values()]
+}
+
+function sanitizeEvolution(value: unknown): DiscussionGraphEvolution {
+  const item = value && typeof value === 'object' ? value as Partial<DiscussionGraphEvolution> : {}
+  return {
+    kind: stableId(item.kind, 40),
+    summary: text(item.summary, 1_000),
+    actor: text(item.actor, 160),
+    changed_at: text(item.changed_at, 64),
+    previous_revision: text(item.previous_revision, 128),
+  }
 }
