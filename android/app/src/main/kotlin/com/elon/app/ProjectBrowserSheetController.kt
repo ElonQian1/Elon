@@ -46,10 +46,10 @@ internal class ProjectBrowserSheetController(
         setHintTextColor(activity.getColor(R.color.elon_text_placeholder))
         setPadding(dp(48), 0, dp(48), 0)
         setTextColor(activity.getColor(R.color.elon_text_primary))
-        textSize = 16f
+        textSize = 13f
     }
-    private var personalExpanded = true
-    private var jointExpanded = true
+    private var personalExpanded = false
+    private var jointExpanded = false
     private var dragStartY = 0f
 
     val isOpen: Boolean
@@ -73,6 +73,8 @@ internal class ProjectBrowserSheetController(
 
     fun open() {
         if (isOpen) return
+        personalExpanded = false
+        jointExpanded = false
         showLoading()
         root.visibility = View.VISIBLE
         root.alpha = 1f
@@ -268,30 +270,30 @@ internal class ProjectBrowserSheetController(
             ))
             return
         }
-        groupsContainer.addView(projectGrid(entries))
+        groupsContainer.addView(projectGrid(visibleProjectBrowserEntries(entries, expanded)))
     }
 
     private fun sectionHeader(title: String, expanded: Boolean, toggle: () -> Unit): LinearLayout {
         return LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            isClickable = true
-            isFocusable = true
-            foreground = dependencies.selectableForeground()
-            contentDescription = if (expanded) "收起$title" else "展开$title"
             addView(TextView(activity).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 includeFontPadding = false
                 text = title
                 setTextColor(activity.getColor(R.color.elon_text_placeholder))
-                textSize = 17f
+                textSize = 13f
             }, LinearLayout.LayoutParams(0, dp(48), 1f))
             addView(ImageView(activity).apply {
+                isClickable = true
+                isFocusable = true
+                foreground = dependencies.selectableForeground()
                 contentDescription = if (expanded) "收起$title" else "展开$title"
+                rotation = if (expanded) 90f else 0f
                 scaleType = ImageView.ScaleType.CENTER
                 setImageResource(R.drawable.project_view_chevron)
+                setOnClickListener { toggle() }
             }, LinearLayout.LayoutParams(dp(48), dp(48)))
-            setOnClickListener { toggle() }
         }
     }
 
@@ -342,7 +344,7 @@ internal class ProjectBrowserSheetController(
                 maxLines = 1
                 text = project.title.ifBlank { "未命名项目" }
                 setTextColor(activity.getColor(R.color.elon_text_primary))
-                textSize = 16f
+                textSize = 13f
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(30)

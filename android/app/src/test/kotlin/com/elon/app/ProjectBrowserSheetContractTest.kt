@@ -49,6 +49,25 @@ class ProjectBrowserSheetContractTest {
     }
 
     @Test
+    fun collapsedSectionsShowTwoRowsAndExpansionPreservesEveryProject() {
+        val projects = (0 until 10).map { index ->
+            IndexedBrowserProject(
+                index = index,
+                project = project("project-$index", "项目 $index", index.toLong())
+            )
+        }
+
+        val collapsed = visibleProjectBrowserEntries(projects, expanded = false)
+        val expanded = visibleProjectBrowserEntries(projects, expanded = true)
+
+        assertEquals(PROJECT_BROWSER_COLUMN_COUNT * 2, collapsed.size)
+        assertEquals((0 until 8).toList(), collapsed.map(IndexedBrowserProject::index))
+        assertEquals(projects, expanded)
+        assertEquals(2, projectBrowserGridRows(collapsed).size)
+        assertEquals(3, projectBrowserGridRows(expanded).size)
+    }
+
+    @Test
     fun memberProjectsUseTheGroupSectionSemantic() {
         val groups = groupProjectsForBrowser(
             listOf(
@@ -129,9 +148,20 @@ class ProjectBrowserSheetContractTest {
         assertTrue(controller.contains("View.IMPORTANT_FOR_ACCESSIBILITY_NO"))
         assertTrue(controller.contains("TextUtils.TruncateAt.END"))
         assertTrue(controller.contains("dp(48)"))
+        assertTrue(controller.contains("textSize = 13f"))
+        assertTrue(controller.contains("visibleProjectBrowserEntries(entries, expanded)"))
+        assertTrue(controller.contains("personalExpanded = false"))
+        assertTrue(controller.contains("jointExpanded = false"))
+        assertTrue(controller.contains("rotation = if (expanded) 90f else 0f"))
         assertTrue(web.contains("top: max(10px, env(safe-area-inset-top));"))
         assertTrue(web.contains("env(safe-area-inset-bottom)"))
         assertTrue(web.contains("grid-template-columns: repeat(4"))
+        assertTrue(web.contains("font-size: 13px"))
+        assertTrue(web.contains("PROJECT_BROWSER_COLLAPSED_ITEM_COUNT = 8"))
+        assertTrue(web.contains("entries.slice(0, PROJECT_BROWSER_COLLAPSED_ITEM_COUNT)"))
+        assertTrue(web.contains("projectBrowserPersonalExpanded = false"))
+        assertTrue(web.contains("projectBrowserJointExpanded = false"))
+        assertTrue(web.contains("project-browser-toggle"))
         assertTrue(web.contains("projectBrowserSearchInput.addEventListener('input', renderProjectBrowser)"))
         assertTrue(web.contains("selectProject(project)"))
     }

@@ -3425,7 +3425,7 @@
       background: transparent;
       color: var(--ink);
       font: inherit;
-      font-size: 16px;
+      font-size: 13px;
       text-align: center;
     }
     .project-browser-search input::placeholder { color: var(--ink-placeholder); }
@@ -3442,25 +3442,33 @@
     .project-browser-heading {
       width: 100%;
       min-height: 48px;
-      border: 0;
-      padding: 0;
-      background: transparent;
       color: var(--ink-placeholder);
       display: flex;
       align-items: center;
       justify-content: space-between;
       font: inherit;
-      font-size: 17px;
+      font-size: 13px;
       text-align: left;
+    }
+    .project-browser-toggle {
+      width: 48px;
+      height: 48px;
+      flex: 0 0 48px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      display: grid;
+      place-items: center;
       cursor: pointer;
     }
-    .project-browser-heading img {
+    .project-browser-toggle img {
       width: 14px;
       height: 14px;
-      margin: 17px;
       object-fit: contain;
       display: block;
+      transition: transform 160ms ease;
     }
+    .project-browser-toggle[aria-expanded="true"] img { transform: rotate(90deg); }
     .project-browser-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3497,7 +3505,7 @@
       width: 100%;
       margin-top: 7px;
       color: var(--ink);
-      font-size: 16px;
+      font-size: 13px;
       line-height: 30px;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -5478,8 +5486,9 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     });
     document.addEventListener('click', () => homeNavMenu.classList.add('hidden'));
   }
-  let projectBrowserPersonalExpanded = true;
-  let projectBrowserJointExpanded = true;
+  const PROJECT_BROWSER_COLLAPSED_ITEM_COUNT = 8;
+  let projectBrowserPersonalExpanded = false;
+  let projectBrowserJointExpanded = false;
   let projectBrowserHistoryActive = false;
   let projectBrowserDragStartY = 0;
   let projectBrowserDragDistance = 0;
@@ -5546,14 +5555,17 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     };
   }
 
-  function projectBrowserGrid(entries, title) {
+  function projectBrowserGrid(entries, title, expanded) {
     if (!entries.length) {
       const empty = projectBrowserSearchInput && projectBrowserSearchInput.value.trim()
         ? '没有匹配的' + title
         : '暂无' + title;
       return '<div class="project-browser-status">' + escapeHtml(empty) + '</div>';
     }
-    return '<div class="project-browser-grid">' + entries.map(({ project, index }) => {
+    const visibleEntries = expanded
+      ? entries
+      : entries.slice(0, PROJECT_BROWSER_COLLAPSED_ITEM_COUNT);
+    return '<div class="project-browser-grid">' + visibleEntries.map(({ project, index }) => {
       const titleText = projectBrowserTitle(project);
       const icon = projectBrowserIcon(project);
       return '<button class="project-browser-item" type="button" data-project-browser-index="' + index +
@@ -5567,11 +5579,11 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
 
   function projectBrowserSection(title, group, entries, expanded) {
     return '<section class="project-browser-section">' +
-      '<button class="project-browser-heading" type="button" data-project-browser-group="' + group +
+      '<div class="project-browser-heading"><span>' + title + '</span>' +
+      '<button class="project-browser-toggle" type="button" data-project-browser-group="' + group +
       '" aria-expanded="' + expanded + '" aria-label="' + (expanded ? '收起' : '展开') + title + '">' +
-      '<span>' + title + '</span><img src="/assets/project_view_chevron.png" alt="' +
-      (expanded ? '收起' : '展开') + title + '" /></button>' +
-      (expanded ? projectBrowserGrid(entries, title) : '') + '</section>';
+      '<img src="/assets/project_view_chevron.png" alt="" aria-hidden="true" /></button></div>' +
+      projectBrowserGrid(entries, title, expanded) + '</section>';
   }
 
   function renderProjectBrowser() {
@@ -5588,6 +5600,8 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
 
   function openProjectBrowser() {
     if (!projectBrowserSheet || projectBrowserSheet.classList.contains('active')) return;
+    projectBrowserPersonalExpanded = false;
+    projectBrowserJointExpanded = false;
     if (projectBrowserBody) projectBrowserBody.innerHTML = '<div class="project-browser-status">正在加载项目…</div>';
     projectBrowserSheet.style.removeProperty('transform');
     projectBrowserSheet.classList.add('active');
