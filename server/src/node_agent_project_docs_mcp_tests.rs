@@ -154,6 +154,8 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "project_discussions_get_graph_at_version",
             "project_discussions_compare_versions",
             "project_discussions_trace_node",
+            "project_discussions_review_graph",
+            "project_discussions_prepare_safe_repair",
             "project_discussions_get_suggestions",
             "project_discussions_save_proposal",
             "project_discussions_apply",
@@ -551,16 +553,78 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         discussion_node["result"]["structuredContent"]["node"]["title"],
         "产品讨论"
     );
-    let discussion_history = handle_request(
+    let discussion_review = handle_request(
         &root,
         request(json!({
             "jsonrpc":"2.0","id":64,"method":"tools/call",
+            "params":{"name":"project_discussions_review_graph","arguments":{"projection":"page"}}
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        discussion_review["result"]["structuredContent"]["safe_repair_count"],
+        1
+    );
+    let safe_repair = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":65,"method":"tools/call",
+            "params":{"name":"project_discussions_prepare_safe_repair","arguments":{}}
+        })),
+    )
+    .await
+    .unwrap();
+    let repair = &safe_repair["result"]["structuredContent"];
+    let repair_saved = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":66,"method":"tools/call",
+            "params":{"name":"project_discussions_save_proposal","arguments":{
+                "authorization_mode":"git_backed_full",
+                "expected_graph_revision":repair["expected_graph_revision"],
+                "expected_suggestions_revision":repair["expected_suggestions_revision"],
+                "proposal":repair["proposal"]
+            }}
+        })),
+    )
+    .await
+    .unwrap();
+    let repair_suggestions_revision = repair_saved["result"]["structuredContent"]
+        ["suggestions_revision"]
+        .as_str()
+        .unwrap();
+    let repaired = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":67,"method":"tools/call",
+            "params":{"name":"project_discussions_apply","arguments":{
+                "authorization_mode":"git_backed_full",
+                "expected_graph_revision":repair["expected_graph_revision"],
+                "expected_suggestions_revision":repair_suggestions_revision
+            }}
+        })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        repaired["result"]["structuredContent"]["discussion_version_required"],
+        true
+    );
+    let discussion_history = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":68,"method":"tools/call",
             "params":{"name":"project_discussions_get_history","arguments":{"limit":10}}
         })),
     )
     .await
     .unwrap();
-    let discussion_commit = discussion_history["result"]["structuredContent"]["versions"][0]
+    let discussion_versions = discussion_history["result"]["structuredContent"]["versions"]
+        .as_array()
+        .unwrap();
+    assert!(discussion_versions.len() >= 2);
+    let discussion_commit = discussion_versions[0]
         ["commit"]
         .as_str()
         .unwrap();
@@ -571,7 +635,7 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
     let historical_graph = handle_request(
         &root,
         request(json!({
-            "jsonrpc":"2.0","id":65,"method":"tools/call",
+            "jsonrpc":"2.0","id":69,"method":"tools/call",
             "params":{"name":"project_discussions_get_graph_at_version","arguments":{
                 "commit":discussion_commit,"projection":"page"
             }}
@@ -583,10 +647,28 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
         historical_graph["result"]["structuredContent"]["nodes"][0]["id"],
         "root"
     );
+    let version_comparison = handle_request(
+        &root,
+        request(json!({
+            "jsonrpc":"2.0","id":70,"method":"tools/call",
+            "params":{"name":"project_discussions_compare_versions","arguments":{
+                "base_commit":discussion_versions[1]["commit"],
+                "target_commit":discussion_commit
+            }}
+        })),
+    )
+    .await
+    .unwrap();
+    assert!(
+        version_comparison["result"]["structuredContent"]["counts"]["nodes_changed"]
+            .as_u64()
+            .unwrap()
+            >= 1
+    );
     let node_trace = handle_request(
         &root,
         request(json!({
-            "jsonrpc":"2.0","id":66,"method":"tools/call",
+            "jsonrpc":"2.0","id":71,"method":"tools/call",
             "params":{"name":"project_discussions_trace_node","arguments":{"node_id":"root"}}
         })),
     )

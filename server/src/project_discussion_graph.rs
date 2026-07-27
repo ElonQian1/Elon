@@ -7,8 +7,8 @@ use std::path::Path;
 
 use crate::{
     project_discussion_graph_model::{
-        DiscussionGraph, DiscussionGraphProposal, DiscussionPromotion, Versioned,
-        DISCUSSION_GRAPH_PATH, DISCUSSION_SUGGESTIONS_PATH,
+        DiscussionGraph, DiscussionGraphEvolution, DiscussionGraphProposal, DiscussionPromotion,
+        Versioned, DISCUSSION_GRAPH_PATH, DISCUSSION_SUGGESTIONS_PATH,
     },
     project_discussion_graph_validation::{
         counts, merge_graph, normalize_graph, normalize_proposal, validate_promotions,
@@ -110,14 +110,21 @@ pub(crate) fn apply_proposal(
         }));
     }
     validate_promotions(workspace, &proposal)?;
-    let merged = merge_graph(current.value, proposal.graph.clone())?;
-    let managed =
-        authorization_mode == DocumentAutomationMode::GitBackedFull && is_managed_vault(workspace);
+    let previous_revision = current.revision.clone().unwrap_or_default();
+    let mut merged = merge_graph(current.value, proposal.graph.clone())?;
+    merged.evolution = DiscussionGraphEvolution {
+        kind: proposal.change_kind.clone(),
+        summary: proposal.summary.clone(),
+        actor: proposal.actor.clone(),
+        changed_at: chrono::Utc::now().to_rfc3339(),
+        previous_revision,
+    };
+    let managed = is_managed_vault(workspace);
     let pre_commit = managed.then(|| current_version(workspace)).transpose()?;
-    let baseline = if authorization_mode == DocumentAutomationMode::GitBackedFull && !managed {
-        Some(commit_document_baseline(workspace)?)
-    } else {
+    let baseline = if managed {
         pre_commit.clone()
+    } else {
+        Some(commit_document_baseline(workspace)?)
     };
     let promoted = write_promotions(workspace, &proposal.promotions)?;
     let graph_saved = write_project_document_file(
@@ -135,9 +142,7 @@ pub(crate) fn apply_proposal(
         expected_proposal_revision,
     )
     .map_err(|error| anyhow!(error.message))?;
-    let result_commit = if authorization_mode != DocumentAutomationMode::GitBackedFull {
-        None
-    } else if managed {
+    let result_commit = if managed {
         Some(current_version(workspace)?)
     } else {
         baseline
@@ -157,6 +162,8 @@ pub(crate) fn apply_proposal(
         "git_baseline_commit": baseline,
         "git_result_commit": result_commit,
         "git_document_transaction_complete": result_commit.is_some(),
+        "discussion_version_required": true,
+        "change_kind": proposal.change_kind,
     }))
 }
 

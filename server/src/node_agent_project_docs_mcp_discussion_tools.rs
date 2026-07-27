@@ -87,7 +87,7 @@ pub(crate) fn definitions() -> Vec<Value> {
         ),
         tool(
             "project_discussions_apply",
-            "应用已保存的讨论图建议，并创建建议中明确列出的新 Markdown；禁止覆盖现有不同内容。git_backed_full 默认生成整理前后文档提交。",
+            "应用已保存的讨论图建议，并创建建议中明确列出的新 Markdown；禁止覆盖现有不同内容。所有可应用授权模式都生成整理前后版本，保证旧脑图可回看。",
             json!({"type":"object","properties":{
                 "authorization_mode":{"type":"string","enum":["git_backed_full","trusted_reversible","review_all","suggestions_only"],"default":"git_backed_full"},
                 "reviewed":{"type":"boolean","default":false},
@@ -96,16 +96,25 @@ pub(crate) fn definitions() -> Vec<Value> {
             }}),
         ),
     ];
-    definitions.splice(
-        2..2,
-        crate::node_agent_project_docs_mcp_discussion_history_tools::definitions(),
-    );
+    let mut read_tools =
+        crate::node_agent_project_docs_mcp_discussion_history_tools::definitions();
+    read_tools.extend(crate::node_agent_project_docs_mcp_discussion_review_tools::definitions());
+    definitions.splice(2..2, read_tools);
     definitions
 }
 
 pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result<Option<Value>> {
     if let Some(value) =
         crate::node_agent_project_docs_mcp_discussion_history_tools::try_call(
+            workspace,
+            name,
+            arguments.clone(),
+        )?
+    {
+        return Ok(Some(value));
+    }
+    if let Some(value) =
+        crate::node_agent_project_docs_mcp_discussion_review_tools::try_call(
             workspace,
             name,
             arguments.clone(),
@@ -309,6 +318,8 @@ fn save_schema() -> Value {
             "version":{"type":"integer","const":1},
             "status":{"type":"string","enum":["ready"]},
             "summary":{"type":"string","maxLength":1000},
+            "change_kind":{"type":"string","enum":["import","expand","refine","decision","implementation","review","repair","merge"],"default":"refine"},
+            "actor":{"type":"string","maxLength":160},
             "documents_read":{"type":"integer","minimum":0},
             "estimated_tokens_used":{"type":"integer","minimum":0},
             "graph":{"type":"object","properties":{

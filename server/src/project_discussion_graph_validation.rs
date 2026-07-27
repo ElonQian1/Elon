@@ -9,8 +9,8 @@ use std::{
 
 use crate::{
     project_discussion_graph_model::{
-        version, DiscussionEdge, DiscussionGraph, DiscussionGraphProposal, DiscussionNode,
-        DiscussionPromotion, DiscussionSource,
+        version, DiscussionEdge, DiscussionGraph, DiscussionGraphEvolution,
+        DiscussionGraphProposal, DiscussionNode, DiscussionPromotion, DiscussionSource,
     },
     project_document_file_operation_model::normalize_document_path,
     project_document_files::{content_revision, read_project_document_file},
@@ -48,6 +48,7 @@ pub(crate) fn normalize_graph(mut graph: DiscussionGraph) -> Result<DiscussionGr
         .map(|edge| normalize_edge(edge, &node_ids))
         .collect::<Result<Vec<_>>>()?;
     unique_ids(graph.edges.iter().map(|item| item.id.as_str()), "关系")?;
+    graph.evolution = normalize_evolution(graph.evolution)?;
     Ok(graph)
 }
 
@@ -61,6 +62,22 @@ pub(crate) fn normalize_proposal(
         _ => bail!("讨论图建议状态只支持 ready 或 applied"),
     };
     proposal.summary = truncate(proposal.summary.trim(), 1_000);
+    proposal.change_kind = normalized_choice(
+        &proposal.change_kind,
+        &[
+            "import",
+            "expand",
+            "refine",
+            "decision",
+            "implementation",
+            "review",
+            "repair",
+            "merge",
+        ],
+        "refine",
+        "讨论图变更类型",
+    )?;
+    proposal.actor = truncate(proposal.actor.trim(), 160);
     proposal.graph = normalize_graph(proposal.graph)?;
     if proposal.promotions.len() > MAX_PROMOTIONS {
         bail!("一次最多晋升 {MAX_PROMOTIONS} 份文档");
@@ -87,6 +104,7 @@ pub(crate) fn merge_graph(
     current: DiscussionGraph,
     proposed: DiscussionGraph,
 ) -> Result<DiscussionGraph> {
+    let evolution = current.evolution.clone();
     let mut sources = current
         .sources
         .into_iter()
@@ -125,6 +143,7 @@ pub(crate) fn merge_graph(
         sources: sources.into_values().collect(),
         nodes: nodes.into_values().collect(),
         edges: edges.into_values().collect(),
+        evolution,
     })
 }
 
@@ -164,6 +183,31 @@ fn normalize_source(mut source: DiscussionSource) -> Result<DiscussionSource> {
         bail!("讨论来源必须包含 id 和标题");
     }
     Ok(source)
+}
+
+fn normalize_evolution(
+    mut evolution: DiscussionGraphEvolution,
+) -> Result<DiscussionGraphEvolution> {
+    evolution.kind = normalized_choice(
+        &evolution.kind,
+        &[
+            "import",
+            "expand",
+            "refine",
+            "decision",
+            "implementation",
+            "review",
+            "repair",
+            "merge",
+        ],
+        "refine",
+        "讨论图演化类型",
+    )?;
+    evolution.summary = truncate(evolution.summary.trim(), 1_000);
+    evolution.actor = truncate(evolution.actor.trim(), 160);
+    evolution.changed_at = truncate(evolution.changed_at.trim(), 64);
+    evolution.previous_revision = truncate(evolution.previous_revision.trim(), 128);
+    Ok(evolution)
 }
 
 fn normalize_node(mut node: DiscussionNode) -> Result<DiscussionNode> {

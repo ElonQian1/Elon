@@ -219,6 +219,8 @@ pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
             | "project_discussions_get_graph_at_version"
             | "project_discussions_compare_versions"
             | "project_discussions_trace_node"
+            | "project_discussions_review_graph"
+            | "project_discussions_prepare_safe_repair"
             | "project_discussions_get_suggestions"
                 if can_advance_work(&trace) =>
             {
@@ -236,6 +238,8 @@ pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
             | "project_discussions_get_graph_at_version"
             | "project_discussions_compare_versions"
             | "project_discussions_trace_node"
+            | "project_discussions_review_graph"
+            | "project_discussions_prepare_safe_repair"
             | "project_discussions_get_suggestions" => {}
             "project_discussions_save_proposal" => {
                 trace.suggestions_revision = string_field(value, "suggestions_revision");
@@ -394,6 +398,8 @@ pub(crate) fn record_tool_failure(workspace: &Path, tool: &str, error: &anyhow::
         | "project_discussions_get_graph_at_version"
         | "project_discussions_compare_versions"
         | "project_discussions_trace_node"
+        | "project_discussions_review_graph"
+        | "project_discussions_prepare_safe_repair"
         | "project_discussions_get_suggestions" => {
             "刷新讨论图 revision，确认提交仍在当前分支历史且 root_id 或 node_id 存在后重试。"
         }

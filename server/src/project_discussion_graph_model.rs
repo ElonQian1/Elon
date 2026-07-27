@@ -15,6 +15,22 @@ pub(crate) struct DiscussionGraph {
     pub nodes: Vec<DiscussionNode>,
     #[serde(default)]
     pub edges: Vec<DiscussionEdge>,
+    #[serde(default)]
+    pub evolution: DiscussionGraphEvolution,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct DiscussionGraphEvolution {
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub actor: String,
+    #[serde(default)]
+    pub changed_at: String,
+    #[serde(default)]
+    pub previous_revision: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -95,6 +111,10 @@ pub(crate) struct DiscussionGraphProposal {
     pub status: String,
     #[serde(default)]
     pub summary: String,
+    #[serde(default)]
+    pub change_kind: String,
+    #[serde(default)]
+    pub actor: String,
     #[serde(default)]
     pub graph: DiscussionGraph,
     #[serde(default)]

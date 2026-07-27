@@ -51,8 +51,11 @@ pub(crate) fn list_discussion_versions(workspace: &Path, limit: usize) -> Result
         let changes = semantic_diff(&previous, &graph);
         versions.push(json!({
             "commit": meta.commit,
-            "created_at": meta.created_at,
-            "summary": meta.summary,
+            "created_at": non_empty(&graph.evolution.changed_at, &meta.created_at),
+            "summary": non_empty(&graph.evolution.summary, &meta.summary),
+            "change_kind": &graph.evolution.kind,
+            "actor": &graph.evolution.actor,
+            "previous_revision": &graph.evolution.previous_revision,
             "graph_revision": graph_revision(&graph)?,
             "counts": counts(&graph, 0),
             "changes": changes["counts"],
@@ -73,8 +76,8 @@ pub(crate) fn load_discussion_graph_version(
     let graph = graph_at_resolved(workspace, &commit)?;
     Ok(HistoricalDiscussionGraph {
         commit,
-        created_at: meta.created_at,
-        summary: meta.summary,
+        created_at: non_empty(&graph.evolution.changed_at, &meta.created_at).to_string(),
+        summary: non_empty(&graph.evolution.summary, &meta.summary).to_string(),
         graph_revision: graph_revision(&graph)?,
         graph,
     })
@@ -348,6 +351,14 @@ fn metadata_budget() -> Value {
         "document_bodies_read": 0,
         "metadata_only": true,
     })
+}
+
+fn non_empty<'a>(preferred: &'a str, fallback: &'a str) -> &'a str {
+    if preferred.trim().is_empty() {
+        fallback
+    } else {
+        preferred
+    }
 }
 
 #[cfg(test)]
