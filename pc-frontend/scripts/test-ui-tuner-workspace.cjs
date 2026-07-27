@@ -551,6 +551,10 @@ try {
   assert.match(pwaInspectorSource, /低 Token 交接/)
   assert.match(pwaInspectorSource, /data-testid="pwa-low-token-handoff"/)
   assert.match(pwaInspectorSource, /优先读取 compactHandoff/)
+  assert.match(pwaInspectorSource, /设计师常用微调/)
+  assert.match(pwaInspectorSource, /designer:primary/)
+  assert.match(pwaInspectorSource, /designer:ghost/)
+  assert.match(pwaInspectorSource, /直接改 iframe 内真实 PWA DOM/)
   const sourcePreviewCss = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreview.module.css'),
     'utf8',
@@ -558,6 +562,8 @@ try {
   assert.match(sourcePreviewCss, /\.pwaHandoffSummary/)
   assert.match(sourcePreviewCss, /\.pwaSyncProgress/)
   assert.match(sourcePreviewCss, /data-step-state="failed"/)
+  assert.match(sourcePreviewCss, /\.pwaDesignerQuickSection/)
+  assert.match(sourcePreviewCss, /\.pwaDesignerQuickGrid/)
   const pwaBridgeSource = fs.readFileSync(
     path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
     'utf8',

@@ -263,6 +263,37 @@ function StylePresetBar({ session }: Props) {
   )
 }
 
+function quickValue(session: PwaDesignSession, property: PwaStyleProperty, delta: number, fallback: number, unit = 'px', min = 0, max?: number): string {
+  return adjustedCssValue(fieldValue(session, property), delta, unit, min, max) || `${fallback}${unit}`
+}
+
+function DesignerQuickActions({ session }: Props) {
+  const nudgeBox = (label: string, delta: number) => session.updateStyles(`designer:${label}`, {
+    width: quickValue(session, 'width', delta * 4, delta > 0 ? 4 : 0, 'px', 1),
+    height: quickValue(session, 'height', delta * 4, delta > 0 ? 4 : 0, 'px', 1),
+    paddingTop: quickValue(session, 'paddingTop', delta * 2, delta > 0 ? 2 : 0),
+    paddingRight: quickValue(session, 'paddingRight', delta * 2, delta > 0 ? 2 : 0),
+    paddingBottom: quickValue(session, 'paddingBottom', delta * 2, delta > 0 ? 2 : 0),
+    paddingLeft: quickValue(session, 'paddingLeft', delta * 2, delta > 0 ? 2 : 0),
+  })
+  return (
+    <section className={styles.pwaDesignerQuickSection} aria-label="设计师常用微调">
+      <h3>设计师常用微调</h3>
+      <div className={styles.pwaDesignerQuickGrid}>
+        <button type="button" onClick={() => nudgeBox('smaller', -1)}><strong>变小</strong><span>尺寸和内边距一起收紧</span></button>
+        <button type="button" onClick={() => nudgeBox('larger', 1)}><strong>变大</strong><span>尺寸和内边距一起放大</span></button>
+        <button type="button" onClick={() => session.updateStyle('borderRadius', quickValue(session, 'borderRadius', 2, 12))}><strong>更圆</strong><span>圆角 +2px</span></button>
+        <button type="button" onClick={() => session.updateStyle('borderRadius', quickValue(session, 'borderRadius', -2, 0))}><strong>少圆</strong><span>圆角 -2px</span></button>
+        <button type="button" onClick={() => session.updateStyle('fontSize', quickValue(session, 'fontSize', 1, 14, 'px', 8))}><strong>字大</strong><span>字号 +1px</span></button>
+        <button type="button" onClick={() => session.updateStyle('fontSize', quickValue(session, 'fontSize', -1, 14, 'px', 8))}><strong>字小</strong><span>字号 -1px</span></button>
+        <button type="button" onClick={() => session.updateStyles('designer:primary', { backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '14px' })}><strong>主按钮</strong><span>蓝底白字</span></button>
+        <button type="button" onClick={() => session.updateStyles('designer:ghost', { backgroundColor: 'transparent', color: '#e5e7eb' })}><strong>透明底</strong><span>保留文字层级</span></button>
+      </div>
+      <small>这些按钮不是截图覆盖层；它们会直接改 iframe 内真实 PWA DOM，并进入后续 APK/PWA 写回计划。</small>
+    </section>
+  )
+}
+
 export function PwaStyleInspector({ session }: Props) {
   const selectedDraft = session.selection
     ? Object.values(session.draft?.elements ?? {}).find((element) => (
@@ -379,6 +410,8 @@ export function PwaStyleInspector({ session }: Props) {
           <p>PWA 候选 {selectedDraft?.binding.pwaCandidates.length ?? 0} 个 · Android 候选 {selectedDraft?.binding.androidCandidates.length ?? 0} 个</p>
           {(selectedDraft?.binding.needsBinding ?? session.selection.identity.needsBinding) && <p>需要 AI 建立绑定；selector 只作为本次 Runtime 定位证据，不会成为长期源码身份。</p>}
         </section>
+
+        <DesignerQuickActions session={session} />
 
         <StylePresetBar session={session} />
 
