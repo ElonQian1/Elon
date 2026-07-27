@@ -82,18 +82,24 @@ function New-CargoAttemptRecord {
 
 function Write-CargoAttemptTestFailureContext {
     param(
-        [Parameter(Mandatory)][AllowEmptyCollection()][string[]]$Lines,
+        [Parameter(Mandatory)][AllowEmptyCollection()][AllowEmptyString()][string[]]$Lines,
         [Parameter(Mandatory)][string]$Stage,
         [Parameter(Mandatory)][string]$Stream,
         [int]$MaximumLines = 100
     )
+    $plainLines = @($Lines | ForEach-Object {
+        ([string]$_) -replace "`e\[[0-9;?]*[ -/]*[@-~]", ''
+    })
     $testFailureIndex = -1
+    $testFailureSummary = $null
     $fallbackIndex = -1
-    for ($index = 0; $index -lt $Lines.Count; $index++) {
-        $plain = ([string]$Lines[$index]) -replace "`e\[[0-9;?]*[ -/]*[@-~]", ''
-        if ($plain -match '^\s*test\s+.+?\s+\.\.\.\s+FAILED\b') {
+    for ($index = 0; $index -lt $plainLines.Count; $index++) {
+        $end = [Math]::Min($plainLines.Count - 1, $index + 4)
+        $window = $plainLines[$index..$end] -join ' '
+        if ($window -match '\btest\s+.+?\s+\.\s*\.\s*\.\s+FAILED\b') {
             $testFailureIndex = $index
-        } elseif ($plain -match '^\s*failures:\s*$|panicked at|assertion .* failed') {
+            $testFailureSummary = (($Matches[0] -replace '\s+', ' ') -replace '\.\s*\.\s*\.', '...').Trim()
+        } elseif ($plainLines[$index] -match '^\s*failures:\s*$|panicked at|assertion .* failed') {
             $fallbackIndex = $index
         }
     }
@@ -105,6 +111,9 @@ function Write-CargoAttemptTestFailureContext {
     $context = @($Lines[$start..$end] | Where-Object { $_ -and $_.Trim() })
     if ($context.Count -eq 0) { return }
 
+    if ($testFailureSummary) {
+        Write-Host "CARGO_ATTEMPT_TEST_FAILURE_SUMMARY stage=$Stage stream=$Stream $testFailureSummary"
+    }
     Write-Host "CARGO_ATTEMPT_TEST_FAILURE_CONTEXT_BEGIN stage=$Stage stream=$Stream lines=$($context.Count)"
     foreach ($line in $context) {
         $safeLine = ([string]$line).Replace("`0", '').Replace("`r", '').Replace("`n", ' ')
