@@ -136,6 +136,7 @@ class FakeElement {
     this.parentElement = null;
     this.isConnected = true;
     this.listeners = new Map();
+    this.matchesCount = 0;
   }
   appendChild(child) { child.parentElement = this; this.children.push(child); return child; }
   remove() {
@@ -166,7 +167,10 @@ class FakeElement {
     if (selector.includes('[id]') && this.id) return this;
     return null;
   }
-  matches(selector) { return selector === '.page-title' && this.id === 'topTitle'; }
+  matches(selector) {
+    this.matchesCount += 1;
+    return selector === '.page-title' && this.id === 'topTitle';
+  }
   getBoundingClientRect() { return { left: 12, top: 24, width: 180, height: 48 }; }
   querySelectorAll(selector) {
     if (selector !== '[data-ui-screen]') return [];
@@ -364,7 +368,9 @@ function runBridgeBehavior() {
   assert.equal(navigationCount, 2, 'the first click after exiting design must navigate exactly once');
 
   command('set-mode', { mode: 'select' });
+  const matchesBeforeTitleSelection = title.matchesCount;
   dispatchClick(title);
+  assert.equal(title.matchesCount - matchesBeforeTitleSelection, 1, 'one selection should scan each stylesheet rule once instead of once per editable property');
   const titleBinding = posted.filter((message) => message.type === 'selection').at(-1).payload.node.sourceBinding;
   assert.equal(titleBinding.sourceFile, 'src/styles/title.css', 'selection should carry the explicit safe source file');
   assert.deepEqual(titleBinding.propertyMap, { fontSize: 'font-size', color: 'color' });

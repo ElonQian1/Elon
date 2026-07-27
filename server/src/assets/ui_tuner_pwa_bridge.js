@@ -281,11 +281,9 @@
     return property.replace(/[A-Z]/g, (match) => '-' + match.toLowerCase());
   }
 
-  function authoredValue(element, property) {
-    const cssProperty = kebabCase(property);
-    const inlineValue = element.style.getPropertyValue(cssProperty);
-    if (inlineValue) return inlineValue;
-    let matchedValue = '';
+  function inspectAuthoredStyles(element) {
+    const values = {};
+    const selectors = [];
     function visitRules(rules) {
       Array.from(rules || []).forEach((rule) => {
         if (rule.cssRules) {
@@ -294,9 +292,15 @@
         }
         if (!rule.selectorText || !rule.style) return;
         try {
-          if (element.matches(rule.selectorText) && rule.style.getPropertyValue(cssProperty)) {
-            matchedValue = rule.style.getPropertyValue(cssProperty);
-          }
+          if (!element.matches(rule.selectorText)) return;
+          let editable = false;
+          editableProperties.forEach((property) => {
+            const value = rule.style.getPropertyValue(kebabCase(property));
+            if (!value) return;
+            values[property] = value;
+            editable = true;
+          });
+          if (editable && selectors.length < 16 && !selectors.includes(rule.selectorText)) selectors.push(rule.selectorText);
         } catch (_) {
           // Ignore unsupported selectors in authored stylesheets.
         }
@@ -305,58 +309,35 @@
     Array.from(document.styleSheets || []).forEach((sheet) => {
       try { visitRules(sheet.cssRules); } catch (_) { /* Cross-origin sheets are not inspected. */ }
     });
-    return matchedValue;
+    editableProperties.forEach((property) => {
+      const inlineValue = element.style.getPropertyValue(kebabCase(property));
+      if (inlineValue) values[property] = inlineValue;
+    });
+    return { values, selectors };
   }
 
-  function styleValues(element, computed, authored) {
+  function computedStyleValues(computed) {
     return editableProperties.reduce((result, property) => {
-      const value = authored ? authoredValue(element, property) : computed[property];
+      const value = computed[property];
       if (value !== undefined && value !== '') result[property] = String(value);
       return result;
     }, {});
   }
 
-  function matchingStyleSelectors(element) {
-    const selectors = [];
-    function visitRules(rules) {
-      Array.from(rules || []).forEach((rule) => {
-        if (selectors.length >= 16) return;
-        if (rule.cssRules) {
-          visitRules(rule.cssRules);
-          return;
-        }
-        if (!rule.selectorText || !rule.style) return;
-        try {
-          const hasEditableStyle = editableProperties.some((property) => (
-            rule.style.getPropertyValue(kebabCase(property))
-          ));
-          if (hasEditableStyle && element.matches(rule.selectorText) && !selectors.includes(rule.selectorText)) {
-            selectors.push(rule.selectorText);
-          }
-        } catch (_) {
-          // Ignore cross-origin or unsupported selectors; they cannot be written back safely.
-        }
-      });
-    }
-    Array.from(document.styleSheets || []).forEach((sheet) => {
-      try { visitRules(sheet.cssRules); } catch (_) { /* Cross-origin sheets are not inspected. */ }
-    });
-    return selectors;
-  }
-
   function snapshotOf(element, knownRect) {
     const rect = knownRect || element.getBoundingClientRect();
     const computed = window.getComputedStyle(element);
+    const authored = inspectAuthoredStyles(element);
     return {
       identity: identityOf(element),
       rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
       originalStyle: {
-        computed: styleValues(element, computed, false),
-        authored: styleValues(element, computed, true),
+        computed: computedStyleValues(computed),
+        authored: authored.values,
         inlineStyle: element.getAttribute('style'),
       },
       domContext: localDomContext(element),
-      sourceSelectors: matchingStyleSelectors(element),
+      sourceSelectors: authored.selectors,
       sourceBinding: explicitStyleBinding(element),
     };
   }
