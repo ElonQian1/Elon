@@ -127,6 +127,21 @@ function writebackTargetLabel(status: 'DETERMINISTIC' | 'DETERMINISTIC_PARTIAL' 
   return '需要 AI 建立绑定/结构修改'
 }
 
+function WritebackPlanSummary({ session }: Props) {
+  const plan = session.writebackPlan
+  const deterministicCount = plan.deterministic.pwa.length + plan.deterministic.android.length
+  const codexCount = plan.codexChanges.length
+  if (!deterministicCount && !codexCount) return null
+  return (
+    <div className={styles.pwaWritebackPlanSummary}>
+      <span>可直接写回 {deterministicCount} 组</span>
+      <span>AI 只补 {codexCount} 项</span>
+      {plan.codexReasons.slice(0, 2).map((reason) => <small key={reason}>{reason}</small>)}
+      {plan.codexReasons.length > 2 && <small>还有 {plan.codexReasons.length - 2} 个绑定缺口会放入 CLI 包。</small>}
+    </div>
+  )
+}
+
 export function PwaStyleInspector({ session }: Props) {
   const selectedDraft = session.selection
     ? Object.values(session.draft?.elements ?? {}).find((element) => (
@@ -159,6 +174,7 @@ export function PwaStyleInspector({ session }: Props) {
           <span>APK：{writebackTargetLabel(session.writebackPlan.targets.android)}</span>
           <strong>{session.writebackPlan.requiresCodex ? '确定性优先，AI 只补缺口' : '无需 AI 重做'}</strong>
         </div>
+        <WritebackPlanSummary session={session} />
         <button
           type="button"
           className={styles.pwaPrimarySync}
