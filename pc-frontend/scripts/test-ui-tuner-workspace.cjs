@@ -528,6 +528,10 @@ try {
   assert.match(pwaSurfaceSource, /已选中：/)
   assert.match(pwaSurfaceSource, /继续选组件/)
   assert.match(pwaSurfaceSource, /右侧可直接改尺寸、间距、圆角、字体和颜色/)
+  assert.match(pwaSurfaceSource, /pwaCanvasQuickTune/)
+  assert.match(pwaSurfaceSource, /canvas:compact/)
+  assert.match(pwaSurfaceSource, /圆角 \+/)
+  assert.match(pwaSurfaceSource, /字号 \+/)
   assert.match(pwaSurfaceSource, /pwaDeviceFrame/)
   const pwaInspectorSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaStyleInspector.tsx'),

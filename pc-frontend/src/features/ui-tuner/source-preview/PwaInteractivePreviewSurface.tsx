@@ -1,6 +1,7 @@
 import { MousePointer2, RefreshCw, Smartphone } from 'lucide-react'
 import type { SourcePreviewDocument } from './types'
 import type { PwaDesignSession } from './usePwaDesignSession'
+import type { PwaStyleProperty } from './pwaDesignDraft'
 import styles from './SourcePreview.module.css'
 
 interface Props {
@@ -43,6 +44,28 @@ function selectedConfidenceLabel(design: PwaDesignSession): string {
   if (confidence === 'high') return '稳定映射'
   if (confidence === 'medium') return '候选映射'
   return 'DOM 路径'
+}
+
+function currentStyleValue(design: PwaDesignSession, property: PwaStyleProperty): string {
+  const selection = design.selection
+  if (!selection) return ''
+  const draftElement = Object.values(design.draft?.elements ?? {}).find((element) => (
+    element.identity.key === selection.identity.key || element.identity.selector === selection.identity.selector
+  ))
+  return draftElement?.styleDiff[property]
+    ?? selection.originalStyle.authored[property]
+    ?? selection.originalStyle.computed[property]
+    ?? ''
+}
+
+function formatNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '')
+}
+
+function adjustCssNumber(value: string, delta: number, fallback: number, unit = 'px', min = 0): string {
+  const match = value.trim().match(/^(-?\d+(?:\.\d+)?)([a-z%]*)$/i)
+  const next = match ? Number(match[1]) + delta : fallback
+  return `${formatNumber(Math.max(min, next))}${match?.[2] || unit}`
 }
 
 export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Props) {
@@ -91,6 +114,12 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Pr
           <strong>已选中：{selectedLabel(design)}</strong>
           <span>{selectedConfidenceLabel(design)} · 右侧可直接改尺寸、间距、圆角、字体和颜色</span>
           <code>{design.selection.identity.selector}</code>
+        </div>
+        <div className={styles.pwaCanvasQuickTune} aria-label="选中组件快速微调">
+          <button type="button" onClick={() => design.updateStyles('canvas:compact', { paddingTop: '6px', paddingRight: '10px', paddingBottom: '6px', paddingLeft: '10px', fontSize: '13px' })}>紧凑</button>
+          <button type="button" onClick={() => design.updateStyles('canvas:relaxed', { paddingTop: '14px', paddingRight: '18px', paddingBottom: '14px', paddingLeft: '18px', fontSize: '15px' })}>舒展</button>
+          <button type="button" onClick={() => design.updateStyle('borderRadius', adjustCssNumber(currentStyleValue(design, 'borderRadius'), 2, 12))}>圆角 +</button>
+          <button type="button" onClick={() => design.updateStyle('fontSize', adjustCssNumber(currentStyleValue(design, 'fontSize'), 1, 14, 'px', 8))}>字号 +</button>
         </div>
         <button type="button" onClick={() => design.setMode('select')}><MousePointer2 size={14} />继续选组件</button>
         <button type="button" onClick={() => design.setMode('interact')}><Smartphone size={14} />操作页面</button>
