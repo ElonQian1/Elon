@@ -240,6 +240,7 @@ mod realtime_metrics;
 mod release_batch;
 mod release_claim;
 mod release_manager;
+mod release_publish_queue;
 mod route_a_session_lease;
 mod route_c_admin;
 mod router;
