@@ -56,3 +56,22 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 
 只有运行时代码需要在实际网页中验收时才发布一次服务端；不为中间提交重复构建或发布。
 
+## 2026-07-29 实现与验证记录
+
+当前 V1 已形成同一服务层驱动的纵向实现：
+
+- SQLite v108：商户、能力、授权、调用和审计五类事实；
+- HTTP：项目管理、公开发现和幂等调用；
+- MCP：`yilong-open-commerce` 的 9 个供应商无关工具；
+- PC：项目详情页“开放商业”工作台；
+- 安全边界：只允许 `merchant_profile` 与 `static_json`，拒绝任意 HTTP 处理器；
+- 资金边界：只记录整数微单位计量，固定为 `recorded_not_charged`。
+
+最终专项证据：
+
+- PC `npm run build`：TypeScript 检查与 Vite 生产构建通过；
+- Rust `cargo check --manifest-path server/Cargo.toml --bin elon-server`：通过；
+- Rust `cargo test --manifest-path server/Cargo.toml --bin elon-server open_commerce`：8 项通过；
+- 纵向测试真实执行“创建项目与商户 → 发布公开/授权能力 → 公开调用 → 幂等重放 → 创建授权 → HTTP 共用服务调用 → MCP 调用 → 计量与审计回读”，并验证公开发现不会泄漏处理器配置或调用原始值。
+
+尚不属于 V1 已验证能力：真实第三方平台连接、真实资金扣款/退款/分账、消费者数据保险箱、多排序器、公开评价、配送、联邦治理和闲置算力市场。

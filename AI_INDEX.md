@@ -18,6 +18,7 @@
 | Windows 节点升级兼容 / 自动迁移 / 灰度 / 事故处置 | `docs/node-agent-upgrade-compatibility.md` |
 | PWA 真实无头像素捕获 / `yilong_ui_live` MCP / route-source-PNG 验证 | `docs/system-architecture.md` 的“PWA Runtime 像素证据”、`server/src/node_agent_pwa_runtime/`、`server/src/node_agent_source_preview/pwa_runtime.rs`、`pc-frontend/src/features/ui-tuner/source-preview/` |
 | 项目知识首页 / 产品功能图 / 技术架构图 / 主题树 / 讨论推理图 / 独立治理属性 / 低 token MCP | `docs/README.md`、`.github/instructions/document-authority.instructions.md`、`docs/project-document-governance-mcp.md`、`docs/discussion-knowledge-compiler.md`、`pc-frontend/src/features/project-docs/`、`server/src/project_document_knowledge_graph*.rs`、`server/src/project_discussion_graph*.rs`、`server/src/project_document_governance*.rs`、`server/src/node_agent_project_docs_mcp*.rs` |
+| AI 原生开放商业网络 V1 / 商户节点、能力、授权、调用、计量、审计和 MCP | `docs/decisions/open-commerce-network-v1-architecture.md`、`docs/open-commerce-network-v1-api.md`、`server/src/open_commerce_*.rs`、`server/src/store/open_commerce_*.rs`、`pc-frontend/src/features/open-commerce/` |
 | 模型供应商和自定义模型 | `server/src/model_*`、`server/src/agent_model_*` |
 | 用户等级、经验条、token 消耗/分享算力经验 | `server/src/user_progression.rs`、`server/src/store/user_progression.rs`、`server/src/token_usage_api.rs`、`server/src/store/node_ledger.rs` |
 | context compiler / repo map | `server/src/context_compiler/` |

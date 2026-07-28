@@ -10,7 +10,7 @@ source: docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md
 
 ## 当前实施切片
 
-第一版已经收敛为“商户节点 → 能力发布 → 发现 → 授权调用 → 计量审计 → MCP/PC 观察”的项目级纵向闭环。权威边界见：
+第一版已经实现并验证“商户节点 → 能力发布 → 发现 → 授权调用 → 计量审计 → MCP/PC 观察”的项目级纵向闭环。权威边界见：
 
 - `docs/decisions/open-commerce-network-v1-architecture.md`
 - `docs/open-commerce-network-v1-api.md`
