@@ -1,5 +1,6 @@
 package com.elon.app
 
+import java.security.MessageDigest
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
@@ -82,6 +83,26 @@ class ProfilePageLayoutContractTest {
         resources.forEach { resource ->
             assertTrue("missing $resource", Files.isRegularFile(directory.resolve(resource)))
         }
+    }
+
+    @Test
+    fun stretchablePrimaryPanelKeepsTheVerifiedCompleteBitmap() {
+        val path = repositoryRoot().resolve(
+            "android/app/src/main/res/drawable-nodpi/profile_panel_primary_actions_stable.9.png"
+        )
+        val bytes = Files.readAllBytes(path)
+        fun pngInt(offset: Int): Int =
+            ((bytes[offset].toInt() and 0xFF) shl 24) or
+                ((bytes[offset + 1].toInt() and 0xFF) shl 16) or
+                ((bytes[offset + 2].toInt() and 0xFF) shl 8) or
+                (bytes[offset + 3].toInt() and 0xFF)
+
+        assertTrue(pngInt(16) == 1148)
+        assertTrue(pngInt(20) == 945)
+        val sha256 = MessageDigest.getInstance("SHA-256")
+            .digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+        assertTrue(sha256 == "b4acf2bb56b76f6a6d4fb0e8bc556bb39eb8e576fc09f29fc0f5cf334e542b19")
     }
 
     private fun readRepositoryFile(relativePath: String): String =
