@@ -25,9 +25,11 @@ use serde_json::{json, Value};
 use uuid::Uuid;
 
 use crate::release_manager::{
-    bump_semver, clamp_lease, enqueue_global_publish, err, finish_global_publish, lane, lane_mut,
-    manager, max_semver, now_secs, parse_kind, semver_ge, sweep_expired, sweep_global_expired,
-    InFlightBuilder, Lane, LaneState, LastRelease, PublishAdmission, PublishLeaseEntry,
+    bump_semver, clamp_lease, err, lane, lane_mut, manager, max_semver, now_secs, parse_kind,
+    semver_ge, sweep_expired, InFlightBuilder, Lane, LaneState, LastRelease, PublishLeaseEntry,
+};
+use crate::release_publish_queue::{
+    enqueue_global_publish, finish_global_publish, sweep_global_expired, PublishAdmission,
 };
 
 #[path = "release_claim_mutations.rs"]
