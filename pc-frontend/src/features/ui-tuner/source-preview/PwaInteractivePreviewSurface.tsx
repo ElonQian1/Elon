@@ -1,13 +1,17 @@
 import { MousePointer2, RefreshCw, Smartphone } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { PwaDeviceToolbar } from './PwaDeviceToolbar'
 import type { SourcePreviewDocument } from './types'
 import type { PwaDesignSession } from './usePwaDesignSession'
 import type { PwaStyleProperty } from './pwaDesignDraft'
+import { readPwaDeviceViewport, savePwaDeviceViewport } from './pwaDeviceViewport'
 import styles from './SourcePreview.module.css'
 
 interface Props {
   url: string
   document: SourcePreviewDocument
   zoom: number
+  onZoom: (zoom: number) => void
   design: PwaDesignSession
 }
 
@@ -68,14 +72,24 @@ function adjustCssNumber(value: string, delta: number, fallback: number, unit = 
   return `${formatNumber(Math.max(min, next))}${match?.[2] || unit}`
 }
 
-export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Props) {
-  const viewportWidth = Math.max(320, Math.min(430, Math.round(document.canvas.width / 3)))
-  const viewportHeight = Math.max(640, Math.min(932, Math.round(document.canvas.height / 3)))
-  const scale = Math.max(.55, Math.min(1.5, zoom))
+export function PwaInteractivePreviewSurface({ url, document, zoom, onZoom, design }: Props) {
+  const [viewport, setViewport] = useState(readPwaDeviceViewport)
+  const workspaceRef = useRef<HTMLDivElement>(null)
+  const viewportWidth = viewport.width
+  const viewportHeight = viewport.height
+  const scale = Math.max(.35, Math.min(1.5, zoom))
   const route = design.route
+  useEffect(() => savePwaDeviceViewport(viewport), [viewport])
+
+  const fitViewport = () => {
+    const availableWidth = Math.max(280, (workspaceRef.current?.clientWidth ?? window.innerWidth) - 72)
+    const availableHeight = Math.max(360, window.innerHeight - 410)
+    const next = Math.max(.35, Math.min(1.5, availableWidth / viewportWidth, availableHeight / viewportHeight))
+    onZoom(Math.round(next * 100) / 100)
+  }
 
   return (
-    <div className={styles.pwaPreviewWorkspace} data-testid="pwa-interactive-preview">
+    <div ref={workspaceRef} className={styles.pwaPreviewWorkspace} data-testid="pwa-interactive-preview">
       <div className={styles.pwaWorkflowGuide} aria-label="PWA 手工设计步骤">
         <span className={design.mode === 'interact' ? styles.activeWorkflowStep : ''}>① 真实使用并到达页面</span>
         <span className={design.mode === 'select' && !design.selection ? styles.activeWorkflowStep : ''}>② 点一次选择组件</span>
@@ -90,6 +104,18 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Pr
         </div>
         <button type="button" title="重新载入 PWA（已保存草稿会自动恢复）" onClick={design.prepareReload}><RefreshCw size={14} /></button>
       </div>
+      <PwaDeviceToolbar
+        viewport={viewport}
+        runtimeViewport={route?.viewport}
+        zoom={zoom}
+        projectRoot={document.projectRoot}
+        sourceRevision={document.sourceRevision}
+        runtimeUrl={url}
+        route={route}
+        onViewportChange={setViewport}
+        onZoom={onZoom}
+        onFit={fitViewport}
+      />
       <div className={styles.pwaModeGuide} data-mode={design.mode} data-ready={design.ready ? 'true' : 'false'}>
         <strong>{modeTitle(design)}</strong>
         <span>{modeDetail(design)}</span>
@@ -129,6 +155,16 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, design }: Pr
       <div className={styles.pwaDraftBadge}>真实 PWA 页面 · 手工草稿</div>
       <div className={styles.pwaDeviceViewport} style={{ width: viewportWidth * scale, height: viewportHeight * scale }}>
         <iframe key={design.reloadKey} ref={design.iframeRef} className={styles.pwaDeviceFrame} src={pwaUrl(url, design.reloadKey)} title="移动 PWA 真实页面" style={{ width: viewportWidth, height: viewportHeight, transform: `scale(${scale})` }} />
+        {viewport.showSafeArea && <div
+          className={styles.pwaSafeAreaGuide}
+          aria-hidden="true"
+          style={{
+            top: viewport.safeArea.top * scale,
+            right: viewport.safeArea.right * scale,
+            bottom: viewport.safeArea.bottom * scale,
+            left: viewport.safeArea.left * scale,
+          }}
+        />}
       </div>
     </div>
   )

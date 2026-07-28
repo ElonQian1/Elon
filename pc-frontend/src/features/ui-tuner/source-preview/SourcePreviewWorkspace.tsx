@@ -91,7 +91,7 @@ export function SourcePreviewWorkspace({
           renderer={session.renderer}
         />
         <SourceUiDesignProgress hasDocument={Boolean(session.document)} pendingCount={Object.keys(session.pending).length} saveState={session.saveState} />
-        <SourceDrivenPreviewSurface document={session.document} androidRender={session.renderer.render} pwaPreview={session.renderer.capabilities?.pwaPreview ?? null} selectedKey={session.selectedKey} zoom={zoom} loading={session.loading || session.renderer.rendering} error={session.error || session.renderer.error} onSelect={session.setSelectedKey} onModeChange={onModeChange} pwaDesign={pwaDesign} />
+        <SourceDrivenPreviewSurface document={session.document} androidRender={session.renderer.render} pwaPreview={session.renderer.capabilities?.pwaPreview ?? null} selectedKey={session.selectedKey} zoom={zoom} onZoom={setZoom} loading={session.loading || session.renderer.rendering} error={session.error || session.renderer.error} onSelect={session.setSelectedKey} onModeChange={onModeChange} pwaDesign={pwaDesign} />
       </section>
       {pwaPreviewActive
         ? <PwaStyleInspector session={pwaDesign} />

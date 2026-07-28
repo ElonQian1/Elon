@@ -166,3 +166,67 @@ export async function capturePwaSourceRuntime(
     ),
   })
 }
+
+export async function capturePwaViewportSnapshot(input: {
+  projectRoot: string
+  sourceRevision: string
+  runtimeUrl: string
+  route?: { path: string; search: string; hash: string } | null
+  viewport: { width: number; height: number; deviceScaleFactor: number }
+}): Promise<PwaRuntimeCaptureResult> {
+  if (!input.runtimeUrl.trim()) {
+    throw new Error('PWA_RUNTIME_URL_REQUIRED：当前画面没有可捕获的真实 PWA URL')
+  }
+  const target = new URL(input.runtimeUrl, window.location.origin)
+  if (input.route?.path?.startsWith('/')) target.pathname = input.route.path
+  target.search = input.route?.search || target.search
+  target.hash = input.route?.hash || ''
+  const adminUrl = sourcePreviewAdminUrl()
+  const token = getAuthToken()
+  const accountLabel = getAuthIdentityLabel()
+  const width = Math.max(240, Math.min(1440, Math.round(input.viewport.width)))
+  const height = Math.max(240, Math.min(2048, Math.round(input.viewport.height)))
+  const deviceScaleFactor = Math.max(.5, Math.min(4, input.viewport.deviceScaleFactor))
+  return captureWithTemporaryPwaAuthProfile(input.projectRoot, token, accountLabel, {
+    prepare: (projectRoot, currentToken, currentAccountLabel) => nodeApi<PreparedPwaAuthProfile>(
+      adminUrl,
+      '/api/source-preview/pwa-auth-profile/prepare',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          projectRoot,
+          token: currentToken || undefined,
+          remember: true,
+          accountLabel: currentAccountLabel || undefined,
+        }),
+      },
+      15_000,
+    ),
+    capture: (profile) => nodeApi<PwaRuntimeCaptureResult>(
+      adminUrl,
+      '/api/source-preview/capture-pwa-runtime',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          projectRoot: input.projectRoot,
+          url: target.toString(),
+          viewport: { width, height, deviceScaleFactor },
+          waitFor: { condition: 'networkidle', selector: 'body', timeoutMs: 30_000, settleMs: 500 },
+          capture: { fullPage: false },
+          authProfile: profile,
+          evidence: {
+            sourceRevision: input.sourceRevision || 'source-preview-unavailable',
+            routeRevision: `viewport-${width}x${height}-${input.route?.path || '/web'}`,
+          },
+        }),
+      },
+      45_000,
+    ),
+    cleanup: (projectRoot, profile) => nodeApi(
+      adminUrl,
+      '/api/source-preview/pwa-auth-profile/cleanup',
+      { method: 'POST', body: JSON.stringify({ projectRoot, profile }) },
+      15_000,
+    ),
+  })
+}

@@ -74,6 +74,12 @@ export interface PwaSelection {
 export interface PwaRouteState extends PwaRouteIdentity {
   href: string
   title: string
+  viewport: PwaRouteIdentity['viewport'] & {
+    deviceScaleFactor?: number
+    visualWidth?: number
+    visualHeight?: number
+    pointer?: 'coarse' | 'fine' | 'none'
+  }
   scroll?: { x: number; y: number }
 }
 
@@ -450,7 +456,14 @@ export function usePwaDesignSession({
       }
       if (message.type === 'route-changed' && message.payload?.path && message.payload.viewport) {
         const normalized = normalizePwaRoute(message.payload as PwaRouteState)
-        const nextRoute: PwaRouteState = { ...(message.payload as PwaRouteState), ...normalized }
+        const nextRoute: PwaRouteState = {
+          ...(message.payload as PwaRouteState),
+          ...normalized,
+          viewport: {
+            ...(message.payload.viewport as PwaRouteState['viewport']),
+            ...normalized.viewport,
+          },
+        }
         const changed = !routeRef.current || routeKey(routeRef.current) !== routeKey(nextRoute)
         routeRef.current = nextRoute
         setRoute(nextRoute)

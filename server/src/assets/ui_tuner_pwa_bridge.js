@@ -375,6 +375,24 @@
     };
   }
 
+  function viewportState() {
+    const visual = window.visualViewport;
+    let pointer = 'none';
+    if (typeof window.matchMedia === 'function') {
+      pointer = window.matchMedia('(pointer: coarse)').matches
+        ? 'coarse'
+        : window.matchMedia('(pointer: fine)').matches ? 'fine' : 'none';
+    }
+    return {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      deviceScaleFactor: window.devicePixelRatio || 1,
+      visualWidth: visual ? visual.width : window.innerWidth,
+      visualHeight: visual ? visual.height : window.innerHeight,
+      pointer,
+    };
+  }
+
   function routeState(reason) {
     const screen = screenIdentity();
     return {
@@ -386,7 +404,7 @@
       title: document.title,
       screenKey: screen.screenKey,
       screenTitle: screen.screenTitle,
-      viewport: { width: window.innerWidth, height: window.innerHeight },
+      viewport: viewportState(),
       scroll: { x: window.scrollX, y: window.scrollY },
     };
   }
@@ -626,8 +644,8 @@
     const exhausted = !hasRetryable || state.attempt >= DRAFT_RETRY_LIMIT;
     const acknowledgement = draftAck(state, exhausted);
     lastDraftAck = acknowledgement;
-    post('draft-applied', acknowledgement);
     postHealth('draft-applied');
+    post('draft-applied', acknowledgement);
     if (acknowledgement.complete) {
       completedDraftRevision = state.revisionKey;
       activeDraft = null;
@@ -790,7 +808,7 @@
 
   post('ready', {
     href: window.location.href,
-    viewport: { width: window.innerWidth, height: window.innerHeight },
+    viewport: viewportState(),
     mode: 'interact',
   });
   postRoute('ready');

@@ -543,6 +543,30 @@ try {
   assert.match(pwaSurfaceSource, /圆角 \+/)
   assert.match(pwaSurfaceSource, /字号 \+/)
   assert.match(pwaSurfaceSource, /pwaDeviceFrame/)
+  assert.match(pwaSurfaceSource, /PwaDeviceToolbar/)
+  assert.match(pwaSurfaceSource, /viewportWidth = viewport\.width/)
+  assert.match(pwaSurfaceSource, /viewportHeight = viewport\.height/)
+  assert.match(pwaSurfaceSource, /onFit=\{fitViewport\}/)
+  assert.doesNotMatch(pwaSurfaceSource, /document\.canvas\.width\s*\/\s*3/)
+  const pwaDeviceToolbarSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaDeviceToolbar.tsx'),
+    'utf8',
+  )
+  assert.match(pwaDeviceToolbarSource, /PWA 设备视口/)
+  assert.match(pwaDeviceToolbarSource, /响应式 \/ 自定义/)
+  assert.match(pwaDeviceToolbarSource, /旋转 PWA 视口/)
+  assert.match(pwaDeviceToolbarSource, /捕获当前视口 PNG/)
+  assert.match(pwaDeviceToolbarSource, /浏览器实测 DPR/)
+  assert.match(pwaDeviceToolbarSource, /显示安全区参考线/)
+  const pwaDeviceViewportSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/pwaDeviceViewport.ts'),
+    'utf8',
+  )
+  assert.match(pwaDeviceViewportSource, /当前小米真机/)
+  assert.match(pwaDeviceViewportSource, /width: 412/)
+  assert.match(pwaDeviceViewportSource, /height: 915/)
+  assert.match(pwaDeviceViewportSource, /小屏兼容/)
+  assert.match(pwaDeviceViewportSource, /PWA_DEVICE_VIEWPORT_STORAGE_KEY/)
   const pwaInspectorSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaStyleInspector.tsx'),
     'utf8',
@@ -592,6 +616,8 @@ try {
   assert.match(sourcePreviewCss, /\.colorField\{display:grid;grid-template-columns:44px minmax\(132px,1fr\)/)
   assert.match(sourcePreviewCss, /\.pwaQuickAdjust:has\(>input:only-child\)/)
   assert.match(sourcePreviewCss, /\.fieldGrid:has\(\.colorField\)/)
+  assert.match(sourcePreviewCss, /\.pwaDeviceToolbar/)
+  assert.match(sourcePreviewCss, /\.pwaSafeAreaGuide/)
   const pwaBridgeSource = fs.readFileSync(
     path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
     'utf8',
@@ -603,6 +629,10 @@ try {
   assert.match(pwaBridgeSource, /function postHealth/)
   assert.match(pwaBridgeSource, /health-check/)
   assert.match(pwaBridgeSource, /editablePropertyCount/)
+  assert.match(pwaBridgeSource, /function viewportState/)
+  assert.match(pwaBridgeSource, /deviceScaleFactor: window\.devicePixelRatio/)
+  assert.match(pwaBridgeSource, /visualWidth/)
+  assert.match(pwaBridgeSource, /\(pointer: coarse\)/)
   const pwaSessionSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/usePwaDesignSession.ts'),
     'utf8',
