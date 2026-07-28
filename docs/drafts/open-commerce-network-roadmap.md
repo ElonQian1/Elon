@@ -8,6 +8,16 @@ source: docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md
 
 # 开放商业网络阶段路线图
 
+## 当前实施切片
+
+第一版已经收敛为“商户节点 → 能力发布 → 发现 → 授权调用 → 计量审计 → MCP/PC 观察”的项目级纵向闭环。权威边界见：
+
+- `docs/decisions/open-commerce-network-v1-architecture.md`
+- `docs/open-commerce-network-v1-api.md`
+- `docs/open-commerce-network-v1-acceptance.md`
+
+真实支付、第三方平台连接器、消费者数据保险箱、多排序器和联邦治理继续留在后续阶段，不进入第一版完成条件。
+
 ## 阶段一：商户 AI 经营系统
 
 选择一个高复购行业和单一区域，交付数据连接、经营诊断、营销执行、小游戏、会员召回和结果归因。目标是证明商户获得的增量收益或节省成本高于产品费用。
