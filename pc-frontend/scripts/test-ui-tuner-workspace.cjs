@@ -622,6 +622,10 @@ try {
     path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
     'utf8',
   )
+  const pwaViewportBridgeSource = fs.readFileSync(
+    path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_viewport_bridge.js'),
+    'utf8',
+  )
   assert.match(pwaBridgeSource, /selectingTimeoutTimer/)
   assert.match(pwaBridgeSource, /15000/)
   assert.match(pwaBridgeSource, /bridge-notice/)
@@ -629,10 +633,10 @@ try {
   assert.match(pwaBridgeSource, /function postHealth/)
   assert.match(pwaBridgeSource, /health-check/)
   assert.match(pwaBridgeSource, /editablePropertyCount/)
-  assert.match(pwaBridgeSource, /function viewportState/)
-  assert.match(pwaBridgeSource, /deviceScaleFactor: window\.devicePixelRatio/)
-  assert.match(pwaBridgeSource, /visualWidth/)
-  assert.match(pwaBridgeSource, /\(pointer: coarse\)/)
+  assert.match(pwaBridgeSource, /__ELON_UI_TUNER_VIEWPORT_STATE__/)
+  assert.match(pwaViewportBridgeSource, /deviceScaleFactor: window\.devicePixelRatio/)
+  assert.match(pwaViewportBridgeSource, /visualWidth/)
+  assert.match(pwaViewportBridgeSource, /\(pointer: coarse\)/)
   const pwaSessionSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/usePwaDesignSession.ts'),
     'utf8',

@@ -132,6 +132,8 @@ const VOICE_TTS_SDK_JS: &str = include_str!("assets/voice_tts_sdk.js");
 const ELON_ROUTE_C_SDK_JS: &str = include_str!("assets/elon_route_c_sdk.js");
 const UI_TUNER_PWA_AUTH_BOOTSTRAP_JS: &str = include_str!("assets/ui_tuner_pwa_auth_bootstrap.js");
 const UI_TUNER_PWA_VERIFICATION_JS: &str = include_str!("assets/ui_tuner_pwa_verification.js");
+const UI_TUNER_PWA_VIEWPORT_BRIDGE_JS: &str =
+    include_str!("assets/ui_tuner_pwa_viewport_bridge.js");
 const UI_TUNER_PWA_BRIDGE_JS: &str = include_str!("assets/ui_tuner_pwa_bridge.js");
 
 pub async fn web_page() -> impl IntoResponse {
@@ -175,6 +177,8 @@ fn decode_brand_png() -> Vec<u8> {
 }
 
 fn build_html() -> String {
+    let ui_tuner_pwa_bridge =
+        format!("{UI_TUNER_PWA_VIEWPORT_BRIDGE_JS}\n{UI_TUNER_PWA_BRIDGE_JS}");
     let refresh_ring_png_b64 = base64::Engine::encode(
         &base64::engine::general_purpose::STANDARD,
         CHAT_SIDE_MENU_REFRESH_RING_PNG,
@@ -223,7 +227,7 @@ fn build_html() -> String {
             "__UI_TUNER_PWA_VERIFICATION_JS__",
             UI_TUNER_PWA_VERIFICATION_JS,
         )
-        .replace("__UI_TUNER_PWA_BRIDGE_JS__", UI_TUNER_PWA_BRIDGE_JS)
+        .replace("__UI_TUNER_PWA_BRIDGE_JS__", &ui_tuner_pwa_bridge)
         .replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim())
         .replace("__TAB_CHAT_PNG_B64__", TAB_CHAT_PNG_B64.trim())
         .replace("__TAB_PROJECT_PNG_B64__", TAB_PROJECT_PNG_B64.trim())

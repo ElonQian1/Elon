@@ -53,10 +53,12 @@ import {
   type AndroidWritebackVerification,
 } from './useCrossPlatformWritebackReceipt'
 import { usePwaSourceVerification } from './usePwaSourceVerification'
+import { mergePwaRouteState, type PwaRouteState } from './pwaRuntimeViewport'
 import type { PwaBridgeHealth } from './pwaBridgeHealth'
 import type { SourcePreviewNode } from './types'
 
 export type { AndroidWritebackVerification } from './useCrossPlatformWritebackReceipt'
+export type { PwaRouteState } from './pwaRuntimeViewport'
 
 const BRIDGE_SOURCE = 'elon-pwa-design-bridge'
 const PARENT_SOURCE = 'elon-pc-ui-tuner'
@@ -69,18 +71,6 @@ export interface PwaSelection {
   domContext: PwaDomContextNode[]
   sourceSelectors?: string[]
   sourceBinding?: PwaExplicitStyleBinding
-}
-
-export interface PwaRouteState extends PwaRouteIdentity {
-  href: string
-  title: string
-  viewport: PwaRouteIdentity['viewport'] & {
-    deviceScaleFactor?: number
-    visualWidth?: number
-    visualHeight?: number
-    pointer?: 'coarse' | 'fine' | 'none'
-  }
-  scroll?: { x: number; y: number }
 }
 
 interface UsePwaDesignSessionOptions {
@@ -455,15 +445,7 @@ export function usePwaDesignSession({
         return
       }
       if (message.type === 'route-changed' && message.payload?.path && message.payload.viewport) {
-        const normalized = normalizePwaRoute(message.payload as PwaRouteState)
-        const nextRoute: PwaRouteState = {
-          ...(message.payload as PwaRouteState),
-          ...normalized,
-          viewport: {
-            ...(message.payload.viewport as PwaRouteState['viewport']),
-            ...normalized.viewport,
-          },
-        }
+        const nextRoute = mergePwaRouteState(message.payload as PwaRouteState)
         const changed = !routeRef.current || routeKey(routeRef.current) !== routeKey(nextRoute)
         routeRef.current = nextRoute
         setRoute(nextRoute)

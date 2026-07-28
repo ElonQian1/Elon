@@ -7,6 +7,7 @@ const repoRoot = path.resolve(__dirname, '..');
 const mobileWeb = fs.readFileSync(path.join(repoRoot, 'server/src/assets/web_page.html'), 'utf8');
 const authBootstrap = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_auth_bootstrap.js'), 'utf8');
 const sourceVerification = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_verification.js'), 'utf8');
+const viewportBridge = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_viewport_bridge.js'), 'utf8');
 const bridge = fs.readFileSync(path.join(repoRoot, 'server/src/assets/ui_tuner_pwa_bridge.js'), 'utf8');
 const previewSurface = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/PwaInteractivePreviewSurface.tsx'), 'utf8');
 const previewSurfaceCss = fs.readFileSync(path.join(repoRoot, 'pc-frontend/src/features/ui-tuner/source-preview/SourcePreview.module.css'), 'utf8');
@@ -43,6 +44,9 @@ assert.ok(bridge.includes("message.type === 'set-session-auth'"), 'preview shoul
 assert.ok(bridge.includes("CustomEvent('elon:ui-tuner-session-auth'"), 'session auth must stay in page memory');
 assert.ok(!bridge.includes("localStorage.setItem('lodex_token'"), 'preview bridge must not persist the PC token');
 assert.ok(bridge.includes("post('route-changed'"), 'PWA should report route changes without parent reloads');
+assert.ok(viewportBridge.includes('window.devicePixelRatio'), 'PWA should report the actual browser DPR');
+assert.ok(viewportBridge.includes('window.visualViewport'), 'PWA should report the actual visual viewport');
+assert.ok(viewportBridge.includes('(pointer: coarse)'), 'PWA should distinguish touch and mouse pointer targets');
 assert.ok(bridge.includes("getAttribute('data-ui-screen')"), 'PWA should prefer an explicit screen identity when the app supplies one');
 assert.ok(bridge.includes("document.querySelectorAll('.page.active[id]')"), 'PWA should fall back to the active page id without depending on DOM order');
 assert.ok(bridge.includes("document.querySelector('#topTitle')"), 'PWA should distinguish active screens by their stable visible title');
@@ -323,6 +327,7 @@ function runBridgeBehavior() {
     MutationObserver: FakeMutationObserver,
   };
   vm.runInNewContext(sourceVerification, context);
+  vm.runInNewContext(viewportBridge, context);
   vm.runInNewContext(bridge, context);
 
   assert.equal(windowListeners.get('message').length, 1, 'bridge should install exactly one command listener');
@@ -331,6 +336,9 @@ function runBridgeBehavior() {
   assert.equal(posted.filter((message) => message.type === 'ready').length, 1, 'bridge should emit one ready event');
   assert.equal(posted.filter((message) => message.type === 'route-changed').length, 1, 'bridge should emit one initial route event');
   assert.equal(posted.find((message) => message.type === 'route-changed').payload.screenKey, 'page:chatPage|title:好友');
+  assert.equal(posted.find((message) => message.type === 'route-changed').payload.viewport.deviceScaleFactor, 1);
+  assert.equal(posted.find((message) => message.type === 'route-changed').payload.viewport.visualWidth, 390);
+  assert.equal(posted.find((message) => message.type === 'route-changed').payload.viewport.pointer, 'none');
   assert.equal(screenObserver.target, body, 'screen observer should watch the rendered PWA body');
   assert.ok(screenObserver.options.characterData, 'screen observer should watch visible title text');
   assert.ok(!screenObserver.options.attributeFilter.includes('style'), 'screen observer should exclude style mutations');
