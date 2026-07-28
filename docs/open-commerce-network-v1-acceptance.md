@@ -65,6 +65,7 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 - MCP：`yilong-open-commerce` 的 9 个供应商无关工具；
 - PC：项目详情页“开放商业”工作台；
 - 安全边界：只允许 `merchant_profile` 与 `static_json`，拒绝任意 HTTP 处理器；
+- 身份边界：公开商户发现允许匿名读取，能力调用、项目管理和 MCP 必须携带身份；
 - 资金边界：只记录整数微单位计量，固定为 `recorded_not_charged`。
 
 最终专项证据：

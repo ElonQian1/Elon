@@ -228,12 +228,8 @@ async fn project_audit(
 
 async fn search_merchants(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Query(query): Query<MerchantSearchQuery>,
 ) -> Response {
-    if let Err(response) = authenticated_user(&state, &headers) {
-        return response;
-    }
     service_response(
         open_commerce_service::discover_merchants(
             &state.store,
@@ -247,12 +243,8 @@ async fn search_merchants(
 
 async fn get_merchant(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     Path(merchant_id): Path<String>,
 ) -> Response {
-    if let Err(response) = authenticated_user(&state, &headers) {
-        return response;
-    }
     service_response(open_commerce_service::discover_merchant(
         &state.store,
         &merchant_id,

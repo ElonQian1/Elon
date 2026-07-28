@@ -40,6 +40,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `GET` | `/api/open-commerce/merchants/:merchant_id` | 读取商户公开资料和可发现能力 |
 | `POST` | `/api/open-commerce/invoke` | 调用能力并记录幂等、计量和审计 |
 
+两个 `GET` 发现接口允许匿名读取，便于任意 App 或 AI 在未加入一龙项目时发现公开商户能力。能力调用、项目管理和 MCP 仍需要 Bearer 身份；开放发现不等于匿名执行。
+
 发现接口不返回授权数据、内部处理器配置、项目成员信息或商户内部数据。
 
 ## 调用请求
@@ -112,4 +114,3 @@ V1 拒绝未知处理器和任意 URL。后续真实连接器必须单独注册�
 | `422` | 能力存在但当前输入不满足契约 |
 
 错误响应不得包含 token、密钥、内部处理器配置或原始敏感输入。
-
