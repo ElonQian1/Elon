@@ -42,6 +42,10 @@ jobs:
         shell: pwsh
         run: scripts\check-ci-quality-gates.ps1
 
+      - name: APP UI Fast Lane Guard
+        shell: powershell
+        run: scripts\test-app-ui-fast-lane.ps1
+
       - name: Realtime Runbook Guard
         shell: pwsh
         run: scripts\check-realtime-runbook.ps1

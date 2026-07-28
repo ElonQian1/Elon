@@ -100,6 +100,7 @@ if ($Scope -eq "Static" -or $SkipCargoTest) {
 Invoke-RepoPowerShellScript -Name "Source Size Guard" -ScriptPath "scripts\check-source-size.ps1"
 Invoke-RepoPowerShellScript -Name "Release Runbook Guard" -ScriptPath "scripts\check-release-runbook.ps1"
 Invoke-RepoPowerShellScript -Name "CI Quality Gates Guard" -ScriptPath "scripts\check-ci-quality-gates.ps1"
+Invoke-RepoPowerShellScript -Name "APP UI Fast Lane Guard" -ScriptPath "scripts\test-app-ui-fast-lane.ps1"
 Invoke-RepoPowerShellScript -Name "Realtime Runbook Guard" -ScriptPath "scripts\check-realtime-runbook.ps1"
 Invoke-RepoPowerShellScript -Name "Realtime Ownership Guard" -ScriptPath "scripts\check-realtime-ownership.ps1"
 Invoke-RepoPowerShellScript -Name "Realtime Diagnostics Snapshot Guard" -ScriptPath "scripts\check-realtime-diagnostics-snapshot.ps1" -Arguments $snapshotArgs

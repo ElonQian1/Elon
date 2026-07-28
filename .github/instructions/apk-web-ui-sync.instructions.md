@@ -11,6 +11,8 @@ applyTo: >
 
 # APK UI ↔ 网页 UI 同步规则
 
+Ripple、颜色、间距、圆角、字号和轻量动画等低风险纯视觉同步，优先按 `docs/app-ui-fast-lane.md` 的单命令验证与发布流程执行；默认不启动真机、模拟器或 Renderer。
+
 ## 核心原则
 
 **每次修改 APK UI，必须同步更新 `server/src/assets/web_page.html`**。

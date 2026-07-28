@@ -2,8 +2,7 @@
 
 最后更新：2026-07-18
 
-> 本文件是 Codex、Codex CLI、Copilot、Copilot CLI 等代理的共享权威规则。
-> 它只保留每轮都必须知道的不变量；任务专项细节由 `AGENTS.md` 路由按需读取。
+> 本文件是各 AI 代理的共享权威规则，只保留每轮不变量；专项细节由 `AGENTS.md` 按需路由。
 > 开始任务时还要读取 `AGENTS.md`，只选择当前任务命中的专项文档。
 
 ## 项目边界
@@ -57,6 +56,7 @@
 | `pc-frontend/`、`/pc` 用户可见改动 | 构建后默认 `publish-server.*` 并验证 `/pc` | `PcFrontend`；只同步时 `CodePushed` |
 | Win 节点客户端用户可见改动 | 默认 `publish-node-agent.ps1` | `NodeAgent`；只同步时 `CodePushed` |
 | Android 可安装端用户可见改动 | 默认 `publish-apk.*` | `AndroidFeature`；只同步时 `CodePushed` |
+| Android + 移动 PWA 视觉同步 | `publish-app-ui-fast-lane.ps1` | `AndroidFeature` |
 
 发布期间若被更新的 `origin/main` 或服务器版本超越，业务代码已进入主线的结论不变；按脚本输出汇报“代码已合并，发布交给最新主线”，不要循环 rebase 或重跑。
 
@@ -67,7 +67,7 @@
 - Rust/Cargo 验证必须走 `scripts/validate-rust.ps1`（Git Bash/非 Windows 由 `cargo-dev.sh` 适配）；入口先执行廉价门禁，再按精确指纹复用或运行 `cargo-dev`。发布构建走发布脚本，不能共享裸 Cargo 写入。
 - 经仓库脚本确认的全量纯 rustfmt 先独立提交；业务改动另提，不为缩小 diff 反复撤销。
 - 新建源文件目标不超过 500 行，超过 800 行必须拆分；入口文件只做组装。
-- APP UI 改动先读 `docs/Design.md`、`docs/APP 颜色规范.md`；APK UI 还要按路由检查网页同步规则。
+- APP 纯视觉微调读 `docs/app-ui-fast-lane.md`；复杂 UI 再读完整设计规则。
 - 带 `#requires -Version 7.0` 的脚本必须用 `pwsh`，不能删要求或降级脚本来绕过。
 
 所有专项文档、验证命令和发布细节从 `AGENTS.md` 路由，不固定全量读取。

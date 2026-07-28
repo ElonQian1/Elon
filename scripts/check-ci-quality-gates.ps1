@@ -61,6 +61,8 @@ $requiredEntries = @(
     "scripts\check-release-runbook.ps1",
     "CI Quality Gates Guard",
     "scripts\check-ci-quality-gates.ps1",
+    "APP UI Fast Lane Guard",
+    "scripts\test-app-ui-fast-lane.ps1",
     "Realtime Runbook Guard",
     "scripts\check-realtime-runbook.ps1",
     "Realtime Ownership Guard",
