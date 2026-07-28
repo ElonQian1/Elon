@@ -121,6 +121,8 @@ class ChatSocialSideMenuContractTest {
         assertTrue(view.contains("-3L -> Gravity.START"))
         assertTrue(view.contains("3L -> Gravity.END"))
         assertTrue(view.contains("offset.toInt() * 3"))
+        assertTrue(view.contains("socialSidebarDateLabelParams(contentGravity)"))
+        assertTrue(view.contains("gravity = contentGravity"))
         assertTrue(
             "TextStyle.SHORT, Locale.ENGLISH\\),\\s+14f,\\s+selected"
                 .toRegex()

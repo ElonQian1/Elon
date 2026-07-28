@@ -62,16 +62,26 @@ private fun socialSidebarDateCell(
     }, FrameLayout.LayoutParams(dp(35), dp(67)).apply { gravity = Gravity.CENTER })
     addView(LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        gravity = socialSidebarDateContentGravity(offset) or Gravity.CENTER_VERTICAL
-        translationX = dp(socialSidebarDateContentOffsetDp(offset)).toFloat()
-        addView(socialSidebarDateLabel(context, date.dayOfMonth.toString(), 14f, selected))
+        gravity = Gravity.CENTER_VERTICAL
+        val contentGravity = socialSidebarDateContentGravity(offset)
+        val contentOffsetPx = dp(socialSidebarDateContentOffsetDp(offset)).toFloat()
+        addView(
+            socialSidebarDateLabel(context, date.dayOfMonth.toString(), 14f, selected).apply {
+                translationX = contentOffsetPx
+            },
+            socialSidebarDateLabelParams(contentGravity)
+        )
         addView(
             socialSidebarDateLabel(
                 context,
                 date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH),
                 14f,
                 selected
-            ).apply { setPadding(0, dp(6), 0, 0) }
+            ).apply {
+                setPadding(0, dp(6), 0, 0)
+                translationX = contentOffsetPx
+            },
+            socialSidebarDateLabelParams(contentGravity)
         )
     }, FrameLayout.LayoutParams(
         FrameLayout.LayoutParams.MATCH_PARENT,
@@ -90,6 +100,14 @@ private fun socialSidebarDateContentOffsetDp(offset: Long): Int = when (offset) 
     -2L, -1L, 1L, 2L -> offset.toInt() * 3
     else -> 0
 }
+
+private fun socialSidebarDateLabelParams(contentGravity: Int) =
+    LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams.WRAP_CONTENT,
+        LinearLayout.LayoutParams.WRAP_CONTENT
+    ).apply {
+        gravity = contentGravity
+    }
 
 private fun socialSidebarDateLabel(
     context: Context,
