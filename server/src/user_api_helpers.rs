@@ -155,6 +155,7 @@ pub(super) fn copilot_model_friendly_name(model: &str) -> &str {
         // 混元
         "hunyuan-turbo" => "混元 Turbo",
         "hunyuan-2.0-instruct-20251111" => "混元 2.0 Instruct",
+        "qwen3.5-plus" => "Qwen 3.5 Plus",
         "hy-image-v3.0" => "混元生图 3.0",
         other => other,
     }

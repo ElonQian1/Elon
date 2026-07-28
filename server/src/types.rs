@@ -138,7 +138,7 @@ impl AppState {
             (
                 "TOKENHUB",
                 "https://tokenhub.tencentmaas.com/v1",
-                "hunyuan-2.0-instruct-20251111",
+                "qwen3.5-plus",
             ),
             ("CUSTOM", "", ""),
         ];
