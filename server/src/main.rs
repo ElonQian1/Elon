@@ -124,6 +124,8 @@ mod node_runtime;
 mod node_scheduler;
 mod offline_completion_migration;
 mod open_commerce_api;
+mod open_commerce_mcp;
+mod open_commerce_mcp_tools;
 mod open_commerce_migration;
 mod open_commerce_model;
 mod open_commerce_service;
