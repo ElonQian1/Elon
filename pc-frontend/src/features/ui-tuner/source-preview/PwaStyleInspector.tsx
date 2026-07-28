@@ -199,14 +199,14 @@ function designModeTitle(session: PwaDesignSession): string {
   if (!session.ready) return '正在连接真实 PWA'
   if (session.mode === 'select') return '选择模式：下一次点击会选中组件'
   if (session.selection) return '设计模式：正在修改选中组件'
-  return '操作模式：像手机一样正常使用'
+  return '操作模式：正常使用'
 }
 
 function designModeHint(session: PwaDesignSession): string {
-  if (!session.ready) return '连接后先登录、点击和滚动到目标页面；草稿工具不会覆盖真实页面。'
-  if (session.mode === 'select') return '点击页面里的按钮、卡片、文字或图片；选中后自动回到正常操作，右侧会显示可调样式。'
-  if (session.selection) return '修改下面的尺寸、间距、圆角、文字和颜色会即时作用到 PWA 页面；确认后再写回 APK/PWA 源码。'
-  return '先到目标页面；需要改样式时点击“选择组件”，系统只拦截一次点击。'
+  if (!session.ready) return '连接后先操作到目标页面。'
+  if (session.mode === 'select') return '点击要修改的真实组件。'
+  if (session.selection) return '改尺寸、间距、圆角、颜色；确认后写回源码。'
+  return '到目标页后点击“选择组件”。'
 }
 
 function BridgeHealthCard({ session }: Props) {
@@ -217,7 +217,7 @@ function BridgeHealthCard({ session }: Props) {
         <strong>{health?.ready ? 'PWA 草稿链路已连接' : '等待 PWA 草稿链路'}</strong>
         <span>{health
           ? `${health.mode === 'select' ? '选择组件' : '正常操作'} · 可编辑 ${health.editablePropertyCount} 类样式`
-          : 'iframe 连接后会自动检测是否能接收草稿、回写验证和样式编辑命令。'}</span>
+          : '连接后自动检测草稿、回写和样式命令。'}</span>
       </div>
       {health && <dl>
         <div><dt>草稿命令</dt><dd>{health.canApplyDraft ? '可用' : '不可用'}</dd></div>
@@ -239,7 +239,7 @@ function WritebackPlanSummary({ session }: Props) {
       <span>可直接写回 {deterministicCount} 组</span>
       <span>AI 只补 {codexCount} 项</span>
       {plan.codexReasons.slice(0, 2).map((reason) => <small key={reason}>{reason}</small>)}
-      {plan.codexReasons.length > 2 && <small>还有 {plan.codexReasons.length - 2} 个绑定缺口会放入 CLI 包。</small>}
+      {plan.codexReasons.length > 2 && <small>还有 {plan.codexReasons.length - 2} 个缺口进 CLI 包。</small>}
     </div>
   )
 }
@@ -257,7 +257,7 @@ function HandoffSummary({ session }: Props) {
       <span>候选源码 {handoff.sourceFilesToInspect.length} 个</span>
       <small>{bindingGapCount > 0
         ? `AI 只补 ${bindingGapCount} 个绑定缺口，优先读取 compactHandoff。`
-        : 'AI 优先按 compactHandoff 写回，不默认读取整仓库、整 DOM 或 Base64 截图。'}</small>
+        : 'AI 按 compactHandoff 写回，不读整仓库。'}</small>
     </div>
   )
 }
@@ -279,7 +279,7 @@ function StylePresetBar({ session }: Props) {
           </button>
         ))}
       </div>
-      <small>预设只写入当前选中元素的草稿；确认后再走 PWA/APK 写回与验证。</small>
+      <small>预设只改当前元素草稿；确认后写回验证。</small>
     </section>
   )
 }
@@ -310,7 +310,7 @@ function DesignerQuickActions({ session }: Props) {
         <button type="button" onClick={() => session.updateStyles('designer:primary', { backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '14px' })}><strong>主按钮</strong><span>蓝底白字</span></button>
         <button type="button" onClick={() => session.updateStyles('designer:ghost', { backgroundColor: 'transparent', color: '#e5e7eb' })}><strong>透明底</strong><span>保留文字层级</span></button>
       </div>
-      <small>这些按钮不是截图覆盖层；它们会直接改 iframe 内真实 PWA DOM，并进入后续 APK/PWA 写回计划。</small>
+      <small>直接改真实 PWA DOM，并进入写回计划。</small>
     </section>
   )
 }
@@ -328,7 +328,7 @@ export function PwaStyleInspector({ session }: Props) {
       <header>
         <div>
           <strong>PWA 手工样式</strong>
-          <small>直接修改 iframe 内真实 DOM，页面会立即重排重绘</small>
+          <small>直接修改真实 DOM，页面立即重绘</small>
         </div>
         <span className={styles.pwaDraftCount}>{elementCount} 个元素</span>
       </header>
@@ -409,7 +409,7 @@ export function PwaStyleInspector({ session }: Props) {
       {!session.selection && (
         <div className={styles.pwaInspectorEmpty}>
           <strong>{session.mode === 'interact' ? '先正常使用 PWA 到目标页面' : '点击左侧页面中的真实组件'}</strong>
-          <span>{session.mode === 'interact' ? '到达目标页面后点击“选择一个组件”，系统只拦截下一次点击；选中后这里会变成样式面板。' : '选中后自动回到正常操作模式，右侧可调尺寸、间距、圆角、字体和颜色。'}</span>
+          <span>{session.mode === 'interact' ? '到目标页后点“选择组件”。' : '选中后右侧可调样式。'}</span>
           <button
             type="button"
             className={styles.pwaEmptyPrimaryAction}
@@ -433,7 +433,7 @@ export function PwaStyleInspector({ session }: Props) {
             <span>置信度：{selectedDraft?.binding.bindingConfidence ?? session.selection.identity.confidence}</span>
           </div>
           <p>PWA 候选 {selectedDraft?.binding.pwaCandidates.length ?? 0} 个 · Android 候选 {selectedDraft?.binding.androidCandidates.length ?? 0} 个</p>
-          {(selectedDraft?.binding.needsBinding ?? session.selection.identity.needsBinding) && <p>需要 AI 建立绑定；selector 只作为本次 Runtime 定位证据，不会成为长期源码身份。</p>}
+          {(selectedDraft?.binding.needsBinding ?? session.selection.identity.needsBinding) && <p>需要 AI 建立源码绑定。</p>}
         </section>
 
         <DesignerQuickActions session={session} />
@@ -443,7 +443,7 @@ export function PwaStyleInspector({ session }: Props) {
         <section className={styles.pwaStyleSection}>
           <h3>尺寸</h3>
           <div className={styles.pwaTwoColumn}>{SIZE_FIELDS.map((spec) => <StyleField key={spec.property} session={session} spec={spec} />)}</div>
-          <small>可直接输入 auto、百分比、rem 或 px，不会强制转成像素。</small>
+      <small>支持 auto/%/rem/px。</small>
         </section>
 
         <section className={styles.pwaStyleSection}>
@@ -463,8 +463,8 @@ export function PwaStyleInspector({ session }: Props) {
 
         <section className={styles.pwaStyleSection}>
           <h3>颜色与透明度</h3>
-          <StyleField session={session} spec={{ property: 'color', label: '文字色', placeholder: '#111827 / rgb(...)' }} />
-          <StyleField session={session} spec={{ property: 'backgroundColor', label: '背景色', placeholder: '#ffffff / transparent' }} />
+          <StyleField session={session} spec={{ property: 'color', label: '文字色' }} />
+          <StyleField session={session} spec={{ property: 'backgroundColor', label: '背景色' }} />
           <label className={styles.pwaOpacityField}>
             <span>透明度</span>
             <input type="range" min="0" max="1" step="0.01" value={Number(fieldValue(session, 'opacity')) || 0} onChange={(event) => session.updateStyle('opacity', event.currentTarget.value)} />
