@@ -55,6 +55,8 @@ mod node_payout_tests;
 mod node_payouts;
 mod node_public_dev;
 mod open_commerce_capabilities;
+mod open_commerce_grants;
+mod open_commerce_invocations;
 mod open_commerce_merchants;
 mod pc_project_binding;
 mod project_android_device_leases;
