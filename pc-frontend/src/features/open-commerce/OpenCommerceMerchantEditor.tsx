@@ -24,6 +24,7 @@ export default function OpenCommerceMerchantEditor({
 }: Props) {
   const [capabilityName, setCapabilityName] = useState('')
   const [capabilityKey, setCapabilityKey] = useState('')
+  const [capabilityKind, setCapabilityKind] = useState<'query' | 'action'>('query')
   const [accessLevel, setAccessLevel] = useState<'public' | 'authorized' | 'owner_only'>('public')
   const [handlerType, setHandlerType] = useState<'merchant_profile' | 'static_json'>('merchant_profile')
   const [staticResponse, setStaticResponse] = useState('{"message":"hello"}')
@@ -60,7 +61,7 @@ export default function OpenCommerceMerchantEditor({
         capability_key: capabilityKey,
         display_name: capabilityName,
         description: '',
-        kind: 'information',
+        kind: capabilityKind,
         access_level: accessLevel,
         input_schema: {},
         output_schema: {},
@@ -167,16 +168,20 @@ export default function OpenCommerceMerchantEditor({
           <label>能力名称<input value={capabilityName} onChange={(e) => setCapabilityName(e.target.value)} required disabled={!canEdit} /></label>
           <label>能力键<input value={capabilityKey} onChange={(e) => setCapabilityKey(e.target.value)} placeholder="menu.lookup" required disabled={!canEdit} /></label>
           <div className={styles.twoColumns}>
+            <label>能力类型<select value={capabilityKind} onChange={(e) => setCapabilityKind(e.target.value as typeof capabilityKind)} disabled={!canEdit}>
+              <option value="query">查询</option>
+              <option value="action">动作</option>
+            </select></label>
             <label>访问级别<select value={accessLevel} onChange={(e) => setAccessLevel(e.target.value as typeof accessLevel)} disabled={!canEdit}>
               <option value="public">公开</option>
               <option value="authorized">需要授权</option>
               <option value="owner_only">仅项目编辑者</option>
             </select></label>
-            <label>处理器<select value={handlerType} onChange={(e) => setHandlerType(e.target.value as typeof handlerType)} disabled={!canEdit}>
-              <option value="merchant_profile">商户公开资料</option>
-              <option value="static_json">静态 JSON</option>
-            </select></label>
           </div>
+          <label>处理器<select value={handlerType} onChange={(e) => setHandlerType(e.target.value as typeof handlerType)} disabled={!canEdit}>
+            <option value="merchant_profile">商户公开资料</option>
+            <option value="static_json">静态 JSON</option>
+          </select></label>
           {handlerType === 'static_json' && <label>静态响应<textarea value={staticResponse} onChange={(e) => setStaticResponse(e.target.value)} disabled={!canEdit} /></label>}
           <label>单次计量（微元）<input type="number" min="0" value={unitPriceMicros} onChange={(e) => setUnitPriceMicros(e.target.value)} disabled={!canEdit} /></label>
           <button type="submit" disabled={!canEdit || busy === 'capability'}>{busy === 'capability' ? '发布中…' : '发布能力'}</button>
@@ -224,7 +229,7 @@ function CapabilityRow({ capability }: { capability: OpenCommerceCapability }) {
   return (
     <div className={styles.capabilityRow}>
       <span><strong>{capability.display_name}</strong><code>{capability.capability_key}</code></span>
-      <span><em>{accessLabel(capability.access_level)}</em><small>v{capability.version} · {capability.unit_price_micros} 微元</small></span>
+      <span><em>{capability.kind === 'action' ? '动作' : '查询'} · {accessLabel(capability.access_level)}</em><small>v{capability.version} · {capability.unit_price_micros} 微元</small></span>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 export type OpenCommerceAccessLevel = 'public' | 'authorized' | 'owner_only'
 export type OpenCommerceHandlerType = 'merchant_profile' | 'static_json'
+export type OpenCommerceCapabilityKind = 'query' | 'action'
 
 export interface OpenCommerceMerchant {
   id: string
@@ -21,7 +22,7 @@ export interface OpenCommerceCapability {
   capability_key: string
   display_name: string
   description: string
-  kind: string
+  kind: OpenCommerceCapabilityKind
   access_level: OpenCommerceAccessLevel
   input_schema: Record<string, unknown>
   output_schema: Record<string, unknown>
@@ -108,7 +109,7 @@ export interface CreateOpenCommerceCapability {
   capability_key: string
   display_name: string
   description: string
-  kind: string
+  kind: OpenCommerceCapabilityKind
   access_level: OpenCommerceAccessLevel
   input_schema: Record<string, unknown>
   output_schema: Record<string, unknown>
@@ -135,4 +136,3 @@ export interface InvokeOpenCommerceCapability {
   idempotency_key: string
   input: Record<string, unknown>
 }
-
