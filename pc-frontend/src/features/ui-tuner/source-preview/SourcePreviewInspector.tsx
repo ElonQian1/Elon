@@ -91,4 +91,19 @@ function EdgeSection({ title, prefix, edges, onChange }: { title: string; prefix
 function FullField({ label, children }: { label: string; children: ReactNode }) { return <label className={styles.fullField}><span>{label}</span>{children}</label> }
 function TextField({ property, label, value, onChange }: { property: string; label: string; value: string; onChange: (value: string) => void }) { return <label className={styles.field}><span>{label}</span><input data-preview-property={property} value={value} onChange={(event) => onChange(event.target.value)} /></label> }
 function NumberField({ property, label, value, onChange, min, max, step = 1 }: { property: string; label: string; value: number; onChange: (value: number) => void; min?: number; max?: number; step?: number }) { return <label className={styles.field}><span>{label}</span><input data-preview-property={property} type="number" value={value} min={min} max={max} step={step} onChange={(event) => onChange(Number(event.target.value))} /></label> }
-function ColorField({ property, label, value, onChange }: { property: string; label: string; value: string; onChange: (value: string) => void }) { const safe = /^#[0-9a-f]{6}$/i.test(value) ? value : '#ffffff'; return <label className={styles.field}><span>{label}</span><div className={styles.colorField}><input data-preview-property={`${property}Picker`} type="color" value={safe} onChange={(event) => onChange(event.target.value)} /><input data-preview-property={property} value={value} onChange={(event) => onChange(event.target.value)} /></div></label> }
+function ColorField({ property, label, value, onChange }: { property: string; label: string; value: string; onChange: (value: string) => void }) {
+  const safe = /^#[0-9a-f]{6}$/i.test(value) ? value : '#ffffff'
+  return (
+    <label className={styles.field}>
+      <span>{label}</span>
+      <div className={styles.colorField}>
+        <input data-preview-property={`${property}Picker`} type="color" value={safe} onChange={(event) => onChange(event.currentTarget.value)} />
+        <input
+          data-preview-property={property}
+          value={value}
+          onChange={(event) => onChange(event.currentTarget.value)}
+        />
+      </div>
+    </label>
+  )
+}

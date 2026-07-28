@@ -474,7 +474,7 @@ try {
   assert.match(fieldsSource, /className=\{styles\.colorField\}/)
   assert.match(fieldsSource, /type="color"/)
   assert.match(fieldsSource, /styles\.colorTextInput/)
-  assert.match(fieldsSource, /normalizeHexColor/)
+  assert.match(fieldsSource, /export function normalizeHexColor/)
   const livePanelSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/live/UiTunerLivePanel.tsx'),
     'utf8',
@@ -589,6 +589,9 @@ try {
   assert.match(sourcePreviewCss, /\.pwaBridgeHealthCard/)
   assert.match(sourcePreviewCss, /\.pwaDesignerWorkflowCard/)
   assert.match(sourcePreviewCss, /\.pwaDesignerWorkflowSteps/)
+  assert.match(sourcePreviewCss, /\.colorField\{display:grid;grid-template-columns:44px minmax\(132px,1fr\)/)
+  assert.match(sourcePreviewCss, /\.pwaQuickAdjust:has\(>input:only-child\)/)
+  assert.match(sourcePreviewCss, /\.fieldGrid:has\(\.colorField\)/)
   const pwaBridgeSource = fs.readFileSync(
     path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
     'utf8',

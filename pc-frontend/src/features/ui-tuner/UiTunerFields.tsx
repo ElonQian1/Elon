@@ -142,7 +142,7 @@ export function ColorField({
   )
 }
 
-function normalizeHexColor(input: string): string | null {
+export function normalizeHexColor(input: string): string | null {
   const value = input.trim()
   if (/^#[0-9a-f]{6}$/i.test(value)) return value.toLowerCase()
   const short = value.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i)

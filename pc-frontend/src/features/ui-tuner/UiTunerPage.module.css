@@ -694,24 +694,31 @@
   padding: 3px;
 }
 
+.gridFields:has(.colorField) {
+  grid-template-columns: 1fr;
+}
+
 .colorField {
   display: grid;
-  grid-template-columns: 42px minmax(96px, 1fr);
+  grid-template-columns: 44px minmax(132px, 1fr);
   gap: 7px;
   align-items: center;
   min-width: 0;
 }
 
 .colorField .colorSwatchInput {
-  width: 42px;
-  min-width: 42px;
+  width: 44px;
+  min-width: 44px;
   padding: 3px;
   cursor: pointer;
 }
 
 .colorField .colorTextInput {
   min-width: 0;
+  height: 34px;
+  padding: 0 10px;
   font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
+  font-size: 12px;
   letter-spacing: .01em;
   text-transform: lowercase;
 }
