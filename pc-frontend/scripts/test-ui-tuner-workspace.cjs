@@ -473,7 +473,7 @@ try {
   assert.match(inspectorSource, /supportsTypography/)
   assert.match(fieldsSource, /className=\{styles\.colorField\}/)
   assert.match(fieldsSource, /type="color"/)
-  assert.match(fieldsSource, /HEX颜色值/)
+  assert.match(fieldsSource, /styles\.colorTextInput/)
   assert.match(fieldsSource, /normalizeHexColor/)
   const livePanelSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/live/UiTunerLivePanel.tsx'),

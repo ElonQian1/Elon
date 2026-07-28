@@ -120,14 +120,11 @@ export function ColorField({
           className={styles.colorSwatchInput}
           type="color"
           value={normalizedValue}
-          aria-label={`${label}颜色选择器`}
           onChange={(event) => commit(event.currentTarget.value)}
         />
         <input
           className={styles.colorTextInput}
           value={draft}
-          spellCheck={false}
-          aria-label={`${label}HEX颜色值`}
           onChange={(event) => {
             const nextDraft = event.currentTarget.value
             setDraft(nextDraft)
@@ -138,13 +135,6 @@ export function ColorField({
             const next = normalizeHexColor(draft)
             if (next) commit(next)
             else setDraft(normalizedValue)
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') event.currentTarget.blur()
-            if (event.key === 'Escape') {
-              setDraft(normalizedValue)
-              event.currentTarget.blur()
-            }
           }}
         />
       </div>
