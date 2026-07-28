@@ -20,12 +20,14 @@ internal fun createSocialSidebarFilterDock(
     addView(LinearLayout(context).apply {
         gravity = Gravity.CENTER_VERTICAL
         orientation = LinearLayout.HORIZONTAL
-        socialSidebarFilterDefinitions().forEach { (label, type) ->
+        val filters = socialSidebarFilterDefinitions()
+        filters.forEachIndexed { index, (label, type) ->
             addView(
                 socialSidebarFilterText(
                     context = context,
                     label = label,
                     type = type,
+                    contentGravity = socialSidebarFilterContentGravity(index, filters.lastIndex),
                     selectedFilter = selectedFilter,
                     onFilterSelected = onFilterSelected,
                     selectableForeground = selectableForeground
@@ -56,11 +58,12 @@ private fun socialSidebarFilterText(
     context: Context,
     label: String,
     type: SocialSidebarContentType,
+    contentGravity: Int,
     selectedFilter: SocialSidebarContentType,
     onFilterSelected: (SocialSidebarContentType) -> Unit,
     selectableForeground: () -> Drawable?
 ) = TextView(context).apply {
-    gravity = Gravity.CENTER
+    gravity = contentGravity or Gravity.CENTER_VERTICAL
     includeFontPadding = false
     text = label
     textSize = 13f
@@ -74,6 +77,12 @@ private fun socialSidebarFilterText(
             if (selectedFilter == type) SocialSidebarContentType.ALL else type
         )
     }
+}
+
+private fun socialSidebarFilterContentGravity(index: Int, lastIndex: Int): Int = when (index) {
+    0 -> Gravity.START
+    lastIndex -> Gravity.END
+    else -> Gravity.CENTER_HORIZONTAL
 }
 
 private fun socialSidebarFilterDefinitions() = listOf(

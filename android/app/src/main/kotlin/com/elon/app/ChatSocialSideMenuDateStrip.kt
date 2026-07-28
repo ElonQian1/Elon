@@ -33,6 +33,7 @@ internal fun createSocialSidebarDateStrip(
                 context = context,
                 date = date,
                 selected = offset == 0L,
+                offset = offset,
                 onDateSelected = onDateSelected,
                 dp = dp,
                 selectableForeground = selectableForeground
@@ -46,6 +47,7 @@ private fun socialSidebarDateCell(
     context: Context,
     date: LocalDate,
     selected: Boolean,
+    offset: Long,
     onDateSelected: (LocalDate) -> Unit,
     dp: (Int) -> Int,
     selectableForeground: () -> Drawable?
@@ -60,7 +62,8 @@ private fun socialSidebarDateCell(
     }, FrameLayout.LayoutParams(dp(35), dp(67)).apply { gravity = Gravity.CENTER })
     addView(LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        gravity = Gravity.CENTER
+        gravity = socialSidebarDateContentGravity(offset) or Gravity.CENTER_VERTICAL
+        translationX = dp(socialSidebarDateContentOffsetDp(offset)).toFloat()
         addView(socialSidebarDateLabel(context, date.dayOfMonth.toString(), 14f, selected))
         addView(
             socialSidebarDateLabel(
@@ -75,6 +78,17 @@ private fun socialSidebarDateCell(
         FrameLayout.LayoutParams.MATCH_PARENT
     ))
     setOnClickListener { onDateSelected(date) }
+}
+
+private fun socialSidebarDateContentGravity(offset: Long): Int = when (offset) {
+    -3L -> Gravity.START
+    3L -> Gravity.END
+    else -> Gravity.CENTER_HORIZONTAL
+}
+
+private fun socialSidebarDateContentOffsetDp(offset: Long): Int = when (offset) {
+    -2L, -1L, 1L, 2L -> offset.toInt() * 3
+    else -> 0
 }
 
 private fun socialSidebarDateLabel(

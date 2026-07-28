@@ -117,6 +117,10 @@ class ChatSocialSideMenuContractTest {
         assertTrue(view.contains("LinearLayout.LayoutParams(0, dp(76), 1f)"))
         assertTrue(view.contains("FrameLayout.LayoutParams(dp(35), dp(67))"))
         assertTrue(view.contains("date.dayOfMonth.toString(), 14f, selected"))
+        assertTrue(view.contains("socialSidebarDateContentGravity(offset)"))
+        assertTrue(view.contains("-3L -> Gravity.START"))
+        assertTrue(view.contains("3L -> Gravity.END"))
+        assertTrue(view.contains("offset.toInt() * 3"))
         assertTrue(
             "TextStyle.SHORT, Locale.ENGLISH\\),\\s+14f,\\s+selected"
                 .toRegex()
@@ -126,6 +130,9 @@ class ChatSocialSideMenuContractTest {
         assertTrue(view.contains("if (selected) \"#464646\" else \"#D9D9D9\""))
         listOf("图片与视频", "文本", "链接", "笔记", "文件", "设置")
             .forEach { assertTrue(view.contains("\"$it\"")) }
+        assertTrue(view.contains("socialSidebarFilterContentGravity(index, filters.lastIndex)"))
+        assertTrue(view.contains("0 -> Gravity.START"))
+        assertTrue(view.contains("lastIndex -> Gravity.END"))
         assertTrue(view.contains("SocialTimelineDragPayload"))
         assertTrue(controller.contains("event.x > panelWidth"))
         assertTrue(controller.contains("sendTimelineMessage(payload.message)"))
