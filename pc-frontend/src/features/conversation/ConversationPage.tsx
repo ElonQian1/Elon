@@ -144,6 +144,7 @@ export default function ConversationPage() {
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => initialProjectRuntimeRouteFromStorage(
     typeof window === 'undefined' ? null : window.localStorage,
+    user?.id,
   ))
   const [directPcCli, setDirectPcCli] = useState(() => initialDirectPcCliFromStorage(
     typeof window === 'undefined' ? null : window.localStorage,
@@ -218,8 +219,12 @@ export default function ConversationPage() {
   useEffect(() => { loadProjects() }, [user?.id])
 
   useEffect(() => {
-    persistProjectRuntimeRouteSelection(window.localStorage, runtimeRoute)
-  }, [runtimeRoute])
+    setRuntimeRoute(initialProjectRuntimeRouteFromStorage(window.localStorage, user?.id))
+  }, [user?.id])
+
+  useEffect(() => {
+    persistProjectRuntimeRouteSelection(window.localStorage, runtimeRoute, user?.id)
+  }, [runtimeRoute, user?.id])
 
   useEffect(() => {
     persistDirectPcCliSelection(window.localStorage, directPcCli)

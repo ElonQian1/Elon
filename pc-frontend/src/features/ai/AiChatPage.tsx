@@ -194,6 +194,7 @@ export default function AiChatPage() {
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => initialRuntimeRouteFromStorage(
     typeof window === 'undefined' ? null : window.localStorage,
+    user?.id,
   ))
   const [friends, setFriends] = useState<Friend[]>([])
   const [totalUserCount, setTotalUserCount] = useState(0)
@@ -237,8 +238,12 @@ export default function AiChatPage() {
   )
 
   useEffect(() => {
-    persistRuntimeRouteSelection(window.localStorage, runtimeRoute)
-  }, [runtimeRoute])
+    setRuntimeRoute(initialRuntimeRouteFromStorage(window.localStorage, user?.id))
+  }, [user?.id])
+
+  useEffect(() => {
+    persistRuntimeRouteSelection(window.localStorage, runtimeRoute, user?.id)
+  }, [runtimeRoute, user?.id])
 
   useEffect(() => {
     try {

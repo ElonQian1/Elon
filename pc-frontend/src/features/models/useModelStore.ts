@@ -10,6 +10,10 @@ import type { AgentOption, AgentConfigResponse } from './types'
 const CACHE_AGENT_KEY = 'elon_pc_selected_agent_name'
 const CACHE_LABEL_KEY = 'elon_pc_selected_model_label'
 
+function accountCacheKey(baseKey: string, userId: string): string {
+  return `${baseKey}:user:${encodeURIComponent(userId.trim())}`
+}
+
 interface ModelState {
   options: AgentOption[]
   selectedAgent: string
@@ -42,7 +46,15 @@ export const useModelStore = create<ModelState>()(
       error: '',
 
       load: async (userId: string) => {
-        set({ loading: true, error: '' })
+        // 清掉上一个账号在 Zustand 持久化状态里的展示值；真正的选择只从
+        // 当前账号的服务端配置和当前账号缓存恢复，避免新账号短暂继承旧账号模型。
+        set({
+          loading: true,
+          error: '',
+          selectedAgent: '',
+          label: 'AI',
+          options: [],
+        })
         try {
           const [data, localStatus] = await Promise.all([
             api.get<AgentConfigResponse>(`/api/user/${encodeURIComponent(userId)}/agent`),
@@ -51,7 +63,7 @@ export const useModelStore = create<ModelState>()(
               .catch(() => null),
           ])
           const options = mergeLocalNodeOptions(buildOptions(data ?? {}), localStatus)
-          const cachedAgent = localStorage.getItem(CACHE_AGENT_KEY) ?? ''
+          const cachedAgent = localStorage.getItem(accountCacheKey(CACHE_AGENT_KEY, userId)) ?? ''
           const { selectedAgent, label } = resolveSelection(data ?? {}, options, cachedAgent)
           const localCliCount =
             localStatus?.allowed_clis?.length ??
@@ -59,8 +71,8 @@ export const useModelStore = create<ModelState>()(
             0
           const localModelCount = localStatus?.local_ai?.models?.length ?? localStatus?.models?.length ?? 0
 
-          localStorage.setItem(CACHE_AGENT_KEY, selectedAgent)
-          localStorage.setItem(CACHE_LABEL_KEY, label)
+          localStorage.setItem(accountCacheKey(CACHE_AGENT_KEY, userId), selectedAgent)
+          localStorage.setItem(accountCacheKey(CACHE_LABEL_KEY, userId), label)
 
           set({
             options,
@@ -93,8 +105,8 @@ export const useModelStore = create<ModelState>()(
           api_key: null,
           model: null,
         })
-        localStorage.setItem(CACHE_AGENT_KEY, option.agentName)
-        localStorage.setItem(CACHE_LABEL_KEY, option.label)
+        localStorage.setItem(accountCacheKey(CACHE_AGENT_KEY, userId), option.agentName)
+        localStorage.setItem(accountCacheKey(CACHE_LABEL_KEY, userId), option.label)
         set({ selectedAgent: option.agentName, label: option.label })
       },
 

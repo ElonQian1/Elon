@@ -29,8 +29,6 @@ pub(super) fn auto_runtime_route_candidates() -> &'static [PcRuntimeRoutePrefere
     &[
         PcRuntimeRoutePreference::RouteA,
         PcRuntimeRoutePreference::RouteB,
-        PcRuntimeRoutePreference::RouteC3,
-        PcRuntimeRoutePreference::RouteC2,
         PcRuntimeRoutePreference::RouteC,
     ]
 }
@@ -158,15 +156,10 @@ fn auto_route_progress_message(
         Some(PcRuntimeRoutePreference::RouteB) => {
             Some("本机 AI 工具未就绪，自动改用本机 API key。")
         }
-        Some(PcRuntimeRoutePreference::RouteC3) => {
-            Some("本机 AI 不可用，自动切换到其他用户远程 Codex 节点。")
-        }
-        Some(PcRuntimeRoutePreference::RouteC2) => {
-            Some("本机和远程 Codex 不可用，自动切换到其他用户远程 AI 节点。")
-        }
         Some(PcRuntimeRoutePreference::RouteC) => {
-            Some("本机和远程节点 AI 不可用，自动使用平台 AI 兜底。")
+            Some("本机 AI 和我的 Key 未配置，自动使用平台 AI。")
         }
+        Some(PcRuntimeRoutePreference::RouteC2 | PcRuntimeRoutePreference::RouteC3) => None,
         None => None,
     }
 }
@@ -183,8 +176,6 @@ mod tests {
             &[
                 PcRuntimeRoutePreference::RouteA,
                 PcRuntimeRoutePreference::RouteB,
-                PcRuntimeRoutePreference::RouteC3,
-                PcRuntimeRoutePreference::RouteC2,
                 PcRuntimeRoutePreference::RouteC,
             ]
         );

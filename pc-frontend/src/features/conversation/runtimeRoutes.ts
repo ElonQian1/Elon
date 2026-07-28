@@ -30,6 +30,13 @@ export const DEFAULT_RUNTIME_ROUTE: RuntimeRoute = 'auto'
 export const PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION = 'project-auto-priority-default-20260707'
 export const DEFAULT_PROJECT_RUNTIME_ROUTE: RuntimeRoute = 'auto'
 
+function accountScopedStorageKey(baseKey: string, userId?: string): string | null {
+  const normalizedUserId = userId?.trim()
+  return normalizedUserId
+    ? `${baseKey}:user:${encodeURIComponent(normalizedUserId)}`
+    : null
+}
+
 export const FIRST_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
   {
     value: 'auto',
@@ -37,7 +44,7 @@ export const FIRST_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
     shortLabel: '自动选择',
     title: '自动选择',
     subtitle: '一龙按当前项目选择合适的 AI',
-    description: '默认按本机AI/我的Key、其他用户节点AI、平台AI依次选择；手动切换后会记住上一次选择。',
+    description: '默认按本机AI、我的Key、平台AI依次选择；远程节点只在手动选择并完成授权后使用。',
   },
   {
     value: 'route_a',
@@ -134,35 +141,59 @@ function isLegacyImplicitDefault(stored: string | null, defaultVersion: string |
     || (stored === 'auto' && defaultVersion === LEGACY_PROJECT_AUTO_DEFAULT_VERSION)
 }
 
-export function initialRuntimeRouteFromStorage(storage?: Storage | null): RuntimeRoute {
-  if (!storage) return DEFAULT_RUNTIME_ROUTE
-  const stored = getStorageValue(storage, RUNTIME_ROUTE_STORAGE_KEY)
-  const defaultVersion = getStorageValue(storage, RUNTIME_ROUTE_DEFAULT_VERSION_KEY)
+export function initialRuntimeRouteFromStorage(
+  storage?: Storage | null,
+  userId?: string,
+): RuntimeRoute {
+  const storageKey = accountScopedStorageKey(RUNTIME_ROUTE_STORAGE_KEY, userId)
+  const versionKey = accountScopedStorageKey(RUNTIME_ROUTE_DEFAULT_VERSION_KEY, userId)
+  if (!storage || !storageKey || !versionKey) return DEFAULT_RUNTIME_ROUTE
+  const stored = getStorageValue(storage, storageKey)
+  const defaultVersion = getStorageValue(storage, versionKey)
   if (!stored || isLegacyImplicitDefault(stored, defaultVersion)) return DEFAULT_RUNTIME_ROUTE
   return normalizeRuntimeRoute(stored)
 }
 
-export function initialProjectRuntimeRouteFromStorage(storage?: Storage | null): RuntimeRoute {
-  if (!storage) return DEFAULT_PROJECT_RUNTIME_ROUTE
-  const stored = getStorageValue(storage, PROJECT_RUNTIME_ROUTE_STORAGE_KEY)
-  const defaultVersion = getStorageValue(storage, PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION_KEY)
+export function initialProjectRuntimeRouteFromStorage(
+  storage?: Storage | null,
+  userId?: string,
+): RuntimeRoute {
+  const storageKey = accountScopedStorageKey(PROJECT_RUNTIME_ROUTE_STORAGE_KEY, userId)
+  const versionKey = accountScopedStorageKey(PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION_KEY, userId)
+  if (!storage || !storageKey || !versionKey) return DEFAULT_PROJECT_RUNTIME_ROUTE
+  const stored = getStorageValue(storage, storageKey)
+  const defaultVersion = getStorageValue(storage, versionKey)
   if (!stored || isLegacyImplicitDefault(stored, defaultVersion)) return DEFAULT_PROJECT_RUNTIME_ROUTE
   return normalizeRuntimeRoute(stored, DEFAULT_PROJECT_RUNTIME_ROUTE)
 }
 
-export function persistRuntimeRouteSelection(storage: Storage | null | undefined, value: RuntimeRoute): void {
+export function persistRuntimeRouteSelection(
+  storage: Storage | null | undefined,
+  value: RuntimeRoute,
+  userId?: string,
+): void {
+  const storageKey = accountScopedStorageKey(RUNTIME_ROUTE_STORAGE_KEY, userId)
+  const versionKey = accountScopedStorageKey(RUNTIME_ROUTE_DEFAULT_VERSION_KEY, userId)
+  if (!storageKey || !versionKey) return
   try {
-    storage?.setItem(RUNTIME_ROUTE_STORAGE_KEY, value)
-    storage?.setItem(RUNTIME_ROUTE_DEFAULT_VERSION_KEY, RUNTIME_ROUTE_DEFAULT_VERSION)
+    storage?.setItem(storageKey, value)
+    storage?.setItem(versionKey, RUNTIME_ROUTE_DEFAULT_VERSION)
   } catch {
     // Ignore blocked storage; the selected route still works for the current session.
   }
 }
 
-export function persistProjectRuntimeRouteSelection(storage: Storage | null | undefined, value: RuntimeRoute): void {
+export function persistProjectRuntimeRouteSelection(
+  storage: Storage | null | undefined,
+  value: RuntimeRoute,
+  userId?: string,
+): void {
+  const storageKey = accountScopedStorageKey(PROJECT_RUNTIME_ROUTE_STORAGE_KEY, userId)
+  const versionKey = accountScopedStorageKey(PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION_KEY, userId)
+  if (!storageKey || !versionKey) return
   try {
-    storage?.setItem(PROJECT_RUNTIME_ROUTE_STORAGE_KEY, value)
-    storage?.setItem(PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION_KEY, PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION)
+    storage?.setItem(storageKey, value)
+    storage?.setItem(versionKey, PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION)
   } catch {
     // Ignore blocked storage; the selected value still works for the current session.
   }

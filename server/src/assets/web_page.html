@@ -5949,7 +5949,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     { value: 'route_c2', button: '远程', label: '远程一龙AI', subtitle: '其他用户 PC 节点 + 一龙 CLI' },
     { value: 'route_c3', button: '远Codex', label: '远程 Codex / Claude', subtitle: '其他用户 PC 节点 + Codex / Claude' }
   ];
-  let selectedRuntimeRoute = initialRuntimeRouteFromStorage();
+  let selectedRuntimeRoute = DEFAULT_RUNTIME_ROUTE;
   let agentOptions = [];
 
   function setMoreButtonMode(mode) {
@@ -6705,6 +6705,10 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   });
 
   function showLogin() {
+    runtimeRouteInitialized = false;
+    agentSelectionInitialized = false;
+    selectedRuntimeRoute = DEFAULT_RUNTIME_ROUTE;
+    selectedAgent = '';
     if (socket) { try { socket.close(); } catch {} socket = null; }
     if (appSocket) { try { appSocket.close(); } catch {} appSocket = null; }
     stopContactPolling();
@@ -9302,9 +9306,16 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   function isValidRuntimeRoute(value) {
     return runtimeRouteOptions.some((it) => it.value === value);
   }
-  function initialRuntimeRouteFromStorage() {
-    const stored = localStorage.getItem(RUNTIME_ROUTE_KEY);
-    const defaultVersion = localStorage.getItem(RUNTIME_ROUTE_DEFAULT_VERSION_KEY);
+  function accountRuntimeRouteKey(baseKey, userId) {
+    const normalizedUserId = String(userId || '').trim();
+    return normalizedUserId ? baseKey + ':user:' + encodeURIComponent(normalizedUserId) : '';
+  }
+  function initialRuntimeRouteFromStorage(userId) {
+    const key = accountRuntimeRouteKey(RUNTIME_ROUTE_KEY, userId);
+    const versionKey = accountRuntimeRouteKey(RUNTIME_ROUTE_DEFAULT_VERSION_KEY, userId);
+    if (!key || !versionKey) return DEFAULT_RUNTIME_ROUTE;
+    const stored = localStorage.getItem(key);
+    const defaultVersion = localStorage.getItem(versionKey);
     if (!stored || (!defaultVersion && stored === 'auto') ||
         (stored === 'route_c' && (
           defaultVersion === 'platform-ai-default-20260630' ||
@@ -9312,9 +9323,12 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
         ))) return DEFAULT_RUNTIME_ROUTE;
     return isValidRuntimeRoute(stored) ? stored : DEFAULT_RUNTIME_ROUTE;
   }
-  function persistRuntimeRouteSelection(value) {
-    localStorage.setItem(RUNTIME_ROUTE_KEY, value);
-    localStorage.setItem(RUNTIME_ROUTE_DEFAULT_VERSION_KEY, RUNTIME_ROUTE_DEFAULT_VERSION);
+  function persistRuntimeRouteSelection(value, userId) {
+    const key = accountRuntimeRouteKey(RUNTIME_ROUTE_KEY, userId || (currentUser && currentUser.id));
+    const versionKey = accountRuntimeRouteKey(RUNTIME_ROUTE_DEFAULT_VERSION_KEY, userId || (currentUser && currentUser.id));
+    if (!key || !versionKey) return;
+    localStorage.setItem(key, value);
+    localStorage.setItem(versionKey, RUNTIME_ROUTE_DEFAULT_VERSION);
   }
   function runtimeRouteForRequest() {
     return selectedRuntimeRoute && selectedRuntimeRoute !== 'auto' ? selectedRuntimeRoute : '';
@@ -9543,6 +9557,11 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   }
   async function loadAgents() {
     if (!currentUser) return;
+    if (!runtimeRouteInitialized) {
+      selectedRuntimeRoute = initialRuntimeRouteFromStorage(currentUser.id);
+      runtimeRouteInitialized = true;
+      persistRuntimeRouteSelection(selectedRuntimeRoute, currentUser.id);
+    }
     setAgentMessage('');
     agentLoading = true;
     renderAgentOptions();
@@ -9577,10 +9596,6 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
       const options = [{ name: '', label: '默认模型' }].concat(serverOptions);
       agentOptions = options;
       const hasCustomConfig = !!((config.api_base || '').trim() || (config.model || '').trim());
-      if (!runtimeRouteInitialized) {
-        runtimeRouteInitialized = true;
-        persistRuntimeRouteSelection(selectedRuntimeRoute);
-      }
       if (!agentSelectionInitialized) {
         const configured = config && config.use_agent;
         selectedAgent = hasCustomConfig ? '' : (options.some((it) => it.name === configured) ? configured : '');

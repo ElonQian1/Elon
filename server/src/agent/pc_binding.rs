@@ -312,7 +312,7 @@ pub(super) async fn wait_for_bound_pc_agent_reconnect(
     let wait_secs = wait.as_secs().max(1);
     let message = if wait_secs <= 30 {
         format!(
-            "自动模式正在等待绑定的 PC 节点短暂重连，最多等待 {wait_secs} 秒；未恢复会继续尝试远程节点或平台 AI。"
+            "自动模式正在等待绑定的 PC 节点短暂重连，最多等待 {wait_secs} 秒；未恢复会继续使用平台 AI。"
         )
     } else {
         format!(
