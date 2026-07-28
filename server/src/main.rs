@@ -129,6 +129,8 @@ mod open_commerce_mcp_tools;
 mod open_commerce_migration;
 mod open_commerce_model;
 mod open_commerce_service;
+#[cfg(test)]
+mod open_commerce_service_tests;
 mod pc_agent_runtime_choice;
 mod pc_node_capacity;
 mod pc_node_display;

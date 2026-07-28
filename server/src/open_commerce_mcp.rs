@@ -107,7 +107,14 @@ async fn mcp_handler(
         "initialize" => Ok(initialize_response()),
         "notifications/initialized" => return StatusCode::ACCEPTED.into_response(),
         "tools/list" => Ok(json!({"tools": crate::open_commerce_mcp_tools::definitions()})),
-        "tools/call" => call_tool(&state, &project_id, &caller, request.params),
+        "tools/call" => call_tool(
+            &state.store,
+            &project_id,
+            &caller.user_id,
+            &caller.project_role,
+            &caller.app_id,
+            request.params,
+        ),
         "ping" => Ok(json!({})),
         _ => Err(anyhow!("不支持 MCP method: {}", request.method)),
     };
@@ -122,10 +129,12 @@ async fn mcp_handler(
     .into_response()
 }
 
-fn call_tool(
-    state: &AppState,
+pub(crate) fn call_tool(
+    store: &crate::store::Store,
     project_id: &str,
-    caller: &McpCaller,
+    user_id: &str,
+    project_role: &str,
+    app_id: &str,
     params: Value,
 ) -> Result<Value> {
     let name = params
@@ -137,21 +146,21 @@ fn call_tool(
         .cloned()
         .unwrap_or_else(|| json!({}));
     let actor = OpenCommerceActor {
-        user_id: &caller.user_id,
-        app_id: &caller.app_id,
-        project_role: Some(&caller.project_role),
+        user_id,
+        app_id,
+        project_role: Some(project_role),
     };
     let value = match name {
         "open_commerce_get_overview" => {
             ensure_empty_object(&arguments, name)?;
-            serde_json::to_value(open_commerce_service::overview(&state.store, project_id)?)?
+            serde_json::to_value(open_commerce_service::overview(store, project_id)?)?
         }
         "open_commerce_search_merchants" => {
             let input: SearchArguments = decode(arguments, name)?;
             json!({
                 "schema":"open_commerce.discovery.v1",
                 "merchants":open_commerce_service::discover_merchants(
-                    &state.store,
+                    store,
                     input.query.as_deref(),
                     input.capability.as_deref(),
                     input.limit,
@@ -161,23 +170,20 @@ fn call_tool(
         "open_commerce_get_merchant" => {
             let input: MerchantArguments = decode(arguments, name)?;
             serde_json::to_value(open_commerce_service::discover_merchant(
-                &state.store,
+                store,
                 &input.merchant_id,
             )?)?
         }
         "open_commerce_create_merchant" => {
             let input: CreateMerchantRequest = decode(arguments, name)?;
             serde_json::to_value(open_commerce_service::create_merchant(
-                &state.store,
-                project_id,
-                &actor,
-                input,
+                store, project_id, &actor, input,
             )?)?
         }
         "open_commerce_publish_capability" => {
             let input: PublishCapabilityArguments = decode(arguments, name)?;
             serde_json::to_value(open_commerce_service::publish_capability(
-                &state.store,
+                store,
                 project_id,
                 &input.merchant_id,
                 &actor,
@@ -187,16 +193,13 @@ fn call_tool(
         "open_commerce_create_grant" => {
             let input: CreateGrantRequest = decode(arguments, name)?;
             serde_json::to_value(open_commerce_service::create_grant(
-                &state.store,
-                project_id,
-                &actor,
-                input,
+                store, project_id, &actor, input,
             )?)?
         }
         "open_commerce_revoke_grant" => {
             let input: RevokeGrantArguments = decode(arguments, name)?;
             serde_json::to_value(open_commerce_service::revoke_grant(
-                &state.store,
+                store,
                 project_id,
                 &input.grant_id,
                 &actor,
@@ -204,21 +207,22 @@ fn call_tool(
         }
         "open_commerce_invoke" => {
             let input: InvokeArguments = decode(arguments, name)?;
-            let merchant = state.store.open_commerce_merchant(&input.merchant_id)?;
-            let target_role = project_access(state, &caller.user_id, &merchant.project_id)
+            let merchant = store.open_commerce_merchant(&input.merchant_id)?;
+            let target_role = store
+                .get_project_access(user_id, &merchant.project_id)
                 .ok()
                 .map(|access| access.role);
             open_commerce_service::invoke(
-                &state.store,
+                store,
                 &OpenCommerceActor {
-                    user_id: &caller.user_id,
-                    app_id: &caller.app_id,
+                    user_id,
+                    app_id,
                     project_role: target_role.as_deref(),
                 },
                 InvokeCapabilityRequest {
                     merchant_id: input.merchant_id,
                     capability_key: input.capability_key,
-                    requester_app_id: caller.app_id.clone(),
+                    requester_app_id: app_id.to_string(),
                     grant_id: input.grant_id,
                     idempotency_key: input.idempotency_key,
                     input: input.input,
@@ -229,7 +233,7 @@ fn call_tool(
             let input: AuditArguments = decode(arguments, name)?;
             json!({
                 "schema":"open_commerce.audit.v1",
-                "events":state.store.list_project_open_commerce_audit(project_id, input.limit)?
+                "events":store.list_project_open_commerce_audit(project_id, input.limit)?
             })
         }
         _ => return Err(anyhow!("未知开放商业 MCP 工具：{name}")),
