@@ -105,6 +105,37 @@ pub(crate) async fn wake_device_for_user_interaction(device_id: &str) {
     tokio::time::sleep(Duration::from_millis(300)).await;
 }
 
+/// Performs a bounded, non-invasive readiness probe before a visual UI task
+/// spends minutes building and installing onto a physical device.
+///
+/// `Ok(None)` means the current foreground surface is usable. A reason means
+/// that the device is technically online but cannot currently provide visible
+/// UI evidence, so callers may immediately hand the task to an emulator.
+pub(crate) async fn visual_unavailable_reason(device_id: &str) -> Result<Option<String>> {
+    validate_device_id(device_id)?;
+    wake_device_for_user_interaction(device_id).await;
+    match current_activity(device_id).await {
+        Ok(activity) if locked_or_covered_activity(&activity) => Ok(Some(format!(
+            "设备在线但当前窗口不可用于视觉验收: {activity}"
+        ))),
+        Ok(_) => Ok(None),
+        Err(error) => Ok(Some(format!("设备在线但无法读取当前窗口: {error:#}"))),
+    }
+}
+
+fn locked_or_covered_activity(activity: &str) -> bool {
+    let normalized = activity.to_ascii_lowercase();
+    [
+        "notificationshade",
+        "keyguard",
+        "aod",
+        "lockscreen",
+        "dream",
+    ]
+    .iter()
+    .any(|marker| normalized.contains(marker))
+}
+
 pub(crate) async fn capture_snapshot(req: CaptureRequest) -> Result<DeviceUiSnapshot> {
     let requested_device_id = req.device_id.trim().to_string();
     validate_device_id(&requested_device_id)?;
@@ -538,6 +569,21 @@ adb-ASUJ6R6324002425-ZDy0od (3)._adb-tls-connect._tcp device product:AAK-AN00 mo
             r#"<node package="com.android.systemui" resource-id="com.android.systemui:id/aod_root_view" />"#,
             "com.elon.app.uituner_deadbeef",
             &[],
+        ));
+    }
+
+    #[test]
+    fn classifies_locked_or_covered_foreground_surfaces() {
+        for activity in [
+            "Window{abc u0 NotificationShade}",
+            "com.android.systemui/.keyguard.KeyguardService",
+            "com.huawei.aod/.AodActivity",
+            "com.android.systemui/.DreamActivity",
+        ] {
+            assert!(locked_or_covered_activity(activity), "{activity}");
+        }
+        assert!(!locked_or_covered_activity(
+            "com.elon.app.uituner_deadbeef/.UiRuntimePreviewHostActivity"
         ));
     }
 

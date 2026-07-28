@@ -12,13 +12,13 @@ use tokio::sync::{Mutex, OwnedMutexGuard};
 const DEFAULT_CROSS_PROCESS_WAIT_SECS: u64 = 60 * 60;
 const CROSS_PROCESS_POLL_INTERVAL: Duration = Duration::from_millis(200);
 
-/// Serializes build/install/handshake for one fixed app on one Android device.
+/// Serializes every write-side build/install/handshake on one Android renderer.
 ///
-/// Different Codex sessions and worktrees on the same PC node intentionally
-/// share the node-scoped Debug package. They may edit source concurrently, but
-/// only one deployment can own that package's process and Runtime handshake at
-/// a time. The in-memory mutex handles one MCP process; the OS-backed file lock
-/// closes the same-package race between multiple live MCP sidecars.
+/// Different Codex sessions and worktrees may edit source concurrently, but a
+/// physical device or emulator instance can only have one write owner. The
+/// lock key deliberately excludes package name so a second debug suffix cannot
+/// bypass the renderer lease. The in-memory mutex handles one MCP process; the
+/// OS-backed file lock closes the same-device race between MCP sidecars.
 #[derive(Default)]
 pub(crate) struct DebugDeploymentRegistry {
     node_install_id: Option<String>,
@@ -49,7 +49,7 @@ impl DebugDeploymentRegistry {
         device_id: &str,
         package_name: &str,
     ) -> Result<DebugDeploymentLease> {
-        let key = format!("{}\n{}", device_id.trim(), package_name.trim());
+        let key = device_id.trim().to_string();
         let lock = self
             .locks
             .lock()
@@ -82,7 +82,7 @@ impl DebugDeploymentRegistry {
 fn acquire_cross_process_lock(root: &Path, device_id: &str, package_name: &str) -> Result<File> {
     std::fs::create_dir_all(root)
         .with_context(|| format!("无法创建 Android Debug 部署锁目录 {}", root.display()))?;
-    let digest = Sha256::digest(format!("{device_id}\n{package_name}").as_bytes());
+    let digest = Sha256::digest(device_id.as_bytes());
     let path = root.join(format!("{}.lock", hex::encode(&digest[..16])));
     let timeout = cross_process_wait_timeout();
     let started = Instant::now();
@@ -250,18 +250,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn different_node_packages_do_not_block_each_other() {
+    async fn different_packages_cannot_bypass_the_same_renderer_lock() {
         let registry = DebugDeploymentRegistry::default();
-        let _first = registry
+        let first = registry
             .acquire("phone-a", "com.elon.app.node_a")
             .await
             .unwrap();
+        assert!(tokio::time::timeout(
+            Duration::from_millis(20),
+            registry.acquire("phone-a", "com.elon.app.node_b")
+        )
+        .await
+        .is_err());
+        drop(first);
         tokio::time::timeout(
             Duration::from_millis(100),
             registry.acquire("phone-a", "com.elon.app.node_b"),
         )
         .await
-        .expect("different node-scoped packages may deploy independently")
+        .expect("renderer lock should release for the next package")
         .unwrap();
     }
 

@@ -30,10 +30,30 @@ pub(super) async fn prepare_debug_runtime(
         .get("fallbackToEmulator")
         .and_then(Value::as_bool)
         .unwrap_or(true);
+    let prefer_emulator = arguments
+        .get("preferEmulator")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let require_visual_ready = arguments
+        .get("fastFailPhysicalVisualProbe")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let mut excluded_device_ids = broker
+        .renderer_devices_owned_by_other_sessions(session_id)
+        .await;
+    excluded_device_ids.extend(
+        broker
+            .debug_runtime_preparations
+            .busy_device_ids_except(session_id)
+            .await,
+    );
     let device_selection = super::emulator_start::select_or_start(
         requested_device_id,
         auto_start_emulator,
         fallback_to_emulator,
+        prefer_emulator,
+        require_visual_ready,
+        &excluded_device_ids,
     )
     .await?;
     let device_id = device_selection.device_id.clone();
@@ -65,9 +85,9 @@ pub(super) async fn prepare_debug_runtime(
         .poll_or_start(
             broker.clone(),
             PrepareDebugRuntimeRequest {
-                device_id,
+                device_id: device_id.clone(),
                 base_package_name,
-                project_root,
+                project_root: project_root.clone(),
                 debug_application_id_suffix,
                 isolated_emulator_package: arguments
                     .get("isolatedEmulatorPackage")
@@ -88,6 +108,7 @@ pub(super) async fn prepare_debug_runtime(
             },
             crate::node_agent_admin_open::admin_port_from_env(),
             restart,
+            session_id,
         )
         .await?;
     let next_phase = match progress.status.as_str() {
@@ -95,10 +116,48 @@ pub(super) async fn prepare_debug_runtime(
         "FAILED" => "RETRY_WITH_RESTART",
         _ => "POLL_PREPARATION",
     };
+    let source_sha = super::fit_run::workspace_fingerprint(&project_root)
+        .context("读取 Renderer 来源指纹失败")?;
+    let pc_install_id = broker.node_install_id().unwrap_or("unknown");
+    let renderer_resource_id = if device_id.starts_with("emulator-") {
+        format!(
+            "emulator:{pc_install_id}:{}:{device_id}",
+            device_selection
+                .emulator_slot_id
+                .as_deref()
+                .unwrap_or(device_id.as_str())
+        )
+    } else {
+        format!("android:{device_id}")
+    };
+    let task_id = arguments
+        .get("taskId")
+        .and_then(Value::as_str)
+        .or_else(|| {
+            arguments
+                .pointer("/candidate/sourceTaskId")
+                .and_then(Value::as_str)
+        })
+        .unwrap_or(session_id);
+    let renderer_lease_id = progress.operation_id.clone();
+    let renderer_fencing_token = progress.generation;
     Ok(json!({
         "result": progress,
         "nextPhase": next_phase,
         "deviceSelection": device_selection,
+        "rendererLease":{
+            "leaseId":renderer_lease_id,
+            "rendererResourceId":renderer_resource_id,
+            "fencingToken":renderer_fencing_token,
+            "scope":"NODE_LOCAL_OPERATION_SESSION",
+            "owner":{
+                "pcInstallId":pc_install_id,
+                "taskId":task_id,
+                "sessionId":session_id,
+                "projectId":project_root,
+                "sourceSha":source_sha,
+            }
+        }
     }))
 }
 

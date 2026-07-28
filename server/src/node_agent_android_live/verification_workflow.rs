@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use chrono::{DateTime, Utc};
 use serde_json::{json, Value};
 use std::sync::Arc;
 
@@ -27,14 +28,18 @@ pub(super) fn tool_definition() -> Value {
                         "deviceId":{"type":"string"},
                         "autoStartEmulator":{"type":"boolean","default":true},
                         "fallbackToEmulator":{"type":"boolean","default":true},
+                        "preferEmulator":{"type":"boolean","default":false},
+                        "fastFailPhysicalVisualProbe":{"type":"boolean","default":true},
                         "debugApplicationIdSuffix":{"type":"string","default":".uitest"},
                         "isolatedEmulatorPackage":{"type":"boolean","default":false},
                         "lkgEnabled":{"type":"boolean","default":false},
+                        "taskId":{"type":"string"},
                         "restart":{"type":"boolean","default":false}
                     }
                 },
                 "realDeviceRequired":{"type":"boolean","default":false,"description":"OEM、权限、键盘、启动器、硬件或性能专项设为 true；模拟器结果只作为降级证据"},
-                "fallbackToEmulator":{"type":"boolean","default":true}
+                "fallbackToEmulator":{"type":"boolean","default":true},
+                "physicalDeviceBudgetMs":{"type":"integer","minimum":5000,"maximum":120000,"default":60000,"description":"纯视觉任务等待物理设备准备的总预算；超时后停止轮询真机并申请空闲模拟器 slot"}
             }
         },
         "annotations":{
@@ -130,20 +135,93 @@ async fn prepare_android(
     android_object
         .entry("autoStartEmulator")
         .or_insert(json!(true));
+    if real_device_required {
+        android_object.insert("fallbackToEmulator".into(), json!(false));
+    } else {
+        android_object
+            .entry("fallbackToEmulator")
+            .or_insert(json!(arguments
+                .get("fallbackToEmulator")
+                .and_then(Value::as_bool)
+                .unwrap_or(true)));
+    }
     android_object
-        .entry("fallbackToEmulator")
-        .or_insert(json!(true));
-    let prepared =
+        .entry("fastFailPhysicalVisualProbe")
+        .or_insert(json!(!real_device_required));
+    let mut prepared =
         super::mcp_runtime_preparation::prepare_debug_runtime(broker, session_id, &android).await?;
-    let preparation_status = prepared
-        .pointer("/result/status")
-        .and_then(Value::as_str)
-        .unwrap_or("IN_PROGRESS");
-    let selection_source = prepared
-        .pointer("/deviceSelection/source")
-        .and_then(Value::as_str)
-        .unwrap_or("unknown");
+    let mut physical_failure = None;
+    let physical_budget_ms = arguments
+        .get("physicalDeviceBudgetMs")
+        .and_then(Value::as_u64)
+        .unwrap_or(60_000)
+        .clamp(5_000, 120_000);
+    let fallback_enabled = !real_device_required
+        && arguments
+            .get("fallbackToEmulator")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
+    let initial_status = preparation_status(&prepared);
+    let initial_source = selection_source(&prepared);
+    let initial_is_emulator = initial_source.contains("emulator");
+    let elapsed_ms = preparation_elapsed_ms(&prepared).unwrap_or_default();
+    if should_fallback_physical_renderer(
+        initial_status,
+        initial_is_emulator,
+        real_device_required,
+        fallback_enabled,
+        elapsed_ms,
+        physical_budget_ms,
+    ) {
+        physical_failure = Some(json!({
+            "status":initial_status,
+            "phase":prepared.pointer("/result/phase"),
+            "error":prepared.pointer("/result/error"),
+            "deviceId":prepared.pointer("/deviceSelection/deviceId"),
+            "elapsedMs":elapsed_ms,
+            "budgetMs":physical_budget_ms,
+            "reason":if initial_status == "FAILED" {
+                "PHYSICAL_RUNTIME_PREPARATION_FAILED"
+            } else {
+                "PHYSICAL_DEVICE_BUDGET_EXHAUSTED"
+            }
+        }));
+        let mut emulator_android = android;
+        let emulator_object = emulator_android
+            .as_object_mut()
+            .ok_or_else(|| anyhow!("android 参数必须是 object"))?;
+        emulator_object.remove("deviceId");
+        emulator_object.insert("preferEmulator".into(), json!(true));
+        emulator_object.insert("fastFailPhysicalVisualProbe".into(), json!(false));
+        emulator_object.insert("fallbackToEmulator".into(), json!(true));
+        emulator_object.insert("isolatedEmulatorPackage".into(), json!(true));
+        emulator_object.insert("restart".into(), json!(false));
+        prepared = super::mcp_runtime_preparation::prepare_debug_runtime(
+            broker,
+            session_id,
+            &emulator_android,
+        )
+        .await?;
+    }
+    let preparation_status = preparation_status(&prepared);
+    let selection_source = selection_source(&prepared);
     let emulator_evidence = selection_source.contains("emulator");
+    let selection_fallback = selection_source.starts_with("fallback_")
+        || prepared
+            .pointer("/deviceSelection/fallbackReason")
+            .and_then(Value::as_str)
+            .is_some();
+    let real_device_status = if emulator_evidence && real_device_required {
+        "REQUIRED_FOLLOWUP"
+    } else if emulator_evidence && (physical_failure.is_some() || selection_fallback) {
+        "DEFERRED_USER_CONFIRMATION"
+    } else if emulator_evidence {
+        "NOT_REQUIRED"
+    } else if preparation_status == "COMPLETED" {
+        "READY"
+    } else {
+        "PROBING"
+    };
     Ok(json!({
         "status":match preparation_status {
             "COMPLETED" => "ANDROID_RENDERER_READY",
@@ -165,13 +243,62 @@ async fn prepare_android(
         },
         "requiresRealDevice":real_device_required && emulator_evidence,
         "pwaFailure":pwa_failure,
+        "physicalFailure":physical_failure,
         "android":compact_android_preparation(&prepared),
+        "ANDROID_RENDERER":if emulator_evidence {"EMULATOR"} else {"PHYSICAL_DEVICE"},
+        "REAL_DEVICE_STATUS":real_device_status,
+        "rendererResourceId":prepared.pointer("/rendererLease/rendererResourceId"),
+        "leaseOwner":prepared.pointer("/rendererLease/owner"),
+        "sourceSha":prepared.pointer("/rendererLease/owner/sourceSha"),
         "next":match preparation_status {
             "COMPLETED" => "REPLAY_STATE_AND_CAPTURE_ANDROID_EVIDENCE",
             "FAILED" => "RETRY_ANDROID_PREPARATION_WITH_RESUME_ANDROID_TRUE",
             _ => "POLL_UI_VERIFY_WITH_RESUME_ANDROID_TRUE",
         }
     }))
+}
+
+fn preparation_status(prepared: &Value) -> &str {
+    prepared
+        .pointer("/result/status")
+        .and_then(Value::as_str)
+        .unwrap_or("IN_PROGRESS")
+}
+
+fn selection_source(prepared: &Value) -> &str {
+    prepared
+        .pointer("/deviceSelection/source")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown")
+}
+
+fn preparation_elapsed_ms(prepared: &Value) -> Option<u64> {
+    let recorded_at = prepared
+        .pointer("/result/evidence/0/recordedAt")
+        .and_then(Value::as_str)?;
+    let started = DateTime::parse_from_rfc3339(recorded_at)
+        .ok()?
+        .with_timezone(&Utc);
+    Some(
+        Utc::now()
+            .signed_duration_since(started)
+            .num_milliseconds()
+            .max(0) as u64,
+    )
+}
+
+fn should_fallback_physical_renderer(
+    status: &str,
+    emulator_selected: bool,
+    real_device_required: bool,
+    fallback_enabled: bool,
+    elapsed_ms: u64,
+    budget_ms: u64,
+) -> bool {
+    !emulator_selected
+        && !real_device_required
+        && fallback_enabled
+        && (status == "FAILED" || (status == "IN_PROGRESS" && elapsed_ms >= budget_ms))
 }
 
 fn fallback_eligible(code: &str) -> bool {
@@ -218,6 +345,9 @@ fn compact_android_preparation(result: &Value) -> Value {
         "deviceId":result.pointer("/deviceSelection/deviceId"),
         "deviceSource":result.pointer("/deviceSelection/source"),
         "avdName":result.pointer("/deviceSelection/avdName"),
+        "emulatorSlotId":result.pointer("/deviceSelection/emulatorSlotId"),
+        "fallbackReason":result.pointer("/deviceSelection/fallbackReason"),
+        "rendererLease":result.pointer("/rendererLease"),
         "nextPhase":result.pointer("/nextPhase"),
     })
 }
@@ -257,5 +387,38 @@ mod tests {
             definition["inputSchema"]["properties"]["resumeAndroid"]["default"],
             false
         );
+        assert_eq!(
+            definition["inputSchema"]["properties"]["physicalDeviceBudgetMs"]["default"],
+            60_000
+        );
+    }
+
+    #[test]
+    fn physical_visual_tasks_fallback_after_failure_or_budget() {
+        assert!(should_fallback_physical_renderer(
+            "FAILED", false, false, true, 5_000, 60_000
+        ));
+        assert!(should_fallback_physical_renderer(
+            "IN_PROGRESS",
+            false,
+            false,
+            true,
+            60_000,
+            60_000
+        ));
+        assert!(!should_fallback_physical_renderer(
+            "IN_PROGRESS",
+            false,
+            false,
+            true,
+            59_999,
+            60_000
+        ));
+        assert!(!should_fallback_physical_renderer(
+            "FAILED", false, true, true, 120_000, 60_000
+        ));
+        assert!(!should_fallback_physical_renderer(
+            "FAILED", true, false, true, 120_000, 60_000
+        ));
     }
 }

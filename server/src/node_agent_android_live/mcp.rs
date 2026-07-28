@@ -208,13 +208,46 @@ async fn call_tool(
         "ui_list_render_devices" => {
             let devices =
                 crate::node_agent_android_inspector::adb_wireless::list_device_inventory().await?;
+            let mut busy_device_ids = broker
+                .renderer_devices_owned_by_other_sessions(&session_id)
+                .await;
+            busy_device_ids.extend(
+                broker
+                    .debug_runtime_preparations
+                    .busy_device_ids_except(&session_id)
+                    .await,
+            );
+            let device_availability = devices
+                .iter()
+                .map(|device| {
+                    (
+                        device.serial.clone(),
+                        json!({
+                            "rendererBusy":busy_device_ids.contains(device.serial.as_str()),
+                            "emulatorSlotId":device.serial.starts_with("emulator-").then_some(device.serial.as_str()),
+                        }),
+                    )
+                })
+                .collect::<std::collections::BTreeMap<_, _>>();
+            let recommended_device_id = devices
+                .iter()
+                .find(|device| {
+                    device.state == "device"
+                        && device.serial.starts_with("emulator-")
+                        && !busy_device_ids.contains(device.serial.as_str())
+                })
+                .or_else(|| {
+                    devices.iter().find(|device| {
+                        device.state == "device"
+                            && !busy_device_ids.contains(device.serial.as_str())
+                    })
+                })
+                .map(|device| device.serial.clone());
             json!({
                 "devices": devices,
-                "recommendedDeviceId": devices
-                    .iter()
-                    .find(|device| device.state == "device" && device.serial.starts_with("emulator-"))
-                    .or_else(|| devices.iter().find(|device| device.state == "device"))
-                    .map(|device| device.serial.as_str()),
+                "deviceAvailability":device_availability,
+                "recommendedDeviceId":recommended_device_id,
+                "busyDeviceIds":busy_device_ids,
             })
         }
         "ui_prepare_debug_runtime" => {

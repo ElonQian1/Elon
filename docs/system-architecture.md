@@ -238,7 +238,11 @@ Windows 节点复用 `yilong_ui_live` Streamable HTTP MCP，通过 `ui_capture_p
 
 成功结果保存到项目 `.elon/ui-tuner/pwa-runtime/captures/`，返回 PNG 与 manifest 的绝对路径、SHA-256、实际像素尺寸、媒体类型、采集时间、脱敏 route、浏览器版本、viewport、网络门禁、进程回收和 source/route revision。PWA 源码闭环仍先完成构建、资源、真实 iframe route/source revision 校验，再安全自动请求 PNG；无法自动捕获时保留源码验收成功并显示明确下一步。Codex context pack 只引用工件路径、哈希和尺寸，`screenshotsEmbeddedAsBase64=false`，默认不嵌入图片 Base64。
 
-跨端验证默认调用 `ui_verify_with_fallback`：共享 Web/普通布局交互先走 PWA；PWA 不适合或认证、浏览器、导航、交互运行失败时，自动进入 Android Renderer。进入 Android 准备后的轮询传 `resumeAndroid=true`，避免重复打开浏览器和生成 PWA 截图。没有在线设备时节点启动 `ELON_ANDROID_AVD`，未配置则选择排序后的首个 AVD；显式真机不在线时默认回退模拟器，并把证据标为 emulator fallback。可用替代渲染器会返回 `capabilityGapRequired=false` 和明确的 gap disposition，避免把“已成功回退”误留成平台阻塞缺口；只有替代路径也失败且能力确实无法提供时才报告平台 gap。OEM、权限、软键盘、启动器、硬件和性能专项仍要求真机，模拟器结果只能是 provisional。`ui_build_and_verify` 默认保留 Gradle 增量与 build cache，成功后仍校验精确 applicationId、APK 身份、源码 revision、安装与纯源码画面；只有诊断缓存污染时才显式 `forceRerun=true` 使用 `--rerun-tasks`。非首页继续复用 FitRun 的持久化 `stateReplay`，重新安装后重放到目标节点再截图，不能把默认首页当成源码不一致。
+跨端验证默认调用 `ui_verify_with_fallback`：共享 Web/普通布局交互先走 PWA；PWA 不适合或认证、浏览器、导航、交互运行失败时，自动进入 Android Renderer。进入 Android 准备后的轮询传 `resumeAndroid=true`，避免重复打开浏览器和生成 PWA 截图。普通视觉任务给物理设备 60 秒硬预算；设备离线、被占用、锁屏/AOD/通知栏遮挡、授权/安装确认、Runtime 失败或超时后立即申请明确的空闲模拟器槽，并把 `REAL_DEVICE_STATUS`、`ANDROID_RENDERER`、resource/owner/source 证据写入结果。OEM、权限、软键盘、启动器、摄像头、蓝牙、传感器、硬件和性能专项显式要求真机且不回退。
+
+节点内 Android Renderer 使用设备级独占写语义：准备阶段排除其他 Runtime/operation 正在使用的 serial，部署锁不能被不同 package 绕过；同项目存在多个连接 Runtime 时，未指定 `sessionId/deviceIdentity` 的调用拒绝仅按 projectRoot 猜测。模拟器池默认上限为两个实例，忙时选择其他槽或明确等待，不抢占“第一个在线 emulator”。当前返回的 `rendererLease` 是 `NODE_LOCAL_OPERATION_SESSION` 范围的 owner/fencing 证据；跨 PC 真机以 `hardwareSerial` 为键的全局 TTL/heartbeat lease、所有副作用前的 fencing 复核、独立预克隆 AVD 数据目录和 FIFO 扩容仍需后续阶段完成，兼容 MCP 路径不得用本机证据冒充全局 lease。
+
+可用替代渲染器会返回 `capabilityGapRequired=false` 和明确的 gap disposition，避免把“已成功回退”误留成平台阻塞缺口；只有替代路径也失败且能力确实无法提供时才报告平台 gap。模拟器只有在 package、generation、集成/业务 revision、workspace 指纹、runtimeBuildId 与零 Patch 全一致时才是普通视觉任务的权威 Android 证据。`ui_build_and_verify` 默认保留 Gradle 增量与 build cache，成功后仍校验精确 applicationId、APK 身份、源码 revision、安装与纯源码画面；只有诊断缓存污染时才显式 `forceRerun=true` 使用 `--rerun-tasks`。非首页继续复用 FitRun 的持久化 `stateReplay`，重新安装后重放到目标节点再截图，不能把默认首页当成源码不一致。
 
 PC 网页登录的 `remember_device=true` 只用于用户主动登录的可信 PC：服务端发放十年有效、仍可注销或管理员撤销的长期 session；已登录的旧 PC session 会在 `/api/me` 成功后通过 `/api/auth/trust-current-device` 原位升级，不要求重新输入密码或轮换 token。普通客户端与旧调用保持 30 天。这里的“长期记住”不是保存密码，也不是不可撤销的永久凭据；PC 主动退出时同时尽力删除 Windows DPAPI 保存的 PWA 凭据。
 

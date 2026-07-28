@@ -50,6 +50,8 @@ pub(crate) struct PrepareDebugRuntimeProgress {
 }
 
 struct PreparationState {
+    owner_session_id: String,
+    device_id: String,
     operation_id: String,
     status: String,
     phase: String,
@@ -145,12 +147,34 @@ pub(crate) struct PreparationRegistry {
 }
 
 impl PreparationRegistry {
+    pub(crate) async fn busy_device_ids_except(
+        &self,
+        owner_session_id: &str,
+    ) -> std::collections::HashSet<String> {
+        let states = self
+            .operations
+            .lock()
+            .await
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut busy = std::collections::HashSet::new();
+        for state in states {
+            let state = state.read().await;
+            if state.owner_session_id != owner_session_id && state.status == "IN_PROGRESS" {
+                busy.insert(state.device_id.clone());
+            }
+        }
+        busy
+    }
+
     pub(crate) async fn poll_or_start(
         &self,
         broker: Arc<LiveUiBroker>,
         mut request: PrepareDebugRuntimeRequest,
         host_port: u16,
         restart: bool,
+        owner_session_id: &str,
     ) -> Result<PrepareDebugRuntimeProgress> {
         let mut operations = self.operations.lock().await;
         let mut plan = prepare_integration_plan(&broker, &request)?;
@@ -182,6 +206,8 @@ impl PreparationRegistry {
         request.integration_plan = Some(plan.clone());
         let operation_id = format!("runtime_prepare_{}", uuid::Uuid::new_v4().simple());
         let state = Arc::new(RwLock::new(PreparationState {
+            owner_session_id: owner_session_id.to_string(),
+            device_id: request.device_id.trim().to_string(),
             operation_id,
             status: "IN_PROGRESS".to_string(),
             phase: "QUEUED".to_string(),
@@ -326,6 +352,8 @@ mod tests {
     #[tokio::test]
     async fn reporter_keeps_failure_phase_and_bounded_evidence() {
         let state = Arc::new(RwLock::new(PreparationState {
+            owner_session_id: "session-a".into(),
+            device_id: "device-a".into(),
             operation_id: "op-1".into(),
             status: "IN_PROGRESS".into(),
             phase: "BUILD".into(),

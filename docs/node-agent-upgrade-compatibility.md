@@ -44,6 +44,7 @@
 15. Debug Runtime source proof 必须同时记录固定集成槽 generation、已部署 integration Git revision、原业务 worktree Git revision、generation 内容指纹、原业务 workspace 内容指纹和 runtimeBuildId。创建证明时先核对项目、物理设备、包、期望/已安装代次与 `DEPLOYED` 状态；FitRun 复用时再回查当前槽状态、generation worktree HEAD/内容指纹和原业务 HEAD。任一身份漂移或非零 Patch 都 fail-closed，不能要求两个因 HEAD 不同而必然不同的 workspace fingerprint 直接相等。
 16. 显式隔离模拟器包可以复用零 Patch 的新鲜 Runtime source proof，但只在 generation、installed generation、integration revision、generation HEAD/内容指纹、原业务 Git/workspace revision、包和 runtimeBuildId 全部一致时允许 FitRun `ACCEPT_BEST`；这不放宽真机固定包、签名、物理设备或来源 worktree 校验。
 17. `CROSS_PLATFORM_STYLE_WRITEBACK` 支持 `NO_WEB_COUNTERPART` 正式分支：仍需真实 Android 工件、当前 source revision、源码写回和无 Patch 构建；Web 侧改为扫描调用者声明的仓库内 Android 跟踪来源、Web 跟踪源码根和在 Android 来源中实际出现的搜索词。只有检查到 Web 跟踪文件且零匹配时通过；若存在匹配、证据越界、非跟踪来源或空扫描则拒绝，禁止用伪造 Web 截图代替。
+18. 普通视觉任务的物理设备准备预算默认 60 秒；离线、占用、锁屏/AOD/通知栏遮挡、授权/安装确认、Runtime 失败或超时后必须转入明确的空闲模拟器槽。`realDeviceRequired` 任务禁止回退。同一节点按设备 serial 独占写入，package 后缀不能绕过；未绑定明确 Runtime 身份时不能只按 projectRoot 猜测。Node-local operation lease 只能作为本机阶段证据，不能冒充跨 PC 全局 lease。
 
 ## 配置与缓存迁移合同
 
@@ -87,6 +88,7 @@ Linux 交叉编译延长 Windows 发布。该开关不影响 `publish-server.*` 
 - 远程监督 v1 的身份、能力、live lease 和断线恢复 fail-closed fixture；本地可信任务优先，远程证据缺失不得降级绕过。
 - PWA Runtime 捕获的 Windows Edge/Chrome 标准路径与 `ELON_PWA_BROWSER_PATH` 探测、浏览器缺失诊断、真实 loopback HTML/PWA fixture 精确 viewport PNG、SHA-256/route/revision 元数据、认证失败不误报、SSRF/秘密门禁，以及成功/超时/启动失败后的浏览器进程树和临时 profile 回收。发布包不得新增 Desktop Browser 或人工可见浏览器依赖。
 - Android 调试身份 fixture：旧 `node.json` 首次补写、连续更新/重启包名不变、身份漂移 fail-closed、三个会话按序合并、新代次淘汰旧构建、USB/无线端点共用物理设备部署锁、所有兼容后缀无法绕过固定真机包、正式包不受影响、历史杂包仅报告不自动卸载；另须覆盖 LKG 缺字段/默认关闭时不记录且不阻塞安装，以及任务显式启用后仍保留同文件冲突保护、最近成功 APK 保留和签名钉扎语义。
+- Android Renderer 调度 fixture：同项目不同空闲模拟器槽允许并行，不同项目不能写同一槽，同真机跨 PC 的全局 lease 冲突拒绝，新 generation 在安装前 fencing 旧 generation，断线/过期 lease 仅在进程和心跳证据闭合后回收；显式离线 deviceId 且 `fallbackToEmulator=false` 不换机，多个在线 emulator 必须跳过已租用实例。第一阶段至少覆盖节点内 busy serial 排除、设备级部署锁、多个 Runtime 时 fail-closed 路由和 60 秒回退；跨 PC TTL/heartbeat/fencing、独立 AVD 数据目录与 FIFO 队列未落地时必须在发布报告中列为未覆盖边界。
 - Debug Runtime/FitRun fixture：原业务 Git/workspace revision 到合成 integration revision 的映射可复核；隔离模拟器包仅在 generation、integration、Git、runtimeBuildId 与零 Patch 全匹配时接受；generation、installed generation、integration HEAD、业务 HEAD、包、Runtime 或 Patch 任一漂移都拒绝。
 - 跨端验收 fixture：真实 Android/Web 视觉分支继续要求独立截图与 loss 阈值；`NO_WEB_COUNTERPART` 使用跟踪仓库来源与零匹配扫描通过，存在 Web 匹配、非跟踪 Android 来源、空 Web 根或伪造 Web 截图均拒绝。
 - 无新 capability 的旧节点执行已有项目 CLI/Exec；有新 capability 的节点创建托管 workspace。

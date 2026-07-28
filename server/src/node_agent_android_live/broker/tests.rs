@@ -102,6 +102,43 @@ async fn direct_mcp_session_follows_a_rebound_emulator_for_the_same_project() {
 }
 
 #[tokio::test]
+async fn bootstrap_session_refuses_to_guess_between_multiple_renderers() {
+    let broker = LiveUiBroker::new();
+    let root = std::env::temp_dir().join(format!(
+        "runtime-ambiguous-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    std::fs::create_dir_all(&root).unwrap();
+    let root_path = root.clone();
+    let root = root.to_string_lossy().to_string();
+    let bootstrap = broker
+        .create_session(
+            "ui-design-bootstrap".into(),
+            "ui.design.bootstrap".into(),
+            Some(root.clone()),
+            1,
+        )
+        .await;
+    for device_id in ["emulator-5554", "emulator-5556"] {
+        let renderer = broker
+            .create_session(
+                device_id.into(),
+                "com.elon.app.uitest".into(),
+                Some(root.clone()),
+                1,
+            )
+            .await;
+        mark_real_runtime(&renderer).await;
+    }
+    let error = broker
+        .effective_session_id(&bootstrap.id)
+        .await
+        .expect_err("project-only routing must fail closed when renderer identity is ambiguous");
+    assert!(error.to_string().contains("拒绝仅按 projectRoot 猜测"));
+    std::fs::remove_dir_all(root_path).unwrap();
+}
+
+#[tokio::test]
 async fn frame_request_retries_once_on_replacement_connection() {
     let broker = LiveUiBroker::new();
     let session = broker

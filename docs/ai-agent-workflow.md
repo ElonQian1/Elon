@@ -57,6 +57,8 @@
 2. UI 业务会话发现平台缺口后只创建 `BUSINESS_THREAD` handoff，不在原会话升级、发布或长时间等待。`DELIVERY_NON_BLOCKING` 先按业务类型提交、push、发布并统一收尾，再由 Codex Desktop 在同一项目创建用户可见的独立 Worktree 任务；`DELIVERY_BLOCKING` 则暂停原任务并立即创建该任务。
 3. 后台任务用 handoff 参数重建 `EVOLUTION_THREAD` 工件，完成平台源码修改、测试、提交、发布、复检和原任务通知。长期进化不能藏在原任务的子代理中，原任务也不等待后台任务结束。
 4. 真机 Renderer/设备租约、节点发布和节点重启属于共享串行资源。后台进化优先级低于前台 UI：存在前台任务时必须无占用等待；设备授权失败时停止并请求人工处理，不得靠 debug 包名或重复安装循环绕过。
+5. 普通视觉 UI 的真机尝试以 60 秒为硬预算：一次可用性/遮挡探测和一次 Runtime 准备不能闭环时，立即申请明确的空闲模拟器槽并无人值守继续，禁止把 token 消耗在长时间 ADB 修复、重复配对或安装确认循环上。OEM、权限、软键盘、Launcher、摄像头、蓝牙、传感器、硬件和性能专项必须显式 `realDeviceRequired=true`，不回退。
+6. Android Renderer 是独占写资源，不是普通 CLI 容量槽。同一设备上的构建、安装、启动、点击、取帧和 FitRun 按返回的 lease/session/device identity 串行；不同空闲模拟器槽可以并行。设备忙时排队或选择其他空闲槽，不得选择“第一个在线 emulator”或接管其他会话的旧 Runtime。
 
 ---
 
