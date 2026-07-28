@@ -2,6 +2,7 @@ import { Bot, Copy, Download, MousePointer2, Redo2, RotateCcw, Save, Smartphone,
 import { buildPwaDraftCliCompactHandoff, type PwaStyleProperty } from './pwaDesignDraft'
 import type { PwaDesignSession, PwaSelection } from './usePwaDesignSession'
 import { CrossPlatformWritebackReceiptPanel } from './CrossPlatformWritebackReceiptPanel'
+import { PwaDesignerWorkflowGuide } from './PwaDesignerWorkflowGuide'
 import styles from './SourcePreview.module.css'
 
 interface Props {
@@ -338,6 +339,8 @@ export function PwaStyleInspector({ session }: Props) {
         <button type="button" disabled={!session.draft} onClick={session.saveNow}><Save size={15} />保存草稿</button>
       </div>
       <p className={styles.pwaSaveStatus}>{session.saveLabel}</p>
+
+      <PwaDesignerWorkflowGuide session={session} />
 
       <BridgeHealthCard session={session} />
 

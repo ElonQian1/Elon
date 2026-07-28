@@ -558,6 +558,17 @@ try {
   assert.match(pwaInspectorSource, /PWA 草稿链路自检/)
   assert.match(pwaInspectorSource, /PWA 草稿链路已连接/)
   assert.match(pwaInspectorSource, /草稿命令/)
+  assert.match(pwaInspectorSource, /PwaDesignerWorkflowGuide/)
+  const pwaWorkflowGuideSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaDesignerWorkflowGuide.tsx'),
+    'utf8',
+  )
+  assert.match(pwaWorkflowGuideSource, /PWA 设计师三步流程/)
+  assert.match(pwaWorkflowGuideSource, /新手按这个顺序做/)
+  assert.match(pwaWorkflowGuideSource, /真实 PWA 交互/)
+  assert.match(pwaWorkflowGuideSource, /AI 低 Token 写回 APK\/PWA/)
+  assert.match(pwaWorkflowGuideSource, /session\.setMode\('select'\)/)
+  assert.match(pwaWorkflowGuideSource, /void session\.syncNow\(\)/)
   const sourcePreviewCss = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreview.module.css'),
     'utf8',
@@ -568,6 +579,8 @@ try {
   assert.match(sourcePreviewCss, /\.pwaDesignerQuickSection/)
   assert.match(sourcePreviewCss, /\.pwaDesignerQuickGrid/)
   assert.match(sourcePreviewCss, /\.pwaBridgeHealthCard/)
+  assert.match(sourcePreviewCss, /\.pwaDesignerWorkflowCard/)
+  assert.match(sourcePreviewCss, /\.pwaDesignerWorkflowSteps/)
   const pwaBridgeSource = fs.readFileSync(
     path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
     'utf8',
