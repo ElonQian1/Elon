@@ -116,7 +116,7 @@ export default function OpenCommerceMerchantEditor({
         capability_key: invokeCapability,
         requester_app_id: 'pc-web',
         grant_id: invokeGrantId || undefined,
-        idempotency_key: `pc-${Date.now()}-${crypto.randomUUID()}`,
+        idempotency_key: newInvocationIdempotencyKey(),
         input: parseObject(invokeInput, '调用输入'),
       })
       setResult(JSON.stringify(response, null, 2))
@@ -250,4 +250,9 @@ function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   if (error && typeof error === 'object' && 'message' in error) return String(error.message)
   return '操作失败，请稍后重试'
+}
+
+function newInvocationIdempotencyKey(): string {
+  if (typeof crypto.randomUUID === 'function') return `pc-${crypto.randomUUID()}`
+  return `pc-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
 }
