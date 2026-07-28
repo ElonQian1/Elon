@@ -160,12 +160,13 @@ impl Store {
             "{INVOCATION_SELECT}
              WHERE project_id = ?1 ORDER BY created_at DESC LIMIT ?2"
         ))?;
-        Ok(stmt
+        let invocations = stmt
             .query_map(
                 params![project_id.trim(), limit.clamp(1, 200) as i64],
                 invocation_from_row,
             )?
-            .collect::<rusqlite::Result<Vec<_>>>()?)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(invocations)
     }
 
     pub(crate) fn record_open_commerce_audit(
@@ -216,12 +217,13 @@ impl Store {
             "{AUDIT_SELECT}
              WHERE project_id = ?1 ORDER BY created_at DESC LIMIT ?2"
         ))?;
-        Ok(stmt
+        let events = stmt
             .query_map(
                 params![project_id.trim(), limit.clamp(1, 200) as i64],
                 audit_from_row,
             )?
-            .collect::<rusqlite::Result<Vec<_>>>()?)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(events)
     }
 
     fn find_open_commerce_invocation(

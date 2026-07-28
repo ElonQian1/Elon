@@ -114,12 +114,13 @@ impl Store {
              WHERE project_id = ?1
              ORDER BY created_at DESC LIMIT ?2"
         ))?;
-        Ok(stmt
+        let grants = stmt
             .query_map(
                 params![project_id.trim(), limit.clamp(1, 200) as i64],
                 grant_from_row,
             )?
-            .collect::<rusqlite::Result<Vec<_>>>()?)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(grants)
     }
 }
 

@@ -213,9 +213,10 @@ impl Store {
         let mut stmt = conn.prepare(&format!(
             "{CAPABILITY_SELECT} WHERE merchant_id = ?1 ORDER BY created_at ASC"
         ))?;
-        Ok(stmt
+        let capabilities = stmt
             .query_map(params![merchant_id.trim()], capability_from_row)?
-            .collect::<rusqlite::Result<Vec<_>>>()?)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(capabilities)
     }
 }
 
