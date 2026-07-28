@@ -24,7 +24,7 @@ class ProfilePageLayoutContractTest {
         assertTrue(layout.contains("android:paddingStart=\"16dp\""))
         assertTrue(layout.contains("android:paddingEnd=\"10dp\""))
         assertTrue(!layout.contains("android:paddingStart=\"36dp\""))
-        assertTrue(layout.contains("android:background=\"@drawable/profile_panel_primary_actions\""))
+        assertTrue(layout.contains("android:background=\"@drawable/profile_panel_primary_actions_stable\""))
         assertTrue(layout.contains("android:background=\"@drawable/profile_panel_support_actions\""))
         listOf(
             "profile_icon_pc_node",
@@ -54,6 +54,10 @@ class ProfilePageLayoutContractTest {
         assertTrue(web.contains("class=\"usage-gauge-progress\""))
         assertTrue(web.contains("padding: 12px 10px 12px 16px"))
         assertTrue(web.contains("padding: 0 10px 0 16px"))
+        assertTrue(web.contains("--profile-action-group-radius: 18px"))
+        val profileGroupCss =
+            web.substringAfter("#profilePage .profile-action-group {").substringBefore("}")
+        assertTrue(profileGroupCss.contains("border-radius: var(--profile-action-group-radius)"))
         listOf("PC 节点", "AI 记忆", "AI 代理设置", "Agent 自动化", "分享推广", "检测更新")
             .forEach { label -> assertTrue(web.contains(label)) }
     }
@@ -65,6 +69,7 @@ class ProfilePageLayoutContractTest {
             "profile_panel_identity.png",
             "profile_panel_quota.png",
             "profile_panel_primary_actions.png",
+            "profile_panel_primary_actions_stable.9.png",
             "profile_panel_support_actions.png",
             "profile_pill_dark.png",
             "profile_pill_light.png",

@@ -76,6 +76,7 @@
       --tab-icon: #D6D6D6;
       --tab-active: #D6D6D6;
       --bottom-menu-height: 72px;
+      --profile-action-group-radius: 18px;
       --top-safe-area: env(safe-area-inset-top);
     }
     * {
@@ -2778,7 +2779,7 @@
     #profilePage .profile-action-group {
       margin-top: 14px;
       padding: 4px 0;
-      border-radius: 18px;
+      border-radius: var(--profile-action-group-radius);
       background: #151515;
       overflow: hidden;
     }
