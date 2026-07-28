@@ -4,6 +4,9 @@
         <item name="colorPrimary">@color/elon_bg_app</item>
         <item name="colorPrimaryVariant">@color/elon_bg_app</item>
         <item name="colorOnPrimary">@color/elon_text_primary</item>
+        <!-- 全局禁用系统无边界 Ripple；控件自身的状态切换与业务动画仍然保留。 -->
+        <item name="selectableItemBackgroundBorderless">@null</item>
+        <item name="android:selectableItemBackgroundBorderless">@null</item>
         <item name="android:statusBarColor">@color/elon_bg_app</item>
         <item name="android:navigationBarColor">@color/elon_bg_app</item>
         <item name="android:windowSoftInputMode">adjustResize</item>
@@ -89,6 +92,8 @@
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowContentOverlay">@null</item>
+        <item name="selectableItemBackgroundBorderless">@null</item>
+        <item name="android:selectableItemBackgroundBorderless">@null</item>
         <item name="android:backgroundDimEnabled">true</item>
         <item name="android:backgroundDimAmount">0.6</item>
     </style>
