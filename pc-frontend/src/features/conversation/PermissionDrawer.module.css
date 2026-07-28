@@ -1,0 +1,256 @@
+.savePermissionBtn {
+  padding: 7px 12px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  color: var(--text-soft);
+  font-size: 12px;
+  align-self: flex-end;
+}
+
+.savePermissionBtn:hover:not(:disabled) {
+  border-color: var(--green);
+  color: var(--text);
+}
+
+.savePermissionBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.permissionColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.permissionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.permissionToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.permissionToolbar strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.permissionToolbar select,
+.permissionGrid select {
+  min-width: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.permissionToolbar select:focus,
+.permissionGrid select:focus {
+  border-color: var(--green);
+}
+
+.permissionCards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.permissionCard {
+  background: var(--sidebar-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.permissionPreview {
+  background: var(--sidebar-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.permissionPreviewHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.permissionPreviewHead div:first-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.permissionPreviewHead strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.permissionPreviewHead span {
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permissionPreviewStats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.permissionPreviewStats em {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,.05);
+  color: var(--text-soft);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.permissionPreviewNote {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.permissionPreviewList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.permissionPreviewRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,.025);
+}
+
+.permissionPreviewRowHidden {
+  opacity: .58;
+  background: rgba(223,92,92,.06);
+}
+
+.permissionPreviewAvatar {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+}
+
+.permissionPreviewRow div:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.permissionPreviewRow strong {
+  color: var(--text);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permissionPreviewRow strong em {
+  flex-shrink: 0;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(250,174,64,.12);
+  color: #faae40;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.permissionPreviewRow span {
+  color: var(--text-muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permissionCardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.permissionCardHead strong {
+  color: var(--text);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roleSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.permissionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.permissionGrid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.permissionGrid span,
+.permissionMemberName {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .permissionColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .permissionPreviewList {
+    grid-template-columns: 1fr;
+  }
+}

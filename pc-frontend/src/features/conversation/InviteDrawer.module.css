@@ -1,0 +1,252 @@
+.inviteDrawer {
+  width: min(720px, 92vw);
+}
+
+.inviteList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inviteStats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.inviteStats button {
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: var(--sidebar-2);
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.inviteStats button:hover {
+  border-color: rgba(88,190,106,.38);
+  color: var(--text-soft);
+}
+
+.inviteStats button[data-active="true"] {
+  border-color: rgba(88,190,106,.48);
+  background: rgba(88,190,106,.1);
+  color: var(--green);
+}
+
+.inviteStats strong {
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.inviteStats span {
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invitePresetGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.invitePresetGrid button {
+  min-width: 0;
+  min-height: 30px;
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invitePresetGrid button:hover {
+  border-color: var(--green);
+  color: var(--text);
+}
+
+.inviteToolbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.inviteSpotlight {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 11px;
+  border: 1px solid rgba(88,190,106,.42);
+  border-radius: 7px;
+  background: rgba(88,190,106,.08);
+}
+
+.inviteSpotlight[data-state="revoked"],
+.inviteSpotlight[data-state="expired"],
+.inviteSpotlight[data-state="full"] {
+  border-color: rgba(240,178,50,.3);
+  background: rgba(240,178,50,.07);
+}
+
+.inviteSpotlightMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inviteSpotlightMain strong,
+.inviteSpotlightMain span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inviteSpotlightMain strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.inviteSpotlightMain span {
+  color: #9fe6ac;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.inviteRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 10px;
+  background: var(--sidebar-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+}
+
+.inviteRow[data-state="revoked"],
+.inviteRow[data-state="expired"],
+.inviteRow[data-state="full"] {
+  opacity: .78;
+}
+
+.inviteRowMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.inviteRowTitle {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.inviteRowMain strong {
+  color: var(--text);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inviteRowMain > span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.inviteStatusPill {
+  flex: 0 0 auto;
+  min-height: 19px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(88,190,106,.24);
+  background: rgba(88,190,106,.09);
+  color: var(--green);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.inviteStatusPill[data-state="revoked"] {
+  border-color: rgba(223,92,92,.26);
+  background: rgba(223,92,92,.1);
+  color: #ff9f9f;
+}
+
+.inviteStatusPill[data-state="expired"],
+.inviteStatusPill[data-state="full"] {
+  border-color: rgba(240,178,50,.26);
+  background: rgba(240,178,50,.1);
+  color: #f0c978;
+}
+
+.inviteMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.inviteMeta em {
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(255,255,255,.035);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.inviteRowActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  max-width: 150px;
+}
+
+@media (max-width: 900px) {
+  .inviteStats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .invitePresetGrid,
+  .inviteToolbar,
+  .inviteRow {
+    grid-template-columns: 1fr;
+  }
+
+  .inviteRowActions {
+    justify-content: flex-start;
+    max-width: none;
+  }
+}

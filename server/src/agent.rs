@@ -20,10 +20,18 @@ use crate::{
     pc_agent_runtime_choice::{choose_pc_agent_runtime, PcRuntimeRoutePreference},
     pc_node_display::pc_node_progress_name,
     project_workspace_provision, source_hygiene,
-    store::{ProjectAccess, ProjectDevProfile, MEMORY_SCOPE_PROJECT},
+    store::{ProjectAccess, MEMORY_SCOPE_PROJECT},
     tools,
     types::{AiBackend, AppState, UserAgentConfig, WsMessage},
 };
+
+mod authorized_remote_pc;
+mod project_dev_profile_context;
+pub(crate) use authorized_remote_pc::authorized_remote_project_pc_node_id;
+use authorized_remote_pc::authorized_remote_project_pc_binding;
+#[cfg(test)]
+use authorized_remote_pc::route_c3_cli_allowed;
+use project_dev_profile_context::append_project_dev_profile_context;
 
 const BOUND_PC_NODE_RECONNECT_WAIT_SECS: u64 = 120;
 const BOUND_PC_NODE_RECONNECT_POLL_MS: u64 = 1_000;
@@ -114,7 +122,8 @@ pub async fn run_pc_cli_passthrough_for_project(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project, Some(&tx)).await
+    let Some(pc_binding) =
+        resolve_pc_project_binding(state, user_id, project, pc_runtime_route, Some(&tx)).await
     else {
         if project.source_type == "pc_managed" {
             send_pc_workspace_unavailable_error(project, &tx);
@@ -145,7 +154,10 @@ pub async fn run_pc_cli_passthrough_for_project(
         project_id: project.id.clone(),
         user_id: user_id.to_string(),
         conversation_id: cid.to_string(),
-        runtime_permission: project.runtime_permission.clone(),
+        runtime_permission: pc_binding
+            .runtime_permission
+            .clone()
+            .unwrap_or_else(|| project.runtime_permission.clone()),
     });
 
     match ai_cli::run_with_pc_agent_passthrough_workspace(
@@ -296,7 +308,9 @@ async fn run_for_project_in_workspace_with_routing(
             .unwrap_or(false);
         if project_chat_should_use_pc_cli(pc_runtime_route, agent_name, agent_is_local_cli) {
             let route_label = pc_cli_chat_route_label(pc_runtime_route);
-            let Some(agent_id) = resolve_pc_chat_agent(state, user_id, project).await else {
+            let Some(agent_id) =
+                resolve_pc_chat_agent(state, user_id, project, pc_runtime_route).await
+            else {
                 let msg = format!(
                     "项目会话默认交给{route_label}处理，但当前项目还没有绑定可用 PC 节点。请先连接节点，或手动切换到平台 AI。"
                 );
@@ -381,7 +395,7 @@ async fn run_for_project_in_workspace_with_routing(
 
     if requires_project_workflow {
         if let Some(pc_binding) =
-            resolve_pc_project_binding(state, user_id, project, Some(&tx)).await
+            resolve_pc_project_binding(state, user_id, project, pc_runtime_route, Some(&tx)).await
         {
             let agent_id = pc_binding.agent_id.as_str();
             let pc_workspace = pc_binding.workspace.as_str();
@@ -403,7 +417,10 @@ async fn run_for_project_in_workspace_with_routing(
                 project_id: project.id.clone(),
                 user_id: user_id.to_string(),
                 conversation_id: cid.to_string(),
-                runtime_permission: project.runtime_permission.clone(),
+                runtime_permission: pc_binding
+                    .runtime_permission
+                    .clone()
+                    .unwrap_or_else(|| project.runtime_permission.clone()),
             });
             let pc_user_message =
                 append_project_dev_profile_context(state, user_id, project, user_message);
@@ -651,7 +668,9 @@ pub async fn plan_for_project_in_workspace(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    if let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project, Some(&tx)).await {
+    if let Some(pc_binding) =
+        resolve_pc_project_binding(state, user_id, project, pc_runtime_route, Some(&tx)).await
+    {
         let agent_id = pc_binding.agent_id.as_str();
         let pc_workspace = pc_binding.workspace.as_str();
         let runtime_choice =
@@ -674,7 +693,10 @@ pub async fn plan_for_project_in_workspace(
             project_id: project.id.clone(),
             user_id: user_id.to_string(),
             conversation_id: cid.to_string(),
-            runtime_permission: project.runtime_permission.clone(),
+            runtime_permission: pc_binding
+                .runtime_permission
+                .clone()
+                .unwrap_or_else(|| project.runtime_permission.clone()),
         });
         let plan_result = ai_cli::run_with_pc_agent_workspace(
             agent_id,
@@ -796,6 +818,7 @@ fn requested_agent_for_runtime_route<'a>(
 struct PcProjectBinding {
     agent_id: String,
     workspace: String,
+    runtime_permission: Option<String>,
 }
 
 fn project_requires_pc_workspace(project: &ProjectAccess) -> bool {
@@ -841,7 +864,14 @@ async fn resolve_pc_chat_agent(
     state: &Arc<AppState>,
     user_id: &str,
     project: &ProjectAccess,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
 ) -> Option<String> {
+    if pc_runtime_route == Some(PcRuntimeRoutePreference::RouteC3) {
+        return authorized_remote_project_pc_binding(state, project, None)
+            .await
+            .map(|binding| binding.agent_id);
+    }
+
     if let Some(agent_id) = project
         .node_id
         .as_deref()
@@ -861,8 +891,15 @@ async fn resolve_pc_project_binding(
     state: &Arc<AppState>,
     user_id: &str,
     project: &ProjectAccess,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
     tx: Option<&UnboundedSender<String>>,
 ) -> Option<PcProjectBinding> {
+    if pc_runtime_route == Some(PcRuntimeRoutePreference::RouteC3) {
+        if let Some(binding) = authorized_remote_project_pc_binding(state, project, tx).await {
+            return Some(binding);
+        }
+    }
+
     let workspace = project
         .workspace_path
         .as_deref()
@@ -940,6 +977,7 @@ async fn resolve_pc_project_binding(
             return Some(PcProjectBinding {
                 agent_id: fallback_agent_id,
                 workspace: workspace.to_string(),
+                runtime_permission: None,
             });
         }
     }
@@ -991,6 +1029,7 @@ async fn resolve_pc_project_binding(
     Some(PcProjectBinding {
         agent_id: fallback_agent_id,
         workspace: workspace.to_string(),
+        runtime_permission: None,
     })
 }
 
@@ -1107,6 +1146,7 @@ async fn usable_project_binding_for_agent(
         Ok(status) if pc_workspace_inspect_usable(&status) => Some(PcProjectBinding {
             agent_id: agent_id.to_string(),
             workspace: workspace.to_string(),
+            runtime_permission: None,
         }),
         Ok(status) => {
             let problem = pc_workspace_inspect_problem(&status);
@@ -1156,6 +1196,7 @@ async fn usable_project_binding_for_agent(
                     return Some(PcProjectBinding {
                         agent_id: agent_id.to_string(),
                         workspace: workspace.to_string(),
+                        runtime_permission: None,
                     });
                 }
                 let message = bound_agent_progress_name
@@ -1258,6 +1299,7 @@ async fn provision_pc_project_binding(
     Some(PcProjectBinding {
         agent_id: agent_id.to_string(),
         workspace: provisioned.workspace_path,
+        runtime_permission: None,
     })
 }
 
@@ -1476,66 +1518,6 @@ async fn node_cli_available(state: &Arc<AppState>, agent_id: &str, cli_name: &st
                 .any(|c| c.eq_ignore_ascii_case(cli_name))
         })
         .unwrap_or(false)
-}
-
-fn append_project_dev_profile_context(
-    state: &Arc<AppState>,
-    user_id: &str,
-    project: &ProjectAccess,
-    user_message: &str,
-) -> String {
-    let profile = match state
-        .store
-        .get_project_dev_profile_for_user(user_id, &project.id)
-    {
-        Ok(Some(profile)) if !profile.is_empty() => profile,
-        Ok(_) => return user_message.to_string(),
-        Err(error) => {
-            warn!(
-                project_id = %project.id,
-                "读取项目开发命令 profile 失败，继续使用原始用户消息: {error}"
-            );
-            return user_message.to_string();
-        }
-    };
-    format!(
-        "{user_message}\n\n{}",
-        project_dev_profile_prompt_block(&profile)
-    )
-}
-
-fn project_dev_profile_prompt_block(profile: &ProjectDevProfile) -> String {
-    let mut lines = vec![
-        "系统自动识别的本地项目开发命令；执行 run/test/build 时优先参考，除非仓库文档给出更明确命令。".to_string(),
-        "<project_dev_profile>".to_string(),
-    ];
-    push_profile_line(&mut lines, "project_type", profile.project_type.as_deref());
-    push_profile_line(
-        &mut lines,
-        "package_manager",
-        profile.package_manager.as_deref(),
-    );
-    push_profile_line(&mut lines, "run_command", profile.run_command.as_deref());
-    push_profile_line(&mut lines, "test_command", profile.test_command.as_deref());
-    push_profile_line(
-        &mut lines,
-        "build_command",
-        profile.build_command.as_deref(),
-    );
-    if !profile.detected_files.is_empty() {
-        lines.push(format!(
-            "detected_files: {}",
-            profile.detected_files.join(", ")
-        ));
-    }
-    lines.push("</project_dev_profile>".to_string());
-    lines.join("\n")
-}
-
-fn push_profile_line(lines: &mut Vec<String>, key: &str, value: Option<&str>) {
-    if let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) {
-        lines.push(format!("{key}: {value}"));
-    }
 }
 
 async fn run_dispatch_with_workspace(
@@ -2006,7 +1988,7 @@ mod tests {
         pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
         pc_workspace_inspect_usable, project_chat_should_use_pc_cli,
         project_fields_require_pc_workspace, requires_project_workflow_for_message,
-        should_attempt_pc_apk_sync, BOUND_PC_NODE_RECONNECT_WAIT_SECS,
+        route_c3_cli_allowed, should_attempt_pc_apk_sync, BOUND_PC_NODE_RECONNECT_WAIT_SECS,
     };
     use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
     use crate::store::ProjectAccess;
@@ -2088,6 +2070,22 @@ mod tests {
             "远程 Codex"
         );
         assert_eq!(pc_cli_chat_route_label(None), "本机 AI");
+    }
+
+    #[test]
+    fn route_c3_authorization_requires_project_cli() {
+        assert!(route_c3_cli_allowed(
+            &[String::from("codex")],
+            &[String::from("api-runtime")]
+        ));
+        assert!(route_c3_cli_allowed(
+            &[],
+            &[String::from("copilot"), String::from("api-runtime")]
+        ));
+        assert!(!route_c3_cli_allowed(
+            &[String::from("api-runtime")],
+            &[String::from("codex")]
+        ));
     }
 
     #[test]

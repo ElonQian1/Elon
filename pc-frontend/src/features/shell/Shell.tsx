@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { CircleCheck, Link2, TriangleAlert } from 'lucide-react'
 import ServerRail from './ServerRail'
 import { useNotifications } from '../notifications/useNotifications'
@@ -37,6 +37,22 @@ function NodeConnectBanner() {
   return null
 }
 
+function AccountClaimBanner() {
+  const navigate = useNavigate()
+  const token = useAuthStore((s) => s.token)
+  const user = useAuthStore((s) => s.user)
+  if (token || user) return null
+
+  return (
+    <div className={styles.claimBanner}>
+      <span>这是一个无人认领的帐户。失去之前来认领吧。</span>
+      <button type="button" onClick={() => navigate('/login')}>
+        认证账号
+      </button>
+    </div>
+  )
+}
+
 export default function Shell() {
   useNotifications()
   const token = useAuthStore((s) => s.token)
@@ -57,6 +73,7 @@ export default function Shell() {
     <div className={styles.shell}>
       <ServerRail />
       <div className={styles.content}>
+        <AccountClaimBanner />
         <NodeConnectBanner />
         <Outlet />
       </div>

@@ -1,0 +1,312 @@
+.memberDirectoryDrawer {
+  width: min(860px, 94vw);
+}
+
+.memberDirectoryBody {
+  min-height: 0;
+  overflow: hidden;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.memberDirectoryStats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.memberDirectoryStats button {
+  min-width: 0;
+  min-height: 58px;
+  padding: 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--sidebar-2);
+  color: var(--text-muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.memberDirectoryStats button:hover,
+.memberDirectoryStats button[data-active="true"] {
+  border-color: rgba(88,101,242,.38);
+  background: rgba(88,101,242,.1);
+}
+
+.memberDirectoryStats strong,
+.memberDirectoryStats span {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberDirectoryStats strong {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.memberDirectoryStats span {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.memberDirectoryToolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(140px, 180px) minmax(120px, 150px);
+  gap: 8px;
+}
+
+.memberDirectoryToolbar select {
+  min-width: 0;
+  min-height: 34px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.memberDirectoryToolbar select:focus {
+  border-color: var(--green);
+}
+
+.memberDirectoryMeta {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.memberDirectoryBatchBar {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(88,101,242,.18);
+  border-radius: 8px;
+  background: rgba(88,101,242,.07);
+}
+
+.memberDirectoryBatchCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.memberDirectoryBatchCopy strong,
+.memberDirectoryBatchCopy span,
+.memberDirectoryBatchBar p {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberDirectoryBatchCopy strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.memberDirectoryBatchCopy span,
+.memberDirectoryBatchBar p {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.memberDirectoryBatchBar p {
+  grid-column: 1 / -1;
+}
+
+.memberDirectoryBatchActions {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.memberDirectoryBatchBtn {
+  min-height: 30px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.memberDirectoryBatchDangerBtn {
+  border-color: rgba(223,92,92,.28);
+  color: #ffb4b4;
+}
+
+.memberDirectoryList {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  position: relative;
+  scrollbar-width: thin;
+}
+
+.memberDirectoryVirtualCanvas {
+  position: relative;
+  min-width: 0;
+}
+
+.memberDirectoryVirtualSlot {
+  height: 82px;
+  padding-bottom: 7px;
+  box-sizing: border-box;
+}
+
+.memberDirectoryRow {
+  min-width: 0;
+  height: 75px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 8px;
+  background: var(--sidebar-2);
+}
+
+.memberDirectoryRow[data-selectable="true"] {
+  grid-template-columns: 22px 40px minmax(0, 1fr) auto;
+}
+
+.memberDirectoryRow[data-selected="true"] {
+  border-color: rgba(88,101,242,.42);
+  background: rgba(88,101,242,.105);
+}
+
+.memberDirectoryRow[data-state="banned"] {
+  border-color: rgba(223,92,92,.25);
+  background: rgba(223,92,92,.055);
+}
+
+.memberDirectoryRow[data-state="muted"] {
+  border-color: rgba(240,178,50,.22);
+  background: rgba(240,178,50,.055);
+}
+
+.memberDirectoryAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.memberDirectorySelect {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.memberDirectorySelect input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+
+.memberDirectoryMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.memberDirectoryMain strong,
+.memberDirectoryMain span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberDirectoryMain strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.memberDirectoryMain span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.memberDirectoryBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.memberDirectoryBadges em {
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.035);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.memberDirectoryRolePill {
+  border-color: rgba(255,255,255,.16);
+  background: rgba(255,255,255,.055);
+  color: var(--text-soft);
+  font-weight: 900;
+}
+
+.memberDirectoryActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(56px, auto));
+  gap: 6px;
+}
+
+.memberDirectoryActionBtn {
+  min-width: 56px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+@media (max-width: 780px) {
+  .memberDirectoryStats,
+  .memberDirectoryToolbar,
+  .memberDirectoryBatchBar,
+  .memberDirectoryRow {
+    grid-template-columns: 1fr;
+  }
+
+  .memberDirectoryBatchActions {
+    justify-content: stretch;
+  }
+
+  .memberDirectoryBatchBtn {
+    flex: 1 1 120px;
+  }
+
+  .memberDirectoryActions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

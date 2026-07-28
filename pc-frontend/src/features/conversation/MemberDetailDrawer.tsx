@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { api } from '../../api/client'
 import { clean, formatTime } from '../../lib/utils'
 import type { Channel, ProjectMember, ProjectMemberAuditEntry, ProjectMemberAuditResponse, ProjectRoleRef } from './types'
-import type { MemberModerationAction } from './MemberPanel'
+import type { MemberModerationAction } from './memberPanelTypes'
 import {
   formatDateTime,
   memberChannelCanView,
@@ -15,7 +15,10 @@ import {
   presenceLabel,
   roleLabel,
 } from './memberUtils'
-import styles from './ConversationPage.module.css'
+import sharedStyles from './ConversationPage.module.css'
+import detailStyles from './MemberDetailDrawer.module.css'
+
+const styles = { ...sharedStyles, ...detailStyles }
 
 type MemberDetailChannelRow = {
   channel: Channel
@@ -315,7 +318,7 @@ export function MemberDetailDrawer({
                       placeholder="仅成员管理员可见"
                     />
                   </label>
-                  <button className={styles.primaryBtn} onClick={saveMemberProfile} disabled={savingProfile}>
+                  <button className={[styles.primaryBtn, styles.memberDetailSaveBtn].join(' ')} onClick={saveMemberProfile} disabled={savingProfile}>
                     {savingProfile ? '保存中...' : '保存项目资料'}
                   </button>
                 </div>

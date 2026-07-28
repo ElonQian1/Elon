@@ -1,0 +1,355 @@
+.memberDetailDrawer {
+  width: min(960px, 94vw);
+}
+
+.memberDetailBody {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.memberDetailHero {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(88,101,242,.14), rgba(35,37,43,.76));
+}
+
+.memberDetailAvatarWrap {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+}
+
+.memberDetailAvatar {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #38414a;
+  border: 4px solid #1e1f22;
+  color: white;
+  font-size: 20px;
+  font-weight: 900;
+  overflow: hidden;
+}
+
+.memberDetailAvatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.memberDetailHeroCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.memberDetailHeroCopy > strong {
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberDetailHeroCopy > span {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.memberDetailBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.memberDetailBadges em,
+.memberDetailRoleList em {
+  min-width: 0;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.045);
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 800;
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberDetailBadges em[data-tone="danger"] {
+  color: var(--red);
+  border-color: rgba(223,92,92,.3);
+  background: rgba(223,92,92,.08);
+}
+
+.memberDetailActionBar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.memberDetailGrid {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.memberDetailCard {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--sidebar-2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.memberDetailWideCard {
+  grid-column: 1 / -1;
+}
+
+.memberDetailCardHead {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.memberDetailCardHead strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.memberDetailCardHead span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  text-align: right;
+}
+
+.memberDetailRoleList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.memberDetailKv {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 7px 10px;
+  align-items: center;
+}
+
+.memberDetailKv span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.memberDetailKv strong {
+  min-width: 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 650;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberDetailEditGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
+}
+
+.memberDetailSaveBtn {
+  justify-self: flex-end;
+}
+
+.memberDetailModerationGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.memberDetailCurrentChannel {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(88,101,242,.22);
+  background: rgba(88,101,242,.08);
+}
+
+.memberDetailCurrentChannel span,
+.memberDetailCurrentChannel em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.memberDetailCurrentChannel strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberDetailChannelList {
+  max-height: 300px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-right: 2px;
+}
+
+.memberDetailChannelRow {
+  min-width: 0;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(120px, auto);
+  gap: 9px;
+  align-items: center;
+  padding: 7px 9px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(255,255,255,.025);
+}
+
+.memberDetailChannelRow[data-hidden="true"] {
+  opacity: .58;
+  background: rgba(223,92,92,.035);
+}
+
+.memberDetailChannelRow > span {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.08);
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.memberDetailChannelRow div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.memberDetailChannelRow strong {
+  color: var(--text-soft);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberDetailChannelRow em,
+.memberDetailChannelRow p {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.memberDetailChannelRow p {
+  margin: 0;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberDetailAuditList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.memberDetailAuditRow {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 6px;
+  background: rgba(255,255,255,.025);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.memberDetailAuditRow div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.memberDetailAuditRow strong {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.memberDetailAuditRow time {
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.memberDetailAuditRow span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+@media (max-width: 780px) {
+  .memberDetailGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .memberDetailChannelRow {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+
+  .memberDetailChannelRow p {
+    grid-column: 2;
+    text-align: left;
+  }
+}

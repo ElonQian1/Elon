@@ -2,7 +2,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { api } from '../../api/client'
 import type { UserPresenceSettings } from './types'
 import { PRESENCE_OPTIONS, presenceLabel } from './memberUtils'
-import styles from './ConversationPage.module.css'
+import sharedStyles from './ConversationPage.module.css'
+import presenceStyles from './PresenceDrawer.module.css'
+
+const styles = { ...sharedStyles, ...presenceStyles }
 
 const PRESENCE_DESCRIPTIONS: Record<string, string> = {
   online: '正常接收消息',

@@ -14,7 +14,10 @@ import {
   presenceLabel,
   roleLabel,
 } from './memberUtils'
-import styles from './ConversationPage.module.css'
+import sharedStyles from './ConversationPage.module.css'
+import directoryStyles from './MemberDirectoryDrawer.module.css'
+
+const styles = { ...sharedStyles, ...directoryStyles }
 
 type DirectoryFilter = 'all' | 'online' | 'offline' | 'restricted' | 'recent'
 type DirectorySort = 'status' | 'name' | 'joined'
@@ -270,7 +273,7 @@ export function MemberDirectoryDrawer({
               </div>
               <div className={styles.memberDirectoryBatchActions}>
                 <button
-                  className={styles.drawerCloseBtn}
+                  className={[styles.drawerCloseBtn, styles.memberDirectoryBatchBtn].join(' ')}
                   type="button"
                   disabled={selectableVisibleMembers.length === 0 || !!batchBusy}
                   onClick={toggleVisibleSelection}
@@ -278,7 +281,7 @@ export function MemberDirectoryDrawer({
                   {allVisibleSelected ? '取消当前' : '选择当前'}
                 </button>
                 <button
-                  className={styles.drawerCloseBtn}
+                  className={[styles.drawerCloseBtn, styles.memberDirectoryBatchBtn].join(' ')}
                   type="button"
                   disabled={selectedMembers.length === 0 || !!batchBusy}
                   onClick={() => setSelectedIds(new Set())}
@@ -288,7 +291,7 @@ export function MemberDirectoryDrawer({
                 {canModerate && (
                   <>
                     <button
-                      className={styles.drawerCloseBtn}
+                      className={[styles.drawerCloseBtn, styles.memberDirectoryBatchBtn].join(' ')}
                       type="button"
                       disabled={selectedMembers.length === 0 || !!batchBusy}
                       onClick={() => runBatchAction('mute1h')}
@@ -296,7 +299,7 @@ export function MemberDirectoryDrawer({
                       禁言 1 小时
                     </button>
                     <button
-                      className={styles.drawerCloseBtn}
+                      className={[styles.drawerCloseBtn, styles.memberDirectoryBatchBtn].join(' ')}
                       type="button"
                       disabled={selectedMembers.length === 0 || !!batchBusy}
                       onClick={() => runBatchAction('mute1d')}
@@ -304,7 +307,7 @@ export function MemberDirectoryDrawer({
                       禁言 1 天
                     </button>
                     <button
-                      className={styles.drawerCloseBtn}
+                      className={[styles.drawerCloseBtn, styles.memberDirectoryBatchBtn].join(' ')}
                       type="button"
                       disabled={selectedMembers.length === 0 || !!batchBusy}
                       onClick={() => runBatchAction('unmute')}
@@ -315,9 +318,8 @@ export function MemberDirectoryDrawer({
                 )}
                 {canManageMembers && (
                   <button
-                    className={styles.drawerCloseBtn}
+                    className={[styles.drawerCloseBtn, styles.memberDirectoryBatchBtn, styles.memberDirectoryBatchDangerBtn].join(' ')}
                     type="button"
-                    data-danger="true"
                     disabled={selectedMembers.length === 0 || !!batchBusy}
                     onClick={() => runBatchAction('remove')}
                   >
@@ -410,7 +412,7 @@ function MemberDirectoryRow({
           />
         </label>
       )}
-      <span className={[styles.memberAvatar, directoryAvatarClass(status)].join(' ')} style={roleAvatarStyle}>
+      <span className={[styles.memberAvatar, styles.memberDirectoryAvatar, directoryAvatarClass(status)].join(' ')} style={roleAvatarStyle}>
         {member.avatar_data_url
           ? <img src={member.avatar_data_url} alt="" />
           : memberInitial(member)
@@ -427,10 +429,10 @@ function MemberDirectoryRow({
         </div>
       </div>
       <div className={styles.memberDirectoryActions}>
-        <button className={styles.drawerCloseBtn} type="button" onClick={() => onOpenDetails(member)}>资料</button>
-        {onOpenConversations && <button className={styles.drawerCloseBtn} type="button" onClick={() => onOpenConversations(member)}>会话</button>}
-        {canManageRoles && onOpenRoles && <button className={styles.drawerCloseBtn} type="button" onClick={() => onOpenRoles(member)}>角色</button>}
-        {canModerate && onOpenModerationCenter && <button className={styles.drawerCloseBtn} type="button" onClick={() => onOpenModerationCenter(member)}>限制</button>}
+        <button className={[styles.drawerCloseBtn, styles.memberDirectoryActionBtn].join(' ')} type="button" onClick={() => onOpenDetails(member)}>资料</button>
+        {onOpenConversations && <button className={[styles.drawerCloseBtn, styles.memberDirectoryActionBtn].join(' ')} type="button" onClick={() => onOpenConversations(member)}>会话</button>}
+        {canManageRoles && onOpenRoles && <button className={[styles.drawerCloseBtn, styles.memberDirectoryActionBtn].join(' ')} type="button" onClick={() => onOpenRoles(member)}>角色</button>}
+        {canModerate && onOpenModerationCenter && <button className={[styles.drawerCloseBtn, styles.memberDirectoryActionBtn].join(' ')} type="button" onClick={() => onOpenModerationCenter(member)}>限制</button>}
       </div>
     </article>
   )

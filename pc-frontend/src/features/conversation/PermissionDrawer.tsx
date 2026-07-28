@@ -25,7 +25,10 @@ import {
   roleLabel,
 } from './memberUtils'
 import { compareMembersForPanel, memberAvatarRoleClass, memberPresenceAvatarClass } from './MemberPanel'
-import styles from './ConversationPage.module.css'
+import sharedStyles from './ConversationPage.module.css'
+import permissionStyles from './PermissionDrawer.module.css'
+
+const styles = { ...sharedStyles, ...permissionStyles }
 
 type PermissionEffect = '' | 'allow' | 'deny'
 
@@ -379,6 +382,7 @@ function ChannelMemberPreviewRow({
   const status = memberPresenceStatus(member)
   const avatarCls = [
     styles.memberAvatar,
+    styles.permissionPreviewAvatar,
     memberAvatarRoleClass(roleKey),
     memberPresenceAvatarClass(status),
   ].filter(Boolean).join(' ')

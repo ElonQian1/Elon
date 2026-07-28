@@ -93,8 +93,27 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   projectHomeVersion: 0,
 
   loadProjects: async () => {
-    const data = await api.get<ProjectListResponse>('/api/me/projects')
-    set({ projects: data.projects ?? [], projectsLoaded: true })
+    try {
+      const data = await api.get<ProjectListResponse>('/api/me/projects')
+      set({ projects: data.projects ?? [], projectsLoaded: true })
+    } catch (err) {
+      if ((err as { status?: number })?.status === 401) {
+        set({
+          projects: [],
+          projectsLoaded: true,
+          activeProjectId: '',
+          space: null,
+          landing: null,
+          channels: [],
+          categories: [],
+          members: [],
+          activeChannelId: '',
+          messages: [],
+        })
+        return
+      }
+      throw err
+    }
   },
 
   selectProject: async (id: string) => {

@@ -8,7 +8,10 @@ import type {
   ProjectRolesResponse,
 } from './types'
 import { numberOrUndefined, inviteUrl, roleLabel, formatDateTime } from './memberUtils'
-import styles from './ConversationPage.module.css'
+import sharedStyles from './ConversationPage.module.css'
+import inviteStyles from './InviteDrawer.module.css'
+
+const styles = { ...sharedStyles, ...inviteStyles }
 
 type InviteState = 'active' | 'revoked' | 'expired' | 'full'
 type InviteFilter = 'active' | 'all' | InviteState

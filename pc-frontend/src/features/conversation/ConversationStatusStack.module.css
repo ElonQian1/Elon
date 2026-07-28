@@ -1,0 +1,89 @@
+.chatStatusStack {
+  min-height: 0;
+  display: grid;
+  gap: 6px;
+  padding: 8px 16px 0;
+}
+
+.chatStatusStack:empty { padding: 0; }
+
+.localNodeNotice {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(108, 168, 255, .24);
+  background: rgba(108, 168, 255, .08);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.localNodeNotice strong {
+  flex: 0 0 auto;
+  font-size: 12px;
+}
+
+.localNodeNoticeOk {
+  border-color: rgba(46, 168, 97, .26);
+  background: rgba(46, 168, 97, .1);
+}
+
+.localNodeNoticeOk strong { color: var(--green); }
+
+.localNodeNoticeInfo strong { color: var(--blue); }
+
+.localNodeNoticeWarn {
+  border-color: rgba(216, 165, 53, .28);
+  background: rgba(216, 165, 53, .1);
+}
+
+.localNodeNoticeWarn strong { color: var(--yellow); }
+
+.localNodeNotice span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectRouteNotice,
+.permissionNotice {
+  min-height: 32px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.projectRouteNotice {
+  justify-content: space-between;
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(255,255,255,.035);
+  color: var(--text-muted);
+}
+
+.projectRouteNotice span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectRouteNotice span:first-child {
+  color: var(--text-soft);
+}
+
+.projectRouteNotice strong {
+  color: var(--text);
+  margin-right: 6px;
+}
+
+.permissionNotice {
+  border: 1px solid rgba(223, 92, 92, .25);
+  background: rgba(223, 92, 92, .1);
+  color: #ffb8b8;
+}

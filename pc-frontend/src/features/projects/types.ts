@@ -1,6 +1,7 @@
 export interface NodeCapacity {
   capacity_tone?: string
   capacity_label?: string
+  capacity_warnings?: string[]
   can_accept_project?: boolean | number | string
   project_slots_remaining?: number
   project_count?: number
@@ -18,6 +19,7 @@ export interface ProjectNode extends NodeCapacity {
   node_id?: string
   agent_id?: string
   id?: string
+  owner_user_id?: string
   short_id?: string
   display_name?: string
   label?: string

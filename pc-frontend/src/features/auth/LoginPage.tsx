@@ -56,7 +56,7 @@ export default function LoginPage() {
           </button>
         </form>
         <p className={styles.hint}>
-          如需使用旧版 PC，请访问 <a href="/pc">/pc</a>
+          如需使用旧版 PC，请访问 <a href="/pc-legacy">/pc-legacy</a>
         </p>
       </div>
     </div>
