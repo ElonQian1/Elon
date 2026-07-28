@@ -32,7 +32,7 @@ pub(crate) fn schedule_assignment_run(
     actor_user_id: String,
     comment: Option<String>,
 ) -> Result<MatterDetail> {
-    if assignment.runtime_route != "pc_node_cli" {
+    if !is_supported_pc_node_cli_route(&assignment.runtime_route) {
         anyhow::bail!("第一版群体 AI 执行只支持 pc_node_cli Assignment");
     }
     if !assignment_can_be_dispatched(&assignment.status) {
@@ -111,6 +111,10 @@ pub(crate) fn schedule_assignment_run(
 
     matter_detail(&state, &detail_project_id, &detail_matter_id)?
         .ok_or_else(|| anyhow!("Matter 不存在"))
+}
+
+fn is_supported_pc_node_cli_route(runtime_route: &str) -> bool {
+    matches!(runtime_route.trim(), "pc_node_cli" | "route_a_cli")
 }
 
 #[derive(Clone)]
@@ -497,4 +501,16 @@ fn is_finished_assignment_status(status: &str) -> bool {
 
 pub(crate) fn assignment_can_be_dispatched(status: &str) -> bool {
     matches!(status, "planned" | "failed")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_supported_pc_node_cli_route;
+
+    #[test]
+    fn supports_current_and_legacy_pc_node_cli_routes() {
+        assert!(is_supported_pc_node_cli_route("pc_node_cli"));
+        assert!(is_supported_pc_node_cli_route("route_a_cli"));
+        assert!(!is_supported_pc_node_cli_route("route_c_server_runtime"));
+    }
 }

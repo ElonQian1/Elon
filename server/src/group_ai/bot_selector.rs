@@ -188,7 +188,7 @@ fn runtime_route_for_cli(cli_name: &str) -> &'static str {
     match cli_name {
         "api-runtime" => "route_b_api_runtime",
         "server-runtime" => "route_c_server_runtime",
-        _ => "route_a_cli",
+        _ => "pc_node_cli",
     }
 }
 
@@ -205,4 +205,15 @@ fn capabilities_for_cli(cli_name: &str) -> Vec<String> {
         _ => capabilities.push("local_cli".to_string()),
     }
     capabilities
+}
+
+#[cfg(test)]
+mod tests {
+    use super::runtime_route_for_cli;
+
+    #[test]
+    fn local_cli_bots_use_group_ai_pc_node_route() {
+        assert_eq!(runtime_route_for_cli("codex"), "pc_node_cli");
+        assert_eq!(runtime_route_for_cli("copilot"), "pc_node_cli");
+    }
 }

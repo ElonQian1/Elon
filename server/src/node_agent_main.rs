@@ -929,8 +929,7 @@ fn probe_codex_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
             available: false,
             status: "not_runnable".to_string(),
             detail: Some(run.summary.clone().unwrap_or_else(|| {
-                "检测到 codex 命令，但无法非交互执行；请安装 Codex CLI 或修复 PATH"
-                    .to_string()
+                "检测到 codex 命令，但无法非交互执行；请安装 Codex CLI 或修复 PATH".to_string()
             })),
             reason: run
                 .reason

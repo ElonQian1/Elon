@@ -395,7 +395,10 @@ mod tests {
         assert_eq!(attachment.size_bytes, Some(128));
         assert_eq!(attachment.image_width, Some(640));
         assert_eq!(attachment.image_height, Some(480));
-        let annotation = attachment.annotations.first().expect("annotation should parse");
+        let annotation = attachment
+            .annotations
+            .first()
+            .expect("annotation should parse");
         assert_eq!(annotation.note, "看这里");
         assert_eq!(annotation.icon_x, Some(0.42));
     }
