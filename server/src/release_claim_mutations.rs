@@ -20,9 +20,9 @@ pub async fn heartbeat_handler(
 
     let mut lease_entry = candidate
         .global_publish
-        .owner
-        .as_ref()
-        .filter(|item| item.token == req.token && item.kind == kind.as_str())
+        .owners
+        .iter()
+        .find(|item| item.token == req.token && item.kind == kind.as_str())
         .or_else(|| {
             candidate
                 .global_publish
@@ -79,9 +79,9 @@ pub async fn heartbeat_handler(
 
     if let Some(owner) = candidate
         .global_publish
-        .owner
-        .as_mut()
-        .filter(|item| item.token == req.token && item.kind == kind.as_str())
+        .owners
+        .iter_mut()
+        .find(|item| item.token == req.token && item.kind == kind.as_str())
     {
         owner.last_heartbeat = now;
         owner.lease_expires_at = new_expiry;
@@ -174,9 +174,9 @@ pub async fn finish_handler(
 
     let owner = candidate
         .global_publish
-        .owner
-        .as_ref()
-        .filter(|owner| owner.token == req.token && owner.kind == kind.as_str())
+        .owners
+        .iter()
+        .find(|owner| owner.token == req.token && owner.kind == kind.as_str())
         .cloned()
         .ok_or_else(|| {
             err(

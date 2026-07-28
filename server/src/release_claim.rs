@@ -29,7 +29,9 @@ use crate::release_manager::{
     semver_ge, sweep_expired, InFlightBuilder, Lane, LaneState, LastRelease, PublishLeaseEntry,
 };
 use crate::release_publish_queue::{
-    enqueue_global_publish, finish_global_publish, sweep_global_expired, PublishAdmission,
+    active_owner_count, enqueue_global_publish, finish_global_publish, owner_by_token,
+    owner_for_kind, queue_position_for_token, sweep_global_expired, waiter_count_for_kind,
+    PublishAdmission, PUBLISH_HEARTBEAT_TIMEOUT_SECS,
 };
 
 #[path = "release_claim_mutations.rs"]
@@ -264,21 +266,17 @@ pub async fn claim_handler(
                 .and_then(|release| release.version_code),
             claimed_at: completion.finished_at,
             lease_expires_at: completion.finished_at,
-            in_flight_count: usize::from(candidate.global_publish.owner.is_some())
+            in_flight_count: active_owner_count(&candidate)
                 + candidate.global_publish.waiters.len(),
             queue_position: 0,
             coalesced: true,
-            owner: candidate
-                .global_publish
-                .owner
-                .as_ref()
-                .map(PublicPublishLeaseEntry::from),
-            waiter_count: candidate.global_publish.waiters.len(),
+            owner: owner_for_kind(&candidate, kind_name).map(PublicPublishLeaseEntry::from),
+            waiter_count: waiter_count_for_kind(&candidate, kind_name),
         };
         return Ok(Json(response));
     }
 
-    if let Some(existing) = candidate.global_publish.owner.as_ref().filter(|item| {
+    if let Some(existing) = candidate.global_publish.owners.iter().find(|item| {
         item.kind == kind_name
             && item.sha == req.sha
             && item.batch_id == batch_id
@@ -289,26 +287,21 @@ pub async fn claim_handler(
             &candidate, kind, existing, "build", 0,
         )));
     }
-    if let Some((index, existing)) =
-        candidate
-            .global_publish
-            .waiters
-            .iter()
-            .enumerate()
-            .find(|(_, item)| {
-                item.kind == kind_name
-                    && item.sha == req.sha
-                    && item.batch_id == batch_id
-                    && item.stage == stage
-                    && item.builder_id == req.builder_id
-            })
-    {
+    if let Some(existing) = candidate.global_publish.waiters.iter().find(|item| {
+        item.kind == kind_name
+            && item.sha == req.sha
+            && item.batch_id == batch_id
+            && item.stage == stage
+            && item.builder_id == req.builder_id
+    }) {
+        let queue_position =
+            queue_position_for_token(&candidate, kind_name, &existing.token).unwrap_or(1);
         return Ok(Json(claim_response_for_existing(
             &candidate,
             kind,
             existing,
             "wait",
-            index + 1,
+            queue_position,
         )));
     }
 
@@ -391,11 +384,7 @@ pub async fn claim_handler(
         PublishAdmission::Owner => ("build", 0),
         PublishAdmission::Waiter { queue_position } => ("wait", queue_position),
     };
-    if let Some(lease) = candidate
-        .global_publish
-        .owner
-        .as_ref()
-        .filter(|lease| lease.token == token)
+    if let Some(lease) = owner_by_token(&candidate, &token)
         .or_else(|| {
             candidate
                 .global_publish
@@ -416,8 +405,7 @@ pub async fn claim_handler(
             now,
         );
     }
-    let in_flight_count = usize::from(candidate.global_publish.owner.is_some())
-        + candidate.global_publish.waiters.len();
+    let in_flight_count = active_owner_count(&candidate) + candidate.global_publish.waiters.len();
 
     let resp = ClaimResponse {
         action: action.to_string(),
@@ -433,12 +421,8 @@ pub async fn claim_handler(
         in_flight_count,
         queue_position,
         coalesced: false,
-        owner: candidate
-            .global_publish
-            .owner
-            .as_ref()
-            .map(PublicPublishLeaseEntry::from),
-        waiter_count: candidate.global_publish.waiters.len(),
+        owner: owner_for_kind(&candidate, kind_name).map(PublicPublishLeaseEntry::from),
+        waiter_count: waiter_count_for_kind(&candidate, kind_name),
     };
 
     commit_candidate(&mgr, &mut guard, candidate).await?;
@@ -489,10 +473,12 @@ pub async fn status_handler(
         .as_deref()
         .map(|token| publish_token_status(&candidate, token));
     let global = json!({
-        "owner": candidate.global_publish.owner.as_ref().map(PublicPublishLeaseEntry::from),
+        "owner": candidate.global_publish.owners.first().map(PublicPublishLeaseEntry::from),
+        "owners": candidate.global_publish.owners.iter().map(PublicPublishLeaseEntry::from).collect::<Vec<_>>(),
         "waiters": candidate.global_publish.waiters.iter().map(PublicPublishLeaseEntry::from).collect::<Vec<_>>(),
         "waiterCount": candidate.global_publish.waiters.len(),
-        "queuePolicy": "fifo",
+        "queuePolicy": "independent-kind-fifo",
+        "heartbeatTimeoutSecs": PUBLISH_HEARTBEAT_TIMEOUT_SECS,
         "coalescingKey": "batchId+stage+kind+sha",
         "immutableReleaseSha": true,
         "batchIdentity": "batchId+sha",

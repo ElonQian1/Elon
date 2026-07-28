@@ -14,8 +14,8 @@ use tokio::sync::Mutex;
 use crate::types::AppState;
 use anyhow::{Context, Result};
 
-/// 最长 lease 时长（秒）。客户端要求再长也截到这里。
-pub(crate) const MAX_LEASE_SECS: i64 = 14_400; // 4 h; node-agent cross builds can be lengthy
+/// 发布 lease 只证明进程仍有心跳；长构建靠续租，不靠一次占用数小时。
+pub(crate) const MAX_LEASE_SECS: i64 = 180;
 
 // ===== 持久化结构 =====
 
@@ -78,8 +78,12 @@ pub struct PublishCompletion {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GlobalPublishState {
+    /// 旧版单 owner 字段；首次状态操作时迁入 `owners`。
     #[serde(default)]
     pub owner: Option<PublishLeaseEntry>,
+    /// 各发布通道可各自拥有一个 owner。
+    #[serde(default)]
+    pub owners: Vec<PublishLeaseEntry>,
     #[serde(default)]
     pub waiters: Vec<PublishLeaseEntry>,
     #[serde(default)]
@@ -300,6 +304,12 @@ mod tests {
     use super::*;
 
     #[test]
+    fn publish_lease_is_short_and_heartbeat_renewable() {
+        assert_eq!(clamp_lease(14_400), 180);
+        assert_eq!(clamp_lease(30), 60);
+    }
+
+    #[test]
     fn corrupt_release_state_fails_closed_instead_of_resetting() {
         let root = std::env::temp_dir().join(format!(
             "elon-release-corrupt-{}-{}",
@@ -314,5 +324,6 @@ mod tests {
         assert!(manager.health_error().is_some());
         let state = manager.inner.try_lock().unwrap();
         assert!(state.global_publish.owner.is_none());
+        assert!(state.global_publish.owners.is_empty());
     }
 }

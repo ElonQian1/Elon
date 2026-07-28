@@ -55,7 +55,7 @@ function Wait-ElonGlobalPublishLease {
         [Parameter(Mandatory)][object]$Claim,
         [Parameter(Mandatory)][string]$Kind,
         [Parameter(Mandatory)][string]$ReleaseApiBase,
-        [int]$LeaseSecs = 3600
+        [int]$LeaseSecs = 180
     )
     if ($Claim.action -eq 'coalesced') { return $Claim }
     while ($Claim.action -eq 'wait') {
@@ -109,7 +109,7 @@ function Enter-ElonGlobalPublishLease {
         [Parameter(Mandatory)][object]$Claim,
         [Parameter(Mandatory)][string]$Kind,
         [Parameter(Mandatory)][string]$ReleaseApiBase,
-        [int]$LeaseSecs = 3600
+        [int]$LeaseSecs = 180
     )
     $result = Wait-ElonGlobalPublishLease @PSBoundParameters
     if ($result.action -eq 'coalesced' -or ($result.action -eq 'finished' -and $result.success)) {
@@ -133,7 +133,7 @@ function Enter-ElonNodeAgentPublishLease {
         $claim = Invoke-ElonReleaseLeaseRequest -Uri "$ReleaseApiBase/claim" -Method POST -Body @{
             kind = 'node_agent'; sha = $Sha; builderId = $BuilderId
             builderLabel = "publish-node-agent.ps1 @ $BuilderId"
-            currentVersionName = $VersionName; leaseSecs = 14400
+            currentVersionName = $VersionName; leaseSecs = 180
             batchId = Get-ElonReleaseBatchId -Sha $Sha; stage = 'windows_node'
         }
     } catch {
@@ -146,7 +146,7 @@ function Enter-ElonNodeAgentPublishLease {
         }
     }
     $result = Wait-ElonGlobalPublishLease -Claim $claim -Kind 'node_agent' `
-        -ReleaseApiBase $ReleaseApiBase -LeaseSecs 14400
+        -ReleaseApiBase $ReleaseApiBase -LeaseSecs 180
     if ($result.action -eq 'coalesced' -or ($result.action -eq 'finished' -and $result.success)) {
         Write-Host '   Same node SHA already published; entering artifact-verified broadcast replay.' -ForegroundColor Green
         $result | Add-Member -NotePropertyName replayOnly -NotePropertyValue $true -Force
@@ -168,7 +168,7 @@ function Update-ElonReleaseStage {
         [Parameter(Mandatory)][string]$Stage,
         [string]$Phase = '',
         [ValidateSet('queued','running','succeeded','failed')][string]$Status = 'running',
-        [int]$LeaseSecs = 14400
+        [int]$LeaseSecs = 180
     )
     if ([string]::IsNullOrWhiteSpace($Token)) { return }
     $stageStatus = if ([string]::IsNullOrWhiteSpace($Phase)) { $Status } else { 'running' }
@@ -192,7 +192,7 @@ function Start-ElonReleaseHeartbeat {
         [Parameter(Mandatory)][string]$BatchId,
         [Parameter(Mandatory)][string]$Stage,
         [int]$IntervalSecs = 30,
-        [int]$LeaseSecs = 14400
+        [int]$LeaseSecs = 180
     )
     if ([string]::IsNullOrWhiteSpace($Token)) { return $null }
     # The caller observes the first heartbeat synchronously. A broken API or

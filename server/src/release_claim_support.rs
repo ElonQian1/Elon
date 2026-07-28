@@ -8,6 +8,10 @@ use super::{
     err, lane, lane_mut, parse_kind, ClaimResponse, FinishRequest, HeartbeatRequest,
     InFlightBuilder, Lane, PublicPublishLeaseEntry,
 };
+use crate::release_publish_queue::{
+    active_owner_count, normalize_legacy_owner, owner_by_token, owner_for_kind,
+    queue_position_for_token, waiter_count_for_kind,
+};
 
 pub(super) fn heartbeat_stage<'a>(
     state: &crate::release_manager::ReleaseStateFile,
@@ -99,12 +103,13 @@ pub(super) fn adopt_legacy_batch_identity(
     token: &str,
     batch_id: &str,
 ) {
+    normalize_legacy_owner(state);
     let stage = crate::release_batch::default_stage(kind.as_str()).to_string();
     if let Some(owner) = state
         .global_publish
-        .owner
-        .as_mut()
-        .filter(|entry| entry.token == token && entry.batch_id.is_empty())
+        .owners
+        .iter_mut()
+        .find(|entry| entry.token == token && entry.batch_id.is_empty())
     {
         owner.batch_id = batch_id.to_string();
         owner.stage = stage.clone();
@@ -152,16 +157,11 @@ pub(super) fn claim_response_for_existing(
         assigned_version_code: build.and_then(|item| item.assigned_version_code),
         claimed_at: lease.requested_at,
         lease_expires_at: lease.lease_expires_at,
-        in_flight_count: usize::from(state.global_publish.owner.is_some())
-            + state.global_publish.waiters.len(),
+        in_flight_count: active_owner_count(state) + state.global_publish.waiters.len(),
         queue_position,
         coalesced: false,
-        owner: state
-            .global_publish
-            .owner
-            .as_ref()
-            .map(PublicPublishLeaseEntry::from),
-        waiter_count: state.global_publish.waiters.len(),
+        owner: owner_for_kind(state, kind.as_str()).map(PublicPublishLeaseEntry::from),
+        waiter_count: waiter_count_for_kind(state, kind.as_str()),
     }
 }
 
@@ -169,12 +169,7 @@ pub(super) fn publish_token_status(
     state: &crate::release_manager::ReleaseStateFile,
     token: &str,
 ) -> Value {
-    if let Some(owner) = state
-        .global_publish
-        .owner
-        .as_ref()
-        .filter(|owner| owner.token == token)
-    {
+    if let Some(owner) = owner_by_token(state, token) {
         let kind = parse_kind(&owner.kind).ok();
         let build = kind.and_then(|kind| {
             lane(state, kind)
@@ -190,17 +185,17 @@ pub(super) fn publish_token_status(
             "queuePosition": 0,
         });
     }
-    if let Some((index, waiter)) = state
+    if let Some(waiter) = state
         .global_publish
         .waiters
         .iter()
-        .enumerate()
-        .find(|(_, waiter)| waiter.token == token)
+        .find(|waiter| waiter.token == token)
     {
+        let queue_position = queue_position_for_token(state, &waiter.kind, token).unwrap_or(1);
         return json!({
             "action": "wait", "token": token, "kind": waiter.kind, "sha": waiter.sha,
-            "batchId": waiter.batch_id, "stage": waiter.stage, "queuePosition": index + 1,
-            "owner": state.global_publish.owner.as_ref().map(PublicPublishLeaseEntry::from),
+            "batchId": waiter.batch_id, "stage": waiter.stage, "queuePosition": queue_position,
+            "owner": owner_for_kind(state, &waiter.kind).map(PublicPublishLeaseEntry::from),
         });
     }
     if let Some(completion) = state
@@ -319,7 +314,7 @@ mod tests {
 
         adopt_legacy_batch_identity(&mut state, Lane::Server, "token", "release-fixed-sha");
 
-        let owner = state.global_publish.owner.as_ref().unwrap();
+        let owner = state.global_publish.owners.first().unwrap();
         assert_eq!(owner.batch_id, "release-fixed-sha");
         assert_eq!(owner.stage, "server");
         assert_eq!(state.server.in_flight[0].batch_id, "release-fixed-sha");
