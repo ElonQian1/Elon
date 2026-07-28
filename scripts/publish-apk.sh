@@ -464,9 +464,7 @@ remote_advance_safe_for_apk() {
   return 0
 }
 
-# ═══════════════════════════════════════════════════════════════
 # Step 0: Git fetch + fast-forward
-# ═══════════════════════════════════════════════════════════════
 echo -e "${CYAN}🔄 同步最新代码...${NC}"
 git_fetch_with_retry
 
@@ -517,9 +515,7 @@ if [[ "$FORCE" == "0" && -n "$DEPLOYED_APK_SHA" ]]; then
   fi
 fi
 
-# ═══════════════════════════════════════════════════════════════
 # Step 1: Claim 版本号
-# ═══════════════════════════════════════════════════════════════
 echo -e "${CYAN}📝 向服务器申请新版本号...${NC}"
 
 ORIGINAL_GRADLE_CONTENT=$(cat "$GRADLE_PATH")
@@ -566,6 +562,14 @@ fi
 
 echo -e "${GREEN}   ✅ 已分配版本号: v${NEW_NAME} (build ${NEW_CODE})${NC}"
 
+git_fetch_with_retry 1
+CURRENT_MAIN_AT_BUILD_START=$(git -C "$REPO_ROOT" rev-parse origin/main)
+if [[ "$CURRENT_MAIN_AT_BUILD_START" != "$BUILD_BASE_SHA" ]] && ! remote_advance_safe_for_apk "$BUILD_BASE_SHA"; then
+  complete_release "false" "" 0 "" "superseded before build by $CURRENT_MAIN_AT_BUILD_START"
+  print_publish_status "superseded_before_build" "synced" "not_attempted" "未开始的旧候选已合并到最新 Android 主线。"
+  exit 0
+fi
+
 if [[ "$FORCE" == "0" ]] && live_apk_includes_build_base; then
   LIVE_VERSION=$(curl -s --noproxy '*' --max-time 10 "$SERVER_URL/app/version.json" 2>/dev/null || true)
   LIVE_NAME=$(json_get "$LIVE_VERSION" "versionName")
@@ -582,9 +586,7 @@ sed -i "s/versionCode ${OLD_CODE}/versionCode ${NEW_CODE}/" "$GRADLE_PATH"
 sed -i "s/versionName \"${OLD_NAME}\"/versionName \"${NEW_NAME}\"/" "$GRADLE_PATH"
 echo -e "${GREEN}   versionCode: ${OLD_CODE} → ${NEW_CODE} (临时，编译后自动还原)${NC}"
 
-# ═══════════════════════════════════════════════════════════════
 # Step 2: 编译 Release APK
-# ═══════════════════════════════════════════════════════════════
 if [[ "$SKIP_BUILD" == "0" ]]; then
   assert_signing_config
   echo -e "${CYAN}🔨 编译 Release APK...${NC}"
@@ -609,9 +611,7 @@ else
   echo -e "${YELLOW}⏭️  跳过编译（--skip-build）${NC}"
 fi
 
-# ═══════════════════════════════════════════════════════════════
 # Step 3: 找到 APK 文件
-# ═══════════════════════════════════════════════════════════════
 APK_PATH=$(find "$APK_DIR" -name "*.apk" 2>/dev/null | sort | tail -1 || true)
 if [[ -z "$APK_PATH" ]]; then
   echo -e "${RED}❌ 未找到 APK 文件: $APK_DIR${NC}" >&2; exit 1
@@ -620,9 +620,7 @@ FILE_SIZE=$(stat -c%s "$APK_PATH" 2>/dev/null || stat -f%z "$APK_PATH")
 assert_apk_manifest_version "$APK_PATH" "$NEW_CODE" "$NEW_NAME" "本地 release APK"
 echo -e "${GREEN}📦 APK: $(basename "$APK_PATH") ($(python3 -c "print(round($FILE_SIZE/1024/1024,2))") MB)${NC}"
 
-# ═══════════════════════════════════════════════════════════════
 # Step 4: 还原 build.gradle（版本号不进 git）
-# ═══════════════════════════════════════════════════════════════
 echo -e "${CYAN}🧹 还原 build.gradle 到 git 兜底版本 (v${OLD_NAME} / build ${OLD_CODE})...${NC}"
 restore_gradle
 
@@ -638,6 +636,8 @@ REMOTE_HEAD_NOW=$(git -C "$REPO_ROOT" rev-parse origin/main)
 if [[ "$REMOTE_HEAD_NOW" != "$SHA_FULL" ]]; then
   if remote_advance_safe_for_apk "$SHA_FULL"; then
     echo -e "${CYAN}   ℹ️  origin/main 已前进到 ${REMOTE_HEAD_NOW:0:7}，但新提交不影响 Android，继续发布。${NC}"
+  elif is_git_ancestor "$SHA_FULL" "$REMOTE_HEAD_NOW"; then
+    echo -e "${CYAN}   ℹ️  已完成 APK 是当前主线祖先；允许按版本顺序先发布，绝不覆盖已上线的新后代。${NC}"
   else
     echo -e "${CYAN}⏭️  origin/main 已从本次基础 ${SHA_SHORT} 前进到 ${REMOTE_HEAD_NOW:0:7}，且包含 Android 改动。为避免上传过期 APK，已停止；代码已合并，发布交给最新主线。${NC}"
     complete_release "false" "" 0 "" "origin/main moved to $REMOTE_HEAD_NOW and changed android files"

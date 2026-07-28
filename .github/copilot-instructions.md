@@ -58,7 +58,7 @@
 | Android 可安装端用户可见改动 | 默认 `publish-apk.*` | `AndroidFeature`；只同步时 `CodePushed` |
 | Android + 移动 PWA 视觉同步 | `publish-app-ui-fast-lane.ps1` | `AndroidFeature` |
 
-发布期间若被更新的 `origin/main` 或服务器版本超越，业务代码已进入主线的结论不变；按脚本输出汇报“代码已合并，发布交给最新主线”，不要循环 rebase 或重跑。
+发布期间主线前进：未构建的旧 Android 候选让位；已验证 APK 若仍是主线祖先且线上无更新后代，可先发布。发布类型互不阻塞，失联由短租约回收。业务已入主线的结论不变，不循环 rebase 或重跑旧构建。
 
 ## 其他硬边界
 

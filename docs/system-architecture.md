@@ -316,6 +316,8 @@ scripts/publish-apk.ps1
     └── GET /app/relay/peer/{peer_id}/apk
 ```
 
+发布协调采用按类型隔离的短租约：`apk`、`server`、`node_agent` 各自只有一个最终发布 owner，彼此不阻塞；owner 每 30 秒心跳，连续约 180 秒失联即回收。APK 在 claim 前按 `android/` 构建输入去重；已完成且仍安全的 A 可先发布，未开始的中间候选会让位给最新 Android 主线。最终上传继续使用版本单调性、Git 祖先关系与 SHA/CAS，保证旧产物不能覆盖新后代。
+
 相关实现：
 
 | 模块 | 职责 |

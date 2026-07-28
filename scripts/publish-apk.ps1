@@ -44,7 +44,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'release-publish-lease.ps1')
-
+. (Join-Path $PSScriptRoot 'apk-release-freshness.ps1')
 . (Join-Path $PSScriptRoot "direct-network.ps1")
 
 Set-ElonProjectDirectNetwork
@@ -512,20 +512,6 @@ function Restore-GradleVersionFile {
     )
 }
 
-function Test-GitAncestor {
-    param(
-        [string]$Ancestor,
-        [string]$Descendant
-    )
-
-    if ($Ancestor -notmatch '^[0-9a-f]{40}$' -or $Descendant -notmatch '^[0-9a-f]{40}$') {
-        return $false
-    }
-
-    git -C $RepoRoot merge-base --is-ancestor $Ancestor $Descendant 2>$null | Out-Null
-    return ($LASTEXITCODE -eq 0)
-}
-
 function Get-OriginMainSha {
     Invoke-GitFetchWithRetry -GitArgs @("fetch", "origin", "main", "--quiet") -FailureContext "无法判断 APK 构建是否已过期" -Quiet
     $sha = (git -C $RepoRoot rev-parse origin/main 2>$null).Trim()
@@ -540,7 +526,7 @@ function Get-DeployedApkSha {
     # SSH 仅作为 fallback，且必须设连接超时避免阻塞构建/轮询。
     try {
         $published = Invoke-HttpJson -Url "$ServerUrl/app/version.json" -TimeoutSec 10
-        $sha = [string]$published.gitSha
+        $sha = if ($published.sourceSha) { [string]$published.sourceSha } else { [string]$published.gitSha }
         if ($sha -match '^[0-9a-f]{40}$') { return $sha }
     } catch {
         Write-Warning "无法从 /app/version.json 读取 APK gitSha：$_"
@@ -660,18 +646,6 @@ function Invoke-GradleReleaseBuild {
     }
 }
 
-function Test-RemoteAdvanceSafeForApk {
-    param([string]$BaseSha)
-    # 检查 BaseSha..origin/main 区间是否只动了非 Android 文件；如是则 APK 不受影响，可安全 rebase。
-    Invoke-GitFetchWithRetry -GitArgs @("fetch", "origin", "main") -FailureContext "无法判断远端前进是否影响 APK" -Quiet
-    $changed = git -C $RepoRoot diff --name-only "$BaseSha..origin/main" 2>$null
-    if (-not $changed) { return $true }
-    foreach ($p in $changed) {
-        if ($p -match '^android/' -or $p -match '^scripts/publish-apk') { return $false }
-    }
-    return $true
-}
-
 function Assert-ApkStillCurrentBeforeCommit {
     $freshness = Get-ApkBuildFreshness -BaseSha $BuildBaseSha
     if ($freshness.Action -eq "Continue") { return }
@@ -683,6 +657,10 @@ function Assert-ApkStillCurrentBeforeCommit {
     # 远端有新提交，但若全部都不影响 Android/发布脚本，则 APK 仍有效，允许继续发布。
     if (Test-RemoteAdvanceSafeForApk -BaseSha $BuildBaseSha) {
         Write-Host "   ℹ️  origin/main 前进到 $((Format-ShortSha $freshness.RemoteHead))，但新提交仅涉及非 Android 路径，本次 APK 仍可发布。" -ForegroundColor Cyan
+        return
+    }
+    if (Test-GitAncestor -Ancestor $BuildBaseSha -Descendant $freshness.RemoteHead) {
+        Write-Host "   ℹ️  A 代 APK 已构建完成且仍是最新主线祖先；先发布本产物，后续主线另发新版。" -ForegroundColor Cyan
         return
     }
 
@@ -706,6 +684,10 @@ function Assert-ApkStillCurrentBeforeUpload {
         # 远端在编译期间前进；如果新增提交都不影响 Android，仍可安全发布
         if (Test-RemoteAdvanceSafeForApk -BaseSha $ReleaseSha) {
             Write-Host "   ℹ️  origin/main 已前进到 $((Format-ShortSha $remoteHead))，但新提交不影响 Android，继续发布。" -ForegroundColor Cyan
+            return
+        }
+        if (Test-GitAncestor -Ancestor $ReleaseSha -Descendant $remoteHead) {
+            Write-Host "   ℹ️  已完成 APK 是当前主线祖先；允许按版本顺序先发布，绝不覆盖已上线的新后代。" -ForegroundColor Cyan
             return
         }
         Complete-Release -Success:$false -ErrorMessage "origin/main moved to $remoteHead and changed android files"
@@ -844,6 +826,15 @@ if ($BuildBaseSha -ne $originMainSha) {
         $BuildBaseSha = $originMainSha
     }
 }
+$deployedBeforeClaim = Get-DeployedApkSha
+if (-not $Force -and $deployedBeforeClaim) {
+    $coverage = Get-ElonApkInputCoverage -RepoRoot $RepoRoot -CandidateSha $BuildBaseSha -DeployedSha $deployedBeforeClaim
+    if ($coverage.Covered) {
+        Write-Host "⏭️  线上 APK 已覆盖当前 Android 构建输入（$($coverage.Reason)），不申请版本号、不重复构建。" -ForegroundColor Cyan
+        Write-ApkPublishStatus -ApkReleaseStatus "already_covered" -Message "线上 APK 已覆盖当前 Android 构建输入。"
+        exit 0
+    }
+}
 
 # ── Step 1: 向服务器申请新的 versionName + versionCode（claim） ───────────
 
@@ -895,6 +886,14 @@ if (-not $claim) { exit 0 }
 
 $script:ReleaseToken = [string]$claim.token
 $script:ReleaseContext = New-ElonReleaseStageContext -ReleaseApiBase $ReleaseApiBase -Kind 'apk' -Token $script:ReleaseToken -Sha $BuildBaseSha -BatchId ([string]$claim.batchId) -Stage 'android_apk'
+$currentMainAtBuildStart = Get-OriginMainSha
+$startDecision = Get-ElonApkBuildStartDecision -RepoRoot $RepoRoot -CandidateSha $BuildBaseSha -CurrentMainSha $currentMainAtBuildStart
+if (-not $startDecision.Build) {
+    Complete-Release -Success:$false -ErrorMessage "superseded before build by $currentMainAtBuildStart"
+    Write-Host "⏭️  本候选尚未构建且已有更新 Android 主线，释放槽位，由最新候选接续。" -ForegroundColor Cyan
+    Write-ApkPublishStatus -ApkReleaseStatus "superseded_before_build" -Message "未开始的旧候选已合并到最新 Android 主线。"
+    exit 0
+}
 $script:ReleaseHeartbeat = Start-ElonReleaseContextHeartbeat -Context $script:ReleaseContext
 $newName = [string]$claim.assignedVersionName
 $newCode = [int]$claim.assignedVersionCode

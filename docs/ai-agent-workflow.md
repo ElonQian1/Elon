@@ -35,7 +35,7 @@
 2. 提交后：立即 `git push origin HEAD:main`。
 3. 只有 push 被 non-fast-forward 拒绝：才 `git fetch origin` + `git rebase origin/main`，解决冲突后再 push。
 4. 自己的 commit 已经进入 `origin/main` 后：任务代码层面完成；后续 `origin/main` 再前进，不应该为了“保持自己是最新 HEAD”反复 rebase。
-5. 发布阶段：如果构建产物被更新的 main 超越，停止上传旧产物，汇报“代码已合并，发布交给最新主线”，而不是重跑。
+5. 发布阶段：未开始构建的旧 Android 候选被更新 main 超越时直接让位；已经完成并验证通过的 APK 若仍是 main 祖先且线上没有更新后代，则先发布该产物，再由最新候选接续。
 6. rebase 完成后不默认重新编译或重跑全量测试。无冲突且上游未改动本任务路径、直接依赖、构建输入或测试基础设施时复用原验证；有命中时只补受影响的最小验证。只有明确发布门禁或无法限定影响面的共享底层变化才跑全量。
 7. 收尾阶段：运行统一收尾；如果主 `main` 不能快进或 worktree 清理失败，分别报告业务状态和 `LOCAL_MAIN_STATUS` / `TASK_WORKTREE_STATUS`，不得伪造 `FINALIZABLE=true`。
 
@@ -48,7 +48,15 @@
 3. PC 节点外部 CLI 路线还要按“PC 节点 + CLI”分配容量槽位：不同 PC 节点可以并行，同一 PC 节点上的 Codex / Claude / Copilot 等外部 CLI 也可以并行，但不能无上限并发。当前试运行默认每个 PC 节点 6 个 CLI 槽位；硬件估算只作为容量参考，不再把默认值压低到 1-4。服务端仍可用 `ELON_PC_NODE_CLI_MAX_PARALLEL` / `ELON_PC_NODE_CLI_HARD_MAX_PARALLEL` 兜底控制。
 4. 同一 PC 节点所有 CLI 槽位都被占用时，新任务进入节点队列，而不是继续启动更多 CLI 进程。这样能避免多个会话同时争用同一个本机登录态、sidecar、缓存和项目路径，导致只剩等待状态、没有 CLI 输出、最终超时失败。
 5. PC 前端必须明确展示节点容量状态：节点槽位已满、并发槽位数、排队等待时长、已获得节点 CLI 执行权、PC 节点已确认接收、CLI 公开输出、命令/文件/测试/最终回复。云端只写出派发消息不等于本机节点已收到；Route A 必须用节点 ACK 区分“已送达本机”和“等待 CLI 输出”。
-6. 推送到远端主线、Android 版本 claim、APK 发布、服务器部署、PC 前端 `pc-next-dist` 发布、数据库任务状态落库必须串行；如果项目不能创建 worktree，退回项目级共享工作区串行执行。
+6. 推送主线和同一发布通道内的最终切换必须串行；APK、服务器、Win 节点使用独立 FIFO 通道，不能跨类型互相阻塞。构建受节点容量控制，最终上传/切换受通道 owner 控制。
+
+### 发布候选合并与断电恢复
+
+1. APK claim 前比较线上 `sourceSha` 与当前候选的 `android/` 构建输入；没有 Android 差异就复用线上 APK，不分配新版本、不重复构建。
+2. 同一 APK 通道中，A 已完成构建时允许先发布 A；尚未开始的 B 若已被更新 Android 主线 C 超越，则 B 获得 owner 后立即释放，不启动 Gradle，由 C 接续。
+3. 同一类型保持 FIFO 和单 owner；`server`、`apk`、`node_agent` 各有独立 owner。版本号仍由服务器原子分配，最终上传仍使用 SHA/CAS，旧 APK 不能覆盖已发布的新后代。
+4. 发布脚本每 30 秒心跳，lease 最长 180 秒。断电、进程退出或节点失联后，连续约 3 分钟没有心跳即回收 owner 并提升该通道的首个存活 waiter；失败只终止本次 attempt，不冻结其他通道。
+5. 如果断电时所有本地 publisher 都消失，服务器保留审计账本但不会伪造成功；节点恢复或下一次发布请求以当前 `origin/main` 重新 claim。后续可增加持久 `desiredApkSha` 调度器，实现无新会话介入的自动重建。
 7. 一龙自项目与普通 GitHub / `local_path` 项目遵守同一套规则，不允许隐藏特殊流程。
 
 ### UI 平台进化分流（Codex Desktop）
@@ -360,7 +368,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -
 
 发布脚本会完成：快进到当前 `origin/main`、向服务器申请版本号、临时注入 `build.gradle`、构建 release APK、还原版本字段、上传 APK 和 `version.json`、写入 `.apk-deployed-sha`、验证服务器版本。版本号不写入 git，也不会生成 release-only commit。
 
-APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现服务器已部署包含本次基础提交的更新 APK，就中止本地旧编译并测试线上新版；构建完成后如果 `origin/main` 已前进且包含 Android 改动，就停止上传并汇报“代码已合并，发布交给最新主线”。脚本不得在 APK 编译完成后自动 rebase 或要求本代理重新跑旧产物。**这类发布并发中止不会否定“代码已经同步到远端主线”这一完成状态。**
+APK 发布脚本必须防止慢构建覆盖新版本：构建期间若服务器已部署包含本次基础提交的更新 APK，就中止重复编译；候选尚未开始构建且已被更新 Android 主线超越时直接让位。已经完成并验证通过的 APK 若仍是当前主线祖先、线上没有更新后代，则允许先按版本顺序发布，避免浪费完成产物；随后由最新候选接续。脚本不得自动 rebase。**并发让位不会否定“代码已经同步到远端主线”这一完成状态。**
 
 ### 8.3 推送结果给用户
 
