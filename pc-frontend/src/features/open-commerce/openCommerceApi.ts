@@ -1,0 +1,46 @@
+import { api } from '../../api/client'
+import type {
+  CreateOpenCommerceCapability,
+  CreateOpenCommerceGrant,
+  CreateOpenCommerceMerchant,
+  InvokeOpenCommerceCapability,
+  OpenCommerceCapability,
+  OpenCommerceGrant,
+  OpenCommerceMerchant,
+  OpenCommerceOverview,
+} from './openCommerceTypes'
+
+function projectBase(projectId: string) {
+  return `/api/projects/${encodeURIComponent(projectId)}/open-commerce`
+}
+
+export const openCommerceApi = {
+  overview: (projectId: string) =>
+    api.get<OpenCommerceOverview>(`${projectBase(projectId)}/overview`),
+
+  createMerchant: (projectId: string, request: CreateOpenCommerceMerchant) =>
+    api.post<OpenCommerceMerchant>(`${projectBase(projectId)}/merchants`, request),
+
+  createCapability: (
+    projectId: string,
+    merchantId: string,
+    request: CreateOpenCommerceCapability,
+  ) =>
+    api.post<OpenCommerceCapability>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/capabilities`,
+      request,
+    ),
+
+  createGrant: (projectId: string, request: CreateOpenCommerceGrant) =>
+    api.post<OpenCommerceGrant>(`${projectBase(projectId)}/grants`, request),
+
+  revokeGrant: (projectId: string, grantId: string) =>
+    api.post<OpenCommerceGrant>(
+      `${projectBase(projectId)}/grants/${encodeURIComponent(grantId)}/revoke`,
+      {},
+    ),
+
+  invoke: (request: InvokeOpenCommerceCapability) =>
+    api.post<Record<string, unknown>>('/api/open-commerce/invoke', request),
+}
+

@@ -63,6 +63,7 @@ server/src/
 | 项目工作区设置（Git/Node） | 🟢 低 | `src/features/projects/WorkspaceAccessPanel.tsx`、`ProjectGitSettingsPanel.tsx` | ✅ 已补本机目录选择、节点重绑、Route A 开发期完全访问自动登记、健康检查、Git remote/branch 配置和 Deploy Key 管理；自动登记只接受当前登录账号下与本机节点、项目和目录一致的云端绑定，显式选择目录仍走注册与授权 API，不重复弹窗 |
 | 频道管理（新建/改名/删除）| 🟢 低 | `src/features/projects/ProjectChannelsTab.tsx`、`server/src/project_channels.rs` | ✅ 已完成：支持频道新建、改名、删除自定义频道；默认频道有删除保护，改动后刷新项目空间 |
 | 发布历史 / APK 管理 | 🟢 低 | `src/features/projects/ProjectReleasesTab.tsx`、`server/src/project_releases.rs` | ✅ 已完成第一版：项目详情页可查看 releases、下载 APK、上传 APK 并记录版本/渠道/变更说明 |
+| AI 原生开放商业网络 | 🔴 高 | `src/features/open-commerce/`、`server/src/open_commerce_*` | ✅ V1 已接入项目详情：可管理商户节点、能力契约和应用授权，直接测试幂等调用并查看计量与审计；PC、HTTP 与供应商无关 MCP 共用同一服务层 |
 
 ### 阶段 P3 — 个人 AI 对话
 

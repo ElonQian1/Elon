@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { api } from '../../api/client'
 import GroupAiPanel from '../group-ai/GroupAiPanel'
+import OpenCommercePanel from '../open-commerce/OpenCommercePanel'
 import { useProjectStore } from '../conversation/useProjectStore'
 import ProjectChannelsTab from './ProjectChannelsTab'
 import ProjectGitSettingsPanel from './ProjectGitSettingsPanel'
@@ -29,7 +30,7 @@ import { useAuthStore } from '../../store/auth'
 import type { WorkspaceHealth } from './projectManagementTypes'
 import styles from './ProjectDetailPage.module.css'
 
-type Tab = 'overview' | 'channels' | 'members' | 'workspace' | 'releases' | 'settings' | 'groupAi'
+type Tab = 'overview' | 'channels' | 'members' | 'workspace' | 'releases' | 'settings' | 'groupAi' | 'openCommerce'
 
 const DETAIL_TABS: Array<{ key: Tab; label: string }> = [
   { key: 'overview', label: '概览' },
@@ -39,6 +40,7 @@ const DETAIL_TABS: Array<{ key: Tab; label: string }> = [
   { key: 'releases', label: '发布/APK' },
   { key: 'settings', label: '设置' },
   { key: 'groupAi', label: '群体 AI' },
+  { key: 'openCommerce', label: '开放商业' },
 ]
 
 export default function ProjectDetailPage() {
@@ -188,6 +190,7 @@ export default function ProjectDetailPage() {
           />
         )}
         {tab === 'groupAi' && <GroupAiPanel projectId={id ?? ''} channels={space?.channels ?? []} />}
+        {tab === 'openCommerce' && <OpenCommercePanel projectId={id ?? ''} canEdit={canEditProject} />}
         {tab === 'workspace' && (
           <>
             <WorkspaceAccessPanel
