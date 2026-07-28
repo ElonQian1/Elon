@@ -58,6 +58,7 @@ mod open_commerce_capabilities;
 mod open_commerce_grants;
 mod open_commerce_invocations;
 mod open_commerce_merchants;
+pub(crate) use open_commerce_invocations::OpenCommerceInvocationStart;
 mod pc_project_binding;
 mod project_android_device_leases;
 mod project_android_devices;

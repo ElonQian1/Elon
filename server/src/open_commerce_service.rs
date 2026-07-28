@@ -9,10 +9,10 @@ use crate::{
     open_commerce_model::{
         normalize_app_id, normalize_idempotency_key, CreateCapabilityRequest, CreateGrantRequest,
         CreateMerchantRequest, InvokeCapabilityRequest, OpenCommerceCapability,
-        OpenCommerceInvocation, OpenCommerceMerchant, OpenCommerceOverview, OpenCommerceTotals,
-        UpdateCapabilityRequest, UpdateMerchantRequest, ACCESS_AUTHORIZED, ACCESS_OWNER_ONLY,
-        CAPABILITY_STATUS_ACTIVE, HANDLER_MERCHANT_PROFILE, HANDLER_STATIC_JSON,
-        MERCHANT_STATUS_ACTIVE, OPEN_COMMERCE_SCHEMA,
+        OpenCommerceInvocation, OpenCommerceMerchant, OpenCommerceMerchantDetail,
+        OpenCommerceOverview, OpenCommerceTotals, UpdateCapabilityRequest, UpdateMerchantRequest,
+        ACCESS_AUTHORIZED, ACCESS_OWNER_ONLY, CAPABILITY_STATUS_ACTIVE, HANDLER_MERCHANT_PROFILE,
+        HANDLER_STATIC_JSON, MERCHANT_STATUS_ACTIVE, OPEN_COMMERCE_SCHEMA,
     },
     project_auth::can_edit,
     store::{OpenCommerceInvocationStart, Store},
@@ -61,6 +61,32 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
         recent_invocations,
         recent_audit_events,
     })
+}
+
+pub(crate) fn discover_merchants(
+    store: &Store,
+    query: Option<&str>,
+    capability_key: Option<&str>,
+    limit: usize,
+) -> Result<Vec<OpenCommerceMerchantDetail>> {
+    store.search_open_commerce_merchants(query, capability_key, limit)
+}
+
+pub(crate) fn discover_merchant(
+    store: &Store,
+    merchant_id: &str,
+) -> Result<OpenCommerceMerchantDetail> {
+    let mut detail = store.open_commerce_merchant_detail(merchant_id)?;
+    if detail.merchant.status != MERCHANT_STATUS_ACTIVE {
+        bail!("商户节点未发布");
+    }
+    detail
+        .capabilities
+        .retain(|capability| capability.status == CAPABILITY_STATUS_ACTIVE);
+    for capability in &mut detail.capabilities {
+        capability.handler_config = None;
+    }
+    Ok(detail)
 }
 
 pub(crate) fn create_merchant(
