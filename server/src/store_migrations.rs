@@ -142,6 +142,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (105, "修复已记录 v104 安装的运行权限默认值", crate::project_runtime_permission_migration::migration_v105),
     (106, "实时 WebSocket 断开事件窗口统计", migration_v106),
     (107, "PC 可信设备长期登录会话", migration_v107),
+    (108, "AI 原生开放商业网络 V1 商户、能力、授权、调用与审计", crate::open_commerce_migration::migration_v108),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
