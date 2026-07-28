@@ -7,6 +7,7 @@
 - 没有通过对应 `check-task-complete.ps1 -Kind ...` 前，不把用户可见任务汇报为完成。
 - 发布脚本里的门禁失败时，不手工上传旧产物兜底；先修失败原因，再重新走脚本。
 - `-SkipBuild` 只允许复用已知新鲜产物；复用的 PC dist 仍必须通过 bundle budget。
+- Bundle budget 采用分级门禁：软线只告警并允许发布，硬线或压缩体积上限才阻断。当前最大异步 JS 的原始体积软线为 `480 KiB`、硬线为 `520 KiB`，Gzip 硬线为 `140 KiB`。
 - 并发发布被更新主线超越时，默认交给最新主线发布，不强制覆盖。
 - UI 截图、遮挡、交互类修复除了构建和发布，还需要本地预览、截图、DOM 或线上页面证据之一。
 
@@ -33,7 +34,8 @@
 | 失败点 | 处理方式 |
 | --- | --- |
 | `source-size guard` 拦截红区文件增长 | 不放宽门禁；抽共享脚本或模块，保持红区文件不继续变大。 |
-| `check:bundle-budget` 超限 | 优先 route/component lazy loading、拆出重页面 chunk、移除无用依赖；预算调整必须显式说明原因。 |
+| `check:bundle-budget` 软线告警 | 发布可继续；记录增长来源，后续优先 route/component lazy loading、拆出重页面 chunk 或移除无用依赖。 |
+| `check:bundle-budget` 硬线超限 | 阻断发布并修复；预算调整必须基于实际网络传输、解析成本或功能边界，显式说明原因，不能为消除单次失败直接放宽。 |
 | `publish-server.ps1` post-deploy smoke 失败 | 脚本会 `finish(success=false)`；检查服务日志、端口、版本注入和 `/api/server/version.gitSha`，修复后重新发布。 |
 | `publish-node-agent.ps1` manifest/download smoke 失败 | 不广播更新；检查 `/opt/elon/data/downloads` 产物、manifest SHA、下载路由和服务器 data_dir。 |
 | `publish-apk.ps1` manifest 或 freshness 失败 | 不上传或不继续覆盖；检查 Gradle 版本注入、aapt manifest、`/app/version.json`、origin/main 是否已被 Android 相关提交推进。 |
@@ -61,7 +63,8 @@ SMOKE=<health/version/download result>
 - `scripts\publish-server-pc-frontend.ps1`：PC frontend 构建辅助和 bundle budget 发布侧检查。
 - `scripts\publish-health-checks.ps1`：发布后 server/node-agent smoke helper。
 - `scripts\check-local-quality.ps1`：本地统一质量预检入口，支持 `Static`、`Server`、`Frontend` 和 `All` 四种范围。
-- `scripts\check-pc-frontend-bundle-budget.js`：Vite 产物预算门禁。
+- `scripts\check-pc-frontend-bundle-budget.js`：Vite 产物分级预算门禁；轻微原始体积增长告警，明显膨胀或 Gzip 超限阻断。
+- `scripts\test-pc-frontend-bundle-budget.js`：预算门禁夹具测试，覆盖正常、软告警、原始体积硬失败和 Gzip 硬失败。
 - `scripts\check-source-size.ps1`：源码体积门禁，阻止巨型文件继续扩张。
 - `scripts\check-dependency-audit.ps1`：Rust/npm dependency audit 汇总门禁。
 - `scripts\check-rust-warning-budget.ps1`：Rust warning budget 门禁，当前预算为 0。

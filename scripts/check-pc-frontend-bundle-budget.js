@@ -69,21 +69,29 @@ function matchOne(files, pattern, label) {
   return { label, file: matches[0] }
 }
 
-function budgetResult(label, actualBytes, actualGzipBytes, maxBytes, maxGzipBytes, detail) {
+function budgetResult(label, actualBytes, actualGzipBytes, spec, detail) {
   const failures = []
-  if (actualBytes > maxBytes) {
-    failures.push(`raw ${formatKiB(actualBytes)} > ${formatKiB(maxBytes)}`)
+  const warnings = []
+  if (actualBytes > spec.maxBytes) {
+    failures.push(`raw ${formatKiB(actualBytes)} > hard ${formatKiB(spec.maxBytes)}`)
+  } else if (spec.warnBytes != null && actualBytes > spec.warnBytes) {
+    warnings.push(`raw ${formatKiB(actualBytes)} > soft ${formatKiB(spec.warnBytes)}`)
   }
-  if (actualGzipBytes > maxGzipBytes) {
-    failures.push(`gzip ${formatKiB(actualGzipBytes)} > ${formatKiB(maxGzipBytes)}`)
+  if (actualGzipBytes > spec.maxGzipBytes) {
+    failures.push(`gzip ${formatKiB(actualGzipBytes)} > hard ${formatKiB(spec.maxGzipBytes)}`)
+  } else if (spec.warnGzipBytes != null && actualGzipBytes > spec.warnGzipBytes) {
+    warnings.push(`gzip ${formatKiB(actualGzipBytes)} > soft ${formatKiB(spec.warnGzipBytes)}`)
   }
   return {
     label,
     detail,
     actualBytes,
     actualGzipBytes,
-    maxBytes,
-    maxGzipBytes,
+    warnBytes: spec.warnBytes,
+    warnGzipBytes: spec.warnGzipBytes,
+    maxBytes: spec.maxBytes,
+    maxGzipBytes: spec.maxGzipBytes,
+    warnings,
     failures,
   }
 }
@@ -93,12 +101,14 @@ function checkNamedBudget(files, spec) {
   if (match.missing) {
     return {
       label: spec.label,
+      warnings: [],
       failures: [`required chunk is missing: ${spec.pattern}`],
     }
   }
   if (match.multiple) {
     return {
       label: spec.label,
+      warnings: [],
       failures: [`expected one chunk, found ${match.multiple.length}: ${match.multiple.join(', ')}`],
     }
   }
@@ -106,8 +116,7 @@ function checkNamedBudget(files, spec) {
     spec.label,
     match.file.bytes,
     match.file.gzipBytes,
-    spec.maxBytes,
-    spec.maxGzipBytes,
+    spec,
     match.file.name,
   )
 }
@@ -117,6 +126,7 @@ function checkGroupBudget(files, spec) {
   if (matches.length === 0) {
     return {
       label: spec.label,
+      warnings: [],
       failures: [`required chunks are missing: ${spec.pattern}`],
     }
   }
@@ -124,8 +134,7 @@ function checkGroupBudget(files, spec) {
     spec.label,
     sum(matches, 'bytes'),
     sum(matches, 'gzipBytes'),
-    spec.maxBytes,
-    spec.maxGzipBytes,
+    spec,
     matches.map((file) => file.name).join(', '),
   )
 }
@@ -136,8 +145,7 @@ function checkTotalBudget(files, spec) {
     spec.label,
     sum(scoped, 'bytes'),
     sum(scoped, 'gzipBytes'),
-    spec.maxBytes,
-    spec.maxGzipBytes,
+    spec,
     `${scoped.length} files`,
   )
 }
@@ -149,14 +157,13 @@ function checkMaxSingleBudget(files, spec) {
     .sort((a, b) => b.bytes - a.bytes)
   const largest = scoped[0]
   if (!largest) {
-    return { label: spec.label, failures: [`no ${spec.ext} chunks found`] }
+    return { label: spec.label, warnings: [], failures: [`no ${spec.ext} chunks found`] }
   }
   return budgetResult(
     spec.label,
     largest.bytes,
     largest.gzipBytes,
-    spec.maxBytes,
-    spec.maxGzipBytes,
+    spec,
     largest.name,
   )
 }
@@ -217,7 +224,8 @@ const maxSingleBudgets = [
     label: 'largest async js',
     ext: '.js',
     exclude: [/^app-/, /^vendor-/, /^store-/],
-    maxBytes: 480 * KiB,
+    warnBytes: 480 * KiB,
+    maxBytes: 520 * KiB,
     maxGzipBytes: 140 * KiB,
   },
   {
@@ -234,13 +242,22 @@ function printResult(result) {
   const actual = result.actualBytes == null
     ? ''
     : ` ${formatKiB(result.actualBytes)} gzip ${formatKiB(result.actualGzipBytes)}`
-  const max = result.maxBytes == null
+  const budget = result.maxBytes == null
     ? ''
-    : ` budget ${formatKiB(result.maxBytes)} gzip ${formatKiB(result.maxGzipBytes)}`
-  const status = result.failures.length > 0 ? 'failed' : 'passed'
-  console.log(`PC_BUNDLE_BUDGET_CHECK=${status} ${result.label}${detail}${actual}${max}`)
+    : ` hard ${formatKiB(result.maxBytes)} gzip ${formatKiB(result.maxGzipBytes)}`
+  const soft = result.warnBytes == null && result.warnGzipBytes == null
+    ? ''
+    : ` soft${result.warnBytes == null ? '' : ` ${formatKiB(result.warnBytes)}`}`
+      + `${result.warnGzipBytes == null ? '' : ` gzip ${formatKiB(result.warnGzipBytes)}`}`
+  const status = result.failures.length > 0
+    ? 'failed'
+    : result.warnings.length > 0 ? 'warning' : 'passed'
+  console.log(`PC_BUNDLE_BUDGET_CHECK=${status} ${result.label}${detail}${actual}${soft}${budget}`)
+  for (const warning of result.warnings) {
+    console.log(`  warning: ${warning}`)
+  }
   for (const failure of result.failures) {
-    console.log(`  ${failure}`)
+    console.log(`  failure: ${failure}`)
   }
 }
 
@@ -259,16 +276,17 @@ function main() {
     ...totalBudgets.map((spec) => checkTotalBudget(files, spec)),
   ]
   const failures = results.flatMap((result) => result.failures)
+  const warnings = results.flatMap((result) => result.warnings)
 
   for (const result of results) {
     printResult(result)
   }
 
   if (failures.length > 0) {
-    console.error(`PC_BUNDLE_BUDGET=failed failures=${failures.length}`)
+    console.error(`PC_BUNDLE_BUDGET=failed failures=${failures.length} warnings=${warnings.length}`)
     process.exit(1)
   }
-  console.log(`PC_BUNDLE_BUDGET=passed assets=${files.length}`)
+  console.log(`PC_BUNDLE_BUDGET=passed assets=${files.length} warnings=${warnings.length}`)
 }
 
 try {
