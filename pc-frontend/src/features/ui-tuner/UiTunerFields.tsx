@@ -97,10 +97,65 @@ export function ColorField({
   value: string
   onChange: (value: string) => void
 }) {
+  const normalizedValue = normalizeHexColor(value) ?? '#000000'
+  const [draft, setDraft] = useState(normalizedValue)
+
+  useEffect(() => {
+    const next = normalizeHexColor(value) ?? '#000000'
+    setDraft(next)
+  }, [value])
+
+  const commit = (input: string) => {
+    const next = normalizeHexColor(input)
+    if (!next) return
+    setDraft(next)
+    if (next.toLowerCase() !== value.toLowerCase()) onChange(next)
+  }
+
   return (
     <label className={styles.field}>
       <span>{label}</span>
-      <input type="color" value={value} onChange={(event) => onChange(event.currentTarget.value)} />
+      <div className={styles.colorField}>
+        <input
+          className={styles.colorSwatchInput}
+          type="color"
+          value={normalizedValue}
+          aria-label={`${label}颜色选择器`}
+          onChange={(event) => commit(event.currentTarget.value)}
+        />
+        <input
+          className={styles.colorTextInput}
+          value={draft}
+          spellCheck={false}
+          aria-label={`${label}HEX颜色值`}
+          onChange={(event) => {
+            const nextDraft = event.currentTarget.value
+            setDraft(nextDraft)
+            const next = normalizeHexColor(nextDraft)
+            if (next) onChange(next)
+          }}
+          onBlur={() => {
+            const next = normalizeHexColor(draft)
+            if (next) commit(next)
+            else setDraft(normalizedValue)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') event.currentTarget.blur()
+            if (event.key === 'Escape') {
+              setDraft(normalizedValue)
+              event.currentTarget.blur()
+            }
+          }}
+        />
+      </div>
     </label>
   )
+}
+
+function normalizeHexColor(input: string): string | null {
+  const value = input.trim()
+  if (/^#[0-9a-f]{6}$/i.test(value)) return value.toLowerCase()
+  const short = value.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i)
+  if (!short) return null
+  return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase()
 }

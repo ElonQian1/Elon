@@ -10,8 +10,8 @@ interface AutomaticDesignSetupOptions {
   onUseDraft: () => void
 }
 
-const DRAFT_FALLBACK_DELAY_MS = 1800
-const RUNTIME_BACKGROUND_FALLBACK_MS = 8000
+export const DRAFT_FALLBACK_DELAY_MS = 1200
+export const RUNTIME_BACKGROUND_FALLBACK_MS = 2200
 
 /**
  * Pick the best editable path without asking a designer to understand the

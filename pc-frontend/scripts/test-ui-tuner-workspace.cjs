@@ -461,12 +461,20 @@ try {
     path.join(projectRoot, 'src/features/ui-tuner/UiTunerInspector.tsx'),
     'utf8',
   )
+  const fieldsSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/UiTunerFields.tsx'),
+    'utf8',
+  )
   assert.match(inspectorSource, /window\.confirm\('移除后将暂时看不到真机底图/)
   assert.match(inspectorSource, /真机画面底图已移除/)
   assert.match(inspectorSource, /重新读取真机画面/)
   assert.match(inspectorSource, /<UiInspectorTabs/)
   assert.match(inspectorSource, /<UiDesignGateway/)
   assert.match(inspectorSource, /supportsTypography/)
+  assert.match(fieldsSource, /className=\{styles\.colorField\}/)
+  assert.match(fieldsSource, /type="color"/)
+  assert.match(fieldsSource, /HEX颜色值/)
+  assert.match(fieldsSource, /normalizeHexColor/)
   const livePanelSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/live/UiTunerLivePanel.tsx'),
     'utf8',
@@ -488,7 +496,7 @@ try {
   )
   assert.match(automaticSetupSource, /prepareRuntimeRef\.current\(\)/)
   assert.match(automaticSetupSource, /useDraftRef\.current\(\)/)
-  assert.match(automaticSetupSource, /RUNTIME_BACKGROUND_FALLBACK_MS = 8000/)
+  assert.match(automaticSetupSource, /RUNTIME_BACKGROUND_FALLBACK_MS = 2200/)
   assert.doesNotMatch(automaticSetupSource, /setupKey \|\| runtimeBusy\) return undefined/)
   assert.match(inspectorSource, /useAutomaticDesignSetup\(/)
   const sourceInspectorSource = fs.readFileSync(
