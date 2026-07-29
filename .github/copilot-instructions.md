@@ -1,6 +1,6 @@
 # 一龙项目 AI 共享契约
 
-最后更新：2026-07-18
+最后更新：2026-07-29
 
 > 本文件是各 AI 代理的共享权威规则，只保留每轮不变量；专项细节由 `AGENTS.md` 按需路由。
 > 开始任务时还要读取 `AGENTS.md`，只选择当前任务命中的专项文档。
@@ -24,17 +24,17 @@
 | `WF-FILES` | 有意创建的源码、测试、fixture 必须提交；一次性产物写入 `.ai-tmp/`；稳定且可重复生成的输出才添加精确 `.gitignore`；来源不明文件不提交、不忽略、不删除。 |
 | `WF-VERIFY` | 运行与风险匹配的最小验证。Rust/Cargo、格式化、Android、PC 前端等命令按 `AGENTS.md` 路由读取，不自行绕过项目脚本。 |
 | `WF-PUSH` | 只 stage 当前任务文件；提交信息用中文并包含用户标识；commit 后立即 `git push origin HEAD:main`。提交前检查未跟踪文件，防止漏交新源码或测试。 |
-| `WF-REBASE` | 只有 push 被 non-fast-forward 拒绝时，才 `git fetch origin`、`git rebase origin/main`、解决冲突后重推。远端前进本身不触发追车。变基不自动触发重新编译或全量测试：先审查上游差异与冲突；无冲突且未命中本任务代码、构建输入或测试基础设施时复用变基前验证，直接重推；命中时只重跑受影响的最小验证。只有发布脚本、明确项目门禁或无法限定影响面的共享底层变更要求全量验证。 |
+| `WF-REBASE` | 仅 push 被 non-fast-forward 拒绝后才 fetch/rebase/retry，不主动追车。先审查上游与冲突：未命中本任务代码、构建输入或测试设施则复用验证；命中时只重跑受影响验证；发布脚本、明确门禁或影响无法限定才全量验证。 |
 | `WF-FINISH` | 修改任务只能用统一收尾命令结束：Windows `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind <Kind>`；Linux/macOS `bash scripts/finish-ai-task.sh --kind <Kind>`。 |
 | `WF-REPORT` | 只有收尾输出 `FINALIZABLE=true` 才能正常宣告完成。最终回复必须分别报告 `BUSINESS_STATUS`、`LOCAL_MAIN_STATUS`、`TASK_WORKTREE_STATUS` 和未跟踪文件告警。 |
 
 预检输出的 `NEXT=`、`EDIT_ROOT=`、`FINISH_COMMAND_*=`，以及收尾输出的 `FINALIZABLE=`，优先级高于文档示例。
 
-预检会用 Git worktree lock 标记活跃的 `codex/*` 任务；全局清理不得回收 locked worktree，统一收尾在定向删除前负责 unlock。这样长时间构建/发布不会因超过年龄保护而被并发清理。
+预检用 Git worktree lock 保护活跃 `codex/*` 任务；统一收尾负责 unlock 后定向清理。
 
 ### 平台会话 worktree 例外
 
-当前目录位于 `conversation-worktrees/<project>/<conversation>`，或分支为 `ai/session/<project>/<conversation>` 时，平台已经完成隔离；不要创建嵌套 worktree。仍需遵守 `WF-FILES` 至 `WF-REPORT`；平台会话 worktree 由 `cleanup-task-worktrees.*` 在 clean、已合入 `origin/main`、超过年龄保护且非当前 worktree 时回收。
+位于 `conversation-worktrees/<project>/<conversation>` 或 `ai/session/<project>/<conversation>` 分支时已由平台隔离，不建嵌套 worktree；仍遵守 `WF-FILES` 至 `WF-REPORT`，由 `cleanup-task-worktrees.*` 回收。
 
 ## 文件处置契约
 
@@ -57,6 +57,8 @@
 | Win 节点客户端用户可见改动 | 默认 `publish-node-agent.ps1` | `NodeAgent`；只同步时 `CodePushed` |
 | Android 可安装端用户可见改动 | 默认 `publish-apk.*` | `AndroidFeature`；只同步时 `CodePushed` |
 | Android + 移动 PWA 视觉同步 | `publish-app-ui-fast-lane.ps1` | `AndroidFeature` |
+
+APP UI：`APP_UI_RELEASE_POLICY=publish_before_optional_renderer`。push 后先发 Server/PWA 和 APK；Renderer 忙、离线或超时记 `VERIFICATION_DEFERRED`，不阻塞收尾。明确要求发布前验收或 `realDeviceRequired=true` 除外；无真帧不得称视觉已验收。
 
 发布期间主线前进：未构建的旧 Android 候选让位；已验证 APK 若仍是主线祖先且线上无更新后代，可先发布。发布类型互不阻塞，失联由短租约回收。业务已入主线的结论不变，不循环 rebase 或重跑旧构建。
 

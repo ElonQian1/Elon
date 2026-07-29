@@ -99,15 +99,26 @@ React 数字孪生不是“另写一个网页冒充 APK”。它消费统一 UI 
 - `ANDROID_RENDERER`、`rendererResourceId`、lease owner 与 `sourceSha`；
 - 真机失败原因、模拟器槽和最终无 Patch/source proof。
 
-OEM、权限弹窗、软键盘、Launcher、摄像头、蓝牙、传感器、硬件和性能专项设置 `realDeviceRequired=true`，禁止模拟器替代。其他纯视觉任务在模拟器已证明精确 package、generation、业务/集成 revision、workspace 指纹、runtimeBuildId 和零 Patch 时可以完成；真机复核作为用户设备恢复后的后续项，不阻塞提交与发布。
+OEM、权限弹窗、软键盘、Launcher、摄像头、蓝牙、传感器、硬件和性能专项设置 `realDeviceRequired=true`，禁止模拟器替代。其他纯视觉任务在模拟器已证明精确 package、generation、业务/集成 revision、workspace 指纹、runtimeBuildId 和零 Patch 时可以报告“视觉已验收”；真机复核作为用户设备恢复后的后续项，不阻塞提交、正式发布或统一收尾。
 
 同一 NodeAgent 内，一台物理设备或一个 `emulator-*` 实例同时只允许一个写入链路。准备阶段排除其他 Live Runtime 和正在准备的设备，部署锁按设备而不是包名串行；同一项目绑定多个已连接 Renderer 时，未带明确 `sessionId` 的 bootstrap 调用拒绝猜测。模拟器池默认最多两个并行实例，可用 `ELON_ANDROID_EMULATOR_MAX_SLOTS` 调整；无空闲槽时明确等待，不抢占已有实例。
 
 当前本机闭环的 lease 证据作用域是 `NODE_LOCAL_OPERATION_SESSION`：owner 包含 `pcInstallId/taskId/sessionId/projectId/sourceSha`，generation 作为 fencing token。跨 PC 真机全局互斥、持久 TTL/heartbeat、所有点击/取帧/FitRun 副作用前的云端 fencing 复核，以及预克隆独立 AVD 数据目录与 FIFO 冷启动队列仍是下一阶段强制项；在这些能力发布前，跨 PC 共用同一真机必须由现有物理设备 lease 串行，MCP 入口不得宣称已获得全局 Renderer lease。
 
-## 完成标准
+## 发布顺序与完成状态
 
-一次 UI 修改只有同时满足下列条件才完成：
+普通 APP UI 开发固定采用 `push → 发布 Server/PWA → 发布 APK → 有资源时补做 Renderer 验收`。Renderer 资源忙碌、无空闲模拟器、真机离线或 Runtime 准备超时只产生 `VERIFICATION_DEFERRED`，不得把已经通过源码、契约、构建和发布门禁的业务状态回退为未交付。
+
+最终报告必须拆开：
+
+- 业务交付状态：是否已推送、Server/PWA 是否发布、APK 是否发布、统一收尾是否完成；
+- 视觉验收状态：`VISUAL_ACCEPTED` 或 `VERIFICATION_DEFERRED`，以及真实设备和 Renderer 证据。
+
+只有用户明确要求发布前验收，或 `realDeviceRequired=true` 专项，视觉验收才是发布前置门禁。没有真帧时不得宣称视觉通过。
+
+## 视觉验收闭环标准
+
+一次 UI 修改只有同时满足下列条件，才能宣称“视觉验收闭环完成”：
 
 - PC 草稿可即时预览；
 - Android 权威渲染结果达到目标；

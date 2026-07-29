@@ -19,6 +19,7 @@ if ($status) {
 }
 
 $watch = [System.Diagnostics.Stopwatch]::StartNew()
+Write-Host "APP_UI_RELEASE_POLICY=publish_before_optional_renderer"
 Write-Host "APP_UI_PUBLISH_ORDER=mobile_pwa_then_apk"
 Write-Host "APP_UI_RENDERER=skipped"
 
