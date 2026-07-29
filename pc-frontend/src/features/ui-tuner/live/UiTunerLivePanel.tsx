@@ -277,7 +277,7 @@ export function UiTunerLivePanel({
           </div>
 
           {COLOR_FIELDS.map(([property, label]) => node.properties[property] && (
-            <TextLiveField
+            <ColorLiveField
               key={property}
               label={label}
               value={stringValue(node, property)}
@@ -574,6 +574,73 @@ function NumberLiveField({
   )
 }
 
+function ColorLiveField({
+  label,
+  value,
+  disabled,
+  onCommit,
+}: {
+  label: string
+  value: string
+  disabled: boolean
+  onCommit: (value: string) => Promise<unknown>
+}) {
+  const [draft, setDraft] = useState(value)
+  const [committing, setCommitting] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => setDraft(value), [value])
+  const commit = async () => {
+    const next = normalizeColorDraft(inputRef.current?.value ?? draft)
+    if (!next || next === value) return
+    setCommitting(true)
+    try {
+      await onCommit(next)
+    } catch {
+      setDraft(value)
+    } finally {
+      setCommitting(false)
+    }
+  }
+  const nativeColor = nativePickerColor(draft)
+  return (
+    <div className={`${styles.liveFieldRow} ${styles.liveColorRow}`}>
+      <label className={styles.colorFieldFull}>
+        <span>{label}</span>
+        <span className={styles.liveColorInputs}>
+          <input
+            className={styles.colorSwatchInput}
+            type="color"
+            aria-label={`${label}取色器`}
+            value={nativeColor}
+            disabled={disabled || committing}
+            onChange={(event) => setDraft(event.currentTarget.value)}
+          />
+          <input
+            ref={inputRef}
+            className={styles.colorTextInput}
+            aria-label={`${label}颜色值`}
+            value={draft}
+            placeholder="#222255 / #ff222255 / rgba(34,34,85,.9)"
+            disabled={disabled || committing}
+            spellCheck={false}
+            onFocus={(event) => event.currentTarget.select()}
+            onChange={(event) => setDraft(event.currentTarget.value)}
+            onKeyDown={(event) => { if (event.key === 'Enter') void commit() }}
+          />
+        </span>
+      </label>
+      <button
+        type="button"
+        disabled={disabled || committing || normalizeColorDraft(draft) === value}
+        aria-label={`应用${label}`}
+        onClick={() => { void commit() }}
+      >
+        {committing ? '…' : '应用'}
+      </button>
+    </div>
+  )
+}
+
 function TextLiveField({
   label,
   value,
@@ -632,6 +699,17 @@ function numberValue(node: LiveUiNode, property: string) {
 
 function stringValue(node: LiveUiNode, property: string) {
   return String(node.properties[property]?.effective?.value ?? '')
+}
+
+function normalizeColorDraft(value: string) {
+  return value.trim()
+}
+
+function nativePickerColor(value: string) {
+  const trimmed = value.trim()
+  if (/^#[0-9a-fA-F]{6}$/.test(trimmed)) return trimmed
+  if (/^#[0-9a-fA-F]{8}$/.test(trimmed)) return `#${trimmed.slice(3)}`
+  return '#000000'
 }
 
 function numericStep(property: string) {

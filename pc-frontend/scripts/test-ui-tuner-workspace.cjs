@@ -483,6 +483,16 @@ try {
   )
   assert.match(livePanelSource, /本次调试任务启用最近成功版本/)
   assert.match(livePanelSource, /debugIntegration\.lkgEnabled && debugIntegration\.lastUsable/)
+  assert.match(livePanelSource, /function ColorLiveField/)
+  assert.match(livePanelSource, /className=\{styles\.colorSwatchInput\}/)
+  assert.match(livePanelSource, /className=\{styles\.colorTextInput\}/)
+  assert.match(livePanelSource, /placeholder="#222255 \/ #ff222255 \/ rgba\(34,34,85,\.9\)"/)
+  const livePanelCss = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/live/UiTunerLivePanel.module.css'),
+    'utf8',
+  )
+  assert.match(livePanelCss, /\.liveColorInputs\s*\{[^}]*grid-template-columns:\s*44px minmax\(0,\s*1fr\)/s)
+  assert.match(livePanelCss, /\.colorTextInput\s*\{[^}]*height:\s*38px/s)
   const gatewaySource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/inspector/UiDesignGateway.tsx'),
     'utf8',
