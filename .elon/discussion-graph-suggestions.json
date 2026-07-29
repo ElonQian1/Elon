@@ -1,221 +1,81 @@
 {
   "version": 1,
-  "status": "applied",
-  "summary": "确定性修正 1 个节点的根主题引用",
-  "change_kind": "repair",
-  "actor": "yilong-graph-review",
+  "status": "ready",
+  "summary": "确认 Sui 仅作为阶段四候选经济层的边界，将具体对象、任务、资产分层和风险保留为探索，并晋升独立架构草案。",
+  "change_kind": "decision",
+  "actor": "Codex Desktop",
   "graph": {
     "version": 1,
     "sources": [
+      {
+        "id": "conversation-dcbd31fc4a3d3bd7",
+        "title": "Sui 与 AI Agent 开放商业网络讨论",
+        "kind": "conversation",
+        "reference": "docs/inbox/conversations/2026-07-29-2026-07-30-sui-ai-agent-network-discussion.md",
+        "imported_at": "2026-07-30T00:37:00+08:00",
+        "content_revision": "dcbd31fc4a3d3bd7b61224aced6623cb40512c17ee7cbd675f846c8cb4949513",
+        "source_format": "markdown",
+        "message_count": 0,
+        "chunk_count": 1,
+        "processed_chunk_ids": [
+          "chunk-0001-64d395f3dd"
+        ],
+        "compilation_status": "complete"
+      },
       {
         "id": "chat-open-commerce",
         "title": "AI 原生开放商业网络长讨论",
         "kind": "conversation",
         "reference": "docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md",
-        "imported_at": "2026-07-27T00:00:00+08:00"
+        "imported_at": "2026-07-27T00:00:00+08:00",
+        "content_revision": "",
+        "source_format": "",
+        "message_count": 0,
+        "chunk_count": 0,
+        "processed_chunk_ids": [],
+        "compilation_status": "pending"
       }
     ],
     "nodes": [
       {
-        "id": "initial-vertical",
+        "id": "sui-stable-compute-credit",
         "root_id": "open-commerce-network",
-        "parent_id": "go-to-market",
-        "kind": "question",
-        "title": "第一批行业与城市",
-        "summary": "餐饮、饮品、美容、健身、宠物和社区零售均为候选，尚需按数据可得性与复购价值选择。",
-        "status": "open",
-        "authority": "source",
-        "section_id": "project-system",
-        "order": 720,
-        "color": "#d8a950",
-        "source_refs": [
-          "chat-open-commerce#section-17"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-17"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "city",
-          "vertical"
-        ]
-      },
-      {
-        "id": "phase-3-open-network",
-        "root_id": "open-commerce-network",
-        "parent_id": "roadmap",
-        "kind": "task",
-        "title": "阶段三：消费者 AI 与第三方应用接入",
-        "summary": "开放 SDK、API、MCP、发现、调用和结算，验证跨 App 交易。",
-        "status": "open",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 1030,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-6"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-6"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "phase-3"
-        ]
-      },
-      {
-        "id": "permission-service",
-        "root_id": "open-commerce-network",
-        "parent_id": "target-architecture",
-        "kind": "feature",
-        "title": "授权、撤销与审计服务",
-        "summary": "管理授权范围、用途、有效期、撤销、审计记录和异常访问。",
-        "status": "open",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 360,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-17"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-17"
-        ],
-        "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
-        ],
-        "feature_node_ids": [
-          "cap-security"
-        ],
-        "tags": [
-          "audit",
-          "authorization"
-        ]
-      },
-      {
-        "id": "hybrid-storage-model",
-        "root_id": "open-commerce-network",
-        "parent_id": "target-architecture",
-        "kind": "decision",
-        "title": "成熟云与自有节点优先的混合存储",
-        "summary": "近期使用成熟云数据库和商户节点承载实时业务，避免把所有数据放入低效的去中心化网络。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 390,
-        "color": "#55b989",
-        "source_refs": [
-          "chat-open-commerce#section-3"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-3"
-        ],
-        "document_paths": [
-          "docs/decisions/open-commerce-network-principles.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "cloud",
-          "storage"
-        ]
-      },
-      {
-        "id": "platform-incentive-conflict",
-        "root_id": "open-commerce-network",
-        "parent_id": "problem-space",
-        "kind": "hypothesis",
-        "title": "大型平台彻底开放存在激励冲突",
-        "summary": "大型平台有技术能力，但完整开放数据迁移、独立排序和跨 App 交易可能削弱现有流量、广告与佣金闭环。",
+        "parent_id": "sui-token-asset-layers",
+        "kind": "option",
+        "title": "CREDIT 用于稳定计量 AI 与算力服务",
+        "summary": "闭环且价格稳定的 CREDIT 用于 AI Token、GPU 时间、构建、存储和能力调用；充值、贡献奖励、退款和兑换规则仍需验证。",
         "status": "exploring",
-        "authority": "source",
-        "section_id": "project-system",
-        "order": 150,
-        "color": "#d8a950",
-        "source_refs": [
-          "chat-open-commerce#section-9"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-9"
-        ],
-        "document_paths": [],
-        "feature_node_ids": [],
-        "tags": [
-          "competition",
-          "platform"
-        ]
-      },
-      {
-        "id": "marketing-content-plugins",
-        "root_id": "open-commerce-network",
-        "parent_id": "merchant-product",
-        "kind": "feature",
-        "title": "海报、视频、文案、活动和小游戏插件",
-        "summary": "这些能力用于执行经营策略并采集效果，不单独作为长期护城河。",
-        "status": "open",
         "authority": "proposal",
         "section_id": "project-system",
-        "order": 540,
-        "color": "#5f91dc",
+        "order": 1160,
+        "color": "#9a73dc",
         "source_refs": [
-          "chat-open-commerce#section-7"
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
         ],
         "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-7"
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
         ],
         "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
         ],
         "feature_node_ids": [],
         "tags": [
-          "marketing",
-          "plugin"
+          "compute-credit",
+          "metering"
         ]
       },
       {
-        "id": "merchant-directory",
+        "id": "revocable-auditable-auth",
         "root_id": "open-commerce-network",
-        "parent_id": "target-architecture",
-        "kind": "feature",
-        "title": "公共商户目录与能力发现",
-        "summary": "提供名称、位置、营业时间、服务目录和能力端点，同时防止虚假商户与过期数据。",
-        "status": "open",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 340,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-17"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-17"
-        ],
-        "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "directory",
-          "discovery"
-        ]
-      },
-      {
-        "id": "core-principles",
-        "root_id": "open-commerce-network",
-        "parent_id": "open-commerce-network",
-        "kind": "topic",
-        "title": "已收敛的产品原则",
-        "summary": "讨论反复确认的数据、授权、互操作和商业边界，作为后续需求与决策的约束。",
+        "parent_id": "core-principles",
+        "kind": "requirement",
+        "title": "授权可撤销、可审计、最小权限",
+        "summary": "每次敏感数据和业务能力调用都必须有身份、范围、期限、撤销与审计记录。",
         "status": "accepted",
         "authority": "accepted",
         "section_id": "project-system",
-        "order": 200,
-        "color": "#9a73dc",
+        "order": 230,
+        "color": "#5f91dc",
         "source_refs": [
           "chat-open-commerce#section-16"
         ],
@@ -225,9 +85,12 @@
         "document_paths": [
           "docs/decisions/open-commerce-network-principles.md"
         ],
-        "feature_node_ids": [],
+        "feature_node_ids": [
+          "cap-security"
+        ],
         "tags": [
-          "principles"
+          "audit",
+          "authorization"
         ]
       },
       {
@@ -258,73 +121,17 @@
         ]
       },
       {
-        "id": "natural-language-app-builder",
-        "root_id": "open-commerce-network",
-        "parent_id": "merchant-product",
-        "kind": "feature",
-        "title": "自然语言应用与活动程序开发",
-        "summary": "允许商户用自然语言创建或修改网页、活动和应用，但发布必须经过权限、验证和回滚门禁。",
-        "status": "open",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 550,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-7"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-7"
-        ],
-        "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
-        ],
-        "feature_node_ids": [
-          "cap-ai-tasks",
-          "cap-release"
-        ],
-        "tags": [
-          "app-builder",
-          "release"
-        ]
-      },
-      {
-        "id": "merchant-first-wedge",
+        "id": "initial-vertical",
         "root_id": "open-commerce-network",
         "parent_id": "go-to-market",
-        "kind": "decision",
-        "title": "商户先行的 B2B2C 路线",
-        "summary": "不同时冷启动消费者与商户；先通过商户产品和活动带入消费者关系。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 710,
-        "color": "#55b989",
-        "source_refs": [
-          "chat-open-commerce#section-12"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "merchant-first"
-        ]
-      },
-      {
-        "id": "identity-trust",
-        "root_id": "open-commerce-network",
-        "parent_id": "target-architecture",
-        "kind": "requirement",
-        "title": "消费者、商户、应用和代理身份",
-        "summary": "每次授权、调用和交易必须能够验证主体、代理关系和服务商。",
+        "kind": "question",
+        "title": "第一批行业与城市",
+        "summary": "餐饮、饮品、美容、健身、宠物和社区零售均为候选，尚需按数据可得性与复购价值选择。",
         "status": "open",
-        "authority": "proposal",
+        "authority": "source",
         "section_id": "project-system",
-        "order": 350,
-        "color": "#5f91dc",
+        "order": 720,
+        "color": "#d8a950",
         "source_refs": [
           "chat-open-commerce#section-17"
         ],
@@ -332,14 +139,39 @@
           "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-17"
         ],
         "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
+          "docs/drafts/open-commerce-network-roadmap.md"
         ],
-        "feature_node_ids": [
-          "cap-security"
-        ],
+        "feature_node_ids": [],
         "tags": [
-          "identity",
-          "trust"
+          "city",
+          "vertical"
+        ]
+      },
+      {
+        "id": "hybrid-storage-model",
+        "root_id": "open-commerce-network",
+        "parent_id": "target-architecture",
+        "kind": "decision",
+        "title": "成熟云与自有节点优先的混合存储",
+        "summary": "近期使用成熟云数据库和商户节点承载实时业务，避免把所有数据放入低效的去中心化网络。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 390,
+        "color": "#55b989",
+        "source_refs": [
+          "chat-open-commerce#section-3"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-3"
+        ],
+        "document_paths": [
+          "docs/decisions/open-commerce-network-principles.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "cloud",
+          "storage"
         ]
       },
       {
@@ -370,30 +202,59 @@
         ]
       },
       {
-        "id": "gongshi-brand",
+        "id": "open-business-protocol",
         "root_id": "open-commerce-network",
-        "parent_id": "organization-brand",
-        "kind": "option",
-        "title": "“共市”开放网络品牌",
-        "summary": "共市、共市协议、店域、我的市和共市工坊是讨论候选，正式使用前需商标与域名核查。",
+        "parent_id": "target-architecture",
+        "kind": "feature",
+        "title": "AI 可调用的开放商业协议",
+        "summary": "标准化商户发现、数据授权、能力描述、调用、订单与结算，支持 API、SDK 和 MCP。",
         "status": "exploring",
-        "authority": "source",
+        "authority": "proposal",
         "section_id": "project-system",
-        "order": 810,
-        "color": "#9a73dc",
+        "order": 330,
+        "color": "#5f91dc",
         "source_refs": [
-          "chat-open-commerce#section-13"
+          "chat-open-commerce#section-8"
         ],
         "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-13"
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-8"
         ],
         "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
+          "docs/drafts/requirements/open-commerce-network.md"
+        ],
+        "feature_node_ids": [
+          "cap-context-rag"
+        ],
+        "tags": [
+          "mcp",
+          "protocol"
+        ]
+      },
+      {
+        "id": "transaction-service-fees",
+        "root_id": "open-commerce-network",
+        "parent_id": "business-model",
+        "kind": "decision",
+        "title": "跨 App 交易技术服务费",
+        "summary": "身份、订单路由、凭证、风控和结算可收透明、低比例或固定技术服务费。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 630,
+        "color": "#55b989",
+        "source_refs": [
+          "chat-open-commerce#section-10"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
+        ],
+        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md"
         ],
         "feature_node_ids": [],
         "tags": [
-          "brand",
-          "gongshi"
+          "settlement",
+          "transaction"
         ]
       },
       {
@@ -424,124 +285,44 @@
         ]
       },
       {
-        "id": "roadmap",
+        "id": "sui-arbitrary-compute-verification-risk",
         "root_id": "open-commerce-network",
-        "parent_id": "open-commerce-network",
-        "kind": "topic",
-        "title": "阶段路线图",
-        "summary": "从单店价值验证逐步演进到开放网络，避免把长期基础设施作为近期交付承诺。",
-        "status": "exploring",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 1000,
-        "color": "#9a73dc",
-        "source_refs": [
-          "chat-open-commerce#section-6"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-6"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "roadmap"
-        ]
-      },
-      {
-        "id": "edge-compute-network",
-        "root_id": "open-commerce-network",
-        "parent_id": "target-architecture",
-        "kind": "hypothesis",
-        "title": "边缘设备与闲置算力网络",
-        "summary": "个人设备和机器人节点未来可承担本地推理与部分任务，但可靠性、安全、定价和收益尚未验证。",
-        "status": "exploring",
+        "parent_id": "risks-open-questions",
+        "kind": "risk",
+        "title": "任意 GPU 任务难以低成本验证",
+        "summary": "Sui 或可信执行环境不能自动证明所有模型推理、训练和构建结果正确；若验证成本接近重新执行，算力市场经济性可能不成立。",
+        "status": "open",
         "authority": "source",
         "section_id": "project-system",
-        "order": 410,
-        "color": "#d8a950",
+        "order": 970,
+        "color": "#d66f78",
         "source_refs": [
-          "chat-open-commerce#section-4"
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
         ],
         "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-4"
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
         ],
         "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
         ],
         "feature_node_ids": [],
         "tags": [
           "compute",
-          "edge"
+          "risk",
+          "verification"
         ]
       },
       {
-        "id": "merchant-ai-employee",
+        "id": "business-model",
         "root_id": "open-commerce-network",
-        "parent_id": "merchant-product",
-        "kind": "decision",
-        "title": "商户 AI 员工与数据经营中心",
-        "summary": "统一经营数据，主动发现问题，提出方案，经授权后执行并追踪结果。",
+        "parent_id": "open-commerce-network",
+        "kind": "topic",
+        "title": "商业模式",
+        "summary": "协议和基础目录促进开放，收入来自商户软件、商业能力、交易基础设施和生态服务。",
         "status": "accepted",
         "authority": "accepted",
         "section_id": "project-system",
-        "order": 510,
-        "color": "#55b989",
-        "source_refs": [
-          "chat-open-commerce#section-7"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-7"
-        ],
-        "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
-        ],
-        "feature_node_ids": [
-          "cap-ai-tasks"
-        ],
-        "tags": [
-          "merchant-ai"
-        ]
-      },
-      {
-        "id": "merchant-data-node",
-        "root_id": "open-commerce-network",
-        "parent_id": "target-architecture",
-        "kind": "requirement",
-        "title": "商户自有或可迁移的数据节点",
-        "summary": "商户可选择平台托管、自建或第三方托管，必须支持完整导出和服务商迁移。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 320,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-3"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-3"
-        ],
-        "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "merchant",
-          "node"
-        ]
-      },
-      {
-        "id": "per-search-fee",
-        "root_id": "open-commerce-network",
-        "parent_id": "business-model",
-        "kind": "option",
-        "title": "消费者逐次搜索付费",
-        "summary": "逐次收几毛钱会增加使用摩擦且基础信息易缓存，不适合作为核心收入。",
-        "status": "rejected",
-        "authority": "source",
-        "section_id": "project-system",
-        "order": 660,
+        "order": 600,
         "color": "#9a73dc",
         "source_refs": [
           "chat-open-commerce#section-10"
@@ -549,144 +330,13 @@
         "conversation_refs": [
           "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
         ],
-        "document_paths": [],
-        "feature_node_ids": [],
-        "tags": [
-          "search-fee"
-        ]
-      },
-      {
-        "id": "developer-ecosystem-phase",
-        "root_id": "open-commerce-network",
-        "parent_id": "go-to-market",
-        "kind": "task",
-        "title": "商户密度形成后开放开发者生态",
-        "summary": "提供 SDK、API、MCP、沙盒、模拟数据、计费和自动分账。",
-        "status": "open",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 760,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-12"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
-        ],
         "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "developer",
-          "ecosystem"
-        ]
-      },
-      {
-        "id": "consumer-data-control",
-        "root_id": "open-commerce-network",
-        "parent_id": "problem-space",
-        "kind": "requirement",
-        "title": "消费者控制个人数据与关系",
-        "summary": "消费者决定偏好、会员关系和历史权益的授权范围，并可撤销或迁移。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 140,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-16"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-16"
-        ],
-        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md",
           "docs/decisions/open-commerce-network-principles.md"
         ],
         "feature_node_ids": [],
         "tags": [
-          "consumer",
-          "ownership"
-        ]
-      },
-      {
-        "id": "pilot-50-100-merchants",
-        "root_id": "open-commerce-network",
-        "parent_id": "go-to-market",
-        "kind": "task",
-        "title": "单一区域 50–100 家商户试点",
-        "summary": "验证数据接入意愿、成本节省、复购提升、持续付费和标准能力开放意愿。",
-        "status": "open",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 730,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-12"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "pilot",
-          "validation"
-        ]
-      },
-      {
-        "id": "enterprise-services",
-        "root_id": "open-commerce-network",
-        "parent_id": "business-model",
-        "kind": "decision",
-        "title": "企业与渠道服务",
-        "summary": "私有部署、白标、专用连接器、合规和技术支持形成补充收入。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 650,
-        "color": "#55b989",
-        "source_refs": [
-          "chat-open-commerce#section-10"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
-        ],
-        "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "enterprise"
-        ]
-      },
-      {
-        "id": "transaction-service-fees",
-        "root_id": "open-commerce-network",
-        "parent_id": "business-model",
-        "kind": "decision",
-        "title": "跨 App 交易技术服务费",
-        "summary": "身份、订单路由、凭证、风控和结算可收透明、低比例或固定技术服务费。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 630,
-        "color": "#55b989",
-        "source_refs": [
-          "chat-open-commerce#section-10"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
-        ],
-        "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "settlement",
-          "transaction"
+          "business-model"
         ]
       },
       {
@@ -744,16 +394,96 @@
         ]
       },
       {
-        "id": "privacy-compliance-risk",
+        "id": "sui-nontransferable-reputation",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-token-asset-layers",
+        "kind": "requirement",
+        "title": "身份与信誉不可转让",
+        "summary": "商户、Agent、开发者和算力节点的履约、争议和认证进入不可转让信誉对象，不能靠购买代币直接获得信誉。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1170,
+        "color": "#5f91dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "identity",
+          "reputation"
+        ]
+      },
+      {
+        "id": "developer-ecosystem-phase",
+        "root_id": "open-commerce-network",
+        "parent_id": "go-to-market",
+        "kind": "task",
+        "title": "商户密度形成后开放开发者生态",
+        "summary": "提供 SDK、API、MCP、沙盒、模拟数据、计费和自动分账。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 760,
+        "color": "#5f91dc",
+        "source_refs": [
+          "chat-open-commerce#section-12"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "developer",
+          "ecosystem"
+        ]
+      },
+      {
+        "id": "phase-1-merchant-os",
+        "root_id": "open-commerce-network",
+        "parent_id": "roadmap",
+        "kind": "task",
+        "title": "阶段一：商户 AI 经营系统",
+        "summary": "完成连接器、经营闭环、营销执行、权限与结果量化，在单一区域验证付费。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1010,
+        "color": "#5f91dc",
+        "source_refs": [
+          "chat-open-commerce#section-6"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-6"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "phase-1"
+        ]
+      },
+      {
+        "id": "data-quality-trust-risk",
         "root_id": "open-commerce-network",
         "parent_id": "risks-open-questions",
         "kind": "risk",
-        "title": "隐私、授权与数据合规",
-        "summary": "客户数据不能由商户或 AI 无条件导出；需明确合法基础、目的限制、删除、撤销和跨境边界。",
+        "title": "商户身份、数据质量和刷量治理",
+        "summary": "开放目录仍需防止虚假商户、过期库存、虚假评价、恶意排序和欺诈交易。",
         "status": "open",
         "authority": "source",
         "section_id": "project-system",
-        "order": 920,
+        "order": 930,
         "color": "#d66f78",
         "source_refs": [
           "chat-open-commerce#section-17"
@@ -764,65 +494,34 @@
         "document_paths": [
           "docs/drafts/open-commerce-network-roadmap.md"
         ],
-        "feature_node_ids": [
-          "cap-security"
-        ],
+        "feature_node_ids": [],
         "tags": [
-          "compliance",
-          "privacy"
+          "quality",
+          "trust"
         ]
       },
       {
-        "id": "plugin-marketplace-revenue",
+        "id": "per-search-fee",
         "root_id": "open-commerce-network",
         "parent_id": "business-model",
-        "kind": "decision",
-        "title": "插件与开发者市场分成",
-        "summary": "对插件分发、托管、计费和结算服务分成，让第三方参与创造行业能力。",
-        "status": "accepted",
-        "authority": "accepted",
+        "kind": "option",
+        "title": "消费者逐次搜索付费",
+        "summary": "逐次收几毛钱会增加使用摩擦且基础信息易缓存，不适合作为核心收入。",
+        "status": "rejected",
+        "authority": "source",
         "section_id": "project-system",
-        "order": 640,
-        "color": "#55b989",
+        "order": 660,
+        "color": "#9a73dc",
         "source_refs": [
           "chat-open-commerce#section-10"
         ],
         "conversation_refs": [
           "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
         ],
-        "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
-        ],
+        "document_paths": [],
         "feature_node_ids": [],
         "tags": [
-          "developer",
-          "marketplace"
-        ]
-      },
-      {
-        "id": "merchant-subscription",
-        "root_id": "open-commerce-network",
-        "parent_id": "business-model",
-        "kind": "decision",
-        "title": "商户 AI 经营订阅",
-        "summary": "早期以数据节点、经营分析、营销自动化、CRM 和托管服务获得稳定收入。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 610,
-        "color": "#55b989",
-        "source_refs": [
-          "chat-open-commerce#section-10"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
-        ],
-        "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "subscription"
+          "search-fee"
         ]
       },
       {
@@ -853,16 +552,16 @@
         ]
       },
       {
-        "id": "phase-1-merchant-os",
+        "id": "phase-2-standard-nodes",
         "root_id": "open-commerce-network",
         "parent_id": "roadmap",
         "kind": "task",
-        "title": "阶段一：商户 AI 经营系统",
-        "summary": "完成连接器、经营闭环、营销执行、权限与结果量化，在单一区域验证付费。",
+        "title": "阶段二：标准化商户节点",
+        "summary": "形成商户数据模型、能力清单、身份授权和可迁移托管。",
         "status": "open",
         "authority": "proposal",
         "section_id": "project-system",
-        "order": 1010,
+        "order": 1020,
         "color": "#5f91dc",
         "source_refs": [
           "chat-open-commerce#section-6"
@@ -875,298 +574,36 @@
         ],
         "feature_node_ids": [],
         "tags": [
-          "phase-1"
+          "phase-2"
         ]
       },
       {
-        "id": "unverified-technical-claims",
+        "id": "privacy-compliance-risk",
         "root_id": "open-commerce-network",
         "parent_id": "risks-open-questions",
         "kind": "risk",
-        "title": "未验证技术主张影响可信度",
-        "summary": "自主大模型、分布式算力等主张需基准、演示和成本数据，否则应明确标为长期假设。",
+        "title": "隐私、授权与数据合规",
+        "summary": "客户数据不能由商户或 AI 无条件导出；需明确合法基础、目的限制、删除、撤销和跨境边界。",
         "status": "open",
         "authority": "source",
         "section_id": "project-system",
-        "order": 960,
+        "order": 920,
         "color": "#d66f78",
         "source_refs": [
-          "chat-open-commerce#section-15"
+          "chat-open-commerce#section-17"
         ],
         "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-15"
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-17"
         ],
         "document_paths": [
           "docs/drafts/open-commerce-network-roadmap.md"
         ],
-        "feature_node_ids": [],
+        "feature_node_ids": [
+          "cap-security"
+        ],
         "tags": [
-          "claims",
-          "evidence"
-        ]
-      },
-      {
-        "id": "go-to-market",
-        "root_id": "open-commerce-network",
-        "parent_id": "open-commerce-network",
-        "kind": "topic",
-        "title": "市场进入与网络演进",
-        "summary": "先验证单一行业商户的可量化经营价值，再逐步开放消费者与开发者网络。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 700,
-        "color": "#9a73dc",
-        "source_refs": [
-          "chat-open-commerce#section-12"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "go-to-market"
-        ]
-      },
-      {
-        "id": "data-not-public",
-        "root_id": "open-commerce-network",
-        "parent_id": "core-principles",
-        "kind": "decision",
-        "title": "开放不等于公开原始数据",
-        "summary": "公开信息、动态能力、授权数据和商户内部数据必须分级；不把完整数据库暴露给外部 AI。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 210,
-        "color": "#55b989",
-        "source_refs": [
-          "chat-open-commerce#section-16"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-16"
-        ],
-        "document_paths": [
-          "docs/decisions/open-commerce-network-principles.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "data",
+          "compliance",
           "privacy"
-        ]
-      },
-      {
-        "id": "foundation-company-split",
-        "root_id": "open-commerce-network",
-        "parent_id": "organization-brand",
-        "kind": "option",
-        "title": "基金会与商业公司双层结构",
-        "summary": "开放组织负责协议与治理，商业公司负责产品、托管、连接器、风控、结算和企业服务。",
-        "status": "exploring",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 820,
-        "color": "#9a73dc",
-        "source_refs": [
-          "chat-open-commerce#section-2"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-2"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "company",
-          "foundation"
-        ]
-      },
-      {
-        "id": "no-raw-data-sale",
-        "root_id": "open-commerce-network",
-        "parent_id": "core-principles",
-        "kind": "decision",
-        "title": "不出售用户或商户原始数据",
-        "summary": "收入来自软件、托管、调用、执行、结算和生态服务，而不是转卖原始数据。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 220,
-        "color": "#55b989",
-        "source_refs": [
-          "chat-open-commerce#section-10"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
-        ],
-        "document_paths": [
-          "docs/decisions/open-commerce-network-principles.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "business-model",
-          "privacy"
-        ]
-      },
-      {
-        "id": "platform-data-silos",
-        "root_id": "open-commerce-network",
-        "parent_id": "problem-space",
-        "kind": "claim",
-        "title": "多平台数据孤岛",
-        "summary": "订单、商品、库存、会员、评价和营销数据分散在平台、POS 与社交系统，商户难以统一使用。",
-        "status": "accepted",
-        "authority": "source",
-        "section_id": "project-system",
-        "order": 110,
-        "color": "#9a73dc",
-        "source_refs": [
-          "chat-open-commerce#section-5"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-5"
-        ],
-        "document_paths": [],
-        "feature_node_ids": [],
-        "tags": [
-          "data-silo",
-          "merchant"
-        ]
-      },
-      {
-        "id": "channel-partners",
-        "root_id": "open-commerce-network",
-        "parent_id": "go-to-market",
-        "kind": "option",
-        "title": "POS、支付、代运营和商会渠道",
-        "summary": "通过已有商户关系的合作伙伴降低逐店销售成本，并提供白标与收入分成。",
-        "status": "exploring",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 740,
-        "color": "#9a73dc",
-        "source_refs": [
-          "chat-open-commerce#section-12"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "channel",
-          "partner"
-        ]
-      },
-      {
-        "id": "capability-call-fees",
-        "root_id": "open-commerce-network",
-        "parent_id": "business-model",
-        "kind": "decision",
-        "title": "高价值商业能力调用费",
-        "summary": "基础公开信息宜免费；实时库存、预约、动态权益、分析和任务执行可按套餐或用量计费。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 620,
-        "color": "#55b989",
-        "source_refs": [
-          "chat-open-commerce#section-10"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
-        ],
-        "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "api",
-          "billing"
-        ]
-      },
-      {
-        "id": "problem-space",
-        "root_id": "open-commerce-network",
-        "parent_id": "open-commerce-network",
-        "kind": "question",
-        "title": "为什么需要新的商业连接层",
-        "summary": "中心化平台造成数据孤岛和关系锁定，AI 无法获得真实、实时、经授权的数据并执行商业任务。",
-        "status": "accepted",
-        "authority": "source",
-        "section_id": "project-system",
-        "order": 100,
-        "color": "#d8a950",
-        "source_refs": [
-          "chat-open-commerce#section-5"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-5"
-        ],
-        "document_paths": [],
-        "feature_node_ids": [],
-        "tags": [
-          "problem"
-        ]
-      },
-      {
-        "id": "decentralized-trust-layer",
-        "root_id": "open-commerce-network",
-        "parent_id": "target-architecture",
-        "kind": "option",
-        "title": "可选去中心化信任与长期存证",
-        "summary": "对公共档案、长期证明和不可篡改凭证可研究 Filecoin、Arweave 或其他存证机制，但不是近期依赖。",
-        "status": "exploring",
-        "authority": "source",
-        "section_id": "project-system",
-        "order": 400,
-        "color": "#9a73dc",
-        "source_refs": [
-          "chat-open-commerce#section-3"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-3"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "decentralized",
-          "long-term"
-        ]
-      },
-      {
-        "id": "merchant-data-control",
-        "root_id": "open-commerce-network",
-        "parent_id": "problem-space",
-        "kind": "requirement",
-        "title": "商户控制经营数据",
-        "summary": "商户应能导出、迁移和授权合法持有的经营数据，不被单一平台锁定。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 130,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-16"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-16"
-        ],
-        "document_paths": [
-          "docs/decisions/open-commerce-network-principles.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "merchant",
-          "ownership"
         ]
       },
       {
@@ -1199,165 +636,85 @@
         ]
       },
       {
-        "id": "consumer-reference-client",
+        "id": "platform-incentive-conflict",
         "root_id": "open-commerce-network",
-        "parent_id": "merchant-product",
-        "kind": "option",
-        "title": "消费者参考客户端",
-        "summary": "可以提供官方参考客户端承载授权和体验，但不应成为唯一入口。",
+        "parent_id": "problem-space",
+        "kind": "hypothesis",
+        "title": "大型平台彻底开放存在激励冲突",
+        "summary": "大型平台有技术能力，但完整开放数据迁移、独立排序和跨 App 交易可能削弱现有流量、广告与佣金闭环。",
         "status": "exploring",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 560,
-        "color": "#9a73dc",
-        "source_refs": [
-          "chat-open-commerce#section-17"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-17"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [
-          "cap-clients"
-        ],
-        "tags": [
-          "client",
-          "consumer"
-        ]
-      },
-      {
-        "id": "revocable-auditable-auth",
-        "root_id": "open-commerce-network",
-        "parent_id": "core-principles",
-        "kind": "requirement",
-        "title": "授权可撤销、可审计、最小权限",
-        "summary": "每次敏感数据和业务能力调用都必须有身份、范围、期限、撤销与审计记录。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 230,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-16"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-16"
-        ],
-        "document_paths": [
-          "docs/decisions/open-commerce-network-principles.md"
-        ],
-        "feature_node_ids": [
-          "cap-security"
-        ],
-        "tags": [
-          "audit",
-          "authorization"
-        ]
-      },
-      {
-        "id": "two-sided-cold-start",
-        "root_id": "open-commerce-network",
-        "parent_id": "risks-open-questions",
-        "kind": "risk",
-        "title": "双边网络冷启动",
-        "summary": "没有商户时消费者无价值，没有消费者时商户不愿开放能力；需靠商户经营产品先建立单边价值。",
-        "status": "open",
         "authority": "source",
         "section_id": "project-system",
-        "order": 910,
-        "color": "#d66f78",
-        "source_refs": [
-          "chat-open-commerce#section-2"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-2"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "cold-start"
-        ]
-      },
-      {
-        "id": "merchant-led-consumer-acquisition",
-        "root_id": "open-commerce-network",
-        "parent_id": "go-to-market",
-        "kind": "hypothesis",
-        "title": "消费者随商户活动进入",
-        "summary": "通过二维码、小票、会员、小游戏和分享自然建立授权关系，降低消费者获客成本。",
-        "status": "exploring",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 750,
+        "order": 150,
         "color": "#d8a950",
         "source_refs": [
-          "chat-open-commerce#section-12"
+          "chat-open-commerce#section-9"
         ],
         "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "consumer-acquisition"
-        ]
-      },
-      {
-        "id": "business-model",
-        "root_id": "open-commerce-network",
-        "parent_id": "open-commerce-network",
-        "kind": "topic",
-        "title": "商业模式",
-        "summary": "协议和基础目录促进开放，收入来自商户软件、商业能力、交易基础设施和生态服务。",
-        "status": "accepted",
-        "authority": "accepted",
-        "section_id": "project-system",
-        "order": 600,
-        "color": "#9a73dc",
-        "source_refs": [
-          "chat-open-commerce#section-10"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
-        ],
-        "document_paths": [
-          "docs/drafts/requirements/open-commerce-network.md",
-          "docs/decisions/open-commerce-network-principles.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "business-model"
-        ]
-      },
-      {
-        "id": "consumer-agent-node",
-        "root_id": "open-commerce-network",
-        "parent_id": "target-architecture",
-        "kind": "feature",
-        "title": "消费者个人 AI 与数据账户",
-        "summary": "保存个人偏好、授权和关系，代表用户选择排序器并调用商户能力。",
-        "status": "exploring",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 310,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-8"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-8"
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-9"
         ],
         "document_paths": [],
         "feature_node_ids": [],
         "tags": [
-          "agent",
-          "consumer"
+          "competition",
+          "platform"
+        ]
+      },
+      {
+        "id": "sui-object-asset-model",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-agent-economy-layer",
+        "kind": "feature",
+        "title": "以对象表达商户、Agent、任务与能力凭证",
+        "summary": "候选对象包括 Merchant、Agent、ComputeNode、SkillPackage、Job、Escrow、DataCapability、ResultReceipt 和 Reputation，以明确归属、共享、撤销与组合边界。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1070,
+        "color": "#9a73dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [
+          "cap-multi-agent"
+        ],
+        "tags": [
+          "object-model",
+          "ownership"
+        ]
+      },
+      {
+        "id": "sui-gasless-onboarding",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-agent-economy-layer",
+        "kind": "requirement",
+        "title": "隐藏钱包与 Gas 复杂度",
+        "summary": "普通商户不应先学习钱包和助记词；候选体验使用 zkLogin 类入口和赞助交易，由平台套餐承担链上费用并实施额度与防滥用控制。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1100,
+        "color": "#5f91dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "sponsored-transactions",
+          "ux",
+          "zklogin"
         ]
       },
       {
@@ -1389,16 +746,16 @@
         ]
       },
       {
-        "id": "open-business-protocol",
+        "id": "consumer-agent-node",
         "root_id": "open-commerce-network",
         "parent_id": "target-architecture",
         "kind": "feature",
-        "title": "AI 可调用的开放商业协议",
-        "summary": "标准化商户发现、数据授权、能力描述、调用、订单与结算，支持 API、SDK 和 MCP。",
+        "title": "消费者个人 AI 与数据账户",
+        "summary": "保存个人偏好、授权和关系，代表用户选择排序器并调用商户能力。",
         "status": "exploring",
         "authority": "proposal",
         "section_id": "project-system",
-        "order": 330,
+        "order": 310,
         "color": "#5f91dc",
         "source_refs": [
           "chat-open-commerce#section-8"
@@ -1406,15 +763,200 @@
         "conversation_refs": [
           "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-8"
         ],
+        "document_paths": [],
+        "feature_node_ids": [],
+        "tags": [
+          "agent",
+          "consumer"
+        ]
+      },
+      {
+        "id": "unverified-technical-claims",
+        "root_id": "open-commerce-network",
+        "parent_id": "risks-open-questions",
+        "kind": "risk",
+        "title": "未验证技术主张影响可信度",
+        "summary": "自主大模型、分布式算力等主张需基准、演示和成本数据，否则应明确标为长期假设。",
+        "status": "open",
+        "authority": "source",
+        "section_id": "project-system",
+        "order": 960,
+        "color": "#d66f78",
+        "source_refs": [
+          "chat-open-commerce#section-15"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-15"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "claims",
+          "evidence"
+        ]
+      },
+      {
+        "id": "merchant-ai-employee",
+        "root_id": "open-commerce-network",
+        "parent_id": "merchant-product",
+        "kind": "decision",
+        "title": "商户 AI 员工与数据经营中心",
+        "summary": "统一经营数据，主动发现问题，提出方案，经授权后执行并追踪结果。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 510,
+        "color": "#55b989",
+        "source_refs": [
+          "chat-open-commerce#section-7"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-7"
+        ],
         "document_paths": [
           "docs/drafts/requirements/open-commerce-network.md"
         ],
         "feature_node_ids": [
-          "cap-context-rag"
+          "cap-ai-tasks"
         ],
         "tags": [
-          "mcp",
-          "protocol"
+          "merchant-ai"
+        ]
+      },
+      {
+        "id": "merchant-subscription",
+        "root_id": "open-commerce-network",
+        "parent_id": "business-model",
+        "kind": "decision",
+        "title": "商户 AI 经营订阅",
+        "summary": "早期以数据节点、经营分析、营销自动化、CRM 和托管服务获得稳定收入。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 610,
+        "color": "#55b989",
+        "source_refs": [
+          "chat-open-commerce#section-10"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
+        ],
+        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "subscription"
+        ]
+      },
+      {
+        "id": "foundation-company-split",
+        "root_id": "open-commerce-network",
+        "parent_id": "organization-brand",
+        "kind": "option",
+        "title": "基金会与商业公司双层结构",
+        "summary": "开放组织负责协议与治理，商业公司负责产品、托管、连接器、风控、结算和企业服务。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 820,
+        "color": "#9a73dc",
+        "source_refs": [
+          "chat-open-commerce#section-2"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-2"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "company",
+          "foundation"
+        ]
+      },
+      {
+        "id": "gongshi-brand",
+        "root_id": "open-commerce-network",
+        "parent_id": "organization-brand",
+        "kind": "option",
+        "title": "“共市”开放网络品牌",
+        "summary": "共市、共市协议、店域、我的市和共市工坊是讨论候选，正式使用前需商标与域名核查。",
+        "status": "exploring",
+        "authority": "source",
+        "section_id": "project-system",
+        "order": 810,
+        "color": "#9a73dc",
+        "source_refs": [
+          "chat-open-commerce#section-13"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-13"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "brand",
+          "gongshi"
+        ]
+      },
+      {
+        "id": "plugin-marketplace-revenue",
+        "root_id": "open-commerce-network",
+        "parent_id": "business-model",
+        "kind": "decision",
+        "title": "插件与开发者市场分成",
+        "summary": "对插件分发、托管、计费和结算服务分成，让第三方参与创造行业能力。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 640,
+        "color": "#55b989",
+        "source_refs": [
+          "chat-open-commerce#section-10"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
+        ],
+        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "developer",
+          "marketplace"
+        ]
+      },
+      {
+        "id": "marketing-content-plugins",
+        "root_id": "open-commerce-network",
+        "parent_id": "merchant-product",
+        "kind": "feature",
+        "title": "海报、视频、文案、活动和小游戏插件",
+        "summary": "这些能力用于执行经营策略并采集效果，不单独作为长期护城河。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 540,
+        "color": "#5f91dc",
+        "source_refs": [
+          "chat-open-commerce#section-7"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-7"
+        ],
+        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "marketing",
+          "plugin"
         ]
       },
       {
@@ -1442,6 +984,829 @@
         "tags": [
           "brand",
           "governance"
+        ]
+      },
+      {
+        "id": "sui-tokenomics-validation-risk",
+        "root_id": "open-commerce-network",
+        "parent_id": "risks-open-questions",
+        "kind": "risk",
+        "title": "代币激励可能偏离真实服务价值",
+        "summary": "若奖励主要来自新增代币而不是真实任务收入，网络容易形成补贴依赖；必须用有效任务量、结算量、服务质量和商户留存验证价值。",
+        "status": "open",
+        "authority": "source",
+        "section_id": "project-system",
+        "order": 980,
+        "color": "#d66f78",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "incentive",
+          "risk",
+          "tokenomics"
+        ]
+      },
+      {
+        "id": "selectable-ranking",
+        "root_id": "open-commerce-network",
+        "parent_id": "core-principles",
+        "kind": "decision",
+        "title": "排序器可选择、可替换、可解释",
+        "summary": "网络不取消排序，而是避免单一平台垄断排序；用户可选择距离、价格、复购、朋友推荐或个人 AI 等规则。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 250,
+        "color": "#55b989",
+        "source_refs": [
+          "chat-open-commerce#section-8"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-8"
+        ],
+        "document_paths": [
+          "docs/decisions/open-commerce-network-principles.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "choice",
+          "ranking"
+        ]
+      },
+      {
+        "id": "sui-verifiable-offchain-compute",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-agent-economy-layer",
+        "kind": "hypothesis",
+        "title": "验证链外 AI 与 GPU 任务结果",
+        "summary": "可评估 Nautilus 或可信执行环境验证部分链外任务，但任意 GPU 计算结果仍需按任务类型设计证明、复算、抽检和争议机制。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1120,
+        "color": "#9a73dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [
+          "cap-ai-runtime"
+        ],
+        "tags": [
+          "nautilus",
+          "tee",
+          "verification"
+        ]
+      },
+      {
+        "id": "merchant-first-wedge",
+        "root_id": "open-commerce-network",
+        "parent_id": "go-to-market",
+        "kind": "decision",
+        "title": "商户先行的 B2B2C 路线",
+        "summary": "不同时冷启动消费者与商户；先通过商户产品和活动带入消费者关系。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 710,
+        "color": "#55b989",
+        "source_refs": [
+          "chat-open-commerce#section-12"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "merchant-first"
+        ]
+      },
+      {
+        "id": "core-principles",
+        "root_id": "open-commerce-network",
+        "parent_id": "open-commerce-network",
+        "kind": "topic",
+        "title": "已收敛的产品原则",
+        "summary": "讨论反复确认的数据、授权、互操作和商业边界，作为后续需求与决策的约束。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 200,
+        "color": "#9a73dc",
+        "source_refs": [
+          "chat-open-commerce#section-16"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-16"
+        ],
+        "document_paths": [
+          "docs/decisions/open-commerce-network-principles.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "principles"
+        ]
+      },
+      {
+        "id": "two-sided-cold-start",
+        "root_id": "open-commerce-network",
+        "parent_id": "risks-open-questions",
+        "kind": "risk",
+        "title": "双边网络冷启动",
+        "summary": "没有商户时消费者无价值，没有消费者时商户不愿开放能力；需靠商户经营产品先建立单边价值。",
+        "status": "open",
+        "authority": "source",
+        "section_id": "project-system",
+        "order": 910,
+        "color": "#d66f78",
+        "source_refs": [
+          "chat-open-commerce#section-2"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-2"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "cold-start"
+        ]
+      },
+      {
+        "id": "permission-service",
+        "root_id": "open-commerce-network",
+        "parent_id": "target-architecture",
+        "kind": "feature",
+        "title": "授权、撤销与审计服务",
+        "summary": "管理授权范围、用途、有效期、撤销、审计记录和异常访问。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 360,
+        "color": "#5f91dc",
+        "source_refs": [
+          "chat-open-commerce#section-17"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-17"
+        ],
+        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md"
+        ],
+        "feature_node_ids": [
+          "cap-security"
+        ],
+        "tags": [
+          "audit",
+          "authorization"
+        ]
+      },
+      {
+        "id": "consumer-reference-client",
+        "root_id": "open-commerce-network",
+        "parent_id": "merchant-product",
+        "kind": "option",
+        "title": "消费者参考客户端",
+        "summary": "可以提供官方参考客户端承载授权和体验，但不应成为唯一入口。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 560,
+        "color": "#9a73dc",
+        "source_refs": [
+          "chat-open-commerce#section-17"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-17"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [
+          "cap-clients"
+        ],
+        "tags": [
+          "client",
+          "consumer"
+        ]
+      },
+      {
+        "id": "merchant-data-control",
+        "root_id": "open-commerce-network",
+        "parent_id": "problem-space",
+        "kind": "requirement",
+        "title": "商户控制经营数据",
+        "summary": "商户应能导出、迁移和授权合法持有的经营数据，不被单一平台锁定。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 130,
+        "color": "#5f91dc",
+        "source_refs": [
+          "chat-open-commerce#section-16"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-16"
+        ],
+        "document_paths": [
+          "docs/decisions/open-commerce-network-principles.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "merchant",
+          "ownership"
+        ]
+      },
+      {
+        "id": "merchant-directory",
+        "root_id": "open-commerce-network",
+        "parent_id": "target-architecture",
+        "kind": "feature",
+        "title": "公共商户目录与能力发现",
+        "summary": "提供名称、位置、营业时间、服务目录和能力端点，同时防止虚假商户与过期数据。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 340,
+        "color": "#5f91dc",
+        "source_refs": [
+          "chat-open-commerce#section-17"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-17"
+        ],
+        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "directory",
+          "discovery"
+        ]
+      },
+      {
+        "id": "sui-phase-gate",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-agent-economy-layer",
+        "kind": "requirement",
+        "title": "前三阶段成立后才研究上链和发币",
+        "summary": "只有真实商户密度、跨 App 调用、稳定计费和争议处理得到验证后，才评估迁移所有权、结算、信誉与治理；发币不是当前产品成立的前提。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 1180,
+        "color": "#5f91dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "gate",
+          "roadmap"
+        ]
+      },
+      {
+        "id": "natural-language-app-builder",
+        "root_id": "open-commerce-network",
+        "parent_id": "merchant-product",
+        "kind": "feature",
+        "title": "自然语言应用与活动程序开发",
+        "summary": "允许商户用自然语言创建或修改网页、活动和应用，但发布必须经过权限、验证和回滚门禁。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 550,
+        "color": "#5f91dc",
+        "source_refs": [
+          "chat-open-commerce#section-7"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-7"
+        ],
+        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md"
+        ],
+        "feature_node_ids": [
+          "cap-ai-tasks",
+          "cap-release"
+        ],
+        "tags": [
+          "app-builder",
+          "release"
+        ]
+      },
+      {
+        "id": "pilot-50-100-merchants",
+        "root_id": "open-commerce-network",
+        "parent_id": "go-to-market",
+        "kind": "task",
+        "title": "单一区域 50–100 家商户试点",
+        "summary": "验证数据接入意愿、成本节省、复购提升、持续付费和标准能力开放意愿。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 730,
+        "color": "#5f91dc",
+        "source_refs": [
+          "chat-open-commerce#section-12"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "pilot",
+          "validation"
+        ]
+      },
+      {
+        "id": "sui-encrypted-offchain-data",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-agent-economy-layer",
+        "kind": "option",
+        "title": "原始数据和大文件保持链外加密",
+        "summary": "模型、记忆、代码、经营数据、图片和视频不直接上链；可评估 Walrus 与 Seal 类能力保存密文并执行访问策略，链上仅登记索引、哈希和授权状态。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1110,
+        "color": "#9a73dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [
+          "cap-security"
+        ],
+        "tags": [
+          "privacy",
+          "seal",
+          "walrus"
+        ]
+      },
+      {
+        "id": "sui-network-token-net",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-token-asset-layers",
+        "kind": "option",
+        "title": "NET 用于质押、惩罚、治理与长期激励",
+        "summary": "可转让网络代币用于节点和服务商质押、作恶惩罚、协议治理及长期激励，不作为商户日常经营成本的直接记账单位。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1150,
+        "color": "#9a73dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "governance",
+          "net-token",
+          "staking"
+        ]
+      },
+      {
+        "id": "identity-trust",
+        "root_id": "open-commerce-network",
+        "parent_id": "target-architecture",
+        "kind": "requirement",
+        "title": "消费者、商户、应用和代理身份",
+        "summary": "每次授权、调用和交易必须能够验证主体、代理关系和服务商。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 350,
+        "color": "#5f91dc",
+        "source_refs": [
+          "chat-open-commerce#section-17"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-17"
+        ],
+        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md"
+        ],
+        "feature_node_ids": [
+          "cap-security"
+        ],
+        "tags": [
+          "identity",
+          "trust"
+        ]
+      },
+      {
+        "id": "ai-action-gap",
+        "root_id": "open-commerce-network",
+        "parent_id": "problem-space",
+        "kind": "claim",
+        "title": "AI 能建议但难执行",
+        "summary": "模型能够生成内容，却缺少真实业务数据、权限和执行接口，无法稳定完成库存、预约、交易和效果追踪。",
+        "status": "accepted",
+        "authority": "source",
+        "section_id": "project-system",
+        "order": 120,
+        "color": "#9a73dc",
+        "source_refs": [
+          "chat-open-commerce#section-5"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-5"
+        ],
+        "document_paths": [],
+        "feature_node_ids": [
+          "cap-ai-tasks"
+        ],
+        "tags": [
+          "agent",
+          "execution"
+        ]
+      },
+      {
+        "id": "merchant-led-consumer-acquisition",
+        "root_id": "open-commerce-network",
+        "parent_id": "go-to-market",
+        "kind": "hypothesis",
+        "title": "消费者随商户活动进入",
+        "summary": "通过二维码、小票、会员、小游戏和分享自然建立授权关系，降低消费者获客成本。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 750,
+        "color": "#d8a950",
+        "source_refs": [
+          "chat-open-commerce#section-12"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "consumer-acquisition"
+        ]
+      },
+      {
+        "id": "sui-agent-economy-layer",
+        "root_id": "open-commerce-network",
+        "parent_id": "phase-4-federated-infrastructure",
+        "kind": "decision",
+        "title": "Sui 仅作为阶段四候选经济层",
+        "summary": "已确认将 Sui 方向限制为开放商业网络阶段四的候选所有权、授权与结算层，不改变当前 V1；具体链上组件、代币参数和上线条件仍需逐项验证。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 1050,
+        "color": "#9a73dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [
+          "cap-ai-runtime",
+          "cap-multi-agent"
+        ],
+        "tags": [
+          "agent-economy",
+          "phase-4",
+          "sui"
+        ]
+      },
+      {
+        "id": "data-not-public",
+        "root_id": "open-commerce-network",
+        "parent_id": "core-principles",
+        "kind": "decision",
+        "title": "开放不等于公开原始数据",
+        "summary": "公开信息、动态能力、授权数据和商户内部数据必须分级；不把完整数据库暴露给外部 AI。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 210,
+        "color": "#55b989",
+        "source_refs": [
+          "chat-open-commerce#section-16"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-16"
+        ],
+        "document_paths": [
+          "docs/decisions/open-commerce-network-principles.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "data",
+          "privacy"
+        ]
+      },
+      {
+        "id": "channel-partners",
+        "root_id": "open-commerce-network",
+        "parent_id": "go-to-market",
+        "kind": "option",
+        "title": "POS、支付、代运营和商会渠道",
+        "summary": "通过已有商户关系的合作伙伴降低逐店销售成本，并提供白标与收入分成。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 740,
+        "color": "#9a73dc",
+        "source_refs": [
+          "chat-open-commerce#section-12"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "channel",
+          "partner"
+        ]
+      },
+      {
+        "id": "problem-space",
+        "root_id": "open-commerce-network",
+        "parent_id": "open-commerce-network",
+        "kind": "question",
+        "title": "为什么需要新的商业连接层",
+        "summary": "中心化平台造成数据孤岛和关系锁定，AI 无法获得真实、实时、经授权的数据并执行商业任务。",
+        "status": "accepted",
+        "authority": "source",
+        "section_id": "project-system",
+        "order": 100,
+        "color": "#d8a950",
+        "source_refs": [
+          "chat-open-commerce#section-5"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-5"
+        ],
+        "document_paths": [],
+        "feature_node_ids": [],
+        "tags": [
+          "problem"
+        ]
+      },
+      {
+        "id": "platform-connectors",
+        "root_id": "open-commerce-network",
+        "parent_id": "merchant-product",
+        "kind": "feature",
+        "title": "多平台与 POS 数据连接器",
+        "summary": "在合法授权与接口允许范围内连接外卖、社交、收银、库存、会员和财务系统。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 520,
+        "color": "#5f91dc",
+        "source_refs": [
+          "chat-open-commerce#section-6"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-6"
+        ],
+        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "connector",
+          "pos"
+        ]
+      },
+      {
+        "id": "sui-token-asset-layers",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-agent-economy-layer",
+        "kind": "topic",
+        "title": "网络代币、稳定算力积分与信誉分层",
+        "summary": "不让单一高波动代币同时承担支付、计量、治理和信誉；把网络安全、稳定服务计价与身份信誉拆开设计。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1140,
+        "color": "#9a73dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "asset-model",
+          "tokenomics"
+        ]
+      },
+      {
+        "id": "sui-sharded-job-execution",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-agent-economy-layer",
+        "kind": "requirement",
+        "title": "按任务和市场分片避免全局共享热点",
+        "summary": "每个任务使用独立 Job/Escrow 对象，市场按行业、区域或能力分片；实施前必须压测共享对象争用、吞吐、延迟和成本。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1080,
+        "color": "#5f91dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "parallelism",
+          "performance"
+        ]
+      },
+      {
+        "id": "roadmap",
+        "root_id": "open-commerce-network",
+        "parent_id": "open-commerce-network",
+        "kind": "topic",
+        "title": "阶段路线图",
+        "summary": "从单店价值验证逐步演进到开放网络，避免把长期基础设施作为近期交付承诺。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1000,
+        "color": "#9a73dc",
+        "source_refs": [
+          "chat-open-commerce#section-6"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-6"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "roadmap"
+        ]
+      },
+      {
+        "id": "sui-control-settlement-boundary",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-agent-economy-layer",
+        "kind": "requirement",
+        "title": "Sui 不承载模型计算与原始大数据",
+        "summary": "模型推理、代码构建、图片视频生成和 GPU 计算继续在云端、PC 或边缘节点执行；链上仅保存所有权、权限、任务状态、支付条件、摘要和争议证据。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 1060,
+        "color": "#5f91dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [
+          "cap-ai-runtime",
+          "cap-windows-node"
+        ],
+        "tags": [
+          "architecture",
+          "boundary"
+        ]
+      },
+      {
+        "id": "decentralized-trust-layer",
+        "root_id": "open-commerce-network",
+        "parent_id": "target-architecture",
+        "kind": "option",
+        "title": "可选去中心化信任与长期存证",
+        "summary": "对公共档案、长期证明和不可篡改凭证可研究 Filecoin、Arweave 或其他存证机制，但不是近期依赖。",
+        "status": "exploring",
+        "authority": "source",
+        "section_id": "project-system",
+        "order": 400,
+        "color": "#9a73dc",
+        "source_refs": [
+          "chat-open-commerce#section-3"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-3"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "decentralized",
+          "long-term"
+        ]
+      },
+      {
+        "id": "platform-data-silos",
+        "root_id": "open-commerce-network",
+        "parent_id": "problem-space",
+        "kind": "claim",
+        "title": "多平台数据孤岛",
+        "summary": "订单、商品、库存、会员、评价和营销数据分散在平台、POS 与社交系统，商户难以统一使用。",
+        "status": "accepted",
+        "authority": "source",
+        "section_id": "project-system",
+        "order": 110,
+        "color": "#9a73dc",
+        "source_refs": [
+          "chat-open-commerce#section-5"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-5"
+        ],
+        "document_paths": [],
+        "feature_node_ids": [],
+        "tags": [
+          "data-silo",
+          "merchant"
+        ]
+      },
+      {
+        "id": "phase-4-federated-infrastructure",
+        "root_id": "open-commerce-network",
+        "parent_id": "roadmap",
+        "kind": "task",
+        "title": "阶段四：联邦治理与可选边缘基础设施",
+        "summary": "在网络规模与经济性成立后再研究基金会治理、分布式算力和去中心化存证。",
+        "status": "open",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1040,
+        "color": "#5f91dc",
+        "source_refs": [
+          "chat-open-commerce#section-6"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-6"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "phase-4"
         ]
       },
       {
@@ -1474,6 +1839,33 @@
         ]
       },
       {
+        "id": "no-raw-data-sale",
+        "root_id": "open-commerce-network",
+        "parent_id": "core-principles",
+        "kind": "decision",
+        "title": "不出售用户或商户原始数据",
+        "summary": "收入来自软件、托管、调用、执行、结算和生态服务，而不是转卖原始数据。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 220,
+        "color": "#55b989",
+        "source_refs": [
+          "chat-open-commerce#section-10"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
+        ],
+        "document_paths": [
+          "docs/decisions/open-commerce-network-principles.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "business-model",
+          "privacy"
+        ]
+      },
+      {
         "id": "settlement-service",
         "root_id": "open-commerce-network",
         "parent_id": "target-architecture",
@@ -1501,16 +1893,98 @@
         ]
       },
       {
-        "id": "phase-4-federated-infrastructure",
+        "id": "sui-skill-marketplace",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-agent-economy-layer",
+        "kind": "option",
+        "title": "Agent 技能与营销插件资产市场",
+        "summary": "可评估 Kiosk 类机制，为技能包、小游戏、模板和 Agent 插件提供授权、版税与受控流转；流动性设施只在确有需求时引入。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1130,
+        "color": "#9a73dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "kiosk",
+          "skill-marketplace"
+        ]
+      },
+      {
+        "id": "sui-ptb-atomic-settlement",
+        "root_id": "open-commerce-network",
+        "parent_id": "sui-agent-economy-layer",
+        "kind": "feature",
+        "title": "用可编程交易块原子托管与分账",
+        "summary": "候选方案在同一原子交易中处理任务预算、限时权限、验收、分账和信誉更新，失败时整体回滚。",
+        "status": "exploring",
+        "authority": "proposal",
+        "section_id": "project-system",
+        "order": 1090,
+        "color": "#9a73dc",
+        "source_refs": [
+          "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        ],
+        "conversation_refs": [
+          "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "escrow",
+          "ptb",
+          "settlement"
+        ]
+      },
+      {
+        "id": "edge-compute-network",
+        "root_id": "open-commerce-network",
+        "parent_id": "target-architecture",
+        "kind": "hypothesis",
+        "title": "边缘设备与闲置算力网络",
+        "summary": "个人设备和机器人节点未来可承担本地推理与部分任务，但可靠性、安全、定价和收益尚未验证。",
+        "status": "exploring",
+        "authority": "source",
+        "section_id": "project-system",
+        "order": 410,
+        "color": "#d8a950",
+        "source_refs": [
+          "chat-open-commerce#section-4"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-4"
+        ],
+        "document_paths": [
+          "docs/drafts/open-commerce-network-roadmap.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "compute",
+          "edge"
+        ]
+      },
+      {
+        "id": "phase-3-open-network",
         "root_id": "open-commerce-network",
         "parent_id": "roadmap",
         "kind": "task",
-        "title": "阶段四：联邦治理与可选边缘基础设施",
-        "summary": "在网络规模与经济性成立后再研究基金会治理、分布式算力和去中心化存证。",
+        "title": "阶段三：消费者 AI 与第三方应用接入",
+        "summary": "开放 SDK、API、MCP、发现、调用和结算，验证跨 App 交易。",
         "status": "open",
         "authority": "proposal",
         "section_id": "project-system",
-        "order": 1040,
+        "order": 1030,
         "color": "#5f91dc",
         "source_refs": [
           "chat-open-commerce#section-6"
@@ -1523,34 +1997,87 @@
         ],
         "feature_node_ids": [],
         "tags": [
-          "phase-4"
+          "phase-3"
         ]
       },
       {
-        "id": "data-quality-trust-risk",
+        "id": "consumer-data-control",
         "root_id": "open-commerce-network",
-        "parent_id": "risks-open-questions",
-        "kind": "risk",
-        "title": "商户身份、数据质量和刷量治理",
-        "summary": "开放目录仍需防止虚假商户、过期库存、虚假评价、恶意排序和欺诈交易。",
-        "status": "open",
-        "authority": "source",
+        "parent_id": "problem-space",
+        "kind": "requirement",
+        "title": "消费者控制个人数据与关系",
+        "summary": "消费者决定偏好、会员关系和历史权益的授权范围，并可撤销或迁移。",
+        "status": "accepted",
+        "authority": "accepted",
         "section_id": "project-system",
-        "order": 930,
-        "color": "#d66f78",
+        "order": 140,
+        "color": "#5f91dc",
         "source_refs": [
-          "chat-open-commerce#section-17"
+          "chat-open-commerce#section-16"
         ],
         "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-17"
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-16"
         ],
         "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
+          "docs/decisions/open-commerce-network-principles.md"
         ],
         "feature_node_ids": [],
         "tags": [
-          "quality",
-          "trust"
+          "consumer",
+          "ownership"
+        ]
+      },
+      {
+        "id": "capability-call-fees",
+        "root_id": "open-commerce-network",
+        "parent_id": "business-model",
+        "kind": "decision",
+        "title": "高价值商业能力调用费",
+        "summary": "基础公开信息宜免费；实时库存、预约、动态权益、分析和任务执行可按套餐或用量计费。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 620,
+        "color": "#55b989",
+        "source_refs": [
+          "chat-open-commerce#section-10"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
+        ],
+        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "api",
+          "billing"
+        ]
+      },
+      {
+        "id": "enterprise-services",
+        "root_id": "open-commerce-network",
+        "parent_id": "business-model",
+        "kind": "decision",
+        "title": "企业与渠道服务",
+        "summary": "私有部署、白标、专用连接器、合规和技术支持形成补充收入。",
+        "status": "accepted",
+        "authority": "accepted",
+        "section_id": "project-system",
+        "order": 650,
+        "color": "#55b989",
+        "source_refs": [
+          "chat-open-commerce#section-10"
+        ],
+        "conversation_refs": [
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-10"
+        ],
+        "document_paths": [
+          "docs/drafts/requirements/open-commerce-network.md"
+        ],
+        "feature_node_ids": [],
+        "tags": [
+          "enterprise"
         ]
       },
       {
@@ -1581,119 +2108,149 @@
         ]
       },
       {
-        "id": "phase-2-standard-nodes",
+        "id": "merchant-data-node",
         "root_id": "open-commerce-network",
-        "parent_id": "roadmap",
-        "kind": "task",
-        "title": "阶段二：标准化商户节点",
-        "summary": "形成商户数据模型、能力清单、身份授权和可迁移托管。",
-        "status": "open",
-        "authority": "proposal",
+        "parent_id": "target-architecture",
+        "kind": "requirement",
+        "title": "商户自有或可迁移的数据节点",
+        "summary": "商户可选择平台托管、自建或第三方托管，必须支持完整导出和服务商迁移。",
+        "status": "accepted",
+        "authority": "accepted",
         "section_id": "project-system",
-        "order": 1020,
+        "order": 320,
         "color": "#5f91dc",
         "source_refs": [
-          "chat-open-commerce#section-6"
+          "chat-open-commerce#section-3"
         ],
         "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-6"
-        ],
-        "document_paths": [
-          "docs/drafts/open-commerce-network-roadmap.md"
-        ],
-        "feature_node_ids": [],
-        "tags": [
-          "phase-2"
-        ]
-      },
-      {
-        "id": "platform-connectors",
-        "root_id": "open-commerce-network",
-        "parent_id": "merchant-product",
-        "kind": "feature",
-        "title": "多平台与 POS 数据连接器",
-        "summary": "在合法授权与接口允许范围内连接外卖、社交、收银、库存、会员和财务系统。",
-        "status": "open",
-        "authority": "proposal",
-        "section_id": "project-system",
-        "order": 520,
-        "color": "#5f91dc",
-        "source_refs": [
-          "chat-open-commerce#section-6"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-6"
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-3"
         ],
         "document_paths": [
           "docs/drafts/requirements/open-commerce-network.md"
         ],
         "feature_node_ids": [],
         "tags": [
-          "connector",
-          "pos"
+          "merchant",
+          "node"
         ]
       },
       {
-        "id": "selectable-ranking",
+        "id": "go-to-market",
         "root_id": "open-commerce-network",
-        "parent_id": "core-principles",
-        "kind": "decision",
-        "title": "排序器可选择、可替换、可解释",
-        "summary": "网络不取消排序，而是避免单一平台垄断排序；用户可选择距离、价格、复购、朋友推荐或个人 AI 等规则。",
+        "parent_id": "open-commerce-network",
+        "kind": "topic",
+        "title": "市场进入与网络演进",
+        "summary": "先验证单一行业商户的可量化经营价值，再逐步开放消费者与开发者网络。",
         "status": "accepted",
         "authority": "accepted",
         "section_id": "project-system",
-        "order": 250,
-        "color": "#55b989",
+        "order": 700,
+        "color": "#9a73dc",
         "source_refs": [
-          "chat-open-commerce#section-8"
+          "chat-open-commerce#section-12"
         ],
         "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-8"
+          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-12"
         ],
         "document_paths": [
-          "docs/decisions/open-commerce-network-principles.md"
+          "docs/drafts/open-commerce-network-roadmap.md"
         ],
         "feature_node_ids": [],
         "tags": [
-          "choice",
-          "ranking"
-        ]
-      },
-      {
-        "id": "ai-action-gap",
-        "root_id": "open-commerce-network",
-        "parent_id": "problem-space",
-        "kind": "claim",
-        "title": "AI 能建议但难执行",
-        "summary": "模型能够生成内容，却缺少真实业务数据、权限和执行接口，无法稳定完成库存、预约、交易和效果追踪。",
-        "status": "accepted",
-        "authority": "source",
-        "section_id": "project-system",
-        "order": 120,
-        "color": "#9a73dc",
-        "source_refs": [
-          "chat-open-commerce#section-5"
-        ],
-        "conversation_refs": [
-          "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-5"
-        ],
-        "document_paths": [],
-        "feature_node_ids": [
-          "cap-ai-tasks"
-        ],
-        "tags": [
-          "agent",
-          "execution"
+          "go-to-market"
         ]
       }
     ],
     "edges": [
       {
+        "id": "risk-decomposes-privacy",
+        "source": "risks-open-questions",
+        "target": "privacy-compliance-risk",
+        "relation": "decomposes_to",
+        "label": ""
+      },
+      {
+        "id": "transaction-depend-settlement",
+        "source": "transaction-service-fees",
+        "target": "settlement-service",
+        "relation": "depends_on",
+        "label": ""
+      },
+      {
+        "id": "risk-decomposes-connector",
+        "source": "risks-open-questions",
+        "target": "connector-legality-risk",
+        "relation": "decomposes_to",
+        "label": ""
+      },
+      {
+        "id": "official-connectors-address-legal",
+        "source": "platform-connectors",
+        "target": "connector-legality-risk",
+        "relation": "depends_on",
+        "label": ""
+      },
+      {
+        "id": "runtime-needs-identity",
+        "source": "capability-runtime",
+        "target": "identity-trust",
+        "relation": "depends_on",
+        "label": ""
+      },
+      {
+        "id": "sui-layer-decomposes-token-layers",
+        "source": "sui-agent-economy-layer",
+        "target": "sui-token-asset-layers",
+        "relation": "decomposes_to",
+        "label": "资产分层"
+      },
+      {
         "id": "no-sale-supports-control",
         "source": "no-raw-data-sale",
         "target": "merchant-data-control",
         "relation": "supports",
+        "label": ""
+      },
+      {
+        "id": "permissions-address-privacy",
+        "source": "permission-service",
+        "target": "privacy-compliance-risk",
+        "relation": "answers",
+        "label": ""
+      },
+      {
+        "id": "protocol-needs-directory",
+        "source": "open-business-protocol",
+        "target": "merchant-directory",
+        "relation": "depends_on",
+        "label": ""
+      },
+      {
+        "id": "business-supported-by-product",
+        "source": "business-model",
+        "target": "merchant-product",
+        "relation": "depends_on",
+        "label": ""
+      },
+      {
+        "id": "feedback-depends-connectors",
+        "source": "business-feedback-loop",
+        "target": "platform-connectors",
+        "relation": "depends_on",
+        "label": ""
+      },
+      {
+        "id": "phase3-implements-protocol",
+        "source": "phase-3-open-network",
+        "target": "open-business-protocol",
+        "relation": "implements",
+        "label": ""
+      },
+      {
+        "id": "phase1-leads-phase2",
+        "source": "phase-1-merchant-os",
+        "target": "phase-2-standard-nodes",
+        "relation": "leads_to",
         "label": ""
       },
       {
@@ -1704,10 +2261,17 @@
         "label": ""
       },
       {
-        "id": "phase3-leads-phase4",
-        "source": "phase-3-open-network",
-        "target": "phase-4-federated-infrastructure",
-        "relation": "leads_to",
+        "id": "merchant-control-answers-silos",
+        "source": "merchant-data-control",
+        "target": "platform-data-silos",
+        "relation": "answers",
+        "label": ""
+      },
+      {
+        "id": "principles-resolve-consumer",
+        "source": "core-principles",
+        "target": "consumer-data-control",
+        "relation": "supports",
         "label": ""
       },
       {
@@ -1715,6 +2279,34 @@
         "source": "core-principles",
         "target": "merchant-data-control",
         "relation": "supports",
+        "label": ""
+      },
+      {
+        "id": "identity-addresses-quality",
+        "source": "identity-trust",
+        "target": "data-quality-trust-risk",
+        "relation": "answers",
+        "label": ""
+      },
+      {
+        "id": "gtm-leads-roadmap",
+        "source": "go-to-market",
+        "target": "roadmap",
+        "relation": "leads_to",
+        "label": ""
+      },
+      {
+        "id": "sui-token-risk-opposes-net",
+        "source": "sui-tokenomics-validation-risk",
+        "target": "sui-network-token-net",
+        "relation": "opposes",
+        "label": "真实收入约束"
+      },
+      {
+        "id": "consumer-acquisition-depends-pilot",
+        "source": "merchant-led-consumer-acquisition",
+        "target": "pilot-50-100-merchants",
+        "relation": "depends_on",
         "label": ""
       },
       {
@@ -1732,129 +2324,10 @@
         "label": ""
       },
       {
-        "id": "multi-app-opposes-lockin",
-        "source": "multi-app-interoperability",
-        "target": "platform-incentive-conflict",
-        "relation": "opposes",
-        "label": "开放网络避免单一入口"
-      },
-      {
-        "id": "silos-lead-action-gap",
-        "source": "platform-data-silos",
-        "target": "ai-action-gap",
+        "id": "phase2-leads-phase3",
+        "source": "phase-2-standard-nodes",
+        "target": "phase-3-open-network",
         "relation": "leads_to",
-        "label": "数据分散使 AI 无法行动"
-      },
-      {
-        "id": "feedback-depends-connectors",
-        "source": "business-feedback-loop",
-        "target": "platform-connectors",
-        "relation": "depends_on",
-        "label": ""
-      },
-      {
-        "id": "gtm-leads-roadmap",
-        "source": "go-to-market",
-        "target": "roadmap",
-        "relation": "leads_to",
-        "label": ""
-      },
-      {
-        "id": "phase1-leads-phase2",
-        "source": "phase-1-merchant-os",
-        "target": "phase-2-standard-nodes",
-        "relation": "leads_to",
-        "label": ""
-      },
-      {
-        "id": "transaction-depend-settlement",
-        "source": "transaction-service-fees",
-        "target": "settlement-service",
-        "relation": "depends_on",
-        "label": ""
-      },
-      {
-        "id": "calls-depend-protocol",
-        "source": "capability-call-fees",
-        "target": "open-business-protocol",
-        "relation": "depends_on",
-        "label": ""
-      },
-      {
-        "id": "business-supported-by-product",
-        "source": "business-model",
-        "target": "merchant-product",
-        "relation": "depends_on",
-        "label": ""
-      },
-      {
-        "id": "problem-to-silos",
-        "source": "problem-space",
-        "target": "platform-data-silos",
-        "relation": "decomposes_to",
-        "label": ""
-      },
-      {
-        "id": "plugins-implement-feedback",
-        "source": "marketing-content-plugins",
-        "target": "business-feedback-loop",
-        "relation": "implements",
-        "label": ""
-      },
-      {
-        "id": "builder-implements-employee",
-        "source": "natural-language-app-builder",
-        "target": "merchant-ai-employee",
-        "relation": "implements",
-        "label": ""
-      },
-      {
-        "id": "official-connectors-address-legal",
-        "source": "platform-connectors",
-        "target": "connector-legality-risk",
-        "relation": "depends_on",
-        "label": ""
-      },
-      {
-        "id": "settlement-validates-runtime",
-        "source": "settlement-service",
-        "target": "capability-runtime",
-        "relation": "depends_on",
-        "label": ""
-      },
-      {
-        "id": "phase3-implements-protocol",
-        "source": "phase-3-open-network",
-        "target": "open-business-protocol",
-        "relation": "implements",
-        "label": ""
-      },
-      {
-        "id": "merchant-control-answers-silos",
-        "source": "merchant-data-control",
-        "target": "platform-data-silos",
-        "relation": "answers",
-        "label": ""
-      },
-      {
-        "id": "not-public-supports-auth",
-        "source": "data-not-public",
-        "target": "revocable-auditable-auth",
-        "relation": "supports",
-        "label": ""
-      },
-      {
-        "id": "identity-addresses-quality",
-        "source": "identity-trust",
-        "target": "data-quality-trust-risk",
-        "relation": "answers",
-        "label": ""
-      },
-      {
-        "id": "consumer-acquisition-depends-pilot",
-        "source": "merchant-led-consumer-acquisition",
-        "target": "pilot-50-100-merchants",
-        "relation": "depends_on",
         "label": ""
       },
       {
@@ -1865,32 +2338,25 @@
         "label": ""
       },
       {
-        "id": "subscription-funds-phase1",
-        "source": "merchant-subscription",
-        "target": "phase-1-merchant-os",
-        "relation": "supports",
+        "id": "sui-ptb-implements-settlement",
+        "source": "sui-ptb-atomic-settlement",
+        "target": "settlement-service",
+        "relation": "implements",
+        "label": "原子托管与分账"
+      },
+      {
+        "id": "merchant-first-resolves-coldstart",
+        "source": "merchant-first-wedge",
+        "target": "two-sided-cold-start",
+        "relation": "resolves",
         "label": ""
       },
       {
-        "id": "protocol-needs-directory",
-        "source": "open-business-protocol",
-        "target": "merchant-directory",
-        "relation": "depends_on",
-        "label": ""
-      },
-      {
-        "id": "merchant-node-exposes-protocol",
-        "source": "merchant-data-node",
-        "target": "open-business-protocol",
-        "relation": "supports",
-        "label": ""
-      },
-      {
-        "id": "permissions-address-privacy",
-        "source": "permission-service",
-        "target": "privacy-compliance-risk",
-        "relation": "answers",
-        "label": ""
+        "id": "multi-app-opposes-lockin",
+        "source": "multi-app-interoperability",
+        "target": "platform-incentive-conflict",
+        "relation": "opposes",
+        "label": "开放网络避免单一入口"
       },
       {
         "id": "evidence-governs-claims",
@@ -1900,9 +2366,149 @@
         "label": ""
       },
       {
+        "id": "phase2-implements-node",
+        "source": "phase-2-standard-nodes",
+        "target": "merchant-data-node",
+        "relation": "implements",
+        "label": ""
+      },
+      {
+        "id": "agent-calls-protocol",
+        "source": "consumer-agent-node",
+        "target": "open-business-protocol",
+        "relation": "depends_on",
+        "label": ""
+      },
+      {
+        "id": "hybrid-alternative-trust",
+        "source": "hybrid-storage-model",
+        "target": "decentralized-trust-layer",
+        "relation": "alternative_to",
+        "label": "运行层与信任层分工"
+      },
+      {
+        "id": "product-implements-architecture",
+        "source": "merchant-product",
+        "target": "target-architecture",
+        "relation": "implements",
+        "label": ""
+      },
+      {
+        "id": "not-public-supports-auth",
+        "source": "data-not-public",
+        "target": "revocable-auditable-auth",
+        "relation": "supports",
+        "label": ""
+      },
+      {
+        "id": "developer-depends-density",
+        "source": "developer-ecosystem-phase",
+        "target": "merchant-led-consumer-acquisition",
+        "relation": "depends_on",
+        "label": ""
+      },
+      {
+        "id": "silos-lead-action-gap",
+        "source": "platform-data-silos",
+        "target": "ai-action-gap",
+        "relation": "leads_to",
+        "label": "数据分散使 AI 无法行动"
+      },
+      {
+        "id": "sui-layer-decomposes-object-model",
+        "source": "sui-agent-economy-layer",
+        "target": "sui-object-asset-model",
+        "relation": "decomposes_to",
+        "label": "对象模型"
+      },
+      {
+        "id": "employee-depends-connectors",
+        "source": "merchant-ai-employee",
+        "target": "platform-connectors",
+        "relation": "depends_on",
+        "label": ""
+      },
+      {
+        "id": "sui-phase-gate-depends-on-phase3",
+        "source": "sui-phase-gate",
+        "target": "phase-3-open-network",
+        "relation": "depends_on",
+        "label": "先验证开放网络"
+      },
+      {
+        "id": "builder-implements-employee",
+        "source": "natural-language-app-builder",
+        "target": "merchant-ai-employee",
+        "relation": "implements",
+        "label": ""
+      },
+      {
+        "id": "sui-skill-market-supports-plugin-revenue",
+        "source": "sui-skill-marketplace",
+        "target": "plugin-marketplace-revenue",
+        "relation": "supports",
+        "label": "授权与版税"
+      },
+      {
         "id": "pilot-depends-vertical",
         "source": "pilot-50-100-merchants",
         "target": "initial-vertical",
+        "relation": "depends_on",
+        "label": ""
+      },
+      {
+        "id": "architecture-implements-principles",
+        "source": "target-architecture",
+        "target": "core-principles",
+        "relation": "implements",
+        "label": ""
+      },
+      {
+        "id": "consumer-control-answers-silos",
+        "source": "consumer-data-control",
+        "target": "platform-data-silos",
+        "relation": "answers",
+        "label": ""
+      },
+      {
+        "id": "sui-encrypted-data-supports-data-not-public",
+        "source": "sui-encrypted-offchain-data",
+        "target": "data-not-public",
+        "relation": "supports",
+        "label": "原始数据不上链"
+      },
+      {
+        "id": "edge-depends-economics",
+        "source": "edge-compute-network",
+        "target": "unverified-technical-claims",
+        "relation": "depends_on",
+        "label": ""
+      },
+      {
+        "id": "sui-boundary-supports-edge-compute",
+        "source": "sui-control-settlement-boundary",
+        "target": "edge-compute-network",
+        "relation": "supports",
+        "label": "链外执行"
+      },
+      {
+        "id": "search-fee-alt-calls",
+        "source": "per-search-fee",
+        "target": "capability-call-fees",
+        "relation": "alternative_to",
+        "label": ""
+      },
+      {
+        "id": "problem-to-silos",
+        "source": "problem-space",
+        "target": "platform-data-silos",
+        "relation": "decomposes_to",
+        "label": ""
+      },
+      {
+        "id": "runtime-needs-permission",
+        "source": "capability-runtime",
+        "target": "permission-service",
         "relation": "depends_on",
         "label": ""
       },
@@ -1914,38 +2520,38 @@
         "label": ""
       },
       {
-        "id": "employee-depends-connectors",
-        "source": "merchant-ai-employee",
-        "target": "platform-connectors",
+        "id": "subscription-funds-phase1",
+        "source": "merchant-subscription",
+        "target": "phase-1-merchant-os",
+        "relation": "supports",
+        "label": ""
+      },
+      {
+        "id": "merchant-node-exposes-protocol",
+        "source": "merchant-data-node",
+        "target": "open-business-protocol",
+        "relation": "supports",
+        "label": ""
+      },
+      {
+        "id": "plugins-implement-feedback",
+        "source": "marketing-content-plugins",
+        "target": "business-feedback-loop",
+        "relation": "implements",
+        "label": ""
+      },
+      {
+        "id": "phase4-spawns-sui-agent-economy",
+        "source": "phase-4-federated-infrastructure",
+        "target": "sui-agent-economy-layer",
+        "relation": "spawns",
+        "label": "阶段四候选实现"
+      },
+      {
+        "id": "settlement-validates-runtime",
+        "source": "settlement-service",
+        "target": "capability-runtime",
         "relation": "depends_on",
-        "label": ""
-      },
-      {
-        "id": "risk-decomposes-governance",
-        "source": "risks-open-questions",
-        "target": "governance-capture-risk",
-        "relation": "decomposes_to",
-        "label": ""
-      },
-      {
-        "id": "hybrid-alternative-trust",
-        "source": "hybrid-storage-model",
-        "target": "decentralized-trust-layer",
-        "relation": "alternative_to",
-        "label": "运行层与信任层分工"
-      },
-      {
-        "id": "risk-decomposes-connector",
-        "source": "risks-open-questions",
-        "target": "connector-legality-risk",
-        "relation": "decomposes_to",
-        "label": ""
-      },
-      {
-        "id": "foundation-addresses-capture",
-        "source": "foundation-company-split",
-        "target": "governance-capture-risk",
-        "relation": "answers",
         "label": ""
       },
       {
@@ -1956,13 +2562,6 @@
         "label": ""
       },
       {
-        "id": "edge-depends-economics",
-        "source": "edge-compute-network",
-        "target": "unverified-technical-claims",
-        "relation": "depends_on",
-        "label": ""
-      },
-      {
         "id": "marketplace-depends-ecosystem",
         "source": "plugin-marketplace-revenue",
         "target": "developer-ecosystem-phase",
@@ -1970,17 +2569,31 @@
         "label": ""
       },
       {
-        "id": "runtime-needs-identity",
-        "source": "capability-runtime",
-        "target": "identity-trust",
-        "relation": "depends_on",
+        "id": "phase3-leads-phase4",
+        "source": "phase-3-open-network",
+        "target": "phase-4-federated-infrastructure",
+        "relation": "leads_to",
         "label": ""
       },
       {
-        "id": "merchant-first-resolves-coldstart",
-        "source": "merchant-first-wedge",
-        "target": "two-sided-cold-start",
-        "relation": "resolves",
+        "id": "sui-verification-risk-opposes-compute",
+        "source": "sui-arbitrary-compute-verification-risk",
+        "target": "sui-verifiable-offchain-compute",
+        "relation": "opposes",
+        "label": "验证成本风险"
+      },
+      {
+        "id": "foundation-addresses-capture",
+        "source": "foundation-company-split",
+        "target": "governance-capture-risk",
+        "relation": "answers",
+        "label": ""
+      },
+      {
+        "id": "risk-decomposes-governance",
+        "source": "risks-open-questions",
+        "target": "governance-capture-risk",
+        "relation": "decomposes_to",
         "label": ""
       },
       {
@@ -1991,13 +2604,6 @@
         "label": ""
       },
       {
-        "id": "product-implements-architecture",
-        "source": "merchant-product",
-        "target": "target-architecture",
-        "relation": "implements",
-        "label": ""
-      },
-      {
         "id": "risk-decomposes-claims",
         "source": "risks-open-questions",
         "target": "unverified-technical-claims",
@@ -2005,85 +2611,32 @@
         "label": ""
       },
       {
-        "id": "principles-resolve-consumer",
-        "source": "core-principles",
-        "target": "consumer-data-control",
-        "relation": "supports",
-        "label": ""
-      },
-      {
-        "id": "agent-calls-protocol",
-        "source": "consumer-agent-node",
+        "id": "calls-depend-protocol",
+        "source": "capability-call-fees",
         "target": "open-business-protocol",
-        "relation": "depends_on",
-        "label": ""
-      },
-      {
-        "id": "search-fee-alt-calls",
-        "source": "per-search-fee",
-        "target": "capability-call-fees",
-        "relation": "alternative_to",
-        "label": ""
-      },
-      {
-        "id": "phase2-leads-phase3",
-        "source": "phase-2-standard-nodes",
-        "target": "phase-3-open-network",
-        "relation": "leads_to",
-        "label": ""
-      },
-      {
-        "id": "developer-depends-density",
-        "source": "developer-ecosystem-phase",
-        "target": "merchant-led-consumer-acquisition",
-        "relation": "depends_on",
-        "label": ""
-      },
-      {
-        "id": "phase2-implements-node",
-        "source": "phase-2-standard-nodes",
-        "target": "merchant-data-node",
-        "relation": "implements",
-        "label": ""
-      },
-      {
-        "id": "architecture-implements-principles",
-        "source": "target-architecture",
-        "target": "core-principles",
-        "relation": "implements",
-        "label": ""
-      },
-      {
-        "id": "risk-decomposes-privacy",
-        "source": "risks-open-questions",
-        "target": "privacy-compliance-risk",
-        "relation": "decomposes_to",
-        "label": ""
-      },
-      {
-        "id": "consumer-control-answers-silos",
-        "source": "consumer-data-control",
-        "target": "platform-data-silos",
-        "relation": "answers",
-        "label": ""
-      },
-      {
-        "id": "runtime-needs-permission",
-        "source": "capability-runtime",
-        "target": "permission-service",
         "relation": "depends_on",
         "label": ""
       }
     ],
     "evolution": {
-      "kind": "refine",
-      "summary": "",
-      "actor": "",
-      "changed_at": "",
-      "previous_revision": ""
+      "kind": "import",
+      "summary": "已登记聊天来源“Sui 与 AI Agent 开放商业网络讨论”，等待增量编译",
+      "actor": "project-docs-import",
+      "changed_at": "2026-07-29T16:47:24.659885100+00:00",
+      "previous_revision": "af109520b02efd064dec1725776705c46cafcc059119599dbdea5fb0fedc95b2"
     }
   },
-  "promotions": [],
-  "documents_read": 0,
-  "estimated_tokens_used": 0
+  "promotions": [
+    {
+      "id": "promote-sui-agent-economy-draft",
+      "node_id": "sui-agent-economy-layer",
+      "path": "docs/drafts/open-commerce-network-sui-agent-economy.md",
+      "title": "开放商业网络 Sui 与 AI Agent 经济架构草案",
+      "content": "---\ntitle: 开放商业网络 Sui 与 AI Agent 经济架构草案\nowner: product-platform\nreviewed_at: 2026-07-30\nstatus: draft\nsource: docs/inbox/conversations/2026-07-29-2026-07-30-sui-ai-agent-network-discussion.md\n---\n\n# 开放商业网络 Sui 与 AI Agent 经济架构草案\n\n## 文档状态\n\n本文整理阶段四的候选技术方向，不改变当前 V1，也不代表区块链、代币、去中心化存储或闲置算力市场已经实现。现行边界以 `docs/decisions/open-commerce-network-v1-architecture.md` 为准。\n\n已确认的边界只有三项：Sui 只作为阶段四候选经济层；Sui 不承载模型计算和原始经营数据；前三阶段成立后才研究上链和发币。其余组件和参数均为待验证方案。\n\n## 一句话定位\n\n> Sui 是开放商业网络的所有权与结算层，不是 AI 模型的计算层。\n\n项目目标不是单纯发行代币，而是让消费者 Agent、商户 Agent、技能开发者和算力节点使用不同 App，通过统一对象和协议发现能力、授权调用、完成任务并自动结算。\n\n## 与现有路线的关系\n\n```text\nV1：商户节点、能力发布、授权调用、计量审计\n  -> 阶段二：标准化商户节点和可迁移数据\n  -> 阶段三：跨 App 发现、调用与真实结算\n  -> 阶段四：评估 Sui 所有权、结算、信誉和治理层\n```\n\nSui 方案不能成为前三阶段的依赖。只有真实商户密度、稳定调用量、真实结算和争议处理得到验证后，才进入原型研究。\n\n## 候选分层架构\n\n```text\n消费者 App / 商户 App / 第三方 AI Agent\n                    |\n          开放 API、SDK、MCP\n                    |\n     身份、授权、任务、计量与争议服务\n          |                     |\nSui 所有权与结算层          链外执行层\n          |          云、PC、GPU、边缘节点\n          |                     |\n  对象、托管、分账      加密数据、模型和结果文件\n  信誉、治理、摘要       Walrus/Seal/普通云存储候选\n```\n\n模型推理、代码构建、图片视频生成和 GPU 任务在链外执行。链上只登记资产归属、能力凭证、任务状态、支付条件、结果摘要、信誉与争议证据。\n\n## Sui 特性与项目映射\n\n| Sui 能力 | 项目中的候选用途 | 设计约束 |\n|---|---|---|\n| 对象模型 | Merchant、Agent、ComputeNode、SkillPackage、Job、Escrow、DataCapability、ResultReceipt、Reputation | 不把所有状态集中在单一全局对象 |\n| 并行执行 | 每任务独立建模，市场按区域、行业或能力分片 | 压测共享对象热点、延迟和成本 |\n| 可编程交易块 | 原子完成托管、授权、验收、分账和信誉更新 | 争议和复杂验收仍需链外服务 |\n| zkLogin 类入口 | 使用熟悉账号进入 | 用户不直接处理助记词 |\n| 赞助交易 | 平台或套餐代付 Gas | 需要额度、限流和防滥用 |\n| Kiosk 类机制 | 技能、模板、小游戏和 Agent 插件的授权与版税 | 可交易性不能替代质量审核 |\n| Walrus/Seal 类能力 | 保存并按策略开放加密模型、记忆、代码和媒体 | 原始经营数据不上链，访问可撤销、可审计 |\n| Nautilus/TEE 类能力 | 验证部分链外任务环境和结果 | 不等于任意 GPU 任务都可验证 |\n| DeepBook 类流动性 | 网络代币确有兑换需求时提供流动性 | 不作为商户使用产品的前置条件 |\n\n实施时必须按届时 Sui 官方文档和测试结果重新核验这些能力。\n\n## AI 任务与算力结算闭环\n\n1. 商户或消费者 Agent 创建独立 Job，声明预算、权限、期限、验收和争议规则。\n2. 预算进入 Escrow；算力节点或技能 Agent 报价并承接任务。\n3. 系统签发最小权限、限时、可撤销的 DataCapability。\n4. 节点在云端、PC、GPU、边缘设备或可信执行环境完成任务。\n5. 大文件和敏感结果进入链外加密存储，链上登记哈希、索引和 ResultReceipt。\n6. 商户 Agent、规则引擎或人工验收结果。\n7. 可编程交易块原子释放费用，向节点、技能开发者和协议服务方分账。\n8. 成功、失败和争议更新不可转让 Reputation；作恶可触发质押惩罚。\n\n## 三层资产模型\n\n### NET：网络安全与治理资产\n\nNET 为可转让网络代币，候选用途是节点和服务商质押、作恶惩罚、协议治理及长期激励。它不直接承担商户日常服务计价，避免币价波动传导到 AI 使用成本。\n\n### CREDIT：稳定服务计量单位\n\nCREDIT 为闭环、价格稳定的服务积分，用于 AI Token、GPU 时间、构建、存储和能力调用。用户可充值或通过完成真实算力任务获得；发行、赎回、退款和兑换规则须单独验证。\n\n### Reputation：不可购买的信誉\n\n商户、Agent、开发者和算力节点的履约、争议和能力认证进入不可转让信誉对象，不能通过购买 NET 或 CREDIT 获得。\n\n网络价值的核心指标是：\n\n```text\n商户节点数量 x 可调用 Agent/技能数量 x 有效任务量 x 真实结算量\n```\n\n代币价格不属于产品价值验证指标。早期收入继续来自商户 AI 经营系统、托管、能力调用、任务执行、结算和插件市场服务。\n\n## 关键风险与进入条件\n\n- 任意 GPU 任务的验证成本可能接近重新执行，需设计复算、抽检、证明和争议机制。\n- 高并发共享对象可能形成热点，必须按真实对象模型压测。\n- 激励应主要来自真实任务收入，不能长期依赖新增代币补贴。\n- Sui 不能解决第三方平台拒绝开放 API、原始数据失真或 AI 结果质量问题。\n- 候选组件的成熟度、成本、退款、密钥恢复和争议流程必须单独验证。\n\n进入测试网原型前，应同时满足：阶段二、三已证明跨 App 调用；存在稳定计费和分账需求；节点贡献可用任务结果和 SLA 衡量；中心化账本已出现真实的多方信任或迁移成本；普通商户无需理解钱包和 Gas；失败、退款和争议已有可执行方案。",
+      "document_type": "architecture",
+      "section_id": "project-system"
+    }
+  ],
+  "documents_read": 4,
+  "estimated_tokens_used": 6800
 }
