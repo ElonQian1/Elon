@@ -57,14 +57,12 @@ import { usePwaSourceVerification } from './usePwaSourceVerification'
 import { mergePwaRouteState, type PwaRouteState } from './pwaRuntimeViewport'
 import type { PwaBridgeHealth } from './pwaBridgeHealth'
 import type { SourcePreviewNode } from './types'
-
+import { validatePwaAiFitTaskReceipt } from './pwaAiFitTaskReceipt'
 export type { AndroidWritebackVerification } from './useCrossPlatformWritebackReceipt'
 export type { PwaRouteState } from './pwaRuntimeViewport'
-
 const BRIDGE_SOURCE = 'elon-pwa-design-bridge'
 const PARENT_SOURCE = 'elon-pc-ui-tuner'
 const PROTOCOL_VERSION = 1
-
 export interface PwaSelection {
   identity: PwaElementIdentity
   rect: { left: number; top: number; width: number; height: number }
@@ -83,7 +81,6 @@ interface UsePwaDesignSessionOptions {
   runtimeUrl: string
   androidVerification?: AndroidWritebackVerification
 }
-
 export interface PwaDesignSession {
   iframeRef: MutableRefObject<HTMLIFrameElement | null>
   ready: boolean
@@ -116,7 +113,6 @@ export interface PwaDesignSession {
   prepareReload: () => void
   retryVerification: () => Promise<void>
 }
-
 function bridgeElements(draft: PwaDesignDraft) {
   return Object.values(draft.elements).map((element) => ({
     selector: element.identity.selector,
@@ -262,9 +258,13 @@ export function usePwaDesignSession({
       const aiEvidence = detail.receipt && currentDraft
         ? sourceSavedEvidenceFromAiReceipt(currentDraft, detail.receipt, `pwa-ai-source-${Date.now()}`)
         : null
+      const fitTaskError = detail.receipt && currentDraft ? validatePwaAiFitTaskReceipt(currentDraft, detail.receipt) : ''
       if (!detail.receipt) {
         verification.fail('AI 任务已结束但缺少机器回执；没有 changedFiles、sourceHash/sourceRevision 与分端结果，不能显示源码已保存')
         setSaveLabel('AI 缺少机器回执；草稿与现有分端状态已保留')
+      } else if (fitTaskError) {
+        verification.fail(fitTaskError)
+        setSaveLabel('AI 回执未通过 PWA 拟合合约校验；草稿已保留')
       } else if (!currentReceipt) {
         if (aiEvidence) {
           verification.markSourceSaved(aiEvidence, 'AI 已写回 PWA 源码；正在用真实源码重载验证，不再停留在 AI 写作状态', detail.taskId)
