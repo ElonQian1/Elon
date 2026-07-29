@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Bot, Copy, Download, MousePointer2, Redo2, RotateCcw, Save, Smartphone, Trash2, Undo2 } from 'lucide-react'
+import { stringifyPwaDraftAiFitTask } from './pwaAiFitTask'
 import { buildPwaDraftCliCompactHandoff, type PwaStyleProperty } from './pwaDesignDraft'
 import type { PwaDesignSession, PwaSelection } from './usePwaDesignSession'
 import { CrossPlatformWritebackReceiptPanel } from './CrossPlatformWritebackReceiptPanel'
@@ -316,6 +318,7 @@ function DesignerQuickActions({ session }: Props) {
 }
 
 export function PwaStyleInspector({ session }: Props) {
+  const [artifactNotice, setArtifactNotice] = useState('')
   const selectedDraft = session.selection
     ? Object.values(session.draft?.elements ?? {}).find((element) => (
         element.identity.key === session.selection?.identity.key
@@ -323,6 +326,15 @@ export function PwaStyleInspector({ session }: Props) {
       ))
     : null
   const elementCount = Object.keys(session.draft?.elements ?? {}).length
+  const copyAiFitTask = async () => {
+    if (!session.draft) return
+    try {
+      await navigator.clipboard.writeText(stringifyPwaDraftAiFitTask(session.draft))
+      setArtifactNotice('AI 拟合任务已复制：只含精简交接、证据路径和执行策略。')
+    } catch {
+      setArtifactNotice('浏览器禁止复制；可先下载草稿，再交给 AI。')
+    }
+  }
   return (
     <aside className={styles.pwaStyleInspector} data-testid="pwa-style-inspector">
       <header>
@@ -402,9 +414,11 @@ export function PwaStyleInspector({ session }: Props) {
         )}
         <div className={styles.pwaArtifactActions}>
           <button type="button" disabled={!elementCount} onClick={() => { void session.copyCompactHandoff() }}><Copy size={13} />复制精简交接</button>
+          <button type="button" data-testid="pwa-ai-fit-task-copy" disabled={!elementCount} onClick={() => { void copyAiFitTask() }}><Bot size={13} />复制 AI 拟合任务</button>
           <button type="button" disabled={!elementCount} onClick={() => { void session.copyCliPackage() }}><Copy size={13} />复制 CLI 包</button>
           <button type="button" disabled={!elementCount} onClick={session.downloadCliPackage}><Download size={13} />下载草稿</button>
         </div>
+        {artifactNotice && <small className={styles.pwaArtifactNotice}>{artifactNotice}</small>}
       </section>
 
       {!session.selection && (

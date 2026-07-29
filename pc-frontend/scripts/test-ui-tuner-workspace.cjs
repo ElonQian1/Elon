@@ -584,6 +584,9 @@ try {
   assert.match(pwaInspectorSource, /data-testid="pwa-low-token-handoff"/)
   assert.match(pwaInspectorSource, /优先读取 compactHandoff/)
   assert.match(pwaInspectorSource, /复制精简交接/)
+  assert.match(pwaInspectorSource, /复制 AI 拟合任务/)
+  assert.match(pwaInspectorSource, /pwa-ai-fit-task-copy/)
+  assert.match(pwaInspectorSource, /stringifyPwaDraftAiFitTask/)
   assert.match(pwaInspectorSource, /copyCompactHandoff/)
   assert.match(pwaInspectorSource, /设计师常用微调/)
   assert.match(pwaInspectorSource, /designer:primary/)
@@ -608,6 +611,7 @@ try {
     'utf8',
   )
   assert.match(sourcePreviewCss, /\.pwaHandoffSummary/)
+  assert.match(sourcePreviewCss, /\.pwaArtifactNotice/)
   assert.match(sourcePreviewCss, /\.pwaSyncProgress/)
   assert.match(sourcePreviewCss, /data-step-state="failed"/)
   assert.match(sourcePreviewCss, /\.pwaDesignerQuickSection/)
@@ -623,6 +627,16 @@ try {
   assert.match(sourcePreviewCss, /\.surfaceScroller\{box-sizing:border-box;min-width:0;min-height:0;flex:1 1 auto;overflow:auto;overscroll-behavior:contain/)
   assert.match(sourcePreviewCss, /padding:36px 36px 72px/)
   assert.doesNotMatch(sourcePreviewCss, /\.surfaceScroller\{height:calc\(100vh - 94px\)/)
+  const pwaAiFitTaskSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/pwaAiFitTask.ts'),
+    'utf8',
+  )
+  assert.match(pwaAiFitTaskSource, /elon\.pwa\.ai_fit_task/)
+  assert.match(pwaAiFitTaskSource, /low-token-visual-fit-and-cross-platform-writeback/)
+  assert.match(pwaAiFitTaskSource, /defaultRepositoryScan: false/)
+  assert.match(pwaAiFitTaskSource, /screenshotsEmbeddedAsBase64: false/)
+  assert.match(pwaAiFitTaskSource, /不要默认读取整仓库/)
+  assert.match(pwaAiFitTaskSource, /不要把图片转成 Base64/)
   const pwaBridgeSource = fs.readFileSync(
     path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
     'utf8',
