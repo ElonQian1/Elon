@@ -179,6 +179,30 @@ fn normalize_source(mut source: DiscussionSource) -> Result<DiscussionSource> {
     source.kind = stable_id(&source.kind, 40);
     source.reference = truncate(source.reference.trim(), 1_000);
     source.imported_at = truncate(source.imported_at.trim(), 64);
+    source.content_revision = stable_id(&source.content_revision, 128);
+    source.source_format = stable_id(&source.source_format, 40);
+    source.message_count = source.message_count.min(1_000_000);
+    source.chunk_count = source.chunk_count.min(512);
+    source.processed_chunk_ids = strings(source.processed_chunk_ids, 512, 80);
+    source.compilation_status = normalized_choice(
+        &source.compilation_status,
+        &["pending", "partial", "complete"],
+        if source.processed_chunk_ids.is_empty() {
+            "pending"
+        } else {
+            "partial"
+        },
+        "来源编译状态",
+    )?;
+    if source.chunk_count > 0 && source.processed_chunk_ids.len() > source.chunk_count {
+        bail!("来源已处理 chunk 数不能超过 chunk 总数");
+    }
+    if source.compilation_status == "complete"
+        && source.chunk_count > 0
+        && source.processed_chunk_ids.len() != source.chunk_count
+    {
+        bail!("来源标记 complete 时必须处理全部 chunk");
+    }
     if source.id.is_empty() || source.title.is_empty() {
         bail!("讨论来源必须包含 id 和标题");
     }

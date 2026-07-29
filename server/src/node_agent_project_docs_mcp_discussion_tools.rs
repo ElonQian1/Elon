@@ -124,6 +124,7 @@ pub(crate) fn definitions() -> Vec<Value> {
     ];
     let mut read_tools = crate::node_agent_project_docs_mcp_discussion_history_tools::definitions();
     read_tools.extend(crate::node_agent_project_docs_mcp_discussion_review_tools::definitions());
+    read_tools.extend(crate::node_agent_project_docs_mcp_discussion_source_tools::definitions());
     definitions.splice(3..3, read_tools);
     definitions
 }
@@ -137,6 +138,13 @@ pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result
         return Ok(Some(value));
     }
     if let Some(value) = crate::node_agent_project_docs_mcp_discussion_review_tools::try_call(
+        workspace,
+        name,
+        arguments.clone(),
+    )? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = crate::node_agent_project_docs_mcp_discussion_source_tools::try_call(
         workspace,
         name,
         arguments.clone(),
@@ -359,7 +367,13 @@ fn save_schema() -> Value {
                 "sources":{"type":"array","maxItems":512,"items":{"type":"object","required":["id","title"],"properties":{
                     "id":{"type":"string","maxLength":100},"title":{"type":"string","maxLength":160},
                     "kind":{"type":"string","maxLength":40},"reference":{"type":"string","maxLength":1000},
-                    "imported_at":{"type":"string","maxLength":64}
+                    "imported_at":{"type":"string","maxLength":64},
+                    "content_revision":{"type":"string","maxLength":128},
+                    "source_format":{"type":"string","maxLength":40},
+                    "message_count":{"type":"integer","minimum":0},
+                    "chunk_count":{"type":"integer","minimum":0,"maximum":512},
+                    "processed_chunk_ids":{"type":"array","maxItems":512,"items":{"type":"string","maxLength":80}},
+                    "compilation_status":{"type":"string","enum":["pending","partial","complete"]}
                 }}},
                 "nodes":{"type":"array","maxItems":4096,"items":{"type":"object","required":["id","title"],"properties":{
                     "id":{"type":"string","maxLength":100},"root_id":{"type":"string","maxLength":100},

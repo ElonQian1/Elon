@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use std::path::Path;
 
 use crate::{
+    project_discussion_source_normalizer::{normalize_conversation, NormalizedConversation},
     project_document_authorization::{authorize_document_apply, DocumentAutomationMode},
     project_document_files::{read_project_document_file, write_project_document_file},
     project_document_git_transaction::{commit_document_baseline, commit_document_result},
@@ -39,7 +40,8 @@ pub(crate) fn import_conversation_source(
         bail!("导入聊天正文超过 2 MiB");
     }
 
-    let content = source_markdown(&title, body, &source_reference)?;
+    let normalized = normalize_conversation(body)?;
+    let content = source_markdown(&title, &normalized, &source_reference)?;
     let target = choose_target_path(workspace, &content, suggested_filename)?;
     if let Ok(existing) = read_project_document_file(workspace, &target.path) {
         if existing.content == content {
@@ -49,6 +51,10 @@ pub(crate) fn import_conversation_source(
                 "path": target.path,
                 "revision": existing.revision,
                 "source_bytes": body.len(),
+                "source_id": normalized.source_id,
+                "source_revision": normalized.content_revision,
+                "source_format": normalized.format,
+                "message_count": normalized.message_count,
                 "authorization_mode": authorization.mode,
                 "auto_authorized": authorization.auto_authorized,
                 "git_document_transaction_complete": true,
@@ -80,6 +86,10 @@ pub(crate) fn import_conversation_source(
         "path": target.path,
         "revision": saved.revision,
         "source_bytes": body.len(),
+        "source_id": normalized.source_id,
+        "source_revision": normalized.content_revision,
+        "source_format": normalized.format,
+        "message_count": normalized.message_count,
         "authorization_mode": authorization.mode,
         "auto_authorized": authorization.auto_authorized,
         "git_baseline_commit": baseline,
@@ -132,11 +142,22 @@ fn choose_target_path(
     bail!("无法为导入聊天分配不冲突的文件名")
 }
 
-fn source_markdown(title: &str, body: &str, source_reference: &str) -> Result<String> {
+fn source_markdown(
+    title: &str,
+    source: &NormalizedConversation,
+    source_reference: &str,
+) -> Result<String> {
     let title_yaml = serde_json::to_string(title)?;
     let source_yaml = serde_json::to_string(source_reference)?;
+    let source_id_yaml = serde_json::to_string(&source.source_id)?;
+    let source_revision_yaml = serde_json::to_string(&source.content_revision)?;
+    let source_format_yaml = serde_json::to_string(&source.format)?;
     let reviewed_at = Utc::now().format("%Y-%m-%d");
-    let heading = if body.lines().any(|line| line.trim_start().starts_with("# ")) {
+    let heading = if source
+        .body
+        .lines()
+        .any(|line| line.trim_start().starts_with("# "))
+    {
         String::new()
     } else {
         format!("# {title}\n\n")
@@ -152,9 +173,14 @@ owner: user\n\
 reviewed_at: {reviewed_at}\n\
 source_type: imported_conversation\n\
 source_reference: {source_yaml}\n\
+source_id: {source_id_yaml}\n\
+source_revision: {source_revision_yaml}\n\
+source_format: {source_format_yaml}\n\
+source_message_count: {}\n\
 ---\n\n\
 > 本文是导入的原始聊天来源，不是当前项目事实；稳定结论必须经讨论图审查后晋升。\n\n\
-{heading}{body}\n"
+{heading}{}\n",
+        source.message_count, source.body
     ))
 }
 
@@ -198,11 +224,14 @@ mod tests {
 
     #[test]
     fn source_markdown_uses_fixed_non_authoritative_facets() {
-        let markdown = source_markdown("产品讨论", "用户：为什么？", "chat://one").unwrap();
+        let source = normalize_conversation("用户：为什么？").unwrap();
+        let markdown = source_markdown("产品讨论", &source, "chat://one").unwrap();
         assert!(markdown.contains("role: discussion"));
         assert!(markdown.contains("lifecycle: source_material"));
         assert!(markdown.contains("authority: none"));
         assert!(markdown.contains("default_retrieval: false"));
+        assert!(markdown.contains("source_id:"));
+        assert!(markdown.contains("source_revision:"));
         assert!(markdown.contains("# 产品讨论"));
     }
 

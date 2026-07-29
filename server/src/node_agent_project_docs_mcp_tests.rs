@@ -157,6 +157,8 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "project_discussions_trace_node",
             "project_discussions_review_graph",
             "project_discussions_prepare_safe_repair",
+            "project_discussions_get_source_manifest",
+            "project_discussions_read_source_chunk",
             "project_discussions_get_suggestions",
             "project_discussions_save_proposal",
             "project_discussions_apply",

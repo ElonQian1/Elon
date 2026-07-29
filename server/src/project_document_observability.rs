@@ -213,6 +213,23 @@ pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
                 "已读取建议 revision，没有读取 Markdown 正文。",
             ),
             "project_docs_get_suggestions" => {}
+            "project_discussions_read_source_chunk" => {
+                trace.documents_read = trace.documents_read.saturating_add(1);
+                trace.estimated_tokens_used = trace.estimated_tokens_used.saturating_add(
+                    value["budget"]["estimated_model_tokens"]
+                        .as_u64()
+                        .unwrap_or_default(),
+                );
+                if can_advance_work(&trace) {
+                    advance(
+                        &mut trace,
+                        "discussion_source_chunk_read",
+                        "running",
+                        "聊天来源已按块读取",
+                        "只读取当前来源的一个稳定 chunk；已记录本次返回字符数和估算 token。",
+                    );
+                }
+            }
             "project_discussions_get_graph"
             | "project_discussions_get_node"
             | "project_discussions_get_history"
@@ -221,6 +238,7 @@ pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
             | "project_discussions_trace_node"
             | "project_discussions_review_graph"
             | "project_discussions_prepare_safe_repair"
+            | "project_discussions_get_source_manifest"
             | "project_discussions_get_suggestions"
                 if can_advance_work(&trace) =>
             {
@@ -240,6 +258,7 @@ pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
             | "project_discussions_trace_node"
             | "project_discussions_review_graph"
             | "project_discussions_prepare_safe_repair"
+            | "project_discussions_get_source_manifest"
             | "project_discussions_get_suggestions" => {}
             "project_discussions_save_proposal" => {
                 trace.suggestions_revision = string_field(value, "suggestions_revision");
@@ -400,8 +419,12 @@ pub(crate) fn record_tool_failure(workspace: &Path, tool: &str, error: &anyhow::
         | "project_discussions_trace_node"
         | "project_discussions_review_graph"
         | "project_discussions_prepare_safe_repair"
+        | "project_discussions_get_source_manifest"
         | "project_discussions_get_suggestions" => {
             "刷新讨论图 revision，确认提交仍在当前分支历史且 root_id 或 node_id 存在后重试。"
+        }
+        "project_discussions_read_source_chunk" => {
+            "重新获取来源 manifest，使用最新 source revision 和其中存在的 chunk id 重试。"
         }
         "project_discussions_save_proposal" => {
             "重新读取讨论图和建议 revision，修正未知来源、循环父子关系或无效晋升目标后重试。"

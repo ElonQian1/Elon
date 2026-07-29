@@ -43,6 +43,18 @@ pub(crate) struct DiscussionSource {
     pub reference: String,
     #[serde(default)]
     pub imported_at: String,
+    #[serde(default)]
+    pub content_revision: String,
+    #[serde(default)]
+    pub source_format: String,
+    #[serde(default)]
+    pub message_count: usize,
+    #[serde(default)]
+    pub chunk_count: usize,
+    #[serde(default)]
+    pub processed_chunk_ids: Vec<String>,
+    #[serde(default)]
+    pub compilation_status: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
