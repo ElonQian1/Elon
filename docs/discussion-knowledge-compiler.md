@@ -8,10 +8,14 @@ default_retrieval: false
 implementation_refs:
   - file:server/src/project_discussion_graph_model.rs
   - file:server/src/project_discussion_source_import.rs
+  - file:server/src/project_discussion_source_chunks.rs
+  - file:server/src/project_discussion_source_registration.rs
   - file:server/src/node_agent_project_docs_mcp_discussion_tools.rs
   - file:server/src/project_discussion_graph_history.rs
   - file:server/src/project_discussion_graph_review.rs
   - file:pc-frontend/src/features/project-docs/ProjectDocumentDiscussionMap.tsx
+  - file:pc-frontend/src/features/project-docs/ProjectDocumentDiscussionProposalPanel.tsx
+  - file:pc-frontend/src/features/project-docs/ProjectDocumentDiscussionSources.tsx
   - file:pc-frontend/src/features/project-docs/ProjectDocumentDiscussionTimeline.tsx
 ---
 
@@ -63,25 +67,25 @@ implementation_refs:
 - `docs/inbox/conversations/*.md`：用户导入的原始聊天，frontmatter 固定为 `role=discussion`、`lifecycle=source_material`、`authority=none`、`default_retrieval=false`。
 - `docs/**.md`：只有经过确认的节点才能晋升到正式文档。晋升不得覆盖已有不同内容。
 
-讨论节点必须保留 `source_refs`；可选保存平台任务或会话 ID 到 `conversation_refs`，并通过 `document_paths`、`feature_node_ids` 连接正式文档和产品功能图。讨论图最多 512 个来源、4096 个节点、8192 条边；PC 页面按根主题和搜索条件显示局部图，默认最多 400 个节点。
+讨论来源还保存 `content_revision`、格式、消息数、总 chunk、已处理 chunk 和 `pending|partial|complete`。讨论节点必须保留 `source_id#turn-xxxx` 形式的 `source_refs`；可选保存平台任务或会话 ID 到 `conversation_refs`，并通过 `document_paths`、`feature_node_ids` 连接正式文档和产品功能图。讨论图最多 512 个来源、4096 个节点、8192 条边；PC 页面按根主题和搜索条件显示局部图，默认最多 400 个节点。
 
 图中的 `evolution` 保存本次变更的 `kind`、摘要、执行者、时间和前一 revision。它用于给不同 Git 实现提供相同的人类可读版本语义，不代替 Git 提交，也不允许客户端覆盖历史版本。稳定节点 ID 是跨版本追踪的身份；标题可以改进，ID 不随标题变化。
 
 ## 低 token 编译流程
 
-1. PC 页面可先把上传文件保存为项目文档来源；没有页面交互时，任意 AI 供应商直接调用 `project_discussions_import_source` 传入标题、正文和原会话引用。该工具固定低权重 frontmatter、不覆盖已有来源，并为普通 Git 项目或托管笔记库创建导入前后版本。
+1. PC 页面通过本机 loopback 入口导入文件；没有页面交互时，任意 AI 供应商直接调用 `project_discussions_import_source`。两条路线复用同一 Rust 实现：规范化 ChatGPT 等 JSON 为稳定 turn 锚点，固定低权重 frontmatter，不覆盖已有来源，立即把来源登记为 `pending`，并为普通 Git 项目或托管笔记库创建导入前后版本。
 2. Windows 节点给当前登录账号选择的 Codex、Copilot、Claude 或 Gemini CLI 注入同一项目文档 MCP；普通开发任务不加载这组工具。
 3. AI 先调用 `project_discussions_get_graph` 读取已有节点和 revision，不读聊天正文。
-4. AI 用 `project_docs_plan_context` 规划范围，只对本次导入的来源调用 `project_docs_read`。
-5. AI 生成增量来源、节点、边和可选晋升项，调用 `project_discussions_save_proposal`。校验器拒绝未知来源、循环父子关系、无效路径和越界晋升。
+4. AI 调用 `project_discussions_get_source_manifest` 获取稳定 chunk 清单，对照图中 `processed_chunk_ids`，只用 `project_discussions_read_source_chunk` 顺序读取未处理 chunk；普通 `project_docs_read` 不用于聊天全文。
+5. AI 生成增量节点、边和可选晋升项，调用 `project_discussions_save_proposal`；每轮同时更新来源 revision、总 chunk、已处理 chunk 和编译状态。任务中断时保存 `partial`，下次从首个未处理 chunk 继续；全部处理后才能标记 `complete`。校验器拒绝进度越界、错误 complete、循环父子关系、无效路径和越界晋升。
 6. 修改前调用 `project_discussions_review_graph`。程序只修正 root 等确定性错误；权威性、采纳状态、重复观点和未解决异议必须根据命中来源判断。
 7. 根据统一权限模式调用 `project_discussions_apply`。所有可应用模式都为普通 Git 项目保存整理前和整理后提交；托管笔记库创建对应版本。晋升项声明的 `section_id`（未声明时使用来源节点的 `section_id`）若命中现有知识主题，系统会同时写入 `.elon/document-sections.json`，避免“生成了文档却在知识架构里找不到”；已有人工主题分配不会被覆盖。授权模式控制“能否应用”，不再控制“是否保留历史”。
-8. PC 页面刷新讨论图。用户可从任意节点继续、分叉或要求晋升，AI 先用 `project_discussions_get_node` 获取该节点的局部上下文。
+8. PC 页面刷新讨论图。用户可查看每个来源的进度并续编；从任意节点继续或分叉时，用户新增文字会先作为新的低权重来源进入 Git，再由 AI 增量编译，不允许 AI 凭按钮文案猜测新需求。晋升时用户可指定文档类型和可选路径。
 9. 应用后调用 `project_discussions_get_history` 和 `project_discussions_review_graph`；需要解释变化时用语义比较，不重读原聊天。
 
 `classification_model_tokens=0` 只代表读取现有讨论图和目录不调用模型。首次理解聊天正文仍会消耗模型 token，但只读当前来源；后续围绕节点工作不需要重复读取整段聊天。
 
-`project_discussions_import_source` 是 MCP 原生入口，不要求 AI 操作网页或直接拼写 frontmatter。相同标题、正文和建议文件名重复导入时返回已有来源；同名不同内容自动分配新文件名，永不覆盖旧聊天。
+`project_discussions_import_source` 是 MCP 原生入口，不要求 AI 操作网页或直接拼写 frontmatter。相同标题、正文和建议文件名重复导入时返回已有来源并保留已处理进度；同名不同内容自动分配新文件名，永不覆盖旧聊天。即使后续 AI 任务断电或失败，`pending` 来源仍已在讨论图和 Git 中，PC 页面可以发现并续编。
 
 ## 版本与演化回看
 
@@ -145,10 +149,12 @@ OneNote 式文档侧边栏中的“讨论推理”是独立虚拟分区：
 - “继续讨论”沿原分支补证据和下一步；
 - “创建备选分支”保留原观点并新增分支；
 - “晋升为正式文档”先评估稳定性和重复文档，不强制创建。
+- 顶部来源条展示 `processed/total chunks`；未完成来源可从断点续编；
+- 待处理建议先展示新增/变更节点、关系、来源进度和拟晋升文档，用户确认后才发起应用；
 - 版本时间轴可回看过去脑图、与当前版比较，并查看单节点如何发展到今天；
 - 质量面板显示确定性问题，并可让当前 Windows 登录账号选择的 AI CLI 生成修正版。
 
-UI 只负责上传、展示和发起带范围的 AI 任务。没有 UI 时，AI 可通过 `project_discussions_import_source` 完成同一导入。拆分、校验、revision、权限、Git 备份和应用均由 Windows 节点上的供应商无关 MCP 完成，网页不另建一套整理算法。
+UI 只负责收集用户输入、展示和发起带范围的 AI 任务。导入、继续和分叉都会先调用本机节点的统一来源/Git 事务；没有 UI 时，AI 可通过 `project_discussions_import_source` 完成同一操作。拆分、校验、revision、权限、Git 备份和应用均由 Windows 节点上的供应商无关 MCP 完成，网页不另建一套整理算法。
 
 ## 可迁移性
 
