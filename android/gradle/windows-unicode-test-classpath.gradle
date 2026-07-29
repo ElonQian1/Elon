@@ -1,0 +1,108 @@
+import java.security.MessageDigest
+
+/*
+ * Gradle's forked Test worker can fail to load project classes from a Windows
+ * path containing non-ASCII characters. Android compilation itself is not
+ * affected. Keep normal builds unchanged and shadow only project-local test
+ * runtime entries into an ASCII path immediately before a Test task executes.
+ */
+def isWindowsHost = System.getProperty("os.name", "")
+    .toLowerCase(Locale.ROOT)
+    .contains("windows")
+def containsNonAscii = { String value ->
+    value.find(/[^\u0000-\u007F]/) != null
+}
+def androidRoot = rootProject.projectDir.canonicalFile
+
+if (isWindowsHost && containsNonAscii(androidRoot.path)) {
+    def configuredShadowRoot = System.getenv("ELON_GRADLE_TEST_ASCII_ROOT")?.trim()
+    def shadowBase = configuredShadowRoot
+        ? new File(configuredShadowRoot).canonicalFile
+        : new File(gradle.gradleUserHomeDir, "elon-test-classes").canonicalFile
+
+    if (containsNonAscii(shadowBase.path)) {
+        throw new GradleException(
+            "Gradle 单元测试的 ASCII 映射目录仍含非 ASCII 字符：${shadowBase}。"
+                + "请把 ELON_GRADLE_TEST_ASCII_ROOT 设置为纯英文绝对路径。"
+        )
+    }
+
+    def androidRootPath = androidRoot.toPath()
+    def rootHash = MessageDigest.getInstance("SHA-256")
+        .digest(androidRoot.path.getBytes("UTF-8"))
+        .encodeHex()
+        .toString()
+        .substring(0, 16)
+
+    gradle.projectsEvaluated {
+        tasks.withType(Test).configureEach { testTask ->
+            def originalTestClasses = project.files(testTask.testClassesDirs)
+            def originalClasspath = project.files(testTask.classpath)
+            def taskShadowRoot = new File(
+                shadowBase,
+                "${rootHash}/${project.name}/${testTask.name}"
+            )
+
+            testTask.doFirst {
+                project.delete(taskShadowRoot)
+                taskShadowRoot.mkdirs()
+
+                def replacements = [:]
+                def localEntries = (
+                    originalClasspath.files + originalTestClasses.files
+                ).unique()
+
+                localEntries.eachWithIndex { entry, index ->
+                    def canonical = entry.canonicalFile
+                    if (canonical.toPath().startsWith(androidRootPath)) {
+                        def safeName = canonical.name.replaceAll("[^A-Za-z0-9._-]", "_")
+                        def destination = new File(
+                            taskShadowRoot,
+                            String.format("%03d-%s", index, safeName)
+                        )
+
+                        if (!canonical.exists()) {
+                            destination.mkdirs()
+                        } else if (canonical.isDirectory()) {
+                            project.copy {
+                                from(canonical)
+                                into(destination)
+                            }
+                        } else {
+                            destination.parentFile.mkdirs()
+                            java.nio.file.Files.copy(
+                                canonical.toPath(),
+                                destination.toPath(),
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                            )
+                        }
+                        replacements[canonical.path] = destination
+                    }
+                }
+
+                testTask.testClassesDirs = project.files(
+                    originalTestClasses.files.collect {
+                        replacements[it.canonicalFile.path] ?: it
+                    }
+                )
+                testTask.classpath = project.files(
+                    originalClasspath.files.collect {
+                        replacements[it.canonicalFile.path] ?: it
+                    }
+                )
+
+                def unresolvedLocalEntries = testTask.classpath.files.findAll {
+                    it.canonicalFile.toPath().startsWith(androidRootPath)
+                }
+                if (!unresolvedLocalEntries.isEmpty()) {
+                    throw new GradleException(
+                        "Gradle 单元测试仍包含中文项目路径：${unresolvedLocalEntries}"
+                    )
+                }
+                logger.lifecycle(
+                    "Windows 中文路径兼容：${testTask.path} 使用 ASCII 测试运行时映射"
+                )
+            }
+        }
+    }
+}

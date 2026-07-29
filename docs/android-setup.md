@@ -96,3 +96,20 @@ cd e:\lodex\Elon\android
 > **为什么不把镜像配置提交到仓库？**
 > `init.gradle` 写入用户级 `~/.gradle/`，不进入 git，不影响其他团队成员或 CI 环境。
 > 每台机器自行按网络测速决定镜像策略，符合"本地环境自治"原则。
+
+---
+
+## Windows 中文路径下的单元测试
+
+项目已内置兼容层。Windows 工作目录含中文字符时，Gradle `Test` 任务会自动把项目内的测试运行时 classpath 映射到 Gradle 用户目录中的纯英文缓存路径；APK 编译、Release 构建和英文路径下的测试不受影响。
+
+因此不要再为单元测试手工创建 `subst` 盘符，也不需要添加临时 Gradle init script。每次实际执行 `Test` 任务时会刷新约 17 MB 的本地映射，通常只增加不到 1 秒；Gradle 的编译增量仍正常工作。
+
+如果 Windows 用户目录本身也含中文，先指定一个纯英文绝对路径：
+
+```powershell
+$env:ELON_GRADLE_TEST_ASCII_ROOT = "C:\GradleTestRuntime"
+.\gradlew.bat :app:testDebugUnitTest
+```
+
+兼容层入口为 `android/gradle/windows-unicode-test-classpath.gradle`。看到“Windows 中文路径兼容”日志，表示映射已自动启用。
