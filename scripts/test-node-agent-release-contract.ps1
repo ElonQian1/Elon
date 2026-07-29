@@ -106,6 +106,11 @@ Assert-True ($brandIconSha256 -match '^[0-9a-f]{64}$') `
 
 $publishScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-node-agent.ps1") -Raw
 $healthScript = Get-Content -LiteralPath (Join-Path $PSScriptRoot "publish-health-checks.ps1") -Raw
+$resolvedPublishCurl = Resolve-ElonPublishCurl
+Assert-True ($resolvedPublishCurl -is [string]) `
+    "Publish smoke checks must resolve exactly one curl executable"
+Assert-True (Test-Path -LiteralPath $resolvedPublishCurl -PathType Leaf) `
+    "The resolved publish curl executable must exist"
 $packagingScript = Get-Content -LiteralPath (
     Join-Path $PSScriptRoot "node-agent-release-packaging.ps1"
 ) -Raw

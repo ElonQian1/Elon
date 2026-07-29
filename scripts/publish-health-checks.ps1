@@ -1,7 +1,9 @@
 function Resolve-ElonPublishCurl {
-    $curl = Get-Command "curl.exe" -CommandType Application -ErrorAction SilentlyContinue
+    $curl = @(Get-Command "curl.exe" -CommandType Application -ErrorAction SilentlyContinue) |
+        Select-Object -First 1
     if ($curl) { return $curl.Source }
-    $curl = Get-Command "curl" -CommandType Application -ErrorAction SilentlyContinue
+    $curl = @(Get-Command "curl" -CommandType Application -ErrorAction SilentlyContinue) |
+        Select-Object -First 1
     if ($curl) { return $curl.Source }
     throw "curl is unavailable; cannot run publish smoke checks."
 }
