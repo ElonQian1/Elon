@@ -40,9 +40,20 @@ class ProfilePageLayoutContractTest {
             "android/app/src/main/kotlin/com/elon/app/ProfileTokenUsageCard.kt"
         )
         assertTrue(tokenCard.contains("R.drawable.profile_panel_quota"))
-        assertTrue(tokenCard.contains("R.drawable.profile_pill_dark"))
-        assertTrue(tokenCard.contains("R.drawable.profile_pill_light"))
+        assertTrue(tokenCard.contains("R.drawable.profile_pill_selected"))
+        assertTrue(tokenCard.contains("R.drawable.profile_pill_unselected"))
+        assertTrue(tokenCard.contains("private var selectedDays = 7"))
         assertTrue(tokenCard.contains("ProfileQuotaGaugeView"))
+        val selectedPill = readRepositoryFile(
+            "android/app/src/main/res/drawable/profile_pill_selected.xml"
+        )
+        assertTrue(selectedPill.contains("@color/elon_profile_quota_selected"))
+        assertTrue(selectedPill.contains("@color/elon_profile_quota_border"))
+        val unselectedPill = readRepositoryFile(
+            "android/app/src/main/res/drawable/profile_pill_unselected.xml"
+        )
+        assertTrue(unselectedPill.contains("@color/elon_profile_quota_control"))
+        assertTrue(unselectedPill.contains("@color/elon_profile_quota_border"))
     }
 
     @Test
@@ -52,6 +63,9 @@ class ProfilePageLayoutContractTest {
         assertTrue(web.contains(".profile-action-group"))
         assertTrue(web.contains("min-height: 284px"))
         assertTrue(web.contains("grid-template-columns: repeat(3"))
+        assertTrue(web.contains("--profile-quota-selected: #5DA6FF"))
+        assertTrue(web.contains("class=\"usage-period-button selected\" id=\"usageWeekBtn\""))
+        assertTrue(web.contains("let profileUsageDays = 7"))
         assertTrue(web.contains("class=\"usage-gauge-progress\""))
         assertTrue(web.contains("padding: 12px 10px 12px 16px"))
         assertTrue(web.contains("padding: 0 10px 0 16px"))

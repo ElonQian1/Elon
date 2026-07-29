@@ -77,6 +77,10 @@
       --tab-active: #D6D6D6;
       --bottom-menu-height: 72px;
       --profile-action-group-radius: 18px;
+      --profile-quota-selected: #5DA6FF;
+      --profile-quota-control: #D9D9D9;
+      --profile-quota-border: #3E3E42;
+      --profile-quota-control-ink: #171717;
       --top-safe-area: env(safe-area-inset-top);
     }
     * {
@@ -2712,18 +2716,17 @@
     }
     #profilePage .usage-period-button {
       height: 38px;
-      border: 1px solid #3E3E42;
+      border: 1px solid var(--profile-quota-border);
       border-radius: 999px;
-      background: #101010;
-      color: #D9D9D9;
+      background: var(--profile-quota-control);
+      color: var(--profile-quota-control-ink);
       font-size: 15px;
       cursor: pointer;
     }
-    #profilePage .usage-period-button.selected,
-    #profilePage .usage-period-button.recharge {
-      border-color: #D9D9D9;
-      background: #D9D9D9;
-      color: #171717;
+    #profilePage .usage-period-button.selected {
+      border-color: var(--profile-quota-border);
+      background: var(--profile-quota-selected);
+      color: var(--ink);
     }
     #profilePage .usage-gauge {
       position: relative;
@@ -4536,8 +4539,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <div class="usage-section">
         <h3>Token 额度</h3>
         <div class="usage-period-actions">
-          <button class="usage-period-button" id="usageWeekBtn" type="button">7天</button>
-          <button class="usage-period-button selected" id="usagePeriodText" type="button">30天</button>
+          <button class="usage-period-button selected" id="usageWeekBtn" type="button">7天</button>
+          <button class="usage-period-button" id="usagePeriodText" type="button">30天</button>
           <button class="usage-period-button recharge" id="rechargeQuotaBtn" type="button">充值</button>
         </div>
         <div class="usage-gauge" id="usageRefreshBtn" role="button" tabindex="0" aria-label="刷新 Token 额度">
@@ -5931,7 +5934,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   let currentTab = 'chatPage';
   let nodeResourceExpanded = false;
   let profileMemoriesExpanded = false;
-  let profileUsageDays = 30;
+  let profileUsageDays = 7;
   let socket = null;
   let appSocket = null;
   let busy = false;

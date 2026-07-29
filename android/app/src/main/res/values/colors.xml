@@ -36,6 +36,10 @@
     <color name="elon_button_secondary_text">#D9D9D9</color>
     <color name="elon_button_primary_bg">#FFFFFF</color>
     <color name="elon_button_primary_text">#000000</color>
+    <color name="elon_profile_quota_selected">#5DA6FF</color>
+    <color name="elon_profile_quota_control">#D9D9D9</color>
+    <color name="elon_profile_quota_border">#3E3E42</color>
+    <color name="elon_profile_quota_button_text">#171717</color>
 
     <color name="elon_accent_primary">#58BE6A</color>
     <color name="elon_link_primary">#58BE6A</color>

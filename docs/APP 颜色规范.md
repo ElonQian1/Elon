@@ -13,6 +13,7 @@
 - 纯黑优先：我的项目列表、项目广场页面、详情页顶部 chrome、项目空间内容画布统一使用 `#000000`。
 - 结构克制：用深灰卡片、分区条、圆角和留白建立层级，不依赖彩色边框。
 - 白色动作：主要按钮统一为白底黑字胶囊，例如“进入空间”“下载APK”“AI 会话”。
+- 额度周期：个人页 Token 额度的周期按钮保持三等宽胶囊；选中态使用 `color.surface.quota.selected`，未选中态使用 `#D9D9D9`，默认选中“7天”。
 - 状态点缀：绿色和红色只用于状态点、在线、通过、需审批、异常，不作为大面积按钮底色。
 - 大字导航：一级页面使用粗体大标题和短下划线表达选中，不使用传统顶部 Tab 条边框。
 - 胶囊筛选：搜索框、筛选项、分段控件均为圆角胶囊，选中态用深灰填充。
@@ -53,6 +54,9 @@
 | 加号 / 主线性图标 | `color.icon.primary` | `elon_icon_primary` | `--icon-primary` | `#D9D9D9` | 图 3 内容加号 |
 | 顶部加号图标 | `color.icon.add.top` | `elon_icon_add_top` | `--icon-add-top` | `#D3D3D3` | 图 1 顶部加号 |
 | 底部主菜单抽屉展开图标 | `color.icon.menu.open` | `ic_bottom_nav_menu_active` | `__BOTTOM_NAV_MENU_ACTIVE_PNG_B64__` | `#5DA6FF` | 2026-07-24 用户提供三横杠素材 |
+| 个人页额度周期选中胶囊 | `color.surface.quota.selected` | `elon_profile_quota_selected` | `--profile-quota-selected` | `#5DA6FF` | 2026-07-29 用户提供个人页标注图 |
+| 个人页额度周期未选胶囊 | `color.surface.quota.control` | `elon_profile_quota_control` | `--profile-quota-control` | `#D9D9D9` | 2026-07-29 用户提供个人页标注图 |
+| 个人页额度周期胶囊描边 | `color.border.quota.control` | `elon_profile_quota_border` | `--profile-quota-border` | `#3E3E42` | 2026-07-29 用户提供个人页标注图 |
 | 成功 / 无需审批 / 可安装状态点 | `color.status.success` | `elon_status_success` | `--success` | `#58BE6A` | 图 2 绿色状态点 |
 | 项目状态 / 好友页下拉筛选项目进度 | `color.status.project` | `elon_status_project` | `--pull-filter-project` | `#F2C94C` | 好友页项目角标与项目筛选进度 |
 | 需审批 / 异常状态点 | `color.status.danger` | `elon_status_danger` | `--danger` | `#E62129` | 图 2 红色状态点 |
@@ -331,7 +335,7 @@ Web 变量建议：
 ## 禁止项
 
 - 禁止把绿色作为大面积主按钮背景，除非是明确的成功状态。
-- 禁止引入蓝色、紫色、橙色作为新的主辅助色；`color.icon.menu.open` 仅限底部主菜单抽屉展开反馈。
+- 禁止引入蓝色、紫色、橙色作为新的主辅助色；`color.icon.menu.open` 仅限底部主菜单抽屉展开反馈，`color.surface.quota.selected` 仅限个人页 Token 额度周期选中态。
 - 禁止使用渐变背景、光斑、装饰球、拟物投影。
 - 禁止用卡片包裹所有列表项；我的项目列表应保持透明行。
 - 禁止在深色卡片内再套一层同样视觉重量的卡片。

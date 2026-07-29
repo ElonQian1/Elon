@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.elon.app.databinding.ActivityMainBinding
 import kotlin.concurrent.thread
 import kotlin.math.roundToInt
@@ -23,7 +24,7 @@ internal class ProfileTokenUsageCard(
 ) {
     private var root: LinearLayout? = null
     private var loadSerial = 0
-    private var selectedDays = 30
+    private var selectedDays = 7
 
     private lateinit var weekButton: TextView
     private lateinit var monthButton: TextView
@@ -133,10 +134,15 @@ internal class ProfileTokenUsageCard(
 
     private fun stylePeriodButton(button: TextView, selected: Boolean) {
         button.setBackgroundResource(
-            if (selected) R.drawable.profile_pill_light else R.drawable.profile_pill_dark
+            if (selected) R.drawable.profile_pill_selected
+            else R.drawable.profile_pill_unselected
         )
         button.setTextColor(
-            Color.parseColor(if (selected) "#171717" else "#D9D9D9")
+            ContextCompat.getColor(
+                activity,
+                if (selected) R.color.elon_text_primary
+                else R.color.elon_profile_quota_button_text
+            )
         )
         button.isSelected = selected
     }
