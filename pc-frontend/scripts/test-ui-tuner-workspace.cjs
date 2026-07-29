@@ -637,6 +637,24 @@ try {
   assert.match(pwaAiFitTaskSource, /screenshotsEmbeddedAsBase64: false/)
   assert.match(pwaAiFitTaskSource, /不要默认读取整仓库/)
   assert.match(pwaAiFitTaskSource, /不要把图片转成 Base64/)
+  const pwaDesignContextSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/pwaDesignContext.ts'),
+    'utf8',
+  )
+  assert.match(pwaDesignContextSource, /buildPwaDraftAiFitTask/)
+  assert.match(pwaDesignContextSource, /aiFitTask: buildPwaDraftAiFitTask\(input\.draft\)/)
+  const contextPackSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/contextPack.ts'),
+    'utf8',
+  )
+  assert.match(contextPackSource, /PwaDraftAiFitTask/)
+  assert.match(contextPackSource, /aiFitTask: PwaDraftAiFitTask/)
+  const projectSessionPanelSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/UiTunerProjectSessionPanel.tsx'),
+    'utf8',
+  )
+  assert.match(projectSessionPanelSource, /pwaDesign\.aiFitTask/)
+  assert.match(projectSessionPanelSource, /aiFitTask\.compactHandoff\.elements/)
   const pwaBridgeSource = fs.readFileSync(
     path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
     'utf8',

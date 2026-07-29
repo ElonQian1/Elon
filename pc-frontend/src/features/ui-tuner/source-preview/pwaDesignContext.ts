@@ -3,6 +3,7 @@ import {
   buildPwaDraftCliCompactHandoff,
   type PwaDesignDraft,
 } from './pwaDesignDraft'
+import { buildPwaDraftAiFitTask } from './pwaAiFitTask'
 import type { PwaRuntimeCaptureArtifact } from './pwaVerificationModel'
 import type { CrossPlatformWritebackReceipt } from './crossPlatformWritebackReceipt'
 import type {
@@ -109,6 +110,7 @@ export function buildPwaDesignContextPack(input: {
       route: input.draft.route,
       viewport: input.draft.viewport,
       compactHandoff: buildPwaDraftCliCompactHandoff(input.draft),
+      aiFitTask: buildPwaDraftAiFitTask(input.draft),
       changes: input.plan.codexChanges,
       compactSourceBundle: compactSourceBundle(input.root, input.plan),
       bindingSummary: bindingSummary(input.draft, unresolvedKeys),

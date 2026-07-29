@@ -8,6 +8,7 @@ import type { UiTunerRepeatGroup } from './runtime/repeatComponents'
 import type { UiTunerSelectionVisualContext } from './runtime/selectionArtifact'
 import type { FitRunDocument } from './fit-run/types'
 import type { PwaDraftCliCompactHandoff } from './source-preview/pwaDesignDraft'
+import type { PwaDraftAiFitTask } from './source-preview/pwaAiFitTask'
 
 export interface UiTunerCodexContextPack {
   version: 4
@@ -126,6 +127,7 @@ export interface UiTunerCodexContextPack {
     route: { path: string; search: string; hash: string }
     viewport: { width: number; height: number }
     compactHandoff: PwaDraftCliCompactHandoff
+    aiFitTask: PwaDraftAiFitTask
     changes: unknown[]
     compactSourceBundle: Array<Record<string, unknown>>
     bindingSummary: Array<Record<string, unknown>>
