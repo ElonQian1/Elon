@@ -1399,6 +1399,7 @@ class MainActivity : AppCompatActivity() {
                     refreshChatTabBadge()
                 }
             },
+            onSessionExpired = { accountActions().refreshAccountUi() },
             openAddFriendPage = {
                 addFriendPageLauncher.launch(Intent(this, AddFriendActivity::class.java))
             }

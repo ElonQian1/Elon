@@ -1,6 +1,6 @@
 # APP UI 设计规范
 
-最后更新：2026-07-24
+最后更新：2026-07-29
 
 本文件替代旧版“APP 颜色规范”，作为一龙 APP 的完整 UI 设计规范。文件名保留历史路径，方便现有 AI 路由、脚本和说明继续定位；内容以本版为准。任何 APP 页面、主题、颜色、按钮、卡片、列表、底部导航、弹窗、状态标签或项目空间 UI 调整，都必须先遵守本文件；除非任务本身是更新本规范。
 
@@ -57,6 +57,7 @@
 | 个人页额度周期选中胶囊 | `color.surface.quota.selected` | `elon_profile_quota_selected` | `--profile-quota-selected` | `#5DA6FF` | 2026-07-29 用户提供个人页标注图 |
 | 个人页额度周期未选胶囊 | `color.surface.quota.control` | `elon_profile_quota_control` | `--profile-quota-control` | `#D9D9D9` | 2026-07-29 用户提供个人页标注图 |
 | 个人页额度周期胶囊描边 | `color.border.quota.control` | `elon_profile_quota_border` | `--profile-quota-border` | `#3E3E42` | 2026-07-29 用户提供个人页标注图 |
+| 我的页账号操作文字 | `color.text.profile.account.action` | `profile_account_action_text` | `--profile-account-action` | `#5DA6FF` | 2026-07-29 用户提供登录/退出板块参考图 |
 | 成功 / 无需审批 / 可安装状态点 | `color.status.success` | `elon_status_success` | `--success` | `#58BE6A` | 图 2 绿色状态点 |
 | 项目状态 / 好友页下拉筛选项目进度 | `color.status.project` | `elon_status_project` | `--pull-filter-project` | `#F2C94C` | 好友页项目角标与项目筛选进度 |
 | 需审批 / 异常状态点 | `color.status.danger` | `elon_status_danger` | `--danger` | `#E62129` | 图 2 红色状态点 |

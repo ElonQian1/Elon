@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import okhttp3.Request
 import org.json.JSONObject
+import java.time.Instant
 import java.util.UUID
 
 /**
@@ -47,7 +48,17 @@ object AuthManager {
         return ctx.getSharedPreferences("elon_data_$guestId", Context.MODE_PRIVATE)
     }
 
-    fun isLoggedIn(ctx: Context): Boolean = !token(ctx).isNullOrBlank() && !userId(ctx).isNullOrBlank()
+    fun isLoggedIn(ctx: Context): Boolean =
+        hasStoredSession(ctx) && !isSessionExpired(ctx)
+
+    fun hasStoredSession(ctx: Context): Boolean =
+        !token(ctx).isNullOrBlank() && !userId(ctx).isNullOrBlank()
+
+    fun isSessionExpired(ctx: Context, nowEpochMillis: Long = System.currentTimeMillis()): Boolean {
+        if (!hasStoredSession(ctx)) return false
+        val expiresAt = prefs(ctx).getLong(KEY_AUTH_EXPIRES_AT, 0L)
+        return expiresAt > 0L && expiresAt <= nowEpochMillis
+    }
 
     fun token(ctx: Context): String? = prefs(ctx).getString(KEY_AUTH_TOKEN, null)?.takeIf { it.isNotBlank() }
 
@@ -115,9 +126,9 @@ object AuthManager {
         val uid = user.optString("id", "").trim()
         val account = user.optString("account", "").trim().ifBlank { null }
         val nickname = user.optString("nickname", "").trim().ifBlank { null }
-        val expiresAt = json.optLong("expires_at", 0L)
+        val expiresAt = parseServerExpiryEpochMillis(json.optString("expires_at", ""))
         if (token.isBlank() || uid.isBlank()) throw IllegalStateException("响应缺少 token 或 user.id")
-        saveSession(ctx, token, uid, account, nickname, expiresAt.takeIf { it > 0 })
+        saveSession(ctx, token, uid, account, nickname, expiresAt)
         return uid
     }
 
@@ -131,4 +142,13 @@ object AuthManager {
             ChatBackgroundService.stop(app)
         }
     }
+}
+
+internal fun parseServerExpiryEpochMillis(value: String): Long? {
+    val text = value.trim()
+    if (text.isEmpty()) return null
+    text.toLongOrNull()?.let { numeric ->
+        return if (numeric in 1..999_999_999_999L) numeric * 1000L else numeric
+    }
+    return runCatching { Instant.parse(text).toEpochMilli() }.getOrNull()
 }

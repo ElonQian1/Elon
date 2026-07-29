@@ -219,7 +219,7 @@ internal class MainAccountActions(
     fun refreshAccountUi() {
         val loggedIn = AuthManager.isLoggedIn(activity)
         binding.profileLoginButton.visibility = if (loggedIn) View.GONE else View.VISIBLE
-        binding.profileLogoutButton.visibility = View.GONE
+        binding.profileLogoutButton.visibility = if (loggedIn) View.VISIBLE else View.GONE
         binding.profileImportGuestButton.visibility =
             if (loggedIn && importableGuestProjects().isNotEmpty()) View.VISIBLE else View.GONE
         refreshProfileSummary()

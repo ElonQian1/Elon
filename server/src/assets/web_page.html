@@ -81,6 +81,7 @@
       --profile-quota-control: #D9D9D9;
       --profile-quota-border: #3E3E42;
       --profile-quota-control-ink: #171717;
+      --profile-account-action: #5DA6FF;
       --top-safe-area: env(safe-area-inset-top);
     }
     * {
@@ -2890,6 +2891,21 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    #profilePage .profile-account-action {
+      width: 100%;
+      min-height: 56px;
+      box-sizing: border-box;
+      margin: 14px 0 env(safe-area-inset-bottom);
+      padding: 0 16px;
+      border: 0;
+      border-radius: 16px;
+      background: #1A1A1A;
+      color: var(--profile-account-action);
+      font: 400 14px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+      text-align: center;
+      cursor: pointer;
+    }
+    #profilePage .profile-account-action:hover { background: #1A1A1A; }
 
     /* ===== Agent 自动化页（网页版同步 APK 入口，不模拟原生权限） ===== */
     .agent-center-page {
@@ -4731,13 +4747,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         </button>
       </div>
 
+      <button class="profile-account-action" id="logoutRow" type="button">
+        <span id="profileAuthActionText">退出登录</span>
+      </button>
+
       <div class="profile-legacy-actions">
         <button id="ttsVoiceRow" type="button"><span>AI 回复语音</span></button>
         <button id="chatHandleToggleRow" type="button"><span>悬浮按钮</span><span id="chatHandleToggleSwitch"></span></button>
         <button id="nodeMarketRow" type="button"><span>PC 节点大厅</span></button>
         <button id="projectPlazaRow" type="button"><span>项目广场</span></button>
         <button id="importGuestRow" type="button"><span>导入游客记录</span></button>
-        <button id="logoutRow" type="button"><span>退出登录</span></button>
       </div>
     </div>
 
@@ -5754,6 +5773,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   const checkUpdateRow = $('checkUpdateRow');
   const updateArrow = $('updateArrow');
   const logoutRow = $('logoutRow');
+  const profileAuthActionText = $('profileAuthActionText');
 
   const inputBar = $('inputBar');
   const imageEditBtn = $('imageEditBtn');
@@ -9172,6 +9192,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     if (expectedToken && expectedToken !== token) return false;
     currentUser = data.user;
     syncWebSideMenuUser();
+    profileAuthActionText.textContent = '退出登录';
     const name = currentUser.nickname || currentUser.account || '用户';
     const account = currentUser.account || '';
     profileNickname.textContent = name;
@@ -10993,6 +11014,11 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
 
   // ====== 退出登录 ======
   logoutRow.addEventListener('click', () => {
+    if (!currentUser) {
+      profileAuthActionText.textContent = '登录账号';
+      showLogin();
+      return;
+    }
     const name = (currentUser && (currentUser.nickname || currentUser.account)) || '';
     const msg = name ? `确定退出账号「${name}」？退出后仍可重新登录恢复项目。` : '确定退出当前账号吗？';
     if (!window.confirm(msg)) return;

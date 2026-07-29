@@ -27,6 +27,10 @@ class ProfilePageLayoutContractTest {
         assertTrue(!layout.contains("android:paddingStart=\"36dp\""))
         assertTrue(layout.contains("android:background=\"@drawable/profile_panel_primary_actions_stable\""))
         assertTrue(layout.contains("android:background=\"@drawable/profile_panel_support_actions\""))
+        assertTrue(layout.contains("android:id=\"@+id/profileLoginButton\""))
+        assertTrue(layout.contains("android:id=\"@+id/profileLogoutButton\""))
+        assertTrue(layout.contains("android:background=\"@drawable/bg_profile_account_action\""))
+        assertTrue(layout.contains("android:textColor=\"@color/profile_account_action_text\""))
         listOf(
             "profile_icon_pc_node",
             "profile_icon_ai_settings",
@@ -73,7 +77,11 @@ class ProfilePageLayoutContractTest {
         val profileGroupCss =
             web.substringAfter("#profilePage .profile-action-group {").substringBefore("}")
         assertTrue(profileGroupCss.contains("border-radius: var(--profile-action-group-radius)"))
-        listOf("PC 节点", "AI 记忆", "AI 代理设置", "Agent 自动化", "分享推广", "检测更新")
+        assertTrue(web.contains("class=\"profile-account-action\""))
+        assertTrue(web.contains("id=\"logoutRow\""))
+        assertTrue(web.contains("--profile-account-action: #5DA6FF"))
+        assertTrue(web.contains("color: var(--profile-account-action)"))
+        listOf("PC 节点", "AI 记忆", "AI 代理设置", "Agent 自动化", "分享推广", "检测更新", "退出登录")
             .forEach { label -> assertTrue(web.contains(label)) }
     }
 

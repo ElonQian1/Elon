@@ -30,9 +30,16 @@ internal class MainFriendActions(
     private val serverUrl: String,
     private val setFriends: (List<AppFriend>) -> Unit,
     private val onFriendsChanged: () -> Unit,
+    private val onSessionExpired: () -> Unit,
     private val openAddFriendPage: () -> Unit
 ) {
+    private var sessionExpiredPromptShown = false
+
     fun loadFriends() {
+        if (AuthManager.isSessionExpired(activity)) {
+            handleSessionExpired()
+            return
+        }
         if (!AuthManager.isLoggedIn(activity)) {
             setFriends(emptyList())
             onFriendsChanged()
@@ -46,6 +53,11 @@ internal class MainFriendActions(
                 val request = AuthManager.applyAuth(activity, builder).build()
                 http.newCall(request).execute().use { response ->
                     val body = response.body?.string().orEmpty()
+                    if (response.code == 401) {
+                        throw SessionExpiredException(
+                            readErrorMessage(body, "登录已过期，请重新登录")
+                        )
+                    }
                     if (!response.isSuccessful) error(readErrorMessage(body, "加载好友失败"))
                     val array = JSONObject(body).optJSONArray("friends") ?: org.json.JSONArray()
                     List(array.length()) { index ->
@@ -55,9 +67,13 @@ internal class MainFriendActions(
             }
             activity.runOnUiThread {
                 result.onSuccess {
+                    sessionExpiredPromptShown = false
                     setFriends(it)
                     onFriendsChanged()
                 }
+                result.exceptionOrNull()
+                    ?.takeIf { it is SessionExpiredException }
+                    ?.let { handleSessionExpired() }
             }
         }
     }
@@ -78,6 +94,23 @@ internal class MainFriendActions(
             }
             .show()
         return false
+    }
+
+    private fun handleSessionExpired() {
+        AuthManager.clear(activity)
+        setFriends(emptyList())
+        onFriendsChanged()
+        onSessionExpired()
+        if (sessionExpiredPromptShown || activity.isFinishing || activity.isDestroyed) return
+        sessionExpiredPromptShown = true
+        AlertDialog.Builder(activity)
+            .setTitle("登录已过期")
+            .setMessage("好友数据仍保存在原账号中。请重新登录原账号恢复好友列表。")
+            .setNegativeButton("稍后", null)
+            .setPositiveButton("重新登录") { _, _ ->
+                activity.startActivity(Intent(activity, LoginActivity::class.java))
+            }
+            .show()
     }
 
     private fun readErrorMessage(body: String, fallback: String): String {
@@ -112,4 +145,6 @@ internal class MainFriendActions(
         if (value.isBlank()) return null
         return runCatching { Instant.parse(value).toEpochMilli() }.getOrNull()
     }
+
+    private class SessionExpiredException(message: String) : IllegalStateException(message)
 }
