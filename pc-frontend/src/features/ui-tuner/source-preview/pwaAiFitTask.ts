@@ -36,8 +36,9 @@ export function buildPwaDraftAiFitTaskContractId(draft: PwaDesignDraft): string 
     sourceRevision: draft.project.sourceRevision,
     viewport: draft.viewport,
     elements: compactHandoff.elements.map((element) => ({
-      key: element.key,
-      scope: element.scope,
+      elementKey: element.elementKey,
+      selector: element.selector,
+      stableIdentity: element.stableIdentity,
       changedProperties: element.changedProperties,
       bindingNeedsBinding: element.binding.needsBinding,
     })),
