@@ -29,10 +29,12 @@ assert.match(fieldsSource, /event\.shiftKey \? 10 : 1/)
 assert.match(fieldsSource, /className=\{styles\.stepper\}/)
 
 const inspectorCss = read('PwaStyleInspector.module.css')
+assert.match(inspectorCss, /\.inspector\s*\{[^}]*height:\s*100%\s*!important/s)
 assert.match(inspectorCss, /\.inspectorChrome\s*\{[^}]*position:\s*sticky/s)
 assert.match(inspectorCss, /\.edgeGrid\s*\{[^}]*grid-template-columns:\s*repeat\(2/s)
 assert.match(inspectorCss, /\.workflowDisclosure/)
 assert.match(inspectorCss, /\.resetActions\s*\{[^}]*position:\s*sticky/s)
+assert.match(inspectorCss, /\.resetActions\s*\{[^}]*flex:\s*0 0 auto/s)
 assert.match(inspectorCss, /@media \(max-width: 1050px\)/)
 
 console.log('PWA_STYLE_INSPECTOR_TEST=passed')

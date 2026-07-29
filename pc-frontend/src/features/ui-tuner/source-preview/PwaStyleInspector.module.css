@@ -3,6 +3,7 @@
   --inspector-border: #2b394c;
   --inspector-panel: #111a28;
   --inspector-field: #172334;
+  height: 100% !important;
 }
 
 .inspectorChrome {
@@ -331,6 +332,7 @@
   position: sticky;
   z-index: 20;
   bottom: 0;
+  flex: 0 0 auto;
   padding: 9px 10px 11px;
   background: rgb(13 21 32 / 94%);
 }
