@@ -28,6 +28,7 @@
 | APP 低风险视觉微调（Ripple、颜色、间距、圆角、字号、轻动画） | `docs/app-ui-fast-lane.md`；默认不启动真机、模拟器或 Renderer |
 | APP 复杂 UI、主题、导航、按图还原 | `docs/Design.md`、`docs/APP 颜色规范.md`；涉及 APK/网页同步再读 `.github/instructions/apk-web-ui-sync.instructions.md` |
 | APP 当前版本记忆 | `docs/app-version-memory.md` |
+| 一龙自身品牌 Logo 替换 | `docs/brand-logo-workflow.md`；统一运行 `scripts/replace-brand-logo.ps1` |
 | Prompt/Agent/Skill | 仅按目标读取；去重先运行 `scripts/audit-ai-prompt-assets.ps1` |
 | 聊天记录、时间线、下载地址溯源、慢任务诊断 | `docs/query-chat-records.md` |
 
