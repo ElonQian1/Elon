@@ -21,5 +21,6 @@ When a script prints `NEXT=`, `EDIT_ROOT=`, `FINISH_COMMAND_*=`, `FINALIZABLE=`,
 ## Codex-Unique Runtime Rules
 
 - **Prewarm** 只做预热，不读文件、不改代码、不构建、不部署。
+- **Tool output budget**：长命令成功只读结构化摘要；失败先筛选错误并分页，禁止打开完整日志。
 - **Stale session**：`codex resume` 失败时标记 stale，带旧 `codex://threads/<thread_id>` URI 和最近后端消息重试一次（不冷启动）。
 - **Executor guard**：请求含 `<elon-pc-executor>` 时，本轮已经是 PC 节点执行者；直接完成项目任务，不得再次派发到本机节点。

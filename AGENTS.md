@@ -35,6 +35,7 @@
 ## 脚本信号优先
 
 - `EDIT_ROOT` 是唯一编辑根；平台会话已隔离时不创建嵌套 worktree。
+- Gradle、Cargo、npm 和发布等长命令完整日志写 `.ai-tmp/`；Windows 用 `scripts/invoke-ai-logged-command.ps1`，成功最多回传 20 行，失败最多 80 行。
 - 收尾必须执行预检输出的 `FINISH_COMMAND_*`，只有 `FINALIZABLE=true` 才可正常宣告完成。
 - 仅 push 被 non-fast-forward 拒绝时 rebase；不追车，只补受影响验证。
 - 保留未知文件；业务/本机状态分报，不重复已推送工作。

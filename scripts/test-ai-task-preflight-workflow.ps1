@@ -57,6 +57,8 @@ Assert-Contains $preflightContent "function Write-AiWorkflowGuard" "PowerShell p
 Assert-Contains $preflightShContent "write_ai_workflow_guard()" "Shell preflight must print the AI workflow guard."
 Assert-Contains $preflightContent "EDIT_ROOT=" "PowerShell preflight must expose the only safe edit root."
 Assert-Contains $preflightShContent "EDIT_ROOT=" "Shell preflight must expose the only safe edit root."
+Assert-Contains $preflightContent "RULE_OUTPUT=" "PowerShell preflight must expose the bounded AI output rule."
+Assert-Contains $preflightShContent "RULE_OUTPUT=" "Shell preflight must expose the bounded AI output rule."
 Assert-Contains $preflightContent "AUTO_CLEANUP=skipped_created_worktree" "PowerShell preflight must not clean up the worktree it just created."
 Assert-Contains $preflightContent "worktree lock --reason" "PowerShell preflight must lock active Codex task worktrees."
 Assert-Contains $preflightShContent "worktree lock --reason" "Shell preflight must lock active Codex task worktrees."
@@ -469,4 +471,18 @@ try {
 $githubSshTestOutput | ForEach-Object { Write-Host ([string]$_) }
 if ($githubSshTestExitCode -ne 0) {
     throw "GitHub SSH network fallback guard failed."
+}
+
+$commandOutputTest = Join-Path $repoRoot "scripts\test-ai-command-output.ps1"
+$oldPreference = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+try {
+    $commandOutputTestOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $commandOutputTest 2>&1
+    $commandOutputTestExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $oldPreference
+}
+$commandOutputTestOutput | ForEach-Object { Write-Host ([string]$_) }
+if ($commandOutputTestExitCode -ne 0) {
+    throw "Bounded AI command output guard failed."
 }
