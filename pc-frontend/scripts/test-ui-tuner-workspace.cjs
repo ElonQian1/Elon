@@ -632,11 +632,30 @@ try {
     'utf8',
   )
   assert.match(pwaAiFitTaskSource, /elon\.pwa\.ai_fit_task/)
+  assert.match(pwaAiFitTaskSource, /contractId/)
+  assert.match(pwaAiFitTaskSource, /buildPwaDraftAiFitTaskContractId/)
+  assert.match(pwaAiFitTaskSource, /hashStableJson/)
   assert.match(pwaAiFitTaskSource, /low-token-visual-fit-and-cross-platform-writeback/)
   assert.match(pwaAiFitTaskSource, /defaultRepositoryScan: false/)
   assert.match(pwaAiFitTaskSource, /screenshotsEmbeddedAsBase64: false/)
   assert.match(pwaAiFitTaskSource, /不要默认读取整仓库/)
   assert.match(pwaAiFitTaskSource, /不要把图片转成 Base64/)
+  assert.match(pwaAiFitTaskSource, /aiFitTaskContractId/)
+  assert.match(pwaAiFitTaskSource, /aiFitTaskHonored=true/)
+  const aiReceiptSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/aiWritebackReceipt.ts'),
+    'utf8',
+  )
+  assert.match(aiReceiptSource, /aiFitTaskContractId/)
+  assert.match(aiReceiptSource, /aiFitTaskHonored/)
+  const pwaAiFitTaskReceiptSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/pwaAiFitTaskReceipt.ts'),
+    'utf8',
+  )
+  assert.match(pwaAiFitTaskReceiptSource, /validatePwaAiFitTaskReceipt/)
+  assert.match(pwaAiFitTaskReceiptSource, /buildPwaDraftAiFitTaskContractId/)
+  assert.match(pwaAiFitTaskReceiptSource, /未声明当前 PWA 拟合任务合约/)
+  assert.match(pwaAiFitTaskReceiptSource, /aiFitTaskHonored=true/)
   const pwaDesignContextSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/pwaDesignContext.ts'),
     'utf8',
@@ -655,6 +674,12 @@ try {
   )
   assert.match(projectSessionPanelSource, /pwaDesign\.aiFitTask/)
   assert.match(projectSessionPanelSource, /aiFitTask\.compactHandoff\.elements/)
+  const pwaDesignSessionSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/usePwaDesignSession.ts'),
+    'utf8',
+  )
+  assert.match(pwaDesignSessionSource, /validatePwaAiFitTaskReceipt/)
+  assert.match(pwaDesignSessionSource, /AI 回执未通过 PWA 拟合合约校验/)
   const pwaBridgeSource = fs.readFileSync(
     path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
     'utf8',
