@@ -44,7 +44,7 @@
 15. Debug Runtime source proof 必须同时记录固定集成槽 generation、已部署 integration Git revision、原业务 worktree Git revision、generation 内容指纹、原业务 workspace 内容指纹和 runtimeBuildId。创建证明时先核对项目、物理设备、包、期望/已安装代次与 `DEPLOYED` 状态；FitRun 复用时再回查当前槽状态、generation worktree HEAD/内容指纹和原业务 HEAD。任一身份漂移或非零 Patch 都 fail-closed，不能要求两个因 HEAD 不同而必然不同的 workspace fingerprint 直接相等。
 16. 显式隔离模拟器包可以复用零 Patch 的新鲜 Runtime source proof，但只在 generation、installed generation、integration revision、generation HEAD/内容指纹、原业务 Git/workspace revision、包和 runtimeBuildId 全部一致时允许 FitRun `ACCEPT_BEST`；这不放宽真机固定包、签名、物理设备或来源 worktree 校验。
 17. `CROSS_PLATFORM_STYLE_WRITEBACK` 支持 `NO_WEB_COUNTERPART` 正式分支：仍需真实 Android 工件、当前 source revision、源码写回和无 Patch 构建；Web 侧改为扫描调用者声明的仓库内 Android 跟踪来源、Web 跟踪源码根和在 Android 来源中实际出现的搜索词。只有检查到 Web 跟踪文件且零匹配时通过；若存在匹配、证据越界、非跟踪来源或空扫描则拒绝，禁止用伪造 Web 截图代替。
-18. 普通视觉任务的物理设备准备预算默认 60 秒；离线、占用、锁屏/AOD/通知栏遮挡、授权/安装确认、Runtime 失败或超时后必须转入明确的空闲模拟器槽。`realDeviceRequired` 任务禁止回退。同一节点按设备 serial 独占写入，package 后缀不能绕过；未绑定明确 Runtime 身份时不能只按 projectRoot 猜测。Node-local operation lease 只能作为本机阶段证据，不能冒充跨 PC 全局 lease。
+18. 普通视觉和设备分类任务默认直接使用 PWA 或明确的隔离模拟器槽，不探测物理设备。只有用户反馈修改结果不正确或明确要求真机复核时才启用 `realDeviceRequired`；同一 MCP 会话只做一次最长 30 秒准备，离线、占用、遮挡、授权/安装确认、Runtime 失败或超时立即延期且禁止回退冒充。同一节点按设备 serial 独占写入，package 后缀不能绕过；未绑定明确 Runtime 身份时不能只按 projectRoot 猜测。Node-local operation lease 只能作为本机阶段证据，不能冒充跨 PC 全局 lease。
 
 ## 配置与缓存迁移合同
 

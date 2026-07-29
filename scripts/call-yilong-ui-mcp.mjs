@@ -4,12 +4,15 @@ import { spawn } from 'node:child_process'
 import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import readline from 'node:readline'
+import { pathToFileURL } from 'node:url'
 
-try {
-  await main()
-} catch (error) {
-  process.stderr.write(`${errorText(error)}\n`)
-  process.exitCode = 1
+if (isMainModule()) {
+  try {
+    await main()
+  } catch (error) {
+    process.stderr.write(`${errorText(error)}\n`)
+    process.exitCode = 1
+  }
 }
 
 async function main() {
@@ -34,37 +37,71 @@ async function main() {
   try {
     client.send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} })
     await client.next((message) => message.id === 1)
-    client.send({
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'tools/call',
-      params: {
-        name: 'ui_bridge_proxy',
-        arguments: {
-          name: options.name,
-          arguments: argumentsValue,
-          waitMs: options.timeoutMs,
-        },
-      },
-    })
-    const response = await client.next((message) => message.id === 2)
-    if (response.error) fail(response.error.message || 'UI MCP 调用失败')
-    if (response.result?.isError) {
-      fail(
-        response.result.content?.map((item) => item.text).filter(Boolean).join('\n') ||
-          'UI MCP 工具返回错误',
-      )
+    const startedAt = Date.now()
+    let callId = 2
+    let callArguments = structuredClone(argumentsValue)
+    let result
+    while (true) {
+      result = await callUiTool(client, callId, options, callArguments)
+      if (!shouldPollUiVerification(options.name, result, startedAt, options.pollBudgetMs)) break
+      await delay(pollDelayMs(result))
+      callArguments = withAndroidResume(callArguments)
+      callId += 1
     }
-    process.stdout.write(`${JSON.stringify(response.result?.structuredContent ?? response.result)}\n`)
+    if (
+      options.name === 'ui_verify_with_fallback' &&
+      result?.status === 'ANDROID_FALLBACK_IN_PROGRESS'
+    ) {
+      result = {
+        ...result,
+        previousStatus: result.status,
+        status: 'VERIFICATION_DEFERRED',
+        completed: false,
+        next: 'STOP_AFTER_CLIENT_POLL_BUDGET',
+        clientPollBudgetMs: options.pollBudgetMs,
+      }
+    }
+    process.stdout.write(`${JSON.stringify(result)}\n`)
   } finally {
     child.stdin.end()
     if (!child.killed) child.kill()
   }
 }
 
+async function callUiTool(client, id, options, argumentsValue) {
+  client.send({
+    jsonrpc: '2.0',
+    id,
+    method: 'tools/call',
+    params: {
+      name: 'ui_bridge_proxy',
+      arguments: {
+        name: options.name,
+        arguments: argumentsValue,
+        waitMs: options.timeoutMs,
+      },
+    },
+  })
+  const response = await client.next((message) => message.id === id)
+  if (response.error) fail(response.error.message || 'UI MCP 调用失败')
+  if (response.result?.isError) {
+    fail(
+      response.result.content?.map((item) => item.text).filter(Boolean).join('\n') ||
+        'UI MCP 工具返回错误',
+    )
+  }
+  return response.result?.structuredContent ?? response.result
+}
+
 function parseOptions(args) {
   const values = {}
-  const allowed = new Set(['name', 'arguments-file', 'workspace-root', 'timeout-ms'])
+  const allowed = new Set([
+    'name',
+    'arguments-file',
+    'workspace-root',
+    'timeout-ms',
+    'poll-budget-ms',
+  ])
   for (let index = 0; index < args.length; index += 2) {
     const key = args[index]
     const value = args[index + 1]
@@ -82,11 +119,16 @@ function parseOptions(args) {
   if (!Number.isFinite(timeoutMs) || timeoutMs < 1_000 || timeoutMs > 120_000) {
     fail('--timeout-ms 必须为 1000..120000')
   }
+  const pollBudgetMs = Number.parseInt(values['poll-budget-ms'] || '30000', 10)
+  if (!Number.isFinite(pollBudgetMs) || pollBudgetMs < 1_000 || pollBudgetMs > 120_000) {
+    fail('--poll-budget-ms 必须为 1000..120000')
+  }
   return {
     name,
     argumentsFile: values['arguments-file'],
     workspaceRoot: values['workspace-root'],
     timeoutMs,
+    pollBudgetMs,
   }
 }
 
@@ -148,9 +190,35 @@ function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
 }
 
+export function shouldPollUiVerification(name, result, startedAt, pollBudgetMs, now = Date.now()) {
+  return (
+    name === 'ui_verify_with_fallback' &&
+    result?.status === 'ANDROID_FALLBACK_IN_PROGRESS' &&
+    result?.next === 'POLL_UI_VERIFY_WITH_RESUME_ANDROID_TRUE' &&
+    now - startedAt < pollBudgetMs
+  )
+}
+
+export function withAndroidResume(argumentsValue) {
+  return { ...structuredClone(argumentsValue), resumeAndroid: true }
+}
+
+function pollDelayMs(result) {
+  const requested = Number(result?.android?.retryAfterMs || 1000)
+  return Math.min(5000, Math.max(250, requested))
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isMainModule() {
+  return Boolean(process.argv[1]) && import.meta.url === pathToFileURL(process.argv[1]).href
+}
+
 function usage() {
   fail(
-    '用法: node scripts/call-yilong-ui-mcp.mjs --name <ui_tool> --arguments-file <utf8.json> [--workspace-root <path>] [--timeout-ms <ms>]',
+    '用法: node scripts/call-yilong-ui-mcp.mjs --name <ui_tool> --arguments-file <utf8.json> [--workspace-root <path>] [--timeout-ms <ms>] [--poll-budget-ms <ms>]',
   )
 }
 

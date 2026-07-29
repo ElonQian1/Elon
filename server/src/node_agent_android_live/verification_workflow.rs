@@ -11,13 +11,13 @@ pub(super) fn tool_definition() -> Value {
     let pwa_schema = crate::node_agent_pwa_runtime::tool_definition()["inputSchema"].clone();
     json!({
         "name":TOOL_NAME,
-        "description":"按 PWA 快速验证 → Android 模拟器回退 → 真机专项验收的策略执行。PWA 成功即返回紧凑证据；PWA 不适合或运行失败时自动准备真实 Android Renderer，并明确标记证据等级。",
+        "description":"按 PWA 快速验证 → Android 模拟器验证 → 用户反馈不正确后真机复核的策略执行。普通任务不占用物理设备；显式真机复核在同一 MCP 会话内轮询并明确标记证据等级。",
         "inputSchema":{
             "type":"object",
             "additionalProperties":false,
             "required":["pwaSuitable"],
             "properties":{
-                "pwaSuitable":{"type":"boolean","description":"共享 Web/布局/普通交互为 true；OEM、权限、键盘、启动器、硬件或性能专项为 false"},
+                "pwaSuitable":{"type":"boolean","description":"共享 Web/布局/普通交互为 true；无法用 PWA 复现的 Android 专项为 false"},
                 "resumeAndroid":{"type":"boolean","default":false,"description":"首次 PWA 已失败并进入 Android 准备后，轮询时设为 true，避免重复启动浏览器与截图"},
                 "pwa":pwa_schema,
                 "android":{
@@ -37,9 +37,9 @@ pub(super) fn tool_definition() -> Value {
                         "restart":{"type":"boolean","default":false}
                     }
                 },
-                "realDeviceRequired":{"type":"boolean","default":false,"description":"OEM、权限、键盘、启动器、硬件或性能专项设为 true；模拟器结果只作为降级证据"},
+                "realDeviceRequired":{"type":"boolean","default":false,"description":"仅当用户反馈修改结果不正确或明确要求真机复核时设为 true；普通 UI、Logo、Launcher、OEM、权限和硬件任务默认不占用真机"},
                 "fallbackToEmulator":{"type":"boolean","default":true},
-                "physicalDeviceBudgetMs":{"type":"integer","minimum":5000,"maximum":120000,"default":60000,"description":"纯视觉任务等待物理设备准备的总预算；超时后停止轮询真机并申请空闲模拟器 slot"}
+                "physicalDeviceBudgetMs":{"type":"integer","minimum":5000,"maximum":60000,"default":30000,"description":"用户触发真机复核后的单次准备预算；失败或超时立即延期，不重复配对或重建会话"}
             }
         },
         "annotations":{
@@ -125,37 +125,15 @@ async fn prepare_android(
     real_device_required: bool,
     pwa_failure: Option<Value>,
 ) -> Result<Value> {
-    let mut android = arguments
-        .get("android")
-        .cloned()
-        .unwrap_or_else(|| json!({}));
-    let android_object = android
-        .as_object_mut()
-        .ok_or_else(|| anyhow!("android 参数必须是 object"))?;
-    android_object
-        .entry("autoStartEmulator")
-        .or_insert(json!(true));
-    if real_device_required {
-        android_object.insert("fallbackToEmulator".into(), json!(false));
-    } else {
-        android_object
-            .entry("fallbackToEmulator")
-            .or_insert(json!(arguments
-                .get("fallbackToEmulator")
-                .and_then(Value::as_bool)
-                .unwrap_or(true)));
-    }
-    android_object
-        .entry("fastFailPhysicalVisualProbe")
-        .or_insert(json!(!real_device_required));
+    let mut android = configure_android_arguments(arguments, real_device_required)?;
     let mut prepared =
         super::mcp_runtime_preparation::prepare_debug_runtime(broker, session_id, &android).await?;
     let mut physical_failure = None;
     let physical_budget_ms = arguments
         .get("physicalDeviceBudgetMs")
         .and_then(Value::as_u64)
-        .unwrap_or(60_000)
-        .clamp(5_000, 120_000);
+        .unwrap_or(30_000)
+        .clamp(5_000, 60_000);
     let fallback_enabled = !real_device_required
         && arguments
             .get("fallbackToEmulator")
@@ -211,7 +189,9 @@ async fn prepare_android(
             .pointer("/deviceSelection/fallbackReason")
             .and_then(Value::as_str)
             .is_some();
-    let real_device_status = if emulator_evidence && real_device_required {
+    let real_device_status = if real_device_required && preparation_status != "COMPLETED" {
+        "REQUIRED_FOLLOWUP"
+    } else if emulator_evidence && real_device_required {
         "REQUIRED_FOLLOWUP"
     } else if emulator_evidence && (physical_failure.is_some() || selection_fallback) {
         "DEFERRED_USER_CONFIRMATION"
@@ -225,6 +205,7 @@ async fn prepare_android(
     Ok(json!({
         "status":match preparation_status {
             "COMPLETED" => "ANDROID_RENDERER_READY",
+            "FAILED" if real_device_required => "REAL_DEVICE_VERIFICATION_DEFERRED",
             "FAILED" => "ANDROID_FALLBACK_FAILED",
             _ => "ANDROID_FALLBACK_IN_PROGRESS",
         },
@@ -238,10 +219,11 @@ async fn prepare_android(
         "capabilityGapRequired":preparation_status == "FAILED",
         "gapDisposition":match preparation_status {
             "COMPLETED" => "ALTERNATIVE_VERIFICATION_READY",
+            "FAILED" if real_device_required => "REAL_DEVICE_VERIFICATION_DEFERRED",
             "FAILED" => "REPORT_ONLY_AFTER_PLATFORM_GAP_IS_PROVEN",
             _ => "ALTERNATIVE_VERIFICATION_PENDING",
         },
-        "requiresRealDevice":real_device_required && emulator_evidence,
+        "requiresRealDevice":real_device_required && preparation_status != "COMPLETED",
         "pwaFailure":pwa_failure,
         "physicalFailure":physical_failure,
         "android":compact_android_preparation(&prepared),
@@ -252,10 +234,57 @@ async fn prepare_android(
         "sourceSha":prepared.pointer("/rendererLease/owner/sourceSha"),
         "next":match preparation_status {
             "COMPLETED" => "REPLAY_STATE_AND_CAPTURE_ANDROID_EVIDENCE",
-            "FAILED" => "RETRY_ANDROID_PREPARATION_WITH_RESUME_ANDROID_TRUE",
+            "FAILED" if real_device_required => "STOP_AND_REQUEST_RUNTIME_RECOVERY",
+            "FAILED" => "STOP_AFTER_ANDROID_PREPARATION_FAILURE",
             _ => "POLL_UI_VERIFY_WITH_RESUME_ANDROID_TRUE",
         }
     }))
+}
+
+fn configure_android_arguments(arguments: &Value, real_device_required: bool) -> Result<Value> {
+    let mut android = arguments
+        .get("android")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let android_object = android
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("android 参数必须是 object"))?;
+    android_object
+        .entry("autoStartEmulator")
+        .or_insert(json!(true));
+    if real_device_required {
+        android_object.remove("preferEmulator");
+        let emulator_device_id = android_object
+            .get("deviceId")
+            .and_then(Value::as_str)
+            .is_some_and(|value| value.starts_with("emulator-"));
+        if emulator_device_id {
+            android_object.remove("deviceId");
+        }
+        android_object.insert("fallbackToEmulator".into(), json!(false));
+    } else {
+        let physical_device_id = android_object
+            .get("deviceId")
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.starts_with("emulator-"));
+        if physical_device_id {
+            android_object.remove("deviceId");
+        }
+        android_object.insert("preferEmulator".into(), json!(true));
+        android_object
+            .entry("isolatedEmulatorPackage")
+            .or_insert(json!(true));
+        android_object
+            .entry("fallbackToEmulator")
+            .or_insert(json!(arguments
+                .get("fallbackToEmulator")
+                .and_then(Value::as_bool)
+                .unwrap_or(true)));
+    }
+    android_object
+        .entry("fastFailPhysicalVisualProbe")
+        .or_insert(json!(!real_device_required));
+    Ok(android)
 }
 
 fn preparation_status(prepared: &Value) -> &str {
@@ -389,8 +418,33 @@ mod tests {
         );
         assert_eq!(
             definition["inputSchema"]["properties"]["physicalDeviceBudgetMs"]["default"],
-            60_000
+            30_000
         );
+    }
+
+    #[test]
+    fn ordinary_android_verification_prefers_an_isolated_emulator() {
+        let configured = configure_android_arguments(
+            &json!({"android":{"deviceId":"192.168.31.171:5555","preferEmulator":false}}),
+            false,
+        )
+        .unwrap();
+        assert_eq!(configured["preferEmulator"], true);
+        assert_eq!(configured["isolatedEmulatorPackage"], true);
+        assert_eq!(configured["fallbackToEmulator"], true);
+        assert!(configured.get("deviceId").is_none());
+    }
+
+    #[test]
+    fn feedback_triggered_real_device_verification_never_falls_back() {
+        let configured = configure_android_arguments(
+            &json!({"android":{"deviceId":"emulator-5554","preferEmulator":true}}),
+            true,
+        )
+        .unwrap();
+        assert_eq!(configured["fallbackToEmulator"], false);
+        assert!(configured.get("preferEmulator").is_none());
+        assert!(configured.get("deviceId").is_none());
     }
 
     #[test]

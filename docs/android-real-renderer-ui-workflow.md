@@ -91,15 +91,17 @@ FitRun 的接受与拒绝结果会写入项目级学习真源：
 
 React 数字孪生不是“另写一个网页冒充 APK”。它消费统一 UI IR、节点几何、绑定和 Token，并由真实 Android 截图持续校准。对于无法从 Android 反射出的圆角、字体、阴影和 Modifier 顺序，必须由组件适配器显式声明，不能凭 XML 猜测。
 
-## 60 秒真机预算与模拟器接管
+## 默认隔离验证与反馈触发真机复核
 
-普通视觉 UI 验收默认使用 `ui_verify_with_fallback`。真机探测从 Android 准备开始计时，预算为 60 秒；一次设备离线、被其他会话占用、锁屏/AOD/通知栏遮挡、授权或安装确认、Runtime 准备失败，或预算到期，都立即结束真机路径并申请空闲模拟器槽。后续构建、安装、启动、点击、取帧和 FitRun 必须始终携带返回的会话、设备身份和 Renderer 资源证据，不能再次按“第一个在线设备”猜测。报告至少包含：
+普通视觉 UI 验收默认使用 `ui_verify_with_fallback`，但不探测或占用物理设备：共享页面优先走 PWA，Android 专项直接选择明确的空闲隔离模拟器槽。Logo、Launcher、OEM、权限、软键盘、摄像头、蓝牙、传感器、硬件和性能分类本身不再自动触发真机。
+
+只有用户反馈刚才修改结果不正确，或明确要求真机复核时，才设置 `realDeviceRequired=true`。真机复核从 Android 准备开始只有一次 30 秒预算，并必须在同一 MCP 会话内用 `resumeAndroid=true` 轮询；设备离线、被占用、锁屏/AOD/通知栏遮挡、授权或安装确认、Runtime 准备失败或超时后立即返回 `REQUIRED_FOLLOWUP`，不重建桥接会话、不重复配对和安装。后续构建、安装、启动、点击、取帧和 FitRun 必须始终携带返回的会话、设备身份和 Renderer 资源证据，不能再次按“第一个在线设备”猜测。报告至少包含：
 
 - `REAL_DEVICE_STATUS`：`READY`、`DEFERRED_USER_CONFIRMATION`、`REQUIRED_FOLLOWUP` 或 `NOT_REQUIRED`；
 - `ANDROID_RENDERER`、`rendererResourceId`、lease owner 与 `sourceSha`；
 - 真机失败原因、模拟器槽和最终无 Patch/source proof。
 
-OEM、权限弹窗、软键盘、Launcher、摄像头、蓝牙、传感器、硬件和性能专项设置 `realDeviceRequired=true`，禁止模拟器替代。其他纯视觉任务在模拟器已证明精确 package、generation、业务/集成 revision、workspace 指纹、runtimeBuildId 和零 Patch 时可以报告“视觉已验收”；真机复核作为用户设备恢复后的后续项，不阻塞提交、正式发布或统一收尾。
+反馈触发的真机复核禁止用模拟器冒充；没有反馈的普通任务在模拟器已证明精确 package、generation、业务/集成 revision、workspace 指纹、runtimeBuildId 和零 Patch 时可以完成。真机复核延期不阻塞已经通过源码、构建和正式发布门禁的业务交付，但没有真帧时不得声称真机已验收。
 
 同一 NodeAgent 内，一台物理设备或一个 `emulator-*` 实例同时只允许一个写入链路。准备阶段排除其他 Live Runtime 和正在准备的设备，部署锁按设备而不是包名串行；同一项目绑定多个已连接 Renderer 时，未带明确 `sessionId` 的 bootstrap 调用拒绝猜测。模拟器池默认最多两个并行实例，可用 `ELON_ANDROID_EMULATOR_MAX_SLOTS` 调整；无空闲槽时明确等待，不抢占已有实例。
 

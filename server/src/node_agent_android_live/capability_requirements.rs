@@ -59,17 +59,22 @@ fn derive_capabilities(task: Option<&Value>, profile: Option<&Value>) -> (Vec<St
             "capabilities": ["NEW_SCREEN_BOOTSTRAP"],
         }));
     }
+    let request = task
+        .and_then(|value| value.pointer("/task/task/request"))
+        .and_then(Value::as_str)
+        .unwrap_or_default();
     if is_android_profile(profile) {
-        required.push("REAL_ANDROID_RENDERER");
-        reasons.push(json!({
-            "reason": "ANDROID_UI_PROJECT",
-            "capabilities": ["REAL_ANDROID_RENDERER"],
-        }));
+        if let Some(reason) = real_device_requirement_reason(request) {
+            required.push("REAL_ANDROID_RENDERER");
+            reasons.push(json!({
+                "reason": reason,
+                "capabilities": ["REAL_ANDROID_RENDERER"],
+            }));
+        }
     }
     if task_has_target_design(task) {
         required.extend([
             "TARGET_DESIGN_BINDING",
-            "REAL_ANDROID_RENDERER",
             "LOCAL_VISUAL_SOLVER",
             "PERSISTENT_FIT_RUN",
         ]);
@@ -77,16 +82,11 @@ fn derive_capabilities(task: Option<&Value>, profile: Option<&Value>) -> (Vec<St
             "reason": "CLEAN_TARGET_DESIGN_PRESENT",
             "capabilities": [
                 "TARGET_DESIGN_BINDING",
-                "REAL_ANDROID_RENDERER",
                 "LOCAL_VISUAL_SOLVER",
                 "PERSISTENT_FIT_RUN"
             ],
         }));
     }
-    let request = task
-        .and_then(|value| value.pointer("/task/task/request"))
-        .and_then(Value::as_str)
-        .unwrap_or_default();
     if request_requires_cross_platform_parity(request)
         || (profile_requires_apk_web_parity(profile) && !task_is_launcher_only(task))
     {
@@ -115,6 +115,44 @@ fn derive_capabilities(task: Option<&Value>, profile: Option<&Value>) -> (Vec<St
         normalize_capabilities(&required.into_iter().map(str::to_string).collect::<Vec<_>>()),
         reasons,
     )
+}
+
+fn real_device_requirement_reason(request: &str) -> Option<&'static str> {
+    let normalized = request.to_lowercase();
+    let explicitly_requested = [
+        "真机测试",
+        "真机验证",
+        "真机复现",
+        "真机验收",
+        "physical device",
+        "real device",
+    ]
+    .iter()
+    .any(|marker| normalized.contains(marker));
+    if explicitly_requested {
+        return Some("USER_EXPLICITLY_REQUESTS_REAL_DEVICE");
+    }
+
+    let reports_incorrect_result = [
+        "修改不对",
+        "改得不对",
+        "还是不对",
+        "显示不对",
+        "效果不对",
+        "图标不对",
+        "位置不对",
+        "尺寸不对",
+        "和设计不一致",
+        "与设计不一致",
+        "手机上有问题",
+        "真机上有问题",
+        "does not look right",
+        "looks wrong",
+        "incorrect on device",
+    ]
+    .iter()
+    .any(|marker| normalized.contains(marker));
+    reports_incorrect_result.then_some("USER_REPORTS_VISUAL_RESULT_INCORRECT")
 }
 
 pub(super) fn task_is_launcher_only(task: Option<&Value>) -> bool {
@@ -357,5 +395,34 @@ mod tests {
             "request":"同步 APP Launcher 图标到 APK 与 Web"
         }}});
         assert!(!task_is_launcher_only(Some(&task)));
+    }
+
+    #[test]
+    fn ordinary_android_and_launcher_tasks_do_not_require_a_physical_device() {
+        let profile = json!({"android":{"applicationId":"com.elon.app"}});
+        for request in ["按设计图重做首页", "替换 APP Launcher 图标"] {
+            let task = json!({"task":{"task":{"request":request}}});
+            let (derived, _) = derive_capabilities(Some(&task), Some(&profile));
+            assert!(!derived.contains(&"REAL_ANDROID_RENDERER".to_string()));
+        }
+    }
+
+    #[test]
+    fn user_feedback_or_explicit_request_enables_real_device_verification() {
+        let profile = json!({"android":{"applicationId":"com.elon.app"}});
+        for (request, expected_reason) in [
+            (
+                "刚刚修改不对，手机上图标显示不对",
+                "USER_REPORTS_VISUAL_RESULT_INCORRECT",
+            ),
+            ("请执行真机验证", "USER_EXPLICITLY_REQUESTS_REAL_DEVICE"),
+        ] {
+            let task = json!({"task":{"task":{"request":request}}});
+            let (derived, reasons) = derive_capabilities(Some(&task), Some(&profile));
+            assert!(derived.contains(&"REAL_ANDROID_RENDERER".to_string()));
+            assert!(reasons.iter().any(|reason| {
+                reason.get("reason").and_then(Value::as_str) == Some(expected_reason)
+            }));
+        }
     }
 }

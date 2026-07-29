@@ -238,7 +238,7 @@ Windows 节点复用 `yilong_ui_live` Streamable HTTP MCP，通过 `ui_capture_p
 
 成功结果保存到项目 `.elon/ui-tuner/pwa-runtime/captures/`，返回 PNG 与 manifest 的绝对路径、SHA-256、实际像素尺寸、媒体类型、采集时间、脱敏 route、浏览器版本、viewport、网络门禁、进程回收和 source/route revision。PWA 源码闭环仍先完成构建、资源、真实 iframe route/source revision 校验，再安全自动请求 PNG；无法自动捕获时保留源码验收成功并显示明确下一步。Codex context pack 只引用工件路径、哈希和尺寸，`screenshotsEmbeddedAsBase64=false`，默认不嵌入图片 Base64。
 
-跨端验证默认调用 `ui_verify_with_fallback`：共享 Web/普通布局交互先走 PWA；PWA 不适合或认证、浏览器、导航、交互运行失败时，自动进入 Android Renderer。进入 Android 准备后的轮询传 `resumeAndroid=true`，避免重复打开浏览器和生成 PWA 截图。普通视觉任务给物理设备 60 秒硬预算；设备离线、被占用、锁屏/AOD/通知栏遮挡、授权/安装确认、Runtime 失败或超时后立即申请明确的空闲模拟器槽，并把 `REAL_DEVICE_STATUS`、`ANDROID_RENDERER`、resource/owner/source 证据写入结果。OEM、权限、软键盘、启动器、摄像头、蓝牙、传感器、硬件和性能专项显式要求真机且不回退。
+跨端验证默认调用 `ui_verify_with_fallback`：共享 Web/普通布局交互先走 PWA；PWA 不适合时直接进入明确的隔离 Android 模拟器槽，普通任务不探测物理设备。只有用户反馈修改结果不正确或明确要求真机复核时才设置 `realDeviceRequired=true`；同一 MCP 会话用 `resumeAndroid=true` 轮询一次，30 秒内设备离线、占用、遮挡、授权/安装确认或 Runtime 失败即延期。结果写入 `REAL_DEVICE_STATUS`、`ANDROID_RENDERER` 和 resource/owner/source 证据；反馈触发的真机复核不允许用模拟器冒充。
 
 节点内 Android Renderer 使用设备级独占写语义：准备阶段排除其他 Runtime/operation 正在使用的 serial，部署锁不能被不同 package 绕过；同项目存在多个连接 Runtime 时，未指定 `sessionId/deviceIdentity` 的调用拒绝仅按 projectRoot 猜测。模拟器池默认上限为两个实例，忙时选择其他槽或明确等待，不抢占“第一个在线 emulator”。当前返回的 `rendererLease` 是 `NODE_LOCAL_OPERATION_SESSION` 范围的 owner/fencing 证据；跨 PC 真机以 `hardwareSerial` 为键的全局 TTL/heartbeat lease、所有副作用前的 fencing 复核、独立预克隆 AVD 数据目录和 FIFO 扩容仍需后续阶段完成，兼容 MCP 路径不得用本机证据冒充全局 lease。
 

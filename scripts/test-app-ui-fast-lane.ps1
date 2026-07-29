@@ -19,6 +19,7 @@ $uiSkill = Get-Content -Raw -LiteralPath (Join-Path $repoRoot ".agents\skills\yi
 Assert-Contains $validator ':app:testDebugUnitTest'
 Assert-Contains $validator ':app:assembleDebug'
 Assert-Contains $validator 'server/src/assets/web_page.html'
+Assert-Contains $validator 'server/src/assets/ic_app_brand.b64'
 Assert-Contains $validator 'FAST_LANE_RENDERER=skipped'
 Assert-Contains $validator 'Start-Process'
 Assert-Contains $publisher 'publish-server.ps1'
