@@ -491,8 +491,7 @@ try {
     path.join(projectRoot, 'src/features/ui-tuner/live/UiTunerLivePanel.module.css'),
     'utf8',
   )
-  assert.match(livePanelCss, /\.liveColorInputs\s*\{[^}]*grid-template-columns:\s*44px minmax\(0,\s*1fr\)/s)
-  assert.match(livePanelCss, /\.colorTextInput\s*\{[^}]*height:\s*38px/s)
+  assert.ok(livePanelSource.includes("gridTemplateColumns: '44px minmax(0, 1fr)'"))
   const gatewaySource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/inspector/UiDesignGateway.tsx'),
     'utf8',

@@ -603,10 +603,10 @@ function ColorLiveField({
   }
   const nativeColor = nativePickerColor(draft)
   return (
-    <div className={`${styles.liveFieldRow} ${styles.liveColorRow}`}>
-      <label className={styles.colorFieldFull}>
+    <div className={styles.liveFieldRow}>
+      <label className={styles.fieldFull}>
         <span>{label}</span>
-        <span className={styles.liveColorInputs}>
+        <span style={{ display: 'grid', gridTemplateColumns: '44px minmax(0, 1fr)', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <input
             className={styles.colorSwatchInput}
             type="color"
