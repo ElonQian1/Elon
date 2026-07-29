@@ -576,7 +576,7 @@ try {
   assert.match(pwaInspectorSource, /操作模式：正常使用/)
   assert.match(pwaInspectorSource, /选择模式：下一次点击会选中组件/)
   assert.match(pwaInspectorSource, /设计模式：正在修改选中组件/)
-  assert.match(pwaInspectorSource, /className=\{styles\.pwaDesignModeCard\}/)
+  assert.match(pwaInspectorSource, /styles\.pwaDesignModeCard/)
   assert.match(pwaInspectorSource, /PWA 到 APK 写回验证进度/)
   assert.match(pwaInspectorSource, /草稿实时预览/)
   assert.match(pwaInspectorSource, /真实构建验证/)
@@ -590,10 +590,13 @@ try {
   assert.match(pwaInspectorSource, /pwa-ai-fit-task-copy/)
   assert.match(pwaInspectorSource, /stringifyPwaDraftAiFitTask/)
   assert.match(pwaInspectorSource, /copyCompactHandoff/)
-  assert.match(pwaInspectorSource, /设计师常用微调/)
-  assert.match(pwaInspectorSource, /designer:primary/)
-  assert.match(pwaInspectorSource, /designer:ghost/)
-  assert.match(pwaInspectorSource, /直接改真实 PWA DOM/)
+  const pwaStyleEditorSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaStyleEditor.tsx'),
+    'utf8',
+  )
+  assert.match(pwaStyleEditorSource, /快速样式/)
+  assert.match(pwaStyleEditorSource, /designer:primary/)
+  assert.match(pwaStyleEditorSource, /designer:ghost/)
   assert.match(pwaInspectorSource, /PWA 草稿链路自检/)
   assert.match(pwaInspectorSource, /PWA 草稿链路已连接/)
   assert.match(pwaInspectorSource, /草稿命令/)
@@ -624,9 +627,6 @@ try {
   assert.match(sourcePreviewCss, /\.sourceInspector \.colorField\{display:grid;grid-template-columns:56px minmax\(180px,1fr\)/)
   assert.match(sourcePreviewCss, /\.pwaColorField\{display:grid;grid-template-columns:56px minmax\(180px,1fr\)/)
   assert.match(sourcePreviewCss, /\.pwaOpacityField\{grid-template-columns:58px minmax\(0,1fr\) 72px/)
-  assert.match(sourcePreviewCss, /\.pwaEdgeGrid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:8px\}/)
-  assert.match(sourcePreviewCss, /\.pwaQuickAdjust\{grid-template-columns:28px minmax\(0,1fr\) 28px;gap:5px\}/)
-  assert.match(sourcePreviewCss, /\.pwaStyleField input\{height:34px;padding:0 9px;font-size:12px\}/)
   const pwaColorStyleFieldSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaColorStyleField.tsx'),
     'utf8',

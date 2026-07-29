@@ -1,49 +1,17 @@
-import { useState } from 'react'
-import { Bot, Copy, Download, MousePointer2, Redo2, RotateCcw, Save, Smartphone, Trash2, Undo2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Bot, ChevronDown, Copy, Download, MousePointer2, Redo2, RotateCcw, Save, Smartphone, Trash2, Undo2 } from 'lucide-react'
 import { stringifyPwaDraftAiFitTask } from './pwaAiFitTask'
-import { buildPwaDraftCliCompactHandoff, type PwaStyleProperty } from './pwaDesignDraft'
+import { buildPwaDraftCliCompactHandoff } from './pwaDesignDraft'
 import type { PwaDesignSession, PwaSelection } from './usePwaDesignSession'
 import { CrossPlatformWritebackReceiptPanel } from './CrossPlatformWritebackReceiptPanel'
 import { PwaDesignerWorkflowGuide } from './PwaDesignerWorkflowGuide'
-import { PwaColorStyleField } from './PwaColorStyleField'
-import {
-  adjustedCssValue,
-  EdgeFields,
-  fieldValue,
-  MARGIN_FIELDS,
-  PADDING_FIELDS,
-  SIZE_FIELDS,
-  StyleField,
-  TYPE_FIELDS,
-} from './PwaStyleFields'
+import { PwaStyleEditor } from './PwaStyleEditor'
+import panelStyles from './PwaStyleInspector.module.css'
 import styles from './SourcePreview.module.css'
 
 interface Props {
   session: PwaDesignSession
 }
-
-const STYLE_PRESETS = [
-  {
-    label: '紧凑',
-    hint: '小按钮/列表项',
-    styles: { paddingTop: '6px', paddingRight: '10px', paddingBottom: '6px', paddingLeft: '10px', borderRadius: '10px', fontSize: '13px' },
-  },
-  {
-    label: '标准',
-    hint: '常规移动端',
-    styles: { paddingTop: '10px', paddingRight: '14px', paddingBottom: '10px', paddingLeft: '14px', borderRadius: '14px', fontSize: '14px' },
-  },
-  {
-    label: '舒展',
-    hint: '主操作/卡片',
-    styles: { paddingTop: '14px', paddingRight: '18px', paddingBottom: '14px', paddingLeft: '18px', borderRadius: '18px', fontSize: '15px' },
-  },
-  {
-    label: '胶囊',
-    hint: '圆润按钮',
-    styles: { borderRadius: '999px', paddingLeft: '18px', paddingRight: '18px' },
-  },
-] satisfies Array<{ label: string; hint: string; styles: Partial<Record<PwaStyleProperty, string>> }>
 
 function confidenceLabel(selection: PwaSelection): string {
   if (selection.identity.confidence === 'high') return '稳定映射'
@@ -174,61 +142,12 @@ function HandoffSummary({ session }: Props) {
   )
 }
 
-function StylePresetBar({ session }: Props) {
-  return (
-    <section className={styles.pwaPresetSection}>
-      <h3>快速草稿</h3>
-      <div className={styles.pwaPresetGrid}>
-        {STYLE_PRESETS.map((preset) => (
-          <button
-            key={preset.label}
-            type="button"
-            title={preset.hint}
-            onClick={() => session.updateStyles(`preset:${preset.label}`, preset.styles)}
-          >
-            <strong>{preset.label}</strong>
-            <span>{preset.hint}</span>
-          </button>
-        ))}
-      </div>
-      <small>预设只改当前元素草稿；确认后写回验证。</small>
-    </section>
-  )
-}
-
-function quickValue(session: PwaDesignSession, property: PwaStyleProperty, delta: number, fallback: number, unit = 'px', min = 0, max?: number): string {
-  return adjustedCssValue(fieldValue(session, property), delta, unit, min, max) || `${fallback}${unit}`
-}
-
-function DesignerQuickActions({ session }: Props) {
-  const nudgeBox = (label: string, delta: number) => session.updateStyles(`designer:${label}`, {
-    width: quickValue(session, 'width', delta * 4, delta > 0 ? 4 : 0, 'px', 1),
-    height: quickValue(session, 'height', delta * 4, delta > 0 ? 4 : 0, 'px', 1),
-    paddingTop: quickValue(session, 'paddingTop', delta * 2, delta > 0 ? 2 : 0),
-    paddingRight: quickValue(session, 'paddingRight', delta * 2, delta > 0 ? 2 : 0),
-    paddingBottom: quickValue(session, 'paddingBottom', delta * 2, delta > 0 ? 2 : 0),
-    paddingLeft: quickValue(session, 'paddingLeft', delta * 2, delta > 0 ? 2 : 0),
-  })
-  return (
-    <section className={styles.pwaDesignerQuickSection} aria-label="设计师常用微调">
-      <h3>设计师常用微调</h3>
-      <div className={styles.pwaDesignerQuickGrid}>
-        <button type="button" onClick={() => nudgeBox('smaller', -1)}><strong>变小</strong><span>尺寸和内边距一起收紧</span></button>
-        <button type="button" onClick={() => nudgeBox('larger', 1)}><strong>变大</strong><span>尺寸和内边距一起放大</span></button>
-        <button type="button" onClick={() => session.updateStyle('borderRadius', quickValue(session, 'borderRadius', 2, 12))}><strong>更圆</strong><span>圆角 +2px</span></button>
-        <button type="button" onClick={() => session.updateStyle('borderRadius', quickValue(session, 'borderRadius', -2, 0))}><strong>少圆</strong><span>圆角 -2px</span></button>
-        <button type="button" onClick={() => session.updateStyle('fontSize', quickValue(session, 'fontSize', 1, 14, 'px', 8))}><strong>字大</strong><span>字号 +1px</span></button>
-        <button type="button" onClick={() => session.updateStyle('fontSize', quickValue(session, 'fontSize', -1, 14, 'px', 8))}><strong>字小</strong><span>字号 -1px</span></button>
-        <button type="button" onClick={() => session.updateStyles('designer:primary', { backgroundColor: '#2563eb', color: '#ffffff', borderRadius: '14px' })}><strong>主按钮</strong><span>蓝底白字</span></button>
-        <button type="button" onClick={() => session.updateStyles('designer:ghost', { backgroundColor: 'transparent', color: '#e5e7eb' })}><strong>透明底</strong><span>保留文字层级</span></button>
-      </div>
-      <small>直接改真实 PWA DOM，并进入写回计划。</small>
-    </section>
-  )
-}
-
 export function PwaStyleInspector({ session }: Props) {
   const [artifactNotice, setArtifactNotice] = useState('')
+  const [workflowOpen, setWorkflowOpen] = useState(!session.selection)
+  useEffect(() => {
+    setWorkflowOpen(!session.selection)
+  }, [session.selection?.identity.key])
   const selectedDraft = session.selection
     ? Object.values(session.draft?.elements ?? {}).find((element) => (
         element.identity.key === session.selection?.identity.key
@@ -246,25 +165,22 @@ export function PwaStyleInspector({ session }: Props) {
     }
   }
   return (
-    <aside className={styles.pwaStyleInspector} data-testid="pwa-style-inspector">
-      <header>
-        <div>
-          <strong>PWA 手工样式</strong>
-          <small>直接修改真实 DOM，页面立即重绘</small>
+    <aside className={`${styles.pwaStyleInspector} ${panelStyles.inspector}`} data-testid="pwa-style-inspector">
+      <div className={panelStyles.inspectorChrome}>
+        <header className={panelStyles.inspectorHeader}>
+          <div>
+            <strong>样式属性</strong>
+            <small>选中组件后实时修改真实 PWA</small>
+          </div>
+          <span className={styles.pwaDraftCount}>{elementCount} 个已改</span>
+        </header>
+        <div className={`${styles.pwaHistoryBar} ${panelStyles.historyBar}`}>
+          <button type="button" disabled={!session.canUndo} onClick={session.undo} title="撤销上一事务" aria-label="撤销"><Undo2 size={15} /></button>
+          <button type="button" disabled={!session.canRedo} onClick={session.redo} title="重做上一事务" aria-label="重做"><Redo2 size={15} /></button>
+          <button type="button" disabled={!session.draft} onClick={session.saveNow}><Save size={14} />保存当前草稿</button>
         </div>
-        <span className={styles.pwaDraftCount}>{elementCount} 个元素</span>
-      </header>
-
-      <div className={styles.pwaHistoryBar}>
-        <button type="button" disabled={!session.canUndo} onClick={session.undo} title="撤销上一事务"><Undo2 size={15} />撤销</button>
-        <button type="button" disabled={!session.canRedo} onClick={session.redo} title="重做上一事务"><Redo2 size={15} />重做</button>
-        <button type="button" disabled={!session.draft} onClick={session.saveNow}><Save size={15} />保存草稿</button>
+        <p className={styles.pwaSaveStatus}>{session.saveLabel}</p>
       </div>
-      <p className={styles.pwaSaveStatus}>{session.saveLabel}</p>
-
-      <PwaDesignerWorkflowGuide session={session} />
-
-      <BridgeHealthCard session={session} />
 
       <section className={styles.pwaDesignModeCard} data-mode={session.mode} data-selected={session.selection ? 'true' : 'false'}>
         <div>
@@ -279,56 +195,6 @@ export function PwaStyleInspector({ session }: Props) {
             <MousePointer2 size={14} />选择组件
           </button>
         </div>
-      </section>
-
-      <section className={styles.pwaSyncCard} data-sync-phase={session.syncState.phase}>
-        <strong>{syncPhaseLabel(session.syncState.phase)}</strong>
-        <SyncProgress session={session} />
-        <div className={styles.pwaSyncTargets}>
-          <span>PWA：{writebackTargetLabel(session.writebackPlan.targets.pwa)}</span>
-          <span>APK：{writebackTargetLabel(session.writebackPlan.targets.android)}</span>
-          <strong>{session.writebackPlan.requiresCodex ? '确定性优先，AI 只补缺口' : '无需 AI 重做'}</strong>
-        </div>
-        <WritebackPlanSummary session={session} />
-        <button
-          type="button"
-          className={styles.pwaPrimarySync}
-          data-testid="pwa-cross-platform-sync"
-          disabled={!elementCount || session.syncState.phase === 'BUILD_VERIFYING' || Boolean(session.syncState.taskId)}
-          onClick={() => { void session.syncNow() }}
-        >
-          <Bot size={16} />{session.syncState.phase === 'BUILD_VERIFYING'
-            ? '正在构建并核验真实源码…'
-            : session.syncState.phase === 'AI_WRITING'
-              ? 'AI 正在写回源码…'
-            : session.writebackPlan.requiresCodex
-              ? '让 AI 建立绑定并验证 APK 与 PWA'
-              : '写回源码并验证 APK 与 PWA'}
-        </button>
-        <p className={styles.pwaSyncStatus}>{session.syncState.message}</p>
-        <HandoffSummary session={session} />
-        <CrossPlatformWritebackReceiptPanel receipt={session.writebackReceipt} />
-        {session.syncState.runtimeCapture && <p className={styles.pwaSyncStatus}>
-          PNG 证据：{session.syncState.runtimeCapture.width}×{session.syncState.runtimeCapture.height}
-          {' · '}<code>{session.syncState.runtimeCapture.sha256.slice(0, 16)}</code>
-          {' · '}{session.syncState.runtimeCapture.path}
-        </p>}
-        {session.syncState.runtimeCaptureDiagnostic && <p className={styles.pwaSyncStatus}>
-          {session.syncState.runtimeCaptureDiagnostic.code}：{session.syncState.runtimeCaptureDiagnostic.nextStep}
-        </p>}
-        {session.syncState.mismatches.length > 0 && <ul>
-          {session.syncState.mismatches.map((mismatch) => <li key={mismatch}>{mismatch}</li>)}
-        </ul>}
-        {session.syncState.phase === 'VERIFY_FAILED' && session.syncState.evidence && (
-          <button type="button" onClick={() => { void session.retryVerification() }}>保留草稿并重试真实验证</button>
-        )}
-        <div className={styles.pwaArtifactActions}>
-          <button type="button" disabled={!elementCount} onClick={() => { void session.copyCompactHandoff() }}><Copy size={13} />复制精简交接</button>
-          <button type="button" data-testid="pwa-ai-fit-task-copy" disabled={!elementCount} onClick={() => { void copyAiFitTask() }}><Bot size={13} />复制 AI 拟合任务</button>
-          <button type="button" disabled={!elementCount} onClick={() => { void session.copyCliPackage() }}><Copy size={13} />复制 CLI 包</button>
-          <button type="button" disabled={!elementCount} onClick={session.downloadCliPackage}><Download size={13} />下载草稿</button>
-        </div>
-        {artifactNotice && <small className={styles.pwaArtifactNotice}>{artifactNotice}</small>}
       </section>
 
       {!session.selection && (
@@ -361,47 +227,80 @@ export function PwaStyleInspector({ session }: Props) {
           {(selectedDraft?.binding.needsBinding ?? session.selection.identity.needsBinding) && <p>需要 AI 建立源码绑定。</p>}
         </section>
 
-        <DesignerQuickActions session={session} />
-
-        <StylePresetBar session={session} />
-
-        <section className={styles.pwaStyleSection}>
-          <h3>尺寸</h3>
-          <div className={styles.pwaTwoColumn}>{SIZE_FIELDS.map((spec) => <StyleField key={spec.property} session={session} spec={spec} />)}</div>
-      <small>支持 auto/%/rem/px。</small>
-        </section>
-
-        <section className={styles.pwaStyleSection}>
-          <h3>内边距</h3>
-          <EdgeFields session={session} fields={PADDING_FIELDS} />
-        </section>
-
-        <section className={styles.pwaStyleSection}>
-          <h3>外边距</h3>
-          <EdgeFields session={session} fields={MARGIN_FIELDS} />
-        </section>
-
-        <section className={styles.pwaStyleSection}>
-          <h3>形状与文字</h3>
-          <div className={styles.pwaTwoColumn}>{TYPE_FIELDS.map((spec) => <StyleField key={spec.property} session={session} spec={spec} />)}</div>
-        </section>
-
-        <section className={styles.pwaStyleSection}>
-          <h3>颜色与透明度</h3>
-          <PwaColorStyleField session={session} property="color" label="文字色" value={fieldValue(session, 'color')} />
-          <PwaColorStyleField session={session} property="backgroundColor" label="背景色" value={fieldValue(session, 'backgroundColor')} />
-          <label className={styles.pwaOpacityField}>
-            <span>整体透明度</span>
-            <input type="range" min="0" max="1" step="0.01" value={Number(fieldValue(session, 'opacity')) || 0} onChange={(event) => session.updateStyle('opacity', event.currentTarget.value)} />
-            <input value={fieldValue(session, 'opacity')} onChange={(event) => session.updateStyle('opacity', event.currentTarget.value)} />
-          </label>
-        </section>
-
-        <div className={styles.pwaResetActions}>
-          <button type="button" disabled={!selectedDraft} onClick={session.resetCurrent}><RotateCcw size={15} />重置当前元素</button>
-          <button type="button" disabled={!elementCount} onClick={session.clearPage}><Trash2 size={15} />清空本页草稿</button>
-        </div>
+        <PwaStyleEditor session={session} />
       </>}
+
+      <details
+        className={panelStyles.workflowDisclosure}
+        open={workflowOpen}
+        onToggle={(event) => setWorkflowOpen(event.currentTarget.open)}
+      >
+        <summary>
+          <Bot size={15} />
+          <span><strong>工作流与交付</strong><small>连接状态、写回源码与双端验证</small></span>
+          <ChevronDown size={15} />
+        </summary>
+        <div className={panelStyles.workflowBody}>
+          <PwaDesignerWorkflowGuide session={session} />
+          <BridgeHealthCard session={session} />
+          <section className={styles.pwaSyncCard} data-sync-phase={session.syncState.phase}>
+            <strong>{syncPhaseLabel(session.syncState.phase)}</strong>
+            <SyncProgress session={session} />
+            <div className={styles.pwaSyncTargets}>
+              <span>PWA：{writebackTargetLabel(session.writebackPlan.targets.pwa)}</span>
+              <span>APK：{writebackTargetLabel(session.writebackPlan.targets.android)}</span>
+              <strong>{session.writebackPlan.requiresCodex ? '确定性优先，AI 只补缺口' : '无需 AI 重做'}</strong>
+            </div>
+            <WritebackPlanSummary session={session} />
+            <button
+              type="button"
+              className={styles.pwaPrimarySync}
+              data-testid="pwa-cross-platform-sync"
+              disabled={!elementCount || session.syncState.phase === 'BUILD_VERIFYING' || Boolean(session.syncState.taskId)}
+              onClick={() => { void session.syncNow() }}
+            >
+              <Bot size={16} />{session.syncState.phase === 'BUILD_VERIFYING'
+                ? '正在构建并核验真实源码…'
+                : session.syncState.phase === 'AI_WRITING'
+                  ? 'AI 正在写回源码…'
+                : session.writebackPlan.requiresCodex
+                  ? '让 AI 建立绑定并验证 APK 与 PWA'
+                  : '写回源码并验证 APK 与 PWA'}
+            </button>
+            <p className={styles.pwaSyncStatus}>{session.syncState.message}</p>
+            <HandoffSummary session={session} />
+            <CrossPlatformWritebackReceiptPanel receipt={session.writebackReceipt} />
+            {session.syncState.runtimeCapture && <p className={styles.pwaSyncStatus}>
+              PNG 证据：{session.syncState.runtimeCapture.width}×{session.syncState.runtimeCapture.height}
+              {' · '}<code>{session.syncState.runtimeCapture.sha256.slice(0, 16)}</code>
+              {' · '}{session.syncState.runtimeCapture.path}
+            </p>}
+            {session.syncState.runtimeCaptureDiagnostic && <p className={styles.pwaSyncStatus}>
+              {session.syncState.runtimeCaptureDiagnostic.code}：{session.syncState.runtimeCaptureDiagnostic.nextStep}
+            </p>}
+            {session.syncState.mismatches.length > 0 && <ul>
+              {session.syncState.mismatches.map((mismatch) => <li key={mismatch}>{mismatch}</li>)}
+            </ul>}
+            {session.syncState.phase === 'VERIFY_FAILED' && session.syncState.evidence && (
+              <button type="button" onClick={() => { void session.retryVerification() }}>保留草稿并重试真实验证</button>
+            )}
+            <div className={styles.pwaArtifactActions}>
+              <button type="button" disabled={!elementCount} onClick={() => { void session.copyCompactHandoff() }}><Copy size={13} />复制精简交接</button>
+              <button type="button" data-testid="pwa-ai-fit-task-copy" disabled={!elementCount} onClick={() => { void copyAiFitTask() }}><Bot size={13} />复制 AI 拟合任务</button>
+              <button type="button" disabled={!elementCount} onClick={() => { void session.copyCliPackage() }}><Copy size={13} />复制 CLI 包</button>
+              <button type="button" disabled={!elementCount} onClick={session.downloadCliPackage}><Download size={13} />下载草稿</button>
+            </div>
+            {artifactNotice && <small className={styles.pwaArtifactNotice}>{artifactNotice}</small>}
+          </section>
+        </div>
+      </details>
+
+      {session.selection && (
+        <div className={`${styles.pwaResetActions} ${panelStyles.resetActions}`}>
+          <button type="button" disabled={!selectedDraft} onClick={session.resetCurrent}><RotateCcw size={14} />重置当前元素</button>
+          <button type="button" disabled={!elementCount} onClick={session.clearPage}><Trash2 size={14} />清空本页草稿</button>
+        </div>
+      )}
     </aside>
   )
 }

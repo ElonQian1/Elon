@@ -1,6 +1,6 @@
 import type { PwaStyleProperty } from './pwaDesignDraft'
 import type { PwaDesignSession, PwaSelection } from './usePwaDesignSession'
-import styles from './SourcePreview.module.css'
+import styles from './PwaStyleInspector.module.css'
 
 export interface PwaStyleFieldSpec {
   property: PwaStyleProperty
@@ -76,29 +76,43 @@ export function adjustedCssValue(current: string, delta: number, fallbackUnit = 
 export function StyleField({ session, spec }: { session: PwaDesignSession; spec: PwaStyleFieldSpec }) {
   const value = fieldValue(session, spec.property)
   const canQuickAdjust = typeof spec.quickStep === 'number'
-  const quickAdjust = (direction: -1 | 1) => {
+  const quickAdjust = (direction: -1 | 1, multiplier = 1) => {
     if (!canQuickAdjust) return
     session.updateStyle(
       spec.property,
-      adjustedCssValue(value, spec.quickStep! * direction, spec.quickUnit, spec.min, spec.max),
+      adjustedCssValue(value, spec.quickStep! * direction * multiplier, spec.quickUnit, spec.min, spec.max),
     )
   }
   return (
-    <label className={styles.pwaStyleField}>
-      <span>{spec.label}</span>
-      <div className={styles.pwaQuickAdjust}>
-        {canQuickAdjust && <button type="button" onClick={() => quickAdjust(-1)} aria-label={`${spec.label}减小`}>−</button>}
+    <label className={styles.styleField}>
+      <span className={styles.fieldLabel}>
+        <span>{spec.label}</span>
+      </span>
+      <div className={styles.valueControl}>
         <input
+          aria-label={spec.label}
           value={value}
           placeholder={spec.placeholder}
+          title="↑/↓ 微调，按住 Shift 调整 10 倍步长"
           onChange={(event) => session.updateStyle(spec.property, event.currentTarget.value)}
+          onFocus={(event) => event.currentTarget.select()}
+          onKeyDown={(event) => {
+            if (!canQuickAdjust || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+            event.preventDefault()
+            quickAdjust(event.key === 'ArrowUp' ? 1 : -1, event.shiftKey ? 10 : 1)
+          }}
         />
-        {canQuickAdjust && <button type="button" onClick={() => quickAdjust(1)} aria-label={`${spec.label}增大`}>+</button>}
+        {canQuickAdjust && (
+          <span className={styles.stepper} aria-label={`${spec.label}快捷调整`}>
+            <button type="button" onClick={() => quickAdjust(-1)} aria-label={`${spec.label}减小`} title="减小">−</button>
+            <button type="button" onClick={() => quickAdjust(1)} aria-label={`${spec.label}增大`} title="增大">+</button>
+          </span>
+        )}
       </div>
     </label>
   )
 }
 
 export function EdgeFields({ session, fields }: { session: PwaDesignSession; fields: PwaStyleFieldSpec[] }) {
-  return <div className={styles.pwaEdgeGrid}>{fields.map((spec) => <StyleField key={spec.property} session={session} spec={spec} />)}</div>
+  return <div className={styles.edgeGrid}>{fields.map((spec) => <StyleField key={spec.property} session={session} spec={spec} />)}</div>
 }

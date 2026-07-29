@@ -6,6 +6,7 @@ interface Props {
   label: string
   value: string
   placement: 'above' | 'below'
+  floatingStyle?: CSSProperties
   onChange: (value: string) => void
 }
 
@@ -31,7 +32,7 @@ const PRESET_COLORS = [
   '#d946ef', '#ec4899', '#f8fafc', '#cbd5e1', '#64748b', '#111827',
 ]
 
-export default function PwaColorPopover({ label, value, placement, onChange }: Props) {
+export default function PwaColorPopover({ label, value, placement, floatingStyle, onChange }: Props) {
   const initial = parseCssColor(value) ?? DEFAULT_COLOR
   const [color, setColor] = useState(initial)
   const [format, setFormat] = useState<ColorFormat>(() => value.trim().toLowerCase().startsWith('rgb') ? 'rgba' : 'hex')
@@ -94,7 +95,13 @@ export default function PwaColorPopover({ label, value, placement, onChange }: P
   } as CSSProperties
 
   return (
-    <div className={styles.popover} data-placement={placement} role="dialog" aria-label={`${label}颜色选择器`} style={colorStyle}>
+    <div
+      className={styles.popover}
+      data-placement={placement}
+      role="dialog"
+      aria-label={`${label}颜色选择器`}
+      style={{ ...colorStyle, ...floatingStyle }}
+    >
       <div
         ref={planeRef}
         className={styles.saturationPlane}

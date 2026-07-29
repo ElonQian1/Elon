@@ -1,0 +1,379 @@
+.inspector {
+  --inspector-accent: #38bdf8;
+  --inspector-border: #2b394c;
+  --inspector-panel: #111a28;
+  --inspector-field: #172334;
+}
+
+.inspectorChrome {
+  position: sticky;
+  z-index: 30;
+  top: 0;
+  border-bottom: 1px solid var(--inspector-border);
+  background: rgb(13 21 32 / 94%);
+}
+
+.inspectorHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 12px 9px;
+}
+
+.inspectorHeader strong {
+  display: block;
+  color: #f4f8fd;
+  font-size: 13px;
+}
+
+.inspectorHeader small {
+  display: block;
+  margin-top: 3px;
+  color: #8494aa;
+  font-size: 9px;
+}
+
+.historyBar {
+  grid-template-columns: 34px 34px minmax(0, 1fr);
+  padding: 0 12px 8px;
+}
+
+.historyBar button:last-child {
+  color: #e0f2fe;
+}
+
+.historyBar button:not(:disabled):hover {
+  border-color: var(--inspector-accent);
+  background: #102a40;
+  color: #fff;
+}
+
+.editor {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.quickPanel,
+.styleSection,
+.workflowDisclosure {
+  overflow: hidden;
+  border: 1px solid var(--inspector-border);
+  border-radius: 10px;
+  background: var(--inspector-panel);
+}
+
+.quickPanel > summary,
+.styleSection > summary,
+.workflowDisclosure > summary {
+  box-sizing: border-box;
+  min-height: 43px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  color: #dce7f5;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.quickPanel > summary::-webkit-details-marker,
+.styleSection > summary::-webkit-details-marker,
+.workflowDisclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.quickPanel > summary:hover,
+.styleSection > summary:hover,
+.workflowDisclosure > summary:hover {
+  background: #172335;
+}
+
+.quickPanel > summary > span {
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.quickPanel > summary > small {
+  min-width: 0;
+  margin-left: auto;
+  color: #72839a;
+  font-size: 8px;
+}
+
+.quickPanel > summary > svg:last-child,
+.sectionChevron,
+.workflowDisclosure > summary > svg:last-child {
+  flex: 0 0 auto;
+  color: #71839a;
+}
+
+.quickPanel[open] > summary > svg:last-child,
+.styleSection[open] .sectionChevron,
+.workflowDisclosure[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.quickBody,
+.sectionBody {
+  border-top: 1px solid #273447;
+  padding: 9px;
+}
+
+.styleSection > summary {
+  padding: 7px 9px 7px 8px;
+}
+
+.sectionTitle {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.sectionTitle strong {
+  color: #e5edf7;
+  font-size: 10px;
+}
+
+.sectionTitle small {
+  overflow: hidden;
+  color: #71839a;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.changeBadge {
+  flex: 0 0 auto;
+  margin-left: auto;
+  border-radius: 999px;
+  background: #0c4a6e;
+  color: #bae6fd;
+  padding: 3px 6px;
+  font-size: 8px;
+}
+
+.sectionBody {
+  display: grid;
+  gap: 9px;
+  background: #0e1724;
+}
+
+.twoColumn,
+.edgeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.styleField {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  color: #8c9bb0;
+  font-size: 9px;
+}
+
+.fieldLabel {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+}
+
+.valueControl {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid #344257;
+  border-radius: 7px;
+  background: var(--inspector-field);
+}
+
+.valueControl:focus-within {
+  border-color: var(--inspector-accent);
+}
+
+.valueControl > input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #f2f6fb;
+  padding: 0 7px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
+}
+
+.valueControl > input::placeholder {
+  color: #56677d;
+}
+
+.stepper {
+  display: grid;
+  grid-template-columns: 22px 22px;
+  border-left: 1px solid #344257;
+}
+
+.stepper button {
+  width: 22px;
+  height: 32px;
+  border: 0;
+  border-left: 1px solid #29374a;
+  background: #121c2a;
+  color: #88a0ba;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stepper button:first-child {
+  border-left: 0;
+}
+
+.stepper button:hover {
+  background: #12334d;
+  color: #e0f2fe;
+}
+
+.edgeGroup + .edgeGroup {
+  margin-top: 2px;
+  padding-top: 9px;
+  border-top: 1px dashed #2b394b;
+}
+
+.subsectionTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: #aebccd;
+  font-size: 9px;
+}
+
+.subsectionTitle span {
+  color: #61738b;
+}
+
+.colorStack {
+  display: grid;
+  gap: 9px;
+}
+
+.opacityField {
+  display: grid;
+  gap: 6px;
+  padding-top: 9px;
+  border-top: 1px dashed #2b394b;
+}
+
+.opacityHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #8c9bb0;
+  font-size: 9px;
+}
+
+.opacityHeader strong {
+  color: #d9e6f5;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 9px;
+}
+
+.opacityControl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  align-items: center;
+  gap: 8px;
+}
+
+.opacityControl input[type="range"] {
+  width: 100%;
+  min-width: 0;
+  accent-color: #0ea5e9;
+}
+
+.opacityControl input:last-child {
+  box-sizing: border-box;
+  width: 100%;
+  height: 31px;
+  border: 1px solid #344257;
+  border-radius: 7px;
+  outline: 0;
+  background: var(--inspector-field);
+  color: #f2f6fb;
+  padding: 0 7px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  text-align: center;
+}
+
+.opacityControl input:last-child:focus {
+  border-color: var(--inspector-accent);
+}
+
+.opacityField > small {
+  color: #61738b;
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.resetActions {
+  position: sticky;
+  z-index: 20;
+  bottom: 0;
+  padding: 9px 10px 11px;
+  background: rgb(13 21 32 / 94%);
+}
+
+.workflowDisclosure {
+  margin: 0 10px 10px;
+}
+
+.workflowDisclosure > summary > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.workflowDisclosure > summary strong {
+  color: #dce7f5;
+  font-size: 10px;
+}
+
+.workflowDisclosure > summary small {
+  color: #71839a;
+  font-size: 8px;
+}
+
+.workflowDisclosure > summary > svg:last-child {
+  margin-left: auto;
+}
+
+.workflowBody {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid #273447;
+  background: #0c1420;
+}
+
+.workflowBody > section {
+  margin: 0;
+}
+
+@media (max-width: 1050px) {
+  .inspector {
+    width: min(326px, calc(100vw - 20px)) !important;
+    box-shadow: -18px 0 50px rgb(0 0 0 / 38%);
+  }
+}
