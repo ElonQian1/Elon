@@ -475,6 +475,8 @@ try {
   assert.match(fieldsSource, /type="color"/)
   assert.match(fieldsSource, /styles\.colorTextInput/)
   assert.match(fieldsSource, /export function normalizeHexColor/)
+  assert.match(pageCss, /grid-template-columns:\s*56px minmax\(180px,\s*1fr\)/)
+  assert.match(pageCss, /\.colorField \.colorTextInput\s*\{[^}]*height:\s*38px/s)
   const livePanelSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/live/UiTunerLivePanel.tsx'),
     'utf8',
@@ -619,7 +621,15 @@ try {
   assert.match(sourcePreviewCss, /\.pwaBridgeHealthCard/)
   assert.match(sourcePreviewCss, /\.pwaDesignerWorkflowCard/)
   assert.match(sourcePreviewCss, /\.pwaDesignerWorkflowSteps/)
-  assert.match(sourcePreviewCss, /\.colorField\{display:grid;grid-template-columns:44px minmax\(132px,1fr\)/)
+  assert.match(sourcePreviewCss, /\.sourceInspector \.colorField\{display:grid;grid-template-columns:56px minmax\(180px,1fr\)/)
+  assert.match(sourcePreviewCss, /\.pwaColorField\{display:grid;grid-template-columns:56px minmax\(180px,1fr\)/)
+  assert.match(sourcePreviewCss, /\.pwaOpacityField\{grid-template-columns:58px minmax\(0,1fr\) 72px/)
+  const pwaColorStyleFieldSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaColorStyleField.tsx'),
+    'utf8',
+  )
+  assert.match(pwaColorStyleFieldSource, /type="color"/)
+  assert.match(pwaColorStyleFieldSource, /placeholder="#222255 \/ rgba\(34,34,85,\.9\)"/)
   assert.match(sourcePreviewCss, /\.pwaQuickAdjust:has\(>input:only-child\)/)
   assert.match(sourcePreviewCss, /\.fieldGrid:has\(\.colorField\)/)
   assert.match(sourcePreviewCss, /\.pwaDeviceToolbar/)
