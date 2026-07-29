@@ -1107,6 +1107,7 @@
       background: var(--panel-3);
       color: var(--ink);
     }
+    .chat-avatar.ai { background: transparent; }
     .chat-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .bubble {
       max-width: 76%;
@@ -3052,7 +3053,7 @@
       height: 42px;
       border-radius: 10px;
       overflow: hidden;
-      background: var(--brand);
+      background: transparent;
       flex: none;
     }
     .pwa-install-icon img {
@@ -8875,7 +8876,7 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     }
     if (kind === 'ai') {
       const avatar = document.createElement('span');
-      avatar.className = 'chat-avatar';
+      avatar.className = 'chat-avatar ai';
       avatar.innerHTML = '<img src="data:image/png;base64,__BRAND_PNG_B64__" alt="" />';
       row.appendChild(avatar);
     } else if (kind === 'friend') {
