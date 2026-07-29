@@ -492,6 +492,7 @@ try {
     'utf8',
   )
   assert.ok(livePanelSource.includes("gridTemplateColumns: '44px minmax(0, 1fr)'"))
+  assert.ok(livePanelSource.includes('void commitValue(next)'))
   const gatewaySource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/inspector/UiDesignGateway.tsx'),
     'utf8',

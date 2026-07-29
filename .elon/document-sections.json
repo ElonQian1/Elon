@@ -205,6 +205,7 @@
     "docs/discussion-knowledge-compiler.md": "custom:pc-workbench",
     "docs/drafts/open-commerce-network-roadmap.md": "custom:open-commerce-network",
     "docs/drafts/open-commerce-network-sui-agent-economy.md": "custom:project-system",
+    "docs/drafts/sui-economy-s4-shadow-settlement-plan.md": "custom:project-system",
     "docs/drafts/requirements/open-commerce-network.md": "custom:open-commerce-network",
     "docs/fb2-ai-center/PLAN.md": "custom:fb2-project",
     "docs/fb2-ai-center/PROGRESS.md": "custom:fb2-project",
@@ -275,6 +276,10 @@
     "docs/drafts/open-commerce-network-sui-agent-economy.md": [
       "custom:open-commerce-network"
     ],
+    "docs/drafts/sui-economy-s4-shadow-settlement-plan.md": [
+      "custom:open-commerce-network",
+      "custom:windows-node"
+    ],
     "docs/project-document-governance-mcp.md": [
       "custom:ai-context",
       "custom:project-system"
@@ -304,6 +309,7 @@
     "docs/fb2-ai-center/test-plan.md": "drafts",
     "docs/group-chat-summary-system.md": "drafts",
     "docs/intent-routing.md": "current",
+    "docs/drafts/sui-economy-s4-shadow-settlement-plan.md": "drafts",
     "docs/open-commerce-network-v1-acceptance.md": "on-demand",
     "docs/open-commerce-network-v1-api.md": "on-demand",
     "docs/pc-frontend-migration.md": "on-demand",

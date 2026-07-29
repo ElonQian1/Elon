@@ -589,8 +589,8 @@ function ColorLiveField({
   const [committing, setCommitting] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   useEffect(() => setDraft(value), [value])
-  const commit = async () => {
-    const next = normalizeColorDraft(inputRef.current?.value ?? draft)
+  const commitValue = async (rawValue: string) => {
+    const next = normalizeColorDraft(rawValue)
     if (!next || next === value) return
     setCommitting(true)
     try {
@@ -600,6 +600,9 @@ function ColorLiveField({
     } finally {
       setCommitting(false)
     }
+  }
+  const commit = async () => {
+    await commitValue(inputRef.current?.value ?? draft)
   }
   const nativeColor = nativePickerColor(draft)
   return (
@@ -613,7 +616,11 @@ function ColorLiveField({
             aria-label={`${label}取色器`}
             value={nativeColor}
             disabled={disabled || committing}
-            onChange={(event) => setDraft(event.currentTarget.value)}
+            onChange={(event) => {
+              const next = event.currentTarget.value
+              setDraft(next)
+              void commitValue(next)
+            }}
           />
           <input
             ref={inputRef}
