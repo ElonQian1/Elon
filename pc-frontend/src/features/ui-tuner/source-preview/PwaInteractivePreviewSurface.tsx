@@ -37,6 +37,13 @@ function modeDetail(design: PwaDesignSession): string {
   return '先登录和点击到目标页面；需要修改时点“选择一个组件”。'
 }
 
+function modeStep(design: PwaDesignSession): number {
+  if (!design.ready) return 1
+  if (design.mode === 'select') return 2
+  if (design.selection) return 3
+  return 1
+}
+
 function selectedLabel(design: PwaDesignSession): string {
   const identity = design.selection?.identity
   if (!identity) return ''
@@ -90,17 +97,18 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, onZoom, desi
 
   return (
     <div ref={workspaceRef} className={styles.pwaPreviewWorkspace} data-testid="pwa-interactive-preview">
-      <div className={styles.pwaWorkflowGuide} aria-label="PWA 手工设计步骤">
-        <span className={design.mode === 'interact' ? styles.activeWorkflowStep : ''}>① 真实使用并到达页面</span>
-        <span className={design.mode === 'select' && !design.selection ? styles.activeWorkflowStep : ''}>② 点一次选择组件</span>
-        <span className={design.mode === 'interact' && design.selection ? styles.activeWorkflowStep : ''}>③ 右侧修改样式</span>
-        <span>④ 草稿自动保存</span>
-      </div>
-      <div className={styles.pwaPreviewToolbar}>
-        <span className={design.ready ? styles.pwaReady : styles.pwaConnecting}><i />{design.ready ? '真实 PWA 已连接' : '正在连接真实 PWA…'}</span>
+      <div className={styles.pwaPreviewToolbar} data-mode={design.mode} data-ready={design.ready ? 'true' : 'false'}>
+        <div className={styles.pwaWorkflowGuide} aria-label="PWA 手工设计步骤">
+          <span>步骤 {modeStep(design)}/4</span>
+          <div>
+            <strong>{modeTitle(design)}</strong>
+            <small>{modeDetail(design)}</small>
+          </div>
+        </div>
+        <span className={`${styles.pwaConnectionStatus} ${design.ready ? styles.pwaReady : styles.pwaConnecting}`}><i />{design.ready ? 'PWA 已连接' : '正在连接…'}</span>
         <div className={styles.pwaModeSwitch}>
           <button className={design.mode === 'interact' ? styles.activePwaMode : ''} type="button" disabled={!design.ready} onClick={() => design.setMode('interact')}><Smartphone size={14} />正常操作页面</button>
-          <button className={design.mode === 'select' ? styles.activePwaMode : ''} type="button" disabled={!design.ready} onClick={() => design.setMode('select')}><MousePointer2 size={14} />选择一个组件</button>
+          <button aria-label="开始设计/修改页面" className={design.mode === 'select' ? styles.activePwaMode : ''} type="button" disabled={!design.ready} onClick={() => design.setMode('select')}><MousePointer2 size={14} />选择组件</button>
         </div>
         <button type="button" title="重新载入 PWA（已保存草稿会自动恢复）" onClick={design.prepareReload}><RefreshCw size={14} /></button>
       </div>
@@ -116,20 +124,6 @@ export function PwaInteractivePreviewSurface({ url, document, zoom, onZoom, desi
         onZoom={onZoom}
         onFit={fitViewport}
       />
-      <div className={styles.pwaModeGuide} data-mode={design.mode} data-ready={design.ready ? 'true' : 'false'}>
-        <strong>{modeTitle(design)}</strong>
-        <span>{modeDetail(design)}</span>
-        {design.mode === 'interact' && !design.selection && (
-          <button type="button" disabled={!design.ready} onClick={() => design.setMode('select')}>
-            <MousePointer2 size={14} /> 开始设计/修改页面
-          </button>
-        )}
-        {design.mode === 'select' && (
-          <button type="button" onClick={() => design.setMode('interact')}>
-            <Smartphone size={14} /> 取消选择，继续操作页面
-          </button>
-        )}
-      </div>
       {route && <div className={styles.pwaRouteStatus}>
         当前画面：{route.screenTitle || '未识别画面'}
         {route.screenKey && <> · <code>{route.screenKey}</code></>}

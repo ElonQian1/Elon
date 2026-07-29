@@ -1,6 +1,6 @@
 .progress {
   display: grid;
-  grid-template-columns: repeat(4, minmax(118px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0;
   margin: 0;
   padding: 7px 12px;
@@ -13,7 +13,7 @@
 .progress li {
   position: relative;
   display: flex;
-  min-width: 118px;
+  min-width: 0;
   align-items: center;
   gap: 7px;
   color: #718096;

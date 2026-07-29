@@ -50,7 +50,7 @@ export function SourceUiDesignProgress({
   pendingCount: number
   saveState: SourcePreviewSaveState
 }) {
-  return <UiDesignProgressBar steps={[
+  return <UiDesignProgressBar compact steps={[
     { label: '草稿', detail: pendingCount ? `${pendingCount} 个组件已调整` : hasDocument ? '可即时编辑' : '等待加载源码', state: pendingCount ? 'active' : hasDocument ? 'done' : 'waiting' },
     { label: 'Android 同步', detail: '等待真帧校准', state: 'waiting' },
     { label: '源码写回', detail: saveState === 'saved' ? '源码已保存' : saveState === 'saving' ? '正在写回' : saveState === 'error' ? '写回失败' : pendingCount ? '等待确认' : '尚无修改', state: saveState === 'saved' ? 'done' : saveState === 'error' ? 'error' : saveState === 'saving' || pendingCount ? 'active' : 'waiting' },
@@ -58,13 +58,18 @@ export function SourceUiDesignProgress({
   ]} />
 }
 
-function UiDesignProgressBar({ steps }: { steps: ProgressStep[] }) {
+function UiDesignProgressBar({ steps, compact = false }: { steps: ProgressStep[]; compact?: boolean }) {
   return (
     <ol className={styles.progress} aria-label="设计落地进度">
       {steps.map((step, index) => (
-        <li key={step.label} data-state={step.state}>
+        <li
+          key={step.label}
+          data-state={step.state}
+          aria-current={step.state === 'active' ? 'step' : undefined}
+          title={`${step.label}：${step.detail}`}
+        >
           <span className={styles.marker}>{step.state === 'done' ? '✓' : index + 1}</span>
-          <span><strong>{step.label}</strong><small>{step.detail}</small></span>
+          <span><strong>{step.label}</strong>{!compact && <small>{step.detail}</small>}</span>
         </li>
       ))}
     </ol>
