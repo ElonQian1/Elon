@@ -91,7 +91,7 @@ pub(crate) fn definitions() -> Vec<Value> {
         ),
         tool(
             "project_discussions_import_source",
-            "把任意供应商的聊天正文直接保存为 docs/inbox/conversations 下的低权重原始来源；固定 authority=none、lifecycle=source_material、default_retrieval=false，不覆盖同名内容，并创建整理前后 Git 版本。导入后再调用讨论图工具编译。",
+            "把任意供应商的聊天正文保存为 docs/inbox/conversations 下的低权重原始来源，并立即在讨论图登记 pending 来源；固定 authority=none、lifecycle=source_material、default_retrieval=false，不覆盖同名内容，创建整理前后 Git 版本。即使 AI 中断，后续也能按 chunk 续编。",
             json!({"type":"object","required":["title","content"],"properties":{
                 "title":{"type":"string","minLength":1,"maxLength":160},
                 "content":{"type":"string","minLength":1,"maxLength":2097152},

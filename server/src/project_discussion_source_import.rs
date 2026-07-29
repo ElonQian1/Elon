@@ -8,9 +8,12 @@ use std::path::Path;
 
 use crate::{
     project_discussion_source_normalizer::{normalize_conversation, NormalizedConversation},
+    project_discussion_source_registration::{apply_pending_source_plan, plan_pending_source},
     project_document_authorization::{authorize_document_apply, DocumentAutomationMode},
     project_document_files::{read_project_document_file, write_project_document_file},
-    project_document_git_transaction::{commit_document_baseline, commit_document_result},
+    project_document_git_transaction::{
+        commit_document_baseline, commit_document_result, current_document_head,
+    },
     project_document_vault::{current_version, is_managed_vault},
 };
 
@@ -43,24 +46,37 @@ pub(crate) fn import_conversation_source(
     let normalized = normalize_conversation(body)?;
     let content = source_markdown(&title, &normalized, &source_reference)?;
     let target = choose_target_path(workspace, &content, suggested_filename)?;
-    if let Ok(existing) = read_project_document_file(workspace, &target.path) {
-        if existing.content == content {
-            return Ok(json!({
-                "status": "imported",
-                "already_imported": true,
-                "path": target.path,
-                "revision": existing.revision,
-                "source_bytes": body.len(),
-                "source_id": normalized.source_id,
-                "source_revision": normalized.content_revision,
-                "source_format": normalized.format,
-                "message_count": normalized.message_count,
-                "authorization_mode": authorization.mode,
-                "auto_authorized": authorization.auto_authorized,
-                "git_document_transaction_complete": true,
-                "budget": metadata_budget(),
-            }));
-        }
+    let existing = read_project_document_file(workspace, &target.path).ok();
+    let already_imported = existing
+        .as_ref()
+        .is_some_and(|document| document.content == content);
+    let registration = plan_pending_source(workspace, &title, &target.path, &normalized)?;
+    let chunk_count = registration.chunk_count;
+    if already_imported && !registration.changed {
+        let current = if is_managed_vault(workspace) {
+            current_version(workspace)?
+        } else {
+            current_document_head(workspace)?
+        };
+        return Ok(json!({
+            "status": "imported",
+            "already_imported": true,
+            "path": target.path,
+            "revision": existing.map(|document| document.revision),
+            "source_bytes": body.len(),
+            "source_id": normalized.source_id,
+            "source_revision": normalized.content_revision,
+            "source_format": normalized.format,
+            "message_count": normalized.message_count,
+            "chunk_count": chunk_count,
+            "graph_revision": registration.expected_graph_revision,
+            "authorization_mode": authorization.mode,
+            "auto_authorized": authorization.auto_authorized,
+            "git_baseline_commit": current.clone(),
+            "git_result_commit": current,
+            "git_document_transaction_complete": true,
+            "budget": metadata_budget(),
+        }));
     }
 
     let managed = is_managed_vault(workspace);
@@ -70,8 +86,16 @@ pub(crate) fn import_conversation_source(
     } else {
         Some(commit_document_baseline(workspace)?)
     };
-    let saved = write_project_document_file(workspace, &target.path, &content, None)
-        .map_err(|error| anyhow!(error.message))?;
+    let saved_revision = if already_imported {
+        existing
+            .map(|document| document.revision)
+            .unwrap_or_default()
+    } else {
+        write_project_document_file(workspace, &target.path, &content, None)
+            .map_err(|error| anyhow!(error.message))?
+            .revision
+    };
+    let graph_revision = apply_pending_source_plan(workspace, registration)?;
     let result_commit = if managed {
         Some(current_version(workspace)?)
     } else {
@@ -82,20 +106,22 @@ pub(crate) fn import_conversation_source(
     };
     Ok(json!({
         "status": "imported",
-        "already_imported": false,
+        "already_imported": already_imported,
         "path": target.path,
-        "revision": saved.revision,
+        "revision": saved_revision,
         "source_bytes": body.len(),
         "source_id": normalized.source_id,
         "source_revision": normalized.content_revision,
         "source_format": normalized.format,
         "message_count": normalized.message_count,
+        "chunk_count": chunk_count,
+        "graph_revision": graph_revision,
         "authorization_mode": authorization.mode,
         "auto_authorized": authorization.auto_authorized,
         "git_baseline_commit": baseline,
         "git_result_commit": result_commit,
         "git_document_transaction_complete": result_commit.is_some(),
-        "next_action": "调用 project_discussions_get_graph，再按路径 plan_context/read，并保存增量讨论图 proposal。",
+        "next_action": "来源已登记为 pending；调用 project_discussions_get_source_manifest，按 chunk 增量编译并更新来源进度。",
         "budget": metadata_budget(),
     }))
 }

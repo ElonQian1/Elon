@@ -12,6 +12,10 @@ const SOURCE_PREFIX: &str = "docs/inbox/conversations/";
 const TARGET_CHARS: usize = 12_000;
 const MAX_CHUNKS: usize = 512;
 
+pub(crate) fn source_chunk_count(body: &str) -> Result<usize> {
+    Ok(build_chunks(body)?.len())
+}
+
 #[derive(Debug, Clone, Serialize)]
 struct SourceChunk {
     id: String,
