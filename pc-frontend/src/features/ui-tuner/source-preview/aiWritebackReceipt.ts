@@ -9,6 +9,8 @@ export interface AiPlatformWritebackResult {
 
 export interface AiWritebackReceipt {
   schemaVersion: 1
+  aiFitTaskContractId?: string
+  aiFitTaskHonored?: true
   changedFiles: string[]
   sourceHash: string
   sourceRevisionBefore: string
@@ -35,6 +37,7 @@ export function aiWritebackReceiptInstruction(): string {
   return [
     '最终回复必须包含一行 ELON_UI_WRITEBACK_RECEIPT_V1，紧接一个 JSON 对象。',
     'JSON 必须包含 schemaVersion=1、changedFiles、sourceHash、sourceRevisionBefore、sourceRevision、targetPlatforms、platformResults。',
+    '如果 Context Artifact 含 pwaDesign.aiFitTask.contractId，JSON 还必须包含相同的 aiFitTaskContractId，并设置 aiFitTaskHonored=true。',
     'platformResults 仅允许 pwa/apk；每端必须给出 SAVED 或 FAILED、changedFiles、sourceRevision，失败时给 error。',
     'sourceHash/sourceRevision 必须来自修改后的真实文件或工作区；缺少该机器回执时，界面不会显示源码已保存或任务完成。',
     '不要把 build verified 写进 AI 回执；PWA 重载和 APK 真机构建由 UI 工作台独立验收。',
@@ -50,6 +53,7 @@ function normalizeAiWritebackReceipt(value: unknown): AiWritebackReceipt | null 
   const sourceHash = safeRevision(input.sourceHash)
   const sourceRevisionBefore = safeRevision(input.sourceRevisionBefore)
   const sourceRevision = safeRevision(input.sourceRevision)
+  const aiFitTaskContractId = safeRevision(input.aiFitTaskContractId)
   if (!changedFiles.length || !targetPlatforms.length || !sourceHash || !sourceRevisionBefore || !sourceRevision) return null
   const platformResults: Partial<Record<CrossPlatformTarget, AiPlatformWritebackResult>> = {}
   for (const platform of targetPlatforms) {
@@ -70,6 +74,8 @@ function normalizeAiWritebackReceipt(value: unknown): AiWritebackReceipt | null 
   if (changedFiles.some((file) => !declaredFiles.has(file))) return null
   return {
     schemaVersion: 1,
+    aiFitTaskContractId: aiFitTaskContractId || undefined,
+    aiFitTaskHonored: input.aiFitTaskHonored === true ? true : undefined,
     changedFiles,
     sourceHash,
     sourceRevisionBefore,
