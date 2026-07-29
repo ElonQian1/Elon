@@ -583,6 +583,8 @@ try {
   assert.match(pwaInspectorSource, /低 Token 交接/)
   assert.match(pwaInspectorSource, /data-testid="pwa-low-token-handoff"/)
   assert.match(pwaInspectorSource, /优先读取 compactHandoff/)
+  assert.match(pwaInspectorSource, /复制精简交接/)
+  assert.match(pwaInspectorSource, /copyCompactHandoff/)
   assert.match(pwaInspectorSource, /设计师常用微调/)
   assert.match(pwaInspectorSource, /designer:primary/)
   assert.match(pwaInspectorSource, /designer:ghost/)
@@ -648,6 +650,9 @@ try {
   assert.match(pwaSessionSource, /PwaBridgeHealth/)
   assert.match(pwaSessionSource, /setBridgeHealth/)
   assert.match(pwaSessionSource, /已退出选择组件模式；页面恢复正常操作/)
+  assert.match(pwaSessionSource, /stringifyPwaDraftCliCompactHandoff/)
+  assert.match(pwaSessionSource, /精简交接已复制/)
+  assert.match(pwaSessionSource, /AI 优先按候选文件写回/)
   const sourceWorkspaceSource = fs.readFileSync(
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/SourcePreviewWorkspace.tsx'),
     'utf8',

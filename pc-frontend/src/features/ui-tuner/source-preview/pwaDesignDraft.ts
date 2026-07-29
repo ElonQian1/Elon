@@ -439,6 +439,10 @@ export function stringifyPwaDraftCliPackage(draft: PwaDesignDraft): string {
   return JSON.stringify(buildPwaDraftCliPackage(draft), null, 2)
 }
 
+export function stringifyPwaDraftCliCompactHandoff(draft: PwaDesignDraft): string {
+  return JSON.stringify(buildPwaDraftCliCompactHandoff(draft), null, 2)
+}
+
 export function buildPwaDraftCliCompactHandoff(draft: PwaDesignDraft): PwaDraftCliCompactHandoff {
   const elements = Object.entries(draft.elements)
     .filter(([, element]) => Object.keys(element.styleDiff).length > 0)

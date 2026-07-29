@@ -29,6 +29,7 @@ import {
 import {
   normalizePwaRoute,
   removePwaDesignDraft,
+  stringifyPwaDraftCliCompactHandoff,
   stringifyPwaDraftCliPackage,
   type PwaDesignDraft,
   type PwaDomContextNode,
@@ -109,6 +110,7 @@ export interface PwaDesignSession {
   redo: () => void
   saveNow: () => void
   syncNow: () => Promise<void>
+  copyCompactHandoff: () => Promise<void>
   copyCliPackage: () => Promise<void>
   downloadCliPackage: () => void
   prepareReload: () => void
@@ -738,6 +740,13 @@ export function usePwaDesignSession({
     }
   }, [model])
 
+  const copyCompactHandoff = useCallback(async () => {
+    const current = model.draft; if (!current) return
+    try {
+      await navigator.clipboard.writeText(stringifyPwaDraftCliCompactHandoff(current)); setSaveLabel('精简交接已复制 · AI 优先按候选文件写回')
+    } catch { setSaveLabel('浏览器禁止复制，请下载完整 CLI 包') }
+  }, [model])
+
   const downloadCliPackage = useCallback(() => {
     const current = model.draft
     if (!current) return
@@ -782,6 +791,7 @@ export function usePwaDesignSession({
     redo,
     saveNow,
     syncNow,
+    copyCompactHandoff,
     copyCliPackage,
     downloadCliPackage,
     prepareReload,

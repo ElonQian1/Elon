@@ -401,6 +401,7 @@ export function PwaStyleInspector({ session }: Props) {
           <button type="button" onClick={() => { void session.retryVerification() }}>保留草稿并重试真实验证</button>
         )}
         <div className={styles.pwaArtifactActions}>
+          <button type="button" disabled={!elementCount} onClick={() => { void session.copyCompactHandoff() }}><Copy size={13} />复制精简交接</button>
           <button type="button" disabled={!elementCount} onClick={() => { void session.copyCliPackage() }}><Copy size={13} />复制 CLI 包</button>
           <button type="button" disabled={!elementCount} onClick={session.downloadCliPackage}><Download size={13} />下载草稿</button>
         </div>
