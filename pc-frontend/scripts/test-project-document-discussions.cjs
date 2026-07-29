@@ -143,5 +143,8 @@ const sourcePrompt = promptsModule.exports.discussionSourceInstruction({
 assert(sourcePrompt.includes('manifest.source_revision'))
 assert(sourcePrompt.includes('1 至 3 句话的可复用 summary'))
 assert(sourcePrompt.includes('不能使用 proposed'))
+assert(sourcePrompt.includes('根节点自身 root_id=id'))
+assert(sourcePrompt.includes('decomposes_to'))
+assert(sourcePrompt.includes('不能自造 contains'))
 
 console.log('project document discussion graph tests passed')

@@ -72,7 +72,7 @@ pub(crate) fn definitions() -> Vec<Value> {
             "project_discussions_get_graph",
             "分页读取独立讨论推理图；返回显式讨论节点、来源锚点和分叉关系，不读取原始聊天正文。长聊天整理先调用它增量了解已有结构。",
             json!({"type":"object","properties":{
-                "root_id":{"type":"string","maxLength":100},
+                "root_id":{"type":"string","maxLength":100,"description":"只返回该稳定根节点及其后代；根节点自身的 root_id 等于自身 id。"},
                 "query":{"type":"string","maxLength":300},
                 "kind":{"type":"string","maxLength":40},
                 "status":{"type":"string","maxLength":40},
@@ -376,7 +376,8 @@ fn save_schema() -> Value {
                     "compilation_status":{"type":"string","enum":["pending","partial","complete"]}
                 }}},
                 "nodes":{"type":"array","maxItems":4096,"items":{"type":"object","required":["id","title"],"properties":{
-                    "id":{"type":"string","maxLength":100},"root_id":{"type":"string","maxLength":100},
+                    "id":{"type":"string","maxLength":100},
+                    "root_id":{"type":"string","maxLength":100,"description":"所属根主题的稳定节点 ID；根节点自身必须填写自己的 id，不能留空。"},
                     "parent_id":{"type":"string","maxLength":100},
                     "kind":{"type":"string","enum":["topic","question","claim","hypothesis","option","objection","evidence","risk","decision","requirement","feature","task","result"]},
                     "title":{"type":"string","maxLength":120},
@@ -393,7 +394,8 @@ fn save_schema() -> Value {
                 }}},
                 "edges":{"type":"array","maxItems":8192,"items":{"type":"object","required":["id","source","target"],"properties":{
                     "id":{"type":"string","maxLength":120},"source":{"type":"string","maxLength":100},
-                    "target":{"type":"string","maxLength":100},"relation":{"type":"string","maxLength":40},
+                    "target":{"type":"string","maxLength":100},
+                    "relation":{"type":"string","enum":["decomposes_to","supports","opposes","alternative_to","depends_on","answers","spawns","leads_to","resolves","merged_into","decides","promotes_to","implements","validated_by","supersedes","related_to"],"default":"related_to"},
                     "label":{"type":"string","maxLength":100}
                 }}}
             }},
@@ -413,4 +415,27 @@ fn tool(name: &str, description: &str, input_schema: Value) -> Value {
 
 fn decode<T: for<'de> Deserialize<'de>>(arguments: Value) -> Result<T> {
     serde_json::from_value(arguments).map_err(Into::into)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::save_schema;
+
+    #[test]
+    fn proposal_schema_exposes_portable_root_and_relation_contract() {
+        let schema = save_schema();
+        let root_description = schema
+            .pointer("/properties/proposal/properties/graph/properties/nodes/items/properties/root_id/description")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default();
+        assert!(root_description.contains("根节点自身必须填写自己的 id"));
+
+        let relations = schema
+            .pointer("/properties/proposal/properties/graph/properties/edges/items/properties/relation/enum")
+            .and_then(|value| value.as_array())
+            .expect("relation enum");
+        assert!(relations.iter().any(|value| value == "decomposes_to"));
+        assert!(relations.iter().any(|value| value == "related_to"));
+        assert!(!relations.iter().any(|value| value == "contains"));
+    }
 }

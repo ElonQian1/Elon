@@ -58,7 +58,7 @@ implementation_refs:
 | `requirement` / `feature` / `task` | 可进入产品与开发流程的节点 |
 | `result` | 已验证结果 |
 
-父子关系表达“这段讨论由哪里展开”，交叉边表达 `supports`、`opposes`、`alternative_to`、`depends_on`、`answers`、`spawns`、`leads_to`、`resolves`、`implements` 等语义。新分支不得覆盖旧节点；被否决或替代的节点仍保留状态和来源。
+每个节点的 `root_id` 都填写所属根主题的稳定节点 ID；根节点自身必须满足 `root_id=id`，不能留空，且根节点的 `parent_id` 为空。父子关系表达“这段讨论由哪里展开”，交叉边只使用 `decomposes_to|supports|opposes|alternative_to|depends_on|answers|spawns|leads_to|resolves|merged_into|decides|promotes_to|implements|validated_by|supersedes|related_to`。不得自造 `contains` 等供应商私有关系。新分支不得覆盖旧节点；被否决或替代的节点仍保留状态和来源。
 
 ## 存储契约
 
@@ -77,7 +77,7 @@ implementation_refs:
 2. Windows 节点给当前登录账号选择的 Codex、Copilot、Claude 或 Gemini CLI 注入同一项目文档 MCP；普通开发任务不加载这组工具。
 3. AI 先调用 `project_discussions_get_graph` 读取已有节点和 revision，不读聊天正文。
 4. AI 调用 `project_discussions_get_source_manifest` 获取稳定 chunk 清单，对照图中 `processed_chunk_ids`，只用 `project_discussions_read_source_chunk` 顺序读取未处理 chunk；普通 `project_docs_read` 不用于聊天全文。
-5. AI 生成增量节点、边和可选晋升项，调用 `project_discussions_save_proposal`；每轮同时更新来源 revision、总 chunk、已处理 chunk 和编译状态。`expected_source_revision` 必须原样取自刚读取的 manifest；除 `topic` 外，每个新增或修改节点必须用 1 至 3 句话填写可复用摘要，状态只能使用 `open|exploring|accepted|rejected|superseded|implemented`。任务中断时保存 `partial`，下次从首个未处理 chunk 继续；全部处理后才能标记 `complete`。校验器拒绝摘要缺失、非法状态、进度越界、错误 complete、循环父子关系、无效路径和越界晋升。
+5. AI 生成增量节点、边和可选晋升项，调用 `project_discussions_save_proposal`；每轮同时更新来源 revision、总 chunk、已处理 chunk 和编译状态。`expected_source_revision` 必须原样取自刚读取的 manifest；所有节点都遵守根 ID 契约，所有边都使用 schema 枚举；除 `topic` 外，每个新增或修改节点必须用 1 至 3 句话填写可复用摘要，状态只能使用 `open|exploring|accepted|rejected|superseded|implemented`。任务中断时保存 `partial`，下次从首个未处理 chunk 继续；全部处理后才能标记 `complete`。校验器拒绝摘要缺失、非法状态、进度越界、错误 complete、循环父子关系、无效路径和越界晋升。
 6. 修改前调用 `project_discussions_review_graph`。程序只修正 root 等确定性错误；权威性、采纳状态、重复观点和未解决异议必须根据命中来源判断。
 7. 根据统一权限模式调用 `project_discussions_apply`。所有可应用模式都为普通 Git 项目保存整理前和整理后提交；托管笔记库创建对应版本。晋升项声明的 `section_id`（未声明时使用来源节点的 `section_id`）若命中现有知识主题，系统会同时写入 `.elon/document-sections.json`，避免“生成了文档却在知识架构里找不到”；已有人工主题分配不会被覆盖。授权模式控制“能否应用”，不再控制“是否保留历史”。
 8. PC 页面刷新讨论图。用户可查看每个来源的进度并续编；从任意节点继续或分叉时，用户新增文字会先作为新的低权重来源进入 Git，再由 AI 增量编译，不允许 AI 凭按钮文案猜测新需求。晋升时用户可指定文档类型和可选路径。

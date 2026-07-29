@@ -28,7 +28,8 @@ applyTo: ".elon/discussion-graph*.json,docs/inbox/conversations/**"
 
 ## 演化语义
 
-- 父子关系表示“从哪个问题展开”；交叉边使用 `supports`、`opposes`、`alternative_to`、`depends_on`、`answers`、`spawns`、`leads_to`、`resolves`、`merged_into`、`supersedes`、`implements` 等明确关系。
+- 每个节点的 `root_id` 都是所属根主题的稳定节点 ID；根节点自身必须满足 `root_id=id`，不能留空。`parent_id` 只表达直接父节点，根节点的 `parent_id` 为空。
+- 父子关系表示“从哪个问题展开”；交叉边只使用 `decomposes_to|supports|opposes|alternative_to|depends_on|answers|spawns|leads_to|resolves|merged_into|decides|promotes_to|implements|validated_by|supersedes|related_to`，不得自造 `contains` 等供应商私有关系。
 - 除 `topic` 外，每个新增或修改节点必须有 1 至 3 句话的可复用 `summary`，说明结论、成立条件、依据或待验证点；否则后续 AI 仍需重读聊天，失去低 Token 价值。
 - 节点状态只允许 `open|exploring|accepted|rejected|superseded|implemented`。待审核建议的 `status=proposed` 属于其他建议模型，不能用于讨论节点。
 - 不删除有意义的失败方案、反对意见或旧决定。用 `rejected`、`superseded`、`merged_into` 和关系边说明它为何退出当前路线。
