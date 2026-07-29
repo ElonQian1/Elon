@@ -26,8 +26,9 @@ export function knowledgeMapReviewInstruction(view: ProjectKnowledgeMapView) {
 export function discussionSourceInstruction(source: ImportedDiscussionSource) {
   return `把已保存的原始聊天“${source.path}”编译为可继续工作的讨论知识图。来源 ID=${source.source_id}，revision=${source.source_revision}。` +
     '必须先调用 project_discussions_get_graph，再调用 project_discussions_get_source_manifest；不得用 project_docs_read 全文读取聊天，也不要扫描其他项目文档。' +
-    '核对 manifest 的 source_id、source_revision 与图中同一来源的 processed_chunk_ids，只按顺序调用 project_discussions_read_source_chunk 读取尚未处理的 chunk，并传 expected_source_revision。' +
+    '核对 manifest 的 source_id、source_revision 与图中同一来源的 processed_chunk_ids，只按顺序调用 project_discussions_read_source_chunk 读取尚未处理的 chunk；expected_source_revision 必须逐字复制本次 manifest.source_revision，不得从图或记忆猜测。' +
     '把讨论拆成稳定主题、问题、主张、假设、方案、反对意见、证据、风险、决策、需求、功能、任务和结果节点，保留父子推导与 supports、opposes、alternative_to、depends_on、leads_to、spawns 关系。' +
+    '除 topic 外，每个新增或修改节点都必须有 1 至 3 句话的可复用 summary，说明结论、条件、依据或待验证点；status 只能是 open、exploring、accepted、rejected、superseded、implemented，不能使用 proposed。' +
     '每个结论必须使用返回的 source_id#turn-xxxx 作为 source_refs；原始聊天只作为 source_material，不得晋升为项目事实。保留现有稳定节点 ID，只增量合并，禁止每次重建整张图。' +
     `调用 project_discussions_save_proposal 保存增量图，change_kind=import，并填写简短 actor；source.reference 必须保持精确路径“${source.path}”，并记录 content_revision、source_format、message_count、chunk_count、processed_chunk_ids 和 compilation_status。` +
     '如果本次不能读完，先保存 partial 进度并明确下一个 chunk；全部处理后才能标记 complete。只对已确认且值得长期维护的结论提出 promotions，避免一节点一文档和重复权威文档。' +
@@ -56,7 +57,7 @@ export function discussionNodeInstruction(
   return `围绕讨论节点“${node.title}”（node_id=${node.id}）继续工作：${action}。` +
     `${promotion}${sourceInstruction}用户本次明确输入如下：\n---\n${userDetails || '没有补充正文，仅请求评估现有节点。'}\n---\n` +
     '必须先调用 project_discussions_get_node 获取祖先、子节点和交叉关系，再按需规划极少量正文读取。' +
-    '新增内容必须携带来源或当前任务引用；把事实、假设、意见和决策分开，不得把讨论自动写成权威事实。' +
+    '新增内容必须携带来源或当前任务引用；把事实、假设、意见和决策分开，不得把讨论自动写成权威事实。除 topic 外，每个新增或修改节点必须填写 1 至 3 句话的可复用 summary；status 只允许 open、exploring、accepted、rejected、superseded、implemented。' +
     '通过 project_discussions_save_proposal 保存增量变更，继续/分叉使用 change_kind=expand，晋升使用 change_kind=decision；' +
     '按当前权限允许时调用 project_discussions_apply，并用 get_node、trace_node 和 review_graph 回读确认。'
 }

@@ -123,4 +123,25 @@ const mapSource = fs.readFileSync(path.join(
 assert(mapSource.includes('ProjectDocumentDiscussionProposalPanel'))
 assert(mapSource.includes('ProjectDocumentDiscussionSources'))
 
+const promptsPath = path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentKnowledgeMapPrompts.ts',
+)
+const promptsOutput = ts.transpileModule(fs.readFileSync(promptsPath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const promptsModule = { exports: {} }
+new Function('module', 'exports', 'require', promptsOutput)(
+  promptsModule, promptsModule.exports, require,
+)
+const sourcePrompt = promptsModule.exports.discussionSourceInstruction({
+  path: 'docs/inbox/conversations/chat.md',
+  source_id: 'conversation-test',
+  source_revision: 'revision-test',
+  source_format: 'conversation_json',
+  message_count: 24,
+})
+assert(sourcePrompt.includes('manifest.source_revision'))
+assert(sourcePrompt.includes('1 至 3 句话的可复用 summary'))
+assert(sourcePrompt.includes('不能使用 proposed'))
+
 console.log('project document discussion graph tests passed')

@@ -12,7 +12,8 @@ use crate::{
         Versioned, DISCUSSION_GRAPH_PATH, DISCUSSION_SUGGESTIONS_PATH,
     },
     project_discussion_graph_validation::{
-        counts, merge_graph, normalize_graph, normalize_proposal, validate_promotions,
+        counts, merge_graph, normalize_graph, normalize_proposal, validate_changed_node_quality,
+        validate_promotions,
     },
     project_document_authorization::{authorize_document_apply, DocumentAutomationMode},
     project_document_files::{read_project_document_file, write_project_document_file},
@@ -59,6 +60,7 @@ pub(crate) fn save_proposal(
     let mut proposal = proposal;
     proposal.graph = merge_graph(graph.value.clone(), proposal.graph)?;
     let proposal = normalize_proposal(proposal)?;
+    validate_changed_node_quality(&graph.value, &proposal.graph, &proposal.change_kind)?;
     validate_promotions(workspace, &proposal)?;
     let content = pretty(&proposal)?;
     let saved = write_project_document_file(
@@ -111,6 +113,7 @@ pub(crate) fn apply_proposal(
             "counts": counts(&current.value, proposal.promotions.len()),
         }));
     }
+    validate_changed_node_quality(&current.value, &proposal.graph, &proposal.change_kind)?;
     validate_promotions(workspace, &proposal)?;
     let previous_revision = current.revision.clone().unwrap_or_default();
     let mut merged = merge_graph(current.value, proposal.graph.clone())?;

@@ -177,6 +177,33 @@ pub(crate) fn counts(graph: &DiscussionGraph, promotions: usize) -> Value {
     })
 }
 
+pub(crate) fn validate_changed_node_quality(
+    current: &DiscussionGraph,
+    proposed: &DiscussionGraph,
+    change_kind: &str,
+) -> Result<()> {
+    if change_kind == "repair" {
+        return Ok(());
+    }
+    let current = current
+        .nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node))
+        .collect::<HashMap<_, _>>();
+    for node in &proposed.nodes {
+        let changed = current
+            .get(node.id.as_str())
+            .is_none_or(|before| *before != node);
+        if changed && node.kind != "topic" && node.summary.trim().is_empty() {
+            bail!(
+                "讨论节点 {} 缺少可复用摘要；非 topic 节点必须用 1 至 3 句话说明结论、条件或待验证点",
+                node.id
+            );
+        }
+    }
+    Ok(())
+}
+
 fn normalize_source(mut source: DiscussionSource) -> Result<DiscussionSource> {
     source.id = stable_id(&source.id, 100);
     source.title = truncate(source.title.trim(), 160);
@@ -558,5 +585,21 @@ mod tests {
                 .parent_id,
             "merchant"
         );
+    }
+
+    #[test]
+    fn rejects_changed_non_topic_nodes_without_reusable_summaries() {
+        let current = normalize_graph(graph()).unwrap();
+        let mut proposed = current.clone();
+        proposed.nodes[1].title = "商户 AI 首版".into();
+        assert!(validate_changed_node_quality(&current, &proposed, "expand").is_err());
+
+        proposed.nodes[1].summary =
+            "先统一经营数据并执行可回滚的营销任务，再逐步开放给消费者 AI。".into();
+        validate_changed_node_quality(&current, &proposed, "expand").unwrap();
+
+        let unchanged_legacy = current.clone();
+        validate_changed_node_quality(&current, &unchanged_legacy, "expand").unwrap();
+        validate_changed_node_quality(&current, &proposed, "repair").unwrap();
     }
 }
