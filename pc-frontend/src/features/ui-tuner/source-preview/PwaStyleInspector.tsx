@@ -482,7 +482,7 @@ export function PwaStyleInspector({ session }: Props) {
           <PwaColorStyleField session={session} property="color" label="文字色" value={fieldValue(session, 'color')} />
           <PwaColorStyleField session={session} property="backgroundColor" label="背景色" value={fieldValue(session, 'backgroundColor')} />
           <label className={styles.pwaOpacityField}>
-            <span>透明度</span>
+            <span>整体透明度</span>
             <input type="range" min="0" max="1" step="0.01" value={Number(fieldValue(session, 'opacity')) || 0} onChange={(event) => session.updateStyle('opacity', event.currentTarget.value)} />
             <input value={fieldValue(session, 'opacity')} onChange={(event) => session.updateStyle('opacity', event.currentTarget.value)} />
           </label>

@@ -1,0 +1,312 @@
+.fieldShell {
+  position: relative;
+  min-width: 0;
+}
+
+.fieldControl {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.fieldControl > input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  border: 1px solid #344257;
+  border-radius: 8px;
+  background: #172130;
+  color: #f8fafc;
+  padding: 0 11px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+}
+
+.fieldControl > input:focus {
+  outline: 1px solid #38bdf8;
+  border-color: #38bdf8;
+}
+
+.swatchButton,
+.currentColor {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #cbd5e1 25%, transparent 25%),
+    linear-gradient(-45deg, #cbd5e1 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #cbd5e1 75%),
+    linear-gradient(-45deg, transparent 75%, #cbd5e1 75%);
+  background-position: 0 0, 0 5px, 5px -5px, -5px 0;
+  background-size: 10px 10px;
+}
+
+.swatchButton {
+  position: relative;
+  box-sizing: border-box;
+  width: 44px;
+  height: 38px;
+  overflow: hidden;
+  border: 1px solid #475569;
+  border-radius: 8px;
+  padding: 4px;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 4%);
+}
+
+.swatchButton:hover,
+.swatchButton[aria-expanded="true"] {
+  border-color: #38bdf8;
+}
+
+.swatchButton:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.swatch {
+  position: absolute;
+  inset: 4px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 18%), 0 1px 2px rgb(0 0 0 / 35%);
+}
+
+.popover {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 7px);
+  right: 0;
+  box-sizing: border-box;
+  width: min(284px, calc(100vw - 28px));
+  padding: 10px;
+  border: 1px solid #475569;
+  border-radius: 10px;
+  background: #24262b;
+  color: #f8fafc;
+  box-shadow: 0 18px 44px rgb(0 0 0 / 50%), 0 0 0 1px rgb(255 255 255 / 3%);
+}
+
+.popover[data-placement="above"] {
+  top: auto;
+  bottom: calc(100% + 7px);
+}
+
+.saturationPlane {
+  position: relative;
+  height: 154px;
+  overflow: hidden;
+  border-radius: 7px 7px 4px 4px;
+  background:
+    linear-gradient(to top, #000, transparent),
+    linear-gradient(to right, #fff, transparent),
+    hsl(var(--picker-hue) 100% 50%);
+  cursor: crosshair;
+  touch-action: none;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 12%);
+}
+
+.saturationHandle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 4px #000, inset 0 0 0 1px rgb(0 0 0 / 38%);
+}
+
+.controlRow {
+  display: grid;
+  grid-template-columns: 30px 34px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin-top: 9px;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #d7dde5;
+  padding: 0;
+  cursor: pointer;
+}
+
+.iconButton:hover:not(:disabled) {
+  border-color: #64748b;
+  background: #34373d;
+  color: #fff;
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+}
+
+.iconButton:disabled {
+  cursor: not-allowed;
+  opacity: .35;
+}
+
+.currentColor {
+  position: relative;
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border: 2px solid #f8fafc;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px #000;
+}
+
+.currentColor::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: rgb(var(--picker-red) var(--picker-green) var(--picker-blue) / var(--picker-alpha, 1));
+}
+
+.sliders {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.sliders input[type="range"] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 10px;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 999px;
+  background-color: transparent;
+  padding: 0;
+  appearance: none;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 28%);
+}
+
+.sliders .hueSlider {
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+
+.sliders .alphaSlider {
+  background:
+    linear-gradient(
+      to right,
+      rgb(var(--picker-red) var(--picker-green) var(--picker-blue) / 0%),
+      rgb(var(--picker-red) var(--picker-green) var(--picker-blue))
+    ),
+    repeating-conic-gradient(#b8bcc2 0 25%, #f1f1f1 0 50%) 0 / 8px 8px;
+}
+
+.sliders input::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: transparent;
+  appearance: none;
+  box-shadow: 0 1px 3px #000;
+}
+
+.sliders input::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 1px 3px #000;
+}
+
+.valueRow {
+  display: grid;
+  grid-template-columns: 67px minmax(0, 1fr) 30px;
+  gap: 6px;
+  align-items: center;
+  margin-top: 9px;
+}
+
+.valueRow select,
+.valueRow input {
+  box-sizing: border-box;
+  min-width: 0;
+  height: 32px;
+  border: 1px solid #60646b;
+  border-radius: 6px;
+  background: #303238;
+  color: #f8fafc;
+  font-size: 11px;
+}
+
+.valueRow select {
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+.valueRow input {
+  width: 100%;
+  padding: 0 9px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.valueRow select:focus,
+.valueRow input:focus {
+  outline: 1px solid #38bdf8;
+  border-color: #38bdf8;
+}
+
+.palette {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 7px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid #41444a;
+}
+
+.palette button {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: 3px;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 35%);
+}
+
+.palette button:hover,
+.palette button:focus-visible {
+  z-index: 1;
+  outline: 2px solid #f8fafc;
+  outline-offset: 1px;
+  transform: scale(1.12);
+}
+
+@media (max-width: 520px) {
+  .popover {
+    right: -2px;
+    width: min(272px, calc(100vw - 20px));
+  }
+
+  .saturationPlane {
+    height: 142px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .palette button {
+    transform: none !important;
+  }
+}

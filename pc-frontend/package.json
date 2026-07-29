@@ -12,7 +12,7 @@
     "test:workspace-access": "node ../scripts/test-pc-frontend-workspace-access.js && node ../scripts/test-pc-frontend-full-access-auto-grant.js",
     "test:local-tasks": "node scripts/test-local-tasks.cjs && node scripts/test-progressive-lists.cjs",
     "test:runtime-draft": "node scripts/test-runtime-draft-model.cjs",
-    "test:ui-tuner-workspace": "node scripts/test-ui-tuner-workspace.cjs",
+    "test:ui-tuner-workspace": "node scripts/test-ui-tuner-workspace.cjs && node scripts/test-pwa-color-picker.cjs",
     "test:pwa-design": "node scripts/test-pwa-design.cjs && node scripts/test-pwa-device-viewport.cjs && node scripts/test-pwa-runtime-capture.cjs && node scripts/test-fit-run-events.cjs && node ../scripts/test-pwa-ui-tuner-bridge.js",
     "test:project-docs": "node scripts/test-project-document-sections.cjs && node scripts/test-project-document-discussions.cjs",
     "test:project-home": "node ../scripts/test-pc-project-home.js && node ../scripts/test-pc-project-context-sidebar.js",

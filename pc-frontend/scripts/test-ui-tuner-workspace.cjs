@@ -624,12 +624,6 @@ try {
   assert.match(sourcePreviewCss, /\.sourceInspector \.colorField\{display:grid;grid-template-columns:56px minmax\(180px,1fr\)/)
   assert.match(sourcePreviewCss, /\.pwaColorField\{display:grid;grid-template-columns:56px minmax\(180px,1fr\)/)
   assert.match(sourcePreviewCss, /\.pwaOpacityField\{grid-template-columns:58px minmax\(0,1fr\) 72px/)
-  const pwaColorStyleFieldSource = fs.readFileSync(
-    path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaColorStyleField.tsx'),
-    'utf8',
-  )
-  assert.match(pwaColorStyleFieldSource, /type="color"/)
-  assert.match(pwaColorStyleFieldSource, /placeholder="#222255 \/ rgba\(34,34,85,\.9\)"/)
   assert.match(sourcePreviewCss, /\.pwaQuickAdjust:has\(>input:only-child\)/)
   assert.match(sourcePreviewCss, /\.fieldGrid:has\(\.colorField\)/)
   assert.match(sourcePreviewCss, /\.pwaDeviceToolbar/)
