@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "status": "ready",
+  "status": "applied",
   "summary": "确认 Sui 仅作为阶段四候选经济层的边界，将具体对象、任务、资产分层和风险保留为探索，并晋升独立架构草案。",
   "change_kind": "decision",
   "actor": "Codex Desktop",

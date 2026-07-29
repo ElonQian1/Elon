@@ -204,6 +204,7 @@
     "docs/decisions/open-commerce-network-v1-architecture.md": "custom:open-commerce-network",
     "docs/discussion-knowledge-compiler.md": "custom:pc-workbench",
     "docs/drafts/open-commerce-network-roadmap.md": "custom:open-commerce-network",
+    "docs/drafts/open-commerce-network-sui-agent-economy.md": "custom:project-system",
     "docs/drafts/requirements/open-commerce-network.md": "custom:open-commerce-network",
     "docs/fb2-ai-center/PLAN.md": "custom:fb2-project",
     "docs/fb2-ai-center/PROGRESS.md": "custom:fb2-project",
@@ -222,10 +223,10 @@
     "docs/fb2-chat-voice-kit-integration.md": "custom:fb2-project",
     "docs/group-chat-summary-system.md": "custom:ai-context",
     "docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md": "custom:open-commerce-network",
-    "docs/open-commerce-network-v1-acceptance.md": "custom:open-commerce-network",
-    "docs/open-commerce-network-v1-api.md": "custom:open-commerce-network",
     "docs/intent-routing.md": "custom:backend-api",
     "docs/node-agent-upgrade-compatibility.md": "custom:windows-node",
+    "docs/open-commerce-network-v1-acceptance.md": "custom:open-commerce-network",
+    "docs/open-commerce-network-v1-api.md": "custom:open-commerce-network",
     "docs/pc-frontend-migration.md": "custom:pc-workbench",
     "docs/pc-node-data-root.md": "custom:windows-node",
     "docs/pc-node-offline-resilience.md": "custom:windows-node",
@@ -258,6 +259,10 @@
     "docs/codex-vault-sharing-runbook.md": [
       "custom:operations"
     ],
+    "docs/discussion-knowledge-compiler.md": [
+      "custom:ai-context",
+      "custom:project-system"
+    ],
     "docs/fb2-ai-center/README.md": [
       "custom:backend-api"
     ],
@@ -268,10 +273,6 @@
       "custom:project-system"
     ],
     "docs/project-document-governance-mcp.md": [
-      "custom:ai-context",
-      "custom:project-system"
-    ],
-    "docs/discussion-knowledge-compiler.md": [
       "custom:ai-context",
       "custom:project-system"
     ],
@@ -291,10 +292,8 @@
     "docs/app-version-memory.md": "on-demand",
     "docs/codex-mcp-native-git-push-20260701-171812.md": "evidence",
     "docs/codex-vault-sharing-runbook.md": "on-demand",
-    "docs/discussion-knowledge-compiler.md": "on-demand",
-    "docs/open-commerce-network-v1-acceptance.md": "on-demand",
-    "docs/open-commerce-network-v1-api.md": "on-demand",
     "docs/codex-vault-usage-estimation.md": "on-demand",
+    "docs/discussion-knowledge-compiler.md": "on-demand",
     "docs/fb2-ai-center/PLAN.md": "drafts",
     "docs/fb2-ai-center/PROGRESS.md": "evidence",
     "docs/fb2-ai-center/handoff.md": "evidence",
@@ -302,6 +301,8 @@
     "docs/fb2-ai-center/test-plan.md": "drafts",
     "docs/group-chat-summary-system.md": "drafts",
     "docs/intent-routing.md": "current",
+    "docs/open-commerce-network-v1-acceptance.md": "on-demand",
+    "docs/open-commerce-network-v1-api.md": "on-demand",
     "docs/pc-frontend-migration.md": "on-demand",
     "docs/pc-node-data-root.md": "on-demand",
     "docs/pc-node-offline-resilience.md": "on-demand",
@@ -387,6 +388,12 @@
       "authority": "non_authoritative",
       "document_type": "note"
     },
+    "docs/discussion-knowledge-compiler.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture"
+    },
     "docs/fb2-ai-center/PLAN.md": {
       "retrieval": "excluded",
       "lifecycle": "draft",
@@ -416,12 +423,6 @@
       "lifecycle": "active",
       "authority": "guidance",
       "document_type": "guide"
-    },
-    "docs/discussion-knowledge-compiler.md": {
-      "retrieval": "on_demand",
-      "lifecycle": "active",
-      "authority": "authoritative",
-      "document_type": "architecture"
     },
     "docs/project-document-governance-mcp.md": {
       "retrieval": "on_demand",
@@ -477,6 +478,7 @@
         "file:scripts/finish-ai-task.ps1"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "AGENTS.md"
       ],
@@ -508,6 +510,7 @@
         "file:.github/copilot-instructions.md"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         ".github/copilot-instructions.md",
         "CODEX.md"
@@ -546,6 +549,7 @@
         "file:server/src/node_agent_main.rs"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "AI_INDEX.md",
         "docs/system-architecture.md"
@@ -587,6 +591,7 @@
         "file:server/src/main.rs"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "AI_ARCHITECTURE.md"
       ],
@@ -620,6 +625,7 @@
         "file:pc-frontend/src/App.tsx"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "AI_ARCHITECTURE.md",
         "docs/README.md"
@@ -664,6 +670,7 @@
         "file:docs/README.md"
       ],
       "version": "2026-07",
+      "version_status": "",
       "related": [
         "AI_ARCHITECTURE.md",
         "AI_INDEX.md",
@@ -714,6 +721,7 @@
         "file:scripts/finish-ai-task.ps1"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "AGENTS.md"
       ],
@@ -746,6 +754,7 @@
         "file:android/app/src/main/kotlin/com/elon/app/MainActivity.kt"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "docs/Design.md",
         "docs/android-real-renderer-ui-workflow.md"
@@ -779,6 +788,7 @@
         "file:server/src/external_app_api.rs"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "docs/fb2-ai-center/contracts.md",
         "docs/fb2-ai-center/handoff.md"
@@ -817,6 +827,7 @@
         "file:server/src/node_agent_client_maintenance.rs"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "docs/ai-agent-workflow.md",
         "docs/pc-node-offline-resilience.md"
@@ -855,6 +866,7 @@
         "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "docs/project-document-governance-mcp.md"
       ],
@@ -891,6 +903,7 @@
         "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"
       ],
       "version": "3",
+      "version_status": "",
       "related": [
         "docs/pc-frontend-migration.md"
       ],
@@ -929,6 +942,7 @@
         "file:server/src/node_agent_main.rs"
       ],
       "version": "1",
+      "version_status": "",
       "related": [
         "docs/ai-agent-workflow.md",
         "docs/system-architecture.md",
@@ -969,6 +983,7 @@
         "file:pc-frontend/src/App.tsx"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "AI_ARCHITECTURE.md",
         "AI_INDEX.md"
@@ -1007,6 +1022,7 @@
         "file:pc-frontend/src/features/project-docs/ProjectDocumentsWorkspace.tsx"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "docs/project-document-governance-mcp.md",
         "docs/project-store-architecture.md"
@@ -1044,6 +1060,7 @@
         "file:server/src/node_agent_main.rs"
       ],
       "version": "",
+      "version_status": "",
       "related": [
         "docs/codex-vault-sharing-runbook.md"
       ],
@@ -1147,8 +1164,8 @@
           "docs/project-document-governance-mcp.md"
         ],
         "implementation_refs": [
-          "file:server/src/node_agent_project_docs_mcp_discussion_tools.rs",
           "file:server/src/node_agent_project_docs_mcp.rs",
+          "file:server/src/node_agent_project_docs_mcp_discussion_tools.rs",
           "file:server/src/project_discussion_graph.rs",
           "file:server/src/project_document_federation_service.rs",
           "file:server/src/project_document_knowledge_graph.rs",
