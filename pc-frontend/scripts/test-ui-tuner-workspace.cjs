@@ -618,6 +618,9 @@ try {
   assert.match(sourcePreviewCss, /\.fieldGrid:has\(\.colorField\)/)
   assert.match(sourcePreviewCss, /\.pwaDeviceToolbar/)
   assert.match(sourcePreviewCss, /\.pwaSafeAreaGuide/)
+  assert.match(sourcePreviewCss, /\.surfaceScroller\{box-sizing:border-box;min-width:0;min-height:0;flex:1 1 auto;overflow:auto;overscroll-behavior:contain/)
+  assert.match(sourcePreviewCss, /padding:36px 36px 72px/)
+  assert.doesNotMatch(sourcePreviewCss, /\.surfaceScroller\{height:calc\(100vh - 94px\)/)
   const pwaBridgeSource = fs.readFileSync(
     path.join(projectRoot, '../server/src/assets/ui_tuner_pwa_bridge.js'),
     'utf8',
