@@ -24,6 +24,7 @@ use crate::{
     agent_api_loop::resolve_agent,
     agent_fallback::call_chat_llm_with_default_fallback_options,
     conversation_router::{resolve_system_conversation_route, ConversationEntryKind},
+    home_ai_search, home_ai_tools,
     pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_auth::{auth_from_headers, json_error},
     types::{AppState, UserAgentConfig},
@@ -160,6 +161,10 @@ pub async fn lm_chat_handler(
     let mut messages = req.messages.clone();
     if entry_kind == ConversationEntryKind::ChatMemory {
         append_system_prompt_note(&mut messages, CHAT_MEMORY_LOCAL_CLI_NOTE);
+        append_system_prompt_note(
+            &mut messages,
+            &home_ai_tools::runtime_note(home_ai_tools::now()),
+        );
     }
     if !memories.is_empty() {
         let memory_block = memories
@@ -190,60 +195,7 @@ pub async fn lm_chat_handler(
         }
     }
 
-    // ── 4. 调用 LLM ──────────────────────────────────────────────────────────
-    let platform_workspace = PathBuf::new();
-    let agent_workspace = match pc_runtime_route {
-        Some(PcRuntimeRoutePreference::RouteC) => platform_workspace.as_path(),
-        _ => user_agent_workspace.as_path(),
-    };
-    let agent = match resolve_agent(&state, agent_workspace, req.agent.as_deref()).await {
-        Ok(a) => a,
-        Err(e) => {
-            return json_error(
-                StatusCode::SERVICE_UNAVAILABLE,
-                format!("无可用 AI 配置：{e}"),
-            );
-        }
-    };
-
-    let allow_agent_fallback = req.agent.as_deref().map(str::trim).unwrap_or("").is_empty();
-    let (response, used_agent, used_fallback) = match call_chat_llm_with_default_fallback_options(
-        &state,
-        &agent,
-        allow_agent_fallback,
-        &messages,
-        &user.id,
-        "lm_chat",
-        0.8,
-        700,
-    )
-    .await
-    {
-        Ok(result) => result,
-        Err(e) => {
-            return json_error(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("LLM 调用失败：{e}"),
-            );
-        }
-    };
-    if used_fallback {
-        tracing::warn!(
-            user_id = %user.id,
-            preferred_agent = %agent.name,
-            used_agent = %used_agent.name,
-            model = %used_agent.model,
-            "默认聊天模型失败后已自动切换备用代理"
-        );
-    }
-
-    let reply = response["choices"][0]["message"]["content"]
-        .as_str()
-        .unwrap_or("")
-        .trim()
-        .to_string();
-
-    // ── 5. 保存消息到会话记录 ────────────────────────────────────────────────
+    // ── 4. 总 AI 基础能力与项目任务分流 ─────────────────────────────────────
     let user_msg = req
         .messages
         .iter()
@@ -252,7 +204,137 @@ pub async fn lm_chat_handler(
         .and_then(|m| m["content"].as_str())
         .unwrap_or("")
         .to_string();
+    let search_requested =
+        entry_kind == ConversationEntryKind::ChatMemory && home_ai_search::should_search(&user_msg);
+    let search_result = if search_requested {
+        home_ai_search::search(&state, &user_msg).await
+    } else {
+        None
+    };
+    if let Some(result) = &search_result {
+        append_system_prompt_note(&mut messages, &home_ai_search::prompt_context(result));
+    } else if search_requested {
+        append_system_prompt_note(
+            &mut messages,
+            "=== 首页总 AI 搜索状态 ===\n本轮联网搜索没有返回可用结果。不要编造最新事实；请明确告诉用户当前无法核实，或建议提供更具体的查询对象。",
+        );
+    }
 
+    let handoff = if entry_kind == ConversationEntryKind::ChatMemory
+        && home_ai_tools::needs_project_handoff(&user_msg)
+    {
+        let candidates = state
+            .store
+            .list_projects_for_user(&user.id)
+            .map(|projects| home_ai_tools::project_candidates(&user_msg, &projects))
+            .unwrap_or_default();
+        Some(json!({
+            "request": user_msg,
+            "reason": "这是需要读取或修改项目代码的任务，应交给具体项目 AI 执行。",
+            "candidates": candidates,
+        }))
+    } else {
+        None
+    };
+
+    let deterministic = if handoff.is_none() && !search_requested {
+        home_ai_tools::deterministic_answer(&user_msg, home_ai_tools::now())
+    } else {
+        None
+    };
+    let (reply, used_agent_name, used_model, used_fallback, assistant_mode, tool_used) =
+        if let Some(answer) = deterministic {
+            (
+                answer.reply,
+                "总 AI".to_string(),
+                "deterministic".to_string(),
+                false,
+                "deterministic".to_string(),
+                Some(answer.tool.to_string()),
+            )
+        } else if let Some(handoff) = &handoff {
+            let has_candidates = handoff["candidates"]
+                .as_array()
+                .map(|items| !items.is_empty())
+                .unwrap_or(false);
+            (
+                if has_candidates {
+                    "我识别到这是一个需要直接操作项目代码的任务。请选择下面的项目，我会把原始需求交给对应的项目 AI 继续执行。"
+                } else {
+                    "我识别到这是一个需要直接操作项目代码的任务，但当前没有找到可用项目。请先创建或加入项目，再从项目 AI 入口继续。"
+                }
+                .to_string(),
+                "总 AI".to_string(),
+                "handoff".to_string(),
+                false,
+                "handoff".to_string(),
+                Some("project_handoff".to_string()),
+            )
+        } else {
+            let platform_workspace = PathBuf::new();
+            let agent_workspace = match pc_runtime_route {
+                Some(PcRuntimeRoutePreference::RouteC) => platform_workspace.as_path(),
+                _ => user_agent_workspace.as_path(),
+            };
+            let agent = match resolve_agent(&state, agent_workspace, req.agent.as_deref()).await {
+                Ok(a) => a,
+                Err(e) => {
+                    return json_error(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        format!("无可用 AI 配置：{e}"),
+                    );
+                }
+            };
+            let allow_agent_fallback = req.agent.as_deref().map(str::trim).unwrap_or("").is_empty();
+            let (response, used_agent, used_fallback) =
+                match call_chat_llm_with_default_fallback_options(
+                    &state,
+                    &agent,
+                    allow_agent_fallback,
+                    &messages,
+                    &user.id,
+                    "lm_chat",
+                    0.8,
+                    900,
+                )
+                .await
+                {
+                    Ok(result) => result,
+                    Err(e) => {
+                        return json_error(
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!("LLM 调用失败：{e}"),
+                        );
+                    }
+                };
+            if used_fallback {
+                tracing::warn!(
+                    user_id = %user.id,
+                    preferred_agent = %agent.name,
+                    used_agent = %used_agent.name,
+                    model = %used_agent.model,
+                    "默认聊天模型失败后已自动切换备用代理"
+                );
+            }
+            (
+                response["choices"][0]["message"]["content"]
+                    .as_str()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string(),
+                used_agent.name.clone(),
+                used_agent.model.clone(),
+                used_fallback,
+                "model".to_string(),
+                if search_result.is_some() {
+                    Some("web_search".to_string())
+                } else {
+                    None
+                },
+            )
+        };
+
+    // ── 5. 保存消息到会话记录 ────────────────────────────────────────────────
     let _ = state.store.add_message(
         &route.project_id,
         Some(&conversation_id),
@@ -298,10 +380,17 @@ pub async fn lm_chat_handler(
         "conversation_id": conversation_id,
         "project_id": route.project_id,
         "project_name": route.project_name,
-        "agent_used": used_agent.name,
-        "model_used": used_agent.model,
+        "agent_used": used_agent_name,
+        "model_used": used_model,
         "agent_fallback": used_fallback,
         "scope": route.entry_key,
+        "assistant_mode": assistant_mode,
+        "tool_used": tool_used,
+        "sources": search_result.as_ref().map(|result| result.sources.iter().map(|source| json!({
+            "title": source.title,
+            "url": source.url,
+        })).collect::<Vec<_>>()).unwrap_or_default(),
+        "handoff": handoff,
     }))
     .into_response()
 }

@@ -377,6 +377,56 @@
   padding: 1px 6px;
   margin-left: 4px;
 }
+.toolTag {
+  font-size: 10px;
+  color: #8ee6ae;
+  background: rgba(46, 168, 97, .16);
+  border-radius: 4px;
+  padding: 1px 7px;
+  font-weight: 600;
+}
+.sourceList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.sourceList a {
+  color: #7ab4e8;
+  font-size: 11px;
+  text-decoration: none;
+  border: 1px solid rgba(122,180,232,.28);
+  border-radius: 4px;
+  padding: 2px 7px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sourceList a:hover { text-decoration: underline; }
+.handoffCard {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid rgba(122,180,232,.26);
+  border-radius: 8px;
+  background: rgba(25,48,72,.28);
+}
+.handoffCard strong { font-size: 13px; color: var(--text); }
+.handoffCard span { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.handoffCandidates { display: flex; flex-wrap: wrap; gap: 6px; }
+.handoffCard button {
+  align-self: flex-start;
+  border: 1px solid rgba(122,180,232,.36);
+  border-radius: 5px;
+  padding: 4px 9px;
+  color: #d9edff;
+  background: rgba(50,96,140,.3);
+  cursor: pointer;
+}
+.handoffCard button:hover { background: rgba(50,96,140,.55); }
 .nodeOutput {
   font-family: 'Cascadia Code', 'Consolas', 'SF Mono', monospace;
   font-size: 12.5px;

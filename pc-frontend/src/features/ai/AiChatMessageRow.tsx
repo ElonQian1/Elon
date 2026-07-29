@@ -17,6 +17,27 @@ export interface AiMessage {
   node_remote?: boolean
   exit_ok?: boolean
   model?: string
+  assistant_mode?: 'deterministic' | 'model' | 'handoff'
+  tool_used?: string | null
+  sources?: AiSource[]
+  handoff?: AiHandoff | null
+}
+
+export interface AiSource {
+  title: string
+  url: string
+}
+
+export interface AiProjectCandidate {
+  id: string
+  name: string
+  description?: string | null
+}
+
+export interface AiHandoff {
+  request: string
+  reason: string
+  candidates: AiProjectCandidate[]
 }
 
 interface AiChatMessageRowProps {
@@ -25,6 +46,7 @@ interface AiChatMessageRowProps {
   message: AiMessage
   user: User | null
   onConversationForked?: (conversationId: string) => void | Promise<void>
+  onProjectHandoff?: (handoff: AiHandoff, candidate?: AiProjectCandidate) => void | Promise<void>
 }
 
 export default function AiChatMessageRow({
@@ -33,6 +55,7 @@ export default function AiChatMessageRow({
   message,
   user,
   onConversationForked,
+  onProjectHandoff,
 }: AiChatMessageRowProps) {
   const isUser = message.role === 'user'
   const isNode = !isUser && message.node_exec === true
@@ -57,10 +80,45 @@ export default function AiChatMessageRow({
           {message.created_at && <span>{formatTime(message.created_at)}</span>}
           {isNode && message.model && <span className={styles.modelTag}>{message.model}</span>}
           {isNode && message.exit_ok === false && <span className={styles.exitFail}>执行失败</span>}
+          {!isUser && !isNode && message.tool_used && (
+            <span className={styles.toolTag}>{message.tool_used === 'web_search' ? '已联网查询' : message.tool_used === 'calculator' ? '计算器' : message.tool_used === 'current_datetime' ? '实时时间' : '已使用工具'}</span>
+          )}
         </div>
         {hasMarkdown
           ? <div id={copySourceId} className={styles.msgContent}><MarkdownContent content={content} copy /></div>
           : <div id={copySourceId} className={styles.msgContent}>{content}</div>}
+        {!isUser && message.sources && message.sources.length > 0 && (
+          <div className={styles.sourceList}>
+            {message.sources.map((source) => (
+              <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
+                {source.title || source.url}
+              </a>
+            ))}
+          </div>
+        )}
+        {!isUser && message.handoff && (
+          <div className={styles.handoffCard}>
+            <strong>继续到项目 AI</strong>
+            <span>{message.handoff.reason}</span>
+            {message.handoff.candidates.length > 0 ? (
+              <div className={styles.handoffCandidates}>
+                {message.handoff.candidates.map((candidate) => (
+                  <button
+                    key={candidate.id}
+                    type="button"
+                    onClick={() => { void onProjectHandoff?.(message.handoff!, candidate) }}
+                  >
+                    {candidate.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <button type="button" onClick={() => { void onProjectHandoff?.(message.handoff!) }}>
+                打开项目列表
+              </button>
+            )}
+          </div>
+        )}
         <MessageActions
           content={content}
           messageKey={messageActionKey}

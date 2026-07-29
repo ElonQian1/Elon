@@ -216,7 +216,15 @@ export default function ConversationPage() {
     sendingMemberDiscussion,
   })
 
-  useEffect(() => { loadProjects() }, [user?.id])
+  useEffect(() => {
+    const projectId = new URLSearchParams(window.location.search).get('project')
+    loadProjects()
+      .then(() => {
+        if (projectId) return selectProject(projectId)
+        return undefined
+      })
+      .catch(() => {})
+  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setRuntimeRoute(initialProjectRuntimeRouteFromStorage(window.localStorage, user?.id))

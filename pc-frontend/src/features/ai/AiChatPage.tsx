@@ -5,6 +5,7 @@ import { ChevronLeft, Folder } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
+import { useProjectStore } from '../conversation/useProjectStore'
 import {
   routeModelButtonCopy,
   selectedAgentForRuntimeRoute,
@@ -30,7 +31,12 @@ import { DEFAULT_POPOVER_ANCHOR, fixedPopoverPosition, popoverAnchorFromRect, ty
 import NodeStatusBanner from './NodeStatusBanner'
 import AiChatTopbar from './AiChatTopbar'
 import AiPinnedTools from './AiPinnedTools'
-import AiChatMessageRow, { type AiMessage } from './AiChatMessageRow'
+import AiChatMessageRow, {
+  type AiHandoff,
+  type AiMessage,
+  type AiProjectCandidate,
+  type AiSource,
+} from './AiChatMessageRow'
 import { isCodexVaultBackupIntent, runCodexVaultBackupFromAiChat } from './codexVaultQuickAction'
 import styles from './AiChatPage.module.css'
 import { v4 as uuidv4 } from 'uuid'
@@ -49,6 +55,10 @@ interface LmChatResponse {
   reply?: string
   content?: string
   conversation_id?: string
+  assistant_mode?: AiMessage['assistant_mode']
+  tool_used?: string | null
+  sources?: AiSource[]
+  handoff?: AiHandoff | null
 }
 
 interface Friend {
@@ -190,6 +200,7 @@ export default function AiChatPage() {
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [input, setInput] = useState(() => pendingAiDraftRef.current?.input ?? '')
   const [sending, setSending] = useState(false)
+  const [handoffSending, setHandoffSending] = useState(false)
   const [error, setError] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => initialRuntimeRouteFromStorage(
@@ -538,6 +549,33 @@ export default function AiChatPage() {
     }])
   }
 
+  async function handleProjectHandoff(handoff: AiHandoff, candidate?: AiProjectCandidate) {
+    if (handoffSending) return
+    if (!candidate?.id) {
+      navigate('/projects')
+      return
+    }
+    setHandoffSending(true)
+    setError('')
+    try {
+      const projectStore = useProjectStore.getState()
+      await projectStore.selectProject(candidate.id)
+      const aiChannel = useProjectStore.getState().channels.find((channel) => channel.kind === 'ai_development')
+      if (!aiChannel) throw new Error('该项目暂时没有可用的项目 AI 频道。')
+      await useProjectStore.getState().selectChannel(aiChannel.id)
+      const response = await useProjectStore.getState().sendMessage(
+        handoff.request,
+        selectedAgentForRuntimeRoute(selectedAgent, modelOptions, 'auto'),
+      )
+      if (!response) throw new Error('项目 AI 没有接收这条任务，请稍后重试。')
+      navigate(`/?project=${encodeURIComponent(candidate.id)}`)
+    } catch (err) {
+      setError((err as { message?: string }).message ?? '交接到项目 AI 失败，请打开项目后重试。')
+    } finally {
+      setHandoffSending(false)
+    }
+  }
+
   async function handleCodexVaultShortcut() {
     if (sending) return
     if (!user?.id) {
@@ -715,7 +753,15 @@ export default function AiChatPage() {
           scope: 'chat_memory',
         })
         const reply = res.reply ?? res.content ?? ''
-        const aiMsg: AiMessage = { role: 'assistant', content: reply, created_at: new Date().toISOString() }
+        const aiMsg: AiMessage = {
+          role: 'assistant',
+          content: reply,
+          created_at: new Date().toISOString(),
+          assistant_mode: res.assistant_mode,
+          tool_used: res.tool_used,
+          sources: res.sources,
+          handoff: res.handoff,
+        }
         setMessages((prev) => [...prev, aiMsg])
         loadConversations()
       }
@@ -851,7 +897,10 @@ export default function AiChatPage() {
               key={m.id ?? `${m.role}:${m.created_at ?? i}`}
               activeConvId={activeConvId}
               index={i}
-              message={m} user={user} onConversationForked={openForkedConversation}
+              message={m}
+              user={user}
+              onConversationForked={openForkedConversation}
+              onProjectHandoff={handleProjectHandoff}
             />
           ))}
           {sending && (
