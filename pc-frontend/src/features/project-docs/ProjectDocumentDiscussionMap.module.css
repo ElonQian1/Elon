@@ -96,5 +96,23 @@
 .actions button:hover:not(:disabled) { filter: brightness(1.18); }
 .actions button:disabled { opacity: .45; }
 .inspectorEmpty { color: #868d98 !important; }
+.dialogBackdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgba(8, 9, 12, .72); backdrop-filter: blur(5px); }
+.dialog { width: min(560px, 100%); overflow: hidden; border: 1px solid rgba(226, 177, 105, .25); border-radius: 13px; color: #dfe2e8; background: #202329; box-shadow: 0 22px 70px rgba(0, 0, 0, .48); }
+.dialog > header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 13px 15px; border-bottom: 1px solid rgba(255, 255, 255, .07); }
+.dialog > header > span { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; color: #f1c37d; background: rgba(183, 125, 53, .18); }
+.dialog > header strong, .dialog > header small { display: block; }
+.dialog > header strong { font-size: 11px; }
+.dialog > header small { margin-top: 3px; overflow: hidden; color: #858b96; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.dialog > header button { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: #9298a3; background: rgba(255, 255, 255, .04); }
+.dialog form { display: grid; gap: 11px; padding: 15px; }
+.dialog form > p { margin: 0; color: #969ca7; font-size: 9px; line-height: 1.6; }
+.dialog label { display: grid; gap: 6px; color: #cbd0d8; font-size: 8px; }
+.dialog textarea, .dialog input, .dialog select { width: 100%; padding: 9px 10px; border: 1px solid rgba(255, 255, 255, .09); border-radius: 7px; color: #e5e7eb; background: #191b20; font: inherit; outline: 0; }
+.dialog textarea { min-height: 130px; resize: vertical; line-height: 1.55; }
+.dialog textarea:focus, .dialog input:focus, .dialog select:focus { border-color: rgba(218, 165, 86, .62); }
+.dialogActions { display: flex; justify-content: flex-end; gap: 7px; padding-top: 3px; }
+.dialogActions button { min-height: 32px; padding: 0 12px; border-radius: 7px; color: #bcc1ca; background: rgba(255, 255, 255, .06); font-size: 8px; }
+.dialogActions button[type="submit"] { color: #fff3df; background: #96632f; font-weight: 700; }
+.dialogActions button:disabled { opacity: .45; }
 @media (max-width: 960px) { .content { grid-template-columns: minmax(0, 1fr) 260px; } .title small { display: none; } .toolbar select { max-width: 140px; } }
 @media (max-width: 820px) { .mapShell { grid-column: 2; } .content { grid-template-columns: 1fr; } .inspector { display: none; } .search { display: none; } }

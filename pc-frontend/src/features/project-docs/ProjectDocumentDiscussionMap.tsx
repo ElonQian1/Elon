@@ -14,6 +14,8 @@ import {
 import '@xyflow/react/dist/style.css'
 
 import { api } from '../../api/client'
+import { nodeApi } from '../node/localNodeApi'
+import ProjectDocumentDiscussionActionDialog from './ProjectDocumentDiscussionActionDialog'
 import ProjectDocumentDiscussionNode, { type DiscussionFlowNode } from './ProjectDocumentDiscussionNode'
 import ProjectDocumentDiscussionTimeline, { type DiscussionVersion } from './ProjectDocumentDiscussionTimeline'
 import {
@@ -24,11 +26,14 @@ import {
   layoutDiscussionNodes,
   parseDiscussionGraph,
   selectDiscussionSubgraph,
+  type DiscussionActionRequest,
   type DiscussionGraph,
+  type ImportedDiscussionSource,
   type DiscussionNode,
 } from './projectDocumentDiscussionModel'
 import type { DocumentFile } from './projectDocumentModel'
 import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
+import type { DocumentAutomationMode } from './projectDocumentSections'
 import { projectDocumentErrorMessage } from './projectDocumentWorkspaceHelpers'
 import styles from './ProjectDocumentDiscussionMap.module.css'
 
@@ -43,9 +48,15 @@ interface Props {
   canStartAi: boolean
   organizing: boolean
   runtime: DocumentOrganizationTrackingRuntime
+  automationMode: DocumentAutomationMode
   onOpenDocument: (path: string) => void
-  onStructureSource: (path: string) => void
-  onDiscussNode: (node: DiscussionNode, mode: 'continue' | 'fork' | 'promote') => void
+  onCompileSource: (source: ImportedDiscussionSource) => void
+  onDiscussNode: (
+    node: DiscussionNode,
+    mode: 'continue' | 'fork' | 'promote',
+    request: DiscussionActionRequest,
+    source?: ImportedDiscussionSource,
+  ) => void
   onApplyPending: () => void
   onRunAi: (instruction: string) => void
 }
@@ -64,8 +75,9 @@ function DiscussionMapSurface({
   canStartAi,
   organizing,
   runtime,
+  automationMode,
   onOpenDocument,
-  onStructureSource,
+  onCompileSource,
   onDiscussNode,
   onApplyPending,
   onRunAi,
@@ -79,6 +91,8 @@ function DiscussionMapSurface({
   const [rootId, setRootId] = useState('')
   const [selectedId, setSelectedId] = useState('')
   const [pending, setPending] = useState<{ summary: string; nodes: number; promotions: number } | null>(null)
+  const [action, setAction] = useState<{ node: DiscussionNode; mode: 'continue' | 'fork' | 'promote' } | null>(null)
+  const [actionBusy, setActionBusy] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const { fitView } = useReactFlow()
 
@@ -154,6 +168,36 @@ function DiscussionMapSurface({
     return () => window.clearTimeout(timer)
   }, [fitView, visibleKey])
 
+  async function saveSource(
+    title: string,
+    content: string,
+    sourceReference: string,
+    suggestedFilename: string,
+  ) {
+    if (!runtime.enabled || !runtime.projectRoot.trim()) {
+      throw new Error('当前项目没有可用的 Windows 节点工作区，无法建立 Git 备份并导入聊天。')
+    }
+    const response = await nodeApi<{ ok: boolean; result: ImportedDiscussionSource; error?: string }>(
+      runtime.adminUrl,
+      '/api/project-docs/discussions/import',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          project_root: runtime.projectRoot,
+          title,
+          content,
+          source_reference: sourceReference,
+          suggested_filename: suggestedFilename,
+          authorization_mode: automationMode,
+          reviewed: automationMode === 'review_all',
+        }),
+      },
+      120_000,
+    )
+    if (!response.ok) throw new Error(response.error || '导入聊天失败')
+    return response.result
+  }
+
   async function importConversation(file: File) {
     if (!canEdit) return
     if (file.size > MAX_IMPORT_BYTES) {
@@ -164,33 +208,42 @@ function DiscussionMapSurface({
     const defaultTitle = file.name.replace(/\.[^.]+$/, '') || '导入聊天'
     const title = window.prompt('这段聊天的来源标题', defaultTitle)?.trim()
     if (!title) return
-    const timestamp = new Date().toISOString().replace(/\D/g, '').slice(0, 17)
-    const path = `docs/inbox/conversations/${timestamp}-conversation.md`
-    const safeTitle = title.replace(/[\r\n]+/g, ' ').slice(0, 120)
-    const content = [
-      '---',
-      'role: discussion',
-      'lifecycle: source_material',
-      'authority: none',
-      'default_retrieval: false',
-      'source_type: imported_conversation',
-      `source_file: ${JSON.stringify(file.name)}`,
-      '---',
-      `# ${safeTitle}`,
-      '',
-      '> 原始聊天来源，仅用于追溯。未经确认的内容不是项目事实。',
-      '',
-      raw,
-      '',
-    ].join('\n')
     try {
-      await api.put(`/api/projects/${encodeURIComponent(projectId)}/docs/file`, { path, content })
-      setMessage('原始聊天已保存到项目 Git 范围，正在交给当前 Windows 登录账号的 AI CLI 结构化。')
-      onStructureSource(path)
+      const source = await saveSource(title, raw, `file:${file.name}`, file.name)
+      const backup = source.git_baseline_commit?.slice(0, 8) || '托管版本'
+      setMessage(`已规范化 ${source.message_count || '未知'} 条消息并建立 Git 备份 ${backup}，正在分块编译。`)
+      onCompileSource(source)
     } catch (error) {
       setMessage(projectDocumentErrorMessage(error, '导入聊天失败'))
     } finally {
       if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  async function submitAction(request: DiscussionActionRequest) {
+    if (!action) return
+    if (action.mode === 'promote') {
+      onDiscussNode(action.node, action.mode, request)
+      setAction(null)
+      return
+    }
+    setActionBusy(true)
+    try {
+      const label = action.mode === 'fork' ? '备选分支' : '继续讨论'
+      const content = JSON.stringify({ conversation: [{ role: 'user', content: request.details }] })
+      const source = await saveSource(
+        `${action.node.title} · ${label}`,
+        content,
+        `discussion-node:${action.node.id}`,
+        `${action.node.id}-${action.mode}.json`,
+      )
+      setMessage(`新增讨论已备份并生成来源 ${source.source_id}，正在增量编译。`)
+      onDiscussNode(action.node, action.mode, request, source)
+      setAction(null)
+    } catch (error) {
+      setMessage(projectDocumentErrorMessage(error, '保存新增讨论失败'))
+    } finally {
+      setActionBusy(false)
     }
   }
 
@@ -206,7 +259,9 @@ function DiscussionMapSurface({
         <button type="button" title="刷新讨论图" onClick={() => { void load() }}><RefreshCw size={14} /></button>
         <input ref={inputRef} hidden type="file" accept=".md,.txt,.json,text/plain,text/markdown,application/json"
           onChange={(event) => { const file = event.target.files?.[0]; if (file) void importConversation(file) }} />
-        <button className={styles.importButton} type="button" disabled={!canEdit || organizing || !!activeVersion} onClick={() => inputRef.current?.click()}>
+        <button className={styles.importButton} type="button"
+          title={!runtime.enabled ? '需要连接当前项目的 Windows 节点，才能先建立 Git 备份' : '导入聊天并用当前登录 AI 整理'}
+          disabled={!canEdit || organizing || !!activeVersion || !runtime.enabled} onClick={() => inputRef.current?.click()}>
           <FileInput size={14} />导入聊天并整理
         </button>
       </header>
@@ -246,7 +301,7 @@ function DiscussionMapSurface({
               <GitFork size={28} />
               <strong>还没有讨论知识图</strong>
               <p>导入 ChatGPT、Codex 或其他供应商的聊天导出文件。原文先保存，再由 Windows 节点上的登录 AI CLI 拆成可追溯节点。</p>
-              <button type="button" disabled={!canEdit || organizing || !!activeVersion} onClick={() => inputRef.current?.click()}><FileInput size={14} />选择聊天文件</button>
+              <button type="button" disabled={!canEdit || organizing || !!activeVersion || !runtime.enabled} onClick={() => inputRef.current?.click()}><FileInput size={14} />选择聊天文件</button>
             </div>
           )}
           {selection.truncated && <div className={styles.truncated}>当前只显示前 400 个节点，请选择根主题或搜索。</div>}
@@ -272,14 +327,16 @@ function DiscussionMapSurface({
                 {selectedNode.document_paths.map((path) => <button key={path} type="button" onClick={() => onOpenDocument(path)}><FileText size={13} /><span>{path}</span></button>)}
               </section>}
               <div className={styles.actions}>
-                <button type="button" disabled={!canStartAi || organizing || !!activeVersion} onClick={() => onDiscussNode(selectedNode, 'continue')}><Sparkles size={14} />继续讨论</button>
-                <button type="button" disabled={!canStartAi || organizing || !!activeVersion} onClick={() => onDiscussNode(selectedNode, 'fork')}><GitFork size={14} />创建备选分支</button>
-                <button type="button" disabled={!canStartAi || organizing || !!activeVersion} onClick={() => onDiscussNode(selectedNode, 'promote')}><FileText size={14} />晋升为正式文档</button>
+                <button type="button" disabled={!canStartAi || organizing || !!activeVersion || !runtime.enabled} onClick={() => setAction({ node: selectedNode, mode: 'continue' })}><Sparkles size={14} />继续讨论</button>
+                <button type="button" disabled={!canStartAi || organizing || !!activeVersion || !runtime.enabled} onClick={() => setAction({ node: selectedNode, mode: 'fork' })}><GitFork size={14} />创建备选分支</button>
+                <button type="button" disabled={!canStartAi || organizing || !!activeVersion} onClick={() => setAction({ node: selectedNode, mode: 'promote' })}><FileText size={14} />晋升为正式文档</button>
               </div>
             </>
           ) : <p className={styles.inspectorEmpty}>选择一个节点查看来源、分支和晋升状态。</p>}
         </aside>
       </div>
+      {action && <ProjectDocumentDiscussionActionDialog node={action.node} mode={action.mode} busy={actionBusy}
+        onCancel={() => setAction(null)} onSubmit={(request) => { void submitAction(request) }} />}
     </main>
   )
 }

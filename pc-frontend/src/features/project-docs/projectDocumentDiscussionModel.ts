@@ -11,6 +11,29 @@ export interface DiscussionSource {
   kind: string
   reference: string
   imported_at: string
+  content_revision: string
+  source_format: string
+  message_count: number
+  chunk_count: number
+  processed_chunk_ids: string[]
+  compilation_status: string
+}
+
+export interface ImportedDiscussionSource {
+  path: string
+  source_id: string
+  source_revision: string
+  source_format: string
+  message_count: number
+  already_imported?: boolean
+  git_baseline_commit?: string
+  git_result_commit?: string
+}
+
+export interface DiscussionActionRequest {
+  details: string
+  documentType: string
+  targetPath: string
 }
 
 export interface DiscussionNode {
@@ -96,6 +119,12 @@ export function sanitizeDiscussionGraph(value: unknown): DiscussionGraph {
         kind: stableId(item.kind, 40),
         reference: text(item.reference, 1_000),
         imported_at: text(item.imported_at, 64),
+        content_revision: text(item.content_revision, 128),
+        source_format: stableId(item.source_format, 80),
+        message_count: number(item.message_count),
+        chunk_count: number(item.chunk_count),
+        processed_chunk_ids: strings(item.processed_chunk_ids, 512, 160),
+        compilation_status: stableId(item.compilation_status, 40),
       }]
     })
     : []

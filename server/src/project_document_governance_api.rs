@@ -11,6 +11,8 @@ use crate::{
         trace_discussion_node,
     },
     project_discussion_graph_review::{prepare_safe_discussion_repair, review_discussion_graph},
+    project_discussion_source_import::import_conversation_source,
+    project_document_authorization::DocumentAutomationMode,
     project_document_index::ProjectDocumentIndex,
     project_document_issue_workflow::{health_trend, update_issue, IssueWorkflowUpdate},
     project_document_maintenance::list_governed_issues,
@@ -55,6 +57,18 @@ struct GovernanceRequest {
     target_commit: String,
     #[serde(default)]
     node_id: String,
+    #[serde(default)]
+    title: String,
+    #[serde(default)]
+    content: String,
+    #[serde(default)]
+    source_reference: String,
+    #[serde(default)]
+    suggested_filename: String,
+    #[serde(default)]
+    authorization_mode: DocumentAutomationMode,
+    #[serde(default)]
+    reviewed: bool,
 }
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
@@ -97,6 +111,10 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
         .route(
             "/api/project-docs/discussions/repair",
             post(discussion_repair_handler),
+        )
+        .route(
+            "/api/project-docs/discussions/import",
+            post(discussion_import_handler),
         )
 }
 
@@ -239,6 +257,20 @@ async fn discussion_repair_handler(
     Json(request): Json<GovernanceRequest>,
 ) -> axum::response::Response {
     response(prepare_safe_discussion_repair(workspace(&request)))
+}
+
+async fn discussion_import_handler(
+    Json(request): Json<GovernanceRequest>,
+) -> axum::response::Response {
+    response(import_conversation_source(
+        workspace(&request),
+        &request.title,
+        &request.content,
+        &request.source_reference,
+        &request.suggested_filename,
+        request.authorization_mode,
+        request.reviewed,
+    ))
 }
 
 fn workspace(request: &GovernanceRequest) -> &Path {
