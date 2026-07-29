@@ -6,7 +6,26 @@
       "title": "AI 原生开放商业网络长讨论",
       "kind": "conversation",
       "reference": "docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md",
-      "imported_at": "2026-07-27T00:00:00+08:00"
+      "imported_at": "2026-07-27T00:00:00+08:00",
+      "content_revision": "",
+      "source_format": "",
+      "message_count": 0,
+      "chunk_count": 0,
+      "processed_chunk_ids": [],
+      "compilation_status": "pending"
+    },
+    {
+      "id": "conversation-dcbd31fc4a3d3bd7",
+      "title": "Sui 与 AI Agent 开放商业网络讨论",
+      "kind": "imported_conversation",
+      "reference": "docs/inbox/conversations/2026-07-29-2026-07-30-sui-ai-agent-network-discussion.md",
+      "imported_at": "2026-07-29T16:47:24.659875800+00:00",
+      "content_revision": "dcbd31fc4a3d3bd7b61224aced6623cb40512c17ee7cbd675f846c8cb4949513",
+      "source_format": "markdown",
+      "message_count": 0,
+      "chunk_count": 1,
+      "processed_chunk_ids": [],
+      "compilation_status": "pending"
     }
   ],
   "nodes": [
@@ -2070,10 +2089,10 @@
     }
   ],
   "evolution": {
-    "kind": "repair",
-    "summary": "确定性修正 1 个节点的根主题引用",
-    "actor": "yilong-graph-review",
-    "changed_at": "2026-07-27T16:00:34.878619800+00:00",
-    "previous_revision": "b81a7eb995a58c02a67e3aefe7330b15b7c56923f9586d23ebae918ffe044cee"
+    "kind": "import",
+    "summary": "已登记聊天来源“Sui 与 AI Agent 开放商业网络讨论”，等待增量编译",
+    "actor": "project-docs-import",
+    "changed_at": "2026-07-29T16:47:24.659885100+00:00",
+    "previous_revision": "af109520b02efd064dec1725776705c46cafcc059119599dbdea5fb0fedc95b2"
   }
 }
