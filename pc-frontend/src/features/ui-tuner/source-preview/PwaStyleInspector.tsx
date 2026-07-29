@@ -5,6 +5,7 @@ import { buildPwaDraftCliCompactHandoff, type PwaStyleProperty } from './pwaDesi
 import type { PwaDesignSession, PwaSelection } from './usePwaDesignSession'
 import { CrossPlatformWritebackReceiptPanel } from './CrossPlatformWritebackReceiptPanel'
 import { PwaDesignerWorkflowGuide } from './PwaDesignerWorkflowGuide'
+import { PwaColorStyleField } from './PwaColorStyleField'
 import styles from './SourcePreview.module.css'
 
 interface Props {
@@ -478,8 +479,8 @@ export function PwaStyleInspector({ session }: Props) {
 
         <section className={styles.pwaStyleSection}>
           <h3>颜色与透明度</h3>
-          <StyleField session={session} spec={{ property: 'color', label: '文字色' }} />
-          <StyleField session={session} spec={{ property: 'backgroundColor', label: '背景色' }} />
+          <PwaColorStyleField session={session} property="color" label="文字色" value={fieldValue(session, 'color')} />
+          <PwaColorStyleField session={session} property="backgroundColor" label="背景色" value={fieldValue(session, 'backgroundColor')} />
           <label className={styles.pwaOpacityField}>
             <span>透明度</span>
             <input type="range" min="0" max="1" step="0.01" value={Number(fieldValue(session, 'opacity')) || 0} onChange={(event) => session.updateStyle('opacity', event.currentTarget.value)} />
