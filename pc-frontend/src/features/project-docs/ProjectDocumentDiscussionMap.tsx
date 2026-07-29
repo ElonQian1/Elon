@@ -17,6 +17,8 @@ import { api } from '../../api/client'
 import { nodeApi } from '../node/localNodeApi'
 import ProjectDocumentDiscussionActionDialog from './ProjectDocumentDiscussionActionDialog'
 import ProjectDocumentDiscussionNode, { type DiscussionFlowNode } from './ProjectDocumentDiscussionNode'
+import ProjectDocumentDiscussionProposalPanel from './ProjectDocumentDiscussionProposalPanel'
+import ProjectDocumentDiscussionSources from './ProjectDocumentDiscussionSources'
 import ProjectDocumentDiscussionTimeline, { type DiscussionVersion } from './ProjectDocumentDiscussionTimeline'
 import {
   discussionKindLabel,
@@ -31,6 +33,10 @@ import {
   type ImportedDiscussionSource,
   type DiscussionNode,
 } from './projectDocumentDiscussionModel'
+import {
+  parseDiscussionProposal,
+  type DiscussionGraphProposalView,
+} from './projectDocumentDiscussionProposal'
 import type { DocumentFile } from './projectDocumentModel'
 import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
 import type { DocumentAutomationMode } from './projectDocumentSections'
@@ -90,10 +96,12 @@ function DiscussionMapSurface({
   const [query, setQuery] = useState('')
   const [rootId, setRootId] = useState('')
   const [selectedId, setSelectedId] = useState('')
-  const [pending, setPending] = useState<{ summary: string; nodes: number; promotions: number } | null>(null)
+  const [proposal, setProposal] = useState<DiscussionGraphProposalView | null>(null)
+  const [proposalOpen, setProposalOpen] = useState(false)
   const [action, setAction] = useState<{ node: DiscussionNode; mode: 'continue' | 'fork' | 'promote' } | null>(null)
   const [actionBusy, setActionBusy] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const previousOrganizing = useRef(organizing)
   const { fitView } = useReactFlow()
 
   const showGraph = useCallback((next: DiscussionGraph) => {
@@ -120,12 +128,16 @@ function DiscussionMapSurface({
       setRootId('')
       setSelectedId('')
     }
-    if (proposalFile.status === 'fulfilled') setPending(parsePendingProposal(proposalFile.value.content))
-    else setPending(null)
+    if (proposalFile.status === 'fulfilled') setProposal(parseDiscussionProposal(proposalFile.value.content))
+    else setProposal(null)
     setLoading(false)
   }, [projectId, showGraph])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    if (previousOrganizing.current && !organizing) void load()
+    previousOrganizing.current = organizing
+  }, [load, organizing])
 
   const selection = useMemo(
     () => selectDiscussionSubgraph(graph, rootId, query),
@@ -270,10 +282,16 @@ function DiscussionMapSurface({
         <small>{activeVersion
           ? `历史版本只读 · ${activeVersion.summary || activeVersion.commit.slice(0, 8)}`
           : message || graph.evolution.summary || '原文保留且默认不检索；AI 只读取当前来源和命中节点，稳定结论才晋升。'}</small>
-        {pending && !activeVersion && <button type="button" title={pending.summary} disabled={!canStartAi || organizing} onClick={onApplyPending}>
-          待审核：{pending.nodes} 节点 / {pending.promotions} 文档
+        {proposal && !activeVersion && <button type="button" title={proposal.summary} disabled={organizing} onClick={() => setProposalOpen(true)}>
+          查看 AI 建议 · {proposal.promotions.length} 份拟晋升文档
         </button>}
       </div>
+      <ProjectDocumentDiscussionSources sources={graph.sources} canStartAi={canStartAi} organizing={organizing}
+        readOnly={!!activeVersion} onResume={(source) => {
+          setMessage(`正在从 ${source.processed_chunk_ids.length + 1}/${source.chunk_count} chunk 继续编译“${source.title}”。`)
+          onCompileSource({ path: source.reference, source_id: source.id, source_revision: source.content_revision,
+            source_format: source.source_format, message_count: source.message_count, already_imported: true })
+        }} />
       <ProjectDocumentDiscussionTimeline
         runtime={runtime}
         activeVersion={activeVersion}
@@ -337,6 +355,11 @@ function DiscussionMapSurface({
       </div>
       {action && <ProjectDocumentDiscussionActionDialog node={action.node} mode={action.mode} busy={actionBusy}
         onCancel={() => setAction(null)} onSubmit={(request) => { void submitAction(request) }} />}
+      {proposalOpen && proposal && <ProjectDocumentDiscussionProposalPanel currentGraph={currentGraph} proposal={proposal}
+        busy={organizing} canApply={canStartAi} onClose={() => setProposalOpen(false)} onApply={() => {
+          setProposalOpen(false)
+          onApplyPending()
+        }} />}
     </main>
   )
 }
@@ -346,18 +369,4 @@ function relationLabel(relation: string) {
     supports: '支持', opposes: '反对', alternative_to: '备选', depends_on: '依赖',
     leads_to: '导向', spawns: '分叉', resolves: '解决', related_to: '相关',
   }[relation] ?? relation
-}
-
-function parsePendingProposal(content: string) {
-  try {
-    const value = JSON.parse(content)
-    if (value?.status !== 'ready') return null
-    return {
-      summary: String(value.summary ?? ''),
-      nodes: Array.isArray(value.graph?.nodes) ? value.graph.nodes.length : 0,
-      promotions: Array.isArray(value.promotions) ? value.promotions.length : 0,
-    }
-  } catch {
-    return null
-  }
 }
