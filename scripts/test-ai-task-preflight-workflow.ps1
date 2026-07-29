@@ -61,6 +61,9 @@ Assert-Contains $preflightContent "AUTO_CLEANUP=skipped_created_worktree" "Power
 Assert-Contains $preflightContent "worktree lock --reason" "PowerShell preflight must lock active Codex task worktrees."
 Assert-Contains $preflightShContent "worktree lock --reason" "Shell preflight must lock active Codex task worktrees."
 Assert-Contains $preflightContent "function Test-PcConversationWorktree" "PowerShell preflight must detect platform-created PC conversation worktrees."
+Assert-Contains $preflightContent "function Resolve-AiTaskWorktreeRoot" "PowerShell preflight must resolve the short Windows worktree root."
+Assert-Contains $preflightContent 'Join-Path $driveRoot "wt"' "PowerShell preflight must default to a short drive-root worktree directory."
+Assert-Contains $preflightContent "ELON_AI_WORKTREE_ROOT" "PowerShell preflight must support an explicit machine-level short worktree root."
 Assert-Contains $preflightShContent "is_pc_conversation_worktree()" "Shell preflight must detect platform-created PC conversation worktrees."
 Assert-Contains $preflightContent "PC_CONVERSATION_WORKTREE=true" "PowerShell preflight must expose when the current workspace is already a PC conversation worktree."
 Assert-Contains $preflightShContent "PC_CONVERSATION_WORKTREE=true" "Shell preflight must expose when the current workspace is already a PC conversation worktree."
@@ -314,6 +317,40 @@ try {
     Invoke-Git $seedRepo @("commit", "-m", "seed preflight workflow test") | Out-Null
     Invoke-Git $seedRepo @("remote", "add", "origin", $originPath) | Out-Null
     Invoke-Git $seedRepo @("push", "-u", "origin", "main") | Out-Null
+
+    $shortWorktreeRoot = Join-Path $testRoot "short-wt"
+    Push-Location -LiteralPath $seedRepo
+    try {
+        $oldPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $shortOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File `
+                (Join-Path $seedRepo "scripts\ai-task-preflight.ps1") -CreateWorktree `
+                -BranchPrefix "codex/short-path-test" -WorktreeParent $shortWorktreeRoot `
+                -SkipAutoCleanup 2>&1
+            $shortExit = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $oldPreference
+        }
+    } finally {
+        Pop-Location
+    }
+    $shortText = ($shortOutput -join "`n")
+    if ($shortExit -ne 0) { throw "Short worktree preflight failed: $shortText" }
+    $shortPathLine = ($shortOutput | Where-Object { "$_" -like "WORKTREE_PATH=*" } | Select-Object -Last 1)
+    if (-not $shortPathLine) { throw "Short worktree preflight did not return WORKTREE_PATH." }
+    $shortPath = ([string]$shortPathLine).Substring("WORKTREE_PATH=".Length)
+    $shortRootFull = [System.IO.Path]::GetFullPath($shortWorktreeRoot)
+    if (-not $shortPath.StartsWith($shortRootFull + [System.IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Created worktree escaped the requested short root: $shortPath"
+    }
+    if ((Split-Path -Leaf $shortPath).Length -gt 20) {
+        throw "Created worktree leaf is still too long: $shortPath"
+    }
+    $shortBranch = (Invoke-Git $shortPath @("branch", "--show-current"))
+    Invoke-Git $seedRepo @("worktree", "unlock", $shortPath) | Out-Null
+    Invoke-Git $seedRepo @("worktree", "remove", $shortPath) | Out-Null
+    Invoke-Git $seedRepo @("branch", "-D", $shortBranch) | Out-Null
 
     Invoke-Git $seedRepo @("worktree", "add", "-b", "codex/existing-clean", $existingWorktree, "origin/main") | Out-Null
     New-Item -ItemType Directory -Path $createdWorktreeParent | Out-Null

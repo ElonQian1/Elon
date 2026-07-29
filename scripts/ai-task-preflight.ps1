@@ -180,6 +180,29 @@ function Test-PcConversationWorktree {
     return $isConversationPath -or $isSessionBranch
 }
 
+function Resolve-AiTaskWorktreeRoot {
+    param(
+        [string]$RepoRoot,
+        [string]$ExplicitParent
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitParent)) {
+        return [System.IO.Path]::GetFullPath($ExplicitParent)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($env:ELON_AI_WORKTREE_ROOT)) {
+        if (-not [System.IO.Path]::IsPathRooted($env:ELON_AI_WORKTREE_ROOT)) {
+            throw "ELON_AI_WORKTREE_ROOT must be an absolute path."
+        }
+        return [System.IO.Path]::GetFullPath($env:ELON_AI_WORKTREE_ROOT)
+    }
+
+    $driveRoot = [System.IO.Path]::GetPathRoot($RepoRoot)
+    if ([string]::IsNullOrWhiteSpace($driveRoot)) {
+        throw "Cannot determine a short worktree root for repository: $RepoRoot"
+    }
+    return Join-Path $driveRoot "wt"
+}
+
 function Lock-AiTaskWorktree {
     param([string]$RepoPath, [string]$WorktreePath)
 
@@ -256,12 +279,9 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     $uniqueSuffix = "$PID-$shortGuid"
     $safePrefix = $BranchPrefix.TrimEnd("/")
     $newBranch = "$safePrefix-$stamp-$uniqueSuffix"
-    $parent = if ([string]::IsNullOrWhiteSpace($WorktreeParent)) {
-        Split-Path -Parent $repoRoot
-    } else {
-        $WorktreeParent
-    }
-    $leaf = "$(Split-Path -Leaf $repoRoot)-task-$stamp-$uniqueSuffix"
+    $parent = Resolve-AiTaskWorktreeRoot -RepoRoot $repoRoot -ExplicitParent $WorktreeParent
+    New-Item -ItemType Directory -Path $parent -Force | Out-Null
+    $leaf = $uniqueSuffix
     $worktreePath = Join-Path $parent $leaf
 
     & git worktree add -b $newBranch $worktreePath origin/main
@@ -272,6 +292,7 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
 
     Write-Host "WORKTREE_CREATED=true"
     Write-Host "WORKTREE_BRANCH=$newBranch"
+    Write-Host "WORKTREE_ROOT=$parent"
     Write-Host "WORKTREE_PATH=$worktreePath"
     Write-Host "WORKTREE_BASE=$(git rev-parse --short origin/main)"
     Write-Host "NEXT=cd `"$worktreePath`""

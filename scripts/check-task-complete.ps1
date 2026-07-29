@@ -5,9 +5,10 @@
 .DESCRIPTION
     Use this before the final AI report. CodePushed/CodeSync verifies that
     local HEAD is already contained in origin/main, even if newer commits have
-    landed. AndroidFeature verifies that local
-    HEAD equals origin/main and that server /app/version.json points at the
-    pushed source commit. APK version numbers are assigned by the server.
+    landed. AndroidFeature verifies that local HEAD is contained in
+    origin/main and that server /app/version.json points at this task commit
+    or a newer published descendant. It never forces an already-published
+    task to rebuild merely because another task advanced main.
     Server verifies /health and that /api/server/version.gitSha points at
     the pushed source commit. PcFrontend performs the same server release
     provenance check and also verifies that /pc serves the built frontend
@@ -45,6 +46,7 @@ $RepoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
 $ServerUrl = "http://43.139.149.158:8080"
 
 . (Join-Path $PSScriptRoot "direct-network.ps1")
+. (Join-Path $PSScriptRoot "android-task-provenance.ps1")
 
 Set-ElonProjectDirectNetwork
 Set-Location $RepoRoot
@@ -246,8 +248,10 @@ if ($Kind -eq "CodePushed" -or $Kind -eq "CodeSync") {
 }
 
 if ($Kind -eq "AndroidFeature") {
-    if ($head -ne $originMain) {
-        Stop-Check "Android task is not complete: HEAD is not pushed to origin/main. HEAD=$($head.Substring(0, 7)) origin/main=$($originMain.Substring(0, 7))"
+    $taskPushed = Test-GitCommitAncestor -RepoPath $RepoRoot `
+        -Ancestor $head -Descendant $originMain
+    if (-not $taskPushed) {
+        Stop-Check "Android task is not complete: HEAD is not contained in origin/main. HEAD=$($head.Substring(0, 7)) origin/main=$($originMain.Substring(0, 7))"
     }
 
     try {
@@ -261,13 +265,19 @@ if ($Kind -eq "AndroidFeature") {
         Stop-Check "Could not read server /app/version.json: $_"
     }
 
-    $remoteGitSha = [string]$remoteVersion.gitSha
+    $remoteGitSha = if ($remoteVersion.sourceSha) {
+        [string]$remoteVersion.sourceSha
+    } else {
+        [string]$remoteVersion.gitSha
+    }
     if ([string]::IsNullOrWhiteSpace($remoteGitSha)) {
         Stop-Check "Server /app/version.json does not include gitSha; APK deploy provenance is unknown."
     }
 
-    if (-not ($head.StartsWith($remoteGitSha) -or $remoteGitSha.StartsWith($head))) {
-        Stop-Check "Server APK gitSha mismatch: local HEAD=$($head.Substring(0, 7)), server gitSha=$remoteGitSha."
+    $provenance = Get-AndroidTaskPublicationProvenance -RepoPath $RepoRoot `
+        -TaskHead $head -OriginMain $originMain -PublishedSha $remoteGitSha
+    if (-not $provenance.PublishedContainsTask) {
+        Stop-Check "Server APK does not contain this Android task commit: task HEAD=$($head.Substring(0, 7)), server gitSha=$remoteGitSha."
     }
 
     try {
@@ -308,6 +318,7 @@ if ($Kind -eq "AndroidFeature") {
     Write-Host "  SERVER_RELEASE_STATUS=not_attempted"
     Write-Host "  version:     v$($remoteVersion.versionName) (build $($remoteVersion.versionCode))"
     Write-Host "  APK gitSha:  $remoteGitSha"
+    Write-Host "  APK_PROVENANCE_STATUS=$(if ($provenance.PublishedExactTask) { 'exact_task_commit' } else { 'newer_descendant_contains_task' })"
     Write-Host "  download:    $ServerUrl/app/ElonSpeed-latest.apk"
     exit 0
 }

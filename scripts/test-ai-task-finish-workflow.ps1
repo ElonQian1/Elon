@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
 $finishScript = Join-Path $repoRoot "scripts\finish-ai-task.ps1"
 $checkScript = Join-Path $repoRoot "scripts\check-task-complete.ps1"
+$androidProvenanceScript = Join-Path $repoRoot "scripts\android-task-provenance.ps1"
 $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
 $directNetworkScript = Join-Path $repoRoot "scripts\direct-network.ps1"
 $finishContractScript = Join-Path $repoRoot "scripts\ai-task-finish-contract.ps1"
@@ -37,6 +38,16 @@ if (-not $serverPushGate.Contains('git merge-base --is-ancestor $head $originMai
 }
 if ($serverPushGate.Contains('$head -ne $originMain')) {
     throw "Server/PcFrontend completion must not chase unrelated commits that landed after deployment."
+}
+$androidGateStart = $checkSource.IndexOf('if ($Kind -eq "AndroidFeature")')
+$androidGateEnd = $checkSource.IndexOf('if ($Kind -eq "NodeAgent")', $androidGateStart)
+if ($androidGateStart -lt 0 -or $androidGateEnd -lt 0) {
+    throw "Android completion gate could not be located."
+}
+$androidGate = $checkSource.Substring($androidGateStart, $androidGateEnd - $androidGateStart)
+if (-not $androidGate.Contains('Get-AndroidTaskPublicationProvenance') -or
+    $androidGate.Contains('$head -ne $originMain')) {
+    throw "Android completion must accept a published task already contained in newer main."
 }
 
 function Invoke-Git {
@@ -169,6 +180,7 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $mainRepo ".ai") | Out-Null
     Copy-Item -LiteralPath $finishScript -Destination (Join-Path $mainRepo "scripts\finish-ai-task.ps1")
     Copy-Item -LiteralPath $checkScript -Destination (Join-Path $mainRepo "scripts\check-task-complete.ps1")
+    Copy-Item -LiteralPath $androidProvenanceScript -Destination (Join-Path $mainRepo "scripts\android-task-provenance.ps1")
     Copy-Item -LiteralPath $cleanupScript -Destination (Join-Path $mainRepo "scripts\cleanup-task-worktrees.ps1")
     Copy-Item -LiteralPath $directNetworkScript -Destination (Join-Path $mainRepo "scripts\direct-network.ps1")
     Copy-Item -LiteralPath $finishContractScript -Destination (Join-Path $mainRepo "scripts\ai-task-finish-contract.ps1")
