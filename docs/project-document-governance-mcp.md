@@ -134,6 +134,18 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 优先读取 `ambiguous`，或与当前需求直接相关的文档。禁止通过分页加批量读取规避预算做全库正文扫描。
 
+### `project_docs_read_sections`
+
+按路径和标题读取一个或多个 Markdown 章节，可选择是否包含子章节。服务端返回稳定章节标识、父级标题链和起止行，适合在不加载整篇长文档的情况下核对局部事实。
+
+### `project_docs_review_modularity`
+
+只扫描文档的行数、字节数、标题数量、路径身份和建议动作，不返回正文。当前规范或架构超过阈值时建议建立目录入口并按职责拆分；讨论和来源材料默认保留原文，只把已接受结论编译到短小的正式文档。
+
+### `project_docs_test_retrieval`
+
+运行 `.elon/document-retrieval-cases.json` 或调用方传入的检索验收用例。每个用例声明任务描述、应命中文档、禁止命中文档及是否要求首位命中，用于防止文档和排序规则变化后 AI 找错事实来源。
+
 ### `project_docs_save_suggestions`
 
 模型携带当前 `authorization_mode` 提交 `status=ready` 的结构化建议。服务会验证：

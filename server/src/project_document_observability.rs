@@ -187,10 +187,31 @@ pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
                     );
                 }
             }
+            "project_docs_read_sections" => {
+                trace.documents_read = trace
+                    .documents_read
+                    .saturating_add(value["sections_read"].as_u64().unwrap_or_default());
+                trace.estimated_tokens_used = trace.estimated_tokens_used.saturating_add(
+                    value["estimated_tokens_returned"]
+                        .as_u64()
+                        .unwrap_or_default(),
+                );
+                if can_advance_work(&trace) {
+                    advance(
+                        &mut trace,
+                        "document_sections_read",
+                        "running",
+                        "文档章节已按需读取",
+                        "只读取了任务指定的标题范围，没有展开整份大文档。",
+                    );
+                }
+            }
             "project_docs_get_map"
             | "project_docs_get_node"
             | "project_docs_review_map"
             | "project_docs_plan_context"
+            | "project_docs_review_modularity"
+            | "project_docs_test_retrieval"
                 if can_advance_work(&trace) =>
             {
                 advance(
@@ -204,7 +225,9 @@ pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
             "project_docs_get_map"
             | "project_docs_get_node"
             | "project_docs_review_map"
-            | "project_docs_plan_context" => {}
+            | "project_docs_plan_context"
+            | "project_docs_review_modularity"
+            | "project_docs_test_retrieval" => {}
             "project_docs_get_suggestions" if can_advance_work(&trace) => advance(
                 &mut trace,
                 "suggestions_checked",
@@ -395,11 +418,15 @@ pub(crate) fn record_tool_success(workspace: &Path, tool: &str, value: &Value) {
 pub(crate) fn record_tool_failure(workspace: &Path, tool: &str, error: &anyhow::Error) {
     let recovery = match tool {
         "project_docs_analyze" => "确认项目目录存在且是 Git 工作区，然后重新分析。",
-        "project_docs_read" => "重新 analyze 获取最新目录 revision，只读取目录中存在的路径。",
+        "project_docs_read" | "project_docs_read_sections" => {
+            "重新 analyze 获取最新目录 revision，只读取目录中存在的路径和标题。"
+        }
         "project_docs_get_map"
         | "project_docs_get_node"
         | "project_docs_review_map"
-        | "project_docs_plan_context" => {
+        | "project_docs_plan_context"
+        | "project_docs_review_modularity"
+        | "project_docs_test_retrieval" => {
             "重新获取 overview 图，确认 view、node_id 和 token 预算后重试。"
         }
         "project_docs_save_suggestions" => {

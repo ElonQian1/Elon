@@ -203,6 +203,7 @@ mod project_document_policy;
 mod project_document_quality;
 mod project_document_quality_rules;
 mod project_document_response;
+mod project_document_scoped_health;
 mod project_document_vault;
 mod project_document_versioning;
 mod project_downloads;

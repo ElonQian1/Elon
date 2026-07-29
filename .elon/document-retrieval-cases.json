@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "open-commerce-current-baseline",
+      "query": "项目现在已经实现哪些开放商业能力，哪些仍然只是 Sui 提案？请先读《一龙开放商业能力基线》。",
+      "expected_paths": [
+        "docs/open-commerce/capability-baseline.md"
+      ],
+      "forbidden_paths": [
+        "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md"
+      ],
+      "require_first": "docs/open-commerce/capability-baseline.md"
+    },
+    {
+      "id": "open-commerce-integration",
+      "query": "手机开发应用、群体 AI、共享 API Token、节点算力和开放商业网络应该如何融合？",
+      "expected_paths": [
+        "docs/open-commerce/integration-architecture.md"
+      ],
+      "forbidden_paths": [
+        "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md"
+      ]
+    },
+    {
+      "id": "open-commerce-v1-contract",
+      "query": "开放商业网络 V1 的 HTTP 和 MCP 调用契约是什么？",
+      "expected_paths": [
+        "docs/open-commerce-network-v1-api.md"
+      ],
+      "forbidden_paths": [
+        "docs/drafts/open-commerce-network-sui-agent-economy.md"
+      ]
+    },
+    {
+      "id": "sui-economy-proposal",
+      "query": "继续讨论 Sui 的 NET、CREDIT、RevenuePosition 和链上治理提案。",
+      "expected_paths": [
+        "docs/drafts/open-commerce-network-sui-agent-economy.md"
+      ],
+      "forbidden_paths": [
+        "docs/decisions/open-commerce-network-v1-architecture.md"
+      ]
+    },
+    {
+      "id": "discussion-provenance",
+      "query": "追溯前面的开放商业、共享资源和 Sui 讨论是如何一步步推进的。",
+      "expected_paths": [
+        "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md"
+      ],
+      "forbidden_paths": []
+    },
+    {
+      "id": "project-docs-mcp",
+      "query": "《项目文档治理 MCP》如何按章节读取、审查巨型文档并运行检索验收？",
+      "expected_paths": [
+        "docs/project-document-governance-mcp.md"
+      ],
+      "forbidden_paths": [
+        "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md"
+      ]
+    }
+  ]
+}

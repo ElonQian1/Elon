@@ -66,6 +66,8 @@ applyTo: "**/*.md"
 - 用 `project_docs_get_health_history` 查看健康分和可执行问题趋势；健康分必须同时返回组成、权重和贡献，不能只显示一个不可解释的总分。
 - 诊断或观察整理运行时调用 `project_docs_get_status`；它返回阶段、revision、读取数、token 估算、错误代码和修复建议，不读取 Markdown。
 - 只对 `ambiguous` 或当前任务命中的路径调用 `project_docs_read`，不得借 MCP 全量读取 Markdown。
+- 长文档只需核对一个主题时优先调用 `project_docs_read_sections`；整理前调用 `project_docs_review_modularity`，来源材料保留原始记录，正式文档按职责拆分。
+- 文档入口、权威性或排序发生变化后调用 `project_docs_test_retrieval`，用真实任务验证应命中和禁止命中的文档，再宣告整理完成。
 - 模型完成判断后携带当前 `authorization_mode` 调用 `project_docs_save_suggestions`；该工具只写建议 JSON，并校验目录 revision、真实路径和结构上限。
 - `git_backed_full` 下继续调用 `project_docs_apply_suggestions`；如有实体操作，把返回的 `git_baseline_commit` 传给 `project_docs_apply_file_operations` 并执行全部 proposed operation id。成功必须同时确认整理前和整理后提交，不需要 `reviewed` 或 `allow_*`。
 - `review_all` 下保存建议后停止，只有用户确认才传 `reviewed=true` 和实体操作对应的 `allow_rename`/`allow_move`；`suggestions_only` 下不得调用任何 apply 工具。

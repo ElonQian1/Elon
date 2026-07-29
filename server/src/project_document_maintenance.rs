@@ -212,12 +212,12 @@ fn refresh_workspace(workspace: &Path) -> Result<()> {
     Ok(())
 }
 
-fn weighted_score(architecture: u8, quality: u8, federation: u8) -> u8 {
+pub(crate) fn weighted_score(architecture: u8, quality: u8, federation: u8) -> u8 {
     ((u16::from(architecture) * 35 + u16::from(quality) * 50 + u16::from(federation) * 15) / 100)
         as u8
 }
 
-fn health_status(score: u8) -> &'static str {
+pub(crate) fn health_status(score: u8) -> &'static str {
     if score >= 85 {
         "healthy"
     } else if score >= 60 {

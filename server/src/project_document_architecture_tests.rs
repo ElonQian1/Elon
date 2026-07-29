@@ -2,7 +2,7 @@ use super::*;
 use homecli_proto::{ProjectDocumentEntry, ProjectDocumentMetadata};
 use std::path::Path;
 
-use crate::project_document_governance_service::analyze_workspace;
+use crate::project_document_governance_service::{analyze_workspace, analyze_workspace_scoped};
 
 fn document(path: &str, title: &str, role: &str, ambiguous: bool) -> ProjectDocumentEntry {
     ProjectDocumentEntry {
@@ -121,4 +121,32 @@ fn repository_self_project_is_scanned_with_zero_model_tokens() {
             || path.starts_with(".github/skills/")
             || matches!(path, "AI_RULES.md" | "AI_TASK_TEMPLATE.md" | "CODEX.md")
     }));
+}
+
+#[test]
+fn scoped_analysis_recomputes_health_for_only_the_selected_documents() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+    let analysis =
+        analyze_workspace_scoped(root, 0, 200, false, Some("document-platform")).unwrap();
+    let matching = analysis["pagination"]["matching_documents"]
+        .as_u64()
+        .unwrap();
+    let health = &analysis["document_health"];
+
+    assert_eq!(health["projection"], "federation_scope");
+    assert_eq!(health["scope_id"], "document-platform");
+    assert_eq!(health["architecture"]["topic_assigned_documents"], matching);
+    assert_eq!(
+        health["federation"]["selected_node"]["document_count"],
+        matching
+    );
+    assert!(health["quality"]["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|issue| {
+            issue["path"].as_str().is_some_and(|path| {
+                path.contains("project-document") || path.contains("discussion-knowledge")
+            })
+        }));
 }

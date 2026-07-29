@@ -20,6 +20,7 @@ use crate::{
         SECTION_CONFIG_PATH, SUGGESTIONS_CONFIG_PATH,
     },
     project_document_governance_facets::effective_facets_with_metadata,
+    project_document_scoped_health::analyze_scoped_document_health,
     project_document_vault::{current_version, is_managed_vault},
 };
 
@@ -135,6 +136,18 @@ pub(crate) fn analyze_workspace_scoped_query(
                 .unwrap_or(Value::Null)
             })
     };
+    let document_health = if let Some(scope_id) = scope_id {
+        analyze_scoped_document_health(
+            workspace,
+            &snapshot.documents,
+            &scoped_documents,
+            &manifest.value,
+            &snapshot.analysis,
+            scope_id,
+        )?
+    } else {
+        snapshot.analysis.clone()
+    };
     Ok(json!({
         "workspace": snapshot.workspace_path,
         "catalog_revision": snapshot.revision,
@@ -156,7 +169,7 @@ pub(crate) fn analyze_workspace_scoped_query(
             "excluded_by_default": excluded_by_default,
         },
         "knowledge_architecture": knowledge_architecture,
-        "document_health": snapshot.analysis,
+        "document_health": document_health,
         "scope": {"id": scope_id, "topic": topic, "definition": scope},
         "documents": documents,
         "manifest": manifest.value,

@@ -132,7 +132,7 @@
       "parent_id": "project-system",
       "order": 10,
       "icon": "network",
-      "entrypoint": "docs/decisions/open-commerce-network-v1-architecture.md"
+      "entrypoint": "docs/open-commerce/README.md"
     },
     {
       "id": "security",
@@ -204,8 +204,8 @@
     "docs/decisions/open-commerce-network-v1-architecture.md": "custom:open-commerce-network",
     "docs/discussion-knowledge-compiler.md": "custom:pc-workbench",
     "docs/drafts/open-commerce-network-roadmap.md": "custom:open-commerce-network",
-    "docs/drafts/open-commerce-network-sui-agent-economy.md": "custom:project-system",
-    "docs/drafts/sui-economy-s4-shadow-settlement-plan.md": "custom:project-system",
+    "docs/drafts/open-commerce-network-sui-agent-economy.md": "custom:open-commerce-network",
+    "docs/drafts/sui-economy-s4-shadow-settlement-plan.md": "custom:open-commerce-network",
     "docs/drafts/requirements/open-commerce-network.md": "custom:open-commerce-network",
     "docs/fb2-ai-center/PLAN.md": "custom:fb2-project",
     "docs/fb2-ai-center/PROGRESS.md": "custom:fb2-project",
@@ -224,8 +224,13 @@
     "docs/fb2-chat-voice-kit-integration.md": "custom:fb2-project",
     "docs/group-chat-summary-system.md": "custom:ai-context",
     "docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md": "custom:open-commerce-network",
+    "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md": "custom:open-commerce-network",
     "docs/intent-routing.md": "custom:backend-api",
     "docs/node-agent-upgrade-compatibility.md": "custom:windows-node",
+    "docs/open-commerce/README.md": "custom:open-commerce-network",
+    "docs/open-commerce/capability-baseline.md": "custom:open-commerce-network",
+    "docs/open-commerce/decision-register.md": "custom:open-commerce-network",
+    "docs/open-commerce/integration-architecture.md": "custom:open-commerce-network",
     "docs/open-commerce-network-v1-acceptance.md": "custom:open-commerce-network",
     "docs/open-commerce-network-v1-api.md": "custom:open-commerce-network",
     "docs/pc-frontend-migration.md": "custom:pc-workbench",
@@ -397,11 +402,47 @@
       "authority": "non_authoritative",
       "document_type": "note"
     },
+    "docs/decisions/open-commerce-network-principles.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "decision"
+    },
+    "docs/decisions/open-commerce-network-v1-architecture.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture_decision"
+    },
     "docs/discussion-knowledge-compiler.md": {
       "retrieval": "on_demand",
       "lifecycle": "active",
       "authority": "authoritative",
       "document_type": "architecture"
+    },
+    "docs/drafts/open-commerce-network-roadmap.md": {
+      "retrieval": "excluded",
+      "lifecycle": "draft",
+      "authority": "proposal",
+      "document_type": "roadmap"
+    },
+    "docs/drafts/open-commerce-network-sui-agent-economy.md": {
+      "retrieval": "excluded",
+      "lifecycle": "draft",
+      "authority": "proposal",
+      "document_type": "architecture_proposal"
+    },
+    "docs/drafts/requirements/open-commerce-network.md": {
+      "retrieval": "excluded",
+      "lifecycle": "draft",
+      "authority": "proposal",
+      "document_type": "requirements"
+    },
+    "docs/drafts/sui-economy-s4-shadow-settlement-plan.md": {
+      "retrieval": "excluded",
+      "lifecycle": "draft",
+      "authority": "proposal",
+      "document_type": "implementation_plan"
     },
     "docs/fb2-ai-center/PLAN.md": {
       "retrieval": "excluded",
@@ -426,6 +467,48 @@
       "lifecycle": "active",
       "authority": "authoritative",
       "document_type": "runbook"
+    },
+    "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md": {
+      "retrieval": "excluded",
+      "lifecycle": "source_material",
+      "authority": "non_authoritative",
+      "document_type": "discussion"
+    },
+    "docs/open-commerce/README.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "subproject_overview"
+    },
+    "docs/open-commerce/capability-baseline.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "capability_baseline"
+    },
+    "docs/open-commerce/decision-register.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "guidance",
+      "document_type": "decision_register"
+    },
+    "docs/open-commerce/integration-architecture.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture"
+    },
+    "docs/open-commerce-network-v1-acceptance.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "evidence",
+      "document_type": "acceptance"
+    },
+    "docs/open-commerce-network-v1-api.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "api_reference"
     },
     "docs/pc-frontend-migration.md": {
       "retrieval": "on_demand",
@@ -471,6 +554,114 @@
     }
   },
   "document_metadata": {
+    "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md": {
+      "doc_type": "discussion",
+      "audience": [
+        "产品负责人",
+        "AI 代理"
+      ],
+      "owner": "产品负责人",
+      "reviewed_at": "2026-07-30",
+      "review_interval_days": 180,
+      "implementation_refs": [],
+      "related": [
+        "docs/open-commerce/README.md"
+      ]
+    },
+    "docs/open-commerce/README.md": {
+      "doc_type": "subproject_overview",
+      "audience": [
+        "产品负责人",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-07-30",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/open_commerce_service.rs",
+        "file:server/src/group_ai/mod.rs"
+      ],
+      "related": [
+        "docs/open-commerce/capability-baseline.md",
+        "docs/open-commerce/integration-architecture.md",
+        "docs/open-commerce/decision-register.md"
+      ]
+    },
+    "docs/open-commerce/capability-baseline.md": {
+      "doc_type": "capability_baseline",
+      "audience": [
+        "产品负责人",
+        "投资人",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-07-30",
+      "review_interval_days": 30,
+      "implementation_refs": [
+        "file:server/src/open_commerce_service.rs",
+        "file:server/src/group_ai/actions/assignment_actions.rs",
+        "file:server/src/store/node_ledger.rs",
+        "file:server/src/codex_vault_api.rs"
+      ],
+      "related": [
+        "docs/open-commerce/README.md",
+        "docs/open-commerce-network-v1-acceptance.md"
+      ]
+    },
+    "docs/open-commerce/decision-register.md": {
+      "doc_type": "decision_register",
+      "audience": [
+        "产品负责人",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-07-30",
+      "review_interval_days": 30,
+      "implementation_refs": [],
+      "related": [
+        "docs/decisions/open-commerce-network-principles.md",
+        "docs/decisions/open-commerce-network-v1-architecture.md"
+      ]
+    },
+    "docs/open-commerce/integration-architecture.md": {
+      "doc_type": "architecture",
+      "audience": [
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-07-30",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/group_ai/mod.rs",
+        "file:server/src/open_commerce_service.rs",
+        "file:server/src/store/node_ledger.rs"
+      ],
+      "related": [
+        "AI_ARCHITECTURE.md",
+        "docs/drafts/open-commerce-network-sui-agent-economy.md"
+      ]
+    },
+    "docs/open-commerce-network-v1-api.md": {
+      "doc_type": "api_reference",
+      "audience": [
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-07-30",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/open_commerce_api.rs",
+        "file:server/src/open_commerce_mcp.rs"
+      ],
+      "related": [
+        "docs/decisions/open-commerce-network-v1-architecture.md"
+      ]
+    },
     ".github/copilot-instructions.md": {
       "id": "shared-ai-contract",
       "doc_type": "policy",
@@ -1087,6 +1278,136 @@
   "audit_log": [],
   "knowledge_graph": {
     "nodes": [
+      {
+        "id": "cap-open-commerce",
+        "view": "capabilities",
+        "kind": "capability_group",
+        "label": "开放商业与商户 AI",
+        "detail": "商户自主数据、AI 应用开发、开放商业调用和共享资源的统一能力包",
+        "parent_id": "",
+        "order": 55,
+        "color": "#C78B55",
+        "entrypoint": "docs/open-commerce/README.md",
+        "document_paths": [
+          "docs/open-commerce/README.md",
+          "docs/open-commerce/capability-baseline.md",
+          "docs/open-commerce/integration-architecture.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/open_commerce_service.rs",
+          "file:server/src/group_ai/mod.rs"
+        ],
+        "tags": [
+          "开放商业",
+          "商户",
+          "ai",
+          "融合"
+        ]
+      },
+      {
+        "id": "cap-open-commerce-v1",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "开放商业网络 V1",
+        "detail": "商户节点、商业能力、授权、调用、计量、审计以及 HTTP/MCP 契约",
+        "parent_id": "cap-open-commerce",
+        "order": 10,
+        "color": "#C78B55",
+        "entrypoint": "docs/open-commerce-network-v1-api.md",
+        "document_paths": [
+          "docs/decisions/open-commerce-network-v1-architecture.md",
+          "docs/open-commerce-network-v1-api.md",
+          "docs/open-commerce-network-v1-acceptance.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/open_commerce_service.rs",
+          "file:server/src/open_commerce_api.rs",
+          "file:server/src/open_commerce_mcp.rs",
+          "test:server/src/open_commerce_service_tests.rs"
+        ],
+        "tags": [
+          "api",
+          "capability",
+          "merchant",
+          "mcp"
+        ]
+      },
+      {
+        "id": "cap-open-commerce-resources",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "共享 AI 资源与任务回执",
+        "detail": "API Token、计算节点、Matter/Assignment、用量计量和链外审计回执",
+        "parent_id": "cap-open-commerce",
+        "order": 20,
+        "color": "#73A75C",
+        "entrypoint": "docs/open-commerce/integration-architecture.md",
+        "document_paths": [
+          "docs/open-commerce/capability-baseline.md",
+          "docs/open-commerce/integration-architecture.md",
+          "docs/token消费统计.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/codex_vault_api.rs",
+          "file:server/src/group_ai/actions/assignment_actions.rs",
+          "file:server/src/store/node_ledger.rs"
+        ],
+        "tags": [
+          "共享",
+          "算力",
+          "token",
+          "receipt"
+        ]
+      },
+      {
+        "id": "cap-open-commerce-sui-proposal",
+        "view": "capabilities",
+        "kind": "planned_capability",
+        "label": "Sui AI 经济层提案",
+        "detail": "NET、CREDIT、RevenuePosition 和链上结算仍是提案，不属于当前实现",
+        "parent_id": "cap-open-commerce",
+        "order": 30,
+        "color": "#8E82D8",
+        "entrypoint": "docs/drafts/open-commerce-network-sui-agent-economy.md",
+        "document_paths": [
+          "docs/drafts/open-commerce-network-sui-agent-economy.md",
+          "docs/drafts/sui-economy-s4-shadow-settlement-plan.md",
+          "docs/open-commerce/decision-register.md"
+        ],
+        "implementation_refs": [],
+        "tags": [
+          "sui",
+          "proposal",
+          "settlement",
+          "revenueposition"
+        ]
+      },
+      {
+        "id": "arch-open-commerce",
+        "view": "architecture",
+        "kind": "domain_service",
+        "label": "开放商业领域服务",
+        "detail": "复用身份、项目和审计底座，承载商户能力、授权、调用及可选结算适配器",
+        "parent_id": "arch-server",
+        "order": 35,
+        "color": "#C78B55",
+        "entrypoint": "docs/open-commerce/integration-architecture.md",
+        "document_paths": [
+          "docs/open-commerce/integration-architecture.md",
+          "docs/decisions/open-commerce-network-v1-architecture.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/open_commerce_service.rs",
+          "file:server/src/open_commerce_model.rs",
+          "file:server/src/store/open_commerce_merchants.rs"
+        ],
+        "tags": [
+          "commerce",
+          "grant",
+          "invocation",
+          "settlement"
+        ]
+      },
       {
         "id": "cap-git-delivery",
         "view": "capabilities",
@@ -2004,6 +2325,20 @@
       }
     ],
     "edges": [
+      {
+        "id": "cap-open-commerce-v1-resources",
+        "source": "cap-open-commerce-v1",
+        "target": "cap-open-commerce-resources",
+        "relation": "records_usage_with",
+        "label": "调用计量与任务回执"
+      },
+      {
+        "id": "arch-open-commerce-data",
+        "source": "arch-open-commerce",
+        "target": "arch-data",
+        "relation": "persists",
+        "label": "商户、授权、调用与审计"
+      },
       {
         "id": "arch-server-data",
         "source": "arch-server",

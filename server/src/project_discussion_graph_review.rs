@@ -133,7 +133,46 @@ fn review_sources(
     graph: &DiscussionGraph,
     issues: &mut Vec<DiscussionReviewIssue>,
 ) {
+    let source_ids = graph
+        .sources
+        .iter()
+        .map(|source| source.id.as_str())
+        .collect::<HashSet<_>>();
+    let refs_by_source = graph.nodes.iter().fold(
+        HashMap::<String, Vec<&DiscussionNode>>::new(),
+        |mut refs, node| {
+            for source_ref in &node.source_refs {
+                let (source_id, _) = source_ref_parts(source_ref);
+                refs.entry(source_id.to_string()).or_default().push(node);
+            }
+            refs
+        },
+    );
+    for (source_id, nodes) in refs_by_source
+        .iter()
+        .filter(|(source_id, _)| !source_ids.contains(source_id.as_str()))
+    {
+        issue(
+            issues,
+            &format!("source-unknown:{source_id}"),
+            "source.reference_unknown",
+            "error",
+            "节点引用了未登记的讨论来源",
+            &format!(
+                "{} 个节点引用来源“{}”，但 sources 中没有该 id。",
+                nodes.len(),
+                source_id
+            ),
+            &nodes.iter().map(|node| node.id.clone()).collect::<Vec<_>>(),
+            "先导入或登记原始来源，再保留节点来源锚点；不要把未知引用当作证据。",
+            false,
+        );
+    }
     for source in &graph.sources {
+        let referenced_nodes = refs_by_source.get(&source.id).cloned().unwrap_or_default();
+        let has_confirmed_nodes = referenced_nodes
+            .iter()
+            .any(|node| is_confirmed_business_node(node));
         let path = source.reference.split('#').next().unwrap_or_default();
         if is_project_path(path) && !workspace.join(path.replace('/', "\\")).is_file() {
             issue(
@@ -148,12 +187,16 @@ fn review_sources(
                 false,
             );
         }
-        if source.chunk_count > 0 && source.compilation_status != "complete" {
+        if !referenced_nodes.is_empty() && source.compilation_status != "complete" {
             issue(
                 issues,
                 &format!("source-incomplete:{}", source.id),
                 "source.compilation_incomplete",
-                "warning",
+                if has_confirmed_nodes {
+                    "error"
+                } else {
+                    "warning"
+                },
                 "聊天来源尚未完整编译",
                 &format!(
                     "来源“{}”已处理 {}/{} 个 chunk，当前状态为 {}。",
@@ -162,12 +205,79 @@ fn review_sources(
                     source.chunk_count,
                     source.compilation_status
                 ),
-                &[],
+                &referenced_nodes
+                    .iter()
+                    .map(|node| node.id.clone())
+                    .collect::<Vec<_>>(),
                 "从 source manifest 的下一个未处理 chunk 继续，不要重新读取已经记录的 chunk。",
                 false,
             );
         }
+        if !referenced_nodes.is_empty() && source.content_revision.trim().is_empty() {
+            issue(
+                issues,
+                &format!("source-revision-missing:{}", source.id),
+                "source.revision_missing",
+                if has_confirmed_nodes {
+                    "error"
+                } else {
+                    "warning"
+                },
+                "讨论来源缺少内容修订号",
+                &format!(
+                    "来源“{}”被 {} 个节点引用，但无法证明节点基于哪一版原始内容。",
+                    source.title,
+                    referenced_nodes.len()
+                ),
+                &referenced_nodes
+                    .iter()
+                    .map(|node| node.id.clone())
+                    .collect::<Vec<_>>(),
+                "重新导入来源并记录 content_revision，再复核已采纳节点。",
+                false,
+            );
+        }
+        if source.compilation_status == "complete" && source.chunk_count > 0 {
+            let unprocessed = referenced_nodes
+                .iter()
+                .filter(|node| {
+                    node.source_refs.iter().any(|source_ref| {
+                        let (source_id, anchor) = source_ref_parts(source_ref);
+                        source_id == source.id
+                            && anchor.starts_with("chunk-")
+                            && !source
+                                .processed_chunk_ids
+                                .iter()
+                                .any(|processed| processed == anchor)
+                    })
+                })
+                .map(|node| node.id.clone())
+                .collect::<Vec<_>>();
+            if !unprocessed.is_empty() {
+                issue(
+                    issues,
+                    &format!("source-anchor-unprocessed:{}", source.id),
+                    "source.anchor_unprocessed",
+                    "error",
+                    "节点引用了未处理的来源分块",
+                    &format!(
+                        "来源“{}”的 {} 个节点锚点不在 processed_chunk_ids 中。",
+                        source.title,
+                        unprocessed.len()
+                    ),
+                    &unprocessed,
+                    "读取并编译对应 chunk，或把节点锚点改为实际处理过的 chunk id。",
+                    false,
+                );
+            }
+        }
     }
+}
+
+fn source_ref_parts(reference: &str) -> (&str, &str) {
+    reference
+        .split_once('#')
+        .map_or((reference, ""), |(source, anchor)| (source, anchor))
 }
 
 fn review_nodes(

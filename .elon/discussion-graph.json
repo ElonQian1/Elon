@@ -7,12 +7,31 @@
       "kind": "conversation",
       "reference": "docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md",
       "imported_at": "2026-07-27T00:00:00+08:00",
-      "content_revision": "",
-      "source_format": "",
+      "content_revision": "c60fb2589d4df011261d8fbd9aa0f2d504c863cb76e6964b0707d8bab9f40471",
+      "source_format": "structured_markdown",
       "message_count": 0,
-      "chunk_count": 0,
-      "processed_chunk_ids": [],
-      "compilation_status": "pending"
+      "chunk_count": 18,
+      "processed_chunk_ids": [
+        "section-1",
+        "section-2",
+        "section-3",
+        "section-4",
+        "section-5",
+        "section-6",
+        "section-7",
+        "section-8",
+        "section-9",
+        "section-10",
+        "section-11",
+        "section-12",
+        "section-13",
+        "section-14",
+        "section-15",
+        "section-16",
+        "section-17",
+        "section-18"
+      ],
+      "compilation_status": "complete"
     },
     {
       "id": "conversation-dcbd31fc4a3d3bd7",
@@ -26,6 +45,30 @@
       "chunk_count": 1,
       "processed_chunk_ids": [
         "chunk-0001-64d395f3dd"
+      ],
+      "compilation_status": "complete"
+    },
+    {
+      "id": "conversation-661c37eebcbf4e82",
+      "title": "开放商业、共享资源与 Sui 经济层后续讨论摘要",
+      "kind": "conversation",
+      "reference": "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md",
+      "imported_at": "2026-07-30T04:30:00+08:00",
+      "content_revision": "661c37eebcbf4e826c11215a070613f8958b07c390c215423412939edce7e702",
+      "source_format": "structured_markdown",
+      "message_count": 0,
+      "chunk_count": 10,
+      "processed_chunk_ids": [
+        "section-1",
+        "section-2",
+        "section-3",
+        "section-4",
+        "section-5",
+        "section-6",
+        "section-7",
+        "section-8",
+        "section-9",
+        "section-10"
       ],
       "compilation_status": "complete"
     }
@@ -150,7 +193,8 @@
       "order": 1070,
       "color": "#9a73dc",
       "source_refs": [
-        "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd",
+        "conversation-661c37eebcbf4e82#section-8"
       ],
       "conversation_refs": [
         "codex-thread-current://2026-07-30-sui-ai-agent-network"
@@ -179,7 +223,8 @@
       "order": 1130,
       "color": "#9a73dc",
       "source_refs": [
-        "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd",
+        "conversation-661c37eebcbf4e82#section-8"
       ],
       "conversation_refs": [
         "codex-thread-current://2026-07-30-sui-ai-agent-network"
@@ -561,7 +606,8 @@
       "order": 1050,
       "color": "#9a73dc",
       "source_refs": [
-        "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd",
+        "conversation-661c37eebcbf4e82#section-8"
       ],
       "conversation_refs": [
         "codex-thread-current://2026-07-30-sui-ai-agent-network"
@@ -807,7 +853,8 @@
       "order": 120,
       "color": "#9a73dc",
       "source_refs": [
-        "chat-open-commerce#section-5"
+        "chat-open-commerce#section-5",
+        "conversation-661c37eebcbf4e82#section-10"
       ],
       "conversation_refs": [
         "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-5"
@@ -949,7 +996,11 @@
         "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-7"
       ],
       "document_paths": [
-        "docs/drafts/requirements/open-commerce-network.md"
+        "docs/drafts/requirements/open-commerce-network.md",
+        "docs/open-commerce/README.md",
+        "docs/open-commerce/capability-baseline.md",
+        "docs/open-commerce/integration-architecture.md",
+        "docs/open-commerce/decision-register.md"
       ],
       "feature_node_ids": [
         "cap-ai-tasks"
@@ -1681,13 +1732,16 @@
       "order": 500,
       "color": "#9a73dc",
       "source_refs": [
-        "chat-open-commerce#section-7"
+        "chat-open-commerce#section-7",
+        "conversation-661c37eebcbf4e82#section-2"
       ],
       "conversation_refs": [
         "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-7"
       ],
       "document_paths": [
-        "docs/drafts/requirements/open-commerce-network.md"
+        "docs/drafts/requirements/open-commerce-network.md",
+        "docs/open-commerce/capability-baseline.md",
+        "docs/open-commerce/decision-register.md"
       ],
       "feature_node_ids": [],
       "tags": [
@@ -1846,13 +1900,16 @@
       "order": 530,
       "color": "#5f91dc",
       "source_refs": [
-        "chat-open-commerce#section-7"
+        "chat-open-commerce#section-7",
+        "conversation-661c37eebcbf4e82#section-2"
       ],
       "conversation_refs": [
         "chatgpt-conversation://6a628bcf-350c-83ee-8daf-0e3e5211c487#section-7"
       ],
       "document_paths": [
-        "docs/drafts/requirements/open-commerce-network.md"
+        "docs/drafts/requirements/open-commerce-network.md",
+        "docs/open-commerce/capability-baseline.md",
+        "docs/open-commerce/integration-architecture.md"
       ],
       "feature_node_ids": [],
       "tags": [
@@ -2613,10 +2670,10 @@
     }
   ],
   "evolution": {
-    "kind": "decision",
-    "summary": "确认 Sui 仅作为阶段四候选经济层的边界，将具体对象、任务、资产分层和风险保留为探索，并晋升独立架构草案。",
+    "kind": "refine",
+    "summary": "登记完整的开放商业讨论来源及后续摘要，并把能力基线、融合架构和决策登记连接到既有主题；不改变 Sui 提案的阶段四边界。",
     "actor": "Codex Desktop",
-    "changed_at": "2026-07-29T16:52:17.791052700+00:00",
-    "previous_revision": "7a83ff738c400dcffad84e7137d5f248d3e0509c0c69384f85cc45358ce96ca4"
+    "changed_at": "2026-07-30T04:24:54.1794828+08:00",
+    "previous_revision": "ffd6d3daf575fd5fe826a7d4b3aba62063881d3451b79543ceb011467c718e16"
   }
 }

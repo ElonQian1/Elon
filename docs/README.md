@@ -25,6 +25,7 @@
 | 用户与项目系统 | `docs/user-project-system.md` | 用户项目、频道、Git 工作区与文档知识库 |
 | 监督式 PC 项目开发 | `docs/supervised-pc-project-development.md` | Codex 桌面监督、PC 节点执行、证据验收和平台改进续跑 |
 | Codex 桌面工作流效率 | `docs/codex-desktop-workflow-efficiency.md` | 增量 Wait、权威 Resume、终态、Runtime、收尾契约与 A/B 度量 |
+| 开放商业与 AI 经济 | `docs/open-commerce/README.md` | 当前能力、商户 AI、开放商业 V1、共享资源与 Sui 提案边界 |
 | 发布与运维 | `docs/ai-agent-workflow.md` | 验证、发布、故障恢复和任务收尾 |
 | 安全与权限 | `docs/windows-client-defender.md` | 权限、凭据、密钥和安全边界 |
 | fb2 AI 中心 | `docs/fb2-ai-center/README.md` | 子项目契约、SDK、计费和验收 |

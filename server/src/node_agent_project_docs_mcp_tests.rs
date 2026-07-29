@@ -173,7 +173,10 @@ async fn mcp_lists_and_directly_calls_compact_document_tools() {
             "project_docs_get_health_history",
             "project_docs_get_history",
             "project_docs_get_version_diff",
-            "project_docs_restore_version"
+            "project_docs_restore_version",
+            "project_docs_read_sections",
+            "project_docs_review_modularity",
+            "project_docs_test_retrieval"
         ]
     );
     let save_schema = listed["result"]["tools"]

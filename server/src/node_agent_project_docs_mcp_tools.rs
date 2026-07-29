@@ -190,6 +190,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         crate::node_agent_project_docs_mcp_discussion_tools::definitions(),
     );
     definitions.extend(crate::node_agent_project_docs_mcp_knowledge_tools::history_definitions());
+    definitions.extend(crate::node_agent_project_docs_mcp_review_tools::definitions());
     definitions
 }
 
@@ -283,6 +284,11 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
                     arguments.clone(),
                 )?,
             )
+            .or(crate::node_agent_project_docs_mcp_review_tools::try_call(
+                workspace,
+                name,
+                arguments.clone(),
+            )?)
             .or(
                 crate::node_agent_project_docs_mcp_knowledge_tools::try_call(
                     workspace, name, arguments,

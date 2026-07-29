@@ -61,6 +61,23 @@ pub(crate) struct DocumentQualityReport {
     pub issue_types: Vec<&'static str>,
 }
 
+pub(crate) fn filter_document_quality(
+    report: &DocumentQualityReport,
+    paths: &HashSet<String>,
+) -> DocumentQualityReport {
+    let issues = report
+        .issues
+        .iter()
+        .filter(|issue| paths.contains(&normalize(&issue.path)))
+        .cloned()
+        .collect::<Vec<_>>();
+    DocumentQualityReport {
+        summary: summarize(&issues, 0, 0),
+        issues,
+        issue_types: report.issue_types.clone(),
+    }
+}
+
 pub(crate) fn analyze_document_quality(
     workspace: &Path,
     documents: &[ProjectDocumentEntry],

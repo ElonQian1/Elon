@@ -303,6 +303,49 @@ fn mcp_graph_queries_are_bounded_and_do_not_read_bodies() {
 }
 
 #[test]
+fn explicit_draft_path_overrides_default_retrieval_exclusion() {
+    let root = fixture("explicit-draft");
+    fs::create_dir_all(root.join("docs/drafts")).unwrap();
+    fs::write(
+        root.join("docs/drafts/sui-shadow-settlement.md"),
+        "# Sui 影子结算计划\n\n待评审草案。\n",
+    )
+    .unwrap();
+    let manifest_path = root.join(".elon/document-sections.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+    manifest["governance_facets"]["docs/drafts/sui-shadow-settlement.md"] = serde_json::json!({
+        "retrieval":"excluded",
+        "lifecycle":"draft",
+        "authority":"proposal",
+        "document_type":"technical_design"
+    });
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+
+    let plan = plan_context(
+        &root,
+        "请读取 docs/drafts/sui-shadow-settlement.md 并实现下一阶段",
+        None,
+        1_000,
+        4,
+        2_000,
+    )
+    .unwrap();
+    let selected = plan["relevant_documents"].as_array().unwrap();
+    assert_eq!(
+        selected[0]["document"]["path"],
+        "docs/drafts/sui-shadow-settlement.md"
+    );
+    assert_eq!(selected[0]["document"]["default_retrieval"], false);
+    assert_eq!(selected[0]["reason"]["explicit_document_match"], true);
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn self_project_overview_is_bounded_and_fast_enough_for_interactive_use() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
