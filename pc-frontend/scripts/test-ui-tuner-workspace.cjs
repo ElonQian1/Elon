@@ -571,7 +571,7 @@ try {
     path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaStyleInspector.tsx'),
     'utf8',
   )
-  assert.match(pwaInspectorSource, /操作模式：像手机一样正常使用/)
+  assert.match(pwaInspectorSource, /操作模式：正常使用/)
   assert.match(pwaInspectorSource, /选择模式：下一次点击会选中组件/)
   assert.match(pwaInspectorSource, /设计模式：正在修改选中组件/)
   assert.match(pwaInspectorSource, /className=\{styles\.pwaDesignModeCard\}/)
@@ -586,7 +586,7 @@ try {
   assert.match(pwaInspectorSource, /设计师常用微调/)
   assert.match(pwaInspectorSource, /designer:primary/)
   assert.match(pwaInspectorSource, /designer:ghost/)
-  assert.match(pwaInspectorSource, /直接改 iframe 内真实 PWA DOM/)
+  assert.match(pwaInspectorSource, /直接改真实 PWA DOM/)
   assert.match(pwaInspectorSource, /PWA 草稿链路自检/)
   assert.match(pwaInspectorSource, /PWA 草稿链路已连接/)
   assert.match(pwaInspectorSource, /草稿命令/)
