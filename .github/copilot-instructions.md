@@ -2,8 +2,7 @@
 
 最后更新：2026-07-29
 
-> 本文件是各 AI 代理的共享权威规则，只保留每轮不变量；专项细节由 `AGENTS.md` 按需路由。
-> 开始任务时还要读取 `AGENTS.md`，只选择当前任务命中的专项文档。
+> 本文件只保留共享不变量；专项细节由 `AGENTS.md` 按需路由。
 
 ## 项目边界
 
@@ -30,7 +29,7 @@
 
 预检输出的 `NEXT=`、`EDIT_ROOT=`、`FINISH_COMMAND_*=`，以及收尾输出的 `FINALIZABLE=`，优先级高于文档示例。
 
-预检用 Git worktree lock 保护活跃 `codex/*` 任务；统一收尾负责 unlock 后定向清理。
+预检 lock 活跃 `codex/*` worktree；收尾负责 unlock 和定向清理。
 Windows 隔离 worktree 默认放在当前仓库盘符的 `\wt\<短ID>`；机器级覆盖使用绝对路径 `ELON_AI_WORKTREE_ROOT`。
 
 ### 平台会话 worktree 例外
@@ -59,7 +58,7 @@ Windows 隔离 worktree 默认放在当前仓库盘符的 `\wt\<短ID>`；机器
 | Android 可安装端用户可见改动 | 默认 `publish-apk.*` | `AndroidFeature`；只同步时 `CodePushed` |
 | Android + 移动 PWA 视觉同步 | `publish-app-ui-fast-lane.ps1` | `AndroidFeature` |
 
-APP UI：`APP_UI_RELEASE_POLICY=publish_before_optional_renderer`。默认不启动或占用物理设备，push 后先用源码契约、构建、PWA 或隔离模拟器验收并发布 Server/PWA 和 APK。只有用户反馈修改结果不正确，或明确要求真机复核时，才设置 `realDeviceRequired=true`；真机复核在同一 MCP 会话中只做一次 30 秒准备，失败记 `VERIFICATION_DEFERRED`，不重复配对、重建会话或阻塞已完成发布。用户明确要求发布前验收时除外；无真帧不得称视觉已验收。
+APP UI：`APP_UI_RELEASE_POLICY=publish_before_optional_renderer`。默认不用物理设备，push 后先验证并发布 Server/PWA 和 APK。仅当用户反馈修改不对或明确要求时设置 `realDeviceRequired=true`；同一 MCP 会话只准备一次、最多 30 秒，失败记 `VERIFICATION_DEFERRED`，不重建会话或阻塞已发布结果。用户要求发布前验收时除外；无真帧不得称视觉已验收。
 
 发布期间主线前进：未构建的旧 Android 候选让位；已验证 APK 若仍是主线祖先且线上无更新后代，可先发布。发布类型互不阻塞，失联由短租约回收。业务已入主线的结论不变，不循环 rebase 或重跑旧构建。
 
