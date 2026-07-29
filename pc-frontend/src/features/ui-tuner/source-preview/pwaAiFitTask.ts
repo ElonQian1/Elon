@@ -3,6 +3,7 @@ import { buildPwaDraftCliCompactHandoff, type PwaDesignDraft } from './pwaDesign
 export interface PwaDraftAiFitTask {
   version: 1
   kind: 'elon.pwa.ai_fit_task'
+  contractId: string
   generatedAt: string
   purpose: 'low-token-visual-fit-and-cross-platform-writeback'
   route: PwaDesignDraft['route']
