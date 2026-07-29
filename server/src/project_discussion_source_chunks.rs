@@ -105,8 +105,7 @@ fn load_source(workspace: &Path, path: &str) -> Result<LoadedSource> {
     if !path.starts_with(SOURCE_PREFIX) || !path.to_ascii_lowercase().ends_with(".md") {
         bail!("讨论来源分块只允许读取 docs/inbox/conversations 下的 Markdown");
     }
-    let document = read_project_document_file(workspace, &path)
-        .map_err(|error| anyhow::anyhow!(error.message))?;
+    let document = read_project_document_file(workspace, &path)?;
     let (metadata, body) = frontmatter_and_body(&document.content);
     let fallback = format!("{:x}", Sha256::digest(body.as_bytes()));
     let source_id = metadata_value(metadata, "source_id")
