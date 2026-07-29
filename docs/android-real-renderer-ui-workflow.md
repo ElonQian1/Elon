@@ -95,6 +95,8 @@ React 数字孪生不是“另写一个网页冒充 APK”。它消费统一 UI 
 
 普通视觉 UI 验收默认使用 `ui_verify_with_fallback`，但不探测或占用物理设备：共享页面优先走 PWA，Android 专项直接选择明确的空闲隔离模拟器槽。Logo、Launcher、OEM、权限、软键盘、摄像头、蓝牙、传感器、硬件和性能分类本身不再自动触发真机。
 
+任何可能启动 Renderer 的调用前，先且只先调用一次 `ui_get_runtime_status` 与 `ui_check_capabilities` 检查 `rendererResourceId` 和 lease。全部资源占用时立即返回 `VERIFICATION_DEFERRED=renderer_capacity_unavailable`、`RENDERER_PREPARATION_ATTEMPTS=0`，不调用 bootstrap/start/prepare，不进行五次超时重试；只有明确空闲资源才进入一次准备。
+
 只有用户反馈刚才修改结果不正确，或明确要求真机复核时，才设置 `realDeviceRequired=true`。真机复核从 Android 准备开始只有一次 30 秒预算，并必须在同一 MCP 会话内用 `resumeAndroid=true` 轮询；设备离线、被占用、锁屏/AOD/通知栏遮挡、授权或安装确认、Runtime 准备失败或超时后立即返回 `REQUIRED_FOLLOWUP`，不重建桥接会话、不重复配对和安装。后续构建、安装、启动、点击、取帧和 FitRun 必须始终携带返回的会话、设备身份和 Renderer 资源证据，不能再次按“第一个在线设备”猜测。报告至少包含：
 
 - `REAL_DEVICE_STATUS`：`READY`、`DEFERRED_USER_CONFIRMATION`、`REQUIRED_FOLLOWUP` 或 `NOT_REQUIRED`；

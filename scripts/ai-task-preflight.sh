@@ -103,6 +103,7 @@ write_ai_workflow_guard() {
   echo "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main."
   echo "RULE_BEFORE_EDIT=cd to EDIT_ROOT/WORKTREE_PATH and run git status --short --branch before editing."
   echo "RULE_OUTPUT=commands expected to exceed 200 lines must write full output to .ai-tmp and return only a bounded summary or failure excerpt."
+  echo "RULE_BEFORE_COMMIT=run scripts/check-source-size.ps1 before git commit; pre-push repeats the guard as a fallback."
   echo "RULE_PUSH=after commit run git push origin HEAD:main; only a non-fast-forward rejection triggers fetch and rebase."
   [[ -z "$contract_id" ]] || echo "FINISH_CONTRACT_SCHEMA=elon.ai_finish_contract.v1"
   [[ -z "$contract_id" ]] || echo "FINISH_CONTRACT_ID=$contract_id"
