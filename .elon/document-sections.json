@@ -272,6 +272,9 @@
     "docs/pc-frontend-migration.md": [
       "custom:project-system"
     ],
+    "docs/drafts/open-commerce-network-sui-agent-economy.md": [
+      "custom:open-commerce-network"
+    ],
     "docs/project-document-governance-mcp.md": [
       "custom:ai-context",
       "custom:project-system"

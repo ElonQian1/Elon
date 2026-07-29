@@ -54,7 +54,7 @@ source: docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md
 
 网络规模与经济模型成立后，再决定是否成立独立基金会、如何治理协议与认证，以及是否引入去中心化存证、边缘推理和闲置算力市场。
 
-Sui 作为阶段四候选所有权与结算层的设计边界、对象模型、任务闭环、资产分层和验证门槛，见 `docs/drafts/open-commerce-network-sui-agent-economy.md`。
+Sui 作为阶段四候选所有权与结算层的设计边界、现有能力基线、项目对象模型、任务闭环、合同收入融资、资产分层和 AI 实施门槛，见 `docs/drafts/open-commerce-network-sui-agent-economy.md`。该草案同时说明一龙现有 APK/PC、项目空间、群体 AI、远程节点和开放商业 V1 如何在不改变当前生产真源的前提下逐步接入链上经济层。
 
 这些长期方向必须单独验证可靠性、安全、成本和收益，不能成为前三阶段的交付前提。
 
