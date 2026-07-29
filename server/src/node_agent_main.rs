@@ -231,6 +231,7 @@ mod project_discussion_graph_validation;
 mod project_discussion_source_chunks;
 mod project_discussion_source_import;
 mod project_discussion_source_normalizer;
+mod project_discussion_source_registration;
 mod project_docs_scan;
 mod project_document_analysis_model;
 mod project_document_architecture;
