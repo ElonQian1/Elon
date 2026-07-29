@@ -624,6 +624,20 @@ try {
   assert.match(sourcePreviewCss, /\.sourceInspector \.colorField\{display:grid;grid-template-columns:56px minmax\(180px,1fr\)/)
   assert.match(sourcePreviewCss, /\.pwaColorField\{display:grid;grid-template-columns:56px minmax\(180px,1fr\)/)
   assert.match(sourcePreviewCss, /\.pwaOpacityField\{grid-template-columns:58px minmax\(0,1fr\) 72px/)
+  assert.match(sourcePreviewCss, /\.pwaEdgeGrid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\);gap:8px\}/)
+  assert.match(sourcePreviewCss, /\.pwaQuickAdjust\{grid-template-columns:28px minmax\(0,1fr\) 28px;gap:5px\}/)
+  assert.match(sourcePreviewCss, /\.pwaStyleField input\{height:34px;padding:0 9px;font-size:12px\}/)
+  const pwaColorStyleFieldSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaColorStyleField.tsx'),
+    'utf8',
+  )
+  const pwaColorStyleFieldControlSource = fs.readFileSync(
+    path.join(projectRoot, 'src/features/ui-tuner/source-preview/PwaColorStyleFieldControl.tsx'),
+    'utf8',
+  )
+  assert.match(pwaColorStyleFieldSource, /PwaColorStyleFieldControl/)
+  assert.match(pwaColorStyleFieldControlSource, /打开\$\{label\}颜色选择器/)
+  assert.match(pwaColorStyleFieldControlSource, /placeholder="#222255 \/ rgba\(34,34,85,\.9\)"/)
   assert.match(sourcePreviewCss, /\.pwaQuickAdjust:has\(>input:only-child\)/)
   assert.match(sourcePreviewCss, /\.fieldGrid:has\(\.colorField\)/)
   assert.match(sourcePreviewCss, /\.pwaDeviceToolbar/)
