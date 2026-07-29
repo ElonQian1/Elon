@@ -1284,15 +1284,15 @@
             android:background="@android:color/transparent"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:paddingStart="20dp"
             android:paddingTop="8dp"
-            android:paddingEnd="20dp"
             android:paddingBottom="@dimen/main_bottom_menu_edge_gap"
             android:visibility="gone">
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:id="@+id/bottomNavContent"
+                android:layout_width="@dimen/main_bottom_menu_content_width"
                 android:layout_height="match_parent"
+                android:layout_gravity="center_horizontal"
                 android:clipChildren="false"
                 android:clipToPadding="false"
                 android:gravity="center_vertical"

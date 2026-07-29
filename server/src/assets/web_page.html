@@ -3563,7 +3563,7 @@
       right: auto;
       bottom: 0;
       width: 100%;
-      max-width: 720px;
+      max-width: 360px;
       transform: translateX(-50%);
       z-index: 20;
       background: transparent;
@@ -3572,7 +3572,7 @@
       align-items: flex-start;
       gap: 12px;
       min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
-      padding: 8px 20px max(8px, env(safe-area-inset-bottom));
+      padding: 8px max(0px, calc(50% - 160px)) max(8px, env(safe-area-inset-bottom));
     }
     .tabs-panel {
       min-width: 0;
@@ -3660,7 +3660,7 @@
     .bottom-compose-button[aria-expanded="true"]::after { transform: translate(-50%, -50%) rotate(135deg); }
     .home-action-menu {
       position: fixed;
-      right: max(20px, calc((100vw - 720px) / 2 + 20px));
+      right: max(0px, calc(50vw - 160px));
       bottom: calc(76px + env(safe-area-inset-bottom));
       z-index: 96;
       width: 176px;
