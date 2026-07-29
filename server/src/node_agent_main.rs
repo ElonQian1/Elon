@@ -222,6 +222,7 @@ mod pc_storage_repo;
 mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;
 mod project_default_docs;
+mod project_discussion_document_projection;
 mod project_discussion_graph;
 mod project_discussion_graph_history;
 mod project_discussion_graph_model;

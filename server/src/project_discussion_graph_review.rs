@@ -148,6 +148,25 @@ fn review_sources(
                 false,
             );
         }
+        if source.chunk_count > 0 && source.compilation_status != "complete" {
+            issue(
+                issues,
+                &format!("source-incomplete:{}", source.id),
+                "source.compilation_incomplete",
+                "warning",
+                "聊天来源尚未完整编译",
+                &format!(
+                    "来源“{}”已处理 {}/{} 个 chunk，当前状态为 {}。",
+                    source.title,
+                    source.processed_chunk_ids.len(),
+                    source.chunk_count,
+                    source.compilation_status
+                ),
+                &[],
+                "从 source manifest 的下一个未处理 chunk 继续，不要重新读取已经记录的 chunk。",
+                false,
+            );
+        }
     }
 }
 

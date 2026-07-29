@@ -152,6 +152,10 @@ pub(crate) fn validate_promotions(
     proposal: &DiscussionGraphProposal,
 ) -> Result<()> {
     for promotion in &proposal.promotions {
+        crate::project_discussion_document_projection::validate_promotion_readiness(
+            &proposal.graph,
+            promotion,
+        )?;
         if let Ok(existing) = read_project_document_file(workspace, &promotion.path) {
             if content_revision(&promotion.content) != existing.revision {
                 bail!("晋升目标已存在且内容不同，禁止覆盖：{}", promotion.path);

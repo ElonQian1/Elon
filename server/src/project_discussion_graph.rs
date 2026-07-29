@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 use std::{collections::HashMap, path::Path};
 
 use crate::{
+    project_discussion_document_projection::{link_promotions_to_graph, render_promotion},
     project_discussion_graph_model::{
         DiscussionGraph, DiscussionGraphEvolution, DiscussionGraphProposal, DiscussionPromotion,
         Versioned, DISCUSSION_GRAPH_PATH, DISCUSSION_SUGGESTIONS_PATH,
@@ -113,6 +114,7 @@ pub(crate) fn apply_proposal(
     validate_promotions(workspace, &proposal)?;
     let previous_revision = current.revision.clone().unwrap_or_default();
     let mut merged = merge_graph(current.value, proposal.graph.clone())?;
+    link_promotions_to_graph(&mut merged, &proposal.promotions);
     merged.evolution = DiscussionGraphEvolution {
         kind: proposal.change_kind.clone(),
         summary: proposal.summary.clone(),
@@ -127,7 +129,7 @@ pub(crate) fn apply_proposal(
     } else {
         Some(commit_document_baseline(workspace)?)
     };
-    let promoted = write_promotions(workspace, &proposal.promotions)?;
+    let promoted = write_promotions(workspace, &proposal.promotions, &merged)?;
     let assigned_promotions =
         write_promotion_section_assignments(workspace, &proposal.promotions, &merged)?;
     let graph_saved = write_project_document_file(
@@ -171,11 +173,16 @@ pub(crate) fn apply_proposal(
     }))
 }
 
-fn write_promotions(workspace: &Path, promotions: &[DiscussionPromotion]) -> Result<Vec<String>> {
+fn write_promotions(
+    workspace: &Path,
+    promotions: &[DiscussionPromotion],
+    graph: &DiscussionGraph,
+) -> Result<Vec<String>> {
     let mut paths = Vec::new();
     for promotion in promotions {
         if read_project_document_file(workspace, &promotion.path).is_err() {
-            write_project_document_file(workspace, &promotion.path, &promotion.content, None)
+            let content = render_promotion(graph, promotion)?;
+            write_project_document_file(workspace, &promotion.path, &content, None)
                 .map_err(|error| anyhow!(error.message))?;
         }
         paths.push(promotion.path.clone());
