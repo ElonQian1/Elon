@@ -78,7 +78,7 @@ impl Store {
         Ok(())
     }
 
-    /// 查询最近的会话消息（限 1-30 条，按时间正序返回）。
+    /// 查询最近的会话消息（限 1-100 条，按时间正序返回）。
     pub fn list_recent_conversation_messages(
         &self,
         project_id: &str,
@@ -86,7 +86,7 @@ impl Store {
         limit: usize,
     ) -> Result<Vec<ConversationMessage>> {
         let conversation_id = safe_external_id(conversation_id.unwrap_or("default"), "default");
-        let limit = limit.clamp(1, 30) as i64;
+        let limit = limit.clamp(1, 100) as i64;
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT role, content

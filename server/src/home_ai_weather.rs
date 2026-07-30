@@ -260,7 +260,8 @@ fn extract_standalone_location(message: &str) -> Option<String> {
             "明白了",
         ]
         .iter()
-        .any(|value| compact == *value)
+        .any(|value| compact.contains(value))
+        || compact.ends_with(['呢', '吗'])
     {
         return None;
     }
@@ -692,6 +693,21 @@ mod tests {
     fn does_not_treat_relative_day_as_a_city() {
         let recent = history(&[("assistant", WEATHER_LOCATION_PROMPT)]);
         assert!(!is_weather_location_follow_up("明天呢", &recent));
+        assert_eq!(extract_standalone_location("明天呢"), None);
+        assert_eq!(extract_standalone_location("现在是什么情况"), None);
+    }
+
+    #[test]
+    fn ignores_stale_relative_day_when_restoring_location() {
+        let recent = history(&[
+            ("user", "广州"),
+            ("assistant", WEATHER_LOCATION_PROMPT),
+            ("user", "明天呢"),
+        ]);
+        assert_eq!(
+            resolve_location("现在是什么情况", &recent).as_deref(),
+            Some("广州")
+        );
     }
 
     #[test]
