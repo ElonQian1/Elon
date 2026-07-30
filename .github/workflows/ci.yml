@@ -34,6 +34,10 @@ jobs:
         shell: pwsh
         run: scripts\check-source-size.ps1
 
+      - name: Document Modularity Guard
+        shell: pwsh
+        run: scripts\check-document-modularity.ps1
+
       - name: Release Runbook Guard
         shell: pwsh
         run: scripts\check-release-runbook.ps1

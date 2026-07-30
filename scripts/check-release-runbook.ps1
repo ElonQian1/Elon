@@ -107,6 +107,7 @@ $requiredScriptRefs = @(
     "scripts\check-local-quality.ps1",
     "scripts\check-pc-frontend-bundle-budget.js",
     "scripts\check-source-size.ps1",
+    "scripts\check-document-modularity.ps1",
     "scripts\check-dependency-audit.ps1",
     "scripts\check-rust-warning-budget.ps1",
     "scripts\check-release-runbook.ps1",

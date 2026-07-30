@@ -57,6 +57,8 @@ $requiredEntries = @(
     "RUST_TEST_THREADS: 1",
     "Source Size Guard",
     "scripts\check-source-size.ps1",
+    "Document Modularity Guard",
+    "scripts\check-document-modularity.ps1",
     "Release Runbook Guard",
     "scripts\check-release-runbook.ps1",
     "CI Quality Gates Guard",

@@ -38,6 +38,15 @@ applyTo: "**/*.md"
 - 任何迁移必须保留 Git 历史；不能确认时留在 `unclassified`，等待用户批准。
 - 报告实际读取的文档数、估算 token，以及未读取或默认排除的范围。
 
+## 讨论编译与文档模块化门禁
+
+- 讨论原稿与正式文档必须分层：聊天、会议记录和长上下文写入 `inbox/`、`drafts/`、`reports/` 或其它明确的低权威来源目录；正式文档只保存已接受结论，不复制完整讨论过程。
+- 一个正式文档只承担一个稳定职责。跨越产品背景、当前能力、架构、协议、经济模型、路线图和决策记录时，保留短 `README.md`/索引，并按职责拆成同目录子文档。
+- 默认红区与 `project_docs_review_modularity` 一致：超过 800 行、50,000 UTF-8 字节或 40 个 Markdown 标题中的任意一项，即视为需要拆分。达到 75% 时应提前拆分，不等到门禁失败。
+- `scripts/check-document-modularity.ps1` 执行增量检查：新的正式红区文档、正式文档跨入红区、已有正式红区文档继续增长都会失败；来源材料只告警并要求把已接受结论编译到正式模块。
+- `.githooks/pre-commit` 对暂存 Markdown 执行门禁，`.githooks/pre-push` 和 CI 再次复核相对 `origin/main` 的完整改动。失败后先调用 `project_docs_review_modularity` 获取职责候选，再拆分正文、更新索引和检索验收。
+- 程序不得按标题机械切割并自动提交。标题边界不一定等于职责边界；拆分必须保持链接、权威状态、来源引用、知识图节点及 Git 历史可追溯。
+
 ## 分区和 AI 建议的可移植约定
 
 - `.elon/document-sections.json` 是所有 AI 供应商共享的知识架构清单；它包含项目类型 `profile`、知识首页 `home`、最多四层的主题 `sections`、主主题 `assignments`、多副主题 `secondary_assignments`、四维治理 `governance_facets`、兼容快捷视图 `governance_overrides`、有类型语义关系/共享顺序/固定状态 `document_metadata`、功能/技术节点与实现证据引用 `knowledge_graph` 和最近 100 条结构操作 `audit_log`，不改变文件实际路径，也不复制 Markdown 正文。

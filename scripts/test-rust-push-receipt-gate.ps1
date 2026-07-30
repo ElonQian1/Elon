@@ -58,6 +58,7 @@ exit /b 0
     Set-Content -LiteralPath (Join-Path $hookRoot 'server\Cargo.toml') -Encoding ASCII -Value '[package]'
     [IO.File]::WriteAllText((Join-Path $hookScripts 'format-rust.sh'), "#!/usr/bin/env bash`nexit 0`n")
     Set-Content -LiteralPath (Join-Path $hookScripts 'check-source-size.ps1') -Encoding UTF8 -Value 'exit 0'
+    Set-Content -LiteralPath (Join-Path $hookScripts 'check-document-modularity.ps1') -Encoding UTF8 -Value 'exit 0'
     Set-Content -LiteralPath (Join-Path $hookScripts 'prepare-push.ps1') -Encoding UTF8 -Value @'
 Write-Host 'TEST_PREPARE_PUSH_CALLED'
 exit 0

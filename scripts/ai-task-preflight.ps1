@@ -156,7 +156,7 @@ function Write-AiWorkflowGuard {
     Write-Host "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main."
     Write-Host "RULE_BEFORE_EDIT=cd to EDIT_ROOT/WORKTREE_PATH and run git status --short --branch before editing."
     Write-Host "RULE_OUTPUT=commands expected to exceed 200 lines must use scripts\invoke-ai-logged-command.ps1; never stream full successful build/test/publish logs into AI context."
-    Write-Host "RULE_BEFORE_COMMIT=run scripts\check-source-size.ps1 before git commit; pre-push repeats the guard as a fallback."
+    Write-Host "RULE_BEFORE_COMMIT=run scripts\check-source-size.ps1 and scripts\check-document-modularity.ps1 before git commit; pre-commit/pre-push repeat the document guard."
     Write-Host "RULE_PUSH=after commit run powershell -NoProfile -ExecutionPolicy Bypass -File scripts\direct-network.ps1 push origin HEAD:main; only a non-fast-forward rejection triggers fetch and rebase."
     $contractId = ''
     if ($State -ne 'blocked_needs_worktree' -and (Test-Path -LiteralPath $EditRoot)) {

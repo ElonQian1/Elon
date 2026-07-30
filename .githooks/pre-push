@@ -28,6 +28,7 @@ git diff --check
 git diff --cached --check
 bash scripts/format-rust.sh
 "$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/check-source-size.ps1
+"$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/check-document-modularity.ps1
 
 # Rust receipt validation is opt-in because it can run cargo check. Keep the
 # existing fail-closed gate available for callers that explicitly request it.

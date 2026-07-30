@@ -66,6 +66,7 @@ SMOKE=<health/version/download result>
 - `scripts\check-pc-frontend-bundle-budget.js`：Vite 产物分级预算门禁；轻微原始体积增长告警，明显膨胀或 Gzip 超限阻断。
 - `scripts\test-pc-frontend-bundle-budget.js`：预算门禁夹具测试，覆盖正常、软告警、原始体积硬失败和 Gzip 硬失败。
 - `scripts\check-source-size.ps1`：源码体积门禁，阻止巨型文件继续扩张。
+- `scripts\check-document-modularity.ps1`：正式 Markdown 增量门禁；允许保留讨论原稿，但阻止新增巨型正式文档、跨入红区或在红区继续增长。
 - `scripts\check-dependency-audit.ps1`：Rust/npm dependency audit 汇总门禁。
 - `scripts\check-rust-warning-budget.ps1`：Rust warning budget 门禁，当前预算为 0。
 - `scripts\check-release-runbook.ps1`：静态校验本 runbook 的脚本引用和 `check-task-complete.ps1 -Kind` 枚举没有漂移。
