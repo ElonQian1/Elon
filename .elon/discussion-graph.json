@@ -71,9 +71,80 @@
         "section-10"
       ],
       "compilation_status": "complete"
+    },
+    {
+      "id": "conversation-demo-oracle-rejection-20260730",
+      "title": "跨设备文档测试与预言家 AI 议案状态修正",
+      "kind": "conversation",
+      "reference": "docs/inbox/conversations/2026-07-30-demo-oracle-rejection.md",
+      "imported_at": "2026-07-30T17:15:00+08:00",
+      "content_revision": "ac59a9657f4e4166d60525ebbc7b68046eb74687e769dbd1b4d501531c1351d7",
+      "source_format": "structured_markdown",
+      "message_count": 0,
+      "chunk_count": 3,
+      "processed_chunk_ids": [
+        "section-1",
+        "section-2",
+        "section-3"
+      ],
+      "compilation_status": "complete"
     }
   ],
   "nodes": [
+    {
+      "id": "product-direction-decisions",
+      "root_id": "product-direction-decisions",
+      "parent_id": "",
+      "kind": "topic",
+      "title": "产品方向决策",
+      "summary": "记录已经由用户明确接受或否决的产品角色和主链路决定，防止旧讨论在跨设备或跨代理读取时重新成为当前需求。",
+      "status": "accepted",
+      "authority": "accepted",
+      "section_id": "ai-context",
+      "order": 100,
+      "color": "#6F8FD8",
+      "source_refs": [
+        "conversation-demo-oracle-rejection-20260730#section-2"
+      ],
+      "conversation_refs": [
+        "codex-thread-current://2026-07-30-demo-oracle-rejection"
+      ],
+      "document_paths": [
+        "docs/decisions/reject-demo-oracle-role.md"
+      ],
+      "feature_node_ids": [],
+      "tags": [
+        "product-decision"
+      ]
+    },
+    {
+      "id": "demo-oracle-role",
+      "root_id": "product-direction-decisions",
+      "parent_id": "product-direction-decisions",
+      "kind": "decision",
+      "title": "独立预言家 AI（Demo Oracle）功能议案",
+      "summary": "该议案已经否决。项目不设置独立预言家角色、专用 DemoPreview 路由或固定预演阶段；用户明确要求的原型仅作为普通开发任务产物。",
+      "status": "rejected",
+      "authority": "accepted",
+      "section_id": "ai-context",
+      "order": 110,
+      "color": "#D06E75",
+      "source_refs": [
+        "conversation-demo-oracle-rejection-20260730#section-2"
+      ],
+      "conversation_refs": [
+        "codex-thread-current://2026-07-30-demo-oracle-rejection"
+      ],
+      "document_paths": [
+        "docs/decisions/reject-demo-oracle-role.md"
+      ],
+      "feature_node_ids": [],
+      "tags": [
+        "rejected",
+        "demo-oracle",
+        "prototype"
+      ]
+    },
     {
       "id": "go-to-market",
       "root_id": "open-commerce-network",
@@ -2214,6 +2285,13 @@
   ],
   "edges": [
     {
+      "id": "product-decisions-decomposes-demo-oracle",
+      "source": "product-direction-decisions",
+      "target": "demo-oracle-role",
+      "relation": "decomposes_to",
+      "label": "已否决"
+    },
+    {
       "id": "phase3-leads-phase4",
       "source": "phase-3-open-network",
       "target": "phase-4-federated-infrastructure",
@@ -2670,10 +2748,10 @@
     }
   ],
   "evolution": {
-    "kind": "refine",
-    "summary": "登记完整的开放商业讨论来源及后续摘要，并把能力基线、融合架构和决策登记连接到既有主题；不改变 Sui 提案的阶段四边界。",
+    "kind": "decision",
+    "summary": "根据跨设备文档测试和用户明确决定，把独立预言家 AI 议案登记为 rejected，并关联权威否决文档，防止旧讨论重新成为当前需求。",
     "actor": "Codex Desktop",
-    "changed_at": "2026-07-30T04:24:54.1794828+08:00",
-    "previous_revision": "ffd6d3daf575fd5fe826a7d4b3aba62063881d3451b79543ceb011467c718e16"
+    "changed_at": "2026-07-30T17:15:00+08:00",
+    "previous_revision": "e69c3292109cc7bfd2168e4023838f042ef3c6147d0f959de58f095e004bd12b"
   }
 }

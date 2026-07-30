@@ -30,6 +30,8 @@
 | embedding provider | `server/src/context_compiler/symbol_index_embedding_provider.rs` |
 | SQLite 符号库 schema | `server/src/context_compiler/symbol_index_store.rs`、`symbol_index_embeddings.rs` |
 | fb2 AI Center / 子项目聊天语音和业务上下文 | `docs/fb2-ai-center/`、`server/src/external_app_*`、`android/chat-voice-kit/` |
+| 已否决的独立预言家 AI / Demo Oracle 议案 | `docs/decisions/reject-demo-oracle-role.md`（查询相关旧概念时必须先读） |
+
 ## Android 核心入口
 
 | 领域 | 入口 |

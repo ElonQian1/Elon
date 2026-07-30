@@ -6,6 +6,8 @@
 
 elon 是一个云端应用开发平台。用户在手机 APK 或 PC 工作台里用自然语言描述需求，后端把任务交给 AI CLI/Codex/Copilot 等代理，在真实 Git 工作区修改代码、验证、构建、发布，再把 APK、项目或其他产物回传给用户。
 
+项目不设置独立的“预言家 AI（Demo Oracle）”或固定 `DemoPreview` 前置阶段。用户明确要求原型时，可把原型作为普通开发任务的阶段性产物；不得把已否决的独立预言家议案恢复为当前产品能力。权威决定见 `docs/decisions/reject-demo-oracle-role.md`。
+
 本仓库同时包含：
 
 - `server/`：Rust 后端、项目管理、AI CLI 调度、发布接口、context compiler、RAG/符号索引能力。

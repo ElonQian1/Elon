@@ -125,6 +125,16 @@
       "entrypoint": "docs/user-project-system.md"
     },
     {
+      "id": "product-direction-decisions",
+      "label": "产品方向决策与已否决议案",
+      "detail": "记录已接受或已否决的产品角色和路线，包括预言家 AI、Demo Oracle 与 DemoPreview 的否决状态",
+      "color": "#D06E75",
+      "parent_id": "ai-context",
+      "order": 90,
+      "icon": "circle-slash",
+      "entrypoint": "docs/decisions/reject-demo-oracle-role.md"
+    },
+    {
       "id": "open-commerce-network",
       "label": "开放商业网络",
       "detail": "共市构想、数据权利、商户 AI、商业模式与演进路线",
@@ -199,6 +209,7 @@
     "docs/cli会话问题/单纯Codex cli上下文会话.md": "custom:external-tools",
     "docs/cli会话问题/纯Codex cli图片会话.md": "custom:external-tools",
     "docs/codex-vault-sharing-runbook.md": "custom:security",
+    "docs/decisions/reject-demo-oracle-role.md": "custom:product-direction-decisions",
     "docs/decisions/open-commerce-network-principles.md": "custom:open-commerce-network",
     "docs/decisions/open-commerce-network-v1-architecture.md": "custom:open-commerce-network",
     "docs/discussion-knowledge-compiler.md": "custom:pc-workbench",
@@ -224,6 +235,7 @@
     "docs/group-chat-summary-system.md": "custom:ai-context",
     "docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md": "custom:open-commerce-network",
     "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md": "custom:open-commerce-network",
+    "docs/inbox/conversations/2026-07-30-demo-oracle-rejection.md": "custom:ai-context",
     "docs/intent-routing.md": "custom:backend-api",
     "docs/node-agent-upgrade-compatibility.md": "custom:windows-node",
     "docs/open-commerce/README.md": "custom:open-commerce-network",
@@ -304,6 +316,7 @@
     "docs/codex-mcp-native-git-push-20260701-171812.md": "evidence",
     "docs/codex-vault-sharing-runbook.md": "on-demand",
     "docs/codex-vault-usage-estimation.md": "on-demand",
+    "docs/decisions/reject-demo-oracle-role.md": "on-demand",
     "docs/discussion-knowledge-compiler.md": "on-demand",
     "docs/fb2-ai-center/PLAN.md": "drafts",
     "docs/fb2-ai-center/PROGRESS.md": "evidence",
@@ -412,6 +425,12 @@
       "authority": "authoritative",
       "document_type": "architecture_decision"
     },
+    "docs/decisions/reject-demo-oracle-role.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "decision"
+    },
     "docs/discussion-knowledge-compiler.md": {
       "retrieval": "on_demand",
       "lifecycle": "active",
@@ -467,6 +486,12 @@
       "document_type": "runbook"
     },
     "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md": {
+      "retrieval": "excluded",
+      "lifecycle": "source_material",
+      "authority": "non_authoritative",
+      "document_type": "discussion"
+    },
+    "docs/inbox/conversations/2026-07-30-demo-oracle-rejection.md": {
       "retrieval": "excluded",
       "lifecycle": "source_material",
       "authority": "non_authoritative",
@@ -552,6 +577,33 @@
     }
   },
   "document_metadata": {
+    "docs/decisions/reject-demo-oracle-role.md": {
+      "doc_type": "decision",
+      "audience": [
+        "AI 代理",
+        "产品负责人"
+      ],
+      "owner": "产品方向",
+      "reviewed_at": "2026-07-30",
+      "review_interval_days": 180,
+      "implementation_refs": [],
+      "related": [
+        "AI_PROJECT.md"
+      ]
+    },
+    "docs/inbox/conversations/2026-07-30-demo-oracle-rejection.md": {
+      "doc_type": "discussion",
+      "audience": [
+        "AI 代理"
+      ],
+      "owner": "产品方向",
+      "reviewed_at": "2026-07-30",
+      "review_interval_days": 0,
+      "implementation_refs": [],
+      "related": [
+        "docs/decisions/reject-demo-oracle-role.md"
+      ]
+    },
     "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md": {
       "doc_type": "discussion",
       "audience": [
