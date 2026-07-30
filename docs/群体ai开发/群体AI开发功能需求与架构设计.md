@@ -72,7 +72,6 @@ MVP 可以限制在“同一个项目内的成员和他们授权的节点”，�
 | Context | Project Context Pack | 项目文档、repo map、符号索引、历史决策和任务相关文件 |
 | Taste | Project / User Preference | 项目成员验收、打回理由、风格偏好、架构偏好 |
 | Skill | AI-to-AI Skill Package | 面向总调度 AI 和 Worker Bot 的机器可读能力包，声明适用意图、输入输出、权限、成本、测试和兼容性 |
-| Demo Oracle | 预言家 AI / Demo Oracle | 在正式 Matter 和 Skill 执行前，用低成本把模糊需求生成可讨论 demo、草图和用户流程 |
 | Skill Router | Skill Router | 根据需求、项目上下文、成功率、成本、风险和兼容性选择 Skill 组合 |
 | Orchestration | Group AI Coordinator | 负责任务拆解、派发、审核、合并、验收汇报 |
 
@@ -222,35 +221,7 @@ ELON_NODE_WORKSPACE_ROOT/
 
 MVP 可以先写入项目作用域 `user_memories` 或项目文档；后续再独立做 `project_ai_preferences` 和 `project_ai_skills`。项目内沉淀的 Skill 默认只属于该项目；只有平台团队明确接管并完成脱敏、测试和权限审计后，才允许升级为内部官方 Skill。Skill 不公开上架，也不进入交易市场。
 
-### R9. 预言家 AI 与 demo 预演
-
-当用户需求仍处于讨论阶段、存在多个方向、正式开发成本较高或用户明确要求先看效果时，总调度 AI 应先调用预言家 AI，而不是直接创建重型开发任务。
-
-预言家 AI 的输入：
-
-- 总调度 AI 整理后的产品目标、目标用户、核心场景和不确定点。
-- 当前项目已有页面、设计规范和可复用组件摘要。
-- 可用官方 Skill 的能力摘要，仅用于提出后续建议，不直接执行正式 Skill。
-- 本轮 demo 的预算、时间、允许产物类型和禁止事项。
-
-预言家 AI 的输出：
-
-- 一句话产品定位和核心用户流程。
-- 3 至 5 个关键页面或状态。
-- 静态 HTML/前端 mock、截图式草图、流程图或可点击轻原型之一。
-- 假数据和未实现能力的明确标记。
-- 需要用户确认的问题。
-- 建议的 Skill 候选、选择理由和预计成本区间。
-
-硬边界：
-
-1. demo 写入独立临时目录或 artifact，不进入项目正式分支。
-2. 默认不连接真实数据库、支付、生产密钥和外部用户数据。
-3. demo 通过不等于正式功能完成，用户确认后必须重新生成 Matter 和验收标准。
-4. 小范围、目标明确的修改可以跳过预言家 AI，避免增加等待和 token 成本。
-5. 预言家 AI 只提供可讨论证据，最终产品方向仍由用户决定。
-
-### R10. AI-to-AI Skill 路由
+### R9. AI-to-AI Skill 路由
 
 Skill 由机器可读 manifest 和执行说明组成，至少声明：
 
@@ -272,7 +243,6 @@ APK / PC 项目频道
   -> Rust API Server
   -> Group AI Coordinator
        -> Product Discussion / Requirement Maturity
-       -> Demo Oracle（按需）
        -> Matter Planner
        -> Skill Registry / Skill Router
        -> Member / Permission Resolver
@@ -445,15 +415,13 @@ POST /api/project-worktrees/dispose
 - 明确群体 AI 开发只进入项目空间，不进入普通聊天。
 - 明确 Matter、Bot、协作模式、验收卡的产品语言。
 - 明确 PC 节点执行和 worktree 隔离是硬规则。
-- 明确一龙会话主 AI 是长期对话 owner；预言家 AI 和 Skill Agent 都是受限旁路角色。
+- 明确一龙会话主 AI 是长期对话 owner；Skill Agent 是受限执行角色。
 
-### 阶段 0.5：预言家 AI 与官方 Skill 试验
+### 阶段 0.5：官方 Skill 试验
 
-- 定义 demo artifact 契约、临时存储位置、预算和安全边界。
-- 先支持静态 HTML 或现有前端组件组成的可点击 demo，不做真实后端。
-- 建立 3 至 5 个官方 Skill manifest，覆盖页面原型、项目初始化、UI 实现、测试和发布检查。
-- 让总调度 AI 输出需求成熟度，并决定跳过 demo、生成 demo 或继续讨论。
-- demo 经用户确认后再创建 Matter；记录确认、打回和放弃原因。
+- 定义 Skill manifest、Matter 关联字段、预算、权限和安全边界。
+- 建立 3 至 5 个官方 Skill manifest，覆盖项目初始化、UI 实现、后端/API、测试和发布检查。
+- 让总调度 AI 根据已确认的目标和验收标准生成 Matter，再选择 Skill 组合。
 - Skill Router 只使用平台维护的内部官方 Skill；不开放第三方提交、上架或交易。
 
 ### 阶段 1：单项目、多成员授权节点、多 Bot

@@ -30,7 +30,7 @@
 | embedding provider | `server/src/context_compiler/symbol_index_embedding_provider.rs` |
 | SQLite 符号库 schema | `server/src/context_compiler/symbol_index_store.rs`、`symbol_index_embeddings.rs` |
 | fb2 AI Center / 子项目聊天语音和业务上下文 | `docs/fb2-ai-center/`、`server/src/external_app_*`、`android/chat-voice-kit/` |
-| AI-to-AI Skill、预言家 AI、demo 预演路线 | `docs/ai-to-ai-skill-oracle-roadmap.md`、`docs/群体ai开发/群体AI开发功能需求与架构设计.md` |
+| AI-to-AI Skill 与 Matter 执行路线 | `docs/ai-to-ai-skill-roadmap.md`、`docs/群体ai开发/群体AI开发功能需求与架构设计.md` |
 
 ## Android 核心入口
 
