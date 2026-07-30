@@ -765,14 +765,14 @@ try {
         id: 'echo-2',
         kind: 'ai_progress',
         task_id: 'tsk-final-echo',
-        content: '我看完项目规则后，建议优先做需求成熟度判断。你的项目定位很清楚：让用户通过持续讨论把模糊想法变成 APK。把项目 APK 图标做成硬链路。',
+        content: '我看完项目规则后，正在核对 APK 图标交付链路。项目 APK 图标需要纳入正式交付链路，并在构建、安装和验收阶段保持一致，同时保留清晰的版本记录和用户可见验收结果。',
       },
     ],
     {
       id: 'final-echo',
       kind: 'ai_result',
       task_id: 'tsk-final-echo',
-      content: '你的项目定位很清楚：让用户通过持续讨论把模糊想法变成 APK。把项目 APK 图标做成硬链路。',
+      content: '项目 APK 图标需要纳入正式交付链路，并在构建、安装和验收阶段保持一致，同时保留清晰的版本记录和用户可见验收结果。',
     },
   );
   assert.deepStrictEqual(
