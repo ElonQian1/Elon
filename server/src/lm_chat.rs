@@ -183,12 +183,12 @@ pub async fn lm_chat_handler(
         append_system_prompt_note(&mut messages, memory_note.trim());
     }
 
-    // ── 3. 注入近期会话历史（短期记忆，最近 6 条）────────────────────────────
+    // ── 3. 注入近期会话历史（短期记忆，最近 20 条）───────────────────────────
     // 只在最后一条用户消息前面插入历史，让 LLM 有上下文。
     // 意图分析 / 脚本生成的调用通常只有一条 user 消息，历史注入对它们无害。
     let history = state
         .store
-        .list_recent_conversation_messages(&route.project_id, Some(&conversation_id), 6)
+        .list_recent_conversation_messages(&route.project_id, Some(&conversation_id), 20)
         .unwrap_or_default();
     if !history.is_empty() {
         // 找到第一条 user/assistant 消息的插入位置（system prompt 之后）
@@ -217,8 +217,9 @@ pub async fn lm_chat_handler(
     } else {
         None
     };
+    let weather_day_offset = home_ai_weather::day_offset(&user_msg);
     let weather_lookup = if let Some(location) = weather_location.as_deref() {
-        Some(home_ai_weather::lookup(&state, location).await)
+        Some(home_ai_weather::lookup(&state, location, weather_day_offset).await)
     } else {
         None
     };
@@ -654,7 +655,7 @@ async fn run_lm_chat_stream(
     {
         state
             .store
-            .list_recent_conversation_messages(&route.project_id, Some(&conversation_id), 6)
+            .list_recent_conversation_messages(&route.project_id, Some(&conversation_id), 20)
             .unwrap_or_default()
     } else {
         Vec::new()
@@ -666,6 +667,7 @@ async fn run_lm_chat_stream(
     } else {
         None
     };
+    let weather_day_offset = home_ai_weather::day_offset(&user_msg);
     if weather_requested {
         let Some(location) = weather_location.as_deref() else {
             let reply = home_ai_weather::missing_location_reply();
@@ -721,7 +723,7 @@ async fn run_lm_chat_stream(
         {
             return;
         }
-        let weather_lookup = home_ai_weather::lookup(&state, location).await;
+        let weather_lookup = home_ai_weather::lookup(&state, location, weather_day_offset).await;
         let (reply, tool_used, source_values) = match &weather_lookup {
             home_ai_weather::WeatherLookup::Answer(answer) => (
                 answer.reply.clone(),
@@ -977,7 +979,7 @@ async fn run_lm_chat_stream(
     }
     let history = state
         .store
-        .list_recent_conversation_messages(&route.project_id, Some(&conversation_id), 6)
+        .list_recent_conversation_messages(&route.project_id, Some(&conversation_id), 20)
         .unwrap_or_default();
     if !history.is_empty() {
         let insert_at = messages

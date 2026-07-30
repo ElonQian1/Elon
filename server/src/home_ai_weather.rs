@@ -73,7 +73,9 @@ pub(crate) fn is_weather_request_with_history(
     message: &str,
     history: &[ConversationMessage],
 ) -> bool {
-    is_weather_request(message) || is_weather_location_follow_up(message, history)
+    is_weather_request(message)
+        || is_weather_location_follow_up(message, history)
+        || is_weather_context_follow_up(message, history)
 }
 
 /// 从当前问题或近期用户消息中解析地点。没有明确地点时返回 None，
@@ -94,6 +96,24 @@ pub(crate) fn resolve_location(message: &str, history: &[ConversationMessage]) -
                 .filter(|item| item.role == "user")
                 .find_map(|item| extract_location(&item.content))
         })
+        .or_else(|| {
+            history
+                .iter()
+                .rev()
+                .filter(|item| item.role == "assistant")
+                .find_map(|item| extract_location_from_weather_answer(&item.content))
+        })
+}
+
+/// 返回当前问题对应的预报日：今天为 0，明天为 1，后天为 2。
+pub(crate) fn day_offset(message: &str) -> usize {
+    if message.contains("后天") {
+        2
+    } else if message.contains("明天") || message.contains("明日") {
+        1
+    } else {
+        0
+    }
 }
 
 pub(crate) fn missing_location_reply() -> &'static str {
@@ -239,8 +259,36 @@ fn is_weather_location_follow_up(message: &str, history: &[ConversationMessage])
     })
 }
 
-pub(crate) async fn lookup(state: &AppState, location: &str) -> WeatherLookup {
-    let cache_key = location.trim().to_lowercase();
+fn is_weather_context_follow_up(message: &str, history: &[ConversationMessage]) -> bool {
+    let compact = message
+        .trim()
+        .trim_matches(|ch: char| "，。？！?：:、".contains(ch));
+    if compact.is_empty()
+        || !["今天", "现在", "明天", "明日", "后天"]
+            .iter()
+            .any(|marker| compact.contains(marker))
+    {
+        return false;
+    }
+    history.iter().rev().any(|item| {
+        item.role == "assistant" && extract_location_from_weather_answer(&item.content).is_some()
+    })
+}
+
+fn extract_location_from_weather_answer(message: &str) -> Option<String> {
+    if !message.contains("数据更新时间：") && !message.contains("预报日期：") {
+        return None;
+    }
+    ["今天", "明天", "后天"]
+        .iter()
+        .filter_map(|marker| message.find(marker))
+        .min()
+        .and_then(|index| clean_location_candidate(&message[..index]))
+}
+
+pub(crate) async fn lookup(state: &AppState, location: &str, day_offset: usize) -> WeatherLookup {
+    let day_offset = day_offset.min(2);
+    let cache_key = format!("{}|{}", location.trim().to_lowercase(), day_offset);
     if let Ok(mut entries) = cache().lock() {
         if let Some(entry) = entries.get(&cache_key) {
             if entry.expires_at > Instant::now() {
@@ -314,7 +362,7 @@ pub(crate) async fn lookup(state: &AppState, location: &str) -> WeatherLookup {
                 "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
                     .to_string(),
             ),
-            ("forecast_days", "1".to_string()),
+            ("forecast_days", (day_offset + 1).to_string()),
             ("timezone", "auto".to_string()),
         ],
         "forecast",
@@ -336,50 +384,70 @@ pub(crate) async fn lookup(state: &AppState, location: &str) -> WeatherLookup {
             }
         }
     };
-    let Some(current) = payload["current"].as_object() else {
-        return WeatherLookup::Unavailable {
-            location: display_location,
-        };
-    };
+    let current = payload["current"].as_object();
     let daily = payload["daily"].as_object();
-    let temperature = current["temperature_2m"].as_f64();
-    let apparent_temperature = current["apparent_temperature"].as_f64();
-    let weather_code = current["weather_code"].as_i64();
-    let wind_speed = current["wind_speed_10m"].as_f64();
+    let weather_code = daily
+        .and_then(|value| value["weather_code"].as_array())
+        .and_then(|values| values.get(day_offset))
+        .and_then(Value::as_i64)
+        .or_else(|| current.and_then(|value| value["weather_code"].as_i64()));
     let max_temperature = daily
         .and_then(|value| value["temperature_2m_max"].as_array())
-        .and_then(|values| values.first())
+        .and_then(|values| values.get(day_offset))
         .and_then(Value::as_f64);
     let min_temperature = daily
         .and_then(|value| value["temperature_2m_min"].as_array())
-        .and_then(|values| values.first())
+        .and_then(|values| values.get(day_offset))
         .and_then(Value::as_f64);
     let precipitation_probability = daily
         .and_then(|value| value["precipitation_probability_max"].as_array())
-        .and_then(|values| values.first())
+        .and_then(|values| values.get(day_offset))
         .and_then(Value::as_f64);
-    let Some(temperature) = temperature else {
+    let forecast_date = daily
+        .and_then(|value| value["time"].as_array())
+        .and_then(|values| values.get(day_offset))
+        .and_then(Value::as_str);
+    let Some(weather_code) = weather_code else {
         return WeatherLookup::Unavailable {
             location: display_location,
         };
     };
 
-    let condition = weather_code.map(weather_description).unwrap_or("天气情况");
-    let mut reply = format!("{display_location}今天{condition}，当前 {temperature:.1}℃");
-    if let Some(value) = apparent_temperature {
-        reply.push_str(&format!("，体感 {value:.1}℃"));
-    }
+    let condition = weather_description(weather_code);
+    let period = match day_offset {
+        1 => "明天",
+        2 => "后天",
+        _ => "今天",
+    };
+    let mut reply = if day_offset == 0 {
+        let Some(temperature) = current.and_then(|value| value["temperature_2m"].as_f64()) else {
+            return WeatherLookup::Unavailable {
+                location: display_location,
+            };
+        };
+        let mut reply = format!("{display_location}{period}{condition}，当前 {temperature:.1}℃");
+        if let Some(value) = current.and_then(|value| value["apparent_temperature"].as_f64()) {
+            reply.push_str(&format!("，体感 {value:.1}℃"));
+        }
+        if let Some(wind) = current.and_then(|value| value["wind_speed_10m"].as_f64()) {
+            reply.push_str(&format!("，风速 {wind:.1} km/h"));
+        }
+        reply
+    } else {
+        format!("{display_location}{period}{condition}")
+    };
     if let (Some(min), Some(max)) = (min_temperature, max_temperature) {
         reply.push_str(&format!("。最高 {max:.1}℃，最低 {min:.1}℃"));
     }
     if let Some(probability) = precipitation_probability {
         reply.push_str(&format!("，降雨概率 {:.0}%", probability.clamp(0.0, 100.0)));
     }
-    if let Some(wind) = wind_speed {
-        reply.push_str(&format!("，风速 {wind:.1} km/h"));
-    }
-    if let Some(updated_at) = current["time"].as_str() {
-        reply.push_str(&format!("。数据更新时间：{updated_at}"));
+    if day_offset == 0 {
+        if let Some(updated_at) = current.and_then(|value| value["time"].as_str()) {
+            reply.push_str(&format!("。数据更新时间：{updated_at}"));
+        }
+    } else if let Some(forecast_date) = forecast_date {
+        reply.push_str(&format!("。预报日期：{forecast_date}"));
     }
     reply.push('。');
 
@@ -529,6 +597,42 @@ mod tests {
         let recent = history(&[("assistant", WEATHER_LOCATION_PROMPT)]);
         assert!(is_weather_request_with_history("广州", &recent));
         assert_eq!(resolve_location("广州", &recent).as_deref(), Some("广州"));
+    }
+
+    #[test]
+    fn reuses_location_from_successful_weather_answer() {
+        let recent = history(&[(
+            "assistant",
+            "广东广州今天多云，当前 28.1℃。数据更新时间：2026-07-30T17:30。",
+        )]);
+        assert!(is_weather_request_with_history("明天天气情况", &recent));
+        assert_eq!(
+            resolve_location("明天天气情况", &recent).as_deref(),
+            Some("广东广州")
+        );
+        assert_eq!(
+            resolve_location("后天呢", &recent).as_deref(),
+            Some("广东广州")
+        );
+    }
+
+    #[test]
+    fn parses_forecast_day_from_follow_up() {
+        assert_eq!(day_offset("今天天气"), 0);
+        assert_eq!(day_offset("明天天气情况"), 1);
+        assert_eq!(day_offset("后天呢"), 2);
+    }
+
+    #[test]
+    fn reuses_location_from_future_weather_answer() {
+        let recent = history(&[(
+            "assistant",
+            "广东广州明天多云。最高 30.0℃，最低 25.0℃。预报日期：2026-07-31。",
+        )]);
+        assert_eq!(
+            resolve_location("后天天气", &recent).as_deref(),
+            Some("广东广州")
+        );
     }
 
     #[test]
