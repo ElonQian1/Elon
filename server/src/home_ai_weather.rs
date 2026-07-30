@@ -6,6 +6,7 @@
 use serde_json::Value;
 use std::{
     collections::HashMap,
+    net::SocketAddr,
     sync::{Mutex, OnceLock},
     time::{Duration, Instant},
 };
@@ -14,8 +15,11 @@ use crate::{store::ConversationMessage, types::AppState};
 
 const GEOCODING_URL: &str = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL: &str = "https://api.open-meteo.com/v1/forecast";
+const GEOCODING_HOST: &str = "geocoding-api.open-meteo.com";
+const FORECAST_HOST: &str = "api.open-meteo.com";
 const SOURCE_URL: &str = "https://open-meteo.com/en/docs";
 const CACHE_TTL: Duration = Duration::from_secs(5 * 60);
+const WEATHER_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 const WEATHER_LOCATION_PROMPT: &str =
     "可以，我能帮你查询实时天气。你想查询哪个城市或地区？例如北京、上海。";
 
@@ -246,21 +250,22 @@ pub(crate) async fn lookup(state: &AppState, location: &str) -> WeatherLookup {
         entries.retain(|_, entry| entry.expires_at > Instant::now());
     }
 
-    let geo_response = match state
-        .http_client
-        .get(GEOCODING_URL)
-        .query(&[
-            ("name", location),
-            ("count", "1"),
-            ("language", "zh"),
-            ("format", "json"),
-        ])
-        .timeout(Duration::from_secs(6))
-        .send()
-        .await
+    let weather_client = build_weather_client(&state.http_client).await;
+    let geo_response = match send_with_retry(
+        &weather_client,
+        GEOCODING_URL,
+        vec![
+            ("name", location.to_string()),
+            ("count", "1".to_string()),
+            ("language", "zh".to_string()),
+            ("format", "json".to_string()),
+        ],
+        "geocoding",
+    )
+    .await
     {
-        Ok(response) if response.status().is_success() => response,
-        _ => {
+        Some(response) => response,
+        None => {
             return WeatherLookup::Unavailable {
                 location: location.to_string(),
             }
@@ -294,10 +299,10 @@ pub(crate) async fn lookup(state: &AppState, location: &str) -> WeatherLookup {
     };
     let display_location = display_location(place, location);
 
-    let forecast_response = match state
-        .http_client
-        .get(FORECAST_URL)
-        .query(&[
+    let forecast_response = match send_with_retry(
+        &weather_client,
+        FORECAST_URL,
+        vec![
             ("latitude", latitude.to_string()),
             ("longitude", longitude.to_string()),
             (
@@ -311,13 +316,13 @@ pub(crate) async fn lookup(state: &AppState, location: &str) -> WeatherLookup {
             ),
             ("forecast_days", "1".to_string()),
             ("timezone", "auto".to_string()),
-        ])
-        .timeout(Duration::from_secs(6))
-        .send()
-        .await
+        ],
+        "forecast",
+    )
+    .await
     {
-        Ok(response) if response.status().is_success() => response,
-        _ => {
+        Some(response) => response,
+        None => {
             return WeatherLookup::Unavailable {
                 location: display_location,
             }
@@ -393,6 +398,57 @@ pub(crate) async fn lookup(state: &AppState, location: &str) -> WeatherLookup {
         );
     }
     WeatherLookup::Answer(answer)
+}
+
+async fn build_weather_client(fallback: &reqwest::Client) -> reqwest::Client {
+    let geocoding_ipv4 = resolve_ipv4(GEOCODING_HOST).await;
+    let forecast_ipv4 = resolve_ipv4(FORECAST_HOST).await;
+    let mut builder = reqwest::Client::builder()
+        .no_proxy()
+        .connect_timeout(Duration::from_secs(4))
+        .timeout(WEATHER_REQUEST_TIMEOUT);
+    if let Some(address) = geocoding_ipv4 {
+        builder = builder.resolve(GEOCODING_HOST, address);
+    }
+    if let Some(address) = forecast_ipv4 {
+        builder = builder.resolve(FORECAST_HOST, address);
+    }
+    builder.build().unwrap_or_else(|_| fallback.clone())
+}
+
+async fn resolve_ipv4(host: &str) -> Option<SocketAddr> {
+    tokio::net::lookup_host((host, 443))
+        .await
+        .ok()?
+        .find(|address| address.is_ipv4())
+}
+
+async fn send_with_retry(
+    client: &reqwest::Client,
+    url: &str,
+    query: Vec<(&str, String)>,
+    phase: &str,
+) -> Option<reqwest::Response> {
+    for attempt in 1..=2 {
+        match client.get(url).query(&query).send().await {
+            Ok(response) if response.status().is_success() => return Some(response),
+            Ok(response) => {
+                tracing::warn!(
+                    phase,
+                    attempt,
+                    status = %response.status(),
+                    "天气服务返回非成功状态"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(phase, attempt, error = %error, "天气服务请求失败");
+            }
+        }
+        if attempt < 2 {
+            tokio::time::sleep(Duration::from_millis(150)).await;
+        }
+    }
+    None
 }
 
 fn display_location(place: &Value, fallback: &str) -> String {
