@@ -6,6 +6,10 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 use crate::{
+    open_commerce_integration_model::{
+        CreateIntegrationRequest, OpenCommerceIntegration, OpenCommerceSyncReceipt,
+        RecordSyncReceiptRequest, INTEGRATION_STATUS_CONNECTED, INTEGRATION_STATUS_DEGRADED,
+    },
     open_commerce_model::{
         normalize_app_id, normalize_idempotency_key, CreateCapabilityRequest, CreateGrantRequest,
         CreateMerchantRequest, InvokeCapabilityRequest, OpenCommerceCapability,
@@ -15,7 +19,7 @@ use crate::{
         HANDLER_STATIC_JSON, MERCHANT_STATUS_ACTIVE, OPEN_COMMERCE_SCHEMA,
     },
     project_auth::can_edit,
-    store::{OpenCommerceInvocationStart, Store},
+    store::{OpenCommerceInvocationStart, RecordOpenCommerceSyncReceipt, Store},
 };
 
 pub(crate) struct OpenCommerceActor<'a> {
@@ -28,6 +32,8 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
     let merchants = store.list_project_open_commerce_merchants(project_id)?;
     let grants = store.list_project_open_commerce_grants(project_id, 100)?;
     let recent_invocations = store.list_project_open_commerce_invocations(project_id, 100)?;
+    let integrations = store.list_project_open_commerce_integrations(project_id)?;
+    let recent_sync_receipts = store.list_project_open_commerce_sync_receipts(project_id, 100)?;
     let recent_audit_events = store.list_project_open_commerce_audit(project_id, 100)?;
     let active_merchants = merchants
         .iter()
@@ -44,6 +50,14 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
         .iter()
         .map(|invocation| invocation.amount_micros)
         .sum();
+    let connected_integrations = integrations
+        .iter()
+        .filter(|integration| integration.status == INTEGRATION_STATUS_CONNECTED)
+        .count();
+    let degraded_integrations = integrations
+        .iter()
+        .filter(|integration| integration.status == INTEGRATION_STATUS_DEGRADED)
+        .count();
     Ok(OpenCommerceOverview {
         schema: OPEN_COMMERCE_SCHEMA,
         project_id: project_id.to_string(),
@@ -54,13 +68,174 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
             active_capabilities,
             active_grants,
             invocations: recent_invocations.len(),
+            integrations: integrations.len(),
+            connected_integrations,
+            degraded_integrations,
+            sync_receipts: recent_sync_receipts.len(),
             metered_amount_micros,
         },
         merchants,
         grants,
         recent_invocations,
+        integrations,
+        recent_sync_receipts,
         recent_audit_events,
     })
+}
+
+pub(crate) fn development_context(store: &Store, project_id: &str) -> Result<Value> {
+    let merchants = store.list_project_open_commerce_merchants(project_id)?;
+    let integrations = store.list_project_open_commerce_integrations(project_id)?;
+    let receipts = store.list_project_open_commerce_sync_receipts(project_id, 50)?;
+    let merchant_contexts = merchants
+        .into_iter()
+        .map(|mut detail| {
+            for capability in &mut detail.capabilities {
+                capability.handler_config = None;
+            }
+            let merchant_integrations = integrations
+                .iter()
+                .filter(|integration| integration.merchant_id == detail.merchant.id)
+                .map(|integration| {
+                    json!({
+                        "id": integration.id,
+                        "integration_key": integration.integration_key,
+                        "provider_key": integration.provider_key,
+                        "display_name": integration.display_name,
+                        "connection_mode": integration.connection_mode,
+                        "status": integration.status,
+                        "scopes": integration.scopes,
+                        "data_domains": integration.data_domains,
+                        "last_verified_at": integration.last_verified_at,
+                        "last_sync_at": integration.last_sync_at
+                    })
+                })
+                .collect::<Vec<_>>();
+            json!({
+                "merchant": {
+                    "id": detail.merchant.id,
+                    "display_name": detail.merchant.display_name,
+                    "status": detail.merchant.status,
+                    "node_mode": detail.merchant.node_mode
+                },
+                "capabilities": detail.capabilities,
+                "integrations": merchant_integrations
+            })
+        })
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "schema": "open_commerce.development_context.v1",
+        "project_id": project_id,
+        "generated_at": Utc::now().to_rfc3339(),
+        "summary": {
+            "merchants": merchant_contexts.len(),
+            "integrations": integrations.len(),
+            "connected_integrations": integrations.iter()
+                .filter(|entry| entry.status == INTEGRATION_STATUS_CONNECTED).count(),
+            "degraded_integrations": integrations.iter()
+                .filter(|entry| entry.status == INTEGRATION_STATUS_DEGRADED).count(),
+            "recent_sync_receipts": receipts.len()
+        },
+        "merchants": merchant_contexts,
+        "recent_sync_evidence": receipts.into_iter().map(|receipt| json!({
+            "integration_id": receipt.integration_id,
+            "sync_kind": receipt.sync_kind,
+            "status": receipt.status,
+            "records_seen": receipt.records_seen,
+            "records_changed": receipt.records_changed,
+            "error_code": receipt.error_code,
+            "started_at": receipt.started_at,
+            "completed_at": receipt.completed_at
+        })).collect::<Vec<_>>(),
+        "implementation_constraints": [
+            "接入状态和同步回执只证明连接健康度，不代表已取得未授权的平台数据。",
+            "不得把 scopes、data_domains 或字段结构误当成原始经营数据。",
+            "不得在源码、Matter、Assignment 或文档中写入访问令牌和平台密钥。",
+            "新增适配器必须复用 Merchant、Capability、Grant、Invocation 和 Audit 主干。",
+            "任何自动发布、下单、财务或库存写操作都必须经过最小权限与人工确认策略。"
+        ]
+    }))
+}
+
+pub(crate) fn create_integration(
+    store: &Store,
+    project_id: &str,
+    actor: &OpenCommerceActor<'_>,
+    request: CreateIntegrationRequest,
+) -> Result<OpenCommerceIntegration> {
+    require_editor(actor.project_role)?;
+    let integration = store.create_open_commerce_integration(project_id, actor.user_id, request)?;
+    store.record_open_commerce_audit(
+        project_id,
+        actor.user_id,
+        Some(actor.app_id),
+        "integration.created",
+        "integration",
+        &integration.id,
+        &json!({
+            "merchant_id": integration.merchant_id,
+            "integration_key": integration.integration_key,
+            "provider_key": integration.provider_key,
+            "connection_mode": integration.connection_mode,
+            "data_domains": integration.data_domains
+        }),
+    )?;
+    Ok(integration)
+}
+
+pub(crate) fn set_integration_enabled(
+    store: &Store,
+    project_id: &str,
+    integration_id: &str,
+    actor: &OpenCommerceActor<'_>,
+    enabled: bool,
+) -> Result<OpenCommerceIntegration> {
+    require_editor(actor.project_role)?;
+    let integration =
+        store.set_open_commerce_integration_enabled(project_id, integration_id, enabled)?;
+    store.record_open_commerce_audit(
+        project_id,
+        actor.user_id,
+        Some(actor.app_id),
+        "integration.enabled_changed",
+        "integration",
+        &integration.id,
+        &json!({"enabled": enabled, "status": integration.status}),
+    )?;
+    Ok(integration)
+}
+
+pub(crate) fn record_sync_receipt(
+    store: &Store,
+    project_id: &str,
+    actor: &OpenCommerceActor<'_>,
+    request: RecordSyncReceiptRequest,
+) -> Result<OpenCommerceSyncReceipt> {
+    require_editor(actor.project_role)?;
+    let receipt = store.record_open_commerce_sync_receipt(RecordOpenCommerceSyncReceipt {
+        project_id,
+        actor_user_id: actor.user_id,
+        actor_app_id: actor.app_id,
+        request,
+    })?;
+    store.record_open_commerce_audit(
+        project_id,
+        actor.user_id,
+        Some(actor.app_id),
+        "integration.sync_recorded",
+        "sync_receipt",
+        &receipt.id,
+        &json!({
+            "integration_id": receipt.integration_id,
+            "receipt_key": receipt.receipt_key,
+            "sync_kind": receipt.sync_kind,
+            "status": receipt.status,
+            "records_seen": receipt.records_seen,
+            "records_changed": receipt.records_changed,
+            "error_code": receipt.error_code
+        }),
+    )?;
+    Ok(receipt)
 }
 
 pub(crate) fn discover_merchants(

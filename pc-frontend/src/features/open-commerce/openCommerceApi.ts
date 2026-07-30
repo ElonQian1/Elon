@@ -2,12 +2,14 @@ import { api } from '../../api/client'
 import type {
   CreateOpenCommerceCapability,
   CreateOpenCommerceGrant,
+  CreateOpenCommerceIntegration,
   CreateOpenCommerceMerchant,
   InvokeOpenCommerceCapability,
   OpenCommerceCapability,
   OpenCommerceGrant,
   OpenCommerceMerchant,
   OpenCommerceOverview,
+  OpenCommerceIntegration,
 } from './openCommerceTypes'
 
 function projectBase(projectId: string) {
@@ -42,5 +44,15 @@ export const openCommerceApi = {
 
   invoke: (request: InvokeOpenCommerceCapability) =>
     api.post<Record<string, unknown>>('/api/open-commerce/invoke', request),
+
+  createIntegration: (projectId: string, request: CreateOpenCommerceIntegration) =>
+    api.post<OpenCommerceIntegration>(`${projectBase(projectId)}/integrations`, request),
+
+  setIntegrationEnabled: (projectId: string, integrationId: string, enabled: boolean) =>
+    api.patch<OpenCommerceIntegration>(
+      `${projectBase(projectId)}/integrations/${encodeURIComponent(integrationId)}/enabled`,
+      { enabled },
+    ),
+
 }
 

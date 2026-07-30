@@ -79,12 +79,45 @@ export interface OpenCommerceAuditEvent {
   created_at: string
 }
 
+export interface OpenCommerceIntegration {
+  id: string
+  project_id: string
+  merchant_id: string
+  integration_key: string
+  provider_key: string
+  display_name: string
+  connection_mode: 'official_api' | 'merchant_export' | 'local_adapter' | 'manual_import'
+  status: 'configured' | 'connected' | 'degraded' | 'disabled'
+  scopes: string[]
+  data_domains: string[]
+  last_verified_at?: string
+  last_sync_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface OpenCommerceSyncReceipt {
+  id: string
+  integration_id: string
+  receipt_key: string
+  sync_kind: 'full' | 'incremental' | 'health_check'
+  status: 'succeeded' | 'partial' | 'failed'
+  records_seen: number
+  records_changed: number
+  error_code?: string
+  started_at: string
+  completed_at: string
+  created_at: string
+}
+
 export interface OpenCommerceOverview {
   schema: string
   project_id: string
   merchants: OpenCommerceMerchantDetail[]
   grants: OpenCommerceGrant[]
   recent_invocations: OpenCommerceInvocation[]
+  integrations: OpenCommerceIntegration[]
+  recent_sync_receipts: OpenCommerceSyncReceipt[]
   recent_audit_events: OpenCommerceAuditEvent[]
   totals: {
     merchants: number
@@ -93,8 +126,34 @@ export interface OpenCommerceOverview {
     active_capabilities: number
     active_grants: number
     invocations: number
+    integrations: number
+    connected_integrations: number
+    degraded_integrations: number
+    sync_receipts: number
     metered_amount_micros: number
   }
+}
+
+export interface CreateOpenCommerceIntegration {
+  merchant_id: string
+  integration_key: string
+  provider_key: string
+  display_name: string
+  connection_mode: OpenCommerceIntegration['connection_mode']
+  scopes: string[]
+  data_domains: string[]
+}
+
+export interface RecordOpenCommerceSyncReceipt {
+  integration_id: string
+  receipt_key: string
+  sync_kind: OpenCommerceSyncReceipt['sync_kind']
+  status: OpenCommerceSyncReceipt['status']
+  records_seen: number
+  records_changed: number
+  error_code?: string
+  started_at: string
+  completed_at: string
 }
 
 export interface CreateOpenCommerceMerchant {

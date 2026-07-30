@@ -13,6 +13,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 use crate::{
+    open_commerce_integration_model::{CreateIntegrationRequest, RecordSyncReceiptRequest},
     open_commerce_model::{
         normalize_app_id, CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
         InvokeCapabilityRequest,
@@ -77,6 +78,12 @@ struct InvokeArguments {
 struct AuditArguments {
     #[serde(default = "default_audit_limit")]
     limit: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct SetIntegrationEnabledArguments {
+    integration_id: String,
+    enabled: bool,
 }
 
 struct McpCaller {
@@ -155,6 +162,10 @@ pub(crate) fn call_tool(
             ensure_empty_object(&arguments, name)?;
             serde_json::to_value(open_commerce_service::overview(store, project_id)?)?
         }
+        "open_commerce_get_development_context" => {
+            ensure_empty_object(&arguments, name)?;
+            open_commerce_service::development_context(store, project_id)?
+        }
         "open_commerce_search_merchants" => {
             let input: SearchArguments = decode(arguments, name)?;
             json!({
@@ -193,6 +204,28 @@ pub(crate) fn call_tool(
         "open_commerce_create_grant" => {
             let input: CreateGrantRequest = decode(arguments, name)?;
             serde_json::to_value(open_commerce_service::create_grant(
+                store, project_id, &actor, input,
+            )?)?
+        }
+        "open_commerce_create_integration" => {
+            let input: CreateIntegrationRequest = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_service::create_integration(
+                store, project_id, &actor, input,
+            )?)?
+        }
+        "open_commerce_set_integration_enabled" => {
+            let input: SetIntegrationEnabledArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_service::set_integration_enabled(
+                store,
+                project_id,
+                &input.integration_id,
+                &actor,
+                input.enabled,
+            )?)?
+        }
+        "open_commerce_record_sync_receipt" => {
+            let input: RecordSyncReceiptRequest = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_service::record_sync_receipt(
                 store, project_id, &actor, input,
             )?)?
         }
@@ -268,7 +301,7 @@ fn initialize_response() -> Value {
         "protocolVersion":MCP_PROTOCOL_VERSION,
         "capabilities":{"tools":{"listChanged":false}},
         "serverInfo":{"name":"yilong-open-commerce","version":"1.0.0"},
-        "instructions":"先调用 open_commerce_get_overview 或 search_merchants。公开发现不暴露处理器配置；授权能力必须携带 grant_id；所有调用必须使用幂等键。V1 只记录计量，不真实扣款。写操作需要当前项目编辑权限，调用身份由 x-elon-app-id 固定，不能由工具参数冒充。"
+        "instructions":"先调用 open_commerce_get_overview、open_commerce_get_development_context 或 search_merchants。数据接入记录不包含令牌，公开发现不暴露处理器配置；授权能力必须携带 grant_id；所有调用和同步回执必须使用幂等键。当前只记录计量，不真实扣款。写操作需要当前项目编辑权限，调用身份由 x-elon-app-id 固定，不能由工具参数冒充。"
     })
 }
 

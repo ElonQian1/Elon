@@ -12,6 +12,9 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
+    open_commerce_integration_model::{
+        CreateIntegrationRequest, RecordSyncReceiptRequest, SetIntegrationEnabledRequest,
+    },
     open_commerce_model::{
         normalize_app_id, CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
         InvokeCapabilityRequest, UpdateCapabilityRequest, UpdateMerchantRequest,
@@ -52,6 +55,10 @@ pub fn routes() -> Router<Arc<AppState>> {
             get(project_overview),
         )
         .route(
+            "/api/projects/:project_id/open-commerce/development-context",
+            get(project_development_context),
+        )
+        .route(
             "/api/projects/:project_id/open-commerce/merchants",
             post(create_merchant),
         )
@@ -79,12 +86,38 @@ pub fn routes() -> Router<Arc<AppState>> {
             "/api/projects/:project_id/open-commerce/audit",
             get(project_audit),
         )
+        .route(
+            "/api/projects/:project_id/open-commerce/integrations",
+            post(create_integration),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/integrations/:integration_id/enabled",
+            patch(set_integration_enabled),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/sync-receipts",
+            post(record_sync_receipt),
+        )
         .route("/api/open-commerce/merchants", get(search_merchants))
         .route(
             "/api/open-commerce/merchants/:merchant_id",
             get(get_merchant),
         )
         .route("/api/open-commerce/invoke", post(invoke_capability))
+}
+
+async fn project_development_context(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+) -> Response {
+    if let Err(response) = project_caller(&state, &headers, &project_id) {
+        return response;
+    }
+    service_response(open_commerce_service::development_context(
+        &state.store,
+        &project_id,
+    ))
 }
 
 async fn project_overview(
@@ -224,6 +257,61 @@ async fn project_audit(
             .list_project_open_commerce_audit(&project_id, query.limit)
             .map(|events| json!({"schema": "open_commerce.audit.v1", "events": events})),
     )
+}
+
+async fn create_integration(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(request): Json<CreateIntegrationRequest>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_service::create_integration(
+        &state.store,
+        &project_id,
+        &actor(&caller),
+        request,
+    ))
+}
+
+async fn set_integration_enabled(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, integration_id)): Path<(String, String)>,
+    Json(request): Json<SetIntegrationEnabledRequest>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_service::set_integration_enabled(
+        &state.store,
+        &project_id,
+        &integration_id,
+        &actor(&caller),
+        request.enabled,
+    ))
+}
+
+async fn record_sync_receipt(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(request): Json<RecordSyncReceiptRequest>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_service::record_sync_receipt(
+        &state.store,
+        &project_id,
+        &actor(&caller),
+        request,
+    ))
 }
 
 async fn search_merchants(

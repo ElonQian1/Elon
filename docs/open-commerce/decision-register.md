@@ -11,12 +11,13 @@
 | V1 先做商户节点和能力调用主干 | 商户、能力、授权、调用、计量、审计是最小闭环 | `docs/decisions/open-commerce-network-v1-architecture.md` |
 | HTTP 与 MCP 共用同一领域服务 | 避免网页、AI 和第三方应用形成不同业务规则 | `docs/open-commerce-network-v1-api.md` |
 | 当前调用只计量、不做真实收费 | 先验证行为、权限和审计，再验证经济层 | `docs/decisions/open-commerce-network-v1-architecture.md` |
+| 先建数据接入控制面，再逐个平台实现适配器 | 统一记录来源、范围、健康度和同步证据，不用“已接入”掩盖真实权限差异 | `docs/decisions/open-commerce-integration-control-plane.md` |
 | 文档按状态与职责模块化 | 事实、决策、草稿和讨论来源分开，避免巨型愿景文档误导 AI | `docs/open-commerce/README.md` |
 
 ## 当前实施重点
 
 1. 维持 AI 应用开发、Matter/Assignment、Git 执行和发布主链稳定。
-2. 完善开放商业 V1 的权限、处理器、审计和真实行业试点。
+2. 基于数据接入控制面逐个平台实现、审核并验收真实行业适配器。
 3. 为商户 ERP、营销内容、小游戏和经营分析建立可验证的行业模板。
 4. 把节点调用、Token 使用和商业调用统一为可对账的回执事实。
 5. 用项目文档 MCP 保持实现状态、决策和讨论来源一致。

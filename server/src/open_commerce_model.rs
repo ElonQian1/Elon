@@ -4,6 +4,8 @@ use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::open_commerce_integration_model::{OpenCommerceIntegration, OpenCommerceSyncReceipt};
+
 pub(crate) const OPEN_COMMERCE_SCHEMA: &str = "open_commerce.v1";
 pub(crate) const MERCHANT_STATUS_ACTIVE: &str = "active";
 pub(crate) const MERCHANT_STATUS_DISABLED: &str = "disabled";
@@ -121,6 +123,8 @@ pub(crate) struct OpenCommerceOverview {
     pub merchants: Vec<OpenCommerceMerchantDetail>,
     pub grants: Vec<OpenCommerceGrant>,
     pub recent_invocations: Vec<OpenCommerceInvocation>,
+    pub integrations: Vec<OpenCommerceIntegration>,
+    pub recent_sync_receipts: Vec<OpenCommerceSyncReceipt>,
     pub recent_audit_events: Vec<OpenCommerceAuditEvent>,
     pub totals: OpenCommerceTotals,
 }
@@ -133,6 +137,10 @@ pub(crate) struct OpenCommerceTotals {
     pub active_capabilities: usize,
     pub active_grants: usize,
     pub invocations: usize,
+    pub integrations: usize,
+    pub connected_integrations: usize,
+    pub degraded_integrations: usize,
+    pub sync_receipts: usize,
     pub metered_amount_micros: i64,
 }
 

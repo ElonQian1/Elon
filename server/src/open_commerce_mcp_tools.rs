@@ -12,6 +12,13 @@ pub(crate) fn definitions() -> Vec<Value> {
             true,
         ),
         tool(
+            "open_commerce_get_development_context",
+            "生成供开发代理使用的商户能力、数据来源和同步健康度上下文。不会返回平台密钥、处理器配置或原始经营数据。",
+            json!({"type":"object","properties":{},"additionalProperties":false}),
+            true,
+            true,
+        ),
+        tool(
             "open_commerce_search_merchants",
             "按名称、描述或能力键搜索已发布商户节点。只返回公开资料和公开能力契约，不返回处理器配置。",
             json!({
@@ -99,6 +106,79 @@ pub(crate) fn definitions() -> Vec<Value> {
             }),
             false,
             false,
+        ),
+        tool(
+            "open_commerce_create_integration",
+            "登记一个商户自有数据源的接入方式、授权范围和数据域。这里只登记连接事实，不接收也不保存访问令牌。",
+            json!({
+                "type":"object",
+                "required":[
+                    "merchant_id","integration_key","provider_key",
+                    "display_name","connection_mode"
+                ],
+                "properties":{
+                    "merchant_id":{"type":"string","minLength":1,"maxLength":120},
+                    "integration_key":{"type":"string","minLength":3,"maxLength":96},
+                    "provider_key":{"type":"string","minLength":2,"maxLength":64},
+                    "display_name":{"type":"string","minLength":2,"maxLength":80},
+                    "connection_mode":{
+                        "type":"string",
+                        "enum":["official_api","merchant_export","local_adapter","manual_import"]
+                    },
+                    "scopes":{
+                        "type":"array","maxItems":32,
+                        "items":{"type":"string","minLength":1,"maxLength":64}
+                    },
+                    "data_domains":{
+                        "type":"array","maxItems":32,
+                        "items":{"type":"string","minLength":1,"maxLength":64}
+                    }
+                },
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
+        tool(
+            "open_commerce_set_integration_enabled",
+            "停用或重新启用一个商户数据接入。重新启用只恢复为已配置状态，不能伪造连接成功。",
+            json!({
+                "type":"object",
+                "required":["integration_id","enabled"],
+                "properties":{
+                    "integration_id":{"type":"string","minLength":1,"maxLength":120},
+                    "enabled":{"type":"boolean"}
+                },
+                "additionalProperties":false
+            }),
+            false,
+            true,
+        ),
+        tool(
+            "open_commerce_record_sync_receipt",
+            "由受信任适配器记录一次有界同步或健康检查结果。回执只含数量、摘要和错误码，不接收原始订单、客户或财务数据。",
+            json!({
+                "type":"object",
+                "required":[
+                    "integration_id","receipt_key","sync_kind","status",
+                    "started_at","completed_at"
+                ],
+                "properties":{
+                    "integration_id":{"type":"string","minLength":1,"maxLength":120},
+                    "receipt_key":{"type":"string","minLength":3,"maxLength":128},
+                    "sync_kind":{"type":"string","enum":["full","incremental","health_check"]},
+                    "status":{"type":"string","enum":["succeeded","partial","failed"]},
+                    "records_seen":{"type":"integer","minimum":0,"default":0},
+                    "records_changed":{"type":"integer","minimum":0,"default":0},
+                    "cursor_digest":{"type":"string","maxLength":128},
+                    "error_code":{"type":"string","maxLength":96},
+                    "started_at":{"type":"string","format":"date-time"},
+                    "completed_at":{"type":"string","format":"date-time"}
+                },
+                "additionalProperties":false
+            }),
+            false,
+            true,
         ),
         tool(
             "open_commerce_revoke_grant",

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { openCommerceApi } from './openCommerceApi'
 import OpenCommerceMerchantEditor from './OpenCommerceMerchantEditor'
+import OpenCommerceIntegrationManager from './OpenCommerceIntegrationManager'
 import type { OpenCommerceOverview } from './openCommerceTypes'
 import styles from './OpenCommercePanel.module.css'
 
@@ -94,6 +95,7 @@ export default function OpenCommercePanel({
         <Stat label="有效能力" value={totals?.active_capabilities ?? 0} detail={`共 ${totals?.capabilities ?? 0} 项`} />
         <Stat label="有效授权" value={totals?.active_grants ?? 0} detail="可撤销、可审计" />
         <Stat label="调用次数" value={totals?.invocations ?? 0} detail={`${formatMicros(totals?.metered_amount_micros ?? 0)} CNY 已计量`} />
+        <Stat label="数据接入" value={totals?.connected_integrations ?? 0} detail={`共 ${totals?.integrations ?? 0} 个，${totals?.degraded_integrations ?? 0} 个异常`} />
       </section>
 
       <div className={styles.workspace}>
@@ -127,7 +129,17 @@ export default function OpenCommercePanel({
 
         <main className={styles.main}>
           {selectedMerchant
-            ? <OpenCommerceMerchantEditor projectId={projectId} merchant={selectedMerchant} grants={overview?.grants ?? []} canEdit={canEdit} onChanged={refresh} />
+            ? <>
+              <OpenCommerceMerchantEditor projectId={projectId} merchant={selectedMerchant} grants={overview?.grants ?? []} canEdit={canEdit} onChanged={refresh} />
+              <OpenCommerceIntegrationManager
+                projectId={projectId}
+                merchantId={selectedMerchant.merchant.id}
+                integrations={overview?.integrations ?? []}
+                receipts={overview?.recent_sync_receipts ?? []}
+                canEdit={canEdit}
+                onChanged={refresh}
+              />
+            </>
             : <section className={styles.firstStep}><strong>先创建一个商户节点</strong><p>它是商户自有数据与商业能力的边界，不是平台复制的一份商户页面。</p></section>}
 
           <section className={styles.audit}>
