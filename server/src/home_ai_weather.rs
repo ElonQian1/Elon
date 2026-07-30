@@ -94,7 +94,15 @@ pub(crate) fn resolve_location(message: &str, history: &[ConversationMessage]) -
                 .iter()
                 .rev()
                 .filter(|item| item.role == "user")
-                .find_map(|item| extract_location(&item.content))
+                .find_map(|item| {
+                    extract_location(&item.content).or_else(|| {
+                        if has_weather_context(history) {
+                            extract_standalone_location(&item.content)
+                        } else {
+                            None
+                        }
+                    })
+                })
         })
         .or_else(|| {
             history
@@ -230,6 +238,35 @@ fn clean_location_candidate(candidate: &str) -> Option<String> {
     Some(candidate)
 }
 
+fn extract_standalone_location(message: &str) -> Option<String> {
+    let compact = message
+        .trim()
+        .trim_matches(|ch: char| "，。？！?：:、".contains(ch));
+    if compact.is_empty()
+        || compact.chars().any(char::is_whitespace)
+        || [
+            "今天",
+            "现在",
+            "明天",
+            "明日",
+            "后天",
+            "你好",
+            "您好",
+            "嗨",
+            "哈喽",
+            "谢谢",
+            "感谢",
+            "好的",
+            "明白了",
+        ]
+        .iter()
+        .any(|value| compact == *value)
+    {
+        return None;
+    }
+    clean_location_candidate(compact)
+}
+
 fn is_weather_location_follow_up(message: &str, history: &[ConversationMessage]) -> bool {
     let compact = message
         .trim()
@@ -237,6 +274,9 @@ fn is_weather_location_follow_up(message: &str, history: &[ConversationMessage])
     let length = compact.chars().count();
     if !(2..=20).contains(&length)
         || compact.chars().any(|ch| ch.is_whitespace())
+        || ["今天", "现在", "明天", "明日", "后天"]
+            .iter()
+            .any(|marker| compact.contains(marker))
         || [
             "你好",
             "您好",
@@ -259,6 +299,14 @@ fn is_weather_location_follow_up(message: &str, history: &[ConversationMessage])
     })
 }
 
+fn has_weather_context(history: &[ConversationMessage]) -> bool {
+    history.iter().any(|item| {
+        item.role == "assistant"
+            && (item.content.contains(WEATHER_LOCATION_PROMPT)
+                || extract_location_from_weather_answer(&item.content).is_some())
+    })
+}
+
 fn is_weather_context_follow_up(message: &str, history: &[ConversationMessage]) -> bool {
     let compact = message
         .trim()
@@ -276,7 +324,12 @@ fn is_weather_context_follow_up(message: &str, history: &[ConversationMessage]) 
 }
 
 fn extract_location_from_weather_answer(message: &str) -> Option<String> {
-    if !message.contains("数据更新时间：") && !message.contains("预报日期：") {
+    let looks_like_structured_weather = message.contains("数据更新时间：")
+        || message.contains("预报日期：")
+        || (message.contains("℃")
+            && (message.contains("当前")
+                || (message.contains("最高") && message.contains("最低"))));
+    if !looks_like_structured_weather {
         return None;
     }
     ["今天", "明天", "后天"]
@@ -633,6 +686,32 @@ mod tests {
             resolve_location("后天天气", &recent).as_deref(),
             Some("广东广州")
         );
+    }
+
+    #[test]
+    fn does_not_treat_relative_day_as_a_city() {
+        let recent = history(&[("assistant", WEATHER_LOCATION_PROMPT)]);
+        assert!(!is_weather_location_follow_up("明天呢", &recent));
+    }
+
+    #[test]
+    fn restores_location_from_wrapped_weather_answer_and_prior_city() {
+        let recent = history(&[
+            ("user", "广州"),
+            (
+                "assistant",
+                "广东广州今天多云，当前 28.1℃，体感 33.9℃。\n最高 28.9℃，最低 24.7℃。",
+            ),
+        ]);
+        assert_eq!(
+            extract_location_from_weather_answer(&recent[1].content).as_deref(),
+            Some("广东广州")
+        );
+        assert_eq!(
+            resolve_location("明天天气情况", &recent).as_deref(),
+            Some("广州")
+        );
+        assert_eq!(resolve_location("后天呢", &recent).as_deref(), Some("广州"));
     }
 
     #[test]
