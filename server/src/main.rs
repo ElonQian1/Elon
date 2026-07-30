@@ -100,6 +100,7 @@ mod group_summary_context_pack;
 mod group_summary_topic_split;
 mod home_ai_search;
 mod home_ai_tools;
+mod home_ai_weather;
 mod homecli_agent;
 mod homecli_agent_project_git_worktree;
 mod image_generation;

@@ -34,7 +34,6 @@ pub(crate) fn should_search(message: &str) -> bool {
         "帮我查",
         "最新",
         "新闻",
-        "天气",
         "汇率",
         "股价",
         "价格",
@@ -154,6 +153,7 @@ mod tests {
     fn detects_current_information_questions() {
         assert!(should_search("帮我查一下今天有什么新闻"));
         assert!(should_search("现在的美元汇率"));
+        assert!(!should_search("北京今天天气怎么样"));
         assert!(!should_search("请解释一下什么是 Rust"));
     }
 
