@@ -211,7 +211,7 @@ pub async fn lm_chat_handler(
         .unwrap_or("")
         .to_string();
     let weather_requested = entry_kind == ConversationEntryKind::ChatMemory
-        && home_ai_weather::is_weather_request(&user_msg);
+        && home_ai_weather::is_weather_request_with_history(&user_msg, &history);
     let weather_location = if weather_requested {
         home_ai_weather::resolve_location(&user_msg, &history)
     } else {
@@ -649,18 +649,20 @@ async fn run_lm_chat_stream(
         .and_then(|m| m["content"].as_str())
         .unwrap_or("")
         .to_string();
+    let weather_history = if entry_kind == ConversationEntryKind::ChatMemory
+        && home_ai_weather::extract_location(&user_msg).is_none()
+    {
+        state
+            .store
+            .list_recent_conversation_messages(&route.project_id, Some(&conversation_id), 6)
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     let weather_requested = entry_kind == ConversationEntryKind::ChatMemory
-        && home_ai_weather::is_weather_request(&user_msg);
+        && home_ai_weather::is_weather_request_with_history(&user_msg, &weather_history);
     let weather_location = if weather_requested {
-        let history = if home_ai_weather::extract_location(&user_msg).is_none() {
-            state
-                .store
-                .list_recent_conversation_messages(&route.project_id, Some(&conversation_id), 6)
-                .unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-        home_ai_weather::resolve_location(&user_msg, &history)
+        home_ai_weather::resolve_location(&user_msg, &weather_history)
     } else {
         None
     };

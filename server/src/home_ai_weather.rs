@@ -16,6 +16,8 @@ const GEOCODING_URL: &str = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL: &str = "https://api.open-meteo.com/v1/forecast";
 const SOURCE_URL: &str = "https://open-meteo.com/en/docs";
 const CACHE_TTL: Duration = Duration::from_secs(5 * 60);
+const WEATHER_LOCATION_PROMPT: &str =
+    "可以，我能帮你查询实时天气。你想查询哪个城市或地区？例如北京、上海。";
 
 #[derive(Debug, Clone)]
 pub(crate) struct WeatherAnswer {
@@ -63,20 +65,35 @@ pub(crate) fn is_weather_request(message: &str) -> bool {
     .any(|keyword| normalized.contains(keyword))
 }
 
+pub(crate) fn is_weather_request_with_history(
+    message: &str,
+    history: &[ConversationMessage],
+) -> bool {
+    is_weather_request(message) || is_weather_location_follow_up(message, history)
+}
+
 /// 从当前问题或近期用户消息中解析地点。没有明确地点时返回 None，
 /// 让上层向用户追问，而不是猜测所在地。
 pub(crate) fn resolve_location(message: &str, history: &[ConversationMessage]) -> Option<String> {
-    extract_location(message).or_else(|| {
-        history
-            .iter()
-            .rev()
-            .filter(|item| item.role == "user")
-            .find_map(|item| extract_location(&item.content))
-    })
+    extract_location(message)
+        .or_else(|| {
+            if is_weather_location_follow_up(message, history) {
+                clean_location_candidate(message)
+            } else {
+                None
+            }
+        })
+        .or_else(|| {
+            history
+                .iter()
+                .rev()
+                .filter(|item| item.role == "user")
+                .find_map(|item| extract_location(&item.content))
+        })
 }
 
 pub(crate) fn missing_location_reply() -> &'static str {
-    "可以，我能帮你查询实时天气。你想查询哪个城市或地区？例如北京、上海。"
+    WEATHER_LOCATION_PROMPT
 }
 
 pub(crate) fn not_found_reply(location: &str) -> String {
@@ -187,6 +204,35 @@ fn clean_location_candidate(candidate: &str) -> Option<String> {
         return None;
     }
     Some(candidate)
+}
+
+fn is_weather_location_follow_up(message: &str, history: &[ConversationMessage]) -> bool {
+    let compact = message
+        .trim()
+        .trim_matches(|ch: char| "，。？！?：:、".contains(ch));
+    let length = compact.chars().count();
+    if !(2..=20).contains(&length)
+        || compact.chars().any(|ch| ch.is_whitespace())
+        || [
+            "你好",
+            "您好",
+            "嗨",
+            "哈喽",
+            "谢谢",
+            "感谢",
+            "好的",
+            "明白了",
+        ]
+        .iter()
+        .any(|value| compact == *value)
+    {
+        return false;
+    }
+    history.iter().rev().any(|item| {
+        item.role == "assistant"
+            && (item.content.contains(WEATHER_LOCATION_PROMPT)
+                || (item.content.contains("天气") && item.content.contains("哪个城市")))
+    })
 }
 
 pub(crate) async fn lookup(state: &AppState, location: &str) -> WeatherLookup {
@@ -420,6 +466,13 @@ mod tests {
             resolve_location("今天会下雨吗", &recent).as_deref(),
             Some("杭州")
         );
+    }
+
+    #[test]
+    fn treats_city_only_reply_as_weather_follow_up() {
+        let recent = history(&[("assistant", WEATHER_LOCATION_PROMPT)]);
+        assert!(is_weather_request_with_history("广州", &recent));
+        assert_eq!(resolve_location("广州", &recent).as_deref(), Some("广州"));
     }
 
     #[test]
