@@ -190,6 +190,7 @@ export default function AiChatPage() {
   const [input, setInput] = useState(() => pendingAiDraftRef.current?.input ?? '')
   const [sending, setSending] = useState(false)
   const [streamStatus, setStreamStatus] = useState('')
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null)
   const [handoffSending, setHandoffSending] = useState(false)
   const [error, setError] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
@@ -737,6 +738,7 @@ export default function AiChatPage() {
       } else {
         // ── 无节点：走首页 AI 流式对话 ────────────────────────────────────
         pendingStreamMessageId = uuidv4()
+        setStreamingMessageId(pendingStreamMessageId)
         setMessages((prev) => [...prev, {
           id: pendingStreamMessageId!,
           role: 'assistant',
@@ -801,6 +803,7 @@ export default function AiChatPage() {
       restoreComposerAfterError(previousInput, err)
     } finally {
       setSending(false)
+      setStreamingMessageId(null)
       setStreamStatus('')
     }
   }
@@ -932,21 +935,12 @@ export default function AiChatPage() {
               index={i}
               message={m}
               user={user}
+              streaming={m.id === streamingMessageId}
+              streamingStatus={streamStatus || '正在处理…'}
               onConversationForked={openForkedConversation}
               onProjectHandoff={handleProjectHandoff}
             />
           ))}
-          {sending && (
-            <div className={styles.msgRow}>
-              <div className={styles.avatar}>AI</div>
-              <div className={styles.msgBody}>
-                <div className={styles.typing}>
-                  <span className={styles.typingText}>{streamStatus || '正在处理…'}</span>
-                  <span className={styles.typingDot} /><span className={styles.typingDot} /><span className={styles.typingDot} />
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         <form className={styles.composer} onSubmit={handleSend}>

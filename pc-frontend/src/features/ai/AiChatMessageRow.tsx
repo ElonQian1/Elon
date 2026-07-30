@@ -45,6 +45,8 @@ interface AiChatMessageRowProps {
   index: number
   message: AiMessage
   user: User | null
+  streaming?: boolean
+  streamingStatus?: string
   onConversationForked?: (conversationId: string) => void | Promise<void>
   onProjectHandoff?: (handoff: AiHandoff, candidate?: AiProjectCandidate) => void | Promise<void>
 }
@@ -54,6 +56,8 @@ export default function AiChatMessageRow({
   index,
   message,
   user,
+  streaming = false,
+  streamingStatus = '正在生成回答…',
   onConversationForked,
   onProjectHandoff,
 }: AiChatMessageRowProps) {
@@ -84,7 +88,12 @@ export default function AiChatMessageRow({
             <span className={styles.toolTag}>{message.tool_used === 'web_search' ? '已联网查询' : message.tool_used === 'calculator' ? '计算器' : message.tool_used === 'current_datetime' ? '实时时间' : '已使用工具'}</span>
           )}
         </div>
-        {hasMarkdown
+        {streaming && !content.trim()
+          ? <div className={styles.typing} aria-live="polite">
+            <span className={styles.typingText}>{streamingStatus}</span>
+            <span className={styles.typingDot} /><span className={styles.typingDot} /><span className={styles.typingDot} />
+          </div>
+          : hasMarkdown
           ? <div id={copySourceId} className={styles.msgContent}><MarkdownContent content={content} copy /></div>
           : <div id={copySourceId} className={styles.msgContent}>{content}</div>}
         {!isUser && message.sources && message.sources.length > 0 && (
