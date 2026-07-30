@@ -28,7 +28,8 @@ function Invoke-Guard {
     param(
         [string]$Repo,
         [string]$Base,
-        [switch]$Staged
+        [switch]$Staged,
+        [switch]$AutomationHandoff
     )
     $arguments = @(
         "-NoProfile", "-ExecutionPolicy", "Bypass",
@@ -36,6 +37,7 @@ function Invoke-Guard {
         "-BaseRef", $Base
     )
     if ($Staged) { $arguments += "-Staged" }
+    if ($AutomationHandoff) { $arguments += "-AutomationHandoff" }
     Push-Location $Repo
     $oldPreference = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
@@ -109,10 +111,44 @@ try {
     $staged = Invoke-Guard $stagedRepo "HEAD" -Staged
     Assert-True ($staged.Code -ne 0) "staged giant document was not blocked before commit"
 
+    $handoffRepo = Join-Path $tempRoot "handoff"
+    $null = New-TestRepo $handoffRepo
+    [System.IO.File]::WriteAllText((Join-Path $handoffRepo "docs\handoff-giant.md"), $giantFormal)
+    & git -C $handoffRepo add docs/handoff-giant.md
+    $handoff = Invoke-Guard $handoffRepo "HEAD" -Staged -AutomationHandoff
+    Assert-True ($handoff.Code -eq 0) "pre-commit automation handoff should allow the local commit: $($handoff.Output)"
+    Assert-True ($handoff.Output -match "deferred_to_post_commit_automation") "handoff did not report deferred automation"
+    $signalPath = (& git -C $handoffRepo rev-parse --git-path "elon/document-organization-trigger.json").Trim()
+    if (-not [System.IO.Path]::IsPathRooted($signalPath)) {
+        $signalPath = Join-Path $handoffRepo $signalPath
+    }
+    Assert-True (Test-Path -LiteralPath $signalPath -PathType Leaf) "handoff signal was not persisted"
+    $signal = [System.IO.File]::ReadAllText($signalPath) | ConvertFrom-Json
+    Assert-True ($signal.severity -eq "blocking") "handoff severity was not blocking"
+    Assert-True (@($signal.paths) -contains "docs/handoff-giant.md") "handoff signal omitted the changed document"
+
+    $warningHandoffRepo = Join-Path $tempRoot "warning-handoff"
+    $warningBase = New-TestRepo $warningHandoffRepo
+    New-Item -ItemType Directory -Force -Path (Join-Path $warningHandoffRepo "docs\inbox") | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $warningHandoffRepo "docs\inbox\source.md"), $sourceContent)
+    & git -C $warningHandoffRepo add docs/inbox/source.md
+    $warningHandoff = Invoke-Guard $warningHandoffRepo $warningBase -Staged -AutomationHandoff
+    Assert-True ($warningHandoff.Code -eq 0) "source warning handoff failed: $($warningHandoff.Output)"
+    $warningSignalPath = (& git -C $warningHandoffRepo rev-parse --git-path "elon/document-organization-trigger.json").Trim()
+    if (-not [System.IO.Path]::IsPathRooted($warningSignalPath)) {
+        $warningSignalPath = Join-Path $warningHandoffRepo $warningSignalPath
+    }
+    $warningSignal = [System.IO.File]::ReadAllText($warningSignalPath) | ConvertFrom-Json
+    Assert-True ($warningSignal.severity -eq "warning") "source material did not produce a warning trigger"
+
     $preCommit = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".githooks\pre-commit"))
+    $postCommit = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".githooks\post-commit"))
     $prePush = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".githooks\pre-push"))
     Assert-True ($preCommit.Contains("check-document-modularity.ps1")) "pre-commit hook does not run the document guard"
+    Assert-True ($preCommit.Contains("-AutomationHandoff")) "pre-commit hook does not enable automatic handoff"
+    Assert-True ($postCommit.Contains("dispatch-document-organization.ps1")) "post-commit hook does not dispatch the persisted signal"
     Assert-True ($prePush.Contains("check-document-modularity.ps1")) "pre-push hook does not repeat the document guard"
+    Assert-True (-not $prePush.Contains("-AutomationHandoff")) "pre-push must keep the strict document gate"
 
     Write-Host "DOCUMENT_MODULARITY_GUARD_TEST=passed"
 } finally {

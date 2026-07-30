@@ -12,6 +12,7 @@
 param(
     [string]$BaseRef = "origin/main",
     [switch]$Staged,
+    [switch]$AutomationHandoff,
     [switch]$AllowFormalGrowth,
     [int]$MaxLines = 800,
     [int]$MaxBytes = 50000,
@@ -32,6 +33,54 @@ function Stop-DocumentGuard {
     param([string]$Message)
     Write-Error $Message
     exit 1
+}
+
+function Get-AutomationSignalPath {
+    $gitPath = (& git rev-parse --git-path "elon/document-organization-trigger.json").Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($gitPath)) {
+        Stop-DocumentGuard "Cannot resolve the document organization signal path."
+    }
+    if ([System.IO.Path]::IsPathRooted($gitPath)) {
+        return [System.IO.Path]::GetFullPath($gitPath)
+    }
+    return [System.IO.Path]::GetFullPath((Join-Path (Get-Location) $gitPath))
+}
+
+function Remove-AutomationSignal {
+    if (-not $AutomationHandoff) { return }
+    $signalPath = Get-AutomationSignalPath
+    Remove-Item -LiteralPath $signalPath -Force -ErrorAction SilentlyContinue
+}
+
+function Write-AutomationSignal {
+    param(
+        [string]$RepoRoot,
+        [array]$ChangedDocuments,
+        [array]$Failures,
+        [array]$Warnings
+    )
+    $signalPath = Get-AutomationSignalPath
+    $signalDirectory = Split-Path -Parent $signalPath
+    New-Item -ItemType Directory -Force -Path $signalDirectory | Out-Null
+    $head = (& git rev-parse HEAD).Trim()
+    $payload = [ordered]@{
+        version = 1
+        workspace_path = [System.IO.Path]::GetFullPath($RepoRoot)
+        base_head = $head
+        severity = if ($Failures.Count -gt 0) { "blocking" } else { "warning" }
+        staged = [bool]$Staged
+        paths = @($ChangedDocuments | ForEach-Object { $_.CurrentPath } | Sort-Object -Unique)
+        reasons = @($Failures) + @($Warnings)
+        created_at = [DateTimeOffset]::UtcNow.ToString("O")
+    }
+    $temporaryPath = "$signalPath.$([guid]::NewGuid().ToString('N')).tmp"
+    [System.IO.File]::WriteAllText(
+        $temporaryPath,
+        ($payload | ConvertTo-Json -Depth 6),
+        [System.Text.UTF8Encoding]::new($false)
+    )
+    Move-Item -LiteralPath $temporaryPath -Destination $signalPath -Force
+    Write-Host "DOCUMENT_AUTOMATION_SIGNAL=$signalPath"
 }
 
 function ConvertTo-NormalizedPath {
@@ -251,6 +300,13 @@ function Invoke-DocumentModularityGuard {
     foreach ($warning in $warnings) {
         Write-Host "DOCUMENT_MODULARITY_WARNING=$warning" -ForegroundColor Yellow
     }
+    if ($AutomationHandoff) {
+        if ($failures.Count -gt 0 -or $warnings.Count -gt 0) {
+            Write-AutomationSignal $repoRoot $changed $failures $warnings
+        } else {
+            Remove-AutomationSignal
+        }
+    }
     if ($failures.Count -gt 0) {
         Write-Host "DOCUMENT_MODULARITY_GUARD=failed" -ForegroundColor Red
         foreach ($failure in $failures) {
@@ -258,6 +314,11 @@ function Invoke-DocumentModularityGuard {
         }
         Write-Host "SPLIT_REQUIRED=Keep a short README/index and move each responsibility into focused sibling documents." -ForegroundColor Red
         Write-Host "MCP_REVIEW=Run project_docs_review_modularity for the affected paths before committing again." -ForegroundColor Red
+        if ($AutomationHandoff) {
+            Write-Host "DOCUMENT_MODULARITY_GUARD=deferred_to_post_commit_automation" -ForegroundColor Yellow
+            Write-Host "PUSH_REMAINS_BLOCKED=pre-push keeps the strict modularity guard until focused documents replace the giant formal document." -ForegroundColor Yellow
+            return
+        }
         Stop-DocumentGuard "Document modularity guard failed. Do not commit a growing giant formal document."
     }
     Write-Host "DOCUMENT_MODULARITY_GUARD=passed checked=$($changed.Count) warnings=$($warnings.Count)"

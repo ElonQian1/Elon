@@ -77,6 +77,7 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/project-docs/organization/apply-suggestions",
             post(apply_suggestions_handler),
         )
+        .merge(crate::project_document_automation_trigger_api::routes())
 }
 
 #[cfg(test)]
@@ -104,6 +105,7 @@ pub(crate) fn test_routes() -> Router {
             "/api/project-docs/organization/apply-suggestions",
             post(apply_suggestions_handler),
         )
+        .merge(crate::project_document_automation_trigger_api::test_routes())
 }
 
 async fn start_handler(Json(request): Json<OperationRequest>) -> axum::response::Response {

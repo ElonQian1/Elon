@@ -228,6 +228,49 @@ async fn loopback_api_exposes_the_same_trace_contract() {
         .await
         .unwrap();
     assert_eq!(started["trace"]["current_stage"], "requested");
+    let automatic: serde_json::Value = client
+        .post(format!("{base}/automatic-trigger"))
+        .json(&json!({
+            "project_root": root_string.clone(),
+            "commit_sha": "e".repeat(40),
+            "severity": "blocking",
+            "paths": ["docs/large.md"],
+            "reasons": ["formal document entered the red zone"]
+        }))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(automatic["trigger"]["status"], "pending");
+    let pending: serde_json::Value = client
+        .post(format!("{base}/automatic-trigger/pending"))
+        .json(&json!({"project_root": root_string.clone()}))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(
+        pending["trigger"]["trigger_id"],
+        automatic["trigger"]["trigger_id"]
+    );
+    let claimed: serde_json::Value = client
+        .post(format!("{base}/automatic-trigger/claim"))
+        .json(&json!({
+            "project_root": root_string.clone(),
+            "trigger_id": automatic["trigger"]["trigger_id"],
+            "operation_id": automatic["trigger"]["operation_id"]
+        }))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(claimed["trigger"]["status"], "claimed");
     let status: serde_json::Value = client
         .post(format!("{base}/status"))
         .json(&json!({"project_root":root_string,"operation_id":"docs_http_test"}))

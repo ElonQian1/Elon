@@ -345,9 +345,17 @@ assert.equal(diagnoseConsistency({
 const workspaceSource = fs.readFileSync(path.join(
   __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentsWorkspace.tsx',
 ), 'utf8')
+const organizerSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'useProjectDocumentAiOrganizer.ts',
+), 'utf8')
 assert(!workspaceSource.includes('markSuggestionsRequested'), '启动 AI 前不得在主工作区预写建议占位文件')
-assert(workspaceSource.includes('const basePrompt = buildOrganizationPrompt'))
-assert(workspaceSource.includes('await onStartAiOrganize(scopeInstruction'))
+assert(workspaceSource.includes('useProjectDocumentAiOrganizer'))
+assert(organizerSource.includes('const basePrompt = buildOrganizationPrompt'))
+assert(organizerSource.includes('await onStartAiOrganize(scopeInstruction'))
+assert(organizerSource.includes('/api/project-docs/organization/automatic-trigger/pending'))
+assert(organizerSource.includes('/api/project-docs/organization/automatic-trigger/claim'))
+assert(organizerSource.includes('project_docs_review_modularity'))
+assert(organizerSource.includes('已否决或 excluded'))
 assert(workspaceSource.includes('useProjectDocumentGraphFreshness'))
 assert(workspaceSource.includes('await organization.applySuggestions'))
 assert(workspaceSource.includes('expectedWorkspace={organizationTracking.projectRoot}'))

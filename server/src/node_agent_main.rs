@@ -237,6 +237,8 @@ mod project_docs_scan;
 mod project_document_analysis_model;
 mod project_document_architecture;
 mod project_document_authorization;
+mod project_document_automation_trigger;
+mod project_document_automation_trigger_api;
 mod project_document_federation;
 mod project_document_federation_service;
 mod project_document_file_operation_model;

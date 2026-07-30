@@ -33,6 +33,13 @@ applyTo: "**/*.md"
 
 AI 首轮只根据路径和元数据形成分类、冲突和迁移建议，不自动提升权威性；无法确认的内容留在 `unclassified`。报告实际读取的文档数、估算 token 和默认排除范围。
 
+## 讨论编译与提交整理
+
+- 讨论原稿写入 `inbox/`、`drafts/` 或其它低权威来源目录；正式文档只保存已接受结论，并按稳定职责拆分。
+- 正式文档超过 800 行、50,000 UTF-8 字节或 40 个标题时进入红区；达到 75% 时提前拆分。
+- `pre-commit` 命中红区或预警时只在 Git 元数据保存整理信号，`post-commit` 把信号排入 Windows 节点，由 PC 文档工作台复用现有 AI 整理流程；节点离线时保留信号重试。
+- `pre-push` 和 CI 始终严格阻止未拆分的巨型正式文档进入远端。自动触发不能替代拆分、索引更新和检索验收。
+
 ## 分区和 AI 建议
 
 - `.elon/document-sections.json` 保存所有 AI 供应商共享的项目知识架构：项目类型 `profile`、知识首页 `home`、最多四层主题 `sections`、主主题 `assignments`、副主题 `secondary_assignments`、四维治理 `governance_facets`、兼容快捷视图 `governance_overrides`、有类型语义关系/共享顺序/固定状态 `document_metadata`、功能/技术节点与证据引用 `knowledge_graph` 和最近 100 条结构操作 `audit_log`；不改变文件实际路径，也不复制正文。

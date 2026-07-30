@@ -44,7 +44,8 @@ applyTo: "**/*.md"
 - 一个正式文档只承担一个稳定职责。跨越产品背景、当前能力、架构、协议、经济模型、路线图和决策记录时，保留短 `README.md`/索引，并按职责拆成同目录子文档。
 - 默认红区与 `project_docs_review_modularity` 一致：超过 800 行、50,000 UTF-8 字节或 40 个 Markdown 标题中的任意一项，即视为需要拆分。达到 75% 时应提前拆分，不等到门禁失败。
 - `scripts/check-document-modularity.ps1` 执行增量检查：新的正式红区文档、正式文档跨入红区、已有正式红区文档继续增长都会失败；来源材料只告警并要求把已接受结论编译到正式模块。
-- `.githooks/pre-commit` 对暂存 Markdown 执行门禁，`.githooks/pre-push` 和 CI 再次复核相对 `origin/main` 的完整改动。失败后先调用 `project_docs_review_modularity` 获取职责候选，再拆分正文、更新索引和检索验收。
+- `.githooks/pre-commit` 对暂存 Markdown 执行检测；命中红区或预警时把工作区、路径和原因写入 Git 元数据中的持久信号，允许本地提交继续。`.githooks/post-commit` 把该信号排入 Windows 节点，PC 文档工作台复用当前 AI 开发频道自动调用 `project_docs_review_modularity`、按职责整理并运行检索验收；节点暂时离线时信号保留到后续提交重试。
+- `.githooks/pre-push` 和 CI 始终使用不带自动接力的严格模式，复核相对 `origin/main` 的完整改动。自动整理尚未完成时必须阻止 push；不得把自动触发理解为允许巨型正式文档进入远端。
 - 程序不得按标题机械切割并自动提交。标题边界不一定等于职责边界；拆分必须保持链接、权威状态、来源引用、知识图节点及 Git 历史可追溯。
 
 ## 分区和 AI 建议的可移植约定

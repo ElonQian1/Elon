@@ -153,9 +153,9 @@ export function useProjectDocumentOrganization(
     }
   }, [load, trace?.current_stage])
 
-  const startRun = useCallback(async () => {
+  const startRun = useCallback(async (requestedOperationId?: string) => {
     if (!trackingAvailable) return undefined
-    const operationId = newDocumentOrganizationOperationId()
+    const operationId = requestedOperationId || newDocumentOrganizationOperationId()
     const started = await trackingRequest('/api/project-docs/organization/start', {
       operation_id: operationId,
     })

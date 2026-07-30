@@ -63,7 +63,6 @@ import {
 } from './projectDocumentCommands'
 import { type DocumentCatalog, type DocumentFile } from './projectDocumentModel'
 import {
-  buildOrganizationPrompt,
   customSectionKey,
   GOVERNANCE_OVERVIEW_SECTION,
   governanceSectionForDocument,
@@ -71,6 +70,7 @@ import {
   type DocumentSection,
 } from './projectDocumentSections'
 import styles from './ProjectDocumentsWorkspace.module.css'
+import { useProjectDocumentAiOrganizer } from './useProjectDocumentAiOrganizer'
 import { useProjectDocumentOrganization } from './useProjectDocumentOrganization'
 import { useProjectDocumentGraphFreshness } from './useProjectDocumentGraphFreshness'
 import { normalizeProjectDocumentPath as normalizeDocumentPath, projectDocumentErrorMessage as errorMessage } from './projectDocumentWorkspaceHelpers'
@@ -111,7 +111,6 @@ export default function ProjectDocumentsWorkspace({
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [message, setMessage] = useState('')
   const [viewMode, setViewMode] = useState<ProjectDocumentViewMode>('split')
-  const [organizing, setOrganizing] = useState(false)
   const [applyingSuggestions, setApplyingSuggestions] = useState(false)
   const [applyingFileOperations, setApplyingFileOperations] = useState(false)
   const [commandBusy, setCommandBusy] = useState(false)
@@ -122,6 +121,16 @@ export default function ProjectDocumentsWorkspace({
   const [viewPreferences, setViewPreferences] = useState<ProjectDocumentViewPreferences>(() => loadDocumentViewPreferences(projectId))
   const organization = useProjectDocumentOrganization(projectId, organizationTracking)
   const automationPolicy = useProjectDocumentAutomationPolicy(projectId)
+  const { organizing, startAiOrganize } = useProjectDocumentAiOrganizer({
+    projectName,
+    catalog,
+    canStartAi,
+    trackingRuntime: organizationTracking,
+    organization,
+    automationMode: automationPolicy.mode,
+    onStartAiOrganize,
+    onMessage: setMessage,
+  })
   const architectureHealth = useMemo(() => serverArchitectureHealth(
     catalog, analyzeKnowledgeArchitecture(catalog, organization.manifest),
   ), [catalog, organization.manifest])
@@ -328,35 +337,6 @@ export default function ProjectDocumentsWorkspace({
           : '治理归类已保存；主题知识树和真实文件路径均未改变。')
     } catch (error) {
       setMessage(errorMessage(error, '保存文档分区失败'))
-    }
-  }
-
-  async function startAiOrganize(scopeInstruction = '') {
-    if (!catalog || !canStartAi) return
-    setOrganizing(true)
-    setMessage('')
-    let operationId: string | undefined
-    try {
-      operationId = await organization.startRun()
-      const basePrompt = buildOrganizationPrompt(
-        projectName,
-        catalog,
-        organization.manifest,
-        operationId,
-        automationPolicy.mode,
-      )
-      const response = await onStartAiOrganize(scopeInstruction
-        ? `${basePrompt}\n\n本次菜单范围：${scopeInstruction}`
-        : basePrompt)
-      await organization.markDispatched(operationId, response?.task_id)
-      setMessage(operationId
-        ? 'AI 整理任务已发起；可在“AI 整理建议”分区观察 MCP 每一步。'
-        : 'AI 整理任务已发起；当前运行路线不提供本机 MCP 分阶段观测。')
-    } catch (error) {
-      await organization.markFailed(operationId, errorMessage(error, '无法发起 AI 整理任务'))
-      setMessage(errorMessage(error, '无法发起 AI 整理任务'))
-    } finally {
-      setOrganizing(false)
     }
   }
 
