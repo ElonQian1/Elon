@@ -354,7 +354,7 @@ fn inferred_facets(document: &ProjectDocumentEntry) -> DocumentGovernanceFacets 
         "archive" | "discussion" | "note" | "status" | "report" | "project_template"
     );
     DocumentGovernanceFacets {
-        retrieval: if matches!(role, "policy" | "router") {
+        retrieval: if matches!(role, "policy" | "router" | "current_status") {
             "required"
         } else if excluded {
             "excluded"
@@ -423,7 +423,9 @@ fn clamp_authority(base: &str, requested: &str) -> String {
 fn authority_level(value: &str) -> &'static str {
     match value {
         "repository_policy" | "repository_routing" | "domain_policy" => "binding",
-        "normative" | "approved" | "operational" | "decision_record" => "authoritative",
+        "normative" | "approved" | "operational" | "decision_record" | "project_status" => {
+            "authoritative"
+        }
         "evidence" => "evidence",
         "proposal" => "proposal",
         "none" => "none",

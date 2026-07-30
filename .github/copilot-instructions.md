@@ -8,6 +8,8 @@
 
 一龙是云端 APK 开发平台。本仓库中的 `android/`、`server/`、`pc-frontend/`、`scripts/` 都属于一龙自项目；用户子项目位于独立项目目录，不能套用一龙自身的发布脚本。
 
+项目现状以 `AI_CURRENT.md` 为准。
+
 - 一龙 Android 发布只走 `scripts/publish-apk.*`，不能用 Debug 包代替可安装端发布。
 - 后端发布只走 `scripts/publish-server.*`；Win 节点发布只走 `scripts/publish-node-agent.ps1`。
 - 发布版本由服务器 claim/finish 分配，不手改并提交 `server/Cargo.toml` 或 `build.gradle` 版本号。
@@ -72,4 +74,4 @@ APP UI：`APP_UI_RELEASE_POLICY=publish_before_optional_renderer`。默认不用
 - APP 纯视觉微调读 `docs/app-ui-fast-lane.md`；复杂 UI 再读完整设计规则。
 - 带 `#requires -Version 7.0` 的脚本必须用 `pwsh`，不能删要求或降级脚本来绕过。
 
-所有专项文档、验证命令和发布细节从 `AGENTS.md` 路由，不固定全量读取。
+专项文档和命令从 `AGENTS.md` 路由。

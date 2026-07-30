@@ -24,9 +24,11 @@ use crate::{
     },
 };
 use context_match::{
-    context_query_terms, context_reason, explicit_document_matches, is_historical_noise,
-    is_task_specific_customization, manifest_entrypoint_score,
+    context_query_terms, context_reason, explicit_document_matches, governance_intent_score,
+    is_historical_noise, is_task_specific_customization, manifest_entrypoint_score,
 };
+
+const EXPLICIT_DOCUMENT_SCORE: usize = 10_000;
 
 pub(crate) fn get_map(
     workspace: &Path,
@@ -395,14 +397,15 @@ pub(crate) fn plan_context(
                         && (facets.lifecycle == "draft" || facets.authority == "proposal"),
                 ) * 80;
             let entrypoint_score = manifest_entrypoint_score(&path, &query_terms, &manifest);
-            let score = usize::from(explicitly_requested) * 2_000
+            let score = usize::from(explicitly_requested) * EXPLICIT_DOCUMENT_SCORE
                 + usize::from(linked_entrypoints.contains(&path)) * 800
                 + usize::from(linked.contains(&path)) * 100
                 + linked_entrypoint_scores.get(&path).copied().unwrap_or(0)
                 + term_score
                 + authority_score
                 + lifecycle_score
-                + entrypoint_score;
+                + entrypoint_score
+                + governance_intent_score(&query_lower, term_score, &facets);
             (score, document)
         })
         .filter(|(score, _)| *score >= 20)

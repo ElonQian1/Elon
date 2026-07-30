@@ -27,6 +27,14 @@ const DEFAULT_PROJECT_FILES: &[DefaultProjectFile] = &[
         )),
     },
     DefaultProjectFile {
+        path: "AI_CURRENT.md",
+        title: Some("AI 当前状态"),
+        content: include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../default-project-docs/files/AI_CURRENT.md"
+        )),
+    },
+    DefaultProjectFile {
         path: "AI_PROJECT.md",
         title: Some("AI 项目定位"),
         content: include_str!(concat!(

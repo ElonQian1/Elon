@@ -2,10 +2,15 @@ use std::{fs, path::Path};
 
 use serde::Serialize;
 
-const PROJECT_DOCS_TOTAL_BUDGET: usize = 8_000;
+const PROJECT_DOCS_TOTAL_BUDGET: usize = 9_600;
 const TRUNCATION_MARKER: &str = "\n<!-- project doc truncated by projectDocs budget -->\n";
 
 const PROJECT_DOC_SPECS: &[ProjectDocSpec] = &[
+    ProjectDocSpec {
+        path: "AI_CURRENT.md",
+        max_chars: 2_000,
+        role: "current_status",
+    },
     ProjectDocSpec {
         path: "AI_PROJECT.md",
         max_chars: 2_400,

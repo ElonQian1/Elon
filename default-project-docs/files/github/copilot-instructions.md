@@ -14,7 +14,7 @@
 ## 开始任务
 
 1. 查看当前目录、Git 状态和用户需求。
-2. 阅读 `AGENTS.md` 和本文件。
+2. 阅读 `AGENTS.md`、本文件和 `AI_CURRENT.md`；不得用旧讨论或草稿覆盖当前状态。
 3. 按任务读取相关专项文档：
    - Git、提交、分支、发布、回滚：`.github/instructions/git-workflow.instructions.md`
    - 项目文档、笔记、权威性、归档、低 token 整理：`.github/instructions/document-authority.instructions.md`

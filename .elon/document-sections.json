@@ -6,6 +6,7 @@
     "summary": "一龙是由服务端、PC Web 工作台、Windows 节点和 Android 客户端组成的 AI 协作平台。先从项目总览理解范围，再按平台架构、客户端、AI 上下文、项目系统和运维主题深入；权威性、生命周期和检索优先级在治理视图中独立判断。",
     "entrypoint": "docs/README.md",
     "start_here": [
+      "AI_CURRENT.md",
       "AI_ARCHITECTURE.md",
       "AI_INDEX.md",
       "AI_PROJECT.md",
@@ -188,6 +189,7 @@
   "assignments": {
     "AGENTS.md": "custom:ai-context",
     "AI_ARCHITECTURE.md": "custom:architecture",
+    "AI_CURRENT.md": "custom:overview",
     "AI_INDEX.md": "custom:overview",
     "AI_PROJECT.md": "custom:overview",
     "AI_RULES.md": "custom:ai-context",
@@ -209,6 +211,7 @@
     "docs/cli会话问题/单纯Codex cli上下文会话.md": "custom:external-tools",
     "docs/cli会话问题/纯Codex cli图片会话.md": "custom:external-tools",
     "docs/codex-vault-sharing-runbook.md": "custom:security",
+    "docs/decisions/reject-ai-to-ai-skill-route.md": "custom:product-direction-decisions",
     "docs/decisions/reject-demo-oracle-role.md": "custom:product-direction-decisions",
     "docs/decisions/open-commerce-network-principles.md": "custom:open-commerce-network",
     "docs/decisions/open-commerce-network-v1-architecture.md": "custom:open-commerce-network",
@@ -371,6 +374,12 @@
       "authority": "authoritative",
       "document_type": "architecture"
     },
+    "AI_CURRENT.md": {
+      "retrieval": "required",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "current_status"
+    },
     "AI_INDEX.md": {
       "retrieval": "on_demand",
       "lifecycle": "active",
@@ -426,6 +435,12 @@
       "document_type": "architecture_decision"
     },
     "docs/decisions/reject-demo-oracle-role.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "decision"
+    },
+    "docs/decisions/reject-ai-to-ai-skill-route.md": {
       "retrieval": "on_demand",
       "lifecycle": "active",
       "authority": "authoritative",
@@ -577,6 +592,43 @@
     }
   },
   "document_metadata": {
+    "AI_CURRENT.md": {
+      "doc_type": "current_status",
+      "audience": [
+        "开发者",
+        "AI 代理",
+        "产品负责人"
+      ],
+      "owner": "项目维护者",
+      "reviewed_at": "2026-07-30",
+      "review_interval_days": 30,
+      "implementation_refs": [
+        "file:server/src/main.rs",
+        "file:server/src/open_commerce_service.rs",
+        "file:pc-frontend/src/App.tsx"
+      ],
+      "related": [
+        "AI_PROJECT.md",
+        "docs/open-commerce/capability-baseline.md",
+        "docs/decisions/reject-demo-oracle-role.md",
+        "docs/decisions/reject-ai-to-ai-skill-route.md"
+      ]
+    },
+    "docs/decisions/reject-ai-to-ai-skill-route.md": {
+      "doc_type": "decision",
+      "audience": [
+        "AI 代理",
+        "产品负责人"
+      ],
+      "owner": "产品方向",
+      "reviewed_at": "2026-07-30",
+      "review_interval_days": 180,
+      "implementation_refs": [],
+      "related": [
+        "AI_CURRENT.md",
+        "docs/decisions/reject-demo-oracle-role.md"
+      ]
+    },
     "docs/decisions/reject-demo-oracle-role.md": {
       "doc_type": "decision",
       "audience": [
@@ -1493,6 +1545,7 @@
         "color": "#4FA9B8",
         "entrypoint": "docs/system-architecture.md",
         "document_paths": [
+          "AI_CURRENT.md",
           "AI_ARCHITECTURE.md",
           "docs/system-architecture.md"
         ],
@@ -1593,6 +1646,7 @@
         "color": "#69B5D0",
         "entrypoint": "docs/project-document-governance-mcp.md",
         "document_paths": [
+          "AI_CURRENT.md",
           "AI_ARCHITECTURE.md",
           "docs/project-document-governance-mcp.md"
         ],

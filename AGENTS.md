@@ -5,14 +5,15 @@
 ## 必读顺序
 
 1. 读 `.github/copilot-instructions.md` 和本文件。
-2. 只读命中的专项文档；Codex CLI 再读 `CODEX.md`。
-3. 不全量读取 instructions、docs、Prompt、Agent 或 Skill。
+2. 读 `AI_CURRENT.md`，确认当前事实、提案和已禁用路线。
+3. 只读命中的专项文档；Codex CLI 再读 `CODEX.md`。
+4. 不全量读取 instructions、docs、Prompt、Agent 或 Skill。
 
 ## 任务路由
 
 | 任务类型 | 继续读取或执行 |
 |---|---|
-| 项目定位、架构、模块入口、任务模板 | `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
+| 项目定位、当前状态、架构、模块入口、任务模板 | `AI_CURRENT.md`、`AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
 | 文档、笔记、归档、低 token 整理 | `.github/instructions/document-authority.instructions.md` |
 | 长聊天拆分、讨论分叉、脑图 | `.github/instructions/discussion-knowledge.instructions.md` |
 | Git、worktree、提交、push、部署、发布 | `.github/instructions/git-deploy-workflow.instructions.md` |

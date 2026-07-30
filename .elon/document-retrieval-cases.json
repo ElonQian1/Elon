@@ -2,6 +2,18 @@
   "version": 1,
   "cases": [
     {
+      "id": "current-project-status",
+      "query": "项目当前已经实现什么、正在建设什么、哪些只是提案或已经否决？",
+      "expected_paths": [
+        "AI_CURRENT.md"
+      ],
+      "forbidden_paths": [
+        "docs/inbox/conversations/2026-07-30-open-commerce-and-sui-follow-up.md",
+        "docs/inbox/conversations/2026-07-30-demo-oracle-rejection.md"
+      ],
+      "require_first": "AI_CURRENT.md"
+    },
+    {
       "id": "open-commerce-current-baseline",
       "query": "项目现在已经实现哪些开放商业能力，哪些仍然只是 Sui 提案？请先读《一龙开放商业能力基线》。",
       "expected_paths": [
@@ -70,6 +82,15 @@
         "docs/inbox/conversations/2026-07-30-demo-oracle-rejection.md"
       ],
       "require_first": "docs/decisions/reject-demo-oracle-role.md"
+    },
+    {
+      "id": "rejected-ai-to-ai-skill-route",
+      "query": "项目现在是否采用 AI-to-AI Skill、Skill 市场或 Skill-to-Skill 调度作为主架构？",
+      "expected_paths": [
+        "docs/decisions/reject-ai-to-ai-skill-route.md"
+      ],
+      "forbidden_paths": [],
+      "require_first": "docs/decisions/reject-ai-to-ai-skill-route.md"
     }
   ]
 }

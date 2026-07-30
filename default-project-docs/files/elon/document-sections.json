@@ -7,6 +7,7 @@
     "entrypoint": "docs/project-readme.md",
     "start_here": [
       "docs/project-readme.md",
+      "AI_CURRENT.md",
       "AI_PROJECT.md",
       "AI_ARCHITECTURE.md",
       "AI_INDEX.md"
@@ -21,6 +22,7 @@
     { "id": "unassigned-topic", "label": "未归主题", "detail": "尚未确定主要业务主题；不代表文档权威性", "color": "#8A91A3", "parent_id": "", "order": 90, "icon": "circle-help", "entrypoint": "" }
   ],
   "assignments": {
+    "AI_CURRENT.md": "custom:overview",
     "AI_PROJECT.md": "custom:overview",
     "docs/project-readme.md": "custom:overview",
     "AI_ARCHITECTURE.md": "custom:architecture",
@@ -28,9 +30,17 @@
     "AI_TASK_TEMPLATE.md": "custom:guides"
   },
   "secondary_assignments": {},
-  "governance_facets": {},
+  "governance_facets": {
+    "AI_CURRENT.md": {
+      "retrieval": "required",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "current_status"
+    }
+  },
   "governance_overrides": {},
   "document_metadata": {
+    "AI_CURRENT.md": { "doc_type": "current_status", "audience": ["项目成员", "AI 代理"], "owner": "", "version": "", "related": ["AI_PROJECT.md"], "supersedes": [] },
     "docs/project-readme.md": { "doc_type": "overview", "audience": ["项目成员"], "owner": "", "version": "", "related": ["AI_PROJECT.md"], "supersedes": [] },
     "AI_ARCHITECTURE.md": { "doc_type": "architecture", "audience": ["开发者", "AI 代理"], "owner": "", "version": "", "related": ["AI_INDEX.md"], "supersedes": [] },
     "AI_INDEX.md": { "doc_type": "reference", "audience": ["开发者", "AI 代理"], "owner": "", "version": "", "related": ["AI_ARCHITECTURE.md"], "supersedes": [] }

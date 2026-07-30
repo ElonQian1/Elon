@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use serde_json::{json, Value};
 
-use crate::project_document_governance::DocumentSectionManifest;
+use crate::{
+    project_document_governance::DocumentSectionManifest,
+    project_document_governance_facets::DocumentGovernanceFacets,
+};
 
 use super::normalize;
 
@@ -92,6 +95,52 @@ pub(super) fn context_reason(
     })
 }
 
+pub(super) fn governance_intent_score(
+    query: &str,
+    term_score: usize,
+    facets: &DocumentGovernanceFacets,
+) -> usize {
+    let current_status_requested = [
+        "当前",
+        "现在",
+        "现状",
+        "已经实现",
+        "已实现",
+        "正在建设",
+        "当前事实",
+        "current status",
+        "implemented",
+    ]
+    .iter()
+    .any(|term| query.contains(term));
+    if current_status_requested && facets.document_type == "current_status" {
+        return 2_500 + term_score;
+    }
+
+    let direct_decision_requested = ["是否采用", "是否使用", "主架构", "不采用"]
+        .iter()
+        .any(|term| query.contains(term));
+    let decision_requested = direct_decision_requested
+        || ["否决", "拒绝", "弃用", "决定", "decision", "reject"]
+            .iter()
+            .any(|term| query.contains(term));
+    if decision_requested
+        && matches!(
+            facets.document_type.as_str(),
+            "decision" | "architecture_decision"
+        )
+    {
+        let intent_score = if direct_decision_requested {
+            4_000
+        } else {
+            1_600
+        };
+        return intent_score + term_score.saturating_mul(4);
+    }
+
+    0
+}
+
 pub(super) fn explicit_document_matches(
     documents: &[homecli_proto::ProjectDocumentEntry],
     query: &str,
@@ -122,6 +171,12 @@ pub(super) fn context_query_terms(query: &str) -> Vec<String> {
         .map(str::to_string)
         .collect::<Vec<_>>();
     for keyword in [
+        "当前",
+        "现状",
+        "已实现",
+        "正在建设",
+        "否决",
+        "拒绝",
         "文档",
         "知识",
         "治理",

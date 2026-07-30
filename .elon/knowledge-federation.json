@@ -11,7 +11,7 @@
         "title": "一龙项目知识中心",
         "summary": "平台级知识入口；向下联邦到服务端、PC、节点、Android 和独立子项目。",
         "entrypoint": "docs/README.md",
-        "start_here": ["docs/README.md", "AI_PROJECT.md", "AI_ARCHITECTURE.md", "AI_INDEX.md"]
+        "start_here": ["AI_CURRENT.md", "docs/README.md", "AI_PROJECT.md", "AI_ARCHITECTURE.md", "AI_INDEX.md"]
       }
     },
     {
@@ -21,12 +21,12 @@
       "scope_path": "",
       "profile": "software-platform",
       "owner": "项目维护者",
-      "include_globs": ["docs/README.md", "AI_PROJECT.md", "AI_ARCHITECTURE.md", "AI_INDEX.md", "docs/system-architecture.md"],
+      "include_globs": ["AI_CURRENT.md", "docs/README.md", "AI_PROJECT.md", "AI_ARCHITECTURE.md", "AI_INDEX.md", "docs/system-architecture.md"],
       "home": {
         "title": "平台总览与核心架构",
         "summary": "从平台定位、模块边界和推荐阅读入口理解一龙整体系统。",
         "entrypoint": "docs/README.md",
-        "start_here": ["AI_PROJECT.md", "AI_ARCHITECTURE.md"]
+        "start_here": ["AI_CURRENT.md", "AI_PROJECT.md", "AI_ARCHITECTURE.md"]
       }
     },
     {
@@ -66,7 +66,7 @@
       "scope_path": "",
       "profile": "software-platform",
       "owner": "AI 平台",
-      "include_globs": ["AGENTS.md", "AI_RULES.md", "AI_TASK_TEMPLATE.md", "CODEX.md", ".github/copilot-instructions.md", "docs/ai-agent-workflow.md", "docs/ai-to-ai-*.md", "docs/记忆系统.md"],
+      "include_globs": ["AGENTS.md", "AI_CURRENT.md", "AI_RULES.md", "AI_TASK_TEMPLATE.md", "CODEX.md", ".github/copilot-instructions.md", "docs/ai-agent-workflow.md", "docs/记忆系统.md"],
       "home": {
         "title": "AI 运行与上下文模块",
         "summary": "多供应商任务入口、上下文编译、RAG、工作流和代理定制资产。",

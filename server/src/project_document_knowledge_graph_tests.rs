@@ -346,6 +346,100 @@ fn explicit_draft_path_overrides_default_retrieval_exclusion() {
 }
 
 #[test]
+fn current_fact_questions_prioritize_the_current_status_document() {
+    let root = fixture("current-status");
+    fs::write(
+        root.join("AI_CURRENT.md"),
+        "# 当前事实\n\n这是当前实现、建设中能力和已否决路线的短快照。\n",
+    )
+    .unwrap();
+    let manifest_path = root.join(".elon/document-sections.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+    manifest["assignments"]["AI_CURRENT.md"] = serde_json::json!("custom:overview");
+    manifest["governance_facets"]["AI_CURRENT.md"] = serde_json::json!({
+        "retrieval": "required",
+        "lifecycle": "active",
+        "authority": "authoritative",
+        "document_type": "current_status"
+    });
+    manifest["document_metadata"]["AI_CURRENT.md"] = serde_json::json!({
+        "doc_type": "current_status",
+        "owner": "test",
+        "reviewed_at": "2026-07-30",
+        "version_status": "current"
+    });
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+
+    let plan = plan_context(
+        &root,
+        "项目当前已经实现什么、正在建设什么、哪些已经否决？",
+        None,
+        3_000,
+        8,
+        1_000,
+    )
+    .unwrap();
+    assert_eq!(
+        plan["relevant_documents"][0]["document"]["path"],
+        "AI_CURRENT.md"
+    );
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
+fn route_status_questions_prioritize_the_relevant_decision() {
+    let root = fixture("route-decision");
+    let decision_path = "docs/decisions/reject-ai-to-ai-skill-route.md";
+    fs::create_dir_all(root.join("docs/decisions")).unwrap();
+    fs::write(
+        root.join(decision_path),
+        "# 否决 AI-to-AI Skill 路线\n\n该路线不作为当前主架构。\n",
+    )
+    .unwrap();
+    let manifest_path = root.join(".elon/document-sections.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&manifest_path).unwrap()).unwrap();
+    manifest["assignments"][decision_path] = serde_json::json!("custom:overview");
+    manifest["governance_facets"][decision_path] = serde_json::json!({
+        "retrieval": "on_demand",
+        "lifecycle": "active",
+        "authority": "authoritative",
+        "document_type": "decision"
+    });
+    manifest["document_metadata"][decision_path] = serde_json::json!({
+        "doc_type": "decision",
+        "owner": "test",
+        "reviewed_at": "2026-07-30",
+        "version_status": "current"
+    });
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
+
+    let plan = plan_context(
+        &root,
+        "项目现在是否采用 AI-to-AI Skill 或 Skill-to-Skill 调度作为主架构？",
+        None,
+        3_000,
+        8,
+        1_000,
+    )
+    .unwrap();
+    assert_eq!(
+        plan["relevant_documents"][0]["document"]["path"],
+        decision_path
+    );
+    fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn self_project_overview_is_bounded_and_fast_enough_for_interactive_use() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()

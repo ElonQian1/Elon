@@ -10,6 +10,11 @@ fn loads_existing_ai_project_docs_into_pack_section() {
     let workspace = temp_dir("elon_agent_project_docs");
     fs::create_dir_all(&workspace).unwrap();
     fs::write(
+        workspace.join("AI_CURRENT.md"),
+        "# Current\n\nImplemented facts.\n",
+    )
+    .unwrap();
+    fs::write(
         workspace.join("AI_PROJECT.md"),
         "# Demo\n\nProject overview.\n",
     )
@@ -18,9 +23,13 @@ fn loads_existing_ai_project_docs_into_pack_section() {
 
     let context = load_agent_project_docs(&workspace);
 
-    assert_eq!(context.included_count, 2);
-    assert_eq!(context.missing_count, PROJECT_DOC_SPECS.len() - 2);
+    assert_eq!(context.included_count, 3);
+    assert_eq!(context.missing_count, PROJECT_DOC_SPECS.len() - 3);
     assert!(context.pack_section.contains("<project_docs_context"));
+    assert!(context.pack_section.contains("AI_CURRENT.md"));
+    assert!(
+        context.pack_section.find("AI_CURRENT.md") < context.pack_section.find("AI_PROJECT.md")
+    );
     assert!(context.pack_section.contains("AI_PROJECT.md"));
     assert!(context.pack_section.contains("Project overview."));
     assert!(context.pack_section.contains("AI_RULES.md"));

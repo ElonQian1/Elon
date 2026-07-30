@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "template_version": "2026-07-27.1",
+  "template_version": "2026-07-30.1",
   "authority": ".github/copilot-instructions.md",
   "strategy": "copilot-primary-bridged-agents",
   "update_policy": {
@@ -25,6 +25,10 @@
     {
       "path": ".elon/document-sections.json",
       "role": "knowledge-architecture"
+    },
+    {
+      "path": "AI_CURRENT.md",
+      "role": "ai-current-status"
     },
     {
       "path": "AI_PROJECT.md",

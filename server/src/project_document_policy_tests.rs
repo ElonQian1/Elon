@@ -18,6 +18,11 @@ fn path_sets_authority_ceiling_and_default_retrieval() {
     assert_eq!(project_guide.role, "project_guide");
     assert!(!project_guide.default_retrieval);
 
+    let current_status = classify_project_document("AI_CURRENT.md", "# Current\n", 10);
+    assert_eq!(current_status.role, "current_status");
+    assert_eq!(current_status.authority, "project_status");
+    assert!(current_status.default_retrieval);
+
     let archive = classify_project_document(
         "docs/archive/requirements/old.md",
         "---\nstatus: active\nauthority: normative\n---\n# Old\n",

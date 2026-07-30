@@ -1,6 +1,6 @@
 # Elon AI Index
 
-本文件是给 AI 的高信噪比入口索引。需要规则时先读 `AGENTS.md`；需要项目事实时读 `AI_PROJECT.md`；需要架构分层时读 `AI_ARCHITECTURE.md`；需要具体实现时再按本文件定位源码。
+本文件是给 AI 的高信噪比入口索引。需要规则时先读 `AGENTS.md`；判断当前实现、提案或禁用路线时先读 `AI_CURRENT.md`；需要项目事实时读 `AI_PROJECT.md`；需要架构分层时读 `AI_ARCHITECTURE.md`；需要具体实现时再按本文件定位源码。
 
 ## 后端核心入口
 
@@ -31,6 +31,7 @@
 | SQLite 符号库 schema | `server/src/context_compiler/symbol_index_store.rs`、`symbol_index_embeddings.rs` |
 | fb2 AI Center / 子项目聊天语音和业务上下文 | `docs/fb2-ai-center/`、`server/src/external_app_*`、`android/chat-voice-kit/` |
 | 已否决的独立预言家 AI / Demo Oracle 议案 | `docs/decisions/reject-demo-oracle-role.md`（查询相关旧概念时必须先读） |
+| 已否决的 AI-to-AI Skill / Skill 市场路线 | `docs/decisions/reject-ai-to-ai-skill-route.md`（旧 Git 文档不得恢复为当前架构） |
 
 ## Android 核心入口
 

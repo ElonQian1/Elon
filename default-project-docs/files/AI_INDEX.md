@@ -6,10 +6,11 @@
 
 1. `AGENTS.md`
 2. `.github/copilot-instructions.md`
-3. `AI_PROJECT.md`
-4. `AI_ARCHITECTURE.md`
-5. `AI_RULES.md`
-6. `docs/project-readme.md`
+3. `AI_CURRENT.md`
+4. `AI_PROJECT.md`
+5. `AI_ARCHITECTURE.md`
+6. `AI_RULES.md`
+7. `docs/project-readme.md`
 
 ## 目录索引
 
@@ -48,7 +49,7 @@
 ## 检索建议
 
 - 知道关键词时先用 `rg`。
-- 不知道文件名时先读本索引和 `AI_PROJECT.md`。
+- 不知道文件名时先读本索引、`AI_CURRENT.md` 和 `AI_PROJECT.md`。
 - 整理长聊天、讨论分叉或脑图历史时，按需读取 `.github/instructions/discussion-knowledge.instructions.md`。
 - 修改公共接口时同步查调用方和测试。
 - 修改后必须运行项目指定验证命令。

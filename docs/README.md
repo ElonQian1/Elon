@@ -2,13 +2,16 @@
 
 本文是面向开发者、项目管理者和各类 AI 代理的项目知识首页。它回答“项目是什么、先读什么、到哪里继续找”，不复制具体实现细节或工作流硬规则。
 
+判断项目当前已实现、建设中、提案或已否决状态时，先读根目录 `AI_CURRENT.md`。
+
 ## 推荐阅读顺序
 
-1. `AI_PROJECT.md`：项目定位、能力边界和任务入口。
-2. `AI_ARCHITECTURE.md`：稳定的模块地图与依赖方向。
-3. `docs/system-architecture.md`：后端、PC、节点和客户端的数据流。
-4. `AI_INDEX.md`：从功能定位到源码、测试与专项文档。
-5. `AGENTS.md`：所有 AI 供应商共享的最小路由入口；真正的写任务硬规则位于 `.github/copilot-instructions.md`。
+1. `AI_CURRENT.md`：当前事实、提案和已禁用路线。
+2. `AI_PROJECT.md`：项目定位、能力边界和任务入口。
+3. `AI_ARCHITECTURE.md`：稳定的模块地图与依赖方向。
+4. `docs/system-architecture.md`：后端、PC、节点和客户端的数据流。
+5. `AI_INDEX.md`：从功能定位到源码、测试与专项文档。
+6. `AGENTS.md`：所有 AI 供应商共享的最小路由入口；真正的写任务硬规则位于 `.github/copilot-instructions.md`。
 
 ## 知识主题地图
 

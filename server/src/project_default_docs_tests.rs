@@ -29,6 +29,7 @@ fn default_docs_seed_missing_files_without_overwriting_user_docs() {
     let agents = std::fs::read_to_string(root.join("AGENTS.md")).unwrap();
     let codex = std::fs::read_to_string(root.join("CODEX.md")).unwrap();
     let copilot = std::fs::read_to_string(root.join(".github/copilot-instructions.md")).unwrap();
+    let current = std::fs::read_to_string(root.join("AI_CURRENT.md")).unwrap();
     let document_authority = std::fs::read_to_string(
         root.join(".github/instructions/document-authority.instructions.md"),
     )
@@ -46,6 +47,8 @@ fn default_docs_seed_missing_files_without_overwriting_user_docs() {
     assert_eq!(agents, "# User Rules\nkeep me");
     assert!(codex.contains(".github/copilot-instructions.md"));
     assert!(copilot.contains("共享规则权威来源"));
+    assert!(current.contains("已实现"));
+    assert!(current.contains("已否决或暂停"));
     assert!(document_authority.contains("路径权威上限"));
     assert!(discussion_knowledge.contains("每次应用都创建新版本"));
     assert!(metadata.contains("copilot-primary-bridged-agents"));

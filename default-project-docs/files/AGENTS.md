@@ -9,14 +9,15 @@
 ## 必读顺序
 
 1. 读 `.github/copilot-instructions.md`。
-2. 按任务类型读取 `.github/instructions/*.instructions.md`。
-3. 如需了解项目目标、架构、技术栈或常用命令，读取 `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md` 和 `docs/project-readme.md`。
+2. 读 `AI_CURRENT.md`，确认已实现、建设中、提案和已否决状态。
+3. 按任务类型读取 `.github/instructions/*.instructions.md`。
+4. 如需了解项目目标、架构、技术栈或常用命令，读取 `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md` 和 `docs/project-readme.md`。
 
 ## 按需文档
 
 | 任务类型 | 继续读取 |
 |---|---|
-| 项目定位、架构、模块入口、AI 任务模板 | `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
+| 当前状态、项目定位、架构、模块入口、AI 任务模板 | `AI_CURRENT.md`、`AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
 | 项目文档、笔记、权威性、归档、低 token 整理 | `.github/instructions/document-authority.instructions.md` |
 | 长聊天拆分、讨论分叉、脑图版本与修正 | `.github/instructions/discussion-knowledge.instructions.md` |
 | Git、提交、分支、发布、回滚 | `.github/instructions/git-workflow.instructions.md` |

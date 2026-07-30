@@ -9,7 +9,7 @@ use sha2::{Digest, Sha256};
 /// Increment whenever deterministic path/frontmatter classification semantics
 /// change. Persistent catalog entries are derived data and must be rebuilt
 /// even when the Markdown file size and mtime are unchanged.
-pub(crate) const CLASSIFIER_VERSION: &str = "3";
+pub(crate) const CLASSIFIER_VERSION: &str = "4";
 
 pub(crate) fn classify_project_document(
     path: &str,
@@ -109,6 +109,16 @@ fn path_defaults(path: &str, file_name: &str) -> ProjectDocumentMetadata {
                 false,
                 "high",
                 "供应商桥接文档",
+            )
+        } else if path == "ai_current.md" {
+            (
+                "current_status",
+                "active",
+                "project_status",
+                true,
+                false,
+                "high",
+                "项目当前事实入口",
             )
         } else if matches!(
             path,
