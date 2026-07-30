@@ -9,7 +9,6 @@ Android APK / Web UI
   -> Rust API server
   -> Intent Router / Conversation Owner
   -> Group AI Coordinator / Matter Planner
-  -> AI-to-AI Skill Router / Skill Registry
   -> AI CLI / API agent routing
   -> Project workspace / Git worktree
   -> Context compiler / repo map / symbol index
@@ -19,13 +18,13 @@ Android APK / Web UI
 ## 运行时主链路
 
 1. 用户在 APK 或 Web 里通过多轮讨论表达自然语言需求。
-2. 后端识别项目、用户、会话、模型配置以及需求成熟度。
-3. 用户确认方向和验收标准后，Group AI Coordinator 生成 Matter，Skill Router 从平台维护的内部官方 Skill 中选择能力组合，并说明选择理由、成本和风险；Skill Registry 是内部基础设施，不是对外市场。
+2. 后端识别项目、用户、会话和模型配置。
+3. 用户确认方向和验收标准后，Group AI Coordinator 生成 Matter 和执行计划。
 4. AI CLI、API agent 或 Worker Bot 在真实 Git 隔离工作区执行任务。
 5. context compiler 为不同角色生成裁剪后的 repo map、symbol index、task pack 和验证线索。
 6. AI 修改代码后由 Reviewer / Verifier 执行最小有效验证和独立审查。
 7. 业务提交进入目标项目 Git 历史，再由后端或 APK 发布脚本按需构建、上传、部署和验证。
-8. 运行结果、用户验收和失败原因沉淀为 Context、Taste、Skill 质量数据。
+8. 运行结果、用户验收和失败原因沉淀为 Context 和 Taste 数据。
 
 ## PC 节点 AI 运行路线
 

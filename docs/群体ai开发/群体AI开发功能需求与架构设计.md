@@ -71,8 +71,7 @@ MVP 可以限制在“同一个项目内的成员和他们授权的节点”，�
 | Matter | Project AI Matter | 从讨论转成可执行事项，有发起人、负责人、参与 Bot、产物、验收标准和状态 |
 | Context | Project Context Pack | 项目文档、repo map、符号索引、历史决策和任务相关文件 |
 | Taste | Project / User Preference | 项目成员验收、打回理由、风格偏好、架构偏好 |
-| Skill | AI-to-AI Skill Package | 面向总调度 AI 和 Worker Bot 的机器可读能力包，声明适用意图、输入输出、权限、成本、测试和兼容性 |
-| Skill Router | Skill Router | 根据需求、项目上下文、成功率、成本、风险和兼容性选择 Skill 组合 |
+| Skill | Reusable Task Skill | 可复用的任务模板、测试清单、发布清单、项目规范 |
 | Orchestration | Group AI Coordinator | 负责任务拆解、派发、审核、合并、验收汇报 |
 
 ## 4. 功能需求
@@ -219,20 +218,7 @@ ELON_NODE_WORKSPACE_ROOT/
 - Taste：不同项目成员喜欢或拒绝的实现风格、UI 风格、命名习惯、审核偏好。
 - Skill：可复用任务模板、测试清单、发布清单、项目专属 agent 指令。
 
-MVP 可以先写入项目作用域 `user_memories` 或项目文档；后续再独立做 `project_ai_preferences` 和 `project_ai_skills`。项目内沉淀的 Skill 默认只属于该项目；只有平台团队明确接管并完成脱敏、测试和权限审计后，才允许升级为内部官方 Skill。Skill 不公开上架，也不进入交易市场。
-
-### R9. AI-to-AI Skill 路由
-
-Skill 由机器可读 manifest 和执行说明组成，至少声明：
-
-- Skill ID、版本、作者和兼容范围。
-- `intents`、`capabilities`、输入 schema、输出 artifact 类型。
-- 所需权限、允许工具、风险等级和数据边界。
-- 预计 token、节点、构建和第三方 API 成本。
-- 前置条件、冲突领域和可组合 Skill。
-- 验收标准、测试入口、历史成功率和失败原因。
-
-Skill Router 不能只按关键词匹配。推荐评分维度为：需求匹配、项目兼容、历史成功率、与其他 Skill 的冲突、预算、权限、节点可用性和风险。MVP 只路由官方 Skill，路由结果写入 Matter 并向用户解释“选择了什么、为什么、预计会产生什么结果”。
+MVP 可以先写入项目作用域 `user_memories` 或项目文档；后续再独立做 `project_ai_preferences` 和 `project_ai_skills`。
 
 ## 5. 架构设计
 
@@ -242,9 +228,7 @@ Skill Router 不能只按关键词匹配。推荐评分维度为：需求匹配�
 APK / PC 项目频道
   -> Rust API Server
   -> Group AI Coordinator
-       -> Product Discussion / Requirement Maturity
        -> Matter Planner
-       -> Skill Registry / Skill Router
        -> Member / Permission Resolver
        -> Node / Bot Selector
        -> Context Pack Builder
@@ -415,14 +399,6 @@ POST /api/project-worktrees/dispose
 - 明确群体 AI 开发只进入项目空间，不进入普通聊天。
 - 明确 Matter、Bot、协作模式、验收卡的产品语言。
 - 明确 PC 节点执行和 worktree 隔离是硬规则。
-- 明确一龙会话主 AI 是长期对话 owner；Skill Agent 是受限执行角色。
-
-### 阶段 0.5：官方 Skill 试验
-
-- 定义 Skill manifest、Matter 关联字段、预算、权限和安全边界。
-- 建立 3 至 5 个官方 Skill manifest，覆盖项目初始化、UI 实现、后端/API、测试和发布检查。
-- 让总调度 AI 根据已确认的目标和验收标准生成 Matter，再选择 Skill 组合。
-- Skill Router 只使用平台维护的内部官方 Skill；不开放第三方提交、上架或交易。
 
 ### 阶段 1：单项目、多成员授权节点、多 Bot
 
@@ -467,13 +443,6 @@ POST /api/project-worktrees/dispose
 - 项目成员验收和打回理由结构化进入项目偏好。
 - 成功流程沉淀为项目 Skill。
 - 新 Bot 加入项目时自动读取项目 Taste / Skill。
-
-### 阶段 5：内部 Skill 治理与应用分发
-
-- 把验证通过的官方 Skill 升级为版本化 Skill Registry。
-- 增加内部安装、依赖、兼容性、安全审核、调用记录、质量评分和回滚能力。
-- 官方 Skill 只由平台团队维护，不接收第三方上架，不设置 Skill 价格、订阅或创作者结算。
-- 长期将 Skill 生成的应用、模板和插件接入独立的版本分发、更新和二次创作体系；分发对象不包含 Skill 本身。
 
 ## 7. 权限、安全和成本
 
