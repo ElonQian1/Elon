@@ -102,6 +102,8 @@ mod store_types_project;
 mod system_projects;
 mod task_completion_replay;
 mod task_recovery;
+mod task_settlement_rows;
+mod task_settlements;
 mod task_start_sync;
 #[cfg(test)]
 mod task_title_tests;

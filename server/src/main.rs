@@ -276,6 +276,8 @@ mod speech_translate;
 mod store;
 mod store_migrations;
 mod store_schema;
+mod task_settlement;
+mod task_settlement_migration;
 mod task_title;
 mod token_usage_api;
 mod tools;

@@ -15,6 +15,7 @@
 5. `docs/open-commerce-network-v1-api.md`：查看当前 HTTP 与 MCP 契约。
 6. `docs/decisions/open-commerce-integration-control-plane.md`：查看多平台接入状态、同步回执和 AI 开发上下文边界。
 7. `docs/open-commerce/decision-register.md`：区分已接受决定、试验方向和未决问题。
+8. `docs/decisions/task-shadow-settlement-v1.md`：查看链外影子经济层已经接受的事实来源、账本和 Sui 边界。
 
 ## 专题地图
 
@@ -25,10 +26,11 @@
 | 商户节点、能力、授权、调用和审计 | V1 已接受并实现 | `docs/decisions/open-commerce-network-v1-architecture.md`、`docs/open-commerce-network-v1-api.md` |
 | 商户数据来源、健康度和同步回执 | 控制面已实现，具体平台适配器待逐项验收 | `docs/decisions/open-commerce-integration-control-plane.md`、`docs/open-commerce-integration-control-plane-acceptance.md` |
 | API Token 保管与节点计算计量 | 已有实现，尚不是公开交易市场 | `docs/token消费统计.md`、`server/src/store/node_ledger.rs` |
+| 链外影子用量、验收后双分录和 Sui 信封 | V1 已实现、默认关闭，不移动资金 | `docs/decisions/task-shadow-settlement-v1.md`、`docs/task-shadow-settlement-v1-api.md` |
 | 商户 AI 经营、营销内容和业务应用生成 | 产品方向，按真实连接器逐步实现 | `docs/drafts/requirements/open-commerce-network.md` |
 | 消费者 AI 与任意商户节点互联 | 目标架构，尚未形成公共网络 | `docs/drafts/open-commerce-network-roadmap.md` |
 | 闲置算力公开市场 | 提案，尚未实现 | `docs/drafts/open-commerce-network-sui-agent-economy.md` |
-| Sui 结算、网络资产和收入权益 | 提案，不属于当前系统事实 | `docs/drafts/open-commerce-network-sui-agent-economy.md` |
+| Sui 链上结算、网络资产和收入权益 | 提案；当前仅有未提交网络的链外信封 | `docs/drafts/open-commerce-network-sui-agent-economy.md` |
 
 ## 文档治理边界
 

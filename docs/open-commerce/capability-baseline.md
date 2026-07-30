@@ -20,6 +20,8 @@
 | 多成员、多 AI 协同开发 | 已实现并持续收口 | Matter、Assignment、执行节点、审核、产物和事件形成协作主干 | `server/src/group_ai/`、`docs/群体ai开发/群体AI开发功能需求与架构设计.md` |
 | API Token 保管与使用统计 | 已实现 | 支持 Codex 凭据保险箱、额度与使用估算；凭据不应直接分发到普通客户端 | `server/src/codex_vault_api.rs`、`server/src/codex_vault_emergency_api.rs`、`docs/token消费统计.md` |
 | 节点计算调用和账本证据 | 已实现并持续收口 | 已有节点调用、用量、补偿与 Assignment 结算证据，可作为未来影子结算输入 | `server/src/store/node_ledger.rs`、`server/src/group_ai/actions/assignment_actions.rs` |
+| 链外影子经济回执 | 已实现、默认关闭 | 真实节点成本可形成幂等用量凭证，Matter 人工验收后生成双分录；商业调用只记录未扣费用量 | `server/src/task_settlement/`、`docs/task-shadow-settlement-v1-acceptance.md` |
+| Sui 凭证投影 | 已实现、无网络副作用 | 已对账影子凭证可生成对象化数据和候选 PTB 步骤，固定标记 `not_submitted` | `server/src/task_settlement/sui_projection.rs` |
 | 开放商业网络 V1 | 已实现 | 已有商户节点、商业能力、授权、调用、计量和审计的 HTTP/MCP 主路径 | `server/src/open_commerce_service.rs`、`server/src/open_commerce_mcp.rs`、`docs/open-commerce-network-v1-acceptance.md` |
 | 商户数据接入控制面 | 已实现 | 可登记厂商无关的数据来源、授权范围和数据域，以幂等同步回执记录健康度，并向开发代理提供脱敏上下文 | `server/src/open_commerce_integration_model.rs`、`docs/open-commerce-integration-control-plane-acceptance.md` |
 | 项目文档治理和讨论知识图 | 已实现 | AI 可按范围分析、精确检索、按章节读取、审查模块化和维护讨论来源 | `server/src/node_agent_project_docs_mcp_tools.rs`、`docs/project-document-governance-mcp.md` |
@@ -36,7 +38,7 @@
 
 ## 尚未实现的提案
 
-- Sui 测试网或主网适配器。
+- Sui SDK、Move Package、钱包及测试网或主网适配器。
 - 可转让网络代币、服务 Credit 或链上收入权益。
 - 将每月合同收入自动分配给链上持有人。
 - 面向公众的消费者 AI 商业发现网络。

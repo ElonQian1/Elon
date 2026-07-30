@@ -220,6 +220,22 @@ pub(crate) fn record_assignment_settlement(
         "assignment_settlement_recorded",
         settlement_payload(&updated, &compute_call_id, compute_run.as_ref(), &input),
     )?;
+    if let Err(error) = crate::task_settlement::capture_task_assignment(
+        &state.store,
+        project_id,
+        matter_id,
+        assignment_id,
+        &compute_call_id,
+    ) {
+        tracing::warn!(
+            project_id,
+            matter_id,
+            assignment_id,
+            compute_call_id,
+            error = %error,
+            "failed to capture optional task shadow settlement facts"
+        );
+    }
     mark_review_ready_if_all_completed(state, project_id, matter_id, actor_user_id, &matter)?;
     require_detail(state, project_id, matter_id)
 }

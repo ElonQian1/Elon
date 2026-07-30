@@ -221,6 +221,16 @@ pub(crate) fn accept_matter(
         Some(&gate),
     );
     write_channel_notice(state, &matter, actor_user_id, "群体 AI Matter 已验收完成。")?;
+    if let Err(error) =
+        crate::task_settlement::post_accepted_matter(&state.store, project_id, matter_id)
+    {
+        tracing::warn!(
+            project_id,
+            matter_id,
+            error = %error,
+            "failed to post optional task shadow settlement"
+        );
+    }
     require_detail(state, project_id, matter_id)
 }
 
@@ -251,6 +261,16 @@ pub(crate) fn cancel_matter(
         json!({ "comment": clean_comment(comment) }),
     )?;
     write_channel_notice(state, &matter, actor_user_id, "群体 AI Matter 已取消。")?;
+    if let Err(error) =
+        crate::task_settlement::void_canceled_matter(&state.store, project_id, matter_id)
+    {
+        tracing::warn!(
+            project_id,
+            matter_id,
+            error = %error,
+            "failed to void optional task shadow settlement"
+        );
+    }
     require_detail(state, project_id, matter_id)
 }
 

@@ -4,8 +4,8 @@ owner: project
 reviewed_at: 2026-07-30
 review_interval_days: 30
 role: implementation_plan
-lifecycle: draft
-authority: proposal
+lifecycle: implemented
+authority: accepted
 default_retrieval: true
 source_refs:
   - "docs/drafts/open-commerce-network-sui-agent-economy.md"
@@ -26,6 +26,8 @@ implementation_refs:
 ---
 
 # S4.0 共享节点任务经济回执与影子账本实施计划
+
+> 2026-07-30 实现状态：S4.0 链外影子层已按 `docs/decisions/task-shadow-settlement-v1.md` 实现。本文保留为实施来源；当前接口和验收分别以 `docs/task-shadow-settlement-v1-api.md`、`docs/task-shadow-settlement-v1-acceptance.md` 为准。Sui SDK、Move 合约、钱包和网络提交仍未实现。
 
 ## 文档状态
 

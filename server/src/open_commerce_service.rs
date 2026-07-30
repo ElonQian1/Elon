@@ -496,6 +496,18 @@ pub(crate) fn invoke(
             "settlement_status": invocation.settlement_status
         }),
     )?;
+    if let Err(error) = crate::task_settlement::capture_commerce_invocation(
+        store,
+        &invocation,
+        &merchant.owner_user_id,
+    ) {
+        tracing::warn!(
+            project_id = merchant.project_id,
+            invocation_id = invocation.id,
+            error = %error,
+            "failed to capture optional open-commerce shadow usage"
+        );
+    }
     invocation_response(&invocation, false)
 }
 

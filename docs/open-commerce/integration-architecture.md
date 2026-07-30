@@ -74,8 +74,10 @@
 | Invocation | 记录一次真实商业能力调用 | 开放商业 V1 |
 | Integration | 描述商户授权的数据来源、接入方式、范围和健康状态 | 开放商业接入控制面 |
 | Sync Receipt | 记录适配器同步数量、摘要、结果和时间，不保存原始经营值 | 开放商业接入控制面 |
-| Usage Receipt | 记录模型、节点、商业能力或任务的可计量事实 | 节点账本、调用审计、候选影子账本 |
-| Settlement Adapter | 把已经确认的回执映射到具体结算网络 | 当前仅为 Sui 提案 |
+| Usage Receipt | 记录模型、节点、商业能力或任务的可计量事实 | 节点账本、调用审计、链外影子账本 |
+| Settlement Intent | 把 Assignment 与真实用量来源绑定，等待人工验收或取消 | `server/src/task_settlement/` |
+| Settlement Receipt | 记录验收后不可重复的影子经济判断及双分录 | `server/src/task_settlement/` |
+| Settlement Adapter | 把已经确认的回执映射到具体结算网络 | 当前仅实现无网络副作用的 Sui 信封，网络适配器仍是提案 |
 
 ## 可融合与不可混合的边界
 
