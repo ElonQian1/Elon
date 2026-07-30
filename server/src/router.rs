@@ -305,6 +305,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(agent_balloon::ensure_balloon_project),
         )
         .route("/api/llm/chat", post(lm_chat::lm_chat_handler))
+        .route(
+            "/api/llm/chat/stream",
+            post(lm_chat::lm_chat_stream_handler),
+        )
         .route("/api/me/ai/conversations", get(lm_chat::list_ai_chat_conversations))
         .route("/api/me/ai/conversations/:conversation_id/messages", get(lm_chat::list_ai_chat_conversation_messages))
         .route("/api/me/ai/conversations/:conversation_id/fork", post(conversation_forks::fork_ai_chat_conversation))

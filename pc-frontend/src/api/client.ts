@@ -33,6 +33,11 @@ export interface ApiError {
   message: string
 }
 
+export interface ApiStreamEvent {
+  type: string
+  [key: string]: unknown
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getAuthToken()
   const headers: Record<string, string> = {
@@ -57,6 +62,75 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+export async function streamPost(
+  path: string,
+  body: unknown,
+  onEvent: (event: ApiStreamEvent) => void,
+): Promise<void> {
+  const token = getAuthToken()
+  const res = await fetch(resolveApiUrl(path), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let message = res.statusText
+    try {
+      const data = await res.json()
+      if (typeof data?.error === 'string') message = data.error
+      else if (typeof data?.message === 'string') message = data.message
+    } catch {
+      // ignore parse error
+    }
+    throw { status: res.status, message } satisfies ApiError
+  }
+  if (!res.body) throw { status: 0, message: '服务器没有返回流式响应' } satisfies ApiError
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  try {
+    while (true) {
+      const chunk = await reader.read()
+      buffer += decoder.decode(chunk.value ?? new Uint8Array(), { stream: !chunk.done })
+      let separator = buffer.indexOf('\r\n\r\n')
+      let separatorLength = 4
+      if (separator < 0) {
+        separator = buffer.indexOf('\n\n')
+        separatorLength = 2
+      }
+      while (separator >= 0) {
+        const block = buffer.slice(0, separator)
+        buffer = buffer.slice(separator + separatorLength)
+        for (const line of block.split(/\r?\n/)) {
+          if (!line.startsWith('data:')) continue
+          const raw = line.slice(5).trim()
+          if (!raw || raw === '[DONE]') continue
+          try {
+            const event = JSON.parse(raw) as ApiStreamEvent
+            onEvent(event)
+          } catch {
+            // Ignore incomplete/non-JSON SSE lines and continue the stream.
+          }
+        }
+        separator = buffer.indexOf('\r\n\r\n')
+        separatorLength = 4
+        if (separator < 0) {
+          separator = buffer.indexOf('\n\n')
+          separatorLength = 2
+        }
+      }
+      if (chunk.done) break
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) =>
@@ -66,4 +140,5 @@ export const api = {
   put: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  streamPost,
 }

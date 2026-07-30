@@ -35,7 +35,6 @@ import AiChatMessageRow, {
   type AiHandoff,
   type AiMessage,
   type AiProjectCandidate,
-  type AiSource,
 } from './AiChatMessageRow'
 import { isCodexVaultBackupIntent, runCodexVaultBackupFromAiChat } from './codexVaultQuickAction'
 import styles from './AiChatPage.module.css'
@@ -49,16 +48,6 @@ interface AiConversation {
   project_id?: string
   project_name?: string
   first_user_message?: string
-}
-
-interface LmChatResponse {
-  reply?: string
-  content?: string
-  conversation_id?: string
-  assistant_mode?: AiMessage['assistant_mode']
-  tool_used?: string | null
-  sources?: AiSource[]
-  handoff?: AiHandoff | null
 }
 
 interface Friend {
@@ -200,6 +189,7 @@ export default function AiChatPage() {
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [input, setInput] = useState(() => pendingAiDraftRef.current?.input ?? '')
   const [sending, setSending] = useState(false)
+  const [streamStatus, setStreamStatus] = useState('')
   const [handoffSending, setHandoffSending] = useState(false)
   const [error, setError] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
@@ -680,6 +670,8 @@ export default function AiChatPage() {
     const { convId, newConversationTitle } = enqueueUserMessage(text)
 
     setSending(true)
+    setStreamStatus('')
+    let pendingStreamMessageId: string | null = null
     try {
       if (isVaultBackup) {
         await runCodexVaultBackupMessage()
@@ -743,32 +735,73 @@ export default function AiChatPage() {
         }
         setMessages((prev) => [...prev, nodeMsg])
       } else {
-        // ── 无节点：走云端 AI 对话 ───────────────────────────────────────
-        const res = await api.post<LmChatResponse>('/api/llm/chat', {
+        // ── 无节点：走首页 AI 流式对话 ────────────────────────────────────
+        pendingStreamMessageId = uuidv4()
+        setMessages((prev) => [...prev, {
+          id: pendingStreamMessageId!,
+          role: 'assistant',
+          content: '',
+          created_at: new Date().toISOString(),
+        }])
+        await api.streamPost('/api/llm/chat/stream', {
           messages: [{ role: 'user', content: text }],
           agent: requestAgent || null,
           runtimeRoute: requestRuntimeRoute,
           conversation_id: convId,
           conversation_title: newConversationTitle,
           scope: 'chat_memory',
+        }, (event) => {
+          if (event.type === 'status') {
+            setStreamStatus(typeof event.message === 'string' ? event.message : '正在生成回答…')
+            return
+          }
+          if (event.type === 'delta') {
+            const delta = typeof event.content === 'string' ? event.content : ''
+            if (!delta || !pendingStreamMessageId) return
+            setStreamStatus('正在生成回答…')
+            setMessages((prev) => prev.map((message) => message.id === pendingStreamMessageId
+              ? { ...message, content: message.content + delta }
+              : message))
+            return
+          }
+          if (event.type === 'sources' && pendingStreamMessageId) {
+            setMessages((prev) => prev.map((message) => message.id === pendingStreamMessageId
+              ? { ...message, sources: Array.isArray(event.sources) ? event.sources as AiMessage['sources'] : [] }
+              : message))
+            return
+          }
+          if (event.type === 'handoff' && pendingStreamMessageId) {
+            setMessages((prev) => prev.map((message) => message.id === pendingStreamMessageId
+              ? { ...message, handoff: event.handoff as AiMessage['handoff'] }
+              : message))
+            return
+          }
+          if (event.type === 'error') {
+            throw new Error(typeof event.message === 'string' ? event.message : 'AI 请求失败')
+          }
+          if (event.type === 'done' && pendingStreamMessageId) {
+            setMessages((prev) => prev.map((message) => message.id === pendingStreamMessageId
+              ? {
+                ...message,
+                content: message.content || (typeof event.reply === 'string' ? event.reply : ''),
+                assistant_mode: event.assistant_mode as AiMessage['assistant_mode'],
+                tool_used: typeof event.tool_used === 'string' ? event.tool_used || null : null,
+                sources: Array.isArray(event.sources) ? event.sources as AiMessage['sources'] : message.sources,
+                handoff: event.handoff as AiMessage['handoff'],
+              }
+              : message))
+          }
         })
-        const reply = res.reply ?? res.content ?? ''
-        const aiMsg: AiMessage = {
-          role: 'assistant',
-          content: reply,
-          created_at: new Date().toISOString(),
-          assistant_mode: res.assistant_mode,
-          tool_used: res.tool_used,
-          sources: res.sources,
-          handoff: res.handoff,
-        }
-        setMessages((prev) => [...prev, aiMsg])
         loadConversations()
       }
     } catch (err) {
+      if (pendingStreamMessageId) {
+        setMessages((prev) => prev.filter((message) => message.id !== pendingStreamMessageId))
+      }
       restoreComposerAfterError(previousInput, err)
     } finally {
       setSending(false)
+      setStreamStatus('')
     }
   }
 
@@ -908,7 +941,8 @@ export default function AiChatPage() {
               <div className={styles.avatar}>AI</div>
               <div className={styles.msgBody}>
                 <div className={styles.typing}>
-                  <span /><span /><span />
+                  <span className={styles.typingText}>{streamStatus || '正在处理…'}</span>
+                  <span className={styles.typingDot} /><span className={styles.typingDot} /><span className={styles.typingDot} />
                 </div>
               </div>
             </div>

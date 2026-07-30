@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tracing::warn;
 
 use crate::{
-    agent_llm_call::{call_chat_llm_with_options, call_llm},
+    agent_llm_call::{call_chat_llm_with_options, call_llm, start_chat_llm_stream},
     types::{AgentConfig, AgentsConfig, AppState},
 };
 
@@ -66,6 +66,52 @@ pub(crate) async fn call_chat_llm_with_default_fallback_options(
         }
     }
 
+    Err(anyhow!(
+        "{}",
+        last_retryable_error.unwrap_or_else(|| "未配置可用 AI 代理".to_string())
+    ))
+}
+
+pub(crate) async fn start_chat_llm_stream_with_default_fallback(
+    state: &Arc<AppState>,
+    preferred: &AgentConfig,
+    allow_fallback: bool,
+    messages: &[Value],
+    user_id: &str,
+    temperature: f64,
+    max_tokens: usize,
+) -> Result<(reqwest::Response, AgentConfig, bool)> {
+    let mut agents = vec![preferred.clone()];
+    if allow_fallback {
+        for agent in server_api_agents_in_fallback_order(state).await {
+            if agent.name != preferred.name {
+                agents.push(agent);
+            }
+        }
+    }
+
+    let mut last_retryable_error = None;
+    for (index, agent) in agents.iter().enumerate() {
+        match start_chat_llm_stream(state, agent, messages, user_id, temperature, max_tokens).await
+        {
+            Ok(response) => return Ok((response, agent.clone(), index > 0)),
+            Err(error) => {
+                let message = error.to_string();
+                let has_next = index + 1 < agents.len();
+                if !is_retryable_agent_error(&message) || !has_next {
+                    return Err(anyhow!(message));
+                }
+                warn!(
+                    feature = "lm_chat_stream",
+                    agent = %agent.name,
+                    model = %agent.model,
+                    "AI agent failed before stream, trying fallback: {}",
+                    message
+                );
+                last_retryable_error = Some(message);
+            }
+        }
+    }
     Err(anyhow!(
         "{}",
         last_retryable_error.unwrap_or_else(|| "未配置可用 AI 代理".to_string())

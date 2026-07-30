@@ -116,6 +116,28 @@ pub(crate) async fn call_chat_llm_with_options(
     .await
 }
 
+/// 启动普通对话的上游流式请求。响应体仍由调用方解析，以便把增量文本转发给前端。
+pub(crate) async fn start_chat_llm_stream(
+    state: &Arc<AppState>,
+    agent: &AgentConfig,
+    messages: &[Value],
+    user_id: &str,
+    temperature: f64,
+    max_tokens: usize,
+) -> Result<reqwest::Response> {
+    ensure_api_call_allowed(state, agent, user_id)?;
+    let url = format!("{}/chat/completions", agent.api_base);
+    let mut body = chat_completion_body(agent, messages, temperature, max_tokens, false);
+    body["stream"] = json!(true);
+    let resp = send_chat_completion_request(state, agent, &url, &body).await?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let text = resp.text().await?;
+        return Err(anyhow::anyhow!("{}", friendly_ai_api_error(status, &text)));
+    }
+    Ok(resp)
+}
+
 /// 调用 LLM API（普通对话），要求 OpenAI 兼容模型尽量返回 JSON 对象。
 ///
 /// 部分 OpenAI-compatible 网关不支持 `response_format`，遇到兼容性错误时会自动降级

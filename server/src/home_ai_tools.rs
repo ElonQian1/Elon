@@ -75,6 +75,13 @@ pub(crate) fn deterministic_answer(
         });
     }
 
+    if let Some(reply) = fast_conversation_reply(&normalized) {
+        return Some(DeterministicAnswer {
+            tool: "fast_reply",
+            reply: reply.to_string(),
+        });
+    }
+
     let expression = extract_expression(&normalized)?;
     let value = Calculator::new(&expression).parse().ok()?;
     if !value.is_finite() {
@@ -84,6 +91,44 @@ pub(crate) fn deterministic_answer(
         tool: "calculator",
         reply: format!("计算结果：{}", format_number(value)),
     })
+}
+
+fn fast_conversation_reply(message: &str) -> Option<&'static str> {
+    let compact = message
+        .trim()
+        .trim_end_matches(['?', '!', '。', '？', '！'])
+        .trim();
+    if compact.is_empty() {
+        return None;
+    }
+    if [
+        "你好",
+        "您好",
+        "嗨",
+        "哈喽",
+        "hello",
+        "hi",
+        "在吗",
+        "你好啊",
+    ]
+    .iter()
+    .any(|value| compact == *value)
+    {
+        return Some("你好！我在。你可以直接问我问题；如果要修改项目代码，我会帮你转到对应的项目 AI。现在想做什么？");
+    }
+    if ["谢谢", "感谢", "多谢", "谢谢你"]
+        .iter()
+        .any(|value| compact == *value)
+    {
+        return Some("不客气！有需要继续告诉我就好。");
+    }
+    if ["你是谁", "你叫什么", "你能做什么", "有什么功能"]
+        .iter()
+        .any(|value| compact == *value)
+    {
+        return Some("我是首页总 AI，可以回答普通知识、查询最新信息，也能把代码和项目任务交给对应的项目 AI 执行。");
+    }
+    None
 }
 
 pub(crate) fn needs_project_handoff(message: &str) -> bool {
@@ -373,6 +418,13 @@ mod tests {
     #[test]
     fn rejects_non_math_text() {
         assert!(deterministic_answer("帮我写一个计算器页面", sample_time()).is_none());
+    }
+
+    #[test]
+    fn answers_common_greeting_without_model() {
+        let answer = deterministic_answer("你好啊？", sample_time()).unwrap();
+        assert_eq!(answer.tool, "fast_reply");
+        assert!(answer.reply.contains("我在"));
     }
 
     #[test]
