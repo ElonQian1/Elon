@@ -8,8 +8,8 @@
   "properties": {
     "schema": { "const": "yilong.erp.release.v1" },
     "blueprint_key": { "type": "string", "minLength": 3, "maxLength": 64 },
-    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$" },
-    "previous_version": { "type": ["string", "null"] },
+    "version": { "$ref": "#/$defs/version" },
+    "previous_version": { "oneOf": [{ "$ref": "#/$defs/version" }, { "type": "null" }] },
     "source_git_commit": { "type": "string", "pattern": "^[0-9a-f]{7,64}$" },
     "modules": { "type": "array", "items": { "$ref": "#/$defs/versioned" }, "minItems": 1 },
     "capabilities": { "type": "array", "items": { "type": "string" } },
@@ -31,7 +31,7 @@
       "additionalProperties": false,
       "required": ["minimum_instance_version"],
       "properties": {
-        "minimum_instance_version": { "type": "string" },
+        "minimum_instance_version": { "$ref": "#/$defs/version" },
         "required_plugins": { "type": "array", "items": { "type": "string" }, "default": [] }
       }
     },
@@ -46,13 +46,14 @@
     }
   },
   "$defs": {
+    "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
     "versioned": {
       "type": "object",
       "additionalProperties": false,
       "required": ["module_key", "version", "required"],
       "properties": {
         "module_key": { "type": "string", "minLength": 2, "maxLength": 80 },
-        "version": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "version": { "$ref": "#/$defs/version" },
         "required": { "type": "boolean" }
       }
     }

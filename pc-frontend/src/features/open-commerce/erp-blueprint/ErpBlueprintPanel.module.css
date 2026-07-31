@@ -17,6 +17,7 @@
 .formAction { display: flex; justify-content: flex-end; }
 .formAction button, .inlineForm button, .band > button, .proposal button, .upgrade button, .signalBox button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 .message { margin: 10px 0 0; color: #9ed9c8; white-space: pre-wrap; }
+.mutedLine { margin: 10px 0 0; color: var(--text-muted); font-size: 11px; }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-block: 1px solid var(--border); }
 .metrics > div { padding: 14px 16px; border-right: 1px solid var(--border); }
 .metrics > div:last-child { border-right: 0; }
@@ -51,6 +52,20 @@
 .checkLabel input { margin-top: 2px; }
 .upgrade span { display: block; margin-top: 3px; color: var(--text-muted); font-size: 11px; }
 .upgrade[data-status='blocked'] { border-left: 3px solid #c77b7b; padding-left: 10px; }
+.upgradeSummary { min-width: 0; flex: 1; }
+.upgradeDecision { width: min(360px, 42%); display: grid; gap: 8px; }
+.upgradeDecision textarea { min-height: 70px; resize: vertical; }
+.configurationGrid { display: grid; grid-template-columns: minmax(180px, 0.7fr) minmax(280px, 1.3fr); gap: 16px; }
+.configurationGrid > label, .configurationGrid > div { display: grid; gap: 7px; color: var(--text-muted); font-size: 12px; }
+.fieldLabel { color: var(--text-muted); font-size: 12px; }
+.moduleChecks { display: flex; flex-wrap: wrap; gap: 8px 16px; min-height: 38px; align-items: center; }
+.extensionEditor { display: grid; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+.extensionEditor > strong { font-size: 12px; }
+.extensionRows { display: grid; gap: 5px; }
+.extensionRows > div { min-height: 34px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 8px; background: var(--surface-2); font-size: 11px; }
+.extensionRows button { width: 28px; height: 28px; display: grid; place-content: center; padding: 0; }
+.actionRow { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.actionRow button { display: inline-flex; align-items: center; gap: 7px; }
 .capabilityGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--border); }
 .capabilityGrid > div { padding: 12px; background: var(--surface); }
 .capabilityGrid strong, .capabilityGrid span { display: block; }
@@ -62,10 +77,13 @@
   .formGrid { grid-template-columns: 1fr; }
   .wideField { grid-column: auto; }
   .row { grid-template-columns: 1fr 1fr; }
+  .configurationGrid { grid-template-columns: 1fr; }
 }
 @media (max-width: 620px) {
   .hero, .instanceHeader, .proposal, .upgrade, .signalBox, .inlineForm { align-items: stretch; flex-direction: column; }
   .metrics, .capabilityGrid { grid-template-columns: 1fr; }
   .metrics > div { border-right: 0; border-bottom: 1px solid var(--border); }
   .extensionCount { text-align: left; }
+  .upgradeDecision { width: 100%; }
+  .actionRow { align-items: stretch; flex-direction: column; }
 }

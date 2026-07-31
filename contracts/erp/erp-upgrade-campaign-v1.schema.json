@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.ai/contracts/erp/erp-upgrade-campaign-v1.schema.json",
+  "title": "Yilong ERP Upgrade Campaign V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "instance_key", "from_version", "target_version", "status",
+    "instance_revision", "from_configuration", "target_configuration",
+    "private_extensions_snapshot", "merchant_confirmation_required"
+  ],
+  "properties": {
+    "schema": { "const": "yilong.erp.upgrade_campaign.v1" },
+    "instance_key": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{2,79}$" },
+    "from_version": { "$ref": "#/$defs/version" },
+    "target_version": { "$ref": "#/$defs/version" },
+    "status": { "enum": ["ready", "blocked", "adopted", "rolled_back"] },
+    "instance_revision": { "type": "integer", "minimum": 1 },
+    "adopted_instance_revision": { "type": ["integer", "null"], "minimum": 2 },
+    "from_configuration": { "$ref": "#/$defs/configuration" },
+    "target_configuration": { "$ref": "#/$defs/configuration" },
+    "private_extensions_snapshot": { "type": "array", "items": { "$ref": "#/$defs/extension" } },
+    "merchant_confirmation_required": { "const": true },
+    "adoption_evidence": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["execution_attested", "verification_summary"],
+          "properties": {
+            "execution_attested": { "const": true },
+            "verification_summary": { "type": "string", "minLength": 8, "maxLength": 500 },
+            "deployed_commit": { "type": ["string", "null"], "pattern": "^[0-9a-fA-F]{7,64}$" }
+          }
+        }
+      ]
+    },
+    "rollback_reason": { "type": ["string", "null"], "maxLength": 500 }
+  },
+  "$defs": {
+    "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["theme_key", "enabled_modules", "plugins"],
+      "properties": {
+        "theme_key": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "enabled_modules": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "plugins": { "type": "array", "items": { "$ref": "#/$defs/extension" } }
+      }
+    },
+    "extension": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["extension_key", "version", "extension_point", "requires_modules"],
+      "properties": {
+        "extension_key": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{1,79}$" },
+        "version": { "$ref": "#/$defs/version" },
+        "extension_point": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "requires_modules": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    }
+  }
+}

@@ -1,8 +1,10 @@
-import { useMemo, useState } from 'react'
-import { ArrowUpCircle, CheckCircle2, RotateCcw, Search, Send } from 'lucide-react'
+import { useState } from 'react'
+import { CheckCircle2, Search, Send } from 'lucide-react'
+import ErpInstanceConfigurationPanel from './ErpInstanceConfigurationPanel'
+import ErpUpgradePanel from './ErpUpgradePanel'
 import { erpBlueprintApi } from './erpBlueprintApi'
 import type { ErpOverview, RequirementResolution } from './erpBlueprintTypes'
-import { classificationLabels, errorMessage, isNewerVersion, shortDate } from './erpBlueprintUi'
+import { classificationLabels, errorMessage } from './erpBlueprintUi'
 import styles from './ErpBlueprintPanel.module.css'
 
 export default function ErpInstanceView({
@@ -21,13 +23,8 @@ export default function ErpInstanceView({
   const [scope, setScope] = useState<'merchant_specific' | 'potential_common'>('merchant_specific')
   const [resolution, setResolution] = useState<RequirementResolution | null>(null)
   const [authorized, setAuthorized] = useState(false)
-  const [targetVersion, setTargetVersion] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
-  const availableVersions = useMemo(
-    () => overview.versions.filter((item) => isNewerVersion(item.manifest.version, instance.pinned_version)),
-    [instance.pinned_version, overview.versions],
-  )
 
   async function run(action: () => Promise<unknown>, success: string) {
     setBusy(true)
@@ -125,51 +122,8 @@ export default function ErpInstanceView({
         )}
       </section>
 
-      <section className={styles.band}>
-        <header><ArrowUpCircle size={17} /><h3>版本升级</h3></header>
-        <div className={styles.inlineForm}>
-          <label className={styles.grow}>
-            目标版本
-            <select value={targetVersion} onChange={(event) => setTargetVersion(event.target.value)}>
-              <option value="">选择版本</option>
-              {availableVersions.map((item) => <option key={item.id} value={item.manifest.version}>{item.manifest.version}</option>)}
-            </select>
-          </label>
-          <button
-            type="button"
-            disabled={!canEdit || busy || !targetVersion}
-            onClick={() => run(
-              () => erpBlueprintApi.prepareUpgrade(projectId, instance.id, targetVersion),
-              '兼容检查已完成；平台尚未修改代码或部署。',
-            )}
-          ><CheckCircle2 size={15} />检查兼容性</button>
-        </div>
-        <div className={styles.upgradeList}>
-          {overview.upgrades.map((upgrade) => (
-            <article key={upgrade.id} className={styles.upgrade} data-status={upgrade.status}>
-              <div>
-                <strong>{upgrade.compatibility.from_version} → {upgrade.compatibility.target_version}</strong>
-                <span>{upgrade.status} · {shortDate(upgrade.updated_at)}</span>
-                {upgrade.compatibility.issues.map((issue) => <p key={`${issue.code}-${issue.subject}`}>{issue.message}</p>)}
-                {!upgrade.compatibility.issues.length && <p>模块、插件与私有扩展边界通过检查。</p>}
-              </div>
-              {upgrade.status === 'ready' && (
-                <button type="button" disabled={!canEdit || busy} onClick={() => run(
-                  () => erpBlueprintApi.decideUpgrade(projectId, upgrade.id, 'adopt'),
-                  '已记录采用目标版本；真实代码发布仍由项目发布流程完成。',
-                )}><CheckCircle2 size={15} />确认采用</button>
-              )}
-              {upgrade.status === 'adopted' && (
-                <button type="button" disabled={!canEdit || busy} onClick={() => run(
-                  () => erpBlueprintApi.decideUpgrade(projectId, upgrade.id, 'rollback', '商户人工回滚'),
-                  '已恢复升级前固定版本，私有扩展清单保持不变。',
-                )}><RotateCcw size={15} />回滚版本</button>
-              )}
-            </article>
-          ))}
-          {!overview.upgrades.length && <p className={styles.empty}>尚无升级活动。</p>}
-        </div>
-      </section>
+      <ErpInstanceConfigurationPanel projectId={projectId} canEdit={canEdit} overview={overview} refresh={refresh} />
+      <ErpUpgradePanel projectId={projectId} canEdit={canEdit} overview={overview} refresh={refresh} />
 
       <section className={styles.band}>
         <header><CheckCircle2 size={17} /><h3>当前可复用能力</h3></header>
@@ -181,6 +135,7 @@ export default function ErpInstanceView({
             </div>
           ))}
         </div>
+        <p className={styles.mutedLine}>当前目录版本 {overview.catalog_version ?? '尚未发布'}</p>
       </section>
       {message && <p className={styles.message}>{message}</p>}
     </div>

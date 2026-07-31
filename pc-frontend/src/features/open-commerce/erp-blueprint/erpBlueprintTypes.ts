@@ -36,6 +36,7 @@ export type ErpBlueprint = {
     extension_points: string[]
     proposal_threshold: number
   }
+  definition_revision: number
   status: string
   created_by: string
   created_at: string
@@ -78,6 +79,8 @@ export type ErpInstance = {
   enabled_modules: string[]
   plugins: ErpExtension[]
   private_extensions: ErpExtension[]
+  configuration_revision: number
+  bootstrap_matter_id?: string | null
   status: string
   created_by: string
   created_at: string
@@ -119,6 +122,11 @@ export type ErpUpgrade = {
     issues: CompatibilityIssue[]
   }
   private_extensions_snapshot: ErpExtension[]
+  instance_revision: number
+  adopted_instance_revision?: number | null
+  from_configuration: ErpInstanceConfiguration
+  target_configuration: ErpInstanceConfiguration
+  adoption_evidence?: ErpUpgradeAdoptionEvidence | null
   rollback_reason?: string | null
   updated_at: string
 }
@@ -132,6 +140,8 @@ export type ErpOverview = {
   proposals: ErpProposal[]
   upgrades: ErpUpgrade[]
   capability_catalog: ErpCapability[]
+  catalog_version?: string | null
+  unreleased_capability_keys: string[]
   boundaries: Record<string, boolean | string>
 }
 
@@ -143,4 +153,32 @@ export type RequirementResolution = {
   need_key?: string | null
   recommendation: string
   may_submit_signal: boolean
+  catalog_version?: string | null
+}
+
+export type ErpInstanceConfiguration = {
+  theme_key: string
+  enabled_modules: string[]
+  plugins: ErpExtension[]
+}
+
+export type ErpUpgradeAdoptionEvidence = {
+  execution_attested: boolean
+  verification_summary: string
+  deployed_commit?: string | null
+}
+
+export type UpdateErpInstanceRequest = ErpInstanceConfiguration & {
+  expected_revision: number
+  merchant_confirmed: boolean
+  private_extensions: ErpExtension[]
+}
+
+export type DecideErpUpgradeRequest = {
+  action: 'adopt' | 'rollback'
+  reason: string
+  merchant_confirmed: boolean
+  execution_attested: boolean
+  verification_summary: string
+  deployed_commit?: string | null
 }

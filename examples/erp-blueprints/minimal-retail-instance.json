@@ -11,5 +11,7 @@
     { "extension_key": "retail.barcode", "version": "1.0.0", "extension_point": "catalog.enrichment", "requires_modules": ["catalog", "inventory"] }
   ],
   "private_extensions": [],
+  "configuration_revision": 1,
+  "bootstrap_matter_id": null,
   "data_policy": { "owner": "merchant_project", "raw_data_exported_to_blueprint": false }
 }

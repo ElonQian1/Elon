@@ -4,18 +4,20 @@
   "title": "Yilong Merchant ERP Instance V1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "instance_key", "project_id", "blueprint_key", "pinned_version", "industry", "theme_key", "enabled_modules", "plugins", "private_extensions"],
+  "required": ["schema", "instance_key", "project_id", "blueprint_key", "pinned_version", "industry", "theme_key", "enabled_modules", "plugins", "private_extensions", "configuration_revision", "data_policy"],
   "properties": {
     "schema": { "const": "yilong.erp.instance.v1" },
     "instance_key": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{2,63}$" },
     "project_id": { "type": "string", "minLength": 1, "maxLength": 120 },
     "blueprint_key": { "type": "string", "minLength": 3, "maxLength": 64 },
-    "pinned_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$" },
+    "pinned_version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
     "industry": { "type": "string", "minLength": 1, "maxLength": 80 },
     "theme_key": { "type": "string", "minLength": 2, "maxLength": 64 },
     "enabled_modules": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
     "plugins": { "type": "array", "items": { "$ref": "#/$defs/extension" } },
     "private_extensions": { "type": "array", "items": { "$ref": "#/$defs/extension" } },
+    "configuration_revision": { "type": "integer", "minimum": 1 },
+    "bootstrap_matter_id": { "type": ["string", "null"], "minLength": 1, "maxLength": 120 },
     "data_policy": {
       "type": "object",
       "additionalProperties": false,
@@ -32,7 +34,7 @@
       "required": ["extension_key", "version", "extension_point"],
       "properties": {
         "extension_key": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{1,79}$" },
-        "version": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
         "extension_point": { "type": "string", "minLength": 2, "maxLength": 80 },
         "requires_modules": { "type": "array", "items": { "type": "string" }, "default": [] }
       }

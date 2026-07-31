@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Check, GitBranch, PackagePlus, Plus, RotateCcw, X } from 'lucide-react'
 import { erpBlueprintApi } from './erpBlueprintApi'
+import BlueprintEvolutionForm from './BlueprintEvolutionForm'
 import type { ErpOverview, ErpReleaseManifest } from './erpBlueprintTypes'
 import { errorMessage, shortDate } from './erpBlueprintUi'
 import styles from './ErpBlueprintPanel.module.css'
@@ -107,6 +108,14 @@ export default function BlueprintMaintainerView({
           {!overview.versions.length && <p className={styles.empty}>尚未发布版本。</p>}
         </div>
       </section>
+
+      <BlueprintEvolutionForm
+        projectId={projectId}
+        canEdit={canEdit}
+        blueprint={blueprint}
+        unreleasedCapabilityKeys={overview.unreleased_capability_keys}
+        refresh={refresh}
+      />
 
       <section className={styles.band}>
         <header><Plus size={17} /><h3>创建独立商户项目</h3></header>

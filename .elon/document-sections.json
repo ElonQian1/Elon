@@ -224,6 +224,7 @@
     "docs/decisions/ai-resource-control-v1.md": "custom:open-commerce-network",
     "docs/decisions/erp-blueprint-and-instance-v1.md": "custom:erp-blueprint-system",
     "docs/decisions/erp-feature-proposal-governance-v1.md": "custom:erp-blueprint-system",
+    "docs/decisions/erp-instance-materialization-v1.md": "custom:erp-blueprint-system",
     "docs/decisions/erp-release-upgrade-v1.md": "custom:erp-blueprint-system",
     "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md": "custom:open-commerce-network",
     "docs/decisions/open-commerce-integration-control-plane.md": "custom:open-commerce-network",
@@ -241,6 +242,7 @@
     "docs/erp/README.md": "custom:erp-blueprint-system",
     "docs/erp/acceptance-v1.md": "custom:erp-blueprint-system",
     "docs/erp/api-and-agent-tools-v1.md": "custom:erp-blueprint-system",
+    "docs/erp/operating-workflow-v1.md": "custom:erp-blueprint-system",
     "docs/fb2-ai-center/PLAN.md": "custom:fb2-project",
     "docs/fb2-ai-center/PROGRESS.md": "custom:fb2-project",
     "docs/fb2-ai-center/README.md": "custom:fb2-project",
@@ -351,6 +353,7 @@
     "docs/decisions/ai-resource-control-v1.md": "on-demand",
     "docs/decisions/erp-blueprint-and-instance-v1.md": "on-demand",
     "docs/decisions/erp-feature-proposal-governance-v1.md": "on-demand",
+    "docs/decisions/erp-instance-materialization-v1.md": "on-demand",
     "docs/decisions/erp-release-upgrade-v1.md": "on-demand",
     "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md": "on-demand",
     "docs/decisions/open-commerce-integration-control-plane.md": "on-demand",
@@ -369,6 +372,7 @@
     "docs/erp/README.md": "on-demand",
     "docs/erp/acceptance-v1.md": "evidence",
     "docs/erp/api-and-agent-tools-v1.md": "on-demand",
+    "docs/erp/operating-workflow-v1.md": "on-demand",
     "docs/open-commerce-network-v1-acceptance.md": "on-demand",
     "docs/open-commerce-network-v1-api.md": "on-demand",
     "docs/open-commerce/ai-resource-control.md": "on-demand",
@@ -494,6 +498,12 @@
       "authority": "authoritative",
       "document_type": "architecture_decision"
     },
+    "docs/decisions/erp-instance-materialization-v1.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture_decision"
+    },
     "docs/decisions/erp-release-upgrade-v1.md": {
       "retrieval": "on_demand",
       "lifecycle": "active",
@@ -517,6 +527,12 @@
       "lifecycle": "active",
       "authority": "authoritative",
       "document_type": "api_reference"
+    },
+    "docs/erp/operating-workflow-v1.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "runbook"
     },
     "docs/decisions/reject-demo-oracle-role.md": {
       "retrieval": "on_demand",
@@ -771,6 +787,27 @@
       "related": [
         "docs/open-commerce/connector-sdk.md",
         "docs/open-commerce-integration-control-plane-acceptance.md"
+      ]
+    },
+    "docs/decisions/erp-instance-materialization-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "通用 ERP 蓝图",
+      "reviewed_at": "2026-08-01",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/erp_blueprint/matter_bridge.rs",
+        "file:server/src/store/group_ai.rs",
+        "test:server/src/erp_blueprint_workflow_tests.rs"
+      ],
+      "related": [
+        "docs/erp/README.md",
+        "docs/erp/operating-workflow-v1.md",
+        "docs/decisions/erp-blueprint-and-instance-v1.md"
       ]
     },
     "docs/decisions/task-shadow-settlement-v1.md": {
@@ -1061,6 +1098,8 @@
       "review_interval_days": 90,
       "implementation_refs": [
         "test:server/src/erp_blueprint_tests.rs",
+        "test:server/src/erp_blueprint_evolution_tests.rs",
+        "test:server/src/erp_blueprint_workflow_tests.rs",
         "test:scripts/test-erp-blueprint-contracts.js",
         "test:scripts/test-erp-blueprint-pc-workspace.js"
       ],
@@ -1086,6 +1125,30 @@
       "related": [
         "docs/erp/README.md",
         "contracts/erp/erp-feature-signal-v1.schema.json"
+      ]
+    },
+    "docs/erp/operating-workflow-v1.md": {
+      "doc_type": "runbook",
+      "audience": [
+        "产品负责人",
+        "商户",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "通用 ERP 蓝图",
+      "reviewed_at": "2026-08-01",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/erp_blueprint/catalog_service.rs",
+        "file:server/src/erp_blueprint/instance_service.rs",
+        "file:server/src/erp_blueprint/matter_bridge.rs",
+        "file:server/src/store/erp_upgrades.rs",
+        "file:pc-frontend/src/features/open-commerce/erp-blueprint/"
+      ],
+      "related": [
+        "docs/erp/README.md",
+        "docs/erp/api-and-agent-tools-v1.md",
+        "docs/erp/acceptance-v1.md"
       ]
     },
     "docs/open-commerce/README.md": {
@@ -1880,6 +1943,13 @@
   },
   "audit_log": [
     {
+      "id": "erp-blueprint-v1-1-20260801",
+      "action": "document.knowledge_graph.update",
+      "target": ".elon/document-sections.json",
+      "summary": "登记版本能力目录、蓝图和实例修订、商户初始化 Matter、执行证据、完整配置回滚及对应测试与机器合同",
+      "at": "2026-08-01T06:30:00Z"
+    },
+    {
       "id": "erp-blueprint-governance-v1-20260801",
       "action": "document.knowledge_graph.update",
       "target": ".elon/document-sections.json",
@@ -1991,7 +2061,7 @@
         "view": "capabilities",
         "kind": "capability",
         "label": "通用 ERP 蓝图与独立实例",
-        "detail": "复用现有项目系统登记官方内核和不可变版本，为每个商户创建独立项目、主题、插件与私有扩展边界",
+        "detail": "按修订号演进官方定义和不可变版本，为每个商户创建独立项目、版本能力目录、可编辑配置与幂等初始化 Matter",
         "parent_id": "cap-open-commerce",
         "order": 13,
         "color": "#4FA9B8",
@@ -1999,14 +2069,20 @@
         "document_paths": [
           "docs/erp/README.md",
           "docs/decisions/erp-blueprint-and-instance-v1.md",
+          "docs/decisions/erp-instance-materialization-v1.md",
+          "docs/erp/operating-workflow-v1.md",
           "docs/erp/api-and-agent-tools-v1.md"
         ],
         "implementation_refs": [
           "file:server/src/erp_blueprint/service.rs",
+          "file:server/src/erp_blueprint/catalog_service.rs",
+          "file:server/src/erp_blueprint/instance_service.rs",
+          "file:server/src/erp_blueprint/matter_bridge.rs",
           "file:server/src/store/erp_blueprints.rs",
           "file:server/src/erp_blueprint_api.rs",
           "file:pc-frontend/src/features/open-commerce/erp-blueprint/ErpBlueprintPanel.tsx",
-          "test:server/src/erp_blueprint_tests.rs"
+          "test:server/src/erp_blueprint_evolution_tests.rs",
+          "test:server/src/erp_blueprint_workflow_tests.rs"
         ],
         "tags": [
           "blueprint",
@@ -2020,7 +2096,7 @@
         "view": "capabilities",
         "kind": "capability",
         "label": "AI 通用功能提案治理",
-        "detail": "先检索能力，再将经授权的脱敏需求按独立商户去重聚合；维护者接受后才创建正式 Matter",
+        "detail": "按固定版本和强匹配检索能力，再将经授权的脱敏需求按独立商户去重聚合；维护者接受后原子创建正式 Matter",
         "parent_id": "cap-open-commerce",
         "order": 14,
         "color": "#73A75C",
@@ -2034,7 +2110,8 @@
           "file:server/src/erp_blueprint/proposal.rs",
           "file:server/src/erp_blueprint/matter_bridge.rs",
           "file:server/src/store/erp_proposals.rs",
-          "test:server/src/erp_blueprint_tests.rs"
+          "test:server/src/erp_blueprint_tests.rs",
+          "test:server/src/erp_blueprint_evolution_tests.rs"
         ],
         "tags": [
           "ai",
@@ -2048,20 +2125,22 @@
         "view": "capabilities",
         "kind": "capability",
         "label": "ERP 兼容升级与回滚治理",
-        "detail": "以不可变发布清单检查模块、插件和扩展点，原子记录人工采用或回滚且不覆盖私有扩展",
+        "detail": "以不可变发布清单和实例修订检查模块、插件和扩展点，由商户凭执行证据采用，并可恢复完整公共配置快照",
         "parent_id": "cap-open-commerce",
         "order": 16,
         "color": "#D0A34F",
         "entrypoint": "docs/decisions/erp-release-upgrade-v1.md",
         "document_paths": [
           "docs/decisions/erp-release-upgrade-v1.md",
+          "docs/erp/operating-workflow-v1.md",
           "docs/erp/acceptance-v1.md",
           "examples/erp-blueprints/README.md"
         ],
         "implementation_refs": [
           "file:server/src/erp_blueprint/compatibility.rs",
           "file:server/src/store/erp_upgrades.rs",
-          "test:server/src/erp_blueprint_tests.rs"
+          "test:server/src/erp_blueprint_tests.rs",
+          "test:server/src/erp_blueprint_workflow_tests.rs"
         ],
         "tags": [
           "compatibility",

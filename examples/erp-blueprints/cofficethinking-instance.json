@@ -13,5 +13,7 @@
   "private_extensions": [
     { "extension_key": "cofficethinking.roast_profile", "version": "1.0.0", "extension_point": "order.enrichment", "requires_modules": ["order"] }
   ],
+  "configuration_revision": 1,
+  "bootstrap_matter_id": null,
   "data_policy": { "owner": "merchant_project", "raw_data_exported_to_blueprint": false }
 }

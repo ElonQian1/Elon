@@ -1,0 +1,33 @@
+{
+  "schema": "yilong.erp.upgrade_campaign.v1",
+  "instance_key": "cofficethinking.store",
+  "from_version": "1.0.0",
+  "target_version": "1.1.0",
+  "status": "adopted",
+  "instance_revision": 1,
+  "adopted_instance_revision": 2,
+  "from_configuration": {
+    "theme_key": "coffee.warm",
+    "enabled_modules": ["catalog", "order", "inventory", "customer", "finance", "marketing"],
+    "plugins": [
+      { "extension_key": "coffee.bean_catalog", "version": "1.0.0", "extension_point": "catalog.enrichment", "requires_modules": ["catalog"] }
+    ]
+  },
+  "target_configuration": {
+    "theme_key": "coffee.warm",
+    "enabled_modules": ["catalog", "order", "inventory", "customer", "finance", "marketing"],
+    "plugins": [
+      { "extension_key": "coffee.bean_catalog", "version": "1.0.0", "extension_point": "catalog.enrichment", "requires_modules": ["catalog"] }
+    ]
+  },
+  "private_extensions_snapshot": [
+    { "extension_key": "cofficethinking.roast_profile", "version": "1.0.0", "extension_point": "order.enrichment", "requires_modules": ["order"] }
+  ],
+  "merchant_confirmation_required": true,
+  "adoption_evidence": {
+    "execution_attested": true,
+    "verification_summary": "已完成参考实例、迁移、构建和商户验收",
+    "deployed_commit": "abcdef0123456789"
+  },
+  "rollback_reason": null
+}
