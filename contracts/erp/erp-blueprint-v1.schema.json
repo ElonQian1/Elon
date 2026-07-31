@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.ai/contracts/erp/erp-blueprint-v1.schema.json",
+  "title": "Yilong ERP Blueprint V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "blueprint_key", "name", "source_project_id", "modules", "capabilities", "themes", "extension_points"],
+  "properties": {
+    "schema": { "const": "yilong.erp.blueprint.v1" },
+    "blueprint_key": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{2,63}$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "description": { "type": "string", "maxLength": 2000 },
+    "source_project_id": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "modules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/module" },
+      "minItems": 1
+    },
+    "capabilities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "themes": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{1,63}$" },
+      "minItems": 1
+    },
+    "extension_points": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{1,79}$" }
+    },
+    "proposal_threshold": { "type": "integer", "minimum": 2, "maximum": 100, "default": 3 }
+  },
+  "$defs": {
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_key", "version", "kind", "required"],
+      "properties": {
+        "module_key": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{1,79}$" },
+        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?$" },
+        "kind": { "enum": ["core", "industry", "integration"] },
+        "required": { "type": "boolean" },
+        "dependencies": { "type": "array", "items": { "type": "string" }, "default": [] }
+      }
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability_key", "display_name", "category", "module_key"],
+      "properties": {
+        "capability_key": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{1,79}$" },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "category": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "module_key": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "aliases": { "type": "array", "items": { "type": "string", "maxLength": 80 }, "default": [] },
+        "composable_with": { "type": "array", "items": { "type": "string" }, "default": [] }
+      }
+    }
+  }
+}

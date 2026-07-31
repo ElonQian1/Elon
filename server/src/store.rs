@@ -29,6 +29,9 @@ mod compute_metering;
 mod conversation_forks;
 mod conversations;
 pub(crate) mod default_joint_projects;
+mod erp_blueprints;
+mod erp_proposals;
+mod erp_upgrades;
 mod external_app_tool_executions;
 mod external_apps;
 #[cfg(test)]

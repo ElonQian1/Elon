@@ -1,0 +1,17 @@
+{
+  "schema": "yilong.erp.instance.v1",
+  "instance_key": "cofficethinking.store",
+  "project_id": "cofficethinking",
+  "blueprint_key": "official.erp",
+  "pinned_version": "1.0.0",
+  "industry": "coffee",
+  "theme_key": "coffee.warm",
+  "enabled_modules": ["catalog", "order", "inventory", "customer", "finance", "marketing"],
+  "plugins": [
+    { "extension_key": "coffee.bean_catalog", "version": "1.0.0", "extension_point": "catalog.enrichment", "requires_modules": ["catalog"] }
+  ],
+  "private_extensions": [
+    { "extension_key": "cofficethinking.roast_profile", "version": "1.0.0", "extension_point": "order.enrichment", "requires_modules": ["order"] }
+  ],
+  "data_policy": { "owner": "merchant_project", "raw_data_exported_to_blueprint": false }
+}

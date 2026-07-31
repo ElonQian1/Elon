@@ -15,7 +15,7 @@ mod live;
 mod merge_gate;
 mod merge_git;
 mod permissions;
-mod planner;
+pub(crate) mod planner;
 mod policy;
 mod review_gate;
 mod review_result;

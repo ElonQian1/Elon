@@ -16,7 +16,7 @@
     "test:pwa-design": "node scripts/test-pwa-design.cjs && node scripts/test-pwa-device-viewport.cjs && node scripts/test-pwa-runtime-capture.cjs && node scripts/test-fit-run-events.cjs && node ../scripts/test-pwa-ui-tuner-bridge.js",
     "test:project-docs": "node scripts/test-project-document-sections.cjs && node scripts/test-project-document-discussions.cjs",
     "test:project-home": "node ../scripts/test-pc-project-home.js && node ../scripts/test-pc-project-context-sidebar.js",
-    "test:open-commerce": "node ../scripts/test-open-commerce-pc-workspace.js",
+    "test:open-commerce": "node ../scripts/test-open-commerce-pc-workspace.js && node ../scripts/test-erp-blueprint-pc-workspace.js",
     "test:plaza": "node scripts/test-project-plaza-carousel.mjs",
     "test:message-actions": "node scripts/test-message-actions-hover.cjs",
     "check:bundle-budget": "node ../scripts/test-pc-frontend-bundle-budget.js && node ../scripts/check-pc-frontend-bundle-budget.js",

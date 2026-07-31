@@ -1,0 +1,15 @@
+{
+  "schema": "yilong.erp.instance.v1",
+  "instance_key": "retail.minimum",
+  "project_id": "minimal-retail-reference",
+  "blueprint_key": "official.erp",
+  "pinned_version": "1.0.0",
+  "industry": "convenience_retail",
+  "theme_key": "retail.fresh",
+  "enabled_modules": ["catalog", "order", "inventory", "finance", "marketing"],
+  "plugins": [
+    { "extension_key": "retail.barcode", "version": "1.0.0", "extension_point": "catalog.enrichment", "requires_modules": ["catalog", "inventory"] }
+  ],
+  "private_extensions": [],
+  "data_policy": { "owner": "merchant_project", "raw_data_exported_to_blueprint": false }
+}

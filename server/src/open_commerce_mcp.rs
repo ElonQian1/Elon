@@ -122,7 +122,11 @@ async fn mcp_handler(
     let result = match request.method.as_str() {
         "initialize" => Ok(initialize_response()),
         "notifications/initialized" => return StatusCode::ACCEPTED.into_response(),
-        "tools/list" => Ok(json!({"tools": crate::open_commerce_mcp_tools::definitions()})),
+        "tools/list" => {
+            let mut tools = crate::open_commerce_mcp_tools::definitions();
+            tools.extend(crate::erp_blueprint_mcp_tools::definitions());
+            Ok(json!({"tools": tools}))
+        }
         "tools/call" => {
             call_tool(
                 &state.store,
@@ -164,6 +168,17 @@ pub(crate) async fn call_tool(
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| json!({}));
+    if crate::erp_blueprint_mcp::handles(name) {
+        let value = crate::erp_blueprint_mcp::call_tool(
+            store,
+            project_id,
+            user_id,
+            project_role,
+            name,
+            arguments,
+        )?;
+        return tool_response(value);
+    }
     let actor = OpenCommerceActor {
         user_id,
         app_id,
@@ -336,7 +351,7 @@ fn initialize_response() -> Value {
         "protocolVersion":MCP_PROTOCOL_VERSION,
         "capabilities":{"tools":{"listChanged":false}},
         "serverInfo":{"name":"yilong-open-commerce","version":"1.0.0"},
-        "instructions":"先调用 open_commerce_get_overview、open_commerce_get_development_context 或 search_merchants。数据接入记录不包含令牌，公开发现不暴露处理器配置；授权能力必须携带 grant_id；所有调用和同步回执必须使用幂等键。当前只记录计量，不真实扣款。写操作需要当前项目编辑权限，调用身份由 x-elon-app-id 固定，不能由工具参数冒充。"
+        "instructions":"开放商业任务先调用 open_commerce_get_overview；ERP 开发先调用 erp_get_overview、erp_search_capabilities 和 erp_resolve_requirement，避免重复造轮子。ERP 工具不允许接受提案、创建 Matter、合并、发布、采用或回滚。数据接入记录不包含令牌，公开发现不暴露处理器配置；授权能力必须携带 grant_id；所有调用和同步回执必须使用幂等键。当前只记录计量，不真实扣款。写操作需要当前项目编辑权限，调用身份由 x-elon-app-id 固定，不能由工具参数冒充。"
     })
 }
 

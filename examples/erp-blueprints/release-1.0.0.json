@@ -1,0 +1,20 @@
+{
+  "schema": "yilong.erp.release.v1",
+  "blueprint_key": "official.erp",
+  "version": "1.0.0",
+  "previous_version": null,
+  "source_git_commit": "378890e",
+  "modules": [
+    { "module_key": "catalog", "version": "1.0.0", "required": true },
+    { "module_key": "order", "version": "1.0.0", "required": true },
+    { "module_key": "inventory", "version": "1.0.0", "required": true },
+    { "module_key": "customer", "version": "1.0.0", "required": false },
+    { "module_key": "finance", "version": "1.0.0", "required": false },
+    { "module_key": "marketing", "version": "1.0.0", "required": false }
+  ],
+  "capabilities": ["catalog.search", "order.create", "order.status", "inventory.query", "marketing.campaign"],
+  "extension_points": ["catalog.enrichment", "order.enrichment", "marketing.campaign", "dashboard.widget", "integration.connector"],
+  "migrations": [],
+  "compatibility": { "minimum_instance_version": "1.0.0", "required_plugins": [] },
+  "rollback": { "supported": true, "instructions": "恢复 1.0.0 固定版本并运行项目验证。" }
+}

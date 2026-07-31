@@ -146,6 +146,16 @@
       "entrypoint": "docs/open-commerce/README.md"
     },
     {
+      "id": "erp-blueprint-system",
+      "label": "通用 ERP 蓝图",
+      "detail": "官方内核、独立商户实例、AI 通用提案和可回滚升级治理",
+      "color": "#4FA9B8",
+      "parent_id": "open-commerce-network",
+      "order": 15,
+      "icon": "blocks",
+      "entrypoint": "docs/erp/README.md"
+    },
+    {
       "id": "security",
       "label": "安全与权限",
       "detail": "权限、密钥、隐私、凭据与安全边界",
@@ -212,6 +222,9 @@
     "docs/cli会话问题/纯Codex cli图片会话.md": "custom:external-tools",
     "docs/codex-vault-sharing-runbook.md": "custom:security",
     "docs/decisions/ai-resource-control-v1.md": "custom:open-commerce-network",
+    "docs/decisions/erp-blueprint-and-instance-v1.md": "custom:erp-blueprint-system",
+    "docs/decisions/erp-feature-proposal-governance-v1.md": "custom:erp-blueprint-system",
+    "docs/decisions/erp-release-upgrade-v1.md": "custom:erp-blueprint-system",
     "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md": "custom:open-commerce-network",
     "docs/decisions/open-commerce-integration-control-plane.md": "custom:open-commerce-network",
     "docs/decisions/open-commerce-merchant-runtime-v1.md": "custom:open-commerce-network",
@@ -225,6 +238,9 @@
     "docs/drafts/open-commerce-network-sui-agent-economy.md": "custom:open-commerce-network",
     "docs/drafts/sui-economy-s4-shadow-settlement-plan.md": "custom:open-commerce-network",
     "docs/drafts/requirements/open-commerce-network.md": "custom:open-commerce-network",
+    "docs/erp/README.md": "custom:erp-blueprint-system",
+    "docs/erp/acceptance-v1.md": "custom:erp-blueprint-system",
+    "docs/erp/api-and-agent-tools-v1.md": "custom:erp-blueprint-system",
     "docs/fb2-ai-center/PLAN.md": "custom:fb2-project",
     "docs/fb2-ai-center/PROGRESS.md": "custom:fb2-project",
     "docs/fb2-ai-center/README.md": "custom:fb2-project",
@@ -333,6 +349,9 @@
     "docs/codex-vault-sharing-runbook.md": "on-demand",
     "docs/codex-vault-usage-estimation.md": "on-demand",
     "docs/decisions/ai-resource-control-v1.md": "on-demand",
+    "docs/decisions/erp-blueprint-and-instance-v1.md": "on-demand",
+    "docs/decisions/erp-feature-proposal-governance-v1.md": "on-demand",
+    "docs/decisions/erp-release-upgrade-v1.md": "on-demand",
     "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md": "on-demand",
     "docs/decisions/open-commerce-integration-control-plane.md": "on-demand",
     "docs/decisions/open-commerce-merchant-runtime-v1.md": "on-demand",
@@ -347,6 +366,9 @@
     "docs/group-chat-summary-system.md": "drafts",
     "docs/intent-routing.md": "current",
     "docs/drafts/sui-economy-s4-shadow-settlement-plan.md": "drafts",
+    "docs/erp/README.md": "on-demand",
+    "docs/erp/acceptance-v1.md": "evidence",
+    "docs/erp/api-and-agent-tools-v1.md": "on-demand",
     "docs/open-commerce-network-v1-acceptance.md": "on-demand",
     "docs/open-commerce-network-v1-api.md": "on-demand",
     "docs/open-commerce/ai-resource-control.md": "on-demand",
@@ -459,6 +481,42 @@
       "lifecycle": "active",
       "authority": "authoritative",
       "document_type": "architecture_decision"
+    },
+    "docs/decisions/erp-blueprint-and-instance-v1.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture_decision"
+    },
+    "docs/decisions/erp-feature-proposal-governance-v1.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture_decision"
+    },
+    "docs/decisions/erp-release-upgrade-v1.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture_decision"
+    },
+    "docs/erp/README.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "subproject_overview"
+    },
+    "docs/erp/acceptance-v1.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "evidence",
+      "document_type": "acceptance"
+    },
+    "docs/erp/api-and-agent-tools-v1.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "api_reference"
     },
     "docs/decisions/reject-demo-oracle-role.md": {
       "retrieval": "on_demand",
@@ -907,6 +965,127 @@
       "related": [
         "docs/open-commerce/merchant-runtime.md",
         "docs/open-commerce-merchant-runtime-v1-acceptance.md"
+      ]
+    },
+    "docs/decisions/erp-blueprint-and-instance-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "通用 ERP 蓝图",
+      "reviewed_at": "2026-08-01",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/erp_blueprint/model.rs",
+        "file:server/src/store/erp_blueprints.rs",
+        "file:contracts/erp/erp-blueprint-v1.schema.json"
+      ],
+      "related": [
+        "docs/erp/README.md",
+        "docs/decisions/erp-feature-proposal-governance-v1.md",
+        "docs/decisions/erp-release-upgrade-v1.md"
+      ]
+    },
+    "docs/decisions/erp-feature-proposal-governance-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "产品负责人",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "通用 ERP 蓝图",
+      "reviewed_at": "2026-08-01",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/erp_blueprint/proposal.rs",
+        "file:server/src/erp_blueprint/matter_bridge.rs",
+        "test:server/src/erp_blueprint_tests.rs"
+      ],
+      "related": [
+        "docs/erp/README.md",
+        "docs/erp/api-and-agent-tools-v1.md"
+      ]
+    },
+    "docs/decisions/erp-release-upgrade-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "通用 ERP 蓝图",
+      "reviewed_at": "2026-08-01",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/erp_blueprint/compatibility.rs",
+        "file:server/src/store/erp_upgrades.rs",
+        "file:contracts/erp/erp-release-manifest-v1.schema.json"
+      ],
+      "related": [
+        "docs/erp/README.md",
+        "docs/erp/acceptance-v1.md"
+      ]
+    },
+    "docs/erp/README.md": {
+      "doc_type": "subproject_overview",
+      "audience": [
+        "产品负责人",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "通用 ERP 蓝图",
+      "reviewed_at": "2026-08-01",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/erp_blueprint/",
+        "file:server/src/erp_blueprint_api.rs",
+        "file:pc-frontend/src/features/open-commerce/erp-blueprint/"
+      ],
+      "related": [
+        "docs/open-commerce/README.md",
+        "docs/erp/api-and-agent-tools-v1.md",
+        "docs/erp/acceptance-v1.md"
+      ]
+    },
+    "docs/erp/acceptance-v1.md": {
+      "doc_type": "acceptance",
+      "audience": [
+        "开发者",
+        "测试人员",
+        "AI 代理"
+      ],
+      "owner": "通用 ERP 蓝图",
+      "reviewed_at": "2026-08-01",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "test:server/src/erp_blueprint_tests.rs",
+        "test:scripts/test-erp-blueprint-contracts.js",
+        "test:scripts/test-erp-blueprint-pc-workspace.js"
+      ],
+      "related": [
+        "docs/erp/README.md",
+        "examples/erp-blueprints/README.md"
+      ]
+    },
+    "docs/erp/api-and-agent-tools-v1.md": {
+      "doc_type": "api_reference",
+      "audience": [
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "通用 ERP 蓝图",
+      "reviewed_at": "2026-08-01",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/erp_blueprint_api.rs",
+        "file:server/src/erp_blueprint_mcp.rs",
+        "file:server/src/erp_blueprint_mcp_tools.rs"
+      ],
+      "related": [
+        "docs/erp/README.md",
+        "contracts/erp/erp-feature-signal-v1.schema.json"
       ]
     },
     "docs/open-commerce/README.md": {
@@ -1701,6 +1880,13 @@
   },
   "audit_log": [
     {
+      "id": "erp-blueprint-governance-v1-20260801",
+      "action": "document.knowledge_graph.update",
+      "target": ".elon/document-sections.json",
+      "summary": "登记通用 ERP 蓝图、独立商户实例、AI 脱敏提案、Matter 桥接、兼容升级和参考实例的权威入口与实现证据",
+      "at": "2026-08-01T00:00:00Z"
+    },
+    {
       "id": "open-commerce-independent-loops-20260731",
       "action": "document.knowledge_graph.update",
       "target": ".elon/document-sections.json",
@@ -1798,6 +1984,90 @@
           "hmac",
           "merchant-runtime",
           "order"
+        ]
+      },
+      {
+        "id": "cap-erp-blueprint-v1",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "通用 ERP 蓝图与独立实例",
+        "detail": "复用现有项目系统登记官方内核和不可变版本，为每个商户创建独立项目、主题、插件与私有扩展边界",
+        "parent_id": "cap-open-commerce",
+        "order": 13,
+        "color": "#4FA9B8",
+        "entrypoint": "docs/erp/README.md",
+        "document_paths": [
+          "docs/erp/README.md",
+          "docs/decisions/erp-blueprint-and-instance-v1.md",
+          "docs/erp/api-and-agent-tools-v1.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/erp_blueprint/service.rs",
+          "file:server/src/store/erp_blueprints.rs",
+          "file:server/src/erp_blueprint_api.rs",
+          "file:pc-frontend/src/features/open-commerce/erp-blueprint/ErpBlueprintPanel.tsx",
+          "test:server/src/erp_blueprint_tests.rs"
+        ],
+        "tags": [
+          "blueprint",
+          "erp",
+          "instance",
+          "extension"
+        ]
+      },
+      {
+        "id": "cap-erp-common-proposals",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "AI 通用功能提案治理",
+        "detail": "先检索能力，再将经授权的脱敏需求按独立商户去重聚合；维护者接受后才创建正式 Matter",
+        "parent_id": "cap-open-commerce",
+        "order": 14,
+        "color": "#73A75C",
+        "entrypoint": "docs/decisions/erp-feature-proposal-governance-v1.md",
+        "document_paths": [
+          "docs/decisions/erp-feature-proposal-governance-v1.md",
+          "docs/erp/api-and-agent-tools-v1.md",
+          "docs/erp/acceptance-v1.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/erp_blueprint/proposal.rs",
+          "file:server/src/erp_blueprint/matter_bridge.rs",
+          "file:server/src/store/erp_proposals.rs",
+          "test:server/src/erp_blueprint_tests.rs"
+        ],
+        "tags": [
+          "ai",
+          "matter",
+          "proposal",
+          "sanitization"
+        ]
+      },
+      {
+        "id": "cap-erp-governed-upgrades",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "ERP 兼容升级与回滚治理",
+        "detail": "以不可变发布清单检查模块、插件和扩展点，原子记录人工采用或回滚且不覆盖私有扩展",
+        "parent_id": "cap-open-commerce",
+        "order": 16,
+        "color": "#D0A34F",
+        "entrypoint": "docs/decisions/erp-release-upgrade-v1.md",
+        "document_paths": [
+          "docs/decisions/erp-release-upgrade-v1.md",
+          "docs/erp/acceptance-v1.md",
+          "examples/erp-blueprints/README.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/erp_blueprint/compatibility.rs",
+          "file:server/src/store/erp_upgrades.rs",
+          "test:server/src/erp_blueprint_tests.rs"
+        ],
+        "tags": [
+          "compatibility",
+          "release",
+          "rollback",
+          "upgrade"
         ]
       },
       {
@@ -2985,6 +3255,34 @@
       }
     ],
     "edges": [
+      {
+        "id": "cap-erp-blueprint-commerce-v1",
+        "source": "cap-erp-blueprint-v1",
+        "target": "cap-open-commerce-v1",
+        "relation": "feeds",
+        "label": "商户实例向开放商业声明可调用能力"
+      },
+      {
+        "id": "cap-erp-blueprint-runtime",
+        "source": "cap-erp-blueprint-v1",
+        "target": "cap-open-commerce-merchant-runtime",
+        "relation": "templates",
+        "label": "同一内核生成独立商户运行项目"
+      },
+      {
+        "id": "cap-erp-proposal-blueprint",
+        "source": "cap-erp-common-proposals",
+        "target": "cap-erp-blueprint-v1",
+        "relation": "governs",
+        "label": "脱敏共性需求经 Matter 进入公共内核评审"
+      },
+      {
+        "id": "cap-erp-upgrade-blueprint",
+        "source": "cap-erp-governed-upgrades",
+        "target": "cap-erp-blueprint-v1",
+        "relation": "evolves",
+        "label": "兼容检查、人工采用与可审计回滚"
+      },
       {
         "id": "cap-open-commerce-connectors-v1",
         "source": "cap-open-commerce-connectors",

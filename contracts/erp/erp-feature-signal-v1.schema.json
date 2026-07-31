@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.ai/contracts/erp/erp-feature-signal-v1.schema.json",
+  "title": "Yilong ERP Feature Signal V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "requirement_summary", "industry", "merchant_authorized", "classification"],
+  "properties": {
+    "schema": { "const": "yilong.erp.feature_signal.v1" },
+    "requirement_summary": { "type": "string", "minLength": 8, "maxLength": 500 },
+    "need_key": { "type": "string", "pattern": "^[a-z][a-z0-9._-]{2,79}$" },
+    "industry": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "requested_outcome": { "type": "string", "maxLength": 300 },
+    "merchant_authorized": { "const": true },
+    "classification": { "enum": ["sanitized_aggregate", "public_requirement"] },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "occurrence_count": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "affected_workflow": { "type": "string", "maxLength": 120 },
+        "estimated_time_saved_minutes": { "type": "integer", "minimum": 0, "maximum": 100000 }
+      }
+    }
+  }
+}

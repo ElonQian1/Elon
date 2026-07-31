@@ -4,6 +4,7 @@ import {
   Bot,
   Coins,
   Compass,
+  DatabaseZap,
   Store,
 } from 'lucide-react'
 import AiResourceControlPanel from './AiResourceControlPanel'
@@ -11,10 +12,11 @@ import ConsumerCommerceSandbox from './ConsumerCommerceSandbox'
 import DeveloperCommercePortal from './DeveloperCommercePortal'
 import OpenCommerceMerchantWorkspace from './OpenCommerceMerchantWorkspace'
 import ShadowEconomyPanel from './ShadowEconomyPanel'
+import ErpBlueprintPanel from './erp-blueprint/ErpBlueprintPanel'
 import base from './OpenCommercePanel.module.css'
 import { commerceStyles, tabStyle } from './openCommerceStyles'
 
-type WorkspaceView = 'merchant' | 'consumer' | 'developer' | 'resources' | 'economy'
+type WorkspaceView = 'merchant' | 'erp' | 'consumer' | 'developer' | 'resources' | 'economy'
 
 const views: Array<{
   id: WorkspaceView
@@ -22,6 +24,7 @@ const views: Array<{
   icon: typeof Store
 }> = [
   { id: 'merchant', label: '商户节点', icon: Store },
+  { id: 'erp', label: 'ERP 蓝图', icon: DatabaseZap },
   { id: 'consumer', label: '消费者沙盒', icon: Compass },
   { id: 'developer', label: '开发者', icon: Blocks },
   { id: 'resources', label: 'AI 资源', icon: Bot },
@@ -57,6 +60,7 @@ export default function OpenCommercePanel({
       {view === 'merchant' && (
         <OpenCommerceMerchantWorkspace projectId={projectId} canEdit={canEdit} />
       )}
+      {view === 'erp' && <ErpBlueprintPanel projectId={projectId} canEdit={canEdit} />}
       {view === 'consumer' && <ConsumerCommerceSandbox projectId={projectId} />}
       {view === 'developer' && (
         <DeveloperCommercePortal projectId={projectId} canEdit={canEdit} />

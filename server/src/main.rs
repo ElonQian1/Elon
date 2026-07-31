@@ -50,6 +50,13 @@ mod compute_usage;
 mod context_compiler;
 mod conversation_forks;
 mod conversation_router;
+mod erp_blueprint;
+mod erp_blueprint_api;
+mod erp_blueprint_mcp;
+mod erp_blueprint_mcp_tools;
+mod erp_blueprint_migration;
+#[cfg(test)]
+mod erp_blueprint_tests;
 mod errors;
 mod external_app_api;
 mod external_app_chat_bootstrap;

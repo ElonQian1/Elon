@@ -1,0 +1,25 @@
+{
+  "schema": "yilong.erp.blueprint.v1",
+  "blueprint_key": "official.erp",
+  "name": "一龙通用商户 ERP",
+  "description": "同一公共内核、独立商户项目、可替换主题和插件。",
+  "source_project_id": "yilong-official-erp",
+  "modules": [
+    { "module_key": "catalog", "version": "1.0.0", "kind": "core", "required": true, "dependencies": [] },
+    { "module_key": "order", "version": "1.0.0", "kind": "core", "required": true, "dependencies": ["catalog"] },
+    { "module_key": "inventory", "version": "1.0.0", "kind": "core", "required": true, "dependencies": ["catalog"] },
+    { "module_key": "customer", "version": "1.0.0", "kind": "core", "required": false, "dependencies": [] },
+    { "module_key": "finance", "version": "1.0.0", "kind": "core", "required": false, "dependencies": ["order"] },
+    { "module_key": "marketing", "version": "1.0.0", "kind": "core", "required": false, "dependencies": ["catalog", "customer"] }
+  ],
+  "capabilities": [
+    { "capability_key": "catalog.search", "display_name": "查询商品", "description": "按名称和分类检索可售商品", "category": "catalog", "module_key": "catalog", "aliases": ["搜索商品", "查商品"], "composable_with": ["order.create"] },
+    { "capability_key": "order.create", "display_name": "创建订单", "description": "创建待确认订单", "category": "order", "module_key": "order", "aliases": ["下单", "开单"], "composable_with": ["catalog.search", "inventory.query"] },
+    { "capability_key": "order.status", "display_name": "订单状态", "description": "读取订单当前状态", "category": "order", "module_key": "order", "aliases": ["订单进度"], "composable_with": [] },
+    { "capability_key": "inventory.query", "display_name": "查询库存", "description": "读取当前可用库存", "category": "inventory", "module_key": "inventory", "aliases": ["查库存"], "composable_with": ["order.create"] },
+    { "capability_key": "marketing.campaign", "display_name": "创建营销活动", "description": "创建商户自有营销活动", "category": "marketing", "module_key": "marketing", "aliases": ["优惠活动", "营销活动"], "composable_with": ["catalog.search"] }
+  ],
+  "themes": ["default.clean", "coffee.warm", "retail.fresh"],
+  "extension_points": ["catalog.enrichment", "order.enrichment", "marketing.campaign", "dashboard.widget", "integration.connector"],
+  "proposal_threshold": 3
+}

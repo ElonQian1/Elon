@@ -1,0 +1,14 @@
+{
+  "schema": "yilong.erp.feature_signal.v1",
+  "requirement_summary": "多个商户需要按临期批次生成补货建议",
+  "need_key": "need.expiry_restock",
+  "industry": "retail",
+  "requested_outcome": "减少人工检查临期库存的时间",
+  "merchant_authorized": true,
+  "classification": "sanitized_aggregate",
+  "evidence": {
+    "occurrence_count": 3,
+    "affected_workflow": "inventory.restock",
+    "estimated_time_saved_minutes": 30
+  }
+}
