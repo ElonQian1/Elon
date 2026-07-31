@@ -2,7 +2,6 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  color: var(--text);
 }
 
 .hero {
@@ -11,21 +10,17 @@
   justify-content: space-between;
   gap: 24px;
   padding: 22px;
-  border: 1px solid rgba(112, 96, 225, .32);
-  border-radius: 14px;
-  background:
-    radial-gradient(circle at 88% 12%, rgba(112, 96, 225, .2), transparent 38%),
-    linear-gradient(145deg, #202128, #282832);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: #202126;
 }
 
 .hero h2 {
-  max-width: 780px;
   margin: 6px 0 7px;
   font-size: 21px;
 }
 
 .hero p {
-  max-width: 820px;
   margin: 0;
   color: var(--text-muted);
   font-size: 13px;
@@ -37,9 +32,9 @@
 .createMerchant > button {
   min-height: 34px;
   padding: 0 14px;
-  border: 1px solid rgba(123, 109, 226, .5);
-  border-radius: 8px;
-  background: #6f5dd4;
+  border: 1px solid #4aa28f;
+  border-radius: 6px;
+  background: #2f7467;
   color: #fff;
   font-size: 12px;
   font-weight: 800;
@@ -51,13 +46,6 @@
 .createMerchant > button:disabled {
   cursor: not-allowed;
   opacity: .45;
-}
-
-.eyebrow {
-  color: #a99cf4;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: .12em;
 }
 
 .stats {
@@ -142,7 +130,7 @@
 
 .integrationList article > span {
   align-self: start;
-  color: #c6bdf8;
+  color: #a9ded2;
   font-size: 10px;
 }
 
@@ -256,8 +244,8 @@
 
 .merchantList button:hover,
 .merchantList button[data-active="true"] {
-  border-color: rgba(112, 96, 225, .35);
-  background: rgba(112, 96, 225, .12);
+  border-color: #3e7e72;
+  background: #203b37;
 }
 
 .merchantList strong,
@@ -346,7 +334,7 @@
 .formCard input:focus,
 .formCard select:focus,
 .formCard textarea:focus {
-  border-color: #7463dc;
+  border-color: #4aa28f;
 }
 
 .main,
@@ -388,7 +376,7 @@
 .audit code {
   max-width: 260px;
   overflow: hidden;
-  color: #a99cf4;
+  color: #a9ded2;
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -555,42 +543,12 @@
   font-size: 9px;
 }
 
-.auditDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #6dc99a;
-}
-
-.firstStep {
-  padding: 28px;
-  text-align: center;
-}
-
-.firstStep p,
 .empty {
-  margin: 5px 0 0;
   color: var(--text-muted);
-  font-size: 11px;
 }
 
 .empty {
   padding: 12px 14px;
-}
-
-.message {
-  padding: 10px 12px;
-  border: 1px solid rgba(112, 96, 225, .3);
-  border-radius: 8px;
-  background: rgba(112, 96, 225, .09);
-  color: #c7bffc;
-  font-size: 11px;
-}
-
-.loading {
-  padding: 34px;
-  color: var(--text-muted);
-  text-align: center;
 }
 
 @media (max-width: 1180px) {

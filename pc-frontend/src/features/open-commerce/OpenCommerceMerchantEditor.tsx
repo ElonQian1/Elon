@@ -5,6 +5,7 @@ import type {
   OpenCommerceGrant,
   OpenCommerceMerchantDetail,
 } from './openCommerceTypes'
+import { commerceStyles } from './openCommerceStyles'
 import styles from './OpenCommercePanel.module.css'
 
 interface Props {
@@ -220,7 +221,7 @@ export default function OpenCommerceMerchantEditor({
           {result && <pre className={styles.result}>{result}</pre>}
         </form>
       </div>
-      {message && <div className={styles.message}>{message}</div>}
+      {message && <div style={commerceStyles.message}>{message}</div>}
     </div>
   )
 }

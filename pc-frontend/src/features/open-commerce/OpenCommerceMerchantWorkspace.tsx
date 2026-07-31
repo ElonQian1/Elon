@@ -3,7 +3,15 @@ import { openCommerceApi } from './openCommerceApi'
 import OpenCommerceMerchantEditor from './OpenCommerceMerchantEditor'
 import OpenCommerceIntegrationManager from './OpenCommerceIntegrationManager'
 import type { OpenCommerceOverview } from './openCommerceTypes'
+import { commerceStyles } from './openCommerceStyles'
 import styles from './OpenCommercePanel.module.css'
+
+const localStyles = {
+  loading: { padding: 34, color: 'var(--text-muted)', textAlign: 'center' },
+  eyebrow: { color: '#a9ded2', fontSize: 10, fontWeight: 900 },
+  firstStep: { padding: 28, textAlign: 'center' },
+  auditDot: { width: 6, height: 6, borderRadius: '50%', background: '#6dc99a' },
+} as const
 
 export default function OpenCommerceMerchantWorkspace({
   projectId,
@@ -75,7 +83,7 @@ export default function OpenCommerceMerchantWorkspace({
   }
 
   if (loading && !overview) {
-    return <div className={styles.loading}>正在加载开放商业网络…</div>
+    return <div style={localStyles.loading}>正在加载开放商业网络…</div>
   }
 
   const totals = overview?.totals
@@ -83,7 +91,7 @@ export default function OpenCommerceMerchantWorkspace({
     <div className={styles.panel}>
       <section className={styles.hero}>
         <div>
-          <span className={styles.eyebrow}>AI-NATIVE OPEN COMMERCE · V1</span>
+          <span style={localStyles.eyebrow}>AI-NATIVE OPEN COMMERCE · V1</span>
           <h2>让商户能力被任何获得授权的 AI 发现和调用</h2>
           <p>第一版先打通商户节点、能力契约、应用授权、幂等调用、计量与审计。数据不出售，V1 计量不真实扣款。</p>
         </div>
@@ -140,13 +148,13 @@ export default function OpenCommerceMerchantWorkspace({
                 onChanged={refresh}
               />
             </>
-            : <section className={styles.firstStep}><strong>先创建一个商户节点</strong><p>它是商户自有数据与商业能力的边界，不是平台复制的一份商户页面。</p></section>}
+            : <section style={localStyles.firstStep}><strong>先创建一个商户节点</strong><p>它是商户自有数据与商业能力的边界，不是平台复制的一份商户页面。</p></section>}
 
           <section className={styles.audit}>
             <header><strong>最近审计</strong><span>原始调用值不会写入审计</span></header>
             {(overview?.recent_audit_events ?? []).slice(0, 12).map((event) => (
               <div key={event.id}>
-                <span className={styles.auditDot} />
+                <span style={localStyles.auditDot} />
                 <span><strong>{auditLabel(event.action)}</strong><small>{event.actor_app_id ?? 'system'} · {new Date(event.created_at).toLocaleString('zh-CN')}</small></span>
                 <code>{event.subject_id}</code>
               </div>
@@ -155,7 +163,7 @@ export default function OpenCommerceMerchantWorkspace({
           </section>
         </main>
       </div>
-      {message && <div className={styles.message}>{message}</div>}
+      {message && <div style={commerceStyles.message}>{message}</div>}
     </div>
   )
 }

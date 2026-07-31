@@ -190,7 +190,7 @@ export interface CreateOpenCommerceGrant {
 export interface InvokeOpenCommerceCapability {
   merchant_id: string
   capability_key: string
-  requester_app_id: 'pc-web'
+  requester_app_id: string
   grant_id?: string
   idempotency_key: string
   input: Record<string, unknown>

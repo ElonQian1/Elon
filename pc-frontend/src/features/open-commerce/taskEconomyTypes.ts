@@ -1,0 +1,126 @@
+export interface TaskEconomyProjectSetting {
+  project_id: string
+  enabled: boolean
+  shadow_only: true
+  updated_by_user_id?: string
+  updated_at?: string
+}
+
+export interface UsageReceipt {
+  id: string
+  project_id: string
+  subject_type: string
+  subject_id: string
+  source_type: string
+  source_id: string
+  source_digest: string
+  consumer_user_id: string
+  provider_user_id?: string
+  units: number
+  amount_micros: number
+  provider_amount_micros: number
+  currency: string
+  billing_source: string
+  source_status: string
+  occurred_at: string
+  created_at: string
+}
+
+export interface SettlementIntent {
+  id: string
+  project_id: string
+  matter_id?: string
+  assignment_id?: string
+  payer_user_id: string
+  payee_user_id?: string
+  idempotency_key: string
+  policy_version: string
+  policy_digest: string
+  status: 'pending' | 'posted' | 'voided'
+  shadow_only: true
+  created_at: string
+  updated_at: string
+}
+
+export interface SettlementReceipt {
+  id: string
+  project_id: string
+  intent_id: string
+  posting_key: string
+  status: 'reconciled' | 'voided'
+  compute_amount_micros: number
+  provider_amount_micros: number
+  platform_amount_micros: number
+  outcome_reward_micros: number
+  review_reward_micros: number
+  currency: string
+  shadow_only: true
+  accepted_matter_id?: string
+  reason: string
+  created_at: string
+}
+
+export interface LedgerEntry {
+  id: string
+  transaction_id: string
+  account_key: string
+  user_id?: string
+  side: 'debit' | 'credit'
+  amount_micros: number
+  currency: string
+  created_at: string
+}
+
+export interface LedgerTransaction {
+  id: string
+  project_id: string
+  settlement_receipt_id: string
+  posting_key: string
+  description: string
+  created_at: string
+  entries: LedgerEntry[]
+}
+
+export interface TaskEconomyOverview {
+  schema: string
+  project_id: string
+  runtime_enabled: boolean
+  project_setting: TaskEconomyProjectSetting
+  shadow_only: true
+  totals: {
+    usage_receipts: number
+    pending_intents: number
+    posted_intents: number
+    voided_intents: number
+    settlement_receipts: number
+    compute_amount_micros: number
+    provider_amount_micros: number
+    platform_amount_micros: number
+  }
+  usage_receipts: UsageReceipt[]
+  intents: SettlementIntent[]
+  settlement_receipts: SettlementReceipt[]
+}
+
+export interface SettlementReceiptDetail {
+  receipt: SettlementReceipt
+  intent: SettlementIntent
+  usage_receipts: UsageReceipt[]
+  ledger_transaction?: LedgerTransaction
+}
+
+export interface SuiSettlementEnvelope {
+  schema: string
+  source_receipt_id: string
+  source_posting_key: string
+  project_object_key: string
+  intent_object_key: string
+  receipt_object_key: string
+  amount_micros: number
+  provider_amount_micros: number
+  platform_amount_micros: number
+  currency: string
+  shadow_only: true
+  ptb_steps: string[]
+  network_submission: 'not_submitted'
+}

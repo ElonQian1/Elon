@@ -4,6 +4,7 @@ import type {
   OpenCommerceIntegration,
   OpenCommerceSyncReceipt,
 } from './openCommerceTypes'
+import { commerceStyles } from './openCommerceStyles'
 import styles from './OpenCommercePanel.module.css'
 
 interface Props {
@@ -151,7 +152,7 @@ export default function OpenCommerceIntegrationManager({
           </button>
         </form>
       </div>
-      {message && <div className={styles.message}>{message}</div>}
+      {message && <div style={commerceStyles.message}>{message}</div>}
     </section>
   )
 }
