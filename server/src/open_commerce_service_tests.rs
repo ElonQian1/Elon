@@ -20,8 +20,8 @@ fn temp_store() -> Store {
     Store::open(&path).expect("open-commerce test store should open")
 }
 
-#[test]
-fn merchant_integration_receipts_feed_a_bounded_ai_development_context() {
+#[tokio::test]
+async fn merchant_integration_receipts_feed_a_bounded_ai_development_context() {
     let store = temp_store();
     let owner = store
         .create_user(
@@ -136,6 +136,7 @@ fn merchant_integration_receipts_feed_a_bounded_ai_development_context() {
             "arguments":{}
         }),
     )
+    .await
     .unwrap();
     assert_eq!(
         mcp_context["structuredContent"]["schema"],
@@ -143,8 +144,8 @@ fn merchant_integration_receipts_feed_a_bounded_ai_development_context() {
     );
 }
 
-#[test]
-fn merchant_to_authorized_invocation_is_audited_and_idempotent() {
+#[tokio::test]
+async fn merchant_to_authorized_invocation_is_audited_and_idempotent() {
     let store = temp_store();
     let owner = store
         .create_user(
@@ -242,6 +243,7 @@ fn merchant_to_authorized_invocation_is_audited_and_idempotent() {
             input: json!({"locale":"zh-CN"}),
         },
     )
+    .await
     .expect("public capability should invoke");
     assert_eq!(first_public["replayed"], false);
     assert_eq!(first_public["result"]["display_name"], "测试咖啡店");
@@ -258,6 +260,7 @@ fn merchant_to_authorized_invocation_is_audited_and_idempotent() {
             input: json!({"locale":"zh-CN"}),
         },
     )
+    .await
     .expect("same invocation should replay");
     assert_eq!(replayed_public["replayed"], true);
     assert_eq!(
@@ -291,6 +294,7 @@ fn merchant_to_authorized_invocation_is_audited_and_idempotent() {
             input: json!({}),
         },
     )
+    .await
     .expect("authorized capability should invoke");
     assert_eq!(authorized["result"]["items"], json!(["拿铁", "美式"]));
     assert_eq!(authorized["metering"]["amount_micros"], 25_000);
@@ -316,6 +320,7 @@ fn merchant_to_authorized_invocation_is_audited_and_idempotent() {
             }
         }),
     )
+    .await
     .expect("MCP should call the same authorized service");
     assert_eq!(
         mcp_invocation["structuredContent"]["result"]["items"],

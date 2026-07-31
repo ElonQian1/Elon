@@ -23,6 +23,7 @@
 | 链外影子经济回执 | 已实现、默认关闭 | 真实节点成本可形成幂等用量凭证，Matter 人工验收后生成双分录；商业调用只记录未扣费用量 | `server/src/task_settlement/`、`docs/task-shadow-settlement-v1-acceptance.md` |
 | Sui 凭证投影 | 已实现、无网络副作用 | 已对账影子凭证可生成对象化数据和候选 PTB 步骤，固定标记 `not_submitted` | `server/src/task_settlement/sui_projection.rs` |
 | 开放商业网络 V1 | 已实现 | 已有商户节点、商业能力、授权、调用、计量和审计的 HTTP/MCP 主路径 | `server/src/open_commerce_service.rs`、`server/src/open_commerce_mcp.rs`、`docs/open-commerce-network-v1-acceptance.md` |
+| 受控商户自有运行时 | 已实现、生产配置依赖环境 | 平台可通过审核绑定和 HMAC 签名调用商户 ERP；`cofficethinking` 参考节点已实现商品、报价、显式确认下单、订单查询、幂等回执和库存事务 | `docs/open-commerce/merchant-runtime.md`、`docs/open-commerce-merchant-runtime-v1-acceptance.md` |
 | 商户数据接入控制面 | 已实现 | 可登记厂商无关的数据来源、授权范围和数据域，以幂等同步回执记录健康度，并向开发代理提供脱敏上下文 | `server/src/open_commerce_integration_model.rs`、`docs/open-commerce-integration-control-plane-acceptance.md` |
 | 开放商业连接器 SDK | 已实现 | 提供厂商无关 Manifest、健康检查、分页同步、幂等回执和兼容性门禁；不包含任何具体大厂生产适配器 | `sdk/open-commerce-connector/`、`docs/open-commerce/connector-sdk.md` |
 | 消费者发现与第三方应用沙盒 | 已实现、范围受限 | 项目内可注册测试 App、一次性显示测试 Token、按非付费规则发现能力、申请并审批授权后调用 | `server/src/open_commerce_client_api.rs`、`docs/open-commerce/consumer-developer-sandbox.md` |
@@ -36,7 +37,7 @@
 |---|---|---|
 | 美团、抖音、京东、淘宝闪购等经营数据统一接入 | 部分实现 | 接入控制面、状态和同步回执已实现；仍必须逐个平台确认官方授权、实现适配器、验证字段覆盖和长期稳定性，不能把登记数据源描述成已接通全量 API |
 | 商户 ERP、海报、短视频、小游戏和营销活动自动生成 | 部分实现 | 通用应用开发与 AI 生成主干已存在；行业模板、发布连接器、经营效果回流和规模化验证仍需完善 |
-| 商户数据自主控制和跨应用授权 | 部分实现 | V1 与项目内消费者/开发者沙盒已打通授权调用；可携带关系、跨项目发现、生产 App 身份和公共互操作网络尚未完成 |
+| 商户数据自主控制和跨应用授权 | 部分实现 | V1、项目内消费者沙盒和首个商户自有运行时已打通授权调用；可携带关系、跨项目发现、生产 App 身份和公共互操作网络尚未完成 |
 | 闲置电脑、收银机和工作站共享算力 | 部分实现 | 已有节点执行、计量和资源控制面；控制面目前只盘点与预演，开放供需市场、异构调度、故障补偿和真实结算仍未完成 |
 | 低成本分布式模型训练 | 提案 | 普通公网节点更适合异步任务、推理和可切分工作，不能宣称已等效替代高速互联的企业级 GPU 集群 |
 

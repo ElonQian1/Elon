@@ -1,0 +1,40 @@
+{
+  "schema": "yilong.open_commerce.merchant_runtime.contract.v1",
+  "request_schema": "merchant_runtime.invoke.v1",
+  "result_schema": "merchant_runtime.result.v1",
+  "error_schema": "merchant_runtime.error.v1",
+  "manifest_schema": "merchant_runtime.manifest.v1",
+  "invoke_path": "/commerce/v1/invoke",
+  "manifest_path": "/commerce/v1/manifest",
+  "signature": {
+    "algorithm": "HMAC-SHA256",
+    "payload": "<unix_timestamp>.<raw_json_body>",
+    "headers": [
+      "x-yilong-runtime-key-id",
+      "x-yilong-runtime-timestamp",
+      "x-yilong-runtime-signature"
+    ],
+    "signature_prefix": "v1=",
+    "max_clock_skew_seconds": 300
+  },
+  "money": {
+    "business_amounts": "integer_minor_units",
+    "platform_metering": "integer_micros",
+    "business_order_excludes_platform_api_fee": true
+  },
+  "capabilities": [
+    "merchant.profile.read",
+    "catalog.search",
+    "product.detail.read",
+    "order.quote.create",
+    "order.commit",
+    "order.status.read"
+  ],
+  "write_guards": {
+    "quote_price_source": "merchant_server",
+    "order_commit_requires_grant": true,
+    "order_commit_requires_explicit_user_confirmation": true,
+    "confirmation_id_one_time_per_user_app": true,
+    "idempotency_required": true
+  }
+}

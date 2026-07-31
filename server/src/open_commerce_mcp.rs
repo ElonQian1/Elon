@@ -18,6 +18,8 @@ use crate::{
         normalize_app_id, CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
         InvokeCapabilityRequest,
     },
+    open_commerce_runtime_model::UpsertRuntimeBindingRequest,
+    open_commerce_runtime_service,
     open_commerce_service::{self, OpenCommerceActor},
     project_auth::{auth_from_headers, json_error, project_access},
     types::AppState,
@@ -56,6 +58,13 @@ struct PublishCapabilityArguments {
     merchant_id: String,
     #[serde(flatten)]
     request: CreateCapabilityRequest,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuntimeBindingArguments {
+    merchant_id: String,
+    #[serde(flatten)]
+    request: UpsertRuntimeBindingRequest,
 }
 
 #[derive(Debug, Deserialize)]
@@ -114,14 +123,17 @@ async fn mcp_handler(
         "initialize" => Ok(initialize_response()),
         "notifications/initialized" => return StatusCode::ACCEPTED.into_response(),
         "tools/list" => Ok(json!({"tools": crate::open_commerce_mcp_tools::definitions()})),
-        "tools/call" => call_tool(
-            &state.store,
-            &project_id,
-            &caller.user_id,
-            &caller.project_role,
-            &caller.app_id,
-            request.params,
-        ),
+        "tools/call" => {
+            call_tool(
+                &state.store,
+                &project_id,
+                &caller.user_id,
+                &caller.project_role,
+                &caller.app_id,
+                request.params,
+            )
+            .await
+        }
         "ping" => Ok(json!({})),
         _ => Err(anyhow!("不支持 MCP method: {}", request.method)),
     };
@@ -136,7 +148,7 @@ async fn mcp_handler(
     .into_response()
 }
 
-pub(crate) fn call_tool(
+pub(crate) async fn call_tool(
     store: &crate::store::Store,
     project_id: &str,
     user_id: &str,
@@ -201,6 +213,28 @@ pub(crate) fn call_tool(
                 input.request,
             )?)?
         }
+        "open_commerce_upsert_runtime" => {
+            let input: RuntimeBindingArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_runtime_service::upsert_binding(
+                store,
+                project_id,
+                &input.merchant_id,
+                &actor,
+                input.request,
+            )?)?
+        }
+        "open_commerce_verify_runtime" => {
+            let input: MerchantArguments = decode(arguments, name)?;
+            serde_json::to_value(
+                open_commerce_runtime_service::verify_binding(
+                    store,
+                    project_id,
+                    &input.merchant_id,
+                    &actor,
+                )
+                .await?,
+            )?
+        }
         "open_commerce_create_grant" => {
             let input: CreateGrantRequest = decode(arguments, name)?;
             serde_json::to_value(open_commerce_service::create_grant(
@@ -260,7 +294,8 @@ pub(crate) fn call_tool(
                     idempotency_key: input.idempotency_key,
                     input: input.input,
                 },
-            )?
+            )
+            .await?
         }
         "open_commerce_list_audit" => {
             let input: AuditArguments = decode(arguments, name)?;

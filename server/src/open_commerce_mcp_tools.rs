@@ -65,7 +65,7 @@ pub(crate) fn definitions() -> Vec<Value> {
         ),
         tool(
             "open_commerce_publish_capability",
-            "为当前项目的商户发布可被 AI 发现和调用的能力。V1 仅允许 merchant_profile 和 static_json 两种平台审核处理器，不允许任意外部 URL。",
+            "为当前项目的商户发布可被 AI 发现和调用的能力。merchant_runtime 只引用当前商户经过平台验证的受控运行绑定，不接受 URL 或密钥配置。",
             json!({
                 "type":"object",
                 "required":["merchant_id","capability_key","display_name","handler_type"],
@@ -78,7 +78,7 @@ pub(crate) fn definitions() -> Vec<Value> {
                     "access_level":{"type":"string","enum":["public","authorized","owner_only"],"default":"public"},
                     "input_schema":{"type":"object","default":{}},
                     "output_schema":{"type":"object","default":{}},
-                    "handler_type":{"type":"string","enum":["merchant_profile","static_json"]},
+                    "handler_type":{"type":"string","enum":["merchant_profile","static_json","merchant_runtime"]},
                     "handler_config":{"type":"object"},
                     "unit_price_micros":{"type":"integer","minimum":0,"default":0},
                     "currency":{"type":"string","minLength":3,"maxLength":8,"default":"CNY"},
@@ -88,6 +88,36 @@ pub(crate) fn definitions() -> Vec<Value> {
             }),
             false,
             false,
+        ),
+        tool(
+            "open_commerce_upsert_runtime",
+            "为当前项目商户配置受控运行绑定。地址必须通过平台主机白名单，credential_ref 只引用服务端环境变量，不能提交明文密钥。配置后仍需单独验证。",
+            json!({
+                "type":"object",
+                "required":["merchant_id","endpoint_base_url","credential_ref"],
+                "properties":{
+                    "merchant_id":{"type":"string","minLength":1,"maxLength":120},
+                    "endpoint_base_url":{"type":"string","format":"uri","maxLength":500},
+                    "credential_ref":{"type":"string","pattern":"^OPEN_COMMERCE_RUNTIME_SECRET_[A-Z0-9_]+$","maxLength":128},
+                    "manifest_sha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},
+                    "timeout_ms":{"type":"integer","minimum":500,"maximum":15000,"default":5000}
+                },
+                "additionalProperties":false
+            }),
+            false,
+            true,
+        ),
+        tool(
+            "open_commerce_verify_runtime",
+            "向商户运行时发起带平台签名的健康请求，核对商户身份和能力清单摘要；验证成功后真实能力才可调用。",
+            json!({
+                "type":"object",
+                "required":["merchant_id"],
+                "properties":{"merchant_id":{"type":"string","minLength":1,"maxLength":120}},
+                "additionalProperties":false
+            }),
+            false,
+            true,
         ),
         tool(
             "open_commerce_create_grant",

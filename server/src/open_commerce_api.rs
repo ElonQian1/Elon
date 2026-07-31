@@ -4,7 +4,7 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, patch, post},
+    routing::{get, patch, post, put},
     Json, Router,
 };
 use serde::Deserialize;
@@ -19,6 +19,8 @@ use crate::{
         normalize_app_id, CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
         InvokeCapabilityRequest, UpdateCapabilityRequest, UpdateMerchantRequest,
     },
+    open_commerce_runtime_model::UpsertRuntimeBindingRequest,
+    open_commerce_runtime_service,
     open_commerce_service::{self, OpenCommerceActor},
     project_auth::{auth_from_headers, json_error, project_access},
     types::AppState,
@@ -73,6 +75,14 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/open-commerce/merchants/:merchant_id/capabilities",
             post(publish_capability),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/merchants/:merchant_id/runtime",
+            put(upsert_runtime_binding),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/merchants/:merchant_id/runtime/verify",
+            post(verify_runtime_binding),
         )
         .route(
             "/api/projects/:project_id/open-commerce/capabilities/:capability_id",
@@ -213,6 +223,45 @@ async fn update_capability(
         &actor(&caller),
         request,
     ))
+}
+
+async fn upsert_runtime_binding(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, merchant_id)): Path<(String, String)>,
+    Json(request): Json<UpsertRuntimeBindingRequest>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_runtime_service::upsert_binding(
+        &state.store,
+        &project_id,
+        &merchant_id,
+        &actor(&caller),
+        request,
+    ))
+}
+
+async fn verify_runtime_binding(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, merchant_id)): Path<(String, String)>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(
+        open_commerce_runtime_service::verify_binding(
+            &state.store,
+            &project_id,
+            &merchant_id,
+            &actor(&caller),
+        )
+        .await,
+    )
 }
 
 async fn create_grant(
@@ -378,7 +427,7 @@ async fn invoke_capability(
         app_id: &app_id,
         project_role: role.as_deref(),
     };
-    service_response(open_commerce_service::invoke(&state.store, &actor, request))
+    service_response(open_commerce_service::invoke(&state.store, &actor, request).await)
 }
 
 fn project_caller(

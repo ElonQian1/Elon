@@ -10,6 +10,8 @@ import type {
   OpenCommerceMerchant,
   OpenCommerceOverview,
   OpenCommerceIntegration,
+  OpenCommerceRuntimeBinding,
+  UpsertOpenCommerceRuntimeBinding,
 } from './openCommerceTypes'
 
 function projectBase(projectId: string) {
@@ -52,6 +54,22 @@ export const openCommerceApi = {
     api.patch<OpenCommerceIntegration>(
       `${projectBase(projectId)}/integrations/${encodeURIComponent(integrationId)}/enabled`,
       { enabled },
+    ),
+
+  upsertRuntime: (
+    projectId: string,
+    merchantId: string,
+    request: UpsertOpenCommerceRuntimeBinding,
+  ) =>
+    api.put<OpenCommerceRuntimeBinding>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/runtime`,
+      request,
+    ),
+
+  verifyRuntime: (projectId: string, merchantId: string) =>
+    api.post<OpenCommerceRuntimeBinding>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/runtime/verify`,
+      {},
     ),
 
 }

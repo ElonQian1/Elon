@@ -345,18 +345,21 @@ async fn developer_invoke(
         app_id: &app.app_id,
         project_role: role.as_deref(),
     };
-    service_response(open_commerce_service::invoke(
-        &state.store,
-        &actor,
-        InvokeCapabilityRequest {
-            merchant_id: request.merchant_id,
-            capability_key: request.capability_key,
-            requester_app_id: app.app_id.clone(),
-            grant_id: request.grant_id,
-            idempotency_key: request.idempotency_key,
-            input: request.input,
-        },
-    ))
+    service_response(
+        open_commerce_service::invoke(
+            &state.store,
+            &actor,
+            InvokeCapabilityRequest {
+                merchant_id: request.merchant_id,
+                capability_key: request.capability_key,
+                requester_app_id: app.app_id.clone(),
+                grant_id: request.grant_id,
+                idempotency_key: request.idempotency_key,
+                input: request.input,
+            },
+        )
+        .await,
+    )
 }
 
 fn project_caller(

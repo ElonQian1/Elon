@@ -13,12 +13,13 @@
 3. `docs/decisions/open-commerce-network-principles.md`：查看已经接受的产品原则。
 4. `docs/decisions/open-commerce-network-v1-architecture.md`：查看 V1 已接受的架构边界。
 5. `docs/open-commerce-network-v1-api.md`：查看当前 HTTP 与 MCP 契约。
-6. `docs/decisions/open-commerce-integration-control-plane.md`：查看多平台接入状态、同步回执和 AI 开发上下文边界。
-7. `docs/open-commerce/decision-register.md`：区分已接受决定、试验方向和未决问题。
-8. `docs/decisions/task-shadow-settlement-v1.md`：查看链外影子经济层已经接受的事实来源、账本和 Sui 边界。
-9. `docs/open-commerce/connector-sdk.md`：查看厂商无关连接器契约、数据边界和兼容性门禁。
-10. `docs/open-commerce/consumer-developer-sandbox.md`：查看消费者发现、App 注册、授权审批和测试调用闭环。
-11. `docs/open-commerce/ai-resource-control.md`：查看 AI 资源盘点、项目策略和不执行任务的路由预演。
+6. `docs/open-commerce/merchant-runtime.md`：查看商户自有 ERP 运行时、签名验证、报价与订单边界。
+7. `docs/decisions/open-commerce-integration-control-plane.md`：查看多平台接入状态、同步回执和 AI 开发上下文边界。
+8. `docs/open-commerce/decision-register.md`：区分已接受决定、试验方向和未决问题。
+9. `docs/decisions/task-shadow-settlement-v1.md`：查看链外影子经济层已经接受的事实来源、账本和 Sui 边界。
+10. `docs/open-commerce/connector-sdk.md`：查看厂商无关连接器契约、数据边界和兼容性门禁。
+11. `docs/open-commerce/consumer-developer-sandbox.md`：查看消费者发现、App 注册、授权审批和测试调用闭环。
+12. `docs/open-commerce/ai-resource-control.md`：查看 AI 资源盘点、项目策略和不执行任务的路由预演。
 
 ## 专题地图
 
@@ -27,6 +28,7 @@
 | AI 应用开发与发布 | 已实现并持续演进 | `AI_PROJECT.md`、`AI_ARCHITECTURE.md` |
 | 多人、多 AI 协同开发 | 已有实现，持续收口 | `docs/群体ai开发/群体AI开发功能需求与架构设计.md` |
 | 商户节点、能力、授权、调用和审计 | V1 已接受并实现 | `docs/decisions/open-commerce-network-v1-architecture.md`、`docs/open-commerce-network-v1-api.md` |
+| 商户自有 ERP 受控运行时 | 参考实现已完成，生产配置依赖环境 | `docs/open-commerce/merchant-runtime.md`、`docs/open-commerce-merchant-runtime-v1-acceptance.md` |
 | 商户数据来源、健康度和同步回执 | 控制面已实现，具体平台适配器待逐项验收 | `docs/decisions/open-commerce-integration-control-plane.md`、`docs/open-commerce-integration-control-plane-acceptance.md` |
 | 连接器 SDK 与兼容性门禁 | 已实现 V1，尚不包含具体大厂适配器 | `sdk/open-commerce-connector/`、`docs/open-commerce/connector-sdk.md` |
 | 消费者发现与第三方应用接入 | 项目内沙盒已实现，公共网络未实现 | `docs/open-commerce/consumer-developer-sandbox.md`、`server/src/open_commerce_client_api.rs` |

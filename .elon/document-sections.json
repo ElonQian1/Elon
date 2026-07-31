@@ -214,6 +214,7 @@
     "docs/decisions/ai-resource-control-v1.md": "custom:open-commerce-network",
     "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md": "custom:open-commerce-network",
     "docs/decisions/open-commerce-integration-control-plane.md": "custom:open-commerce-network",
+    "docs/decisions/open-commerce-merchant-runtime-v1.md": "custom:open-commerce-network",
     "docs/decisions/reject-ai-to-ai-skill-route.md": "custom:product-direction-decisions",
     "docs/decisions/reject-demo-oracle-role.md": "custom:product-direction-decisions",
     "docs/decisions/open-commerce-network-principles.md": "custom:open-commerce-network",
@@ -252,7 +253,9 @@
     "docs/open-commerce/consumer-developer-sandbox.md": "custom:open-commerce-network",
     "docs/open-commerce/decision-register.md": "custom:open-commerce-network",
     "docs/open-commerce/integration-architecture.md": "custom:open-commerce-network",
+    "docs/open-commerce/merchant-runtime.md": "custom:open-commerce-network",
     "docs/open-commerce-integration-control-plane-acceptance.md": "custom:open-commerce-network",
+    "docs/open-commerce-merchant-runtime-v1-acceptance.md": "custom:open-commerce-network",
     "docs/open-commerce-network-v1-acceptance.md": "custom:open-commerce-network",
     "docs/open-commerce-network-v1-api.md": "custom:open-commerce-network",
     "docs/task-shadow-settlement-v1-acceptance.md": "custom:open-commerce-network",
@@ -332,6 +335,7 @@
     "docs/decisions/ai-resource-control-v1.md": "on-demand",
     "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md": "on-demand",
     "docs/decisions/open-commerce-integration-control-plane.md": "on-demand",
+    "docs/decisions/open-commerce-merchant-runtime-v1.md": "on-demand",
     "docs/decisions/task-shadow-settlement-v1.md": "on-demand",
     "docs/decisions/reject-demo-oracle-role.md": "on-demand",
     "docs/discussion-knowledge-compiler.md": "on-demand",
@@ -348,7 +352,9 @@
     "docs/open-commerce/ai-resource-control.md": "on-demand",
     "docs/open-commerce/connector-sdk.md": "on-demand",
     "docs/open-commerce/consumer-developer-sandbox.md": "on-demand",
+    "docs/open-commerce/merchant-runtime.md": "on-demand",
     "docs/open-commerce-integration-control-plane-acceptance.md": "evidence",
+    "docs/open-commerce-merchant-runtime-v1-acceptance.md": "evidence",
     "docs/pc-frontend-migration.md": "on-demand",
     "docs/pc-node-data-root.md": "on-demand",
     "docs/pc-node-offline-resilience.md": "on-demand",
@@ -550,6 +556,12 @@
       "authority": "authoritative",
       "document_type": "architecture_decision"
     },
+    "docs/decisions/open-commerce-merchant-runtime-v1.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture_decision"
+    },
     "docs/decisions/task-shadow-settlement-v1.md": {
       "retrieval": "on_demand",
       "lifecycle": "active",
@@ -592,7 +604,19 @@
       "authority": "authoritative",
       "document_type": "technical_guide"
     },
+    "docs/open-commerce/merchant-runtime.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "technical_guide"
+    },
     "docs/open-commerce-integration-control-plane-acceptance.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "evidence",
+      "document_type": "acceptance"
+    },
+    "docs/open-commerce-merchant-runtime-v1-acceptance.md": {
       "retrieval": "on_demand",
       "lifecycle": "active",
       "authority": "evidence",
@@ -865,6 +889,26 @@
         "docs/decisions/open-commerce-network-v1-architecture.md"
       ]
     },
+    "docs/decisions/open-commerce-merchant-runtime-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-07-31",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/open_commerce_runtime_service.rs",
+        "file:server/src/open_commerce_runtime_client.rs",
+        "file:server/src/store/open_commerce_runtime_bindings.rs"
+      ],
+      "related": [
+        "docs/open-commerce/merchant-runtime.md",
+        "docs/open-commerce-merchant-runtime-v1-acceptance.md"
+      ]
+    },
     "docs/open-commerce/README.md": {
       "doc_type": "subproject_overview",
       "audience": [
@@ -873,7 +917,7 @@
         "AI 代理"
       ],
       "owner": "开放商业网络",
-      "reviewed_at": "2026-07-30",
+      "reviewed_at": "2026-07-31",
       "review_interval_days": 60,
       "implementation_refs": [
         "file:server/src/open_commerce_service.rs",
@@ -882,7 +926,8 @@
       "related": [
         "docs/open-commerce/capability-baseline.md",
         "docs/open-commerce/integration-architecture.md",
-        "docs/open-commerce/decision-register.md"
+        "docs/open-commerce/decision-register.md",
+        "docs/open-commerce/merchant-runtime.md"
       ]
     },
     "docs/open-commerce/ai-resource-control.md": {
@@ -913,7 +958,7 @@
         "AI 代理"
       ],
       "owner": "开放商业网络",
-      "reviewed_at": "2026-07-30",
+      "reviewed_at": "2026-07-31",
       "review_interval_days": 30,
       "implementation_refs": [
         "file:server/src/open_commerce_service.rs",
@@ -934,7 +979,7 @@
         "AI 代理"
       ],
       "owner": "开放商业网络",
-      "reviewed_at": "2026-07-30",
+      "reviewed_at": "2026-07-31",
       "review_interval_days": 30,
       "implementation_refs": [],
       "related": [
@@ -963,6 +1008,46 @@
         "docs/open-commerce-network-v1-api.md"
       ]
     },
+    "docs/open-commerce/merchant-runtime.md": {
+      "doc_type": "technical_guide",
+      "audience": [
+        "商户系统开发者",
+        "平台运维人员",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-07-31",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/open_commerce_runtime_service.rs",
+        "file:server/src/open_commerce_runtime_security.rs",
+        "file:pc-frontend/src/features/open-commerce/OpenCommerceRuntimeManager.tsx",
+        "test:server/src/open_commerce_runtime_service_tests.rs"
+      ],
+      "related": [
+        "docs/decisions/open-commerce-merchant-runtime-v1.md",
+        "contracts/open-commerce/merchant-runtime-v1.json"
+      ]
+    },
+    "docs/open-commerce-merchant-runtime-v1-acceptance.md": {
+      "doc_type": "acceptance",
+      "audience": [
+        "开发者",
+        "测试人员",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-07-31",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "test:server/src/open_commerce_runtime_service_tests.rs",
+        "test:scripts/test-open-commerce-merchant-runtime-contract.ps1"
+      ],
+      "related": [
+        "docs/open-commerce/merchant-runtime.md",
+        "docs/decisions/open-commerce-merchant-runtime-v1.md"
+      ]
+    },
     "docs/open-commerce/integration-architecture.md": {
       "doc_type": "architecture",
       "audience": [
@@ -971,7 +1056,7 @@
         "AI 代理"
       ],
       "owner": "开放商业网络",
-      "reviewed_at": "2026-07-30",
+      "reviewed_at": "2026-07-31",
       "review_interval_days": 60,
       "implementation_refs": [
         "file:server/src/group_ai/mod.rs",
@@ -990,14 +1075,15 @@
         "AI 代理"
       ],
       "owner": "开放商业网络",
-      "reviewed_at": "2026-07-30",
+      "reviewed_at": "2026-07-31",
       "review_interval_days": 60,
       "implementation_refs": [
         "file:server/src/open_commerce_api.rs",
         "file:server/src/open_commerce_mcp.rs"
       ],
       "related": [
-        "docs/decisions/open-commerce-network-v1-architecture.md"
+        "docs/decisions/open-commerce-network-v1-architecture.md",
+        "docs/open-commerce/merchant-runtime.md"
       ]
     },
     ".github/copilot-instructions.md": {
@@ -1620,6 +1706,13 @@
       "target": ".elon/document-sections.json",
       "summary": "拆分开放商业消费者与开发者沙盒、AI 资源控制、连接器 SDK 和影子经济文档，并补齐主题归属、治理元数据与知识图关系",
       "at": "2026-07-31T04:49:16Z"
+    },
+    {
+      "id": "open-commerce-merchant-runtime-20260731",
+      "action": "document.knowledge_graph.update",
+      "target": ".elon/document-sections.json",
+      "summary": "登记首个受控商户自有运行时、跨仓库协议、验收证据与生产配置边界",
+      "at": "2026-07-31T16:40:00Z"
     }
   ],
   "knowledge_graph": {
@@ -1676,6 +1769,35 @@
           "capability",
           "merchant",
           "mcp"
+        ]
+      },
+      {
+        "id": "cap-open-commerce-merchant-runtime",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "商户自有 ERP 受控运行时",
+        "detail": "通过 HTTPS 白名单、HMAC、Manifest 和幂等回执连接商户真实商品、报价、库存与订单",
+        "parent_id": "cap-open-commerce",
+        "order": 12,
+        "color": "#4FA9B8",
+        "entrypoint": "docs/open-commerce/merchant-runtime.md",
+        "document_paths": [
+          "docs/decisions/open-commerce-merchant-runtime-v1.md",
+          "docs/open-commerce/merchant-runtime.md",
+          "docs/open-commerce-merchant-runtime-v1-acceptance.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/open_commerce_runtime_service.rs",
+          "file:server/src/open_commerce_runtime_client.rs",
+          "file:server/src/store/open_commerce_runtime_bindings.rs",
+          "file:pc-frontend/src/features/open-commerce/OpenCommerceRuntimeManager.tsx",
+          "test:server/src/open_commerce_runtime_service_tests.rs"
+        ],
+        "tags": [
+          "erp",
+          "hmac",
+          "merchant-runtime",
+          "order"
         ]
       },
       {
@@ -1862,6 +1984,33 @@
           "grant",
           "invocation",
           "settlement"
+        ]
+      },
+      {
+        "id": "arch-open-commerce-merchant-runtime",
+        "view": "architecture",
+        "kind": "integration_component",
+        "label": "受控商户运行时网关",
+        "detail": "把统一 Invocation 签名转发到已验证商户后端，并区分业务拒绝与运行故障",
+        "parent_id": "arch-open-commerce",
+        "order": 5,
+        "color": "#4FA9B8",
+        "entrypoint": "docs/open-commerce/merchant-runtime.md",
+        "document_paths": [
+          "docs/open-commerce/merchant-runtime.md",
+          "docs/decisions/open-commerce-merchant-runtime-v1.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/open_commerce_runtime_client.rs",
+          "file:server/src/open_commerce_runtime_security.rs",
+          "file:server/src/open_commerce_runtime_service.rs",
+          "file:contracts/open-commerce/merchant-runtime-v1.json"
+        ],
+        "tags": [
+          "binding",
+          "hmac",
+          "manifest",
+          "runtime"
         ]
       },
       {
@@ -2851,6 +3000,13 @@
         "label": "发现、授权与调用"
       },
       {
+        "id": "cap-open-commerce-runtime-v1",
+        "source": "cap-open-commerce-merchant-runtime",
+        "target": "cap-open-commerce-v1",
+        "relation": "implements",
+        "label": "将统一能力调用落到商户真实 ERP"
+      },
+      {
         "id": "cap-open-commerce-v1-resources",
         "source": "cap-open-commerce-v1",
         "target": "cap-open-commerce-resources",
@@ -2877,6 +3033,13 @@
         "target": "arch-open-commerce",
         "relation": "uses",
         "label": "共用开放商业领域服务"
+      },
+      {
+        "id": "arch-merchant-runtime-commerce",
+        "source": "arch-open-commerce-merchant-runtime",
+        "target": "arch-open-commerce",
+        "relation": "extends",
+        "label": "受控转发到商户自有后端"
       },
       {
         "id": "arch-resource-control-ai",

@@ -144,6 +144,13 @@ mod open_commerce_mcp;
 mod open_commerce_mcp_tools;
 mod open_commerce_migration;
 mod open_commerce_model;
+mod open_commerce_runtime_client;
+mod open_commerce_runtime_migration;
+mod open_commerce_runtime_model;
+mod open_commerce_runtime_security;
+mod open_commerce_runtime_service;
+#[cfg(test)]
+mod open_commerce_runtime_service_tests;
 mod open_commerce_service;
 #[cfg(test)]
 mod open_commerce_service_tests;

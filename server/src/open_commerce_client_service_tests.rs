@@ -23,8 +23,8 @@ fn temp_store() -> Store {
     Store::open(&path).expect("client test store should open")
 }
 
-#[test]
-fn consumer_discovery_request_approval_and_test_token_invocation_form_a_loop() {
+#[tokio::test]
+async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_loop() {
     let store = temp_store();
     let merchant_owner = store
         .create_user(
@@ -214,6 +214,7 @@ fn consumer_discovery_request_approval_and_test_token_invocation_form_a_loop() {
             input: request.input,
         },
     )
+    .await
     .unwrap();
     assert_eq!(result["result"]["items"], json!(["拿铁", "美式"]));
 

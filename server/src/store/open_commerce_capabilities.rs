@@ -239,6 +239,12 @@ fn validate_handler_config(handler_type: &str, config: Option<&Value>) -> Result
         "static_json" => config
             .map(|value| validate_json_object(value, "静态处理器配置"))
             .transpose(),
+        "merchant_runtime" => {
+            if config.is_some() {
+                bail!("merchant_runtime 处理器配置由受控运行绑定管理，能力中不能保存地址或密钥");
+            }
+            Ok(None)
+        }
         _ => bail!("未知商业能力处理器"),
     }
 }

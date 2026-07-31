@@ -12,6 +12,8 @@ const resources = read(`${featureRoot}/AiResourceControlPanel.tsx`)
 const economy = read(`${featureRoot}/ShadowEconomyPanel.tsx`)
 const resourceService = read('server/src/ai_resource_control/service.rs')
 const economyProjection = read('server/src/task_settlement/sui_projection.rs')
+const runtimeManager = read(`${featureRoot}/OpenCommerceRuntimeManager.tsx`)
+const runtimeClient = read('server/src/open_commerce_runtime_client.rs')
 
 for (const view of [
   'OpenCommerceMerchantWorkspace',
@@ -39,6 +41,12 @@ assert.ok(resourceService.includes('quota_verified: false'), 'external quota mus
 assert.ok(economy.includes('SHADOW ONLY'), 'economy UI must label shadow mode')
 assert.ok(economy.includes('network_submission'), 'economy UI must show submission state')
 assert.ok(economyProjection.includes('not_submitted'), 'Sui projection must remain unsubmitted')
+
+assert.ok(runtimeManager.includes('credential_ref'), 'runtime UI must submit a server-side credential reference')
+assert.doesNotMatch(runtimeManager, /shared_secret|明文密钥/, 'runtime UI must never collect the shared secret')
+assert.ok(runtimeManager.includes('verifyRuntime'), 'runtime UI must require an explicit signed verification')
+assert.ok(runtimeClient.includes('x-yilong-runtime-signature'), 'runtime calls must carry an HMAC signature')
+assert.ok(runtimeClient.includes('merchant_runtime.result.v1'), 'runtime results must use the versioned contract')
 
 console.log('Open commerce PC workspace contracts passed')
 

@@ -1,7 +1,7 @@
 ---
 title: AI 原生开放商业网络 V1 API 与 MCP 契约
 owner: backend
-reviewed_at: 2026-07-30
+reviewed_at: 2026-07-31
 status: accepted
 source: docs/decisions/open-commerce-network-v1-architecture.md
 ---
@@ -29,6 +29,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `PATCH` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id` | 更新或停用商户节点 |
 | `POST` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/capabilities` | 创建商业能力 |
 | `PATCH` | `/api/projects/:project_id/open-commerce/capabilities/:capability_id` | 更新或停用能力 |
+| `PUT` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/runtime` | 配置受控商户运行绑定，不接收明文密钥 |
+| `POST` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/runtime/verify` | 执行签名健康检查并核对 Manifest |
 | `POST` | `/api/projects/:project_id/open-commerce/grants` | 创建调用授权 |
 | `POST` | `/api/projects/:project_id/open-commerce/grants/:grant_id/revoke` | 撤销授权 |
 | `GET` | `/api/projects/:project_id/open-commerce/audit` | 读取项目审计与调用记录 |
@@ -75,6 +77,15 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
     "amount_micros": 0,
     "currency": "CNY",
     "settlement_status": "recorded_not_charged"
+  },
+  "settlement_receipt": {
+    "schema": "open_commerce.settlement_receipt.v1",
+    "receipt_id": "invoke_xxx",
+    "billable_units": 1,
+    "amount_micros": 0,
+    "currency": "CNY",
+    "status": "recorded_not_charged",
+    "funds_moved": false
   }
 }
 ```
@@ -91,6 +102,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `open_commerce_get_merchant` | 读 | 获取单个商户与公开能力 |
 | `open_commerce_create_merchant` | 写 | 创建商户节点 |
 | `open_commerce_publish_capability` | 写 | 发布受控能力 |
+| `open_commerce_upsert_runtime` | 写 | 配置商户运行绑定的地址、服务端凭据引用和 Manifest 摘要 |
+| `open_commerce_verify_runtime` | 写 | 通过签名健康检查激活运行绑定 |
 | `open_commerce_create_grant` | 写 | 为 App 创建最小范围授权 |
 | `open_commerce_create_integration` | 写 | 登记商户数据来源 |
 | `open_commerce_set_integration_enabled` | 写 | 停用或重新启用接入 |
@@ -107,14 +120,15 @@ MCP 写工具遵循与 HTTP API 相同的项目角色、授权和幂等规则。
 
 同步回执以 `integration_id + receipt_key` 幂等。同键不同结果返回冲突；回执只包含记录数量、游标摘要、错误代码和时间，不包含原始订单、客户、财务或库存值。
 
-## 第一方处理器
+## 受控处理器
 
 V1 允许：
 
 - `merchant_profile`：返回商户公开资料；
-- `static_json`：返回项目编辑者配置的静态演示数据。
+- `static_json`：返回项目编辑者配置的静态演示数据；
+- `merchant_runtime`：把调用转交给当前商户已验证的运行绑定。
 
-V1 拒绝未知处理器和任意 URL。后续真实连接器必须单独注册、审核、限定主机、管理密钥并声明超时与失败语义。
+V1 仍拒绝未知处理器，也不允许在能力配置中填写任意 URL 或密钥。`merchant_runtime` 的地址和凭据引用独立保存；生产地址必须使用 HTTPS 并命中 `OPEN_COMMERCE_RUNTIME_ALLOWED_HOSTS`，密钥只从服务端环境变量解析。平台使用 HMAC-SHA256 对时间戳和原始 JSON 请求体签名，签名健康检查核对商户身份与 Manifest 摘要，失败时绑定进入降级状态。详细契约见 `docs/open-commerce/merchant-runtime.md`。
 
 ## 错误语义
 

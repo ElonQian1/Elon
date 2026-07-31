@@ -16,8 +16,10 @@ use crate::{
         OpenCommerceInvocation, OpenCommerceMerchant, OpenCommerceMerchantDetail,
         OpenCommerceOverview, OpenCommerceTotals, UpdateCapabilityRequest, UpdateMerchantRequest,
         ACCESS_AUTHORIZED, ACCESS_OWNER_ONLY, CAPABILITY_STATUS_ACTIVE, HANDLER_MERCHANT_PROFILE,
-        HANDLER_STATIC_JSON, MERCHANT_STATUS_ACTIVE, OPEN_COMMERCE_SCHEMA,
+        HANDLER_MERCHANT_RUNTIME, HANDLER_STATIC_JSON, MERCHANT_STATUS_ACTIVE,
+        OPEN_COMMERCE_SCHEMA,
     },
+    open_commerce_runtime_model::{MerchantRuntimeEnvelope, RUNTIME_STATUS_ACTIVE},
     project_auth::can_edit,
     store::{OpenCommerceInvocationStart, RecordOpenCommerceSyncReceipt, Store},
 };
@@ -33,6 +35,7 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
     let grants = store.list_project_open_commerce_grants(project_id, 100)?;
     let recent_invocations = store.list_project_open_commerce_invocations(project_id, 100)?;
     let integrations = store.list_project_open_commerce_integrations(project_id)?;
+    let runtime_bindings = store.list_project_open_commerce_runtime_bindings(project_id)?;
     let recent_sync_receipts = store.list_project_open_commerce_sync_receipts(project_id, 100)?;
     let recent_audit_events = store.list_project_open_commerce_audit(project_id, 100)?;
     let active_merchants = merchants
@@ -58,6 +61,10 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
         .iter()
         .filter(|integration| integration.status == INTEGRATION_STATUS_DEGRADED)
         .count();
+    let active_runtime_bindings = runtime_bindings
+        .iter()
+        .filter(|binding| binding.status == RUNTIME_STATUS_ACTIVE)
+        .count();
     Ok(OpenCommerceOverview {
         schema: OPEN_COMMERCE_SCHEMA,
         project_id: project_id.to_string(),
@@ -71,6 +78,7 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
             integrations: integrations.len(),
             connected_integrations,
             degraded_integrations,
+            active_runtime_bindings,
             sync_receipts: recent_sync_receipts.len(),
             metered_amount_micros,
         },
@@ -78,6 +86,7 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
         grants,
         recent_invocations,
         integrations,
+        runtime_bindings,
         recent_sync_receipts,
         recent_audit_events,
     })
@@ -86,6 +95,7 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
 pub(crate) fn development_context(store: &Store, project_id: &str) -> Result<Value> {
     let merchants = store.list_project_open_commerce_merchants(project_id)?;
     let integrations = store.list_project_open_commerce_integrations(project_id)?;
+    let runtime_bindings = store.list_project_open_commerce_runtime_bindings(project_id)?;
     let receipts = store.list_project_open_commerce_sync_receipts(project_id, 50)?;
     let merchant_contexts = merchants
         .into_iter()
@@ -111,6 +121,17 @@ pub(crate) fn development_context(store: &Store, project_id: &str) -> Result<Val
                     })
                 })
                 .collect::<Vec<_>>();
+            let runtime = runtime_bindings
+                .iter()
+                .find(|binding| binding.merchant_id == detail.merchant.id)
+                .map(|binding| {
+                    json!({
+                        "status":binding.status,
+                        "manifest_sha256":binding.manifest_sha256,
+                        "last_verified_at":binding.last_verified_at,
+                        "last_error_code":binding.last_error_code
+                    })
+                });
             json!({
                 "merchant": {
                     "id": detail.merchant.id,
@@ -119,7 +140,8 @@ pub(crate) fn development_context(store: &Store, project_id: &str) -> Result<Val
                     "node_mode": detail.merchant.node_mode
                 },
                 "capabilities": detail.capabilities,
-                "integrations": merchant_integrations
+                "integrations": merchant_integrations,
+                "runtime": runtime
             })
         })
         .collect::<Vec<_>>();
@@ -134,7 +156,9 @@ pub(crate) fn development_context(store: &Store, project_id: &str) -> Result<Val
                 .filter(|entry| entry.status == INTEGRATION_STATUS_CONNECTED).count(),
             "degraded_integrations": integrations.iter()
                 .filter(|entry| entry.status == INTEGRATION_STATUS_DEGRADED).count(),
-            "recent_sync_receipts": receipts.len()
+            "recent_sync_receipts": receipts.len(),
+            "active_runtime_bindings": runtime_bindings.iter()
+                .filter(|entry| entry.status == RUNTIME_STATUS_ACTIVE).count()
         },
         "merchants": merchant_contexts,
         "recent_sync_evidence": receipts.into_iter().map(|receipt| json!({
@@ -152,7 +176,8 @@ pub(crate) fn development_context(store: &Store, project_id: &str) -> Result<Val
             "不得把 scopes、data_domains 或字段结构误当成原始经营数据。",
             "不得在源码、Matter、Assignment 或文档中写入访问令牌和平台密钥。",
             "新增适配器必须复用 Merchant、Capability、Grant、Invocation 和 Audit 主干。",
-            "任何自动发布、下单、财务或库存写操作都必须经过最小权限与人工确认策略。"
+            "任何自动发布、下单、财务或库存写操作都必须经过最小权限与人工确认策略。",
+            "merchant_runtime 只有签名健康验证通过后才可调用；开发上下文不得返回运行地址或密钥引用。"
         ]
     }))
 }
@@ -406,7 +431,7 @@ pub(crate) fn revoke_grant(
     Ok(grant)
 }
 
-pub(crate) fn invoke(
+pub(crate) async fn invoke(
     store: &Store,
     actor: &OpenCommerceActor<'_>,
     request: InvokeCapabilityRequest,
@@ -458,7 +483,18 @@ pub(crate) fn invoke(
         return invocation_response(&claim.invocation, true);
     }
 
-    let result = match execute_first_party_handler(&merchant, &capability, &input) {
+    let result = match execute_handler(
+        store,
+        actor,
+        &merchant,
+        &capability,
+        grant_id.as_deref(),
+        &idempotency_key,
+        &claim.invocation.id,
+        &input,
+    )
+    .await
+    {
         Ok(result) => result,
         Err(error) => {
             let failed = store
@@ -509,6 +545,44 @@ pub(crate) fn invoke(
         );
     }
     invocation_response(&invocation, false)
+}
+
+async fn execute_handler(
+    store: &Store,
+    actor: &OpenCommerceActor<'_>,
+    merchant: &OpenCommerceMerchant,
+    capability: &OpenCommerceCapability,
+    grant_id: Option<&str>,
+    idempotency_key: &str,
+    invocation_id: &str,
+    input: &Value,
+) -> Result<Value> {
+    if capability.handler_type != HANDLER_MERCHANT_RUNTIME {
+        return execute_first_party_handler(merchant, capability, input);
+    }
+    let binding = store.active_open_commerce_runtime_binding(&merchant.id)?;
+    let envelope = MerchantRuntimeEnvelope {
+        schema: "merchant_runtime.invoke.v1",
+        invocation_id: invocation_id.to_string(),
+        merchant_id: merchant.id.clone(),
+        capability_key: capability.capability_key.clone(),
+        requester_user_id: actor.user_id.to_string(),
+        requester_app_id: actor.app_id.to_string(),
+        grant_id: grant_id.map(str::to_string),
+        idempotency_key: idempotency_key.to_string(),
+        issued_at_unix: Utc::now().timestamp(),
+        input: input.clone(),
+    };
+    match crate::open_commerce_runtime_client::invoke_runtime(&binding, &envelope).await {
+        Ok(result) => Ok(result),
+        Err(error) => {
+            if error.degrades_binding() {
+                let _ = store
+                    .mark_open_commerce_runtime_degraded(&merchant.id, "runtime_invocation_failed");
+            }
+            Err(error.into())
+        }
+    }
 }
 
 fn authorize_invocation(
@@ -575,6 +649,15 @@ fn invocation_response(invocation: &OpenCommerceInvocation, replayed: bool) -> R
             "amount_micros": invocation.amount_micros,
             "currency": invocation.currency,
             "settlement_status": invocation.settlement_status
+        },
+        "settlement_receipt": {
+            "schema": "open_commerce.settlement_receipt.v1",
+            "receipt_id": invocation.id,
+            "billable_units": invocation.units,
+            "amount_micros": invocation.amount_micros,
+            "currency": invocation.currency,
+            "status": invocation.settlement_status,
+            "funds_moved": false
         }
     }))
 }

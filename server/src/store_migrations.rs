@@ -147,6 +147,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (110, "AI 任务与开放商业调用链外影子结算凭证", crate::task_settlement_migration::migration_v110),
     (111, "开放商业开发者测试应用与消费者授权请求", crate::open_commerce_client_migration::migration_v111),
     (112, "项目 AI 资源盘点、策略与路由预演", crate::ai_resource_control_migration::migration_v112),
+    (113, "开放商业受控商户运行绑定与真实能力处理器", crate::open_commerce_runtime_migration::migration_v113),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

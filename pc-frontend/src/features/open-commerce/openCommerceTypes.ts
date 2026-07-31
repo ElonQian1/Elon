@@ -1,5 +1,5 @@
 export type OpenCommerceAccessLevel = 'public' | 'authorized' | 'owner_only'
-export type OpenCommerceHandlerType = 'merchant_profile' | 'static_json'
+export type OpenCommerceHandlerType = 'merchant_profile' | 'static_json' | 'merchant_runtime'
 export type OpenCommerceCapabilityKind = 'query' | 'action'
 
 export interface OpenCommerceMerchant {
@@ -110,6 +110,22 @@ export interface OpenCommerceSyncReceipt {
   created_at: string
 }
 
+export interface OpenCommerceRuntimeBinding {
+  id: string
+  project_id: string
+  merchant_id: string
+  endpoint_base_url: string
+  credential_ref: string
+  manifest_sha256?: string
+  timeout_ms: number
+  status: 'configured' | 'active' | 'degraded' | 'disabled'
+  last_verified_at?: string
+  last_error_code?: string
+  created_by_user_id: string
+  created_at: string
+  updated_at: string
+}
+
 export interface OpenCommerceOverview {
   schema: string
   project_id: string
@@ -117,6 +133,7 @@ export interface OpenCommerceOverview {
   grants: OpenCommerceGrant[]
   recent_invocations: OpenCommerceInvocation[]
   integrations: OpenCommerceIntegration[]
+  runtime_bindings: OpenCommerceRuntimeBinding[]
   recent_sync_receipts: OpenCommerceSyncReceipt[]
   recent_audit_events: OpenCommerceAuditEvent[]
   totals: {
@@ -130,8 +147,16 @@ export interface OpenCommerceOverview {
     connected_integrations: number
     degraded_integrations: number
     sync_receipts: number
+    active_runtime_bindings: number
     metered_amount_micros: number
   }
+}
+
+export interface UpsertOpenCommerceRuntimeBinding {
+  endpoint_base_url: string
+  credential_ref: string
+  manifest_sha256?: string
+  timeout_ms: number
 }
 
 export interface CreateOpenCommerceIntegration {

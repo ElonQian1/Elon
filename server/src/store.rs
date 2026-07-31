@@ -62,6 +62,7 @@ mod open_commerce_grants;
 mod open_commerce_integrations;
 mod open_commerce_invocations;
 mod open_commerce_merchants;
+mod open_commerce_runtime_bindings;
 pub(crate) use open_commerce_integrations::RecordOpenCommerceSyncReceipt;
 pub(crate) use open_commerce_invocations::OpenCommerceInvocationStart;
 mod pc_project_binding;

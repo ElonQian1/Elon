@@ -70,6 +70,7 @@ chrono = { version = "0.4", features = ["serde"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
 sha2 = { version = "0.10", features = ["oid"] }
 hex = "0.4"
+hmac = "0.12"
 
 # 微信支付 v3 —— RSA-SHA256 请求签名 & AES-256-GCM 回调解密
 rsa = { version = "0.9", features = ["pem"] }

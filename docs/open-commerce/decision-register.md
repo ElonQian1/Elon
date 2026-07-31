@@ -10,6 +10,7 @@
 | 商户数据默认归商户控制 | 平台提供存储、授权、调用和审计能力，不把数据控制权作为流量壁垒 | `docs/decisions/open-commerce-network-principles.md` |
 | V1 先做商户节点和能力调用主干 | 商户、能力、授权、调用、计量、审计是最小闭环 | `docs/decisions/open-commerce-network-v1-architecture.md` |
 | HTTP 与 MCP 共用同一领域服务 | 避免网页、AI 和第三方应用形成不同业务规则 | `docs/open-commerce-network-v1-api.md` |
+| 真实商户 ERP 通过受控运行时接入 | 运行地址和密钥与能力契约分离，经过 HTTPS 白名单、HMAC 和 Manifest 健康验证后才可调用 | `docs/decisions/open-commerce-merchant-runtime-v1.md` |
 | 当前调用只计量、不做真实收费 | 先验证行为、权限和审计，再验证经济层 | `docs/decisions/open-commerce-network-v1-architecture.md` |
 | 先建数据接入控制面，再逐个平台实现适配器 | 统一记录来源、范围、健康度和同步证据，不用“已接入”掩盖真实权限差异 | `docs/decisions/open-commerce-integration-control-plane.md` |
 | 先用项目内消费者与开发者沙盒验证开放网络 | 采用非付费透明排序、显式授权和一次性测试凭据；不把沙盒宣传为公共网络 | `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` |
@@ -21,7 +22,7 @@
 ## 当前实施重点
 
 1. 维持 AI 应用开发、Matter/Assignment、Git 执行和发布主链稳定。
-2. 用项目内消费者与开发者沙盒验证发现、授权、调用和审计体验，保持公共网络边界清晰。
+2. 以 `cofficethinking` 参考节点验证真实商品、服务端报价、用户确认下单、订单查询、调用审计与失败降级，保持公共网络边界清晰。
 3. 将 AI 资源策略接入真实调度前，先验证额度、成本、失败回退和隐私要求。
 4. 基于数据接入控制面逐个平台实现、审核并验收真实行业适配器。
 5. 为商户 ERP、营销内容、小游戏和经营分析建立可验证的行业模板。

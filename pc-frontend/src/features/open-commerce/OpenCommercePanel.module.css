@@ -50,7 +50,7 @@
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -158,6 +158,45 @@
   background: #25262d;
   color: var(--text);
   font-size: 9px;
+}
+
+.runtimeSummary {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #191a1f;
+}
+
+.runtimeSummary strong,
+.runtimeSummary code,
+.runtimeSummary p,
+.runtimeSummary small {
+  max-width: 100%;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.runtimeSummary code,
+.runtimeSummary p,
+.runtimeSummary small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.runtimeSummary button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #4aa28f;
+  border-radius: 6px;
+  background: #25262d;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .stats > div {

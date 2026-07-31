@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::open_commerce_integration_model::{OpenCommerceIntegration, OpenCommerceSyncReceipt};
+use crate::open_commerce_runtime_model::OpenCommerceRuntimeBinding;
 
 pub(crate) const OPEN_COMMERCE_SCHEMA: &str = "open_commerce.v1";
 pub(crate) const MERCHANT_STATUS_ACTIVE: &str = "active";
@@ -16,6 +17,7 @@ pub(crate) const ACCESS_AUTHORIZED: &str = "authorized";
 pub(crate) const ACCESS_OWNER_ONLY: &str = "owner_only";
 pub(crate) const HANDLER_MERCHANT_PROFILE: &str = "merchant_profile";
 pub(crate) const HANDLER_STATIC_JSON: &str = "static_json";
+pub(crate) const HANDLER_MERCHANT_RUNTIME: &str = "merchant_runtime";
 pub(crate) const SETTLEMENT_RECORDED_NOT_CHARGED: &str = "recorded_not_charged";
 
 #[derive(Debug, Clone, Serialize)]
@@ -124,6 +126,7 @@ pub(crate) struct OpenCommerceOverview {
     pub grants: Vec<OpenCommerceGrant>,
     pub recent_invocations: Vec<OpenCommerceInvocation>,
     pub integrations: Vec<OpenCommerceIntegration>,
+    pub runtime_bindings: Vec<OpenCommerceRuntimeBinding>,
     pub recent_sync_receipts: Vec<OpenCommerceSyncReceipt>,
     pub recent_audit_events: Vec<OpenCommerceAuditEvent>,
     pub totals: OpenCommerceTotals,
@@ -140,6 +143,7 @@ pub(crate) struct OpenCommerceTotals {
     pub integrations: usize,
     pub connected_integrations: usize,
     pub degraded_integrations: usize,
+    pub active_runtime_bindings: usize,
     pub sync_receipts: usize,
     pub metered_amount_micros: i64,
 }
@@ -324,7 +328,8 @@ pub(crate) fn validate_handler_type(value: &str) -> Result<String> {
     match value.trim() {
         HANDLER_MERCHANT_PROFILE => Ok(HANDLER_MERCHANT_PROFILE.to_string()),
         HANDLER_STATIC_JSON => Ok(HANDLER_STATIC_JSON.to_string()),
-        _ => bail!("V1 仅支持 merchant_profile 或 static_json 处理器"),
+        HANDLER_MERCHANT_RUNTIME => Ok(HANDLER_MERCHANT_RUNTIME.to_string()),
+        _ => bail!("仅支持 merchant_profile、static_json 或 merchant_runtime 处理器"),
     }
 }
 

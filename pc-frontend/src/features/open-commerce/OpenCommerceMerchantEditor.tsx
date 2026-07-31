@@ -27,7 +27,7 @@ export default function OpenCommerceMerchantEditor({
   const [capabilityKey, setCapabilityKey] = useState('')
   const [capabilityKind, setCapabilityKind] = useState<'query' | 'action'>('query')
   const [accessLevel, setAccessLevel] = useState<'public' | 'authorized' | 'owner_only'>('public')
-  const [handlerType, setHandlerType] = useState<'merchant_profile' | 'static_json'>('merchant_profile')
+  const [handlerType, setHandlerType] = useState<'merchant_profile' | 'static_json' | 'merchant_runtime'>('merchant_profile')
   const [staticResponse, setStaticResponse] = useState('{"message":"hello"}')
   const [unitPriceMicros, setUnitPriceMicros] = useState('0')
   const [grantAppId, setGrantAppId] = useState('pc-web')
@@ -182,6 +182,7 @@ export default function OpenCommerceMerchantEditor({
           <label>处理器<select value={handlerType} onChange={(e) => setHandlerType(e.target.value as typeof handlerType)} disabled={!canEdit}>
             <option value="merchant_profile">商户公开资料</option>
             <option value="static_json">静态 JSON</option>
+            <option value="merchant_runtime">已验证商户运行时</option>
           </select></label>
           {handlerType === 'static_json' && <label>静态响应<textarea value={staticResponse} onChange={(e) => setStaticResponse(e.target.value)} disabled={!canEdit} /></label>}
           <label>单次计量（微元）<input type="number" min="0" value={unitPriceMicros} onChange={(e) => setUnitPriceMicros(e.target.value)} disabled={!canEdit} /></label>
