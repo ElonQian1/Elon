@@ -3,10 +3,10 @@ package com.elon.app
 internal object SocialSidebarTimelineMetrics {
     const val DATE_ROW_MIN_HEIGHT_DP = 128
     const val FAVORITE_ROW_MIN_HEIGHT_DP = 120
-    const val SPINE_WIDTH_DP = 12
+    const val SPINE_WIDTH_DP = 16
     const val SPINE_DOT_SIZE_DP = 16
     const val SPINE_LINE_TOP_DP = 18
-    const val CONTENT_START_DP = 2
+    const val CONTENT_START_DP = -2
     const val CONTENT_TOP_DP = 12
     const val HEADER_HEIGHT_DP = 48
     const val AVATAR_SLOT_WIDTH_DP = 40

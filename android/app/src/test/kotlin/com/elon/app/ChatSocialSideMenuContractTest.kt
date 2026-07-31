@@ -83,7 +83,7 @@ class ChatSocialSideMenuContractTest {
     @Test
     fun timelineVisualMetricsMatchTheCompactFriendSidebarDesign() {
         assertEquals(128, SocialSidebarTimelineMetrics.DATE_ROW_MIN_HEIGHT_DP)
-        assertEquals(12, SocialSidebarTimelineMetrics.SPINE_WIDTH_DP)
+        assertEquals(16, SocialSidebarTimelineMetrics.SPINE_WIDTH_DP)
         assertEquals(16, SocialSidebarTimelineMetrics.SPINE_DOT_SIZE_DP)
         assertEquals(32, SocialSidebarTimelineMetrics.AVATAR_SIZE_DP)
         assertEquals(16f, SocialSidebarTimelineMetrics.NAME_TEXT_SP)
@@ -92,12 +92,8 @@ class ChatSocialSideMenuContractTest {
         assertEquals(18, SocialSidebarTimelineMetrics.PREVIEW_START_DP)
         assertEquals(96, SocialSidebarTimelineMetrics.VIDEO_WIDTH_DP)
         assertEquals(54, SocialSidebarTimelineMetrics.VIDEO_HEIGHT_DP)
-        assertTrue(SocialSidebarTimelineMetrics.SPINE_DOT_SIZE_DP > SocialSidebarTimelineMetrics.SPINE_WIDTH_DP)
-        val timelineSpine = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/ChatSocialSideMenuView.kt"
-        ).substringAfter("private fun timelineSpine()").substringBefore("private fun avatar(")
-        assertTrue(timelineSpine.contains("clipChildren = false"))
-        assertTrue(timelineSpine.contains("clipToPadding = false"))
+        assertEquals(SocialSidebarTimelineMetrics.SPINE_DOT_SIZE_DP, SocialSidebarTimelineMetrics.SPINE_WIDTH_DP)
+        assertEquals(14, SocialSidebarTimelineMetrics.SPINE_WIDTH_DP + SocialSidebarTimelineMetrics.CONTENT_START_DP)
     }
 
     @Test

@@ -301,8 +301,6 @@ internal class ChatSocialSideMenuView(
         clipToPadding = false
     }
     private fun timelineSpine(): FrameLayout = FrameLayout(context).apply {
-        clipChildren = false
-        clipToPadding = false
         addView(View(context).apply {
             setBackgroundColor(Color.parseColor("#D9D9D9"))
         }, LayoutParams(dp(2), LayoutParams.MATCH_PARENT).apply {
