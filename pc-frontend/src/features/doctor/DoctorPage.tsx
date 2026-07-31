@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
+import { v4 as uuidv4 } from 'uuid'
+import { api } from '../../api/client'
 import { useDoctorStore } from './useDoctorStore'
 import { useAuthStore } from '../../store/auth'
 import { formatTime } from '../../lib/utils'
+import type { DoctorMessage } from './types'
 import styles from './DoctorPage.module.css'
 
 const SECTIONS = [
@@ -15,7 +18,49 @@ const QUICK_PROMPTS = [
   '网页打不开，但微信能正常使用',
   '电脑变慢，风扇一直在转',
   '代理关不掉，网络总是异常',
+  '帮我解释一下量子计算',
 ]
+
+function casualReply(text: string): string | null {
+  const normalized = text.replace(/[\s！!？?，。,。；;：:、…]+/g, '')
+  if (['你好', '您好', '嗨', '嗨喽', '在吗'].includes(normalized)) {
+    return '你好！我是电脑医生。请告诉我电脑遇到了什么现象，我会帮你检查原因并给出处理建议。'
+  }
+  if (['你是谁', '你能做什么', '能做什么'].includes(normalized)) {
+    return '我是电脑医生，可以帮你检查网络、系统状态和常见电脑故障，也可以在确认后执行安全修复。'
+  }
+  if (['谢谢', '感谢'].includes(normalized)) return '不客气，有电脑问题随时告诉我。'
+  return null
+}
+
+function appendLocalConversation(userText: string, assistantText: string) {
+  const now = Date.now()
+  const userMessage: DoctorMessage = {
+    id: `local-${now}-u`, role: 'user', content: userText, kind: '', createdAtMs: now, time: formatTime(now),
+  }
+  const assistantMessage: DoctorMessage = {
+    id: `local-${now}-a`, role: 'assistant', content: assistantText, kind: 'ok', createdAtMs: now + 1, time: formatTime(now + 1),
+  }
+  useDoctorStore.setState((state) => ({
+    section: 'diagnosis',
+    messages: [...state.messages, userMessage, assistantMessage],
+    result: null,
+  }))
+}
+
+function isComputerQuestion(text: string): boolean {
+  const computerTerms = /(电脑|本机|Windows|Win系统|网络|Wi[ -]?Fi|无线|代理|DNS|网卡|蓝屏|死机|卡顿|风扇|网页打不开|驱动|打印机|下载慢|黑屏)/i
+  const problemOrAction = /(打不开|无法|不能|异常|报错|失败|很慢|卡|断|连不上|怎么|检查|修复|重启|清理|设置|安装|卸载|查看|连接|恢复)/i
+  return computerTerms.test(text) && problemOrAction.test(text)
+}
+
+function generalChatErrorText(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  if (/failed to fetch|networkerror|load failed/i.test(message)) {
+    return '通用 AI 暂时无法连接服务器，请检查网络后重试。'
+  }
+  return `通用 AI 请求失败：${message || '未知错误'}`
+}
 
 export default function DoctorPage() {
   const user = useAuthStore((s) => s.user)
@@ -29,11 +74,16 @@ export default function DoctorPage() {
 
   const [input, setInput] = useState('')
   const [adapterName, setAdapterName] = useState('')
+  const [sending, setSending] = useState(false)
   const feedRef = useRef<HTMLDivElement>(null)
+  const generalConversationIdRef = useRef('')
 
   useEffect(() => { loadSessions() }, [])
   useEffect(() => { if (section === 'memory' && memories === null) loadMemory() }, [section])
   useEffect(() => { if (section === 'router' && routerStatus === null) loadRouterStatus() }, [section])
+  useEffect(() => {
+    if (activeSessionId) generalConversationIdRef.current = activeSessionId
+  }, [activeSessionId])
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
   }, [messages, result])
@@ -44,9 +94,77 @@ export default function DoctorPage() {
   async function handleSend(e: React.FormEvent) {
     e.preventDefault()
     const text = input.trim()
-    if (!text) return
+    if (!text || sending) return
     setInput('')
-    await analyze(text)
+    const reply = casualReply(text)
+    if (reply) {
+      appendLocalConversation(text, reply)
+      return
+    }
+    setSending(true)
+    try {
+      if (isComputerQuestion(text)) {
+        await analyze(text)
+      } else {
+        await handleGeneralChat(text)
+      }
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function handleGeneralChat(text: string) {
+    const now = Date.now()
+    const assistantId = `general-${now}-a`
+    const userMessage: DoctorMessage = {
+      id: `general-${now}-u`, role: 'user', content: text, kind: '', createdAtMs: now, time: formatTime(now),
+    }
+    const assistantMessage: DoctorMessage = {
+      id: assistantId, role: 'assistant', content: '', kind: 'general', createdAtMs: now + 1, time: formatTime(now + 1),
+    }
+    useDoctorStore.setState((state) => ({
+      section: 'diagnosis',
+      messages: [...state.messages, userMessage, assistantMessage],
+      result: null,
+    }))
+    const conversationId = generalConversationIdRef.current || uuidv4()
+    generalConversationIdRef.current = conversationId
+    try {
+      await api.streamPost('/api/llm/chat/stream', {
+        messages: [{ role: 'user', content: text }],
+        conversation_id: conversationId,
+        conversation_title: sessionTitle,
+        runtimeRoute: 'auto',
+        scope: 'chat_memory',
+      }, (event) => {
+        if (event.type === 'delta') {
+          const delta = typeof event.content === 'string' ? event.content : ''
+          if (!delta) return
+          useDoctorStore.setState((state) => ({
+            messages: state.messages.map((message) => message.id === assistantId
+              ? { ...message, content: message.content + delta }
+              : message),
+          }))
+        }
+        if (event.type === 'error') {
+          throw new Error(typeof event.message === 'string' ? event.message : 'AI 请求失败')
+        }
+        if (event.type === 'done') {
+          const reply = typeof event.reply === 'string' ? event.reply : ''
+          useDoctorStore.setState((state) => ({
+            messages: state.messages.map((message) => message.id === assistantId
+              ? { ...message, content: message.content || reply || 'AI 未返回可显示的内容。' }
+              : message),
+          }))
+        }
+      })
+    } catch (err) {
+      useDoctorStore.setState((state) => ({
+        messages: state.messages.map((message) => message.id === assistantId
+          ? { ...message, content: generalChatErrorText(err), kind: 'general' }
+          : message),
+      }))
+    }
   }
 
   async function handleRepair(action: string) {
@@ -124,7 +242,7 @@ export default function DoctorPage() {
       <div className={styles.main}>
         <header className={styles.header}>
           <div>
-            <div className={styles.kicker}>电脑医生 · 本机工作台</div>
+            <div className={styles.kicker}>电脑医生 · 自动分流工作台</div>
             <h2 className={styles.title}>{sessionTitle}</h2>
           </div>
           <div className={styles.headerActions}>
@@ -140,7 +258,7 @@ export default function DoctorPage() {
               {messages.length === 0 && !result && (
                 <div className={styles.emptyState}>
                   <h3>电脑哪里不舒服？</h3>
-                  <p>描述你看到的现象，电脑医生会先分析原因，再给出检查或修复建议。</p>
+                  <p>你可以直接问任何问题。电脑故障会自动进入本机诊断，其他问题交给通用 AI 回答。</p>
                   <div className={styles.quickPrompts}>
                     {QUICK_PROMPTS.map((prompt) => (
                       <button key={prompt} type="button" onClick={() => setInput(prompt)}>{prompt}</button>
@@ -157,7 +275,9 @@ export default function DoctorPage() {
                   <div className={styles.avatar}>{m.role === 'user' ? (user?.nickname ?? user?.account)?.[0] ?? '你' : '医'}</div>
                   <div className={styles.msgBody}>
                     <div className={styles.msgMeta}>
-                      <strong>{m.role === 'user' ? (user?.nickname ?? user?.account ?? '你') : '电脑医生'}</strong>
+                      <strong>{m.role === 'user'
+                        ? (user?.nickname ?? user?.account ?? '你')
+                        : m.kind === 'general' ? '一龙 AI' : '电脑医生'}</strong>
                       <span>{m.time}</span>
                     </div>
                     <pre className={[styles.msgContent, styles[m.kind] ?? ''].join(' ')}>{m.content}</pre>
@@ -270,9 +390,9 @@ export default function DoctorPage() {
             className={styles.composerInput}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="描述电脑问题，按 Enter 发送给电脑医生"
+            placeholder="直接提问；电脑故障会自动进入本机诊断"
           />
-          <button className={styles.sendBtn} type="submit">发送</button>
+          <button className={styles.sendBtn} type="submit" disabled={sending}>{sending ? '处理中…' : '发送'}</button>
         </form>
       </div>
     </div>

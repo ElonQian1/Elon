@@ -215,7 +215,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  background: var(--bg-base);
+  background: var(--bg-surface);
 }
 
 .feed > * {
@@ -321,6 +321,7 @@
 }
 
 .msgContent.ok { border-color: rgba(35, 165, 90, 0.36); }
+.msgContent.general { border-color: rgba(138, 215, 255, 0.28); }
 .msgContent.err { border-color: rgba(223, 92, 92, 0.38); color: #ffd7d7; }
 
 .resultBox {
@@ -518,6 +519,7 @@
 }
 
 .sendBtn:hover { background: var(--accent-hover); }
+.sendBtn:disabled { opacity: 0.55; cursor: wait; }
 
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }

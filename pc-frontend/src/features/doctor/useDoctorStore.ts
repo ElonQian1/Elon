@@ -8,6 +8,14 @@ import type {
   DownloadRouterStatus, DownloadRouterDoctorReport,
 } from './types'
 
+function analyzeErrorText(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err)
+  if (/failed to fetch|networkerror|load failed/i.test(message)) {
+    return '电脑医生暂时无法连接本机服务。请先启动“一龙 AI”Windows 客户端，确认电脑医生服务在线后再重试。'
+  }
+  return `分析失败：${message || '未知错误'}`
+}
+
 function normalizeMessages(raw: unknown[]): DoctorMessage[] {
   return raw.map((m) => {
     const msg = m as Record<string, unknown>
@@ -164,7 +172,7 @@ export const useDoctorStore = create<DoctorState>()((set, get) => ({
     const now = Date.now()
     const userMsg: DoctorMessage = { id: `local-${now}-u`, role: 'user', content: problem, kind: '', createdAtMs: now, time: formatTime(now) }
     const assistantMsg: DoctorMessage = { id: `local-${now}-a`, role: 'assistant', content: '正在采集只读快照，并请求远程 AI 分析…', kind: '', createdAtMs: now + 1, time: formatTime(now) }
-    set({ section: 'diagnosis', problem, messages: [...messages, userMsg, assistantMsg], result: { kind: '', text: '正在分析…' } })
+    set({ section: 'diagnosis', problem, messages: [...messages, userMsg, assistantMsg], result: null })
     try {
       const data = await localJson<{ analysis?: string; snapshot?: SnapshotData; sessions?: DoctorSessionSummary[]; session?: Record<string, unknown> }>(
         nodeAdminUrl, '/api/doctor/analyze',
@@ -173,18 +181,19 @@ export const useDoctorStore = create<DoctorState>()((set, get) => ({
       if (data.sessions) set({ sessions: data.sessions })
       if (data.session) {
         const msgs = normalizeMessages(Array.isArray((data.session as Record<string, unknown>).messages) ? ((data.session as Record<string, unknown>).messages as unknown[]) : [])
-        set({ messages: msgs, analysis: data.analysis ?? '', snapshot: data.snapshot ?? get().snapshot, result: { kind: 'ok', text: '远程 AI 已完成分析。' } })
+        set({ messages: msgs, analysis: data.analysis ?? '', snapshot: data.snapshot ?? get().snapshot, result: null })
       } else {
         const updated = get().messages.map((m) =>
           m.id === assistantMsg.id ? { ...m, content: data.analysis ?? '已完成分析。', kind: 'ok' } : m,
         )
-        set({ messages: updated, analysis: data.analysis ?? '', snapshot: data.snapshot ?? get().snapshot, result: { kind: 'ok', text: '远程 AI 已完成分析。' } })
+        set({ messages: updated, analysis: data.analysis ?? '', snapshot: data.snapshot ?? get().snapshot, result: null })
       }
     } catch (err) {
+      const errorText = analyzeErrorText(err)
       const updated = get().messages.map((m) =>
-        m.id === assistantMsg.id ? { ...m, content: `分析失败：${(err as Error).message}`, kind: 'err' } : m,
+        m.id === assistantMsg.id ? { ...m, content: errorText, kind: 'err' } : m,
       )
-      set({ messages: updated, result: { kind: 'err', text: `分析失败：${(err as Error).message}` } })
+      set({ messages: updated, result: null })
     }
   },
 
