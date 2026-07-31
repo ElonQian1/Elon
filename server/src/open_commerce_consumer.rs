@@ -1,0 +1,255 @@
+use anyhow::{bail, Result};
+
+use crate::{
+    open_commerce_consumer_model::{
+        ConsumerAuthorizationState, ConsumerDiscoveryMatch, ConsumerDiscoveryRequest,
+        ConsumerDiscoveryResponse, ConsumerPreferences,
+    },
+    open_commerce_developer_model::{CreateAuthorizationRequest, OpenCommerceAuthorizationRequest},
+    open_commerce_model::{
+        OpenCommerceCapability, OpenCommerceMerchantDetail, ACCESS_AUTHORIZED, ACCESS_OWNER_ONLY,
+        ACCESS_PUBLIC, CAPABILITY_STATUS_ACTIVE,
+    },
+    open_commerce_service,
+    store::Store,
+};
+
+pub(crate) fn discover(
+    store: &Store,
+    user_id: &str,
+    mut request: ConsumerDiscoveryRequest,
+) -> Result<ConsumerDiscoveryResponse> {
+    if request.requester_app_id.trim().is_empty() {
+        request.requester_app_id = "pc-web".to_string();
+    }
+    ensure_app_owned_by_user(store, user_id, &request.requester_app_id)?;
+    validate_preferences(&request.preferences)?;
+    let candidates = open_commerce_service::discover_merchants(
+        store,
+        request.query.as_deref(),
+        request.capability_key.as_deref(),
+        request.limit.clamp(1, 50).saturating_mul(4),
+    )?;
+    let mut matches = candidates
+        .into_iter()
+        .filter_map(|detail| best_match(store, detail, &request).transpose())
+        .collect::<Result<Vec<_>>>()?;
+    matches.sort_by(|left, right| {
+        right
+            .score
+            .cmp(&left.score)
+            .then_with(|| left.merchant.display_name.cmp(&right.merchant.display_name))
+    });
+    matches.truncate(request.limit.clamp(1, 50));
+    Ok(ConsumerDiscoveryResponse {
+        schema: "open_commerce.consumer_discovery.v1",
+        requester_app_id: request.requester_app_id,
+        ranking_policy: "transparent_preference_match.v1",
+        ranking_is_paid: false,
+        matches,
+    })
+}
+
+pub(crate) fn create_authorization_request(
+    store: &Store,
+    user_id: &str,
+    request: CreateAuthorizationRequest,
+) -> Result<OpenCommerceAuthorizationRequest> {
+    if request.requester_app_id.trim() == "pc-web" {
+        bail!("公共 pc-web 身份只能用于发现，申请授权前请注册独立开发者应用");
+    }
+    ensure_app_owned_by_user(store, user_id, &request.requester_app_id)?;
+    store.create_open_commerce_authorization_request(user_id, request)
+}
+
+pub(crate) fn ensure_app_owned_by_user(store: &Store, user_id: &str, app_id: &str) -> Result<()> {
+    if app_id.trim() == "pc-web" {
+        return Ok(());
+    }
+    let app = store
+        .open_commerce_developer_app_by_app_id(app_id)?
+        .ok_or_else(|| anyhow::anyhow!("开发者应用不存在"))?;
+    if app.owner_user_id != user_id {
+        bail!("当前用户不能代表该开发者应用发起请求");
+    }
+    if app.status != "active" {
+        bail!("开发者应用已停用");
+    }
+    Ok(())
+}
+
+fn best_match(
+    store: &Store,
+    detail: OpenCommerceMerchantDetail,
+    request: &ConsumerDiscoveryRequest,
+) -> Result<Option<ConsumerDiscoveryMatch>> {
+    let selected = detail
+        .capabilities
+        .iter()
+        .filter(|capability| capability.status == CAPABILITY_STATUS_ACTIVE)
+        .filter(|capability| {
+            request
+                .capability_key
+                .as_deref()
+                .map(|key| capability.capability_key == key)
+                .unwrap_or(true)
+        })
+        .filter(|capability| {
+            request
+                .preferences
+                .max_unit_price_micros
+                .map(|maximum| capability.unit_price_micros <= maximum)
+                .unwrap_or(true)
+        })
+        .max_by_key(|capability| capability_score(capability, &request.preferences))
+        .cloned();
+    let Some(capability) = selected else {
+        return Ok(None);
+    };
+    let (score, reasons) = score_match(&detail, &capability, &request.preferences);
+    let authorization =
+        authorization_state(store, &detail, &capability, &request.requester_app_id)?;
+    Ok(Some(ConsumerDiscoveryMatch {
+        merchant: detail.merchant,
+        capability,
+        score,
+        reasons,
+        authorization,
+    }))
+}
+
+fn score_match(
+    detail: &OpenCommerceMerchantDetail,
+    capability: &OpenCommerceCapability,
+    preferences: &ConsumerPreferences,
+) -> (i64, Vec<String>) {
+    let mut score = 40;
+    let mut reasons = vec![format!("提供 {} 能力", capability.display_name)];
+    let profile = &detail.merchant.public_profile;
+    let category = profile.get("category").and_then(|value| value.as_str());
+    if category
+        .map(|value| contains_ignore_case(&preferences.categories, value))
+        .unwrap_or(false)
+    {
+        score += 20;
+        reasons.push(format!("经营类别匹配 {}", category.unwrap_or_default()));
+    }
+    let city = profile.get("city").and_then(|value| value.as_str());
+    if city
+        .zip(preferences.city.as_deref())
+        .map(|(left, right)| left.eq_ignore_ascii_case(right))
+        .unwrap_or(false)
+    {
+        score += 15;
+        reasons.push(format!("所在城市匹配 {}", city.unwrap_or_default()));
+    }
+    let merchant_tags = profile
+        .get("tags")
+        .and_then(|value| value.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|value| value.as_str())
+        .collect::<Vec<_>>();
+    let tag_matches = merchant_tags
+        .iter()
+        .filter(|tag| contains_ignore_case(&preferences.tags, tag))
+        .count();
+    if tag_matches > 0 {
+        let points = (tag_matches as i64 * 5).min(20);
+        score += points;
+        reasons.push(format!("匹配 {} 个偏好标签", tag_matches));
+    }
+    if preferences.prefer_public && capability.access_level == ACCESS_PUBLIC {
+        score += 5;
+        reasons.push("无需额外授权即可调用".to_string());
+    }
+    if capability.unit_price_micros == 0 {
+        score += 3;
+        reasons.push("当前能力调用价格为 0".to_string());
+    }
+    (score, reasons)
+}
+
+fn authorization_state(
+    store: &Store,
+    detail: &OpenCommerceMerchantDetail,
+    capability: &OpenCommerceCapability,
+    app_id: &str,
+) -> Result<ConsumerAuthorizationState> {
+    match capability.access_level.as_str() {
+        ACCESS_PUBLIC => Ok(ConsumerAuthorizationState {
+            required: false,
+            status: "not_required".to_string(),
+            grant_id: None,
+            request_id: None,
+        }),
+        ACCESS_OWNER_ONLY => Ok(ConsumerAuthorizationState {
+            required: true,
+            status: "owner_only".to_string(),
+            grant_id: None,
+            request_id: None,
+        }),
+        ACCESS_AUTHORIZED => {
+            let grant_id = store.active_open_commerce_grant_for_app_capability(
+                &detail.merchant.id,
+                app_id,
+                &capability.capability_key,
+            )?;
+            if grant_id.is_some() {
+                return Ok(ConsumerAuthorizationState {
+                    required: true,
+                    status: "granted".to_string(),
+                    grant_id,
+                    request_id: None,
+                });
+            }
+            let request_id = store.pending_authorization_for_app_capability(
+                &detail.merchant.id,
+                app_id,
+                &capability.capability_key,
+            )?;
+            Ok(ConsumerAuthorizationState {
+                required: true,
+                status: if request_id.is_some() {
+                    "pending"
+                } else {
+                    "request_required"
+                }
+                .to_string(),
+                grant_id: None,
+                request_id,
+            })
+        }
+        _ => bail!("能力访问级别无效"),
+    }
+}
+
+fn capability_score(capability: &OpenCommerceCapability, preferences: &ConsumerPreferences) -> i64 {
+    let access = match capability.access_level.as_str() {
+        ACCESS_PUBLIC if preferences.prefer_public => 30,
+        ACCESS_PUBLIC => 20,
+        ACCESS_AUTHORIZED => 10,
+        _ => 0,
+    };
+    access - capability.unit_price_micros.min(1_000_000) / 100_000
+}
+
+fn validate_preferences(preferences: &ConsumerPreferences) -> Result<()> {
+    if preferences.categories.len() > 20 || preferences.tags.len() > 40 {
+        bail!("消费者偏好类别或标签数量过多");
+    }
+    if preferences
+        .max_unit_price_micros
+        .map(|value| value < 0)
+        .unwrap_or(false)
+    {
+        bail!("最大调用价格不能为负数");
+    }
+    Ok(())
+}
+
+fn contains_ignore_case(values: &[String], needle: &str) -> bool {
+    values
+        .iter()
+        .any(|value| value.trim().eq_ignore_ascii_case(needle.trim()))
+}

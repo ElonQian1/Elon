@@ -127,7 +127,14 @@ mod node_runtime;
 mod node_scheduler;
 mod offline_completion_migration;
 mod open_commerce_api;
+mod open_commerce_client_api;
+mod open_commerce_client_migration;
+#[cfg(test)]
+mod open_commerce_client_service_tests;
 mod open_commerce_connector_contract;
+mod open_commerce_consumer;
+mod open_commerce_consumer_model;
+mod open_commerce_developer_model;
 mod open_commerce_integration_migration;
 mod open_commerce_integration_model;
 mod open_commerce_mcp;

@@ -546,6 +546,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
                 .merge(crate::project_git_worktree_audit_api::routes()),
         )
         .merge(open_commerce_api::routes())
+        .merge(crate::open_commerce_client_api::routes())
         .merge(crate::open_commerce_mcp::routes())
         .merge(crate::task_settlement::api::routes())
         // ── 应用自更新（Android 客户端检查版本 / 下载 APK）────────────────────
