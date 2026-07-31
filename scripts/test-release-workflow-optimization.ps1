@@ -69,6 +69,10 @@ $deployScript = New-ElonApkAtomicDeployScript -ApkStage '/tmp/app.apk' -JsonStag
 Assert-True ($deployScript.Contains("awk '{print `$1}'")) 'APK staging hash command lost its shell field expression.'
 Assert-True ($deployScript.Contains('EXPECTED_HASH=' + "'" + ('a' * 64) + "'")) 'APK expected hash was not injected.'
 
+$serverPublisher = Get-Content -LiteralPath (Join-Path $repoRoot 'scripts\publish-server.ps1') -Raw
+Assert-True (-not $serverPublisher.Contains("-Phase 'pc_frontend' -Status 'skipped'")) `
+    'The server publisher uses a release-ledger status that the API does not accept.'
+
 & powershell -NoProfile -ExecutionPolicy Bypass -File `
     (Join-Path $repoRoot 'scripts\publish-mobile-pwa-static.ps1') -PlanOnly
 if ($LASTEXITCODE -ne 0) { throw 'Static mobile PWA plan failed.' }

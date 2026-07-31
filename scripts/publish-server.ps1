@@ -703,7 +703,7 @@ $RemotePcLegacyDist = "$RemoteDataDir/pc-legacy-dist"
 
 if ($SkipPcFrontend) {
     Write-Host "3.5⃣  ⏩ 跳过 PC 前端构建与上传（-SkipPcFrontend）" -ForegroundColor Cyan
-    Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'pc_frontend' -Status 'skipped'
+    Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'pc_frontend' -Status 'succeeded'
 } elseif (Test-Path (Join-Path $PcFrontendDir "package.json")) {
     Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'pc_frontend' -Status 'running'
     if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
