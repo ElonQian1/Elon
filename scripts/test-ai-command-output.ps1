@@ -19,6 +19,7 @@ $fixtureRoot = Join-Path $repoRoot ".ai-tmp\command-output-test"
 New-Item -ItemType Directory -Path $fixtureRoot -Force | Out-Null
 $successFixture = Join-Path $fixtureRoot "success.cmd"
 $failureFixture = Join-Path $fixtureRoot "failure.cmd"
+$timeoutFixture = Join-Path $fixtureRoot "timeout.cmd"
 
 Set-Content -LiteralPath $successFixture -Encoding ASCII -Value @(
     "@echo off",
@@ -30,6 +31,11 @@ Set-Content -LiteralPath $failureFixture -Encoding ASCII -Value @(
     "echo error: deterministic failure 1>&2",
     "for /L %%i in (1,1,100) do echo failure tail line %%i",
     "exit /b 7"
+)
+Set-Content -LiteralPath $timeoutFixture -Encoding ASCII -Value @(
+    "@echo off",
+    "powershell -NoProfile -Command `"Start-Sleep -Seconds 30`"",
+    "exit /b 0"
 )
 
 $oldPreference = $ErrorActionPreference
@@ -46,6 +52,15 @@ try {
         -WorkingDirectory $repoRoot `
         -CommandLine "`"$failureFixture`"" 2>&1)
     $failureExit = $LASTEXITCODE
+
+    $timeoutWatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $timeoutOutput = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $runner `
+        -LogName "bounded-timeout" `
+        -WorkingDirectory $repoRoot `
+        -TimeoutSeconds 2 `
+        -CommandLine "`"$timeoutFixture`"" 2>&1)
+    $timeoutExit = $LASTEXITCODE
+    $timeoutWatch.Stop()
 } finally {
     $ErrorActionPreference = $oldPreference
 }
@@ -63,6 +78,11 @@ Assert-True ($failureExit -eq 7) "Bounded failure command must preserve the nati
 Assert-True ($failureText.Contains("AI_COMMAND_STATUS=failed")) "Failure summary is missing."
 Assert-True ($failureText.Contains("error: deterministic failure")) "Failure error excerpt is missing."
 Assert-True ($failureOutput.Count -le 80) "Failure excerpt exceeded its line budget."
+
+$timeoutText = $timeoutOutput -join "`n"
+Assert-True ($timeoutExit -eq 124) "Timed out command must return exit code 124."
+Assert-True ($timeoutText.Contains("AI_COMMAND_TIMED_OUT=true")) "Timeout summary is missing."
+Assert-True ($timeoutWatch.Elapsed.TotalSeconds -lt 10) "Timed out command left its process tree running."
 
 $stdoutLogLine = $successOutput |
     Where-Object { "$_".StartsWith("AI_COMMAND_STDOUT_LOG=") } |

@@ -111,6 +111,7 @@ mod join_request_events;
 mod lan_peer;
 mod lm_chat;
 mod message_recall_migration;
+mod mobile_pwa_template;
 mod node_agent_atomic_file;
 mod node_agent_cli_security;
 mod node_agent_downloads;

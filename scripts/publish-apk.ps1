@@ -46,6 +46,10 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'release-publish-lease.ps1')
 . (Join-Path $PSScriptRoot 'apk-release-freshness.ps1')
 . (Join-Path $PSScriptRoot "direct-network.ps1")
+$nativeCommandHelper = Join-Path $PSScriptRoot 'native-command-timeout.ps1'
+$apkTransportHelper = Join-Path $PSScriptRoot 'apk-publish-transport.ps1'
+. $nativeCommandHelper
+. $apkTransportHelper
 
 Set-ElonProjectDirectNetwork
 
@@ -323,24 +327,6 @@ function Assert-ApkManifestVersion {
     Write-Host "   ✅ $Label manifest: v$($actual.VersionName) (build $($actual.VersionCode))" -ForegroundColor Green
 }
 
-function Assert-RemoteApkManifestVersion {
-    param(
-        [Parameter(Mandatory)] [int]$ExpectedVersionCode,
-        [Parameter(Mandatory)] [string]$ExpectedVersionName
-    )
-
-    $tmpApk = Join-Path $env:TEMP ("elon-remote-apk-" + [Guid]::NewGuid().ToString("N") + ".apk")
-    try {
-        & curl.exe --noproxy '*' -f -L -sS --max-time 120 -o $tmpApk "$ServerUrl/app/ElonSpeed-latest.apk" 2>&1 | Out-Host
-        if ($LASTEXITCODE -ne 0) {
-            throw "下载线上 APK 校验包体失败，curl exit=$LASTEXITCODE"
-        }
-        Assert-ApkManifestVersion -ApkPath $tmpApk -ExpectedVersionCode $ExpectedVersionCode -ExpectedVersionName $ExpectedVersionName -Label "线上 APK"
-    } finally {
-        Remove-Item -LiteralPath $tmpApk -Force -ErrorAction SilentlyContinue
-    }
-}
-
 function Get-LocalSigningProperty {
     param([string]$Name)
 
@@ -532,8 +518,9 @@ function Get-DeployedApkSha {
         Write-Warning "无法从 /app/version.json 读取 APK gitSha：$_"
     }
     try {
-        $raw = ssh -o ProxyCommand=none -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -o BatchMode=yes $ServerHost "cat $ApkShaFile 2>/dev/null || true" 2>$null
-        $sha = ($raw | Out-String).Trim()
+        $result = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 20 -Label 'read deployed APK SHA' `
+            -ArgumentList @('-n', '-o', 'ProxyCommand=none', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-o', 'ServerAliveInterval=5', '-o', 'ServerAliveCountMax=1', $ServerHost, "cat $ApkShaFile 2>/dev/null || true")
+        $sha = $result.Stdout.Trim()
         if ($sha -match '^[0-9a-f]{40}$') { return $sha }
     } catch {
         Write-Warning "无法读取服务器 APK 部署 SHA：$_"
@@ -598,7 +585,7 @@ function Invoke-GradleReleaseBuild {
     $gradle = Join-Path $AndroidDir "gradlew.bat"
     $buildStartedAt = Get-Date
     $process = Start-Process -FilePath "cmd.exe" `
-        -ArgumentList @("/c", "`"$gradle`"", "assembleRelease") `
+        -ArgumentList @("/c", "`"$gradle`"", "--no-daemon", "assembleRelease", "--console=plain") `
         -WorkingDirectory $AndroidDir `
         -NoNewWindow `
         -PassThru
@@ -694,96 +681,6 @@ function Assert-ApkStillCurrentBeforeUpload {
         Write-Host "⏭️  origin/main 已从本次基础 $((Format-ShortSha $ReleaseSha)) 前进到 $((Format-ShortSha $remoteHead))，且包含 Android 改动。为避免上传过期 APK，已停止；代码已合并，发布交给最新主线。" -ForegroundColor Cyan
         Write-ApkPublishStatus -ApkReleaseStatus "superseded_by_newer_main" -Message "代码已合并，发布交给最新主线。"
         exit 0
-    }
-}
-
-function Publish-ApkStaged {
-    param(
-        [string]$ApkPath,
-        [string]$JsonPath,
-        [string]$ReleaseSha,
-        [string]$ExpectedServerSha,
-        [int]$Attempt = 1
-    )
-
-    $apkStage = "$ServerDir/ElonSpeed-latest.apk.$ReleaseSha.tmp"
-    $jsonStage = "$ServerDir/version.json.$ReleaseSha.tmp"
-
-    ssh -o ProxyCommand=none -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 $ServerHost "mkdir -p $ServerDir"
-    if ($LASTEXITCODE -ne 0) { Write-Error "无法创建服务器 APK 目录：$ServerDir" }
-
-    scp -o ProxyCommand=none $ApkPath "${ServerHost}:${apkStage}"
-    if ($LASTEXITCODE -ne 0) { Write-Error "APK staging 上传失败" }
-    Write-Host "   ✅ APK staging 上传完成" -ForegroundColor Green
-
-    scp -o ProxyCommand=none $JsonPath "${ServerHost}:${jsonStage}"
-    if ($LASTEXITCODE -ne 0) { Write-Error "version.json staging 上传失败" }
-    Write-Host "   ✅ version.json staging 上传完成" -ForegroundColor Green
-
-    $remoteScript = @'
-set -eu
-APP_DIR='__APP_DIR__'
-EXPECTED='__EXPECTED__'
-NEW_SHA='__NEW_SHA__'
-APK_STAGE='__APK_STAGE__'
-JSON_STAGE='__JSON_STAGE__'
-LOCK_FILE="$APP_DIR/.apk-deploy.lock"
-SHA_FILE="$APP_DIR/.apk-deployed-sha"
-
-(
-  flock -x 9
-  CURRENT=""
-  if [ -f "$SHA_FILE" ]; then
-    CURRENT="$(cat "$SHA_FILE" 2>/dev/null || true)"
-  fi
-  if [ "$CURRENT" != "$EXPECTED" ]; then
-    echo "APK_DEPLOY_CAS_MISMATCH current=$CURRENT expected=$EXPECTED" >&2
-    exit 42
-  fi
-  mv "$APK_STAGE" "$APP_DIR/ElonSpeed-latest.apk"
-  mv "$JSON_STAGE" "$APP_DIR/version.json"
-  printf '%s\n' "$NEW_SHA" > "$SHA_FILE"
-) 9>"$LOCK_FILE"
-'@
-
-    $remoteScript = $remoteScript.
-        Replace('__APP_DIR__', $ServerDir).
-        Replace('__EXPECTED__', $ExpectedServerSha).
-        Replace('__NEW_SHA__', $ReleaseSha).
-        Replace('__APK_STAGE__', $apkStage).
-        Replace('__JSON_STAGE__', $jsonStage)
-
-    # PowerShell here-strings on Windows use CRLF; strip CR before piping to bash
-    $remoteScript = $remoteScript -replace "`r`n", "`n"
-    $remoteScript = $remoteScript -replace "`r", "`n"
-
-    $remoteScript | ssh -o ProxyCommand=none -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 $ServerHost "bash -s"
-    $deployExit = $LASTEXITCODE
-
-    if ($deployExit -eq 42) {
-        $deployedSha = Get-DeployedApkSha
-        if ($deployedSha -and (Test-GitAncestor $ReleaseSha $deployedSha)) {
-            Write-Host "⏭️  另一台机器已部署更新 APK：$((Format-ShortSha $deployedSha))。本次 staging 不覆盖。" -ForegroundColor Cyan
-            ssh -o ProxyCommand=none $ServerHost "rm -f '$apkStage' '$jsonStage'" | Out-Null
-            Complete-Release -Success:$false -ErrorMessage "superseded by deployed apk $deployedSha"
-            Write-ApkPublishStatus -ApkReleaseStatus "published" -Message "APK 已由更新主线发布，当前 staging 不覆盖。"
-            exit 0
-        }
-        if ($deployedSha -and (Test-GitAncestor $deployedSha $ReleaseSha) -and $Attempt -lt 3) {
-            Write-Host "   ℹ️  服务器刚部署了较旧 APK $((Format-ShortSha $deployedSha))，本 release $((Format-ShortSha $ReleaseSha)) 更新，重试原子发布..." -ForegroundColor Cyan
-            Publish-ApkStaged -ApkPath $ApkPath -JsonPath $JsonPath -ReleaseSha $ReleaseSha -ExpectedServerSha $deployedSha -Attempt ($Attempt + 1)
-            return
-        }
-        ssh -o ProxyCommand=none $ServerHost "rm -f '$apkStage' '$jsonStage'" | Out-Null
-        Complete-Release -Success:$false -ErrorMessage "cas mismatch in apk deploy"
-        Write-Host "⏭️  APK 上传 CAS 失败：服务器部署状态已变化，且未确认包含本源代码提交。本次 staging 不覆盖；代码已合并，发布交给最新主线。" -ForegroundColor Cyan
-        Write-ApkPublishStatus -ApkReleaseStatus "superseded_by_newer_main" -Message "代码已合并，发布交给最新主线。"
-        exit 0
-    }
-
-    if ($deployExit -ne 0) {
-        Complete-Release -Success:$false -ErrorMessage "apk atomic deploy failed: exit=$deployExit"
-        Write-Error "服务器 APK 原子发布失败，退出码 $deployExit"
     }
 }
 
@@ -944,7 +841,9 @@ if (-not $apk) {
 }
 
 $fileSize = $apk.Length
+$apkSha256 = (Get-FileHash -LiteralPath $apk.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
 Write-Host "📦 APK: $($apk.Name) ($([math]::Round($fileSize / 1MB, 2)) MB)" -ForegroundColor Green
+Write-Host "   SHA-256: $apkSha256" -ForegroundColor DarkGray
 Assert-ApkManifestVersion -ApkPath $apk.FullName -ExpectedVersionCode $newCode -ExpectedVersionName $versionName -Label "本地 release APK"
 
 # ── Step 4: 还原 build.gradle（版本号不进 git） ──────────────────────────────
@@ -972,6 +871,7 @@ $versionJson = @{
     changelog   = $Changelog
     forceUpdate = $false
     fileSize    = $fileSize
+    sha256      = $apkSha256
     gitSha      = $shaFull
     sourceSha   = $BuildBaseSha
 } | ConvertTo-Json -Depth 2
@@ -1038,9 +938,12 @@ Write-Host "🚀 上传到服务器..." -ForegroundColor Cyan
 
 Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'artifact_upload' -Status 'running'
 
-Publish-ApkStaged -ApkPath $apk.FullName -JsonPath $tmpJson -ReleaseSha $shaFull -ExpectedServerSha $serverShaBeforeUpload
+Publish-ApkStaged -ApkPath $apk.FullName -JsonPath $tmpJson -ReleaseSha $shaFull `
+    -ExpectedServerSha $serverShaBeforeUpload -ExpectedSha256 $apkSha256
 Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'artifact_upload' -Status 'succeeded'
 Write-Host "   ✅ APK 原子发布完成，.apk-deployed-sha = $sha" -ForegroundColor Green
+Assert-RemoteApkArtifact -ExpectedSha256 $apkSha256 -ExpectedSize $fileSize
+Complete-Release -Success:$true -VersionName $versionName -VersionCode $newCode
 
 # 清理临时文件
 Remove-Item $tmpJson -Force
@@ -1061,8 +964,6 @@ try {
 } catch {
     Write-Warning "   ⚠️  验证请求失败: $_（可能服务端重启中，稍后手动验证）"
 }
-Assert-RemoteApkManifestVersion -ExpectedVersionCode $newCode -ExpectedVersionName $versionName
-
 Write-Host "📣 广播在线客户端更新提醒..." -ForegroundColor Cyan
 try {
     $broadcastUrl = "$ServerUrl/api/app/update/broadcast"
@@ -1084,8 +985,6 @@ try {
 }
 
 # ── 汇报 ──────────────────────────────────────────────────────────────────────
-
-Complete-Release -Success:$true -VersionName $versionName -VersionCode $newCode
 
 Write-Host ""
 Write-Host ("=" * 60) -ForegroundColor Cyan

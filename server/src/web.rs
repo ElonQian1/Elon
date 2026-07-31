@@ -4,7 +4,7 @@
 // 视觉、交互、文案对齐 android/app/src/main/res/layout/activity_main.xml。
 // 响应式断点：< 720 手机、720~1100 平板、>= 1100 桌面（左侧栏 Tab）。
 
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use axum::{
     extract::State,
@@ -12,6 +12,7 @@ use axum::{
     response::{Html, IntoResponse},
 };
 
+use crate::mobile_pwa_template::load_mobile_pwa_page;
 use crate::types::AppState;
 
 const BRAND_PNG_B64: &str = include_str!("assets/ic_app_brand.b64");
@@ -136,9 +137,8 @@ const UI_TUNER_PWA_VIEWPORT_BRIDGE_JS: &str =
     include_str!("assets/ui_tuner_pwa_viewport_bridge.js");
 const UI_TUNER_PWA_BRIDGE_JS: &str = include_str!("assets/ui_tuner_pwa_bridge.js");
 
-pub async fn web_page() -> impl IntoResponse {
-    static HTML: OnceLock<String> = OnceLock::new();
-    let body = HTML.get_or_init(build_html).as_str();
+pub async fn web_page(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let page = load_mobile_pwa_page(&state.data_dir, WEB_HTML_TEMPLATE, build_html);
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CACHE_CONTROL,
@@ -146,7 +146,11 @@ pub async fn web_page() -> impl IntoResponse {
     );
     headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
     headers.insert(header::EXPIRES, HeaderValue::from_static("0"));
-    (headers, Html(body))
+    headers.insert(
+        "x-elon-mobile-pwa-source",
+        HeaderValue::from_static(page.source),
+    );
+    (headers, Html(page.html))
 }
 
 pub async fn favicon() -> impl IntoResponse {
@@ -176,7 +180,7 @@ fn decode_brand_png() -> Vec<u8> {
     .unwrap_or_default()
 }
 
-fn build_html() -> String {
+fn build_html(template: &str) -> String {
     let ui_tuner_pwa_bridge =
         format!("{UI_TUNER_PWA_VIEWPORT_BRIDGE_JS}\n{UI_TUNER_PWA_BRIDGE_JS}");
     let refresh_ring_png_b64 = base64::Engine::encode(
@@ -218,7 +222,7 @@ fn build_html() -> String {
     let input_camera_png_b64 = encode_png(INPUT_CAMERA_PNG);
     let input_photo_png_b64 = encode_png(INPUT_PHOTO_PNG);
     let input_file_png_b64 = encode_png(INPUT_FILE_PNG);
-    WEB_HTML_TEMPLATE
+    template
         .replace(
             "__UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__",
             UI_TUNER_PWA_AUTH_BOOTSTRAP_JS,

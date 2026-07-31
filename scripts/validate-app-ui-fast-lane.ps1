@@ -90,7 +90,7 @@ Invoke-Checked -Label "git diff check" -Action {
 }
 
 if ($ContractTest.Count -gt 0) {
-    $contractArgs = @(":app:testDebugUnitTest", "--console=plain")
+    $contractArgs = @('--no-daemon', ":app:testDebugUnitTest", "--console=plain")
     foreach ($testName in $ContractTest) {
         $contractArgs += @("--tests", $testName)
     }
@@ -116,7 +116,7 @@ Remove-Item -LiteralPath $androidOut, $androidErr, $pwaOut, $pwaErr -Force -Erro
 
 $watch = [System.Diagnostics.Stopwatch]::StartNew()
 $androidProcess = Start-Process -FilePath $gradle `
-    -ArgumentList @(":app:assembleDebug", "--console=plain") `
+    -ArgumentList @('--no-daemon', ":app:assembleDebug", "--console=plain") `
     -WorkingDirectory $androidRoot -PassThru -WindowStyle Hidden `
     -RedirectStandardOutput $androidOut -RedirectStandardError $androidErr
 $pwaProcess = Start-Process -FilePath "node.exe" `

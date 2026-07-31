@@ -42,7 +42,14 @@
      -CommandLine 'powershell -NoProfile -ExecutionPolicy Bypass -File scripts\publish-app-ui-fast-lane.ps1 -Changelog "同步说明"'
    ```
 
-   包装脚本先发布包含移动 PWA 的 Server，再发布 APK。两个正式发布共享全局队列，因此按顺序执行，不并行抢占。
+   包装脚本先比较线上 Server SHA 与当前 HEAD 的改动范围，再发布移动 PWA，最后发布 APK：
+
+   - 只有 `server/src/assets/web_page.html` 变化时，原子上传运行时模板，不重新编译 Rust，也不构建 PC 前端。
+   - 后端 Rust、其他内嵌资源或 PC 前端变化时，才运行完整 Server 发布；APP UI 路线使用 `-SkipPcFrontend` 避免重复构建无关 PC 页面。
+   - 没有移动 PWA 变化时记录 skipped，不启动 Server 发布。
+   - APK 发布始终先做线上 Android 构建输入覆盖检查；已覆盖时不 claim 版本、不重复构建。
+
+   每个阶段写入 `.ai-tmp/release-receipts/`，相同源码 SHA 的重试可以复用已经完成的移动 PWA 阶段。两个正式发布仍按顺序执行，不并行抢占。
 6. 发布完成后，有空闲 Renderer 时再做针对性视觉补验。任何 start/bootstrap/prepare 前只调用一次 `ui_get_runtime_status` 和 `ui_check_capabilities` 检查明确的 `rendererResourceId`/lease；全部占用时立即记录 `VERIFICATION_DEFERRED=renderer_capacity_unavailable`、`RENDERER_PREPARATION_ATTEMPTS=0`，不得发起准备或重试。存在明确空闲槽时才允许一次最多 30 秒的准备；忙碌、离线或超时不得阻塞 Server/PWA、APK 发布或统一收尾。
 7. 用 `AndroidFeature` 执行统一收尾，并分别报告“业务已发布”和“视觉已验收 / 验证延期”，不得把两种状态混为一谈。
 
@@ -53,6 +60,15 @@
 - Renderer 容量检查必须早于启动或准备；零空闲槽直接延期，禁止以五次超时轮询代替资源检查。
 - 只有用户明确要求“验收通过后再发布”，或 OEM、权限、软键盘、Launcher、硬件、传感器、性能等必须设置 `realDeviceRequired=true` 的专项，才把真实设备验收作为发布前置条件。
 - 没有真帧证据时允许报告“已发布、验证延期”，但禁止报告“视觉已验收”或伪造视觉损失值。
+
+## 时间与可靠性约束
+
+- Gradle 快速验证和 Release 构建使用 `--no-daemon`，避免 daemon 持有日志句柄导致包装器无法退出。
+- `invoke-ai-logged-command.ps1` 支持 `-TimeoutSeconds`；超时返回 124，并终止对应任务的完整子进程树。
+- SSH/SCP 固定为非交互模式，具有连接、保活和阶段硬超时；单条远程命令不得无限等待。
+- APK 上传前计算 SHA-256 并写入 `version.json`；服务器 staging、原子切换后都在原地校验哈希和文件大小，不重新下载完整 APK。
+- APK 已完成原子发布和哈希验证后立即调用 release/finish；广播或 HTTP 后置检查失败只记 warning，不能遗留 in-flight 租约。
+- 发布输出必须包含 `RELEASE_STAGE=<name> status=<status> durationSeconds=<n>`，用于定位真实慢阶段。
 
 ## 退出快速通道
 

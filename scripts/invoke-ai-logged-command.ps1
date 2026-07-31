@@ -16,7 +16,10 @@ param(
     [int]$MaxErrorLines = 30,
 
     [ValidateRange(1, 30)]
-    [int]$FailureTailLines = 30
+    [int]$FailureTailLines = 30,
+
+    [ValidateRange(0, 86400)]
+    [int]$TimeoutSeconds = 0
 )
 
 $ErrorActionPreference = "Stop"
@@ -72,15 +75,18 @@ New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
 $stdoutLog = Join-Path $logRoot "$LogName-$stamp.stdout.log"
 $stderrLog = Join-Path $logRoot "$LogName-$stamp.stderr.log"
+$pidFile = Join-Path $logRoot "$LogName-$stamp.job.pid"
 $watch = [System.Diagnostics.Stopwatch]::StartNew()
 
 $job = Start-Job -ArgumentList @(
     $workingPath,
     $CommandLine,
     $stdoutLog,
-    $stderrLog
+    $stderrLog,
+    $pidFile
 ) -ScriptBlock {
-    param($CommandWorkingPath, $CommandText, $StdoutPath, $StderrPath)
+    param($CommandWorkingPath, $CommandText, $StdoutPath, $StderrPath, $PidPath)
+    [System.IO.File]::WriteAllText($PidPath, [string]$PID, [System.Text.Encoding]::ASCII)
     Set-Location -LiteralPath $CommandWorkingPath
     $redirectedCommand = "chcp 65001>nul & $CommandText 1>`"$StdoutPath`" 2>`"$StderrPath`""
     & $env:ComSpec /d /s /c $redirectedCommand
@@ -92,25 +98,47 @@ $job = Start-Job -ArgumentList @(
 try {
     $heartbeatInterval = $HeartbeatSeconds
     $heartbeatCount = 0
+    $timedOut = $false
     while ($job.State -in @("NotStarted", "Running")) {
-        Wait-Job -Job $job -Timeout $heartbeatInterval | Out-Null
+        $waitSeconds = $heartbeatInterval
+        if ($TimeoutSeconds -gt 0) {
+            $remaining = $TimeoutSeconds - $watch.Elapsed.TotalSeconds
+            if ($remaining -le 0) {
+                $timedOut = $true
+                break
+            }
+            $waitSeconds = [Math]::Max(1, [Math]::Min($waitSeconds, [Math]::Ceiling($remaining)))
+        }
+        Wait-Job -Job $job -Timeout $waitSeconds | Out-Null
         if ($job.State -in @("NotStarted", "Running")) {
             if ($heartbeatCount -lt 10) {
                 Write-Output "AI_COMMAND_PROGRESS=running name=$LogName elapsed_seconds=$([Math]::Round($watch.Elapsed.TotalSeconds, 1))"
                 $heartbeatCount++
             }
-            $heartbeatInterval = [Math]::Min(300, $heartbeatInterval * 2)
+            $heartbeatInterval = [Math]::Min(60, $heartbeatInterval * 2)
         }
     }
-    $jobResult = @(Receive-Job -Job $job)
-    $resultRecord = $jobResult |
-        Where-Object { $_.PSObject.Properties.Name -contains "ExitCode" } |
-        Select-Object -Last 1
-    $exitCode = if ($resultRecord) { [int]$resultRecord.ExitCode } else { 1 }
-    if ($job.State -eq "Failed") { $exitCode = 1 }
+    if ($timedOut) {
+        $jobPid = if (Test-Path -LiteralPath $pidFile) {
+            [int](Get-Content -LiteralPath $pidFile -Raw)
+        } else { 0 }
+        if ($jobPid -gt 0) {
+            & taskkill.exe /PID $jobPid /T /F 2>$null | Out-Null
+        }
+        Stop-Job -Job $job -ErrorAction SilentlyContinue
+        $exitCode = 124
+    } else {
+        $jobResult = @(Receive-Job -Job $job)
+        $resultRecord = $jobResult |
+            Where-Object { $_.PSObject.Properties.Name -contains "ExitCode" } |
+            Select-Object -Last 1
+        $exitCode = if ($resultRecord) { [int]$resultRecord.ExitCode } else { 1 }
+        if ($job.State -eq "Failed") { $exitCode = 1 }
+    }
 } finally {
     $watch.Stop()
     Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue
 }
 
 $logPaths = @($stdoutLog, $stderrLog)
@@ -121,6 +149,7 @@ $warningCount = Get-MatchCount -Paths $logPaths -Pattern '(?i)\bwarning(?:s)?\b|
 Write-Output "AI_COMMAND_STATUS=$(if ($exitCode -eq 0) { 'passed' } else { 'failed' })"
 Write-Output "AI_COMMAND_NAME=$LogName"
 Write-Output "AI_COMMAND_EXIT_CODE=$exitCode"
+Write-Output "AI_COMMAND_TIMED_OUT=$($timedOut.ToString().ToLowerInvariant())"
 Write-Output "AI_COMMAND_DURATION_SECONDS=$([Math]::Round($watch.Elapsed.TotalSeconds, 1))"
 Write-Output "AI_COMMAND_OUTPUT_LINES=$($stdoutLines + $stderrLines)"
 Write-Output "AI_COMMAND_WARNING_LINES=$warningCount"

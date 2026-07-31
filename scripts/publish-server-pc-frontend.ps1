@@ -30,10 +30,16 @@ function Publish-StaticDist {
 
     Write-Host "3.5⃣  上传 $Label 到服务器 $RemoteDir ..." -ForegroundColor Yellow
     $stagingDist = "$RemoteDir-staging-$Sha"
-    ssh @SshOpts $Server "mkdir -p '$stagingDist'" 2>&1 | Out-Null
-    scp @SshOpts -r "$LocalDir/." "${Server}:${stagingDist}"
-    if ($LASTEXITCODE -ne 0) {
-        ssh @SshOpts $Server "rm -rf '$stagingDist'" 2>&1 | Out-Null
+    $networkOptions = @('-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-o', 'ServerAliveInterval=5', '-o', 'ServerAliveCountMax=1')
+    $prepare = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label "$Label prepare" `
+        -ArgumentList (@($SshOpts) + @('-n') + $networkOptions + @($Server, "mkdir -p '$stagingDist'"))
+    Assert-ElonNativeCommand -Result $prepare -FailureMessage "$Label staging directory creation failed."
+
+    $upload = Invoke-ElonNativeCommand -FilePath 'scp.exe' -TimeoutSeconds 300 -Label "$Label upload" `
+        -ArgumentList (@($SshOpts) + $networkOptions + @('-r', "$LocalDir/.", "${Server}:${stagingDist}"))
+    if ($upload.ExitCode -ne 0) {
+        Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label "$Label cleanup" `
+            -ArgumentList (@($SshOpts) + @('-n') + $networkOptions + @($Server, "rm -rf '$stagingDist'")) | Out-Null
         Write-Host "   ⚠️  $Label 上传失败（不中止后端部署）" -ForegroundColor Yellow
         if ($Required) { throw "$Label 上传失败，发布批次失败关闭" }
         return $false
@@ -56,16 +62,93 @@ function Publish-StaticDist {
         "elif find '$RemoteDir/.atomic-static-retention' -mtime +14 -print -quit | grep -q .; then " +
         "find '$RemoteDir/assets' -type f -mtime +14 -delete; touch '$RemoteDir/.atomic-static-retention'; fi; " +
         "rm -rf '$stagingDist'"
-    ssh @SshOpts $Server $swapScript 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) {
+    $swap = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 90 -Label "$Label atomic swap" `
+        -ArgumentList (@($SshOpts) + @('-n') + $networkOptions + @($Server, $swapScript))
+    if ($swap.ExitCode -eq 0) {
         Write-Host "   ✅ $Label 原子入口发布完成（旧 hash 保留宽限期）→ $RemoteDir" -ForegroundColor Green
         return $true
     }
 
-    ssh @SshOpts $Server "rm -rf '$stagingDist'" 2>&1 | Out-Null
+    Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label "$Label cleanup" `
+        -ArgumentList (@($SshOpts) + @('-n') + $networkOptions + @($Server, "rm -rf '$stagingDist'")) | Out-Null
     Write-Host "   ⚠️  $Label 目录替换失败（staging 已清理）" -ForegroundColor Yellow
     if ($Required) { throw "$Label 目录替换失败，发布批次失败关闭" }
     return $false
+}
+
+function Export-PcLegacyDist {
+    param(
+        [string]$Commit,
+        [string]$OutDir
+    )
+    if (Test-Path $OutDir) {
+        Remove-Item -LiteralPath $OutDir -Recurse -Force
+    }
+    $assetsDir = Join-Path $OutDir "assets"
+    New-Item -ItemType Directory -Force -Path $assetsDir | Out-Null
+
+    $assetPaths = & git -C $RepoRoot ls-tree -r --name-only $Commit -- "server/src/assets"
+    if ($LASTEXITCODE -ne 0) { throw "无法读取旧版 PC 资源列表: $Commit" }
+    foreach ($assetPath in $assetPaths) {
+        $name = Split-Path $assetPath -Leaf
+        if ($name -eq "pc_app.html") { continue }
+        if (($name -like "pc_*") -or ($name -eq "voice_tts_sdk.js")) {
+            Write-GitTextFile -Commit $Commit -GitPath $assetPath -Destination (Join-Path $assetsDir $name)
+        }
+    }
+
+    $savedEnc = [Console]::OutputEncoding
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+    $htmlLines = & git -C $RepoRoot show "${Commit}:server/src/assets/pc_app.html"
+    [Console]::OutputEncoding = $savedEnc
+    if ($LASTEXITCODE -ne 0) { throw "无法导出旧版 PC HTML: $Commit" }
+    $html = [string]::Join("`n", [string[]]$htmlLines)
+    $brandPath = Join-Path $RepoRoot "server/src/assets/ic_app_brand.b64"
+    $brandB64 = if (Test-Path $brandPath) { (Get-Content -LiteralPath $brandPath -Raw).Trim() } else { "" }
+    $html = $html.Replace("__BRAND_PNG_B64__", $brandB64)
+    $html = $html.Replace('"/assets/', '"/pc-legacy/assets/')
+    $html = $html.Replace("'/assets/", "'/pc-legacy/assets/")
+    $openNewLink = '<a class="text-button pc-legacy-new-link" id="pcLegacyOpenNewBtn" href="/pc" title="打开新版 PC 工作台" aria-label="打开新版 PC 工作台" style="display:inline-flex;align-items:center;">打开新版</a>'
+    if ($html -match 'id="openLegacyWebBtn"') {
+        $html = $html -replace '(id="openLegacyWebBtn"[^>]*>[^<]*</button>)', "`$1`n          $openNewLink"
+    } elseif ($html -match '<div class="topbar-actions">') {
+        $html = $html -replace '(<div class="topbar-actions">)', "`$1`n          $openNewLink"
+    } else {
+        Write-Host "   ℹ️  旧版 PC HTML 未找到 openLegacyWebBtn，跳过注入打开新版入口"
+    }
+    $legacySwitchScriptTag = '    <script src="/pc-legacy/assets/pc_legacy_switch.js"></script>'
+    if (-not $html.Contains("</body>")) {
+        throw "旧版 PC HTML 中未找到 </body>，无法注入新版切换脚本"
+    }
+    $html = $html.Replace("</body>", "$legacySwitchScriptTag`n  </body>")
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    $legacySwitchJs = @'
+(function () {
+  function legacyToken() {
+    return localStorage.getItem('lodex_token') || localStorage.getItem('elon_token') || '';
+  }
+
+  function bridgeToken() {
+    var token = legacyToken();
+    if (!token) return;
+    try {
+      localStorage.setItem('elon_auth', JSON.stringify({
+        state: { token: token, user: null },
+        version: 0
+      }));
+    } catch (_) {
+      // Keep normal navigation even when localStorage is unavailable.
+    }
+  }
+
+  var btn = document.getElementById('pcLegacyOpenNewBtn');
+  if (btn) btn.addEventListener('click', bridgeToken);
+})();
+'@
+    [System.IO.File]::WriteAllText((Join-Path $OutDir "index.html"), $html, $utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $assetsDir "pc_legacy_switch.js"), $legacySwitchJs, $utf8NoBom)
+    return $OutDir
 }
 
 function Write-GitTextFile {

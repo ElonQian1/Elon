@@ -24,6 +24,8 @@
     但 binary 是旧的，binary 内嵌的版本可能与本次 assignedVersionName 不符。
 .PARAMETER SkipUpload
     只做本地编译，不上传不重启（用于本地验证 binary）。会调用 finish(success=false) 释放槽位。
+.PARAMETER SkipPcFrontend
+    跳过 PC 前端构建与静态资源上传。APP UI 快速通道只需要发布后端运行时能力时使用。
 .PARAMETER Force
     强制重新部署，跳过 SHA 顺序检查 + CAS（仅在确认要覆盖线上更新版本时使用）。
 .PARAMETER SkipVersionBump
@@ -68,6 +70,7 @@
 param(
     [switch]$SkipBuild,
     [switch]$SkipUpload,
+    [switch]$SkipPcFrontend,
     [switch]$Force,
     [switch]$SkipVersionBump
 )
@@ -78,6 +81,8 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'node-storage-paths.ps1')
 
 . (Join-Path $PSScriptRoot "direct-network.ps1")
+$nativeCommandHelper = Join-Path $PSScriptRoot 'native-command-timeout.ps1'
+. $nativeCommandHelper
 . (Join-Path $PSScriptRoot "publish-server-pc-frontend.ps1")
 . (Join-Path $PSScriptRoot "publish-health-checks.ps1")
 
@@ -91,6 +96,7 @@ $Server      = "root@43.139.149.158"
 $RemoteDir   = "/root/Elon"
 $RemoteBin   = "$RemoteDir/server/target/release/elon-server"
 $SshOpts     = @("-o", "ProxyCommand=none", "-o", "ProxyJump=none")  # 绕过本地 VPN/跳板代理
+$SshNetworkOpts = @('-o', 'BatchMode=yes', '-o', 'ConnectTimeout=10', '-o', 'ServerAliveInterval=5', '-o', 'ServerAliveCountMax=1')
 
 # ─────────────────────────────────────────────────────────────
 # 路径推导（基于 git 仓库根，兼容任意 PC、任意路径）
@@ -695,90 +701,10 @@ $RemoteDataDir = "/opt/elon/data"
 $RemotePcDist  = "$RemoteDataDir/pc-next-dist"
 $RemotePcLegacyDist = "$RemoteDataDir/pc-legacy-dist"
 
-function Export-PcLegacyDist {
-    param(
-        [string]$Commit,
-        [string]$OutDir
-    )
-    if (Test-Path $OutDir) {
-        Remove-Item -LiteralPath $OutDir -Recurse -Force
-    }
-    $assetsDir = Join-Path $OutDir "assets"
-    New-Item -ItemType Directory -Force -Path $assetsDir | Out-Null
-
-    $assetPaths = & git -C $RepoRoot ls-tree -r --name-only $Commit -- "server/src/assets"
-    if ($LASTEXITCODE -ne 0) {
-        throw "无法读取旧版 PC 资源列表: $Commit"
-    }
-    foreach ($assetPath in $assetPaths) {
-        $name = Split-Path $assetPath -Leaf
-        if ($name -eq "pc_app.html") { continue }
-        if (($name -like "pc_*") -or ($name -eq "voice_tts_sdk.js")) {
-            Write-GitTextFile -Commit $Commit -GitPath $assetPath -Destination (Join-Path $assetsDir $name)
-        }
-    }
-
-    $savedEnc = [Console]::OutputEncoding
-    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-    $htmlLines = & git -C $RepoRoot show "${Commit}:server/src/assets/pc_app.html"
-    [Console]::OutputEncoding = $savedEnc
-    if ($LASTEXITCODE -ne 0) {
-        throw "无法导出旧版 PC HTML: $Commit"
-    }
-    $html = [string]::Join("`n", [string[]]$htmlLines)
-    $brandPath = Join-Path $RepoRoot "server/src/assets/ic_app_brand.b64"
-    $brandB64 = if (Test-Path $brandPath) { (Get-Content -LiteralPath $brandPath -Raw).Trim() } else { "" }
-    $html = $html.Replace("__BRAND_PNG_B64__", $brandB64)
-    $html = $html.Replace('"/assets/', '"/pc-legacy/assets/')
-    $html = $html.Replace("'/assets/", "'/pc-legacy/assets/")
-    $openNewLink = '<a class="text-button pc-legacy-new-link" id="pcLegacyOpenNewBtn" href="/pc" title="打开新版 PC 工作台" aria-label="打开新版 PC 工作台" style="display:inline-flex;align-items:center;">打开新版</a>'
-    # 按 ID 查找 topbar-actions 里的第一个 text-button，在其后注入「打开新版」链接
-    # 使用正则替换（比完整文本匹配更健壮，不受编码乱码影响）
-    if ($html -match 'id="openLegacyWebBtn"') {
-        $html = $html -replace '(id="openLegacyWebBtn"[^>]*>[^<]*</button>)', "`$1`n          $openNewLink"
-    } elseif ($html -match '<div class="topbar-actions">') {
-        # fallback：直接在 topbar-actions 开头注入
-        $html = $html -replace '(<div class="topbar-actions">)', "`$1`n          $openNewLink"
-    } else {
-        Write-Host "   ℹ️  旧版 PC HTML 未找到 openLegacyWebBtn，跳过注入打开新版入口"
-    }
-    $legacySwitchScriptTag = '    <script src="/pc-legacy/assets/pc_legacy_switch.js"></script>'
-    if (-not $html.Contains("</body>")) {
-        throw "旧版 PC HTML 中未找到 </body>，无法注入新版切换脚本"
-    }
-    $html = $html.Replace("</body>", "$legacySwitchScriptTag`n  </body>")
-
-    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-    $legacySwitchJs = @'
-(function () {
-  function legacyToken() {
-    return localStorage.getItem('lodex_token') || localStorage.getItem('elon_token') || '';
-  }
-
-  function bridgeToken() {
-    var token = legacyToken();
-    if (!token) return;
-    try {
-      localStorage.setItem('elon_auth', JSON.stringify({
-        state: { token: token, user: null },
-        version: 0
-      }));
-    } catch (_) {
-      // Keep normal navigation even when localStorage is unavailable.
-    }
-  }
-
-  var btn = document.getElementById('pcLegacyOpenNewBtn');
-  if (btn) btn.addEventListener('click', bridgeToken);
-})();
-'@
-    [System.IO.File]::WriteAllText((Join-Path $OutDir "index.html"), $html, $utf8NoBom)
-    [System.IO.File]::WriteAllText((Join-Path $assetsDir "pc_legacy_switch.js"), $legacySwitchJs, $utf8NoBom)
-
-    return $OutDir
-}
-
-if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
+if ($SkipPcFrontend) {
+    Write-Host "3.5⃣  ⏩ 跳过 PC 前端构建与上传（-SkipPcFrontend）" -ForegroundColor Cyan
+    Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'pc_frontend' -Status 'skipped'
+} elseif (Test-Path (Join-Path $PcFrontendDir "package.json")) {
     Set-ElonReleasePhase -Context $script:ReleaseContext -Phase 'pc_frontend' -Status 'running'
     if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
         Write-Host "3.5⃣  ⚠️  npm 不在 PATH，跳过前端构建（/pc 将使用现有 dist 或返回 404）" -ForegroundColor Yellow
@@ -836,12 +762,14 @@ if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
 } else {
     throw 'pc-frontend/ 不存在，统一发布批次失败关闭'
 }
+if (-not $SkipPcFrontend) {
 try {
     Write-Host "3.5⃣  生成旧版 PC 对照快照（$($PcLegacyBaseCommit.Substring(0, 8))）..." -ForegroundColor Yellow
     $PcLegacyDistDir = Export-PcLegacyDist -Commit $PcLegacyBaseCommit -OutDir $PcLegacyDistDir
     Publish-StaticDist -LocalDir $PcLegacyDistDir -RemoteDir $RemotePcLegacyDist -Label "旧版 PC 对照快照"
 } catch {
     Write-Host "   ⚠️  旧版 PC 对照快照生成失败（不中止后端部署）: $_" -ForegroundColor Yellow
+}
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -850,11 +778,12 @@ try {
 Write-Host "4⃣  上传 binary 到服务器..." -ForegroundColor Yellow
 # 每次部署 staging 路径唯一（含 SHA），两个开发者同时部署不会互相覆盖 binary
 $stagingPath = "/tmp/elon-server-$Sha"
-scp @SshOpts $Binary "${Server}:${stagingPath}"
-if ($LASTEXITCODE -ne 0) {
+$binaryUpload = Invoke-ElonNativeCommand -FilePath 'scp.exe' -TimeoutSeconds 300 -Label 'server binary upload' `
+    -ArgumentList (@($SshOpts) + $SshNetworkOpts + @($Binary, "${Server}:${stagingPath}"))
+if ($binaryUpload.ExitCode -ne 0) {
     Remove-Worktree
     Complete-Release -Success $false -ErrorMessage "scp upload failed"
-    Write-Error "❌ SCP 上传失败"
+    Assert-ElonNativeCommand -Result $binaryUpload -FailureMessage 'SCP 上传失败.'
 }
 Write-Host "   ✅ 上传完成" -ForegroundColor Green
 
@@ -863,7 +792,10 @@ Write-Host "   ✅ 上传完成" -ForegroundColor Green
 # ─────────────────────────────────────────────────────────────
 if (-not $Force) {
     $deployedShaFile = "$RemoteDir/.deployed-sha"
-    $serverSha = (ssh @SshOpts $Server "cat $deployedShaFile 2>/dev/null || echo ''").Trim()
+    $readServerSha = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label 'read deployed server SHA' `
+        -ArgumentList (@($SshOpts) + @('-n') + $SshNetworkOpts + @($Server, "cat $deployedShaFile 2>/dev/null || echo ''"))
+    Assert-ElonNativeCommand -Result $readServerSha -FailureMessage '读取服务器部署 SHA 失败.'
+    $serverSha = $readServerSha.Stdout.Trim()
     if ($serverSha -and $serverSha -ne $ShaBig) {
         # 长构建期间 origin/main 可能已经前进；先刷新远端引用，再做祖先判断。
         $oldErrorActionPreference = $ErrorActionPreference
@@ -886,7 +818,8 @@ if (-not $Force) {
         }
         if ($mergeBaseExitCode -ne 0) {
             # 服务器 SHA 不是我们的祖先 → 服务器已有更新版本，拒绝回退
-            ssh @SshOpts $Server "rm -f $stagingPath" 2>$null
+            Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label 'remove stale server staging' `
+                -ArgumentList (@($SshOpts) + @('-n') + $SshNetworkOpts + @($Server, "rm -f $stagingPath")) | Out-Null
             Remove-Worktree
             Complete-Release -Success $false -ErrorMessage "superseded by server sha $serverSha"
             $shortServer = $serverSha.Substring(0, [Math]::Min(8, $serverSha.Length))
@@ -960,8 +893,11 @@ $lockScript = $lockScriptTemplate.
 # （否则远端 bash 看到 "set -e\r" → "set: - : invalid option"）
 $lockScriptLF = $lockScript -replace "`r`n", "`n"
 $lockB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($lockScriptLF))
-$lockResult = ssh @SshOpts $Server "flock -x -w 120 /tmp/elon-deploy.lock bash -c 'echo $lockB64 | base64 -d | bash'" 2>&1
-$lockExit = $LASTEXITCODE
+$lockCommand = "flock -x -w 120 /tmp/elon-deploy.lock bash -c 'echo $lockB64 | base64 -d | bash'"
+$lockExecution = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 150 -Label 'atomic server deploy' `
+    -ArgumentList (@($SshOpts) + @('-n') + $SshNetworkOpts + @($Server, $lockCommand))
+$lockResult = @($lockExecution.Stdout, $lockExecution.Stderr) -join "`n"
+$lockExit = $lockExecution.ExitCode
 if ($lockExit -eq 42) {
     Remove-Worktree
     Complete-Release -Success $false -ErrorMessage "cas conflict inside flock: $lockResult"
