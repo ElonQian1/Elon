@@ -1279,33 +1279,40 @@
         <FrameLayout
             android:id="@+id/pageTabs"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/main_bottom_menu_outer_height"
+            android:layout_height="@dimen/main_bottom_menu_container_height"
             android:layout_gravity="bottom"
-            android:background="@color/elon_bg_app"
+            android:background="@android:color/transparent"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:paddingTop="8dp"
-            android:paddingBottom="@dimen/main_bottom_menu_edge_gap"
             android:visibility="gone">
+
+            <View
+                android:id="@+id/bottomMenuBase"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/main_bottom_menu_outer_height"
+                android:layout_gravity="bottom"
+                android:background="@color/elon_bg_app"
+                android:importantForAccessibility="no" />
 
             <View
                 android:id="@+id/bottomMenuFade"
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/main_bottom_menu_fade_height"
                 android:layout_gravity="top"
-                android:layout_marginTop="-24dp"
                 android:background="@drawable/bg_bottom_nav_fade"
                 android:importantForAccessibility="no" />
 
             <LinearLayout
                 android:id="@+id/bottomNavContent"
                 android:layout_width="@dimen/main_bottom_menu_content_width"
-                android:layout_height="match_parent"
-                android:layout_gravity="center_horizontal"
+                android:layout_height="@dimen/main_bottom_menu_outer_height"
+                android:layout_gravity="bottom|center_horizontal"
                 android:clipChildren="false"
                 android:clipToPadding="false"
                 android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:paddingTop="8dp"
+                android:paddingBottom="@dimen/main_bottom_menu_edge_gap">
 
                 <FrameLayout
                     android:id="@+id/bottomNavPrimaryPanel"

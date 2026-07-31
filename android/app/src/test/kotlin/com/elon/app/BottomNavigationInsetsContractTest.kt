@@ -13,21 +13,28 @@ class BottomNavigationInsetsContractTest {
         val dimens = readRepositoryFile("android/app/src/main/res/values/dimens.xml")
         val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
         val fade = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_fade.xml")
-        assertTrue(dimens.contains("name=\"main_bottom_menu_fade_height\">24dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_fade_height\">32dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_container_height\">104dp</dimen>"))
         assertTrue(
             Regex(
-                """android:id="@\+id/pageTabs"[^>]*android:background="@color/elon_bg_app"""",
+                """android:id="@\+id/pageTabs"[^>]*android:layout_height="@dimen/main_bottom_menu_container_height"[^>]*android:background="@android:color/transparent"""",
                 RegexOption.DOT_MATCHES_ALL
             ).containsMatchIn(layout)
         )
         assertTrue(
             Regex(
-                """android:id="@\+id/bottomMenuFade"[^>]*android:layout_height="@dimen/main_bottom_menu_fade_height"[^>]*android:layout_marginTop="-24dp"[^>]*android:background="@drawable/bg_bottom_nav_fade"""",
+                """android:id="@\+id/bottomMenuBase"[^>]*android:layout_height="@dimen/main_bottom_menu_outer_height"[^>]*android:layout_gravity="bottom"[^>]*android:background="@color/elon_bg_app"""",
+                RegexOption.DOT_MATCHES_ALL
+            ).containsMatchIn(layout)
+        )
+        assertTrue(
+            Regex(
+                """android:id="@\+id/bottomMenuFade"[^>]*android:layout_height="@dimen/main_bottom_menu_fade_height"[^>]*android:layout_gravity="top"[^>]*android:background="@drawable/bg_bottom_nav_fade"""",
                 RegexOption.DOT_MATCHES_ALL
             ).containsMatchIn(layout)
         )
         assertTrue(fade.contains("android:startColor=\"@android:color/transparent\""))
-        assertTrue(fade.contains("android:centerColor=\"#99000000\""))
+        assertTrue(fade.contains("android:centerColor=\"#B3000000\""))
         assertTrue(fade.contains("android:endColor=\"@color/elon_bg_app\""))
 
         val web = readRepositoryFile("server/src/assets/web_page.html")
@@ -39,7 +46,7 @@ class BottomNavigationInsetsContractTest {
         )
         assertTrue(
             Regex(
-                """\.tabs-bar::before\s*\{[^}]*top:\s*-24px;[^}]*height:\s*24px;[^}]*background:\s*linear-gradient\([^}]*var\(--bg\)\s+100%""",
+                """\.tabs-bar::before\s*\{[^}]*top:\s*-32px;[^}]*height:\s*32px;[^}]*background:\s*linear-gradient\([^}]*rgb\(0 0 0 / 70%\)\s+50%[^}]*var\(--bg\)\s+100%""",
                 RegexOption.DOT_MATCHES_ALL
             ).containsMatchIn(web)
         )
@@ -56,7 +63,8 @@ class BottomNavigationInsetsContractTest {
         val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
         val content = linearLayoutBlock(layout, "bottomNavContent")
         assertTrue(content.contains("android:layout_width=\"@dimen/main_bottom_menu_content_width\""))
-        assertTrue(content.contains("android:layout_gravity=\"center_horizontal\""))
+        assertTrue(content.contains("android:layout_gravity=\"bottom|center_horizontal\""))
+        assertTrue(content.contains("android:layout_height=\"@dimen/main_bottom_menu_outer_height\""))
         assertTrue(!content.contains("android:layout_width=\"match_parent\""))
         listOf(
             "tabChatSelection",
