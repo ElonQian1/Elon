@@ -118,7 +118,6 @@
 
 .integrationList article code {
   display: block;
-  margin-top: 3px;
 }
 
 .integrationList article p,
@@ -149,7 +148,6 @@
 .integrationList article footer {
   display: flex;
   gap: 7px;
-  margin-top: 3px;
 }
 
 .integrationList article button {
@@ -261,7 +259,6 @@
 }
 
 .merchantList span {
-  margin-top: 3px;
   color: var(--text-muted);
   font-size: 10px;
 }
@@ -362,7 +359,7 @@
 }
 
 .editorHeader h2 {
-  margin: 3px 0;
+  margin: 0;
   font-size: 18px;
 }
 
@@ -421,7 +418,6 @@
 
 .capabilityRow code,
 .capabilityRow small {
-  margin-top: 2px;
   color: var(--text-muted);
   font-size: 10px;
 }
@@ -461,7 +457,6 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
-  margin-top: 2px;
 }
 
 .grants > div {
@@ -538,16 +533,12 @@
 }
 
 .audit small {
-  margin-top: 2px;
   color: var(--text-muted);
   font-size: 9px;
 }
 
 .empty {
   color: var(--text-muted);
-}
-
-.empty {
   padding: 12px 14px;
 }
 
