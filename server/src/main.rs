@@ -52,6 +52,8 @@ mod conversation_forks;
 mod conversation_router;
 mod erp_blueprint;
 mod erp_blueprint_api;
+#[cfg(test)]
+mod erp_blueprint_hardening_tests;
 mod erp_blueprint_mcp;
 mod erp_blueprint_mcp_tools;
 mod erp_blueprint_migration;

@@ -128,11 +128,17 @@ impl Store {
         let mut stmt = conn.prepare(&format!(
             "{VERSION_SELECT} WHERE blueprint_id=?1 ORDER BY created_at DESC"
         ))?;
-        let result = stmt
+        let mut result = stmt
             .query_map(params![blueprint_id.trim()], version_from_row)?
             .collect::<rusqlite::Result<Vec<_>>>()
-            .map_err(Into::into);
-        result
+            .map_err(anyhow::Error::from)?;
+        result.sort_by(|left, right| {
+            super::super::erp_blueprint::validation::version_cmp(
+                &right.manifest.version,
+                &left.manifest.version,
+            )
+        });
+        Ok(result)
     }
 
     #[allow(clippy::too_many_arguments)]

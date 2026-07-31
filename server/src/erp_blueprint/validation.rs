@@ -1,6 +1,6 @@
 use anyhow::{bail, Result};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::model::{
     CreateBlueprintRequest, ErpBlueprintDefinition, ErpCapabilityDefinition, ErpExtensionRef,
@@ -10,7 +10,7 @@ use super::model::{
 
 pub(crate) fn build_definition(
     project_id: &str,
-    request: CreateBlueprintRequest,
+    mut request: CreateBlueprintRequest,
 ) -> Result<ErpBlueprintDefinition> {
     let blueprint_key = normalize_key(&request.blueprint_key, "blueprint_key")?;
     let name = required_text(&request.name, "蓝图名称", 120)?;
@@ -20,10 +20,33 @@ pub(crate) fn build_definition(
     if request.modules.is_empty() || request.themes.is_empty() {
         bail!("蓝图至少需要一个模块和一个主题");
     }
+    for module in &mut request.modules {
+        module.module_key = normalize_key(&module.module_key, "module_key")?;
+        module.kind = module.kind.trim().to_ascii_lowercase();
+        module.version = module.version.trim().to_string();
+        module.dependencies =
+            normalize_key_list(std::mem::take(&mut module.dependencies), "模块依赖")?;
+        validate_version(&module.version)?;
+        if !matches!(module.kind.as_str(), "core" | "industry" | "integration") {
+            bail!("模块 kind 只能是 core、industry 或 integration");
+        }
+    }
     unique_keys(
         request.modules.iter().map(|item| item.module_key.as_str()),
         "模块",
     )?;
+    for capability in &mut request.capabilities {
+        capability.capability_key = normalize_key(&capability.capability_key, "capability_key")?;
+        capability.category = normalize_key(&capability.category, "category")?;
+        capability.module_key = normalize_key(&capability.module_key, "module_key")?;
+        capability.display_name = required_text(&capability.display_name, "能力名称", 120)?;
+        capability.description = capability.description.trim().chars().take(500).collect();
+        capability.aliases = normalize_aliases(std::mem::take(&mut capability.aliases))?;
+        capability.composable_with = normalize_key_list(
+            std::mem::take(&mut capability.composable_with),
+            "可组合能力",
+        )?;
+    }
     unique_keys(
         request
             .capabilities
@@ -31,13 +54,6 @@ pub(crate) fn build_definition(
             .map(|item| item.capability_key.as_str()),
         "能力",
     )?;
-    for module in &request.modules {
-        normalize_key(&module.module_key, "module_key")?;
-        validate_version(&module.version)?;
-        if !matches!(module.kind.as_str(), "core" | "industry" | "integration") {
-            bail!("模块 kind 只能是 core、industry 或 integration");
-        }
-    }
     let module_keys: BTreeSet<_> = request
         .modules
         .iter()
@@ -54,6 +70,7 @@ pub(crate) fn build_definition(
             }
         }
     }
+    validate_module_dependency_graph(&request.modules)?;
     let capability_keys: BTreeSet<_> = request
         .capabilities
         .iter()
@@ -119,19 +136,57 @@ pub(crate) fn validate_release(
         "发布模块",
     )?;
     for module in &manifest.modules {
-        normalize_key(&module.module_key, "module_key")?;
+        require_normalized_key(&module.module_key, "module_key")?;
         validate_version(&module.version)?;
     }
+    let definition_modules: BTreeMap<_, _> = definition
+        .modules
+        .iter()
+        .map(|module| (module.module_key.as_str(), module))
+        .collect();
+    let release_modules: BTreeSet<_> = manifest
+        .modules
+        .iter()
+        .map(|module| module.module_key.as_str())
+        .collect();
+    for module in &manifest.modules {
+        if !definition_modules.contains_key(module.module_key.as_str()) {
+            bail!("发布模块 {} 尚未登记到蓝图定义", module.module_key);
+        }
+    }
+    for module in definition.modules.iter().filter(|module| module.required) {
+        if !release_modules.contains(module.module_key.as_str()) {
+            bail!("发布清单缺少蓝图必需模块 {}", module.module_key);
+        }
+    }
     unique_keys(manifest.capabilities.iter().map(String::as_str), "发布能力")?;
+    let definition_capabilities: BTreeMap<_, _> = definition
+        .capabilities
+        .iter()
+        .map(|capability| (capability.capability_key.as_str(), capability))
+        .collect();
     for capability in &manifest.capabilities {
-        normalize_key(capability, "capability_key")?;
+        require_normalized_key(capability, "capability_key")?;
+        let definition_capability = definition_capabilities
+            .get(capability.as_str())
+            .ok_or_else(|| anyhow::anyhow!("发布能力 {capability} 尚未登记到蓝图定义"))?;
+        if !release_modules.contains(definition_capability.module_key.as_str()) {
+            bail!(
+                "发布能力 {} 所属模块 {} 未包含在发布清单中",
+                capability,
+                definition_capability.module_key
+            );
+        }
     }
     unique_keys(
         manifest.extension_points.iter().map(String::as_str),
         "发布扩展点",
     )?;
     for extension_point in &manifest.extension_points {
-        normalize_key(extension_point, "extension_point")?;
+        require_normalized_key(extension_point, "extension_point")?;
+        if !definition.extension_points.contains(extension_point) {
+            bail!("发布扩展点 {extension_point} 尚未登记到蓝图定义");
+        }
     }
     validate_version(&manifest.compatibility.minimum_instance_version)?;
     unique_keys(
@@ -143,7 +198,7 @@ pub(crate) fn validate_release(
         "必需插件",
     )?;
     for plugin in &manifest.compatibility.required_plugins {
-        normalize_key(plugin, "required_plugin")?;
+        require_normalized_key(plugin, "required_plugin")?;
     }
     unique_keys(
         manifest
@@ -153,10 +208,13 @@ pub(crate) fn validate_release(
         "迁移",
     )?;
     for migration in &manifest.migrations {
-        normalize_key(&migration.migration_key, "migration_key")?;
+        require_normalized_key(&migration.migration_key, "migration_key")?;
     }
     if manifest.rollback.instructions.trim().is_empty() {
         bail!("发布清单必须提供回滚说明");
+    }
+    if manifest.rollback.supported && manifest.migrations.iter().any(|step| !step.reversible) {
+        bail!("发布清单声明支持回滚时，所有迁移步骤都必须可逆");
     }
     Ok(())
 }
@@ -171,13 +229,14 @@ pub(crate) fn validate_extensions(
         "扩展",
     )?;
     for value in values {
-        normalize_key(&value.extension_key, "extension_key")?;
+        require_normalized_key(&value.extension_key, "extension_key")?;
         validate_version(&value.version)?;
+        require_normalized_key(&value.extension_point, "extension_point")?;
         if !extension_points.contains(value.extension_point.as_str()) {
             bail!("扩展 {} 使用了蓝图未声明的扩展点", value.extension_key);
         }
         for module in &value.requires_modules {
-            normalize_key(module, "requires_module")?;
+            require_normalized_key(module, "requires_module")?;
             if !enabled_modules.contains(module.as_str()) {
                 bail!("扩展 {} 依赖未启用模块 {}", value.extension_key, module);
             }
@@ -235,9 +294,17 @@ pub(crate) fn manifest_hash(manifest: &ErpReleaseManifest) -> Result<String> {
 }
 
 pub(crate) fn validate_version(value: &str) -> Result<()> {
-    let core = value.trim().split(['-', '+']).next().unwrap_or_default();
-    let parts: Vec<_> = core.split('.').collect();
-    if parts.len() != 3 || parts.iter().any(|part| part.parse::<u64>().is_err()) {
+    if value.trim() != value {
+        bail!("版本不能包含首尾空格");
+    }
+    let parts: Vec<_> = value.split('.').collect();
+    if parts.len() != 3
+        || parts.iter().any(|part| {
+            part.is_empty()
+                || part.parse::<u64>().is_err()
+                || (part.len() > 1 && part.starts_with('0'))
+        })
+    {
         bail!("版本必须使用 x.y.z 格式");
     }
     Ok(())
@@ -247,12 +314,12 @@ pub(crate) fn version_is_newer(candidate: &str, base: &str) -> bool {
     version_tuple(candidate) > version_tuple(base)
 }
 
+pub(crate) fn version_cmp(left: &str, right: &str) -> std::cmp::Ordering {
+    version_tuple(left).cmp(&version_tuple(right))
+}
+
 fn version_tuple(value: &str) -> (u64, u64, u64) {
     let mut parts = value
-        .trim()
-        .split(['-', '+'])
-        .next()
-        .unwrap_or_default()
         .split('.')
         .map(|part| part.parse::<u64>().unwrap_or(0));
     (
@@ -266,11 +333,67 @@ fn validate_capability(
     capability: &ErpCapabilityDefinition,
     module_keys: &BTreeSet<&str>,
 ) -> Result<()> {
-    normalize_key(&capability.capability_key, "capability_key")?;
+    require_normalized_key(&capability.capability_key, "capability_key")?;
     required_text(&capability.display_name, "能力名称", 120)?;
     if !module_keys.contains(capability.module_key.as_str()) {
         bail!("能力 {} 引用了不存在的模块", capability.capability_key);
     }
+    Ok(())
+}
+
+fn require_normalized_key(value: &str, field: &str) -> Result<()> {
+    let normalized = normalize_key(value, field)?;
+    if normalized != value {
+        bail!("{field} 必须使用规范化小写标识：{normalized}");
+    }
+    Ok(())
+}
+
+fn normalize_aliases(values: Vec<String>) -> Result<Vec<String>> {
+    let mut out = Vec::new();
+    let mut seen = BTreeSet::new();
+    for value in values {
+        let value = required_text(&value, "能力别名", 80)?;
+        let dedupe_key = value.to_lowercase();
+        if seen.insert(dedupe_key) {
+            out.push(value);
+        }
+    }
+    Ok(out)
+}
+
+fn validate_module_dependency_graph(modules: &[super::model::ErpModuleDefinition]) -> Result<()> {
+    let dependencies: BTreeMap<_, _> = modules
+        .iter()
+        .map(|module| (module.module_key.as_str(), module.dependencies.as_slice()))
+        .collect();
+    let mut visiting = BTreeSet::new();
+    let mut visited = BTreeSet::new();
+    for module in dependencies.keys() {
+        visit_module(module, &dependencies, &mut visiting, &mut visited)?;
+    }
+    Ok(())
+}
+
+fn visit_module<'a>(
+    module: &'a str,
+    dependencies: &BTreeMap<&'a str, &'a [String]>,
+    visiting: &mut BTreeSet<&'a str>,
+    visited: &mut BTreeSet<&'a str>,
+) -> Result<()> {
+    if visited.contains(module) {
+        return Ok(());
+    }
+    if !visiting.insert(module) {
+        bail!("模块依赖形成循环：{module}");
+    }
+    if let Some(children) = dependencies.get(module) {
+        for child in *children {
+            visit_module(child, dependencies, visiting, visited)?;
+        }
+    }
+    visiting.remove(module);
+    visited.insert(module);
     Ok(())
 }
 

@@ -101,8 +101,14 @@ pub(crate) fn create_instance(
 ) -> Result<ErpInstance> {
     let blueprint = owned_blueprint(store, project_id, blueprint_id)?;
     let instance_key = normalize_key(&request.instance_key, "instance_key")?;
+    let project_name = request.project_name.trim();
+    if project_name.is_empty() || project_name.chars().count() > 120 {
+        bail!("商户项目名称不能为空且不能超过 120 个字符");
+    }
+    let industry = normalize_key(&request.industry, "industry")?;
+    let theme_key = normalize_key(&request.theme_key, "theme_key")?;
     let version = store.erp_blueprint_version_by_name(blueprint_id, &request.version)?;
-    if !blueprint.definition.themes.contains(&request.theme_key) {
+    if !blueprint.definition.themes.contains(&theme_key) {
         bail!("主题未在蓝图中声明");
     }
     let manifest_modules: BTreeSet<_> = version
@@ -119,8 +125,16 @@ pub(crate) fn create_instance(
             .map(|module| module.module_key.clone())
             .collect::<Vec<_>>()
     } else {
-        request.enabled_modules
+        request
+            .enabled_modules
+            .into_iter()
+            .map(|module| normalize_key(&module, "enabled_module"))
+            .collect::<Result<Vec<_>>>()?
     };
+    let unique_enabled: BTreeSet<_> = enabled_modules.iter().collect();
+    if unique_enabled.len() != enabled_modules.len() {
+        bail!("实例启用模块不能重复");
+    }
     if enabled_modules
         .iter()
         .any(|module| !manifest_modules.contains(module.as_str()))
@@ -167,17 +181,20 @@ pub(crate) fn create_instance(
     }
     let created = store.create_project(
         actor_user_id,
-        &request.project_name,
+        project_name,
         Some("由一龙官方 ERP 蓝图创建的独立商户项目"),
         Some("android"),
     )?;
+    if created.reused_existing {
+        bail!("同名项目已经存在；为避免误绑定或覆盖，请为商户实例使用新的项目名称");
+    }
     let result = store.create_erp_instance(
         &instance_key,
         &created.project.id,
         blueprint_id,
         &version.id,
-        &request.industry,
-        &request.theme_key,
+        &industry,
+        &theme_key,
         &enabled_modules,
         &request.plugins,
         &request.private_extensions,
