@@ -88,6 +88,21 @@
         "section-3"
       ],
       "compilation_status": "complete"
+    },
+    {
+      "id": "conversation-0dc2c11cc8dd854e",
+      "title": "区块链作为多方可信、授权与结算层的边界",
+      "kind": "conversation",
+      "reference": "docs/inbox/conversations/2026-07-31-blockchain-trust-authorization-settlement-boundary.md",
+      "imported_at": "2026-07-31T12:27:38+08:00",
+      "content_revision": "0dc2c11cc8dd854ea86400caa85eec8c35fd134f90952fce722562ff52abc0e9",
+      "source_format": "text",
+      "message_count": 0,
+      "chunk_count": 1,
+      "processed_chunk_ids": [
+        "chunk-0001-10e527d889"
+      ],
+      "compilation_status": "complete"
     }
   ],
   "nodes": [
@@ -1933,21 +1948,25 @@
       "root_id": "open-commerce-network",
       "parent_id": "sui-agent-economy-layer",
       "kind": "requirement",
-      "title": "Sui 不承载模型计算与原始大数据",
-      "summary": "模型推理、代码构建、图片视频生成和 GPU 计算继续在云端、PC 或边缘节点执行；链上仅保存所有权、权限、任务状态、支付条件、摘要和争议证据。",
+      "title": "区块链只承担多方可信、授权与结算",
+      "summary": "仅当商户、用户、AI Agent、节点和协议方无法共同信任单一平台时，才把所有权、授权期限、不可抵赖回执与分账放到候选链上层。订单、行为日志、媒体、实时库存、AI 推理、复杂查询和匿名化继续由链外系统完成。",
       "status": "accepted",
       "authority": "accepted",
       "section_id": "project-system",
       "order": 1060,
       "color": "#5f91dc",
       "source_refs": [
-        "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd"
+        "conversation-dcbd31fc4a3d3bd7#chunk-0001-64d395f3dd",
+        "conversation-0dc2c11cc8dd854e#chunk-0001-10e527d889"
       ],
       "conversation_refs": [
-        "codex-thread-current://2026-07-30-sui-ai-agent-network"
+        "codex-thread-current://2026-07-30-sui-ai-agent-network",
+        "https://chatgpt.com/share/6a6c1733-bb48-83ee-be8f-9b0675d32f37#user-provided-excerpt"
       ],
       "document_paths": [
-        "docs/drafts/open-commerce-network-sui-agent-economy.md"
+        "docs/drafts/open-commerce-network-sui-agent-economy.md",
+        "docs/open-commerce/integration-architecture.md",
+        "docs/open-commerce/decision-register.md"
       ],
       "feature_node_ids": [
         "cap-ai-runtime",
@@ -1955,7 +1974,10 @@
       ],
       "tags": [
         "architecture",
-        "boundary"
+        "boundary",
+        "authorization",
+        "settlement",
+        "trust"
       ]
     },
     {
@@ -2748,10 +2770,10 @@
     }
   ],
   "evolution": {
-    "kind": "decision",
-    "summary": "根据跨设备文档测试和用户明确决定，把独立预言家 AI 议案登记为 rejected，并关联权威否决文档，防止旧讨论重新成为当前需求。",
+    "kind": "refine",
+    "summary": "导入用户关于多方信任边界的新来源，并把既有 Sui 边界节点收敛为“区块链只承担可信、授权与结算”；正式架构继续要求订单、日志、媒体、实时数据库、AI 推理、复杂查询和匿名化留在链外。",
     "actor": "Codex Desktop",
-    "changed_at": "2026-07-30T17:15:00+08:00",
-    "previous_revision": "e69c3292109cc7bfd2168e4023838f042ef3c6147d0f959de58f095e004bd12b"
+    "changed_at": "2026-07-31T12:27:38+08:00",
+    "previous_revision": "92630dc5e7883f9a7493fb3e55cb328f3b2a46cb5fc7eead8cd42c825357bc20"
   }
 }

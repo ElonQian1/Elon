@@ -13,6 +13,7 @@
 | 当前调用只计量、不做真实收费 | 先验证行为、权限和审计，再验证经济层 | `docs/decisions/open-commerce-network-v1-architecture.md` |
 | 先建数据接入控制面，再逐个平台实现适配器 | 统一记录来源、范围、健康度和同步证据，不用“已接入”掩盖真实权限差异 | `docs/decisions/open-commerce-integration-control-plane.md` |
 | 先实现链外影子结算，再评估 Sui 网络适配器 | 复用真实成本和人工验收事实，保持双分录、幂等和默认关闭，不移动真实资金 | `docs/decisions/task-shadow-settlement-v1.md` |
+| 区块链只作为多方可信、授权与结算候选层 | 链上只承载跨主体所有权、授权、关键回执和结算；订单、日志、媒体、实时数据库、AI 推理、复杂查询和匿名化继续留在链外 | `docs/open-commerce/integration-architecture.md` |
 | 文档按状态与职责模块化 | 事实、决策、草稿和讨论来源分开，避免巨型愿景文档误导 AI | `docs/open-commerce/README.md` |
 
 ## 当前实施重点
