@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub(crate) use super::model_configuration::*;
+
 pub(crate) const BLUEPRINT_SCHEMA: &str = "yilong.erp.blueprint.v1";
 pub(crate) const INSTANCE_SCHEMA: &str = "yilong.erp.instance.v1";
 pub(crate) const RELEASE_SCHEMA: &str = "yilong.erp.release.v1";
@@ -31,7 +33,7 @@ pub(crate) struct ErpCapabilityDefinition {
     pub composable_with: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct ErpBlueprintDefinition {
     pub schema: String,
     pub blueprint_key: String,
@@ -69,6 +71,7 @@ pub(crate) struct CreateBlueprintRequest {
 pub(crate) struct ErpBlueprint {
     pub id: String,
     pub definition: ErpBlueprintDefinition,
+    pub definition_revision: i64,
     pub status: String,
     pub created_by: String,
     pub created_at: String,
@@ -173,6 +176,8 @@ pub(crate) struct ErpInstance {
     pub enabled_modules: Vec<String>,
     pub plugins: Vec<ErpExtensionRef>,
     pub private_extensions: Vec<ErpExtensionRef>,
+    pub configuration_revision: i64,
+    pub bootstrap_matter_id: Option<String>,
     pub status: String,
     pub created_by: String,
     pub created_at: String,
@@ -197,6 +202,7 @@ pub(crate) struct RequirementResolution {
     pub need_key: Option<String>,
     pub recommendation: String,
     pub may_submit_signal: bool,
+    pub catalog_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -293,6 +299,14 @@ pub(crate) struct DecideUpgradeRequest {
     pub action: String,
     #[serde(default)]
     pub reason: String,
+    #[serde(default)]
+    pub merchant_confirmed: bool,
+    #[serde(default)]
+    pub execution_attested: bool,
+    #[serde(default)]
+    pub verification_summary: String,
+    #[serde(default)]
+    pub deployed_commit: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -304,6 +318,11 @@ pub(crate) struct ErpUpgradeCampaign {
     pub status: String,
     pub compatibility: ErpCompatibilityReport,
     pub private_extensions_snapshot: Vec<ErpExtensionRef>,
+    pub instance_revision: i64,
+    pub adopted_instance_revision: Option<i64>,
+    pub from_configuration: ErpInstanceConfiguration,
+    pub target_configuration: ErpInstanceConfiguration,
+    pub adoption_evidence: Option<ErpUpgradeAdoptionEvidence>,
     pub created_by: String,
     pub decided_by: Option<String>,
     pub rollback_reason: Option<String>,
@@ -321,6 +340,8 @@ pub(crate) struct ErpProjectOverview {
     pub proposals: Vec<ErpFeatureProposal>,
     pub upgrades: Vec<ErpUpgradeCampaign>,
     pub capability_catalog: Vec<ErpCapabilityDefinition>,
+    pub catalog_version: Option<String>,
+    pub unreleased_capability_keys: Vec<String>,
     pub boundaries: Value,
 }
 

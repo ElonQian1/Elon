@@ -12,41 +12,55 @@ pub(crate) fn resolve_requirement(
     definition: &ErpBlueprintDefinition,
     request: ResolveRequirementRequest,
 ) -> Result<RequirementResolution> {
+    if !matches!(
+        request.expected_scope.as_deref(),
+        None | Some("merchant_specific") | Some("potential_common")
+    ) {
+        bail!("expected_scope 只能是 merchant_specific 或 potential_common");
+    }
     let requirement = request.requirement.trim();
     if requirement.chars().count() < 4 || requirement.chars().count() > 500 {
         bail!("需求描述必须在 4 到 500 个字符之间");
     }
-    let matched_capabilities = search_capabilities(definition, requirement, 8);
-    let (classification, recommendation, need_key, may_submit_signal) =
-        if matched_capabilities.len() == 1 {
-            (
-                "existing",
-                "优先复用已存在的蓝图能力，不创建新公共功能。",
-                None,
-                false,
-            )
-        } else if matched_capabilities.len() > 1 {
-            (
-                "composition",
-                "使用现有能力编排商户项目内的工作流，先验证组合是否足够。",
-                None,
-                false,
-            )
-        } else if request.expected_scope.as_deref() == Some("potential_common") {
-            (
-                "candidate_common",
-                "当前目录没有匹配能力；获得商户明确授权后，可提交脱敏通用需求信号。",
-                Some(stable_need_key(requirement)),
-                true,
-            )
-        } else {
-            (
-                "private_extension",
-                "当前目录没有匹配能力，先在该商户项目的私有扩展命名空间实现。",
-                None,
-                false,
-            )
-        };
+    let scored_matches = scored_capabilities(definition, requirement, 8);
+    let strong_match_count = scored_matches
+        .iter()
+        .filter(|(_, strong, _)| *strong)
+        .count();
+    let matched_capabilities = scored_matches
+        .into_iter()
+        .filter(|(_, strong, _)| strong_match_count == 0 || *strong)
+        .map(|(_, _, capability)| capability)
+        .collect();
+    let (classification, recommendation, need_key, may_submit_signal) = if strong_match_count == 1 {
+        (
+            "existing",
+            "优先复用已存在的蓝图能力，不创建新公共功能。",
+            None,
+            false,
+        )
+    } else if strong_match_count > 1 {
+        (
+            "composition",
+            "使用现有能力编排商户项目内的工作流，先验证组合是否足够。",
+            None,
+            false,
+        )
+    } else if request.expected_scope.as_deref() == Some("potential_common") {
+        (
+            "candidate_common",
+            "当前目录没有匹配能力；获得商户明确授权后，可提交脱敏通用需求信号。",
+            Some(stable_need_key(requirement)),
+            true,
+        )
+    } else {
+        (
+            "private_extension",
+            "当前目录没有匹配能力，先在该商户项目的私有扩展命名空间实现。",
+            None,
+            false,
+        )
+    };
     Ok(RequirementResolution {
         schema: "yilong.erp.requirement_resolution.v1",
         classification: classification.to_string(),
@@ -55,6 +69,7 @@ pub(crate) fn resolve_requirement(
         need_key,
         recommendation: recommendation.to_string(),
         may_submit_signal,
+        catalog_version: None,
     })
 }
 
@@ -63,33 +78,49 @@ pub(crate) fn search_capabilities(
     query: &str,
     limit: usize,
 ) -> Vec<ErpCapabilityDefinition> {
+    scored_capabilities(definition, query, limit)
+        .into_iter()
+        .map(|(_, _, capability)| capability)
+        .collect()
+}
+
+fn scored_capabilities(
+    definition: &ErpBlueprintDefinition,
+    query: &str,
+    limit: usize,
+) -> Vec<(i64, bool, ErpCapabilityDefinition)> {
     let normalized = normalize_search_text(query);
     let mut scored: Vec<_> = definition
         .capabilities
         .iter()
         .filter_map(|capability| {
-            let mut score = match_score(&normalized, &capability.capability_key) * 4
-                + match_score(&normalized, &capability.display_name) * 3
-                + match_score(&normalized, &capability.description);
-            score += capability
+            let key_score = match_score(&normalized, &capability.capability_key);
+            let display_score = match_score(&normalized, &capability.display_name);
+            let description_score = match_score(&normalized, &capability.description);
+            let alias_scores = capability
                 .aliases
                 .iter()
-                .map(|alias| match_score(&normalized, alias) * 2)
-                .sum::<i64>();
-            (score > 0).then_some((score, capability.clone()))
+                .map(|alias| match_score(&normalized, alias))
+                .collect::<Vec<_>>();
+            let score = key_score * 4
+                + display_score * 3
+                + description_score
+                + alias_scores.iter().sum::<i64>() * 2;
+            let strong = key_score >= 3
+                || display_score >= 3
+                || description_score >= 3
+                || alias_scores.iter().any(|score| *score >= 3);
+            (score > 0).then_some((score, strong, capability.clone()))
         })
         .collect();
     scored.sort_by(|left, right| {
         right
             .0
             .cmp(&left.0)
-            .then_with(|| left.1.capability_key.cmp(&right.1.capability_key))
+            .then_with(|| right.1.cmp(&left.1))
+            .then_with(|| left.2.capability_key.cmp(&right.2.capability_key))
     });
-    scored
-        .into_iter()
-        .take(limit.clamp(1, 100))
-        .map(|(_, capability)| capability)
-        .collect()
+    scored.into_iter().take(limit.clamp(1, 100)).collect()
 }
 
 fn match_score(query: &str, candidate: &str) -> i64 {
@@ -164,5 +195,44 @@ mod tests {
         .unwrap();
         assert_eq!(result.classification, "existing");
         assert!(!result.may_submit_signal);
+    }
+
+    #[test]
+    fn weak_token_overlap_does_not_claim_the_capability_already_exists() {
+        let mut definition = definition();
+        definition.capabilities.push(ErpCapabilityDefinition {
+            capability_key: "inventory.audit".into(),
+            display_name: "Inventory audit".into(),
+            description: "Review inventory records".into(),
+            category: "inventory".into(),
+            module_key: "inventory".into(),
+            aliases: vec![],
+            composable_with: vec![],
+        });
+        let result = resolve_requirement(
+            &definition,
+            ResolveRequirementRequest {
+                instance_id: None,
+                requirement: "inventory customer forecast".into(),
+                expected_scope: Some("potential_common".into()),
+            },
+        )
+        .unwrap();
+        assert_eq!(result.classification, "candidate_common");
+        assert!(result.may_submit_signal);
+    }
+
+    #[test]
+    fn unknown_scope_is_rejected_instead_of_silently_becoming_private() {
+        let error = resolve_requirement(
+            &definition(),
+            ResolveRequirementRequest {
+                instance_id: None,
+                requirement: "查询库存".into(),
+                expected_scope: Some("global".into()),
+            },
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("expected_scope"));
     }
 }

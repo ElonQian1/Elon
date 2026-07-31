@@ -3,24 +3,29 @@ use anyhow::{anyhow, bail, Result};
 use crate::{
     group_ai::{
         planner::build_matter_plan,
-        types::{CreateMatterPlanRequest, CreateMatterRecord, ProjectAiMatter},
+        types::{CreateMatterPlanRequest, CreateMatterRecord, ProjectAiBot, ProjectAiMatter},
     },
     store::Store,
 };
 
-use super::model::{ErpBlueprint, ErpFeatureProposal};
+use super::model::{ErpBlueprint, ErpBlueprintVersion, ErpFeatureProposal, ErpInstance};
 
-pub(crate) fn create_matter(
+pub(crate) fn create_proposal_matter(
     store: &Store,
     blueprint: &ErpBlueprint,
     proposal: &ErpFeatureProposal,
     actor_user_id: &str,
+    bots: &[ProjectAiBot],
 ) -> Result<ProjectAiMatter> {
-    if proposal.blueprint_id != blueprint.id || proposal.status != "accepted" {
+    if proposal.blueprint_id != blueprint.id
+        || !matches!(proposal.status.as_str(), "accepted" | "matter_created")
+    {
         bail!("只有当前蓝图已接受的提案可以创建 Matter");
     }
-    if proposal.matter_id.is_some() {
-        bail!("该提案已经创建 Matter");
+    if let Some(matter_id) = proposal.matter_id.as_deref() {
+        return store
+            .get_project_ai_matter(&blueprint.definition.source_project_id, matter_id)?
+            .ok_or_else(|| anyhow!("提案关联的 Matter 不存在"));
     }
     let channel = store
         .list_project_space_channels(actor_user_id, &blueprint.definition.source_project_id)?
@@ -47,20 +52,98 @@ pub(crate) fn create_matter(
             "合并与发布必须由维护者人工确认".into(),
         ],
     };
-    let draft = build_matter_plan(&request, actor_user_id, &[]);
-    let matter = store.create_project_ai_matter(CreateMatterRecord {
-        project_id: blueprint.definition.source_project_id.clone(),
-        channel_id: channel.id,
-        requester_user_id: actor_user_id.to_string(),
+    let draft = build_matter_plan(&request, actor_user_id, bots);
+    store.create_project_ai_matter_for_erp_proposal(
+        &proposal.id,
+        CreateMatterRecord {
+            project_id: blueprint.definition.source_project_id.clone(),
+            channel_id: channel.id,
+            requester_user_id: actor_user_id.to_string(),
+            source_message_id: None,
+            title: draft.title,
+            brief,
+            collaboration_mode: draft.collaboration_mode,
+            participant_user_ids: draft.participant_user_ids,
+            node_policy_json: draft.node_policy_json,
+            acceptance_criteria: draft.acceptance_criteria,
+            plan_json: draft.plan_json,
+        },
+    )
+}
+
+pub(crate) fn create_bootstrap_matter(
+    store: &Store,
+    blueprint: &ErpBlueprint,
+    version: &ErpBlueprintVersion,
+    instance: &ErpInstance,
+    actor_user_id: &str,
+    bots: &[ProjectAiBot],
+) -> Result<ProjectAiMatter> {
+    if instance.blueprint_id != blueprint.id || instance.pinned_version_id != version.id {
+        bail!("实例、蓝图与固定版本不一致");
+    }
+    if let Some(matter_id) = instance.bootstrap_matter_id.as_deref() {
+        return store
+            .get_project_ai_matter(&instance.project_id, matter_id)?
+            .ok_or_else(|| anyhow!("实例关联的初始化 Matter 不存在"));
+    }
+    let channel = store
+        .list_project_space_channels(actor_user_id, &instance.project_id)?
+        .into_iter()
+        .find(|channel| channel.kind == "ai_development")
+        .ok_or_else(|| anyhow!("商户项目缺少 AI 开发频道"))?;
+    let modules = instance.enabled_modules.join("、");
+    let plugins = instance
+        .plugins
+        .iter()
+        .map(|extension| extension.extension_key.as_str())
+        .collect::<Vec<_>>()
+        .join("、");
+    let private_extensions = instance
+        .private_extensions
+        .iter()
+        .map(|extension| extension.extension_key.as_str())
+        .collect::<Vec<_>>()
+        .join("、");
+    let brief = format!(
+        "基于 ERP 蓝图 {} v{} 初始化独立商户项目 {}。\n主题：{}\n公共模块：{}\n行业插件：{}\n私有扩展边界：{}\n源版本提交：{}\n\n只在当前商户项目工作区实现；不得复制其他商户数据、密钥或私有源码；不得自动发布。",
+        blueprint.definition.blueprint_key,
+        version.manifest.version,
+        instance.instance_key,
+        instance.theme_key,
+        modules,
+        if plugins.is_empty() { "无" } else { &plugins },
+        if private_extensions.is_empty() { "无" } else { &private_extensions },
+        version.manifest.source_git_commit,
+    );
+    let request = CreateMatterPlanRequest {
+        channel_id: channel.id.clone(),
         source_message_id: None,
-        title: draft.title,
-        brief,
-        collaboration_mode: draft.collaboration_mode,
-        participant_user_ids: draft.participant_user_ids,
-        node_policy_json: draft.node_policy_json,
-        acceptance_criteria: draft.acceptance_criteria,
-        plan_json: draft.plan_json,
-    })?;
-    store.attach_matter_to_erp_proposal(&proposal.id, &matter.id)?;
-    Ok(matter)
+        title: Some(format!("初始化 ERP：{}", instance.instance_key)),
+        brief: brief.clone(),
+        collaboration_mode: Some("solo".into()),
+        acceptance_criteria: vec![
+            "在独立商户项目中实现发布清单声明的公共模块和能力".into(),
+            "应用商户主题并保持插件与私有扩展命名空间隔离".into(),
+            "生成机器可读实例清单和升级基线，不写入密钥或经营原始数据".into(),
+            "完成项目测试；合并与发布由商户人工确认".into(),
+        ],
+    };
+    let draft = build_matter_plan(&request, actor_user_id, bots);
+    store.create_project_ai_matter_for_erp_instance(
+        &instance.id,
+        CreateMatterRecord {
+            project_id: instance.project_id.clone(),
+            channel_id: channel.id,
+            requester_user_id: actor_user_id.to_string(),
+            source_message_id: None,
+            title: draft.title,
+            brief,
+            collaboration_mode: draft.collaboration_mode,
+            participant_user_ids: draft.participant_user_ids,
+            node_policy_json: draft.node_policy_json,
+            acceptance_criteria: draft.acceptance_criteria,
+            plan_json: draft.plan_json,
+        },
+    )
 }

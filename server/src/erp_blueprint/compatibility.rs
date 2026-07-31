@@ -1,11 +1,23 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::model::{CompatibilityIssue, ErpBlueprintVersion, ErpCompatibilityReport, ErpInstance};
+use super::model::{
+    CompatibilityIssue, ErpBlueprintVersion, ErpCompatibilityReport, ErpInstance,
+    ErpInstanceConfiguration,
+};
+
+pub(crate) struct UpgradePreparation {
+    pub report: ErpCompatibilityReport,
+    pub target_configuration: ErpInstanceConfiguration,
+}
 
 pub(crate) fn check(
     instance: &ErpInstance,
     target: &ErpBlueprintVersion,
 ) -> ErpCompatibilityReport {
+    prepare(instance, target).report
+}
+
+pub(crate) fn prepare(instance: &ErpInstance, target: &ErpBlueprintVersion) -> UpgradePreparation {
     let manifest = &target.manifest;
     let mut issues = Vec::new();
     if version_less_than(
@@ -25,6 +37,17 @@ pub(crate) fn check(
         .iter()
         .map(|module| (module.module_key.as_str(), module))
         .collect();
+    for module in &instance.enabled_modules {
+        if !target_modules.contains_key(module.as_str()) {
+            issues.push(issue(
+                "enabled_module_removed",
+                "blocking",
+                module,
+                "目标版本移除了实例当前启用的模块，不能静默丢弃配置",
+            ));
+        }
+    }
+    let mut target_enabled_modules = instance.enabled_modules.clone();
     for module in manifest.modules.iter().filter(|module| module.required) {
         if !instance
             .enabled_modules
@@ -37,8 +60,11 @@ pub(crate) fn check(
                 &module.module_key,
                 "目标版本会增加一个必需公共模块，采用前应由项目开发流程安装并验证",
             ));
+            target_enabled_modules.push(module.module_key.clone());
         }
     }
+    target_enabled_modules.sort();
+    target_enabled_modules.dedup();
 
     let extension_points: BTreeSet<_> = manifest
         .extension_points
@@ -94,12 +120,19 @@ pub(crate) fn check(
         ));
     }
 
-    ErpCompatibilityReport {
-        compatible: !issues.iter().any(|item| item.severity == "blocking"),
-        from_version: instance.pinned_version.clone(),
-        target_version: manifest.version.clone(),
-        preserved_private_extensions: instance.private_extensions.clone(),
-        issues,
+    UpgradePreparation {
+        report: ErpCompatibilityReport {
+            compatible: !issues.iter().any(|item| item.severity == "blocking"),
+            from_version: instance.pinned_version.clone(),
+            target_version: manifest.version.clone(),
+            preserved_private_extensions: instance.private_extensions.clone(),
+            issues,
+        },
+        target_configuration: ErpInstanceConfiguration {
+            theme_key: instance.theme_key.clone(),
+            enabled_modules: target_enabled_modules,
+            plugins: instance.plugins.clone(),
+        },
     }
 }
 
@@ -155,6 +188,8 @@ mod tests {
             enabled_modules: vec!["order".into()],
             plugins: vec![],
             private_extensions: vec![private.clone()],
+            configuration_revision: 1,
+            bootstrap_matter_id: None,
             status: "active".into(),
             created_by: "owner".into(),
             created_at: "now".into(),

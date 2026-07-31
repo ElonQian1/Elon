@@ -7,6 +7,7 @@ pub(crate) fn definitions() -> Vec<Value> {
             "读取当前项目关联的 ERP 蓝图、版本、商户实例、能力目录、提案与升级状态。不会返回商户原始经营数据、密钥或私有源码。",
             json!({"type":"object","properties":{},"additionalProperties":false}),
             true,
+            false,
             true,
         ),
         tool(
@@ -22,6 +23,7 @@ pub(crate) fn definitions() -> Vec<Value> {
                 "additionalProperties":false
             }),
             true,
+            false,
             true,
         ),
         tool(
@@ -38,6 +40,7 @@ pub(crate) fn definitions() -> Vec<Value> {
                 "additionalProperties":false
             }),
             true,
+            false,
             true,
         ),
         tool(
@@ -68,7 +71,42 @@ pub(crate) fn definitions() -> Vec<Value> {
                 "additionalProperties":false
             }),
             false,
+            false,
             true,
+        ),
+        tool(
+            "erp_update_instance_configuration",
+            "在商户确认后更新当前实例的主题、启用模块、插件和私有扩展元数据。只登记边界与版本，不上传扩展源码、密钥或经营数据。",
+            json!({
+                "type":"object",
+                "required":["instance_id","expected_revision","merchant_confirmed","theme_key","enabled_modules","plugins","private_extensions"],
+                "properties":{
+                    "instance_id":{"type":"string","minLength":1,"maxLength":120},
+                    "expected_revision":{"type":"integer","minimum":1},
+                    "merchant_confirmed":{"const":true},
+                    "theme_key":{"type":"string","minLength":2,"maxLength":80},
+                    "enabled_modules":{"type":"array","items":{"type":"string","minLength":2,"maxLength":80},"uniqueItems":true},
+                    "plugins":{"type":"array","items":{"$ref":"#/definitions/extension"}},
+                    "private_extensions":{"type":"array","items":{"$ref":"#/definitions/extension"}}
+                },
+                "definitions":{
+                    "extension":{
+                        "type":"object",
+                        "required":["extension_key","version","extension_point"],
+                        "properties":{
+                            "extension_key":{"type":"string","minLength":2,"maxLength":80},
+                            "version":{"type":"string","pattern":"^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+                            "extension_point":{"type":"string","minLength":2,"maxLength":80},
+                            "requires_modules":{"type":"array","items":{"type":"string"},"uniqueItems":true}
+                        },
+                        "additionalProperties":false
+                    }
+                },
+                "additionalProperties":false
+            }),
+            false,
+            true,
+            false,
         ),
         tool(
             "erp_prepare_upgrade_check",
@@ -84,6 +122,7 @@ pub(crate) fn definitions() -> Vec<Value> {
             }),
             false,
             false,
+            false,
         ),
     ]
 }
@@ -93,6 +132,7 @@ fn tool(
     description: &str,
     input_schema: Value,
     read_only: bool,
+    destructive: bool,
     idempotent: bool,
 ) -> Value {
     json!({
@@ -101,9 +141,25 @@ fn tool(
         "inputSchema":input_schema,
         "annotations":{
             "readOnlyHint":read_only,
-            "destructiveHint":false,
+            "destructiveHint":destructive,
             "idempotentHint":idempotent,
             "openWorldHint":false
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn instance_configuration_is_the_only_destructive_agent_tool() {
+        let tools = definitions();
+        let destructive = tools
+            .iter()
+            .filter(|tool| tool["annotations"]["destructiveHint"] == true)
+            .map(|tool| tool["name"].as_str().unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(destructive, vec!["erp_update_instance_configuration"]);
+    }
 }

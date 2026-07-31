@@ -4,8 +4,12 @@ use serde_json::{json, Value};
 
 use crate::{
     erp_blueprint::{
-        model::{PrepareUpgradeRequest, ResolveRequirementRequest, SubmitFeatureSignalRequest},
-        proposal, service,
+        catalog_service, instance_service,
+        model::{
+            PrepareUpgradeRequest, ResolveRequirementRequest, SubmitFeatureSignalRequest,
+            UpdateErpInstanceRequest,
+        },
+        service,
     },
     project_auth::can_edit,
     store::Store,
@@ -31,6 +35,13 @@ struct UpgradeArgs {
     target_version: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct UpdateInstanceArgs {
+    instance_id: String,
+    #[serde(flatten)]
+    request: UpdateErpInstanceRequest,
+}
+
 pub(crate) fn handles(name: &str) -> bool {
     name.starts_with("erp_")
 }
@@ -50,12 +61,12 @@ pub(crate) fn call_tool(
         }
         "erp_search_capabilities" => {
             let args: SearchArgs = decode(arguments, name)?;
-            let blueprint = store
-                .erp_blueprint_for_project(project_id)?
-                .ok_or_else(|| anyhow::anyhow!("当前项目尚未关联 ERP 蓝图"))?;
+            let snapshot =
+                catalog_service::search_capabilities(store, project_id, &args.query, args.limit)?;
             Ok(json!({
                 "schema":"yilong.erp.capability_catalog.v1",
-                "capabilities":proposal::search_capabilities(&blueprint.definition, &args.query, args.limit)
+                "catalog_version":snapshot.version,
+                "capabilities":snapshot.capabilities
             }))
         }
         "erp_resolve_requirement" => {
@@ -74,6 +85,18 @@ pub(crate) fn call_tool(
                 user_id,
                 args.request,
             )?)?)
+        }
+        "erp_update_instance_configuration" => {
+            ensure_write(project_role)?;
+            let args: UpdateInstanceArgs = decode(arguments, name)?;
+            Ok(serde_json::to_value(
+                instance_service::update_configuration(
+                    store,
+                    project_id,
+                    &args.instance_id,
+                    args.request,
+                )?,
+            )?)
         }
         "erp_prepare_upgrade_check" => {
             ensure_write(project_role)?;

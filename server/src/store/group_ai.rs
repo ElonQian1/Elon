@@ -87,47 +87,84 @@ impl Store {
         &self,
         record: CreateMatterRecord,
     ) -> Result<ProjectAiMatter> {
-        let project_id = clean_required(&record.project_id, "project_id")?;
-        let channel_id = clean_required(&record.channel_id, "channel_id")?;
-        let requester_user_id = clean_required(&record.requester_user_id, "requester_user_id")?;
-        let title = clean_required(&record.title, "title")?;
-        let brief = clean_required(&record.brief, "brief")?;
-        let matter_id = new_id("paim");
-        let ts = now();
-        let participant_user_ids_json =
-            serde_json::to_string(&normalize_clis_like_values(&record.participant_user_ids))?;
-        let node_policy_json = serde_json::to_string(&record.node_policy_json)?;
-        let acceptance_criteria_json =
-            serde_json::to_string(&normalize_texts(&record.acceptance_criteria))?;
-        let plan_json = serde_json::to_string(&record.plan_json)?;
-
+        let project_id = record.project_id.trim().to_string();
         let conn = self.conn()?;
-        conn.execute(
-            "INSERT INTO project_ai_matters
-               (id, project_id, channel_id, requester_user_id, decision_user_id,
-                source_message_id, title, brief, collaboration_mode, status,
-                participant_user_ids_json, node_policy_json, acceptance_criteria_json,
-                plan_json, final_summary, final_decision, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, NULL, NULL, ?14, ?14)",
-            params![
-                matter_id,
-                project_id,
-                channel_id,
-                requester_user_id,
-                record.source_message_id,
-                title,
-                brief,
-                record.collaboration_mode,
-                MATTER_STATUS_PLAN_READY,
-                participant_user_ids_json,
-                node_policy_json,
-                acceptance_criteria_json,
-                plan_json,
-                ts,
-            ],
-        )?;
+        let matter_id = insert_project_ai_matter_locked(&conn, record)?;
         get_project_ai_matter_locked(&conn, &project_id, &matter_id)?
             .ok_or_else(|| anyhow!("Matter 保存失败"))
+    }
+
+    pub(crate) fn create_project_ai_matter_for_erp_proposal(
+        &self,
+        proposal_id: &str,
+        record: CreateMatterRecord,
+    ) -> Result<ProjectAiMatter> {
+        let project_id = record.project_id.trim().to_string();
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let (status, existing_matter_id): (String, Option<String>) = tx.query_row(
+            "SELECT status, matter_id FROM erp_feature_proposals WHERE id=?1",
+            params![proposal_id.trim()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        if let Some(matter_id) = existing_matter_id {
+            let matter = get_project_ai_matter_locked(&tx, &project_id, &matter_id)?
+                .ok_or_else(|| anyhow!("提案已关联 Matter，但 Matter 记录不存在"))?;
+            tx.commit()?;
+            return Ok(matter);
+        }
+        if status != "accepted" {
+            anyhow::bail!("只有已接受的 ERP 提案可以创建 Matter");
+        }
+        let matter_id = insert_project_ai_matter_locked(&tx, record)?;
+        let updated = tx.execute(
+            "UPDATE erp_feature_proposals
+                SET status='matter_created', matter_id=?1, updated_at=?2
+              WHERE id=?3 AND status='accepted' AND matter_id IS NULL",
+            params![matter_id, now(), proposal_id.trim()],
+        )?;
+        if updated == 0 {
+            anyhow::bail!("ERP 提案状态已变化");
+        }
+        tx.commit()?;
+        drop(conn);
+        self.get_project_ai_matter(&project_id, &matter_id)?
+            .ok_or_else(|| anyhow!("ERP 提案 Matter 保存失败"))
+    }
+
+    pub(crate) fn create_project_ai_matter_for_erp_instance(
+        &self,
+        instance_id: &str,
+        record: CreateMatterRecord,
+    ) -> Result<ProjectAiMatter> {
+        let project_id = record.project_id.trim().to_string();
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let existing_matter_id: Option<String> = tx.query_row(
+            "SELECT bootstrap_matter_id FROM erp_instances WHERE id=?1",
+            params![instance_id.trim()],
+            |row| row.get(0),
+        )?;
+        if let Some(matter_id) = existing_matter_id {
+            let matter = get_project_ai_matter_locked(&tx, &project_id, &matter_id)?
+                .ok_or_else(|| anyhow!("实例已关联初始化 Matter，但 Matter 记录不存在"))?;
+            tx.commit()?;
+            return Ok(matter);
+        }
+        let matter_id = insert_project_ai_matter_locked(&tx, record)?;
+        let updated = tx.execute(
+            "UPDATE erp_instances
+                SET bootstrap_matter_id=?1, updated_at=?2
+              WHERE id=?3 AND bootstrap_matter_id IS NULL AND status='active'",
+            params![matter_id, now(), instance_id.trim()],
+        )?;
+        if updated == 0 {
+            anyhow::bail!("ERP 实例状态已变化或已存在初始化 Matter");
+        }
+        tx.commit()?;
+        drop(conn);
+        self.get_project_ai_matter(&project_id, &matter_id)?
+            .ok_or_else(|| anyhow!("ERP 实例初始化 Matter 保存失败"))
     }
 
     pub(crate) fn list_project_ai_matters(
@@ -152,7 +189,54 @@ impl Store {
         rows.collect::<rusqlite::Result<Vec<_>>>()
             .map_err(Into::into)
     }
+}
 
+fn insert_project_ai_matter_locked(
+    conn: &rusqlite::Connection,
+    record: CreateMatterRecord,
+) -> Result<String> {
+    let project_id = clean_required(&record.project_id, "project_id")?;
+    let channel_id = clean_required(&record.channel_id, "channel_id")?;
+    let requester_user_id = clean_required(&record.requester_user_id, "requester_user_id")?;
+    let title = clean_required(&record.title, "title")?;
+    let brief = clean_required(&record.brief, "brief")?;
+    let matter_id = new_id("paim");
+    let ts = now();
+    let participant_user_ids_json =
+        serde_json::to_string(&normalize_clis_like_values(&record.participant_user_ids))?;
+    let node_policy_json = serde_json::to_string(&record.node_policy_json)?;
+    let acceptance_criteria_json =
+        serde_json::to_string(&normalize_texts(&record.acceptance_criteria))?;
+    let plan_json = serde_json::to_string(&record.plan_json)?;
+
+    conn.execute(
+            "INSERT INTO project_ai_matters
+               (id, project_id, channel_id, requester_user_id, decision_user_id,
+                source_message_id, title, brief, collaboration_mode, status,
+                participant_user_ids_json, node_policy_json, acceptance_criteria_json,
+                plan_json, final_summary, final_decision, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, NULL, NULL, ?14, ?14)",
+            params![
+                matter_id,
+                project_id,
+                channel_id,
+                requester_user_id,
+                record.source_message_id,
+                title,
+                brief,
+                record.collaboration_mode,
+                MATTER_STATUS_PLAN_READY,
+                participant_user_ids_json,
+                node_policy_json,
+                acceptance_criteria_json,
+                plan_json,
+                ts,
+            ],
+        )?;
+    Ok(matter_id)
+}
+
+impl Store {
     pub(crate) fn get_project_ai_matter(
         &self,
         project_id: &str,

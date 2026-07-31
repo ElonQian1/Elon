@@ -151,6 +151,7 @@ fn shared_blueprint_keeps_instances_independent_and_governs_common_proposals() {
             note: "两个独立行业实例验证".into(),
             create_matter: true,
         },
+        &[],
     )
     .unwrap();
     assert_eq!(proposal.status, "matter_created");
@@ -185,6 +186,10 @@ fn shared_blueprint_keeps_instances_independent_and_governs_common_proposals() {
         DecideUpgradeRequest {
             action: "adopt".into(),
             reason: String::new(),
+            merchant_confirmed: true,
+            execution_attested: true,
+            verification_summary: "参考实例测试、迁移和发布流程均已完成".into(),
+            deployed_commit: Some("abcdef0123456789".into()),
         },
     )
     .unwrap();
@@ -211,6 +216,10 @@ fn shared_blueprint_keeps_instances_independent_and_governs_common_proposals() {
         DecideUpgradeRequest {
             action: "rollback".into(),
             reason: String::new(),
+            merchant_confirmed: true,
+            execution_attested: false,
+            verification_summary: String::new(),
+            deployed_commit: None,
         },
     )
     .unwrap_err();
@@ -223,6 +232,10 @@ fn shared_blueprint_keeps_instances_independent_and_governs_common_proposals() {
         DecideUpgradeRequest {
             action: "rollback".into(),
             reason: "reference rollback".into(),
+            merchant_confirmed: true,
+            execution_attested: false,
+            verification_summary: String::new(),
+            deployed_commit: None,
         },
     )
     .unwrap();

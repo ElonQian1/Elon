@@ -3,7 +3,7 @@ pub(crate) mod api;
 mod artifacts;
 mod automation;
 pub(crate) mod automation_api;
-mod bot_selector;
+pub(crate) mod bot_selector;
 mod context_policy;
 mod execution_prompt;
 mod execution_recording;

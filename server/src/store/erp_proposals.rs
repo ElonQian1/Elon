@@ -113,23 +113,6 @@ impl Store {
         )?;
         self.erp_feature_proposal(proposal_id)
     }
-
-    pub(crate) fn attach_matter_to_erp_proposal(
-        &self,
-        proposal_id: &str,
-        matter_id: &str,
-    ) -> Result<ErpFeatureProposal> {
-        let updated = self.conn()?.execute(
-            "UPDATE erp_feature_proposals
-             SET status='matter_created', matter_id=?1, updated_at=?2
-             WHERE id=?3 AND status='accepted' AND matter_id IS NULL",
-            params![matter_id.trim(), now(), proposal_id.trim()],
-        )?;
-        if updated == 0 {
-            bail!("提案未接受、已创建 Matter 或状态已变化");
-        }
-        self.erp_feature_proposal(proposal_id)
-    }
 }
 
 fn refresh_erp_feature_proposal(

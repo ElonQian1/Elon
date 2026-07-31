@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::model::{
     CreateBlueprintRequest, ErpBlueprintDefinition, ErpCapabilityDefinition, ErpExtensionRef,
-    ErpReleaseManifest, FeatureSignalEvidence, SubmitFeatureSignalRequest, BLUEPRINT_SCHEMA,
-    RELEASE_SCHEMA, SIGNAL_SCHEMA,
+    ErpInstanceConfiguration, ErpReleaseManifest, FeatureSignalEvidence,
+    SubmitFeatureSignalRequest, BLUEPRINT_SCHEMA, RELEASE_SCHEMA, SIGNAL_SCHEMA,
 };
 
 pub(crate) fn build_definition(
@@ -243,6 +243,63 @@ pub(crate) fn validate_extensions(
         }
     }
     Ok(())
+}
+
+pub(crate) fn validate_instance_configuration(
+    definition: &ErpBlueprintDefinition,
+    manifest: &ErpReleaseManifest,
+    theme_key: &str,
+    enabled_modules: &[String],
+    plugins: &[ErpExtensionRef],
+    private_extensions: &[ErpExtensionRef],
+) -> Result<ErpInstanceConfiguration> {
+    require_normalized_key(theme_key, "theme_key")?;
+    if !definition.themes.iter().any(|theme| theme == theme_key) {
+        bail!("主题未在蓝图中声明");
+    }
+    unique_keys(enabled_modules.iter().map(String::as_str), "实例启用模块")?;
+    for module in enabled_modules {
+        require_normalized_key(module, "enabled_module")?;
+    }
+    let manifest_modules: BTreeSet<_> = manifest
+        .modules
+        .iter()
+        .map(|module| module.module_key.as_str())
+        .collect();
+    if enabled_modules
+        .iter()
+        .any(|module| !manifest_modules.contains(module.as_str()))
+    {
+        bail!("实例启用了发布清单中不存在的模块");
+    }
+    for required in manifest.modules.iter().filter(|module| module.required) {
+        if !enabled_modules.contains(&required.module_key) {
+            bail!("实例缺少必需模块 {}", required.module_key);
+        }
+    }
+    let extension_points: BTreeSet<_> = manifest
+        .extension_points
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let enabled_module_keys: BTreeSet<_> = enabled_modules.iter().map(String::as_str).collect();
+    validate_extensions(plugins, &extension_points, &enabled_module_keys)?;
+    validate_extensions(private_extensions, &extension_points, &enabled_module_keys)?;
+    let plugin_keys: BTreeSet<_> = plugins
+        .iter()
+        .map(|extension| extension.extension_key.as_str())
+        .collect();
+    if private_extensions
+        .iter()
+        .any(|extension| plugin_keys.contains(extension.extension_key.as_str()))
+    {
+        bail!("插件和私有扩展不能使用相同标识");
+    }
+    Ok(ErpInstanceConfiguration {
+        theme_key: theme_key.to_string(),
+        enabled_modules: enabled_modules.to_vec(),
+        plugins: plugins.to_vec(),
+    })
 }
 
 pub(crate) fn validate_signal(request: &SubmitFeatureSignalRequest) -> Result<()> {

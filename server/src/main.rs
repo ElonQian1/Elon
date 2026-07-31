@@ -52,6 +52,9 @@ mod conversation_forks;
 mod conversation_router;
 mod erp_blueprint;
 mod erp_blueprint_api;
+mod erp_blueprint_evolution_migration;
+#[cfg(test)]
+mod erp_blueprint_evolution_tests;
 #[cfg(test)]
 mod erp_blueprint_hardening_tests;
 mod erp_blueprint_mcp;
@@ -59,6 +62,8 @@ mod erp_blueprint_mcp_tools;
 mod erp_blueprint_migration;
 #[cfg(test)]
 mod erp_blueprint_tests;
+#[cfg(test)]
+mod erp_blueprint_workflow_tests;
 mod errors;
 mod external_app_api;
 mod external_app_chat_bootstrap;

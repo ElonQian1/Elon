@@ -3,7 +3,7 @@ use rusqlite::{params, OptionalExtension, Row};
 
 use crate::erp_blueprint::model::{
     ErpBlueprint, ErpBlueprintDefinition, ErpBlueprintVersion, ErpExtensionRef, ErpInstance,
-    ErpReleaseManifest,
+    ErpReleaseManifest, UpdateErpInstanceRequest,
 };
 
 use super::{new_id, now, Store};
@@ -92,6 +92,34 @@ impl Store {
             )
             .map_err(|error| anyhow!(error).context("该蓝图版本已存在；已发布清单不可覆盖"))?;
         self.erp_blueprint_version(&id)
+    }
+
+    pub(crate) fn update_erp_blueprint_definition(
+        &self,
+        blueprint_id: &str,
+        expected_revision: i64,
+        definition: &ErpBlueprintDefinition,
+    ) -> Result<ErpBlueprint> {
+        let updated = self.conn()?.execute(
+            "UPDATE erp_blueprints
+                SET name=?1, description=?2, proposal_threshold=?3,
+                    definition_json=?4, definition_revision=definition_revision+1,
+                    updated_at=?5
+              WHERE id=?6 AND status='active' AND definition_revision=?7",
+            params![
+                definition.name,
+                definition.description,
+                definition.proposal_threshold,
+                serde_json::to_string(definition)?,
+                now(),
+                blueprint_id.trim(),
+                expected_revision,
+            ],
+        )?;
+        if updated == 0 {
+            bail!("蓝图已被其他维护者修改或已归档，请刷新后重试");
+        }
+        self.erp_blueprint(blueprint_id)
     }
 
     pub(crate) fn erp_blueprint_version(&self, version_id: &str) -> Result<ErpBlueprintVersion> {
@@ -226,24 +254,53 @@ impl Store {
             .map_err(Into::into);
         result
     }
+
+    pub(crate) fn update_erp_instance_configuration(
+        &self,
+        instance_id: &str,
+        request: &UpdateErpInstanceRequest,
+    ) -> Result<ErpInstance> {
+        let updated = self.conn()?.execute(
+            "UPDATE erp_instances
+                SET theme_key=?1, enabled_modules_json=?2, plugins_json=?3,
+                    private_extensions_json=?4,
+                    configuration_revision=configuration_revision+1, updated_at=?5
+              WHERE id=?6 AND status='active' AND configuration_revision=?7",
+            params![
+                request.theme_key,
+                serde_json::to_string(&request.enabled_modules)?,
+                serde_json::to_string(&request.plugins)?,
+                serde_json::to_string(&request.private_extensions)?,
+                now(),
+                instance_id.trim(),
+                request.expected_revision,
+            ],
+        )?;
+        if updated == 0 {
+            bail!("实例配置已变化或实例已归档，请刷新后重试");
+        }
+        self.erp_instance(instance_id)
+    }
 }
 
 const BLUEPRINT_SELECT: &str =
-    "SELECT id, definition_json, status, created_by, created_at, updated_at FROM erp_blueprints";
+    "SELECT id, definition_json, definition_revision, status, created_by, created_at, updated_at FROM erp_blueprints";
 const VERSION_SELECT: &str = "SELECT id, blueprint_id, manifest_json, manifest_sha256, status, created_by, created_at FROM erp_blueprint_versions";
 const INSTANCE_SELECT: &str = "SELECT i.id, i.instance_key, i.project_id, i.blueprint_id,
  i.pinned_version_id, v.version, i.industry, i.theme_key, i.enabled_modules_json,
- i.plugins_json, i.private_extensions_json, i.status, i.created_by, i.created_at, i.updated_at
+ i.plugins_json, i.private_extensions_json, i.configuration_revision, i.bootstrap_matter_id,
+ i.status, i.created_by, i.created_at, i.updated_at
  FROM erp_instances i JOIN erp_blueprint_versions v ON v.id=i.pinned_version_id";
 
 fn blueprint_from_row(row: &Row<'_>) -> rusqlite::Result<ErpBlueprint> {
     Ok(ErpBlueprint {
         id: row.get(0)?,
         definition: decode(row, 1)?,
-        status: row.get(2)?,
-        created_by: row.get(3)?,
-        created_at: row.get(4)?,
-        updated_at: row.get(5)?,
+        definition_revision: row.get(2)?,
+        status: row.get(3)?,
+        created_by: row.get(4)?,
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
     })
 }
 
@@ -272,10 +329,12 @@ fn instance_from_row(row: &Row<'_>) -> rusqlite::Result<ErpInstance> {
         enabled_modules: decode(row, 8)?,
         plugins: decode(row, 9)?,
         private_extensions: decode(row, 10)?,
-        status: row.get(11)?,
-        created_by: row.get(12)?,
-        created_at: row.get(13)?,
-        updated_at: row.get(14)?,
+        configuration_revision: row.get(11)?,
+        bootstrap_matter_id: row.get(12)?,
+        status: row.get(13)?,
+        created_by: row.get(14)?,
+        created_at: row.get(15)?,
+        updated_at: row.get(16)?,
     })
 }
 
