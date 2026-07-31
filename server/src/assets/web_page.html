@@ -2635,8 +2635,11 @@
     /* 个人中心 v2：与 Android 新排版共用 20px 边距、14px 分组节奏和 70px 功能行。 */
     #profilePage {
       box-sizing: border-box;
-      padding: 14px 20px 104px;
+      padding: 14px 20px calc(var(--bottom-menu-height) + 16px + env(safe-area-inset-bottom));
       background: #000000;
+    }
+    .project-plaza-inline-root {
+      padding-bottom: calc(var(--bottom-menu-height) + 16px + env(safe-area-inset-bottom));
     }
     #profilePage > .apk-promo,
     #profilePage > .profile-legacy-actions { display: none; }

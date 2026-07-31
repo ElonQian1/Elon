@@ -113,7 +113,7 @@ internal class MainMarketplaceActions(
         filterChipViews.clear()
         val shell = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, dp(124))
+            setPadding(0, 0, 0, 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT

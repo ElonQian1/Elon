@@ -104,6 +104,52 @@ class BottomNavigationInsetsContractTest {
         assertTrue(!menuButton.contains("tab-selection"))
     }
 
+    @Test
+    fun scrollPagesReserveBottomBarExactlyOnceAcrossAndroidAndWeb() {
+        val controller = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainBottomNavigationController.kt"
+        )
+        assertTrue(controller.contains("R.dimen.main_bottom_menu_outer_height"))
+        listOf("projectScrollView", "profilePage", "marketplacePage").forEach { id ->
+            assertTrue(controller.contains("binding.$id"))
+        }
+
+        val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
+        assertTrue(
+            Regex(
+                """android:id="@\+id/profilePageContent"[^>]*android:paddingBottom="16dp"""",
+                RegexOption.DOT_MATCHES_ALL
+            ).containsMatchIn(layout)
+        )
+        assertTrue(
+            Regex(
+                """android:id="@\+id/marketplaceListContainer"[^>]*android:paddingBottom="16dp"""",
+                RegexOption.DOT_MATCHES_ALL
+            ).containsMatchIn(layout)
+        )
+
+        val marketplace = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
+        )
+        assertTrue(!marketplace.contains("setPadding(0, 0, 0, dp(124))"))
+
+        val web = readRepositoryFile("server/src/assets/web_page.html")
+        val sharedBottomInset =
+            """calc(var(--bottom-menu-height) + 16px + env(safe-area-inset-bottom))"""
+        assertTrue(
+            Regex(
+                """#profilePage\s*\{[^}]*padding:\s*14px\s+20px\s+${Regex.escape(sharedBottomInset)};""",
+                RegexOption.DOT_MATCHES_ALL
+            ).containsMatchIn(web)
+        )
+        assertTrue(
+            Regex(
+                """\.project-plaza-inline-root\s*\{[^}]*padding-bottom:\s*${Regex.escape(sharedBottomInset)};""",
+                RegexOption.DOT_MATCHES_ALL
+            ).containsMatchIn(web)
+        )
+    }
+
     private fun imageViewBlock(layout: String, id: String): String {
         val marker = "android:id=\"@+id/$id\""
         val start = layout.indexOf(marker)
