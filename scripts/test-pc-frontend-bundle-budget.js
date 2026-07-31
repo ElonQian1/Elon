@@ -19,7 +19,7 @@ function deterministicNoise(size) {
   return buffer
 }
 
-function writeFixture(root, asyncChunk) {
+function writeFixture(root, asyncChunk, extraFiles = {}) {
   const assets = path.join(root, 'assets')
   fs.mkdirSync(assets, { recursive: true })
   const files = {
@@ -29,6 +29,7 @@ function writeFixture(root, asyncChunk) {
     'ConversationPage-fixture.js': 'conversation',
     'ConversationPage-fixture.css': '.conversation{}',
     'UiTunerPage-fixture.css': '.tuner{}',
+    ...extraFiles,
   }
   for (const [name, content] of Object.entries(files)) {
     fs.writeFileSync(path.join(assets, name), content)
@@ -36,10 +37,10 @@ function writeFixture(root, asyncChunk) {
   fs.writeFileSync(path.join(assets, 'UiTunerPage-fixture.js'), asyncChunk)
 }
 
-function runCase(asyncChunk) {
+function runCase(asyncChunk, extraFiles) {
   const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'elon-bundle-budget-'))
   try {
-    writeFixture(fixture, asyncChunk)
+    writeFixture(fixture, asyncChunk, extraFiles)
     return childProcess.spawnSync(
       process.execPath,
       [checker, '--dist', fixture],
@@ -72,4 +73,48 @@ assert.strictEqual(gzipFailure.status, 1)
 assert.match(gzipFailure.stdout, /failure: gzip .* > hard 140\.00 KiB/)
 assert.match(gzipFailure.stderr, /PC_BUNDLE_BUDGET=failed failures=1 warnings=0/)
 
-console.log('PC_FRONTEND_BUNDLE_BUDGET_TEST=passed cases=4')
+const totalJsGrowth = runCase('a'.repeat(470 * KiB), {
+  'FeatureOne-fixture.js': 'a'.repeat(450 * KiB),
+  'FeatureTwo-fixture.js': 'b'.repeat(450 * KiB),
+  'FeatureThree-fixture.js': 'c'.repeat(450 * KiB),
+  'FeatureFour-fixture.js': 'd'.repeat(450 * KiB),
+})
+assert.strictEqual(totalJsGrowth.status, 0, totalJsGrowth.stderr)
+assert.match(totalJsGrowth.stdout, /PC_BUNDLE_BUDGET_CHECK=warning total js/)
+assert.match(totalJsGrowth.stdout, /warning: raw .* > soft 2200\.00 KiB/)
+assert.match(totalJsGrowth.stdout, /PC_BUNDLE_BUDGET=passed assets=11 warnings=1/)
+
+const totalCssGrowth = runCase('a'.repeat(470 * KiB), {
+  'FeatureOne-fixture.css': 'a'.repeat(155 * KiB),
+  'FeatureTwo-fixture.css': 'b'.repeat(155 * KiB),
+  'FeatureThree-fixture.css': 'c'.repeat(155 * KiB),
+  'FeatureFour-fixture.css': 'd'.repeat(155 * KiB),
+})
+assert.strictEqual(totalCssGrowth.status, 0, totalCssGrowth.stderr)
+assert.match(totalCssGrowth.stdout, /PC_BUNDLE_BUDGET_CHECK=warning total css/)
+assert.match(totalCssGrowth.stdout, /warning: raw .* > soft 600\.00 KiB/)
+assert.match(totalCssGrowth.stdout, /PC_BUNDLE_BUDGET=passed assets=11 warnings=1/)
+
+const totalGzipGrowth = runCase('a'.repeat(470 * KiB), {
+  'FeatureOne-fixture.js': deterministicNoise(90 * KiB),
+  'FeatureTwo-fixture.js': deterministicNoise(90 * KiB),
+  'FeatureThree-fixture.js': deterministicNoise(90 * KiB),
+  'FeatureFour-fixture.js': deterministicNoise(90 * KiB),
+  'FeatureFive-fixture.js': deterministicNoise(90 * KiB),
+  'FeatureSix-fixture.js': deterministicNoise(90 * KiB),
+  'FeatureSeven-fixture.js': deterministicNoise(90 * KiB),
+  'FeatureEight-fixture.js': deterministicNoise(90 * KiB),
+  'FeatureOne-fixture.css': deterministicNoise(26 * KiB),
+  'FeatureTwo-fixture.css': deterministicNoise(26 * KiB),
+  'FeatureThree-fixture.css': deterministicNoise(26 * KiB),
+  'FeatureFour-fixture.css': deterministicNoise(26 * KiB),
+  'FeatureFive-fixture.css': deterministicNoise(26 * KiB),
+})
+assert.strictEqual(totalGzipGrowth.status, 0, totalGzipGrowth.stderr)
+assert.match(totalGzipGrowth.stdout, /PC_BUNDLE_BUDGET_CHECK=warning total js/)
+assert.match(totalGzipGrowth.stdout, /warning: gzip .* > soft 700\.00 KiB/)
+assert.match(totalGzipGrowth.stdout, /PC_BUNDLE_BUDGET_CHECK=warning total css/)
+assert.match(totalGzipGrowth.stdout, /warning: gzip .* > soft 120\.00 KiB/)
+assert.match(totalGzipGrowth.stdout, /PC_BUNDLE_BUDGET=passed assets=20 warnings=2/)
+
+console.log('PC_FRONTEND_BUNDLE_BUDGET_TEST=passed cases=7')

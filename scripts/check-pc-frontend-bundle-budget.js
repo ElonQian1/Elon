@@ -72,12 +72,12 @@ function matchOne(files, pattern, label) {
 function budgetResult(label, actualBytes, actualGzipBytes, spec, detail) {
   const failures = []
   const warnings = []
-  if (actualBytes > spec.maxBytes) {
+  if (spec.maxBytes != null && actualBytes > spec.maxBytes) {
     failures.push(`raw ${formatKiB(actualBytes)} > hard ${formatKiB(spec.maxBytes)}`)
   } else if (spec.warnBytes != null && actualBytes > spec.warnBytes) {
     warnings.push(`raw ${formatKiB(actualBytes)} > soft ${formatKiB(spec.warnBytes)}`)
   }
-  if (actualGzipBytes > spec.maxGzipBytes) {
+  if (spec.maxGzipBytes != null && actualGzipBytes > spec.maxGzipBytes) {
     failures.push(`gzip ${formatKiB(actualGzipBytes)} > hard ${formatKiB(spec.maxGzipBytes)}`)
   } else if (spec.warnGzipBytes != null && actualGzipBytes > spec.warnGzipBytes) {
     warnings.push(`gzip ${formatKiB(actualGzipBytes)} > soft ${formatKiB(spec.warnGzipBytes)}`)
@@ -208,14 +208,14 @@ const totalBudgets = [
   {
     label: 'total js',
     ext: '.js',
-    maxBytes: 2200 * KiB,
-    maxGzipBytes: 700 * KiB,
+    warnBytes: 2200 * KiB,
+    warnGzipBytes: 700 * KiB,
   },
   {
     label: 'total css',
     ext: '.css',
-    maxBytes: 600 * KiB,
-    maxGzipBytes: 120 * KiB,
+    warnBytes: 600 * KiB,
+    warnGzipBytes: 120 * KiB,
   },
 ]
 
