@@ -5,11 +5,17 @@ import { formatTime } from '../../lib/utils'
 import styles from './DoctorPage.module.css'
 
 const SECTIONS = [
-  { id: 'snapshot', icon: '查', title: '体检快照' },
-  { id: 'router', icon: '下', title: '下载加速' },
-  { id: 'repair', icon: '修', title: '修复动作' },
-  { id: 'memory', icon: '记', title: '问题记忆' },
+  { id: 'snapshot', icon: '⌁', title: '体检快照', description: '查看本机状态' },
+  { id: 'router', icon: '⇩', title: '下载加速', description: '优化 Rust / npm 下载' },
+  { id: 'repair', icon: '✦', title: '修复动作', description: '执行白名单修复' },
+  { id: 'memory', icon: '▱', title: '问题记忆', description: '回看解决过的问题' },
 ] as const
+
+const QUICK_PROMPTS = [
+  '网页打不开，但微信能正常使用',
+  '电脑变慢，风扇一直在转',
+  '代理关不掉，网络总是异常',
+]
 
 export default function DoctorPage() {
   const user = useAuthStore((s) => s.user)
@@ -71,9 +77,19 @@ export default function DoctorPage() {
     <div className={styles.layout}>
       {/* 侧边栏 */}
       <aside className={styles.sidebar}>
-        <div className={styles.sideSection}>电脑医生项目</div>
+        <div className={styles.sidebarBrand}>
+          <div className={styles.doctorBadge}>医</div>
+          <div>
+            <strong>电脑医生</strong>
+            <span>本机问题诊断</span>
+          </div>
+        </div>
         <button className={styles.newSession} onClick={createSession}>
-          <span>+</span> 新诊断
+          <span className={styles.newSessionIcon}>+</span>
+          <span className={styles.newSessionText}>
+            <strong>新建诊断</strong>
+            <small>从一个新的问题开始</small>
+          </span>
         </button>
 
         <div className={styles.sideSection}>诊断会话</div>
@@ -104,7 +120,10 @@ export default function DoctorPage() {
             onClick={() => setSection(sc.id)}
           >
             <span className={styles.toolIcon}>{sc.icon}</span>
-            {sc.title}
+            <span className={styles.toolText}>
+              <strong>{sc.title}</strong>
+              <small>{sc.description}</small>
+            </span>
           </button>
         ))}
       </aside>
@@ -113,13 +132,15 @@ export default function DoctorPage() {
       <div className={styles.main}>
         <header className={styles.header}>
           <div>
-            <div className={styles.kicker}>Windows PC Doctor Session</div>
+            <div className={styles.kicker}>电脑医生 · 本机工作台</div>
             <h2 className={styles.title}>{sessionTitle}</h2>
+            <p className={styles.subtitle}>分析问题、检查状态，并按需执行安全修复</p>
           </div>
+          <span className={styles.scopePill}>本机诊断</span>
           <div className={styles.headerActions}>
-            <button className={styles.actionBtn} onClick={loadSnapshot}>只读体检</button>
-            <button className={styles.actionBtn} onClick={() => analyze()} disabled={!problem}>分析最近问题</button>
-            <button className={styles.actionBtn} onClick={saveMemory} disabled={!analysis}>保存记忆</button>
+            <button className={styles.actionBtn} onClick={loadSnapshot}>开始体检</button>
+            <button className={styles.actionBtn} onClick={() => analyze()} disabled={!problem}>分析当前问题</button>
+            <button className={styles.actionBtn} onClick={saveMemory} disabled={!analysis}>保存为记忆</button>
           </div>
         </header>
 
@@ -127,8 +148,20 @@ export default function DoctorPage() {
           {section === 'diagnosis' && (
             <>
               {messages.length === 0 && !result && (
-                <div className={styles.emptyHint}>
-                  用底部的消息发送框描述电脑问题，例如"网页打不开但微信能用"或"代理关不掉"。
+                <div className={styles.emptyState}>
+                  <div className={styles.emptyIcon}>医</div>
+                  <div className={styles.emptyEyebrow}>开始一次诊断</div>
+                  <h3>电脑哪里不舒服？</h3>
+                  <p>描述你看到的现象，电脑医生会先分析原因，再给出检查或修复建议。</p>
+                  <div className={styles.quickPrompts}>
+                    {QUICK_PROMPTS.map((prompt) => (
+                      <button key={prompt} type="button" onClick={() => setInput(prompt)}>{prompt}</button>
+                    ))}
+                  </div>
+                  <div className={styles.emptyActions}>
+                    <button type="button" onClick={loadSnapshot}>先做一次只读体检</button>
+                    <button type="button" onClick={() => setSection('repair')}>查看可用修复动作</button>
+                  </div>
                 </div>
               )}
               {messages.map((m) => (

@@ -2,7 +2,7 @@
 
 .layout {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 248px minmax(0, 1fr);
   height: 100%;
   overflow: hidden;
   background: var(--bg-base);
@@ -12,15 +12,56 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 10px 8px;
+  gap: 4px;
+  padding: 16px 12px;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
   overflow-y: auto;
 }
 
+.sidebarBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px 16px;
+}
+
+.sidebarBrand strong,
+.sidebarBrand span {
+  display: block;
+}
+
+.sidebarBrand strong {
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.sidebarBrand span {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.doctorBadge,
+.emptyIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--accent-dim);
+  border: 1px solid rgba(138, 215, 255, 0.25);
+  color: #8ad7ff;
+  font-weight: 800;
+}
+
+.doctorBadge {
+  width: 34px;
+  height: 34px;
+  font-size: 15px;
+}
+
 .sideSection {
-  padding: 10px 8px 5px;
+  padding: 16px 8px 6px;
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 800;
@@ -30,14 +71,15 @@
 .newSession {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
   color: #8ad7ff;
   font-size: 13px;
   border: 1px solid rgba(138, 215, 255, 0.2);
   background: rgba(49, 93, 114, 0.28);
-  margin-bottom: 4px;
+  text-align: left;
   transition: background var(--transition);
 }
 
@@ -45,12 +87,47 @@
   background: rgba(49, 93, 114, 0.5);
 }
 
+.newSessionIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: rgba(138, 215, 255, 0.14);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.newSessionText,
+.toolText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.newSessionText strong,
+.toolText strong {
+  color: inherit;
+  font-size: 12px;
+}
+
+.newSessionText small,
+.toolText small {
+  color: var(--text-muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sessionBtn {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  border-radius: 8px;
   color: var(--text-secondary);
   font-size: 12px;
   text-align: left;
@@ -95,10 +172,11 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  border-radius: 8px;
   color: var(--text-secondary);
   font-size: 13px;
+  text-align: left;
   transition: background var(--transition);
 }
 
@@ -106,10 +184,25 @@
 .toolActive { background: rgba(138, 215, 255, 0.1); color: #8ad7ff; }
 
 .toolIcon {
-  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--bg-elevated);
   text-align: center;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 800;
+  flex-shrink: 0;
+}
+
+.toolActive .toolIcon {
+  background: rgba(138, 215, 255, 0.14);
+}
+
+.toolText {
+  flex: 1;
 }
 
 .sideEmpty {
@@ -123,6 +216,7 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
+  min-width: 0;
 }
 
 .header {
@@ -130,28 +224,46 @@
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  padding: 14px 18px;
+  padding: 18px 28px;
   border-bottom: 1px solid var(--border);
-  background: #272a31;
+  background: var(--bg-surface);
   flex-wrap: wrap;
 }
 
 .kicker {
   color: #8ad7ff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
 }
 
 .title {
-  margin: 2px 0 0;
-  font-size: 16px;
+  margin: 3px 0 0;
+  font-size: 18px;
   color: var(--text-primary);
+}
+
+.subtitle {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.scopePill {
+  margin-left: auto;
+  padding: 5px 9px;
+  border: 1px solid rgba(46, 168, 97, 0.3);
+  border-radius: 999px;
+  color: #8ee6b3;
+  background: rgba(46, 168, 97, 0.1);
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .headerActions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .actionBtn {
@@ -173,10 +285,17 @@
 
 .feed {
   overflow-y: auto;
-  padding: 18px;
+  padding: 28px clamp(18px, 4vw, 52px);
   display: flex;
   flex-direction: column;
   gap: 14px;
+  background: var(--bg-base);
+}
+
+.feed > * {
+  width: 100%;
+  max-width: 980px;
+  margin-inline: auto;
 }
 
 .emptyHint {
@@ -186,6 +305,83 @@
   color: var(--text-muted);
   line-height: 1.55;
   font-size: 13px;
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: min(470px, 62vh);
+  padding: 30px 20px;
+  text-align: center;
+}
+
+.emptyIcon {
+  width: 52px;
+  height: 52px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+  font-size: 22px;
+}
+
+.emptyEyebrow {
+  color: #8ad7ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.emptyState h3 {
+  margin: 8px 0 6px;
+  color: var(--text-primary);
+  font-size: 22px;
+}
+
+.emptyState p {
+  max-width: 480px;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.quickPrompts,
+.emptyActions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quickPrompts {
+  margin-top: 22px;
+}
+
+.quickPrompts button,
+.emptyActions button {
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  font-size: 12px;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.quickPrompts button:hover,
+.emptyActions button:hover {
+  border-color: rgba(138, 215, 255, 0.45);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.emptyActions {
+  margin-top: 12px;
+}
+
+.emptyActions button:first-child {
+  border-color: rgba(138, 215, 255, 0.28);
+  color: #8ad7ff;
 }
 
 .msgRow {
