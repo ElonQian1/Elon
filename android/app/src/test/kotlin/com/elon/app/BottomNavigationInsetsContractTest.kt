@@ -9,6 +9,25 @@ import org.junit.Test
 
 class BottomNavigationInsetsContractTest {
     @Test
+    fun bottomMenuUsesOpaquePageBackgroundOnBothSurfaces() {
+        val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
+        assertTrue(
+            Regex(
+                """android:id="@\+id/pageTabs"[^>]*android:background="@color/elon_bg_app"""",
+                RegexOption.DOT_MATCHES_ALL
+            ).containsMatchIn(layout)
+        )
+
+        val web = readRepositoryFile("server/src/assets/web_page.html")
+        assertTrue(
+            Regex(
+                """\.tabs-bar\s*\{[^}]*background:\s*var\(--bg\);""",
+                RegexOption.DOT_MATCHES_ALL
+            ).containsMatchIn(web)
+        )
+    }
+
+    @Test
     fun androidEdgeSelectionsKeepFiveDpInsets() {
         val dimens = readRepositoryFile("android/app/src/main/res/values/dimens.xml")
         assertTrue(dimens.contains("name=\"main_bottom_menu_content_width\">320dp</dimen>"))
