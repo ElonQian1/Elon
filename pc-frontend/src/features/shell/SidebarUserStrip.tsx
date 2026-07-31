@@ -4,6 +4,7 @@ import { Settings } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import LevelExperienceBar from '../billing/LevelExperienceBar'
 import { useUserProgression } from '../billing/useUserProgression'
+import { useUserUsage } from '../billing/useUserUsage'
 import UserAvatar, { userDisplayName } from './UserAvatar'
 import UserAccountMenu from './UserAccountMenu'
 import { presenceSummary, useMyPresence } from './useMyPresence'
@@ -20,6 +21,7 @@ export default function SidebarUserStrip() {
   const token = useAuthStore((s) => s.token)
   const logout = useAuthStore((s) => s.logout)
   const progression = useUserProgression(user?.id, token)
+  const { usage, loading: usageLoading } = useUserUsage(user?.id, token)
   const presence = useMyPresence()
   const displayName = user ? userDisplayName(user) : token ? '加载中…' : '未登录'
   const statusText = user ? presenceSummary(presence) : '需要登录'
@@ -42,7 +44,7 @@ export default function SidebarUserStrip() {
       className={[styles.strip, menuOpen ? styles.stripOpen : ''].filter(Boolean).join(' ')}
     >
       <div className={styles.progressSlot}>
-        <LevelExperienceBar progression={progression} />
+          <LevelExperienceBar progression={progression} usage={usage} usageLoading={usageLoading} />
       </div>
 
       <button

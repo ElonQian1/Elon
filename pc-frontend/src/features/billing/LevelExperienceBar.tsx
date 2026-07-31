@@ -1,11 +1,14 @@
 import styles from './LevelExperienceBar.module.css'
 import type { UserProgressionSummary } from './progressionApi'
+import type { UserUsageStats } from './usageApi'
 
 interface LevelExperienceBarProps {
   progression: UserProgressionSummary | null
+  usage: UserUsageStats | null
+  usageLoading?: boolean
 }
 
-export default function LevelExperienceBar({ progression }: LevelExperienceBarProps) {
+export default function LevelExperienceBar({ progression, usage, usageLoading = false }: LevelExperienceBarProps) {
   if (!progression) return null
 
   const level = positiveInteger(progression.level, 1)
@@ -133,6 +136,7 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
           <strong>{tierName}</strong>
           <span>Lv.{level}</span>
         </div>
+        <UsageSummary usage={usage} loading={usageLoading} />
         <div className={styles.nextLine}>
           <span>距 Lv.{nextLevel}</span>
           <strong>{formatTokens(tokensToNextLevel)}</strong>
@@ -173,6 +177,40 @@ export default function LevelExperienceBar({ progression }: LevelExperienceBarPr
   )
 }
 
+function UsageSummary({ usage, loading }: { usage: UserUsageStats | null; loading: boolean }) {
+  const quota = usage?.quota
+  const limit = positiveNumber(quota?.limit_tokens)
+  const remaining = nonNegative(quota?.remaining_tokens ?? undefined)
+  const used = nonNegative(quota?.used_tokens)
+  const recent = nonNegative(usage?.total?.total_tokens)
+  const percent = limit ? Math.round(Math.max(0, Math.min(1, remaining / limit)) * 100) : null
+
+  return (
+    <div className={styles.usage} aria-label="剩余用量">
+      <div className={styles.usageHead}>
+        <span>剩余用量</span>
+        <span>{loading ? '同步中…' : '本月'}</span>
+      </div>
+      <div className={styles.usageValueRow}>
+        <strong>{loading ? '读取中…' : percent == null ? '不限额' : `${percent}%`}</strong>
+        <span>{formatResetDate(quota?.reset_at)}</span>
+      </div>
+      <div className={styles.usageTrack} aria-hidden="true">
+        <span style={{ width: `${percent ?? 100}%` }} />
+      </div>
+      <div className={styles.usageCaption}>
+        {loading
+          ? '正在同步服务器用量'
+          : usage == null
+            ? '暂时无法读取用量'
+            : percent == null
+              ? `近 7 天消耗 ${formatTokens(recent)} tokens`
+              : `剩余 ${formatTokens(remaining)} / ${formatTokens(limit)} tokens · 已用 ${formatTokens(used)}`}
+      </div>
+    </div>
+  )
+}
+
 function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0
   return Math.max(0, Math.min(100, value * 100))
@@ -190,6 +228,17 @@ function nonNegative(value: number | undefined, fallback = 0) {
 
 function positiveInteger(value: number | undefined, fallback: number) {
   return Math.max(1, Math.round(nonNegative(value, fallback)))
+}
+
+function positiveNumber(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0
+}
+
+function formatResetDate(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
 }
 
 function formatTokens(value: number) {

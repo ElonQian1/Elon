@@ -133,6 +133,70 @@
   font-weight: 900;
 }
 
+.usage {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 9px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.usageHead,
+.usageValueRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.usageHead {
+  color: #cbd1da;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.usageHead span:last-child,
+.usageValueRow span {
+  color: #8f98a7;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.usageValueRow strong {
+  color: #f2f4f8;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.usageTrack {
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .12);
+}
+
+.usageTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #58be6a, #79e1a1);
+  transition: width .2s ease;
+}
+
+.usageCaption {
+  overflow: hidden;
+  color: #8f98a7;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .nextLine {
   padding: 7px 8px;
   border-radius: 7px;
