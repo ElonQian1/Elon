@@ -72,8 +72,12 @@
 | Capability | 描述商户或服务提供者可被调用的能力 | `server/src/open_commerce_model.rs` |
 | Grant | 描述谁可在何种范围和时限内调用能力 | 开放商业 V1 |
 | Invocation | 记录一次真实商业能力调用 | 开放商业 V1 |
+| Developer App | 表达项目内第三方测试应用身份；凭据只保存摘要 | 消费者与开发者沙盒 V1 |
+| Authorization Request | 表达第三方 App 对受限能力的申请、用途和商户决定 | 消费者与开发者沙盒 V1 |
 | Integration | 描述商户授权的数据来源、接入方式、范围和健康状态 | 开放商业接入控制面 |
 | Sync Receipt | 记录适配器同步数量、摘要、结果和时间，不保存原始经营值 | 开放商业接入控制面 |
+| AI Resource Policy | 描述项目允许的资源类型、优先级、回退、隐私倾向和成本上限 | `server/src/ai_resource_control/` |
+| AI Route Preview | 在不执行任务的前提下解释候选资源和回退 | `server/src/ai_resource_control/` |
 | Usage Receipt | 记录模型、节点、商业能力或任务的可计量事实 | 节点账本、调用审计、链外影子账本 |
 | Settlement Intent | 把 Assignment 与真实用量来源绑定，等待人工验收或取消 | `server/src/task_settlement/` |
 | Settlement Receipt | 记录验收后不可重复的影子经济判断及双分录 | `server/src/task_settlement/` |
@@ -101,6 +105,7 @@ Sui 只能作为上述链上职责的候选实现，不能独自完成数据治�
 - AI 应用生成与商户 ERP、营销活动、小游戏和内容生产共用工程执行链路。
 - 群体 AI 的 Matter/Assignment 与节点算力调度共用任务事实。
 - API Token、云模型和闲置节点共用资源选择、预算和用量回执。
+- 消费者 App、开发者测试 App 和商户授权共用 Capability、Grant、Invocation 与 Audit。
 - 开放商业调用与未来结算共用 Invocation 和 Usage Receipt。
 
 不能直接混合：
@@ -135,6 +140,8 @@ Sui 适合放在已经产生确定业务事实之后：
 ```
 
 控制面已实现，但具体平台适配器必须逐项验收。登记一个平台标识只表达准备接入，不代表已获得该平台的官方权限。开发代理读取的上下文只包含能力契约、数据域、授权范围和同步健康度，密钥与原始经营数据不进入代码提示或协作文档。
+
+消费者发现与第三方应用目前只在项目沙盒内形成闭环。公共跨项目索引、生产 App 审核、身份互认、限流和滥用处置必须独立实现，不能从沙盒状态推导为公共网络已经完成。AI 资源控制面同样只负责真实来源盘点、策略和预演；真实任务继续由现有聊天、AI CLI、节点与计量链路执行。
 
 ## 模块依赖方向
 

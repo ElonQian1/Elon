@@ -211,10 +211,14 @@
     "docs/cli会话问题/单纯Codex cli上下文会话.md": "custom:external-tools",
     "docs/cli会话问题/纯Codex cli图片会话.md": "custom:external-tools",
     "docs/codex-vault-sharing-runbook.md": "custom:security",
+    "docs/decisions/ai-resource-control-v1.md": "custom:open-commerce-network",
+    "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md": "custom:open-commerce-network",
+    "docs/decisions/open-commerce-integration-control-plane.md": "custom:open-commerce-network",
     "docs/decisions/reject-ai-to-ai-skill-route.md": "custom:product-direction-decisions",
     "docs/decisions/reject-demo-oracle-role.md": "custom:product-direction-decisions",
     "docs/decisions/open-commerce-network-principles.md": "custom:open-commerce-network",
     "docs/decisions/open-commerce-network-v1-architecture.md": "custom:open-commerce-network",
+    "docs/decisions/task-shadow-settlement-v1.md": "custom:open-commerce-network",
     "docs/discussion-knowledge-compiler.md": "custom:pc-workbench",
     "docs/drafts/open-commerce-network-roadmap.md": "custom:open-commerce-network",
     "docs/drafts/open-commerce-network-sui-agent-economy.md": "custom:open-commerce-network",
@@ -242,11 +246,17 @@
     "docs/intent-routing.md": "custom:backend-api",
     "docs/node-agent-upgrade-compatibility.md": "custom:windows-node",
     "docs/open-commerce/README.md": "custom:open-commerce-network",
+    "docs/open-commerce/ai-resource-control.md": "custom:open-commerce-network",
     "docs/open-commerce/capability-baseline.md": "custom:open-commerce-network",
+    "docs/open-commerce/connector-sdk.md": "custom:open-commerce-network",
+    "docs/open-commerce/consumer-developer-sandbox.md": "custom:open-commerce-network",
     "docs/open-commerce/decision-register.md": "custom:open-commerce-network",
     "docs/open-commerce/integration-architecture.md": "custom:open-commerce-network",
+    "docs/open-commerce-integration-control-plane-acceptance.md": "custom:open-commerce-network",
     "docs/open-commerce-network-v1-acceptance.md": "custom:open-commerce-network",
     "docs/open-commerce-network-v1-api.md": "custom:open-commerce-network",
+    "docs/task-shadow-settlement-v1-acceptance.md": "custom:open-commerce-network",
+    "docs/task-shadow-settlement-v1-api.md": "custom:open-commerce-network",
     "docs/pc-frontend-migration.md": "custom:pc-workbench",
     "docs/pc-node-data-root.md": "custom:windows-node",
     "docs/pc-node-offline-resilience.md": "custom:windows-node",
@@ -319,6 +329,10 @@
     "docs/codex-mcp-native-git-push-20260701-171812.md": "evidence",
     "docs/codex-vault-sharing-runbook.md": "on-demand",
     "docs/codex-vault-usage-estimation.md": "on-demand",
+    "docs/decisions/ai-resource-control-v1.md": "on-demand",
+    "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md": "on-demand",
+    "docs/decisions/open-commerce-integration-control-plane.md": "on-demand",
+    "docs/decisions/task-shadow-settlement-v1.md": "on-demand",
     "docs/decisions/reject-demo-oracle-role.md": "on-demand",
     "docs/discussion-knowledge-compiler.md": "on-demand",
     "docs/fb2-ai-center/PLAN.md": "drafts",
@@ -331,6 +345,10 @@
     "docs/drafts/sui-economy-s4-shadow-settlement-plan.md": "drafts",
     "docs/open-commerce-network-v1-acceptance.md": "on-demand",
     "docs/open-commerce-network-v1-api.md": "on-demand",
+    "docs/open-commerce/ai-resource-control.md": "on-demand",
+    "docs/open-commerce/connector-sdk.md": "on-demand",
+    "docs/open-commerce/consumer-developer-sandbox.md": "on-demand",
+    "docs/open-commerce-integration-control-plane-acceptance.md": "evidence",
     "docs/pc-frontend-migration.md": "on-demand",
     "docs/pc-node-data-root.md": "on-demand",
     "docs/pc-node-offline-resilience.md": "on-demand",
@@ -343,6 +361,8 @@
     "docs/shared-android-device-host.md": "on-demand",
     "docs/supervised-pc-project-development.md": "current",
     "docs/system-architecture.md": "current",
+    "docs/task-shadow-settlement-v1-acceptance.md": "evidence",
+    "docs/task-shadow-settlement-v1-api.md": "on-demand",
     "docs/token消费统计.md": "drafts",
     "docs/user-project-system.md": "current",
     "docs/voice-tts-deployment.md": "on-demand",
@@ -512,11 +532,47 @@
       "authority": "non_authoritative",
       "document_type": "discussion"
     },
+    "docs/decisions/ai-resource-control-v1.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture_decision"
+    },
+    "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture_decision"
+    },
+    "docs/decisions/open-commerce-integration-control-plane.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture_decision"
+    },
+    "docs/decisions/task-shadow-settlement-v1.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "architecture_decision"
+    },
     "docs/open-commerce/README.md": {
       "retrieval": "on_demand",
       "lifecycle": "active",
       "authority": "authoritative",
       "document_type": "subproject_overview"
+    },
+    "docs/open-commerce/ai-resource-control.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "technical_guide"
+    },
+    "docs/open-commerce/connector-sdk.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "sdk_guide"
     },
     "docs/open-commerce/capability-baseline.md": {
       "retrieval": "on_demand",
@@ -529,6 +585,18 @@
       "lifecycle": "active",
       "authority": "guidance",
       "document_type": "decision_register"
+    },
+    "docs/open-commerce/consumer-developer-sandbox.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "technical_guide"
+    },
+    "docs/open-commerce-integration-control-plane-acceptance.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "evidence",
+      "document_type": "acceptance"
     },
     "docs/open-commerce/integration-architecture.md": {
       "retrieval": "on_demand",
@@ -572,6 +640,18 @@
       "authority": "authoritative",
       "document_type": "architecture"
     },
+    "docs/task-shadow-settlement-v1-acceptance.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "evidence",
+      "document_type": "acceptance"
+    },
+    "docs/task-shadow-settlement-v1-api.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "api_reference"
+    },
     "docs/user-project-system.md": {
       "retrieval": "on_demand",
       "lifecycle": "active",
@@ -592,6 +672,83 @@
     }
   },
   "document_metadata": {
+    "docs/decisions/open-commerce-integration-control-plane.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-07-31",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/open_commerce_integration_model.rs",
+        "file:server/src/store/open_commerce_integrations.rs"
+      ],
+      "related": [
+        "docs/open-commerce/connector-sdk.md",
+        "docs/open-commerce-integration-control-plane-acceptance.md"
+      ]
+    },
+    "docs/decisions/task-shadow-settlement-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "影子经济层",
+      "reviewed_at": "2026-07-31",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/task_settlement/service.rs",
+        "file:server/src/task_settlement/sui_projection.rs"
+      ],
+      "related": [
+        "docs/task-shadow-settlement-v1-api.md",
+        "docs/task-shadow-settlement-v1-acceptance.md"
+      ]
+    },
+    "docs/open-commerce/connector-sdk.md": {
+      "doc_type": "sdk_guide",
+      "audience": [
+        "连接器开发者",
+        "架构师",
+        "AI 代理"
+      ],
+      "owner": "开放商业连接器",
+      "reviewed_at": "2026-07-31",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:sdk/open-commerce-connector/src/index.js",
+        "test:sdk/open-commerce-connector/test/compatibility.test.mjs",
+        "route:/api/open-commerce/connector-contract"
+      ],
+      "related": [
+        "docs/decisions/open-commerce-integration-control-plane.md",
+        "docs/open-commerce-integration-control-plane-acceptance.md"
+      ]
+    },
+    "docs/task-shadow-settlement-v1-api.md": {
+      "doc_type": "api_reference",
+      "audience": [
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "影子经济层",
+      "reviewed_at": "2026-07-31",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/task_settlement/api.rs",
+        "file:server/src/task_settlement/sui_projection.rs",
+        "file:pc-frontend/src/features/open-commerce/ShadowEconomyPanel.tsx"
+      ],
+      "related": [
+        "docs/decisions/task-shadow-settlement-v1.md",
+        "docs/task-shadow-settlement-v1-acceptance.md"
+      ]
+    },
     "AI_CURRENT.md": {
       "doc_type": "current_status",
       "audience": [
@@ -670,6 +827,44 @@
         "docs/open-commerce/README.md"
       ]
     },
+    "docs/decisions/ai-resource-control-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "AI 资源控制面",
+      "reviewed_at": "2026-07-31",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/ai_resource_control/service.rs",
+        "test:server/src/ai_resource_control/tests.rs"
+      ],
+      "related": [
+        "docs/open-commerce/ai-resource-control.md",
+        "docs/open-commerce/integration-architecture.md"
+      ]
+    },
+    "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "产品负责人",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-07-31",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/open_commerce_client_api.rs",
+        "test:server/src/open_commerce_client_service_tests.rs"
+      ],
+      "related": [
+        "docs/open-commerce/consumer-developer-sandbox.md",
+        "docs/decisions/open-commerce-network-v1-architecture.md"
+      ]
+    },
     "docs/open-commerce/README.md": {
       "doc_type": "subproject_overview",
       "audience": [
@@ -688,6 +883,26 @@
         "docs/open-commerce/capability-baseline.md",
         "docs/open-commerce/integration-architecture.md",
         "docs/open-commerce/decision-register.md"
+      ]
+    },
+    "docs/open-commerce/ai-resource-control.md": {
+      "doc_type": "technical_guide",
+      "audience": [
+        "开发者",
+        "运维人员",
+        "AI 代理"
+      ],
+      "owner": "AI 资源控制面",
+      "reviewed_at": "2026-07-31",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/ai_resource_control/api.rs",
+        "file:server/src/ai_resource_control/service.rs",
+        "file:pc-frontend/src/features/open-commerce/AiResourceControlPanel.tsx"
+      ],
+      "related": [
+        "docs/decisions/ai-resource-control-v1.md",
+        "docs/open-commerce/integration-architecture.md"
       ]
     },
     "docs/open-commerce/capability-baseline.md": {
@@ -725,6 +940,27 @@
       "related": [
         "docs/decisions/open-commerce-network-principles.md",
         "docs/decisions/open-commerce-network-v1-architecture.md"
+      ]
+    },
+    "docs/open-commerce/consumer-developer-sandbox.md": {
+      "doc_type": "technical_guide",
+      "audience": [
+        "开发者",
+        "产品负责人",
+        "AI 代理"
+      ],
+      "owner": "开放商业网络",
+      "reviewed_at": "2026-07-31",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/open_commerce_client_api.rs",
+        "file:server/src/open_commerce_consumer.rs",
+        "file:pc-frontend/src/features/open-commerce/DeveloperCommercePortal.tsx",
+        "file:pc-frontend/src/features/open-commerce/ConsumerCommerceSandbox.tsx"
+      ],
+      "related": [
+        "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md",
+        "docs/open-commerce-network-v1-api.md"
       ]
     },
     "docs/open-commerce/integration-architecture.md": {
@@ -1377,7 +1613,15 @@
       "pinned": false
     }
   },
-  "audit_log": [],
+  "audit_log": [
+    {
+      "id": "open-commerce-independent-loops-20260731",
+      "action": "document.knowledge_graph.update",
+      "target": ".elon/document-sections.json",
+      "summary": "拆分开放商业消费者与开发者沙盒、AI 资源控制、连接器 SDK 和影子经济文档，并补齐主题归属、治理元数据与知识图关系",
+      "at": "2026-07-31T04:49:16Z"
+    }
+  ],
   "knowledge_graph": {
     "nodes": [
       {
@@ -1435,13 +1679,95 @@
         ]
       },
       {
+        "id": "cap-open-commerce-connectors",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "商户数据接入控制面与连接器 SDK",
+        "detail": "厂商无关来源登记、脱敏同步回执、连接器契约和兼容性门禁；不包含具体大厂生产适配器",
+        "parent_id": "cap-open-commerce",
+        "order": 15,
+        "color": "#4FA9B8",
+        "entrypoint": "docs/open-commerce/connector-sdk.md",
+        "document_paths": [
+          "docs/decisions/open-commerce-integration-control-plane.md",
+          "docs/open-commerce/connector-sdk.md",
+          "docs/open-commerce-integration-control-plane-acceptance.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/open_commerce_integration_model.rs",
+          "file:sdk/open-commerce-connector/src/index.js",
+          "test:sdk/open-commerce-connector/test/compatibility.test.mjs",
+          "route:/api/open-commerce/connector-contract"
+        ],
+        "tags": [
+          "connector",
+          "integration",
+          "sdk",
+          "sync-receipt"
+        ]
+      },
+      {
+        "id": "cap-open-commerce-consumer-developer",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "消费者与开发者沙盒",
+        "detail": "非付费发现、项目测试 App、显式授权、一次性测试凭据和能力调用调试",
+        "parent_id": "cap-open-commerce",
+        "order": 20,
+        "color": "#58A8DF",
+        "entrypoint": "docs/open-commerce/consumer-developer-sandbox.md",
+        "document_paths": [
+          "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md",
+          "docs/open-commerce/consumer-developer-sandbox.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/open_commerce_client_api.rs",
+          "file:server/src/open_commerce_consumer.rs",
+          "file:pc-frontend/src/features/open-commerce/DeveloperCommercePortal.tsx",
+          "test:server/src/open_commerce_client_service_tests.rs"
+        ],
+        "tags": [
+          "authorization",
+          "consumer",
+          "developer",
+          "sandbox"
+        ]
+      },
+      {
+        "id": "cap-ai-resource-control",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "项目 AI 资源控制面",
+        "detail": "盘点自己的 Codex、本人节点、授权共享 Codex 和平台模型，保存策略并预演路由",
+        "parent_id": "cap-open-commerce",
+        "order": 30,
+        "color": "#73A75C",
+        "entrypoint": "docs/open-commerce/ai-resource-control.md",
+        "document_paths": [
+          "docs/decisions/ai-resource-control-v1.md",
+          "docs/open-commerce/ai-resource-control.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/ai_resource_control/api.rs",
+          "file:server/src/ai_resource_control/service.rs",
+          "file:pc-frontend/src/features/open-commerce/AiResourceControlPanel.tsx",
+          "test:server/src/ai_resource_control/tests.rs"
+        ],
+        "tags": [
+          "control-plane",
+          "preview",
+          "resource",
+          "routing"
+        ]
+      },
+      {
         "id": "cap-open-commerce-resources",
         "view": "capabilities",
         "kind": "capability",
         "label": "共享 AI 资源与任务回执",
         "detail": "API Token、计算节点、Matter/Assignment、用量计量和链外审计回执",
         "parent_id": "cap-open-commerce",
-        "order": 20,
+        "order": 40,
         "color": "#73A75C",
         "entrypoint": "docs/open-commerce/integration-architecture.md",
         "document_paths": [
@@ -1462,13 +1788,41 @@
         ]
       },
       {
+        "id": "cap-task-shadow-economy",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "链外影子经济与对账",
+        "detail": "真实用量凭证、验收后双分录和未提交网络的 Sui 投影信封；默认关闭且不移动资金",
+        "parent_id": "cap-open-commerce",
+        "order": 45,
+        "color": "#D0A34F",
+        "entrypoint": "docs/task-shadow-settlement-v1-api.md",
+        "document_paths": [
+          "docs/decisions/task-shadow-settlement-v1.md",
+          "docs/task-shadow-settlement-v1-api.md",
+          "docs/task-shadow-settlement-v1-acceptance.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/task_settlement/service.rs",
+          "file:server/src/task_settlement/sui_projection.rs",
+          "file:pc-frontend/src/features/open-commerce/ShadowEconomyPanel.tsx",
+          "test:server/src/task_settlement/service_tests.rs"
+        ],
+        "tags": [
+          "double-entry",
+          "receipt",
+          "shadow",
+          "sui-projection"
+        ]
+      },
+      {
         "id": "cap-open-commerce-sui-proposal",
         "view": "capabilities",
         "kind": "planned_capability",
         "label": "Sui AI 经济层提案",
         "detail": "NET、CREDIT、RevenuePosition 和链上结算仍是提案，不属于当前实现",
         "parent_id": "cap-open-commerce",
-        "order": 30,
+        "order": 50,
         "color": "#8E82D8",
         "entrypoint": "docs/drafts/open-commerce-network-sui-agent-economy.md",
         "document_paths": [
@@ -1508,6 +1862,33 @@
           "grant",
           "invocation",
           "settlement"
+        ]
+      },
+      {
+        "id": "arch-open-commerce-client-sandbox",
+        "view": "architecture",
+        "kind": "component",
+        "label": "开放商业客户端沙盒",
+        "detail": "消费者发现、开发者 App 身份、授权申请和测试 Token 调用共用开放商业领域服务",
+        "parent_id": "arch-open-commerce",
+        "order": 10,
+        "color": "#58A8DF",
+        "entrypoint": "docs/open-commerce/consumer-developer-sandbox.md",
+        "document_paths": [
+          "docs/open-commerce/consumer-developer-sandbox.md",
+          "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/open_commerce_client_api.rs",
+          "file:server/src/open_commerce_consumer.rs",
+          "file:server/src/store/open_commerce_developer_apps.rs",
+          "file:server/src/store/open_commerce_authorization_requests.rs"
+        ],
+        "tags": [
+          "app-identity",
+          "authorization",
+          "discovery",
+          "sandbox"
         ]
       },
       {
@@ -1711,6 +2092,32 @@
           "ai-cli",
           "group-ai",
           "router"
+        ]
+      },
+      {
+        "id": "arch-ai-resource-control",
+        "view": "architecture",
+        "kind": "component",
+        "label": "AI 资源控制面",
+        "detail": "从现有保险箱、节点、授权和模型配置投影资源，校验项目策略并生成无副作用预演",
+        "parent_id": "arch-ai-control",
+        "order": 20,
+        "color": "#73A75C",
+        "entrypoint": "docs/open-commerce/ai-resource-control.md",
+        "document_paths": [
+          "docs/open-commerce/ai-resource-control.md",
+          "docs/decisions/ai-resource-control-v1.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/ai_resource_control/model.rs",
+          "file:server/src/ai_resource_control/service.rs",
+          "file:server/src/store/ai_resource_control.rs"
+        ],
+        "tags": [
+          "policy",
+          "preview",
+          "resource",
+          "routing"
         ]
       },
       {
@@ -2430,11 +2837,53 @@
     ],
     "edges": [
       {
+        "id": "cap-open-commerce-connectors-v1",
+        "source": "cap-open-commerce-connectors",
+        "target": "cap-open-commerce-v1",
+        "relation": "feeds",
+        "label": "同步事实形成商户能力"
+      },
+      {
+        "id": "cap-open-commerce-consumer-v1",
+        "source": "cap-open-commerce-consumer-developer",
+        "target": "cap-open-commerce-v1",
+        "relation": "uses",
+        "label": "发现、授权与调用"
+      },
+      {
         "id": "cap-open-commerce-v1-resources",
         "source": "cap-open-commerce-v1",
         "target": "cap-open-commerce-resources",
         "relation": "records_usage_with",
         "label": "调用计量与任务回执"
+      },
+      {
+        "id": "cap-resources-shadow-economy",
+        "source": "cap-open-commerce-resources",
+        "target": "cap-task-shadow-economy",
+        "relation": "feeds",
+        "label": "真实用量进入影子对账"
+      },
+      {
+        "id": "cap-shadow-sui-proposal",
+        "source": "cap-task-shadow-economy",
+        "target": "cap-open-commerce-sui-proposal",
+        "relation": "precedes",
+        "label": "先验证链外事实再评估链上"
+      },
+      {
+        "id": "arch-client-sandbox-commerce",
+        "source": "arch-open-commerce-client-sandbox",
+        "target": "arch-open-commerce",
+        "relation": "uses",
+        "label": "共用开放商业领域服务"
+      },
+      {
+        "id": "arch-resource-control-ai",
+        "source": "arch-ai-resource-control",
+        "target": "arch-ai-control",
+        "relation": "projects",
+        "label": "盘点资源并预演策略"
       },
       {
         "id": "arch-open-commerce-data",
