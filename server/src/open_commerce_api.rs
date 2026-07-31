@@ -51,6 +51,10 @@ struct ProjectCaller {
 pub fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route(
+            "/api/open-commerce/connector-contract",
+            get(connector_contract),
+        )
+        .route(
             "/api/projects/:project_id/open-commerce/overview",
             get(project_overview),
         )
@@ -104,6 +108,10 @@ pub fn routes() -> Router<Arc<AppState>> {
             get(get_merchant),
         )
         .route("/api/open-commerce/invoke", post(invoke_capability))
+}
+
+async fn connector_contract() -> Response {
+    Json(crate::open_commerce_connector_contract::contract()).into_response()
 }
 
 async fn project_development_context(

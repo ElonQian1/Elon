@@ -16,6 +16,7 @@
 6. `docs/decisions/open-commerce-integration-control-plane.md`：查看多平台接入状态、同步回执和 AI 开发上下文边界。
 7. `docs/open-commerce/decision-register.md`：区分已接受决定、试验方向和未决问题。
 8. `docs/decisions/task-shadow-settlement-v1.md`：查看链外影子经济层已经接受的事实来源、账本和 Sui 边界。
+9. `docs/open-commerce/connector-sdk.md`：查看厂商无关连接器契约、数据边界和兼容性门禁。
 
 ## 专题地图
 
@@ -25,6 +26,7 @@
 | 多人、多 AI 协同开发 | 已有实现，持续收口 | `docs/群体ai开发/群体AI开发功能需求与架构设计.md` |
 | 商户节点、能力、授权、调用和审计 | V1 已接受并实现 | `docs/decisions/open-commerce-network-v1-architecture.md`、`docs/open-commerce-network-v1-api.md` |
 | 商户数据来源、健康度和同步回执 | 控制面已实现，具体平台适配器待逐项验收 | `docs/decisions/open-commerce-integration-control-plane.md`、`docs/open-commerce-integration-control-plane-acceptance.md` |
+| 连接器 SDK 与兼容性门禁 | 已实现 V1，尚不包含具体大厂适配器 | `sdk/open-commerce-connector/`、`docs/open-commerce/connector-sdk.md` |
 | API Token 保管与节点计算计量 | 已有实现，尚不是公开交易市场 | `docs/token消费统计.md`、`server/src/store/node_ledger.rs` |
 | 链外影子用量、验收后双分录和 Sui 信封 | V1 已实现、默认关闭，不移动资金 | `docs/decisions/task-shadow-settlement-v1.md`、`docs/task-shadow-settlement-v1-api.md` |
 | 商户 AI 经营、营销内容和业务应用生成 | 产品方向，按真实连接器逐步实现 | `docs/drafts/requirements/open-commerce-network.md` |
