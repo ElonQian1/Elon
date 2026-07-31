@@ -81,6 +81,20 @@ class ChatSocialSideMenuContractTest {
     }
 
     @Test
+    fun timelineVisualMetricsMatchTheCompactFriendSidebarDesign() {
+        assertEquals(128, SocialSidebarTimelineMetrics.DATE_ROW_MIN_HEIGHT_DP)
+        assertEquals(12, SocialSidebarTimelineMetrics.SPINE_WIDTH_DP)
+        assertEquals(16, SocialSidebarTimelineMetrics.SPINE_DOT_SIZE_DP)
+        assertEquals(32, SocialSidebarTimelineMetrics.AVATAR_SIZE_DP)
+        assertEquals(16f, SocialSidebarTimelineMetrics.NAME_TEXT_SP)
+        assertEquals(12f, SocialSidebarTimelineMetrics.TIME_TEXT_SP)
+        assertEquals(14f, SocialSidebarTimelineMetrics.BODY_TEXT_SP)
+        assertEquals(18, SocialSidebarTimelineMetrics.PREVIEW_START_DP)
+        assertEquals(96, SocialSidebarTimelineMetrics.VIDEO_WIDTH_DP)
+        assertEquals(54, SocialSidebarTimelineMetrics.VIDEO_HEIGHT_DP)
+    }
+
+    @Test
     fun dateFavoritesSearchFiltersAndDragSendAreRealInteractivePaths() {
         val view = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/ChatSocialSideMenuView.kt"

@@ -232,54 +232,65 @@ internal class ChatSocialSideMenuView(
     }
 
     private fun dateTimelineRow(item: SocialSidebarTimelineItem): LinearLayout =
-        timelineShell(minHeightDp = 154).apply {
-            addView(timelineSpine(), LinearLayout.LayoutParams(dp(34), LinearLayout.LayoutParams.MATCH_PARENT))
+        timelineShell(minHeightDp = SocialSidebarTimelineMetrics.DATE_ROW_MIN_HEIGHT_DP).apply {
+            addView(timelineSpine(), LinearLayout.LayoutParams(dp(SocialSidebarTimelineMetrics.SPINE_WIDTH_DP), LinearLayout.LayoutParams.MATCH_PARENT))
             addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(SocialSidebarTimelineMetrics.CONTENT_TOP_DP), 0, 0)
                 addView(LinearLayout(context).apply {
-                    gravity = Gravity.CENTER_VERTICAL
                     orientation = LinearLayout.HORIZONTAL
-                    addView(avatar(item), LinearLayout.LayoutParams(dp(54), dp(54)))
+                    isClickable = true
+                    foreground = selectableForeground()
+                    contentDescription = "打开${item.name}聊天"
+                    setOnClickListener { openTimelineConversation(item) }
+                    addView(avatar(item), LinearLayout.LayoutParams(dp(SocialSidebarTimelineMetrics.AVATAR_SLOT_WIDTH_DP), dp(SocialSidebarTimelineMetrics.HEADER_HEIGHT_DP)))
                     addView(TextView(context).apply {
                         includeFontPadding = false
                         maxLines = 1
                         ellipsize = TextUtils.TruncateAt.END
                         text = item.name
-                        textSize = 18f
+                        textSize = SocialSidebarTimelineMetrics.NAME_TEXT_SP
+                        setPadding(0, dp(4), 0, 0)
                         setTextColor(Color.parseColor("#D9D9D9"))
-                    }, LinearLayout.LayoutParams(0, dp(54), 1f).apply { leftMargin = dp(12) })
-                    addView(timeText(item.lastReceivedAt), LinearLayout.LayoutParams(dp(64), dp(54)))
+                    }, LinearLayout.LayoutParams(0, dp(SocialSidebarTimelineMetrics.HEADER_HEIGHT_DP), 1f).apply {
+                        leftMargin = dp(SocialSidebarTimelineMetrics.NAME_START_DP)
+                    })
+                    addView(timeText(item.lastReceivedAt), LinearLayout.LayoutParams(dp(SocialSidebarTimelineMetrics.TIME_WIDTH_DP), dp(SocialSidebarTimelineMetrics.HEADER_HEIGHT_DP)))
                 })
                 addView(messagePreview(item), LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(10)
-                    bottomMargin = dp(20)
+                    leftMargin = dp(SocialSidebarTimelineMetrics.PREVIEW_START_DP)
+                    bottomMargin = dp(SocialSidebarTimelineMetrics.PREVIEW_BOTTOM_DP)
                 })
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                leftMargin = dp(8)
+                leftMargin = dp(SocialSidebarTimelineMetrics.CONTENT_START_DP)
             })
         }
 
     private fun favoriteTimelineRow(item: SocialSidebarTimelineItem): LinearLayout =
-        timelineShell(minHeightDp = 144).apply {
-            addView(timelineSpine(), LinearLayout.LayoutParams(dp(34), LinearLayout.LayoutParams.MATCH_PARENT))
+        timelineShell(minHeightDp = SocialSidebarTimelineMetrics.FAVORITE_ROW_MIN_HEIGHT_DP).apply {
+            addView(timelineSpine(), LinearLayout.LayoutParams(dp(SocialSidebarTimelineMetrics.SPINE_WIDTH_DP), LinearLayout.LayoutParams.MATCH_PARENT))
             addView(LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
+                setPadding(0, dp(SocialSidebarTimelineMetrics.CONTENT_TOP_DP), 0, 0)
                 addView(TextView(context).apply {
                     gravity = Gravity.END or Gravity.CENTER_VERTICAL
                     includeFontPadding = false
                     text = formatSidebarDate(item.lastReceivedAt)
-                    textSize = 15f
+                    textSize = SocialSidebarTimelineMetrics.FAVORITE_DATE_TEXT_SP
                     setTextColor(Color.parseColor("#D9D9D9"))
-                }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(42)))
+                }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(SocialSidebarTimelineMetrics.FAVORITE_DATE_HEIGHT_DP)))
                 addView(messagePreview(item), LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = dp(22) })
+                ).apply {
+                    leftMargin = dp(SocialSidebarTimelineMetrics.PREVIEW_START_DP)
+                    bottomMargin = dp(SocialSidebarTimelineMetrics.PREVIEW_BOTTOM_DP)
+                })
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-                leftMargin = dp(8)
+                leftMargin = dp(SocialSidebarTimelineMetrics.CONTENT_START_DP)
             })
         }
 
@@ -295,13 +306,13 @@ internal class ChatSocialSideMenuView(
             setBackgroundColor(Color.parseColor("#D9D9D9"))
         }, LayoutParams(dp(2), LayoutParams.MATCH_PARENT).apply {
             gravity = Gravity.CENTER_HORIZONTAL
-            topMargin = dp(24)
+            topMargin = dp(SocialSidebarTimelineMetrics.SPINE_LINE_TOP_DP)
         })
         addView(ImageView(context).apply {
             setImageResource(R.drawable.social_sidebar_timeline_dot)
             scaleType = ImageView.ScaleType.FIT_CENTER
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        }, LayoutParams(dp(24), dp(24)).apply {
+        }, LayoutParams(dp(SocialSidebarTimelineMetrics.SPINE_DOT_SIZE_DP), dp(SocialSidebarTimelineMetrics.SPINE_DOT_SIZE_DP)).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
         })
     }
@@ -309,9 +320,6 @@ internal class ChatSocialSideMenuView(
     private fun avatar(item: SocialSidebarTimelineItem): FrameLayout = FrameLayout(context).apply {
         clipChildren = false
         clipToPadding = false
-        isClickable = true
-        foreground = selectableForeground()
-        contentDescription = "打开${item.name}聊天"
         val bitmap = UserProfileStore.decodeAvatar(item.avatarDataUrl)
         addView(ImageView(context).apply {
             scaleType = ImageView.ScaleType.CENTER_CROP
@@ -322,42 +330,37 @@ internal class ChatSocialSideMenuView(
                     cornerRadius = dp(10).toFloat()
                 })
             }
-        }, LayoutParams(dp(46), dp(46)).apply { gravity = Gravity.CENTER })
+        }, LayoutParams(dp(SocialSidebarTimelineMetrics.AVATAR_SIZE_DP), dp(SocialSidebarTimelineMetrics.AVATAR_SIZE_DP)).apply {
+            gravity = Gravity.CENTER
+        })
         if (item.unreadCount > 0) addView(unreadBadge(item.unreadCount))
-        setOnClickListener {
-            requestClose(true)
-            postDelayed({ openConversation(item) }, CLOSE_DELAY_MS)
-        }
     }
-
+    private fun openTimelineConversation(item: SocialSidebarTimelineItem) =
+        requestClose(true).also { postDelayed({ openConversation(item) }, CLOSE_DELAY_MS) }
     private fun unreadBadge(count: Int): TextView {
         val value = if (count > 99) "99+" else count.toString()
-        val width = when {
-            value.length >= 3 -> 34
-            value.length == 2 -> 28
-            else -> 22
-        }
+        val width = when { value.length >= 3 -> 34; value.length == 2 -> 28; else -> 22 }
         return TextView(context).apply {
-            layoutParams = LayoutParams(dp(width), dp(22)).apply {
+            layoutParams = LayoutParams(dp(width), dp(SocialSidebarTimelineMetrics.UNREAD_BADGE_HEIGHT_DP)).apply {
                 gravity = Gravity.TOP or Gravity.END
-                topMargin = -dp(11)
-                rightMargin = -dp(11)
+                topMargin = -dp(9)
+                rightMargin = -dp(9)
             }
-            background = roundedRect("#F04B4F", 11)
+            background = roundedRect("#F04B4F", 9)
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = value
-            textSize = 12f
+            textSize = SocialSidebarTimelineMetrics.UNREAD_BADGE_TEXT_SP
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.WHITE)
         }
     }
-
     private fun timeText(time: Long) = TextView(context).apply {
-        gravity = Gravity.END or Gravity.CENTER_VERTICAL
+        gravity = Gravity.END or Gravity.TOP
         includeFontPadding = false
         text = java.text.SimpleDateFormat("HH:mm", Locale.getDefault()).format(java.util.Date(time))
-        textSize = 15f
+        textSize = SocialSidebarTimelineMetrics.TIME_TEXT_SP
+        setPadding(0, dp(4), 0, 0)
         setTextColor(Color.parseColor("#D9D9D9"))
     }
 
@@ -408,20 +411,19 @@ internal class ChatSocialSideMenuView(
         maxLines = 4
         ellipsize = TextUtils.TruncateAt.END
         text = value
-        textSize = 17f
-        setLineSpacing(dp(4).toFloat(), 1f)
+        textSize = SocialSidebarTimelineMetrics.BODY_TEXT_SP
+        setLineSpacing(dp(SocialSidebarTimelineMetrics.BODY_LINE_EXTRA_DP).toFloat(), 1f)
         setTextColor(Color.parseColor("#D9D9D9"))
-        setPadding(dp(4), dp(8), dp(4), dp(10))
+        setPadding(0, dp(2), 0, dp(6))
     }
 
     private fun mediaPreview(item: SocialSidebarTimelineItem, message: ChatMessage?): FrameLayout {
-        val isVideo = (message?.attachments.orEmpty().any {
-            it.kind == "video" || it.mimeType.orEmpty().startsWith("video/")
-        }) || item.summary.contains("视频")
+        val isVideo = message?.attachments.orEmpty().any { it.kind == "video" ||
+            it.mimeType.orEmpty().startsWith("video/") } || item.summary.contains("视频")
         return FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
-                if (isVideo) dp(176) else dp(142),
-                if (isVideo) dp(96) else dp(128)
+                dp(if (isVideo) SocialSidebarTimelineMetrics.VIDEO_WIDTH_DP else SocialSidebarTimelineMetrics.IMAGE_WIDTH_DP),
+                dp(if (isVideo) SocialSidebarTimelineMetrics.VIDEO_HEIGHT_DP else SocialSidebarTimelineMetrics.IMAGE_HEIGHT_DP)
             )
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
@@ -432,7 +434,9 @@ internal class ChatSocialSideMenuView(
                 addView(ImageView(context).apply {
                     setImageResource(R.drawable.social_sidebar_play)
                     scaleType = ImageView.ScaleType.FIT_CENTER
-                }, LayoutParams(dp(30), dp(42)).apply { gravity = Gravity.CENTER })
+                }, LayoutParams(dp(SocialSidebarTimelineMetrics.PLAY_WIDTH_DP), dp(SocialSidebarTimelineMetrics.PLAY_HEIGHT_DP)).apply {
+                    gravity = Gravity.CENTER
+                })
             } else {
                 addView(TextView(context).apply {
                     gravity = Gravity.CENTER
