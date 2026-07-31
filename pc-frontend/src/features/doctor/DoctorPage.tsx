@@ -5,10 +5,10 @@ import { formatTime } from '../../lib/utils'
 import styles from './DoctorPage.module.css'
 
 const SECTIONS = [
-  { id: 'snapshot', icon: '⌁', title: '体检快照', description: '查看本机状态' },
-  { id: 'router', icon: '⇩', title: '下载加速', description: '优化 Rust / npm 下载' },
-  { id: 'repair', icon: '✦', title: '修复动作', description: '执行白名单修复' },
-  { id: 'memory', icon: '▱', title: '问题记忆', description: '回看解决过的问题' },
+  { id: 'snapshot', icon: '⌁', title: '体检快照' },
+  { id: 'router', icon: '⇩', title: '下载加速' },
+  { id: 'repair', icon: '✦', title: '修复动作' },
+  { id: 'memory', icon: '▱', title: '问题记忆' },
 ] as const
 
 const QUICK_PROMPTS = [
@@ -78,18 +78,13 @@ export default function DoctorPage() {
       {/* 侧边栏 */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarBrand}>
-          <div className={styles.doctorBadge}>医</div>
           <div>
             <strong>电脑医生</strong>
-            <span>本机问题诊断</span>
           </div>
         </div>
         <button className={styles.newSession} onClick={createSession}>
           <span className={styles.newSessionIcon}>+</span>
-          <span className={styles.newSessionText}>
-            <strong>新建诊断</strong>
-            <small>从一个新的问题开始</small>
-          </span>
+          <strong>新建诊断</strong>
         </button>
 
         <div className={styles.sideSection}>诊断会话</div>
@@ -120,10 +115,7 @@ export default function DoctorPage() {
             onClick={() => setSection(sc.id)}
           >
             <span className={styles.toolIcon}>{sc.icon}</span>
-            <span className={styles.toolText}>
-              <strong>{sc.title}</strong>
-              <small>{sc.description}</small>
-            </span>
+            <span>{sc.title}</span>
           </button>
         ))}
       </aside>
@@ -134,9 +126,7 @@ export default function DoctorPage() {
           <div>
             <div className={styles.kicker}>电脑医生 · 本机工作台</div>
             <h2 className={styles.title}>{sessionTitle}</h2>
-            <p className={styles.subtitle}>分析问题、检查状态，并按需执行安全修复</p>
           </div>
-          <span className={styles.scopePill}>本机诊断</span>
           <div className={styles.headerActions}>
             <button className={styles.actionBtn} onClick={loadSnapshot}>开始体检</button>
             <button className={styles.actionBtn} onClick={() => analyze()} disabled={!problem}>分析当前问题</button>
@@ -149,8 +139,6 @@ export default function DoctorPage() {
             <>
               {messages.length === 0 && !result && (
                 <div className={styles.emptyState}>
-                  <div className={styles.emptyIcon}>医</div>
-                  <div className={styles.emptyEyebrow}>开始一次诊断</div>
                   <h3>电脑哪里不舒服？</h3>
                   <p>描述你看到的现象，电脑医生会先分析原因，再给出检查或修复建议。</p>
                   <div className={styles.quickPrompts}>
@@ -158,7 +146,7 @@ export default function DoctorPage() {
                       <button key={prompt} type="button" onClick={() => setInput(prompt)}>{prompt}</button>
                     ))}
                   </div>
-                  <div className={styles.emptyActions}>
+                  <div className={styles.quickPrompts}>
                     <button type="button" onClick={loadSnapshot}>先做一次只读体检</button>
                     <button type="button" onClick={() => setSection('repair')}>查看可用修复动作</button>
                   </div>

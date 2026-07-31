@@ -5,7 +5,6 @@
   grid-template-columns: 248px minmax(0, 1fr);
   height: 100%;
   overflow: hidden;
-  background: var(--bg-base);
 }
 
 /* ── 侧边栏 ── */
@@ -33,30 +32,6 @@
 
 .sidebarBrand strong {
   color: var(--text-primary);
-  font-size: 15px;
-}
-
-.sidebarBrand span {
-  margin-top: 3px;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
-.doctorBadge,
-.emptyIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  background: var(--accent-dim);
-  border: 1px solid rgba(138, 215, 255, 0.25);
-  color: #8ad7ff;
-  font-weight: 800;
-}
-
-.doctorBadge {
-  width: 34px;
-  height: 34px;
   font-size: 15px;
 }
 
@@ -97,29 +72,6 @@
   background: rgba(138, 215, 255, 0.14);
   font-size: 17px;
   line-height: 1;
-}
-
-.newSessionText,
-.toolText {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-}
-
-.newSessionText strong,
-.toolText strong {
-  color: inherit;
-  font-size: 12px;
-}
-
-.newSessionText small,
-.toolText small {
-  color: var(--text-muted);
-  font-size: 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .sessionBtn {
@@ -197,14 +149,6 @@
   flex-shrink: 0;
 }
 
-.toolActive .toolIcon {
-  background: rgba(138, 215, 255, 0.14);
-}
-
-.toolText {
-  flex: 1;
-}
-
 .sideEmpty {
   padding: 8px 10px;
   color: var(--text-muted);
@@ -216,7 +160,6 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: hidden;
-  min-width: 0;
 }
 
 .header {
@@ -240,23 +183,6 @@
   margin: 3px 0 0;
   font-size: 18px;
   color: var(--text-primary);
-}
-
-.subtitle {
-  margin: 4px 0 0;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.scopePill {
-  margin-left: auto;
-  padding: 5px 9px;
-  border: 1px solid rgba(46, 168, 97, 0.3);
-  border-radius: 999px;
-  color: #8ee6b3;
-  background: rgba(46, 168, 97, 0.1);
-  font-size: 11px;
-  white-space: nowrap;
 }
 
 .headerActions {
@@ -298,15 +224,6 @@
   margin-inline: auto;
 }
 
-.emptyHint {
-  padding: 14px;
-  border: 1px dashed #454954;
-  border-radius: 8px;
-  color: var(--text-muted);
-  line-height: 1.55;
-  font-size: 13px;
-}
-
 .emptyState {
   display: flex;
   flex-direction: column;
@@ -315,20 +232,6 @@
   min-height: min(470px, 62vh);
   padding: 30px 20px;
   text-align: center;
-}
-
-.emptyIcon {
-  width: 52px;
-  height: 52px;
-  margin-bottom: 16px;
-  border-radius: 16px;
-  font-size: 22px;
-}
-
-.emptyEyebrow {
-  color: #8ad7ff;
-  font-size: 12px;
-  font-weight: 800;
 }
 
 .emptyState h3 {
@@ -345,8 +248,7 @@
   line-height: 1.7;
 }
 
-.quickPrompts,
-.emptyActions {
+.quickPrompts {
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
@@ -357,8 +259,7 @@
   margin-top: 22px;
 }
 
-.quickPrompts button,
-.emptyActions button {
+.quickPrompts button {
   padding: 8px 11px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -368,20 +269,10 @@
   transition: background var(--transition), border-color var(--transition), color var(--transition);
 }
 
-.quickPrompts button:hover,
-.emptyActions button:hover {
+.quickPrompts button:hover {
   border-color: rgba(138, 215, 255, 0.45);
   color: var(--text-primary);
   background: var(--bg-hover);
-}
-
-.emptyActions {
-  margin-top: 12px;
-}
-
-.emptyActions button:first-child {
-  border-color: rgba(138, 215, 255, 0.28);
-  color: #8ad7ff;
 }
 
 .msgRow {
