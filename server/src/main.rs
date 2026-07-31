@@ -23,6 +23,8 @@ mod agent_routing;
 mod agent_runtime_error_summary;
 mod agent_tool_calls;
 mod ai_cli;
+mod ai_resource_control;
+mod ai_resource_control_migration;
 mod api;
 mod app_update;
 mod auth_api;

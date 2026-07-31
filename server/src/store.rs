@@ -5,6 +5,7 @@ use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
 mod admin_stats;
 mod admin_stats_quotas;
+mod ai_resource_policies;
 mod billing;
 mod billing_alerts;
 mod billing_pay;
