@@ -3574,6 +3574,22 @@
       min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
       padding: 8px max(0px, calc(50% - 160px)) max(8px, env(safe-area-inset-bottom));
     }
+    .tabs-bar::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: -24px;
+      width: 100vw;
+      height: 24px;
+      transform: translateX(-50%);
+      background: linear-gradient(
+        to bottom,
+        rgb(0 0 0 / 0%) 0%,
+        rgb(0 0 0 / 60%) 50%,
+        var(--bg) 100%
+      );
+      pointer-events: none;
+    }
     .tabs-panel {
       min-width: 0;
       height: 56px;

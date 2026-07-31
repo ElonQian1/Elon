@@ -9,19 +9,37 @@ import org.junit.Test
 
 class BottomNavigationInsetsContractTest {
     @Test
-    fun bottomMenuUsesOpaquePageBackgroundOnBothSurfaces() {
+    fun bottomMenuUsesOpaqueBaseAndFadeOnBothSurfaces() {
+        val dimens = readRepositoryFile("android/app/src/main/res/values/dimens.xml")
         val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
+        val fade = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_fade.xml")
+        assertTrue(dimens.contains("name=\"main_bottom_menu_fade_height\">24dp</dimen>"))
         assertTrue(
             Regex(
                 """android:id="@\+id/pageTabs"[^>]*android:background="@color/elon_bg_app"""",
                 RegexOption.DOT_MATCHES_ALL
             ).containsMatchIn(layout)
         )
+        assertTrue(
+            Regex(
+                """android:id="@\+id/bottomMenuFade"[^>]*android:layout_height="@dimen/main_bottom_menu_fade_height"[^>]*android:layout_marginTop="-24dp"[^>]*android:background="@drawable/bg_bottom_nav_fade"""",
+                RegexOption.DOT_MATCHES_ALL
+            ).containsMatchIn(layout)
+        )
+        assertTrue(fade.contains("android:startColor=\"@android:color/transparent\""))
+        assertTrue(fade.contains("android:centerColor=\"#99000000\""))
+        assertTrue(fade.contains("android:endColor=\"@color/elon_bg_app\""))
 
         val web = readRepositoryFile("server/src/assets/web_page.html")
         assertTrue(
             Regex(
                 """\.tabs-bar\s*\{[^}]*background:\s*var\(--bg\);""",
+                RegexOption.DOT_MATCHES_ALL
+            ).containsMatchIn(web)
+        )
+        assertTrue(
+            Regex(
+                """\.tabs-bar::before\s*\{[^}]*top:\s*-24px;[^}]*height:\s*24px;[^}]*background:\s*linear-gradient\([^}]*var\(--bg\)\s+100%""",
                 RegexOption.DOT_MATCHES_ALL
             ).containsMatchIn(web)
         )
