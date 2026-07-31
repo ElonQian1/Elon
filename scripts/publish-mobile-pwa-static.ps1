@@ -24,7 +24,9 @@ if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
 
 $sourceSha = (& git -C $repoRoot rev-parse HEAD).Trim()
 $localHash = (Get-FileHash -LiteralPath $SourcePath -Algorithm SHA256).Hash.ToLowerInvariant()
-$remoteDirectory = Split-Path $RemotePath -Parent
+$remoteSeparator = $RemotePath.LastIndexOf('/')
+if ($remoteSeparator -le 0) { throw "RemotePath must be an absolute POSIX path: $RemotePath" }
+$remoteDirectory = $RemotePath.Substring(0, $remoteSeparator)
 $stagingPath = "$RemotePath.$sourceSha.tmp"
 
 Write-Host 'MOBILE_PWA_STATIC_POLICY=atomic_template_without_server_rebuild'
@@ -60,7 +62,7 @@ $swap = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label '
     -ArgumentList ($sshOptions + @($ServerHost, $swapCommand))
 Assert-ElonNativeCommand -Result $swap -FailureMessage 'Unable to atomically publish mobile PWA template.'
 
-$verifyCommand = "printf '%s %s' `"`$(sha256sum '$RemotePath' | awk '{print `$1}')`" `"`$(stat -c %s '$RemotePath')`""
+$verifyCommand = "set -eu; printf '%s %s' `"`$(sha256sum '$RemotePath' | awk '{print `$1}')`" `"`$(stat -c %s '$RemotePath')`""
 $verify = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label 'mobile-pwa-verify' `
     -ArgumentList ($sshOptions + @($ServerHost, $verifyCommand))
 Assert-ElonNativeCommand -Result $verify -FailureMessage 'Unable to verify mobile PWA template.'

@@ -27,6 +27,10 @@ $success = Invoke-ElonNativeCommand -FilePath 'cmd.exe' -TimeoutSeconds 10 -Labe
     -ArgumentList @('/d', '/s', '/c', 'echo native-ok')
 Assert-True ($success.ExitCode -eq 0) 'Native command success exit code was not preserved.'
 Assert-True ($success.Stdout.Contains('native-ok')) 'Native command stdout was not captured.'
+$failure = Invoke-ElonNativeCommand -FilePath 'cmd.exe' -TimeoutSeconds 10 -Label 'native failure' `
+    -ArgumentList @('/d', '/s', '/c', 'exit 7')
+Assert-True ($failure.ExitCode -eq 7 -and -not $failure.TimedOut) `
+    'Native command failure exit code was not preserved.'
 
 $timeoutWatch = [System.Diagnostics.Stopwatch]::StartNew()
 $timeout = Invoke-ElonNativeCommand -FilePath 'powershell.exe' -TimeoutSeconds 1 -Label 'native timeout' `
@@ -76,5 +80,8 @@ Assert-True (-not $serverPublisher.Contains("-Phase 'pc_frontend' -Status 'skipp
 & powershell -NoProfile -ExecutionPolicy Bypass -File `
     (Join-Path $repoRoot 'scripts\publish-mobile-pwa-static.ps1') -PlanOnly
 if ($LASTEXITCODE -ne 0) { throw 'Static mobile PWA plan failed.' }
+$staticPublisher = Get-Content -LiteralPath (Join-Path $repoRoot 'scripts\publish-mobile-pwa-static.ps1') -Raw
+Assert-True (-not $staticPublisher.Contains('Split-Path $RemotePath')) `
+    'The static publisher treats a POSIX remote path as a Windows path.'
 
 Write-Host 'RELEASE_WORKFLOW_OPTIMIZATION_TESTS=passed'

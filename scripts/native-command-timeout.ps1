@@ -71,6 +71,9 @@ function Invoke-ElonNativeCommand {
             -PassThru -WindowStyle Hidden `
             -RedirectStandardOutput $stdoutPath `
             -RedirectStandardError $stderrPath
+        # Windows PowerShell 5 may report ExitCode=0 for a fast process unless
+        # its native handle is materialized before the process exits.
+        [void]$process.Handle
 
         while (-not $process.HasExited -and $watch.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
             Start-Sleep -Milliseconds 200
