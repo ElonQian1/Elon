@@ -60,6 +60,7 @@ Assert-Contains $rendererWorkflow 'RENDERER_PREPARATION_ATTEMPTS=0'
 Assert-Contains $uiSkill 'must not block Server/PWA or APK publication or repository finish'
 $postflight = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts\apk-publish-postflight.ps1')
 Assert-Contains $postflight 'VERIFICATION_DEFERRED=real_device_unavailable'
+Assert-Contains $postflight "Arguments @('kill-server')"
 $lanDistClient = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts\lan-dist-client.ps1')
 Assert-Contains $lanDistClient '-RedirectStandardOutput "$LogFile.stdout"'
 
