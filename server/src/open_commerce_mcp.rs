@@ -24,6 +24,8 @@ use crate::{
         SetOpenCommerceRateLimitEnabledRequest, UpsertOpenCommerceRateLimitRequest,
     },
     open_commerce_rate_limit_service,
+    open_commerce_relationship_model::CreateConsumerRelationshipRequest,
+    open_commerce_relationship_service,
     open_commerce_runtime_model::UpsertRuntimeBindingRequest,
     open_commerce_runtime_service,
     open_commerce_service::{self, OpenCommerceActor},
@@ -82,6 +84,19 @@ struct RuntimeBindingArguments {
 #[derive(Debug, Deserialize)]
 struct RevokeGrantArguments {
     grant_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateConsumerRelationshipArguments {
+    merchant_id: String,
+    scopes: Vec<String>,
+    purpose: String,
+    expires_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RevokeConsumerRelationshipArguments {
+    relationship_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -235,6 +250,26 @@ pub(crate) async fn call_tool(
                 &input.merchant_id,
             )?)?
         }
+        "open_commerce_list_consumer_relationships" => {
+            ensure_empty_object(&arguments, name)?;
+            serde_json::to_value(
+                open_commerce_relationship_service::list_consumer_relationships(
+                    store, project_id, &actor, 100,
+                )?,
+            )?
+        }
+        "open_commerce_list_merchant_relationships" => {
+            let input: MerchantArguments = decode(arguments, name)?;
+            serde_json::to_value(
+                open_commerce_relationship_service::list_merchant_relationships(
+                    store,
+                    project_id,
+                    &input.merchant_id,
+                    &actor,
+                    100,
+                )?,
+            )?
+        }
         "open_commerce_create_merchant" => {
             let input: CreateMerchantRequest = decode(arguments, name)?;
             serde_json::to_value(open_commerce_service::create_merchant(
@@ -259,6 +294,30 @@ pub(crate) async fn call_tool(
                 &input.merchant_id,
                 &actor,
                 input.published,
+            )?)?
+        }
+        "open_commerce_create_consumer_relationship" => {
+            let input: CreateConsumerRelationshipArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_relationship_service::create_relationship(
+                store,
+                project_id,
+                &actor,
+                CreateConsumerRelationshipRequest {
+                    merchant_id: input.merchant_id,
+                    source_app_id: app_id.to_string(),
+                    scopes: input.scopes,
+                    purpose: input.purpose,
+                    expires_at: input.expires_at,
+                },
+            )?)?
+        }
+        "open_commerce_revoke_consumer_relationship" => {
+            let input: RevokeConsumerRelationshipArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_relationship_service::revoke_relationship(
+                store,
+                project_id,
+                &input.relationship_id,
+                &actor,
             )?)?
         }
         "open_commerce_upsert_runtime" => {

@@ -38,15 +38,17 @@
 28. `docs/open-commerce-grant-budgets-v1-acceptance.md`：查看授权生命周期预算 V1 的验证证据。
 29. `docs/decisions/open-commerce-grant-expiration-v1.md`：查看商户限时授权、安全默认值和到期失败关闭边界。
 30. `docs/open-commerce-grant-expiration-v1-acceptance.md`：查看 Grant 限时授权 V1 的验证证据。
-31. `docs/decisions/open-commerce-invocation-recovery-v1.md`：查看孤儿调用失败关闭、Grant 预算回收和迟到结果边界。
-32. `docs/decisions/open-commerce-app-activity-health-v1.md`：查看外部 App 近 24 小时可解释调用证据和人工处置边界。
-33. `docs/open-commerce-app-activity-health-v1-acceptance.md`：查看 App 调用活动证据 V1 的验证结果和未完成范围。
-34. `docs/decisions/node-compute-sharing-supply-v1.md`：查看节点所有者显式开放模型算力及原子调度边界。
-35. `docs/decisions/node-compute-sharing-token-reservation-v1.md`：查看每日实耗、活动预留和本次请求共同受预算约束的边界。
-36. `docs/decisions/node-compute-sharing-runtime-health-v1.md`：查看所有者运行健康快照、告警和非经济处置边界。
-37. `docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md`：查看过期执行终结、预授权回收和非终态状态边界。
-38. `docs/node-compute-sharing-supply-v1-acceptance.md`：查看节点模型共享 V1 的验证证据和未完成范围。
-39. `docs/node-compute-sharing-supply-v1-api.md`：查看策略字段、状态码和发现/调用契约。
+31. `docs/decisions/open-commerce-consumer-relationships-v1.md`：查看消费者自主建立、限时和撤销匿名商户关系的边界。
+32. `docs/open-commerce-consumer-relationships-v1-acceptance.md`：查看消费者关系凭证 V1 的验证证据。
+33. `docs/decisions/open-commerce-invocation-recovery-v1.md`：查看孤儿调用失败关闭、Grant 预算回收和迟到结果边界。
+34. `docs/decisions/open-commerce-app-activity-health-v1.md`：查看外部 App 近 24 小时可解释调用证据和人工处置边界。
+35. `docs/open-commerce-app-activity-health-v1-acceptance.md`：查看 App 调用活动证据 V1 的验证结果和未完成范围。
+36. `docs/decisions/node-compute-sharing-supply-v1.md`：查看节点所有者显式开放模型算力及原子调度边界。
+37. `docs/decisions/node-compute-sharing-token-reservation-v1.md`：查看每日实耗、活动预留和本次请求共同受预算约束的边界。
+38. `docs/decisions/node-compute-sharing-runtime-health-v1.md`：查看所有者运行健康快照、告警和非经济处置边界。
+39. `docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md`：查看过期执行终结、预授权回收和非终态状态边界。
+40. `docs/node-compute-sharing-supply-v1-acceptance.md`：查看节点模型共享 V1 的验证证据和未完成范围。
+41. `docs/node-compute-sharing-supply-v1-api.md`：查看策略字段、状态码和发现/调用契约。
 
 ## 专题地图
 
@@ -59,13 +61,13 @@
 | 通用 ERP 蓝图与智能提案 | V1 已实现，代码执行仍走既有项目流程 | `docs/erp/README.md`、`docs/erp/acceptance-v1.md` |
 | 商户数据来源、健康度和同步回执 | 控制面已实现，具体平台适配器待逐项验收 | `docs/decisions/open-commerce-integration-control-plane.md`、`docs/open-commerce-integration-control-plane-acceptance.md` |
 | 连接器 SDK 与兼容性门禁 | 已实现 V1，尚不包含具体大厂适配器 | `sdk/open-commerce-connector/`、`docs/open-commerce/connector-sdk.md` |
-| 消费者发现与第三方应用接入 | 跨项目基础目录、授权沙盒、App/申请生命周期、限时 Grant、调用配额、Grant 总预算、孤儿调用回收、商户侧调用活动证据及手动封禁已实现，生产公共网络未完成 | `docs/decisions/open-commerce-directory-publication-v1.md`、`docs/decisions/open-commerce-developer-lifecycle-v1.md`、`docs/decisions/open-commerce-grant-expiration-v1.md`、`docs/decisions/open-commerce-rate-limits-v1.md`、`docs/decisions/open-commerce-grant-budgets-v1.md`、`docs/decisions/open-commerce-invocation-recovery-v1.md`、`docs/decisions/open-commerce-app-activity-health-v1.md`、`docs/decisions/open-commerce-app-blocks-v1.md` |
+| 消费者发现、关系授权与第三方应用接入 | 跨项目基础目录、消费者匿名关系凭证、授权沙盒、App/申请生命周期、限时 Grant、调用配额、Grant 总预算、孤儿调用回收、商户侧调用活动证据及手动封禁已实现，生产公共网络未完成 | `docs/decisions/open-commerce-directory-publication-v1.md`、`docs/decisions/open-commerce-consumer-relationships-v1.md`、`docs/decisions/open-commerce-developer-lifecycle-v1.md`、`docs/decisions/open-commerce-grant-expiration-v1.md`、`docs/decisions/open-commerce-rate-limits-v1.md`、`docs/decisions/open-commerce-grant-budgets-v1.md`、`docs/decisions/open-commerce-invocation-recovery-v1.md`、`docs/decisions/open-commerce-app-activity-health-v1.md`、`docs/decisions/open-commerce-app-blocks-v1.md` |
 | AI 资源盘点、策略与路由预演 | 控制面已实现，尚未接管真实任务调度 | `docs/open-commerce/ai-resource-control.md`、`server/src/ai_resource_control/` |
 | API Token 保管与节点计算计量 | 已有实现，尚不是公开 Token 交易市场 | `docs/token消费统计.md`、`server/src/store/node_ledger.rs` |
 | 节点模型算力显式共享 | V1 已实现，包含模型白名单、并发、每日预算、所有者健康快照和过期执行回收；尚不是完整算力市场 | `docs/decisions/node-compute-sharing-supply-v1.md`、`docs/decisions/node-compute-sharing-runtime-health-v1.md`、`docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md`、`docs/node-compute-sharing-supply-v1-acceptance.md` |
 | 链外影子用量、验收后双分录、争议纠正和 Sui 投影包 | V1 已实现、默认关闭；纠正可追加冲销与替换、解析当前有效凭证并保存链下原子包；所有读取失败关闭，所有包均不提交网络、不移动资金 | `docs/decisions/task-shadow-settlement-v1.md`、`docs/decisions/task-shadow-settlement-corrections-v1.md`、`docs/decisions/task-shadow-settlement-lineage-v1.md`、`docs/decisions/sui-correction-projection-packages-v1.md`、`docs/task-shadow-settlement-v1-api.md` |
 | 商户 AI 经营、营销内容和业务应用生成 | 产品方向，按真实连接器逐步实现 | `docs/drafts/requirements/open-commerce-network.md` |
-| 消费者 AI 与任意商户节点互联 | 商户主动发布、跨项目发现、授权、调用、固定时间窗配额、可解释活动证据和手动 App 封禁已实现；生产身份、自动风控和联邦治理仍待完成 | `docs/open-commerce/consumer-developer-sandbox.md`、`docs/decisions/open-commerce-app-activity-health-v1.md`、`docs/drafts/open-commerce-network-roadmap.md` |
+| 消费者 AI 与任意商户节点互联 | 商户主动发布、跨项目发现、消费者限时匿名关系、App 授权、调用、固定时间窗配额、可解释活动证据和手动 App 封禁已实现；关系凭证不保存偏好或订单，生产身份、自动风控和联邦治理仍待完成 | `docs/open-commerce/consumer-developer-sandbox.md`、`docs/decisions/open-commerce-consumer-relationships-v1.md`、`docs/decisions/open-commerce-app-activity-health-v1.md`、`docs/drafts/open-commerce-network-roadmap.md` |
 | 闲置算力公开市场 | 模型推理供给控制已实现；异构任务、竞价、赔付和真实结算仍是提案 | `docs/decisions/node-compute-sharing-supply-v1.md`、`docs/drafts/open-commerce-network-sui-agent-economy.md` |
 | Sui 链上结算、网络资产和收入权益 | 提案；当前仅有未提交网络的链外信封和可复核投影包 | `docs/drafts/open-commerce-network-sui-agent-economy.md`、`docs/decisions/sui-offchain-projection-packages-v1.md` |
 

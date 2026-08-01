@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { KeyRound, Play, RefreshCw, Search } from 'lucide-react'
 import { openCommerceApi } from './openCommerceApi'
 import { openCommerceClientApi } from './openCommerceClientApi'
+import ConsumerRelationshipManager from './ConsumerRelationshipManager'
 import type {
   ConsumerDiscoveryMatch,
   ConsumerDiscoveryResponse,
@@ -42,6 +43,21 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   useEffect(() => {
     loadApps()
   }, [loadApps])
+
+  const discoveredMerchants = useMemo(
+    () => result?.matches.map((match) => match.merchant) ?? [],
+    [result],
+  )
+  const activeApps = useMemo(
+    () => apps.filter((app) => app.status === 'active'),
+    [apps],
+  )
+
+  useEffect(() => {
+    if (appId !== 'pc-web' && !activeApps.some((app) => app.app_id === appId)) {
+      setAppId('pc-web')
+    }
+  }, [activeApps, appId])
 
   const discover = useCallback(async () => {
     setBusy(true)
@@ -137,7 +153,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
               请求应用
               <select value={appId} onChange={(event) => setAppId(event.target.value)}>
                 <option value="pc-web">公共网页身份（仅公开能力）</option>
-                {apps.map((app) => <option key={app.id} value={app.app_id}>{app.display_name}</option>)}
+                {activeApps.map((app) => <option key={app.id} value={app.app_id}>{app.display_name}</option>)}
               </select>
             </label>
             <label>搜索词<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="咖啡、维修、零售" /></label>
@@ -194,6 +210,12 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
           </div>
         </section>
       </div>
+
+      <ConsumerRelationshipManager
+        projectId={projectId}
+        sourceAppId={appId}
+        merchants={discoveredMerchants}
+      />
 
       {invocation && <pre className={base.result}>{JSON.stringify(invocation, null, 2)}</pre>}
       {message && <div style={{ ...commerceStyles.message, ...(message.includes('失败') ? errorMessageStyle : {}) }}>{message}</div>}

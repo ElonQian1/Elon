@@ -48,6 +48,25 @@ export interface AuthorizationRequestList {
   requests: AuthorizationRequest[]
 }
 
+export interface ConsumerRelationship {
+  id: string
+  merchant_id: string
+  source_app_id: string
+  subject_alias: string
+  scopes: Array<'preference.remember' | 'membership.link'>
+  purpose: string
+  status: 'active' | 'expired' | 'revoked'
+  expires_at: string
+  revoked_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ConsumerRelationshipList {
+  schema: string
+  relationships: ConsumerRelationship[]
+}
+
 export interface ConsumerPreferences {
   categories: string[]
   tags: string[]

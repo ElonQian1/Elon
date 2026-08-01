@@ -18,6 +18,7 @@
 | 沙盒 App 与授权申请必须有完整生命周期 | 停用永久废弃旧 Token 并取消待处理申请；重新启用生成新 Token；申请方和商户共享同一申请状态 | `docs/decisions/open-commerce-developer-lifecycle-v1.md` |
 | 商户必须能终止失信 App 的访问 | 商户可手动封禁具体 App，并原子撤销 Grant、取消待审批申请；解除不恢复旧信任 | `docs/decisions/open-commerce-app-blocks-v1.md` |
 | 第三方 App 授权应默认有期限 | PC 新授权默认 30 天，长期授权需显式选择；到期不改历史、不自动续期，发现和调用失败关闭 | `docs/decisions/open-commerce-grant-expiration-v1.md` |
+| 消费者关系必须由消费者持有和撤销 | 关系只包含匿名标识、固定范围和最长 366 天期限；商户看不到消费者账号或项目，重新建立关系会更换匿名标识 | `docs/decisions/open-commerce-consumer-relationships-v1.md` |
 | 每个 Grant 可限制完整授权期风险 | 商户可选设置总调用次数和总计量金额；调用前原子预留、失败退回，预算用尽后重新授权 | `docs/decisions/open-commerce-grant-budgets-v1.md` |
 | 孤儿商业调用必须失败关闭并释放 Grant 预留 | 启动时关闭遗留调用，运行期回收超过 120 秒的调用；失败、预算退回、预留释放和脱敏审计保持同一事务 | `docs/decisions/open-commerce-invocation-recovery-v1.md` |
 | App 异常先形成商户可解释证据 | 按商户和外部 App 派生近 24 小时失败、限流、Grant 预算拒绝和中断恢复计数；只提醒人工处置，不自动评分、封禁或赔付 | `docs/decisions/open-commerce-app-activity-health-v1.md` |

@@ -20,8 +20,8 @@ impl Store {
     ) -> Result<OpenCommerceDeveloperAppCredential> {
         let id = new_id("devapp");
         let app_id = normalize_app_id(&request.app_id)?;
-        if app_id == "pc-web" {
-            bail!("pc-web 是系统保留 App ID");
+        if matches!(app_id.as_str(), "pc-web" | "mcp-client") {
+            bail!("pc-web 和 mcp-client 是系统保留 App ID");
         }
         let display_name = validate_display_name(&request.display_name, "开发者应用名称")?;
         let test_token = new_test_token();

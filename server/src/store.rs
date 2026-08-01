@@ -64,6 +64,7 @@ mod open_commerce_app_activity_health;
 mod open_commerce_app_blocks;
 mod open_commerce_authorization_requests;
 mod open_commerce_capabilities;
+mod open_commerce_consumer_relationships;
 mod open_commerce_developer_apps;
 mod open_commerce_directory;
 mod open_commerce_grant_budgets;

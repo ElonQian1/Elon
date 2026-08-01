@@ -161,6 +161,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (124, "影子结算争议纠正 Matter、冲销与替换凭证", crate::task_settlement_correction_migration::migration_v124),
     (125, "Sui 纠正双腿链下投影包与完整性复核", crate::task_sui_correction_projection_migration::migration_v125),
     (126, "共享节点推理每日 Token 预算原子预留", crate::node_compute_reservation_migration::migration_v126),
+    (127, "消费者可撤销关系授权凭证", crate::open_commerce_relationship_migration::migration_v127),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

@@ -46,6 +46,25 @@ pub(crate) fn definitions() -> Vec<Value> {
             true,
         ),
         tool(
+            "open_commerce_list_consumer_relationships",
+            "读取当前用户在本项目持有的消费者关系凭证。只返回匿名关系标识、范围、期限和状态，不返回其他用户的凭证。",
+            json!({"type":"object","properties":{},"additionalProperties":false}),
+            true,
+            true,
+        ),
+        tool(
+            "open_commerce_list_merchant_relationships",
+            "读取当前项目指定商户收到的消费者关系凭证。消费者身份和消费者项目始终脱敏。",
+            json!({
+                "type":"object",
+                "required":["merchant_id"],
+                "properties":{"merchant_id":{"type":"string","minLength":1,"maxLength":120}},
+                "additionalProperties":false
+            }),
+            true,
+            true,
+        ),
+        tool(
             "open_commerce_create_merchant",
             "在当前项目创建商户节点。需要项目编辑权限；默认由平台托管，但数据仍归当前项目控制。",
             json!({
@@ -103,6 +122,38 @@ pub(crate) fn definitions() -> Vec<Value> {
             }),
             false,
             false,
+        ),
+        tool(
+            "open_commerce_create_consumer_relationship",
+            "为当前用户和已发布商户建立限时关系凭证。只授权商户关联用户主动提供的偏好或会员标识，不上传偏好原文、联系方式或订单数据。",
+            json!({
+                "type":"object",
+                "required":["merchant_id","scopes","purpose","expires_at"],
+                "properties":{
+                    "merchant_id":{"type":"string","minLength":1,"maxLength":120},
+                    "scopes":{
+                        "type":"array","minItems":1,"maxItems":2,"uniqueItems":true,
+                        "items":{"type":"string","enum":["preference.remember","membership.link"]}
+                    },
+                    "purpose":{"type":"string","minLength":1,"maxLength":500},
+                    "expires_at":{"type":"string","format":"date-time"}
+                },
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
+        tool(
+            "open_commerce_revoke_consumer_relationship",
+            "撤销当前用户持有的一项消费者关系凭证。重复撤销保持同一结果；商户历史只能继续看到已撤销的匿名凭证。",
+            json!({
+                "type":"object",
+                "required":["relationship_id"],
+                "properties":{"relationship_id":{"type":"string","minLength":1,"maxLength":120}},
+                "additionalProperties":false
+            }),
+            false,
+            true,
         ),
         tool(
             "open_commerce_upsert_runtime",
@@ -358,7 +409,12 @@ fn tool(
         "inputSchema": input_schema,
         "annotations": {
             "readOnlyHint": read_only,
-            "destructiveHint": matches!(name, "open_commerce_revoke_grant" | "open_commerce_block_app"),
+            "destructiveHint": matches!(
+                name,
+                "open_commerce_revoke_grant"
+                    | "open_commerce_block_app"
+                    | "open_commerce_revoke_consumer_relationship"
+            ),
             "idempotentHint": idempotent,
             "openWorldHint": name == "open_commerce_search_merchants"
                 || name == "open_commerce_get_merchant"

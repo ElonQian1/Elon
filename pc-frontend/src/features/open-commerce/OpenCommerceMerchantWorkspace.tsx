@@ -6,6 +6,7 @@ import OpenCommerceRuntimeManager from './OpenCommerceRuntimeManager'
 import OpenCommerceDirectoryPublisher from './OpenCommerceDirectoryPublisher'
 import OpenCommerceRateLimitManager from './OpenCommerceRateLimitManager'
 import OpenCommerceAppBlockManager from './OpenCommerceAppBlockManager'
+import MerchantRelationshipInbox from './MerchantRelationshipInbox'
 import type { OpenCommerceOverview } from './openCommerceTypes'
 import { commerceStyles } from './openCommerceStyles'
 import styles from './OpenCommercePanel.module.css'
@@ -171,6 +172,10 @@ export default function OpenCommerceMerchantWorkspace({
                   .map((invocation) => invocation.requester_app_id)}
                 canEdit={canEdit}
                 onChanged={refresh}
+              />
+              <MerchantRelationshipInbox
+                projectId={projectId}
+                merchantId={selectedMerchant.merchant.id}
               />
               <OpenCommerceRuntimeManager
                 projectId={projectId}

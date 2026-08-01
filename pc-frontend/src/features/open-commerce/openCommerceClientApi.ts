@@ -4,6 +4,8 @@ import type {
   AuthorizationRequestList,
   ConsumerDiscoveryRequest,
   ConsumerDiscoveryResponse,
+  ConsumerRelationship,
+  ConsumerRelationshipList,
   DeveloperAppCredential,
   DeveloperAppList,
   DeveloperInvokeRequest,
@@ -50,6 +52,28 @@ export const openCommerceClientApi = {
     api.post<AuthorizationRequest>(
       `${projectBase(projectId)}/outbound-authorization-requests/${encodeURIComponent(requestId)}/cancel`,
       {},
+    ),
+
+  listConsumerRelationships: (projectId: string) =>
+    api.get<ConsumerRelationshipList>(`${projectBase(projectId)}/consumer-relationships`),
+
+  createConsumerRelationship: (projectId: string, request: {
+    merchant_id: string
+    source_app_id: string
+    scopes: string[]
+    purpose: string
+    expires_at: string
+  }) => api.post<ConsumerRelationship>(`${projectBase(projectId)}/consumer-relationships`, request),
+
+  revokeConsumerRelationship: (projectId: string, relationshipId: string) =>
+    api.post<ConsumerRelationship>(
+      `${projectBase(projectId)}/consumer-relationships/${encodeURIComponent(relationshipId)}/revoke`,
+      {},
+    ),
+
+  listMerchantRelationships: (projectId: string, merchantId: string) =>
+    api.get<ConsumerRelationshipList>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/consumer-relationships`,
     ),
 
   decideAuthorization: (

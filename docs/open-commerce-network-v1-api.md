@@ -104,6 +104,18 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 
 Grant 到期不删除或改写历史，也不会自动续期。消费者发现不再把它视为有效授权，调用必须重新申请新 Grant。
 
+## 消费者关系凭证
+
+消费者关系与商户到 App 的 Grant 是两类不同对象。Grant 控制 App 能否调用商户能力；消费者关系凭证只证明消费者允许指定商户在期限内把主动提供的偏好或会员标识关联到一个匿名关系标识，不授予读取商户私有数据的权限。
+
+- `GET/POST /api/projects/:project_id/open-commerce/consumer-relationships`：当前用户读取或创建自己的关系凭证。
+- `POST /api/projects/:project_id/open-commerce/consumer-relationships/:relationship_id/revoke`：当前用户幂等撤销自己的关系。
+- `GET /api/projects/:project_id/open-commerce/merchants/:merchant_id/consumer-relationships`：商户项目读取指向本商户的脱敏关系历史。
+
+创建请求包含 `merchant_id`、`source_app_id`、固定 `scopes`、`purpose` 和 RFC 3339 `expires_at`。关系只能指向已发布商户，期限必须在未来且不超过 366 天。商户响应不含消费者账号、用户 ID 或消费者项目 ID；重新创建会撤销旧关系并生成新的 `subject_alias`。
+
+MCP 对应工具为 `open_commerce_list_consumer_relationships`、`open_commerce_list_merchant_relationships`、`open_commerce_create_consumer_relationship` 和 `open_commerce_revoke_consumer_relationship`。MCP 来源身份由入口绑定，不能通过参数冒充其他 App。
+
 ## 调用配额
 
 商户可以为每项能力配置固定时间窗调用上限。指定 App 策略优先于全部 App 策略；全部 App 策略按调用主体分别计数。没有策略时保持现有允许行为，项目编辑者在本项目内调试不占额度。
