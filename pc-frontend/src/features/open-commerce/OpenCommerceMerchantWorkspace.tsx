@@ -5,6 +5,7 @@ import OpenCommerceIntegrationManager from './OpenCommerceIntegrationManager'
 import OpenCommerceRuntimeManager from './OpenCommerceRuntimeManager'
 import OpenCommerceDirectoryPublisher from './OpenCommerceDirectoryPublisher'
 import OpenCommerceRateLimitManager from './OpenCommerceRateLimitManager'
+import OpenCommerceAppBlockManager from './OpenCommerceAppBlockManager'
 import type { OpenCommerceOverview } from './openCommerceTypes'
 import { commerceStyles } from './openCommerceStyles'
 import styles from './OpenCommercePanel.module.css'
@@ -160,6 +161,15 @@ export default function OpenCommerceMerchantWorkspace({
                 canEdit={canEdit}
                 onChanged={refresh}
               />
+              <OpenCommerceAppBlockManager
+                projectId={projectId}
+                merchantId={selectedMerchant.merchant.id}
+                suggestedAppIds={(overview?.recent_invocations ?? [])
+                  .filter((invocation) => invocation.merchant_id === selectedMerchant.merchant.id)
+                  .map((invocation) => invocation.requester_app_id)}
+                canEdit={canEdit}
+                onChanged={refresh}
+              />
               <OpenCommerceRuntimeManager
                 projectId={projectId}
                 merchantId={selectedMerchant.merchant.id}
@@ -225,6 +235,8 @@ function auditLabel(action: string) {
     'invocation.rate_limited': '调用超出配额',
     'rate_limit.upserted': '设置调用配额',
     'rate_limit.status_changed': '切换配额状态',
+    'app_block.activated': '封禁开发者 App',
+    'app_block.released': '解除 App 封禁',
     'runtime.configured': '配置商户运行时',
     'runtime.verified': '验证商户运行时',
   }

@@ -112,6 +112,43 @@ export interface OpenCommerceRateLimitUsage {
   active_subjects: number
 }
 
+export type OpenCommerceAppBlockReason =
+  | 'abusive_traffic'
+  | 'policy_violation'
+  | 'security_incident'
+  | 'merchant_request'
+  | 'other'
+
+export interface OpenCommerceAppBlock {
+  id: string
+  project_id: string
+  merchant_id: string
+  requester_app_id: string
+  reason_code: OpenCommerceAppBlockReason
+  reason_note: string
+  status: 'active' | 'unblocked'
+  blocked_by_user_id: string
+  unblocked_by_user_id?: string
+  blocked_at: string
+  unblocked_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface OpenCommerceAppBlockOutcome {
+  block: OpenCommerceAppBlock
+  revoked_grants: number
+  canceled_authorization_requests: number
+  grants_restored: number
+}
+
+export interface BlockOpenCommerceApp {
+  merchant_id: string
+  requester_app_id: string
+  reason_code: OpenCommerceAppBlockReason
+  reason_note: string
+}
+
 export interface OpenCommerceIntegration {
   id: string
   project_id: string

@@ -6,7 +6,7 @@ use crate::{
     open_commerce_model::{normalize_app_id, normalize_capability_key, ACCESS_AUTHORIZED},
 };
 
-use super::{new_id, now, Store};
+use super::{new_id, now, open_commerce_app_blocks::ensure_app_not_blocked_on, Store};
 
 impl Store {
     pub(crate) fn create_open_commerce_authorization_request(
@@ -37,7 +37,9 @@ impl Store {
         }
         let id = new_id("authreq");
         let timestamp = now();
-        self.conn()?.execute(
+        let conn = self.conn()?;
+        ensure_app_not_blocked_on(&conn, &merchant.id, &requester_app_id)?;
+        conn.execute(
             "INSERT INTO open_commerce_authorization_requests (
                id, merchant_project_id, merchant_id, requester_user_id,
                requester_app_id, scopes_json, purpose, status,
@@ -58,6 +60,7 @@ impl Store {
                 timestamp
             ],
         )?;
+        drop(conn);
         self.open_commerce_authorization_request(&id)
     }
 

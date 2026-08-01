@@ -13,7 +13,8 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 use crate::{
-    open_commerce_directory_service,
+    open_commerce_app_block_model::BlockOpenCommerceAppRequest,
+    open_commerce_app_block_service, open_commerce_directory_service,
     open_commerce_integration_model::{CreateIntegrationRequest, RecordSyncReceiptRequest},
     open_commerce_model::{
         normalize_app_id, CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
@@ -110,6 +111,11 @@ struct SetIntegrationEnabledArguments {
 struct SetRateLimitEnabledArguments {
     policy_id: String,
     enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct UnblockAppArguments {
+    block_id: String,
 }
 
 struct McpCaller {
@@ -308,6 +314,31 @@ pub(crate) async fn call_tool(
                 },
             )?)?
         }
+        "open_commerce_list_app_blocks" => serde_json::to_value(
+            open_commerce_app_block_service::list_blocks(store, project_id)?,
+        )?,
+        "open_commerce_block_app" => {
+            let input: BlockOpenCommerceAppRequest = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_app_block_service::block_app(
+                store,
+                project_id,
+                user_id,
+                app_id,
+                project_role,
+                input,
+            )?)?
+        }
+        "open_commerce_unblock_app" => {
+            let input: UnblockAppArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_app_block_service::unblock_app(
+                store,
+                project_id,
+                &input.block_id,
+                user_id,
+                app_id,
+                project_role,
+            )?)?
+        }
         "open_commerce_create_integration" => {
             let input: CreateIntegrationRequest = decode(arguments, name)?;
             serde_json::to_value(open_commerce_service::create_integration(
@@ -403,7 +434,7 @@ fn initialize_response() -> Value {
         "protocolVersion":MCP_PROTOCOL_VERSION,
         "capabilities":{"tools":{"listChanged":false}},
         "serverInfo":{"name":"yilong-open-commerce","version":"1.0.0"},
-        "instructions":"开放商业任务先调用 open_commerce_get_overview；商户只有显式发布目录后才会进入跨项目发现。ERP 开发先调用 erp_get_overview、erp_search_capabilities 和 erp_resolve_requirement，避免重复造轮子。ERP 工具不允许接受提案、创建 Matter、合并、发布、采用或回滚。数据接入记录不包含令牌，公开发现只返回脱敏目录契约；授权能力必须携带 grant_id 并使用已注册应用身份；所有调用和同步回执必须使用幂等键。当前只记录计量，不真实扣款。写操作需要当前项目编辑权限，调用身份由 x-elon-app-id 固定，不能由工具参数冒充。"
+        "instructions":"开放商业任务先调用 open_commerce_get_overview；商户只有显式发布目录后才会进入跨项目发现。ERP 开发先调用 erp_get_overview、erp_search_capabilities 和 erp_resolve_requirement，避免重复造轮子。ERP 工具不允许接受提案、创建 Matter、合并、发布、采用或回滚。数据接入记录不包含令牌，公开发现只返回脱敏目录契约；授权能力必须携带 grant_id 并使用已注册应用身份；所有调用和同步回执必须使用幂等键。商户可手动封禁已注册 App，封禁会撤销现有授权且解除后不会恢复。当前只记录计量，不真实扣款。写操作需要当前项目编辑权限，调用身份由 x-elon-app-id 固定，不能由工具参数冒充。"
     })
 }
 

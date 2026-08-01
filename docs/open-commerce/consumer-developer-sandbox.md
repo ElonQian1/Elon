@@ -1,6 +1,6 @@
 # 消费者发现与第三方应用沙盒
 
-本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定。
+本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定。
 
 ## 使用入口
 
@@ -38,6 +38,7 @@
 | 查看或撤回本项目发出的申请 | `GET .../outbound-authorization-requests`、`POST .../{request_id}/cancel` |
 | 发布或撤回商户目录 | `PUT /api/projects/{project_id}/open-commerce/merchants/{merchant_id}/directory-publication` |
 | 设置或停用商户调用配额 | `PUT .../rate-limits`、`PATCH .../rate-limits/{policy_id}/enabled` |
+| 列出、封禁或解除开发者 App | `GET/PUT .../app-blocks`、`POST .../app-blocks/{block_id}/unblock` |
 | 消费者发现 | `POST /api/open-commerce/sandbox/discover` |
 | 提交授权申请 | `POST /api/open-commerce/authorization-requests` |
 | 使用测试 Token 调用 | `POST /api/open-commerce/developer/invoke` |
@@ -56,4 +57,4 @@ Set-Location pc-frontend
 npm run test:open-commerce
 ```
 
-当前已实现商户主动选择的跨项目基础目录、持久化能力调用配额，以及沙盒 App 停用、旧 Token 永久失效、重新启用生成新 Token、申请方查看和撤回的生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、全网滥用处置、支付和真实平台适配器仍是后续模块。
+当前已实现商户主动选择的跨项目基础目录、持久化能力调用配额、商户级手动 App 封禁，以及沙盒 App 停用、旧 Token 永久失效、重新启用生成新 Token、申请方查看和撤回的生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、自动全网滥用处置、支付和真实平台适配器仍是后续模块。

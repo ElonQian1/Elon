@@ -39,6 +39,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `POST` | `/api/projects/:project_id/open-commerce/sync-receipts` | 由适配器记录幂等同步或健康检查回执 |
 | `PUT` | `/api/projects/:project_id/open-commerce/rate-limits` | 按能力和指定 App/全部 App 创建或更新调用配额 |
 | `PATCH` | `/api/projects/:project_id/open-commerce/rate-limits/:policy_id/enabled` | 停用或重新启用调用配额 |
+| `GET/PUT` | `/api/projects/:project_id/open-commerce/app-blocks` | 列出记录或封禁已注册开发者 App |
+| `POST` | `/api/projects/:project_id/open-commerce/app-blocks/:block_id/unblock` | 解除封禁；不会恢复旧授权 |
 
 ## 发现与调用 API
 
@@ -102,6 +104,10 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 
 当前计数持久化在一龙主数据库中，适用于共用该数据库的服务实例；它不等于跨数据库、跨地域的全网限流。
 
+## App 紧急封禁
+
+商户项目编辑者可手动封禁具体的已注册 App。封禁在同一事务内激活记录、撤销该商户授予该 App 的有效 Grant，并取消待审批授权申请。被封 App 不能继续调用公开或受限能力，也不能提交新申请。解除封禁不会恢复旧 Grant；受限能力必须重新申请授权。
+
 ## MCP 工具
 
 | 工具 | 读写 | 用途 |
@@ -117,6 +123,9 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `open_commerce_create_grant` | 写 | 为 App 创建最小范围授权 |
 | `open_commerce_upsert_rate_limit` | 写 | 按商户能力和 App 创建或更新固定时间窗配额 |
 | `open_commerce_set_rate_limit_enabled` | 写 | 停用或重新启用调用配额 |
+| `open_commerce_list_app_blocks` | 读 | 查看当前项目的 App 封禁与解除记录 |
+| `open_commerce_block_app` | 写 | 封禁 App，并撤销授权、取消待审批申请 |
+| `open_commerce_unblock_app` | 写 | 解除封禁但不恢复旧授权 |
 | `open_commerce_create_integration` | 写 | 登记商户数据来源 |
 | `open_commerce_set_integration_enabled` | 写 | 停用或重新启用接入 |
 | `open_commerce_record_sync_receipt` | 写 | 记录有界、幂等的适配器回执 |
@@ -148,7 +157,7 @@ V1 仍拒绝未知处理器，也不允许在能力配置中填写任意 URL 或
 |---|---|
 | `400` | 输入、schema、幂等键或状态不合法 |
 | `401` | 未登录或 token 无效 |
-| `403` | 不是项目成员、角色不足或授权不匹配 |
+| `403` | 不是项目成员、角色不足、授权不匹配或 App 已被商户封禁 |
 | `404` | 商户、能力、授权或项目不存在 |
 | `409` | slug、能力键、幂等键语义冲突 |
 | `422` | 能力存在但当前输入不满足契约 |

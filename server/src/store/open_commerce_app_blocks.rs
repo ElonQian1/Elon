@@ -1,11 +1,11 @@
 use anyhow::{anyhow, bail, Result};
-use rusqlite::{params, OptionalExtension, Row, Transaction};
+use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
 
 use crate::{
     open_commerce_app_block_model::{
         normalize_app_block_note, normalize_app_block_reason, BlockOpenCommerceAppRequest,
-        OpenCommerceAppBlock, OpenCommerceAppBlockOutcome, APP_BLOCK_STATUS_ACTIVE,
-        APP_BLOCK_STATUS_UNBLOCKED,
+        OpenCommerceAppBlock, OpenCommerceAppBlockOutcome, OpenCommerceAppBlocked,
+        APP_BLOCK_STATUS_ACTIVE, APP_BLOCK_STATUS_UNBLOCKED,
     },
     open_commerce_model::normalize_app_id,
 };
@@ -194,6 +194,30 @@ impl Store {
             .optional()
             .map_err(Into::into)
     }
+}
+
+pub(super) fn ensure_app_not_blocked_on(
+    conn: &Connection,
+    merchant_id: &str,
+    requester_app_id: &str,
+) -> Result<()> {
+    let requester_app_id = normalize_app_id(requester_app_id)?;
+    if matches!(requester_app_id.as_str(), "pc-web" | "mcp-client") {
+        return Ok(());
+    }
+    let blocked = conn
+        .query_row(
+            "SELECT 1 FROM open_commerce_merchant_app_blocks
+             WHERE merchant_id = ?1 AND requester_app_id = ?2 AND status = 'active'",
+            params![merchant_id.trim(), requester_app_id],
+            |_| Ok(true),
+        )
+        .optional()?
+        .unwrap_or(false);
+    if blocked {
+        return Err(OpenCommerceAppBlocked { requester_app_id }.into());
+    }
+    Ok(())
 }
 
 fn ensure_block_target(

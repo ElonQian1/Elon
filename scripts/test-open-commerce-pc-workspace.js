@@ -24,6 +24,8 @@ const clientApiRoute = read('server/src/open_commerce_client_api.rs')
 const merchantWorkspace = read(`${featureRoot}/OpenCommerceMerchantWorkspace.tsx`)
 const rateLimitManager = read(`${featureRoot}/OpenCommerceRateLimitManager.tsx`)
 const rateLimitStore = read('server/src/store/open_commerce_rate_limits.rs')
+const appBlockManager = read(`${featureRoot}/OpenCommerceAppBlockManager.tsx`)
+const appBlockStore = read('server/src/store/open_commerce_app_blocks.rs')
 const mcpTools = read('server/src/open_commerce_mcp_tools.rs')
 
 for (const view of [
@@ -55,6 +57,13 @@ assert.ok(rateLimitManager.includes('默认沿用现有调用行为'), 'quota UI
 assert.ok(rateLimitStore.includes('ON CONFLICT(policy_id, subject_key) DO UPDATE'), 'rate-limit claims must use a persistent atomic counter')
 assert.ok(mcpTools.includes('open_commerce_upsert_rate_limit'), 'merchant AI must be able to configure invocation quotas through MCP')
 assert.ok(mcpTools.includes('open_commerce_set_rate_limit_enabled'), 'merchant AI must be able to disable invocation quotas through MCP')
+assert.ok(merchantWorkspace.includes('OpenCommerceAppBlockManager'), 'merchant workspace must expose emergency App blocks')
+assert.ok(appBlockManager.includes('旧授权没有恢复'), 'unblocking must state that prior trust is not restored')
+assert.ok(appBlockManager.includes('取消 ${outcome.canceled_authorization_requests}'), 'block result must show canceled authorization requests')
+assert.ok(appBlockStore.includes("decision_reason = 'merchant_app_blocked'"), 'blocking must cancel pending requests with a stable reason')
+assert.ok(appBlockStore.includes('AND revoked_at IS NULL'), 'blocking must revoke only active grants')
+assert.ok(mcpTools.includes('open_commerce_block_app'), 'merchant AI must be able to block a developer App through MCP')
+assert.ok(mcpTools.includes('open_commerce_unblock_app'), 'merchant AI must be able to release a developer App block through MCP')
 
 assert.ok(clientApi.includes("'x-elon-app-id'"), 'signed-in app calls must bind an app identity')
 assert.ok(clientApi.includes('Authorization: `Bearer ${testToken}`'), 'developer calls must use test credentials')

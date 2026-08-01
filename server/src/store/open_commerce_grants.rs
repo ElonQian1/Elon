@@ -6,7 +6,7 @@ use crate::open_commerce_model::{
     normalize_app_id, normalize_capability_key, CreateGrantRequest, OpenCommerceGrant,
 };
 
-use super::{new_id, now, Store};
+use super::{new_id, now, open_commerce_app_blocks::ensure_app_not_blocked_on, Store};
 
 impl Store {
     pub(crate) fn create_open_commerce_grant(
@@ -22,7 +22,9 @@ impl Store {
         let expires_at = validate_expiration(request.expires_at.as_deref())?;
         let id = new_id("grant");
         let timestamp = now();
-        self.conn()?.execute(
+        let conn = self.conn()?;
+        ensure_app_not_blocked_on(&conn, &request.merchant_id, &grantee_app_id)?;
+        conn.execute(
             "INSERT INTO open_commerce_grants (
                 id, project_id, merchant_id, grantor_user_id, grantee_app_id,
                 scopes_json, purpose, expires_at, revoked_at, created_at, updated_at
@@ -39,6 +41,7 @@ impl Store {
                 timestamp
             ],
         )?;
+        drop(conn);
         self.open_commerce_grant(&id)
     }
 

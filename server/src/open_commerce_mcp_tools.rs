@@ -187,6 +187,45 @@ pub(crate) fn definitions() -> Vec<Value> {
             true,
         ),
         tool(
+            "open_commerce_list_app_blocks",
+            "读取当前商户项目的开发者 App 封禁记录。包含已解除记录，便于审计；不会修改数据。",
+            json!({"type":"object","properties":{},"additionalProperties":false}),
+            true,
+            true,
+        ),
+        tool(
+            "open_commerce_block_app",
+            "手动封禁一个已注册开发者 App。该操作会原子撤销此商户授予该 App 的有效授权并取消待审批申请；重复封禁保持同一记录。",
+            json!({
+                "type":"object",
+                "required":["merchant_id","requester_app_id","reason_code"],
+                "properties":{
+                    "merchant_id":{"type":"string","minLength":1,"maxLength":120},
+                    "requester_app_id":{"type":"string","minLength":2,"maxLength":96},
+                    "reason_code":{"type":"string","enum":[
+                        "abusive_traffic","policy_violation","security_incident",
+                        "merchant_request","other"
+                    ]},
+                    "reason_note":{"type":"string","maxLength":500,"default":""}
+                },
+                "additionalProperties":false
+            }),
+            false,
+            true,
+        ),
+        tool(
+            "open_commerce_unblock_app",
+            "解除一项商户 App 封禁。旧授权不会恢复，调用方必须重新申请授权。重复解除保持已解除状态。",
+            json!({
+                "type":"object",
+                "required":["block_id"],
+                "properties":{"block_id":{"type":"string","minLength":1,"maxLength":120}},
+                "additionalProperties":false
+            }),
+            false,
+            true,
+        ),
+        tool(
             "open_commerce_create_integration",
             "登记一个商户自有数据源的接入方式、授权范围和数据域。这里只登记连接事实，不接收也不保存访问令牌。",
             json!({
@@ -316,7 +355,7 @@ fn tool(
         "inputSchema": input_schema,
         "annotations": {
             "readOnlyHint": read_only,
-            "destructiveHint": false,
+            "destructiveHint": matches!(name, "open_commerce_revoke_grant" | "open_commerce_block_app"),
             "idempotentHint": idempotent,
             "openWorldHint": name == "open_commerce_search_merchants"
                 || name == "open_commerce_get_merchant"

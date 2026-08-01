@@ -6,7 +6,7 @@ use crate::open_commerce_model::{
     OpenCommerceAuditEvent, OpenCommerceInvocation, SETTLEMENT_RECORDED_NOT_CHARGED,
 };
 
-use super::{new_id, now, Store};
+use super::{new_id, now, open_commerce_app_blocks::ensure_app_not_blocked_on, Store};
 
 pub(crate) struct OpenCommerceInvocationStart<'a> {
     pub project_id: &'a str,
@@ -51,9 +51,10 @@ impl Store {
         }
 
         let id = new_id("invoke");
-        self.conn()?
-            .execute(
-                "INSERT INTO open_commerce_invocations (
+        let conn = self.conn()?;
+        ensure_app_not_blocked_on(&conn, input.merchant_id, input.requester_app_id)?;
+        conn.execute(
+            "INSERT INTO open_commerce_invocations (
                     id, project_id, merchant_id, capability_id, capability_key,
                     requester_user_id, requester_app_id, grant_id, idempotency_key,
                     request_hash, request_shape_json, status, result_json, error_code,
@@ -63,25 +64,26 @@ impl Store {
                     ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'started',
                     NULL, NULL, 0, ?12, 0, ?13, ?14, ?15, NULL
                  )",
-                params![
-                    id,
-                    input.project_id.trim(),
-                    input.merchant_id.trim(),
-                    input.capability_id.trim(),
-                    input.capability_key.trim(),
-                    input.requester_user_id.trim(),
-                    input.requester_app_id.trim(),
-                    input.grant_id,
-                    input.idempotency_key.trim(),
-                    input.request_hash,
-                    serde_json::to_string(input.request_shape)?,
-                    input.unit_price_micros,
-                    input.currency,
-                    SETTLEMENT_RECORDED_NOT_CHARGED,
-                    now()
-                ],
-            )
-            .map_err(map_invocation_conflict)?;
+            params![
+                id,
+                input.project_id.trim(),
+                input.merchant_id.trim(),
+                input.capability_id.trim(),
+                input.capability_key.trim(),
+                input.requester_user_id.trim(),
+                input.requester_app_id.trim(),
+                input.grant_id,
+                input.idempotency_key.trim(),
+                input.request_hash,
+                serde_json::to_string(input.request_shape)?,
+                input.unit_price_micros,
+                input.currency,
+                SETTLEMENT_RECORDED_NOT_CHARGED,
+                now()
+            ],
+        )
+        .map_err(map_invocation_conflict)?;
+        drop(conn);
         Ok(OpenCommerceInvocationClaim {
             invocation: self.open_commerce_invocation(&id)?,
             created: true,

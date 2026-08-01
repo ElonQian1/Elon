@@ -1,11 +1,14 @@
 import { api } from '../../api/client'
 import type {
   CreateOpenCommerceCapability,
+  BlockOpenCommerceApp,
   CreateOpenCommerceGrant,
   CreateOpenCommerceIntegration,
   CreateOpenCommerceMerchant,
   InvokeOpenCommerceCapability,
   OpenCommerceCapability,
+  OpenCommerceAppBlock,
+  OpenCommerceAppBlockOutcome,
   OpenCommerceGrant,
   OpenCommerceDirectoryPublication,
   OpenCommerceMerchant,
@@ -88,6 +91,18 @@ export const openCommerceApi = {
     api.patch<OpenCommerceRateLimitPolicy>(
       `${projectBase(projectId)}/rate-limits/${encodeURIComponent(policyId)}/enabled`,
       { enabled },
+    ),
+
+  listAppBlocks: (projectId: string) =>
+    api.get<OpenCommerceAppBlock[]>(`${projectBase(projectId)}/app-blocks`),
+
+  blockApp: (projectId: string, request: BlockOpenCommerceApp) =>
+    api.put<OpenCommerceAppBlockOutcome>(`${projectBase(projectId)}/app-blocks`, request),
+
+  unblockApp: (projectId: string, blockId: string) =>
+    api.post<OpenCommerceAppBlockOutcome>(
+      `${projectBase(projectId)}/app-blocks/${encodeURIComponent(blockId)}/unblock`,
+      {},
     ),
 
 }
