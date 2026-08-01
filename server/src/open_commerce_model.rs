@@ -4,6 +4,7 @@ use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::open_commerce_directory_model::OpenCommerceDirectoryPublication;
 use crate::open_commerce_integration_model::{OpenCommerceIntegration, OpenCommerceSyncReceipt};
 use crate::open_commerce_runtime_model::OpenCommerceRuntimeBinding;
 
@@ -123,6 +124,7 @@ pub(crate) struct OpenCommerceOverview {
     pub schema: &'static str,
     pub project_id: String,
     pub merchants: Vec<OpenCommerceMerchantDetail>,
+    pub directory_publications: Vec<OpenCommerceDirectoryPublication>,
     pub grants: Vec<OpenCommerceGrant>,
     pub recent_invocations: Vec<OpenCommerceInvocation>,
     pub integrations: Vec<OpenCommerceIntegration>,
@@ -136,6 +138,7 @@ pub(crate) struct OpenCommerceOverview {
 pub(crate) struct OpenCommerceTotals {
     pub merchants: usize,
     pub active_merchants: usize,
+    pub published_merchants: usize,
     pub capabilities: usize,
     pub active_capabilities: usize,
     pub active_grants: usize,

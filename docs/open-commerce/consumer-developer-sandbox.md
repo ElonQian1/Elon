@@ -1,6 +1,6 @@
 # 消费者发现与第三方应用沙盒
 
-本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。产品边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定。
+本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定。
 
 ## 使用入口
 
@@ -14,7 +14,8 @@
 ## 最小闭环
 
 ```text
-项目编辑者注册测试 App
+商户编辑者主动发布脱敏目录
+  -> 项目编辑者注册测试 App
   -> Token 只显示一次
   -> 消费者沙盒以该 App 发现能力
   -> 对 authorized 能力提交授权申请
@@ -23,7 +24,7 @@
   -> 复用幂等、计量与审计
 ```
 
-公开能力可由 `pc-web` 直接调用。受限能力必须使用独立 App；`pc-web`、未知 App 和 `owner_only` 能力都不能绕过授权。
+公开能力可由 `pc-web` 直接调用。受限能力必须使用独立 App；`pc-web`、未知 App 和 `owner_only` 能力都不能绕过授权。非系统 App 还必须证明 App 归当前用户所有，不能通过伪造请求头借用其他 App 的 Grant。
 
 ## HTTP 接口
 
@@ -33,6 +34,7 @@
 | 轮换一次性测试 Token | `POST /api/projects/{project_id}/open-commerce/developer-apps/{record_id}/rotate-token` |
 | 查看项目授权收件箱 | `GET /api/projects/{project_id}/open-commerce/authorization-requests` |
 | 批准或拒绝申请 | `POST .../authorization-requests/{request_id}/approve` 或 `reject` |
+| 发布或撤回商户目录 | `PUT /api/projects/{project_id}/open-commerce/merchants/{merchant_id}/directory-publication` |
 | 消费者发现 | `POST /api/open-commerce/sandbox/discover` |
 | 提交授权申请 | `POST /api/open-commerce/authorization-requests` |
 | 使用测试 Token 调用 | `POST /api/open-commerce/developer/invoke` |
@@ -51,4 +53,4 @@ Set-Location pc-frontend
 npm run test:open-commerce
 ```
 
-通过沙盒验收不代表公共网络已经完成。跨项目索引、生产应用审核、限流、滥用处置、支付和真实平台适配器仍是后续模块。
+当前已实现商户主动选择的跨项目基础目录：未发布商户默认不可见，公开响应使用脱敏专用契约，撤回后外部调用也会关闭。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、限流、滥用处置、支付和真实平台适配器仍是后续模块。

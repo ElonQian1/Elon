@@ -163,7 +163,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
           </header>
           <div className={base.formCard} style={{ ...commerceStyles.sectionBody, ...commerceStyles.scrollArea }}>
             {result?.matches.map((match) => (
-              <article className={base.formCard} style={listItemStyle()} key={`${match.merchant.id}:${match.capability.id}`}>
+              <article className={base.formCard} style={listItemStyle()} key={`${match.merchant.id}:${match.capability.capability_key}`}>
                 <header style={commerceStyles.itemHeader}>
                   <h3 style={commerceStyles.itemTitle}>{match.merchant.display_name} · {match.capability.display_name}</h3>
                   <span style={badgeStyle()}>{match.score} 分</span>
@@ -207,12 +207,12 @@ function authorizationLabel(status: string) {
     request_required: '需要申请',
     pending: '等待商户',
     granted: '已授权',
-    owner_only: '仅商户所有者',
+    app_registration_required: '请先注册应用',
   }[status] ?? status
 }
 
 function authorizationTone(status: string): 'danger' | 'neutral' | 'warn' {
-  if (status === 'owner_only') return 'danger'
+  if (status === 'app_registration_required') return 'danger'
   if (status === 'request_required' || status === 'pending') return 'warn'
   return 'neutral'
 }

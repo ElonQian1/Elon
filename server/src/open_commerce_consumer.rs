@@ -6,11 +6,11 @@ use crate::{
         ConsumerDiscoveryResponse, ConsumerPreferences,
     },
     open_commerce_developer_model::{CreateAuthorizationRequest, OpenCommerceAuthorizationRequest},
-    open_commerce_model::{
-        OpenCommerceCapability, OpenCommerceMerchantDetail, ACCESS_AUTHORIZED, ACCESS_OWNER_ONLY,
-        ACCESS_PUBLIC, CAPABILITY_STATUS_ACTIVE,
+    open_commerce_directory_model::{
+        OpenCommerceDirectoryCapability, OpenCommerceDirectoryMerchantDetail,
     },
-    open_commerce_service,
+    open_commerce_directory_service,
+    open_commerce_model::{ACCESS_AUTHORIZED, ACCESS_PUBLIC},
     store::Store,
 };
 
@@ -24,7 +24,7 @@ pub(crate) fn discover(
     }
     ensure_app_owned_by_user(store, user_id, &request.requester_app_id)?;
     validate_preferences(&request.preferences)?;
-    let candidates = open_commerce_service::discover_merchants(
+    let candidates = open_commerce_directory_service::discover_merchants(
         store,
         request.query.as_deref(),
         request.capability_key.as_deref(),
@@ -66,27 +66,18 @@ pub(crate) fn ensure_app_owned_by_user(store: &Store, user_id: &str, app_id: &st
     if app_id.trim() == "pc-web" {
         return Ok(());
     }
-    let app = store
-        .open_commerce_developer_app_by_app_id(app_id)?
-        .ok_or_else(|| anyhow::anyhow!("开发者应用不存在"))?;
-    if app.owner_user_id != user_id {
-        bail!("当前用户不能代表该开发者应用发起请求");
-    }
-    if app.status != "active" {
-        bail!("开发者应用已停用");
-    }
+    store.ensure_open_commerce_developer_app_owned_by_user(app_id, user_id)?;
     Ok(())
 }
 
 fn best_match(
     store: &Store,
-    detail: OpenCommerceMerchantDetail,
+    detail: OpenCommerceDirectoryMerchantDetail,
     request: &ConsumerDiscoveryRequest,
 ) -> Result<Option<ConsumerDiscoveryMatch>> {
     let selected = detail
         .capabilities
         .iter()
-        .filter(|capability| capability.status == CAPABILITY_STATUS_ACTIVE)
         .filter(|capability| {
             request
                 .capability_key
@@ -119,8 +110,8 @@ fn best_match(
 }
 
 fn score_match(
-    detail: &OpenCommerceMerchantDetail,
-    capability: &OpenCommerceCapability,
+    detail: &OpenCommerceDirectoryMerchantDetail,
+    capability: &OpenCommerceDirectoryCapability,
     preferences: &ConsumerPreferences,
 ) -> (i64, Vec<String>) {
     let mut score = 40;
@@ -172,8 +163,8 @@ fn score_match(
 
 fn authorization_state(
     store: &Store,
-    detail: &OpenCommerceMerchantDetail,
-    capability: &OpenCommerceCapability,
+    detail: &OpenCommerceDirectoryMerchantDetail,
+    capability: &OpenCommerceDirectoryCapability,
     app_id: &str,
 ) -> Result<ConsumerAuthorizationState> {
     match capability.access_level.as_str() {
@@ -183,13 +174,15 @@ fn authorization_state(
             grant_id: None,
             request_id: None,
         }),
-        ACCESS_OWNER_ONLY => Ok(ConsumerAuthorizationState {
-            required: true,
-            status: "owner_only".to_string(),
-            grant_id: None,
-            request_id: None,
-        }),
         ACCESS_AUTHORIZED => {
+            if app_id == "pc-web" {
+                return Ok(ConsumerAuthorizationState {
+                    required: true,
+                    status: "app_registration_required".to_string(),
+                    grant_id: None,
+                    request_id: None,
+                });
+            }
             let grant_id = store.active_open_commerce_grant_for_app_capability(
                 &detail.merchant.id,
                 app_id,
@@ -224,7 +217,10 @@ fn authorization_state(
     }
 }
 
-fn capability_score(capability: &OpenCommerceCapability, preferences: &ConsumerPreferences) -> i64 {
+fn capability_score(
+    capability: &OpenCommerceDirectoryCapability,
+    preferences: &ConsumerPreferences,
+) -> i64 {
     let access = match capability.access_level.as_str() {
         ACCESS_PUBLIC if preferences.prefer_public => 30,
         ACCESS_PUBLIC => 20,

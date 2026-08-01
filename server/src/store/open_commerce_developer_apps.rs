@@ -145,6 +145,23 @@ impl Store {
             )
             .map_err(|error| anyhow!(error).context("开发者测试凭据无效或已停用"))
     }
+
+    pub(crate) fn ensure_open_commerce_developer_app_owned_by_user(
+        &self,
+        app_id: &str,
+        owner_user_id: &str,
+    ) -> Result<OpenCommerceDeveloperApp> {
+        let app = self
+            .open_commerce_developer_app_by_app_id(app_id)?
+            .ok_or_else(|| anyhow!("开发者应用不存在"))?;
+        if app.owner_user_id != owner_user_id.trim() {
+            bail!("当前用户不能代表该开发者应用发起请求");
+        }
+        if app.status != "active" {
+            bail!("开发者应用已停用");
+        }
+        Ok(app)
+    }
 }
 
 fn app_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceDeveloperApp> {

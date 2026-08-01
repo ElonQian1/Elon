@@ -3,6 +3,7 @@ import { openCommerceApi } from './openCommerceApi'
 import OpenCommerceMerchantEditor from './OpenCommerceMerchantEditor'
 import OpenCommerceIntegrationManager from './OpenCommerceIntegrationManager'
 import OpenCommerceRuntimeManager from './OpenCommerceRuntimeManager'
+import OpenCommerceDirectoryPublisher from './OpenCommerceDirectoryPublisher'
 import type { OpenCommerceOverview } from './openCommerceTypes'
 import { commerceStyles } from './openCommerceStyles'
 import styles from './OpenCommercePanel.module.css'
@@ -101,6 +102,7 @@ export default function OpenCommerceMerchantWorkspace({
 
       <section className={styles.stats}>
         <Stat label="商户节点" value={totals?.active_merchants ?? 0} detail={`共 ${totals?.merchants ?? 0} 个`} />
+        <Stat label="目录发布" value={totals?.published_merchants ?? 0} detail="商户主动选择" />
         <Stat label="有效能力" value={totals?.active_capabilities ?? 0} detail={`共 ${totals?.capabilities ?? 0} 项`} />
         <Stat label="有效授权" value={totals?.active_grants ?? 0} detail="可撤销、可审计" />
         <Stat label="调用次数" value={totals?.invocations ?? 0} detail={`${formatMicros(totals?.metered_amount_micros ?? 0)} CNY 已计量`} />
@@ -140,6 +142,13 @@ export default function OpenCommerceMerchantWorkspace({
         <main className={styles.main}>
           {selectedMerchant
             ? <>
+              <OpenCommerceDirectoryPublisher
+                projectId={projectId}
+                merchant={selectedMerchant}
+                publication={overview?.directory_publications.find((item) => item.merchant_id === selectedMerchant.merchant.id)}
+                canEdit={canEdit}
+                onChanged={refresh}
+              />
               <OpenCommerceMerchantEditor projectId={projectId} merchant={selectedMerchant} grants={overview?.grants ?? []} canEdit={canEdit} onChanged={refresh} />
               <OpenCommerceRuntimeManager
                 projectId={projectId}
@@ -195,6 +204,8 @@ function auditLabel(action: string) {
   const labels: Record<string, string> = {
     'merchant.created': '创建商户',
     'merchant.updated': '更新商户',
+    'directory.published': '发布开放目录',
+    'directory.unpublished': '撤回开放目录',
     'capability.published': '发布能力',
     'capability.updated': '更新能力',
     'grant.created': '创建授权',

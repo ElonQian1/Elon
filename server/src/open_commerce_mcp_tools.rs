@@ -90,6 +90,21 @@ pub(crate) fn definitions() -> Vec<Value> {
             false,
         ),
         tool(
+            "open_commerce_set_directory_publication",
+            "显式发布或撤回当前项目商户的开放目录条目。只有 published 状态才允许跨项目发现；公开响应不包含项目、所有者、运行地址、密钥或处理器配置。",
+            json!({
+                "type":"object",
+                "required":["merchant_id","published"],
+                "properties":{
+                    "merchant_id":{"type":"string","minLength":1,"maxLength":120},
+                    "published":{"type":"boolean"}
+                },
+                "additionalProperties":false
+            }),
+            false,
+            false,
+        ),
+        tool(
             "open_commerce_upsert_runtime",
             "为当前项目商户配置受控运行绑定。地址必须通过平台主机白名单，credential_ref 只引用服务端环境变量，不能提交明文密钥。配置后仍需单独验证。",
             json!({

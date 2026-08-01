@@ -7,6 +7,7 @@ use crate::{
     open_commerce_developer_model::{
         CreateAuthorizationRequest, CreateDeveloperAppRequest, DeveloperInvokeRequest,
     },
+    open_commerce_directory_service,
     open_commerce_model::{
         CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
         InvokeCapabilityRequest, ACCESS_AUTHORIZED, HANDLER_STATIC_JSON,
@@ -81,6 +82,14 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
         },
     )
     .unwrap();
+    open_commerce_directory_service::set_publication(
+        &store,
+        &merchant_project.id,
+        &merchant.id,
+        &merchant_actor,
+        true,
+    )
+    .unwrap();
 
     let developer = store
         .create_user("developer@example.com", "secret1", Some("Developer"), None)
@@ -134,6 +143,10 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
     assert_eq!(before.matches[0].authorization.status, "request_required");
     assert!(before.matches[0].score >= 80);
     assert!(!before.ranking_is_paid);
+    let discovery_json = serde_json::to_string(&before).unwrap();
+    assert!(!discovery_json.contains(&merchant_project.id));
+    assert!(!discovery_json.contains(&merchant_owner.id));
+    assert!(!discovery_json.contains("handler_type"));
 
     let request = open_commerce_consumer::create_authorization_request(
         &store,
@@ -217,6 +230,77 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
     .await
     .unwrap();
     assert_eq!(result["result"]["items"], json!(["拿铁", "美式"]));
+
+    let impersonation = open_commerce_service::invoke(
+        &store,
+        &OpenCommerceActor {
+            user_id: &merchant_owner.id,
+            app_id: &authenticated.app_id,
+            project_role: None,
+        },
+        InvokeCapabilityRequest {
+            merchant_id: approved.merchant_id.clone(),
+            capability_key: "menu.preview".to_string(),
+            requester_app_id: authenticated.app_id.clone(),
+            grant_id: approved.grant_id.clone(),
+            idempotency_key: "developer-impersonation".to_string(),
+            input: json!({}),
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(impersonation.to_string().contains("不能代表该开发者应用"));
+
+    open_commerce_directory_service::set_publication(
+        &store,
+        &merchant_project.id,
+        &approved.merchant_id,
+        &merchant_actor,
+        false,
+    )
+    .unwrap();
+    let hidden_invoke = open_commerce_service::invoke(
+        &store,
+        &developer_actor,
+        InvokeCapabilityRequest {
+            merchant_id: approved.merchant_id.clone(),
+            capability_key: "menu.preview".to_string(),
+            requester_app_id: authenticated.app_id.clone(),
+            grant_id: approved.grant_id.clone(),
+            idempotency_key: "developer-debug-hidden".to_string(),
+            input: json!({}),
+        },
+    )
+    .await
+    .unwrap_err();
+    assert!(hidden_invoke.to_string().contains("未发布到开放目录"));
+    let hidden_authorization = open_commerce_consumer::create_authorization_request(
+        &store,
+        &developer.id,
+        CreateAuthorizationRequest {
+            merchant_id: approved.merchant_id.clone(),
+            requester_app_id: authenticated.app_id.clone(),
+            scopes: vec!["menu.preview".to_string()],
+            purpose: "撤回目录后不应继续收到授权申请".to_string(),
+        },
+    )
+    .unwrap_err();
+    assert!(hidden_authorization
+        .to_string()
+        .contains("不能接收外部授权申请"));
+    let hidden = open_commerce_consumer::discover(
+        &store,
+        &developer.id,
+        ConsumerDiscoveryRequest {
+            query: Some("咖啡".to_string()),
+            capability_key: Some("menu.preview".to_string()),
+            requester_app_id: credential.app.app_id.clone(),
+            preferences: ConsumerPreferences::default(),
+            limit: 10,
+        },
+    )
+    .unwrap();
+    assert!(hidden.matches.is_empty());
 
     let apps = store
         .list_project_open_commerce_developer_apps(&developer_project.id)

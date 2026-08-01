@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/open-commerce/directory-merchant-v1.schema.json",
+  "title": "Open Commerce Directory Merchant V1",
+  "type": "object",
+  "required": ["schema", "merchant", "capabilities"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "open_commerce.directory_merchant.v1" },
+    "merchant": {
+      "type": "object",
+      "required": [
+        "id", "slug", "display_name", "description", "public_profile",
+        "directory_revision", "published_at", "updated_at"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "slug": { "type": "string" },
+        "display_name": { "type": "string" },
+        "description": { "type": "string" },
+        "public_profile": { "type": "object" },
+        "directory_revision": { "type": "integer", "minimum": 1 },
+        "published_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "capability_key", "display_name", "description", "kind", "access_level",
+          "input_schema", "output_schema", "unit_price_micros", "currency",
+          "freshness_seconds", "version", "updated_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "capability_key": { "type": "string" },
+          "display_name": { "type": "string" },
+          "description": { "type": "string" },
+          "kind": { "enum": ["query", "action"] },
+          "access_level": { "enum": ["public", "authorized"] },
+          "input_schema": { "type": "object" },
+          "output_schema": { "type": "object" },
+          "unit_price_micros": { "type": "integer", "minimum": 0 },
+          "currency": { "type": "string" },
+          "freshness_seconds": { "type": "integer", "minimum": 0 },
+          "version": { "type": "integer", "minimum": 1 },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

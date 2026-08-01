@@ -43,6 +43,17 @@ export interface OpenCommerceMerchantDetail {
   capabilities: OpenCommerceCapability[]
 }
 
+export interface OpenCommerceDirectoryPublication {
+  merchant_id: string
+  project_id: string
+  status: 'published' | 'unpublished'
+  revision: number
+  published_by_user_id?: string
+  published_at?: string
+  unpublished_at?: string
+  updated_at: string
+}
+
 export interface OpenCommerceGrant {
   id: string
   project_id: string
@@ -130,6 +141,7 @@ export interface OpenCommerceOverview {
   schema: string
   project_id: string
   merchants: OpenCommerceMerchantDetail[]
+  directory_publications: OpenCommerceDirectoryPublication[]
   grants: OpenCommerceGrant[]
   recent_invocations: OpenCommerceInvocation[]
   integrations: OpenCommerceIntegration[]
@@ -139,6 +151,7 @@ export interface OpenCommerceOverview {
   totals: {
     merchants: number
     active_merchants: number
+    published_merchants: number
     capabilities: number
     active_capabilities: number
     active_grants: number

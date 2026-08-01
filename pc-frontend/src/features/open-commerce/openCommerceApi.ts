@@ -7,6 +7,7 @@ import type {
   InvokeOpenCommerceCapability,
   OpenCommerceCapability,
   OpenCommerceGrant,
+  OpenCommerceDirectoryPublication,
   OpenCommerceMerchant,
   OpenCommerceOverview,
   OpenCommerceIntegration,
@@ -33,6 +34,12 @@ export const openCommerceApi = {
     api.post<OpenCommerceCapability>(
       `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/capabilities`,
       request,
+    ),
+
+  setDirectoryPublication: (projectId: string, merchantId: string, published: boolean) =>
+    api.put<OpenCommerceDirectoryPublication>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/directory-publication`,
+      { published },
     ),
 
   createGrant: (projectId: string, request: CreateOpenCommerceGrant) =>

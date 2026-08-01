@@ -2,11 +2,12 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
+    open_commerce_directory_service,
     open_commerce_integration_model::{CreateIntegrationRequest, RecordSyncReceiptRequest},
     open_commerce_model::{
         CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
-        InvokeCapabilityRequest, ACCESS_AUTHORIZED, ACCESS_PUBLIC, HANDLER_MERCHANT_PROFILE,
-        HANDLER_STATIC_JSON,
+        InvokeCapabilityRequest, ACCESS_AUTHORIZED, ACCESS_OWNER_ONLY, ACCESS_PUBLIC,
+        HANDLER_MERCHANT_PROFILE, HANDLER_STATIC_JSON,
     },
     open_commerce_service::{self, OpenCommerceActor},
     store::Store,
@@ -223,13 +224,48 @@ async fn merchant_to_authorized_invocation_is_audited_and_idempotent() {
     )
     .expect("authorized capability should be published");
 
-    let discovery =
-        open_commerce_service::discover_merchant(&store, &merchant.id).expect("merchant discover");
+    open_commerce_service::publish_capability(
+        &store,
+        &project.id,
+        &merchant.id,
+        &actor,
+        CreateCapabilityRequest {
+            capability_key: "operations.internal".to_string(),
+            display_name: "内部经营数据".to_string(),
+            description: "仅供商户项目内部使用".to_string(),
+            kind: "query".to_string(),
+            access_level: ACCESS_OWNER_ONLY.to_string(),
+            input_schema: json!({}),
+            output_schema: json!({}),
+            handler_type: HANDLER_STATIC_JSON.to_string(),
+            handler_config: Some(json!({"response":{"gross_margin":42}})),
+            unit_price_micros: 0,
+            currency: "CNY".to_string(),
+            freshness_seconds: 60,
+        },
+    )
+    .expect("owner-only capability should be published internally");
+
+    let publication = open_commerce_directory_service::set_publication(
+        &store,
+        &project.id,
+        &merchant.id,
+        &actor,
+        true,
+    )
+    .expect("merchant should explicitly enter the directory");
+    assert_eq!(publication.status, "published");
+
+    let discovery = open_commerce_directory_service::discover_merchant(&store, &merchant.id)
+        .expect("merchant discover");
     assert_eq!(discovery.capabilities.len(), 2);
-    assert!(discovery
-        .capabilities
-        .iter()
-        .all(|capability| capability.handler_config.is_none()));
+    let serialized_discovery = serde_json::to_string(&discovery).unwrap();
+    assert!(!serialized_discovery.contains("operations.internal"));
+    assert!(!serialized_discovery.contains("gross_margin"));
+    assert!(!serialized_discovery.contains(&project.id));
+    assert!(!serialized_discovery.contains(&owner.id));
+    assert!(!serialized_discovery.contains("handler_config"));
+    assert!(!serialized_discovery.contains("handler_type"));
 
     let first_public = open_commerce_service::invoke(
         &store,
@@ -334,7 +370,8 @@ async fn merchant_to_authorized_invocation_is_audited_and_idempotent() {
     let overview =
         open_commerce_service::overview(&store, &project.id).expect("overview should load");
     assert_eq!(overview.totals.active_merchants, 1);
-    assert_eq!(overview.totals.active_capabilities, 2);
+    assert_eq!(overview.totals.published_merchants, 1);
+    assert_eq!(overview.totals.active_capabilities, 3);
     assert_eq!(overview.totals.active_grants, 1);
     assert_eq!(overview.totals.invocations, 3);
     assert_eq!(overview.totals.metered_amount_micros, 50_000);

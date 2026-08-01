@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::open_commerce_model::{OpenCommerceCapability, OpenCommerceMerchant};
+use crate::open_commerce_directory_model::{
+    OpenCommerceDirectoryCapability, OpenCommerceDirectoryMerchant,
+};
 
 #[derive(Debug, Clone, Default, Deserialize)]
 pub(crate) struct ConsumerPreferences {
@@ -40,8 +42,8 @@ pub(crate) struct ConsumerAuthorizationState {
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ConsumerDiscoveryMatch {
-    pub merchant: OpenCommerceMerchant,
-    pub capability: OpenCommerceCapability,
+    pub merchant: OpenCommerceDirectoryMerchant,
+    pub capability: OpenCommerceDirectoryCapability,
     pub score: i64,
     pub reasons: Vec<String>,
     pub authorization: ConsumerAuthorizationState,

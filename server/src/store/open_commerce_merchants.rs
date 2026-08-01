@@ -2,10 +2,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use rusqlite::{params, Row};
 
 use crate::open_commerce_model::{
-    normalize_capability_key, normalize_slug, slug_from_display_name, validate_display_name,
-    validate_json_object, validate_status, CreateMerchantRequest, OpenCommerceMerchant,
-    OpenCommerceMerchantDetail, UpdateMerchantRequest, CAPABILITY_STATUS_ACTIVE,
-    OPEN_COMMERCE_SCHEMA,
+    normalize_slug, slug_from_display_name, validate_display_name, validate_json_object,
+    validate_status, CreateMerchantRequest, OpenCommerceMerchant, OpenCommerceMerchantDetail,
+    UpdateMerchantRequest, OPEN_COMMERCE_SCHEMA,
 };
 
 use super::{new_id, now, Store};
@@ -151,54 +150,6 @@ impl Store {
             .into_iter()
             .map(|merchant| {
                 let capabilities = self.list_open_commerce_capabilities(&merchant.id)?;
-                Ok(OpenCommerceMerchantDetail {
-                    schema: OPEN_COMMERCE_SCHEMA,
-                    merchant,
-                    capabilities,
-                })
-            })
-            .collect()
-    }
-
-    pub(crate) fn search_open_commerce_merchants(
-        &self,
-        query: Option<&str>,
-        capability_key: Option<&str>,
-        limit: usize,
-    ) -> Result<Vec<OpenCommerceMerchantDetail>> {
-        let query = query.map(str::trim).filter(|value| !value.is_empty());
-        let like = query.map(|value| format!("%{}%", value.replace('%', "\\%")));
-        let capability_key = capability_key.map(normalize_capability_key).transpose()?;
-        let conn = self.conn()?;
-        let mut stmt = conn.prepare(&format!(
-            "{MERCHANT_SELECT}
-             WHERE status = 'active'
-               AND (?1 IS NULL OR display_name LIKE ?1 ESCAPE '\\'
-                    OR slug LIKE ?1 ESCAPE '\\' OR description LIKE ?1 ESCAPE '\\')
-               AND (?2 IS NULL OR EXISTS (
-                 SELECT 1 FROM open_commerce_capabilities c
-                 WHERE c.merchant_id = open_commerce_merchants.id
-                   AND c.capability_key = ?2 AND c.status = 'active'
-               ))
-             ORDER BY updated_at DESC LIMIT ?3"
-        ))?;
-        let merchants = stmt
-            .query_map(
-                params![like, capability_key, limit.clamp(1, 100) as i64],
-                merchant_from_row,
-            )?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
-        drop(stmt);
-        drop(conn);
-        merchants
-            .into_iter()
-            .map(|merchant| {
-                let capabilities = self
-                    .list_open_commerce_capabilities(&merchant.id)?
-                    .into_iter()
-                    .filter(|capability| capability.status == CAPABILITY_STATUS_ACTIVE)
-                    .map(super::open_commerce_capabilities::public_capability)
-                    .collect();
                 Ok(OpenCommerceMerchantDetail {
                     schema: OPEN_COMMERCE_SCHEMA,
                     merchant,

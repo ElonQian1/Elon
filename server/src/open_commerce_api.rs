@@ -12,6 +12,8 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
+    open_commerce_directory_model::SetDirectoryPublicationRequest,
+    open_commerce_directory_service,
     open_commerce_integration_model::{
         CreateIntegrationRequest, RecordSyncReceiptRequest, SetIntegrationEnabledRequest,
     },
@@ -71,6 +73,10 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/open-commerce/merchants/:merchant_id",
             patch(update_merchant),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/merchants/:merchant_id/directory-publication",
+            put(set_directory_publication),
         )
         .route(
             "/api/projects/:project_id/open-commerce/merchants/:merchant_id/capabilities",
@@ -184,6 +190,25 @@ async fn update_merchant(
         &merchant_id,
         &actor(&caller),
         request,
+    ))
+}
+
+async fn set_directory_publication(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, merchant_id)): Path<(String, String)>,
+    Json(request): Json<SetDirectoryPublicationRequest>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_directory_service::set_publication(
+        &state.store,
+        &project_id,
+        &merchant_id,
+        &actor(&caller),
+        request.published,
     ))
 }
 
@@ -376,7 +401,7 @@ async fn search_merchants(
     Query(query): Query<MerchantSearchQuery>,
 ) -> Response {
     service_response(
-        open_commerce_service::discover_merchants(
+        open_commerce_directory_service::discover_merchants(
             &state.store,
             query.query.as_deref(),
             query.capability.as_deref(),
@@ -390,7 +415,7 @@ async fn get_merchant(
     State(state): State<Arc<AppState>>,
     Path(merchant_id): Path<String>,
 ) -> Response {
-    service_response(open_commerce_service::discover_merchant(
+    service_response(open_commerce_directory_service::discover_merchant(
         &state.store,
         &merchant_id,
     ))

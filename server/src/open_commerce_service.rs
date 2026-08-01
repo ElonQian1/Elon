@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 use crate::{
+    open_commerce_directory_model::DIRECTORY_STATUS_PUBLISHED,
     open_commerce_integration_model::{
         CreateIntegrationRequest, OpenCommerceIntegration, OpenCommerceSyncReceipt,
         RecordSyncReceiptRequest, INTEGRATION_STATUS_CONNECTED, INTEGRATION_STATUS_DEGRADED,
@@ -32,6 +33,8 @@ pub(crate) struct OpenCommerceActor<'a> {
 
 pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOverview> {
     let merchants = store.list_project_open_commerce_merchants(project_id)?;
+    let directory_publications =
+        store.list_project_open_commerce_directory_publications(project_id)?;
     let grants = store.list_project_open_commerce_grants(project_id, 100)?;
     let recent_invocations = store.list_project_open_commerce_invocations(project_id, 100)?;
     let integrations = store.list_project_open_commerce_integrations(project_id)?;
@@ -41,6 +44,10 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
     let active_merchants = merchants
         .iter()
         .filter(|entry| entry.merchant.status == MERCHANT_STATUS_ACTIVE)
+        .count();
+    let published_merchants = directory_publications
+        .iter()
+        .filter(|publication| publication.status == DIRECTORY_STATUS_PUBLISHED)
         .count();
     let capabilities = merchants.iter().map(|entry| entry.capabilities.len()).sum();
     let active_capabilities = merchants
@@ -71,6 +78,7 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
         totals: OpenCommerceTotals {
             merchants: merchants.len(),
             active_merchants,
+            published_merchants,
             capabilities,
             active_capabilities,
             active_grants,
@@ -83,6 +91,7 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
             metered_amount_micros,
         },
         merchants,
+        directory_publications,
         grants,
         recent_invocations,
         integrations,
@@ -263,32 +272,6 @@ pub(crate) fn record_sync_receipt(
     Ok(receipt)
 }
 
-pub(crate) fn discover_merchants(
-    store: &Store,
-    query: Option<&str>,
-    capability_key: Option<&str>,
-    limit: usize,
-) -> Result<Vec<OpenCommerceMerchantDetail>> {
-    store.search_open_commerce_merchants(query, capability_key, limit)
-}
-
-pub(crate) fn discover_merchant(
-    store: &Store,
-    merchant_id: &str,
-) -> Result<OpenCommerceMerchantDetail> {
-    let mut detail = store.open_commerce_merchant_detail(merchant_id)?;
-    if detail.merchant.status != MERCHANT_STATUS_ACTIVE {
-        bail!("商户节点未发布");
-    }
-    detail
-        .capabilities
-        .retain(|capability| capability.status == CAPABILITY_STATUS_ACTIVE);
-    for capability in &mut detail.capabilities {
-        capability.handler_config = None;
-    }
-    Ok(detail)
-}
-
 pub(crate) fn create_merchant(
     store: &Store,
     project_id: &str,
@@ -450,6 +433,17 @@ pub(crate) async fn invoke(
     }
     if capability.status != CAPABILITY_STATUS_ACTIVE {
         bail!("商业能力当前不可用");
+    }
+    let target_editor = actor.project_role.is_some_and(can_edit);
+    let system_app = matches!(requester_app_id.as_str(), "pc-web" | "mcp-client");
+    if !system_app {
+        store.ensure_open_commerce_developer_app_owned_by_user(&requester_app_id, actor.user_id)?;
+    }
+    if !target_editor && !store.open_commerce_directory_is_published(&merchant.id)? {
+        bail!("商户节点未发布到开放目录");
+    }
+    if capability.access_level == ACCESS_AUTHORIZED && system_app && !target_editor {
+        bail!("受限能力必须使用已注册且已认证的开发者应用身份");
     }
     let grant_id = authorize_invocation(
         store,

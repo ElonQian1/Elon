@@ -1,5 +1,3 @@
-import type { OpenCommerceCapability, OpenCommerceMerchant } from './openCommerceTypes'
-
 export interface OpenCommerceDeveloperApp {
   id: string
   project_id: string
@@ -64,14 +62,40 @@ export interface ConsumerDiscoveryRequest {
 
 export interface ConsumerAuthorizationState {
   required: boolean
-  status: 'not_required' | 'owner_only' | 'granted' | 'pending' | 'request_required'
+  status: 'not_required' | 'app_registration_required' | 'granted' | 'pending' | 'request_required'
   grant_id?: string
   request_id?: string
 }
 
+export interface DirectoryMerchant {
+  id: string
+  slug: string
+  display_name: string
+  description: string
+  public_profile: Record<string, unknown>
+  directory_revision: number
+  published_at: string
+  updated_at: string
+}
+
+export interface DirectoryCapability {
+  capability_key: string
+  display_name: string
+  description: string
+  kind: 'query' | 'action'
+  access_level: 'public' | 'authorized'
+  input_schema: Record<string, unknown>
+  output_schema: Record<string, unknown>
+  unit_price_micros: number
+  currency: string
+  freshness_seconds: number
+  version: number
+  updated_at: string
+}
+
 export interface ConsumerDiscoveryMatch {
-  merchant: OpenCommerceMerchant
-  capability: OpenCommerceCapability
+  merchant: DirectoryMerchant
+  capability: DirectoryCapability
   score: number
   reasons: string[]
   authorization: ConsumerAuthorizationState

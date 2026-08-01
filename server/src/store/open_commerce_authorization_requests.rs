@@ -15,6 +15,9 @@ impl Store {
         request: CreateAuthorizationRequest,
     ) -> Result<OpenCommerceAuthorizationRequest> {
         let merchant = self.open_commerce_merchant(&request.merchant_id)?;
+        if !self.open_commerce_directory_is_published(&merchant.id)? {
+            bail!("商户节点未发布到开放目录，不能接收外部授权申请");
+        }
         let requester_app_id = normalize_app_id(&request.requester_app_id)?;
         let scopes = normalize_scopes(&request.scopes)?;
         for scope in &scopes {

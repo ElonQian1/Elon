@@ -13,6 +13,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 use crate::{
+    open_commerce_directory_service,
     open_commerce_integration_model::{CreateIntegrationRequest, RecordSyncReceiptRequest},
     open_commerce_model::{
         normalize_app_id, CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
@@ -51,6 +52,12 @@ struct SearchArguments {
 #[derive(Debug, Deserialize)]
 struct MerchantArguments {
     merchant_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DirectoryPublicationArguments {
+    merchant_id: String,
+    published: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -197,7 +204,7 @@ pub(crate) async fn call_tool(
             let input: SearchArguments = decode(arguments, name)?;
             json!({
                 "schema":"open_commerce.discovery.v1",
-                "merchants":open_commerce_service::discover_merchants(
+                "merchants":open_commerce_directory_service::discover_merchants(
                     store,
                     input.query.as_deref(),
                     input.capability.as_deref(),
@@ -207,7 +214,7 @@ pub(crate) async fn call_tool(
         }
         "open_commerce_get_merchant" => {
             let input: MerchantArguments = decode(arguments, name)?;
-            serde_json::to_value(open_commerce_service::discover_merchant(
+            serde_json::to_value(open_commerce_directory_service::discover_merchant(
                 store,
                 &input.merchant_id,
             )?)?
@@ -226,6 +233,16 @@ pub(crate) async fn call_tool(
                 &input.merchant_id,
                 &actor,
                 input.request,
+            )?)?
+        }
+        "open_commerce_set_directory_publication" => {
+            let input: DirectoryPublicationArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_directory_service::set_publication(
+                store,
+                project_id,
+                &input.merchant_id,
+                &actor,
+                input.published,
             )?)?
         }
         "open_commerce_upsert_runtime" => {
@@ -351,7 +368,7 @@ fn initialize_response() -> Value {
         "protocolVersion":MCP_PROTOCOL_VERSION,
         "capabilities":{"tools":{"listChanged":false}},
         "serverInfo":{"name":"yilong-open-commerce","version":"1.0.0"},
-        "instructions":"开放商业任务先调用 open_commerce_get_overview；ERP 开发先调用 erp_get_overview、erp_search_capabilities 和 erp_resolve_requirement，避免重复造轮子。ERP 工具不允许接受提案、创建 Matter、合并、发布、采用或回滚。数据接入记录不包含令牌，公开发现不暴露处理器配置；授权能力必须携带 grant_id；所有调用和同步回执必须使用幂等键。当前只记录计量，不真实扣款。写操作需要当前项目编辑权限，调用身份由 x-elon-app-id 固定，不能由工具参数冒充。"
+        "instructions":"开放商业任务先调用 open_commerce_get_overview；商户只有显式发布目录后才会进入跨项目发现。ERP 开发先调用 erp_get_overview、erp_search_capabilities 和 erp_resolve_requirement，避免重复造轮子。ERP 工具不允许接受提案、创建 Matter、合并、发布、采用或回滚。数据接入记录不包含令牌，公开发现只返回脱敏目录契约；授权能力必须携带 grant_id 并使用已注册应用身份；所有调用和同步回执必须使用幂等键。当前只记录计量，不真实扣款。写操作需要当前项目编辑权限，调用身份由 x-elon-app-id 固定，不能由工具参数冒充。"
     })
 }
 
