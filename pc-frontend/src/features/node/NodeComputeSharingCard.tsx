@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Cpu, Save } from 'lucide-react'
+import { Activity, Cpu, Save, TriangleAlert } from 'lucide-react'
 import { fetchNodeComputeSharing, nodeId, updateNodeComputeSharing } from './nodeHelpers'
 import type { NodeComputeSharingResponse, NodeSummary } from './types'
 import styles from './NodePage.module.css'
@@ -77,6 +77,12 @@ export default function NodeComputeSharingCard({ node }: { node: NodeSummary }) 
   }
 
   const status = response?.compute_sharing
+  const health = response?.runtime_health
+  const healthLabel = health?.status === 'critical'
+    ? '存在运行风险'
+    : health?.status === 'warning'
+      ? '需要关注'
+      : '运行健康'
   return (
     <section className={styles.computeSharingCard}>
       <header>
@@ -111,6 +117,21 @@ export default function NodeComputeSharingCard({ node }: { node: NodeSummary }) 
         <span>今日实耗 {formatCount(status?.tokens_used_today ?? 0)}{dailyTokenLimit > 0 ? `/${formatCount(dailyTokenLimit)}` : '（不限）'}</span>
         <span>执行中预留 {formatCount(status?.tokens_reserved_today ?? 0)}</span>
       </div>
+      {health && (
+        <div className={styles.computeSharingHealth} data-tone={health.status}>
+          <div className={styles.computeSharingHealthTitle}>
+            {health.status === 'healthy' ? <Activity size={15} /> : <TriangleAlert size={15} />}
+            <strong>{healthLabel}</strong>
+            <small>近 24 小时</small>
+          </div>
+          <div className={styles.computeSharingHealthMetrics}>
+            <span>结束 {health.completed_runs_24h}</span>
+            <span>失败 {health.failed_runs_24h}</span>
+            <span>超出预留 {health.budget_overrun_runs_24h} 次 / {formatCount(health.budget_overrun_tokens_24h)} Token</span>
+            <span>租约过期 {health.expired_active_runs}</span>
+          </div>
+        </div>
+      )}
       {notice && <div className={styles.computeSharingNotice}>{notice}</div>}
       {error && <div className={styles.computeSharingError}>{error}</div>}
       <button className={[styles.btn, styles.primary].join(' ')} type="button" onClick={save} disabled={busy || (enabled && allowedModels.length === 0)}>

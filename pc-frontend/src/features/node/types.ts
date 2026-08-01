@@ -86,9 +86,22 @@ export interface NodeComputeSharingStatus {
   availability: string
 }
 
+export interface NodeComputeSharingRuntimeHealth {
+  node_id: string
+  status: 'healthy' | 'warning' | 'critical' | string
+  completed_runs_24h: number
+  failed_runs_24h: number
+  budget_overrun_runs_24h: number
+  budget_overrun_tokens_24h: number
+  expired_active_runs: number
+  attention_codes: string[]
+  evaluated_at: string
+}
+
 export interface NodeComputeSharingResponse {
   ok?: boolean
   compute_sharing: NodeComputeSharingStatus
+  runtime_health?: NodeComputeSharingRuntimeHealth
   observed_models?: NonNullable<NodeSummary['models']>
 }
 

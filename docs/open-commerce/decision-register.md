@@ -19,8 +19,9 @@
 | 商户必须能终止失信 App 的访问 | 商户可手动封禁具体 App，并原子撤销 Grant、取消待审批申请；解除不恢复旧信任 | `docs/decisions/open-commerce-app-blocks-v1.md` |
 | 每个 Grant 可限制完整授权期风险 | 商户可选设置总调用次数和总计量金额；调用前原子预留、失败退回，预算用尽后重新授权 | `docs/decisions/open-commerce-grant-budgets-v1.md` |
 | AI 资源 V1 先做控制面和路由预演 | 统一盘点现有真实资源并保存项目策略，但不复制执行器、不泄露凭据、不假装已核验外部额度 | `docs/decisions/ai-resource-control-v1.md` |
-| 节点模型共享必须由所有者显式开放 | 在线和模型上报不代表同意出租；按模型、并发和每日已完成 Token 阈值授权，调度前原子占位，所有者自用不受影响 | `docs/decisions/node-compute-sharing-supply-v1.md` |
+| 节点模型共享必须由所有者显式开放 | 在线和模型上报不代表同意出租；按模型、并发和每日 Token 预算授权，调度前原子预留，所有者自用不受影响 | `docs/decisions/node-compute-sharing-supply-v1.md` |
 | 共享节点每日 Token 预算必须覆盖在途任务 | 派发前原子检查今日实耗、活动预留和本次保守预留；终态按实际用量记账，过期租约不能复活 | `docs/decisions/node-compute-sharing-token-reservation-v1.md` |
+| 共享节点运行偏差只先形成所有者健康证据 | 从持久化记录派生失败、Token 预留超出和过期租约，仅在所有者控制面告警，不自动处罚、赔付或上链 | `docs/decisions/node-compute-sharing-runtime-health-v1.md` |
 | 先实现链外影子结算，再评估 Sui 网络适配器 | 复用真实成本和人工验收事实，保持双分录、幂等和默认关闭，不移动真实资金 | `docs/decisions/task-shadow-settlement-v1.md` |
 | Sui 适配器先消费可复核的链下投影包 | 投影包绑定目标网络、来源摘要与投影摘要；当前只持久化和复核，固定未提交 | `docs/decisions/sui-offchain-projection-packages-v1.md` |
 | 争议只追加证据并阻断投影，不改写历史账本 | 待审核或已接受争议阻断原凭证投影；纠正必须使用新的 Matter 和凭证 | `docs/decisions/task-shadow-settlement-disputes-v1.md` |

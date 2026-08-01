@@ -31,11 +31,24 @@ Authorization: Bearer <user-token>
     "available": false,
     "availability": "sharing_disabled"
   },
+  "runtime_health": {
+    "node_id": "node-123",
+    "status": "healthy",
+    "completed_runs_24h": 0,
+    "failed_runs_24h": 0,
+    "budget_overrun_runs_24h": 0,
+    "budget_overrun_tokens_24h": 0,
+    "expired_active_runs": 0,
+    "attention_codes": [],
+    "evaluated_at": "2026-08-02T03:00:00Z"
+  },
   "observed_models": []
 }
 ```
 
 `observed_models` 来自当前在线节点上报，只用于辅助选择。策略中的模型白名单是所有者保存的授权事实；节点仍必须在线并实际上报目标模型才可调度。
+
+`runtime_health` 只在本人节点策略接口返回。它从持久化的对外共享推理记录派生近 24 小时终态、失败、实际 Token 超出准入预留，以及当前过期活动租约。`critical` 表示存在预留超出或过期租约，`warning` 表示近期存在失败，`healthy` 表示当前未命中这些规则。该快照不进入公开节点目录，也不会自动触发扣款、赔付或链上操作。
 
 ## 更新策略
 

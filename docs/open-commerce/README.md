@@ -38,8 +38,9 @@
 28. `docs/open-commerce-grant-budgets-v1-acceptance.md`：查看授权生命周期预算 V1 的验证证据。
 29. `docs/decisions/node-compute-sharing-supply-v1.md`：查看节点所有者显式开放模型算力及原子调度边界。
 30. `docs/decisions/node-compute-sharing-token-reservation-v1.md`：查看每日实耗、活动预留和本次请求共同受预算约束的边界。
-31. `docs/node-compute-sharing-supply-v1-acceptance.md`：查看节点模型共享 V1 的验证证据和未完成范围。
-32. `docs/node-compute-sharing-supply-v1-api.md`：查看策略字段、状态码和发现/调用契约。
+31. `docs/decisions/node-compute-sharing-runtime-health-v1.md`：查看所有者运行健康快照、告警和非经济处置边界。
+32. `docs/node-compute-sharing-supply-v1-acceptance.md`：查看节点模型共享 V1 的验证证据和未完成范围。
+33. `docs/node-compute-sharing-supply-v1-api.md`：查看策略字段、状态码和发现/调用契约。
 
 ## 专题地图
 
@@ -55,7 +56,7 @@
 | 消费者发现与第三方应用接入 | 跨项目基础目录、授权沙盒、App/申请生命周期、调用配额、Grant 总预算及商户级手动封禁已实现，生产公共网络未完成 | `docs/decisions/open-commerce-directory-publication-v1.md`、`docs/decisions/open-commerce-developer-lifecycle-v1.md`、`docs/decisions/open-commerce-rate-limits-v1.md`、`docs/decisions/open-commerce-grant-budgets-v1.md`、`docs/decisions/open-commerce-app-blocks-v1.md` |
 | AI 资源盘点、策略与路由预演 | 控制面已实现，尚未接管真实任务调度 | `docs/open-commerce/ai-resource-control.md`、`server/src/ai_resource_control/` |
 | API Token 保管与节点计算计量 | 已有实现，尚不是公开 Token 交易市场 | `docs/token消费统计.md`、`server/src/store/node_ledger.rs` |
-| 节点模型算力显式共享 | V1 已实现，包含模型白名单、并发和每日阈值；尚不是完整算力市场 | `docs/decisions/node-compute-sharing-supply-v1.md`、`docs/node-compute-sharing-supply-v1-acceptance.md` |
+| 节点模型算力显式共享 | V1 已实现，包含模型白名单、并发、每日预算和所有者运行健康快照；尚不是完整算力市场 | `docs/decisions/node-compute-sharing-supply-v1.md`、`docs/decisions/node-compute-sharing-runtime-health-v1.md`、`docs/node-compute-sharing-supply-v1-acceptance.md` |
 | 链外影子用量、验收后双分录、争议纠正和 Sui 投影包 | V1 已实现、默认关闭；纠正可追加冲销与替换、解析当前有效凭证并保存链下原子包；所有读取失败关闭，所有包均不提交网络、不移动资金 | `docs/decisions/task-shadow-settlement-v1.md`、`docs/decisions/task-shadow-settlement-corrections-v1.md`、`docs/decisions/task-shadow-settlement-lineage-v1.md`、`docs/decisions/sui-correction-projection-packages-v1.md`、`docs/task-shadow-settlement-v1-api.md` |
 | 商户 AI 经营、营销内容和业务应用生成 | 产品方向，按真实连接器逐步实现 | `docs/drafts/requirements/open-commerce-network.md` |
 | 消费者 AI 与任意商户节点互联 | 商户主动发布、跨项目发现、授权、调用、固定时间窗配额和手动 App 封禁已实现；生产身份、自动风控和联邦治理仍待完成 | `docs/open-commerce/consumer-developer-sandbox.md`、`docs/drafts/open-commerce-network-roadmap.md` |

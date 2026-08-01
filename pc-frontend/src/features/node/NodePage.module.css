@@ -361,6 +361,28 @@
 }
 
 .computeSharingStatus { flex-wrap: wrap; color: var(--text-muted); font-size: 11px; }
+.computeSharingHealth {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.computeSharingHealth[data-tone='warning'] { color: #c5923e; }
+.computeSharingHealth[data-tone='critical'] { color: #d96868; }
+.computeSharingHealthTitle,
+.computeSharingHealthMetrics {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.computeSharingHealthTitle strong { font-size: 12px; color: currentColor; }
+.computeSharingHealthTitle small,
+.computeSharingHealthMetrics { font-size: 11px; }
 .computeSharingNotice { color: #4caf78; font-size: 12px; }
 .computeSharingError { color: #e07070; font-size: 12px; }
 .computeSharingCard .btn { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; }

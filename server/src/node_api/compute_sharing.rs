@@ -95,6 +95,13 @@ async fn compute_sharing_response(
         Ok(status) => status,
         Err(error) => return error_response(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
+    let runtime_health = match state
+        .store
+        .node_compute_sharing_runtime_health(node_id, owner_user_id)
+    {
+        Ok(health) => health,
+        Err(error) => return error_response(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+    };
     let observed_models = state
         .node_registry
         .list_by_owner(owner_user_id)
@@ -106,6 +113,7 @@ async fn compute_sharing_response(
     Json(serde_json::json!({
         "ok": true,
         "compute_sharing": status,
+        "runtime_health": runtime_health,
         "observed_models": observed_models,
     }))
     .into_response()
