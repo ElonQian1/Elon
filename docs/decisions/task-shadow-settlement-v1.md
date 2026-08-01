@@ -52,6 +52,8 @@ V1 可以把一张已对账影子凭证投影成 Sui 数据信封，包含项目
 
 在此基础上，v122 增加了可持久、幂等和可复核的链下投影包，详见 `docs/decisions/sui-offchain-projection-packages-v1.md`。投影包仍不产生网络副作用。
 
+v123 增加追加式争议案件与事件。待审核或已接受争议会阻断原凭证的 Sui 投影，但不会改写凭证、账本或资金，详见 `docs/decisions/task-shadow-settlement-disputes-v1.md`。
+
 该投影用于稳定未来适配器输入，不代表已经：
 
 - 安装 Sui SDK；

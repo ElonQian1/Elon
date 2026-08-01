@@ -3,6 +3,7 @@ use anyhow::{anyhow, Result};
 use crate::store::Store;
 
 use super::{
+    dispute_service,
     model::{
         CreateSuiProjectionPackage, SuiProjectionPackage, SUI_INTEGRITY_CONFLICT,
         SUI_INTEGRITY_VERIFIED, SUI_PROJECTION_PACKAGE_SCHEMA,
@@ -18,6 +19,7 @@ pub(super) fn prepare(
     actor_user_id: &str,
     target_network: &str,
 ) -> Result<SuiProjectionPackage> {
+    dispute_service::ensure_projection_allowed(store, project_id, receipt_id)?;
     let target_network = sui_projection::normalized_target_network(target_network)?;
     let detail = receipt_detail(store, project_id, receipt_id)?;
     let envelope = sui_projection::envelope(&detail.receipt)?;
@@ -38,7 +40,11 @@ pub(super) fn prepare(
 }
 
 pub(super) fn list(store: &Store, project_id: &str) -> Result<Vec<SuiProjectionPackage>> {
-    store.list_task_sui_projection_packages(project_id, 100)
+    store
+        .list_task_sui_projection_packages(project_id, 100)?
+        .into_iter()
+        .map(|package| with_dispute_readiness(store, package))
+        .collect()
 }
 
 pub(super) fn detail(
@@ -46,9 +52,25 @@ pub(super) fn detail(
     project_id: &str,
     projection_id: &str,
 ) -> Result<SuiProjectionPackage> {
-    store
+    let package = store
         .task_sui_projection_package(project_id, projection_id)?
-        .ok_or_else(|| anyhow!("Sui 投影包不存在"))
+        .ok_or_else(|| anyhow!("Sui 投影包不存在"))?;
+    with_dispute_readiness(store, package)
+}
+
+fn with_dispute_readiness(
+    store: &Store,
+    mut package: SuiProjectionPackage,
+) -> Result<SuiProjectionPackage> {
+    if package.submission_readiness == "adapter_required"
+        && store.task_settlement_has_blocking_dispute(
+            &package.project_id,
+            &package.settlement_receipt_id,
+        )?
+    {
+        package.submission_readiness = "dispute_blocked".to_string();
+    }
+    Ok(package)
 }
 
 pub(super) fn verify(
@@ -70,7 +92,7 @@ pub(super) fn verify(
         && package.source_receipt_digest == expected_source_digest;
     let error =
         (!matches).then_some("投影包与当前不可变影子凭证或 v1 投影规则不一致；禁止交给网络适配器");
-    store.update_task_sui_projection_integrity(
+    let package = store.update_task_sui_projection_integrity(
         project_id,
         projection_id,
         if matches {
@@ -79,7 +101,8 @@ pub(super) fn verify(
             SUI_INTEGRITY_CONFLICT
         },
         error,
-    )
+    )?;
+    with_dispute_readiness(store, package)
 }
 
 #[cfg(test)]

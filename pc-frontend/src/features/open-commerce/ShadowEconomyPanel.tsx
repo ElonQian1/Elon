@@ -7,6 +7,7 @@ import type {
   TaskEconomyOverview,
 } from './taskEconomyTypes'
 import SuiProjectionPackages from './SuiProjectionPackages'
+import SettlementDisputes from './SettlementDisputes'
 import { errorText, formatMicros } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import {
@@ -27,6 +28,7 @@ export default function ShadowEconomyPanel({
   const [overview, setOverview] = useState<TaskEconomyOverview | null>(null)
   const [detail, setDetail] = useState<SettlementReceiptDetail | null>(null)
   const [busy, setBusy] = useState(false)
+  const [economyRevision, setEconomyRevision] = useState(0)
   const [message, setMessage] = useState('')
 
   const refresh = useCallback(async () => {
@@ -161,9 +163,16 @@ export default function ShadowEconomyPanel({
         </section>
       </div>
 
+      <SettlementDisputes
+        canEdit={canEdit}
+        projectId={projectId}
+        selectedReceipt={detail?.receipt ?? null}
+        onChanged={() => setEconomyRevision((value) => value + 1)}
+      />
       <SuiProjectionPackages
         canEdit={canEdit}
         projectId={projectId}
+        refreshToken={economyRevision}
         selectedReceipt={detail?.receipt ?? null}
       />
       {message && <div style={{ ...commerceStyles.message, ...errorMessageStyle }}>{message}</div>}

@@ -14,6 +14,10 @@ pub(crate) const SUI_PROJECTION_PACKAGE_SCHEMA: &str = "task_economy.sui_project
 pub(crate) const SUI_NETWORK_NOT_SUBMITTED: &str = "not_submitted";
 pub(crate) const SUI_INTEGRITY_VERIFIED: &str = "verified";
 pub(crate) const SUI_INTEGRITY_CONFLICT: &str = "conflict";
+pub(crate) const DISPUTE_OPEN: &str = "open";
+pub(crate) const DISPUTE_ACCEPTED: &str = "accepted";
+pub(crate) const DISPUTE_REJECTED: &str = "rejected";
+pub(crate) const DISPUTE_WITHDRAWN: &str = "withdrawn";
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct TaskEconomyProjectSetting {
@@ -239,4 +243,67 @@ pub(crate) struct CreateSuiProjectionPackage<'a> {
     pub source_receipt_digest: &'a str,
     pub envelope_json: &'a str,
     pub created_by_user_id: &'a str,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct OpenSettlementDisputeRequest {
+    pub reason_code: String,
+    pub summary: String,
+    pub evidence_ref: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ResolveSettlementDisputeRequest {
+    pub decision: String,
+    pub note: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct WithdrawSettlementDisputeRequest {
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SettlementDispute {
+    pub id: String,
+    pub project_id: String,
+    pub settlement_receipt_id: String,
+    pub status: String,
+    pub reason_code: String,
+    pub summary: String,
+    pub evidence_ref: Option<String>,
+    pub opened_by_user_id: String,
+    pub resolved_by_user_id: Option<String>,
+    pub resolution_note: Option<String>,
+    pub opened_at: String,
+    pub resolved_at: Option<String>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SettlementDisputeEvent {
+    pub id: String,
+    pub dispute_id: String,
+    pub action: String,
+    pub previous_status: Option<String>,
+    pub next_status: String,
+    pub actor_user_id: String,
+    pub note: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SettlementDisputeDetail {
+    pub dispute: SettlementDispute,
+    pub events: Vec<SettlementDisputeEvent>,
+    pub blocks_projection: bool,
+}
+
+pub(crate) struct CreateSettlementDispute<'a> {
+    pub project_id: &'a str,
+    pub settlement_receipt_id: &'a str,
+    pub reason_code: &'a str,
+    pub summary: &'a str,
+    pub evidence_ref: Option<&'a str>,
+    pub actor_user_id: &'a str,
 }

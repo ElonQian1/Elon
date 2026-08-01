@@ -19,22 +19,23 @@
 9. `docs/open-commerce/decision-register.md`：区分已接受决定、试验方向和未决问题。
 10. `docs/decisions/task-shadow-settlement-v1.md`：查看链外影子经济层已经接受的事实来源、账本和 Sui 边界。
 11. `docs/decisions/sui-offchain-projection-packages-v1.md`：查看 Sui 链下投影包、双摘要、目标网络和完整性复核边界。
-12. `docs/open-commerce/connector-sdk.md`：查看厂商无关连接器契约、数据边界和兼容性门禁。
-13. `docs/open-commerce/consumer-developer-sandbox.md`：查看消费者发现、App 注册、授权审批和测试调用闭环。
-14. `docs/open-commerce/ai-resource-control.md`：查看 AI 资源盘点、项目策略和不执行任务的路由预演。
-15. `docs/decisions/open-commerce-directory-publication-v1.md`：查看商户主动发布、脱敏目录和撤回边界。
-16. `docs/open-commerce-directory-v1-acceptance.md`：查看目录 V1 的验证证据和未完成边界。
-17. `docs/decisions/open-commerce-developer-lifecycle-v1.md`：查看沙盒 App 停用、重新启用和授权申请撤回边界。
-18. `docs/open-commerce-developer-lifecycle-v1-acceptance.md`：查看开发者生命周期 V1 的验证证据。
-19. `docs/decisions/open-commerce-rate-limits-v1.md`：查看商户可控调用配额、幂等和超限审计边界。
-20. `docs/open-commerce-rate-limits-v1-acceptance.md`：查看调用配额 V1 的验证证据。
-21. `docs/decisions/open-commerce-app-blocks-v1.md`：查看商户级 App 封禁、授权紧急撤销和解除后不恢复信任的边界。
-22. `docs/open-commerce-app-blocks-v1-acceptance.md`：查看商户级 App 封禁 V1 的验证证据。
-23. `docs/decisions/open-commerce-grant-budgets-v1.md`：查看单个 Grant 总调用和总计量预算的原子预留边界。
-24. `docs/open-commerce-grant-budgets-v1-acceptance.md`：查看授权生命周期预算 V1 的验证证据。
-25. `docs/decisions/node-compute-sharing-supply-v1.md`：查看节点所有者显式开放模型算力及原子调度边界。
-26. `docs/node-compute-sharing-supply-v1-acceptance.md`：查看节点模型共享 V1 的验证证据和未完成范围。
-27. `docs/node-compute-sharing-supply-v1-api.md`：查看策略字段、状态码和发现/调用契约。
+12. `docs/decisions/task-shadow-settlement-disputes-v1.md`：查看争议案件、追加式事件和投影阻断边界。
+13. `docs/open-commerce/connector-sdk.md`：查看厂商无关连接器契约、数据边界和兼容性门禁。
+14. `docs/open-commerce/consumer-developer-sandbox.md`：查看消费者发现、App 注册、授权审批和测试调用闭环。
+15. `docs/open-commerce/ai-resource-control.md`：查看 AI 资源盘点、项目策略和不执行任务的路由预演。
+16. `docs/decisions/open-commerce-directory-publication-v1.md`：查看商户主动发布、脱敏目录和撤回边界。
+17. `docs/open-commerce-directory-v1-acceptance.md`：查看目录 V1 的验证证据和未完成边界。
+18. `docs/decisions/open-commerce-developer-lifecycle-v1.md`：查看沙盒 App 停用、重新启用和授权申请撤回边界。
+19. `docs/open-commerce-developer-lifecycle-v1-acceptance.md`：查看开发者生命周期 V1 的验证证据。
+20. `docs/decisions/open-commerce-rate-limits-v1.md`：查看商户可控调用配额、幂等和超限审计边界。
+21. `docs/open-commerce-rate-limits-v1-acceptance.md`：查看调用配额 V1 的验证证据。
+22. `docs/decisions/open-commerce-app-blocks-v1.md`：查看商户级 App 封禁、授权紧急撤销和解除后不恢复信任的边界。
+23. `docs/open-commerce-app-blocks-v1-acceptance.md`：查看商户级 App 封禁 V1 的验证证据。
+24. `docs/decisions/open-commerce-grant-budgets-v1.md`：查看单个 Grant 总调用和总计量预算的原子预留边界。
+25. `docs/open-commerce-grant-budgets-v1-acceptance.md`：查看授权生命周期预算 V1 的验证证据。
+26. `docs/decisions/node-compute-sharing-supply-v1.md`：查看节点所有者显式开放模型算力及原子调度边界。
+27. `docs/node-compute-sharing-supply-v1-acceptance.md`：查看节点模型共享 V1 的验证证据和未完成范围。
+28. `docs/node-compute-sharing-supply-v1-api.md`：查看策略字段、状态码和发现/调用契约。
 
 ## 专题地图
 
@@ -51,7 +52,7 @@
 | AI 资源盘点、策略与路由预演 | 控制面已实现，尚未接管真实任务调度 | `docs/open-commerce/ai-resource-control.md`、`server/src/ai_resource_control/` |
 | API Token 保管与节点计算计量 | 已有实现，尚不是公开 Token 交易市场 | `docs/token消费统计.md`、`server/src/store/node_ledger.rs` |
 | 节点模型算力显式共享 | V1 已实现，包含模型白名单、并发和每日阈值；尚不是完整算力市场 | `docs/decisions/node-compute-sharing-supply-v1.md`、`docs/node-compute-sharing-supply-v1-acceptance.md` |
-| 链外影子用量、验收后双分录和 Sui 投影包 | V1 已实现、默认关闭，可持久化和复核但不提交网络、不移动资金 | `docs/decisions/task-shadow-settlement-v1.md`、`docs/decisions/sui-offchain-projection-packages-v1.md`、`docs/task-shadow-settlement-v1-api.md` |
+| 链外影子用量、验收后双分录、争议和 Sui 投影包 | V1 已实现、默认关闭；争议可阻断投影，链下包可复核但不提交网络、不移动资金 | `docs/decisions/task-shadow-settlement-v1.md`、`docs/decisions/task-shadow-settlement-disputes-v1.md`、`docs/decisions/sui-offchain-projection-packages-v1.md`、`docs/task-shadow-settlement-v1-api.md` |
 | 商户 AI 经营、营销内容和业务应用生成 | 产品方向，按真实连接器逐步实现 | `docs/drafts/requirements/open-commerce-network.md` |
 | 消费者 AI 与任意商户节点互联 | 商户主动发布、跨项目发现、授权、调用、固定时间窗配额和手动 App 封禁已实现；生产身份、自动风控和联邦治理仍待完成 | `docs/open-commerce/consumer-developer-sandbox.md`、`docs/drafts/open-commerce-network-roadmap.md` |
 | 闲置算力公开市场 | 模型推理供给控制已实现；异构任务、竞价、赔付和真实结算仍是提案 | `docs/decisions/node-compute-sharing-supply-v1.md`、`docs/drafts/open-commerce-network-sui-agent-economy.md` |

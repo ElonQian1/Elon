@@ -1,5 +1,7 @@
 import { api } from '../../api/client'
 import type {
+  SettlementDisputeDetail,
+  SettlementDisputeReason,
   SettlementReceiptDetail,
   SuiProjectionPackage,
   SuiSettlementEnvelope,
@@ -39,5 +41,33 @@ export const taskEconomyApi = {
     api.post<SuiProjectionPackage>(
       `${base(projectId)}/sui-projections/${encodeURIComponent(projectionId)}/verify`,
       {},
+    ),
+  settlementDisputes: (projectId: string, receiptId: string) =>
+    api.get<SettlementDisputeDetail[]>(
+      `${base(projectId)}/settlements/${encodeURIComponent(receiptId)}/disputes`,
+    ),
+  openSettlementDispute: (
+    projectId: string,
+    receiptId: string,
+    input: { reason_code: SettlementDisputeReason; summary: string; evidence_ref?: string },
+  ) =>
+    api.post<SettlementDisputeDetail>(
+      `${base(projectId)}/settlements/${encodeURIComponent(receiptId)}/disputes`,
+      input,
+    ),
+  withdrawSettlementDispute: (projectId: string, disputeId: string, note: string) =>
+    api.post<SettlementDisputeDetail>(
+      `${base(projectId)}/disputes/${encodeURIComponent(disputeId)}/withdraw`,
+      { note },
+    ),
+  resolveSettlementDispute: (
+    projectId: string,
+    disputeId: string,
+    decision: 'accept' | 'reject',
+    note: string,
+  ) =>
+    api.post<SettlementDisputeDetail>(
+      `${base(projectId)}/disputes/${encodeURIComponent(disputeId)}/resolve`,
+      { decision, note },
     ),
 }

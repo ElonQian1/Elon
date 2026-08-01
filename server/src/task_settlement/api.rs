@@ -13,7 +13,12 @@ use crate::{
 };
 
 use super::{
-    model::{PrepareSuiProjectionPackageRequest, UpdateTaskEconomyProjectSettingRequest},
+    dispute_service,
+    model::{
+        OpenSettlementDisputeRequest, PrepareSuiProjectionPackageRequest,
+        ResolveSettlementDisputeRequest, UpdateTaskEconomyProjectSettingRequest,
+        WithdrawSettlementDisputeRequest,
+    },
     service, sui_projection_service,
 };
 
@@ -50,6 +55,18 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/economy/sui-projections/:projection_id/verify",
             post(verify_sui_projection),
+        )
+        .route(
+            "/api/projects/:project_id/economy/settlements/:receipt_id/disputes",
+            get(list_settlement_disputes).post(open_settlement_dispute),
+        )
+        .route(
+            "/api/projects/:project_id/economy/disputes/:dispute_id/withdraw",
+            post(withdraw_settlement_dispute),
+        )
+        .route(
+            "/api/projects/:project_id/economy/disputes/:dispute_id/resolve",
+            post(resolve_settlement_dispute),
         )
 }
 
@@ -178,6 +195,87 @@ async fn verify_sui_projection(
         &state.store,
         &project_id,
         &projection_id,
+    ))
+}
+
+async fn list_settlement_disputes(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, receipt_id)): Path<(String, String)>,
+) -> Response {
+    if let Err(response) = project_caller(&state, &headers, &project_id) {
+        return response;
+    }
+    service_response(dispute_service::list(
+        &state.store,
+        &project_id,
+        &receipt_id,
+    ))
+}
+
+async fn open_settlement_dispute(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, receipt_id)): Path<(String, String)>,
+    Json(request): Json<OpenSettlementDisputeRequest>,
+) -> Response {
+    let (user_id, role) = match project_caller(&state, &headers, &project_id) {
+        Ok(caller) => caller,
+        Err(response) => return response,
+    };
+    if !can_edit(&role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目编辑者可以提出影子结算争议");
+    }
+    service_response(dispute_service::open(
+        &state.store,
+        &project_id,
+        &receipt_id,
+        &user_id,
+        &request,
+    ))
+}
+
+async fn withdraw_settlement_dispute(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, dispute_id)): Path<(String, String)>,
+    Json(request): Json<WithdrawSettlementDisputeRequest>,
+) -> Response {
+    let (user_id, role) = match project_caller(&state, &headers, &project_id) {
+        Ok(caller) => caller,
+        Err(response) => return response,
+    };
+    if !can_edit(&role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目编辑者可以撤回影子结算争议");
+    }
+    service_response(dispute_service::withdraw(
+        &state.store,
+        &project_id,
+        &dispute_id,
+        &user_id,
+        &request,
+    ))
+}
+
+async fn resolve_settlement_dispute(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, dispute_id)): Path<(String, String)>,
+    Json(request): Json<ResolveSettlementDisputeRequest>,
+) -> Response {
+    let (user_id, role) = match project_caller(&state, &headers, &project_id) {
+        Ok(caller) => caller,
+        Err(response) => return response,
+    };
+    if !can_edit(&role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目编辑者可以审核影子结算争议");
+    }
+    service_response(dispute_service::resolve(
+        &state.store,
+        &project_id,
+        &dispute_id,
+        &user_id,
+        &request,
     ))
 }
 

@@ -157,6 +157,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (120, "ERP 商户实例新建与现有项目纳入来源", crate::erp_instance_onboarding_migration::migration_v120),
     (121, "节点模型算力显式共享策略与供给限制", crate::node_compute_sharing_migration::migration_v121),
     (122, "Sui 链下投影包、摘要与完整性复核", crate::task_sui_projection_migration::migration_v122),
+    (123, "影子结算争议案件与追加式事件", crate::task_settlement_dispute_migration::migration_v123),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

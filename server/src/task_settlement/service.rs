@@ -110,6 +110,7 @@ pub(crate) fn sui_envelope(
     project_id: &str,
     receipt_id: &str,
 ) -> Result<super::model::SuiSettlementEnvelope> {
+    super::dispute_service::ensure_projection_allowed(store, project_id, receipt_id)?;
     let detail = receipt_detail(store, project_id, receipt_id)?;
     sui_projection::envelope(&detail.receipt)
 }

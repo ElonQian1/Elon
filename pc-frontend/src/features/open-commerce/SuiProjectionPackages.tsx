@@ -20,10 +20,12 @@ export default function SuiProjectionPackages({
   projectId,
   canEdit,
   selectedReceipt,
+  refreshToken,
 }: {
   projectId: string
   canEdit: boolean
   selectedReceipt: SettlementReceipt | null
+  refreshToken: number
 }) {
   const [packages, setPackages] = useState<SuiProjectionPackage[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -46,7 +48,7 @@ export default function SuiProjectionPackages({
 
   useEffect(() => {
     refresh()
-  }, [refresh])
+  }, [refresh, refreshToken])
 
   const selected = useMemo(
     () => packages.find((item) => item.id === selectedId) ?? null,

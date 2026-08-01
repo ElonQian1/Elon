@@ -336,6 +336,7 @@ mod store;
 mod store_migrations;
 mod store_schema;
 mod task_settlement;
+mod task_settlement_dispute_migration;
 mod task_settlement_migration;
 mod task_sui_projection_migration;
 mod task_title;

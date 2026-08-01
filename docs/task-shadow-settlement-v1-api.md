@@ -87,6 +87,39 @@ POST /api/projects/{project_id}/economy/sui-projections/{projection_id}/verify
 
 `adapter_required` 表示链下包已通过完整性复核，但项目尚未实现钱包、签名、Gas、交易广播或最终性确认。
 
+## 影子结算争议
+
+项目成员可以查看凭证的争议案件和事件：
+
+```http
+GET /api/projects/{project_id}/economy/settlements/{receipt_id}/disputes
+```
+
+项目编辑者可以对已对账凭证提出争议：
+
+```http
+POST /api/projects/{project_id}/economy/settlements/{receipt_id}/disputes
+Content-Type: application/json
+
+{
+  "reason_code": "amount",
+  "summary": "计量金额与节点原始记录不一致",
+  "evidence_ref": "artifact:billing-evidence"
+}
+```
+
+`reason_code` 只能是 `amount`、`provider_allocation`、`policy`、`source_evidence` 或 `other`。同一凭证同时只能有一个 `open` 案件；完全相同的请求幂等复用，内容漂移返回冲突。
+
+```http
+POST /api/projects/{project_id}/economy/disputes/{dispute_id}/withdraw
+{"note":"证据仍需补充，先撤回"}
+
+POST /api/projects/{project_id}/economy/disputes/{dispute_id}/resolve
+{"decision":"accept","note":"确认需要另建纠正凭证"}
+```
+
+`decision` 只能是 `accept` 或 `reject`。`open` 与 `accepted` 会阻断 Sui 信封和新投影包，并使既有投影包返回 `submission_readiness=dispute_blocked`。接受争议仅确认需要纠正，不自动退款、冲正或修改原账本。
+
 ## 自动写入点
 
 | 现有事件 | 影子行为 |

@@ -137,7 +137,7 @@ export interface SuiProjectionPackage {
   source_receipt_digest: string
   envelope: SuiSettlementEnvelope
   integrity_status: 'verified' | 'conflict'
-  submission_readiness: 'adapter_required' | 'integrity_conflict'
+  submission_readiness: 'adapter_required' | 'integrity_conflict' | 'dispute_blocked'
   network_submission: 'not_submitted'
   submission_attempts: number
   last_error?: string
@@ -145,4 +145,45 @@ export interface SuiProjectionPackage {
   verified_at: string
   created_at: string
   updated_at: string
+}
+
+export type SettlementDisputeStatus = 'open' | 'accepted' | 'rejected' | 'withdrawn'
+export type SettlementDisputeReason =
+  | 'amount'
+  | 'provider_allocation'
+  | 'policy'
+  | 'source_evidence'
+  | 'other'
+
+export interface SettlementDispute {
+  id: string
+  project_id: string
+  settlement_receipt_id: string
+  status: SettlementDisputeStatus
+  reason_code: SettlementDisputeReason
+  summary: string
+  evidence_ref?: string
+  opened_by_user_id: string
+  resolved_by_user_id?: string
+  resolution_note?: string
+  opened_at: string
+  resolved_at?: string
+  updated_at: string
+}
+
+export interface SettlementDisputeEvent {
+  id: string
+  dispute_id: string
+  action: 'opened' | 'accepted' | 'rejected' | 'withdrawn'
+  previous_status?: SettlementDisputeStatus
+  next_status: SettlementDisputeStatus
+  actor_user_id: string
+  note?: string
+  created_at: string
+}
+
+export interface SettlementDisputeDetail {
+  dispute: SettlementDispute
+  events: SettlementDisputeEvent[]
+  blocks_projection: boolean
 }
