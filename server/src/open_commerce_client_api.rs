@@ -258,6 +258,9 @@ async fn approve_authorization_request(
             scopes: request.scopes.clone(),
             purpose: request.purpose.clone(),
             expires_at: None,
+            max_invocations: decision.max_invocations,
+            max_amount_micros: decision.max_amount_micros,
+            budget_currency: decision.budget_currency.clone(),
         },
     ) {
         Ok(grant) => grant,
@@ -283,7 +286,10 @@ async fn approve_authorization_request(
         &authorization.id,
         &json!({
             "requester_app_id": authorization.requester_app_id,
-            "grant_id": grant.id
+            "grant_id": grant.id,
+            "max_invocations": grant.max_invocations,
+            "max_amount_micros": grant.max_amount_micros,
+            "budget_currency": grant.budget_currency
         }),
     ) {
         return service_error(error);
@@ -404,11 +410,13 @@ fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response 
 fn service_error(error: anyhow::Error) -> Response {
     let rate_limited =
         error.is::<crate::open_commerce_rate_limit_model::OpenCommerceRateLimitExceeded>();
+    let grant_budget_exceeded =
+        error.is::<crate::open_commerce_grant_budget_model::OpenCommerceGrantBudgetExceeded>();
     let app_blocked = error.is::<crate::open_commerce_app_block_model::OpenCommerceAppBlocked>();
     let message = format!("{error:#}");
     let status = if rate_limited {
         StatusCode::TOO_MANY_REQUESTS
-    } else if app_blocked {
+    } else if app_blocked || grant_budget_exceeded {
         StatusCode::FORBIDDEN
     } else if message.contains("权限") || message.contains("不能代表") {
         StatusCode::FORBIDDEN

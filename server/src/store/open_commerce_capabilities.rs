@@ -225,7 +225,7 @@ pub(super) fn public_capability(mut capability: OpenCommerceCapability) -> OpenC
     capability
 }
 
-fn normalize_currency(value: &str) -> Result<String> {
+pub(super) fn normalize_currency(value: &str) -> Result<String> {
     let value = value.trim().to_ascii_uppercase();
     if value.len() != 3 || !value.chars().all(|ch| ch.is_ascii_uppercase()) {
         bail!("币种必须是 3 位大写 ISO 代码");

@@ -6,7 +6,10 @@ use crate::open_commerce_model::{
     normalize_app_id, normalize_capability_key, CreateGrantRequest, OpenCommerceGrant,
 };
 
-use super::{new_id, now, open_commerce_app_blocks::ensure_app_not_blocked_on, Store};
+use super::{
+    new_id, now, open_commerce_app_blocks::ensure_app_not_blocked_on,
+    open_commerce_capabilities::normalize_currency, Store,
+};
 
 impl Store {
     pub(crate) fn create_open_commerce_grant(
@@ -20,6 +23,9 @@ impl Store {
         let scopes = normalize_scopes(&request.scopes)?;
         let purpose = validate_purpose(&request.purpose)?;
         let expires_at = validate_expiration(request.expires_at.as_deref())?;
+        let max_invocations = validate_budget_limit(request.max_invocations, "授权总调用次数")?;
+        let max_amount_micros = validate_budget_limit(request.max_amount_micros, "授权总计量金额")?;
+        let budget_currency = normalize_currency(&request.budget_currency)?;
         let id = new_id("grant");
         let timestamp = now();
         let conn = self.conn()?;
@@ -27,8 +33,13 @@ impl Store {
         conn.execute(
             "INSERT INTO open_commerce_grants (
                 id, project_id, merchant_id, grantor_user_id, grantee_app_id,
-                scopes_json, purpose, expires_at, revoked_at, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, ?9, ?9)",
+                scopes_json, purpose, expires_at, revoked_at,
+                max_invocations, max_amount_micros, budget_currency,
+                used_invocations, used_amount_micros, created_at, updated_at
+             ) VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL,
+                ?9, ?10, ?11, 0, 0, ?12, ?12
+             )",
             params![
                 id,
                 project_id.trim(),
@@ -38,6 +49,9 @@ impl Store {
                 serde_json::to_string(&scopes)?,
                 purpose,
                 expires_at,
+                max_invocations,
+                max_amount_micros,
+                budget_currency,
                 timestamp
             ],
         )?;
@@ -188,11 +202,25 @@ fn grant_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceGrant> {
         purpose: row.get(6)?,
         expires_at: row.get(7)?,
         revoked_at: row.get(8)?,
-        created_at: row.get(9)?,
-        updated_at: row.get(10)?,
+        max_invocations: row.get(9)?,
+        max_amount_micros: row.get(10)?,
+        budget_currency: row.get(11)?,
+        used_invocations: row.get(12)?,
+        used_amount_micros: row.get(13)?,
+        created_at: row.get(14)?,
+        updated_at: row.get(15)?,
     })
 }
 
 const GRANT_SELECT: &str = "SELECT id, project_id, merchant_id, grantor_user_id, grantee_app_id,
-            scopes_json, purpose, expires_at, revoked_at, created_at, updated_at
+            scopes_json, purpose, expires_at, revoked_at,
+            max_invocations, max_amount_micros, budget_currency,
+            used_invocations, used_amount_micros, created_at, updated_at
        FROM open_commerce_grants";
+
+fn validate_budget_limit(value: Option<i64>, label: &str) -> Result<Option<i64>> {
+    if value.is_some_and(|limit| limit <= 0) {
+        bail!("{label}必须大于 0");
+    }
+    Ok(value)
+}

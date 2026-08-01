@@ -504,11 +504,13 @@ fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response 
 fn service_error(error: anyhow::Error) -> Response {
     let rate_limited =
         error.is::<crate::open_commerce_rate_limit_model::OpenCommerceRateLimitExceeded>();
+    let grant_budget_exceeded =
+        error.is::<crate::open_commerce_grant_budget_model::OpenCommerceGrantBudgetExceeded>();
     let app_blocked = error.is::<crate::open_commerce_app_block_model::OpenCommerceAppBlocked>();
     let message = format!("{error:#}");
     let status = if rate_limited {
         StatusCode::TOO_MANY_REQUESTS
-    } else if app_blocked {
+    } else if app_blocked || grant_budget_exceeded {
         StatusCode::FORBIDDEN
     } else if message.contains("权限") || message.contains("授权") {
         StatusCode::FORBIDDEN
@@ -561,6 +563,18 @@ mod tests {
             service_error(anyhow::anyhow!(
                 crate::open_commerce_app_block_model::OpenCommerceAppBlocked {
                     requester_app_id: "consumer.blocked".to_string(),
+                }
+            ))
+            .status(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            service_error(anyhow::anyhow!(
+                crate::open_commerce_grant_budget_model::OpenCommerceGrantBudgetExceeded {
+                    grant_id: "grant_test".to_string(),
+                    limit_kind: "invocations",
+                    limit: 2,
+                    used: 2,
                 }
             ))
             .status(),

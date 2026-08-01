@@ -80,6 +80,11 @@ pub(crate) struct OpenCommerceGrant {
     pub purpose: String,
     pub expires_at: Option<String>,
     pub revoked_at: Option<String>,
+    pub max_invocations: Option<i64>,
+    pub max_amount_micros: Option<i64>,
+    pub budget_currency: String,
+    pub used_invocations: i64,
+    pub used_amount_micros: i64,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -245,6 +250,12 @@ pub(crate) struct CreateGrantRequest {
     pub purpose: String,
     #[serde(default)]
     pub expires_at: Option<String>,
+    #[serde(default)]
+    pub max_invocations: Option<i64>,
+    #[serde(default)]
+    pub max_amount_micros: Option<i64>,
+    #[serde(default = "default_currency")]
+    pub budget_currency: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

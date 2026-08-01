@@ -58,6 +58,12 @@ pub(crate) struct CreateAuthorizationRequest {
 pub(crate) struct DecideAuthorizationRequest {
     #[serde(default)]
     pub reason: String,
+    #[serde(default)]
+    pub max_invocations: Option<i64>,
+    #[serde(default)]
+    pub max_amount_micros: Option<i64>,
+    #[serde(default = "default_budget_currency")]
+    pub budget_currency: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -73,4 +79,8 @@ pub(crate) struct DeveloperInvokeRequest {
 
 fn empty_object() -> Value {
     serde_json::json!({})
+}
+
+fn default_budget_currency() -> String {
+    "CNY".to_string()
 }

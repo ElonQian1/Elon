@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use crate::{
     open_commerce_app_block_service,
     open_commerce_directory_model::DIRECTORY_STATUS_PUBLISHED,
+    open_commerce_grant_budget_service,
     open_commerce_integration_model::{
         CreateIntegrationRequest, OpenCommerceIntegration, OpenCommerceSyncReceipt,
         RecordSyncReceiptRequest, INTEGRATION_STATUS_CONNECTED, INTEGRATION_STATUS_DEGRADED,
@@ -402,7 +403,10 @@ pub(crate) fn create_grant(
             "merchant_id": grant.merchant_id,
             "grantee_app_id": grant.grantee_app_id,
             "scopes": grant.scopes,
-            "expires_at": grant.expires_at
+            "expires_at": grant.expires_at,
+            "max_invocations": grant.max_invocations,
+            "max_amount_micros": grant.max_amount_micros,
+            "budget_currency": grant.budget_currency
         }),
     )?;
     Ok(grant)
@@ -509,6 +513,15 @@ pub(crate) async fn invoke(
         &requester_app_id,
         &claim.invocation.id,
         target_editor,
+    )?;
+
+    open_commerce_grant_budget_service::enforce_invocation(
+        store,
+        &merchant,
+        &capability,
+        actor.user_id,
+        &requester_app_id,
+        &claim.invocation,
     )?;
 
     let result = match execute_handler(

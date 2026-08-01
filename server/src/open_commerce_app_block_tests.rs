@@ -125,6 +125,9 @@ async fn merchant_block_revokes_trust_and_unblock_does_not_restore_it() {
             scopes: vec!["order.create".to_string()],
             purpose: "自动下单测试".to_string(),
             expires_at: None,
+            max_invocations: None,
+            max_amount_micros: None,
+            budget_currency: "CNY".to_string(),
         },
     )
     .unwrap();
@@ -214,6 +217,9 @@ async fn merchant_block_revokes_trust_and_unblock_does_not_restore_it() {
             scopes: vec!["order.create".to_string()],
             purpose: "封禁期间误授权".to_string(),
             expires_at: None,
+            max_invocations: None,
+            max_amount_micros: None,
+            budget_currency: "CNY".to_string(),
         },
     )
     .unwrap_err();

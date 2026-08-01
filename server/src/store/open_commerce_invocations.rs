@@ -6,7 +6,14 @@ use crate::open_commerce_model::{
     OpenCommerceAuditEvent, OpenCommerceInvocation, SETTLEMENT_RECORDED_NOT_CHARGED,
 };
 
-use super::{new_id, now, open_commerce_app_blocks::ensure_app_not_blocked_on, Store};
+use super::{
+    new_id, now,
+    open_commerce_app_blocks::ensure_app_not_blocked_on,
+    open_commerce_grant_budgets::{
+        commit_grant_budget_reservation_on, release_grant_budget_reservation_on,
+    },
+    Store,
+};
 
 pub(crate) struct OpenCommerceInvocationStart<'a> {
     pub project_id: &'a str,
@@ -96,7 +103,9 @@ impl Store {
         result: &Value,
     ) -> Result<OpenCommerceInvocation> {
         let timestamp = now();
-        let updated = self.conn()?.execute(
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let updated = tx.execute(
             "UPDATE open_commerce_invocations
                 SET status = 'succeeded', result_json = ?1, error_code = NULL,
                     units = 1, amount_micros = unit_price_micros,
@@ -112,6 +121,9 @@ impl Store {
         if updated == 0 {
             bail!("调用不存在或已经完成");
         }
+        commit_grant_budget_reservation_on(&tx, invocation_id, &timestamp)?;
+        tx.commit()?;
+        drop(conn);
         self.open_commerce_invocation(invocation_id)
     }
 
@@ -120,7 +132,10 @@ impl Store {
         invocation_id: &str,
         error_code: &str,
     ) -> Result<OpenCommerceInvocation> {
-        let updated = self.conn()?.execute(
+        let timestamp = now();
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let updated = tx.execute(
             "UPDATE open_commerce_invocations
                 SET status = 'failed', result_json = NULL, error_code = ?1,
                     units = 0, amount_micros = 0,
@@ -129,13 +144,16 @@ impl Store {
             params![
                 error_code.trim(),
                 SETTLEMENT_RECORDED_NOT_CHARGED,
-                now(),
+                timestamp,
                 invocation_id.trim()
             ],
         )?;
         if updated == 0 {
             bail!("调用不存在或已经完成");
         }
+        release_grant_budget_reservation_on(&tx, invocation_id, &timestamp)?;
+        tx.commit()?;
+        drop(conn);
         self.open_commerce_invocation(invocation_id)
     }
 

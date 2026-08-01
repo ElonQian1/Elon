@@ -314,6 +314,9 @@ async fn merchant_to_authorized_invocation_is_audited_and_idempotent() {
             scopes: vec!["menu.preview".to_string()],
             purpose: "验证获得授权后的菜单查询".to_string(),
             expires_at: None,
+            max_invocations: None,
+            max_amount_micros: None,
+            budget_currency: "CNY".to_string(),
         },
     )
     .expect("grant should be created");

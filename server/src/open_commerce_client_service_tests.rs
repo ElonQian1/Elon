@@ -171,6 +171,9 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
             scopes: request.scopes.clone(),
             purpose: request.purpose.clone(),
             expires_at: None,
+            max_invocations: None,
+            max_amount_micros: None,
+            budget_currency: "CNY".to_string(),
         },
     )
     .unwrap();

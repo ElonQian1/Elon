@@ -63,6 +63,7 @@ mod open_commerce_authorization_requests;
 mod open_commerce_capabilities;
 mod open_commerce_developer_apps;
 mod open_commerce_directory;
+mod open_commerce_grant_budgets;
 mod open_commerce_grants;
 mod open_commerce_integrations;
 mod open_commerce_invocations;

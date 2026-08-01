@@ -136,7 +136,7 @@ pub(crate) fn definitions() -> Vec<Value> {
         ),
         tool(
             "open_commerce_create_grant",
-            "授权指定 AI 应用调用某个商户的一个或多个能力。授权可设置用途和到期时间，并可随时撤销。",
+            "授权指定 AI 应用调用某个商户的一个或多个能力。可设置总调用次数或总计量金额预算；授权可随时撤销。",
             json!({
                 "type":"object",
                 "required":["merchant_id","grantee_app_id","scopes","purpose"],
@@ -145,7 +145,10 @@ pub(crate) fn definitions() -> Vec<Value> {
                     "grantee_app_id":{"type":"string","minLength":2,"maxLength":80},
                     "scopes":{"type":"array","minItems":1,"maxItems":64,"items":{"type":"string","minLength":2,"maxLength":80}},
                     "purpose":{"type":"string","minLength":1,"maxLength":500},
-                    "expires_at":{"type":"string","format":"date-time"}
+                    "expires_at":{"type":"string","format":"date-time"},
+                    "max_invocations":{"type":"integer","minimum":1},
+                    "max_amount_micros":{"type":"integer","minimum":1},
+                    "budget_currency":{"type":"string","minLength":3,"maxLength":3,"default":"CNY"}
                 },
                 "additionalProperties":false
             }),
