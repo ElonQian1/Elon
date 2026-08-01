@@ -234,6 +234,15 @@ async fn approve_authorization_request(
     if request.status != "pending" {
         return Json(request).into_response();
     }
+    if let Err(error) = state
+        .store
+        .ensure_open_commerce_developer_app_owned_by_user(
+            &request.requester_app_id,
+            &request.requester_user_id,
+        )
+    {
+        return service_error(error);
+    }
     let actor = OpenCommerceActor {
         user_id: &user_id,
         app_id: "pc-web",

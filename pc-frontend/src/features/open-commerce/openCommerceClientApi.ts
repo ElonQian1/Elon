@@ -7,6 +7,7 @@ import type {
   DeveloperAppCredential,
   DeveloperAppList,
   DeveloperInvokeRequest,
+  OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
 import type { InvokeOpenCommerceCapability } from './openCommerceTypes'
 
@@ -27,8 +28,29 @@ export const openCommerceClientApi = {
       {},
     ),
 
+  disableApp: (projectId: string, appRecordId: string) =>
+    api.post<OpenCommerceDeveloperApp>(
+      `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/disable`,
+      {},
+    ),
+
+  reactivateApp: (projectId: string, appRecordId: string) =>
+    api.post<DeveloperAppCredential>(
+      `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/reactivate`,
+      {},
+    ),
+
   listAuthorizationRequests: (projectId: string) =>
     api.get<AuthorizationRequestList>(`${projectBase(projectId)}/authorization-requests`),
+
+  listOutboundAuthorizationRequests: (projectId: string) =>
+    api.get<AuthorizationRequestList>(`${projectBase(projectId)}/outbound-authorization-requests`),
+
+  cancelOutboundAuthorization: (projectId: string, requestId: string) =>
+    api.post<AuthorizationRequest>(
+      `${projectBase(projectId)}/outbound-authorization-requests/${encodeURIComponent(requestId)}/cancel`,
+      {},
+    ),
 
   decideAuthorization: (
     projectId: string,

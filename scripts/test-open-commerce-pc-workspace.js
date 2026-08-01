@@ -16,6 +16,11 @@ const runtimeManager = read(`${featureRoot}/OpenCommerceRuntimeManager.tsx`)
 const runtimeClient = read('server/src/open_commerce_runtime_client.rs')
 const directoryPublisher = read(`${featureRoot}/OpenCommerceDirectoryPublisher.tsx`)
 const directoryContract = read('contracts/open-commerce/directory-merchant-v1.schema.json')
+const developerPortal = read(`${featureRoot}/DeveloperCommercePortal.tsx`)
+const outboundRequests = read(`${featureRoot}/OutboundAuthorizationRequests.tsx`)
+const lifecycleService = read('server/src/open_commerce_client_lifecycle_service.rs')
+const lifecycleApi = read('server/src/open_commerce_client_lifecycle_api.rs')
+const clientApiRoute = read('server/src/open_commerce_client_api.rs')
 
 for (const view of [
   'OpenCommerceMerchantWorkspace',
@@ -34,6 +39,12 @@ assert.ok(consumer.includes('app_registration_required'), 'restricted capabiliti
 assert.ok(directoryPublisher.includes('setDirectoryPublication'), 'merchant UI must explicitly publish or withdraw directory access')
 assert.ok(directoryPublisher.includes('项目 ID、所有者、运行地址、密钥和处理器配置不会公开'), 'merchant UI must explain the sanitized directory boundary')
 assert.doesNotMatch(directoryContract, /project_id|owner_user_id|handler_type|handler_config/, 'public directory contract must not expose internal ownership or handlers')
+assert.ok(developerPortal.includes('disableApp'), 'developer portal must allow an editor to disable a sandbox app')
+assert.ok(developerPortal.includes('reactivateApp'), 'developer portal must issue a new one-time credential when reactivating')
+assert.ok(outboundRequests.includes('撤回申请'), 'developer portal must show and cancel outbound authorization requests')
+assert.ok(lifecycleService.includes('authorization.request_canceled'), 'requester cancellation must be audited')
+assert.ok(lifecycleApi.includes('outbound-authorization-requests/:request_id/cancel'), 'requester cancellation route must be registered')
+assert.ok(clientApiRoute.includes('ensure_open_commerce_developer_app_owned_by_user'), 'merchant approval must recheck that the requester app is active and owned')
 
 assert.ok(clientApi.includes("'x-elon-app-id'"), 'signed-in app calls must bind an app identity')
 assert.ok(clientApi.includes('Authorization: `Bearer ${testToken}`'), 'developer calls must use test credentials')

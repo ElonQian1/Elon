@@ -4,11 +4,14 @@ import {
   Copy,
   KeyRound,
   Play,
+  Power,
+  PowerOff,
   RefreshCw,
   RotateCcw,
   X,
 } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
+import OutboundAuthorizationRequests from './OutboundAuthorizationRequests'
 import type {
   AuthorizationRequest,
   OpenCommerceDeveloperApp,
@@ -31,6 +34,7 @@ export default function DeveloperCommercePortal({
 }) {
   const [apps, setApps] = useState<OpenCommerceDeveloperApp[]>([])
   const [requests, setRequests] = useState<AuthorizationRequest[]>([])
+  const [outboundRequests, setOutboundRequests] = useState<AuthorizationRequest[]>([])
   const [appId, setAppId] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [visibleToken, setVisibleToken] = useState('')
@@ -44,14 +48,15 @@ export default function DeveloperCommercePortal({
   const [message, setMessage] = useState('')
 
   const refresh = useCallback(async () => {
-    setMessage('')
     try {
-      const [appResponse, requestResponse] = await Promise.all([
+      const [appResponse, requestResponse, outboundResponse] = await Promise.all([
         openCommerceClientApi.listApps(projectId),
         openCommerceClientApi.listAuthorizationRequests(projectId),
+        openCommerceClientApi.listOutboundAuthorizationRequests(projectId),
       ])
       setApps(appResponse.apps)
       setRequests(requestResponse.requests)
+      setOutboundRequests(outboundResponse.requests)
     } catch (error) {
       setMessage(errorText(error))
     }
@@ -87,6 +92,50 @@ export default function DeveloperCommercePortal({
     try {
       const credential = await openCommerceClientApi.rotateToken(projectId, app.id)
       showCredential(credential.test_token)
+      await refresh()
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function disableApp(app: OpenCommerceDeveloperApp) {
+    setBusy(true)
+    setMessage('')
+    try {
+      await openCommerceClientApi.disableApp(projectId, app.id)
+      setTestToken('')
+      setVisibleToken('')
+      setMessage('应用已停用，旧测试凭据已永久失效，待处理授权申请已自动撤回。')
+      await refresh()
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function reactivateApp(app: OpenCommerceDeveloperApp) {
+    setBusy(true)
+    setMessage('')
+    try {
+      const credential = await openCommerceClientApi.reactivateApp(projectId, app.id)
+      showCredential(credential.test_token)
+      await refresh()
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function cancelOutbound(request: AuthorizationRequest) {
+    setBusy(true)
+    setMessage('')
+    try {
+      await openCommerceClientApi.cancelOutboundAuthorization(projectId, request.id)
+      setMessage('授权申请已撤回，商户收件箱会同步显示撤回状态。')
       await refresh()
     } catch (error) {
       setMessage(errorText(error))
@@ -137,7 +186,7 @@ export default function DeveloperCommercePortal({
   function showCredential(token: string) {
     setVisibleToken(token)
     setTestToken(token)
-    setMessage('新测试凭据只显示本次。旧凭据已失效。')
+    setMessage('测试凭据只显示本次，请立即保存；轮换或重新启用会使此前凭据失效。')
   }
 
   return (
@@ -147,7 +196,7 @@ export default function DeveloperCommercePortal({
           <h2>第三方应用开发者门户</h2>
           <p>沙盒 App、一次性测试凭据、授权收件箱和能力调用调试器。</p>
         </div>
-        <button style={actionStyle('icon')} type="button" onClick={refresh} title="刷新">
+        <button style={actionStyle('icon')} type="button" onClick={() => { setMessage(''); refresh() }} title="刷新">
           <RefreshCw size={15} />
         </button>
       </header>
@@ -176,13 +225,20 @@ export default function DeveloperCommercePortal({
             <div style={commerceStyles.list}>
               {apps.map((app) => (
                 <article className={base.formCard} style={listItemStyle()} key={app.id}>
-                  <header style={commerceStyles.itemHeader}><h3 style={commerceStyles.itemTitle}>{app.display_name}</h3><span style={badgeStyle()}>{app.environment}</span></header>
+                  <header style={commerceStyles.itemHeader}><h3 style={commerceStyles.itemTitle}>{app.display_name}</h3><span style={badgeStyle(app.status === 'active' ? 'neutral' : 'warn')}>{app.status === 'active' ? '已启用' : '已停用'}</span></header>
                   <code style={commerceStyles.itemMeta}>{app.app_id} · {app.token_hint}</code>
                   <footer style={commerceStyles.itemHeader}>
-                    <small style={commerceStyles.itemMeta}>{app.status}</small>
-                    <button style={actionStyle('icon', !canEdit || busy)} type="button" onClick={() => rotateToken(app)} disabled={!canEdit || busy} title="轮换测试凭据">
-                      <RotateCcw size={13} />
-                    </button>
+                    <small style={commerceStyles.itemMeta}>{app.environment}</small>
+                    <div style={commerceStyles.headerActions}>
+                      {app.status === 'active' ? (
+                        <>
+                          <button style={actionStyle('icon', !canEdit || busy)} type="button" onClick={() => rotateToken(app)} disabled={!canEdit || busy} title="轮换测试凭据"><RotateCcw size={13} /></button>
+                          <button style={actionStyle('icon', !canEdit || busy)} type="button" onClick={() => disableApp(app)} disabled={!canEdit || busy} title="停用应用"><PowerOff size={13} /></button>
+                        </>
+                      ) : (
+                        <button style={actionStyle('icon', !canEdit || busy)} type="button" onClick={() => reactivateApp(app)} disabled={!canEdit || busy} title="重新启用并生成新凭据"><Power size={13} /></button>
+                      )}
+                    </div>
                   </footer>
                 </article>
               ))}
@@ -214,6 +270,8 @@ export default function DeveloperCommercePortal({
           </div>
         </section>
       </div>
+
+      <OutboundAuthorizationRequests requests={outboundRequests} canEdit={canEdit} busy={busy} onCancel={cancelOutbound} />
 
       <section className={base.integrationSection}>
         <header><strong>能力调用调试器</strong><span style={badgeStyle()}>TEST TOKEN</span></header>

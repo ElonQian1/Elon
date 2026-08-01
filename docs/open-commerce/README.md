@@ -23,6 +23,8 @@
 13. `docs/open-commerce/ai-resource-control.md`：查看 AI 资源盘点、项目策略和不执行任务的路由预演。
 14. `docs/decisions/open-commerce-directory-publication-v1.md`：查看商户主动发布、脱敏目录和撤回边界。
 15. `docs/open-commerce-directory-v1-acceptance.md`：查看目录 V1 的验证证据和未完成边界。
+16. `docs/decisions/open-commerce-developer-lifecycle-v1.md`：查看沙盒 App 停用、重新启用和授权申请撤回边界。
+17. `docs/open-commerce-developer-lifecycle-v1-acceptance.md`：查看开发者生命周期 V1 的验证证据。
 
 ## 专题地图
 
@@ -35,7 +37,7 @@
 | 通用 ERP 蓝图与智能提案 | V1 已实现，代码执行仍走既有项目流程 | `docs/erp/README.md`、`docs/erp/acceptance-v1.md` |
 | 商户数据来源、健康度和同步回执 | 控制面已实现，具体平台适配器待逐项验收 | `docs/decisions/open-commerce-integration-control-plane.md`、`docs/open-commerce-integration-control-plane-acceptance.md` |
 | 连接器 SDK 与兼容性门禁 | 已实现 V1，尚不包含具体大厂适配器 | `sdk/open-commerce-connector/`、`docs/open-commerce/connector-sdk.md` |
-| 消费者发现与第三方应用接入 | 跨项目基础目录与授权沙盒已实现，生产公共网络未完成 | `docs/decisions/open-commerce-directory-publication-v1.md`、`docs/open-commerce/consumer-developer-sandbox.md` |
+| 消费者发现与第三方应用接入 | 跨项目基础目录、授权沙盒及 App/申请生命周期已实现，生产公共网络未完成 | `docs/decisions/open-commerce-directory-publication-v1.md`、`docs/decisions/open-commerce-developer-lifecycle-v1.md`、`docs/open-commerce/consumer-developer-sandbox.md` |
 | AI 资源盘点、策略与路由预演 | 控制面已实现，尚未接管真实任务调度 | `docs/open-commerce/ai-resource-control.md`、`server/src/ai_resource_control/` |
 | API Token 保管与节点计算计量 | 已有实现，尚不是公开交易市场 | `docs/token消费统计.md`、`server/src/store/node_ledger.rs` |
 | 链外影子用量、验收后双分录和 Sui 信封 | V1 已实现、默认关闭，不移动资金 | `docs/decisions/task-shadow-settlement-v1.md`、`docs/task-shadow-settlement-v1-api.md` |

@@ -2,7 +2,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::{
-    open_commerce_consumer,
+    open_commerce_client_lifecycle_service, open_commerce_consumer,
     open_commerce_consumer_model::{ConsumerDiscoveryRequest, ConsumerPreferences},
     open_commerce_developer_model::{
         CreateAuthorizationRequest, CreateDeveloperAppRequest, DeveloperInvokeRequest,
@@ -301,6 +301,111 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
     )
     .unwrap();
     assert!(hidden.matches.is_empty());
+
+    open_commerce_directory_service::set_publication(
+        &store,
+        &merchant_project.id,
+        &approved.merchant_id,
+        &merchant_actor,
+        true,
+    )
+    .unwrap();
+    let lifecycle_actor = OpenCommerceActor {
+        user_id: &developer.id,
+        app_id: "pc-web",
+        project_role: Some("owner"),
+    };
+    let lifecycle_credential = store
+        .create_open_commerce_developer_app(
+            &developer_project.id,
+            &developer.id,
+            CreateDeveloperAppRequest {
+                app_id: "consumer.lifecycle".to_string(),
+                display_name: "生命周期测试应用".to_string(),
+            },
+        )
+        .unwrap();
+    let cancelable = open_commerce_consumer::create_authorization_request(
+        &store,
+        &developer.id,
+        CreateAuthorizationRequest {
+            merchant_id: approved.merchant_id.clone(),
+            requester_app_id: lifecycle_credential.app.app_id.clone(),
+            scopes: vec!["menu.preview".to_string()],
+            purpose: "验证申请方主动撤回".to_string(),
+        },
+    )
+    .unwrap();
+    let outbound = open_commerce_client_lifecycle_service::list_outbound_requests(
+        &store,
+        &developer_project.id,
+    )
+    .unwrap();
+    assert!(outbound.iter().any(|request| request.id == cancelable.id));
+    let canceled = open_commerce_client_lifecycle_service::cancel_outbound_request(
+        &store,
+        &developer_project.id,
+        &cancelable.id,
+        &lifecycle_actor,
+    )
+    .unwrap();
+    assert_eq!(canceled.status, "canceled");
+
+    let pending_on_disable = open_commerce_consumer::create_authorization_request(
+        &store,
+        &developer.id,
+        CreateAuthorizationRequest {
+            merchant_id: approved.merchant_id.clone(),
+            requester_app_id: lifecycle_credential.app.app_id.clone(),
+            scopes: vec!["menu.preview".to_string()],
+            purpose: "验证停用应用自动撤回".to_string(),
+        },
+    )
+    .unwrap();
+    let disabled = open_commerce_client_lifecycle_service::disable_app(
+        &store,
+        &developer_project.id,
+        &lifecycle_credential.app.id,
+        &lifecycle_actor,
+    )
+    .unwrap();
+    assert_eq!(disabled.status, "disabled");
+    assert!(store
+        .authenticate_open_commerce_developer_app(&lifecycle_credential.test_token)
+        .is_err());
+    assert!(store
+        .ensure_open_commerce_developer_app_owned_by_user(
+            &lifecycle_credential.app.app_id,
+            &developer.id,
+        )
+        .is_err());
+    assert_eq!(
+        store
+            .open_commerce_authorization_request(&pending_on_disable.id)
+            .unwrap()
+            .status,
+        "canceled"
+    );
+
+    let reactivated = open_commerce_client_lifecycle_service::reactivate_app(
+        &store,
+        &developer_project.id,
+        &lifecycle_credential.app.id,
+        &lifecycle_actor,
+    )
+    .unwrap();
+    assert_eq!(reactivated.app.status, "active");
+    assert_ne!(reactivated.test_token, lifecycle_credential.test_token);
+    assert!(store
+        .authenticate_open_commerce_developer_app(&lifecycle_credential.test_token)
+        .is_err());
+    assert_eq!(
+        store
+            .authenticate_open_commerce_developer_app(&reactivated.test_token)
+            .unwrap()
+            .app_id,
+        lifecycle_credential.app.app_id
+    );
 
     let apps = store
         .list_project_open_commerce_developer_apps(&developer_project.id)

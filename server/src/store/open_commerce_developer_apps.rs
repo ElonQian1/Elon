@@ -61,13 +61,88 @@ impl Store {
         project_id: &str,
         app_record_id: &str,
     ) -> Result<OpenCommerceDeveloperAppCredential> {
-        self.open_commerce_developer_app_for_project(project_id, app_record_id)?;
+        let current = self.open_commerce_developer_app_for_project(project_id, app_record_id)?;
+        if current.status != "active" {
+            bail!("开发者应用已停用，请先重新启用");
+        }
         let test_token = new_test_token();
         let timestamp = now();
         self.conn()?.execute(
             "UPDATE open_commerce_developer_apps
                 SET test_token_hash = ?1, token_hint = ?2, updated_at = ?3
               WHERE project_id = ?4 AND id = ?5",
+            params![
+                token_hash(&test_token),
+                token_hint(&test_token),
+                timestamp,
+                project_id.trim(),
+                app_record_id.trim()
+            ],
+        )?;
+        let app = self.open_commerce_developer_app_for_project(project_id, app_record_id)?;
+        Ok(OpenCommerceDeveloperAppCredential {
+            schema: "open_commerce.developer_credential.v1",
+            app,
+            test_token,
+            token_visible_once: true,
+        })
+    }
+
+    pub(crate) fn disable_open_commerce_developer_app(
+        &self,
+        project_id: &str,
+        app_record_id: &str,
+    ) -> Result<(OpenCommerceDeveloperApp, usize)> {
+        let current = self.open_commerce_developer_app_for_project(project_id, app_record_id)?;
+        let timestamp = now();
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        if current.status == "active" {
+            let revoked_token = new_test_token();
+            tx.execute(
+                "UPDATE open_commerce_developer_apps
+                    SET status = 'disabled', test_token_hash = ?1,
+                        token_hint = 'disabled', updated_at = ?2
+                  WHERE project_id = ?3 AND id = ?4 AND status = 'active'",
+                params![
+                    token_hash(&revoked_token),
+                    timestamp,
+                    project_id.trim(),
+                    app_record_id.trim()
+                ],
+            )?;
+        }
+        let canceled = tx.execute(
+            "UPDATE open_commerce_authorization_requests
+                SET status = 'canceled', decision_reason = 'developer_app_disabled',
+                    updated_at = ?1
+              WHERE requester_app_id = ?2 AND status = 'pending'",
+            params![timestamp, current.app_id],
+        )?;
+        tx.commit()?;
+        drop(conn);
+        Ok((
+            self.open_commerce_developer_app_for_project(project_id, app_record_id)?,
+            canceled,
+        ))
+    }
+
+    pub(crate) fn reactivate_open_commerce_developer_app(
+        &self,
+        project_id: &str,
+        app_record_id: &str,
+    ) -> Result<OpenCommerceDeveloperAppCredential> {
+        let current = self.open_commerce_developer_app_for_project(project_id, app_record_id)?;
+        if current.status == "active" {
+            bail!("开发者应用当前已启用");
+        }
+        let test_token = new_test_token();
+        let timestamp = now();
+        self.conn()?.execute(
+            "UPDATE open_commerce_developer_apps
+                SET status = 'active', test_token_hash = ?1, token_hint = ?2,
+                    updated_at = ?3
+              WHERE project_id = ?4 AND id = ?5 AND status = 'disabled'",
             params![
                 token_hash(&test_token),
                 token_hint(&test_token),

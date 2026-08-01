@@ -145,6 +145,8 @@ mod node_scheduler;
 mod offline_completion_migration;
 mod open_commerce_api;
 mod open_commerce_client_api;
+mod open_commerce_client_lifecycle_api;
+mod open_commerce_client_lifecycle_service;
 mod open_commerce_client_migration;
 #[cfg(test)]
 mod open_commerce_client_service_tests;

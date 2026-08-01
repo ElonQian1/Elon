@@ -15,6 +15,7 @@
 | 先建数据接入控制面，再逐个平台实现适配器 | 统一记录来源、范围、健康度和同步证据，不用“已接入”掩盖真实权限差异 | `docs/decisions/open-commerce-integration-control-plane.md` |
 | 先用项目内消费者与开发者沙盒验证开放网络 | 采用非付费透明排序、显式授权和一次性测试凭据；不把沙盒宣传为公共网络 | `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` |
 | 商户主动发布脱敏跨项目目录 | 商户默认私有；只有显式发布后才返回专用脱敏契约，撤回后阻断外部调用，App 身份必须绑定所有者 | `docs/decisions/open-commerce-directory-publication-v1.md` |
+| 沙盒 App 与授权申请必须有完整生命周期 | 停用永久废弃旧 Token 并取消待处理申请；重新启用生成新 Token；申请方和商户共享同一申请状态 | `docs/decisions/open-commerce-developer-lifecycle-v1.md` |
 | AI 资源 V1 先做控制面和路由预演 | 统一盘点现有真实资源并保存项目策略，但不复制执行器、不泄露凭据、不假装已核验外部额度 | `docs/decisions/ai-resource-control-v1.md` |
 | 先实现链外影子结算，再评估 Sui 网络适配器 | 复用真实成本和人工验收事实，保持双分录、幂等和默认关闭，不移动真实资金 | `docs/decisions/task-shadow-settlement-v1.md` |
 | 区块链只作为多方可信、授权与结算候选层 | 链上只承载跨主体所有权、授权、关键回执和结算；订单、日志、媒体、实时数据库、AI 推理、复杂查询和匿名化继续留在链外 | `docs/open-commerce/integration-architecture.md` |

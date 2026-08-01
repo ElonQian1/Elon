@@ -96,6 +96,73 @@ impl Store {
         Ok(requests)
     }
 
+    pub(crate) fn list_requester_project_open_commerce_authorization_requests(
+        &self,
+        requester_project_id: &str,
+        limit: usize,
+    ) -> Result<Vec<OpenCommerceAuthorizationRequest>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(&format!(
+            "{REQUEST_SELECT}
+             WHERE requester_app_id IN (
+               SELECT app_id FROM open_commerce_developer_apps WHERE project_id = ?1
+             )
+             ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, updated_at DESC
+             LIMIT ?2"
+        ))?;
+        let requests = stmt
+            .query_map(
+                params![requester_project_id.trim(), limit.clamp(1, 200) as i64],
+                request_from_row,
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(anyhow::Error::from)?;
+        Ok(requests)
+    }
+
+    pub(crate) fn list_pending_open_commerce_authorization_requests_for_app(
+        &self,
+        requester_app_id: &str,
+    ) -> Result<Vec<OpenCommerceAuthorizationRequest>> {
+        let requester_app_id = normalize_app_id(requester_app_id)?;
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(&format!(
+            "{REQUEST_SELECT}
+             WHERE requester_app_id = ?1 AND status = 'pending'
+             ORDER BY updated_at DESC"
+        ))?;
+        let requests = stmt
+            .query_map(params![requester_app_id], request_from_row)?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(anyhow::Error::from)?;
+        Ok(requests)
+    }
+
+    pub(crate) fn cancel_requester_open_commerce_authorization_request(
+        &self,
+        requester_project_id: &str,
+        request_id: &str,
+    ) -> Result<OpenCommerceAuthorizationRequest> {
+        let current = self.open_commerce_authorization_request(request_id)?;
+        let app = self
+            .open_commerce_developer_app_by_app_id(&current.requester_app_id)?
+            .ok_or_else(|| anyhow!("授权请求对应的开发者应用不存在"))?;
+        if app.project_id != requester_project_id.trim() {
+            bail!("授权请求不属于当前开发者项目");
+        }
+        if current.status != "pending" {
+            return Ok(current);
+        }
+        self.conn()?.execute(
+            "UPDATE open_commerce_authorization_requests
+                SET status = 'canceled', decision_reason = 'requester_canceled',
+                    updated_at = ?1
+              WHERE id = ?2 AND status = 'pending'",
+            params![now(), request_id.trim()],
+        )?;
+        self.open_commerce_authorization_request(request_id)
+    }
+
     pub(crate) fn decide_open_commerce_authorization_request(
         &self,
         project_id: &str,
