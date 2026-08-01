@@ -133,6 +133,7 @@ mod node_agent_downloads;
 mod node_agent_supervision_worktree_lease;
 mod node_api;
 mod node_compute_admin;
+mod node_compute_reservation_migration;
 mod node_compute_sharing;
 mod node_compute_sharing_migration;
 mod node_exec_api;

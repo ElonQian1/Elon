@@ -39,6 +39,9 @@ pub async fn dispatch_to_node_with_req_id(
     String,
     mpsc::UnboundedReceiver<AgentToServer>,
 )> {
+    let max_output_tokens = crate::node_compute_sharing::normalize_max_output_tokens(max_tokens);
+    let reserved_token_budget =
+        crate::node_compute_sharing::estimate_token_budget(&messages, max_output_tokens);
     let target = target_node_id
         .map(str::trim)
         .filter(|value| !value.is_empty());
@@ -84,6 +87,7 @@ pub async fn dispatch_to_node_with_req_id(
                 usage_mode: "server_node_llm",
                 route_reason: Some(&route_reason),
             },
+            reserved_token_budget,
         )?;
         (node_id, Some(provider_user_id), route_reason)
     } else {
@@ -147,6 +151,7 @@ pub async fn dispatch_to_node_with_req_id(
                     usage_mode: "server_node_llm",
                     route_reason: Some(&route_reason),
                 },
+                reserved_token_budget,
             ) {
                 Ok(_) => {
                     selected = Some((
@@ -183,7 +188,7 @@ pub async fn dispatch_to_node_with_req_id(
             req_id,
             model_id.to_string(),
             messages,
-            max_tokens,
+            Some(max_output_tokens),
         )
         .await;
 

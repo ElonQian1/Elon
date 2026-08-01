@@ -294,6 +294,203 @@ fn completed_shared_usage_closes_the_daily_budget() {
 }
 
 #[test]
+fn active_token_reservations_atomically_prevent_parallel_overspend() {
+    let (store, owner, consumer, node_id) = setup();
+    store
+        .update_node_compute_sharing_policy(
+            &owner,
+            &node_id,
+            UpdateNodeComputeSharingPolicy {
+                enabled: true,
+                allowed_model_ids: vec!["qwen".into()],
+                max_concurrent_runs: 3,
+                daily_token_limit: 100,
+            },
+        )
+        .unwrap();
+
+    store
+        .claim_shared_node_compute_run_with_budget(
+            start("node_llm:budget-first", &consumer, &owner, &node_id, "qwen"),
+            60,
+        )
+        .unwrap();
+    let status = store
+        .node_compute_sharing_status(&node_id, &owner, Some("qwen"))
+        .unwrap();
+    assert_eq!(status.tokens_used_today, 0);
+    assert_eq!(status.tokens_reserved_today, 60);
+
+    let error = store
+        .claim_shared_node_compute_run_with_budget(
+            start("node_llm:budget-over", &consumer, &owner, &node_id, "qwen"),
+            50,
+        )
+        .unwrap_err();
+    assert!(error
+        .to_string()
+        .contains("daily_token_reservation_exceeds_limit"));
+
+    store
+        .claim_shared_node_compute_run_with_budget(
+            start("node_llm:budget-exact", &consumer, &owner, &node_id, "qwen"),
+            40,
+        )
+        .unwrap();
+    let full = store
+        .node_compute_sharing_status(&node_id, &owner, Some("qwen"))
+        .unwrap();
+    assert_eq!(full.tokens_reserved_today, 100);
+    assert_eq!(full.availability, "daily_token_limit_reached");
+}
+
+#[test]
+fn terminal_usage_replaces_active_reservation_with_actual_tokens() {
+    let (store, owner, consumer, node_id) = setup();
+    store
+        .update_node_compute_sharing_policy(
+            &owner,
+            &node_id,
+            UpdateNodeComputeSharingPolicy {
+                enabled: true,
+                allowed_model_ids: vec!["qwen".into()],
+                max_concurrent_runs: 2,
+                daily_token_limit: 100,
+            },
+        )
+        .unwrap();
+    store
+        .claim_shared_node_compute_run_with_budget(
+            start(
+                "node_llm:budget-finish",
+                &consumer,
+                &owner,
+                &node_id,
+                "qwen",
+            ),
+            80,
+        )
+        .unwrap();
+    store
+        .finish_node_compute_run(
+            "node_llm:budget-finish",
+            NodeComputeRunFinish {
+                provider_user_id: Some(&owner),
+                status: "settled",
+                prompt_tokens: 12,
+                completion_tokens: 8,
+                billed_cost_rmb_fen: 1,
+                provider_earned_fen: 1,
+                settlement_status: Some("settled"),
+                error_message: None,
+            },
+        )
+        .unwrap();
+    let status = store
+        .node_compute_sharing_status(&node_id, &owner, Some("qwen"))
+        .unwrap();
+    assert_eq!(status.tokens_used_today, 20);
+    assert_eq!(status.tokens_reserved_today, 0);
+    assert!(status.available);
+
+    store
+        .claim_shared_node_compute_run_with_budget(
+            start(
+                "node_llm:budget-after-finish",
+                &consumer,
+                &owner,
+                &node_id,
+                "qwen",
+            ),
+            80,
+        )
+        .unwrap();
+}
+
+#[test]
+fn replay_cannot_change_reserved_token_budget() {
+    let (store, owner, consumer, node_id) = setup();
+    store
+        .update_node_compute_sharing_policy(
+            &owner,
+            &node_id,
+            UpdateNodeComputeSharingPolicy {
+                enabled: true,
+                allowed_model_ids: vec!["qwen".into()],
+                max_concurrent_runs: 1,
+                daily_token_limit: 1_000,
+            },
+        )
+        .unwrap();
+    let input = || {
+        start(
+            "node_llm:budget-replay",
+            &consumer,
+            &owner,
+            &node_id,
+            "qwen",
+        )
+    };
+    let first = store
+        .claim_shared_node_compute_run_with_budget(input(), 100)
+        .unwrap();
+    let replay = store
+        .claim_shared_node_compute_run_with_budget(input(), 100)
+        .unwrap();
+    assert_eq!(first.id, replay.id);
+    let error = store
+        .claim_shared_node_compute_run_with_budget(input(), 101)
+        .unwrap_err();
+    assert!(error.to_string().contains("不能改变 Token 预留预算"));
+}
+
+#[test]
+fn expired_reservation_is_released_and_cannot_be_revived_by_late_heartbeat() {
+    let (store, owner, consumer, node_id) = setup();
+    store
+        .update_node_compute_sharing_policy(
+            &owner,
+            &node_id,
+            UpdateNodeComputeSharingPolicy {
+                enabled: true,
+                allowed_model_ids: vec!["qwen".into()],
+                max_concurrent_runs: 1,
+                daily_token_limit: 100,
+            },
+        )
+        .unwrap();
+    store
+        .claim_shared_node_compute_run_with_budget(
+            start(
+                "node_llm:budget-expired",
+                &consumer,
+                &owner,
+                &node_id,
+                "qwen",
+            ),
+            80,
+        )
+        .unwrap();
+    {
+        let conn = store.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE node_compute_runs SET updated_at='2000-01-01T00:00:00Z'
+              WHERE compute_call_id='node_llm:budget-expired'",
+            [],
+        )
+        .unwrap();
+    }
+    let status = store
+        .node_compute_sharing_status(&node_id, &owner, Some("qwen"))
+        .unwrap();
+    assert_eq!(status.active_runs, 0);
+    assert_eq!(status.tokens_reserved_today, 0);
+    assert!(!store
+        .heartbeat_started_server_node_llm_run("node_llm:budget-expired")
+        .unwrap());
+}
+
+#[test]
 fn disabling_supply_keeps_exact_replay_but_rejects_new_work() {
     let (store, owner, consumer, node_id) = setup();
     store

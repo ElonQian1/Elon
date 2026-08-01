@@ -4,6 +4,29 @@ use anyhow::Result;
 
 use crate::store::{NodeComputeRun, NodeComputeRunStart, NodeComputeSharingStatus, Store};
 
+pub(crate) const DEFAULT_MAX_OUTPUT_TOKENS: u32 = 1024;
+const MAX_MAX_OUTPUT_TOKENS: u32 = 1_000_000;
+
+pub(crate) fn normalize_max_output_tokens(value: Option<u32>) -> u32 {
+    value
+        .unwrap_or(DEFAULT_MAX_OUTPUT_TOKENS)
+        .clamp(1, MAX_MAX_OUTPUT_TOKENS)
+}
+
+pub(crate) fn estimate_token_budget(messages: &[serde_json::Value], max_output_tokens: u32) -> i64 {
+    // UTF-8 bytes plus per-message overhead is intentionally conservative for
+    // byte-fallback tokenizers; the provider's terminal usage remains the fact.
+    let serialized_bytes = serde_json::to_vec(messages)
+        .map(|value| value.len())
+        .unwrap_or(0);
+    let overhead = messages.len().saturating_mul(16).saturating_add(64);
+    let input_budget = serialized_bytes.saturating_add(overhead).max(1);
+    i64::try_from(input_budget)
+        .unwrap_or(i64::MAX)
+        .saturating_add(i64::from(max_output_tokens))
+        .clamp(1, 1_000_000_000_000)
+}
+
 pub(crate) fn status(
     store: &Store,
     consumer_user_id: &str,
@@ -25,7 +48,11 @@ pub(crate) fn status(
     store.node_compute_sharing_status(node_id, provider_user_id, Some(model_id))
 }
 
-pub(crate) fn admit(store: &Store, input: NodeComputeRunStart<'_>) -> Result<NodeComputeRun> {
+pub(crate) fn admit(
+    store: &Store,
+    input: NodeComputeRunStart<'_>,
+    reserved_token_budget: i64,
+) -> Result<NodeComputeRun> {
     let provider_user_id = input.provider_user_id.unwrap_or_default().trim();
     let consumer_user_id = input.consumer_user_id.trim();
     if !provider_user_id.is_empty()
@@ -34,7 +61,7 @@ pub(crate) fn admit(store: &Store, input: NodeComputeRunStart<'_>) -> Result<Nod
     {
         store.start_node_compute_run(input)
     } else {
-        store.claim_shared_node_compute_run(input)
+        store.claim_shared_node_compute_run_with_budget(input, reserved_token_budget)
     }
 }
 
@@ -84,6 +111,7 @@ mod tests {
                 usage_mode: "server_node_llm",
                 route_reason: Some("self_use_test"),
             },
+            128,
         )
         .unwrap();
         assert_eq!(run.consumer_user_id, owner.id);
@@ -95,5 +123,18 @@ mod tests {
         let status = status(&store, "", "", "unknown-node", "qwen").unwrap();
         assert!(!status.available);
         assert_eq!(status.availability, "sharing_disabled");
+    }
+
+    #[test]
+    fn token_budget_includes_conservative_input_and_bounded_output() {
+        let messages = vec![serde_json::json!({"role": "user", "content": "你好"})];
+        let max_output = normalize_max_output_tokens(Some(0));
+        assert_eq!(max_output, 1);
+        let budget = estimate_token_budget(&messages, max_output);
+        assert!(budget > serde_json::to_vec(&messages).unwrap().len() as i64);
+        assert_eq!(
+            normalize_max_output_tokens(Some(u32::MAX)),
+            MAX_MAX_OUTPUT_TOKENS
+        );
     }
 }

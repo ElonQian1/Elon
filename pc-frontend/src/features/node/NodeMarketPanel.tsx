@@ -217,6 +217,7 @@ function modelSharingText(node: NodeSummary) {
     model_not_allowed: '模型不匹配',
     concurrency_limit_reached: '并发已满',
     daily_token_limit_reached: '今日额度已满',
+    daily_token_reservation_exceeds_limit: '剩余额度不足',
   }
   return labels[status.availability] ?? '暂不可用'
 }
@@ -336,6 +337,14 @@ function formatShare(value?: number) {
 
 function formatTokens(run: NodeComputeRun) {
   const tokens = Number(run.prompt_tokens ?? 0) + Number(run.completion_tokens ?? 0)
+  const reserved = Number(run.reserved_token_budget ?? 0)
+  if (run.status === 'started' && Number.isFinite(reserved) && reserved > 0) {
+    return `预留 ${formatTokenCount(reserved)}`
+  }
+  return formatTokenCount(tokens)
+}
+
+function formatTokenCount(tokens: number) {
   if (!Number.isFinite(tokens) || tokens <= 0) return '0'
   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`
   if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`

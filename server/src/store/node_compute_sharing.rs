@@ -30,6 +30,7 @@ pub struct NodeComputeSharingStatus {
     pub policy: NodeComputeSharingPolicy,
     pub active_runs: i64,
     pub tokens_used_today: i64,
+    pub tokens_reserved_today: i64,
     pub available: bool,
     pub availability: String,
 }
@@ -132,9 +133,10 @@ impl Store {
 
     /// Atomically re-check the provider policy and reserve a shared inference slot.
     /// Idempotent retries return the existing run even if the owner disabled sharing later.
-    pub fn claim_shared_node_compute_run(
+    pub fn claim_shared_node_compute_run_with_budget(
         &self,
         input: NodeComputeRunStart<'_>,
+        reserved_token_budget: i64,
     ) -> Result<NodeComputeRun> {
         let compute_call_id = input.compute_call_id.trim();
         let provider_user_id = input
@@ -147,11 +149,17 @@ impl Store {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .ok_or_else(|| anyhow::anyhow!("共享节点执行缺少模型标识"))?;
+        if !(1..=1_000_000_000_000).contains(&reserved_token_budget) {
+            bail!("共享节点 Token 预留必须在 1 到 1000000000000 之间");
+        }
         let mut conn = self.conn.lock().unwrap();
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
         if let Some(existing) = select_run_by_compute_call_id(&tx, compute_call_id)? {
             ensure_compute_run_replay_matches(&existing, &input)?;
+            if existing.reserved_token_budget != reserved_token_budget {
+                bail!("同一算力调用编号不能改变 Token 预留预算");
+            }
             tx.commit()?;
             return Ok(existing);
         }
@@ -160,6 +168,14 @@ impl Store {
         if !status.available {
             bail!("共享节点当前不可接单：{}", status.availability);
         }
+        let requested_total = i128::from(status.tokens_used_today)
+            + i128::from(status.tokens_reserved_today)
+            + i128::from(reserved_token_budget);
+        if status.policy.daily_token_limit > 0
+            && requested_total > i128::from(status.policy.daily_token_limit)
+        {
+            bail!("共享节点当前不可接单：daily_token_reservation_exceeds_limit");
+        }
 
         let id = new_id("nrun");
         let ts = now();
@@ -167,8 +183,8 @@ impl Store {
             "INSERT INTO node_compute_runs (
                id, compute_call_id, consumer_user_id, provider_user_id,
                node_id, model_id, feature, usage_mode, status,
-               started_at, route_reason, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'started', ?9, ?10, ?9, ?9)",
+               started_at, route_reason, reserved_token_budget, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'started', ?9, ?10, ?11, ?9, ?9)",
             params![
                 id,
                 compute_call_id,
@@ -180,12 +196,21 @@ impl Store {
                 input.usage_mode,
                 ts,
                 clean_optional(input.route_reason),
+                reserved_token_budget,
             ],
         )?;
         let run = select_run_by_compute_call_id(&tx, compute_call_id)?
             .ok_or_else(|| anyhow::anyhow!("共享节点执行已占用但无法读回"))?;
         tx.commit()?;
         Ok(run)
+    }
+
+    #[cfg(test)]
+    pub fn claim_shared_node_compute_run(
+        &self,
+        input: NodeComputeRunStart<'_>,
+    ) -> Result<NodeComputeRun> {
+        self.claim_shared_node_compute_run_with_budget(input, 1)
     }
 }
 
@@ -226,6 +251,17 @@ fn sharing_status(
         params![node_id],
         |row| row.get::<_, i64>(0),
     )?;
+    let tokens_reserved_today = conn.query_row(
+        "SELECT COALESCE(SUM(reserved_token_budget), 0)
+           FROM node_compute_runs
+          WHERE node_id=?1 AND usage_mode='server_node_llm' AND status='started'
+            AND provider_user_id IS NOT NULL
+            AND consumer_user_id <> provider_user_id
+            AND date(started_at)=date('now')
+            AND julianday(updated_at) >= julianday('now', ?2)",
+        params![node_id, format!("-{SERVER_NODE_LLM_LEASE_SECONDS} seconds")],
+        |row| row.get::<_, i64>(0),
+    )?;
 
     let model_id = model_id.map(str::trim).filter(|value| !value.is_empty());
     let availability = if policy.owner_user_id != owner_user_id {
@@ -243,7 +279,10 @@ fn sharing_status(
         "model_not_allowed"
     } else if active_runs >= policy.max_concurrent_runs {
         "concurrency_limit_reached"
-    } else if policy.daily_token_limit > 0 && tokens_used_today >= policy.daily_token_limit {
+    } else if policy.daily_token_limit > 0
+        && i128::from(tokens_used_today) + i128::from(tokens_reserved_today)
+            >= i128::from(policy.daily_token_limit)
+    {
         "daily_token_limit_reached"
     } else {
         "available"
@@ -252,6 +291,7 @@ fn sharing_status(
         policy,
         active_runs,
         tokens_used_today,
+        tokens_reserved_today,
         available: availability == "available",
         availability: availability.to_string(),
     })

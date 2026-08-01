@@ -27,6 +27,7 @@ Authorization: Bearer <user-token>
     },
     "active_runs": 0,
     "tokens_used_today": 0,
+    "tokens_reserved_today": 0,
     "available": false,
     "availability": "sharing_disabled"
   },
@@ -57,7 +58,8 @@ Content-Type: application/json
 - 单节点最多保存 64 个模型标识；
 - `max_concurrent_runs` 为 1 至 16；
 - `daily_token_limit` 为 0 至 1000000000000，0 表示不限；
-- 每日阈值按已完成的对外推理 Token 判断，不包含所有者自用；在途任务可能使最终值略高于阈值。
+- 每日预算不包含所有者自用；共享任务派发前原子检查今日实际 Token、活动租约预留和本次请求预留。
+- 输入预算按消息 UTF-8 序列化大小和结构余量保守估算，输出预算按归一后的 `max_tokens` 计算；未传输出上限时使用 1024。
 
 ## 发现与调用
 
@@ -66,7 +68,7 @@ Content-Type: application/json
 - `GET /api/nodes/models`：登录用户可看到自己的在线模型与当前可用共享模型；未登录调用者只能看到当前可用共享模型。
 - `POST /api/nodes/chat`：指定节点或自动选点都执行供给检查和原子占位；自己的节点无需开启共享。
 
-推理开始后，服务端每 30 秒更新一次执行租约。活动租约为 2 分钟；只有收到匹配请求编号的 `LlmStreamEnd` 才会按节点返回的 Token 用量进入结算。节点报错、流提前断开或服务重启都会将任务标记为失败并释放尚未结算的预授权。
+推理开始后，服务端每 30 秒更新一次执行租约。活动租约为 2 分钟；只有仍在租期内的任务可以续期，过期任务不能被迟到心跳复活。只有收到匹配请求编号的 `LlmStreamEnd` 才会按节点返回的实际 Token 用量进入结算。节点报错、流提前断开或服务重启都会将任务标记为失败并释放尚未结算的预授权；终态或过期租约的 Token 预留不再占每日预算。
 
 ## Availability
 
@@ -78,7 +80,9 @@ Content-Type: application/json
 | `no_allowed_models` | 未配置模型白名单 |
 | `model_not_allowed` | 目标模型不在白名单 |
 | `concurrency_limit_reached` | 对外活动任务已达到并发上限 |
-| `daily_token_limit_reached` | 今日已完成 Token 达到阈值 |
+| `daily_token_limit_reached` | 今日实耗与有效活动预留之和达到预算 |
 | `owner_mismatch` | 策略所有者与节点所有者不一致，失败关闭 |
 
 调用接口在没有可用候选时返回服务不可用错误；策略接口分别使用 `401`、`403`、`404`、`400` 或 `500` 表达认证、归属、节点、输入和存储错误。
+
+若节点仍显示可用，但本次保守预留大于剩余预算，准入返回 `daily_token_reservation_exceeds_limit`。该值是本次调用的失败原因，不会覆盖节点长期策略状态。

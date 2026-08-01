@@ -37,8 +37,9 @@
 27. `docs/decisions/open-commerce-grant-budgets-v1.md`：查看单个 Grant 总调用和总计量预算的原子预留边界。
 28. `docs/open-commerce-grant-budgets-v1-acceptance.md`：查看授权生命周期预算 V1 的验证证据。
 29. `docs/decisions/node-compute-sharing-supply-v1.md`：查看节点所有者显式开放模型算力及原子调度边界。
-30. `docs/node-compute-sharing-supply-v1-acceptance.md`：查看节点模型共享 V1 的验证证据和未完成范围。
-31. `docs/node-compute-sharing-supply-v1-api.md`：查看策略字段、状态码和发现/调用契约。
+30. `docs/decisions/node-compute-sharing-token-reservation-v1.md`：查看每日实耗、活动预留和本次请求共同受预算约束的边界。
+31. `docs/node-compute-sharing-supply-v1-acceptance.md`：查看节点模型共享 V1 的验证证据和未完成范围。
+32. `docs/node-compute-sharing-supply-v1-api.md`：查看策略字段、状态码和发现/调用契约。
 
 ## 专题地图
 

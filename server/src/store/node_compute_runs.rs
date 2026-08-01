@@ -32,6 +32,7 @@ pub struct NodeComputeRun {
     pub duration_ms: Option<i64>,
     pub prompt_tokens: i64,
     pub completion_tokens: i64,
+    pub reserved_token_budget: i64,
     pub billed_cost_rmb_fen: i64,
     pub provider_earned_fen: i64,
     pub settlement_status: Option<String>,
@@ -179,8 +180,13 @@ impl Store {
                 SET updated_at = ?2
               WHERE compute_call_id = ?1
                 AND status = 'started'
-                AND usage_mode = 'server_node_llm'",
-            params![compute_call_id, ts],
+                AND usage_mode = 'server_node_llm'
+                AND julianday(updated_at) >= julianday('now', ?3)",
+            params![
+                compute_call_id,
+                ts,
+                format!("-{SERVER_NODE_LLM_LEASE_SECONDS} seconds")
+            ],
         )?;
         Ok(updated > 0)
     }
@@ -386,8 +392,9 @@ fn run_select_sql() -> &'static str {
             billing_source, resource_owner_user_id, lease_id, offline_policy,
             replay_deadline, max_cost_rmb_fen, allowance_id, status,
             started_at, finished_at, duration_ms, prompt_tokens,
-            completion_tokens, billed_cost_rmb_fen, provider_earned_fen,
-            settlement_status, route_reason, error_message, created_at, updated_at
+            completion_tokens, reserved_token_budget, billed_cost_rmb_fen,
+            provider_earned_fen, settlement_status, route_reason, error_message,
+            created_at, updated_at
        FROM node_compute_runs"
 }
 
@@ -414,13 +421,14 @@ fn read_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<NodeComputeRun> {
         duration_ms: row.get(18)?,
         prompt_tokens: row.get(19)?,
         completion_tokens: row.get(20)?,
-        billed_cost_rmb_fen: row.get(21)?,
-        provider_earned_fen: row.get(22)?,
-        settlement_status: row.get(23)?,
-        route_reason: row.get(24)?,
-        error_message: row.get(25)?,
-        created_at: row.get(26)?,
-        updated_at: row.get(27)?,
+        reserved_token_budget: row.get(21)?,
+        billed_cost_rmb_fen: row.get(22)?,
+        provider_earned_fen: row.get(23)?,
+        settlement_status: row.get(24)?,
+        route_reason: row.get(25)?,
+        error_message: row.get(26)?,
+        created_at: row.get(27)?,
+        updated_at: row.get(28)?,
     })
 }
 

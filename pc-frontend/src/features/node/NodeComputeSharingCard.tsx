@@ -104,11 +104,12 @@ export default function NodeComputeSharingCard({ node }: { node: NodeSummary }) 
 
       <div className={styles.computeSharingLimits}>
         <label>最大并发<input type="number" min={1} max={16} value={maxConcurrent} onChange={(event) => setMaxConcurrent(Number(event.target.value))} /></label>
-        <label>每日已完成 Token 阈值<input type="number" min={0} step={1000} value={dailyTokenLimit} onChange={(event) => setDailyTokenLimit(Number(event.target.value))} /></label>
+        <label>每日共享 Token 预算<input type="number" min={0} step={1000} value={dailyTokenLimit} onChange={(event) => setDailyTokenLimit(Number(event.target.value))} /></label>
       </div>
       <div className={styles.computeSharingStatus}>
         <span>当前任务 {status?.active_runs ?? 0}/{maxConcurrent}</span>
-        <span>今日 Token {formatCount(status?.tokens_used_today ?? 0)}{dailyTokenLimit > 0 ? `/${formatCount(dailyTokenLimit)}` : '（不限）'}</span>
+        <span>今日实耗 {formatCount(status?.tokens_used_today ?? 0)}{dailyTokenLimit > 0 ? `/${formatCount(dailyTokenLimit)}` : '（不限）'}</span>
+        <span>执行中预留 {formatCount(status?.tokens_reserved_today ?? 0)}</span>
       </div>
       {notice && <div className={styles.computeSharingNotice}>{notice}</div>}
       {error && <div className={styles.computeSharingError}>{error}</div>}

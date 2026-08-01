@@ -81,6 +81,7 @@ export interface NodeComputeSharingStatus {
   policy: NodeComputeSharingPolicy
   active_runs: number
   tokens_used_today: number
+  tokens_reserved_today: number
   available: boolean
   availability: string
 }
@@ -479,6 +480,7 @@ export interface NodeComputeRun {
   duration_ms?: number | null
   prompt_tokens?: number
   completion_tokens?: number
+  reserved_token_budget?: number
   billed_cost_rmb_fen?: number
   provider_earned_fen?: number
   settlement_status?: string | null

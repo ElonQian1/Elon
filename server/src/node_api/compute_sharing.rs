@@ -138,6 +138,7 @@ pub(super) fn disabled_status(
         policy: NodeComputeSharingPolicy::disabled(node_id, owner_user_id),
         active_runs: 0,
         tokens_used_today: 0,
+        tokens_reserved_today: 0,
         available: false,
         availability: "sharing_disabled".to_string(),
     }
