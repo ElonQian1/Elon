@@ -51,8 +51,9 @@ if (-not $NoResume -and (Test-ElonReleaseStagePassed -Receipt $receipt -Stage 'm
         & (Join-Path $PSScriptRoot 'publish-mobile-pwa-static.ps1')
     }
 } elseif ($scope.MobilePwaMode -eq 'full_server') {
-    Invoke-ElonReleaseStage -Receipt $receipt -Stage 'mobile_pwa' -SuccessMessage 'server runtime published' -Action {
+    Invoke-ElonReleaseStage -Receipt $receipt -Stage 'mobile_pwa' -SuccessMessage 'server runtime and template published' -Action {
         & (Join-Path $PSScriptRoot 'publish-server.ps1') -SkipPcFrontend
+        & (Join-Path $PSScriptRoot 'publish-mobile-pwa-static.ps1')
     }
 } else {
     Set-ElonReleaseStageReceipt -Receipt $receipt -Stage 'mobile_pwa' -Status skipped `

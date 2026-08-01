@@ -31,6 +31,13 @@ Assert-Contains $publisher '-SkipPcFrontend'
 Assert-Contains $publisher 'publish-apk.ps1'
 Assert-Contains $publisher '-AllowAdbVerificationDeferred'
 Assert-Contains $publisher 'APP_UI_RELEASE_POLICY=publish_before_optional_renderer'
+$fullServerBranch = [regex]::Match(
+    $publisher,
+    "(?s)MobilePwaMode -eq 'full_server'.*?^\s*}\s*else\s*{",
+    [System.Text.RegularExpressions.RegexOptions]::Multiline
+).Value
+Assert-Contains $fullServerBranch 'publish-server.ps1'
+Assert-Contains $fullServerBranch 'publish-mobile-pwa-static.ps1'
 if ($publisher.IndexOf('publish-server.ps1') -gt $publisher.IndexOf('publish-apk.ps1')) {
     throw "Mobile PWA/server must publish before APK."
 }
