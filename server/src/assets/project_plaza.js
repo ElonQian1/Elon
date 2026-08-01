@@ -273,12 +273,11 @@
   function render() {
     const el = root();
     if (!el) return;
+    const searchArtwork = el.dataset.searchArtwork || '/assets/project_view_search_icon.png';
     el.innerHTML = `
       <div class="project-plaza-search-bar">
         <span class="project-plaza-search-icon" aria-hidden="true">
-          <svg viewBox="0 0 26 26" fill="none">
-            <path d="M11.6 5.8a5.8 5.8 0 1 0 .1 0M16.1 16.1 21.8 21.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
-          </svg>
+          <img src="${escapeHtml(searchArtwork)}" alt="" />
         </span>
         <input class="project-plaza-search-input" type="search" placeholder="搜索应用" value="${escapeHtml(state.query)}" data-plaza-action="search" />
       </div>

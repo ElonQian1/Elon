@@ -42,6 +42,7 @@
 
 .sectionHeading {
   min-height: 48px;
+  padding-right: 12px;
 }
 
 .sectionHeading h2,
@@ -65,10 +66,10 @@
   cursor: pointer;
 }
 
-.searchToggle svg {
-  width: 30px;
-  height: 30px;
-  stroke-width: 2.2;
+.searchToggle > img {
+  width: 27px;
+  height: 27px;
+  object-fit: contain;
 }
 
 .searchRow {
@@ -112,9 +113,9 @@
 }
 
 .featuredRail {
-  --featured-card-width: min(65.6vw, 460px);
+  --featured-card-width: min(65.6471vw, 460px);
   display: flex;
-  gap: 22px;
+  gap: 9px;
   overflow-x: auto;
   padding: 4px max(23vw, calc(100% - var(--plaza-side) - var(--featured-card-width))) 8px var(--plaza-side);
   scroll-padding-inline: var(--plaza-side);
@@ -160,7 +161,7 @@
   inset: 0;
   display: flex;
   flex-direction: column;
-  padding: 22px 19px 14px;
+  padding: 21px 19px 14px;
   box-sizing: border-box;
 }
 
@@ -215,7 +216,7 @@
 
 .featuredContent > strong {
   min-width: 0;
-  margin-top: 8px;
+  margin-top: 11px;
   overflow: hidden;
   color: #d9d9d9;
   font-size: 16px;
@@ -227,7 +228,7 @@
 
 .featuredContent > p {
   height: 28px;
-  margin: 6px 0;
+  margin: 6px 0 9px;
   overflow: hidden;
   color: #777;
   font-size: 13px;
@@ -239,7 +240,7 @@
 
 .mediaRow {
   display: flex;
-  gap: 8px;
+  gap: 7px;
 }
 
 .mediaRow span {
@@ -248,7 +249,7 @@
   display: grid;
   place-items: center;
   border-radius: 10px;
-  background: #747474;
+  background: #676767;
   color: #d9d9d9;
 }
 
@@ -259,21 +260,31 @@
 
 .primaryAction {
   position: absolute;
-  right: 19px;
-  bottom: 17px;
-  width: 32px;
-  height: 32px;
+  right: 10px;
+  bottom: 7px;
+  width: 48px;
+  height: 48px;
   display: grid;
   place-items: center;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: #d9d9d9;
+  background: transparent;
   color: #454545;
   cursor: pointer;
 }
 
+.primaryAction::before {
+  position: absolute;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #d9d9d9;
+  content: "";
+}
+
 .primaryAction > img {
+  position: relative;
   width: 16px;
   height: 16px;
   filter: brightness(.318);
@@ -301,22 +312,22 @@
 .projectList {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   padding: 0 var(--plaza-side);
 }
 
 .projectRow {
-  min-height: 68px;
+  min-height: 48px;
   display: grid;
-  grid-template-columns: 53px minmax(0, 1fr) 48px;
+  grid-template-columns: 45px minmax(0, 1fr) 48px;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   padding-left: 9px;
 }
 
 .thumbnail {
-  width: 53px;
-  height: 52px;
+  width: 45px;
+  height: 44px;
   object-fit: fill;
 }
 
@@ -431,7 +442,7 @@
     min-height: 78px;
   }
 
-  .featuredRail { --featured-card-width: 65.6vw; }
+  .featuredRail { --featured-card-width: 65.6471vw; }
 }
 
 @media (prefers-reduced-motion: reduce) {

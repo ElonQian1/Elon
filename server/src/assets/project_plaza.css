@@ -32,10 +32,11 @@
   justify-content: center;
 }
 
-.project-plaza-search-icon svg {
+.project-plaza-search-icon img {
   width: 24px;
   height: 24px;
   display: block;
+  object-fit: contain;
 }
 
 .project-plaza-search-input {

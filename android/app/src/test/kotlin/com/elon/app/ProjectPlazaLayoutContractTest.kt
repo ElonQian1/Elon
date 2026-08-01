@@ -45,9 +45,11 @@ class ProjectPlazaLayoutContractTest {
             "R.drawable.project_plaza_ui4_heart",
             "R.drawable.project_plaza_ui5_star"
         ).forEach { resource -> assertTrue(source.contains(resource)) }
-        assertTrue(source.contains("FEATURED_CARD_WIDTH_FRACTION = 0.656f"))
-        assertTrue(source.contains("FEATURED_CARD_HEIGHT_RATIO = 1.126f"))
-        assertTrue(source.contains("FEATURED_CARD_GAP_DP = 22"))
+        assertTrue(source.contains("FEATURED_CARD_WIDTH_FRACTION = 0.6564706f"))
+        assertTrue(source.contains("FEATURED_CARD_HEIGHT_RATIO = 1.1266428f"))
+        assertTrue(source.contains("FEATURED_CARD_GAP_DP = 9"))
+        assertTrue(source.contains("LIST_ROW_GAP_PX = 50"))
+        assertTrue(source.contains("LIST_TEXT_GAP_PX = 48"))
     }
 
     @Test
@@ -74,45 +76,21 @@ class ProjectPlazaLayoutContractTest {
     }
 
     @Test
-    fun plazaListArrowMatchesTheProfileChevronContainerStandard() {
+    fun plazaListArrowKeepsAFullTouchTargetWhileRenderingTheOriginalBitmapSize() {
         val androidSource = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
         )
         val projectListRow = androidSource.substringAfter("private fun buildProjectListRow")
             .substringBefore("private fun projectThumbnail")
-        val listArrow = requireNotNull(
-            Regex(
-                """setImageResource\(R\.drawable\.project_view_chevron\)([\s\S]*?)""" +
-                    """\}, LinearLayout\.LayoutParams\(dp\((\d+)\), dp\((\d+)\)\)\)"""
-            ).find(projectListRow)
-        )
-        val listPadding = requireNotNull(
-            Regex(
-                """setPadding\(dp\((\d+)\), dp\((\d+)\), dp\((\d+)\), dp\((\d+)\)\)"""
-            ).find(listArrow.groupValues[1])
-        )
-
-        val profileLayout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
-        val profileArrow = profileLayout.substringAfter(
-            "android:id=\"@+id/profileNodeResourceArrow\""
-        ).substringBefore("/>")
-        val profileWidth = xmlDpAttribute(profileArrow, "android:layout_width")
-        val profileHeight = xmlDpAttribute(profileArrow, "android:layout_height")
-        val profilePadding = xmlDpAttribute(profileArrow, "android:padding")
-
-        assertEquals(32, profileWidth)
-        assertEquals(48, profileHeight)
-        assertEquals(8, profilePadding)
-        assertEquals(profileWidth, listArrow.groupValues[2].toInt())
-        assertEquals(profileHeight, listArrow.groupValues[3].toInt())
-        listPadding.groupValues.drop(1).forEach { value ->
-            assertEquals(profilePadding, value.toInt())
-        }
-        assertEquals(16, listArrow.groupValues[2].toInt() - (profilePadding * 2))
+        assertTrue(projectListRow.contains("FrameLayout.LayoutParams(designPx(LIST_CHEVRON_PX)"))
+        assertTrue(projectListRow.contains("marginEnd = designPx(LIST_CHEVRON_END_INSET_PX)"))
+        assertTrue(projectListRow.contains("LinearLayout.LayoutParams(dp(48), dp(48))"))
+        assertTrue(androidSource.contains("LIST_CHEVRON_PX = 43"))
+        assertTrue(androidSource.contains("LIST_CHEVRON_END_INSET_PX = 12"))
     }
 
     @Test
-    fun plazaFeaturedArrowUsesTheSameSixteenDpBitmapInsideItsRoundButton() {
+    fun plazaFeaturedArrowMatchesTheTargetRoundButtonSize() {
         val androidSource = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
         )
@@ -130,10 +108,10 @@ class ProjectPlazaLayoutContractTest {
             ).find(featuredArrow.groupValues[1])
         ).groupValues.drop(1).map(String::toInt)
 
-        assertEquals(28, featuredArrow.groupValues[2].toInt())
-        assertEquals(28, featuredArrow.groupValues[3].toInt())
+        assertEquals(27, featuredArrow.groupValues[2].toInt())
+        assertEquals(27, featuredArrow.groupValues[3].toInt())
         featuredPadding.forEach { assertEquals(6, it) }
-        assertEquals(16, featuredArrow.groupValues[2].toInt() - featuredPadding[0] - featuredPadding[2])
+        assertEquals(15, featuredArrow.groupValues[2].toInt() - featuredPadding[0] - featuredPadding[2])
     }
 
     @Test
@@ -154,10 +132,14 @@ class ProjectPlazaLayoutContractTest {
     }
 
     @Test
-    fun webPlazaFeaturedChevronIsSixteenPixelsWhileItsSpinnerRemainsTwentyTwo() {
+    fun webPlazaFeaturedChevronKeepsAFortyEightPixelTouchTargetAndTargetCircle() {
         val styles = readRepositoryFile("pc-frontend/src/features/plaza/PlazaPage.module.css")
         assertTrue(
-            Regex("""\.primaryAction\s*\{[\s\S]*?width:\s*32px;[\s\S]*?height:\s*32px;[\s\S]*?\}""")
+            Regex("""\.primaryAction\s*\{[\s\S]*?width:\s*48px;[\s\S]*?height:\s*48px;[\s\S]*?\}""")
+                .containsMatchIn(styles)
+        )
+        assertTrue(
+            Regex("""\.primaryAction::before\s*\{[\s\S]*?width:\s*27px;[\s\S]*?height:\s*27px;[\s\S]*?\}""")
                 .containsMatchIn(styles)
         )
         assertTrue(
@@ -196,8 +178,31 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(entry.contains("<ProjectPlazaView />"))
         listOf("card.png", "thumbnail.png", "avatar.png", "heart.png", "star.png")
             .forEach { asset -> assertTrue(view.contains(asset)) }
-        assertTrue(styles.contains("65.6vw"))
+        assertTrue(styles.contains("65.6471vw"))
         assertTrue(styles.contains("aspect-ratio: 837 / 943"))
+    }
+
+    @Test
+    fun plazaSearchReusesTheFriendHomeArtworkAcrossAndroidAndWeb() {
+        val androidSearch = repositoryRoot().resolve(
+            "android/app/src/main/res/drawable-nodpi/ic_top_search_custom.png"
+        )
+        val webSearch = repositoryRoot().resolve("server/src/assets/project_view_search_icon.png")
+        assertEquals(sha256(androidSearch), sha256(webSearch))
+
+        val androidSource = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
+        ).substringAfter("private fun buildDiscoveryHeader")
+            .substringBefore("private fun buildSearchBar")
+        assertTrue(androidSource.contains("R.drawable.ic_top_search_custom"))
+        assertTrue(androidSource.contains("PLAZA_SEARCH_END_MARGIN_DP"))
+
+        val webView = readRepositoryFile("pc-frontend/src/features/plaza/ProjectPlazaView.tsx")
+        assertTrue(webView.contains("project_view_search_icon.png"))
+        assertTrue(webView.contains("src={sharedTopSearchAsset}"))
+
+        val mobileWeb = readRepositoryFile("server/src/assets/web_page.html")
+        assertTrue(mobileWeb.contains("data-search-artwork=\"/assets/project_view_search_icon.png\""))
     }
 
     private fun readRepositoryFile(relativePath: String): String =
@@ -215,10 +220,6 @@ class ProjectPlazaLayoutContractTest {
     private fun sha256(path: Path): String = MessageDigest.getInstance("SHA-256")
         .digest(Files.readAllBytes(path))
         .joinToString("") { "%02x".format(it) }
-
-    private fun xmlDpAttribute(fragment: String, attribute: String): Int = requireNotNull(
-        Regex("""${Regex.escape(attribute)}=\"(\d+)dp\"""").find(fragment)
-    ).groupValues[1].toInt()
 
     private fun repositoryRoot(): Path {
         val cwd = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize()

@@ -140,7 +140,7 @@ internal class MainMarketplaceActions(
     private fun buildDiscoveryHeader(): LinearLayout = LinearLayout(activity).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(PLAZA_SIDE_MARGIN_DP), 0, dp(PLAZA_SIDE_MARGIN_DP), 0)
+        setPadding(dp(PLAZA_SIDE_MARGIN_DP), 0, dp(PLAZA_SEARCH_END_MARGIN_DP), 0)
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             dp(48)
@@ -157,10 +157,10 @@ internal class MainMarketplaceActions(
                 if (!showing) searchField?.requestFocus()
             }
             addView(ImageView(activity).apply {
-                setImageResource(R.drawable.ic_search_simple)
-                setColorFilter(Color.parseColor(COLOR_TEXT_PRIMARY))
+                setImageResource(R.drawable.ic_top_search_custom)
+                scaleType = ImageView.ScaleType.FIT_CENTER
                 contentDescription = null
-            }, FrameLayout.LayoutParams(dp(30), dp(30), Gravity.CENTER))
+            }, FrameLayout.LayoutParams(designPx(TOP_SEARCH_ICON_PX), designPx(TOP_SEARCH_ICON_PX), Gravity.CENTER))
         }, LinearLayout.LayoutParams(dp(48), dp(48)))
     }
 
@@ -328,7 +328,7 @@ internal class MainMarketplaceActions(
             ).apply {
                 marginStart = dp(PLAZA_SIDE_MARGIN_DP)
                 marginEnd = dp(PLAZA_SIDE_MARGIN_DP)
-                topMargin = dp(if (index == 0) 0 else 16)
+                topMargin = designPx(if (index == 0) LIST_FIRST_ROW_TOP_PX else LIST_ROW_GAP_PX)
             })
         }
     }
@@ -370,7 +370,7 @@ internal class MainMarketplaceActions(
         }, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(19), dp(22), dp(19), dp(14))
+            setPadding(dp(19), dp(21), dp(19), dp(14))
             addView(LinearLayout(activity).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 addView(ImageView(activity).apply {
@@ -390,7 +390,7 @@ internal class MainMarketplaceActions(
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(8) })
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(11) })
             addView(TextView(activity).apply {
                 text = project.description?.takeIf { it.isNotBlank() } ?: "这个项目还没有填写简介。"
                 maxLines = 2
@@ -403,10 +403,10 @@ internal class MainMarketplaceActions(
                 orientation = LinearLayout.HORIZONTAL
                 repeat(2) { index ->
                     addView(mediaPlaceholder(), LinearLayout.LayoutParams(dp(60), dp(85)).apply {
-                        if (index == 1) marginStart = dp(8)
+                        if (index == 1) marginStart = dp(7)
                     })
                 }
-            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(85)).apply { topMargin = dp(6) })
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(85)).apply { topMargin = dp(9) })
         }, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         addView(ImageView(activity).apply {
             setImageResource(R.drawable.project_view_chevron)
@@ -415,14 +415,14 @@ internal class MainMarketplaceActions(
             background = rect("#D9D9D9", 18)
             setPadding(dp(6), dp(6), dp(6), dp(6))
             contentDescription = "进入${project.displayTitle()}"
-        }, FrameLayout.LayoutParams(dp(28), dp(28), Gravity.END or Gravity.BOTTOM).apply {
-            marginEnd = dp(19)
+        }, FrameLayout.LayoutParams(dp(27), dp(27), Gravity.END or Gravity.BOTTOM).apply {
+            marginEnd = dp(20)
             bottomMargin = dp(17)
         })
     }
 
     private fun mediaPlaceholder() = FrameLayout(activity).apply {
-        background = rect("#747474", 10)
+        background = rect("#676767", 10)
         addView(ImageView(activity).apply {
             setImageResource(R.drawable.ic_attach_photos)
             setColorFilter(Color.parseColor("#D9D9D9"))
@@ -463,7 +463,7 @@ internal class MainMarketplaceActions(
     private fun buildProjectListRow(project: StoreProject) = LinearLayout(activity).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(9), dp(8), 0, dp(8))
+        setPadding(dp(9), 0, 0, 0)
         isClickable = true
         foreground = selectableForeground()
         setOnClickListener { openProjectSpace(project) }
@@ -472,20 +472,24 @@ internal class MainMarketplaceActions(
             orientation = LinearLayout.VERTICAL
             addView(TextView(activity).apply {
                 text = project.displayTitle(); maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             })
             addView(TextView(activity).apply {
                 text = project.description?.takeIf { it.isNotBlank() } ?: "这个项目还没有填写简介。"
                 maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(5) })
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(8) })
-        addView(ImageView(activity).apply {
-            setImageResource(R.drawable.project_view_chevron)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(dp(8), dp(8), dp(8), dp(8))
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = designPx(LIST_TEXT_GAP_PX) })
+        addView(FrameLayout(activity).apply {
             contentDescription = "进入${project.displayTitle()}"
-        }, LinearLayout.LayoutParams(dp(32), dp(48)))
+            addView(ImageView(activity).apply {
+                setImageResource(R.drawable.project_view_chevron)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = null
+            }, FrameLayout.LayoutParams(designPx(LIST_CHEVRON_PX), designPx(LIST_CHEVRON_PX), Gravity.END or Gravity.CENTER_VERTICAL).apply {
+                marginEnd = designPx(LIST_CHEVRON_END_INSET_PX)
+            })
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
     }
 
     private fun projectThumbnail(project: StoreProject): View {
@@ -663,11 +667,18 @@ internal class MainMarketplaceActions(
         const val SEARCH_RADIUS_DP = 24
         const val SEARCH_SIDE_MARGIN_DP = 16
         const val PLAZA_SIDE_MARGIN_DP = 20
+        const val PLAZA_SEARCH_END_MARGIN_DP = 12
         const val PLAZA_TRAILING_PADDING_DP = 98
-        const val FEATURED_CARD_GAP_DP = 22
-        const val FEATURED_CARD_WIDTH_FRACTION = 0.656f
-        const val FEATURED_CARD_HEIGHT_RATIO = 1.126f
-        const val DESIGN_WIDTH_PX = 1272
+        const val FEATURED_CARD_GAP_DP = 9
+        const val FEATURED_CARD_WIDTH_FRACTION = 0.6564706f
+        const val FEATURED_CARD_HEIGHT_RATIO = 1.1266428f
+        const val DESIGN_WIDTH_PX = 1275
+        const val TOP_SEARCH_ICON_PX = 97
+        const val LIST_FIRST_ROW_TOP_PX = 28
+        const val LIST_ROW_GAP_PX = 50
+        const val LIST_TEXT_GAP_PX = 48
+        const val LIST_CHEVRON_PX = 43
+        const val LIST_CHEVRON_END_INSET_PX = 12
         const val SEGMENT_WIDTH_PX = 210
         const val SEGMENT_HEIGHT_PX = 138
         const val FILTER_SIDE_PADDING_DP = 16

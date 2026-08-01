@@ -8,6 +8,7 @@ import heartAsset from '../../assets/project-plaza/heart.png'
 import starAsset from '../../assets/project-plaza/star.png'
 import thumbnailAsset from '../../assets/project-plaza/thumbnail.png'
 import plazaChevronAsset from '../../../../server/src/assets/project_view_chevron.png'
+import sharedTopSearchAsset from '../../../../server/src/assets/project_view_search_icon.png'
 import { useProjectStore } from '../conversation/useProjectStore'
 import { projectPlazaCardScales } from './projectCarouselScale.mjs'
 import styles from './PlazaPage.module.css'
@@ -208,7 +209,7 @@ export default function ProjectPlazaView() {
               aria-expanded={searchOpen}
               onClick={() => setSearchOpen((open) => !open)}
             >
-              <Search aria-hidden="true" />
+              <img src={sharedTopSearchAsset} alt="" aria-hidden="true" />
             </button>
           </div>
 
