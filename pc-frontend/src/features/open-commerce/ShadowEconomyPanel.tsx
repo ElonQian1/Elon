@@ -125,7 +125,7 @@ export default function ShadowEconomyPanel({
                 type="button"
                 onClick={() => selectReceipt(receipt)}
               >
-                <header style={commerceStyles.itemHeader}><h3 style={commerceStyles.itemTitle}>{receipt.reason}</h3><span style={badgeStyle(receipt.status === 'voided' ? 'warn' : 'neutral')}>{receipt.status}</span></header>
+                <header style={commerceStyles.itemHeader}><h3 style={commerceStyles.itemTitle}>{receipt.reason}</h3><span style={badgeStyle(receipt.status === 'voided' ? 'warn' : 'neutral')}>{receipt.receipt_kind}</span></header>
                 <p style={commerceStyles.itemText}>{formatMicros(receipt.compute_amount_micros, receipt.currency)} · 节点 {formatShort(receipt.provider_amount_micros)} · 平台 {formatShort(receipt.platform_amount_micros)}</p>
                 <code style={commerceStyles.itemMeta}>{receipt.posting_key}</code>
               </button>
@@ -167,7 +167,10 @@ export default function ShadowEconomyPanel({
         canEdit={canEdit}
         projectId={projectId}
         selectedReceipt={detail?.receipt ?? null}
-        onChanged={() => setEconomyRevision((value) => value + 1)}
+        onChanged={() => {
+          setEconomyRevision((value) => value + 1)
+          refresh()
+        }}
       />
       <SuiProjectionPackages
         canEdit={canEdit}

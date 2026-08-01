@@ -1,7 +1,7 @@
 ---
 title: "链外影子结算 V1 API"
 owner: backend
-reviewed_at: 2026-07-30
+reviewed_at: 2026-08-02
 status: active
 decision_ref: "docs/decisions/task-shadow-settlement-v1.md"
 ---
@@ -43,7 +43,7 @@ GET /api/projects/{project_id}/economy/settlements/{receipt_id}
 GET /api/projects/{project_id}/economy/settlements/{receipt_id}/sui-envelope
 ```
 
-仅已对账影子凭证可生成。响应只描述未来对象键和候选 PTB 步骤，固定为：
+仅 `receipt_kind=standard` 的已对账影子凭证可生成。`correction_reversal` 和 `correction_replacement` 必须由未来适配器作为同一个原子纠正包处理，不能分别生成普通信封。响应只描述未来对象键和候选 PTB 步骤，固定为：
 
 ```json
 {
@@ -119,6 +119,38 @@ POST /api/projects/{project_id}/economy/disputes/{dispute_id}/resolve
 ```
 
 `decision` 只能是 `accept` 或 `reject`。`open` 与 `accepted` 会阻断 Sui 信封和新投影包，并使既有投影包返回 `submission_readiness=dispute_blocked`。接受争议仅确认需要纠正，不自动退款、冲正或修改原账本。
+
+## 追加式纠正 Matter
+
+读取某张原凭证的全部纠正流程：
+
+```http
+GET /api/projects/{project_id}/economy/settlements/{receipt_id}/corrections
+```
+
+项目编辑者可为已接受争议创建纠正 Matter。金额单位仍为人民币微元：
+
+```http
+POST /api/projects/{project_id}/economy/disputes/{dispute_id}/corrections
+Content-Type: application/json
+
+{
+  "corrected_compute_amount_micros": 600000,
+  "corrected_provider_amount_micros": 500000,
+  "summary": "依据节点原始日志重新核对金额和节点分配",
+  "evidence_ref": "artifact:correction-review"
+}
+```
+
+节点金额不能高于计算金额。同一争议的相同活动请求幂等复用；内容变化返回冲突；已取消计划可重新创建。返回状态为 `matter_pending`，必须等待关联 Matter 完成并通过人工验收。
+
+Matter 验收时系统会自动尝试过账。编辑者也可在修复暂时性错误后重试：
+
+```http
+POST /api/projects/{project_id}/economy/corrections/{correction_id}/finalize
+```
+
+过账要求全局和项目影子经济开关均已开启，并在同一事务内追加 `correction_reversal` 与 `correction_replacement` 两张已平衡凭证。原凭证不会修改。取消 Matter 只把纠正计划标记为 `canceled`，不写纠正凭证。
 
 ## 自动写入点
 

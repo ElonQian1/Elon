@@ -57,6 +57,8 @@ export interface SettlementReceipt {
   shadow_only: true
   accepted_matter_id?: string
   reason: string
+  receipt_kind: 'standard' | 'correction_reversal' | 'correction_replacement'
+  correction_id?: string
   created_at: string
 }
 
@@ -186,4 +188,48 @@ export interface SettlementDisputeDetail {
   dispute: SettlementDispute
   events: SettlementDisputeEvent[]
   blocks_projection: boolean
+}
+
+export type SettlementCorrectionStatus = 'matter_pending' | 'posted' | 'canceled'
+
+export interface SettlementCorrection {
+  id: string
+  project_id: string
+  dispute_id: string
+  original_settlement_receipt_id: string
+  correction_matter_id: string
+  status: SettlementCorrectionStatus
+  corrected_compute_amount_micros: number
+  corrected_provider_amount_micros: number
+  corrected_platform_amount_micros: number
+  summary: string
+  evidence_ref?: string
+  created_by_user_id: string
+  posted_by_user_id?: string
+  reversal_receipt_id?: string
+  replacement_receipt_id?: string
+  matter_status: string
+  matter_final_decision?: string
+  created_at: string
+  posted_at?: string
+  updated_at: string
+}
+
+export interface SettlementCorrectionEvent {
+  id: string
+  correction_id: string
+  action: 'matter_created' | 'posted' | 'canceled'
+  previous_status?: SettlementCorrectionStatus
+  next_status: SettlementCorrectionStatus
+  actor_user_id: string
+  note?: string
+  created_at: string
+}
+
+export interface SettlementCorrectionDetail {
+  correction: SettlementCorrection
+  events: SettlementCorrectionEvent[]
+  original_receipt: SettlementReceipt
+  reversal_receipt?: SettlementReceipt
+  replacement_receipt?: SettlementReceipt
 }

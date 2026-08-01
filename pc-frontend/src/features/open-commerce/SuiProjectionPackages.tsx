@@ -88,7 +88,14 @@ export default function SuiProjectionPackages({
     }
   }
 
-  const canPrepare = canEdit && selectedReceipt?.status === 'reconciled' && !busy
+  const isStandardReceipt = selectedReceipt?.receipt_kind === 'standard'
+  const canPrepare =
+    canEdit && selectedReceipt?.status === 'reconciled' && isStandardReceipt && !busy
+  const prepareTitle = !selectedReceipt
+    ? '请先选择已对账凭证'
+    : !isStandardReceipt
+      ? '纠正凭证必须作为冲销与替换组成的纠正包原子投影'
+      : '保存所选凭证的不可变投影包'
 
   return (
     <section className={base.integrationSection}>
@@ -118,7 +125,7 @@ export default function SuiProjectionPackages({
             type="button"
             onClick={prepare}
             disabled={!canPrepare}
-            title={selectedReceipt ? '保存所选凭证的不可变投影包' : '请先选择已对账凭证'}
+            title={prepareTitle}
           >
             <PackagePlus size={14} />保存投影包
           </button>

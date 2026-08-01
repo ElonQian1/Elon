@@ -25,7 +25,7 @@ acceptance_ref: "docs/task-shadow-settlement-v1-acceptance.md"
 2. 争议状态固定为 `open`、`accepted`、`rejected`、`withdrawn`。每个状态变化都追加不可删除事件，案件保留提出者、处理者、说明和时间。
 3. 同一凭证同时最多有一个待审核争议，完全相同的重复请求幂等返回原案件；内容不同则拒绝覆盖。驳回或撤回后可以重新提出，接受后不得再次建案。
 4. `open` 和 `accepted` 均阻断原凭证生成 Sui 信封、准备新投影包，并把已有投影包的就绪状态派生为 `dispute_blocked`。驳回或撤回后解除阻断。
-5. 接受争议不修改原凭证、双分录、节点收益或任何真实资金。需要金额纠正时必须建立独立 Matter 和新的纠正凭证，保留原始事实与前后关联。
+5. 接受争议不修改原凭证、双分录、节点收益或任何真实资金。金额纠正已按 `docs/decisions/task-shadow-settlement-corrections-v1.md` 实现为独立 Matter，以及同一事务内追加的冲销与替换凭证。
 
 ## 权限与边界
 

@@ -7,6 +7,9 @@ pub(crate) const INTENT_POSTED: &str = "posted";
 pub(crate) const INTENT_VOIDED: &str = "voided";
 pub(crate) const RECEIPT_RECONCILED: &str = "reconciled";
 pub(crate) const RECEIPT_VOIDED: &str = "voided";
+pub(crate) const RECEIPT_KIND_STANDARD: &str = "standard";
+pub(crate) const RECEIPT_KIND_CORRECTION_REVERSAL: &str = "correction_reversal";
+pub(crate) const RECEIPT_KIND_CORRECTION_REPLACEMENT: &str = "correction_replacement";
 pub(crate) const SUBJECT_TASK_ASSIGNMENT: &str = "task_assignment";
 pub(crate) const SUBJECT_COMMERCE_INVOCATION: &str = "commerce_invocation";
 pub(crate) const SUI_PROJECTION_SCHEMA: &str = "task_economy.sui_projection.v1";
@@ -18,6 +21,9 @@ pub(crate) const DISPUTE_OPEN: &str = "open";
 pub(crate) const DISPUTE_ACCEPTED: &str = "accepted";
 pub(crate) const DISPUTE_REJECTED: &str = "rejected";
 pub(crate) const DISPUTE_WITHDRAWN: &str = "withdrawn";
+pub(crate) const CORRECTION_MATTER_PENDING: &str = "matter_pending";
+pub(crate) const CORRECTION_POSTED: &str = "posted";
+pub(crate) const CORRECTION_CANCELED: &str = "canceled";
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct TaskEconomyProjectSetting {
@@ -117,6 +123,8 @@ pub(crate) struct SettlementReceipt {
     pub shadow_only: bool,
     pub accepted_matter_id: Option<String>,
     pub reason: String,
+    pub receipt_kind: String,
+    pub correction_id: Option<String>,
     pub created_at: String,
 }
 
@@ -133,6 +141,8 @@ pub(crate) struct CreateSettlementReceipt<'a> {
     pub currency: &'a str,
     pub accepted_matter_id: Option<&'a str>,
     pub reason: &'a str,
+    pub receipt_kind: &'a str,
+    pub correction_id: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -303,6 +313,69 @@ pub(crate) struct CreateSettlementDispute<'a> {
     pub project_id: &'a str,
     pub settlement_receipt_id: &'a str,
     pub reason_code: &'a str,
+    pub summary: &'a str,
+    pub evidence_ref: Option<&'a str>,
+    pub actor_user_id: &'a str,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CreateSettlementCorrectionRequest {
+    pub corrected_compute_amount_micros: i64,
+    pub corrected_provider_amount_micros: i64,
+    pub summary: String,
+    pub evidence_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SettlementCorrection {
+    pub id: String,
+    pub project_id: String,
+    pub dispute_id: String,
+    pub original_settlement_receipt_id: String,
+    pub correction_matter_id: String,
+    pub status: String,
+    pub corrected_compute_amount_micros: i64,
+    pub corrected_provider_amount_micros: i64,
+    pub corrected_platform_amount_micros: i64,
+    pub summary: String,
+    pub evidence_ref: Option<String>,
+    pub created_by_user_id: String,
+    pub posted_by_user_id: Option<String>,
+    pub reversal_receipt_id: Option<String>,
+    pub replacement_receipt_id: Option<String>,
+    pub matter_status: String,
+    pub matter_final_decision: Option<String>,
+    pub created_at: String,
+    pub posted_at: Option<String>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SettlementCorrectionEvent {
+    pub id: String,
+    pub correction_id: String,
+    pub action: String,
+    pub previous_status: Option<String>,
+    pub next_status: String,
+    pub actor_user_id: String,
+    pub note: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SettlementCorrectionDetail {
+    pub correction: SettlementCorrection,
+    pub events: Vec<SettlementCorrectionEvent>,
+    pub original_receipt: SettlementReceipt,
+    pub reversal_receipt: Option<SettlementReceipt>,
+    pub replacement_receipt: Option<SettlementReceipt>,
+}
+
+pub(crate) struct CreateSettlementCorrection<'a> {
+    pub project_id: &'a str,
+    pub dispute_id: &'a str,
+    pub corrected_compute_amount_micros: i64,
+    pub corrected_provider_amount_micros: i64,
     pub summary: &'a str,
     pub evidence_ref: Option<&'a str>,
     pub actor_user_id: &'a str,

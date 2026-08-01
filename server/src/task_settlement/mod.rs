@@ -1,6 +1,7 @@
 //! Chain-off shadow settlement for accepted AI work and metered commerce usage.
 
 pub(crate) mod api;
+mod correction_service;
 mod dispute_service;
 pub(crate) mod ledger;
 pub(crate) mod model;

@@ -5,7 +5,7 @@ use crate::store::Store;
 use super::model::{
     CreateSettlementDispute, OpenSettlementDisputeRequest, ResolveSettlementDisputeRequest,
     SettlementDisputeDetail, WithdrawSettlementDisputeRequest, DISPUTE_ACCEPTED, DISPUTE_REJECTED,
-    DISPUTE_WITHDRAWN,
+    DISPUTE_WITHDRAWN, RECEIPT_KIND_CORRECTION_REVERSAL,
 };
 
 pub(super) fn open(
@@ -15,6 +15,12 @@ pub(super) fn open(
     actor_user_id: &str,
     request: &OpenSettlementDisputeRequest,
 ) -> Result<SettlementDisputeDetail> {
+    let receipt = store
+        .task_settlement_receipt(project_id, receipt_id)?
+        .ok_or_else(|| anyhow!("影子结算凭证不存在"))?;
+    if receipt.receipt_kind == RECEIPT_KIND_CORRECTION_REVERSAL {
+        bail!("冲销凭证是不可变的反向记录，不能单独发起争议；请针对替换凭证继续纠正");
+    }
     let reason_code = normalized_reason_code(&request.reason_code)?;
     let summary = required_text(&request.summary, "争议摘要", 8, 500)?;
     let evidence_ref = optional_text(request.evidence_ref.as_deref(), "证据引用", 512)?;

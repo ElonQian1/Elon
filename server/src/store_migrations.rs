@@ -158,6 +158,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (121, "节点模型算力显式共享策略与供给限制", crate::node_compute_sharing_migration::migration_v121),
     (122, "Sui 链下投影包、摘要与完整性复核", crate::task_sui_projection_migration::migration_v122),
     (123, "影子结算争议案件与追加式事件", crate::task_settlement_dispute_migration::migration_v123),
+    (124, "影子结算争议纠正 Matter、冲销与替换凭证", crate::task_settlement_correction_migration::migration_v124),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

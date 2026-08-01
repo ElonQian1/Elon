@@ -10,7 +10,8 @@ use super::{
         CreateSettlementIntent, CreateSettlementReceipt, CreateUsageReceipt,
         SettlementReceiptDetail, TaskEconomyOverview, TaskEconomyTotals, UsageReceipt,
         CURRENCY_CNY, ECONOMY_SCHEMA, INTENT_PENDING, INTENT_POSTED, INTENT_VOIDED,
-        RECEIPT_RECONCILED, SUBJECT_COMMERCE_INVOCATION, SUBJECT_TASK_ASSIGNMENT,
+        RECEIPT_KIND_STANDARD, RECEIPT_RECONCILED, SUBJECT_COMMERCE_INVOCATION,
+        SUBJECT_TASK_ASSIGNMENT,
     },
     sui_projection,
 };
@@ -55,19 +56,19 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<TaskEconomyOve
         compute_amount_micros: checked_sum(
             settlement_receipts
                 .iter()
-                .map(|receipt| receipt.compute_amount_micros),
+                .map(|receipt| signed_receipt_amount(receipt, receipt.compute_amount_micros)),
             "计算金额",
         )?,
         provider_amount_micros: checked_sum(
             settlement_receipts
                 .iter()
-                .map(|receipt| receipt.provider_amount_micros),
+                .map(|receipt| signed_receipt_amount(receipt, receipt.provider_amount_micros)),
             "节点金额",
         )?,
         platform_amount_micros: checked_sum(
             settlement_receipts
                 .iter()
-                .map(|receipt| receipt.platform_amount_micros),
+                .map(|receipt| signed_receipt_amount(receipt, receipt.platform_amount_micros)),
             "平台金额",
         )?,
     };
@@ -110,6 +111,7 @@ pub(crate) fn sui_envelope(
     project_id: &str,
     receipt_id: &str,
 ) -> Result<super::model::SuiSettlementEnvelope> {
+    super::correction_service::ensure_standard_projection(store, project_id, receipt_id)?;
     super::dispute_service::ensure_projection_allowed(store, project_id, receipt_id)?;
     let detail = receipt_detail(store, project_id, receipt_id)?;
     sui_projection::envelope(&detail.receipt)
@@ -267,7 +269,12 @@ pub(crate) fn post_accepted_matter(
     if !project_active(store, project_id)? {
         return Ok(0);
     }
-    post_accepted_matter_facts(store, project_id, matter_id)
+    let corrections =
+        super::correction_service::finalize_for_accepted_matter(store, project_id, matter_id)?;
+    let regular = post_accepted_matter_facts(store, project_id, matter_id)?;
+    regular
+        .checked_add(corrections.saturating_mul(2))
+        .ok_or_else(|| anyhow!("影子结算过账数量溢出"))
 }
 
 fn post_accepted_matter_facts(store: &Store, project_id: &str, matter_id: &str) -> Result<usize> {
@@ -322,6 +329,8 @@ fn post_accepted_matter_facts(store: &Store, project_id: &str, matter_id: &str) 
                 currency: CURRENCY_CNY,
                 accepted_matter_id: Some(matter_id),
                 reason: "matter accepted after review gate; mirror existing compute facts only",
+                receipt_kind: RECEIPT_KIND_STANDARD,
+                correction_id: None,
             },
             &postings,
         )?;
@@ -335,11 +344,12 @@ pub(crate) fn void_canceled_matter(
     project_id: &str,
     matter_id: &str,
 ) -> Result<usize> {
+    let corrections = super::correction_service::cancel_for_matter(store, project_id, matter_id)?;
     if !project_active(store, project_id)? {
-        return Ok(0);
+        return Ok(corrections);
     }
     let intents = store.list_task_settlement_intents_for_matter(project_id, matter_id)?;
-    let mut voided = 0;
+    let mut voided = corrections;
     for intent in intents
         .iter()
         .filter(|intent| intent.status == INTENT_PENDING)
@@ -354,7 +364,7 @@ pub(crate) fn void_canceled_matter(
     Ok(voided)
 }
 
-fn project_active(store: &Store, project_id: &str) -> Result<bool> {
+pub(super) fn project_active(store: &Store, project_id: &str) -> Result<bool> {
     Ok(runtime_enabled() && store.task_economy_project_setting(project_id)?.enabled)
 }
 
@@ -370,6 +380,14 @@ fn checked_sum(mut values: impl Iterator<Item = i64>, label: &str) -> Result<i64
     values
         .try_fold(0_i64, i64::checked_add)
         .ok_or_else(|| anyhow!("{label}汇总溢出"))
+}
+
+fn signed_receipt_amount(receipt: &super::model::SettlementReceipt, amount: i64) -> i64 {
+    if receipt.receipt_kind == super::model::RECEIPT_KIND_CORRECTION_REVERSAL {
+        -amount
+    } else {
+        amount
+    }
 }
 
 fn digest_json(value: &serde_json::Value) -> Result<String> {

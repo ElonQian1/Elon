@@ -2,6 +2,7 @@ import { api } from '../../api/client'
 import type {
   SettlementDisputeDetail,
   SettlementDisputeReason,
+  SettlementCorrectionDetail,
   SettlementReceiptDetail,
   SuiProjectionPackage,
   SuiSettlementEnvelope,
@@ -69,5 +70,28 @@ export const taskEconomyApi = {
     api.post<SettlementDisputeDetail>(
       `${base(projectId)}/disputes/${encodeURIComponent(disputeId)}/resolve`,
       { decision, note },
+    ),
+  settlementCorrections: (projectId: string, receiptId: string) =>
+    api.get<SettlementCorrectionDetail[]>(
+      `${base(projectId)}/settlements/${encodeURIComponent(receiptId)}/corrections`,
+    ),
+  createSettlementCorrection: (
+    projectId: string,
+    disputeId: string,
+    input: {
+      corrected_compute_amount_micros: number
+      corrected_provider_amount_micros: number
+      summary: string
+      evidence_ref?: string
+    },
+  ) =>
+    api.post<SettlementCorrectionDetail>(
+      `${base(projectId)}/disputes/${encodeURIComponent(disputeId)}/corrections`,
+      input,
+    ),
+  finalizeSettlementCorrection: (projectId: string, correctionId: string) =>
+    api.post<SettlementCorrectionDetail>(
+      `${base(projectId)}/corrections/${encodeURIComponent(correctionId)}/finalize`,
+      {},
     ),
 }

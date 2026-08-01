@@ -7,6 +7,7 @@ import type {
   SettlementReceipt,
 } from './taskEconomyTypes'
 import { errorText } from './openCommerceUi'
+import SettlementCorrections from './SettlementCorrections'
 import base from './OpenCommercePanel.module.css'
 import {
   actionStyle,
@@ -43,6 +44,7 @@ export default function SettlementDisputes({
   const [resolutionNote, setResolutionNote] = useState('')
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState('')
+  const [correctionRevision, setCorrectionRevision] = useState(0)
 
   const receiptId = selectedReceipt?.id ?? ''
   const refresh = useCallback(async () => {
@@ -122,6 +124,7 @@ export default function SettlementDisputes({
       setResolutionNote('')
       await refresh()
       onChanged()
+      setCorrectionRevision((value) => value + 1)
     } catch (error) {
       setMessage(errorText(error))
     } finally {
@@ -246,6 +249,19 @@ export default function SettlementDisputes({
               </div>
             )}
           </div>
+        )}
+        {selected && selectedReceipt && (
+          <SettlementCorrections
+            canEdit={canEdit}
+            projectId={projectId}
+            refreshToken={correctionRevision}
+            selectedDispute={selected}
+            selectedReceipt={selectedReceipt}
+            onChanged={() => {
+              setCorrectionRevision((value) => value + 1)
+              onChanged()
+            }}
+          />
         )}
         {message && <div style={{ ...commerceStyles.message, ...errorMessageStyle }}>{message}</div>}
       </div>

@@ -8,7 +8,7 @@ pub(crate) struct LedgerPosting {
     pub amount_micros: i64,
 }
 
-pub(super) fn compute_mirror_postings(
+pub(crate) fn compute_mirror_postings(
     payer_user_id: &str,
     payee_user_id: Option<&str>,
     compute_amount_micros: i64,

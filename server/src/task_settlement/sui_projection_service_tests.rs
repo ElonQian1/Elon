@@ -71,6 +71,8 @@ fn fixture() -> (Store, std::path::PathBuf, String, String, String) {
                 currency: "CNY",
                 accepted_matter_id: Some("matter-sui"),
                 reason: "projection package test",
+                receipt_kind: "standard",
+                correction_id: None,
             },
             &Vec::<LedgerPosting>::new(),
         )

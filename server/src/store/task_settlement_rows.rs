@@ -72,7 +72,9 @@ pub(super) fn read_settlement(row: &Row<'_>) -> rusqlite::Result<SettlementRecei
         shadow_only: row.get::<_, i64>(11)? != 0,
         accepted_matter_id: row.get(12)?,
         reason: row.get(13)?,
-        created_at: row.get(14)?,
+        receipt_kind: row.get(14)?,
+        correction_id: row.get(15)?,
+        created_at: row.get(16)?,
     })
 }
 
@@ -105,7 +107,7 @@ pub(super) fn settlement_select() -> &'static str {
     "SELECT id, project_id, intent_id, posting_key, status,
             compute_amount_micros, provider_amount_micros, platform_amount_micros,
             outcome_reward_micros, review_reward_micros, currency, shadow_only,
-            accepted_matter_id, reason, created_at
+            accepted_matter_id, reason, receipt_kind, correction_id, created_at
        FROM task_settlement_receipts"
 }
 
@@ -179,8 +181,14 @@ pub(super) fn ensure_same_settlement(
         || existing.compute_amount_micros != input.compute_amount_micros
         || existing.provider_amount_micros != input.provider_amount_micros
         || existing.platform_amount_micros != input.platform_amount_micros
+        || existing.receipt_kind != input.receipt_kind.trim()
+        || existing.correction_id.as_deref() != clean(input.correction_id)
     {
         bail!("同一结算意图不能映射到不同影子凭证");
     }
     Ok(())
+}
+
+fn clean(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
 }

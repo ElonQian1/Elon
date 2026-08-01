@@ -8,6 +8,9 @@ use super::model::{
 };
 
 pub(super) fn envelope(receipt: &SettlementReceipt) -> Result<SuiSettlementEnvelope> {
+    if receipt.receipt_kind != super::model::RECEIPT_KIND_STANDARD {
+        bail!("纠正凭证不能作为普通单笔 Sui 投影");
+    }
     if !receipt.shadow_only || receipt.status != RECEIPT_RECONCILED {
         bail!("仅已对账的影子凭证可以生成 Sui 投影信封");
     }

@@ -8,16 +8,17 @@ use axum::{
 use std::sync::Arc;
 
 use crate::{
+    group_ai::bot_selector::bots_for_project,
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     types::AppState,
 };
 
 use super::{
-    dispute_service,
+    correction_service, dispute_service,
     model::{
-        OpenSettlementDisputeRequest, PrepareSuiProjectionPackageRequest,
-        ResolveSettlementDisputeRequest, UpdateTaskEconomyProjectSettingRequest,
-        WithdrawSettlementDisputeRequest,
+        CreateSettlementCorrectionRequest, OpenSettlementDisputeRequest,
+        PrepareSuiProjectionPackageRequest, ResolveSettlementDisputeRequest,
+        UpdateTaskEconomyProjectSettingRequest, WithdrawSettlementDisputeRequest,
     },
     service, sui_projection_service,
 };
@@ -67,6 +68,18 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/economy/disputes/:dispute_id/resolve",
             post(resolve_settlement_dispute),
+        )
+        .route(
+            "/api/projects/:project_id/economy/settlements/:receipt_id/corrections",
+            get(list_settlement_corrections),
+        )
+        .route(
+            "/api/projects/:project_id/economy/disputes/:dispute_id/corrections",
+            post(create_settlement_correction),
+        )
+        .route(
+            "/api/projects/:project_id/economy/corrections/:correction_id/finalize",
+            post(finalize_settlement_correction),
         )
 }
 
@@ -276,6 +289,68 @@ async fn resolve_settlement_dispute(
         &dispute_id,
         &user_id,
         &request,
+    ))
+}
+
+async fn list_settlement_corrections(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, receipt_id)): Path<(String, String)>,
+) -> Response {
+    if let Err(response) = project_caller(&state, &headers, &project_id) {
+        return response;
+    }
+    service_response(correction_service::list(
+        &state.store,
+        &project_id,
+        &receipt_id,
+    ))
+}
+
+async fn create_settlement_correction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, dispute_id)): Path<(String, String)>,
+    Json(request): Json<CreateSettlementCorrectionRequest>,
+) -> Response {
+    let (user_id, role) = match project_caller(&state, &headers, &project_id) {
+        Ok(caller) => caller,
+        Err(response) => return response,
+    };
+    if !can_edit(&role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目编辑者可以创建纠正 Matter");
+    }
+    let bots = match bots_for_project(&state, &project_id).await {
+        Ok(bots) => bots,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    };
+    service_response(correction_service::create(
+        &state.store,
+        &project_id,
+        &dispute_id,
+        &user_id,
+        &request,
+        &bots,
+    ))
+}
+
+async fn finalize_settlement_correction(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, correction_id)): Path<(String, String)>,
+) -> Response {
+    let (user_id, role) = match project_caller(&state, &headers, &project_id) {
+        Ok(caller) => caller,
+        Err(response) => return response,
+    };
+    if !can_edit(&role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目编辑者可以重试纠正过账");
+    }
+    service_response(correction_service::finalize(
+        &state.store,
+        &project_id,
+        &correction_id,
+        &user_id,
     ))
 }
 

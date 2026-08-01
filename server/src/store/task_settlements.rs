@@ -288,9 +288,9 @@ impl Store {
                id, project_id, intent_id, posting_key, status,
                compute_amount_micros, provider_amount_micros, platform_amount_micros,
                outcome_reward_micros, review_reward_micros, currency, shadow_only,
-               accepted_matter_id, reason, created_at
+               accepted_matter_id, reason, receipt_kind, correction_id, created_at
              ) VALUES (
-               ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 1, ?12, ?13, ?14
+               ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 1, ?12, ?13, ?14, ?15, ?16
              )",
             params![
                 receipt_id,
@@ -306,6 +306,8 @@ impl Store {
                 input.currency.trim(),
                 clean(input.accepted_matter_id),
                 input.reason.trim(),
+                input.receipt_kind.trim(),
+                clean(input.correction_id),
                 timestamp
             ],
         )?;
@@ -395,8 +397,8 @@ impl Store {
                id, project_id, intent_id, posting_key, status,
                compute_amount_micros, provider_amount_micros, platform_amount_micros,
                outcome_reward_micros, review_reward_micros, currency, shadow_only,
-               accepted_matter_id, reason, created_at
-             ) VALUES (?1, ?2, ?3, ?4, 'voided', 0, 0, 0, 0, 0, 'CNY', 1, NULL, ?5, ?6)",
+               accepted_matter_id, reason, receipt_kind, correction_id, created_at
+             ) VALUES (?1, ?2, ?3, ?4, 'voided', 0, 0, 0, 0, 0, 'CNY', 1, NULL, ?5, 'standard', NULL, ?6)",
             params![
                 receipt_id,
                 project_id.trim(),

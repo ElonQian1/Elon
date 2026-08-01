@@ -268,7 +268,7 @@ impl Store {
     }
 }
 
-fn insert_project_ai_matter_locked(
+pub(super) fn insert_project_ai_matter_locked(
     conn: &rusqlite::Connection,
     record: CreateMatterRecord,
 ) -> Result<String> {
