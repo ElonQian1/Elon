@@ -48,7 +48,7 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(source.contains("FEATURED_CARD_WIDTH_FRACTION = 0.6564706f"))
         assertTrue(source.contains("FEATURED_CARD_HEIGHT_RATIO = 1.1266428f"))
         assertTrue(source.contains("FEATURED_CARD_GAP_DP = 9"))
-        assertTrue(source.contains("LIST_ROW_GAP_PX = 50"))
+        assertTrue(source.contains("LIST_ROW_GAP_PX = 64"))
         assertTrue(source.contains("LIST_TEXT_GAP_PX = 48"))
     }
 
@@ -203,6 +203,17 @@ class ProjectPlazaLayoutContractTest {
 
         val mobileWeb = readRepositoryFile("server/src/assets/web_page.html")
         assertTrue(mobileWeb.contains("data-search-artwork=\"/assets/project_view_search_icon.png\""))
+    }
+
+    @Test
+    fun plazaListUsesComfortableVerticalSpacingAcrossAndroidAndMobileWeb() {
+        val androidSource = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
+        )
+        assertTrue(androidSource.contains("LIST_ROW_GAP_PX = 64"))
+
+        val mobileWeb = readRepositoryFile("server/src/assets/web_page.html")
+        assertTrue(mobileWeb.contains("#projectPlazaInlineRoot .project-plaza-results { gap: 38px; }"))
     }
 
     private fun readRepositoryFile(relativePath: String): String =

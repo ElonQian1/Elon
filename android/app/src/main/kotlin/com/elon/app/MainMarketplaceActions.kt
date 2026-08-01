@@ -675,7 +675,7 @@ internal class MainMarketplaceActions(
         const val DESIGN_WIDTH_PX = 1275
         const val TOP_SEARCH_ICON_PX = 97
         const val LIST_FIRST_ROW_TOP_PX = 28
-        const val LIST_ROW_GAP_PX = 50
+        const val LIST_ROW_GAP_PX = 64
         const val LIST_TEXT_GAP_PX = 48
         const val LIST_CHEVRON_PX = 43
         const val LIST_CHEVRON_END_INSET_PX = 12
