@@ -149,6 +149,9 @@ mod node_runtime;
 mod node_scheduler;
 mod offline_completion_migration;
 mod open_commerce_api;
+mod open_commerce_app_activity_health_model;
+#[cfg(test)]
+mod open_commerce_app_activity_health_tests;
 mod open_commerce_app_block_api;
 mod open_commerce_app_block_migration;
 mod open_commerce_app_block_model;

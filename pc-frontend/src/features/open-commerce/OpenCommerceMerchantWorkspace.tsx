@@ -164,6 +164,8 @@ export default function OpenCommerceMerchantWorkspace({
               <OpenCommerceAppBlockManager
                 projectId={projectId}
                 merchantId={selectedMerchant.merchant.id}
+                appActivityHealth={(overview?.app_activity_health ?? [])
+                  .filter((item) => item.merchant_id === selectedMerchant.merchant.id)}
                 suggestedAppIds={(overview?.recent_invocations ?? [])
                   .filter((invocation) => invocation.merchant_id === selectedMerchant.merchant.id)
                   .map((invocation) => invocation.requester_app_id)}
@@ -233,6 +235,9 @@ function auditLabel(action: string) {
     'invocation.succeeded': '调用成功',
     'invocation.failed': '调用失败',
     'invocation.rate_limited': '调用超出配额',
+    'invocation.grant_budget_exceeded': '授权总预算已用尽',
+    'invocation.grant_budget_rejected': '授权预算拒绝调用',
+    'invocation.recovered_failed': '恢复孤儿调用',
     'rate_limit.upserted': '设置调用配额',
     'rate_limit.status_changed': '切换配额状态',
     'app_block.activated': '封禁开发者 App',

@@ -60,6 +60,7 @@ mod node_ledger;
 mod node_payout_tests;
 mod node_payouts;
 mod node_public_dev;
+mod open_commerce_app_activity_health;
 mod open_commerce_app_blocks;
 mod open_commerce_authorization_requests;
 mod open_commerce_capabilities;

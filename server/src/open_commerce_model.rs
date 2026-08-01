@@ -4,6 +4,7 @@ use anyhow::{anyhow, bail, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::open_commerce_app_activity_health_model::OpenCommerceAppActivityHealth;
 use crate::open_commerce_directory_model::OpenCommerceDirectoryPublication;
 use crate::open_commerce_integration_model::{OpenCommerceIntegration, OpenCommerceSyncReceipt};
 use crate::open_commerce_rate_limit_model::{
@@ -141,6 +142,7 @@ pub(crate) struct OpenCommerceOverview {
     pub recent_audit_events: Vec<OpenCommerceAuditEvent>,
     pub rate_limit_policies: Vec<OpenCommerceRateLimitPolicy>,
     pub rate_limit_usage: Vec<OpenCommerceRateLimitUsage>,
+    pub app_activity_health: Vec<OpenCommerceAppActivityHealth>,
     pub totals: OpenCommerceTotals,
 }
 

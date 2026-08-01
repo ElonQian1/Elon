@@ -95,6 +95,25 @@ export interface OpenCommerceAuditEvent {
   created_at: string
 }
 
+export interface OpenCommerceAppActivityHealth {
+  merchant_id: string
+  requester_app_id: string
+  status: 'normal' | 'attention'
+  total_invocations_24h: number
+  succeeded_invocations_24h: number
+  failed_invocations_24h: number
+  rate_limited_invocations_24h: number
+  grant_budget_rejections_24h: number
+  recovered_invocations_24h: number
+  last_invoked_at: string
+  attention_codes: Array<
+    | 'recovered_invocation'
+    | 'repeated_failures'
+    | 'rate_limit_pressure'
+    | 'grant_budget_pressure'
+  >
+}
+
 export interface OpenCommerceRateLimitPolicy {
   id: string
   project_id: string
@@ -214,6 +233,7 @@ export interface OpenCommerceOverview {
   recent_audit_events: OpenCommerceAuditEvent[]
   rate_limit_policies: OpenCommerceRateLimitPolicy[]
   rate_limit_usage: OpenCommerceRateLimitUsage[]
+  app_activity_health: OpenCommerceAppActivityHealth[]
   totals: {
     merchants: number
     active_merchants: number

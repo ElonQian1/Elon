@@ -33,6 +33,7 @@
 | 消费者发现与第三方应用沙盒 | 已实现、范围受限 | 可注册、轮换、停用和重新启用测试 App，一次性显示测试 Token，跨项目发现主动发布商户，查看或撤回申请并在审批后调用；App 身份绑定所有者 | `server/src/open_commerce_client_api.rs`、`server/src/open_commerce_client_lifecycle_service.rs`、`docs/open-commerce/consumer-developer-sandbox.md` |
 | 商户可控外部调用配额 | 已实现 | 可按能力和指定 App/全部 App 配置固定时间窗上限；新调用原子计数，幂等重放不重复占额，超限记录为零金额失败并返回 429 | `server/src/open_commerce_rate_limit_service.rs`、`server/src/store/open_commerce_rate_limits.rs`、`docs/open-commerce-rate-limits-v1-acceptance.md` |
 | 商户级 App 紧急封禁 | 已实现 | 商户可手动封禁已注册 App，原子撤销有效 Grant 并取消待审批申请；解除不恢复旧授权 | `server/src/open_commerce_app_block_service.rs`、`server/src/store/open_commerce_app_blocks.rs`、`docs/open-commerce-app-blocks-v1-acceptance.md` |
+| 商户侧 App 调用活动证据 | 已实现 | 从持久化调用派生外部 App 近 24 小时成功、失败、限流、Grant 预算拒绝和中断恢复计数；稳定原因只提醒人工处置，不自动评分或封禁 | `server/src/store/open_commerce_app_activity_health.rs`、`pc-frontend/src/features/open-commerce/OpenCommerceAppBlockManager.tsx`、`docs/open-commerce-app-activity-health-v1-acceptance.md` |
 | Grant 生命周期预算 | 已实现 | 商户可为单个授权设置总调用次数和总计量金额；调用前原子预留，成功确认、失败退回，幂等重放不重复占额；重启与过期孤儿调用会原子失败关闭并释放遗留预留 | `server/src/open_commerce_grant_budget_service.rs`、`server/src/store/open_commerce_grant_budgets.rs`、`server/src/store/open_commerce_invocation_recovery.rs`、`docs/open-commerce-grant-budgets-v1-acceptance.md` |
 | 项目 AI 资源控制面 | 已实现、只预演 | 可盘点当前用户的 Codex、本人节点、授权共享 Codex 和平台模型，保存项目策略并预演候选；不会启动真实任务 | `server/src/ai_resource_control/`、`docs/open-commerce/ai-resource-control.md` |
 | 开放商业 PC 五工作区 | 已实现 | 项目详情内已有商户节点、消费者沙盒、开发者、AI 资源和影子经济五个独立视图 | `pc-frontend/src/features/open-commerce/`、`scripts/test-open-commerce-pc-workspace.js` |
@@ -44,7 +45,7 @@
 |---|---|---|
 | 美团、抖音、京东、淘宝闪购等经营数据统一接入 | 部分实现 | 接入控制面、状态和同步回执已实现；仍必须逐个平台确认官方授权、实现适配器、验证字段覆盖和长期稳定性，不能把登记数据源描述成已接通全量 API |
 | 商户 ERP、海报、短视频、小游戏和营销活动自动生成 | 部分实现 | 通用 ERP 蓝图与 AI 应用开发主干已存在；真实行业业务模块、发布连接器、经营效果回流和规模化验证仍需完善 |
-| 商户数据自主控制和跨应用授权 | 部分实现 | V1、跨项目脱敏目录、消费者沙盒、调用配额、手动 App 封禁和首个商户自有运行时已打通；可携带关系、生产 App 身份互认、自动全网风控与公共互操作治理尚未完成 |
+| 商户数据自主控制和跨应用授权 | 部分实现 | V1、跨项目脱敏目录、消费者沙盒、调用配额、活动证据、手动 App 封禁和首个商户自有运行时已打通；可携带关系、生产 App 身份互认、自动全网风控与公共互操作治理尚未完成 |
 | 闲置电脑、收银机和工作站共享算力 | 部分实现 | 模型推理供给的所有者开关、模型白名单、并发、每日实耗与在途预算原子预留、候选回退、流租约、重启与过期预授权回收、所有者运行告警和 PC 控件已实现；通用异构任务、竞价市场、故障赔付、真实提现与链上结算仍未完成 |
 | 低成本分布式模型训练 | 提案 | 普通公网节点更适合异步任务、推理和可切分工作，不能宣称已等效替代高速互联的企业级 GPU 集群 |
 

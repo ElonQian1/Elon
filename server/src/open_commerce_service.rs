@@ -46,6 +46,7 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
     let recent_audit_events = store.list_project_open_commerce_audit(project_id, 100)?;
     let rate_limit_policies = store.list_project_open_commerce_rate_limits(project_id)?;
     let rate_limit_usage = store.list_project_open_commerce_rate_limit_usage(project_id)?;
+    let app_activity_health = store.open_commerce_app_activity_health(project_id)?;
     let active_merchants = merchants
         .iter()
         .filter(|entry| entry.merchant.status == MERCHANT_STATUS_ACTIVE)
@@ -116,6 +117,7 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
         recent_audit_events,
         rate_limit_policies,
         rate_limit_usage,
+        app_activity_health,
     })
 }
 

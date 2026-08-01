@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ShieldAlert } from 'lucide-react'
 import { openCommerceApi } from './openCommerceApi'
 import type {
+  OpenCommerceAppActivityHealth,
   OpenCommerceAppBlock,
   OpenCommerceAppBlockReason,
 } from './openCommerceTypes'
@@ -10,6 +12,7 @@ import styles from './OpenCommercePanel.module.css'
 interface Props {
   projectId: string
   merchantId: string
+  appActivityHealth: OpenCommerceAppActivityHealth[]
   suggestedAppIds: string[]
   canEdit: boolean
   onChanged: () => Promise<void>
@@ -26,6 +29,7 @@ const reasonOptions: Array<{ value: OpenCommerceAppBlockReason; label: string }>
 export default function OpenCommerceAppBlockManager({
   projectId,
   merchantId,
+  appActivityHealth,
   suggestedAppIds,
   canEdit,
   onChanged,
@@ -53,10 +57,12 @@ export default function OpenCommerceAppBlockManager({
   const appSuggestions = useMemo(
     () => Array.from(new Set([
       ...suggestedAppIds,
+      ...appActivityHealth.map((item) => item.requester_app_id),
       ...merchantBlocks.map((block) => block.requester_app_id),
     ])).filter((appId) => !['pc-web', 'mcp-client'].includes(appId)),
-    [merchantBlocks, suggestedAppIds],
+    [appActivityHealth, merchantBlocks, suggestedAppIds],
   )
+  const attentionCount = appActivityHealth.filter((item) => item.status === 'attention').length
 
   async function blockApp(event: React.FormEvent) {
     event.preventDefault()
@@ -100,8 +106,44 @@ export default function OpenCommerceAppBlockManager({
     <section className={styles.capabilityList}>
       <header>
         <strong>App 安全控制</strong>
-        <span>{merchantBlocks.filter((block) => block.status === 'active').length} 个已封禁</span>
+        <span>{attentionCount} 个需关注 · {merchantBlocks.filter((block) => block.status === 'active').length} 个已封禁</span>
       </header>
+
+      {appActivityHealth.map((health) => (
+        <div key={health.requester_app_id} className={styles.capabilityRow}>
+          <span>
+            <strong>{health.requester_app_id}</strong>
+            <small>
+              近 24 小时 {health.total_invocations_24h} 次 · 成功 {health.succeeded_invocations_24h} · 失败 {health.failed_invocations_24h}
+            </small>
+            {health.attention_codes.length > 0 && (
+              <small>{health.attention_codes.map(attentionLabel).join(' · ')}</small>
+            )}
+            {(health.rate_limited_invocations_24h > 0
+              || health.grant_budget_rejections_24h > 0
+              || health.recovered_invocations_24h > 0) && (
+              <small>
+                限流 {health.rate_limited_invocations_24h} · 授权预算拒绝 {health.grant_budget_rejections_24h} · 中断恢复 {health.recovered_invocations_24h}
+              </small>
+            )}
+          </span>
+          <span>
+            <small>{formatTime(health.last_invoked_at)}</small>
+            {health.status === 'attention' && (
+              <button
+                type="button"
+                title="填入紧急封禁表单"
+                onClick={() => setRequesterAppId(health.requester_app_id)}
+                disabled={!canEdit}
+              >
+                <ShieldAlert size={16} aria-hidden="true" />
+                处置
+              </button>
+            )}
+          </span>
+        </div>
+      ))}
+      {appActivityHealth.length === 0 && <p className={styles.empty}>近 24 小时暂无外部 App 调用。</p>}
 
       {merchantBlocks.map((block) => (
         <div key={block.id} className={styles.capabilityRow}>
@@ -153,6 +195,16 @@ export default function OpenCommerceAppBlockManager({
 
 function reasonLabel(reason: OpenCommerceAppBlockReason) {
   return reasonOptions.find((option) => option.value === reason)?.label ?? reason
+}
+
+function attentionLabel(code: OpenCommerceAppActivityHealth['attention_codes'][number]) {
+  const labels = {
+    recovered_invocation: '存在中断恢复',
+    repeated_failures: '失败次数较多',
+    rate_limit_pressure: '多次触发配额',
+    grant_budget_pressure: '触达授权总预算',
+  }
+  return labels[code]
 }
 
 function formatTime(value?: string) {

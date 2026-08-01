@@ -1,6 +1,6 @@
 # 消费者发现与第三方应用沙盒
 
-本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定。
+本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定，商户侧调用活动证据由 `docs/decisions/open-commerce-app-activity-health-v1.md` 决定。
 
 ## 使用入口
 
@@ -8,6 +8,7 @@
 
 - **消费者沙盒**：选择请求 App，按搜索词、能力、城市、标签和价格上限发现商户能力。
 - **开发者**：注册沙盒 App、轮换一次性测试 Token、处理授权申请并调试能力调用。
+- **商户工作台**：查看外部 App 近 24 小时的成功、失败、限流、授权预算拒绝和中断恢复证据，再人工决定是否封禁。
 
 发现结果必须展示是否存在付费排序。当前实现固定采用非付费排序；分数来自公开资料、能力匹配和显式偏好，不能通过购买排名改变。
 
@@ -47,6 +48,8 @@
 
 批准申请时，商户可选填写授权期内的总调用次数和总预算（人民币元）。留空表示不限；用尽后不能由 App 自行扩容，商户需要撤销并重新授权。调用失败会退回刚预留的预算，重复请求不会再次占用。
 
+活动证据来自已经保存的调用记录，只显示稳定计数和关注原因。“处置”只填入紧急封禁表单；系统不会因失败次数、限流或预算拒绝自动封禁 App，也不会把这些信号解释为跨商户信誉。
+
 ## 验收
 
 ```powershell
@@ -59,4 +62,4 @@ Set-Location pc-frontend
 npm run test:open-commerce
 ```
 
-当前已实现商户主动选择的跨项目基础目录、持久化能力调用配额、商户级手动 App 封禁，以及沙盒 App 停用、旧 Token 永久失效、重新启用生成新 Token、申请方查看和撤回的生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、自动全网滥用处置、支付和真实平台适配器仍是后续模块。
+当前已实现商户主动选择的跨项目基础目录、持久化能力调用配额、近 24 小时可解释活动证据、商户级手动 App 封禁，以及沙盒 App 停用、旧 Token 永久失效、重新启用生成新 Token、申请方查看和撤回的生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、自动全网滥用处置、支付和真实平台适配器仍是后续模块。
