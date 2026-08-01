@@ -1,11 +1,13 @@
 //! 节点算力执行证明：记录每次派发、完成、真实扣费与节点收益。
 
 use anyhow::{bail, Result};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
 use std::collections::HashMap;
 
 use super::{clean_optional, new_id, now, Store};
+
+pub(crate) const SERVER_NODE_LLM_LEASE_SECONDS: i64 = 120;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct NodeComputeRun {
@@ -161,6 +163,56 @@ impl Store {
             ],
         )?;
         select_run_by_compute_call_id(&conn, compute_call_id)
+    }
+
+    /// Refresh the execution lease while a node LLM stream is still open.
+    /// Terminal or unrelated runs are never revived by a late heartbeat.
+    pub fn heartbeat_started_server_node_llm_run(&self, compute_call_id: &str) -> Result<bool> {
+        let compute_call_id = compute_call_id.trim();
+        if compute_call_id.is_empty() {
+            return Ok(false);
+        }
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+        let updated = conn.execute(
+            "UPDATE node_compute_runs
+                SET updated_at = ?2
+              WHERE compute_call_id = ?1
+                AND status = 'started'
+                AND usage_mode = 'server_node_llm'",
+            params![compute_call_id, ts],
+        )?;
+        Ok(updated > 0)
+    }
+
+    /// A server restart destroys every in-memory node LLM receiver. Return the
+    /// interrupted rows so startup can also release their billing holds.
+    pub fn mark_interrupted_started_server_node_llm_runs(&self) -> Result<Vec<NodeComputeRun>> {
+        let ts = now();
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let interrupted = {
+            let mut stmt = tx.prepare(&format!(
+                "{} WHERE status = 'started' AND usage_mode = 'server_node_llm'",
+                run_select_sql()
+            ))?;
+            let rows = stmt.query_map([], read_run)?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        tx.execute(
+            "UPDATE node_compute_runs
+                SET status = 'failed',
+                    finished_at = ?1,
+                    duration_ms = MAX(0, CAST((julianday(?1) - julianday(started_at)) * 86400000 AS INTEGER)),
+                    settlement_status = COALESCE(settlement_status, 'released_error'),
+                    error_message = COALESCE(error_message, 'server restarted before node LLM terminal event'),
+                    updated_at = ?1
+              WHERE status = 'started'
+                AND usage_mode = 'server_node_llm'",
+            params![ts],
+        )?;
+        tx.commit()?;
+        Ok(interrupted)
     }
 
     pub fn mark_interrupted_started_pc_agent_runs(&self) -> Result<usize> {

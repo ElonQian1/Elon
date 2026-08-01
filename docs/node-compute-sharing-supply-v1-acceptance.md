@@ -12,6 +12,8 @@
 - `/api/nodes/models` 不再把所有在线节点模型默认暴露为公共供给。
 - PC 节点详情可设置开关、模型范围、并发和每日阈值；节点市场只展示明确开放的服务。
 - 节点执行、用量、失败和提供者收益继续进入现有链外账本。
+- 长时间流式推理通过 30 秒心跳续期 2 分钟执行租约，并发名额以最近心跳而非开始时间判断。
+- 流提前断开、请求编号不匹配或服务重启不会被当成成功结果结算；遗留预授权会进入释放流程。
 
 ## 验证命令
 
@@ -24,6 +26,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 `
   -Domain node-compute-runs -- test `
   --manifest-path server\Cargo.toml --bin elon-server node_compute_runs
 
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 `
+  -Domain node-llm-stream -- test `
+  --manifest-path server\Cargo.toml --bin elon-server node_llm_stream
+
 Set-Location pc-frontend
 npm run test:node-compute-sharing
 npm run build
@@ -31,7 +37,6 @@ npm run build
 
 ## 尚未覆盖
 
-- 超过 15 分钟任务的租约心跳与主动续期。
 - 为未完成任务预留输入和输出 Token，因此每日阈值可能被最后一批并发任务少量超过。
 - 通用 CPU/GPU 批处理、训练、图片或视频生成任务的异构报价与调度。
 - 节点质押、服务等级协议、自动故障赔付、真实提现和 Sui 网络结算。

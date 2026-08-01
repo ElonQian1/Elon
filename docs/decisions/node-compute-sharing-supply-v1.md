@@ -25,7 +25,9 @@ owners: backend, pc
 ## 安全与运行边界
 
 - 供给策略使用数据库立即事务，在派发前重新检查开关、模型、并发和每日阈值并占用执行名额。
-- `started` 任务按 15 分钟活动窗口计入共享并发，避免服务异常后永久占满；长于该窗口的推理需要后续租约心跳能力进一步收紧。
+- `started` 推理持有 2 分钟活动租约，服务端在流式接收期间每 30 秒续期；并发判断使用最近续期时间，不再因任务总时长超过固定窗口而提前释放名额。
+- 节点流必须收到与请求编号一致的结束事件才进入结算。错误、提前断流或租约已终止均失败关闭并释放预授权。
+- 服务重启会终止进程内流接收器，因此启动恢复会把遗留的 `server_node_llm` 执行证明标记失败，并立即尝试释放对应计费预授权。
 - 公开模型目录只返回调用者自己的模型或当前明确可用的共享模型。
 - 策略读取异常时失败关闭，不把节点推断为可共享。
 
@@ -37,7 +39,7 @@ V1 不是完整公开算力市场，不负责异构训练任务拆分、竞价�
 
 - 数据与迁移：`server/src/node_compute_sharing_migration.rs`、`server/src/store/node_compute_sharing.rs`
 - 统一供给边界：`server/src/node_compute_sharing.rs`
-- 路由与回退：`server/src/node_router.rs`、`server/src/node_scheduler.rs`
+- 路由、流租约与回退：`server/src/node_router.rs`、`server/src/node_llm_stream.rs`、`server/src/node_scheduler.rs`
 - HTTP：`GET/PATCH /api/me/nodes/:node_id/compute-sharing`
 - API 契约：`docs/node-compute-sharing-supply-v1-api.md`
 - PC 工作台：`pc-frontend/src/features/node/NodeComputeSharingCard.tsx`、`NodeMarketPanel.tsx`

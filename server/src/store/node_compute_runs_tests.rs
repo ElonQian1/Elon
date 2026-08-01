@@ -283,6 +283,119 @@ fn startup_interrupts_started_pc_agent_runs() {
 }
 
 #[test]
+fn heartbeat_only_refreshes_active_server_node_llm_runs() {
+    let (store, path) = temp_store();
+    let consumer = store
+        .create_user("node-heartbeat@example.com", "secret1", None, None)
+        .unwrap();
+    store
+        .start_node_compute_run(NodeComputeRunStart {
+            compute_call_id: "node_llm:heartbeat",
+            consumer_user_id: &consumer.id,
+            provider_user_id: Some(&consumer.id),
+            node_id: "node-a",
+            model_id: Some("qwen"),
+            feature: "node_llm",
+            usage_mode: "server_node_llm",
+            route_reason: None,
+        })
+        .unwrap();
+    store
+        .start_node_compute_run(NodeComputeRunStart {
+            compute_call_id: "pc_agent_cli:no-heartbeat",
+            consumer_user_id: &consumer.id,
+            provider_user_id: Some(&consumer.id),
+            node_id: "node-a",
+            model_id: Some("codex"),
+            feature: "pc_agent_cli_dev",
+            usage_mode: "pc_agent_cli",
+            route_reason: None,
+        })
+        .unwrap();
+
+    assert!(store
+        .heartbeat_started_server_node_llm_run("node_llm:heartbeat")
+        .unwrap());
+    assert!(!store
+        .heartbeat_started_server_node_llm_run("pc_agent_cli:no-heartbeat")
+        .unwrap());
+    store
+        .finish_node_compute_run(
+            "node_llm:heartbeat",
+            NodeComputeRunFinish {
+                provider_user_id: Some(&consumer.id),
+                status: "settled",
+                prompt_tokens: 1,
+                completion_tokens: 1,
+                billed_cost_rmb_fen: 0,
+                provider_earned_fen: 0,
+                settlement_status: Some("settled"),
+                error_message: None,
+            },
+        )
+        .unwrap();
+    assert!(!store
+        .heartbeat_started_server_node_llm_run("node_llm:heartbeat")
+        .unwrap());
+
+    drop(store);
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn startup_interrupts_server_node_llm_runs_for_billing_release() {
+    let (store, path) = temp_store();
+    let consumer = store
+        .create_user("node-stream-restart@example.com", "secret1", None, None)
+        .unwrap();
+    for (call_id, usage_mode) in [
+        ("node_llm:restart", "server_node_llm"),
+        ("pc_agent_cli:restart", "pc_agent_cli"),
+    ] {
+        store
+            .start_node_compute_run(NodeComputeRunStart {
+                compute_call_id: call_id,
+                consumer_user_id: &consumer.id,
+                provider_user_id: Some(&consumer.id),
+                node_id: "node-a",
+                model_id: Some("qwen"),
+                feature: "test",
+                usage_mode,
+                route_reason: None,
+            })
+            .unwrap();
+    }
+
+    let interrupted = store
+        .mark_interrupted_started_server_node_llm_runs()
+        .unwrap();
+    assert_eq!(interrupted.len(), 1);
+    assert_eq!(interrupted[0].compute_call_id, "node_llm:restart");
+    assert_eq!(interrupted[0].consumer_user_id, consumer.id);
+    let node_run = store
+        .get_node_compute_run_by_compute_call_id("node_llm:restart")
+        .unwrap()
+        .unwrap();
+    assert_eq!(node_run.status, "failed");
+    assert_eq!(
+        node_run.settlement_status.as_deref(),
+        Some("released_error")
+    );
+    assert_eq!(
+        node_run.error_message.as_deref(),
+        Some("server restarted before node LLM terminal event")
+    );
+    let pc_run = store
+        .get_node_compute_run_by_compute_call_id("pc_agent_cli:restart")
+        .unwrap()
+        .unwrap();
+    assert_eq!(pc_run.status, "started");
+
+    drop(store);
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
 fn local_offline_claim_is_atomic_strict_and_terminal_idempotent() {
     let (store, path) = temp_store();
     let owner = store

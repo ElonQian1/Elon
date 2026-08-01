@@ -330,55 +330,46 @@ pub async fn chat_with_node(
             }
         };
 
-    // 收集流式块
-    let mut content = String::new();
-    let mut prompt_tokens: u32 = 0;
-    let mut completion_tokens: u32 = 0;
-
-    while let Some(msg) = rx.recv().await {
-        match msg {
-            homecli_proto::AgentToServer::LlmStreamChunk { delta, .. } => {
-                content.push_str(&delta);
-            }
-            homecli_proto::AgentToServer::LlmStreamEnd {
-                prompt_tokens: pt,
-                completion_tokens: ct,
-                ..
-            } => {
-                prompt_tokens = pt;
-                completion_tokens = ct;
-                break;
-            }
-            homecli_proto::AgentToServer::LlmStreamError { message, .. } => {
-                crate::node_router::finish_node_compute_run(
-                    &state,
-                    &accounting_key,
-                    crate::store::NodeComputeRunFinish {
-                        provider_user_id: None,
-                        status: "failed",
-                        prompt_tokens: prompt_tokens as i64,
-                        completion_tokens: completion_tokens as i64,
-                        billed_cost_rmb_fen: 0,
-                        provider_earned_fen: 0,
-                        settlement_status: None,
-                        error_message: Some(&message),
-                    },
-                );
-                crate::billing::release_trusted_call(
-                    &state.store,
-                    &user.id,
-                    &accounting_key,
-                    "released_error",
-                );
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({"error": message})),
-                )
-                    .into_response();
-            }
-            _ => {}
+    let stream = match crate::node_llm_stream::collect(
+        &state.store,
+        &accounting_key,
+        &req_id,
+        &mut rx,
+    )
+    .await
+    {
+        Ok(stream) => stream,
+        Err(message) => {
+            crate::node_router::finish_node_compute_run(
+                &state,
+                &accounting_key,
+                crate::store::NodeComputeRunFinish {
+                    provider_user_id: None,
+                    status: "failed",
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    billed_cost_rmb_fen: 0,
+                    provider_earned_fen: 0,
+                    settlement_status: None,
+                    error_message: Some(&message),
+                },
+            );
+            crate::billing::release_trusted_call(
+                &state.store,
+                &user.id,
+                &accounting_key,
+                "released_error",
+            );
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": message})),
+            )
+                .into_response();
         }
-    }
+    };
+    let content = stream.content;
+    let prompt_tokens = stream.prompt_tokens;
+    let completion_tokens = stream.completion_tokens;
 
     // 后台积分结算（不阻塞响应）
     let price = state

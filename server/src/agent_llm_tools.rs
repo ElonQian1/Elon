@@ -175,51 +175,43 @@ pub(crate) async fn try_casual_chat_via_node(
         }
     };
 
-    let mut content = String::new();
-    let mut prompt_tokens: u32 = 0;
-    let mut completion_tokens: u32 = 0;
-
-    while let Some(msg) = rx.recv().await {
-        match msg {
-            homecli_proto::AgentToServer::LlmStreamChunk { delta, .. } => {
-                content.push_str(&delta);
-            }
-            homecli_proto::AgentToServer::LlmStreamEnd {
-                prompt_tokens: pt,
-                completion_tokens: ct,
-                ..
-            } => {
-                prompt_tokens = pt;
-                completion_tokens = ct;
-                break;
-            }
-            homecli_proto::AgentToServer::LlmStreamError { message, .. } => {
-                crate::node_router::finish_node_compute_run(
-                    state,
-                    &accounting_key,
-                    crate::store::NodeComputeRunFinish {
-                        provider_user_id: None,
-                        status: "failed",
-                        prompt_tokens: prompt_tokens as i64,
-                        completion_tokens: completion_tokens as i64,
-                        billed_cost_rmb_fen: 0,
-                        provider_earned_fen: 0,
-                        settlement_status: None,
-                        error_message: Some(&message),
-                    },
-                );
-                crate::billing::release_trusted_call(
-                    &state.store,
-                    user_id,
-                    &accounting_key,
-                    "released_error",
-                );
-                tracing::warn!("节点推理错误，降级到云端 LLM: {message}");
-                return None;
-            }
-            _ => {}
+    let stream = match crate::node_llm_stream::collect(
+        &state.store,
+        &accounting_key,
+        &req_id,
+        &mut rx,
+    )
+    .await
+    {
+        Ok(stream) => stream,
+        Err(message) => {
+            crate::node_router::finish_node_compute_run(
+                state,
+                &accounting_key,
+                crate::store::NodeComputeRunFinish {
+                    provider_user_id: None,
+                    status: "failed",
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    billed_cost_rmb_fen: 0,
+                    provider_earned_fen: 0,
+                    settlement_status: None,
+                    error_message: Some(&message),
+                },
+            );
+            crate::billing::release_trusted_call(
+                &state.store,
+                user_id,
+                &accounting_key,
+                "released_error",
+            );
+            tracing::warn!("节点推理错误，降级到云端 LLM: {message}");
+            return None;
         }
-    }
+    };
+    let content = stream.content;
+    let prompt_tokens = stream.prompt_tokens;
+    let completion_tokens = stream.completion_tokens;
 
     if looks_like_node_casual_chat_failure(&content) {
         crate::node_router::finish_node_compute_run(

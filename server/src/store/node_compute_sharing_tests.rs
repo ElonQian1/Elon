@@ -130,6 +130,100 @@ fn admission_is_model_scoped_idempotent_and_concurrency_bounded() {
 }
 
 #[test]
+fn active_concurrency_uses_renewable_lease_not_original_start_time() {
+    let (store, owner, consumer, node_id) = setup();
+    store
+        .update_node_compute_sharing_policy(
+            &owner,
+            &node_id,
+            UpdateNodeComputeSharingPolicy {
+                enabled: true,
+                allowed_model_ids: vec!["qwen".into()],
+                max_concurrent_runs: 1,
+                daily_token_limit: 0,
+            },
+        )
+        .unwrap();
+    store
+        .claim_shared_node_compute_run(start(
+            "node_llm:leased-first",
+            &consumer,
+            &owner,
+            &node_id,
+            "qwen",
+        ))
+        .unwrap();
+    {
+        let conn = store.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE node_compute_runs SET started_at='2000-01-01T00:00:00Z' WHERE compute_call_id='node_llm:leased-first'",
+            [],
+        )
+        .unwrap();
+    }
+    let live = store
+        .node_compute_sharing_status(&node_id, &owner, Some("qwen"))
+        .unwrap();
+    assert_eq!(live.active_runs, 1);
+    assert_eq!(live.availability, "concurrency_limit_reached");
+
+    {
+        let conn = store.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE node_compute_runs SET updated_at='2000-01-01T00:00:00Z' WHERE compute_call_id='node_llm:leased-first'",
+            [],
+        )
+        .unwrap();
+    }
+    let expired = store
+        .node_compute_sharing_status(&node_id, &owner, Some("qwen"))
+        .unwrap();
+    assert_eq!(expired.active_runs, 0);
+    assert!(expired.available);
+    store
+        .claim_shared_node_compute_run(start(
+            "node_llm:leased-second",
+            &consumer,
+            &owner,
+            &node_id,
+            "qwen",
+        ))
+        .unwrap();
+}
+
+#[test]
+fn owner_self_use_does_not_consume_external_concurrency() {
+    let (store, owner, _consumer, node_id) = setup();
+    store
+        .update_node_compute_sharing_policy(
+            &owner,
+            &node_id,
+            UpdateNodeComputeSharingPolicy {
+                enabled: true,
+                allowed_model_ids: vec!["qwen".into()],
+                max_concurrent_runs: 1,
+                daily_token_limit: 0,
+            },
+        )
+        .unwrap();
+    store
+        .start_node_compute_run(start(
+            "node_llm:owner-self-use",
+            &owner,
+            &owner,
+            &node_id,
+            "qwen",
+        ))
+        .unwrap();
+
+    let status = store
+        .node_compute_sharing_status(&node_id, &owner, Some("qwen"))
+        .unwrap();
+    assert_eq!(status.active_runs, 0);
+    assert!(status.available);
+}
+
+#[test]
 fn only_node_owner_can_change_supply_policy() {
     let (store, _owner, consumer, node_id) = setup();
     let error = store

@@ -6,11 +6,12 @@ use serde::Serialize;
 
 use super::{
     clean_optional, new_id,
-    node_compute_runs::{ensure_compute_run_replay_matches, select_run_by_compute_call_id},
+    node_compute_runs::{
+        ensure_compute_run_replay_matches, select_run_by_compute_call_id,
+        SERVER_NODE_LLM_LEASE_SECONDS,
+    },
     now, NodeComputeRun, NodeComputeRunStart, Store,
 };
-
-const ACTIVE_RUN_WINDOW_MINUTES: i64 = 15;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct NodeComputeSharingPolicy {
@@ -211,8 +212,8 @@ fn sharing_status(
           WHERE node_id=?1 AND usage_mode='server_node_llm' AND status='started'
             AND provider_user_id IS NOT NULL
             AND consumer_user_id <> provider_user_id
-            AND julianday(started_at) >= julianday('now', ?2)",
-        params![node_id, format!("-{ACTIVE_RUN_WINDOW_MINUTES} minutes")],
+            AND julianday(updated_at) >= julianday('now', ?2)",
+        params![node_id, format!("-{SERVER_NODE_LLM_LEASE_SECONDS} seconds")],
         |row| row.get::<_, i64>(0),
     )?;
     let tokens_used_today = conn.query_row(

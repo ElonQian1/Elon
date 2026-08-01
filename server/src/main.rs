@@ -138,6 +138,7 @@ mod node_compute_sharing_migration;
 mod node_exec_api;
 mod node_hardware_probe;
 mod node_install_id_migration;
+mod node_llm_stream;
 mod node_payout_admin;
 mod node_public_dev_migration;
 mod node_register_api;
@@ -430,6 +431,7 @@ async fn main() -> Result<()> {
             interrupted_pc_runs
         );
     }
+    node_llm_stream::recover_interrupted_runs(&state.store);
     let interrupted_pc_sessions = state
         .store
         .mark_interrupted_running_project_execution_sessions()
