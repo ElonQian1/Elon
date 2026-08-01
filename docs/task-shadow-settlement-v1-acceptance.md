@@ -10,7 +10,7 @@ decision_ref: "docs/decisions/task-shadow-settlement-v1.md"
 
 ## 自动化标准
 
-1. v110 迁移创建项目设置、用量凭证、结算意图、来源关联、结算凭证、账本交易和账本分录七张表。
+1. v110 迁移创建项目设置、用量凭证、结算意图、来源关联、结算凭证、账本交易和账本分录七张表；v122 创建 Sui 链下投影包表。
 2. 默认全局关闭，项目默认关闭；项目设置不能关闭 `shadow_only`。
 3. 同一来源重复到达返回同一用量凭证；摘要变化返回冲突。
 4. 同一 Assignment 重放不产生第二个结算意图。
@@ -22,6 +22,9 @@ decision_ref: "docs/decisions/task-shadow-settlement-v1.md"
 10. Matter 取消只作废待处理意图。
 11. 商业调用只记录用量，不产生真实扣款或收入。
 12. Sui 信封只能由已对账影子凭证生成，且明确标记未提交网络。
+13. 同一凭证、目标网络和 schema 重复准备返回同一投影包，不同网络生成不同摘要。
+14. 投影包保存来源摘要和投影摘要；任一内容被篡改后复核状态变为 `conflict`。
+15. 没有网络适配器时，所有投影包保持 `not_submitted`、零提交次数和 `adapter_required`。
 
 ## 纵向场景
 
@@ -37,6 +40,8 @@ decision_ref: "docs/decisions/task-shadow-settlement-v1.md"
   -> 单次影子过账
   -> 双分录平衡
   -> Sui 未提交信封
+  -> 持久链下投影包
+  -> 摘要复核与篡改冲突
 ```
 
 ## 不属于本期验收

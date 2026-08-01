@@ -117,6 +117,7 @@ mod task_recovery;
 mod task_settlement_rows;
 mod task_settlements;
 mod task_start_sync;
+mod task_sui_projection_packages;
 #[cfg(test)]
 mod task_title_tests;
 mod tasks;

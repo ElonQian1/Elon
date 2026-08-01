@@ -50,6 +50,8 @@ V1 不发行代币、不连接钱包、不部署 Move 合约、不移动资金�
 
 V1 可以把一张已对账影子凭证投影成 Sui 数据信封，包含项目、意图、凭证对象键和候选 PTB 步骤。信封固定声明 `network_submission: not_submitted`。
 
+在此基础上，v122 增加了可持久、幂等和可复核的链下投影包，详见 `docs/decisions/sui-offchain-projection-packages-v1.md`。投影包仍不产生网络副作用。
+
 该投影用于稳定未来适配器输入，不代表已经：
 
 - 安装 Sui SDK；

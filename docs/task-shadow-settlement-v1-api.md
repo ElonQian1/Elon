@@ -55,6 +55,38 @@ GET /api/projects/{project_id}/economy/settlements/{receipt_id}/sui-envelope
 
 接口没有网络副作用，不接收钱包、私钥、Gas 或链 ID。
 
+## Sui 链下投影包
+
+项目编辑者可把已对账凭证保存为不可变链下投影包：
+
+```http
+POST /api/projects/{project_id}/economy/settlements/{receipt_id}/sui-projections
+Content-Type: application/json
+
+{"target_network":"testnet"}
+```
+
+`target_network` 只能是 `devnet`、`testnet` 或 `mainnet`。相同项目、凭证、网络和 schema 的请求幂等返回同一个包；摘要或信封发生变化时返回冲突，不覆盖历史包。
+
+```http
+GET /api/projects/{project_id}/economy/sui-projections
+GET /api/projects/{project_id}/economy/sui-projections/{projection_id}
+POST /api/projects/{project_id}/economy/sui-projections/{projection_id}/verify
+```
+
+列表和详情允许项目成员读取，复核要求编辑权限。复核重新计算来源凭证摘要和投影摘要，并返回 `verified` 或 `conflict`。当前所有响应都必须保持：
+
+```json
+{
+  "integrity_status": "verified",
+  "submission_readiness": "adapter_required",
+  "network_submission": "not_submitted",
+  "submission_attempts": 0
+}
+```
+
+`adapter_required` 表示链下包已通过完整性复核，但项目尚未实现钱包、签名、Gas、交易广播或最终性确认。
+
 ## 自动写入点
 
 | 现有事件 | 影子行为 |

@@ -124,3 +124,25 @@ export interface SuiSettlementEnvelope {
   ptb_steps: string[]
   network_submission: 'not_submitted'
 }
+
+export type SuiTargetNetwork = 'devnet' | 'testnet' | 'mainnet'
+
+export interface SuiProjectionPackage {
+  id: string
+  project_id: string
+  settlement_receipt_id: string
+  target_network: SuiTargetNetwork
+  package_schema: string
+  projection_digest: string
+  source_receipt_digest: string
+  envelope: SuiSettlementEnvelope
+  integrity_status: 'verified' | 'conflict'
+  submission_readiness: 'adapter_required' | 'integrity_conflict'
+  network_submission: 'not_submitted'
+  submission_attempts: number
+  last_error?: string
+  created_by_user_id: string
+  verified_at: string
+  created_at: string
+  updated_at: string
+}

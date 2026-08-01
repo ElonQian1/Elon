@@ -1,16 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import {
-  FileJson,
-  RefreshCw,
-  Scale,
-} from 'lucide-react'
+import { RefreshCw, Scale } from 'lucide-react'
 import { taskEconomyApi } from './taskEconomyApi'
 import type {
   SettlementReceipt,
   SettlementReceiptDetail,
-  SuiSettlementEnvelope,
   TaskEconomyOverview,
 } from './taskEconomyTypes'
+import SuiProjectionPackages from './SuiProjectionPackages'
 import { errorText, formatMicros } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import {
@@ -30,7 +26,6 @@ export default function ShadowEconomyPanel({
 }) {
   const [overview, setOverview] = useState<TaskEconomyOverview | null>(null)
   const [detail, setDetail] = useState<SettlementReceiptDetail | null>(null)
-  const [envelope, setEnvelope] = useState<SuiSettlementEnvelope | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -64,22 +59,8 @@ export default function ShadowEconomyPanel({
   async function selectReceipt(receipt: SettlementReceipt) {
     setBusy(true)
     setMessage('')
-    setEnvelope(null)
     try {
       setDetail(await taskEconomyApi.receipt(projectId, receipt.id))
-    } catch (error) {
-      setMessage(errorText(error))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function loadEnvelope() {
-    if (!detail) return
-    setBusy(true)
-    setMessage('')
-    try {
-      setEnvelope(await taskEconomyApi.suiEnvelope(projectId, detail.receipt.id))
     } catch (error) {
       setMessage(errorText(error))
     } finally {
@@ -174,21 +155,17 @@ export default function ShadowEconomyPanel({
                     </div>
                   ))}
                 </div>
-                <button style={actionStyle('secondary', busy || detail.receipt.status !== 'reconciled')} type="button" onClick={loadEnvelope} disabled={busy || detail.receipt.status !== 'reconciled'}>
-                  <FileJson size={13} />生成 Sui 投影信封
-                </button>
               </>
             )}
           </div>
         </section>
       </div>
 
-      {envelope && (
-        <section className={base.integrationSection}>
-          <header><strong>Sui 投影信封</strong><span style={badgeStyle('warn')}>{envelope.network_submission}</span></header>
-          <div className={base.formCard} style={commerceStyles.sectionBody}><pre className={base.result}>{JSON.stringify(envelope, null, 2)}</pre></div>
-        </section>
-      )}
+      <SuiProjectionPackages
+        canEdit={canEdit}
+        projectId={projectId}
+        selectedReceipt={detail?.receipt ?? null}
+      />
       {message && <div style={{ ...commerceStyles.message, ...errorMessageStyle }}>{message}</div>}
     </div>
   )

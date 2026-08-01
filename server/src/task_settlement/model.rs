@@ -9,6 +9,11 @@ pub(crate) const RECEIPT_RECONCILED: &str = "reconciled";
 pub(crate) const RECEIPT_VOIDED: &str = "voided";
 pub(crate) const SUBJECT_TASK_ASSIGNMENT: &str = "task_assignment";
 pub(crate) const SUBJECT_COMMERCE_INVOCATION: &str = "commerce_invocation";
+pub(crate) const SUI_PROJECTION_SCHEMA: &str = "task_economy.sui_projection.v1";
+pub(crate) const SUI_PROJECTION_PACKAGE_SCHEMA: &str = "task_economy.sui_projection_package.v1";
+pub(crate) const SUI_NETWORK_NOT_SUBMITTED: &str = "not_submitted";
+pub(crate) const SUI_INTEGRITY_VERIFIED: &str = "verified";
+pub(crate) const SUI_INTEGRITY_CONFLICT: &str = "conflict";
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct TaskEconomyProjectSetting {
@@ -182,9 +187,9 @@ pub(crate) struct SettlementReceiptDetail {
     pub ledger_transaction: Option<LedgerTransaction>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct SuiSettlementEnvelope {
-    pub schema: &'static str,
+    pub schema: String,
     pub source_receipt_id: String,
     pub source_posting_key: String,
     pub project_object_key: String,
@@ -196,5 +201,42 @@ pub(crate) struct SuiSettlementEnvelope {
     pub currency: String,
     pub shadow_only: bool,
     pub ptb_steps: Vec<String>,
-    pub network_submission: &'static str,
+    pub network_submission: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct PrepareSuiProjectionPackageRequest {
+    pub target_network: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SuiProjectionPackage {
+    pub id: String,
+    pub project_id: String,
+    pub settlement_receipt_id: String,
+    pub target_network: String,
+    pub package_schema: String,
+    pub projection_digest: String,
+    pub source_receipt_digest: String,
+    pub envelope: SuiSettlementEnvelope,
+    pub integrity_status: String,
+    pub submission_readiness: String,
+    pub network_submission: String,
+    pub submission_attempts: i64,
+    pub last_error: Option<String>,
+    pub created_by_user_id: String,
+    pub verified_at: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+pub(crate) struct CreateSuiProjectionPackage<'a> {
+    pub project_id: &'a str,
+    pub settlement_receipt_id: &'a str,
+    pub target_network: &'a str,
+    pub package_schema: &'a str,
+    pub projection_digest: &'a str,
+    pub source_receipt_digest: &'a str,
+    pub envelope_json: &'a str,
+    pub created_by_user_id: &'a str,
 }
