@@ -59,6 +59,12 @@ pub(crate) fn create_authorization_request(
         bail!("公共 pc-web 身份只能用于发现，申请授权前请注册独立开发者应用");
     }
     ensure_app_owned_by_user(store, user_id, &request.requester_app_id)?;
+    crate::open_commerce_app_block_service::ensure_app_allowed(
+        store,
+        &request.merchant_id,
+        &request.requester_app_id,
+        false,
+    )?;
     store.create_open_commerce_authorization_request(user_id, request)
 }
 

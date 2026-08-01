@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 use crate::{
+    open_commerce_app_block_service,
     open_commerce_directory_model::DIRECTORY_STATUS_PUBLISHED,
     open_commerce_integration_model::{
         CreateIntegrationRequest, OpenCommerceIntegration, OpenCommerceSyncReceipt,
@@ -389,6 +390,7 @@ pub(crate) fn create_grant(
     request: CreateGrantRequest,
 ) -> Result<crate::open_commerce_model::OpenCommerceGrant> {
     require_editor(actor.project_role)?;
+    open_commerce_app_block_service::ensure_grant_allowed(store, &request)?;
     let grant = store.create_open_commerce_grant(project_id, actor.user_id, request)?;
     store.record_open_commerce_audit(
         project_id,
@@ -456,6 +458,12 @@ pub(crate) async fn invoke(
     if !system_app {
         store.ensure_open_commerce_developer_app_owned_by_user(&requester_app_id, actor.user_id)?;
     }
+    open_commerce_app_block_service::ensure_app_allowed(
+        store,
+        &merchant.id,
+        &requester_app_id,
+        target_editor,
+    )?;
     if !target_editor && !store.open_commerce_directory_is_published(&merchant.id)? {
         bail!("商户节点未发布到开放目录");
     }
