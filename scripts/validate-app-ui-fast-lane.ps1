@@ -122,6 +122,8 @@ $androidProcess = Start-Process -FilePath $gradle `
 $pwaProcess = Start-Process -FilePath "node.exe" `
     -ArgumentList @($pwaCheck) -WorkingDirectory $repoRoot -PassThru -WindowStyle Hidden `
     -RedirectStandardOutput $pwaOut -RedirectStandardError $pwaErr
+[void]$androidProcess.Handle
+[void]$pwaProcess.Handle
 
 $androidProcess.WaitForExit()
 $pwaProcess.WaitForExit()

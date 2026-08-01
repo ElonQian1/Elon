@@ -13,8 +13,8 @@ class BottomNavigationInsetsContractTest {
         val dimens = readRepositoryFile("android/app/src/main/res/values/dimens.xml")
         val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
         val fade = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_fade.xml")
-        assertTrue(dimens.contains("name=\"main_bottom_menu_fade_height\">32dp</dimen>"))
-        assertTrue(dimens.contains("name=\"main_bottom_menu_container_height\">104dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_fade_height\">12dp</dimen>"))
+        assertTrue(dimens.contains("name=\"main_bottom_menu_container_height\">84dp</dimen>"))
         assertTrue(
             Regex(
                 """android:id="@\+id/pageTabs"[^>]*android:layout_height="@dimen/main_bottom_menu_container_height"[^>]*android:background="@android:color/transparent"""",
@@ -46,7 +46,7 @@ class BottomNavigationInsetsContractTest {
         )
         assertTrue(
             Regex(
-                """\.tabs-bar::before\s*\{[^}]*top:\s*-32px;[^}]*height:\s*32px;[^}]*background:\s*linear-gradient\([^}]*rgb\(0 0 0 / 70%\)\s+50%[^}]*var\(--bg\)\s+100%""",
+                """\.tabs-bar::before\s*\{[^}]*top:\s*-12px;[^}]*height:\s*12px;[^}]*background:\s*linear-gradient\([^}]*rgb\(0 0 0 / 70%\)\s+50%[^}]*var\(--bg\)\s+100%""",
                 RegexOption.DOT_MATCHES_ALL
             ).containsMatchIn(web)
         )
