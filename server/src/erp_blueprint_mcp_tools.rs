@@ -11,6 +11,21 @@ pub(crate) fn definitions() -> Vec<Value> {
             true,
         ),
         tool(
+            "erp_get_materialization_status",
+            "读取商户 ERP 从初始化 Matter、Assignment 到验证证据的实时状态和下一步。状态从现有任务真源派生，不会启动任务、复制源码、合并或发布。",
+            json!({
+                "type":"object",
+                "required":["instance_id"],
+                "properties":{
+                    "instance_id":{"type":"string","minLength":1,"maxLength":120}
+                },
+                "additionalProperties":false
+            }),
+            true,
+            false,
+            true,
+        ),
+        tool(
             "erp_search_capabilities",
             "在官方 ERP 能力目录中检索可直接复用的能力。开发前应先调用，避免重复造轮子。",
             json!({

@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 
 use crate::{
     erp_blueprint::{
-        catalog_service, instance_service,
+        catalog_service, instance_service, materialization,
         model::{
             PrepareUpgradeRequest, ResolveRequirementRequest, SubmitFeatureSignalRequest,
             UpdateErpInstanceRequest,
@@ -20,6 +20,11 @@ struct SearchArgs {
     query: String,
     #[serde(default = "default_limit")]
     limit: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct InstanceArgs {
+    instance_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,6 +63,14 @@ pub(crate) fn call_tool(
         "erp_get_overview" => {
             ensure_empty(&arguments, name)?;
             Ok(serde_json::to_value(service::overview(store, project_id)?)?)
+        }
+        "erp_get_materialization_status" => {
+            let args: InstanceArgs = decode(arguments, name)?;
+            Ok(serde_json::to_value(materialization::status(
+                store,
+                project_id,
+                &args.instance_id,
+            )?)?)
         }
         "erp_search_capabilities" => {
             let args: SearchArgs = decode(arguments, name)?;

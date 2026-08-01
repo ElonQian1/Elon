@@ -3,12 +3,19 @@ use anyhow::{anyhow, bail, Result};
 use crate::{
     group_ai::{
         planner::build_matter_plan,
-        types::{CreateMatterPlanRequest, CreateMatterRecord, ProjectAiBot, ProjectAiMatter},
+        types::{
+            CreateMatterPlanRequest, CreateMatterRecord, ProjectAiBot, ProjectAiMatter,
+            MATTER_STATUS_CANCELED, MATTER_STATUS_DONE, MATTER_STATUS_FAILED,
+            MATTER_STATUS_PLAN_READY,
+        },
     },
     store::Store,
 };
 
-use super::model::{ErpBlueprint, ErpBlueprintVersion, ErpFeatureProposal, ErpInstance};
+use super::{
+    materialization,
+    model::{ErpBlueprint, ErpBlueprintVersion, ErpFeatureProposal, ErpInstance},
+};
 
 pub(crate) fn create_proposal_matter(
     store: &Store,
@@ -82,11 +89,45 @@ pub(crate) fn create_bootstrap_matter(
     if instance.blueprint_id != blueprint.id || instance.pinned_version_id != version.id {
         bail!("实例、蓝图与固定版本不一致");
     }
-    if let Some(matter_id) = instance.bootstrap_matter_id.as_deref() {
-        return store
+    let contract = materialization::build_contract(blueprint, version, instance);
+    let replacement_of = if let Some(matter_id) = instance.bootstrap_matter_id.as_deref() {
+        let matter = store
             .get_project_ai_matter(&instance.project_id, matter_id)?
-            .ok_or_else(|| anyhow!("实例关联的初始化 Matter 不存在"));
-    }
+            .ok_or_else(|| anyhow!("实例关联的初始化 Matter 不存在"))?;
+        let missing_roles = matter
+            .plan
+            .get("roles")
+            .and_then(serde_json::Value::as_array)
+            .map(Vec::is_empty)
+            .unwrap_or(true);
+        if matter.plan.get("execution_contract") == Some(&serde_json::to_value(&contract)?)
+            && matter.status != MATTER_STATUS_CANCELED
+            && !missing_roles
+        {
+            return Ok(matter);
+        }
+        let assignments = store.list_project_ai_matter_assignments(matter_id)?;
+        let has_active_assignment = assignments.iter().any(|assignment| {
+            matches!(
+                assignment.status.as_str(),
+                "queued" | "dispatching" | "running"
+            )
+        });
+        if has_active_assignment
+            || !matches!(
+                matter.status.as_str(),
+                MATTER_STATUS_PLAN_READY
+                    | MATTER_STATUS_FAILED
+                    | MATTER_STATUS_CANCELED
+                    | MATTER_STATUS_DONE
+            )
+        {
+            bail!("旧初始化 Matter 正在执行或等待验收，不能覆盖；请先完成或取消旧流程");
+        }
+        Some(matter_id.to_string())
+    } else {
+        None
+    };
     let channel = store
         .list_project_space_channels(actor_user_id, &instance.project_id)?
         .into_iter()
@@ -129,21 +170,29 @@ pub(crate) fn create_bootstrap_matter(
             "完成项目测试；合并与发布由商户人工确认".into(),
         ],
     };
-    let draft = build_matter_plan(&request, actor_user_id, bots);
-    store.create_project_ai_matter_for_erp_instance(
-        &instance.id,
-        CreateMatterRecord {
-            project_id: instance.project_id.clone(),
-            channel_id: channel.id,
-            requester_user_id: actor_user_id.to_string(),
-            source_message_id: None,
-            title: draft.title,
-            brief,
-            collaboration_mode: draft.collaboration_mode,
-            participant_user_ids: draft.participant_user_ids,
-            node_policy_json: draft.node_policy_json,
-            acceptance_criteria: draft.acceptance_criteria,
-            plan_json: draft.plan_json,
-        },
-    )
+    let mut draft = build_matter_plan(&request, actor_user_id, bots);
+    draft.plan_json["execution_contract"] = serde_json::to_value(contract)?;
+    let record = CreateMatterRecord {
+        project_id: instance.project_id.clone(),
+        channel_id: channel.id,
+        requester_user_id: actor_user_id.to_string(),
+        source_message_id: None,
+        title: draft.title,
+        brief,
+        collaboration_mode: draft.collaboration_mode,
+        participant_user_ids: draft.participant_user_ids,
+        node_policy_json: draft.node_policy_json,
+        acceptance_criteria: draft.acceptance_criteria,
+        plan_json: draft.plan_json,
+    };
+    match replacement_of {
+        Some(previous_matter_id) => store.replace_project_ai_matter_for_erp_instance(
+            &instance.id,
+            &previous_matter_id,
+            instance.configuration_revision,
+            actor_user_id,
+            record,
+        ),
+        None => store.create_project_ai_matter_for_erp_instance(&instance.id, record),
+    }
 }

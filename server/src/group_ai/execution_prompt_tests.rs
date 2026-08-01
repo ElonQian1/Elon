@@ -18,7 +18,7 @@ fn prompt_contains_assignment_scope_and_human_merge_rules() {
         participant_user_ids: vec!["u1".to_string()],
         node_policy: json!({}),
         acceptance_criteria: vec!["记录 compute_call_id".to_string()],
-        plan: json!({}),
+        plan: json!({"execution_contract":{"schema":"test.contract.v1","required_artifact":{"artifact_kind":"test_evidence"}}}),
         final_summary: None,
         final_decision: None,
         created_at: "now".to_string(),
@@ -49,4 +49,6 @@ fn prompt_contains_assignment_scope_and_human_merge_rules() {
     assert!(prompt.contains("group-ai/m1"));
     assert!(prompt.contains("不要 push"));
     assert!(prompt.contains("验证命令和结果"));
+    assert!(prompt.contains("test.contract.v1"));
+    assert!(prompt.contains("不得伪造测试、部署、支付或链上结果"));
 }

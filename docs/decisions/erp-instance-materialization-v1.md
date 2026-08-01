@@ -15,6 +15,10 @@
 4. Matter 与实例在同一事务中通过 `bootstrap_matter_id` 关联；重复请求返回同一 Matter。
 5. API 从项目已授权节点选择 Bot 生成计划角色。商户批准并启动 Matter 后，现有群体 AI 流程再生成 Assignment。
 6. Matter 继续要求人工合并和发布；没有可用 Bot 时只保存计划，不伪造已执行状态。
+7. Matter 计划保存 `yilong.erp.materialization_contract.v1`，固定源提交、目标项目、配置修订、模块与扩展边界，以及要求的实例清单和证据格式。
+8. 物化状态从现有 Matter、Assignment 和 Artifact 实时派生，不建立第二套任务状态表。失败沿原 Assignment 重试；实例修订或证据不一致必须显示为阻塞，不得伪造完成。
+9. 商户配置修订导致合同漂移时，再次显式确认初始化会创建替代 Matter，并在新旧 Matter 记录审计事件；旧 Matter 正在执行或等待验收时禁止覆盖。
+10. 带 `execution_contract` 的 Matter 启动前必须已有项目成员批准记录；自动派发和直接启动均不得绕过该门禁。未携带合同的既有 Matter 保持原兼容行为。
 
 ## 结果
 

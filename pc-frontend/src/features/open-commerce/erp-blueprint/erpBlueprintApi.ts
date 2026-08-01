@@ -3,6 +3,7 @@ import type {
   ErpBlueprint,
   ErpBlueprintVersion,
   ErpInstance,
+  ErpMaterializationStatus,
   ErpOverview,
   ErpProposal,
   ErpReleaseManifest,
@@ -61,6 +62,11 @@ export const erpBlueprintApi = {
     api.post<{ instance: ErpInstance; matter_id: string }>(
       `${base(projectId)}/instances/${encodeURIComponent(instanceId)}/bootstrap-matter`,
       {},
+    ),
+
+  materializationStatus: (projectId: string, instanceId: string) =>
+    api.get<ErpMaterializationStatus>(
+      `${base(projectId)}/instances/${encodeURIComponent(instanceId)}/materialization`,
     ),
 
   decideProposal: (

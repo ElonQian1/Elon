@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://yilong.example/contracts/erp/erp-materialization-contract-v1.schema.json",
+  "title": "ERP instance materialization contract V1",
+  "type": "object",
+  "required": ["schema", "instance_id", "instance_key", "target_project_id", "source", "configuration", "required_artifact", "verification_requirements", "boundaries"],
+  "properties": {
+    "schema": { "const": "yilong.erp.materialization_contract.v1" },
+    "instance_id": { "type": "string", "minLength": 1 },
+    "instance_key": { "type": "string", "minLength": 2 },
+    "target_project_id": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "required": ["project_id", "git_commit", "blueprint_key", "version"],
+      "properties": {
+        "project_id": { "type": "string", "minLength": 1 },
+        "git_commit": { "type": "string", "pattern": "^[0-9A-Fa-f]{7,64}$" },
+        "blueprint_key": { "type": "string", "minLength": 2 },
+        "version": { "$ref": "#/$defs/version" }
+      },
+      "additionalProperties": false
+    },
+    "configuration": {
+      "type": "object",
+      "required": ["revision", "industry", "theme_key", "enabled_modules", "plugins", "private_extensions"],
+      "properties": {
+        "revision": { "type": "integer", "minimum": 1 },
+        "industry": { "type": "string", "minLength": 1 },
+        "theme_key": { "type": "string", "minLength": 2 },
+        "enabled_modules": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "plugins": { "type": "array", "items": { "$ref": "#/$defs/extension" } },
+        "private_extensions": { "type": "array", "items": { "$ref": "#/$defs/extension" } }
+      },
+      "additionalProperties": false
+    },
+    "required_artifact": {
+      "type": "object",
+      "required": ["artifact_kind", "instance_manifest_path", "evidence_schema", "required_metadata_fields"],
+      "properties": {
+        "artifact_kind": { "const": "erp_instance_materialization" },
+        "instance_manifest_path": { "const": ".yilong/erp-instance.json" },
+        "evidence_schema": { "const": "yilong.erp.materialization_evidence.v1" },
+        "required_metadata_fields": { "type": "array", "items": { "type": "string" }, "minItems": 7, "uniqueItems": true }
+      },
+      "additionalProperties": false
+    },
+    "verification_requirements": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "boundaries": { "type": "array", "items": { "type": "string" }, "minItems": 1, "uniqueItems": true }
+  },
+  "$defs": {
+    "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "extension": {
+      "type": "object",
+      "required": ["extension_key", "version", "extension_point", "requires_modules"],
+      "properties": {
+        "extension_key": { "type": "string", "minLength": 2 },
+        "version": { "$ref": "#/$defs/version" },
+        "extension_point": { "type": "string", "minLength": 2 },
+        "requires_modules": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

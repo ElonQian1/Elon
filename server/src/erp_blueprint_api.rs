@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use crate::{
     erp_blueprint::{
-        catalog_service, instance_service,
+        catalog_service, instance_service, materialization,
         model::{
             CreateBlueprintRequest, CreateBlueprintVersionRequest, CreateErpInstanceRequest,
             DecideProposalRequest, DecideUpgradeRequest, EvolveBlueprintRequest,
@@ -73,6 +73,10 @@ pub fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/erp/instances/:instance_id/bootstrap-matter",
             post(create_instance_bootstrap_matter),
+        )
+        .route(
+            "/api/projects/:project_id/erp/instances/:instance_id/materialization",
+            get(materialization_status),
         )
         .route(
             "/api/projects/:project_id/erp/proposals/:proposal_id/decision",
@@ -272,6 +276,21 @@ async fn create_instance_bootstrap_matter(
         )
         .map(|(instance, matter_id)| json!({"instance":instance,"matter_id":matter_id})),
     )
+}
+
+async fn materialization_status(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, instance_id)): Path<(String, String)>,
+) -> Response {
+    if let Err(response) = authenticate(&state, &headers, &project_id, false) {
+        return response;
+    }
+    respond(materialization::status(
+        &state.store,
+        &project_id,
+        &instance_id,
+    ))
 }
 
 async fn decide_proposal(

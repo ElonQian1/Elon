@@ -18,6 +18,7 @@
 | POST | `/api/projects/:project_id/erp/instances/:instance_id/signals` | 经授权提交脱敏需求信号 |
 | POST | `/api/projects/:project_id/erp/instances/:instance_id/configuration` | 由商户按配置修订号更新主题、模块和扩展元数据 |
 | POST | `/api/projects/:project_id/erp/instances/:instance_id/bootstrap-matter` | 原子创建或返回商户实例初始化 Matter |
+| GET | `/api/projects/:project_id/erp/instances/:instance_id/materialization` | 从 Matter、Assignment 和 Artifact 真源读取初始化状态、证据与下一步 |
 | POST | `/api/projects/:project_id/erp/proposals/:proposal_id/decision` | 由蓝图维护者接受或拒绝提案 |
 | POST | `/api/projects/:project_id/erp/proposals/:proposal_id/matter` | 为已接受提案创建正式 Matter |
 | POST | `/api/projects/:project_id/erp/instances/:instance_id/upgrades` | 准备兼容检查和升级活动 |
@@ -30,6 +31,7 @@ ERP 工具合并到现有开放商业 MCP 工具列表中，供项目内 AI 在�
 | 工具 | 副作用 | 用途 |
 |---|---|---|
 | `erp_get_overview` | 无 | 读取当前项目的 ERP 治理概况 |
+| `erp_get_materialization_status` | 无 | 读取实例初始化合同、任务进度、失败项和证据缺口，不启动任务 |
 | `erp_search_capabilities` | 无 | 开发前检索已有能力，避免重复造轮子 |
 | `erp_resolve_requirement` | 无 | 生成需求分类和实现建议，不修改公共内核 |
 | `erp_submit_feature_signal` | 写治理元数据 | 仅在商户明确授权后提交脱敏信号 |
@@ -47,5 +49,7 @@ AI 工具故意不提供蓝图演进、提案接受、Matter 创建、公共版�
 - `contracts/erp/erp-feature-signal-v1.schema.json`
 - `contracts/erp/erp-release-manifest-v1.schema.json`
 - `contracts/erp/erp-upgrade-campaign-v1.schema.json`
+- `contracts/erp/erp-materialization-contract-v1.schema.json`
+- `contracts/erp/erp-materialization-evidence-v1.schema.json`
 
 参考清单位于 `examples/erp-blueprints/`。其中咖啡店与最小零售实例使用同一内核版本，但拥有不同主题、插件和私有扩展边界。

@@ -1,0 +1,9 @@
+{
+  "schema": "yilong.erp.materialization_evidence.v1",
+  "instance_id": "erp_instance_example_coffee",
+  "configuration_revision": 1,
+  "source_git_commit": "abcdef0123456789",
+  "instance_manifest_path": ".yilong/erp-instance.json",
+  "instance_manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "verification_passed": true
+}

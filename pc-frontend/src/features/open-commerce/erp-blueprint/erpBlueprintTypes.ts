@@ -87,6 +87,63 @@ export type ErpInstance = {
   updated_at: string
 }
 
+export type ErpMaterializationStatus = {
+  schema: string
+  state: string
+  recoverable: boolean
+  contract: {
+    schema: string
+    instance_id: string
+    instance_key: string
+    target_project_id: string
+    source: {
+      project_id: string
+      git_commit: string
+      blueprint_key: string
+      version: string
+    }
+    configuration: {
+      revision: number
+      industry: string
+      theme_key: string
+      enabled_modules: string[]
+      plugins: ErpExtension[]
+      private_extensions: ErpExtension[]
+    }
+    required_artifact: {
+      artifact_kind: string
+      instance_manifest_path: string
+      evidence_schema: string
+      required_metadata_fields: string[]
+    }
+    verification_requirements: string[]
+    boundaries: string[]
+  }
+  matter?: {
+    id: string
+    status: string
+    decision?: string | null
+    plan_contract_matches: boolean
+    assignments: {
+      total: number
+      planned: number
+      running: number
+      completed: number
+      failed: number
+      failed_assignment_ids: string[]
+    }
+  } | null
+  evidence: Array<{
+    artifact_id: string
+    assignment_id: string
+    valid: boolean
+    issues: string[]
+    created_at: string
+  }>
+  blockers: string[]
+  next_action: string
+}
+
 export type ErpProposal = {
   id: string
   blueprint_id: string
@@ -139,6 +196,7 @@ export type ErpOverview = {
   instances: ErpInstance[]
   proposals: ErpProposal[]
   upgrades: ErpUpgrade[]
+  materialization?: ErpMaterializationStatus | null
   capability_catalog: ErpCapability[]
   catalog_version?: string | null
   unreleased_capability_keys: string[]

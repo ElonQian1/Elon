@@ -8,6 +8,7 @@
 .workspace { display: grid; gap: 18px; }
 .setup, .band { padding: 18px 0; border-bottom: 1px solid var(--border); }
 .setupIntro, .band header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
+.band header .statusBadge { margin-left: auto; }
 .setupIntro h3, .band h3, .instanceHeader h3 { margin: 0; font-size: 16px; letter-spacing: 0; }
 .formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: end; }
 .formGrid label, .inlineForm label { display: grid; gap: 6px; color: var(--text-muted); font-size: 12px; }
@@ -18,6 +19,20 @@
 .formAction button, .inlineForm button, .band > button, .proposal button, .upgrade button, .signalBox button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 .message { margin: 10px 0 0; color: #9ed9c8; white-space: pre-wrap; }
 .mutedLine { margin: 10px 0 0; color: var(--text-muted); font-size: 11px; }
+.statusBadge { padding: 4px 7px; border: 1px solid var(--border); color: var(--text-muted); font-size: 10px; }
+.statusBadge[data-state='complete'] { border-color: #4f9d87; color: #9ed9c8; }
+.statusBadge[data-state='warning'] { border-color: #a77452; color: #e3b58f; }
+.materializationGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-block: 1px solid var(--border); }
+.materializationGrid > div { min-width: 0; padding: 12px; border-right: 1px solid var(--border); }
+.materializationGrid > div:last-child { border-right: 0; }
+.materializationGrid span, .materializationGrid strong, .materializationGrid small { display: block; }
+.materializationGrid span { color: var(--text-muted); font-size: 10px; }
+.materializationGrid strong { margin-top: 4px; font-size: 13px; overflow-wrap: anywhere; }
+.materializationGrid small { margin-top: 5px; color: var(--text-muted); font-size: 10px; overflow-wrap: anywhere; }
+.materializationGrid small svg { margin-right: 4px; vertical-align: -2px; }
+.blockerList { margin-top: 12px; padding-left: 10px; border-left: 3px solid #a77452; }
+.blockerList p { margin: 3px 0; color: #e3b58f; font-size: 11px; }
+.nextAction { margin: 12px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
 .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-block: 1px solid var(--border); }
 .metrics > div { padding: 14px 16px; border-right: 1px solid var(--border); }
 .metrics > div:last-child { border-right: 0; }
@@ -73,7 +88,7 @@
 .spin { animation: erp-spin 900ms linear infinite; }
 @keyframes erp-spin { to { transform: rotate(360deg); } }
 @media (max-width: 900px) {
-  .metrics, .capabilityGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metrics, .capabilityGrid, .materializationGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .formGrid { grid-template-columns: 1fr; }
   .wideField { grid-column: auto; }
   .row { grid-template-columns: 1fr 1fr; }
@@ -81,7 +96,7 @@
 }
 @media (max-width: 620px) {
   .hero, .instanceHeader, .proposal, .upgrade, .signalBox, .inlineForm { align-items: stretch; flex-direction: column; }
-  .metrics, .capabilityGrid { grid-template-columns: 1fr; }
+  .metrics, .capabilityGrid, .materializationGrid { grid-template-columns: 1fr; }
   .metrics > div { border-right: 0; border-bottom: 1px solid var(--border); }
   .extensionCount { text-align: left; }
   .upgradeDecision { width: 100%; }

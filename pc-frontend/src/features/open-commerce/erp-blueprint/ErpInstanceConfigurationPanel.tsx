@@ -17,6 +17,7 @@ export default function ErpInstanceConfigurationPanel({
   refresh: () => Promise<void>
 }) {
   const instance = overview.instance!
+  const contractDrift = overview.materialization?.matter?.plan_contract_matches === false
   const version = overview.versions.find((item) => item.id === instance.pinned_version_id)
   const availableModules = version?.manifest.modules ?? []
   const themes = overview.blueprint?.definition.themes ?? [instance.theme_key]
@@ -110,7 +111,7 @@ export default function ErpInstanceConfigurationPanel({
           商户确认本次配置变更
         </label>
         <button type="button" disabled={!canEdit || busy || !changed || !confirmed} onClick={save}><Save size={15} />保存配置</button>
-        <button type="button" disabled={!canEdit || busy} onClick={bootstrap}><Bot size={15} />{instance.bootstrap_matter_id ? '确认初始化 Matter' : '创建初始化 Matter'}</button>
+        <button type="button" disabled={!canEdit || busy} onClick={bootstrap}><Bot size={15} />{contractDrift ? '重新规划初始化 Matter' : instance.bootstrap_matter_id ? '确认初始化 Matter' : '创建初始化 Matter'}</button>
       </div>
       <p className={styles.mutedLine}>配置修订 {instance.configuration_revision}{instance.bootstrap_matter_id ? ` · Matter ${instance.bootstrap_matter_id}` : ''}</p>
       {message && <p className={styles.message}>{message}</p>}

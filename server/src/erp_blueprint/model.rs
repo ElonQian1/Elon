@@ -7,6 +7,8 @@ pub(crate) const BLUEPRINT_SCHEMA: &str = "yilong.erp.blueprint.v1";
 pub(crate) const INSTANCE_SCHEMA: &str = "yilong.erp.instance.v1";
 pub(crate) const RELEASE_SCHEMA: &str = "yilong.erp.release.v1";
 pub(crate) const SIGNAL_SCHEMA: &str = "yilong.erp.feature_signal.v1";
+pub(crate) const MATERIALIZATION_CONTRACT_SCHEMA: &str = "yilong.erp.materialization_contract.v1";
+pub(crate) const MATERIALIZATION_EVIDENCE_SCHEMA: &str = "yilong.erp.materialization_evidence.v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct ErpModuleDefinition {
@@ -184,6 +186,85 @@ pub(crate) struct ErpInstance {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub(crate) struct ErpMaterializationSource {
+    pub project_id: String,
+    pub git_commit: String,
+    pub blueprint_key: String,
+    pub version: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub(crate) struct ErpMaterializationConfiguration {
+    pub revision: i64,
+    pub industry: String,
+    pub theme_key: String,
+    pub enabled_modules: Vec<String>,
+    pub plugins: Vec<ErpExtensionRef>,
+    pub private_extensions: Vec<ErpExtensionRef>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub(crate) struct ErpMaterializationArtifactContract {
+    pub artifact_kind: &'static str,
+    pub instance_manifest_path: &'static str,
+    pub evidence_schema: &'static str,
+    pub required_metadata_fields: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub(crate) struct ErpMaterializationContract {
+    pub schema: &'static str,
+    pub instance_id: String,
+    pub instance_key: String,
+    pub target_project_id: String,
+    pub source: ErpMaterializationSource,
+    pub configuration: ErpMaterializationConfiguration,
+    pub required_artifact: ErpMaterializationArtifactContract,
+    pub verification_requirements: Vec<&'static str>,
+    pub boundaries: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ErpMaterializationAssignmentSummary {
+    pub total: usize,
+    pub planned: usize,
+    pub running: usize,
+    pub completed: usize,
+    pub failed: usize,
+    pub failed_assignment_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ErpMaterializationMatterSummary {
+    pub id: String,
+    pub status: String,
+    pub decision: Option<String>,
+    pub plan_contract_matches: bool,
+    pub assignments: ErpMaterializationAssignmentSummary,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ErpMaterializationEvidenceSummary {
+    pub artifact_id: String,
+    pub assignment_id: String,
+    pub valid: bool,
+    pub issues: Vec<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ErpMaterializationStatus {
+    pub schema: &'static str,
+    pub state: String,
+    pub recoverable: bool,
+    pub contract: ErpMaterializationContract,
+    pub matter: Option<ErpMaterializationMatterSummary>,
+    pub evidence: Vec<ErpMaterializationEvidenceSummary>,
+    pub blockers: Vec<String>,
+    pub next_action: String,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct ResolveRequirementRequest {
     #[serde(default)]
@@ -339,6 +420,7 @@ pub(crate) struct ErpProjectOverview {
     pub instances: Vec<ErpInstance>,
     pub proposals: Vec<ErpFeatureProposal>,
     pub upgrades: Vec<ErpUpgradeCampaign>,
+    pub materialization: Option<ErpMaterializationStatus>,
     pub capability_catalog: Vec<ErpCapabilityDefinition>,
     pub catalog_version: Option<String>,
     pub unreleased_capability_keys: Vec<String>,

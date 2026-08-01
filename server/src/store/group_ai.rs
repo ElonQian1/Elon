@@ -167,6 +167,83 @@ impl Store {
             .ok_or_else(|| anyhow!("ERP 实例初始化 Matter 保存失败"))
     }
 
+    pub(crate) fn replace_project_ai_matter_for_erp_instance(
+        &self,
+        instance_id: &str,
+        expected_matter_id: &str,
+        expected_configuration_revision: i64,
+        actor_user_id: &str,
+        record: CreateMatterRecord,
+    ) -> Result<ProjectAiMatter> {
+        let project_id = record.project_id.trim().to_string();
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let (current_matter_id, current_revision): (Option<String>, i64) = tx.query_row(
+            "SELECT bootstrap_matter_id, configuration_revision
+               FROM erp_instances WHERE id=?1 AND status='active'",
+            params![instance_id.trim()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        if current_matter_id.as_deref() != Some(expected_matter_id) {
+            let current_matter_id = current_matter_id
+                .ok_or_else(|| anyhow!("ERP 实例初始化 Matter 已被其他操作清空"))?;
+            let matter = get_project_ai_matter_locked(&tx, &project_id, &current_matter_id)?
+                .ok_or_else(|| anyhow!("ERP 实例当前初始化 Matter 不存在"))?;
+            tx.commit()?;
+            return Ok(matter);
+        }
+        if current_revision != expected_configuration_revision {
+            anyhow::bail!("ERP 实例配置已变化，请刷新后重新规划");
+        }
+        let replacement_id = insert_project_ai_matter_locked(&tx, record)?;
+        let timestamp = now();
+        let updated = tx.execute(
+            "UPDATE erp_instances
+                SET bootstrap_matter_id=?1, updated_at=?2
+              WHERE id=?3 AND bootstrap_matter_id=?4
+                AND configuration_revision=?5 AND status='active'",
+            params![
+                replacement_id,
+                timestamp,
+                instance_id.trim(),
+                expected_matter_id.trim(),
+                expected_configuration_revision,
+            ],
+        )?;
+        if updated == 0 {
+            anyhow::bail!("ERP 实例配置或初始化 Matter 已变化，请刷新后重试");
+        }
+        let payload = serde_json::to_string(&serde_json::json!({
+            "instance_id": instance_id.trim(),
+            "old_matter_id": expected_matter_id.trim(),
+            "replacement_matter_id": replacement_id,
+            "configuration_revision": expected_configuration_revision,
+        }))?;
+        for (matter_id, event_type) in [
+            (expected_matter_id.trim(), "erp_bootstrap_matter_superseded"),
+            (replacement_id.as_str(), "erp_bootstrap_matter_replanned"),
+        ] {
+            tx.execute(
+                "INSERT INTO project_ai_events
+                   (id, matter_id, project_id, actor_user_id, event_type, payload_json, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                params![
+                    new_id("paie"),
+                    matter_id,
+                    project_id,
+                    actor_user_id.trim(),
+                    event_type,
+                    payload,
+                    timestamp
+                ],
+            )?;
+        }
+        tx.commit()?;
+        drop(conn);
+        self.get_project_ai_matter(&project_id, &replacement_id)?
+            .ok_or_else(|| anyhow!("ERP 实例替换初始化 Matter 保存失败"))
+    }
+
     pub(crate) fn list_project_ai_matters(
         &self,
         project_id: &str,

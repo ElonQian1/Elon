@@ -10,6 +10,7 @@ const coffee = json('cofficethinking-instance.json')
 const retail = json('minimal-retail-instance.json')
 const signal = json('feature-signal.json')
 const upgrade = json('upgrade-campaign.json')
+const materializationEvidence = json('materialization-evidence.json')
 
 assert.equal(blueprint.schema, 'yilong.erp.blueprint.v1')
 assert.equal(release.schema, 'yilong.erp.release.v1')
@@ -30,6 +31,9 @@ assert.equal(upgrade.schema, 'yilong.erp.upgrade_campaign.v1')
 assert.equal(upgrade.merchant_confirmation_required, true)
 assert.equal(upgrade.adoption_evidence.execution_attested, true)
 assert.deepEqual(upgrade.private_extensions_snapshot, coffee.private_extensions)
+assert.equal(materializationEvidence.schema, 'yilong.erp.materialization_evidence.v1')
+assert.equal(materializationEvidence.verification_passed, true)
+assert.equal(materializationEvidence.instance_manifest_sha256.length, 64)
 
 const extensionPoints = new Set(release.extension_points)
 for (const instance of [coffee, retail]) {
@@ -48,6 +52,8 @@ for (const schema of [
   'erp-feature-signal-v1.schema.json',
   'erp-release-manifest-v1.schema.json',
   'erp-upgrade-campaign-v1.schema.json',
+  'erp-materialization-contract-v1.schema.json',
+  'erp-materialization-evidence-v1.schema.json',
 ]) {
   assert.doesNotThrow(() => JSON.parse(fs.readFileSync(path.join(root, 'contracts/erp', schema), 'utf8')))
 }

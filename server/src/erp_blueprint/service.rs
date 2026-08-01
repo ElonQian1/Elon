@@ -5,7 +5,7 @@ use crate::group_ai::types::ProjectAiBot;
 use crate::store::Store;
 
 use super::{
-    catalog_service, compatibility, matter_bridge,
+    catalog_service, compatibility, materialization, matter_bridge,
     model::{
         CreateBlueprintRequest, CreateBlueprintVersionRequest, CreateErpInstanceRequest,
         DecideProposalRequest, DecideUpgradeRequest, ErpBlueprint, ErpBlueprintVersion,
@@ -39,6 +39,10 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<ErpProjectOver
     } else {
         Vec::new()
     };
+    let materialization = current_instance
+        .as_ref()
+        .map(|instance| materialization::status(store, project_id, &instance.id))
+        .transpose()?;
     let catalog = catalog_service::catalog_for_project(store, project_id, None)?;
     Ok(ErpProjectOverview {
         schema: "yilong.erp.project_overview.v1",
@@ -51,6 +55,7 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<ErpProjectOver
         instances,
         proposals,
         upgrades,
+        materialization,
         boundaries: boundaries(),
     })
 }
@@ -395,6 +400,7 @@ fn empty_overview() -> ErpProjectOverview {
         instances: vec![],
         proposals: vec![],
         upgrades: vec![],
+        materialization: None,
         capability_catalog: vec![],
         catalog_version: None,
         unreleased_capability_keys: vec![],

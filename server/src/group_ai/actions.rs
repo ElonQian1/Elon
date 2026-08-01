@@ -92,6 +92,7 @@ pub(crate) fn start_matter(
     if matter.status != MATTER_STATUS_PLAN_READY && matter.status != MATTER_STATUS_RUNNING {
         anyhow::bail!("当前 Matter 状态不能启动");
     }
+    ensure_execution_contract_approved(&matter)?;
 
     let mut assignments = state.store.list_project_ai_matter_assignments(matter_id)?;
     if assignments.is_empty() {
@@ -348,6 +349,15 @@ fn assignment_records_from_plan(
     Ok(records)
 }
 
+fn ensure_execution_contract_approved(matter: &ProjectAiMatter) -> Result<()> {
+    if matter.plan.get("execution_contract").is_some()
+        && matter.final_decision.as_deref() != Some("approved")
+    {
+        anyhow::bail!("带机器执行合同的 Matter 必须先由项目成员批准，不能直接启动");
+    }
+    Ok(())
+}
+
 fn string_field<'a>(value: &'a Value, field: &str) -> Option<&'a str> {
     value
         .get(field)
@@ -400,6 +410,10 @@ pub(super) fn write_channel_notice(
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "actions/start_gate_tests.rs"]
+mod start_gate_tests;
 
 pub(super) fn clean_comment(value: Option<&str>) -> Option<String> {
     value
