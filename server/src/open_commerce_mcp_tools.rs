@@ -153,6 +153,40 @@ pub(crate) fn definitions() -> Vec<Value> {
             false,
         ),
         tool(
+            "open_commerce_upsert_rate_limit",
+            "为当前项目商户的指定能力设置固定时间窗调用配额。可限定一个 App；留空则对每个外部调用主体分别执行。幂等重放和项目编辑者调试不占额度。",
+            json!({
+                "type":"object",
+                "required":["merchant_id","capability_key","window_seconds","max_requests"],
+                "properties":{
+                    "merchant_id":{"type":"string","minLength":1,"maxLength":120},
+                    "capability_key":{"type":"string","minLength":3,"maxLength":96},
+                    "requester_app_id":{"type":"string","minLength":2,"maxLength":96},
+                    "window_seconds":{"type":"integer","minimum":1,"maximum":86400},
+                    "max_requests":{"type":"integer","minimum":1,"maximum":1000000},
+                    "enabled":{"type":"boolean","default":true}
+                },
+                "additionalProperties":false
+            }),
+            false,
+            true,
+        ),
+        tool(
+            "open_commerce_set_rate_limit_enabled",
+            "停用或重新启用一项商户调用配额。停用指定 App 策略后，仍可能命中该能力的全部 App 策略。",
+            json!({
+                "type":"object",
+                "required":["policy_id","enabled"],
+                "properties":{
+                    "policy_id":{"type":"string","minLength":1,"maxLength":120},
+                    "enabled":{"type":"boolean"}
+                },
+                "additionalProperties":false
+            }),
+            false,
+            true,
+        ),
+        tool(
             "open_commerce_create_integration",
             "登记一个商户自有数据源的接入方式、授权范围和数据域。这里只登记连接事实，不接收也不保存访问令牌。",
             json!({

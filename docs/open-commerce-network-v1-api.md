@@ -37,6 +37,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `POST` | `/api/projects/:project_id/open-commerce/integrations` | 登记商户数据来源、授权范围和数据域 |
 | `PATCH` | `/api/projects/:project_id/open-commerce/integrations/:integration_id/enabled` | 停用或重新启用数据接入 |
 | `POST` | `/api/projects/:project_id/open-commerce/sync-receipts` | 由适配器记录幂等同步或健康检查回执 |
+| `PUT` | `/api/projects/:project_id/open-commerce/rate-limits` | 按能力和指定 App/全部 App 创建或更新调用配额 |
+| `PATCH` | `/api/projects/:project_id/open-commerce/rate-limits/:policy_id/enabled` | 停用或重新启用调用配额 |
 
 ## 发现与调用 API
 
@@ -92,6 +94,14 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 
 相同调用方、商户、能力和幂等键的重复调用返回原调用结果或稳定的重复结果，不重复累计金额。
 
+## 调用配额
+
+商户可以为每项能力配置固定时间窗调用上限。指定 App 策略优先于全部 App 策略；全部 App 策略按调用主体分别计数。没有策略时保持现有允许行为，项目编辑者在本项目内调试不占额度。
+
+幂等重放在限流前返回原调用结果。超过配额的新调用不会进入处理器，记录为 `failed/rate_limited`，单位和金额均为 0，并返回 `429` 与重试时间。项目总览同时返回 `rate_limit_policies` 和当前时间窗 `rate_limit_usage`。
+
+当前计数持久化在一龙主数据库中，适用于共用该数据库的服务实例；它不等于跨数据库、跨地域的全网限流。
+
 ## MCP 工具
 
 | 工具 | 读写 | 用途 |
@@ -105,6 +115,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `open_commerce_upsert_runtime` | 写 | 配置商户运行绑定的地址、服务端凭据引用和 Manifest 摘要 |
 | `open_commerce_verify_runtime` | 写 | 通过签名健康检查激活运行绑定 |
 | `open_commerce_create_grant` | 写 | 为 App 创建最小范围授权 |
+| `open_commerce_upsert_rate_limit` | 写 | 按商户能力和 App 创建或更新固定时间窗配额 |
+| `open_commerce_set_rate_limit_enabled` | 写 | 停用或重新启用调用配额 |
 | `open_commerce_create_integration` | 写 | 登记商户数据来源 |
 | `open_commerce_set_integration_enabled` | 写 | 停用或重新启用接入 |
 | `open_commerce_record_sync_receipt` | 写 | 记录有界、幂等的适配器回执 |
@@ -140,5 +152,6 @@ V1 仍拒绝未知处理器，也不允许在能力配置中填写任意 URL 或
 | `404` | 商户、能力、授权或项目不存在 |
 | `409` | slug、能力键、幂等键语义冲突 |
 | `422` | 能力存在但当前输入不满足契约 |
+| `429` | 商户配置的能力调用配额已达到上限 |
 
 错误响应不得包含 token、密钥、内部处理器配置或原始敏感输入。

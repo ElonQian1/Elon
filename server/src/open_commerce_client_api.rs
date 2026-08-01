@@ -402,8 +402,12 @@ fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response 
 }
 
 fn service_error(error: anyhow::Error) -> Response {
+    let rate_limited =
+        error.is::<crate::open_commerce_rate_limit_model::OpenCommerceRateLimitExceeded>();
     let message = format!("{error:#}");
-    let status = if message.contains("权限") || message.contains("不能代表") {
+    let status = if rate_limited {
+        StatusCode::TOO_MANY_REQUESTS
+    } else if message.contains("权限") || message.contains("不能代表") {
         StatusCode::FORBIDDEN
     } else if message.contains("不存在") {
         StatusCode::NOT_FOUND

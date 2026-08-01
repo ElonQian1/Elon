@@ -20,6 +20,8 @@ use crate::{
         HANDLER_MERCHANT_RUNTIME, HANDLER_STATIC_JSON, MERCHANT_STATUS_ACTIVE,
         OPEN_COMMERCE_SCHEMA,
     },
+    open_commerce_rate_limit_model::RATE_LIMIT_STATUS_ACTIVE,
+    open_commerce_rate_limit_service,
     open_commerce_runtime_model::{MerchantRuntimeEnvelope, RUNTIME_STATUS_ACTIVE},
     project_auth::can_edit,
     store::{OpenCommerceInvocationStart, RecordOpenCommerceSyncReceipt, Store},
@@ -41,6 +43,8 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
     let runtime_bindings = store.list_project_open_commerce_runtime_bindings(project_id)?;
     let recent_sync_receipts = store.list_project_open_commerce_sync_receipts(project_id, 100)?;
     let recent_audit_events = store.list_project_open_commerce_audit(project_id, 100)?;
+    let rate_limit_policies = store.list_project_open_commerce_rate_limits(project_id)?;
+    let rate_limit_usage = store.list_project_open_commerce_rate_limit_usage(project_id)?;
     let active_merchants = merchants
         .iter()
         .filter(|entry| entry.merchant.status == MERCHANT_STATUS_ACTIVE)
@@ -72,6 +76,14 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
         .iter()
         .filter(|binding| binding.status == RUNTIME_STATUS_ACTIVE)
         .count();
+    let active_rate_limit_policies = rate_limit_policies
+        .iter()
+        .filter(|policy| policy.status == RATE_LIMIT_STATUS_ACTIVE)
+        .count();
+    let recent_rate_limited_invocations = recent_invocations
+        .iter()
+        .filter(|invocation| invocation.error_code.as_deref() == Some("rate_limited"))
+        .count();
     Ok(OpenCommerceOverview {
         schema: OPEN_COMMERCE_SCHEMA,
         project_id: project_id.to_string(),
@@ -89,6 +101,9 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
             active_runtime_bindings,
             sync_receipts: recent_sync_receipts.len(),
             metered_amount_micros,
+            rate_limit_policies: rate_limit_policies.len(),
+            active_rate_limit_policies,
+            recent_rate_limited_invocations,
         },
         merchants,
         directory_publications,
@@ -98,6 +113,8 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
         runtime_bindings,
         recent_sync_receipts,
         recent_audit_events,
+        rate_limit_policies,
+        rate_limit_usage,
     })
 }
 
@@ -476,6 +493,16 @@ pub(crate) async fn invoke(
     if !claim.created {
         return invocation_response(&claim.invocation, true);
     }
+
+    open_commerce_rate_limit_service::enforce_invocation(
+        store,
+        &merchant,
+        &capability,
+        actor.user_id,
+        &requester_app_id,
+        &claim.invocation.id,
+        target_editor,
+    )?;
 
     let result = match execute_handler(
         store,

@@ -4,6 +4,7 @@ import OpenCommerceMerchantEditor from './OpenCommerceMerchantEditor'
 import OpenCommerceIntegrationManager from './OpenCommerceIntegrationManager'
 import OpenCommerceRuntimeManager from './OpenCommerceRuntimeManager'
 import OpenCommerceDirectoryPublisher from './OpenCommerceDirectoryPublisher'
+import OpenCommerceRateLimitManager from './OpenCommerceRateLimitManager'
 import type { OpenCommerceOverview } from './openCommerceTypes'
 import { commerceStyles } from './openCommerceStyles'
 import styles from './OpenCommercePanel.module.css'
@@ -106,6 +107,7 @@ export default function OpenCommerceMerchantWorkspace({
         <Stat label="有效能力" value={totals?.active_capabilities ?? 0} detail={`共 ${totals?.capabilities ?? 0} 项`} />
         <Stat label="有效授权" value={totals?.active_grants ?? 0} detail="可撤销、可审计" />
         <Stat label="调用次数" value={totals?.invocations ?? 0} detail={`${formatMicros(totals?.metered_amount_micros ?? 0)} CNY 已计量`} />
+        <Stat label="调用配额" value={totals?.active_rate_limit_policies ?? 0} detail={`近期 ${totals?.recent_rate_limited_invocations ?? 0} 次超限被拒绝`} />
         <Stat label="数据接入" value={totals?.connected_integrations ?? 0} detail={`共 ${totals?.integrations ?? 0} 个，${totals?.degraded_integrations ?? 0} 个异常`} />
         <Stat label="商户运行时" value={totals?.active_runtime_bindings ?? 0} detail="签名验证后方可调用" />
       </section>
@@ -150,6 +152,14 @@ export default function OpenCommerceMerchantWorkspace({
                 onChanged={refresh}
               />
               <OpenCommerceMerchantEditor projectId={projectId} merchant={selectedMerchant} grants={overview?.grants ?? []} canEdit={canEdit} onChanged={refresh} />
+              <OpenCommerceRateLimitManager
+                projectId={projectId}
+                merchant={selectedMerchant}
+                policies={overview?.rate_limit_policies ?? []}
+                usage={overview?.rate_limit_usage ?? []}
+                canEdit={canEdit}
+                onChanged={refresh}
+              />
               <OpenCommerceRuntimeManager
                 projectId={projectId}
                 merchantId={selectedMerchant.merchant.id}
@@ -212,6 +222,9 @@ function auditLabel(action: string) {
     'grant.revoked': '撤销授权',
     'invocation.succeeded': '调用成功',
     'invocation.failed': '调用失败',
+    'invocation.rate_limited': '调用超出配额',
+    'rate_limit.upserted': '设置调用配额',
+    'rate_limit.status_changed': '切换配额状态',
     'runtime.configured': '配置商户运行时',
     'runtime.verified': '验证商户运行时',
   }

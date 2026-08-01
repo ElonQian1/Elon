@@ -41,7 +41,7 @@ source: docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md
 
 ## 阶段三：开放消费者 AI 与开发者接入
 
-开放 SDK、API、MCP、沙盒和计费，支持不同消费者 App 与 AI 发现和调用同一商户能力，并完成至少一个跨 App 预约或交易闭环。
+开放 SDK、API、MCP、沙盒和计费，支持不同消费者 App 与 AI 发现和调用同一商户能力，并完成至少一个跨 App 预约或交易闭环。固定时间窗调用配额已先行实现，生产应用审核、动态风控和跨运营方治理仍需后续验证。
 
 关键验证：
 

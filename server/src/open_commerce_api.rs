@@ -502,8 +502,12 @@ fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response 
 }
 
 fn service_error(error: anyhow::Error) -> Response {
+    let rate_limited =
+        error.is::<crate::open_commerce_rate_limit_model::OpenCommerceRateLimitExceeded>();
     let message = format!("{error:#}");
-    let status = if message.contains("权限") || message.contains("授权") {
+    let status = if rate_limited {
+        StatusCode::TOO_MANY_REQUESTS
+    } else if message.contains("权限") || message.contains("授权") {
         StatusCode::FORBIDDEN
     } else if message.contains("不存在") || message.contains("未发布") {
         StatusCode::NOT_FOUND
@@ -538,6 +542,17 @@ mod tests {
         assert_eq!(
             service_error(anyhow::anyhow!("相同幂等键不能用于不同输入")).status(),
             StatusCode::CONFLICT
+        );
+        assert_eq!(
+            service_error(anyhow::anyhow!(
+                crate::open_commerce_rate_limit_model::OpenCommerceRateLimitExceeded {
+                    retry_after_seconds: 3,
+                    max_requests: 2,
+                    window_seconds: 60,
+                }
+            ))
+            .status(),
+            StatusCode::TOO_MANY_REQUESTS
         );
     }
 }

@@ -19,6 +19,10 @@ use crate::{
         normalize_app_id, CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
         InvokeCapabilityRequest,
     },
+    open_commerce_rate_limit_model::{
+        SetOpenCommerceRateLimitEnabledRequest, UpsertOpenCommerceRateLimitRequest,
+    },
+    open_commerce_rate_limit_service,
     open_commerce_runtime_model::UpsertRuntimeBindingRequest,
     open_commerce_runtime_service,
     open_commerce_service::{self, OpenCommerceActor},
@@ -99,6 +103,12 @@ struct AuditArguments {
 #[derive(Debug, Deserialize)]
 struct SetIntegrationEnabledArguments {
     integration_id: String,
+    enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct SetRateLimitEnabledArguments {
+    policy_id: String,
     enabled: bool,
 }
 
@@ -271,6 +281,31 @@ pub(crate) async fn call_tool(
             let input: CreateGrantRequest = decode(arguments, name)?;
             serde_json::to_value(open_commerce_service::create_grant(
                 store, project_id, &actor, input,
+            )?)?
+        }
+        "open_commerce_upsert_rate_limit" => {
+            let input: UpsertOpenCommerceRateLimitRequest = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_rate_limit_service::upsert_policy(
+                store,
+                project_id,
+                user_id,
+                app_id,
+                project_role,
+                input,
+            )?)?
+        }
+        "open_commerce_set_rate_limit_enabled" => {
+            let input: SetRateLimitEnabledArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_rate_limit_service::set_policy_enabled(
+                store,
+                project_id,
+                &input.policy_id,
+                user_id,
+                app_id,
+                project_role,
+                SetOpenCommerceRateLimitEnabledRequest {
+                    enabled: input.enabled,
+                },
             )?)?
         }
         "open_commerce_create_integration" => {

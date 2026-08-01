@@ -12,6 +12,8 @@ import type {
   OpenCommerceOverview,
   OpenCommerceIntegration,
   OpenCommerceRuntimeBinding,
+  OpenCommerceRateLimitPolicy,
+  UpsertOpenCommerceRateLimit,
   UpsertOpenCommerceRuntimeBinding,
 } from './openCommerceTypes'
 
@@ -77,6 +79,15 @@ export const openCommerceApi = {
     api.post<OpenCommerceRuntimeBinding>(
       `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/runtime/verify`,
       {},
+    ),
+
+  upsertRateLimit: (projectId: string, request: UpsertOpenCommerceRateLimit) =>
+    api.put<OpenCommerceRateLimitPolicy>(`${projectBase(projectId)}/rate-limits`, request),
+
+  setRateLimitEnabled: (projectId: string, policyId: string, enabled: boolean) =>
+    api.patch<OpenCommerceRateLimitPolicy>(
+      `${projectBase(projectId)}/rate-limits/${encodeURIComponent(policyId)}/enabled`,
+      { enabled },
     ),
 
 }

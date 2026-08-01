@@ -37,6 +37,7 @@
 | 批准或拒绝申请 | `POST .../authorization-requests/{request_id}/approve` 或 `reject` |
 | 查看或撤回本项目发出的申请 | `GET .../outbound-authorization-requests`、`POST .../{request_id}/cancel` |
 | 发布或撤回商户目录 | `PUT /api/projects/{project_id}/open-commerce/merchants/{merchant_id}/directory-publication` |
+| 设置或停用商户调用配额 | `PUT .../rate-limits`、`PATCH .../rate-limits/{policy_id}/enabled` |
 | 消费者发现 | `POST /api/open-commerce/sandbox/discover` |
 | 提交授权申请 | `POST /api/open-commerce/authorization-requests` |
 | 使用测试 Token 调用 | `POST /api/open-commerce/developer/invoke` |
@@ -55,4 +56,4 @@ Set-Location pc-frontend
 npm run test:open-commerce
 ```
 
-当前已实现商户主动选择的跨项目基础目录，以及沙盒 App 停用、旧 Token 永久失效、重新启用生成新 Token、申请方查看和撤回的生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、限流、滥用处置、支付和真实平台适配器仍是后续模块。
+当前已实现商户主动选择的跨项目基础目录、持久化能力调用配额，以及沙盒 App 停用、旧 Token 永久失效、重新启用生成新 Token、申请方查看和撤回的生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、全网滥用处置、支付和真实平台适配器仍是后续模块。

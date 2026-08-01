@@ -163,6 +163,12 @@ mod open_commerce_mcp;
 mod open_commerce_mcp_tools;
 mod open_commerce_migration;
 mod open_commerce_model;
+mod open_commerce_rate_limit_api;
+mod open_commerce_rate_limit_migration;
+mod open_commerce_rate_limit_model;
+mod open_commerce_rate_limit_service;
+#[cfg(test)]
+mod open_commerce_rate_limit_tests;
 mod open_commerce_runtime_client;
 mod open_commerce_runtime_migration;
 mod open_commerce_runtime_model;

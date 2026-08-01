@@ -151,6 +151,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (114, "通用 ERP 蓝图、提案与升级治理", crate::erp_blueprint_migration::migration_v114),
     (115, "ERP 蓝图演进、实例修订与升级证据", crate::erp_blueprint_evolution_migration::migration_v115),
     (116, "开放商业商户主动发布与脱敏跨项目目录", crate::open_commerce_directory_migration::migration_v116),
+    (117, "开放商业商户可控调用配额与原子计数", crate::open_commerce_rate_limit_migration::migration_v117),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

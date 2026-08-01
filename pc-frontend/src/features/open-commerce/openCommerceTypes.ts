@@ -90,6 +90,28 @@ export interface OpenCommerceAuditEvent {
   created_at: string
 }
 
+export interface OpenCommerceRateLimitPolicy {
+  id: string
+  project_id: string
+  merchant_id: string
+  capability_id: string
+  capability_key: string
+  requester_app_id?: string
+  window_seconds: number
+  max_requests: number
+  status: 'active' | 'disabled'
+  created_by_user_id: string
+  created_at: string
+  updated_at: string
+}
+
+export interface OpenCommerceRateLimitUsage {
+  policy_id: string
+  window_started_at_unix: number
+  accepted_requests: number
+  active_subjects: number
+}
+
 export interface OpenCommerceIntegration {
   id: string
   project_id: string
@@ -148,6 +170,8 @@ export interface OpenCommerceOverview {
   runtime_bindings: OpenCommerceRuntimeBinding[]
   recent_sync_receipts: OpenCommerceSyncReceipt[]
   recent_audit_events: OpenCommerceAuditEvent[]
+  rate_limit_policies: OpenCommerceRateLimitPolicy[]
+  rate_limit_usage: OpenCommerceRateLimitUsage[]
   totals: {
     merchants: number
     active_merchants: number
@@ -162,6 +186,9 @@ export interface OpenCommerceOverview {
     sync_receipts: number
     active_runtime_bindings: number
     metered_amount_micros: number
+    rate_limit_policies: number
+    active_rate_limit_policies: number
+    recent_rate_limited_invocations: number
   }
 }
 
@@ -232,4 +259,13 @@ export interface InvokeOpenCommerceCapability {
   grant_id?: string
   idempotency_key: string
   input: Record<string, unknown>
+}
+
+export interface UpsertOpenCommerceRateLimit {
+  merchant_id: string
+  capability_key: string
+  requester_app_id?: string
+  window_seconds: number
+  max_requests: number
+  enabled: boolean
 }

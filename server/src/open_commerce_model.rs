@@ -6,6 +6,9 @@ use serde_json::{Map, Value};
 
 use crate::open_commerce_directory_model::OpenCommerceDirectoryPublication;
 use crate::open_commerce_integration_model::{OpenCommerceIntegration, OpenCommerceSyncReceipt};
+use crate::open_commerce_rate_limit_model::{
+    OpenCommerceRateLimitPolicy, OpenCommerceRateLimitUsage,
+};
 use crate::open_commerce_runtime_model::OpenCommerceRuntimeBinding;
 
 pub(crate) const OPEN_COMMERCE_SCHEMA: &str = "open_commerce.v1";
@@ -131,6 +134,8 @@ pub(crate) struct OpenCommerceOverview {
     pub runtime_bindings: Vec<OpenCommerceRuntimeBinding>,
     pub recent_sync_receipts: Vec<OpenCommerceSyncReceipt>,
     pub recent_audit_events: Vec<OpenCommerceAuditEvent>,
+    pub rate_limit_policies: Vec<OpenCommerceRateLimitPolicy>,
+    pub rate_limit_usage: Vec<OpenCommerceRateLimitUsage>,
     pub totals: OpenCommerceTotals,
 }
 
@@ -149,6 +154,9 @@ pub(crate) struct OpenCommerceTotals {
     pub active_runtime_bindings: usize,
     pub sync_receipts: usize,
     pub metered_amount_micros: i64,
+    pub rate_limit_policies: usize,
+    pub active_rate_limit_policies: usize,
+    pub recent_rate_limited_invocations: usize,
 }
 
 #[derive(Debug, Clone, Deserialize)]
