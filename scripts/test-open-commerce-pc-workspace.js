@@ -49,6 +49,9 @@ const mcpTools = read('server/src/open_commerce_mcp_tools.rs')
 const merchantEditor = read(`${featureRoot}/OpenCommerceMerchantEditor.tsx`)
 const grantBudgetStore = read('server/src/store/open_commerce_grant_budgets.rs')
 const invocationStore = read('server/src/store/open_commerce_invocations.rs')
+const invocationRecovery = read('server/src/store/open_commerce_invocation_recovery.rs')
+const invocationRecoveryLoop = read('server/src/open_commerce_invocation_recovery.rs')
+const serverMain = read('server/src/main.rs')
 const grantBudgetUi = read(`${featureRoot}/openCommerceGrantBudget.ts`)
 
 for (const view of [
@@ -95,6 +98,12 @@ assert.ok(clientApi.includes('max_amount_micros'), 'authorization decisions must
 assert.ok(mcpTools.includes('max_invocations'), 'merchant AI must be able to set a lifetime grant budget through MCP')
 assert.ok(grantBudgetStore.includes('TransactionBehavior::Immediate'), 'grant budget reservation must serialize concurrent claims')
 assert.ok(invocationStore.includes('release_grant_budget_reservation_on'), 'failed handlers must release their grant budget reservation')
+assert.ok(grantBudgetStore.includes('invocation_status.as_deref() != Some("started")'), 'a recovered invocation must not reserve budget again')
+assert.ok(invocationRecovery.includes('invocation.recovered_failed'), 'orphan invocation recovery must append a stable audit event')
+assert.ok(invocationRecovery.includes('OPEN_COMMERCE_INVOCATION_LEASE_SECONDS'), 'runtime recovery must use an explicit invocation lease')
+assert.ok(invocationRecovery.includes("status = 'released'"), 'orphan recovery must release its Grant reservation')
+assert.ok(invocationRecoveryLoop.includes('spawn_expired_invocation_reconciler'), 'orphan invocation reconciliation must run periodically')
+assert.ok(serverMain.includes('recover_interrupted_invocations(&state.store)'), 'server startup must close interrupted commerce invocations')
 
 assert.ok(clientApi.includes("'x-elon-app-id'"), 'signed-in app calls must bind an app identity')
 assert.ok(clientApi.includes('Authorization: `Bearer ${testToken}`'), 'developer calls must use test credentials')

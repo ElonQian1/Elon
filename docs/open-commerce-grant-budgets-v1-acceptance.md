@@ -1,6 +1,6 @@
 # 开放商业授权生命周期预算 V1 验收
 
-验收日期：2026-08-01
+验收日期：2026-08-02
 
 ## 已验证闭环
 
@@ -12,6 +12,9 @@
 - Grant 返回已用次数和金额；PC 商户工作台展示已用/上限，审批入口可设置同一预算。
 - MCP 创建 Grant 与 HTTP 使用同一预算字段和领域规则。
 - 预算事件审计不包含原始调用值。
+- 服务启动会原子失败关闭全部遗留 `started` 调用；运行期间会回收超过 120 秒的孤儿调用。
+- 有预算预留时，调用失败、Grant 计数退回、预留释放和脱敏审计在同一事务中完成；重复扫描不重复退回。
+- 恢复后的迟到结果不能改写终态，也不能重新预留 Grant 预算。
 
 ## 验证命令
 
@@ -20,6 +23,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 `
   -Domain open-commerce-grant-budget -- test `
   --manifest-path server\Cargo.toml open_commerce_grant_budget
 
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 `
+  -Domain open-commerce-invocation-recovery -- test `
+  --manifest-path server\Cargo.toml open_commerce_invocation_recovery
+
 Set-Location pc-frontend
 npm run build
 npm run test:open-commerce
@@ -27,7 +34,7 @@ npm run test:open-commerce
 
 ## 尚未覆盖
 
-- 进程在预留后崩溃时的自动超时对账与人工释放工具。
+- 商户可手动查看、确认或处理单个恢复事件的运营工作台。
 - 跨数据库、跨地域部署下的分布式原子预算。
 - 真实支付、退款、争议裁决、链上结算或收入权益。
 - 商户对现有 Grant 原地增加预算；V1 必须撤销并重新授权。

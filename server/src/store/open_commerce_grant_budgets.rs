@@ -29,6 +29,16 @@ impl Store {
         };
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let invocation_status = tx
+            .query_row(
+                "SELECT status FROM open_commerce_invocations WHERE id = ?1",
+                params![invocation.id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if invocation_status.as_deref() != Some("started") {
+            bail!("调用不存在或已经完成，不能预留授权预算");
+        }
         let mut state = active_budget_state(
             &tx,
             grant_id,

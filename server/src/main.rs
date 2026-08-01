@@ -176,6 +176,9 @@ mod open_commerce_grant_budget_tests;
 mod open_commerce_integration_migration;
 mod open_commerce_integration_model;
 mod open_commerce_invocation_protocol;
+mod open_commerce_invocation_recovery;
+#[cfg(test)]
+mod open_commerce_invocation_recovery_tests;
 mod open_commerce_mcp;
 mod open_commerce_mcp_tools;
 mod open_commerce_migration;
@@ -438,6 +441,8 @@ async fn main() -> Result<()> {
     }
     node_llm_stream::recover_interrupted_runs(&state.store);
     node_llm_stream::spawn_expired_run_reconciler(state.clone());
+    open_commerce_invocation_recovery::recover_interrupted_invocations(&state.store);
+    open_commerce_invocation_recovery::spawn_expired_invocation_reconciler(state.clone());
     let interrupted_pc_sessions = state
         .store
         .mark_interrupted_running_project_execution_sessions()

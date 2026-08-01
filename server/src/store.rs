@@ -68,6 +68,7 @@ mod open_commerce_directory;
 mod open_commerce_grant_budgets;
 mod open_commerce_grants;
 mod open_commerce_integrations;
+mod open_commerce_invocation_recovery;
 mod open_commerce_invocations;
 mod open_commerce_merchants;
 mod open_commerce_rate_limits;
