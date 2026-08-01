@@ -437,6 +437,7 @@ async fn main() -> Result<()> {
         );
     }
     node_llm_stream::recover_interrupted_runs(&state.store);
+    node_llm_stream::spawn_expired_run_reconciler(state.clone());
     let interrupted_pc_sessions = state
         .store
         .mark_interrupted_running_project_execution_sessions()

@@ -22,6 +22,7 @@
 | 节点模型共享必须由所有者显式开放 | 在线和模型上报不代表同意出租；按模型、并发和每日 Token 预算授权，调度前原子预留，所有者自用不受影响 | `docs/decisions/node-compute-sharing-supply-v1.md` |
 | 共享节点每日 Token 预算必须覆盖在途任务 | 派发前原子检查今日实耗、活动预留和本次保守预留；终态按实际用量记账，过期租约不能复活 | `docs/decisions/node-compute-sharing-token-reservation-v1.md` |
 | 共享节点运行偏差只先形成所有者健康证据 | 从持久化记录派生失败、Token 预留超出和过期租约，仅在所有者控制面告警，不自动处罚、赔付或上链 | `docs/decisions/node-compute-sharing-runtime-health-v1.md` |
+| 过期节点推理必须失败关闭并回收预授权 | 收到终态后先冻结实际用量为非执行状态；只有未收到可信终态且租约过期的运行才原子失败关闭，迟到结果不得改写终态 | `docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md` |
 | 先实现链外影子结算，再评估 Sui 网络适配器 | 复用真实成本和人工验收事实，保持双分录、幂等和默认关闭，不移动真实资金 | `docs/decisions/task-shadow-settlement-v1.md` |
 | Sui 适配器先消费可复核的链下投影包 | 投影包绑定目标网络、来源摘要与投影摘要；当前只持久化和复核，固定未提交 | `docs/decisions/sui-offchain-projection-packages-v1.md` |
 | 争议只追加证据并阻断投影，不改写历史账本 | 待审核或已接受争议阻断原凭证投影；纠正必须使用新的 Matter 和凭证 | `docs/decisions/task-shadow-settlement-disputes-v1.md` |

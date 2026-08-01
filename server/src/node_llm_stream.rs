@@ -8,7 +8,7 @@ use tokio::{
     time::{interval, MissedTickBehavior},
 };
 
-use crate::store::Store;
+use crate::{store::Store, types::AppState};
 
 #[cfg(not(test))]
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
@@ -45,6 +45,46 @@ pub(crate) fn recover_interrupted_runs(store: &Store) -> usize {
         );
     }
     interrupted.len()
+}
+
+pub(crate) fn reconcile_expired_runs(store: &Store) -> usize {
+    let expired = match store.mark_expired_started_server_node_llm_runs() {
+        Ok(runs) => runs,
+        Err(error) => {
+            tracing::warn!(%error, "节点推理过期租约终结失败");
+            return 0;
+        }
+    };
+    for run in &expired {
+        crate::billing::release_trusted_call(
+            store,
+            &run.consumer_user_id,
+            &run.compute_call_id,
+            "expired_released",
+        );
+    }
+    if !expired.is_empty() {
+        tracing::warn!(
+            count = expired.len(),
+            "节点推理租约过期，执行证明已失败关闭并释放预授权"
+        );
+    }
+    expired.len()
+}
+
+pub(crate) fn spawn_expired_run_reconciler(state: std::sync::Arc<AppState>) {
+    let interval_secs = std::env::var("NODE_LLM_LEASE_RECONCILE_SECS")
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or(30)
+        .max(5);
+    tokio::spawn(async move {
+        let mut ticker = tokio::time::interval(Duration::from_secs(interval_secs));
+        loop {
+            ticker.tick().await;
+            reconcile_expired_runs(&state.store);
+        }
+    });
 }
 
 pub(crate) async fn collect(
@@ -252,6 +292,9 @@ mod tests {
             store.billing_get_balance(&run.consumer_user_id).unwrap(),
             Some(900)
         );
+        assert!(store
+            .mark_server_node_llm_usage_received(call_id, run.provider_user_id.as_deref(), 2, 1,)
+            .unwrap());
 
         assert_eq!(recover_interrupted_runs(&store), 1);
         assert_eq!(
@@ -266,6 +309,67 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(recovered.status, "failed");
+        assert_eq!(
+            recovered.settlement_status.as_deref(),
+            Some("released_error")
+        );
+        assert_eq!(
+            recovered.error_message.as_deref(),
+            Some("server restarted before node LLM settlement completed")
+        );
+        drop(store);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn expired_reconcile_releases_reserved_balance_once() {
+        let call_id = "node_llm:expired-refund";
+        let (store, path) = running_store(call_id);
+        let run = store
+            .get_node_compute_run_by_compute_call_id(call_id)
+            .unwrap()
+            .unwrap();
+        store
+            .billing_recharge(&run.consumer_user_id, 1_000, "test", "test", None)
+            .unwrap();
+        crate::billing::reserve_trusted_call(
+            &store,
+            &run.consumer_user_id,
+            call_id,
+            "node_llm",
+            "server_node_llm",
+            Some("qwen"),
+            100,
+        )
+        .unwrap();
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute(
+            "UPDATE node_compute_runs SET updated_at='2000-01-01T00:00:00Z'
+              WHERE compute_call_id=?1",
+            rusqlite::params![call_id],
+        )
+        .unwrap();
+        drop(conn);
+
+        assert_eq!(reconcile_expired_runs(&store), 1);
+        assert_eq!(reconcile_expired_runs(&store), 0);
+        assert_eq!(
+            store.billing_get_balance(&run.consumer_user_id).unwrap(),
+            Some(1_000)
+        );
+        assert!(!store
+            .billing_reservation_is_still_reserved(&run.consumer_user_id, call_id)
+            .unwrap());
+        let reconciled = store
+            .get_node_compute_run_by_compute_call_id(call_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(reconciled.status, "failed");
+        assert_eq!(
+            reconciled.settlement_status.as_deref(),
+            Some("expired_released")
+        );
+
         drop(store);
         let _ = std::fs::remove_file(path);
     }

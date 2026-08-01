@@ -185,3 +185,39 @@ fn recent_failure_without_critical_signal_is_warning() {
     assert_eq!(health.status, "warning");
     assert_eq!(health.attention_codes, vec!["recent_execution_failure"]);
 }
+
+#[test]
+fn usage_received_is_not_reported_as_terminal_or_expired_execution() {
+    let (store, owner, consumer, node_id) = fixture();
+    store
+        .claim_shared_node_compute_run_with_budget(
+            start(
+                "node_llm:health-usage-received",
+                &consumer,
+                &owner,
+                &node_id,
+            ),
+            20,
+        )
+        .unwrap();
+    assert!(store
+        .mark_server_node_llm_usage_received("node_llm:health-usage-received", Some(&owner), 4, 3,)
+        .unwrap());
+    {
+        let conn = store.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE node_compute_runs SET updated_at='2000-01-01T00:00:00Z'
+              WHERE compute_call_id='node_llm:health-usage-received'",
+            [],
+        )
+        .unwrap();
+    }
+
+    let health = store
+        .node_compute_sharing_runtime_health(&node_id, &owner)
+        .unwrap();
+    assert_eq!(health.status, "healthy");
+    assert_eq!(health.completed_runs_24h, 0);
+    assert_eq!(health.expired_active_runs, 0);
+    assert!(health.attention_codes.is_empty());
+}

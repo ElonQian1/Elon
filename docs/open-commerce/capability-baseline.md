@@ -19,7 +19,7 @@
 | APK、网页和项目产物交付 | 已实现 | 平台已有项目执行、构建和发布链路，不等于所有第三方平台均已接入 | `AI_PROJECT.md`、`scripts/publish-apk.ps1` |
 | 多成员、多 AI 协同开发 | 已实现并持续收口 | Matter、Assignment、执行节点、审核、产物和事件形成协作主干 | `server/src/group_ai/`、`docs/群体ai开发/群体AI开发功能需求与架构设计.md` |
 | API Token 保管与使用统计 | 已实现 | 支持 Codex 凭据保险箱、额度与使用估算；凭据不应直接分发到普通客户端 | `server/src/codex_vault_api.rs`、`server/src/codex_vault_emergency_api.rs`、`docs/token消费统计.md` |
-| 节点计算调用、供给授权和账本证据 | 已实现并持续收口 | 节点所有者可默认关闭或按模型、并发和每日 Token 预算开放推理供给；指定与自动调度会原子检查今日实耗、活动预留和本次预留。所有者控制面还会从持久化记录派生近 24 小时失败、预留超出和过期租约健康快照 | `server/src/node_compute_sharing.rs`、`server/src/store/node_compute_sharing.rs`、`server/src/store/node_compute_sharing_health.rs`、`server/src/store/node_ledger.rs` |
+| 节点计算调用、供给授权和账本证据 | 已实现并持续收口 | 节点所有者可默认关闭或按模型、并发和每日 Token 预算开放推理供给；指定与自动调度会原子检查今日实耗、活动预留和本次预留。可信终态先冻结实际用量，过期执行会失败关闭并幂等释放预授权；所有者控制面派生近 24 小时失败、预留超出和过期租约健康快照 | `server/src/node_compute_sharing.rs`、`server/src/store/node_compute_sharing.rs`、`server/src/store/node_compute_runs.rs`、`server/src/store/node_compute_sharing_health.rs`、`server/src/store/node_ledger.rs` |
 | 链外影子经济回执、争议与纠正 | 已实现、默认关闭 | 真实节点成本可形成幂等用量凭证，Matter 人工验收后生成双分录；争议阻断投影，已接受争议通过独立 Matter 原子追加冲销和替换。任意凭证可只读解析根、全部已过账步骤和当前有效凭证，循环或分叉失败关闭 | `server/src/task_settlement/`、`docs/decisions/task-shadow-settlement-corrections-v1.md`、`docs/decisions/task-shadow-settlement-lineage-v1.md`、`docs/task-shadow-settlement-v1-acceptance.md` |
 | Sui 凭证投影与链下包 | 已实现、无网络副作用 | 标准凭证可保存单笔投影包；已过账纠正可把冲销与替换共同保存为不可拆分的原子包。两类包均绑定目标网络和来源摘要、可复核完整性，并固定标记 `not_submitted` | `server/src/task_settlement/sui_projection_service.rs`、`server/src/task_settlement/sui_correction_projection_service.rs`、`docs/decisions/sui-correction-projection-packages-v1.md` |
 | 开放商业网络 V1 | 已实现 | 已有商户节点、商业能力、授权、调用、计量和审计的 HTTP/MCP 主路径 | `server/src/open_commerce_service.rs`、`server/src/open_commerce_mcp.rs`、`docs/open-commerce-network-v1-acceptance.md` |
@@ -45,7 +45,7 @@
 | 美团、抖音、京东、淘宝闪购等经营数据统一接入 | 部分实现 | 接入控制面、状态和同步回执已实现；仍必须逐个平台确认官方授权、实现适配器、验证字段覆盖和长期稳定性，不能把登记数据源描述成已接通全量 API |
 | 商户 ERP、海报、短视频、小游戏和营销活动自动生成 | 部分实现 | 通用 ERP 蓝图与 AI 应用开发主干已存在；真实行业业务模块、发布连接器、经营效果回流和规模化验证仍需完善 |
 | 商户数据自主控制和跨应用授权 | 部分实现 | V1、跨项目脱敏目录、消费者沙盒、调用配额、手动 App 封禁和首个商户自有运行时已打通；可携带关系、生产 App 身份互认、自动全网风控与公共互操作治理尚未完成 |
-| 闲置电脑、收银机和工作站共享算力 | 部分实现 | 模型推理供给的所有者开关、模型白名单、并发、每日实耗与在途预算原子预留、候选回退、流租约、重启退款、所有者运行告警和 PC 控件已实现；通用异构任务、竞价市场、故障赔付、真实提现与链上结算仍未完成 |
+| 闲置电脑、收银机和工作站共享算力 | 部分实现 | 模型推理供给的所有者开关、模型白名单、并发、每日实耗与在途预算原子预留、候选回退、流租约、重启与过期预授权回收、所有者运行告警和 PC 控件已实现；通用异构任务、竞价市场、故障赔付、真实提现与链上结算仍未完成 |
 | 低成本分布式模型训练 | 提案 | 普通公网节点更适合异步任务、推理和可切分工作，不能宣称已等效替代高速互联的企业级 GPU 集群 |
 
 ## 尚未实现的提案

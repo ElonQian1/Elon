@@ -149,7 +149,8 @@ impl Store {
                     error_message = ?9,
                     provider_user_id = COALESCE(?10, provider_user_id),
                     updated_at = ?3
-              WHERE compute_call_id = ?1",
+              WHERE compute_call_id = ?1
+                AND status IN ('started', 'usage_received', 'verification_pending')",
             params![
                 compute_call_id,
                 normalize_status(finish.status),
@@ -164,6 +165,45 @@ impl Store {
             ],
         )?;
         select_run_by_compute_call_id(&conn, compute_call_id)
+    }
+
+    /// Freezes the trusted terminal usage before asynchronous billing begins.
+    /// A stale or already terminal execution cannot re-enter settlement.
+    pub fn mark_server_node_llm_usage_received(
+        &self,
+        compute_call_id: &str,
+        provider_user_id: Option<&str>,
+        prompt_tokens: i64,
+        completion_tokens: i64,
+    ) -> Result<bool> {
+        let compute_call_id = compute_call_id.trim();
+        if compute_call_id.is_empty() {
+            return Ok(false);
+        }
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+        let updated = conn.execute(
+            "UPDATE node_compute_runs
+                SET status = 'usage_received',
+                    prompt_tokens = ?3,
+                    completion_tokens = ?4,
+                    provider_user_id = COALESCE(?5, provider_user_id),
+                    settlement_status = 'pending',
+                    updated_at = ?2
+              WHERE compute_call_id = ?1
+                AND status = 'started'
+                AND usage_mode = 'server_node_llm'
+                AND julianday(updated_at) >= julianday('now', ?6)",
+            params![
+                compute_call_id,
+                ts,
+                prompt_tokens.max(0),
+                completion_tokens.max(0),
+                clean_optional(provider_user_id),
+                format!("-{SERVER_NODE_LLM_LEASE_SECONDS} seconds")
+            ],
+        )?;
+        Ok(updated > 0)
     }
 
     /// Refresh the execution lease while a node LLM stream is still open.
@@ -199,7 +239,8 @@ impl Store {
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let interrupted = {
             let mut stmt = tx.prepare(&format!(
-                "{} WHERE status = 'started' AND usage_mode = 'server_node_llm'",
+                "{} WHERE status IN ('started', 'usage_received')
+                      AND usage_mode = 'server_node_llm'",
                 run_select_sql()
             ))?;
             let rows = stmt.query_map([], read_run)?;
@@ -210,15 +251,60 @@ impl Store {
                 SET status = 'failed',
                     finished_at = ?1,
                     duration_ms = MAX(0, CAST((julianday(?1) - julianday(started_at)) * 86400000 AS INTEGER)),
-                    settlement_status = COALESCE(settlement_status, 'released_error'),
-                    error_message = COALESCE(error_message, 'server restarted before node LLM terminal event'),
+                    settlement_status = CASE
+                        WHEN status = 'usage_received' THEN 'released_error'
+                        ELSE COALESCE(settlement_status, 'released_error')
+                    END,
+                    error_message = COALESCE(
+                        error_message,
+                        CASE
+                            WHEN status = 'usage_received'
+                            THEN 'server restarted before node LLM settlement completed'
+                            ELSE 'server restarted before node LLM terminal event'
+                        END
+                    ),
                     updated_at = ?1
-              WHERE status = 'started'
+              WHERE status IN ('started', 'usage_received')
                 AND usage_mode = 'server_node_llm'",
             params![ts],
         )?;
         tx.commit()?;
         Ok(interrupted)
+    }
+
+    /// Fail closed after the renewable execution lease expires. Selection and
+    /// transition share one immediate transaction so a concurrent heartbeat or
+    /// terminal result cannot revive or overwrite the reconciled run.
+    pub fn mark_expired_started_server_node_llm_runs(&self) -> Result<Vec<NodeComputeRun>> {
+        let ts = now();
+        let lease_cutoff = format!("-{SERVER_NODE_LLM_LEASE_SECONDS} seconds");
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let expired = {
+            let mut stmt = tx.prepare(&format!(
+                "{} WHERE status = 'started'
+                      AND usage_mode = 'server_node_llm'
+                      AND julianday(updated_at) < julianday('now', ?1)",
+                run_select_sql()
+            ))?;
+            let rows = stmt.query_map(params![lease_cutoff], read_run)?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        tx.execute(
+            "UPDATE node_compute_runs
+                SET status = 'failed',
+                    finished_at = ?1,
+                    duration_ms = MAX(0, CAST((julianday(?1) - julianday(started_at)) * 86400000 AS INTEGER)),
+                    settlement_status = 'expired_released',
+                    error_message = COALESCE(error_message, 'node LLM execution lease expired before terminal event'),
+                    updated_at = ?1
+              WHERE status = 'started'
+                AND usage_mode = 'server_node_llm'
+                AND julianday(updated_at) < julianday('now', ?2)",
+            params![ts, lease_cutoff],
+        )?;
+        tx.commit()?;
+        Ok(expired)
     }
 
     pub fn mark_interrupted_started_pc_agent_runs(&self) -> Result<usize> {
@@ -311,7 +397,7 @@ impl Store {
              FROM (
                 SELECT *
                   FROM node_compute_runs
-                 WHERE status != 'started'
+                 WHERE status NOT IN ('started', 'usage_received', 'verification_pending')
                  ORDER BY started_at DESC
                  LIMIT 2000
              )
@@ -435,6 +521,7 @@ fn read_run(row: &rusqlite::Row<'_>) -> rusqlite::Result<NodeComputeRun> {
 fn normalize_status(status: &str) -> &str {
     match status.trim() {
         "started" => "started",
+        "usage_received" => "usage_received",
         "settled" => "settled",
         "settled_no_provider" => "settled_no_provider",
         "settlement_skipped" => "settlement_skipped",
@@ -464,3 +551,7 @@ fn truncate_optional(value: Option<&str>, max_len: usize) -> Option<String> {
 #[cfg(test)]
 #[path = "node_compute_runs_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "node_compute_run_lease_tests.rs"]
+mod lease_tests;

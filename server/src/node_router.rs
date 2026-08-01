@@ -252,6 +252,44 @@ pub fn settle_after_stream(
     let node = node_id.to_string();
     let model = model_id.to_string();
 
+    if let Some(key) = accounting_key.as_deref() {
+        match state.store.mark_server_node_llm_usage_received(
+            key,
+            provider.as_deref(),
+            prompt_tokens as i64,
+            completion_tokens as i64,
+        ) {
+            Ok(true) => {}
+            Ok(false) => {
+                crate::billing::release_trusted_call(
+                    &state.store,
+                    &consumer,
+                    key,
+                    "expired_released",
+                );
+                tracing::warn!(
+                    compute_call_id = key,
+                    "节点推理终态到达时执行租约已失效，跳过记账与节点收益"
+                );
+                return;
+            }
+            Err(error) => {
+                crate::billing::release_trusted_call(
+                    &state.store,
+                    &consumer,
+                    key,
+                    "released_error",
+                );
+                tracing::warn!(
+                    compute_call_id = key,
+                    %error,
+                    "节点推理终态用量冻结失败，跳过记账与节点收益"
+                );
+                return;
+            }
+        }
+    }
+
     tokio::spawn(async move {
         let usage = crate::cli_usage::CliTokenUsage {
             input_tokens: prompt_tokens as i64,

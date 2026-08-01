@@ -61,7 +61,7 @@ impl Store {
                  FROM node_compute_runs
                 WHERE node_id=?1
                   AND usage_mode='server_node_llm'
-                  AND status <> 'started'
+                  AND status NOT IN ('started', 'usage_received')
                   AND provider_user_id=?2
                   AND consumer_user_id <> provider_user_id
                   AND julianday(COALESCE(finished_at, updated_at)) >= julianday('now', '-24 hours')",
