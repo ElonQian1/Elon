@@ -5,6 +5,13 @@ import {
   optionalPositiveInteger,
   optionalYuanMicros,
 } from './openCommerceGrantBudget'
+import {
+  grantExpiresAt,
+  grantExpiryLabel,
+  grantExpiryOptions,
+  isGrantExpired,
+  type GrantExpiryPreset,
+} from './openCommerceGrantExpiry'
 import type {
   OpenCommerceCapability,
   OpenCommerceGrant,
@@ -40,6 +47,7 @@ export default function OpenCommerceMerchantEditor({
   const [grantPurpose, setGrantPurpose] = useState('允许消费者 AI 调用指定商业能力')
   const [grantMaxInvocations, setGrantMaxInvocations] = useState('')
   const [grantMaxAmountYuan, setGrantMaxAmountYuan] = useState('')
+  const [grantExpiryPreset, setGrantExpiryPreset] = useState<GrantExpiryPreset>('30')
   const [invokeCapability, setInvokeCapability] = useState('')
   const [invokeGrantId, setInvokeGrantId] = useState('')
   const [invokeInput, setInvokeInput] = useState('{}')
@@ -104,6 +112,7 @@ export default function OpenCommerceMerchantEditor({
         grantee_app_id: grantAppId,
         scopes,
         purpose: grantPurpose,
+        expires_at: grantExpiresAt(grantExpiryPreset),
         max_invocations: maxInvocations,
         max_amount_micros: maxAmountMicros,
         budget_currency: 'CNY',
@@ -206,6 +215,9 @@ export default function OpenCommerceMerchantEditor({
           <label>应用 ID<input value={grantAppId} onChange={(e) => setGrantAppId(e.target.value)} required disabled={!canEdit} /></label>
           <label>能力键（逗号分隔）<input value={grantScopes} onChange={(e) => setGrantScopes(e.target.value)} placeholder="menu.lookup,booking.create" required disabled={!canEdit} /></label>
           <label>授权用途<textarea value={grantPurpose} onChange={(e) => setGrantPurpose(e.target.value)} required disabled={!canEdit} /></label>
+          <label>授权有效期<select value={grantExpiryPreset} onChange={(e) => setGrantExpiryPreset(e.target.value as GrantExpiryPreset)} disabled={!canEdit}>
+            {grantExpiryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select></label>
           <div className={styles.twoColumns}>
             <label>总调用次数<input type="number" min="1" value={grantMaxInvocations} onChange={(e) => setGrantMaxInvocations(e.target.value)} placeholder="留空不限" disabled={!canEdit} /></label>
             <label>总预算（元）<input type="number" min="0.000001" step="0.000001" value={grantMaxAmountYuan} onChange={(e) => setGrantMaxAmountYuan(e.target.value)} placeholder="留空不限" disabled={!canEdit} /></label>
@@ -214,10 +226,12 @@ export default function OpenCommerceMerchantEditor({
           <div className={styles.grants}>
             {merchantGrants.map((grant) => (
               <div key={grant.id}>
-                <span><strong>{grant.grantee_app_id}</strong><small>{grant.scopes.join('、')} · {grantBudgetLabel(grant)}</small></span>
+                <span><strong>{grant.grantee_app_id}</strong><small>{grant.scopes.join('、')} · {grantExpiryLabel(grant.expires_at)} · {grantBudgetLabel(grant)}</small></span>
                 {grant.revoked_at
                   ? <em>已撤销</em>
-                  : <button type="button" onClick={() => revokeGrant(grant.id)} disabled={!canEdit || busy === grant.id}>撤销</button>}
+                  : isGrantExpired(grant.expires_at)
+                    ? <em>已过期</em>
+                    : <button type="button" onClick={() => revokeGrant(grant.id)} disabled={!canEdit || busy === grant.id}>撤销</button>}
               </div>
             ))}
           </div>
@@ -231,7 +245,7 @@ export default function OpenCommerceMerchantEditor({
           </select></label>
           {selectedCapability?.access_level === 'authorized' && <label>授权<select value={invokeGrantId} onChange={(e) => setInvokeGrantId(e.target.value)} required>
             <option value="">请选择授权</option>
-            {merchantGrants.filter((grant) => !grant.revoked_at).map((grant) => <option key={grant.id} value={grant.id}>{grant.grantee_app_id} · {grant.scopes.join(', ')}</option>)}
+            {merchantGrants.filter((grant) => !grant.revoked_at && !isGrantExpired(grant.expires_at)).map((grant) => <option key={grant.id} value={grant.id}>{grant.grantee_app_id} · {grant.scopes.join(', ')}</option>)}
           </select></label>}
           <label>调用输入<textarea value={invokeInput} onChange={(e) => setInvokeInput(e.target.value)} /></label>
           <button type="submit" disabled={busy === 'invoke'}>{busy === 'invoke' ? '调用中…' : '调用并记录计量'}</button>

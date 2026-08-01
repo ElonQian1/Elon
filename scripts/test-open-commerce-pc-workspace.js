@@ -54,6 +54,9 @@ const invocationRecovery = read('server/src/store/open_commerce_invocation_recov
 const invocationRecoveryLoop = read('server/src/open_commerce_invocation_recovery.rs')
 const serverMain = read('server/src/main.rs')
 const grantBudgetUi = read(`${featureRoot}/openCommerceGrantBudget.ts`)
+const grantExpiryUi = read(`${featureRoot}/openCommerceGrantExpiry.ts`)
+const authorizationDecision = read('server/src/open_commerce_authorization_decision.rs')
+const authorizationRequestStore = read('server/src/store/open_commerce_authorization_requests.rs')
 
 for (const view of [
   'OpenCommerceMerchantWorkspace',
@@ -104,7 +107,17 @@ assert.ok(merchantEditor.includes('总预算（元）'), 'merchant grant UI must
 assert.ok(merchantEditor.includes('grantBudgetLabel'), 'merchant grant UI must show consumed and maximum budget')
 assert.ok(grantBudgetUi.includes('used_amount_micros'), 'grant budget formatting must use persisted consumption')
 assert.ok(developerPortal.includes('批准后总调用次数'), 'authorization approval must expose a lifetime call budget')
+assert.ok(developerPortal.includes('批准后有效期'), 'authorization approval must expose a Grant expiry preset')
+assert.ok(developerPortal.includes("useState<GrantExpiryPreset>('30')"), 'merchant approval must default to a 30-day Grant')
+assert.ok(merchantEditor.includes('授权有效期'), 'direct Grant creation must expose an expiry preset')
+assert.ok(merchantEditor.includes('isGrantExpired'), 'expired Grants must not remain callable in the PC workspace')
+assert.ok(outboundRequests.includes('grantTermsLabel'), 'requesters must see the approved Grant terms')
+assert.ok(grantExpiryUi.includes("{ value: 'none', label: '长期有效' }"), 'unlimited duration must require an explicit preset')
+assert.ok(authorizationDecision.includes('expires_at: decision.expires_at.clone()'), 'authorization approval must preserve the requested expiry')
+assert.ok(authorizationRequestStore.includes('grant_expires_at'), 'authorization request reads must include actual Grant expiry terms')
+assert.doesNotMatch(grantExpiryUi, /auto.?renew|自动续期/i, 'Grant expiry helpers must not auto-renew access')
 assert.ok(clientApi.includes('max_amount_micros'), 'authorization decisions must send the optional amount budget')
+assert.ok(clientApi.includes('expires_at?: string'), 'authorization decisions must send the optional expiry')
 assert.ok(mcpTools.includes('max_invocations'), 'merchant AI must be able to set a lifetime grant budget through MCP')
 assert.ok(grantBudgetStore.includes('TransactionBehavior::Immediate'), 'grant budget reservation must serialize concurrent claims')
 assert.ok(invocationStore.includes('release_grant_budget_reservation_on'), 'failed handlers must release their grant budget reservation')

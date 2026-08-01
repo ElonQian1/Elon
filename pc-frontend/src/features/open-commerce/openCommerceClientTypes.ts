@@ -35,6 +35,10 @@ export interface AuthorizationRequest {
   decided_by_user_id?: string
   decision_reason?: string
   grant_id?: string
+  grant_expires_at?: string
+  grant_max_invocations?: number
+  grant_max_amount_micros?: number
+  grant_budget_currency?: string
   created_at: string
   updated_at: string
 }

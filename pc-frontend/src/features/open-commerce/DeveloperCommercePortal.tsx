@@ -15,6 +15,12 @@ import {
   optionalPositiveInteger,
   optionalYuanMicros,
 } from './openCommerceGrantBudget'
+import {
+  grantExpiresAt,
+  grantExpiryOptions,
+  grantTermsLabel,
+  type GrantExpiryPreset,
+} from './openCommerceGrantExpiry'
 import OutboundAuthorizationRequests from './OutboundAuthorizationRequests'
 import type {
   AuthorizationRequest,
@@ -49,6 +55,7 @@ export default function DeveloperCommercePortal({
   const [input, setInput] = useState('{}')
   const [approvalMaxInvocations, setApprovalMaxInvocations] = useState('')
   const [approvalMaxAmountYuan, setApprovalMaxAmountYuan] = useState('')
+  const [approvalExpiryPreset, setApprovalExpiryPreset] = useState<GrantExpiryPreset>('30')
   const [response, setResponse] = useState<Record<string, unknown> | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -155,6 +162,7 @@ export default function DeveloperCommercePortal({
     setMessage('')
     try {
       const approvalBudget = decision === 'approve' ? {
+        expires_at: grantExpiresAt(approvalExpiryPreset),
         max_invocations: optionalPositiveInteger(approvalMaxInvocations, '总调用次数'),
         max_amount_micros: optionalYuanMicros(approvalMaxAmountYuan),
         budget_currency: 'CNY',
@@ -265,6 +273,9 @@ export default function DeveloperCommercePortal({
           <header><strong>商户授权收件箱</strong><span style={badgeStyle('warn')}>{requests.filter((item) => item.status === 'pending').length} 待处理</span></header>
           <div className={base.formCard} style={{ ...commerceStyles.sectionBody, ...commerceStyles.scrollArea }}>
             <div style={commerceStyles.grid}>
+              <label>批准后有效期<select value={approvalExpiryPreset} onChange={(event) => setApprovalExpiryPreset(event.target.value as GrantExpiryPreset)} disabled={!canEdit}>
+                {grantExpiryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select></label>
               <label>批准后总调用次数<input type="number" min="1" value={approvalMaxInvocations} onChange={(event) => setApprovalMaxInvocations(event.target.value)} placeholder="留空不限" disabled={!canEdit} /></label>
               <label>批准后总预算（元）<input type="number" min="0.000001" step="0.000001" value={approvalMaxAmountYuan} onChange={(event) => setApprovalMaxAmountYuan(event.target.value)} placeholder="留空不限" disabled={!canEdit} /></label>
             </div>
@@ -273,6 +284,13 @@ export default function DeveloperCommercePortal({
                 <header style={commerceStyles.itemHeader}><h3 style={commerceStyles.itemTitle}>{request.requester_app_id}</h3><span style={badgeStyle(request.status === 'pending' ? 'warn' : 'neutral')}>{request.status}</span></header>
                 <p style={commerceStyles.itemText}>{request.purpose}</p>
                 <code style={commerceStyles.itemMeta}>{request.scopes.join(', ')}</code>
+                {request.status === 'approved' && (
+                  <small style={commerceStyles.itemMeta}>{grantTermsLabel({
+                    expires_at: request.grant_expires_at,
+                    max_invocations: request.grant_max_invocations,
+                    max_amount_micros: request.grant_max_amount_micros,
+                  })}</small>
+                )}
                 {request.status === 'pending' && (
                   <footer style={commerceStyles.itemHeader}>
                     <small style={commerceStyles.itemMeta}>{request.merchant_id}</small>

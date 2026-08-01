@@ -9,13 +9,14 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
+    open_commerce_authorization_decision::grant_request_for_authorization,
     open_commerce_consumer,
     open_commerce_consumer_model::ConsumerDiscoveryRequest,
     open_commerce_developer_model::{
         CreateAuthorizationRequest, CreateDeveloperAppRequest, DecideAuthorizationRequest,
         DeveloperInvokeRequest,
     },
-    open_commerce_model::{CreateGrantRequest, InvokeCapabilityRequest},
+    open_commerce_model::InvokeCapabilityRequest,
     open_commerce_service::{self, OpenCommerceActor},
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     types::AppState,
@@ -252,16 +253,7 @@ async fn approve_authorization_request(
         &state.store,
         &project_id,
         &actor,
-        CreateGrantRequest {
-            merchant_id: request.merchant_id.clone(),
-            grantee_app_id: request.requester_app_id.clone(),
-            scopes: request.scopes.clone(),
-            purpose: request.purpose.clone(),
-            expires_at: None,
-            max_invocations: decision.max_invocations,
-            max_amount_micros: decision.max_amount_micros,
-            budget_currency: decision.budget_currency.clone(),
-        },
+        grant_request_for_authorization(&request, &decision),
     ) {
         Ok(grant) => grant,
         Err(error) => return service_error(error),
@@ -287,6 +279,7 @@ async fn approve_authorization_request(
         &json!({
             "requester_app_id": authorization.requester_app_id,
             "grant_id": grant.id,
+            "expires_at": grant.expires_at,
             "max_invocations": grant.max_invocations,
             "max_amount_micros": grant.max_amount_micros,
             "budget_currency": grant.budget_currency

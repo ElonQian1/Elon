@@ -158,6 +158,9 @@ mod open_commerce_app_block_model;
 mod open_commerce_app_block_service;
 #[cfg(test)]
 mod open_commerce_app_block_tests;
+mod open_commerce_authorization_decision;
+#[cfg(test)]
+mod open_commerce_authorization_expiry_tests;
 mod open_commerce_client_api;
 mod open_commerce_client_lifecycle_api;
 mod open_commerce_client_lifecycle_service;

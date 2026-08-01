@@ -307,6 +307,10 @@ fn request_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceAuthorization
         grant_id: row.get(10)?,
         created_at: row.get(11)?,
         updated_at: row.get(12)?,
+        grant_expires_at: row.get(13)?,
+        grant_max_invocations: row.get(14)?,
+        grant_max_amount_micros: row.get(15)?,
+        grant_budget_currency: row.get(16)?,
     })
 }
 
@@ -341,5 +345,9 @@ fn normalize_decision_reason(value: &str) -> Result<Option<String>> {
 
 const REQUEST_SELECT: &str = "SELECT id, merchant_project_id, merchant_id,
            requester_user_id, requester_app_id, scopes_json, purpose, status,
-           decided_by_user_id, decision_reason, grant_id, created_at, updated_at
+           decided_by_user_id, decision_reason, grant_id, created_at, updated_at,
+           (SELECT expires_at FROM open_commerce_grants WHERE id = grant_id),
+           (SELECT max_invocations FROM open_commerce_grants WHERE id = grant_id),
+           (SELECT max_amount_micros FROM open_commerce_grants WHERE id = grant_id),
+           (SELECT budget_currency FROM open_commerce_grants WHERE id = grant_id)
       FROM open_commerce_authorization_requests";

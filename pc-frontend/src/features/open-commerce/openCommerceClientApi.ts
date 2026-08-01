@@ -58,6 +58,7 @@ export const openCommerceClientApi = {
     decision: 'approve' | 'reject',
     request: {
       reason: string
+      expires_at?: string
       max_invocations?: number
       max_amount_micros?: number
       budget_currency?: string

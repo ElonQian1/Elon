@@ -1,5 +1,6 @@
 import { X } from 'lucide-react'
 import type { AuthorizationRequest } from './openCommerceClientTypes'
+import { grantTermsLabel } from './openCommerceGrantExpiry'
 import base from './OpenCommercePanel.module.css'
 import { actionStyle, badgeStyle, commerceStyles, listItemStyle } from './openCommerceStyles'
 
@@ -26,6 +27,13 @@ export default function OutboundAuthorizationRequests({ requests, canEdit, busy,
             </header>
             <p style={commerceStyles.itemText}>{request.purpose}</p>
             <code style={commerceStyles.itemMeta}>{request.scopes.join(', ')}</code>
+            {request.status === 'approved' && (
+              <small style={commerceStyles.itemMeta}>{grantTermsLabel({
+                expires_at: request.grant_expires_at,
+                max_invocations: request.grant_max_invocations,
+                max_amount_micros: request.grant_max_amount_micros,
+              })}</small>
+            )}
             <footer style={commerceStyles.itemHeader}>
               <small style={commerceStyles.itemMeta}>商户 {request.merchant_id}</small>
               {request.status === 'pending' && (

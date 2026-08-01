@@ -98,9 +98,11 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 
 ## Grant 生命周期预算
 
-创建 Grant 或批准授权申请时，可选设置 `max_invocations`、`max_amount_micros` 和 `budget_currency`。全部留空表示不限；返回值同时包含 `used_invocations` 和 `used_amount_micros`。
+创建 Grant 或批准授权申请时，可选设置 RFC 3339 格式的 `expires_at`、`max_invocations`、`max_amount_micros` 和 `budget_currency`。期限必须晚于当前服务器时间；未提供期限表示长期有效。PC 新授权默认 30 天，长期有效必须显式选择。返回值同时包含期限、`used_invocations` 和 `used_amount_micros`；批准后的授权申请还回读实际 Grant 条件，供商户与申请方核对。
 
 预算在新调用进入处理器前原子预留，成功后确认，处理器失败时释放。幂等重放不重复占用。达到次数或金额上限的新调用记录为 `failed/grant_budget_exceeded`、单位与金额为 0，并返回 `403`。该金额只限制当前链外计量，不移动真实资金。
+
+Grant 到期不删除或改写历史，也不会自动续期。消费者发现不再把它视为有效授权，调用必须重新申请新 Grant。
 
 ## 调用配额
 

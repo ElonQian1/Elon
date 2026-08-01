@@ -42,6 +42,10 @@ pub(crate) struct OpenCommerceAuthorizationRequest {
     pub decided_by_user_id: Option<String>,
     pub decision_reason: Option<String>,
     pub grant_id: Option<String>,
+    pub grant_expires_at: Option<String>,
+    pub grant_max_invocations: Option<i64>,
+    pub grant_max_amount_micros: Option<i64>,
+    pub grant_budget_currency: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -58,6 +62,8 @@ pub(crate) struct CreateAuthorizationRequest {
 pub(crate) struct DecideAuthorizationRequest {
     #[serde(default)]
     pub reason: String,
+    #[serde(default)]
+    pub expires_at: Option<String>,
     #[serde(default)]
     pub max_invocations: Option<i64>,
     #[serde(default)]
