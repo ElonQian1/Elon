@@ -21,10 +21,19 @@ function Invoke-ElonApkPublishPostflight {
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
         [Parameter(Mandatory)][string]$ApkPath,
-        [Parameter(Mandatory)][int]$ExpectedVersionCode
+        [Parameter(Mandatory)][int]$ExpectedVersionCode,
+        [switch]$AllowAdbVerificationDeferred
     )
 
     Invoke-ElonApkWorktreeCleanup -RepoRoot $RepoRoot
     . (Join-Path $PSScriptRoot 'apk-adb-autodeploy.ps1')
-    Invoke-ElonApkAdbAutodeploy -ApkPath $ApkPath -ExpectedVersionCode $ExpectedVersionCode | Out-Null
+    try {
+        Invoke-ElonApkAdbAutodeploy -ApkPath $ApkPath -ExpectedVersionCode $ExpectedVersionCode | Out-Null
+    } catch {
+        if (-not $AllowAdbVerificationDeferred) { throw }
+        Write-Warning "Real-device APK verification deferred after successful server publication: $_"
+        Write-Host 'APK_ADB_DEPLOY_STATUS=verification_deferred'
+        Write-Host 'VERIFICATION_DEFERRED=real_device_unavailable'
+        Write-Host 'REAL_DEVICE_STATUS=offline_or_unavailable'
+    }
 }

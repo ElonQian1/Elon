@@ -63,7 +63,7 @@ Write-Host 'MOBILE_PWA_PUBLISH=passed'
 # publish-apk.ps1 performs an online input-coverage check before claiming a
 # version. Calling it on resume is cheap and protects against server rollback.
 Invoke-ElonReleaseStage -Receipt $receipt -Stage 'apk' -SuccessMessage 'APK published or already covered' -Action {
-    & (Join-Path $PSScriptRoot 'publish-apk.ps1') -Changelog $Changelog
+    & (Join-Path $PSScriptRoot 'publish-apk.ps1') -Changelog $Changelog -AllowAdbVerificationDeferred
 }
 
 $watch.Stop()

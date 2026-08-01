@@ -339,7 +339,7 @@ if (-not $daemonRunning) {
         "-ExecutionPolicy", "Bypass",
         "-File", $DaemonScript,
         "-DaemonMode"
-    )
+    ) -RedirectStandardOutput "$LogFile.stdout" -RedirectStandardError "$LogFile.stderr"
     $proc.Id | Set-Content $PidFile -Encoding UTF8
     Write-Host "   ✅ LAN-Dist 守护进程已启动 (PID: $($proc.Id))，注册 $ProjectId/$ArtifactId" -ForegroundColor Green
 } else {

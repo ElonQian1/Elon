@@ -39,7 +39,7 @@ param(
     # 以该已安装 build 作为 claim 最低基线，仍由服务器分配下一个版本号。
     [int]$CurrentInstalledVersionCode = 0,
 
-    [string]$CurrentInstalledVersionName = ''
+    [string]$CurrentInstalledVersionName = '', [switch]$AllowAdbVerificationDeferred
 )
 
 $ErrorActionPreference = "Stop"
@@ -1018,4 +1018,4 @@ if (Test-Path $distClient) {
 
 # ── 自动清理已合并、工作树干净的孤儿 task worktree ─────────────
 . (Join-Path $PSScriptRoot 'apk-publish-postflight.ps1')
-Invoke-ElonApkPublishPostflight -RepoRoot $RepoRoot -ApkPath $apk.FullName -ExpectedVersionCode $newCode
+Invoke-ElonApkPublishPostflight -RepoRoot $RepoRoot -ApkPath $apk.FullName -ExpectedVersionCode $newCode -AllowAdbVerificationDeferred:$AllowAdbVerificationDeferred

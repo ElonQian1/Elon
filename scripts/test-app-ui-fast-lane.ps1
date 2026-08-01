@@ -29,6 +29,7 @@ Assert-Contains $publisher 'publish-mobile-pwa-static.ps1'
 Assert-Contains $publisher 'app-ui-change-scope.ps1'
 Assert-Contains $publisher '-SkipPcFrontend'
 Assert-Contains $publisher 'publish-apk.ps1'
+Assert-Contains $publisher '-AllowAdbVerificationDeferred'
 Assert-Contains $publisher 'APP_UI_RELEASE_POLICY=publish_before_optional_renderer'
 if ($publisher.IndexOf('publish-server.ps1') -gt $publisher.IndexOf('publish-apk.ps1')) {
     throw "Mobile PWA/server must publish before APK."
@@ -50,6 +51,10 @@ Assert-Contains $rendererWorkflow 'VERIFICATION_DEFERRED'
 Assert-Contains $rendererWorkflow 'realDeviceRequired=true'
 Assert-Contains $rendererWorkflow 'RENDERER_PREPARATION_ATTEMPTS=0'
 Assert-Contains $uiSkill 'must not block Server/PWA or APK publication or repository finish'
+$postflight = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts\apk-publish-postflight.ps1')
+Assert-Contains $postflight 'VERIFICATION_DEFERRED=real_device_unavailable'
+$lanDistClient = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'scripts\lan-dist-client.ps1')
+Assert-Contains $lanDistClient '-RedirectStandardOutput "$LogFile.stdout"'
 
 & node (Join-Path $repoRoot "scripts\check-mobile-pwa-source.js")
 if ($LASTEXITCODE -ne 0) { throw "Mobile PWA source check failed." }
