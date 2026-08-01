@@ -56,11 +56,16 @@ export const openCommerceClientApi = {
     projectId: string,
     requestId: string,
     decision: 'approve' | 'reject',
-    reason: string,
+    request: {
+      reason: string
+      max_invocations?: number
+      max_amount_micros?: number
+      budget_currency?: string
+    },
   ) =>
     api.post<AuthorizationRequest>(
       `${projectBase(projectId)}/authorization-requests/${encodeURIComponent(requestId)}/${decision}`,
-      { reason },
+      request,
     ),
 
   discover: (request: ConsumerDiscoveryRequest) =>

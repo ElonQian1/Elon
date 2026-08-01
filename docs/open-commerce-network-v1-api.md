@@ -96,6 +96,12 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 
 相同调用方、商户、能力和幂等键的重复调用返回原调用结果或稳定的重复结果，不重复累计金额。
 
+## Grant 生命周期预算
+
+创建 Grant 或批准授权申请时，可选设置 `max_invocations`、`max_amount_micros` 和 `budget_currency`。全部留空表示不限；返回值同时包含 `used_invocations` 和 `used_amount_micros`。
+
+预算在新调用进入处理器前原子预留，成功后确认，处理器失败时释放。幂等重放不重复占用。达到次数或金额上限的新调用记录为 `failed/grant_budget_exceeded`、单位与金额为 0，并返回 `403`。该金额只限制当前链外计量，不移动真实资金。
+
 ## 调用配额
 
 商户可以为每项能力配置固定时间窗调用上限。指定 App 策略优先于全部 App 策略；全部 App 策略按调用主体分别计数。没有策略时保持现有允许行为，项目编辑者在本项目内调试不占额度。
@@ -120,7 +126,7 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `open_commerce_publish_capability` | 写 | 发布受控能力 |
 | `open_commerce_upsert_runtime` | 写 | 配置商户运行绑定的地址、服务端凭据引用和 Manifest 摘要 |
 | `open_commerce_verify_runtime` | 写 | 通过签名健康检查激活运行绑定 |
-| `open_commerce_create_grant` | 写 | 为 App 创建最小范围授权 |
+| `open_commerce_create_grant` | 写 | 为 App 创建最小范围授权，可附加总调用与总计量预算 |
 | `open_commerce_upsert_rate_limit` | 写 | 按商户能力和 App 创建或更新固定时间窗配额 |
 | `open_commerce_set_rate_limit_enabled` | 写 | 停用或重新启用调用配额 |
 | `open_commerce_list_app_blocks` | 读 | 查看当前项目的 App 封禁与解除记录 |
@@ -157,7 +163,7 @@ V1 仍拒绝未知处理器，也不允许在能力配置中填写任意 URL 或
 |---|---|
 | `400` | 输入、schema、幂等键或状态不合法 |
 | `401` | 未登录或 token 无效 |
-| `403` | 不是项目成员、角色不足、授权不匹配或 App 已被商户封禁 |
+| `403` | 不是项目成员、角色不足、授权不匹配、Grant 预算用尽或 App 已被商户封禁 |
 | `404` | 商户、能力、授权或项目不存在 |
 | `409` | slug、能力键、幂等键语义冲突 |
 | `422` | 能力存在但当前输入不满足契约 |

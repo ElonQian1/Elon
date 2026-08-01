@@ -11,6 +11,10 @@ import {
   X,
 } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
+import {
+  optionalPositiveInteger,
+  optionalYuanMicros,
+} from './openCommerceGrantBudget'
 import OutboundAuthorizationRequests from './OutboundAuthorizationRequests'
 import type {
   AuthorizationRequest,
@@ -43,6 +47,8 @@ export default function DeveloperCommercePortal({
   const [capabilityKey, setCapabilityKey] = useState('')
   const [grantId, setGrantId] = useState('')
   const [input, setInput] = useState('{}')
+  const [approvalMaxInvocations, setApprovalMaxInvocations] = useState('')
+  const [approvalMaxAmountYuan, setApprovalMaxAmountYuan] = useState('')
   const [response, setResponse] = useState<Record<string, unknown> | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -148,11 +154,19 @@ export default function DeveloperCommercePortal({
     setBusy(true)
     setMessage('')
     try {
+      const approvalBudget = decision === 'approve' ? {
+        max_invocations: optionalPositiveInteger(approvalMaxInvocations, '总调用次数'),
+        max_amount_micros: optionalYuanMicros(approvalMaxAmountYuan),
+        budget_currency: 'CNY',
+      } : {}
       await openCommerceClientApi.decideAuthorization(
         projectId,
         request.id,
         decision,
-        decision === 'approve' ? '商户项目批准沙盒用途' : '商户项目拒绝沙盒用途',
+        {
+          reason: decision === 'approve' ? '商户项目批准沙盒用途' : '商户项目拒绝沙盒用途',
+          ...approvalBudget,
+        },
       )
       await refresh()
     } catch (error) {
@@ -250,6 +264,10 @@ export default function DeveloperCommercePortal({
         <section className={base.integrationSection}>
           <header><strong>商户授权收件箱</strong><span style={badgeStyle('warn')}>{requests.filter((item) => item.status === 'pending').length} 待处理</span></header>
           <div className={base.formCard} style={{ ...commerceStyles.sectionBody, ...commerceStyles.scrollArea }}>
+            <div style={commerceStyles.grid}>
+              <label>批准后总调用次数<input type="number" min="1" value={approvalMaxInvocations} onChange={(event) => setApprovalMaxInvocations(event.target.value)} placeholder="留空不限" disabled={!canEdit} /></label>
+              <label>批准后总预算（元）<input type="number" min="0.000001" step="0.000001" value={approvalMaxAmountYuan} onChange={(event) => setApprovalMaxAmountYuan(event.target.value)} placeholder="留空不限" disabled={!canEdit} /></label>
+            </div>
             {requests.map((request) => (
               <article className={base.formCard} style={listItemStyle()} key={request.id}>
                 <header style={commerceStyles.itemHeader}><h3 style={commerceStyles.itemTitle}>{request.requester_app_id}</h3><span style={badgeStyle(request.status === 'pending' ? 'warn' : 'neutral')}>{request.status}</span></header>

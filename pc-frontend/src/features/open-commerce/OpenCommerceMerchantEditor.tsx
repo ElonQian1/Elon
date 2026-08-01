@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react'
 import { openCommerceApi } from './openCommerceApi'
+import {
+  grantBudgetLabel,
+  optionalPositiveInteger,
+  optionalYuanMicros,
+} from './openCommerceGrantBudget'
 import type {
   OpenCommerceCapability,
   OpenCommerceGrant,
@@ -33,6 +38,8 @@ export default function OpenCommerceMerchantEditor({
   const [grantAppId, setGrantAppId] = useState('pc-web')
   const [grantScopes, setGrantScopes] = useState('')
   const [grantPurpose, setGrantPurpose] = useState('允许消费者 AI 调用指定商业能力')
+  const [grantMaxInvocations, setGrantMaxInvocations] = useState('')
+  const [grantMaxAmountYuan, setGrantMaxAmountYuan] = useState('')
   const [invokeCapability, setInvokeCapability] = useState('')
   const [invokeGrantId, setInvokeGrantId] = useState('')
   const [invokeInput, setInvokeInput] = useState('{}')
@@ -90,11 +97,16 @@ export default function OpenCommerceMerchantEditor({
     try {
       const scopes = grantScopes.split(',').map((scope) => scope.trim()).filter(Boolean)
       if (scopes.length === 0) throw new Error('至少填写一个能力键')
+      const maxInvocations = optionalPositiveInteger(grantMaxInvocations, '总调用次数')
+      const maxAmountMicros = optionalYuanMicros(grantMaxAmountYuan)
       await openCommerceApi.createGrant(projectId, {
         merchant_id: merchant.merchant.id,
         grantee_app_id: grantAppId,
         scopes,
         purpose: grantPurpose,
+        max_invocations: maxInvocations,
+        max_amount_micros: maxAmountMicros,
+        budget_currency: 'CNY',
       })
       setMessage('授权已创建；调用方仍需同时提供自己的应用身份和 grant_id。')
       await onChanged()
@@ -194,11 +206,15 @@ export default function OpenCommerceMerchantEditor({
           <label>应用 ID<input value={grantAppId} onChange={(e) => setGrantAppId(e.target.value)} required disabled={!canEdit} /></label>
           <label>能力键（逗号分隔）<input value={grantScopes} onChange={(e) => setGrantScopes(e.target.value)} placeholder="menu.lookup,booking.create" required disabled={!canEdit} /></label>
           <label>授权用途<textarea value={grantPurpose} onChange={(e) => setGrantPurpose(e.target.value)} required disabled={!canEdit} /></label>
+          <div className={styles.twoColumns}>
+            <label>总调用次数<input type="number" min="1" value={grantMaxInvocations} onChange={(e) => setGrantMaxInvocations(e.target.value)} placeholder="留空不限" disabled={!canEdit} /></label>
+            <label>总预算（元）<input type="number" min="0.000001" step="0.000001" value={grantMaxAmountYuan} onChange={(e) => setGrantMaxAmountYuan(e.target.value)} placeholder="留空不限" disabled={!canEdit} /></label>
+          </div>
           <button type="submit" disabled={!canEdit || busy === 'grant'}>{busy === 'grant' ? '授权中…' : '创建授权'}</button>
           <div className={styles.grants}>
             {merchantGrants.map((grant) => (
               <div key={grant.id}>
-                <span><strong>{grant.grantee_app_id}</strong><small>{grant.scopes.join('、')}</small></span>
+                <span><strong>{grant.grantee_app_id}</strong><small>{grant.scopes.join('、')} · {grantBudgetLabel(grant)}</small></span>
                 {grant.revoked_at
                   ? <em>已撤销</em>
                   : <button type="button" onClick={() => revokeGrant(grant.id)} disabled={!canEdit || busy === grant.id}>撤销</button>}

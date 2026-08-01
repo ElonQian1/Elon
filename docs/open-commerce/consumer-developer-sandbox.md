@@ -1,6 +1,6 @@
 # 消费者发现与第三方应用沙盒
 
-本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定。
+本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定。
 
 ## 使用入口
 
@@ -44,6 +44,8 @@
 | 使用测试 Token 调用 | `POST /api/open-commerce/developer/invoke` |
 
 开发者调用使用 `Authorization: Bearer <test-token>` 和 `x-elon-app-id`。Token 不得进入 URL、日志、项目文档、浏览器本地存储或商户能力元数据。
+
+批准申请时，商户可选填写授权期内的总调用次数和总预算（人民币元）。留空表示不限；用尽后不能由 App 自行扩容，商户需要撤销并重新授权。调用失败会退回刚预留的预算，重复请求不会再次占用。
 
 ## 验收
 

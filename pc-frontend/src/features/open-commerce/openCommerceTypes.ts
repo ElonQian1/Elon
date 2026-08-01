@@ -64,6 +64,11 @@ export interface OpenCommerceGrant {
   purpose: string
   expires_at?: string
   revoked_at?: string
+  max_invocations?: number
+  max_amount_micros?: number
+  budget_currency: string
+  used_invocations: number
+  used_amount_micros: number
   created_at: string
   updated_at: string
 }
@@ -287,6 +292,9 @@ export interface CreateOpenCommerceGrant {
   scopes: string[]
   purpose: string
   expires_at?: string
+  max_invocations?: number
+  max_amount_micros?: number
+  budget_currency?: string
 }
 
 export interface InvokeOpenCommerceCapability {

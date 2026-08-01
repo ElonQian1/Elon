@@ -27,6 +27,10 @@ const rateLimitStore = read('server/src/store/open_commerce_rate_limits.rs')
 const appBlockManager = read(`${featureRoot}/OpenCommerceAppBlockManager.tsx`)
 const appBlockStore = read('server/src/store/open_commerce_app_blocks.rs')
 const mcpTools = read('server/src/open_commerce_mcp_tools.rs')
+const merchantEditor = read(`${featureRoot}/OpenCommerceMerchantEditor.tsx`)
+const grantBudgetStore = read('server/src/store/open_commerce_grant_budgets.rs')
+const invocationStore = read('server/src/store/open_commerce_invocations.rs')
+const grantBudgetUi = read(`${featureRoot}/openCommerceGrantBudget.ts`)
 
 for (const view of [
   'OpenCommerceMerchantWorkspace',
@@ -64,6 +68,14 @@ assert.ok(appBlockStore.includes("decision_reason = 'merchant_app_blocked'"), 'b
 assert.ok(appBlockStore.includes('AND revoked_at IS NULL'), 'blocking must revoke only active grants')
 assert.ok(mcpTools.includes('open_commerce_block_app'), 'merchant AI must be able to block a developer App through MCP')
 assert.ok(mcpTools.includes('open_commerce_unblock_app'), 'merchant AI must be able to release a developer App block through MCP')
+assert.ok(merchantEditor.includes('总预算（元）'), 'merchant grant UI must expose a lifetime amount budget')
+assert.ok(merchantEditor.includes('grantBudgetLabel'), 'merchant grant UI must show consumed and maximum budget')
+assert.ok(grantBudgetUi.includes('used_amount_micros'), 'grant budget formatting must use persisted consumption')
+assert.ok(developerPortal.includes('批准后总调用次数'), 'authorization approval must expose a lifetime call budget')
+assert.ok(clientApi.includes('max_amount_micros'), 'authorization decisions must send the optional amount budget')
+assert.ok(mcpTools.includes('max_invocations'), 'merchant AI must be able to set a lifetime grant budget through MCP')
+assert.ok(grantBudgetStore.includes('TransactionBehavior::Immediate'), 'grant budget reservation must serialize concurrent claims')
+assert.ok(invocationStore.includes('release_grant_budget_reservation_on'), 'failed handlers must release their grant budget reservation')
 
 assert.ok(clientApi.includes("'x-elon-app-id'"), 'signed-in app calls must bind an app identity')
 assert.ok(clientApi.includes('Authorization: `Bearer ${testToken}`'), 'developer calls must use test credentials')

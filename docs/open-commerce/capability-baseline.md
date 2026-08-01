@@ -33,6 +33,7 @@
 | 消费者发现与第三方应用沙盒 | 已实现、范围受限 | 可注册、轮换、停用和重新启用测试 App，一次性显示测试 Token，跨项目发现主动发布商户，查看或撤回申请并在审批后调用；App 身份绑定所有者 | `server/src/open_commerce_client_api.rs`、`server/src/open_commerce_client_lifecycle_service.rs`、`docs/open-commerce/consumer-developer-sandbox.md` |
 | 商户可控外部调用配额 | 已实现 | 可按能力和指定 App/全部 App 配置固定时间窗上限；新调用原子计数，幂等重放不重复占额，超限记录为零金额失败并返回 429 | `server/src/open_commerce_rate_limit_service.rs`、`server/src/store/open_commerce_rate_limits.rs`、`docs/open-commerce-rate-limits-v1-acceptance.md` |
 | 商户级 App 紧急封禁 | 已实现 | 商户可手动封禁已注册 App，原子撤销有效 Grant 并取消待审批申请；解除不恢复旧授权 | `server/src/open_commerce_app_block_service.rs`、`server/src/store/open_commerce_app_blocks.rs`、`docs/open-commerce-app-blocks-v1-acceptance.md` |
+| Grant 生命周期预算 | 已实现 | 商户可为单个授权设置总调用次数和总计量金额；调用前原子预留，成功确认、失败退回，幂等重放不重复占额 | `server/src/open_commerce_grant_budget_service.rs`、`server/src/store/open_commerce_grant_budgets.rs`、`docs/open-commerce-grant-budgets-v1-acceptance.md` |
 | 项目 AI 资源控制面 | 已实现、只预演 | 可盘点当前用户的 Codex、本人节点、授权共享 Codex 和平台模型，保存项目策略并预演候选；不会启动真实任务 | `server/src/ai_resource_control/`、`docs/open-commerce/ai-resource-control.md` |
 | 开放商业 PC 五工作区 | 已实现 | 项目详情内已有商户节点、消费者沙盒、开发者、AI 资源和影子经济五个独立视图 | `pc-frontend/src/features/open-commerce/`、`scripts/test-open-commerce-pc-workspace.js` |
 | 项目文档治理和讨论知识图 | 已实现 | AI 可按范围分析、精确检索、按章节读取、审查模块化和维护讨论来源 | `server/src/node_agent_project_docs_mcp_tools.rs`、`docs/project-document-governance-mcp.md` |
