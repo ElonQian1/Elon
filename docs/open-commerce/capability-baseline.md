@@ -19,7 +19,7 @@
 | APK、网页和项目产物交付 | 已实现 | 平台已有项目执行、构建和发布链路，不等于所有第三方平台均已接入 | `AI_PROJECT.md`、`scripts/publish-apk.ps1` |
 | 多成员、多 AI 协同开发 | 已实现并持续收口 | Matter、Assignment、执行节点、审核、产物和事件形成协作主干 | `server/src/group_ai/`、`docs/群体ai开发/群体AI开发功能需求与架构设计.md` |
 | API Token 保管与使用统计 | 已实现 | 支持 Codex 凭据保险箱、额度与使用估算；凭据不应直接分发到普通客户端 | `server/src/codex_vault_api.rs`、`server/src/codex_vault_emergency_api.rs`、`docs/token消费统计.md` |
-| 节点计算调用和账本证据 | 已实现并持续收口 | 已有节点调用、用量、补偿与 Assignment 结算证据，可作为未来影子结算输入 | `server/src/store/node_ledger.rs`、`server/src/group_ai/actions/assignment_actions.rs` |
+| 节点计算调用、供给授权和账本证据 | 已实现并持续收口 | 节点所有者可默认关闭或按模型、并发和每日已完成 Token 阈值开放推理供给；指定与自动调度原子检查后复用现有用量、失败、收益及 Assignment 结算证据 | `server/src/node_compute_sharing.rs`、`server/src/store/node_compute_sharing.rs`、`server/src/store/node_ledger.rs` |
 | 链外影子经济回执 | 已实现、默认关闭 | 真实节点成本可形成幂等用量凭证，Matter 人工验收后生成双分录；商业调用只记录未扣费用量 | `server/src/task_settlement/`、`docs/task-shadow-settlement-v1-acceptance.md` |
 | Sui 凭证投影 | 已实现、无网络副作用 | 已对账影子凭证可生成对象化数据和候选 PTB 步骤，固定标记 `not_submitted` | `server/src/task_settlement/sui_projection.rs` |
 | 开放商业网络 V1 | 已实现 | 已有商户节点、商业能力、授权、调用、计量和审计的 HTTP/MCP 主路径 | `server/src/open_commerce_service.rs`、`server/src/open_commerce_mcp.rs`、`docs/open-commerce-network-v1-acceptance.md` |
@@ -45,7 +45,7 @@
 | 美团、抖音、京东、淘宝闪购等经营数据统一接入 | 部分实现 | 接入控制面、状态和同步回执已实现；仍必须逐个平台确认官方授权、实现适配器、验证字段覆盖和长期稳定性，不能把登记数据源描述成已接通全量 API |
 | 商户 ERP、海报、短视频、小游戏和营销活动自动生成 | 部分实现 | 通用 ERP 蓝图与 AI 应用开发主干已存在；真实行业业务模块、发布连接器、经营效果回流和规模化验证仍需完善 |
 | 商户数据自主控制和跨应用授权 | 部分实现 | V1、跨项目脱敏目录、消费者沙盒、调用配额、手动 App 封禁和首个商户自有运行时已打通；可携带关系、生产 App 身份互认、自动全网风控与公共互操作治理尚未完成 |
-| 闲置电脑、收银机和工作站共享算力 | 部分实现 | 已有节点执行、计量和资源控制面；控制面目前只盘点与预演，开放供需市场、异构调度、故障补偿和真实结算仍未完成 |
+| 闲置电脑、收银机和工作站共享算力 | 部分实现 | 模型推理供给的所有者开关、模型白名单、并发与每日阈值、原子占位、候选回退和 PC 控件已实现；通用异构任务、竞价市场、长任务租约、故障赔付、真实提现与链上结算仍未完成 |
 | 低成本分布式模型训练 | 提案 | 普通公网节点更适合异步任务、推理和可切分工作，不能宣称已等效替代高速互联的企业级 GPU 集群 |
 
 ## 尚未实现的提案

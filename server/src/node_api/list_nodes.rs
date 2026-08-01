@@ -107,6 +107,13 @@ pub async fn list_nodes(
             &allowed_clis,
             dev_runtime.as_ref(),
         );
+        let compute_sharing = state
+            .store
+            .node_compute_sharing_status(&node_id, &node.owner_user_id, None)
+            .unwrap_or_else(|error| {
+                tracing::warn!(node_id = %node_id, error = %error, "failed to read public compute sharing status");
+                super::compute_sharing::disabled_status(&node_id, &node.owner_user_id)
+            });
         nodes.push(PublicNodeResponse {
             agent_id: node_id.clone(),
             node_id: node_id.clone(),
@@ -149,6 +156,7 @@ pub async fn list_nodes(
                 .unwrap_or_else(|| "project_write".to_string()),
             public_dev_handshake_ready,
             public_dev_handshake_status,
+            compute_sharing,
             last_handshake_at: credential
                 .as_ref()
                 .and_then(|credential| credential.last_handshake_at.clone()),
@@ -231,6 +239,13 @@ pub async fn list_nodes(
             &allowed_clis,
             dev_runtime.as_ref(),
         );
+        let compute_sharing = state
+            .store
+            .node_compute_sharing_status(&node_id, &owner_user_id, None)
+            .unwrap_or_else(|error| {
+                tracing::warn!(node_id = %node_id, error = %error, "failed to read public compute sharing status");
+                super::compute_sharing::disabled_status(&node_id, &owner_user_id)
+            });
         nodes.push(PublicNodeResponse {
             agent_id: node_id.clone(),
             node_id: node_id.clone(),
@@ -270,6 +285,7 @@ pub async fn list_nodes(
                 .unwrap_or_else(|| "project_write".to_string()),
             public_dev_handshake_ready,
             public_dev_handshake_status,
+            compute_sharing,
             last_handshake_at: credential
                 .as_ref()
                 .and_then(|credential| credential.last_handshake_at.clone()),

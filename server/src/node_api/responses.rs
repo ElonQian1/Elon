@@ -4,6 +4,8 @@ use homecli_proto::{
 };
 use serde::Serialize;
 
+use crate::store::NodeComputeSharingStatus;
+
 #[derive(Serialize)]
 pub(super) struct PublicNodeResponse {
     pub agent_id: String,
@@ -27,6 +29,7 @@ pub(super) struct PublicNodeResponse {
     pub public_dev_permission_level: String,
     pub public_dev_handshake_ready: bool,
     pub public_dev_handshake_status: String,
+    pub compute_sharing: NodeComputeSharingStatus,
     pub last_handshake_at: Option<String>,
     pub last_handshake_agent_version: Option<String>,
     pub last_handshake_allowed_clis: Vec<String>,
@@ -74,6 +77,7 @@ pub(super) struct MyNodeResponse {
     pub public_dev_permission_level: String,
     pub public_dev_handshake_ready: bool,
     pub public_dev_handshake_status: String,
+    pub compute_sharing: NodeComputeSharingStatus,
     pub last_handshake_at: Option<String>,
     pub last_handshake_agent_version: Option<String>,
     pub last_handshake_allowed_clis: Vec<String>,

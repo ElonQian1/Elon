@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ArrowRightLeft, CircleDollarSign, Cpu, HardDrive, Server, Users } from 'lucide-react'
+import { ArrowRightLeft, CircleDollarSign, Cpu, Server, Users } from 'lucide-react'
 import {
   fetchMarketNodes,
   fetchNodeBalance,
@@ -51,8 +51,16 @@ export default function NodeMarketPanel({ myNodes, onOpenMyNode }: NodeMarketPan
     () => nodes.filter((node) => !isOwnNode(node, user?.id, myNodeIds)),
     [nodes, user?.id, myNodeIds],
   )
-  const borrowableNodes = visibleMarketNodes.filter((node) => node.online && nodeCanAcceptProject(node))
-  const publicOwnNodes = nodes.filter((node) => isOwnNode(node, user?.id, myNodeIds))
+  const serviceNodes = visibleMarketNodes.filter((node) => (
+    node.compute_sharing?.policy.enabled || node.public_dev_enabled
+  ))
+  const availableModelNodes = serviceNodes.filter((node) => (
+    node.online && node.compute_sharing?.available && hasObservedSharedModel(node)
+  ))
+  const borrowableNodes = serviceNodes.filter((node) => (
+    node.online && node.public_dev_enabled && nodeCanAcceptProject(node)
+  ))
+  const publicOwnNodes = nodes.filter((node) => isOwnNode(node, user?.id, myNodeIds) && node.online)
   const nodeNames = useMemo(() => {
     const map = new Map<string, string>()
     for (const node of [...nodes, ...myNodes]) {
@@ -68,7 +76,7 @@ export default function NodeMarketPanel({ myNodes, onOpenMyNode }: NodeMarketPan
         <div>
           <div className={styles.kicker}>节点市场</div>
           <h2>共享算力网络</h2>
-          <p>在线节点、可用开发环境、使用账本和收益结算在同一处汇总。</p>
+          <p>只展示节点所有者明确开放的模型算力或开发能力，并汇总使用账本与收益结算。</p>
         </div>
         <button className={styles.refreshBtn} type="button" onClick={() => setRefreshTick((value) => value + 1)}>
           {loading ? '同步中' : '刷新'}
@@ -77,9 +85,9 @@ export default function NodeMarketPanel({ myNodes, onOpenMyNode }: NodeMarketPan
 
       {error && <div className={styles.error}>{error}</div>}
       <div className={styles.statsGrid}>
-        <StatCard icon={<Server size={16} />} label="市场在线" value={visibleMarketNodes.length} />
-        <StatCard icon={<Cpu size={16} />} label="可接项目" value={borrowableNodes.length} />
-        <StatCard icon={<HardDrive size={16} />} label="我的在线节点" value={publicOwnNodes.length} />
+        <StatCard icon={<Cpu size={16} />} label="可用模型节点" value={availableModelNodes.length} />
+        <StatCard icon={<Server size={16} />} label="可接开发项目" value={borrowableNodes.length} />
+        <StatCard icon={<Users size={16} />} label="我的在线节点" value={publicOwnNodes.length} />
         <StatCard
           icon={<CircleDollarSign size={16} />}
           label="可提现收益"
@@ -91,18 +99,18 @@ export default function NodeMarketPanel({ myNodes, onOpenMyNode }: NodeMarketPan
         <div className={styles.panelHead}>
           <div>
             <span>Discovery</span>
-            <h3>可用市场节点</h3>
+            <h3>已开放服务的节点</h3>
           </div>
-          <strong>{loading ? '同步中' : `${borrowableNodes.length}/${visibleMarketNodes.length}`}</strong>
+          <strong>{loading ? '同步中' : serviceNodes.length}</strong>
         </div>
-        {visibleMarketNodes.length > 0 ? (
+        {serviceNodes.length > 0 ? (
           <div className={styles.nodeGrid}>
-            {visibleMarketNodes.map((node) => (
+            {serviceNodes.map((node) => (
               <MarketNodeCard key={nodeId(node)} node={node} />
             ))}
           </div>
         ) : (
-          <div className={styles.empty}>当前没有其他用户在线节点。</div>
+          <div className={styles.empty}>当前没有其他用户明确开放模型算力或开发服务。</div>
         )}
       </section>
 
@@ -170,6 +178,7 @@ function MarketNodeCard({ node }: { node: NodeSummary }) {
     node.route_a_ready ? '本机 AI' : '',
     node.api_runtime_ready ? 'API Key' : '',
     node.server_runtime_ready ? '服务器模型' : '',
+    node.compute_sharing?.policy.enabled ? '模型算力共享' : '',
     node.public_dev_enabled ? '公开开发' : '',
   ].filter(Boolean)
   return (
@@ -187,14 +196,34 @@ function MarketNodeCard({ node }: { node: NodeSummary }) {
       <div className={styles.metaGrid}>
         <div><span>容量</span><strong>{node.capacity_label ?? '未上报'}</strong></div>
         <div><span>项目</span><strong>{capacityLine(node)}</strong></div>
-        <div><span>硬盘</span><strong>{node.storage_repo_url_configured ? '跨 PC' : node.storage_ready ? '本机' : '未配置'}</strong></div>
-        <div><span>共享</span><strong>{publicDevHandshakeText(node)}</strong></div>
+        <div><span>模型共享</span><strong>{modelSharingText(node)}</strong></div>
+        <div><span>开发共享</span><strong>{publicDevHandshakeText(node)}</strong></div>
       </div>
       <div className={styles.pills}>
         {(capabilities.length ? capabilities : ['待检测']).map((item) => <span key={item}>{item}</span>)}
       </div>
     </article>
   )
+}
+
+function modelSharingText(node: NodeSummary) {
+  const status = node.compute_sharing
+  if (!status?.policy.enabled) return '未开放'
+  if (!node.online) return '离线'
+  if (!hasObservedSharedModel(node)) return '模型未上报'
+  if (status.available) return '可调度'
+  const labels: Record<string, string> = {
+    no_allowed_models: '未选模型',
+    model_not_allowed: '模型不匹配',
+    concurrency_limit_reached: '并发已满',
+    daily_token_limit_reached: '今日额度已满',
+  }
+  return labels[status.availability] ?? '暂不可用'
+}
+
+function hasObservedSharedModel(node: NodeSummary) {
+  const allowed = new Set(node.compute_sharing?.policy.allowed_model_ids ?? [])
+  return (node.models ?? []).some((model) => allowed.has(String(model.model_id ?? '').trim()))
 }
 
 function UsagePanel({

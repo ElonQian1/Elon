@@ -11,6 +11,7 @@ import CodexVaultUsageEstimateCard from './CodexVaultUsageEstimateCard'
 import CodexToolboxCard from './CodexToolboxCard'
 import NodeMarketPanel from './NodeMarketPanel'
 import NodeShareStatus, { publicDevHandshakeText } from './NodeShareStatus'
+import NodeComputeSharingCard from './NodeComputeSharingCard'
 import LocalNodeHealthPanel from './LocalNodeHealthPanel'
 import LocalNodeOfflineCard from './LocalNodeOfflineCard'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
@@ -747,6 +748,7 @@ function NodeDetailPanel({ node, onBack, adminUrl: _adminUrl }: { node: NodeSumm
       )}
       <NodeLifecycleStatusCard node={node} />
       <NodeShareStatus node={node} />
+      <NodeComputeSharingCard key={nodeId(node)} node={node} />
       <div className={styles.kvGrid}>
         {rows.map(([k, v]) => <div key={k}><span>{k}</span><strong>{v}</strong></div>)}
       </div>

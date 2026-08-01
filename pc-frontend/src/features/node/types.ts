@@ -51,7 +51,8 @@ export interface NodeSummary {
     server_runtime_status?: Record<string, unknown>
   }
   lifecycle?: NodeLifecycleReport | null
-  models?: { model_id?: string; display_name?: string; provider?: string; price_per_1k_credits?: string }[]
+  models?: { model_id?: string; display_name?: string; provider?: string; price_per_1k_credits?: number | string }[]
+  compute_sharing?: NodeComputeSharingStatus
   capacity_warnings?: string[]
   owner_user_id?: string
   hardware_summary?: string
@@ -63,6 +64,31 @@ export interface NodeSummary {
   storage_repo_url_configured?: boolean
   created_at?: string
   connected_at?: number
+}
+
+export interface NodeComputeSharingPolicy {
+  node_id: string
+  owner_user_id: string
+  enabled: boolean
+  allowed_model_ids: string[]
+  max_concurrent_runs: number
+  daily_token_limit: number
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface NodeComputeSharingStatus {
+  policy: NodeComputeSharingPolicy
+  active_runs: number
+  tokens_used_today: number
+  available: boolean
+  availability: string
+}
+
+export interface NodeComputeSharingResponse {
+  ok?: boolean
+  compute_sharing: NodeComputeSharingStatus
+  observed_models?: NonNullable<NodeSummary['models']>
 }
 
 export interface NodeAgentVersion {

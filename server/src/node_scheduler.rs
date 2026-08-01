@@ -178,6 +178,16 @@ pub fn select_best_node(
     quality_by_node: &HashMap<String, NodeQualityScore>,
     model_id: &str,
 ) -> Option<NodeScheduleDecision> {
+    rank_nodes(candidates, quality_by_node, model_id)
+        .into_iter()
+        .next()
+}
+
+pub fn rank_nodes(
+    candidates: &[NodeSummary],
+    quality_by_node: &HashMap<String, NodeQualityScore>,
+    model_id: &str,
+) -> Vec<NodeScheduleDecision> {
     let mut decisions = candidates
         .iter()
         .filter(|candidate| candidate.online)
@@ -197,7 +207,7 @@ pub fn select_best_node(
             .cmp(&a.score)
             .then_with(|| a.node_id.cmp(&b.node_id))
     });
-    decisions.into_iter().next()
+    decisions
 }
 
 fn score_candidate(

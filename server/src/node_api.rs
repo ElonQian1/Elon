@@ -2,7 +2,7 @@
 //!
 //! 路由（注册在 router.rs）：
 //! - `GET  /api/nodes`                 列出所有在线节点（需登录）
-//! - `GET  /api/nodes/models`          所有在线节点中可用模型列表（无需登录，供 APK 模型选择用）
+//! - `GET  /api/nodes/models`          当前用户自有或节点所有者显式共享的在线模型
 //! - `POST /api/nodes/chat`            向节点 LLM 发起对话（需登录，同步阻塞返回）
 //! - `GET  /api/me/nodes`              本用户自己的节点列表
 //! - `POST /api/me/nodes/register`     注册一个新 PC 节点，获取 agent_id 和 secret
@@ -26,6 +26,7 @@ use crate::{
     types::AppState,
 };
 use serde::{Deserialize, Serialize};
+mod compute_sharing;
 mod my_nodes;
 mod payouts;
 mod public_dev;
@@ -33,6 +34,7 @@ mod public_dev_smoke;
 mod responses;
 mod runtime_response;
 mod usage;
+pub use compute_sharing::{get_my_node_compute_sharing, update_my_node_compute_sharing};
 pub use my_nodes::my_nodes;
 use payouts::node_payout_min_fen;
 pub use payouts::{cancel_node_payout, create_node_payout, my_node_payouts};
@@ -68,9 +70,32 @@ struct AvailableModelsResp {
     models: Vec<homecli_proto::ModelCapability>,
 }
 
-/// GET /api/nodes/models — 当前可用的 LLM 模型列表（无需登录）
-pub async fn list_available_models(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let models = state.node_registry.available_models().await;
+/// GET /api/nodes/models — 当前用户自有或所有者显式共享的在线 LLM 模型。
+/// 未登录调用者只能看到明确开启共享且仍有额度的模型。
+pub async fn list_available_models(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let viewer_user_id = auth_from_headers(&state, &headers)
+        .ok()
+        .map(|user| user.id)
+        .unwrap_or_default();
+    let mut models = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for node in state.node_registry.list_online().await {
+        for model in node.models {
+            let status = crate::node_compute_sharing::status(
+                &state.store,
+                &viewer_user_id,
+                &node.owner_user_id,
+                &node.node_id,
+                &model.model_id,
+            );
+            if status.is_ok_and(|status| status.available) && seen.insert(model.model_id.clone()) {
+                models.push(model);
+            }
+        }
+    }
     Json(AvailableModelsResp { models }).into_response()
 }
 
@@ -277,32 +302,33 @@ pub async fn chat_with_node(
     }
 
     // 找节点、发起请求。预授权成功后才派发，避免余额不足用户先消耗节点算力。
-    let (req_id, node_id, mut rx) = match crate::node_router::dispatch_to_node_with_req_id(
-        &state,
-        req_id,
-        &user.id,
-        &req.model_id,
-        req.node_id.as_deref(),
-        req.messages,
-        req.max_tokens,
-    )
-    .await
-    {
-        Ok(t) => t,
-        Err(e) => {
-            crate::billing::release_trusted_call(
-                &state.store,
-                &user.id,
-                &accounting_key,
-                "released_error",
-            );
-            return (
-                StatusCode::SERVICE_UNAVAILABLE,
-                Json(serde_json::json!({"error": e.to_string()})),
-            )
-                .into_response();
-        }
-    };
+    let (req_id, node_id, provider_user_id, mut rx) =
+        match crate::node_router::dispatch_to_node_with_req_id(
+            &state,
+            req_id,
+            &user.id,
+            &req.model_id,
+            req.node_id.as_deref(),
+            req.messages,
+            req.max_tokens,
+        )
+        .await
+        {
+            Ok(t) => t,
+            Err(e) => {
+                crate::billing::release_trusted_call(
+                    &state.store,
+                    &user.id,
+                    &accounting_key,
+                    "released_error",
+                );
+                return (
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Json(serde_json::json!({"error": e.to_string()})),
+                )
+                    .into_response();
+            }
+        };
 
     // 收集流式块
     let mut content = String::new();
@@ -360,16 +386,11 @@ pub async fn chat_with_node(
         .get_node_model_price(&node_id, &req.model_id)
         .await
         .unwrap_or(1.0);
-    let owner = state
-        .node_registry
-        .get_node_owner(&node_id)
-        .await
-        .unwrap_or_default();
     crate::node_router::settle_after_stream(
         &state,
         &user.id,
         Some(&req_id),
-        Some(&owner),
+        Some(&provider_user_id),
         &node_id,
         &req.model_id,
         prompt_tokens,

@@ -1,0 +1,36 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const root = path.resolve(__dirname, '..')
+const migration = source('server/src/node_compute_sharing_migration.rs')
+const store = source('server/src/store/node_compute_sharing.rs')
+const boundary = source('server/src/node_compute_sharing.rs')
+const router = source('server/src/node_router.rs')
+const routes = source('server/src/router/node_routes.rs')
+const card = source('pc-frontend/src/features/node/NodeComputeSharingCard.tsx')
+const market = source('pc-frontend/src/features/node/NodeMarketPanel.tsx')
+
+assert.match(migration, /enabled\s+INTEGER NOT NULL DEFAULT 0/)
+assert.match(migration, /max_concurrent_runs BETWEEN 1 AND 16/)
+assert.match(migration, /daily_token_limit BETWEEN 0 AND 1000000000000/)
+assert.match(store, /transaction_with_behavior\(TransactionBehavior::Immediate\)/)
+assert.match(store, /ensure_compute_run_replay_matches/)
+assert.match(store, /consumer_user_id <> provider_user_id/)
+assert.match(boundary, /!consumer_user_id\.is_empty\(\)/)
+assert.match(boundary, /consumer_user_id == provider_user_id/)
+assert.match(router, /node_compute_sharing::status/)
+assert.match(router, /node_compute_sharing::admit/)
+assert.match(router, /trying next candidate/)
+assert.match(routes, /\/api\/me\/nodes\/:node_id\/compute-sharing/)
+assert.match(card, /只有这里明确选择的本地模型才允许其他用户调度/)
+assert.match(card, /max_concurrent_runs/)
+assert.match(card, /daily_token_limit/)
+assert.match(market, /node\.compute_sharing\?\.policy\.enabled \|\| node\.public_dev_enabled/)
+assert.match(market, /只展示节点所有者明确开放的模型算力或开发能力/)
+
+console.log('Node compute sharing machine contracts passed')
+
+function source(relativePath) {
+  return fs.readFileSync(path.join(root, relativePath), 'utf8')
+}

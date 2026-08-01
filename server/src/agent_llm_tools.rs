@@ -161,7 +161,7 @@ pub(crate) async fn try_casual_chat_via_node(
     )
     .await;
 
-    let (req_id, actual_node_id, mut rx) = match dispatch {
+    let (req_id, actual_node_id, provider_user_id, mut rx) = match dispatch {
         Ok(t) => t,
         Err(e) => {
             crate::billing::release_trusted_call(
@@ -276,16 +276,11 @@ pub(crate) async fn try_casual_chat_via_node(
         .get_node_model_price(&actual_node_id, model)
         .await
         .unwrap_or(1.0);
-    let owner = state
-        .node_registry
-        .get_node_owner(&actual_node_id)
-        .await
-        .unwrap_or_default();
     crate::node_router::settle_after_stream(
         state,
         user_id,
         Some(&req_id),
-        Some(&owner),
+        Some(&provider_user_id),
         &actual_node_id,
         model,
         prompt_tokens,

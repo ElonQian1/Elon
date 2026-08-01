@@ -81,6 +81,7 @@
 | Sync Receipt | 记录适配器同步数量、摘要、结果和时间，不保存原始经营值 | 开放商业接入控制面 |
 | AI Resource Policy | 描述项目允许的资源类型、优先级、回退、隐私倾向和成本上限 | `server/src/ai_resource_control/` |
 | AI Route Preview | 在不执行任务的前提下解释候选资源和回退 | `server/src/ai_resource_control/` |
+| Compute Supply Policy | 由节点所有者显式限定可共享模型、并发和每日阈值，并在派发前原子占位 | `server/src/node_compute_sharing.rs` |
 | Usage Receipt | 记录模型、节点、商业能力或任务的可计量事实 | 节点账本、调用审计、链外影子账本 |
 | Settlement Intent | 把 Assignment 与真实用量来源绑定，等待人工验收或取消 | `server/src/task_settlement/` |
 | Settlement Receipt | 记录验收后不可重复的影子经济判断及双分录 | `server/src/task_settlement/` |

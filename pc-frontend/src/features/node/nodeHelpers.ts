@@ -1,6 +1,6 @@
 import { api } from '../../api/client'
 import { formatBytes } from '../projects/nodeHelpers'
-import type { NodeAgentVersion, NodeBalanceResponse, NodeSummary, NodeUsageResponse } from './types'
+import type { NodeAgentVersion, NodeBalanceResponse, NodeComputeSharingResponse, NodeSummary, NodeUsageResponse } from './types'
 
 export { formatBytes }
 
@@ -65,4 +65,20 @@ export async function fetchNodeUsage(): Promise<NodeUsageResponse> {
 
 export async function fetchNodeAgentVersion(): Promise<NodeAgentVersion> {
   return api.get('/api/node-agent/version')
+}
+
+export async function fetchNodeComputeSharing(nodeId: string): Promise<NodeComputeSharingResponse> {
+  return api.get(`/api/me/nodes/${encodeURIComponent(nodeId)}/compute-sharing`)
+}
+
+export async function updateNodeComputeSharing(
+  nodeId: string,
+  request: {
+    enabled: boolean
+    allowed_model_ids: string[]
+    max_concurrent_runs: number
+    daily_token_limit: number
+  },
+): Promise<NodeComputeSharingResponse> {
+  return api.patch(`/api/me/nodes/${encodeURIComponent(nodeId)}/compute-sharing`, request)
 }

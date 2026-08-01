@@ -33,22 +33,59 @@ pub async fn dispatch_to_node_with_req_id(
     target_node_id: Option<&str>,
     messages: Vec<serde_json::Value>,
     max_tokens: Option<u32>,
-) -> Result<(String, String, mpsc::UnboundedReceiver<AgentToServer>)> {
+) -> Result<(
+    String,
+    String,
+    String,
+    mpsc::UnboundedReceiver<AgentToServer>,
+)> {
     let target = target_node_id
         .map(str::trim)
         .filter(|value| !value.is_empty());
+    let compute_call_id = node_llm_compute_key(&req_id);
     let (node_id, provider_user_id, route_reason) = if let Some(target_node_id) = target {
         let node_id = state
             .node_registry
             .find_node_for_model_target(model_id, Some(target_node_id))
             .await
             .ok_or_else(|| anyhow!("节点 {target_node_id} 当前离线或不支持模型 {model_id}"))?;
-        let provider_user_id = state.node_registry.get_node_owner(&node_id).await;
-        (
-            node_id,
-            provider_user_id,
-            format!("target_node node_id={target_node_id}"),
-        )
+        let provider_user_id = state
+            .node_registry
+            .get_node_owner(&node_id)
+            .await
+            .filter(|owner| !owner.trim().is_empty())
+            .ok_or_else(|| anyhow!("节点 {target_node_id} 缺少可验证的所有者身份"))?;
+        let supply = crate::node_compute_sharing::status(
+            &state.store,
+            consumer_user_id,
+            &provider_user_id,
+            &node_id,
+            model_id,
+        )?;
+        if !supply.available {
+            return Err(anyhow!(
+                "节点 {target_node_id} 未向当前用户开放模型 {model_id}：{}",
+                supply.availability
+            ));
+        }
+        let route_reason = format!(
+            "target_node node_id={target_node_id} supply={}",
+            supply.availability
+        );
+        crate::node_compute_sharing::admit(
+            &state.store,
+            crate::store::NodeComputeRunStart {
+                compute_call_id: &compute_call_id,
+                consumer_user_id,
+                provider_user_id: Some(&provider_user_id),
+                node_id: &node_id,
+                model_id: Some(model_id),
+                feature: "node_llm",
+                usage_mode: "server_node_llm",
+                route_reason: Some(&route_reason),
+            },
+        )?;
+        (node_id, Some(provider_user_id), route_reason)
     } else {
         let candidates = state
             .node_registry
@@ -64,37 +101,81 @@ pub async fn dispatch_to_node_with_req_id(
                 Default::default()
             }
         };
-        let decision = crate::node_scheduler::select_best_node(&candidates, &quality, model_id)
-            .ok_or_else(|| anyhow!("没有在线节点支持模型 {model_id}"))?;
-        let provider_user_id = candidates
-            .iter()
-            .find(|candidate| candidate.node_id == decision.node_id)
-            .map(|candidate| candidate.owner_user_id.clone());
-        (decision.node_id, provider_user_id, decision.route_reason)
+        let mut eligible = Vec::new();
+        for candidate in candidates {
+            match crate::node_compute_sharing::status(
+                &state.store,
+                consumer_user_id,
+                &candidate.owner_user_id,
+                &candidate.node_id,
+                model_id,
+            ) {
+                Ok(supply) if supply.available => eligible.push(candidate),
+                Ok(_) => {}
+                Err(error) => tracing::warn!(
+                    node_id = %candidate.node_id,
+                    error = %error,
+                    "failed closed while checking shared compute supply"
+                ),
+            }
+        }
+        if eligible.is_empty() {
+            return Err(anyhow!(
+                "没有自己的在线节点或已显式开放模型 {model_id} 的共享节点"
+            ));
+        }
+        let decisions = crate::node_scheduler::rank_nodes(&eligible, &quality, model_id);
+        let mut selected = None;
+        let mut last_admission_error = None;
+        for decision in decisions {
+            let Some(candidate) = eligible
+                .iter()
+                .find(|candidate| candidate.node_id == decision.node_id)
+            else {
+                continue;
+            };
+            let route_reason = format!("{} supply=atomic_admission", decision.route_reason);
+            match crate::node_compute_sharing::admit(
+                &state.store,
+                crate::store::NodeComputeRunStart {
+                    compute_call_id: &compute_call_id,
+                    consumer_user_id,
+                    provider_user_id: Some(&candidate.owner_user_id),
+                    node_id: &candidate.node_id,
+                    model_id: Some(model_id),
+                    feature: "node_llm",
+                    usage_mode: "server_node_llm",
+                    route_reason: Some(&route_reason),
+                },
+            ) {
+                Ok(_) => {
+                    selected = Some((
+                        candidate.node_id.clone(),
+                        Some(candidate.owner_user_id.clone()),
+                        route_reason,
+                    ));
+                    break;
+                }
+                Err(error) => {
+                    last_admission_error = Some(error.to_string());
+                    tracing::warn!(
+                        node_id = %candidate.node_id,
+                        "shared compute admission raced or was withdrawn; trying next candidate"
+                    );
+                }
+            }
+        }
+        selected.ok_or_else(|| {
+            anyhow!(
+                "共享节点均未能取得执行名额：{}",
+                last_admission_error.unwrap_or_else(|| "没有可用候选".to_string())
+            )
+        })?
     };
 
-    let compute_call_id = node_llm_compute_key(&req_id);
-    if let Err(e) = state
-        .store
-        .start_node_compute_run(crate::store::NodeComputeRunStart {
-            compute_call_id: &compute_call_id,
-            consumer_user_id,
-            provider_user_id: provider_user_id.as_deref(),
-            node_id: &node_id,
-            model_id: Some(model_id),
-            feature: "node_llm",
-            usage_mode: "server_node_llm",
-            route_reason: Some(&route_reason),
-        })
-    {
-        tracing::warn!(
-            consumer_user_id,
-            node_id,
-            model_id,
-            "节点执行证明 start 记录失败: {e:#}"
-        );
-    }
-
+    let provider_user_id = provider_user_id
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| anyhow!("节点缺少可用于结算的提供者身份"))?;
     let dispatch_result = state
         .agent_manager
         .dispatch_llm_stream_with_req_id(
@@ -113,7 +194,7 @@ pub async fn dispatch_to_node_with_req_id(
                 state,
                 &compute_call_id,
                 crate::store::NodeComputeRunFinish {
-                    provider_user_id: provider_user_id.as_deref(),
+                    provider_user_id: Some(&provider_user_id),
                     status: "failed",
                     prompt_tokens: 0,
                     completion_tokens: 0,
@@ -127,7 +208,7 @@ pub async fn dispatch_to_node_with_req_id(
         }
     };
 
-    Ok((req_id, node_id, rx))
+    Ok((req_id, node_id, provider_user_id, rx))
 }
 
 pub(crate) fn node_llm_compute_key(compute_call_id: &str) -> String {

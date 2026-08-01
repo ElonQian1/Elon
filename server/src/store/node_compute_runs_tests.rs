@@ -146,6 +146,43 @@ fn start_is_idempotent_and_finish_records_settlement() {
 }
 
 #[test]
+fn start_rejects_idempotency_key_rebinding() {
+    let (store, path) = temp_store();
+    let consumer = store
+        .create_user("node-run-rebind@example.com", "secret1", None, None)
+        .unwrap();
+    store
+        .start_node_compute_run(NodeComputeRunStart {
+            compute_call_id: "node_llm:stable-key",
+            consumer_user_id: &consumer.id,
+            provider_user_id: Some(&consumer.id),
+            node_id: "node-a",
+            model_id: Some("qwen"),
+            feature: "node_llm",
+            usage_mode: "server_node_llm",
+            route_reason: None,
+        })
+        .unwrap();
+
+    let error = store
+        .start_node_compute_run(NodeComputeRunStart {
+            compute_call_id: "node_llm:stable-key",
+            consumer_user_id: &consumer.id,
+            provider_user_id: Some(&consumer.id),
+            node_id: "node-b",
+            model_id: Some("qwen"),
+            feature: "node_llm",
+            usage_mode: "server_node_llm",
+            route_reason: None,
+        })
+        .unwrap_err();
+    assert!(error.to_string().contains("不能绑定到不同"));
+
+    drop(store);
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
 fn replay_binding_rejects_unsafe_source_policy_combinations() {
     let (store, path) = temp_store();
     let consumer = store

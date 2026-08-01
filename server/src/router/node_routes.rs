@@ -38,6 +38,11 @@ pub(super) fn routes() -> Router<Arc<AppState>> {
             "/api/me/nodes/:node_id/sharing",
             axum::routing::patch(node_api::update_my_node_sharing),
         )
+        .route(
+            "/api/me/nodes/:node_id/compute-sharing",
+            get(node_api::get_my_node_compute_sharing)
+                .patch(node_api::update_my_node_compute_sharing),
+        )
         .route("/api/me/node/exec", post(node_exec_api::node_exec_handler))
         .route(
             "/api/admin/nodes/public-dev-handshake",

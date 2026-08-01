@@ -1,6 +1,6 @@
 //! 节点算力执行证明：记录每次派发、完成、真实扣费与节点收益。
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -92,6 +92,7 @@ impl Store {
         let conn = self.conn.lock().unwrap();
 
         if let Some(existing) = select_run_by_compute_call_id(&conn, compute_call_id)? {
+            ensure_compute_run_replay_matches(&existing, &input)?;
             return Ok(existing);
         }
 
@@ -301,6 +302,30 @@ pub(super) fn select_run_by_compute_call_id(
     )
     .optional()
     .map_err(Into::into)
+}
+
+pub(super) fn ensure_compute_run_replay_matches(
+    existing: &NodeComputeRun,
+    input: &NodeComputeRunStart<'_>,
+) -> Result<()> {
+    let provider_user_id = input
+        .provider_user_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let model_id = input
+        .model_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if existing.consumer_user_id != input.consumer_user_id.trim()
+        || existing.provider_user_id.as_deref() != provider_user_id
+        || existing.node_id != input.node_id.trim()
+        || existing.model_id.as_deref() != model_id
+        || existing.feature != input.feature.trim()
+        || existing.usage_mode != input.usage_mode.trim()
+    {
+        bail!("同一算力调用编号不能绑定到不同的用户、节点、模型或用途");
+    }
+    Ok(())
 }
 
 fn run_select_sql() -> &'static str {

@@ -80,6 +80,18 @@ fn keeps_cold_start_nodes_eligible() {
 }
 
 #[test]
+fn ranking_keeps_deterministic_fallback_order() {
+    let candidates = vec![
+        candidate("node-b", 0.10, None),
+        candidate("node-a", 0.10, None),
+    ];
+    let ranked = rank_nodes(&candidates, &HashMap::new(), "qwen");
+    assert_eq!(ranked.len(), 2);
+    assert_eq!(ranked[0].node_id, "node-a");
+    assert_eq!(ranked[1].node_id, "node-b");
+}
+
+#[test]
 fn pc_dispatch_score_prefers_ready_capacity_and_quality() {
     let hardware = NodeHardwareProfile {
         cpu_cores: Some(12),

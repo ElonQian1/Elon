@@ -51,6 +51,7 @@ mod native_sessions;
 mod node_cli_completion_receipts;
 mod node_compute_replay;
 mod node_compute_runs;
+mod node_compute_sharing;
 mod node_credentials;
 mod node_hardware;
 mod node_ledger;
@@ -159,6 +160,9 @@ pub use node_compute_replay::{
 };
 pub use node_compute_runs::{
     NodeComputeRun, NodeComputeRunFinish, NodeComputeRunStart, NodeQualityScore,
+};
+pub use node_compute_sharing::{
+    NodeComputeSharingPolicy, NodeComputeSharingStatus, UpdateNodeComputeSharingPolicy,
 };
 pub use node_ledger::{NodeBalance, NodeCredential, NodeTransaction, SettleParams};
 pub use node_payouts::CreateNodePayout;

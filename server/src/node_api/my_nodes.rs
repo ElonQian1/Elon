@@ -71,6 +71,17 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
             let hardware_summary = hardware_summary(hardware.as_ref());
             let (public_dev_handshake_ready, public_dev_handshake_status) =
                 public_dev_handshake_state_for_runtime(&node);
+            let compute_sharing = state
+                .store
+                .node_compute_sharing_status(&node.node_id, &node.owner_user_id, None)
+                .unwrap_or_else(|error| {
+                    tracing::warn!(
+                        node_id = %node.node_id,
+                        error = %error,
+                        "failed to read node compute sharing status"
+                    );
+                    super::compute_sharing::disabled_status(&node.node_id, &node.owner_user_id)
+                });
             MyNodeResponse {
                 agent_id: node.node_id.clone(),
                 node_id: node.node_id,
@@ -95,6 +106,7 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 public_dev_permission_level: node.public_dev_permission_level,
                 public_dev_handshake_ready,
                 public_dev_handshake_status,
+                compute_sharing,
                 last_handshake_at: node.last_handshake_at,
                 last_handshake_agent_version: node.last_handshake_agent_version,
                 last_handshake_allowed_clis: node.last_handshake_allowed_clis,
