@@ -233,3 +233,51 @@ export interface SettlementCorrectionDetail {
   reversal_receipt?: SettlementReceipt
   replacement_receipt?: SettlementReceipt
 }
+
+export interface SuiCorrectionProjectionLeg {
+  receipt_id: string
+  receipt_kind: 'correction_reversal' | 'correction_replacement'
+  intent_id: string
+  posting_key: string
+  compute_amount_micros: number
+  provider_amount_micros: number
+  platform_amount_micros: number
+  currency: string
+  source_receipt_digest: string
+}
+
+export interface SuiCorrectionProjectionEnvelope {
+  schema: string
+  correction_id: string
+  correction_matter_id: string
+  original_receipt_id: string
+  project_object_key: string
+  reversal: SuiCorrectionProjectionLeg
+  replacement: SuiCorrectionProjectionLeg
+  shadow_only: true
+  atomic_bundle: true
+  ptb_steps: string[]
+  network_submission: 'not_submitted'
+}
+
+export interface SuiCorrectionProjectionPackage {
+  id: string
+  project_id: string
+  correction_id: string
+  reversal_receipt_id: string
+  replacement_receipt_id: string
+  target_network: SuiTargetNetwork
+  package_schema: string
+  projection_digest: string
+  source_bundle_digest: string
+  envelope: SuiCorrectionProjectionEnvelope
+  integrity_status: 'verified' | 'conflict'
+  submission_readiness: 'adapter_required' | 'integrity_conflict' | 'dispute_blocked'
+  network_submission: 'not_submitted'
+  submission_attempts: number
+  last_error?: string
+  created_by_user_id: string
+  verified_at: string
+  created_at: string
+  updated_at: string
+}

@@ -21,7 +21,7 @@
 | API Token 保管与使用统计 | 已实现 | 支持 Codex 凭据保险箱、额度与使用估算；凭据不应直接分发到普通客户端 | `server/src/codex_vault_api.rs`、`server/src/codex_vault_emergency_api.rs`、`docs/token消费统计.md` |
 | 节点计算调用、供给授权和账本证据 | 已实现并持续收口 | 节点所有者可默认关闭或按模型、并发和每日已完成 Token 阈值开放推理供给；指定与自动调度原子检查后复用现有用量、失败、收益及 Assignment 结算证据 | `server/src/node_compute_sharing.rs`、`server/src/store/node_compute_sharing.rs`、`server/src/store/node_ledger.rs` |
 | 链外影子经济回执、争议与纠正 | 已实现、默认关闭 | 真实节点成本可形成幂等用量凭证，Matter 人工验收后生成双分录；争议阻断投影，已接受争议通过独立纠正 Matter 原子追加冲销和替换凭证并显示净额，不改写原凭证；商业调用只记录未扣费用量 | `server/src/task_settlement/`、`docs/decisions/task-shadow-settlement-corrections-v1.md`、`docs/task-shadow-settlement-v1-acceptance.md` |
-| Sui 凭证投影与链下包 | 已实现、无网络副作用 | 已对账影子凭证可生成对象化数据和候选 PTB 步骤，并按目标网络持久化双摘要投影包；可复核完整性，固定标记 `not_submitted` | `server/src/task_settlement/sui_projection.rs`、`server/src/task_settlement/sui_projection_service.rs` |
+| Sui 凭证投影与链下包 | 已实现、无网络副作用 | 标准凭证可保存单笔投影包；已过账纠正可把冲销与替换共同保存为不可拆分的原子包。两类包均绑定目标网络和来源摘要、可复核完整性，并固定标记 `not_submitted` | `server/src/task_settlement/sui_projection_service.rs`、`server/src/task_settlement/sui_correction_projection_service.rs`、`docs/decisions/sui-correction-projection-packages-v1.md` |
 | 开放商业网络 V1 | 已实现 | 已有商户节点、商业能力、授权、调用、计量和审计的 HTTP/MCP 主路径 | `server/src/open_commerce_service.rs`、`server/src/open_commerce_mcp.rs`、`docs/open-commerce-network-v1-acceptance.md` |
 | 受控商户自有运行时 | 已实现、生产配置依赖环境 | 平台可通过审核绑定和 HMAC 签名调用商户 ERP；`cofficethinking` 参考节点已实现商品、报价、显式确认下单、订单查询、幂等回执和库存事务 | `docs/open-commerce/merchant-runtime.md`、`docs/open-commerce-merchant-runtime-v1-acceptance.md` |
 | 通用 ERP 蓝图与独立实例 | 已实现 | 可登记官方蓝图及不可变版本，从蓝图创建独立商户项目，并以公共模块、行业插件、主题和私有扩展表达差异；初始化 Matter 携带物化合同，状态从既有任务与产物证据派生 | `server/src/erp_blueprint/`、`docs/erp/README.md`、`contracts/erp/` |

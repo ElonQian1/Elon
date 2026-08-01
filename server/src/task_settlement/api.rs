@@ -81,6 +81,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/projects/:project_id/economy/corrections/:correction_id/finalize",
             post(finalize_settlement_correction),
         )
+        .merge(super::sui_correction_api::routes())
 }
 
 async fn project_overview(
@@ -354,7 +355,7 @@ async fn finalize_settlement_correction(
     ))
 }
 
-fn project_caller(
+pub(super) fn project_caller(
     state: &AppState,
     headers: &HeaderMap,
     project_id: &str,
@@ -366,7 +367,7 @@ fn project_caller(
     Ok((user.id, access.role))
 }
 
-fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response {
+pub(super) fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response {
     match result {
         Ok(value) => Json(value).into_response(),
         Err(error) => {

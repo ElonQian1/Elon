@@ -152,6 +152,27 @@ POST /api/projects/{project_id}/economy/corrections/{correction_id}/finalize
 
 过账要求全局和项目影子经济开关均已开启，并在同一事务内追加 `correction_reversal` 与 `correction_replacement` 两张已平衡凭证。原凭证不会修改。取消 Matter 只把纠正计划标记为 `canceled`，不写纠正凭证。
 
+## Sui 纠正双腿链下投影包
+
+项目编辑者可为已验收并完成过账的纠正准备一个同时绑定冲销与替换凭证的链下原子包：
+
+```http
+POST /api/projects/{project_id}/economy/corrections/{correction_id}/sui-projections
+Content-Type: application/json
+
+{"target_network":"testnet"}
+```
+
+单条冲销或替换凭证继续被普通投影接口拒绝。纠正包固定 `atomic_bundle=true`，并保存两条腿、来源包摘要、目标网络投影摘要和 `not_submitted` 状态。
+
+```http
+GET /api/projects/{project_id}/economy/sui-correction-projections
+GET /api/projects/{project_id}/economy/sui-correction-projections/{projection_id}
+POST /api/projects/{project_id}/economy/sui-correction-projections/{projection_id}/verify
+```
+
+列表和详情允许项目成员读取，准备和复核要求编辑权限。相同项目、纠正、网络和 schema 的请求幂等；任一纠正腿、来源摘要或信封不一致时复核为 `integrity_conflict`。替换凭证出现新的阻断争议时返回 `dispute_blocked`。当前接口不创建 PTB、不连接 Sui 网络，也不移动任何资金。
+
 ## 自动写入点
 
 | 现有事件 | 影子行为 |

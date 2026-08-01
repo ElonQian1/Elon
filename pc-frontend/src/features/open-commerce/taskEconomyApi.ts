@@ -4,6 +4,7 @@ import type {
   SettlementDisputeReason,
   SettlementCorrectionDetail,
   SettlementReceiptDetail,
+  SuiCorrectionProjectionPackage,
   SuiProjectionPackage,
   SuiSettlementEnvelope,
   SuiTargetNetwork,
@@ -92,6 +93,24 @@ export const taskEconomyApi = {
   finalizeSettlementCorrection: (projectId: string, correctionId: string) =>
     api.post<SettlementCorrectionDetail>(
       `${base(projectId)}/corrections/${encodeURIComponent(correctionId)}/finalize`,
+      {},
+    ),
+  suiCorrectionProjections: (projectId: string) =>
+    api.get<SuiCorrectionProjectionPackage[]>(
+      `${base(projectId)}/sui-correction-projections`,
+    ),
+  prepareSuiCorrectionProjection: (
+    projectId: string,
+    correctionId: string,
+    targetNetwork: SuiTargetNetwork,
+  ) =>
+    api.post<SuiCorrectionProjectionPackage>(
+      `${base(projectId)}/corrections/${encodeURIComponent(correctionId)}/sui-projections`,
+      { target_network: targetNetwork },
+    ),
+  verifySuiCorrectionProjection: (projectId: string, projectionId: string) =>
+    api.post<SuiCorrectionProjectionPackage>(
+      `${base(projectId)}/sui-correction-projections/${encodeURIComponent(projectionId)}/verify`,
       {},
     ),
 }

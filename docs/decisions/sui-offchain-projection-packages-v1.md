@@ -29,7 +29,7 @@ acceptance_ref: "docs/task-shadow-settlement-v1-acceptance.md"
 
 ## 安全边界
 
-- 只有已对账且 `shadow_only` 的凭证可准备投影包。
+- 只有已对账、`shadow_only` 且 `receipt_kind=standard` 的凭证可准备普通投影包；纠正双腿使用独立的 `docs/decisions/sui-correction-projection-packages-v1.md`。
 - 摘要算法使用显式版本化字段，不依赖数据库行的隐式序列化顺序。
 - 完整性复核只能改写尚未提交网络的包；未来适配器进入提交生命周期后必须使用独立的带租约状态机。
 - 选择 `mainnet` 只是记录目标，不会连接主网、创建交易或承诺资产存在。

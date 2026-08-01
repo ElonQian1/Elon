@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { CheckCircle2, RefreshCw, RotateCcw } from 'lucide-react'
+import SuiCorrectionProjectionPackages from './SuiCorrectionProjectionPackages'
 import { taskEconomyApi } from './taskEconomyApi'
 import type {
   SettlementCorrectionDetail,
@@ -163,7 +164,14 @@ export default function SettlementCorrections({
               <p style={commerceStyles.itemText}>{correction.summary}</p>
               <small style={commerceStyles.itemMeta}>Matter {correction.correction_matter_id} · {correction.matter_status}{correction.matter_final_decision ? ` / ${correction.matter_final_decision}` : ''}</small>
               {correction.status === 'posted' && (
-                <code style={commerceStyles.itemMeta}>冲销 {correction.reversal_receipt_id} · 替换 {correction.replacement_receipt_id}</code>
+                <>
+                  <code style={commerceStyles.itemMeta}>冲销 {correction.reversal_receipt_id} · 替换 {correction.replacement_receipt_id}</code>
+                  <SuiCorrectionProjectionPackages
+                    canEdit={canEdit}
+                    correctionId={correction.id}
+                    projectId={projectId}
+                  />
+                </>
               )}
               {correction.status === 'matter_pending' && (
                 <button style={actionStyle('secondary', !matterAccepted)} type="button" onClick={() => finalize(item)} disabled={!canEdit || !matterAccepted || busy !== ''}>

@@ -339,6 +339,7 @@ mod task_settlement;
 mod task_settlement_correction_migration;
 mod task_settlement_dispute_migration;
 mod task_settlement_migration;
+mod task_sui_correction_projection_migration;
 mod task_sui_projection_migration;
 mod task_title;
 mod token_usage_api;
