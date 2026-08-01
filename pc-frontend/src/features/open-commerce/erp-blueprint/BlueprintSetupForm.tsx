@@ -51,7 +51,7 @@ export default function BlueprintSetupForm({
         <Boxes size={24} aria-hidden="true" />
         <div>
           <h3>把当前项目登记为 ERP 蓝图</h3>
-          <p>默认包含商品、订单、库存、会员、财务和营销模块。商户实例仍会创建为独立项目。</p>
+          <p>默认包含商品、订单、库存、会员、财务和营销模块。商户可新建独立项目，也可纳入已有项目。</p>
         </div>
       </div>
       <form className={styles.formGrid} onSubmit={submit}>

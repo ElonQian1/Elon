@@ -5,7 +5,7 @@ use crate::group_ai::types::ProjectAiBot;
 use crate::store::Store;
 
 use super::{
-    catalog_service, compatibility, materialization, matter_bridge,
+    catalog_service, compatibility, instance_service, materialization, matter_bridge,
     model::{
         CreateBlueprintRequest, CreateBlueprintVersionRequest, CreateErpInstanceRequest,
         DecideProposalRequest, DecideUpgradeRequest, ErpBlueprint, ErpBlueprintVersion,
@@ -109,10 +109,6 @@ pub(crate) fn create_instance(
 ) -> Result<ErpInstance> {
     let blueprint = owned_blueprint(store, project_id, blueprint_id)?;
     let instance_key = normalize_key(&request.instance_key, "instance_key")?;
-    let project_name = request.project_name.trim();
-    if project_name.is_empty() || project_name.chars().count() > 120 {
-        bail!("商户项目名称不能为空且不能超过 120 个字符");
-    }
     let industry = normalize_key(&request.industry, "industry")?;
     let theme_key = normalize_key(&request.theme_key, "theme_key")?;
     let version = store.erp_blueprint_version_by_name(blueprint_id, &request.version)?;
@@ -144,18 +140,16 @@ pub(crate) fn create_instance(
     if store.erp_instance_by_key(&instance_key)?.is_some() {
         bail!("instance_key 已被其他商户实例使用");
     }
-    let created = store.create_project(
+    let target = instance_service::resolve_instance_target(
+        store,
         actor_user_id,
-        project_name,
-        Some("由一龙官方 ERP 蓝图创建的独立商户项目"),
-        Some("android"),
+        &blueprint.definition.source_project_id,
+        &request.project_name,
+        request.target_project_id.as_deref(),
     )?;
-    if created.reused_existing {
-        bail!("同名项目已经存在；为避免误绑定或覆盖，请为商户实例使用新的项目名称");
-    }
     let result = store.create_erp_instance(
         &instance_key,
-        &created.project.id,
+        &target.project_id,
         blueprint_id,
         &version.id,
         &industry,
@@ -163,11 +157,12 @@ pub(crate) fn create_instance(
         &configuration.enabled_modules,
         &configuration.plugins,
         &request.private_extensions,
+        target.onboarding_mode,
         actor_user_id,
     );
-    if result.is_err() {
+    if result.is_err() && target.cleanup_on_failure {
         store
-            .purge_project_records(actor_user_id, &created.project.id)
+            .purge_project_records(actor_user_id, &target.project_id)
             .map_err(|cleanup| anyhow::anyhow!("ERP 实例登记失败且空项目清理失败：{cleanup}"))?;
     }
     result

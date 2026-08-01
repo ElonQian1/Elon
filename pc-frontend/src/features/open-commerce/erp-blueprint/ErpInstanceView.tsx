@@ -64,7 +64,7 @@ export default function ErpInstanceView({
         <div>
           <span>独立商户 ERP</span>
           <h3>{instance.instance_key}</h3>
-          <p>{instance.industry} · {instance.theme_key} · 蓝图 v{instance.pinned_version}</p>
+          <p>{instance.industry} · {instance.theme_key} · 蓝图 v{instance.pinned_version} · {instance.onboarding_mode === 'existing_project' ? '已有项目纳入' : '蓝图新建'}</p>
         </div>
         <div className={styles.extensionCount}>
           <strong>{instance.private_extensions.length}</strong>

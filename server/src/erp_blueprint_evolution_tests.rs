@@ -243,6 +243,7 @@ fn create_instance(
         CreateErpInstanceRequest {
             instance_key: format!("merchant.{}", Uuid::new_v4().simple()),
             project_name: format!("Merchant ERP {}", Uuid::new_v4().simple()),
+            target_project_id: None,
             version: "1.0.0".into(),
             industry: "retail".into(),
             theme_key: "default.clean".into(),

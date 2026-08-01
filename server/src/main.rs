@@ -64,6 +64,7 @@ mod erp_blueprint_migration;
 mod erp_blueprint_tests;
 #[cfg(test)]
 mod erp_blueprint_workflow_tests;
+mod erp_instance_onboarding_migration;
 mod errors;
 mod external_app_api;
 mod external_app_chat_bootstrap;

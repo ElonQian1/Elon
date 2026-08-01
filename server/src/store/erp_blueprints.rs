@@ -181,6 +181,7 @@ impl Store {
         enabled_modules: &[String],
         plugins: &[ErpExtensionRef],
         private_extensions: &[ErpExtensionRef],
+        onboarding_mode: &str,
         actor_user_id: &str,
     ) -> Result<ErpInstance> {
         let id = new_id("erp_instance");
@@ -190,8 +191,8 @@ impl Store {
                 "INSERT INTO erp_instances (
                    id, instance_key, project_id, blueprint_id, pinned_version_id,
                    industry, theme_key, enabled_modules_json, plugins_json,
-                   private_extensions_json, status, created_by, created_at, updated_at
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'active', ?11, ?12, ?12)",
+                   private_extensions_json, onboarding_mode, status, created_by, created_at, updated_at
+                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'active', ?12, ?13, ?13)",
                 params![
                     id,
                     instance_key.trim(),
@@ -203,6 +204,7 @@ impl Store {
                     serde_json::to_string(enabled_modules)?,
                     serde_json::to_string(plugins)?,
                     serde_json::to_string(private_extensions)?,
+                    onboarding_mode.trim(),
                     actor_user_id.trim(),
                     timestamp,
                 ],
@@ -289,7 +291,7 @@ const VERSION_SELECT: &str = "SELECT id, blueprint_id, manifest_json, manifest_s
 const INSTANCE_SELECT: &str = "SELECT i.id, i.instance_key, i.project_id, i.blueprint_id,
  i.pinned_version_id, v.version, i.industry, i.theme_key, i.enabled_modules_json,
  i.plugins_json, i.private_extensions_json, i.configuration_revision, i.bootstrap_matter_id,
- i.status, i.created_by, i.created_at, i.updated_at
+ i.onboarding_mode, i.status, i.created_by, i.created_at, i.updated_at
  FROM erp_instances i JOIN erp_blueprint_versions v ON v.id=i.pinned_version_id";
 
 fn blueprint_from_row(row: &Row<'_>) -> rusqlite::Result<ErpBlueprint> {
@@ -331,10 +333,11 @@ fn instance_from_row(row: &Row<'_>) -> rusqlite::Result<ErpInstance> {
         private_extensions: decode(row, 10)?,
         configuration_revision: row.get(11)?,
         bootstrap_matter_id: row.get(12)?,
-        status: row.get(13)?,
-        created_by: row.get(14)?,
-        created_at: row.get(15)?,
-        updated_at: row.get(16)?,
+        onboarding_mode: row.get(13)?,
+        status: row.get(14)?,
+        created_by: row.get(15)?,
+        created_at: row.get(16)?,
+        updated_at: row.get(17)?,
     })
 }
 

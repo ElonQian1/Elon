@@ -35,6 +35,11 @@ assert.ok(api.includes('/bootstrap-matter'), 'PC API must expose the controlled 
 assert.ok(api.includes('/materialization'), 'PC API must expose read-only materialization status')
 assert.ok(maintainer.includes('create_matter: true'), 'accepted proposals must enter the existing Matter flow')
 assert.ok(maintainer.includes('support_count < blueprint.definition.proposal_threshold'), 'UI must enforce the independent-merchant threshold')
+assert.ok(maintainer.includes("'existing_project'"), 'maintainer must support explicitly adopting an existing project')
+assert.ok(maintainer.includes('target_project_id:'), 'existing project adoption must send an explicit project id')
+assert.ok(maintainer.includes("['owner', 'admin', 'editor']"), 'target project picker must exclude read-only projects')
+assert.ok(maintainer.includes('project.viewer_role ?? project.role ?? project.my_role'), 'target project picker must read the project list role field')
+assert.ok(api.includes("'/api/me/projects'"), 'ERP workspace must load user-owned target projects through the authenticated project list')
 
 for (const forbidden of [
   'erp_accept_proposal',

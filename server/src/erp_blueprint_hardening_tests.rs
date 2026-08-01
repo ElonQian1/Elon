@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use uuid::Uuid;
 
 use crate::{
-    erp_blueprint::{model::*, service, validation},
+    erp_blueprint::{materialization, model::*, service, validation},
     store::Store,
 };
 
@@ -40,6 +40,61 @@ fn existing_project_name_is_never_reused_or_purged_for_instance_creation() {
         },
     )
     .unwrap();
+    let self_target_error = service::create_instance(
+        &store,
+        &blueprint_project.id,
+        &blueprint.id,
+        &owner.id,
+        CreateErpInstanceRequest {
+            instance_key: "merchant.blueprint-self".into(),
+            project_name: String::new(),
+            target_project_id: Some(blueprint_project.id.clone()),
+            version: "1.0.0".into(),
+            industry: "retail".into(),
+            theme_key: "default.clean".into(),
+            enabled_modules: vec![],
+            plugins: vec![],
+            private_extensions: vec![],
+        },
+    )
+    .unwrap_err();
+    assert!(self_target_error
+        .to_string()
+        .contains("蓝图维护项目不能同时作为商户实例项目"));
+    let another_blueprint_project = store
+        .create_project(&owner.id, "Another ERP Blueprint", None, None)
+        .unwrap()
+        .project;
+    let mut another_blueprint_request = blueprint_request(vec![module("catalog", true, vec![])]);
+    another_blueprint_request.blueprint_key = "official.hardening.another".into();
+    service::create_blueprint(
+        &store,
+        &another_blueprint_project.id,
+        &owner.id,
+        another_blueprint_request,
+    )
+    .unwrap();
+    let blueprint_target_error = service::create_instance(
+        &store,
+        &blueprint_project.id,
+        &blueprint.id,
+        &owner.id,
+        CreateErpInstanceRequest {
+            instance_key: "merchant.another-blueprint".into(),
+            project_name: String::new(),
+            target_project_id: Some(another_blueprint_project.id),
+            version: "1.0.0".into(),
+            industry: "retail".into(),
+            theme_key: "default.clean".into(),
+            enabled_modules: vec![],
+            plugins: vec![],
+            private_extensions: vec![],
+        },
+    )
+    .unwrap_err();
+    assert!(blueprint_target_error
+        .to_string()
+        .contains("ERP 蓝图维护项目不能作为商户实例项目"));
     let existing = store
         .create_project(&owner.id, "Existing Merchant Project", None, None)
         .unwrap()
@@ -53,6 +108,7 @@ fn existing_project_name_is_never_reused_or_purged_for_instance_creation() {
         CreateErpInstanceRequest {
             instance_key: "merchant.existing".into(),
             project_name: existing.name.clone(),
+            target_project_id: None,
             version: "1.0.0".into(),
             industry: "retail".into(),
             theme_key: "default.clean".into(),
@@ -71,6 +127,180 @@ fn existing_project_name_is_never_reused_or_purged_for_instance_creation() {
             .id,
         existing.id
     );
+}
+
+#[test]
+fn editable_existing_project_can_be_adopted_without_recreation() {
+    let store = temp_store();
+    let owner = store
+        .create_user(
+            "erp-adopt@example.com",
+            "secret1",
+            Some("Adopt Owner"),
+            None,
+        )
+        .unwrap();
+    let blueprint_project = store
+        .create_project(&owner.id, "ERP Adoption Blueprint", None, None)
+        .unwrap()
+        .project;
+    let blueprint = service::create_blueprint(
+        &store,
+        &blueprint_project.id,
+        &owner.id,
+        blueprint_request(vec![module("catalog", true, vec![])]),
+    )
+    .unwrap();
+    let version = service::publish_version(
+        &store,
+        &blueprint_project.id,
+        &blueprint.id,
+        &owner.id,
+        CreateBlueprintVersionRequest {
+            manifest: release(vec!["catalog"], vec!["catalog.search"]),
+        },
+    )
+    .unwrap();
+    let existing = store
+        .create_project(&owner.id, "Paid Coffee ERP", None, Some("android"))
+        .unwrap()
+        .project;
+
+    let instance = service::create_instance(
+        &store,
+        &blueprint_project.id,
+        &blueprint.id,
+        &owner.id,
+        CreateErpInstanceRequest {
+            instance_key: "merchant.paid-coffee".into(),
+            project_name: String::new(),
+            target_project_id: Some(existing.id.clone()),
+            version: "1.0.0".into(),
+            industry: "coffee".into(),
+            theme_key: "default.clean".into(),
+            enabled_modules: vec![],
+            plugins: vec![],
+            private_extensions: vec![],
+        },
+    )
+    .unwrap();
+
+    assert_eq!(instance.project_id, existing.id);
+    assert_eq!(instance.onboarding_mode, "existing_project");
+    let contract = materialization::build_contract(&blueprint, &version, &instance);
+    assert_eq!(contract.target_onboarding_mode, "existing_project");
+    assert!(contract
+        .boundaries
+        .contains(&"does_not_overwrite_existing_project"));
+    assert_eq!(
+        store
+            .get_project_access(&owner.id, &existing.id)
+            .unwrap()
+            .name,
+        "Paid Coffee ERP"
+    );
+
+    let protected_existing = store
+        .create_project(&owner.id, "Protected Existing ERP", None, Some("android"))
+        .unwrap()
+        .project;
+    let duplicate_error = service::create_instance(
+        &store,
+        &blueprint_project.id,
+        &blueprint.id,
+        &owner.id,
+        CreateErpInstanceRequest {
+            instance_key: instance.instance_key,
+            project_name: String::new(),
+            target_project_id: Some(protected_existing.id.clone()),
+            version: "1.0.0".into(),
+            industry: "coffee".into(),
+            theme_key: "default.clean".into(),
+            enabled_modules: vec![],
+            plugins: vec![],
+            private_extensions: vec![],
+        },
+    )
+    .unwrap_err();
+    assert!(duplicate_error.to_string().contains("instance_key"));
+    assert_eq!(
+        store
+            .get_project_access(&owner.id, &protected_existing.id)
+            .unwrap()
+            .id,
+        protected_existing.id
+    );
+}
+
+#[test]
+fn existing_project_adoption_requires_edit_permission() {
+    let store = temp_store();
+    let owner_account = "erp-adopt-member@example.com";
+    let owner = store
+        .create_user(owner_account, "secret1", Some("Blueprint Owner"), None)
+        .unwrap();
+    let target_owner = store
+        .create_user(
+            "erp-target-owner@example.com",
+            "secret1",
+            Some("Target Owner"),
+            None,
+        )
+        .unwrap();
+    let blueprint_project = store
+        .create_project(&owner.id, "ERP Permission Blueprint", None, None)
+        .unwrap()
+        .project;
+    let blueprint = service::create_blueprint(
+        &store,
+        &blueprint_project.id,
+        &owner.id,
+        blueprint_request(vec![module("catalog", true, vec![])]),
+    )
+    .unwrap();
+    service::publish_version(
+        &store,
+        &blueprint_project.id,
+        &blueprint.id,
+        &owner.id,
+        CreateBlueprintVersionRequest {
+            manifest: release(vec!["catalog"], vec!["catalog.search"]),
+        },
+    )
+    .unwrap();
+    let target = store
+        .create_project(
+            &target_owner.id,
+            "Member Only Target",
+            None,
+            Some("android"),
+        )
+        .unwrap()
+        .project;
+    store
+        .add_project_member_by_account(&target.id, owner_account, "member")
+        .unwrap();
+
+    let error = service::create_instance(
+        &store,
+        &blueprint_project.id,
+        &blueprint.id,
+        &owner.id,
+        CreateErpInstanceRequest {
+            instance_key: "merchant.member-only".into(),
+            project_name: String::new(),
+            target_project_id: Some(target.id),
+            version: "1.0.0".into(),
+            industry: "retail".into(),
+            theme_key: "default.clean".into(),
+            enabled_modules: vec![],
+            plugins: vec![],
+            private_extensions: vec![],
+        },
+    )
+    .unwrap_err();
+
+    assert!(error.to_string().contains("owner、admin 或 editor"));
 }
 
 #[test]

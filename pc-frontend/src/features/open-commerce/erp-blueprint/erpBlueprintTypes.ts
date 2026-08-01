@@ -81,6 +81,7 @@ export type ErpInstance = {
   private_extensions: ErpExtension[]
   configuration_revision: number
   bootstrap_matter_id?: string | null
+  onboarding_mode: 'new_project' | 'existing_project'
   status: string
   created_by: string
   created_at: string
@@ -96,6 +97,7 @@ export type ErpMaterializationStatus = {
     instance_id: string
     instance_key: string
     target_project_id: string
+    target_onboarding_mode: 'new_project' | 'existing_project'
     source: {
       project_id: string
       git_commit: string
@@ -142,6 +144,19 @@ export type ErpMaterializationStatus = {
   }>
   blockers: string[]
   next_action: string
+}
+
+export type ErpTargetProject = {
+  id: string
+  name: string
+  display_name?: string | null
+  role?: string
+  my_role?: string
+  viewer_role?: string
+}
+
+export type ErpTargetProjectList = {
+  projects?: ErpTargetProject[]
 }
 
 export type ErpProposal = {

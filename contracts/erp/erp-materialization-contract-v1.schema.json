@@ -3,12 +3,13 @@
   "$id": "https://yilong.example/contracts/erp/erp-materialization-contract-v1.schema.json",
   "title": "ERP instance materialization contract V1",
   "type": "object",
-  "required": ["schema", "instance_id", "instance_key", "target_project_id", "source", "configuration", "required_artifact", "verification_requirements", "boundaries"],
+  "required": ["schema", "instance_id", "instance_key", "target_project_id", "target_onboarding_mode", "source", "configuration", "required_artifact", "verification_requirements", "boundaries"],
   "properties": {
     "schema": { "const": "yilong.erp.materialization_contract.v1" },
     "instance_id": { "type": "string", "minLength": 1 },
     "instance_key": { "type": "string", "minLength": 2 },
     "target_project_id": { "type": "string", "minLength": 1 },
+    "target_onboarding_mode": { "enum": ["new_project", "existing_project"] },
     "source": {
       "type": "object",
       "required": ["project_id", "git_commit", "blueprint_key", "version"],

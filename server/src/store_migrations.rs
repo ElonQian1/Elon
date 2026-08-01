@@ -154,6 +154,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (117, "开放商业商户可控调用配额与原子计数", crate::open_commerce_rate_limit_migration::migration_v117),
     (118, "开放商业商户级开发者应用封禁与紧急撤销", crate::open_commerce_app_block_migration::migration_v118),
     (119, "开放商业授权总调用与总计量预算预留", crate::open_commerce_grant_budget_migration::migration_v119),
+    (120, "ERP 商户实例新建与现有项目纳入来源", crate::erp_instance_onboarding_migration::migration_v120),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

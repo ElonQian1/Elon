@@ -13,6 +13,7 @@ use crate::{
 };
 
 use super::{
+    instance_service::ONBOARDING_EXISTING_PROJECT,
     materialization,
     model::{ErpBlueprint, ErpBlueprintVersion, ErpFeatureProposal, ErpInstance},
 };
@@ -146,16 +147,23 @@ pub(crate) fn create_bootstrap_matter(
         .map(|extension| extension.extension_key.as_str())
         .collect::<Vec<_>>()
         .join("、");
+    let project_instruction = if instance.onboarding_mode == ONBOARDING_EXISTING_PROJECT {
+        "目标是已存在的真实商户项目。先盘点现有模块、数据库迁移、测试和私有扩展，只补齐缺口；不得用空白模板覆盖现有代码。"
+    } else {
+        "目标是新建的独立商户项目，按固定蓝图版本建立最小可运行基线。"
+    };
     let brief = format!(
-        "基于 ERP 蓝图 {} v{} 初始化独立商户项目 {}。\n主题：{}\n公共模块：{}\n行业插件：{}\n私有扩展边界：{}\n源版本提交：{}\n\n只在当前商户项目工作区实现；不得复制其他商户数据、密钥或私有源码；不得自动发布。",
+        "基于 ERP 蓝图 {} v{} 初始化独立商户项目 {}。\n纳入方式：{}\n主题：{}\n公共模块：{}\n行业插件：{}\n私有扩展边界：{}\n源版本提交：{}\n\n{}\n只在当前商户项目工作区实现；不得复制其他商户数据、密钥或私有源码；不得自动发布。",
         blueprint.definition.blueprint_key,
         version.manifest.version,
         instance.instance_key,
+        instance.onboarding_mode,
         instance.theme_key,
         modules,
         if plugins.is_empty() { "无" } else { &plugins },
         if private_extensions.is_empty() { "无" } else { &private_extensions },
         version.manifest.source_git_commit,
+        project_instruction,
     );
     let request = CreateMatterPlanRequest {
         channel_id: channel.id.clone(),
@@ -164,7 +172,11 @@ pub(crate) fn create_bootstrap_matter(
         brief: brief.clone(),
         collaboration_mode: Some("solo".into()),
         acceptance_criteria: vec![
-            "在独立商户项目中实现发布清单声明的公共模块和能力".into(),
+            if instance.onboarding_mode == ONBOARDING_EXISTING_PROJECT {
+                "先输出已有能力与蓝图能力的差异清单，只实现缺失项".into()
+            } else {
+                "在独立商户项目中实现发布清单声明的公共模块和能力".into()
+            },
             "应用商户主题并保持插件与私有扩展命名空间隔离".into(),
             "生成机器可读实例清单和升级基线，不写入密钥或经营原始数据".into(),
             "完成项目测试；合并与发布由商户人工确认".into(),

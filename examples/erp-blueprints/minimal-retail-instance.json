@@ -13,5 +13,6 @@
   "private_extensions": [],
   "configuration_revision": 1,
   "bootstrap_matter_id": null,
+  "onboarding_mode": "new_project",
   "data_policy": { "owner": "merchant_project", "raw_data_exported_to_blueprint": false }
 }

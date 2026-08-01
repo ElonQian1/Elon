@@ -444,6 +444,7 @@ fn setup() -> (Store, String, String, ErpBlueprint, ErpInstance) {
         CreateErpInstanceRequest {
             instance_key: format!("merchant.{}", Uuid::new_v4().simple()),
             project_name: format!("Workflow Merchant {}", Uuid::new_v4().simple()),
+            target_project_id: None,
             version: "1.0.0".into(),
             industry: "retail".into(),
             theme_key: "merchant.clean".into(),

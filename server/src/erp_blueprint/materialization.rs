@@ -10,6 +10,7 @@ use crate::{
     store::Store,
 };
 
+use super::instance_service::ONBOARDING_EXISTING_PROJECT;
 use super::model::{
     ErpBlueprint, ErpBlueprintVersion, ErpInstance, ErpMaterializationArtifactContract,
     ErpMaterializationAssignmentSummary, ErpMaterializationConfiguration,
@@ -27,11 +28,31 @@ pub(crate) fn build_contract(
     version: &ErpBlueprintVersion,
     instance: &ErpInstance,
 ) -> ErpMaterializationContract {
+    let mut verification_requirements = vec![
+        "实例清单必须与当前固定版本和配置修订一致",
+        "测试结果必须登记到 Assignment artifact",
+        "不得把密钥、经营原始数据或其他商户私有源码写入产物",
+        "合并、验收和发布必须由商户人工确认",
+    ];
+    let mut boundaries = vec![
+        "does_not_copy_source_automatically",
+        "does_not_start_assignment_automatically",
+        "does_not_merge_or_publish_automatically",
+        "does_not_attest_deployment_or_payment",
+    ];
+    if instance.onboarding_mode == ONBOARDING_EXISTING_PROJECT {
+        verification_requirements.insert(
+            0,
+            "先盘点现有项目模块、数据迁移与私有扩展，再以最小改动补齐蓝图能力",
+        );
+        boundaries.push("does_not_overwrite_existing_project");
+    }
     ErpMaterializationContract {
         schema: MATERIALIZATION_CONTRACT_SCHEMA,
         instance_id: instance.id.clone(),
         instance_key: instance.instance_key.clone(),
         target_project_id: instance.project_id.clone(),
+        target_onboarding_mode: instance.onboarding_mode.clone(),
         source: ErpMaterializationSource {
             project_id: blueprint.definition.source_project_id.clone(),
             git_commit: version.manifest.source_git_commit.clone(),
@@ -60,18 +81,8 @@ pub(crate) fn build_contract(
                 "verification_passed",
             ],
         },
-        verification_requirements: vec![
-            "实例清单必须与当前固定版本和配置修订一致",
-            "测试结果必须登记到 Assignment artifact",
-            "不得把密钥、经营原始数据或其他商户私有源码写入产物",
-            "合并、验收和发布必须由商户人工确认",
-        ],
-        boundaries: vec![
-            "does_not_copy_source_automatically",
-            "does_not_start_assignment_automatically",
-            "does_not_merge_or_publish_automatically",
-            "does_not_attest_deployment_or_payment",
-        ],
+        verification_requirements,
+        boundaries,
     }
 }
 

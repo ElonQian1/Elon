@@ -74,6 +74,7 @@ fn shared_blueprint_keeps_instances_independent_and_governs_common_proposals() {
         CreateErpInstanceRequest {
             instance_key: "cofficethinking.store".into(),
             project_name: "Coffee Thinking ERP".into(),
+            target_project_id: None,
             version: "1.0.0".into(),
             industry: "coffee".into(),
             theme_key: "coffee.warm".into(),
@@ -96,6 +97,7 @@ fn shared_blueprint_keeps_instances_independent_and_governs_common_proposals() {
         CreateErpInstanceRequest {
             instance_key: "retail.minimum".into(),
             project_name: "Minimal Retail ERP".into(),
+            target_project_id: None,
             version: "1.0.0".into(),
             industry: "convenience_retail".into(),
             theme_key: "retail.fresh".into(),
@@ -279,6 +281,7 @@ fn signal_rejects_secrets_and_existing_capability_avoids_proposal() {
         CreateErpInstanceRequest {
             instance_key: "safety.store".into(),
             project_name: "Safety Merchant".into(),
+            target_project_id: None,
             version: "1.0.0".into(),
             industry: "retail".into(),
             theme_key: "default.clean".into(),

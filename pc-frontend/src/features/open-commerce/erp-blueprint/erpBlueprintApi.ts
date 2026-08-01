@@ -8,6 +8,7 @@ import type {
   ErpProposal,
   ErpReleaseManifest,
   ErpUpgrade,
+  ErpTargetProjectList,
   DecideErpUpgradeRequest,
   RequirementResolution,
   UpdateErpInstanceRequest,
@@ -17,6 +18,8 @@ function base(projectId: string) {
   return `/api/projects/${encodeURIComponent(projectId)}/erp`
 }
 export const erpBlueprintApi = {
+  listTargetProjects: () => api.get<ErpTargetProjectList>('/api/me/projects'),
+
   overview: (projectId: string) => api.get<ErpOverview>(`${base(projectId)}/overview`),
 
   createBlueprint: (projectId: string, request: Record<string, unknown>) =>

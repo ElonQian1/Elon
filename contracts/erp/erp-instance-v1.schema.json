@@ -18,6 +18,7 @@
     "private_extensions": { "type": "array", "items": { "$ref": "#/$defs/extension" } },
     "configuration_revision": { "type": "integer", "minimum": 1 },
     "bootstrap_matter_id": { "type": ["string", "null"], "minLength": 1, "maxLength": 120 },
+    "onboarding_mode": { "enum": ["new_project", "existing_project"] },
     "data_policy": {
       "type": "object",
       "additionalProperties": false,

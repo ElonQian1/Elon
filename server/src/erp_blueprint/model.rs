@@ -153,7 +153,10 @@ pub(crate) struct ErpExtensionRef {
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct CreateErpInstanceRequest {
     pub instance_key: String,
+    #[serde(default)]
     pub project_name: String,
+    #[serde(default)]
+    pub target_project_id: Option<String>,
     pub version: String,
     pub industry: String,
     pub theme_key: String,
@@ -180,6 +183,7 @@ pub(crate) struct ErpInstance {
     pub private_extensions: Vec<ErpExtensionRef>,
     pub configuration_revision: i64,
     pub bootstrap_matter_id: Option<String>,
+    pub onboarding_mode: String,
     pub status: String,
     pub created_by: String,
     pub created_at: String,
@@ -218,6 +222,7 @@ pub(crate) struct ErpMaterializationContract {
     pub instance_id: String,
     pub instance_key: String,
     pub target_project_id: String,
+    pub target_onboarding_mode: String,
     pub source: ErpMaterializationSource,
     pub configuration: ErpMaterializationConfiguration,
     pub required_artifact: ErpMaterializationArtifactContract,

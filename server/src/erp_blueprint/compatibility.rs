@@ -190,6 +190,7 @@ mod tests {
             private_extensions: vec![private.clone()],
             configuration_revision: 1,
             bootstrap_matter_id: None,
+            onboarding_mode: "new_project".into(),
             status: "active".into(),
             created_by: "owner".into(),
             created_at: "now".into(),

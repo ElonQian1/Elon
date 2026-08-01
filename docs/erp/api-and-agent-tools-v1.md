@@ -12,7 +12,7 @@
 | POST | `/api/projects/:project_id/erp/blueprints` | 将当前项目登记为官方蓝图 |
 | POST | `/api/projects/:project_id/erp/blueprints/:blueprint_id/versions` | 发布不可变版本清单 |
 | POST | `/api/projects/:project_id/erp/blueprints/:blueprint_id/evolve` | 按定义修订号追加模块、能力、主题或扩展点 |
-| POST | `/api/projects/:project_id/erp/blueprints/:blueprint_id/instances` | 创建独立商户项目实例 |
+| POST | `/api/projects/:project_id/erp/blueprints/:blueprint_id/instances` | 新建独立商户项目实例，或以 `target_project_id` 纳入现有项目 |
 | GET | `/api/projects/:project_id/erp/capabilities` | 检索机器可读能力目录 |
 | POST | `/api/projects/:project_id/erp/requirements/resolve` | 把需求解析为复用、组合、私有扩展或通用候选 |
 | POST | `/api/projects/:project_id/erp/instances/:instance_id/signals` | 经授权提交脱敏需求信号 |
@@ -41,6 +41,8 @@ ERP 工具合并到现有开放商业 MCP 工具列表中，供项目内 AI 在�
 AI 工具故意不提供蓝图演进、提案接受、Matter 创建、公共版本发布、升级采用或回滚操作。这些操作必须由有权限的人通过 PC 工作台完成。实例配置工具受当前项目写权限和 Harness 工具确认约束，`merchant_confirmed` 只是业务确认字段，不应被当作独立的身份凭证。
 
 能力检索和需求解析始终使用当前商户固定版本的能力目录。维护项目可查看最新已发布目录以及尚未发布的能力标识，但尚未发布能力不会出现在旧商户实例的可复用结果中。
+
+创建实例时默认使用 `project_name` 新建项目；传入 `target_project_id` 时忽略空的 `project_name`，并要求操作者对目标项目具有 `owner`、`admin` 或 `editor` 角色。响应中的 `onboarding_mode` 以及物化合同中的 `target_onboarding_mode` 用于区分 `new_project` 与 `existing_project`。该接口只登记治理关系，不导入本机目录、不复制 Git 仓库，也不启动开发任务。
 
 ## 机器合同
 

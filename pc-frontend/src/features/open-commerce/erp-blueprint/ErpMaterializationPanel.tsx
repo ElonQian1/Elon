@@ -40,7 +40,7 @@ export default function ErpMaterializationPanel({ status }: { status: ErpMateria
         <div>
           <span>配置修订</span>
           <strong>{status.contract.configuration.revision}</strong>
-          <small>{status.contract.configuration.theme_key}</small>
+          <small>{status.contract.target_onboarding_mode === 'existing_project' ? '已有项目纳入' : '蓝图新建'} · {status.contract.configuration.theme_key}</small>
         </div>
         <div>
           <span>任务进度</span>
