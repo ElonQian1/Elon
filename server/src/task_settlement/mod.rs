@@ -4,6 +4,8 @@ pub(crate) mod api;
 mod correction_service;
 mod dispute_service;
 pub(crate) mod ledger;
+pub(crate) mod lineage_model;
+mod lineage_service;
 pub(crate) mod model;
 mod service;
 mod sui_correction_api;

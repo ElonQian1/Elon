@@ -3,6 +3,7 @@ import type {
   SettlementDisputeDetail,
   SettlementDisputeReason,
   SettlementCorrectionDetail,
+  SettlementCorrectionLineage,
   SettlementReceiptDetail,
   SuiCorrectionProjectionPackage,
   SuiProjectionPackage,
@@ -75,6 +76,10 @@ export const taskEconomyApi = {
   settlementCorrections: (projectId: string, receiptId: string) =>
     api.get<SettlementCorrectionDetail[]>(
       `${base(projectId)}/settlements/${encodeURIComponent(receiptId)}/corrections`,
+    ),
+  settlementLineage: (projectId: string, receiptId: string) =>
+    api.get<SettlementCorrectionLineage>(
+      `${base(projectId)}/settlements/${encodeURIComponent(receiptId)}/lineage`,
     ),
   createSettlementCorrection: (
     projectId: string,

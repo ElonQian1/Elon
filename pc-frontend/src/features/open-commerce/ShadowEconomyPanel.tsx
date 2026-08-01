@@ -7,6 +7,7 @@ import type {
   TaskEconomyOverview,
 } from './taskEconomyTypes'
 import SuiProjectionPackages from './SuiProjectionPackages'
+import SettlementLineage from './SettlementLineage'
 import SettlementDisputes from './SettlementDisputes'
 import { errorText, formatMicros } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
@@ -162,6 +163,12 @@ export default function ShadowEconomyPanel({
           </div>
         </section>
       </div>
+
+      <SettlementLineage
+        projectId={projectId}
+        receiptId={detail?.receipt.id ?? null}
+        refreshToken={economyRevision}
+      />
 
       <SettlementDisputes
         canEdit={canEdit}

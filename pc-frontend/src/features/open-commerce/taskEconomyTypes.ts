@@ -281,3 +281,23 @@ export interface SuiCorrectionProjectionPackage {
   created_at: string
   updated_at: string
 }
+
+export interface SettlementCorrectionLineage {
+  schema: 'task_economy.settlement_correction_lineage.v1'
+  project_id: string
+  requested_receipt: SettlementReceipt
+  requested_position:
+    | 'effective_standard'
+    | 'superseded_original'
+    | 'correction_reversal'
+    | 'effective_replacement'
+    | 'superseded_replacement'
+    | 'unknown'
+  root_receipt: SettlementReceipt
+  effective_receipt: SettlementReceipt
+  posted_corrections: SettlementCorrectionDetail[]
+  non_posted_corrections: SettlementCorrectionDetail[]
+  depth: number
+  effective_has_blocking_dispute: boolean
+  shadow_only: true
+}

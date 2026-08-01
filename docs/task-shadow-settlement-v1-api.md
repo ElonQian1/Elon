@@ -173,6 +173,18 @@ POST /api/projects/{project_id}/economy/sui-correction-projections/{projection_i
 
 列表和详情允许项目成员读取，准备和复核要求编辑权限。相同项目、纠正、网络和 schema 的请求幂等；任一纠正腿、来源摘要或信封不一致时复核为 `integrity_conflict`。替换凭证出现新的阻断争议时返回 `dispute_blocked`。当前接口不创建 PTB、不连接 Sui 网络，也不移动任何资金。
 
+## 纠正链与当前有效凭证
+
+项目成员可从任意标准、冲销或替换凭证解析完整纠正链：
+
+```http
+GET /api/projects/{project_id}/economy/settlements/{receipt_id}/lineage
+```
+
+响应包含 `root_receipt`、`requested_receipt`、`requested_position`、`effective_receipt`、`posted_corrections`、`non_posted_corrections`、`depth` 和 `effective_has_blocking_dispute`。只有已过账纠正会推动有效凭证；待验收和已取消计划只用于审计展示。
+
+解析最多向前或向后遍历 32 层。循环、分叉、缺失替换凭证或关联不一致均返回错误，不修改任何数据。`effective_receipt` 表示当前影子事实，不是法定财务报表或真实余额。
+
 ## 自动写入点
 
 | 现有事件 | 影子行为 |

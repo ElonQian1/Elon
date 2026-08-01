@@ -25,6 +25,7 @@
 | 争议只追加证据并阻断投影，不改写历史账本 | 待审核或已接受争议阻断原凭证投影；纠正必须使用新的 Matter 和凭证 | `docs/decisions/task-shadow-settlement-disputes-v1.md` |
 | 影子结算纠正采用独立 Matter 和追加式双腿过账 | 人工验收后在同一事务内追加冲销与替换凭证，原凭证不改写；单张纠正凭证不进入普通 Sui 投影 | `docs/decisions/task-shadow-settlement-corrections-v1.md` |
 | Sui 纠正投影必须把冲销与替换绑定为一个链下原子包 | 包绑定两条腿、来源摘要和目标网络；可复核但固定未提交，替换凭证的新争议会阻断就绪 | `docs/decisions/sui-correction-projection-packages-v1.md` |
+| 纠正后的经营读取必须解析当前有效凭证 | 从任意凭证回溯根并沿已过账纠正前进；待验收计划不改金额，循环或分叉失败关闭 | `docs/decisions/task-shadow-settlement-lineage-v1.md` |
 | 区块链只作为多方可信、授权与结算候选层 | 链上只承载跨主体所有权、授权、关键回执和结算；订单、日志、媒体、实时数据库、AI 推理、复杂查询和匿名化继续留在链外 | `docs/open-commerce/integration-architecture.md` |
 | 文档按状态与职责模块化 | 事实、决策、草稿和讨论来源分开，避免巨型愿景文档误导 AI | `docs/open-commerce/README.md` |
 

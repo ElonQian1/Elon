@@ -14,7 +14,7 @@ use crate::{
 };
 
 use super::{
-    correction_service, dispute_service,
+    correction_service, dispute_service, lineage_service,
     model::{
         CreateSettlementCorrectionRequest, OpenSettlementDisputeRequest,
         PrepareSuiProjectionPackageRequest, ResolveSettlementDisputeRequest,
@@ -72,6 +72,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/economy/settlements/:receipt_id/corrections",
             get(list_settlement_corrections),
+        )
+        .route(
+            "/api/projects/:project_id/economy/settlements/:receipt_id/lineage",
+            get(settlement_lineage),
         )
         .route(
             "/api/projects/:project_id/economy/disputes/:dispute_id/corrections",
@@ -302,6 +306,21 @@ async fn list_settlement_corrections(
         return response;
     }
     service_response(correction_service::list(
+        &state.store,
+        &project_id,
+        &receipt_id,
+    ))
+}
+
+async fn settlement_lineage(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, receipt_id)): Path<(String, String)>,
+) -> Response {
+    if let Err(response) = project_caller(&state, &headers, &project_id) {
+        return response;
+    }
+    service_response(lineage_service::resolve(
         &state.store,
         &project_id,
         &receipt_id,
