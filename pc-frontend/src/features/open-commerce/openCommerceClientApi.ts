@@ -73,6 +73,15 @@ export const openCommerceClientApi = {
       {},
     ),
 
+  renewConsumerRelationship: (
+    projectId: string,
+    relationshipId: string,
+    request: { source_app_id: string; expires_at: string },
+  ) => api.post<ConsumerRelationship>(
+    `${projectBase(projectId)}/consumer-relationships/${encodeURIComponent(relationshipId)}/renew`,
+    request,
+  ),
+
   listMerchantRelationships: (projectId: string, merchantId: string) =>
     api.get<ConsumerRelationshipList>(
       `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/consumer-relationships`,

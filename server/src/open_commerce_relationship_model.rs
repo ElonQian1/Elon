@@ -28,6 +28,13 @@ pub(crate) struct CreateConsumerRelationshipRequest {
     pub expires_at: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct RenewConsumerRelationshipRequest {
+    #[serde(default = "default_source_app_id")]
+    pub source_app_id: String,
+    pub expires_at: String,
+}
+
 fn default_source_app_id() -> String {
     "pc-web".to_string()
 }

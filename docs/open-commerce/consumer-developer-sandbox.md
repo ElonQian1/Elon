@@ -1,6 +1,6 @@
 # 消费者发现与第三方应用沙盒
 
-本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权期限由 `docs/decisions/open-commerce-grant-expiration-v1.md` 决定，消费者关系由 `docs/decisions/open-commerce-consumer-relationships-v1.md` 决定，关联数据删除请求由 `docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定，商户侧调用活动证据由 `docs/decisions/open-commerce-app-activity-health-v1.md` 决定。
+本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权期限由 `docs/decisions/open-commerce-grant-expiration-v1.md` 决定，消费者关系及续期由 `docs/decisions/open-commerce-consumer-relationships-v1.md` 和 `docs/decisions/open-commerce-consumer-relationship-renewal-v1.md` 决定，关联数据删除请求由 `docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定，商户侧调用活动证据由 `docs/decisions/open-commerce-app-activity-health-v1.md` 决定。
 
 ## 使用入口
 
@@ -48,7 +48,7 @@
 
 批准申请时，商户可选择 7 天、30 天、90 天、1 年或长期有效，并可填写授权期内的总调用次数和总预算（人民币元）。PC 默认 30 天；长期有效必须显式选择。用尽或到期后不能由 App 自行扩容、续期，商户需要重新授权。调用失败会退回刚预留的预算，重复请求不会再次占用。批准后的实际期限和预算会同时展示给商户与申请方。
 
-消费者还可以在发现商户后建立独立的关系凭证。关系凭证不等同于 App Grant：它只允许商户把消费者主动提供的偏好或会员标识关联到随机匿名标识。PC 默认 90 天、最长 366 天，消费者可随时撤销；商户看不到消费者账号、用户 ID 或消费者项目 ID。关系凭证不存放偏好原文、联系方式、订单和支付数据。
+消费者还可以在发现商户后建立独立的关系凭证。关系凭证不等同于 App Grant：它只允许商户把消费者主动提供的偏好或会员标识关联到随机匿名标识。PC 默认 90 天、最长 366 天，消费者可随时撤销；到期前 14 天显示续期入口。续期会撤销旧凭证并轮换匿名标识，相同请求只返回同一个新凭证。商户看不到消费者账号、用户 ID、消费者项目 ID 或内部续期链。关系凭证不存放偏好原文、联系方式、订单和支付数据。
 
 消费者还可针对本人关系发起关联数据删除请求。创建请求会原子撤销该关系；商户只能看到匿名关系别名，可接单、拒绝或声明完成。消费者可在接单前撤回请求，但关系不会恢复。`completed` 只表示商户提交了可审计声明，平台尚未验证美团、ERP、CRM 或会员系统中的真实删除结果。
 
@@ -66,4 +66,4 @@ Set-Location pc-frontend
 npm run test:open-commerce
 ```
 
-当前已实现商户主动选择的跨项目基础目录、限时授权、消费者可撤销关系凭证、匿名删除请求与商户履约声明、持久化能力调用配额、近 24 小时可解释活动证据、商户级手动 App 封禁，以及沙盒 App 停用、旧 Token 永久失效、重新启用生成新 Token、申请方查看和撤回的生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、自动全网滥用处置、消费者数据保险箱、外部删除适配器、支付和真实平台适配器仍是后续模块。
+当前已实现商户主动选择的跨项目基础目录、限时授权、消费者可撤销及安全续期的关系凭证、匿名删除请求与商户履约声明、持久化能力调用配额、近 24 小时可解释活动证据、商户级手动 App 封禁，以及沙盒 App 停用、旧 Token 永久失效、重新启用生成新 Token、申请方查看和撤回的生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、外部到期通知、自动全网滥用处置、消费者数据保险箱、外部删除适配器、支付和真实平台适配器仍是后续模块。

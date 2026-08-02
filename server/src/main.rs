@@ -204,6 +204,9 @@ mod open_commerce_rate_limit_tests;
 mod open_commerce_relationship_api;
 mod open_commerce_relationship_migration;
 mod open_commerce_relationship_model;
+mod open_commerce_relationship_renewal_migration;
+#[cfg(test)]
+mod open_commerce_relationship_renewal_tests;
 mod open_commerce_relationship_service;
 #[cfg(test)]
 mod open_commerce_relationship_tests;

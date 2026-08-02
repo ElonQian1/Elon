@@ -163,6 +163,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (126, "共享节点推理每日 Token 预算原子预留", crate::node_compute_reservation_migration::migration_v126),
     (127, "消费者可撤销关系授权凭证", crate::open_commerce_relationship_migration::migration_v127),
     (128, "消费者关联数据删除请求与商户履约声明", crate::open_commerce_data_request_migration::migration_v128),
+    (129, "消费者关系凭证匿名续期与幂等链", crate::open_commerce_relationship_renewal_migration::migration_v129),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

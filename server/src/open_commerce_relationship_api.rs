@@ -9,7 +9,9 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
-    open_commerce_relationship_model::CreateConsumerRelationshipRequest,
+    open_commerce_relationship_model::{
+        CreateConsumerRelationshipRequest, RenewConsumerRelationshipRequest,
+    },
     open_commerce_relationship_service,
     open_commerce_service::OpenCommerceActor,
     project_auth::{auth_from_headers, json_error, project_access},
@@ -25,6 +27,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/open-commerce/consumer-relationships/:relationship_id/revoke",
             post(revoke_consumer_relationship),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/consumer-relationships/:relationship_id/renew",
+            post(renew_consumer_relationship),
         )
         .route(
             "/api/projects/:project_id/open-commerce/merchants/:merchant_id/consumer-relationships",
@@ -86,6 +92,25 @@ async fn revoke_consumer_relationship(
         &project_id,
         &relationship_id,
         &actor(&caller),
+    ))
+}
+
+async fn renew_consumer_relationship(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, relationship_id)): Path<(String, String)>,
+    Json(request): Json<RenewConsumerRelationshipRequest>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_relationship_service::renew_relationship(
+        &state.store,
+        &project_id,
+        &relationship_id,
+        &actor(&caller),
+        request,
     ))
 }
 

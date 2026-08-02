@@ -28,7 +28,9 @@ use crate::{
         SetOpenCommerceRateLimitEnabledRequest, UpsertOpenCommerceRateLimitRequest,
     },
     open_commerce_rate_limit_service,
-    open_commerce_relationship_model::CreateConsumerRelationshipRequest,
+    open_commerce_relationship_model::{
+        CreateConsumerRelationshipRequest, RenewConsumerRelationshipRequest,
+    },
     open_commerce_relationship_service,
     open_commerce_runtime_model::UpsertRuntimeBindingRequest,
     open_commerce_runtime_service,
@@ -101,6 +103,12 @@ struct CreateConsumerRelationshipArguments {
 #[derive(Debug, Deserialize)]
 struct RevokeConsumerRelationshipArguments {
     relationship_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RenewConsumerRelationshipArguments {
+    relationship_id: String,
+    expires_at: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -357,6 +365,19 @@ pub(crate) async fn call_tool(
                 project_id,
                 &input.relationship_id,
                 &actor,
+            )?)?
+        }
+        "open_commerce_renew_consumer_relationship" => {
+            let input: RenewConsumerRelationshipArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_relationship_service::renew_relationship(
+                store,
+                project_id,
+                &input.relationship_id,
+                &actor,
+                RenewConsumerRelationshipRequest {
+                    source_app_id: app_id.to_string(),
+                    expires_at: input.expires_at,
+                },
             )?)?
         }
         "open_commerce_create_consumer_data_erasure_request" => {

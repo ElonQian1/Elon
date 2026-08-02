@@ -6,7 +6,8 @@ use crate::{
     open_commerce_model::normalize_app_id,
     open_commerce_relationship_model::{
         CreateConsumerRelationshipRequest, OpenCommerceConsumerRelationship,
-        RELATIONSHIP_SCOPE_MEMBERSHIP_LINK, RELATIONSHIP_SCOPE_PREFERENCE_REMEMBER,
+        RenewConsumerRelationshipRequest, RELATIONSHIP_SCOPE_MEMBERSHIP_LINK,
+        RELATIONSHIP_SCOPE_PREFERENCE_REMEMBER,
     },
     open_commerce_service::OpenCommerceActor,
     store::Store,
@@ -112,6 +113,72 @@ pub(crate) fn revoke_relationship(
             "subject_alias": relationship.subject_alias
         }),
     )?;
+    Ok(relationship)
+}
+
+pub(crate) fn renew_relationship(
+    store: &Store,
+    consumer_project_id: &str,
+    relationship_id: &str,
+    actor: &OpenCommerceActor<'_>,
+    request: RenewConsumerRelationshipRequest,
+) -> Result<OpenCommerceConsumerRelationship> {
+    if actor.project_role.is_none() {
+        bail!("当前调用方不属于消费者关系项目");
+    }
+    let relationship_id = relationship_id.trim();
+    if relationship_id.is_empty() || relationship_id.chars().count() > 120 {
+        bail!("消费者关系凭证 ID 长度必须为 1 到 120 个字符");
+    }
+    let source = store
+        .consumer_owned_open_commerce_relationship(
+            consumer_project_id,
+            actor.user_id,
+            relationship_id,
+        )?
+        .ok_or_else(|| anyhow::anyhow!("消费者关系凭证不存在"))?;
+    if let Some(existing) = store.existing_open_commerce_consumer_relationship_renewal(
+        consumer_project_id,
+        actor.user_id,
+        relationship_id,
+    )? {
+        return Ok(existing);
+    }
+
+    store.published_open_commerce_merchant_detail(&source.merchant_id)?;
+    let source_app_id = validate_source_app(
+        store,
+        consumer_project_id,
+        actor.user_id,
+        actor.app_id,
+        &request.source_app_id,
+    )?;
+    let expires_at = validate_expiration(&request.expires_at)?;
+    let (relationship, created) = store.renew_open_commerce_consumer_relationship(
+        consumer_project_id,
+        actor.user_id,
+        relationship_id,
+        &source_app_id,
+        &expires_at,
+    )?;
+    if created {
+        store.record_open_commerce_audit(
+            consumer_project_id,
+            actor.user_id,
+            Some(actor.app_id),
+            "consumer_relationship.renewed",
+            "consumer_relationship",
+            &relationship.id,
+            &json!({
+                "renewed_from_relationship_id": source.id,
+                "previous_subject_alias": source.subject_alias,
+                "merchant_id": relationship.merchant_id,
+                "source_app_id": relationship.source_app_id,
+                "subject_alias": relationship.subject_alias,
+                "expires_at": relationship.expires_at
+            }),
+        )?;
+    }
     Ok(relationship)
 }
 

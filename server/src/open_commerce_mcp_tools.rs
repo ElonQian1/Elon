@@ -175,6 +175,21 @@ pub(crate) fn definitions() -> Vec<Value> {
             true,
         ),
         tool(
+            "open_commerce_renew_consumer_relationship",
+            "为当前用户持有的一项消费者关系凭证安全续期。续期会撤销旧凭证、轮换匿名标识并继承原授权范围和用途；对同一旧凭证重复调用返回同一续期结果。",
+            json!({
+                "type":"object",
+                "required":["relationship_id","expires_at"],
+                "properties":{
+                    "relationship_id":{"type":"string","minLength":1,"maxLength":120},
+                    "expires_at":{"type":"string","format":"date-time"}
+                },
+                "additionalProperties":false
+            }),
+            false,
+            true,
+        ),
+        tool(
             "open_commerce_create_consumer_data_erasure_request",
             "针对当前用户持有的匿名商户关系发起关联数据删除请求，并原子撤销该关系。平台只创建请求回执，不声称已删除商户外部系统数据。",
             json!({
@@ -474,6 +489,7 @@ fn tool(
                 "open_commerce_revoke_grant"
                     | "open_commerce_block_app"
                     | "open_commerce_revoke_consumer_relationship"
+                    | "open_commerce_renew_consumer_relationship"
                     | "open_commerce_create_consumer_data_erasure_request"
                     | "open_commerce_withdraw_consumer_data_request"
                     | "open_commerce_decide_consumer_data_request"

@@ -110,11 +110,12 @@ Grant 到期不删除或改写历史，也不会自动续期。消费者发现�
 
 - `GET/POST /api/projects/:project_id/open-commerce/consumer-relationships`：当前用户读取或创建自己的关系凭证。
 - `POST /api/projects/:project_id/open-commerce/consumer-relationships/:relationship_id/revoke`：当前用户幂等撤销自己的关系。
+- `POST /api/projects/:project_id/open-commerce/consumer-relationships/:relationship_id/renew`：当前用户安全续期；撤销旧关系、轮换匿名标识并返回幂等后继。
 - `GET /api/projects/:project_id/open-commerce/merchants/:merchant_id/consumer-relationships`：商户项目读取指向本商户的脱敏关系历史。
 
-创建请求包含 `merchant_id`、`source_app_id`、固定 `scopes`、`purpose` 和 RFC 3339 `expires_at`。关系只能指向已发布商户，期限必须在未来且不超过 366 天。商户响应不含消费者账号、用户 ID 或消费者项目 ID；重新创建会撤销旧关系并生成新的 `subject_alias`。
+创建请求包含 `merchant_id`、`source_app_id`、固定 `scopes`、`purpose` 和 RFC 3339 `expires_at`。关系只能指向已发布商户，期限必须在未来且不超过 366 天。商户响应不含消费者账号、用户 ID 或消费者项目 ID；重新创建会撤销旧关系并生成新的 `subject_alias`。续期请求包含 `source_app_id` 和新的 `expires_at`，继承原范围和用途；同一来源关系重复续期返回同一后继。内部续期链不进入公开响应。
 
-MCP 对应工具为 `open_commerce_list_consumer_relationships`、`open_commerce_list_merchant_relationships`、`open_commerce_create_consumer_relationship` 和 `open_commerce_revoke_consumer_relationship`。MCP 来源身份由入口绑定，不能通过参数冒充其他 App。
+MCP 对应工具为 `open_commerce_list_consumer_relationships`、`open_commerce_list_merchant_relationships`、`open_commerce_create_consumer_relationship`、`open_commerce_revoke_consumer_relationship` 和 `open_commerce_renew_consumer_relationship`。MCP 来源身份由入口绑定，不能通过参数冒充其他 App。
 
 ## 消费者关联数据删除请求
 
