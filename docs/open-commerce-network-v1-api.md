@@ -117,6 +117,19 @@ Grant 到期不删除或改写历史，也不会自动续期。消费者发现�
 
 MCP 对应工具为 `open_commerce_list_consumer_relationships`、`open_commerce_list_merchant_relationships`、`open_commerce_create_consumer_relationship`、`open_commerce_revoke_consumer_relationship` 和 `open_commerce_renew_consumer_relationship`。MCP 来源身份由入口绑定，不能通过参数冒充其他 App。
 
+## 消费者偏好档案与关系级披露
+
+偏好档案属于当前项目中的当前用户，保存档案不自动授权商户，也不自动改变发现请求。V1 只接受类别、标签、城市、单位调用价格上限和公开能力偏好；不接受自由文本和敏感身份资料。
+
+- `GET/PUT/DELETE /api/projects/:project_id/open-commerce/consumer-preference-profile`：读取、保存或删除本人档案。删除同时移除本人在该项目生成的披露快照。
+- `GET /api/projects/:project_id/open-commerce/consumer-preference-disclosures`：读取本人披露历史，包括关系已经失效的审计视图。
+- `GET/PUT/DELETE /api/projects/:project_id/open-commerce/consumer-relationships/:relationship_id/preference-disclosure`：读取、更新或撤回本人指定关系的披露快照。
+- `GET /api/projects/:project_id/open-commerce/merchants/:merchant_id/preference-disclosures`：商户项目只读取仍有效关系的匿名披露。
+
+披露请求使用固定 `shared_fields` 白名单，只能绑定有效且含 `preference.remember` 的关系。返回值包含匿名 `subject_alias`、字段快照和来源档案修订号，不含消费者账号、用户 ID 或消费者项目。档案后续更新不自动同步，关系撤销、到期、删除请求或续期都会使旧披露对商户失败关闭。
+
+MCP 提供档案读取、保存、删除，本人披露列表、单关系披露读取/更新/撤回，以及商户有效披露列表工具。工具定义集中在 `server/src/open_commerce_consumer_preference_mcp.rs`，共用同一领域服务。当前数据不进入消费者可携带数据包 V1，也不声称是端到端加密或跨运营方消费者数据保险箱。
+
 ## 消费者关联数据删除请求
 
 删除请求与关系撤销也是不同对象：撤销关系停止未来授权，删除请求则要求商户处理此前按该匿名关系关联的数据。创建删除请求会在同一事务内撤销关系，但平台不保存待删除的数据，也不能仅凭请求状态证明商户外部系统已经删除数据。

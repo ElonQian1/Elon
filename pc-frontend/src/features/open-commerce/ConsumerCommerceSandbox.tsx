@@ -4,9 +4,11 @@ import { openCommerceApi } from './openCommerceApi'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import ConsumerRelationshipManager from './ConsumerRelationshipManager'
 import ConsumerPortabilityExports from './ConsumerPortabilityExports'
+import ConsumerPreferenceProfilePanel from './ConsumerPreferenceProfilePanel'
 import type {
   ConsumerDiscoveryMatch,
   ConsumerDiscoveryResponse,
+  ConsumerPreferences,
   OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
 import { errorText, formatMicros, splitValues } from './openCommerceUi'
@@ -25,6 +27,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   const [query, setQuery] = useState('')
   const [capabilityKey, setCapabilityKey] = useState('')
   const [city, setCity] = useState('')
+  const [categories, setCategories] = useState('')
   const [tags, setTags] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [result, setResult] = useState<ConsumerDiscoveryResponse | null>(null)
@@ -70,7 +73,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         capability_key: capabilityKey.trim() || undefined,
         requester_app_id: appId,
         preferences: {
-          categories: [],
+          categories: splitValues(categories),
           tags: splitValues(tags),
           city: city.trim() || undefined,
           max_unit_price_micros: maxPrice
@@ -86,7 +89,17 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
     } finally {
       setBusy(false)
     }
-  }, [appId, capabilityKey, city, maxPrice, query, tags])
+  }, [appId, capabilityKey, categories, city, maxPrice, query, tags])
+
+  const applyProfile = useCallback((preferences: ConsumerPreferences) => {
+    setCategories(preferences.categories.join(', '))
+    setTags(preferences.tags.join(', '))
+    setCity(preferences.city ?? '')
+    setMaxPrice(preferences.max_unit_price_micros === undefined
+      ? ''
+      : String(preferences.max_unit_price_micros / 1_000_000))
+    setMessage('偏好档案已带入本次发现条件。')
+  }, [])
 
   async function requestAuthorization(match: ConsumerDiscoveryMatch) {
     if (appId === 'pc-web') {
@@ -160,6 +173,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
             <label>搜索词<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="咖啡、维修、零售" /></label>
             <label>能力 Key<input value={capabilityKey} onChange={(event) => setCapabilityKey(event.target.value)} placeholder="menu.preview" /></label>
             <label>城市<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ji'an" /></label>
+            <label>经营类别<input value={categories} onChange={(event) => setCategories(event.target.value)} placeholder="cafe, retail" /></label>
             <label>偏好标签<input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="quiet, coffee" /></label>
             <label>单位价格上限（CNY）<input type="number" min="0" step="0.01" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label>
             <button style={actionStyle('primary', busy)} type="submit" disabled={busy}>
@@ -211,6 +225,12 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
           </div>
         </section>
       </div>
+
+      <ConsumerPreferenceProfilePanel
+        projectId={projectId}
+        merchants={discoveredMerchants}
+        onApply={applyProfile}
+      />
 
       <ConsumerRelationshipManager
         projectId={projectId}

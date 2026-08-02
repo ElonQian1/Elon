@@ -136,6 +136,58 @@ export interface ConsumerPreferences {
   prefer_public: boolean
 }
 
+export interface ConsumerPreferenceProfile {
+  preferences: ConsumerPreferences
+  revision: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ConsumerPreferenceProfileEnvelope {
+  schema: string
+  profile: ConsumerPreferenceProfile | null
+}
+
+export type ConsumerPreferenceField =
+  | 'categories'
+  | 'tags'
+  | 'city'
+  | 'max_unit_price_micros'
+
+export interface DisclosedConsumerPreferences {
+  categories?: string[]
+  tags?: string[]
+  city?: string
+  max_unit_price_micros?: number
+}
+
+export interface ConsumerPreferenceDisclosure {
+  relationship_id: string
+  merchant_id: string
+  subject_alias: string
+  relationship_status: 'active' | 'expired' | 'revoked'
+  shared_fields: ConsumerPreferenceField[]
+  preferences: DisclosedConsumerPreferences
+  profile_revision: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ConsumerPreferenceDisclosureList {
+  schema: string
+  disclosures: ConsumerPreferenceDisclosure[]
+}
+
+export interface DeleteConsumerPreferenceProfileResult {
+  deleted_profile: boolean
+  removed_disclosures: number
+}
+
+export interface DeleteConsumerPreferenceDisclosureResult {
+  relationship_id: string
+  deleted: boolean
+}
+
 export interface ConsumerDiscoveryRequest {
   query?: string
   capability_key?: string

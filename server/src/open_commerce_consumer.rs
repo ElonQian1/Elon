@@ -5,6 +5,7 @@ use crate::{
         ConsumerAuthorizationState, ConsumerDiscoveryMatch, ConsumerDiscoveryRequest,
         ConsumerDiscoveryResponse, ConsumerPreferences,
     },
+    open_commerce_consumer_preference_service,
     open_commerce_developer_model::{CreateAuthorizationRequest, OpenCommerceAuthorizationRequest},
     open_commerce_directory_model::{
         OpenCommerceDirectoryCapability, OpenCommerceDirectoryMerchantDetail,
@@ -23,7 +24,8 @@ pub(crate) fn discover(
         request.requester_app_id = "pc-web".to_string();
     }
     ensure_app_owned_by_user(store, user_id, &request.requester_app_id)?;
-    validate_preferences(&request.preferences)?;
+    request.preferences =
+        open_commerce_consumer_preference_service::normalize_preferences(request.preferences)?;
     let candidates = open_commerce_directory_service::discover_merchants(
         store,
         request.query.as_deref(),
@@ -234,20 +236,6 @@ fn capability_score(
         _ => 0,
     };
     access - capability.unit_price_micros.min(1_000_000) / 100_000
-}
-
-fn validate_preferences(preferences: &ConsumerPreferences) -> Result<()> {
-    if preferences.categories.len() > 20 || preferences.tags.len() > 40 {
-        bail!("消费者偏好类别或标签数量过多");
-    }
-    if preferences
-        .max_unit_price_micros
-        .map(|value| value < 0)
-        .unwrap_or(false)
-    {
-        bail!("最大调用价格不能为负数");
-    }
-    Ok(())
 }
 
 fn contains_ignore_case(values: &[String], needle: &str) -> bool {

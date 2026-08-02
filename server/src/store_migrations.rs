@@ -165,6 +165,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (128, "消费者关联数据删除请求与商户履约声明", crate::open_commerce_data_request_migration::migration_v128),
     (129, "消费者关系凭证匿名续期与幂等链", crate::open_commerce_relationship_renewal_migration::migration_v129),
     (130, "消费者关系与请求可移植导出快照", crate::open_commerce_portability_migration::migration_v130),
+    (131, "消费者自有偏好档案与关系级披露快照", crate::open_commerce_consumer_preference_migration::migration_v131),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

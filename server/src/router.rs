@@ -553,6 +553,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .merge(crate::open_commerce_relationship_api::routes())
         .merge(crate::open_commerce_data_request_api::routes())
         .merge(crate::open_commerce_portability_api::routes())
+        .merge(crate::open_commerce_consumer_preference_api::routes())
         .merge(crate::ai_resource_control::api::routes())
         .merge(crate::open_commerce_mcp::routes())
         .merge(crate::erp_blueprint_api::routes())

@@ -4,7 +4,7 @@ use crate::open_commerce_directory_model::{
     OpenCommerceDirectoryCapability, OpenCommerceDirectoryMerchant,
 };
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub(crate) struct ConsumerPreferences {
     #[serde(default)]
     pub categories: Vec<String>,

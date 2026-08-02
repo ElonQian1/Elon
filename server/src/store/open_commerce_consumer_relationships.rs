@@ -321,7 +321,24 @@ pub(super) fn relationship_from_row(
     })?;
     let stored_status: String = row.get(6)?;
     let expires_at: String = row.get(7)?;
-    let status = if stored_status == "revoked" {
+    let status = effective_relationship_status(&stored_status, &expires_at);
+    Ok(OpenCommerceConsumerRelationship {
+        id: row.get(0)?,
+        merchant_id: row.get(1)?,
+        source_app_id: row.get(2)?,
+        subject_alias: row.get(3)?,
+        scopes,
+        purpose: row.get(5)?,
+        status,
+        expires_at,
+        revoked_at: row.get(8)?,
+        created_at: row.get(9)?,
+        updated_at: row.get(10)?,
+    })
+}
+
+pub(super) fn effective_relationship_status(stored_status: &str, expires_at: &str) -> String {
+    if stored_status == "revoked" {
         "revoked"
     } else if DateTime::parse_from_rfc3339(&expires_at)
         .map(|value| value.with_timezone(&Utc) <= Utc::now())
@@ -330,20 +347,8 @@ pub(super) fn relationship_from_row(
         "expired"
     } else {
         "active"
-    };
-    Ok(OpenCommerceConsumerRelationship {
-        id: row.get(0)?,
-        merchant_id: row.get(1)?,
-        source_app_id: row.get(2)?,
-        subject_alias: row.get(3)?,
-        scopes,
-        purpose: row.get(5)?,
-        status: status.to_string(),
-        expires_at,
-        revoked_at: row.get(8)?,
-        created_at: row.get(9)?,
-        updated_at: row.get(10)?,
-    })
+    }
+    .to_string()
 }
 
 pub(super) const RELATIONSHIP_SELECT: &str = "SELECT id, merchant_id, source_app_id,

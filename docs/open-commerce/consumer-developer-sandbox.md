@@ -1,6 +1,6 @@
 # 消费者发现与第三方应用沙盒
 
-本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权期限由 `docs/decisions/open-commerce-grant-expiration-v1.md` 决定，消费者关系及续期由 `docs/decisions/open-commerce-consumer-relationships-v1.md` 和 `docs/decisions/open-commerce-consumer-relationship-renewal-v1.md` 决定，关联数据删除请求由 `docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` 决定，本人可验证导出由 `docs/decisions/open-commerce-consumer-portability-exports-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定，商户侧调用活动证据由 `docs/decisions/open-commerce-app-activity-health-v1.md` 决定。
+本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权期限由 `docs/decisions/open-commerce-grant-expiration-v1.md` 决定，消费者关系及续期由 `docs/decisions/open-commerce-consumer-relationships-v1.md` 和 `docs/decisions/open-commerce-consumer-relationship-renewal-v1.md` 决定，偏好档案与关系级披露由 `docs/decisions/open-commerce-consumer-preference-disclosures-v1.md` 决定，关联数据删除请求由 `docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` 决定，本人可验证导出由 `docs/decisions/open-commerce-consumer-portability-exports-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定，商户侧调用活动证据由 `docs/decisions/open-commerce-app-activity-health-v1.md` 决定。
 
 ## 使用入口
 
@@ -50,6 +50,8 @@
 
 消费者还可以在发现商户后建立独立的关系凭证。关系凭证不等同于 App Grant：它只允许商户把消费者主动提供的偏好或会员标识关联到随机匿名标识。PC 默认 90 天、最长 366 天，消费者可随时撤销；到期前 14 天显示续期入口。续期会撤销旧凭证并轮换匿名标识，相同请求只返回同一个新凭证。商户看不到消费者账号、用户 ID、消费者项目 ID 或内部续期链。关系凭证不存放偏好原文、联系方式、订单和支付数据。
 
+消费者可另行保存类别、标签、城市和价格上限等低敏结构化偏好。保存不会自动向商户披露，也不会自动改变发现请求；用户可显式带入一次发现，或针对有效且含 `preference.remember` 的关系选择字段生成快照。商户只看到仍有效关系的匿名快照；档案更新不自动同步，关系撤销、到期或续期后旧披露立即不可见。该能力不保存自由文本或敏感身份资料，也不等于完整数据保险箱。
+
 消费者还可针对本人关系发起关联数据删除请求。创建请求会原子撤销该关系；商户只能看到匿名关系别名，可接单、拒绝或声明完成。消费者可在接单前撤回请求，但关系不会恢复。`completed` 只表示商户提交了可审计声明，平台尚未验证美团、ERP、CRM 或会员系统中的真实删除结果。
 
 消费者可把本人的关系历史、消费者私有续期链和删除请求回执生成不可变 JSON 数据包。相同幂等键始终返回原快照，服务端和 PC 下载前都会复核 SHA-256。该数据包不含偏好、订单或账号 ID，当前也没有导入、冲突处理或跨运营方迁移能力。
@@ -68,4 +70,4 @@ Set-Location pc-frontend
 npm run test:open-commerce
 ```
 
-当前已实现商户主动选择的跨项目基础目录、限时授权、消费者可撤销及安全续期的关系凭证、匿名删除请求与商户履约声明、本人可验证导出、持久化能力调用配额、近 24 小时可解释活动证据、商户级手动 App 封禁，以及沙盒 App 停用、旧 Token 永久失效、重新启用生成新 Token、申请方查看和撤回的生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、数据包导入、外部到期通知、自动全网滥用处置、消费者数据保险箱、外部删除适配器、支付和真实平台适配器仍是后续模块。
+当前已实现商户主动选择的跨项目基础目录、限时授权、消费者可撤销及安全续期的关系凭证、低敏偏好字段披露、匿名删除请求与商户履约声明、本人可验证导出、持久化能力调用配额、近 24 小时可解释活动证据、商户级手动 App 封禁，以及沙盒 App 生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、偏好与数据包迁移、外部通知、自动全网滥用处置、敏感数据保险箱、外部删除适配器、支付和真实平台适配器仍是后续模块。

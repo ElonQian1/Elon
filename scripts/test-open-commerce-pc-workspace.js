@@ -77,6 +77,13 @@ const portabilityMigration = read('server/src/open_commerce_portability_migratio
 const portabilityStore = read('server/src/store/open_commerce_consumer_portability.rs')
 const portabilityService = read('server/src/open_commerce_portability_service.rs')
 const portabilityApi = read('server/src/open_commerce_portability_api.rs')
+const preferenceProfile = read(`${featureRoot}/ConsumerPreferenceProfilePanel.tsx`)
+const merchantPreferenceInbox = read(`${featureRoot}/MerchantPreferenceInbox.tsx`)
+const preferenceMigration = read('server/src/open_commerce_consumer_preference_migration.rs')
+const preferenceStore = read('server/src/store/open_commerce_consumer_preferences.rs')
+const preferenceService = read('server/src/open_commerce_consumer_preference_service.rs')
+const preferenceApi = read('server/src/open_commerce_consumer_preference_api.rs')
+const preferenceMcp = read('server/src/open_commerce_consumer_preference_mcp.rs')
 
 for (const view of [
   'OpenCommerceMerchantWorkspace',
@@ -192,6 +199,32 @@ for (const toolName of [
   'open_commerce_get_consumer_portability_export',
 ]) {
   assert.ok(mcpTools.includes(toolName), `AI agents must share the portability service through ${toolName}`)
+}
+assert.ok(consumer.includes('ConsumerPreferenceProfilePanel'), 'consumer workspace must expose an owner preference profile')
+assert.ok(preferenceProfile.includes('用于本次发现'), 'saved preferences must require an explicit action before discovery use')
+assert.ok(preferenceProfile.includes('更新披露快照'), 'preference sharing must be an explicit snapshot action')
+assert.ok(preferenceProfile.includes('sharedFields'), 'consumers must select the disclosed preference fields')
+assert.ok(merchantWorkspace.includes('MerchantPreferenceInbox'), 'merchant workspace must expose active anonymous preference disclosures')
+assert.ok(merchantPreferenceInbox.includes('仅显示仍有效关系'), 'merchant UI must state the active-relationship boundary')
+assert.doesNotMatch(`${preferenceProfile}\n${merchantPreferenceInbox}`, /consumer_user_id|consumer_project_id/, 'preference UIs must not depend on private consumer identity')
+assert.ok(preferenceMigration.includes('open_commerce_consumer_preference_profiles'), 'consumer preferences must use a durable owner-scoped profile')
+assert.ok(preferenceMigration.includes('open_commerce_consumer_preference_disclosures'), 'relationship disclosures must use a separate durable table')
+assert.ok(preferenceStore.includes("relationship.status='active'"), 'merchant preference reads must fail closed on revoked relationships')
+assert.ok(preferenceStore.includes('relationship.expires_at>?3'), 'merchant preference reads must fail closed on expired relationships')
+assert.ok(preferenceService.includes('RELATIONSHIP_SCOPE_PREFERENCE_REMEMBER'), 'preference disclosure must require the dedicated relationship scope')
+assert.ok(preferenceService.includes('shared_fields'), 'preference audit must record field names rather than hiding the disclosure boundary')
+assert.doesNotMatch(preferenceService, /"preferences"\s*:/, 'preference audit must not write disclosed values')
+assert.ok(preferenceApi.includes('consumer-preference-disclosures'), 'consumer preference disclosure list route must be registered')
+assert.ok(preferenceApi.includes('merchants/:merchant_id/preference-disclosures'), 'merchant preference inbox route must be registered')
+for (const toolName of [
+  'open_commerce_get_consumer_preference_profile',
+  'open_commerce_upsert_consumer_preference_profile',
+  'open_commerce_delete_consumer_preference_profile',
+  'open_commerce_upsert_consumer_preference_disclosure',
+  'open_commerce_delete_consumer_preference_disclosure',
+  'open_commerce_list_merchant_preference_disclosures',
+]) {
+  assert.ok(preferenceMcp.includes(toolName), `AI agents must share the preference service through ${toolName}`)
 }
 assert.ok(mcpTools.includes('max_invocations'), 'merchant AI must be able to set a lifetime grant budget through MCP')
 assert.ok(grantBudgetStore.includes('TransactionBehavior::Immediate'), 'grant budget reservation must serialize concurrent claims')

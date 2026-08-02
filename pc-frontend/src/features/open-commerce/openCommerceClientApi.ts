@@ -6,6 +6,11 @@ import type {
   ConsumerDiscoveryResponse,
   ConsumerDataRequest,
   ConsumerDataRequestList,
+  ConsumerPreferenceDisclosure,
+  ConsumerPreferenceDisclosureList,
+  ConsumerPreferenceField,
+  ConsumerPreferenceProfile,
+  ConsumerPreferenceProfileEnvelope,
   ConsumerPortabilityExport,
   ConsumerPortabilityExportList,
   ConsumerRelationship,
@@ -13,6 +18,8 @@ import type {
   DeveloperAppCredential,
   DeveloperAppList,
   DeveloperInvokeRequest,
+  DeleteConsumerPreferenceDisclosureResult,
+  DeleteConsumerPreferenceProfileResult,
   OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
 import type { InvokeOpenCommerceCapability } from './openCommerceTypes'
@@ -60,6 +67,48 @@ export const openCommerceClientApi = {
 
   listConsumerRelationships: (projectId: string) =>
     api.get<ConsumerRelationshipList>(`${projectBase(projectId)}/consumer-relationships`),
+
+  getConsumerPreferenceProfile: (projectId: string) =>
+    api.get<ConsumerPreferenceProfileEnvelope>(
+      `${projectBase(projectId)}/consumer-preference-profile`,
+    ),
+
+  upsertConsumerPreferenceProfile: (
+    projectId: string,
+    preferences: ConsumerPreferenceProfile['preferences'],
+  ) => api.put<ConsumerPreferenceProfile>(
+    `${projectBase(projectId)}/consumer-preference-profile`,
+    { preferences },
+  ),
+
+  deleteConsumerPreferenceProfile: (projectId: string) =>
+    api.delete<DeleteConsumerPreferenceProfileResult>(
+      `${projectBase(projectId)}/consumer-preference-profile`,
+    ),
+
+  listConsumerPreferenceDisclosures: (projectId: string) =>
+    api.get<ConsumerPreferenceDisclosureList>(
+      `${projectBase(projectId)}/consumer-preference-disclosures`,
+    ),
+
+  upsertConsumerPreferenceDisclosure: (
+    projectId: string,
+    relationshipId: string,
+    sharedFields: ConsumerPreferenceField[],
+  ) => api.put<ConsumerPreferenceDisclosure>(
+    `${projectBase(projectId)}/consumer-relationships/${encodeURIComponent(relationshipId)}/preference-disclosure`,
+    { shared_fields: sharedFields },
+  ),
+
+  deleteConsumerPreferenceDisclosure: (projectId: string, relationshipId: string) =>
+    api.delete<DeleteConsumerPreferenceDisclosureResult>(
+      `${projectBase(projectId)}/consumer-relationships/${encodeURIComponent(relationshipId)}/preference-disclosure`,
+    ),
+
+  listMerchantPreferenceDisclosures: (projectId: string, merchantId: string) =>
+    api.get<ConsumerPreferenceDisclosureList>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/preference-disclosures`,
+    ),
 
   createConsumerRelationship: (projectId: string, request: {
     merchant_id: string

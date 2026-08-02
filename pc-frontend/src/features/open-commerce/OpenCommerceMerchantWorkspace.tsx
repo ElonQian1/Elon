@@ -7,6 +7,7 @@ import OpenCommerceDirectoryPublisher from './OpenCommerceDirectoryPublisher'
 import OpenCommerceRateLimitManager from './OpenCommerceRateLimitManager'
 import OpenCommerceAppBlockManager from './OpenCommerceAppBlockManager'
 import MerchantRelationshipInbox from './MerchantRelationshipInbox'
+import MerchantPreferenceInbox from './MerchantPreferenceInbox'
 import MerchantDataRequestInbox from './MerchantDataRequestInbox'
 import type { OpenCommerceOverview } from './openCommerceTypes'
 import { commerceStyles } from './openCommerceStyles'
@@ -175,6 +176,10 @@ export default function OpenCommerceMerchantWorkspace({
                 onChanged={refresh}
               />
               <MerchantRelationshipInbox
+                projectId={projectId}
+                merchantId={selectedMerchant.merchant.id}
+              />
+              <MerchantPreferenceInbox
                 projectId={projectId}
                 merchantId={selectedMerchant.merchant.id}
               />

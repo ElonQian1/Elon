@@ -205,6 +205,7 @@ async fn mcp_handler(
         "notifications/initialized" => return StatusCode::ACCEPTED.into_response(),
         "tools/list" => {
             let mut tools = crate::open_commerce_mcp_tools::definitions();
+            tools.extend(crate::open_commerce_consumer_preference_mcp::definitions());
             tools.extend(crate::erp_blueprint_mcp_tools::definitions());
             Ok(json!({"tools": tools}))
         }
@@ -258,6 +259,17 @@ pub(crate) async fn call_tool(
             name,
             arguments,
         )?;
+        return tool_response(value);
+    }
+    if let Some(value) = crate::open_commerce_consumer_preference_mcp::call_if_handled(
+        store,
+        project_id,
+        user_id,
+        project_role,
+        app_id,
+        name,
+        arguments.clone(),
+    )? {
         return tool_response(value);
     }
     let actor = OpenCommerceActor {
