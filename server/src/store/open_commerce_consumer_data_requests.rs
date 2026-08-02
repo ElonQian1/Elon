@@ -313,7 +313,9 @@ fn merchant_owned_request(
     .map_err(Into::into)
 }
 
-fn data_request_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceConsumerDataRequest> {
+pub(super) fn data_request_from_row(
+    row: &Row<'_>,
+) -> rusqlite::Result<OpenCommerceConsumerDataRequest> {
     Ok(OpenCommerceConsumerDataRequest {
         id: row.get(0)?,
         relationship_id: row.get(1)?,
@@ -331,7 +333,7 @@ fn data_request_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceConsumer
     })
 }
 
-const DATA_REQUEST_SELECT: &str = "SELECT id, relationship_id, merchant_id,
+pub(super) const DATA_REQUEST_SELECT: &str = "SELECT id, relationship_id, merchant_id,
        subject_alias, request_type, status, resolution_kind, resolution_note,
        requested_at, accepted_at, resolved_at, withdrawn_at, updated_at
   FROM open_commerce_consumer_data_requests";

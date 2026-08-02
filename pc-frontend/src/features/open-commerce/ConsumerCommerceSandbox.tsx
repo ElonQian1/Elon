@@ -3,6 +3,7 @@ import { KeyRound, Play, RefreshCw, Search } from 'lucide-react'
 import { openCommerceApi } from './openCommerceApi'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import ConsumerRelationshipManager from './ConsumerRelationshipManager'
+import ConsumerPortabilityExports from './ConsumerPortabilityExports'
 import type {
   ConsumerDiscoveryMatch,
   ConsumerDiscoveryResponse,
@@ -216,6 +217,8 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         sourceAppId={appId}
         merchants={discoveredMerchants}
       />
+
+      <ConsumerPortabilityExports projectId={projectId} />
 
       {invocation && <pre className={base.result}>{JSON.stringify(invocation, null, 2)}</pre>}
       {message && <div style={{ ...commerceStyles.message, ...(message.includes('失败') ? errorMessageStyle : {}) }}>{message}</div>}

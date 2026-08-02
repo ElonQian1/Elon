@@ -6,6 +6,8 @@ import type {
   ConsumerDiscoveryResponse,
   ConsumerDataRequest,
   ConsumerDataRequestList,
+  ConsumerPortabilityExport,
+  ConsumerPortabilityExportList,
   ConsumerRelationship,
   ConsumerRelationshipList,
   DeveloperAppCredential,
@@ -89,6 +91,19 @@ export const openCommerceClientApi = {
 
   listConsumerDataRequests: (projectId: string) =>
     api.get<ConsumerDataRequestList>(`${projectBase(projectId)}/consumer-data-requests`),
+
+  listConsumerPortabilityExports: (projectId: string) =>
+    api.get<ConsumerPortabilityExportList>(`${projectBase(projectId)}/consumer-portability-exports`),
+
+  createConsumerPortabilityExport: (projectId: string, idempotencyKey: string) =>
+    api.post<ConsumerPortabilityExport>(`${projectBase(projectId)}/consumer-portability-exports`, {
+      idempotency_key: idempotencyKey,
+    }),
+
+  getConsumerPortabilityExport: (projectId: string, exportId: string) =>
+    api.get<ConsumerPortabilityExport>(
+      `${projectBase(projectId)}/consumer-portability-exports/${encodeURIComponent(exportId)}`,
+    ),
 
   createConsumerDataErasureRequest: (projectId: string, relationshipId: string) =>
     api.post<ConsumerDataRequest>(`${projectBase(projectId)}/consumer-data-requests`, {

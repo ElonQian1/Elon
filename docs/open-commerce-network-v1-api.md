@@ -130,6 +130,17 @@ MCP 对应工具为 `open_commerce_list_consumer_relationships`、`open_commerce
 
 MCP 对应工具为 `open_commerce_list_consumer_data_requests`、`open_commerce_list_merchant_data_requests`、`open_commerce_create_consumer_data_erasure_request`、`open_commerce_withdraw_consumer_data_request` 和 `open_commerce_decide_consumer_data_request`。
 
+## 消费者可携带数据包
+
+可携带数据包是当前用户拥有的不可变快照，不是商户公开目录，也不是完整账户备份。V1 只包含关系历史、消费者私有续期链和删除请求回执；不包含消费者账号 ID、偏好原文、订单、支付或商户私有数据。
+
+- `GET/POST /api/projects/:project_id/open-commerce/consumer-portability-exports`：列出当前用户的数据包摘要，或用幂等键创建新快照。
+- `GET /api/projects/:project_id/open-commerce/consumer-portability-exports/:export_id`：读取当前用户拥有的数据包并重新校验 SHA-256。
+
+创建参数为 `idempotency_key`。同一用户在同一项目重复使用相同键时永远返回首次快照；要反映后续关系或请求变化必须使用新键。负载最多 5 MiB，关系和请求各最多 5000 条，超限不会截断。
+
+MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_commerce_get_consumer_portability_export` 和 `open_commerce_create_consumer_portability_export`。V1 只导出，不提供导入、跨运营方迁移或偏好保险箱。
+
 ## 调用配额
 
 商户可以为每项能力配置固定时间窗调用上限。指定 App 策略优先于全部 App 策略；全部 App 策略按调用主体分别计数。没有策略时保持现有允许行为，项目编辑者在本项目内调试不占额度。

@@ -72,6 +72,11 @@ const dataRequestMigration = read('server/src/open_commerce_data_request_migrati
 const dataRequestStore = read('server/src/store/open_commerce_consumer_data_requests.rs')
 const dataRequestService = read('server/src/open_commerce_data_request_service.rs')
 const dataRequestApi = read('server/src/open_commerce_data_request_api.rs')
+const portabilityUi = read(`${featureRoot}/ConsumerPortabilityExports.tsx`)
+const portabilityMigration = read('server/src/open_commerce_portability_migration.rs')
+const portabilityStore = read('server/src/store/open_commerce_consumer_portability.rs')
+const portabilityService = read('server/src/open_commerce_portability_service.rs')
+const portabilityApi = read('server/src/open_commerce_portability_api.rs')
 
 for (const view of [
   'OpenCommerceMerchantWorkspace',
@@ -171,6 +176,23 @@ assert.ok(dataRequestService.includes('必须填写说明'), 'completed or rejec
 assert.ok(dataRequestApi.includes('consumer-data-requests/:request_id/withdraw'), 'consumer erasure withdrawal route must be registered')
 assert.ok(mcpTools.includes('open_commerce_create_consumer_data_erasure_request'), 'AI agents must be able to create an owner-scoped erasure request')
 assert.ok(mcpTools.includes('open_commerce_decide_consumer_data_request'), 'merchant AI must use the same erasure request state machine')
+assert.ok(consumer.includes('ConsumerPortabilityExports'), 'consumer workspace must expose owner portability exports')
+assert.ok(portabilityUi.includes("crypto.subtle.digest('SHA-256'"), 'PC downloads must verify the payload digest locally')
+assert.ok(portabilityUi.includes('不含偏好原文、订单或账号标识'), 'PC must state the V1 portability boundary')
+assert.doesNotMatch(portabilityUi, /consumer_user_id|consumer_project_id/, 'portability UI must not depend on private consumer identity')
+assert.ok(portabilityMigration.includes('UNIQUE(consumer_project_id, consumer_user_id, idempotency_key)'), 'portability snapshots must be idempotent per owner')
+assert.ok(portabilityStore.includes('MAX_CONSUMER_PORTABILITY_RECORDS'), 'portability snapshots must have an explicit record limit')
+assert.ok(portabilityStore.includes('renewed_from_relationship_id'), 'consumer-owned exports must recover the internal renewal chain')
+assert.ok(portabilityService.includes('MAX_PORTABILITY_PAYLOAD_BYTES'), 'portability snapshots must have an explicit payload limit')
+assert.ok(portabilityService.includes('完整性校验失败'), 'portability reads must fail closed on digest mismatch')
+assert.ok(portabilityApi.includes('consumer-portability-exports/:export_id'), 'consumer portability detail route must be registered')
+for (const toolName of [
+  'open_commerce_create_consumer_portability_export',
+  'open_commerce_list_consumer_portability_exports',
+  'open_commerce_get_consumer_portability_export',
+]) {
+  assert.ok(mcpTools.includes(toolName), `AI agents must share the portability service through ${toolName}`)
+}
 assert.ok(mcpTools.includes('max_invocations'), 'merchant AI must be able to set a lifetime grant budget through MCP')
 assert.ok(grantBudgetStore.includes('TransactionBehavior::Immediate'), 'grant budget reservation must serialize concurrent claims')
 assert.ok(invocationStore.includes('release_grant_budget_reservation_on'), 'failed handlers must release their grant budget reservation')

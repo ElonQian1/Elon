@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 pub(crate) const RELATIONSHIP_SCOPE_PREFERENCE_REMEMBER: &str = "preference.remember";
 pub(crate) const RELATIONSHIP_SCOPE_MEMBERSHIP_LINK: &str = "membership.link";
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct OpenCommerceConsumerRelationship {
     pub id: String,
     pub merchant_id: String,

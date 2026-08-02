@@ -308,7 +308,9 @@ impl Store {
     }
 }
 
-fn relationship_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceConsumerRelationship> {
+pub(super) fn relationship_from_row(
+    row: &Row<'_>,
+) -> rusqlite::Result<OpenCommerceConsumerRelationship> {
     let scopes_json: String = row.get(4)?;
     let scopes = serde_json::from_str(&scopes_json).map_err(|error| {
         rusqlite::Error::FromSqlConversionFailure(
@@ -344,7 +346,7 @@ fn relationship_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceConsumer
     })
 }
 
-const RELATIONSHIP_SELECT: &str = "SELECT id, merchant_id, source_app_id,
+pub(super) const RELATIONSHIP_SELECT: &str = "SELECT id, merchant_id, source_app_id,
        subject_alias, scopes_json, purpose, status,
        expires_at, revoked_at, created_at, updated_at
   FROM open_commerce_consumer_relationships";

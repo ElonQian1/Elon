@@ -72,6 +72,25 @@ pub(crate) fn definitions() -> Vec<Value> {
             true,
         ),
         tool(
+            "open_commerce_list_consumer_portability_exports",
+            "读取当前用户在本项目生成的可携带数据包摘要。只包含关系、内部续期链和数据删除请求计数及摘要，不包含偏好原文、订单或消费者账号。",
+            json!({"type":"object","properties":{},"additionalProperties":false}),
+            true,
+            true,
+        ),
+        tool(
+            "open_commerce_get_consumer_portability_export",
+            "读取并校验当前用户拥有的一个可携带数据包。数据包只导出消费者关系、内部续期链和数据删除请求回执，不允许读取其他用户的数据包。",
+            json!({
+                "type":"object",
+                "required":["export_id"],
+                "properties":{"export_id":{"type":"string","minLength":1,"maxLength":120}},
+                "additionalProperties":false
+            }),
+            true,
+            true,
+        ),
+        tool(
             "open_commerce_list_merchant_data_requests",
             "读取指定商户收到的匿名消费者数据删除请求。只返回关系别名和状态，不披露消费者账号或项目。",
             json!({
@@ -196,6 +215,23 @@ pub(crate) fn definitions() -> Vec<Value> {
                 "type":"object",
                 "required":["relationship_id"],
                 "properties":{"relationship_id":{"type":"string","minLength":1,"maxLength":120}},
+                "additionalProperties":false
+            }),
+            false,
+            true,
+        ),
+        tool(
+            "open_commerce_create_consumer_portability_export",
+            "为当前用户生成不可变的消费者可携带数据快照，并返回可验证的 SHA-256 摘要。同一幂等键始终返回原快照；新键才生成新快照。V1 不包含偏好原文、订单或消费者账号，也不执行跨平台导入。",
+            json!({
+                "type":"object",
+                "required":["idempotency_key"],
+                "properties":{
+                    "idempotency_key":{
+                        "type":"string","minLength":8,"maxLength":120,
+                        "pattern":"^[A-Za-z0-9_.:-]+$"
+                    }
+                },
                 "additionalProperties":false
             }),
             false,

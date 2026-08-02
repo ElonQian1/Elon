@@ -37,6 +37,7 @@
 | Grant 限时授权 | 已实现 | 商户直接授权和批准申请均可选择期限；PC 默认 30 天，长期授权需显式选择。批准条件对双方可见，到期后发现和调用失败关闭，历史不改写 | `server/src/open_commerce_authorization_decision.rs`、`pc-frontend/src/features/open-commerce/openCommerceGrantExpiry.ts`、`docs/open-commerce-grant-expiration-v1-acceptance.md` |
 | 消费者关系授权凭证 | 已实现、范围受限 | 消费者可对已发布商户建立最长 366 天的匿名关系并随时撤销；PC 在 14 天内提醒安全续期，续期撤销旧凭证、轮换匿名标识且对重试幂等。商户只见匿名标识、范围、期限和状态，不见用户、消费者项目或续期链。V1 不保存偏好原文，也未绑定真实订单或 CRM | `server/src/open_commerce_relationship_service.rs`、`pc-frontend/src/features/open-commerce/ConsumerRelationshipManager.tsx`、`docs/open-commerce-consumer-relationship-renewal-v1-acceptance.md` |
 | 消费者关联数据删除请求 | 已实现、范围受限 | 消费者可针对本人关系发起删除请求并原子撤销关系；商户只见匿名别名，可接单、拒绝或声明完成。平台不存待删除数据，商户完成不是平台验证的外部删除证明 | `server/src/open_commerce_data_request_service.rs`、`pc-frontend/src/features/open-commerce/ConsumerDataRequestManager.tsx`、`docs/open-commerce-consumer-data-erasure-requests-v1-acceptance.md` |
+| 消费者可携带数据包 | 已实现、范围受限 | 当前用户可把关系历史、消费者私有续期链和删除请求回执保存为幂等不可变快照，服务端和 PC 以 SHA-256 复核后下载；V1 不含偏好、订单或账号 ID，也未提供跨运营方导入 | `server/src/open_commerce_portability_service.rs`、`pc-frontend/src/features/open-commerce/ConsumerPortabilityExports.tsx`、`docs/open-commerce-consumer-portability-exports-v1-acceptance.md` |
 | Grant 生命周期预算 | 已实现 | 商户可为单个授权设置总调用次数和总计量金额；调用前原子预留，成功确认、失败退回，幂等重放不重复占额；重启与过期孤儿调用会原子失败关闭并释放遗留预留 | `server/src/open_commerce_grant_budget_service.rs`、`server/src/store/open_commerce_grant_budgets.rs`、`server/src/store/open_commerce_invocation_recovery.rs`、`docs/open-commerce-grant-budgets-v1-acceptance.md` |
 | 项目 AI 资源控制面 | 已实现、只预演 | 可盘点当前用户的 Codex、本人节点、授权共享 Codex 和平台模型，保存项目策略并预演候选；不会启动真实任务 | `server/src/ai_resource_control/`、`docs/open-commerce/ai-resource-control.md` |
 | 开放商业 PC 五工作区 | 已实现 | 项目详情内已有商户节点、消费者沙盒、开发者、AI 资源和影子经济五个独立视图 | `pc-frontend/src/features/open-commerce/`、`scripts/test-open-commerce-pc-workspace.js` |
@@ -48,7 +49,7 @@
 |---|---|---|
 | 美团、抖音、京东、淘宝闪购等经营数据统一接入 | 部分实现 | 接入控制面、状态和同步回执已实现；仍必须逐个平台确认官方授权、实现适配器、验证字段覆盖和长期稳定性，不能把登记数据源描述成已接通全量 API |
 | 商户 ERP、海报、短视频、小游戏和营销活动自动生成 | 部分实现 | 通用 ERP 蓝图与 AI 应用开发主干已存在；真实行业业务模块、发布连接器、经营效果回流和规模化验证仍需完善 |
-| 商户数据自主控制和跨应用授权 | 部分实现 | V1、跨项目脱敏目录、消费者沙盒、限时 App 授权、消费者匿名关系凭证及安全续期、删除请求与商户声明、调用配额、活动证据、手动 App 封禁和首个商户自有运行时已打通；消费者数据保险箱、外部到期通知、真实外部删除适配器与证明、订单/CRM 绑定、跨运营方关系迁移、生产 App 身份互认、自动全网风控与公共互操作治理尚未完成 |
+| 商户数据自主控制和跨应用授权 | 部分实现 | V1、跨项目脱敏目录、消费者沙盒、限时 App 授权、消费者匿名关系凭证及安全续期、删除请求与商户声明、关系及请求的可验证导出、调用配额、活动证据、手动 App 封禁和首个商户自有运行时已打通；消费者数据保险箱、导出包跨运营方导入、外部到期通知、真实外部删除适配器与证明、订单/CRM 绑定、生产 App 身份互认、自动全网风控与公共互操作治理尚未完成 |
 | 闲置电脑、收银机和工作站共享算力 | 部分实现 | 模型推理供给的所有者开关、模型白名单、并发、每日实耗与在途预算原子预留、候选回退、流租约、重启与过期预授权回收、所有者运行告警和 PC 控件已实现；通用异构任务、竞价市场、故障赔付、真实提现与链上结算仍未完成 |
 | 低成本分布式模型训练 | 提案 | 普通公网节点更适合异步任务、推理和可切分工作，不能宣称已等效替代高速互联的企业级 GPU 集群 |
 

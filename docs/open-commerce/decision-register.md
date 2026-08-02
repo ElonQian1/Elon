@@ -21,6 +21,7 @@
 | 消费者关系必须由消费者持有和撤销 | 关系只包含匿名标识、固定范围和最长 366 天期限；商户看不到消费者账号或项目，重新建立关系会更换匿名标识 | `docs/decisions/open-commerce-consumer-relationships-v1.md` |
 | 消费者关系续期必须轮换匿名身份并保持重试幂等 | 续期撤销旧关系、继承原范围和用途并生成新别名；同一来源只产生一个后继，内部续期链不向商户公开 | `docs/decisions/open-commerce-consumer-relationship-renewal-v1.md` |
 | 删除请求必须停止关系且不能伪装外部履约 | 消费者发起请求时原子撤销关系；商户可处理匿名工单，但完成只表示商户声明，不是平台验证的删除证明 | `docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` |
+| 消费者关系与删除请求应支持本人可验证导出 | 同一幂等键保存不可变快照，每次读取复核 SHA-256；V1 只导出关系、续期链和请求回执，不冒充完整数据迁移 | `docs/decisions/open-commerce-consumer-portability-exports-v1.md` |
 | 每个 Grant 可限制完整授权期风险 | 商户可选设置总调用次数和总计量金额；调用前原子预留、失败退回，预算用尽后重新授权 | `docs/decisions/open-commerce-grant-budgets-v1.md` |
 | 孤儿商业调用必须失败关闭并释放 Grant 预留 | 启动时关闭遗留调用，运行期回收超过 120 秒的调用；失败、预算退回、预留释放和脱敏审计保持同一事务 | `docs/decisions/open-commerce-invocation-recovery-v1.md` |
 | App 异常先形成商户可解释证据 | 按商户和外部 App 派生近 24 小时失败、限流、Grant 预算拒绝和中断恢复计数；只提醒人工处置，不自动评分、封禁或赔付 | `docs/decisions/open-commerce-app-activity-health-v1.md` |

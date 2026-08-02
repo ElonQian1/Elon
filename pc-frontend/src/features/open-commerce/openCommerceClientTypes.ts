@@ -88,6 +88,46 @@ export interface ConsumerDataRequestList {
   requests: ConsumerDataRequest[]
 }
 
+export interface ConsumerRelationshipRenewalLink {
+  source_relationship_id: string
+  renewed_relationship_id: string
+}
+
+export interface ConsumerPortabilityPayload {
+  schema: string
+  source_project_id: string
+  generated_at: string
+  relationships: ConsumerRelationship[]
+  relationship_renewals: ConsumerRelationshipRenewalLink[]
+  data_requests: ConsumerDataRequest[]
+}
+
+export interface ConsumerPortabilityExport {
+  schema: string
+  id: string
+  source_project_id: string
+  idempotency_key: string
+  payload_sha256: string
+  payload: ConsumerPortabilityPayload
+  created_at: string
+}
+
+export interface ConsumerPortabilityExportSummary {
+  id: string
+  source_project_id: string
+  idempotency_key: string
+  payload_sha256: string
+  relationship_count: number
+  renewal_count: number
+  data_request_count: number
+  created_at: string
+}
+
+export interface ConsumerPortabilityExportList {
+  schema: string
+  exports: ConsumerPortabilityExportSummary[]
+}
+
 export interface ConsumerPreferences {
   categories: string[]
   tags: string[]

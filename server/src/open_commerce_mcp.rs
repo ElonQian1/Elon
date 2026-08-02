@@ -24,6 +24,8 @@ use crate::{
         normalize_app_id, CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
         InvokeCapabilityRequest,
     },
+    open_commerce_portability_model::CreateConsumerPortabilityExportRequest,
+    open_commerce_portability_service,
     open_commerce_rate_limit_model::{
         SetOpenCommerceRateLimitEnabledRequest, UpsertOpenCommerceRateLimitRequest,
     },
@@ -114,6 +116,16 @@ struct RenewConsumerRelationshipArguments {
 #[derive(Debug, Deserialize)]
 struct ConsumerDataRequestArguments {
     request_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateConsumerPortabilityExportArguments {
+    idempotency_key: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ConsumerPortabilityExportArguments {
+    export_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -307,6 +319,21 @@ pub(crate) async fn call_tool(
                 store, project_id, &actor, 100,
             )?)?
         }
+        "open_commerce_list_consumer_portability_exports" => {
+            ensure_empty_object(&arguments, name)?;
+            serde_json::to_value(open_commerce_portability_service::list_exports(
+                store, project_id, &actor, 100,
+            )?)?
+        }
+        "open_commerce_get_consumer_portability_export" => {
+            let input: ConsumerPortabilityExportArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_portability_service::get_export(
+                store,
+                project_id,
+                &input.export_id,
+                &actor,
+            )?)?
+        }
         "open_commerce_list_merchant_data_requests" => {
             let input: MerchantArguments = decode(arguments, name)?;
             serde_json::to_value(open_commerce_data_request_service::list_merchant_requests(
@@ -388,6 +415,17 @@ pub(crate) async fn call_tool(
                 &actor,
                 CreateConsumerDataErasureRequest {
                     relationship_id: input.relationship_id,
+                },
+            )?)?
+        }
+        "open_commerce_create_consumer_portability_export" => {
+            let input: CreateConsumerPortabilityExportArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_portability_service::create_export(
+                store,
+                project_id,
+                &actor,
+                CreateConsumerPortabilityExportRequest {
+                    idempotency_key: input.idempotency_key,
                 },
             )?)?
         }

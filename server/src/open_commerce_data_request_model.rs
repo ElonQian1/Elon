@@ -7,7 +7,7 @@ pub(crate) const DATA_REQUEST_STATUS_COMPLETED: &str = "completed";
 pub(crate) const DATA_REQUEST_STATUS_REJECTED: &str = "rejected";
 pub(crate) const DATA_REQUEST_STATUS_WITHDRAWN: &str = "withdrawn";
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct OpenCommerceConsumerDataRequest {
     pub id: String,
     pub relationship_id: String,
