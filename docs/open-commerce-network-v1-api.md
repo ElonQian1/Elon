@@ -53,6 +53,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `POST` | `/api/open-commerce/action-confirmations/:confirmation_id/confirm` | 独立确认待执行动作，不直接执行能力 |
 | `POST` | `/api/open-commerce/developer/action-confirmations` | 使用开发者测试 Token 准备沙盒动作确认 |
 | `POST` | `/api/open-commerce/developer/action-confirmations/:confirmation_id/confirm` | 使用同一测试 Token 确认沙盒动作 |
+| `GET` | `/api/open-commerce/developer/events` | 使用测试 Token 按游标读取当前 App 的终态调用摘要 |
+| `GET` | `/api/open-commerce/developer/events/:invocation_id` | 使用测试 Token 读取当前 App 的单条终态结果 |
 | `GET` | `/api/open-commerce/consumer-invocation-receipts` | 当前账户列出本人的终态调用凭证摘要 |
 | `GET` | `/api/open-commerce/consumer-invocation-receipts/:invocation_id` | 当前账户读取并复核本人的单条调用凭证 |
 
@@ -118,6 +120,12 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 凭证不返回用户 ID、项目 ID、能力内部 ID、Grant ID、幂等键、请求哈希或原始输入。请求侧只给出字段数量、序列化字节数和 `contains_raw_values=false`；本人详情可包含商户当时返回的结果。V1 只接受 `recorded_not_charged` 并明确标记未移动真实资金，遇到未来资金状态时失败关闭。
 
 服务端返回规范 `payload_json` 和其 SHA-256。PC 下载前会重新计算摘要、解析该字符串并核对外层 `payload`；摘要只证明所下载字节与服务端响应一致，不是商户签名、外部时间戳、链上证明或支付凭证。现有 Invocation 没有消费者项目标识，因此 HTTP 和 MCP 都按当前登录账户读取跨项目历史。
+
+## 开发者终态事件流
+
+开发者 App 可使用自身测试 Token 轮询终态调用。列表按只增终态序号升序返回 `succeeded` 或 `failed` 摘要，默认 20 条、最多 100 条；游标绑定当前 App，不能跨 App 复用。列表不返回结果正文、原始输入、请求摘要、Grant 或内部身份，单条详情只允许同一 App 读取其原本已获得的结果。
+
+客户端应持久保存每次响应的 `next_cursor`，处理完本页后再请求下一页。空轮询会保留原检查点；`has_more=true` 时应立即继续读取。该接口是可恢复的拉取事件流，不是 Webhook 或外部主动推送，也不证明真实支付、订单或履约完成。
 
 ## Grant 生命周期预算
 

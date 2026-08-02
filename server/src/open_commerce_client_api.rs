@@ -384,7 +384,7 @@ fn project_caller(
     Ok((user.id, access.role))
 }
 
-fn bearer_token(headers: &HeaderMap) -> Result<String, Response> {
+pub(crate) fn bearer_token(headers: &HeaderMap) -> Result<String, Response> {
     headers
         .get("authorization")
         .and_then(|value| value.to_str().ok())

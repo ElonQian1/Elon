@@ -168,6 +168,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (131, "消费者自有偏好档案与关系级披露快照", crate::open_commerce_consumer_preference_migration::migration_v131),
     (132, "消费者本人开放商业调用凭证查询索引", crate::open_commerce_consumer_receipt_migration::migration_v132),
     (133, "开放商业动作能力短时一次性输入绑定确认", crate::open_commerce_action_confirmation_migration::migration_v133),
+    (134, "开放商业开发者 App 终态调用事件流", crate::open_commerce_developer_event_migration::migration_v134),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

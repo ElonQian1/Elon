@@ -1,6 +1,6 @@
 # 消费者发现与第三方应用沙盒
 
-本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权期限由 `docs/decisions/open-commerce-grant-expiration-v1.md` 决定，消费者关系及续期由 `docs/decisions/open-commerce-consumer-relationships-v1.md` 和 `docs/decisions/open-commerce-consumer-relationship-renewal-v1.md` 决定，偏好档案与关系级披露由 `docs/decisions/open-commerce-consumer-preference-disclosures-v1.md` 决定，关联数据删除请求由 `docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` 决定，本人可验证导出由 `docs/decisions/open-commerce-consumer-portability-exports-v3.md` 决定，消费者调用凭证由 `docs/decisions/open-commerce-consumer-invocation-receipts-v1.md` 决定，Schema 驱动调用表单由 `docs/decisions/open-commerce-schema-driven-invocation-form-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定，商户侧调用活动证据由 `docs/decisions/open-commerce-app-activity-health-v1.md` 决定。
+本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权期限由 `docs/decisions/open-commerce-grant-expiration-v1.md` 决定，消费者关系及续期由 `docs/decisions/open-commerce-consumer-relationships-v1.md` 和 `docs/decisions/open-commerce-consumer-relationship-renewal-v1.md` 决定，偏好档案与关系级披露由 `docs/decisions/open-commerce-consumer-preference-disclosures-v1.md` 决定，关联数据删除请求由 `docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` 决定，本人可验证导出由 `docs/decisions/open-commerce-consumer-portability-exports-v3.md` 决定，消费者调用凭证由 `docs/decisions/open-commerce-consumer-invocation-receipts-v1.md` 决定，开发者终态事件流由 `docs/decisions/open-commerce-developer-terminal-events-v1.md` 决定，Schema 驱动调用表单由 `docs/decisions/open-commerce-schema-driven-invocation-form-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定，商户侧调用活动证据由 `docs/decisions/open-commerce-app-activity-health-v1.md` 决定。
 
 ## 使用入口
 
@@ -8,7 +8,7 @@
 
 - **消费者沙盒**：选择请求 App，按搜索词、能力、城市、标签和价格上限发现商户能力，再按商户发布的输入契约填写并调用。
 - **本人调用凭证**：按账户查看跨项目终态调用摘要，读取并下载经过 SHA-256 复核的单条结果。
-- **开发者**：注册沙盒 App、轮换一次性测试 Token、处理授权申请并调试能力调用。
+- **开发者**：注册沙盒 App、轮换一次性测试 Token、处理授权申请、调试能力调用并按游标取回本 App 的终态结果。
 - **商户工作台**：查看外部 App 近 24 小时的成功、失败、限流、授权预算拒绝和中断恢复证据，再人工决定是否封禁。
 
 发现结果必须展示是否存在付费排序。当前实现固定采用非付费排序；分数来自公开资料、能力匹配和显式偏好，不能通过购买排名改变。
@@ -50,10 +50,12 @@
 | 消费者发现 | `POST /api/open-commerce/sandbox/discover` |
 | 提交授权申请 | `POST /api/open-commerce/authorization-requests` |
 | 使用测试 Token 调用 | `POST /api/open-commerce/developer/invoke` |
+| 轮询本 App 终态事件 | `GET /api/open-commerce/developer/events?cursor=&limit=` |
+| 读取本 App 单条终态结果 | `GET /api/open-commerce/developer/events/{invocation_id}` |
 | 列出本人调用凭证 | `GET /api/open-commerce/consumer-invocation-receipts` |
 | 读取本人单条调用凭证 | `GET /api/open-commerce/consumer-invocation-receipts/{invocation_id}` |
 
-开发者调用使用 `Authorization: Bearer <test-token>` 和 `x-elon-app-id`。Token 不得进入 URL、日志、项目文档、浏览器本地存储或商户能力元数据。
+开发者调用和事件读取只使用 `Authorization: Bearer <test-token>`，App 身份由 Token 唯一确定，不能用额外请求头切换。Token 不得进入 URL、日志、项目文档、浏览器本地存储或商户能力元数据。
 
 批准申请时，商户可选择 7 天、30 天、90 天、1 年或长期有效，并可填写授权期内的总调用次数和总预算（人民币元）。PC 默认 30 天；长期有效必须显式选择。用尽或到期后不能由 App 自行扩容、续期，商户需要重新授权。调用失败会退回刚预留的预算，重复请求不会再次占用。批准后的实际期限和预算会同时展示给商户与申请方。
 

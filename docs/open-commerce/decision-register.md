@@ -32,6 +32,7 @@
 | 每个 Grant 可限制完整授权期风险 | 商户可选设置总调用次数和总计量金额；调用前原子预留、失败退回，预算用尽后重新授权 | `docs/decisions/open-commerce-grant-budgets-v1.md` |
 | 孤儿商业调用必须失败关闭并释放 Grant 预留 | 启动时关闭遗留调用，运行期回收超过 120 秒的调用；失败、预算退回、预留释放和脱敏审计保持同一事务 | `docs/decisions/open-commerce-invocation-recovery-v1.md` |
 | App 异常先形成商户可解释证据 | 按商户和外部 App 派生近 24 小时失败、限流、Grant 预算拒绝和中断恢复计数；只提醒人工处置，不自动评分、封禁或赔付 | `docs/decisions/open-commerce-app-activity-health-v1.md` |
+| 开发者 App 必须能可靠续读自己的调用结果 | Invocation 进入终态时原子追加稳定序号；测试 Token 只读取本 App 摘要和详情，游标跨 App 失败关闭；当前不冒充 Webhook | `docs/decisions/open-commerce-developer-terminal-events-v1.md` |
 | AI 资源 V1 先做控制面和路由预演 | 统一盘点现有真实资源并保存项目策略，但不复制执行器、不泄露凭据、不假装已核验外部额度 | `docs/decisions/ai-resource-control-v1.md` |
 | 节点模型共享必须由所有者显式开放 | 在线和模型上报不代表同意出租；按模型、并发和每日 Token 预算授权，调度前原子预留，所有者自用不受影响 | `docs/decisions/node-compute-sharing-supply-v1.md` |
 | 共享节点每日 Token 预算必须覆盖在途任务 | 派发前原子检查今日实耗、活动预留和本次保守预留；终态按实际用量记账，过期租约不能复活 | `docs/decisions/node-compute-sharing-token-reservation-v1.md` |
