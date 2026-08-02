@@ -6,6 +6,7 @@ import type {
   CreateOpenCommerceIntegration,
   CreateOpenCommerceMerchant,
   InvokeOpenCommerceCapability,
+  OpenCommerceActionConfirmation,
   OpenCommerceCapability,
   OpenCommerceAppBlock,
   OpenCommerceAppBlockOutcome,
@@ -58,6 +59,15 @@ export const openCommerceApi = {
 
   invoke: (request: InvokeOpenCommerceCapability) =>
     api.post<Record<string, unknown>>('/api/open-commerce/invoke', request),
+
+  prepareActionConfirmation: (request: InvokeOpenCommerceCapability) =>
+    api.post<OpenCommerceActionConfirmation>('/api/open-commerce/action-confirmations', request),
+
+  confirmActionConfirmation: (confirmationId: string) =>
+    api.post<OpenCommerceActionConfirmation>(
+      `/api/open-commerce/action-confirmations/${encodeURIComponent(confirmationId)}/confirm`,
+      { confirmation_phrase: 'CONFIRM_ACTION' },
+    ),
 
   createIntegration: (projectId: string, request: CreateOpenCommerceIntegration) =>
     api.post<OpenCommerceIntegration>(`${projectBase(projectId)}/integrations`, request),

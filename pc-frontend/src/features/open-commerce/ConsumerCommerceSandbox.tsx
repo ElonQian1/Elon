@@ -145,9 +145,22 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
     setBusy(true)
     setMessage('')
     try {
+      let actionConfirmationId: string | undefined
+      if (match.capability.kind === 'action') {
+        const prepared = appId === 'pc-web'
+          ? await openCommerceApi.prepareActionConfirmation(request)
+          : await openCommerceClientApi.prepareActionConfirmation(appId, request)
+        const confirmed = appId === 'pc-web'
+          ? await openCommerceApi.confirmActionConfirmation(prepared.id)
+          : await openCommerceClientApi.confirmActionConfirmation(appId, prepared.id)
+        actionConfirmationId = confirmed.id
+      }
       const response = appId === 'pc-web'
-        ? await openCommerceApi.invoke(request)
-        : await openCommerceClientApi.invokeAsApp(appId, request)
+        ? await openCommerceApi.invoke({ ...request, action_confirmation_id: actionConfirmationId })
+        : await openCommerceClientApi.invokeAsApp(appId, {
+            ...request,
+            action_confirmation_id: actionConfirmationId,
+          })
       setInvocation(response)
       setReceiptRefreshKey((value) => value + 1)
       setMessage('调用已完成，结果和本人调用凭证已更新。')

@@ -13,6 +13,8 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 use crate::{
+    open_commerce_action_confirmation_model::ACTION_CONFIRMATION_PHRASE,
+    open_commerce_action_confirmation_service,
     open_commerce_app_block_model::BlockOpenCommerceAppRequest,
     open_commerce_app_block_service,
     open_commerce_data_request_model::{
@@ -149,8 +151,16 @@ struct InvokeArguments {
     #[serde(default)]
     grant_id: Option<String>,
     idempotency_key: String,
+    #[serde(default)]
+    action_confirmation_id: Option<String>,
     #[serde(default = "empty_object")]
     input: Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct ConfirmActionArguments {
+    confirmation_id: String,
+    confirmation_phrase: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -582,14 +592,14 @@ pub(crate) async fn call_tool(
                 &actor,
             )?)?
         }
-        "open_commerce_invoke" => {
+        "open_commerce_prepare_action_confirmation" => {
             let input: InvokeArguments = decode(arguments, name)?;
             let merchant = store.open_commerce_merchant(&input.merchant_id)?;
             let target_role = store
                 .get_project_access(user_id, &merchant.project_id)
                 .ok()
                 .map(|access| access.role);
-            open_commerce_service::invoke(
+            serde_json::to_value(open_commerce_action_confirmation_service::prepare(
                 store,
                 &OpenCommerceActor {
                     user_id,
@@ -604,6 +614,48 @@ pub(crate) async fn call_tool(
                     idempotency_key: input.idempotency_key,
                     input: input.input,
                 },
+            )?)?
+        }
+        "open_commerce_confirm_action_confirmation" => {
+            let input: ConfirmActionArguments = decode(arguments, name)?;
+            if input.confirmation_phrase != ACTION_CONFIRMATION_PHRASE {
+                return Err(anyhow!("动作确认短语无效"));
+            }
+            serde_json::to_value(open_commerce_action_confirmation_service::confirm(
+                store,
+                &OpenCommerceActor {
+                    user_id,
+                    app_id,
+                    project_role: Some(project_role),
+                },
+                &input.confirmation_id,
+                &input.confirmation_phrase,
+            )?)?
+        }
+        "open_commerce_invoke" => {
+            let input: InvokeArguments = decode(arguments, name)?;
+            let action_confirmation_id = input.action_confirmation_id.clone();
+            let merchant = store.open_commerce_merchant(&input.merchant_id)?;
+            let target_role = store
+                .get_project_access(user_id, &merchant.project_id)
+                .ok()
+                .map(|access| access.role);
+            open_commerce_service::invoke_with_action_confirmation(
+                store,
+                &OpenCommerceActor {
+                    user_id,
+                    app_id,
+                    project_role: target_role.as_deref(),
+                },
+                InvokeCapabilityRequest {
+                    merchant_id: input.merchant_id,
+                    capability_key: input.capability_key,
+                    requester_app_id: app_id.to_string(),
+                    grant_id: input.grant_id,
+                    idempotency_key: input.idempotency_key,
+                    input: input.input,
+                },
+                action_confirmation_id.as_deref(),
             )
             .await?
         }

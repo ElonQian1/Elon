@@ -49,6 +49,10 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `GET` | `/api/open-commerce/merchants` | 按文本和能力发现启用的商户 |
 | `GET` | `/api/open-commerce/merchants/:merchant_id` | 读取商户公开资料和可发现能力 |
 | `POST` | `/api/open-commerce/invoke` | 调用能力并记录幂等、计量和审计 |
+| `POST` | `/api/open-commerce/action-confirmations` | 为当前用户和 App 的动作请求准备 5 分钟输入绑定确认 |
+| `POST` | `/api/open-commerce/action-confirmations/:confirmation_id/confirm` | 独立确认待执行动作，不直接执行能力 |
+| `POST` | `/api/open-commerce/developer/action-confirmations` | 使用开发者测试 Token 准备沙盒动作确认 |
+| `POST` | `/api/open-commerce/developer/action-confirmations/:confirmation_id/confirm` | 使用同一测试 Token 确认沙盒动作 |
 | `GET` | `/api/open-commerce/consumer-invocation-receipts` | 当前账户列出本人的终态调用凭证摘要 |
 | `GET` | `/api/open-commerce/consumer-invocation-receipts/:invocation_id` | 当前账户读取并复核本人的单条调用凭证 |
 
@@ -102,6 +106,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 ```
 
 相同调用方、商户、能力和幂等键的重复调用不重复累计金额；历史成功结果仍满足能力当前输出契约时返回原结果，否则以 `422` 拒绝本次重放且不改写历史调用。
+
+`action` 调用必须先向确认接口提交完全相同的商户、能力、Grant、幂等键和输入。服务端校验后返回 5 分钟有效的确认 ID；独立确认后，调用请求在顶层增加 `action_confirmation_id`。Invocation 创建和确认消费在同一事务中完成。已消费确认只允许重放所绑定的同一 Invocation，不能创建第二次动作。准备接口按精确请求幂等复用，因此动作成功但网络响应丢失后仍可通过同一幂等键恢复原确认和 Invocation；同键更换输入或 Grant 会失败。每个用户与 App 同时最多保留 20 份活动确认，创建超过 7 天且没有 Invocation 的过期确认会在后续准备时清理。`query` 不需要也不接受该字段。
 
 能力创建和更新只接受平台可以实际执行的有限 Schema 配置。调用输入在 Invocation、限流和 Grant 预算预留前校验；处理器输出在成功计量前校验。输入违例返回 `422` 且不创建调用；输出违例保存为 `output_schema_violation` 零金额失败调用并释放预算。错误与审计只返回字段路径和规则代码，不返回业务值。当前不支持 `$ref`、组合或条件 Schema，也不把结构校验解释为业务真实性证明。
 
@@ -205,12 +211,14 @@ MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_co
 | `open_commerce_set_integration_enabled` | 写 | 停用或重新启用接入 |
 | `open_commerce_record_sync_receipt` | 写 | 记录有界、幂等的适配器回执 |
 | `open_commerce_revoke_grant` | 写 | 撤销授权 |
-| `open_commerce_invoke` | 写 | 调用能力并生成计量和审计 |
+| `open_commerce_prepare_action_confirmation` | 写 | 校验并准备或幂等复用短时、输入绑定的动作确认，不执行能力 |
+| `open_commerce_confirm_action_confirmation` | 写 | 仅在用户已明确同意后确认准备结果，不执行能力 |
+| `open_commerce_invoke` | 写 | 调用能力并生成计量和审计；动作必须携带已确认 ID |
 | `open_commerce_list_my_invocation_receipts` | 读 | 按当前账户列出本人终态调用凭证摘要 |
 | `open_commerce_get_my_invocation_receipt` | 读 | 按当前账户读取并复核本人单条调用凭证 |
 | `open_commerce_list_audit` | 读 | 查看调用与治理证据 |
 
-MCP 写工具遵循与 HTTP API 相同的项目角色、授权和幂等规则。MCP 不提供绕过确认的真实资金、发布或外部系统写操作。
+MCP 写工具遵循与 HTTP API 相同的项目角色、授权、动作确认和幂等规则。MCP 不提供绕过确认的真实资金、发布或外部系统写操作。
 
 ## 数据接入与同步回执
 

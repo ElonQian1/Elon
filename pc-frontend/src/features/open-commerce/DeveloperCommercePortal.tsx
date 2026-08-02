@@ -53,6 +53,7 @@ export default function DeveloperCommercePortal({
   const [capabilityKey, setCapabilityKey] = useState('')
   const [grantId, setGrantId] = useState('')
   const [input, setInput] = useState('{}')
+  const [confirmAction, setConfirmAction] = useState(false)
   const [approvalMaxInvocations, setApprovalMaxInvocations] = useState('')
   const [approvalMaxAmountYuan, setApprovalMaxAmountYuan] = useState('')
   const [approvalExpiryPreset, setApprovalExpiryPreset] = useState<GrantExpiryPreset>('30')
@@ -190,12 +191,28 @@ export default function DeveloperCommercePortal({
     setMessage('')
     setResponse(null)
     try {
-      const result = await openCommerceClientApi.developerInvoke(testToken.trim(), {
+      const request = {
         merchant_id: merchantId.trim(),
         capability_key: capabilityKey.trim(),
         grant_id: grantId.trim() || undefined,
         idempotency_key: `developer-console-${crypto.randomUUID()}`,
         input: parseJsonObject(input),
+      }
+      let actionConfirmationId: string | undefined
+      if (confirmAction) {
+        const prepared = await openCommerceClientApi.developerPrepareActionConfirmation(
+          testToken.trim(),
+          request,
+        )
+        const confirmed = await openCommerceClientApi.developerConfirmActionConfirmation(
+          testToken.trim(),
+          prepared.id,
+        )
+        actionConfirmationId = confirmed.id
+      }
+      const result = await openCommerceClientApi.developerInvoke(testToken.trim(), {
+        ...request,
+        action_confirmation_id: actionConfirmationId,
       })
       setResponse(result)
     } catch (error) {
@@ -318,6 +335,7 @@ export default function DeveloperCommercePortal({
             <label>能力 Key<input value={capabilityKey} onChange={(event) => setCapabilityKey(event.target.value)} required /></label>
             <label>Grant ID<input value={grantId} onChange={(event) => setGrantId(event.target.value)} /></label>
             <label style={commerceStyles.wideField}>输入 JSON<textarea value={input} onChange={(event) => setInput(event.target.value)} /></label>
+            <label style={commerceStyles.wideField}><input type="checkbox" checked={confirmAction} onChange={(event) => setConfirmAction(event.target.checked)} />本次是动作能力，我已确认当前输入并同意执行</label>
           </div>
           <button style={actionStyle('primary', busy)} type="submit" disabled={busy}><Play size={13} />{busy ? '调用中…' : '执行沙盒调用'}</button>
           {response && <pre className={base.result}>{JSON.stringify(response, null, 2)}</pre>}

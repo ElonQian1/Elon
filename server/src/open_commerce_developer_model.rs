@@ -79,6 +79,8 @@ pub(crate) struct DeveloperInvokeRequest {
     #[serde(default)]
     pub grant_id: Option<String>,
     pub idempotency_key: String,
+    #[serde(default)]
+    pub action_confirmation_id: Option<String>,
     #[serde(default = "empty_object")]
     pub input: Value,
 }

@@ -148,6 +148,12 @@ mod node_router;
 mod node_runtime;
 mod node_scheduler;
 mod offline_completion_migration;
+mod open_commerce_action_confirmation_api;
+mod open_commerce_action_confirmation_migration;
+mod open_commerce_action_confirmation_model;
+mod open_commerce_action_confirmation_service;
+#[cfg(test)]
+mod open_commerce_action_confirmation_tests;
 mod open_commerce_api;
 mod open_commerce_app_activity_health_model;
 #[cfg(test)]

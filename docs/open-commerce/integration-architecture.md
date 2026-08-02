@@ -18,7 +18,7 @@
        Matter、Assignment、Agent、审核、Git 工作区、产物
                            |
                     开放商业协议层
-     Merchant、Capability、Grant、Invocation、Meter、Audit
+ Merchant、Capability、Grant、ActionConfirmation、Invocation、Meter、Audit
                            |
                      资源执行层
      云模型、用户 API Token、PC 节点、闲置算力、外部服务
@@ -75,6 +75,7 @@
 | Runtime Binding | 将能力受控绑定到商户自有 HTTPS 后端；保存地址、服务端凭据引用、Manifest 摘要和验证状态 | `server/src/open_commerce_runtime_model.rs` |
 | Merchant Runtime | 由商户维护商品、价格、库存、报价与订单事实，通过统一签名协议接受平台调用 | `contracts/open-commerce/merchant-runtime-v1.json` |
 | Grant | 描述谁可在何种范围和时限内调用能力 | 开放商业 V1 |
+| Action Confirmation | 记录当前用户对具体动作请求的短时独立确认；绑定 App、商户、能力、Grant、幂等键和输入摘要，与 Invocation 创建原子消费，不保存原始输入值 | 服务端动作确认 V1 |
 | Consumer Relationship | 记录消费者主动建立、限时、可撤销及安全续期的匿名商户关系；续期轮换别名且内部链不向商户公开，不保存偏好值、联系方式或订单，也不授予能力调用权限 | 消费者关系凭证与安全续期 V1 |
 | Consumer Preference Disclosure | 保存消费者本人低敏结构化偏好，并把明确选择的字段固化为关系级匿名快照；商户只读取有效关系，档案更新和关系续期不自动扩张访问 | 消费者偏好档案与关系级披露 V1 |
 | Consumer Data Request | 记录消费者对匿名关系发起的删除请求、关系撤销和商户履约声明；不承载待删除数据，也不把声明解释为外部删除证明 | 消费者关联数据删除请求 V1 |
@@ -114,7 +115,7 @@ Sui 只能作为上述链上职责的候选实现，不能独自完成数据治�
 - AI 应用生成与商户 ERP、营销活动、小游戏和内容生产共用工程执行链路。
 - 群体 AI 的 Matter/Assignment 与节点算力调度共用任务事实。
 - API Token、云模型和闲置节点共用资源选择、预算和用量回执。
-- 消费者 App、开发者测试 App 和商户授权共用 Capability、Grant、Invocation 与 Audit。
+- 消费者 App、开发者测试 App 和商户授权共用 Capability、Grant、Action Confirmation、Invocation 与 Audit。
 - 开放商业调用与未来结算共用 Invocation 和 Usage Receipt。
 
 不能直接混合：

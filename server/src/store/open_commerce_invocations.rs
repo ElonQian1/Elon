@@ -339,7 +339,7 @@ fn parse_json(value: String, label: &str) -> rusqlite::Result<Value> {
     })
 }
 
-fn map_invocation_conflict(error: rusqlite::Error) -> anyhow::Error {
+pub(super) fn map_invocation_conflict(error: rusqlite::Error) -> anyhow::Error {
     if error.to_string().contains("UNIQUE constraint failed") {
         anyhow!("调用幂等键发生并发冲突，请读取已有调用结果")
     } else {

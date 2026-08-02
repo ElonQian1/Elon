@@ -92,6 +92,9 @@ const preferenceApi = read('server/src/open_commerce_consumer_preference_api.rs'
 const preferenceMcp = read('server/src/open_commerce_consumer_preference_mcp.rs')
 const capabilitySchema = read('server/src/open_commerce_capability_schema.rs')
 const invocationProtocol = read('server/src/open_commerce_invocation_protocol.rs')
+const actionConfirmationService = read('server/src/open_commerce_action_confirmation_service.rs')
+const actionConfirmationStore = read('server/src/store/open_commerce_action_confirmations.rs')
+const actionConfirmationMigration = read('server/src/open_commerce_action_confirmation_migration.rs')
 
 for (const view of [
   'OpenCommerceMerchantWorkspace',
@@ -121,6 +124,17 @@ assert.ok(invocationComposer.includes('idempotencyKey'), 'same-input retries mus
 assert.ok(invocationComposer.includes('setIdempotencyKey(createInvocationKey())'), 'input changes must rotate the idempotency key')
 assert.doesNotMatch(consumer, /idempotency_key:\s*`consumer-sandbox-\$\{crypto\.randomUUID\(\)\}`/, 'the parent must not create a new key on every retry')
 assert.ok(invocationComposer.includes('未扣真实资金'), 'invocation form must not imply a real platform charge')
+assert.ok(consumer.includes('prepareActionConfirmation'), 'consumer actions must prepare a server confirmation')
+assert.ok(consumer.includes('confirmActionConfirmation'), 'consumer actions must confirm through the server before invocation')
+assert.ok(actionConfirmationService.includes('ACTION_CONFIRMATION_TTL_SECONDS'), 'action confirmations must use the bounded server TTL')
+assert.ok(actionConfirmationService.includes('contains_raw_values'), 'confirmation audit must explicitly exclude raw input values')
+assert.ok(actionConfirmationStore.includes("status = 'consumed'"), 'confirmation consumption must be persisted')
+assert.ok(actionConfirmationStore.includes('insert_invocation_on(&tx'), 'invocation creation and confirmation consumption must share a transaction')
+assert.ok(actionConfirmationStore.includes('TransactionBehavior::Immediate'), 'confirmation preparation must serialize idempotent recovery and active limits')
+assert.ok(actionConfirmationStore.includes('MAX_ACTIVE_ACTION_CONFIRMATIONS_PER_APP'), 'active confirmations must be bounded per user and app')
+assert.ok(actionConfirmationMigration.includes('idx_open_commerce_action_confirmations_invocation'), 'one confirmation must bind at most one invocation')
+assert.ok(mcpTools.includes('open_commerce_prepare_action_confirmation'), 'MCP actions must use the same confirmation preparation service')
+assert.ok(mcpTools.includes('open_commerce_confirm_action_confirmation'), 'MCP must expose a separate explicit confirmation step')
 assert.ok(invocationSchemaField.includes('createCapabilityFieldValue'), 'array fields must support bounded repeatable items')
 assert.ok(invocationSchemaModel.includes('MAX_CAPABILITY_FORM_ITEMS = 50'), 'schema forms must bound repeated items')
 assert.ok(invocationSchemaModel.includes('没有可呈现的字段定义'), 'unrenderable required fields must fail closed')

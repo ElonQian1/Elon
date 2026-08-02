@@ -304,5 +304,6 @@ export interface DeveloperInvokeRequest {
   capability_key: string
   grant_id?: string
   idempotency_key: string
+  action_confirmation_id?: string
   input: Record<string, unknown>
 }

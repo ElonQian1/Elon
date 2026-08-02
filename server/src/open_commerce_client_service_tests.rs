@@ -216,6 +216,7 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
         capability_key: "menu.preview".to_string(),
         grant_id: Some(grant.id),
         idempotency_key: "developer-debug-1".to_string(),
+        action_confirmation_id: None,
         input: json!({}),
     };
     let result = open_commerce_service::invoke(

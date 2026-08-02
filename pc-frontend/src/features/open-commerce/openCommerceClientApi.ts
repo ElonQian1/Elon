@@ -24,7 +24,10 @@ import type {
   DeleteConsumerPreferenceProfileResult,
   OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
-import type { InvokeOpenCommerceCapability } from './openCommerceTypes'
+import type {
+  InvokeOpenCommerceCapability,
+  OpenCommerceActionConfirmation,
+} from './openCommerceTypes'
 
 function projectBase(projectId: string) {
   return `/api/projects/${encodeURIComponent(projectId)}/open-commerce`
@@ -223,6 +226,34 @@ export const openCommerceClientApi = {
     api.postWithHeaders<Record<string, unknown>>('/api/open-commerce/invoke', request, {
       'x-elon-app-id': appId,
     }),
+
+  prepareActionConfirmation: (appId: string, request: InvokeOpenCommerceCapability) =>
+    api.postWithHeaders<OpenCommerceActionConfirmation>(
+      '/api/open-commerce/action-confirmations',
+      request,
+      { 'x-elon-app-id': appId },
+    ),
+
+  confirmActionConfirmation: (appId: string, confirmationId: string) =>
+    api.postWithHeaders<OpenCommerceActionConfirmation>(
+      `/api/open-commerce/action-confirmations/${encodeURIComponent(confirmationId)}/confirm`,
+      { confirmation_phrase: 'CONFIRM_ACTION' },
+      { 'x-elon-app-id': appId },
+    ),
+
+  developerPrepareActionConfirmation: (testToken: string, request: DeveloperInvokeRequest) =>
+    api.postWithHeaders<OpenCommerceActionConfirmation>(
+      '/api/open-commerce/developer/action-confirmations',
+      request,
+      { Authorization: `Bearer ${testToken}` },
+    ),
+
+  developerConfirmActionConfirmation: (testToken: string, confirmationId: string) =>
+    api.postWithHeaders<OpenCommerceActionConfirmation>(
+      `/api/open-commerce/developer/action-confirmations/${encodeURIComponent(confirmationId)}/confirm`,
+      { confirmation_phrase: 'CONFIRM_ACTION' },
+      { Authorization: `Bearer ${testToken}` },
+    ),
 
   developerInvoke: (testToken: string, request: DeveloperInvokeRequest) =>
     api.postWithHeaders<Record<string, unknown>>('/api/open-commerce/developer/invoke', request, {

@@ -353,8 +353,9 @@ async fn developer_invoke(
         app_id: &app.app_id,
         project_role: role.as_deref(),
     };
+    let action_confirmation_id = request.action_confirmation_id.clone();
     service_response(
-        open_commerce_service::invoke(
+        open_commerce_service::invoke_with_action_confirmation(
             &state.store,
             &actor,
             InvokeCapabilityRequest {
@@ -365,6 +366,7 @@ async fn developer_invoke(
                 idempotency_key: request.idempotency_key,
                 input: request.input,
             },
+            action_confirmation_id.as_deref(),
         )
         .await,
     )

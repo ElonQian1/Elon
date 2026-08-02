@@ -12,6 +12,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
+    open_commerce_action_confirmation_model::InvokeCapabilityEnvelope,
     open_commerce_directory_model::SetDirectoryPublicationRequest,
     open_commerce_directory_service,
     open_commerce_integration_model::{
@@ -424,8 +425,9 @@ async fn get_merchant(
 async fn invoke_capability(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-    Json(request): Json<InvokeCapabilityRequest>,
+    Json(envelope): Json<InvokeCapabilityEnvelope>,
 ) -> Response {
+    let request = envelope.invocation;
     let user_id = match authenticated_user(&state, &headers) {
         Ok(value) => value,
         Err(response) => return response,
@@ -452,7 +454,15 @@ async fn invoke_capability(
         app_id: &app_id,
         project_role: role.as_deref(),
     };
-    service_response(open_commerce_service::invoke(&state.store, &actor, request).await)
+    service_response(
+        open_commerce_service::invoke_with_action_confirmation(
+            &state.store,
+            &actor,
+            request,
+            envelope.action_confirmation_id.as_deref(),
+        )
+        .await,
+    )
 }
 
 fn project_caller(

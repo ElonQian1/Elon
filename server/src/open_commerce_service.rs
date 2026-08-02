@@ -443,6 +443,15 @@ pub(crate) async fn invoke(
     actor: &OpenCommerceActor<'_>,
     request: InvokeCapabilityRequest,
 ) -> Result<Value> {
+    invoke_with_action_confirmation(store, actor, request, None).await
+}
+
+pub(crate) async fn invoke_with_action_confirmation(
+    store: &Store,
+    actor: &OpenCommerceActor<'_>,
+    request: InvokeCapabilityRequest,
+    action_confirmation_id: Option<&str>,
+) -> Result<Value> {
     let requester_app_id = normalize_app_id(&request.requester_app_id)?;
     if requester_app_id != normalize_app_id(actor.app_id)? {
         bail!("requester_app_id 与当前调用入口不一致");
@@ -491,7 +500,7 @@ pub(crate) async fn invoke(
         &input,
     )?;
     let request_shape = request_shape(&input)?;
-    let claim = store.start_open_commerce_invocation(OpenCommerceInvocationStart {
+    let invocation_start = OpenCommerceInvocationStart {
         project_id: &merchant.project_id,
         merchant_id: &merchant.id,
         capability_id: &capability.id,
@@ -504,7 +513,19 @@ pub(crate) async fn invoke(
         request_shape: &request_shape,
         unit_price_micros: capability.unit_price_micros,
         currency: &capability.currency,
-    })?;
+    };
+    let claim = if capability.kind == "action" {
+        let confirmation_id = action_confirmation_id
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| anyhow!("动作能力必须先完成服务端一次性确认"))?;
+        store.start_confirmed_open_commerce_invocation(invocation_start, confirmation_id)?
+    } else {
+        if action_confirmation_id.is_some() {
+            bail!("查询能力不接受动作确认凭证");
+        }
+        store.start_open_commerce_invocation(invocation_start)?
+    };
     if !claim.created {
         crate::open_commerce_capability_contract_service::validate_replayed_output(
             store,
@@ -654,7 +675,7 @@ async fn execute_handler(
     }
 }
 
-fn authorize_invocation(
+pub(crate) fn authorize_invocation(
     store: &Store,
     actor: &OpenCommerceActor<'_>,
     merchant: &OpenCommerceMerchant,

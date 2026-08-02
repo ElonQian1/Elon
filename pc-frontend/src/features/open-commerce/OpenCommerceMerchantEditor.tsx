@@ -51,6 +51,7 @@ export default function OpenCommerceMerchantEditor({
   const [invokeCapability, setInvokeCapability] = useState('')
   const [invokeGrantId, setInvokeGrantId] = useState('')
   const [invokeInput, setInvokeInput] = useState('{}')
+  const [invokeConfirmed, setInvokeConfirmed] = useState(false)
   const [result, setResult] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState('')
@@ -133,13 +134,26 @@ export default function OpenCommerceMerchantEditor({
     setBusy('invoke')
     try {
       if (!invokeCapability) throw new Error('请选择要调用的能力')
-      const response = await openCommerceApi.invoke({
+      if (selectedCapability?.kind === 'action' && !invokeConfirmed) {
+        throw new Error('测试动作能力前需要明确确认当前输入。')
+      }
+      const request = {
         merchant_id: merchant.merchant.id,
         capability_key: invokeCapability,
         requester_app_id: 'pc-web',
         grant_id: invokeGrantId || undefined,
         idempotency_key: newInvocationIdempotencyKey(),
         input: parseObject(invokeInput, '调用输入'),
+      }
+      let actionConfirmationId: string | undefined
+      if (selectedCapability?.kind === 'action') {
+        const prepared = await openCommerceApi.prepareActionConfirmation(request)
+        const confirmed = await openCommerceApi.confirmActionConfirmation(prepared.id)
+        actionConfirmationId = confirmed.id
+      }
+      const response = await openCommerceApi.invoke({
+        ...request,
+        action_confirmation_id: actionConfirmationId,
       })
       setResult(JSON.stringify(response, null, 2))
       setMessage('调用成功；本次只记录计量账本，不真实扣款。')
@@ -239,7 +253,7 @@ export default function OpenCommerceMerchantEditor({
 
         <form className={styles.formCard} onSubmit={invoke}>
           <header><strong>测试能力调用</strong><small>使用 PC 应用身份与全新幂等键</small></header>
-          <label>能力<select value={invokeCapability} onChange={(e) => setInvokeCapability(e.target.value)} required>
+          <label>能力<select value={invokeCapability} onChange={(e) => { setInvokeCapability(e.target.value); setInvokeConfirmed(false) }} required>
             <option value="">请选择</option>
             {activeCapabilities.map((capability) => <option key={capability.id} value={capability.capability_key}>{capability.display_name}</option>)}
           </select></label>
@@ -247,7 +261,8 @@ export default function OpenCommerceMerchantEditor({
             <option value="">请选择授权</option>
             {merchantGrants.filter((grant) => !grant.revoked_at && !isGrantExpired(grant.expires_at)).map((grant) => <option key={grant.id} value={grant.id}>{grant.grantee_app_id} · {grant.scopes.join(', ')}</option>)}
           </select></label>}
-          <label>调用输入<textarea value={invokeInput} onChange={(e) => setInvokeInput(e.target.value)} /></label>
+          <label>调用输入<textarea value={invokeInput} onChange={(e) => { setInvokeInput(e.target.value); setInvokeConfirmed(false) }} /></label>
+          {selectedCapability?.kind === 'action' && <label><input type="checkbox" checked={invokeConfirmed} onChange={(e) => setInvokeConfirmed(e.target.checked)} />确认使用当前输入执行经营操作</label>}
           <button type="submit" disabled={busy === 'invoke'}>{busy === 'invoke' ? '调用中…' : '调用并记录计量'}</button>
           {result && <pre className={styles.result}>{result}</pre>}
         </form>

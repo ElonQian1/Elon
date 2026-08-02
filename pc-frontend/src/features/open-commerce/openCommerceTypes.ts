@@ -323,7 +323,18 @@ export interface InvokeOpenCommerceCapability {
   requester_app_id: string
   grant_id?: string
   idempotency_key: string
+  action_confirmation_id?: string
   input: Record<string, unknown>
+}
+
+export interface OpenCommerceActionConfirmation {
+  id: string
+  merchant_id: string
+  capability_key: string
+  requester_app_id: string
+  idempotency_key: string
+  status: 'pending' | 'confirmed' | 'consumed' | 'expired'
+  expires_at: string
 }
 
 export interface UpsertOpenCommerceRateLimit {
