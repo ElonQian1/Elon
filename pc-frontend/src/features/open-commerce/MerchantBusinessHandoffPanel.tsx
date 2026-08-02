@@ -20,6 +20,7 @@ type Props = {
   integrations: OpenCommerceIntegration[]
   canEdit: boolean
   onClose: () => void
+  onRecorded: () => void
 }
 
 const outcomeOptions: Array<{ value: OpenCommerceBusinessHandoffStatus; label: string }> = [
@@ -48,6 +49,7 @@ export default function MerchantBusinessHandoffPanel({
   integrations,
   canEdit,
   onClose,
+  onRecorded,
 }: Props) {
   const [list, setList] = useState<OpenCommerceBusinessHandoffReceiptList | null>(null)
   const [integrationId, setIntegrationId] = useState('')
@@ -112,6 +114,7 @@ export default function MerchantBusinessHandoffPanel({
         completed_at: attempt.completedAt,
       })
       setMessage({ text: '衔接结果已记录', error: false })
+      onRecorded()
       onClose()
       await refresh()
     } catch (error) {

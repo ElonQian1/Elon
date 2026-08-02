@@ -240,6 +240,120 @@ async fn handoff_receipt_is_idempotent_auditable_and_does_not_store_raw_referenc
         .any(|tool| tool["name"] == "open_commerce_record_business_handoff_receipt"));
 }
 
+#[tokio::test]
+async fn handoff_queue_is_derived_from_latest_receipt_and_keeps_rejections_retryable() {
+    let fixture = fixture();
+    let actor = owner_actor(&fixture.user_id);
+
+    let pending = open_commerce_business_handoff_service::list_queue(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.merchant_id,
+        None,
+        50,
+    )
+    .unwrap();
+    assert_eq!(pending.items.len(), 1);
+    assert_eq!(pending.items[0].queue_state, "pending");
+    assert!(pending.items[0].can_apply);
+    assert!(pending.items[0].latest_receipt.is_none());
+    assert_eq!(pending.returned_pending_count, 1);
+    assert_eq!(pending.returned_retry_required_count, 0);
+    assert!(!pending.has_more);
+
+    let mcp_pending = crate::open_commerce_mcp::call_tool(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.user_id,
+        "owner",
+        "pc-web",
+        json!({
+            "name":"open_commerce_list_business_handoff_queue",
+            "arguments":{"merchant_id":fixture.merchant_id,"state":"pending"}
+        }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        mcp_pending["structuredContent"]["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    let mut rejected = applied_request(&fixture, "handoff.erp.retry-1");
+    rejected.status = "rejected".to_string();
+    rejected.target_reference = None;
+    rejected.error_code = Some("adapter_failed".to_string());
+    open_commerce_business_handoff_service::record_receipt(
+        &fixture.store,
+        &fixture.project_id,
+        &actor,
+        rejected,
+    )
+    .unwrap();
+
+    let no_longer_pending = open_commerce_business_handoff_service::list_queue(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.merchant_id,
+        Some("pending"),
+        50,
+    )
+    .unwrap();
+    assert!(no_longer_pending.items.is_empty());
+    let retry = open_commerce_business_handoff_service::list_queue(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.merchant_id,
+        Some("retry_required"),
+        50,
+    )
+    .unwrap();
+    assert_eq!(retry.items.len(), 1);
+    assert_eq!(retry.items[0].queue_state, "retry_required");
+    assert_eq!(
+        retry.items[0]
+            .latest_receipt
+            .as_ref()
+            .map(|receipt| receipt.status.as_str()),
+        Some("rejected")
+    );
+
+    let mut applied = applied_request(&fixture, "handoff.erp.retry-2");
+    applied.completed_at = "2026-08-03T02:02:00Z".to_string();
+    open_commerce_business_handoff_service::record_receipt(
+        &fixture.store,
+        &fixture.project_id,
+        &actor,
+        applied,
+    )
+    .unwrap();
+    let resolved = open_commerce_business_handoff_service::list_queue(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.merchant_id,
+        None,
+        50,
+    )
+    .unwrap();
+    assert!(resolved.items.is_empty());
+    assert!(open_commerce_business_handoff_service::list_queue(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.merchant_id,
+        Some("resolved"),
+        50,
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("pending"));
+    assert!(crate::open_commerce_business_handoff_mcp::definitions()
+        .iter()
+        .any(|tool| tool["name"] == "open_commerce_list_business_handoff_queue"));
+}
+
 #[test]
 fn handoff_receipt_fails_closed_on_tampering_rewrite_and_missing_confirmation() {
     let fixture = fixture();

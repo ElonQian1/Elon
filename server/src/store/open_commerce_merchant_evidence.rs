@@ -59,7 +59,7 @@ impl Store {
     }
 }
 
-fn merchant_record_from_row(
+pub(super) fn merchant_record_from_row(
     row: &rusqlite::Row<'_>,
 ) -> rusqlite::Result<MerchantTerminalInvocationRecord> {
     Ok(MerchantTerminalInvocationRecord {

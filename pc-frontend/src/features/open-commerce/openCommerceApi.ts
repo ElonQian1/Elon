@@ -19,6 +19,8 @@ import type {
   MerchantBusinessEvidenceList,
   OpenCommerceBusinessHandoffReceipt,
   OpenCommerceBusinessHandoffReceiptList,
+  OpenCommerceBusinessHandoffQueue,
+  OpenCommerceBusinessHandoffQueueState,
   OpenCommerceRuntimeBinding,
   OpenCommerceRateLimitPolicy,
   UpsertOpenCommerceRateLimit,
@@ -117,6 +119,18 @@ export const openCommerceApi = {
     api.get<OpenCommerceBusinessHandoffReceiptList>(
       `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/business-handoff-receipts`,
     ),
+
+  listBusinessHandoffQueue: (
+    projectId: string,
+    merchantId: string,
+    state?: OpenCommerceBusinessHandoffQueueState,
+  ) => {
+    const query = new URLSearchParams({ limit: '100' })
+    if (state) query.set('state', state)
+    return api.get<OpenCommerceBusinessHandoffQueue>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/business-handoff-queue?${query}`,
+    )
+  },
 
   recordBusinessHandoffReceipt: (
     projectId: string,

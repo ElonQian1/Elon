@@ -3,10 +3,12 @@ use serde_json::json;
 
 use crate::{
     open_commerce_business_handoff_model::{
-        normalize_handoff_error_code, normalize_handoff_status, normalize_sha256,
-        normalize_target_reference, OpenCommerceBusinessHandoffReceipt,
+        normalize_handoff_error_code, normalize_handoff_queue_state, normalize_handoff_status,
+        normalize_sha256, normalize_target_reference, OpenCommerceBusinessHandoffQueue,
+        OpenCommerceBusinessHandoffQueueItem, OpenCommerceBusinessHandoffReceipt,
         OpenCommerceBusinessHandoffReceiptList, RecordBusinessHandoffReceiptRequest,
-        BUSINESS_HANDOFF_LIST_SCHEMA,
+        BUSINESS_HANDOFF_LIST_SCHEMA, BUSINESS_HANDOFF_QUEUE_ITEM_SCHEMA,
+        BUSINESS_HANDOFF_QUEUE_SCHEMA,
     },
     open_commerce_merchant_evidence_service,
     open_commerce_service::OpenCommerceActor,
@@ -19,6 +21,13 @@ const BOUNDARY: [&str; 4] = [
     "applied 只允许绑定有效标准业务回执，且不会复制商户订单、客户、库存或财务表",
     "目标记录号只保存 SHA-256，不在平台保留外部系统的原始记录号",
     "funds_moved 固定为 false，不代表支付、分账、履约或退款完成",
+];
+
+const QUEUE_BOUNDARY: [&str; 4] = [
+    "待衔接队列由终态业务证据与最新衔接回执实时派生，不是另一套订单状态",
+    "pending 表示尚无衔接回执；retry_required 表示最新回执为 rejected",
+    "applied 或 ignored 的证据会自动移出队列，新的 rejected 回执会重新进入队列",
+    "队列不自动调用外部 ERP/CRM，不代表支付、履约、退款或资金移动",
 ];
 
 pub(crate) fn record_receipt(
@@ -103,6 +112,75 @@ pub(crate) fn list_receipts(
             limit,
         )?,
         boundary: BOUNDARY.to_vec(),
+    })
+}
+
+pub(crate) fn list_queue(
+    store: &Store,
+    project_id: &str,
+    merchant_id: &str,
+    state: Option<&str>,
+    limit: usize,
+) -> Result<OpenCommerceBusinessHandoffQueue> {
+    let state_filter = normalize_handoff_queue_state(state)?;
+    let limit = limit.clamp(1, 200);
+    let mut records = store.list_open_commerce_business_handoff_queue_records(
+        project_id,
+        merchant_id,
+        state_filter.as_deref(),
+        limit.saturating_add(1),
+    )?;
+    let has_more = records.len() > limit;
+    records.truncate(limit);
+
+    let mut items = Vec::with_capacity(records.len());
+    for record in records {
+        let invocation_id = record.invocation.id.clone();
+        let evidence = open_commerce_merchant_evidence_service::get_evidence(
+            store,
+            project_id,
+            merchant_id,
+            &invocation_id,
+        )?
+        .evidence;
+        let latest_receipt = store.latest_open_commerce_business_handoff_receipt(
+            project_id,
+            merchant_id,
+            &invocation_id,
+        )?;
+        let queue_state = match latest_receipt
+            .as_ref()
+            .map(|receipt| receipt.status.as_str())
+        {
+            None => "pending",
+            Some("rejected") => "retry_required",
+            Some("applied" | "ignored") => continue,
+            Some(_) => continue,
+        };
+        items.push(OpenCommerceBusinessHandoffQueueItem {
+            schema: BUSINESS_HANDOFF_QUEUE_ITEM_SCHEMA,
+            queue_state,
+            can_apply: evidence.status == "succeeded" && evidence.receipt_state == "valid",
+            evidence,
+            latest_receipt,
+        });
+    }
+    let returned_pending_count = items
+        .iter()
+        .filter(|item| item.queue_state == "pending")
+        .count();
+    let returned_retry_required_count = items.len() - returned_pending_count;
+
+    Ok(OpenCommerceBusinessHandoffQueue {
+        schema: BUSINESS_HANDOFF_QUEUE_SCHEMA,
+        project_id: project_id.trim().to_string(),
+        merchant_id: merchant_id.trim().to_string(),
+        state_filter,
+        items,
+        returned_pending_count,
+        returned_retry_required_count,
+        has_more,
+        boundary: QUEUE_BOUNDARY.to_vec(),
     })
 }
 

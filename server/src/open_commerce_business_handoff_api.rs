@@ -23,6 +23,14 @@ struct ReceiptQuery {
     limit: usize,
 }
 
+#[derive(Debug, Deserialize)]
+struct QueueQuery {
+    #[serde(default)]
+    state: Option<String>,
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
 struct ProjectCaller {
     user_id: String,
     role: String,
@@ -38,6 +46,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/open-commerce/merchants/:merchant_id/business-handoff-receipts",
             get(list_receipts),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/merchants/:merchant_id/business-handoff-queue",
+            get(list_queue),
         )
 }
 
@@ -76,6 +88,24 @@ async fn list_receipts(
         &state.store,
         &project_id,
         &merchant_id,
+        query.limit,
+    ))
+}
+
+async fn list_queue(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, merchant_id)): Path<(String, String)>,
+    Query(query): Query<QueueQuery>,
+) -> Response {
+    if let Err(response) = authorize(&state, &headers, &project_id) {
+        return response;
+    }
+    service_response(open_commerce_business_handoff_service::list_queue(
+        &state.store,
+        &project_id,
+        &merchant_id,
+        query.state.as_deref(),
         query.limit,
     ))
 }

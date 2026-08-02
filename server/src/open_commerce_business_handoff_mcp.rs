@@ -8,12 +8,23 @@ use crate::{
 };
 
 const LIST_RECEIPTS: &str = "open_commerce_list_business_handoff_receipts";
+const LIST_QUEUE: &str = "open_commerce_list_business_handoff_queue";
 const RECORD_RECEIPT: &str = "open_commerce_record_business_handoff_receipt";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ListArguments {
     merchant_id: String,
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QueueArguments {
+    merchant_id: String,
+    #[serde(default)]
+    state: Option<String>,
     #[serde(default = "default_limit")]
     limit: usize,
 }
@@ -28,6 +39,21 @@ pub(crate) fn definitions() -> Vec<Value> {
                 "required":["merchant_id"],
                 "properties":{
                     "merchant_id":{"type":"string","minLength":1,"maxLength":120},
+                    "limit":{"type":"integer","minimum":1,"maximum":200,"default":50}
+                },
+                "additionalProperties":false
+            }),
+            true,
+        ),
+        tool(
+            LIST_QUEUE,
+            "读取当前商户尚未完成 ERP/CRM 衔接的业务证据。pending 尚无回执，retry_required 表示最新处理失败；成功或忽略后自动移出。该工具只读，不会调用外部系统或移动资金。",
+            json!({
+                "type":"object",
+                "required":["merchant_id"],
+                "properties":{
+                    "merchant_id":{"type":"string","minLength":1,"maxLength":120},
+                    "state":{"type":"string","enum":["pending","retry_required"]},
                     "limit":{"type":"integer","minimum":1,"maximum":200,"default":50}
                 },
                 "additionalProperties":false
@@ -83,6 +109,16 @@ pub(crate) fn call_if_handled(
                 store,
                 project_id,
                 &input.merchant_id,
+                input.limit,
+            )?)?
+        }
+        LIST_QUEUE => {
+            let input: QueueArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_business_handoff_service::list_queue(
+                store,
+                project_id,
+                &input.merchant_id,
+                input.state.as_deref(),
                 input.limit,
             )?)?
         }

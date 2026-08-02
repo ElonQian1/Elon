@@ -1,7 +1,7 @@
 ---
 title: AI 原生开放商业网络 V1 API 与 MCP 契约
 owner: backend
-reviewed_at: 2026-07-31
+reviewed_at: 2026-08-03
 status: accepted
 source: docs/decisions/open-commerce-network-v1-architecture.md
 ---
@@ -35,6 +35,7 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `GET` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/business-evidence/:invocation_id` | 读取单条商户业务证据及当时结果 |
 | `POST` | `/api/projects/:project_id/open-commerce/business-handoff-receipts` | 项目编辑者明确记录 ERP/CRM 对指定业务证据的处理结果 |
 | `GET` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/business-handoff-receipts` | 读取指定商户的业务衔接回执 |
+| `GET` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/business-handoff-queue` | 读取由业务证据和最新回执派生的待处理或需重试队列 |
 | `POST` | `/api/projects/:project_id/open-commerce/grants` | 创建调用授权 |
 | `POST` | `/api/projects/:project_id/open-commerce/grants/:grant_id/revoke` | 撤销授权 |
 | `GET` | `/api/projects/:project_id/open-commerce/audit` | 读取项目审计与调用记录 |
@@ -247,6 +248,7 @@ MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_co
 | `open_commerce_list_merchant_business_evidence` | 读 | 按当前项目列出指定商户的终态调用证据和可选业务回执 |
 | `open_commerce_get_merchant_business_evidence` | 读 | 读取单条商户业务证据和当时结果，不自动写入 ERP |
 | `open_commerce_list_business_handoff_receipts` | 读 | 读取指定商户的 ERP/CRM 显式衔接回执 |
+| `open_commerce_list_business_handoff_queue` | 读 | 读取指定商户待处理或需重试的 ERP/CRM 衔接证据 |
 | `open_commerce_record_business_handoff_receipt` | 写 | 用户确认后幂等记录接入器对业务证据的处理结果，不移动资金 |
 | `open_commerce_list_audit` | 读 | 查看调用与治理证据 |
 

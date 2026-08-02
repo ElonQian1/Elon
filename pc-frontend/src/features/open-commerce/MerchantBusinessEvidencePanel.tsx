@@ -8,6 +8,7 @@ import type {
   OpenCommerceIntegration,
 } from './openCommerceTypes'
 import MerchantBusinessHandoffPanel from './MerchantBusinessHandoffPanel'
+import MerchantBusinessHandoffQueue from './MerchantBusinessHandoffQueue'
 import { errorText, formatMicros } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import {
@@ -34,6 +35,7 @@ export default function MerchantBusinessEvidencePanel({
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [handoffEvidence, setHandoffEvidence] = useState<MerchantBusinessEvidenceSummary | null>(null)
+  const [handoffRevision, setHandoffRevision] = useState(0)
 
   const refresh = useCallback(async () => {
     if (!projectId || !merchantId) return
@@ -130,6 +132,14 @@ export default function MerchantBusinessEvidencePanel({
         <div style={{ ...commerceStyles.message, ...errorMessageStyle }}>{message}</div>
       )}
       </section>
+      <MerchantBusinessHandoffQueue
+        projectId={projectId}
+        merchantId={merchantId}
+        integrations={integrations}
+        canEdit={canEdit}
+        revision={handoffRevision}
+        onSelect={(evidence) => setHandoffEvidence(evidence)}
+      />
       <MerchantBusinessHandoffPanel
         projectId={projectId}
         merchantId={merchantId}
@@ -137,6 +147,7 @@ export default function MerchantBusinessEvidencePanel({
         integrations={integrations}
         canEdit={canEdit}
         onClose={() => setHandoffEvidence(null)}
+        onRecorded={() => setHandoffRevision((value) => value + 1)}
       />
     </>
   )

@@ -143,6 +143,7 @@ export interface MerchantBusinessEvidenceDetail {
 
 export type OpenCommerceBusinessHandoffStatus = 'applied' | 'ignored' | 'rejected'
 export type OpenCommerceBusinessHandoffTarget = 'erp' | 'crm'
+export type OpenCommerceBusinessHandoffQueueState = 'pending' | 'retry_required'
 
 export interface OpenCommerceBusinessHandoffReceipt {
   schema: 'open_commerce.business_handoff_receipt.v1'
@@ -171,6 +172,26 @@ export interface OpenCommerceBusinessHandoffReceiptList {
   project_id: string
   merchant_id: string
   receipts: OpenCommerceBusinessHandoffReceipt[]
+  boundary: string[]
+}
+
+export interface OpenCommerceBusinessHandoffQueueItem {
+  schema: 'open_commerce.business_handoff_queue_item.v1'
+  queue_state: OpenCommerceBusinessHandoffQueueState
+  can_apply: boolean
+  evidence: MerchantBusinessEvidenceSummary
+  latest_receipt: OpenCommerceBusinessHandoffReceipt | null
+}
+
+export interface OpenCommerceBusinessHandoffQueue {
+  schema: 'open_commerce.business_handoff_queue.v1'
+  project_id: string
+  merchant_id: string
+  state_filter: OpenCommerceBusinessHandoffQueueState | null
+  items: OpenCommerceBusinessHandoffQueueItem[]
+  returned_pending_count: number
+  returned_retry_required_count: number
+  has_more: boolean
   boundary: string[]
 }
 

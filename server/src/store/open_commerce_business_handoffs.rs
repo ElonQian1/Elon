@@ -10,8 +10,12 @@ use crate::open_commerce_business_handoff_model::{
     BUSINESS_HANDOFF_RECEIPT_SCHEMA,
 };
 use crate::open_commerce_integration_model::INTEGRATION_STATUS_DISABLED;
+use crate::open_commerce_merchant_evidence_model::MerchantTerminalInvocationRecord;
 
-use super::{new_id, now, Store};
+use super::{
+    new_id, now, open_commerce_invocations::INVOCATION_SELECT,
+    open_commerce_merchant_evidence::merchant_record_from_row, Store,
+};
 
 pub(crate) struct RecordOpenCommerceBusinessHandoffReceipt<'a> {
     pub project_id: &'a str,
@@ -136,6 +140,76 @@ impl Store {
             )?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(receipts)
+    }
+
+    pub(crate) fn list_open_commerce_business_handoff_queue_records(
+        &self,
+        project_id: &str,
+        merchant_id: &str,
+        state: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<MerchantTerminalInvocationRecord>> {
+        self.open_commerce_merchant_for_project(project_id, merchant_id)?;
+        let conn = self.conn()?;
+        let mut statement = conn.prepare(&format!(
+            "SELECT i.*, e.seq
+               FROM open_commerce_invocation_terminal_events e
+               JOIN ({INVOCATION_SELECT}) i ON i.id = e.invocation_id
+               LEFT JOIN open_commerce_business_handoff_receipts h
+                 ON h.id = (
+                    SELECT h2.id
+                      FROM open_commerce_business_handoff_receipts h2
+                     WHERE h2.project_id = i.project_id
+                       AND h2.merchant_id = i.merchant_id
+                       AND h2.invocation_id = i.id
+                     ORDER BY h2.completed_at DESC, h2.created_at DESC, h2.id DESC
+                     LIMIT 1
+                 )
+              WHERE i.project_id = ?1
+                AND i.merchant_id = ?2
+                AND i.result_json IS NOT NULL
+                AND (h.id IS NULL OR h.status = 'rejected')
+                AND (
+                    ?3 = ''
+                    OR (?3 = 'pending' AND h.id IS NULL)
+                    OR (?3 = 'retry_required' AND h.status = 'rejected')
+                )
+              ORDER BY e.seq DESC
+              LIMIT ?4"
+        ))?;
+        let records = statement
+            .query_map(
+                params![
+                    project_id.trim(),
+                    merchant_id.trim(),
+                    state.unwrap_or_default(),
+                    limit.clamp(1, 201) as i64
+                ],
+                merchant_record_from_row,
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    pub(crate) fn latest_open_commerce_business_handoff_receipt(
+        &self,
+        project_id: &str,
+        merchant_id: &str,
+        invocation_id: &str,
+    ) -> Result<Option<OpenCommerceBusinessHandoffReceipt>> {
+        self.conn()?
+            .query_row(
+                &format!(
+                    "{HANDOFF_SELECT}
+                     WHERE project_id = ?1 AND merchant_id = ?2 AND invocation_id = ?3
+                     ORDER BY completed_at DESC, created_at DESC, id DESC
+                     LIMIT 1"
+                ),
+                params![project_id.trim(), merchant_id.trim(), invocation_id.trim()],
+                handoff_from_row,
+            )
+            .optional()
+            .map_err(Into::into)
     }
 
     fn open_commerce_business_handoff_receipt(

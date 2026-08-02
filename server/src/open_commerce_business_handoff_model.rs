@@ -2,10 +2,15 @@ use anyhow::{bail, Context, Result};
 use chrono::DateTime;
 use serde::{Deserialize, Serialize};
 
+use crate::open_commerce_merchant_evidence_model::MerchantBusinessEvidenceSummary;
+
 pub(crate) const BUSINESS_HANDOFF_RECEIPT_SCHEMA: &str =
     "open_commerce.business_handoff_receipt.v1";
 pub(crate) const BUSINESS_HANDOFF_LIST_SCHEMA: &str =
     "open_commerce.business_handoff_receipt_list.v1";
+pub(crate) const BUSINESS_HANDOFF_QUEUE_SCHEMA: &str = "open_commerce.business_handoff_queue.v1";
+pub(crate) const BUSINESS_HANDOFF_QUEUE_ITEM_SCHEMA: &str =
+    "open_commerce.business_handoff_queue_item.v1";
 pub(crate) const BUSINESS_HANDOFF_AUTHORITY: &str = "project_editor_asserted";
 
 #[derive(Debug, Clone, Serialize)]
@@ -40,6 +45,28 @@ pub(crate) struct OpenCommerceBusinessHandoffReceiptList {
     pub boundary: Vec<&'static str>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct OpenCommerceBusinessHandoffQueueItem {
+    pub schema: &'static str,
+    pub queue_state: &'static str,
+    pub can_apply: bool,
+    pub evidence: MerchantBusinessEvidenceSummary,
+    pub latest_receipt: Option<OpenCommerceBusinessHandoffReceipt>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct OpenCommerceBusinessHandoffQueue {
+    pub schema: &'static str,
+    pub project_id: String,
+    pub merchant_id: String,
+    pub state_filter: Option<String>,
+    pub items: Vec<OpenCommerceBusinessHandoffQueueItem>,
+    pub returned_pending_count: usize,
+    pub returned_retry_required_count: usize,
+    pub has_more: bool,
+    pub boundary: Vec<&'static str>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RecordBusinessHandoffReceiptRequest {
@@ -64,6 +91,17 @@ pub(crate) fn normalize_handoff_status(value: &str) -> Result<String> {
         "ignored" => Ok("ignored".to_string()),
         "rejected" => Ok("rejected".to_string()),
         _ => bail!("衔接状态必须是 applied、ignored 或 rejected"),
+    }
+}
+
+pub(crate) fn normalize_handoff_queue_state(value: Option<&str>) -> Result<Option<String>> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    match value {
+        "pending" => Ok(Some("pending".to_string())),
+        "retry_required" => Ok(Some("retry_required".to_string())),
+        _ => bail!("待衔接状态必须是 pending 或 retry_required"),
     }
 }
 
