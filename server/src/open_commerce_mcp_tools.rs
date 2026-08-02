@@ -65,6 +65,25 @@ pub(crate) fn definitions() -> Vec<Value> {
             true,
         ),
         tool(
+            "open_commerce_list_consumer_data_requests",
+            "读取当前用户在本项目发起的数据删除请求及商户履约声明。响应不包含其他消费者身份。",
+            json!({"type":"object","properties":{},"additionalProperties":false}),
+            true,
+            true,
+        ),
+        tool(
+            "open_commerce_list_merchant_data_requests",
+            "读取指定商户收到的匿名消费者数据删除请求。只返回关系别名和状态，不披露消费者账号或项目。",
+            json!({
+                "type":"object",
+                "required":["merchant_id"],
+                "properties":{"merchant_id":{"type":"string","minLength":1,"maxLength":120}},
+                "additionalProperties":false
+            }),
+            true,
+            true,
+        ),
+        tool(
             "open_commerce_create_merchant",
             "在当前项目创建商户节点。需要项目编辑权限；默认由平台托管，但数据仍归当前项目控制。",
             json!({
@@ -150,6 +169,47 @@ pub(crate) fn definitions() -> Vec<Value> {
                 "type":"object",
                 "required":["relationship_id"],
                 "properties":{"relationship_id":{"type":"string","minLength":1,"maxLength":120}},
+                "additionalProperties":false
+            }),
+            false,
+            true,
+        ),
+        tool(
+            "open_commerce_create_consumer_data_erasure_request",
+            "针对当前用户持有的匿名商户关系发起关联数据删除请求，并原子撤销该关系。平台只创建请求回执，不声称已删除商户外部系统数据。",
+            json!({
+                "type":"object",
+                "required":["relationship_id"],
+                "properties":{"relationship_id":{"type":"string","minLength":1,"maxLength":120}},
+                "additionalProperties":false
+            }),
+            false,
+            true,
+        ),
+        tool(
+            "open_commerce_withdraw_consumer_data_request",
+            "在商户接单前撤回当前用户的数据删除请求。撤回不会恢复此前已撤销的关系。",
+            json!({
+                "type":"object",
+                "required":["request_id"],
+                "properties":{"request_id":{"type":"string","minLength":1,"maxLength":120}},
+                "additionalProperties":false
+            }),
+            false,
+            true,
+        ),
+        tool(
+            "open_commerce_decide_consumer_data_request",
+            "由商户项目编辑者接受、完成或拒绝匿名数据删除请求。completed 只是商户可审计声明，不是平台验证的删除证明。",
+            json!({
+                "type":"object",
+                "required":["merchant_id","request_id","action"],
+                "properties":{
+                    "merchant_id":{"type":"string","minLength":1,"maxLength":120},
+                    "request_id":{"type":"string","minLength":1,"maxLength":120},
+                    "action":{"type":"string","enum":["accept","complete","reject"]},
+                    "note":{"type":"string","maxLength":500}
+                },
                 "additionalProperties":false
             }),
             false,
@@ -414,6 +474,9 @@ fn tool(
                 "open_commerce_revoke_grant"
                     | "open_commerce_block_app"
                     | "open_commerce_revoke_consumer_relationship"
+                    | "open_commerce_create_consumer_data_erasure_request"
+                    | "open_commerce_withdraw_consumer_data_request"
+                    | "open_commerce_decide_consumer_data_request"
             ),
             "idempotentHint": idempotent,
             "openWorldHint": name == "open_commerce_search_merchants"

@@ -14,7 +14,11 @@ use std::sync::Arc;
 
 use crate::{
     open_commerce_app_block_model::BlockOpenCommerceAppRequest,
-    open_commerce_app_block_service, open_commerce_directory_service,
+    open_commerce_app_block_service,
+    open_commerce_data_request_model::{
+        CreateConsumerDataErasureRequest, DecideConsumerDataRequest,
+    },
+    open_commerce_data_request_service, open_commerce_directory_service,
     open_commerce_integration_model::{CreateIntegrationRequest, RecordSyncReceiptRequest},
     open_commerce_model::{
         normalize_app_id, CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
@@ -97,6 +101,25 @@ struct CreateConsumerRelationshipArguments {
 #[derive(Debug, Deserialize)]
 struct RevokeConsumerRelationshipArguments {
     relationship_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ConsumerDataRequestArguments {
+    request_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateConsumerDataErasureArguments {
+    relationship_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DecideConsumerDataRequestArguments {
+    merchant_id: String,
+    request_id: String,
+    action: String,
+    #[serde(default)]
+    note: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -270,6 +293,22 @@ pub(crate) async fn call_tool(
                 )?,
             )?
         }
+        "open_commerce_list_consumer_data_requests" => {
+            ensure_empty_object(&arguments, name)?;
+            serde_json::to_value(open_commerce_data_request_service::list_consumer_requests(
+                store, project_id, &actor, 100,
+            )?)?
+        }
+        "open_commerce_list_merchant_data_requests" => {
+            let input: MerchantArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_data_request_service::list_merchant_requests(
+                store,
+                project_id,
+                &input.merchant_id,
+                &actor,
+                100,
+            )?)?
+        }
         "open_commerce_create_merchant" => {
             let input: CreateMerchantRequest = decode(arguments, name)?;
             serde_json::to_value(open_commerce_service::create_merchant(
@@ -318,6 +357,40 @@ pub(crate) async fn call_tool(
                 project_id,
                 &input.relationship_id,
                 &actor,
+            )?)?
+        }
+        "open_commerce_create_consumer_data_erasure_request" => {
+            let input: CreateConsumerDataErasureArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_data_request_service::create_erasure_request(
+                store,
+                project_id,
+                &actor,
+                CreateConsumerDataErasureRequest {
+                    relationship_id: input.relationship_id,
+                },
+            )?)?
+        }
+        "open_commerce_withdraw_consumer_data_request" => {
+            let input: ConsumerDataRequestArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_data_request_service::withdraw_request(
+                store,
+                project_id,
+                &input.request_id,
+                &actor,
+            )?)?
+        }
+        "open_commerce_decide_consumer_data_request" => {
+            let input: DecideConsumerDataRequestArguments = decode(arguments, name)?;
+            serde_json::to_value(open_commerce_data_request_service::decide_request(
+                store,
+                project_id,
+                &input.merchant_id,
+                &input.request_id,
+                &actor,
+                DecideConsumerDataRequest {
+                    action: input.action,
+                    note: input.note,
+                },
             )?)?
         }
         "open_commerce_upsert_runtime" => {

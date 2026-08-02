@@ -4,6 +4,8 @@ import type {
   AuthorizationRequestList,
   ConsumerDiscoveryRequest,
   ConsumerDiscoveryResponse,
+  ConsumerDataRequest,
+  ConsumerDataRequestList,
   ConsumerRelationship,
   ConsumerRelationshipList,
   DeveloperAppCredential,
@@ -75,6 +77,35 @@ export const openCommerceClientApi = {
     api.get<ConsumerRelationshipList>(
       `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/consumer-relationships`,
     ),
+
+  listConsumerDataRequests: (projectId: string) =>
+    api.get<ConsumerDataRequestList>(`${projectBase(projectId)}/consumer-data-requests`),
+
+  createConsumerDataErasureRequest: (projectId: string, relationshipId: string) =>
+    api.post<ConsumerDataRequest>(`${projectBase(projectId)}/consumer-data-requests`, {
+      relationship_id: relationshipId,
+    }),
+
+  withdrawConsumerDataRequest: (projectId: string, requestId: string) =>
+    api.post<ConsumerDataRequest>(
+      `${projectBase(projectId)}/consumer-data-requests/${encodeURIComponent(requestId)}/withdraw`,
+      {},
+    ),
+
+  listMerchantDataRequests: (projectId: string, merchantId: string) =>
+    api.get<ConsumerDataRequestList>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/consumer-data-requests`,
+    ),
+
+  decideConsumerDataRequest: (
+    projectId: string,
+    merchantId: string,
+    requestId: string,
+    request: { action: 'accept' | 'complete' | 'reject'; note: string },
+  ) => api.post<ConsumerDataRequest>(
+    `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/consumer-data-requests/${encodeURIComponent(requestId)}/decision`,
+    request,
+  ),
 
   decideAuthorization: (
     projectId: string,

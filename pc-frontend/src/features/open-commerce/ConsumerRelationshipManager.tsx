@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link2, RefreshCw, Unlink } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
+import ConsumerDataRequestManager from './ConsumerDataRequestManager'
 import type {
   ConsumerRelationship,
   DirectoryMerchant,
@@ -116,7 +117,8 @@ export default function ConsumerRelationshipManager({
     merchantOptions.find((merchant) => merchant.id === id)?.display_name ?? id
 
   return (
-    <section className={base.integrationSection}>
+    <>
+      <section className={base.integrationSection}>
       <header>
         <strong>我的商户关系</strong>
         <button style={actionStyle('icon')} type="button" onClick={refresh} title="刷新关系凭证">
@@ -173,8 +175,14 @@ export default function ConsumerRelationshipManager({
         ))}
         {relationships.length === 0 && <p className={base.empty}>尚未建立商户关系。</p>}
       </div>
-      {message && <div style={commerceStyles.message}>{message}</div>}
-    </section>
+        {message && <div style={commerceStyles.message}>{message}</div>}
+      </section>
+      <ConsumerDataRequestManager
+        projectId={projectId}
+        relationships={relationships}
+        onRelationshipChanged={refresh}
+      />
+    </>
   )
 }
 

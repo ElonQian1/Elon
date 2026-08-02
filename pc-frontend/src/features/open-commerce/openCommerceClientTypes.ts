@@ -67,6 +67,27 @@ export interface ConsumerRelationshipList {
   relationships: ConsumerRelationship[]
 }
 
+export interface ConsumerDataRequest {
+  id: string
+  relationship_id: string
+  merchant_id: string
+  subject_alias: string
+  request_type: 'erase_linked_data'
+  status: 'requested' | 'in_progress' | 'completed' | 'rejected' | 'withdrawn'
+  resolution_kind?: 'merchant_processing' | 'merchant_attested_completed' | 'merchant_rejected' | 'consumer_withdrawn'
+  resolution_note?: string
+  requested_at: string
+  accepted_at?: string
+  resolved_at?: string
+  withdrawn_at?: string
+  updated_at: string
+}
+
+export interface ConsumerDataRequestList {
+  schema: string
+  requests: ConsumerDataRequest[]
+}
+
 export interface ConsumerPreferences {
   categories: string[]
   tags: string[]

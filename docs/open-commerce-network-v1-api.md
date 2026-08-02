@@ -116,6 +116,19 @@ Grant 到期不删除或改写历史，也不会自动续期。消费者发现�
 
 MCP 对应工具为 `open_commerce_list_consumer_relationships`、`open_commerce_list_merchant_relationships`、`open_commerce_create_consumer_relationship` 和 `open_commerce_revoke_consumer_relationship`。MCP 来源身份由入口绑定，不能通过参数冒充其他 App。
 
+## 消费者关联数据删除请求
+
+删除请求与关系撤销也是不同对象：撤销关系停止未来授权，删除请求则要求商户处理此前按该匿名关系关联的数据。创建删除请求会在同一事务内撤销关系，但平台不保存待删除的数据，也不能仅凭请求状态证明商户外部系统已经删除数据。
+
+- `GET/POST /api/projects/:project_id/open-commerce/consumer-data-requests`：当前用户读取或针对本人关系创建删除请求。
+- `POST /api/projects/:project_id/open-commerce/consumer-data-requests/:request_id/withdraw`：在商户接单前撤回；不恢复关系。
+- `GET /api/projects/:project_id/open-commerce/merchants/:merchant_id/consumer-data-requests`：商户项目读取指向本商户的匿名请求。
+- `POST /api/projects/:project_id/open-commerce/merchants/:merchant_id/consumer-data-requests/:request_id/decision`：商户编辑者执行 `accept`、`complete` 或 `reject`。
+
+状态机为 `requested -> in_progress -> completed/rejected`，消费者可把尚未接单的 `requested` 改为 `withdrawn`。完成和拒绝必须填写说明；`completed` 的 `resolution_kind` 固定为 `merchant_attested_completed`，只代表商户声明。响应不含消费者账号、用户 ID 或消费者项目 ID。
+
+MCP 对应工具为 `open_commerce_list_consumer_data_requests`、`open_commerce_list_merchant_data_requests`、`open_commerce_create_consumer_data_erasure_request`、`open_commerce_withdraw_consumer_data_request` 和 `open_commerce_decide_consumer_data_request`。
+
 ## 调用配额
 
 商户可以为每项能力配置固定时间窗调用上限。指定 App 策略优先于全部 App 策略；全部 App 策略按调用主体分别计数。没有策略时保持现有允许行为，项目编辑者在本项目内调试不占额度。

@@ -170,6 +170,12 @@ mod open_commerce_client_service_tests;
 mod open_commerce_connector_contract;
 mod open_commerce_consumer;
 mod open_commerce_consumer_model;
+mod open_commerce_data_request_api;
+mod open_commerce_data_request_migration;
+mod open_commerce_data_request_model;
+mod open_commerce_data_request_service;
+#[cfg(test)]
+mod open_commerce_data_request_tests;
 mod open_commerce_developer_model;
 mod open_commerce_directory_migration;
 mod open_commerce_directory_model;
