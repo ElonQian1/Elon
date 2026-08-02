@@ -133,6 +133,8 @@ export async function streamPost(
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  getWithHeaders: <T>(path: string, headers: Record<string, string>) =>
+    request<T>(path, { headers }),
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
   postWithHeaders: <T>(path: string, body: unknown, headers: Record<string, string>) =>

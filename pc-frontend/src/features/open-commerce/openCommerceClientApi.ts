@@ -20,6 +20,8 @@ import type {
   DeveloperAppCredential,
   DeveloperAppList,
   DeveloperInvokeRequest,
+  DeveloperTerminalEventDetail,
+  DeveloperTerminalEventPage,
   DeleteConsumerPreferenceDisclosureResult,
   DeleteConsumerPreferenceProfileResult,
   OpenCommerceDeveloperApp,
@@ -259,4 +261,19 @@ export const openCommerceClientApi = {
     api.postWithHeaders<Record<string, unknown>>('/api/open-commerce/developer/invoke', request, {
       Authorization: `Bearer ${testToken}`,
     }),
+
+  listDeveloperTerminalEvents: (testToken: string, cursor?: string) => {
+    const query = new URLSearchParams({ limit: '20' })
+    if (cursor) query.set('cursor', cursor)
+    return api.getWithHeaders<DeveloperTerminalEventPage>(
+      `/api/open-commerce/developer/events?${query.toString()}`,
+      { Authorization: `Bearer ${testToken}` },
+    )
+  },
+
+  getDeveloperTerminalEvent: (testToken: string, invocationId: string) =>
+    api.getWithHeaders<DeveloperTerminalEventDetail>(
+      `/api/open-commerce/developer/events/${encodeURIComponent(invocationId)}`,
+      { Authorization: `Bearer ${testToken}` },
+    ),
 }

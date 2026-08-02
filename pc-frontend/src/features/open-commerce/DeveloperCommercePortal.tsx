@@ -22,6 +22,7 @@ import {
   type GrantExpiryPreset,
 } from './openCommerceGrantExpiry'
 import OutboundAuthorizationRequests from './OutboundAuthorizationRequests'
+import DeveloperInvocationEvents from './DeveloperInvocationEvents'
 import type {
   AuthorizationRequest,
   OpenCommerceDeveloperApp,
@@ -58,6 +59,7 @@ export default function DeveloperCommercePortal({
   const [approvalMaxAmountYuan, setApprovalMaxAmountYuan] = useState('')
   const [approvalExpiryPreset, setApprovalExpiryPreset] = useState<GrantExpiryPreset>('30')
   const [response, setResponse] = useState<Record<string, unknown> | null>(null)
+  const [eventRefreshKey, setEventRefreshKey] = useState(0)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -215,6 +217,7 @@ export default function DeveloperCommercePortal({
         action_confirmation_id: actionConfirmationId,
       })
       setResponse(result)
+      setEventRefreshKey((current) => current + 1)
     } catch (error) {
       setMessage(errorText(error))
     } finally {
@@ -233,7 +236,7 @@ export default function DeveloperCommercePortal({
       <header className={base.hero} style={commerceStyles.workspaceHeader}>
         <div>
           <h2>第三方应用开发者门户</h2>
-          <p>沙盒 App、一次性测试凭据、授权收件箱和能力调用调试器。</p>
+          <p>沙盒 App、一次性测试凭据、授权收件箱、能力调试和可恢复结果流。</p>
         </div>
         <button style={actionStyle('icon')} type="button" onClick={() => { setMessage(''); refresh() }} title="刷新">
           <RefreshCw size={15} />
@@ -341,6 +344,8 @@ export default function DeveloperCommercePortal({
           {response && <pre className={base.result}>{JSON.stringify(response, null, 2)}</pre>}
         </form>
       </section>
+
+      <DeveloperInvocationEvents testToken={testToken} refreshKey={eventRefreshKey} />
 
       {message && <div style={commerceStyles.message}>{message}</div>}
     </div>

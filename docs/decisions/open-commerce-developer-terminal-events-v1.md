@@ -35,3 +35,4 @@ reviewed_at: 2026-08-03
 - `server/src/store/open_commerce_developer_events.rs`
 - `server/src/open_commerce_developer_event_migration.rs`
 - `server/src/open_commerce_developer_event_tests.rs`
+- `pc-frontend/src/features/open-commerce/DeveloperInvocationEvents.tsx`

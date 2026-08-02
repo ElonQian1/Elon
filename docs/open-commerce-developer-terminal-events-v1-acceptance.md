@@ -10,6 +10,8 @@
 - 列表不包含原始输入、请求形状、请求哈希、Grant ID、项目 ID 或用户 ID。
 - 计量固定显示 `funds_moved=false`，不宣称已真实扣款。
 - 定向 Rust 迁移、隔离、游标、隐私和详情测试，以及全部 `open_commerce` Rust 回归通过。
+- PC 开发者门户可从当前检查点刷新、继续分页和读取单条结果；测试 Token 只保存在组件内存中。
+- PC 开放商业静态契约、定向 ESLint、生产构建和硬性包体预算通过；总 JS/CSS 保留 3 条既有软预算告警。
 
 ## 仍未完成
 
@@ -22,4 +24,7 @@
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\validate-rust.ps1 -- test --manifest-path server\Cargo.toml open_commerce_developer_event -- --nocapture
+npm --prefix pc-frontend run test:open-commerce
+npm --prefix pc-frontend run build
+npm --prefix pc-frontend run check:bundle-budget
 ```

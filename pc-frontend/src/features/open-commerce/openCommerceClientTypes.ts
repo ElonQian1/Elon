@@ -321,3 +321,37 @@ export interface DeveloperInvokeRequest {
   action_confirmation_id?: string
   input: Record<string, unknown>
 }
+
+export interface DeveloperTerminalEventSummary {
+  schema: string
+  event_id: string
+  event_type: 'invocation.succeeded' | 'invocation.failed'
+  invocation_id: string
+  merchant_id: string
+  capability_key: string
+  idempotency_key: string
+  status: 'succeeded' | 'failed'
+  result_available: boolean
+  error_code: string | null
+  units: number
+  amount_micros: number
+  currency: string
+  settlement_status: string
+  funds_moved: false
+  created_at: string
+  completed_at: string
+}
+
+export interface DeveloperTerminalEventPage {
+  schema: string
+  app_id: string
+  events: DeveloperTerminalEventSummary[]
+  next_cursor: string | null
+  has_more: boolean
+}
+
+export interface DeveloperTerminalEventDetail {
+  schema: string
+  event: DeveloperTerminalEventSummary
+  result: unknown | null
+}
