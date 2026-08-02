@@ -43,4 +43,5 @@ date: 2026-08-03
 - 存储与幂等：`server/src/store/open_commerce_business_handoffs.rs`
 - HTTP：`server/src/open_commerce_business_handoff_api.rs`
 - MCP：`server/src/open_commerce_business_handoff_mcp.rs`
+- PC 工作台：`pc-frontend/src/features/open-commerce/MerchantBusinessHandoffPanel.tsx`
 - 测试：`server/src/open_commerce_business_handoff_tests.rs`

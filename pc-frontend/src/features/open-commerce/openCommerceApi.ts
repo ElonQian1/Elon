@@ -17,10 +17,13 @@ import type {
   OpenCommerceIntegration,
   MerchantBusinessEvidenceDetail,
   MerchantBusinessEvidenceList,
+  OpenCommerceBusinessHandoffReceipt,
+  OpenCommerceBusinessHandoffReceiptList,
   OpenCommerceRuntimeBinding,
   OpenCommerceRateLimitPolicy,
   UpsertOpenCommerceRateLimit,
   UpsertOpenCommerceRuntimeBinding,
+  RecordOpenCommerceBusinessHandoffReceipt,
 } from './openCommerceTypes'
 
 function projectBase(projectId: string) {
@@ -108,6 +111,20 @@ export const openCommerceApi = {
   ) =>
     api.get<MerchantBusinessEvidenceDetail>(
       `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/business-evidence/${encodeURIComponent(invocationId)}`,
+    ),
+
+  listBusinessHandoffReceipts: (projectId: string, merchantId: string) =>
+    api.get<OpenCommerceBusinessHandoffReceiptList>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/business-handoff-receipts`,
+    ),
+
+  recordBusinessHandoffReceipt: (
+    projectId: string,
+    request: RecordOpenCommerceBusinessHandoffReceipt,
+  ) =>
+    api.post<OpenCommerceBusinessHandoffReceipt>(
+      `${projectBase(projectId)}/business-handoff-receipts`,
+      request,
     ),
 
   upsertRateLimit: (projectId: string, request: UpsertOpenCommerceRateLimit) =>

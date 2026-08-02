@@ -192,6 +192,8 @@ export default function OpenCommerceMerchantWorkspace({
               <MerchantBusinessEvidencePanel
                 projectId={projectId}
                 merchantId={selectedMerchant.merchant.id}
+                integrations={overview?.integrations ?? []}
+                canEdit={canEdit}
               />
               <OpenCommerceRuntimeManager
                 projectId={projectId}

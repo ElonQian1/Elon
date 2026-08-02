@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Eye, RefreshCw } from 'lucide-react'
+import { ArrowRightLeft, Eye, RefreshCw } from 'lucide-react'
 import { openCommerceApi } from './openCommerceApi'
 import type {
   MerchantBusinessEvidenceDetail,
   MerchantBusinessEvidenceList,
+  MerchantBusinessEvidenceSummary,
+  OpenCommerceIntegration,
 } from './openCommerceTypes'
+import MerchantBusinessHandoffPanel from './MerchantBusinessHandoffPanel'
 import { errorText, formatMicros } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import {
@@ -18,14 +21,19 @@ import {
 export default function MerchantBusinessEvidencePanel({
   projectId,
   merchantId,
+  integrations,
+  canEdit,
 }: {
   projectId: string
   merchantId: string
+  integrations: OpenCommerceIntegration[]
+  canEdit: boolean
 }) {
   const [list, setList] = useState<MerchantBusinessEvidenceList | null>(null)
   const [detail, setDetail] = useState<MerchantBusinessEvidenceDetail | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [handoffEvidence, setHandoffEvidence] = useState<MerchantBusinessEvidenceSummary | null>(null)
 
   const refresh = useCallback(async () => {
     if (!projectId || !merchantId) return
@@ -61,8 +69,13 @@ export default function MerchantBusinessEvidencePanel({
     }
   }
 
+  const availableIntegrations = integrations.filter(
+    (item) => item.merchant_id === merchantId && item.status !== 'disabled',
+  )
+
   return (
-    <section className={base.integrationSection}>
+    <>
+      <section className={base.integrationSection}>
       <header>
         <span>
           <strong>AI 业务调用证据</strong>
@@ -100,6 +113,11 @@ export default function MerchantBusinessEvidencePanel({
               <button style={actionStyle('secondary', busy)} type="button" onClick={() => inspect(item.invocation_id)} disabled={busy}>
                 <Eye size={13} />查看证据
               </button>
+              {canEdit && item.result_sha256 && availableIntegrations.length > 0 && (
+                <button style={actionStyle('secondary', busy)} type="button" onClick={() => setHandoffEvidence(item)} disabled={busy}>
+                  <ArrowRightLeft size={13} />记录衔接
+                </button>
+              )}
             </footer>
           </article>
         ))}
@@ -111,7 +129,16 @@ export default function MerchantBusinessEvidencePanel({
       {message && (
         <div style={{ ...commerceStyles.message, ...errorMessageStyle }}>{message}</div>
       )}
-    </section>
+      </section>
+      <MerchantBusinessHandoffPanel
+        projectId={projectId}
+        merchantId={merchantId}
+        evidence={handoffEvidence}
+        integrations={integrations}
+        canEdit={canEdit}
+        onClose={() => setHandoffEvidence(null)}
+      />
+    </>
   )
 }
 

@@ -141,6 +141,53 @@ export interface MerchantBusinessEvidenceDetail {
   boundary: string[]
 }
 
+export type OpenCommerceBusinessHandoffStatus = 'applied' | 'ignored' | 'rejected'
+export type OpenCommerceBusinessHandoffTarget = 'erp' | 'crm'
+
+export interface OpenCommerceBusinessHandoffReceipt {
+  schema: 'open_commerce.business_handoff_receipt.v1'
+  id: string
+  project_id: string
+  merchant_id: string
+  invocation_id: string
+  integration_id: string
+  receipt_key: string
+  status: OpenCommerceBusinessHandoffStatus
+  target_domain: OpenCommerceBusinessHandoffTarget
+  evidence_result_sha256: string
+  target_reference_sha256?: string
+  error_code?: string
+  confirmed_by_user: boolean
+  assertion_authority: 'project_editor_asserted'
+  recorded_by_user_id: string
+  recorded_by_app_id: string
+  completed_at: string
+  created_at: string
+  funds_moved: false
+}
+
+export interface OpenCommerceBusinessHandoffReceiptList {
+  schema: 'open_commerce.business_handoff_receipt_list.v1'
+  project_id: string
+  merchant_id: string
+  receipts: OpenCommerceBusinessHandoffReceipt[]
+  boundary: string[]
+}
+
+export interface RecordOpenCommerceBusinessHandoffReceipt {
+  merchant_id: string
+  invocation_id: string
+  integration_id: string
+  receipt_key: string
+  status: OpenCommerceBusinessHandoffStatus
+  target_domain: OpenCommerceBusinessHandoffTarget
+  evidence_result_sha256: string
+  target_reference?: string
+  error_code?: string
+  confirmed_by_user: boolean
+  completed_at: string
+}
+
 export interface OpenCommerceAuditEvent {
   id: string
   actor_app_id?: string
