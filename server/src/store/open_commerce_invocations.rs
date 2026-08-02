@@ -286,7 +286,7 @@ impl Store {
     }
 }
 
-fn invocation_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceInvocation> {
+pub(super) fn invocation_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceInvocation> {
     Ok(OpenCommerceInvocation {
         id: row.get(0)?,
         project_id: row.get(1)?,
@@ -347,7 +347,8 @@ fn map_invocation_conflict(error: rusqlite::Error) -> anyhow::Error {
     }
 }
 
-const INVOCATION_SELECT: &str = "SELECT id, project_id, merchant_id, capability_id, capability_key,
+pub(super) const INVOCATION_SELECT: &str =
+    "SELECT id, project_id, merchant_id, capability_id, capability_key,
             requester_user_id, requester_app_id, grant_id, idempotency_key,
             request_hash, request_shape_json, status, result_json, error_code,
             units, unit_price_micros, amount_micros, currency, settlement_status,

@@ -6,6 +6,8 @@ import type {
   ConsumerDiscoveryResponse,
   ConsumerDataRequest,
   ConsumerDataRequestList,
+  ConsumerInvocationReceipt,
+  ConsumerInvocationReceiptList,
   ConsumerPreferenceDisclosure,
   ConsumerPreferenceDisclosureList,
   ConsumerPreferenceField,
@@ -152,6 +154,16 @@ export const openCommerceClientApi = {
   getConsumerPortabilityExport: (projectId: string, exportId: string) =>
     api.get<ConsumerPortabilityExport>(
       `${projectBase(projectId)}/consumer-portability-exports/${encodeURIComponent(exportId)}`,
+    ),
+
+  listConsumerInvocationReceipts: () =>
+    api.get<ConsumerInvocationReceiptList>(
+      '/api/open-commerce/consumer-invocation-receipts?limit=100',
+    ),
+
+  getConsumerInvocationReceipt: (invocationId: string) =>
+    api.get<ConsumerInvocationReceipt>(
+      `/api/open-commerce/consumer-invocation-receipts/${encodeURIComponent(invocationId)}`,
     ),
 
   createConsumerDataErasureRequest: (projectId: string, relationshipId: string) =>

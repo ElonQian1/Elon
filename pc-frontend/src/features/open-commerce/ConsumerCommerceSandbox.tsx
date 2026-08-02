@@ -5,6 +5,7 @@ import { openCommerceClientApi } from './openCommerceClientApi'
 import ConsumerRelationshipManager from './ConsumerRelationshipManager'
 import ConsumerPortabilityExports from './ConsumerPortabilityExports'
 import ConsumerPreferenceProfilePanel from './ConsumerPreferenceProfilePanel'
+import ConsumerInvocationReceipts from './ConsumerInvocationReceipts'
 import type {
   ConsumerDiscoveryMatch,
   ConsumerDiscoveryResponse,
@@ -34,6 +35,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   const [invocation, setInvocation] = useState<Record<string, unknown> | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [receiptRefreshKey, setReceiptRefreshKey] = useState(0)
 
   const loadApps = useCallback(async () => {
     try {
@@ -140,6 +142,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         ? await openCommerceApi.invoke(request)
         : await openCommerceClientApi.invokeAsApp(appId, request)
       setInvocation(response)
+      setReceiptRefreshKey((value) => value + 1)
     } catch (error) {
       setMessage(errorText(error))
     } finally {
@@ -242,6 +245,8 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
       />
 
       <ConsumerPortabilityExports projectId={projectId} />
+
+      <ConsumerInvocationReceipts refreshKey={receiptRefreshKey} />
 
       {invocation && <pre className={base.result}>{JSON.stringify(invocation, null, 2)}</pre>}
       {message && <div style={{ ...commerceStyles.message, ...(message.includes('失败') ? errorMessageStyle : {}) }}>{message}</div>}

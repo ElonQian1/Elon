@@ -1,12 +1,13 @@
 # 消费者发现与第三方应用沙盒
 
-本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权期限由 `docs/decisions/open-commerce-grant-expiration-v1.md` 决定，消费者关系及续期由 `docs/decisions/open-commerce-consumer-relationships-v1.md` 和 `docs/decisions/open-commerce-consumer-relationship-renewal-v1.md` 决定，偏好档案与关系级披露由 `docs/decisions/open-commerce-consumer-preference-disclosures-v1.md` 决定，关联数据删除请求由 `docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` 决定，本人可验证导出由 `docs/decisions/open-commerce-consumer-portability-exports-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定，商户侧调用活动证据由 `docs/decisions/open-commerce-app-activity-health-v1.md` 决定。
+本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权期限由 `docs/decisions/open-commerce-grant-expiration-v1.md` 决定，消费者关系及续期由 `docs/decisions/open-commerce-consumer-relationships-v1.md` 和 `docs/decisions/open-commerce-consumer-relationship-renewal-v1.md` 决定，偏好档案与关系级披露由 `docs/decisions/open-commerce-consumer-preference-disclosures-v1.md` 决定，关联数据删除请求由 `docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` 决定，本人可验证导出由 `docs/decisions/open-commerce-consumer-portability-exports-v1.md` 决定，消费者调用凭证由 `docs/decisions/open-commerce-consumer-invocation-receipts-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定，商户侧调用活动证据由 `docs/decisions/open-commerce-app-activity-health-v1.md` 决定。
 
 ## 使用入口
 
 项目详情的“开放商业”区域包含：
 
 - **消费者沙盒**：选择请求 App，按搜索词、能力、城市、标签和价格上限发现商户能力。
+- **本人调用凭证**：按账户查看跨项目终态调用摘要，读取并下载经过 SHA-256 复核的单条结果。
 - **开发者**：注册沙盒 App、轮换一次性测试 Token、处理授权申请并调试能力调用。
 - **商户工作台**：查看外部 App 近 24 小时的成功、失败、限流、授权预算拒绝和中断恢复证据，再人工决定是否封禁。
 
@@ -43,6 +44,8 @@
 | 消费者发现 | `POST /api/open-commerce/sandbox/discover` |
 | 提交授权申请 | `POST /api/open-commerce/authorization-requests` |
 | 使用测试 Token 调用 | `POST /api/open-commerce/developer/invoke` |
+| 列出本人调用凭证 | `GET /api/open-commerce/consumer-invocation-receipts` |
+| 读取本人单条调用凭证 | `GET /api/open-commerce/consumer-invocation-receipts/{invocation_id}` |
 
 开发者调用使用 `Authorization: Bearer <test-token>` 和 `x-elon-app-id`。Token 不得进入 URL、日志、项目文档、浏览器本地存储或商户能力元数据。
 
@@ -55,6 +58,8 @@
 消费者还可针对本人关系发起关联数据删除请求。创建请求会原子撤销该关系；商户只能看到匿名关系别名，可接单、拒绝或声明完成。消费者可在接单前撤回请求，但关系不会恢复。`completed` 只表示商户提交了可审计声明，平台尚未验证美团、ERP、CRM 或会员系统中的真实删除结果。
 
 消费者可把本人的关系历史、消费者私有续期链和删除请求回执生成不可变 JSON 数据包。相同幂等键始终返回原快照，服务端和 PC 下载前都会复核 SHA-256。该数据包不含偏好、订单或账号 ID，当前也没有导入、冲突处理或跨运营方迁移能力。
+
+消费者还可查看本人账户发起的终态商业调用。列表只展示摘要，单条详情才包含商户返回结果；下载前会复核服务端规范负载的 SHA-256。凭证不暴露原始请求、项目、Grant、幂等键或内部用户标识，并固定说明当前计量未扣真实资金。由于现有调用真源不保存消费者项目标识，该入口是账户级而不是项目级；MCP 工具 `open_commerce_list_my_invocation_receipts` 和 `open_commerce_get_my_invocation_receipt` 也遵循同一边界。
 
 活动证据来自已经保存的调用记录，只显示稳定计数和关注原因。“处置”只填入紧急封禁表单；系统不会因失败次数、限流或预算拒绝自动封禁 App，也不会把这些信号解释为跨商户信誉。
 
@@ -70,4 +75,4 @@ Set-Location pc-frontend
 npm run test:open-commerce
 ```
 
-当前已实现商户主动选择的跨项目基础目录、限时授权、消费者可撤销及安全续期的关系凭证、低敏偏好字段披露、匿名删除请求与商户履约声明、本人可验证导出、持久化能力调用配额、近 24 小时可解释活动证据、商户级手动 App 封禁，以及沙盒 App 生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、偏好与数据包迁移、外部通知、自动全网滥用处置、敏感数据保险箱、外部删除适配器、支付和真实平台适配器仍是后续模块。
+当前已实现商户主动选择的跨项目基础目录、限时授权、消费者可撤销及安全续期的关系凭证、低敏偏好字段披露、匿名删除请求与商户履约声明、本人可验证导出、账户级终态调用凭证、持久化能力调用配额、近 24 小时可解释活动证据、商户级手动 App 封禁，以及沙盒 App 生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、偏好与数据包迁移、完整订单迁移、外部通知、自动全网滥用处置、敏感数据保险箱、外部删除适配器、支付和真实平台适配器仍是后续模块。

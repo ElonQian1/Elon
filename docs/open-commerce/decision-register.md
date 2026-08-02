@@ -11,6 +11,7 @@
 | V1 先做商户节点和能力调用主干 | 商户、能力、授权、调用、计量、审计是最小闭环 | `docs/decisions/open-commerce-network-v1-architecture.md` |
 | HTTP 与 MCP 共用同一领域服务 | 避免网页、AI 和第三方应用形成不同业务规则 | `docs/open-commerce-network-v1-api.md` |
 | 能力声明必须在调用时强制执行 | 发布时只接受平台真正支持的有限 Schema；无效输入不创建调用，无效输出零金额失败并释放预算，审计不记录业务值 | `docs/decisions/open-commerce-capability-contract-enforcement-v1.md` |
+| 消费者应持有本人可复核的调用凭证 | 从现有 Invocation 派生账户级终态只读投影；列表隐藏结果，详情仅本人读取，摘要绑定规范负载且不冒充支付或链上证明 | `docs/decisions/open-commerce-consumer-invocation-receipts-v1.md` |
 | 真实商户 ERP 通过受控运行时接入 | 运行地址和密钥与能力契约分离，经过 HTTPS 白名单、HMAC 和 Manifest 健康验证后才可调用 | `docs/decisions/open-commerce-merchant-runtime-v1.md` |
 | 当前调用只计量、不做真实收费 | 先验证行为、权限和审计，再验证经济层 | `docs/decisions/open-commerce-network-v1-architecture.md` |
 | 先建数据接入控制面，再逐个平台实现适配器 | 统一记录来源、范围、健康度和同步证据，不用“已接入”掩盖真实权限差异 | `docs/decisions/open-commerce-integration-control-plane.md` |

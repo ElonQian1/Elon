@@ -246,6 +246,59 @@ export interface ConsumerDiscoveryResponse {
   matches: ConsumerDiscoveryMatch[]
 }
 
+export interface ConsumerInvocationReceiptSummary {
+  invocation_id: string
+  merchant_id: string
+  capability_key: string
+  requester_app_id: string
+  status: 'succeeded' | 'failed'
+  result_available: boolean
+  error_code: string | null
+  amount_micros: number
+  currency: string
+  settlement_status: string
+  funds_moved: false
+  created_at: string
+  completed_at: string
+}
+
+export interface ConsumerInvocationReceiptList {
+  schema: string
+  scope: 'authenticated_user_account'
+  receipts: ConsumerInvocationReceiptSummary[]
+}
+
+export interface ConsumerInvocationReceiptPayload {
+  schema: string
+  invocation_id: string
+  merchant_id: string
+  capability_key: string
+  requester_app_id: string
+  request_shape: {
+    input_fields: string[]
+    input_bytes: number
+    contains_raw_values: false
+  }
+  result: unknown | null
+  error_code: string | null
+  status: 'succeeded' | 'failed'
+  units: number
+  unit_price_micros: number
+  amount_micros: number
+  currency: string
+  settlement_status: string
+  funds_moved: false
+  created_at: string
+  completed_at: string
+}
+
+export interface ConsumerInvocationReceipt {
+  schema: string
+  payload_sha256: string
+  payload_json: string
+  payload: ConsumerInvocationReceiptPayload
+}
+
 export interface DeveloperInvokeRequest {
   merchant_id: string
   capability_key: string

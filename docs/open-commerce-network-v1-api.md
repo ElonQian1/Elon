@@ -49,6 +49,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `GET` | `/api/open-commerce/merchants` | 按文本和能力发现启用的商户 |
 | `GET` | `/api/open-commerce/merchants/:merchant_id` | 读取商户公开资料和可发现能力 |
 | `POST` | `/api/open-commerce/invoke` | 调用能力并记录幂等、计量和审计 |
+| `GET` | `/api/open-commerce/consumer-invocation-receipts` | 当前账户列出本人的终态调用凭证摘要 |
+| `GET` | `/api/open-commerce/consumer-invocation-receipts/:invocation_id` | 当前账户读取并复核本人的单条调用凭证 |
 
 两个 `GET` 发现接口允许匿名读取，便于任意 App 或 AI 在未加入一龙项目时发现公开商户能力。能力调用、项目管理和 MCP 仍需要 Bearer 身份；开放发现不等于匿名执行。
 
@@ -102,6 +104,14 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 相同调用方、商户、能力和幂等键的重复调用不重复累计金额；历史成功结果仍满足能力当前输出契约时返回原结果，否则以 `422` 拒绝本次重放且不改写历史调用。
 
 能力创建和更新只接受平台可以实际执行的有限 Schema 配置。调用输入在 Invocation、限流和 Grant 预算预留前校验；处理器输出在成功计量前校验。输入违例返回 `422` 且不创建调用；输出违例保存为 `output_schema_violation` 零金额失败调用并释放预算。错误与审计只返回字段路径和规则代码，不返回业务值。当前不支持 `$ref`、组合或条件 Schema，也不把结构校验解释为业务真实性证明。
+
+## 消费者调用凭证
+
+消费者调用凭证是已有 Invocation 的账户级只读投影，不是第二套订单或结算记录。列表仅包含 `succeeded` 和 `failed` 的摘要，不返回商户结果；详情只允许调用发起账户读取，其他账户统一收到未找到。
+
+凭证不返回用户 ID、项目 ID、能力内部 ID、Grant ID、幂等键、请求哈希或原始输入。请求侧只给出字段数量、序列化字节数和 `contains_raw_values=false`；本人详情可包含商户当时返回的结果。V1 只接受 `recorded_not_charged` 并明确标记未移动真实资金，遇到未来资金状态时失败关闭。
+
+服务端返回规范 `payload_json` 和其 SHA-256。PC 下载前会重新计算摘要、解析该字符串并核对外层 `payload`；摘要只证明所下载字节与服务端响应一致，不是商户签名、外部时间戳、链上证明或支付凭证。现有 Invocation 没有消费者项目标识，因此 HTTP 和 MCP 都按当前登录账户读取跨项目历史。
 
 ## Grant 生命周期预算
 
@@ -196,6 +206,8 @@ MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_co
 | `open_commerce_record_sync_receipt` | 写 | 记录有界、幂等的适配器回执 |
 | `open_commerce_revoke_grant` | 写 | 撤销授权 |
 | `open_commerce_invoke` | 写 | 调用能力并生成计量和审计 |
+| `open_commerce_list_my_invocation_receipts` | 读 | 按当前账户列出本人终态调用凭证摘要 |
+| `open_commerce_get_my_invocation_receipt` | 读 | 按当前账户读取并复核本人单条调用凭证 |
 | `open_commerce_list_audit` | 读 | 查看调用与治理证据 |
 
 MCP 写工具遵循与 HTTP API 相同的项目角色、授权和幂等规则。MCP 不提供绕过确认的真实资金、发布或外部系统写操作。
