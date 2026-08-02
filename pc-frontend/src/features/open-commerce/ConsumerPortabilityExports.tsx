@@ -64,7 +64,7 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
       <header>
         <span>
           <strong>我的可携带数据包</strong>
-          <small>导出关系、删除回执、本人低敏偏好和披露快照；不含订单、联系方式、支付或账号标识。</small>
+          <small>导出关系、偏好、披露和本人调用凭证；不含原始输入、商户完整订单、联系方式、真实支付或账号标识。</small>
         </span>
         <div style={commerceStyles.headerActions}>
           <button style={actionStyle('icon', busy)} type="button" onClick={refresh} disabled={busy} title="刷新数据包">
@@ -86,6 +86,7 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
             <small style={commerceStyles.itemMeta}>
               关系 {item.relationship_count} · 续期 {item.renewal_count} · 删除请求 {item.data_request_count}
               {' · '}偏好档案 {item.preference_profile_included ? '1' : '0'} · 披露 {item.preference_disclosure_count}
+              {' · '}调用凭证 {item.invocation_receipt_count}
             </small>
             <footer style={{ ...commerceStyles.itemHeader, marginTop: 8 }}>
               <code style={{ ...commerceStyles.itemMeta, overflowWrap: 'anywhere' }}>{item.id}</code>
@@ -104,10 +105,18 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
 
 async function downloadVerifiedExport(value: ConsumerPortabilityExport) {
   if (!crypto.subtle) throw new Error('当前浏览器无法执行 SHA-256 校验')
-  const payloadBytes = new TextEncoder().encode(JSON.stringify(value.payload))
-  const digestBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', payloadBytes))
-  const digest = Array.from(digestBytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  const digest = await sha256Hex(value.payload_json)
   if (digest !== value.payload_sha256) throw new Error('数据包摘要校验失败，已停止下载')
+  const payload = JSON.parse(value.payload_json) as ConsumerPortabilityExport['payload']
+  if (JSON.stringify(payload) !== JSON.stringify(value.payload)) {
+    throw new Error('数据包规范负载不一致，已停止下载')
+  }
+  for (const receipt of value.payload.invocation_receipts ?? []) {
+    const receiptDigest = await sha256Hex(receipt.payload_json)
+    if (receiptDigest !== receipt.payload_sha256) {
+      throw new Error('数据包内调用凭证摘要校验失败，已停止下载')
+    }
+  }
 
   const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
@@ -118,4 +127,10 @@ async function downloadVerifiedExport(value: ConsumerPortabilityExport) {
   anchor.click()
   anchor.remove()
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+async function sha256Hex(value: string) {
+  const bytes = new TextEncoder().encode(value)
+  const digestBytes = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
+  return Array.from(digestBytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }

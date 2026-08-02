@@ -1,11 +1,11 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub(crate) const CONSUMER_RECEIPT_SCHEMA: &str = "open_commerce.consumer_invocation_receipt.v1";
 pub(crate) const CONSUMER_RECEIPT_PAYLOAD_SCHEMA: &str =
     "open_commerce.consumer_invocation_receipt_payload.v1";
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ConsumerInvocationReceiptPayload {
     pub schema: String,
     pub invocation_id: String,
@@ -26,7 +26,7 @@ pub(crate) struct ConsumerInvocationReceiptPayload {
     pub completed_at: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ConsumerInvocationReceipt {
     pub schema: String,
     pub payload_sha256: String,
@@ -34,7 +34,7 @@ pub(crate) struct ConsumerInvocationReceipt {
     pub payload: ConsumerInvocationReceiptPayload,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ConsumerInvocationRequestShape {
     pub input_fields: Vec<String>,
     pub input_bytes: u64,

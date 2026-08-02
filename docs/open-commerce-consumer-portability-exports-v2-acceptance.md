@@ -1,5 +1,7 @@
 # 开放商业消费者可携带数据包 V2 验收
 
+> 本文保留 V2 历史验收。当前新建快照使用 V3，见 `docs/open-commerce-consumer-portability-exports-v3-acceptance.md`。
+
 ## 已验证闭环
 
 - 新快照使用 V2 版本，并包含当前用户低敏结构化偏好档案和历史披露快照。

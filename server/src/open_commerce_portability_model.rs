@@ -9,8 +9,12 @@ use crate::{
 };
 
 pub(crate) const CONSUMER_PORTABILITY_EXPORT_SCHEMA: &str =
-    "open_commerce.consumer_portability_export.v2";
+    "open_commerce.consumer_portability_export.v3";
 pub(crate) const CONSUMER_PORTABILITY_PAYLOAD_SCHEMA: &str =
+    "open_commerce.consumer_portability_payload.v3";
+pub(crate) const CONSUMER_PORTABILITY_EXPORT_SCHEMA_V2: &str =
+    "open_commerce.consumer_portability_export.v2";
+pub(crate) const CONSUMER_PORTABILITY_PAYLOAD_SCHEMA_V2: &str =
     "open_commerce.consumer_portability_payload.v2";
 pub(crate) const CONSUMER_PORTABILITY_EXPORT_SCHEMA_V1: &str =
     "open_commerce.consumer_portability_export.v1";
@@ -29,6 +33,13 @@ pub(crate) struct ConsumerRelationshipRenewalLink {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct ConsumerPortableInvocationReceipt {
+    pub schema: String,
+    pub payload_sha256: String,
+    pub payload_json: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ConsumerPortabilityPayload {
     pub schema: String,
     pub source_project_id: String,
@@ -40,6 +51,10 @@ pub(crate) struct ConsumerPortabilityPayload {
     pub preference_profile: Option<ConsumerPreferenceProfile>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub preference_disclosures: Vec<ConsumerPreferenceDisclosure>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invocation_receipt_scope: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub invocation_receipts: Vec<ConsumerPortableInvocationReceipt>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,6 +64,7 @@ pub(crate) struct ConsumerPortabilityExport {
     pub source_project_id: String,
     pub idempotency_key: String,
     pub payload_sha256: String,
+    pub payload_json: String,
     pub payload: ConsumerPortabilityPayload,
     pub created_at: String,
 }
@@ -64,6 +80,7 @@ pub(crate) struct ConsumerPortabilityExportSummary {
     pub data_request_count: usize,
     pub preference_profile_included: bool,
     pub preference_disclosure_count: usize,
+    pub invocation_receipt_count: usize,
     pub created_at: String,
 }
 
@@ -79,6 +96,7 @@ impl ConsumerPortabilityExport {
             data_request_count: self.payload.data_requests.len(),
             preference_profile_included: self.payload.preference_profile.is_some(),
             preference_disclosure_count: self.payload.preference_disclosures.len(),
+            invocation_receipt_count: self.payload.invocation_receipts.len(),
             created_at: self.created_at.clone(),
         }
     }

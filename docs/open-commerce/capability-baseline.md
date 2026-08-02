@@ -41,7 +41,7 @@
 | 消费者关系授权凭证 | 已实现、范围受限 | 消费者可对已发布商户建立最长 366 天的匿名关系并随时撤销；PC 在 14 天内提示安全续期，续期撤销旧凭证、轮换匿名标识且对重试幂等。关系凭证本身不保存偏好值、订单或 CRM 数据 | `server/src/open_commerce_relationship_service.rs`、`pc-frontend/src/features/open-commerce/ConsumerRelationshipManager.tsx`、`docs/open-commerce-consumer-relationship-renewal-v1-acceptance.md` |
 | 消费者结构化偏好档案与关系披露 | 已实现、范围受限 | 当前用户可保存类别、标签、城市和价格上限等低敏偏好，显式用于发现，并对有效 `preference.remember` 关系选择字段生成匿名快照；商户只见有效关系披露。当前未实现敏感数据保险箱、字段加密、自动营销或跨运营方迁移 | `server/src/open_commerce_consumer_preference_service.rs`、`pc-frontend/src/features/open-commerce/ConsumerPreferenceProfilePanel.tsx`、`docs/open-commerce-consumer-preference-disclosures-v1-acceptance.md` |
 | 消费者关联数据删除请求 | 已实现、范围受限 | 消费者可针对本人关系发起删除请求并原子撤销关系；商户只见匿名别名，可接单、拒绝或声明完成。平台不存待删除数据，商户完成不是平台验证的外部删除证明 | `server/src/open_commerce_data_request_service.rs`、`pc-frontend/src/features/open-commerce/ConsumerDataRequestManager.tsx`、`docs/open-commerce-consumer-data-erasure-requests-v1-acceptance.md` |
-| 消费者可携带数据包 | 已实现、范围受限 | V2 把本人关系历史、私有续期链、删除请求回执、当前低敏结构化偏好档案和历史披露快照保存为幂等不可变快照，服务端和 PC 以 SHA-256 复核；旧 V1 包保持原摘要兼容。仍不含订单、联系方式、支付或账号 ID，也未提供跨运营方导入 | `server/src/open_commerce_portability_service.rs`、`pc-frontend/src/features/open-commerce/ConsumerPortabilityExports.tsx`、`docs/open-commerce-consumer-portability-exports-v2-acceptance.md` |
+| 消费者可携带数据包 | 已实现、范围受限 | V3 把本人关系历史、私有续期链、删除请求、低敏偏好、历史披露和账户级终态调用凭证保存为幂等不可变快照，服务端和 PC 同时复核总包及每条凭证的 SHA-256；旧 V1/V2 包保持原摘要兼容。凭证可含本人已收到的商户结果，但不含原始输入，也不是商户完整订单或支付证明；尚未提供跨运营方导入 | `server/src/open_commerce_portability_service.rs`、`pc-frontend/src/features/open-commerce/ConsumerPortabilityExports.tsx`、`docs/open-commerce-consumer-portability-exports-v3-acceptance.md` |
 | 消费者账户级调用凭证 | 已实现、范围受限 | 当前用户可列出跨项目终态调用摘要，读取并下载仅属于本人的结果；服务端和 PC 复核规范负载 SHA-256，且不暴露原始输入和内部标识。当前只支持未扣真实资金状态，不是订单、支付或链上凭证 | `server/src/open_commerce_consumer_receipt_service.rs`、`pc-frontend/src/features/open-commerce/ConsumerInvocationReceipts.tsx`、`docs/open-commerce-consumer-invocation-receipts-v1-acceptance.md` |
 | Grant 生命周期预算 | 已实现 | 商户可为单个授权设置总调用次数和总计量金额；调用前原子预留，成功确认、失败退回，幂等重放不重复占额；重启与过期孤儿调用会原子失败关闭并释放遗留预留 | `server/src/open_commerce_grant_budget_service.rs`、`server/src/store/open_commerce_grant_budgets.rs`、`server/src/store/open_commerce_invocation_recovery.rs`、`docs/open-commerce-grant-budgets-v1-acceptance.md` |
 | 项目 AI 资源控制面 | 已实现、只预演 | 可盘点当前用户的 Codex、本人节点、授权共享 Codex 和平台模型，保存项目策略并预演候选；不会启动真实任务 | `server/src/ai_resource_control/`、`docs/open-commerce/ai-resource-control.md` |
@@ -54,7 +54,7 @@
 |---|---|---|
 | 美团、抖音、京东、淘宝闪购等经营数据统一接入 | 部分实现 | 接入控制面、状态和同步回执已实现；仍必须逐个平台确认官方授权、实现适配器、验证字段覆盖和长期稳定性，不能把登记数据源描述成已接通全量 API |
 | 商户 ERP、海报、短视频、小游戏和营销活动自动生成 | 部分实现 | 通用 ERP 蓝图与 AI 应用开发主干已存在；真实行业业务模块、发布连接器、经营效果回流和规模化验证仍需完善 |
-| 商户数据自主控制和跨应用授权 | 部分实现 | V1、跨项目脱敏目录、消费者沙盒、限时 App 授权、消费者匿名关系及低敏偏好字段披露、删除请求与商户声明、关系及请求的可验证导出、本人账户级调用凭证、调用配额、活动证据、手动 App 封禁和首个商户自有运行时已打通；敏感数据保险箱、偏好与订单导出、跨运营方导入、外部通知和删除证明、订单/CRM 绑定、生产 App 身份互认、自动全网风控与公共互操作治理尚未完成 |
+| 商户数据自主控制和跨应用授权 | 部分实现 | V1、跨项目脱敏目录、消费者沙盒、限时 App 授权、消费者匿名关系及低敏偏好字段披露、删除请求与商户声明、关系、偏好、披露及调用凭证的可验证导出、调用配额、活动证据、手动 App 封禁和首个商户自有运行时已打通；敏感数据保险箱、完整订单迁移、跨运营方导入、外部通知和删除证明、订单/CRM 绑定、生产 App 身份互认、自动全网风控与公共互操作治理尚未完成 |
 | 闲置电脑、收银机和工作站共享算力 | 部分实现 | 模型推理供给的所有者开关、模型白名单、并发、每日实耗与在途预算原子预留、候选回退、流租约、重启与过期预授权回收、所有者运行告警和 PC 控件已实现；通用异构任务、竞价市场、故障赔付、真实提现与链上结算仍未完成 |
 | 低成本分布式模型训练 | 提案 | 普通公网节点更适合异步任务、推理和可切分工作，不能宣称已等效替代高速互联的企业级 GPU 集群 |
 

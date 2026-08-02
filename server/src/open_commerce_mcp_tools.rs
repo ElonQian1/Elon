@@ -73,14 +73,14 @@ pub(crate) fn definitions() -> Vec<Value> {
         ),
         tool(
             "open_commerce_list_consumer_portability_exports",
-            "读取当前用户在本项目生成的可携带数据包摘要。V2 包含关系、内部续期链、数据删除请求、本人低敏结构化偏好档案和历史披露计数；不包含订单、联系方式、支付或消费者账号。",
+            "读取当前用户在本项目生成的可携带数据包摘要。V3 包含关系、内部续期链、数据删除请求、本人低敏偏好、历史披露和账户级调用凭证计数；不包含原始调用输入、商户数据库完整订单、联系方式、真实支付或消费者账号。",
             json!({"type":"object","properties":{},"additionalProperties":false}),
             true,
             true,
         ),
         tool(
             "open_commerce_get_consumer_portability_export",
-            "读取并校验当前用户拥有的一个可携带数据包。V2 可导出消费者关系、内部续期链、数据删除请求回执、本人低敏结构化偏好档案及历史披露快照，不允许读取其他用户的数据包。",
+            "读取并校验当前用户拥有的一个可携带数据包。V3 还包含本人账户级、逐条可验证的终态调用凭证和商户返回结果，不允许读取其他用户的数据包，也不把结果冒充为完整订单或支付证明。",
             json!({
                 "type":"object",
                 "required":["export_id"],
@@ -222,7 +222,7 @@ pub(crate) fn definitions() -> Vec<Value> {
         ),
         tool(
             "open_commerce_create_consumer_portability_export",
-            "为当前用户生成不可变的消费者可携带数据快照，并返回可验证的 SHA-256 摘要。同一幂等键始终返回原快照；新键才生成新快照。V2 包含本人低敏结构化偏好及历史披露，但不包含订单、联系方式、支付或消费者账号，也不执行跨平台导入。",
+            "为当前用户生成不可变的消费者可携带数据快照，并返回可验证的 SHA-256 摘要。同一幂等键始终返回原快照；新键才生成新快照。V3 包含本人低敏偏好、历史披露及账户级调用凭证；不包含原始输入、商户数据库完整订单、联系方式、真实支付或消费者账号，也不执行跨运营方导入。",
             json!({
                 "type":"object",
                 "required":["idempotency_key"],

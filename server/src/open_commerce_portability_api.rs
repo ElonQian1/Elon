@@ -45,7 +45,7 @@ async fn list_exports(
             100,
         )
         .map(|exports| {
-            json!({"schema":"open_commerce.consumer_portability_exports.v2","exports":exports})
+            json!({"schema":"open_commerce.consumer_portability_exports.v3","exports":exports})
         }),
     )
 }

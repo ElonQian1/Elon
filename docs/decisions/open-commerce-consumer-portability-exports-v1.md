@@ -8,7 +8,7 @@ superseded_by: docs/decisions/open-commerce-consumer-portability-exports-v2.md
 
 # 开放商业消费者可携带数据包 V1
 
-> V1 仍作为历史数据格式受支持；当前新建快照使用 V2。新增能力与现行边界见 `docs/decisions/open-commerce-consumer-portability-exports-v2.md`。
+> V1 仍作为历史数据格式受支持；其直接后继是 V2，当前新建快照已使用 V3。版本链见 `docs/decisions/open-commerce-consumer-portability-exports-v2.md` 和 `docs/decisions/open-commerce-consumer-portability-exports-v3.md`。
 
 ## 背景
 

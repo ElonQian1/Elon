@@ -102,6 +102,8 @@ export interface ConsumerPortabilityPayload {
   data_requests: ConsumerDataRequest[]
   preference_profile?: ConsumerPreferenceProfile
   preference_disclosures?: ConsumerPreferenceDisclosure[]
+  invocation_receipt_scope?: 'authenticated_user_account'
+  invocation_receipts?: ConsumerPortableInvocationReceipt[]
 }
 
 export interface ConsumerPortabilityExport {
@@ -110,6 +112,7 @@ export interface ConsumerPortabilityExport {
   source_project_id: string
   idempotency_key: string
   payload_sha256: string
+  payload_json: string
   payload: ConsumerPortabilityPayload
   created_at: string
 }
@@ -124,6 +127,7 @@ export interface ConsumerPortabilityExportSummary {
   data_request_count: number
   preference_profile_included: boolean
   preference_disclosure_count: number
+  invocation_receipt_count: number
   created_at: string
 }
 
@@ -294,6 +298,12 @@ export interface ConsumerInvocationReceiptPayload {
   funds_moved: false
   created_at: string
   completed_at: string
+}
+
+export interface ConsumerPortableInvocationReceipt {
+  schema: string
+  payload_sha256: string
+  payload_json: string
 }
 
 export interface ConsumerInvocationReceipt {

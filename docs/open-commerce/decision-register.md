@@ -28,6 +28,7 @@
 | 消费者关系与删除请求应支持本人可验证导出 | 同一幂等键保存不可变快照，每次读取复核 SHA-256；V1 只导出关系、续期链和请求回执，不冒充完整数据迁移 | `docs/decisions/open-commerce-consumer-portability-exports-v1.md` |
 | 消费者偏好必须由本人保存并按关系选择字段披露 | 档案默认私有；商户只读取有效 `preference.remember` 关系上的匿名快照，关系失效后失败关闭，档案更新不自动扩张披露 | `docs/decisions/open-commerce-consumer-preference-disclosures-v1.md` |
 | 消费者低敏偏好应进入本人可验证数据包 | V2 在同一读事务中加入当前偏好档案和历史披露，旧 V1 包保持原字节摘要；仍不导出订单、联系方式、支付或账号身份 | `docs/decisions/open-commerce-consumer-portability-exports-v2.md` |
+| 消费者本人调用凭证应进入可携带数据包 | V3 在同一读事务中加入账户级终态调用，每条凭证和总包双层复核；保留 V1/V2 原摘要，不导出原始输入，也不冒充完整订单或支付证明 | `docs/decisions/open-commerce-consumer-portability-exports-v3.md` |
 | 每个 Grant 可限制完整授权期风险 | 商户可选设置总调用次数和总计量金额；调用前原子预留、失败退回，预算用尽后重新授权 | `docs/decisions/open-commerce-grant-budgets-v1.md` |
 | 孤儿商业调用必须失败关闭并释放 Grant 预留 | 启动时关闭遗留调用，运行期回收超过 120 秒的调用；失败、预算退回、预留释放和脱敏审计保持同一事务 | `docs/decisions/open-commerce-invocation-recovery-v1.md` |
 | App 异常先形成商户可解释证据 | 按商户和外部 App 派生近 24 小时失败、限流、Grant 预算拒绝和中断恢复计数；只提醒人工处置，不自动评分、封禁或赔付 | `docs/decisions/open-commerce-app-activity-health-v1.md` |

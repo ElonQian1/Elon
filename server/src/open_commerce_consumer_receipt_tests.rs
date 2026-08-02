@@ -253,7 +253,7 @@ fn fixture() -> ReceiptFixture {
             capability_key: "order.receipt.demo".to_string(),
             display_name: "演示订单".to_string(),
             description: String::new(),
-            kind: "action".to_string(),
+            kind: "query".to_string(),
             access_level: ACCESS_PUBLIC.to_string(),
             input_schema: json!({"type":"object","additionalProperties":false}),
             output_schema: json!({

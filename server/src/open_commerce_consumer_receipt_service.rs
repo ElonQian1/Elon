@@ -44,7 +44,7 @@ pub(crate) fn get_receipt(
     let invocation = store
         .user_open_commerce_terminal_invocation(requester_user_id, invocation_id)?
         .ok_or_else(|| anyhow!("消费者调用凭证不存在"))?;
-    receipt(invocation)
+    receipt_from_invocation(invocation)
 }
 
 fn summary(invocation: OpenCommerceInvocation) -> Result<ConsumerInvocationReceiptSummary> {
@@ -71,7 +71,9 @@ fn summary(invocation: OpenCommerceInvocation) -> Result<ConsumerInvocationRecei
     })
 }
 
-fn receipt(invocation: OpenCommerceInvocation) -> Result<ConsumerInvocationReceipt> {
+pub(crate) fn receipt_from_invocation(
+    invocation: OpenCommerceInvocation,
+) -> Result<ConsumerInvocationReceipt> {
     ensure_unfunded_settlement(&invocation)?;
     let completed_at = invocation
         .completed_at

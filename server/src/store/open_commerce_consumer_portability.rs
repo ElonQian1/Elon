@@ -6,6 +6,7 @@ use crate::{
         ConsumerPreferenceDisclosure, ConsumerPreferenceProfile,
     },
     open_commerce_data_request_model::OpenCommerceConsumerDataRequest,
+    open_commerce_model::OpenCommerceInvocation,
     open_commerce_portability_model::{
         ConsumerPortabilityExport, ConsumerPortabilityPayload, ConsumerRelationshipRenewalLink,
     },
@@ -19,6 +20,7 @@ use super::{
         preference_disclosure_from_row, preference_profile_from_row,
     },
     open_commerce_consumer_relationships::relationship_from_row,
+    open_commerce_invocations::{invocation_from_row, INVOCATION_SELECT},
     Store,
 };
 
@@ -30,6 +32,7 @@ pub(crate) struct ConsumerPortabilitySnapshotSources {
     pub data_requests: Vec<OpenCommerceConsumerDataRequest>,
     pub preference_profile: Option<ConsumerPreferenceProfile>,
     pub preference_disclosures: Vec<ConsumerPreferenceDisclosure>,
+    pub terminal_invocations: Vec<OpenCommerceInvocation>,
 }
 
 impl Store {
@@ -130,6 +133,23 @@ impl Store {
         if preference_disclosures.len() > MAX_CONSUMER_PORTABILITY_RECORDS {
             bail!("消费者偏好披露超过单个 V2 导出包的 5000 条上限");
         }
+        let mut invocation_stmt = tx.prepare(&format!(
+            "{INVOCATION_SELECT}
+              WHERE requester_user_id=?1 AND status IN ('succeeded', 'failed')
+              ORDER BY created_at ASC, rowid ASC LIMIT ?2"
+        ))?;
+        let invocation_rows = invocation_stmt.query_map(
+            params![
+                consumer_user_id.trim(),
+                (MAX_CONSUMER_PORTABILITY_RECORDS + 1) as i64,
+            ],
+            invocation_from_row,
+        )?;
+        let terminal_invocations = invocation_rows.collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(invocation_stmt);
+        if terminal_invocations.len() > MAX_CONSUMER_PORTABILITY_RECORDS {
+            bail!("消费者调用凭证超过单个 V3 导出包的 5000 条上限");
+        }
         tx.commit()?;
         Ok(ConsumerPortabilitySnapshotSources {
             relationships,
@@ -137,6 +157,7 @@ impl Store {
             data_requests,
             preference_profile,
             preference_disclosures,
+            terminal_invocations,
         })
     }
 
@@ -295,6 +316,7 @@ fn portability_export_from_row(row: &Row<'_>) -> rusqlite::Result<ConsumerPortab
         source_project_id,
         idempotency_key: row.get(2)?,
         schema: row.get(3)?,
+        payload_json,
         payload,
         payload_sha256: row.get(5)?,
         created_at: row.get(6)?,
