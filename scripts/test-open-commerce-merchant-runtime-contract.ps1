@@ -37,14 +37,18 @@ if ($platformHash -ne $coffeeHash) {
 $platformImplementation = @(
     Get-Content -Raw -LiteralPath (Join-Path $repoRoot "server\src\open_commerce_runtime_client.rs")
     Get-Content -Raw -LiteralPath (Join-Path $repoRoot "server\src\open_commerce_service.rs")
+    Get-Content -Raw -LiteralPath (Join-Path $repoRoot "server\src\open_commerce_merchant_evidence_model.rs")
 ) -join "`n"
 $coffeeSecurity = Get-Content -Raw -LiteralPath (Join-Path $CoffeeRepo "services\backend\src\modules\commerce_gateway\security.rs")
 $coffeeService = Get-Content -Raw -LiteralPath (Join-Path $CoffeeRepo "services\backend\src\modules\commerce_gateway\service.rs")
+$coffeeBusinessReceipt = Get-Content -Raw -LiteralPath (Join-Path $CoffeeRepo "services\backend\src\modules\commerce_gateway\business_receipt.rs")
 
 foreach ($required in @(
     "merchant_runtime.invoke.v1",
     "merchant_runtime.result.v1",
-    "x-yilong-runtime-signature"
+    "x-yilong-runtime-signature",
+    "open_commerce.merchant_business_receipt.v1",
+    "validate_optional_business_receipt"
 )) {
     if (-not $platformImplementation.Contains($required)) {
         throw "Platform runtime implementation does not implement contract token: $required"
@@ -57,6 +61,16 @@ foreach ($required in @(
 )) {
     if (-not $coffeeSecurity.Contains($required)) {
         throw "Coffee runtime security does not implement contract header: $required"
+    }
+}
+foreach ($required in @(
+    "_yilong_business_receipt",
+    "open_commerce.merchant_business_receipt.v1",
+    "attach_quote",
+    "attach_order"
+)) {
+    if (-not $coffeeBusinessReceipt.Contains($required)) {
+        throw "Coffee runtime does not implement business receipt token: $required"
     }
 }
 foreach ($required in @(

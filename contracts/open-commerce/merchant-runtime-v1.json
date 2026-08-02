@@ -22,6 +22,25 @@
     "platform_metering": "integer_micros",
     "business_order_excludes_platform_api_fee": true
   },
+  "business_receipt": {
+    "field": "_yilong_business_receipt",
+    "schema": "open_commerce.merchant_business_receipt.v1",
+    "authority": "merchant_runtime_asserted",
+    "reference_authority": "merchant_erp",
+    "money": "integer_minor_units",
+    "capabilities": [
+      "order.quote.create",
+      "order.commit",
+      "order.status.read"
+    ],
+    "does_not_prove": [
+      "platform_independent_verification",
+      "payment",
+      "settlement",
+      "fulfillment",
+      "refund"
+    ]
+  },
   "capabilities": [
     "merchant.profile.read",
     "catalog.search",
