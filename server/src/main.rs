@@ -225,6 +225,12 @@ mod open_commerce_invocation_recovery;
 mod open_commerce_invocation_recovery_tests;
 mod open_commerce_mcp;
 mod open_commerce_mcp_tools;
+mod open_commerce_merchant_evidence_api;
+mod open_commerce_merchant_evidence_mcp;
+mod open_commerce_merchant_evidence_model;
+mod open_commerce_merchant_evidence_service;
+#[cfg(test)]
+mod open_commerce_merchant_evidence_tests;
 mod open_commerce_migration;
 mod open_commerce_model;
 mod open_commerce_portability_api;

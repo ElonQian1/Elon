@@ -31,6 +31,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `PATCH` | `/api/projects/:project_id/open-commerce/capabilities/:capability_id` | 更新或停用能力 |
 | `PUT` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/runtime` | 配置受控商户运行绑定，不接收明文密钥 |
 | `POST` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/runtime/verify` | 执行签名健康检查并核对 Manifest |
+| `GET` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/business-evidence` | 读取商户终态能力调用证据、结果摘要和可选业务回执 |
+| `GET` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/business-evidence/:invocation_id` | 读取单条商户业务证据及当时结果 |
 | `POST` | `/api/projects/:project_id/open-commerce/grants` | 创建调用授权 |
 | `POST` | `/api/projects/:project_id/open-commerce/grants/:grant_id/revoke` | 撤销授权 |
 | `GET` | `/api/projects/:project_id/open-commerce/audit` | 读取项目审计与调用记录 |
@@ -126,6 +128,14 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 开发者 App 可使用自身测试 Token 轮询终态调用。列表按只增终态序号升序返回 `succeeded` 或 `failed` 摘要，默认 20 条、最多 100 条；游标绑定当前 App，不能跨 App 复用。列表不返回结果正文、原始输入、请求摘要、Grant 或内部身份，单条详情只允许同一 App 读取其原本已获得的结果。
 
 客户端应持久保存每次响应的 `next_cursor`，处理完本页后再请求下一页。空轮询会保留原检查点；`has_more=true` 时应立即继续读取。该接口是可恢复的拉取事件流，不是 Webhook 或外部主动推送，也不证明真实支付、订单或履约完成。
+
+## 商户业务调用证据
+
+商户证据是终态 Invocation 的项目内只读投影。列表按终态序号返回调用状态、结果摘要、计量、可选标准业务回执和当前 ERP 实例关联；详情可返回商户当时的结果。证据不包含原始调用输入，也不会自动写入 ERP。
+
+商户运行时可在结果中加入 `_yilong_business_receipt`，版本固定为 `open_commerce.merchant_business_receipt.v1`。新响应中的回执必须使用小写业务类型和状态、商户侧引用、RFC 3339 时间；金额采用非负整数最小货币单位，且必须与大写币种同时出现。平台不从任意业务 JSON 猜测订单字段。
+
+Invocation 只证明平台完成调用，标准业务回执只证明商户运行时作出声明，真实订单、库存、财务、支付和履约仍以商户 ERP 为准。MCP 工具为 `open_commerce_list_merchant_business_evidence` 和 `open_commerce_get_merchant_business_evidence`。
 
 ## Grant 生命周期预算
 
@@ -224,6 +234,8 @@ MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_co
 | `open_commerce_invoke` | 写 | 调用能力并生成计量和审计；动作必须携带已确认 ID |
 | `open_commerce_list_my_invocation_receipts` | 读 | 按当前账户列出本人终态调用凭证摘要 |
 | `open_commerce_get_my_invocation_receipt` | 读 | 按当前账户读取并复核本人单条调用凭证 |
+| `open_commerce_list_merchant_business_evidence` | 读 | 按当前项目列出指定商户的终态调用证据和可选业务回执 |
+| `open_commerce_get_merchant_business_evidence` | 读 | 读取单条商户业务证据和当时结果，不自动写入 ERP |
 | `open_commerce_list_audit` | 读 | 查看调用与治理证据 |
 
 MCP 写工具遵循与 HTTP API 相同的项目角色、授权、动作确认和幂等规则。MCP 不提供绕过确认的真实资金、发布或外部系统写操作。

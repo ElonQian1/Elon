@@ -85,6 +85,62 @@ export interface OpenCommerceInvocation {
   created_at: string
 }
 
+export interface MerchantBusinessReceipt {
+  schema: 'open_commerce.merchant_business_receipt.v1'
+  entity_type: string
+  reference_id: string
+  state: string
+  occurred_at: string
+  amount_minor?: number
+  currency?: string
+}
+
+export interface MerchantEvidenceErpBinding {
+  instance_id: string
+  instance_key: string
+  configuration_revision: number
+}
+
+export interface MerchantBusinessEvidenceSummary {
+  schema: 'open_commerce.merchant_business_evidence.v1'
+  sequence: number
+  invocation_id: string
+  merchant_id: string
+  erp_binding?: MerchantEvidenceErpBinding
+  capability_key: string
+  capability_kind: OpenCommerceCapabilityKind
+  requester_app_id: string
+  status: 'succeeded' | 'failed'
+  source_authority: 'merchant_runtime_asserted' | 'platform_handler_result'
+  receipt_state: 'valid' | 'digest_only' | 'invalid_legacy' | 'not_available' | 'not_applicable'
+  business_receipt?: MerchantBusinessReceipt
+  result_available: boolean
+  result_sha256?: string
+  error_code?: string
+  amount_micros: number
+  currency: string
+  settlement_status: string
+  funds_moved: false
+  created_at: string
+  completed_at: string
+}
+
+export interface MerchantBusinessEvidenceList {
+  schema: 'open_commerce.merchant_business_evidence_list.v1'
+  project_id: string
+  merchant_id: string
+  erp_binding?: MerchantEvidenceErpBinding
+  evidence: MerchantBusinessEvidenceSummary[]
+  boundary: string[]
+}
+
+export interface MerchantBusinessEvidenceDetail {
+  schema: 'open_commerce.merchant_business_evidence_detail.v1'
+  evidence: MerchantBusinessEvidenceSummary
+  result?: unknown
+  boundary: string[]
+}
+
 export interface OpenCommerceAuditEvent {
   id: string
   actor_app_id?: string

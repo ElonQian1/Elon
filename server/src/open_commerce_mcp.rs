@@ -217,6 +217,7 @@ async fn mcp_handler(
             let mut tools = crate::open_commerce_mcp_tools::definitions();
             tools.extend(crate::open_commerce_consumer_preference_mcp::definitions());
             tools.extend(crate::open_commerce_consumer_receipt_mcp::definitions());
+            tools.extend(crate::open_commerce_merchant_evidence_mcp::definitions());
             tools.extend(crate::erp_blueprint_mcp_tools::definitions());
             Ok(json!({"tools": tools}))
         }
@@ -286,6 +287,14 @@ pub(crate) async fn call_tool(
     if let Some(value) = crate::open_commerce_consumer_receipt_mcp::call_if_handled(
         store,
         user_id,
+        name,
+        arguments.clone(),
+    )? {
+        return tool_response(value);
+    }
+    if let Some(value) = crate::open_commerce_merchant_evidence_mcp::call_if_handled(
+        store,
+        project_id,
         name,
         arguments.clone(),
     )? {

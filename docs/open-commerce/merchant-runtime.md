@@ -71,6 +71,24 @@ HMAC-SHA256(secret, unix_timestamp + "." + raw_json_body)
 - 平台返回 `settlement_receipt`，当前固定 `funds_moved=false`；真实收费仍未启用。
 - 商户运行时对同一商户、App、能力和幂等键返回同一业务结果，同键不同输入返回冲突。
 
+商户运行时可以在业务结果中附带可选的标准业务回执，供商户工作台和后续 ERP/CRM 适配器识别；平台不会从任意 `order_id` 字段猜测订单事实：
+
+```json
+{
+  "_yilong_business_receipt": {
+    "schema": "open_commerce.merchant_business_receipt.v1",
+    "entity_type": "order",
+    "reference_id": "order-1001",
+    "state": "confirmed",
+    "occurred_at": "2026-08-03T01:00:00Z",
+    "amount_minor": 2600,
+    "currency": "CNY"
+  }
+}
+```
+
+新响应中的非法标准回执会使调用失败并降级运行绑定。标准回执仍是商户运行时声明；平台只保存调用证据和摘要，不把它解释为真实支付或履约证明。
+
 ## 失败处理
 
 - 签名、时间戳或密钥标识错误：拒绝，不进入业务逻辑。

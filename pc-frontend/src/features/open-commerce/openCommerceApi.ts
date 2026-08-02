@@ -15,6 +15,8 @@ import type {
   OpenCommerceMerchant,
   OpenCommerceOverview,
   OpenCommerceIntegration,
+  MerchantBusinessEvidenceDetail,
+  MerchantBusinessEvidenceList,
   OpenCommerceRuntimeBinding,
   OpenCommerceRateLimitPolicy,
   UpsertOpenCommerceRateLimit,
@@ -92,6 +94,20 @@ export const openCommerceApi = {
     api.post<OpenCommerceRuntimeBinding>(
       `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/runtime/verify`,
       {},
+    ),
+
+  listMerchantBusinessEvidence: (projectId: string, merchantId: string) =>
+    api.get<MerchantBusinessEvidenceList>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/business-evidence`,
+    ),
+
+  getMerchantBusinessEvidence: (
+    projectId: string,
+    merchantId: string,
+    invocationId: string,
+  ) =>
+    api.get<MerchantBusinessEvidenceDetail>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/business-evidence/${encodeURIComponent(invocationId)}`,
     ),
 
   upsertRateLimit: (projectId: string, request: UpsertOpenCommerceRateLimit) =>

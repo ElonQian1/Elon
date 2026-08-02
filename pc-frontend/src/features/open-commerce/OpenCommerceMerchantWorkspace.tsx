@@ -9,6 +9,7 @@ import OpenCommerceAppBlockManager from './OpenCommerceAppBlockManager'
 import MerchantRelationshipInbox from './MerchantRelationshipInbox'
 import MerchantPreferenceInbox from './MerchantPreferenceInbox'
 import MerchantDataRequestInbox from './MerchantDataRequestInbox'
+import MerchantBusinessEvidencePanel from './MerchantBusinessEvidencePanel'
 import type { OpenCommerceOverview } from './openCommerceTypes'
 import { commerceStyles } from './openCommerceStyles'
 import styles from './OpenCommercePanel.module.css'
@@ -187,6 +188,10 @@ export default function OpenCommerceMerchantWorkspace({
                 projectId={projectId}
                 merchantId={selectedMerchant.merchant.id}
                 canEdit={canEdit}
+              />
+              <MerchantBusinessEvidencePanel
+                projectId={projectId}
+                merchantId={selectedMerchant.merchant.id}
               />
               <OpenCommerceRuntimeManager
                 projectId={projectId}

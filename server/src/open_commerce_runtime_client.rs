@@ -66,10 +66,13 @@ pub(crate) async fn invoke_runtime(
             "商户运行响应身份不匹配"
         )));
     }
-    value
+    let result = value
         .get("result")
         .cloned()
-        .ok_or_else(|| RuntimeCallError::infrastructure(anyhow!("商户运行响应缺少 result")))
+        .ok_or_else(|| RuntimeCallError::infrastructure(anyhow!("商户运行响应缺少 result")))?;
+    crate::open_commerce_merchant_evidence_model::validate_optional_business_receipt(&result)
+        .map_err(RuntimeCallError::infrastructure)?;
+    Ok(result)
 }
 
 #[derive(Debug)]

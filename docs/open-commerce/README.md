@@ -71,6 +71,8 @@
 61. `docs/open-commerce-consumer-portability-exports-v3-acceptance.md`：查看消费者可携带数据包 V3 的事务、隐私、兼容和 PC 验收证据。
 62. `docs/decisions/open-commerce-developer-terminal-events-v1.md`：查看开发者 App 终态调用事件、游标隔离和外部通知边界。
 63. `docs/open-commerce-developer-terminal-events-v1-acceptance.md`：查看开发者终态事件流 V1 的迁移、隔离和隐私验证证据。
+64. `docs/decisions/open-commerce-merchant-business-evidence-v1.md`：查看商户业务回执、调用证据、ERP 关联和真实经营事实边界。
+65. `docs/open-commerce-merchant-business-evidence-v1-acceptance.md`：查看商户业务证据的 HTTP、MCP、PC 与失败关闭验证范围。
 
 ## 专题地图
 
@@ -80,6 +82,7 @@
 | 多人、多 AI 协同开发 | 已有实现，持续收口 | `docs/群体ai开发/群体AI开发功能需求与架构设计.md` |
 | 商户节点、能力、授权、调用和审计 | V1 已接受并实现 | `docs/decisions/open-commerce-network-v1-architecture.md`、`docs/open-commerce-network-v1-api.md` |
 | 商户自有 ERP 受控运行时 | 参考实现已完成，生产配置依赖环境 | `docs/open-commerce/merchant-runtime.md`、`docs/open-commerce-merchant-runtime-v1-acceptance.md` |
+| 商户调用证据与 ERP/CRM 衔接 | V1 证据层已实现，生产入库适配器待逐项实现 | `docs/decisions/open-commerce-merchant-business-evidence-v1.md`、`docs/open-commerce-merchant-business-evidence-v1-acceptance.md` |
 | 通用 ERP 蓝图与智能提案 | V1 已实现，代码执行仍走既有项目流程 | `docs/erp/README.md`、`docs/erp/acceptance-v1.md` |
 | 商户数据来源、健康度和同步回执 | 控制面已实现，具体平台适配器待逐项验收 | `docs/decisions/open-commerce-integration-control-plane.md`、`docs/open-commerce-integration-control-plane-acceptance.md` |
 | 连接器 SDK 与兼容性门禁 | 已实现 V1，尚不包含具体大厂适配器 | `sdk/open-commerce-connector/`、`docs/open-commerce/connector-sdk.md` |
