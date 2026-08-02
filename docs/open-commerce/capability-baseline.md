@@ -45,7 +45,7 @@
 | 消费者账户级调用凭证 | 已实现、范围受限 | 当前用户可列出跨项目终态调用摘要，读取并下载仅属于本人的结果；服务端和 PC 复核规范负载 SHA-256，且不暴露原始输入和内部标识。当前只支持未扣真实资金状态，不是订单、支付或链上凭证 | `server/src/open_commerce_consumer_receipt_service.rs`、`pc-frontend/src/features/open-commerce/ConsumerInvocationReceipts.tsx`、`docs/open-commerce-consumer-invocation-receipts-v1-acceptance.md` |
 | 开发者 App 终态调用事件流 | 已实现、范围受限 | 测试 Token 可按 App 绑定游标持续读取成功或失败摘要，并读取本 App 单条结果；序号由数据库终态触发器原子追加，PC 开发者门户可断点续读且不持久化 Token。当前是轮询，不是外部 Webhook 或跨运营方事件总线 | `server/src/open_commerce_developer_event_service.rs`、`server/src/store/open_commerce_developer_events.rs`、`pc-frontend/src/features/open-commerce/DeveloperInvocationEvents.tsx`、`docs/open-commerce-developer-terminal-events-v1-acceptance.md` |
 | 商户业务调用证据与 ERP 关联 | 已实现、范围受限 | 项目成员可按商户读取终态 Invocation、结果摘要、可选标准业务回执和当前 ERP 实例关联；新商户运行回执格式错误时失败关闭。当前只提供证据层，不自动写入 ERP/CRM，也不证明支付或履约 | `server/src/open_commerce_merchant_evidence_service.rs`、`pc-frontend/src/features/open-commerce/MerchantBusinessEvidencePanel.tsx`、`docs/decisions/open-commerce-merchant-business-evidence-v1.md` |
-| 业务证据到 ERP/CRM 显式衔接回执 | 已实现、范围受限 | 项目编辑者可在 PC、HTTP 或 MCP 中把终态证据摘要与同商户接入器的真实处理结果保存为幂等回执；`applied` 必须有有效标准业务回执和目标记录摘要。当前权威仅为项目编辑者声明，不是适配器独立签名或自动入库证明 | `server/src/open_commerce_business_handoff_service.rs`、`pc-frontend/src/features/open-commerce/MerchantBusinessHandoffPanel.tsx`、`docs/decisions/open-commerce-business-handoff-receipts-v1.md` |
+| 业务证据到 ERP/CRM 显式衔接回执 | 已实现、范围受限 | 项目编辑者可记录人工确认回执；每个数据接入也可签发只写回执的一次性机器 Token，轮换、撤销和接入停用立即失败关闭，机器回执固化凭据版本。`applied` 必须有有效标准业务回执和目标记录摘要。机器鉴权仍不是外部签名、回读或自动入库证明 | `server/src/open_commerce_business_handoff_service.rs`、`server/src/store/open_commerce_adapter_credentials.rs`、`pc-frontend/src/features/open-commerce/OpenCommerceAdapterCredentialManager.tsx`、`docs/decisions/open-commerce-adapter-machine-credentials-v1.md` |
 | ERP/CRM 待衔接任务队列 | 已实现、派生视图 | 从终态证据和最新衔接回执实时派生 `pending` 与 `retry_required`；成功或忽略自动移出，失败保留重试。HTTP、MCP 与 PC 共用服务，不自动执行外部系统 | `server/src/open_commerce_business_handoff_service.rs`、`pc-frontend/src/features/open-commerce/MerchantBusinessHandoffQueue.tsx`、`docs/decisions/open-commerce-business-handoff-queue-v1.md` |
 | Grant 生命周期预算 | 已实现 | 商户可为单个授权设置总调用次数和总计量金额；调用前原子预留，成功确认、失败退回，幂等重放不重复占额；重启与过期孤儿调用会原子失败关闭并释放遗留预留 | `server/src/open_commerce_grant_budget_service.rs`、`server/src/store/open_commerce_grant_budgets.rs`、`server/src/store/open_commerce_invocation_recovery.rs`、`docs/open-commerce-grant-budgets-v1-acceptance.md` |
 | 项目 AI 资源控制面 | 已实现、只预演 | 可盘点当前用户的 Codex、本人节点、授权共享 Codex 和平台模型，保存项目策略并预演候选；不会启动真实任务 | `server/src/ai_resource_control/`、`docs/open-commerce/ai-resource-control.md` |
@@ -58,7 +58,7 @@
 |---|---|---|
 | 美团、抖音、京东、淘宝闪购等经营数据统一接入 | 部分实现 | 接入控制面、状态和同步回执已实现；仍必须逐个平台确认官方授权、实现适配器、验证字段覆盖和长期稳定性，不能把登记数据源描述成已接通全量 API |
 | 商户 ERP、海报、短视频、小游戏和营销活动自动生成 | 部分实现 | 通用 ERP 蓝图与 AI 应用开发主干已存在；真实行业业务模块、发布连接器、经营效果回流和规模化验证仍需完善 |
-| 商户数据自主控制和跨应用授权 | 部分实现 | V1、跨项目脱敏目录、消费者沙盒、限时 App 授权、消费者匿名关系及低敏偏好字段披露、删除请求与商户声明、关系、偏好、披露及调用凭证的可验证导出、调用配额、App 终态结果流、商户业务证据、显式 ERP/CRM 衔接回执、活动证据、手动 App 封禁和首个商户自有运行时已打通；敏感数据保险箱、完整订单迁移、跨运营方导入、外部主动推送和删除证明、生产 ERP/CRM 写入适配器及其机器身份、生产 App 身份互认、自动全网风控与公共互操作治理尚未完成 |
+| 商户数据自主控制和跨应用授权 | 部分实现 | V1、跨项目脱敏目录、消费者沙盒、限时 App 授权、消费者匿名关系及低敏偏好字段披露、删除请求与商户声明、可验证导出、调用配额、App 终态结果流、商户业务证据、人工和受限机器 ERP/CRM 衔接回执、活动证据、手动 App 封禁和首个商户自有运行时已打通；敏感数据保险箱、完整订单迁移、跨运营方导入、外部主动推送和删除证明、生产 ERP/CRM 写入适配器、外部回读、签名信任、生产 App 身份互认、自动全网风控与公共互操作治理尚未完成 |
 | 闲置电脑、收银机和工作站共享算力 | 部分实现 | 模型推理供给的所有者开关、模型白名单、并发、每日实耗与在途预算原子预留、候选回退、流租约、重启与过期预授权回收、所有者运行告警和 PC 控件已实现；通用异构任务、竞价市场、故障赔付、真实提现与链上结算仍未完成 |
 | 低成本分布式模型训练 | 提案 | 普通公网节点更适合异步任务、推理和可切分工作，不能宣称已等效替代高速互联的企业级 GPU 集群 |
 

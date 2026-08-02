@@ -12,6 +12,7 @@ pub(crate) const BUSINESS_HANDOFF_QUEUE_SCHEMA: &str = "open_commerce.business_h
 pub(crate) const BUSINESS_HANDOFF_QUEUE_ITEM_SCHEMA: &str =
     "open_commerce.business_handoff_queue_item.v1";
 pub(crate) const BUSINESS_HANDOFF_AUTHORITY: &str = "project_editor_asserted";
+pub(crate) const BUSINESS_HANDOFF_ADAPTER_AUTHORITY: &str = "adapter_token_authenticated";
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct OpenCommerceBusinessHandoffReceipt {
@@ -29,6 +30,8 @@ pub(crate) struct OpenCommerceBusinessHandoffReceipt {
     pub error_code: Option<String>,
     pub confirmed_by_user: bool,
     pub assertion_authority: String,
+    pub adapter_credential_id: Option<String>,
+    pub adapter_credential_version: Option<i64>,
     pub recorded_by_user_id: String,
     pub recorded_by_app_id: String,
     pub completed_at: String,

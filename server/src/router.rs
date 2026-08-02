@@ -547,6 +547,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .merge(open_commerce_api::routes())
         .merge(crate::open_commerce_action_confirmation_api::routes())
+        .merge(crate::open_commerce_adapter_api::routes())
         .merge(crate::open_commerce_app_block_api::routes())
         .merge(crate::open_commerce_business_handoff_api::routes())
         .merge(crate::open_commerce_rate_limit_api::routes())

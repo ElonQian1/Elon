@@ -77,6 +77,8 @@
 67. `docs/open-commerce-business-handoff-receipts-v1-acceptance.md`：查看衔接回执的摘要绑定、权限、隔离和失败关闭验证。
 68. `docs/decisions/open-commerce-business-handoff-queue-v1.md`：查看从证据和最新回执派生待处理、需重试状态的规则。
 69. `docs/open-commerce-business-handoff-queue-v1-acceptance.md`：查看待衔接队列的 HTTP、MCP、PC 和生命周期验证。
+70. `docs/decisions/open-commerce-adapter-machine-credentials-v1.md`：查看接入器受限机器身份、一次性 Token、轮换和回执权威边界。
+71. `docs/open-commerce-adapter-machine-credentials-v1-acceptance.md`：查看接入器机器凭据的鉴权、版本固化和 PC 验收证据。
 
 ## 专题地图
 
@@ -86,7 +88,7 @@
 | 多人、多 AI 协同开发 | 已有实现，持续收口 | `docs/群体ai开发/群体AI开发功能需求与架构设计.md` |
 | 商户节点、能力、授权、调用和审计 | V1 已接受并实现 | `docs/decisions/open-commerce-network-v1-architecture.md`、`docs/open-commerce-network-v1-api.md` |
 | 商户自有 ERP 受控运行时 | 参考实现已完成，生产配置依赖环境 | `docs/open-commerce/merchant-runtime.md`、`docs/open-commerce-merchant-runtime-v1-acceptance.md` |
-| 商户调用证据与 ERP/CRM 衔接 | V1 证据层、项目编辑者显式回执及由最新回执派生的待处理/需重试队列已实现；生产入库适配器、机器身份和外部回读待逐项实现 | `docs/decisions/open-commerce-merchant-business-evidence-v1.md`、`docs/decisions/open-commerce-business-handoff-receipts-v1.md`、`docs/decisions/open-commerce-business-handoff-queue-v1.md` |
+| 商户调用证据与 ERP/CRM 衔接 | V1 证据层、人工回执、派生待办队列及受限接入器机器凭据已实现；生产入库适配器、官方授权、外部回读和签名证明待逐项实现 | `docs/decisions/open-commerce-merchant-business-evidence-v1.md`、`docs/decisions/open-commerce-business-handoff-receipts-v1.md`、`docs/decisions/open-commerce-business-handoff-queue-v1.md`、`docs/decisions/open-commerce-adapter-machine-credentials-v1.md` |
 | 通用 ERP 蓝图与智能提案 | V1 已实现，代码执行仍走既有项目流程 | `docs/erp/README.md`、`docs/erp/acceptance-v1.md` |
 | 商户数据来源、健康度和同步回执 | 控制面已实现，具体平台适配器待逐项验收 | `docs/decisions/open-commerce-integration-control-plane.md`、`docs/open-commerce-integration-control-plane-acceptance.md` |
 | 连接器 SDK 与兼容性门禁 | 已实现 V1，尚不包含具体大厂适配器 | `sdk/open-commerce-connector/`、`docs/open-commerce/connector-sdk.md` |

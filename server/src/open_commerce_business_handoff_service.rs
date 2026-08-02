@@ -2,11 +2,15 @@ use anyhow::{bail, Result};
 use serde_json::json;
 
 use crate::{
+    open_commerce_adapter_model::{
+        AdapterBusinessHandoffReceiptRequest, OpenCommerceAdapterCredential, ADAPTER_HANDOFF_SCOPE,
+    },
     open_commerce_business_handoff_model::{
         normalize_handoff_error_code, normalize_handoff_queue_state, normalize_handoff_status,
         normalize_sha256, normalize_target_reference, OpenCommerceBusinessHandoffQueue,
         OpenCommerceBusinessHandoffQueueItem, OpenCommerceBusinessHandoffReceipt,
         OpenCommerceBusinessHandoffReceiptList, RecordBusinessHandoffReceiptRequest,
+        BUSINESS_HANDOFF_ADAPTER_AUTHORITY, BUSINESS_HANDOFF_AUTHORITY,
         BUSINESS_HANDOFF_LIST_SCHEMA, BUSINESS_HANDOFF_QUEUE_ITEM_SCHEMA,
         BUSINESS_HANDOFF_QUEUE_SCHEMA,
     },
@@ -17,7 +21,7 @@ use crate::{
 };
 
 const BOUNDARY: [&str; 4] = [
-    "衔接回执是项目编辑者或其应用的声明，不是平台对外部 ERP/CRM 的独立核验",
+    "人工回执由项目编辑者确认；机器回执仅证明来自有效接入器凭据，均不是平台对外部 ERP/CRM 的独立核验",
     "applied 只允许绑定有效标准业务回执，且不会复制商户订单、客户、库存或财务表",
     "目标记录号只保存 SHA-256，不在平台保留外部系统的原始记录号",
     "funds_moved 固定为 false，不代表支付、分账、履约或退款完成",
@@ -41,6 +45,69 @@ pub(crate) fn record_receipt(
         bail!("必须由当前用户明确确认真实 ERP/CRM 衔接结果");
     }
 
+    record_validated_receipt(
+        store,
+        project_id,
+        actor.user_id,
+        actor.app_id,
+        BUSINESS_HANDOFF_AUTHORITY,
+        None,
+        None,
+        request,
+    )
+}
+
+pub(crate) fn record_adapter_receipt(
+    store: &Store,
+    credential: &OpenCommerceAdapterCredential,
+    request: AdapterBusinessHandoffReceiptRequest,
+) -> Result<OpenCommerceBusinessHandoffReceipt> {
+    if credential.status != "active"
+        || !credential
+            .scopes
+            .iter()
+            .any(|scope| scope == ADAPTER_HANDOFF_SCOPE)
+    {
+        bail!("适配器凭据未获得 business_handoff.write 权限");
+    }
+    let actor_app_id = format!("adapter-{}", credential.id);
+    let receipt = record_validated_receipt(
+        store,
+        &credential.project_id,
+        &credential.created_by_user_id,
+        &actor_app_id,
+        BUSINESS_HANDOFF_ADAPTER_AUTHORITY,
+        Some(&credential.id),
+        Some(credential.credential_version),
+        RecordBusinessHandoffReceiptRequest {
+            merchant_id: credential.merchant_id.clone(),
+            invocation_id: request.invocation_id,
+            integration_id: credential.integration_id.clone(),
+            receipt_key: request.receipt_key,
+            status: request.status,
+            target_domain: request.target_domain,
+            evidence_result_sha256: request.evidence_result_sha256,
+            target_reference: request.target_reference,
+            error_code: request.error_code,
+            confirmed_by_user: false,
+            completed_at: request.completed_at,
+        },
+    )?;
+    store.touch_open_commerce_adapter_credential(&credential.id)?;
+    Ok(receipt)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn record_validated_receipt(
+    store: &Store,
+    project_id: &str,
+    actor_user_id: &str,
+    actor_app_id: &str,
+    assertion_authority: &str,
+    adapter_credential_id: Option<&str>,
+    adapter_credential_version: Option<i64>,
+    request: RecordBusinessHandoffReceiptRequest,
+) -> Result<OpenCommerceBusinessHandoffReceipt> {
     let evidence = open_commerce_merchant_evidence_service::get_evidence(
         store,
         project_id,
@@ -65,16 +132,19 @@ pub(crate) fn record_receipt(
     let (receipt, created) = store.record_open_commerce_business_handoff_receipt(
         RecordOpenCommerceBusinessHandoffReceipt {
             project_id,
-            actor_user_id: actor.user_id,
-            actor_app_id: actor.app_id,
+            actor_user_id,
+            actor_app_id,
+            assertion_authority,
+            adapter_credential_id,
+            adapter_credential_version,
             request,
         },
     )?;
     if created {
         store.record_open_commerce_audit(
             project_id,
-            actor.user_id,
-            Some(actor.app_id),
+            actor_user_id,
+            Some(actor_app_id),
             "business_handoff.recorded",
             "business_handoff_receipt",
             &receipt.id,
@@ -89,6 +159,8 @@ pub(crate) fn record_receipt(
                 "target_reference_sha256":receipt.target_reference_sha256,
                 "error_code":receipt.error_code,
                 "assertion_authority":receipt.assertion_authority,
+                "adapter_credential_id":receipt.adapter_credential_id,
+                "adapter_credential_version":receipt.adapter_credential_version,
                 "funds_moved":false
             }),
         )?;

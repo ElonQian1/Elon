@@ -170,6 +170,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (133, "开放商业动作能力短时一次性输入绑定确认", crate::open_commerce_action_confirmation_migration::migration_v133),
     (134, "开放商业开发者 App 终态调用事件流", crate::open_commerce_developer_event_migration::migration_v134),
     (135, "开放商业业务证据到 ERP/CRM 的显式衔接回执", crate::open_commerce_business_handoff_migration::migration_v135),
+    (136, "开放商业适配器机器凭据与鉴权衔接回执", crate::open_commerce_adapter_migration::migration_v136),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

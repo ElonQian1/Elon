@@ -6,8 +6,8 @@ use crate::open_commerce_business_handoff_model::{
     normalize_handoff_completed_at, normalize_handoff_error_code, normalize_handoff_receipt_key,
     normalize_handoff_status, normalize_sha256, normalize_target_domain,
     normalize_target_reference, OpenCommerceBusinessHandoffReceipt,
-    RecordBusinessHandoffReceiptRequest, BUSINESS_HANDOFF_AUTHORITY,
-    BUSINESS_HANDOFF_RECEIPT_SCHEMA,
+    RecordBusinessHandoffReceiptRequest, BUSINESS_HANDOFF_ADAPTER_AUTHORITY,
+    BUSINESS_HANDOFF_AUTHORITY, BUSINESS_HANDOFF_RECEIPT_SCHEMA,
 };
 use crate::open_commerce_integration_model::INTEGRATION_STATUS_DISABLED;
 use crate::open_commerce_merchant_evidence_model::MerchantTerminalInvocationRecord;
@@ -21,6 +21,9 @@ pub(crate) struct RecordOpenCommerceBusinessHandoffReceipt<'a> {
     pub project_id: &'a str,
     pub actor_user_id: &'a str,
     pub actor_app_id: &'a str,
+    pub assertion_authority: &'a str,
+    pub adapter_credential_id: Option<&'a str>,
+    pub adapter_credential_version: Option<i64>,
     pub request: RecordBusinessHandoffReceiptRequest,
 }
 
@@ -39,6 +42,7 @@ impl Store {
         if integration.status == INTEGRATION_STATUS_DISABLED {
             bail!("数据接入已停用，不能记录业务衔接回执");
         }
+        validate_authority(self, &input, &integration.id)?;
 
         let receipt_key = normalize_handoff_receipt_key(&input.request.receipt_key)?;
         let status = normalize_handoff_status(&input.request.status)?;
@@ -62,6 +66,9 @@ impl Store {
             target_reference_sha256.as_deref(),
             error_code.as_deref(),
             input.request.confirmed_by_user,
+            input.assertion_authority,
+            input.adapter_credential_id,
+            input.adapter_credential_version,
             &completed_at,
         );
 
@@ -76,18 +83,25 @@ impl Store {
 
         let id = new_id("handoff");
         let created_at = now();
-        self.conn()?
+        let inserted = self
+            .conn()?
             .execute(
                 "INSERT INTO open_commerce_business_handoff_receipts (
                     id, project_id, merchant_id, invocation_id, integration_id,
                     receipt_key, receipt_fingerprint, status, target_domain,
                     evidence_result_sha256, target_reference_sha256, error_code,
-                    confirmed_by_user, assertion_authority, recorded_by_user_id,
-                    recorded_by_app_id, completed_at, created_at
-                 ) VALUES (
+                    confirmed_by_user, assertion_authority, adapter_credential_id,
+                    adapter_credential_version, recorded_by_user_id, recorded_by_app_id,
+                    completed_at, created_at
+                 ) SELECT
                     ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
-                    ?13, ?14, ?15, ?16, ?17, ?18
-                 )",
+                    ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20
+                  WHERE ?14 <> 'adapter_token_authenticated'
+                     OR EXISTS (
+                        SELECT 1 FROM open_commerce_adapter_credentials c
+                         WHERE c.id=?15 AND c.integration_id=?5 AND c.status='active'
+                           AND c.credential_version=?16
+                     )",
                 params![
                     id,
                     input.project_id.trim(),
@@ -102,7 +116,9 @@ impl Store {
                     target_reference_sha256,
                     error_code,
                     input.request.confirmed_by_user,
-                    BUSINESS_HANDOFF_AUTHORITY,
+                    input.assertion_authority,
+                    input.adapter_credential_id,
+                    input.adapter_credential_version,
                     input.actor_user_id.trim(),
                     input.actor_app_id.trim(),
                     completed_at,
@@ -110,6 +126,9 @@ impl Store {
                 ],
             )
             .map_err(map_handoff_conflict)?;
+        if inserted == 0 {
+            bail!("适配器凭据已撤销或轮换，请重新鉴权后提交回执");
+        }
         Ok((
             self.open_commerce_business_handoff_receipt(input.project_id, &id)?,
             true,
@@ -236,12 +255,13 @@ impl Store {
                 "SELECT id, project_id, merchant_id, invocation_id, integration_id,
                         receipt_key, status, target_domain, evidence_result_sha256,
                         target_reference_sha256, error_code, confirmed_by_user,
-                        assertion_authority, recorded_by_user_id, recorded_by_app_id,
-                        completed_at, created_at, receipt_fingerprint
+                        assertion_authority, adapter_credential_id, adapter_credential_version,
+                        recorded_by_user_id, recorded_by_app_id, completed_at, created_at,
+                        receipt_fingerprint
                    FROM open_commerce_business_handoff_receipts
                   WHERE integration_id = ?1 AND receipt_key = ?2",
                 params![integration_id.trim(), receipt_key.trim()],
-                |row| Ok((handoff_from_row(row)?, row.get(17)?)),
+                |row| Ok((handoff_from_row(row)?, row.get(19)?)),
             )
             .optional()
             .map_err(Into::into)
@@ -264,10 +284,12 @@ fn handoff_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceBusinessHando
         error_code: row.get(10)?,
         confirmed_by_user: row.get(11)?,
         assertion_authority: row.get(12)?,
-        recorded_by_user_id: row.get(13)?,
-        recorded_by_app_id: row.get(14)?,
-        completed_at: row.get(15)?,
-        created_at: row.get(16)?,
+        adapter_credential_id: row.get(13)?,
+        adapter_credential_version: row.get(14)?,
+        recorded_by_user_id: row.get(15)?,
+        recorded_by_app_id: row.get(16)?,
+        completed_at: row.get(17)?,
+        created_at: row.get(18)?,
         funds_moved: false,
     })
 }
@@ -283,13 +305,18 @@ fn receipt_fingerprint(
     target_reference_sha256: Option<&str>,
     error_code: Option<&str>,
     confirmed_by_user: bool,
+    assertion_authority: &str,
+    adapter_credential_id: Option<&str>,
+    adapter_credential_version: Option<i64>,
     completed_at: &str,
 ) -> String {
     let canonical = format!(
         "{integration_id}\n{invocation_id}\n{receipt_key}\n{status}\n{target_domain}\n\
-         {evidence_result_sha256}\n{}\n{}\n{confirmed_by_user}\n{completed_at}",
+         {evidence_result_sha256}\n{}\n{}\n{confirmed_by_user}\n{assertion_authority}\n{}\n{}\n{completed_at}",
         target_reference_sha256.unwrap_or_default(),
-        error_code.unwrap_or_default()
+        error_code.unwrap_or_default(),
+        adapter_credential_id.unwrap_or_default(),
+        adapter_credential_version.unwrap_or_default()
     );
     hex::encode(Sha256::digest(canonical.as_bytes()))
 }
@@ -305,6 +332,45 @@ fn map_handoff_conflict(error: rusqlite::Error) -> anyhow::Error {
 const HANDOFF_SELECT: &str = "SELECT id, project_id, merchant_id, invocation_id, integration_id,
             receipt_key, status, target_domain, evidence_result_sha256,
             target_reference_sha256, error_code, confirmed_by_user,
-            assertion_authority, recorded_by_user_id, recorded_by_app_id,
+            assertion_authority, adapter_credential_id, adapter_credential_version,
+            recorded_by_user_id, recorded_by_app_id,
             completed_at, created_at
        FROM open_commerce_business_handoff_receipts";
+
+fn validate_authority(
+    store: &Store,
+    input: &RecordOpenCommerceBusinessHandoffReceipt<'_>,
+    integration_id: &str,
+) -> Result<()> {
+    match input.assertion_authority {
+        BUSINESS_HANDOFF_AUTHORITY => {
+            if !input.request.confirmed_by_user
+                || input.adapter_credential_id.is_some()
+                || input.adapter_credential_version.is_some()
+            {
+                bail!("人工衔接回执必须由用户确认且不能绑定适配器凭据");
+            }
+        }
+        BUSINESS_HANDOFF_ADAPTER_AUTHORITY => {
+            if input.request.confirmed_by_user {
+                bail!("适配器衔接回执不能伪装成人工确认");
+            }
+            let credential_id = input
+                .adapter_credential_id
+                .ok_or_else(|| anyhow!("适配器衔接回执必须绑定机器凭据"))?;
+            let credential_version = input
+                .adapter_credential_version
+                .ok_or_else(|| anyhow!("适配器衔接回执必须绑定机器凭据版本"))?;
+            let credential = store
+                .open_commerce_adapter_credential_for_project(input.project_id, credential_id)?;
+            if credential.integration_id != integration_id
+                || credential.status != "active"
+                || credential.credential_version != credential_version
+            {
+                bail!("适配器凭据与当前数据接入不匹配或已撤销");
+            }
+        }
+        _ => bail!("业务衔接回执权威类型不受支持"),
+    }
+    Ok(())
+}

@@ -154,6 +154,13 @@ mod open_commerce_action_confirmation_model;
 mod open_commerce_action_confirmation_service;
 #[cfg(test)]
 mod open_commerce_action_confirmation_tests;
+mod open_commerce_adapter_api;
+mod open_commerce_adapter_mcp;
+mod open_commerce_adapter_migration;
+mod open_commerce_adapter_model;
+mod open_commerce_adapter_service;
+#[cfg(test)]
+mod open_commerce_adapter_tests;
 mod open_commerce_api;
 mod open_commerce_app_activity_health_model;
 #[cfg(test)]

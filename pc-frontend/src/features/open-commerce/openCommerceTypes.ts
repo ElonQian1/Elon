@@ -159,12 +159,44 @@ export interface OpenCommerceBusinessHandoffReceipt {
   target_reference_sha256?: string
   error_code?: string
   confirmed_by_user: boolean
-  assertion_authority: 'project_editor_asserted'
+  assertion_authority: 'project_editor_asserted' | 'adapter_token_authenticated'
+  adapter_credential_id?: string
+  adapter_credential_version?: number
   recorded_by_user_id: string
   recorded_by_app_id: string
   completed_at: string
   created_at: string
   funds_moved: false
+}
+
+export interface OpenCommerceAdapterCredential {
+  schema: 'open_commerce.adapter_credential.v1'
+  id: string
+  project_id: string
+  merchant_id: string
+  integration_id: string
+  status: 'active' | 'revoked'
+  scopes: string[]
+  token_hint: string
+  credential_version: number
+  created_by_user_id: string
+  last_used_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface OpenCommerceAdapterCredentialIssue {
+  schema: 'open_commerce.adapter_credential_issue.v1'
+  credential: OpenCommerceAdapterCredential
+  adapter_token: string
+  token_visible_once: true
+}
+
+export interface OpenCommerceAdapterCredentialList {
+  schema: 'open_commerce.adapter_credential_list.v1'
+  project_id: string
+  credentials: OpenCommerceAdapterCredential[]
+  boundary: string[]
 }
 
 export interface OpenCommerceBusinessHandoffReceiptList {

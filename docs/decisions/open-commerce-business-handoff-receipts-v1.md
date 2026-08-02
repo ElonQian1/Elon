@@ -36,6 +36,10 @@ date: 2026-08-03
 
 生产适配器仍需逐项实现官方授权、密钥保管、写入事务、回读校验和独立机器身份。未来可以新增适配器签名或受控服务身份，但不得把 V1 的人工确认记录静默升级成机器证明。
 
+## 后续演进
+
+`docs/decisions/open-commerce-adapter-machine-credentials-v1.md` 已增加权限固定为 `business_handoff.write` 的受控机器身份。人工回执仍保持本 ADR 的 `project_editor_asserted` 语义；机器回执使用独立的 `adapter_token_authenticated` 权威、凭据 ID 和版本。该演进没有实现具体平台生产适配器、外部回读或签名证明。
+
 ## 实现证据
 
 - 迁移：`server/src/open_commerce_business_handoff_migration.rs`

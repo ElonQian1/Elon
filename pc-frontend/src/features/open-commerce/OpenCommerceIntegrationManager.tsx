@@ -5,6 +5,7 @@ import type {
   OpenCommerceSyncReceipt,
 } from './openCommerceTypes'
 import { commerceStyles } from './openCommerceStyles'
+import OpenCommerceAdapterCredentialManager from './OpenCommerceAdapterCredentialManager'
 import styles from './OpenCommercePanel.module.css'
 
 interface Props {
@@ -152,6 +153,11 @@ export default function OpenCommerceIntegrationManager({
           </button>
         </form>
       </div>
+      <OpenCommerceAdapterCredentialManager
+        projectId={projectId}
+        integrations={merchantIntegrations}
+        canEdit={canEdit}
+      />
       {message && <div style={commerceStyles.message}>{message}</div>}
     </section>
   )

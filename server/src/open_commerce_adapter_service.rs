@@ -1,0 +1,88 @@
+use anyhow::{bail, Result};
+use serde_json::json;
+
+use crate::{
+    open_commerce_adapter_model::{
+        OpenCommerceAdapterCredential, OpenCommerceAdapterCredentialIssue,
+        OpenCommerceAdapterCredentialList, ADAPTER_CREDENTIAL_LIST_SCHEMA,
+    },
+    open_commerce_service::OpenCommerceActor,
+    project_auth::can_edit,
+    store::Store,
+};
+
+const BOUNDARY: [&str; 4] = [
+    "适配器 Token 明文只在签发或轮换时返回一次，服务端只保存 SHA-256",
+    "V1 凭据仅授权 business_handoff.write，不能调用消费者能力或读取经营原始数据",
+    "撤销凭据或停用所属数据接入后，适配器鉴权立即失败",
+    "机器凭据只提升回执来源权威，不代表平台独立核验订单、支付、履约或退款",
+];
+
+pub(crate) fn list_credentials(
+    store: &Store,
+    project_id: &str,
+) -> Result<OpenCommerceAdapterCredentialList> {
+    Ok(OpenCommerceAdapterCredentialList {
+        schema: ADAPTER_CREDENTIAL_LIST_SCHEMA,
+        project_id: project_id.trim().to_string(),
+        credentials: store.list_project_open_commerce_adapter_credentials(project_id)?,
+        boundary: BOUNDARY.to_vec(),
+    })
+}
+
+pub(crate) fn rotate_credential(
+    store: &Store,
+    project_id: &str,
+    integration_id: &str,
+    actor: &OpenCommerceActor<'_>,
+) -> Result<OpenCommerceAdapterCredentialIssue> {
+    require_editor(actor.project_role)?;
+    let issue =
+        store.rotate_open_commerce_adapter_credential(project_id, integration_id, actor.user_id)?;
+    store.record_open_commerce_audit(
+        project_id,
+        actor.user_id,
+        Some(actor.app_id),
+        "adapter_credential.rotated",
+        "adapter_credential",
+        &issue.credential.id,
+        &json!({
+            "integration_id":issue.credential.integration_id,
+            "credential_version":issue.credential.credential_version,
+            "scopes":issue.credential.scopes,
+            "token_visible_once":true
+        }),
+    )?;
+    Ok(issue)
+}
+
+pub(crate) fn revoke_credential(
+    store: &Store,
+    project_id: &str,
+    credential_id: &str,
+    actor: &OpenCommerceActor<'_>,
+) -> Result<OpenCommerceAdapterCredential> {
+    require_editor(actor.project_role)?;
+    let credential = store.revoke_open_commerce_adapter_credential(project_id, credential_id)?;
+    store.record_open_commerce_audit(
+        project_id,
+        actor.user_id,
+        Some(actor.app_id),
+        "adapter_credential.revoked",
+        "adapter_credential",
+        &credential.id,
+        &json!({
+            "integration_id":credential.integration_id,
+            "credential_version":credential.credential_version,
+            "status":credential.status
+        }),
+    )?;
+    Ok(credential)
+}
+
+fn require_editor(role: Option<&str>) -> Result<()> {
+    if !role.is_some_and(can_edit) {
+        bail!("只有项目编辑者可以管理适配器机器凭据");
+    }
+    Ok(())
+}

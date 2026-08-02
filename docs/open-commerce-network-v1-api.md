@@ -41,6 +41,9 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `GET` | `/api/projects/:project_id/open-commerce/audit` | 读取项目审计与调用记录 |
 | `POST` | `/api/projects/:project_id/open-commerce/integrations` | 登记商户数据来源、授权范围和数据域 |
 | `PATCH` | `/api/projects/:project_id/open-commerce/integrations/:integration_id/enabled` | 停用或重新启用数据接入 |
+| `GET` | `/api/projects/:project_id/open-commerce/adapter-credentials` | 列出不含明文 Token 的接入器机器凭据元数据 |
+| `POST` | `/api/projects/:project_id/open-commerce/integrations/:integration_id/adapter-credential/rotate` | 经明确确认后签发或轮换一次性机器 Token |
+| `POST` | `/api/projects/:project_id/open-commerce/adapter-credentials/:credential_id/revoke` | 经明确确认后撤销机器凭据 |
 | `POST` | `/api/projects/:project_id/open-commerce/sync-receipts` | 由适配器记录幂等同步或健康检查回执 |
 | `PUT` | `/api/projects/:project_id/open-commerce/rate-limits` | 按能力和指定 App/全部 App 创建或更新调用配额 |
 | `PATCH` | `/api/projects/:project_id/open-commerce/rate-limits/:policy_id/enabled` | 停用或重新启用调用配额 |
@@ -62,6 +65,7 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `GET` | `/api/open-commerce/developer/events/:invocation_id` | 使用测试 Token 读取当前 App 的单条终态结果 |
 | `GET` | `/api/open-commerce/consumer-invocation-receipts` | 当前账户列出本人的终态调用凭证摘要 |
 | `GET` | `/api/open-commerce/consumer-invocation-receipts/:invocation_id` | 当前账户读取并复核本人的单条调用凭证 |
+| `POST` | `/api/open-commerce/adapter/business-handoff-receipts` | 使用受限接入器 Bearer Token 提交机器衔接回执 |
 
 两个 `GET` 发现接口允许匿名读取，便于任意 App 或 AI 在未加入一龙项目时发现公开商户能力。能力调用、项目管理和 MCP 仍需要 Bearer 身份；开放发现不等于匿名执行。
 
@@ -146,7 +150,9 @@ Invocation 只证明平台完成调用，标准业务回执只证明商户运行
 
 `applied` 只接受成功且带有效标准业务回执的 Invocation，同时必须提供外部目标记录号；服务端只保存目标记录号 SHA-256。`ignored` 和 `rejected` 不能提供目标记录号，必须提供结果代码。停用接入器、跨商户接入器、摘要不匹配、非编辑者或同键改写均失败关闭。
 
-回执权威固定为 `project_editor_asserted`，所有响应固定 `funds_moved=false`。它不创建平台订单，不证明外部适配器身份、支付、履约或退款。生产机器身份和外部系统回读仍需具体适配器实现。
+人工入口的回执权威为 `project_editor_asserted`。接入器也可使用只显示一次、服务端仅保存 SHA-256 的专用 Bearer Token 向机器入口提交；项目、商户和接入器全部从凭据派生，权限固定为 `business_handoff.write`。机器回执标记 `adapter_token_authenticated`、`confirmed_by_user=false`，并固化凭据 ID 和提交时版本。轮换、撤销或停用接入后旧身份立即失败关闭。
+
+两类回执均固定 `funds_moved=false`，不创建平台订单，也不证明外部 ERP 数据真实、支付、履约或退款。机器凭据不是外部平台签名；具体生产适配器、官方授权和外部系统回读仍需逐项实现。
 
 ## Grant 生命周期预算
 

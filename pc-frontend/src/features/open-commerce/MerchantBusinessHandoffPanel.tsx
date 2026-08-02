@@ -231,7 +231,9 @@ export default function MerchantBusinessHandoffPanel({
                   <span style={badgeStyle(receiptTone(receipt.status))}>{receiptLabel(receipt.status)}</span>
                 </header>
                 <p>{receipt.error_code ? reasonLabel(receipt.error_code) : `目标摘要 ${receipt.target_reference_sha256?.slice(0, 12)}…`}</p>
-                <small className={styles.receiptMeta}>人工确认 · 未扣真实资金 · {new Date(receipt.completed_at).toLocaleString('zh-CN')}</small>
+                <small className={styles.receiptMeta}>
+                  {authorityLabel(receipt.assertion_authority, receipt.adapter_credential_version)} · 未扣真实资金 · {new Date(receipt.completed_at).toLocaleString('zh-CN')}
+                </small>
               </article>
             )
           })}
@@ -262,4 +264,13 @@ function receiptTone(status: OpenCommerceBusinessHandoffStatus): 'neutral' | 'wa
 function reasonLabel(code: string) {
   const labels = Object.fromEntries([...reasonOptions.ignored, ...reasonOptions.rejected])
   return labels[code] ?? code
+}
+
+function authorityLabel(
+  authority: 'project_editor_asserted' | 'adapter_token_authenticated',
+  credentialVersion?: number,
+) {
+  return authority === 'adapter_token_authenticated'
+    ? `接入器鉴权${credentialVersion ? ` v${credentialVersion}` : ''}`
+    : '人工确认'
 }

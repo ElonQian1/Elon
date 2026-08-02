@@ -15,6 +15,9 @@ import type {
   OpenCommerceMerchant,
   OpenCommerceOverview,
   OpenCommerceIntegration,
+  OpenCommerceAdapterCredential,
+  OpenCommerceAdapterCredentialIssue,
+  OpenCommerceAdapterCredentialList,
   MerchantBusinessEvidenceDetail,
   MerchantBusinessEvidenceList,
   OpenCommerceBusinessHandoffReceipt,
@@ -83,6 +86,23 @@ export const openCommerceApi = {
     api.patch<OpenCommerceIntegration>(
       `${projectBase(projectId)}/integrations/${encodeURIComponent(integrationId)}/enabled`,
       { enabled },
+    ),
+
+  listAdapterCredentials: (projectId: string) =>
+    api.get<OpenCommerceAdapterCredentialList>(
+      `${projectBase(projectId)}/adapter-credentials`,
+    ),
+
+  rotateAdapterCredential: (projectId: string, integrationId: string) =>
+    api.post<OpenCommerceAdapterCredentialIssue>(
+      `${projectBase(projectId)}/integrations/${encodeURIComponent(integrationId)}/adapter-credential/rotate`,
+      { confirmed_by_user: true },
+    ),
+
+  revokeAdapterCredential: (projectId: string, credentialId: string) =>
+    api.post<OpenCommerceAdapterCredential>(
+      `${projectBase(projectId)}/adapter-credentials/${encodeURIComponent(credentialId)}/revoke`,
+      { confirmed_by_user: true },
     ),
 
   upsertRuntime: (
