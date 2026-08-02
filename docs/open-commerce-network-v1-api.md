@@ -33,6 +33,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `POST` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/runtime/verify` | 执行签名健康检查并核对 Manifest |
 | `GET` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/business-evidence` | 读取商户终态能力调用证据、结果摘要和可选业务回执 |
 | `GET` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/business-evidence/:invocation_id` | 读取单条商户业务证据及当时结果 |
+| `POST` | `/api/projects/:project_id/open-commerce/business-handoff-receipts` | 项目编辑者明确记录 ERP/CRM 对指定业务证据的处理结果 |
+| `GET` | `/api/projects/:project_id/open-commerce/merchants/:merchant_id/business-handoff-receipts` | 读取指定商户的业务衔接回执 |
 | `POST` | `/api/projects/:project_id/open-commerce/grants` | 创建调用授权 |
 | `POST` | `/api/projects/:project_id/open-commerce/grants/:grant_id/revoke` | 撤销授权 |
 | `GET` | `/api/projects/:project_id/open-commerce/audit` | 读取项目审计与调用记录 |
@@ -137,6 +139,14 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 
 Invocation 只证明平台完成调用，标准业务回执只证明商户运行时作出声明，真实订单、库存、财务、支付和履约仍以商户 ERP 为准。MCP 工具为 `open_commerce_list_merchant_business_evidence` 和 `open_commerce_get_merchant_business_evidence`。
 
+## ERP/CRM 业务衔接回执
+
+项目编辑者在真实接入器已经处理业务证据后，可显式记录 `applied`、`ignored` 或 `rejected`。请求必须绑定商户、Invocation、同商户接入器、幂等键和当前结果 SHA-256，并设置 `confirmed_by_user=true`。
+
+`applied` 只接受成功且带有效标准业务回执的 Invocation，同时必须提供外部目标记录号；服务端只保存目标记录号 SHA-256。`ignored` 和 `rejected` 不能提供目标记录号，必须提供结果代码。停用接入器、跨商户接入器、摘要不匹配、非编辑者或同键改写均失败关闭。
+
+回执权威固定为 `project_editor_asserted`，所有响应固定 `funds_moved=false`。它不创建平台订单，不证明外部适配器身份、支付、履约或退款。生产机器身份和外部系统回读仍需具体适配器实现。
+
 ## Grant 生命周期预算
 
 创建 Grant 或批准授权申请时，可选设置 RFC 3339 格式的 `expires_at`、`max_invocations`、`max_amount_micros` 和 `budget_currency`。期限必须晚于当前服务器时间；未提供期限表示长期有效。PC 新授权默认 30 天，长期有效必须显式选择。返回值同时包含期限、`used_invocations` 和 `used_amount_micros`；批准后的授权申请还回读实际 Grant 条件，供商户与申请方核对。
@@ -236,6 +246,8 @@ MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_co
 | `open_commerce_get_my_invocation_receipt` | 读 | 按当前账户读取并复核本人单条调用凭证 |
 | `open_commerce_list_merchant_business_evidence` | 读 | 按当前项目列出指定商户的终态调用证据和可选业务回执 |
 | `open_commerce_get_merchant_business_evidence` | 读 | 读取单条商户业务证据和当时结果，不自动写入 ERP |
+| `open_commerce_list_business_handoff_receipts` | 读 | 读取指定商户的 ERP/CRM 显式衔接回执 |
+| `open_commerce_record_business_handoff_receipt` | 写 | 用户确认后幂等记录接入器对业务证据的处理结果，不移动资金 |
 | `open_commerce_list_audit` | 读 | 查看调用与治理证据 |
 
 MCP 写工具遵循与 HTTP API 相同的项目角色、授权、动作确认和幂等规则。MCP 不提供绕过确认的真实资金、发布或外部系统写操作。
