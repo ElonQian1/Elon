@@ -239,6 +239,7 @@ export interface ConsumerDiscoveryMatch {
 
 export interface ConsumerDiscoveryResponse {
   schema: string
+  capability_contract_profile: string
   requester_app_id: string
   ranking_policy: string
   ranking_is_paid: boolean

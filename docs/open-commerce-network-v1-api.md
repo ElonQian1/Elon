@@ -73,6 +73,11 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 {
   "schema": "open_commerce.invocation.v1",
   "invocation_id": "invoke_xxx",
+  "contract_validation": {
+    "profile": "open_commerce.capability_schema.v1",
+    "input_validated": true,
+    "output_validated": true
+  },
   "status": "succeeded",
   "result": {},
   "metering": {
@@ -94,7 +99,9 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 }
 ```
 
-相同调用方、商户、能力和幂等键的重复调用返回原调用结果或稳定的重复结果，不重复累计金额。
+相同调用方、商户、能力和幂等键的重复调用不重复累计金额；历史成功结果仍满足能力当前输出契约时返回原结果，否则以 `422` 拒绝本次重放且不改写历史调用。
+
+能力创建和更新只接受平台可以实际执行的有限 Schema 配置。调用输入在 Invocation、限流和 Grant 预算预留前校验；处理器输出在成功计量前校验。输入违例返回 `422` 且不创建调用；输出违例保存为 `output_schema_violation` 零金额失败调用并释放预算。错误与审计只返回字段路径和规则代码，不返回业务值。当前不支持 `$ref`、组合或条件 Schema，也不把结构校验解释为业务真实性证明。
 
 ## Grant 生命周期预算
 
@@ -158,7 +165,7 @@ MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_co
 
 商户可以为每项能力配置固定时间窗调用上限。指定 App 策略优先于全部 App 策略；全部 App 策略按调用主体分别计数。没有策略时保持现有允许行为，项目编辑者在本项目内调试不占额度。
 
-幂等重放在限流前返回原调用结果。超过配额的新调用不会进入处理器，记录为 `failed/rate_limited`，单位和金额均为 0，并返回 `429` 与重试时间。项目总览同时返回 `rate_limit_policies` 和当前时间窗 `rate_limit_usage`。
+幂等重放不重复占用限流配额，但历史成功结果必须先通过能力当前输出契约；契约变化导致旧结果不再匹配时返回 `422`，原始历史调用状态和金额不被改写。超过配额的新调用不会进入处理器，记录为 `failed/rate_limited`，单位和金额均为 0，并返回 `429` 与重试时间。项目总览同时返回 `rate_limit_policies` 和当前时间窗 `rate_limit_usage`。
 
 当前计数持久化在一龙主数据库中，适用于共用该数据库的服务实例；它不等于跨数据库、跨地域的全网限流。
 
@@ -218,7 +225,7 @@ V1 仍拒绝未知处理器，也不允许在能力配置中填写任意 URL 或
 | `403` | 不是项目成员、角色不足、授权不匹配、Grant 预算用尽或 App 已被商户封禁 |
 | `404` | 商户、能力、授权或项目不存在 |
 | `409` | slug、能力键、幂等键语义冲突 |
-| `422` | 能力存在但当前输入不满足契约 |
+| `422` | 当前输入、处理器输出或历史重放结果不满足能力契约 |
 | `429` | 商户配置的能力调用配额已达到上限 |
 
 错误响应不得包含 token、密钥、内部处理器配置或原始敏感输入。

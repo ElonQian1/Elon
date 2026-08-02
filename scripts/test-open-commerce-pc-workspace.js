@@ -84,6 +84,8 @@ const preferenceStore = read('server/src/store/open_commerce_consumer_preference
 const preferenceService = read('server/src/open_commerce_consumer_preference_service.rs')
 const preferenceApi = read('server/src/open_commerce_consumer_preference_api.rs')
 const preferenceMcp = read('server/src/open_commerce_consumer_preference_mcp.rs')
+const capabilitySchema = read('server/src/open_commerce_capability_schema.rs')
+const invocationProtocol = read('server/src/open_commerce_invocation_protocol.rs')
 
 for (const view of [
   'OpenCommerceMerchantWorkspace',
@@ -96,6 +98,8 @@ for (const view of [
 }
 
 assert.ok(consumer.includes('ranking_is_paid'), 'consumer sandbox must expose paid-ranking state')
+assert.ok(consumer.includes('capability_contract_profile'), 'consumer sandbox must expose capability contract enforcement')
+assert.ok(consumer.includes('契约校验'), 'consumer sandbox must explain capability contract enforcement')
 assert.ok(consumer.includes('requestAuthorization'), 'consumer sandbox must support explicit grants')
 assert.ok(consumer.includes("appId === 'pc-web'"), 'public browser identity must stay explicit')
 assert.ok(consumer.includes('app_registration_required'), 'restricted capabilities must require a registered app')
@@ -229,6 +233,9 @@ for (const toolName of [
 assert.ok(mcpTools.includes('max_invocations'), 'merchant AI must be able to set a lifetime grant budget through MCP')
 assert.ok(grantBudgetStore.includes('TransactionBehavior::Immediate'), 'grant budget reservation must serialize concurrent claims')
 assert.ok(invocationStore.includes('release_grant_budget_reservation_on'), 'failed handlers must release their grant budget reservation')
+assert.ok(capabilitySchema.includes('additionalProperties'), 'capability validation must enforce bounded object inputs')
+assert.ok(capabilitySchema.includes('invalid_schema'), 'legacy unsupported schemas must fail closed at invocation time')
+assert.ok(invocationProtocol.includes('open_commerce.capability_schema.v1'), 'invocation receipts must name the enforced contract profile')
 assert.ok(grantBudgetStore.includes('invocation_status.as_deref() != Some("started")'), 'a recovered invocation must not reserve budget again')
 assert.ok(invocationRecovery.includes('invocation.recovered_failed'), 'orphan invocation recovery must append a stable audit event')
 assert.ok(invocationRecovery.includes('OPEN_COMMERCE_INVOCATION_LEASE_SECONDS'), 'runtime recovery must use an explicit invocation lease')

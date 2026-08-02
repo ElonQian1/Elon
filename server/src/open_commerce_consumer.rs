@@ -45,6 +45,7 @@ pub(crate) fn discover(
     matches.truncate(request.limit.clamp(1, 50));
     Ok(ConsumerDiscoveryResponse {
         schema: "open_commerce.consumer_discovery.v1",
+        capability_contract_profile: "open_commerce.capability_schema.v1",
         requester_app_id: request.requester_app_id,
         ranking_policy: "transparent_preference_match.v1",
         ranking_is_paid: false,

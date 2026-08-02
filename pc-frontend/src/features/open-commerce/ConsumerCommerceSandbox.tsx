@@ -185,12 +185,15 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         <section className={base.integrationSection}>
           <header>
             <strong>匹配结果</strong>
-            <span
-              style={badgeStyle(result?.ranking_is_paid ? 'danger' : 'neutral')}
-              data-tone={result?.ranking_is_paid ? 'danger' : 'neutral'}
-            >
-              {result?.ranking_is_paid ? '存在付费排序' : '非付费排序'}
-            </span>
+            <div style={commerceStyles.headerActions}>
+              {result?.capability_contract_profile && <span style={badgeStyle()}>契约校验</span>}
+              <span
+                style={badgeStyle(result?.ranking_is_paid ? 'danger' : 'neutral')}
+                data-tone={result?.ranking_is_paid ? 'danger' : 'neutral'}
+              >
+                {result?.ranking_is_paid ? '存在付费排序' : '非付费排序'}
+              </span>
+            </div>
           </header>
           <div className={base.formCard} style={{ ...commerceStyles.sectionBody, ...commerceStyles.scrollArea }}>
             {result?.matches.map((match) => (

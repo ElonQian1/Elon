@@ -48,15 +48,17 @@
 38. `docs/open-commerce-consumer-portability-exports-v1-acceptance.md`：查看消费者可携带数据包 V1 的验证证据。
 39. `docs/decisions/open-commerce-consumer-preference-disclosures-v1.md`：查看消费者私有偏好档案、字段级快照和关系失效边界。
 40. `docs/open-commerce-consumer-preference-disclosures-v1-acceptance.md`：查看消费者偏好档案与商户匿名披露的验证证据。
-39. `docs/decisions/open-commerce-invocation-recovery-v1.md`：查看孤儿调用失败关闭、Grant 预算回收和迟到结果边界。
-40. `docs/decisions/open-commerce-app-activity-health-v1.md`：查看外部 App 近 24 小时可解释调用证据和人工处置边界。
-41. `docs/open-commerce-app-activity-health-v1-acceptance.md`：查看 App 调用活动证据 V1 的验证结果和未完成范围。
-42. `docs/decisions/node-compute-sharing-supply-v1.md`：查看节点所有者显式开放模型算力及原子调度边界。
-43. `docs/decisions/node-compute-sharing-token-reservation-v1.md`：查看每日实耗、活动预留和本次请求共同受预算约束的边界。
-44. `docs/decisions/node-compute-sharing-runtime-health-v1.md`：查看所有者运行健康快照、告警和非经济处置边界。
-45. `docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md`：查看过期执行终结、预授权回收和非终态状态边界。
-46. `docs/node-compute-sharing-supply-v1-acceptance.md`：查看节点模型共享 V1 的验证证据和未完成范围。
-47. `docs/node-compute-sharing-supply-v1-api.md`：查看策略字段、状态码和发现/调用契约。
+41. `docs/decisions/open-commerce-capability-contract-enforcement-v1.md`：查看能力输入输出 Schema 的有限支持、失败关闭和隐私边界。
+42. `docs/open-commerce-capability-contract-enforcement-v1-acceptance.md`：查看能力契约强制执行 V1 的验证证据。
+43. `docs/decisions/open-commerce-invocation-recovery-v1.md`：查看孤儿调用失败关闭、Grant 预算回收和迟到结果边界。
+44. `docs/decisions/open-commerce-app-activity-health-v1.md`：查看外部 App 近 24 小时可解释调用证据和人工处置边界。
+45. `docs/open-commerce-app-activity-health-v1-acceptance.md`：查看 App 调用活动证据 V1 的验证结果和未完成范围。
+46. `docs/decisions/node-compute-sharing-supply-v1.md`：查看节点所有者显式开放模型算力及原子调度边界。
+47. `docs/decisions/node-compute-sharing-token-reservation-v1.md`：查看每日实耗、活动预留和本次请求共同受预算约束的边界。
+48. `docs/decisions/node-compute-sharing-runtime-health-v1.md`：查看所有者运行健康快照、告警和非经济处置边界。
+49. `docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md`：查看过期执行终结、预授权回收和非终态状态边界。
+50. `docs/node-compute-sharing-supply-v1-acceptance.md`：查看节点模型共享 V1 的验证证据和未完成范围。
+51. `docs/node-compute-sharing-supply-v1-api.md`：查看策略字段、状态码和发现/调用契约。
 
 ## 专题地图
 

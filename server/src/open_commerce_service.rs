@@ -458,6 +458,8 @@ pub(crate) async fn invoke(
     if capability.status != CAPABILITY_STATUS_ACTIVE {
         bail!("商业能力当前不可用");
     }
+    crate::open_commerce_capability_schema::validate_input(&capability.input_schema, &input)
+        .map_err(anyhow::Error::new)?;
     let target_editor = actor.project_role.is_some_and(can_edit);
     let system_app = matches!(requester_app_id.as_str(), "pc-web" | "mcp-client");
     if !system_app {
@@ -504,6 +506,14 @@ pub(crate) async fn invoke(
         currency: &capability.currency,
     })?;
     if !claim.created {
+        crate::open_commerce_capability_contract_service::validate_replayed_output(
+            store,
+            actor,
+            &merchant,
+            &capability,
+            &requester_app_id,
+            &claim.invocation,
+        )?;
         return invocation_response(&claim.invocation, true);
     }
 
@@ -540,24 +550,40 @@ pub(crate) async fn invoke(
     {
         Ok(result) => result,
         Err(error) => {
-            let failed = store
-                .finish_open_commerce_invocation_failure(&claim.invocation.id, "handler_failed")?;
-            store.record_open_commerce_audit(
-                &merchant.project_id,
-                actor.user_id,
-                Some(&requester_app_id),
-                "invocation.failed",
-                "invocation",
-                &failed.id,
-                &json!({
-                    "merchant_id": merchant.id,
-                    "capability_key": capability.capability_key,
-                    "error_code": "handler_failed"
-                }),
+            crate::open_commerce_capability_contract_service::record_failed_invocation(
+                store,
+                actor,
+                &merchant,
+                &capability,
+                &requester_app_id,
+                &claim.invocation.id,
+                "handler_failed",
+                None,
             )?;
             return Err(error);
         }
     };
+    if let Err(error) =
+        crate::open_commerce_capability_schema::validate_output(&capability.output_schema, &result)
+    {
+        if capability.handler_type == HANDLER_MERCHANT_RUNTIME {
+            let _ = store.mark_open_commerce_runtime_degraded(
+                &merchant.id,
+                "runtime_output_schema_violation",
+            );
+        }
+        crate::open_commerce_capability_contract_service::record_failed_invocation(
+            store,
+            actor,
+            &merchant,
+            &capability,
+            &requester_app_id,
+            &claim.invocation.id,
+            "output_schema_violation",
+            Some((&error.path, error.code)),
+        )?;
+        return Err(anyhow::Error::new(error));
+    }
     let invocation =
         store.finish_open_commerce_invocation_success(&claim.invocation.id, &result)?;
     store.record_open_commerce_audit(

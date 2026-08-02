@@ -52,6 +52,7 @@ pub(crate) struct ConsumerDiscoveryMatch {
 #[derive(Debug, Serialize)]
 pub(crate) struct ConsumerDiscoveryResponse {
     pub schema: &'static str,
+    pub capability_contract_profile: &'static str,
     pub requester_app_id: String,
     pub ranking_policy: &'static str,
     pub ranking_is_paid: bool,

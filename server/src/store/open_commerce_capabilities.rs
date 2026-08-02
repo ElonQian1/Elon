@@ -2,6 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use rusqlite::{params, Row};
 use serde_json::Value;
 
+use crate::open_commerce_capability_schema::{validate_input_schema, validate_output_schema};
 use crate::open_commerce_model::{
     normalize_capability_key, validate_access_level, validate_capability_kind,
     validate_display_name, validate_handler_type, validate_json_object, validate_status,
@@ -24,6 +25,8 @@ impl Store {
         let access_level = validate_access_level(&request.access_level)?;
         let input_schema = validate_json_object(&request.input_schema, "输入 schema")?;
         let output_schema = validate_json_object(&request.output_schema, "输出 schema")?;
+        validate_input_schema(&input_schema)?;
+        validate_output_schema(&output_schema)?;
         let handler_type = validate_handler_type(&request.handler_type)?;
         let handler_config =
             validate_handler_config(&handler_type, request.handler_config.as_ref())?;
@@ -93,6 +96,8 @@ impl Store {
             Some(value) => validate_json_object(&value, "输出 schema")?,
             None => current.output_schema,
         };
+        validate_input_schema(&input_schema)?;
+        validate_output_schema(&output_schema)?;
         let handler_type = match request.handler_type {
             Some(value) => validate_handler_type(&value)?,
             None => current.handler_type,

@@ -17,6 +17,11 @@ pub(crate) fn invocation_response(
         "replayed": replayed,
         "result": invocation.result,
         "error_code": invocation.error_code,
+        "contract_validation": {
+            "profile": "open_commerce.capability_schema.v1",
+            "input_validated": true,
+            "output_validated": invocation.status == "succeeded"
+        },
         "metering": {
             "units": invocation.units,
             "unit_price_micros": invocation.unit_price_micros,

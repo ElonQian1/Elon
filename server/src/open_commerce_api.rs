@@ -504,11 +504,15 @@ fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response 
 fn service_error(error: anyhow::Error) -> Response {
     let rate_limited =
         error.is::<crate::open_commerce_rate_limit_model::OpenCommerceRateLimitExceeded>();
+    let schema_violation =
+        error.is::<crate::open_commerce_capability_schema::CapabilitySchemaViolation>();
     let grant_budget_exceeded =
         error.is::<crate::open_commerce_grant_budget_model::OpenCommerceGrantBudgetExceeded>();
     let app_blocked = error.is::<crate::open_commerce_app_block_model::OpenCommerceAppBlocked>();
     let message = format!("{error:#}");
-    let status = if rate_limited {
+    let status = if schema_violation {
+        StatusCode::UNPROCESSABLE_ENTITY
+    } else if rate_limited {
         StatusCode::TOO_MANY_REQUESTS
     } else if app_blocked || grant_budget_exceeded {
         StatusCode::FORBIDDEN
@@ -579,6 +583,17 @@ mod tests {
             ))
             .status(),
             StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            service_error(anyhow::anyhow!(
+                crate::open_commerce_capability_schema::CapabilitySchemaViolation {
+                    code: "required",
+                    path: "$.items".to_string(),
+                    side: "输入 schema",
+                }
+            ))
+            .status(),
+            StatusCode::UNPROCESSABLE_ENTITY
         );
     }
 }
