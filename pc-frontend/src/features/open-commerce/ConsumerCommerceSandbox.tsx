@@ -6,6 +6,7 @@ import ConsumerRelationshipManager from './ConsumerRelationshipManager'
 import ConsumerPortabilityExports from './ConsumerPortabilityExports'
 import ConsumerPreferenceProfilePanel from './ConsumerPreferenceProfilePanel'
 import ConsumerInvocationReceipts from './ConsumerInvocationReceipts'
+import CapabilityInvocationComposer from './CapabilityInvocationComposer'
 import type {
   ConsumerDiscoveryMatch,
   ConsumerDiscoveryResponse,
@@ -36,6 +37,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [receiptRefreshKey, setReceiptRefreshKey] = useState(0)
+  const [selectedMatch, setSelectedMatch] = useState<ConsumerDiscoveryMatch | null>(null)
 
   const loadApps = useCallback(async () => {
     try {
@@ -69,6 +71,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
     setBusy(true)
     setMessage('')
     setInvocation(null)
+    setSelectedMatch(null)
     try {
       const response = await openCommerceClientApi.discover({
         query: query.trim() || undefined,
@@ -126,14 +129,18 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
     }
   }
 
-  async function invoke(match: ConsumerDiscoveryMatch) {
+  async function invoke(
+    match: ConsumerDiscoveryMatch,
+    input: Record<string, unknown>,
+    idempotencyKey: string,
+  ) {
     const request = {
       merchant_id: match.merchant.id,
       capability_key: match.capability.capability_key,
       requester_app_id: appId,
       grant_id: match.authorization.grant_id,
-      idempotency_key: `consumer-sandbox-${crypto.randomUUID()}`,
-      input: {},
+      idempotency_key: idempotencyKey,
+      input,
     }
     setBusy(true)
     setMessage('')
@@ -143,8 +150,11 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         : await openCommerceClientApi.invokeAsApp(appId, request)
       setInvocation(response)
       setReceiptRefreshKey((value) => value + 1)
+      setMessage('调用已完成，结果和本人调用凭证已更新。')
+      return true
     } catch (error) {
       setMessage(errorText(error))
+      return false
     } finally {
       setBusy(false)
     }
@@ -168,7 +178,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
           <form className={base.formCard} style={commerceStyles.sectionBody} onSubmit={(event) => { event.preventDefault(); discover() }}>
             <label>
               请求应用
-              <select value={appId} onChange={(event) => setAppId(event.target.value)}>
+              <select value={appId} onChange={(event) => { setAppId(event.target.value); setSelectedMatch(null) }}>
                 <option value="pc-web">公共网页身份（仅公开能力）</option>
                 {activeApps.map((app) => <option key={app.id} value={app.app_id}>{app.display_name}</option>)}
               </select>
@@ -218,8 +228,8 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
                       </button>
                     )}
                     {['not_required', 'granted'].includes(match.authorization.status) && (
-                      <button style={actionStyle('primary', busy)} type="button" onClick={() => invoke(match)} disabled={busy}>
-                        <Play size={13} />调用
+                      <button style={actionStyle('primary', busy)} type="button" onClick={() => setSelectedMatch(match)} disabled={busy}>
+                        <Play size={13} />填写并调用
                       </button>
                     )}
                   </div>
@@ -231,6 +241,16 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
           </div>
         </section>
       </div>
+
+      {selectedMatch && (
+        <CapabilityInvocationComposer
+          key={`${selectedMatch.merchant.id}:${selectedMatch.capability.capability_key}:${appId}`}
+          match={selectedMatch}
+          busy={busy}
+          onCancel={() => setSelectedMatch(null)}
+          onInvoke={invoke}
+        />
+      )}
 
       <ConsumerPreferenceProfilePanel
         projectId={projectId}
