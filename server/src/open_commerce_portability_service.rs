@@ -40,6 +40,8 @@ pub(crate) fn create_export(
         relationships: sources.relationships,
         relationship_renewals: sources.relationship_renewals,
         data_requests: sources.data_requests,
+        preference_profile: sources.preference_profile,
+        preference_disclosures: sources.preference_disclosures,
     };
     let payload_json = canonical_payload_json(&payload)?;
     let payload_sha256 = digest_payload(payload_json.as_bytes());
@@ -64,7 +66,9 @@ pub(crate) fn create_export(
                 "payload_sha256": export.payload_sha256,
                 "relationship_count": export.payload.relationships.len(),
                 "renewal_count": export.payload.relationship_renewals.len(),
-                "data_request_count": export.payload.data_requests.len()
+                "data_request_count": export.payload.data_requests.len(),
+                "preference_profile_included": export.payload.preference_profile.is_some(),
+                "preference_disclosure_count": export.payload.preference_disclosures.len()
             }),
         )?;
     }
@@ -127,10 +131,17 @@ fn verify_export(
     export: ConsumerPortabilityExport,
     expected_project_id: &str,
 ) -> Result<ConsumerPortabilityExport> {
-    if export.schema != CONSUMER_PORTABILITY_EXPORT_SCHEMA {
-        bail!("消费者可携带数据包版本不受支持");
-    }
-    if export.payload.schema != CONSUMER_PORTABILITY_PAYLOAD_SCHEMA {
+    let supported_version = matches!(
+        (export.schema.as_str(), export.payload.schema.as_str()),
+        (
+            CONSUMER_PORTABILITY_EXPORT_SCHEMA,
+            CONSUMER_PORTABILITY_PAYLOAD_SCHEMA
+        ) | (
+            crate::open_commerce_portability_model::CONSUMER_PORTABILITY_EXPORT_SCHEMA_V1,
+            crate::open_commerce_portability_model::CONSUMER_PORTABILITY_PAYLOAD_SCHEMA_V1
+        )
+    );
+    if !supported_version {
         bail!("消费者可携带数据负载版本不受支持");
     }
     if export.source_project_id != expected_project_id.trim()

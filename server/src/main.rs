@@ -227,6 +227,8 @@ mod open_commerce_portability_model;
 mod open_commerce_portability_service;
 #[cfg(test)]
 mod open_commerce_portability_tests;
+#[cfg(test)]
+mod open_commerce_portability_v2_tests;
 mod open_commerce_rate_limit_api;
 mod open_commerce_rate_limit_migration;
 mod open_commerce_rate_limit_model;

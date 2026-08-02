@@ -64,7 +64,7 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
       <header>
         <span>
           <strong>我的可携带数据包</strong>
-          <small>导出关系、续期链和删除请求回执；不含偏好原文、订单或账号标识。</small>
+          <small>导出关系、删除回执、本人低敏偏好和披露快照；不含订单、联系方式、支付或账号标识。</small>
         </span>
         <div style={commerceStyles.headerActions}>
           <button style={actionStyle('icon', busy)} type="button" onClick={refresh} disabled={busy} title="刷新数据包">
@@ -85,6 +85,7 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
             <p style={{ ...commerceStyles.itemText, overflowWrap: 'anywhere' }}>{item.payload_sha256}</p>
             <small style={commerceStyles.itemMeta}>
               关系 {item.relationship_count} · 续期 {item.renewal_count} · 删除请求 {item.data_request_count}
+              {' · '}偏好档案 {item.preference_profile_included ? '1' : '0'} · 披露 {item.preference_disclosure_count}
             </small>
             <footer style={{ ...commerceStyles.itemHeader, marginTop: 8 }}>
               <code style={{ ...commerceStyles.itemMeta, overflowWrap: 'anywhere' }}>{item.id}</code>

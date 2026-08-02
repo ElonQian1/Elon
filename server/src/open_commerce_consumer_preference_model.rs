@@ -7,7 +7,7 @@ pub(crate) const PREFERENCE_FIELD_TAGS: &str = "tags";
 pub(crate) const PREFERENCE_FIELD_CITY: &str = "city";
 pub(crate) const PREFERENCE_FIELD_MAX_UNIT_PRICE: &str = "max_unit_price_micros";
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ConsumerPreferenceProfile {
     pub preferences: ConsumerPreferences,
     pub revision: i64,
@@ -38,7 +38,7 @@ pub(crate) struct DisclosedConsumerPreferences {
     pub max_unit_price_micros: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ConsumerPreferenceDisclosure {
     pub relationship_id: String,
     pub merchant_id: String,

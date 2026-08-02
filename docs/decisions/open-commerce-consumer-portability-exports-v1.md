@@ -3,9 +3,12 @@ title: 开放商业消费者可携带数据包 V1
 status: accepted
 date: 2026-08-02
 owners: backend, product
+superseded_by: docs/decisions/open-commerce-consumer-portability-exports-v2.md
 ---
 
 # 开放商业消费者可携带数据包 V1
+
+> V1 仍作为历史数据格式受支持；当前新建快照使用 V2。新增能力与现行边界见 `docs/decisions/open-commerce-consumer-portability-exports-v2.md`。
 
 ## 背景
 

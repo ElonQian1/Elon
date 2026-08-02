@@ -1,13 +1,20 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    open_commerce_consumer_preference_model::{
+        ConsumerPreferenceDisclosure, ConsumerPreferenceProfile,
+    },
     open_commerce_data_request_model::OpenCommerceConsumerDataRequest,
     open_commerce_relationship_model::OpenCommerceConsumerRelationship,
 };
 
 pub(crate) const CONSUMER_PORTABILITY_EXPORT_SCHEMA: &str =
-    "open_commerce.consumer_portability_export.v1";
+    "open_commerce.consumer_portability_export.v2";
 pub(crate) const CONSUMER_PORTABILITY_PAYLOAD_SCHEMA: &str =
+    "open_commerce.consumer_portability_payload.v2";
+pub(crate) const CONSUMER_PORTABILITY_EXPORT_SCHEMA_V1: &str =
+    "open_commerce.consumer_portability_export.v1";
+pub(crate) const CONSUMER_PORTABILITY_PAYLOAD_SCHEMA_V1: &str =
     "open_commerce.consumer_portability_payload.v1";
 
 #[derive(Debug, Clone, Deserialize)]
@@ -29,6 +36,10 @@ pub(crate) struct ConsumerPortabilityPayload {
     pub relationships: Vec<OpenCommerceConsumerRelationship>,
     pub relationship_renewals: Vec<ConsumerRelationshipRenewalLink>,
     pub data_requests: Vec<OpenCommerceConsumerDataRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preference_profile: Option<ConsumerPreferenceProfile>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub preference_disclosures: Vec<ConsumerPreferenceDisclosure>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,6 +62,8 @@ pub(crate) struct ConsumerPortabilityExportSummary {
     pub relationship_count: usize,
     pub renewal_count: usize,
     pub data_request_count: usize,
+    pub preference_profile_included: bool,
+    pub preference_disclosure_count: usize,
     pub created_at: String,
 }
 
@@ -64,6 +77,8 @@ impl ConsumerPortabilityExport {
             relationship_count: self.payload.relationships.len(),
             renewal_count: self.payload.relationship_renewals.len(),
             data_request_count: self.payload.data_requests.len(),
+            preference_profile_included: self.payload.preference_profile.is_some(),
+            preference_disclosure_count: self.payload.preference_disclosures.len(),
             created_at: self.created_at.clone(),
         }
     }

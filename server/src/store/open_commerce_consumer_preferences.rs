@@ -188,7 +188,7 @@ impl Store {
                 consumer_user_id,
                 limit.clamp(1, 200) as i64
             ],
-            merchant_disclosure_from_row,
+            preference_disclosure_from_row,
         )?;
         rows.collect::<rusqlite::Result<Vec<_>>>()
             .map_err(Into::into)
@@ -226,14 +226,16 @@ impl Store {
                 timestamp,
                 limit.clamp(1, 200) as i64
             ],
-            merchant_disclosure_from_row,
+            preference_disclosure_from_row,
         )?;
         rows.collect::<rusqlite::Result<Vec<_>>>()
             .map_err(Into::into)
     }
 }
 
-fn preference_profile_from_row(row: &Row<'_>) -> rusqlite::Result<ConsumerPreferenceProfile> {
+pub(super) fn preference_profile_from_row(
+    row: &Row<'_>,
+) -> rusqlite::Result<ConsumerPreferenceProfile> {
     let preferences_json: String = row.get(0)?;
     let preferences = parse_json(&preferences_json)?;
     Ok(ConsumerPreferenceProfile {
@@ -244,7 +246,9 @@ fn preference_profile_from_row(row: &Row<'_>) -> rusqlite::Result<ConsumerPrefer
     })
 }
 
-fn merchant_disclosure_from_row(row: &Row<'_>) -> rusqlite::Result<ConsumerPreferenceDisclosure> {
+pub(super) fn preference_disclosure_from_row(
+    row: &Row<'_>,
+) -> rusqlite::Result<ConsumerPreferenceDisclosure> {
     let stored_status: String = row.get(3)?;
     let expires_at: String = row.get(4)?;
     let relationship_status = effective_relationship_status(&stored_status, &expires_at);

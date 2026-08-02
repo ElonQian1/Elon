@@ -100,6 +100,8 @@ export interface ConsumerPortabilityPayload {
   relationships: ConsumerRelationship[]
   relationship_renewals: ConsumerRelationshipRenewalLink[]
   data_requests: ConsumerDataRequest[]
+  preference_profile?: ConsumerPreferenceProfile
+  preference_disclosures?: ConsumerPreferenceDisclosure[]
 }
 
 export interface ConsumerPortabilityExport {
@@ -120,6 +122,8 @@ export interface ConsumerPortabilityExportSummary {
   relationship_count: number
   renewal_count: number
   data_request_count: number
+  preference_profile_included: boolean
+  preference_disclosure_count: number
   created_at: string
 }
 

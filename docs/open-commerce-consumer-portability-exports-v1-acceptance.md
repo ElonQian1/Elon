@@ -1,5 +1,7 @@
 # 开放商业消费者可携带数据包 V1 验收
 
+> 本文保留 V1 历史验收证据。当前新建快照已升级为 V2，详见 `docs/open-commerce-consumer-portability-exports-v2-acceptance.md`。
+
 ## 已验证闭环
 
 - 当前用户可创建、列出和读取自己的不可变数据包；同项目其他用户不能读取或列出该用户的数据包。

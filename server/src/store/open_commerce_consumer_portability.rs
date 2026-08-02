@@ -2,6 +2,9 @@ use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension, Row, TransactionBehavior};
 
 use crate::{
+    open_commerce_consumer_preference_model::{
+        ConsumerPreferenceDisclosure, ConsumerPreferenceProfile,
+    },
     open_commerce_data_request_model::OpenCommerceConsumerDataRequest,
     open_commerce_portability_model::{
         ConsumerPortabilityExport, ConsumerPortabilityPayload, ConsumerRelationshipRenewalLink,
@@ -12,6 +15,9 @@ use crate::{
 use super::{
     new_id, now,
     open_commerce_consumer_data_requests::{data_request_from_row, DATA_REQUEST_SELECT},
+    open_commerce_consumer_preferences::{
+        preference_disclosure_from_row, preference_profile_from_row,
+    },
     open_commerce_consumer_relationships::relationship_from_row,
     Store,
 };
@@ -22,6 +28,8 @@ pub(crate) struct ConsumerPortabilitySnapshotSources {
     pub relationships: Vec<OpenCommerceConsumerRelationship>,
     pub relationship_renewals: Vec<ConsumerRelationshipRenewalLink>,
     pub data_requests: Vec<OpenCommerceConsumerDataRequest>,
+    pub preference_profile: Option<ConsumerPreferenceProfile>,
+    pub preference_disclosures: Vec<ConsumerPreferenceDisclosure>,
 }
 
 impl Store {
@@ -53,7 +61,7 @@ impl Store {
         let relationship_rows = relationship_rows.collect::<rusqlite::Result<Vec<_>>>()?;
         drop(relationship_stmt);
         if relationship_rows.len() > MAX_CONSUMER_PORTABILITY_RECORDS {
-            bail!("消费者关系记录超过单个 V1 导出包的 5000 条上限");
+            bail!("消费者关系记录超过单个导出包的 5000 条上限");
         }
         let mut relationships = Vec::with_capacity(relationship_rows.len());
         let mut relationship_renewals = Vec::new();
@@ -83,13 +91,52 @@ impl Store {
         let data_requests = request_rows.collect::<rusqlite::Result<Vec<_>>>()?;
         drop(request_stmt);
         if data_requests.len() > MAX_CONSUMER_PORTABILITY_RECORDS {
-            bail!("消费者数据请求超过单个 V1 导出包的 5000 条上限");
+            bail!("消费者数据请求超过单个导出包的 5000 条上限");
+        }
+
+        let preference_profile = tx
+            .query_row(
+                "SELECT preferences_json, revision, created_at, updated_at
+                   FROM open_commerce_consumer_preference_profiles
+                  WHERE consumer_project_id=?1 AND consumer_user_id=?2",
+                params![consumer_project_id.trim(), consumer_user_id.trim()],
+                preference_profile_from_row,
+            )
+            .optional()?;
+        let mut disclosure_stmt = tx.prepare(
+            "SELECT disclosure.relationship_id, relationship.merchant_id,
+                    relationship.subject_alias, relationship.status,
+                    relationship.expires_at, disclosure.shared_fields_json,
+                    disclosure.disclosure_json, disclosure.profile_revision,
+                    disclosure.created_at, disclosure.updated_at
+               FROM open_commerce_consumer_preference_disclosures disclosure
+               JOIN open_commerce_consumer_relationships relationship
+                 ON relationship.id=disclosure.relationship_id
+              WHERE relationship.consumer_project_id=?1
+                AND relationship.consumer_user_id=?2
+              ORDER BY disclosure.created_at ASC, disclosure.rowid ASC
+              LIMIT ?3",
+        )?;
+        let disclosure_rows = disclosure_stmt.query_map(
+            params![
+                consumer_project_id.trim(),
+                consumer_user_id.trim(),
+                (MAX_CONSUMER_PORTABILITY_RECORDS + 1) as i64,
+            ],
+            preference_disclosure_from_row,
+        )?;
+        let preference_disclosures = disclosure_rows.collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(disclosure_stmt);
+        if preference_disclosures.len() > MAX_CONSUMER_PORTABILITY_RECORDS {
+            bail!("消费者偏好披露超过单个 V2 导出包的 5000 条上限");
         }
         tx.commit()?;
         Ok(ConsumerPortabilitySnapshotSources {
             relationships,
             relationship_renewals,
             data_requests,
+            preference_profile,
+            preference_disclosures,
         })
     }
 

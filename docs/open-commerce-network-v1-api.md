@@ -151,7 +151,7 @@ MCP 对应工具为 `open_commerce_list_consumer_relationships`、`open_commerce
 
 披露请求使用固定 `shared_fields` 白名单，只能绑定有效且含 `preference.remember` 的关系。返回值包含匿名 `subject_alias`、字段快照和来源档案修订号，不含消费者账号、用户 ID 或消费者项目。档案后续更新不自动同步，关系撤销、到期、删除请求或续期都会使旧披露对商户失败关闭。
 
-MCP 提供档案读取、保存、删除，本人披露列表、单关系披露读取/更新/撤回，以及商户有效披露列表工具。工具定义集中在 `server/src/open_commerce_consumer_preference_mcp.rs`，共用同一领域服务。当前数据不进入消费者可携带数据包 V1，也不声称是端到端加密或跨运营方消费者数据保险箱。
+MCP 提供档案读取、保存、删除，本人披露列表、单关系披露读取/更新/撤回，以及商户有效披露列表工具。工具定义集中在 `server/src/open_commerce_consumer_preference_mcp.rs`，共用同一领域服务。当前低敏结构化档案和历史披露可进入消费者本人 V2 数据包，但这仍不是端到端加密或跨运营方消费者数据保险箱。
 
 ## 消费者关联数据删除请求
 
@@ -168,14 +168,14 @@ MCP 对应工具为 `open_commerce_list_consumer_data_requests`、`open_commerce
 
 ## 消费者可携带数据包
 
-可携带数据包是当前用户拥有的不可变快照，不是商户公开目录，也不是完整账户备份。V1 只包含关系历史、消费者私有续期链和删除请求回执；不包含消费者账号 ID、偏好原文、订单、支付或商户私有数据。
+可携带数据包是当前用户拥有的不可变快照，不是商户公开目录，也不是完整账户备份。V2 包含关系历史、消费者私有续期链、删除请求回执、当前低敏结构化偏好档案和历史披露快照；不包含消费者账号 ID、联系方式、订单、支付或商户私有数据。披露记录是消费者当时主动固化的快照，即使关系后来失效仍可由本人导出，但商户实时读取仍按关系状态失败关闭。
 
 - `GET/POST /api/projects/:project_id/open-commerce/consumer-portability-exports`：列出当前用户的数据包摘要，或用幂等键创建新快照。
 - `GET /api/projects/:project_id/open-commerce/consumer-portability-exports/:export_id`：读取当前用户拥有的数据包并重新校验 SHA-256。
 
 创建参数为 `idempotency_key`。同一用户在同一项目重复使用相同键时永远返回首次快照；要反映后续关系或请求变化必须使用新键。负载最多 5 MiB，关系和请求各最多 5000 条，超限不会截断。
 
-MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_commerce_get_consumer_portability_export` 和 `open_commerce_create_consumer_portability_export`。V1 只导出，不提供导入、跨运营方迁移或偏好保险箱。
+MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_commerce_get_consumer_portability_export` 和 `open_commerce_create_consumer_portability_export`。V2 新包使用新版本标识；读取同时接受原 V1 包，并通过缺省字段不参与重新序列化保持旧 SHA-256。当前仍只导出，不提供导入、跨运营方迁移、加密归档或敏感偏好保险箱。
 
 ## 调用配额
 
