@@ -184,6 +184,13 @@ fn validate_steps(steps: &[CaptureInteractionStep]) -> Result<u64, CaptureDiagno
                     ));
                 }
             }
+            CaptureInteractionStep::PreviewStyle { selector, patches } => {
+                validate_selector(Some(selector))?;
+                super::style_preview::validate_patches(patches)?;
+            }
+            CaptureInteractionStep::RestoreStyle { selector } => {
+                validate_selector(Some(selector))?;
+            }
         }
     }
     if timeout_ms > 120_000 {

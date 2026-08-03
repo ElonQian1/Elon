@@ -74,7 +74,7 @@ pub(super) async fn call(session: &LiveUiSession, name: &str, arguments: Value) 
 
 async fn prepare(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
     let (root, mut record) = browser_record(session, arguments)?;
-    let capture = capture_input(&record, arguments, None)?;
+    let capture = capture_input(&record, arguments, None).await?;
     let input = serde_json::from_value(capture).context("持久浏览器 capture 参数无效")?;
     let restart = arguments
         .get("restart")
@@ -99,7 +99,7 @@ async fn interact(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
         .and_then(Value::as_str)
         .map(sanitize_url)
         .transpose()?;
-    let capture = capture_input(&record, arguments, navigate_to.as_deref())?;
+    let capture = capture_input(&record, arguments, navigate_to.as_deref()).await?;
     let input = serde_json::from_value(capture).context("持久浏览器交互参数无效")?;
     let root_text = root.to_string_lossy().to_string();
     let result = crate::node_agent_pwa_runtime::interact_stateful_browser(
@@ -162,7 +162,7 @@ fn browser_record(
     Ok((root, record))
 }
 
-fn capture_input(
+async fn capture_input(
     record: &DesignSessionRecord,
     arguments: &Value,
     navigate_to: Option<&str>,
@@ -184,6 +184,16 @@ fn capture_input(
         json!({"sourceRevision":"design-session-source-unverified",
             "routeRevision":format!("stateful:{}",record.design_session_id)}),
     );
+    if let Some(binding) =
+        crate::node_agent_pwa_runtime::stateful_browser_binding(&record.design_session_id).await
+    {
+        input
+            .entry("authProfile".into())
+            .or_insert_with(|| json!(binding.auth_profile));
+        input
+            .entry("fixtureProfile".into())
+            .or_insert_with(|| json!(binding.fixture_profile));
+    }
     Ok(capture)
 }
 

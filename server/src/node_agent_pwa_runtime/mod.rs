@@ -14,10 +14,11 @@ mod process;
 mod security;
 mod semantic_tree;
 mod stateful;
+mod style_preview;
 
 pub(crate) use stateful::{
-    interact as interact_stateful_browser, start as start_stateful_browser,
-    stop as stop_stateful_browser,
+    binding as stateful_browser_binding, interact as interact_stateful_browser,
+    start as start_stateful_browser, stop as stop_stateful_browser,
 };
 
 #[cfg(test)]
@@ -84,6 +85,20 @@ pub(crate) enum CaptureInteractionStep {
         selector: String,
         text: String,
     },
+    PreviewStyle {
+        selector: String,
+        patches: Vec<PreviewStylePatch>,
+    },
+    RestoreStyle {
+        selector: String,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct PreviewStylePatch {
+    pub(crate) property: String,
+    pub(crate) value: String,
 }
 
 fn default_interaction_state() -> String {
@@ -314,6 +329,29 @@ pub(crate) fn tool_definition() -> Value {
                                     "action":{"const":"assertText"},
                                     "selector":{"type":"string","minLength":1,"maxLength":1000},
                                     "text":{"type":"string","minLength":1,"maxLength":500}
+                                }
+                            },
+                            {
+                                "type":"object","additionalProperties":false,
+                                "required":["action","selector","patches"],
+                                "properties":{
+                                    "action":{"const":"previewStyle"},
+                                    "selector":{"type":"string","minLength":1,"maxLength":1000},
+                                    "patches":{"type":"array","minItems":1,"maxItems":32,"items":{
+                                        "type":"object","additionalProperties":false,"required":["property","value"],
+                                        "properties":{
+                                            "property":{"type":"string","minLength":1,"maxLength":64},
+                                            "value":{"type":"string","maxLength":300}
+                                        }
+                                    }}
+                                }
+                            },
+                            {
+                                "type":"object","additionalProperties":false,
+                                "required":["action","selector"],
+                                "properties":{
+                                    "action":{"const":"restoreStyle"},
+                                    "selector":{"type":"string","minLength":1,"maxLength":1000}
                                 }
                             }
                         ]

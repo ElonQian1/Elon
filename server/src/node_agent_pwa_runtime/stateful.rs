@@ -20,6 +20,12 @@ const MAX_OPERATIONS: u32 = 128;
 const IDLE_TTL: Duration = Duration::from_secs(15 * 60);
 const LIFETIME_TTL: Duration = Duration::from_secs(60 * 60);
 
+#[derive(Debug, Clone)]
+pub(crate) struct StatefulBrowserBinding {
+    pub(crate) auth_profile: Option<String>,
+    pub(crate) fixture_profile: Option<String>,
+}
+
 struct StatefulBrowser {
     runtime_id: String,
     project_root: PathBuf,
@@ -53,8 +59,11 @@ pub(crate) async fn start(
     prune_expired().await;
     if restart {
         let _ = stop(runtime_key).await;
-    } else if let Some(view) = existing_view(runtime_key).await {
-        return json!({"ok":true,"status":"READY","runtime":view,"reused":true});
+    } else if let Some(result) = existing_reuse(runtime_key, &prepared).await {
+        return match result {
+            Ok(view) => json!({"ok":true,"status":"READY","runtime":view,"reused":true}),
+            Err(diagnostic) => diagnostic.response(),
+        };
     }
     if sessions().lock().await.len() >= MAX_ACTIVE_SESSIONS {
         return diagnostic(
@@ -213,8 +222,26 @@ pub(crate) async fn stop(runtime_key: &str) -> Value {
     })
 }
 
-async fn existing_view(runtime_key: &str) -> Option<Value> {
-    sessions().lock().await.get(runtime_key).map(runtime_view)
+async fn existing_reuse(
+    runtime_key: &str,
+    prepared: &PreparedCapture,
+) -> Option<Result<Value, CaptureDiagnostic>> {
+    sessions()
+        .lock()
+        .await
+        .get(runtime_key)
+        .map(|runtime| validate_reuse(runtime, prepared).map(|_| runtime_view(runtime)))
+}
+
+pub(crate) async fn binding(runtime_key: &str) -> Option<StatefulBrowserBinding> {
+    sessions()
+        .lock()
+        .await
+        .get(runtime_key)
+        .map(|runtime| StatefulBrowserBinding {
+            auth_profile: runtime.auth_profile.clone(),
+            fixture_profile: runtime.fixture_profile.clone(),
+        })
 }
 
 async fn prune_expired() {

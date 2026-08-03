@@ -152,6 +152,16 @@ pub(super) async fn execute_steps(
                     _ => return Err(interaction_error(index, "assertText selector 无效")),
                 }
             }
+            CaptureInteractionStep::PreviewStyle { selector, patches } => {
+                let value =
+                    super::style_preview::preview(cdp, session, selector, patches, deadline)
+                        .await?;
+                expect_status(value, index, "previewed", "previewStyle")?;
+            }
+            CaptureInteractionStep::RestoreStyle { selector } => {
+                let value = super::style_preview::restore(cdp, session, selector, deadline).await?;
+                expect_status(value, index, "restored", "restoreStyle")?;
+            }
         }
     }
     Ok(prepared.steps.len())
