@@ -1,6 +1,6 @@
 # Windows 节点升级兼容与事故处置
 
-最后更新：2026-07-24
+最后更新：2026-08-04
 
 本文是 Windows EXE 节点升级时按需读取的兼容门禁。项目数据架构合同见 `docs/pc-node-data-root.md`；发布命令引用 Git/发布手册，不在这里重复。
 
@@ -45,6 +45,7 @@
 16. 显式隔离模拟器包可以复用零 Patch 的新鲜 Runtime source proof，但只在 generation、installed generation、integration revision、generation HEAD/内容指纹、原业务 Git/workspace revision、包和 runtimeBuildId 全部一致时允许 FitRun `ACCEPT_BEST`；这不放宽真机固定包、签名、物理设备或来源 worktree 校验。
 17. `CROSS_PLATFORM_STYLE_WRITEBACK` 支持 `NO_WEB_COUNTERPART` 正式分支：仍需真实 Android 工件、当前 source revision、源码写回和无 Patch 构建；Web 侧改为扫描调用者声明的仓库内 Android 跟踪来源、Web 跟踪源码根和在 Android 来源中实际出现的搜索词。只有检查到 Web 跟踪文件且零匹配时通过；若存在匹配、证据越界、非跟踪来源或空扫描则拒绝，禁止用伪造 Web 截图代替。
 18. 普通视觉和设备分类任务默认直接使用 PWA 或明确的隔离模拟器槽，不探测物理设备。只有用户反馈修改结果不正确或明确要求真机复核时才启用 `realDeviceRequired`；同一 MCP 会话只做一次最长 30 秒准备，离线、占用、遮挡、授权/安装确认、Runtime 失败或超时立即延期且禁止回退冒充。同一节点按设备 serial 独占写入，package 后缀不能绕过；未绑定明确 Runtime 身份时不能只按 projectRoot 猜测。Node-local operation lease 只能作为本机阶段证据，不能冒充跨 PC 全局 lease。
+19. 后台多端设计 schema v1.7 必须显式能力协商：旧节点没有 `ui_get_design_capabilities` 时，现有 CLI/Exec 和旧 UI 工具继续兼容，新持久浏览器/Tauri 行为/验证矩阵显示“节点待升级”并失败关闭；不得从仓库版本、PC 前端版本或工具文档推断节点已经安装。升级成功必须回读 `runtimeSchema=yilong-ui-live@1.7.0` 和所需 capability ID；更新不迁移、删除或跨项目复用 `.elon/ui-tuner/headless-design` 会话、草稿、工件或 fixture。
 
 ## 配置与缓存迁移合同
 
@@ -87,6 +88,7 @@ Linux 交叉编译延长 Windows 发布。该开关不影响 `publish-server.*` 
 - 低优先自进化在前台任务、发布、更新和构建压力下 pause/yield，门禁解除后自动 resume；必须证明实际派发目录是已持久化的独立 worktree，并覆盖 action intent 重放、审查 provenance 和配额自动重试。
 - 远程监督 v1 的身份、能力、live lease 和断线恢复 fail-closed fixture；本地可信任务优先，远程证据缺失不得降级绕过。
 - PWA Runtime 捕获的 Windows Edge/Chrome 标准路径与 `ELON_PWA_BROWSER_PATH` 探测、浏览器缺失诊断、真实 loopback HTML/PWA fixture 精确 viewport PNG、SHA-256/route/revision 元数据、认证失败不误报、SSRF/秘密门禁，以及成功/超时/启动失败后的浏览器进程树和临时 profile 回收。发布包不得新增 Desktop Browser 或人工可见浏览器依赖。
+- 后台设计 v1.7 fixture：旧节点不识别能力工具时 PC 只显示待升级且旧 CLI/Exec 正常；新节点能力回读精确。持久浏览器覆盖同 session 状态保留、项目/origin/auth/fixture/viewport 绑定、4/15m/60m/128 上限、秘密键值和 password/hidden/file 拒绝、停止/过期进程回收；Tauri 覆盖后代窗口、菜单/对话框分层、插桩与未插桩 trace，证明工具没有任意菜单点击或任意 command 执行；四端验证矩阵不得在缺少平台回执时标记 PASSED。
 - Android 调试身份 fixture：旧 `node.json` 首次补写、连续更新/重启包名不变、身份漂移 fail-closed、三个会话按序合并、新代次淘汰旧构建、USB/无线端点共用物理设备部署锁、所有兼容后缀无法绕过固定真机包、正式包不受影响、历史杂包仅报告不自动卸载；另须覆盖 LKG 缺字段/默认关闭时不记录且不阻塞安装，以及任务显式启用后仍保留同文件冲突保护、最近成功 APK 保留和签名钉扎语义。
 - Android Renderer 调度 fixture：同项目不同空闲模拟器槽允许并行，不同项目不能写同一槽，同真机跨 PC 的全局 lease 冲突拒绝，新 generation 在安装前 fencing 旧 generation，断线/过期 lease 仅在进程和心跳证据闭合后回收；显式离线 deviceId 且 `fallbackToEmulator=false` 不换机，多个在线 emulator 必须跳过已租用实例。第一阶段至少覆盖节点内 busy serial 排除、设备级部署锁、多个 Runtime 时 fail-closed 路由和 60 秒回退；跨 PC TTL/heartbeat/fencing、独立 AVD 数据目录与 FIFO 队列未落地时必须在发布报告中列为未覆盖边界。
 - Debug Runtime/FitRun fixture：原业务 Git/workspace revision 到合成 integration revision 的映射可复核；隔离模拟器包仅在 generation、integration、Git、runtimeBuildId 与零 Patch 全匹配时接受；generation、installed generation、integration HEAD、业务 HEAD、包、Runtime 或 Patch 任一漂移都拒绝。

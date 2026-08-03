@@ -250,11 +250,11 @@ PC 网页登录的 `remember_device=true` 只用于用户主动登录的可信 P
 
 `yilong-ui-live` 现在把微调画布的数据面独立为后台设计会话。代理先通过 `ui_list_design_targets` 发现项目的 Web、PWA、Tauri 和 Android 目标，再用 `ui_open_design_target` 建立与当前 MCP session 绑定的 `designSessionId`；用户是否打开 PC 画布不影响这条链路。`ui_get_project_profile` schema v3 同时返回相同的小型目标索引，避免代理先全仓搜索技术栈。
 
-Web、PWA 与 Tauri 第一阶段复用 PWA Runtime 的受控无头 Chromium、origin 白名单、临时 profile、认证和受限交互策略。`ui_capture_design_surface` 同时保存 PNG 与紧凑语义 UI 树；`ui_get_design_surface` 按 selector、role、label 或 tag 分页式查询节点，读取前复核项目内路径、512 KiB 上限和 SHA-256。响应不嵌入 PNG/Base64，代理默认先读 UI 树，再按需读取像素工件。
+Web、PWA 与 Tauri 前端复用 PWA Runtime 的受控无头 Chromium、origin 白名单、认证、fixture 和受限交互策略。单次 `ui_capture_design_surface` 保持临时 profile；连续调试使用 `ui_prepare_design_browser -> ui_interact_design_browser -> ui_stop_design_browser`，以 `designSessionId` 保留同一页面、Cookie、localStorage、滚动和组件状态，并受 4 会话、15 分钟空闲、60 分钟寿命与 128 次操作上限约束。交互只接受 selector 动作；表单值通过项目 `fixtureProfile.formValues` 引用，秘密字段和任意脚本失败关闭。每次证据仍保存 PNG 与紧凑语义 UI 树，返回路径和 SHA-256，不嵌入 Base64。
 
-平台证据不互相冒充：Android 仍走 Android Live Runtime，未连接时返回 `PREPARATION_REQUIRED`；Tauri 当前只覆盖前端 WebView，固定返回 `TAURI_FRONTEND_WEBVIEW_ONLY` 和 `nativeHostVerified=false`，没有证明原生窗口、系统菜单、Rust command 或系统对话框。设计会话记录位于 `.elon/ui-tuner/headless-design/sessions/`，并绑定项目 canonical root 与创建它的 MCP session。
+平台证据不互相冒充：Android 仍走 Android Live Runtime；Tauri WebView、原生窗口 PNG、Win32 菜单、Runtime 后代顶层窗口/候选对话框和项目插桩 Rust command trace 分层记录。只有原生窗口 PNG/SHA-256 能设置 `nativeHostVerified=true`；项目 trace 不含参数/结果正文，也不冒充操作系统证明。Tauri 数据面不开放任意菜单点击或任意 command 执行。设计会话记录位于 `.elon/ui-tuner/headless-design/sessions/`，以 canonical 项目根作为授权边界，创建时 MCP session 仅保留审计。
 
-PC 微调画布的目标形态是消费相同 `designSessionId` 的可选客户端：中间显示实际页面和选区，右侧默认保持 AI 对话，平台与 route 由代理根据自然语言切换。当前批次尚未把 PC UI 接入该会话，也尚未实现通用多端草稿、撤销和源码写回。完整契约、信任边界、实现引用与分阶段路线见 `docs/headless-ui-design-mcp.md`。
+Design Draft、源码绑定、乐观 revision 与写回回执由四端共用。`ui_get_design_capabilities` 是当前节点已安装 schema 的机器证据；`ui_get_design_verification_matrix` 将草稿、会话工件和平台回执分成 READY/IN_PROGRESS/BLOCKED/PASSED，源码存在不等于运行通过。PC 微调画布已消费同一状态机：左侧平台/会话/UI 树，中间最终 UI 与选区，右侧默认 AI 对话，并提供持久浏览器、fixture 引用、Tauri 行为证据和矩阵控制。完整契约及尚未执行的真实编译、平台运行与节点发布边界见 `docs/headless-ui-design-mcp.md`。
 
 ## 3. 代码仓库结构（目标结构）
 

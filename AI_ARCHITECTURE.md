@@ -139,9 +139,9 @@ AI / PC Canvas
   -> source change + evidence-gated platform writeback receipt
 ```
 
-`ui_get_project_profile` schema v3 先返回 Web、PWA、Tauri、Android 的小型目标索引。代理无需打开 PC 页面，即可用 `ui_list_design_targets -> ui_list_design_sessions -> resume/open -> ui_capture_design_surface -> ui_get_design_surface` 完成后台发现、恢复、受限交互和证据读取。同一 canonical Git 项目的 MCP 或 Node Admin 会话共享项目内记录，不共享跨项目权限。Web/PWA/Tauri 默认先读紧凑 UI 树、再按需取 PNG，避免反复传输整图；Android 不使用浏览器替代，继续走真实 Runtime。Tauri 原生证据另走 `ui_prepare_tauri_runtime -> ui_capture_tauri_host -> ui_stop_tauri_runtime`，只允许目标发现的启动命令并限制在登记的后代进程树。
+代理先用 `ui_get_design_capabilities` 验证当前节点实际安装的 schema，再读取 Web、PWA、Tauri、Android 小型目标索引。无需打开 PC 页面即可恢复/打开项目 `designSessionId`；单次捕获之外，Web/PWA/Tauri 可用持久浏览器在同一 page 中导航和执行有界 selector 交互，非秘密表单值只引用项目 fixture。Android 不使用浏览器替代。Tauri 原生链路按项目发现命令启动，仅访问登记 Runtime 后代进程，窗口像素、菜单/候选对话框和项目 command trace 分层，且不开放任意菜单点击或 command 执行。
 
-设计意图通过项目级、乐观 revision 的 Design Draft 表达，包含 selector/scope/style patch、目标平台与项目内源码绑定；`ui_begin_design_writeback` 固定 Git/source 基线，代理修改真实源码并提供分平台验证证据后，`ui_complete_design_writeback` 才形成持久回执。PC `/pc/ui-tuner` 直接消费同一 `designSessionId`、draft 和 receipt，默认展示平台/会话/UI 树、中间 WebView/原生画面和右侧持续对话，不创建平行状态机。Tauri 前端不能证明原生宿主，原生窗口像素也不能证明系统菜单、对话框或 Rust command 行为；具体契约、持久交互缺口与验收边界见 `docs/headless-ui-design-mcp.md`。
+设计意图通过项目级、乐观 revision 的 Design Draft 表达；写回回执固定 Git/source 基线并要求分平台证据。`ui_get_design_verification_matrix` 把草稿、当前会话工件与回执分开，不把“代码能力已存在”显示成“运行已验证”。PC `/pc/ui-tuner` 消费同一 session/draft/receipt/capability/matrix：左侧目标与 UI 树，中间 WebView/原生画面，右侧默认持续对话，不创建平行状态机。具体契约、安装节点仍待升级和未执行真实编译/平台验收的边界见 `docs/headless-ui-design-mcp.md`。
 
 ## 项目理解 / RAG 架构
 
