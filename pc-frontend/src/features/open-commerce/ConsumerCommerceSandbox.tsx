@@ -6,6 +6,7 @@ import ConsumerRelationshipManager from './ConsumerRelationshipManager'
 import ConsumerPortabilityExports from './ConsumerPortabilityExports'
 import ConsumerPortabilityImports from './ConsumerPortabilityImports'
 import ConsumerPortabilityTrustKeys from './ConsumerPortabilityTrustKeys'
+import ConsumerPortabilityAdoptions from './ConsumerPortabilityAdoptions'
 import ConsumerPreferenceProfilePanel from './ConsumerPreferenceProfilePanel'
 import ConsumerInvocationReceipts from './ConsumerInvocationReceipts'
 import CapabilityInvocationComposer from './CapabilityInvocationComposer'
@@ -284,6 +285,8 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
       <ConsumerPortabilityImports projectId={projectId} />
 
       <ConsumerPortabilityTrustKeys projectId={projectId} />
+
+      <ConsumerPortabilityAdoptions projectId={projectId} />
 
       <ConsumerInvocationReceipts refreshKey={receiptRefreshKey} />
 
