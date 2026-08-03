@@ -22,6 +22,8 @@ pub(crate) struct PortabilityRelationshipMapping {
     pub source_merchant_id: String,
     pub target_merchant_id: String,
     pub target_merchant_project_id: String,
+    pub identity_match_status: String,
+    pub identity_match_key_id: Option<String>,
     pub status: String,
     pub created_at: String,
     pub revoked_at: Option<String>,

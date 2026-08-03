@@ -17,6 +17,8 @@ impl Store {
         source_merchant_id: &str,
         target_merchant_id: &str,
         target_merchant_project_id: &str,
+        identity_match_status: &str,
+        identity_match_key_id: Option<&str>,
     ) -> Result<(PortabilityRelationshipMapping, bool)> {
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -49,8 +51,9 @@ impl Store {
             "INSERT INTO open_commerce_portability_relationship_mappings (
                id, destination_project_id, consumer_user_id, import_id,
                source_relationship_id, source_merchant_id, target_merchant_id,
-               target_merchant_project_id, status, created_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'active', ?9)",
+               target_merchant_project_id, identity_match_status,
+               identity_match_key_id, status, created_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'active', ?11)",
             params![
                 id,
                 destination_project_id,
@@ -60,6 +63,8 @@ impl Store {
                 source_merchant_id,
                 target_merchant_id,
                 target_merchant_project_id,
+                identity_match_status,
+                identity_match_key_id,
                 created_at,
             ],
         )?;
@@ -150,13 +155,15 @@ fn mapping_from_row(row: &Row<'_>) -> rusqlite::Result<PortabilityRelationshipMa
         source_merchant_id: row.get(3)?,
         target_merchant_id: row.get(4)?,
         target_merchant_project_id: row.get(5)?,
-        status: row.get(6)?,
-        created_at: row.get(7)?,
-        revoked_at: row.get(8)?,
+        identity_match_status: row.get(6)?,
+        identity_match_key_id: row.get(7)?,
+        status: row.get(8)?,
+        created_at: row.get(9)?,
+        revoked_at: row.get(10)?,
     })
 }
 
 const MAPPING_SELECT: &str = "SELECT id, import_id, source_relationship_id,
        source_merchant_id, target_merchant_id, target_merchant_project_id,
-       status, created_at, revoked_at
+       identity_match_status, identity_match_key_id, status, created_at, revoked_at
   FROM open_commerce_portability_relationship_mappings";

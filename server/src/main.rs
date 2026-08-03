@@ -263,6 +263,7 @@ mod open_commerce_portability_adoption_migration;
 mod open_commerce_portability_adoption_model;
 mod open_commerce_portability_adoption_service;
 mod open_commerce_portability_api;
+mod open_commerce_portability_identity_match_migration;
 mod open_commerce_portability_import_migration;
 mod open_commerce_portability_import_model;
 mod open_commerce_portability_import_service;

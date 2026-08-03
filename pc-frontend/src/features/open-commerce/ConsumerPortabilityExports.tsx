@@ -101,6 +101,7 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
               关系 {item.relationship_count} · 续期 {item.renewal_count} · 删除请求 {item.data_request_count}
               {' · '}偏好档案 {item.preference_profile_included ? '1' : '0'} · 披露 {item.preference_disclosure_count}
               {' · '}调用凭证 {item.invocation_receipt_count}
+              {' · '}商户身份声明 {item.merchant_identity_claim_count}
             </small>
             <footer style={{ ...commerceStyles.itemHeader, marginTop: 8 }}>
               <code style={{ ...commerceStyles.itemMeta, overflowWrap: 'anywhere' }}>{item.id}</code>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link2, RefreshCw, Search, Send, Unlink } from 'lucide-react'
+import { Link2, RefreshCw, Search, Send, ShieldCheck, Unlink } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type {
   ConsumerPortabilityAdoptionPlan,
@@ -69,6 +69,9 @@ export default function ConsumerPortabilityReauthorization({ projectId }: { proj
 
   function selectRelationship(relationshipId: string) {
     setSourceRelationshipId(relationshipId)
+    setTargetMerchantId('')
+    setTargetQuery('')
+    setTargetMerchants([])
     const candidate = plan?.relationship_candidates.find((item) => item.source_relationship_id === relationshipId)
     setScopesText(candidate?.requested_scopes.join(', ') ?? '')
     setPurpose(candidate?.purpose ?? '迁移后重新授权')
@@ -92,6 +95,12 @@ export default function ConsumerPortabilityReauthorization({ projectId }: { proj
     setTargetMerchantId(merchant.id)
     setTargetQuery(merchant.display_name)
     setMessage(`已选择目标商户：${merchant.display_name}。请仍由本人核对是否为同一业务主体。`)
+  }
+
+  function selectIdentityCandidate(merchantId: string) {
+    setTargetMerchantId(merchantId)
+    setTargetQuery(`指纹匹配候选 ${merchantId}`)
+    setMessage('已选择公钥指纹一致的候选商户。它仍需要本人确认和目标商户重新审批。')
   }
 
   async function createMapping() {
@@ -176,6 +185,17 @@ export default function ConsumerPortabilityReauthorization({ projectId }: { proj
             </option>
           ))}
         </select>
+        {selectedCandidate?.verified_target_merchant_ids.map((merchantId) => (
+          <button
+            key={merchantId}
+            style={actionStyle(targetMerchantId === merchantId ? 'primary' : 'secondary', busy)}
+            type="button"
+            onClick={() => selectIdentityCandidate(merchantId)}
+            disabled={busy}
+          >
+            <ShieldCheck size={14} />指纹匹配候选 · {merchantId}
+          </button>
+        ))}
         <span style={{ display: 'flex', gap: 8 }}>
           <input
             value={targetQuery}
@@ -219,6 +239,9 @@ export default function ConsumerPortabilityReauthorization({ projectId }: { proj
           <article key={mapping.id} style={listItemStyle()}>
             <header style={commerceStyles.itemHeader}>
               <strong style={commerceStyles.itemTitle}>{mapping.source_merchant_id} → {mapping.target_merchant_id}</strong>
+              <span style={badgeStyle(mapping.identity_match_status === 'trusted_operator_key_match' ? 'neutral' : 'warn')}>
+                {mapping.identity_match_status === 'trusted_operator_key_match' ? '指纹匹配' : '仅人工确认'}
+              </span>
               <span style={badgeStyle(mapping.status === 'active' ? 'neutral' : 'warn')}>{mapping.status === 'active' ? '有效映射' : '已撤销'}</span>
             </header>
             {mapping.status === 'active' && (

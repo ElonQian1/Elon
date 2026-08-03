@@ -10,6 +10,7 @@ use crate::{
         ConsumerPortabilityRelationshipCandidate, RollbackConsumerPortabilityAdoptionRequest,
         CONSUMER_PORTABILITY_ADOPTION_PLAN_SCHEMA, CONSUMER_PORTABILITY_ADOPTION_SCHEMA,
     },
+    open_commerce_portability_import_model::CONSUMER_PORTABILITY_IMPORT_TRUSTED_STATUS,
     open_commerce_portability_import_service,
     open_commerce_service::OpenCommerceActor,
     store::Store,
@@ -44,20 +45,43 @@ pub(crate) fn adoption_plan(
         .map(|preferences| preference_changes(current_preferences, preferences))
         .transpose()?
         .unwrap_or_default();
+    let trusted_operator = import_record.trust_status == CONSUMER_PORTABILITY_IMPORT_TRUSTED_STATUS;
     let relationship_candidates = import_record
         .package
         .payload
         .relationships
         .iter()
-        .map(|relationship| ConsumerPortabilityRelationshipCandidate {
-            source_relationship_id: relationship.id.clone(),
-            source_merchant_id: relationship.merchant_id.clone(),
-            source_status: relationship.status.clone(),
-            requested_scopes: relationship.scopes.clone(),
-            purpose: relationship.purpose.clone(),
-            requires_reauthorization: true,
+        .map(|relationship| {
+            let source_identity_key_ids = import_record
+                .package
+                .payload
+                .merchant_identity_claims
+                .iter()
+                .find(|claim| claim.source_merchant_id == relationship.merchant_id)
+                .map(|claim| claim.key_ids.clone())
+                .unwrap_or_default();
+            let verified_target_merchant_ids = if trusted_operator {
+                store.published_open_commerce_merchant_ids_for_identity_keys(
+                    &source_identity_key_ids,
+                )?
+            } else {
+                Vec::new()
+            };
+            let identity_match_authority = (!verified_target_merchant_ids.is_empty())
+                .then(|| "trusted_operator_package_plus_matching_possession_key".to_string());
+            Ok(ConsumerPortabilityRelationshipCandidate {
+                source_relationship_id: relationship.id.clone(),
+                source_merchant_id: relationship.merchant_id.clone(),
+                source_status: relationship.status.clone(),
+                requested_scopes: relationship.scopes.clone(),
+                purpose: relationship.purpose.clone(),
+                requires_reauthorization: true,
+                source_identity_key_ids,
+                verified_target_merchant_ids,
+                identity_match_authority,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>>>()?;
     Ok(ConsumerPortabilityAdoptionPlan {
         schema: CONSUMER_PORTABILITY_ADOPTION_PLAN_SCHEMA.to_string(),
         import_id: import_record.id,
