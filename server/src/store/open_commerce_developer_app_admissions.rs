@@ -131,9 +131,10 @@ impl Store {
              ORDER BY CASE status WHEN 'submitted' THEN 0 ELSE 1 END,
                       requested_at ASC LIMIT ?1"
         ))?;
-        stmt.query_map(params![limit], admission_from_row)?
-            .collect::<rusqlite::Result<Vec<_>>>()
-            .map_err(Into::into)
+        let admissions = stmt
+            .query_map(params![limit], admission_from_row)?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(admissions)
     }
 
     pub(crate) fn review_open_commerce_developer_app_admission(

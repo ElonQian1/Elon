@@ -94,16 +94,17 @@ impl Store {
               WHERE project_id=?1 AND app_record_id=?2
               ORDER BY issued_at DESC LIMIT ?3"
         ))?;
-        stmt.query_map(
-            params![
-                project_id.trim(),
-                app_record_id.trim(),
-                limit.clamp(1, 100) as i64
-            ],
-            production_credential_from_row,
-        )?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(Into::into)
+        let credentials = stmt
+            .query_map(
+                params![
+                    project_id.trim(),
+                    app_record_id.trim(),
+                    limit.clamp(1, 100) as i64
+                ],
+                production_credential_from_row,
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(credentials)
     }
 
     pub(crate) fn revoke_open_commerce_developer_production_credential(

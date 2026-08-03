@@ -90,12 +90,13 @@ impl Store {
               WHERE project_id=?1 AND app_record_id=?2
               ORDER BY created_at DESC"
         ))?;
-        Ok(statement
+        let subscriptions = statement
             .query_map(
                 params![project_id.trim(), app_record_id.trim()],
                 subscription_from_row,
             )?
-            .collect::<rusqlite::Result<Vec<_>>>()?)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(subscriptions)
     }
 
     pub(crate) fn open_commerce_developer_webhook_for_app(
@@ -231,12 +232,13 @@ impl Store {
               WHERE subscription_id=?1
               ORDER BY event_sequence DESC LIMIT ?2"
         ))?;
-        Ok(statement
+        let deliveries = statement
             .query_map(
                 params![subscription_id.trim(), limit.clamp(1, 100) as i64],
                 delivery_from_row,
             )?
-            .collect::<rusqlite::Result<Vec<_>>>()?)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(deliveries)
     }
 
     pub(crate) fn claim_open_commerce_developer_webhook_delivery(

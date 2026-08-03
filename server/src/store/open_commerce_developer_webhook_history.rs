@@ -74,7 +74,7 @@ impl Store {
                          OR (invocation.status<>'succeeded' AND ?5=1))
                   ORDER BY event.seq ASC LIMIT ?6",
             )?;
-            statement
+            let rows = statement
                 .query_map(
                     params![
                         owner_user_id,
@@ -86,7 +86,8 @@ impl Store {
                     ],
                     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
                 )?
-                .collect::<rusqlite::Result<Vec<_>>>()?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            rows
         };
         let has_more = events.len() > limit;
         let eligible = events.into_iter().take(limit).collect::<Vec<_>>();
