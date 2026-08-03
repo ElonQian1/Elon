@@ -40,3 +40,4 @@ implementation_status: implementation_uncompiled
 - `server/src/store/open_commerce_developer_credentials.rs`
 - `pc-frontend/src/features/open-commerce/DeveloperWebhookPanel.tsx`
 - `docs/open-commerce-production-webhooks-v1-acceptance.md`
+- `docs/decisions/open-commerce-webhook-operational-health-v1.md`

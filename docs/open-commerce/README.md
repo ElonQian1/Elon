@@ -111,6 +111,8 @@
 101. `docs/open-commerce-invocation-credential-provenance-v1-acceptance.md`：查看调用环境隔离代码状态与统一回归清单。
 102. `docs/decisions/open-commerce-production-webhooks-v1.md`：查看环境绑定生产订阅、双开关和生产资格联动决定。
 103. `docs/open-commerce-production-webhooks-v1-acceptance.md`：查看生产 Webhook 代码状态与后置统一回归清单。
+104. `docs/decisions/open-commerce-webhook-operational-health-v1.md`：查看只读运行健康、环境聚合和生产阻断码决定。
+105. `docs/open-commerce-webhook-operational-health-v1-acceptance.md`：查看 Webhook 健康代码状态与后置统一回归清单。
 
 ## 专题地图
 
