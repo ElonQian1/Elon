@@ -62,6 +62,8 @@ MCP 消费者 AI 可使用 `open_commerce_discover_for_consumer` 获取与上述
 
 选择能力后，AI 可把实际拟调用输入交给 `open_commerce_plan_consumer_capability`。计划只读返回调用、注册 App、申请授权、等待审批或动作确认的有序步骤；动作能力固定要求准备、用户明确同意、确认和调用。计划不会占用 Grant 次数或预算，也不会创建确认、调用、订单或结算记录。
 
+计划会用能力当前单位价格和币种检查该 App 的全部有效 Grant，优先选择任意能覆盖下一次调用的一张。若全部授权的次数、金额或币种均不满足，发现页显示“授权额度不足”，AI 返回 `grant_refresh_required` 和具体 `grant_budget_status`；用户可提交新的最小授权申请。该过程不会自动扩容或撤销旧 Grant，新额度仍须商户批准，真正调用时还会在事务内再次预留预算。
+
 动作确认准备后，AI 可在用户同意前调用 `open_commerce_get_my_action_confirmation` 重新核对当前用户和当前 App 持有的确认状态、商户、能力、输入字段形状、失效时间和下一步。服务端不会返回原始输入值，因此 AI 或宿主仍必须从当前安全会话向用户展示本次真实参数；读取本身不会确认、续期、占用预算或执行动作。
 
 计划要求授权时，消费者 AI 只有在用户明确同意、MCP 使用本人已注册 App 身份并提供固定确认短语后，才能用 `open_commerce_request_consumer_authorization` 提交单能力申请。成功只表示等待商户决定；批准、拒绝、期限、总次数和总预算仍由商户控制，AI 不能自批或扩权。

@@ -13,8 +13,11 @@
 - `app_registration_required`：默认 MCP 身份不能调用需授权能力。
 - `authorization_request_required`：注册 App 尚无 Grant 或待审批申请。
 - `authorization_pending`：已有待商户决定的授权申请。
+- `grant_refresh_required`：存在未撤销、未过期的 Grant，但没有任何一张能覆盖下一次调用次数、单位价格或币种要求，需要申请新的期限或预算。
 
-计划可返回当前有效 `grant_id` 或待审批 `authorization_request_id`，并提供有序下一步；参数不能覆盖 MCP 入口固定的 App 身份。
+计划可返回当前选中的 `grant_id`、`grant_budget_status` 或待审批 `authorization_request_id`，并提供有序下一步；参数不能覆盖 MCP 入口固定的 App 身份。预算状态固定为 `available`、`invocation_budget_exhausted`、`amount_budget_exhausted` 或 `budget_currency_mismatch`。
+
+同一能力存在多张有效 Grant 时，计划按创建时间从新到旧检查，但优先选择任意一张能覆盖下一次调用的 Grant；不能仅因最新 Grant 耗尽而忽略仍可用的旧 Grant。全部不可用且已有续额申请时返回 `authorization_pending`，避免重复申请。
 
 ## 副作用边界
 
@@ -23,5 +26,7 @@
 ## 实现入口
 
 - `server/src/open_commerce_consumer_execution_plan.rs`
+- `server/src/open_commerce_grant_readiness.rs`
+- `server/src/store/open_commerce_grants.rs`
 - `server/src/open_commerce_consumer_discovery_mcp.rs`
 - `docs/open-commerce-consumer-capability-execution-plan-v1-acceptance.md`
