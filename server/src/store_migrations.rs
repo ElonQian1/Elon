@@ -204,6 +204,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (167, "分布式算力容量池追加式生命周期", crate::compute_capacity_lifecycle_migration::migration_v167),
     (168, "分布式算力容量池 epoch 轮换事件", crate::compute_capacity_epoch_migration::migration_v168),
     (169, "分布式算力提供者版本化注册表", crate::compute_provider_migration::migration_v169),
+    (170, "分布式算力 Offer 版本化注册表", crate::compute_offer_migration::migration_v170),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

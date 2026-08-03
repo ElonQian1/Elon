@@ -40,6 +40,7 @@ mod compute_capacity_rows;
 mod compute_capacity_supply_withdrawal;
 mod compute_metering;
 mod compute_offer_contract_validation;
+mod compute_offer_registry;
 mod compute_provider_registry;
 mod conversation_forks;
 mod conversations;
@@ -241,6 +242,7 @@ pub(crate) use compute_capacity_supply_withdrawal::{
     WithdrawComputeCapacitySupply, WithdrawComputeCapacitySupplyLine,
 };
 pub use compute_metering::ComputeMeterEvent;
+pub(crate) use compute_offer_registry::ComputeOfferRegistrationReceipt;
 pub(crate) use compute_provider_registry::ComputeProviderRegistrationReceipt;
 pub(crate) use external_app_tool_executions::{
     AdminExternalAppToolExecutionSummary, ExternalAppToolExecutionWrite,
