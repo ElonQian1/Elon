@@ -50,6 +50,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         )
         .merge(crate::open_commerce_developer_admission_api::routes())
         .merge(crate::open_commerce_developer_credential_api::routes())
+        .merge(crate::open_commerce_developer_readiness_api::routes())
 }
 
 async fn issue_domain_challenge(

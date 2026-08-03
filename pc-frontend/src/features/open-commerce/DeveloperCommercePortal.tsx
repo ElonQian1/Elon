@@ -29,6 +29,7 @@ import DeveloperAppManifestReviewPanel from './DeveloperAppManifestReviewPanel'
 import DeveloperAppAdmissionPanel from './DeveloperAppAdmissionPanel'
 import DeveloperAppAdmissionReviewPanel from './DeveloperAppAdmissionReviewPanel'
 import DeveloperProductionCredentialPanel from './DeveloperProductionCredentialPanel'
+import DeveloperProductionReadinessPanel from './DeveloperProductionReadinessPanel'
 import { useAuthStore } from '../../store/auth'
 import type {
   AuthorizationRequest,
@@ -354,6 +355,8 @@ export default function DeveloperCommercePortal({
       </section>
 
       <DeveloperInvocationEvents testToken={testToken} refreshKey={eventRefreshKey} />
+
+      {canEdit && <DeveloperProductionReadinessPanel projectId={projectId} apps={apps} canEdit={canEdit} />}
 
       <DeveloperAppManifestPanel projectId={projectId} apps={apps} canEdit={canEdit} onChanged={refresh} />
 

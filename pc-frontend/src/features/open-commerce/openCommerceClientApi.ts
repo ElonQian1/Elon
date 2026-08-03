@@ -3,6 +3,7 @@ import { developerWebhookClientApi } from './developerWebhookClientApi'
 import { developerAppManifestClientApi } from './developerAppManifestClientApi'
 import { developerAppAdmissionClientApi } from './developerAppAdmissionClientApi'
 import { developerProductionCredentialClientApi } from './developerProductionCredentialClientApi'
+import { developerProductionReadinessClientApi } from './developerProductionReadinessClientApi'
 import type {
   AuthorizationRequest,
   AuthorizationRequestList,
@@ -58,6 +59,7 @@ export const openCommerceClientApi = {
   ...developerAppManifestClientApi,
   ...developerAppAdmissionClientApi,
   ...developerProductionCredentialClientApi,
+  ...developerProductionReadinessClientApi,
   ...developerWebhookClientApi,
   searchDirectoryMerchants: (query: string, limit = 20) => {
     const params = new URLSearchParams({ limit: String(limit) })
