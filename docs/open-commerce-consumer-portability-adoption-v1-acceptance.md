@@ -8,6 +8,7 @@
 - 采用前后状态和修订保存在同一事务的采用记录中。
 - 回滚要求当前修订仍等于采用结果修订，检测到后续修改即失败关闭。
 - PC 工作台提供预演、来源信任提示、偏好采用、历史记录和显式回滚入口。
+- 字段级选择由 `docs/open-commerce-consumer-portability-selective-adoption-v1-acceptance.md` 承接，仍待统一验证。
 
 ## 验证状态
 
