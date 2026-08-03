@@ -9,6 +9,7 @@ pub(super) fn tool_definitions() -> Vec<Value> {
     definitions.extend(super::tauri_host_runtime::tool_definitions());
     definitions.extend(super::tauri_behavior::tool_definitions());
     definitions.extend(super::design_drafts::tool_definitions());
+    definitions.extend(super::design_draft_preview::tool_definitions());
     definitions.extend(super::design_verification_matrix::tool_definitions());
     definitions
 }
@@ -19,6 +20,7 @@ pub(super) fn is_tool(name: &str) -> bool {
         || super::tauri_host_runtime::is_tool(name)
         || super::tauri_behavior::is_tool(name)
         || super::design_drafts::is_tool(name)
+        || super::design_draft_preview::is_tool(name)
         || super::design_verification_matrix::is_tool(name)
 }
 
@@ -37,6 +39,9 @@ pub(super) async fn call(session: &LiveUiSession, name: &str, arguments: Value) 
     }
     if super::design_drafts::is_tool(name) {
         return super::design_drafts::call(session, name, arguments);
+    }
+    if super::design_draft_preview::is_tool(name) {
+        return super::design_draft_preview::call(session, name, arguments).await;
     }
     if super::design_verification_matrix::is_tool(name) {
         return super::design_verification_matrix::call(session, name, arguments);

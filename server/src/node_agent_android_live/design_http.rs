@@ -94,6 +94,14 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/design/drafts/:draft_id/verification-matrix",
             post(get_verification_matrix),
         )
+        .route(
+            "/api/android-live/design/drafts/:draft_id/preview",
+            post(preview_draft),
+        )
+        .route(
+            "/api/android-live/design/drafts/:draft_id/preview/restore",
+            post(restore_draft_preview),
+        )
 }
 
 async fn get_capabilities(
@@ -301,6 +309,24 @@ async fn get_verification_matrix(
 ) -> Response {
     arguments["draftId"] = json!(draft_id);
     call(&runtime, "ui_get_design_verification_matrix", arguments).await
+}
+
+async fn preview_draft(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(draft_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["draftId"] = json!(draft_id);
+    call(&runtime, "ui_preview_design_draft", arguments).await
+}
+
+async fn restore_draft_preview(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(draft_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["draftId"] = json!(draft_id);
+    call(&runtime, "ui_restore_design_draft_preview", arguments).await
 }
 
 fn artifact_response(artifact: super::design_session_store::VerifiedPixelArtifact) -> Response {
