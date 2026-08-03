@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FileJson, PackagePlus, RefreshCw, ShieldCheck } from 'lucide-react'
+import { Download, FileJson, PackagePlus, RefreshCw, ShieldCheck } from 'lucide-react'
 import { taskEconomyApi } from './taskEconomyApi'
+import { downloadSuiAdapterHandoff } from './suiAdapterHandoffDownload'
 import type {
   SettlementReceipt,
   SuiProjectionPackage,
@@ -88,6 +89,21 @@ export default function SuiProjectionPackages({
     }
   }
 
+  async function downloadHandoff() {
+    if (!selected) return
+    setBusy(true)
+    setMessage('')
+    try {
+      const bundle = await taskEconomyApi.suiProjectionAdapterHandoff(projectId, selected.id)
+      downloadSuiAdapterHandoff(bundle)
+      await refresh()
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const isStandardReceipt = selectedReceipt?.receipt_kind === 'standard'
   const canPrepare =
     canEdit && selectedReceipt?.status === 'reconciled' && isStandardReceipt && !busy
@@ -168,6 +184,18 @@ export default function SuiProjectionPackages({
                   disabled={!canEdit || busy}
                 >
                   <ShieldCheck size={14} />复核完整性
+                </button>
+                <button
+                  style={actionStyle(
+                    'secondary',
+                    !canEdit || busy || selected.submission_readiness !== 'adapter_required',
+                  )}
+                  type="button"
+                  onClick={downloadHandoff}
+                  disabled={!canEdit || busy || selected.submission_readiness !== 'adapter_required'}
+                  title="重新复核并下载离线适配器交接包"
+                >
+                  <Download size={14} />下载交接包
                 </button>
                 <pre className={base.result}>{JSON.stringify(selected.envelope, null, 2)}</pre>
               </>

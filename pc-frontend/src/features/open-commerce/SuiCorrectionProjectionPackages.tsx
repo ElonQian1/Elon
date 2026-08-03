@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { PackagePlus, RefreshCw, ShieldCheck } from 'lucide-react'
+import { Download, PackagePlus, RefreshCw, ShieldCheck } from 'lucide-react'
 import { taskEconomyApi } from './taskEconomyApi'
+import { downloadSuiAdapterHandoff } from './suiAdapterHandoffDownload'
 import type {
   SuiCorrectionProjectionPackage,
   SuiTargetNetwork,
@@ -75,6 +76,23 @@ export default function SuiCorrectionProjectionPackages({
     }
   }
 
+  async function downloadHandoff(item: SuiCorrectionProjectionPackage) {
+    setBusy(`handoff:${item.id}`)
+    setMessage('')
+    try {
+      const bundle = await taskEconomyApi.suiCorrectionProjectionAdapterHandoff(
+        projectId,
+        item.id,
+      )
+      downloadSuiAdapterHandoff(bundle)
+      await refresh()
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy('')
+    }
+  }
+
   return (
     <div style={commerceStyles.list}>
       <header style={commerceStyles.itemHeader}>
@@ -112,15 +130,28 @@ export default function SuiCorrectionProjectionPackages({
             {item.target_network} · {item.submission_readiness}
           </span>
           <code>{item.projection_digest.slice(0, 20)}</code>
-          <button
-            style={actionStyle('icon')}
-            type="button"
-            onClick={() => verify(item)}
-            disabled={!canEdit || busy !== ''}
-            title="复核两条腿和摘要"
-          >
-            <ShieldCheck size={14} />
-          </button>
+          <div style={commerceStyles.headerActions}>
+            <button
+              style={actionStyle('icon')}
+              type="button"
+              onClick={() => verify(item)}
+              disabled={!canEdit || busy !== ''}
+              title="复核两条腿和摘要"
+            >
+              <ShieldCheck size={14} />
+            </button>
+            <button
+              style={actionStyle('icon')}
+              type="button"
+              onClick={() => downloadHandoff(item)}
+              disabled={
+                !canEdit || busy !== '' || item.submission_readiness !== 'adapter_required'
+              }
+              title="重新复核并下载离线适配器交接包"
+            >
+              <Download size={14} />
+            </button>
+          </div>
         </div>
       ))}
       {items.length === 0 && <small style={commerceStyles.itemMeta}>尚未保存任何目标网络的原子纠正包。</small>}

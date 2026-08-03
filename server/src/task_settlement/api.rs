@@ -85,6 +85,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/projects/:project_id/economy/corrections/:correction_id/finalize",
             post(finalize_settlement_correction),
         )
+        .merge(super::sui_adapter_handoff_api::routes())
         .merge(super::sui_correction_api::routes())
 }
 

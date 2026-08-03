@@ -12,6 +12,7 @@ import type {
   TaskEconomyOverview,
   TaskEconomyProjectSetting,
 } from './taskEconomyTypes'
+import type { SuiAdapterHandoffBundle } from './suiAdapterHandoffTypes'
 
 function base(projectId: string) {
   return `/api/projects/${encodeURIComponent(projectId)}/economy`
@@ -43,6 +44,11 @@ export const taskEconomyApi = {
   verifySuiProjection: (projectId: string, projectionId: string) =>
     api.post<SuiProjectionPackage>(
       `${base(projectId)}/sui-projections/${encodeURIComponent(projectionId)}/verify`,
+      {},
+    ),
+  suiProjectionAdapterHandoff: (projectId: string, projectionId: string) =>
+    api.post<SuiAdapterHandoffBundle>(
+      `${base(projectId)}/sui-projections/${encodeURIComponent(projectionId)}/adapter-handoff`,
       {},
     ),
   settlementDisputes: (projectId: string, receiptId: string) =>
@@ -116,6 +122,11 @@ export const taskEconomyApi = {
   verifySuiCorrectionProjection: (projectId: string, projectionId: string) =>
     api.post<SuiCorrectionProjectionPackage>(
       `${base(projectId)}/sui-correction-projections/${encodeURIComponent(projectionId)}/verify`,
+      {},
+    ),
+  suiCorrectionProjectionAdapterHandoff: (projectId: string, projectionId: string) =>
+    api.post<SuiAdapterHandoffBundle>(
+      `${base(projectId)}/sui-correction-projections/${encodeURIComponent(projectionId)}/adapter-handoff`,
       {},
     ),
 }
