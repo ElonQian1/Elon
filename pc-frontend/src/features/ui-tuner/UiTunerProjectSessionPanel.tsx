@@ -386,8 +386,10 @@ export function UiTunerProjectSessionPanel({
       } else {
         setConversationOpen(true)
         setVerificationTaskId(taskId)
-        void onTaskActivityChange?.({ running: true, taskId })
-        taskActivityStarted = true
+        if (taskId) {
+          void onTaskActivityChange?.({ running: true, taskId })
+          taskActivityStarted = true
+        }
         await onMutationTaskStarted(activePack)
         setStatus('已进入持续项目 Codex CLI 会话')
       }

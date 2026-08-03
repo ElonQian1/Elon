@@ -36,6 +36,7 @@ export function useDesignTaskEventSync(input: Input) {
     taskIdRef.current = nextTaskId
     cursorRef.current = ''
     setTaskId(nextTaskId)
+    setBinding(null)
     setCursor('')
     setLatestEvents([])
     setError('')
@@ -100,7 +101,7 @@ export function useDesignTaskEventSync(input: Input) {
           setLatestEvents((previous) => [...previous, ...page.events].slice(-20))
           const designSessionId = [...page.events].reverse()
             .find((event) => event.designSessionId)?.designSessionId ?? binding?.designSessionId
-          if (!binding && page.events.some((event) => event.eventType === 'TASK_BOUND')) {
+          if (page.events.some((event) => event.eventType === 'TASK_BOUND')) {
             const result = await getDesignTaskBinding(input.projectRoot, taskId)
             if (!cancelled) setBinding(result.binding ?? null)
           }

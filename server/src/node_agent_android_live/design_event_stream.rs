@@ -250,7 +250,7 @@ fn event_type(tool: &str) -> Option<&'static str> {
         "ui_renew_design_task_binding" => "TASK_LEASE_RENEWED",
         "ui_settle_design_task_binding" => "TASK_SETTLED",
         "ui_open_design_target" => "SESSION_OPENED",
-        "ui_capture_design_surface" | "ui_get_design_surface" => "SURFACE_CAPTURED",
+        "ui_capture_design_surface" => "SURFACE_CAPTURED",
         "ui_prepare_design_browser" | "ui_interact_design_browser" | "ui_stop_design_browser" => {
             "BROWSER_UPDATED"
         }
