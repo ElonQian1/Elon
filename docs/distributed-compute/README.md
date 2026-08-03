@@ -28,6 +28,7 @@ owners: backend, node, ai-economy
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 共享 CapacityPool 与追加式容量账本 | 领域合同、v165-v168 schema、隔离 Store、只读审计、到期批处理、状态门卫和 epoch 轮换已写；尚未编译、执行迁移或接线 |
+| Provider 与 Offer 版本注册表 | v169/v170 schema、Provider/Offer 当前投影、追加式历史版本、规范摘要和容量引用审计已写；尚未编译、执行迁移或接线 |
 | 外部算力池适配器与统一报价 | 已接受设计，尚未实现 |
 | 多源验证、标准化 SKU 与期货锁价结算 | 已接受设计，尚未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
@@ -57,9 +58,9 @@ owners: backend, node, ai-economy
 
 ### F2：Broker、验证和真实结算
 
-共享 CapacityPool 与追加式容量账本已经形成领域合同、checked-i128 reducer、v165-v168 SQLite schema 和隔离的本地 Store。Store 可登记池版本与零余额 bucket，原子追加多 meter 发行/撤出双分录，并通过稳定 Claim 完成 hold、revision 栅栏释放和到期归还；幂等重放返回当前余额。只读审计可从 ledger legs 重算投影，有界批处理可逐 Claim 恢复到期容量；状态门卫、追加式生命周期和排空后的 epoch 轮换也已形成。上述代码尚未编译、执行迁移、调度或接入运行路由。Offer 发布、复制或续期都不会铸造容量；只有 Pool bucket 的 `supply_added` 进入账本后才形成可用余额。V1 最终仍要求一份 Reservation 只绑定一个 Pool 和一个精确 UTC 半开窗口 `[starts_at, ends_at)`，并在同一事务中完成多 meter 容量、消费者预算、Price Snapshot 与 Reservation 的原子预留。
+共享 CapacityPool 与追加式容量账本已经形成领域合同、checked-i128 reducer、v165-v168 SQLite schema 和隔离的本地 Store。Store 可登记池版本与零余额 bucket，原子追加多 meter 发行/撤出双分录，并通过稳定 Claim 完成 hold、revision 栅栏释放和到期归还；幂等重放返回当前余额。只读审计可从 ledger legs 重算投影，有界批处理可逐 Claim 恢复到期容量；状态门卫、追加式生命周期和排空后的 epoch 轮换也已形成。v169/v170 又增加版本化 Provider 与 Offer 注册表：Provider 的当前投影和不可变历史分离；Offer 绑定发布时的 Provider 版本、SKU、容量池、窗口和 bucket，并验证静态容量上限不超过已发行容量，但不保存实时剩余量。上述代码尚未编译、执行迁移、调度或接入运行路由。Offer 发布、复制或续期都不会铸造容量；只有 Pool bucket 的 `supply_added` 进入账本后才形成可用余额。V1 最终仍要求一份 Reservation 只绑定一个 Pool 和一个精确 UTC 半开窗口 `[starts_at, ends_at)`，并在同一事务中完成多 meter 容量、消费者预算、Price Snapshot 与 Reservation 的原子预留。
 
-后续实现 Offer Registry、报价锁定、容量自动调度与受控修复、容量和预算统一 Reserve、带 `fencing_generation` 的尝试租约、多源计量、挑战任务、争议状态和可提取收益账本。
+后续实现可选择 Offer 查询、Price Snapshot 报价锁定、容量自动调度与受控修复、容量和预算统一 Reserve、带 `fencing_generation` 的尝试租约、多源计量、挑战任务、争议状态和可提取收益账本。
 
 ### F3：外部矿池与企业集群
 
