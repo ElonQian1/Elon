@@ -25,7 +25,9 @@ mod codex_vault_sharing_health;
 mod codex_vault_sharing_regression_tests;
 pub(crate) mod codex_vault_usage_estimation;
 mod common;
+mod compute_capacity_claims;
 mod compute_capacity_ledger;
+mod compute_capacity_posting;
 mod compute_capacity_registry;
 mod compute_capacity_rows;
 mod compute_metering;
@@ -202,6 +204,9 @@ pub(crate) use codex_vault_emergency_delivery_guard::CodexVaultEmergencyCredenti
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,
+};
+pub(crate) use compute_capacity_claims::{
+    HoldComputeCapacityClaim, HoldComputeCapacityClaimLine, HoldComputeCapacityClaimReceipt,
 };
 pub(crate) use compute_capacity_ledger::{
     AddComputeCapacitySupply, AddComputeCapacitySupplyLine, ComputeCapacityLedgerWriteReceipt,

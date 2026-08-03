@@ -4,19 +4,24 @@ use anyhow::{anyhow, bail, Result};
 use chrono::DateTime;
 use rusqlite::{params, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 
 use crate::compute_federation::{
     capacity::{
-        apply_capacity_transaction, expand_capacity_ledger_legs, ComputeCapacityAccount,
-        ComputeCapacityBucketBalance, ComputeCapacityCausalBinding, ComputeCapacityEventKind,
-        ComputeCapacityLedgerTransaction, ComputeCapacityMovementLine, ComputeCapacityPoolBinding,
-        COMPUTE_CAPACITY_TRANSACTION_SCHEMA,
+        ComputeCapacityAccount, ComputeCapacityBucketBalance, ComputeCapacityCausalBinding,
+        ComputeCapacityEventKind, ComputeCapacityLedgerTransaction, ComputeCapacityMovementLine,
+        ComputeCapacityPoolBinding, COMPUTE_CAPACITY_TRANSACTION_SCHEMA,
     },
     market::ComputeDeliveryWindowBinding,
 };
 
-use super::{compute_capacity_rows::stored_bucket_on, new_id, now, Store};
+use super::{
+    compute_capacity_posting::{
+        balances_for_transaction_on, event_kind_value, finalize_transaction_digest,
+        next_ledger_sequence_on, post_capacity_transaction_on,
+    },
+    compute_capacity_rows::stored_bucket_on,
+    new_id, now, Store,
+};
 
 #[derive(Debug, Clone)]
 pub(crate) struct AddComputeCapacitySupplyLine {
@@ -88,7 +93,7 @@ impl Store {
             {
                 bail!("相同容量幂等键不能用于不同发行请求");
             }
-            let balances = balances_for_transaction(&tx, &existing.transaction_id)?;
+            let balances = balances_for_transaction_on(&tx, &existing.transaction_id)?;
             if balances.iter().any(|balance| {
                 balance.binding.pool != input.pool
                     || balance.binding.delivery_window != input.delivery_window
@@ -130,14 +135,7 @@ impl Store {
             });
             balances.insert(stored.balance.binding.bucket_id.clone(), stored.balance);
         }
-        let before = balances.clone();
-        let ledger_sequence: i64 = tx.query_row(
-            "SELECT COALESCE(MAX(ledger_sequence), 0) + 1
-               FROM compute_capacity_ledger_transactions
-              WHERE pool_id=?1 AND capacity_epoch=?2",
-            params![input.pool.pool_id.trim(), input.pool.capacity_epoch],
-            |row| row.get(0),
-        )?;
+        let ledger_sequence = next_ledger_sequence_on(&tx, &input.pool)?;
         let recorded_at = now();
         let mut transaction = ComputeCapacityLedgerTransaction {
             schema: COMPUTE_CAPACITY_TRANSACTION_SCHEMA.to_string(),
@@ -165,95 +163,16 @@ impl Store {
             occurred_at: input.occurred_at.trim().to_string(),
             recorded_at,
         };
-        transaction.transaction_digest = transaction_digest(&transaction)?;
-        let legs = expand_capacity_ledger_legs(&transaction).map_err(anyhow::Error::new)?;
-        apply_capacity_transaction(&mut balances, &transaction).map_err(anyhow::Error::new)?;
-
-        tx.execute(
-            "INSERT INTO compute_capacity_ledger_transactions (
-                transaction_id, transaction_digest, pool_id, capacity_epoch,
-                delivery_window_id, ledger_sequence, event_kind,
-                claim_id, claim_effect, claim_effect_key,
-                offer_id, offer_version, offer_digest, job_id, reservation_id,
-                attempt_lease_id, fencing_generation, idempotency_scope,
-                idempotency_key, request_digest, subject_kind, subject_id,
-                causal_transaction_id, occurred_at, recorded_at
-             ) VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, 'supply_added',
-                NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-                ?7, ?8, ?9, ?10, ?11, NULL, ?12, ?13
-             )",
-            params![
-                transaction.transaction_id,
-                transaction.transaction_digest,
-                transaction.pool.pool_id,
-                transaction.pool.capacity_epoch,
-                transaction.delivery_window.window_id,
-                transaction.ledger_sequence,
-                transaction.idempotency_scope,
-                transaction.idempotency_key,
-                transaction.request_digest,
-                transaction.subject_kind,
-                transaction.subject_id,
-                transaction.occurred_at,
-                transaction.recorded_at,
-            ],
-        )?;
-        for leg in legs {
-            tx.execute(
-                "INSERT INTO compute_capacity_ledger_legs (
-                    leg_id, transaction_id, line_no, leg_role, bucket_id,
-                    meter, account, delta_units, created_at
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-                params![
-                    new_id("capacity_leg"),
-                    transaction.transaction_id,
-                    leg.line_no,
-                    leg_role_value(leg.leg_role),
-                    leg.bucket.bucket_id,
-                    leg.bucket.meter,
-                    account_value(leg.account),
-                    leg.delta_units,
-                    transaction.recorded_at,
-                ],
-            )?;
-        }
-        for (bucket_id, balance) in &balances {
-            let prior = before
-                .get(bucket_id)
-                .ok_or_else(|| anyhow!("容量 bucket 更新缺少原始余额"))?;
-            let changed = tx.execute(
-                "UPDATE compute_capacity_buckets SET
-                    issued_units=?1, available_units=?2, held_units=?3,
-                    active_units=?4, consumed_units=?5, retired_units=?6,
-                    balance_revision=?7, through_ledger_sequence=?8, updated_at=?9
-                  WHERE bucket_id=?10 AND balance_revision=?11",
-                params![
-                    balance.issued_units,
-                    balance.available_units,
-                    balance.held_units,
-                    balance.active_units,
-                    balance.consumed_units,
-                    balance.retired_units,
-                    balance.balance_revision,
-                    balance.through_ledger_sequence,
-                    transaction.recorded_at,
-                    bucket_id,
-                    prior.balance_revision,
-                ],
-            )?;
-            if changed != 1 {
-                bail!("容量 bucket 余额版本已变化，发行事务未提交");
-            }
-        }
+        finalize_transaction_digest(&mut transaction)?;
+        let current_balances = post_capacity_transaction_on(&tx, &transaction, balances)?;
         let receipt = ComputeCapacityLedgerWriteReceipt {
             transaction_id: transaction.transaction_id,
             transaction_digest: transaction.transaction_digest,
             ledger_sequence: transaction.ledger_sequence,
-            event_kind: "supply_added".to_string(),
+            event_kind: event_kind_value(transaction.event_kind).to_string(),
             request_digest: transaction.request_digest,
             replayed: false,
-            current_balances: balances.into_values().collect(),
+            current_balances,
         };
         tx.commit()?;
         Ok(receipt)
@@ -307,68 +226,4 @@ fn validate_supply_input(input: &AddComputeCapacitySupply) -> Result<()> {
         bail!("容量发行发生时间必须使用 UTC 时区");
     }
     Ok(())
-}
-
-fn balances_for_transaction(
-    conn: &rusqlite::Connection,
-    transaction_id: &str,
-) -> Result<Vec<ComputeCapacityBucketBalance>> {
-    let mut statement = conn.prepare(
-        "SELECT DISTINCT bucket_id FROM compute_capacity_ledger_legs
-          WHERE transaction_id=?1 ORDER BY bucket_id",
-    )?;
-    let bucket_ids = statement
-        .query_map(params![transaction_id], |row| row.get::<_, String>(0))?
-        .collect::<rusqlite::Result<Vec<_>>>()?;
-    bucket_ids
-        .into_iter()
-        .map(|bucket_id| {
-            stored_bucket_on(conn, &bucket_id)?
-                .map(|stored| stored.balance)
-                .ok_or_else(|| anyhow!("容量账本引用的 bucket 不存在"))
-        })
-        .collect()
-}
-
-fn transaction_digest(transaction: &ComputeCapacityLedgerTransaction) -> Result<String> {
-    let payload = serde_json::json!({
-        "schema": transaction.schema,
-        "transaction_id": transaction.transaction_id,
-        "pool": transaction.pool,
-        "delivery_window": transaction.delivery_window,
-        "ledger_sequence": transaction.ledger_sequence,
-        "event_kind": transaction.event_kind,
-        "claim_effect": transaction.claim_effect,
-        "causal_binding": transaction.causal_binding,
-        "idempotency_scope": transaction.idempotency_scope,
-        "idempotency_key": transaction.idempotency_key,
-        "request_digest": transaction.request_digest,
-        "subject_kind": transaction.subject_kind,
-        "subject_id": transaction.subject_id,
-        "causal_transaction_id": transaction.causal_transaction_id,
-        "movements": transaction.movements,
-        "occurred_at": transaction.occurred_at,
-        "recorded_at": transaction.recorded_at,
-    });
-    Ok(hex::encode(Sha256::digest(serde_json::to_vec(&payload)?)))
-}
-
-fn leg_role_value(
-    role: crate::compute_federation::capacity::ComputeCapacityLegRole,
-) -> &'static str {
-    match role {
-        crate::compute_federation::capacity::ComputeCapacityLegRole::From => "from",
-        crate::compute_federation::capacity::ComputeCapacityLegRole::To => "to",
-    }
-}
-
-fn account_value(account: ComputeCapacityAccount) -> &'static str {
-    match account {
-        ComputeCapacityAccount::Issuance => "issuance",
-        ComputeCapacityAccount::Available => "available",
-        ComputeCapacityAccount::Held => "held",
-        ComputeCapacityAccount::Active => "active",
-        ComputeCapacityAccount::Consumed => "consumed",
-        ComputeCapacityAccount::Retired => "retired",
-    }
 }
