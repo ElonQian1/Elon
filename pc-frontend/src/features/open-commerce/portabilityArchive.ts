@@ -95,7 +95,7 @@ export function isPortabilityEncryptedArchive(value: unknown): value is Portabil
 
 async function deriveKey(
   passphrase: string,
-  salt: Uint8Array<ArrayBuffer>,
+  salt: Uint8Array,
   usages: KeyUsage[],
 ) {
   const material = await crypto.subtle.importKey(
@@ -106,7 +106,12 @@ async function deriveKey(
     ['deriveKey'],
   )
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: PORTABILITY_ARCHIVE_ITERATIONS },
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: toArrayBuffer(salt),
+      iterations: PORTABILITY_ARCHIVE_ITERATIONS,
+    },
     material,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -134,9 +139,15 @@ function assertPassphrase(value: string) {
   if (value.length < 12 || value.length > 256) throw new Error('归档口令长度必须为 12 到 256 个字符')
 }
 
-async function sha256Hex(value: Uint8Array<ArrayBuffer>) {
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', value))
+async function sha256Hex(value: Uint8Array) {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', toArrayBuffer(value)))
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function toArrayBuffer(value: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(value.byteLength)
+  copy.set(value)
+  return copy.buffer
 }
 
 function bytesToBase64(value: Uint8Array) {
