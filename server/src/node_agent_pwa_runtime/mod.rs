@@ -9,6 +9,7 @@ mod auth;
 mod browser;
 mod cdp;
 mod fixture;
+mod interaction;
 mod process;
 mod security;
 mod semantic_tree;
