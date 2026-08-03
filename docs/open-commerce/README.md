@@ -161,6 +161,8 @@
 151. `docs/open-commerce-consumer-preference-constraints-v1-acceptance.md`：查看偏好硬约束代码状态及后置统一回归矩阵。
 152. `docs/decisions/open-commerce-consumer-candidate-scope-v1.md`：查看普通发现响应的候选窗口与非穷尽边界。
 153. `docs/open-commerce-consumer-candidate-scope-v1-acceptance.md`：查看候选范围摘要代码状态及后置统一回归矩阵。
+154. `docs/decisions/open-commerce-consumer-discovery-inputs-v1.md`：查看第三方 App 消费者发现请求的服务端规范化边界。
+155. `docs/open-commerce-consumer-discovery-inputs-v1-acceptance.md`：查看发现输入规范化代码状态及后置统一回归矩阵。
 
 ## 专题地图
 
