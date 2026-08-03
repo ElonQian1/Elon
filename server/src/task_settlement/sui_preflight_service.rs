@@ -11,7 +11,7 @@ use super::{
     sui_adapter_handoff_model::SuiAdapterHandoffBundle,
     sui_adapter_handoff_service,
     sui_preflight_model::{
-        CreateSuiPreflightAdapterRequest, CreateSuiPreflightReport,
+        CreateSuiPreflightAdapterRequest, PreparedSuiPreflightReport,
         RecordSuiPreflightReportRequest, SuiPreflightAdapter, SuiPreflightAdapterIssue,
         SuiPreflightAdapterList, SuiPreflightReport, SuiPreflightReportList,
         SUI_PREFLIGHT_ADAPTER_LIST_SCHEMA, SUI_PREFLIGHT_REPORT_LIST_SCHEMA,
@@ -118,6 +118,17 @@ pub(super) fn record_report(
     adapter: &SuiPreflightAdapter,
     request: &RecordSuiPreflightReportRequest,
 ) -> Result<SuiPreflightReport> {
+    let prepared = prepare_report(store, adapter, request)?;
+    let report = store.record_task_sui_preflight_report(prepared.as_create())?;
+    store.touch_task_sui_preflight_adapter(&adapter.id)?;
+    Ok(report)
+}
+
+pub(super) fn prepare_report(
+    store: &Store,
+    adapter: &SuiPreflightAdapter,
+    request: &RecordSuiPreflightReportRequest,
+) -> Result<PreparedSuiPreflightReport> {
     if !runtime_enabled() {
         bail!("Sui 离线预检机器报告入口未启用");
     }
@@ -169,23 +180,21 @@ pub(super) fn record_report(
         tool_version: &tool_version,
         idempotency_key: &idempotency_key,
     })?;
-    let report = store.record_task_sui_preflight_report(CreateSuiPreflightReport {
-        project_id: &adapter.project_id,
-        adapter_id: &adapter.id,
+    Ok(PreparedSuiPreflightReport {
+        project_id: adapter.project_id.clone(),
+        adapter_id: adapter.id.clone(),
         credential_version: adapter.credential_version,
-        package_kind,
-        projection_package_id: &projection_package_id,
-        target_network: &bundle.payload.target_network,
-        handoff_digest: &handoff_digest,
-        projection_digest: &bundle.payload.projection_digest,
-        outcome,
-        summary: &summary,
-        tool_version: &tool_version,
-        idempotency_key: &idempotency_key,
-        report_digest: &report_digest,
-    })?;
-    store.touch_task_sui_preflight_adapter(&adapter.id)?;
-    Ok(report)
+        package_kind: package_kind.to_string(),
+        projection_package_id,
+        target_network: bundle.payload.target_network,
+        handoff_digest,
+        projection_digest: bundle.payload.projection_digest,
+        outcome: outcome.to_string(),
+        summary,
+        tool_version,
+        idempotency_key,
+        report_digest,
+    })
 }
 
 fn read_only_bundle(

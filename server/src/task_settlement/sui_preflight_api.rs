@@ -154,7 +154,7 @@ async fn record_machine_report(
     service_response(service::record_report(&state.store, &adapter, &request))
 }
 
-fn bearer_token(headers: &HeaderMap) -> Option<&str> {
+pub(super) fn bearer_token(headers: &HeaderMap) -> Option<&str> {
     headers
         .get("authorization")?
         .to_str()

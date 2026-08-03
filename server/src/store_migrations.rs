@@ -193,6 +193,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (156, "开放商业 Webhook 沙箱与生产环境绑定", crate::open_commerce_production_webhook_migration::migration_v156),
     (157, "开放商业 Webhook 死信人工确认", crate::open_commerce_webhook_dead_letter_migration::migration_v157),
     (158, "Sui 离线预检适配器身份与追加式报告", crate::task_sui_preflight_migration::migration_v158),
+    (159, "Sui 离线预检显式任务与短时租约", crate::task_sui_preflight_job_migration::migration_v159),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

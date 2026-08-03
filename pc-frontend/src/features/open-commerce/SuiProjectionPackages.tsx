@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, FileJson, PackagePlus, RefreshCw, ShieldCheck } from 'lucide-react'
+import { Download, FileJson, PackagePlus, Plus, RefreshCw, ShieldCheck } from 'lucide-react'
 import { taskEconomyApi } from './taskEconomyApi'
 import { downloadSuiAdapterHandoff } from './suiAdapterHandoffDownload'
 import type {
@@ -104,6 +104,20 @@ export default function SuiProjectionPackages({
     }
   }
 
+  async function queuePreflight() {
+    if (!selected) return
+    setBusy(true)
+    setMessage('')
+    try {
+      await taskEconomyApi.queueSuiPreflightJob(projectId, 'standard', selected.id)
+      setMessage('离线预检任务已入队。')
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const isStandardReceipt = selectedReceipt?.receipt_kind === 'standard'
   const canPrepare =
     canEdit && selectedReceipt?.status === 'reconciled' && isStandardReceipt && !busy
@@ -196,6 +210,18 @@ export default function SuiProjectionPackages({
                   title="重新复核并下载离线适配器交接包"
                 >
                   <Download size={14} />下载交接包
+                </button>
+                <button
+                  style={actionStyle(
+                    'secondary',
+                    !canEdit || busy || selected.submission_readiness !== 'adapter_required',
+                  )}
+                  type="button"
+                  onClick={queuePreflight}
+                  disabled={!canEdit || busy || selected.submission_readiness !== 'adapter_required'}
+                  title="把当前投影包加入离线预检任务队列"
+                >
+                  <Plus size={14} />加入预检队列
                 </button>
                 <pre className={base.result}>{JSON.stringify(selected.envelope, null, 2)}</pre>
               </>

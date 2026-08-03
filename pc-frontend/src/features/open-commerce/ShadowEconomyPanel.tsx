@@ -8,6 +8,7 @@ import type {
 } from './taskEconomyTypes'
 import SuiProjectionPackages from './SuiProjectionPackages'
 import SuiPreflightAdaptersPanel from './SuiPreflightAdaptersPanel'
+import SuiPreflightJobsPanel from './SuiPreflightJobsPanel'
 import SettlementLineage from './SettlementLineage'
 import SettlementDisputes from './SettlementDisputes'
 import { errorText, formatMicros } from './openCommerceUi'
@@ -187,6 +188,7 @@ export default function ShadowEconomyPanel({
         selectedReceipt={detail?.receipt ?? null}
       />
       <SuiPreflightAdaptersPanel canEdit={canEdit} projectId={projectId} />
+      <SuiPreflightJobsPanel canEdit={canEdit} projectId={projectId} />
       {message && <div style={{ ...commerceStyles.message, ...errorMessageStyle }}>{message}</div>}
     </div>
   )

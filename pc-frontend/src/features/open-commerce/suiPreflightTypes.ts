@@ -61,3 +61,43 @@ export interface SuiPreflightReportList {
   reports: SuiPreflightReport[]
   boundary: string[]
 }
+
+export type SuiPreflightJobStatus =
+  | 'pending'
+  | 'leased'
+  | 'completed'
+  | 'canceled'
+  | 'blocked'
+
+export interface SuiPreflightJob {
+  schema: 'task_economy.sui_preflight_job.v1'
+  id: string
+  project_id: string
+  package_kind: SuiPreflightPackageKind
+  projection_package_id: string
+  target_network: 'devnet' | 'testnet' | 'mainnet'
+  handoff_digest: string
+  projection_digest: string
+  status: SuiPreflightJobStatus
+  adapter_id: string | null
+  credential_version: number | null
+  attempt_no: number
+  lease_token_hint: string | null
+  lease_started_at: string | null
+  lease_expires_at: string | null
+  lease_deadline_at: string | null
+  report_id: string | null
+  last_error: string | null
+  created_by_user_id: string
+  completed_at: string | null
+  canceled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SuiPreflightJobList {
+  schema: 'task_economy.sui_preflight_job_list.v1'
+  project_id: string
+  jobs: SuiPreflightJob[]
+  boundary: string[]
+}

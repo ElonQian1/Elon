@@ -110,6 +110,7 @@ pub(crate) struct RecordSuiPreflightReportRequest {
     pub idempotency_key: String,
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct CreateSuiPreflightReport<'a> {
     pub project_id: &'a str,
     pub adapter_id: &'a str,
@@ -124,4 +125,40 @@ pub(crate) struct CreateSuiPreflightReport<'a> {
     pub tool_version: &'a str,
     pub idempotency_key: &'a str,
     pub report_digest: &'a str,
+}
+
+pub(crate) struct PreparedSuiPreflightReport {
+    pub project_id: String,
+    pub adapter_id: String,
+    pub credential_version: i64,
+    pub package_kind: String,
+    pub projection_package_id: String,
+    pub target_network: String,
+    pub handoff_digest: String,
+    pub projection_digest: String,
+    pub outcome: String,
+    pub summary: String,
+    pub tool_version: String,
+    pub idempotency_key: String,
+    pub report_digest: String,
+}
+
+impl PreparedSuiPreflightReport {
+    pub(crate) fn as_create(&self) -> CreateSuiPreflightReport<'_> {
+        CreateSuiPreflightReport {
+            project_id: &self.project_id,
+            adapter_id: &self.adapter_id,
+            credential_version: self.credential_version,
+            package_kind: &self.package_kind,
+            projection_package_id: &self.projection_package_id,
+            target_network: &self.target_network,
+            handoff_digest: &self.handoff_digest,
+            projection_digest: &self.projection_digest,
+            outcome: &self.outcome,
+            summary: &self.summary,
+            tool_version: &self.tool_version,
+            idempotency_key: &self.idempotency_key,
+            report_digest: &self.report_digest,
+        }
+    }
 }

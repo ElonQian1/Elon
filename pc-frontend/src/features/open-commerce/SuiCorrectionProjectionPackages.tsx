@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, PackagePlus, RefreshCw, ShieldCheck } from 'lucide-react'
+import { Download, PackagePlus, Plus, RefreshCw, ShieldCheck } from 'lucide-react'
 import { taskEconomyApi } from './taskEconomyApi'
 import { downloadSuiAdapterHandoff } from './suiAdapterHandoffDownload'
 import type {
@@ -93,6 +93,19 @@ export default function SuiCorrectionProjectionPackages({
     }
   }
 
+  async function queuePreflight(item: SuiCorrectionProjectionPackage) {
+    setBusy(`queue:${item.id}`)
+    setMessage('')
+    try {
+      await taskEconomyApi.queueSuiPreflightJob(projectId, 'correction', item.id)
+      setMessage('原子纠正包已加入离线预检队列。')
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy('')
+    }
+  }
+
   return (
     <div style={commerceStyles.list}>
       <header style={commerceStyles.itemHeader}>
@@ -150,6 +163,17 @@ export default function SuiCorrectionProjectionPackages({
               title="重新复核并下载离线适配器交接包"
             >
               <Download size={14} />
+            </button>
+            <button
+              style={actionStyle('icon')}
+              type="button"
+              onClick={() => queuePreflight(item)}
+              disabled={
+                !canEdit || busy !== '' || item.submission_readiness !== 'adapter_required'
+              }
+              title="把原子纠正包加入离线预检任务队列"
+            >
+              <Plus size={14} />
             </button>
           </div>
         </div>

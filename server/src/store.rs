@@ -161,6 +161,8 @@ mod task_settlements;
 mod task_start_sync;
 mod task_sui_correction_projection_packages;
 mod task_sui_preflight_adapters;
+mod task_sui_preflight_job_leases;
+mod task_sui_preflight_jobs;
 mod task_sui_preflight_reports;
 mod task_sui_projection_packages;
 #[cfg(test)]

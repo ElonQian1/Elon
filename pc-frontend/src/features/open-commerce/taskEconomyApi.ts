@@ -17,6 +17,8 @@ import type {
   SuiPreflightAdapter,
   SuiPreflightAdapterIssue,
   SuiPreflightAdapterList,
+  SuiPreflightJob,
+  SuiPreflightJobList,
   SuiPreflightPackageKind,
   SuiPreflightReportList,
 } from './suiPreflightTypes'
@@ -161,4 +163,21 @@ export const taskEconomyApi = {
     ),
   suiPreflightReports: (projectId: string) =>
     api.get<SuiPreflightReportList>(`${base(projectId)}/sui-preflight-reports`),
+  suiPreflightJobs: (projectId: string) =>
+    api.get<SuiPreflightJobList>(`${base(projectId)}/sui-preflight-jobs`),
+  queueSuiPreflightJob: (
+    projectId: string,
+    packageKind: SuiPreflightPackageKind,
+    projectionPackageId: string,
+  ) =>
+    api.post<SuiPreflightJob>(`${base(projectId)}/sui-preflight-jobs`, {
+      package_kind: packageKind,
+      projection_package_id: projectionPackageId,
+      confirmed_by_user: true,
+    }),
+  cancelSuiPreflightJob: (projectId: string, jobId: string, reason: string) =>
+    api.post<SuiPreflightJob>(
+      `${base(projectId)}/sui-preflight-jobs/${encodeURIComponent(jobId)}/cancel`,
+      { reason, confirmed_by_user: true },
+    ),
 }
