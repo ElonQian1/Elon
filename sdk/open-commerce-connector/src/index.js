@@ -17,6 +17,18 @@ export {
   createAdapterHandoffWorker,
 } from './adapter-handoff-worker.js'
 
+export { createMemoryMerchantRuntimeIdempotencyStore } from './merchant-runtime-memory-store.js'
+
+export {
+  MERCHANT_RUNTIME_ERROR_SCHEMA,
+  MERCHANT_RUNTIME_MANIFEST_SCHEMA,
+  MERCHANT_RUNTIME_MAX_BODY_BYTES,
+  MERCHANT_RUNTIME_REQUEST_SCHEMA,
+  MERCHANT_RUNTIME_RESULT_SCHEMA,
+  MerchantRuntimeError,
+  createMerchantRuntime,
+} from './merchant-runtime.js'
+
 export const CONNECTOR_SCHEMA = 'open_commerce.connector.v1'
 export const CONNECTOR_CONTRACT_VERSION = '1.0'
 export const MAX_SYNC_PAGE_RECORDS = 500

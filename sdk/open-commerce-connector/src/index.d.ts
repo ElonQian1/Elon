@@ -8,6 +8,11 @@ export const ADAPTER_HANDOFF_CLAIM_RELEASE_SCHEMA: 'open_commerce.adapter_busine
 export const ADAPTER_HANDOFF_CLAIM_RENEW_SCHEMA: 'open_commerce.adapter_business_handoff_claim_renew.v1'
 export const ADAPTER_HANDOFF_MAX_RESPONSE_BYTES: number
 export const ADAPTER_HANDOFF_WORKER_SCHEMA: 'open_commerce.adapter_handoff_worker_result.v1'
+export const MERCHANT_RUNTIME_REQUEST_SCHEMA: 'merchant_runtime.invoke.v1'
+export const MERCHANT_RUNTIME_RESULT_SCHEMA: 'merchant_runtime.result.v1'
+export const MERCHANT_RUNTIME_ERROR_SCHEMA: 'merchant_runtime.error.v1'
+export const MERCHANT_RUNTIME_MANIFEST_SCHEMA: 'merchant_runtime.manifest.v1'
+export const MERCHANT_RUNTIME_MAX_BODY_BYTES: number
 
 export type ConnectionMode =
   | 'official_api'
@@ -279,6 +284,98 @@ export function createAdapterHandoffWorker(options: {
   errorDelayMs?: number
   completionAttempts?: number
 }): AdapterHandoffWorker
+
+export interface MerchantRuntimeCapabilityDefinition {
+  key: string
+  access: 'public' | 'authorized'
+  input_schema: Record<string, unknown>
+}
+
+export interface MerchantRuntimeEnvelope {
+  schema: typeof MERCHANT_RUNTIME_REQUEST_SCHEMA
+  invocation_id: string
+  merchant_id: string
+  capability_key: string
+  requester_user_id: string
+  requester_app_id: string
+  grant_id?: string | null
+  idempotency_key: string
+  issued_at_unix: number
+  input: Record<string, unknown>
+}
+
+export interface MerchantRuntimeHandlerContext {
+  invocationId: string
+  merchantId: string
+  capabilityKey: string
+  requesterUserId: string
+  requesterAppId: string
+  grantId?: string | null
+  idempotencyKey: string
+  issuedAtUnix: number
+}
+
+export interface MerchantRuntimeIdempotencyInput {
+  merchantId: string
+  requesterAppId: string
+  capabilityKey: string
+  idempotencyKey: string
+  invocationId: string
+  requestHash: string
+}
+
+export interface MerchantRuntimeIdempotencyStore {
+  claim(input: MerchantRuntimeIdempotencyInput): Promise<
+    | { status: 'claimed' | 'busy' | 'conflict' }
+    | { status: 'replayed'; result: Record<string, unknown> }
+  >
+  complete(
+    input: MerchantRuntimeIdempotencyInput,
+    result: Record<string, unknown>,
+  ): Promise<boolean>
+  release(input: MerchantRuntimeIdempotencyInput): Promise<void>
+}
+
+export interface MerchantRuntimeResponse {
+  status: number
+  body: Record<string, unknown>
+}
+
+export interface MerchantRuntime {
+  manifest(): Readonly<Record<string, unknown>>
+  manifestSha256(): string
+  handleInvoke(request: {
+    headers: Headers | Record<string, string | string[] | undefined>
+    body: string | Uint8Array
+    nowUnix?: number
+  }): Promise<MerchantRuntimeResponse>
+}
+
+export class MerchantRuntimeError extends Error {
+  status: number
+  errorCode: string
+  constructor(status: number, errorCode: string, message: string)
+}
+
+export function createMerchantRuntime(options: {
+  merchantId: string
+  keyId: string
+  secret: string
+  capabilities: MerchantRuntimeCapabilityDefinition[]
+  handlers: Record<
+    string,
+    (
+      input: Record<string, unknown>,
+      context: MerchantRuntimeHandlerContext,
+    ) => Record<string, unknown> | Promise<Record<string, unknown>>
+  >
+  idempotencyStore: MerchantRuntimeIdempotencyStore
+  maxClockSkewSeconds?: number
+}): MerchantRuntime
+
+export function createMemoryMerchantRuntimeIdempotencyStore(options?: {
+  takeoverAfterMs?: number
+}): MerchantRuntimeIdempotencyStore
 
 export function defineConnector<T extends OpenCommerceConnector>(connector: T): Readonly<T>
 export function validateConnector<T extends OpenCommerceConnector>(connector: T): T
