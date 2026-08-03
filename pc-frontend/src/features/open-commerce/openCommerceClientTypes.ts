@@ -262,6 +262,31 @@ export interface ConsumerPortabilityAdoptionList {
   adoptions: ConsumerPortabilityAdoption[]
 }
 
+export interface PortabilityRelationshipMapping {
+  schema: 'open_commerce.portability_relationship_mapping.v1'
+  id: string
+  import_id: string
+  source_relationship_id: string
+  source_merchant_id: string
+  target_merchant_id: string
+  target_merchant_project_id: string
+  status: 'active' | 'revoked'
+  created_at: string
+  revoked_at?: string
+}
+
+export interface PortabilityRelationshipMappingList {
+  schema: 'open_commerce.portability_relationship_mappings.v1'
+  mappings: PortabilityRelationshipMapping[]
+}
+
+export interface PortabilityReauthorizationResult {
+  schema: 'open_commerce.portability_reauthorization_result.v1'
+  mapping: PortabilityRelationshipMapping
+  authorization_request: AuthorizationRequest
+  old_grant_restored: false
+}
+
 export interface ConsumerPreferences {
   categories: string[]
   tags: string[]
