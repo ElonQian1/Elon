@@ -6,7 +6,9 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{
-    open_commerce_action_confirmation_model::ACTION_CONFIRMATION_PHRASE,
+    open_commerce_action_confirmation_model::{
+        ACTION_CANCELLATION_PHRASE, ACTION_CONFIRMATION_PHRASE,
+    },
     open_commerce_action_confirmation_service,
     open_commerce_model::InvokeCapabilityRequest,
     open_commerce_service::{self, OpenCommerceActor},
@@ -14,6 +16,7 @@ use crate::{
 };
 
 const GET_MY_ACTION_CONFIRMATION: &str = "open_commerce_get_my_action_confirmation";
+const CANCEL_MY_ACTION_CONFIRMATION: &str = "open_commerce_cancel_my_action_confirmation";
 const PREPARE_ACTION_CONFIRMATION: &str = "open_commerce_prepare_action_confirmation";
 const CONFIRM_ACTION_CONFIRMATION: &str = "open_commerce_confirm_action_confirmation";
 const INVOKE: &str = "open_commerce_invoke";
@@ -42,6 +45,12 @@ struct ConfirmActionArguments {
     confirmation_phrase: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct CancelActionArguments {
+    confirmation_id: String,
+    confirmation_phrase: String,
+}
+
 pub(crate) fn definitions() -> Vec<Value> {
     vec![
         tool(
@@ -57,6 +66,23 @@ pub(crate) fn definitions() -> Vec<Value> {
             }),
             true,
             false,
+            true,
+            false,
+        ),
+        tool(
+            CANCEL_MY_ACTION_CONFIRMATION,
+            "仅在当前用户明确要求停止后，取消当前用户与当前 App 持有且尚未创建 Invocation 的动作确认。已消费或自然过期确认不能伪装为取消。",
+            json!({
+                "type":"object",
+                "required":["confirmation_id","confirmation_phrase"],
+                "properties":{
+                    "confirmation_id":{"type":"string","minLength":1,"maxLength":120},
+                    "confirmation_phrase":{"const":"CANCEL_ACTION"}
+                },
+                "additionalProperties":false
+            }),
+            false,
+            true,
             true,
             false,
         ),
@@ -142,18 +168,24 @@ pub(crate) async fn call_if_handled(
                     .context("动作确认失效时间无效")?
                     .with_timezone(&Utc)
                     <= Utc::now();
-            let effective_status = match (confirmation.status.as_str(), expired) {
-                ("pending" | "confirmed", true) => "expired",
-                ("pending", false) => "pending",
-                ("confirmed", false) => "confirmed",
-                ("consumed", _) => "consumed",
-                ("expired", _) => "expired",
+            let effective_status = match (
+                confirmation.status.as_str(),
+                expired,
+                confirmation.canceled_at.is_some(),
+            ) {
+                (_, _, true) => "canceled",
+                ("pending" | "confirmed", true, false) => "expired",
+                ("pending", false, false) => "pending",
+                ("confirmed", false, false) => "confirmed",
+                ("consumed", _, false) => "consumed",
+                ("expired", _, false) => "expired",
                 _ => "invalid",
             };
             let next_step = match effective_status {
                 "pending" => "obtain_explicit_user_confirmation",
                 "confirmed" => "invoke_with_confirmation",
                 "consumed" => "read_invocation_receipt",
+                "canceled" => "stop",
                 "expired" => "prepare_new_confirmation",
                 _ => "stop",
             };
@@ -173,8 +205,36 @@ pub(crate) async fn call_if_handled(
                 "created_at":confirmation.created_at,
                 "confirmed_at":confirmation.confirmed_at,
                 "consumed_at":confirmation.consumed_at,
+                "canceled_at":confirmation.canceled_at,
                 "invocation_id":confirmation.invocation_id,
                 "next_step":next_step
+            })))
+        }
+        CANCEL_MY_ACTION_CONFIRMATION => {
+            let input: CancelActionArguments = decode(arguments, name)?;
+            if input.confirmation_phrase != ACTION_CANCELLATION_PHRASE {
+                bail!("动作取消短语无效");
+            }
+            let confirmation = open_commerce_action_confirmation_service::cancel(
+                store,
+                &OpenCommerceActor {
+                    user_id,
+                    app_id,
+                    project_role: Some(project_role),
+                },
+                &input.confirmation_id,
+                &input.confirmation_phrase,
+            )?;
+            Ok(Some(json!({
+                "schema":"open_commerce.consumer_action_confirmation_cancellation.v1",
+                "confirmation_id":confirmation.id,
+                "merchant_id":confirmation.merchant_id,
+                "capability_key":confirmation.capability_key,
+                "requester_app_id":confirmation.requester_app_id,
+                "status":"canceled",
+                "canceled_at":confirmation.canceled_at,
+                "invocation_created":false,
+                "next_step":"stop"
             })))
         }
         PREPARE_ACTION_CONFIRMATION => {

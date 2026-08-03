@@ -21,6 +21,7 @@ pub(crate) fn migration_v133(conn: &Connection) -> Result<()> {
            created_at          TEXT NOT NULL,
            confirmed_at        TEXT,
            consumed_at         TEXT,
+           canceled_at         TEXT,
            invocation_id       TEXT,
            FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
            FOREIGN KEY(merchant_id) REFERENCES open_commerce_merchants(id) ON DELETE CASCADE,
@@ -35,6 +36,16 @@ pub(crate) fn migration_v133(conn: &Connection) -> Result<()> {
          CREATE UNIQUE INDEX IF NOT EXISTS idx_open_commerce_action_confirmations_invocation
            ON open_commerce_action_confirmations(invocation_id)
            WHERE invocation_id IS NOT NULL;",
+    )?;
+    Ok(())
+}
+
+pub(crate) fn migration_v166(conn: &Connection) -> Result<()> {
+    crate::store_migrations::add_column_if_missing(
+        conn,
+        "open_commerce_action_confirmations",
+        "canceled_at",
+        "canceled_at TEXT",
     )?;
     Ok(())
 }

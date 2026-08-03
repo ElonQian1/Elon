@@ -4,7 +4,8 @@ use serde_json::json;
 
 use crate::{
     open_commerce_action_confirmation_model::{
-        OpenCommerceActionConfirmation, ACTION_CONFIRMATION_PHRASE, ACTION_CONFIRMATION_TTL_SECONDS,
+        OpenCommerceActionConfirmation, ACTION_CANCELLATION_PHRASE, ACTION_CONFIRMATION_PHRASE,
+        ACTION_CONFIRMATION_TTL_SECONDS,
     },
     open_commerce_app_block_service,
     open_commerce_invocation_protocol::{request_digest, request_shape},
@@ -137,5 +138,38 @@ pub(crate) fn confirm(
             "contains_raw_values": false
         }),
     )?;
+    Ok(confirmation)
+}
+
+pub(crate) fn cancel(
+    store: &Store,
+    actor: &OpenCommerceActor<'_>,
+    confirmation_id: &str,
+    confirmation_phrase: &str,
+) -> Result<OpenCommerceActionConfirmation> {
+    if confirmation_phrase.trim() != ACTION_CANCELLATION_PHRASE {
+        bail!("动作取消短语无效");
+    }
+    let app_id = normalize_app_id(actor.app_id)?;
+    let (confirmation, changed) =
+        store.cancel_open_commerce_action_confirmation(confirmation_id, actor.user_id, &app_id)?;
+    if changed {
+        store.record_open_commerce_audit(
+            &confirmation.project_id,
+            actor.user_id,
+            Some(&app_id),
+            "action_confirmation.canceled",
+            "action_confirmation",
+            &confirmation.id,
+            &json!({
+                "merchant_id": confirmation.merchant_id,
+                "capability_key": confirmation.capability_key,
+                "idempotency_key": confirmation.idempotency_key,
+                "request_hash": confirmation.request_hash,
+                "status": "canceled",
+                "contains_raw_values": false
+            }),
+        )?;
+    }
     Ok(confirmation)
 }

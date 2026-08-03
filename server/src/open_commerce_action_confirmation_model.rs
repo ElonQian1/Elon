@@ -4,6 +4,7 @@ use serde_json::Value;
 use crate::open_commerce_model::InvokeCapabilityRequest;
 
 pub(crate) const ACTION_CONFIRMATION_PHRASE: &str = "CONFIRM_ACTION";
+pub(crate) const ACTION_CANCELLATION_PHRASE: &str = "CANCEL_ACTION";
 pub(crate) const ACTION_CONFIRMATION_TTL_SECONDS: i64 = 300;
 pub(crate) const ACTION_CONFIRMATION_RETENTION_DAYS: i64 = 7;
 pub(crate) const MAX_ACTIVE_ACTION_CONFIRMATIONS_PER_APP: i64 = 20;
@@ -30,6 +31,7 @@ pub(crate) struct OpenCommerceActionConfirmation {
     pub created_at: String,
     pub confirmed_at: Option<String>,
     pub consumed_at: Option<String>,
+    pub canceled_at: Option<String>,
     pub invocation_id: Option<String>,
 }
 

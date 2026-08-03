@@ -178,7 +178,8 @@ impl Store {
         let mut conn = self.conn()?;
         let tx = conn.transaction()?;
         let confirmation = confirmation_on(&tx, confirmation_id)?;
-        ensure_actor(&confirmation, requester_user_id, requester_app_id)?;
+        ensure_actor(&confirmation, requester_user_id, requester_app_id)
+            .map_err(|_| anyhow!("动作确认不存在"))?;
         match confirmation.status.as_str() {
             "pending" if is_expired(&confirmation.expires_at)? => {
                 tx.execute(
@@ -205,6 +206,56 @@ impl Store {
         tx.commit()?;
         drop(conn);
         self.open_commerce_action_confirmation(confirmation_id)
+    }
+
+    pub(crate) fn cancel_open_commerce_action_confirmation(
+        &self,
+        confirmation_id: &str,
+        requester_user_id: &str,
+        requester_app_id: &str,
+    ) -> Result<(OpenCommerceActionConfirmation, bool)> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let confirmation = confirmation_on(&tx, confirmation_id)?;
+        ensure_actor(&confirmation, requester_user_id, requester_app_id)
+            .map_err(|_| anyhow!("动作确认不存在"))?;
+        if confirmation.canceled_at.is_some() {
+            tx.commit()?;
+            return Ok((confirmation, false));
+        }
+        match confirmation.status.as_str() {
+            "pending" | "confirmed" if is_expired(&confirmation.expires_at)? => {
+                tx.execute(
+                    "UPDATE open_commerce_action_confirmations
+                        SET status = 'expired' WHERE id = ?1 AND status IN ('pending', 'confirmed')",
+                    params![confirmation.id],
+                )?;
+                tx.commit()?;
+                bail!("动作确认已自然过期，不能标记为主动取消");
+            }
+            "pending" | "confirmed" => {
+                let timestamp = now();
+                let updated = tx.execute(
+                    "UPDATE open_commerce_action_confirmations
+                        SET status = 'expired', canceled_at = ?1
+                      WHERE id = ?2 AND status IN ('pending', 'confirmed')
+                        AND canceled_at IS NULL AND invocation_id IS NULL",
+                    params![timestamp, confirmation.id],
+                )?;
+                if updated != 1 {
+                    bail!("动作确认状态已变化，请重新读取");
+                }
+            }
+            "consumed" => bail!("动作已创建调用，不能取消确认"),
+            "expired" => bail!("动作确认已过期，不能标记为主动取消"),
+            _ => bail!("动作确认状态无效"),
+        }
+        tx.commit()?;
+        drop(conn);
+        Ok((
+            self.open_commerce_action_confirmation(confirmation_id)?,
+            true,
+        ))
     }
 
     pub(crate) fn start_confirmed_open_commerce_invocation(
@@ -422,6 +473,7 @@ fn confirmation_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceActionCo
         confirmed_at: row.get(14)?,
         consumed_at: row.get(15)?,
         invocation_id: row.get(16)?,
+        canceled_at: row.get(17)?,
     })
 }
 
@@ -439,5 +491,5 @@ const CONFIRMATION_SELECT: &str =
     "SELECT id, project_id, merchant_id, capability_id, capability_key,
             requester_user_id, requester_app_id, grant_id, idempotency_key,
             request_hash, request_shape_json, status, expires_at, created_at,
-            confirmed_at, consumed_at, invocation_id
+            confirmed_at, consumed_at, invocation_id, canceled_at
        FROM open_commerce_action_confirmations";

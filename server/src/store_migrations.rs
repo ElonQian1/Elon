@@ -200,6 +200,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (163, "消费者删除请求催办与升级关注记录", crate::open_commerce_data_request_followup_migration::migration_v163),
     (164, "开放商业能力与数据同步回执来源绑定", crate::open_commerce_capability_source_migration::migration_v164),
     (165, "分布式算力共享容量池与追加式账本", crate::compute_capacity_migration::migration_v165),
+    (166, "开放商业动作确认主动取消时间", crate::open_commerce_action_confirmation_migration::migration_v166),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
