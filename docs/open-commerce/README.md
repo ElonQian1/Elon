@@ -157,6 +157,8 @@
 147. `docs/open-commerce-consumer-price-currency-v1-acceptance.md`：查看价格币种代码状态及后置统一回归矩阵。
 148. `docs/decisions/open-commerce-consumer-capability-filters-v1.md`：查看能力类型与访问级别筛选及安全边界。
 149. `docs/open-commerce-consumer-capability-filters-v1-acceptance.md`：查看能力筛选代码状态及后置统一回归矩阵。
+150. `docs/decisions/open-commerce-consumer-preference-constraints-v1.md`：查看软偏好升级为硬约束的规则与边界。
+151. `docs/open-commerce-consumer-preference-constraints-v1-acceptance.md`：查看偏好硬约束代码状态及后置统一回归矩阵。
 
 ## 专题地图
 
