@@ -217,6 +217,10 @@ mod open_commerce_consumer_receipt_model;
 mod open_commerce_consumer_receipt_service;
 #[cfg(test)]
 mod open_commerce_consumer_receipt_tests;
+mod open_commerce_data_erasure_evidence_api;
+mod open_commerce_data_erasure_evidence_migration;
+mod open_commerce_data_erasure_evidence_model;
+mod open_commerce_data_erasure_evidence_service;
 mod open_commerce_data_request_api;
 mod open_commerce_data_request_migration;
 mod open_commerce_data_request_model;

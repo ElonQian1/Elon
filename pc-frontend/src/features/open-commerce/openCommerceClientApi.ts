@@ -9,6 +9,8 @@ import type {
   AuthorizationRequestList,
   ConsumerDiscoveryRequest,
   ConsumerDiscoveryResponse,
+  ConsumerDataErasureEvidence,
+  ConsumerDataErasureEvidenceList,
   ConsumerDataRequest,
   ConsumerDataRequestList,
   ConsumerInvocationReceipt,
@@ -34,6 +36,7 @@ import type {
   PortabilityRelationshipMappingList,
   ConsumerRelationship,
   ConsumerRelationshipList,
+  CreateConsumerDataErasureEvidence,
   DeveloperAppCredential,
   DeveloperAppList,
   DeveloperInvokeRequest,
@@ -349,6 +352,26 @@ export const openCommerceClientApi = {
     request: { action: 'accept' | 'complete' | 'reject'; note: string },
   ) => api.post<ConsumerDataRequest>(
     `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/consumer-data-requests/${encodeURIComponent(requestId)}/decision`,
+    request,
+  ),
+
+  listConsumerDataErasureEvidence: (projectId: string) =>
+    api.get<ConsumerDataErasureEvidenceList>(
+      `${projectBase(projectId)}/consumer-data-erasure-evidence?limit=500`,
+    ),
+
+  listMerchantDataErasureEvidence: (projectId: string, merchantId: string) =>
+    api.get<ConsumerDataErasureEvidenceList>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/consumer-data-erasure-evidence?limit=500`,
+    ),
+
+  createMerchantDataErasureEvidence: (
+    projectId: string,
+    merchantId: string,
+    requestId: string,
+    request: CreateConsumerDataErasureEvidence,
+  ) => api.post<ConsumerDataErasureEvidence>(
+    `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/consumer-data-requests/${encodeURIComponent(requestId)}/evidence`,
     request,
   ),
 

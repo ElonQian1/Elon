@@ -226,6 +226,35 @@ export interface ConsumerDataRequestList {
   requests: ConsumerDataRequest[]
 }
 
+export interface ConsumerDataErasureEvidence {
+  id: string
+  data_request_id: string
+  merchant_id: string
+  evidence_kind: 'external_system_receipt' | 'merchant_attestation'
+  external_system: string
+  reference_id: string
+  receipt_sha256: string
+  summary: string
+  source_authority: 'merchant_supplied_unverified'
+  platform_verified: false
+  created_at: string
+}
+
+export interface ConsumerDataErasureEvidenceList {
+  schema: string
+  evidence: ConsumerDataErasureEvidence[]
+  boundary: string[]
+}
+
+export interface CreateConsumerDataErasureEvidence {
+  evidence_kind: ConsumerDataErasureEvidence['evidence_kind']
+  external_system: string
+  reference_id: string
+  receipt_sha256: string
+  summary: string
+  merchant_confirmed_unverified: boolean
+}
+
 export interface ConsumerRelationshipRenewalLink {
   source_relationship_id: string
   renewed_relationship_id: string

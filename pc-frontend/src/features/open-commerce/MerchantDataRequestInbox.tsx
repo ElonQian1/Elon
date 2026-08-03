@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Check, RefreshCw, ShieldCheck, X } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
-import type { ConsumerDataRequest } from './openCommerceClientTypes'
+import type { ConsumerDataErasureEvidence, ConsumerDataRequest } from './openCommerceClientTypes'
+import DataErasureEvidenceList from './DataErasureEvidenceList'
+import MerchantDataErasureEvidenceForm from './MerchantDataErasureEvidenceForm'
 import { errorText } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import { actionStyle, badgeStyle, commerceStyles, listItemStyle } from './openCommerceStyles'
@@ -16,14 +18,19 @@ export default function MerchantDataRequestInbox({
   canEdit: boolean
 }) {
   const [requests, setRequests] = useState<ConsumerDataRequest[]>([])
+  const [evidence, setEvidence] = useState<ConsumerDataErasureEvidence[]>([])
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
 
   const refresh = useCallback(async () => {
     try {
-      const response = await openCommerceClientApi.listMerchantDataRequests(projectId, merchantId)
-      setRequests(response.requests)
+      const [requestResponse, evidenceResponse] = await Promise.all([
+        openCommerceClientApi.listMerchantDataRequests(projectId, merchantId),
+        openCommerceClientApi.listMerchantDataErasureEvidence(projectId, merchantId),
+      ])
+      setRequests(requestResponse.requests)
+      setEvidence(evidenceResponse.evidence)
       setMessage('')
     } catch (error) {
       setMessage(errorText(error))
@@ -73,7 +80,20 @@ export default function MerchantDataRequestInbox({
                 <input value={notes[request.id] ?? ''} onChange={(event) => setNotes((current) => ({ ...current, [request.id]: event.target.value }))} maxLength={500} placeholder="完成或拒绝时必填" />
               </label>
             )}
-            {request.status === 'completed' && <p style={commerceStyles.itemText}><ShieldCheck size={13} /> 商户已声明完成，平台未核验外部系统。</p>}
+            {request.status === 'completed' && (
+              <>
+                <p style={commerceStyles.itemText}><ShieldCheck size={13} /> 商户已声明完成，平台未核验外部系统。</p>
+                <DataErasureEvidenceList evidence={evidence.filter((item) => item.data_request_id === request.id)} />
+                {canEdit && (
+                  <MerchantDataErasureEvidenceForm
+                    projectId={projectId}
+                    merchantId={merchantId}
+                    requestId={request.id}
+                    onCreated={refresh}
+                  />
+                )}
+              </>
+            )}
             {canEdit && request.status === 'requested' && (
               <div style={commerceStyles.headerActions}>
                 <button style={actionStyle('primary', busy)} type="button" onClick={() => decide(request, 'accept')} disabled={busy}><Check size={13} />接单</button>

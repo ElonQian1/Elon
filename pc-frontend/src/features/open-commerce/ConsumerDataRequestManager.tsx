@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Trash2, Undo2 } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
-import type { ConsumerDataRequest, ConsumerRelationship } from './openCommerceClientTypes'
+import type { ConsumerDataErasureEvidence, ConsumerDataRequest, ConsumerRelationship } from './openCommerceClientTypes'
+import DataErasureEvidenceList from './DataErasureEvidenceList'
 import { errorText } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import { actionStyle, badgeStyle, commerceStyles, listItemStyle } from './openCommerceStyles'
@@ -16,14 +17,19 @@ export default function ConsumerDataRequestManager({
   onRelationshipChanged: () => Promise<void>
 }) {
   const [requests, setRequests] = useState<ConsumerDataRequest[]>([])
+  const [evidence, setEvidence] = useState<ConsumerDataErasureEvidence[]>([])
   const [relationshipId, setRelationshipId] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
 
   const refresh = useCallback(async () => {
     try {
-      const response = await openCommerceClientApi.listConsumerDataRequests(projectId)
-      setRequests(response.requests)
+      const [requestResponse, evidenceResponse] = await Promise.all([
+        openCommerceClientApi.listConsumerDataRequests(projectId),
+        openCommerceClientApi.listConsumerDataErasureEvidence(projectId),
+      ])
+      setRequests(requestResponse.requests)
+      setEvidence(evidenceResponse.evidence)
     } catch (error) {
       setMessage(errorText(error))
     }
@@ -110,7 +116,12 @@ export default function ConsumerDataRequestManager({
             </header>
             <small style={commerceStyles.itemMeta}>关系 {relationshipById.get(request.relationship_id)?.status ?? '历史'} · {new Date(request.requested_at).toLocaleString('zh-CN')}</small>
             {request.resolution_note && <p style={commerceStyles.itemText}>商户说明：{request.resolution_note}</p>}
-            {request.status === 'completed' && <p style={commerceStyles.itemText}>该状态为商户声明完成，平台未验证外部系统删除结果。</p>}
+            {request.status === 'completed' && (
+              <>
+                <p style={commerceStyles.itemText}>该状态为商户声明完成，平台未验证外部系统删除结果。</p>
+                <DataErasureEvidenceList evidence={evidence.filter((item) => item.data_request_id === request.id)} />
+              </>
+            )}
             {request.status === 'requested' && (
               <button style={actionStyle('secondary', busy)} type="button" onClick={() => withdraw(request)} disabled={busy}><Undo2 size={13} />撤回请求</button>
             )}
