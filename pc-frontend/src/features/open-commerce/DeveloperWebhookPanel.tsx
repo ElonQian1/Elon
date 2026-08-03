@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import DeveloperWebhookReplayControls from './DeveloperWebhookReplayControls'
+import DeveloperWebhookHealthSummary from './DeveloperWebhookHealthSummary'
 import type {
   DeveloperWebhookDelivery,
   DeveloperWebhookHistoryReplayResult,
@@ -50,6 +51,7 @@ export default function DeveloperWebhookPanel({
   const [deliveries, setDeliveries] = useState<DeveloperWebhookDelivery[]>([])
   const [selectedWebhookId, setSelectedWebhookId] = useState('')
   const [visibleSecret, setVisibleSecret] = useState('')
+  const [healthRevision, setHealthRevision] = useState(0)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -76,6 +78,7 @@ export default function DeveloperWebhookPanel({
     try {
       const response = await openCommerceClientApi.listDeveloperWebhooks(projectId, appRecordId)
       setWebhooks(response.webhooks)
+      setHealthRevision((current) => current + 1)
       if (!response.webhooks.some((item) => item.id === selectedWebhookId)) {
         setSelectedWebhookId(response.webhooks[0]?.id ?? '')
       }
@@ -100,6 +103,7 @@ export default function DeveloperWebhookPanel({
         selectedWebhookId,
       )
       setDeliveries(response.deliveries)
+      setHealthRevision((current) => current + 1)
     } catch (error) {
       setMessage(errorText(error))
     }
@@ -258,6 +262,11 @@ export default function DeveloperWebhookPanel({
         </button>
       </header>
       <div className={base.formCard} style={commerceStyles.sectionBody}>
+        <DeveloperWebhookHealthSummary
+          projectId={projectId}
+          appRecordId={appRecordId}
+          refreshSignal={String(healthRevision)}
+        />
         <form style={commerceStyles.grid} onSubmit={createWebhook}>
           <label>
             开发者 App

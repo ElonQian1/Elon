@@ -4,6 +4,7 @@ import type {
   DeveloperWebhookDelivery,
   DeveloperWebhookDeliveryList,
   DeveloperWebhookHistoryReplayResult,
+  DeveloperWebhookHealthSummary,
   DeveloperWebhookSubscription,
   DeveloperWebhookSubscriptionList,
 } from './openCommerceClientTypes'
@@ -16,6 +17,11 @@ export const developerWebhookClientApi = {
   listDeveloperWebhooks: (projectId: string, appRecordId: string) =>
     api.get<DeveloperWebhookSubscriptionList>(
       `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks`,
+    ),
+
+  getDeveloperWebhookHealth: (projectId: string, appRecordId: string) =>
+    api.get<DeveloperWebhookHealthSummary>(
+      `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhook-health`,
     ),
 
   createDeveloperWebhook: (

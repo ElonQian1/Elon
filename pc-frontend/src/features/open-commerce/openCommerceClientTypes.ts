@@ -129,6 +129,34 @@ export interface DeveloperWebhookHistoryReplayResult {
   has_more: boolean
 }
 
+export interface DeveloperWebhookEnvironmentHealth {
+  environment: 'sandbox' | 'production'
+  status: 'idle' | 'healthy' | 'processing' | 'attention' | 'action_required'
+  subscription_count: number
+  active_subscription_count: number
+  verified_subscription_count: number
+  pending_delivery_count: number
+  retry_delivery_count: number
+  delivering_delivery_count: number
+  dead_delivery_count: number
+  oldest_queued_at?: string
+  latest_delivery_at?: string
+  latest_error_code?: string
+}
+
+export interface DeveloperWebhookHealthSummary {
+  schema: string
+  app_record_id: string
+  app_id: string
+  production_webhooks_enabled: boolean
+  production_credentials_enabled: boolean
+  production_credential_eligible: boolean
+  production_ready: boolean
+  production_blocker_code?: string
+  environments: DeveloperWebhookEnvironmentHealth[]
+  generated_at: string
+}
+
 export interface AuthorizationRequest {
   id: string
   merchant_project_id: string

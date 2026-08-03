@@ -9,6 +9,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
+    open_commerce_webhook_health_service,
     open_commerce_webhook_model::{
         CreateDeveloperWebhookRequest, DeveloperWebhookHistoryReplayRequest,
     },
@@ -22,6 +23,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks",
             get(list_webhooks).post(create_webhook),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhook-health",
+            get(webhook_health),
         )
         .route(
             "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks/:subscription_id/disable",
@@ -51,6 +56,21 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks/:subscription_id/replay-history",
             post(replay_history),
         )
+}
+
+async fn webhook_health(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, app_record_id)): Path<(String, String)>,
+) -> Response {
+    let app = match caller_app(&state, &headers, &project_id, &app_record_id, false) {
+        Ok(app) => app,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_webhook_health_service::health_summary(
+        &state.store,
+        &app,
+    ))
 }
 
 async fn list_webhooks(

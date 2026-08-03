@@ -116,6 +116,15 @@ impl Store {
         ensure_current_production_credential_on(&conn, project_id, app_record_id)
     }
 
+    pub(crate) fn has_current_open_commerce_production_credential(
+        &self,
+        project_id: &str,
+        app_record_id: &str,
+    ) -> Result<bool> {
+        let conn = self.conn()?;
+        current_production_credential_eligible_on(&conn, project_id, app_record_id)
+    }
+
     pub(crate) fn revoke_open_commerce_developer_production_credential(
         &self,
         project_id: &str,
@@ -259,7 +268,18 @@ pub(super) fn ensure_current_production_credential_on(
     project_id: &str,
     app_record_id: &str,
 ) -> Result<()> {
-    let eligible: bool = conn.query_row(
+    if !current_production_credential_eligible_on(conn, project_id, app_record_id)? {
+        bail!("生产 Webhook 需要当前有效的生产凭据和准入状态");
+    }
+    Ok(())
+}
+
+fn current_production_credential_eligible_on(
+    conn: &Connection,
+    project_id: &str,
+    app_record_id: &str,
+) -> Result<bool> {
+    conn.query_row(
         "SELECT EXISTS(
             SELECT 1
               FROM open_commerce_developer_production_credentials credential
@@ -281,11 +301,8 @@ pub(super) fn ensure_current_production_credential_on(
          )",
         params![project_id.trim(), app_record_id.trim()],
         |row| row.get(0),
-    )?;
-    if !eligible {
-        bail!("生产 Webhook 需要当前有效的生产凭据和准入状态");
-    }
-    Ok(())
+    )
+    .map_err(Into::into)
 }
 
 fn production_credential_on(
