@@ -16,11 +16,11 @@ implementation_status: implementation_uncompiled
 
 1. 每次消费者发现响应增加 `candidate_scope`，不要求用户额外生成排序凭证。
 2. 范围固定为 `current_operator_public_directory.v1`，并固定 `operator_exhaustive=false`。
-3. 响应公开 `candidate_cap`、`directory_candidate_count`、`eligible_match_count` 和 `returned_match_count`。
+3. 当前候选窗口固定为 100，响应公开 `candidate_cap`、`directory_candidate_count`、`eligible_match_count` 和 `returned_match_count`；请求 `limit` 只控制最终返回 1 至 50 条，不改变参与排序的候选集合。
 4. `results_truncated` 只在合格匹配数大于实际返回数时为真。
 5. 目录候选数等于候选上限不能用来推断全网总量，也不代表当前运营方目录已全部扫描。
 6. PC 使用无框摘要行显示计数、截断状态和“非全网穷尽”，不在结果容器中嵌套卡片。
-7. 本批不提供全局游标分页、跨运营方聚合或全网基数估计。
+7. 本批不提供全局游标分页、跨运营方聚合或全网基数估计；固定窗口也不代表前 100 个候选具有全网代表性。
 
 ## 信任边界
 
