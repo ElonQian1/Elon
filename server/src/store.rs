@@ -70,6 +70,7 @@ mod open_commerce_business_handoffs;
 mod open_commerce_capabilities;
 mod open_commerce_consumer_data_requests;
 mod open_commerce_consumer_portability;
+mod open_commerce_consumer_portability_imports;
 mod open_commerce_consumer_preferences;
 mod open_commerce_consumer_receipts;
 mod open_commerce_consumer_relationships;

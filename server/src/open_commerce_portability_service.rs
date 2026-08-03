@@ -147,10 +147,40 @@ fn normalize_idempotency_key(value: &str) -> Result<String> {
     Ok(value.to_string())
 }
 
+pub(crate) fn verify_external_export(
+    export: ConsumerPortabilityExport,
+) -> Result<ConsumerPortabilityExport> {
+    let source_project_id = export.source_project_id.trim();
+    if source_project_id.is_empty() || source_project_id.chars().count() > 120 {
+        bail!("消费者可携带数据包来源项目 ID 长度必须为 1 到 120 个字符");
+    }
+    if export.id.trim().is_empty() || export.id.chars().count() > 120 {
+        bail!("消费者可携带数据包 ID 长度必须为 1 到 120 个字符");
+    }
+    normalize_idempotency_key(&export.idempotency_key)?;
+    verify_export_contents(export)
+}
+
+pub(crate) fn canonical_export_json(export: &ConsumerPortabilityExport) -> Result<String> {
+    let package_json = serde_json::to_string(export).context("序列化消费者可携带数据包失败")?;
+    if package_json.len() > MAX_PORTABILITY_PAYLOAD_BYTES + 64 * 1024 {
+        bail!("消费者可携带数据包信封超过允许上限");
+    }
+    Ok(package_json)
+}
+
 fn verify_export(
     export: ConsumerPortabilityExport,
     expected_project_id: &str,
 ) -> Result<ConsumerPortabilityExport> {
+    let export = verify_external_export(export)?;
+    if export.source_project_id != expected_project_id.trim() {
+        bail!("消费者可携带数据包来源项目不一致");
+    }
+    Ok(export)
+}
+
+fn verify_export_contents(export: ConsumerPortabilityExport) -> Result<ConsumerPortabilityExport> {
     let supported_version = matches!(
         (export.schema.as_str(), export.payload.schema.as_str()),
         (
@@ -181,8 +211,8 @@ fn verify_export(
     {
         bail!("旧版消费者可携带数据包不能包含 V3 调用凭证字段");
     }
-    if export.source_project_id != expected_project_id.trim()
-        || export.payload.source_project_id != expected_project_id.trim()
+    if export.source_project_id != export.source_project_id.trim()
+        || export.payload.source_project_id != export.source_project_id
     {
         bail!("消费者可携带数据包来源项目不一致");
     }

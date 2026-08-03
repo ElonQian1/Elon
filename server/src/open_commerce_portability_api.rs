@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{DefaultBodyLimit, Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
@@ -9,6 +9,8 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
+    open_commerce_portability_import_model::CreateConsumerPortabilityImportRequest,
+    open_commerce_portability_import_service,
     open_commerce_portability_model::CreateConsumerPortabilityExportRequest,
     open_commerce_portability_service,
     open_commerce_service::OpenCommerceActor,
@@ -25,6 +27,16 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/open-commerce/consumer-portability-exports/:export_id",
             get(get_export),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/consumer-portability-imports",
+            get(list_imports)
+                .post(create_import)
+                .layer(DefaultBodyLimit::max(6 * 1024 * 1024)),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/consumer-portability-imports/:import_id",
+            get(get_import).delete(delete_import),
         )
 }
 
@@ -81,6 +93,80 @@ async fn get_export(
         &state.store,
         &project_id,
         &export_id,
+        &actor(&caller),
+    ))
+}
+
+async fn list_imports(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(
+        open_commerce_portability_import_service::list_imports(
+            &state.store,
+            &project_id,
+            &actor(&caller),
+            100,
+        )
+        .map(|imports| {
+            json!({"schema":"open_commerce.consumer_portability_imports.v1","imports":imports})
+        }),
+    )
+}
+
+async fn create_import(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(request): Json<CreateConsumerPortabilityImportRequest>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_portability_import_service::create_import(
+        &state.store,
+        &project_id,
+        &actor(&caller),
+        request,
+    ))
+}
+
+async fn get_import(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, import_id)): Path<(String, String)>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_portability_import_service::get_import(
+        &state.store,
+        &project_id,
+        &import_id,
+        &actor(&caller),
+    ))
+}
+
+async fn delete_import(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, import_id)): Path<(String, String)>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_portability_import_service::delete_import(
+        &state.store,
+        &project_id,
+        &import_id,
         &actor(&caller),
     ))
 }

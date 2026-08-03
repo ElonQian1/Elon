@@ -136,6 +136,45 @@ export interface ConsumerPortabilityExportList {
   exports: ConsumerPortabilityExportSummary[]
 }
 
+export interface ConsumerPortabilityImport {
+  schema: 'open_commerce.consumer_portability_import.v1'
+  id: string
+  destination_project_id: string
+  source_operator: string
+  source_project_id: string
+  source_package_id: string
+  source_package_schema: string
+  envelope_sha256: string
+  payload_sha256: string
+  package_json: string
+  package: ConsumerPortabilityExport
+  trust_status: 'integrity_verified_source_untrusted'
+  merge_status: 'isolated_snapshot'
+  imported_at: string
+}
+
+export interface ConsumerPortabilityImportSummary {
+  id: string
+  source_operator: string
+  source_project_id: string
+  source_package_id: string
+  source_package_schema: string
+  envelope_sha256: string
+  payload_sha256: string
+  relationship_count: number
+  data_request_count: number
+  preference_profile_included: boolean
+  invocation_receipt_count: number
+  trust_status: 'integrity_verified_source_untrusted'
+  merge_status: 'isolated_snapshot'
+  imported_at: string
+}
+
+export interface ConsumerPortabilityImportList {
+  schema: 'open_commerce.consumer_portability_imports.v1'
+  imports: ConsumerPortabilityImportSummary[]
+}
+
 export interface ConsumerPreferences {
   categories: string[]
   tags: string[]
