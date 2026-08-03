@@ -26,6 +26,14 @@ export {
   verifySuiAdapterHandoff,
 } from './sui-preflight.js'
 
+export {
+  SUI_PREFLIGHT_JOB_COMPLETE_SCHEMA,
+  SUI_PREFLIGHT_JOB_POLL_SCHEMA,
+  SUI_PREFLIGHT_JOB_RELEASE_SCHEMA,
+  SUI_PREFLIGHT_JOB_RENEW_SCHEMA,
+  createSuiPreflightJobClient,
+} from './sui-preflight-job-client.js'
+
 export { createMemoryMerchantRuntimeIdempotencyStore } from './merchant-runtime-memory-store.js'
 
 export {

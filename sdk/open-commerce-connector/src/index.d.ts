@@ -47,6 +47,10 @@ export const MERCHANT_IDENTITY_PROOF_PROTOCOL: 'open_commerce.merchant_identity_
 export const SUI_ADAPTER_HANDOFF_SCHEMA: 'task_economy.sui_adapter_handoff.v1'
 export const SUI_PREFLIGHT_REPORT_SCHEMA: 'task_economy.sui_preflight_report.v1'
 export const SUI_PREFLIGHT_MAX_RESPONSE_BYTES: number
+export const SUI_PREFLIGHT_JOB_POLL_SCHEMA: 'task_economy.sui_preflight_job_poll.v1'
+export const SUI_PREFLIGHT_JOB_RENEW_SCHEMA: 'task_economy.sui_preflight_job_renew.v1'
+export const SUI_PREFLIGHT_JOB_RELEASE_SCHEMA: 'task_economy.sui_preflight_job_release.v1'
+export const SUI_PREFLIGHT_JOB_COMPLETE_SCHEMA: 'task_economy.sui_preflight_job_complete.v1'
 
 export interface SuiAdapterHandoffBundle {
   schema: typeof SUI_ADAPTER_HANDOFF_SCHEMA
@@ -104,6 +108,40 @@ export interface SuiPreflightReport {
   created_at: string
 }
 
+export interface SuiPreflightJob {
+  schema: 'task_economy.sui_preflight_job.v1'
+  id: string
+  project_id: string
+  package_kind: 'standard' | 'correction'
+  projection_package_id: string
+  target_network: 'devnet' | 'testnet' | 'mainnet'
+  handoff_digest: string
+  projection_digest: string
+  status: 'pending' | 'leased' | 'completed' | 'canceled' | 'blocked'
+  adapter_id: string | null
+  credential_version: number | null
+  attempt_no: number
+  lease_token_hint: string | null
+  lease_started_at: string | null
+  lease_expires_at: string | null
+  lease_deadline_at: string | null
+  report_id: string | null
+  last_error: string | null
+  created_by_user_id: string
+  completed_at: string | null
+  canceled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SuiPreflightJobIssue {
+  schema: 'task_economy.sui_preflight_job_issue.v1'
+  job: SuiPreflightJob
+  lease_token: string
+  lease_token_visible_once: true
+  handoff: SuiAdapterHandoffBundle
+}
+
 export class SuiPreflightContractError extends Error {
   code: string
   status?: number
@@ -129,6 +167,46 @@ export function createSuiPreflightClient(options: {
     },
     options?: { signal?: AbortSignal },
   ): Promise<SuiPreflightReport>
+}>
+
+export function createSuiPreflightJobClient(options: {
+  baseUrl: string
+  token: string
+  fetch?: typeof fetch
+}): Readonly<{
+  claimNext(options?: { leaseSeconds?: number; signal?: AbortSignal }): Promise<{
+    schema: typeof SUI_PREFLIGHT_JOB_POLL_SCHEMA
+    claimed: boolean
+    issue: SuiPreflightJobIssue | null
+    retry_after_seconds: number
+    boundary: string[]
+  }>
+  renew(
+    jobId: string,
+    leaseToken: string,
+    options?: { extendSeconds?: number; signal?: AbortSignal },
+  ): Promise<{ schema: typeof SUI_PREFLIGHT_JOB_RENEW_SCHEMA; renewed: true; job: SuiPreflightJob }>
+  release(
+    jobId: string,
+    leaseToken: string,
+    options: { reason: string; signal?: AbortSignal },
+  ): Promise<{ schema: typeof SUI_PREFLIGHT_JOB_RELEASE_SCHEMA; released: true; job: SuiPreflightJob }>
+  complete(
+    jobId: string,
+    leaseToken: string,
+    input: {
+      outcome: 'passed' | 'rejected'
+      summary: string
+      toolVersion: string
+      idempotencyKey: string
+    },
+    options?: { signal?: AbortSignal },
+  ): Promise<{
+    schema: typeof SUI_PREFLIGHT_JOB_COMPLETE_SCHEMA
+    completed: true
+    job: SuiPreflightJob
+    report: SuiPreflightReport
+  }>
 }>
 
 export interface MerchantIdentityProof {

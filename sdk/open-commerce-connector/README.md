@@ -105,6 +105,43 @@ node bin/sui-preflight.mjs --handoff .\sui-handoff.json --report `
 
 该工具只证明本地文件符合当前离线契约并可向平台追加预检意见。它不构建 PTB、不签名、不广播、不确认最终性，也不移动资金。
 
+项目编辑者把投影包显式加入预检队列后，机器可用独立任务客户端领取短时租约。领取结果会在内存中复核任务与交接包的项目、类型、网络和摘要绑定；SDK 不持久化适配器令牌或租约令牌。
+
+```js
+import { createSuiPreflightJobClient } from '@elon/open-commerce-connector'
+
+const jobs = createSuiPreflightJobClient({
+  baseUrl: 'https://commerce.example.com',
+  token: process.env.ELON_SUI_PREFLIGHT_TOKEN,
+})
+
+const poll = await jobs.claimNext({ leaseSeconds: 300 })
+if (poll.claimed) {
+  const { job, handoff, lease_token: leaseToken } = poll.issue
+  const outcome = await runDeterministicOfflineChecks(handoff)
+  await jobs.complete(job.id, leaseToken, {
+    outcome: outcome.passed ? 'passed' : 'rejected',
+    summary: outcome.summary,
+    toolVersion: 'merchant-preflight/1.0',
+    idempotencyKey: `preflight-${job.id}-${job.attempt_no}`,
+  })
+}
+```
+
+命令行支持 `claim/renew/release/complete`。适配器令牌和后续命令使用的租约令牌都只从环境变量读取；`claim` 只把不含租约令牌的交接包写入新文件，并在标准输出中一次性返回租约令牌，调用方应立即放入受控环境变量且不得记录日志。领取不会自动完成任务。
+
+```powershell
+$env:ELON_SUI_PREFLIGHT_TOKEN = 'sui_preflight_...'
+node bin/sui-preflight.mjs claim --base-url https://commerce.example.com `
+  --output .\sui-preflight-handoff.json
+
+$env:ELON_SUI_PREFLIGHT_LEASE_TOKEN = 'sui_preflight_lease_...'
+node bin/sui-preflight.mjs complete --base-url https://commerce.example.com `
+  --job-id sui_preflight_job_... --idempotency-key preflight-attempt-001
+```
+
+`renew` 和 `release` 同样要求 `--job-id` 与租约环境变量。所有任务命令都强制非本机地址使用 HTTPS、限制响应体大小，并且不包含 Sui SDK、钱包、RPC、签名或广播逻辑。
+
 ## 处理 ERP/CRM 衔接任务
 
 获得项目编辑者显式签发且包含 `business_handoff.claim` 的限时机器 Token 后，适配器可复用 SDK 客户端领取一条任务。客户端不会要求或发送项目、商户、接入器 ID，这些边界由服务端从 Token 派生。
