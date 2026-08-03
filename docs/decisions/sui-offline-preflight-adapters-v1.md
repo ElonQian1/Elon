@@ -35,4 +35,6 @@ implementation_status: implementation_uncompiled
 - `server/src/store/task_sui_preflight_*.rs`
 - `server/src/task_sui_preflight_migration.rs`
 - `pc-frontend/src/features/open-commerce/SuiPreflightAdaptersPanel.tsx`
+- `sdk/open-commerce-connector/src/sui-preflight.js`
+- `sdk/open-commerce-connector/bin/sui-preflight.mjs`
 - `docs/sui-offline-preflight-adapters-v1-acceptance.md`

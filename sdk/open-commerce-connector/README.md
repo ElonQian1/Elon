@@ -67,6 +67,44 @@ await runConnectorCompatibility(connector, {
 })
 ```
 
+## Sui 离线交接包预检
+
+SDK 可在不安装 Sui SDK、不读取钱包和不连接 RPC 的情况下，检查平台导出的 `task_economy.sui_adapter_handoff.v1` 文件。校验内容包括固定字段、目标网络、标准或纠正包原子性、未提交状态、零提交次数、离线约束和 `handoff_digest`。
+
+```js
+import {
+  createSuiPreflightClient,
+  verifySuiAdapterHandoff,
+} from '@elon/open-commerce-connector'
+
+const verified = verifySuiAdapterHandoff(handoffJson)
+
+const client = createSuiPreflightClient({
+  baseUrl: 'https://commerce.example.com',
+  token: process.env.ELON_SUI_PREFLIGHT_TOKEN,
+})
+
+await client.report(handoffJson, {
+  outcome: 'passed',
+  summary: 'deterministic offline preflight passed',
+  toolVersion: 'merchant-adapter/1.0',
+  idempotencyKey: `preflight-${verified.projectionPackageId}`,
+})
+```
+
+命令行默认只做本地检查；只有显式增加 `--report` 才向平台提交报告。机器 Token 只能通过环境变量传入，不支持把 Token 放入命令参数。
+
+```powershell
+node bin/sui-preflight.mjs --handoff .\sui-handoff.json
+
+$env:ELON_SUI_PREFLIGHT_TOKEN = 'sui_preflight_...'
+node bin/sui-preflight.mjs --handoff .\sui-handoff.json --report `
+  --base-url https://commerce.example.com `
+  --idempotency-key preflight-job-001
+```
+
+该工具只证明本地文件符合当前离线契约并可向平台追加预检意见。它不构建 PTB、不签名、不广播、不确认最终性，也不移动资金。
+
 ## 处理 ERP/CRM 衔接任务
 
 获得项目编辑者显式签发且包含 `business_handoff.claim` 的限时机器 Token 后，适配器可复用 SDK 客户端领取一条任务。客户端不会要求或发送项目、商户、接入器 ID，这些边界由服务端从 Token 派生。
