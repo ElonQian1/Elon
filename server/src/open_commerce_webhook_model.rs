@@ -17,6 +17,10 @@ pub(crate) struct DeveloperWebhookSubscription {
     pub callback_url: String,
     pub signing_key_id: String,
     pub status: String,
+    pub verification_status: String,
+    pub verification_attempted_at: Option<String>,
+    pub verification_error_code: Option<String>,
+    pub verified_at: Option<String>,
     pub consecutive_failures: i64,
     pub last_delivery_at: Option<String>,
     pub last_error_code: Option<String>,
@@ -75,4 +79,13 @@ pub(crate) struct DeveloperWebhookEnvelope {
     pub app_id: String,
     pub emitted_at: String,
     pub event: DeveloperTerminalEventSummary,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct DeveloperWebhookVerificationEnvelope {
+    pub schema: &'static str,
+    pub subscription_id: String,
+    pub challenge: String,
+    pub issued_at: String,
+    pub expires_at: String,
 }

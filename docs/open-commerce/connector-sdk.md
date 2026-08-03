@@ -61,6 +61,8 @@
 
 Webhook 负载只携带终态事件摘要。完整结果仍通过 App 自己的测试 Token 查询。验签成功只证明请求由持有当前订阅密钥的平台实例发出，不证明真实支付、履约、ERP 入库或跨运营方身份。
 
+新订阅首次激活前会收到 `open_commerce.developer_webhook_verification.v1` 负载。接收端使用相同方式验证签名后，可调用 `createDeveloperWebhookVerificationResponse` 生成原样回显的 JSON。只有验证成功后的事件才会进入该订阅；创建到验证之间的历史继续通过终态事件轮询接口恢复。
+
 ## 服务端发现
 
 第三方开发者可调用：

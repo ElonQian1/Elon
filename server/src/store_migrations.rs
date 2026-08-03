@@ -180,6 +180,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (143, "商户 RSA 私钥持有证明与可携带公钥指纹", crate::open_commerce_merchant_identity_migration::migration_v143),
     (144, "可携带关系映射的商户身份指纹匹配证据", crate::open_commerce_portability_identity_match_migration::migration_v144),
     (145, "开放商业开发者 App 签名 Webhook 与耐久投递队列", crate::open_commerce_webhook_migration::migration_v145),
+    (146, "开放商业开发者 Webhook 回调端点控制验证", crate::open_commerce_webhook_verification_migration::migration_v146),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

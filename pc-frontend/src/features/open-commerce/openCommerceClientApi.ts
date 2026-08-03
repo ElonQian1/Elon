@@ -229,6 +229,12 @@ export const openCommerceClientApi = {
       {},
     ),
 
+  verifyDeveloperWebhook: (projectId: string, appRecordId: string, webhookId: string) =>
+    api.post<DeveloperWebhookSubscription>(
+      `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks/${encodeURIComponent(webhookId)}/verify`,
+      {},
+    ),
+
   listDeveloperWebhookDeliveries: (
     projectId: string,
     appRecordId: string,

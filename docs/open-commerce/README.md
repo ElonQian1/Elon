@@ -85,6 +85,8 @@
 75. `docs/open-commerce-adapter-handoff-claims-v1-acceptance.md`：查看已落位实现和统一验证待执行范围。
 76. `docs/decisions/open-commerce-developer-webhooks-v1.md`：查看开发者 App 签名 Webhook、回调白名单、耐久投递、重试和失败关闭边界。
 77. `docs/open-commerce-developer-webhooks-v1-acceptance.md`：查看 Webhook V1 已形成代码和统一回归待验证范围。
+78. `docs/decisions/open-commerce-developer-webhook-verification-v1.md`：查看签名 challenge、精确回显和验证后激活边界。
+79. `docs/open-commerce-developer-webhook-verification-v1-acceptance.md`：查看回调验证代码及统一回归待验证范围。
 
 ## 专题地图
 

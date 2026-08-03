@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
 export const DEVELOPER_WEBHOOK_EVENT_SCHEMA = 'open_commerce.developer_webhook_event.v1'
+export const DEVELOPER_WEBHOOK_VERIFICATION_SCHEMA = 'open_commerce.developer_webhook_verification.v1'
 export const DEVELOPER_WEBHOOK_MAX_CLOCK_SKEW_SECONDS = 300
 
 export class DeveloperWebhookSignatureError extends Error {
@@ -58,6 +59,33 @@ export function verifyDeveloperWebhookSignature({
     throw new DeveloperWebhookSignatureError('signature_mismatch', 'webhook signature does not match')
   }
   return { eventId, timestampUnix }
+}
+
+export function createDeveloperWebhookVerificationResponse(body) {
+  let payload
+  try {
+    const bodyText = body instanceof Uint8Array
+      ? Buffer.from(body).toString('utf8')
+      : String(body)
+    payload = JSON.parse(bodyText)
+  } catch {
+    throw new DeveloperWebhookSignatureError(
+      'invalid_verification_payload',
+      'webhook verification payload is not valid JSON',
+    )
+  }
+  if (
+    !payload
+    || payload.schema !== DEVELOPER_WEBHOOK_VERIFICATION_SCHEMA
+    || typeof payload.challenge !== 'string'
+    || !/^whch_[0-9a-f]{32}$/i.test(payload.challenge)
+  ) {
+    throw new DeveloperWebhookSignatureError(
+      'invalid_verification_payload',
+      'webhook verification payload is invalid',
+    )
+  }
+  return { challenge: payload.challenge }
 }
 
 function requiredHeader(headers, name) {
