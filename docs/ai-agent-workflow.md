@@ -32,12 +32,13 @@
 合理流程固定为：
 
 1. 开工前：从当时最新 `origin/main` 派生独立 worktree。
-2. 提交后：立即 `git push origin HEAD:main`。
-3. 只有 push 被 non-fast-forward 拒绝：才 `git fetch origin` + `git rebase origin/main`，解决冲突后再 push。
-4. 自己的 commit 已经进入 `origin/main` 后：任务代码层面完成；后续 `origin/main` 再前进，不应该为了“保持自己是最新 HEAD”反复 rebase。
-5. 发布阶段：未开始构建的旧 Android 候选被更新 main 超越时直接让位；已经完成并验证通过的 APK 若仍是 main 祖先且线上没有更新后代，则先发布该产物，再由最新候选接续。
-6. rebase 完成后不默认重新编译或重跑全量测试。无冲突且上游未改动本任务路径、直接依赖、构建输入或测试基础设施时复用原验证；有命中时只补受影响的最小验证。只有明确发布门禁或无法限定影响面的共享底层变化才跑全量。
-7. 收尾阶段：运行统一收尾；如果主 `main` 不能快进或 worktree 清理失败，分别报告业务状态和 `LOCAL_MAIN_STATUS` / `TASK_WORKTREE_STATUS`，不得伪造 `FINALIZABLE=true`。
+2. 预检允许继续后：把完整 `HEAD` 固定为 `TASK_BASE_SHA`。模块首次写入前按 `WF-DEDUP` 刷新远端跟踪引用，比较 `TASK_BASE_SHA..origin/main` 的文件、公开符号、迁移版本、Store/API 入口和权威文档；它不改变当前分支、index 或 worktree。
+3. 上游已完整实现就复用并转为审查；同路径不同符号只补不相交缺口；同符号、同迁移版本或语义边界不清时停止重复实现并登记协调项，不能复制、回退或覆盖上游。长任务或高冲突模块才追加一次检查，远端前进不自动重启任务或重新验证。
+4. 提交后立即 `git push origin HEAD:main`。只有 push 被 non-fast-forward 拒绝，才重新 fetch 最新远端、`git rebase origin/main`、解决冲突并重试 push。
+5. 自己的 commit 已经进入 `origin/main` 后：任务代码层面完成；后续 `origin/main` 再前进，不应该为了“保持自己是最新 HEAD”反复 rebase。
+6. 发布阶段：未开始构建的旧 Android 候选被更新 main 超越时直接让位；已经完成并验证通过的 APK 若仍是 main 祖先且线上没有更新后代，则先发布该产物，再由最新候选接续。
+7. rebase 完成后不默认重新编译或重跑全量测试。无冲突且上游未改动本任务路径、直接依赖、构建输入或测试基础设施时复用原验证；有命中时只补受影响的最小验证。只有明确发布门禁或无法限定影响面的共享底层变化才跑全量。
+8. 收尾阶段：运行统一收尾；如果主 `main` 不能快进或 worktree 清理失败，分别报告业务状态和 `LOCAL_MAIN_STATUS` / `TASK_WORKTREE_STATUS`，不得伪造 `FINALIZABLE=true`。
 
 ---
 

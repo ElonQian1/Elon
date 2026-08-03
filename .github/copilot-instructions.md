@@ -1,7 +1,5 @@
 # 一龙项目 AI 共享契约
 
-最后更新：2026-07-29
-
 > 本文件只保留共享不变量；专项细节由 `AGENTS.md` 按需路由。
 
 ## 项目边界
@@ -22,10 +20,11 @@
 |---|---|
 | `WF-START` | 任何写任务先运行预检：Windows `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`；Linux/macOS `bash scripts/ai-task-preflight.sh --create-worktree`。 |
 | `WF-EDIT` | 只在脚本输出的 `EDIT_ROOT` 修改、格式化、验证、提交。`main` checkout 只做同步基线。`EDIT_ROOT=BLOCKED_CREATE_WORKTREE_FIRST` 时禁止编辑。 |
+| `WF-DEDUP` | 记 `TASK_BASE_SHA`；写模块前按手册查重。重叠转审查，仅补不相交缺口；同符号或边界不清则停止；不提前 rebase。 |
 | `WF-FILES` | 有意创建的源码、测试、fixture 必须提交；一次性产物写入 `.ai-tmp/`；稳定且可重复生成的输出才添加精确 `.gitignore`；来源不明文件不提交、不忽略、不删除。 |
 | `WF-VERIFY` | 运行与风险匹配的最小验证。Rust/Cargo、格式化、Android、PC 前端等命令按 `AGENTS.md` 路由读取，不自行绕过项目脚本。 |
 | `WF-PUSH` | 只 stage 当前任务文件；提交信息用中文并包含用户标识；commit 后立即 `git push origin HEAD:main`。提交前检查未跟踪文件，防止漏交新源码或测试。 |
-| `WF-REBASE` | 仅 push 被 non-fast-forward 拒绝后才 fetch/rebase/retry，不主动追车。先审查上游与冲突：未命中本任务代码、构建输入或测试设施则复用验证；命中时只重跑受影响验证；发布脚本、明确门禁或影响无法限定才全量验证。 |
+| `WF-REBASE` | 仅 non-fast-forward 后重新 fetch 并 rebase/retry；命中上游才补受影响验证，影响不明才全量验证。 |
 | `WF-FINISH` | 修改任务只能用统一收尾命令结束：Windows `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\finish-ai-task.ps1 -Kind <Kind>`；Linux/macOS `bash scripts/finish-ai-task.sh --kind <Kind>`。 |
 | `WF-REPORT` | 只有收尾输出 `FINALIZABLE=true` 才能正常宣告完成。最终回复必须分别报告 `BUSINESS_STATUS`、`LOCAL_MAIN_STATUS`、`TASK_WORKTREE_STATUS` 和未跟踪文件告警。 |
 
