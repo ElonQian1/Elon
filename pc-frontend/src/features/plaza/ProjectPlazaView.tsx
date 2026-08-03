@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Loader2, LogIn, Search, Store, UsersRound } from 'lucide-react'
+import { Download, LayoutGrid, Loader2, LogIn, Search, UsersRound } from 'lucide-react'
 import { api } from '../../api/client'
 import { useProjectStore } from '../conversation/useProjectStore'
 import styles from './PlazaPage.module.css'
@@ -168,7 +168,7 @@ export default function ProjectPlazaView() {
     <section className={styles.page} aria-label="项目广场">
       <header className={styles.toolbar}>
         <div className={styles.toolbarTitle}>
-          <Store size={18} aria-hidden="true" />
+          <LayoutGrid size={18} aria-hidden="true" />
           <div>
             <strong>项目广场</strong>
             <span>发现、安装或加入公开项目</span>
@@ -207,7 +207,7 @@ export default function ProjectPlazaView() {
         </div>
       ) : projects.length === 0 ? (
         <div className={styles.empty}>
-          <Store size={24} aria-hidden="true" />
+          <LayoutGrid size={24} aria-hidden="true" />
           <strong>没有找到符合条件的项目</strong>
           <span>可以换个关键词，或查看全部公开项目。</span>
         </div>
