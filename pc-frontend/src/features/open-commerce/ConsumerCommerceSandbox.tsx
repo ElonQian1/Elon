@@ -11,6 +11,7 @@ import ConsumerPortabilityReauthorization from './ConsumerPortabilityReauthoriza
 import ConsumerDataVaultPanel from './ConsumerDataVaultPanel'
 import ConsumerPreferenceProfilePanel from './ConsumerPreferenceProfilePanel'
 import ConsumerInvocationReceipts from './ConsumerInvocationReceipts'
+import ConsumerSourceFilterFields from './ConsumerSourceFilterFields'
 import CapabilityInvocationComposer from './CapabilityInvocationComposer'
 import { downloadConsumerRankingReceipt, verifyConsumerRankingReceipt } from './consumerRankingReceipt'
 import type {
@@ -253,9 +254,15 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
               <span>只看有内部同步回执的能力</span>
               <input type="checkbox" checked={requireInternalSyncReceipt} onChange={(event) => setRequireInternalSyncReceipt(event.target.checked)} />
             </label>
-            <label>来源厂商标识<input value={sourceProviderKey} onChange={(event) => setSourceProviderKey(event.target.value)} placeholder="可选，例如 meituan" /></label>
-            <label>来源数据域<input value={sourceDataDomain} onChange={(event) => setSourceDataDomain(event.target.value)} placeholder="可选，例如 inventory" /></label>
-            <label>回执最长年龄（分钟）<input type="number" min="1" max="525600" step="1" value={maxSourceAgeMinutes} onChange={(event) => setMaxSourceAgeMinutes(event.target.value)} placeholder="可选，例如 30" /></label>
+            <ConsumerSourceFilterFields
+              providerKey={sourceProviderKey}
+              dataDomain={sourceDataDomain}
+              maxAgeMinutes={maxSourceAgeMinutes}
+              options={result?.source_filter_options}
+              onProviderKeyChange={setSourceProviderKey}
+              onDataDomainChange={setSourceDataDomain}
+              onMaxAgeMinutesChange={setMaxSourceAgeMinutes}
+            />
             <label>搜索词<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="咖啡、维修、零售" /></label>
             <label>能力 Key<input value={capabilityKey} onChange={(event) => setCapabilityKey(event.target.value)} placeholder="menu.preview" /></label>
             <label>城市<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ji'an" /></label>

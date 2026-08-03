@@ -812,9 +812,23 @@ export interface ConsumerDiscoveryResponse {
     data_domain: string | null
     max_age_seconds: number | null
   }
+  source_filter_options: ConsumerSourceFilterOptions
   available_ranking_policies: ConsumerRankingPolicyDescriptor[]
   ranking_receipt?: ConsumerRankingReceipt
   matches: ConsumerDiscoveryMatch[]
+}
+
+export interface ConsumerSourceFilterOptions {
+  schema: 'open_commerce.consumer_source_filter_options.v1'
+  scope: 'current_operator_candidate_window.v1'
+  operator_exhaustive: false
+  providers: ConsumerSourceFilterOption[]
+  data_domains: ConsumerSourceFilterOption[]
+}
+
+export interface ConsumerSourceFilterOption {
+  value: string
+  capability_count: number
 }
 
 export interface ConsumerInvocationReceiptSummary {
