@@ -25,7 +25,15 @@ impl Store {
                     support_email=?4, requested_scopes_json=?5,
                     manifest_status='draft', manifest_revision=manifest_revision+1,
                     submitted_at=NULL, reviewed_at=NULL,
-                    reviewed_by_user_id=NULL, review_note=NULL, updated_at=?6
+                    reviewed_by_user_id=NULL, review_note=NULL,
+                    domain_verification_status='pending',
+                    domain_verification_host=NULL,
+                    domain_verification_revision=NULL,
+                    domain_verification_challenge_hash=NULL,
+                    domain_verification_expires_at=NULL,
+                    domain_verification_attempted_at=NULL,
+                    domain_verified_at=NULL,
+                    domain_verification_error_code=NULL, updated_at=?6
               WHERE project_id=?7 AND id=?8 AND manifest_revision=?9
                 AND status='active'",
             params![

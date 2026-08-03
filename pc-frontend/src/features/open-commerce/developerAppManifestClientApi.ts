@@ -1,5 +1,6 @@
 import { api } from '../../api/client'
 import type {
+  DeveloperAppDomainChallengeCredential,
   DeveloperAppManifestReviewQueue,
   OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
@@ -33,6 +34,21 @@ export const developerAppManifestClientApi = {
     `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/manifest/submit`,
     { expected_manifest_revision: expectedManifestRevision },
   ),
+
+  issueDeveloperAppDomainChallenge: (
+    projectId: string,
+    appRecordId: string,
+    expectedManifestRevision: number,
+  ) => api.post<DeveloperAppDomainChallengeCredential>(
+    `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/manifest/domain-challenge`,
+    { expected_manifest_revision: expectedManifestRevision },
+  ),
+
+  verifyDeveloperAppDomainChallenge: (projectId: string, appRecordId: string) =>
+    api.post<OpenCommerceDeveloperApp>(
+      `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/manifest/domain-challenge/verify`,
+      {},
+    ),
 
   listSubmittedDeveloperAppManifests: () =>
     api.get<DeveloperAppManifestReviewQueue>(

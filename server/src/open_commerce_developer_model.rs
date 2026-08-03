@@ -22,6 +22,13 @@ pub(crate) struct OpenCommerceDeveloperApp {
     pub reviewed_at: Option<String>,
     pub reviewed_by_user_id: Option<String>,
     pub review_note: Option<String>,
+    pub domain_verification_status: String,
+    pub domain_verification_host: Option<String>,
+    pub domain_verification_revision: Option<i64>,
+    pub domain_verification_expires_at: Option<String>,
+    pub domain_verification_attempted_at: Option<String>,
+    pub domain_verified_at: Option<String>,
+    pub domain_verification_error_code: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -66,6 +73,32 @@ pub(crate) struct ReviewDeveloperAppManifestRequest {
     pub decision: String,
     #[serde(default)]
     pub note: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct IssueDeveloperAppDomainChallengeRequest {
+    pub expected_manifest_revision: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct DeveloperAppDomainChallengeCredential {
+    pub schema: &'static str,
+    pub app: OpenCommerceDeveloperApp,
+    pub verification_url: String,
+    pub verification_content: String,
+    pub content_visible_once: bool,
+    pub expires_at: String,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct DeveloperAppDomainChallengeState {
+    pub app_record_id: String,
+    pub project_id: String,
+    pub manifest_revision: i64,
+    pub verification_host: String,
+    pub challenge_hash: String,
+    pub expires_at: String,
+    pub status: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

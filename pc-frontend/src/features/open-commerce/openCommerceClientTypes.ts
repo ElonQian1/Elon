@@ -18,6 +18,13 @@ export interface OpenCommerceDeveloperApp {
   reviewed_at: string | null
   reviewed_by_user_id: string | null
   review_note: string | null
+  domain_verification_status: 'pending' | 'failed' | 'verified'
+  domain_verification_host: string | null
+  domain_verification_revision: number | null
+  domain_verification_expires_at: string | null
+  domain_verification_attempted_at: string | null
+  domain_verified_at: string | null
+  domain_verification_error_code: string | null
   created_at: string
   updated_at: string
 }
@@ -94,6 +101,15 @@ export interface DeveloperWebhookDelivery {
 export interface DeveloperAppManifestReviewQueue {
   schema: string
   apps: OpenCommerceDeveloperApp[]
+}
+
+export interface DeveloperAppDomainChallengeCredential {
+  schema: string
+  app: OpenCommerceDeveloperApp
+  verification_url: string
+  verification_content: string
+  content_visible_once: boolean
+  expires_at: string
 }
 
 export interface DeveloperWebhookDeliveryList {

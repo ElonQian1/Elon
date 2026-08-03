@@ -97,6 +97,8 @@
 87. `docs/open-commerce-developer-webhook-history-replay-v1-acceptance.md`：查看历史补发代码及统一回归待验证范围。
 88. `docs/decisions/open-commerce-developer-app-manifest-review-v1.md`：查看 App 资料修订、提交、审核和非生产准入边界。
 89. `docs/open-commerce-developer-app-manifest-review-v1-acceptance.md`：查看 App 资料审核代码及统一回归待验证范围。
+90. `docs/decisions/open-commerce-developer-app-domain-verification-v1.md`：查看主页域名 challenge、精确白名单和证明边界。
+91. `docs/open-commerce-developer-app-domain-verification-v1-acceptance.md`：查看域名控制证明代码及统一回归待验证范围。
 
 ## 专题地图
 

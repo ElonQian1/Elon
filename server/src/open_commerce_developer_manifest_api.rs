@@ -12,10 +12,10 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
-    open_commerce_developer_manifest_service as service,
+    open_commerce_developer_domain_service, open_commerce_developer_manifest_service as service,
     open_commerce_developer_model::{
-        ReviewDeveloperAppManifestRequest, SubmitDeveloperAppManifestRequest,
-        UpdateDeveloperAppManifestRequest,
+        IssueDeveloperAppDomainChallengeRequest, ReviewDeveloperAppManifestRequest,
+        SubmitDeveloperAppManifestRequest, UpdateDeveloperAppManifestRequest,
     },
     open_commerce_service::OpenCommerceActor,
     project_auth::{auth_from_headers, json_error, project_access},
@@ -33,6 +33,14 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(submit_manifest),
         )
         .route(
+            "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/manifest/domain-challenge",
+            post(issue_domain_challenge),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/manifest/domain-challenge/verify",
+            post(verify_domain_challenge),
+        )
+        .route(
             "/api/admin/open-commerce/developer-app-manifests",
             get(list_submitted_manifests),
         )
@@ -40,6 +48,45 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/admin/open-commerce/developer-app-manifests/:app_record_id/review",
             post(review_manifest),
         )
+}
+
+async fn issue_domain_challenge(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, app_record_id)): Path<(String, String)>,
+    Json(request): Json<IssueDeveloperAppDomainChallengeRequest>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_developer_domain_service::issue_challenge(
+        &state.store,
+        &project_id,
+        &app_record_id,
+        request.expected_manifest_revision,
+        &actor(&caller),
+    ))
+}
+
+async fn verify_domain_challenge(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, app_record_id)): Path<(String, String)>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(
+        open_commerce_developer_domain_service::verify_domain(
+            &state.store,
+            &project_id,
+            &app_record_id,
+            &actor(&caller),
+        )
+        .await,
+    )
 }
 
 async fn update_manifest(

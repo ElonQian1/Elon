@@ -124,7 +124,7 @@ pub(crate) fn review_manifest(
     Ok(app)
 }
 
-fn managed_app(
+pub(crate) fn managed_app(
     store: &Store,
     project_id: &str,
     app_record_id: &str,
@@ -152,6 +152,11 @@ fn require_complete_manifest(app: &OpenCommerceDeveloperApp) -> Result<()> {
         || app.requested_scopes.is_empty()
     {
         bail!("提交审核前必须填写主页、隐私政策、服务条款、支持邮箱和申请能力");
+    }
+    if app.domain_verification_status != "verified"
+        || app.domain_verification_revision != Some(app.manifest_revision)
+    {
+        bail!("提交审核前必须验证当前资料修订的应用主页域名");
     }
     Ok(())
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileCheck2, Save, Send } from 'lucide-react'
+import { Copy, FileCheck2, Save, Send, ShieldCheck } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type { OpenCommerceDeveloperApp } from './openCommerceClientTypes'
 import { errorText } from './openCommerceUi'
@@ -41,6 +41,8 @@ export default function DeveloperAppManifestPanel({
   const [termsUrl, setTermsUrl] = useState('')
   const [supportEmail, setSupportEmail] = useState('')
   const [requestedScopes, setRequestedScopes] = useState('')
+  const [verificationUrl, setVerificationUrl] = useState('')
+  const [verificationContent, setVerificationContent] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -62,6 +64,8 @@ export default function DeveloperAppManifestPanel({
     setTermsUrl(selectedApp.terms_url ?? '')
     setSupportEmail(selectedApp.support_email ?? '')
     setRequestedScopes(selectedApp.requested_scopes.join(', '))
+    setVerificationUrl('')
+    setVerificationContent('')
     setMessage('')
   }, [selectedApp])
 
@@ -107,9 +111,49 @@ export default function DeveloperAppManifestPanel({
     }
   }
 
+  async function issueDomainChallenge() {
+    if (!selectedApp) return
+    setBusy(true)
+    setMessage('')
+    setVerificationUrl('')
+    setVerificationContent('')
+    try {
+      const credential = await openCommerceClientApi.issueDeveloperAppDomainChallenge(
+        projectId,
+        selectedApp.id,
+        selectedApp.manifest_revision,
+      )
+      setVerificationUrl(credential.verification_url)
+      setVerificationContent(credential.verification_content)
+      setMessage('验证内容仅显示本次。请发布到固定地址后再发起验证。')
+      await onChanged()
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function verifyDomainChallenge() {
+    if (!selectedApp) return
+    setBusy(true)
+    setMessage('')
+    try {
+      await openCommerceClientApi.verifyDeveloperAppDomainChallenge(projectId, selectedApp.id)
+      setMessage('当前资料修订的主页域名控制证明已通过。')
+      await onChanged()
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const locked = selectedApp?.manifest_status === 'submitted'
   const editable = canEdit && selectedApp?.status === 'active' && !locked && !busy
-  const submittable = editable && selectedApp?.manifest_status !== 'approved'
+  const domainVerified = selectedApp?.domain_verification_status === 'verified'
+    && selectedApp.domain_verification_revision === selectedApp.manifest_revision
+  const submittable = editable && selectedApp?.manifest_status !== 'approved' && domainVerified
 
   return (
     <section className={base.integrationSection}>
@@ -131,6 +175,19 @@ export default function DeveloperAppManifestPanel({
           <label style={commerceStyles.wideField}>申请能力<textarea value={requestedScopes} onChange={(event) => setRequestedScopes(event.target.value)} disabled={!editable} placeholder="catalog.search, order.quote, order.create" /></label>
         </div>
         {selectedApp?.review_note && <p style={commerceStyles.itemText}>审核说明：{selectedApp.review_note}</p>}
+        <div style={commerceStyles.itemHeader}>
+          <small style={commerceStyles.itemMeta}>主页域名：{domainVerified ? `已验证 ${selectedApp?.domain_verification_host}` : selectedApp?.domain_verification_error_code ? `验证失败 ${selectedApp.domain_verification_error_code}` : '待验证'}</small>
+          <div style={commerceStyles.headerActions}>
+            <button style={actionStyle('secondary', !editable)} type="button" onClick={issueDomainChallenge} disabled={!editable}><ShieldCheck size={13} />生成验证内容</button>
+            <button style={actionStyle('secondary', !editable)} type="button" onClick={verifyDomainChallenge} disabled={!editable}><ShieldCheck size={13} />验证域名</button>
+          </div>
+        </div>
+        {verificationContent && (
+          <div style={commerceStyles.grid}>
+            <label style={commerceStyles.wideField}>固定验证地址<div style={commerceStyles.itemHeader}><code style={commerceStyles.itemMeta}>{verificationUrl}</code><button style={actionStyle('icon')} type="button" onClick={() => navigator.clipboard.writeText(verificationUrl)} title="复制验证地址"><Copy size={13} /></button></div></label>
+            <label style={commerceStyles.wideField}>一次性验证内容<div style={commerceStyles.itemHeader}><code style={commerceStyles.itemMeta}>{verificationContent}</code><button style={actionStyle('icon')} type="button" onClick={() => navigator.clipboard.writeText(verificationContent)} title="复制验证内容"><Copy size={13} /></button></div></label>
+          </div>
+        )}
         <div style={commerceStyles.headerActions}>
           <button style={actionStyle('secondary', !editable)} type="submit" disabled={!editable}><Save size={13} />保存草稿</button>
           <button style={actionStyle('primary', !submittable)} type="button" onClick={submitManifest} disabled={!submittable}><Send size={13} />提交审核</button>

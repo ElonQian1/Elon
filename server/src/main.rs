@@ -223,6 +223,8 @@ mod open_commerce_data_request_model;
 mod open_commerce_data_request_service;
 #[cfg(test)]
 mod open_commerce_data_request_tests;
+mod open_commerce_developer_domain_migration;
+mod open_commerce_developer_domain_service;
 mod open_commerce_developer_event_api;
 mod open_commerce_developer_event_migration;
 mod open_commerce_developer_event_model;

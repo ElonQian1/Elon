@@ -281,8 +281,15 @@ pub(super) fn app_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceDevelo
         reviewed_at: row.get(16)?,
         reviewed_by_user_id: row.get(17)?,
         review_note: row.get(18)?,
-        created_at: row.get(19)?,
-        updated_at: row.get(20)?,
+        domain_verification_status: row.get(19)?,
+        domain_verification_host: row.get(20)?,
+        domain_verification_revision: row.get(21)?,
+        domain_verification_expires_at: row.get(22)?,
+        domain_verification_attempted_at: row.get(23)?,
+        domain_verified_at: row.get(24)?,
+        domain_verification_error_code: row.get(25)?,
+        created_at: row.get(26)?,
+        updated_at: row.get(27)?,
     })
 }
 
@@ -314,5 +321,8 @@ pub(super) const APP_SELECT: &str = "SELECT id, project_id, owner_user_id, app_i
            environment, status, token_hint, homepage_url, privacy_policy_url,
            terms_url, support_email, requested_scopes_json, manifest_status,
            manifest_revision, submitted_at, reviewed_at, reviewed_by_user_id,
-           review_note, created_at, updated_at
+           review_note, domain_verification_status, domain_verification_host,
+           domain_verification_revision, domain_verification_expires_at,
+           domain_verification_attempted_at, domain_verified_at,
+           domain_verification_error_code, created_at, updated_at
       FROM open_commerce_developer_apps";
