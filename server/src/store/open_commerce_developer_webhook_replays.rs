@@ -5,7 +5,7 @@ use crate::open_commerce_webhook_model::DeveloperWebhookDelivery;
 
 use super::{
     now,
-    open_commerce_developer_webhooks::{delivery_from_row, DELIVERY_SELECT},
+    open_commerce_developer_webhook_rows::{delivery_from_row, DELIVERY_SELECT},
     Store,
 };
 
