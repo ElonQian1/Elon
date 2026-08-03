@@ -101,6 +101,41 @@ if (poll.claimed) {
 
 租约密钥只存在于本次 `poll.issue` 中；SDK 不写浏览器存储、文件或日志。非本机地址强制 HTTPS，响应体上限为 256 KiB。续租单次限制 60–900 秒，总处理期限不超过首次领取后 1 小时。主动释放只表示当前适配器放弃本次尝试，任务可被重新领取，不表示外部 ERP 已处理。提交 `rejected` 后，服务端按 30–900 秒有界退避并优先分配未尝试或最久未尝试任务，调用方无需自行制造高频重试；第 6 次拒绝后自动领取暂停，需由项目编辑者先排查外部故障并明确恢复。
 
+生产接入器可使用通用工作器，把租约协议与商户业务处理函数分开。工作器顺序处理任务，自动续租、生成稳定回执键、重试幂等完成请求，并在临时故障或停机时释放任务。商户处理器必须使用 `idempotencyKey` 写入 ERP，避免“外部写入成功但回执网络中断”后重复创建订单。
+
+```js
+import {
+  AdapterHandoffRejectError,
+  createAdapterHandoffWorker,
+} from '@elon/open-commerce-connector'
+
+const worker = createAdapterHandoffWorker({
+  baseUrl: 'https://commerce.example.com',
+  token: process.env.ELON_ADAPTER_TOKEN,
+  targetDomain: 'merchant_erp',
+  async handler(task, { idempotencyKey, signal }) {
+    const result = await merchantErp.applyBusinessResult(task.result, {
+      idempotencyKey,
+      signal,
+    })
+    if (result.permanentlyRejected) {
+      throw new AdapterHandoffRejectError('erp_validation_failed')
+    }
+    return {
+      status: 'applied',
+      targetReference: result.referenceId,
+    }
+  },
+})
+
+const shutdown = new AbortController()
+process.once('SIGTERM', () => shutdown.abort('SIGTERM'))
+process.once('SIGINT', () => shutdown.abort('SIGINT'))
+await worker.run({ signal: shutdown.signal })
+```
+
+普通异常默认按 `transient_failure` 主动释放；明确的永久业务拒绝使用 `AdapterHandoffRejectError`，容量不足或人工暂停可抛出 `AdapterHandoffReleaseError`。工作器不会保存机器 Token、租约密钥或原始任务，也不会替代商户 ERP 自身的幂等、事务和权限校验。
+
 ## 数据边界
 
 - 单页最多 500 条标准化变更。

@@ -59,7 +59,7 @@ export function createAdapterHandoffClient(options) {
             receipt.targetReference,
             'receipt.targetReference',
             1,
-            240,
+            160,
           ),
           error_code: optionalIdentifier(receipt.errorCode, 'receipt.errorCode', 2, 96),
           completed_at: expectTimestamp(receipt.completedAt, 'receipt.completedAt'),

@@ -10,6 +10,13 @@ export {
   createAdapterHandoffClient,
 } from './adapter-handoff-client.js'
 
+export {
+  ADAPTER_HANDOFF_WORKER_SCHEMA,
+  AdapterHandoffRejectError,
+  AdapterHandoffReleaseError,
+  createAdapterHandoffWorker,
+} from './adapter-handoff-worker.js'
+
 export const CONNECTOR_SCHEMA = 'open_commerce.connector.v1'
 export const CONNECTOR_CONTRACT_VERSION = '1.0'
 export const MAX_SYNC_PAGE_RECORDS = 500
