@@ -66,6 +66,16 @@
       "entrypoint": ""
     },
     {
+      "id": "distributed-compute",
+      "label": "分布式算力联邦",
+      "detail": "用户节点、受管集群、外部矿池、按需插件、验证计量和期货锁价结算",
+      "color": "#48A889",
+      "parent_id": "",
+      "order": 55,
+      "icon": "cpu",
+      "entrypoint": "docs/distributed-compute/README.md"
+    },
+    {
       "id": "external-tools",
       "label": "工具与外部生态",
       "detail": "CLI、模型、语音与第三方工具集成；权威性由治理维度单独表达",
@@ -222,6 +232,7 @@
     "docs/cli会话问题/纯Codex cli图片会话.md": "custom:external-tools",
     "docs/codex-vault-sharing-runbook.md": "custom:security",
     "docs/decisions/ai-resource-control-v1.md": "custom:open-commerce-network",
+    "docs/decisions/distributed-compute-federation-v1.md": "custom:distributed-compute",
     "docs/decisions/erp-blueprint-and-instance-v1.md": "custom:erp-blueprint-system",
     "docs/decisions/erp-feature-proposal-governance-v1.md": "custom:erp-blueprint-system",
     "docs/decisions/erp-instance-materialization-v1.md": "custom:erp-blueprint-system",
@@ -233,8 +244,16 @@
     "docs/decisions/reject-demo-oracle-role.md": "custom:product-direction-decisions",
     "docs/decisions/open-commerce-network-principles.md": "custom:open-commerce-network",
     "docs/decisions/open-commerce-network-v1-architecture.md": "custom:open-commerce-network",
+    "docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md": "custom:distributed-compute",
+    "docs/decisions/node-compute-sharing-runtime-health-v1.md": "custom:distributed-compute",
+    "docs/decisions/node-compute-sharing-supply-v1.md": "custom:distributed-compute",
+    "docs/decisions/node-compute-sharing-token-reservation-v1.md": "custom:distributed-compute",
     "docs/decisions/task-shadow-settlement-v1.md": "custom:open-commerce-network",
     "docs/discussion-knowledge-compiler.md": "custom:pc-workbench",
+    "docs/distributed-compute/README.md": "custom:distributed-compute",
+    "docs/distributed-compute/architecture.md": "custom:distributed-compute",
+    "docs/distributed-compute/market-and-settlement.md": "custom:distributed-compute",
+    "docs/distributed-compute/node-client-and-plugins.md": "custom:distributed-compute",
     "docs/drafts/open-commerce-network-roadmap.md": "custom:open-commerce-network",
     "docs/drafts/open-commerce-network-sui-agent-economy.md": "custom:open-commerce-network",
     "docs/drafts/sui-economy-s4-shadow-settlement-plan.md": "custom:open-commerce-network",
@@ -264,6 +283,8 @@
     "docs/inbox/conversations/2026-07-30-demo-oracle-rejection.md": "custom:ai-context",
     "docs/intent-routing.md": "custom:backend-api",
     "docs/node-agent-upgrade-compatibility.md": "custom:windows-node",
+    "docs/node-compute-sharing-supply-v1-acceptance.md": "custom:distributed-compute",
+    "docs/node-compute-sharing-supply-v1-api.md": "custom:distributed-compute",
     "docs/open-commerce/README.md": "custom:open-commerce-network",
     "docs/open-commerce/ai-resource-control.md": "custom:open-commerce-network",
     "docs/open-commerce/capability-baseline.md": "custom:open-commerce-network",
@@ -351,6 +372,7 @@
     "docs/codex-vault-sharing-runbook.md": "on-demand",
     "docs/codex-vault-usage-estimation.md": "on-demand",
     "docs/decisions/ai-resource-control-v1.md": "on-demand",
+    "docs/decisions/distributed-compute-federation-v1.md": "on-demand",
     "docs/decisions/erp-blueprint-and-instance-v1.md": "on-demand",
     "docs/decisions/erp-feature-proposal-governance-v1.md": "on-demand",
     "docs/decisions/erp-instance-materialization-v1.md": "on-demand",
@@ -358,9 +380,17 @@
     "docs/decisions/open-commerce-consumer-developer-sandbox-v1.md": "on-demand",
     "docs/decisions/open-commerce-integration-control-plane.md": "on-demand",
     "docs/decisions/open-commerce-merchant-runtime-v1.md": "on-demand",
+    "docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md": "on-demand",
+    "docs/decisions/node-compute-sharing-runtime-health-v1.md": "on-demand",
+    "docs/decisions/node-compute-sharing-supply-v1.md": "on-demand",
+    "docs/decisions/node-compute-sharing-token-reservation-v1.md": "on-demand",
     "docs/decisions/task-shadow-settlement-v1.md": "on-demand",
     "docs/decisions/reject-demo-oracle-role.md": "on-demand",
     "docs/discussion-knowledge-compiler.md": "on-demand",
+    "docs/distributed-compute/README.md": "current",
+    "docs/distributed-compute/architecture.md": "current",
+    "docs/distributed-compute/market-and-settlement.md": "current",
+    "docs/distributed-compute/node-client-and-plugins.md": "current",
     "docs/fb2-ai-center/PLAN.md": "drafts",
     "docs/fb2-ai-center/PROGRESS.md": "evidence",
     "docs/fb2-ai-center/handoff.md": "evidence",
@@ -368,6 +398,8 @@
     "docs/fb2-ai-center/test-plan.md": "drafts",
     "docs/group-chat-summary-system.md": "drafts",
     "docs/intent-routing.md": "current",
+    "docs/node-compute-sharing-supply-v1-acceptance.md": "evidence",
+    "docs/node-compute-sharing-supply-v1-api.md": "on-demand",
     "docs/drafts/sui-economy-s4-shadow-settlement-plan.md": "drafts",
     "docs/erp/README.md": "on-demand",
     "docs/erp/acceptance-v1.md": "evidence",
@@ -770,6 +802,213 @@
     }
   },
   "document_metadata": {
+    "docs/distributed-compute/README.md": {
+      "doc_type": "subproject_overview",
+      "audience": [
+        "产品负责人",
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "分布式算力联邦",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 30,
+      "implementation_refs": [
+        "file:server/src/compute_federation/mod.rs",
+        "file:server/src/node_compute_sharing.rs"
+      ],
+      "related": [
+        "docs/decisions/distributed-compute-federation-v1.md",
+        "docs/distributed-compute/architecture.md",
+        "docs/distributed-compute/node-client-and-plugins.md",
+        "docs/distributed-compute/market-and-settlement.md"
+      ]
+    },
+    "docs/decisions/distributed-compute-federation-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "产品负责人",
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "分布式算力联邦",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/compute_federation/mod.rs"
+      ],
+      "related": [
+        "docs/distributed-compute/README.md",
+        "docs/decisions/node-compute-sharing-supply-v1.md"
+      ]
+    },
+    "docs/distributed-compute/architecture.md": {
+      "doc_type": "architecture",
+      "audience": [
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "分布式算力联邦",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "file:server/src/compute_federation/mod.rs",
+        "file:server/src/node_router.rs"
+      ],
+      "related": [
+        "docs/decisions/distributed-compute-federation-v1.md",
+        "docs/system-architecture.md"
+      ]
+    },
+    "docs/distributed-compute/node-client-and-plugins.md": {
+      "doc_type": "client_architecture",
+      "audience": [
+        "节点开发者",
+        "架构师",
+        "AI 代理"
+      ],
+      "owner": "分布式算力节点",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 60,
+      "implementation_refs": [],
+      "related": [
+        "docs/distributed-compute/architecture.md",
+        "docs/node-agent-upgrade-compatibility.md"
+      ]
+    },
+    "docs/distributed-compute/market-and-settlement.md": {
+      "doc_type": "technical_design",
+      "audience": [
+        "产品负责人",
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "算力市场与结算",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 45,
+      "implementation_refs": [
+        "file:server/src/compute_federation/market.rs",
+        "file:server/src/compute_federation/receipts.rs"
+      ],
+      "related": [
+        "docs/decisions/distributed-compute-federation-v1.md",
+        "docs/decisions/task-shadow-settlement-v1.md"
+      ]
+    },
+    "docs/decisions/node-compute-sharing-supply-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "节点算力共享",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/node_compute_sharing.rs",
+        "file:server/src/store/node_compute_sharing.rs",
+        "file:server/src/node_router.rs",
+        "file:pc-frontend/src/features/node/NodeComputeSharingCard.tsx"
+      ],
+      "related": [
+        "docs/node-compute-sharing-supply-v1-api.md",
+        "docs/node-compute-sharing-supply-v1-acceptance.md",
+        "docs/decisions/distributed-compute-federation-v1.md"
+      ]
+    },
+    "docs/decisions/node-compute-sharing-token-reservation-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "节点算力共享",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/store/node_compute_sharing.rs",
+        "file:server/src/node_router.rs"
+      ],
+      "related": [
+        "docs/decisions/node-compute-sharing-supply-v1.md"
+      ]
+    },
+    "docs/decisions/node-compute-sharing-runtime-health-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "运维人员",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "节点算力共享",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/store/node_compute_sharing_health.rs"
+      ],
+      "related": [
+        "docs/decisions/node-compute-sharing-supply-v1.md"
+      ]
+    },
+    "docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "运维人员",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "节点算力共享",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "file:server/src/store/node_compute_runs.rs",
+        "file:server/src/node_llm_stream.rs"
+      ],
+      "related": [
+        "docs/decisions/node-compute-sharing-supply-v1.md"
+      ]
+    },
+    "docs/node-compute-sharing-supply-v1-api.md": {
+      "doc_type": "api_reference",
+      "audience": [
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "节点算力共享",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 60,
+      "implementation_refs": [
+        "route:/api/me/nodes/:node_id/compute-sharing",
+        "file:server/src/node_api/compute_sharing.rs"
+      ],
+      "related": [
+        "docs/decisions/node-compute-sharing-supply-v1.md",
+        "docs/node-compute-sharing-supply-v1-acceptance.md"
+      ]
+    },
+    "docs/node-compute-sharing-supply-v1-acceptance.md": {
+      "doc_type": "acceptance_evidence",
+      "audience": [
+        "验证者",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "节点算力共享",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 90,
+      "implementation_refs": [
+        "test:scripts/test-node-compute-sharing-contracts.js"
+      ],
+      "related": [
+        "docs/decisions/node-compute-sharing-supply-v1.md",
+        "docs/node-compute-sharing-supply-v1-api.md"
+      ]
+    },
     "docs/decisions/open-commerce-integration-control-plane.md": {
       "doc_type": "architecture_decision",
       "audience": [
@@ -1943,6 +2182,13 @@
   },
   "audit_log": [
     {
+      "id": "distributed-compute-federation-v1-20260804",
+      "action": "document.knowledge_graph.update",
+      "target": ".elon/document-sections.json",
+      "summary": "登记任务级分布式算力联邦、现有节点模型共享基线、按需插件、期货锁价结算及首批未接线领域合同，并修复节点算力文档治理漂移",
+      "at": "2026-08-04T03:30:00Z"
+    },
+    {
       "id": "erp-blueprint-v1-1-20260801",
       "action": "document.knowledge_graph.update",
       "target": ".elon/document-sections.json",
@@ -1973,6 +2219,158 @@
   ],
   "knowledge_graph": {
     "nodes": [
+      {
+        "id": "cap-distributed-compute",
+        "view": "capabilities",
+        "kind": "capability_group",
+        "label": "分布式算力联邦",
+        "detail": "聚合用户节点、受管集群和外部矿池，统一任务、验证、定价与结算",
+        "parent_id": "",
+        "order": 58,
+        "color": "#48A889",
+        "entrypoint": "docs/distributed-compute/README.md",
+        "document_paths": [
+          "docs/distributed-compute/README.md",
+          "docs/decisions/distributed-compute-federation-v1.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/compute_federation/mod.rs",
+          "file:server/src/node_compute_sharing.rs"
+        ],
+        "tags": [
+          "算力",
+          "federation",
+          "provider",
+          "market"
+        ]
+      },
+      {
+        "id": "cap-node-model-sharing-v1",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "节点模型算力共享 V1",
+        "detail": "已实现的模型白名单、并发、每日 Token 预留、流租约、健康快照与过期回收",
+        "parent_id": "cap-distributed-compute",
+        "order": 10,
+        "color": "#65A8C8",
+        "entrypoint": "docs/decisions/node-compute-sharing-supply-v1.md",
+        "document_paths": [
+          "docs/decisions/node-compute-sharing-supply-v1.md",
+          "docs/decisions/node-compute-sharing-token-reservation-v1.md",
+          "docs/decisions/node-compute-sharing-runtime-health-v1.md",
+          "docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md",
+          "docs/node-compute-sharing-supply-v1-api.md",
+          "docs/node-compute-sharing-supply-v1-acceptance.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/node_compute_sharing.rs",
+          "file:server/src/store/node_compute_sharing.rs",
+          "file:server/src/node_router.rs",
+          "file:server/src/node_llm_stream.rs",
+          "file:server/src/node_scheduler.rs",
+          "file:pc-frontend/src/features/node/NodeComputeSharingCard.tsx",
+          "test:scripts/test-node-compute-sharing-contracts.js"
+        ],
+        "tags": [
+          "node",
+          "llm",
+          "implemented",
+          "lease"
+        ]
+      },
+      {
+        "id": "cap-compute-federation-v1",
+        "view": "capabilities",
+        "kind": "planned_capability",
+        "label": "任务级算力联邦 V1",
+        "detail": "方向已接受且基础合同已写入；Broker、外部 Provider、通用任务与运行接线尚未实现",
+        "parent_id": "cap-distributed-compute",
+        "order": 20,
+        "color": "#48A889",
+        "entrypoint": "docs/distributed-compute/architecture.md",
+        "document_paths": [
+          "docs/decisions/distributed-compute-federation-v1.md",
+          "docs/distributed-compute/architecture.md",
+          "docs/distributed-compute/node-client-and-plugins.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/compute_federation/mod.rs"
+        ],
+        "tags": [
+          "planned",
+          "job",
+          "offer",
+          "receipt"
+        ]
+      },
+      {
+        "id": "cap-compute-market-settlement-v1",
+        "view": "capabilities",
+        "kind": "planned_capability",
+        "label": "算力期货锁价与结算",
+        "detail": "标准 Compute SKU、期货交付窗口、不可变价格快照、持仓与清算的目标市场",
+        "parent_id": "cap-distributed-compute",
+        "order": 30,
+        "color": "#D0A34F",
+        "entrypoint": "docs/distributed-compute/market-and-settlement.md",
+        "document_paths": [
+          "docs/distributed-compute/market-and-settlement.md",
+          "docs/decisions/distributed-compute-federation-v1.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/compute_federation/market.rs",
+          "file:server/src/compute_federation/receipts.rs"
+        ],
+        "tags": [
+          "planned",
+          "future",
+          "price-snapshot",
+          "settlement"
+        ]
+      },
+      {
+        "id": "arch-compute-federation-contracts",
+        "view": "architecture",
+        "kind": "component",
+        "label": "算力联邦领域合同",
+        "detail": "未编译未接线的 Provider、Offer、Workload、Job、Lease、价格和回执模型",
+        "parent_id": "arch-server",
+        "order": 35,
+        "color": "#48A889",
+        "entrypoint": "docs/distributed-compute/architecture.md",
+        "document_paths": [
+          "docs/distributed-compute/architecture.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/compute_federation/mod.rs"
+        ],
+        "tags": [
+          "contract",
+          "uncompiled",
+          "federation"
+        ]
+      },
+      {
+        "id": "arch-compute-node-plugin-runtime",
+        "view": "architecture",
+        "kind": "planned_component",
+        "label": "按需算力插件运行时",
+        "detail": "共享开启后才安装的 Node Core、Plugin Host、Runtime Plugin 与模型工件",
+        "parent_id": "arch-node",
+        "order": 20,
+        "color": "#65A8C8",
+        "entrypoint": "docs/distributed-compute/node-client-and-plugins.md",
+        "document_paths": [
+          "docs/distributed-compute/node-client-and-plugins.md"
+        ],
+        "implementation_refs": [],
+        "tags": [
+          "planned",
+          "plugin",
+          "node-agent",
+          "on-demand"
+        ]
+      },
       {
         "id": "cap-open-commerce",
         "view": "capabilities",
@@ -3334,6 +3732,34 @@
       }
     ],
     "edges": [
+      {
+        "id": "cap-node-sharing-compute-federation",
+        "source": "cap-node-model-sharing-v1",
+        "target": "cap-compute-federation-v1",
+        "relation": "precedes",
+        "label": "现有单节点 LLM 供给作为兼容起点"
+      },
+      {
+        "id": "cap-compute-federation-market",
+        "source": "cap-compute-federation-v1",
+        "target": "cap-compute-market-settlement-v1",
+        "relation": "feeds",
+        "label": "验证后的任务与容量进入期货锁价结算"
+      },
+      {
+        "id": "cap-shadow-compute-market",
+        "source": "cap-task-shadow-economy",
+        "target": "cap-compute-market-settlement-v1",
+        "relation": "precedes",
+        "label": "追加式回执和纠正思路先于真实算力清算"
+      },
+      {
+        "id": "arch-plugin-compute-contracts",
+        "source": "arch-compute-node-plugin-runtime",
+        "target": "arch-compute-federation-contracts",
+        "relation": "implements",
+        "label": "节点插件执行统一任务与回执合同"
+      },
       {
         "id": "cap-erp-blueprint-commerce-v1",
         "source": "cap-erp-blueprint-v1",

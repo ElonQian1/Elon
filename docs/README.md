@@ -24,6 +24,7 @@
 | 后台多端 UI 设计 | `docs/headless-ui-design-mcp.md` | AI 无需打开画布即可发现、捕获和读取 Web/PWA/Tauri/Android 页面 |
 | Windows 节点 | `docs/node-agent-upgrade-compatibility.md` | 本机节点、数据目录、升级和离线行为 |
 | Android 客户端 | `docs/android-setup.md` | APK、Compose、真机渲染与发布 |
+| 分布式算力联邦 | `docs/distributed-compute/README.md` | 用户节点、外部矿池、按需插件、任务调度和期货锁价结算 |
 | AI 与上下文 | `AGENTS.md` | 跨供应商入口、按需指令、Prompt/Agent/Skill |
 | 讨论知识与脑图演化 | `docs/discussion-knowledge-compiler.md` | 长聊天拆分、分叉、节点晋升、版本回看与修正 |
 | 用户与项目系统 | `docs/user-project-system.md` | 用户项目、频道、Git 工作区与文档知识库 |

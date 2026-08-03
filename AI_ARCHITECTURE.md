@@ -177,6 +177,29 @@ AI_PROJECT / AI_INDEX / AGENTS
 
 长聊天另行编译为 `.elon/discussion-graph.json`，不混入产品功能、技术架构或当前权威文档。讨论图以稳定节点 ID 和 Git 快照保存演化：MCP 可读取语义版本、旧版图、版本差异和单节点生命周期，PC 端显示同一时间轴。确定性审查先发现来源、权威性、失效关联、未解决异议和演化链问题；Win 端登录账号的任意受支持 AI CLI 再通过 proposal/apply 形成修正版。每次应用产生新版本，不改写旧图，也不需要为单次脑图变化发布一龙程序版本。
 
+## 任务级分布式算力联邦
+
+一龙把用户节点、受管 GPU 集群和外部算力池统一为 `ComputeProvider`，聚合可独立执行、分片、重试和验证的 AI 任务。普通公网节点不被伪装成一张低延迟虚拟 GPU；需要张量或流水线并行的工作负载由受管集群内部完成，集群对一龙表现为一个逻辑 Provider。
+
+```text
+需求 / 本地 AI
+  -> Broker + Offer Registry + Price Snapshot
+  -> Reservation + Attempt Lease (fencing generation)
+  -> User Node / Managed Cluster / External Pool
+  -> declared / observed / verified usage
+  -> Settlement Receipt + pending/disputed/available balance
+```
+
+架构分为五个平面：
+
+- 控制面：Provider、Offer、报价、预留、租约、重试和取消；
+- 数据面：输入工件、执行事件、检查点和结果工件；
+- 工件面：Plugin、Runtime、Model 分开版本化和内容寻址；
+- 验证与计量面：节点声明、平台观测、挑战/复算和最终验证事实；
+- 市场与结算面：标准 Compute SKU、期货交付窗口、不可变价格快照和双价格腿回执。
+
+当前 `server/src/compute_federation/` 只提供未编译、未接线的领域合同；数据库、API、WS、Broker、节点插件和真实市场均未采用它。现有节点模型白名单、Token 预留和流租约继续作为 `user_node + llm_chat` 兼容路径。权威架构与阶段见 `docs/distributed-compute/README.md`。
+
 ## 关键模块边界
 
 | 模块 | 职责 |
@@ -187,6 +210,7 @@ AI_PROJECT / AI_INDEX / AGENTS
 | `server/src/context_compiler/symbol_index_embedding_provider.rs` | embedding provider 抽象与本地 hash provider |
 | `server/src/agent_config.rs` | 用户模型/API key 配置和加密持久化 |
 | `server/src/agent_llm_call.rs` | OpenAI-compatible chat 调用和用量记录 |
+| `server/src/compute_federation/` | 分布式算力 Provider、Offer、Job、Lease、价格与回执领域合同；当前未接运行路径 |
 | `scripts/publish-server.ps1` | 后端构建、版本 claim、上传、部署、验证 |
 | `scripts/publish-apk.ps1` | APK 构建、签名、上传和版本发布 |
 
