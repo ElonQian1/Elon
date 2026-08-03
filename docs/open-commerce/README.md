@@ -149,6 +149,8 @@
 139. `docs/open-commerce-consumer-source-requirement-v1-acceptance.md`：查看来源筛选代码状态及后置统一回归矩阵。
 140. `docs/decisions/open-commerce-consumer-source-filters-v1.md`：查看消费者按厂商和数据域精确过滤及未外部核验边界。
 141. `docs/open-commerce-consumer-source-filters-v1-acceptance.md`：查看来源字段过滤代码状态及后置统一回归矩阵。
+142. `docs/decisions/open-commerce-consumer-source-age-v1.md`：查看消费者最大内部回执年龄筛选及未外部核验边界。
+143. `docs/open-commerce-consumer-source-age-v1-acceptance.md`：查看回执年龄筛选代码状态及后置统一回归矩阵。
 
 ## 专题地图
 
