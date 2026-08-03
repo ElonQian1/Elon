@@ -167,6 +167,8 @@
 157. `docs/open-commerce-consumer-discovery-mcp-v1-acceptance.md`：查看消费者发现 MCP 代码状态及后置统一回归矩阵。
 158. `docs/decisions/open-commerce-consumer-capability-execution-plan-v1.md`：查看消费者能力调用前的只读执行计划与状态机。
 159. `docs/open-commerce-consumer-capability-execution-plan-v1-acceptance.md`：查看执行计划代码状态及后置统一回归矩阵。
+160. `docs/decisions/open-commerce-consumer-authorization-mcp-v1.md`：查看消费者 AI 单能力授权申请和商户决定权边界。
+161. `docs/open-commerce-consumer-authorization-mcp-v1-acceptance.md`：查看授权申请 MCP 代码状态及后置统一回归矩阵。
 
 ## 专题地图
 
