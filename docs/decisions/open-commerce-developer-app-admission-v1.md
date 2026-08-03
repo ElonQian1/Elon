@@ -20,13 +20,13 @@ implementation_status: implementation_uncompiled
 4. 准入状态为 `submitted`、`changes_requested`、`approved` 或 `suspended`。平台管理员可批准或退回待审申请，也可单独暂停已批准记录；退回与暂停必须填写说明。
 5. 批准时固定 `low`、`standard` 或 `enhanced` 风险层级。该层级只是人工治理标签，不是自动风控结论。
 6. App 资料变化会原子失效待审或已批准记录；App 停用会原子暂停待审或已批准记录。重新启用不会恢复旧准入，申请人必须重新提交。
-7. `approved` 只表示平台批准了当前资料修订对应的准入记录。V1 始终返回 `production_credential_issued=false` 和 `network_access_enabled=false`，不改变沙盒环境，不签发生产密钥，也不开放真实资金或交易。
+7. `approved` 只表示平台批准了当前资料修订对应的准入记录，不改变沙盒 App，也不自动签发生产密钥。后续独立生产凭据仍需平台管理员显式签发，并可随准入暂停而原子撤销。
 
 ## 边界
 
 - 主体名称、地区和登记编号均为申请人声明，V1 未连接工商、税务或第三方身份核验机构。
 - 域名证明不等于域名法律所有权，风险层级不等于信用评级。
-- 未来生产凭据必须是独立、一次性展示、仅保存摘要、可轮换和可紧急撤销的能力，并同时检查 App 启用状态、当前资料修订、域名证明和准入状态。
+- 独立生产凭据的当前决定见 `docs/decisions/open-commerce-developer-production-credentials-v1.md`；准入批准本身仍不代表真实资金、交易或外部平台权限已经开放。
 
 ## 实现引用
 

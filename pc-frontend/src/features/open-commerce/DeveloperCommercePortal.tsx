@@ -28,6 +28,7 @@ import DeveloperAppManifestPanel from './DeveloperAppManifestPanel'
 import DeveloperAppManifestReviewPanel from './DeveloperAppManifestReviewPanel'
 import DeveloperAppAdmissionPanel from './DeveloperAppAdmissionPanel'
 import DeveloperAppAdmissionReviewPanel from './DeveloperAppAdmissionReviewPanel'
+import DeveloperProductionCredentialPanel from './DeveloperProductionCredentialPanel'
 import { useAuthStore } from '../../store/auth'
 import type {
   AuthorizationRequest,
@@ -359,6 +360,8 @@ export default function DeveloperCommercePortal({
       {(systemRole === 'admin' || systemRole === 'owner') && <DeveloperAppManifestReviewPanel />}
 
       <DeveloperAppAdmissionPanel projectId={projectId} apps={apps} canEdit={canEdit} />
+
+      {canEdit && <DeveloperProductionCredentialPanel projectId={projectId} apps={apps} canEdit={canEdit} />}
 
       {(systemRole === 'admin' || systemRole === 'owner') && <DeveloperAppAdmissionReviewPanel />}
 

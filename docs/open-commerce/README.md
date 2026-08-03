@@ -105,6 +105,8 @@
 95. `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`：查看运行时出站安全代码及统一回归待验证范围。
 96. `docs/decisions/open-commerce-developer-app-admission-v1.md`：查看主体声明、人工风险层级和可撤销准入边界。
 97. `docs/open-commerce-developer-app-admission-v1-acceptance.md`：查看 App 准入审查代码及统一回归待验证范围。
+98. `docs/decisions/open-commerce-developer-production-credentials-v1.md`：查看默认关闭、一次性显示、能力限权和紧急撤销的生产凭据边界。
+99. `docs/open-commerce-developer-production-credentials-v1-acceptance.md`：查看生产凭据代码状态与后置统一回归清单。
 
 ## 专题地图
 

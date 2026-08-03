@@ -25,8 +25,8 @@ export interface DeveloperAppAdmission {
   review_note: string | null
   risk_tier: DeveloperAppAdmissionRiskTier | null
   suspended_at: string | null
-  production_credential_issued: false
-  network_access_enabled: false
+  production_credential_issued: boolean
+  network_access_enabled: boolean
   created_at: string
   updated_at: string
 }
@@ -34,8 +34,8 @@ export interface DeveloperAppAdmission {
 export interface DeveloperAppAdmissionState {
   schema: 'open_commerce.developer_app_admission_state.v1'
   admission: DeveloperAppAdmission | null
-  production_credential_issued: false
-  network_access_enabled: false
+  production_credential_issued: boolean
+  network_access_enabled: boolean
 }
 
 export interface DeveloperAppAdmissionReviewItem {
@@ -46,5 +46,5 @@ export interface DeveloperAppAdmissionReviewItem {
 export interface DeveloperAppAdmissionReviewQueue {
   schema: 'open_commerce.developer_app_admission_review_queue.v1'
   items: DeveloperAppAdmissionReviewItem[]
-  production_credential_issued: false
+  production_credentials_enabled: boolean
 }
