@@ -66,6 +66,8 @@ MCP 消费者 AI 可使用 `open_commerce_discover_for_consumer` 获取与上述
 
 提交后可用 `open_commerce_list_my_consumer_authorization_requests` 按状态查看本人申请和批准后的 Grant 条件。查询同时按当前用户和当前项目本人 App 隔离，不返回团队成员或审核人内部身份；它只读，不会重提或调用。项目编辑者在用户明确同意并提供固定确认短语后，可用 `open_commerce_cancel_my_consumer_authorization_request` 撤回本人 pending 请求；非 pending 保持原状态，该工具不会撤销已批准 Grant。历史 `approved` 也不保证 Grant 仍有效，实际调用前仍需重新执行计划。
 
+需要判断当前还能使用哪些授权时，AI 应调用 `open_commerce_list_my_active_grants`，而不是只查看历史申请。该工具只列当前项目中本人 App 仍有效的 Grant，并返回期限、已用和剩余调用次数、已用和剩余计量预算；预算耗尽会明确标记。它不预留预算、不调用能力，也不代替 `open_commerce_plan_consumer_capability` 对实际输入和当前封禁状态的最终复核。
+
 开发者调用和事件读取只使用 `Authorization: Bearer <test-token>`，App 身份由 Token 唯一确定，不能用额外请求头切换。Token 不得进入 URL、日志、项目文档、浏览器本地存储或商户能力元数据。
 
 批准申请时，商户可选择 7 天、30 天、90 天、1 年或长期有效，并可填写授权期内的总调用次数和总预算（人民币元）。PC 默认 30 天；长期有效必须显式选择。用尽或到期后不能由 App 自行扩容、续期，商户需要重新授权。调用失败会退回刚预留的预算，重复请求不会再次占用。批准后的实际期限和预算会同时展示给商户与申请方。

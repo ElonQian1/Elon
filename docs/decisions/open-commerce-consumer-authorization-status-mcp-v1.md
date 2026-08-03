@@ -14,6 +14,14 @@
 
 列表只读，不重提、批准、拒绝或调用能力；`approved` 仍需结合 Grant 当前有效性和执行计划复核，不能仅凭历史状态假定仍可调用。
 
+## 当前有效 Grant
+
+新增只读工具 `open_commerce_list_my_active_grants`，用于回答“当前还能用哪些授权”。查询只覆盖当前项目中由当前用户拥有的 App，可按 App ID 缩小范围，最多返回 100 条仍未撤销且未到期的 Grant。
+
+响应包含商户 ID、App ID、能力范围、用途、期限，以及调用次数和计量金额的上限、已用和剩余值。达到任一预算上限时状态为 `budget_exhausted`；没有耗尽时为 `budget_available`。无限额度以空上限和空剩余值表达，不伪造无限数字。
+
+该列表不预留或扣减预算，不调用商户能力，不证明 App 未被商户临时封禁，也不替代按实际输入执行 `open_commerce_plan_consumer_capability`。响应不包含消费者项目、授权人用户 ID 或其他内部身份。
+
 ## 本人申请撤回
 
 项目编辑者可在当前用户明确同意并提交固定短语 `CANCEL_AUTHORIZATION_REQUEST` 后，调用 `open_commerce_cancel_my_consumer_authorization_request` 撤回当前项目中由本人 App 发出的 pending 请求。服务端先核对请求的 `requester_user_id`，再复用现有项目侧取消和消费者/商户双侧审计。
@@ -24,4 +32,5 @@
 
 - `server/src/open_commerce_consumer_authorization_mcp.rs`
 - `server/src/store/open_commerce_authorization_requests.rs`
+- `server/src/store/open_commerce_grants.rs`
 - `docs/open-commerce-consumer-authorization-status-mcp-v1-acceptance.md`
