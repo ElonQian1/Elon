@@ -20,6 +20,7 @@ import { buildHeadlessDesignContext } from './headlessDesignContext'
 import { DesignRuntimeControls } from './DesignRuntimeControls'
 import type { DesignPlatform, SemanticUiNode } from './types'
 import { useHeadlessDesignSession } from './useHeadlessDesignSession'
+import { useHeadlessDesignLiveSync } from './useHeadlessDesignLiveSync'
 import { useDesignRuntimeControls } from './useDesignRuntimeControls'
 import styles from './HeadlessDesignWorkspace.module.css'
 
@@ -42,6 +43,8 @@ const PLATFORM_OPTIONS: Array<{
 
 export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChange }: Props) {
   const model = useHeadlessDesignSession(active, initialProjectRoot)
+  const [aiWorking, setAiWorking] = useState(false)
+  const liveSync = useHeadlessDesignLiveSync(active && aiWorking, model.reload)
   const runtimeControls = useDesignRuntimeControls({
     active,
     projectRoot: initialProjectRoot,
@@ -62,7 +65,10 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
     browserRuntime: runtimeControls.browserResult?.runtime ?? null,
     tauriBehavior: runtimeControls.tauriBehavior ?? model.surface?.nativeBehavior ?? null,
     verificationMatrix: runtimeControls.verificationMatrix,
-  }), [initialProjectRoot, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt, runtimeControls.browserResult?.runtime, runtimeControls.capabilities, runtimeControls.tauriBehavior, runtimeControls.verificationMatrix])
+    draftPreview: runtimeControls.draftPreview,
+    sourceBindingCandidates: runtimeControls.bindingCandidates,
+    liveFollow: liveSync,
+  }), [initialProjectRoot, liveSync, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt, runtimeControls.bindingCandidates, runtimeControls.browserResult?.runtime, runtimeControls.capabilities, runtimeControls.draftPreview, runtimeControls.tauriBehavior, runtimeControls.verificationMatrix])
   const intent = useMemo(() => [
     `修改 ${model.platform.toUpperCase()} 端 ${model.route || '/'} 页面。`,
     model.selectedNode
@@ -169,7 +175,7 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           mode="headless"
           onModeChange={onModeChange}
           status={model.target
-            ? `${model.target.label} · ${model.target.evidenceLevel}${model.target.nativeHostVerified ? ' · 原生宿主已验证' : ''}`
+            ? `${model.target.label} · ${model.target.evidenceLevel}${model.target.nativeHostVerified ? ' · 原生宿主已验证' : ''}${aiWorking ? ' · AI 工作中，画布自动跟随' : ''}`
             : '选择项目中已发现的设计目标'}
         />
         <div className={styles.routeBar}>
@@ -295,7 +301,7 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
         </div>
 
         <footer className={styles.statusBar}>
-          <span className={model.error ? styles.error : ''}>{model.error || model.status || '等待后台设计会话'}</span>
+          <span className={model.error || liveSync.error ? styles.error : ''}>{model.error || liveSync.error || (aiWorking ? 'AI 工作中 · 正在自动跟随最新 designSession' : model.status) || '等待后台设计会话'}</span>
           <span>{model.session?.designSessionId ?? '尚未打开 designSession'}</span>
           {model.surface?.pixels?.sha256 && <code>PNG {model.surface.pixels.sha256.slice(0, 12)}</code>}
           {model.surface?.uiTree?.sha256 && <code>UI {model.surface.uiTree.sha256.slice(0, 12)}</code>}
@@ -311,6 +317,7 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           defaultConversationOpen
           onMutationTaskStarted={() => undefined}
           onTaskSettled={() => { void model.reload() }}
+          onTaskActivityChange={(running) => setAiWorking(running)}
         />
       </aside>
     </div>

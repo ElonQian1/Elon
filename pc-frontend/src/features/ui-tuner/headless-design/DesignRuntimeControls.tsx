@@ -15,6 +15,10 @@ export function DesignRuntimeControls({ platform, selectedNode, disabled, model 
   const browserReady = model.browserResult?.runtime?.status === 'READY'
     && !['STOPPED', 'NOT_RUNNING', 'STOP_INCOMPLETE'].includes(model.browserResult.status)
   const busy = disabled || Boolean(model.busyAction)
+  const candidate = model.bindingCandidates[0]
+  const candidateAdopted = Boolean(candidate
+    && model.draft?.sourceBinding?.status === 'CANDIDATE'
+    && model.draft.sourceBinding.sourceFile === candidate.file)
   return (
     <section className={styles.controls} aria-label="后台设计 Runtime 控制">
       <div className={styles.capability}>
@@ -55,6 +59,23 @@ export function DesignRuntimeControls({ platform, selectedNode, disabled, model 
           <small>只传 profile/key，不传真实值；秘密字段和 password/file 永久拒绝。</small>
         </div>
       )}
+
+      <div className={styles.draftRuntimeRow}>
+        <span>草稿画面</span>
+        <button type="button" disabled={!runtimeAvailable || !model.draft || busy} onClick={() => void model.previewDraft()}>预览草稿</button>
+        <button type="button" disabled={!runtimeAvailable || !model.draft || busy} onClick={() => void model.restoreDraft()}>恢复画面</button>
+        <button type="button" disabled={!runtimeAvailable || !model.draft || busy} onClick={() => void model.suggestBinding()}>查找源码</button>
+        {candidate && (
+          <>
+            <code title={candidate.excerpt}>{candidate.file}:{candidate.line} · {candidate.score}</code>
+            <button type="button" disabled={candidateAdopted || busy} onClick={() => void model.applyBinding(candidate, false)}>采用候选</button>
+            <button type="button" disabled={!candidateAdopted || busy} onClick={() => void model.applyBinding(candidate, true)}>确认绑定</button>
+          </>
+        )}
+        <small>{model.draftPreview
+          ? `${model.draftPreview.action === 'PREVIEW' ? '正在显示临时预览' : '已恢复'} · 未修改源码`
+          : '候选必须先采用，再显式确认 BOUND'}</small>
+      </div>
 
       <div className={styles.matrixRow}>
         {platform === 'tauri' && <button type="button" disabled={!runtimeAvailable || busy} onClick={() => void model.captureBehavior()}>采集菜单 / 对话框 / command trace</button>}

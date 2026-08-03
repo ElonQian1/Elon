@@ -3,9 +3,11 @@ import type { UiTunerCodexContextPack } from '../contextPack'
 import type {
   DesignSessionIdentity,
   DesignDraft,
+  DesignDraftPreviewResult,
   DesignBrowserRuntime,
   DesignCapabilities,
   DesignSurface,
+  DesignSourceBindingCandidate,
   DesignTarget,
   DesignWritebackReceipt,
   DesignVerificationMatrix,
@@ -25,9 +27,13 @@ export function buildHeadlessDesignContext(input: {
   browserRuntime: DesignBrowserRuntime | null
   tauriBehavior: TauriBehaviorEvidence | null
   verificationMatrix: DesignVerificationMatrix | null
+  draftPreview: DesignDraftPreviewResult | null
+  sourceBindingCandidates: DesignSourceBindingCandidate[]
+  liveFollow: { active: boolean; lastSyncedAt: string; error: string }
 }): UiTunerCodexContextPack {
   const { projectRoot, target, session, surface, selectedNode, designDraft, writebackReceipt,
-    capabilities, browserRuntime, tauriBehavior, verificationMatrix } = input
+    capabilities, browserRuntime, tauriBehavior, verificationMatrix,
+    draftPreview, sourceBindingCandidates, liveFollow } = input
   const viewport = surface?.surface?.viewport ?? session?.viewport ?? { width: 1280, height: 800, deviceScaleFactor: 1 }
   const sourceRoots = target?.sourceRoots ?? []
   const configFiles = target?.configFiles ?? []
@@ -64,11 +70,20 @@ export function buildHeadlessDesignContext(input: {
       bindingReason: selectedNode
         ? '当前只有后台语义 selector；修改前仍需通过项目源码建立 source binding'
         : '尚未选择语义 UI 节点',
-      sourceCandidates: [...sourceRoots, ...configFiles].slice(0, 8).map((file) => ({
-        file,
-        reason: '由多端目标发现器提供，需按 selector/route 继续缩小源码绑定',
-        scope: target?.platform,
-      })),
+      sourceCandidates: sourceBindingCandidates.length
+        ? sourceBindingCandidates.slice(0, 8).map((candidate) => ({
+            file: candidate.file,
+            line: candidate.line,
+            confidence: Math.min(1, candidate.score / 120),
+            reason: candidate.suggestedBinding.reason,
+            matchKind: candidate.suggestedBinding.kind,
+            scope: target?.platform,
+          }))
+        : [...sourceRoots, ...configFiles].slice(0, 8).map((file) => ({
+            file,
+            reason: '由多端目标发现器提供，需按 selector/route 继续缩小源码绑定',
+            scope: target?.platform,
+          })),
     },
     liveRuntime: null,
     fitRun: null,
@@ -123,6 +138,13 @@ export function buildHeadlessDesignContext(input: {
       browserRuntime: browserRuntime ?? undefined,
       tauriBehavior: tauriBehavior ?? undefined,
       verificationMatrix: verificationMatrix ?? undefined,
+      draftPreview: draftPreview ?? undefined,
+      sourceBindingCandidates: sourceBindingCandidates.slice(0, 8),
+      liveFollow: {
+        active: liveFollow.active,
+        lastSyncedAt: liveFollow.lastSyncedAt || undefined,
+        error: liveFollow.error || undefined,
+      },
       selectedNode: selectedNode ?? undefined,
       contextPolicy: {
         fullRepositoryIncluded: false,

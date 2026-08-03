@@ -49,6 +49,7 @@ interface UiTunerProjectSessionPanelProps {
   headless?: boolean
   conversationLayout?: 'drawer' | 'panel'
   defaultConversationOpen?: boolean
+  onTaskActivityChange?: (running: boolean, succeeded?: boolean) => void
 }
 
 const CODEX_ROUTE: RuntimeRoute = 'route_a'
@@ -75,6 +76,7 @@ export function UiTunerProjectSessionPanel({
   headless = false,
   conversationLayout = 'drawer',
   defaultConversationOpen = false,
+  onTaskActivityChange,
 }: UiTunerProjectSessionPanelProps) {
   const [nodeAdminUrl, setNodeAdminUrl] = useState(uiTunerNodeAdminUrl)
   const user = useAuthStore((state) => state.user)
@@ -296,6 +298,7 @@ export function UiTunerProjectSessionPanel({
       return null
     }
     setStatus(mode === 'fork' ? '正在从最新稳定检查点分叉…' : '正在发送到持续项目会话…')
+    let taskActivityStarted = false
     try {
       const taskIntent = overrideIntent?.trim() || intent.trim() || '继续优化微调画布和 APK UI 标准闭环。'
       const activePack = options?.contextPack ?? pack
@@ -375,12 +378,15 @@ export function UiTunerProjectSessionPanel({
       } else {
         setConversationOpen(true)
         setVerificationTaskId(taskId)
+        onTaskActivityChange?.(true)
+        taskActivityStarted = true
         await onMutationTaskStarted(activePack)
         setStatus('已进入持续项目 Codex CLI 会话')
       }
       window.setTimeout(() => { void refreshWorkspace(false) }, 600)
       return { ...session, taskId, status: 'running' }
     } catch (error) {
+      if (taskActivityStarted) onTaskActivityChange?.(false, false)
       setStatus((error as { message?: string }).message ?? '项目 Codex 会话启动失败')
       return null
     }
@@ -478,6 +484,7 @@ export function UiTunerProjectSessionPanel({
           return
         }
         setVerificationTaskId('')
+        onTaskActivityChange?.(false, succeeded)
         if (succeeded) onTaskSettled()
       }}
     />

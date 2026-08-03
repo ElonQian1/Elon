@@ -5,14 +5,20 @@ import {
   getDesignVerificationMatrix,
   interactDesignBrowser,
   prepareDesignBrowser,
+  previewDesignDraft,
+  restoreDesignDraftPreview,
   stopDesignBrowser,
+  suggestDesignSourceBinding,
+  updateDesignDraft,
 } from './designSessionApi'
 import type {
   DesignBrowserInteraction,
   DesignBrowserResult,
   DesignCapabilities,
   DesignDraft,
+  DesignDraftPreviewResult,
   DesignSessionIdentity,
+  DesignSourceBindingCandidate,
   DesignVerificationMatrix,
   TauriBehaviorEvidence,
 } from './types'
@@ -31,6 +37,8 @@ export function useDesignRuntimeControls(input: Input) {
   const [browserResult, setBrowserResult] = useState<DesignBrowserResult | null>(null)
   const [tauriBehavior, setTauriBehavior] = useState<TauriBehaviorEvidence | null>(null)
   const [verificationMatrix, setVerificationMatrix] = useState<DesignVerificationMatrix | null>(null)
+  const [draftPreview, setDraftPreview] = useState<DesignDraftPreviewResult | null>(null)
+  const [bindingCandidates, setBindingCandidates] = useState<DesignSourceBindingCandidate[]>([])
   const [fixtureProfile, setFixtureProfile] = useState('')
   const [activeFixtureProfile, setActiveFixtureProfile] = useState('')
   const [fixtureKey, setFixtureKey] = useState('')
@@ -74,6 +82,8 @@ export function useDesignRuntimeControls(input: Input) {
     setBrowserResult(null)
     setTauriBehavior(null)
     setActiveFixtureProfile('')
+    setDraftPreview(null)
+    setBindingCandidates([])
     setMessage('')
   }, [input.session?.designSessionId])
 
@@ -160,12 +170,96 @@ export function useDesignRuntimeControls(input: Input) {
     }
   }, [input, refreshMatrix])
 
+  const previewDraft = useCallback(async () => {
+    if (!input.draft) return
+    setBusyAction('draft-preview')
+    setError('')
+    try {
+      const result = await previewDesignDraft(input.projectRoot, input.draft.draftId)
+      assertBrowserResult(result.capture)
+      setDraftPreview(result)
+      setBrowserResult(result.capture)
+      setMessage(`草稿 r${result.revision} 已临时预览；源码未修改`)
+      await input.onEvidenceChanged()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '设计草稿预览失败')
+    } finally {
+      setBusyAction('')
+    }
+  }, [input])
+
+  const restoreDraft = useCallback(async () => {
+    if (!input.draft) return
+    setBusyAction('draft-preview')
+    setError('')
+    try {
+      const result = await restoreDesignDraftPreview(input.projectRoot, input.draft.draftId)
+      assertBrowserResult(result.capture)
+      setDraftPreview(result)
+      setBrowserResult(result.capture)
+      setMessage('已恢复预览前页面样式；草稿和源码均未修改')
+      await input.onEvidenceChanged()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '设计草稿预览恢复失败')
+    } finally {
+      setBusyAction('')
+    }
+  }, [input])
+
+  const suggestBinding = useCallback(async () => {
+    if (!input.draft) return
+    setBusyAction('binding')
+    setError('')
+    try {
+      const result = await suggestDesignSourceBinding(input.projectRoot, input.draft.draftId)
+      setBindingCandidates(result.candidates)
+      setMessage(result.candidates.length
+        ? `已从 ${result.scan.filesInspected} 个项目文件中找到 ${result.candidates.length} 个有界候选`
+        : `扫描了 ${result.scan.filesInspected} 个项目文件，未找到可靠候选`)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '源码绑定候选读取失败')
+    } finally {
+      setBusyAction('')
+    }
+  }, [input])
+
+  const applyBinding = useCallback(async (candidate: DesignSourceBindingCandidate, confirmed: boolean) => {
+    if (!input.draft) return
+    setBusyAction('binding')
+    setError('')
+    try {
+      const result = await updateDesignDraft({
+        projectRoot: input.projectRoot,
+        draftId: input.draft.draftId,
+        expectedRevision: input.draft.revision,
+        sourceBinding: {
+          ...candidate.suggestedBinding,
+          status: confirmed ? 'BOUND' : 'CANDIDATE',
+          reason: confirmed
+            ? `已显式确认：${candidate.suggestedBinding.reason}`
+            : candidate.suggestedBinding.reason,
+        },
+      })
+      setMessage(confirmed
+        ? `已将 ${candidate.file}:${candidate.line} 确认为源码绑定 r${result.draft.revision}`
+        : `已采用 ${candidate.file}:${candidate.line} 作为待确认候选 r${result.draft.revision}`)
+      await input.onEvidenceChanged()
+      await refreshMatrix()
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '源码绑定更新失败')
+    } finally {
+      setBusyAction('')
+    }
+  }, [input, refreshMatrix])
+
   return {
-    capabilities, browserResult, tauriBehavior, verificationMatrix,
+    capabilities, browserResult, tauriBehavior, verificationMatrix, draftPreview, bindingCandidates,
+    draft: input.draft,
     canRefreshMatrix: Boolean(input.draft), activeFixtureProfile,
     fixtureProfile, fixtureKey, busyAction, message, error,
     setFixtureProfile, setFixtureKey, refreshCapabilities, refreshMatrix,
     prepareBrowser, interact, stopBrowser, captureBehavior,
+    previewDraft, restoreDraft, suggestBinding, applyBinding,
   }
 }
 

@@ -196,11 +196,11 @@ fn inspect_file(root: &Path, path: &Path, context: &SearchContext) -> Result<Opt
         .replace('\\', "/");
     let sha256 = hex::encode(Sha256::digest(&bytes));
     let confidence = if score >= 100 {
-        "HIGH"
+        "high"
     } else if score >= 55 {
-        "MEDIUM"
+        "medium"
     } else {
-        "LOW"
+        "low"
     };
     let kind = binding_kind(path);
     Ok(Some(Candidate {

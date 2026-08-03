@@ -6,11 +6,13 @@ import type {
   DesignBrowserResult,
   DesignCapabilities,
   DesignDraft,
+  DesignDraftPreviewResult,
   DesignDraftSummary,
   DesignPlatform,
   DesignSessionListResult,
   DesignSessionRecord,
   DesignSurface,
+  DesignSourceBindingCandidates,
   DesignTargetListResult,
   DesignViewport,
   DesignWritebackReceipt,
@@ -254,5 +256,29 @@ export function getDesignVerificationMatrix(projectRoot: string, draftId: string
   return call<DesignVerificationMatrix>(
     `/api/android-live/design/drafts/${encodeURIComponent(draftId)}/verification-matrix`,
     { projectRoot },
+  )
+}
+
+export function previewDesignDraft(projectRoot: string, draftId: string) {
+  return call<DesignDraftPreviewResult>(
+    `/api/android-live/design/drafts/${encodeURIComponent(draftId)}/preview`,
+    { projectRoot },
+    60_000,
+  )
+}
+
+export function restoreDesignDraftPreview(projectRoot: string, draftId: string) {
+  return call<DesignDraftPreviewResult>(
+    `/api/android-live/design/drafts/${encodeURIComponent(draftId)}/preview/restore`,
+    { projectRoot },
+    60_000,
+  )
+}
+
+export function suggestDesignSourceBinding(projectRoot: string, draftId: string, limit = 8) {
+  return call<DesignSourceBindingCandidates>(
+    `/api/android-live/design/drafts/${encodeURIComponent(draftId)}/source-binding/candidates`,
+    { projectRoot, limit },
+    30_000,
   )
 }

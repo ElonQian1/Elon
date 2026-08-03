@@ -284,6 +284,49 @@ export interface DesignBrowserResult {
   diagnostic?: { code: string; message: string; retryable: boolean; nextStep: string }
 }
 
+export interface DesignDraftPreviewResult {
+  schema: 'elon.ui-design-draft-preview.v1'
+  draftId: string
+  designSessionId: string
+  revision: number
+  action: 'PREVIEW' | 'RESTORE'
+  previewOnly: true
+  sourceModified: false
+  completionEvidence: false
+  browserPreparedNow: boolean
+  capture: DesignBrowserResult
+  contentEmbedded: false
+}
+
+export interface DesignSourceBindingCandidate {
+  file: string
+  line: number
+  byteRange: { start: number; end: number }
+  excerpt: string
+  score: number
+  matchedSignals: string[]
+  sourceSha256: string
+  suggestedBinding: DesignSourceBinding
+}
+
+export interface DesignSourceBindingCandidates {
+  schema: 'elon.ui-design-source-binding-candidates.v1'
+  draftId: string
+  designSessionId: string
+  selector: string
+  uiTreeVerified: true
+  candidates: DesignSourceBindingCandidate[]
+  scan: {
+    filesInspected: number
+    truncated: boolean
+    sourceRoots: string[]
+    maxFileBytes: number
+  }
+  bindingStatus: 'CANDIDATE'
+  autoBound: false
+  contentEmbedded: false
+}
+
 export type DesignBrowserInteraction =
   | { action: 'click'; selector: string }
   | { action: 'scrollIntoView'; selector: string }

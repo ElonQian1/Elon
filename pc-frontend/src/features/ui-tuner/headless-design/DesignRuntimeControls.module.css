@@ -10,6 +10,7 @@
 .capability,
 .browserRow,
 .fixtureRow,
+.draftRuntimeRow,
 .matrixRow {
   min-height: 32px;
   display: flex;
@@ -69,6 +70,23 @@
 
 .fixtureRow small {
   color: #686b74;
+}
+
+.draftRuntimeRow code {
+  max-width: 260px;
+  overflow: hidden;
+  color: #aeb2bd;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draftRuntimeRow small {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: #686b74;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .browserRow code {
