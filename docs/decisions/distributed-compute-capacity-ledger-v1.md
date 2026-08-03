@@ -51,7 +51,7 @@ V1 Claim 不做部分拆分。未来 Commitment 分配给多个 Job 时创建带
 
 ### 7. 幂等键绑定请求摘要
 
-目标语义是写操作使用 `(idempotency_scope, idempotency_key)` 唯一键并保存 Store 规范化的 `request_digest`：同键同摘要返回不可变首次结果，同键不同摘要失败关闭。当前隔离 Store 只保存并比对调用方摘要、重放当前 Claim/余额，尚未达到这项严格保证。容量、预算、Reservation 和 Job 绑定的最终 Reserve 必须处于同一个本地数据库线性化事务。
+目标语义是写操作使用 `(idempotency_scope, idempotency_key)` 唯一键并保存 Store 规范化的 `request_digest`：同键同摘要返回不可变首次结果，同键不同摘要失败关闭。当前隔离 Store 已不再接收 Supply Add/Withdraw 与 Claim Hold/Finish 的调用方摘要。Supply 与 Hold 按带版本 schema 的 typed payload、完整 pool/window 绑定、主体、排序 bucket 数量、规范 UTC 时间及 Claim 类型计算 SHA-256；Finish 则绑定 claim ID、expected revision、终态 action 和规范 UTC 发生时间，资源与主体经不可替换的 claim ID 间接固定。幂等范围和键作为查重信封，不进入内容摘要。它仍重放当前 Claim/余额，尚未保存不可变首次结果，因此严格保证只完成了摘要一半。该 V1 字节规则只由 Store 计算，不是跨语言 JCS 合同；外部矿池如需自行验签摘要，必须使用共享 SDK 或另立显式版本。容量、预算、Reservation 和 Job 绑定的最终 Reserve 必须处于同一个本地数据库线性化事务。
 
 ### 8. 事务内禁止外部网络
 
@@ -77,4 +77,4 @@ SQLite 路径使用 `BEGIN IMMEDIATE`、稳定 meter 顺序和条件更新。节
 
 ## 验证状态
 
-本决定已接受。领域合同、纯状态投影和 v165 SQLite schema 已写入；本地 Store 还形成了池版本与 bucket 登记、供给发行/撤出、窗口有界 Claim hold、Claim-local held-only 释放/到期，以及共用的双分录落库和余额 CAS。只读审计可从账本重算余额投影，有界批处理可逐 Claim 恢复到期容量；状态门卫、v167 追加式生命周期、v168 epoch 轮换、v169 Provider Registry、Offer 规范合同校验、v170 Offer Registry 与 v171 不可变 Price Snapshot Registry 也已形成代码。上述新增路径均未编译、执行迁移、调度或并发验证。Hold/Finish causal binding 仍为空；严格 canonical request digest、不可变 Claim 首次响应、消费者预算与 Reservation/Price Snapshot 的统一 Reserve、事务内 Broker API、Attempt 激活、自动修复、外部 Provider saga 和运行接线仍未实现。
+本决定已接受。领域合同、纯状态投影和 v165 SQLite schema 已写入；本地 Store 还形成了池版本与 bucket 登记、供给发行/撤出、窗口有界 Claim hold、Claim-local held-only 释放/到期、四类写入的 Store-canonical request digest，以及共用的双分录落库和余额 CAS。只读审计可从账本重算余额投影，有界批处理可逐 Claim 恢复到期容量；状态门卫、v167 追加式生命周期、v168 epoch 轮换、v169 Provider Registry、Offer 规范合同校验、v170 Offer Registry 与 v171 不可变 Price Snapshot Registry 也已形成代码。上述新增路径均未编译、执行迁移、调度或并发验证。Hold/Finish causal binding 仍为空；不可变 Claim 首次响应、消费者预算与 Reservation/Price Snapshot 的统一 Reserve、事务内 Broker API、Attempt 激活、自动修复、外部 Provider saga 和运行接线仍未实现。
