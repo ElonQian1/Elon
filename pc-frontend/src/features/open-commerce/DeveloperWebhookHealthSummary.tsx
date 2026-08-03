@@ -68,7 +68,10 @@ export default function DeveloperWebhookHealthSummary({
               <p style={commerceStyles.itemText}>
                 订阅 {item.active_subscription_count}/{item.subscription_count} · 待发{' '}
                 {item.pending_delivery_count + item.delivering_delivery_count} · 重试{' '}
-                {item.retry_delivery_count} · 死信 {item.dead_delivery_count}
+                {item.retry_delivery_count} · 待处理死信 {item.unresolved_dead_delivery_count}
+                {item.acknowledged_dead_delivery_count > 0
+                  ? ` · 已确认 ${item.acknowledged_dead_delivery_count}`
+                  : ''}
               </p>
               {(item.latest_error_code || item.oldest_queued_at) && (
                 <small style={commerceStyles.itemMeta}>

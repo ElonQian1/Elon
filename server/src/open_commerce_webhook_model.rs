@@ -5,7 +5,7 @@ use crate::open_commerce_developer_event_model::DeveloperTerminalEventSummary;
 pub(crate) const DEVELOPER_WEBHOOK_SUBSCRIPTION_SCHEMA: &str =
     "open_commerce.developer_webhook_subscription.v2";
 pub(crate) const DEVELOPER_WEBHOOK_DELIVERY_SCHEMA: &str =
-    "open_commerce.developer_webhook_delivery.v1";
+    "open_commerce.developer_webhook_delivery.v2";
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct DeveloperWebhookSubscription {
@@ -61,6 +61,9 @@ pub(crate) struct DeveloperWebhookDelivery {
     pub last_manual_retry_at: Option<String>,
     pub history_replay_requested_at: Option<String>,
     pub delivered_at: Option<String>,
+    pub dead_letter_acknowledged_at: Option<String>,
+    pub dead_letter_acknowledged_by_user_id: Option<String>,
+    pub dead_letter_acknowledgement_reason: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -89,6 +92,12 @@ pub(crate) struct CreateDeveloperWebhookRequest {
 pub(crate) struct DeveloperWebhookHistoryReplayRequest {
     pub after_sequence: i64,
     pub limit: usize,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AcknowledgeDeveloperWebhookDeadLetterRequest {
+    pub reason: String,
 }
 
 #[derive(Debug, Serialize)]

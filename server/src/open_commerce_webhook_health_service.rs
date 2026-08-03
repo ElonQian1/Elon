@@ -73,7 +73,7 @@ fn environment_status(
         && !production_ready
     {
         WEBHOOK_HEALTH_ACTION_REQUIRED
-    } else if health.dead_delivery_count > 0 {
+    } else if health.unresolved_dead_delivery_count > 0 {
         WEBHOOK_HEALTH_ACTION_REQUIRED
     } else if health.retry_delivery_count > 0 {
         WEBHOOK_HEALTH_ATTENTION

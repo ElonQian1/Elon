@@ -84,6 +84,17 @@ export const developerWebhookClientApi = {
     {},
   ),
 
+  acknowledgeDeveloperWebhookDeadLetter: (
+    projectId: string,
+    appRecordId: string,
+    webhookId: string,
+    deliveryId: string,
+    reason: string,
+  ) => api.post<DeveloperWebhookDelivery>(
+    `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks/${encodeURIComponent(webhookId)}/deliveries/${encodeURIComponent(deliveryId)}/acknowledge`,
+    { reason },
+  ),
+
   replayDeveloperWebhookHistory: (
     projectId: string,
     appRecordId: string,

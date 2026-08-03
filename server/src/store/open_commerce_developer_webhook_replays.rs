@@ -89,6 +89,9 @@ impl Store {
                     manual_retry_count=manual_retry_count+1,
                     next_attempt_at=?1, response_status=NULL, error_code=NULL,
                     last_attempt_at=NULL, last_manual_retry_at=?1, delivered_at=NULL,
+                    dead_letter_acknowledged_at=NULL,
+                    dead_letter_acknowledged_by_user_id=NULL,
+                    dead_letter_acknowledgement_reason=NULL,
                     lease_owner=NULL, lease_expires_at=NULL
               WHERE subscription_id=?2 AND id=?3 AND status='dead'",
             params![timestamp, subscription_id.trim(), delivery_id.trim()],

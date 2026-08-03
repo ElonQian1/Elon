@@ -44,15 +44,21 @@ fn environment_health_on(
         pending_delivery_count,
         retry_delivery_count,
         delivering_delivery_count,
-        dead_delivery_count,
+        unresolved_dead_delivery_count,
+        acknowledged_dead_delivery_count,
         oldest_queued_at,
         latest_delivery_at,
-    ): (i64, i64, i64, i64, Option<String>, Option<String>) = conn.query_row(
+    ): (i64, i64, i64, i64, i64, Option<String>, Option<String>) = conn.query_row(
         "SELECT
             COALESCE(SUM(CASE WHEN delivery.status='pending' THEN 1 ELSE 0 END), 0),
             COALESCE(SUM(CASE WHEN delivery.status='retry' THEN 1 ELSE 0 END), 0),
             COALESCE(SUM(CASE WHEN delivery.status='delivering' THEN 1 ELSE 0 END), 0),
-            COALESCE(SUM(CASE WHEN delivery.status='dead' THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN delivery.status='dead'
+                               AND delivery.dead_letter_acknowledged_at IS NULL
+                              THEN 1 ELSE 0 END), 0),
+            COALESCE(SUM(CASE WHEN delivery.status='dead'
+                               AND delivery.dead_letter_acknowledged_at IS NOT NULL
+                              THEN 1 ELSE 0 END), 0),
             MIN(CASE WHEN delivery.status IN ('pending', 'retry', 'delivering')
                      THEN delivery.created_at END),
             MAX(delivery.delivered_at)
@@ -70,6 +76,7 @@ fn environment_health_on(
                 row.get(3)?,
                 row.get(4)?,
                 row.get(5)?,
+                row.get(6)?,
             ))
         },
     )?;
@@ -107,7 +114,8 @@ fn environment_health_on(
         pending_delivery_count,
         retry_delivery_count,
         delivering_delivery_count,
-        dead_delivery_count,
+        unresolved_dead_delivery_count,
+        acknowledged_dead_delivery_count,
         oldest_queued_at,
         latest_delivery_at: latest_delivery_at.or(latest_subscription_delivery_at),
         latest_error_code: latest_delivery_error.or(latest_subscription_error),

@@ -17,7 +17,9 @@ pub(super) const DELIVERY_SELECT: &str =
     "SELECT id, subscription_id, invocation_id, event_sequence, event_type,
             enqueue_source, status, attempt_count, manual_retry_count, next_attempt_at,
             response_status, error_code, created_at, last_attempt_at,
-            last_manual_retry_at, history_replay_requested_at, delivered_at
+            last_manual_retry_at, history_replay_requested_at, delivered_at,
+            dead_letter_acknowledged_at, dead_letter_acknowledged_by_user_id,
+            dead_letter_acknowledgement_reason
        FROM open_commerce_developer_webhook_deliveries";
 
 pub(super) fn subscription_from_row(
@@ -69,5 +71,8 @@ pub(super) fn delivery_from_row(row: &Row<'_>) -> rusqlite::Result<DeveloperWebh
         last_manual_retry_at: row.get(14)?,
         history_replay_requested_at: row.get(15)?,
         delivered_at: row.get(16)?,
+        dead_letter_acknowledged_at: row.get(17)?,
+        dead_letter_acknowledged_by_user_id: row.get(18)?,
+        dead_letter_acknowledgement_reason: row.get(19)?,
     })
 }

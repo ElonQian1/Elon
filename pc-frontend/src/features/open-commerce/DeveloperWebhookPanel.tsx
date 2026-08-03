@@ -5,13 +5,13 @@ import {
   Power,
   PowerOff,
   RefreshCw,
-  RotateCcw,
   ShieldCheck,
   Webhook,
 } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import DeveloperWebhookReplayControls from './DeveloperWebhookReplayControls'
 import DeveloperWebhookHealthSummary from './DeveloperWebhookHealthSummary'
+import DeveloperWebhookDeadLetterActions from './DeveloperWebhookDeadLetterActions'
 import type {
   DeveloperWebhookDelivery,
   DeveloperWebhookHistoryReplayResult,
@@ -191,26 +191,6 @@ export default function DeveloperWebhookPanel({
       setSelectedWebhookId(webhook.id)
       setMessage('旧密钥已失效。新密钥只显示本次，接收端更新后需要重新验证。')
       await refreshWebhooks()
-      await refreshDeliveries()
-    } catch (error) {
-      setMessage(errorText(error))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function retryDelivery(delivery: DeveloperWebhookDelivery) {
-    if (!selectedApp || !selectedWebhookId) return
-    setBusy(true)
-    setMessage('')
-    try {
-      await openCommerceClientApi.retryDeveloperWebhookDelivery(
-        projectId,
-        selectedApp.id,
-        selectedWebhookId,
-        delivery.id,
-      )
-      setMessage('死信已重新进入投递队列。')
       await refreshDeliveries()
     } catch (error) {
       setMessage(errorText(error))
@@ -457,17 +437,15 @@ export default function DeveloperWebhookPanel({
                     <span style={badgeStyle(delivery.status === 'delivered' ? 'neutral' : 'warn')}>
                       {delivery.status}
                     </span>
-                    {delivery.status === 'dead' && (
-                      <button
-                        style={actionStyle('icon', !canEdit || busy)}
-                        type="button"
-                        onClick={() => retryDelivery(delivery)}
-                        disabled={!canEdit || busy}
-                        title="重新投递死信"
-                      >
-                        <RotateCcw size={13} />
-                      </button>
-                    )}
+                    <DeveloperWebhookDeadLetterActions
+                      projectId={projectId}
+                      appRecordId={appRecordId}
+                      webhookId={selectedWebhookId}
+                      delivery={delivery}
+                      disabled={!canEdit || busy}
+                      onChanged={refreshDeliveries}
+                      onMessage={setMessage}
+                    />
                   </div>
                 </header>
                 <small style={commerceStyles.itemMeta}>

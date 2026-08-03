@@ -179,6 +179,31 @@ pub(crate) fn retry_delivery(
     )
 }
 
+pub(crate) fn acknowledge_dead_letter(
+    store: &Store,
+    app: &OpenCommerceDeveloperApp,
+    subscription_id: &str,
+    delivery_id: &str,
+    acknowledged_by_user_id: &str,
+    reason: &str,
+) -> Result<DeveloperWebhookDelivery> {
+    let reason = reason.trim();
+    if reason.chars().count() < 4
+        || reason.chars().count() > 500
+        || reason.chars().any(char::is_control)
+    {
+        bail!("死信处理原因必须为 4 至 500 个有效字符");
+    }
+    store.acknowledge_open_commerce_developer_webhook_dead_letter(
+        &app.project_id,
+        &app.id,
+        subscription_id,
+        delivery_id,
+        acknowledged_by_user_id,
+        reason,
+    )
+}
+
 pub(crate) fn replay_history(
     store: &Store,
     app: &OpenCommerceDeveloperApp,

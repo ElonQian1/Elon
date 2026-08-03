@@ -97,6 +97,9 @@ export interface DeveloperWebhookDelivery {
   last_manual_retry_at?: string
   history_replay_requested_at?: string
   delivered_at?: string
+  dead_letter_acknowledged_at?: string
+  dead_letter_acknowledged_by_user_id?: string
+  dead_letter_acknowledgement_reason?: string
 }
 
 export interface DeveloperAppManifestReviewQueue {
@@ -138,7 +141,8 @@ export interface DeveloperWebhookEnvironmentHealth {
   pending_delivery_count: number
   retry_delivery_count: number
   delivering_delivery_count: number
-  dead_delivery_count: number
+  unresolved_dead_delivery_count: number
+  acknowledged_dead_delivery_count: number
   oldest_queued_at?: string
   latest_delivery_at?: string
   latest_error_code?: string
