@@ -176,6 +176,32 @@ export interface DesignStylePatch {
   unit?: string | null
 }
 
+export type DraftOperation =
+  | { type: 'SET_STYLE'; property: string; before?: string | null; after: string; state?: string | null; breakpoint?: string | null }
+  | { type: 'SET_TEXT'; before?: string | null; after: string }
+  | { type: 'REPLACE_ASSET'; beforeAsset?: string | null; afterAsset: string; alt?: string | null }
+  | { type: 'SET_VARIANT'; name: string; value: string }
+  | { type: 'INSERT_NODE'; nodeKind: string; position: 'before' | 'after' | 'first-child' | 'last-child'; referenceSelector?: string | null }
+  | { type: 'REMOVE_NODE' }
+  | { type: 'MOVE_NODE'; position: 'before' | 'after' | 'first-child' | 'last-child'; referenceSelector?: string | null }
+  | { type: 'SET_RESPONSIVE_STYLE'; property: string; after: string; minWidth?: number | null; maxWidth?: number | null }
+
+export interface DraftOperationCapability {
+  operationIndex: number
+  operationType: DraftOperation['type']
+  platform: DesignPlatform
+  status: 'LIVE_PREVIEW' | 'SOURCE_HANDOFF' | 'UNSUPPORTED'
+  adapter: string
+  reason: string
+}
+
+export interface DraftOperationCapabilities {
+  schema: 'elon.ui-design-operation-capabilities.v1'
+  livePreviewSupported: boolean
+  requiresSourceWriteback: boolean
+  entries: DraftOperationCapability[]
+}
+
 export interface DesignSourceBinding {
   status: 'BOUND' | 'CANDIDATE' | 'NEEDS_AI'
   sourceFile: string
@@ -188,7 +214,7 @@ export interface DesignSourceBinding {
 }
 
 export interface DesignDraft {
-  schemaVersion: 1
+  schemaVersion: 1 | 2
   draftId: string
   designSessionId: string
   platform: DesignPlatform
@@ -196,6 +222,8 @@ export interface DesignDraft {
   selector: string
   scope: 'instance' | 'component' | 'route' | 'project'
   patches: DesignStylePatch[]
+  operations: DraftOperation[]
+  operationCapabilities: DraftOperationCapabilities
   sourceBinding?: DesignSourceBinding | null
   targetPlatforms: DesignPlatform[]
   revision: number
@@ -215,10 +243,55 @@ export interface DesignDraftSummary {
   scope: DesignDraft['scope']
   revision: number
   status: string
+  operationCount?: number
   targetPlatforms: DesignPlatform[]
   sourceBindingStatus?: DesignSourceBinding['status'] | null
   writebackReceiptId?: string | null
   updatedAt: string
+}
+
+export interface DesignTaskBinding {
+  schemaVersion: 1
+  taskId: string
+  designSessionId: string
+  draftId?: string | null
+  leaseId: string
+  status: 'ACTIVE' | 'SETTLED'
+  succeeded?: boolean | null
+  acquiredAt: string
+  expiresAt: string
+  updatedAt: string
+}
+
+export interface DesignTaskBindingResult {
+  schema: 'elon.ui-design-task-binding.v1'
+  action?: 'BOUND' | 'RENEWED' | 'SETTLED' | 'UNCHANGED'
+  binding?: DesignTaskBinding | null
+}
+
+export interface DesignEvent {
+  schemaVersion: 1
+  cursor: string
+  eventId: string
+  eventType: string
+  tool: string
+  taskId?: string | null
+  designSessionId?: string | null
+  draftId?: string | null
+  platform?: DesignPlatform | null
+  route?: string | null
+  revision?: number | null
+  createdAt: string
+  payload: Record<string, unknown>
+}
+
+export interface DesignEventPage {
+  schema: 'elon.ui-design-events.v1'
+  events: DesignEvent[]
+  cursor: string
+  hasMore: boolean
+  waited: boolean
+  contentEmbedded: false
 }
 
 export interface DesignWritebackReceipt {

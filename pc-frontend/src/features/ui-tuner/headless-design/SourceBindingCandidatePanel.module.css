@@ -1,0 +1,74 @@
+.panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 32%) minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid #222328;
+  background: #0d0e11;
+}
+
+.list {
+  display: flex;
+  max-height: 154px;
+  flex-direction: column;
+  gap: 4px;
+  overflow: auto;
+}
+
+.list button {
+  min-height: 34px;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.list button[aria-selected='true'] {
+  border-color: #5f78b8;
+  background: #1b2234;
+}
+
+.list strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list span {
+  color: #858a99;
+}
+
+.review {
+  min-width: 0;
+}
+
+.metadata,
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metadata span,
+.actions small {
+  min-width: 0;
+  overflow: hidden;
+  color: #777c89;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review pre {
+  max-height: 72px;
+  margin: 6px 0;
+  padding: 6px;
+  overflow: auto;
+  border: 1px solid #292b31;
+  border-radius: 5px;
+  background: #111216;
+  color: #b9bdc8;
+  font: 10px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: pre-wrap;
+}
+
+.actions small {
+  flex: 1;
+}

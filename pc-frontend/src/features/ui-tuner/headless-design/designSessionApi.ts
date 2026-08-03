@@ -14,6 +14,8 @@ import type {
   DesignSurface,
   DesignSourceBindingCandidates,
   DesignTargetListResult,
+  DesignTaskBindingResult,
+  DesignEventPage,
   DesignViewport,
   DesignWritebackReceipt,
   DesignVerificationMatrix,
@@ -192,7 +194,7 @@ export async function loadTauriNativePixel(projectRoot: string, designSessionId:
 }
 
 export async function listDesignDrafts(projectRoot: string, designSessionId?: string) {
-  return call<{ schemaVersion: 1; drafts: DesignDraftSummary[]; contentEmbedded: false }>(
+  return call<{ schemaVersion: 1 | 2; drafts: DesignDraftSummary[]; contentEmbedded: false }>(
     '/api/android-live/design/drafts/list',
     { projectRoot, designSessionId: designSessionId || undefined },
   )
@@ -204,6 +206,7 @@ export async function createDesignDraft(input: {
   selector: string
   scope?: DesignDraft['scope']
   patches: DesignDraft['patches']
+  operations?: DesignDraft['operations']
   targetPlatforms: DesignPlatform[]
 }) {
   return call<{ draft: DesignDraft; next: string }>('/api/android-live/design/drafts', input)
@@ -221,6 +224,7 @@ export async function updateDesignDraft(input: {
   draftId: string
   expectedRevision: number
   patches?: DesignDraft['patches']
+  operations?: DesignDraft['operations']
   sourceBinding?: DesignDraft['sourceBinding']
   targetPlatforms?: DesignPlatform[]
 }) {
@@ -281,4 +285,58 @@ export function suggestDesignSourceBinding(projectRoot: string, draftId: string,
     { projectRoot, limit },
     30_000,
   )
+}
+
+export function bindDesignTask(input: {
+  projectRoot: string
+  taskId: string
+  designSessionId: string
+  draftId?: string
+  expectedLeaseId?: string
+  leaseSeconds?: number
+}) {
+  const { taskId, ...body } = input
+  return call<DesignTaskBindingResult>(
+    `/api/android-live/design/tasks/${encodeURIComponent(taskId)}/bind`, body,
+  )
+}
+
+export function getDesignTaskBinding(projectRoot: string, taskId: string) {
+  return call<DesignTaskBindingResult>(
+    `/api/android-live/design/tasks/${encodeURIComponent(taskId)}/binding`, { projectRoot },
+  )
+}
+
+export function renewDesignTaskBinding(input: {
+  projectRoot: string
+  taskId: string
+  leaseId: string
+  leaseSeconds?: number
+}) {
+  const { taskId, ...body } = input
+  return call<DesignTaskBindingResult>(
+    `/api/android-live/design/tasks/${encodeURIComponent(taskId)}/renew`, body,
+  )
+}
+
+export function settleDesignTaskBinding(input: {
+  projectRoot: string
+  taskId: string
+  leaseId: string
+  succeeded?: boolean
+}) {
+  const { taskId, ...body } = input
+  return call<DesignTaskBindingResult>(
+    `/api/android-live/design/tasks/${encodeURIComponent(taskId)}/settle`, body,
+  )
+}
+
+export function listDesignEvents(input: {
+  projectRoot: string
+  taskId?: string
+  afterCursor?: string
+  limit?: number
+  waitMs?: number
+}) {
+  return call<DesignEventPage>('/api/android-live/design/events', input, Math.max(30_000, (input.waitMs ?? 0) + 5_000))
 }

@@ -15,8 +15,10 @@ import type {
   DesignCapabilities,
   DesignDraft,
   DesignDraftPreviewResult,
+  DesignEvent,
   DesignPlatform,
   DesignSourceBindingCandidate,
+  DesignTaskBinding,
   DesignWritebackReceipt,
   DesignVerificationMatrix,
   SemanticUiNode,
@@ -198,6 +200,10 @@ export interface UiTunerCodexContextPack {
     sourceBindingCandidates?: DesignSourceBindingCandidate[]
     liveFollow?: {
       active: boolean
+      taskId?: string
+      binding?: DesignTaskBinding
+      cursor?: string
+      latestEvents?: DesignEvent[]
       lastSyncedAt?: string
       error?: string
     }

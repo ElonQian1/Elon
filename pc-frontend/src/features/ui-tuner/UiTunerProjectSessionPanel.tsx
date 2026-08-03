@@ -49,7 +49,13 @@ interface UiTunerProjectSessionPanelProps {
   headless?: boolean
   conversationLayout?: 'drawer' | 'panel'
   defaultConversationOpen?: boolean
-  onTaskActivityChange?: (running: boolean, succeeded?: boolean) => void
+  onTaskActivityChange?: (activity: UiTunerTaskActivity) => Promise<void> | void
+}
+
+export interface UiTunerTaskActivity {
+  running: boolean
+  taskId: string
+  succeeded?: boolean
 }
 
 const CODEX_ROUTE: RuntimeRoute = 'route_a'
@@ -299,6 +305,7 @@ export function UiTunerProjectSessionPanel({
     }
     setStatus(mode === 'fork' ? '正在从最新稳定检查点分叉…' : '正在发送到持续项目会话…')
     let taskActivityStarted = false
+    let activityTaskId = ''
     try {
       const taskIntent = overrideIntent?.trim() || intent.trim() || '继续优化微调画布和 APK UI 标准闭环。'
       const activePack = options?.contextPack ?? pack
@@ -356,6 +363,7 @@ export function UiTunerProjectSessionPanel({
         },
       )
       const taskId = clean(response?.task_id ?? response?.message?.task_id ?? response?.message?.taskId)
+      activityTaskId = taskId
       setActiveSessionId(session.id)
       setWorkspaceState((previous) => previous ? {
         ...previous,
@@ -378,7 +386,7 @@ export function UiTunerProjectSessionPanel({
       } else {
         setConversationOpen(true)
         setVerificationTaskId(taskId)
-        onTaskActivityChange?.(true)
+        void onTaskActivityChange?.({ running: true, taskId })
         taskActivityStarted = true
         await onMutationTaskStarted(activePack)
         setStatus('已进入持续项目 Codex CLI 会话')
@@ -386,7 +394,9 @@ export function UiTunerProjectSessionPanel({
       window.setTimeout(() => { void refreshWorkspace(false) }, 600)
       return { ...session, taskId, status: 'running' }
     } catch (error) {
-      if (taskActivityStarted) onTaskActivityChange?.(false, false)
+      if (taskActivityStarted && activityTaskId) {
+        void onTaskActivityChange?.({ running: false, taskId: activityTaskId, succeeded: false })
+      }
       setStatus((error as { message?: string }).message ?? '项目 Codex 会话启动失败')
       return null
     }
@@ -483,8 +493,11 @@ export function UiTunerProjectSessionPanel({
           setFitRunTask(null)
           return
         }
+        const settledTaskId = verificationTaskId
         setVerificationTaskId('')
-        onTaskActivityChange?.(false, succeeded)
+        if (settledTaskId) {
+          void onTaskActivityChange?.({ running: false, taskId: settledTaskId, succeeded })
+        }
         if (succeeded) onTaskSettled()
       }}
     />

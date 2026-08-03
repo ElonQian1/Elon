@@ -1,6 +1,7 @@
 import { Activity, CornerDownLeft, MousePointerClick, RefreshCw, Square, TextCursorInput } from 'lucide-react'
 import type { DesignPlatform, SemanticUiNode } from './types'
 import type { DesignRuntimeControlsModel } from './useDesignRuntimeControls'
+import { SourceBindingCandidatePanel } from './SourceBindingCandidatePanel'
 import styles from './DesignRuntimeControls.module.css'
 
 interface Props {
@@ -15,10 +16,6 @@ export function DesignRuntimeControls({ platform, selectedNode, disabled, model 
   const browserReady = model.browserResult?.runtime?.status === 'READY'
     && !['STOPPED', 'NOT_RUNNING', 'STOP_INCOMPLETE'].includes(model.browserResult.status)
   const busy = disabled || Boolean(model.busyAction)
-  const candidate = model.bindingCandidates[0]
-  const candidateAdopted = Boolean(candidate
-    && model.draft?.sourceBinding?.status === 'CANDIDATE'
-    && model.draft.sourceBinding.sourceFile === candidate.file)
   return (
     <section className={styles.controls} aria-label="后台设计 Runtime 控制">
       <div className={styles.capability}>
@@ -65,17 +62,17 @@ export function DesignRuntimeControls({ platform, selectedNode, disabled, model 
         <button type="button" disabled={!runtimeAvailable || !model.draft || busy} onClick={() => void model.previewDraft()}>预览草稿</button>
         <button type="button" disabled={!runtimeAvailable || !model.draft || busy} onClick={() => void model.restoreDraft()}>恢复画面</button>
         <button type="button" disabled={!runtimeAvailable || !model.draft || busy} onClick={() => void model.suggestBinding()}>查找源码</button>
-        {candidate && (
-          <>
-            <code title={candidate.excerpt}>{candidate.file}:{candidate.line} · {candidate.score}</code>
-            <button type="button" disabled={candidateAdopted || busy} onClick={() => void model.applyBinding(candidate, false)}>采用候选</button>
-            <button type="button" disabled={!candidateAdopted || busy} onClick={() => void model.applyBinding(candidate, true)}>确认绑定</button>
-          </>
-        )}
         <small>{model.draftPreview
           ? `${model.draftPreview.action === 'PREVIEW' ? '正在显示临时预览' : '已恢复'} · 未修改源码`
           : '候选必须先采用，再显式确认 BOUND'}</small>
       </div>
+
+      <SourceBindingCandidatePanel
+        candidates={model.bindingCandidates}
+        draft={model.draft}
+        busy={busy}
+        onApply={model.applyBinding}
+      />
 
       <div className={styles.matrixRow}>
         {platform === 'tauri' && <button type="button" disabled={!runtimeAvailable || busy} onClick={() => void model.captureBehavior()}>采集菜单 / 对话框 / command trace</button>}

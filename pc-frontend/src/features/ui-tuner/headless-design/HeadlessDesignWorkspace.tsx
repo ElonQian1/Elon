@@ -20,7 +20,7 @@ import { buildHeadlessDesignContext } from './headlessDesignContext'
 import { DesignRuntimeControls } from './DesignRuntimeControls'
 import type { DesignPlatform, SemanticUiNode } from './types'
 import { useHeadlessDesignSession } from './useHeadlessDesignSession'
-import { useHeadlessDesignLiveSync } from './useHeadlessDesignLiveSync'
+import { useDesignTaskEventSync } from './useDesignTaskEventSync'
 import { useDesignRuntimeControls } from './useDesignRuntimeControls'
 import styles from './HeadlessDesignWorkspace.module.css'
 
@@ -43,8 +43,13 @@ const PLATFORM_OPTIONS: Array<{
 
 export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChange }: Props) {
   const model = useHeadlessDesignSession(active, initialProjectRoot)
-  const [aiWorking, setAiWorking] = useState(false)
-  const liveSync = useHeadlessDesignLiveSync(active && aiWorking, model.reload)
+  const taskFollow = useDesignTaskEventSync({
+    active,
+    projectRoot: initialProjectRoot,
+    designSessionId: model.session?.designSessionId,
+    draftId: model.designDraft?.draftId,
+    reload: model.reload,
+  })
   const runtimeControls = useDesignRuntimeControls({
     active,
     projectRoot: initialProjectRoot,
@@ -67,8 +72,8 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
     verificationMatrix: runtimeControls.verificationMatrix,
     draftPreview: runtimeControls.draftPreview,
     sourceBindingCandidates: runtimeControls.bindingCandidates,
-    liveFollow: liveSync,
-  }), [initialProjectRoot, liveSync, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt, runtimeControls.bindingCandidates, runtimeControls.browserResult?.runtime, runtimeControls.capabilities, runtimeControls.draftPreview, runtimeControls.tauriBehavior, runtimeControls.verificationMatrix])
+    liveFollow: taskFollow,
+  }), [initialProjectRoot, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt, runtimeControls.bindingCandidates, runtimeControls.browserResult?.runtime, runtimeControls.capabilities, runtimeControls.draftPreview, runtimeControls.tauriBehavior, runtimeControls.verificationMatrix, taskFollow])
   const intent = useMemo(() => [
     `修改 ${model.platform.toUpperCase()} 端 ${model.route || '/'} 页面。`,
     model.selectedNode
@@ -175,7 +180,7 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           mode="headless"
           onModeChange={onModeChange}
           status={model.target
-            ? `${model.target.label} · ${model.target.evidenceLevel}${model.target.nativeHostVerified ? ' · 原生宿主已验证' : ''}${aiWorking ? ' · AI 工作中，画布自动跟随' : ''}`
+            ? `${model.target.label} · ${model.target.evidenceLevel}${model.target.nativeHostVerified ? ' · 原生宿主已验证' : ''}${taskFollow.active ? ` · 跟随任务 ${taskFollow.taskId}` : ''}`
             : '选择项目中已发现的设计目标'}
         />
         <div className={styles.routeBar}>
@@ -301,7 +306,7 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
         </div>
 
         <footer className={styles.statusBar}>
-          <span className={model.error || liveSync.error ? styles.error : ''}>{model.error || liveSync.error || (aiWorking ? 'AI 工作中 · 正在自动跟随最新 designSession' : model.status) || '等待后台设计会话'}</span>
+          <span className={model.error || taskFollow.error ? styles.error : ''}>{model.error || taskFollow.error || (taskFollow.active ? `AI 工作中 · 跟随任务 ${taskFollow.taskId}` : model.status) || '等待后台设计会话'}</span>
           <span>{model.session?.designSessionId ?? '尚未打开 designSession'}</span>
           {model.surface?.pixels?.sha256 && <code>PNG {model.surface.pixels.sha256.slice(0, 12)}</code>}
           {model.surface?.uiTree?.sha256 && <code>UI {model.surface.uiTree.sha256.slice(0, 12)}</code>}
@@ -317,7 +322,7 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           defaultConversationOpen
           onMutationTaskStarted={() => undefined}
           onTaskSettled={() => { void model.reload() }}
-          onTaskActivityChange={(running) => setAiWorking(running)}
+          onTaskActivityChange={taskFollow.onTaskActivityChange}
         />
       </aside>
     </div>

@@ -122,7 +122,7 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     return next
   }, [clearNativePixel, clearPixel, installNativePixel, installPixel, projectRoot, refreshDrafts])
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (preferredDesignSessionId?: string) => {
     if (!projectRoot) return
     setBusy(true)
     setError('')
@@ -133,7 +133,9 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
       ])
       setTargets(targetResult.targets)
       setSessions(sessionResult.sessions)
-      const preferred = sessionResult.sessions[0]
+      const preferred = sessionResult.sessions.find((item) => (
+        item.designSessionId === preferredDesignSessionId
+      )) ?? sessionResult.sessions[0]
       const preferredPlatform = preferred?.platform
         ?? targetResult.targets[0]?.platform
       if (preferredPlatform) {
@@ -342,18 +344,26 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     try {
       const style = selectedNode.style as Record<string, string | undefined>
       const nextPatch = { property: cleanProperty, before: style[cleanProperty], after: cleanAfter }
+      const nextOperation = { type: 'SET_STYLE' as const, property: cleanProperty, before: style[cleanProperty], after: cleanAfter }
       const result = designDraft && designDraft.selector === selectedNode.selector
         ? await updateDesignDraft({
             projectRoot,
             draftId: designDraft.draftId,
             expectedRevision: designDraft.revision,
             patches: [...designDraft.patches.filter((patch) => patch.property !== cleanProperty), nextPatch],
+            operations: [
+              ...(designDraft.operations ?? []).filter((operation) => (
+                operation.type !== 'SET_STYLE' || operation.property !== cleanProperty
+              )),
+              nextOperation,
+            ],
           })
         : await createDesignDraft({
             projectRoot,
             designSessionId: session.designSessionId,
             selector: selectedNode.selector,
             patches: [nextPatch],
+            operations: [nextOperation],
             targetPlatforms: [platform],
           })
       setDesignDraft(result.draft)

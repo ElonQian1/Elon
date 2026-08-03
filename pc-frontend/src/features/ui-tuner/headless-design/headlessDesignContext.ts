@@ -4,11 +4,13 @@ import type {
   DesignSessionIdentity,
   DesignDraft,
   DesignDraftPreviewResult,
+  DesignEvent,
   DesignBrowserRuntime,
   DesignCapabilities,
   DesignSurface,
   DesignSourceBindingCandidate,
   DesignTarget,
+  DesignTaskBinding,
   DesignWritebackReceipt,
   DesignVerificationMatrix,
   SemanticUiNode,
@@ -29,7 +31,15 @@ export function buildHeadlessDesignContext(input: {
   verificationMatrix: DesignVerificationMatrix | null
   draftPreview: DesignDraftPreviewResult | null
   sourceBindingCandidates: DesignSourceBindingCandidate[]
-  liveFollow: { active: boolean; lastSyncedAt: string; error: string }
+  liveFollow: {
+    active: boolean
+    taskId: string
+    binding: DesignTaskBinding | null
+    cursor: string
+    latestEvents: DesignEvent[]
+    lastSyncedAt: string
+    error: string
+  }
 }): UiTunerCodexContextPack {
   const { projectRoot, target, session, surface, selectedNode, designDraft, writebackReceipt,
     capabilities, browserRuntime, tauriBehavior, verificationMatrix,
@@ -114,6 +124,7 @@ export function buildHeadlessDesignContext(input: {
         '不要读取整仓库或把 PNG/Base64 塞进上下文',
       ],
       acceptance: [
+        'AI 任务通过 taskId lease 绑定 designSession，并用 cursor 增量发布设计事件',
         '通过 designSessionId 读取当前语义 UI 树和截图哈希',
         '为选中 selector 建立可审查的源码绑定并修改源码',
         '重新捕获同一 platform/route 并给出新的 UI tree 与 PNG 哈希',
@@ -142,6 +153,10 @@ export function buildHeadlessDesignContext(input: {
       sourceBindingCandidates: sourceBindingCandidates.slice(0, 8),
       liveFollow: {
         active: liveFollow.active,
+        taskId: liveFollow.taskId || undefined,
+        binding: liveFollow.binding ?? undefined,
+        cursor: liveFollow.cursor || undefined,
+        latestEvents: liveFollow.latestEvents.slice(-8),
         lastSyncedAt: liveFollow.lastSyncedAt || undefined,
         error: liveFollow.error || undefined,
       },
