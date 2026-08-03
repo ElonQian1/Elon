@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::{anyhow, bail, Result};
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
 
@@ -75,16 +75,47 @@ impl Store {
         if claim.revision != input.expected_revision {
             bail!("容量 Claim revision 已变化，拒绝执行旧终态请求");
         }
-        let from_account = match claim.state {
-            ComputeCapacityClaimState::Held => ComputeCapacityAccount::Held,
-            ComputeCapacityClaimState::Active => ComputeCapacityAccount::Active,
-            _ => bail!("容量 Claim 当前状态不能释放或到期"),
-        };
-        enforce_expiry_boundary(&input, claim.expires_at.as_deref())?;
+        if claim.state != ComputeCapacityClaimState::Held {
+            bail!("只有 held 容量 Claim 可以释放或到期；active 必须走 Attempt 归还路径");
+        }
+        let from_account = ComputeCapacityAccount::Held;
+        let recorded_at = now();
+        let occurred_at = parse_utc("容量 Claim 终态发生时间", input.occurred_at.trim())?;
+        let recorded_at_utc = parse_utc("容量 Claim 终态记录时间", &recorded_at)?;
+        if occurred_at > recorded_at_utc {
+            bail!("容量 Claim 终态发生时间不能晚于当前记录时间");
+        }
+        let occurred_at_value = occurred_at.with_timezone(&Utc).to_rfc3339();
+        enforce_expiry_boundary(
+            input.action,
+            claim.expires_at.as_deref(),
+            input.occurred_at.trim(),
+            &recorded_at,
+        )?;
 
         let mut balances = BTreeMap::new();
         let mut movements = Vec::with_capacity(claim.lines.len());
         for line in &claim.lines {
+            let held_units =
+                claim_account_net_units_on(&tx, &claim.claim_id, &line.bucket.bucket_id, "held")?;
+            if held_units != i128::from(line.quantity_units) {
+                bail!(
+                    "容量 Claim {} 在 bucket {} 的 held 归属为 {}，与 Claim 数量 {} 不一致",
+                    claim.claim_id,
+                    line.bucket.bucket_id,
+                    held_units,
+                    line.quantity_units
+                );
+            }
+            let active_units =
+                claim_account_net_units_on(&tx, &claim.claim_id, &line.bucket.bucket_id, "active")?;
+            if active_units != 0 {
+                bail!(
+                    "容量 Claim {} 在 bucket {} 仍拥有 active 容量，必须走 Attempt 归还路径",
+                    claim.claim_id,
+                    line.bucket.bucket_id
+                );
+            }
             let stored = stored_bucket_on(&tx, &line.bucket.bucket_id)?
                 .ok_or_else(|| anyhow!("容量 Claim 引用的 bucket 不存在"))?;
             if stored.balance.binding != line.bucket {
@@ -104,7 +135,6 @@ impl Store {
             latest_claim_transaction_id_on(&tx, &claim.claim_id)?
                 .ok_or_else(|| anyhow!("容量 Claim 缺少前序账本事务"))?,
         );
-        let recorded_at = now();
         let (event_kind, next_state, claim_effect) = terminal_parts(input.action);
         let mut ledger_transaction = ComputeCapacityLedgerTransaction {
             schema: COMPUTE_CAPACITY_TRANSACTION_SCHEMA.to_string(),
@@ -133,7 +163,7 @@ impl Store {
             subject_id: claim.subject_id.clone(),
             causal_transaction_id,
             movements,
-            occurred_at: input.occurred_at.trim().to_string(),
+            occurred_at: occurred_at_value,
             recorded_at: recorded_at.clone(),
         };
         finalize_transaction_digest(&mut ledger_transaction)?;
@@ -272,6 +302,32 @@ fn latest_claim_transaction_id_on(conn: &Connection, claim_id: &str) -> Result<O
     .map_err(Into::into)
 }
 
+fn claim_account_net_units_on(
+    conn: &Connection,
+    claim_id: &str,
+    bucket_id: &str,
+    account: &str,
+) -> Result<i128> {
+    let mut statement = conn.prepare(
+        "SELECT l.delta_units
+           FROM compute_capacity_ledger_legs l
+           JOIN compute_capacity_ledger_transactions t
+             ON t.transaction_id=l.transaction_id
+          WHERE t.claim_id=?1 AND l.bucket_id=?2 AND l.account=?3
+          ORDER BY t.ledger_sequence, l.line_no, l.leg_role",
+    )?;
+    let deltas = statement.query_map(params![claim_id, bucket_id, account], |row| {
+        row.get::<_, i64>(0)
+    })?;
+    let mut total = 0_i128;
+    for delta in deltas {
+        total = total
+            .checked_add(i128::from(delta?))
+            .ok_or_else(|| anyhow!("容量 Claim 归属余额溢出"))?;
+    }
+    Ok(total)
+}
+
 fn validate_finish_input(input: &FinishComputeCapacityClaim) -> Result<()> {
     for (label, value) in [
         ("容量 Claim ID", input.claim_id.as_str()),
@@ -292,17 +348,23 @@ fn validate_finish_input(input: &FinishComputeCapacityClaim) -> Result<()> {
 }
 
 fn enforce_expiry_boundary(
-    input: &FinishComputeCapacityClaim,
+    action: ComputeCapacityClaimTerminalAction,
     expires_at: Option<&str>,
+    occurred_at: &str,
+    recorded_at: &str,
 ) -> Result<()> {
-    if input.action != ComputeCapacityClaimTerminalAction::Expire {
+    if action != ComputeCapacityClaimTerminalAction::Expire {
         return Ok(());
     }
     let expires_at = expires_at.ok_or_else(|| anyhow!("无到期时间的容量 Claim 不能自动过期"))?;
-    let occurred_at = parse_utc("容量 Claim 到期发生时间", input.occurred_at.trim())?;
+    let occurred_at = parse_utc("容量 Claim 到期发生时间", occurred_at)?;
+    let recorded_at = parse_utc("容量 Claim 到期记录时间", recorded_at)?;
     let expires_at = parse_utc("容量 Claim 到期边界", expires_at)?;
-    if occurred_at < expires_at {
+    if recorded_at < expires_at {
         bail!("容量 Claim 尚未到期");
+    }
+    if occurred_at < expires_at {
+        bail!("容量 Claim 到期事件的发生时间不能早于到期边界");
     }
     Ok(())
 }

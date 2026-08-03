@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{anyhow, bail, Result};
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
 
@@ -88,11 +88,31 @@ impl Store {
             ComputeCapacityPoolOperation::HoldClaim,
         )?;
 
+        let recorded_at = now();
+        let recorded_at_utc = parse_utc("容量 Claim 记录时间", &recorded_at)?;
+        let occurred_at = parse_utc("容量 Claim 发生时间", input.occurred_at.trim())?;
+        let expires_at = parse_utc(
+            "容量 Claim 到期时间",
+            input
+                .expires_at
+                .as_deref()
+                .ok_or_else(|| anyhow!("容量 Claim 必须设置到期时间"))?
+                .trim(),
+        )?;
+        if occurred_at > recorded_at_utc {
+            bail!("容量 Claim 发生时间不能晚于当前记录时间");
+        }
+        if expires_at <= recorded_at_utc {
+            bail!("容量 Claim 到期时间必须晚于当前记录时间");
+        }
+        let occurred_at_value = occurred_at.with_timezone(&Utc).to_rfc3339();
+        let expires_at_value = expires_at.with_timezone(&Utc).to_rfc3339();
         let mut balances = BTreeMap::new();
         let mut claim_lines = Vec::with_capacity(input.lines.len());
         let mut movements = Vec::with_capacity(input.lines.len());
         let mut bucket_ids = BTreeSet::new();
         let mut meters = BTreeSet::new();
+        let mut window_bounds: Option<(String, String)> = None;
         for (line_no, input_line) in input.lines.iter().enumerate() {
             if !bucket_ids.insert(input_line.bucket_id.trim()) {
                 bail!("同一容量 Claim 不能重复 bucket");
@@ -104,6 +124,23 @@ impl Store {
             {
                 bail!("容量 Claim bucket 不属于目标容量池与交付窗口");
             }
+            let window_starts_at = parse_utc("容量 bucket 窗口开始时间", &stored.starts_at)?;
+            let window_ends_at = parse_utc("容量 bucket 窗口结束时间", &stored.ends_at)?;
+            if window_starts_at >= window_ends_at {
+                bail!("容量 bucket 交付窗口边界无效");
+            }
+            if occurred_at >= window_ends_at || recorded_at_utc >= window_ends_at {
+                bail!("已结束的交付窗口不能创建容量 Claim");
+            }
+            if expires_at > window_ends_at {
+                bail!("容量 Claim 到期时间不能晚于交付窗口结束时间");
+            }
+            if window_bounds.as_ref().is_some_and(|(starts_at, ends_at)| {
+                starts_at != &stored.starts_at || ends_at != &stored.ends_at
+            }) {
+                bail!("同一容量 Claim 的 bucket 必须共享精确交付窗口边界");
+            }
+            window_bounds = Some((stored.starts_at.clone(), stored.ends_at.clone()));
             if !meters.insert(stored.balance.binding.meter.as_str()) {
                 bail!("同一容量 Claim 不能重复 meter");
             }
@@ -123,7 +160,6 @@ impl Store {
             balances.insert(stored.balance.binding.bucket_id.clone(), stored.balance);
         }
 
-        let recorded_at = now();
         let mut claim = ComputeCapacityClaim {
             schema: COMPUTE_CAPACITY_CLAIM_SCHEMA.to_string(),
             claim_id: new_id("capacity_claim"),
@@ -142,11 +178,7 @@ impl Store {
             lines: claim_lines,
             created_at: recorded_at.clone(),
             updated_at: recorded_at.clone(),
-            expires_at: input
-                .expires_at
-                .as_deref()
-                .map(str::trim)
-                .map(ToOwned::to_owned),
+            expires_at: Some(expires_at_value),
             terminal_at: None,
         };
         finalize_claim_digest(&mut claim)?;
@@ -179,7 +211,7 @@ impl Store {
             subject_id: claim.subject_id.clone(),
             causal_transaction_id: None,
             movements,
-            occurred_at: input.occurred_at.trim().to_string(),
+            occurred_at: occurred_at_value,
             recorded_at,
         };
         finalize_transaction_digest(&mut ledger_transaction)?;
@@ -367,8 +399,8 @@ fn validate_hold_input(input: &HoldComputeCapacityClaim) -> Result<()> {
     ) {
         bail!("只有报价、预约或容量承诺 Claim 可以直接进入 held 状态");
     }
-    if input.lines.is_empty() {
-        bail!("容量 Claim 至少需要一个 bucket");
+    if input.lines.is_empty() || input.lines.len() > 64 {
+        bail!("容量 Claim 必须包含 1 到 64 个 bucket");
     }
     if input
         .lines
@@ -378,13 +410,15 @@ fn validate_hold_input(input: &HoldComputeCapacityClaim) -> Result<()> {
         bail!("容量 Claim bucket 和数量必须有效");
     }
     let occurred_at = parse_utc("容量 Claim 发生时间", input.occurred_at.trim())?;
-    if let Some(expires_at) = input.expires_at.as_deref() {
-        if expires_at.trim().is_empty() {
-            bail!("容量 Claim 到期时间不能为空字符串");
-        }
-        if parse_utc("容量 Claim 到期时间", expires_at.trim())? <= occurred_at {
-            bail!("容量 Claim 到期时间必须晚于发生时间");
-        }
+    let expires_at = input
+        .expires_at
+        .as_deref()
+        .ok_or_else(|| anyhow!("容量 Claim 必须设置到期时间"))?;
+    if expires_at.trim().is_empty() {
+        bail!("容量 Claim 到期时间不能为空字符串");
+    }
+    if parse_utc("容量 Claim 到期时间", expires_at.trim())? <= occurred_at {
+        bail!("容量 Claim 到期时间必须晚于发生时间");
     }
     Ok(())
 }

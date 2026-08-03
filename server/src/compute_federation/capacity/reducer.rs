@@ -245,9 +245,7 @@ fn is_allowed_transition(
         UsageConsumed => {
             meter_mode == ComputeCapacityMeterMode::Consumable && (from, to) == (Active, Consumed)
         }
-        ReservationReleased | ReservationExpired => {
-            matches!(from, Held | Active) && to == Available
-        }
+        ReservationReleased | ReservationExpired => (from, to) == (Held, Available),
     }
 }
 

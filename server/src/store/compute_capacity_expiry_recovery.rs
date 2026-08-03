@@ -1,10 +1,10 @@
 use anyhow::{anyhow, bail, Result};
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use rusqlite::params;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-use super::{ComputeCapacityClaimTerminalAction, FinishComputeCapacityClaim, Store};
+use super::{now, ComputeCapacityClaimTerminalAction, FinishComputeCapacityClaim, Store};
 
 const EXPIRY_RECOVERY_SCOPE: &str = "capacity_expiry_recovery_v1";
 const MAX_EXPIRY_RECOVERY_BATCH: i64 = 500;
@@ -36,7 +36,8 @@ impl Store {
         cutoff_at: &str,
         limit: i64,
     ) -> Result<ComputeCapacityExpiryRecoveryReport> {
-        let cutoff_at = validate_recovery_input(cutoff_at, limit)?;
+        let recovery_started_at = now();
+        let cutoff_at = validate_recovery_input(cutoff_at, limit, &recovery_started_at)?;
         let candidates = {
             let conn = self.conn()?;
             let mut statement = conn.prepare(
@@ -122,7 +123,11 @@ struct ExpiryCandidate {
     expires_at: String,
 }
 
-fn validate_recovery_input(cutoff_at: &str, limit: i64) -> Result<String> {
+fn validate_recovery_input(
+    cutoff_at: &str,
+    limit: i64,
+    recovery_started_at: &str,
+) -> Result<String> {
     if cutoff_at.trim().is_empty() {
         bail!("容量 Claim 到期恢复截止时间不能为空");
     }
@@ -134,7 +139,15 @@ fn validate_recovery_input(cutoff_at: &str, limit: i64) -> Result<String> {
     if parsed.offset().local_minus_utc() != 0 {
         bail!("容量 Claim 到期恢复截止时间必须使用 UTC 时区");
     }
-    Ok(cutoff_at.trim().to_string())
+    let recovery_started_at = DateTime::parse_from_rfc3339(recovery_started_at)
+        .map_err(|_| anyhow!("容量 Claim 到期恢复记录时间不是 RFC3339"))?;
+    if recovery_started_at.offset().local_minus_utc() != 0 {
+        bail!("容量 Claim 到期恢复记录时间必须使用 UTC 时区");
+    }
+    if parsed > recovery_started_at {
+        bail!("容量 Claim 到期恢复截止时间不能晚于当前记录时间");
+    }
+    Ok(parsed.with_timezone(&Utc).to_rfc3339())
 }
 
 fn recovery_request_digest(candidate: &ExpiryCandidate) -> Result<String> {
