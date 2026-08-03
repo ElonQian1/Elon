@@ -79,7 +79,7 @@ export default function ConsumerPortabilityReauthorization({ projectId }: { proj
     setMessage('')
     try {
       const response = await openCommerceClientApi.searchDirectoryMerchants(targetQuery)
-      setTargetMerchants(response.merchants)
+      setTargetMerchants(response.merchants.map((item) => item.merchant))
       if (response.merchants.length === 0) setMessage('未找到已发布的目标商户。')
     } catch (error) {
       setMessage(errorText(error))

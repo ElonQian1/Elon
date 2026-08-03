@@ -37,6 +37,8 @@ import type {
   DeleteConsumerPreferenceDisclosureResult,
   DeleteConsumerPreferenceProfileResult,
   DirectoryMerchantList,
+  MerchantIdentityKey,
+  MerchantIdentityKeyList,
   OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
 import type {
@@ -54,6 +56,26 @@ export const openCommerceClientApi = {
     if (query.trim()) params.set('query', query.trim())
     return api.get<DirectoryMerchantList>(`/api/open-commerce/merchants?${params.toString()}`)
   },
+
+  listMerchantIdentityKeys: (projectId: string, merchantId: string) =>
+    api.get<MerchantIdentityKeyList>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/identity-keys`,
+    ),
+
+  createMerchantIdentityKey: (
+    projectId: string,
+    merchantId: string,
+    request: { public_key_pem: string; proof_signature_base64: string },
+  ) => api.post<MerchantIdentityKey>(
+    `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/identity-keys`,
+    request,
+  ),
+
+  revokeMerchantIdentityKey: (projectId: string, merchantId: string, recordId: string) =>
+    api.post<MerchantIdentityKey>(
+      `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/identity-keys/${encodeURIComponent(recordId)}/revoke`,
+      {},
+    ),
 
   listApps: (projectId: string) =>
     api.get<DeveloperAppList>(`${projectBase(projectId)}/developer-apps`),

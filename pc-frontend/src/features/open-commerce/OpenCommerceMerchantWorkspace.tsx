@@ -4,6 +4,7 @@ import OpenCommerceMerchantEditor from './OpenCommerceMerchantEditor'
 import OpenCommerceIntegrationManager from './OpenCommerceIntegrationManager'
 import OpenCommerceRuntimeManager from './OpenCommerceRuntimeManager'
 import OpenCommerceDirectoryPublisher from './OpenCommerceDirectoryPublisher'
+import MerchantPortableIdentityPanel from './MerchantPortableIdentityPanel'
 import OpenCommerceRateLimitManager from './OpenCommerceRateLimitManager'
 import OpenCommerceAppBlockManager from './OpenCommerceAppBlockManager'
 import MerchantRelationshipInbox from './MerchantRelationshipInbox'
@@ -155,6 +156,11 @@ export default function OpenCommerceMerchantWorkspace({
                 publication={overview?.directory_publications.find((item) => item.merchant_id === selectedMerchant.merchant.id)}
                 canEdit={canEdit}
                 onChanged={refresh}
+              />
+              <MerchantPortableIdentityPanel
+                projectId={projectId}
+                merchantId={selectedMerchant.merchant.id}
+                canEdit={canEdit}
               />
               <OpenCommerceMerchantEditor projectId={projectId} merchant={selectedMerchant} grants={overview?.grants ?? []} canEdit={canEdit} onChanged={refresh} />
               <OpenCommerceRateLimitManager

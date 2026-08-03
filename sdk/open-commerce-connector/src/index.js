@@ -20,6 +20,15 @@ export {
 export { createMemoryMerchantRuntimeIdempotencyStore } from './merchant-runtime-memory-store.js'
 
 export {
+  MERCHANT_IDENTITY_ALGORITHM,
+  MERCHANT_IDENTITY_PROOF_PROTOCOL,
+  createMerchantIdentityProof,
+  merchantIdentityProofMessage,
+  merchantIdentityPublicKeyId,
+  verifyMerchantIdentityProof,
+} from './merchant-identity.js'
+
+export {
   CONSUMER_PORTABILITY_SIGNATURE_ALGORITHM,
   CONSUMER_PORTABILITY_SIGNATURE_SCHEMA,
   consumerPortabilityPublicKeyId,

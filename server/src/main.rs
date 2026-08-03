@@ -252,6 +252,10 @@ mod open_commerce_merchant_evidence_model;
 mod open_commerce_merchant_evidence_service;
 #[cfg(test)]
 mod open_commerce_merchant_evidence_tests;
+mod open_commerce_merchant_identity_api;
+mod open_commerce_merchant_identity_migration;
+mod open_commerce_merchant_identity_model;
+mod open_commerce_merchant_identity_service;
 mod open_commerce_migration;
 mod open_commerce_model;
 mod open_commerce_portability_adoption_api;

@@ -17,6 +17,32 @@ export const CONSUMER_PORTABILITY_SIGNATURE_SCHEMA: 'open_commerce.consumer_port
 export const CONSUMER_PORTABILITY_SIGNATURE_ALGORITHM: 'rsa-pkcs1v15-sha256'
 export const CONSUMER_PORTABILITY_ARCHIVE_SCHEMA: 'open_commerce.consumer_portability_encrypted_archive.v1'
 export const CONSUMER_PORTABILITY_ARCHIVE_ITERATIONS: 310000
+export const MERCHANT_IDENTITY_ALGORITHM: 'rsa-pkcs1v15-sha256'
+export const MERCHANT_IDENTITY_PROOF_PROTOCOL: 'open_commerce.merchant_identity_proof.v1'
+
+export interface MerchantIdentityProof {
+  key_id: string
+  algorithm: typeof MERCHANT_IDENTITY_ALGORITHM
+  public_key_pem: string
+  proof_signature_base64: string
+}
+
+export function merchantIdentityPublicKeyId(publicKey: string | Buffer | object): string
+export function merchantIdentityProofMessage(input: {
+  projectId: string
+  merchantId: string
+  keyId: string
+}): string
+export function createMerchantIdentityProof(input: {
+  projectId: string
+  merchantId: string
+  privateKey: string | Buffer | object
+}): MerchantIdentityProof
+export function verifyMerchantIdentityProof(input: {
+  projectId: string
+  merchantId: string
+  proof: MerchantIdentityProof
+}): boolean
 
 export interface ConsumerPortabilityEncryptedArchive {
   schema: typeof CONSUMER_PORTABILITY_ARCHIVE_SCHEMA
