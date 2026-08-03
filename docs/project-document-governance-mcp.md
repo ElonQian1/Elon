@@ -64,6 +64,10 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 相同请求使用进程内 5 分钟、最多 64 项的 LRU 缓存。clean worktree 绑定 Git HEAD；dirty worktree 只在 Git 报告的变更及未跟踪普通文件不超过 256 个、合计不超过 64 MiB，且路径、符号链接、读取和前后状态复核全部安全时，才以流式 SHA-256 内容指纹加入缓存键。超限、非普通文件、越界/符号链接、读取失败或采样期间变化均不缓存，并返回 `fingerprint_status` 与 `cache_bypass_reason`。哈希内容不会进入 MCP 响应。只有怀疑索引异常时才传 `force_refresh=true`。
 
+每个两小时短期 context MCP 会话还在自身临时目录保存最多 8 个查询范围的 `plan_id`、已投递路径和内容哈希，不保存任务文本、Markdown 或源码正文。相同计划即使调用方忘记传 `previous_plan_id` 也自动返回 `not_modified`；revision 变化时返回 `context_delta`，省略内容哈希未变的信源，并以计数和最多 4 个已移除路径报告来源集合/内容哈希漂移。该漂移是确定性字节事实，仍固定返回 `semantic_content_compared=false`。`force_refresh=true` 会忽略会话回执并完整重发。
+
+`performance_receipt.transport` 在最终 MCP tool result 组装后报告 `structured_content_bytes`、`mcp_tool_result_bytes` 和 UTF-8 字节除以 4 的估算 token；它覆盖文本兼容摘要与结构化结果的实际传输对象，但不是供应商账单 token。context/governance profile 固化在会话凭证中，修改 URL 查询参数不能把单工具会话升级为完整治理工具。
+
 `source_policy.precedence` 明确实现真源、接受方向和仅导航信源；`source_conflict_summary` 只根据元数据报告歧义、非当前、非权威和 dirty worktree 风险，并明确 `semantic_content_compared=false`，不得冒充已经比较过正文冲突。dirty 状态即使成功指纹化也必须用原生 Git/文件工具核对；指纹只允许安全复用导航计划。代理只打开结果中的少量路径、章节和 `implementation_refs`；已有精确文件/符号时不调用。Git HEAD、worktree 指纹、catalog revision 或任务范围变化后重新规划；否则复用回执。本工具减少首次宽搜和重复读取，不替代供应商自己的文件工具。
 
 整理任务携带统一的 `authorization_mode`，所有供应商使用同一语义：

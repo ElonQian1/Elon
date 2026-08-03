@@ -53,7 +53,8 @@ pub(crate) struct McpRequest {
     pub(crate) params: Value,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 enum DescriptorProfile {
     Governance,
     Context,
@@ -67,6 +68,8 @@ struct ProjectDocsMcpSession {
     project_root: String,
     #[serde(default)]
     managed_vault_id: Option<String>,
+    #[serde(default)]
+    profile: Option<DescriptorProfile>,
     created_at: u64,
     expires_at: u64,
 }
@@ -122,6 +125,7 @@ fn create_descriptor(
         ),
         project_root: root.to_string_lossy().to_string(),
         managed_vault_id,
+        profile: Some(profile),
         created_at: now,
         expires_at: now.saturating_add(SESSION_TTL_SECONDS),
     };
@@ -258,20 +262,25 @@ fn named_mcp_config(name: &str, server: Value) -> Value {
 }
 
 pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Option<Value> {
-    handle_request_for_profile(workspace, request, None).await
+    handle_request_for_profile(workspace, request, None, None).await
 }
 
 async fn handle_request_for_profile(
     workspace: &Path,
     request: McpRequest,
     profile: Option<&str>,
+    context_receipt_path: Option<&Path>,
 ) -> Option<Value> {
     let id = request.id.clone().unwrap_or(Value::Null);
     if request.method == "notifications/initialized" {
         return None;
     }
     let result = if crate::node_agent_project_context_mcp::handles(profile) {
-        crate::node_agent_project_context_mcp::handle_request(workspace, &request)
+        crate::node_agent_project_context_mcp::handle_request(
+            workspace,
+            &request,
+            context_receipt_path,
+        )
     } else if !matches!(profile, None | Some("governance")) {
         Err(anyhow!("未知项目文档 MCP profile"))
     } else {
@@ -331,17 +340,40 @@ async fn mcp_handler(
     Query(query): Query<McpQuery>,
     Json(request): Json<McpRequest>,
 ) -> Response {
-    let workspace = match authorize_session(&session_id, &query.token) {
-        Ok(workspace) => workspace,
+    let (workspace, session_profile) = match authorize_session_profile(&session_id, &query.token) {
+        Ok(session) => session,
         Err(error) => return json_error(StatusCode::UNAUTHORIZED, format!("{error:#}")),
     };
-    match handle_request_for_profile(&workspace, request, query.profile.as_deref()).await {
+    let requested_profile = match query.profile.as_deref() {
+        None | Some("governance") => DescriptorProfile::Governance,
+        Some("context") => DescriptorProfile::Context,
+        Some(_) => return json_error(StatusCode::BAD_REQUEST, "未知项目文档 MCP profile"),
+    };
+    if requested_profile != session_profile {
+        return json_error(StatusCode::UNAUTHORIZED, "MCP 会话不允许切换 profile");
+    }
+    let context_receipt_path = session_dir(&session_id).join("context-receipt.json");
+    match handle_request_for_profile(
+        &workspace,
+        request,
+        query.profile.as_deref(),
+        Some(&context_receipt_path),
+    )
+    .await
+    {
         Some(response) => Json(response).into_response(),
         None => StatusCode::ACCEPTED.into_response(),
     }
 }
 
 pub(crate) fn authorize_session(session_id: &str, token: &str) -> Result<PathBuf> {
+    authorize_session_profile(session_id, token).map(|(workspace, _)| workspace)
+}
+
+fn authorize_session_profile(
+    session_id: &str,
+    token: &str,
+) -> Result<(PathBuf, DescriptorProfile)> {
     if !valid_session_id(session_id) || token.trim().is_empty() {
         bail!("项目文档 MCP 会话凭证无效");
     }
@@ -354,7 +386,11 @@ pub(crate) fn authorize_session(session_id: &str, token: &str) -> Result<PathBuf
     if session.id != session_id || session.token != token || session.expires_at < unix_seconds() {
         bail!("项目文档 MCP 会话已过期或令牌无效");
     }
-    validate_project_root(&session.project_root)
+    let workspace = validate_project_root(&session.project_root)?;
+    Ok((
+        workspace,
+        session.profile.unwrap_or(DescriptorProfile::Governance),
+    ))
 }
 
 fn validate_project_root(project_root: &str) -> Result<PathBuf> {

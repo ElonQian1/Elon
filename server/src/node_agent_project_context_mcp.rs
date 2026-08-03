@@ -4,6 +4,8 @@
 //! returns a bounded, revision-aware navigation plan so normal tasks do not pay
 //! for the complete project-document governance tool catalog.
 
+mod session;
+
 use anyhow::{bail, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -14,8 +16,7 @@ use crate::{
         inspect_workspace, lookup, request_cache_key, stable_plan_id, store, WorkspaceRevision,
     },
     node_agent_project_context_projection::{
-        enforce_response_projection, not_modified_response, project_navigation_plan,
-        source_conflict_summary,
+        enforce_response_projection, project_navigation_plan, source_conflict_summary,
     },
     node_agent_project_docs_mcp::McpRequest,
     project_document_knowledge_graph_service::plan_context,
@@ -25,7 +26,7 @@ use crate::{
 pub(crate) const PROFILE: &str = "context";
 pub(crate) const TOOL_NAME: &str = "project_context_plan";
 
-const SERVER_INSTRUCTIONS: &str = "Use project_context_plan only for unfamiliar, cross-file, architecture, or current-status work. It returns bounded metadata, never source bodies. Reuse plan_receipt.plan_id as previous_plan_id; an unchanged revision then returns only a small receipt. Clean HEAD or a complete bounded dirty-content fingerprint controls cache reuse; incomplete dirty states fail closed. Open selected paths with Codex native tools before editing. Current files/tests decide implementation truth; binding current docs/ADRs decide accepted direction. Skip precise single-file tasks.";
+const SERVER_INSTRUCTIONS: &str = "Use project_context_plan only for unfamiliar, cross-file, architecture, or current-status work. It returns bounded metadata, never source bodies. The short-lived MCP session remembers delivered plan/source hashes and automatically returns a small receipt or source delta; previous_plan_id remains an explicit cross-client fallback. Clean HEAD or a complete bounded dirty-content fingerprint controls cache reuse; incomplete dirty states fail closed. Open only added or changed paths with native tools. Current files/tests decide implementation truth; binding current docs/ADRs decide accepted direction. Skip precise single-file tasks.";
 const MIN_RESPONSE_TOKENS: u64 = 800;
 const MAX_RESPONSE_TOKENS: u64 = 2_000;
 
@@ -48,16 +49,20 @@ pub(crate) fn handles(profile: Option<&str>) -> bool {
     profile == Some(PROFILE)
 }
 
-pub(crate) fn handle_request(workspace: &Path, request: &McpRequest) -> Result<Value> {
+pub(crate) fn handle_request(
+    workspace: &Path,
+    request: &McpRequest,
+    receipt_path: Option<&Path>,
+) -> Result<Value> {
     match request.method.as_str() {
         "initialize" => Ok(json!({
             "protocolVersion": "2025-03-26",
             "capabilities": { "tools": { "listChanged": false } },
-            "serverInfo": { "name": "yilong-project-context", "version": "1.2.0" },
+            "serverInfo": { "name": "yilong-project-context", "version": "1.3.0" },
             "instructions": SERVER_INSTRUCTIONS,
         })),
         "tools/list" => Ok(json!({ "tools": [definition()] })),
-        "tools/call" => call_tool(workspace, request.params.clone()),
+        "tools/call" => call_tool(workspace, request.params.clone(), receipt_path),
         "ping" => Ok(json!({})),
         _ => bail!("轻量项目上下文 MCP 不支持 method: {}", request.method),
     }
@@ -66,7 +71,7 @@ pub(crate) fn handle_request(workspace: &Path, request: &McpRequest) -> Result<V
 pub(crate) fn definition() -> Value {
     json!({
         "name": TOOL_NAME,
-        "description": "为陌生项目、跨文件、架构或当前状态任务返回严格限额的 Git/revision、权威性、图谱入口和实现引用。零正文、只读；重复调用传 previous_plan_id 可只取未变化回执。精确单文件任务不要调用。",
+        "description": "为陌生项目、跨文件、架构或当前状态任务返回严格限额的 Git/revision、权威性、图谱入口和实现引用。零正文、只读；同一短期会话自动复用 plan/source hash，只返回未变化或增量回执。精确单文件任务不要调用。",
         "inputSchema": {
             "type": "object",
             "required": ["query"],
@@ -100,7 +105,7 @@ pub(crate) fn definition() -> Value {
                 "previous_plan_id": {
                     "type": "string",
                     "maxLength": 96,
-                    "description": "复用上一响应 plan_receipt.plan_id；revision 未变时只返回小回执。"
+                    "description": "显式复用上一响应 plan_receipt.plan_id；同一 MCP 会话也会自动记忆，跨客户端恢复时可传。"
                 },
                 "force_refresh": {
                     "type": "boolean",
@@ -112,15 +117,20 @@ pub(crate) fn definition() -> Value {
     })
 }
 
-pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result<Option<Value>> {
+pub(crate) fn try_call(
+    workspace: &Path,
+    name: &str,
+    arguments: Value,
+    receipt_path: Option<&Path>,
+) -> Result<Option<Value>> {
     if name != TOOL_NAME {
         return Ok(None);
     }
     let input: ContextPlanArguments = serde_json::from_value(arguments)?;
-    Ok(Some(build_plan(workspace, input)?))
+    Ok(Some(build_plan(workspace, input, receipt_path)?))
 }
 
-fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
+fn call_tool(workspace: &Path, params: Value, receipt_path: Option<&Path>) -> Result<Value> {
     let name = params
         .get("name")
         .and_then(Value::as_str)
@@ -129,17 +139,23 @@ fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| json!({}));
-    let value = try_call(workspace, name, arguments.clone())?
+    let value = try_call(workspace, name, arguments.clone(), receipt_path)?
         .ok_or_else(|| anyhow::anyhow!("轻量项目上下文 MCP 只开放 {TOOL_NAME}"))?;
     let value = project_tool_response(name, &arguments, value)?;
-    Ok(json!({
+    let mut response = json!({
         "content": [{ "type": "text", "text": compact_text(name, &value)? }],
         "structuredContent": value,
         "isError": false,
-    }))
+    });
+    session::attach_tool_result_size(&mut response)?;
+    Ok(response)
 }
 
-fn build_plan(workspace: &Path, input: ContextPlanArguments) -> Result<Value> {
+fn build_plan(
+    workspace: &Path,
+    input: ContextPlanArguments,
+    receipt_path: Option<&Path>,
+) -> Result<Value> {
     let started = Instant::now();
     let query = input.query.trim();
     if query.is_empty() {
@@ -170,7 +186,7 @@ fn build_plan(workspace: &Path, input: ContextPlanArguments) -> Result<Value> {
     let cached = (!input.force_refresh)
         .then(|| cache_key.as_deref().and_then(lookup))
         .flatten();
-    let (mut plan, cache_status, cache_age_ms) = if let Some(hit) = cached {
+    let (plan, cache_status, cache_age_ms) = if let Some(hit) = cached {
         (hit.plan, "hit", Some(hit.age_ms))
     } else {
         let plan = build_fresh_plan(
@@ -198,40 +214,22 @@ fn build_plan(workspace: &Path, input: ContextPlanArguments) -> Result<Value> {
         };
         (plan, status, None)
     };
-    let plan_id = plan
-        .pointer("/plan_receipt/plan_id")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    if !input.force_refresh && previous_plan_id == Some(plan_id) {
-        return Ok(not_modified_response(
-            &plan,
+    session::finish(
+        plan,
+        session::DeliveryInput {
+            receipt_path,
+            query,
+            max_tokens,
+            max_documents,
+            max_response_tokens,
+            previous_plan_id,
+            force_refresh: input.force_refresh,
             cache_status,
             cache_age_ms,
-            max_response_tokens,
-            elapsed_ms(started),
-        ));
-    }
-    let estimated_full_plan_tokens = plan
-        .pointer("/plan_receipt/estimated_full_plan_tokens")
-        .and_then(Value::as_u64)
-        .unwrap_or_default();
-    plan["cache"] = json!({
-        "status": cache_status,
-        "age_ms": cache_age_ms,
-        "ttl_seconds": 300,
-        "revision_mode": revision.fingerprint_status,
-        "fingerprinted_files": revision.fingerprint_file_count,
-        "fingerprinted_bytes": revision.fingerprint_total_bytes,
-        "bypass_reason": revision.cache_bypass_reason,
-        "dirty_requires_complete_fingerprint": true,
-    });
-    plan["performance_receipt"] = json!({
-        "planning_ms": elapsed_ms(started),
-        "cache_reused": cache_status == "hit",
-        "estimated_full_plan_tokens": estimated_full_plan_tokens,
-        "estimated_tokens_avoided": 0,
-    });
-    Ok(plan)
+            planning_ms: elapsed_ms(started),
+            revision: &revision,
+        },
+    )
 }
 
 fn build_fresh_plan(
@@ -247,7 +245,7 @@ fn build_fresh_plan(
     let mut plan = project_navigation_plan(&raw);
     let catalog_revision = plan.get("catalog_revision").cloned().unwrap_or(Value::Null);
     plan["contract"] = json!({
-        "schema": "elon.project_context_plan.v3",
+        "schema": "elon.project_context_plan.v4",
         "read_only": true,
         "source_bodies_returned": 0,
         "native_search_replaced": false,
@@ -356,7 +354,7 @@ mod tests {
             "params": {}
         }))
         .unwrap();
-        let response = handle_request(Path::new("."), &request).unwrap();
+        let response = handle_request(Path::new("."), &request, None).unwrap();
         assert_eq!(response["tools"].as_array().unwrap().len(), 1);
         assert_eq!(response["tools"][0]["name"], TOOL_NAME);
     }
