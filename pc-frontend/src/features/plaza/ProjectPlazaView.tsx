@@ -1,16 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Image, Loader2, Search } from 'lucide-react'
+import { Download, Loader2, LogIn, Search, Store, UsersRound } from 'lucide-react'
 import { api } from '../../api/client'
-import avatarAsset from '../../assets/project-plaza/avatar.png'
-import cardAsset from '../../assets/project-plaza/card.png'
-import heartAsset from '../../assets/project-plaza/heart.png'
-import starAsset from '../../assets/project-plaza/star.png'
-import thumbnailAsset from '../../assets/project-plaza/thumbnail.png'
-import plazaChevronAsset from '../../../../server/src/assets/project_view_chevron.png'
-import sharedTopSearchAsset from '../../../../server/src/assets/project_view_search_icon.png'
 import { useProjectStore } from '../conversation/useProjectStore'
-import { projectPlazaCardScales } from './projectCarouselScale.mjs'
 import styles from './PlazaPage.module.css'
 
 export interface PlazaProject {
@@ -36,45 +28,82 @@ interface StoreProjectsResponse {
   has_more?: boolean
 }
 
+interface Filter {
+  key: string
+  label: string
+  params?: Record<string, string | boolean>
+  joinedOnly?: boolean
+}
+
 type JoinStatus = 'joined' | 'requested' | 'error'
 
 const PAGE_SIZE = 30
 
+const FILTERS: Filter[] = [
+  { key: 'all', label: '全部' },
+  { key: 'installable', label: '可安装', params: { has_apk: true } },
+  { key: 'no_approval', label: '无审批', params: { join_mode: 'open' } },
+  { key: 'joined', label: '已加入', joinedOnly: true },
+  { key: 'popular', label: '最热门', params: { sort: 'members' } },
+]
+
 export default function ProjectPlazaView() {
   const navigate = useNavigate()
-  const featuredRailRef = useRef<HTMLDivElement>(null)
   const [projects, setProjects] = useState<PlazaProject[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
-  const [searchOpen, setSearchOpen] = useState(false)
   const [searchQ, setSearchQ] = useState('')
   const [submittedQ, setSubmittedQ] = useState('')
+  const [activeFilter, setActiveFilter] = useState('all')
   const [joiningId, setJoiningId] = useState<string | null>(null)
   const [joinStatus, setJoinStatus] = useState<Record<string, JoinStatus>>({})
+  const [total, setTotal] = useState<number | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
-  const [reactions, setReactions] = useState<Record<string, boolean>>(() => {
-    try {
-      return JSON.parse(localStorage.getItem('project-plaza-reactions') || '{}') as Record<string, boolean>
-    } catch {
-      return {}
-    }
-  })
 
   const load = useCallback(async (options?: { append?: boolean; cursor?: string | null }) => {
     const append = options?.append ?? false
     if (append && !options?.cursor) return
+    const filter = FILTERS.find((item) => item.key === activeFilter) ?? FILTERS[0]
     setError('')
     if (append) setLoadingMore(true)
     else setLoading(true)
     try {
+      if (filter.joinedOnly) {
+        const data = await api.get<{ projects?: PlazaProject[] }>('/api/store/joined')
+        const source = data.projects ?? []
+        const keyword = submittedQ.trim().toLowerCase()
+        const filtered = keyword
+          ? source.filter((project) => {
+            const haystack = [
+              project.display_name,
+              project.name,
+              project.description,
+              project.owner_account,
+            ].filter(Boolean).join(' ').toLowerCase()
+            return haystack.includes(keyword)
+          })
+          : source
+        setProjects(filtered)
+        setTotal(filtered.length)
+        setNextCursor(null)
+        setHasMore(false)
+        return
+      }
+
       const params = new URLSearchParams({ limit: String(PAGE_SIZE), page_mode: 'cursor' })
       if (options?.cursor) params.set('cursor', options.cursor)
       if (submittedQ.trim()) params.set('q', submittedQ.trim())
+      if (filter.params) {
+        for (const [key, value] of Object.entries(filter.params)) {
+          params.set(key, String(value))
+        }
+      }
       const data = await api.get<StoreProjectsResponse>(`/api/store/projects?${params.toString()}`)
       const incoming = data.projects ?? []
       setProjects((current) => append ? mergeProjects(current, incoming) : incoming)
+      setTotal(typeof data.total === 'number' ? data.total : null)
       setNextCursor(data.next_cursor ?? null)
       setHasMore(Boolean(data.has_more && data.next_cursor))
     } catch (caught) {
@@ -83,63 +112,25 @@ export default function ProjectPlazaView() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [submittedQ])
+  }, [activeFilter, submittedQ])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  useEffect(() => {
-    const rail = featuredRailRef.current
-    if (!rail) return
-    let frame = 0
-    const cards = Array.from(rail.querySelectorAll<HTMLElement>('[data-featured-card]'))
-    const update = () => {
-      frame = 0
-      if (cards.length === 0) return
-      const first = cards[0]
-      const previewCenter = first.offsetLeft + first.offsetWidth / 2
-      const snapDistance = cards.length > 1
-        ? cards[1].offsetLeft - first.offsetLeft
-        : first.offsetWidth
-      const centers = cards.map((card) => card.offsetLeft + card.offsetWidth / 2 - rail.scrollLeft)
-      const scales = projectPlazaCardScales(centers, previewCenter, snapDistance)
-      cards.forEach((slot, index) => {
-        const visualCard = slot.firstElementChild as HTMLElement | null
-        visualCard?.style.setProperty('--featured-card-scale', scales[index].toFixed(4))
-      })
-    }
-    const scheduleUpdate = () => {
-      if (!frame) frame = window.requestAnimationFrame(update)
-    }
-    const resizeObserver = typeof ResizeObserver === 'undefined'
-      ? null
-      : new ResizeObserver(scheduleUpdate)
-    rail.addEventListener('scroll', scheduleUpdate, { passive: true })
-    resizeObserver?.observe(rail)
-    cards.forEach((card) => resizeObserver?.observe(card))
-    scheduleUpdate()
-    return () => {
-      rail.removeEventListener('scroll', scheduleUpdate)
-      resizeObserver?.disconnect()
-      if (frame) window.cancelAnimationFrame(frame)
-    }
-  }, [projects])
-
-  function toggleReaction(projectId: string, kind: 'favorite' | 'liked') {
-    const key = `${projectId}:${kind}`
-    setReactions((current) => {
-      const next = { ...current, [key]: !current[key] }
-      localStorage.setItem('project-plaza-reactions', JSON.stringify(next))
-      return next
-    })
-  }
-
   function handleSearch(event: React.FormEvent) {
     event.preventDefault()
     setNextCursor(null)
     setHasMore(false)
+    setTotal(null)
     setSubmittedQ(searchQ)
+  }
+
+  function switchFilter(key: string) {
+    setActiveFilter(key)
+    setNextCursor(null)
+    setHasMore(false)
+    setTotal(null)
   }
 
   async function openProject(project: PlazaProject) {
@@ -171,19 +162,40 @@ export default function ProjectPlazaView() {
     }
   }
 
-  async function runPrimaryAction(project: PlazaProject) {
-    const status = joinStatus[project.id]
-    if (project.viewer_role || status === 'joined' || status === 'requested') {
-      await openProject(project)
-      return
-    }
-    await handleJoin(project)
-  }
+  const canLoadMore = activeFilter !== 'joined' && hasMore
 
   return (
     <section className={styles.page} aria-label="项目广场">
       <header className={styles.toolbar}>
-        <h1 className={styles.pageTitle}>项目广场</h1>
+        <div className={styles.toolbarTitle}>
+          <Store size={18} aria-hidden="true" />
+          <div>
+            <strong>项目广场</strong>
+            <span>发现、安装或加入公开项目</span>
+          </div>
+        </div>
+        <form onSubmit={handleSearch} className={styles.searchRow}>
+          <Search size={16} aria-hidden="true" />
+          <input
+            className={styles.searchInput}
+            value={searchQ}
+            onChange={(event) => setSearchQ(event.target.value)}
+            placeholder="搜索应用、项目、作者"
+          />
+          <button className={styles.searchBtn} type="submit">搜索</button>
+        </form>
+        <div className={styles.filterRow} aria-label="项目筛选">
+          {FILTERS.map((filter) => (
+            <button
+              key={filter.key}
+              className={[styles.filterBtn, activeFilter === filter.key ? styles.filterActive : ''].join(' ')}
+              onClick={() => switchFilter(filter.key)}
+              type="button"
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
       </header>
 
       {error && <div className={styles.error}>{error}</div>}
@@ -195,109 +207,28 @@ export default function ProjectPlazaView() {
         </div>
       ) : projects.length === 0 ? (
         <div className={styles.empty}>
+          <Store size={24} aria-hidden="true" />
           <strong>没有找到符合条件的项目</strong>
-          <button type="button" onClick={() => { setSearchQ(''); setSubmittedQ('') }}>查看全部</button>
+          <span>可以换个关键词，或查看全部公开项目。</span>
         </div>
       ) : (
         <div className={styles.scrollArea}>
-          <div className={styles.sectionHeading}>
-            <h2>推荐</h2>
-            <button
-              className={styles.searchToggle}
-              type="button"
-              aria-label="搜索项目"
-              aria-expanded={searchOpen}
-              onClick={() => setSearchOpen((open) => !open)}
-            >
-              <img src={sharedTopSearchAsset} alt="" aria-hidden="true" />
-            </button>
+          <div className={styles.resultMeta}>
+            <span>{total === null ? `已显示 ${projects.length}` : `已显示 ${projects.length} / ${total || projects.length}`}</span>
           </div>
-
-          {searchOpen && (
-            <form onSubmit={handleSearch} className={styles.searchRow}>
-              <Search size={18} aria-hidden="true" />
-              <input
-                className={styles.searchInput}
-                value={searchQ}
-                onChange={(event) => setSearchQ(event.target.value)}
-                placeholder="搜索项目、作者"
-                autoFocus
-              />
-              <button className={styles.searchBtn} type="submit">搜索</button>
-            </form>
-          )}
-
-          <div className={styles.featuredRail} ref={featuredRailRef}>
-            {projects.slice(0, 5).map((project) => {
-              const title = project.display_name || project.name
-              return (
-                <div className={styles.featuredCardSlot} data-featured-card key={`featured-${project.id}`}>
-                <article className={styles.featuredCard}>
-                  <img className={styles.featuredSurface} src={cardAsset} alt="" />
-                  <div className={styles.featuredContent}>
-                    <div className={styles.featuredTop}>
-                      <img className={styles.avatar} src={avatarAsset} alt="" />
-                      <span>
-                        <button
-                          type="button"
-                          aria-label={reactions[`${project.id}:favorite`] ? '取消收藏' : '收藏'}
-                          data-active={reactions[`${project.id}:favorite`]}
-                          onClick={() => toggleReaction(project.id, 'favorite')}
-                        ><img src={starAsset} alt="" /></button>
-                        <button
-                          type="button"
-                          aria-label={reactions[`${project.id}:liked`] ? '取消点赞' : '点赞'}
-                          data-active={reactions[`${project.id}:liked`]}
-                          onClick={() => toggleReaction(project.id, 'liked')}
-                        ><img src={heartAsset} alt="" /></button>
-                      </span>
-                    </div>
-                    <strong>{title}</strong>
-                    <p>{project.description || '这个项目还没有填写简介。'}</p>
-                    <div className={styles.mediaRow}><span><Image /></span><span><Image /></span></div>
-                    <button
-                      className={styles.primaryAction}
-                      type="button"
-                      disabled={joiningId === project.id}
-                      aria-label={primaryActionLabel(project, joinStatus[project.id])}
-                      onClick={() => void runPrimaryAction(project)}
-                    >
-                      {joiningId === project.id
-                        ? <Loader2 className={styles.spinner} />
-                        : <img src={plazaChevronAsset} alt="" aria-hidden="true" />}
-                    </button>
-                  </div>
-                </article>
-                </div>
-              )
-            })}
-          </div>
-
-          <div className={styles.allHeading}><h2>全部</h2></div>
-          <div className={styles.projectList} data-testid="project-list">
+          <div className={styles.grid} data-testid="project-list">
             {projects.map((project) => (
-              <article className={styles.projectRow} data-testid="project-row" data-project-id={project.id} key={project.id}>
-                <img className={styles.thumbnail} src={thumbnailAsset} alt="" />
-                <button className={styles.projectRowMain} type="button" onClick={() => void openProject(project)}>
-                  <strong>{project.display_name || project.name}</strong>
-                  <span>{project.description || '这个项目还没有填写简介。'}</span>
-                </button>
-                <button
-                  className={styles.rowAction}
-                  type="button"
-                  disabled={joiningId === project.id}
-                  aria-label={primaryActionLabel(project, joinStatus[project.id])}
-                  onClick={() => void runPrimaryAction(project)}
-                >
-                  {joiningId === project.id
-                    ? <Loader2 className={styles.spinner} />
-                    : <img src={plazaChevronAsset} alt="" aria-hidden="true" />}
-                </button>
-              </article>
+              <ProjectCard
+                key={project.id}
+                project={project}
+                joining={joiningId === project.id}
+                joinStatus={joinStatus[project.id]}
+                onJoin={handleJoin}
+                onOpen={openProject}
+              />
             ))}
           </div>
-
-          {hasMore && (
+          {canLoadMore && (
             <div className={styles.loadMoreRow}>
               <button
                 className={styles.loadMoreBtn}
@@ -316,12 +247,106 @@ export default function ProjectPlazaView() {
   )
 }
 
-function primaryActionLabel(project: PlazaProject, status?: JoinStatus): string {
+function ProjectCard({
+  project,
+  joining,
+  joinStatus,
+  onJoin,
+  onOpen,
+}: {
+  project: PlazaProject
+  joining: boolean
+  joinStatus?: JoinStatus
+  onJoin: (project: PlazaProject) => void
+  onOpen: (project: PlazaProject) => void
+}) {
   const title = project.display_name || project.name
-  if (project.viewer_role || status === 'joined' || status === 'requested') return `进入${title}`
-  if (project.join_mode === 'approval') return `申请加入${title}`
-  if (project.join_mode === 'invite') return `查看${title}`
-  return `加入${title}`
+  const alreadyJoined = Boolean(project.viewer_role) || joinStatus === 'joined'
+  const requested = joinStatus === 'requested'
+  const isOpen = project.join_mode === 'open'
+  const isReadonly = project.join_mode === 'readonly'
+
+  return (
+    <article className={styles.card} data-testid="project-row" data-project-id={project.id}>
+      <header className={styles.cardHead}>
+        <ProjectIcon project={project} />
+        <div className={styles.cardTitle}>
+          <strong title={title}>{title}</strong>
+          <span title={project.owner_account}>@{project.owner_account}</span>
+        </div>
+        <span className={styles.statusPill} data-mode={project.latest_apk_url ? 'installable' : project.join_mode}>
+          {project.latest_apk_url ? '可安装' : joinModeLabel(project.join_mode)}
+        </span>
+      </header>
+
+      <p className={styles.cardDesc}>{project.description || '这个项目还没有填写简介。'}</p>
+
+      <div className={styles.cardMeta}>
+        <span><UsersRound size={13} aria-hidden="true" />{project.member_count} 成员</span>
+        <span>{project.template || '项目'}</span>
+        <span>{formatProjectDate(project.updated_at || project.created_at)}</span>
+      </div>
+
+      <div className={styles.cardActions}>
+        {project.latest_apk_url && (
+          <a
+            href={project.latest_apk_url}
+            className={styles.apkBtn}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Download size={14} aria-hidden="true" />
+            <span>下载</span>
+          </a>
+        )}
+        {alreadyJoined ? (
+          <button className={styles.openBtn} type="button" onClick={() => onOpen(project)}>
+            <LogIn size={14} aria-hidden="true" />
+            <span>进入项目</span>
+          </button>
+        ) : requested ? (
+          <span className={styles.requestedLabel}>已申请</span>
+        ) : project.join_mode === 'invite' ? (
+          <button className={styles.openBtn} type="button" onClick={() => onOpen(project)}>
+            <LogIn size={14} aria-hidden="true" />
+            <span>查看项目</span>
+          </button>
+        ) : (
+          <button
+            className={styles.joinBtn}
+            disabled={joining}
+            onClick={() => onJoin(project)}
+            type="button"
+          >
+            {joining ? '处理中…' : isOpen || isReadonly ? '加入项目' : '申请加入'}
+          </button>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function ProjectIcon({ project }: { project: PlazaProject }) {
+  const title = project.display_name || project.name
+  if (project.icon_data_url) {
+    return <img className={styles.cardIconImage} src={project.icon_data_url} alt="" />
+  }
+  return <div className={styles.cardIcon}>{title[0]?.toUpperCase() || '项'}</div>
+}
+
+function joinModeLabel(mode: string): string {
+  if (mode === 'open') return '无审批'
+  if (mode === 'approval') return '需审批'
+  if (mode === 'readonly') return '只读'
+  if (mode === 'invite') return '邀请'
+  return mode || '公开'
+}
+
+function formatProjectDate(value?: string): string {
+  if (!value) return '最近更新'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '最近更新'
+  return new Intl.DateTimeFormat('zh-CN', { month: '2-digit', day: '2-digit' }).format(date)
 }
 
 function mergeProjects(current: PlazaProject[], incoming: PlazaProject[]): PlazaProject[] {
