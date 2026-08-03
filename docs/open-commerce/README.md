@@ -155,6 +155,8 @@
 145. `docs/open-commerce-consumer-source-filter-options-v1-acceptance.md`：查看来源建议代码状态及后置统一回归矩阵。
 146. `docs/decisions/open-commerce-consumer-price-currency-v1.md`：查看币种安全价格筛选和兼容默认规则。
 147. `docs/open-commerce-consumer-price-currency-v1-acceptance.md`：查看价格币种代码状态及后置统一回归矩阵。
+148. `docs/decisions/open-commerce-consumer-capability-filters-v1.md`：查看能力类型与访问级别筛选及安全边界。
+149. `docs/open-commerce-consumer-capability-filters-v1-acceptance.md`：查看能力筛选代码状态及后置统一回归矩阵。
 
 ## 专题地图
 
