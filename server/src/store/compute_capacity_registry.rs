@@ -61,6 +61,9 @@ impl Store {
                 bail!("容量池状态必须通过独立生命周期操作变更");
             }
         } else {
+            if pool.status != ComputeCapacityPoolStatus::Registering {
+                bail!("新容量池必须先以 registering 状态创建");
+            }
             let conflicting_pool_id = tx
                 .query_row(
                     "SELECT pool_id FROM compute_capacity_pools
@@ -119,6 +122,12 @@ impl Store {
             }
             tx.commit()?;
             return Ok(pool.clone());
+        }
+        if !matches!(
+            pool.status,
+            ComputeCapacityPoolStatus::Registering | ComputeCapacityPoolStatus::Active
+        ) {
+            bail!("容量池当前状态不允许登记新版本");
         }
 
         let latest_revision: i64 = tx.query_row(
