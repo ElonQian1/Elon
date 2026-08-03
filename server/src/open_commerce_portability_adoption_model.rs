@@ -46,6 +46,8 @@ pub(crate) struct ConsumerPortabilityAdoptionPlan {
 #[derive(Debug, Clone, Deserialize)]
 pub(crate) struct ApplyConsumerPortabilityPreferencesRequest {
     pub expected_current_revision: Option<i64>,
+    #[serde(default)]
+    pub selected_fields: Vec<String>,
     pub confirmed_by_user: bool,
 }
 
@@ -64,6 +66,8 @@ pub(crate) struct ConsumerPortabilityAdoption {
     pub before_preferences: Option<ConsumerPreferences>,
     pub before_revision: Option<i64>,
     pub applied_preferences: ConsumerPreferences,
+    #[serde(default)]
+    pub selected_fields: Vec<String>,
     pub resulting_revision: i64,
     pub status: String,
     pub applied_at: String,

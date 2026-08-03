@@ -249,35 +249,62 @@ fn current_preferences(
 fn adoption_from_row(row: &Row<'_>) -> rusqlite::Result<ConsumerPortabilityAdoption> {
     let before_json: Option<String> = row.get(3)?;
     let applied_json: String = row.get(5)?;
-    Ok(ConsumerPortabilityAdoption {
-        schema: CONSUMER_PORTABILITY_ADOPTION_SCHEMA.to_string(),
-        id: row.get(0)?,
-        import_id: row.get(1)?,
-        kind: row.get(2)?,
-        before_preferences: before_json
-            .map(|value| serde_json::from_str(&value))
-            .transpose()
-            .map_err(|error| {
-                rusqlite::Error::FromSqlConversionFailure(
-                    0,
-                    rusqlite::types::Type::Text,
-                    error.into(),
-                )
-            })?,
-        before_revision: row.get(4)?,
-        applied_preferences: serde_json::from_str(&applied_json).map_err(|error| {
+    let before_preferences = before_json
+        .map(|value| serde_json::from_str(&value))
+        .transpose()
+        .map_err(|error| {
+            rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, error.into())
+        })?;
+    let applied_preferences: ConsumerPreferences =
+        serde_json::from_str(&applied_json).map_err(|error| {
             rusqlite::Error::FromSqlConversionFailure(
                 applied_json.len(),
                 rusqlite::types::Type::Text,
                 error.into(),
             )
-        })?,
+        })?;
+    let selected_fields =
+        changed_preference_fields(before_preferences.as_ref(), &applied_preferences);
+    Ok(ConsumerPortabilityAdoption {
+        schema: CONSUMER_PORTABILITY_ADOPTION_SCHEMA.to_string(),
+        id: row.get(0)?,
+        import_id: row.get(1)?,
+        kind: row.get(2)?,
+        before_preferences,
+        before_revision: row.get(4)?,
+        applied_preferences,
+        selected_fields,
         resulting_revision: row.get(6)?,
         status: row.get(7)?,
         applied_at: row.get(8)?,
         rolled_back_at: row.get(9)?,
         rollback_revision: row.get(10)?,
     })
+}
+
+fn changed_preference_fields(
+    before: Option<&ConsumerPreferences>,
+    applied: &ConsumerPreferences,
+) -> Vec<String> {
+    let empty = ConsumerPreferences::default();
+    let before = before.unwrap_or(&empty);
+    let mut fields = Vec::new();
+    if before.categories != applied.categories {
+        fields.push("categories".to_string());
+    }
+    if before.tags != applied.tags {
+        fields.push("tags".to_string());
+    }
+    if before.city != applied.city {
+        fields.push("city".to_string());
+    }
+    if before.max_unit_price_micros != applied.max_unit_price_micros {
+        fields.push("max_unit_price_micros".to_string());
+    }
+    if before.prefer_public != applied.prefer_public {
+        fields.push("prefer_public".to_string());
+    }
+    fields
 }
 
 const ADOPTION_SELECT: &str = "SELECT id, import_id, adoption_kind,

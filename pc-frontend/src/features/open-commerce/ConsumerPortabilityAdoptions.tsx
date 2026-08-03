@@ -15,6 +15,7 @@ export default function ConsumerPortabilityAdoptions({ projectId }: { projectId:
   const [adoptions, setAdoptions] = useState<ConsumerPortabilityAdoption[]>([])
   const [selectedImportId, setSelectedImportId] = useState('')
   const [plan, setPlan] = useState<ConsumerPortabilityAdoptionPlan | null>(null)
+  const [selectedFields, setSelectedFields] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -44,6 +45,7 @@ export default function ConsumerPortabilityAdoptions({ projectId }: { projectId:
     setMessage('')
     try {
       setPlan(await openCommerceClientApi.getConsumerPortabilityAdoptionPlan(projectId, selectedImportId))
+      setSelectedFields([])
     } catch (error) {
       setMessage(errorText(error))
     } finally {
@@ -53,7 +55,11 @@ export default function ConsumerPortabilityAdoptions({ projectId }: { projectId:
 
   async function applyPreferences() {
     if (!plan?.imported_profile_available) return
-    if (!window.confirm('采用该数据包中的低敏偏好？现有关系和授权不会恢复。')) return
+    if (selectedFields.length === 0) {
+      setMessage('请至少选择一个发生变化的偏好字段。')
+      return
+    }
+    if (!window.confirm(`采用已选择的 ${selectedFields.length} 个低敏偏好字段？现有关系和授权不会恢复。`)) return
     setBusy(true)
     setMessage('')
     try {
@@ -61,9 +67,11 @@ export default function ConsumerPortabilityAdoptions({ projectId }: { projectId:
         projectId,
         plan.import_id,
         plan.current_profile_revision,
+        selectedFields,
       )
       setMessage('导入偏好已采用，并保存了可回滚快照。')
       setPlan(null)
+      setSelectedFields([])
       await refresh()
     } catch (error) {
       setMessage(errorText(error))
@@ -103,7 +111,15 @@ export default function ConsumerPortabilityAdoptions({ projectId }: { projectId:
         </button>
       </header>
       <div style={{ ...commerceStyles.list, padding: 12 }}>
-        <select value={selectedImportId} onChange={(event) => setSelectedImportId(event.target.value)} disabled={busy}>
+        <select
+          value={selectedImportId}
+          onChange={(event) => {
+            setSelectedImportId(event.target.value)
+            setPlan(null)
+            setSelectedFields([])
+          }}
+          disabled={busy}
+        >
           <option value="">选择隔离数据包</option>
           {imports.map((item) => (
             <option key={item.id} value={item.id}>{item.source_operator} · {item.source_package_id}</option>
@@ -121,17 +137,38 @@ export default function ConsumerPortabilityAdoptions({ projectId }: { projectId:
               </span>
             </header>
             {plan.preference_changes.map((change) => (
-              <p key={change.field} style={commerceStyles.itemText}>
-                {change.field}: {JSON.stringify(change.current_value)} → {JSON.stringify(change.imported_value)}
-              </p>
+              <label key={change.field} style={commerceStyles.checkRow}>
+                <input
+                  type="checkbox"
+                  checked={selectedFields.includes(change.field)}
+                  disabled={busy || !change.changed}
+                  onChange={() =>
+                    setSelectedFields((current) => toggleField(current, change.field))
+                  }
+                />
+                <span>
+                  {preferenceFieldLabel(change.field)}: {JSON.stringify(change.current_value)} →{' '}
+                  {JSON.stringify(change.imported_value)}
+                </span>
+              </label>
             ))}
             <small style={commerceStyles.itemMeta}>
               待重新授权关系 {plan.relationship_candidates.length} · 自动恢复 关闭 · 业务写入 关闭
             </small>
             <footer style={{ ...commerceStyles.itemHeader, marginTop: 8 }}>
               <span />
-              <button style={actionStyle('primary', busy || !plan.imported_profile_available)} type="button" onClick={applyPreferences} disabled={busy || !plan.imported_profile_available}>
-                <Save size={13} />采用偏好
+              <button
+                style={actionStyle(
+                  'primary',
+                  busy || !plan.imported_profile_available || selectedFields.length === 0,
+                )}
+                type="button"
+                onClick={applyPreferences}
+                disabled={
+                  busy || !plan.imported_profile_available || selectedFields.length === 0
+                }
+              >
+                <Save size={13} />采用所选字段
               </button>
             </footer>
           </article>
@@ -144,7 +181,10 @@ export default function ConsumerPortabilityAdoptions({ projectId }: { projectId:
                 {adoption.status === 'applied' ? '已采用' : '已回滚'}
               </span>
             </header>
-            <small style={commerceStyles.itemMeta}>修订 {adoption.before_revision ?? '无'} → {adoption.resulting_revision}</small>
+            <small style={commerceStyles.itemMeta}>
+              修订 {adoption.before_revision ?? '无'} → {adoption.resulting_revision} ·{' '}
+              {adoption.selected_fields.map(preferenceFieldLabel).join('、') || '整包采用'}
+            </small>
             {adoption.status === 'applied' && (
               <footer style={{ ...commerceStyles.itemHeader, marginTop: 8 }}>
                 <span />
@@ -159,4 +199,18 @@ export default function ConsumerPortabilityAdoptions({ projectId }: { projectId:
       {message && <div style={commerceStyles.message}>{message}</div>}
     </section>
   )
+}
+
+function toggleField(fields: string[], field: string) {
+  return fields.includes(field) ? fields.filter((value) => value !== field) : [...fields, field]
+}
+
+function preferenceFieldLabel(field: string) {
+  return {
+    categories: '类别',
+    tags: '标签',
+    city: '城市',
+    max_unit_price_micros: '价格上限',
+    prefer_public: '优先公开商户',
+  }[field] ?? field
 }

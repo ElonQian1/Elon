@@ -1,3 +1,5 @@
+use std::collections::BTreeSet;
+
 use anyhow::{anyhow, bail, Result};
 use serde_json::{json, to_value};
 
@@ -113,12 +115,31 @@ pub(crate) fn apply_preferences(
         import_id,
         actor,
     )?;
-    let preferences = import_record
+    let imported = import_record
         .package
         .payload
         .preference_profile
         .map(|profile| profile.preferences)
         .ok_or_else(|| anyhow!("导入数据包不包含消费者偏好档案"))?;
+    let imported = open_commerce_consumer_preference_service::normalize_preferences(imported)?;
+    let current = open_commerce_consumer_preference_service::get_profile(
+        store,
+        destination_project_id,
+        actor,
+    )?;
+    let current_revision = current.as_ref().map(|profile| profile.revision);
+    if current_revision != request.expected_current_revision {
+        bail!("消费者偏好档案已变化，请刷新迁移预演后重试");
+    }
+    let selected_fields = normalize_selected_fields(request.selected_fields)?;
+    let preferences = merge_selected_preferences(
+        current
+            .as_ref()
+            .map(|profile| profile.preferences.clone())
+            .unwrap_or_default(),
+        &imported,
+        &selected_fields,
+    )?;
     let preferences =
         open_commerce_consumer_preference_service::normalize_preferences(preferences)?;
     let adoption = store.apply_consumer_portability_preferences(
@@ -139,10 +160,73 @@ pub(crate) fn apply_preferences(
             "import_id": adoption.import_id,
             "before_revision": adoption.before_revision,
             "resulting_revision": adoption.resulting_revision,
+            "selected_fields": &adoption.selected_fields,
             "source_trust_status": import_record.trust_status,
         }),
     )?;
     Ok(adoption)
+}
+
+fn normalize_selected_fields(fields: Vec<String>) -> Result<Vec<String>> {
+    let allowed = [
+        "categories",
+        "tags",
+        "city",
+        "max_unit_price_micros",
+        "prefer_public",
+    ];
+    let mut selected = BTreeSet::new();
+    for field in fields {
+        let field = field.trim().to_ascii_lowercase();
+        if !allowed.contains(&field.as_str()) {
+            bail!("偏好字段 {field} 不支持选择性采用");
+        }
+        selected.insert(field);
+    }
+    if selected.is_empty() {
+        bail!("至少选择一个需要采用的偏好字段");
+    }
+    Ok(selected.into_iter().collect())
+}
+
+fn merge_selected_preferences(
+    mut current: ConsumerPreferences,
+    imported: &ConsumerPreferences,
+    selected_fields: &[String],
+) -> Result<ConsumerPreferences> {
+    let mut changed = 0;
+    for field in selected_fields {
+        match field.as_str() {
+            "categories" if current.categories != imported.categories => {
+                current.categories = imported.categories.clone();
+                changed += 1;
+            }
+            "tags" if current.tags != imported.tags => {
+                current.tags = imported.tags.clone();
+                changed += 1;
+            }
+            "city" if current.city != imported.city => {
+                current.city = imported.city.clone();
+                changed += 1;
+            }
+            "max_unit_price_micros"
+                if current.max_unit_price_micros != imported.max_unit_price_micros =>
+            {
+                current.max_unit_price_micros = imported.max_unit_price_micros;
+                changed += 1;
+            }
+            "prefer_public" if current.prefer_public != imported.prefer_public => {
+                current.prefer_public = imported.prefer_public;
+                changed += 1;
+            }
+            "categories" | "tags" | "city" | "max_unit_price_micros" | "prefer_public" => {}
+            _ => bail!("未知偏好字段"),
+        }
+    }
+    if changed != selected_fields.len() {
+        bail!("只能采用预演中真实发生变化的偏好字段，请刷新后重新选择");
+    }
+    Ok(current)
 }
 
 pub(crate) fn list_adoptions(

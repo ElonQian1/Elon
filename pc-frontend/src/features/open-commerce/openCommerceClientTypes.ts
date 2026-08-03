@@ -400,6 +400,7 @@ export interface ConsumerPortabilityAdoption {
   before_preferences?: ConsumerPreferences
   before_revision?: number
   applied_preferences: ConsumerPreferences
+  selected_fields: string[]
   resulting_revision: number
   status: 'applied' | 'rolled_back'
   applied_at: string
