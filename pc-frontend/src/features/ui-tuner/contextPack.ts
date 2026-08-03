@@ -9,6 +9,7 @@ import type { UiTunerSelectionVisualContext } from './runtime/selectionArtifact'
 import type { FitRunDocument } from './fit-run/types'
 import type { PwaDraftCliCompactHandoff } from './source-preview/pwaDesignDraft'
 import type { PwaDraftAiFitTask } from './source-preview/pwaAiFitTask'
+import type { DesignArtifactRef, DesignPlatform, SemanticUiNode } from './headless-design/types'
 
 export interface UiTunerCodexContextPack {
   version: 4
@@ -162,6 +163,23 @@ export interface UiTunerCodexContextPack {
       screenshotsEmbeddedAsBase64: false
     }
     capabilities: { PWA_CODE_GENERATION: true }
+  }
+  headlessDesign?: {
+    designSessionId?: string
+    platform: DesignPlatform
+    route: string
+    url?: string
+    state: string
+    evidenceLevel: string
+    nativeHostVerified: boolean
+    pixels?: DesignArtifactRef
+    uiTree?: DesignArtifactRef
+    selectedNode?: SemanticUiNode
+    contextPolicy: {
+      fullRepositoryIncluded: false
+      fullDomIncluded: false
+      screenshotsEmbeddedAsBase64: false
+    }
   }
 }
 
@@ -372,6 +390,7 @@ export function stringifyUiTunerCodexContextPack(args: BuildPackArgs) {
 }
 
 export function buildUiTunerCodexTaskPrompt(pack: UiTunerCodexContextPack, userIntent: string) {
+  if (pack.headlessDesign) return buildHeadlessDesignTaskPrompt(pack, userIntent)
   const selected = pack.selectedElement
   const target = selected
     ? `${selected.name} (${selected.kind}, ${selected.rect.x},${selected.rect.y} ${selected.rect.width}x${selected.rect.height})`
@@ -394,6 +413,29 @@ export function buildUiTunerCodexTaskPrompt(pack: UiTunerCodexContextPack, userI
     '3. 给出或实施可审查的源码/config 修改，不要只改截图坐标。',
     '4. 输出验证方式：构建检查、重新 ADB 捕获或可执行的验收命令。',
     '5. 如果绑定置信度不足，先列出需要人工确认的 resourceId/xpath/source 文件。',
+    '',
+    'Compact context pack JSON:',
+    '```json',
+    JSON.stringify(pack, null, 2),
+    '```',
+  ].join('\n')
+}
+
+function buildHeadlessDesignTaskPrompt(pack: UiTunerCodexContextPack, userIntent: string) {
+  const design = pack.headlessDesign!
+  const selected = pack.selectedElement
+  return [
+    '你正在处理一龙 `/pc/ui-tuner` 的多端后台 designSession。',
+    `平台：${design.platform}；路由：${design.route}；designSessionId：${design.designSessionId ?? '尚未打开'}`,
+    selected ? `当前语义节点：${selected.name}（${design.selectedNode?.selector ?? selected.id}）` : '当前没有选中语义节点。',
+    `用户意图：${userIntent.trim() || '请修改当前页面并重新捕获后台证据。'}`,
+    '',
+    '执行顺序：',
+    '1. 先用 ui_list_design_sessions 恢复 designSessionId，再用 ui_get_design_surface 读取紧凑 UI 树；不要先操控 PC 桌面。',
+    '2. 结合 route、selector、configFiles/sourceRoots 建立最小源码绑定，只读取相关源码。',
+    '3. 修改源码；如果是样式草稿，保留可撤销变更和分平台写回状态。',
+    '4. 需要调试交互时，在 ui_capture_design_surface.capture.steps 中只使用 click、waitFor、assertText；再读取新的 UI tree/PNG 路径与 SHA-256。',
+    '5. 明确平台覆盖：Tauri 前端不能冒充原生宿主，Android 必须使用 Android Runtime。',
     '',
     'Compact context pack JSON:',
     '```json',

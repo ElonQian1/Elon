@@ -37,8 +37,11 @@
   border-radius: 9px 0 0 9px;
 }
 
-.tabs button:last-child {
+.tabs button + button {
   border-left: 0;
+}
+
+.tabs button:last-child {
   border-radius: 0 9px 9px 0;
 }
 

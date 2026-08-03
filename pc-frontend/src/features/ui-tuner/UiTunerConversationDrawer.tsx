@@ -26,10 +26,12 @@ import {
   type UiTunerConversationMode,
 } from './uiTunerConversation'
 import panelStyles from './UiTunerPanels.module.css'
+import conversationStyles from './UiTunerConversationPanel.module.css'
 
 interface UiTunerConversationDrawerProps {
   open: boolean
   onClose: () => void
+  variant?: 'drawer' | 'panel'
   pack: UiTunerCodexContextPack
   intent: string
   activeProject?: Project | null
@@ -53,6 +55,7 @@ interface UiTunerConversationDrawerProps {
 export default function UiTunerConversationDrawer({
   open,
   onClose,
+  variant = 'drawer',
   pack,
   intent,
   activeProject,
@@ -246,27 +249,31 @@ export default function UiTunerConversationDrawer({
   }, [channelId, loadConversation, projectId, selectedSession])
 
   if (!open) return null
+  const inline = variant === 'panel'
 
   return (
     <>
-      <button type="button" className={panelStyles.conversationDrawerBackdrop} onClick={onClose} aria-label="关闭项目会话" />
+      {!inline && <button type="button" className={panelStyles.conversationDrawerBackdrop} onClick={onClose} aria-label="关闭项目会话" />}
       <aside
-        className={panelStyles.conversationDrawer}
+        className={`${panelStyles.conversationDrawer} ${inline ? conversationStyles.panel : ''}`}
         data-ui-tuner-conversation-drawer="open"
+        data-ui-tuner-conversation-variant={variant}
         data-ui-tuner-context-element={elementLabel}
       >
         <header className={panelStyles.conversationHeader}>
           <div>
-            <span>项目 Codex 会话</span>
+            <span>{pack.headlessDesign ? '多端设计 Codex 会话' : '项目 Codex 会话'}</span>
             <strong>{uiTunerSessionLabel(selectedSession)}</strong>
           </div>
           <div className={panelStyles.conversationHeaderActions}>
             <button type="button" title="刷新会话" onClick={() => void loadConversation(selectedSession)}>
               <RefreshCw size={15} aria-hidden="true" />
             </button>
-            <button type="button" title="关闭" onClick={onClose}>
-              <X size={15} aria-hidden="true" />
-            </button>
+            {!inline && (
+              <button type="button" title="关闭" onClick={onClose}>
+                <X size={15} aria-hidden="true" />
+              </button>
+            )}
           </div>
         </header>
 
@@ -324,7 +331,9 @@ export default function UiTunerConversationDrawer({
             value={draft}
             onChange={(event) => setDraft(event.currentTarget.value)}
             onKeyDown={handleComposerKeyDown}
-            placeholder="告诉 Codex 你想怎么调整当前 APK 元素"
+            placeholder={pack.headlessDesign
+              ? `告诉 Codex 要怎么修改 ${pack.headlessDesign.platform.toUpperCase()} 端当前页面`
+              : '告诉 Codex 你想怎么调整当前 APK 元素'}
             className={panelStyles.conversationTextarea}
           />
           <div className={panelStyles.conversationActions}>

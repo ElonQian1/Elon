@@ -1,0 +1,366 @@
+.workspace {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 248px minmax(420px, 1fr) minmax(320px, 390px);
+  overflow: hidden;
+  background: #0d0d0e;
+  color: #e7e7e8;
+}
+
+.navigator,
+.conversation,
+.stage {
+  min-width: 0;
+  min-height: 0;
+}
+
+.navigator {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #292a2d;
+  background: #141416;
+  overflow: hidden;
+}
+
+.navigator > header,
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.navigator > header {
+  min-height: 50px;
+  padding: 0 12px;
+  border-bottom: 1px solid #292a2d;
+  font-size: 13px;
+}
+
+.navigator button,
+.routeBar button,
+.emptyEvidence button {
+  border: 1px solid #35363a;
+  background: #1a1b1e;
+  color: #d9d9dc;
+}
+
+.navigator > header button,
+.searchRow button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 7px;
+}
+
+.platforms {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid #292a2d;
+}
+
+.platforms button {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 2px 5px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.platforms button span {
+  font-size: 12px;
+}
+
+.platforms button small {
+  grid-column: 2;
+  color: #7f8188;
+  font-size: 10px;
+}
+
+.platforms button:disabled {
+  opacity: .42;
+}
+
+.platforms .activePlatform,
+.sessionList .activeItem,
+.nodeList .activeItem {
+  border-color: #7d8cff;
+  background: #24283b;
+  color: #f5f6ff;
+}
+
+.listSection {
+  min-height: 0;
+  padding: 9px 10px;
+  border-bottom: 1px solid #292a2d;
+}
+
+.nodeSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 0;
+  overflow: hidden;
+}
+
+.sectionTitle {
+  padding: 0 2px 7px;
+  color: #a9abb2;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.sectionTitle small {
+  color: #676970;
+}
+
+.sessionList,
+.nodeList {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: auto;
+}
+
+.sessionList {
+  max-height: 150px;
+}
+
+.nodeList {
+  flex: 1;
+}
+
+.sessionList > p {
+  margin: 4px 2px;
+  color: #777981;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.sessionList button,
+.nodeList button {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  text-align: left;
+}
+
+.sessionList strong,
+.nodeList strong {
+  overflow: hidden;
+  color: inherit;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sessionList span,
+.nodeList span,
+.sessionList small {
+  overflow: hidden;
+  color: #7f8188;
+  font: 10px/1.3 ui-monospace, SFMono-Regular, Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchRow {
+  display: grid;
+  grid-template-columns: 1fr 30px;
+  gap: 5px;
+  margin-bottom: 7px;
+}
+
+.searchRow input,
+.routeBar input {
+  min-width: 0;
+  border: 1px solid #34353a;
+  outline: none;
+  background: #101114;
+  color: #e3e3e6;
+}
+
+.searchRow input {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #0b0c0e;
+}
+
+.routeBar {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #292a2d;
+  background: #141416;
+}
+
+.routeBar label {
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #8c8e95;
+  font-size: 11px;
+}
+
+.routeBar .urlField {
+  min-width: 200px;
+  flex: 1;
+}
+
+.routeBar input {
+  width: 100%;
+  height: 32px;
+  padding: 0 9px;
+  border-radius: 7px;
+}
+
+.routeBar button,
+.emptyEvidence button {
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.evidenceShell {
+  min-height: 0;
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  overflow: auto;
+  background-color: #0e0f11;
+  background-image: linear-gradient(45deg, #151619 25%, transparent 25%), linear-gradient(-45deg, #151619 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #151619 75%), linear-gradient(-45deg, transparent 75%, #151619 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+}
+
+.captureCanvas {
+  position: relative;
+  width: 100%;
+  max-width: 1120px;
+  max-height: calc(100vh - 190px);
+  overflow: hidden;
+  border: 1px solid #34363d;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 14px 40px #0009;
+}
+
+.captureCanvas > img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.semanticOverlay {
+  position: absolute;
+  min-width: 2px;
+  min-height: 2px;
+  padding: 0;
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.semanticOverlay:hover {
+  border-color: #8e9bff;
+  background: #7180ff1f;
+}
+
+.selectedOverlay {
+  border: 2px solid #6f80ff;
+  background: #7180ff2b;
+  box-shadow: 0 0 0 1px #fff8 inset;
+}
+
+.emptyEvidence {
+  max-width: 430px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 34px;
+  border: 1px dashed #3a3b41;
+  border-radius: 12px;
+  background: #151619e6;
+  color: #81838a;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.emptyEvidence strong {
+  color: #dbdce0;
+  font-size: 14px;
+}
+
+.statusBar {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  border-top: 1px solid #292a2d;
+  background: #121315;
+  color: #777981;
+  font-size: 10px;
+  overflow: hidden;
+}
+
+.statusBar span:first-child {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusBar code {
+  color: #9396a0;
+}
+
+.error {
+  color: #ff8b8b;
+}
+
+.conversation {
+  border-left: 1px solid #292a2d;
+  background: #151517;
+  overflow: hidden;
+}
+
+@media (max-width: 1180px) {
+  .workspace {
+    grid-template-columns: 220px minmax(380px, 1fr) 330px;
+  }
+}

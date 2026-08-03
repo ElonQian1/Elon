@@ -85,6 +85,45 @@ export async function nodeApi<T = Record<string, unknown>>(
   }
 }
 
+export async function nodeApiBlob(
+  baseUrl: string,
+  path: string,
+  options: RequestInit = {},
+  timeoutMs = 15000,
+): Promise<Blob> {
+  const needsAdmin = isAdminPath(path)
+  if (needsAdmin && !adminState.token) {
+    await fetchStatus(baseUrl, timeoutMs).catch(() => {})
+  }
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+  try {
+    let init = applyHeaders({ cache: 'no-store', ...options }, needsAdmin)
+    let res = await fetch(buildUrl(baseUrl, path), { ...init, signal: ctrl.signal })
+    if (needsAdmin && res.status === 403) {
+      adminState.token = ''
+      await fetchStatus(baseUrl, timeoutMs).catch(() => {})
+      init = applyHeaders({ cache: 'no-store', ...options }, needsAdmin)
+      res = await fetch(buildUrl(baseUrl, path), { ...init, signal: ctrl.signal })
+    }
+    if (!res.ok) {
+      const text = await res.text()
+      let message = `HTTP ${res.status}`
+      try {
+        const data = text ? JSON.parse(text) as Record<string, unknown> : {}
+        rememberToken(data)
+        message = String(data.error ?? data.message ?? message)
+      } catch {
+        if (text.trim()) message = text.trim().slice(0, 500)
+      }
+      throw new Error(message)
+    }
+    return await res.blob()
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export async function probeLocalNode(baseUrl: string): Promise<Record<string, unknown>> {
   return fetchStatus(baseUrl, 2200)
 }

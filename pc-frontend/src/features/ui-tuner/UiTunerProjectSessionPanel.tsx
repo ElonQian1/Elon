@@ -47,6 +47,8 @@ interface UiTunerProjectSessionPanelProps {
   onMutationTaskStarted: (pack: UiTunerCodexContextPack) => Promise<void> | void
   onTaskSettled: () => void
   headless?: boolean
+  conversationLayout?: 'drawer' | 'panel'
+  defaultConversationOpen?: boolean
 }
 
 const CODEX_ROUTE: RuntimeRoute = 'route_a'
@@ -71,6 +73,8 @@ export function UiTunerProjectSessionPanel({
   onMutationTaskStarted,
   onTaskSettled,
   headless = false,
+  conversationLayout = 'drawer',
+  defaultConversationOpen = false,
 }: UiTunerProjectSessionPanelProps) {
   const [nodeAdminUrl, setNodeAdminUrl] = useState(uiTunerNodeAdminUrl)
   const user = useAuthStore((state) => state.user)
@@ -86,7 +90,7 @@ export function UiTunerProjectSessionPanel({
   const [workspaceState, setWorkspaceState] = useState<UiTunerWorkspaceResponse | null>(null)
   const [workspaceLoading, setWorkspaceLoading] = useState(false)
   const [activeSessionId, setActiveSessionId] = useState('')
-  const [conversationOpen, setConversationOpen] = useState(false)
+  const [conversationOpen, setConversationOpen] = useState(defaultConversationOpen)
   const [verificationTaskId, setVerificationTaskId] = useState('')
   const [fitRunTask, setFitRunTask] = useState<FitRunTaskRef | null>(null)
   const [fitRunStarting, setFitRunStarting] = useState(false)
@@ -448,6 +452,39 @@ export function UiTunerProjectSessionPanel({
 
   if (headless || !pack) return null
 
+  const conversation = (
+    <UiTunerConversationDrawer
+      open={conversationLayout === 'panel' || conversationOpen}
+      onClose={() => setConversationOpen(false)}
+      variant={conversationLayout}
+      pack={pack}
+      intent={intent}
+      activeProject={activeProject}
+      aiChannel={aiChannel}
+      workspacePath={workspacePath}
+      canStart={canStart}
+      localNodeReady={localNodeReady}
+      localNodeStatusText={localNodeStatusText}
+      selectedSession={selectedSession}
+      visibleSessions={visibleSessions}
+      verificationTaskId={trackedFitRunTask?.taskId ?? verificationTaskId}
+      status={status}
+      onSelectSession={setActiveSessionId}
+      onStartSession={startSession}
+      onTaskSettled={(succeeded) => {
+        if (trackedFitRunTask) {
+          notifyFitRunCodexSettled({ taskId: trackedFitRunTask.taskId, succeeded })
+          setFitRunTask(null)
+          return
+        }
+        setVerificationTaskId('')
+        if (succeeded) onTaskSettled()
+      }}
+    />
+  )
+
+  if (conversationLayout === 'panel') return conversation
+
   return (
     <div className={panelStyles.projectSessionPanel}>
       <div className={panelStyles.projectSessionHeader}>
@@ -544,33 +581,7 @@ export function UiTunerProjectSessionPanel({
         )}
       </div>
 
-      <UiTunerConversationDrawer
-        open={conversationOpen}
-        onClose={() => setConversationOpen(false)}
-        pack={pack}
-        intent={intent}
-        activeProject={activeProject}
-        aiChannel={aiChannel}
-        workspacePath={workspacePath}
-        canStart={canStart}
-        localNodeReady={localNodeReady}
-        localNodeStatusText={localNodeStatusText}
-        selectedSession={selectedSession}
-        visibleSessions={visibleSessions}
-        verificationTaskId={trackedFitRunTask?.taskId ?? verificationTaskId}
-        status={status}
-        onSelectSession={setActiveSessionId}
-        onStartSession={startSession}
-        onTaskSettled={(succeeded) => {
-          if (trackedFitRunTask) {
-            notifyFitRunCodexSettled({ taskId: trackedFitRunTask.taskId, succeeded })
-            setFitRunTask(null)
-            return
-          }
-          setVerificationTaskId('')
-          if (succeeded) onTaskSettled()
-        }}
-      />
+      {conversation}
     </div>
   )
 }

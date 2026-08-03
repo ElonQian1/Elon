@@ -48,11 +48,12 @@ import {
   type UiTunerVerificationReport,
 } from './runtime/verification'
 import styles from './UiTunerPage.module.css'
+import { HeadlessDesignWorkspace } from './headless-design/HeadlessDesignWorkspace'
 import { SourcePreviewWorkspace } from './source-preview/SourcePreviewWorkspace'
-import type { SourcePreviewMode } from './source-preview/types'
 import { deriveUiTunerRenderMode } from './rendering/renderMode'
 import { handleCanvasArrowKey } from './uiTunerCanvasKeyboard'
 import { UiWorkspaceModeBar } from './workspace/UiWorkspaceModeBar'
+import { useUiTunerWorkspaceMode } from './workspace/useUiTunerWorkspaceMode'
 import { getSelectedId } from './workspace/uiWorkspaceSelection'
 import { useUiWorkspaceSelectionSync } from './workspace/useUiWorkspaceSelectionSync'
 import { AndroidUiDesignProgress } from './workspace/UiDesignProgressBar'
@@ -60,13 +61,10 @@ import {
   DEFAULT_ANDROID_PACKAGE,
   UI_TUNER_HISTORY_LIMIT,
   UI_TUNER_MIN_SIZE,
-  WORKSPACE_MODE_STORAGE_KEY,
   type UiTunerHistoryState,
 } from './workspace/uiTunerWorkspaceState'
 export default function UiTunerPage() {
-  const [workspaceMode, setWorkspaceMode] = useState<SourcePreviewMode>(() => (
-    window.localStorage.getItem(WORKSPACE_MODE_STORAGE_KEY) as SourcePreviewMode | null
-  ) ?? 'evidence')
+  const { workspaceMode, changeWorkspaceMode } = useUiTunerWorkspaceMode()
   const projects = useProjectStore((state) => state.projects)
   const activeProjectId = useProjectStore((state) => state.activeProjectId)
   const projectSpace = useProjectStore((state) => state.space)
@@ -135,11 +133,6 @@ export default function UiTunerPage() {
   const effectiveProjectRoot = clean(liveProjectRoot) || projectRoot
 
   const sharedDevices = useProjectSharedAndroidDevices(activeProjectId, setNotice)
-
-  const changeWorkspaceMode = useCallback((mode: SourcePreviewMode) => {
-    setWorkspaceMode(mode)
-    window.localStorage.setItem(WORKSPACE_MODE_STORAGE_KEY, mode)
-  }, [])
 
   useEffect(() => {
     if (projectRoot && !clean(liveProjectRoot)) setLiveProjectRoot(projectRoot)
@@ -611,6 +604,7 @@ export default function UiTunerPage() {
 
   return (
     <>
+    <HeadlessDesignWorkspace active={workspaceMode === 'headless'} initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
     <SourcePreviewWorkspace
       active={workspaceMode === 'source'}
       initialProjectRoot={effectiveProjectRoot}

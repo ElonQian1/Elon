@@ -1,4 +1,4 @@
-export type SourcePreviewMode = 'source' | 'evidence'
+export type SourcePreviewMode = 'headless' | 'source' | 'evidence'
 export type SourcePreviewSaveState = 'preview' | 'saving' | 'saved' | 'error'
 export type SourcePreviewBackend = 'android_layoutlib' | 'android_preview_host' | 'pwa_interactive' | 'react_twin'
 

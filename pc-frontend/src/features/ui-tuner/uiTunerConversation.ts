@@ -14,6 +14,9 @@ export function uiTunerElementLabel(pack: UiTunerCodexContextPack): string {
 export function uiTunerConversationSeed(pack: UiTunerCodexContextPack, intent: string): string {
   const cleanIntent = intent.trim()
   if (cleanIntent) return cleanIntent
+  if (pack.headlessDesign) {
+    return `请读取 ${pack.headlessDesign.platform.toUpperCase()} 端 ${pack.headlessDesign.route} 的后台 designSession，定位当前选区对应源码，完成修改并重新捕获 UI 树和截图哈希。`
+  }
   return `请基于当前选中的 ${uiTunerElementLabel(pack)}，分析它的 XML 节点、源码映射和可复用 UI 标准，并给出可执行修改方案。`
 }
 
