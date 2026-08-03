@@ -142,6 +142,32 @@ node bin/sui-preflight.mjs complete --base-url https://commerce.example.com `
 
 `renew` 和 `release` 同样要求 `--job-id` 与租约环境变量。所有任务命令都强制非本机地址使用 HTTPS、限制响应体大小，并且不包含 Sui SDK、钱包、RPC、签名或广播逻辑。
 
+持续运行的离线预检进程可使用 `createSuiPreflightWorker`。工作器一次只处理一条任务，在租约临近到期时续租；正常结果原子完成，普通异常或进程中止会尽力释放任务，网络不可达时则依靠租约到期回收。幂等键由任务 ID 和尝试次数稳定生成。
+
+```js
+import { createSuiPreflightWorker } from '@elon/open-commerce-connector'
+
+const worker = createSuiPreflightWorker({
+  baseUrl: 'https://commerce.example.com',
+  token: process.env.ELON_SUI_PREFLIGHT_TOKEN,
+  toolVersion: 'merchant-preflight/1.0',
+  async handler(handoff, { signal }) {
+    const result = await runDeterministicOfflineChecks(handoff, { signal })
+    return {
+      outcome: result.passed ? 'passed' : 'rejected',
+      summary: result.summary,
+    }
+  },
+})
+
+const shutdown = new AbortController()
+process.once('SIGTERM', () => shutdown.abort('SIGTERM'))
+process.once('SIGINT', () => shutdown.abort('SIGINT'))
+await worker.run({ signal: shutdown.signal })
+```
+
+工作器的 `handler` 只能返回 `passed/rejected` 和说明，不会收到适配器令牌或租约令牌，也不能借此获得签名、广播或资金权限。
+
 ## 处理 ERP/CRM 衔接任务
 
 获得项目编辑者显式签发且包含 `business_handoff.claim` 的限时机器 Token 后，适配器可复用 SDK 客户端领取一条任务。客户端不会要求或发送项目、商户、接入器 ID，这些边界由服务端从 Token 派生。

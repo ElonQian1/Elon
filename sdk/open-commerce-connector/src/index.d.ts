@@ -51,6 +51,7 @@ export const SUI_PREFLIGHT_JOB_POLL_SCHEMA: 'task_economy.sui_preflight_job_poll
 export const SUI_PREFLIGHT_JOB_RENEW_SCHEMA: 'task_economy.sui_preflight_job_renew.v1'
 export const SUI_PREFLIGHT_JOB_RELEASE_SCHEMA: 'task_economy.sui_preflight_job_release.v1'
 export const SUI_PREFLIGHT_JOB_COMPLETE_SCHEMA: 'task_economy.sui_preflight_job_complete.v1'
+export const SUI_PREFLIGHT_WORKER_SCHEMA: 'task_economy.sui_preflight_worker_result.v1'
 
 export interface SuiAdapterHandoffBundle {
   schema: typeof SUI_ADAPTER_HANDOFF_SCHEMA
@@ -207,6 +208,58 @@ export function createSuiPreflightJobClient(options: {
     job: SuiPreflightJob
     report: SuiPreflightReport
   }>
+}>
+
+export interface SuiPreflightWorkerContext {
+  job: SuiPreflightJob
+  attemptNo: number
+  idempotencyKey: string
+  signal: AbortSignal
+}
+
+export interface SuiPreflightWorkerOutcome {
+  outcome: 'passed' | 'rejected'
+  summary: string
+}
+
+export interface SuiPreflightWorkerResult {
+  schema: typeof SUI_PREFLIGHT_WORKER_SCHEMA
+  claimed: boolean
+  jobId?: string
+  status?: SuiPreflightJob['status']
+  outcome?: 'passed' | 'rejected'
+  reportId?: string
+  retryAfterMs: number
+}
+
+export class SuiPreflightReleaseError extends Error {
+  reason: string
+  constructor(reason: string, message?: string)
+}
+
+export function createSuiPreflightWorker(options: {
+  client?: ReturnType<typeof createSuiPreflightJobClient>
+  baseUrl?: string
+  token?: string
+  fetch?: typeof fetch
+  toolVersion: string
+  handler: (
+    handoff: SuiAdapterHandoffBundle,
+    context: SuiPreflightWorkerContext,
+  ) => SuiPreflightWorkerOutcome | Promise<SuiPreflightWorkerOutcome>
+  leaseSeconds?: number
+  extendSeconds?: number
+  renewBeforeSeconds?: number
+  idleDelayMs?: number
+  errorDelayMs?: number
+  completionAttempts?: number
+}): Readonly<{
+  runOnce(options?: { signal?: AbortSignal }): Promise<SuiPreflightWorkerResult>
+  run(options?: {
+    signal?: AbortSignal
+    onResult?: (result: SuiPreflightWorkerResult) => void | Promise<void>
+    onError?: (error: unknown) => void | Promise<void>
+  }): Promise<{ claimed: number; completed: number; failed: number }>
 }>
 
 export interface MerchantIdentityProof {

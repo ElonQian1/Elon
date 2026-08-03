@@ -34,6 +34,12 @@ export {
   createSuiPreflightJobClient,
 } from './sui-preflight-job-client.js'
 
+export {
+  SUI_PREFLIGHT_WORKER_SCHEMA,
+  SuiPreflightReleaseError,
+  createSuiPreflightWorker,
+} from './sui-preflight-worker.js'
+
 export { createMemoryMerchantRuntimeIdempotencyStore } from './merchant-runtime-memory-store.js'
 
 export {
