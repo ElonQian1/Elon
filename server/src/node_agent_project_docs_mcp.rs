@@ -32,21 +32,31 @@ struct BootstrapRequest {
     project_root: Option<String>,
     #[serde(default)]
     vault_id: Option<String>,
+    #[serde(default)]
+    profile: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct McpQuery {
     token: String,
+    #[serde(default)]
+    profile: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct McpRequest {
     #[allow(dead_code)]
     jsonrpc: Option<String>,
-    id: Option<Value>,
-    method: String,
+    pub(crate) id: Option<Value>,
+    pub(crate) method: String,
     #[serde(default)]
-    params: Value,
+    pub(crate) params: Value,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DescriptorProfile {
+    Governance,
+    Context,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -76,18 +86,29 @@ pub(crate) fn test_transport_routes() -> Router {
 
 pub(crate) fn descriptor_for_project(project_root: &str, host_port: u16) -> Result<Value> {
     let root = validate_project_root(project_root)?;
-    create_descriptor(&root, None, host_port)
+    create_descriptor(&root, None, host_port, DescriptorProfile::Governance)
+}
+
+pub(crate) fn descriptor_for_project_context(project_root: &str, host_port: u16) -> Result<Value> {
+    let root = validate_project_root(project_root)?;
+    create_descriptor(&root, None, host_port, DescriptorProfile::Context)
 }
 
 pub(crate) fn descriptor_for_vault(vault_id: &str, host_port: u16) -> Result<Value> {
     let vault = crate::project_document_vault::resolve_or_create(vault_id)?;
-    create_descriptor(&vault.workspace, Some(vault.vault_id), host_port)
+    create_descriptor(
+        &vault.workspace,
+        Some(vault.vault_id),
+        host_port,
+        DescriptorProfile::Governance,
+    )
 }
 
 fn create_descriptor(
     root: &Path,
     managed_vault_id: Option<String>,
     host_port: u16,
+    profile: DescriptorProfile,
 ) -> Result<Value> {
     let _guard = session_create_lock();
     cleanup_expired_sessions();
@@ -108,30 +129,42 @@ fn create_descriptor(
     let staging_dir = session_root().join(format!(".creating_{}", uuid::Uuid::new_v4().simple()));
     fs::create_dir_all(&staging_dir)
         .with_context(|| format!("创建项目文档 MCP 会话目录失败：{}", staging_dir.display()))?;
-    let create_result = write_session_files(&staging_dir, &session, host_port).and_then(|_| {
-        fs::rename(&staging_dir, &final_session_dir).with_context(|| {
-            format!(
-                "发布项目文档 MCP 会话目录失败：{}",
-                final_session_dir.display()
-            )
-        })
-    });
+    let create_result =
+        write_session_files(&staging_dir, &session, host_port, profile).and_then(|_| {
+            fs::rename(&staging_dir, &final_session_dir).with_context(|| {
+                format!(
+                    "发布项目文档 MCP 会话目录失败：{}",
+                    final_session_dir.display()
+                )
+            })
+        });
     if let Err(error) = create_result {
         let _ = fs::remove_dir_all(&staging_dir);
         return Err(error);
     }
-    let operation_id =
+    let operation_id = if profile == DescriptorProfile::Governance {
         match crate::project_document_observability::mark_session_ready(&root, &session.id) {
-            Ok(operation_id) => operation_id,
+            Ok(operation_id) => Some(operation_id),
             Err(error) => {
                 let _ = fs::remove_dir_all(&final_session_dir);
                 return Err(error);
             }
-        };
-    let url = format!(
+        }
+    } else {
+        None
+    };
+    let base_url = format!(
         "http://127.0.0.1:{host_port}/api/project-docs/mcp/{}?token={}",
         session.id, session.token
     );
+    let url = if profile == DescriptorProfile::Context {
+        format!(
+            "{base_url}&profile={}",
+            crate::node_agent_project_context_mcp::PROFILE
+        )
+    } else {
+        base_url
+    };
     let config_path = final_session_dir.join("mcp.json");
     let copilot_config_path = final_session_dir.join("copilot-mcp.json");
     let claude_config_path = final_session_dir.join("claude-mcp.json");
@@ -153,7 +186,11 @@ fn create_descriptor(
         "managedVaultId": session.managed_vault_id,
         "expiresAt": session.expires_at,
         "protocolVersion": MCP_PROTOCOL_VERSION,
-        "purpose": "低 token 分析项目文档权威性、质量与联邦节点；支持项目 Git 工作区和平台托管版本的个人知识库。",
+        "purpose": if profile == DescriptorProfile::Context {
+            "普通编码任务的单工具、零正文、revision 感知项目导航；真实搜索与读取继续使用代理原生工具。"
+        } else {
+            "低 token 分析项目文档权威性、质量与联邦节点；支持项目 Git 工作区和平台托管版本的个人知识库。"
+        },
     }))
 }
 
@@ -161,52 +198,95 @@ fn write_session_files(
     directory: &Path,
     session: &ProjectDocsMcpSession,
     host_port: u16,
+    profile: DescriptorProfile,
 ) -> Result<()> {
     write_private_json(&directory.join("session.json"), session)?;
-    let url = format!(
+    let mut url = format!(
         "http://127.0.0.1:{host_port}/api/project-docs/mcp/{}?token={}",
         session.id, session.token
     );
+    if profile == DescriptorProfile::Context {
+        url.push_str("&profile=context");
+    }
+    let server_name = if profile == DescriptorProfile::Context {
+        "yilong_project_context"
+    } else {
+        "yilong_project_docs"
+    };
     write_private_json(
         &directory.join("mcp.json"),
-        &json!({"mcpServers":{"yilong_project_docs":{
-            "url":url,"required":false,"toolTimeoutSec":60
-        }}}),
+        &named_mcp_config(
+            server_name,
+            json!({
+                "url":url,"required":false,"toolTimeoutSec":60
+            }),
+        ),
     )?;
     write_private_json(
         &directory.join("copilot-mcp.json"),
-        &json!({"mcpServers":{"yilong_project_docs":{
-            "type":"http","url":url,"tools":["*"],"timeout":60000
-        }}}),
+        &named_mcp_config(
+            server_name,
+            json!({
+                "type":"http","url":url,"tools":["*"],"timeout":60000
+            }),
+        ),
     )?;
     write_private_json(
         &directory.join("claude-mcp.json"),
-        &json!({"mcpServers":{"yilong_project_docs":{
-            "type":"http","url":url,"timeout":60000
-        }}}),
+        &named_mcp_config(
+            server_name,
+            json!({
+                "type":"http","url":url,"timeout":60000
+            }),
+        ),
     )?;
     write_private_json(
         &directory.join("gemini-settings.json"),
-        &json!({"mcpServers":{"yilong_project_docs":{
-            "httpUrl":url,"timeout":60000,"trust":false
-        }}}),
+        &named_mcp_config(
+            server_name,
+            json!({
+                "httpUrl":url,"timeout":60000,"trust":false
+            }),
+        ),
     )
 }
 
+fn named_mcp_config(name: &str, server: Value) -> Value {
+    let mut config = json!({"mcpServers": {}});
+    config["mcpServers"][name] = server;
+    config
+}
+
 pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Option<Value> {
+    handle_request_for_profile(workspace, request, None).await
+}
+
+async fn handle_request_for_profile(
+    workspace: &Path,
+    request: McpRequest,
+    profile: Option<&str>,
+) -> Option<Value> {
     let id = request.id.clone().unwrap_or(Value::Null);
-    let result = match request.method.as_str() {
-        "initialize" => Ok(json!({
-            "protocolVersion": MCP_PROTOCOL_VERSION,
-            "capabilities": { "tools": { "listChanged": false } },
-            "serverInfo": { "name": "yilong-project-docs", "version": "1.0.0" },
-            "instructions": "先调用 project_docs_analyze；再按任务局部查询图谱、节点和 token 阅读计划。大型项目按 federation scope_id 分页。目录与图谱预分类不读正文且 classification_model_tokens=0；用 project_docs_get_issues 取得质量证据，只用 project_docs_read 按需读歧义文档。聊天整理使用 project_discussions_get_graph/get_node 先看已有讨论结构；新来源先 get_source_manifest，再按稳定 chunk id 逐块 read_source_chunk，每块只读一次并在 source.processed_chunk_ids 记录进度，expected_source_revision 必须逐字复制刚读取的 manifest.source_revision，禁止用普通文档读取截断长聊天。每个节点的 root_id 都填写所属根主题的稳定 ID，根节点自身 root_id=id。除 topic 外，每个新增或修改节点必须有 1 至 3 句话的可复用 summary；节点 status 只允许 open、exploring、accepted、rejected、superseded、implemented，不能使用 proposed。关系类型只使用 save_proposal schema 的 relation enum，不能自造 contains 等关系。回顾演化优先使用 project_discussions_get_history/get_graph_at_version/compare_versions/trace_node，禁止为了看版本而重读聊天正文。修改前调用 project_discussions_review_graph；确定性问题可 prepare_safe_repair→save_proposal→apply，语义问题只读取 issue 命中的来源后再生成 proposal。apply 始终创建可回看的新版本。save_proposal 保存来源、分支和晋升建议，apply 才更新讨论图和创建新文档。讨论来源默认无权威性，假设、意见、证据、决策和当前事实必须分开。authorization_mode 默认 git_backed_full：普通文档建议和讨论图应用均创建整理前后提交。普通 Git 与托管知识库均可 get_history/get_version_diff；restore 只创建新提交并拒绝混合代码版本。review_all 必须用户审核；suggestions_only 只保存建议。禁止覆盖、越界、修改代码或自动 push。"
-        })),
-        "notifications/initialized" => return None,
-        "tools/list" => Ok(json!({ "tools": tool_definitions() })),
-        "tools/call" => call_tool(workspace, request.params),
-        "ping" => Ok(json!({})),
-        _ => Err(anyhow!("不支持 MCP method: {}", request.method)),
+    if request.method == "notifications/initialized" {
+        return None;
+    }
+    let result = if crate::node_agent_project_context_mcp::handles(profile) {
+        crate::node_agent_project_context_mcp::handle_request(workspace, &request)
+    } else if !matches!(profile, None | Some("governance")) {
+        Err(anyhow!("未知项目文档 MCP profile"))
+    } else {
+        match request.method.as_str() {
+            "initialize" => Ok(json!({
+                "protocolVersion": MCP_PROTOCOL_VERSION,
+                "capabilities": { "tools": { "listChanged": false } },
+                "serverInfo": { "name": "yilong-project-docs", "version": "1.0.0" },
+                "instructions": "先调用 project_docs_analyze；再按任务局部查询图谱、节点和 token 阅读计划。大型项目按 federation scope_id 分页。目录与图谱预分类不读正文且 classification_model_tokens=0；用 project_docs_get_issues 取得质量证据，只用 project_docs_read 按需读歧义文档。聊天整理使用 project_discussions_get_graph/get_node 先看已有讨论结构；新来源先 get_source_manifest，再按稳定 chunk id 逐块 read_source_chunk，每块只读一次并在 source.processed_chunk_ids 记录进度，expected_source_revision 必须逐字复制刚读取的 manifest.source_revision，禁止用普通文档读取截断长聊天。每个节点的 root_id 都填写所属根主题的稳定 ID，根节点自身 root_id=id。除 topic 外，每个新增或修改节点必须有 1 至 3 句话的可复用 summary；节点 status 只允许 open、exploring、accepted、rejected、superseded、implemented，不能使用 proposed。关系类型只使用 save_proposal schema 的 relation enum，不能自造 contains 等关系。回顾演化优先使用 project_discussions_get_history/get_graph_at_version/compare_versions/trace_node，禁止为了看版本而重读聊天正文。修改前调用 project_discussions_review_graph；确定性问题可 prepare_safe_repair→save_proposal→apply，语义问题只读取 issue 命中的来源后再生成 proposal。apply 始终创建可回看的新版本。save_proposal 保存来源、分支和晋升建议，apply 才更新讨论图和创建新文档。讨论来源默认无权威性，假设、意见、证据、决策和当前事实必须分开。authorization_mode 默认 git_backed_full：普通文档建议和讨论图应用均创建整理前后提交。普通 Git 与托管知识库均可 get_history/get_version_diff；restore 只创建新提交并拒绝混合代码版本。review_all 必须用户审核；suggestions_only 只保存建议。禁止覆盖、越界、修改代码或自动 push。"
+            })),
+            "tools/list" => Ok(json!({ "tools": tool_definitions() })),
+            "tools/call" => call_tool(workspace, request.params),
+            "ping" => Ok(json!({})),
+            _ => Err(anyhow!("不支持 MCP method: {}", request.method)),
+        }
     };
     Some(match result {
         Ok(value) => json!({ "jsonrpc": "2.0", "id": id, "result": value }),
@@ -220,9 +300,24 @@ pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Opt
 
 async fn bootstrap_handler(Json(request): Json<BootstrapRequest>) -> Response {
     let host_port = crate::node_agent_admin_open::admin_port_from_env();
-    let descriptor = match (request.project_root.as_deref(), request.vault_id.as_deref()) {
-        (Some(project_root), None) => descriptor_for_project(project_root, host_port),
-        (None, Some(vault_id)) => descriptor_for_vault(vault_id, host_port),
+    let context_profile = request.profile.as_deref() == Some("context");
+    let unknown_profile = request
+        .profile
+        .as_deref()
+        .is_some_and(|profile| !matches!(profile, "context" | "governance"));
+    let descriptor = match (
+        request.project_root.as_deref(),
+        request.vault_id.as_deref(),
+        context_profile,
+        unknown_profile,
+    ) {
+        (_, _, _, true) => Err(anyhow!("profile 只支持 governance 或 context")),
+        (Some(project_root), None, true, false) => {
+            descriptor_for_project_context(project_root, host_port)
+        }
+        (Some(project_root), None, false, false) => descriptor_for_project(project_root, host_port),
+        (None, Some(vault_id), false, false) => descriptor_for_vault(vault_id, host_port),
+        (None, Some(_), true, false) => Err(anyhow!("context profile 当前只支持 Git 项目")),
         _ => Err(anyhow!("必须且只能提供 projectRoot 或 vaultId")),
     };
     match descriptor {
@@ -240,7 +335,7 @@ async fn mcp_handler(
         Ok(workspace) => workspace,
         Err(error) => return json_error(StatusCode::UNAUTHORIZED, format!("{error:#}")),
     };
-    match handle_request(&workspace, request).await {
+    match handle_request_for_profile(&workspace, request, query.profile.as_deref()).await {
         Some(response) => Json(response).into_response(),
         None => StatusCode::ACCEPTED.into_response(),
     }

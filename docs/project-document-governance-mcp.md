@@ -42,9 +42,23 @@ Content-Type: application/json
 
 任何支持 HTTP MCP 的供应商适配器都应读取这份通用配置。适配器可以把相同 URL 映射到自己的用户级配置格式，但不得复制工具逻辑或另建供应商专属文档真源。
 
-PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task version="1">` 标记。节点启动器据此为 Codex、Copilot、Claude 和 Gemini 分别使用会话级参数或临时设置注入同一个 MCP；普通开发任务不加载这些工具，不承担额外工具 schema token。新增供应商适配器也应识别同一标记并转换 `mcp.configPaths`，不能复制工具逻辑。
+PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task version="1">` 标记。节点启动器据此为 Codex、Copilot、Claude 和 Gemini 分别使用会话级参数或临时设置注入同一个 MCP；普通开发任务不加载这些完整治理工具，不承担整套工具 schema token。新增供应商适配器也应识别同一标记并转换 `mcp.configPaths`，不能复制工具逻辑。
+
+普通 Codex 编码任务使用同一项目绑定和短期令牌，但 URL 增加 `profile=context`，服务只发布一个只读 `project_context_plan` 工具及短初始化说明，不发布治理、正文读取、讨论或写工具。它只为陌生项目、跨文件、架构和当前状态任务返回 Git HEAD、catalog revision、权威性、少量路径/章节、图谱入口和实现引用；精确单文件任务应跳过。Codex 随后继续用原生文件搜索和读取核对真实工作区，索引与摘要不得替代源码。其他 CLI 的普通任务暂不自动注入，避免没有可靠工具过滤时重新引入完整 schema；显式文档整理任务保持上述完整 MCP。
+
+需要由 Codex Desktop、插件或其他会话适配器主动 bootstrap 轻量 profile 时传：
+
+```json
+{"projectRoot":"D:\\path\\to\\git-worktree","profile":"context"}
+```
+
+返回 URL 和临时配置只在当前短期会话使用，不得把带 token 的 URL 提交到项目或长期配置。
 
 ## 3. 工具顺序
+
+### `project_context_plan`（仅轻量 context profile）
+
+输入当前任务和最多 2400 token、8 份文档的规划预算。输出不含 Markdown 或源码正文；`source_policy` 明确实现真源、接受方向、导航信源和默认排除材料，`workspace_revision` 同时固定 Git HEAD 与 catalog revision。Git HEAD 或 catalog revision 变化后必须重新规划。代理只打开结果中的少量路径、章节和 `implementation_refs`；已有精确文件/符号时不调用。本工具的目标是减少首次宽搜和重复读取，不替代 Codex、Claude 等供应商自己的文件工具。
 
 整理任务携带统一的 `authorization_mode`，所有供应商使用同一语义：
 

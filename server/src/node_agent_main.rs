@@ -142,6 +142,7 @@ mod node_agent_local_task_session_view;
 mod node_agent_program_resolver;
 mod node_agent_project_agent_recovery;
 mod node_agent_project_agent_runs;
+mod node_agent_project_context_mcp;
 mod node_agent_project_data_policy;
 mod node_agent_project_docs_mcp;
 mod node_agent_project_docs_mcp_discussion_history_tools;

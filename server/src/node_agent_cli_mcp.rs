@@ -88,14 +88,21 @@ pub(crate) fn project_docs_mcp_launch_config(
     cli_name: &str,
     host_port: u16,
 ) -> Option<ProjectDocsMcpLaunchConfig> {
-    if !prompt.contains(PROJECT_DOCS_TASK_MARKER) {
+    let full_governance = prompt.contains(PROJECT_DOCS_TASK_MARKER);
+    let cli_name = cli_name.trim().to_ascii_lowercase();
+    if !full_governance && cli_name != "codex" {
         return None;
     }
     let cwd = cwd?.trim();
     if cwd.is_empty() {
         return None;
     }
-    match crate::node_agent_project_docs_mcp::descriptor_for_project(cwd, host_port) {
+    let descriptor = if full_governance {
+        crate::node_agent_project_docs_mcp::descriptor_for_project(cwd, host_port)
+    } else {
+        crate::node_agent_project_docs_mcp::descriptor_for_project_context(cwd, host_port)
+    };
+    match descriptor {
         Ok(descriptor) => {
             let config_path = |provider: &str| {
                 descriptor
@@ -107,10 +114,14 @@ pub(crate) fn project_docs_mcp_launch_config(
                 args: Vec::new(),
                 env: Vec::new(),
             };
-            match cli_name.trim().to_ascii_lowercase().as_str() {
+            match cli_name.as_str() {
                 "codex" => append_http_mcp_args(
                     &mut config.args,
-                    "yilong_project_docs",
+                    if full_governance {
+                        "yilong_project_docs"
+                    } else {
+                        "yilong_project_context"
+                    },
                     descriptor.get("url")?.as_str()?,
                 ),
                 "copilot" => config.args.push(format!(
@@ -130,7 +141,11 @@ pub(crate) fn project_docs_mcp_launch_config(
             Some(config)
         }
         Err(error) => {
-            tracing::warn!(error = %error, "无法为项目文档整理任务自动准备 MCP");
+            tracing::warn!(
+                error = %error,
+                profile = if full_governance { "governance" } else { "context" },
+                "无法为项目任务自动准备文档 MCP"
+            );
             None
         }
     }
@@ -259,14 +274,22 @@ mod tests {
     }
 
     #[test]
-    fn injects_project_docs_mcp_only_for_explicit_task_marker() {
+    fn injects_one_context_tool_for_plain_codex_and_full_mcp_for_document_tasks() {
         let root = std::env::temp_dir().join(format!(
             "elon_project_docs_cli_mcp_{}",
             uuid::Uuid::new_v4().simple()
         ));
         fs::create_dir_all(root.join(".git")).unwrap();
         let plain = project_docs_mcp_launch_config("普通代码任务", root.to_str(), "codex", 7799);
-        assert!(plain.is_none());
+        let plain = plain.unwrap();
+        assert!(plain
+            .args
+            .iter()
+            .any(|arg| arg.contains("mcp_servers.yilong_project_context.url")));
+        assert!(plain.args.iter().any(|arg| arg.contains("profile=context")));
+        assert!(
+            project_docs_mcp_launch_config("普通代码任务", root.to_str(), "claude", 7799).is_none()
+        );
         let config = project_docs_mcp_launch_config(
             "<elon-project-docs-task version=\"1\">",
             root.to_str(),

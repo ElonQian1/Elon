@@ -476,6 +476,8 @@ pub(crate) fn plan_context(
             "status":node.documentation_status,
             "score":score,
             "entrypoint":node.entrypoint,
+            "document_paths":node.document_paths.iter().take(8).collect::<Vec<_>>(),
+            "implementation_refs":node.implementation_refs.iter().take(8).collect::<Vec<_>>(),
         })).collect::<Vec<_>>(),
         "mandatory_rules": mandatory_rules,
         "relevant_documents": selected,
