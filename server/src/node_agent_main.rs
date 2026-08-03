@@ -154,6 +154,7 @@ mod node_agent_project_docs_mcp_discussion_source_tools;
 mod node_agent_project_docs_mcp_discussion_tools;
 mod node_agent_project_docs_mcp_graph_tools;
 mod node_agent_project_docs_mcp_knowledge_tools;
+mod node_agent_project_docs_mcp_native_context_tools;
 mod node_agent_project_docs_mcp_review_tools;
 mod node_agent_project_docs_mcp_tools;
 mod node_agent_project_documents;
@@ -267,6 +268,10 @@ mod project_document_knowledge_graph_service;
 mod project_document_knowledge_graph_templates;
 mod project_document_maintenance;
 mod project_document_modularity_review;
+mod project_document_native_context;
+mod project_document_native_context_projection;
+#[cfg(test)]
+mod project_document_native_context_tests;
 mod project_document_observability;
 mod project_document_observability_api;
 mod project_document_policy;

@@ -183,7 +183,9 @@ pub(crate) fn enforce_response_projection(mut plan: Value, max_response_tokens: 
     let target_bytes = max_response_tokens.saturating_mul(4).saturating_sub(900) as usize;
     let mut removed = 0usize;
     while serialized_len(&plan) > target_bytes {
-        if pop_array(&mut plan, "relevant_documents", 1)
+        if pop_nested_array(&mut plan, "verified_project_memory", "selected", 0)
+            || pop_nested_array(&mut plan, "verified_project_memory", "invalidated", 0)
+            || pop_array(&mut plan, "relevant_documents", 1)
             || pop_array(&mut plan, "matched_nodes", 2)
             || pop_nested_array(&mut plan, "source_conflict_summary", "metadata_warnings", 1)
             || pop_array(&mut plan, "mandatory_rules", 1)
@@ -227,6 +229,11 @@ fn compact_budget_fallback(plan: &Value) -> Value {
         "contract": plan.get("contract"),
         "workspace_revision": plan.get("workspace_revision"),
         "source_policy": plan.get("source_policy"),
+        "verified_project_memory": {
+            "selected_count": plan.pointer("/verified_project_memory/selected_count"),
+            "invalidated_count": plan.pointer("/verified_project_memory/invalidated_count"),
+            "details_omitted": true,
+        },
         "selected_paths": selected_paths,
         "matched_entrypoints": entrypoints,
         "source_conflict_summary": {

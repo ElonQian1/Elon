@@ -425,6 +425,7 @@ mod project_document_knowledge_graph_model;
 mod project_document_knowledge_graph_service;
 mod project_document_knowledge_graph_templates;
 mod project_document_maintenance;
+mod project_document_native_context;
 mod project_document_organization_api;
 mod project_document_policy;
 mod project_document_quality;

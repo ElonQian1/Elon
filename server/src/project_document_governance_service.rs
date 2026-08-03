@@ -20,6 +20,9 @@ use crate::{
         SECTION_CONFIG_PATH, SUGGESTIONS_CONFIG_PATH,
     },
     project_document_governance_facets::effective_facets_with_metadata,
+    project_document_native_context::{
+        mark_candidates_applied, validate_reviewed_memories_current,
+    },
     project_document_scoped_health::analyze_scoped_document_health,
     project_document_vault::{current_version, is_managed_vault},
 };
@@ -287,6 +290,7 @@ pub(crate) fn save_suggestions(
     verify_catalog_revision(&snapshot, Some(expected_catalog_revision))?;
     let existing = load_suggestions(workspace)?;
     let suggestions = validate_ready_suggestions(suggestions, &snapshot.documents)?;
+    validate_reviewed_memories_current(workspace, &suggestions.proposed_context_memories)?;
     if existing.value.as_ref() == Some(&suggestions) {
         return Ok(json!({
             "status": "ready",
@@ -359,6 +363,9 @@ pub(crate) fn apply_saved_suggestions(
         &snapshot.documents,
     )?;
     if result.already_applied {
+        let native_context_candidates_marked_applied =
+            mark_candidates_applied(workspace, &result.suggestions.proposed_context_memories)
+                .unwrap_or_default();
         return Ok(json!({
             "status": "applied",
             "already_applied": true,
@@ -368,9 +375,11 @@ pub(crate) fn apply_saved_suggestions(
             "suggestions_revision": suggestions.revision,
             "authorization_mode": authorization.mode,
             "auto_authorized": authorization.auto_authorized,
+            "native_context_candidates_marked_applied": native_context_candidates_marked_applied,
             "markdown_changed": false,
         }));
     }
+    validate_reviewed_memories_current(workspace, &result.suggestions.proposed_context_memories)?;
     verify_file_revision(
         "AI 整理建议",
         suggestions.revision.as_deref(),
@@ -443,6 +452,9 @@ pub(crate) fn apply_saved_suggestions(
             .transpose()?
     };
     let git_document_transaction_complete = git_result_commit.is_some();
+    let native_context_candidates_marked_applied =
+        mark_candidates_applied(workspace, &result.suggestions.proposed_context_memories)
+            .unwrap_or_default();
     Ok(json!({
         "status": "applied",
         "already_applied": false,
@@ -460,6 +472,7 @@ pub(crate) fn apply_saved_suggestions(
         "git_pre_organization_commit": managed_pre_organization_commit,
         "git_result_commit": git_result_commit,
         "git_document_transaction_complete": git_document_transaction_complete,
+        "native_context_candidates_marked_applied": native_context_candidates_marked_applied,
         "markdown_changed": false,
     }))
 }

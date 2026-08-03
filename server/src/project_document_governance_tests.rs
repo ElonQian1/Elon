@@ -17,6 +17,7 @@ use crate::{
     project_document_knowledge_graph_model::{
         ProjectKnowledgeGraphConfig, ProjectKnowledgeNodeConfig,
     },
+    project_document_native_context::{ProjectContextEvidence, ProjectContextMemory},
 };
 
 fn workspace(label: &str) -> PathBuf {
@@ -256,6 +257,37 @@ fn ai_section_operations_apply_with_reason_impact_and_audit() {
     .unwrap_err()
     .to_string()
     .contains("不存在"));
+}
+
+#[test]
+fn reviewed_native_context_memory_uses_existing_suggestion_apply_flow() {
+    let mut suggestions = DocumentOrganizationSuggestions {
+        version: 1,
+        status: OrganizationStatus::Ready,
+        ..DocumentOrganizationSuggestions::default()
+    };
+    suggestions.proposed_context_memories = vec![ProjectContextMemory {
+        summary: "The route table delegates document authorization to one policy module.".into(),
+        topics: vec!["project documents".into(), "authorization".into()],
+        evidence: vec![ProjectContextEvidence {
+            path: "server/src/main.rs".into(),
+            content_hash: "a".repeat(64),
+            locator: "project document routes".into(),
+            evidence_kind: "source".into(),
+        }],
+        reviewed_at: "catalog-revision-1".into(),
+        ..ProjectContextMemory::default()
+    }];
+
+    let result = apply_suggestions(DocumentSectionManifest::default(), suggestions, &[]).unwrap();
+    assert_eq!(result.manifest.context_memories.len(), 1);
+    assert_eq!(
+        result.manifest.context_memories[0].summary,
+        "The route table delegates document authorization to one policy module."
+    );
+    assert!(result.manifest.context_memories[0]
+        .candidate_id
+        .starts_with("native-"));
 }
 
 #[test]

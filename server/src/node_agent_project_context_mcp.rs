@@ -9,7 +9,7 @@ mod session;
 use anyhow::{bail, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{path::Path, time::Instant};
+use std::{fs, path::Path, time::Instant};
 
 use crate::{
     node_agent_project_context_cache::{
@@ -19,7 +19,9 @@ use crate::{
         enforce_response_projection, project_navigation_plan, source_conflict_summary,
     },
     node_agent_project_docs_mcp::McpRequest,
+    project_document_governance::{parse_manifest, SECTION_CONFIG_PATH},
     project_document_knowledge_graph_service::plan_context,
+    project_document_native_context_projection::relevant_memories,
     project_document_response::{compact_text, project_tool_response},
 };
 
@@ -58,7 +60,7 @@ pub(crate) fn handle_request(
         "initialize" => Ok(json!({
             "protocolVersion": "2025-03-26",
             "capabilities": { "tools": { "listChanged": false } },
-            "serverInfo": { "name": "yilong-project-context", "version": "1.3.0" },
+            "serverInfo": { "name": "yilong-project-context", "version": "1.4.0" },
             "instructions": SERVER_INSTRUCTIONS,
         })),
         "tools/list" => Ok(json!({ "tools": [definition()] })),
@@ -71,7 +73,7 @@ pub(crate) fn handle_request(
 pub(crate) fn definition() -> Value {
     json!({
         "name": TOOL_NAME,
-        "description": "为陌生项目、跨文件、架构或当前状态任务返回严格限额的 Git/revision、权威性、图谱入口和实现引用。零正文、只读；同一短期会话自动复用 plan/source hash，只返回未变化或增量回执。精确单文件任务不要调用。",
+        "description": "为陌生项目、跨文件、架构或当前状态任务返回严格限额的 Git/revision、权威性、图谱入口、实现引用和最多 3 条证据 hash 有效的已审核导航记忆。零正文、只读；同一短期会话自动复用 plan/source hash，只返回未变化或增量回执。精确单文件任务不要调用。",
         "inputSchema": {
             "type": "object",
             "required": ["query"],
@@ -243,9 +245,10 @@ fn build_fresh_plan(
 ) -> Result<Value> {
     let raw = plan_context(workspace, query, None, max_tokens, max_documents, 1_600)?;
     let mut plan = project_navigation_plan(&raw);
+    plan["verified_project_memory"] = portable_memory_projection(workspace, query);
     let catalog_revision = plan.get("catalog_revision").cloned().unwrap_or(Value::Null);
     plan["contract"] = json!({
-        "schema": "elon.project_context_plan.v4",
+        "schema": "elon.project_context_plan.v5",
         "read_only": true,
         "source_bodies_returned": 0,
         "native_search_replaced": false,
@@ -267,7 +270,7 @@ fn build_fresh_plan(
         "precedence": [
             {"rank":1,"role":"implementation_truth","sources":["current_files","tests","runtime_evidence"]},
             {"rank":2,"role":"accepted_direction","sources":["binding_rules","current_status","accepted_decisions"]},
-            {"rank":3,"role":"navigation_only","sources":["knowledge_graph","indexes","generated_summaries"]}
+            {"rank":3,"role":"navigation_only","sources":["verified_project_memory","knowledge_graph","indexes","generated_summaries"]}
         ],
         "default_excluded": ["drafts","discussions","history","archives","traces"],
         "conflict_action": "Report drift and verify both current source and binding direction; never silently choose an index or summary."
@@ -276,7 +279,9 @@ fn build_fresh_plan(
     plan["native_tool_handoff"] = json!({
         "next": "Open only selected paths and implementation_refs with Codex native search/read.",
         "before_edit": "Verify exact current source/tests; this response is navigation metadata.",
-        "stop": "Stop expanding once one verified source resolves the task."
+        "stop": "Stop expanding once one verified source resolves the task.",
+        "memory_rule": "Reusable memory may narrow where to look, but never replaces current native reads before an edit.",
+        "durable_handoff": "Submit stable verified navigation facts only in a later full-governance session; never copy tool output or source bodies."
     });
     plan = enforce_response_projection(plan, max_response_tokens);
     let receipt_material = json!({
@@ -287,6 +292,7 @@ fn build_fresh_plan(
         "matched_nodes": plan.get("matched_nodes"),
         "mandatory_rules": plan.get("mandatory_rules"),
         "relevant_documents": plan.get("relevant_documents"),
+        "verified_project_memory": plan.get("verified_project_memory"),
         "selected_paths": plan.get("selected_paths"),
     });
     let estimated_full_plan_tokens = serde_json::to_vec(&plan)?.len().div_ceil(4);
@@ -299,6 +305,24 @@ fn build_fresh_plan(
         "estimated_full_plan_tokens": estimated_full_plan_tokens,
     });
     Ok(plan)
+}
+
+fn portable_memory_projection(workspace: &Path, query: &str) -> Value {
+    let path = workspace.join(SECTION_CONFIG_PATH);
+    let Some(content) = fs::read_to_string(path).ok() else {
+        return relevant_memories(workspace, query, &[], 3);
+    };
+    let Ok(manifest) = parse_manifest(Some(&content)) else {
+        return json!({
+            "schema":"elon.project_context_memory.v1",
+            "status":"manifest_invalid",
+            "selected":[],
+            "selected_count":0,
+            "source_bodies_returned":0,
+            "action":"Run full project document governance analysis before trusting portable memory."
+        });
+    };
+    relevant_memories(workspace, query, &manifest.context_memories, 3)
 }
 
 fn default_token_budget() -> u64 {

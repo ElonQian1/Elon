@@ -130,7 +130,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             "project_docs_save_suggestions",
-            "保存 AI 根据紧凑目录形成的结构化建议，包括项目类型、层级主题、知识首页、文档关系和安全路径操作。只能写 .elon/document-organization-suggestions.json，不能移动、删除、改写 Markdown，也不能直接更新分区配置。",
+            "保存 AI 根据紧凑目录形成的结构化建议，包括项目类型、层级主题、知识首页、文档关系、已审核原生理解导航记忆和安全路径操作。只能写 .elon/document-organization-suggestions.json，不能移动、删除、改写 Markdown，也不能直接更新分区配置。",
             json!({
                 "type":"object",
                 "required":["suggestions","expected_catalog_revision"],
@@ -190,6 +190,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         crate::node_agent_project_docs_mcp_discussion_tools::definitions(),
     );
     definitions.extend(crate::node_agent_project_docs_mcp_knowledge_tools::history_definitions());
+    definitions.extend(crate::node_agent_project_docs_mcp_native_context_tools::definitions());
     definitions.extend(crate::node_agent_project_docs_mcp_review_tools::definitions());
     definitions
 }
@@ -289,6 +290,13 @@ pub(crate) fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
                 name,
                 arguments.clone(),
             )?)
+            .or(
+                crate::node_agent_project_docs_mcp_native_context_tools::try_call(
+                    workspace,
+                    name,
+                    arguments.clone(),
+                )?,
+            )
             .or(
                 crate::node_agent_project_docs_mcp_knowledge_tools::try_call(
                     workspace, name, arguments,
@@ -419,6 +427,7 @@ fn suggestions_schema() -> Value {
                 }
             },
             "proposed_knowledge_graph":crate::node_agent_project_docs_mcp_graph_tools::proposal_schema(),
+            "proposed_context_memories":crate::node_agent_project_docs_mcp_native_context_tools::memory_schema(),
             "documents_read":{"type":"integer","minimum":0},
             "estimated_tokens_used":{"type":"integer","minimum":0}
         }

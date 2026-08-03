@@ -23,6 +23,7 @@ use crate::project_document_knowledge_graph_model::{
     merge_graph_config, normalize_graph_config, validate_graph_document_paths,
     ProjectKnowledgeGraphConfig,
 };
+use crate::project_document_native_context::{self as native, ProjectContextMemory};
 
 pub(crate) const SECTION_CONFIG_PATH: &str = ".elon/document-sections.json";
 pub(crate) const SUGGESTIONS_CONFIG_PATH: &str = ".elon/document-organization-suggestions.json";
@@ -110,6 +111,8 @@ pub(crate) struct DocumentSectionManifest {
     pub audit_log: Vec<DocumentOrganizationAuditEntry>,
     #[serde(default)]
     pub knowledge_graph: ProjectKnowledgeGraphConfig,
+    #[serde(default)]
+    pub context_memories: Vec<ProjectContextMemory>,
 }
 
 impl Default for DocumentSectionManifest {
@@ -126,6 +129,7 @@ impl Default for DocumentSectionManifest {
             document_metadata: BTreeMap::new(),
             audit_log: Vec::new(),
             knowledge_graph: ProjectKnowledgeGraphConfig::default(),
+            context_memories: Vec::new(),
         }
     }
 }
@@ -208,6 +212,8 @@ pub(crate) struct DocumentOrganizationSuggestions {
     pub file_operations: Vec<SuggestedFileOperation>,
     #[serde(default)]
     pub proposed_knowledge_graph: ProjectKnowledgeGraphConfig,
+    #[serde(default)]
+    pub proposed_context_memories: Vec<ProjectContextMemory>,
     #[serde(default)]
     pub documents_read: u64,
     #[serde(default)]
@@ -321,6 +327,7 @@ pub(crate) fn normalize_manifest(
         .collect::<Vec<_>>();
     manifest.audit_log.reverse();
     manifest.knowledge_graph = normalize_graph_config(manifest.knowledge_graph)?;
+    manifest.context_memories = native::normalize_memories(manifest.context_memories)?;
     Ok(manifest)
 }
 
@@ -386,6 +393,8 @@ pub(crate) fn normalize_suggestions(
     suggestions.file_operations = normalize_file_operations(suggestions.file_operations)?;
     suggestions.proposed_knowledge_graph =
         normalize_graph_config(suggestions.proposed_knowledge_graph)?;
+    suggestions.proposed_context_memories =
+        native::normalize_memories(suggestions.proposed_context_memories)?;
     Ok(suggestions)
 }
 
@@ -494,6 +503,10 @@ pub(crate) fn apply_suggestions(
     manifest.knowledge_graph = merge_graph_config(
         manifest.knowledge_graph,
         suggestions.proposed_knowledge_graph.clone(),
+    )?;
+    native::merge(
+        &mut manifest.context_memories,
+        &suggestions.proposed_context_memories,
     )?;
     manifest.sections = sections.into_values().collect();
     let valid_keys = valid_section_keys(&manifest.sections);

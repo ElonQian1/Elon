@@ -10,7 +10,7 @@
 - 路径决定文档权威性上限；frontmatter 和 manifest 元数据只能进一步收窄 `lifecycle`、`authority` 与 `default_retrieval`，不能越过路径上限。`version_status=current|draft|deprecated|superseded|archived` 与正文中的显式状态共同决定版本状态；旧讨论、旧需求和历史报告默认不进入当前知识上下文。
 - PC 网页端“知识架构”按业务主题浏览；一个文档有一个主主题和最多 12 个副主题。治理总览把 `retrieval`、`lifecycle`、`authority`、`document_type` 四个维度分开保存和交叉筛选，旧的单选治理分区只是兼容快捷投影。
 - PC 网页端“项目图谱”包含三张正交视图：产品功能图回答“用户能做什么”，技术架构图回答“系统怎样实现”，文档主题图回答“文档讲什么”。治理视图继续单独回答“能否作为当前事实”。网页和 MCP 都消费 Rust 后端生成的同一图谱，前端不再从主题树自行猜测功能。
-- `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主主题 `assignments`、副主题 `secondary_assignments`、四维 `governance_facets`、兼容 `governance_overrides`、有类型的文档语义关系、`knowledge_graph` 节点/关系/文档引用/实现证据和最近 100 条结构操作审计，不移动实际文件、不复制 Markdown 正文。
+- `.elon/document-sections.json` 保存项目类型、知识首页、层级主题、主主题 `assignments`、副主题 `secondary_assignments`、四维 `governance_facets`、兼容 `governance_overrides`、有类型的文档语义关系、`knowledge_graph` 节点/关系/文档引用/实现证据、`context_memories` 导航记忆和最近 100 条结构操作审计，不移动实际文件、不复制 Markdown 或源码正文。导航记忆固定低于当前源码、测试和约束性文档，不能成为实现真源。
 - 主题树只改变 OneNote 式浏览位置，不改变 `role`、`lifecycle`、`authority` 或 `default_retrieval`；AI 检索仍以真实路径元数据为准。
 - `.elon/document-organization-suggestions.json` 保存待审核或已应用的 AI 建议，不是当前规则真源。
 - `.elon/knowledge-federation.json` 可为大型仓库声明“项目根 → 子项目 → 模块/主题”的知识节点；每个节点可用 `scope_path` 表示主目录、`include_globs` 纳入目录外的模块文档、`exclude_globs` 排除局部材料，并有独立 owner、项目类型、知识首页和健康度，最多 4096 个节点、六层。MCP 和网页端按 `parent_id + cursor/offset + limit` 惰性展开；旧的 16 分区或 500 文档窗口不参与联邦完整性判断。
@@ -69,6 +69,8 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 `performance_receipt.transport` 在最终 MCP tool result 组装后报告 `structured_content_bytes`、`mcp_tool_result_bytes` 和 UTF-8 字节除以 4 的估算 token；它覆盖文本兼容摘要与结构化结果的实际传输对象，但不是供应商账单 token。context/governance profile 固化在会话凭证中，修改 URL 查询参数不能把单工具会话升级为完整治理工具。
 
 `source_policy.precedence` 明确实现真源、接受方向和仅导航信源；`source_conflict_summary` 只根据元数据报告歧义、非当前、非权威和 dirty worktree 风险，并明确 `semantic_content_compared=false`，不得冒充已经比较过正文冲突。dirty 状态即使成功指纹化也必须用原生 Git/文件工具核对；指纹只允许安全复用导航计划。代理只打开结果中的少量路径、章节和 `implementation_refs`；已有精确文件/符号时不调用。Git HEAD、worktree 指纹、catalog revision 或任务范围变化后重新规划；否则复用回执。本工具减少首次宽搜和重复读取，不替代供应商自己的文件工具。
+
+`verified_project_memory` 最多返回 3 条与当前 query 相关的已审核导航摘要。每条只含 topic、工作区相对证据路径、可选 symbol/heading 定位符和 SHA-256，不含源码正文；服务端先做零 I/O 相关性排序，只对前 8 个候选重新计算证据 hash，取得 3 条有效结果即停止，任一证据漂移则整条失效并要求原生工具重读。该层随 `.elon/document-sections.json` 进入 Git，因此换 PC 后可以复用，但每次编辑前仍须核对当前实现。Codex 的 `~/.codex/memories`、聊天记录和命令输出不导入这里，也不是该功能的备份源。
 
 整理任务携带统一的 `authorization_mode`，所有供应商使用同一语义：
 
@@ -186,9 +188,15 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 读取当前结构化建议和 revision，不读取正文。
 
+### `project_docs_record_native_context_candidate` / `project_docs_list_native_context_candidates`
+
+前者接收 Codex Desktop、Codex CLI 或其他代理已经用原生文件工具核对出的短摘要，并强制附带 1–8 个当前工作区证据路径及 SHA-256。候选保存在工作区外的项目文档 SQLite，只记录摘要、topic、路径、定位符、hash、producer 和时间，不记录 prompt、聊天、命令输出或源码正文，也不修改 Git。后者每次限额列出 `pending`、`applied` 或全部候选。
+
+候选不是项目事实，也不会自动进入普通编码上下文。显式文档治理任务审核候选后，把接受项复制到 `suggestions.proposed_context_memories`；只有既有 `project_docs_save_suggestions` 和 `project_docs_apply_suggestions` 的 catalog/manifest/suggestions revision、authorization 和 Git 事务全部通过，才合并为跨 PC 的 `context_memories`。应用成功后本机候选只更新为 `applied` 回执；新 PC 无需复制这份 SQLite，直接从 Git manifest 获取已审核导航记忆。
+
 ### `project_docs_apply_suggestions`
 
-工具把建议的项目类型、知识首页、层级主题、文档关系、`proposed_knowledge_graph` 和归类合并到知识架构清单，再将建议状态改为 `applied`。默认 `git_backed_full` 会先创建整理前提交；没有实体操作时同时创建整理后提交，有实体操作时返回 `git_baseline_commit` 交给下一工具；`review_all` 必须显式传 `reviewed=true`；`suggestions_only` 禁止调用：
+工具把建议的项目类型、知识首页、层级主题、文档关系、`proposed_knowledge_graph`、证据 hash 仍有效的 `proposed_context_memories` 和归类合并到知识架构清单，再将建议状态改为 `applied`。默认 `git_backed_full` 会先创建整理前提交；没有实体操作时同时创建整理后提交，有实体操作时返回 `git_baseline_commit` 交给下一工具；`review_all` 必须显式传 `reviewed=true`；`suggestions_only` 禁止调用：
 
 - catalog、manifest 和 suggestions revision 必须一致；
 - 重复调用是幂等的；
