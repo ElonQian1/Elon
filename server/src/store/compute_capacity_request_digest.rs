@@ -4,7 +4,10 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::compute_federation::{
-    capacity::{ComputeCapacityClaimKind, ComputeCapacityPoolBinding},
+    capacity::{
+        ComputeCapacityCausalBinding, ComputeCapacityClaimKind, ComputeCapacityOfferBinding,
+        ComputeCapacityPoolBinding,
+    },
     market::ComputeDeliveryWindowBinding,
 };
 
@@ -20,7 +23,7 @@ use super::{
 const ADD_SUPPLY_REQUEST_SCHEMA: &str = "compute_federation.capacity_add_supply_request.v1";
 const WITHDRAW_SUPPLY_REQUEST_SCHEMA: &str =
     "compute_federation.capacity_withdraw_supply_request.v1";
-const HOLD_CLAIM_REQUEST_SCHEMA: &str = "compute_federation.capacity_hold_claim_request.v1";
+const HOLD_CLAIM_REQUEST_SCHEMA: &str = "compute_federation.capacity_hold_claim_request.v2";
 const FINISH_CLAIM_REQUEST_SCHEMA: &str = "compute_federation.capacity_finish_claim_request.v1";
 
 #[derive(Serialize)]
@@ -63,8 +66,25 @@ struct CanonicalHoldRequest<'a> {
     subject_kind: &'a str,
     subject_id: &'a str,
     lines: Vec<CanonicalCapacityLine>,
+    causal_binding: CanonicalCausalBinding<'a>,
     expires_at: String,
     occurred_at: String,
+}
+
+#[derive(Serialize)]
+struct CanonicalOfferBinding<'a> {
+    offer_id: &'a str,
+    offer_version: i64,
+    offer_digest: &'a str,
+}
+
+#[derive(Serialize)]
+struct CanonicalCausalBinding<'a> {
+    offer: Option<CanonicalOfferBinding<'a>>,
+    job_id: Option<&'a str>,
+    reservation_id: Option<&'a str>,
+    attempt_lease_id: Option<&'a str>,
+    fencing_generation: Option<i64>,
 }
 
 #[derive(Serialize)]
@@ -130,9 +150,28 @@ pub(super) fn hold_claim_request_digest(input: &HoldComputeCapacityClaim) -> Res
                 .iter()
                 .map(|line| (line.bucket_id.as_str(), line.quantity_units)),
         ),
+        causal_binding: canonical_causal_binding(&input.causal_binding),
         expires_at: canonical_utc("容量 Claim 到期时间", expires_at)?,
         occurred_at: canonical_utc("容量 Claim 发生时间", &input.occurred_at)?,
     })
+}
+
+fn canonical_causal_binding(binding: &ComputeCapacityCausalBinding) -> CanonicalCausalBinding<'_> {
+    CanonicalCausalBinding {
+        offer: binding.offer.as_ref().map(canonical_offer_binding),
+        job_id: binding.job_id.as_deref().map(str::trim),
+        reservation_id: binding.reservation_id.as_deref().map(str::trim),
+        attempt_lease_id: binding.attempt_lease_id.as_deref().map(str::trim),
+        fencing_generation: binding.fencing_generation,
+    }
+}
+
+fn canonical_offer_binding(binding: &ComputeCapacityOfferBinding) -> CanonicalOfferBinding<'_> {
+    CanonicalOfferBinding {
+        offer_id: binding.offer_id.trim(),
+        offer_version: binding.offer_version,
+        offer_digest: binding.offer_digest.trim(),
+    }
 }
 
 pub(super) fn finish_claim_request_digest(input: &FinishComputeCapacityClaim) -> Result<String> {
