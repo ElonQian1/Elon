@@ -373,6 +373,11 @@ export interface DirectoryMerchant {
   updated_at: string
 }
 
+export interface DirectoryMerchantList {
+  schema: string
+  merchants: DirectoryMerchant[]
+}
+
 export interface DirectoryCapability {
   capability_key: string
   display_name: string

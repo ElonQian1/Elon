@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link2, RefreshCw, Send, Unlink } from 'lucide-react'
+import { Link2, RefreshCw, Search, Send, Unlink } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type {
   ConsumerPortabilityAdoptionPlan,
   ConsumerPortabilityImportSummary,
+  DirectoryMerchant,
   OpenCommerceDeveloperApp,
   PortabilityRelationshipMapping,
 } from './openCommerceClientTypes'
@@ -19,6 +20,8 @@ export default function ConsumerPortabilityReauthorization({ projectId }: { proj
   const [plan, setPlan] = useState<ConsumerPortabilityAdoptionPlan | null>(null)
   const [sourceRelationshipId, setSourceRelationshipId] = useState('')
   const [targetMerchantId, setTargetMerchantId] = useState('')
+  const [targetQuery, setTargetQuery] = useState('')
+  const [targetMerchants, setTargetMerchants] = useState<DirectoryMerchant[]>([])
   const [requesterAppId, setRequesterAppId] = useState('')
   const [scopesText, setScopesText] = useState('')
   const [purpose, setPurpose] = useState('迁移后重新授权')
@@ -69,6 +72,26 @@ export default function ConsumerPortabilityReauthorization({ projectId }: { proj
     const candidate = plan?.relationship_candidates.find((item) => item.source_relationship_id === relationshipId)
     setScopesText(candidate?.requested_scopes.join(', ') ?? '')
     setPurpose(candidate?.purpose ?? '迁移后重新授权')
+  }
+
+  async function searchTargetMerchants() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const response = await openCommerceClientApi.searchDirectoryMerchants(targetQuery)
+      setTargetMerchants(response.merchants)
+      if (response.merchants.length === 0) setMessage('未找到已发布的目标商户。')
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function selectTargetMerchant(merchant: DirectoryMerchant) {
+    setTargetMerchantId(merchant.id)
+    setTargetQuery(merchant.display_name)
+    setMessage(`已选择目标商户：${merchant.display_name}。请仍由本人核对是否为同一业务主体。`)
   }
 
   async function createMapping() {
@@ -153,7 +176,36 @@ export default function ConsumerPortabilityReauthorization({ projectId }: { proj
             </option>
           ))}
         </select>
-        <input value={targetMerchantId} onChange={(event) => setTargetMerchantId(event.target.value)} placeholder="目标开放目录商户 ID" disabled={busy} />
+        <span style={{ display: 'flex', gap: 8 }}>
+          <input
+            value={targetQuery}
+            onChange={(event) => setTargetQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                void searchTargetMerchants()
+              }
+            }}
+            placeholder="按名称搜索已发布商户"
+            disabled={busy}
+            style={{ flex: 1 }}
+          />
+          <button style={actionStyle('secondary', busy)} type="button" onClick={searchTargetMerchants} disabled={busy}>
+            <Search size={14} />搜索
+          </button>
+        </span>
+        {targetMerchants.map((merchant) => (
+          <button
+            key={merchant.id}
+            style={actionStyle(targetMerchantId === merchant.id ? 'primary' : 'secondary', busy)}
+            type="button"
+            onClick={() => selectTargetMerchant(merchant)}
+            disabled={busy}
+          >
+            {merchant.display_name} · {merchant.slug}
+          </button>
+        ))}
+        <input value={targetMerchantId} readOnly placeholder="选中后写入目标商户 ID" />
         <button style={actionStyle('primary', busy || !selectedCandidate)} type="button" onClick={createMapping} disabled={busy || !selectedCandidate}>
           <Link2 size={14} />确认映射
         </button>
