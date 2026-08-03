@@ -5,9 +5,9 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     open_commerce_consumer_model::{
-        ConsumerAuthorizationState, ConsumerDiscoveryMatch, ConsumerDiscoveryRequest,
-        ConsumerDiscoveryResponse, ConsumerPreferences, ConsumerPriceFilter,
-        ConsumerRankingReceipt, ConsumerSourceFilter,
+        ConsumerAuthorizationState, ConsumerCapabilityFilter, ConsumerDiscoveryMatch,
+        ConsumerDiscoveryRequest, ConsumerDiscoveryResponse, ConsumerPreferences,
+        ConsumerPriceFilter, ConsumerRankingReceipt, ConsumerSourceFilter,
     },
     open_commerce_consumer_preference_service,
     open_commerce_consumer_ranking::{self, ConsumerRankingPolicy},
@@ -18,7 +18,10 @@ use crate::{
     },
     open_commerce_directory_service,
     open_commerce_integration_model::{normalize_provider_key, normalize_string_list},
-    open_commerce_model::{ACCESS_AUTHORIZED, ACCESS_PUBLIC},
+    open_commerce_model::{
+        validate_access_level, validate_capability_kind, ACCESS_AUTHORIZED, ACCESS_OWNER_ONLY,
+        ACCESS_PUBLIC,
+    },
     store::Store,
 };
 
@@ -40,6 +43,7 @@ pub(crate) fn discover(
         open_commerce_consumer_preference_service::normalize_preferences(request.preferences)?;
     normalize_source_filters(&mut request)?;
     normalize_price_filter(&mut request)?;
+    normalize_capability_filter(&mut request)?;
     let candidate_limit = request.limit.clamp(1, 50).saturating_mul(4).min(100);
     let candidates = open_commerce_directory_service::discover_merchants(
         store,
@@ -90,6 +94,7 @@ pub(crate) fn discover(
         source_filter: source_filter(&request),
         source_filter_options,
         price_filter: price_filter(&request),
+        capability_filter: capability_filter(&request),
         available_ranking_policies: open_commerce_consumer_ranking::available_ranking_policies(),
         ranking_receipt,
         matches,
@@ -114,6 +119,7 @@ fn build_ranking_receipt(
         "require_internal_sync_receipt": request.require_internal_sync_receipt,
         "source_filter": source_filter(request),
         "price_filter": price_filter(request),
+        "capability_filter": capability_filter(request),
         "preferences": &request.preferences,
         "limit": request.limit.clamp(1, 50)
     });
@@ -156,6 +162,7 @@ fn build_ranking_receipt(
         "source_requirement": source_requirement(request),
         "source_filter": source_filter(request),
         "price_filter": price_filter(request),
+        "capability_filter": capability_filter(request),
         "request_fingerprint_sha256": sha256_hex(&request_fingerprint_json),
         "eligible_match_count": eligible_match_count,
         "returned_match_count": matches.len(),
@@ -220,6 +227,20 @@ fn best_match(
                 .capability_key
                 .as_deref()
                 .map(|key| capability.capability_key == key)
+                .unwrap_or(true)
+        })
+        .filter(|capability| {
+            request
+                .capability_kind
+                .as_deref()
+                .map(|kind| capability.kind == kind)
+                .unwrap_or(true)
+        })
+        .filter(|capability| {
+            request
+                .access_level
+                .as_deref()
+                .map(|access_level| capability.access_level == access_level)
                 .unwrap_or(true)
         })
         .filter(|capability| {
@@ -293,6 +314,12 @@ fn best_match(
         } else {
             reasons.push(format!("调用价币种匹配 {currency}"));
         }
+    }
+    if let Some(kind) = request.capability_kind.as_deref() {
+        reasons.push(format!("能力类型匹配 {kind}"));
+    }
+    if let Some(access_level) = request.access_level.as_deref() {
+        reasons.push(format!("访问级别匹配 {access_level}"));
     }
     let authorization =
         authorization_state(store, &detail, &capability, &request.requester_app_id)?;
@@ -381,6 +408,32 @@ fn price_filter(request: &ConsumerDiscoveryRequest) -> ConsumerPriceFilter {
     ConsumerPriceFilter {
         currency: request.price_currency.clone(),
         max_unit_price_micros: request.preferences.max_unit_price_micros,
+    }
+}
+
+fn normalize_capability_filter(request: &mut ConsumerDiscoveryRequest) -> Result<()> {
+    request.capability_kind = request
+        .capability_kind
+        .take()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| validate_capability_kind(&value))
+        .transpose()?;
+    request.access_level = request
+        .access_level
+        .take()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| validate_access_level(&value))
+        .transpose()?;
+    if request.access_level.as_deref() == Some(ACCESS_OWNER_ONLY) {
+        bail!("消费者公开发现不支持 owner_only 访问级别");
+    }
+    Ok(())
+}
+
+fn capability_filter(request: &ConsumerDiscoveryRequest) -> ConsumerCapabilityFilter {
+    ConsumerCapabilityFilter {
+        kind: request.capability_kind.clone(),
+        access_level: request.access_level.clone(),
     }
 }
 
