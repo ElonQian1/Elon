@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use crate::{
     open_commerce_data_request_model::{
-        CreateConsumerDataErasureRequest, DecideConsumerDataRequest,
+        CreateConsumerDataErasureRequest, DecideConsumerDataRequest, FollowUpConsumerDataRequest,
     },
     open_commerce_data_request_service,
     open_commerce_service::OpenCommerceActor,
@@ -27,6 +27,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/open-commerce/consumer-data-requests/:request_id/withdraw",
             post(withdraw_request),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/consumer-data-requests/:request_id/follow-up",
+            post(follow_up_request),
         )
         .route(
             "/api/projects/:project_id/open-commerce/merchants/:merchant_id/consumer-data-requests",
@@ -92,6 +96,25 @@ async fn withdraw_request(
         &project_id,
         &request_id,
         &actor(&caller),
+    ))
+}
+
+async fn follow_up_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, request_id)): Path<(String, String)>,
+    Json(followup): Json<FollowUpConsumerDataRequest>,
+) -> Response {
+    let caller = match project_caller(&state, &headers, &project_id) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_data_request_service::follow_up_request(
+        &state.store,
+        &project_id,
+        &request_id,
+        &actor(&caller),
+        followup,
     ))
 }
 

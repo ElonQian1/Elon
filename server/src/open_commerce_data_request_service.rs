@@ -3,8 +3,10 @@ use serde_json::json;
 
 use crate::{
     open_commerce_data_request_model::{
-        CreateConsumerDataErasureRequest, DecideConsumerDataRequest,
-        OpenCommerceConsumerDataRequest,
+        CreateConsumerDataErasureRequest, DecideConsumerDataRequest, FollowUpConsumerDataRequest,
+        OpenCommerceConsumerDataRequest, DATA_REQUEST_FOLLOWUP_ACTION_ESCALATE,
+        DATA_REQUEST_FOLLOWUP_ACTION_REMINDER, DATA_REQUEST_STATUS_IN_PROGRESS,
+        DATA_REQUEST_STATUS_REQUESTED,
     },
     open_commerce_service::OpenCommerceActor,
     project_auth::can_edit,
@@ -50,7 +52,13 @@ pub(crate) fn list_consumer_requests(
     limit: usize,
 ) -> Result<Vec<OpenCommerceConsumerDataRequest>> {
     ensure_project_member(actor, "消费者数据请求项目")?;
-    store.list_open_commerce_consumer_data_requests(consumer_project_id, actor.user_id, limit)
+    let mut requests = store.list_open_commerce_consumer_data_requests(
+        consumer_project_id,
+        actor.user_id,
+        limit,
+    )?;
+    populate_operations(store, &mut requests)?;
+    Ok(requests)
 }
 
 pub(crate) fn withdraw_request(
@@ -91,7 +99,67 @@ pub(crate) fn list_merchant_requests(
     limit: usize,
 ) -> Result<Vec<OpenCommerceConsumerDataRequest>> {
     ensure_project_member(actor, "商户项目")?;
-    store.list_open_commerce_merchant_data_requests(merchant_project_id, merchant_id, limit)
+    let mut requests =
+        store.list_open_commerce_merchant_data_requests(merchant_project_id, merchant_id, limit)?;
+    populate_operations(store, &mut requests)?;
+    requests.sort_by(|left, right| {
+        attention_priority(right)
+            .cmp(&attention_priority(left))
+            .then_with(|| {
+                right
+                    .is_operationally_overdue
+                    .cmp(&left.is_operationally_overdue)
+            })
+    });
+    Ok(requests)
+}
+
+pub(crate) fn follow_up_request(
+    store: &Store,
+    consumer_project_id: &str,
+    request_id: &str,
+    actor: &OpenCommerceActor<'_>,
+    followup: FollowUpConsumerDataRequest,
+) -> Result<OpenCommerceConsumerDataRequest> {
+    ensure_project_member(actor, "消费者数据请求项目")?;
+    let request_id = require_id(request_id, "request_id")?;
+    let idempotency_key = require_id(&followup.idempotency_key, "idempotency_key")?;
+    let action = followup.action.trim();
+    if !matches!(
+        action,
+        DATA_REQUEST_FOLLOWUP_ACTION_REMINDER | DATA_REQUEST_FOLLOWUP_ACTION_ESCALATE
+    ) {
+        bail!("消费者数据请求跟进动作无效");
+    }
+    let note = normalize_followup_note(&followup.note)?;
+    let (current, changed) = store.follow_up_open_commerce_consumer_data_request(
+        consumer_project_id,
+        actor.user_id,
+        &request_id,
+        action,
+        &idempotency_key,
+        note.as_deref(),
+    )?;
+    if changed {
+        store.record_open_commerce_audit(
+            consumer_project_id,
+            actor.user_id,
+            Some(actor.app_id),
+            &format!("consumer_data_erasure.{action}"),
+            "consumer_data_request",
+            &current.id,
+            &json!({
+                "merchant_id": current.merchant_id,
+                "subject_alias": current.subject_alias,
+                "reminder_count": current.reminder_count,
+                "is_operationally_overdue": current.is_operationally_overdue,
+                "consumer_escalated": current.consumer_escalated_at.is_some(),
+                "legal_deadline_asserted": false,
+                "platform_adjudication_started": false
+            }),
+        )?;
+    }
+    Ok(current)
 }
 
 pub(crate) fn decide_request(
@@ -165,4 +233,29 @@ fn normalize_note(action: &str, value: &str) -> Result<Option<String>> {
         bail!("完成或拒绝消费者数据请求时必须填写说明");
     }
     Ok((!value.is_empty()).then(|| value.to_string()))
+}
+
+fn normalize_followup_note(value: &str) -> Result<Option<String>> {
+    let value = value.trim();
+    if value.chars().count() > 500 {
+        bail!("消费者数据请求跟进说明不能超过 500 个字符");
+    }
+    Ok((!value.is_empty()).then(|| value.to_string()))
+}
+
+fn populate_operations(
+    store: &Store,
+    requests: &mut [OpenCommerceConsumerDataRequest],
+) -> Result<()> {
+    for request in requests {
+        store.populate_open_commerce_data_request_operations(request)?;
+    }
+    Ok(())
+}
+
+fn attention_priority(request: &OpenCommerceConsumerDataRequest) -> bool {
+    matches!(
+        request.status.as_str(),
+        DATA_REQUEST_STATUS_REQUESTED | DATA_REQUEST_STATUS_IN_PROGRESS
+    ) && request.consumer_escalated_at.is_some()
 }

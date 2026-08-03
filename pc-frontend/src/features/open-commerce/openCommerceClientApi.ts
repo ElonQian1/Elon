@@ -429,6 +429,16 @@ export const openCommerceClientApi = {
       {},
     ),
 
+  followUpConsumerDataRequest: (
+    projectId: string,
+    requestId: string,
+    action: 'reminder' | 'escalate_attention',
+    idempotencyKey: string,
+  ) => api.post<ConsumerDataRequest>(
+    `${projectBase(projectId)}/consumer-data-requests/${encodeURIComponent(requestId)}/follow-up`,
+    { action, idempotency_key: idempotencyKey, note: '' },
+  ),
+
   listMerchantDataRequests: (projectId: string, merchantId: string) =>
     api.get<ConsumerDataRequestList>(
       `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/consumer-data-requests`,

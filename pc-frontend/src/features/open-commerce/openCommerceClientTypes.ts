@@ -219,6 +219,14 @@ export interface ConsumerDataRequest {
   resolved_at?: string
   withdrawn_at?: string
   updated_at: string
+  operational_target_at?: string
+  is_operationally_overdue?: boolean
+  reminder_count?: number
+  last_reminded_at?: string
+  next_reminder_at?: string
+  consumer_escalated_at?: string
+  can_send_reminder?: boolean
+  can_escalate_attention?: boolean
 }
 
 export interface ConsumerDataRequestList {

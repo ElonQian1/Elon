@@ -227,6 +227,7 @@ mod open_commerce_data_erasure_evidence_migration;
 mod open_commerce_data_erasure_evidence_model;
 mod open_commerce_data_erasure_evidence_service;
 mod open_commerce_data_request_api;
+mod open_commerce_data_request_followup_migration;
 mod open_commerce_data_request_migration;
 mod open_commerce_data_request_model;
 mod open_commerce_data_request_service;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, RefreshCw, ShieldCheck, X } from 'lucide-react'
+import { Check, RefreshCw, ShieldCheck, TriangleAlert, X } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type { ConsumerDataErasureEvidence, ConsumerDataRequest } from './openCommerceClientTypes'
 import DataErasureEvidenceList from './DataErasureEvidenceList'
@@ -70,9 +70,19 @@ export default function MerchantDataRequestInbox({
           <article className={base.formCard} style={listItemStyle()} key={request.id}>
             <header style={commerceStyles.itemHeader}>
               <h3 style={commerceStyles.itemTitle}>{request.subject_alias}</h3>
-              <span style={badgeStyle(dataRequestTone(request.status))}>{dataRequestStatusLabel(request.status)}</span>
+              <div style={commerceStyles.headerActions}>
+                {request.consumer_escalated_at && <span style={badgeStyle('danger')}><TriangleAlert size={12} />消费者升级关注</span>}
+                {request.is_operationally_overdue && <span style={badgeStyle('warn')}>超过运营目标</span>}
+                <span style={badgeStyle(dataRequestTone(request.status))}>{dataRequestStatusLabel(request.status)}</span>
+              </div>
             </header>
             <small style={commerceStyles.itemMeta}>匿名关系 · {new Date(request.requested_at).toLocaleString('zh-CN')}</small>
+            {request.operational_target_at && (
+              <small style={commerceStyles.itemMeta}>
+                内部目标 {new Date(request.operational_target_at).toLocaleString('zh-CN')}
+                {' · '}消费者已催办 {request.reminder_count ?? 0}/3 次
+              </small>
+            )}
             {request.resolution_note && <p style={commerceStyles.itemText}>处理说明：{request.resolution_note}</p>}
             {canEdit && ['requested', 'in_progress'].includes(request.status) && (
               <label>
@@ -110,6 +120,7 @@ export default function MerchantDataRequestInbox({
         ))}
         {requests.length === 0 && <p className={base.empty}>尚无消费者数据删除请求。</p>}
       </div>
+      <small style={commerceStyles.sectionBody}>运营目标、催办和升级关注只用于内部排队，不代表法定逾期、平台裁决或外部系统删除证明。</small>
       {message && <div style={commerceStyles.message}>{message}</div>}
     </section>
   )

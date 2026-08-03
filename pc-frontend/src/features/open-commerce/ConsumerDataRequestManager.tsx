@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { RefreshCw, Trash2, Undo2 } from 'lucide-react'
+import { BellRing, RefreshCw, Trash2, TriangleAlert, Undo2 } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type { ConsumerDataErasureEvidence, ConsumerDataRequest, ConsumerRelationship } from './openCommerceClientTypes'
 import DataErasureEvidenceList from './DataErasureEvidenceList'
@@ -85,6 +85,26 @@ export default function ConsumerDataRequestManager({
     }
   }
 
+  async function followUp(request: ConsumerDataRequest, action: 'reminder' | 'escalate_attention') {
+    if (action === 'escalate_attention' && !window.confirm('升级关注只会提高商户收件箱优先级，不代表平台仲裁、处罚或认定违法。确定继续吗？')) return
+    setBusy(true)
+    setMessage('')
+    try {
+      await openCommerceClientApi.followUpConsumerDataRequest(
+        projectId,
+        request.id,
+        action,
+        `consumer-data-request-${action}-${crypto.randomUUID()}`,
+      )
+      setMessage(action === 'reminder' ? '催办记录已发送给商户。' : '该请求已标记为升级关注。')
+      await refresh()
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section className={base.integrationSection}>
       <header>
@@ -112,9 +132,22 @@ export default function ConsumerDataRequestManager({
           <article className={base.formCard} style={listItemStyle()} key={request.id}>
             <header style={commerceStyles.itemHeader}>
               <h3 style={commerceStyles.itemTitle}>{request.subject_alias}</h3>
-              <span style={badgeStyle(dataRequestTone(request.status))}>{dataRequestStatusLabel(request.status)}</span>
+              <div style={commerceStyles.headerActions}>
+                {request.consumer_escalated_at && <span style={badgeStyle('danger')}>已升级关注</span>}
+                {request.is_operationally_overdue && <span style={badgeStyle('warn')}>超过运营目标</span>}
+                <span style={badgeStyle(dataRequestTone(request.status))}>{dataRequestStatusLabel(request.status)}</span>
+              </div>
             </header>
             <small style={commerceStyles.itemMeta}>关系 {relationshipById.get(request.relationship_id)?.status ?? '历史'} · {new Date(request.requested_at).toLocaleString('zh-CN')}</small>
+            {request.operational_target_at && (
+              <small style={commerceStyles.itemMeta}>
+                内部目标 {new Date(request.operational_target_at).toLocaleString('zh-CN')}
+                {' · '}已催办 {request.reminder_count ?? 0}/3 次
+              </small>
+            )}
+            {request.next_reminder_at && !request.can_send_reminder && ['requested', 'in_progress'].includes(request.status) && (
+              <small style={commerceStyles.itemMeta}>下次可催办 {new Date(request.next_reminder_at).toLocaleString('zh-CN')}</small>
+            )}
             {request.resolution_note && <p style={commerceStyles.itemText}>商户说明：{request.resolution_note}</p>}
             {request.status === 'completed' && (
               <>
@@ -122,13 +155,24 @@ export default function ConsumerDataRequestManager({
                 <DataErasureEvidenceList evidence={evidence.filter((item) => item.data_request_id === request.id)} />
               </>
             )}
-            {request.status === 'requested' && (
-              <button style={actionStyle('secondary', busy)} type="button" onClick={() => withdraw(request)} disabled={busy}><Undo2 size={13} />撤回请求</button>
+            {['requested', 'in_progress'].includes(request.status) && (
+              <div style={commerceStyles.headerActions}>
+                {request.status === 'requested' && (
+                  <button style={actionStyle('secondary', busy)} type="button" onClick={() => withdraw(request)} disabled={busy}><Undo2 size={13} />撤回请求</button>
+                )}
+                {request.can_send_reminder && (
+                  <button style={actionStyle('secondary', busy)} type="button" onClick={() => followUp(request, 'reminder')} disabled={busy}><BellRing size={13} />催办</button>
+                )}
+                {request.can_escalate_attention && (
+                  <button style={actionStyle('danger', busy)} type="button" onClick={() => followUp(request, 'escalate_attention')} disabled={busy}><TriangleAlert size={13} />升级关注</button>
+                )}
+              </div>
             )}
           </article>
         ))}
         {requests.length === 0 && <p className={base.empty}>尚未发起关联数据删除请求。</p>}
       </div>
+      <small style={commerceStyles.sectionBody}>7 天为产品内部运营目标，不是对任何地区法定期限的判断；升级关注也不会自动启动仲裁或处罚。</small>
       {message && <div style={commerceStyles.message}>{message}</div>}
     </section>
   )

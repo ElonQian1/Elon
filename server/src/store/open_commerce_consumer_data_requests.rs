@@ -330,6 +330,14 @@ pub(super) fn data_request_from_row(
         resolved_at: row.get(10)?,
         withdrawn_at: row.get(11)?,
         updated_at: row.get(12)?,
+        operational_target_at: None,
+        is_operationally_overdue: false,
+        reminder_count: 0,
+        last_reminded_at: None,
+        next_reminder_at: None,
+        consumer_escalated_at: None,
+        can_send_reminder: false,
+        can_escalate_attention: false,
     })
 }
 
