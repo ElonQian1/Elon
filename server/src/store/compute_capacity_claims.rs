@@ -26,6 +26,7 @@ use super::{
         balances_for_transaction_on, event_kind_value, finalize_transaction_digest,
         next_ledger_sequence_on, post_capacity_transaction_on,
     },
+    compute_capacity_request_digest::hold_claim_request_digest,
     compute_capacity_rows::stored_bucket_on,
     new_id, now, Store,
 };
@@ -45,7 +46,6 @@ pub(crate) struct HoldComputeCapacityClaim {
     pub subject_id: String,
     pub idempotency_scope: String,
     pub idempotency_key: String,
-    pub request_digest: String,
     pub lines: Vec<HoldComputeCapacityClaimLine>,
     pub expires_at: Option<String>,
     pub occurred_at: String,
@@ -69,6 +69,7 @@ impl Store {
         input: HoldComputeCapacityClaim,
     ) -> Result<HoldComputeCapacityClaimReceipt> {
         validate_hold_input(&input)?;
+        let request_digest = hold_claim_request_digest(&input)?;
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
@@ -78,7 +79,7 @@ impl Store {
             input.idempotency_key.trim(),
         )?;
         if let Some(existing) = existing {
-            let receipt = replay_existing_hold_on(&tx, &input, existing)?;
+            let receipt = replay_existing_hold_on(&tx, &input, &request_digest, existing)?;
             tx.commit()?;
             return Ok(receipt);
         }
@@ -174,7 +175,7 @@ impl Store {
             subject_id: input.subject_id.trim().to_string(),
             idempotency_scope: input.idempotency_scope.trim().to_string(),
             idempotency_key: input.idempotency_key.trim().to_string(),
-            request_digest: input.request_digest.trim().to_string(),
+            request_digest,
             lines: claim_lines,
             created_at: recorded_at.clone(),
             updated_at: recorded_at.clone(),
@@ -299,9 +300,10 @@ fn read_existing_claim_on(
 fn replay_existing_hold_on(
     conn: &Connection,
     input: &HoldComputeCapacityClaim,
+    request_digest: &str,
     existing: ExistingClaim,
 ) -> Result<HoldComputeCapacityClaimReceipt> {
-    if existing.request_digest != input.request_digest.trim()
+    if existing.request_digest != request_digest
         || existing.pool_id != input.pool.pool_id.trim()
         || existing.capacity_epoch != input.pool.capacity_epoch
         || existing.delivery_window_id != input.delivery_window.window_id.trim()
@@ -336,7 +338,7 @@ fn replay_existing_hold_on(
         .optional()?
         .ok_or_else(|| anyhow!("容量 Claim 已存在但缺少 held 账本事务"))?;
     if ledger.event_kind != "reservation_held"
-        || ledger.request_digest != input.request_digest.trim()
+        || ledger.request_digest != request_digest
         || ledger.pool_id != input.pool.pool_id.trim()
         || ledger.capacity_epoch != input.pool.capacity_epoch
         || ledger.delivery_window_id != input.delivery_window.window_id.trim()
@@ -381,7 +383,6 @@ fn validate_hold_input(input: &HoldComputeCapacityClaim) -> Result<()> {
         ("主体 ID", input.subject_id.as_str()),
         ("幂等范围", input.idempotency_scope.as_str()),
         ("幂等键", input.idempotency_key.as_str()),
-        ("请求摘要", input.request_digest.as_str()),
         ("发生时间", input.occurred_at.as_str()),
     ] {
         if value.trim().is_empty() {

@@ -20,6 +20,7 @@ use super::{
         balances_for_transaction_on, event_kind_value, finalize_transaction_digest,
         next_ledger_sequence_on, post_capacity_transaction_on,
     },
+    compute_capacity_request_digest::finish_claim_request_digest,
     compute_capacity_rows::stored_bucket_on,
     new_id, now, Store,
 };
@@ -37,7 +38,6 @@ pub(crate) struct FinishComputeCapacityClaim {
     pub action: ComputeCapacityClaimTerminalAction,
     pub idempotency_scope: String,
     pub idempotency_key: String,
-    pub request_digest: String,
     pub occurred_at: String,
 }
 
@@ -58,6 +58,7 @@ impl Store {
         input: FinishComputeCapacityClaim,
     ) -> Result<FinishComputeCapacityClaimReceipt> {
         validate_finish_input(&input)?;
+        let request_digest = finish_claim_request_digest(&input)?;
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let transaction_scope = transaction_scope(&input);
@@ -65,7 +66,7 @@ impl Store {
         if let Some(existing) =
             read_existing_transition_on(&tx, &transaction_scope, input.idempotency_key.trim())?
         {
-            let receipt = replay_existing_transition_on(&tx, &input, existing)?;
+            let receipt = replay_existing_transition_on(&tx, &input, &request_digest, existing)?;
             tx.commit()?;
             return Ok(receipt);
         }
@@ -158,7 +159,7 @@ impl Store {
             },
             idempotency_scope: transaction_scope,
             idempotency_key: input.idempotency_key.trim().to_string(),
-            request_digest: input.request_digest.trim().to_string(),
+            request_digest,
             subject_kind: claim.subject_kind.clone(),
             subject_id: claim.subject_id.clone(),
             causal_transaction_id,
@@ -244,13 +245,14 @@ fn read_existing_transition_on(
 fn replay_existing_transition_on(
     conn: &Connection,
     input: &FinishComputeCapacityClaim,
+    request_digest: &str,
     existing: ExistingTransition,
 ) -> Result<FinishComputeCapacityClaimReceipt> {
     let (expected_event, expected_state, expected_effect) = terminal_parts(input.action);
     if existing.claim_id != input.claim_id.trim()
         || existing.event_kind != event_kind_value(expected_event)
         || existing.claim_effect != expected_effect
-        || existing.request_digest != input.request_digest.trim()
+        || existing.request_digest != request_digest
     {
         bail!("相同容量 Claim 终态幂等键不能用于不同请求");
     }
@@ -333,7 +335,6 @@ fn validate_finish_input(input: &FinishComputeCapacityClaim) -> Result<()> {
         ("容量 Claim ID", input.claim_id.as_str()),
         ("幂等范围", input.idempotency_scope.as_str()),
         ("幂等键", input.idempotency_key.as_str()),
-        ("请求摘要", input.request_digest.as_str()),
         ("发生时间", input.occurred_at.as_str()),
     ] {
         if value.trim().is_empty() {

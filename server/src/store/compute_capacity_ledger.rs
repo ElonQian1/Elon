@@ -22,6 +22,7 @@ use super::{
         balances_for_transaction_on, event_kind_value, finalize_transaction_digest,
         next_ledger_sequence_on, post_capacity_transaction_on,
     },
+    compute_capacity_request_digest::{add_supply_request_digest, canonical_utc},
     compute_capacity_rows::stored_bucket_on,
     new_id, now, Store,
 };
@@ -40,7 +41,6 @@ pub(crate) struct AddComputeCapacitySupply {
     pub subject_id: String,
     pub idempotency_scope: String,
     pub idempotency_key: String,
-    pub request_digest: String,
     pub lines: Vec<AddComputeCapacitySupplyLine>,
     pub occurred_at: String,
 }
@@ -62,6 +62,7 @@ impl Store {
         input: AddComputeCapacitySupply,
     ) -> Result<ComputeCapacityLedgerWriteReceipt> {
         validate_supply_input(&input)?;
+        let request_digest = add_supply_request_digest(&input)?;
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
 
@@ -88,7 +89,7 @@ impl Store {
             )
             .optional()?;
         if let Some(existing) = existing {
-            if existing.request_digest != input.request_digest.trim()
+            if existing.request_digest != request_digest
                 || existing.event_kind != "supply_added"
                 || existing.pool_id != input.pool.pool_id.trim()
                 || existing.capacity_epoch != input.pool.capacity_epoch
@@ -163,12 +164,12 @@ impl Store {
             },
             idempotency_scope: input.idempotency_scope.trim().to_string(),
             idempotency_key: input.idempotency_key.trim().to_string(),
-            request_digest: input.request_digest.trim().to_string(),
+            request_digest,
             subject_kind: input.subject_kind.trim().to_string(),
             subject_id: input.subject_id.trim().to_string(),
             causal_transaction_id: None,
             movements,
-            occurred_at: input.occurred_at.trim().to_string(),
+            occurred_at: canonical_utc("容量发行发生时间", &input.occurred_at)?,
             recorded_at,
         };
         finalize_transaction_digest(&mut transaction)?;
@@ -208,7 +209,6 @@ fn validate_supply_input(input: &AddComputeCapacitySupply) -> Result<()> {
         ("主体 ID", input.subject_id.as_str()),
         ("幂等范围", input.idempotency_scope.as_str()),
         ("幂等键", input.idempotency_key.as_str()),
-        ("请求摘要", input.request_digest.as_str()),
         ("发生时间", input.occurred_at.as_str()),
     ] {
         if value.trim().is_empty() {

@@ -2,7 +2,6 @@ use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::params;
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 
 use super::{now, ComputeCapacityClaimTerminalAction, FinishComputeCapacityClaim, Store};
 
@@ -67,15 +66,13 @@ impl Store {
                 "{}:r{}:{}",
                 candidate.claim_id, candidate.revision, candidate.expires_at
             );
-            let request_digest = recovery_request_digest(&candidate)?;
             match self.finish_compute_capacity_claim(FinishComputeCapacityClaim {
                 claim_id: candidate.claim_id.clone(),
                 expected_revision: candidate.revision,
                 action: ComputeCapacityClaimTerminalAction::Expire,
                 idempotency_scope: EXPIRY_RECOVERY_SCOPE.to_string(),
                 idempotency_key,
-                request_digest,
-                occurred_at: cutoff_at.clone(),
+                occurred_at: candidate.expires_at.clone(),
             }) {
                 Ok(receipt) => {
                     expired_count = expired_count.saturating_add(1);
@@ -148,15 +145,4 @@ fn validate_recovery_input(
         bail!("容量 Claim 到期恢复截止时间不能晚于当前记录时间");
     }
     Ok(parsed.with_timezone(&Utc).to_rfc3339())
-}
-
-fn recovery_request_digest(candidate: &ExpiryCandidate) -> Result<String> {
-    let payload = serde_json::json!({
-        "schema": "compute_federation.capacity_expiry_recovery.v1",
-        "claim_id": candidate.claim_id,
-        "expected_revision": candidate.revision,
-        "expires_at": candidate.expires_at,
-        "action": "expire",
-    });
-    Ok(hex::encode(Sha256::digest(serde_json::to_vec(&payload)?)))
 }
