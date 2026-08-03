@@ -176,6 +176,13 @@ pub(crate) struct ComputeCapacityClaim {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ComputeCapacityClaimBinding {
+    pub claim_id: String,
+    pub claim_revision: i64,
+    pub claim_digest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct ComputeCapacityOfferBinding {
     pub offer_id: String,
     pub offer_version: i64,

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::{
+    capacity::ComputeCapacityClaimBinding,
     market::ComputePriceSnapshot,
     workload::{ComputeArtifactRef, ComputeWorkloadSpec},
 };
@@ -48,6 +49,13 @@ pub(crate) struct ComputeOfferBinding {
     pub offer_digest: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ComputeJobVersionBinding {
+    pub job_id: String,
+    pub job_revision: i64,
+    pub job_digest: String,
+}
+
 /// Stable demand identity. Individual machine executions are attempt leases.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct ComputeJob {
@@ -79,10 +87,11 @@ pub(crate) struct ComputeReservedCapacity {
 pub(crate) struct ComputeReservation {
     pub schema: String,
     pub reservation_id: String,
-    pub job_id: String,
+    pub job: ComputeJobVersionBinding,
     pub idempotency_key: String,
     pub offer: ComputeOfferBinding,
     pub price_snapshot: ComputePriceSnapshot,
+    pub capacity_claim: ComputeCapacityClaimBinding,
     pub reserved_capacity: Vec<ComputeReservedCapacity>,
     pub consumer_authorization_ref: String,
     pub status: String,
