@@ -39,6 +39,7 @@ mod compute_capacity_registry;
 mod compute_capacity_rows;
 mod compute_capacity_supply_withdrawal;
 mod compute_job_contract_validation;
+mod compute_job_registry;
 mod compute_metering;
 mod compute_offer_contract_validation;
 mod compute_offer_registry;
