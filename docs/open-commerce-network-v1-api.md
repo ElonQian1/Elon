@@ -268,6 +268,7 @@ MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_co
 | `open_commerce_record_sync_receipt` | 写 | 记录有界、幂等的适配器回执 |
 | `open_commerce_revoke_grant` | 写 | 撤销授权 |
 | `open_commerce_get_my_action_confirmation` | 读 | 当前用户按当前 App 重新读取一份动作确认的脱敏状态和下一步；不返回原始输入 |
+| `open_commerce_cancel_my_action_confirmation` | 写 | 经用户明确确认后取消本人当前 App 尚未创建 Invocation 的动作确认；不撤销已消费动作 |
 | `open_commerce_prepare_action_confirmation` | 写 | 校验并准备或幂等复用短时、输入绑定的动作确认，不执行能力 |
 | `open_commerce_confirm_action_confirmation` | 写 | 仅在用户已明确同意后确认准备结果，不执行能力 |
 | `open_commerce_invoke` | 写 | 调用能力并生成计量和审计；动作必须携带已确认 ID |

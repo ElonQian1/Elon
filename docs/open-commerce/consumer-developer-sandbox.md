@@ -66,6 +66,8 @@ MCP 消费者 AI 可使用 `open_commerce_discover_for_consumer` 获取与上述
 
 动作确认准备后，AI 可在用户同意前调用 `open_commerce_get_my_action_confirmation` 重新核对当前用户和当前 App 持有的确认状态、商户、能力、输入字段形状、失效时间和下一步。服务端不会返回原始输入值，因此 AI 或宿主仍必须从当前安全会话向用户展示本次真实参数；读取本身不会确认、续期、占用预算或执行动作。
 
+用户决定停止时，AI 只有在获得明确指令并提交固定短语后，才能调用 `open_commerce_cancel_my_action_confirmation`。该工具可幂等终止尚未创建 Invocation 的 pending 或 confirmed 确认；自然过期和已消费确认不会被改写。取消确认不是取消订单、退款或回滚已经发生的商户动作。
+
 计划要求授权时，消费者 AI 只有在用户明确同意、MCP 使用本人已注册 App 身份并提供固定确认短语后，才能用 `open_commerce_request_consumer_authorization` 提交单能力申请。成功只表示等待商户决定；批准、拒绝、期限、总次数和总预算仍由商户控制，AI 不能自批或扩权。
 
 提交后可用 `open_commerce_list_my_consumer_authorization_requests` 按状态查看本人申请和批准后的 Grant 条件。查询同时按当前用户和当前项目本人 App 隔离，不返回团队成员或审核人内部身份；它只读，不会重提或调用。项目编辑者在用户明确同意并提供固定确认短语后，可用 `open_commerce_cancel_my_consumer_authorization_request` 撤回本人 pending 请求；非 pending 保持原状态，该工具不会撤销已批准 Grant。历史 `approved` 也不保证 Grant 仍有效，实际调用前仍需重新执行计划。
