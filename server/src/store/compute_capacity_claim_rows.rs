@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use sha2::{Digest, Sha256};
 
@@ -7,7 +7,7 @@ use crate::compute_federation::capacity::{
     ComputeCapacityClaimLine, ComputeCapacityClaimState, COMPUTE_CAPACITY_CLAIM_SCHEMA,
 };
 
-use super::compute_capacity_rows::stored_bucket_on;
+use super::{compute_capacity_rows::stored_bucket_on, now};
 
 struct ClaimHeader {
     claim_id: String,
@@ -132,7 +132,7 @@ pub(super) fn stored_claim_on(
         expires_at: header.expires_at,
         terminal_at: header.terminal_at,
     };
-    validate_capacity_claim(&claim).map_err(anyhow::Error::new)?;
+    validate_capacity_claim(&claim).map_err(|error| anyhow!("容量 Claim 合同无效: {error:?}"))?;
     let stored_digest = claim.claim_digest.clone();
     finalize_claim_digest(&mut claim)?;
     if claim.claim_digest != stored_digest {
@@ -189,6 +189,7 @@ pub(super) fn insert_claim_on(conn: &Connection, claim: &ComputeCapacityClaim) -
             ],
         )?;
     }
+    insert_claim_version_on(conn, claim)?;
     Ok(())
 }
 
@@ -216,6 +217,70 @@ pub(super) fn update_claim_projection_on(
     if changed != 1 {
         bail!("容量 Claim revision 或状态已变化，事务未提交");
     }
+    insert_claim_version_on(conn, claim)?;
+    Ok(())
+}
+
+pub(super) fn stored_claim_version_on(
+    conn: &Connection,
+    claim_id: &str,
+    revision: i64,
+) -> Result<Option<ComputeCapacityClaim>> {
+    let normalized_claim_id = claim_id.trim();
+    let stored = conn
+        .query_row(
+            "SELECT claim_digest, status, request_digest, claim_json
+               FROM compute_capacity_claim_versions
+              WHERE claim_id=?1 AND revision=?2",
+            params![normalized_claim_id, revision],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            },
+        )
+        .optional()?;
+    let Some((claim_digest, status, request_digest, claim_json)) = stored else {
+        return Ok(None);
+    };
+    let claim: ComputeCapacityClaim =
+        serde_json::from_str(&claim_json).context("容量 Claim 历史版本 JSON 无效")?;
+    validate_capacity_claim(&claim)
+        .map_err(|error| anyhow!("容量 Claim 历史版本合同无效: {error:?}"))?;
+    let mut recomputed = claim.clone();
+    finalize_claim_digest(&mut recomputed)?;
+    if claim.claim_id != normalized_claim_id
+        || claim.revision != revision
+        || claim.claim_digest != claim_digest
+        || recomputed.claim_digest != claim_digest
+        || claim_state_value(claim.state) != status
+        || claim.request_digest != request_digest
+    {
+        bail!("容量 Claim 历史版本身份、摘要或索引字段审计失败");
+    }
+    Ok(Some(claim))
+}
+
+fn insert_claim_version_on(conn: &Connection, claim: &ComputeCapacityClaim) -> Result<()> {
+    let claim_json = serde_json::to_string(claim)?;
+    conn.execute(
+        "INSERT INTO compute_capacity_claim_versions (
+            claim_id, revision, claim_digest, status, request_digest,
+            claim_json, recorded_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            claim.claim_id,
+            claim.revision,
+            claim.claim_digest,
+            claim_state_value(claim.state),
+            claim.request_digest,
+            claim_json,
+            now(),
+        ],
+    )?;
     Ok(())
 }
 
