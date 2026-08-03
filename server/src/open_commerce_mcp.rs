@@ -303,6 +303,8 @@ pub(crate) async fn call_tool(
         store,
         project_id,
         user_id,
+        project_role,
+        app_id,
         name,
         arguments.clone(),
     )? {
