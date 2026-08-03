@@ -40,10 +40,18 @@ impl Store {
         let candidates = {
             let conn = self.conn()?;
             let mut statement = conn.prepare(
-                "SELECT claim_id, revision, expires_at
-                   FROM compute_capacity_claims
-                  WHERE status='held' AND expires_at IS NOT NULL AND expires_at<=?1
-                  ORDER BY expires_at, claim_id LIMIT ?2",
+                "SELECT claims.claim_id, claims.revision, claims.expires_at
+                   FROM compute_capacity_claims AS claims
+                  WHERE claims.status='held'
+                    AND NOT EXISTS (
+                        SELECT 1
+                          FROM compute_capacity_ledger_transactions AS held_transaction
+                         WHERE held_transaction.claim_id=claims.claim_id
+                           AND held_transaction.claim_effect='held'
+                           AND held_transaction.reservation_id IS NOT NULL
+                    )
+                    AND claims.expires_at IS NOT NULL AND claims.expires_at<=?1
+                  ORDER BY claims.expires_at, claims.claim_id LIMIT ?2",
             )?;
             let rows = statement
                 .query_map(params![cutoff_at, limit], |row| {

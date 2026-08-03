@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::{anyhow, bail, Result};
 use chrono::Utc;
-use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
+use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 use serde::Serialize;
 
 use crate::compute_federation::{
@@ -64,6 +64,8 @@ pub(crate) struct HoldComputeCapacityClaimReceipt {
     pub state: String,
     pub revision: i64,
     pub request_digest: String,
+    pub recorded_at: String,
+    pub expires_at: String,
     pub replayed: bool,
     pub ledger: ComputeCapacityLedgerWriteReceipt,
 }
@@ -73,6 +75,12 @@ impl Store {
         &self,
         input: HoldComputeCapacityClaim,
     ) -> Result<HoldComputeCapacityClaimReceipt> {
+        validate_hold_input(&input)?;
+        if input.subject_kind.trim() == "compute_reservation"
+            || input.causal_binding.reservation_id.is_some()
+        {
+            bail!("Reservation-bound 容量 Hold 必须由外层事务内入口创建");
+        }
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let receipt = hold_compute_capacity_claim_on(&tx, input)?;
@@ -82,7 +90,7 @@ impl Store {
 }
 
 pub(super) fn hold_compute_capacity_claim_on(
-    conn: &Connection,
+    conn: &Transaction<'_>,
     input: HoldComputeCapacityClaim,
 ) -> Result<HoldComputeCapacityClaimReceipt> {
     validate_hold_input(&input)?;
@@ -220,6 +228,10 @@ pub(super) fn hold_compute_capacity_claim_on(
     };
     finalize_transaction_digest(&mut ledger_transaction)?;
     let current_balances = post_capacity_transaction_on(conn, &ledger_transaction, balances)?;
+    let claim_expires_at = claim
+        .expires_at
+        .clone()
+        .ok_or_else(|| anyhow!("held 容量 Claim 缺少规范到期时间"))?;
     let receipt = HoldComputeCapacityClaimReceipt {
         claim_id: claim.claim_id,
         claim_digest: claim.claim_digest,
@@ -227,6 +239,8 @@ pub(super) fn hold_compute_capacity_claim_on(
         state: "held".to_string(),
         revision: claim.revision,
         request_digest: claim.request_digest,
+        recorded_at: ledger_transaction.recorded_at.clone(),
+        expires_at: claim_expires_at,
         replayed: false,
         ledger: ComputeCapacityLedgerWriteReceipt {
             transaction_id: ledger_transaction.transaction_id,
@@ -253,6 +267,7 @@ struct ExistingClaim {
     state: String,
     revision: i64,
     request_digest: String,
+    expires_at: Option<String>,
 }
 
 struct ExistingHoldTransaction {
@@ -271,6 +286,7 @@ struct ExistingHoldTransaction {
     reservation_id: Option<String>,
     attempt_lease_id: Option<String>,
     fencing_generation: Option<i64>,
+    recorded_at: String,
 }
 
 fn read_existing_claim_on(
@@ -281,7 +297,7 @@ fn read_existing_claim_on(
     conn.query_row(
         "SELECT claim_id, claim_digest, pool_id, capacity_epoch,
                 delivery_window_id, claim_kind, subject_kind, subject_id,
-                status, revision, request_digest
+                status, revision, request_digest, expires_at
            FROM compute_capacity_claims
           WHERE idempotency_scope=?1 AND idempotency_key=?2",
         params![idempotency_scope, idempotency_key],
@@ -298,6 +314,7 @@ fn read_existing_claim_on(
                 state: row.get(8)?,
                 revision: row.get(9)?,
                 request_digest: row.get(10)?,
+                expires_at: row.get(11)?,
             })
         },
     )
@@ -321,13 +338,27 @@ fn replay_existing_hold_on(
     {
         bail!("相同容量 Claim 幂等键不能用于不同预留请求");
     }
+    if input.causal_binding.reservation_id.is_some() {
+        if existing.state != "held" || existing.revision != 1 {
+            bail!("Reservation-bound 容量 Hold 只能重放初始 held Claim");
+        }
+        let expires_at = existing
+            .expires_at
+            .as_deref()
+            .ok_or_else(|| anyhow!("Reservation-bound 容量 Hold 缺少到期时间"))?;
+        if parse_utc("容量 Claim 到期时间", expires_at)? <= parse_utc("当前记录时间", &now())?
+        {
+            bail!("已到期的 Reservation-bound 容量 Hold 不能作为有效授权重放");
+        }
+    }
 
     let ledger = conn
         .query_row(
             "SELECT transaction_id, transaction_digest, ledger_sequence,
                     event_kind, request_digest, pool_id, capacity_epoch,
                     delivery_window_id, offer_id, offer_version, offer_digest,
-                    job_id, reservation_id, attempt_lease_id, fencing_generation
+                    job_id, reservation_id, attempt_lease_id, fencing_generation,
+                    recorded_at
                FROM compute_capacity_ledger_transactions
               WHERE claim_id=?1 AND claim_effect='held' AND claim_effect_key=?2",
             params![existing.claim_id, input.idempotency_key.trim()],
@@ -348,6 +379,7 @@ fn replay_existing_hold_on(
                     reservation_id: row.get(12)?,
                     attempt_lease_id: row.get(13)?,
                     fencing_generation: row.get(14)?,
+                    recorded_at: row.get(15)?,
                 })
             },
         )
@@ -377,6 +409,10 @@ fn replay_existing_hold_on(
         state: existing.state,
         revision: existing.revision,
         request_digest: existing.request_digest,
+        recorded_at: ledger.recorded_at,
+        expires_at: existing
+            .expires_at
+            .ok_or_else(|| anyhow!("held 容量 Claim 重放缺少规范到期时间"))?,
         replayed: true,
         ledger: ComputeCapacityLedgerWriteReceipt {
             transaction_id: ledger.transaction_id,

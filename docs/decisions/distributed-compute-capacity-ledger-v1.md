@@ -51,13 +51,13 @@ V1 Claim 不做部分拆分。未来 Commitment 分配给多个 Job 时创建带
 
 ### 7. 幂等键绑定请求摘要
 
-目标语义是写操作使用 `(idempotency_scope, idempotency_key)` 唯一键并保存 Store 规范化的 `request_digest`：同键同摘要返回不可变首次结果，同键不同摘要失败关闭。当前隔离 Store 已不再接收 Supply Add/Withdraw 与 Claim Hold/Finish 的调用方摘要。Supply 与 standalone Hold 按带版本 schema 的 V1 typed payload、完整 pool/window 绑定、主体、排序 bucket 数量、规范 UTC 时间及 Claim 类型计算 SHA-256；Finish 则绑定 claim ID、expected revision、终态 action 和规范 UTC 发生时间，资源与主体经不可替换的 claim ID 间接固定。幂等范围和键作为查重信封，不进入内容摘要。
+目标语义是写操作使用 `(idempotency_scope, idempotency_key)` 唯一键并保存 Store 规范化的 `request_digest`：同键同摘要返回不可变首次结果，同键不同摘要失败关闭。当前隔离 Store 已不再接收 Supply Add/Withdraw 与 Claim Hold/Finish 的调用方摘要。Supply 使用 V1 typed payload；Hold V2 绑定完整 pool/window、主体、排序 bucket 数量、规范 UTC 时间、Claim 类型与完整 causal binding；Finish 则绑定 claim ID、expected revision、终态 action 和规范 UTC 发生时间，资源与主体经不可替换的 claim ID 间接固定。幂等范围和键作为查重信封，不进入内容摘要。
 
-Reservation-bound Hold 使用独立 V2 typed payload，在 V1 容量字段之外固定 Offer ID/version/digest、Job ID 和 Reservation ID；不能通过修改 V1 字节规则偷偷加入业务字段。其 causal binding 逐字段持久化并在重放时复核，同键换绑失败关闭。Finish 不接受调用方重新指定业务绑定，而是从原 held 账本事务继承。V2 仍只是容量 Claim 的业务绑定摘要，不等于包含预算授权、Price Snapshot 与完整 Reservation 合同的最终 Broker request digest。当前重放仍返回当前 Claim/余额，尚未保存不可变首次结果，因此严格保证仍未闭环。上述字节规则只由 Store 计算，不是跨语言 JCS 合同；外部矿池如需自行验签摘要，必须使用共享 SDK 或另立显式版本。容量、预算、Reservation 和 Job 绑定的最终 Reserve 必须处于同一个本地数据库线性化事务。
+Reservation Claim 在 Hold V2 中必须固定 Offer ID/version/digest、Job ID 和同主体 Reservation ID，Attempt/fencing 仍禁止提前绑定；因果标识拒绝首尾空白，摘要字节与逐字段持久化值一致，同键换绑失败关闭。Hold 回执返回持久化后的规范 `recorded_at` 与 `expires_at`，供外层 Reservation 精确复用。Finish 的 Reservation 专用入口再次核对预期绑定，再从原始 held 账本事务继承，终态业务时间不得早于 held 记录时间。Hold V2 仍只是容量 Claim 的业务绑定摘要，不等于包含预算授权、Price Snapshot 与完整 Reservation 合同的最终 Broker request digest。普通重放仍返回当前 Claim/余额，Reservation-bound Hold 只重放仍未到期的初始 held 版本；尚未保存通用不可变首次结果，因此严格保证仍未闭环。上述字节规则只由 Store 计算，不是跨语言 JCS 合同；外部矿池如需自行验签摘要，必须使用共享 SDK 或另立显式版本。容量、预算、Reservation 和 Job 绑定的最终 Reserve 必须处于同一个本地数据库线性化事务。
 
 ### 8. 事务内禁止外部网络
 
-SQLite 路径使用 `BEGIN IMMEDIATE`、稳定 meter 顺序和条件更新。公开 standalone API 继续拥有连接、事务与 commit；供 Store sibling 调用的 Claim kernel 只接受调用方已有的 `Transaction`，内部不得重新取连接、开启嵌套事务或提交。最外层 Broker 将来负责把 Job、预算、Reservation 与该 kernel 组合成唯一线性化点。节点 WebSocket、价格远程源或外部矿池 reserve 不得在数据库事务内调用。外部 Provider 使用 pending Reservation + outbox + 补偿动作；重放始终沿用同一远程幂等身份。通用容量到期恢复器不得单独终结 `compute_reservation` Claim；这类 Claim 必须由未来 Broker 在同一事务内同步推进预算、Reservation 与 Job。
+SQLite 路径使用 `BEGIN IMMEDIATE`、稳定 meter 顺序和条件更新。公开 standalone API 继续拥有连接、事务与 commit，但拒绝 `compute_reservation` 主体或任何 Reservation causal binding；供 Store sibling 调用的 Claim kernel 只接受调用方已有的 `Transaction`，内部不得重新取连接、开启嵌套事务或提交。最外层 Broker 将来负责把 Job、预算、Reservation 与该 kernel 组合成唯一线性化点。节点 WebSocket、价格远程源或外部矿池 reserve 不得在数据库事务内调用。外部 Provider 使用 pending Reservation + outbox + 补偿动作；重放始终沿用同一远程幂等身份。通用容量到期恢复器依据 held 账本中持久化的 Reservation causal binding 跳过 Broker 管理的 Claim，不信任可伪造的主体字符串；这类 Claim 必须由未来 Broker 在同一事务内同步推进预算、Reservation 与 Job。
 
 ## 核心不变量
 
@@ -79,4 +79,4 @@ SQLite 路径使用 `BEGIN IMMEDIATE`、稳定 meter 顺序和条件更新。公
 
 ## 验证状态
 
-本决定已接受。领域合同、纯状态投影和 v165 SQLite schema 已写入；本地 Store 还形成了池版本与 bucket 登记、供给发行/撤出、窗口有界 Claim hold、Claim-local held-only 释放/到期、四类写入的 Store-canonical request digest，以及共用的双分录落库和余额 CAS。只读审计可从账本重算余额投影，有界批处理可逐 Claim 恢复到期容量；状态门卫、v167 追加式生命周期、v168 epoch 轮换、v169 Provider Registry、Offer 规范合同校验、v170 Offer Registry 与 v171 不可变 Price Snapshot Registry 也已形成代码。Claim Hold/Finish 已提供不自行提交的事务内 kernel；standalone Hold 仍使用空 causal binding，Reservation-bound Hold 才使用含 Offer/Job/Reservation 的 V2 摘要和显式 binding，终态继承原 held 绑定。上述新增路径均未编译、执行迁移、调度或并发验证。不可变 Claim 首次响应、消费者预算与 Reservation/Price Snapshot 的统一 Reserve、完整事务内 Broker API、Attempt 激活、自动修复、外部 Provider saga 和运行接线仍未实现。
+本决定已接受。领域合同、纯状态投影和 v165 SQLite schema 已写入；本地 Store 还形成了池版本与 bucket 登记、供给发行/撤出、窗口有界 Claim hold、Claim-local held-only 释放/到期、四类写入的 Store-canonical request digest，以及共用的双分录落库和余额 CAS。只读审计可从账本重算余额投影，有界批处理可逐 Claim 恢复到期容量；状态门卫、v167 追加式生命周期、v168 epoch 轮换、v169 Provider Registry、Offer 规范合同校验、v170 Offer Registry、v171 不可变 Price Snapshot Registry、v173 Claim 历史与 v174 Reservation Registry 也已形成代码。Claim Hold/Finish、Job 登记与 Reservation 登记已提供不自行提交的事务内入口；Hold V2 固定 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，终态继承并审计原始 held 绑定。上述新增路径均未编译、执行迁移、调度或并发验证。不可变 Claim 首次响应、消费者预算与 Reservation/Price Snapshot 的统一 Reserve、完整事务内 Broker API、Attempt 激活、自动修复、外部 Provider saga 和运行接线仍未实现。

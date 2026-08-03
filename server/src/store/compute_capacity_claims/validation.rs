@@ -58,6 +58,12 @@ pub(super) fn validate_hold_input(input: &HoldComputeCapacityClaim) -> Result<()
 
 fn validate_hold_causal_binding(input: &HoldComputeCapacityClaim) -> Result<()> {
     let binding = &input.causal_binding;
+    if input.subject_kind.trim() == "compute_reservation"
+        && (input.subject_kind != "compute_reservation"
+            || input.claim_kind != ComputeCapacityClaimKind::Reservation)
+    {
+        bail!("compute_reservation 主体只能用于精确的 Reservation Claim");
+    }
     if binding.attempt_lease_id.is_some() || binding.fencing_generation.is_some() {
         bail!("容量 Hold 不能提前绑定 Attempt 或 fencing generation");
     }
@@ -75,6 +81,9 @@ fn validate_hold_causal_binding(input: &HoldComputeCapacityClaim) -> Result<()> 
         validate_exact_causal_value("Reservation ID", reservation_id)?;
         if binding.job_id.is_none() {
             bail!("容量 Hold 绑定 Reservation 时必须同时绑定 Job");
+        }
+        if input.claim_kind != ComputeCapacityClaimKind::Reservation {
+            bail!("只有 Reservation Claim 可以绑定 Reservation ID");
         }
     }
     if input.claim_kind == ComputeCapacityClaimKind::Reservation {
