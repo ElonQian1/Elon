@@ -1,0 +1,72 @@
+.monitor {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.monitor > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.monitor > header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.monitor > header small,
+.claims small,
+.claims time,
+.claims > p {
+  display: block;
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.claims {
+  display: grid;
+  gap: 6px;
+}
+
+.claims article {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #191a1f;
+}
+
+.claims article > button {
+  min-height: 26px;
+  padding: 4px 7px;
+  font-size: 10px;
+}
+
+.claims article > span:nth-child(2),
+.claims strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.claims time {
+  grid-column: 2 / -1;
+  margin: 0;
+}
+
+.error {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid #75464c;
+  color: #f0aeb5;
+  font-size: 10px;
+}

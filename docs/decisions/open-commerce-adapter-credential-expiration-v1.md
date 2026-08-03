@@ -26,6 +26,8 @@ date: 2026-08-03
 - 到期只限制一龙机器入口，不代表外部平台授权或商户 ERP 密钥已同步失效。
 - 历史 `adapter_token_authenticated` 回执仍保留当时凭据 ID 和版本，不因当前凭据到期而失真。
 
+后续任务领取 ADR 允许项目编辑者在轮换时显式增加 `business_handoff.claim`，因此凭据不再必然只有一个 Scope；无论凭据是默认只写还是显式可领取，到期、轮换、撤销和接入停用都会同时使其活动租约失去完成或释放资格。
+
 ## 实现证据
 
 - 迁移：`server/src/open_commerce_adapter_expiration_migration.rs`

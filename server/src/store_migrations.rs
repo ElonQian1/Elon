@@ -172,6 +172,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (135, "开放商业业务证据到 ERP/CRM 的显式衔接回执", crate::open_commerce_business_handoff_migration::migration_v135),
     (136, "开放商业适配器机器凭据与鉴权衔接回执", crate::open_commerce_adapter_migration::migration_v136),
     (137, "开放商业适配器机器凭据限时有效", crate::open_commerce_adapter_expiration_migration::migration_v137),
+    (138, "开放商业适配器衔接任务领取、租约与原子完成", crate::open_commerce_adapter_claim_migration::migration_v138),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

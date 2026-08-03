@@ -149,6 +149,7 @@ async fn adapter_token_is_one_time_rotatable_revocable_and_records_machine_autho
         &fixture.project_id,
         &fixture.integration_id,
         90,
+        false,
         &actor,
     )
     .unwrap();
@@ -191,6 +192,7 @@ async fn adapter_token_is_one_time_rotatable_revocable_and_records_machine_autho
         &fixture.project_id,
         &fixture.integration_id,
         30,
+        false,
         &actor,
     )
     .unwrap();
@@ -247,6 +249,12 @@ async fn adapter_token_is_one_time_rotatable_revocable_and_records_machine_autho
     assert!(crate::open_commerce_adapter_mcp::definitions()
         .iter()
         .any(|tool| tool["name"] == "open_commerce_rotate_adapter_credential"));
+    assert!(crate::open_commerce_adapter_mcp::definitions()
+        .iter()
+        .any(|tool| tool["name"] == "open_commerce_list_adapter_handoff_claims"));
+    assert!(crate::open_commerce_adapter_mcp::definitions()
+        .iter()
+        .any(|tool| tool["name"] == "open_commerce_resume_adapter_handoff_claim"));
 
     let unconfirmed = crate::open_commerce_mcp::call_tool(
         &fixture.store,
@@ -259,7 +267,8 @@ async fn adapter_token_is_one_time_rotatable_revocable_and_records_machine_autho
             "arguments":{
                 "integration_id":fixture.integration_id,
                 "confirmed_by_user":false,
-                "expires_in_days":90
+                "expires_in_days":90,
+                "allow_task_claims":false
             }
         }),
     )
@@ -281,6 +290,7 @@ fn adapter_credential_management_requires_editor_and_disabled_integration_fails_
         &fixture.project_id,
         &fixture.integration_id,
         90,
+        false,
         &viewer,
     )
     .unwrap_err()
@@ -293,6 +303,7 @@ fn adapter_credential_management_requires_editor_and_disabled_integration_fails_
         &fixture.project_id,
         &fixture.integration_id,
         90,
+        false,
         &actor,
     )
     .unwrap();
@@ -321,6 +332,7 @@ fn adapter_credential_expiration_is_bounded_and_fails_closed() {
         &fixture.project_id,
         &fixture.integration_id,
         0,
+        false,
         &actor,
     )
     .unwrap_err()
@@ -332,6 +344,7 @@ fn adapter_credential_expiration_is_bounded_and_fails_closed() {
         &fixture.project_id,
         &fixture.integration_id,
         1,
+        false,
         &actor,
     )
     .unwrap();

@@ -9,6 +9,7 @@ import type {
 import { errorText } from './openCommerceUi'
 import { actionStyle, badgeStyle } from './openCommerceStyles'
 import styles from './OpenCommerceAdapterCredentialManager.module.css'
+import OpenCommerceAdapterClaimMonitor from './OpenCommerceAdapterClaimMonitor'
 
 type Props = {
   projectId: string
@@ -24,6 +25,7 @@ export default function OpenCommerceAdapterCredentialManager({
   const [credentials, setCredentials] = useState<OpenCommerceAdapterCredential[]>([])
   const [issued, setIssued] = useState<OpenCommerceAdapterCredentialIssue | null>(null)
   const [expiresInDays, setExpiresInDays] = useState(90)
+  const [allowTaskClaims, setAllowTaskClaims] = useState(false)
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
 
@@ -46,12 +48,20 @@ export default function OpenCommerceAdapterCredentialManager({
 
   async function rotate(integration: OpenCommerceIntegration, existing?: OpenCommerceAdapterCredential) {
     const verb = existing ? '轮换' : '签发'
-    if (!globalThis.confirm(`${verb}后明文 Token 只显示一次，有效期 ${expiresInDays} 天${existing ? '，旧 Token 会立即失效' : ''}。是否继续？`)) return
+    const accessNotice = allowTaskClaims
+      ? '允许领取一条待衔接任务并读取该任务结果'
+      : '仅允许写入业务衔接回执'
+    if (!globalThis.confirm(`${verb}后明文 Token 只显示一次，有效期 ${expiresInDays} 天，权限为“${accessNotice}”${existing ? '，旧 Token 会立即失效' : ''}。是否继续？`)) return
     setBusy(integration.id)
     setMessage(null)
     setIssued(null)
     try {
-      const result = await openCommerceApi.rotateAdapterCredential(projectId, integration.id, expiresInDays)
+      const result = await openCommerceApi.rotateAdapterCredential(
+        projectId,
+        integration.id,
+        expiresInDays,
+        allowTaskClaims,
+      )
       setIssued(result)
       setMessage({ text: `已${verb}机器凭据，请立即复制并交给该接入器。`, error: false })
       await refresh()
@@ -104,6 +114,15 @@ export default function OpenCommerceAdapterCredentialManager({
               <option value={365}>365 天</option>
             </select>
           </label>
+          <label className={styles.claimControl} title="允许该接入器领取单条待衔接任务并读取该任务结果">
+            <input
+              type="checkbox"
+              checked={allowTaskClaims}
+              onChange={(event) => setAllowTaskClaims(event.target.checked)}
+              disabled={busy !== ''}
+            />
+            允许领取任务
+          </label>
           <button style={actionStyle('icon', busy !== '')} type="button" onClick={refresh} disabled={busy !== ''} title="刷新机器凭据">
             <RefreshCw size={14} />
           </button>
@@ -119,7 +138,7 @@ export default function OpenCommerceAdapterCredentialManager({
             </button>
           </header>
           <code>{issued.adapter_token}</code>
-          <p>服务端只保存摘要，有效至 {new Date(issued.credential.expires_at).toLocaleString('zh-CN')}。本页面关闭或刷新后无法找回，只能重新轮换。</p>
+          <p>服务端只保存摘要，有效至 {new Date(issued.credential.expires_at).toLocaleString('zh-CN')}。权限：{credentialScopeLabel(issued.credential)}。本页面关闭或刷新后无法找回，只能重新轮换。</p>
           <button style={actionStyle('primary')} type="button" onClick={copyToken}>
             <Clipboard size={14} />复制 Token
           </button>
@@ -141,7 +160,7 @@ export default function OpenCommerceAdapterCredentialManager({
                 {expiryLabel(expiry)}
               </span>
               <p>
-                权限：business_handoff.write
+                权限：{credential ? credentialScopeLabel(credential) : '未签发'}
                 {credential ? ` · 到期 ${new Date(credential.expires_at).toLocaleDateString('zh-CN')}` : ''}
                 {credential?.last_used_at ? ` · 最近使用 ${new Date(credential.last_used_at).toLocaleString('zh-CN')}` : ''}
               </p>
@@ -170,6 +189,7 @@ export default function OpenCommerceAdapterCredentialManager({
         })}
         {integrations.length === 0 && <p className={styles.empty}>登记数据接入后，才可为实际接入器签发机器凭据。</p>}
       </div>
+      <OpenCommerceAdapterClaimMonitor projectId={projectId} integrations={integrations} />
       {message && <p className={message.error ? styles.error : styles.success}>{message.text}</p>}
     </div>
   )
@@ -193,4 +213,10 @@ function expiryLabel(expiry: CredentialExpiry) {
     missing: '未配置',
   }
   return labels[expiry]
+}
+
+function credentialScopeLabel(credential: OpenCommerceAdapterCredential) {
+  return credential.scopes.includes('business_handoff.claim')
+    ? '写回执 + 领取单条任务'
+    : '仅写回执'
 }

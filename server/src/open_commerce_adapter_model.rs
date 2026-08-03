@@ -5,6 +5,7 @@ pub(crate) const ADAPTER_CREDENTIAL_ISSUE_SCHEMA: &str =
     "open_commerce.adapter_credential_issue.v1";
 pub(crate) const ADAPTER_CREDENTIAL_LIST_SCHEMA: &str = "open_commerce.adapter_credential_list.v1";
 pub(crate) const ADAPTER_HANDOFF_SCOPE: &str = "business_handoff.write";
+pub(crate) const ADAPTER_HANDOFF_CLAIM_SCOPE: &str = "business_handoff.claim";
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct OpenCommerceAdapterCredential {
@@ -67,4 +68,6 @@ pub(crate) struct ConfirmedAdapterCredentialChangeRequest {
 pub(crate) struct RotateAdapterCredentialRequest {
     pub confirmed_by_user: bool,
     pub expires_in_days: i64,
+    #[serde(default)]
+    pub allow_task_claims: bool,
 }

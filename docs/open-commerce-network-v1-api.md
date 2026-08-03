@@ -44,6 +44,8 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `GET` | `/api/projects/:project_id/open-commerce/adapter-credentials` | 列出不含明文 Token 的接入器机器凭据元数据 |
 | `POST` | `/api/projects/:project_id/open-commerce/integrations/:integration_id/adapter-credential/rotate` | 经明确确认并指定 1–366 天有效期后签发或轮换一次性机器 Token |
 | `POST` | `/api/projects/:project_id/open-commerce/adapter-credentials/:credential_id/revoke` | 经明确确认后撤销机器凭据 |
+| `GET` | `/api/projects/:project_id/open-commerce/adapter-handoff-claims` | 项目成员查看最近接入器任务租约，不返回密钥 |
+| `POST` | `/api/projects/:project_id/open-commerce/adapter-handoff-claims/:claim_id/resume` | 项目编辑者明确确认后重新排队第 6 次拒绝而暂停的当前任务 |
 | `POST` | `/api/projects/:project_id/open-commerce/sync-receipts` | 由适配器记录幂等同步或健康检查回执 |
 | `PUT` | `/api/projects/:project_id/open-commerce/rate-limits` | 按能力和指定 App/全部 App 创建或更新调用配额 |
 | `PATCH` | `/api/projects/:project_id/open-commerce/rate-limits/:policy_id/enabled` | 停用或重新启用调用配额 |
@@ -66,6 +68,10 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `GET` | `/api/open-commerce/consumer-invocation-receipts` | 当前账户列出本人的终态调用凭证摘要 |
 | `GET` | `/api/open-commerce/consumer-invocation-receipts/:invocation_id` | 当前账户读取并复核本人的单条调用凭证 |
 | `POST` | `/api/open-commerce/adapter/business-handoff-receipts` | 使用受限接入器 Bearer Token 提交机器衔接回执 |
+| `POST` | `/api/open-commerce/adapter/business-handoff-claims` | 使用显式扩权的机器凭据领取一条短时待衔接任务 |
+| `POST` | `/api/open-commerce/adapter/business-handoff-claims/:claim_id/complete` | 使用机器凭据与一次性租约密钥原子完成任务回执 |
+| `POST` | `/api/open-commerce/adapter/business-handoff-claims/:claim_id/release` | 主动释放未完成租约并立即允许安全重试，不创建业务回执 |
+| `POST` | `/api/open-commerce/adapter/business-handoff-claims/:claim_id/renew` | 使用当前租约密钥续租 60–900 秒，但不超过首次领取后 1 小时 |
 
 两个 `GET` 发现接口允许匿名读取，便于任意 App 或 AI 在未加入一龙项目时发现公开商户能力。能力调用、项目管理和 MCP 仍需要 Bearer 身份；开放发现不等于匿名执行。
 
@@ -150,11 +156,15 @@ Invocation 只证明平台完成调用，标准业务回执只证明商户运行
 
 `applied` 只接受成功且带有效标准业务回执的 Invocation，同时必须提供外部目标记录号；服务端只保存目标记录号 SHA-256。`ignored` 和 `rejected` 不能提供目标记录号，必须提供结果代码。停用接入器、跨商户接入器、摘要不匹配、非编辑者或同键改写均失败关闭。
 
-人工入口的回执权威为 `project_editor_asserted`。接入器也可使用只显示一次、服务端仅保存 SHA-256 的专用 Bearer Token 向机器入口提交；项目、商户和接入器全部从凭据派生，权限固定为 `business_handoff.write`。机器回执标记 `adapter_token_authenticated`、`confirmed_by_user=false`，并固化凭据 ID 和提交时版本。轮换、撤销或停用接入后旧身份立即失败关闭。
+人工入口的回执权威为 `project_editor_asserted`。接入器也可使用只显示一次、服务端仅保存 SHA-256 的专用 Bearer Token 向机器入口提交；项目、商户和接入器全部从凭据派生。凭据始终包含 `business_handoff.write`，任务领取权限 `business_handoff.claim` 默认关闭，只能在用户明确轮换时加入。机器回执标记 `adapter_token_authenticated`、`confirmed_by_user=false`，并固化凭据 ID 和提交时版本。轮换、撤销、到期或停用接入后旧身份立即失败关闭。
+
+显式获得 `business_handoff.claim` 的接入器可调用领取入口。请求只接受 `lease_seconds`，范围 60–900 秒；响应最多包含一条由凭据边界派生的任务、一次性 `lease_token` 和该任务结果。服务端不提供任意商户数据读取。接入器可用同一租约密钥续租 60–900 秒，但 `lease_deadline_at` 在首次领取时固定为 1 小时后，不能无限延期。完成入口不接受客户端重写 Invocation、商户或接入器，只接受租约密钥和处理结果；回执与租约完成状态在同一数据库事务中提交，回执保存 `adapter_claim_id`。同一 Invocation 同时只有一个活动租约，超时、主动释放或 `rejected` 后方可产生下一次尝试。`rejected` 按尝试次数进入 30–900 秒退避，候选任务按最久未尝试优先；第 6 次拒绝后暂停自动领取，只有项目编辑者明确确认恢复当前最新尝试后才能继续。主动释放只接受租约密钥与受限原因代码，不创建回执，也不表示外部任务已经处理。
 
 签发或轮换请求还必须提交 `expires_in_days`，允许 1–366。凭据元数据返回绝对 `expires_at` 与服务端派生的 `is_expired`；到期后鉴权失败且不自动续期。升级前已有凭据由迁移补 90 天期限。
 
 两类回执均固定 `funds_moved=false`，不创建平台订单，也不证明外部 ERP 数据真实、支付、履约或退款。机器凭据不是外部平台签名；具体生产适配器、官方授权和外部系统回读仍需逐项实现。
+
+项目内 AI 可通过 `open_commerce_list_adapter_handoff_claims` 读取与 PC 相同的脱敏租约状态；`open_commerce_resume_adapter_handoff_claim` 只恢复第 6 次拒绝后暂停的当前任务，要求项目编辑权限和 `confirmed_by_user=true`。机器领取、续租、完成和释放仍只走专用 Bearer HTTP 入口，不把机器 Token 暴露给项目 MCP。
 
 ## Grant 生命周期预算
 

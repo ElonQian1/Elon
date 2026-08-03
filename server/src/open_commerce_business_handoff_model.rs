@@ -32,6 +32,7 @@ pub(crate) struct OpenCommerceBusinessHandoffReceipt {
     pub assertion_authority: String,
     pub adapter_credential_id: Option<String>,
     pub adapter_credential_version: Option<i64>,
+    pub adapter_claim_id: Option<String>,
     pub recorded_by_user_id: String,
     pub recorded_by_app_id: String,
     pub completed_at: String,

@@ -4,7 +4,8 @@ use sha2::{Digest, Sha256};
 
 use crate::open_commerce_adapter_model::{
     OpenCommerceAdapterCredential, OpenCommerceAdapterCredentialIssue,
-    ADAPTER_CREDENTIAL_ISSUE_SCHEMA, ADAPTER_CREDENTIAL_SCHEMA, ADAPTER_HANDOFF_SCOPE,
+    ADAPTER_CREDENTIAL_ISSUE_SCHEMA, ADAPTER_CREDENTIAL_SCHEMA, ADAPTER_HANDOFF_CLAIM_SCOPE,
+    ADAPTER_HANDOFF_SCOPE,
 };
 use crate::open_commerce_integration_model::INTEGRATION_STATUS_DISABLED;
 
@@ -17,6 +18,7 @@ impl Store {
         integration_id: &str,
         actor_user_id: &str,
         expires_at: &str,
+        allow_task_claims: bool,
     ) -> Result<OpenCommerceAdapterCredentialIssue> {
         let integration = self.open_commerce_integration_for_project(project_id, integration_id)?;
         if integration.status == INTEGRATION_STATUS_DISABLED {
@@ -24,6 +26,11 @@ impl Store {
         }
         let token = new_adapter_token();
         let timestamp = now();
+        let mut scopes = vec![ADAPTER_HANDOFF_SCOPE];
+        if allow_task_claims {
+            scopes.push(ADAPTER_HANDOFF_CLAIM_SCOPE);
+        }
+        let scopes_json = serde_json::to_string(&scopes)?;
         let existing_id = self
             .conn()?
             .query_row(
@@ -40,7 +47,7 @@ impl Store {
                         expires_at=?4, updated_at=?5
                   WHERE id=?6",
                 params![
-                    serde_json::to_string(&vec![ADAPTER_HANDOFF_SCOPE])?,
+                    scopes_json,
                     token_hash(&token),
                     token_hint(&token),
                     expires_at,
@@ -60,7 +67,7 @@ impl Store {
                     project_id.trim(),
                     integration.merchant_id,
                     integration.id,
-                    serde_json::to_string(&vec![ADAPTER_HANDOFF_SCOPE])?,
+                    scopes_json,
                     token_hash(&token),
                     token_hint(&token),
                     actor_user_id.trim(),

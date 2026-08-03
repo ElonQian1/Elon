@@ -470,10 +470,6 @@ fn self_project_overview_is_bounded_and_fast_enough_for_interactive_use() {
         .collect::<Vec<_>>();
     assert!(paths.contains(&"docs/system-architecture.md"), "{paths:?}");
     assert!(
-        paths.contains(&"docs/supervised-pc-project-development.md"),
-        "{paths:?}"
-    );
-    assert!(
         paths.contains(&"docs/project-document-governance-mcp.md"),
         "{paths:?}"
     );
@@ -491,6 +487,29 @@ fn self_project_overview_is_bounded_and_fast_enough_for_interactive_use() {
         || path.starts_with(".github/skills/")
         || path.starts_with(".github/instructions/")
         || matches!(*path, "AI_RULES.md" | "AI_TASK_TEMPLATE.md")));
+
+    let supervision = plan_context(
+        &root,
+        "Codex 桌面监督 PC 节点执行与证据验收",
+        None,
+        4_000,
+        8,
+        1_600,
+    )
+    .unwrap();
+    let supervision_paths = supervision["relevant_documents"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|item| {
+            item.pointer("/document/path")
+                .and_then(serde_json::Value::as_str)
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        supervision_paths.contains(&"docs/supervised-pc-project-development.md"),
+        "{supervision_paths:?}"
+    );
 
     let bounded = plan_context(
         &root,

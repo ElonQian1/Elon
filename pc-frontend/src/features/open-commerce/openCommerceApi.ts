@@ -18,6 +18,8 @@ import type {
   OpenCommerceAdapterCredential,
   OpenCommerceAdapterCredentialIssue,
   OpenCommerceAdapterCredentialList,
+  OpenCommerceAdapterHandoffClaimList,
+  OpenCommerceAdapterHandoffClaimResume,
   MerchantBusinessEvidenceDetail,
   MerchantBusinessEvidenceList,
   OpenCommerceBusinessHandoffReceipt,
@@ -93,10 +95,30 @@ export const openCommerceApi = {
       `${projectBase(projectId)}/adapter-credentials`,
     ),
 
-  rotateAdapterCredential: (projectId: string, integrationId: string, expiresInDays: number) =>
+  listAdapterHandoffClaims: (projectId: string, limit = 50) =>
+    api.get<OpenCommerceAdapterHandoffClaimList>(
+      `${projectBase(projectId)}/adapter-handoff-claims?limit=${limit}`,
+    ),
+
+  resumeAdapterHandoffClaim: (projectId: string, claimId: string) =>
+    api.post<OpenCommerceAdapterHandoffClaimResume>(
+      `${projectBase(projectId)}/adapter-handoff-claims/${encodeURIComponent(claimId)}/resume`,
+      { confirmed_by_user: true },
+    ),
+
+  rotateAdapterCredential: (
+    projectId: string,
+    integrationId: string,
+    expiresInDays: number,
+    allowTaskClaims: boolean,
+  ) =>
     api.post<OpenCommerceAdapterCredentialIssue>(
       `${projectBase(projectId)}/integrations/${encodeURIComponent(integrationId)}/adapter-credential/rotate`,
-      { confirmed_by_user: true, expires_in_days: expiresInDays },
+      {
+        confirmed_by_user: true,
+        expires_in_days: expiresInDays,
+        allow_task_claims: allowTaskClaims,
+      },
     ),
 
   revokeAdapterCredential: (projectId: string, credentialId: string) =>

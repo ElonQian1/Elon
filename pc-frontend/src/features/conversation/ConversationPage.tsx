@@ -224,7 +224,7 @@ export default function ConversationPage() {
         return undefined
       })
       .catch(() => {})
-  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   useEffect(() => {
     setRuntimeRoute(initialProjectRuntimeRouteFromStorage(window.localStorage, user?.id))

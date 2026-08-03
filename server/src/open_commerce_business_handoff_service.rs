@@ -2,6 +2,9 @@ use anyhow::{bail, Result};
 use serde_json::json;
 
 use crate::{
+    open_commerce_adapter_claim_model::{
+        CompleteAdapterHandoffClaimRequest, OpenCommerceAdapterHandoffClaim,
+    },
     open_commerce_adapter_model::{
         AdapterBusinessHandoffReceiptRequest, OpenCommerceAdapterCredential, ADAPTER_HANDOFF_SCOPE,
     },
@@ -17,7 +20,7 @@ use crate::{
     open_commerce_merchant_evidence_service,
     open_commerce_service::OpenCommerceActor,
     project_auth::can_edit,
-    store::{RecordOpenCommerceBusinessHandoffReceipt, Store},
+    store::{AdapterClaimReceiptProof, RecordOpenCommerceBusinessHandoffReceipt, Store},
 };
 
 const BOUNDARY: [&str; 4] = [
@@ -53,6 +56,7 @@ pub(crate) fn record_receipt(
         BUSINESS_HANDOFF_AUTHORITY,
         None,
         None,
+        None,
         request,
     )
 }
@@ -79,6 +83,7 @@ pub(crate) fn record_adapter_receipt(
         BUSINESS_HANDOFF_ADAPTER_AUTHORITY,
         Some(&credential.id),
         Some(credential.credential_version),
+        None,
         RecordBusinessHandoffReceiptRequest {
             merchant_id: credential.merchant_id.clone(),
             invocation_id: request.invocation_id,
@@ -97,6 +102,59 @@ pub(crate) fn record_adapter_receipt(
     Ok(receipt)
 }
 
+pub(crate) fn record_claimed_adapter_receipt(
+    store: &Store,
+    credential: &OpenCommerceAdapterCredential,
+    claim: &OpenCommerceAdapterHandoffClaim,
+    lease_token: &str,
+    request: CompleteAdapterHandoffClaimRequest,
+) -> Result<OpenCommerceBusinessHandoffReceipt> {
+    if claim.adapter_credential_id != credential.id
+        || claim.adapter_credential_version != credential.credential_version
+        || claim.integration_id != credential.integration_id
+    {
+        bail!("衔接任务租约与当前机器凭据不匹配");
+    }
+    let evidence = open_commerce_merchant_evidence_service::get_evidence(
+        store,
+        &claim.project_id,
+        &claim.merchant_id,
+        &claim.invocation_id,
+    )?;
+    let evidence_result_sha256 = evidence
+        .evidence
+        .result_sha256
+        .ok_or_else(|| anyhow::anyhow!("该业务证据没有可绑定的结果摘要"))?;
+    let actor_app_id = format!("adapter-{}", credential.id);
+    let receipt = record_validated_receipt(
+        store,
+        &claim.project_id,
+        &credential.created_by_user_id,
+        &actor_app_id,
+        BUSINESS_HANDOFF_ADAPTER_AUTHORITY,
+        Some(&credential.id),
+        Some(credential.credential_version),
+        Some(AdapterClaimReceiptProof {
+            claim_id: &claim.id,
+            lease_token,
+        }),
+        RecordBusinessHandoffReceiptRequest {
+            merchant_id: claim.merchant_id.clone(),
+            invocation_id: claim.invocation_id.clone(),
+            integration_id: claim.integration_id.clone(),
+            receipt_key: request.receipt_key,
+            status: request.status,
+            target_domain: request.target_domain,
+            evidence_result_sha256,
+            target_reference: request.target_reference,
+            error_code: request.error_code,
+            confirmed_by_user: false,
+            completed_at: request.completed_at,
+        },
+    )?;
+    Ok(receipt)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn record_validated_receipt(
     store: &Store,
@@ -106,6 +164,7 @@ fn record_validated_receipt(
     assertion_authority: &str,
     adapter_credential_id: Option<&str>,
     adapter_credential_version: Option<i64>,
+    adapter_claim: Option<AdapterClaimReceiptProof<'_>>,
     request: RecordBusinessHandoffReceiptRequest,
 ) -> Result<OpenCommerceBusinessHandoffReceipt> {
     let evidence = open_commerce_merchant_evidence_service::get_evidence(
@@ -137,6 +196,7 @@ fn record_validated_receipt(
             assertion_authority,
             adapter_credential_id,
             adapter_credential_version,
+            adapter_claim,
             request,
         },
     )?;
@@ -161,6 +221,7 @@ fn record_validated_receipt(
                 "assertion_authority":receipt.assertion_authority,
                 "adapter_credential_id":receipt.adapter_credential_id,
                 "adapter_credential_version":receipt.adapter_credential_version,
+                "adapter_claim_id":receipt.adapter_claim_id,
                 "funds_moved":false
             }),
         )?;
