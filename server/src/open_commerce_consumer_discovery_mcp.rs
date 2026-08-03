@@ -1,16 +1,20 @@
 //! Consumer-facing MCP discovery backed by the same policy service as the PC sandbox.
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{
     open_commerce_consumer, open_commerce_consumer_execution_plan,
-    open_commerce_consumer_model::ConsumerDiscoveryRequest, store::Store,
+    open_commerce_consumer_model::ConsumerDiscoveryRequest,
+    open_commerce_developer_model::CreateAuthorizationRequest,
+    open_commerce_model::normalize_capability_key, store::Store,
 };
 
 const DISCOVER_FOR_CONSUMER: &str = "open_commerce_discover_for_consumer";
 const PLAN_CONSUMER_CAPABILITY: &str = "open_commerce_plan_consumer_capability";
+const REQUEST_CONSUMER_AUTHORIZATION: &str = "open_commerce_request_consumer_authorization";
+const REQUEST_AUTHORIZATION_PHRASE: &str = "REQUEST_AUTHORIZATION";
 
 #[derive(Debug, Deserialize)]
 struct PlanArguments {
@@ -18,6 +22,14 @@ struct PlanArguments {
     capability_key: String,
     #[serde(default = "empty_object")]
     input: Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct RequestAuthorizationArguments {
+    merchant_id: String,
+    capability_key: String,
+    purpose: String,
+    confirmation_phrase: String,
 }
 
 pub(crate) fn definitions() -> Vec<Value> {
@@ -103,6 +115,27 @@ pub(crate) fn definitions() -> Vec<Value> {
                 "openWorldHint":true
             }
         }),
+        json!({
+            "name":REQUEST_CONSUMER_AUTHORIZATION,
+            "description":"仅在当前用户明确同意后，以 MCP 入口固定的已注册开发者 App 身份，向商户申请一个 authorized 能力。商户仍独立决定批准、期限和预算；工具不会自行批准、调用或下单。",
+            "inputSchema":{
+                "type":"object",
+                "required":["merchant_id","capability_key","purpose","confirmation_phrase"],
+                "properties":{
+                    "merchant_id":{"type":"string","minLength":1,"maxLength":120},
+                    "capability_key":{"type":"string","minLength":3,"maxLength":96},
+                    "purpose":{"type":"string","minLength":3,"maxLength":200},
+                    "confirmation_phrase":{"const":"REQUEST_AUTHORIZATION"}
+                },
+                "additionalProperties":false
+            },
+            "annotations":{
+                "readOnlyHint":false,
+                "destructiveHint":false,
+                "idempotentHint":true,
+                "openWorldHint":true
+            }
+        }),
     ]
 }
 
@@ -141,6 +174,54 @@ pub(crate) fn call_if_handled(
                     &input.input,
                 )?,
             )?))
+        }
+        REQUEST_CONSUMER_AUTHORIZATION => {
+            if uses_default_mcp_identity {
+                bail!("申请授权前必须通过 x-elon-app-id 使用本人已注册的开发者 App 身份");
+            }
+            let input: RequestAuthorizationArguments = serde_json::from_value(arguments)
+                .with_context(|| format!("{REQUEST_CONSUMER_AUTHORIZATION} 参数无效"))?;
+            if input.confirmation_phrase != REQUEST_AUTHORIZATION_PHRASE {
+                bail!("授权申请确认短语无效");
+            }
+            store.ensure_open_commerce_developer_app_owned_by_user(app_id, user_id)?;
+            let capability_key = normalize_capability_key(&input.capability_key)?;
+            if store
+                .active_open_commerce_grant_for_app_capability(
+                    &input.merchant_id,
+                    app_id,
+                    &capability_key,
+                )?
+                .is_some()
+            {
+                bail!("当前 App 已拥有该能力的有效授权，无需重复申请");
+            }
+            let authorization = open_commerce_consumer::create_authorization_request(
+                store,
+                user_id,
+                CreateAuthorizationRequest {
+                    merchant_id: input.merchant_id,
+                    requester_app_id: app_id.to_string(),
+                    scopes: vec![capability_key],
+                    purpose: input.purpose,
+                },
+            )?;
+            store.record_open_commerce_audit(
+                &authorization.merchant_project_id,
+                user_id,
+                Some(&authorization.requester_app_id),
+                "authorization.requested",
+                "authorization_request",
+                &authorization.id,
+                &json!({
+                    "merchant_id": authorization.merchant_id,
+                    "requester_app_id": authorization.requester_app_id,
+                    "scopes": authorization.scopes,
+                    "consumer_user_confirmed": true,
+                    "source": "mcp"
+                }),
+            )?;
+            Ok(Some(serde_json::to_value(authorization)?))
         }
         _ => Ok(None),
     }

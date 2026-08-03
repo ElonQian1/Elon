@@ -169,8 +169,8 @@ fn next_steps(readiness: &str) -> Vec<ConsumerCapabilityExecutionStep> {
         )],
         "authorization_request_required" => vec![(
             "request_authorization",
-            "在消费者沙盒向商户提交限时最小范围授权申请",
-            None,
+            "经用户明确同意后向商户提交单能力授权申请",
+            Some("open_commerce_request_consumer_authorization"),
             true,
         )],
         "authorization_pending" => vec![(
