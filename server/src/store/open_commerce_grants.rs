@@ -139,6 +139,42 @@ impl Store {
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(grants)
     }
+
+    pub(crate) fn list_user_project_active_open_commerce_grants(
+        &self,
+        requester_project_id: &str,
+        requester_user_id: &str,
+        grantee_app_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<OpenCommerceGrant>> {
+        let grantee_app_id = grantee_app_id.map(normalize_app_id).transpose()?;
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(&format!(
+            "{GRANT_SELECT}
+             WHERE grantee_app_id IN (
+               SELECT app_id FROM open_commerce_developer_apps
+                WHERE project_id = ?1 AND owner_user_id = ?2 AND status = 'active'
+             )
+               AND (?3 IS NULL OR grantee_app_id = ?3)
+               AND revoked_at IS NULL
+               AND (expires_at IS NULL OR expires_at > ?4)
+             ORDER BY updated_at DESC
+             LIMIT ?5"
+        ))?;
+        let grants = stmt
+            .query_map(
+                params![
+                    requester_project_id.trim(),
+                    requester_user_id.trim(),
+                    grantee_app_id,
+                    now(),
+                    limit.clamp(1, 100) as i64
+                ],
+                grant_from_row,
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(grants)
+    }
 }
 
 fn normalize_scopes(scopes: &[String]) -> Result<Vec<String>> {
