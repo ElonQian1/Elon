@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Download, FileArchive, RefreshCw } from 'lucide-react'
+import { Download, FileArchive, KeyRound, RefreshCw } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type {
   ConsumerPortabilityExport,
@@ -8,11 +8,13 @@ import type {
 import { errorText } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import { actionStyle, badgeStyle, commerceStyles, listItemStyle } from './openCommerceStyles'
+import { encryptPortabilityArchive } from './portabilityArchive'
 
 export default function ConsumerPortabilityExports({ projectId }: { projectId: string }) {
   const [exports, setExports] = useState<ConsumerPortabilityExportSummary[]>([])
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [archivePassphrase, setArchivePassphrase] = useState('')
 
   const refresh = useCallback(async () => {
     try {
@@ -35,7 +37,7 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
         projectId,
         `pc-export-${crypto.randomUUID()}`,
       )
-      await downloadVerifiedExport(result)
+      await downloadVerifiedExport(result, archivePassphrase)
       setMessage('可携带数据包已校验并下载。')
       await refresh()
     } catch (error) {
@@ -50,7 +52,7 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
     setMessage('')
     try {
       const result = await openCommerceClientApi.getConsumerPortabilityExport(projectId, summary.id)
-      await downloadVerifiedExport(result)
+      await downloadVerifiedExport(result, archivePassphrase)
       setMessage('历史数据包已校验并下载。')
     } catch (error) {
       setMessage(errorText(error))
@@ -76,6 +78,18 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
         </div>
       </header>
       <div style={{ ...commerceStyles.list, padding: 12 }}>
+        <label style={commerceStyles.checkRow}>
+          <KeyRound size={13} />
+          <input
+            type="password"
+            value={archivePassphrase}
+            minLength={12}
+            maxLength={256}
+            onChange={(event) => setArchivePassphrase(event.target.value)}
+            placeholder="可选：12 位以上离线归档口令"
+            disabled={busy}
+          />
+        </label>
         {exports.map((item) => (
           <article key={item.id} style={listItemStyle()}>
             <header style={commerceStyles.itemHeader}>
@@ -103,7 +117,7 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
   )
 }
 
-async function downloadVerifiedExport(value: ConsumerPortabilityExport) {
+async function downloadVerifiedExport(value: ConsumerPortabilityExport, passphrase: string) {
   if (!crypto.subtle) throw new Error('当前浏览器无法执行 SHA-256 校验')
   const digest = await sha256Hex(value.payload_json)
   if (digest !== value.payload_sha256) throw new Error('数据包摘要校验失败，已停止下载')
@@ -118,11 +132,14 @@ async function downloadVerifiedExport(value: ConsumerPortabilityExport) {
     }
   }
 
-  const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' })
+  const downloadValue = passphrase
+    ? await encryptPortabilityArchive(value, passphrase)
+    : value
+  const blob = new Blob([JSON.stringify(downloadValue, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `consumer-portability-${value.id}.json`
+  anchor.download = `consumer-portability-${value.id}${passphrase ? '.encrypted' : ''}.json`
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()

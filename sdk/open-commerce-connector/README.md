@@ -144,6 +144,8 @@ await worker.run({ signal: shutdown.signal })
 
 `signConsumerPortabilityPackage` 使用运营方 RSA 私钥签署固定协议消息，绑定来源运营方、公钥摘要、导出包标识、来源项目、幂等键、负载 SHA-256 和创建时间。接收方可用 `consumerPortabilityPublicKeyId` 登记公钥，并用 `verifyConsumerPortabilityPackageSignature` 在上传前复核。私钥只由来源运营方持有，不上传平台；签名证明某个已信任密钥签过该包，不会自动恢复关系、Grant、ERP、订单或资金状态。
 
+`encryptConsumerPortabilityArchive` 和 `decryptConsumerPortabilityArchive` 提供可互操作的 PBKDF2-SHA256（310000 次）与 AES-256-GCM 离线归档。口令只存在于调用方进程，归档包含随机盐、随机 Nonce、认证标签和明文 SHA-256，不负责口令找回或云端密钥托管。
+
 ```js
 import {
   createMemoryMerchantRuntimeIdempotencyStore,

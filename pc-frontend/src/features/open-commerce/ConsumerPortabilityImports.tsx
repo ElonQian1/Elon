@@ -10,11 +10,16 @@ import type {
 import { errorText } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import { actionStyle, badgeStyle, commerceStyles, listItemStyle } from './openCommerceStyles'
+import {
+  decryptPortabilityArchive,
+  isPortabilityEncryptedArchive,
+} from './portabilityArchive'
 
 export default function ConsumerPortabilityImports({ projectId }: { projectId: string }) {
   const [imports, setImports] = useState<ConsumerPortabilityImportSummary[]>([])
   const [sourceOperator, setSourceOperator] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [archivePassphrase, setArchivePassphrase] = useState('')
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -40,8 +45,12 @@ export default function ConsumerPortabilityImports({ projectId }: { projectId: s
     setBusy(true)
     setMessage('')
     try {
-      if (selectedFile.size > 6 * 1024 * 1024) throw new Error('数据包超过 6 MiB 上传上限')
-      const parsed = JSON.parse(await selectedFile.text()) as
+      if (selectedFile.size > 9 * 1024 * 1024) throw new Error('数据包文件超过 9 MiB 本地处理上限')
+      const fileValue = JSON.parse(await selectedFile.text()) as unknown
+      const decryptedValue = isPortabilityEncryptedArchive(fileValue)
+        ? await decryptPortabilityArchive(fileValue, archivePassphrase)
+        : fileValue
+      const parsed = decryptedValue as
         | ConsumerPortabilityExport
         | SignedConsumerPortabilityPackage
       const packageValue = isSignedPackage(parsed) ? parsed.package : parsed
@@ -123,6 +132,15 @@ export default function ConsumerPortabilityImports({ projectId }: { projectId: s
             maxLength={160}
             onChange={(event) => setSourceOperator(event.target.value)}
             placeholder="来源运营方或来源环境"
+            disabled={busy}
+          />
+          <input
+            type="password"
+            value={archivePassphrase}
+            minLength={12}
+            maxLength={256}
+            onChange={(event) => setArchivePassphrase(event.target.value)}
+            placeholder="加密归档口令（普通 JSON 留空）"
             disabled={busy}
           />
           <input
