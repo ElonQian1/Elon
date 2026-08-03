@@ -672,6 +672,9 @@ export interface ConsumerDiscoveryRequest {
   price_currency?: string
   capability_kind?: 'query' | 'action'
   access_level?: 'public' | 'authorized'
+  require_city_match?: boolean
+  require_category_match?: boolean
+  require_all_tags_match?: boolean
   preferences: ConsumerPreferences
   limit: number
 }
@@ -823,6 +826,11 @@ export interface ConsumerDiscoveryResponse {
   capability_filter: {
     kind: 'query' | 'action' | null
     access_level: 'public' | 'authorized' | null
+  }
+  preference_constraints: {
+    require_city_match: boolean
+    require_category_match: boolean
+    require_all_tags_match: boolean
   }
   available_ranking_policies: ConsumerRankingPolicyDescriptor[]
   ranking_receipt?: ConsumerRankingReceipt

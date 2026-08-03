@@ -12,6 +12,7 @@ import ConsumerDataVaultPanel from './ConsumerDataVaultPanel'
 import ConsumerPreferenceProfilePanel from './ConsumerPreferenceProfilePanel'
 import ConsumerInvocationReceipts from './ConsumerInvocationReceipts'
 import ConsumerPriceFilterFields from './ConsumerPriceFilterFields'
+import ConsumerPreferenceConstraintFields from './ConsumerPreferenceConstraintFields'
 import ConsumerSourceFilterFields from './ConsumerSourceFilterFields'
 import CapabilityInvocationComposer from './CapabilityInvocationComposer'
 import ConsumerCapabilityFilterFields from './ConsumerCapabilityFilterFields'
@@ -44,6 +45,9 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   const [city, setCity] = useState('')
   const [categories, setCategories] = useState('')
   const [tags, setTags] = useState('')
+  const [requireCityMatch, setRequireCityMatch] = useState(false)
+  const [requireCategoryMatch, setRequireCategoryMatch] = useState(false)
+  const [requireAllTagsMatch, setRequireAllTagsMatch] = useState(false)
   const [maxPrice, setMaxPrice] = useState('')
   const [priceCurrency, setPriceCurrency] = useState('CNY')
   const [rankingPolicy, setRankingPolicy] = useState<ConsumerRankingPolicyKey>('transparent_preference_match.v1')
@@ -103,6 +107,9 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         access_level: accessLevel === 'public' || accessLevel === 'authorized'
           ? accessLevel
           : undefined,
+        require_city_match: requireCityMatch,
+        require_category_match: requireCategoryMatch,
+        require_all_tags_match: requireAllTagsMatch,
         requester_app_id: appId,
         ranking_policy: rankingPolicy,
         include_ranking_receipt: includeRankingReceipt,
@@ -132,7 +139,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
     } finally {
       setBusy(false)
     }
-  }, [accessLevel, appId, capabilityKey, capabilityKind, categories, city, includeRankingReceipt, maxPrice, maxSourceAgeMinutes, priceCurrency, query, rankingPolicy, requireCurrentDeclaration, requireInternalSyncReceipt, sourceDataDomain, sourceProviderKey, tags])
+  }, [accessLevel, appId, capabilityKey, capabilityKind, categories, city, includeRankingReceipt, maxPrice, maxSourceAgeMinutes, priceCurrency, query, rankingPolicy, requireAllTagsMatch, requireCategoryMatch, requireCityMatch, requireCurrentDeclaration, requireInternalSyncReceipt, sourceDataDomain, sourceProviderKey, tags])
 
   const applyProfile = useCallback((preferences: ConsumerPreferences) => {
     setCategories(preferences.categories.join(', '))
@@ -287,6 +294,14 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
             <label>城市<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ji'an" /></label>
             <label>经营类别<input value={categories} onChange={(event) => setCategories(event.target.value)} placeholder="cafe, retail" /></label>
             <label>偏好标签<input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="quiet, coffee" /></label>
+            <ConsumerPreferenceConstraintFields
+              requireCityMatch={requireCityMatch}
+              requireCategoryMatch={requireCategoryMatch}
+              requireAllTagsMatch={requireAllTagsMatch}
+              onRequireCityMatchChange={setRequireCityMatch}
+              onRequireCategoryMatchChange={setRequireCategoryMatch}
+              onRequireAllTagsMatchChange={setRequireAllTagsMatch}
+            />
             <ConsumerPriceFilterFields
               maxPrice={maxPrice}
               currency={priceCurrency}
@@ -315,6 +330,9 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
               )}
               {result?.capability_filter.kind && <span style={badgeStyle()}>{result.capability_filter.kind === 'action' ? '仅经营操作' : '仅信息查询'}</span>}
               {result?.capability_filter.access_level && <span style={badgeStyle()}>{result.capability_filter.access_level === 'authorized' ? '仅需授权调用' : '仅公开调用'}</span>}
+              {result?.preference_constraints.require_city_match && <span style={badgeStyle()}>城市硬约束</span>}
+              {result?.preference_constraints.require_category_match && <span style={badgeStyle()}>类别硬约束</span>}
+              {result?.preference_constraints.require_all_tags_match && <span style={badgeStyle()}>全部标签硬约束</span>}
               <span
                 style={badgeStyle(result?.ranking_is_paid ? 'danger' : 'neutral')}
                 data-tone={result?.ranking_is_paid ? 'danger' : 'neutral'}
