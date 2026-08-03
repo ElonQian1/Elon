@@ -127,10 +127,10 @@ impl Store {
         let mut statement = conn.prepare(&format!(
             "{ADAPTER_SELECT} WHERE project_id=?1 ORDER BY updated_at DESC"
         ))?;
-        statement
+        let adapters = statement
             .query_map(params![project_id.trim()], adapter_from_row)?
-            .collect::<rusqlite::Result<Vec<_>>>()
-            .map_err(Into::into)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(adapters)
     }
 
     pub(crate) fn task_sui_preflight_adapter(

@@ -76,13 +76,13 @@ impl Store {
         let mut statement = conn.prepare(&format!(
             "{JOB_SELECT} WHERE project_id=?1 ORDER BY created_at DESC LIMIT ?2"
         ))?;
-        statement
+        let jobs = statement
             .query_map(
                 params![project_id.trim(), limit.clamp(1, 500) as i64],
                 job_from_row,
             )?
-            .collect::<rusqlite::Result<Vec<_>>>()
-            .map_err(Into::into)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(jobs)
     }
 
     pub(crate) fn task_sui_preflight_job(
@@ -140,13 +140,13 @@ impl Store {
               WHERE project_id=?1 AND status='pending'
               ORDER BY created_at, id LIMIT ?2",
         )?;
-        statement
+        let candidate_ids = statement
             .query_map(
                 params![project_id.trim(), limit.clamp(1, 100) as i64],
                 |row| row.get(0),
             )?
-            .collect::<rusqlite::Result<Vec<_>>>()
-            .map_err(Into::into)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(candidate_ids)
     }
 
     pub(crate) fn block_task_sui_preflight_job(

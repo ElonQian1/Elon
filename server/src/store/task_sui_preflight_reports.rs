@@ -12,7 +12,8 @@ impl Store {
         &self,
         input: CreateSuiPreflightReport<'_>,
     ) -> Result<SuiPreflightReport> {
-        insert_or_get_report(&self.conn()?, input)
+        let conn = self.conn()?;
+        insert_or_get_report(&conn, input)
     }
 
     pub(crate) fn list_task_sui_preflight_reports(
@@ -24,13 +25,13 @@ impl Store {
         let mut statement = conn.prepare(&format!(
             "{REPORT_SELECT} WHERE project_id=?1 ORDER BY created_at DESC LIMIT ?2"
         ))?;
-        statement
+        let reports = statement
             .query_map(
                 params![project_id.trim(), limit.clamp(1, 500) as i64],
                 report_from_row,
             )?
-            .collect::<rusqlite::Result<Vec<_>>>()
-            .map_err(Into::into)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(reports)
     }
 }
 

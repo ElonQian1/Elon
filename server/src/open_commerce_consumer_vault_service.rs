@@ -169,7 +169,8 @@ fn record_audit(
             "ciphertext_bytes": item.ciphertext_bytes,
             "server_can_decrypt": false,
         }),
-    )
+    )?;
+    Ok(())
 }
 
 fn validate_envelope(
