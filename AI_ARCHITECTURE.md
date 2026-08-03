@@ -198,7 +198,7 @@ AI_PROJECT / AI_INDEX / AGENTS
 - 验证与计量面：节点声明、平台观测、挑战/复算和最终验证事实；
 - 市场与结算面：标准 Compute SKU、期货交付窗口、不可变价格快照和双价格腿回执。
 
-当前 `server/src/compute_federation/` 只提供未编译、未接线的云端领域合同；`server/src/node_agent_compute_plugin_host/` 已增加未编译的 Manifest、InstallPlan、双槽生命周期、ReadyCapability、Attempt 命令和 typed event 合同，但尚无下载器、Sidecar 或通用协议接线。现有节点模型白名单、Token 预留和流租约继续作为 `user_node + llm_chat` 兼容路径。权威架构与阶段见 `docs/distributed-compute/README.md`。
+当前 `server/src/compute_federation/` 提供未编译、未接线的云端领域合同；`server/src/store/compute_capacity_*.rs`、`compute_provider_registry.rs`、`compute_offer_registry.rs` 与 `compute_price_snapshot_registry.rs` 已形成隔离的 CapacityPool、Provider/Offer Registry、供给、Claim、账本审计、到期恢复、生命周期和不可变锁价快照 Store，但这些路径尚未编译、执行迁移或接入 Broker。`server/src/node_agent_compute_plugin_host/` 已增加未编译的 Manifest、InstallPlan、双槽生命周期、ReadyCapability、Attempt 命令和 typed event 合同，但尚无下载器、Sidecar 或通用协议接线。现有节点模型白名单、Token 预留和流租约继续作为 `user_node + llm_chat` 兼容路径。权威架构与阶段见 `docs/distributed-compute/README.md`。
 
 ## 关键模块边界
 
@@ -211,6 +211,7 @@ AI_PROJECT / AI_INDEX / AGENTS
 | `server/src/agent_config.rs` | 用户模型/API key 配置和加密持久化 |
 | `server/src/agent_llm_call.rs` | OpenAI-compatible chat 调用和用量记录 |
 | `server/src/compute_federation/` | 分布式算力 Provider、Offer、Job、Lease、价格与回执领域合同；当前未接运行路径 |
+| `server/src/store/compute_capacity_*.rs`、`compute_provider_registry.rs`、`compute_offer_registry.rs` | 共享容量池、版本化 Provider/Offer、供给双分录、Claim Hold/终态、账本审计、恢复和 Pool 控制面；当前未编译、未迁移、未接 Broker |
 | `server/src/node_agent_compute_plugin_host/` | Windows 节点 legacy Host seam 与按需插件、Attempt、Runner event 合同；当前只有旧 LLM 接入，正式合同未接运行路径 |
 | `scripts/publish-server.ps1` | 后端构建、版本 claim、上传、部署、验证 |
 | `scripts/publish-apk.ps1` | APK 构建、签名、上传和版本发布 |

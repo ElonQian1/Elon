@@ -43,6 +43,8 @@ Offer 引用精确 Pool binding；每条容量行再引用精确 bucket。Offer 
 
 Claim 把一组 meter 数量绑定到 Quote hold、Reservation、未来 Commitment、DeliveryAllocation 或 Attempt。它拥有稳定 ID、主体、状态、revision、可选 parent claim 和过期时间，是幂等释放与防止“释放别人的容量”的边界。
 
+当前 Store 的 Hold 必须显式设置 `expires_at`，只允许在交付窗口结束前创建，且 TTL 不得越过窗口结束；一个多 meter Claim 的全部 bucket 必须共享完全相同的窗口边界。窗口结束、TTL 生效和 Expire 授权都以 Store 生成的 `recorded_at` 为权威，调用方 `occurred_at/cutoff_at` 不能伪装未来时间或提前到期。Release/Expire 只接受仍为 `held` 的 Claim，并从该 Claim 自己的 ledger legs 以 checked `i128` 证明每条 held 归属数量且 active 为零。`active` 容量只能由未来绑定 fencing 的 Attempt return/consume 路径推进。
+
 ### LedgerTransaction 与 LedgerLeg
 
 Transaction 固定 pool、epoch、window、事件类型、幂等键、请求摘要、业务主体和因果引用，并包含一个或多个 meter line。每个 line 展开成等额双腿；Transaction/Leg 均不可更新或删除。
@@ -104,6 +106,7 @@ reusable:   issued = available + held + active + retired
 - Quote hold、Reservation 和 Commitment 都有明确 expires_at；
 - 恢复器按 Claim 而非汇总余额追加 release/expired transaction；
 - 相同 effect 使用唯一幂等键，不会重复归还；
+- 当前代码级重放返回当前 Claim/余额，尚未保存不可变首次响应；调用方 request digest 也尚未由 Store 规范计算，这两项不能被描述为严格幂等闭环；
 - 账本与余额投影不一致时停止新 Reserve，重放 ledger 重建投影并形成审计报告；
 - 旧 epoch、旧 fencing generation 和晚到终态只能追加审计，不能影响当前余额。
 
@@ -113,4 +116,4 @@ reusable:   issued = available + held + active + retired
 
 ## 9. 当前实现边界
 
-2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v171 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、Claim hold、revision 栅栏释放/到期、双分录落库、余额 CAS、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、版本化 Provider/Offer，以及不可变 Price Snapshot。Offer 只保存静态销售上限，快照只冻结价格与来源，两者都不成为实时余额真源。这些新增路径尚未编译、执行迁移、调度、并发验证或真实容量操作；消费者预算与 Reservation 的统一 Reserve、Attempt 激活、受控自动修复、Broker 和运行协议仍未写入或接线。
+2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v171 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、窗口与 TTL 有界的 Claim hold、Claim-local held-only 释放/到期、双分录落库、余额 CAS、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、版本化 Provider/Offer 注册和历史审计，以及不可变 Price Snapshot 登记与读取。Offer 只保存静态销售上限并交叉核验真实 bucket，不成为实时余额真源；Price Snapshot Registry 接收已构造快照，不生成报价，也不与容量/预算原子锁定。这些新增路径尚未编译、执行迁移、调度、并发验证或真实容量操作。Hold/Finish 的 causal binding 当前仍为空，standalone Reservation/Commitment 不等于与预算、Price Snapshot、Reservation 原子完成的 Broker Reserve。Offer 发现/撮合、价格源与报价生成、统一 Reserve、Attempt 激活、canonical Claim 请求摘要、不可变 Claim 首次响应、事务内 Broker API、受控自动修复和运行协议仍未写入或接线。

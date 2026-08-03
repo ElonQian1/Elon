@@ -23,15 +23,15 @@ owners: backend, node, ai-economy
 | 能力 | 2026-08-04 状态 |
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
-| Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码已写，尚未编译、接线和运行验证 |
+| Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码、v169 Provider Registry、Offer 规范合同校验与 v170 追加式 Offer Registry 已写，尚未编译、迁移、接线和运行验证 |
 | 节点插件治理合同 | Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 与短期 ReadyCapability 合同已写，尚未编译或接线 |
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
-| 共享 CapacityPool 与追加式容量账本 | 领域合同、v165-v168 schema、隔离 Store、只读审计、到期批处理、状态门卫和 epoch 轮换已写；尚未编译、执行迁移或接线 |
+| 共享 CapacityPool 与追加式容量账本 | 领域合同、v165-v168 schema、隔离 Store、只读审计、到期批处理、状态门卫和 epoch 轮换已写；Hold 已收紧窗口/TTL，Release/Expire 只接受 Claim 自有 held 容量；尚未编译、执行迁移或接线 |
 | Provider 与 Offer 版本注册表 | v169/v170 schema、Provider/Offer 当前投影、追加式历史版本、规范摘要和容量引用审计已写；尚未编译、执行迁移或接线 |
-| 不可变 Price Snapshot | v171 schema、当前 active Offer 绑定、双价格腿、来源证据和历史摘要审计已写；尚未编译、执行迁移或冻结真实预算 |
+| Price Snapshot 锁价注册表 | v171 schema、active Offer/单一窗口/双价格腿/费用/来源绑定、不可变登记读取、精确重放和历史审计已写；尚未编译、执行迁移或接入报价/Broker |
 | 外部算力池适配器与统一报价 | 已接受设计，尚未实现 |
-| 多源验证、标准化 SKU 与期货锁价结算 | 已接受设计，尚未实现 |
+| 多源验证、期货曲线与真实结算 | 已接受设计，尚未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
 “已接受设计”不等于“已上线”。任何代理都必须保留实现状态，不得把文档中的目标合同描述成当前生产能力。
@@ -53,15 +53,15 @@ owners: backend, node, ai-economy
 
 ### F1：用户节点成为可插拔 Provider
 
-节点内部已经形成 Plugin Host 兼容 seam，以及 Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架，均尚未编译或接线。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**；只有控制面结合策略、容量和价格后才能发布版本化 Offer。
+节点内部已经形成 Plugin Host 兼容 seam，以及 Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架；云端还形成 v169 版本化 Provider Registry、Offer 规范合同校验和 v170 追加式 Offer Registry。它们均尚未编译、执行迁移或接线。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**；只有控制面结合 Provider、策略、容量和价格后才能登记版本化 Offer。
 
 目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。真实下载器、Sidecar 进程与 IPC、动态健康状态、云端 capability gate、通用 Attempt 协议接线和 Offer 发布目前都未实现。
 
 ### F2：Broker、验证和真实结算
 
-共享 CapacityPool 与追加式容量账本已经形成领域合同、checked-i128 reducer、v165-v168 SQLite schema 和隔离的本地 Store。Store 可登记池版本与零余额 bucket，原子追加多 meter 发行/撤出双分录，并通过稳定 Claim 完成 hold、revision 栅栏释放和到期归还；幂等重放返回当前余额。只读审计可从 ledger legs 重算投影，有界批处理可逐 Claim 恢复到期容量；状态门卫、追加式生命周期和排空后的 epoch 轮换也已形成。v169-v171 又增加版本化 Provider/Offer 注册表与不可变 Price Snapshot：Offer 绑定发布时的 Provider 版本、SKU、容量池、窗口和 bucket，快照固定当前 active Offer 的双价格腿、费用、来源证据和失效边界；两者都不保存实时剩余量或移动资金。上述代码尚未编译、执行迁移、调度或接入运行路由。Offer 发布、复制或续期都不会铸造容量；只有 Pool bucket 的 `supply_added` 进入账本后才形成可用余额。V1 最终仍要求一份 Reservation 只绑定一个 Pool 和一个精确 UTC 半开窗口 `[starts_at, ends_at)`，并在同一事务中完成多 meter 容量、消费者预算、Price Snapshot 与 Reservation 的原子预留。
+共享 CapacityPool 与追加式容量账本已经形成领域合同、checked-i128 reducer、v165-v168 SQLite schema 和隔离的本地 Store。Store 可登记池版本与零余额 bucket，原子追加多 meter 发行/撤出双分录，并通过稳定 Claim 完成 hold、revision 栅栏释放和到期归还。Hold 必须显式到期、不允许在窗口结束后创建或晚于窗口结束；这些边界和 Expire 授权以 Store 当前记录时间为准，不信任调用方回填/未来时间。Release/Expire 只允许 `held -> available`，并用 checked `i128` 从 Claim 自己的 ledger legs 证明归属，不能释放 `active` Attempt 容量。幂等重放目前仍返回当前 Claim/余额并信任调用方 request digest；Hold/Finish 的 causal binding 仍硬编码为空，standalone Reservation/Commitment 也尚未与预算、Price Snapshot 或真实 Reservation 原子绑定。canonical 请求摘要、不可变首次响应、业务绑定与事务内 Broker API 都是待补缺口。只读审计、有界到期恢复、状态门卫、追加式生命周期和排空后的 epoch 轮换也已形成。v169/v170 又增加版本化 Provider 与 Offer 注册表：Provider 的当前投影和不可变历史分离；Offer 绑定发布时的 Provider 版本、SKU、容量池、窗口和 bucket，并验证静态容量上限不超过已发行容量，但不保存实时剩余量。v171 Price Snapshot Registry 固定当前 active Offer、单一交付窗口、双价格腿、费用和来源证据，可持久化完整快照，按快照 ID 精确重放，约束 quote ID 唯一，读取时复核历史 Offer，且数据库触发器拒绝更新和删除。上述代码尚未编译、执行迁移、调度或接入运行路由；Registry 接收已构造快照，不负责价格源、期货曲线、报价生成或 Broker 原子锁定，也不保存实时容量或移动资金。Offer 发布、复制或续期都不会铸造容量；只有 Pool bucket 的 `supply_added` 进入账本后才形成可用余额。V1 最终仍要求一份 Reservation 只绑定一个 Pool 和一个精确 UTC 半开窗口 `[starts_at, ends_at)`，并在同一事务中完成多 meter 容量、消费者预算、Price Snapshot 与 Reservation 的原子预留。
 
-后续实现可选择 Offer 查询、消费者预算与容量统一 Reserve、容量自动调度与受控修复、带 `fencing_generation` 的尝试租约、多源计量、挑战任务、争议状态和可提取收益账本。
+后续实现可选择 Offer 查询与撮合、价格源/期货曲线和报价生成、容量自动调度与受控修复、容量/预算/Price Snapshot/Reservation 统一 Reserve、带 `fencing_generation` 的尝试租约、多源计量、挑战任务、争议状态和可提取收益账本。
 
 ### F3：外部矿池与企业集群
 

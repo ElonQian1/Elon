@@ -71,7 +71,7 @@ Provider 发布的不可变版本，包含支持的任务类型、模型/工件�
 
 共享 CapacityPool 和追加式容量账本已经成为已接受设计，权威决定见 `docs/decisions/distributed-compute-capacity-ledger-v1.md`，完整对象与事务边界见 `docs/distributed-compute/capacity-ledger.md`。CapacityPool 表达会互相争用的物理资源边界，不保存实时余额；同一物理资源的全部 Offer 必须绑定同一 pool/epoch/bucket，防止跨模型、SKU 或销售渠道重复出售。
 
-V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v171 SQLite schema，以及隔离的容量、Provider、Offer 和 Price Snapshot Store 已经写入但未编译、未执行迁移；消费者预算统一 Reserve、Broker 与运行协议接线仍未实现。
+V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v171 SQLite schema，以及隔离的容量、Provider、Offer 和不可变 Price Snapshot Store 已经写入但未编译、未执行迁移；预算统一 Reserve、报价生成、快照与 Reservation 原子锁定、Broker 与运行协议接线仍未实现。
 
 ### WorkloadSpec
 
@@ -104,6 +104,8 @@ Receipt 同时绑定 Job、Attempt、Offer、插件摘要、模型摘要、输�
 ### PriceSnapshot 与 SettlementReceipt
 
 Price Snapshot 冻结报价来源、交付窗口、消费者价格腿、Provider 价格腿、币种/积分单位和费用规则。Settlement Receipt 只引用快照与验证用量，不能回头读取“当前价格”重算历史任务。
+
+当前 v171 Registry 已把规范校验接入不可变快照登记与读取：按快照 ID 精确幂等重放，quote ID 唯一，读取复核历史 Offer，数据库拒绝更新和删除。它只接收已构造快照，尚无价格源/期货曲线、报价生成、HTTP 或 Broker 原子锁定接线。
 
 ## 5. 标准任务生命周期
 

@@ -81,6 +81,8 @@ Reservation 必须绑定不可变快照，至少包含：
 
 所有价格使用 `i64/u64` 微单位，比例使用 basis points；禁止 `f32/f64`。历史任务永远引用原快照，不因未来曲线变化而重算。
 
+2026-08-04 已形成 v171 不可变 Price Snapshot Registry：合同校验会核验快照与 active Offer、Provider、SKU、交付窗口和价格条款的精确绑定，约束 trade/index/mark/fallback 来源及观察窗口，并用 checked `i128` 检查整数金额上限。Store 可登记和读取完整快照；相同快照 ID 只能精确重放，quote ID 唯一，读取会按历史 Offer 复核摘要与索引字段，数据库触发器拒绝更新和删除。当前 Registry 只接收已构造快照，没有价格源注册、期货曲线、报价生成、HTTP 或 Broker 原子锁价接线。
+
 ## 7. 双价格腿与平台价差
 
 一笔任务同时冻结消费者价格腿和 Provider 价格腿：
@@ -118,7 +120,7 @@ platform_margin
 
 容量市场底层统一使用已接受的共享 CapacityPool 与追加式账本设计，见 `docs/decisions/distributed-compute-capacity-ledger-v1.md` 和 `docs/distributed-compute/capacity-ledger.md`。Offer 只声明静态出售上限；发布、复制或续期 Offer 不会铸造任何可用容量。只有 Pool bucket 的发行事件进入账本后才形成余额，所有现货 Reservation 与未来 Commitment 必须争用同一容量真源。
 
-V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v171 SQLite schema、容量 Store、版本化 Provider/Offer Registry，以及不可变 Price Snapshot Registry 已写入但未编译、未执行迁移；消费者预算统一 Reserve、Broker 接线和真实容量操作仍未实现。
+V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v171 SQLite schema、容量 Store、版本化 Provider/Offer Registry，以及不可变 Price Snapshot Registry 已写入但未编译、未执行迁移；价格源与报价生成、预算统一 Reserve、快照/容量/Reservation 原子绑定、Broker 接线和真实容量操作仍未实现。
 
 市场对象分层：
 
@@ -154,8 +156,8 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 
 ## 12. 演进顺序
 
-1. 版本化 Price Snapshot 与整数微单位；
-2. 平台发布的期货曲线和固定交付窗口；
+1. 版本化 Price Snapshot 注册、持久化与整数微单位（代码已写，尚未验证接线）；
+2. 平台发布的价格源、期货曲线、报价生成和固定交付窗口；
 3. Provider Capacity Commitment 与需求方 Delivery Allocation；
 4. 限价订单簿、成交、持仓和净额；
 5. YCI 指数、标记价、替代交付和自动清算；
@@ -165,4 +167,4 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 
 ## 13. 当前未验证声明
 
-本文是已接受的目标市场合同。当前代码尚未运行期货曲线、订单簿、持仓或真实清算；2026-08-04 的首批只铺领域模型，不编译、不迁移、不执行资金或积分移动。
+本文是已接受的目标市场合同。当前代码尚未运行 Price Snapshot 迁移与 Registry、报价生成、Broker 原子锁价、期货曲线、订单簿、持仓或真实清算；2026-08-04 的首批只铺领域模型、校验和持久化边界，不编译、不迁移、不执行资金或积分移动。
