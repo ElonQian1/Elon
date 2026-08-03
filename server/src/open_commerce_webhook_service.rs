@@ -136,3 +136,17 @@ pub(crate) fn list_deliveries(
         50,
     )
 }
+
+pub(crate) fn retry_delivery(
+    store: &Store,
+    app: &OpenCommerceDeveloperApp,
+    subscription_id: &str,
+    delivery_id: &str,
+) -> Result<DeveloperWebhookDelivery> {
+    store.retry_open_commerce_developer_webhook_delivery(
+        &app.project_id,
+        &app.id,
+        subscription_id,
+        delivery_id,
+    )
+}

@@ -48,11 +48,13 @@ pub(crate) struct DeveloperWebhookDelivery {
     pub event_type: String,
     pub status: String,
     pub attempt_count: i64,
+    pub manual_retry_count: i64,
     pub next_attempt_at: String,
     pub response_status: Option<i64>,
     pub error_code: Option<String>,
     pub created_at: String,
     pub last_attempt_at: Option<String>,
+    pub last_manual_retry_at: Option<String>,
     pub delivered_at: Option<String>,
 }
 

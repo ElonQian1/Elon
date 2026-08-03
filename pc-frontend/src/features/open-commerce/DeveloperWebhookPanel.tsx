@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Copy, KeyRound, Power, PowerOff, RefreshCw, ShieldCheck, Webhook } from 'lucide-react'
+import {
+  Copy,
+  KeyRound,
+  Power,
+  PowerOff,
+  RefreshCw,
+  RotateCcw,
+  ShieldCheck,
+  Webhook,
+} from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type {
   DeveloperWebhookDelivery,
@@ -174,6 +183,26 @@ export default function DeveloperWebhookPanel({
     }
   }
 
+  async function retryDelivery(delivery: DeveloperWebhookDelivery) {
+    if (!selectedApp || !selectedWebhookId) return
+    setBusy(true)
+    setMessage('')
+    try {
+      await openCommerceClientApi.retryDeveloperWebhookDelivery(
+        projectId,
+        selectedApp.id,
+        selectedWebhookId,
+        delivery.id,
+      )
+      setMessage('死信已重新进入投递队列。')
+      await refreshDeliveries()
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section className={base.integrationSection}>
       <header>
@@ -315,12 +344,26 @@ export default function DeveloperWebhookPanel({
               <article style={listItemStyle()} key={delivery.id}>
                 <header style={commerceStyles.itemHeader}>
                   <code style={commerceStyles.itemMeta}>{delivery.event_type}</code>
-                  <span style={badgeStyle(delivery.status === 'delivered' ? 'neutral' : 'warn')}>
-                    {delivery.status}
-                  </span>
+                  <div style={commerceStyles.itemHeader}>
+                    <span style={badgeStyle(delivery.status === 'delivered' ? 'neutral' : 'warn')}>
+                      {delivery.status}
+                    </span>
+                    {delivery.status === 'dead' && (
+                      <button
+                        style={actionStyle('icon', !canEdit || busy)}
+                        type="button"
+                        onClick={() => retryDelivery(delivery)}
+                        disabled={!canEdit || busy}
+                        title="重新投递死信"
+                      >
+                        <RotateCcw size={13} />
+                      </button>
+                    )}
+                  </div>
                 </header>
                 <small style={commerceStyles.itemMeta}>
                   {delivery.invocation_id} · 尝试 {delivery.attempt_count} 次
+                  {delivery.manual_retry_count > 0 ? ` · 人工重试 ${delivery.manual_retry_count} 次` : ''}
                   {delivery.response_status ? ` · HTTP ${delivery.response_status}` : ''}
                 </small>
               </article>

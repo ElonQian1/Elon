@@ -89,6 +89,8 @@
 79. `docs/open-commerce-developer-webhook-verification-v1-acceptance.md`：查看回调验证代码及统一回归待验证范围。
 80. `docs/decisions/open-commerce-developer-webhook-secret-rotation-v1.md`：查看订阅级签名密钥版本、显式轮换和重新验证边界。
 81. `docs/open-commerce-developer-webhook-secret-rotation-v1-acceptance.md`：查看密钥轮换代码及统一回归待验证范围。
+82. `docs/decisions/open-commerce-developer-webhook-dead-letter-retry-v1.md`：查看单条死信原地重新排队和人工重试证据边界。
+83. `docs/open-commerce-developer-webhook-dead-letter-retry-v1-acceptance.md`：查看死信人工重试代码及统一回归待验证范围。
 
 ## 专题地图
 

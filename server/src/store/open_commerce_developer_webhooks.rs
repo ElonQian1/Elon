@@ -19,10 +19,11 @@ const SUBSCRIPTION_SELECT: &str =
             last_delivery_at, last_error_code, created_at, updated_at, disabled_at
        FROM open_commerce_developer_webhook_subscriptions";
 
-const DELIVERY_SELECT: &str =
+pub(super) const DELIVERY_SELECT: &str =
     "SELECT id, subscription_id, invocation_id, event_sequence, event_type,
-            status, attempt_count, next_attempt_at, response_status, error_code,
-            created_at, last_attempt_at, delivered_at
+            status, attempt_count, manual_retry_count, next_attempt_at,
+            response_status, error_code, created_at, last_attempt_at,
+            last_manual_retry_at, delivered_at
        FROM open_commerce_developer_webhook_deliveries";
 
 impl Store {
@@ -300,9 +301,10 @@ impl Store {
             &format!(
                 "SELECT delivery.id, delivery.subscription_id, delivery.invocation_id,
                         delivery.event_sequence, delivery.event_type, delivery.status,
-                        delivery.attempt_count, delivery.next_attempt_at,
-                        delivery.response_status, delivery.error_code, delivery.created_at,
-                        delivery.last_attempt_at, delivery.delivered_at,
+                        delivery.attempt_count, delivery.manual_retry_count,
+                        delivery.next_attempt_at, delivery.response_status,
+                        delivery.error_code, delivery.created_at, delivery.last_attempt_at,
+                        delivery.last_manual_retry_at, delivery.delivered_at,
                         subscription.owner_user_id, subscription.app_id,
                         subscription.callback_url, subscription.signing_key_id,
                         subscription.signing_secret_version
@@ -323,18 +325,20 @@ impl Store {
                         event_type: row.get(4)?,
                         status: row.get(5)?,
                         attempt_count: row.get(6)?,
-                        next_attempt_at: row.get(7)?,
-                        response_status: row.get(8)?,
-                        error_code: row.get(9)?,
-                        created_at: row.get(10)?,
-                        last_attempt_at: row.get(11)?,
-                        delivered_at: row.get(12)?,
+                        manual_retry_count: row.get(7)?,
+                        next_attempt_at: row.get(8)?,
+                        response_status: row.get(9)?,
+                        error_code: row.get(10)?,
+                        created_at: row.get(11)?,
+                        last_attempt_at: row.get(12)?,
+                        last_manual_retry_at: row.get(13)?,
+                        delivered_at: row.get(14)?,
                     },
-                    owner_user_id: row.get(13)?,
-                    app_id: row.get(14)?,
-                    callback_url: row.get(15)?,
-                    signing_key_id: row.get(16)?,
-                    signing_secret_version: row.get(17)?,
+                    owner_user_id: row.get(15)?,
+                    app_id: row.get(16)?,
+                    callback_url: row.get(17)?,
+                    signing_key_id: row.get(18)?,
+                    signing_secret_version: row.get(19)?,
                     lease_owner: lease_owner.trim().to_string(),
                 })
             },
@@ -471,7 +475,7 @@ fn subscription_from_row(row: &Row<'_>) -> rusqlite::Result<DeveloperWebhookSubs
     })
 }
 
-fn delivery_from_row(row: &Row<'_>) -> rusqlite::Result<DeveloperWebhookDelivery> {
+pub(super) fn delivery_from_row(row: &Row<'_>) -> rusqlite::Result<DeveloperWebhookDelivery> {
     Ok(DeveloperWebhookDelivery {
         schema: DEVELOPER_WEBHOOK_DELIVERY_SCHEMA,
         id: row.get(0)?,
@@ -481,11 +485,13 @@ fn delivery_from_row(row: &Row<'_>) -> rusqlite::Result<DeveloperWebhookDelivery
         event_type: row.get(4)?,
         status: row.get(5)?,
         attempt_count: row.get(6)?,
-        next_attempt_at: row.get(7)?,
-        response_status: row.get(8)?,
-        error_code: row.get(9)?,
-        created_at: row.get(10)?,
-        last_attempt_at: row.get(11)?,
-        delivered_at: row.get(12)?,
+        manual_retry_count: row.get(7)?,
+        next_attempt_at: row.get(8)?,
+        response_status: row.get(9)?,
+        error_code: row.get(10)?,
+        created_at: row.get(11)?,
+        last_attempt_at: row.get(12)?,
+        last_manual_retry_at: row.get(13)?,
+        delivered_at: row.get(14)?,
     })
 }

@@ -313,6 +313,7 @@ mod open_commerce_webhook_api;
 mod open_commerce_webhook_lifecycle_migration;
 mod open_commerce_webhook_migration;
 mod open_commerce_webhook_model;
+mod open_commerce_webhook_replay_migration;
 mod open_commerce_webhook_security;
 mod open_commerce_webhook_service;
 mod open_commerce_webhook_verification;

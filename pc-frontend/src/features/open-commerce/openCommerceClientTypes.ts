@@ -66,11 +66,13 @@ export interface DeveloperWebhookDelivery {
   event_type: 'invocation.succeeded' | 'invocation.failed'
   status: 'pending' | 'delivering' | 'retry' | 'delivered' | 'dead'
   attempt_count: number
+  manual_retry_count: number
   next_attempt_at: string
   response_status?: number
   error_code?: string
   created_at: string
   last_attempt_at?: string
+  last_manual_retry_at?: string
   delivered_at?: string
 }
 

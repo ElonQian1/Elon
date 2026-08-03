@@ -35,6 +35,7 @@ import type {
   DeveloperTerminalEventDetail,
   DeveloperTerminalEventPage,
   DeveloperWebhookCredential,
+  DeveloperWebhookDelivery,
   DeveloperWebhookDeliveryList,
   DeveloperWebhookSubscription,
   DeveloperWebhookSubscriptionList,
@@ -247,6 +248,16 @@ export const openCommerceClientApi = {
     webhookId: string,
   ) => api.get<DeveloperWebhookDeliveryList>(
     `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks/${encodeURIComponent(webhookId)}/deliveries`,
+  ),
+
+  retryDeveloperWebhookDelivery: (
+    projectId: string,
+    appRecordId: string,
+    webhookId: string,
+    deliveryId: string,
+  ) => api.post<DeveloperWebhookDelivery>(
+    `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks/${encodeURIComponent(webhookId)}/deliveries/${encodeURIComponent(deliveryId)}/retry`,
+    {},
   ),
 
   listConsumerPortabilityImports: (projectId: string) =>

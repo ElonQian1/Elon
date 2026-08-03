@@ -41,6 +41,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks/:subscription_id/deliveries",
             get(list_deliveries),
         )
+        .route(
+            "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks/:subscription_id/deliveries/:delivery_id/retry",
+            post(retry_delivery),
+        )
 }
 
 async fn list_webhooks(
@@ -237,6 +241,53 @@ async fn list_deliveries(
             },
         ),
     )
+}
+
+async fn retry_delivery(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, app_record_id, subscription_id, delivery_id)): Path<(
+        String,
+        String,
+        String,
+        String,
+    )>,
+) -> Response {
+    let (user_id, app) =
+        match editable_caller_app(&state, &headers, &project_id, &app_record_id, true) {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
+    let delivery = match open_commerce_webhook_service::retry_delivery(
+        &state.store,
+        &app,
+        &subscription_id,
+        &delivery_id,
+    ) {
+        Ok(value) => value,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
+    };
+    if let Err(error) = state.store.record_open_commerce_audit(
+        &project_id,
+        &user_id,
+        Some("pc-web"),
+        "developer_webhook.delivery_retried",
+        "developer_webhook_delivery",
+        &delivery.id,
+        &json!({
+            "app_id":app.app_id,
+            "subscription_id":delivery.subscription_id,
+            "invocation_id":delivery.invocation_id,
+            "manual_retry_count":delivery.manual_retry_count
+        }),
+    ) {
+        tracing::warn!(
+            delivery_id = %delivery.id,
+            error = %error,
+            "Webhook 死信已重新排队，但审计记录写入失败"
+        );
+    }
+    Json(delivery).into_response()
 }
 
 fn mutate_webhook(
