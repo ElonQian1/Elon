@@ -107,6 +107,8 @@
 97. `docs/open-commerce-developer-app-admission-v1-acceptance.md`：查看 App 准入审查代码及统一回归待验证范围。
 98. `docs/decisions/open-commerce-developer-production-credentials-v1.md`：查看默认关闭、一次性显示、能力限权和紧急撤销的生产凭据边界。
 99. `docs/open-commerce-developer-production-credentials-v1-acceptance.md`：查看生产凭据代码状态与后置统一回归清单。
+100. `docs/decisions/open-commerce-invocation-credential-provenance-v1.md`：查看调用来源证据、幂等边界和沙箱/生产隔离决定。
+101. `docs/open-commerce-invocation-credential-provenance-v1-acceptance.md`：查看调用环境隔离代码状态与统一回归清单。
 
 ## 专题地图
 

@@ -18,7 +18,7 @@ implementation_status: implementation_uncompiled
 2. 功能由 `OPEN_COMMERCE_PRODUCTION_CREDENTIALS_ENABLED` 显式启用，默认关闭。关闭时不能签发，现有生产凭据也不能完成鉴权；撤销入口始终可用。
 3. 只有启用中的 App、当前已批准资料、当前已验证主页域名和当前已批准准入记录同时成立时，平台管理员才能签发。主体声明仍不是外部工商核验。
 4. 每次签发生成一个只显示一次的随机密钥，数据库只保存 SHA-256、末尾提示和审计元数据。同一 App 同时最多一条活动生产凭据；再次签发会原子撤销旧凭据。
-5. 凭据范围必须是当前已审核 `requested_scopes` 的非空子集。生产调用、动作准备和动作确认均按能力 Key 失败关闭；终态事件仍按 App 身份隔离。
+5. 凭据范围必须是当前已审核 `requested_scopes` 的非空子集。生产调用、动作准备和动作确认均按能力 Key 失败关闭；调用账本、终态事件和幂等重放同时按凭据环境隔离。
 6. 有效期由人工风险层级限制：`low` 最长 366 天、`standard` 最长 180 天、`enhanced` 最长 90 天。到期凭据鉴权失败。
 7. 修改资料、重新发起域名验证、停用 App 或暂停准入会在同一事务中撤销活动生产凭据。重新审核、重新验证或重新启用不会恢复旧密钥。
 8. App 所有者或项目管理员可查看凭据元数据并紧急撤销；平台管理员负责签发或轮换。PC 只在当前内存中显示一次完整密钥，不写入浏览器持久存储。
@@ -39,3 +39,4 @@ implementation_status: implementation_uncompiled
 - `pc-frontend/src/features/open-commerce/DeveloperProductionCredentialPanel.tsx`
 - `pc-frontend/src/features/open-commerce/DeveloperAppAdmissionReviewPanel.tsx`
 - `docs/open-commerce-developer-production-credentials-v1-acceptance.md`
+- `docs/decisions/open-commerce-invocation-credential-provenance-v1.md`

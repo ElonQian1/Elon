@@ -8,6 +8,8 @@ implementation_status: implementation_uncompiled
 
 # 开放商业开发者签名 Webhook V1
 
+> 后续修订：现有 Webhook 被明确限定为沙箱/旧调用通知，自动入队、历史补发、死信重试和工作器读取均不得交付生产调用。生产 Webhook 需要独立准入，当前边界以 `open-commerce-invocation-credential-provenance-v1.md` 为准。
+
 ## 背景
 
 开发者 App 已能用测试 Token 按游标读取自己的终态调用事件，但持续轮询会增加接入复杂度和无效请求。开放商业需要主动通知能力，使外部 App 在调用成功或失败后及时继续订单、ERP 或用户通知流程，同时不能把平台变成可访问任意内网地址的代理，也不能把未签名响应当作可信业务事实。
