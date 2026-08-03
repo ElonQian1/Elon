@@ -41,6 +41,8 @@ export default function DeveloperWebhookPanel({
 }) {
   const [appRecordId, setAppRecordId] = useState('')
   const [callbackUrl, setCallbackUrl] = useState('')
+  const [deliverOnSucceeded, setDeliverOnSucceeded] = useState(true)
+  const [deliverOnFailed, setDeliverOnFailed] = useState(true)
   const [webhooks, setWebhooks] = useState<DeveloperWebhookSubscription[]>([])
   const [deliveries, setDeliveries] = useState<DeveloperWebhookDelivery[]>([])
   const [selectedWebhookId, setSelectedWebhookId] = useState('')
@@ -111,6 +113,8 @@ export default function DeveloperWebhookPanel({
         projectId,
         selectedApp.id,
         callbackUrl,
+        deliverOnSucceeded,
+        deliverOnFailed,
       )
       setVisibleSecret(credential.signing_secret)
       setSelectedWebhookId(credential.subscription.id)
@@ -237,10 +241,39 @@ export default function DeveloperWebhookPanel({
               required
             />
           </label>
+          <div style={commerceStyles.itemHeader}>
+            <label>
+              <input
+                type="checkbox"
+                checked={deliverOnSucceeded}
+                onChange={(event) => setDeliverOnSucceeded(event.target.checked)}
+              />
+              调用成功
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={deliverOnFailed}
+                onChange={(event) => setDeliverOnFailed(event.target.checked)}
+              />
+              调用失败
+            </label>
+          </div>
           <button
-            style={actionStyle('primary', !canEdit || busy || selectedApp?.status !== 'active')}
+            style={actionStyle(
+              'primary',
+              !canEdit
+                || busy
+                || selectedApp?.status !== 'active'
+                || (!deliverOnSucceeded && !deliverOnFailed),
+            )}
             type="submit"
-            disabled={!canEdit || busy || selectedApp?.status !== 'active'}
+            disabled={
+              !canEdit
+              || busy
+              || selectedApp?.status !== 'active'
+              || (!deliverOnSucceeded && !deliverOnFailed)
+            }
           >
             <Webhook size={13} />创建订阅
           </button>
@@ -284,6 +317,12 @@ export default function DeveloperWebhookPanel({
               <small style={commerceStyles.itemMeta}>
                 失败 {webhook.consecutive_failures} 次 ·{' '}
                 {webhook.verification_error_code ?? webhook.last_error_code ?? '无错误'}
+              </small>
+              <small style={commerceStyles.itemMeta}>
+                接收事件：{[
+                  webhook.deliver_on_succeeded ? '调用成功' : '',
+                  webhook.deliver_on_failed ? '调用失败' : '',
+                ].filter(Boolean).join('、')}
               </small>
               <footer style={commerceStyles.itemHeader}>
                 <small style={commerceStyles.itemMeta}>

@@ -183,6 +183,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (146, "开放商业开发者 Webhook 回调端点控制验证", crate::open_commerce_webhook_verification_migration::migration_v146),
     (147, "开放商业开发者 Webhook 签名密钥版本轮换", crate::open_commerce_webhook_lifecycle_migration::migration_v147),
     (148, "开放商业开发者 Webhook 死信人工重试证据", crate::open_commerce_webhook_replay_migration::migration_v148),
+    (149, "开放商业开发者 Webhook 终态事件筛选", crate::open_commerce_webhook_event_filter_migration::migration_v149),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

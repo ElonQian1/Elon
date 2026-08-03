@@ -7,7 +7,8 @@ use crate::open_commerce_webhook_model::{
 
 pub(super) const SUBSCRIPTION_SELECT: &str =
     "SELECT id, project_id, app_record_id, app_id, callback_url, signing_key_id,
-            signing_secret_version, status, verification_status, verification_attempted_at,
+            signing_secret_version, deliver_on_succeeded, deliver_on_failed,
+            status, verification_status, verification_attempted_at,
             verification_error_code, verified_at, consecutive_failures,
             last_delivery_at, last_error_code, created_at, updated_at, disabled_at
        FROM open_commerce_developer_webhook_subscriptions";
@@ -31,17 +32,19 @@ pub(super) fn subscription_from_row(
         callback_url: row.get(4)?,
         signing_key_id: row.get(5)?,
         signing_secret_version: row.get(6)?,
-        status: row.get(7)?,
-        verification_status: row.get(8)?,
-        verification_attempted_at: row.get(9)?,
-        verification_error_code: row.get(10)?,
-        verified_at: row.get(11)?,
-        consecutive_failures: row.get(12)?,
-        last_delivery_at: row.get(13)?,
-        last_error_code: row.get(14)?,
-        created_at: row.get(15)?,
-        updated_at: row.get(16)?,
-        disabled_at: row.get(17)?,
+        deliver_on_succeeded: row.get(7)?,
+        deliver_on_failed: row.get(8)?,
+        status: row.get(9)?,
+        verification_status: row.get(10)?,
+        verification_attempted_at: row.get(11)?,
+        verification_error_code: row.get(12)?,
+        verified_at: row.get(13)?,
+        consecutive_failures: row.get(14)?,
+        last_delivery_at: row.get(15)?,
+        last_error_code: row.get(16)?,
+        created_at: row.get(17)?,
+        updated_at: row.get(18)?,
+        disabled_at: row.get(19)?,
     })
 }
 

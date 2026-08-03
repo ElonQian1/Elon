@@ -17,6 +17,8 @@ pub(crate) struct DeveloperWebhookSubscription {
     pub callback_url: String,
     pub signing_key_id: String,
     pub signing_secret_version: i64,
+    pub deliver_on_succeeded: bool,
+    pub deliver_on_failed: bool,
     pub status: String,
     pub verification_status: String,
     pub verification_attempted_at: Option<String>,
@@ -73,6 +75,8 @@ pub(crate) struct DeveloperWebhookDeliveryClaim {
 #[serde(deny_unknown_fields)]
 pub(crate) struct CreateDeveloperWebhookRequest {
     pub callback_url: String,
+    pub deliver_on_succeeded: Option<bool>,
+    pub deliver_on_failed: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]

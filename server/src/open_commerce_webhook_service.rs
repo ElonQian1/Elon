@@ -34,9 +34,19 @@ pub(crate) fn create_webhook(
     let callback_url = crate::open_commerce_webhook_security::validate_webhook_callback_url(
         &request.callback_url,
     )?;
+    let deliver_on_succeeded = request.deliver_on_succeeded.unwrap_or(true);
+    let deliver_on_failed = request.deliver_on_failed.unwrap_or(true);
+    if !deliver_on_succeeded && !deliver_on_failed {
+        bail!("Webhook 至少需要订阅一种终态事件");
+    }
     let signing_key_id = crate::open_commerce_webhook_security::webhook_master_key_id()?;
-    let subscription =
-        store.create_open_commerce_developer_webhook(app, &callback_url, &signing_key_id)?;
+    let subscription = store.create_open_commerce_developer_webhook(
+        app,
+        &callback_url,
+        &signing_key_id,
+        deliver_on_succeeded,
+        deliver_on_failed,
+    )?;
     let signing_secret = match crate::open_commerce_webhook_security::derive_webhook_signing_secret(
         &subscription.id,
         subscription.signing_secret_version,

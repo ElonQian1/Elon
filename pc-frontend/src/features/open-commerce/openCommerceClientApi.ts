@@ -212,10 +212,20 @@ export const openCommerceClientApi = {
       `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks`,
     ),
 
-  createDeveloperWebhook: (projectId: string, appRecordId: string, callbackUrl: string) =>
+  createDeveloperWebhook: (
+    projectId: string,
+    appRecordId: string,
+    callbackUrl: string,
+    deliverOnSucceeded: boolean,
+    deliverOnFailed: boolean,
+  ) =>
     api.post<DeveloperWebhookCredential>(
       `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks`,
-      { callback_url: callbackUrl },
+      {
+        callback_url: callbackUrl,
+        deliver_on_succeeded: deliverOnSucceeded,
+        deliver_on_failed: deliverOnFailed,
+      },
     ),
 
   disableDeveloperWebhook: (projectId: string, appRecordId: string, webhookId: string) =>

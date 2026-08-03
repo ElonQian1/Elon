@@ -24,6 +24,8 @@ impl Store {
         app: &OpenCommerceDeveloperApp,
         callback_url: &str,
         signing_key_id: &str,
+        deliver_on_succeeded: bool,
+        deliver_on_failed: bool,
     ) -> Result<DeveloperWebhookSubscription> {
         let id = new_id("devhook");
         let timestamp = now();
@@ -56,8 +58,9 @@ impl Store {
             "INSERT INTO open_commerce_developer_webhook_subscriptions(
                id, project_id, owner_user_id, app_record_id, app_id,
                callback_url, signing_key_id, signing_secret_version, status, verification_status,
-               start_sequence, consecutive_failures, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 'disabled', 'pending', ?8, 0, ?9, ?9)",
+               deliver_on_succeeded, deliver_on_failed, start_sequence,
+               consecutive_failures, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 'disabled', 'pending', ?8, ?9, ?10, 0, ?11, ?11)",
             params![
                 id,
                 app.project_id,
@@ -66,6 +69,8 @@ impl Store {
                 app.app_id,
                 callback_url.trim(),
                 signing_key_id.trim(),
+                deliver_on_succeeded,
+                deliver_on_failed,
                 start_sequence,
                 timestamp
             ],
