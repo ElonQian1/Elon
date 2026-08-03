@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, KeyRound, Play, RefreshCw, Search, X } from 'lucide-react'
+import { Download, KeyRound, Play, RefreshCw, Search } from 'lucide-react'
 import { openCommerceApi } from './openCommerceApi'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import ConsumerRelationshipManager from './ConsumerRelationshipManager'
@@ -17,6 +17,9 @@ import ConsumerSourceFilterFields from './ConsumerSourceFilterFields'
 import CapabilityInvocationComposer from './CapabilityInvocationComposer'
 import ConsumerCapabilityFilterFields from './ConsumerCapabilityFilterFields'
 import ConsumerCandidateScopeSummary from './ConsumerCandidateScopeSummary'
+import PendingActionConfirmationNotice, {
+  type PendingActionConfirmationSummary,
+} from './PendingActionConfirmationNotice'
 import { downloadConsumerRankingReceipt, verifyConsumerRankingReceipt } from './consumerRankingReceipt'
 import type {
   ConsumerDiscoveryMatch,
@@ -26,7 +29,6 @@ import type {
   DirectoryCapability,
   OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
-import type { OpenCommerceActionConfirmation } from './openCommerceTypes'
 import { errorText, formatMicros, splitValues } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import {
@@ -37,11 +39,8 @@ import {
   listItemStyle,
 } from './openCommerceStyles'
 
-interface PendingActionConfirmation {
-  confirmation: OpenCommerceActionConfirmation
+interface ConsumerPendingActionConfirmation extends PendingActionConfirmationSummary {
   appId: string
-  merchantLabel: string
-  capabilityLabel: string
 }
 
 export default function ConsumerCommerceSandbox({ projectId }: { projectId: string }) {
@@ -72,7 +71,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   const [message, setMessage] = useState('')
   const [receiptRefreshKey, setReceiptRefreshKey] = useState(0)
   const [selectedMatch, setSelectedMatch] = useState<ConsumerDiscoveryMatch | null>(null)
-  const [pendingActionConfirmation, setPendingActionConfirmation] = useState<PendingActionConfirmation | null>(null)
+  const [pendingActionConfirmation, setPendingActionConfirmation] = useState<ConsumerPendingActionConfirmation | null>(null)
 
   const loadApps = useCallback(async () => {
     try {
@@ -465,29 +464,12 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
       )}
 
       {pendingActionConfirmation && (
-        <section className={base.integrationSection}>
-          <header>
-            <strong>待处理经营操作</strong>
-            <span style={badgeStyle('danger')} data-tone="danger">等待处理</span>
-          </header>
-          <div style={commerceStyles.sectionBody}>
-            <p style={commerceStyles.itemText}>
-              {pendingActionConfirmation.merchantLabel} · {pendingActionConfirmation.capabilityLabel}
-            </p>
-            <small style={commerceStyles.itemMeta}>
-              调用未完成。可以保留相同幂等键重试，或明确取消本次动作确认。
-            </small>
-            <button
-              style={actionStyle('secondary', busy)}
-              type="button"
-              onClick={cancelPendingActionConfirmation}
-              disabled={busy}
-              title="取消本次经营操作"
-            >
-              <X size={14} />取消本次动作
-            </button>
-          </div>
-        </section>
+        <PendingActionConfirmationNotice
+          pending={pendingActionConfirmation}
+          busy={busy}
+          retryText="调用未完成。可以保留相同幂等键重试，或明确取消本次动作确认。"
+          onCancel={cancelPendingActionConfirmation}
+        />
       )}
 
       <ConsumerPreferenceProfilePanel

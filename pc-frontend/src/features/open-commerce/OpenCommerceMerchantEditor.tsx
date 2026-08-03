@@ -17,6 +17,9 @@ import type {
   OpenCommerceGrant,
   OpenCommerceMerchantDetail,
 } from './openCommerceTypes'
+import PendingActionConfirmationNotice, {
+  type PendingActionConfirmationSummary,
+} from './PendingActionConfirmationNotice'
 import { commerceStyles } from './openCommerceStyles'
 import styles from './OpenCommercePanel.module.css'
 
@@ -56,6 +59,7 @@ export default function OpenCommerceMerchantEditor({
   const [result, setResult] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState('')
+  const [pendingActionConfirmation, setPendingActionConfirmation] = useState<PendingActionConfirmationSummary | null>(null)
 
   const activeCapabilities = useMemo(
     () => merchant.capabilities.filter((capability) => capability.status === 'active'),
@@ -143,13 +147,24 @@ export default function OpenCommerceMerchantEditor({
         capability_key: invokeCapability,
         requester_app_id: 'pc-web',
         grant_id: invokeGrantId || undefined,
-        idempotency_key: newInvocationIdempotencyKey(),
+        idempotency_key: pendingActionConfirmation?.confirmation.idempotency_key
+          ?? newInvocationIdempotencyKey(),
         input: parseObject(invokeInput, '调用输入'),
       }
       let actionConfirmationId: string | undefined
       if (selectedCapability?.kind === 'action') {
         const prepared = await openCommerceApi.prepareActionConfirmation(request)
+        setPendingActionConfirmation({
+          confirmation: prepared,
+          merchantLabel: merchant.merchant.display_name,
+          capabilityLabel: selectedCapability.display_name,
+        })
         const confirmed = await openCommerceApi.confirmActionConfirmation(prepared.id)
+        setPendingActionConfirmation({
+          confirmation: confirmed,
+          merchantLabel: merchant.merchant.display_name,
+          capabilityLabel: selectedCapability.display_name,
+        })
         actionConfirmationId = confirmed.id
       }
       const response = await openCommerceApi.invoke({
@@ -157,8 +172,25 @@ export default function OpenCommerceMerchantEditor({
         action_confirmation_id: actionConfirmationId,
       })
       setResult(JSON.stringify(response, null, 2))
+      setPendingActionConfirmation(null)
       setMessage('调用成功；本次只记录计量账本，不真实扣款。')
       await onChanged()
+    } catch (error) {
+      setMessage(errorMessage(error))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function cancelPendingActionConfirmation() {
+    const pending = pendingActionConfirmation
+    if (!pending) return
+    setBusy('invoke')
+    setMessage('')
+    try {
+      await openCommerceApi.cancelActionConfirmation(pending.confirmation.id)
+      setPendingActionConfirmation(null)
+      setMessage('本次商户测试动作已取消。')
     } catch (error) {
       setMessage(errorMessage(error))
     } finally {
@@ -255,20 +287,28 @@ export default function OpenCommerceMerchantEditor({
 
         <form className={styles.formCard} onSubmit={invoke}>
           <header><strong>测试能力调用</strong><small>使用 PC 应用身份与全新幂等键</small></header>
-          <label>能力<select value={invokeCapability} onChange={(e) => { setInvokeCapability(e.target.value); setInvokeConfirmed(false) }} required>
+          <label>能力<select value={invokeCapability} onChange={(e) => { setInvokeCapability(e.target.value); setInvokeConfirmed(false) }} disabled={Boolean(pendingActionConfirmation)} required>
             <option value="">请选择</option>
             {activeCapabilities.map((capability) => <option key={capability.id} value={capability.capability_key}>{capability.display_name}</option>)}
           </select></label>
-          {selectedCapability?.access_level === 'authorized' && <label>授权<select value={invokeGrantId} onChange={(e) => setInvokeGrantId(e.target.value)} required>
+          {selectedCapability?.access_level === 'authorized' && <label>授权<select value={invokeGrantId} onChange={(e) => setInvokeGrantId(e.target.value)} disabled={Boolean(pendingActionConfirmation)} required>
             <option value="">请选择授权</option>
             {merchantGrants.filter((grant) => !grant.revoked_at && !isGrantExpired(grant.expires_at)).map((grant) => <option key={grant.id} value={grant.id}>{grant.grantee_app_id} · {grant.scopes.join(', ')}</option>)}
           </select></label>}
-          <label>调用输入<textarea value={invokeInput} onChange={(e) => { setInvokeInput(e.target.value); setInvokeConfirmed(false) }} /></label>
-          {selectedCapability?.kind === 'action' && <label><input type="checkbox" checked={invokeConfirmed} onChange={(e) => setInvokeConfirmed(e.target.checked)} />确认使用当前输入执行经营操作</label>}
+          <label>调用输入<textarea value={invokeInput} onChange={(e) => { setInvokeInput(e.target.value); setInvokeConfirmed(false) }} disabled={Boolean(pendingActionConfirmation)} /></label>
+          {selectedCapability?.kind === 'action' && <label><input type="checkbox" checked={invokeConfirmed} onChange={(e) => setInvokeConfirmed(e.target.checked)} disabled={Boolean(pendingActionConfirmation)} />确认使用当前输入执行经营操作</label>}
           <button type="submit" disabled={busy === 'invoke'}>{busy === 'invoke' ? '调用中…' : '调用并记录计量'}</button>
           {result && <pre className={styles.result}>{result}</pre>}
         </form>
       </div>
+      {pendingActionConfirmation && (
+        <PendingActionConfirmationNotice
+          pending={pendingActionConfirmation}
+          busy={busy === 'invoke'}
+          retryText="再次调用将使用相同幂等键重试；也可以明确取消本次商户测试动作。"
+          onCancel={cancelPendingActionConfirmation}
+        />
+      )}
       {message && <div style={commerceStyles.message}>{message}</div>}
     </div>
   )

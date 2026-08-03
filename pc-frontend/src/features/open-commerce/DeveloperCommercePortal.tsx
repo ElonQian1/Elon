@@ -30,6 +30,9 @@ import DeveloperAppAdmissionPanel from './DeveloperAppAdmissionPanel'
 import DeveloperAppAdmissionReviewPanel from './DeveloperAppAdmissionReviewPanel'
 import DeveloperProductionCredentialPanel from './DeveloperProductionCredentialPanel'
 import DeveloperProductionReadinessPanel from './DeveloperProductionReadinessPanel'
+import PendingActionConfirmationNotice, {
+  type PendingActionConfirmationSummary,
+} from './PendingActionConfirmationNotice'
 import { useAuthStore } from '../../store/auth'
 import type {
   AuthorizationRequest,
@@ -68,6 +71,7 @@ export default function DeveloperCommercePortal({
   const [approvalExpiryPreset, setApprovalExpiryPreset] = useState<GrantExpiryPreset>('30')
   const [response, setResponse] = useState<Record<string, unknown> | null>(null)
   const [eventRefreshKey, setEventRefreshKey] = useState(0)
+  const [pendingActionConfirmation, setPendingActionConfirmation] = useState<PendingActionConfirmationSummary | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const systemRole = useAuthStore((state) => state.user?.role)
@@ -206,7 +210,8 @@ export default function DeveloperCommercePortal({
         merchant_id: merchantId.trim(),
         capability_key: capabilityKey.trim(),
         grant_id: grantId.trim() || undefined,
-        idempotency_key: `developer-console-${crypto.randomUUID()}`,
+        idempotency_key: pendingActionConfirmation?.confirmation.idempotency_key
+          ?? newDeveloperInvocationIdempotencyKey(),
         input: parseJsonObject(input),
       }
       let actionConfirmationId: string | undefined
@@ -215,10 +220,20 @@ export default function DeveloperCommercePortal({
           testToken.trim(),
           request,
         )
+        setPendingActionConfirmation({
+          confirmation: prepared,
+          merchantLabel: request.merchant_id,
+          capabilityLabel: request.capability_key,
+        })
         const confirmed = await openCommerceClientApi.developerConfirmActionConfirmation(
           testToken.trim(),
           prepared.id,
         )
+        setPendingActionConfirmation({
+          confirmation: confirmed,
+          merchantLabel: request.merchant_id,
+          capabilityLabel: request.capability_key,
+        })
         actionConfirmationId = confirmed.id
       }
       const result = await openCommerceClientApi.developerInvoke(testToken.trim(), {
@@ -226,7 +241,27 @@ export default function DeveloperCommercePortal({
         action_confirmation_id: actionConfirmationId,
       })
       setResponse(result)
+      setPendingActionConfirmation(null)
       setEventRefreshKey((current) => current + 1)
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function cancelPendingActionConfirmation() {
+    const pending = pendingActionConfirmation
+    if (!pending) return
+    setBusy(true)
+    setMessage('')
+    try {
+      await openCommerceClientApi.developerCancelActionConfirmation(
+        testToken.trim(),
+        pending.confirmation.id,
+      )
+      setPendingActionConfirmation(null)
+      setMessage('本次开发者测试动作已取消。')
     } catch (error) {
       setMessage(errorText(error))
     } finally {
@@ -271,7 +306,7 @@ export default function DeveloperCommercePortal({
             <form style={commerceStyles.grid} onSubmit={createApp}>
               <label>App ID<input value={appId} onChange={(event) => setAppId(event.target.value)} placeholder="consumer.demo" disabled={!canEdit} required /></label>
               <label>应用名称<input value={displayName} onChange={(event) => setDisplayName(event.target.value)} disabled={!canEdit} required /></label>
-              <button style={actionStyle('primary', !canEdit || busy)} type="submit" disabled={!canEdit || busy}><KeyRound size={13} />注册应用</button>
+              <button style={actionStyle('primary', !canEdit || busy || Boolean(pendingActionConfirmation))} type="submit" disabled={!canEdit || busy || Boolean(pendingActionConfirmation)}><KeyRound size={13} />注册应用</button>
             </form>
             <div style={commerceStyles.list}>
               {apps.map((app) => (
@@ -283,11 +318,11 @@ export default function DeveloperCommercePortal({
                     <div style={commerceStyles.headerActions}>
                       {app.status === 'active' ? (
                         <>
-                          <button style={actionStyle('icon', !canEdit || busy)} type="button" onClick={() => rotateToken(app)} disabled={!canEdit || busy} title="轮换测试凭据"><RotateCcw size={13} /></button>
-                          <button style={actionStyle('icon', !canEdit || busy)} type="button" onClick={() => disableApp(app)} disabled={!canEdit || busy} title="停用应用"><PowerOff size={13} /></button>
+                          <button style={actionStyle('icon', !canEdit || busy || Boolean(pendingActionConfirmation))} type="button" onClick={() => rotateToken(app)} disabled={!canEdit || busy || Boolean(pendingActionConfirmation)} title="轮换测试凭据"><RotateCcw size={13} /></button>
+                          <button style={actionStyle('icon', !canEdit || busy || Boolean(pendingActionConfirmation))} type="button" onClick={() => disableApp(app)} disabled={!canEdit || busy || Boolean(pendingActionConfirmation)} title="停用应用"><PowerOff size={13} /></button>
                         </>
                       ) : (
-                        <button style={actionStyle('icon', !canEdit || busy)} type="button" onClick={() => reactivateApp(app)} disabled={!canEdit || busy} title="重新启用并生成新凭据"><Power size={13} /></button>
+                        <button style={actionStyle('icon', !canEdit || busy || Boolean(pendingActionConfirmation))} type="button" onClick={() => reactivateApp(app)} disabled={!canEdit || busy || Boolean(pendingActionConfirmation)} title="重新启用并生成新凭据"><Power size={13} /></button>
                       )}
                     </div>
                   </footer>
@@ -342,17 +377,26 @@ export default function DeveloperCommercePortal({
         <header><strong>能力调用调试器</strong><span style={badgeStyle()}>TEST TOKEN</span></header>
         <form className={base.formCard} style={commerceStyles.sectionBody} onSubmit={invoke}>
           <div style={commerceStyles.grid}>
-            <label style={commerceStyles.wideField}>测试凭据<input type="password" value={testToken} onChange={(event) => setTestToken(event.target.value)} required /></label>
-            <label>商户 ID<input value={merchantId} onChange={(event) => setMerchantId(event.target.value)} required /></label>
-            <label>能力 Key<input value={capabilityKey} onChange={(event) => setCapabilityKey(event.target.value)} required /></label>
-            <label>Grant ID<input value={grantId} onChange={(event) => setGrantId(event.target.value)} /></label>
-            <label style={commerceStyles.wideField}>输入 JSON<textarea value={input} onChange={(event) => setInput(event.target.value)} /></label>
-            <label style={commerceStyles.wideField}><input type="checkbox" checked={confirmAction} onChange={(event) => setConfirmAction(event.target.checked)} />本次是动作能力，我已确认当前输入并同意执行</label>
+            <label style={commerceStyles.wideField}>测试凭据<input type="password" value={testToken} onChange={(event) => setTestToken(event.target.value)} disabled={Boolean(pendingActionConfirmation)} required /></label>
+            <label>商户 ID<input value={merchantId} onChange={(event) => setMerchantId(event.target.value)} disabled={Boolean(pendingActionConfirmation)} required /></label>
+            <label>能力 Key<input value={capabilityKey} onChange={(event) => setCapabilityKey(event.target.value)} disabled={Boolean(pendingActionConfirmation)} required /></label>
+            <label>Grant ID<input value={grantId} onChange={(event) => setGrantId(event.target.value)} disabled={Boolean(pendingActionConfirmation)} /></label>
+            <label style={commerceStyles.wideField}>输入 JSON<textarea value={input} onChange={(event) => setInput(event.target.value)} disabled={Boolean(pendingActionConfirmation)} /></label>
+            <label style={commerceStyles.wideField}><input type="checkbox" checked={confirmAction} onChange={(event) => setConfirmAction(event.target.checked)} disabled={Boolean(pendingActionConfirmation)} />本次是动作能力，我已确认当前输入并同意执行</label>
           </div>
           <button style={actionStyle('primary', busy)} type="submit" disabled={busy}><Play size={13} />{busy ? '调用中…' : '执行沙盒调用'}</button>
           {response && <pre className={base.result}>{JSON.stringify(response, null, 2)}</pre>}
         </form>
       </section>
+
+      {pendingActionConfirmation && (
+        <PendingActionConfirmationNotice
+          pending={pendingActionConfirmation}
+          busy={busy}
+          retryText="再次执行将使用相同幂等键重试；也可以明确取消本次测试动作。"
+          onCancel={cancelPendingActionConfirmation}
+        />
+      )}
 
       <DeveloperInvocationEvents testToken={testToken} refreshKey={eventRefreshKey} />
 
@@ -373,4 +417,9 @@ export default function DeveloperCommercePortal({
       {message && <div style={commerceStyles.message}>{message}</div>}
     </div>
   )
+}
+
+function newDeveloperInvocationIdempotencyKey(): string {
+  if (typeof crypto.randomUUID === 'function') return `developer-console-${crypto.randomUUID()}`
+  return `developer-console-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
 }
