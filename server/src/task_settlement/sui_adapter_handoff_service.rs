@@ -6,11 +6,12 @@ use sha2::{Digest, Sha256};
 use crate::store::Store;
 
 use super::{
-    model::{SUI_INTEGRITY_VERIFIED, SUI_NETWORK_NOT_SUBMITTED},
+    model::{SuiProjectionPackage, SUI_INTEGRITY_VERIFIED, SUI_NETWORK_NOT_SUBMITTED},
     sui_adapter_handoff_model::{
         SuiAdapterHandoffBundle, SuiAdapterHandoffConstraints, SuiAdapterHandoffPayload,
         SUI_ADAPTER_HANDOFF_SCHEMA,
     },
+    sui_correction_model::SuiCorrectionProjectionPackage,
     sui_correction_projection_service, sui_projection_service,
 };
 
@@ -20,6 +21,22 @@ pub(super) fn standard(
     projection_id: &str,
 ) -> Result<SuiAdapterHandoffBundle> {
     let package = sui_projection_service::verify(store, project_id, projection_id)?;
+    standard_bundle(package)
+}
+
+pub(super) fn standard_read_only(
+    store: &Store,
+    project_id: &str,
+    projection_id: &str,
+) -> Result<SuiAdapterHandoffBundle> {
+    standard_bundle(sui_projection_service::detail(
+        store,
+        project_id,
+        projection_id,
+    )?)
+}
+
+fn standard_bundle(package: SuiProjectionPackage) -> Result<SuiAdapterHandoffBundle> {
     ensure_exportable(
         &package.integrity_status,
         &package.submission_readiness,
@@ -52,6 +69,22 @@ pub(super) fn correction(
     projection_id: &str,
 ) -> Result<SuiAdapterHandoffBundle> {
     let package = sui_correction_projection_service::verify(store, project_id, projection_id)?;
+    correction_bundle(package)
+}
+
+pub(super) fn correction_read_only(
+    store: &Store,
+    project_id: &str,
+    projection_id: &str,
+) -> Result<SuiAdapterHandoffBundle> {
+    correction_bundle(sui_correction_projection_service::detail(
+        store,
+        project_id,
+        projection_id,
+    )?)
+}
+
+fn correction_bundle(package: SuiCorrectionProjectionPackage) -> Result<SuiAdapterHandoffBundle> {
     ensure_exportable(
         &package.integrity_status,
         &package.submission_readiness,

@@ -13,6 +13,13 @@ import type {
   TaskEconomyProjectSetting,
 } from './taskEconomyTypes'
 import type { SuiAdapterHandoffBundle } from './suiAdapterHandoffTypes'
+import type {
+  SuiPreflightAdapter,
+  SuiPreflightAdapterIssue,
+  SuiPreflightAdapterList,
+  SuiPreflightPackageKind,
+  SuiPreflightReportList,
+} from './suiPreflightTypes'
 
 function base(projectId: string) {
   return `/api/projects/${encodeURIComponent(projectId)}/economy`
@@ -129,4 +136,29 @@ export const taskEconomyApi = {
       `${base(projectId)}/sui-correction-projections/${encodeURIComponent(projectionId)}/adapter-handoff`,
       {},
     ),
+  suiPreflightAdapters: (projectId: string) =>
+    api.get<SuiPreflightAdapterList>(`${base(projectId)}/sui-preflight-adapters`),
+  createSuiPreflightAdapter: (
+    projectId: string,
+    input: {
+      display_name: string
+      allowed_networks: Array<'devnet' | 'testnet' | 'mainnet'>
+      allowed_package_kinds: SuiPreflightPackageKind[]
+      expires_in_days: number
+      confirmed_by_user: true
+    },
+  ) =>
+    api.post<SuiPreflightAdapterIssue>(`${base(projectId)}/sui-preflight-adapters`, input),
+  rotateSuiPreflightAdapter: (projectId: string, adapterId: string, expiresInDays: number) =>
+    api.post<SuiPreflightAdapterIssue>(
+      `${base(projectId)}/sui-preflight-adapters/${encodeURIComponent(adapterId)}/rotate`,
+      { expires_in_days: expiresInDays, confirmed_by_user: true },
+    ),
+  disableSuiPreflightAdapter: (projectId: string, adapterId: string) =>
+    api.post<SuiPreflightAdapter>(
+      `${base(projectId)}/sui-preflight-adapters/${encodeURIComponent(adapterId)}/disable`,
+      { confirmed_by_user: true },
+    ),
+  suiPreflightReports: (projectId: string) =>
+    api.get<SuiPreflightReportList>(`${base(projectId)}/sui-preflight-reports`),
 }

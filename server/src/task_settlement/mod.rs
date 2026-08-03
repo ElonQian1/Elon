@@ -15,6 +15,9 @@ mod sui_correction_api;
 pub(crate) mod sui_correction_model;
 mod sui_correction_projection;
 mod sui_correction_projection_service;
+mod sui_preflight_api;
+pub(crate) mod sui_preflight_model;
+mod sui_preflight_service;
 mod sui_projection;
 mod sui_projection_service;
 

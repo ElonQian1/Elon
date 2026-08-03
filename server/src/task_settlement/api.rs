@@ -87,6 +87,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         )
         .merge(super::sui_adapter_handoff_api::routes())
         .merge(super::sui_correction_api::routes())
+        .merge(super::sui_preflight_api::routes())
 }
 
 async fn project_overview(
