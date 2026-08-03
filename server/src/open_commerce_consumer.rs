@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde_json::json;
 use sha2::{Digest, Sha256};
 
@@ -46,9 +46,12 @@ pub(crate) fn discover(
         candidate_limit,
     )?;
     let directory_candidate_count = candidates.len();
+    let discovery_time = Utc::now();
     let mut matches = candidates
         .into_iter()
-        .filter_map(|detail| best_match(store, detail, &request, ranking_policy).transpose())
+        .filter_map(|detail| {
+            best_match(store, detail, &request, ranking_policy, &discovery_time).transpose()
+        })
         .collect::<Result<Vec<_>>>()?;
     let eligible_match_count = matches.len();
     ranking_policy.sort_matches(&mut matches);
@@ -196,6 +199,7 @@ fn best_match(
     detail: OpenCommerceDirectoryMerchantDetail,
     request: &ConsumerDiscoveryRequest,
     ranking_policy: ConsumerRankingPolicy,
+    discovery_time: &DateTime<Utc>,
 ) -> Result<Option<ConsumerDiscoveryMatch>> {
     let candidates = detail
         .capabilities
@@ -235,6 +239,12 @@ fn best_match(
                 .map(|domain| capability.source.data_domain.as_deref() == Some(domain))
                 .unwrap_or(true)
         })
+        .filter(|capability| {
+            request
+                .max_source_age_seconds
+                .map(|maximum| receipt_is_within_age(capability, maximum, discovery_time))
+                .unwrap_or(true)
+        })
         .collect::<Vec<_>>();
     let selected = ranking_policy
         .select_capability(candidates, &request.preferences, capability_score)
@@ -255,6 +265,9 @@ fn best_match(
     }
     if let Some(domain) = request.source_data_domain.as_deref() {
         reasons.push(format!("来源数据域匹配 {domain}"));
+    }
+    if let Some(maximum) = request.max_source_age_seconds {
+        reasons.push(format!("内部同步回执完成时间不超过 {maximum} 秒"));
     }
     let authorization =
         authorization_state(store, &detail, &capability, &request.requester_app_id)?;
@@ -279,6 +292,7 @@ fn source_requirement(request: &ConsumerDiscoveryRequest) -> &'static str {
     if request.require_internal_sync_receipt
         || request.source_provider_key.is_some()
         || request.source_data_domain.is_some()
+        || request.max_source_age_seconds.is_some()
     {
         "internal_sync_receipt"
     } else {
@@ -287,6 +301,11 @@ fn source_requirement(request: &ConsumerDiscoveryRequest) -> &'static str {
 }
 
 fn normalize_source_filters(request: &mut ConsumerDiscoveryRequest) -> Result<()> {
+    if let Some(maximum) = request.max_source_age_seconds {
+        if !(1..=31_536_000).contains(&maximum) {
+            bail!("来源回执最长年龄必须在 1 秒到 365 天之间");
+        }
+    }
     request.source_provider_key = request
         .source_provider_key
         .take()
@@ -308,7 +327,30 @@ fn source_filter(request: &ConsumerDiscoveryRequest) -> ConsumerSourceFilter {
     ConsumerSourceFilter {
         provider_key: request.source_provider_key.clone(),
         data_domain: request.source_data_domain.clone(),
+        max_age_seconds: request.max_source_age_seconds,
     }
+}
+
+fn receipt_is_within_age(
+    capability: &OpenCommerceDirectoryCapability,
+    maximum_seconds: i64,
+    discovery_time: &DateTime<Utc>,
+) -> bool {
+    if capability.source.kind != "integration_sync_receipt" {
+        return false;
+    }
+    capability
+        .source
+        .receipt_completed_at
+        .as_deref()
+        .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+        .map(|completed_at| {
+            let age = discovery_time
+                .signed_duration_since(completed_at.with_timezone(&Utc))
+                .num_seconds();
+            age >= 0 && age <= maximum_seconds
+        })
+        .unwrap_or(false)
 }
 
 fn score_match(

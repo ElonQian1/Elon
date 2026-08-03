@@ -668,6 +668,7 @@ export interface ConsumerDiscoveryRequest {
   require_internal_sync_receipt?: boolean
   source_provider_key?: string
   source_data_domain?: string
+  max_source_age_seconds?: number
   preferences: ConsumerPreferences
   limit: number
 }
@@ -809,6 +810,7 @@ export interface ConsumerDiscoveryResponse {
   source_filter: {
     provider_key: string | null
     data_domain: string | null
+    max_age_seconds: number | null
   }
   available_ranking_policies: ConsumerRankingPolicyDescriptor[]
   ranking_receipt?: ConsumerRankingReceipt

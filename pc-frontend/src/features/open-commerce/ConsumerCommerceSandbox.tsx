@@ -46,6 +46,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   const [requireInternalSyncReceipt, setRequireInternalSyncReceipt] = useState(false)
   const [sourceProviderKey, setSourceProviderKey] = useState('')
   const [sourceDataDomain, setSourceDataDomain] = useState('')
+  const [maxSourceAgeMinutes, setMaxSourceAgeMinutes] = useState('')
   const [result, setResult] = useState<ConsumerDiscoveryResponse | null>(null)
   const [invocation, setInvocation] = useState<Record<string, unknown> | null>(null)
   const [busy, setBusy] = useState(false)
@@ -97,6 +98,9 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         require_internal_sync_receipt: requireInternalSyncReceipt,
         source_provider_key: sourceProviderKey.trim() || undefined,
         source_data_domain: sourceDataDomain.trim() || undefined,
+        max_source_age_seconds: maxSourceAgeMinutes
+          ? Math.round(Number(maxSourceAgeMinutes) * 60)
+          : undefined,
         preferences: {
           categories: splitValues(categories),
           tags: splitValues(tags),
@@ -115,7 +119,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
     } finally {
       setBusy(false)
     }
-  }, [appId, capabilityKey, categories, city, includeRankingReceipt, maxPrice, query, rankingPolicy, requireCurrentDeclaration, requireInternalSyncReceipt, sourceDataDomain, sourceProviderKey, tags])
+  }, [appId, capabilityKey, categories, city, includeRankingReceipt, maxPrice, maxSourceAgeMinutes, query, rankingPolicy, requireCurrentDeclaration, requireInternalSyncReceipt, sourceDataDomain, sourceProviderKey, tags])
 
   const applyProfile = useCallback((preferences: ConsumerPreferences) => {
     setCategories(preferences.categories.join(', '))
@@ -251,6 +255,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
             </label>
             <label>来源厂商标识<input value={sourceProviderKey} onChange={(event) => setSourceProviderKey(event.target.value)} placeholder="可选，例如 meituan" /></label>
             <label>来源数据域<input value={sourceDataDomain} onChange={(event) => setSourceDataDomain(event.target.value)} placeholder="可选，例如 inventory" /></label>
+            <label>回执最长年龄（分钟）<input type="number" min="1" max="525600" step="1" value={maxSourceAgeMinutes} onChange={(event) => setMaxSourceAgeMinutes(event.target.value)} placeholder="可选，例如 30" /></label>
             <label>搜索词<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="咖啡、维修、零售" /></label>
             <label>能力 Key<input value={capabilityKey} onChange={(event) => setCapabilityKey(event.target.value)} placeholder="menu.preview" /></label>
             <label>城市<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ji'an" /></label>
@@ -273,6 +278,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
               {result?.source_requirement === 'internal_sync_receipt' && <span style={badgeStyle()}>仅内部回执来源</span>}
               {result?.source_filter.provider_key && <span style={badgeStyle()}>厂商 {result.source_filter.provider_key}</span>}
               {result?.source_filter.data_domain && <span style={badgeStyle()}>数据域 {result.source_filter.data_domain}</span>}
+              {result?.source_filter.max_age_seconds && <span style={badgeStyle()}>回执不超过 {Math.ceil(result.source_filter.max_age_seconds / 60)} 分钟</span>}
               <span
                 style={badgeStyle(result?.ranking_is_paid ? 'danger' : 'neutral')}
                 data-tone={result?.ranking_is_paid ? 'danger' : 'neutral'}

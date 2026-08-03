@@ -39,6 +39,8 @@ pub(crate) struct ConsumerDiscoveryRequest {
     #[serde(default)]
     pub source_data_domain: Option<String>,
     #[serde(default)]
+    pub max_source_age_seconds: Option<i64>,
+    #[serde(default)]
     pub preferences: ConsumerPreferences,
     #[serde(default = "default_limit")]
     pub limit: usize,
@@ -92,6 +94,7 @@ pub(crate) struct ConsumerRankingPolicyDescriptor {
 pub(crate) struct ConsumerSourceFilter {
     pub provider_key: Option<String>,
     pub data_domain: Option<String>,
+    pub max_age_seconds: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
