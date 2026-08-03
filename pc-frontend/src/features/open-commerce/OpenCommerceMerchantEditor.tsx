@@ -42,6 +42,7 @@ export default function OpenCommerceMerchantEditor({
   const [handlerType, setHandlerType] = useState<'merchant_profile' | 'static_json' | 'merchant_runtime'>('merchant_profile')
   const [staticResponse, setStaticResponse] = useState('{"message":"hello"}')
   const [unitPriceMicros, setUnitPriceMicros] = useState('0')
+  const [freshnessSeconds, setFreshnessSeconds] = useState('0')
   const [grantAppId, setGrantAppId] = useState('pc-web')
   const [grantScopes, setGrantScopes] = useState('')
   const [grantPurpose, setGrantPurpose] = useState('允许消费者 AI 调用指定商业能力')
@@ -86,7 +87,7 @@ export default function OpenCommerceMerchantEditor({
         handler_config: response ? { response } : undefined,
         unit_price_micros: Math.max(0, Number.parseInt(unitPriceMicros, 10) || 0),
         currency: 'CNY',
-        freshness_seconds: 0,
+        freshness_seconds: Math.max(0, Number.parseInt(freshnessSeconds, 10) || 0),
       })
       setCapabilityName('')
       setCapabilityKey('')
@@ -221,6 +222,7 @@ export default function OpenCommerceMerchantEditor({
           </select></label>
           {handlerType === 'static_json' && <label>静态响应<textarea value={staticResponse} onChange={(e) => setStaticResponse(e.target.value)} disabled={!canEdit} /></label>}
           <label>单次计量（微元）<input type="number" min="0" value={unitPriceMicros} onChange={(e) => setUnitPriceMicros(e.target.value)} disabled={!canEdit} /></label>
+          <label>新鲜度声明（秒）<input type="number" min="0" value={freshnessSeconds} onChange={(e) => setFreshnessSeconds(e.target.value)} disabled={!canEdit} /><small>0 表示不声明；仅代表商户项目声明，不代表外部平台已核验。</small></label>
           <button type="submit" disabled={!canEdit || busy === 'capability'}>{busy === 'capability' ? '发布中…' : '发布能力'}</button>
         </form>
 
@@ -276,7 +278,7 @@ function CapabilityRow({ capability }: { capability: OpenCommerceCapability }) {
   return (
     <div className={styles.capabilityRow}>
       <span><strong>{capability.display_name}</strong><code>{capability.capability_key}</code></span>
-      <span><em>{capability.kind === 'action' ? '动作' : '查询'} · {accessLabel(capability.access_level)}</em><small>v{capability.version} · {capability.unit_price_micros} 微元</small></span>
+      <span><em>{capability.kind === 'action' ? '动作' : '查询'} · {accessLabel(capability.access_level)}</em><small>v{capability.version} · {capability.unit_price_micros} 微元 · 新鲜度 {capability.freshness_seconds > 0 ? `${capability.freshness_seconds} 秒` : '未声明'}</small></span>
     </div>
   )
 }

@@ -753,8 +753,28 @@ export interface DirectoryCapability {
   unit_price_micros: number
   currency: string
   freshness_seconds: number
+  source: DirectoryCapabilitySourceDeclaration
+  freshness: DirectoryCapabilityFreshness
   version: number
   updated_at: string
+}
+
+export interface DirectoryCapabilitySourceDeclaration {
+  schema: 'open_commerce.directory_source_declaration.v1'
+  kind: 'merchant_profile' | 'merchant_static_data' | 'merchant_runtime' | 'merchant_declared'
+  assertion_authority: 'merchant_project'
+  externally_verified: false
+  integration_receipt_id: null
+}
+
+export interface DirectoryCapabilityFreshness {
+  schema: 'open_commerce.directory_freshness.v1'
+  status: 'current' | 'stale' | 'unknown'
+  declared_seconds: number
+  declaration_updated_at: string
+  valid_until: string | null
+  basis: 'capability_declaration_updated_at'
+  externally_verified: false
 }
 
 export interface ConsumerDiscoveryMatch {

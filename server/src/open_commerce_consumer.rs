@@ -109,7 +109,9 @@ fn build_ranking_receipt(
                 "access_level": item.capability.access_level.as_str(),
                 "unit_price_micros": item.capability.unit_price_micros,
                 "currency": item.capability.currency.as_str(),
-                "directory_updated_at": item.capability.updated_at.as_str()
+                "directory_updated_at": item.capability.updated_at.as_str(),
+                "source": &item.capability.source,
+                "freshness": &item.capability.freshness
             })
         })
         .collect::<Vec<_>>();

@@ -279,9 +279,15 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
                 <p style={commerceStyles.itemText}>{match.reasons.join(' · ')}</p>
                 <small style={commerceStyles.itemMeta}>{match.capability.capability_key} · {formatMicros(match.capability.unit_price_micros, match.capability.currency)}</small>
                 <footer style={commerceStyles.itemHeader}>
-                  <span style={badgeStyle(authorizationTone(match.authorization.status))} data-tone={authorizationTone(match.authorization.status)}>
-                    {authorizationLabel(match.authorization.status)}
-                  </span>
+                  <div style={commerceStyles.headerActions}>
+                    <span style={badgeStyle(authorizationTone(match.authorization.status))} data-tone={authorizationTone(match.authorization.status)}>
+                      {authorizationLabel(match.authorization.status)}
+                    </span>
+                    <span style={badgeStyle(freshnessTone(match.capability.freshness.status))} data-tone={freshnessTone(match.capability.freshness.status)}>
+                      {freshnessLabel(match.capability.freshness.status)}
+                    </span>
+                    <span style={badgeStyle('neutral')}>{sourceLabel(match.capability.source.kind)} · 商户声明</span>
+                  </div>
                   <div style={commerceStyles.headerActions}>
                     {match.authorization.status === 'request_required' && (
                       <button style={actionStyle('secondary', busy)} type="button" onClick={() => requestAuthorization(match)} disabled={busy}>
@@ -343,6 +349,25 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
       {message && <div style={{ ...commerceStyles.message, ...(message.includes('失败') ? errorMessageStyle : {}) }}>{message}</div>}
     </div>
   )
+}
+
+function freshnessLabel(status: 'current' | 'stale' | 'unknown') {
+  if (status === 'current') return '声明期内'
+  if (status === 'stale') return '声明已过期'
+  return '未声明新鲜度'
+}
+
+function freshnessTone(status: 'current' | 'stale' | 'unknown') {
+  if (status === 'current') return 'neutral' as const
+  if (status === 'stale') return 'warn' as const
+  return 'neutral' as const
+}
+
+function sourceLabel(kind: 'merchant_profile' | 'merchant_static_data' | 'merchant_runtime' | 'merchant_declared') {
+  if (kind === 'merchant_profile') return '商户公开资料'
+  if (kind === 'merchant_static_data') return '商户静态数据'
+  if (kind === 'merchant_runtime') return '商户运行时'
+  return '商户声明数据'
 }
 
 function authorizationLabel(status: string) {
