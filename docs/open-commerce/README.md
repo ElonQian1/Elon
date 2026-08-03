@@ -121,6 +121,8 @@
 111. `docs/sui-adapter-offline-handoff-v1-acceptance.md`：查看交接包代码状态与后置统一回归清单。
 112. `docs/decisions/sui-offline-preflight-adapters-v1.md`：查看离线预检机器身份、摘要匹配和追加式报告边界。
 113. `docs/sui-offline-preflight-adapters-v1-acceptance.md`：查看预检适配器代码状态与后置统一回归清单。
+114. `docs/decisions/sui-offline-preflight-job-leases-v1.md`：查看显式预检任务、短时租约、漂移阻断和单事务完成边界。
+115. `docs/sui-offline-preflight-job-leases-v1-acceptance.md`：查看预检任务租约的代码状态与后置统一回归清单。
 
 ## 专题地图
 
@@ -138,7 +140,7 @@
 | AI 资源盘点、策略与路由预演 | 控制面已实现，尚未接管真实任务调度 | `docs/open-commerce/ai-resource-control.md`、`server/src/ai_resource_control/` |
 | API Token 保管与节点计算计量 | 已有实现，尚不是公开 Token 交易市场 | `docs/token消费统计.md`、`server/src/store/node_ledger.rs` |
 | 节点模型算力显式共享 | V1 已实现，包含模型白名单、并发、每日预算、所有者健康快照和过期执行回收；尚不是完整算力市场 | `docs/decisions/node-compute-sharing-supply-v1.md`、`docs/decisions/node-compute-sharing-runtime-health-v1.md`、`docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md`、`docs/node-compute-sharing-supply-v1-acceptance.md` |
-| 链外影子用量、验收后双分录、争议纠正和 Sui 投影包 | V1 已实现、默认关闭；纠正可追加冲销与替换、解析当前有效凭证并保存链下原子包；标准包与纠正包可导出统一离线预检交接文件，并由限权机器身份和参考 CLI 追加摘要匹配的预检报告。所有包和报告仍不签名、不提交网络、不移动资金 | `docs/decisions/task-shadow-settlement-v1.md`、`docs/decisions/task-shadow-settlement-corrections-v1.md`、`docs/decisions/task-shadow-settlement-lineage-v1.md`、`docs/decisions/sui-correction-projection-packages-v1.md`、`docs/decisions/sui-adapter-offline-handoff-v1.md`、`docs/decisions/sui-offline-preflight-adapters-v1.md`、`sdk/open-commerce-connector/src/sui-preflight.js`、`docs/task-shadow-settlement-v1-api.md` |
+| 链外影子用量、验收后双分录、争议纠正和 Sui 投影包 | V1 已实现、默认关闭；纠正可追加冲销与替换、解析当前有效凭证并保存链下原子包；标准包与纠正包可导出统一离线预检交接文件，并由限权机器身份领取短时任务、阻断摘要漂移和追加预检报告。所有包、任务和报告仍不签名、不提交网络、不移动资金 | `docs/decisions/task-shadow-settlement-v1.md`、`docs/decisions/task-shadow-settlement-corrections-v1.md`、`docs/decisions/task-shadow-settlement-lineage-v1.md`、`docs/decisions/sui-correction-projection-packages-v1.md`、`docs/decisions/sui-adapter-offline-handoff-v1.md`、`docs/decisions/sui-offline-preflight-adapters-v1.md`、`docs/decisions/sui-offline-preflight-job-leases-v1.md`、`sdk/open-commerce-connector/src/sui-preflight.js`、`docs/task-shadow-settlement-v1-api.md` |
 | 商户 AI 经营、营销内容和业务应用生成 | 产品方向，按真实连接器逐步实现 | `docs/drafts/requirements/open-commerce-network.md` |
 | 消费者 AI 与任意商户节点互联 | 商户主动发布、跨项目发现、消费者限时匿名关系、安全续期、低敏偏好字段披露、关联数据删除请求、含偏好、披露与调用凭证的本人 V3 可验证导出、Schema 驱动 PC 填写、App 授权、调用、配额、活动证据和手动封禁已实现；完整订单迁移、跨运营方导入、生产身份、外部通知、删除证明、自动风控和联邦治理仍待完成 | `docs/open-commerce/consumer-developer-sandbox.md`、`docs/decisions/open-commerce-consumer-relationships-v1.md`、`docs/decisions/open-commerce-consumer-preference-disclosures-v1.md`、`docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md`、`docs/decisions/open-commerce-consumer-portability-exports-v3.md`、`docs/decisions/open-commerce-consumer-invocation-receipts-v1.md`、`docs/decisions/open-commerce-schema-driven-invocation-form-v1.md`、`docs/drafts/open-commerce-network-roadmap.md` |
 | 闲置算力公开市场 | 模型推理供给控制已实现；异构任务、竞价、赔付和真实结算仍是提案 | `docs/decisions/node-compute-sharing-supply-v1.md`、`docs/drafts/open-commerce-network-sui-agent-economy.md` |

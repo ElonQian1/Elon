@@ -53,6 +53,7 @@
 | 先实现链外影子结算，再评估 Sui 网络适配器 | 复用真实成本和人工验收事实，保持双分录、幂等和默认关闭，不移动真实资金 | `docs/decisions/task-shadow-settlement-v1.md` |
 | Sui 适配器先消费可复核的链下投影包 | 投影包绑定目标网络、来源摘要与投影摘要；标准包与纠正双腿可导出统一离线预检交接包，仍固定未提交 | `docs/decisions/sui-offchain-projection-packages-v1.md`、`docs/decisions/sui-adapter-offline-handoff-v1.md` |
 | 离线预检机器身份与链上提交身份必须分离 | 项目签发限时、限网络和限包类型的机器凭据；只有服务端可只读重建且摘要一致的交接包能追加预检报告，报告不改投影也不授权广播 | `docs/decisions/sui-offline-preflight-adapters-v1.md` |
+| 离线预检必须显式入队并使用短时租约 | 只有项目编辑者能把当前可导出投影入队；机器按权限领取 60 至 900 秒租约，摘要漂移失败关闭，报告与完成原子写入 | `docs/decisions/sui-offline-preflight-job-leases-v1.md` |
 | 争议只追加证据并阻断投影，不改写历史账本 | 待审核或已接受争议阻断原凭证投影；纠正必须使用新的 Matter 和凭证 | `docs/decisions/task-shadow-settlement-disputes-v1.md` |
 | 影子结算纠正采用独立 Matter 和追加式双腿过账 | 人工验收后在同一事务内追加冲销与替换凭证，原凭证不改写；单张纠正凭证不进入普通 Sui 投影 | `docs/decisions/task-shadow-settlement-corrections-v1.md` |
 | Sui 纠正投影必须把冲销与替换绑定为一个链下原子包 | 包绑定两条腿、来源摘要和目标网络；可复核但固定未提交，替换凭证的新争议会阻断就绪 | `docs/decisions/sui-correction-projection-packages-v1.md` |
