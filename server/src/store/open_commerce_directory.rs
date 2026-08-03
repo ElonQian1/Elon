@@ -151,7 +151,7 @@ impl Store {
         limit: usize,
     ) -> Result<Vec<OpenCommerceDirectoryMerchantDetail>> {
         let query = query.map(str::trim).filter(|value| !value.is_empty());
-        let like = query.map(|value| format!("%{}%", value.replace('%', "\\%")));
+        let like = query.map(|value| format!("%{}%", escape_like_pattern(value)));
         let capability_key = capability_key.map(normalize_capability_key).transpose()?;
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
@@ -182,6 +182,17 @@ impl Store {
             .map(|merchant_id| self.published_open_commerce_merchant_detail(&merchant_id))
             .collect()
     }
+}
+
+fn escape_like_pattern(value: &str) -> String {
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if matches!(ch, '\\' | '%' | '_') {
+            escaped.push('\\');
+        }
+        escaped.push(ch);
+    }
+    escaped
 }
 
 fn publication_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceDirectoryPublication> {

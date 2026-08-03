@@ -20,13 +20,14 @@ use crate::{
     open_commerce_directory_service,
     open_commerce_integration_model::{normalize_provider_key, normalize_string_list},
     open_commerce_model::{
-        validate_access_level, validate_capability_kind, ACCESS_AUTHORIZED, ACCESS_OWNER_ONLY,
-        ACCESS_PUBLIC,
+        normalize_app_id, normalize_capability_key, validate_access_level,
+        validate_capability_kind, ACCESS_AUTHORIZED, ACCESS_OWNER_ONLY, ACCESS_PUBLIC,
     },
     store::Store,
 };
 
 const CONSUMER_DISCOVERY_CANDIDATE_LIMIT: usize = 100;
+const CONSUMER_DISCOVERY_QUERY_MAX_CHARS: usize = 200;
 
 pub(crate) fn discover(
     store: &Store,
@@ -36,6 +37,7 @@ pub(crate) fn discover(
     if request.requester_app_id.trim().is_empty() {
         request.requester_app_id = "pc-web".to_string();
     }
+    normalize_discovery_request(&mut request)?;
     ensure_app_owned_by_user(store, user_id, &request.requester_app_id)?;
     let ranking_is_user_selected = request
         .ranking_policy
@@ -70,7 +72,7 @@ pub(crate) fn discover(
         .collect::<Result<Vec<_>>>()?;
     let eligible_match_count = matches.len();
     ranking_policy.sort_matches(&mut matches);
-    matches.truncate(request.limit.clamp(1, 50));
+    matches.truncate(request.limit);
     let candidate_scope = candidate_scope(
         candidate_limit,
         directory_candidate_count,
@@ -152,7 +154,7 @@ fn build_ranking_receipt(
         "capability_filter": capability_filter(request),
         "preference_constraints": open_commerce_consumer_constraints::response(request),
         "preferences": &request.preferences,
-        "limit": request.limit.clamp(1, 50)
+        "limit": request.limit
     });
     let request_fingerprint_json = serde_json::to_string(&request_fingerprint_payload)?;
     let ordered_results = matches
@@ -212,6 +214,35 @@ fn build_ranking_receipt(
 
 fn normalized_optional(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
+}
+
+fn normalize_discovery_request(request: &mut ConsumerDiscoveryRequest) -> Result<()> {
+    request.query = request
+        .query
+        .take()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    if let Some(query) = request.query.as_deref() {
+        if query.chars().count() > CONSUMER_DISCOVERY_QUERY_MAX_CHARS {
+            bail!(
+                "消费者发现搜索词不能超过 {} 个字符",
+                CONSUMER_DISCOVERY_QUERY_MAX_CHARS
+            );
+        }
+        if query.chars().any(char::is_control) {
+            bail!("消费者发现搜索词不能包含控制字符");
+        }
+    }
+    request.capability_key = request
+        .capability_key
+        .take()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(|value| normalize_capability_key(&value))
+        .transpose()?;
+    request.requester_app_id = normalize_app_id(&request.requester_app_id)?;
+    request.limit = request.limit.clamp(1, 50);
+    Ok(())
 }
 
 fn sha256_hex(value: &str) -> String {
