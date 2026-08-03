@@ -73,6 +73,7 @@ pub(crate) fn discover(
         ranking_is_paid: false,
         ranking_is_user_selected,
         freshness_requirement: freshness_requirement(request.require_current_declaration),
+        source_requirement: source_requirement(request.require_internal_sync_receipt),
         available_ranking_policies: open_commerce_consumer_ranking::available_ranking_policies(),
         ranking_receipt,
         matches,
@@ -94,6 +95,7 @@ fn build_ranking_receipt(
         "requester_app_id": request.requester_app_id.as_str(),
         "ranking_policy": ranking_policy.key(),
         "require_current_declaration": request.require_current_declaration,
+        "require_internal_sync_receipt": request.require_internal_sync_receipt,
         "preferences": &request.preferences,
         "limit": request.limit.clamp(1, 50)
     });
@@ -133,6 +135,7 @@ fn build_ranking_receipt(
             "paid_placement": false
         },
         "freshness_requirement": freshness_requirement(request.require_current_declaration),
+        "source_requirement": source_requirement(request.require_internal_sync_receipt),
         "request_fingerprint_sha256": sha256_hex(&request_fingerprint_json),
         "eligible_match_count": eligible_match_count,
         "returned_match_count": matches.len(),
@@ -208,6 +211,10 @@ fn best_match(
         .filter(|capability| {
             !request.require_current_declaration || capability.freshness.status == "current"
         })
+        .filter(|capability| {
+            !request.require_internal_sync_receipt
+                || capability.source.kind == "integration_sync_receipt"
+        })
         .collect::<Vec<_>>();
     let selected = ranking_policy
         .select_capability(candidates, &request.preferences, capability_score)
@@ -219,6 +226,9 @@ fn best_match(
     reasons.push(ranking_policy.ranking_reason());
     if request.require_current_declaration {
         reasons.push("符合消费者要求的商户声明有效期".to_string());
+    }
+    if request.require_internal_sync_receipt {
+        reasons.push("已关联商户项目内部业务同步回执".to_string());
     }
     let authorization =
         authorization_state(store, &detail, &capability, &request.requester_app_id)?;
@@ -236,6 +246,14 @@ fn freshness_requirement(required: bool) -> &'static str {
         "current_declaration"
     } else {
         "any_declaration"
+    }
+}
+
+fn source_requirement(required: bool) -> &'static str {
+    if required {
+        "internal_sync_receipt"
+    } else {
+        "any_merchant_source"
     }
 }
 

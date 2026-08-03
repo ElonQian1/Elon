@@ -131,6 +131,7 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
             ranking_policy: None,
             include_ranking_receipt: false,
             require_current_declaration: false,
+            require_internal_sync_receipt: false,
             preferences: ConsumerPreferences {
                 categories: vec!["cafe".to_string()],
                 tags: vec!["quiet".to_string()],
@@ -202,6 +203,7 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
             ranking_policy: None,
             include_ranking_receipt: false,
             require_current_declaration: false,
+            require_internal_sync_receipt: false,
             preferences: ConsumerPreferences::default(),
             limit: 10,
         },
@@ -308,6 +310,7 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
             ranking_policy: None,
             include_ranking_receipt: false,
             require_current_declaration: false,
+            require_internal_sync_receipt: false,
             preferences: ConsumerPreferences::default(),
             limit: 10,
         },
