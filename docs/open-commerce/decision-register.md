@@ -25,6 +25,7 @@
 | 消费者关系必须由消费者持有和撤销 | 关系只包含匿名标识、固定范围和最长 366 天期限；商户看不到消费者账号或项目，重新建立关系会更换匿名标识 | `docs/decisions/open-commerce-consumer-relationships-v1.md` |
 | 消费者关系续期必须轮换匿名身份并保持重试幂等 | 续期撤销旧关系、继承原范围和用途并生成新别名；同一来源只产生一个后继，内部续期链不向商户公开 | `docs/decisions/open-commerce-consumer-relationship-renewal-v1.md` |
 | 删除请求必须停止关系且不能伪装外部履约 | 消费者发起请求时原子撤销关系；商户可处理匿名工单，但完成只表示商户声明，不是平台验证的删除证明 | `docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` |
+| 外部删除证明必须与完成声明分离 | 已完成请求可追加多个商户提供的外部回执摘要；来源固定为未核验，原始回执、外部删除执行和平台验证不在 V1 内 | `docs/decisions/open-commerce-consumer-data-erasure-evidence-v1.md` |
 | 消费者关系与删除请求应支持本人可验证导出 | 同一幂等键保存不可变快照，每次读取复核 SHA-256；V1 只导出关系、续期链和请求回执，不冒充完整数据迁移 | `docs/decisions/open-commerce-consumer-portability-exports-v1.md` |
 | 消费者偏好必须由本人保存并按关系选择字段披露 | 档案默认私有；商户只读取有效 `preference.remember` 关系上的匿名快照，关系失效后失败关闭，档案更新不自动扩张披露 | `docs/decisions/open-commerce-consumer-preference-disclosures-v1.md` |
 | 消费者低敏偏好应进入本人可验证数据包 | V2 在同一读事务中加入当前偏好档案和历史披露，旧 V1 包保持原字节摘要；仍不导出订单、联系方式、支付或账号身份 | `docs/decisions/open-commerce-consumer-portability-exports-v2.md` |
