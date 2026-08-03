@@ -216,6 +216,7 @@ async fn mcp_handler(
         "tools/list" => {
             let mut tools = crate::open_commerce_mcp_tools::definitions();
             tools.extend(crate::open_commerce_adapter_mcp::definitions());
+            tools.extend(crate::open_commerce_consumer_discovery_mcp::definitions());
             tools.extend(crate::open_commerce_consumer_preference_mcp::definitions());
             tools.extend(crate::open_commerce_consumer_receipt_mcp::definitions());
             tools.extend(crate::open_commerce_merchant_evidence_mcp::definitions());
@@ -281,6 +282,16 @@ pub(crate) async fn call_tool(
         user_id,
         project_role,
         app_id,
+        name,
+        arguments.clone(),
+    )? {
+        return tool_response(value);
+    }
+    if let Some(value) = crate::open_commerce_consumer_discovery_mcp::call_if_handled(
+        store,
+        user_id,
+        app_id,
+        app_id == DEFAULT_MCP_APP_ID,
         name,
         arguments.clone(),
     )? {
@@ -731,7 +742,7 @@ fn initialize_response() -> Value {
         "protocolVersion":MCP_PROTOCOL_VERSION,
         "capabilities":{"tools":{"listChanged":false}},
         "serverInfo":{"name":"yilong-open-commerce","version":"1.0.0"},
-        "instructions":"开放商业任务先调用 open_commerce_get_overview；商户只有显式发布目录后才会进入跨项目发现。ERP 开发先调用 erp_get_overview、erp_search_capabilities 和 erp_resolve_requirement，避免重复造轮子。ERP 工具不允许接受提案、创建 Matter、合并、发布、采用或回滚。数据接入记录不包含令牌，公开发现只返回脱敏目录契约；授权能力必须携带 grant_id 并使用已注册应用身份；所有调用和同步回执必须使用幂等键。商户可手动封禁已注册 App，封禁会撤销现有授权且解除后不会恢复。当前只记录计量，不真实扣款。写操作需要当前项目编辑权限，调用身份由 x-elon-app-id 固定，不能由工具参数冒充。"
+        "instructions":"开放商业任务先调用 open_commerce_get_overview；消费者 AI 使用 open_commerce_discover_for_consumer 获取透明排序、候选范围和授权状态，该工具不会自动调用或下单。商户只有显式发布目录后才会进入跨项目发现。ERP 开发先调用 erp_get_overview、erp_search_capabilities 和 erp_resolve_requirement，避免重复造轮子。ERP 工具不允许接受提案、创建 Matter、合并、发布、采用或回滚。数据接入记录不包含令牌，公开发现只返回脱敏目录契约；授权能力必须携带 grant_id 并使用已注册应用身份；所有调用和同步回执必须使用幂等键。商户可手动封禁已注册 App，封禁会撤销现有授权且解除后不会恢复。当前只记录计量，不真实扣款。写操作需要当前项目编辑权限，调用身份由 x-elon-app-id 固定，不能由工具参数冒充。"
     })
 }
 
