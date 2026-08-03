@@ -7,6 +7,8 @@ import {
   MousePointerClick,
   Play,
   RefreshCw,
+  RotateCcw,
+  Save,
   Search,
   Smartphone,
   Square,
@@ -44,7 +46,9 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
     session: model.session,
     surface: model.surface,
     selectedNode: model.selectedNode,
-  }), [initialProjectRoot, model.selectedNode, model.session, model.surface, model.target])
+    designDraft: model.designDraft,
+    writebackReceipt: model.writebackReceipt,
+  }), [initialProjectRoot, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt])
   const intent = useMemo(() => [
     `修改 ${model.platform.toUpperCase()} 端 ${model.route || '/'} 页面。`,
     model.selectedNode
@@ -55,6 +59,8 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
   const viewport = model.surface?.surface?.viewport ?? model.session?.viewport ?? model.viewport
   const nodes = model.surface?.nodes ?? []
   const [surfaceView, setSurfaceView] = useState<'frontend' | 'native'>('frontend')
+  const [draftProperty, setDraftProperty] = useState('backgroundColor')
+  const [draftAfter, setDraftAfter] = useState('')
   useEffect(() => {
     if (model.platform !== 'tauri') setSurfaceView('frontend')
     else if (!model.pixelUrl && model.nativePixelUrl) setSurfaceView('native')
@@ -201,6 +207,40 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
             </div>
           </div>
         )}
+
+        <div className={styles.draftBar}>
+          <span>可撤销草稿{model.designDraft ? ` · r${model.designDraft.revision}` : ''}</span>
+          <input
+            value={draftProperty}
+            onChange={(event) => setDraftProperty(event.currentTarget.value)}
+            placeholder="样式属性"
+            aria-label="草稿样式属性"
+          />
+          <input
+            value={draftAfter}
+            onChange={(event) => setDraftAfter(event.currentTarget.value)}
+            placeholder={model.selectedNode
+              ? `新值（当前 ${(model.selectedNode.style as Record<string, string | undefined>)[draftProperty] || '未声明'}）`
+              : '先选择语义节点'}
+            aria-label="草稿样式新值"
+          />
+          <button type="button" disabled={!model.selectedNode || !draftAfter.trim() || model.busy} onClick={() => void model.saveDraftPatch(draftProperty, draftAfter)}>
+            <Save size={13} aria-hidden="true" />保存草稿
+          </button>
+          <button type="button" disabled={!model.designDraft?.historyDepth || model.busy} onClick={() => void model.undoDraft()}>
+            <RotateCcw size={13} aria-hidden="true" />撤销
+          </button>
+          <button type="button" disabled={model.designDraft?.sourceBinding?.status !== 'BOUND' || model.busy} onClick={() => void model.beginDraftWriteback()}>
+            固定写回基线
+          </button>
+          <small>
+            {model.writebackReceipt
+              ? `回执 ${model.writebackReceipt.status}`
+              : model.designDraft?.sourceBinding
+                ? `绑定 ${model.designDraft.sourceBinding.status} · ${model.designDraft.sourceBinding.sourceFile}`
+                : 'AI 建立 source binding 后才能写回'}
+          </small>
+        </div>
 
         <div className={styles.evidenceShell}>
           {activePixelUrl ? (

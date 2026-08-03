@@ -2,12 +2,15 @@ import { safeNodeAdminUrl } from '../../../lib/utils'
 import { nodeApi, nodeApiBlob, probeLocalNode } from '../../node/localNodeApi'
 import type {
   DesignCaptureResult,
+  DesignDraft,
+  DesignDraftSummary,
   DesignPlatform,
   DesignSessionListResult,
   DesignSessionRecord,
   DesignSurface,
   DesignTargetListResult,
   DesignViewport,
+  DesignWritebackReceipt,
   TauriRuntimeResult,
 } from './types'
 
@@ -128,5 +131,66 @@ export async function loadTauriNativePixel(projectRoot: string, designSessionId:
     `/api/android-live/design/sessions/${encodeURIComponent(designSessionId)}/tauri/artifact`,
     { method: 'POST', body: JSON.stringify({ projectRoot }) },
     30_000,
+  )
+}
+
+export async function listDesignDrafts(projectRoot: string, designSessionId?: string) {
+  return call<{ schemaVersion: 1; drafts: DesignDraftSummary[]; contentEmbedded: false }>(
+    '/api/android-live/design/drafts/list',
+    { projectRoot, designSessionId: designSessionId || undefined },
+  )
+}
+
+export async function createDesignDraft(input: {
+  projectRoot: string
+  designSessionId: string
+  selector: string
+  scope?: DesignDraft['scope']
+  patches: DesignDraft['patches']
+  targetPlatforms: DesignPlatform[]
+}) {
+  return call<{ draft: DesignDraft; next: string }>('/api/android-live/design/drafts', input)
+}
+
+export async function getDesignDraft(projectRoot: string, draftId: string) {
+  return call<{ draft: DesignDraft; historyDepth: number; contentEmbedded: false }>(
+    `/api/android-live/design/drafts/${encodeURIComponent(draftId)}`,
+    { projectRoot },
+  )
+}
+
+export async function updateDesignDraft(input: {
+  projectRoot: string
+  draftId: string
+  expectedRevision: number
+  patches?: DesignDraft['patches']
+  sourceBinding?: DesignDraft['sourceBinding']
+  targetPlatforms?: DesignPlatform[]
+}) {
+  const { draftId, ...body } = input
+  return call<{ draft: DesignDraft; historyDepth: number }>(
+    `/api/android-live/design/drafts/${encodeURIComponent(draftId)}/update`, body,
+  )
+}
+
+export async function undoDesignDraft(input: {
+  projectRoot: string
+  draftId: string
+  expectedRevision: number
+}) {
+  const { draftId, ...body } = input
+  return call<{ draft: DesignDraft; historyDepth: number }>(
+    `/api/android-live/design/drafts/${encodeURIComponent(draftId)}/undo`, body,
+  )
+}
+
+export async function beginDesignWriteback(input: {
+  projectRoot: string
+  draftId: string
+  expectedRevision: number
+}) {
+  const { draftId, ...body } = input
+  return call<{ draft: DesignDraft; receipt: DesignWritebackReceipt; next: string }>(
+    `/api/android-live/design/drafts/${encodeURIComponent(draftId)}/writeback/begin`, body,
   )
 }

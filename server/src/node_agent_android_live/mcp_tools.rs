@@ -540,6 +540,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
         json!({"type":"object","required":["deviceId"],"properties":{"deviceId":{"type":"string"},"projectId":{"type":"string"}}})));
     definitions.extend(super::design_targets::tool_definitions());
     definitions.extend(super::tauri_host_runtime::tool_definitions());
+    definitions.extend(super::design_drafts::tool_definitions());
     definitions.push(crate::node_agent_pwa_runtime::tool_definition());
     definitions.push(super::verification_workflow::tool_definition());
     definitions.extend(fit_run_tools::definitions());

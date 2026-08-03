@@ -2,8 +2,10 @@ import { UI_TUNER_CLOSURE_PRIORITIES } from '../closurePriorities'
 import type { UiTunerCodexContextPack } from '../contextPack'
 import type {
   DesignSessionIdentity,
+  DesignDraft,
   DesignSurface,
   DesignTarget,
+  DesignWritebackReceipt,
   SemanticUiNode,
 } from './types'
 
@@ -13,8 +15,10 @@ export function buildHeadlessDesignContext(input: {
   session: DesignSessionIdentity | null
   surface: DesignSurface | null
   selectedNode: SemanticUiNode | null
+  designDraft: DesignDraft | null
+  writebackReceipt: DesignWritebackReceipt | null
 }): UiTunerCodexContextPack {
-  const { projectRoot, target, session, surface, selectedNode } = input
+  const { projectRoot, target, session, surface, selectedNode, designDraft, writebackReceipt } = input
   const viewport = surface?.surface?.viewport ?? session?.viewport ?? { width: 1280, height: 800, deviceScaleFactor: 1 }
   const sourceRoots = target?.sourceRoots ?? []
   const configFiles = target?.configFiles ?? []
@@ -104,6 +108,8 @@ export function buildHeadlessDesignContext(input: {
       pixels: surface?.pixels ?? undefined,
       uiTree: surface?.uiTree ?? undefined,
       nativeHost: surface?.nativeHost ?? undefined,
+      designDraft: designDraft ?? undefined,
+      writebackReceipt: writebackReceipt ?? undefined,
       selectedNode: selectedNode ?? undefined,
       contextPolicy: {
         fullRepositoryIncluded: false,

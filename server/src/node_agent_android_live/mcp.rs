@@ -130,9 +130,9 @@ fn initialize_response() -> Result<Value> {
     Ok(json!({
         "protocolVersion": MCP_PROTOCOL_VERSION,
         "capabilities": { "tools": { "listChanged": false } },
-        "serverInfo": { "name": "yilong-ui-live", "version": "1.5.0" },
+        "serverInfo": { "name": "yilong-ui-live", "version": "1.6.0" },
         "toolContract": tool_contract,
-        "instructions": "模糊路由任务先调用 ui_confirm_route。无需打开 PC 画布的多端任务按 ui_list_design_targets -> ui_list_design_sessions -> ui_open_design_target -> ui_capture_design_surface -> ui_get_design_surface 工作；已有 designSessionId 可在同一项目的新 MCP session 或 PC 画布中恢复。Tauri 先捕获 WebView 前端；需要原生宿主证据时按 ui_prepare_tauri_runtime 轮询到 READY，再 ui_capture_tauri_host，完成后 ui_stop_tauri_runtime。后台证据只返回 PNG/UI tree 路径与哈希，不嵌入 Base64，也不把 WebView 冒充原生窗口。Codex 桌面端 UI 请求先导入任务、读取项目与 Runtime 并检查能力；requiredCapabilities 只能追加系统推导能力。样式优先 Live Patch/FitRun，结构变化使用最小 CODEX_SOURCE_HANDOFF。平台缺口必须声明 deliveryImpact：原业务任务只创建 Worktree handoff，不得就地升级；DELIVERY_NON_BLOCKING 在 businessDeliveryReady=true 后先收尾业务，再由新的 Codex Desktop Worktree 任务后台升级、发布和复检，前台 UI 任务优先使用真机与节点发布资源；DELIVERY_BLOCKING 则暂停业务并分流。全新页面先建骨架和首次构建，再回到真实 Android Renderer。收尾必须调用 ui_check_workflow_completion；仅 completionReady 或经验证的 businessDeliveryReady 允许对应声明。"
+        "instructions": "模糊路由任务先调用 ui_confirm_route。无需打开 PC 画布的多端任务按 ui_list_design_targets -> ui_list_design_sessions -> ui_open_design_target -> ui_capture_design_surface -> ui_get_design_surface 工作；已有 designSessionId 可在同一项目的新 MCP session 或 PC 画布中恢复。Tauri 先捕获 WebView 前端；需要原生宿主证据时按 ui_prepare_tauri_runtime 轮询到 READY，再 ui_capture_tauri_host，完成后 ui_stop_tauri_runtime。设计修改用 ui_create_design_draft -> ui_update_design_draft 建立 sourceBinding 和可撤销 patch，再 ui_begin_design_writeback 固定 Git 基线；源码修改与分平台验证后只能用 ui_complete_design_writeback 形成完成回执。后台证据只返回路径、哈希和紧凑当前状态，不嵌入 Base64/完整历史，也不把草稿冒充源码或把 WebView 冒充原生窗口。Codex 桌面端 UI 请求先导入任务、读取项目与 Runtime 并检查能力；requiredCapabilities 只能追加系统推导能力。样式优先 Live Patch/FitRun，结构变化使用最小 CODEX_SOURCE_HANDOFF。平台缺口必须声明 deliveryImpact：原业务任务只创建 Worktree handoff，不得就地升级；DELIVERY_NON_BLOCKING 在 businessDeliveryReady=true 后先收尾业务，再由新的 Codex Desktop Worktree 任务后台升级、发布和复检，前台 UI 任务优先使用真机与节点发布资源；DELIVERY_BLOCKING 则暂停业务并分流。全新页面先建骨架和首次构建，再回到真实 Android Renderer。收尾必须调用 ui_check_workflow_completion；仅 completionReady 或经验证的 businessDeliveryReady 允许对应声明。"
     }))
 }
 
@@ -485,6 +485,10 @@ async fn call_tool(
         name if super::tauri_host_runtime::is_tool(name) => {
             let session = broker.session(&session_id).await?;
             super::tauri_host_runtime::call(&session, name, arguments).await?
+        }
+        name if super::design_drafts::is_tool(name) => {
+            let session = broker.session(&session_id).await?;
+            super::design_drafts::call(&session, name, arguments)?
         }
         crate::node_agent_pwa_runtime::TOOL_NAME => {
             let session = broker.session(&session_id).await?;

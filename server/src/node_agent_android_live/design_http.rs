@@ -51,6 +51,25 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/design/sessions/:design_session_id/tauri/artifact",
             post(get_tauri_artifact),
         )
+        .route("/api/android-live/design/drafts/list", post(list_drafts))
+        .route("/api/android-live/design/drafts", post(create_draft))
+        .route("/api/android-live/design/drafts/:draft_id", post(get_draft))
+        .route(
+            "/api/android-live/design/drafts/:draft_id/update",
+            post(update_draft),
+        )
+        .route(
+            "/api/android-live/design/drafts/:draft_id/undo",
+            post(undo_draft),
+        )
+        .route(
+            "/api/android-live/design/drafts/:draft_id/writeback/begin",
+            post(begin_draft_writeback),
+        )
+        .route(
+            "/api/android-live/design/drafts/:draft_id/writeback/complete",
+            post(complete_draft_writeback),
+        )
 }
 
 async fn list_targets(
@@ -147,6 +166,65 @@ async fn get_tauri_artifact(
         Ok(artifact) => artifact_response(artifact),
         Err(error) => json_error(StatusCode::BAD_REQUEST, error),
     }
+}
+
+async fn list_drafts(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Json(arguments): Json<Value>,
+) -> Response {
+    call(&runtime, "ui_list_design_drafts", arguments).await
+}
+
+async fn create_draft(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Json(arguments): Json<Value>,
+) -> Response {
+    call(&runtime, "ui_create_design_draft", arguments).await
+}
+
+async fn get_draft(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(draft_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["draftId"] = json!(draft_id);
+    call(&runtime, "ui_get_design_draft", arguments).await
+}
+
+async fn update_draft(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(draft_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["draftId"] = json!(draft_id);
+    call(&runtime, "ui_update_design_draft", arguments).await
+}
+
+async fn undo_draft(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(draft_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["draftId"] = json!(draft_id);
+    call(&runtime, "ui_undo_design_draft", arguments).await
+}
+
+async fn begin_draft_writeback(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(draft_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["draftId"] = json!(draft_id);
+    call(&runtime, "ui_begin_design_writeback", arguments).await
+}
+
+async fn complete_draft_writeback(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(draft_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["draftId"] = json!(draft_id);
+    call(&runtime, "ui_complete_design_writeback", arguments).await
 }
 
 fn artifact_response(artifact: super::design_session_store::VerifiedPixelArtifact) -> Response {

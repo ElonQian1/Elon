@@ -48,6 +48,61 @@
   color: #d9d9dc;
 }
 
+.draftBar {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #292a2d;
+  background: #141416;
+  color: #8c8e95;
+  font-size: 11px;
+}
+
+.draftBar > span {
+  white-space: nowrap;
+}
+
+.draftBar input {
+  width: 118px;
+  min-width: 0;
+  height: 29px;
+  padding: 0 7px;
+  border: 1px solid #34353a;
+  border-radius: 6px;
+  outline: none;
+  background: #101114;
+  color: #e3e3e6;
+  font-size: 11px;
+}
+
+.draftBar input:nth-of-type(2) {
+  min-width: 145px;
+  flex: 1;
+}
+
+.draftBar button {
+  height: 29px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 1px solid #35363a;
+  border-radius: 6px;
+  background: #1a1b1e;
+  color: #d9d9dc;
+  white-space: nowrap;
+}
+
+.draftBar small {
+  max-width: 190px;
+  overflow: hidden;
+  color: #777981;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .tauriBar {
   min-height: 40px;
   display: flex;

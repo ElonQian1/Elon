@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
+    fs,
     path::Path,
     sync::{Mutex, OnceLock},
 };
@@ -52,7 +53,7 @@ pub(crate) struct CompleteWritebackReceiptRequest {
     pub(crate) platform_results: BTreeMap<String, PlatformReceiptUpdate>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PlatformWritebackResult {
     pub(crate) platform: String,
@@ -70,7 +71,7 @@ pub(crate) struct PlatformWritebackResult {
     pub(crate) evidence_complete: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct WritebackReceipt {
     pub(crate) schema_version: u8,
@@ -93,7 +94,7 @@ pub(crate) struct WritebackReceipt {
     pub(crate) updated_at: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct ReceiptState {
     baseline: WorkspaceSnapshot,
     receipt: WritebackReceipt,
@@ -159,13 +160,12 @@ pub(crate) fn begin_writeback_receipt(
             active.remove(&oldest);
         }
     }
-    active.insert(
-        receipt_id,
-        ReceiptState {
-            baseline,
-            receipt: receipt.clone(),
-        },
-    );
+    let state = ReceiptState {
+        baseline,
+        receipt: receipt.clone(),
+    };
+    persist_receipt_state(&state)?;
+    active.insert(receipt_id, state);
     Ok(receipt)
 }
 
@@ -175,6 +175,12 @@ pub(crate) fn complete_writeback_receipt(
     let receipt_id = safe_identifier(&request.receipt_id, "receiptId")?;
     let requested_root = canonical_project_root(&request.project_root)?;
     let mut active = active_receipts()?;
+    if !active.contains_key(&receipt_id) {
+        active.insert(
+            receipt_id.clone(),
+            read_receipt_state(&requested_root, &receipt_id)?,
+        );
+    }
     let state = active.get_mut(&receipt_id).ok_or_else(|| {
         anyhow!("WRITEBACK_RECEIPT_NOT_FOUND：回执不存在或节点已重启，请重新开始写回")
     })?;
@@ -216,6 +222,7 @@ pub(crate) fn complete_writeback_receipt(
     state.receipt.updated_at = Utc::now().to_rfc3339();
     state.receipt.diagnostics = diagnostics;
     settle_receipt(&mut state.receipt);
+    persist_receipt_state(state)?;
     Ok(state.receipt.clone())
 }
 
@@ -370,6 +377,13 @@ fn valid_build_evidence(platform: &str, evidence: Option<&Value>, current_revisi
         return false;
     }
     match platform {
+        "web" => {
+            evidence.get("browserCaptured").and_then(Value::as_bool) == Some(true)
+                && evidence
+                    .get("routeRevision")
+                    .and_then(Value::as_str)
+                    .is_some_and(|value| !value.trim().is_empty())
+        }
         "pwa" => {
             evidence.get("runtimeReloaded").and_then(Value::as_bool) == Some(true)
                 && evidence
@@ -377,7 +391,17 @@ fn valid_build_evidence(platform: &str, evidence: Option<&Value>, current_revisi
                     .and_then(Value::as_str)
                     .is_some_and(|value| !value.trim().is_empty())
         }
-        "apk" => {
+        "tauri" => {
+            evidence.get("frontendCaptured").and_then(Value::as_bool) == Some(true)
+                && evidence.get("nativeHostVerified").and_then(Value::as_bool) == Some(true)
+                && evidence
+                    .get("nativeArtifactSha256")
+                    .and_then(Value::as_str)
+                    .is_some_and(|value| {
+                        value.len() == 64 && value.chars().all(|ch| ch.is_ascii_hexdigit())
+                    })
+        }
+        "apk" | "android" => {
             evidence.get("runtimeConnected").and_then(Value::as_bool) == Some(true)
                 && evidence
                     .get("apkPath")
@@ -393,14 +417,14 @@ fn normalize_platforms(values: &[String]) -> Result<Vec<String>> {
         .iter()
         .map(|value| value.trim().to_ascii_lowercase())
         .collect::<BTreeSet<_>>();
-    if platforms.is_empty() || platforms.len() > 2 {
-        bail!("targetPlatforms 必须包含 pwa/apk 中的一到两项");
+    if platforms.is_empty() || platforms.len() > 4 {
+        bail!("targetPlatforms 必须包含 web/pwa/tauri/android 中的一到四项");
     }
     if platforms
         .iter()
-        .any(|value| value != "pwa" && value != "apk")
+        .any(|value| !matches!(value.as_str(), "web" | "pwa" | "tauri" | "android" | "apk"))
     {
-        bail!("targetPlatforms 只支持 pwa 与 apk");
+        bail!("targetPlatforms 只支持 web、pwa、tauri、android；apk 仅作旧客户端兼容");
     }
     Ok(platforms.iter().map(|value| value.to_string()).collect())
 }
@@ -503,4 +527,38 @@ fn active_receipts() -> Result<std::sync::MutexGuard<'static, HashMap<String, Re
         .get_or_init(|| Mutex::new(HashMap::new()))
         .lock()
         .map_err(|_| anyhow!("写回回执状态锁已损坏"))
+}
+
+fn persist_receipt_state(state: &ReceiptState) -> Result<()> {
+    let root = Path::new(&state.receipt.project_root).canonicalize()?;
+    let path = receipt_state_path(&root, &state.receipt.receipt_id, true)?;
+    fs::write(path, serde_json::to_vec_pretty(state)?)?;
+    Ok(())
+}
+
+fn read_receipt_state(root: &Path, receipt_id: &str) -> Result<ReceiptState> {
+    let path = receipt_state_path(root, receipt_id, false)?;
+    let metadata = fs::metadata(&path).context("WRITEBACK_RECEIPT_NOT_FOUND：回执不存在")?;
+    if !metadata.is_file() || metadata.len() > 2 * 1024 * 1024 {
+        bail!("WRITEBACK_RECEIPT_INVALID：回执文件无效或过大");
+    }
+    let state: ReceiptState = serde_json::from_slice(&fs::read(path)?)
+        .context("WRITEBACK_RECEIPT_INVALID：回执 JSON 无效")?;
+    if state.baseline.root != root || state.receipt.receipt_id != receipt_id {
+        bail!("WRITEBACK_RECEIPT_ROOT_MISMATCH：回执与当前项目目录不一致");
+    }
+    Ok(state)
+}
+
+fn receipt_state_path(root: &Path, receipt_id: &str, create: bool) -> Result<std::path::PathBuf> {
+    safe_identifier(receipt_id, "receiptId")?;
+    let directory = root.join(".elon/ui-tuner/writeback-receipts");
+    if create {
+        fs::create_dir_all(&directory)?;
+    }
+    let canonical = directory.canonicalize().context("写回回执目录不存在")?;
+    if !canonical.starts_with(root) {
+        bail!("写回回执目录越出项目");
+    }
+    Ok(canonical.join(format!("{receipt_id}.json")))
 }

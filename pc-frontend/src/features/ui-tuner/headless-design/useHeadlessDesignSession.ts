@@ -1,24 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   captureTauriHost,
+  beginDesignWriteback,
   captureDesignSession,
+  createDesignDraft,
+  getDesignDraft,
   getDesignSurface,
   listDesignSessions,
+  listDesignDrafts,
   listDesignTargets,
   loadDesignPixel,
   loadTauriNativePixel,
   openDesignSession,
   prepareTauriRuntime,
   stopTauriRuntime,
+  undoDesignDraft,
+  updateDesignDraft,
 } from './designSessionApi'
 import type {
   DesignPlatform,
+  DesignDraft,
+  DesignDraftSummary,
   DesignSessionIdentity,
   DesignSessionSummary,
   DesignSurface,
   DesignTarget,
   DesignViewport,
   SemanticUiNode,
+  DesignWritebackReceipt,
 } from './types'
 
 const DEFAULT_VIEWPORT: Record<DesignPlatform, DesignViewport> = {
@@ -38,6 +47,9 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
   const [session, setSession] = useState<DesignSessionIdentity | null>(null)
   const [surface, setSurface] = useState<DesignSurface | null>(null)
   const [selectedNode, setSelectedNode] = useState<SemanticUiNode | null>(null)
+  const [drafts, setDrafts] = useState<DesignDraftSummary[]>([])
+  const [designDraft, setDesignDraft] = useState<DesignDraft | null>(null)
+  const [writebackReceipt, setWritebackReceipt] = useState<DesignWritebackReceipt | null>(null)
   const [query, setQuery] = useState('')
   const [pixelUrl, setPixelUrl] = useState('')
   const [nativePixelUrl, setNativePixelUrl] = useState('')
@@ -47,6 +59,7 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
   const [error, setError] = useState('')
   const pixelUrlRef = useRef('')
   const nativePixelUrlRef = useRef('')
+  const selectedNodeRef = useRef<SemanticUiNode | null>(null)
 
   const installPixel = useCallback(async (designSessionId: string) => {
     const blob = await loadDesignPixel(projectRoot, designSessionId)
@@ -76,21 +89,38 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     setNativePixelUrl('')
   }, [])
 
+  const refreshDrafts = useCallback(async (designSessionId: string, selector?: string) => {
+    const listed = await listDesignDrafts(projectRoot, designSessionId)
+    setDrafts(listed.drafts)
+    const match = listed.drafts.find((item) => item.selector === selector)
+    if (!match) {
+      setDesignDraft(null)
+      setWritebackReceipt(null)
+      return null
+    }
+    const detail = await getDesignDraft(projectRoot, match.draftId)
+    setDesignDraft(detail.draft)
+    return detail.draft
+  }, [projectRoot])
+
   const readSurface = useCallback(async (designSessionId: string, search = '') => {
     const next = await getDesignSurface({ projectRoot, designSessionId, query: search, limit: 80 })
     setSurface(next)
-    setSelectedNode((current) => (
-      next.nodes.find((node) => node.selector === current?.selector)
+    const chosen = (
+      next.nodes.find((node) => node.selector === selectedNodeRef.current?.selector)
       ?? next.nodes.find((node) => node.interactive)
       ?? next.nodes[0]
       ?? null
-    ))
+    )
+    selectedNodeRef.current = chosen
+    setSelectedNode(chosen)
     if (next.pixels?.path) await installPixel(designSessionId)
     else clearPixel()
     if (next.nativeHost?.artifact.path) await installNativePixel(designSessionId)
     else clearNativePixel()
+    await refreshDrafts(designSessionId, chosen?.selector)
     return next
-  }, [clearNativePixel, clearPixel, installNativePixel, installPixel, projectRoot])
+  }, [clearNativePixel, clearPixel, installNativePixel, installPixel, projectRoot, refreshDrafts])
 
   const load = useCallback(async () => {
     if (!projectRoot) return
@@ -155,6 +185,7 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     }
     setSession(null)
     setSurface(null)
+    selectedNodeRef.current = null
     setSelectedNode(null)
     clearPixel()
     clearNativePixel()
@@ -191,6 +222,7 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     setRoute(next.route)
     setUrl(next.url ?? '')
     setSurface(null)
+    selectedNodeRef.current = null
     setSelectedNode(null)
     clearPixel()
     clearNativePixel()
@@ -288,6 +320,86 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     }
   }, [platform, projectRoot, session])
 
+  const selectNode = useCallback((node: SemanticUiNode | null) => {
+    selectedNodeRef.current = node
+    setSelectedNode(node)
+    if (!session) {
+      setDesignDraft(null)
+      return
+    }
+    void refreshDrafts(session.designSessionId, node?.selector).catch((reason) => {
+      setError(reason instanceof Error ? reason.message : '设计草稿读取失败')
+    })
+  }, [refreshDrafts, session])
+
+  const saveDraftPatch = useCallback(async (property: string, after: string) => {
+    if (!session || !selectedNode) return
+    const cleanProperty = property.trim()
+    const cleanAfter = after.trim()
+    if (!cleanProperty || !cleanAfter) return
+    setBusy(true)
+    setError('')
+    try {
+      const style = selectedNode.style as Record<string, string | undefined>
+      const nextPatch = { property: cleanProperty, before: style[cleanProperty], after: cleanAfter }
+      const result = designDraft && designDraft.selector === selectedNode.selector
+        ? await updateDesignDraft({
+            projectRoot,
+            draftId: designDraft.draftId,
+            expectedRevision: designDraft.revision,
+            patches: [...designDraft.patches.filter((patch) => patch.property !== cleanProperty), nextPatch],
+          })
+        : await createDesignDraft({
+            projectRoot,
+            designSessionId: session.designSessionId,
+            selector: selectedNode.selector,
+            patches: [nextPatch],
+            targetPlatforms: [platform],
+          })
+      setDesignDraft(result.draft)
+      setWritebackReceipt(null)
+      const listed = await listDesignDrafts(projectRoot, session.designSessionId)
+      setDrafts(listed.drafts)
+      setStatus(`设计草稿已保存为 r${result.draft.revision}；尚未冒充源码写回`)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '设计草稿保存失败')
+    } finally {
+      setBusy(false)
+    }
+  }, [designDraft, platform, projectRoot, selectedNode, session])
+
+  const undoDraft = useCallback(async () => {
+    if (!designDraft) return
+    setBusy(true)
+    setError('')
+    try {
+      const result = await undoDesignDraft({ projectRoot, draftId: designDraft.draftId, expectedRevision: designDraft.revision })
+      setDesignDraft(result.draft)
+      setWritebackReceipt(null)
+      setStatus(`已撤销最近草稿修改；当前 revision r${result.draft.revision}`)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '设计草稿撤销失败')
+    } finally {
+      setBusy(false)
+    }
+  }, [designDraft, projectRoot])
+
+  const beginDraftWriteback = useCallback(async () => {
+    if (!designDraft) return
+    setBusy(true)
+    setError('')
+    try {
+      const result = await beginDesignWriteback({ projectRoot, draftId: designDraft.draftId, expectedRevision: designDraft.revision })
+      setDesignDraft(result.draft)
+      setWritebackReceipt(result.receipt)
+      setStatus(`已固定 ${result.receipt.sourceRevisionBefore.slice(0, 12)} 的写回基线；等待 AI 修改源码和提交分平台证据`)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '设计写回开始失败')
+    } finally {
+      setBusy(false)
+    }
+  }, [designDraft, projectRoot])
+
   const search = useCallback(async () => {
     if (!session) return
     setBusy(true)
@@ -308,10 +420,11 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
 
   return {
     targets, sessions, target, platform, route, url, viewport, session, surface,
-    selectedNode, query, pixelUrl, nativePixelUrl, tauriRuntimeStatus, busy, status, error,
-    setRoute, setUrl, setViewport, setQuery, setSelectedNode,
+    selectedNode, drafts, designDraft, writebackReceipt, query, pixelUrl, nativePixelUrl,
+    tauriRuntimeStatus, busy, status, error,
+    setRoute, setUrl, setViewport, setQuery, setSelectedNode: selectNode,
     selectPlatform, selectSession, capture, interactSelected, prepareTauri, captureTauri,
-    stopTauri, search, reload: load,
+    stopTauri, saveDraftPatch, undoDraft, beginDraftWriteback, search, reload: load,
   }
 }
 

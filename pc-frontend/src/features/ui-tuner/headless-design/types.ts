@@ -166,3 +166,75 @@ export interface DesignSessionListResult {
   invalidRecordCount: number
   contentEmbedded: false
 }
+
+export interface DesignStylePatch {
+  property: string
+  before?: string | null
+  after: string
+  unit?: string | null
+}
+
+export interface DesignSourceBinding {
+  status: 'BOUND' | 'CANDIDATE' | 'NEEDS_AI'
+  sourceFile: string
+  symbol?: string | null
+  kind: string
+  range?: { start: number; end: number } | null
+  sourceRevision?: string | null
+  confidence: 'high' | 'medium' | 'low'
+  reason: string
+}
+
+export interface DesignDraft {
+  schemaVersion: 1
+  draftId: string
+  designSessionId: string
+  platform: DesignPlatform
+  route: string
+  selector: string
+  scope: 'instance' | 'component' | 'route' | 'project'
+  patches: DesignStylePatch[]
+  sourceBinding?: DesignSourceBinding | null
+  targetPlatforms: DesignPlatform[]
+  revision: number
+  status: string
+  writebackReceiptId?: string | null
+  historyDepth: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DesignDraftSummary {
+  draftId: string
+  designSessionId: string
+  platform: DesignPlatform
+  route: string
+  selector: string
+  scope: DesignDraft['scope']
+  revision: number
+  status: string
+  targetPlatforms: DesignPlatform[]
+  sourceBindingStatus?: DesignSourceBinding['status'] | null
+  writebackReceiptId?: string | null
+  updatedAt: string
+}
+
+export interface DesignWritebackReceipt {
+  schemaVersion: 1
+  receiptId: string
+  operationId: string
+  draftRevision: number
+  targetPlatforms: DesignPlatform[]
+  sourceRevisionBefore: string
+  sourceRevision: string
+  sourceHash: string
+  changedFiles: string[]
+  sourceHashes: Record<string, string>
+  platformResults: Record<string, Record<string, unknown>>
+  status: string
+  complete: boolean
+  evidenceComplete: boolean
+  diagnostics: string[]
+  createdAt: string
+  updatedAt: string
+}

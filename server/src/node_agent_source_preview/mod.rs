@@ -23,3 +23,7 @@ mod pwa_writer_tests;
 mod writeback_receipt_tests;
 
 pub(crate) use routes::routes;
+pub(crate) use writeback_receipt::{
+    begin_writeback_receipt, complete_writeback_receipt, BeginWritebackReceiptRequest,
+    CompleteWritebackReceiptRequest, PlatformReceiptUpdate, WritebackReceipt,
+};

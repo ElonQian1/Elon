@@ -9,7 +9,14 @@ import type { UiTunerSelectionVisualContext } from './runtime/selectionArtifact'
 import type { FitRunDocument } from './fit-run/types'
 import type { PwaDraftCliCompactHandoff } from './source-preview/pwaDesignDraft'
 import type { PwaDraftAiFitTask } from './source-preview/pwaAiFitTask'
-import type { DesignArtifactRef, DesignPlatform, SemanticUiNode, TauriNativeHostEvidence } from './headless-design/types'
+import type {
+  DesignArtifactRef,
+  DesignDraft,
+  DesignPlatform,
+  DesignWritebackReceipt,
+  SemanticUiNode,
+  TauriNativeHostEvidence,
+} from './headless-design/types'
 
 export interface UiTunerCodexContextPack {
   version: 4
@@ -175,6 +182,8 @@ export interface UiTunerCodexContextPack {
     pixels?: DesignArtifactRef
     uiTree?: DesignArtifactRef
     nativeHost?: TauriNativeHostEvidence
+    designDraft?: DesignDraft
+    writebackReceipt?: DesignWritebackReceipt
     selectedNode?: SemanticUiNode
     contextPolicy: {
       fullRepositoryIncluded: false
@@ -434,9 +443,10 @@ function buildHeadlessDesignTaskPrompt(pack: UiTunerCodexContextPack, userIntent
     '执行顺序：',
     '1. 先用 ui_list_design_sessions 恢复 designSessionId，再用 ui_get_design_surface 读取紧凑 UI 树；不要先操控 PC 桌面。',
     '2. 结合 route、selector、configFiles/sourceRoots 建立最小源码绑定，只读取相关源码。',
-    '3. 修改源码；如果是样式草稿，保留可撤销变更和分平台写回状态。',
+    '3. 若 context pack 含 designDraft，先按 sourceBinding 和 expected revision 修改源码；草稿本身不是源码完成证明。',
     '4. 需要调试交互时，在 ui_capture_design_surface.capture.steps 中只使用 click、waitFor、assertText；再读取新的 UI tree/PNG 路径与 SHA-256。',
-    '5. 明确平台覆盖：只有 nativeHost.nativeHostVerified=true 才能声明 Tauri 原生窗口证据；Android 必须使用 Android Runtime。',
+    '5. 用 ui_complete_design_writeback 提交 changedFiles、源码哈希和各平台 evidence；只有 receipt.complete=true 才声明完成。',
+    '6. 明确平台覆盖：只有 nativeHost.nativeHostVerified=true 才能声明 Tauri 原生窗口证据；Android 必须使用 Android Runtime。',
     '',
     'Compact context pack JSON:',
     '```json',

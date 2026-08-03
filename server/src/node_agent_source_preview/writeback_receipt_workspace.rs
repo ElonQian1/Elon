@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Context, Result};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use super::parser::canonical_project_root;
@@ -13,7 +14,7 @@ use crate::node_agent_android_live::fit_run::workspace_fingerprint;
 const MAX_CHANGED_FILES: usize = 256;
 const SOURCE_HASH_DELETED: &str = "deleted";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub(super) struct WorkspaceSnapshot {
     pub(super) root: PathBuf,
     pub(super) head: String,
