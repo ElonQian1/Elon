@@ -120,6 +120,56 @@ impl Store {
         Ok(grant)
     }
 
+    pub(crate) fn active_open_commerce_grant_record_for_app_capability(
+        &self,
+        merchant_id: &str,
+        grantee_app_id: &str,
+        capability_key: &str,
+    ) -> Result<Option<OpenCommerceGrant>> {
+        Ok(self
+            .list_active_open_commerce_grant_records_for_app_capability(
+                merchant_id,
+                grantee_app_id,
+                capability_key,
+            )?
+            .into_iter()
+            .next())
+    }
+
+    pub(crate) fn list_active_open_commerce_grant_records_for_app_capability(
+        &self,
+        merchant_id: &str,
+        grantee_app_id: &str,
+        capability_key: &str,
+    ) -> Result<Vec<OpenCommerceGrant>> {
+        let grantee_app_id = normalize_app_id(grantee_app_id)?;
+        let capability_key = normalize_capability_key(capability_key)?;
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(&format!(
+            "{GRANT_SELECT}
+             WHERE merchant_id = ?1 AND grantee_app_id = ?2
+               AND revoked_at IS NULL
+               AND (expires_at IS NULL OR expires_at > ?3)
+             ORDER BY created_at DESC"
+        ))?;
+        let rows = stmt.query_map(
+            params![merchant_id.trim(), grantee_app_id, now()],
+            grant_from_row,
+        )?;
+        let mut grants = Vec::new();
+        for row in rows {
+            let grant = row?;
+            if grant
+                .scopes
+                .iter()
+                .any(|scope| scope == "*" || scope == &capability_key)
+            {
+                grants.push(grant);
+            }
+        }
+        Ok(grants)
+    }
+
     pub(crate) fn list_project_open_commerce_grants(
         &self,
         project_id: &str,

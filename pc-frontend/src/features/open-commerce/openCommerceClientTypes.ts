@@ -703,8 +703,9 @@ export interface ConsumerRankingReceipt {
 
 export interface ConsumerAuthorizationState {
   required: boolean
-  status: 'not_required' | 'app_registration_required' | 'granted' | 'pending' | 'request_required'
+  status: 'not_required' | 'app_registration_required' | 'granted' | 'pending' | 'request_required' | 'grant_refresh_required'
   grant_id?: string
+  grant_budget_status?: 'available' | 'invocation_budget_exhausted' | 'amount_budget_exhausted' | 'budget_currency_mismatch'
   request_id?: string
 }
 

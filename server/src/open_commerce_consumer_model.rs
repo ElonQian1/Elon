@@ -63,6 +63,7 @@ pub(crate) struct ConsumerAuthorizationState {
     pub required: bool,
     pub status: String,
     pub grant_id: Option<String>,
+    pub grant_budget_status: Option<String>,
     pub request_id: Option<String>,
 }
 

@@ -17,7 +17,7 @@ use crate::{
     open_commerce_directory_model::{
         OpenCommerceDirectoryCapability, OpenCommerceDirectoryMerchantDetail,
     },
-    open_commerce_directory_service,
+    open_commerce_directory_service, open_commerce_grant_readiness,
     open_commerce_integration_model::{normalize_provider_key, normalize_string_list},
     open_commerce_model::{
         normalize_app_id, normalize_capability_key, validate_access_level,
@@ -590,6 +590,7 @@ fn authorization_state(
             required: false,
             status: "not_required".to_string(),
             grant_id: None,
+            grant_budget_status: None,
             request_id: None,
         }),
         ACCESS_AUTHORIZED => {
@@ -598,20 +599,42 @@ fn authorization_state(
                     required: true,
                     status: "app_registration_required".to_string(),
                     grant_id: None,
+                    grant_budget_status: None,
                     request_id: None,
                 });
             }
-            let grant_id = store.active_open_commerce_grant_for_app_capability(
+            let grants = store.list_active_open_commerce_grant_records_for_app_capability(
                 &detail.merchant.id,
                 app_id,
                 &capability.capability_key,
             )?;
-            if grant_id.is_some() {
+            if let Some((grant, readiness)) = open_commerce_grant_readiness::select_best(
+                &grants,
+                capability.unit_price_micros,
+                &capability.currency,
+            ) {
+                let pending_request_id = if readiness.is_available() {
+                    None
+                } else {
+                    store.pending_authorization_for_app_capability(
+                        &detail.merchant.id,
+                        app_id,
+                        &capability.capability_key,
+                    )?
+                };
                 return Ok(ConsumerAuthorizationState {
                     required: true,
-                    status: "granted".to_string(),
-                    grant_id,
-                    request_id: None,
+                    status: if readiness.is_available() {
+                        "granted"
+                    } else if pending_request_id.is_some() {
+                        "pending"
+                    } else {
+                        "grant_refresh_required"
+                    }
+                    .to_string(),
+                    grant_id: Some(grant.id.clone()),
+                    grant_budget_status: Some(readiness.key().to_string()),
+                    request_id: pending_request_id,
                 });
             }
             let request_id = store.pending_authorization_for_app_capability(
@@ -628,6 +651,7 @@ fn authorization_state(
                 }
                 .to_string(),
                 grant_id: None,
+                grant_budget_status: None,
                 request_id,
             })
         }

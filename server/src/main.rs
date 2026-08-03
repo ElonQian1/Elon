@@ -276,6 +276,7 @@ mod open_commerce_grant_budget_model;
 mod open_commerce_grant_budget_service;
 #[cfg(test)]
 mod open_commerce_grant_budget_tests;
+mod open_commerce_grant_readiness;
 mod open_commerce_integration_migration;
 mod open_commerce_integration_model;
 mod open_commerce_invocation_protocol;

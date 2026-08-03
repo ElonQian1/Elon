@@ -250,31 +250,13 @@ impl Store {
         app_id: &str,
         capability_key: &str,
     ) -> Result<Option<String>> {
-        let app_id = normalize_app_id(app_id)?;
-        let capability_key = normalize_capability_key(capability_key)?;
-        let current = now();
-        let conn = self.conn()?;
-        let mut stmt = conn.prepare(
-            "SELECT id, scopes_json FROM open_commerce_grants
-              WHERE merchant_id = ?1 AND grantee_app_id = ?2
-                AND revoked_at IS NULL
-                AND (expires_at IS NULL OR expires_at > ?3)
-              ORDER BY created_at DESC",
-        )?;
-        let rows = stmt.query_map(params![merchant_id.trim(), app_id, current], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-        })?;
-        for row in rows {
-            let (grant_id, scopes_json) = row?;
-            let scopes: Vec<String> = serde_json::from_str(&scopes_json)?;
-            if scopes
-                .iter()
-                .any(|scope| scope == "*" || scope == &capability_key)
-            {
-                return Ok(Some(grant_id));
-            }
-        }
-        Ok(None)
+        Ok(self
+            .active_open_commerce_grant_record_for_app_capability(
+                merchant_id,
+                app_id,
+                capability_key,
+            )?
+            .map(|grant| grant.id))
     }
 
     pub(crate) fn pending_authorization_for_app_capability(

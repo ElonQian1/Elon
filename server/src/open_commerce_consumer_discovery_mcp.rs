@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 use crate::{
     open_commerce_consumer, open_commerce_consumer_execution_plan,
     open_commerce_consumer_model::ConsumerDiscoveryRequest,
-    open_commerce_developer_model::CreateAuthorizationRequest,
+    open_commerce_developer_model::CreateAuthorizationRequest, open_commerce_grant_readiness,
     open_commerce_model::normalize_capability_key, store::Store,
 };
 
@@ -186,13 +186,19 @@ pub(crate) fn call_if_handled(
             }
             store.ensure_open_commerce_developer_app_owned_by_user(app_id, user_id)?;
             let capability_key = normalize_capability_key(&input.capability_key)?;
-            if store
-                .active_open_commerce_grant_for_app_capability(
-                    &input.merchant_id,
-                    app_id,
-                    &capability_key,
-                )?
-                .is_some()
+            let capability =
+                store.open_commerce_capability_by_key(&input.merchant_id, &capability_key)?;
+            let grants = store.list_active_open_commerce_grant_records_for_app_capability(
+                &input.merchant_id,
+                app_id,
+                &capability_key,
+            )?;
+            if open_commerce_grant_readiness::select_best(
+                &grants,
+                capability.unit_price_micros,
+                &capability.currency,
+            )
+            .is_some_and(|(_, readiness)| readiness.is_available())
             {
                 bail!("当前 App 已拥有该能力的有效授权，无需重复申请");
             }

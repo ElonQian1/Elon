@@ -9,7 +9,7 @@ use crate::{
     open_commerce_directory_model::{
         OpenCommerceDirectoryCapability, OpenCommerceDirectoryMerchant,
     },
-    open_commerce_directory_service,
+    open_commerce_directory_service, open_commerce_grant_readiness,
     open_commerce_model::{
         normalize_app_id, normalize_capability_key, validate_json_object, ACCESS_AUTHORIZED,
         ACCESS_PUBLIC,
@@ -28,6 +28,7 @@ pub(crate) struct ConsumerCapabilityExecutionPlan {
     pub input_valid: bool,
     pub readiness: &'static str,
     pub grant_id: Option<String>,
+    pub grant_budget_status: Option<&'static str>,
     pub authorization_request_id: Option<String>,
     pub next_steps: Vec<ConsumerCapabilityExecutionStep>,
 }
@@ -73,32 +74,67 @@ pub(crate) fn plan(
         false,
     )?;
 
-    let (readiness, grant_id, authorization_request_id) = match capability.access_level.as_str() {
-        ACCESS_PUBLIC => (ready_status(&capability.kind)?, None, None),
-        ACCESS_AUTHORIZED if uses_default_mcp_identity => ("app_registration_required", None, None),
-        ACCESS_AUTHORIZED => {
-            let grant_id = store.active_open_commerce_grant_for_app_capability(
-                &detail.merchant.id,
-                &requester_app_id,
-                &capability.capability_key,
-            )?;
-            if grant_id.is_some() {
-                (ready_status(&capability.kind)?, grant_id, None)
-            } else {
-                let request_id = store.pending_authorization_for_app_capability(
+    let (readiness, grant_id, grant_budget_status, authorization_request_id) =
+        match capability.access_level.as_str() {
+            ACCESS_PUBLIC => (ready_status(&capability.kind)?, None, None, None),
+            ACCESS_AUTHORIZED if uses_default_mcp_identity => {
+                ("app_registration_required", None, None, None)
+            }
+            ACCESS_AUTHORIZED => {
+                let grants = store.list_active_open_commerce_grant_records_for_app_capability(
                     &detail.merchant.id,
                     &requester_app_id,
                     &capability.capability_key,
                 )?;
-                if request_id.is_some() {
-                    ("authorization_pending", None, request_id)
+                if let Some((grant, budget_readiness)) = open_commerce_grant_readiness::select_best(
+                    &grants,
+                    capability.unit_price_micros,
+                    &capability.currency,
+                ) {
+                    if budget_readiness.is_available() {
+                        (
+                            ready_status(&capability.kind)?,
+                            Some(grant.id.clone()),
+                            Some(budget_readiness.key()),
+                            None,
+                        )
+                    } else {
+                        let request_id = store.pending_authorization_for_app_capability(
+                            &detail.merchant.id,
+                            &requester_app_id,
+                            &capability.capability_key,
+                        )?;
+                        if request_id.is_some() {
+                            (
+                                "authorization_pending",
+                                Some(grant.id.clone()),
+                                Some(budget_readiness.key()),
+                                request_id,
+                            )
+                        } else {
+                            (
+                                "grant_refresh_required",
+                                Some(grant.id.clone()),
+                                Some(budget_readiness.key()),
+                                None,
+                            )
+                        }
+                    }
                 } else {
-                    ("authorization_request_required", None, None)
+                    let request_id = store.pending_authorization_for_app_capability(
+                        &detail.merchant.id,
+                        &requester_app_id,
+                        &capability.capability_key,
+                    )?;
+                    if request_id.is_some() {
+                        ("authorization_pending", None, None, request_id)
+                    } else {
+                        ("authorization_request_required", None, None, None)
+                    }
                 }
             }
-        }
-        _ => bail!("公开目录能力访问级别无效"),
-    };
+            _ => bail!("公开目录能力访问级别无效"),
+        };
 
     Ok(ConsumerCapabilityExecutionPlan {
         schema: "open_commerce.consumer_capability_execution_plan.v1",
@@ -114,6 +150,7 @@ pub(crate) fn plan(
         input_valid: true,
         readiness,
         grant_id,
+        grant_budget_status,
         authorization_request_id,
         next_steps: next_steps(readiness),
     })
@@ -170,6 +207,12 @@ fn next_steps(readiness: &str) -> Vec<ConsumerCapabilityExecutionStep> {
         "authorization_request_required" => vec![(
             "request_authorization",
             "经用户明确同意后向商户提交单能力授权申请",
+            Some("open_commerce_request_consumer_authorization"),
+            true,
+        )],
+        "grant_refresh_required" => vec![(
+            "request_grant_refresh",
+            "经用户明确同意后向商户申请新的期限或预算",
             Some("open_commerce_request_consumer_authorization"),
             true,
         )],

@@ -376,9 +376,9 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
                     </span>
                   </div>
                   <div style={commerceStyles.headerActions}>
-                    {match.authorization.status === 'request_required' && (
+                    {['request_required', 'grant_refresh_required'].includes(match.authorization.status) && (
                       <button style={actionStyle('secondary', busy)} type="button" onClick={() => requestAuthorization(match)} disabled={busy}>
-                        <KeyRound size={13} />申请授权
+                        <KeyRound size={13} />{match.authorization.status === 'grant_refresh_required' ? '申请新额度' : '申请授权'}
                       </button>
                     )}
                     {['not_required', 'granted'].includes(match.authorization.status) && (
@@ -477,12 +477,13 @@ function authorizationLabel(status: string) {
     request_required: '需要申请',
     pending: '等待商户',
     granted: '已授权',
+    grant_refresh_required: '授权额度不足',
     app_registration_required: '请先注册应用',
   }[status] ?? status
 }
 
 function authorizationTone(status: string): 'danger' | 'neutral' | 'warn' {
   if (status === 'app_registration_required') return 'danger'
-  if (status === 'request_required' || status === 'pending') return 'warn'
+  if (status === 'request_required' || status === 'pending' || status === 'grant_refresh_required') return 'warn'
   return 'neutral'
 }
