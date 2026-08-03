@@ -118,7 +118,7 @@ platform_margin
 
 容量市场底层统一使用已接受的共享 CapacityPool 与追加式账本设计，见 `docs/decisions/distributed-compute-capacity-ledger-v1.md` 和 `docs/distributed-compute/capacity-ledger.md`。Offer 只声明静态出售上限；发布、复制或续期 Offer 不会铸造任何可用容量。只有 Pool bucket 的发行事件进入账本后才形成余额，所有现货 Reservation 与未来 Commitment 必须争用同一容量真源。
 
-V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v170 SQLite schema、容量 Store，以及版本化 Provider/Offer Registry 已写入但未编译、未执行迁移；Price Snapshot、预算统一 Reserve、Broker 接线和真实容量操作仍未实现。
+V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v171 SQLite schema、容量 Store、版本化 Provider/Offer Registry，以及不可变 Price Snapshot Registry 已写入但未编译、未执行迁移；消费者预算统一 Reserve、Broker 接线和真实容量操作仍未实现。
 
 市场对象分层：
 
