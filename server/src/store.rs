@@ -48,6 +48,7 @@ mod compute_price_snapshot_registry;
 mod compute_price_snapshot_validation;
 mod compute_provider_registry;
 mod compute_reservation_contract_validation;
+mod compute_reservation_registry;
 mod conversation_forks;
 mod conversations;
 pub(crate) mod default_joint_projects;
