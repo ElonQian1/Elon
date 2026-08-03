@@ -18,6 +18,7 @@ mod debug_package;
 mod deployment_serialization;
 mod design_bootstrap;
 mod design_diff_regions;
+mod design_session_store;
 mod design_target_discovery;
 mod design_targets;
 mod desktop_task;

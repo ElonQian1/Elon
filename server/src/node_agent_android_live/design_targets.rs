@@ -1,20 +1,19 @@
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::path::PathBuf;
 
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 
 use super::broker::LiveUiSession;
+use super::design_session_store::{
+    persist_record, read_record, read_verified_tree, validate_design_session_id,
+    DesignSessionRecord,
+};
 
 const LIST_TOOL: &str = "ui_list_design_targets";
 const OPEN_TOOL: &str = "ui_open_design_target";
 const CAPTURE_TOOL: &str = "ui_capture_design_surface";
 const GET_TOOL: &str = "ui_get_design_surface";
-const MAX_TREE_BYTES: u64 = 512 * 1024;
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -58,23 +57,6 @@ pub(super) struct DesignTarget {
     pub(super) config_files: Vec<String>,
     pub(super) capabilities: Vec<String>,
     pub(super) native_host_verified: bool,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DesignSessionRecord {
-    schema_version: u32,
-    design_session_id: String,
-    mcp_session_id: String,
-    platform: DesignPlatform,
-    target: DesignTarget,
-    route: String,
-    url: Option<String>,
-    viewport: Value,
-    state: String,
-    last_evidence: Option<Value>,
-    created_at: String,
-    updated_at: String,
 }
 
 pub(super) fn tool_definitions() -> Vec<Value> {
@@ -306,28 +288,6 @@ fn compact_evidence(value: &Value) -> Value {
     })
 }
 
-fn read_verified_tree(root: &Path, evidence: &Value) -> Result<Value> {
-    let path = evidence
-        .pointer("/uiTree/path")
-        .and_then(Value::as_str)
-        .ok_or_else(|| anyhow!("后台设计证据缺少 UI tree path"))?;
-    let expected = evidence
-        .pointer("/uiTree/sha256")
-        .and_then(Value::as_str)
-        .ok_or_else(|| anyhow!("后台设计证据缺少 UI tree sha256"))?;
-    let path = PathBuf::from(path)
-        .canonicalize()
-        .context("后台设计 UI tree 工件不存在")?;
-    if !path.starts_with(root) || fs::metadata(&path)?.len() > MAX_TREE_BYTES {
-        bail!("后台设计 UI tree 越出项目或超过大小上限");
-    }
-    let bytes = fs::read(path)?;
-    if !expected.eq_ignore_ascii_case(&hex::encode(Sha256::digest(&bytes))) {
-        bail!("后台设计 UI tree 哈希不匹配");
-    }
-    serde_json::from_slice(&bytes).context("后台设计 UI tree JSON 无效")
-}
-
 fn node_matches(node: &Value, query: &str) -> bool {
     ["selector", "role", "label", "tag"]
         .iter()
@@ -345,44 +305,10 @@ fn canonical_project_root(session: &LiveUiSession) -> Result<PathBuf> {
         .with_context(|| format!("项目目录不存在: {root}"))
 }
 
-fn persist_record(root: &Path, record: &DesignSessionRecord) -> Result<()> {
-    let path = record_path(root, &record.design_session_id, true)?;
-    fs::write(path, serde_json::to_vec_pretty(record)?)?;
-    Ok(())
-}
-
-fn read_record(root: &Path, id: &str) -> Result<DesignSessionRecord> {
-    let path = record_path(root, id, false)?;
-    serde_json::from_slice(&fs::read(path)?).context("后台设计会话 JSON 无效")
-}
-
-fn record_path(root: &Path, id: &str, create: bool) -> Result<PathBuf> {
-    validate_design_session_id(id)?;
-    let directory = root.join(".elon/ui-tuner/headless-design/sessions");
-    if create {
-        fs::create_dir_all(&directory)?;
-    }
-    let canonical = directory.canonicalize().context("后台设计会话目录不存在")?;
-    if !canonical.starts_with(root) {
-        bail!("后台设计会话目录越出项目");
-    }
-    Ok(canonical.join(format!("{id}.json")))
-}
-
 fn required_design_session_id(arguments: &Value) -> Result<&str> {
     let value = required_string(arguments, "designSessionId")?;
     validate_design_session_id(value)?;
     Ok(value)
-}
-
-fn validate_design_session_id(value: &str) -> Result<()> {
-    if value.len() != 39
-        || !value.starts_with("design_")
-        || !value[7..].chars().all(|ch| ch.is_ascii_hexdigit())
-    {
-        bail!("designSessionId 无效");
-    }
-    Ok(())
 }
 
 fn ensure_mcp_session(session: &LiveUiSession, record: &DesignSessionRecord) -> Result<()> {
