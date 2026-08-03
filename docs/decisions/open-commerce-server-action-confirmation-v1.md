@@ -23,6 +23,8 @@ PC 已能要求消费者在动作能力表单上确认当前输入，但该约�
 8. 能力状态、Grant、App 封禁、目录发布、配额和预算在真正调用时再次校验；准备确认不预留调用配额或资金。
 9. 准备接口本身按用户、App、商户、能力和幂等键复用。同一精确请求会返回已有的 `pending`、`confirmed` 或已绑定 Invocation 的 `consumed` 确认，使动作成功但网络回包丢失时仍可恢复原结果；相同幂等键更换输入或 Grant 时失败关闭。
 10. 每个用户与 App 同时最多保留 20 份未过期的 `pending` 或 `confirmed` 确认。准备新确认时会标记已过期记录，并清理创建超过 7 天且未产生 Invocation 的过期记录。
+11. MCP 新增 `open_commerce_get_my_action_confirmation`，允许代理在跨轮次或准备响应丢失后按确认 ID 重新读取。服务端再次绑定当前用户与当前 App，只返回商户、能力、Grant、幂等键、输入字段形状、时间、状态、Invocation ID 和稳定下一步，不返回原始输入值、请求摘要或内部项目身份。
+12. 读取时对 `pending` 和 `confirmed` 即时计算是否过期，但不改写数据库；它不替代宿主向用户展示本轮实际输入，也不确认或执行动作。
 
 ## 安全边界
 
@@ -31,12 +33,13 @@ PC 已能要求消费者在动作能力表单上确认当前输入，但该约�
 - 确认和调用仍只产生 `recorded_not_charged` 技术服务计量，不移动真实资金，也不构成订单、支付或链上证明。
 - 开发者测试 Token 只用于沙盒验证，不等于生产应用身份互认。
 - 准备确认会写入短时状态和审计，因此不是只读操作；幂等复用只减少重复状态，不意味着可以跳过独立确认。
+- 状态读取只能恢复服务端已经持有的脱敏确认元数据。由于服务端按设计不保存原始输入值，可信宿主仍须从当前会话或本地安全状态向用户展示将要执行的真实参数。
 
 ## 实现引用
 
 - `server/src/open_commerce_action_confirmation_model.rs`
 - `server/src/open_commerce_action_confirmation_service.rs`
+- `server/src/open_commerce_action_confirmation_mcp.rs`
 - `server/src/store/open_commerce_action_confirmations.rs`
 - `server/src/open_commerce_action_confirmation_api.rs`
-- `server/src/open_commerce_mcp.rs`
 - `pc-frontend/src/features/open-commerce/ConsumerCommerceSandbox.tsx`
