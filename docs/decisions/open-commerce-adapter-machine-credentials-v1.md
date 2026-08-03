@@ -33,6 +33,8 @@ date: 2026-08-03
 
 `docs/decisions/open-commerce-adapter-credential-expiration-v1.md` 已增加 1–366 天服务端强制有效期。原有机器身份、固定权限、轮换、撤销和历史回执版本语义不变；到期后必须显式轮换，不会自动续期。
 
+`docs/decisions/open-commerce-adapter-handoff-claims-v1.md` 进一步把“默认只写”和“可领取任务”拆成两个权限。历史凭据及未勾选领取能力的新凭据仍只有 `business_handoff.write`；项目编辑者明确轮换并选择任务领取后，凭据才同时获得 `business_handoff.claim`，且只能通过短时租约读取一条绑定任务，不能使用项目查询接口或任意读取经营数据。本 ADR 的 V1 固定只写结论保留为初始安全基线，不应被理解为所有后续凭据永远无法显式扩权。
+
 ## 实现证据
 
 - 凭据模型与迁移：`server/src/open_commerce_adapter_model.rs`、`server/src/open_commerce_adapter_migration.rs`

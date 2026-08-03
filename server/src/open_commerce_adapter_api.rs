@@ -80,6 +80,7 @@ async fn rotate_credential(
         &project_id,
         &integration_id,
         request.expires_in_days,
+        request.allow_task_claims,
         &OpenCommerceActor {
             user_id: &caller.user_id,
             app_id: &caller.app_id,

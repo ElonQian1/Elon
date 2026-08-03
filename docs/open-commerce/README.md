@@ -81,6 +81,8 @@
 71. `docs/open-commerce-adapter-machine-credentials-v1-acceptance.md`：查看接入器机器凭据的鉴权、版本固化和 PC 验收证据。
 72. `docs/decisions/open-commerce-adapter-credential-expiration-v1.md`：查看机器凭据 1–366 天服务端有效期和到期失败关闭规则。
 73. `docs/open-commerce-adapter-credential-expiration-v1-acceptance.md`：查看旧凭据回填、到期鉴权和 PC 临期提醒证据。
+74. `docs/decisions/open-commerce-adapter-handoff-claims-v1.md`：查看接入器显式任务领取权、受硬期限约束的续租、主动释放、拒绝退避、暂停恢复和原子完成规则。
+75. `docs/open-commerce-adapter-handoff-claims-v1-acceptance.md`：查看已落位实现和统一验证待执行范围。
 
 ## 专题地图
 
@@ -90,7 +92,7 @@
 | 多人、多 AI 协同开发 | 已有实现，持续收口 | `docs/群体ai开发/群体AI开发功能需求与架构设计.md` |
 | 商户节点、能力、授权、调用和审计 | V1 已接受并实现 | `docs/decisions/open-commerce-network-v1-architecture.md`、`docs/open-commerce-network-v1-api.md` |
 | 商户自有 ERP 受控运行时 | 参考实现已完成，生产配置依赖环境 | `docs/open-commerce/merchant-runtime.md`、`docs/open-commerce-merchant-runtime-v1-acceptance.md` |
-| 商户调用证据与 ERP/CRM 衔接 | V1 证据层、人工回执、派生待办队列及限时受控接入器机器凭据已实现；生产入库适配器、官方授权、外部回读和签名证明待逐项实现 | `docs/decisions/open-commerce-merchant-business-evidence-v1.md`、`docs/decisions/open-commerce-business-handoff-receipts-v1.md`、`docs/decisions/open-commerce-business-handoff-queue-v1.md`、`docs/decisions/open-commerce-adapter-machine-credentials-v1.md`、`docs/decisions/open-commerce-adapter-credential-expiration-v1.md` |
+| 商户调用证据与 ERP/CRM 衔接 | V1 证据层、人工回执、派生待办队列、限时机器凭据及显式扩权的单任务租约代码已落位；租约支持受限原因主动释放并等待统一验证，生产入库适配器、官方授权、外部回读和签名证明待逐项实现 | `docs/decisions/open-commerce-merchant-business-evidence-v1.md`、`docs/decisions/open-commerce-business-handoff-receipts-v1.md`、`docs/decisions/open-commerce-business-handoff-queue-v1.md`、`docs/decisions/open-commerce-adapter-machine-credentials-v1.md`、`docs/decisions/open-commerce-adapter-credential-expiration-v1.md`、`docs/decisions/open-commerce-adapter-handoff-claims-v1.md` |
 | 通用 ERP 蓝图与智能提案 | V1 已实现，代码执行仍走既有项目流程 | `docs/erp/README.md`、`docs/erp/acceptance-v1.md` |
 | 商户数据来源、健康度和同步回执 | 控制面已实现，具体平台适配器待逐项验收 | `docs/decisions/open-commerce-integration-control-plane.md`、`docs/open-commerce-integration-control-plane-acceptance.md` |
 | 连接器 SDK 与兼容性门禁 | 已实现 V1，尚不包含具体大厂适配器 | `sdk/open-commerce-connector/`、`docs/open-commerce/connector-sdk.md` |

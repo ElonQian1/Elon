@@ -162,6 +162,7 @@ export interface OpenCommerceBusinessHandoffReceipt {
   assertion_authority: 'project_editor_asserted' | 'adapter_token_authenticated'
   adapter_credential_id?: string
   adapter_credential_version?: number
+  adapter_claim_id?: string
   recorded_by_user_id: string
   recorded_by_app_id: string
   completed_at: string
@@ -198,6 +199,47 @@ export interface OpenCommerceAdapterCredentialList {
   schema: 'open_commerce.adapter_credential_list.v1'
   project_id: string
   credentials: OpenCommerceAdapterCredential[]
+  boundary: string[]
+}
+
+export interface OpenCommerceAdapterHandoffClaim {
+  schema: 'open_commerce.adapter_business_handoff_claim.v1'
+  id: string
+  project_id: string
+  merchant_id: string
+  invocation_id: string
+  integration_id: string
+  adapter_credential_id: string
+  adapter_credential_version: number
+  attempt_no: number
+  status: 'active' | 'completed' | 'expired' | 'released'
+  lease_token_hint: string
+  lease_expires_at: string
+  lease_deadline_at: string
+  release_reason_code?: string
+  released_at?: string
+  completion_status?: 'applied' | 'ignored' | 'rejected'
+  retry_not_before?: string
+  retry_suspended_at?: string
+  retry_suspension_reason?: string
+  retry_resumed_at?: string
+  completed_receipt_id?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface OpenCommerceAdapterHandoffClaimList {
+  schema: 'open_commerce.adapter_business_handoff_claim_list.v1'
+  project_id: string
+  claims: OpenCommerceAdapterHandoffClaim[]
+  boundary: string[]
+}
+
+export interface OpenCommerceAdapterHandoffClaimResume {
+  schema: 'open_commerce.adapter_business_handoff_claim_resume.v1'
+  claim: OpenCommerceAdapterHandoffClaim
+  resumed: true
+  funds_moved: false
   boundary: string[]
 }
 

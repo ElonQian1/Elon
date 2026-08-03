@@ -2,6 +2,11 @@ export const CONNECTOR_SCHEMA: 'open_commerce.connector.v1'
 export const CONNECTOR_CONTRACT_VERSION: '1.0'
 export const MAX_SYNC_PAGE_RECORDS: 500
 export const MAX_RECEIPT_KEY_LENGTH: 128
+export const ADAPTER_HANDOFF_CLAIM_SCHEMA: 'open_commerce.adapter_business_handoff_claim.v1'
+export const ADAPTER_HANDOFF_CLAIM_POLL_SCHEMA: 'open_commerce.adapter_business_handoff_claim_poll.v1'
+export const ADAPTER_HANDOFF_CLAIM_RELEASE_SCHEMA: 'open_commerce.adapter_business_handoff_claim_release.v1'
+export const ADAPTER_HANDOFF_CLAIM_RENEW_SCHEMA: 'open_commerce.adapter_business_handoff_claim_renew.v1'
+export const ADAPTER_HANDOFF_MAX_RESPONSE_BYTES: number
 
 export type ConnectionMode =
   | 'official_api'
@@ -106,6 +111,105 @@ export class ConnectorContractError extends Error {
   path: string
   constructor(code: string, message: string, path?: string)
 }
+
+export type AdapterHandoffReleaseReason =
+  | 'adapter_shutdown'
+  | 'capacity_pressure'
+  | 'transient_failure'
+  | 'manual_release'
+
+export interface AdapterHandoffClaim {
+  schema: typeof ADAPTER_HANDOFF_CLAIM_SCHEMA
+  id: string
+  project_id: string
+  merchant_id: string
+  invocation_id: string
+  integration_id: string
+  adapter_credential_id: string
+  adapter_credential_version: number
+  attempt_no: number
+  status: 'active' | 'completed' | 'expired' | 'released'
+  lease_token_hint: string
+  lease_expires_at: string
+  lease_deadline_at: string
+  release_reason_code?: AdapterHandoffReleaseReason
+  released_at?: string
+  completion_status?: 'applied' | 'ignored' | 'rejected'
+  retry_not_before?: string
+  retry_suspended_at?: string
+  retry_suspension_reason?: string
+  retry_resumed_at?: string
+  completed_receipt_id?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AdapterHandoffClaimIssue {
+  claim: AdapterHandoffClaim
+  lease_token: string
+  lease_token_visible_once: true
+  task: {
+    evidence: Record<string, unknown>
+    result: unknown
+  }
+}
+
+export interface AdapterHandoffClaimPoll {
+  schema: typeof ADAPTER_HANDOFF_CLAIM_POLL_SCHEMA
+  claimed: boolean
+  issue?: AdapterHandoffClaimIssue | null
+  retry_after_seconds: number
+  boundary: string[]
+}
+
+export interface AdapterHandoffCompletion {
+  receiptKey: string
+  status: 'applied' | 'ignored' | 'rejected'
+  targetDomain: string
+  targetReference?: string
+  errorCode?: string
+  completedAt: string
+}
+
+export interface AdapterHandoffClient {
+  claimNext(options?: { leaseSeconds?: number; signal?: AbortSignal }): Promise<AdapterHandoffClaimPoll>
+  complete(
+    issue: AdapterHandoffClaimIssue,
+    receipt: AdapterHandoffCompletion,
+    options?: { signal?: AbortSignal },
+  ): Promise<Record<string, unknown>>
+  release(
+    issue: AdapterHandoffClaimIssue,
+    reasonCode: AdapterHandoffReleaseReason,
+    options?: { signal?: AbortSignal },
+  ): Promise<{
+    schema: typeof ADAPTER_HANDOFF_CLAIM_RELEASE_SCHEMA
+    claim: AdapterHandoffClaim
+    retryable: true
+    boundary: string[]
+  }>
+  renew(
+    issue: AdapterHandoffClaimIssue,
+    options?: { extendSeconds?: number; signal?: AbortSignal },
+  ): Promise<{
+    schema: typeof ADAPTER_HANDOFF_CLAIM_RENEW_SCHEMA
+    claim: AdapterHandoffClaim
+    renewed: true
+    boundary: string[]
+  }>
+}
+
+export class AdapterHandoffClientError extends Error {
+  code: string
+  status?: number
+  constructor(code: string, message: string, status?: number)
+}
+
+export function createAdapterHandoffClient(options: {
+  baseUrl: string
+  token: string
+  fetch?: typeof globalThis.fetch
+}): AdapterHandoffClient
 
 export function defineConnector<T extends OpenCommerceConnector>(connector: T): Readonly<T>
 export function validateConnector<T extends OpenCommerceConnector>(connector: T): T

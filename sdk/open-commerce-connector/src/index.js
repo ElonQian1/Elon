@@ -1,5 +1,15 @@
 import { createHash } from 'node:crypto'
 
+export {
+  ADAPTER_HANDOFF_CLAIM_POLL_SCHEMA,
+  ADAPTER_HANDOFF_CLAIM_RELEASE_SCHEMA,
+  ADAPTER_HANDOFF_CLAIM_RENEW_SCHEMA,
+  ADAPTER_HANDOFF_CLAIM_SCHEMA,
+  ADAPTER_HANDOFF_MAX_RESPONSE_BYTES,
+  AdapterHandoffClientError,
+  createAdapterHandoffClient,
+} from './adapter-handoff-client.js'
+
 export const CONNECTOR_SCHEMA = 'open_commerce.connector.v1'
 export const CONNECTOR_CONTRACT_VERSION = '1.0'
 export const MAX_SYNC_PAGE_RECORDS = 500

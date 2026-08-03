@@ -61,6 +61,7 @@ mod node_payout_tests;
 mod node_payouts;
 mod node_public_dev;
 mod open_commerce_action_confirmations;
+mod open_commerce_adapter_claims;
 mod open_commerce_adapter_credentials;
 mod open_commerce_app_activity_health;
 mod open_commerce_app_blocks;
@@ -85,7 +86,9 @@ mod open_commerce_merchants;
 mod open_commerce_rate_limits;
 mod open_commerce_runtime_bindings;
 pub(crate) use open_commerce_action_confirmations::CreateOpenCommerceActionConfirmation;
-pub(crate) use open_commerce_business_handoffs::RecordOpenCommerceBusinessHandoffReceipt;
+pub(crate) use open_commerce_business_handoffs::{
+    AdapterClaimReceiptProof, RecordOpenCommerceBusinessHandoffReceipt,
+};
 pub(crate) use open_commerce_integrations::RecordOpenCommerceSyncReceipt;
 pub(crate) use open_commerce_invocations::OpenCommerceInvocationStart;
 mod pc_project_binding;
