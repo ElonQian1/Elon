@@ -1,13 +1,15 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AppWindow,
   Camera,
   Globe2,
   MonitorCog,
   MousePointerClick,
+  Play,
   RefreshCw,
   Search,
   Smartphone,
+  Square,
 } from 'lucide-react'
 import { UiTunerProjectSessionPanel } from '../UiTunerProjectSessionPanel'
 import { UiWorkspaceModeBar } from '../workspace/UiWorkspaceModeBar'
@@ -52,6 +54,16 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
   ].join(''), [model.platform, model.route, model.selectedNode])
   const viewport = model.surface?.surface?.viewport ?? model.session?.viewport ?? model.viewport
   const nodes = model.surface?.nodes ?? []
+  const [surfaceView, setSurfaceView] = useState<'frontend' | 'native'>('frontend')
+  useEffect(() => {
+    if (model.platform !== 'tauri') setSurfaceView('frontend')
+    else if (!model.pixelUrl && model.nativePixelUrl) setSurfaceView('native')
+  }, [model.nativePixelUrl, model.pixelUrl, model.platform])
+  const nativeViewport = model.surface?.nativeHost?.artifact
+  const activeViewport = surfaceView === 'native' && nativeViewport?.width && nativeViewport.height
+    ? { width: nativeViewport.width, height: nativeViewport.height }
+    : viewport
+  const activePixelUrl = surfaceView === 'native' ? model.nativePixelUrl : model.pixelUrl
 
   return (
     <div className={styles.workspace} style={{ display: active ? 'grid' : 'none' }}>
@@ -166,15 +178,40 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           </button>
         </div>
 
+        {model.platform === 'tauri' && (
+          <div className={styles.tauriBar}>
+            <span>原生宿主</span>
+            <button type="button" disabled={!model.session || model.busy} onClick={() => void model.prepareTauri()}>
+              <Play size={14} aria-hidden="true" />
+              {model.tauriRuntimeStatus === 'STARTING' ? '轮询窗口' : '启动 / 状态'}
+            </button>
+            <button
+              type="button"
+              disabled={!['READY', 'CAPTURED'].includes(model.tauriRuntimeStatus) || model.busy}
+              onClick={() => void model.captureTauri()}
+            >
+              <Camera size={14} aria-hidden="true" />捕获原生
+            </button>
+            <button type="button" disabled={!model.tauriRuntimeStatus || model.busy} onClick={() => void model.stopTauri()}>
+              <Square size={13} aria-hidden="true" />停止
+            </button>
+            <div className={styles.surfaceTabs}>
+              <button type="button" className={surfaceView === 'frontend' ? styles.activeSurface : ''} disabled={!model.pixelUrl} onClick={() => setSurfaceView('frontend')}>WebView</button>
+              <button type="button" className={surfaceView === 'native' ? styles.activeSurface : ''} disabled={!model.nativePixelUrl} onClick={() => setSurfaceView('native')}>原生窗口</button>
+            </div>
+          </div>
+        )}
+
         <div className={styles.evidenceShell}>
-          {model.pixelUrl ? (
+          {activePixelUrl ? (
             <div
               className={styles.captureCanvas}
-              style={{ aspectRatio: `${viewport.width} / ${viewport.height}` }}
+              style={{ aspectRatio: `${activeViewport.width} / ${activeViewport.height}` }}
               data-design-session-id={model.session?.designSessionId}
+              data-design-surface={surfaceView}
             >
-              <img src={model.pixelUrl} alt={`${model.platform} ${model.route} 后台页面证据`} />
-              {nodes.map((node) => (
+              <img src={activePixelUrl} alt={surfaceView === 'native' ? 'Tauri 原生窗口证据' : `${model.platform} ${model.route} 后台页面证据`} />
+              {surfaceView === 'frontend' && nodes.map((node) => (
                 <SemanticOverlay
                   key={node.id}
                   node={node}
@@ -201,6 +238,7 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           <span>{model.session?.designSessionId ?? '尚未打开 designSession'}</span>
           {model.surface?.pixels?.sha256 && <code>PNG {model.surface.pixels.sha256.slice(0, 12)}</code>}
           {model.surface?.uiTree?.sha256 && <code>UI {model.surface.uiTree.sha256.slice(0, 12)}</code>}
+          {model.surface?.nativeHost?.artifact.sha256 && <code>Native {model.surface.nativeHost.artifact.sha256.slice(0, 12)}</code>}
         </footer>
       </main>
 

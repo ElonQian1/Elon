@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  captureTauriHost,
   captureDesignSession,
   getDesignSurface,
   listDesignSessions,
   listDesignTargets,
   loadDesignPixel,
+  loadTauriNativePixel,
   openDesignSession,
+  prepareTauriRuntime,
+  stopTauriRuntime,
 } from './designSessionApi'
 import type {
   DesignPlatform,
@@ -36,10 +40,13 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
   const [selectedNode, setSelectedNode] = useState<SemanticUiNode | null>(null)
   const [query, setQuery] = useState('')
   const [pixelUrl, setPixelUrl] = useState('')
+  const [nativePixelUrl, setNativePixelUrl] = useState('')
+  const [tauriRuntimeStatus, setTauriRuntimeStatus] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('')
   const [error, setError] = useState('')
   const pixelUrlRef = useRef('')
+  const nativePixelUrlRef = useRef('')
 
   const installPixel = useCallback(async (designSessionId: string) => {
     const blob = await loadDesignPixel(projectRoot, designSessionId)
@@ -55,6 +62,20 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     setPixelUrl('')
   }, [])
 
+  const installNativePixel = useCallback(async (designSessionId: string) => {
+    const blob = await loadTauriNativePixel(projectRoot, designSessionId)
+    const next = URL.createObjectURL(blob)
+    if (nativePixelUrlRef.current) URL.revokeObjectURL(nativePixelUrlRef.current)
+    nativePixelUrlRef.current = next
+    setNativePixelUrl(next)
+  }, [projectRoot])
+
+  const clearNativePixel = useCallback(() => {
+    if (nativePixelUrlRef.current) URL.revokeObjectURL(nativePixelUrlRef.current)
+    nativePixelUrlRef.current = ''
+    setNativePixelUrl('')
+  }, [])
+
   const readSurface = useCallback(async (designSessionId: string, search = '') => {
     const next = await getDesignSurface({ projectRoot, designSessionId, query: search, limit: 80 })
     setSurface(next)
@@ -66,8 +87,10 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     ))
     if (next.pixels?.path) await installPixel(designSessionId)
     else clearPixel()
+    if (next.nativeHost?.artifact.path) await installNativePixel(designSessionId)
+    else clearNativePixel()
     return next
-  }, [clearPixel, installPixel, projectRoot])
+  }, [clearNativePixel, clearPixel, installNativePixel, installPixel, projectRoot])
 
   const load = useCallback(async () => {
     if (!projectRoot) return
@@ -96,6 +119,7 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
         setSession(null)
         setSurface(null)
         clearPixel()
+        clearNativePixel()
       }
       setStatus(sessionResult.invalidRecordCount
         ? `已忽略 ${sessionResult.invalidRecordCount} 个损坏的本地会话记录`
@@ -105,7 +129,7 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     } finally {
       setBusy(false)
     }
-  }, [clearPixel, projectRoot, readSurface])
+  }, [clearNativePixel, clearPixel, projectRoot, readSurface])
 
   useEffect(() => {
     if (active) void load()
@@ -113,6 +137,7 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
 
   useEffect(() => () => {
     if (pixelUrlRef.current) URL.revokeObjectURL(pixelUrlRef.current)
+    if (nativePixelUrlRef.current) URL.revokeObjectURL(nativePixelUrlRef.current)
   }, [])
 
   const selectPlatform = useCallback((next: DesignPlatform) => {
@@ -132,7 +157,9 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     setSurface(null)
     setSelectedNode(null)
     clearPixel()
-  }, [clearPixel, readSurface, sessions])
+    clearNativePixel()
+    setTauriRuntimeStatus('')
+  }, [clearNativePixel, clearPixel, readSurface, sessions])
 
   const selectSession = useCallback(async (next: DesignSessionSummary) => {
     setSession(next)
@@ -166,8 +193,9 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     setSurface(null)
     setSelectedNode(null)
     clearPixel()
+    clearNativePixel()
     return next
-  }, [clearPixel, platform, projectRoot, route, url, viewport])
+  }, [clearNativePixel, clearPixel, platform, projectRoot, route, url, viewport])
 
   const capture = useCallback(async (steps: Array<Record<string, unknown>> = []) => {
     setBusy(true)
@@ -210,6 +238,56 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     await capture([{ action: 'click', selector: selectedNode.selector }])
   }, [capture, selectedNode])
 
+  const prepareTauri = useCallback(async (restart = false) => {
+    if (!session || platform !== 'tauri') return
+    setBusy(true)
+    setError('')
+    try {
+      const result = await prepareTauriRuntime({ projectRoot, designSessionId: session.designSessionId, restart })
+      setTauriRuntimeStatus(result.status)
+      setStatus(result.status === 'READY'
+        ? `Tauri 原生窗口已就绪：${result.runtime?.window?.title || '已发现窗口'}`
+        : result.status === 'STARTING'
+          ? 'Tauri CLI 已在后台启动；请继续轮询窗口状态'
+          : result.next || result.status)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Tauri Runtime 准备失败')
+    } finally {
+      setBusy(false)
+    }
+  }, [platform, projectRoot, session])
+
+  const captureTauri = useCallback(async () => {
+    if (!session || platform !== 'tauri') return
+    setBusy(true)
+    setError('')
+    try {
+      await captureTauriHost({ projectRoot, designSessionId: session.designSessionId })
+      await readSurface(session.designSessionId, query)
+      setTauriRuntimeStatus('CAPTURED')
+      setStatus('已捕获 Tauri 原生窗口 PNG、边界、PID 与 SHA-256')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Tauri 原生窗口捕获失败')
+    } finally {
+      setBusy(false)
+    }
+  }, [platform, projectRoot, query, readSurface, session])
+
+  const stopTauri = useCallback(async () => {
+    if (!session || platform !== 'tauri') return
+    setBusy(true)
+    setError('')
+    try {
+      const result = await stopTauriRuntime({ projectRoot, designSessionId: session.designSessionId })
+      setTauriRuntimeStatus(result.status)
+      setStatus(result.status === 'STOPPED' ? '已停止当前 designSession 启动的 Tauri 进程树' : '当前没有登记的 Tauri Runtime')
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Tauri Runtime 停止失败')
+    } finally {
+      setBusy(false)
+    }
+  }, [platform, projectRoot, session])
+
   const search = useCallback(async () => {
     if (!session) return
     setBusy(true)
@@ -230,9 +308,10 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
 
   return {
     targets, sessions, target, platform, route, url, viewport, session, surface,
-    selectedNode, query, pixelUrl, busy, status, error,
+    selectedNode, query, pixelUrl, nativePixelUrl, tauriRuntimeStatus, busy, status, error,
     setRoute, setUrl, setViewport, setQuery, setSelectedNode,
-    selectPlatform, selectSession, capture, interactSelected, search, reload: load,
+    selectPlatform, selectSession, capture, interactSelected, prepareTauri, captureTauri,
+    stopTauri, search, reload: load,
   }
 }
 

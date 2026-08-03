@@ -52,11 +52,47 @@ export interface DesignSessionSummary extends DesignSessionIdentity {
   adapter: string
   evidenceLevel: string
   nativeHostVerified: boolean
+  nativeHost?: TauriNativeHostEvidence | null
   hasEvidence: boolean
   pixels?: DesignArtifactRef | null
   uiTree?: DesignArtifactRef | null
   createdAt: string
   updatedAt: string
+}
+
+export interface TauriNativeHostEvidence {
+  runtimeId: string
+  nativeHostVerified: true
+  hostCoverage: 'TAURI_NATIVE_WINDOW'
+  artifact: DesignArtifactRef
+  window: {
+    title: string
+    processId: number
+    bounds: { left: number; top: number; width: number; height: number }
+  }
+  launcherProcessId: number
+  runtimeStartedAt: string
+  capturedAt: string
+  base64Embedded: false
+}
+
+export interface TauriRuntimeResult {
+  ok: boolean
+  status: 'STARTING' | 'READY' | 'FAILED' | 'STOPPED' | 'NOT_RUNNING' | string
+  runtime?: {
+    runtimeId: string
+    status: string
+    launcherProcessId: number
+    projectRoot: string
+    moduleRoot: string
+    command: string
+    startedAt: string
+    window?: TauriNativeHostEvidence['window'] | null
+  }
+  nativeHost?: TauriNativeHostEvidence
+  retryAfterMs?: number
+  next?: string
+  exitCode?: number | null
 }
 
 export interface SemanticUiNode {
@@ -99,6 +135,8 @@ export interface DesignSurface {
   nodes: SemanticUiNode[]
   pixels?: DesignArtifactRef | null
   uiTree?: DesignArtifactRef | null
+  nativeHost?: TauriNativeHostEvidence | null
+  nativeHostVerified?: boolean
   base64Embedded?: false
   next?: string
 }

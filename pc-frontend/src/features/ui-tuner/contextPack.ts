@@ -9,7 +9,7 @@ import type { UiTunerSelectionVisualContext } from './runtime/selectionArtifact'
 import type { FitRunDocument } from './fit-run/types'
 import type { PwaDraftCliCompactHandoff } from './source-preview/pwaDesignDraft'
 import type { PwaDraftAiFitTask } from './source-preview/pwaAiFitTask'
-import type { DesignArtifactRef, DesignPlatform, SemanticUiNode } from './headless-design/types'
+import type { DesignArtifactRef, DesignPlatform, SemanticUiNode, TauriNativeHostEvidence } from './headless-design/types'
 
 export interface UiTunerCodexContextPack {
   version: 4
@@ -174,6 +174,7 @@ export interface UiTunerCodexContextPack {
     nativeHostVerified: boolean
     pixels?: DesignArtifactRef
     uiTree?: DesignArtifactRef
+    nativeHost?: TauriNativeHostEvidence
     selectedNode?: SemanticUiNode
     contextPolicy: {
       fullRepositoryIncluded: false
@@ -435,7 +436,7 @@ function buildHeadlessDesignTaskPrompt(pack: UiTunerCodexContextPack, userIntent
     '2. 结合 route、selector、configFiles/sourceRoots 建立最小源码绑定，只读取相关源码。',
     '3. 修改源码；如果是样式草稿，保留可撤销变更和分平台写回状态。',
     '4. 需要调试交互时，在 ui_capture_design_surface.capture.steps 中只使用 click、waitFor、assertText；再读取新的 UI tree/PNG 路径与 SHA-256。',
-    '5. 明确平台覆盖：Tauri 前端不能冒充原生宿主，Android 必须使用 Android Runtime。',
+    '5. 明确平台覆盖：只有 nativeHost.nativeHostVerified=true 才能声明 Tauri 原生窗口证据；Android 必须使用 Android Runtime。',
     '',
     'Compact context pack JSON:',
     '```json',

@@ -100,9 +100,10 @@ export function buildHeadlessDesignContext(input: {
       url: session?.url ?? undefined,
       state: session?.state ?? 'NOT_OPENED',
       evidenceLevel: target?.evidenceLevel ?? 'UNAVAILABLE',
-      nativeHostVerified: target?.nativeHostVerified ?? false,
+      nativeHostVerified: surface?.nativeHost?.nativeHostVerified ?? target?.nativeHostVerified ?? false,
       pixels: surface?.pixels ?? undefined,
       uiTree: surface?.uiTree ?? undefined,
+      nativeHost: surface?.nativeHost ?? undefined,
       selectedNode: selectedNode ?? undefined,
       contextPolicy: {
         fullRepositoryIncluded: false,

@@ -41,10 +41,59 @@
 
 .navigator button,
 .routeBar button,
-.emptyEvidence button {
+.emptyEvidence button,
+.tauriBar button {
   border: 1px solid #35363a;
   background: #1a1b1e;
   color: #d9d9dc;
+}
+
+.tauriBar {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-bottom: 1px solid #292a2d;
+  background: #111216;
+  color: #8c8e95;
+  font-size: 11px;
+}
+
+.tauriBar > button {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid #35363a;
+  border-radius: 7px;
+  background: #1a1b1e;
+  color: #d9d9dc;
+}
+
+.surfaceTabs {
+  display: flex;
+  margin-left: auto;
+}
+
+.surfaceTabs button {
+  border-radius: 0;
+}
+
+.surfaceTabs button:first-child {
+  border-radius: 7px 0 0 7px;
+}
+
+.surfaceTabs button:last-child {
+  margin-left: -1px;
+  border-radius: 0 7px 7px 0;
+}
+
+.surfaceTabs .activeSurface {
+  border-color: #7d8cff;
+  background: #24283b;
+  color: #f5f6ff;
 }
 
 .navigator > header button,

@@ -8,6 +8,7 @@ import type {
   DesignSurface,
   DesignTargetListResult,
   DesignViewport,
+  TauriRuntimeResult,
 } from './types'
 
 interface NodeResult<T> {
@@ -92,5 +93,40 @@ export async function loadDesignPixel(projectRoot: string, designSessionId: stri
     `/api/android-live/design/sessions/${encodeURIComponent(designSessionId)}/artifact`,
     { method: 'POST', body: JSON.stringify({ projectRoot }) },
     30000,
+  )
+}
+
+export function prepareTauriRuntime(input: { projectRoot: string; designSessionId: string; restart?: boolean }) {
+  return call<TauriRuntimeResult>(
+    `/api/android-live/design/sessions/${encodeURIComponent(input.designSessionId)}/tauri/prepare`,
+    { projectRoot: input.projectRoot, restart: input.restart ?? false },
+    30_000,
+  )
+}
+
+export function captureTauriHost(input: { projectRoot: string; designSessionId: string }) {
+  return call<TauriRuntimeResult>(
+    `/api/android-live/design/sessions/${encodeURIComponent(input.designSessionId)}/tauri/capture`,
+    { projectRoot: input.projectRoot },
+    30_000,
+  )
+}
+
+export function stopTauriRuntime(input: { projectRoot: string; designSessionId: string }) {
+  return call<TauriRuntimeResult>(
+    `/api/android-live/design/sessions/${encodeURIComponent(input.designSessionId)}/tauri/stop`,
+    { projectRoot: input.projectRoot },
+    20_000,
+  )
+}
+
+export async function loadTauriNativePixel(projectRoot: string, designSessionId: string): Promise<Blob> {
+  const baseUrl = adminUrl()
+  await probeLocalNode(baseUrl)
+  return nodeApiBlob(
+    baseUrl,
+    `/api/android-live/design/sessions/${encodeURIComponent(designSessionId)}/tauri/artifact`,
+    { method: 'POST', body: JSON.stringify({ projectRoot }) },
+    30_000,
   )
 }
