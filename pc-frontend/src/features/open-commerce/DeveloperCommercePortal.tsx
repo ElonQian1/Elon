@@ -23,6 +23,7 @@ import {
 } from './openCommerceGrantExpiry'
 import OutboundAuthorizationRequests from './OutboundAuthorizationRequests'
 import DeveloperInvocationEvents from './DeveloperInvocationEvents'
+import DeveloperWebhookPanel from './DeveloperWebhookPanel'
 import type {
   AuthorizationRequest,
   OpenCommerceDeveloperApp,
@@ -346,6 +347,8 @@ export default function DeveloperCommercePortal({
       </section>
 
       <DeveloperInvocationEvents testToken={testToken} refreshKey={eventRefreshKey} />
+
+      <DeveloperWebhookPanel projectId={projectId} apps={apps} canEdit={canEdit} />
 
       {message && <div style={commerceStyles.message}>{message}</div>}
     </div>
