@@ -122,7 +122,43 @@ fn validate_steps(steps: &[CaptureInteractionStep]) -> Result<u64, CaptureDiagno
     let mut timeout_ms = 0_u64;
     for step in steps {
         match step {
-            CaptureInteractionStep::Click { selector } => validate_selector(Some(selector))?,
+            CaptureInteractionStep::Click { selector }
+            | CaptureInteractionStep::ScrollIntoView { selector }
+            | CaptureInteractionStep::SetChecked { selector, .. } => {
+                validate_selector(Some(selector))?
+            }
+            CaptureInteractionStep::Fill {
+                selector,
+                fixture_key,
+            }
+            | CaptureInteractionStep::SelectOption {
+                selector,
+                fixture_key,
+            } => {
+                validate_selector(Some(selector))?;
+                super::fixture::validate_form_key(fixture_key)?;
+            }
+            CaptureInteractionStep::PressKey { selector, key } => {
+                validate_selector(selector.as_deref())?;
+                if !matches!(
+                    key.as_str(),
+                    "Enter"
+                        | "Escape"
+                        | "Tab"
+                        | "ArrowUp"
+                        | "ArrowDown"
+                        | "ArrowLeft"
+                        | "ArrowRight"
+                        | "Space"
+                        | "Home"
+                        | "End"
+                ) {
+                    return Err(invalid(
+                        "INTERACTION_STEPS_INVALID",
+                        "pressKey 只允许导航和确认类白名单按键",
+                    ));
+                }
+            }
             CaptureInteractionStep::WaitFor {
                 selector,
                 state,

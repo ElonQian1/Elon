@@ -233,7 +233,7 @@ async fn render_page(
     }
     let wait_deadline = Instant::now() + Duration::from_millis(prepared.wait_for.timeout_ms);
     let mut final_url = wait_for_page(prepared, cdp, &session, wait_deadline).await?;
-    let executed_step_count = execute_steps(&prepared.steps, cdp, &session, deadline).await?;
+    let executed_step_count = execute_steps(prepared, cdp, &session, deadline).await?;
     if executed_step_count > 0 {
         final_url = wait_for_page(prepared, cdp, &session, deadline).await?;
     }

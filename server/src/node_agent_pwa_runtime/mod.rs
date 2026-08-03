@@ -47,6 +47,26 @@ pub(crate) enum CaptureInteractionStep {
     Click {
         selector: String,
     },
+    Fill {
+        selector: String,
+        fixture_key: String,
+    },
+    SelectOption {
+        selector: String,
+        fixture_key: String,
+    },
+    SetChecked {
+        selector: String,
+        checked: bool,
+    },
+    PressKey {
+        #[serde(default)]
+        selector: Option<String>,
+        key: String,
+    },
+    ScrollIntoView {
+        selector: String,
+    },
     WaitFor {
         selector: String,
         #[serde(default = "default_interaction_state")]
@@ -216,7 +236,7 @@ pub(crate) fn tool_definition() -> Value {
                 "fixtureProfile":{"type":"string","pattern":"^[A-Za-z0-9_-]{1,64}$","description":"引用 .elon/ui-tuner/pwa-fixtures/<profile>.json 的非秘密确定性测试数据"},
                 "steps":{
                     "type":"array","maxItems":32,
-                    "description":"可复现的安全交互重放；仅允许 click、waitFor 和 assertText，不执行任意脚本或输入秘密",
+                    "description":"可复现的安全交互重放；表单值只能引用 fixtureProfile.formValues，不在 MCP 参数中传秘密",
                     "items":{
                         "oneOf":[
                             {
@@ -224,6 +244,50 @@ pub(crate) fn tool_definition() -> Value {
                                 "required":["action","selector"],
                                 "properties":{
                                     "action":{"const":"click"},
+                                    "selector":{"type":"string","minLength":1,"maxLength":1000}
+                                }
+                            },
+                            {
+                                "type":"object","additionalProperties":false,
+                                "required":["action","selector","fixtureKey"],
+                                "properties":{
+                                    "action":{"const":"fill"},
+                                    "selector":{"type":"string","minLength":1,"maxLength":1000},
+                                    "fixtureKey":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,64}$"}
+                                }
+                            },
+                            {
+                                "type":"object","additionalProperties":false,
+                                "required":["action","selector","fixtureKey"],
+                                "properties":{
+                                    "action":{"const":"selectOption"},
+                                    "selector":{"type":"string","minLength":1,"maxLength":1000},
+                                    "fixtureKey":{"type":"string","pattern":"^[A-Za-z0-9._:-]{1,64}$"}
+                                }
+                            },
+                            {
+                                "type":"object","additionalProperties":false,
+                                "required":["action","selector","checked"],
+                                "properties":{
+                                    "action":{"const":"setChecked"},
+                                    "selector":{"type":"string","minLength":1,"maxLength":1000},
+                                    "checked":{"type":"boolean"}
+                                }
+                            },
+                            {
+                                "type":"object","additionalProperties":false,
+                                "required":["action","key"],
+                                "properties":{
+                                    "action":{"const":"pressKey"},
+                                    "selector":{"type":"string","minLength":1,"maxLength":1000},
+                                    "key":{"enum":["Enter","Escape","Tab","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Home","End"]}
+                                }
+                            },
+                            {
+                                "type":"object","additionalProperties":false,
+                                "required":["action","selector"],
+                                "properties":{
+                                    "action":{"const":"scrollIntoView"},
                                     "selector":{"type":"string","minLength":1,"maxLength":1000}
                                 }
                             },

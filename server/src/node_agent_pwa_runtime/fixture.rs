@@ -9,6 +9,7 @@ const MAX_FIXTURE_BYTES: u64 = 64 * 1024;
 pub(super) struct PreparedFixture {
     pub(super) profile: Option<String>,
     pub(super) local_storage: BTreeMap<String, String>,
+    pub(super) form_values: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -17,6 +18,8 @@ struct FixtureFile {
     version: u8,
     #[serde(default)]
     local_storage: BTreeMap<String, String>,
+    #[serde(default)]
+    form_values: BTreeMap<String, String>,
 }
 
 pub(super) fn prepare_fixture(
@@ -27,6 +30,7 @@ pub(super) fn prepare_fixture(
         return Ok(PreparedFixture {
             profile: None,
             local_storage: BTreeMap::new(),
+            form_values: BTreeMap::new(),
         });
     };
     if !valid_profile(&profile) {
@@ -74,10 +78,10 @@ pub(super) fn prepare_fixture(
             .map_err(|_| invalid("FIXTURE_PROFILE_INVALID", "无法读取 fixtureProfile"))?,
     )
     .map_err(|_| invalid("FIXTURE_PROFILE_INVALID", "fixtureProfile JSON 无效"))?;
-    if fixture.version != 1 || fixture.local_storage.len() > 64 {
+    if fixture.version != 1 || fixture.local_storage.len() > 64 || fixture.form_values.len() > 64 {
         return Err(invalid(
             "FIXTURE_PROFILE_INVALID",
-            "fixtureProfile 必须是 version=1，且最多包含 64 个 localStorage 项",
+            "fixtureProfile 必须是 version=1，且最多包含 64 个 localStorage 项和 64 个 formValues 项",
         ));
     }
     for (name, value) in &fixture.local_storage {
@@ -111,10 +115,64 @@ pub(super) fn prepare_fixture(
             ));
         }
     }
+    for (name, value) in &fixture.form_values {
+        validate_public_value(name, value)?;
+    }
     Ok(PreparedFixture {
         profile: Some(profile),
         local_storage: fixture.local_storage,
+        form_values: fixture.form_values,
     })
+}
+
+pub(super) fn validate_form_key(name: &str) -> Result<(), CaptureDiagnostic> {
+    if name.is_empty()
+        || name.len() > 64
+        || !name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._:-".contains(&byte))
+        || secret_shaped(name)
+    {
+        return Err(invalid(
+            "FIXTURE_FORM_KEY_REJECTED",
+            "formValues key 必须是非秘密的 1..64 位稳定标识",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_public_value(name: &str, value: &str) -> Result<(), CaptureDiagnostic> {
+    validate_form_key(name)?;
+    if value.is_empty()
+        || value.len() > 2_000
+        || value.contains(['\r', '\0'])
+        || secret_shaped(value)
+    {
+        return Err(invalid(
+            "FIXTURE_PROFILE_SECRET_REJECTED",
+            "formValues 只允许非秘密确定性测试值，且不得包含凭据形态或控制字符",
+        ));
+    }
+    Ok(())
+}
+
+fn secret_shaped(value: &str) -> bool {
+    let lowered = value.to_ascii_lowercase();
+    [
+        "token",
+        "secret",
+        "password",
+        "passwd",
+        "authorization",
+        "credential",
+        "api_key",
+        "apikey",
+        "signature",
+        "bearer ",
+        "jwt",
+    ]
+    .iter()
+    .any(|marker| lowered.contains(marker))
 }
 
 #[cfg(test)]
