@@ -13,6 +13,45 @@ export const MERCHANT_RUNTIME_RESULT_SCHEMA: 'merchant_runtime.result.v1'
 export const MERCHANT_RUNTIME_ERROR_SCHEMA: 'merchant_runtime.error.v1'
 export const MERCHANT_RUNTIME_MANIFEST_SCHEMA: 'merchant_runtime.manifest.v1'
 export const MERCHANT_RUNTIME_MAX_BODY_BYTES: number
+export const CONSUMER_PORTABILITY_SIGNATURE_SCHEMA: 'open_commerce.consumer_portability_signed_package.v1'
+export const CONSUMER_PORTABILITY_SIGNATURE_ALGORITHM: 'rsa-pkcs1v15-sha256'
+
+export interface ConsumerPortabilitySignaturePackage {
+  schema: string
+  id: string
+  source_project_id: string
+  idempotency_key: string
+  payload_sha256: string
+  created_at: string
+  [key: string]: unknown
+}
+
+export interface SignedConsumerPortabilityPackage {
+  schema: typeof CONSUMER_PORTABILITY_SIGNATURE_SCHEMA
+  source_operator: string
+  package: ConsumerPortabilitySignaturePackage
+  signature: {
+    algorithm: typeof CONSUMER_PORTABILITY_SIGNATURE_ALGORITHM
+    key_id: string
+    signature_base64: string
+  }
+}
+
+export function consumerPortabilityPublicKeyId(publicKey: string | Buffer | object): string
+export function consumerPortabilitySignatureMessage(input: {
+  sourceOperator: string
+  keyId: string
+  package: ConsumerPortabilitySignaturePackage
+}): string
+export function signConsumerPortabilityPackage(input: {
+  sourceOperator: string
+  privateKey: string | Buffer | object
+  package: ConsumerPortabilitySignaturePackage
+}): SignedConsumerPortabilityPackage
+export function verifyConsumerPortabilityPackageSignature(input: {
+  publicKey: string | Buffer | object
+  signedPackage: SignedConsumerPortabilityPackage
+}): boolean
 
 export type ConnectionMode =
   | 'official_api'

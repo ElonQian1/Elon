@@ -140,6 +140,10 @@ await worker.run({ signal: shutdown.signal })
 
 `createMerchantRuntime` 抽取了咖啡店参考节点中所有商户共同需要的协议层：HMAC 签名、5 分钟重放窗口、商户身份、Grant 检查、订单明确确认、幂等占位与重放、能力分发、Manifest 摘要和标准结果/错误信封。商户只实现自己的商品、库存、报价和订单处理器。
 
+## 消费者可携带数据包签名
+
+`signConsumerPortabilityPackage` 使用运营方 RSA 私钥签署固定协议消息，绑定来源运营方、公钥摘要、导出包标识、来源项目、幂等键、负载 SHA-256 和创建时间。接收方可用 `consumerPortabilityPublicKeyId` 登记公钥，并用 `verifyConsumerPortabilityPackageSignature` 在上传前复核。私钥只由来源运营方持有，不上传平台；签名证明某个已信任密钥签过该包，不会自动恢复关系、Grant、ERP、订单或资金状态。
+
 ```js
 import {
   createMemoryMerchantRuntimeIdempotencyStore,

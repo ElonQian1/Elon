@@ -6,9 +6,10 @@ use crate::{
     open_commerce_portability_import_model::{
         ConsumerPortabilityImport, ConsumerPortabilityImportSummary,
         CreateConsumerPortabilityImportRequest, CONSUMER_PORTABILITY_IMPORT_MERGE_STATUS,
-        CONSUMER_PORTABILITY_IMPORT_SCHEMA, CONSUMER_PORTABILITY_IMPORT_TRUST_STATUS,
+        CONSUMER_PORTABILITY_IMPORT_SCHEMA, CONSUMER_PORTABILITY_IMPORT_TRUSTED_STATUS,
+        CONSUMER_PORTABILITY_IMPORT_TRUST_STATUS,
     },
-    open_commerce_portability_service,
+    open_commerce_portability_service, open_commerce_portability_trust_service,
     open_commerce_service::OpenCommerceActor,
     store::Store,
 };
@@ -20,17 +21,33 @@ pub(crate) fn create_import(
     request: CreateConsumerPortabilityImportRequest,
 ) -> Result<ConsumerPortabilityImport> {
     ensure_consumer_project_actor(actor)?;
-    let source_operator = normalize_source_operator(&request.source_operator)?;
+    let source_operator = open_commerce_portability_trust_service::normalize_source_operator(
+        &request.source_operator,
+    )?;
     let package = open_commerce_portability_service::verify_external_export(request.package)?;
     let package_json = open_commerce_portability_service::canonical_export_json(&package)?;
     let envelope_sha256 = hex::encode(Sha256::digest(package_json.as_bytes()));
-    let (import_record, created) = store.save_consumer_portability_import(
+    let verified_signature = request
+        .signature
+        .map(|signature| {
+            open_commerce_portability_trust_service::verify_package_signature(
+                store,
+                destination_project_id,
+                actor.user_id,
+                &source_operator,
+                &package,
+                signature,
+            )
+        })
+        .transpose()?;
+    let (import_record, created, trust_upgraded) = store.save_consumer_portability_import(
         destination_project_id,
         actor.user_id,
         &source_operator,
         &package,
         &package_json,
         &envelope_sha256,
+        verified_signature.as_ref(),
     )?;
     let import_record = verify_import(import_record, destination_project_id)?;
     if created {
@@ -50,6 +67,20 @@ pub(crate) fn create_import(
                 "payload_sha256": import_record.payload_sha256,
                 "trust_status": import_record.trust_status,
                 "merge_status": import_record.merge_status,
+            }),
+        )?;
+    } else if trust_upgraded {
+        store.record_open_commerce_audit(
+            destination_project_id,
+            actor.user_id,
+            Some(actor.app_id),
+            "consumer_portability.import_trust_upgraded",
+            "consumer_portability_import",
+            &import_record.id,
+            &json!({
+                "source_operator": import_record.source_operator,
+                "signer_key_id": import_record.signature.as_ref().map(|value| &value.key_id),
+                "signature_verified_at": import_record.signature_verified_at,
             }),
         )?;
     }
@@ -116,13 +147,18 @@ fn verify_import(
     expected_project_id: &str,
 ) -> Result<ConsumerPortabilityImport> {
     if import_record.schema != CONSUMER_PORTABILITY_IMPORT_SCHEMA
-        || import_record.trust_status != CONSUMER_PORTABILITY_IMPORT_TRUST_STATUS
+        || !matches!(
+            import_record.trust_status.as_str(),
+            CONSUMER_PORTABILITY_IMPORT_TRUST_STATUS | CONSUMER_PORTABILITY_IMPORT_TRUSTED_STATUS
+        )
         || import_record.merge_status != CONSUMER_PORTABILITY_IMPORT_MERGE_STATUS
         || import_record.destination_project_id != expected_project_id.trim()
     {
         bail!("消费者外部数据包导入记录边界无效");
     }
-    normalize_source_operator(&import_record.source_operator)?;
+    open_commerce_portability_trust_service::normalize_source_operator(
+        &import_record.source_operator,
+    )?;
     let package =
         open_commerce_portability_service::verify_external_export(import_record.package.clone())?;
     let package_json = open_commerce_portability_service::canonical_export_json(&package)?;
@@ -138,6 +174,25 @@ fn verify_import(
     if envelope_sha256 != import_record.envelope_sha256 {
         bail!("消费者外部数据包信封完整性校验失败");
     }
+    match import_record.trust_status.as_str() {
+        CONSUMER_PORTABILITY_IMPORT_TRUST_STATUS => {
+            if import_record.signature.is_some()
+                || import_record.signature_verified_at.is_some()
+                || import_record.signer_key_record_id.is_some()
+            {
+                bail!("未信任导入记录不能包含签名证明");
+            }
+        }
+        CONSUMER_PORTABILITY_IMPORT_TRUSTED_STATUS => {
+            if import_record.signature.is_none()
+                || import_record.signature_verified_at.is_none()
+                || import_record.signer_key_record_id.is_none()
+            {
+                bail!("可信导入记录缺少签名证明");
+            }
+        }
+        _ => unreachable!(),
+    }
     Ok(import_record)
 }
 
@@ -146,17 +201,6 @@ fn ensure_consumer_project_actor(actor: &OpenCommerceActor<'_>) -> Result<()> {
         bail!("当前调用方不属于消费者项目");
     }
     Ok(())
-}
-
-fn normalize_source_operator(value: &str) -> Result<String> {
-    let value = value.trim();
-    if value.is_empty() || value.chars().count() > 160 {
-        bail!("来源运营方标识长度必须为 1 到 160 个字符");
-    }
-    if value.chars().any(char::is_control) {
-        bail!("来源运营方标识不能包含控制字符");
-    }
-    Ok(value.to_string())
 }
 
 fn normalize_import_id(value: &str) -> Result<String> {

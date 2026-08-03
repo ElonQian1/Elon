@@ -174,6 +174,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (137, "开放商业适配器机器凭据限时有效", crate::open_commerce_adapter_expiration_migration::migration_v137),
     (138, "开放商业适配器衔接任务领取、租约与原子完成", crate::open_commerce_adapter_claim_migration::migration_v138),
     (139, "消费者外部可携带数据包完整性验证与隔离导入", crate::open_commerce_portability_import_migration::migration_v139),
+    (140, "消费者自主管理运营方公钥与可携带数据包签名信任", crate::open_commerce_portability_trust_migration::migration_v140),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
