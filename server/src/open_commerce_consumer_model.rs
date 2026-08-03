@@ -76,6 +76,7 @@ pub(crate) struct ConsumerDiscoveryResponse {
     pub freshness_requirement: &'static str,
     pub source_requirement: &'static str,
     pub source_filter: ConsumerSourceFilter,
+    pub source_filter_options: ConsumerSourceFilterOptions,
     pub available_ranking_policies: Vec<ConsumerRankingPolicyDescriptor>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ranking_receipt: Option<ConsumerRankingReceipt>,
@@ -95,6 +96,21 @@ pub(crate) struct ConsumerSourceFilter {
     pub provider_key: Option<String>,
     pub data_domain: Option<String>,
     pub max_age_seconds: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ConsumerSourceFilterOptions {
+    pub schema: &'static str,
+    pub scope: &'static str,
+    pub operator_exhaustive: bool,
+    pub providers: Vec<ConsumerSourceFilterOption>,
+    pub data_domains: Vec<ConsumerSourceFilterOption>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ConsumerSourceFilterOption {
+    pub value: String,
+    pub capability_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]

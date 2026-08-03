@@ -11,6 +11,7 @@ use crate::{
     },
     open_commerce_consumer_preference_service,
     open_commerce_consumer_ranking::{self, ConsumerRankingPolicy},
+    open_commerce_consumer_source_options,
     open_commerce_developer_model::{CreateAuthorizationRequest, OpenCommerceAuthorizationRequest},
     open_commerce_directory_model::{
         OpenCommerceDirectoryCapability, OpenCommerceDirectoryMerchantDetail,
@@ -46,6 +47,11 @@ pub(crate) fn discover(
         candidate_limit,
     )?;
     let directory_candidate_count = candidates.len();
+    let source_filter_options =
+        open_commerce_consumer_source_options::collect_source_filter_options(
+            &candidates,
+            request.capability_key.as_deref(),
+        );
     let discovery_time = Utc::now();
     let mut matches = candidates
         .into_iter()
@@ -81,6 +87,7 @@ pub(crate) fn discover(
         freshness_requirement: freshness_requirement(request.require_current_declaration),
         source_requirement: source_requirement(&request),
         source_filter: source_filter(&request),
+        source_filter_options,
         available_ranking_policies: open_commerce_consumer_ranking::available_ranking_policies(),
         ranking_receipt,
         matches,

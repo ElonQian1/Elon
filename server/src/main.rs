@@ -222,6 +222,7 @@ mod open_commerce_consumer_receipt_model;
 mod open_commerce_consumer_receipt_service;
 #[cfg(test)]
 mod open_commerce_consumer_receipt_tests;
+mod open_commerce_consumer_source_options;
 mod open_commerce_consumer_vault_api;
 mod open_commerce_consumer_vault_migration;
 mod open_commerce_consumer_vault_model;
