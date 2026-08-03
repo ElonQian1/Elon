@@ -113,4 +113,4 @@ reusable:   issued = available + held + active + retired
 
 ## 9. 当前实现边界
 
-2026-08-04 本文与 ADR 已接受，但代码、migration、Store、恢复器和 Broker 尚未写入或接线；没有执行编译、数据库迁移、并发验证或真实容量操作。
+2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer 和 v165 SQLite schema 骨架已经写入，尚未编译或执行迁移。原子 Store、恢复器、Broker 和运行协议仍未写入或接线，也没有执行并发验证或真实容量操作。

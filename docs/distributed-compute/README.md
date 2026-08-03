@@ -27,7 +27,7 @@ owners: backend, node, ai-economy
 | 节点插件治理合同 | Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 与短期 ReadyCapability 合同已写，尚未编译或接线 |
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
-| 共享 CapacityPool 与追加式容量账本 | 设计与 ADR 已接受；代码、migration、Store、恢复器和 Broker 接线尚未实现，未执行编译、迁移或并发验证 |
+| 共享 CapacityPool 与追加式容量账本 | 领域合同、checked-i128 reducer 与 v165 SQLite schema 骨架已写；尚未编译或执行迁移，Store、恢复器和 Broker 接线仍未实现 |
 | 外部算力池适配器与统一报价 | 已接受设计，尚未实现 |
 | 多源验证、标准化 SKU 与期货锁价结算 | 已接受设计，尚未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
@@ -57,7 +57,7 @@ owners: backend, node, ai-economy
 
 ### F2：Broker、验证和真实结算
 
-共享 CapacityPool 与追加式容量账本已经成为已接受设计，但尚未实现。Offer 发布、复制或续期都不会铸造容量；只有 Pool bucket 的 `supply_added` 进入账本后才形成可用余额。V1 一份 Reservation 只绑定一个 Pool 和一个精确 UTC 半开窗口 `[starts_at, ends_at)`，再在同一事务中完成多 meter 容量、消费者预算、Price Snapshot 与 Reservation 的原子预留。
+共享 CapacityPool 与追加式容量账本已经形成领域合同、checked-i128 reducer 与 v165 SQLite schema 骨架，但尚未编译或执行迁移。Offer 发布、复制或续期都不会铸造容量；只有 Pool bucket 的 `supply_added` 进入账本后才形成可用余额。V1 一份 Reservation 只绑定一个 Pool 和一个精确 UTC 半开窗口 `[starts_at, ends_at)`，再在同一事务中完成多 meter 容量、消费者预算、Price Snapshot 与 Reservation 的原子预留。
 
 后续实现 Offer Registry、报价锁定、容量账本 Store/恢复器、原子预留、带 `fencing_generation` 的尝试租约、多源计量、挑战任务、争议状态和可提取收益账本。
 

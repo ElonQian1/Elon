@@ -3,7 +3,7 @@ title: 分布式算力共享容量池与追加式账本 V1
 status: accepted
 date: 2026-08-04
 owners: backend, ai-economy
-implementation_status: contract_accepted_not_implemented
+implementation_status: domain_contract_and_sqlite_skeleton_uncompiled
 ---
 
 # 分布式算力共享容量池与追加式账本 V1
@@ -76,4 +76,4 @@ SQLite 路径使用 `BEGIN IMMEDIATE`、稳定 meter 顺序和条件更新。节
 
 ## 验证状态
 
-本决定已接受。当前只形成权威合同，容量池、bucket、Claim、SQLite migration、原子 Store 操作和 Broker 接线尚未实现、编译或迁移。
+本决定已接受。`server/src/compute_federation/capacity.rs`、`capacity/reducer.rs` 已写入领域合同与纯状态投影，`server/src/compute_capacity_migration.rs` 已写入 v165 SQLite schema 骨架；它们尚未编译或执行迁移。原子 Store、恢复器、Broker、外部 Provider saga 和运行接线仍未实现。
