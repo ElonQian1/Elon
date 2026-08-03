@@ -9,6 +9,7 @@ import type {
 import { errorText } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import { actionStyle, badgeStyle, commerceStyles, listItemStyle } from './openCommerceStyles'
+import ConsumerPortabilityMergePanel from './ConsumerPortabilityMergePanel'
 
 export default function ConsumerPortabilityAdoptions({ projectId }: { projectId: string }) {
   const [imports, setImports] = useState<ConsumerPortabilityImportSummary[]>([])
@@ -100,6 +101,7 @@ export default function ConsumerPortabilityAdoptions({ projectId }: { projectId:
   }
 
   return (
+    <>
     <section className={base.integrationSection}>
       <header>
         <span>
@@ -198,6 +200,8 @@ export default function ConsumerPortabilityAdoptions({ projectId }: { projectId:
       </div>
       {message && <div style={commerceStyles.message}>{message}</div>}
     </section>
+    <ConsumerPortabilityMergePanel projectId={projectId} imports={imports} onChanged={refresh} />
+    </>
   )
 }
 

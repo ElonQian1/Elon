@@ -31,6 +31,9 @@ import type {
   ConsumerPortabilityAdoption,
   ConsumerPortabilityAdoptionList,
   ConsumerPortabilityAdoptionPlan,
+  ConsumerPortabilityMergeAdoption,
+  ConsumerPortabilityMergeAdoptionList,
+  ConsumerPortabilityMergePlan,
   PortabilityReauthorizationResult,
   PortabilityRelationshipMapping,
   PortabilityRelationshipMappingList,
@@ -288,6 +291,41 @@ export const openCommerceClientApi = {
     expectedCurrentRevision: number,
   ) => api.post<ConsumerPortabilityAdoption>(
     `${projectBase(projectId)}/consumer-portability-adoptions/${encodeURIComponent(adoptionId)}/rollback`,
+    { expected_current_revision: expectedCurrentRevision, confirmed_by_user: true },
+  ),
+
+  getConsumerPortabilityMergePlan: (projectId: string, importIds: string[]) =>
+    api.post<ConsumerPortabilityMergePlan>(
+      `${projectBase(projectId)}/consumer-portability-merge-plan`,
+      { import_ids: importIds },
+    ),
+
+  applyConsumerPortabilityMerge: (
+    projectId: string,
+    importIds: string[],
+    expectedCurrentRevision: number | null,
+    selections: Array<{ field: string; import_id: string }>,
+  ) => api.post<ConsumerPortabilityMergeAdoption>(
+    `${projectBase(projectId)}/consumer-portability-merge-adoptions`,
+    {
+      import_ids: importIds,
+      expected_current_revision: expectedCurrentRevision,
+      selections,
+      confirmed_by_user: true,
+    },
+  ),
+
+  listConsumerPortabilityMergeAdoptions: (projectId: string) =>
+    api.get<ConsumerPortabilityMergeAdoptionList>(
+      `${projectBase(projectId)}/consumer-portability-merge-adoptions`,
+    ),
+
+  rollbackConsumerPortabilityMerge: (
+    projectId: string,
+    adoptionId: string,
+    expectedCurrentRevision: number,
+  ) => api.post<ConsumerPortabilityMergeAdoption>(
+    `${projectBase(projectId)}/consumer-portability-merge-adoptions/${encodeURIComponent(adoptionId)}/rollback`,
     { expected_current_revision: expectedCurrentRevision, confirmed_by_user: true },
   ),
 

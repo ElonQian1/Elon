@@ -72,6 +72,7 @@ mod open_commerce_consumer_data_requests;
 mod open_commerce_consumer_portability;
 mod open_commerce_consumer_portability_adoptions;
 mod open_commerce_consumer_portability_imports;
+mod open_commerce_consumer_portability_merges;
 mod open_commerce_consumer_portability_trust;
 mod open_commerce_consumer_preferences;
 mod open_commerce_consumer_receipts;

@@ -447,6 +447,73 @@ export interface ConsumerPortabilityAdoptionList {
   adoptions: ConsumerPortabilityAdoption[]
 }
 
+export interface ConsumerPortabilityMergeSource {
+  import_id: string
+  source_operator: string
+  source_package_id: string
+  source_package_schema: string
+  envelope_sha256: string
+  payload_sha256: string
+  trust_status: ConsumerPortabilityImportTrustStatus
+}
+
+export interface ConsumerPortabilityMergeCandidate {
+  import_id: string
+  source_operator: string
+  source_package_id: string
+  trust_status: ConsumerPortabilityImportTrustStatus
+  imported_value: unknown
+  differs_from_current: boolean
+}
+
+export interface ConsumerPortabilityMergeField {
+  field: string
+  current_value: unknown
+  candidates: ConsumerPortabilityMergeCandidate[]
+  distinct_candidate_count: number
+  conflict: boolean
+}
+
+export interface ConsumerPortabilityMergePlan {
+  schema: 'open_commerce.consumer_portability_merge_plan.v1'
+  current_profile_revision: number | null
+  sources: ConsumerPortabilityMergeSource[]
+  fields: ConsumerPortabilityMergeField[]
+  automatic_conflict_resolution: false
+  automatic_relationship_restore: false
+  automatic_business_write: false
+}
+
+export interface ConsumerPortabilityFieldSource {
+  field: string
+  import_id: string
+  source_operator: string
+  source_package_id: string
+  envelope_sha256: string
+  payload_sha256: string
+  trust_status: ConsumerPortabilityImportTrustStatus
+}
+
+export interface ConsumerPortabilityMergeAdoption {
+  schema: 'open_commerce.consumer_portability_merge_adoption.v1'
+  id: string
+  source_import_ids: string[]
+  field_sources: ConsumerPortabilityFieldSource[]
+  before_preferences: ConsumerPreferences | null
+  before_revision: number | null
+  applied_preferences: ConsumerPreferences
+  resulting_revision: number
+  status: 'applied' | 'rolled_back'
+  applied_at: string
+  rolled_back_at: string | null
+  rollback_revision: number | null
+}
+
+export interface ConsumerPortabilityMergeAdoptionList {
+  schema: 'open_commerce.consumer_portability_merge_adoptions.v1'
+  adoptions: ConsumerPortabilityMergeAdoption[]
+}
+
 export interface PortabilityRelationshipMapping {
   schema: 'open_commerce.portability_relationship_mapping.v1'
   id: string
