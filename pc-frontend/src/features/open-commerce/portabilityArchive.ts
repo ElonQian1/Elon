@@ -95,7 +95,7 @@ export function isPortabilityEncryptedArchive(value: unknown): value is Portabil
 
 async function deriveKey(
   passphrase: string,
-  salt: Uint8Array,
+  salt: Uint8Array<ArrayBuffer>,
   usages: KeyUsage[],
 ) {
   const material = await crypto.subtle.importKey(
@@ -134,7 +134,7 @@ function assertPassphrase(value: string) {
   if (value.length < 12 || value.length > 256) throw new Error('归档口令长度必须为 12 到 256 个字符')
 }
 
-async function sha256Hex(value: Uint8Array) {
+async function sha256Hex(value: Uint8Array<ArrayBuffer>) {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', value))
   return Array.from(digest, (byte) => byte.toString(16).padStart(2, '0')).join('')
 }

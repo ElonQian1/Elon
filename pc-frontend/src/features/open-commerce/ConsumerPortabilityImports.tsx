@@ -3,7 +3,6 @@ import { Download, RefreshCw, ShieldCheck, Trash2, Upload } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type {
   ConsumerPortabilityExport,
-  ConsumerPortabilityPackageSignature,
   ConsumerPortabilityImportSummary,
   SignedConsumerPortabilityPackage,
 } from './openCommerceClientTypes'
