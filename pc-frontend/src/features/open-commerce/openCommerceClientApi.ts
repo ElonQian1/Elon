@@ -15,6 +15,9 @@ import type {
   ConsumerPreferenceProfileEnvelope,
   ConsumerPortabilityExport,
   ConsumerPortabilityExportList,
+  ConsumerPortabilityImport,
+  ConsumerPortabilityImportList,
+  ConsumerPortabilityImportSummary,
   ConsumerRelationship,
   ConsumerRelationshipList,
   DeveloperAppCredential,
@@ -159,6 +162,28 @@ export const openCommerceClientApi = {
   getConsumerPortabilityExport: (projectId: string, exportId: string) =>
     api.get<ConsumerPortabilityExport>(
       `${projectBase(projectId)}/consumer-portability-exports/${encodeURIComponent(exportId)}`,
+    ),
+
+  listConsumerPortabilityImports: (projectId: string) =>
+    api.get<ConsumerPortabilityImportList>(`${projectBase(projectId)}/consumer-portability-imports`),
+
+  createConsumerPortabilityImport: (
+    projectId: string,
+    sourceOperator: string,
+    portabilityPackage: ConsumerPortabilityExport,
+  ) => api.post<ConsumerPortabilityImport>(
+    `${projectBase(projectId)}/consumer-portability-imports`,
+    { source_operator: sourceOperator, package: portabilityPackage },
+  ),
+
+  getConsumerPortabilityImport: (projectId: string, importId: string) =>
+    api.get<ConsumerPortabilityImport>(
+      `${projectBase(projectId)}/consumer-portability-imports/${encodeURIComponent(importId)}`,
+    ),
+
+  deleteConsumerPortabilityImport: (projectId: string, importId: string) =>
+    api.delete<ConsumerPortabilityImportSummary>(
+      `${projectBase(projectId)}/consumer-portability-imports/${encodeURIComponent(importId)}`,
     ),
 
   listConsumerInvocationReceipts: () =>
