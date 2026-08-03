@@ -40,6 +40,20 @@ pub(crate) fn spawn(state: Arc<AppState>) {
 }
 
 async fn deliver(state: &AppState, claim: DeveloperWebhookDeliveryClaim) {
+    if claim.environment == "production"
+        && (!crate::open_commerce_production_webhook::production_webhooks_enabled()
+            || !crate::open_commerce_developer_credential_model::production_credentials_enabled())
+    {
+        fail(
+            state,
+            &claim,
+            None,
+            "production_webhook_disabled",
+            None,
+            true,
+        );
+        return;
+    }
     let current_key_id = match crate::open_commerce_webhook_security::webhook_master_key_id() {
         Ok(value) => value,
         Err(_) => {
@@ -68,7 +82,7 @@ async fn deliver(state: &AppState, claim: DeveloperWebhookDeliveryClaim) {
     let record = match state.store.open_commerce_developer_terminal_event(
         &claim.owner_user_id,
         &claim.app_id,
-        "sandbox",
+        &claim.environment,
         &claim.delivery.invocation_id,
     ) {
         Ok(Some(record)) => record,
@@ -93,10 +107,11 @@ async fn deliver(state: &AppState, claim: DeveloperWebhookDeliveryClaim) {
     };
     let emitted_at = Utc::now();
     let envelope = DeveloperWebhookEnvelope {
-        schema: "open_commerce.developer_webhook_event.v1",
+        schema: "open_commerce.developer_webhook_event.v2",
         delivery_id: claim.delivery.id.clone(),
         subscription_id: claim.delivery.subscription_id.clone(),
         app_id: claim.app_id.clone(),
+        environment: claim.environment.clone(),
         emitted_at: emitted_at.to_rfc3339(),
         event,
     };

@@ -22,6 +22,7 @@ export const developerWebhookClientApi = {
     projectId: string,
     appRecordId: string,
     callbackUrl: string,
+    environment: 'sandbox' | 'production',
     deliverOnSucceeded: boolean,
     deliverOnFailed: boolean,
   ) =>
@@ -29,6 +30,7 @@ export const developerWebhookClientApi = {
       `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks`,
       {
         callback_url: callbackUrl,
+        environment,
         deliver_on_succeeded: deliverOnSucceeded,
         deliver_on_failed: deliverOnFailed,
       },

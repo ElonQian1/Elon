@@ -43,6 +43,7 @@ export default function DeveloperWebhookPanel({
 }) {
   const [appRecordId, setAppRecordId] = useState('')
   const [callbackUrl, setCallbackUrl] = useState('')
+  const [webhookEnvironment, setWebhookEnvironment] = useState<'sandbox' | 'production'>('sandbox')
   const [deliverOnSucceeded, setDeliverOnSucceeded] = useState(true)
   const [deliverOnFailed, setDeliverOnFailed] = useState(true)
   const [webhooks, setWebhooks] = useState<DeveloperWebhookSubscription[]>([])
@@ -119,6 +120,7 @@ export default function DeveloperWebhookPanel({
         projectId,
         selectedApp.id,
         callbackUrl,
+        webhookEnvironment,
         deliverOnSucceeded,
         deliverOnFailed,
       )
@@ -276,6 +278,17 @@ export default function DeveloperWebhookPanel({
               required
             />
           </label>
+          <label>
+            运行环境
+            <select
+              value={webhookEnvironment}
+              onChange={(event) => setWebhookEnvironment(event.target.value as 'sandbox' | 'production')}
+              disabled={!canEdit || selectedApp?.status !== 'active'}
+            >
+              <option value="sandbox">测试环境</option>
+              <option value="production">生产环境</option>
+            </select>
+          </label>
           <div style={commerceStyles.itemHeader}>
             <label>
               <input
@@ -350,7 +363,8 @@ export default function DeveloperWebhookPanel({
               </header>
               <code style={commerceStyles.itemMeta}>{webhook.callback_url}</code>
               <small style={commerceStyles.itemMeta}>
-                失败 {webhook.consecutive_failures} 次 ·{' '}
+                {webhook.environment === 'production' ? '生产环境' : '测试环境'} · 失败{' '}
+                {webhook.consecutive_failures} 次 ·{' '}
                 {webhook.verification_error_code ?? webhook.last_error_code ?? '无错误'}
               </small>
               <small style={commerceStyles.itemMeta}>

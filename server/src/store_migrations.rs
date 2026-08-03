@@ -190,6 +190,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (153, "开放商业开发者 App 可撤销公共网络准入审查", crate::open_commerce_developer_admission_migration::migration_v153),
     (154, "开放商业开发者 App 限权生产凭据", crate::open_commerce_developer_credential_migration::migration_v154),
     (155, "开放商业调用凭据来源与生产事件隔离", crate::open_commerce_invocation_provenance_migration::migration_v155),
+    (156, "开放商业 Webhook 沙箱与生产环境绑定", crate::open_commerce_production_webhook_migration::migration_v156),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

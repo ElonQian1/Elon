@@ -31,6 +31,10 @@ pub(crate) fn create_webhook(
     app: &OpenCommerceDeveloperApp,
     request: CreateDeveloperWebhookRequest,
 ) -> Result<DeveloperWebhookCredential> {
+    let environment = crate::open_commerce_production_webhook::normalize_environment(
+        request.environment.as_deref(),
+    )?;
+    crate::open_commerce_production_webhook::ensure_eligible(store, app, environment)?;
     let callback_url = crate::open_commerce_webhook_security::validate_webhook_callback_url(
         &request.callback_url,
     )?;
@@ -44,6 +48,7 @@ pub(crate) fn create_webhook(
         app,
         &callback_url,
         &signing_key_id,
+        environment,
         deliver_on_succeeded,
         deliver_on_failed,
     )?;
@@ -77,6 +82,7 @@ pub(crate) fn rotate_webhook_secret(
 ) -> Result<DeveloperWebhookCredential> {
     let current =
         store.open_commerce_developer_webhook_for_app(&app.project_id, &app.id, subscription_id)?;
+    crate::open_commerce_production_webhook::ensure_subscription_eligible(store, app, &current)?;
     let next_version = current
         .signing_secret_version
         .checked_add(1)
@@ -121,6 +127,11 @@ pub(crate) fn set_webhook_enabled(
             &app.id,
             subscription_id,
         )?;
+        crate::open_commerce_production_webhook::ensure_subscription_eligible(
+            store,
+            app,
+            &subscription,
+        )?;
         let current_key_id = crate::open_commerce_webhook_security::webhook_master_key_id()?;
         if subscription.signing_key_id != current_key_id {
             bail!("Webhook 签名主密钥已变化，请创建新订阅");
@@ -153,6 +164,13 @@ pub(crate) fn retry_delivery(
     subscription_id: &str,
     delivery_id: &str,
 ) -> Result<DeveloperWebhookDelivery> {
+    let subscription =
+        store.open_commerce_developer_webhook_for_app(&app.project_id, &app.id, subscription_id)?;
+    crate::open_commerce_production_webhook::ensure_subscription_eligible(
+        store,
+        app,
+        &subscription,
+    )?;
     store.retry_open_commerce_developer_webhook_delivery(
         &app.project_id,
         &app.id,
@@ -174,6 +192,13 @@ pub(crate) fn replay_history(
     if !(1..=100).contains(&limit) {
         bail!("Webhook 单次历史补发数量必须在 1 到 100 之间");
     }
+    let subscription =
+        store.open_commerce_developer_webhook_for_app(&app.project_id, &app.id, subscription_id)?;
+    crate::open_commerce_production_webhook::ensure_subscription_eligible(
+        store,
+        app,
+        &subscription,
+    )?;
     store.replay_open_commerce_developer_webhook_history(
         &app.project_id,
         &app.id,

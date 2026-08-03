@@ -2,7 +2,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, Utc};
-use rusqlite::{params, types::Type, OptionalExtension, Row, Transaction};
+use rusqlite::{params, types::Type, Connection, OptionalExtension, Row, Transaction};
 
 use crate::{
     open_commerce_developer_credential_model::{
@@ -107,6 +107,15 @@ impl Store {
         Ok(credentials)
     }
 
+    pub(crate) fn ensure_current_open_commerce_production_credential(
+        &self,
+        project_id: &str,
+        app_record_id: &str,
+    ) -> Result<()> {
+        let conn = self.conn()?;
+        ensure_current_production_credential_on(&conn, project_id, app_record_id)
+    }
+
     pub(crate) fn revoke_open_commerce_developer_production_credential(
         &self,
         project_id: &str,
@@ -123,13 +132,7 @@ impl Store {
             bail!("生产凭据不属于当前 App");
         }
         if current.status == "active" {
-            tx.execute(
-                "UPDATE open_commerce_developer_production_credentials
-                    SET status='revoked', revoked_at=?1, revocation_reason=?2,
-                        updated_at=?1
-                  WHERE id=?3 AND status='active'",
-                params![timestamp, reason.trim(), credential_id.trim()],
-            )?;
+            revoke_active_production_credentials(&tx, &current.app_record_id, reason, &timestamp)?;
         }
         let credential = production_credential_on(&tx, credential_id)?;
         tx.commit()?;
@@ -224,14 +227,65 @@ pub(super) fn revoke_active_production_credentials(
     reason: &str,
     timestamp: &str,
 ) -> Result<usize> {
-    tx.execute(
+    let revoked = tx.execute(
         "UPDATE open_commerce_developer_production_credentials
             SET status='revoked', revoked_at=?1, revocation_reason=?2,
                 updated_at=?1
           WHERE app_record_id=?3 AND status='active'",
         params![timestamp, reason.trim(), app_record_id.trim()],
-    )
-    .map_err(Into::into)
+    )?;
+    tx.execute(
+        "UPDATE open_commerce_developer_webhook_deliveries
+            SET status='dead', error_code='production_credential_revoked',
+                lease_owner=NULL, lease_expires_at=NULL
+          WHERE subscription_id IN (
+                SELECT id FROM open_commerce_developer_webhook_subscriptions
+                 WHERE app_record_id=?1 AND environment='production'
+          ) AND status IN ('pending', 'retry', 'delivering')",
+        params![app_record_id.trim()],
+    )?;
+    tx.execute(
+        "UPDATE open_commerce_developer_webhook_subscriptions
+            SET status='disabled', last_error_code='production_credential_revoked',
+                updated_at=?1, disabled_at=?1
+          WHERE app_record_id=?2 AND environment='production' AND status='active'",
+        params![timestamp, app_record_id.trim()],
+    )?;
+    Ok(revoked)
+}
+
+pub(super) fn ensure_current_production_credential_on(
+    conn: &Connection,
+    project_id: &str,
+    app_record_id: &str,
+) -> Result<()> {
+    let eligible: bool = conn.query_row(
+        "SELECT EXISTS(
+            SELECT 1
+              FROM open_commerce_developer_production_credentials credential
+              JOIN open_commerce_developer_apps app ON app.id=credential.app_record_id
+              JOIN open_commerce_developer_app_admissions admission
+                ON admission.id=credential.admission_id
+             WHERE credential.project_id=?1 AND credential.app_record_id=?2
+               AND credential.status='active'
+               AND julianday(credential.expires_at) > julianday('now')
+               AND app.project_id=credential.project_id
+               AND app.status='active' AND app.manifest_status='approved'
+               AND app.manifest_revision=credential.manifest_revision
+               AND app.domain_verification_status='verified'
+               AND app.domain_verification_revision=credential.manifest_revision
+               AND admission.app_record_id=credential.app_record_id
+               AND admission.project_id=credential.project_id
+               AND admission.status='approved'
+               AND admission.manifest_revision=credential.manifest_revision
+         )",
+        params![project_id.trim(), app_record_id.trim()],
+        |row| row.get(0),
+    )?;
+    if !eligible {
+        bail!("生产 Webhook 需要当前有效的生产凭据和准入状态");
+    }
+    Ok(())
 }
 
 fn production_credential_on(

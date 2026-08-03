@@ -25,12 +25,14 @@ impl Store {
             subscription_status,
             verification_status,
             app_status,
+            environment,
             deliver_on_succeeded,
             deliver_on_failed,
-        ): (String, String, String, String, String, bool, bool) = tx
+        ): (String, String, String, String, String, String, bool, bool) = tx
             .query_row(
                 "SELECT subscription.owner_user_id, subscription.app_id,
                         subscription.status, subscription.verification_status, app.status,
+                        subscription.environment,
                         subscription.deliver_on_succeeded, subscription.deliver_on_failed
                    FROM open_commerce_developer_webhook_subscriptions subscription
                    JOIN open_commerce_developer_apps app
@@ -51,6 +53,7 @@ impl Store {
                         row.get(4)?,
                         row.get(5)?,
                         row.get(6)?,
+                        row.get(7)?,
                     ))
                 },
             )
@@ -61,6 +64,13 @@ impl Store {
         {
             bail!("Webhook 订阅必须处于已验证且启用状态才能补发历史事件");
         }
+        if environment == "production" {
+            super::open_commerce_developer_credentials::ensure_current_production_credential_on(
+                &tx,
+                project_id,
+                app_record_id,
+            )?;
+        }
         let events: Vec<(i64, String, String)> = {
             let mut statement = tx.prepare(
                 "SELECT event.seq, invocation.id, invocation.status
@@ -69,17 +79,19 @@ impl Store {
                      ON invocation.id=event.invocation_id
                   WHERE invocation.requester_user_id=?1
                     AND invocation.requester_app_id=?2
-                    AND invocation.credential_environment IN ('legacy', 'platform', 'sandbox')
-                    AND event.seq>?3
-                    AND ((invocation.status='succeeded' AND ?4=1)
-                         OR (invocation.status<>'succeeded' AND ?5=1))
-                  ORDER BY event.seq ASC LIMIT ?6",
+                    AND ((?3='sandbox' AND invocation.credential_environment IN ('legacy', 'sandbox'))
+                         OR (?3='production' AND invocation.credential_environment='production'))
+                    AND event.seq>?4
+                    AND ((invocation.status='succeeded' AND ?5=1)
+                         OR (invocation.status<>'succeeded' AND ?6=1))
+                  ORDER BY event.seq ASC LIMIT ?7",
             )?;
             let rows = statement
                 .query_map(
                     params![
                         owner_user_id,
                         app_id,
+                        environment,
                         after_sequence,
                         if deliver_on_succeeded { 1 } else { 0 },
                         if deliver_on_failed { 1 } else { 0 },

@@ -20,9 +20,15 @@ impl Store {
         let timestamp = now();
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let (subscription_status, verification_status, app_status): (String, String, String) = tx
+        let (subscription_status, verification_status, app_status, environment): (
+            String,
+            String,
+            String,
+            String,
+        ) = tx
             .query_row(
-                "SELECT subscription.status, subscription.verification_status, app.status
+                "SELECT subscription.status, subscription.verification_status, app.status,
+                        subscription.environment
                    FROM open_commerce_developer_webhook_subscriptions subscription
                    JOIN open_commerce_developer_apps app
                      ON app.id=subscription.app_record_id
@@ -33,7 +39,7 @@ impl Store {
                     app_record_id.trim(),
                     subscription_id.trim()
                 ],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .map_err(|error| anyhow!(error).context("Webhook 订阅不存在"))?;
         if app_status != "active"
@@ -41,6 +47,13 @@ impl Store {
             || verification_status != "verified"
         {
             bail!("Webhook 订阅必须处于已验证且启用状态才能重试死信");
+        }
+        if environment == "production" {
+            super::open_commerce_developer_credentials::ensure_current_production_credential_on(
+                &tx,
+                project_id,
+                app_record_id,
+            )?;
         }
         let current = tx
             .query_row(
@@ -57,8 +70,13 @@ impl Store {
             params![current.invocation_id.as_str()],
             |row| row.get(0),
         )?;
-        if credential_environment == "production" {
-            bail!("生产调用事件不得通过沙箱 Webhook 重试");
+        let environment_matches = match environment.as_str() {
+            "sandbox" => matches!(credential_environment.as_str(), "legacy" | "sandbox"),
+            "production" => credential_environment == "production",
+            _ => false,
+        };
+        if !environment_matches {
+            bail!("Webhook 投递与订阅凭据环境不一致");
         }
         match current.status.as_str() {
             "dead" => {}

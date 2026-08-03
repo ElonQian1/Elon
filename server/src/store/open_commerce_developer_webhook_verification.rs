@@ -52,6 +52,23 @@ impl Store {
         if app_status != "active" {
             bail!("开发者 App 已停用，不能验证 Webhook");
         }
+        let environment: String = tx.query_row(
+            "SELECT environment FROM open_commerce_developer_webhook_subscriptions
+              WHERE project_id=?1 AND app_record_id=?2 AND id=?3",
+            params![
+                project_id.trim(),
+                app_record_id.trim(),
+                subscription_id.trim()
+            ],
+            |row| row.get(0),
+        )?;
+        if environment == "production" {
+            super::open_commerce_developer_credentials::ensure_current_production_credential_on(
+                &tx,
+                project_id,
+                app_record_id,
+            )?;
+        }
         let active_count: i64 = tx.query_row(
             "SELECT COUNT(*) FROM open_commerce_developer_webhook_subscriptions
               WHERE project_id=?1 AND app_record_id=?2 AND status='active' AND id<>?3",

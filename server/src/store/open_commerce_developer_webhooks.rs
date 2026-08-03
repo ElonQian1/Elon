@@ -15,6 +15,7 @@ use super::{
     open_commerce_developer_webhook_rows::{
         delivery_from_row, subscription_from_row, DELIVERY_SELECT, SUBSCRIPTION_SELECT,
     },
+    open_commerce_production_webhooks::disable_unusable_production_webhooks_on,
     Store,
 };
 
@@ -24,6 +25,7 @@ impl Store {
         app: &OpenCommerceDeveloperApp,
         callback_url: &str,
         signing_key_id: &str,
+        environment: &str,
         deliver_on_succeeded: bool,
         deliver_on_failed: bool,
     ) -> Result<DeveloperWebhookSubscription> {
@@ -56,17 +58,18 @@ impl Store {
         )?;
         tx.execute(
             "INSERT INTO open_commerce_developer_webhook_subscriptions(
-               id, project_id, owner_user_id, app_record_id, app_id,
+               id, project_id, owner_user_id, app_record_id, app_id, environment,
                callback_url, signing_key_id, signing_secret_version, status, verification_status,
                deliver_on_succeeded, deliver_on_failed, start_sequence,
                consecutive_failures, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 'disabled', 'pending', ?8, ?9, ?10, 0, ?11, ?11)",
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, 'disabled', 'pending', ?9, ?10, ?11, 0, ?12, ?12)",
             params![
                 id,
                 app.project_id,
                 app.owner_user_id,
                 app.id,
                 app.app_id,
+                environment.trim(),
                 callback_url.trim(),
                 signing_key_id.trim(),
                 deliver_on_succeeded,
@@ -163,6 +166,13 @@ impl Store {
             if verification_status != "verified" {
                 bail!("Webhook 回调端点尚未验证");
             }
+            if current.environment == "production" {
+                super::open_commerce_developer_credentials::ensure_current_production_credential_on(
+                    &tx,
+                    project_id,
+                    app_record_id,
+                )?;
+            }
             let active_count: i64 = tx.query_row(
                 "SELECT COUNT(*) FROM open_commerce_developer_webhook_subscriptions
                   WHERE project_id=?1 AND app_record_id=?2 AND status='active' AND id<>?3",
@@ -258,6 +268,7 @@ impl Store {
                 AND julianday(lease_expires_at) <= julianday(?1)",
             params![timestamp_text],
         )?;
+        disable_unusable_production_webhooks_on(&tx, &timestamp_text)?;
         let candidate: Option<String> = tx
             .query_row(
                 "SELECT delivery.id
@@ -306,7 +317,7 @@ impl Store {
                         delivery.error_code, delivery.created_at, delivery.last_attempt_at,
                         delivery.last_manual_retry_at, delivery.history_replay_requested_at,
                         delivery.delivered_at,
-                        subscription.owner_user_id, subscription.app_id,
+                        subscription.owner_user_id, subscription.app_id, subscription.environment,
                         subscription.callback_url, subscription.signing_key_id,
                         subscription.signing_secret_version
                    FROM open_commerce_developer_webhook_deliveries delivery
@@ -339,9 +350,10 @@ impl Store {
                     },
                     owner_user_id: row.get(17)?,
                     app_id: row.get(18)?,
-                    callback_url: row.get(19)?,
-                    signing_key_id: row.get(20)?,
-                    signing_secret_version: row.get(21)?,
+                    environment: row.get(19)?,
+                    callback_url: row.get(20)?,
+                    signing_key_id: row.get(21)?,
+                    signing_secret_version: row.get(22)?,
                     lease_owner: lease_owner.trim().to_string(),
                 })
             },

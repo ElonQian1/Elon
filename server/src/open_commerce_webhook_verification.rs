@@ -21,6 +21,11 @@ pub(crate) async fn verify_endpoint(
     if subscription.project_id != app.project_id || subscription.app_record_id != app.id {
         bail!("Webhook 订阅不属于当前开发者 App");
     }
+    crate::open_commerce_production_webhook::ensure_subscription_eligible(
+        store,
+        app,
+        subscription,
+    )?;
     if subscription.verification_status == "verified" {
         return Ok(subscription.clone());
     }
@@ -65,8 +70,9 @@ pub(crate) async fn verify_endpoint(
     let issued_at = Utc::now();
     let challenge = format!("whch_{}", uuid::Uuid::new_v4().simple());
     let envelope = DeveloperWebhookVerificationEnvelope {
-        schema: "open_commerce.developer_webhook_verification.v1",
+        schema: "open_commerce.developer_webhook_verification.v2",
         subscription_id: subscription.id.clone(),
+        environment: subscription.environment.clone(),
         challenge: challenge.clone(),
         issued_at: issued_at.to_rfc3339(),
         expires_at: (issued_at + Duration::minutes(5)).to_rfc3339(),

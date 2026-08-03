@@ -65,7 +65,7 @@ async fn list_webhooks(
     service_response(
         open_commerce_webhook_service::list_webhooks(&state.store, &app).map(|webhooks| {
             json!({
-                "schema":"open_commerce.developer_webhook_subscriptions.v1",
+                "schema":"open_commerce.developer_webhook_subscriptions.v2",
                 "webhooks":webhooks
             })
         }),
@@ -101,6 +101,7 @@ async fn create_webhook(
         &credential.subscription.id,
         &json!({
             "app_id":credential.subscription.app_id,
+            "environment":credential.subscription.environment,
             "callback_host":callback_host,
             "signing_key_id":credential.subscription.signing_key_id
         }),
@@ -181,7 +182,11 @@ async fn verify_webhook(
         "developer_webhook.verified",
         "developer_webhook",
         &verified.id,
-        &json!({"app_id":verified.app_id,"signing_key_id":verified.signing_key_id}),
+        &json!({
+            "app_id":verified.app_id,
+            "environment":verified.environment,
+            "signing_key_id":verified.signing_key_id
+        }),
     ) {
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, error);
     }
@@ -215,6 +220,7 @@ async fn rotate_webhook_secret(
         &credential.subscription.id,
         &json!({
             "app_id":credential.subscription.app_id,
+            "environment":credential.subscription.environment,
             "signing_key_id":credential.subscription.signing_key_id,
             "signing_secret_version":credential.subscription.signing_secret_version
         }),

@@ -47,6 +47,7 @@ export interface DeveloperWebhookSubscription {
   project_id: string
   app_record_id: string
   app_id: string
+  environment: 'sandbox' | 'production'
   callback_url: string
   signing_key_id: string
   signing_secret_version: number
