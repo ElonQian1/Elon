@@ -71,7 +71,7 @@ Provider 发布的不可变版本，包含支持的任务类型、模型/工件�
 
 共享 CapacityPool 和追加式容量账本已经成为已接受设计，权威决定见 `docs/decisions/distributed-compute-capacity-ledger-v1.md`，完整对象与事务边界见 `docs/distributed-compute/capacity-ledger.md`。CapacityPool 表达会互相争用的物理资源边界，不保存实时余额；同一物理资源的全部 Offer 必须绑定同一 pool/epoch/bucket，防止跨模型、SKU 或销售渠道重复出售。
 
-V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v171 SQLite schema，以及隔离的容量、Provider、Offer 和不可变 Price Snapshot Store 已经写入但未编译、未执行迁移；预算统一 Reserve、报价生成、快照与 Reservation 原子锁定、Broker 与运行协议接线仍未实现。
+V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v172 SQLite schema，以及隔离的容量、Provider、Offer、不可变 Price Snapshot 和版本化 Job Store 已经写入但未编译、未执行迁移；预算统一 Reserve、报价生成、快照与 Reservation 原子锁定、Broker 与运行协议接线仍未实现。
 
 ### WorkloadSpec
 
@@ -80,6 +80,8 @@ V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多�
 ### ComputeJob
 
 用户需求的持久身份。Job 保存所选 Offer 版本、Price Snapshot、预算和状态，但不等同于某次机器执行。
+
+当前 v172 Registry 已实现 `submitted -> quoted -> reserved -> running -> verification_pending -> settled` 的受限主路径及失败/取消终态，保存当前投影和不可变历史版本。每次写入和读取都会复核 Workload、Provider 范围、消费者预算以及 Offer/Price Snapshot/Provider 历史链；消费者幂等键和 revision/digest CAS 防止重复或并发覆盖。quoted 可以显式刷新锁价选择，离开 quoted 后不得更换。该实现状态为 `implementation_uncompiled`，尚未冻结预算或容量，也未接入 Reservation、Attempt、HTTP 或 Broker。
 
 ### ComputeReservation
 
