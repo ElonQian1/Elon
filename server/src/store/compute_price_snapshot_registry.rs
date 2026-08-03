@@ -145,14 +145,23 @@ impl Store {
             bail!("算力价格快照 ID 不能为空");
         }
         let conn = self.conn()?;
-        let stored = price_snapshot_on(&conn, snapshot_id.trim())?
+        let snapshot = registered_price_snapshot_on(&conn, snapshot_id.trim())?
             .ok_or_else(|| anyhow!("算力价格快照不存在"))?;
-        let snapshot = audited_price_snapshot_on(&conn, &stored)?;
         Ok(ComputePriceSnapshotRegistrationReceipt {
             snapshot,
             replayed: false,
         })
     }
+}
+
+pub(super) fn registered_price_snapshot_on(
+    conn: &Connection,
+    snapshot_id: &str,
+) -> Result<Option<ComputePriceSnapshot>> {
+    let Some(stored) = price_snapshot_on(conn, snapshot_id.trim())? else {
+        return Ok(None);
+    };
+    audited_price_snapshot_on(conn, &stored).map(Some)
 }
 
 fn audited_price_snapshot_on(
