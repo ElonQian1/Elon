@@ -35,6 +35,22 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/design/sessions/:design_session_id/artifact",
             post(get_artifact),
         )
+        .route(
+            "/api/android-live/design/sessions/:design_session_id/tauri/prepare",
+            post(prepare_tauri),
+        )
+        .route(
+            "/api/android-live/design/sessions/:design_session_id/tauri/capture",
+            post(capture_tauri),
+        )
+        .route(
+            "/api/android-live/design/sessions/:design_session_id/tauri/stop",
+            post(stop_tauri),
+        )
+        .route(
+            "/api/android-live/design/sessions/:design_session_id/tauri/artifact",
+            post(get_tauri_artifact),
+        )
 }
 
 async fn list_targets(
@@ -86,23 +102,67 @@ async fn get_artifact(
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
     };
     match super::design_targets::pixel_artifact(&session, &design_session_id) {
-        Ok(artifact) => {
-            let mut response = Response::new(Body::from(artifact.bytes));
-            response.headers_mut().insert(
-                header::CONTENT_TYPE,
-                HeaderValue::from_str(&artifact.media_type)
-                    .unwrap_or_else(|_| HeaderValue::from_static("image/png")),
-            );
-            response
-                .headers_mut()
-                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-            if let Ok(etag) = HeaderValue::from_str(&format!("\"{}\"", artifact.sha256)) {
-                response.headers_mut().insert(header::ETAG, etag);
-            }
-            response
-        }
+        Ok(artifact) => artifact_response(artifact),
         Err(error) => json_error(StatusCode::BAD_REQUEST, error),
     }
+}
+
+async fn prepare_tauri(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["designSessionId"] = json!(id);
+    call(&runtime, "ui_prepare_tauri_runtime", arguments).await
+}
+
+async fn capture_tauri(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["designSessionId"] = json!(id);
+    call(&runtime, "ui_capture_tauri_host", arguments).await
+}
+
+async fn stop_tauri(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["designSessionId"] = json!(id);
+    call(&runtime, "ui_stop_tauri_runtime", arguments).await
+}
+
+async fn get_tauri_artifact(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(design_session_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    let session = match project_session(&runtime, &mut arguments).await {
+        Ok(session) => session,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
+    };
+    match super::tauri_host_runtime::native_artifact(&session, &design_session_id) {
+        Ok(artifact) => artifact_response(artifact),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, error),
+    }
+}
+
+fn artifact_response(artifact: super::design_session_store::VerifiedPixelArtifact) -> Response {
+    let mut response = Response::new(Body::from(artifact.bytes));
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(&artifact.media_type)
+            .unwrap_or_else(|_| HeaderValue::from_static("image/png")),
+    );
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    if let Ok(etag) = HeaderValue::from_str(&format!("\"{}\"", artifact.sha256)) {
+        response.headers_mut().insert(header::ETAG, etag);
+    }
+    response
 }
 
 async fn call(runtime: &Arc<NodeRuntime>, name: &str, mut arguments: Value) -> Response {

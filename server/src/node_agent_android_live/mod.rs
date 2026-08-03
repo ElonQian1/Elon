@@ -51,6 +51,8 @@ mod source_xml;
 mod style_codegen;
 mod target_design_attachment;
 mod task_completion;
+mod tauri_host_runtime;
+mod tauri_host_windows;
 mod ui_ir;
 mod verification_gate;
 mod verification_workflow;

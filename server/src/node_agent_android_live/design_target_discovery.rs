@@ -98,8 +98,8 @@ pub(super) fn discover_targets(root: &Path) -> Result<(Vec<DesignTarget>, usize,
         targets.push(target(
             DesignPlatform::Tauri,
             "Tauri 桌面",
-            "TAURI_WEBVIEW_FRONTEND",
-            "TAURI_FRONTEND_ONLY",
+            "TAURI_FRONTEND_PLUS_NATIVE_HOST",
+            "TAURI_NATIVE_ON_CAPTURE",
             &web_roots,
             &tauri_configs,
         ));
@@ -134,6 +134,9 @@ fn target(
         capabilities.extend(["RUNTIME_UI_TREE", "LIVE_STYLE_PATCH"]);
     } else {
         capabilities.extend(["SAFE_CLICK_REPLAY", "SEMANTIC_UI_TREE"]);
+    }
+    if platform == DesignPlatform::Tauri {
+        capabilities.extend(["NATIVE_HOST_LIFECYCLE", "NATIVE_WINDOW_CAPTURE"]);
     }
     DesignTarget {
         id: platform.as_str().to_string(),

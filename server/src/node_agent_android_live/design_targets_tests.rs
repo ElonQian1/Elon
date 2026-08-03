@@ -49,8 +49,9 @@ fn discovers_web_pwa_tauri_and_android_as_independent_targets() {
         .iter()
         .find(|target| target.platform == DesignPlatform::Tauri)
         .unwrap();
-    assert_eq!(tauri.evidence_level, "TAURI_FRONTEND_ONLY");
+    assert_eq!(tauri.evidence_level, "TAURI_NATIVE_ON_CAPTURE");
     assert!(!tauri.native_host_verified);
+    assert!(tauri.capabilities.contains(&"NATIVE_WINDOW_CAPTURE".into()));
     fs::remove_dir_all(root).unwrap();
 }
 

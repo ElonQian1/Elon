@@ -103,7 +103,7 @@ pub(super) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             CAPTURE_TOOL,
-            "在后台设计会话中执行受限点击/等待/文本断言并捕获 PNG 与 UI 语义树。open 时已保存 url/viewport，可只传 designSessionId；Tauri 第一阶段只证明前端 WebView。",
+            "在后台设计会话中执行受限点击/等待/文本断言并捕获 PNG 与 UI 语义树。open 时已保存 url/viewport，可只传 designSessionId；Tauri 本工具只证明 WebView，原生窗口另用 ui_prepare_tauri_runtime/ui_capture_tauri_host。",
             json!({
                 "type":"object","additionalProperties":false,"required":["designSessionId"],
                 "properties":{
@@ -185,13 +185,15 @@ fn list_sessions(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
 }
 
 fn session_summary(record: &DesignSessionRecord) -> Value {
+    let native_host = native_host_evidence(record.last_evidence.as_ref());
     json!({
         "designSessionId":record.design_session_id,
         "platform":record.platform,
         "label":record.target.label,
         "adapter":record.target.adapter,
         "evidenceLevel":record.target.evidence_level,
-        "nativeHostVerified":record.target.native_host_verified,
+        "nativeHostVerified":record.target.native_host_verified || native_host.is_some(),
+        "nativeHost":native_host,
         "route":record.route,
         "url":record.url,
         "viewport":record.viewport,
@@ -274,7 +276,12 @@ async fn capture(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
     let mut result =
         crate::node_agent_pwa_runtime::capture_tool(Some(&root_text), capture_arguments).await;
     if result.get("ok").and_then(Value::as_bool) == Some(true) {
-        record.last_evidence = Some(compact_evidence(&result));
+        let native_host = native_host_evidence(record.last_evidence.as_ref()).cloned();
+        let mut evidence = compact_evidence(&result);
+        if let Some(native_host) = native_host {
+            evidence["nativeHost"] = native_host;
+        }
+        record.last_evidence = Some(evidence);
         record.state = "CAPTURED".to_string();
         record.updated_at = chrono::Utc::now().to_rfc3339();
         persist_record(&root, &record)?;
@@ -282,7 +289,10 @@ async fn capture(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
     result["designSessionId"] = json!(design_session_id);
     result["platform"] = json!(record.platform);
     result["hostCoverage"] = json!(host_coverage(record.platform));
-    result["nativeHostVerified"] = json!(record.platform != DesignPlatform::Tauri);
+    result["nativeHostVerified"] = json!(
+        record.platform != DesignPlatform::Tauri
+            || native_host_evidence(record.last_evidence.as_ref()).is_some()
+    );
     Ok(result)
 }
 
@@ -298,6 +308,14 @@ fn get_surface(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
             "next":if record.platform == DesignPlatform::Android {"ui_get_screen_summary"} else {CAPTURE_TOOL},
         }));
     };
+    let native_host = evidence.get("nativeHost").cloned();
+    if evidence.pointer("/uiTree/path").is_none() {
+        return Ok(json!({
+            "session":record,"status":"NATIVE_CAPTURED","nodes":[],
+            "nativeHost":native_host,"nativeHostVerified":native_host.is_some(),
+            "next":CAPTURE_TOOL,"base64Embedded":false,
+        }));
+    }
     let tree = read_verified_tree(&root, evidence)?;
     let query = arguments
         .get("query")
@@ -333,6 +351,8 @@ fn get_surface(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
         "nodes":matching,
         "pixels":evidence.get("artifact"),
         "uiTree":evidence.get("uiTree"),
+        "nativeHost":native_host,
+        "nativeHostVerified":native_host.is_some() || record.target.native_host_verified,
         "base64Embedded":false,
     }))
 }
@@ -372,6 +392,10 @@ fn compact_evidence(value: &Value) -> Value {
         "route":value.get("route"),"revision":value.get("revision"),"viewport":value.get("viewport"),
         "browser":value.get("browser"),"contextPackReference":value.get("contextPackReference"),
     })
+}
+
+fn native_host_evidence(evidence: Option<&Value>) -> Option<&Value> {
+    evidence.and_then(|value| value.get("nativeHost"))
 }
 
 fn node_matches(node: &Value, query: &str) -> bool {
