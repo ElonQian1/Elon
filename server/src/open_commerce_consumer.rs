@@ -72,6 +72,7 @@ pub(crate) fn discover(
         ranking_explanation: ranking_policy.explanation().to_string(),
         ranking_is_paid: false,
         ranking_is_user_selected,
+        freshness_requirement: freshness_requirement(request.require_current_declaration),
         available_ranking_policies: open_commerce_consumer_ranking::available_ranking_policies(),
         ranking_receipt,
         matches,
@@ -92,6 +93,7 @@ fn build_ranking_receipt(
         "capability_key": normalized_optional(request.capability_key.as_deref()),
         "requester_app_id": request.requester_app_id.as_str(),
         "ranking_policy": ranking_policy.key(),
+        "require_current_declaration": request.require_current_declaration,
         "preferences": &request.preferences,
         "limit": request.limit.clamp(1, 50)
     });
@@ -130,6 +132,7 @@ fn build_ranking_receipt(
             "explanation": ranking_policy.explanation(),
             "paid_placement": false
         },
+        "freshness_requirement": freshness_requirement(request.require_current_declaration),
         "request_fingerprint_sha256": sha256_hex(&request_fingerprint_json),
         "eligible_match_count": eligible_match_count,
         "returned_match_count": matches.len(),
@@ -202,6 +205,9 @@ fn best_match(
                 .map(|maximum| capability.unit_price_micros <= maximum)
                 .unwrap_or(true)
         })
+        .filter(|capability| {
+            !request.require_current_declaration || capability.freshness.status == "current"
+        })
         .collect::<Vec<_>>();
     let selected = ranking_policy
         .select_capability(candidates, &request.preferences, capability_score)
@@ -211,6 +217,9 @@ fn best_match(
     };
     let (score, mut reasons) = score_match(&detail, &capability, &request.preferences);
     reasons.push(ranking_policy.ranking_reason());
+    if request.require_current_declaration {
+        reasons.push("符合消费者要求的商户声明有效期".to_string());
+    }
     let authorization =
         authorization_state(store, &detail, &capability, &request.requester_app_id)?;
     Ok(Some(ConsumerDiscoveryMatch {
@@ -220,6 +229,14 @@ fn best_match(
         reasons,
         authorization,
     }))
+}
+
+fn freshness_requirement(required: bool) -> &'static str {
+    if required {
+        "current_declaration"
+    } else {
+        "any_declaration"
+    }
 }
 
 fn score_match(

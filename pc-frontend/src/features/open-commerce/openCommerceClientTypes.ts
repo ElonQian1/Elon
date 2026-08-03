@@ -664,6 +664,7 @@ export interface ConsumerDiscoveryRequest {
   requester_app_id: string
   ranking_policy?: ConsumerRankingPolicyKey
   include_ranking_receipt?: boolean
+  require_current_declaration?: boolean
   preferences: ConsumerPreferences
   limit: number
 }
@@ -794,6 +795,7 @@ export interface ConsumerDiscoveryResponse {
   ranking_explanation: string
   ranking_is_paid: boolean
   ranking_is_user_selected: boolean
+  freshness_requirement: 'any_declaration' | 'current_declaration'
   available_ranking_policies: ConsumerRankingPolicyDescriptor[]
   ranking_receipt?: ConsumerRankingReceipt
   matches: ConsumerDiscoveryMatch[]

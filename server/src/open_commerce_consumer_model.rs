@@ -31,6 +31,8 @@ pub(crate) struct ConsumerDiscoveryRequest {
     #[serde(default)]
     pub include_ranking_receipt: bool,
     #[serde(default)]
+    pub require_current_declaration: bool,
+    #[serde(default)]
     pub preferences: ConsumerPreferences,
     #[serde(default = "default_limit")]
     pub limit: usize,
@@ -63,6 +65,7 @@ pub(crate) struct ConsumerDiscoveryResponse {
     pub ranking_explanation: String,
     pub ranking_is_paid: bool,
     pub ranking_is_user_selected: bool,
+    pub freshness_requirement: &'static str,
     pub available_ranking_policies: Vec<ConsumerRankingPolicyDescriptor>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ranking_receipt: Option<ConsumerRankingReceipt>,
