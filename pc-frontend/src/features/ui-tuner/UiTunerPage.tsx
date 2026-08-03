@@ -48,7 +48,7 @@ import {
   type UiTunerVerificationReport,
 } from './runtime/verification'
 import styles from './UiTunerPage.module.css'
-import { HeadlessDesignWorkspace } from './headless-design/HeadlessDesignWorkspace'
+import { LazyHeadlessDesignWorkspace } from './headless-design/LazyHeadlessDesignWorkspace'
 import { SourcePreviewWorkspace } from './source-preview/SourcePreviewWorkspace'
 import { deriveUiTunerRenderMode } from './rendering/renderMode'
 import { handleCanvasArrowKey } from './uiTunerCanvasKeyboard'
@@ -63,6 +63,7 @@ import {
   UI_TUNER_MIN_SIZE,
   type UiTunerHistoryState,
 } from './workspace/uiTunerWorkspaceState'
+
 export default function UiTunerPage() {
   const { workspaceMode, changeWorkspaceMode } = useUiTunerWorkspaceMode()
   const projects = useProjectStore((state) => state.projects)
@@ -604,7 +605,7 @@ export default function UiTunerPage() {
 
   return (
     <>
-    <HeadlessDesignWorkspace active={workspaceMode === 'headless'} initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
+    <LazyHeadlessDesignWorkspace active={workspaceMode === 'headless'} initialProjectRoot={effectiveProjectRoot} onModeChange={changeWorkspaceMode} />
     <SourcePreviewWorkspace
       active={workspaceMode === 'source'}
       initialProjectRoot={effectiveProjectRoot}

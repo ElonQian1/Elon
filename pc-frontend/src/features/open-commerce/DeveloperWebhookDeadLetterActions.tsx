@@ -3,7 +3,7 @@ import { Archive, Check, RotateCcw, X } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type { DeveloperWebhookDelivery } from './openCommerceClientTypes'
 import { errorText } from './openCommerceUi'
-import { actionStyle, badgeStyle, commerceStyles } from './openCommerceStyles'
+import { actionStyle, badgeStyle } from './openCommerceStyles'
 
 export default function DeveloperWebhookDeadLetterActions({
   projectId,
