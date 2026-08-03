@@ -148,8 +148,10 @@ export interface ConsumerPortabilityImport {
   payload_sha256: string
   package_json: string
   package: ConsumerPortabilityExport
-  trust_status: 'integrity_verified_source_untrusted'
+  trust_status: ConsumerPortabilityImportTrustStatus
   merge_status: 'isolated_snapshot'
+  signature?: ConsumerPortabilityPackageSignature
+  signature_verified_at?: string
   imported_at: string
 }
 
@@ -165,14 +167,50 @@ export interface ConsumerPortabilityImportSummary {
   data_request_count: number
   preference_profile_included: boolean
   invocation_receipt_count: number
-  trust_status: 'integrity_verified_source_untrusted'
+  trust_status: ConsumerPortabilityImportTrustStatus
   merge_status: 'isolated_snapshot'
+  signer_key_id?: string
+  signature_verified_at?: string
   imported_at: string
 }
 
 export interface ConsumerPortabilityImportList {
   schema: 'open_commerce.consumer_portability_imports.v1'
   imports: ConsumerPortabilityImportSummary[]
+}
+
+export type ConsumerPortabilityImportTrustStatus =
+  | 'integrity_verified_source_untrusted'
+  | 'trusted_operator_signature_verified'
+
+export interface ConsumerPortabilityPackageSignature {
+  algorithm: 'rsa-pkcs1v15-sha256'
+  key_id: string
+  signature_base64: string
+}
+
+export interface SignedConsumerPortabilityPackage {
+  schema: 'open_commerce.consumer_portability_signed_package.v1'
+  source_operator: string
+  package: ConsumerPortabilityExport
+  signature: ConsumerPortabilityPackageSignature
+}
+
+export interface ConsumerPortabilityTrustKey {
+  schema: 'open_commerce.consumer_portability_trust_key.v1'
+  id: string
+  source_operator: string
+  key_id: string
+  algorithm: 'rsa-pkcs1v15-sha256'
+  public_key_pem: string
+  status: 'active' | 'revoked'
+  created_at: string
+  revoked_at?: string
+}
+
+export interface ConsumerPortabilityTrustKeyList {
+  schema: 'open_commerce.consumer_portability_trust_keys.v1'
+  keys: ConsumerPortabilityTrustKey[]
 }
 
 export interface ConsumerPreferences {

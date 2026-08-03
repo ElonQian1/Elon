@@ -20,6 +20,15 @@ export {
 export { createMemoryMerchantRuntimeIdempotencyStore } from './merchant-runtime-memory-store.js'
 
 export {
+  CONSUMER_PORTABILITY_SIGNATURE_ALGORITHM,
+  CONSUMER_PORTABILITY_SIGNATURE_SCHEMA,
+  consumerPortabilityPublicKeyId,
+  consumerPortabilitySignatureMessage,
+  signConsumerPortabilityPackage,
+  verifyConsumerPortabilityPackageSignature,
+} from './portability-signature.js'
+
+export {
   MERCHANT_RUNTIME_ERROR_SCHEMA,
   MERCHANT_RUNTIME_MANIFEST_SCHEMA,
   MERCHANT_RUNTIME_MAX_BODY_BYTES,

@@ -154,10 +154,21 @@ pub(crate) fn verify_external_export(
     if source_project_id.is_empty() || source_project_id.chars().count() > 120 {
         bail!("消费者可携带数据包来源项目 ID 长度必须为 1 到 120 个字符");
     }
-    if export.id.trim().is_empty() || export.id.chars().count() > 120 {
+    if export.source_project_id != source_project_id
+        || export.source_project_id.chars().any(char::is_control)
+    {
+        bail!("消费者可携带数据包来源项目 ID 格式无效");
+    }
+    if export.id.trim().is_empty()
+        || export.id.chars().count() > 120
+        || export.id != export.id.trim()
+        || export.id.chars().any(char::is_control)
+    {
         bail!("消费者可携带数据包 ID 长度必须为 1 到 120 个字符");
     }
     normalize_idempotency_key(&export.idempotency_key)?;
+    chrono::DateTime::parse_from_rfc3339(&export.created_at)
+        .context("消费者可携带数据包创建时间无效")?;
     verify_export_contents(export)
 }
 

@@ -263,6 +263,10 @@ mod open_commerce_portability_model;
 mod open_commerce_portability_service;
 #[cfg(test)]
 mod open_commerce_portability_tests;
+mod open_commerce_portability_trust_api;
+mod open_commerce_portability_trust_migration;
+mod open_commerce_portability_trust_model;
+mod open_commerce_portability_trust_service;
 #[cfg(test)]
 mod open_commerce_portability_v2_tests;
 #[cfg(test)]

@@ -3,7 +3,9 @@ import { Download, RefreshCw, ShieldCheck, Trash2, Upload } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type {
   ConsumerPortabilityExport,
+  ConsumerPortabilityPackageSignature,
   ConsumerPortabilityImportSummary,
+  SignedConsumerPortabilityPackage,
 } from './openCommerceClientTypes'
 import { errorText } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
@@ -31,10 +33,6 @@ export default function ConsumerPortabilityImports({ projectId }: { projectId: s
   }, [refresh])
 
   async function importPackage() {
-    if (!sourceOperator.trim()) {
-      setMessage('请填写来源运营方或来源环境名称。')
-      return
-    }
     if (!selectedFile) {
       setMessage('请选择可携带数据包 JSON 文件。')
       return
@@ -43,12 +41,21 @@ export default function ConsumerPortabilityImports({ projectId }: { projectId: s
     setMessage('')
     try {
       if (selectedFile.size > 6 * 1024 * 1024) throw new Error('数据包超过 6 MiB 上传上限')
-      const packageValue = JSON.parse(await selectedFile.text()) as ConsumerPortabilityExport
+      const parsed = JSON.parse(await selectedFile.text()) as
+        | ConsumerPortabilityExport
+        | SignedConsumerPortabilityPackage
+      const packageValue = isSignedPackage(parsed) ? parsed.package : parsed
+      const signature = isSignedPackage(parsed) ? parsed.signature : undefined
+      const effectiveSourceOperator = isSignedPackage(parsed)
+        ? parsed.source_operator
+        : sourceOperator.trim()
+      if (!effectiveSourceOperator) throw new Error('请填写来源运营方或来源环境名称')
       assertPortabilityPackageShape(packageValue)
       await openCommerceClientApi.createConsumerPortabilityImport(
         projectId,
-        sourceOperator.trim(),
+        effectiveSourceOperator,
         packageValue,
+        signature,
       )
       setSelectedFile(null)
       if (fileRef.current) fileRef.current.value = ''
@@ -133,7 +140,10 @@ export default function ConsumerPortabilityImports({ projectId }: { projectId: s
           <article key={item.id} style={listItemStyle()}>
             <header style={commerceStyles.itemHeader}>
               <strong style={commerceStyles.itemTitle}>{item.source_operator}</strong>
-              <span style={badgeStyle()}><ShieldCheck size={12} />完整性通过</span>
+              <span style={badgeStyle(item.trust_status === 'trusted_operator_signature_verified' ? 'neutral' : 'warn')}>
+                <ShieldCheck size={12} />
+                {item.trust_status === 'trusted_operator_signature_verified' ? '签名可信' : '仅完整性'}
+              </span>
             </header>
             <small style={commerceStyles.itemMeta}>
               {new Date(item.imported_at).toLocaleString()} · 关系 {item.relationship_count}
@@ -168,4 +178,11 @@ function assertPortabilityPackageShape(value: ConsumerPortabilityExport) {
   if (typeof value.payload_sha256 !== 'string' || !value.payload) {
     throw new Error('数据包缺少摘要或负载')
   }
+}
+
+function isSignedPackage(
+  value: ConsumerPortabilityExport | SignedConsumerPortabilityPackage,
+): value is SignedConsumerPortabilityPackage {
+  const candidate = value as SignedConsumerPortabilityPackage
+  return Boolean(candidate.package && candidate.signature)
 }

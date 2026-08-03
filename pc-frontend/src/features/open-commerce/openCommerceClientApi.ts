@@ -18,6 +18,9 @@ import type {
   ConsumerPortabilityImport,
   ConsumerPortabilityImportList,
   ConsumerPortabilityImportSummary,
+  ConsumerPortabilityPackageSignature,
+  ConsumerPortabilityTrustKey,
+  ConsumerPortabilityTrustKeyList,
   ConsumerRelationship,
   ConsumerRelationshipList,
   DeveloperAppCredential,
@@ -171,9 +174,10 @@ export const openCommerceClientApi = {
     projectId: string,
     sourceOperator: string,
     portabilityPackage: ConsumerPortabilityExport,
+    signature?: ConsumerPortabilityPackageSignature,
   ) => api.post<ConsumerPortabilityImport>(
     `${projectBase(projectId)}/consumer-portability-imports`,
-    { source_operator: sourceOperator, package: portabilityPackage },
+    { source_operator: sourceOperator, package: portabilityPackage, signature },
   ),
 
   getConsumerPortabilityImport: (projectId: string, importId: string) =>
@@ -184,6 +188,26 @@ export const openCommerceClientApi = {
   deleteConsumerPortabilityImport: (projectId: string, importId: string) =>
     api.delete<ConsumerPortabilityImportSummary>(
       `${projectBase(projectId)}/consumer-portability-imports/${encodeURIComponent(importId)}`,
+    ),
+
+  listConsumerPortabilityTrustKeys: (projectId: string) =>
+    api.get<ConsumerPortabilityTrustKeyList>(
+      `${projectBase(projectId)}/consumer-portability-trust-keys`,
+    ),
+
+  createConsumerPortabilityTrustKey: (
+    projectId: string,
+    sourceOperator: string,
+    publicKeyPem: string,
+  ) => api.post<ConsumerPortabilityTrustKey>(
+    `${projectBase(projectId)}/consumer-portability-trust-keys`,
+    { source_operator: sourceOperator, public_key_pem: publicKeyPem },
+  ),
+
+  revokeConsumerPortabilityTrustKey: (projectId: string, recordId: string) =>
+    api.post<ConsumerPortabilityTrustKey>(
+      `${projectBase(projectId)}/consumer-portability-trust-keys/${encodeURIComponent(recordId)}/revoke`,
+      {},
     ),
 
   listConsumerInvocationReceipts: () =>
