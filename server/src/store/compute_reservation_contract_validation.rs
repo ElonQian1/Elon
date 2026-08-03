@@ -202,6 +202,15 @@ fn validate_reservation_times(
         "Price Snapshot 窗口结束时间",
         &snapshot.delivery_window.ends_at_utc,
     )?;
+    let claim_updated = parse_utc("Capacity Claim 更新时间", &claim.updated_at)?;
+    let claim_update_is_misaligned = match reservation.status.as_str() {
+        RESERVATION_STATUS_ACTIVE => claim_updated > updated,
+        RESERVATION_STATUS_PENDING
+        | RESERVATION_STATUS_CONSUMED
+        | RESERVATION_STATUS_RELEASED
+        | RESERVATION_STATUS_EXPIRED => claim_updated != updated,
+        _ => true,
+    };
     if submitted > created
         || quoted > created
         || created > updated
@@ -211,7 +220,7 @@ fn validate_reservation_times(
         || expires > snapshot_expires
         || expires > window_end
         || claim.created_at != reservation.created_at
-        || claim.updated_at != reservation.updated_at
+        || claim_update_is_misaligned
         || claim.expires_at.as_deref() != Some(reservation.expires_at.as_str())
     {
         bail!("Reservation、Job、Price Snapshot 与 Capacity Claim 时间边界不一致");
