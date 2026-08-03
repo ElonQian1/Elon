@@ -26,6 +26,8 @@ use crate::{
     store::Store,
 };
 
+const CONSUMER_DISCOVERY_CANDIDATE_LIMIT: usize = 100;
+
 pub(crate) fn discover(
     store: &Store,
     user_id: &str,
@@ -46,7 +48,7 @@ pub(crate) fn discover(
     normalize_price_filter(&mut request)?;
     normalize_capability_filter(&mut request)?;
     open_commerce_consumer_constraints::validate(&request)?;
-    let candidate_limit = request.limit.clamp(1, 50).saturating_mul(4).min(100);
+    let candidate_limit = CONSUMER_DISCOVERY_CANDIDATE_LIMIT;
     let candidates = open_commerce_directory_service::discover_merchants(
         store,
         request.query.as_deref(),
