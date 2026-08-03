@@ -153,6 +153,8 @@
 143. `docs/open-commerce-consumer-source-age-v1-acceptance.md`：查看回执年龄筛选代码状态及后置统一回归矩阵。
 144. `docs/decisions/open-commerce-consumer-source-filter-options-v1.md`：查看当前目录候选中的来源筛选建议和非穷尽边界。
 145. `docs/open-commerce-consumer-source-filter-options-v1-acceptance.md`：查看来源建议代码状态及后置统一回归矩阵。
+146. `docs/decisions/open-commerce-consumer-price-currency-v1.md`：查看币种安全价格筛选和兼容默认规则。
+147. `docs/open-commerce-consumer-price-currency-v1-acceptance.md`：查看价格币种代码状态及后置统一回归矩阵。
 
 ## 专题地图
 
