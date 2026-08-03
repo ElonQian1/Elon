@@ -6,9 +6,9 @@ use sha2::{Digest, Sha256};
 use crate::{
     open_commerce_consumer_constraints,
     open_commerce_consumer_model::{
-        ConsumerAuthorizationState, ConsumerCapabilityFilter, ConsumerDiscoveryMatch,
-        ConsumerDiscoveryRequest, ConsumerDiscoveryResponse, ConsumerPreferences,
-        ConsumerPriceFilter, ConsumerRankingReceipt, ConsumerSourceFilter,
+        ConsumerAuthorizationState, ConsumerCandidateScope, ConsumerCapabilityFilter,
+        ConsumerDiscoveryMatch, ConsumerDiscoveryRequest, ConsumerDiscoveryResponse,
+        ConsumerPreferences, ConsumerPriceFilter, ConsumerRankingReceipt, ConsumerSourceFilter,
     },
     open_commerce_consumer_preference_service,
     open_commerce_consumer_ranking::{self, ConsumerRankingPolicy},
@@ -69,6 +69,12 @@ pub(crate) fn discover(
     let eligible_match_count = matches.len();
     ranking_policy.sort_matches(&mut matches);
     matches.truncate(request.limit.clamp(1, 50));
+    let candidate_scope = candidate_scope(
+        candidate_limit,
+        directory_candidate_count,
+        eligible_match_count,
+        matches.len(),
+    );
     let ranking_receipt = request
         .include_ranking_receipt
         .then(|| {
@@ -98,10 +104,29 @@ pub(crate) fn discover(
         price_filter: price_filter(&request),
         capability_filter: capability_filter(&request),
         preference_constraints: open_commerce_consumer_constraints::response(&request),
+        candidate_scope,
         available_ranking_policies: open_commerce_consumer_ranking::available_ranking_policies(),
         ranking_receipt,
         matches,
     })
+}
+
+fn candidate_scope(
+    candidate_cap: usize,
+    directory_candidate_count: usize,
+    eligible_match_count: usize,
+    returned_match_count: usize,
+) -> ConsumerCandidateScope {
+    ConsumerCandidateScope {
+        schema: "open_commerce.consumer_candidate_scope.v1",
+        kind: "current_operator_public_directory.v1",
+        operator_exhaustive: false,
+        candidate_cap,
+        directory_candidate_count,
+        eligible_match_count,
+        returned_match_count,
+        results_truncated: eligible_match_count > returned_match_count,
+    }
 }
 
 fn build_ranking_receipt(

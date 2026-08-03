@@ -92,6 +92,7 @@ pub(crate) struct ConsumerDiscoveryResponse {
     pub price_filter: ConsumerPriceFilter,
     pub capability_filter: ConsumerCapabilityFilter,
     pub preference_constraints: ConsumerPreferenceConstraints,
+    pub candidate_scope: ConsumerCandidateScope,
     pub available_ranking_policies: Vec<ConsumerRankingPolicyDescriptor>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ranking_receipt: Option<ConsumerRankingReceipt>,
@@ -145,6 +146,18 @@ pub(crate) struct ConsumerPreferenceConstraints {
     pub require_city_match: bool,
     pub require_category_match: bool,
     pub require_all_tags_match: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ConsumerCandidateScope {
+    pub schema: &'static str,
+    pub kind: &'static str,
+    pub operator_exhaustive: bool,
+    pub candidate_cap: usize,
+    pub directory_candidate_count: usize,
+    pub eligible_match_count: usize,
+    pub returned_match_count: usize,
+    pub results_truncated: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
