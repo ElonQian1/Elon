@@ -11,6 +11,7 @@ import ConsumerPortabilityReauthorization from './ConsumerPortabilityReauthoriza
 import ConsumerDataVaultPanel from './ConsumerDataVaultPanel'
 import ConsumerPreferenceProfilePanel from './ConsumerPreferenceProfilePanel'
 import ConsumerInvocationReceipts from './ConsumerInvocationReceipts'
+import ConsumerPriceFilterFields from './ConsumerPriceFilterFields'
 import ConsumerSourceFilterFields from './ConsumerSourceFilterFields'
 import CapabilityInvocationComposer from './CapabilityInvocationComposer'
 import { downloadConsumerRankingReceipt, verifyConsumerRankingReceipt } from './consumerRankingReceipt'
@@ -41,6 +42,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   const [categories, setCategories] = useState('')
   const [tags, setTags] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
+  const [priceCurrency, setPriceCurrency] = useState('CNY')
   const [rankingPolicy, setRankingPolicy] = useState<ConsumerRankingPolicyKey>('transparent_preference_match.v1')
   const [includeRankingReceipt, setIncludeRankingReceipt] = useState(false)
   const [requireCurrentDeclaration, setRequireCurrentDeclaration] = useState(false)
@@ -102,6 +104,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         max_source_age_seconds: maxSourceAgeMinutes
           ? Math.round(Number(maxSourceAgeMinutes) * 60)
           : undefined,
+        price_currency: maxPrice ? priceCurrency.trim() || undefined : undefined,
         preferences: {
           categories: splitValues(categories),
           tags: splitValues(tags),
@@ -120,7 +123,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
     } finally {
       setBusy(false)
     }
-  }, [appId, capabilityKey, categories, city, includeRankingReceipt, maxPrice, maxSourceAgeMinutes, query, rankingPolicy, requireCurrentDeclaration, requireInternalSyncReceipt, sourceDataDomain, sourceProviderKey, tags])
+  }, [appId, capabilityKey, categories, city, includeRankingReceipt, maxPrice, maxSourceAgeMinutes, priceCurrency, query, rankingPolicy, requireCurrentDeclaration, requireInternalSyncReceipt, sourceDataDomain, sourceProviderKey, tags])
 
   const applyProfile = useCallback((preferences: ConsumerPreferences) => {
     setCategories(preferences.categories.join(', '))
@@ -129,6 +132,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
     setMaxPrice(preferences.max_unit_price_micros === undefined
       ? ''
       : String(preferences.max_unit_price_micros / 1_000_000))
+    setPriceCurrency('CNY')
     setMessage('偏好档案已带入本次发现条件。')
   }, [])
 
@@ -268,7 +272,12 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
             <label>城市<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ji'an" /></label>
             <label>经营类别<input value={categories} onChange={(event) => setCategories(event.target.value)} placeholder="cafe, retail" /></label>
             <label>偏好标签<input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="quiet, coffee" /></label>
-            <label>单位价格上限（CNY）<input type="number" min="0" step="0.01" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} /></label>
+            <ConsumerPriceFilterFields
+              maxPrice={maxPrice}
+              currency={priceCurrency}
+              onMaxPriceChange={setMaxPrice}
+              onCurrencyChange={setPriceCurrency}
+            />
             <button style={actionStyle('primary', busy)} type="submit" disabled={busy}>
               <Search size={14} />{busy ? '查询中…' : '查询商户能力'}
             </button>
@@ -286,6 +295,9 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
               {result?.source_filter.provider_key && <span style={badgeStyle()}>厂商 {result.source_filter.provider_key}</span>}
               {result?.source_filter.data_domain && <span style={badgeStyle()}>数据域 {result.source_filter.data_domain}</span>}
               {result?.source_filter.max_age_seconds && <span style={badgeStyle()}>回执不超过 {Math.ceil(result.source_filter.max_age_seconds / 60)} 分钟</span>}
+              {result?.price_filter.currency && result.price_filter.max_unit_price_micros !== null && (
+                <span style={badgeStyle()}>价格不超过 {formatMicros(result.price_filter.max_unit_price_micros, result.price_filter.currency)}</span>
+              )}
               <span
                 style={badgeStyle(result?.ranking_is_paid ? 'danger' : 'neutral')}
                 data-tone={result?.ranking_is_paid ? 'danger' : 'neutral'}

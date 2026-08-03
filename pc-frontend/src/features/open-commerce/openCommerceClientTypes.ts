@@ -669,6 +669,7 @@ export interface ConsumerDiscoveryRequest {
   source_provider_key?: string
   source_data_domain?: string
   max_source_age_seconds?: number
+  price_currency?: string
   preferences: ConsumerPreferences
   limit: number
 }
@@ -813,6 +814,10 @@ export interface ConsumerDiscoveryResponse {
     max_age_seconds: number | null
   }
   source_filter_options: ConsumerSourceFilterOptions
+  price_filter: {
+    currency: string | null
+    max_unit_price_micros: number | null
+  }
   available_ranking_policies: ConsumerRankingPolicyDescriptor[]
   ranking_receipt?: ConsumerRankingReceipt
   matches: ConsumerDiscoveryMatch[]
