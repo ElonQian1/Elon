@@ -202,6 +202,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (165, "分布式算力共享容量池与追加式账本", crate::compute_capacity_migration::migration_v165),
     (166, "开放商业动作确认主动取消时间", crate::open_commerce_action_confirmation_migration::migration_v166),
     (167, "分布式算力容量池追加式生命周期", crate::compute_capacity_lifecycle_migration::migration_v167),
+    (168, "分布式算力容量池 epoch 轮换事件", crate::compute_capacity_epoch_migration::migration_v168),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

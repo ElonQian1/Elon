@@ -46,6 +46,7 @@ mod codex_vault_api;
 mod codex_vault_emergency_api;
 mod codex_vault_emergency_migration;
 mod codex_vault_slot_migration;
+mod compute_capacity_epoch_migration;
 mod compute_capacity_lifecycle_migration;
 mod compute_capacity_migration;
 mod compute_federation;
