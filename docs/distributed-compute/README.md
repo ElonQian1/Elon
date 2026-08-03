@@ -51,7 +51,7 @@ owners: backend, node, ai-economy
 
 ### F2：Broker、验证和真实结算
 
-加入 Offer Registry、报价锁定、原子预留、带 fencing token 的尝试租约、多源计量、挑战任务、争议状态和可提取收益账本。
+加入 Offer Registry、报价锁定、原子预留、带 `fencing_generation` 的尝试租约、多源计量、挑战任务、争议状态和可提取收益账本。
 
 ### F3：外部矿池与企业集群
 
@@ -70,7 +70,7 @@ owners: backend, node, ai-economy
 - 核心合同使用显式 `schema_version`，新增字段优先保持向后兼容。
 - 金额、价格和用量禁止使用浮点数；统一使用整数微单位、基点或有理数比例。
 - Offer 和 Price Snapshot 一经被 Job 引用便不可修改，只能创建新版本。
-- 一次 Job 可以有多个 Attempt，但任何时刻只有持有最新 fencing token 的 Attempt 能提交候选结果。
+- 一次 Job 可以有多个 Attempt，但任何时刻只有拥有最新 `fencing_generation` 的 Attempt 能提交候选结果。
 - 节点自报用量、平台观测用量和验证后用量必须分开保存。
 - Provider 特有字段放扩展区或 Adapter 内，不污染核心调度语义。
 - 新功能按模块拆分，禁止继续扩大协议和服务端巨型入口文件。

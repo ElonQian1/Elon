@@ -90,7 +90,7 @@ ready -> draining -> disabled -> removed
 - 施加 CPU、内存、显存、磁盘、时长和并发限制；
 - 转发取消、心跳、进度、检查点和终态；
 - 在进程退出或租约过期时生成失败事实；
-- 只允许最新 fencing token 提交候选终态。
+- 只允许最新 `fencing_generation` 提交候选终态；秘密租约凭据与代次字段分开处理。
 
 第一批内部兼容 seam 可以直接调用现有 Rust 本地推理函数；正式 Sidecar 协议在安装器和能力上报准备好后单独版本化。
 

@@ -79,7 +79,7 @@ Provider 发布的不可变版本，包含支持的任务类型、模型/工件�
 
 ### ComputeAttemptLease
 
-一次具体执行尝试。每次重试递增 `attempt_no` 和 `fencing_token`，续租不能复活已过期尝试。迟到结果可以留作审计，但不能覆盖拥有更新 fencing token 的结果。
+一次具体执行尝试。每次重试递增 `attempt_no` 和 `fencing_generation`，续租不能复活已过期尝试。迟到结果可以留作审计，但不能覆盖拥有更高 `fencing_generation` 的结果。秘密租约凭据只用于鉴权，不承担代次语义。
 
 ### ExecutionReceipt
 
@@ -109,7 +109,7 @@ stateDiagram-v2
     verification_pending --> settled
     leased --> retryable: timeout / provider loss
     running --> retryable: retryable failure
-    retryable --> leased: new attempt + fencing token
+    retryable --> leased: new attempt + fencing generation
     quoted --> cancelled
     reserved --> expired
     verification_pending --> disputed

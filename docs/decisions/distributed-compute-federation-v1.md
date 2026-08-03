@@ -34,7 +34,7 @@ implementation_status: foundation_in_progress_uncompiled
 
 ### 5. Job 与 Attempt 分离
 
-一个 Job 可有多个 Attempt。每次尝试持有递增 fencing token；过期尝试不能被心跳复活，迟到结果不能覆盖新尝试。Reservation 同时保护 Provider 容量与消费者预算，并在终态幂等释放。
+一个 Job 可有多个 Attempt。每次尝试持有递增 `fencing_generation`；过期尝试不能被心跳复活，迟到结果不能覆盖新尝试。秘密租约凭据只负责鉴权，不作为代次字段。Reservation 同时保护 Provider 容量与消费者预算，并在终态幂等释放。
 
 ### 6. 节点采用按需插件
 
