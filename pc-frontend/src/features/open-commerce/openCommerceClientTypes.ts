@@ -375,7 +375,36 @@ export interface DirectoryMerchant {
 
 export interface DirectoryMerchantList {
   schema: string
-  merchants: DirectoryMerchant[]
+  merchants: DirectoryMerchantDetail[]
+}
+
+export interface PublicMerchantIdentityKey {
+  key_id: string
+  algorithm: 'rsa-pkcs1v15-sha256'
+  proof_verified_at: string
+  created_at: string
+}
+
+export interface DirectoryMerchantDetail {
+  schema: string
+  merchant: DirectoryMerchant
+  capabilities: DirectoryCapability[]
+  portable_identity_keys: PublicMerchantIdentityKey[]
+}
+
+export interface MerchantIdentityKey extends PublicMerchantIdentityKey {
+  schema: 'open_commerce.merchant_identity_key.v1'
+  id: string
+  project_id: string
+  merchant_id: string
+  public_key_pem: string
+  status: 'active' | 'revoked'
+  revoked_at?: string
+}
+
+export interface MerchantIdentityKeyList {
+  schema: string
+  keys: MerchantIdentityKey[]
 }
 
 export interface DirectoryCapability {

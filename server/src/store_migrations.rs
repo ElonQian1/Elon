@@ -177,6 +177,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (140, "消费者自主管理运营方公钥与可携带数据包签名信任", crate::open_commerce_portability_trust_migration::migration_v140),
     (141, "消费者可携带数据迁移预演、偏好采用与安全回滚", crate::open_commerce_portability_adoption_migration::migration_v141),
     (142, "消费者确认关系映射并重新发起目标商户授权", crate::open_commerce_portability_reauthorization_migration::migration_v142),
+    (143, "商户 RSA 私钥持有证明与可携带公钥指纹", crate::open_commerce_merchant_identity_migration::migration_v143),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

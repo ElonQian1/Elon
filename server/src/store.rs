@@ -85,6 +85,7 @@ mod open_commerce_integrations;
 mod open_commerce_invocation_recovery;
 mod open_commerce_invocations;
 mod open_commerce_merchant_evidence;
+mod open_commerce_merchant_identity;
 mod open_commerce_merchants;
 mod open_commerce_portability_reauthorization;
 mod open_commerce_rate_limits;

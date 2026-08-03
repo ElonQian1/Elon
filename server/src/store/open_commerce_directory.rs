@@ -131,10 +131,13 @@ impl Store {
                     && capability.access_level != ACCESS_OWNER_ONLY
             })
             .collect();
+        let portable_identity_keys =
+            self.list_public_open_commerce_merchant_identity_keys(merchant_id)?;
         Ok(OpenCommerceDirectoryMerchantDetail::from_domain(
             merchant,
             capabilities,
             publication,
+            portable_identity_keys,
         ))
     }
 

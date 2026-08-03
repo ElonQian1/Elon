@@ -3,7 +3,10 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::open_commerce_model::{OpenCommerceCapability, OpenCommerceMerchant};
+use crate::{
+    open_commerce_merchant_identity_model::OpenCommercePublicMerchantIdentityKey,
+    open_commerce_model::{OpenCommerceCapability, OpenCommerceMerchant},
+};
 
 pub(crate) const DIRECTORY_STATUS_PUBLISHED: &str = "published";
 pub(crate) const DIRECTORY_STATUS_UNPUBLISHED: &str = "unpublished";
@@ -58,6 +61,7 @@ pub(crate) struct OpenCommerceDirectoryMerchantDetail {
     pub schema: &'static str,
     pub merchant: OpenCommerceDirectoryMerchant,
     pub capabilities: Vec<OpenCommerceDirectoryCapability>,
+    pub portable_identity_keys: Vec<OpenCommercePublicMerchantIdentityKey>,
 }
 
 impl OpenCommerceDirectoryMerchantDetail {
@@ -65,6 +69,7 @@ impl OpenCommerceDirectoryMerchantDetail {
         merchant: OpenCommerceMerchant,
         capabilities: Vec<OpenCommerceCapability>,
         publication: OpenCommerceDirectoryPublication,
+        portable_identity_keys: Vec<OpenCommercePublicMerchantIdentityKey>,
     ) -> Self {
         Self {
             schema: "open_commerce.directory_merchant.v1",
@@ -95,6 +100,7 @@ impl OpenCommerceDirectoryMerchantDetail {
                     updated_at: capability.updated_at,
                 })
                 .collect(),
+            portable_identity_keys,
         }
     }
 }
