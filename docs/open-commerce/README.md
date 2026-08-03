@@ -99,6 +99,8 @@
 89. `docs/open-commerce-developer-app-manifest-review-v1-acceptance.md`：查看 App 资料审核代码及统一回归待验证范围。
 90. `docs/decisions/open-commerce-developer-app-domain-verification-v1.md`：查看主页域名 challenge、精确白名单和证明边界。
 91. `docs/open-commerce-developer-app-domain-verification-v1-acceptance.md`：查看域名控制证明代码及统一回归待验证范围。
+92. `docs/decisions/open-commerce-outbound-public-address-pinning-v1.md`：查看 DNS 私网拒绝、本次地址固定和出站边界。
+93. `docs/open-commerce-outbound-public-address-pinning-v1-acceptance.md`：查看出站公网地址固定代码及统一回归待验证范围。
 
 ## 专题地图
 

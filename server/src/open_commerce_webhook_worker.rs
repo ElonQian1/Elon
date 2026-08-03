@@ -18,18 +18,6 @@ pub(crate) fn spawn(state: Arc<AppState>) {
     }
     tokio::spawn(async move {
         let worker_id = format!("webhook-worker:{}", uuid::Uuid::new_v4().simple());
-        let client = match reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(5))
-            .timeout(Duration::from_secs(10))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-        {
-            Ok(client) => client,
-            Err(error) => {
-                tracing::error!(error = %error, "failed to build developer webhook client");
-                return;
-            }
-        };
         let mut interval = tokio::time::interval(Duration::from_secs(2));
         loop {
             interval.tick().await;
@@ -45,13 +33,13 @@ pub(crate) fn spawn(state: Arc<AppState>) {
                         break;
                     }
                 };
-                deliver(&state, &client, claim).await;
+                deliver(&state, claim).await;
             }
         }
     });
 }
 
-async fn deliver(state: &AppState, client: &reqwest::Client, claim: DeveloperWebhookDeliveryClaim) {
+async fn deliver(state: &AppState, claim: DeveloperWebhookDeliveryClaim) {
     let current_key_id = match crate::open_commerce_webhook_security::webhook_master_key_id() {
         Ok(value) => value,
         Err(_) => {
@@ -144,8 +132,32 @@ async fn deliver(state: &AppState, client: &reqwest::Client, claim: DeveloperWeb
                 return;
             }
         };
-    let response = client
-        .post(&claim.callback_url)
+    let callback_url = match crate::open_commerce_webhook_security::validate_webhook_callback_url(
+        &claim.callback_url,
+    ) {
+        Ok(value) => value,
+        Err(_) => {
+            fail(state, &claim, None, "webhook_target_invalid", None, true);
+            return;
+        }
+    };
+    let target = match crate::open_commerce_outbound_security::pinned_public_https_target(
+        &callback_url,
+        Duration::from_secs(5),
+        Duration::from_secs(10),
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::warn!(error = %error, delivery_id = %claim.delivery.id, "developer webhook target rejected");
+            fail(state, &claim, None, "webhook_target_unsafe", None, true);
+            return;
+        }
+    };
+    let response = target
+        .client
+        .post(&target.url)
         .header("content-type", "application/json")
         .header("user-agent", "yilong-open-commerce-webhook/1.0")
         .header("x-yilong-webhook-id", &claim.delivery.id)

@@ -25,7 +25,8 @@
 
 ## 仍未完成
 
-- DNS 解析地址级私网阻断与解析固定，当前安全边界依赖运营方精确白名单。
 - 多域名、子域委托、DNS TXT 证明和周期性重新验证。
 - 组织身份、工商资料、生产凭据、动态风控和公共网络准入。
 - 本批次全部编译、迁移、网络、权限和 UI 验证。
+
+域名验证现已接入公网地址解析与本次请求固定代码，但该新增安全边界同样处于 `implementation_uncompiled`，统一网络回归见 `docs/open-commerce-outbound-public-address-pinning-v1-acceptance.md`。

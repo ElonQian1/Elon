@@ -25,6 +25,9 @@ pub(crate) fn validate_webhook_callback_url(value: &str) -> Result<String> {
     if url.scheme() != "https" && !local_test {
         bail!("Webhook 回调地址必须使用 HTTPS");
     }
+    if !local_test && url.port_or_known_default() != Some(443) {
+        bail!("Webhook 回调地址必须使用标准 HTTPS 443 端口");
+    }
     if !local_test && !allowed_hosts().iter().any(|allowed| allowed == &host) {
         bail!("Webhook 主机未加入 OPEN_COMMERCE_WEBHOOK_ALLOWED_HOSTS 白名单");
     }

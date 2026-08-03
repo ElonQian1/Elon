@@ -263,6 +263,7 @@ mod open_commerce_merchant_identity_model;
 mod open_commerce_merchant_identity_service;
 mod open_commerce_migration;
 mod open_commerce_model;
+mod open_commerce_outbound_security;
 mod open_commerce_portability_adoption_api;
 mod open_commerce_portability_adoption_migration;
 mod open_commerce_portability_adoption_model;

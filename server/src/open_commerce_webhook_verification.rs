@@ -75,13 +75,21 @@ pub(crate) async fn verify_endpoint(
     let timestamp = issued_at.timestamp().to_string();
     let signature =
         crate::open_commerce_webhook_security::sign_webhook(&signing_secret, &timestamp, &body)?;
-    let client = reqwest::Client::builder()
-        .connect_timeout(StdDuration::from_secs(5))
-        .timeout(StdDuration::from_secs(10))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()?;
-    let mut response = match client
-        .post(callback_url)
+    let target = match crate::open_commerce_outbound_security::pinned_public_https_target(
+        &callback_url,
+        StdDuration::from_secs(5),
+        StdDuration::from_secs(10),
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            return verification_failed(store, app, subscription, "callback_unsafe", error)
+        }
+    };
+    let mut response = match target
+        .client
+        .post(&target.url)
         .header("content-type", "application/json")
         .header(
             "user-agent",

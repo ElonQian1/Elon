@@ -103,13 +103,21 @@ pub(crate) async fn verify_domain(
             anyhow!("域名未加入 OPEN_COMMERCE_APP_DOMAIN_ALLOWED_HOSTS 精确白名单"),
         );
     }
-    let client = reqwest::Client::builder()
-        .connect_timeout(StdDuration::from_secs(5))
-        .timeout(StdDuration::from_secs(10))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()?;
-    let mut response = match client
-        .get(&verification_url)
+    let target = match crate::open_commerce_outbound_security::pinned_public_https_target(
+        &verification_url,
+        StdDuration::from_secs(5),
+        StdDuration::from_secs(10),
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => {
+            return verification_failed(store, &app, &challenge, actor, "target_unsafe", error)
+        }
+    };
+    let mut response = match target
+        .client
+        .get(&target.url)
         .header("user-agent", "yilong-open-commerce-domain-verification/1.0")
         .send()
         .await
