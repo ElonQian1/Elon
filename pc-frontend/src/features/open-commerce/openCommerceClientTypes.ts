@@ -514,6 +514,55 @@ export interface ConsumerPortabilityMergeAdoptionList {
   adoptions: ConsumerPortabilityMergeAdoption[]
 }
 
+export interface ConsumerDataVaultEnvelope {
+  schema: 'open_commerce.consumer_data_vault_envelope.v1'
+  record_id: string
+  revision: number
+  kdf: {
+    name: 'PBKDF2'
+    hash: 'SHA-256'
+    iterations: 310000
+    salt_base64: string
+  }
+  cipher: {
+    name: 'AES-256-GCM'
+    nonce_base64: string
+    auth_tag_length_bits: 128
+  }
+  ciphertext_base64: string
+  created_at: string
+}
+
+export type ConsumerDataVaultItemKind =
+  | 'private_note'
+  | 'identity'
+  | 'health'
+  | 'finance'
+  | 'credential_reference'
+  | 'custom'
+
+export interface ConsumerDataVaultItemSummary {
+  schema: 'open_commerce.consumer_data_vault_item.v1'
+  id: string
+  label: string
+  item_kind: ConsumerDataVaultItemKind
+  ciphertext_sha256: string
+  ciphertext_bytes: number
+  revision: number
+  server_can_decrypt: false
+  created_at: string
+  updated_at: string
+}
+
+export interface ConsumerDataVaultItem extends ConsumerDataVaultItemSummary {
+  envelope: ConsumerDataVaultEnvelope
+}
+
+export interface ConsumerDataVaultItemList {
+  schema: 'open_commerce.consumer_data_vault_items.v1'
+  items: ConsumerDataVaultItemSummary[]
+}
+
 export interface PortabilityRelationshipMapping {
   schema: 'open_commerce.portability_relationship_mapping.v1'
   id: string

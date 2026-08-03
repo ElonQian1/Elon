@@ -196,6 +196,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (159, "Sui 离线预检显式任务与短时租约", crate::task_sui_preflight_job_migration::migration_v159),
     (160, "消费者删除请求外部系统证明账本", crate::open_commerce_data_erasure_evidence_migration::migration_v160),
     (161, "消费者多来源偏好冲突预演、采用与回滚", crate::open_commerce_portability_merge_migration::migration_v161),
+    (162, "消费者客户端加密数据保险箱", crate::open_commerce_consumer_vault_migration::migration_v162),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

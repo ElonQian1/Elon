@@ -11,6 +11,11 @@ import type {
   ConsumerDiscoveryResponse,
   ConsumerDataErasureEvidence,
   ConsumerDataErasureEvidenceList,
+  ConsumerDataVaultEnvelope,
+  ConsumerDataVaultItem,
+  ConsumerDataVaultItemKind,
+  ConsumerDataVaultItemList,
+  ConsumerDataVaultItemSummary,
   ConsumerDataRequest,
   ConsumerDataRequestList,
   ConsumerInvocationReceipt,
@@ -327,6 +332,52 @@ export const openCommerceClientApi = {
   ) => api.post<ConsumerPortabilityMergeAdoption>(
     `${projectBase(projectId)}/consumer-portability-merge-adoptions/${encodeURIComponent(adoptionId)}/rollback`,
     { expected_current_revision: expectedCurrentRevision, confirmed_by_user: true },
+  ),
+
+  listConsumerDataVaultItems: (projectId: string) =>
+    api.get<ConsumerDataVaultItemList>(
+      `${projectBase(projectId)}/consumer-data-vault-items`,
+    ),
+
+  getConsumerDataVaultItem: (projectId: string, itemId: string) =>
+    api.get<ConsumerDataVaultItem>(
+      `${projectBase(projectId)}/consumer-data-vault-items/${encodeURIComponent(itemId)}`,
+    ),
+
+  createConsumerDataVaultItem: (
+    projectId: string,
+    request: {
+      id: string
+      label: string
+      item_kind: ConsumerDataVaultItemKind
+      envelope: ConsumerDataVaultEnvelope
+    },
+  ) => api.post<ConsumerDataVaultItem>(
+    `${projectBase(projectId)}/consumer-data-vault-items`,
+    request,
+  ),
+
+  updateConsumerDataVaultItem: (
+    projectId: string,
+    itemId: string,
+    request: {
+      expected_revision: number
+      label: string
+      item_kind: ConsumerDataVaultItemKind
+      envelope: ConsumerDataVaultEnvelope
+    },
+  ) => api.post<ConsumerDataVaultItem>(
+    `${projectBase(projectId)}/consumer-data-vault-items/${encodeURIComponent(itemId)}/update`,
+    request,
+  ),
+
+  deleteConsumerDataVaultItem: (
+    projectId: string,
+    itemId: string,
+    expectedRevision: number,
+  ) => api.post<ConsumerDataVaultItemSummary>(
+    `${projectBase(projectId)}/consumer-data-vault-items/${encodeURIComponent(itemId)}/delete`,
+    { expected_revision: expectedRevision, confirmed_by_user: true },
   ),
 
   listPortabilityRelationshipMappings: (projectId: string) =>

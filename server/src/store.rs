@@ -77,6 +77,7 @@ mod open_commerce_consumer_portability_trust;
 mod open_commerce_consumer_preferences;
 mod open_commerce_consumer_receipts;
 mod open_commerce_consumer_relationships;
+mod open_commerce_consumer_vault;
 mod open_commerce_data_erasure_evidence;
 mod open_commerce_developer_app_admissions;
 mod open_commerce_developer_app_domains;
