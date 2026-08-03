@@ -23,8 +23,8 @@ owners: backend, node, ai-economy
 | 能力 | 2026-08-04 状态 |
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
-| Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 正在铺设代码，尚未编译和运行验证 |
-| 节点按需插件下载与通用任务执行 | 已接受设计，尚未实现 |
+| Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码已写，尚未编译、接线和运行验证 |
+| 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；下载、Sidecar 和通用任务未实现 |
 | 外部算力池适配器与统一报价 | 已接受设计，尚未实现 |
 | 多源验证、标准化 SKU 与期货锁价结算 | 已接受设计，尚未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |

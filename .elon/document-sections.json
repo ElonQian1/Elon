@@ -872,7 +872,11 @@
       "owner": "分布式算力节点",
       "reviewed_at": "2026-08-04",
       "review_interval_days": 60,
-      "implementation_refs": [],
+      "implementation_refs": [
+        "file:server/src/node_agent_compute_plugin_host/mod.rs",
+        "file:server/src/node_agent_session.rs",
+        "file:server/src/node_agent_local_llm.rs"
+      ],
       "related": [
         "docs/distributed-compute/architecture.md",
         "docs/node-agent-upgrade-compatibility.md"
@@ -2182,6 +2186,13 @@
   },
   "audit_log": [
     {
+      "id": "distributed-compute-node-host-seam-20260804",
+      "action": "document.knowledge_graph.update",
+      "target": ".elon/document-sections.json",
+      "summary": "登记未编译的 NodeAgent 内部 legacy Host seam，并保持按需下载、Sidecar、typed events、capability 与 Offer 发布为未实现边界",
+      "at": "2026-08-04T03:50:00Z"
+    },
+    {
       "id": "distributed-compute-federation-v1-20260804",
       "action": "document.knowledge_graph.update",
       "target": ".elon/document-sections.json",
@@ -2355,7 +2366,7 @@
         "view": "architecture",
         "kind": "planned_component",
         "label": "按需算力插件运行时",
-        "detail": "共享开启后才安装的 Node Core、Plugin Host、Runtime Plugin 与模型工件",
+        "detail": "旧 LLM 已形成未编译的内部 Host seam；按需 Node Core、Sidecar、Runtime Plugin 与模型工件仍未实现",
         "parent_id": "arch-node",
         "order": 20,
         "color": "#65A8C8",
@@ -2363,7 +2374,10 @@
         "document_paths": [
           "docs/distributed-compute/node-client-and-plugins.md"
         ],
-        "implementation_refs": [],
+        "implementation_refs": [
+          "file:server/src/node_agent_compute_plugin_host/mod.rs",
+          "file:server/src/node_agent_session.rs"
+        ],
         "tags": [
           "planned",
           "plugin",

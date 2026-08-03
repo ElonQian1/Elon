@@ -80,7 +80,7 @@ ready -> draining -> disabled -> removed
 4. `runner.llama-cpp.cuda12.v1`：NVIDIA GPU；
 5. `runner.llama-cpp.directml.v1`：Windows 多品牌 GPU。
 
-首批优先把现有 `LlmStreamRequest` 经 NodeAgent 内部 Host seam 委托给旧本地推理实现，输出仍保持原有 Chunk/End/Error。此时只能称为“兼容路径接入 Plugin Host”，不能宣称通用插件下载与协议已完成。
+首批代码已经把现有 `LlmStreamRequest` 经 NodeAgent 内部 Host seam 委托给旧本地推理实现，输出仍由原实现产生 Chunk/End/Error。内部登记使用稳定 `runner_id` 和本机 revision，不序列化成 Plugin Manifest，也不发布新 capability。该代码尚未编译；此时只能称为“兼容路径接入 Host seam”，不能宣称通用插件下载与协议已完成。
 
 ## 8. Host 与 Sidecar 边界
 
@@ -118,4 +118,4 @@ V1 只运行平台批准的任务种类和签名 Runner，不接受请求方上�
 
 ## 12. 当前未验证声明
 
-本文是已接受的客户端目标设计。插件安装器、Sidecar IPC、通用能力上报和 Offer 发布尚未实现；当前阶段不编译或启动节点。
+本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam 已形成代码但尚未编译或启动；插件安装器、Sidecar IPC、typed plugin events、通用能力上报和 Offer 发布仍未实现。
