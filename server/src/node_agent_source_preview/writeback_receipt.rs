@@ -226,6 +226,15 @@ pub(crate) fn complete_writeback_receipt(
     Ok(state.receipt.clone())
 }
 
+pub(crate) fn get_writeback_receipt(
+    project_root: &str,
+    receipt_id: &str,
+) -> Result<WritebackReceipt> {
+    let receipt_id = safe_identifier(receipt_id, "receiptId")?;
+    let root = canonical_project_root(project_root)?;
+    Ok(read_receipt_state(&root, &receipt_id)?.receipt)
+}
+
 fn validate_platform_update(
     platform: &str,
     update: PlatformReceiptUpdate,

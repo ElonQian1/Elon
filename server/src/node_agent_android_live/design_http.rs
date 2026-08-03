@@ -19,6 +19,10 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
     Router::new()
         .route("/api/android-live/design/targets", post(list_targets))
         .route(
+            "/api/android-live/design/capabilities",
+            post(get_capabilities),
+        )
+        .route(
             "/api/android-live/design/sessions/list",
             post(list_sessions),
         )
@@ -86,6 +90,17 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/design/drafts/:draft_id/writeback/complete",
             post(complete_draft_writeback),
         )
+        .route(
+            "/api/android-live/design/drafts/:draft_id/verification-matrix",
+            post(get_verification_matrix),
+        )
+}
+
+async fn get_capabilities(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Json(arguments): Json<Value>,
+) -> Response {
+    call(&runtime, "ui_get_design_capabilities", arguments).await
 }
 
 async fn list_targets(
@@ -277,6 +292,15 @@ async fn complete_draft_writeback(
 ) -> Response {
     arguments["draftId"] = json!(draft_id);
     call(&runtime, "ui_complete_design_writeback", arguments).await
+}
+
+async fn get_verification_matrix(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(draft_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["draftId"] = json!(draft_id);
+    call(&runtime, "ui_get_design_verification_matrix", arguments).await
 }
 
 fn artifact_response(artifact: super::design_session_store::VerifiedPixelArtifact) -> Response {

@@ -25,6 +25,7 @@ mod design_session_store;
 mod design_target_discovery;
 mod design_targets;
 mod design_tools;
+mod design_verification_matrix;
 mod desktop_task;
 mod emulator_start;
 mod fit_learning;
