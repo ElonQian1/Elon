@@ -59,11 +59,13 @@ flowchart LR
 
 ### ComputeProvider
 
-稳定身份、Provider 类型、所有者、状态、信任等级和 Adapter 引用。身份不承载瞬时能力，瞬时能力由 Offer 表达。
+稳定身份、Provider 类型、所有者、状态、信任等级和 Adapter 引用。`ComputeProviderCapabilities` 只表达任务种类、加速器、区域、数据等级、流式与检查点等稳定支持包络，不携带并发数、当前可用量或可出售容量。瞬时供给和商业承诺由 Offer 表达。
 
 ### ComputeOffer
 
-Provider 发布的不可变版本，包含支持的任务类型、模型/工件摘要、运行时、精度、上下文档位、容量、并发、区域、交付窗口、价格来源和可用期限。更新供给必须创建新版本。
+Provider 发布的不可变版本，包含支持的任务类型、模型/工件摘要、运行时、精度、上下文档位、容量、区域、交付窗口、价格来源和可用期限。`execution_limits` 是该 Offer 最大并发 Attempt 与单次最长运行时间的唯一合同权威；本机策略可以更严格地降额或拒绝，但不能扩大 Offer。
+
+每个 meter 的 capacity 行只声明该 Offer 版本发布时的 `total_units` 和 `reservable_units`，不保存实时 `committed` 或剩余数量。更新供给条款必须创建新版本；真实的持有、预留、承诺、消费和释放数量由后续原子容量账本维护，不能回写不可变 Offer。
 
 ### WorkloadSpec
 
@@ -75,11 +77,13 @@ Provider 发布的不可变版本，包含支持的任务类型、模型/工件�
 
 ### ComputeReservation
 
-在派发前原子占用 Offer 容量和消费者预算。Reservation 有明确的到期时间；失败或到期后幂等释放。
+在派发前原子占用所选 Offer 背后的容量和消费者预算。Reservation 有明确的到期时间；失败或到期后幂等释放。Offer Registry 与 Broker 落地后，实时剩余量必须从原子容量账本得出，而不是从 Provider 包络或 Offer 静态字段反推。
 
 ### ComputeAttemptLease
 
 一次具体执行尝试。每次重试递增 `attempt_no` 和 `fencing_generation`，续租不能复活已过期尝试。迟到结果可以留作审计，但不能覆盖拥有更高 `fencing_generation` 的结果。秘密租约凭据只用于鉴权，不承担代次语义。
+
+本批已形成 NodeAgent Host 内部的 Attempt command 与 typed event 合同：`start`、`renew_lease`、`cancel` 命令绑定不可变 Attempt 身份、Offer、Runner、模型、资源限制和截止时间；Runner 事件不自带可信 Attempt 身份，由 Host 根据活动命令补写租约、Attempt 编号和 `fencing_generation`。这些结构尚未编译、未接入云端线协议、Sidecar IPC、Broker 或真实节点执行，不能视为通用任务通道已经可用。
 
 ### ExecutionReceipt
 
@@ -147,8 +151,10 @@ Adapter 必须把外部错误归一为稳定错误码，并保存原始 Provider
 
 现有节点模型共享继续提供 `llm_chat` 兼容供给，其白名单、每日 Token 预留、流租约和账本不被删除。新的 Federation 层先把它映射为 Provider、Offer、Job 和 Receipt，再逐步把直接路由迁移到 Broker。
 
+兼容策略中的节点级 `max_concurrent_runs` 是本机共享安全上限。生成 Federation Offer 时可以据此收紧 `execution_limits`，但同一节点发布多个 Offer 时不得把完整节点并发额度复制成每个 Offer 各自独立可售的容量；跨 Offer 的共同占用必须等待共享容量池与原子账本形成后再承诺。
+
 现有 `LlmStreamRequest` 第一批不升级线协议；只有节点明确上报新 capability 后，服务端才可以发送通用 Compute Job。旧节点始终保留旧路径。
 
 ## 9. 当前未验证声明
 
-本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；代码存在不代表运行时已经采用这些合同。
+本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；Provider/Offer 容量合同以及本批新增的 Attempt command/events 都尚未编译和接线，代码存在不代表运行时已经采用这些合同。

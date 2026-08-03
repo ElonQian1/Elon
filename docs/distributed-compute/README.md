@@ -24,7 +24,9 @@ owners: backend, node, ai-economy
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
 | Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码已写，尚未编译、接线和运行验证 |
-| 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；下载、Sidecar 和通用任务未实现 |
+| 节点插件治理合同 | Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 与短期 ReadyCapability 合同已写，尚未编译或接线 |
+| 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
+| 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 外部算力池适配器与统一报价 | 已接受设计，尚未实现 |
 | 多源验证、标准化 SKU 与期货锁价结算 | 已接受设计，尚未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
@@ -43,11 +45,13 @@ owners: backend, node, ai-economy
 
 ### F0：统一语言和合同
 
-建立版本化的 Provider、Offer、Workload、Job、Reservation、Attempt Lease、Execution Receipt、Settlement Receipt 和 Price Snapshot。现有 `LlmStreamRequest` 继续工作，不在首批协议变更中制造强制升级。
+版本化的 Provider、Offer、Workload、Job、Reservation、Attempt Lease、Execution Receipt、Settlement Receipt 和 Price Snapshot 基础合同已经写入代码。节点侧还形成了带 `fencing_generation` 的 Start / RenewLease / Cancel Attempt 命令、Runner typed events 和 Host 盖章事件合同；这些代码均尚未编译、接线或运行验证。现有 `LlmStreamRequest` 继续工作，不在首批协议变更中制造强制升级。
 
 ### F1：用户节点成为可插拔 Provider
 
-在节点内加入 Compute Bootstrap 和 Plugin Host seam。共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。
+节点内部已经形成 Plugin Host 兼容 seam，以及 Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架，均尚未编译或接线。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**；只有控制面结合策略、容量和价格后才能发布版本化 Offer。
+
+目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。真实下载器、Sidecar 进程与 IPC、动态健康状态、云端 capability gate、通用 Attempt 协议接线和 Offer 发布目前都未实现。
 
 ### F2：Broker、验证和真实结算
 

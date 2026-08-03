@@ -815,6 +815,7 @@
       "review_interval_days": 30,
       "implementation_refs": [
         "file:server/src/compute_federation/mod.rs",
+        "file:server/src/node_agent_compute_plugin_host/mod.rs",
         "file:server/src/node_compute_sharing.rs"
       ],
       "related": [
@@ -836,7 +837,8 @@
       "reviewed_at": "2026-08-04",
       "review_interval_days": 60,
       "implementation_refs": [
-        "file:server/src/compute_federation/mod.rs"
+        "file:server/src/compute_federation/mod.rs",
+        "file:server/src/node_agent_compute_plugin_host/attempt_contract.rs"
       ],
       "related": [
         "docs/distributed-compute/README.md",
@@ -855,6 +857,7 @@
       "review_interval_days": 60,
       "implementation_refs": [
         "file:server/src/compute_federation/mod.rs",
+        "file:server/src/node_agent_compute_plugin_host/runner_events.rs",
         "file:server/src/node_router.rs"
       ],
       "related": [
@@ -874,6 +877,12 @@
       "review_interval_days": 60,
       "implementation_refs": [
         "file:server/src/node_agent_compute_plugin_host/mod.rs",
+        "file:server/src/node_agent_compute_plugin_host/plugin_manifest.rs",
+        "file:server/src/node_agent_compute_plugin_host/install_plan.rs",
+        "file:server/src/node_agent_compute_plugin_host/lifecycle.rs",
+        "file:server/src/node_agent_compute_plugin_host/ready_capability.rs",
+        "file:server/src/node_agent_compute_plugin_host/attempt_contract.rs",
+        "file:server/src/node_agent_compute_plugin_host/runner_events.rs",
         "file:server/src/node_agent_session.rs",
         "file:server/src/node_agent_local_llm.rs"
       ],
@@ -2186,6 +2195,13 @@
   },
   "audit_log": [
     {
+      "id": "distributed-compute-node-contracts-20260804",
+      "action": "document.knowledge_graph.update",
+      "target": ".elon/document-sections.json",
+      "summary": "登记未编译的签名插件清单、零下载安装计划、双槽生命周期、短时 ReadyCapability、Attempt 命令和 Host 盖章事件合同，并保持下载器、Sidecar 与协议接线为未实现边界",
+      "at": "2026-08-04T04:05:00Z"
+    },
+    {
       "id": "distributed-compute-node-host-seam-20260804",
       "action": "document.knowledge_graph.update",
       "target": ".elon/document-sections.json",
@@ -2294,7 +2310,7 @@
         "view": "capabilities",
         "kind": "planned_capability",
         "label": "任务级算力联邦 V1",
-        "detail": "方向已接受且基础合同已写入；Broker、外部 Provider、通用任务与运行接线尚未实现",
+        "detail": "云端领域合同与节点 Manifest、Plan、Attempt、typed event 合同已写入且未编译；Broker、外部 Provider 和运行接线尚未实现",
         "parent_id": "cap-distributed-compute",
         "order": 20,
         "color": "#48A889",
@@ -2305,7 +2321,8 @@
           "docs/distributed-compute/node-client-and-plugins.md"
         ],
         "implementation_refs": [
-          "file:server/src/compute_federation/mod.rs"
+          "file:server/src/compute_federation/mod.rs",
+          "file:server/src/node_agent_compute_plugin_host/attempt_contract.rs"
         ],
         "tags": [
           "planned",
@@ -2366,7 +2383,7 @@
         "view": "architecture",
         "kind": "planned_component",
         "label": "按需算力插件运行时",
-        "detail": "旧 LLM 已形成未编译的内部 Host seam；按需 Node Core、Sidecar、Runtime Plugin 与模型工件仍未实现",
+        "detail": "旧 LLM Host seam 及 Manifest、零下载 Plan、双槽生命周期、ReadyCapability、Attempt 与 typed event 合同已写且未编译；下载器、Sidecar 与运行接线仍未实现",
         "parent_id": "arch-node",
         "order": 20,
         "color": "#65A8C8",
@@ -2376,10 +2393,17 @@
         ],
         "implementation_refs": [
           "file:server/src/node_agent_compute_plugin_host/mod.rs",
+          "file:server/src/node_agent_compute_plugin_host/plugin_manifest.rs",
+          "file:server/src/node_agent_compute_plugin_host/install_plan.rs",
+          "file:server/src/node_agent_compute_plugin_host/lifecycle.rs",
+          "file:server/src/node_agent_compute_plugin_host/ready_capability.rs",
+          "file:server/src/node_agent_compute_plugin_host/attempt_contract.rs",
+          "file:server/src/node_agent_compute_plugin_host/runner_events.rs",
           "file:server/src/node_agent_session.rs"
         ],
         "tags": [
           "planned",
+          "contract",
           "plugin",
           "node-agent",
           "on-demand"

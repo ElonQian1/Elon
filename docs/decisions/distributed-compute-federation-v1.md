@@ -32,9 +32,15 @@ implementation_status: foundation_in_progress_uncompiled
 
 建立 `ComputeProvider`、`ComputeOffer`、`WorkloadSpec`、`ComputeJob`、`ComputeReservation`、`ComputeAttemptLease`、`ExecutionReceipt`、`PriceSnapshot` 和 `SettlementReceipt`。Job 必须引用确定的 Offer 与 Price Snapshot 版本；历史版本不原地修改。
 
+Provider 只保存稳定支持包络，不保存并发或实时容量。所选 Offer 的 `execution_limits` 是最大并发 Attempt 和单次运行时长的唯一合同权威；meter capacity 只保存版本发布时的总量与可预留量，不保存实时 committed 或剩余量。真实持有、预留、承诺、消费和释放数量将在 Broker 阶段由原子容量账本维护。
+
 ### 5. Job 与 Attempt 分离
 
-一个 Job 可有多个 Attempt。每次尝试持有递增 `fencing_generation`；过期尝试不能被心跳复活，迟到结果不能覆盖新尝试。秘密租约凭据只负责鉴权，不作为代次字段。Reservation 同时保护 Provider 容量与消费者预算，并在终态幂等释放。
+一个 Job 可有多个 Attempt。每次尝试持有递增 `fencing_generation`；过期尝试不能被心跳复活，迟到结果不能覆盖新尝试。秘密租约凭据只负责鉴权，不作为代次字段。Reservation 同时保护所选 Offer 背后的容量与消费者预算，并在终态幂等释放。
+
+同一节点或资源池的并发额度不能复制给多个 Offer 后分别出售；跨 Offer 的真实剩余量必须由共享容量池和原子账本统一扣减。本机共享策略可以比 Offer 更严格，但不能成为另一套市场容量真源。
+
+本批已写入 NodeAgent Host 内部 `start`、`renew_lease`、`cancel` Attempt command，以及 Runner 原始事件和 Host 补写身份后的 Attempt event 合同。Runner 不能自报可信 Attempt 身份，Host 必须绑定活动租约与 `fencing_generation`；这些结构尚未编译，且未接入云端协议、Sidecar IPC、Broker 或真实派发。
 
 ### 6. 节点采用按需插件
 
@@ -91,4 +97,4 @@ Price Snapshot 同时冻结消费者收费和 Provider 应得规则，平台价�
 
 ## 验证状态
 
-本决定已接受。2026-08-04 按产品负责人的“先铺架构、后统一检查”指令推进：首批代码会提交但不编译、不运行、不迁移，因此在后续集成门禁通过前只能称为“基础合同已写入，尚未验证”。
+本决定已接受。2026-08-04 按产品负责人的“先铺架构、后统一检查”指令推进：首批代码会提交但不编译、不运行、不迁移；本批 Provider/Offer 容量边界和 NodeAgent Host 内部 Attempt command/events 同样尚未编译、未接线。因此在后续集成门禁通过前只能称为“基础合同已写入，尚未验证”。
