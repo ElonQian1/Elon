@@ -36,6 +36,7 @@ import type {
   DeveloperTerminalEventPage,
   DeleteConsumerPreferenceDisclosureResult,
   DeleteConsumerPreferenceProfileResult,
+  DirectoryMerchantList,
   OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
 import type {
@@ -48,6 +49,12 @@ function projectBase(projectId: string) {
 }
 
 export const openCommerceClientApi = {
+  searchDirectoryMerchants: (query: string, limit = 20) => {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (query.trim()) params.set('query', query.trim())
+    return api.get<DirectoryMerchantList>(`/api/open-commerce/merchants?${params.toString()}`)
+  },
+
   listApps: (projectId: string) =>
     api.get<DeveloperAppList>(`${projectBase(projectId)}/developer-apps`),
 
