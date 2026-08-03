@@ -235,5 +235,6 @@ const ADMISSION_SELECT: &str = "SELECT id, app_record_id, project_id, manifest_r
                 SELECT 1 FROM open_commerce_developer_production_credentials credential
                  WHERE credential.app_record_id=open_commerce_developer_app_admissions.app_record_id
                    AND credential.status='active'
+                   AND datetime(credential.expires_at) > CURRENT_TIMESTAMP
             )
        FROM open_commerce_developer_app_admissions";
