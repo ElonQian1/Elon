@@ -1,13 +1,14 @@
 use serde::Serialize;
 
 pub(crate) const COMPUTE_PLUGIN_HOST_SCHEMA: &str = "elon.compute-plugin-host.v1";
-pub(crate) const COMPUTE_TASK_KIND_LLM_CHAT_V1: &str = "llm_chat.v1";
+pub(crate) const COMPUTE_TASK_KIND_LLM_CHAT: &str = "llm_chat";
 pub(crate) const COMPUTE_PLUGIN_MODE_IN_PROCESS_LEGACY: &str = "in_process_legacy";
 
+/// Internal runner registration only; this is not a downloadable plugin manifest or ready offer.
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct ComputePluginDescriptor {
-    pub schema: &'static str,
-    pub plugin_id: &'static str,
+pub(crate) struct InternalComputeRunnerDescriptor {
+    pub host_schema: &'static str,
+    pub runner_id: &'static str,
     pub task_kinds: Vec<&'static str>,
     pub mode: &'static str,
 }
@@ -28,7 +29,7 @@ pub(crate) enum ComputePluginTask {
 impl ComputePluginTask {
     pub(crate) fn task_kind(&self) -> &'static str {
         match self {
-            Self::LlmChatV1(_) => COMPUTE_TASK_KIND_LLM_CHAT_V1,
+            Self::LlmChatV1(_) => COMPUTE_TASK_KIND_LLM_CHAT,
         }
     }
 }

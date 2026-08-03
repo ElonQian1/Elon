@@ -5,7 +5,7 @@ use crate::{node_agent_config::NodeConfig, node_agent_local_llm::run_llm_inferen
 
 use super::contract::LlmChatTask;
 
-pub(super) const LEGACY_LOCAL_LLM_PLUGIN_ID: &str = "builtin.legacy-local-llm.v1";
+pub(super) const LEGACY_LOCAL_LLM_RUNNER_ID: &str = "builtin.legacy-local-llm";
 
 #[derive(Clone)]
 pub(super) struct LegacyLocalLlmAdapter {
