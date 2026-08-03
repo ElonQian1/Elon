@@ -41,6 +41,8 @@ pub(crate) struct ConsumerDiscoveryRequest {
     #[serde(default)]
     pub max_source_age_seconds: Option<i64>,
     #[serde(default)]
+    pub price_currency: Option<String>,
+    #[serde(default)]
     pub preferences: ConsumerPreferences,
     #[serde(default = "default_limit")]
     pub limit: usize,
@@ -77,6 +79,7 @@ pub(crate) struct ConsumerDiscoveryResponse {
     pub source_requirement: &'static str,
     pub source_filter: ConsumerSourceFilter,
     pub source_filter_options: ConsumerSourceFilterOptions,
+    pub price_filter: ConsumerPriceFilter,
     pub available_ranking_policies: Vec<ConsumerRankingPolicyDescriptor>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ranking_receipt: Option<ConsumerRankingReceipt>,
@@ -111,6 +114,12 @@ pub(crate) struct ConsumerSourceFilterOptions {
 pub(crate) struct ConsumerSourceFilterOption {
     pub value: String,
     pub capability_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ConsumerPriceFilter {
+    pub currency: Option<String>,
+    pub max_unit_price_micros: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -6,8 +6,8 @@ use sha2::{Digest, Sha256};
 use crate::{
     open_commerce_consumer_model::{
         ConsumerAuthorizationState, ConsumerDiscoveryMatch, ConsumerDiscoveryRequest,
-        ConsumerDiscoveryResponse, ConsumerPreferences, ConsumerRankingReceipt,
-        ConsumerSourceFilter,
+        ConsumerDiscoveryResponse, ConsumerPreferences, ConsumerPriceFilter,
+        ConsumerRankingReceipt, ConsumerSourceFilter,
     },
     open_commerce_consumer_preference_service,
     open_commerce_consumer_ranking::{self, ConsumerRankingPolicy},
@@ -39,6 +39,7 @@ pub(crate) fn discover(
     request.preferences =
         open_commerce_consumer_preference_service::normalize_preferences(request.preferences)?;
     normalize_source_filters(&mut request)?;
+    normalize_price_filter(&mut request)?;
     let candidate_limit = request.limit.clamp(1, 50).saturating_mul(4).min(100);
     let candidates = open_commerce_directory_service::discover_merchants(
         store,
@@ -88,6 +89,7 @@ pub(crate) fn discover(
         source_requirement: source_requirement(&request),
         source_filter: source_filter(&request),
         source_filter_options,
+        price_filter: price_filter(&request),
         available_ranking_policies: open_commerce_consumer_ranking::available_ranking_policies(),
         ranking_receipt,
         matches,
@@ -111,6 +113,7 @@ fn build_ranking_receipt(
         "require_current_declaration": request.require_current_declaration,
         "require_internal_sync_receipt": request.require_internal_sync_receipt,
         "source_filter": source_filter(request),
+        "price_filter": price_filter(request),
         "preferences": &request.preferences,
         "limit": request.limit.clamp(1, 50)
     });
@@ -152,6 +155,7 @@ fn build_ranking_receipt(
         "freshness_requirement": freshness_requirement(request.require_current_declaration),
         "source_requirement": source_requirement(request),
         "source_filter": source_filter(request),
+        "price_filter": price_filter(request),
         "request_fingerprint_sha256": sha256_hex(&request_fingerprint_json),
         "eligible_match_count": eligible_match_count,
         "returned_match_count": matches.len(),
@@ -220,6 +224,13 @@ fn best_match(
         })
         .filter(|capability| {
             request
+                .price_currency
+                .as_deref()
+                .map(|currency| capability.currency == currency)
+                .unwrap_or(true)
+        })
+        .filter(|capability| {
+            request
                 .preferences
                 .max_unit_price_micros
                 .map(|maximum| capability.unit_price_micros <= maximum)
@@ -275,6 +286,13 @@ fn best_match(
     }
     if let Some(maximum) = request.max_source_age_seconds {
         reasons.push(format!("内部同步回执完成时间不超过 {maximum} 秒"));
+    }
+    if let Some(currency) = request.price_currency.as_deref() {
+        if let Some(maximum) = request.preferences.max_unit_price_micros {
+            reasons.push(format!("调用价不超过 {maximum} 微单位 {currency}"));
+        } else {
+            reasons.push(format!("调用价币种匹配 {currency}"));
+        }
     }
     let authorization =
         authorization_state(store, &detail, &capability, &request.requester_app_id)?;
@@ -335,6 +353,34 @@ fn source_filter(request: &ConsumerDiscoveryRequest) -> ConsumerSourceFilter {
         provider_key: request.source_provider_key.clone(),
         data_domain: request.source_data_domain.clone(),
         max_age_seconds: request.max_source_age_seconds,
+    }
+}
+
+fn normalize_price_filter(request: &mut ConsumerDiscoveryRequest) -> Result<()> {
+    let normalized = request
+        .price_currency
+        .take()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| value.trim().to_ascii_uppercase());
+    if let Some(currency) = normalized.as_deref() {
+        if currency.len() != 3 || !currency.bytes().all(|value| value.is_ascii_alphabetic()) {
+            bail!("价格币种必须是三位字母代码");
+        }
+    }
+    request.price_currency = normalized.or_else(|| {
+        request
+            .preferences
+            .max_unit_price_micros
+            .is_some()
+            .then(|| "CNY".to_string())
+    });
+    Ok(())
+}
+
+fn price_filter(request: &ConsumerDiscoveryRequest) -> ConsumerPriceFilter {
+    ConsumerPriceFilter {
+        currency: request.price_currency.clone(),
+        max_unit_price_micros: request.preferences.max_unit_price_micros,
     }
 }
 

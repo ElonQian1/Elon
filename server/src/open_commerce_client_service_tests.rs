@@ -135,6 +135,7 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
             source_provider_key: None,
             source_data_domain: None,
             max_source_age_seconds: None,
+            price_currency: None,
             preferences: ConsumerPreferences {
                 categories: vec!["cafe".to_string()],
                 tags: vec!["quiet".to_string()],
@@ -210,6 +211,7 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
             source_provider_key: None,
             source_data_domain: None,
             max_source_age_seconds: None,
+            price_currency: None,
             preferences: ConsumerPreferences::default(),
             limit: 10,
         },
@@ -320,6 +322,7 @@ async fn consumer_discovery_request_approval_and_test_token_invocation_form_a_lo
             source_provider_key: None,
             source_data_domain: None,
             max_source_age_seconds: None,
+            price_currency: None,
             preferences: ConsumerPreferences::default(),
             limit: 10,
         },
