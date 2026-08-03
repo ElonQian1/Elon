@@ -192,6 +192,31 @@ pub(super) fn current_registered_provider_on(
     }))
 }
 
+pub(super) fn registered_provider_version_on(
+    conn: &Connection,
+    provider_id: &str,
+    policy_revision: i64,
+) -> Result<Option<ComputeProviderRegistrationReceipt>> {
+    let Some(stored) = provider_version_on(conn, provider_id, policy_revision)? else {
+        return Ok(None);
+    };
+    let provider: ComputeProvider =
+        serde_json::from_str(&stored.provider_json).context("算力提供者历史版本 JSON 无效")?;
+    validate_provider(&provider)?;
+    let recomputed_digest = sha256_hex(stored.provider_json.as_bytes());
+    if recomputed_digest != stored.provider_digest
+        || provider.provider_id != provider_id
+        || provider.policy_revision != policy_revision
+    {
+        bail!("算力提供者历史版本身份或摘要审计失败");
+    }
+    Ok(Some(ComputeProviderRegistrationReceipt {
+        provider,
+        provider_digest: stored.provider_digest,
+        replayed: false,
+    }))
+}
+
 fn current_projection_on(
     conn: &Connection,
     provider_id: &str,
