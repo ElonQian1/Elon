@@ -52,134 +52,11 @@ impl Store {
         job: &ComputeJob,
         expected_revision: i64,
     ) -> Result<ComputeJobRegistrationReceipt> {
-        if job.job_id.trim().is_empty() || job.idempotency_key.trim().is_empty() {
-            bail!("算力 Job ID 和幂等键不能为空");
-        }
-        if expected_revision < 0 {
-            bail!("算力 Job expected_revision 不能为负数");
-        }
-        let job_json = serde_json::to_string(job)?;
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-
-        if let Some(current) = current_job_projection_on(&tx, job.job_id.trim())? {
-            let stored = job_version_on(&tx, &current.job_id, current.current_revision)?
-                .ok_or_else(|| anyhow!("算力 Job 当前历史版本缺失，拒绝继续写入"))?;
-            let current_job = audited_job_on(&tx, Some(&current), &stored)?;
-            if stored.job_json == job_json {
-                tx.commit()?;
-                return Ok(ComputeJobRegistrationReceipt {
-                    job: current_job,
-                    revision: stored.revision,
-                    job_digest: stored.job_digest,
-                    replayed: true,
-                });
-            }
-            if expected_revision != current.current_revision {
-                bail!(
-                    "算力 Job expected_revision 与当前版本不一致，当前版本为 {}",
-                    current.current_revision
-                );
-            }
-            ensure_job_update(&current_job, job)?;
-            let selection = registered_selection_on(&tx, job)?;
-            let job_digest = validate_with_selection(job, selection.as_ref())?;
-            if job.status == JOB_STATUS_QUOTED && selected_contract_changed(&current_job, job) {
-                ensure_live_selection_on(&tx, selection.as_ref())?;
-            }
-            let next_revision = current
-                .current_revision
-                .checked_add(1)
-                .ok_or_else(|| anyhow!("算力 Job 版本溢出"))?;
-            insert_job_version(&tx, job, next_revision, &job_digest, &job_json)?;
-            let selected = job.selected_offer.as_ref();
-            let updated = tx.execute(
-                "UPDATE compute_jobs
-                    SET current_revision=?1, current_job_digest=?2, status=?3,
-                        selected_provider_id=?4, selected_offer_id=?5,
-                        selected_offer_version=?6, selected_offer_digest=?7,
-                        price_snapshot_id=?8, updated_at=?9, recorded_at=?10
-                  WHERE job_id=?11 AND current_revision=?12
-                    AND current_job_digest=?13",
-                params![
-                    next_revision,
-                    job_digest,
-                    job.status,
-                    selected.map(|value| value.provider_id.as_str()),
-                    selected.map(|value| value.offer_id.as_str()),
-                    selected.map(|value| value.offer_version),
-                    selected.map(|value| value.offer_digest.as_str()),
-                    job.price_snapshot_id,
-                    job.updated_at,
-                    now(),
-                    job.job_id,
-                    current.current_revision,
-                    current.current_job_digest,
-                ],
-            )?;
-            if updated != 1 {
-                bail!("算力 Job 当前投影已变化，请基于最新版本重试");
-            }
-            tx.commit()?;
-            return Ok(ComputeJobRegistrationReceipt {
-                job: job.clone(),
-                revision: next_revision,
-                job_digest,
-                replayed: false,
-            });
-        }
-
-        if let Some(existing_job_id) = job_id_for_idempotency_on(
-            &tx,
-            job.consumer_account_id.trim(),
-            job.idempotency_key.trim(),
-        )? {
-            bail!("消费者幂等键已绑定算力 Job {existing_job_id}");
-        }
-        ensure_new_job(job, expected_revision)?;
-        let selection = registered_selection_on(&tx, job)?;
-        let job_digest = validate_with_selection(job, selection.as_ref())?;
-        let selected = job.selected_offer.as_ref();
-        tx.execute(
-            "INSERT INTO compute_jobs (
-                job_id, consumer_account_id, project_id, merchant_id,
-                idempotency_key, current_revision, current_job_digest, status,
-                selected_provider_id, selected_offer_id, selected_offer_version,
-                selected_offer_digest, price_snapshot_id,
-                max_consumer_charge_micros, currency, submitted_at,
-                updated_at, recorded_at
-             ) VALUES (
-                ?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9,
-                ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17
-             )",
-            params![
-                job.job_id,
-                job.consumer_account_id,
-                job.project_id,
-                job.merchant_id,
-                job.idempotency_key,
-                job_digest,
-                job.status,
-                selected.map(|value| value.provider_id.as_str()),
-                selected.map(|value| value.offer_id.as_str()),
-                selected.map(|value| value.offer_version),
-                selected.map(|value| value.offer_digest.as_str()),
-                job.price_snapshot_id,
-                job.max_consumer_charge_micros,
-                job.currency,
-                job.submitted_at,
-                job.updated_at,
-                now(),
-            ],
-        )?;
-        insert_job_version(&tx, job, 1, &job_digest, &job_json)?;
+        let receipt = register_compute_job_on(&tx, job, expected_revision)?;
         tx.commit()?;
-        Ok(ComputeJobRegistrationReceipt {
-            job: job.clone(),
-            revision: 1,
-            job_digest,
-            replayed: false,
-        })
+        Ok(receipt)
     }
 
     pub(crate) fn compute_job(&self, job_id: &str) -> Result<ComputeJobRegistrationReceipt> {
@@ -189,6 +66,136 @@ impl Store {
         let conn = self.conn()?;
         current_registered_job_on(&conn, job_id.trim())?.ok_or_else(|| anyhow!("算力 Job 不存在"))
     }
+}
+
+pub(super) fn register_compute_job_on(
+    conn: &Connection,
+    job: &ComputeJob,
+    expected_revision: i64,
+) -> Result<ComputeJobRegistrationReceipt> {
+    if job.job_id.trim().is_empty() || job.idempotency_key.trim().is_empty() {
+        bail!("算力 Job ID 和幂等键不能为空");
+    }
+    if expected_revision < 0 {
+        bail!("算力 Job expected_revision 不能为负数");
+    }
+    let job_json = serde_json::to_string(job)?;
+
+    if let Some(current) = current_job_projection_on(conn, job.job_id.trim())? {
+        let stored = job_version_on(conn, &current.job_id, current.current_revision)?
+            .ok_or_else(|| anyhow!("算力 Job 当前历史版本缺失，拒绝继续写入"))?;
+        let current_job = audited_job_on(conn, Some(&current), &stored)?;
+        if stored.job_json == job_json {
+            return Ok(ComputeJobRegistrationReceipt {
+                job: current_job,
+                revision: stored.revision,
+                job_digest: stored.job_digest,
+                replayed: true,
+            });
+        }
+        if expected_revision != current.current_revision {
+            bail!(
+                "算力 Job expected_revision 与当前版本不一致，当前版本为 {}",
+                current.current_revision
+            );
+        }
+        ensure_job_update(&current_job, job)?;
+        let selection = registered_selection_on(conn, job)?;
+        let job_digest = validate_with_selection(job, selection.as_ref())?;
+        if job.status == JOB_STATUS_QUOTED && selected_contract_changed(&current_job, job) {
+            ensure_live_selection_on(conn, selection.as_ref())?;
+        }
+        let next_revision = current
+            .current_revision
+            .checked_add(1)
+            .ok_or_else(|| anyhow!("算力 Job 版本溢出"))?;
+        insert_job_version(conn, job, next_revision, &job_digest, &job_json)?;
+        let selected = job.selected_offer.as_ref();
+        let updated = conn.execute(
+            "UPDATE compute_jobs
+                SET current_revision=?1, current_job_digest=?2, status=?3,
+                    selected_provider_id=?4, selected_offer_id=?5,
+                    selected_offer_version=?6, selected_offer_digest=?7,
+                    price_snapshot_id=?8, updated_at=?9, recorded_at=?10
+              WHERE job_id=?11 AND current_revision=?12
+                AND current_job_digest=?13",
+            params![
+                next_revision,
+                job_digest,
+                job.status,
+                selected.map(|value| value.provider_id.as_str()),
+                selected.map(|value| value.offer_id.as_str()),
+                selected.map(|value| value.offer_version),
+                selected.map(|value| value.offer_digest.as_str()),
+                job.price_snapshot_id,
+                job.updated_at,
+                now(),
+                job.job_id,
+                current.current_revision,
+                current.current_job_digest,
+            ],
+        )?;
+        if updated != 1 {
+            bail!("算力 Job 当前投影已变化，请基于最新版本重试");
+        }
+        return Ok(ComputeJobRegistrationReceipt {
+            job: job.clone(),
+            revision: next_revision,
+            job_digest,
+            replayed: false,
+        });
+    }
+
+    if let Some(existing_job_id) = job_id_for_idempotency_on(
+        conn,
+        job.consumer_account_id.trim(),
+        job.idempotency_key.trim(),
+    )? {
+        bail!("消费者幂等键已绑定算力 Job {existing_job_id}");
+    }
+    ensure_new_job(job, expected_revision)?;
+    let selection = registered_selection_on(conn, job)?;
+    let job_digest = validate_with_selection(job, selection.as_ref())?;
+    let selected = job.selected_offer.as_ref();
+    conn.execute(
+        "INSERT INTO compute_jobs (
+            job_id, consumer_account_id, project_id, merchant_id,
+            idempotency_key, current_revision, current_job_digest, status,
+            selected_provider_id, selected_offer_id, selected_offer_version,
+            selected_offer_digest, price_snapshot_id,
+            max_consumer_charge_micros, currency, submitted_at,
+            updated_at, recorded_at
+         ) VALUES (
+            ?1, ?2, ?3, ?4, ?5, 1, ?6, ?7, ?8, ?9,
+            ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17
+         )",
+        params![
+            job.job_id,
+            job.consumer_account_id,
+            job.project_id,
+            job.merchant_id,
+            job.idempotency_key,
+            job_digest,
+            job.status,
+            selected.map(|value| value.provider_id.as_str()),
+            selected.map(|value| value.offer_id.as_str()),
+            selected.map(|value| value.offer_version),
+            selected.map(|value| value.offer_digest.as_str()),
+            job.price_snapshot_id,
+            job.max_consumer_charge_micros,
+            job.currency,
+            job.submitted_at,
+            job.updated_at,
+            now(),
+        ],
+    )?;
+    insert_job_version(conn, job, 1, &job_digest, &job_json)?;
+    Ok(ComputeJobRegistrationReceipt {
+        job: job.clone(),
+        revision: 1,
+        job_digest,
+        replayed: false,
+    })
 }
 
 pub(super) fn current_registered_job_on(
