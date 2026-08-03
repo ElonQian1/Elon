@@ -29,6 +29,7 @@ mod compute_capacity_audit;
 mod compute_capacity_claim_rows;
 mod compute_capacity_claim_transitions;
 mod compute_capacity_claims;
+mod compute_capacity_expiry_recovery;
 mod compute_capacity_ledger;
 mod compute_capacity_posting;
 mod compute_capacity_registry;
@@ -218,6 +219,9 @@ pub(crate) use compute_capacity_claim_transitions::{
 };
 pub(crate) use compute_capacity_claims::{
     HoldComputeCapacityClaim, HoldComputeCapacityClaimLine, HoldComputeCapacityClaimReceipt,
+};
+pub(crate) use compute_capacity_expiry_recovery::{
+    ComputeCapacityExpiryRecoveryItem, ComputeCapacityExpiryRecoveryReport,
 };
 pub(crate) use compute_capacity_ledger::{
     AddComputeCapacitySupply, AddComputeCapacitySupplyLine, ComputeCapacityLedgerWriteReceipt,
