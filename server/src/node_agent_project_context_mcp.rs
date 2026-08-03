@@ -7,7 +7,7 @@
 use anyhow::{bail, Result};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::path::Path;
+use std::{path::Path, time::Instant};
 
 use crate::{
     node_agent_project_context_cache::{
@@ -25,7 +25,7 @@ use crate::{
 pub(crate) const PROFILE: &str = "context";
 pub(crate) const TOOL_NAME: &str = "project_context_plan";
 
-const SERVER_INSTRUCTIONS: &str = "Use project_context_plan only for unfamiliar, cross-file, architecture, or current-status work. It returns bounded metadata, never source bodies. Reuse plan_receipt.plan_id as previous_plan_id; an unchanged revision then returns only a small receipt. Open selected paths with Codex native tools before editing. Current files/tests decide implementation truth; binding current docs/ADRs decide accepted direction. Resolve reported source warnings explicitly. Skip precise single-file tasks.";
+const SERVER_INSTRUCTIONS: &str = "Use project_context_plan only for unfamiliar, cross-file, architecture, or current-status work. It returns bounded metadata, never source bodies. Reuse plan_receipt.plan_id as previous_plan_id; an unchanged revision then returns only a small receipt. Clean HEAD or a complete bounded dirty-content fingerprint controls cache reuse; incomplete dirty states fail closed. Open selected paths with Codex native tools before editing. Current files/tests decide implementation truth; binding current docs/ADRs decide accepted direction. Skip precise single-file tasks.";
 const MIN_RESPONSE_TOKENS: u64 = 800;
 const MAX_RESPONSE_TOKENS: u64 = 2_000;
 
@@ -53,7 +53,7 @@ pub(crate) fn handle_request(workspace: &Path, request: &McpRequest) -> Result<V
         "initialize" => Ok(json!({
             "protocolVersion": "2025-03-26",
             "capabilities": { "tools": { "listChanged": false } },
-            "serverInfo": { "name": "yilong-project-context", "version": "1.1.0" },
+            "serverInfo": { "name": "yilong-project-context", "version": "1.2.0" },
             "instructions": SERVER_INSTRUCTIONS,
         })),
         "tools/list" => Ok(json!({ "tools": [definition()] })),
@@ -105,7 +105,7 @@ pub(crate) fn definition() -> Value {
                 "force_refresh": {
                     "type": "boolean",
                     "default": false,
-                    "description": "仅怀疑索引异常时绕过 clean-worktree 短缓存。"
+                    "description": "仅怀疑索引异常时绕过短缓存。"
                 }
             }
         }
@@ -140,6 +140,7 @@ fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
 }
 
 fn build_plan(workspace: &Path, input: ContextPlanArguments) -> Result<Value> {
+    let started = Instant::now();
     let query = input.query.trim();
     if query.is_empty() {
         bail!("project_context_plan.query 不能为空");
@@ -185,7 +186,11 @@ fn build_plan(workspace: &Path, input: ContextPlanArguments) -> Result<Value> {
             store(key, plan.clone());
         }
         let status = if cache_key.is_none() {
-            "bypass_dirty_workspace"
+            if revision.git_clean == Some(false) {
+                "bypass_incomplete_dirty_fingerprint"
+            } else {
+                "bypass_unknown_revision"
+            }
         } else if input.force_refresh {
             "refreshed"
         } else {
@@ -203,13 +208,28 @@ fn build_plan(workspace: &Path, input: ContextPlanArguments) -> Result<Value> {
             cache_status,
             cache_age_ms,
             max_response_tokens,
+            elapsed_ms(started),
         ));
     }
+    let estimated_full_plan_tokens = plan
+        .pointer("/plan_receipt/estimated_full_plan_tokens")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
     plan["cache"] = json!({
         "status": cache_status,
         "age_ms": cache_age_ms,
         "ttl_seconds": 300,
-        "clean_worktree_only": true,
+        "revision_mode": revision.fingerprint_status,
+        "fingerprinted_files": revision.fingerprint_file_count,
+        "fingerprinted_bytes": revision.fingerprint_total_bytes,
+        "bypass_reason": revision.cache_bypass_reason,
+        "dirty_requires_complete_fingerprint": true,
+    });
+    plan["performance_receipt"] = json!({
+        "planning_ms": elapsed_ms(started),
+        "cache_reused": cache_status == "hit",
+        "estimated_full_plan_tokens": estimated_full_plan_tokens,
+        "estimated_tokens_avoided": 0,
     });
     Ok(plan)
 }
@@ -227,7 +247,7 @@ fn build_fresh_plan(
     let mut plan = project_navigation_plan(&raw);
     let catalog_revision = plan.get("catalog_revision").cloned().unwrap_or(Value::Null);
     plan["contract"] = json!({
-        "schema": "elon.project_context_plan.v2",
+        "schema": "elon.project_context_plan.v3",
         "read_only": true,
         "source_bodies_returned": 0,
         "native_search_replaced": false,
@@ -237,6 +257,11 @@ fn build_fresh_plan(
         "git_head": revision.git_head,
         "git_branch": revision.git_branch,
         "git_clean": revision.git_clean,
+        "worktree_fingerprint": revision.worktree_fingerprint,
+        "fingerprint_status": revision.fingerprint_status,
+        "fingerprinted_files": revision.fingerprint_file_count,
+        "fingerprinted_bytes": revision.fingerprint_total_bytes,
+        "cache_bypass_reason": revision.cache_bypass_reason,
         "catalog_revision": catalog_revision,
         "replan_when_revision_changes": true,
     });
@@ -257,7 +282,7 @@ fn build_fresh_plan(
     });
     plan = enforce_response_projection(plan, max_response_tokens);
     let receipt_material = json!({
-        "schema": "elon.project_context_receipt.v1",
+        "schema": "elon.project_context_receipt.v2",
         "query": plan.get("query"),
         "workspace_revision": plan.get("workspace_revision"),
         "catalog_revision": plan.get("catalog_revision"),
@@ -269,7 +294,7 @@ fn build_fresh_plan(
     let estimated_full_plan_tokens = serde_json::to_vec(&plan)?.len().div_ceil(4);
     plan["plan_receipt"] = json!({
         "plan_id": stable_plan_id(&receipt_material),
-        "schema": "elon.project_context_receipt.v1",
+        "schema": "elon.project_context_receipt.v2",
         "cacheable": cacheable,
         "revision_bound": true,
         "reuse_parameter": "previous_plan_id",
@@ -288,6 +313,10 @@ fn default_document_limit() -> usize {
 
 fn default_response_token_budget() -> u64 {
     1_200
+}
+
+fn elapsed_ms(started: Instant) -> u64 {
+    started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64
 }
 
 #[cfg(test)]

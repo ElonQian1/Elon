@@ -109,10 +109,21 @@ pub(crate) fn source_conflict_summary(plan: &Value, revision: &WorkspaceRevision
         }
     }
     if revision.git_clean == Some(false) {
+        let (code, action) = if revision.worktree_fingerprint.is_some() {
+            (
+                "dirty_workspace_fingerprinted",
+                "Cache is bound to changed-file content hashes; still verify local edits with native tools.",
+            )
+        } else {
+            (
+                "dirty_workspace_uncacheable",
+                "Fingerprint is incomplete, so cache reuse is disabled; verify local edits with native tools.",
+            )
+        };
         warnings.push(json!({
             "path": Value::Null,
-            "code": "dirty_workspace",
-            "action": "Verify local edits with native Git/file tools; cache is disabled."
+            "code": code,
+            "action": action,
         }));
     }
     let warning_count = warnings.len();
@@ -262,8 +273,13 @@ pub(crate) fn not_modified_response(
     cache_status: &str,
     cache_age_ms: Option<u64>,
     max_response_tokens: u64,
+    planning_ms: u64,
 ) -> Value {
-    json!({
+    let estimated_full_plan_tokens = plan
+        .pointer("/plan_receipt/estimated_full_plan_tokens")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+    let mut response = json!({
         "status": "not_modified",
         "contract": plan.get("contract"),
         "plan_receipt": plan.get("plan_receipt"),
@@ -279,12 +295,28 @@ pub(crate) fn not_modified_response(
         },
         "response_projection": {"max_estimated_tokens":max_response_tokens,"delta_only":true},
         "instruction": "Reuse the prior plan; do not repeat project-wide search. Re-plan only when Git/catalog revision or task scope changes."
-    })
+    });
+    for _ in 0..4 {
+        let estimated_delta_tokens =
+            serde_json::to_vec(&response).map_or(0, |encoded| encoded.len().div_ceil(4)) as u64;
+        let performance = json!({
+            "planning_ms": planning_ms,
+            "cache_reused": cache_status == "hit",
+            "estimated_full_plan_tokens": estimated_full_plan_tokens,
+            "estimated_delta_tokens_before_response_budget": estimated_delta_tokens,
+            "estimated_tokens_avoided": estimated_full_plan_tokens.saturating_sub(estimated_delta_tokens),
+        });
+        if response.get("performance_receipt") == Some(&performance) {
+            break;
+        }
+        response["performance_receipt"] = performance;
+    }
+    response
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{enforce_response_projection, project_navigation_plan};
+    use super::{enforce_response_projection, not_modified_response, project_navigation_plan};
     use serde_json::json;
 
     #[test]
@@ -309,5 +341,22 @@ mod tests {
         });
         let bounded = enforce_response_projection(large, 800);
         assert!(serde_json::to_vec(&bounded).unwrap().len() < 3_200);
+    }
+
+    #[test]
+    fn unchanged_receipt_reports_estimated_token_savings() {
+        let plan = json!({
+            "plan_receipt":{"plan_id":"ctx_1","estimated_full_plan_tokens":1200},
+            "workspace_revision":{"git_head":"abc"},
+            "contract":{"source_bodies_returned":0},
+        });
+        let receipt = not_modified_response(&plan, "hit", Some(10), 1200, 5);
+        assert_eq!(receipt["performance_receipt"]["planning_ms"], 5);
+        assert!(
+            receipt["performance_receipt"]["estimated_tokens_avoided"]
+                .as_u64()
+                .unwrap()
+                > 0
+        );
     }
 }

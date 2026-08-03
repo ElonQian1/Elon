@@ -1,6 +1,6 @@
 # 项目文档治理 MCP
 
-最后更新：2026-08-03
+最后更新：2026-08-04
 
 本文是接入或诊断项目文档治理 MCP 时才读取的按需手册。日常文档任务先遵循 `.github/instructions/document-authority.instructions.md`，不要把本文复制到 Codex、Claude、Gemini 或 Copilot 的私有桥接文件。
 
@@ -60,9 +60,11 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 输入当前任务和最多 2400 token、8 份文档的后续阅读规划预算；`max_response_tokens` 另把本工具结构化输出限制在约 800–2000 token，默认 1200。投影只保留少量图节点、每节点最多 4 个文档路径和 4 个实现引用、每文档最多 4 个标题，并在超预算时继续删减或退化为路径摘要。输出不含 Markdown 或源码正文。
 
-响应的 `plan_receipt.plan_id` 绑定查询、Git HEAD、catalog revision 和实际返回的选择，并记录 `estimated_full_plan_tokens` 供调用方统计节省量。代理在同一任务再次调用时必须把它传为 `previous_plan_id`；revision 和选择未变时只返回 `status=not_modified` 小回执，不重复发送阅读计划。clean worktree 的相同请求使用进程内 5 分钟、最多 64 项的 LRU 缓存；dirty worktree 始终绕过缓存并产生 `dirty_workspace` 警告，避免本地修改被旧索引遮蔽。只有怀疑索引异常时才传 `force_refresh=true`。
+响应的 `plan_receipt.plan_id` 绑定查询、Git HEAD、catalog revision、dirty worktree 指纹和实际返回的选择，并记录 `estimated_full_plan_tokens`。代理在同一任务再次调用时必须把它传为 `previous_plan_id`；revision 和选择未变时只返回 `status=not_modified` 小回执，不重复发送阅读计划。`performance_receipt` 同时报告本次规划耗时、是否复用缓存、完整/小回执估算 token 和本次预计避免量，供调用方量化收益。
 
-`source_policy.precedence` 明确实现真源、接受方向和仅导航信源；`source_conflict_summary` 只根据元数据报告歧义、非当前、非权威和 dirty worktree 风险，并明确 `semantic_content_compared=false`，不得冒充已经比较过正文冲突。代理只打开结果中的少量路径、章节和 `implementation_refs`；已有精确文件/符号时不调用。Git HEAD、catalog revision 或任务范围变化后重新规划；否则复用回执。本工具减少首次宽搜和重复读取，不替代供应商自己的文件工具。
+相同请求使用进程内 5 分钟、最多 64 项的 LRU 缓存。clean worktree 绑定 Git HEAD；dirty worktree 只在 Git 报告的变更及未跟踪普通文件不超过 256 个、合计不超过 64 MiB，且路径、符号链接、读取和前后状态复核全部安全时，才以流式 SHA-256 内容指纹加入缓存键。超限、非普通文件、越界/符号链接、读取失败或采样期间变化均不缓存，并返回 `fingerprint_status` 与 `cache_bypass_reason`。哈希内容不会进入 MCP 响应。只有怀疑索引异常时才传 `force_refresh=true`。
+
+`source_policy.precedence` 明确实现真源、接受方向和仅导航信源；`source_conflict_summary` 只根据元数据报告歧义、非当前、非权威和 dirty worktree 风险，并明确 `semantic_content_compared=false`，不得冒充已经比较过正文冲突。dirty 状态即使成功指纹化也必须用原生 Git/文件工具核对；指纹只允许安全复用导航计划。代理只打开结果中的少量路径、章节和 `implementation_refs`；已有精确文件/符号时不调用。Git HEAD、worktree 指纹、catalog revision 或任务范围变化后重新规划；否则复用回执。本工具减少首次宽搜和重复读取，不替代供应商自己的文件工具。
 
 整理任务携带统一的 `authorization_mode`，所有供应商使用同一语义：
 

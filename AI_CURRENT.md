@@ -1,6 +1,6 @@
 ---
 version_status: current
-reviewed_at: 2026-08-03
+reviewed_at: 2026-08-04
 ---
 
 # 一龙项目当前事实
@@ -11,7 +11,7 @@ reviewed_at: 2026-08-03
 
 - 已实现：用户通过 Android APK 或 PC 工作台描述需求，AI CLI/API 代理在真实 Git 工作区开发、验证、构建和发布应用。
 - 已实现：项目、频道、多人/多 AI 协作、Windows 节点执行、上下文编译、项目文档治理与版本恢复等基础能力。
-- 已形成第二阶段代码、未编译：Windows 节点会为普通 Codex 编码任务注入仅含 `project_context_plan` 的项目文档 `context` profile；它最多规划 8 份文档和 2400 token 后续阅读，并把自身结构化响应限制在约 800–2000 token。clean worktree 的同 revision/查询使用 5 分钟、64 项 LRU；`plan_receipt.plan_id` 允许重复调用只返回 `not_modified` 小回执。dirty worktree 禁用缓存。响应只保留少量路径、标题、图谱入口和实现引用，不返回正文；歧义、非当前、非权威与 dirty 信源只作显式元数据警告，不冒充语义冲突已比较。精确单文件任务由 MCP 指令要求跳过，完整治理工具仍只对显式文档任务开放；其他 CLI 普通任务暂不自动注入。本批次按快速实现策略未编译、未测试。
+- 已形成第三阶段代码、未编译：Windows 节点会为普通 Codex 编码任务注入仅含 `project_context_plan` 的项目文档 `context` profile；它最多规划 8 份文档和 2400 token 后续阅读，并把自身结构化响应限制在约 800–2000 token。相同请求使用 5 分钟、64 项 LRU；clean worktree 绑定 HEAD，dirty worktree 仅在最多 256 个变更/未跟踪普通文件、合计 64 MiB 内完成路径安全、前后状态和流式 SHA-256 内容指纹后才可缓存，任何超限、符号链接、读取失败或竞态都失败关闭。`plan_receipt.plan_id` 允许重复调用只返回 `not_modified` 小回执，`performance_receipt` 报告耗时、缓存复用和估算 token 避免量。响应只保留少量路径、标题、图谱入口和实现引用，不返回正文；歧义、非当前、非权威与 dirty 信源只作显式元数据警告，不冒充语义冲突已比较。精确单文件任务由 MCP 指令要求跳过，完整治理工具仍只对显式文档任务开放；其他 CLI 普通任务暂不自动注入。本批次按快速实现策略未编译、未测试。
 - 已形成代码并通过目标 Rust `cargo check`、PC TypeScript/ESLint 门禁，尚未完成平台运行验收或节点发布：`yilong-ui-live` MCP 可在用户不打开微调画布时发现项目的 Web、PWA、Tauri 和 Android 目标，建立可由同一 canonical Git 项目的新 MCP/PC 会话恢复的后台 `designSessionId`；Web/PWA/Tauri 前端复用受控无头浏览器生成 PNG 与可查询的紧凑语义 UI 树，并只允许 click/waitFor/assertText 重放，Android 继续要求真实 Live Runtime。Tauri 可启动项目发现出的开发命令并仅从登记进程树捕获原生窗口 PNG/标题/边界/PID/SHA-256，只有成功捕获才设置 `nativeHostVerified=true`；这不证明系统菜单、原生对话框或 Rust command 行为。Web/PWA/Tauri/Android 已共用可撤销 Design Draft、项目内源码绑定、revision 并发保护和要求分平台证据的持久写回回执。PC `/pc/ui-tuner` 已形成“左侧平台/会话/UI 树、中间 WebView/原生证据与语义选区、右侧默认 Codex 对话”的同数据面客户端代码。真实浏览器、Tauri 窗口、模拟器、真机、人工视觉、完整 E2E 与已安装节点 MCP schema v1.6 升级均未执行；权威边界见 `docs/headless-ui-design-mcp.md`。
 - 已实现：开放商业网络 V1 的商户节点、能力、授权、调用、计量和审计主干；HTTP 与 MCP 共用领域服务。能力输入和处理器输出已按有限 Schema 配置失败关闭，无效输入不创建调用，无效输出以零金额失败并释放 Grant 预算，历史成功结果重放前按当前输出契约复验。
 - 已实现、生产配置依赖环境：受控 `merchant_runtime` 可把平台调用安全转交给商户自有 ERP 后端；首个 `cofficethinking` 参考节点已覆盖商品发现、服务端报价、用户确认后的幂等下单和订单查询。连接器 SDK 已落位通用 Node 运行时内核，统一签名、重放保护、Grant、订单确认、幂等生命周期、Manifest 和响应信封；商户仍需实现自己的业务处理器与生产持久化存储。运行时每次调用重新核对标准 443 HTTPS 白名单，并形成 DNS 私网拒绝、禁代理、禁重定向和单次公网地址固定代码，但该新增安全批次尚未编译或网络验证。真实公网启用仍需 HTTPS 域名、白名单和双方密钥，通用内核完整回归按当前策略后置。

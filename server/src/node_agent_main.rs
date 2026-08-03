@@ -143,6 +143,7 @@ mod node_agent_program_resolver;
 mod node_agent_project_agent_recovery;
 mod node_agent_project_agent_runs;
 mod node_agent_project_context_cache;
+mod node_agent_project_context_fingerprint;
 mod node_agent_project_context_mcp;
 mod node_agent_project_context_projection;
 mod node_agent_project_data_policy;
