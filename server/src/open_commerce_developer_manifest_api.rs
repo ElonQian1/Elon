@@ -48,6 +48,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/admin/open-commerce/developer-app-manifests/:app_record_id/review",
             post(review_manifest),
         )
+        .merge(crate::open_commerce_developer_admission_api::routes())
 }
 
 async fn issue_domain_challenge(

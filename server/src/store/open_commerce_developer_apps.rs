@@ -136,6 +136,14 @@ impl Store {
               ) AND status IN ('pending', 'retry', 'delivering')",
             params![current.id],
         )?;
+        tx.execute(
+            "UPDATE open_commerce_developer_app_admissions
+                SET status='suspended', reviewed_by_user_id=NULL,
+                    review_note='developer_app_disabled', suspended_at=?1,
+                    updated_at=?1
+              WHERE app_record_id=?2 AND status IN ('submitted', 'approved')",
+            params![timestamp, current.id],
+        )?;
         tx.commit()?;
         drop(conn);
         Ok((

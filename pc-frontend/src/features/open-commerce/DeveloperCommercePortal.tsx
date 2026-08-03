@@ -26,6 +26,8 @@ import DeveloperInvocationEvents from './DeveloperInvocationEvents'
 import DeveloperWebhookPanel from './DeveloperWebhookPanel'
 import DeveloperAppManifestPanel from './DeveloperAppManifestPanel'
 import DeveloperAppManifestReviewPanel from './DeveloperAppManifestReviewPanel'
+import DeveloperAppAdmissionPanel from './DeveloperAppAdmissionPanel'
+import DeveloperAppAdmissionReviewPanel from './DeveloperAppAdmissionReviewPanel'
 import { useAuthStore } from '../../store/auth'
 import type {
   AuthorizationRequest,
@@ -355,6 +357,10 @@ export default function DeveloperCommercePortal({
       <DeveloperAppManifestPanel projectId={projectId} apps={apps} canEdit={canEdit} onChanged={refresh} />
 
       {(systemRole === 'admin' || systemRole === 'owner') && <DeveloperAppManifestReviewPanel />}
+
+      <DeveloperAppAdmissionPanel projectId={projectId} apps={apps} canEdit={canEdit} />
+
+      {(systemRole === 'admin' || systemRole === 'owner') && <DeveloperAppAdmissionReviewPanel />}
 
       <DeveloperWebhookPanel projectId={projectId} apps={apps} canEdit={canEdit} />
 

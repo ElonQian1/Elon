@@ -19,7 +19,10 @@ impl Store {
         requested_scopes: &[String],
     ) -> Result<OpenCommerceDeveloperApp> {
         let scopes_json = serde_json::to_string(requested_scopes)?;
-        let changed = self.conn()?.execute(
+        let timestamp = now();
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let changed = tx.execute(
             "UPDATE open_commerce_developer_apps
                 SET homepage_url=?1, privacy_policy_url=?2, terms_url=?3,
                     support_email=?4, requested_scopes_json=?5,
@@ -42,7 +45,7 @@ impl Store {
                 terms_url,
                 support_email,
                 scopes_json,
-                now(),
+                timestamp,
                 project_id.trim(),
                 app_record_id.trim(),
                 expected_revision,
@@ -51,6 +54,17 @@ impl Store {
         if changed != 1 {
             bail!("App 资料已变化或应用已停用，请刷新后重试");
         }
+        tx.execute(
+            "UPDATE open_commerce_developer_app_admissions
+                SET status='changes_requested', reviewed_at=?1,
+                    reviewed_by_user_id=NULL,
+                    review_note='manifest_revision_changed', risk_tier=NULL,
+                    suspended_at=NULL, updated_at=?1
+              WHERE app_record_id=?2 AND status IN ('submitted', 'approved')",
+            params![timestamp, app_record_id.trim()],
+        )?;
+        tx.commit()?;
+        drop(conn);
         self.open_commerce_developer_app_for_project(project_id, app_record_id)
     }
 
