@@ -29,6 +29,13 @@ export {
 } from './portability-signature.js'
 
 export {
+  CONSUMER_PORTABILITY_ARCHIVE_ITERATIONS,
+  CONSUMER_PORTABILITY_ARCHIVE_SCHEMA,
+  decryptConsumerPortabilityArchive,
+  encryptConsumerPortabilityArchive,
+} from './portability-archive.js'
+
+export {
   MERCHANT_RUNTIME_ERROR_SCHEMA,
   MERCHANT_RUNTIME_MANIFEST_SCHEMA,
   MERCHANT_RUNTIME_MAX_BODY_BYTES,
