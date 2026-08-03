@@ -87,3 +87,16 @@ pub(crate) use debug_package::{
 };
 pub(crate) use mcp::descriptor_for_project as mcp_descriptor_for_project;
 pub(crate) use routes::{protected_routes, runtime_routes};
+
+pub(crate) fn design_target_profile(root: &std::path::Path) -> anyhow::Result<serde_json::Value> {
+    let (targets, files_inspected, truncated) = design_target_discovery::discover_targets(root)?;
+    Ok(serde_json::json!({
+        "schemaVersion": 1,
+        "targets": targets,
+        "scan": {
+            "filesInspected": files_inspected,
+            "truncated": truncated,
+            "contentEmbedded": false,
+        }
+    }))
+}

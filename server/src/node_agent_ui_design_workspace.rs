@@ -268,8 +268,9 @@ pub(crate) fn build_project_ui_profile(root: &Path) -> Result<Value> {
         }
     }
 
+    let design_targets = crate::node_agent_android_live::design_target_profile(root)?;
     Ok(json!({
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "projectRoot": root,
         "generatedAt": chrono::Utc::now().to_rfc3339(),
         "capabilities": {
@@ -290,6 +291,7 @@ pub(crate) fn build_project_ui_profile(root: &Path) -> Result<Value> {
             "applicationId": application_id,
             "namespace": android_namespace,
         },
+        "designTargets": design_targets,
         "candidates": {
             "buildFiles": build_files,
             "themesAndTokens": themes,
@@ -505,8 +507,14 @@ mod tests {
 
         let profile = build_project_ui_profile(&root).unwrap();
 
+        assert_eq!(profile["schemaVersion"], 3);
         assert_eq!(profile["capabilities"]["apkWebUiParityRequired"], true);
         assert_eq!(profile["capabilities"]["evidence"]["apkWebMirror"], true);
+        assert!(profile["designTargets"]["targets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|target| target["platform"] == "android"));
         fs::remove_dir_all(root).unwrap();
     }
 }
