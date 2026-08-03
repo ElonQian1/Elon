@@ -22,9 +22,10 @@ use super::{
     node_agent_route_c_status, node_agent_task_journal, node_agent_task_journal_inspect,
     node_agent_ws_control_queue, pc_storage_repo, project_git_worktree_audit,
     project_workspace_inspect, resolve_attachment_args, run_cli_prompt, run_exec,
-    run_llm_inference, run_tts_synthesis, ws_text, CliPromptRun, Credentials, NodeConfig,
-    NodeRuntime, CLOUD_WS_READ_TIMEOUT,
+    run_tts_synthesis, ws_text, CliPromptRun, Credentials, NodeConfig, NodeRuntime,
+    CLOUD_WS_READ_TIMEOUT,
 };
+use crate::node_agent_compute_plugin_host::{ComputePluginTask, LlmChatTask};
 
 const COMPLETION_REPLAY_INTERVAL: Duration = Duration::from_secs(3);
 const COMPLETION_REPLAY_SCAN_LIMIT: usize = 100;
@@ -49,6 +50,10 @@ pub(super) async fn run_session(
     // 扫描本地模型
     let models = discover_models(cfg).await;
     runtime.set_models(models.clone()).await;
+    tracing::debug!(
+        plugins = runtime.compute_plugin_host.descriptor_count(),
+        "本机 Compute Plugin Host 已初始化；尚未向云端发布新 capability"
+    );
     if models.is_empty() {
         warn!("⚠️  未发现本地 LLM，节点将以无模型状态上线（可后续发送 RegisterCapabilities 更新）");
     } else {
@@ -288,7 +293,7 @@ pub(super) async fn run_session(
         }
     });
 
-    let (cfg_r, out_tx_r, control_tx_r) = (cfg.clone(), out_tx.clone(), control_tx.clone());
+    let (out_tx_r, control_tx_r) = (out_tx.clone(), control_tx.clone());
     let read_result: Result<()> = async {
         loop {
             let frame = tokio::select! {
@@ -373,14 +378,15 @@ pub(super) async fn run_session(
                             max_tokens,
                         } => {
                             info!("📨 LLM 推理请求: {} model={}", req_id, model);
-                            let cfg_c = cfg_r.clone();
-                            let tx_c = out_tx_r.clone();
-                            tokio::spawn(async move {
-                                run_llm_inference(
-                                    &cfg_c, req_id, &model, messages, max_tokens, tx_c,
-                                )
-                                .await;
-                            });
+                            runtime.compute_plugin_host.spawn(
+                                ComputePluginTask::LlmChatV1(LlmChatTask {
+                                    req_id,
+                                    model,
+                                    messages,
+                                    max_tokens,
+                                }),
+                                out_tx_r.clone(),
+                            );
                         }
                         ServerToAgent::Ping { nonce } => {
                             let _ = control_tx_r.send(ws_text(&AgentToServer::Pong { nonce }));

@@ -48,6 +48,7 @@ mod node_agent_cli_output_aggregate;
 mod node_agent_cli_probe;
 mod node_agent_cli_runtime_policy;
 mod node_agent_completion_outbox;
+mod node_agent_compute_plugin_host;
 mod node_agent_source_preview;
 use node_agent_cli_probe::{
     cli_unavailable_after_refresh_error, probe_local_clis, LocalCliProbeSnapshot,
@@ -135,7 +136,6 @@ mod node_agent_supervision_terminal_lease_safety;
 mod node_agent_terminal_finalization;
 mod node_agent_terminal_journal;
 use node_agent_local_llm::discover_models;
-pub use node_agent_local_llm::run_llm_inference;
 mod node_agent_local_pc_frontend;
 mod node_agent_local_task_cloud_sync;
 mod node_agent_local_task_session_view;

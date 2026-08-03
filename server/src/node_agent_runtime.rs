@@ -53,6 +53,7 @@ pub(crate) struct NodeStatus {
 
 pub(crate) struct NodeRuntime {
     pub(crate) cfg: NodeConfig,
+    pub(crate) compute_plugin_host: crate::node_agent_compute_plugin_host::ComputePluginHost,
     pub(crate) install_id: String,
     pub(crate) creds: RwLock<Option<Credentials>>,
     pub(crate) status: RwLock<NodeStatus>,
@@ -128,8 +129,11 @@ impl NodeRuntime {
                 desktop_review_broker.verifier(),
                 desktop_review_nonce_ledger,
             );
+        let compute_plugin_host =
+            crate::node_agent_compute_plugin_host::ComputePluginHost::new(cfg.clone());
         Self {
             cfg,
+            compute_plugin_host,
             install_id,
             creds: RwLock::new(creds),
             status: RwLock::new(NodeStatus::default()),

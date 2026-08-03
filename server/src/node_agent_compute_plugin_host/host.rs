@@ -30,8 +30,8 @@ impl ComputePluginHost {
         }
     }
 
-    pub(crate) fn descriptors(&self) -> &[ComputePluginDescriptor] {
-        &self.descriptors
+    pub(crate) fn descriptor_count(&self) -> usize {
+        self.descriptors.len()
     }
 
     /// Preserve the existing fire-and-stream behavior while routing through the Host seam.
