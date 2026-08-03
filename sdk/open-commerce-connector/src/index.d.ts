@@ -7,6 +7,7 @@ export const ADAPTER_HANDOFF_CLAIM_POLL_SCHEMA: 'open_commerce.adapter_business_
 export const ADAPTER_HANDOFF_CLAIM_RELEASE_SCHEMA: 'open_commerce.adapter_business_handoff_claim_release.v1'
 export const ADAPTER_HANDOFF_CLAIM_RENEW_SCHEMA: 'open_commerce.adapter_business_handoff_claim_renew.v1'
 export const ADAPTER_HANDOFF_MAX_RESPONSE_BYTES: number
+export const ADAPTER_HANDOFF_WORKER_SCHEMA: 'open_commerce.adapter_handoff_worker_result.v1'
 
 export type ConnectionMode =
   | 'official_api'
@@ -210,6 +211,74 @@ export function createAdapterHandoffClient(options: {
   token: string
   fetch?: typeof globalThis.fetch
 }): AdapterHandoffClient
+
+export interface AdapterHandoffWorkerContext {
+  claim: AdapterHandoffClaim
+  idempotencyKey: string
+  attemptNo: number
+  signal: AbortSignal
+}
+
+export interface AdapterHandoffWorkerOutcome {
+  status: 'applied' | 'ignored' | 'rejected'
+  receiptKey?: string
+  targetReference?: string
+  errorCode?: string
+  completedAt?: string
+}
+
+export interface AdapterHandoffWorkerResult {
+  schema: typeof ADAPTER_HANDOFF_WORKER_SCHEMA
+  claimed: boolean
+  claimId?: string
+  invocationId?: string
+  status?: 'applied' | 'ignored' | 'rejected'
+  receipt?: Record<string, unknown>
+  retryAfterMs: number
+}
+
+export interface AdapterHandoffWorkerSummary {
+  claimed: number
+  completed: number
+  failed: number
+}
+
+export interface AdapterHandoffWorker {
+  runOnce(options?: { signal?: AbortSignal }): Promise<AdapterHandoffWorkerResult>
+  run(options?: {
+    signal?: AbortSignal
+    onResult?: (result: AdapterHandoffWorkerResult) => void | Promise<void>
+    onError?: (error: unknown) => void | Promise<void>
+  }): Promise<AdapterHandoffWorkerSummary>
+}
+
+export class AdapterHandoffReleaseError extends Error {
+  reasonCode: AdapterHandoffReleaseReason
+  constructor(reasonCode: AdapterHandoffReleaseReason, message?: string)
+}
+
+export class AdapterHandoffRejectError extends Error {
+  errorCode: string
+  constructor(errorCode: string, message?: string)
+}
+
+export function createAdapterHandoffWorker(options: {
+  client?: AdapterHandoffClient
+  baseUrl?: string
+  token?: string
+  fetch?: typeof globalThis.fetch
+  targetDomain: string
+  handler: (
+    task: AdapterHandoffClaimIssue['task'],
+    context: AdapterHandoffWorkerContext,
+  ) => AdapterHandoffWorkerOutcome | Promise<AdapterHandoffWorkerOutcome>
+  leaseSeconds?: number
+  extendSeconds?: number
+  renewBeforeSeconds?: number
+  idleDelayMs?: number
+  errorDelayMs?: number
+  completionAttempts?: number
+}): AdapterHandoffWorker
 
 export function defineConnector<T extends OpenCommerceConnector>(connector: T): Readonly<T>
 export function validateConnector<T extends OpenCommerceConnector>(connector: T): T

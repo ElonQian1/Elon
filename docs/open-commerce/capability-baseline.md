@@ -31,7 +31,7 @@
 | AI 通用功能提案治理 | 已实现 | AI 先匹配能力目录；只有经商户授权的脱敏信号才按独立实例去重聚合，维护者接受后才创建正式 Matter | `server/src/erp_blueprint/proposal.rs`、`server/src/erp_blueprint/matter_bridge.rs`、`docs/decisions/erp-feature-proposal-governance-v1.md` |
 | ERP 兼容检查、采用与回滚 | 已实现、只管理治理状态 | 不可变发布清单驱动兼容检查；实例版本与活动状态原子更新，私有扩展保持不变，但 V1 不自动执行 Git、迁移或部署 | `server/src/erp_blueprint/compatibility.rs`、`server/src/store/erp_upgrades.rs`、`docs/decisions/erp-release-upgrade-v1.md` |
 | 商户数据接入控制面 | 已实现 | 可登记厂商无关的数据来源、授权范围和数据域，以幂等同步回执记录健康度，并向开发代理提供脱敏上下文 | `server/src/open_commerce_integration_model.rs`、`docs/open-commerce-integration-control-plane-acceptance.md` |
-| 开放商业连接器 SDK | 已实现 | 提供厂商无关 Manifest、健康检查、分页同步、幂等回执和兼容性门禁；不包含任何具体大厂生产适配器 | `sdk/open-commerce-connector/`、`docs/open-commerce/connector-sdk.md` |
+| 开放商业连接器 SDK | 已实现，新增工作器完整回归后置 | 提供厂商无关 Manifest、健康检查、分页同步、幂等回执、兼容性门禁，以及可自动领取、续租、完成、释放任务的通用 ERP/CRM 工作器；工作器已通过模块语法检查，不包含任何具体大厂生产适配器 | `sdk/open-commerce-connector/`、`docs/open-commerce/connector-sdk.md` |
 | 商户主动发布与跨项目脱敏目录 | 已实现 | 商户默认私有；编辑者显式发布后，HTTP、MCP 和消费者沙盒只返回脱敏商户与能力契约，撤回后阻断外部调用 | `server/src/open_commerce_directory_service.rs`、`docs/decisions/open-commerce-directory-publication-v1.md` |
 | 消费者发现与第三方应用沙盒 | 已实现、范围受限 | 可注册、轮换、停用和重新启用测试 App，一次性显示测试 Token，跨项目发现主动发布商户，查看或撤回申请并在审批后调用；App 身份绑定所有者 | `server/src/open_commerce_client_api.rs`、`server/src/open_commerce_client_lifecycle_service.rs`、`docs/open-commerce/consumer-developer-sandbox.md` |
 | 商户可控外部调用配额 | 已实现 | 可按能力和指定 App/全部 App 配置固定时间窗上限；新调用原子计数，幂等重放不重复占额，超限记录为零金额失败并返回 429 | `server/src/open_commerce_rate_limit_service.rs`、`server/src/store/open_commerce_rate_limits.rs`、`docs/open-commerce-rate-limits-v1-acceptance.md` |
