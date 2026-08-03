@@ -7,7 +7,11 @@
     ".": {
       "types": "./src/index.d.ts",
       "default": "./src/index.js"
-    }
+    },
+    "./sui-preflight": "./src/sui-preflight.js"
+  },
+  "bin": {
+    "sui-preflight": "./bin/sui-preflight.mjs"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs"

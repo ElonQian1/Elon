@@ -17,6 +17,15 @@ export {
   createAdapterHandoffWorker,
 } from './adapter-handoff-worker.js'
 
+export {
+  SUI_ADAPTER_HANDOFF_SCHEMA,
+  SUI_PREFLIGHT_MAX_RESPONSE_BYTES,
+  SUI_PREFLIGHT_REPORT_SCHEMA,
+  SuiPreflightContractError,
+  createSuiPreflightClient,
+  verifySuiAdapterHandoff,
+} from './sui-preflight.js'
+
 export { createMemoryMerchantRuntimeIdempotencyStore } from './merchant-runtime-memory-store.js'
 
 export {

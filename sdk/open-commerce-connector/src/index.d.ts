@@ -44,6 +44,92 @@ export const CONSUMER_PORTABILITY_ARCHIVE_SCHEMA: 'open_commerce.consumer_portab
 export const CONSUMER_PORTABILITY_ARCHIVE_ITERATIONS: 310000
 export const MERCHANT_IDENTITY_ALGORITHM: 'rsa-pkcs1v15-sha256'
 export const MERCHANT_IDENTITY_PROOF_PROTOCOL: 'open_commerce.merchant_identity_proof.v1'
+export const SUI_ADAPTER_HANDOFF_SCHEMA: 'task_economy.sui_adapter_handoff.v1'
+export const SUI_PREFLIGHT_REPORT_SCHEMA: 'task_economy.sui_preflight_report.v1'
+export const SUI_PREFLIGHT_MAX_RESPONSE_BYTES: number
+
+export interface SuiAdapterHandoffBundle {
+  schema: typeof SUI_ADAPTER_HANDOFF_SCHEMA
+  package_kind: 'standard' | 'correction'
+  project_id: string
+  projection_package_id: string
+  source_id: string
+  target_network: 'devnet' | 'testnet' | 'mainnet'
+  package_schema: string
+  projection_digest: string
+  source_digest: string
+  envelope: Record<string, unknown>
+  shadow_only: true
+  atomic_bundle: boolean
+  network_submission: 'not_submitted'
+  submission_attempts: 0
+  package_created_at: string
+  constraints: {
+    allowed_adapter_action: 'offline_preflight_only'
+    signature_present: false
+    transaction_broadcast: false
+    finality_verified: false
+    funds_moved: false
+  }
+  handoff_digest: string
+}
+
+export interface SuiPreflightVerification {
+  schema: typeof SUI_ADAPTER_HANDOFF_SCHEMA
+  projectId: string
+  packageKind: 'standard' | 'correction'
+  projectionPackageId: string
+  targetNetwork: 'devnet' | 'testnet' | 'mainnet'
+  projectionDigest: string
+  handoffDigest: string
+  atomicBundle: boolean
+}
+
+export interface SuiPreflightReport {
+  schema: typeof SUI_PREFLIGHT_REPORT_SCHEMA
+  id: string
+  project_id: string
+  adapter_id: string
+  credential_version: number
+  package_kind: 'standard' | 'correction'
+  projection_package_id: string
+  target_network: 'devnet' | 'testnet' | 'mainnet'
+  handoff_digest: string
+  projection_digest: string
+  outcome: 'passed' | 'rejected'
+  summary: string
+  tool_version: string
+  idempotency_key: string
+  report_digest: string
+  created_at: string
+}
+
+export class SuiPreflightContractError extends Error {
+  code: string
+  status?: number
+  constructor(code: string, message: string, status?: number)
+}
+
+export function verifySuiAdapterHandoff(
+  bundle: SuiAdapterHandoffBundle,
+): Readonly<SuiPreflightVerification>
+
+export function createSuiPreflightClient(options: {
+  baseUrl: string
+  token: string
+  fetch?: typeof fetch
+}): Readonly<{
+  report(
+    handoff: SuiAdapterHandoffBundle,
+    input: {
+      outcome: 'passed' | 'rejected'
+      summary: string
+      toolVersion: string
+      idempotencyKey: string
+    },
+    options?: { signal?: AbortSignal },
+  ): Promise<SuiPreflightReport>
+}>
 
 export interface MerchantIdentityProof {
   key_id: string
