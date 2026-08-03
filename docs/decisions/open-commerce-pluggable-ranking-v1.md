@@ -50,3 +50,4 @@ implementation_status: implementation_uncompiled
 - `pc-frontend/src/features/open-commerce/openCommerceClientTypes.ts`
 - `pc-frontend/src/features/open-commerce/ConsumerCommerceSandbox.tsx`
 - `docs/open-commerce-pluggable-ranking-v1-acceptance.md`
+- `docs/decisions/open-commerce-consumer-ranking-receipts-v1.md`
