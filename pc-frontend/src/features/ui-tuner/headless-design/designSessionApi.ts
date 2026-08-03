@@ -2,6 +2,9 @@ import { safeNodeAdminUrl } from '../../../lib/utils'
 import { nodeApi, nodeApiBlob, probeLocalNode } from '../../node/localNodeApi'
 import type {
   DesignCaptureResult,
+  DesignBrowserInteraction,
+  DesignBrowserResult,
+  DesignCapabilities,
   DesignDraft,
   DesignDraftSummary,
   DesignPlatform,
@@ -11,6 +14,8 @@ import type {
   DesignTargetListResult,
   DesignViewport,
   DesignWritebackReceipt,
+  DesignVerificationMatrix,
+  TauriBehaviorEvidence,
   TauriRuntimeResult,
 } from './types'
 
@@ -37,6 +42,10 @@ async function call<T>(path: string, body: Record<string, unknown>, timeoutMs = 
 
 export function listDesignTargets(projectRoot: string) {
   return call<DesignTargetListResult>('/api/android-live/design/targets', { projectRoot })
+}
+
+export function getDesignCapabilities(projectRoot: string) {
+  return call<DesignCapabilities>('/api/android-live/design/capabilities', { projectRoot })
 }
 
 export function listDesignSessions(projectRoot: string, limit = 20) {
@@ -69,6 +78,44 @@ export function captureDesignSession(input: {
     `/api/android-live/design/sessions/${encodeURIComponent(input.designSessionId)}/capture`,
     { projectRoot: input.projectRoot, ...(input.capture ? { capture: input.capture } : {}) },
     60000,
+  )
+}
+
+export function prepareDesignBrowser(input: {
+  projectRoot: string
+  designSessionId: string
+  restart?: boolean
+  fixtureProfile?: string
+}) {
+  const capture = input.fixtureProfile ? { fixtureProfile: input.fixtureProfile } : undefined
+  return call<DesignBrowserResult>(
+    `/api/android-live/design/sessions/${encodeURIComponent(input.designSessionId)}/browser/prepare`,
+    { projectRoot: input.projectRoot, restart: input.restart ?? false, capture },
+    60_000,
+  )
+}
+
+export function interactDesignBrowser(input: {
+  projectRoot: string
+  designSessionId: string
+  step: DesignBrowserInteraction
+  fixtureProfile?: string
+}) {
+  return call<DesignBrowserResult>(
+    `/api/android-live/design/sessions/${encodeURIComponent(input.designSessionId)}/browser/interact`,
+    { projectRoot: input.projectRoot, capture: {
+      steps: [input.step],
+      ...(input.fixtureProfile ? { fixtureProfile: input.fixtureProfile } : {}),
+    } },
+    60_000,
+  )
+}
+
+export function stopDesignBrowser(input: { projectRoot: string; designSessionId: string }) {
+  return call<DesignBrowserResult>(
+    `/api/android-live/design/sessions/${encodeURIComponent(input.designSessionId)}/browser/stop`,
+    { projectRoot: input.projectRoot },
+    30_000,
   )
 }
 
@@ -110,6 +157,14 @@ export function prepareTauriRuntime(input: { projectRoot: string; designSessionI
 export function captureTauriHost(input: { projectRoot: string; designSessionId: string }) {
   return call<TauriRuntimeResult>(
     `/api/android-live/design/sessions/${encodeURIComponent(input.designSessionId)}/tauri/capture`,
+    { projectRoot: input.projectRoot },
+    30_000,
+  )
+}
+
+export function captureTauriBehavior(input: { projectRoot: string; designSessionId: string }) {
+  return call<{ ok: boolean; status: string; nativeBehavior: TauriBehaviorEvidence }>(
+    `/api/android-live/design/sessions/${encodeURIComponent(input.designSessionId)}/tauri/behavior`,
     { projectRoot: input.projectRoot },
     30_000,
   )
@@ -192,5 +247,12 @@ export async function beginDesignWriteback(input: {
   const { draftId, ...body } = input
   return call<{ draft: DesignDraft; receipt: DesignWritebackReceipt; next: string }>(
     `/api/android-live/design/drafts/${encodeURIComponent(draftId)}/writeback/begin`, body,
+  )
+}
+
+export function getDesignVerificationMatrix(projectRoot: string, draftId: string) {
+  return call<DesignVerificationMatrix>(
+    `/api/android-live/design/drafts/${encodeURIComponent(draftId)}/verification-matrix`,
+    { projectRoot },
   )
 }

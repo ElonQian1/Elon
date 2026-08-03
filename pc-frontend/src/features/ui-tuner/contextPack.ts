@@ -11,11 +11,15 @@ import type { PwaDraftCliCompactHandoff } from './source-preview/pwaDesignDraft'
 import type { PwaDraftAiFitTask } from './source-preview/pwaAiFitTask'
 import type {
   DesignArtifactRef,
+  DesignBrowserRuntime,
+  DesignCapabilities,
   DesignDraft,
   DesignPlatform,
   DesignWritebackReceipt,
+  DesignVerificationMatrix,
   SemanticUiNode,
   TauriNativeHostEvidence,
+  TauriBehaviorEvidence,
 } from './headless-design/types'
 
 export interface UiTunerCodexContextPack {
@@ -184,6 +188,10 @@ export interface UiTunerCodexContextPack {
     nativeHost?: TauriNativeHostEvidence
     designDraft?: DesignDraft
     writebackReceipt?: DesignWritebackReceipt
+    capabilities?: DesignCapabilities
+    browserRuntime?: DesignBrowserRuntime
+    tauriBehavior?: TauriBehaviorEvidence
+    verificationMatrix?: DesignVerificationMatrix
     selectedNode?: SemanticUiNode
     contextPolicy: {
       fullRepositoryIncluded: false
@@ -441,12 +449,13 @@ function buildHeadlessDesignTaskPrompt(pack: UiTunerCodexContextPack, userIntent
     `用户意图：${userIntent.trim() || '请修改当前页面并重新捕获后台证据。'}`,
     '',
     '执行顺序：',
-    '1. 先用 ui_list_design_sessions 恢复 designSessionId，再用 ui_get_design_surface 读取紧凑 UI 树；不要先操控 PC 桌面。',
+    '1. 先用 ui_get_design_capabilities 确认已安装节点 schema，再用 ui_list_design_sessions 恢复 designSessionId；不要先操控 PC 桌面。',
     '2. 结合 route、selector、configFiles/sourceRoots 建立最小源码绑定，只读取相关源码。',
     '3. 若 context pack 含 designDraft，先按 sourceBinding 和 expected revision 修改源码；草稿本身不是源码完成证明。',
-    '4. 需要调试交互时，在 ui_capture_design_surface.capture.steps 中只使用 click、waitFor、assertText；再读取新的 UI tree/PNG 路径与 SHA-256。',
-    '5. 用 ui_complete_design_writeback 提交 changedFiles、源码哈希和各平台 evidence；只有 receipt.complete=true 才声明完成。',
-    '6. 明确平台覆盖：只有 nativeHost.nativeHostVerified=true 才能声明 Tauri 原生窗口证据；Android 必须使用 Android Runtime。',
+    '4. Web/PWA/Tauri 前端调试优先复用 ui_prepare_design_browser / ui_interact_design_browser 的同一页面状态；fill/select 只能引用 fixtureProfile.formValues，禁止在参数中传秘密。',
+    '5. Tauri 原生层按窗口、菜单/对话框、项目插桩 command trace 分层取证；不得点击任意系统菜单或执行任意 Rust command。',
+    '6. 用 ui_complete_design_writeback 提交 changedFiles、源码哈希和各平台 evidence，再读取 ui_get_design_verification_matrix；只有 receipt.complete=true 且矩阵 PASSED 才声明完成。',
+    '7. 明确平台覆盖：只有 nativeHost.nativeHostVerified=true 才能声明 Tauri 原生窗口证据；Android 必须使用 Android Runtime。',
     '',
     'Compact context pack JSON:',
     '```json',

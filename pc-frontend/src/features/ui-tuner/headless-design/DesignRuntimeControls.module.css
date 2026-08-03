@@ -1,0 +1,97 @@
+.controls {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid #292a2d;
+  background: #111216;
+  color: #8c8e95;
+  font-size: 10px;
+}
+
+.capability,
+.browserRow,
+.fixtureRow,
+.matrixRow {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-top: 1px solid #222328;
+}
+
+.capability:first-child {
+  border-top: 0;
+}
+
+.capability strong {
+  color: #d5d7df;
+  font: 10px/1.2 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.capability span,
+.matrixRow small {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.controls button {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: 1px solid #35363a;
+  border-radius: 6px;
+  background: #1a1b1e;
+  color: #d9d9dc;
+  white-space: nowrap;
+}
+
+.controls button:disabled {
+  opacity: .42;
+}
+
+.fixtureRow input {
+  width: 110px;
+  min-width: 0;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid #34353a;
+  border-radius: 6px;
+  outline: none;
+  background: #101114;
+  color: #e3e3e6;
+  font-size: 10px;
+}
+
+.fixtureRow small {
+  color: #686b74;
+}
+
+.browserRow code {
+  color: #8f93a0;
+}
+
+.matrixRow > span {
+  padding: 3px 6px;
+  border: 1px solid #35363a;
+  border-radius: 999px;
+  color: #b8bac2;
+}
+
+.matrixRow > span[data-status='PASSED'] {
+  border-color: #376a50;
+  color: #7dd9a6;
+}
+
+.matrixRow > span[data-status='BLOCKED'] {
+  border-color: #7a3e43;
+  color: #ff969e;
+}
+
+.error {
+  color: #ff8b8b;
+}

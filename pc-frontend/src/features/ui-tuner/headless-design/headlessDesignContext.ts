@@ -3,10 +3,14 @@ import type { UiTunerCodexContextPack } from '../contextPack'
 import type {
   DesignSessionIdentity,
   DesignDraft,
+  DesignBrowserRuntime,
+  DesignCapabilities,
   DesignSurface,
   DesignTarget,
   DesignWritebackReceipt,
+  DesignVerificationMatrix,
   SemanticUiNode,
+  TauriBehaviorEvidence,
 } from './types'
 
 export function buildHeadlessDesignContext(input: {
@@ -17,8 +21,13 @@ export function buildHeadlessDesignContext(input: {
   selectedNode: SemanticUiNode | null
   designDraft: DesignDraft | null
   writebackReceipt: DesignWritebackReceipt | null
+  capabilities: DesignCapabilities | null
+  browserRuntime: DesignBrowserRuntime | null
+  tauriBehavior: TauriBehaviorEvidence | null
+  verificationMatrix: DesignVerificationMatrix | null
 }): UiTunerCodexContextPack {
-  const { projectRoot, target, session, surface, selectedNode, designDraft, writebackReceipt } = input
+  const { projectRoot, target, session, surface, selectedNode, designDraft, writebackReceipt,
+    capabilities, browserRuntime, tauriBehavior, verificationMatrix } = input
   const viewport = surface?.surface?.viewport ?? session?.viewport ?? { width: 1280, height: 800, deviceScaleFactor: 1 }
   const sourceRoots = target?.sourceRoots ?? []
   const configFiles = target?.configFiles ?? []
@@ -110,6 +119,10 @@ export function buildHeadlessDesignContext(input: {
       nativeHost: surface?.nativeHost ?? undefined,
       designDraft: designDraft ?? undefined,
       writebackReceipt: writebackReceipt ?? undefined,
+      capabilities: capabilities ?? undefined,
+      browserRuntime: browserRuntime ?? undefined,
+      tauriBehavior: tauriBehavior ?? undefined,
+      verificationMatrix: verificationMatrix ?? undefined,
       selectedNode: selectedNode ?? undefined,
       contextPolicy: {
         fullRepositoryIncluded: false,

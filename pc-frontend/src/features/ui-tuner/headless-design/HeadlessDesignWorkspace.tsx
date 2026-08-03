@@ -17,8 +17,10 @@ import { UiTunerProjectSessionPanel } from '../UiTunerProjectSessionPanel'
 import { UiWorkspaceModeBar } from '../workspace/UiWorkspaceModeBar'
 import type { SourcePreviewMode } from '../source-preview/types'
 import { buildHeadlessDesignContext } from './headlessDesignContext'
+import { DesignRuntimeControls } from './DesignRuntimeControls'
 import type { DesignPlatform, SemanticUiNode } from './types'
 import { useHeadlessDesignSession } from './useHeadlessDesignSession'
+import { useDesignRuntimeControls } from './useDesignRuntimeControls'
 import styles from './HeadlessDesignWorkspace.module.css'
 
 interface Props {
@@ -40,6 +42,14 @@ const PLATFORM_OPTIONS: Array<{
 
 export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChange }: Props) {
   const model = useHeadlessDesignSession(active, initialProjectRoot)
+  const runtimeControls = useDesignRuntimeControls({
+    active,
+    projectRoot: initialProjectRoot,
+    session: model.session,
+    draft: model.designDraft,
+    initialTauriBehavior: model.surface?.nativeBehavior ?? null,
+    onEvidenceChanged: model.reload,
+  })
   const pack = useMemo(() => buildHeadlessDesignContext({
     projectRoot: initialProjectRoot,
     target: model.target,
@@ -48,7 +58,11 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
     selectedNode: model.selectedNode,
     designDraft: model.designDraft,
     writebackReceipt: model.writebackReceipt,
-  }), [initialProjectRoot, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt])
+    capabilities: runtimeControls.capabilities,
+    browserRuntime: runtimeControls.browserResult?.runtime ?? null,
+    tauriBehavior: runtimeControls.tauriBehavior ?? model.surface?.nativeBehavior ?? null,
+    verificationMatrix: runtimeControls.verificationMatrix,
+  }), [initialProjectRoot, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt, runtimeControls.browserResult?.runtime, runtimeControls.capabilities, runtimeControls.tauriBehavior, runtimeControls.verificationMatrix])
   const intent = useMemo(() => [
     `修改 ${model.platform.toUpperCase()} 端 ${model.route || '/'} 页面。`,
     model.selectedNode
@@ -176,13 +190,20 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           <button
             type="button"
             disabled={!model.selectedNode?.interactive || model.busy}
-            title="在新的隔离后台页面中按 selector 重放点击并重新捕获"
+            title="在一次性隔离后台页面中按 selector 重放点击；需要保留状态时使用下方持久浏览器"
             onClick={() => void model.interactSelected()}
           >
             <MousePointerClick size={15} aria-hidden="true" />
             后台点击
           </button>
         </div>
+
+        <DesignRuntimeControls
+          platform={model.platform}
+          selectedNode={model.selectedNode}
+          disabled={!model.session || model.busy}
+          model={runtimeControls}
+        />
 
         {model.platform === 'tauri' && (
           <div className={styles.tauriBar}>

@@ -53,6 +53,7 @@ export interface DesignSessionSummary extends DesignSessionIdentity {
   evidenceLevel: string
   nativeHostVerified: boolean
   nativeHost?: TauriNativeHostEvidence | null
+  nativeBehavior?: TauriBehaviorEvidence | null
   hasEvidence: boolean
   pixels?: DesignArtifactRef | null
   uiTree?: DesignArtifactRef | null
@@ -136,6 +137,7 @@ export interface DesignSurface {
   pixels?: DesignArtifactRef | null
   uiTree?: DesignArtifactRef | null
   nativeHost?: TauriNativeHostEvidence | null
+  nativeBehavior?: TauriBehaviorEvidence | null
   nativeHostVerified?: boolean
   base64Embedded?: false
   next?: string
@@ -237,4 +239,98 @@ export interface DesignWritebackReceipt {
   diagnostics: string[]
   createdAt: string
   updatedAt: string
+}
+
+export interface DesignCapabilities {
+  schema: 'elon.ui-design-capabilities.v1'
+  runtimeSchema: string
+  protocolRevision: string
+  installedRuntimeEvidence: { source: 'MCP_TOOL_RESPONSE'; tool: string }
+  capabilityIds: string[]
+  platforms: Record<DesignPlatform, Record<string, unknown>>
+  limits: {
+    activeBrowserRuntimes: number
+    browserIdleMinutes: number
+    browserLifetimeMinutes: number
+    browserOperations: number
+    secretInputAllowed: false
+    arbitraryTauriCommandAllowed: false
+  }
+  project: { detectedPlatforms: DesignPlatform[]; filesInspected: number; scanTruncated: boolean }
+  contentEmbedded: false
+}
+
+export interface DesignBrowserRuntime {
+  runtimeId: string
+  status: 'READY' | string
+  targetOrigin: string
+  fixtureProfile?: string | null
+  operationCount: number
+  limits: {
+    maxActiveSessions: number
+    maxOperations: number
+    idleTtlSeconds: number
+    lifetimeTtlSeconds: number
+  }
+  statePreserved: true
+}
+
+export interface DesignBrowserResult {
+  ok: boolean
+  status: 'CAPTURED' | 'READY' | 'STOPPED' | 'NOT_RUNNING' | string
+  runtime?: DesignBrowserRuntime
+  artifact?: DesignArtifactRef
+  uiTree?: DesignArtifactRef
+  diagnostic?: { code: string; message: string; retryable: boolean; nextStep: string }
+}
+
+export type DesignBrowserInteraction =
+  | { action: 'click'; selector: string }
+  | { action: 'scrollIntoView'; selector: string }
+  | { action: 'pressKey'; selector?: string; key: 'Enter' | 'Escape' | 'Tab' | 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight' | 'Space' | 'Home' | 'End' }
+  | { action: 'fill'; selector: string; fixtureKey: string }
+  | { action: 'selectOption'; selector: string; fixtureKey: string }
+  | { action: 'setChecked'; selector: string; checked: boolean }
+
+export interface TauriBehaviorEvidence {
+  hostCoverage: 'TAURI_NATIVE_BEHAVIOR'
+  artifact: DesignArtifactRef
+  menuCoverage: 'WIN32_NATIVE_MENU_OBSERVED'
+  menuItemCount: number
+  dialogCoverage: 'DESCENDANT_TOP_LEVEL_WINDOWS_OBSERVED'
+  dialogCount: number
+  rustCommandCoverage: 'PROJECT_INSTRUMENTED_TRACE' | 'NOT_INSTRUMENTED'
+  commandEventCount: number
+  assertionsPassed: boolean
+  capturedAt: string
+  base64Embedded: false
+}
+
+export interface DesignVerificationPlatform {
+  platform: DesignPlatform
+  status: 'PASSED' | 'BLOCKED' | 'IN_PROGRESS' | 'READY' | 'NEEDS_DRAFT_OR_BINDING'
+  requirements: string[]
+  writeback: {
+    status: string
+    method?: string | null
+    evidenceComplete: boolean
+    changedFilesCount: number
+    error?: string | null
+  }
+  currentDesignSessionEvidence: Record<string, unknown>
+  codeCapabilityAvailable: true
+  runtimeVerified: boolean
+}
+
+export interface DesignVerificationMatrix {
+  schema: 'elon.ui-design-verification-matrix.v1'
+  runtimeSchema: string
+  draft: { draftId: string; revision: number; status: string; bindingReady: boolean; patchesReady: boolean }
+  designSession: { designSessionId: string; platform: DesignPlatform; state: string; hasEvidence: boolean }
+  receipt?: { receiptId: string; status: string; complete: boolean; evidenceComplete: boolean; sourceRevision: string; updatedAt: string } | null
+  platforms: DesignVerificationPlatform[]
+  overallStatus: string
+  completionRule: string
+  runtimeTestsExecuted: false
+  contentEmbedded: false
 }

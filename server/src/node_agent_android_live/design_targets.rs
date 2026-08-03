@@ -309,10 +309,12 @@ fn get_surface(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
         }));
     };
     let native_host = evidence.get("nativeHost").cloned();
+    let native_behavior = evidence.get("nativeBehavior").cloned();
     if evidence.pointer("/uiTree/path").is_none() {
         return Ok(json!({
             "session":record,"status":"NATIVE_CAPTURED","nodes":[],
-            "nativeHost":native_host,"nativeHostVerified":native_host.is_some(),
+            "nativeHost":native_host,"nativeBehavior":native_behavior,
+            "nativeHostVerified":native_host.is_some(),
             "next":CAPTURE_TOOL,"base64Embedded":false,
         }));
     }
@@ -352,6 +354,7 @@ fn get_surface(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
         "pixels":evidence.get("artifact"),
         "uiTree":evidence.get("uiTree"),
         "nativeHost":native_host,
+        "nativeBehavior":native_behavior,
         "nativeHostVerified":native_host.is_some() || record.target.native_host_verified,
         "base64Embedded":false,
     }))
