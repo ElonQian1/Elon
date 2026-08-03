@@ -16,7 +16,7 @@ source: docs/inbox/conversations/2026-07-27-open-commerce-network-chat.md
 - `docs/open-commerce-network-v1-api.md`
 - `docs/open-commerce-network-v1-acceptance.md`
 
-真实支付、第三方平台连接器、消费者数据保险箱、多排序器和联邦治理继续留在后续阶段，不进入第一版完成条件。
+真实支付、第三方平台连接器、多排序器和联邦治理继续留在后续阶段，不进入第一版完成条件。消费者客户端加密数据保险箱 V1 代码已先行形成但尚未编译，它只托管不透明密文，不代表跨运营方密钥、授权解密或身份体系已经完成。
 
 ## 阶段一：商户 AI 经营系统
 
