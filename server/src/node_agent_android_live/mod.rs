@@ -23,6 +23,7 @@ mod design_draft_preview;
 mod design_drafts;
 mod design_http;
 mod design_session_store;
+mod design_source_binding;
 mod design_target_discovery;
 mod design_targets;
 mod design_tools;

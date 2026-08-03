@@ -102,6 +102,10 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/design/drafts/:draft_id/preview/restore",
             post(restore_draft_preview),
         )
+        .route(
+            "/api/android-live/design/drafts/:draft_id/source-binding/candidates",
+            post(suggest_source_binding),
+        )
 }
 
 async fn get_capabilities(
@@ -327,6 +331,15 @@ async fn restore_draft_preview(
 ) -> Response {
     arguments["draftId"] = json!(draft_id);
     call(&runtime, "ui_restore_design_draft_preview", arguments).await
+}
+
+async fn suggest_source_binding(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(draft_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["draftId"] = json!(draft_id);
+    call(&runtime, "ui_suggest_design_source_binding", arguments).await
 }
 
 fn artifact_response(artifact: super::design_session_store::VerifiedPixelArtifact) -> Response {
