@@ -1,3 +1,5 @@
+mod intent;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -90,7 +92,7 @@ pub(crate) fn project_docs_mcp_launch_config(
 ) -> Option<ProjectDocsMcpLaunchConfig> {
     let full_governance = prompt.contains(PROJECT_DOCS_TASK_MARKER);
     let cli_name = cli_name.trim().to_ascii_lowercase();
-    if !full_governance && cli_name != "codex" {
+    if !full_governance && (cli_name != "codex" || intent::skip_context_profile(prompt)) {
         return None;
     }
     let cwd = cwd?.trim();
@@ -287,6 +289,13 @@ mod tests {
             .iter()
             .any(|arg| arg.contains("mcp_servers.yilong_project_context.url")));
         assert!(plain.args.iter().any(|arg| arg.contains("profile=context")));
+        assert!(project_docs_mcp_launch_config(
+            "请只修改 server/src/exact.rs:42 不要读取其他文件",
+            root.to_str(),
+            "codex",
+            7799,
+        )
+        .is_none());
         assert!(
             project_docs_mcp_launch_config("普通代码任务", root.to_str(), "claude", 7799).is_none()
         );
