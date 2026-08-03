@@ -242,6 +242,7 @@ MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_co
 |---|---|---|
 | `open_commerce_get_overview` | 读 | 查看当前项目网络状态 |
 | `open_commerce_get_development_context` | 读 | 获取不含密钥和原始经营数据的开发上下文 |
+| `open_commerce_list_my_consumer_apps` | 读 | 列出当前项目中本人拥有的 App 和当前 MCP 身份；不返回测试 Token 或生产凭据 |
 | `open_commerce_search_merchants` | 读 | 按文本或能力发现商户 |
 | `open_commerce_discover_for_consumer` | 读 | 按消费者偏好和硬约束透明发现商户能力，并返回候选范围、来源和授权状态；不自动调用或下单 |
 | `open_commerce_plan_consumer_capability` | 读 | 校验拟调用输入并返回调用、注册 App、授权申请、等待审批或动作确认的下一步；不创建副作用 |

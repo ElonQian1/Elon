@@ -58,6 +58,8 @@
 
 MCP 消费者 AI 可使用 `open_commerce_discover_for_consumer` 获取与上述消费者发现同源的排序、来源、筛选、候选范围和授权状态。默认 MCP 身份只按 `pc-web` 做公开发现；显式 `x-elon-app-id` 必须属于当前用户。该工具只读，不会自动申请授权、调用能力、创建订单或结算。
 
+需要选择独立 App 身份时，AI 可先调用 `open_commerce_list_my_consumer_apps`。该工具只列当前项目中本人拥有的 App，并明确当前 MCP 身份；响应不包含测试 Token、Token 提示或生产凭据。创建 App 和管理 Token 仍在开发者门户完成。
+
 选择能力后，AI 可把实际拟调用输入交给 `open_commerce_plan_consumer_capability`。计划只读返回调用、注册 App、申请授权、等待审批或动作确认的有序步骤；动作能力固定要求准备、用户明确同意、确认和调用。计划不会占用 Grant 次数或预算，也不会创建确认、调用、订单或结算记录。
 
 计划要求授权时，消费者 AI 只有在用户明确同意、MCP 使用本人已注册 App 身份并提供固定确认短语后，才能用 `open_commerce_request_consumer_authorization` 提交单能力申请。成功只表示等待商户决定；批准、拒绝、期限、总次数和总预算仍由商户控制，AI 不能自批或扩权。
