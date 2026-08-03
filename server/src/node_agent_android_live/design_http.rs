@@ -63,6 +63,10 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/design/sessions/:design_session_id/tauri/artifact",
             post(get_tauri_artifact),
         )
+        .route(
+            "/api/android-live/design/sessions/:design_session_id/tauri/behavior",
+            post(capture_tauri_behavior),
+        )
         .route("/api/android-live/design/drafts/list", post(list_drafts))
         .route("/api/android-live/design/drafts", post(create_draft))
         .route("/api/android-live/design/drafts/:draft_id", post(get_draft))
@@ -205,6 +209,15 @@ async fn get_tauri_artifact(
         Ok(artifact) => artifact_response(artifact),
         Err(error) => json_error(StatusCode::BAD_REQUEST, error),
     }
+}
+
+async fn capture_tauri_behavior(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["designSessionId"] = json!(id);
+    call(&runtime, "ui_capture_tauri_behavior", arguments).await
 }
 
 async fn list_drafts(

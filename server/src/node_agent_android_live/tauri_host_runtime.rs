@@ -35,7 +35,17 @@ struct RuntimeState {
     command: String,
     launcher_process_id: u32,
     started_at: String,
+    evidence_directory: PathBuf,
+    command_trace_path: PathBuf,
     child: Child,
+}
+
+pub(super) struct RegisteredTauriRuntime {
+    pub(super) runtime_id: String,
+    pub(super) launcher_process_id: u32,
+    pub(super) evidence_directory: PathBuf,
+    pub(super) command_trace_path: PathBuf,
+    pub(super) started_at: String,
 }
 
 static RUNTIMES: OnceLock<Mutex<HashMap<String, RuntimeState>>> = OnceLock::new();
@@ -119,6 +129,12 @@ async fn prepare(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
         .args(&spec.args)
         .current_dir(&module_root)
         .env("NO_COLOR", "1")
+        .env("ELON_UI_TAURI_DESIGN_SESSION_ID", &record.design_session_id)
+        .env("ELON_UI_TAURI_EVIDENCE_DIR", &log_dir)
+        .env(
+            "ELON_UI_TAURI_COMMAND_TRACE_FILE",
+            log_dir.join("command-events.v1.jsonl"),
+        )
         .stdin(Stdio::null())
         .stdout(Stdio::from(log.try_clone()?))
         .stderr(Stdio::from(log));
@@ -135,6 +151,8 @@ async fn prepare(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
         command: spec.display,
         launcher_process_id,
         started_at: chrono::Utc::now().to_rfc3339(),
+        evidence_directory: log_dir.clone(),
+        command_trace_path: log_dir.join("command-events.v1.jsonl"),
         child,
     };
     let view = runtime_view(&state, "STARTING", None);
@@ -145,6 +163,33 @@ async fn prepare(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
     Ok(
         json!({"ok":true,"status":"STARTING","runtime":view,"retryAfterMs":2000,"next":PREPARE_TOOL}),
     )
+}
+
+pub(super) async fn registered_runtime(
+    design_session_id: &str,
+    project_root: &Path,
+) -> Result<RegisteredTauriRuntime> {
+    validate_design_session_id(design_session_id)?;
+    let mut runtimes = runtimes().lock().await;
+    let state = runtimes
+        .get_mut(design_session_id)
+        .ok_or_else(|| anyhow!("TAURI_RUNTIME_NOT_PREPARED：先调用 {PREPARE_TOOL}"))?;
+    if state.project_root != project_root {
+        bail!("TAURI_RUNTIME_PROJECT_MISMATCH：Runtime 不属于当前项目");
+    }
+    if let Some(exit) = state.child.try_wait()? {
+        bail!(
+            "TAURI_RUNTIME_EXITED：Tauri CLI 已退出 code={:?}",
+            exit.code()
+        );
+    }
+    Ok(RegisteredTauriRuntime {
+        runtime_id: state.runtime_id.clone(),
+        launcher_process_id: state.launcher_process_id,
+        evidence_directory: state.evidence_directory.clone(),
+        command_trace_path: state.command_trace_path.clone(),
+        started_at: state.started_at.clone(),
+    })
 }
 
 async fn capture(session: &LiveUiSession, arguments: &Value) -> Result<Value> {

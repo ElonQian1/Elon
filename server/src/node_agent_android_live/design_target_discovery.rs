@@ -136,7 +136,13 @@ fn target(
         capabilities.extend(["SAFE_CLICK_REPLAY", "SEMANTIC_UI_TREE"]);
     }
     if platform == DesignPlatform::Tauri {
-        capabilities.extend(["NATIVE_HOST_LIFECYCLE", "NATIVE_WINDOW_CAPTURE"]);
+        capabilities.extend([
+            "NATIVE_HOST_LIFECYCLE",
+            "NATIVE_WINDOW_CAPTURE",
+            "NATIVE_MENU_INSPECTION",
+            "NATIVE_DIALOG_INSPECTION",
+            "RUST_COMMAND_TRACE",
+        ]);
     }
     DesignTarget {
         id: platform.as_str().to_string(),
