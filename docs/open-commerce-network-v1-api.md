@@ -42,7 +42,7 @@ source: docs/decisions/open-commerce-network-v1-architecture.md
 | `POST` | `/api/projects/:project_id/open-commerce/integrations` | 登记商户数据来源、授权范围和数据域 |
 | `PATCH` | `/api/projects/:project_id/open-commerce/integrations/:integration_id/enabled` | 停用或重新启用数据接入 |
 | `GET` | `/api/projects/:project_id/open-commerce/adapter-credentials` | 列出不含明文 Token 的接入器机器凭据元数据 |
-| `POST` | `/api/projects/:project_id/open-commerce/integrations/:integration_id/adapter-credential/rotate` | 经明确确认后签发或轮换一次性机器 Token |
+| `POST` | `/api/projects/:project_id/open-commerce/integrations/:integration_id/adapter-credential/rotate` | 经明确确认并指定 1–366 天有效期后签发或轮换一次性机器 Token |
 | `POST` | `/api/projects/:project_id/open-commerce/adapter-credentials/:credential_id/revoke` | 经明确确认后撤销机器凭据 |
 | `POST` | `/api/projects/:project_id/open-commerce/sync-receipts` | 由适配器记录幂等同步或健康检查回执 |
 | `PUT` | `/api/projects/:project_id/open-commerce/rate-limits` | 按能力和指定 App/全部 App 创建或更新调用配额 |
@@ -151,6 +151,8 @@ Invocation 只证明平台完成调用，标准业务回执只证明商户运行
 `applied` 只接受成功且带有效标准业务回执的 Invocation，同时必须提供外部目标记录号；服务端只保存目标记录号 SHA-256。`ignored` 和 `rejected` 不能提供目标记录号，必须提供结果代码。停用接入器、跨商户接入器、摘要不匹配、非编辑者或同键改写均失败关闭。
 
 人工入口的回执权威为 `project_editor_asserted`。接入器也可使用只显示一次、服务端仅保存 SHA-256 的专用 Bearer Token 向机器入口提交；项目、商户和接入器全部从凭据派生，权限固定为 `business_handoff.write`。机器回执标记 `adapter_token_authenticated`、`confirmed_by_user=false`，并固化凭据 ID 和提交时版本。轮换、撤销或停用接入后旧身份立即失败关闭。
+
+签发或轮换请求还必须提交 `expires_in_days`，允许 1–366。凭据元数据返回绝对 `expires_at` 与服务端派生的 `is_expired`；到期后鉴权失败且不自动续期。升级前已有凭据由迁移补 90 天期限。
 
 两类回执均固定 `funds_moved=false`，不创建平台订单，也不证明外部 ERP 数据真实、支付、履约或退款。机器凭据不是外部平台签名；具体生产适配器、官方授权和外部系统回读仍需逐项实现。
 

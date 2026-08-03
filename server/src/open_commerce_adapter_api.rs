@@ -10,6 +10,7 @@ use std::sync::Arc;
 use crate::{
     open_commerce_adapter_model::{
         AdapterBusinessHandoffReceiptRequest, ConfirmedAdapterCredentialChangeRequest,
+        RotateAdapterCredentialRequest,
     },
     open_commerce_adapter_service, open_commerce_business_handoff_service,
     open_commerce_model::normalize_app_id,
@@ -62,7 +63,7 @@ async fn rotate_credential(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path((project_id, integration_id)): Path<(String, String)>,
-    Json(request): Json<ConfirmedAdapterCredentialChangeRequest>,
+    Json(request): Json<RotateAdapterCredentialRequest>,
 ) -> Response {
     let caller = match authorize_project(&state, &headers, &project_id) {
         Ok(value) => value,
@@ -78,6 +79,7 @@ async fn rotate_credential(
         &state.store,
         &project_id,
         &integration_id,
+        request.expires_in_days,
         &OpenCommerceActor {
             user_id: &caller.user_id,
             app_id: &caller.app_id,

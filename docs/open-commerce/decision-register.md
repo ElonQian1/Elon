@@ -34,6 +34,9 @@
 | App 异常先形成商户可解释证据 | 按商户和外部 App 派生近 24 小时失败、限流、Grant 预算拒绝和中断恢复计数；只提醒人工处置，不自动评分、封禁或赔付 | `docs/decisions/open-commerce-app-activity-health-v1.md` |
 | 开发者 App 必须能可靠续读自己的调用结果 | Invocation 进入终态时原子追加稳定序号；测试 Token 只读取本 App 摘要和详情，游标跨 App 失败关闭；当前不冒充 Webhook | `docs/decisions/open-commerce-developer-terminal-events-v1.md` |
 | 商户业务结果先形成证据层再进入 ERP/CRM | 从终态 Invocation 派生项目内证据、结果摘要、可选商户标准回执和 ERP 实例关联；不复制订单库，不把调用成功冒充为支付或履约 | `docs/decisions/open-commerce-merchant-business-evidence-v1.md` |
+| ERP/CRM 衔接状态必须来自证据和显式回执 | 人工回执绑定结果摘要、接入器和明确确认；待办与需重试状态由最新回执派生，不建立第二套可漂移状态 | `docs/decisions/open-commerce-business-handoff-receipts-v1.md`、`docs/decisions/open-commerce-business-handoff-queue-v1.md` |
+| 接入器机器身份必须最小授权且可失效 | 每个接入器使用只写衔接回执的一次性 Token；服务端只保存摘要，轮换、撤销和接入停用失败关闭，机器回执固化凭据版本 | `docs/decisions/open-commerce-adapter-machine-credentials-v1.md` |
+| 接入器机器凭据必须限时有效 | 签发时明确选择 1–366 天，服务端按数据库时间拒绝过期 Token；历史不改写且不自动续期 | `docs/decisions/open-commerce-adapter-credential-expiration-v1.md` |
 | AI 资源 V1 先做控制面和路由预演 | 统一盘点现有真实资源并保存项目策略，但不复制执行器、不泄露凭据、不假装已核验外部额度 | `docs/decisions/ai-resource-control-v1.md` |
 | 节点模型共享必须由所有者显式开放 | 在线和模型上报不代表同意出租；按模型、并发和每日 Token 预算授权，调度前原子预留，所有者自用不受影响 | `docs/decisions/node-compute-sharing-supply-v1.md` |
 | 共享节点每日 Token 预算必须覆盖在途任务 | 派发前原子检查今日实耗、活动预留和本次保守预留；终态按实际用量记账，过期租约不能复活 | `docs/decisions/node-compute-sharing-token-reservation-v1.md` |

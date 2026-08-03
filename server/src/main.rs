@@ -155,6 +155,7 @@ mod open_commerce_action_confirmation_service;
 #[cfg(test)]
 mod open_commerce_action_confirmation_tests;
 mod open_commerce_adapter_api;
+mod open_commerce_adapter_expiration_migration;
 mod open_commerce_adapter_mcp;
 mod open_commerce_adapter_migration;
 mod open_commerce_adapter_model;

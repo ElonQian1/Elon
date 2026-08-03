@@ -23,6 +23,7 @@ export default function OpenCommerceAdapterCredentialManager({
 }: Props) {
   const [credentials, setCredentials] = useState<OpenCommerceAdapterCredential[]>([])
   const [issued, setIssued] = useState<OpenCommerceAdapterCredentialIssue | null>(null)
+  const [expiresInDays, setExpiresInDays] = useState(90)
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null)
 
@@ -45,12 +46,12 @@ export default function OpenCommerceAdapterCredentialManager({
 
   async function rotate(integration: OpenCommerceIntegration, existing?: OpenCommerceAdapterCredential) {
     const verb = existing ? '轮换' : '签发'
-    if (!globalThis.confirm(`${verb}后明文 Token 只显示一次${existing ? '，旧 Token 会立即失效' : ''}。是否继续？`)) return
+    if (!globalThis.confirm(`${verb}后明文 Token 只显示一次，有效期 ${expiresInDays} 天${existing ? '，旧 Token 会立即失效' : ''}。是否继续？`)) return
     setBusy(integration.id)
     setMessage(null)
     setIssued(null)
     try {
-      const result = await openCommerceApi.rotateAdapterCredential(projectId, integration.id)
+      const result = await openCommerceApi.rotateAdapterCredential(projectId, integration.id, expiresInDays)
       setIssued(result)
       setMessage({ text: `已${verb}机器凭据，请立即复制并交给该接入器。`, error: false })
       await refresh()
@@ -94,9 +95,19 @@ export default function OpenCommerceAdapterCredentialManager({
           <strong><KeyRound size={14} />接入器机器凭据</strong>
           <small>固定只允许写入业务衔接回执，不能读取经营数据或调用消费者能力。</small>
         </span>
-        <button style={actionStyle('icon', busy !== '')} type="button" onClick={refresh} disabled={busy !== ''} title="刷新机器凭据">
-          <RefreshCw size={14} />
-        </button>
+        <div className={styles.headerActions}>
+          <label className={styles.expiryControl}>
+            有效期
+            <select value={expiresInDays} onChange={(event) => setExpiresInDays(Number(event.target.value))} disabled={busy !== ''}>
+              <option value={30}>30 天</option>
+              <option value={90}>90 天</option>
+              <option value={365}>365 天</option>
+            </select>
+          </label>
+          <button style={actionStyle('icon', busy !== '')} type="button" onClick={refresh} disabled={busy !== ''} title="刷新机器凭据">
+            <RefreshCw size={14} />
+          </button>
+        </div>
       </header>
 
       {issued && (
@@ -108,7 +119,7 @@ export default function OpenCommerceAdapterCredentialManager({
             </button>
           </header>
           <code>{issued.adapter_token}</code>
-          <p>服务端只保存摘要。本页面关闭或刷新后无法找回，只能重新轮换。</p>
+          <p>服务端只保存摘要，有效至 {new Date(issued.credential.expires_at).toLocaleString('zh-CN')}。本页面关闭或刷新后无法找回，只能重新轮换。</p>
           <button style={actionStyle('primary')} type="button" onClick={copyToken}>
             <Clipboard size={14} />复制 Token
           </button>
@@ -118,18 +129,20 @@ export default function OpenCommerceAdapterCredentialManager({
       <div className={styles.rows}>
         {integrations.map((integration) => {
           const credential = credentials.find((item) => item.integration_id === integration.id)
-          const active = credential?.status === 'active'
+          const expiry = credential ? credentialExpiry(credential) : 'missing'
+          const active = expiry === 'active' || expiry === 'expiring'
           return (
             <article key={integration.id}>
               <span>
                 <strong>{integration.display_name}</strong>
                 <small>{credential ? `版本 ${credential.credential_version} · ${credential.token_hint}` : '尚未签发'}</small>
               </span>
-              <span style={badgeStyle(active ? 'neutral' : 'warn')}>
-                {active ? '可鉴权' : credential ? '已撤销' : '未配置'}
+              <span style={badgeStyle(expiry === 'expired' ? 'danger' : active ? expiry === 'expiring' ? 'warn' : 'neutral' : 'warn')}>
+                {expiryLabel(expiry)}
               </span>
               <p>
                 权限：business_handoff.write
+                {credential ? ` · 到期 ${new Date(credential.expires_at).toLocaleDateString('zh-CN')}` : ''}
                 {credential?.last_used_at ? ` · 最近使用 ${new Date(credential.last_used_at).toLocaleString('zh-CN')}` : ''}
               </p>
               <footer>
@@ -160,4 +173,24 @@ export default function OpenCommerceAdapterCredentialManager({
       {message && <p className={message.error ? styles.error : styles.success}>{message.text}</p>}
     </div>
   )
+}
+
+type CredentialExpiry = 'active' | 'expiring' | 'expired' | 'revoked' | 'missing'
+
+function credentialExpiry(credential: OpenCommerceAdapterCredential): CredentialExpiry {
+  if (credential.status === 'revoked') return 'revoked'
+  if (credential.is_expired || new Date(credential.expires_at).getTime() <= Date.now()) return 'expired'
+  const remaining = new Date(credential.expires_at).getTime() - Date.now()
+  return remaining <= 14 * 24 * 60 * 60 * 1000 ? 'expiring' : 'active'
+}
+
+function expiryLabel(expiry: CredentialExpiry) {
+  const labels: Record<CredentialExpiry, string> = {
+    active: '可鉴权',
+    expiring: '即将到期',
+    expired: '已到期',
+    revoked: '已撤销',
+    missing: '未配置',
+  }
+  return labels[expiry]
 }

@@ -181,6 +181,8 @@ export interface OpenCommerceAdapterCredential {
   credential_version: number
   created_by_user_id: string
   last_used_at?: string
+  expires_at: string
+  is_expired: boolean
   created_at: string
   updated_at: string
 }

@@ -19,6 +19,8 @@ pub(crate) struct OpenCommerceAdapterCredential {
     pub credential_version: i64,
     pub created_by_user_id: String,
     pub last_used_at: Option<String>,
+    pub expires_at: String,
+    pub is_expired: bool,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -58,4 +60,11 @@ pub(crate) struct AdapterBusinessHandoffReceiptRequest {
 #[serde(deny_unknown_fields)]
 pub(crate) struct ConfirmedAdapterCredentialChangeRequest {
     pub confirmed_by_user: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RotateAdapterCredentialRequest {
+    pub confirmed_by_user: bool,
+    pub expires_in_days: i64,
 }

@@ -16,6 +16,7 @@ impl Store {
         project_id: &str,
         integration_id: &str,
         actor_user_id: &str,
+        expires_at: &str,
     ) -> Result<OpenCommerceAdapterCredentialIssue> {
         let integration = self.open_commerce_integration_for_project(project_id, integration_id)?;
         if integration.status == INTEGRATION_STATUS_DISABLED {
@@ -36,12 +37,13 @@ impl Store {
                 "UPDATE open_commerce_adapter_credentials
                     SET status='active', scopes_json=?1, token_hash=?2, token_hint=?3,
                         credential_version=credential_version+1, last_used_at=NULL,
-                        updated_at=?4
-                  WHERE id=?5",
+                        expires_at=?4, updated_at=?5
+                  WHERE id=?6",
                 params![
                     serde_json::to_string(&vec![ADAPTER_HANDOFF_SCOPE])?,
                     token_hash(&token),
                     token_hint(&token),
+                    expires_at,
                     timestamp,
                     id
                 ],
@@ -51,8 +53,8 @@ impl Store {
                 "INSERT INTO open_commerce_adapter_credentials (
                     id, project_id, merchant_id, integration_id, status, scopes_json,
                     token_hash, token_hint, credential_version, created_by_user_id,
-                    last_used_at, created_at, updated_at
-                 ) VALUES (?1, ?2, ?3, ?4, 'active', ?5, ?6, ?7, 1, ?8, NULL, ?9, ?9)",
+                    last_used_at, created_at, updated_at, expires_at
+                 ) VALUES (?1, ?2, ?3, ?4, 'active', ?5, ?6, ?7, 1, ?8, NULL, ?9, ?9, ?10)",
                 params![
                     new_id("adaptercred"),
                     project_id.trim(),
@@ -62,7 +64,8 @@ impl Store {
                     token_hash(&token),
                     token_hint(&token),
                     actor_user_id.trim(),
-                    timestamp
+                    timestamp,
+                    expires_at
                 ],
             )?;
         }
@@ -128,15 +131,18 @@ impl Store {
                 &format!(
                     "SELECT c.id, c.project_id, c.merchant_id, c.integration_id,
                             c.status, c.scopes_json, c.token_hint, c.credential_version,
-                            c.created_by_user_id, c.last_used_at, c.created_at, c.updated_at
+                            c.created_by_user_id, c.last_used_at, c.created_at, c.updated_at,
+                            c.expires_at,
+                            (julianday(c.expires_at) <= julianday(?2)) AS is_expired
                        FROM open_commerce_adapter_credentials c
                        JOIN open_commerce_integrations i ON i.id=c.integration_id
-                      WHERE c.token_hash=?1 AND c.status='active' AND i.status<>'disabled'"
+                      WHERE c.token_hash=?1 AND c.status='active' AND i.status<>'disabled'
+                        AND julianday(c.expires_at) > julianday(?2)"
                 ),
-                params![token_hash(token)],
+                params![token_hash(token), now()],
                 adapter_credential_from_row,
             )
-            .map_err(|error| anyhow!(error).context("适配器凭据无效、已撤销或接入已停用"))
+            .map_err(|error| anyhow!(error).context("适配器凭据无效、已撤销、已到期或接入已停用"))
     }
 
     pub(crate) fn touch_open_commerce_adapter_credential(&self, credential_id: &str) -> Result<()> {
@@ -201,6 +207,8 @@ fn adapter_credential_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceAd
         last_used_at: row.get(9)?,
         created_at: row.get(10)?,
         updated_at: row.get(11)?,
+        expires_at: row.get(12)?,
+        is_expired: row.get(13)?,
     })
 }
 
@@ -223,5 +231,6 @@ fn token_hint(value: &str) -> String {
 const ADAPTER_CREDENTIAL_SELECT: &str =
     "SELECT id, project_id, merchant_id, integration_id, status, scopes_json,
             token_hint, credential_version, created_by_user_id, last_used_at,
-            created_at, updated_at
+            created_at, updated_at, expires_at,
+            (julianday(expires_at) <= julianday('now')) AS is_expired
        FROM open_commerce_adapter_credentials";

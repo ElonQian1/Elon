@@ -93,10 +93,10 @@ export const openCommerceApi = {
       `${projectBase(projectId)}/adapter-credentials`,
     ),
 
-  rotateAdapterCredential: (projectId: string, integrationId: string) =>
+  rotateAdapterCredential: (projectId: string, integrationId: string, expiresInDays: number) =>
     api.post<OpenCommerceAdapterCredentialIssue>(
       `${projectBase(projectId)}/integrations/${encodeURIComponent(integrationId)}/adapter-credential/rotate`,
-      { confirmed_by_user: true },
+      { confirmed_by_user: true, expires_in_days: expiresInDays },
     ),
 
   revokeAdapterCredential: (projectId: string, credentialId: string) =>

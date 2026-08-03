@@ -15,6 +15,7 @@ const REVOKE: &str = "open_commerce_revoke_adapter_credential";
 struct IntegrationArguments {
     integration_id: String,
     confirmed_by_user: bool,
+    expires_in_days: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -37,10 +38,11 @@ pub(crate) fn definitions() -> Vec<Value> {
             "为指定数据接入签发或轮换仅可写业务衔接回执的机器凭据。明文 Token 只返回一次，调用前必须取得用户明确同意。",
             json!({
                 "type":"object",
-                "required":["integration_id","confirmed_by_user"],
+                "required":["integration_id","confirmed_by_user","expires_in_days"],
                 "properties":{
                     "integration_id":{"type":"string","minLength":1,"maxLength":120},
-                    "confirmed_by_user":{"const":true}
+                    "confirmed_by_user":{"const":true},
+                    "expires_in_days":{"type":"integer","minimum":1,"maximum":366}
                 },
                 "additionalProperties":false
             }),
@@ -89,6 +91,7 @@ pub(crate) fn call_if_handled(
                 store,
                 project_id,
                 &input.integration_id,
+                input.expires_in_days,
                 &actor,
             )?)?
         }

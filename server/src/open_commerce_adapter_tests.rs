@@ -148,12 +148,15 @@ async fn adapter_token_is_one_time_rotatable_revocable_and_records_machine_autho
         &fixture.store,
         &fixture.project_id,
         &fixture.integration_id,
+        90,
         &actor,
     )
     .unwrap();
     assert!(issue.token_visible_once);
     assert!(issue.adapter_token.starts_with("oc_adapter_"));
     assert_eq!(issue.credential.scopes, vec!["business_handoff.write"]);
+    assert!(!issue.credential.is_expired);
+    assert!(chrono::DateTime::parse_from_rfc3339(&issue.credential.expires_at).is_ok());
     assert!(!serde_json::to_string(
         &open_commerce_adapter_service::list_credentials(&fixture.store, &fixture.project_id)
             .unwrap()
@@ -187,6 +190,7 @@ async fn adapter_token_is_one_time_rotatable_revocable_and_records_machine_autho
         &fixture.store,
         &fixture.project_id,
         &fixture.integration_id,
+        30,
         &actor,
     )
     .unwrap();
@@ -254,7 +258,8 @@ async fn adapter_token_is_one_time_rotatable_revocable_and_records_machine_autho
             "name":"open_commerce_rotate_adapter_credential",
             "arguments":{
                 "integration_id":fixture.integration_id,
-                "confirmed_by_user":false
+                "confirmed_by_user":false,
+                "expires_in_days":90
             }
         }),
     )
@@ -275,6 +280,7 @@ fn adapter_credential_management_requires_editor_and_disabled_integration_fails_
         &fixture.store,
         &fixture.project_id,
         &fixture.integration_id,
+        90,
         &viewer,
     )
     .unwrap_err()
@@ -286,6 +292,7 @@ fn adapter_credential_management_requires_editor_and_disabled_integration_fails_
         &fixture.store,
         &fixture.project_id,
         &fixture.integration_id,
+        90,
         &actor,
     )
     .unwrap();
@@ -303,6 +310,54 @@ fn adapter_credential_management_requires_editor_and_disabled_integration_fails_
         .unwrap_err()
         .to_string()
         .contains("停用"));
+}
+
+#[test]
+fn adapter_credential_expiration_is_bounded_and_fails_closed() {
+    let fixture = fixture();
+    let actor = owner_actor(&fixture.user_id);
+    assert!(open_commerce_adapter_service::rotate_credential(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.integration_id,
+        0,
+        &actor,
+    )
+    .unwrap_err()
+    .to_string()
+    .contains("1 至 366 天"));
+
+    let issue = open_commerce_adapter_service::rotate_credential(
+        &fixture.store,
+        &fixture.project_id,
+        &fixture.integration_id,
+        1,
+        &actor,
+    )
+    .unwrap();
+    fixture
+        .store
+        .conn()
+        .unwrap()
+        .execute(
+            "UPDATE open_commerce_adapter_credentials
+                SET expires_at='2000-01-01T00:00:00Z'
+              WHERE id=?1",
+            rusqlite::params![issue.credential.id],
+        )
+        .unwrap();
+    assert!(fixture
+        .store
+        .authenticate_open_commerce_adapter_credential(&issue.adapter_token)
+        .unwrap_err()
+        .to_string()
+        .contains("已到期"));
+    assert!(
+        open_commerce_adapter_service::list_credentials(&fixture.store, &fixture.project_id)
+            .unwrap()
+            .credentials[0]
+            .is_expired
+    );
 }
 
 fn applied_request(fixture: &Fixture, receipt_key: &str) -> AdapterBusinessHandoffReceiptRequest {

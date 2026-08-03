@@ -1,4 +1,5 @@
 use anyhow::{bail, Result};
+use chrono::{Duration, Utc};
 use serde_json::json;
 
 use crate::{
@@ -11,10 +12,11 @@ use crate::{
     store::Store,
 };
 
-const BOUNDARY: [&str; 4] = [
+const BOUNDARY: [&str; 5] = [
     "适配器 Token 明文只在签发或轮换时返回一次，服务端只保存 SHA-256",
     "V1 凭据仅授权 business_handoff.write，不能调用消费者能力或读取经营原始数据",
     "撤销凭据或停用所属数据接入后，适配器鉴权立即失败",
+    "机器凭据有效期为 1 至 366 天，到期后立即拒绝鉴权，续用必须显式轮换",
     "机器凭据只提升回执来源权威，不代表平台独立核验订单、支付、履约或退款",
 ];
 
@@ -34,11 +36,17 @@ pub(crate) fn rotate_credential(
     store: &Store,
     project_id: &str,
     integration_id: &str,
+    expires_in_days: i64,
     actor: &OpenCommerceActor<'_>,
 ) -> Result<OpenCommerceAdapterCredentialIssue> {
     require_editor(actor.project_role)?;
-    let issue =
-        store.rotate_open_commerce_adapter_credential(project_id, integration_id, actor.user_id)?;
+    let expires_at = expiration_from_days(expires_in_days)?;
+    let issue = store.rotate_open_commerce_adapter_credential(
+        project_id,
+        integration_id,
+        actor.user_id,
+        &expires_at,
+    )?;
     store.record_open_commerce_audit(
         project_id,
         actor.user_id,
@@ -50,10 +58,18 @@ pub(crate) fn rotate_credential(
             "integration_id":issue.credential.integration_id,
             "credential_version":issue.credential.credential_version,
             "scopes":issue.credential.scopes,
-            "token_visible_once":true
+            "token_visible_once":true,
+            "expires_at":issue.credential.expires_at
         }),
     )?;
     Ok(issue)
+}
+
+fn expiration_from_days(expires_in_days: i64) -> Result<String> {
+    if !(1..=366).contains(&expires_in_days) {
+        bail!("适配器凭据有效期必须在 1 至 366 天之间");
+    }
+    Ok((Utc::now() + Duration::days(expires_in_days)).to_rfc3339())
 }
 
 pub(crate) fn revoke_credential(
