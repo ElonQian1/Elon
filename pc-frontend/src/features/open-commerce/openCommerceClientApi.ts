@@ -21,6 +21,9 @@ import type {
   ConsumerPortabilityPackageSignature,
   ConsumerPortabilityTrustKey,
   ConsumerPortabilityTrustKeyList,
+  ConsumerPortabilityAdoption,
+  ConsumerPortabilityAdoptionList,
+  ConsumerPortabilityAdoptionPlan,
   ConsumerRelationship,
   ConsumerRelationshipList,
   DeveloperAppCredential,
@@ -209,6 +212,34 @@ export const openCommerceClientApi = {
       `${projectBase(projectId)}/consumer-portability-trust-keys/${encodeURIComponent(recordId)}/revoke`,
       {},
     ),
+
+  getConsumerPortabilityAdoptionPlan: (projectId: string, importId: string) =>
+    api.get<ConsumerPortabilityAdoptionPlan>(
+      `${projectBase(projectId)}/consumer-portability-imports/${encodeURIComponent(importId)}/adoption-plan`,
+    ),
+
+  applyConsumerPortabilityPreferences: (
+    projectId: string,
+    importId: string,
+    expectedCurrentRevision?: number,
+  ) => api.post<ConsumerPortabilityAdoption>(
+    `${projectBase(projectId)}/consumer-portability-imports/${encodeURIComponent(importId)}/adopt-preferences`,
+    { expected_current_revision: expectedCurrentRevision, confirmed_by_user: true },
+  ),
+
+  listConsumerPortabilityAdoptions: (projectId: string) =>
+    api.get<ConsumerPortabilityAdoptionList>(
+      `${projectBase(projectId)}/consumer-portability-adoptions`,
+    ),
+
+  rollbackConsumerPortabilityAdoption: (
+    projectId: string,
+    adoptionId: string,
+    expectedCurrentRevision: number,
+  ) => api.post<ConsumerPortabilityAdoption>(
+    `${projectBase(projectId)}/consumer-portability-adoptions/${encodeURIComponent(adoptionId)}/rollback`,
+    { expected_current_revision: expectedCurrentRevision, confirmed_by_user: true },
+  ),
 
   listConsumerInvocationReceipts: () =>
     api.get<ConsumerInvocationReceiptList>(

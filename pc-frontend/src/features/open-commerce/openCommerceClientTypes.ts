@@ -213,6 +213,55 @@ export interface ConsumerPortabilityTrustKeyList {
   keys: ConsumerPortabilityTrustKey[]
 }
 
+export interface ConsumerPortabilityPreferenceChange {
+  field: string
+  current_value: unknown
+  imported_value: unknown
+  changed: boolean
+}
+
+export interface ConsumerPortabilityRelationshipCandidate {
+  source_relationship_id: string
+  source_merchant_id: string
+  source_status: string
+  requested_scopes: string[]
+  purpose: string
+  requires_reauthorization: true
+}
+
+export interface ConsumerPortabilityAdoptionPlan {
+  schema: 'open_commerce.consumer_portability_adoption_plan.v1'
+  import_id: string
+  import_trust_status: ConsumerPortabilityImportTrustStatus
+  source_package_schema: string
+  imported_profile_available: boolean
+  current_profile_revision?: number
+  preference_changes: ConsumerPortabilityPreferenceChange[]
+  relationship_candidates: ConsumerPortabilityRelationshipCandidate[]
+  automatic_relationship_restore: false
+  automatic_business_write: false
+}
+
+export interface ConsumerPortabilityAdoption {
+  schema: 'open_commerce.consumer_portability_adoption.v1'
+  id: string
+  import_id: string
+  kind: 'preferences'
+  before_preferences?: ConsumerPreferences
+  before_revision?: number
+  applied_preferences: ConsumerPreferences
+  resulting_revision: number
+  status: 'applied' | 'rolled_back'
+  applied_at: string
+  rolled_back_at?: string
+  rollback_revision?: number
+}
+
+export interface ConsumerPortabilityAdoptionList {
+  schema: 'open_commerce.consumer_portability_adoptions.v1'
+  adoptions: ConsumerPortabilityAdoption[]
+}
+
 export interface ConsumerPreferences {
   categories: string[]
   tags: string[]
