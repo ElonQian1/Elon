@@ -21,6 +21,7 @@
 | 平台架构 | `AI_ARCHITECTURE.md`、`docs/system-architecture.md` | 模块边界、数据流、改动落点 |
 | 后端与 API | `AI_INDEX.md` | 路由、接口、服务端实现与验证入口 |
 | PC Web 工作台 | `docs/pc-frontend-migration.md` | `/pc`、React/Vite、项目文档工作台 |
+| 后台多端 UI 设计 | `docs/headless-ui-design-mcp.md` | AI 无需打开画布即可发现、捕获和读取 Web/PWA/Tauri/Android 页面 |
 | Windows 节点 | `docs/node-agent-upgrade-compatibility.md` | 本机节点、数据目录、升级和离线行为 |
 | Android 客户端 | `docs/android-setup.md` | APK、Compose、真机渲染与发布 |
 | AI 与上下文 | `AGENTS.md` | 跨供应商入口、按需指令、Prompt/Agent/Skill |

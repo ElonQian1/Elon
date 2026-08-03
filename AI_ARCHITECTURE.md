@@ -123,6 +123,24 @@ PTY/ConPTY sidecar 仍然保留，但定位是辅助路：
 - 需要真实终端输入、resize、取消、调试、审批恢复时使用。
 - Copilot / Claude / Gemini 等没有稳定 JSONL 事件流的 CLI 可以继续走 sidecar/PTY。
 
+## 后台多端 UI 设计数据面
+
+微调画布的数据面由 Windows 节点的 `yilong-ui-live` MCP 提供，PC 画布只是可选客户端：
+
+```text
+AI / PC Canvas
+  -> list/open design target
+  -> headless design session
+  -> Web/PWA/Tauri frontend: controlled Chromium
+  -> Android: Live Runtime
+  -> semantic UI tree + PNG path/hash
+  -> source change / existing platform writeback
+```
+
+`ui_get_project_profile` schema v3 先返回 Web、PWA、Tauri、Android 的小型目标索引。代理无需打开 PC 页面，即可用 `ui_list_design_targets -> ui_open_design_target -> ui_capture_design_surface -> ui_get_design_surface` 完成后台发现、受限交互和证据读取。Web/PWA/Tauri 默认先读紧凑 UI 树、再按需取 PNG，避免反复传输整图；Android 不使用浏览器替代，继续走真实 Runtime。
+
+当前 Tauri 只证明前端 WebView，不能证明原生宿主。PC 端后续应直接消费同一 `designSessionId`，实现平台切换、中间画面与默认右侧对话，不创建平行状态机。具体契约和阶段边界见 `docs/headless-ui-design-mcp.md`。
+
 ## 项目理解 / RAG 架构
 
 当前项目理解系统不是纯向量库，而是混合检索：
