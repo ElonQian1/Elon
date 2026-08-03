@@ -670,6 +670,8 @@ export interface ConsumerDiscoveryRequest {
   source_data_domain?: string
   max_source_age_seconds?: number
   price_currency?: string
+  capability_kind?: 'query' | 'action'
+  access_level?: 'public' | 'authorized'
   preferences: ConsumerPreferences
   limit: number
 }
@@ -817,6 +819,10 @@ export interface ConsumerDiscoveryResponse {
   price_filter: {
     currency: string | null
     max_unit_price_micros: number | null
+  }
+  capability_filter: {
+    kind: 'query' | 'action' | null
+    access_level: 'public' | 'authorized' | null
   }
   available_ranking_policies: ConsumerRankingPolicyDescriptor[]
   ranking_receipt?: ConsumerRankingReceipt

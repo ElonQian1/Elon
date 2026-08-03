@@ -14,6 +14,7 @@ import ConsumerInvocationReceipts from './ConsumerInvocationReceipts'
 import ConsumerPriceFilterFields from './ConsumerPriceFilterFields'
 import ConsumerSourceFilterFields from './ConsumerSourceFilterFields'
 import CapabilityInvocationComposer from './CapabilityInvocationComposer'
+import ConsumerCapabilityFilterFields from './ConsumerCapabilityFilterFields'
 import { downloadConsumerRankingReceipt, verifyConsumerRankingReceipt } from './consumerRankingReceipt'
 import type {
   ConsumerDiscoveryMatch,
@@ -38,6 +39,8 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   const [appId, setAppId] = useState('pc-web')
   const [query, setQuery] = useState('')
   const [capabilityKey, setCapabilityKey] = useState('')
+  const [capabilityKind, setCapabilityKind] = useState('')
+  const [accessLevel, setAccessLevel] = useState('')
   const [city, setCity] = useState('')
   const [categories, setCategories] = useState('')
   const [tags, setTags] = useState('')
@@ -94,6 +97,12 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
       const response = await openCommerceClientApi.discover({
         query: query.trim() || undefined,
         capability_key: capabilityKey.trim() || undefined,
+        capability_kind: capabilityKind === 'query' || capabilityKind === 'action'
+          ? capabilityKind
+          : undefined,
+        access_level: accessLevel === 'public' || accessLevel === 'authorized'
+          ? accessLevel
+          : undefined,
         requester_app_id: appId,
         ranking_policy: rankingPolicy,
         include_ranking_receipt: includeRankingReceipt,
@@ -123,7 +132,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
     } finally {
       setBusy(false)
     }
-  }, [appId, capabilityKey, categories, city, includeRankingReceipt, maxPrice, maxSourceAgeMinutes, priceCurrency, query, rankingPolicy, requireCurrentDeclaration, requireInternalSyncReceipt, sourceDataDomain, sourceProviderKey, tags])
+  }, [accessLevel, appId, capabilityKey, capabilityKind, categories, city, includeRankingReceipt, maxPrice, maxSourceAgeMinutes, priceCurrency, query, rankingPolicy, requireCurrentDeclaration, requireInternalSyncReceipt, sourceDataDomain, sourceProviderKey, tags])
 
   const applyProfile = useCallback((preferences: ConsumerPreferences) => {
     setCategories(preferences.categories.join(', '))
@@ -269,6 +278,12 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
             />
             <label>搜索词<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="咖啡、维修、零售" /></label>
             <label>能力 Key<input value={capabilityKey} onChange={(event) => setCapabilityKey(event.target.value)} placeholder="menu.preview" /></label>
+            <ConsumerCapabilityFilterFields
+              capabilityKind={capabilityKind}
+              accessLevel={accessLevel}
+              onCapabilityKindChange={setCapabilityKind}
+              onAccessLevelChange={setAccessLevel}
+            />
             <label>城市<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ji'an" /></label>
             <label>经营类别<input value={categories} onChange={(event) => setCategories(event.target.value)} placeholder="cafe, retail" /></label>
             <label>偏好标签<input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="quiet, coffee" /></label>
@@ -298,6 +313,8 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
               {result?.price_filter.currency && result.price_filter.max_unit_price_micros !== null && (
                 <span style={badgeStyle()}>价格不超过 {formatMicros(result.price_filter.max_unit_price_micros, result.price_filter.currency)}</span>
               )}
+              {result?.capability_filter.kind && <span style={badgeStyle()}>{result.capability_filter.kind === 'action' ? '仅经营操作' : '仅信息查询'}</span>}
+              {result?.capability_filter.access_level && <span style={badgeStyle()}>{result.capability_filter.access_level === 'authorized' ? '仅需授权调用' : '仅公开调用'}</span>}
               <span
                 style={badgeStyle(result?.ranking_is_paid ? 'danger' : 'neutral')}
                 data-tone={result?.ranking_is_paid ? 'danger' : 'neutral'}
