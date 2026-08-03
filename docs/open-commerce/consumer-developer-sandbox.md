@@ -1,6 +1,6 @@
 # 消费者发现与第三方应用沙盒
 
-本文说明消费者发现、应用注册、授权审批和开发者调用闭环。沙盒总边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定；目录、排序、关系、偏好、删除请求与证明分别由 `docs/decisions/open-commerce-directory-publication-v1.md`、`docs/decisions/open-commerce-pluggable-ranking-v1.md`、`docs/decisions/open-commerce-consumer-relationships-v1.md`、`docs/decisions/open-commerce-consumer-preference-disclosures-v1.md`、`docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` 和 `docs/decisions/open-commerce-consumer-data-erasure-evidence-v1.md` 决定；当前本人导出由 `docs/decisions/open-commerce-consumer-portability-exports-v5.md` 决定。应用生命周期、动作确认、授权预算、调用凭证、终态事件和活动证据继续按 `docs/open-commerce/README.md` 所列专项 ADR 执行。
+本文说明消费者发现、应用注册、授权审批和开发者调用闭环。沙盒总边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定；目录、排序、关系、偏好、删除请求、跟进与证明分别由 `docs/decisions/open-commerce-directory-publication-v1.md`、`docs/decisions/open-commerce-pluggable-ranking-v1.md`、`docs/decisions/open-commerce-consumer-relationships-v1.md`、`docs/decisions/open-commerce-consumer-preference-disclosures-v1.md`、`docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md`、`docs/decisions/open-commerce-consumer-data-request-followups-v1.md` 和 `docs/decisions/open-commerce-consumer-data-erasure-evidence-v1.md` 决定；当前本人导出由 `docs/decisions/open-commerce-consumer-portability-exports-v5.md` 决定。应用生命周期、动作确认、授权预算、调用凭证、终态事件和活动证据继续按 `docs/open-commerce/README.md` 所列专项 ADR 执行。
 
 ## 使用入口
 
@@ -65,7 +65,7 @@
 
 敏感自由文本由独立的数据保险箱处理。PC 在本机使用用户口令加密，服务端只托管不透明密文及标签、类型、大小、摘要和修订等最小元数据；列表不返回密文，只有本人可读取单项密文并在本机解锁。平台没有口令或找回能力，保险箱内容不会自动用于发现、披露、商户调用或 AI 执行。
 
-消费者还可针对本人关系发起关联数据删除请求。创建请求会原子撤销该关系；商户只能看到匿名关系别名，可接单、拒绝或声明完成。消费者可在接单前撤回请求，但关系不会恢复。`completed` 只表示商户提交了可审计声明。完成后，商户可按外部系统追加回执编号、原始回执 SHA-256 和摘要，消费者可查看；这些记录固定标记为商户提供且平台未核验，仍不能证明美团、ERP、CRM 或会员系统真实完成删除。
+消费者还可针对本人关系发起关联数据删除请求。创建请求会原子撤销该关系；商户只能看到匿名关系别名，可接单、拒绝或声明完成。消费者可在接单前撤回请求，但关系不会恢复。跟进代码按 7 天内部运营目标，在 24 小时后允许首次催办、每 24 小时一次且最多三次，超时并至少催办一次后可升级关注；该批尚未编译，且不会自动通知第三方、仲裁或处罚。`completed` 只表示商户提交了可审计声明。完成后，商户可按外部系统追加回执编号、原始回执 SHA-256 和摘要，消费者可查看；这些记录固定标记为商户提供且平台未核验，仍不能证明美团、ERP、CRM 或会员系统真实完成删除。
 
 消费者可把本人的关系历史、消费者私有续期链、删除请求回执、当前低敏结构化偏好档案和历史披露快照生成不可变 JSON 数据包。相同幂等键始终返回原快照，服务端和 PC 下载前都会复核 SHA-256；历史 V1 包继续按原字节验证。该 V2 数据包不含订单、联系方式、支付或账号 ID，当前也没有导入、冲突处理、加密归档或跨运营方迁移能力。
 
@@ -85,4 +85,4 @@ Set-Location pc-frontend
 npm run test:open-commerce
 ```
 
-当前已形成商户主动发布目录、五种用户可选透明非付费排序器、限时授权、消费者可撤销关系、低敏偏好字段披露、客户端加密数据保险箱、匿名删除请求、商户未核验证明、含证明与调用凭证的本人 V5 可验证导出、隔离导入、Schema 驱动填写、短时动作确认、持久化调用配额、活动证据、商户级手动 App 封禁和沙盒 App 生命周期闭环。排序器、保险箱与 V5 等新增批次尚未编译或回归；第三方排序器 SDK、生产应用审核、完整订单迁移、外部通知、商户或 AI 授权解密、真实删除适配器、支付和真实平台适配器仍是后续模块。
+当前已形成商户主动发布目录、五种用户可选透明非付费排序器、限时授权、消费者可撤销关系、低敏偏好字段披露、客户端加密数据保险箱、匿名删除请求、有界催办与升级关注、商户未核验证明、含证明与调用凭证的本人 V5 可验证导出、隔离导入、Schema 驱动填写、短时动作确认、持久化调用配额、活动证据、商户级手动 App 封禁和沙盒 App 生命周期闭环。排序器、跟进、保险箱与 V5 等新增批次尚未编译或回归；第三方排序器 SDK、生产应用审核、完整订单迁移、自动外部通知、平台仲裁、商户或 AI 授权解密、真实删除适配器、支付和真实平台适配器仍是后续模块。
