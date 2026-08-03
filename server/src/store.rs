@@ -80,6 +80,7 @@ mod open_commerce_developer_app_admissions;
 mod open_commerce_developer_app_domains;
 mod open_commerce_developer_app_manifests;
 mod open_commerce_developer_apps;
+mod open_commerce_developer_credentials;
 mod open_commerce_developer_events;
 mod open_commerce_developer_webhook_history;
 mod open_commerce_developer_webhook_replays;
