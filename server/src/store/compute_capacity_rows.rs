@@ -27,6 +27,22 @@ pub(super) fn stored_bucket_on(
     row.map(stored_bucket_from_row).transpose()
 }
 
+pub(super) fn stored_buckets_for_pool_epoch_on(
+    conn: &Connection,
+    pool_id: &str,
+    capacity_epoch: i64,
+) -> Result<Vec<StoredComputeCapacityBucket>> {
+    let mut statement = conn.prepare(&format!(
+        "{BUCKET_SELECT}
+          WHERE b.pool_id=?1 AND b.capacity_epoch=?2
+          ORDER BY b.delivery_window_id, b.meter, b.bucket_id"
+    ))?;
+    let rows = statement
+        .query_map(params![pool_id.trim(), capacity_epoch], bucket_row)?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    rows.into_iter().map(stored_bucket_from_row).collect()
+}
+
 struct BucketRow {
     bucket_id: String,
     bucket_digest: String,
