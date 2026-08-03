@@ -244,6 +244,7 @@ MCP 对应工具为 `open_commerce_list_consumer_portability_exports`、`open_co
 | `open_commerce_get_development_context` | 读 | 获取不含密钥和原始经营数据的开发上下文 |
 | `open_commerce_search_merchants` | 读 | 按文本或能力发现商户 |
 | `open_commerce_discover_for_consumer` | 读 | 按消费者偏好和硬约束透明发现商户能力，并返回候选范围、来源和授权状态；不自动调用或下单 |
+| `open_commerce_plan_consumer_capability` | 读 | 校验拟调用输入并返回调用、注册 App、授权申请、等待审批或动作确认的下一步；不创建副作用 |
 | `open_commerce_get_merchant` | 读 | 获取单个商户与公开能力 |
 | `open_commerce_create_merchant` | 写 | 创建商户节点 |
 | `open_commerce_publish_capability` | 写 | 发布受控能力 |
