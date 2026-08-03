@@ -171,6 +171,8 @@
 161. `docs/open-commerce-consumer-authorization-mcp-v1-acceptance.md`：查看授权申请 MCP 代码状态及后置统一回归矩阵。
 162. `docs/decisions/open-commerce-consumer-app-directory-mcp-v1.md`：查看消费者 AI 本人 App 目录和无凭据响应边界。
 163. `docs/open-commerce-consumer-app-directory-mcp-v1-acceptance.md`：查看本人 App 目录代码状态及后置统一回归矩阵。
+164. `docs/decisions/open-commerce-consumer-authorization-status-mcp-v1.md`：查看消费者本人授权申请状态和隔离边界。
+165. `docs/open-commerce-consumer-authorization-status-mcp-v1-acceptance.md`：查看授权状态查询代码及后置统一回归矩阵。
 
 ## 专题地图
 
