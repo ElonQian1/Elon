@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::{
+    capacity::{ComputeCapacityBucketBinding, ComputeCapacityPoolBinding},
     market::{ComputeDeliveryWindow, ComputePriceTerms, ComputeSku},
     workload::{ComputeModelRef, ComputeRuntimeRef},
 };
@@ -15,7 +16,7 @@ pub(crate) const OFFER_STATUS_REVOKED: &str = "revoked";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct ComputeOfferCapacity {
-    pub meter: String,
+    pub bucket: ComputeCapacityBucketBinding,
     pub total_units: i64,
     pub reservable_units: i64,
 }
@@ -62,6 +63,7 @@ pub(crate) struct ComputeOffer {
     pub model: Option<ComputeModelRef>,
     pub runtime: ComputeRuntimeRef,
     pub resource_profile: ComputeOfferResourceProfile,
+    pub capacity_pool: ComputeCapacityPoolBinding,
     pub capacity: Vec<ComputeOfferCapacity>,
     pub execution_limits: ComputeOfferExecutionLimits,
     pub authorization: ComputeOfferAuthorization,

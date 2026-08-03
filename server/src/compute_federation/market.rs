@@ -15,10 +15,17 @@ pub(crate) const PRICE_SOURCE_MARK: &str = "mark";
 pub(crate) const PRICE_SOURCE_FALLBACK_CURVE: &str = "fallback_curve";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ComputeDeliveryWindowBinding {
+    pub window_id: String,
+    pub window_digest: String,
+}
+
+/// Stable half-open UTC interval: `[starts_at_utc, ends_at_utc)`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct ComputeDeliveryWindow {
-    pub starts_at: String,
-    pub ends_at: String,
-    pub timezone: String,
+    pub binding: ComputeDeliveryWindowBinding,
+    pub starts_at_utc: String,
+    pub ends_at_utc: String,
 }
 
 /// Standardized market identity. The digest is calculated outside this model.
