@@ -362,8 +362,9 @@ async fn developer_invoke(
     };
     let action_confirmation_id = request.action_confirmation_id.clone();
     service_response(
-        open_commerce_service::invoke_with_action_confirmation(
+        crate::open_commerce_invocation_service::invoke_with_developer_credential(
             &state.store,
+            &credential,
             &actor,
             InvokeCapabilityRequest {
                 merchant_id: request.merchant_id,

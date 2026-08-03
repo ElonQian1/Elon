@@ -52,6 +52,14 @@ impl Store {
                 delivery_from_row,
             )
             .map_err(|error| anyhow!(error).context("Webhook 投递不存在"))?;
+        let credential_environment: String = tx.query_row(
+            "SELECT credential_environment FROM open_commerce_invocations WHERE id=?1",
+            params![current.invocation_id.as_str()],
+            |row| row.get(0),
+        )?;
+        if credential_environment == "production" {
+            bail!("生产调用事件不得通过沙箱 Webhook 重试");
+        }
         match current.status.as_str() {
             "dead" => {}
             "delivered" => bail!("Webhook 投递已经成功，不能重复发送"),

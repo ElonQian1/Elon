@@ -5,7 +5,9 @@ use chrono::Utc;
 use serde_json::{json, Value};
 
 use crate::{
-    open_commerce_app_block_service, open_commerce_grant_budget_service,
+    open_commerce_app_block_service,
+    open_commerce_developer_credential_model::AuthenticatedDeveloperCredential,
+    open_commerce_grant_budget_service,
     open_commerce_invocation_protocol::{invocation_response, request_digest, request_shape},
     open_commerce_model::{
         normalize_app_id, normalize_idempotency_key, InvokeCapabilityRequest,
@@ -16,7 +18,7 @@ use crate::{
     open_commerce_runtime_model::MerchantRuntimeEnvelope,
     open_commerce_service::{self, OpenCommerceActor},
     project_auth::can_edit,
-    store::{OpenCommerceInvocationStart, Store},
+    store::{OpenCommerceInvocationProvenance, OpenCommerceInvocationStart, Store},
 };
 
 pub(crate) async fn invoke(
@@ -24,7 +26,15 @@ pub(crate) async fn invoke(
     actor: &OpenCommerceActor<'_>,
     request: InvokeCapabilityRequest,
 ) -> Result<Value> {
-    invoke_with_action_confirmation(store, actor, request, None).await
+    invoke_with_provenance(
+        store,
+        actor,
+        request,
+        None,
+        None,
+        OpenCommerceInvocationProvenance::platform(),
+    )
+    .await
 }
 
 pub(crate) async fn invoke_with_action_confirmation(
@@ -32,6 +42,48 @@ pub(crate) async fn invoke_with_action_confirmation(
     actor: &OpenCommerceActor<'_>,
     request: InvokeCapabilityRequest,
     action_confirmation_id: Option<&str>,
+) -> Result<Value> {
+    invoke_with_provenance(
+        store,
+        actor,
+        request,
+        action_confirmation_id,
+        None,
+        OpenCommerceInvocationProvenance::platform(),
+    )
+    .await
+}
+
+pub(crate) async fn invoke_with_developer_credential(
+    store: &Store,
+    credential: &AuthenticatedDeveloperCredential,
+    actor: &OpenCommerceActor<'_>,
+    request: InvokeCapabilityRequest,
+    action_confirmation_id: Option<&str>,
+) -> Result<Value> {
+    credential.ensure_scope(&request.capability_key)?;
+    let provenance = OpenCommerceInvocationProvenance::developer(
+        credential.environment,
+        credential.credential_id.as_deref(),
+    )?;
+    invoke_with_provenance(
+        store,
+        actor,
+        request,
+        action_confirmation_id,
+        Some(credential),
+        provenance,
+    )
+    .await
+}
+
+async fn invoke_with_provenance(
+    store: &Store,
+    actor: &OpenCommerceActor<'_>,
+    request: InvokeCapabilityRequest,
+    action_confirmation_id: Option<&str>,
+    developer_credential: Option<&AuthenticatedDeveloperCredential>,
+    provenance: OpenCommerceInvocationProvenance<'_>,
 ) -> Result<Value> {
     let requester_app_id = normalize_app_id(&request.requester_app_id)?;
     if requester_app_id != normalize_app_id(actor.app_id)? {
@@ -47,6 +99,9 @@ pub(crate) async fn invoke_with_action_confirmation(
     }
     if capability.status != CAPABILITY_STATUS_ACTIVE {
         bail!("商业能力当前不可用");
+    }
+    if let Some(credential) = developer_credential {
+        credential.ensure_runtime_access(&capability.handler_type)?;
     }
     crate::open_commerce_capability_schema::validate_input(&capability.input_schema, &input)
         .map_err(anyhow::Error::new)?;
@@ -100,12 +155,16 @@ pub(crate) async fn invoke_with_action_confirmation(
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .ok_or_else(|| anyhow!("动作能力必须先完成服务端一次性确认"))?;
-        store.start_confirmed_open_commerce_invocation(invocation_start, confirmation_id)?
+        store.start_confirmed_open_commerce_invocation_with_provenance(
+            invocation_start,
+            confirmation_id,
+            provenance,
+        )?
     } else {
         if action_confirmation_id.is_some() {
             bail!("查询能力不接受动作确认凭证");
         }
-        store.start_open_commerce_invocation(invocation_start)?
+        store.start_open_commerce_invocation_with_provenance(invocation_start, provenance)?
     };
     if !claim.created {
         crate::open_commerce_capability_contract_service::validate_replayed_output(
@@ -146,6 +205,7 @@ pub(crate) async fn invoke_with_action_confirmation(
         &idempotency_key,
         &claim.invocation.id,
         &input,
+        provenance,
     )
     .await
     {
@@ -199,7 +259,9 @@ pub(crate) async fn invoke_with_action_confirmation(
             "capability_key": capability.capability_key,
             "grant_id": grant_id,
             "amount_micros": invocation.amount_micros,
-            "settlement_status": invocation.settlement_status
+            "settlement_status": invocation.settlement_status,
+            "credential_environment": invocation.credential_environment,
+            "credential_id": invocation.credential_id
         }),
     )?;
     if let Err(error) = crate::task_settlement::capture_commerce_invocation(
@@ -226,6 +288,7 @@ async fn execute_handler(
     idempotency_key: &str,
     invocation_id: &str,
     input: &Value,
+    provenance: OpenCommerceInvocationProvenance<'_>,
 ) -> Result<Value> {
     if capability.handler_type != HANDLER_MERCHANT_RUNTIME {
         return open_commerce_service::execute_first_party_handler(merchant, capability, input);
@@ -238,6 +301,8 @@ async fn execute_handler(
         capability_key: capability.capability_key.clone(),
         requester_user_id: actor.user_id.to_string(),
         requester_app_id: actor.app_id.to_string(),
+        credential_environment: provenance.environment.to_string(),
+        credential_id: provenance.credential_id.map(str::to_string),
         grant_id: grant_id.map(str::to_string),
         idempotency_key: idempotency_key.to_string(),
         issued_at_unix: Utc::now().timestamp(),

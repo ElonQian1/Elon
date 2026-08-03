@@ -36,11 +36,13 @@ async fn list_terminal_events(
         Ok(credential) => credential,
         Err(response) => return response,
     };
-    service_response(open_commerce_developer_event_service::list_terminal_events(
-        &state.store,
-        &credential.app,
-        query,
-    ))
+    service_response(
+        open_commerce_developer_event_service::list_terminal_events_for_credential(
+            &state.store,
+            &credential,
+            query,
+        ),
+    )
 }
 
 async fn terminal_event_detail(
@@ -53,9 +55,9 @@ async fn terminal_event_detail(
         Err(response) => return response,
     };
     service_response(
-        open_commerce_developer_event_service::terminal_event_detail(
+        open_commerce_developer_event_service::terminal_event_detail_for_credential(
             &state.store,
-            &credential.app,
+            &credential,
             &invocation_id,
         ),
     )

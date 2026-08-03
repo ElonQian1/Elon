@@ -68,6 +68,7 @@ async fn deliver(state: &AppState, claim: DeveloperWebhookDeliveryClaim) {
     let record = match state.store.open_commerce_developer_terminal_event(
         &claim.owner_user_id,
         &claim.app_id,
+        "sandbox",
         &claim.delivery.invocation_id,
     ) {
         Ok(Some(record)) => record,

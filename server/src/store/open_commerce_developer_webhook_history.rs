@@ -69,6 +69,7 @@ impl Store {
                      ON invocation.id=event.invocation_id
                   WHERE invocation.requester_user_id=?1
                     AND invocation.requester_app_id=?2
+                    AND invocation.credential_environment IN ('legacy', 'platform', 'sandbox')
                     AND event.seq>?3
                     AND ((invocation.status='succeeded' AND ?4=1)
                          OR (invocation.status<>'succeeded' AND ?5=1))

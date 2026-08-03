@@ -44,6 +44,8 @@ pub(crate) struct MerchantRuntimeEnvelope {
     pub capability_key: String,
     pub requester_user_id: String,
     pub requester_app_id: String,
+    pub credential_environment: String,
+    pub credential_id: Option<String>,
     pub grant_id: Option<String>,
     pub idempotency_key: String,
     pub issued_at_unix: i64,

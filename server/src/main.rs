@@ -254,6 +254,7 @@ mod open_commerce_grant_budget_tests;
 mod open_commerce_integration_migration;
 mod open_commerce_integration_model;
 mod open_commerce_invocation_protocol;
+mod open_commerce_invocation_provenance_migration;
 mod open_commerce_invocation_recovery;
 #[cfg(test)]
 mod open_commerce_invocation_recovery_tests;

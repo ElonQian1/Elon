@@ -30,6 +30,47 @@ pub(crate) struct OpenCommerceInvocationStart<'a> {
     pub currency: &'a str,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct OpenCommerceInvocationProvenance<'a> {
+    pub environment: &'a str,
+    pub credential_id: Option<&'a str>,
+}
+
+impl<'a> OpenCommerceInvocationProvenance<'a> {
+    pub(crate) fn platform() -> Self {
+        Self {
+            environment: "platform",
+            credential_id: None,
+        }
+    }
+
+    pub(crate) fn developer(environment: &'a str, credential_id: Option<&'a str>) -> Result<Self> {
+        let environment = environment.trim();
+        if !matches!(environment, "sandbox" | "production") {
+            bail!("开发者调用凭据环境无效");
+        }
+        let credential_id = credential_id
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if environment == "production" && credential_id.is_none() {
+            bail!("生产调用必须绑定生产凭据 ID");
+        }
+        if environment == "sandbox" && credential_id.is_some() {
+            bail!("沙箱调用不得伪造生产凭据 ID");
+        }
+        Ok(Self {
+            environment,
+            credential_id,
+        })
+    }
+
+    pub(super) fn matches(self, invocation: &OpenCommerceInvocation) -> bool {
+        (invocation.credential_environment == self.environment
+            && invocation.credential_id.as_deref() == self.credential_id)
+            || (invocation.credential_environment == "legacy" && self.environment != "production")
+    }
+}
+
 pub(crate) struct OpenCommerceInvocationClaim {
     pub invocation: OpenCommerceInvocation,
     pub created: bool,
@@ -40,6 +81,17 @@ impl Store {
         &self,
         input: OpenCommerceInvocationStart<'_>,
     ) -> Result<OpenCommerceInvocationClaim> {
+        self.start_open_commerce_invocation_with_provenance(
+            input,
+            OpenCommerceInvocationProvenance::platform(),
+        )
+    }
+
+    pub(crate) fn start_open_commerce_invocation_with_provenance(
+        &self,
+        input: OpenCommerceInvocationStart<'_>,
+        provenance: OpenCommerceInvocationProvenance<'_>,
+    ) -> Result<OpenCommerceInvocationClaim> {
         let existing = self.find_open_commerce_invocation(
             input.requester_user_id,
             input.requester_app_id,
@@ -48,8 +100,8 @@ impl Store {
             input.idempotency_key,
         )?;
         if let Some(invocation) = existing {
-            if invocation.request_hash != input.request_hash {
-                bail!("相同幂等键不能用于不同输入");
+            if invocation.request_hash != input.request_hash || !provenance.matches(&invocation) {
+                bail!("相同幂等键不能跨输入或凭据环境复用");
             }
             return Ok(OpenCommerceInvocationClaim {
                 invocation,
@@ -63,13 +115,14 @@ impl Store {
         conn.execute(
             "INSERT INTO open_commerce_invocations (
                     id, project_id, merchant_id, capability_id, capability_key,
-                    requester_user_id, requester_app_id, grant_id, idempotency_key,
+                    requester_user_id, requester_app_id, credential_environment,
+                    credential_id, grant_id, idempotency_key,
                     request_hash, request_shape_json, status, result_json, error_code,
                     units, unit_price_micros, amount_micros, currency,
                     settlement_status, created_at, completed_at
                  ) VALUES (
-                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'started',
-                    NULL, NULL, 0, ?12, 0, ?13, ?14, ?15, NULL
+                    ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
+                    'started', NULL, NULL, 0, ?14, 0, ?15, ?16, ?17, NULL
                  )",
             params![
                 id,
@@ -79,6 +132,8 @@ impl Store {
                 input.capability_key.trim(),
                 input.requester_user_id.trim(),
                 input.requester_app_id.trim(),
+                provenance.environment,
+                provenance.credential_id,
                 input.grant_id,
                 input.idempotency_key.trim(),
                 input.request_hash,
@@ -295,23 +350,25 @@ pub(super) fn invocation_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerc
         capability_key: row.get(4)?,
         requester_user_id: row.get(5)?,
         requester_app_id: row.get(6)?,
-        grant_id: row.get(7)?,
-        idempotency_key: row.get(8)?,
-        request_hash: row.get(9)?,
-        request_shape: parse_json(row.get(10)?, "调用摘要 JSON 无效")?,
-        status: row.get(11)?,
+        credential_environment: row.get(7)?,
+        credential_id: row.get(8)?,
+        grant_id: row.get(9)?,
+        idempotency_key: row.get(10)?,
+        request_hash: row.get(11)?,
+        request_shape: parse_json(row.get(12)?, "调用摘要 JSON 无效")?,
+        status: row.get(13)?,
         result: row
-            .get::<_, Option<String>>(12)?
+            .get::<_, Option<String>>(14)?
             .map(|value| parse_json(value, "调用结果 JSON 无效"))
             .transpose()?,
-        error_code: row.get(13)?,
-        units: row.get(14)?,
-        unit_price_micros: row.get(15)?,
-        amount_micros: row.get(16)?,
-        currency: row.get(17)?,
-        settlement_status: row.get(18)?,
-        created_at: row.get(19)?,
-        completed_at: row.get(20)?,
+        error_code: row.get(15)?,
+        units: row.get(16)?,
+        unit_price_micros: row.get(17)?,
+        amount_micros: row.get(18)?,
+        currency: row.get(19)?,
+        settlement_status: row.get(20)?,
+        created_at: row.get(21)?,
+        completed_at: row.get(22)?,
     })
 }
 
@@ -349,11 +406,13 @@ pub(super) fn map_invocation_conflict(error: rusqlite::Error) -> anyhow::Error {
 
 pub(super) const INVOCATION_SELECT: &str =
     "SELECT id, project_id, merchant_id, capability_id, capability_key,
-            requester_user_id, requester_app_id, grant_id, idempotency_key,
-            request_hash, request_shape_json, status, result_json, error_code,
+            requester_user_id, requester_app_id, credential_environment, credential_id,
+            grant_id, idempotency_key, request_hash, request_shape_json, status, result_json, error_code,
             units, unit_price_micros, amount_micros, currency, settlement_status,
             created_at, completed_at
        FROM open_commerce_invocations";
+
+pub(super) const INVOCATION_COLUMN_COUNT: usize = 23;
 
 const AUDIT_SELECT: &str = "SELECT id, project_id, actor_user_id, actor_app_id, action,
             subject_type, subject_id, metadata_json, created_at

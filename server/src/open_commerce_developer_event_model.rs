@@ -13,6 +13,7 @@ pub(crate) struct DeveloperTerminalEventQuery {
 pub(crate) struct DeveloperTerminalEventPage {
     pub schema: &'static str,
     pub app_id: String,
+    pub credential_environment: String,
     pub events: Vec<DeveloperTerminalEventSummary>,
     pub next_cursor: Option<String>,
     pub has_more: bool,
@@ -26,6 +27,8 @@ pub(crate) struct DeveloperTerminalEventSummary {
     pub invocation_id: String,
     pub merchant_id: String,
     pub capability_key: String,
+    pub credential_environment: String,
+    pub credential_id: Option<String>,
     pub idempotency_key: String,
     pub status: String,
     pub result_available: bool,

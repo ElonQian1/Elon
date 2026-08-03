@@ -105,7 +105,9 @@ pub(crate) use open_commerce_business_handoffs::{
     AdapterClaimReceiptProof, RecordOpenCommerceBusinessHandoffReceipt,
 };
 pub(crate) use open_commerce_integrations::RecordOpenCommerceSyncReceipt;
-pub(crate) use open_commerce_invocations::OpenCommerceInvocationStart;
+pub(crate) use open_commerce_invocations::{
+    OpenCommerceInvocationProvenance, OpenCommerceInvocationStart,
+};
 mod pc_project_binding;
 mod project_android_device_leases;
 mod project_android_devices;

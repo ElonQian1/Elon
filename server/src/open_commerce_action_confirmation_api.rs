@@ -106,6 +106,16 @@ async fn prepare_developer(
         Ok(value) => value,
         Err(error) => return service_error(error),
     };
+    let capability = match state
+        .store
+        .open_commerce_capability_by_key(&merchant.id, &request.capability_key)
+    {
+        Ok(value) => value,
+        Err(error) => return service_error(error),
+    };
+    if let Err(error) = credential.ensure_runtime_access(&capability.handler_type) {
+        return service_error(error);
+    }
     let role = project_access(&state, &app.owner_user_id, &merchant.project_id)
         .ok()
         .map(|access| access.role);
@@ -148,6 +158,16 @@ async fn confirm_developer(
         return json_error(StatusCode::FORBIDDEN, "动作确认不属于当前开发者应用");
     }
     if let Err(error) = credential.ensure_scope(&confirmation.capability_key) {
+        return service_error(error);
+    }
+    let capability = match state
+        .store
+        .open_commerce_capability(&confirmation.capability_id)
+    {
+        Ok(value) => value,
+        Err(error) => return service_error(error),
+    };
+    if let Err(error) = credential.ensure_runtime_access(&capability.handler_type) {
         return service_error(error);
     }
     let app = &credential.app;

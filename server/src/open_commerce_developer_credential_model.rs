@@ -92,6 +92,13 @@ impl AuthenticatedDeveloperCredential {
         }
         Ok(())
     }
+
+    pub(crate) fn ensure_runtime_access(&self, handler_type: &str) -> Result<()> {
+        if self.environment == "sandbox" && handler_type.trim() == "merchant_runtime" {
+            bail!("沙箱凭据不得调用真实商户运行时，请使用获准的生产凭据");
+        }
+        Ok(())
+    }
 }
 
 pub(crate) fn production_credentials_enabled() -> bool {

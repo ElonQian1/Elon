@@ -4,7 +4,7 @@ use rusqlite::{params, OptionalExtension};
 use crate::open_commerce_merchant_evidence_model::MerchantTerminalInvocationRecord;
 
 use super::{
-    open_commerce_invocations::{invocation_from_row, INVOCATION_SELECT},
+    open_commerce_invocations::{invocation_from_row, INVOCATION_COLUMN_COUNT, INVOCATION_SELECT},
     Store,
 };
 
@@ -63,7 +63,7 @@ pub(super) fn merchant_record_from_row(
     row: &rusqlite::Row<'_>,
 ) -> rusqlite::Result<MerchantTerminalInvocationRecord> {
     Ok(MerchantTerminalInvocationRecord {
-        sequence: row.get(21)?,
+        sequence: row.get(INVOCATION_COLUMN_COUNT)?,
         invocation: invocation_from_row(row)?,
     })
 }

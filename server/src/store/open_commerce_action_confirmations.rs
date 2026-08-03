@@ -16,7 +16,7 @@ use super::{
     open_commerce_app_blocks::ensure_app_not_blocked_on,
     open_commerce_invocations::{
         invocation_from_row, map_invocation_conflict, OpenCommerceInvocationClaim,
-        OpenCommerceInvocationStart, INVOCATION_SELECT,
+        OpenCommerceInvocationProvenance, OpenCommerceInvocationStart, INVOCATION_SELECT,
     },
     Store,
 };
@@ -200,6 +200,19 @@ impl Store {
         input: OpenCommerceInvocationStart<'_>,
         confirmation_id: &str,
     ) -> Result<OpenCommerceInvocationClaim> {
+        self.start_confirmed_open_commerce_invocation_with_provenance(
+            input,
+            confirmation_id,
+            OpenCommerceInvocationProvenance::platform(),
+        )
+    }
+
+    pub(crate) fn start_confirmed_open_commerce_invocation_with_provenance(
+        &self,
+        input: OpenCommerceInvocationStart<'_>,
+        confirmation_id: &str,
+        provenance: OpenCommerceInvocationProvenance<'_>,
+    ) -> Result<OpenCommerceInvocationClaim> {
         let mut conn = self.conn()?;
         let tx = conn.transaction()?;
         let confirmation = confirmation_on(&tx, confirmation_id)?;
@@ -207,8 +220,8 @@ impl Store {
 
         let existing = find_invocation_on(&tx, &input)?;
         if let Some(invocation) = existing {
-            if invocation.request_hash != input.request_hash {
-                bail!("相同幂等键不能用于不同输入");
+            if invocation.request_hash != input.request_hash || !provenance.matches(&invocation) {
+                bail!("相同幂等键不能跨输入或凭据环境复用");
             }
             if confirmation.status != "consumed"
                 || confirmation.invocation_id.as_deref() != Some(invocation.id.as_str())
@@ -237,7 +250,7 @@ impl Store {
 
         ensure_app_not_blocked_on(&tx, input.merchant_id, input.requester_app_id)?;
         let invocation_id = new_id("invoke");
-        insert_invocation_on(&tx, &invocation_id, &input)?;
+        insert_invocation_on(&tx, &invocation_id, &input, provenance)?;
         let timestamp = now();
         let consumed = tx.execute(
             "UPDATE open_commerce_action_confirmations
@@ -340,17 +353,19 @@ fn insert_invocation_on(
     tx: &Transaction<'_>,
     invocation_id: &str,
     input: &OpenCommerceInvocationStart<'_>,
+    provenance: OpenCommerceInvocationProvenance<'_>,
 ) -> Result<()> {
     tx.execute(
         "INSERT INTO open_commerce_invocations (
             id, project_id, merchant_id, capability_id, capability_key,
-            requester_user_id, requester_app_id, grant_id, idempotency_key,
+            requester_user_id, requester_app_id, credential_environment,
+            credential_id, grant_id, idempotency_key,
             request_hash, request_shape_json, status, result_json, error_code,
             units, unit_price_micros, amount_micros, currency,
             settlement_status, created_at, completed_at
          ) VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 'started',
-            NULL, NULL, 0, ?12, 0, ?13, ?14, ?15, NULL
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13,
+            'started', NULL, NULL, 0, ?14, 0, ?15, ?16, ?17, NULL
          )",
         params![
             invocation_id,
@@ -360,6 +375,8 @@ fn insert_invocation_on(
             input.capability_key.trim(),
             input.requester_user_id.trim(),
             input.requester_app_id.trim(),
+            provenance.environment,
+            provenance.credential_id,
             input.grant_id,
             input.idempotency_key.trim(),
             input.request_hash,
