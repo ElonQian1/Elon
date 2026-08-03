@@ -225,18 +225,44 @@ impl Store {
             bail!("算力 Offer ID 不能为空");
         }
         let conn = self.conn()?;
-        let projection = current_offer_projection_on(&conn, offer_id.trim())?
-            .ok_or_else(|| anyhow!("算力 Offer 不存在"))?;
-        let stored = offer_version_on(&conn, offer_id.trim(), projection.current_offer_version)?
-            .ok_or_else(|| anyhow!("算力 Offer 当前历史版本缺失"))?;
-        let offer = audited_offer_on(&conn, Some(&projection), &stored)?;
-        Ok(ComputeOfferRegistrationReceipt {
-            offer,
-            provider_policy_revision: stored.provider_policy_revision,
-            provider_digest: stored.provider_digest,
-            replayed: false,
-        })
+        current_registered_offer_on(&conn, offer_id.trim())?
+            .ok_or_else(|| anyhow!("算力 Offer 不存在"))
     }
+}
+
+pub(super) fn current_registered_offer_on(
+    conn: &Connection,
+    offer_id: &str,
+) -> Result<Option<ComputeOfferRegistrationReceipt>> {
+    let Some(projection) = current_offer_projection_on(conn, offer_id)? else {
+        return Ok(None);
+    };
+    let stored = offer_version_on(conn, offer_id, projection.current_offer_version)?
+        .ok_or_else(|| anyhow!("算力 Offer 当前历史版本缺失"))?;
+    let offer = audited_offer_on(conn, Some(&projection), &stored)?;
+    Ok(Some(ComputeOfferRegistrationReceipt {
+        offer,
+        provider_policy_revision: stored.provider_policy_revision,
+        provider_digest: stored.provider_digest,
+        replayed: false,
+    }))
+}
+
+pub(super) fn registered_offer_version_on(
+    conn: &Connection,
+    offer_id: &str,
+    offer_version: i64,
+) -> Result<Option<ComputeOfferRegistrationReceipt>> {
+    let Some(stored) = offer_version_on(conn, offer_id, offer_version)? else {
+        return Ok(None);
+    };
+    let offer = audited_offer_on(conn, None, &stored)?;
+    Ok(Some(ComputeOfferRegistrationReceipt {
+        offer,
+        provider_policy_revision: stored.provider_policy_revision,
+        provider_digest: stored.provider_digest,
+        replayed: false,
+    }))
 }
 
 fn insert_offer_version(
