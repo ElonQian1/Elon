@@ -15,7 +15,7 @@ implementation_status: implementation_uncompiled
 ## 决定
 
 1. 每项公开能力增加机器可读的 `source`。V1 根据能力处理器区分商户公开资料、商户静态数据、商户运行时和兜底商户声明，声明权威固定为 `merchant_project`。
-2. `source.externally_verified` 固定为 `false`，`integration_receipt_id` 固定为空。没有建立能力与接入同步回执的摘要绑定前，不得展示为外部平台来源证明。
+2. `source.externally_verified` 固定为 `false`。无有效能力来源绑定时，`integration_receipt_id` 为空；显式内部回执绑定由 `open-commerce-capability-source-link-v1` 管理，也不得展示为外部平台来源证明。
 3. 每项公开能力增加 `freshness`，根据能力声明更新时间与商户填写的有效秒数，在每次目录读取时派生 `current`、`stale` 或 `unknown`。
 4. 有效秒数为零、时间无法解析或有效期无法安全计算时，状态必须为 `unknown`，不得猜测为当前有效。
 5. 新鲜度计算依据固定为 `capability_declaration_updated_at`。它只表示商户对当前能力声明的时间承诺，不代表库存、价格、营业状态或外部订单已经实时回读。
@@ -31,7 +31,7 @@ implementation_status: implementation_uncompiled
 - `unknown` 不等于数据错误，只表示商户没有给出可计算的时间承诺。
 - `merchant_runtime` 只描述能力处理器类型，不证明运行时在线、外部平台授权有效或调用必然成功。
 - 排序凭证中的来源和新鲜度仍是未签名目录快照，不证明运营方身份、商户身份或外部平台背书。
-- 将来若接入同步回执，必须另建能力、数据域、回执摘要和观察时间之间的显式关系，不能复用 V1 字段伪造证明。
+- 能力、数据域、内部同步回执摘要和观察时间的显式关系由后续 `open-commerce-capability-source-link-v1` 管理；该关系仍固定未外部核验，不能复用为外部平台证明。
 - 当前代码未编译、未执行接口、时间边界、浏览器或兼容性验证，状态为 `implementation_uncompiled`。
 
 ## 实现入口
