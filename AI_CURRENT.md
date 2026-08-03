@@ -11,7 +11,7 @@ reviewed_at: 2026-08-03
 
 - 已实现：用户通过 Android APK 或 PC 工作台描述需求，AI CLI/API 代理在真实 Git 工作区开发、验证、构建和发布应用。
 - 已实现：项目、频道、多人/多 AI 协作、Windows 节点执行、上下文编译、项目文档治理与版本恢复等基础能力。
-- 已形成代码、未编译：Windows 节点会为普通 Codex 编码任务注入仅含 `project_context_plan` 的项目文档 `context` profile；它最多规划 8 份文档和 2400 token，只返回 Git HEAD、catalog revision、权威信源、少量路径/章节、图谱入口和实现引用，不返回正文、不替代 Codex 原生搜索。精确单文件任务由 MCP 指令要求跳过，完整治理工具仍只对显式文档任务开放；其他 CLI 普通任务暂不自动注入。本批次按快速实现策略未编译、未测试。
+- 已形成第二阶段代码、未编译：Windows 节点会为普通 Codex 编码任务注入仅含 `project_context_plan` 的项目文档 `context` profile；它最多规划 8 份文档和 2400 token 后续阅读，并把自身结构化响应限制在约 800–2000 token。clean worktree 的同 revision/查询使用 5 分钟、64 项 LRU；`plan_receipt.plan_id` 允许重复调用只返回 `not_modified` 小回执。dirty worktree 禁用缓存。响应只保留少量路径、标题、图谱入口和实现引用，不返回正文；歧义、非当前、非权威与 dirty 信源只作显式元数据警告，不冒充语义冲突已比较。精确单文件任务由 MCP 指令要求跳过，完整治理工具仍只对显式文档任务开放；其他 CLI 普通任务暂不自动注入。本批次按快速实现策略未编译、未测试。
 - 已形成第一阶段代码、尚未完成平台运行验收：`yilong-ui-live` MCP 可在用户不打开微调画布时发现项目的 Web、PWA、Tauri 和 Android 目标，建立绑定当前 MCP 会话的后台设计 session；Web/PWA/Tauri 前端复用受控无头浏览器生成 PNG 与可查询的紧凑语义 UI 树，Android 继续要求真实 Live Runtime。Tauri 当前只覆盖前端 WebView，不能声明原生宿主已验证；通用多端草稿/写回、PC 画布平台切换与默认右侧对话仍是后续阶段。权威边界见 `docs/headless-ui-design-mcp.md`。
 - 已实现：开放商业网络 V1 的商户节点、能力、授权、调用、计量和审计主干；HTTP 与 MCP 共用领域服务。能力输入和处理器输出已按有限 Schema 配置失败关闭，无效输入不创建调用，无效输出以零金额失败并释放 Grant 预算，历史成功结果重放前按当前输出契约复验。
 - 已实现、生产配置依赖环境：受控 `merchant_runtime` 可把平台调用安全转交给商户自有 ERP 后端；首个 `cofficethinking` 参考节点已覆盖商品发现、服务端报价、用户确认后的幂等下单和订单查询。连接器 SDK 已落位通用 Node 运行时内核，统一签名、重放保护、Grant、订单确认、幂等生命周期、Manifest 和响应信封；商户仍需实现自己的业务处理器与生产持久化存储。运行时每次调用重新核对标准 443 HTTPS 白名单，并形成 DNS 私网拒绝、禁代理、禁重定向和单次公网地址固定代码，但该新增安全批次尚未编译或网络验证。真实公网启用仍需 HTTPS 域名、白名单和双方密钥，通用内核完整回归按当前策略后置。

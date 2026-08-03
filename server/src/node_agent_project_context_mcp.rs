@@ -10,6 +10,13 @@ use serde_json::{json, Value};
 use std::path::Path;
 
 use crate::{
+    node_agent_project_context_cache::{
+        inspect_workspace, lookup, request_cache_key, stable_plan_id, store, WorkspaceRevision,
+    },
+    node_agent_project_context_projection::{
+        enforce_response_projection, not_modified_response, project_navigation_plan,
+        source_conflict_summary,
+    },
     node_agent_project_docs_mcp::McpRequest,
     project_document_knowledge_graph_service::plan_context,
     project_document_response::{compact_text, project_tool_response},
@@ -18,7 +25,9 @@ use crate::{
 pub(crate) const PROFILE: &str = "context";
 pub(crate) const TOOL_NAME: &str = "project_context_plan";
 
-const SERVER_INSTRUCTIONS: &str = "Use project_context_plan only to orient an unfamiliar, cross-file, architecture, or current-status task before broad searching. It returns paths and evidence, never source bodies. Open every selected path with Codex native file tools before editing. Current workspace files/tests decide implementation truth; authoritative current docs/ADRs decide accepted direction. Report conflicts and re-plan when git_head or catalog_revision changes. Skip this tool for a precise single-file task.";
+const SERVER_INSTRUCTIONS: &str = "Use project_context_plan only for unfamiliar, cross-file, architecture, or current-status work. It returns bounded metadata, never source bodies. Reuse plan_receipt.plan_id as previous_plan_id; an unchanged revision then returns only a small receipt. Open selected paths with Codex native tools before editing. Current files/tests decide implementation truth; binding current docs/ADRs decide accepted direction. Resolve reported source warnings explicitly. Skip precise single-file tasks.";
+const MIN_RESPONSE_TOKENS: u64 = 800;
+const MAX_RESPONSE_TOKENS: u64 = 2_000;
 
 #[derive(Debug, Deserialize)]
 struct ContextPlanArguments {
@@ -27,6 +36,12 @@ struct ContextPlanArguments {
     max_tokens: u64,
     #[serde(default = "default_document_limit")]
     max_documents: usize,
+    #[serde(default = "default_response_token_budget")]
+    max_response_tokens: u64,
+    #[serde(default)]
+    previous_plan_id: Option<String>,
+    #[serde(default)]
+    force_refresh: bool,
 }
 
 pub(crate) fn handles(profile: Option<&str>) -> bool {
@@ -38,7 +53,7 @@ pub(crate) fn handle_request(workspace: &Path, request: &McpRequest) -> Result<V
         "initialize" => Ok(json!({
             "protocolVersion": "2025-03-26",
             "capabilities": { "tools": { "listChanged": false } },
-            "serverInfo": { "name": "yilong-project-context", "version": "1.0.0" },
+            "serverInfo": { "name": "yilong-project-context", "version": "1.1.0" },
             "instructions": SERVER_INSTRUCTIONS,
         })),
         "tools/list" => Ok(json!({ "tools": [definition()] })),
@@ -51,7 +66,7 @@ pub(crate) fn handle_request(workspace: &Path, request: &McpRequest) -> Result<V
 pub(crate) fn definition() -> Value {
     json!({
         "name": TOOL_NAME,
-        "description": "为陌生项目、跨文件、架构或当前状态任务返回少量带 Git/revision、权威性、图谱入口和实现引用的阅读导航。零正文、只读；随后必须用代理原生文件搜索/读取核对真实工作区。精确单文件任务不要调用。",
+        "description": "为陌生项目、跨文件、架构或当前状态任务返回严格限额的 Git/revision、权威性、图谱入口和实现引用。零正文、只读；重复调用传 previous_plan_id 可只取未变化回执。精确单文件任务不要调用。",
         "inputSchema": {
             "type": "object",
             "required": ["query"],
@@ -74,6 +89,23 @@ pub(crate) fn definition() -> Value {
                     "minimum": 1,
                     "maximum": 8,
                     "default": 6
+                },
+                "max_response_tokens": {
+                    "type": "integer",
+                    "minimum": MIN_RESPONSE_TOKENS,
+                    "maximum": MAX_RESPONSE_TOKENS,
+                    "default": 1200,
+                    "description": "本工具结构化响应的近似硬预算，不是后续文件阅读预算。"
+                },
+                "previous_plan_id": {
+                    "type": "string",
+                    "maxLength": 96,
+                    "description": "复用上一响应 plan_receipt.plan_id；revision 未变时只返回小回执。"
+                },
+                "force_refresh": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "仅怀疑索引异常时绕过 clean-worktree 短缓存。"
                 }
             }
         }
@@ -115,50 +147,133 @@ fn build_plan(workspace: &Path, input: ContextPlanArguments) -> Result<Value> {
     if query.chars().count() > 500 {
         bail!("project_context_plan.query 最多 500 个字符");
     }
-
-    let mut plan = plan_context(
+    let previous_plan_id = input.previous_plan_id.as_deref().map(str::trim);
+    if previous_plan_id.is_some_and(|value| value.len() > 96) {
+        bail!("previous_plan_id 最多 96 个字符");
+    }
+    let max_tokens = input.max_tokens.clamp(200, 2_400);
+    let max_documents = input.max_documents.clamp(1, 8);
+    let max_response_tokens = input
+        .max_response_tokens
+        .clamp(MIN_RESPONSE_TOKENS, MAX_RESPONSE_TOKENS);
+    let revision = inspect_workspace(workspace);
+    let cache_key = request_cache_key(
         workspace,
+        &revision,
         query,
-        None,
-        input.max_tokens.clamp(200, 2_400),
-        input.max_documents.clamp(1, 8),
-        1_600,
-    )?;
-    let git_head = crate::node_agent_update_checkpoint::git_output(
-        workspace,
-        &["rev-parse", "--verify", "HEAD^{commit}"],
+        max_tokens,
+        max_documents,
+        max_response_tokens,
     );
-    let branch =
-        crate::node_agent_update_checkpoint::git_output(workspace, &["branch", "--show-current"]);
-    let git_clean =
-        crate::node_agent_update_checkpoint::git_output(workspace, &["status", "--porcelain"])
-            .map(|status| status.trim().is_empty());
-    let catalog_revision = plan.get("catalog_revision").cloned().unwrap_or(Value::Null);
 
+    let cached = (!input.force_refresh)
+        .then(|| cache_key.as_deref().and_then(lookup))
+        .flatten();
+    let (mut plan, cache_status, cache_age_ms) = if let Some(hit) = cached {
+        (hit.plan, "hit", Some(hit.age_ms))
+    } else {
+        let plan = build_fresh_plan(
+            workspace,
+            query,
+            max_tokens,
+            max_documents,
+            max_response_tokens,
+            &revision,
+            cache_key.is_some(),
+        )?;
+        if let Some(key) = cache_key.clone() {
+            store(key, plan.clone());
+        }
+        let status = if cache_key.is_none() {
+            "bypass_dirty_workspace"
+        } else if input.force_refresh {
+            "refreshed"
+        } else {
+            "miss"
+        };
+        (plan, status, None)
+    };
+    let plan_id = plan
+        .pointer("/plan_receipt/plan_id")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if !input.force_refresh && previous_plan_id == Some(plan_id) {
+        return Ok(not_modified_response(
+            &plan,
+            cache_status,
+            cache_age_ms,
+            max_response_tokens,
+        ));
+    }
+    plan["cache"] = json!({
+        "status": cache_status,
+        "age_ms": cache_age_ms,
+        "ttl_seconds": 300,
+        "clean_worktree_only": true,
+    });
+    Ok(plan)
+}
+
+fn build_fresh_plan(
+    workspace: &Path,
+    query: &str,
+    max_tokens: u64,
+    max_documents: usize,
+    max_response_tokens: u64,
+    revision: &WorkspaceRevision,
+    cacheable: bool,
+) -> Result<Value> {
+    let raw = plan_context(workspace, query, None, max_tokens, max_documents, 1_600)?;
+    let mut plan = project_navigation_plan(&raw);
+    let catalog_revision = plan.get("catalog_revision").cloned().unwrap_or(Value::Null);
     plan["contract"] = json!({
-        "schema": "elon.project_context_plan.v1",
+        "schema": "elon.project_context_plan.v2",
         "read_only": true,
         "source_bodies_returned": 0,
         "native_search_replaced": false,
+        "max_response_tokens": max_response_tokens,
     });
     plan["workspace_revision"] = json!({
-        "git_head": git_head,
-        "git_branch": branch,
-        "git_clean": git_clean,
+        "git_head": revision.git_head,
+        "git_branch": revision.git_branch,
+        "git_clean": revision.git_clean,
         "catalog_revision": catalog_revision,
         "replan_when_revision_changes": true,
     });
     plan["source_policy"] = json!({
-        "implementation_truth": ["current_workspace_files", "tests", "build_or_runtime_evidence"],
-        "accepted_direction": ["binding_project_rules", "authoritative_current_status", "accepted_decisions"],
-        "navigation_only": ["knowledge_graph", "repo_map", "symbol_index", "generated_summaries"],
-        "default_excluded": ["drafts", "discussions", "historical_reports", "archives", "traces"],
-        "conflict_rule": "Report documentation/implementation drift; do not silently let summaries override current files or let code erase an accepted decision.",
+        "precedence": [
+            {"rank":1,"role":"implementation_truth","sources":["current_files","tests","runtime_evidence"]},
+            {"rank":2,"role":"accepted_direction","sources":["binding_rules","current_status","accepted_decisions"]},
+            {"rank":3,"role":"navigation_only","sources":["knowledge_graph","indexes","generated_summaries"]}
+        ],
+        "default_excluded": ["drafts","discussions","history","archives","traces"],
+        "conflict_action": "Report drift and verify both current source and binding direction; never silently choose an index or summary."
     });
+    plan["source_conflict_summary"] = source_conflict_summary(&plan, revision);
     plan["native_tool_handoff"] = json!({
-        "next": "Open only the selected paths/sections and implementation_refs with Codex native search/read tools.",
-        "before_edit": "Verify exact current source and tests at workspace_revision.git_head; treat this plan as navigation, not copied source truth.",
-        "skip_expansion_when": "The first selected source resolves the question or the task already names an exact file/symbol.",
+        "next": "Open only selected paths and implementation_refs with Codex native search/read.",
+        "before_edit": "Verify exact current source/tests; this response is navigation metadata.",
+        "stop": "Stop expanding once one verified source resolves the task."
+    });
+    plan = enforce_response_projection(plan, max_response_tokens);
+    let receipt_material = json!({
+        "schema": "elon.project_context_receipt.v1",
+        "query": plan.get("query"),
+        "workspace_revision": plan.get("workspace_revision"),
+        "catalog_revision": plan.get("catalog_revision"),
+        "matched_nodes": plan.get("matched_nodes"),
+        "mandatory_rules": plan.get("mandatory_rules"),
+        "relevant_documents": plan.get("relevant_documents"),
+        "selected_paths": plan.get("selected_paths"),
+    });
+    let estimated_full_plan_tokens = serde_json::to_vec(&plan)?.len().div_ceil(4);
+    plan["plan_receipt"] = json!({
+        "plan_id": stable_plan_id(&receipt_material),
+        "schema": "elon.project_context_receipt.v1",
+        "cacheable": cacheable,
+        "revision_bound": true,
+        "reuse_parameter": "previous_plan_id",
+        "estimated_full_plan_tokens": estimated_full_plan_tokens,
     });
     Ok(plan)
 }
@@ -169,6 +284,10 @@ fn default_token_budget() -> u64 {
 
 fn default_document_limit() -> usize {
     6
+}
+
+fn default_response_token_budget() -> u64 {
+    1_200
 }
 
 #[cfg(test)]
@@ -190,6 +309,11 @@ mod tests {
             definition["inputSchema"]["properties"]["max_documents"]["maximum"],
             8
         );
+        assert_eq!(
+            definition["inputSchema"]["properties"]["max_response_tokens"]["maximum"],
+            2000
+        );
+        assert!(definition["inputSchema"]["properties"]["previous_plan_id"].is_object());
         assert!(handles(Some(PROFILE)));
         assert!(!handles(None));
     }
