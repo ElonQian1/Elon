@@ -254,7 +254,7 @@ Web、PWA 与 Tauri 前端复用 PWA Runtime 的受控无头 Chromium、origin �
 
 平台证据不互相冒充：Android 仍走 Android Live Runtime；Tauri WebView、原生窗口 PNG、Win32 菜单、Runtime 后代顶层窗口/候选对话框和项目插桩 Rust command trace 分层记录。只有原生窗口 PNG/SHA-256 能设置 `nativeHostVerified=true`；项目 trace 不含参数/结果正文，也不冒充操作系统证明。Tauri 数据面不开放任意菜单点击或任意 command 执行。设计会话记录位于 `.elon/ui-tuner/headless-design/sessions/`，以 canonical 项目根作为授权边界，创建时 MCP session 仅保留审计。
 
-Design Draft、源码绑定、乐观 revision 与写回回执由四端共用。`ui_get_design_capabilities` 是当前节点已安装 schema 的机器证据；`ui_get_design_verification_matrix` 将草稿、会话工件和平台回执分成 READY/IN_PROGRESS/BLOCKED/PASSED，源码存在不等于运行通过。PC 微调画布已消费同一状态机：左侧平台/会话/UI 树，中间最终 UI 与选区，右侧默认 AI 对话，并提供持久浏览器、fixture 引用、Tauri 行为证据和矩阵控制。完整契约及尚未执行的真实编译、平台运行与节点发布边界见 `docs/headless-ui-design-mcp.md`。
+Design Draft、源码绑定、乐观 revision 与写回回执由四端共用。Web/PWA/Tauri 草稿可通过生成式、白名单 `previewStyle` 临时写入当前元素的内联样式；浏览器页内 WeakMap 保存首次原值供恢复，MCP 响应固定标记为非源码证据。源码候选器先验证 UI tree 工件哈希，再只在 designSession 声明的项目 `sourceRoots` 中对 selector/label/role/tag/route 做有界扫描，返回局部 excerpt、文件 SHA-256 和字节范围；状态只能是 `CANDIDATE`，确认 `BOUND` 仍需一次带 expected revision 的草稿更新。`ui_get_design_capabilities` 是当前节点已安装 schema 的机器证据；`ui_get_design_verification_matrix` 将草稿、会话工件和平台回执分成 READY/IN_PROGRESS/BLOCKED/PASSED，源码存在不等于运行通过。PC 微调画布已消费同一状态机：左侧平台/会话/UI 树，中间最终 UI 与选区，右侧默认 AI 对话；普通 AI 任务期间按项目最近 designSession 自动恢复画布，并提供草稿预览/恢复、源码候选两步确认、持久浏览器、fixture、Tauri 行为证据和矩阵控制。完整契约及尚未执行的真实编译、平台运行与节点发布边界见 `docs/headless-ui-design-mcp.md`。
 
 ## 3. 代码仓库结构（目标结构）
 

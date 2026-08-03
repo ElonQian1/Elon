@@ -8,7 +8,7 @@ use crate::node_agent_source_preview::{get_writeback_receipt, WritebackReceipt};
 
 const CAPABILITIES_TOOL: &str = "ui_get_design_capabilities";
 const MATRIX_TOOL: &str = "ui_get_design_verification_matrix";
-const RUNTIME_SCHEMA: &str = "yilong-ui-live@1.7.0";
+const RUNTIME_SCHEMA: &str = "yilong-ui-live@1.8.0";
 
 pub(super) fn tool_definitions() -> Vec<Value> {
     vec![
@@ -48,7 +48,7 @@ fn capabilities(session: &LiveUiSession) -> Result<Value> {
     Ok(json!({
         "schema":"elon.ui-design-capabilities.v1",
         "runtimeSchema":RUNTIME_SCHEMA,
-        "protocolRevision":"1.7",
+        "protocolRevision":"1.8",
         "installedRuntimeEvidence":{"source":"MCP_TOOL_RESPONSE","tool":CAPABILITIES_TOOL},
         "capabilityIds":[
             "PROJECT_SCOPED_DESIGN_SESSIONS",
@@ -59,6 +59,8 @@ fn capabilities(session: &LiveUiSession) -> Result<Value> {
             "TAURI_NATIVE_DIALOG_INSPECTION",
             "TAURI_PROJECT_COMMAND_TRACE",
             "REVISIONED_DESIGN_DRAFTS",
+            "DESIGN_DRAFT_LIVE_PREVIEW",
+            "DESIGN_SOURCE_BINDING_CANDIDATES",
             "EVIDENCE_GATED_WRITEBACK",
             "PLATFORM_VERIFICATION_MATRIX"
         ],
