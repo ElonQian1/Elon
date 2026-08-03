@@ -16,6 +16,7 @@ import ConsumerPreferenceConstraintFields from './ConsumerPreferenceConstraintFi
 import ConsumerSourceFilterFields from './ConsumerSourceFilterFields'
 import CapabilityInvocationComposer from './CapabilityInvocationComposer'
 import ConsumerCapabilityFilterFields from './ConsumerCapabilityFilterFields'
+import ConsumerCandidateScopeSummary from './ConsumerCandidateScopeSummary'
 import { downloadConsumerRankingReceipt, verifyConsumerRankingReceipt } from './consumerRankingReceipt'
 import type {
   ConsumerDiscoveryMatch,
@@ -343,6 +344,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
           </header>
           <div className={base.formCard} style={{ ...commerceStyles.sectionBody, ...commerceStyles.scrollArea }}>
             {result?.ranking_explanation && <small style={commerceStyles.itemMeta}>{result.ranking_explanation}</small>}
+            {result?.candidate_scope && <ConsumerCandidateScopeSummary scope={result.candidate_scope} />}
             {result?.ranking_receipt && (
               <article className={base.formCard} style={listItemStyle()}>
                 <header style={commerceStyles.itemHeader}>

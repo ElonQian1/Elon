@@ -832,9 +832,21 @@ export interface ConsumerDiscoveryResponse {
     require_category_match: boolean
     require_all_tags_match: boolean
   }
+  candidate_scope: ConsumerCandidateScope
   available_ranking_policies: ConsumerRankingPolicyDescriptor[]
   ranking_receipt?: ConsumerRankingReceipt
   matches: ConsumerDiscoveryMatch[]
+}
+
+export interface ConsumerCandidateScope {
+  schema: 'open_commerce.consumer_candidate_scope.v1'
+  kind: 'current_operator_public_directory.v1'
+  operator_exhaustive: false
+  candidate_cap: number
+  directory_candidate_count: number
+  eligible_match_count: number
+  returned_match_count: number
+  results_truncated: boolean
 }
 
 export interface ConsumerSourceFilterOptions {
