@@ -8,7 +8,7 @@ implementation_status: implementation_uncompiled
 
 # 开放商业开发者签名 Webhook V1
 
-> 后续修订：现有 Webhook 被明确限定为沙箱/旧调用通知，自动入队、历史补发、死信重试和工作器读取均不得交付生产调用。生产 Webhook 需要独立准入，当前边界以 `open-commerce-invocation-credential-provenance-v1.md` 为准。
+> 后续修订：订阅已固定为沙箱或生产环境。沙箱/旧调用与生产调用严格隔离，生产订阅由独立默认关闭的准入和凭据规则约束，当前边界以 `open-commerce-invocation-credential-provenance-v1.md` 和 `open-commerce-production-webhooks-v1.md` 为准。
 
 ## 背景
 
@@ -41,3 +41,4 @@ implementation_status: implementation_uncompiled
 - `pc-frontend/src/features/open-commerce/DeveloperWebhookPanel.tsx`
 - `sdk/open-commerce-connector/src/webhook-signature.js`
 - `docs/open-commerce-developer-webhooks-v1-acceptance.md`
+- `docs/decisions/open-commerce-production-webhooks-v1.md`

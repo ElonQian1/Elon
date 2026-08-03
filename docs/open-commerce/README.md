@@ -109,6 +109,8 @@
 99. `docs/open-commerce-developer-production-credentials-v1-acceptance.md`：查看生产凭据代码状态与后置统一回归清单。
 100. `docs/decisions/open-commerce-invocation-credential-provenance-v1.md`：查看调用来源证据、幂等边界和沙箱/生产隔离决定。
 101. `docs/open-commerce-invocation-credential-provenance-v1-acceptance.md`：查看调用环境隔离代码状态与统一回归清单。
+102. `docs/decisions/open-commerce-production-webhooks-v1.md`：查看环境绑定生产订阅、双开关和生产资格联动决定。
+103. `docs/open-commerce-production-webhooks-v1-acceptance.md`：查看生产 Webhook 代码状态与后置统一回归清单。
 
 ## 专题地图
 
@@ -122,7 +124,7 @@
 | 通用 ERP 蓝图与智能提案 | V1 已实现，代码执行仍走既有项目流程 | `docs/erp/README.md`、`docs/erp/acceptance-v1.md` |
 | 商户数据来源、健康度和同步回执 | 控制面已实现，具体平台适配器待逐项验收 | `docs/decisions/open-commerce-integration-control-plane.md`、`docs/open-commerce-integration-control-plane-acceptance.md` |
 | 连接器 SDK 与兼容性门禁 | 已实现 V1，尚不包含具体大厂适配器 | `sdk/open-commerce-connector/`、`docs/open-commerce/connector-sdk.md` |
-| 消费者发现、关系授权与第三方应用接入 | 跨项目基础目录、消费者匿名关系、安全续期、低敏偏好字段披露、关联数据删除请求、含偏好、披露和账户级调用凭证的本人 V3 可验证导出、Schema 驱动填写、服务端一次性动作确认、授权沙盒、App 生命周期、限时 Grant、调用配额、Grant 总预算、孤儿调用回收、App 自有终态结果流、活动证据和手动封禁已实现；签名 Webhook 与 App 资料审核代码已形成但未编译；敏感数据保险箱、跨运营方导入、完整订单迁移、生产身份核验、生产凭据、跨运营方通知、外部删除证明和生产公共网络未完成 | `docs/decisions/open-commerce-directory-publication-v1.md`、`docs/decisions/open-commerce-consumer-relationships-v1.md`、`docs/decisions/open-commerce-consumer-preference-disclosures-v1.md`、`docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md`、`docs/decisions/open-commerce-consumer-portability-exports-v3.md`、`docs/decisions/open-commerce-consumer-invocation-receipts-v1.md`、`docs/decisions/open-commerce-developer-terminal-events-v1.md`、`docs/decisions/open-commerce-developer-webhooks-v1.md`、`docs/decisions/open-commerce-developer-app-manifest-review-v1.md`、`docs/decisions/open-commerce-schema-driven-invocation-form-v1.md`、`docs/decisions/open-commerce-server-action-confirmation-v1.md`、`docs/decisions/open-commerce-developer-lifecycle-v1.md`、`docs/decisions/open-commerce-grant-expiration-v1.md`、`docs/decisions/open-commerce-rate-limits-v1.md`、`docs/decisions/open-commerce-grant-budgets-v1.md`、`docs/decisions/open-commerce-app-activity-health-v1.md`、`docs/decisions/open-commerce-app-blocks-v1.md` |
+| 消费者发现、关系授权与第三方应用接入 | 跨项目目录、匿名关系、低敏偏好披露、删除请求、可验证导出、Schema 调用、动作确认、授权与预算、调用事件和封禁主干已实现；App 资料、域名、准入、生产凭据和环境绑定生产 Webhook 已形成代码但未编译，生产能力默认关闭。敏感数据保险箱、完整订单迁移、跨运营方身份互认与事件总线、外部删除证明和生产公共网络仍未完成 | `docs/decisions/open-commerce-directory-publication-v1.md`、`docs/decisions/open-commerce-consumer-relationships-v1.md`、`docs/decisions/open-commerce-consumer-preference-disclosures-v1.md`、`docs/decisions/open-commerce-consumer-portability-exports-v3.md`、`docs/decisions/open-commerce-developer-terminal-events-v1.md`、`docs/decisions/open-commerce-developer-production-credentials-v1.md`、`docs/decisions/open-commerce-production-webhooks-v1.md` |
 | AI 资源盘点、策略与路由预演 | 控制面已实现，尚未接管真实任务调度 | `docs/open-commerce/ai-resource-control.md`、`server/src/ai_resource_control/` |
 | API Token 保管与节点计算计量 | 已有实现，尚不是公开 Token 交易市场 | `docs/token消费统计.md`、`server/src/store/node_ledger.rs` |
 | 节点模型算力显式共享 | V1 已实现，包含模型白名单、并发、每日预算、所有者健康快照和过期执行回收；尚不是完整算力市场 | `docs/decisions/node-compute-sharing-supply-v1.md`、`docs/decisions/node-compute-sharing-runtime-health-v1.md`、`docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md`、`docs/node-compute-sharing-supply-v1-acceptance.md` |

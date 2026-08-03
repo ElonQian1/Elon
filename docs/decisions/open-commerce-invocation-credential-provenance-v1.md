@@ -20,13 +20,13 @@ implementation_status: implementation_uncompiled
 4. 沙箱凭据可以调用平台托管的脱敏资料和静态能力，但不得准备、确认或执行 `merchant_runtime` 能力。真实商户运行时只接受当前有效且能力范围获准的生产凭据。
 5. 商户运行时信封携带凭据环境和凭据 ID，使商户节点能够把中央调用记录与自身审计对应起来；该字段不包含密钥或 Token 摘要。
 6. 开发者终态事件游标绑定 App 与凭据环境。沙箱只读取沙箱及兼容旧记录，生产只读取当前 App 的生产记录；事件摘要返回环境和凭据 ID。
-7. 现有签名 Webhook 定义为沙箱通知能力。数据库自动入队、历史补发、死信重试和工作器读取均拒绝生产调用；生产 Webhook 需要后续独立的环境绑定、回调准入和密钥治理方案。
+7. 签名 Webhook 必须固定订阅环境。V155 先把既有通知限定为沙箱；V156 再以独立默认关闭的生产开关、当前生产资格复核和环境一致的入队、补发、重试、读取规则增加生产订阅，详见 `open-commerce-production-webhooks-v1.md`。
 8. 生产凭据轮换后，新凭据可以读取同一 App 的既有生产终态事件，但不能用旧幂等键冒充旧凭据重放调用。
 
 ## 边界
 
 - `production` 只表示经过当前平台准入的调用凭据环境，不表示支付成功、真实清算、外部平台授权、链上提交或生产部署已经完成。
-- V1 没有生产 Webhook、mTLS、硬件密钥、跨运营方事件总线、真实商户运行时回归或第三方合规证明。
+- V1 已形成环境绑定生产 Webhook 代码，但没有 mTLS、硬件密钥、跨运营方事件总线、真实商户运行时回归或第三方合规证明。
 - 沙箱不是完整的虚拟商户数据复制环境；它只允许不会触达真实商户运行时的现有平台托管能力。
 - 当前代码尚未编译、迁移、运行接口或执行网络验证。
 
@@ -39,3 +39,4 @@ implementation_status: implementation_uncompiled
 - `server/src/store/open_commerce_developer_webhook_history.rs`
 - `server/src/store/open_commerce_developer_webhook_replays.rs`
 - `docs/open-commerce-invocation-credential-provenance-v1-acceptance.md`
+- `docs/decisions/open-commerce-production-webhooks-v1.md`
