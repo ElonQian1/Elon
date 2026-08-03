@@ -50,6 +50,7 @@ mod compute_capacity_epoch_migration;
 mod compute_capacity_lifecycle_migration;
 mod compute_capacity_migration;
 mod compute_federation;
+mod compute_job_migration;
 mod compute_offer_migration;
 mod compute_price_snapshot_migration;
 mod compute_provider_migration;
