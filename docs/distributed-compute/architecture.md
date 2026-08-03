@@ -1,0 +1,154 @@
+---
+title: 分布式算力联邦架构
+status: current
+reviewed_at: 2026-08-04
+owners: backend, node
+---
+
+# 分布式算力联邦架构
+
+## 1. 边界
+
+一龙聚合的是可验证的 AI 工作负载和容量，不把高延迟、频繁掉线、显存不同的公网设备直接伪装成同一张 GPU。
+
+公网用户节点适合完整承载一个模型副本或一个独立分片任务，例如对话推理、Embedding、重排、图像生成、视频片段、评测样本和可检查点批任务。需要 NVLink、RDMA 或稳定低延迟互联的大模型张量并行、流水线并行，由一个受管集群在内部完成；一龙只把该集群视为单个逻辑 Provider。
+
+## 2. 三类 Provider
+
+| Provider | 内部形态 | 一龙看到的边界 |
+|---|---|---|
+| `user_node` | 用户 PC、工作站或家用服务器 | 单节点插件、可用模型、容量和策略 |
+| `managed_cluster` | 自建或合作方 GPU 集群 | 一个逻辑供给方，可在内部做多 GPU 并行 |
+| `external_pool` | 云平台、其他矿池或公司算力 API | 由服务端 Adapter 翻译报价、任务和回执 |
+
+核心层只依赖 `ComputeProvider` 能力，不直接依赖 Ollama、CUDA 云厂商或具体矿池 API。
+
+## 3. 五个平面
+
+```mermaid
+flowchart LR
+    D["需求与本地 AI"] --> B["控制面：Broker / Offer Registry"]
+    B --> P["数据面：User Node / Cluster / External Pool"]
+    A["工件面：Plugin / Runtime / Model CAS"] --> P
+    P --> V["验证与计量面"]
+    V --> S["市场与结算面"]
+    S --> B
+```
+
+### 控制面
+
+负责 Provider 注册、Offer 版本、能力发现、标准化报价、候选排序、Reservation、Attempt Lease、超时重试和取消。控制面只派发合同，不搬运所有模型字节。
+
+### 数据面
+
+负责输入交付、实际执行、流式事件、检查点和结果回传。大对象使用对象存储或内容寻址传输，控制通道只传引用、摘要和短事件。
+
+### 工件面
+
+分别管理插件、运行时和模型。三者都有独立摘要、版本、依赖、磁盘配额和回收策略，不能把模型权重打进节点可执行插件。
+
+### 验证与计量面
+
+分别保存 Provider 声明、平台观测和验证结果，通过服务端重新分词、确定性复算、抽样副本、挑战任务、输出摘要和历史信誉得出最终可结算用量。
+
+### 市场与结算面
+
+维护 Compute SKU、价格曲线、不可变 Price Snapshot、容量合约、消费者应付、Provider 应得、平台价差、待确认余额和最终 Settlement Receipt。
+
+## 4. 核心合同
+
+### ComputeProvider
+
+稳定身份、Provider 类型、所有者、状态、信任等级和 Adapter 引用。身份不承载瞬时能力，瞬时能力由 Offer 表达。
+
+### ComputeOffer
+
+Provider 发布的不可变版本，包含支持的任务类型、模型/工件摘要、运行时、精度、上下文档位、容量、并发、区域、交付窗口、价格来源和可用期限。更新供给必须创建新版本。
+
+### WorkloadSpec
+
+与 Provider 无关的需求合同：任务种类、输入工件引用、模型约束、输出约束、最大预算、交付期限、检查点策略、验证策略和数据放置要求。
+
+### ComputeJob
+
+用户需求的持久身份。Job 保存所选 Offer 版本、Price Snapshot、预算和状态，但不等同于某次机器执行。
+
+### ComputeReservation
+
+在派发前原子占用 Offer 容量和消费者预算。Reservation 有明确的到期时间；失败或到期后幂等释放。
+
+### ComputeAttemptLease
+
+一次具体执行尝试。每次重试递增 `attempt_no` 和 `fencing_token`，续租不能复活已过期尝试。迟到结果可以留作审计，但不能覆盖拥有更新 fencing token 的结果。
+
+### ExecutionReceipt
+
+至少拆成三层：
+
+- `declared_usage`：Provider 或插件声明的消耗；
+- `observed_usage`：控制面、传输层和计时器观测的事实；
+- `verified_usage`：验证策略接受的最终可计量事实。
+
+Receipt 同时绑定 Job、Attempt、Offer、插件摘要、模型摘要、输入摘要、输出摘要和时间窗，避免回执被移用到另一笔任务。
+
+### PriceSnapshot 与 SettlementReceipt
+
+Price Snapshot 冻结报价来源、交付窗口、消费者价格腿、Provider 价格腿、币种/积分单位和费用规则。Settlement Receipt 只引用快照与验证用量，不能回头读取“当前价格”重算历史任务。
+
+## 5. 标准任务生命周期
+
+```mermaid
+stateDiagram-v2
+    [*] --> submitted
+    submitted --> quoted
+    quoted --> reserved
+    reserved --> leased
+    leased --> running
+    running --> receipt_pending
+    receipt_pending --> verification_pending
+    verification_pending --> settled
+    leased --> retryable: timeout / provider loss
+    running --> retryable: retryable failure
+    retryable --> leased: new attempt + fencing token
+    quoted --> cancelled
+    reserved --> expired
+    verification_pending --> disputed
+    disputed --> settled: correction receipt
+```
+
+Job 状态与 Attempt 状态分离。Job 失败不意味着所有 Attempt 记录消失；重试也不覆盖历史 Attempt。
+
+## 6. Provider Adapter
+
+服务端统一 Adapter 行为：
+
+```text
+sync_offers -> quote -> reserve -> submit -> renew/events
+                                      |-> cancel
+                                      |-> fetch_receipt
+                                      `-> reconcile
+```
+
+Adapter 必须把外部错误归一为稳定错误码，并保存原始 Provider 引用以便对账。外部矿池凭据只存在服务端或专用网关；普通用户节点不需要安装每家公司的 SDK。
+
+## 7. 调度原则
+
+调度先做硬过滤，再做软排序：
+
+1. 任务类型、模型/工件、精度、上下文、交付窗口和插件摘要满足要求；
+2. Offer 仍有效且 Reservation 容量充足；
+3. Provider 信任等级满足验证策略；
+4. 总锁定价格不超过预算；
+5. 在价格、完成概率、延迟、数据传输成本和供给分散度之间排序。
+
+大型请求由上层 Planner 拆成独立可重试分片。Broker 不在第一个版本中承担任意图调度；每种任务先拥有稳定的 Shard 与 Merge 规则。
+
+## 8. 与现有实现的关系
+
+现有节点模型共享继续提供 `llm_chat` 兼容供给，其白名单、每日 Token 预留、流租约和账本不被删除。新的 Federation 层先把它映射为 Provider、Offer、Job 和 Receipt，再逐步把直接路由迁移到 Broker。
+
+现有 `LlmStreamRequest` 第一批不升级线协议；只有节点明确上报新 capability 后，服务端才可以发送通用 Compute Job。旧节点始终保留旧路径。
+
+## 9. 当前未验证声明
+
+本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；代码存在不代表运行时已经采用这些合同。

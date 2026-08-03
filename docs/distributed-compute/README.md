@@ -1,0 +1,76 @@
+---
+title: 一龙任务级分布式算力联邦
+status: current
+reviewed_at: 2026-08-04
+owners: backend, node, ai-economy
+---
+
+# 一龙任务级分布式算力联邦
+
+本目录是“一龙成为 AI 算力矿池与联邦入口”的权威设计入口。目标不是只共享一个本地模型的推理接口，而是把用户闲置节点、平台集群和外部算力池统一成可发现、可报价、可预留、可执行、可验证、可结算的任务级算力网络。
+
+## 北极星
+
+- 一龙是需求聚合器、调度与验证网络、算力市场及统一结算层。
+- 用户节点是自主供给方；只有主动开启共享后才下载节点核心、运行时插件和模型工件。
+- 外部公司、云 GPU 和其他矿池通过 Provider Adapter 接入，对上暴露统一 Offer、Lease 和 Receipt。
+- 用户下载的开源本地模型既可以在自己的设备运行，也可以把可拆分任务调度到联邦节点执行。
+- 公网异构节点优先聚合“任务”，不假装组成一张低延迟虚拟 GPU；真正的张量并行或流水线并行由受管集群内部完成，并作为一个逻辑 Provider 接入。
+- 供需双方先使用不可变的期货/远期价格快照结算，随后演进到标准化容量合约、订单簿、持仓和清算。
+
+## 当前事实
+
+| 能力 | 2026-08-04 状态 |
+|---|---|
+| 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
+| Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 正在铺设代码，尚未编译和运行验证 |
+| 节点按需插件下载与通用任务执行 | 已接受设计，尚未实现 |
+| 外部算力池适配器与统一报价 | 已接受设计，尚未实现 |
+| 多源验证、标准化 SKU 与期货锁价结算 | 已接受设计，尚未实现 |
+| 二级容量市场与自动清算 | 目标架构，尚未实现 |
+
+“已接受设计”不等于“已上线”。任何代理都必须保留实现状态，不得把文档中的目标合同描述成当前生产能力。
+
+## 阅读顺序
+
+1. `docs/decisions/distributed-compute-federation-v1.md`：不可随意改变的架构决定。
+2. `docs/distributed-compute/architecture.md`：Provider、控制面、数据面和任务状态。
+3. `docs/distributed-compute/node-client-and-plugins.md`：客户端按需启用与插件边界。
+4. `docs/distributed-compute/market-and-settlement.md`：标准化 SKU、期货锁价和结算回执。
+5. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
+
+## 分阶段落地
+
+### F0：统一语言和合同
+
+建立版本化的 Provider、Offer、Workload、Job、Reservation、Attempt Lease、Execution Receipt、Settlement Receipt 和 Price Snapshot。现有 `LlmStreamRequest` 继续工作，不在首批协议变更中制造强制升级。
+
+### F1：用户节点成为可插拔 Provider
+
+在节点内加入 Compute Bootstrap 和 Plugin Host seam。共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。
+
+### F2：Broker、验证和真实结算
+
+加入 Offer Registry、报价锁定、原子预留、带 fencing token 的尝试租约、多源计量、挑战任务、争议状态和可提取收益账本。
+
+### F3：外部矿池与企业集群
+
+服务端 Provider Adapter 统一接入公司集群、云 GPU 和其他算力池；每个 Provider 保留自己的内部调度，只向一龙提交标准回执。
+
+### F4：容量期货市场
+
+以标准化 Compute SKU 和交付窗口发行容量合约，引入订单、持仓、指数价、标记价、保证资源和到期交割；任务结算消费已锁定的价格快照。
+
+## 当前工程指令
+
+产品负责人要求先把架构和代码骨架铺到主线，后置统一编译与真实运行验证。因此本阶段每个提交都必须明确标注“未编译/未运行”，只允许做格式化、静态审阅和仓库强制守卫；进入集成检查阶段后再一次性补齐编译、迁移、协议兼容和端到端验收。
+
+## 代理接力规则
+
+- 核心合同使用显式 `schema_version`，新增字段优先保持向后兼容。
+- 金额、价格和用量禁止使用浮点数；统一使用整数微单位、基点或有理数比例。
+- Offer 和 Price Snapshot 一经被 Job 引用便不可修改，只能创建新版本。
+- 一次 Job 可以有多个 Attempt，但任何时刻只有持有最新 fencing token 的 Attempt 能提交候选结果。
+- 节点自报用量、平台观测用量和验证后用量必须分开保存。
+- Provider 特有字段放扩展区或 Adapter 内，不污染核心调度语义。
+- 新功能按模块拆分，禁止继续扩大协议和服务端巨型入口文件。
