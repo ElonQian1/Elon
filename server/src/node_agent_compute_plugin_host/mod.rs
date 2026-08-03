@@ -3,6 +3,7 @@
 //! The first version only wraps the existing local LLM path. It does not change the cloud wire
 //! protocol, publish a new capability, download plugins or claim sidecar isolation.
 
+pub(crate) mod attempt_contract;
 mod contract;
 mod host;
 pub(crate) mod identity;
@@ -11,6 +12,7 @@ mod legacy_llm;
 pub(crate) mod lifecycle;
 pub(crate) mod plugin_manifest;
 pub(crate) mod ready_capability;
+pub(crate) mod runner_events;
 
 pub(crate) use contract::{ComputePluginTask, LlmChatTask};
 pub(crate) use host::ComputePluginHost;
