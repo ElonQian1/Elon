@@ -23,6 +23,57 @@ export interface DeveloperAppList {
   apps: OpenCommerceDeveloperApp[]
 }
 
+export interface DeveloperWebhookSubscription {
+  schema: string
+  id: string
+  project_id: string
+  app_record_id: string
+  app_id: string
+  callback_url: string
+  signing_key_id: string
+  status: 'active' | 'disabled'
+  consecutive_failures: number
+  last_delivery_at?: string
+  last_error_code?: string
+  created_at: string
+  updated_at: string
+  disabled_at?: string
+}
+
+export interface DeveloperWebhookCredential {
+  schema: string
+  subscription: DeveloperWebhookSubscription
+  signing_secret: string
+  signing_secret_visible_once: boolean
+}
+
+export interface DeveloperWebhookSubscriptionList {
+  schema: string
+  webhooks: DeveloperWebhookSubscription[]
+}
+
+export interface DeveloperWebhookDelivery {
+  schema: string
+  id: string
+  subscription_id: string
+  invocation_id: string
+  event_sequence: number
+  event_type: 'invocation.succeeded' | 'invocation.failed'
+  status: 'pending' | 'delivering' | 'retry' | 'delivered' | 'dead'
+  attempt_count: number
+  next_attempt_at: string
+  response_status?: number
+  error_code?: string
+  created_at: string
+  last_attempt_at?: string
+  delivered_at?: string
+}
+
+export interface DeveloperWebhookDeliveryList {
+  schema: string
+  deliveries: DeveloperWebhookDelivery[]
+}
+
 export interface AuthorizationRequest {
   id: string
   merchant_project_id: string

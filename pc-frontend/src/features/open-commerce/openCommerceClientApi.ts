@@ -34,6 +34,10 @@ import type {
   DeveloperInvokeRequest,
   DeveloperTerminalEventDetail,
   DeveloperTerminalEventPage,
+  DeveloperWebhookCredential,
+  DeveloperWebhookDeliveryList,
+  DeveloperWebhookSubscription,
+  DeveloperWebhookSubscriptionList,
   DeleteConsumerPreferenceDisclosureResult,
   DeleteConsumerPreferenceProfileResult,
   DirectoryMerchantList,
@@ -201,6 +205,37 @@ export const openCommerceClientApi = {
     api.get<ConsumerPortabilityExport>(
       `${projectBase(projectId)}/consumer-portability-exports/${encodeURIComponent(exportId)}`,
     ),
+
+  listDeveloperWebhooks: (projectId: string, appRecordId: string) =>
+    api.get<DeveloperWebhookSubscriptionList>(
+      `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks`,
+    ),
+
+  createDeveloperWebhook: (projectId: string, appRecordId: string, callbackUrl: string) =>
+    api.post<DeveloperWebhookCredential>(
+      `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks`,
+      { callback_url: callbackUrl },
+    ),
+
+  disableDeveloperWebhook: (projectId: string, appRecordId: string, webhookId: string) =>
+    api.post<DeveloperWebhookSubscription>(
+      `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks/${encodeURIComponent(webhookId)}/disable`,
+      {},
+    ),
+
+  enableDeveloperWebhook: (projectId: string, appRecordId: string, webhookId: string) =>
+    api.post<DeveloperWebhookSubscription>(
+      `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks/${encodeURIComponent(webhookId)}/enable`,
+      {},
+    ),
+
+  listDeveloperWebhookDeliveries: (
+    projectId: string,
+    appRecordId: string,
+    webhookId: string,
+  ) => api.get<DeveloperWebhookDeliveryList>(
+    `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks/${encodeURIComponent(webhookId)}/deliveries`,
+  ),
 
   listConsumerPortabilityImports: (projectId: string) =>
     api.get<ConsumerPortabilityImportList>(`${projectBase(projectId)}/consumer-portability-imports`),

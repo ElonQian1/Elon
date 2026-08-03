@@ -309,6 +309,12 @@ mod open_commerce_runtime_service_tests;
 mod open_commerce_service;
 #[cfg(test)]
 mod open_commerce_service_tests;
+mod open_commerce_webhook_api;
+mod open_commerce_webhook_migration;
+mod open_commerce_webhook_model;
+mod open_commerce_webhook_security;
+mod open_commerce_webhook_service;
+mod open_commerce_webhook_worker;
 mod pc_agent_runtime_choice;
 mod pc_node_capacity;
 mod pc_node_display;
@@ -521,6 +527,7 @@ async fn main() -> Result<()> {
     billing_monitor::spawn_reconciliation_monitor(state.clone());
     project_workspace_health_monitor::spawn_project_workspace_health_monitor(state.clone());
     project_document_maintenance::spawn_maintenance_worker();
+    open_commerce_webhook_worker::spawn(state.clone());
     // 本地模式：作为 agent 连回云端，实现 APK→云端→PC 全双工中继
     pc_relay_client::spawn_if_configured();
 

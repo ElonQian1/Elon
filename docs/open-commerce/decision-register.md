@@ -32,7 +32,8 @@
 | 每个 Grant 可限制完整授权期风险 | 商户可选设置总调用次数和总计量金额；调用前原子预留、失败退回，预算用尽后重新授权 | `docs/decisions/open-commerce-grant-budgets-v1.md` |
 | 孤儿商业调用必须失败关闭并释放 Grant 预留 | 启动时关闭遗留调用，运行期回收超过 120 秒的调用；失败、预算退回、预留释放和脱敏审计保持同一事务 | `docs/decisions/open-commerce-invocation-recovery-v1.md` |
 | App 异常先形成商户可解释证据 | 按商户和外部 App 派生近 24 小时失败、限流、Grant 预算拒绝和中断恢复计数；只提醒人工处置，不自动评分、封禁或赔付 | `docs/decisions/open-commerce-app-activity-health-v1.md` |
-| 开发者 App 必须能可靠续读自己的调用结果 | Invocation 进入终态时原子追加稳定序号；测试 Token 只读取本 App 摘要和详情，游标跨 App 失败关闭；当前不冒充 Webhook | `docs/decisions/open-commerce-developer-terminal-events-v1.md` |
+| 开发者 App 必须能可靠续读自己的调用结果 | Invocation 进入终态时原子追加稳定序号；测试 Token 只读取本 App 摘要和详情，游标跨 App 失败关闭；轮询继续作为恢复与对账入口 | `docs/decisions/open-commerce-developer-terminal-events-v1.md` |
+| 开发者主动通知必须签名并经过耐久队列 | 复用终态事件真源；回调必须命中 HTTPS 主机白名单，派生密钥只显示一次，投递采用短租约、指数退避、死信和连续失败自动停用，不冒充跨运营方总线或支付通知 | `docs/decisions/open-commerce-developer-webhooks-v1.md` |
 | 商户业务结果先形成证据层再进入 ERP/CRM | 从终态 Invocation 派生项目内证据、结果摘要、可选商户标准回执和 ERP 实例关联；不复制订单库，不把调用成功冒充为支付或履约 | `docs/decisions/open-commerce-merchant-business-evidence-v1.md` |
 | ERP/CRM 衔接状态必须来自证据和显式回执 | 人工回执绑定结果摘要、接入器和明确确认；待办与需重试状态由最新回执派生，不建立第二套可漂移状态 | `docs/decisions/open-commerce-business-handoff-receipts-v1.md`、`docs/decisions/open-commerce-business-handoff-queue-v1.md` |
 | 接入器机器身份必须最小授权且可失效 | 每个接入器使用只写衔接回执的一次性 Token；服务端只保存摘要，轮换、撤销和接入停用失败关闭，机器回执固化凭据版本 | `docs/decisions/open-commerce-adapter-machine-credentials-v1.md` |

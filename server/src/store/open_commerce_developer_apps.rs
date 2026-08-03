@@ -119,6 +119,23 @@ impl Store {
               WHERE requester_app_id = ?2 AND status = 'pending'",
             params![timestamp, current.app_id],
         )?;
+        tx.execute(
+            "UPDATE open_commerce_developer_webhook_subscriptions
+                SET status='disabled', last_error_code='developer_app_disabled',
+                    updated_at=?1, disabled_at=?1
+              WHERE app_record_id=?2 AND status='active'",
+            params![timestamp, current.id],
+        )?;
+        tx.execute(
+            "UPDATE open_commerce_developer_webhook_deliveries
+                SET status='dead', error_code='developer_app_disabled',
+                    lease_owner=NULL, lease_expires_at=NULL
+              WHERE subscription_id IN (
+                SELECT id FROM open_commerce_developer_webhook_subscriptions
+                 WHERE app_record_id=?1
+              ) AND status IN ('pending', 'retry', 'delivering')",
+            params![current.id],
+        )?;
         tx.commit()?;
         drop(conn);
         Ok((

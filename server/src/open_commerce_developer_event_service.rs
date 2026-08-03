@@ -75,7 +75,7 @@ pub(crate) fn terminal_event_detail(
     })
 }
 
-fn summary_from_record(
+pub(crate) fn summary_from_record(
     record: DeveloperTerminalEventRecord,
 ) -> Result<DeveloperTerminalEventSummary> {
     let invocation = record.invocation;
