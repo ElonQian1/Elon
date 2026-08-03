@@ -55,6 +55,7 @@ mod compute_job_migration;
 mod compute_offer_migration;
 mod compute_price_snapshot_migration;
 mod compute_provider_migration;
+mod compute_reservation_migration;
 mod compute_usage;
 mod context_compiler;
 mod conversation_forks;
