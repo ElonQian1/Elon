@@ -31,6 +31,7 @@ export interface DeveloperWebhookSubscription {
   app_id: string
   callback_url: string
   signing_key_id: string
+  signing_secret_version: number
   status: 'active' | 'disabled'
   verification_status: 'pending' | 'failed' | 'verified'
   verification_attempted_at?: string

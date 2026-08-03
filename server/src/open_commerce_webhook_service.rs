@@ -39,6 +39,7 @@ pub(crate) fn create_webhook(
         store.create_open_commerce_developer_webhook(app, &callback_url, &signing_key_id)?;
     let signing_secret = match crate::open_commerce_webhook_security::derive_webhook_signing_secret(
         &subscription.id,
+        subscription.signing_secret_version,
     ) {
         Ok(secret) => secret,
         Err(error) => {
@@ -51,6 +52,38 @@ pub(crate) fn create_webhook(
             return Err(error);
         }
     };
+    Ok(DeveloperWebhookCredential {
+        schema: "open_commerce.developer_webhook_credential.v1",
+        subscription,
+        signing_secret,
+        signing_secret_visible_once: true,
+    })
+}
+
+pub(crate) fn rotate_webhook_secret(
+    store: &Store,
+    app: &OpenCommerceDeveloperApp,
+    subscription_id: &str,
+) -> Result<DeveloperWebhookCredential> {
+    let current =
+        store.open_commerce_developer_webhook_for_app(&app.project_id, &app.id, subscription_id)?;
+    let next_version = current
+        .signing_secret_version
+        .checked_add(1)
+        .ok_or_else(|| anyhow::anyhow!("Webhook 签名密钥版本已耗尽"))?;
+    let signing_key_id = crate::open_commerce_webhook_security::webhook_master_key_id()?;
+    let signing_secret = crate::open_commerce_webhook_security::derive_webhook_signing_secret(
+        &current.id,
+        next_version,
+    )?;
+    let subscription = store.rotate_open_commerce_developer_webhook_secret(
+        &app.project_id,
+        &app.id,
+        &current.id,
+        current.signing_secret_version,
+        next_version,
+        &signing_key_id,
+    )?;
     Ok(DeveloperWebhookCredential {
         schema: "open_commerce.developer_webhook_credential.v1",
         subscription,

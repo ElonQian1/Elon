@@ -78,6 +78,7 @@ mod open_commerce_consumer_receipts;
 mod open_commerce_consumer_relationships;
 mod open_commerce_developer_apps;
 mod open_commerce_developer_events;
+mod open_commerce_developer_webhook_secret;
 mod open_commerce_developer_webhook_verification;
 mod open_commerce_developer_webhooks;
 mod open_commerce_directory;

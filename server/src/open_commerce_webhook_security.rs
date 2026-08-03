@@ -42,11 +42,26 @@ pub(crate) fn webhook_master_key_id() -> Result<String> {
     Ok(format!("sha256:{}", hex_digest(Sha256::digest(master))))
 }
 
-pub(crate) fn derive_webhook_signing_secret(subscription_id: &str) -> Result<String> {
+pub(crate) fn derive_webhook_signing_secret(
+    subscription_id: &str,
+    signing_secret_version: i64,
+) -> Result<String> {
+    if signing_secret_version < 1 {
+        bail!("Webhook 签名密钥版本无效");
+    }
     let master = webhook_master_secret()?;
     let mut mac =
         HmacSha256::new_from_slice(&master).map_err(|_| anyhow!("Webhook 主密钥不可用于 HMAC"))?;
-    mac.update(format!("subscription:{}", subscription_id.trim()).as_bytes());
+    let message = if signing_secret_version == 1 {
+        format!("subscription:{}", subscription_id.trim())
+    } else {
+        format!(
+            "subscription:{}:version:{}",
+            subscription_id.trim(),
+            signing_secret_version
+        )
+    };
+    mac.update(message.as_bytes());
     Ok(format!("whsec_{}", hex_digest(mac.finalize().into_bytes())))
 }
 

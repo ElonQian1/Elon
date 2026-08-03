@@ -235,6 +235,12 @@ export const openCommerceClientApi = {
       {},
     ),
 
+  rotateDeveloperWebhookSecret: (projectId: string, appRecordId: string, webhookId: string) =>
+    api.post<DeveloperWebhookCredential>(
+      `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks/${encodeURIComponent(webhookId)}/rotate-secret`,
+      {},
+    ),
+
   listDeveloperWebhookDeliveries: (
     projectId: string,
     appRecordId: string,

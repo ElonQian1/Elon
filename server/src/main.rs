@@ -310,6 +310,7 @@ mod open_commerce_service;
 #[cfg(test)]
 mod open_commerce_service_tests;
 mod open_commerce_webhook_api;
+mod open_commerce_webhook_lifecycle_migration;
 mod open_commerce_webhook_migration;
 mod open_commerce_webhook_model;
 mod open_commerce_webhook_security;

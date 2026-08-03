@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Copy, Power, PowerOff, RefreshCw, ShieldCheck, Webhook } from 'lucide-react'
+import { Copy, KeyRound, Power, PowerOff, RefreshCw, ShieldCheck, Webhook } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type {
   DeveloperWebhookDelivery,
@@ -151,6 +151,29 @@ export default function DeveloperWebhookPanel({
     }
   }
 
+  async function rotateSecret(webhook: DeveloperWebhookSubscription) {
+    if (!selectedApp) return
+    setBusy(true)
+    setMessage('')
+    setVisibleSecret('')
+    try {
+      const credential = await openCommerceClientApi.rotateDeveloperWebhookSecret(
+        projectId,
+        selectedApp.id,
+        webhook.id,
+      )
+      setVisibleSecret(credential.signing_secret)
+      setSelectedWebhookId(webhook.id)
+      setMessage('旧密钥已失效。新密钥只显示本次，接收端更新后需要重新验证。')
+      await refreshWebhooks()
+      await refreshDeliveries()
+    } catch (error) {
+      setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section className={base.integrationSection}>
       <header>
@@ -234,38 +257,51 @@ export default function DeveloperWebhookPanel({
                 {webhook.verification_error_code ?? webhook.last_error_code ?? '无错误'}
               </small>
               <footer style={commerceStyles.itemHeader}>
-                <small style={commerceStyles.itemMeta}>{webhook.signing_key_id.slice(0, 24)}</small>
-                {webhook.verification_status !== 'verified' ? (
-                  <button
-                    style={actionStyle('primary', !canEdit || busy || selectedApp?.status !== 'active')}
-                    type="button"
-                    onClick={() => verifyWebhook(webhook)}
-                    disabled={!canEdit || busy || selectedApp?.status !== 'active'}
-                    title="验证回调地址"
-                  >
-                    <ShieldCheck size={13} />验证
-                  </button>
-                ) : webhook.status === 'active' ? (
-                  <button
-                    style={actionStyle('icon', !canEdit || busy)}
-                    type="button"
-                    onClick={() => setEnabled(webhook, false)}
-                    disabled={!canEdit || busy}
-                    title="停用 Webhook"
-                  >
-                    <PowerOff size={13} />
-                  </button>
-                ) : (
+                <small style={commerceStyles.itemMeta}>
+                  密钥 v{webhook.signing_secret_version} · {webhook.signing_key_id.slice(0, 18)}
+                </small>
+                <div style={commerceStyles.itemHeader}>
                   <button
                     style={actionStyle('icon', !canEdit || busy || selectedApp?.status !== 'active')}
                     type="button"
-                    onClick={() => setEnabled(webhook, true)}
+                    onClick={() => rotateSecret(webhook)}
                     disabled={!canEdit || busy || selectedApp?.status !== 'active'}
-                    title="启用 Webhook"
+                    title="轮换签名密钥"
                   >
-                    <Power size={13} />
+                    <KeyRound size={13} />
                   </button>
-                )}
+                  {webhook.verification_status !== 'verified' ? (
+                    <button
+                      style={actionStyle('primary', !canEdit || busy || selectedApp?.status !== 'active')}
+                      type="button"
+                      onClick={() => verifyWebhook(webhook)}
+                      disabled={!canEdit || busy || selectedApp?.status !== 'active'}
+                      title="验证回调地址"
+                    >
+                      <ShieldCheck size={13} />验证
+                    </button>
+                  ) : webhook.status === 'active' ? (
+                    <button
+                      style={actionStyle('icon', !canEdit || busy)}
+                      type="button"
+                      onClick={() => setEnabled(webhook, false)}
+                      disabled={!canEdit || busy}
+                      title="停用 Webhook"
+                    >
+                      <PowerOff size={13} />
+                    </button>
+                  ) : (
+                    <button
+                      style={actionStyle('icon', !canEdit || busy || selectedApp?.status !== 'active')}
+                      type="button"
+                      onClick={() => setEnabled(webhook, true)}
+                      disabled={!canEdit || busy || selectedApp?.status !== 'active'}
+                      title="启用 Webhook"
+                    >
+                      <Power size={13} />
+                    </button>
+                  )}
+                </div>
               </footer>
             </article>
           ))}

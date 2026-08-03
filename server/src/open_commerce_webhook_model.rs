@@ -16,6 +16,7 @@ pub(crate) struct DeveloperWebhookSubscription {
     pub app_id: String,
     pub callback_url: String,
     pub signing_key_id: String,
+    pub signing_secret_version: i64,
     pub status: String,
     pub verification_status: String,
     pub verification_attempted_at: Option<String>,
@@ -62,6 +63,7 @@ pub(crate) struct DeveloperWebhookDeliveryClaim {
     pub app_id: String,
     pub callback_url: String,
     pub signing_key_id: String,
+    pub signing_secret_version: i64,
     pub lease_owner: String,
 }
 

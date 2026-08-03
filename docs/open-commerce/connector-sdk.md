@@ -63,6 +63,8 @@ Webhook 负载只携带终态事件摘要。完整结果仍通过 App 自己的�
 
 新订阅首次激活前会收到 `open_commerce.developer_webhook_verification.v1` 负载。接收端使用相同方式验证签名后，可调用 `createDeveloperWebhookVerificationResponse` 生成原样回显的 JSON。只有验证成功后的事件才会进入该订阅；创建到验证之间的历史继续通过终态事件轮询接口恢复。
 
+订阅密钥可以显式轮换。轮换后旧密钥立即失效，订阅回到待验证状态，接收端必须保存本次唯一显示的新密钥并重新完成 challenge。SDK 不推导或保存密钥版本；接收端应把平台返回的 `whsec_` 值作为不透明凭据管理。
+
 ## 服务端发现
 
 第三方开发者可调用：

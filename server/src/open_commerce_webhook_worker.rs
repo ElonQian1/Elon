@@ -120,6 +120,7 @@ async fn deliver(state: &AppState, client: &reqwest::Client, claim: DeveloperWeb
     };
     let secret = match crate::open_commerce_webhook_security::derive_webhook_signing_secret(
         &claim.delivery.subscription_id,
+        claim.signing_secret_version,
     ) {
         Ok(secret) => secret,
         Err(_) => {

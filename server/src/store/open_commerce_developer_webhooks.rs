@@ -14,7 +14,7 @@ use super::{new_id, now, Store};
 
 const SUBSCRIPTION_SELECT: &str =
     "SELECT id, project_id, app_record_id, app_id, callback_url, signing_key_id,
-            status, verification_status, verification_attempted_at,
+            signing_secret_version, status, verification_status, verification_attempted_at,
             verification_error_code, verified_at, consecutive_failures,
             last_delivery_at, last_error_code, created_at, updated_at, disabled_at
        FROM open_commerce_developer_webhook_subscriptions";
@@ -62,9 +62,9 @@ impl Store {
         tx.execute(
             "INSERT INTO open_commerce_developer_webhook_subscriptions(
                id, project_id, owner_user_id, app_record_id, app_id,
-               callback_url, signing_key_id, status, verification_status,
+               callback_url, signing_key_id, signing_secret_version, status, verification_status,
                start_sequence, consecutive_failures, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'disabled', 'pending', ?8, 0, ?9, ?9)",
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 'disabled', 'pending', ?8, 0, ?9, ?9)",
             params![
                 id,
                 app.project_id,
@@ -304,7 +304,8 @@ impl Store {
                         delivery.response_status, delivery.error_code, delivery.created_at,
                         delivery.last_attempt_at, delivery.delivered_at,
                         subscription.owner_user_id, subscription.app_id,
-                        subscription.callback_url, subscription.signing_key_id
+                        subscription.callback_url, subscription.signing_key_id,
+                        subscription.signing_secret_version
                    FROM open_commerce_developer_webhook_deliveries delivery
                    JOIN open_commerce_developer_webhook_subscriptions subscription
                      ON subscription.id=delivery.subscription_id
@@ -333,6 +334,7 @@ impl Store {
                     app_id: row.get(14)?,
                     callback_url: row.get(15)?,
                     signing_key_id: row.get(16)?,
+                    signing_secret_version: row.get(17)?,
                     lease_owner: lease_owner.trim().to_string(),
                 })
             },
@@ -454,17 +456,18 @@ fn subscription_from_row(row: &Row<'_>) -> rusqlite::Result<DeveloperWebhookSubs
         app_id: row.get(3)?,
         callback_url: row.get(4)?,
         signing_key_id: row.get(5)?,
-        status: row.get(6)?,
-        verification_status: row.get(7)?,
-        verification_attempted_at: row.get(8)?,
-        verification_error_code: row.get(9)?,
-        verified_at: row.get(10)?,
-        consecutive_failures: row.get(11)?,
-        last_delivery_at: row.get(12)?,
-        last_error_code: row.get(13)?,
-        created_at: row.get(14)?,
-        updated_at: row.get(15)?,
-        disabled_at: row.get(16)?,
+        signing_secret_version: row.get(6)?,
+        status: row.get(7)?,
+        verification_status: row.get(8)?,
+        verification_attempted_at: row.get(9)?,
+        verification_error_code: row.get(10)?,
+        verified_at: row.get(11)?,
+        consecutive_failures: row.get(12)?,
+        last_delivery_at: row.get(13)?,
+        last_error_code: row.get(14)?,
+        created_at: row.get(15)?,
+        updated_at: row.get(16)?,
+        disabled_at: row.get(17)?,
     })
 }
 

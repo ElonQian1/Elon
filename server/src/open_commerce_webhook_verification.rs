@@ -49,6 +49,7 @@ pub(crate) async fn verify_endpoint(
     }
     let signing_secret = match crate::open_commerce_webhook_security::derive_webhook_signing_secret(
         &subscription.id,
+        subscription.signing_secret_version,
     ) {
         Ok(value) => value,
         Err(error) => {

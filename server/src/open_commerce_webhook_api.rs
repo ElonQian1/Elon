@@ -34,6 +34,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(verify_webhook),
         )
         .route(
+            "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks/:subscription_id/rotate-secret",
+            post(rotate_webhook_secret),
+        )
+        .route(
             "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks/:subscription_id/deliveries",
             get(list_deliveries),
         )
@@ -172,6 +176,46 @@ async fn verify_webhook(
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, error);
     }
     Json(verified).into_response()
+}
+
+async fn rotate_webhook_secret(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, app_record_id, subscription_id)): Path<(String, String, String)>,
+) -> Response {
+    let (user_id, app) =
+        match editable_caller_app(&state, &headers, &project_id, &app_record_id, true) {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
+    let credential = match open_commerce_webhook_service::rotate_webhook_secret(
+        &state.store,
+        &app,
+        &subscription_id,
+    ) {
+        Ok(value) => value,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
+    };
+    if let Err(error) = state.store.record_open_commerce_audit(
+        &project_id,
+        &user_id,
+        Some("pc-web"),
+        "developer_webhook.secret_rotated",
+        "developer_webhook",
+        &credential.subscription.id,
+        &json!({
+            "app_id":credential.subscription.app_id,
+            "signing_key_id":credential.subscription.signing_key_id,
+            "signing_secret_version":credential.subscription.signing_secret_version
+        }),
+    ) {
+        tracing::warn!(
+            webhook_id = %credential.subscription.id,
+            error = %error,
+            "Webhook 密钥已轮换，但审计记录写入失败"
+        );
+    }
+    Json(credential).into_response()
 }
 
 async fn list_deliveries(
