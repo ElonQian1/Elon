@@ -135,6 +135,7 @@ impl BrowserProcess {
             ProcessCleanup {
                 browser_process_reaped: reaped,
                 temporary_profile_removed: removed,
+                retained_for_stateful_session: false,
             },
             stderr,
         )

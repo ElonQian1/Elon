@@ -478,17 +478,9 @@ async fn call_tool(
                 };
             json!({ "result": progress })
         }
-        name if super::design_targets::is_tool(name) => {
+        name if super::design_tools::is_tool(name) => {
             let session = broker.session(&session_id).await?;
-            super::design_targets::call(&session, name, arguments).await?
-        }
-        name if super::tauri_host_runtime::is_tool(name) => {
-            let session = broker.session(&session_id).await?;
-            super::tauri_host_runtime::call(&session, name, arguments).await?
-        }
-        name if super::design_drafts::is_tool(name) => {
-            let session = broker.session(&session_id).await?;
-            super::design_drafts::call(&session, name, arguments)?
+            super::design_tools::call(&session, name, arguments).await?
         }
         crate::node_agent_pwa_runtime::TOOL_NAME => {
             let session = broker.session(&session_id).await?;

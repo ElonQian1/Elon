@@ -13,6 +13,12 @@ mod interaction;
 mod process;
 mod security;
 mod semantic_tree;
+mod stateful;
+
+pub(crate) use stateful::{
+    interact as interact_stateful_browser, start as start_stateful_browser,
+    stop as stop_stateful_browser,
+};
 
 #[cfg(test)]
 mod tests;

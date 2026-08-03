@@ -24,6 +24,7 @@ pub(super) struct RenderedCapture {
     pub(super) executed_step_count: usize,
     pub(super) semantic_tree: Value,
     pub(super) process_cleanup: ProcessCleanup,
+    pub(super) page_session_id: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -43,6 +44,7 @@ pub(super) struct BrowserIdentity {
 pub(super) struct ProcessCleanup {
     pub(super) browser_process_reaped: bool,
     pub(super) temporary_profile_removed: bool,
+    pub(super) retained_for_stateful_session: bool,
 }
 
 pub(super) async fn render(
@@ -102,7 +104,7 @@ pub(super) async fn render(
     }
 }
 
-async fn render_page(
+pub(super) async fn render_page(
     prepared: &PreparedCapture,
     cdp: &mut CdpClient,
     deadline: Instant,
@@ -211,25 +213,38 @@ async fn render_page(
             ));
         }
     }
-    let navigation = cdp
-        .command(
-            "Page.navigate",
-            json!({"url":prepared.url.as_str()}),
-            Some(&session),
-            deadline,
-        )
-        .await?;
-    if navigation
-        .get("errorText")
-        .and_then(Value::as_str)
-        .is_some()
-    {
-        return Err(CaptureDiagnostic::new(
-            "NAVIGATION_FAILED",
-            "本机 PWA 导航失败",
-            true,
-            "确认本机开发服务器已启动、端口可达且没有跳转到未授权 origin",
-        ));
+    capture_existing_page(prepared, cdp, &session, browser, true, deadline).await
+}
+
+pub(super) async fn capture_existing_page(
+    prepared: &PreparedCapture,
+    cdp: &mut CdpClient,
+    session: &str,
+    browser: BrowserIdentity,
+    navigate: bool,
+    deadline: Instant,
+) -> Result<RenderedCapture, CaptureDiagnostic> {
+    if navigate {
+        let navigation = cdp
+            .command(
+                "Page.navigate",
+                json!({"url":prepared.url.as_str()}),
+                Some(&session),
+                deadline,
+            )
+            .await?;
+        if navigation
+            .get("errorText")
+            .and_then(Value::as_str)
+            .is_some()
+        {
+            return Err(CaptureDiagnostic::new(
+                "NAVIGATION_FAILED",
+                "本机 PWA 导航失败",
+                true,
+                "确认本机开发服务器已启动、端口可达且没有跳转到未授权 origin",
+            ));
+        }
     }
     let wait_deadline = Instant::now() + Duration::from_millis(prepared.wait_for.timeout_ms);
     let mut final_url = wait_for_page(prepared, cdp, &session, wait_deadline).await?;
@@ -289,7 +304,9 @@ async fn render_page(
         process_cleanup: ProcessCleanup {
             browser_process_reaped: false,
             temporary_profile_removed: false,
+            retained_for_stateful_session: false,
         },
+        page_session_id: session.to_string(),
     })
 }
 

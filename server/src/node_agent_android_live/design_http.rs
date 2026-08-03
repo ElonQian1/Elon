@@ -36,6 +36,18 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
             post(get_artifact),
         )
         .route(
+            "/api/android-live/design/sessions/:design_session_id/browser/prepare",
+            post(prepare_browser),
+        )
+        .route(
+            "/api/android-live/design/sessions/:design_session_id/browser/interact",
+            post(interact_browser),
+        )
+        .route(
+            "/api/android-live/design/sessions/:design_session_id/browser/stop",
+            post(stop_browser),
+        )
+        .route(
             "/api/android-live/design/sessions/:design_session_id/tauri/prepare",
             post(prepare_tauri),
         )
@@ -124,6 +136,33 @@ async fn get_artifact(
         Ok(artifact) => artifact_response(artifact),
         Err(error) => json_error(StatusCode::BAD_REQUEST, error),
     }
+}
+
+async fn prepare_browser(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["designSessionId"] = json!(id);
+    call(&runtime, "ui_prepare_design_browser", arguments).await
+}
+
+async fn interact_browser(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["designSessionId"] = json!(id);
+    call(&runtime, "ui_interact_design_browser", arguments).await
+}
+
+async fn stop_browser(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["designSessionId"] = json!(id);
+    call(&runtime, "ui_stop_design_browser", arguments).await
 }
 
 async fn prepare_tauri(
@@ -248,7 +287,7 @@ async fn call(runtime: &Arc<NodeRuntime>, name: &str, mut arguments: Value) -> R
         Ok(session) => session,
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
     };
-    match super::design_targets::call(&session, name, arguments).await {
+    match super::design_tools::call(&session, name, arguments).await {
         Ok(result) => Json(json!({"ok":true,"result":result})).into_response(),
         Err(error) => json_error(StatusCode::BAD_REQUEST, error),
     }

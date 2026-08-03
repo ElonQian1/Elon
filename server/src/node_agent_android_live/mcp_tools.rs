@@ -538,9 +538,7 @@ pub(crate) fn tool_definitions() -> Vec<Value> {
     definitions.push(tool("ui_get_debug_integration_status",
         "读取当前项目指定设备的固定调试槽、贡献提交、冲突、代次，以及最近成功版本是否显式启用。",
         json!({"type":"object","required":["deviceId"],"properties":{"deviceId":{"type":"string"},"projectId":{"type":"string"}}})));
-    definitions.extend(super::design_targets::tool_definitions());
-    definitions.extend(super::tauri_host_runtime::tool_definitions());
-    definitions.extend(super::design_drafts::tool_definitions());
+    definitions.extend(super::design_tools::tool_definitions());
     definitions.push(crate::node_agent_pwa_runtime::tool_definition());
     definitions.push(super::verification_workflow::tool_definition());
     definitions.extend(fit_run_tools::definitions());
