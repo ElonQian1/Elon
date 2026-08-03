@@ -159,6 +159,8 @@
 149. `docs/open-commerce-consumer-capability-filters-v1-acceptance.md`：查看能力筛选代码状态及后置统一回归矩阵。
 150. `docs/decisions/open-commerce-consumer-preference-constraints-v1.md`：查看软偏好升级为硬约束的规则与边界。
 151. `docs/open-commerce-consumer-preference-constraints-v1-acceptance.md`：查看偏好硬约束代码状态及后置统一回归矩阵。
+152. `docs/decisions/open-commerce-consumer-candidate-scope-v1.md`：查看普通发现响应的候选窗口与非穷尽边界。
+153. `docs/open-commerce-consumer-candidate-scope-v1-acceptance.md`：查看候选范围摘要代码状态及后置统一回归矩阵。
 
 ## 专题地图
 
