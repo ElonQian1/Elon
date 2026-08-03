@@ -106,6 +106,23 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/design/drafts/:draft_id/source-binding/candidates",
             post(suggest_source_binding),
         )
+        .route(
+            "/api/android-live/design/tasks/:task_id/bind",
+            post(bind_design_task),
+        )
+        .route(
+            "/api/android-live/design/tasks/:task_id/binding",
+            post(get_design_task_binding),
+        )
+        .route(
+            "/api/android-live/design/tasks/:task_id/renew",
+            post(renew_design_task_binding),
+        )
+        .route(
+            "/api/android-live/design/tasks/:task_id/settle",
+            post(settle_design_task_binding),
+        )
+        .route("/api/android-live/design/events", post(list_design_events))
 }
 
 async fn get_capabilities(
@@ -340,6 +357,49 @@ async fn suggest_source_binding(
 ) -> Response {
     arguments["draftId"] = json!(draft_id);
     call(&runtime, "ui_suggest_design_source_binding", arguments).await
+}
+
+async fn bind_design_task(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(task_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["taskId"] = json!(task_id);
+    call(&runtime, "ui_bind_design_task", arguments).await
+}
+
+async fn get_design_task_binding(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(task_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["taskId"] = json!(task_id);
+    call(&runtime, "ui_get_design_task_binding", arguments).await
+}
+
+async fn renew_design_task_binding(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(task_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["taskId"] = json!(task_id);
+    call(&runtime, "ui_renew_design_task_binding", arguments).await
+}
+
+async fn settle_design_task_binding(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(task_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["taskId"] = json!(task_id);
+    call(&runtime, "ui_settle_design_task_binding", arguments).await
+}
+
+async fn list_design_events(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Json(arguments): Json<Value>,
+) -> Response {
+    call(&runtime, "ui_list_design_events", arguments).await
 }
 
 fn artifact_response(artifact: super::design_session_store::VerifiedPixelArtifact) -> Response {
