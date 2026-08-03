@@ -116,6 +116,10 @@ platform_margin
 
 标准合约 `CapacityInstrument` 包含 SKU、合约单位、交付窗口、最小可用率、最小吞吐、允许区域、验证等级和结算单位。
 
+容量市场底层统一使用已接受的共享 CapacityPool 与追加式账本设计，见 `docs/decisions/distributed-compute-capacity-ledger-v1.md` 和 `docs/distributed-compute/capacity-ledger.md`。Offer 只声明静态出售上限；发布、复制或续期 Offer 不会铸造任何可用容量。只有 Pool bucket 的发行事件进入账本后才形成余额，所有现货 Reservation 与未来 Commitment 必须争用同一容量真源。
+
+V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。该规则与账本对象目前均为 accepted design / not implemented，尚无 migration、Store、Broker 接线或真实容量操作。
+
 市场对象分层：
 
 - `Order`：买/卖方向、限价、数量、有效期；
@@ -131,7 +135,7 @@ platform_margin
 
 1. Planner 把任务需求归一为 SKU 与交付窗口；
 2. Market 选择用户已有 Delivery Allocation，或从期货曲线生成可接受快照；
-3. Broker 原子冻结消费者预算、Provider 容量和 Price Snapshot；
+3. Broker 原子冻结消费者预算、所选 Pool/交付窗口的容量和 Price Snapshot；
 4. Attempt 执行并产生声明/观测/验证回执；
 5. Verification 决定 `verified_usage` 与 `compensable_usage`；
 6. Settlement 依据快照生成双价格腿和平台价差；

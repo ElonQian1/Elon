@@ -232,6 +232,7 @@
     "docs/cli会话问题/纯Codex cli图片会话.md": "custom:external-tools",
     "docs/codex-vault-sharing-runbook.md": "custom:security",
     "docs/decisions/ai-resource-control-v1.md": "custom:open-commerce-network",
+    "docs/decisions/distributed-compute-capacity-ledger-v1.md": "custom:distributed-compute",
     "docs/decisions/distributed-compute-federation-v1.md": "custom:distributed-compute",
     "docs/decisions/erp-blueprint-and-instance-v1.md": "custom:erp-blueprint-system",
     "docs/decisions/erp-feature-proposal-governance-v1.md": "custom:erp-blueprint-system",
@@ -252,6 +253,7 @@
     "docs/discussion-knowledge-compiler.md": "custom:pc-workbench",
     "docs/distributed-compute/README.md": "custom:distributed-compute",
     "docs/distributed-compute/architecture.md": "custom:distributed-compute",
+    "docs/distributed-compute/capacity-ledger.md": "custom:distributed-compute",
     "docs/distributed-compute/market-and-settlement.md": "custom:distributed-compute",
     "docs/distributed-compute/node-client-and-plugins.md": "custom:distributed-compute",
     "docs/drafts/open-commerce-network-roadmap.md": "custom:open-commerce-network",
@@ -372,6 +374,7 @@
     "docs/codex-vault-sharing-runbook.md": "on-demand",
     "docs/codex-vault-usage-estimation.md": "on-demand",
     "docs/decisions/ai-resource-control-v1.md": "on-demand",
+    "docs/decisions/distributed-compute-capacity-ledger-v1.md": "on-demand",
     "docs/decisions/distributed-compute-federation-v1.md": "on-demand",
     "docs/decisions/erp-blueprint-and-instance-v1.md": "on-demand",
     "docs/decisions/erp-feature-proposal-governance-v1.md": "on-demand",
@@ -389,6 +392,7 @@
     "docs/discussion-knowledge-compiler.md": "on-demand",
     "docs/distributed-compute/README.md": "current",
     "docs/distributed-compute/architecture.md": "current",
+    "docs/distributed-compute/capacity-ledger.md": "current",
     "docs/distributed-compute/market-and-settlement.md": "current",
     "docs/distributed-compute/node-client-and-plugins.md": "current",
     "docs/fb2-ai-center/PLAN.md": "drafts",
@@ -819,9 +823,29 @@
         "file:server/src/node_compute_sharing.rs"
       ],
       "related": [
+        "docs/decisions/distributed-compute-capacity-ledger-v1.md",
         "docs/decisions/distributed-compute-federation-v1.md",
         "docs/distributed-compute/architecture.md",
+        "docs/distributed-compute/capacity-ledger.md",
         "docs/distributed-compute/node-client-and-plugins.md",
+        "docs/distributed-compute/market-and-settlement.md"
+      ]
+    },
+    "docs/decisions/distributed-compute-capacity-ledger-v1.md": {
+      "doc_type": "architecture_decision",
+      "audience": [
+        "产品负责人",
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "算力容量与账本",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 60,
+      "implementation_refs": [],
+      "related": [
+        "docs/distributed-compute/capacity-ledger.md",
+        "docs/distributed-compute/architecture.md",
         "docs/distributed-compute/market-and-settlement.md"
       ]
     },
@@ -861,8 +885,28 @@
         "file:server/src/node_router.rs"
       ],
       "related": [
+        "docs/decisions/distributed-compute-capacity-ledger-v1.md",
         "docs/decisions/distributed-compute-federation-v1.md",
+        "docs/distributed-compute/capacity-ledger.md",
         "docs/system-architecture.md"
+      ]
+    },
+    "docs/distributed-compute/capacity-ledger.md": {
+      "doc_type": "technical_design",
+      "audience": [
+        "产品负责人",
+        "架构师",
+        "开发者",
+        "AI 代理"
+      ],
+      "owner": "算力容量与账本",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 45,
+      "implementation_refs": [],
+      "related": [
+        "docs/decisions/distributed-compute-capacity-ledger-v1.md",
+        "docs/distributed-compute/architecture.md",
+        "docs/distributed-compute/market-and-settlement.md"
       ]
     },
     "docs/distributed-compute/node-client-and-plugins.md": {
@@ -907,7 +951,9 @@
         "file:server/src/compute_federation/receipts.rs"
       ],
       "related": [
+        "docs/decisions/distributed-compute-capacity-ledger-v1.md",
         "docs/decisions/distributed-compute-federation-v1.md",
+        "docs/distributed-compute/capacity-ledger.md",
         "docs/decisions/task-shadow-settlement-v1.md"
       ]
     },
@@ -2195,6 +2241,13 @@
   },
   "audit_log": [
     {
+      "id": "distributed-compute-capacity-ledger-20260804",
+      "action": "document.knowledge_graph.update",
+      "target": ".elon/document-sections.json",
+      "summary": "登记共享 CapacityPool、精确交付窗口、多 meter Claim、追加式双腿账本和跨 Offer 防超卖决定；实现引用保持为空，直到领域合同与 SQLite 骨架提交",
+      "at": "2026-08-04T04:30:00Z"
+    },
+    {
       "id": "distributed-compute-node-contracts-20260804",
       "action": "document.knowledge_graph.update",
       "target": ".elon/document-sections.json",
@@ -2258,6 +2311,7 @@
         "entrypoint": "docs/distributed-compute/README.md",
         "document_paths": [
           "docs/distributed-compute/README.md",
+          "docs/decisions/distributed-compute-capacity-ledger-v1.md",
           "docs/decisions/distributed-compute-federation-v1.md"
         ],
         "implementation_refs": [
@@ -2318,6 +2372,7 @@
         "document_paths": [
           "docs/decisions/distributed-compute-federation-v1.md",
           "docs/distributed-compute/architecture.md",
+          "docs/distributed-compute/capacity-ledger.md",
           "docs/distributed-compute/node-client-and-plugins.md"
         ],
         "implementation_refs": [
@@ -2376,6 +2431,28 @@
           "contract",
           "uncompiled",
           "federation"
+        ]
+      },
+      {
+        "id": "arch-compute-capacity-ledger-v1",
+        "view": "architecture",
+        "kind": "planned_component",
+        "label": "共享算力容量池与账本 V1",
+        "detail": "已接受的单池单窗口、跨 Offer 共享余额、Claim 幂等释放和追加式双腿账本设计；领域合同、SQLite 投影与 Broker 原子 Reserve 尚未实现",
+        "parent_id": "arch-server",
+        "order": 36,
+        "color": "#D0A34F",
+        "entrypoint": "docs/distributed-compute/capacity-ledger.md",
+        "document_paths": [
+          "docs/decisions/distributed-compute-capacity-ledger-v1.md",
+          "docs/distributed-compute/capacity-ledger.md"
+        ],
+        "implementation_refs": [],
+        "tags": [
+          "planned",
+          "capacity-pool",
+          "ledger",
+          "anti-oversell"
         ]
       },
       {
@@ -3797,6 +3874,20 @@
         "target": "arch-compute-federation-contracts",
         "relation": "implements",
         "label": "节点插件执行统一任务与回执合同"
+      },
+      {
+        "id": "arch-compute-contracts-capacity-ledger",
+        "source": "arch-compute-federation-contracts",
+        "target": "arch-compute-capacity-ledger-v1",
+        "relation": "uses",
+        "label": "Offer 与 Reservation 绑定同一共享容量真源"
+      },
+      {
+        "id": "arch-compute-capacity-ledger-market",
+        "source": "arch-compute-capacity-ledger-v1",
+        "target": "cap-compute-market-settlement-v1",
+        "relation": "feeds",
+        "label": "容量 Claim 与追加式账本支撑现货和未来锁价交付"
       },
       {
         "id": "cap-erp-blueprint-commerce-v1",
