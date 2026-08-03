@@ -10,8 +10,10 @@ import {
   Webhook,
 } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
+import DeveloperWebhookReplayControls from './DeveloperWebhookReplayControls'
 import type {
   DeveloperWebhookDelivery,
+  DeveloperWebhookHistoryReplayResult,
   DeveloperWebhookSubscription,
   OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
@@ -53,6 +55,10 @@ export default function DeveloperWebhookPanel({
   const selectedApp = useMemo(
     () => apps.find((app) => app.id === appRecordId),
     [appRecordId, apps],
+  )
+  const selectedWebhook = useMemo(
+    () => webhooks.find((webhook) => webhook.id === selectedWebhookId),
+    [selectedWebhookId, webhooks],
   )
 
   useEffect(() => {
@@ -202,6 +208,35 @@ export default function DeveloperWebhookPanel({
       await refreshDeliveries()
     } catch (error) {
       setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function replayHistory(
+    afterSequence: number,
+    limit: number,
+  ): Promise<DeveloperWebhookHistoryReplayResult | undefined> {
+    if (!selectedApp || !selectedWebhookId) return undefined
+    setBusy(true)
+    setMessage('')
+    try {
+      const replay = await openCommerceClientApi.replayDeveloperWebhookHistory(
+        projectId,
+        selectedApp.id,
+        selectedWebhookId,
+        afterSequence,
+        limit,
+      )
+      setMessage(
+        `符合 ${replay.eligible_count} 条，新入队 ${replay.enqueued_count} 条，`
+        + `已存在 ${replay.already_present_count} 条${replay.has_more ? '，还有下一批' : ''}。`,
+      )
+      await refreshDeliveries()
+      return replay
+    } catch (error) {
+      setMessage(errorText(error))
+      return undefined
     } finally {
       setBusy(false)
     }
@@ -378,7 +413,19 @@ export default function DeveloperWebhookPanel({
 
         {selectedWebhookId && (
           <div style={commerceStyles.list}>
-            <strong>最近投递</strong>
+            <header style={commerceStyles.itemHeader}>
+              <strong>最近投递</strong>
+              <DeveloperWebhookReplayControls
+                disabled={
+                  !canEdit
+                  || busy
+                  || selectedWebhook?.status !== 'active'
+                  || selectedWebhook?.verification_status !== 'verified'
+                }
+                onReplay={replayHistory}
+                onMessage={setMessage}
+              />
+            </header>
             {deliveries.slice(0, 10).map((delivery) => (
               <article style={listItemStyle()} key={delivery.id}>
                 <header style={commerceStyles.itemHeader}>
@@ -401,7 +448,8 @@ export default function DeveloperWebhookPanel({
                   </div>
                 </header>
                 <small style={commerceStyles.itemMeta}>
-                  {delivery.invocation_id} · 尝试 {delivery.attempt_count} 次
+                  序号 {delivery.event_sequence} · {delivery.invocation_id} · 尝试 {delivery.attempt_count} 次
+                  {delivery.enqueue_source === 'history_replay' ? ' · 历史补发' : ''}
                   {delivery.manual_retry_count > 0 ? ` · 人工重试 ${delivery.manual_retry_count} 次` : ''}
                   {delivery.response_status ? ` · HTTP ${delivery.response_status}` : ''}
                 </small>

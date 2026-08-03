@@ -4,7 +4,7 @@ use crate::{
     open_commerce_developer_model::OpenCommerceDeveloperApp,
     open_commerce_webhook_model::{
         CreateDeveloperWebhookRequest, DeveloperWebhookCredential, DeveloperWebhookDelivery,
-        DeveloperWebhookSubscription,
+        DeveloperWebhookHistoryReplayResult, DeveloperWebhookSubscription,
     },
     store::Store,
 };
@@ -158,5 +158,27 @@ pub(crate) fn retry_delivery(
         &app.id,
         subscription_id,
         delivery_id,
+    )
+}
+
+pub(crate) fn replay_history(
+    store: &Store,
+    app: &OpenCommerceDeveloperApp,
+    subscription_id: &str,
+    after_sequence: i64,
+    limit: usize,
+) -> Result<DeveloperWebhookHistoryReplayResult> {
+    if after_sequence < 0 {
+        bail!("Webhook 历史补发起始序号不能为负数");
+    }
+    if !(1..=100).contains(&limit) {
+        bail!("Webhook 单次历史补发数量必须在 1 到 100 之间");
+    }
+    store.replay_open_commerce_developer_webhook_history(
+        &app.project_id,
+        &app.id,
+        subscription_id,
+        after_sequence,
+        limit,
     )
 }

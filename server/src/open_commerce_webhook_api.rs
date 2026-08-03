@@ -9,7 +9,9 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
-    open_commerce_webhook_model::CreateDeveloperWebhookRequest,
+    open_commerce_webhook_model::{
+        CreateDeveloperWebhookRequest, DeveloperWebhookHistoryReplayRequest,
+    },
     open_commerce_webhook_service,
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     types::AppState,
@@ -44,6 +46,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks/:subscription_id/deliveries/:delivery_id/retry",
             post(retry_delivery),
+        )
+        .route(
+            "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks/:subscription_id/replay-history",
+            post(replay_history),
         )
 }
 
@@ -288,6 +294,53 @@ async fn retry_delivery(
         );
     }
     Json(delivery).into_response()
+}
+
+async fn replay_history(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, app_record_id, subscription_id)): Path<(String, String, String)>,
+    Json(request): Json<DeveloperWebhookHistoryReplayRequest>,
+) -> Response {
+    let (user_id, app) =
+        match editable_caller_app(&state, &headers, &project_id, &app_record_id, true) {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
+    let replay = match open_commerce_webhook_service::replay_history(
+        &state.store,
+        &app,
+        &subscription_id,
+        request.after_sequence,
+        request.limit,
+    ) {
+        Ok(value) => value,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
+    };
+    if let Err(error) = state.store.record_open_commerce_audit(
+        &project_id,
+        &user_id,
+        Some("pc-web"),
+        "developer_webhook.history_replayed",
+        "developer_webhook",
+        &replay.subscription_id,
+        &json!({
+            "app_id":app.app_id,
+            "after_sequence":replay.after_sequence,
+            "processed_through_sequence":replay.processed_through_sequence,
+            "eligible_count":replay.eligible_count,
+            "enqueued_count":replay.enqueued_count,
+            "already_present_count":replay.already_present_count,
+            "has_more":replay.has_more
+        }),
+    ) {
+        tracing::warn!(
+            subscription_id = %replay.subscription_id,
+            error = %error,
+            "Webhook 历史事件已补发，但审计记录写入失败"
+        );
+    }
+    Json(replay).into_response()
 }
 
 fn mutate_webhook(

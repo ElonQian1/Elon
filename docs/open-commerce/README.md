@@ -93,6 +93,8 @@
 83. `docs/open-commerce-developer-webhook-dead-letter-retry-v1-acceptance.md`：查看死信人工重试代码及统一回归待验证范围。
 84. `docs/decisions/open-commerce-developer-webhook-event-filter-v1.md`：查看成功与失败终态事件在入队前筛选的边界。
 85. `docs/open-commerce-developer-webhook-event-filter-v1-acceptance.md`：查看事件筛选代码及统一回归待验证范围。
+86. `docs/decisions/open-commerce-developer-webhook-history-replay-v1.md`：查看最多 100 条历史终态通知的有界、幂等补发边界。
+87. `docs/open-commerce-developer-webhook-history-replay-v1-acceptance.md`：查看历史补发代码及统一回归待验证范围。
 
 ## 专题地图
 

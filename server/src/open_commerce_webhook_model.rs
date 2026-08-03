@@ -48,6 +48,7 @@ pub(crate) struct DeveloperWebhookDelivery {
     pub invocation_id: String,
     pub event_sequence: i64,
     pub event_type: String,
+    pub enqueue_source: String,
     pub status: String,
     pub attempt_count: i64,
     pub manual_retry_count: i64,
@@ -57,6 +58,7 @@ pub(crate) struct DeveloperWebhookDelivery {
     pub created_at: String,
     pub last_attempt_at: Option<String>,
     pub last_manual_retry_at: Option<String>,
+    pub history_replay_requested_at: Option<String>,
     pub delivered_at: Option<String>,
 }
 
@@ -77,6 +79,25 @@ pub(crate) struct CreateDeveloperWebhookRequest {
     pub callback_url: String,
     pub deliver_on_succeeded: Option<bool>,
     pub deliver_on_failed: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeveloperWebhookHistoryReplayRequest {
+    pub after_sequence: i64,
+    pub limit: usize,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct DeveloperWebhookHistoryReplayResult {
+    pub schema: &'static str,
+    pub subscription_id: String,
+    pub after_sequence: i64,
+    pub processed_through_sequence: i64,
+    pub eligible_count: usize,
+    pub enqueued_count: usize,
+    pub already_present_count: usize,
+    pub has_more: bool,
 }
 
 #[derive(Debug, Serialize)]

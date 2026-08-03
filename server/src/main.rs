@@ -311,6 +311,7 @@ mod open_commerce_service;
 mod open_commerce_service_tests;
 mod open_commerce_webhook_api;
 mod open_commerce_webhook_event_filter_migration;
+mod open_commerce_webhook_history_migration;
 mod open_commerce_webhook_lifecycle_migration;
 mod open_commerce_webhook_migration;
 mod open_commerce_webhook_model;

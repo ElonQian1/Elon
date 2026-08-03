@@ -37,6 +37,7 @@ import type {
   DeveloperWebhookCredential,
   DeveloperWebhookDelivery,
   DeveloperWebhookDeliveryList,
+  DeveloperWebhookHistoryReplayResult,
   DeveloperWebhookSubscription,
   DeveloperWebhookSubscriptionList,
   DeleteConsumerPreferenceDisclosureResult,
@@ -268,6 +269,17 @@ export const openCommerceClientApi = {
   ) => api.post<DeveloperWebhookDelivery>(
     `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks/${encodeURIComponent(webhookId)}/deliveries/${encodeURIComponent(deliveryId)}/retry`,
     {},
+  ),
+
+  replayDeveloperWebhookHistory: (
+    projectId: string,
+    appRecordId: string,
+    webhookId: string,
+    afterSequence: number,
+    limit: number,
+  ) => api.post<DeveloperWebhookHistoryReplayResult>(
+    `${projectBase(projectId)}/developer-apps/${encodeURIComponent(appRecordId)}/webhooks/${encodeURIComponent(webhookId)}/replay-history`,
+    { after_sequence: afterSequence, limit },
   ),
 
   listConsumerPortabilityImports: (projectId: string) =>

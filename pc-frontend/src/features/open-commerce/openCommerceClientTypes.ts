@@ -66,6 +66,7 @@ export interface DeveloperWebhookDelivery {
   invocation_id: string
   event_sequence: number
   event_type: 'invocation.succeeded' | 'invocation.failed'
+  enqueue_source: 'live' | 'history_replay'
   status: 'pending' | 'delivering' | 'retry' | 'delivered' | 'dead'
   attempt_count: number
   manual_retry_count: number
@@ -75,12 +76,24 @@ export interface DeveloperWebhookDelivery {
   created_at: string
   last_attempt_at?: string
   last_manual_retry_at?: string
+  history_replay_requested_at?: string
   delivered_at?: string
 }
 
 export interface DeveloperWebhookDeliveryList {
   schema: string
   deliveries: DeveloperWebhookDelivery[]
+}
+
+export interface DeveloperWebhookHistoryReplayResult {
+  schema: string
+  subscription_id: string
+  after_sequence: number
+  processed_through_sequence: number
+  eligible_count: number
+  enqueued_count: number
+  already_present_count: number
+  has_more: boolean
 }
 
 export interface AuthorizationRequest {
