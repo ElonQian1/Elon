@@ -173,6 +173,29 @@ POST /api/projects/{project_id}/economy/sui-correction-projections/{projection_i
 
 列表和详情允许项目成员读取，准备和复核要求编辑权限。相同项目、纠正、网络和 schema 的请求幂等；任一纠正腿、来源摘要或信封不一致时复核为 `integrity_conflict`。替换凭证出现新的阻断争议时返回 `dispute_blocked`。当前接口不创建 PTB、不连接 Sui 网络，也不移动任何资金。
 
+## Sui 适配器离线交接包
+
+项目编辑者可把标准投影或纠正双腿投影导出为统一的离线预检交接包：
+
+```http
+POST /api/projects/{project_id}/economy/sui-projections/{projection_id}/adapter-handoff
+POST /api/projects/{project_id}/economy/sui-correction-projections/{projection_id}/adapter-handoff
+```
+
+导出会重新复核来源、摘要、信封和争议状态，只接受 `integrity_status=verified`、`submission_readiness=adapter_required`、`network_submission=not_submitted` 且提交次数为零的包。响应包含统一 Schema、包类型、目标网络、双摘要、原始信封、`handoff_digest` 和以下固定约束：
+
+```json
+{
+  "allowed_adapter_action": "offline_preflight_only",
+  "signature_present": false,
+  "transaction_broadcast": false,
+  "finality_verified": false,
+  "funds_moved": false
+}
+```
+
+接口不保存新的交接状态，不创建交易字节，也不授权任何外部服务提交网络。未来适配器仍须使用独立机器身份和租约状态机。
+
 ## 纠正链与当前有效凭证
 
 项目成员可从任意标准、冲销或替换凭证解析完整纠正链：

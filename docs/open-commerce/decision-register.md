@@ -51,7 +51,7 @@
 | 共享节点运行偏差只先形成所有者健康证据 | 从持久化记录派生失败、Token 预留超出和过期租约，仅在所有者控制面告警，不自动处罚、赔付或上链 | `docs/decisions/node-compute-sharing-runtime-health-v1.md` |
 | 过期节点推理必须失败关闭并回收预授权 | 收到终态后先冻结实际用量为非执行状态；只有未收到可信终态且租约过期的运行才原子失败关闭，迟到结果不得改写终态 | `docs/decisions/node-compute-sharing-expired-run-reconciliation-v1.md` |
 | 先实现链外影子结算，再评估 Sui 网络适配器 | 复用真实成本和人工验收事实，保持双分录、幂等和默认关闭，不移动真实资金 | `docs/decisions/task-shadow-settlement-v1.md` |
-| Sui 适配器先消费可复核的链下投影包 | 投影包绑定目标网络、来源摘要与投影摘要；当前只持久化和复核，固定未提交 | `docs/decisions/sui-offchain-projection-packages-v1.md` |
+| Sui 适配器先消费可复核的链下投影包 | 投影包绑定目标网络、来源摘要与投影摘要；标准包与纠正双腿可导出统一离线预检交接包，仍固定未提交 | `docs/decisions/sui-offchain-projection-packages-v1.md`、`docs/decisions/sui-adapter-offline-handoff-v1.md` |
 | 争议只追加证据并阻断投影，不改写历史账本 | 待审核或已接受争议阻断原凭证投影；纠正必须使用新的 Matter 和凭证 | `docs/decisions/task-shadow-settlement-disputes-v1.md` |
 | 影子结算纠正采用独立 Matter 和追加式双腿过账 | 人工验收后在同一事务内追加冲销与替换凭证，原凭证不改写；单张纠正凭证不进入普通 Sui 投影 | `docs/decisions/task-shadow-settlement-corrections-v1.md` |
 | Sui 纠正投影必须把冲销与替换绑定为一个链下原子包 | 包绑定两条腿、来源摘要和目标网络；可复核但固定未提交，替换凭证的新争议会阻断就绪 | `docs/decisions/sui-correction-projection-packages-v1.md` |
