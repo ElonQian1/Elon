@@ -101,6 +101,8 @@ HMAC-SHA256(secret, unix_timestamp + "." + raw_json_body)
 
 `cofficethinking` 参考节点的部署配置、商品管理接口和订单落库说明见其 `docs/open_commerce_runtime.md`。跨仓库协议真源为两仓库内容一致的 `contracts/open-commerce/merchant-runtime-v1.json`。
 
+新的 Node.js 商户项目可以复用 `sdk/open-commerce-connector` 的 `createMerchantRuntime`，直接获得签名验证、重放窗口、商户与 Grant 边界、订单明确确认、幂等生命周期、Manifest 摘要和标准信封。商户仍需实现自己的能力处理器和持久化幂等存储；SDK 的内存存储仅供本机开发，不能用于生产订单。
+
 ## 验证
 
 ```powershell

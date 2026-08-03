@@ -136,6 +136,40 @@ await worker.run({ signal: shutdown.signal })
 
 普通异常默认按 `transient_failure` 主动释放；明确的永久业务拒绝使用 `AdapterHandoffRejectError`，容量不足或人工暂停可抛出 `AdapterHandoffReleaseError`。工作器不会保存机器 Token、租约密钥或原始任务，也不会替代商户 ERP 自身的幂等、事务和权限校验。
 
+## 商户运行时内核
+
+`createMerchantRuntime` 抽取了咖啡店参考节点中所有商户共同需要的协议层：HMAC 签名、5 分钟重放窗口、商户身份、Grant 检查、订单明确确认、幂等占位与重放、能力分发、Manifest 摘要和标准结果/错误信封。商户只实现自己的商品、库存、报价和订单处理器。
+
+```js
+import {
+  createMemoryMerchantRuntimeIdempotencyStore,
+  createMerchantRuntime,
+} from '@elon/open-commerce-connector'
+
+const runtime = createMerchantRuntime({
+  merchantId: process.env.YILONG_MERCHANT_ID,
+  keyId: process.env.YILONG_RUNTIME_KEY_ID,
+  secret: process.env.YILONG_RUNTIME_SECRET,
+  // 仅用于本机开发；生产环境必须替换为数据库实现。
+  idempotencyStore: createMemoryMerchantRuntimeIdempotencyStore(),
+  capabilities: [{
+    key: 'catalog.search',
+    access: 'public',
+    input_schema: { type: 'object' },
+  }],
+  handlers: {
+    async 'catalog.search'(input, context) {
+      return merchantRepository.searchProducts(input, context)
+    },
+  },
+})
+
+// HTTP 框架必须把未经重新序列化的原始请求体和请求头交给内核。
+const response = await runtime.handleInvoke({ headers, body: rawBody })
+```
+
+内存幂等存储只供本机开发和原型使用，进程重启会丢失记录。生产商户必须实现 `claim/complete/release` 持久化接口，并在数据库中对“商户 + App + 能力 + 幂等键”建立唯一约束；商品扣减、报价消费和订单创建仍由商户数据库事务负责。
+
 ## 数据边界
 
 - 单页最多 500 条标准化变更。
