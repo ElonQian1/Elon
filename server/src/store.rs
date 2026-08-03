@@ -41,6 +41,7 @@ mod compute_capacity_supply_withdrawal;
 mod compute_metering;
 mod compute_offer_contract_validation;
 mod compute_offer_registry;
+mod compute_price_snapshot_validation;
 mod compute_provider_registry;
 mod conversation_forks;
 mod conversations;
