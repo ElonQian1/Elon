@@ -150,6 +150,7 @@ mod node_runtime;
 mod node_scheduler;
 mod offline_completion_migration;
 mod open_commerce_action_confirmation_api;
+mod open_commerce_action_confirmation_mcp;
 mod open_commerce_action_confirmation_migration;
 mod open_commerce_action_confirmation_model;
 mod open_commerce_action_confirmation_service;

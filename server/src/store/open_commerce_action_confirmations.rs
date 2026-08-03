@@ -157,6 +157,18 @@ impl Store {
             .map_err(|error| anyhow!(error).context("动作确认不存在"))
     }
 
+    pub(crate) fn open_commerce_action_confirmation_for_actor(
+        &self,
+        confirmation_id: &str,
+        requester_user_id: &str,
+        requester_app_id: &str,
+    ) -> Result<OpenCommerceActionConfirmation> {
+        let confirmation = self.open_commerce_action_confirmation(confirmation_id)?;
+        ensure_actor(&confirmation, requester_user_id, requester_app_id)
+            .map_err(|_| anyhow!("动作确认不存在"))?;
+        Ok(confirmation)
+    }
+
     pub(crate) fn confirm_open_commerce_action_confirmation(
         &self,
         confirmation_id: &str,

@@ -476,58 +476,6 @@ pub(crate) fn definitions() -> Vec<Value> {
             true,
         ),
         tool(
-            "open_commerce_prepare_action_confirmation",
-            "为动作类商户能力准备一份服务端短时确认。确认绑定当前用户、App、商户、能力、授权、幂等键和输入摘要；只准备，不执行。查询能力不需要调用此工具。",
-            json!({
-                "type":"object",
-                "required":["merchant_id","capability_key","idempotency_key"],
-                "properties":{
-                    "merchant_id":{"type":"string","minLength":1,"maxLength":120},
-                    "capability_key":{"type":"string","minLength":2,"maxLength":80},
-                    "grant_id":{"type":"string","maxLength":120},
-                    "idempotency_key":{"type":"string","minLength":8,"maxLength":120},
-                    "input":{"type":"object","default":{}}
-                },
-                "additionalProperties":false
-            }),
-            false,
-            true,
-        ),
-        tool(
-            "open_commerce_confirm_action_confirmation",
-            "仅在当前用户已明确同意执行准备结果所指向的经营操作后确认。确认不会执行能力；随后 open_commerce_invoke 仍须携带 confirmation_id。",
-            json!({
-                "type":"object",
-                "required":["confirmation_id","confirmation_phrase"],
-                "properties":{
-                    "confirmation_id":{"type":"string","minLength":1,"maxLength":120},
-                    "confirmation_phrase":{"const":"CONFIRM_ACTION"}
-                },
-                "additionalProperties":false
-            }),
-            false,
-            true,
-        ),
-        tool(
-            "open_commerce_invoke",
-            "调用一个商户能力。调用方身份来自当前 MCP 入口，不能冒充其他应用；必须提供幂等键。动作能力还必须携带已经明确确认、与同一输入绑定的一次性 confirmation_id。返回结果、计量金额和 recorded_not_charged 状态，V1 不真实扣款。",
-            json!({
-                "type":"object",
-                "required":["merchant_id","capability_key","idempotency_key"],
-                "properties":{
-                    "merchant_id":{"type":"string","minLength":1,"maxLength":120},
-                    "capability_key":{"type":"string","minLength":2,"maxLength":80},
-                    "grant_id":{"type":"string","maxLength":120},
-                    "idempotency_key":{"type":"string","minLength":8,"maxLength":120},
-                    "action_confirmation_id":{"type":"string","maxLength":120},
-                    "input":{"type":"object","default":{}}
-                },
-                "additionalProperties":false
-            }),
-            false,
-            true,
-        ),
-        tool(
             "open_commerce_list_audit",
             "读取当前项目最近的商户、能力、授权和调用审计事件。审计只保存字段形状和摘要，不保存调用原始值。",
             json!({
@@ -557,7 +505,6 @@ fn tool(
             "destructiveHint": matches!(
                 name,
                 "open_commerce_revoke_grant"
-                    | "open_commerce_confirm_action_confirmation"
                     | "open_commerce_block_app"
                     | "open_commerce_revoke_consumer_relationship"
                     | "open_commerce_renew_consumer_relationship"
@@ -568,7 +515,6 @@ fn tool(
             "idempotentHint": idempotent,
             "openWorldHint": name == "open_commerce_search_merchants"
                 || name == "open_commerce_get_merchant"
-                || name == "open_commerce_invoke"
         }
     })
 }

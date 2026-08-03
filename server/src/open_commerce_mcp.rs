@@ -13,8 +13,6 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 
 use crate::{
-    open_commerce_action_confirmation_model::ACTION_CONFIRMATION_PHRASE,
-    open_commerce_action_confirmation_service,
     open_commerce_app_block_model::BlockOpenCommerceAppRequest,
     open_commerce_app_block_service,
     open_commerce_data_request_model::{
@@ -24,7 +22,6 @@ use crate::{
     open_commerce_integration_model::{CreateIntegrationRequest, RecordSyncReceiptRequest},
     open_commerce_model::{
         normalize_app_id, CreateCapabilityRequest, CreateGrantRequest, CreateMerchantRequest,
-        InvokeCapabilityRequest,
     },
     open_commerce_portability_model::CreateConsumerPortabilityExportRequest,
     open_commerce_portability_service,
@@ -144,25 +141,6 @@ struct DecideConsumerDataRequestArguments {
 }
 
 #[derive(Debug, Deserialize)]
-struct InvokeArguments {
-    merchant_id: String,
-    capability_key: String,
-    #[serde(default)]
-    grant_id: Option<String>,
-    idempotency_key: String,
-    #[serde(default)]
-    action_confirmation_id: Option<String>,
-    #[serde(default = "empty_object")]
-    input: Value,
-}
-
-#[derive(Debug, Deserialize)]
-struct ConfirmActionArguments {
-    confirmation_id: String,
-    confirmation_phrase: String,
-}
-
-#[derive(Debug, Deserialize)]
 struct AuditArguments {
     #[serde(default = "default_audit_limit")]
     limit: usize,
@@ -214,6 +192,7 @@ async fn mcp_handler(
         "notifications/initialized" => return StatusCode::ACCEPTED.into_response(),
         "tools/list" => {
             let mut tools = crate::open_commerce_mcp_tools::definitions();
+            tools.extend(crate::open_commerce_action_confirmation_mcp::definitions());
             tools.extend(crate::open_commerce_adapter_mcp::definitions());
             tools.extend(crate::open_commerce_consumer_app_mcp::definitions());
             tools.extend(crate::open_commerce_consumer_authorization_mcp::definitions());
@@ -286,6 +265,18 @@ pub(crate) async fn call_tool(
         name,
         arguments.clone(),
     )? {
+        return tool_response(value);
+    }
+    if let Some(value) = crate::open_commerce_action_confirmation_mcp::call_if_handled(
+        store,
+        user_id,
+        project_role,
+        app_id,
+        name,
+        arguments.clone(),
+    )
+    .await?
+    {
         return tool_response(value);
     }
     if let Some(value) = crate::open_commerce_consumer_app_mcp::call_if_handled(
@@ -659,73 +650,6 @@ pub(crate) async fn call_tool(
                 &actor,
             )?)?
         }
-        "open_commerce_prepare_action_confirmation" => {
-            let input: InvokeArguments = decode(arguments, name)?;
-            let merchant = store.open_commerce_merchant(&input.merchant_id)?;
-            let target_role = store
-                .get_project_access(user_id, &merchant.project_id)
-                .ok()
-                .map(|access| access.role);
-            serde_json::to_value(open_commerce_action_confirmation_service::prepare(
-                store,
-                &OpenCommerceActor {
-                    user_id,
-                    app_id,
-                    project_role: target_role.as_deref(),
-                },
-                InvokeCapabilityRequest {
-                    merchant_id: input.merchant_id,
-                    capability_key: input.capability_key,
-                    requester_app_id: app_id.to_string(),
-                    grant_id: input.grant_id,
-                    idempotency_key: input.idempotency_key,
-                    input: input.input,
-                },
-            )?)?
-        }
-        "open_commerce_confirm_action_confirmation" => {
-            let input: ConfirmActionArguments = decode(arguments, name)?;
-            if input.confirmation_phrase != ACTION_CONFIRMATION_PHRASE {
-                return Err(anyhow!("动作确认短语无效"));
-            }
-            serde_json::to_value(open_commerce_action_confirmation_service::confirm(
-                store,
-                &OpenCommerceActor {
-                    user_id,
-                    app_id,
-                    project_role: Some(project_role),
-                },
-                &input.confirmation_id,
-                &input.confirmation_phrase,
-            )?)?
-        }
-        "open_commerce_invoke" => {
-            let input: InvokeArguments = decode(arguments, name)?;
-            let action_confirmation_id = input.action_confirmation_id.clone();
-            let merchant = store.open_commerce_merchant(&input.merchant_id)?;
-            let target_role = store
-                .get_project_access(user_id, &merchant.project_id)
-                .ok()
-                .map(|access| access.role);
-            open_commerce_service::invoke_with_action_confirmation(
-                store,
-                &OpenCommerceActor {
-                    user_id,
-                    app_id,
-                    project_role: target_role.as_deref(),
-                },
-                InvokeCapabilityRequest {
-                    merchant_id: input.merchant_id,
-                    capability_key: input.capability_key,
-                    requester_app_id: app_id.to_string(),
-                    grant_id: input.grant_id,
-                    idempotency_key: input.idempotency_key,
-                    input: input.input,
-                },
-                action_confirmation_id.as_deref(),
-            )
-            .await?
-        }
         "open_commerce_list_audit" => {
             let input: AuditArguments = decode(arguments, name)?;
             json!({
@@ -778,10 +702,6 @@ fn ensure_empty_object(arguments: &Value, name: &str) -> Result<()> {
     } else {
         Err(anyhow!("{name} 不接受参数"))
     }
-}
-
-fn empty_object() -> Value {
-    json!({})
 }
 
 fn default_search_limit() -> usize {
