@@ -24,6 +24,9 @@ pub(crate) struct ConsumerPortabilityRelationshipCandidate {
     pub requested_scopes: Vec<String>,
     pub purpose: String,
     pub requires_reauthorization: bool,
+    pub source_identity_key_ids: Vec<String>,
+    pub verified_target_merchant_ids: Vec<String>,
+    pub identity_match_authority: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

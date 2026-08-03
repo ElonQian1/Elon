@@ -4,6 +4,7 @@ use serde_json::json;
 use crate::{
     open_commerce_consumer,
     open_commerce_developer_model::CreateAuthorizationRequest,
+    open_commerce_portability_import_model::CONSUMER_PORTABILITY_IMPORT_TRUSTED_STATUS,
     open_commerce_portability_import_service,
     open_commerce_portability_reauthorization_model::{
         CreatePortabilityReauthorizationRequest, CreatePortabilityRelationshipMappingRequest,
@@ -46,6 +47,12 @@ pub(crate) fn create_mapping(
     {
         bail!("目标商户未在当前开放目录有效发布");
     }
+    let (identity_match_status, identity_match_key_id) = identity_match(
+        store,
+        &import_record,
+        &source_relationship.merchant_id,
+        &target_merchant.id,
+    )?;
     let (mapping, created) = store.save_portability_relationship_mapping(
         destination_project_id,
         actor.user_id,
@@ -54,6 +61,8 @@ pub(crate) fn create_mapping(
         &source_relationship.merchant_id,
         &target_merchant.id,
         &target_merchant.project_id,
+        &identity_match_status,
+        identity_match_key_id.as_deref(),
     )?;
     if created {
         store.record_open_commerce_audit(
@@ -70,6 +79,8 @@ pub(crate) fn create_mapping(
                 "target_merchant_id": mapping.target_merchant_id,
                 "source_trust_status": import_record.trust_status,
                 "authority": "consumer_confirmed",
+                "identity_match_status": mapping.identity_match_status,
+                "identity_match_key_id": mapping.identity_match_key_id,
             }),
         )?;
     }
@@ -91,6 +102,22 @@ pub(crate) fn list_mappings(
     if mappings.iter().any(|mapping| {
         mapping.schema != PORTABILITY_RELATIONSHIP_MAPPING_SCHEMA
             || !matches!(mapping.status.as_str(), "active" | "revoked")
+            || !matches!(
+                mapping.identity_match_status.as_str(),
+                "not_verified" | "trusted_operator_key_match"
+            )
+            || (mapping.identity_match_status == "trusted_operator_key_match"
+                && mapping
+                    .identity_match_key_id
+                    .as_ref()
+                    .map_or(true, |key_id| {
+                        key_id.len() != 64
+                            || !key_id
+                                .bytes()
+                                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+                    }))
+            || (mapping.identity_match_status == "not_verified"
+                && mapping.identity_match_key_id.is_some())
     }) {
         bail!("消费者关系迁移映射记录无效");
     }
@@ -202,6 +229,44 @@ fn normalize_id(value: &str, label: &str) -> Result<String> {
         bail!("{label} ID 长度或格式无效");
     }
     Ok(value.to_string())
+}
+
+fn identity_match(
+    store: &Store,
+    import_record: &crate::open_commerce_portability_import_model::ConsumerPortabilityImport,
+    source_merchant_id: &str,
+    target_merchant_id: &str,
+) -> Result<(String, Option<String>)> {
+    if import_record.trust_status != CONSUMER_PORTABILITY_IMPORT_TRUSTED_STATUS {
+        return Ok(("not_verified".to_string(), None));
+    }
+    let Some(claim) = import_record
+        .package
+        .payload
+        .merchant_identity_claims
+        .iter()
+        .find(|claim| claim.source_merchant_id == source_merchant_id)
+    else {
+        return Ok(("not_verified".to_string(), None));
+    };
+    let target_key_ids = store
+        .list_active_open_commerce_merchant_identity_keys(target_merchant_id)?
+        .into_iter()
+        .map(|key| key.key_id)
+        .collect::<Vec<_>>();
+    let matched = claim
+        .key_ids
+        .iter()
+        .find(|source_key| {
+            target_key_ids
+                .iter()
+                .any(|target_key| target_key == *source_key)
+        })
+        .cloned();
+    Ok(match matched {
+        Some(key_id) => ("trusted_operator_key_match".to_string(), Some(key_id)),
+        None => ("not_verified".to_string(), None),
+    })
 }
 
 fn ensure_consumer_project_actor(actor: &OpenCommerceActor<'_>) -> Result<()> {

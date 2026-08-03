@@ -93,6 +93,12 @@ export interface ConsumerRelationshipRenewalLink {
   renewed_relationship_id: string
 }
 
+export interface ConsumerPortableMerchantIdentityClaim {
+  source_merchant_id: string
+  key_ids: string[]
+  authority: 'merchant_private_key_possession'
+}
+
 export interface ConsumerPortabilityPayload {
   schema: string
   source_project_id: string
@@ -104,6 +110,7 @@ export interface ConsumerPortabilityPayload {
   preference_disclosures?: ConsumerPreferenceDisclosure[]
   invocation_receipt_scope?: 'authenticated_user_account'
   invocation_receipts?: ConsumerPortableInvocationReceipt[]
+  merchant_identity_claims?: ConsumerPortableMerchantIdentityClaim[]
 }
 
 export interface ConsumerPortabilityExport {
@@ -128,6 +135,7 @@ export interface ConsumerPortabilityExportSummary {
   preference_profile_included: boolean
   preference_disclosure_count: number
   invocation_receipt_count: number
+  merchant_identity_claim_count: number
   created_at: string
 }
 
@@ -167,6 +175,7 @@ export interface ConsumerPortabilityImportSummary {
   data_request_count: number
   preference_profile_included: boolean
   invocation_receipt_count: number
+  merchant_identity_claim_count: number
   trust_status: ConsumerPortabilityImportTrustStatus
   merge_status: 'isolated_snapshot'
   signer_key_id?: string
@@ -227,6 +236,9 @@ export interface ConsumerPortabilityRelationshipCandidate {
   requested_scopes: string[]
   purpose: string
   requires_reauthorization: true
+  source_identity_key_ids: string[]
+  verified_target_merchant_ids: string[]
+  identity_match_authority?: 'trusted_operator_package_plus_matching_possession_key'
 }
 
 export interface ConsumerPortabilityAdoptionPlan {
@@ -270,6 +282,8 @@ export interface PortabilityRelationshipMapping {
   source_merchant_id: string
   target_merchant_id: string
   target_merchant_project_id: string
+  identity_match_status: 'not_verified' | 'trusted_operator_key_match'
+  identity_match_key_id?: string
   status: 'active' | 'revoked'
   created_at: string
   revoked_at?: string

@@ -2,6 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use chrono::Utc;
 use serde_json::json;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 
 use crate::{
     open_commerce_consumer_receipt_model::{
@@ -11,8 +12,9 @@ use crate::{
     open_commerce_model::SETTLEMENT_RECORDED_NOT_CHARGED,
     open_commerce_portability_model::{
         ConsumerPortabilityExport, ConsumerPortabilityExportSummary, ConsumerPortabilityPayload,
-        ConsumerPortableInvocationReceipt, CreateConsumerPortabilityExportRequest,
-        CONSUMER_PORTABILITY_EXPORT_SCHEMA, CONSUMER_PORTABILITY_PAYLOAD_SCHEMA,
+        ConsumerPortableInvocationReceipt, ConsumerPortableMerchantIdentityClaim,
+        CreateConsumerPortabilityExportRequest, CONSUMER_PORTABILITY_EXPORT_SCHEMA,
+        CONSUMER_PORTABILITY_PAYLOAD_SCHEMA,
     },
     open_commerce_service::OpenCommerceActor,
     store::Store,
@@ -50,6 +52,8 @@ pub(crate) fn create_export(
             })
         })
         .collect::<Result<Vec<_>>>()?;
+    let merchant_identity_claims =
+        portable_merchant_identity_claims(store, &sources.relationships)?;
     let payload = ConsumerPortabilityPayload {
         schema: CONSUMER_PORTABILITY_PAYLOAD_SCHEMA.to_string(),
         source_project_id: consumer_project_id.trim().to_string(),
@@ -61,6 +65,7 @@ pub(crate) fn create_export(
         preference_disclosures: sources.preference_disclosures,
         invocation_receipt_scope: Some("authenticated_user_account".to_string()),
         invocation_receipts,
+        merchant_identity_claims,
     };
     let payload_json = canonical_payload_json(&payload)?;
     let payload_sha256 = digest_payload(payload_json.as_bytes());
@@ -89,6 +94,7 @@ pub(crate) fn create_export(
                 "preference_profile_included": export.payload.preference_profile.is_some(),
                 "preference_disclosure_count": export.payload.preference_disclosures.len()
                 ,"invocation_receipt_count": export.payload.invocation_receipts.len()
+                ,"merchant_identity_claim_count": export.payload.merchant_identity_claims.len()
             }),
         )?;
     }
@@ -198,6 +204,9 @@ fn verify_export_contents(export: ConsumerPortabilityExport) -> Result<ConsumerP
             CONSUMER_PORTABILITY_EXPORT_SCHEMA,
             CONSUMER_PORTABILITY_PAYLOAD_SCHEMA
         ) | (
+            crate::open_commerce_portability_model::CONSUMER_PORTABILITY_EXPORT_SCHEMA_V3,
+            crate::open_commerce_portability_model::CONSUMER_PORTABILITY_PAYLOAD_SCHEMA_V3
+        ) | (
             crate::open_commerce_portability_model::CONSUMER_PORTABILITY_EXPORT_SCHEMA_V2,
             crate::open_commerce_portability_model::CONSUMER_PORTABILITY_PAYLOAD_SCHEMA_V2
         ) | (
@@ -208,8 +217,11 @@ fn verify_export_contents(export: ConsumerPortabilityExport) -> Result<ConsumerP
     if !supported_version {
         bail!("消费者可携带数据负载版本不受支持");
     }
-    let is_v3 = export.schema == CONSUMER_PORTABILITY_EXPORT_SCHEMA;
-    if is_v3 {
+    let is_v4 = export.schema == CONSUMER_PORTABILITY_EXPORT_SCHEMA;
+    let has_invocation_receipts = is_v4
+        || export.schema
+            == crate::open_commerce_portability_model::CONSUMER_PORTABILITY_EXPORT_SCHEMA_V3;
+    if has_invocation_receipts {
         if export.payload.invocation_receipt_scope.as_deref() != Some("authenticated_user_account")
         {
             bail!("消费者可携带数据包的调用凭证范围无效");
@@ -221,6 +233,11 @@ fn verify_export_contents(export: ConsumerPortabilityExport) -> Result<ConsumerP
         || !export.payload.invocation_receipts.is_empty()
     {
         bail!("旧版消费者可携带数据包不能包含 V3 调用凭证字段");
+    }
+    if is_v4 {
+        verify_merchant_identity_claims(&export.payload)?;
+    } else if !export.payload.merchant_identity_claims.is_empty() {
+        bail!("旧版消费者可携带数据包不能包含 V4 商户身份声明");
     }
     if export.source_project_id != export.source_project_id.trim()
         || export.payload.source_project_id != export.source_project_id
@@ -284,6 +301,65 @@ fn verify_portable_receipt(receipt: &ConsumerPortableInvocationReceipt) -> Resul
     }
     if digest_payload(receipt.payload_json.as_bytes()) != receipt.payload_sha256 {
         bail!("消费者调用凭证完整性校验失败");
+    }
+    Ok(())
+}
+
+fn portable_merchant_identity_claims(
+    store: &Store,
+    relationships: &[crate::open_commerce_relationship_model::OpenCommerceConsumerRelationship],
+) -> Result<Vec<ConsumerPortableMerchantIdentityClaim>> {
+    let merchant_ids = relationships
+        .iter()
+        .map(|relationship| relationship.merchant_id.clone())
+        .collect::<BTreeSet<_>>();
+    let mut claims = Vec::new();
+    for merchant_id in merchant_ids {
+        let mut key_ids = store
+            .list_active_open_commerce_merchant_identity_keys(&merchant_id)?
+            .into_iter()
+            .map(|key| key.key_id)
+            .collect::<Vec<_>>();
+        key_ids.sort();
+        key_ids.dedup();
+        if !key_ids.is_empty() {
+            claims.push(ConsumerPortableMerchantIdentityClaim {
+                source_merchant_id: merchant_id,
+                key_ids,
+                authority: "merchant_private_key_possession".to_string(),
+            });
+        }
+    }
+    Ok(claims)
+}
+
+fn verify_merchant_identity_claims(payload: &ConsumerPortabilityPayload) -> Result<()> {
+    let relationship_merchants = payload
+        .relationships
+        .iter()
+        .map(|relationship| relationship.merchant_id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut claimed_merchants = BTreeSet::new();
+    for claim in &payload.merchant_identity_claims {
+        if !relationship_merchants.contains(claim.source_merchant_id.as_str())
+            || !claimed_merchants.insert(claim.source_merchant_id.as_str())
+            || claim.authority != "merchant_private_key_possession"
+            || claim.key_ids.is_empty()
+            || claim.key_ids.len() > 3
+        {
+            bail!("消费者可携带数据包的商户身份声明无效");
+        }
+        let mut unique_keys = BTreeSet::new();
+        for key_id in &claim.key_ids {
+            if key_id.len() != 64
+                || !key_id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+                || !unique_keys.insert(key_id.as_str())
+            {
+                bail!("消费者可携带数据包的商户身份指纹无效");
+            }
+        }
     }
     Ok(())
 }

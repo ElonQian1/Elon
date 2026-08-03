@@ -1,5 +1,6 @@
 use anyhow::Result;
 use rusqlite::{params, OptionalExtension, Row, TransactionBehavior};
+use std::collections::BTreeSet;
 
 use crate::open_commerce_merchant_identity_model::{
     OpenCommerceMerchantIdentityKey, OpenCommercePublicMerchantIdentityKey,
@@ -112,6 +113,29 @@ impl Store {
             .into_iter()
             .map(Into::into)
             .collect())
+    }
+
+    pub(crate) fn published_open_commerce_merchant_ids_for_identity_keys(
+        &self,
+        key_ids: &[String],
+    ) -> Result<Vec<String>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT identity.merchant_id
+               FROM open_commerce_merchant_identity_keys identity
+               JOIN open_commerce_merchants merchant ON merchant.id=identity.merchant_id
+               JOIN open_commerce_directory_publications publication
+                 ON publication.merchant_id=identity.merchant_id
+              WHERE identity.key_id=?1 AND identity.status='active'
+                AND merchant.status='active' AND publication.status='published'
+              ORDER BY identity.created_at DESC LIMIT 50",
+        )?;
+        let mut merchant_ids = BTreeSet::new();
+        for key_id in key_ids.iter().take(3) {
+            let rows = stmt.query_map(params![key_id], |row| row.get::<_, String>(0))?;
+            merchant_ids.extend(rows.collect::<rusqlite::Result<Vec<_>>>()?);
+        }
+        Ok(merchant_ids.into_iter().collect())
     }
 
     pub(crate) fn revoke_open_commerce_merchant_identity_key(

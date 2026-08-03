@@ -9,8 +9,12 @@ use crate::{
 };
 
 pub(crate) const CONSUMER_PORTABILITY_EXPORT_SCHEMA: &str =
-    "open_commerce.consumer_portability_export.v3";
+    "open_commerce.consumer_portability_export.v4";
 pub(crate) const CONSUMER_PORTABILITY_PAYLOAD_SCHEMA: &str =
+    "open_commerce.consumer_portability_payload.v4";
+pub(crate) const CONSUMER_PORTABILITY_EXPORT_SCHEMA_V3: &str =
+    "open_commerce.consumer_portability_export.v3";
+pub(crate) const CONSUMER_PORTABILITY_PAYLOAD_SCHEMA_V3: &str =
     "open_commerce.consumer_portability_payload.v3";
 pub(crate) const CONSUMER_PORTABILITY_EXPORT_SCHEMA_V2: &str =
     "open_commerce.consumer_portability_export.v2";
@@ -40,6 +44,13 @@ pub(crate) struct ConsumerPortableInvocationReceipt {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct ConsumerPortableMerchantIdentityClaim {
+    pub source_merchant_id: String,
+    pub key_ids: Vec<String>,
+    pub authority: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ConsumerPortabilityPayload {
     pub schema: String,
     pub source_project_id: String,
@@ -55,6 +66,8 @@ pub(crate) struct ConsumerPortabilityPayload {
     pub invocation_receipt_scope: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub invocation_receipts: Vec<ConsumerPortableInvocationReceipt>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub merchant_identity_claims: Vec<ConsumerPortableMerchantIdentityClaim>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -81,6 +94,7 @@ pub(crate) struct ConsumerPortabilityExportSummary {
     pub preference_profile_included: bool,
     pub preference_disclosure_count: usize,
     pub invocation_receipt_count: usize,
+    pub merchant_identity_claim_count: usize,
     pub created_at: String,
 }
 
@@ -97,6 +111,7 @@ impl ConsumerPortabilityExport {
             preference_profile_included: self.payload.preference_profile.is_some(),
             preference_disclosure_count: self.payload.preference_disclosures.len(),
             invocation_receipt_count: self.payload.invocation_receipts.len(),
+            merchant_identity_claim_count: self.payload.merchant_identity_claims.len(),
             created_at: self.created_at.clone(),
         }
     }
