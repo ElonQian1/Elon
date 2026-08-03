@@ -39,6 +39,7 @@ mod compute_capacity_registry;
 mod compute_capacity_rows;
 mod compute_capacity_supply_withdrawal;
 mod compute_metering;
+mod compute_provider_registry;
 mod conversation_forks;
 mod conversations;
 pub(crate) mod default_joint_projects;
@@ -239,6 +240,7 @@ pub(crate) use compute_capacity_supply_withdrawal::{
     WithdrawComputeCapacitySupply, WithdrawComputeCapacitySupplyLine,
 };
 pub use compute_metering::ComputeMeterEvent;
+pub(crate) use compute_provider_registry::ComputeProviderRegistrationReceipt;
 pub(crate) use external_app_tool_executions::{
     AdminExternalAppToolExecutionSummary, ExternalAppToolExecutionWrite,
 };

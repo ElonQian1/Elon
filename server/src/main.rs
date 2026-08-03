@@ -50,6 +50,7 @@ mod compute_capacity_epoch_migration;
 mod compute_capacity_lifecycle_migration;
 mod compute_capacity_migration;
 mod compute_federation;
+mod compute_provider_migration;
 mod compute_usage;
 mod context_compiler;
 mod conversation_forks;
