@@ -129,17 +129,17 @@ PTY/ConPTY sidecar 仍然保留，但定位是辅助路：
 
 ```text
 AI / PC Canvas
-  -> list/open design target
-  -> headless design session
+  -> list targets / list recent sessions
+  -> resume or open project-scoped design session
   -> Web/PWA/Tauri frontend: controlled Chromium
   -> Android: Live Runtime
   -> semantic UI tree + PNG path/hash
   -> source change / existing platform writeback
 ```
 
-`ui_get_project_profile` schema v3 先返回 Web、PWA、Tauri、Android 的小型目标索引。代理无需打开 PC 页面，即可用 `ui_list_design_targets -> ui_open_design_target -> ui_capture_design_surface -> ui_get_design_surface` 完成后台发现、受限交互和证据读取。Web/PWA/Tauri 默认先读紧凑 UI 树、再按需取 PNG，避免反复传输整图；Android 不使用浏览器替代，继续走真实 Runtime。
+`ui_get_project_profile` schema v3 先返回 Web、PWA、Tauri、Android 的小型目标索引。代理无需打开 PC 页面，即可用 `ui_list_design_targets -> ui_list_design_sessions -> resume/open -> ui_capture_design_surface -> ui_get_design_surface` 完成后台发现、恢复、受限交互和证据读取。同一 canonical Git 项目的 MCP 或 Node Admin 会话共享项目内记录，不共享跨项目权限。Web/PWA/Tauri 默认先读紧凑 UI 树、再按需取 PNG，避免反复传输整图；Android 不使用浏览器替代，继续走真实 Runtime。
 
-当前 Tauri 只证明前端 WebView，不能证明原生宿主。PC 端后续应直接消费同一 `designSessionId`，实现平台切换、中间画面与默认右侧对话，不创建平行状态机。具体契约和阶段边界见 `docs/headless-ui-design-mcp.md`。
+当前 Tauri 只证明前端 WebView，不能证明原生宿主。PC `/pc/ui-tuner` 已直接消费同一 `designSessionId`，默认展示平台/会话/UI 树、中间画面和右侧持续对话；它通过 Node Admin HTTP 适配同一 MCP 调用，不创建平行状态机。具体契约和未完成的原生宿主、持久交互与统一写回边界见 `docs/headless-ui-design-mcp.md`。
 
 ## 项目理解 / RAG 架构
 

@@ -12,26 +12,27 @@ reviewed_at: 2026-08-03
 1. 后台设计数据面：AI 通过 `yilong-ui-live` MCP 发现、打开、捕获和读取项目页面。
 2. 可选可视客户端：PC 微调画布消费同一设计会话，提供中间画面、平台切换和右侧持续对话。
 
-第一部分不依赖 PC 画布是否打开。Codex 等代理可以在绑定的项目工作区中完成“找到目标 → 加载页面 → 受限交互 → 读取 UI 树 → 引用像素工件”的闭环。第二部分是后续阶段的交互增强，不是后台能力的前置条件。
+第一部分不依赖 PC 画布是否打开。Codex 等代理可以在绑定的项目工作区中完成“找到目标 → 恢复会话 → 加载页面 → 受限交互 → 读取 UI 树 → 引用像素工件”的闭环。第二部分已经作为同一数据面的 PC 客户端形成代码，但不是后台能力的前置条件。
 
 ## 2. 当前实现状态
 
-当前代码已经形成以下第一阶段能力：
+当前代码已经形成以下能力：
 
 - 发现 Web、PWA、Tauri 和 Android 设计目标，并返回来源目录、配置文件、适配器和证据级别。
-- 在项目内创建与当前 MCP 会话绑定的 `designSessionId`，无需打开 PC 画布。
+- 在项目内创建 `designSessionId`；同一 canonical Git 项目的新 MCP 会话或 PC 客户端可用 `ui_list_design_sessions` 恢复，无需保留创建时连接或打开 PC 画布。
 - Web、PWA 和 Tauri 前端复用受控无头 Chromium，执行稳定 selector 的点击、等待和文本断言。
 - 每次成功捕获同时生成 PNG 和紧凑语义 UI 树，两者都只返回绝对路径、SHA-256 和小型元数据，不返回 Base64。
 - AI 可按 selector、role、label 或 tag 查询 UI 树，默认最多读取 40 个节点，单次最多 80 个。
 - Android 继续复用既有 Android Live Runtime；Runtime 未连接时明确返回 `PREPARATION_REQUIRED`，不会用浏览器画面冒充 Android。
 - `ui_get_project_profile` 的 schema v3 包含相同的多端目标摘要，其他代理可以先读小型档案再决定调用什么工具。
+- Node Admin 提供与五个 MCP 工具同源的项目级 HTTP 适配层；PC 不复制目标发现、会话和证据状态机。
+- PC `/pc/ui-tuner` 默认进入“多端后台”：左侧平台/会话/UI 树，中间 PNG 与语义选区，右侧常驻项目 Codex 对话。用户可选择节点或重放稳定 selector 的后台点击；AI 消息携带 route、selector、工件路径与哈希，不嵌入 Base64。
 
 本阶段尚未实现或尚未验证：
 
 - Tauri 原生宿主窗口、系统菜单、原生对话框和 Rust command 的运行时证据。
 - Web/PWA/Tauri 共用的持久浏览器进程与跨捕获会话状态；当前每次捕获仍使用独立临时浏览器 profile。
 - 通用多端设计草稿、撤销栈、源码绑定和写回回执；现有 Android Live Patch 与 PWA/APK 源码闭环仍保持各自契约。
-- PC 画布的平台切换器、中央会话画面和默认常驻右侧聊天对新后台会话的消费。
 - 真机、模拟器、Tauri 原生窗口、人工视觉、完整 E2E 或发布验收。
 
 因此，当前 Tauri 证据必须标记为 `TAURI_FRONTEND_WEBVIEW_ONLY`，`nativeHostVerified=false`；文档和 UI 都不得把它表述为 Tauri 原生宿主已经通过。
@@ -40,7 +41,8 @@ reviewed_at: 2026-08-03
 
 ```text
 ui_list_design_targets
-  -> ui_open_design_target(platform, route, url?, viewport?)
+  -> ui_list_design_sessions(limit?)
+  -> 恢复已有 designSessionId 或 ui_open_design_target(platform, route, url?, viewport?)
   -> ui_capture_design_surface(designSessionId, capture)
   -> ui_get_design_surface(designSessionId, query?, limit?)
 ```
@@ -49,7 +51,7 @@ ui_list_design_targets
 
 1. MCP 会话必须绑定项目 `EDIT_ROOT`。
 2. 先枚举目标，不凭目录名称猜测平台。
-3. `ui_open_design_target` 只打开后台会话，不启动 PC 画布。
+3. 先尝试恢复同项目最近会话；目标、route 或 URL 改变时再 `ui_open_design_target`。它只打开后台会话，不启动 PC 画布。
 4. Web/PWA/Tauri 捕获参数复用 `ui_capture_pwa_runtime` 的 URL、认证、fixture、viewport 和受限 steps 契约。
 5. Android 返回准备要求时，继续走 `ui_get_runtime_status`、`ui_prepare_debug_runtime`、`ui_get_screen_summary` 和 `ui_get_current_crop`。
 6. 默认先读取语义 UI 树；只有布局、颜色、间距或像素差需要视觉判断时，再按路径读取 PNG。
@@ -91,7 +93,8 @@ ui_list_design_targets
 记录包含平台、目标、route、脱敏 URL、viewport、状态、最近证据引用和时间戳。它必须同时满足：
 
 - `designSessionId` 使用固定格式并通过路径校验。
-- 记录只能由创建它的 MCP session 读取或继续操作。
+- 记录只能由绑定同一 canonical Git 项目的 MCP/Node Admin 会话读取或继续操作；`mcpSessionId` 只保留创建者审计，不是长期所有权边界。
+- `designSessionId` 是不可猜测 UUID，所有读写仍需项目级本机 Admin/MCP 访问权；仅知道 ID 不获得跨项目读取权。
 - 会话目录 canonical path 必须位于项目根内。
 - URL 只允许无用户名和密码的 http(s)，query 疑似含 token、secret、password、authorization、signature 或 api_key 时失败关闭。
 - 项目工作区是会话状态与工件的唯一落点；不创建供应商私有真源。
@@ -129,9 +132,9 @@ Web/PWA/Tauri 前端捕获会在 PNG 旁生成 `.ui.json`。语义树单个工�
 
 平台覆盖必须单独声明。浏览器证据不能证明 Android Runtime，Tauri 前端证据不能证明原生宿主，模拟器不能冒充用户要求的真机。
 
-## 8. 与 PC 微调画布的目标关系
+## 8. 与 PC 微调画布的关系
 
-PC 端后续应成为后台会话的客户端，而不是第二套状态机：
+PC 端现在是后台会话的可选客户端，而不是第二套状态机：
 
 ```text
 用户自然语言
@@ -143,16 +146,16 @@ PC 端后续应成为后台会话的客户端，而不是第二套状态机：
   -> 同一 session 重新捕获证据
 ```
 
-建议界面保持三个稳定区域：左侧项目/页面/平台导航，中间实际页面与选区，右侧默认打开的 AI 对话。用户说“修改 Web 登录页”或“看 Tauri 设置页”时，代理先切换后台目标和 route，再让画布订阅该 session；用户不打开画布时，同一工具链仍可完全后台运行。
+当前界面保持三个稳定区域：左侧平台、最近会话和紧凑 UI 树，中间实际像素证据与语义选区，右侧默认打开的 AI 对话。用户说“修改 Web 登录页”或“看 Tauri 设置页”时，客户端或代理先切换后台目标和 route，再读取/捕获同一 session；用户不打开画布时，同一工具链仍可完全后台运行。
 
-PC 接入时必须复用 `designSessionId`、平台覆盖和证据引用，不在浏览器 local state 里重新定义“当前页面”。对话记录引用 selector、route、源码绑定和工件哈希，不内嵌整张 PNG。
+PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作为设计真源。项目 session JSON、平台覆盖和证据引用来自 Node 数据面；对话 context pack 引用 selector、route、源码候选和工件哈希，不内嵌整张 PNG。中间语义框单击用于选择；“后台点击”会在新的隔离浏览器中重放稳定 selector 并重新捕获，不声称维持长期登录态。
 
 ## 9. 下一阶段顺序
 
 1. Tauri Runtime Adapter：管理 dev server/Tauri 生命周期，区分 WebView DOM、窗口和原生宿主证据。
 2. Stateful Interaction：在受控权限下维持浏览器会话，支持导航、表单非秘密值和更细的可访问性操作。
 3. Design Draft：统一 selector/node/source binding、可撤销 patch、平台覆盖和 writeback receipt。
-4. PC Canvas Client：平台切换、中央实时画面、选区同步、默认右侧聊天与会话恢复。
+4. Design Writeback：让 AI 修改后的源码 revision、平台验证结果和失败边界形成统一机器回执。
 5. 验证矩阵：分别执行 Web/PWA 浏览器、Tauri 原生窗口、Android 隔离模拟器，以及用户明确要求后的真机复核。
 
 每一阶段都先扩展相同 MCP 契约；不得通过让代理操控 Windows 桌面来绕过缺失的数据面。
@@ -163,9 +166,13 @@ PC 接入时必须复用 `designSessionId`、平台覆盖和证据引用，不�
 
 - `file:server/src/node_agent_android_live/design_target_discovery.rs`
 - `file:server/src/node_agent_android_live/design_targets.rs`
+- `file:server/src/node_agent_android_live/design_session_store.rs`
+- `file:server/src/node_agent_android_live/design_http.rs`
 - `file:server/src/node_agent_pwa_runtime/semantic_tree.rs`
 - `file:server/src/node_agent_pwa_runtime/artifact.rs`
 - `file:server/src/node_agent_ui_design_workspace.rs`
+- `file:pc-frontend/src/features/ui-tuner/headless-design/`
+- `file:pc-frontend/src/features/ui-tuner/UiTunerConversationDrawer.tsx`
 - `symbol:node_agent_android_live::design_targets::tool_definitions`
 - `symbol:node_agent_android_live::design_targets::call`
 - `symbol:node_agent_ui_design_workspace::build_project_ui_profile`
