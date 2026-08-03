@@ -94,10 +94,14 @@ async fn prepare_developer(
     headers: HeaderMap,
     Json(request): Json<DeveloperInvokeRequest>,
 ) -> Response {
-    let app = match developer_app(&state, &headers) {
+    let credential = match developer_credential(&state, &headers) {
         Ok(value) => value,
         Err(response) => return response,
     };
+    if let Err(error) = credential.ensure_scope(&request.capability_key) {
+        return service_error(error);
+    }
+    let app = &credential.app;
     let merchant = match state.store.open_commerce_merchant(&request.merchant_id) {
         Ok(value) => value,
         Err(error) => return service_error(error),
@@ -129,10 +133,24 @@ async fn confirm_developer(
     Path(confirmation_id): Path<String>,
     Json(request): Json<ConfirmActionConfirmationRequest>,
 ) -> Response {
-    let app = match developer_app(&state, &headers) {
+    let credential = match developer_credential(&state, &headers) {
         Ok(value) => value,
         Err(response) => return response,
     };
+    let confirmation = match state
+        .store
+        .open_commerce_action_confirmation(&confirmation_id)
+    {
+        Ok(value) => value,
+        Err(error) => return service_error(error),
+    };
+    if confirmation.requester_app_id != credential.app.app_id {
+        return json_error(StatusCode::FORBIDDEN, "动作确认不属于当前开发者应用");
+    }
+    if let Err(error) = credential.ensure_scope(&confirmation.capability_key) {
+        return service_error(error);
+    }
+    let app = &credential.app;
     service_response(open_commerce_action_confirmation_service::confirm(
         &state.store,
         &OpenCommerceActor {
@@ -160,14 +178,17 @@ fn authenticated_actor_identity(
     Ok((user.id, app_id))
 }
 
-fn developer_app(
+fn developer_credential(
     state: &AppState,
     headers: &HeaderMap,
-) -> Result<crate::open_commerce_developer_model::OpenCommerceDeveloperApp, Response> {
+) -> Result<
+    crate::open_commerce_developer_credential_model::AuthenticatedDeveloperCredential,
+    Response,
+> {
     let token = bearer_token(headers)?;
     state
         .store
-        .authenticate_open_commerce_developer_app(&token)
+        .authenticate_open_commerce_developer_credential(&token)
         .map_err(|error| json_error(StatusCode::UNAUTHORIZED, error))
 }
 
@@ -178,7 +199,7 @@ fn bearer_token(headers: &HeaderMap) -> Result<String, Response> {
         .and_then(|value| value.strip_prefix("Bearer "))
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| json_error(StatusCode::UNAUTHORIZED, "缺少测试应用凭据"))?;
+        .ok_or_else(|| json_error(StatusCode::UNAUTHORIZED, "缺少开发者应用凭据"))?;
     Ok(value.to_string())
 }
 
@@ -200,6 +221,7 @@ fn service_error(error: anyhow::Error) -> Response {
     {
         StatusCode::CONFLICT
     } else if app_blocked
+        || message.contains("生产凭据")
         || message.contains("权限")
         || message.contains("授权")
         || message.contains("不属于")

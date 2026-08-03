@@ -1,4 +1,4 @@
-//! Test-token authenticated terminal invocation event feed for developer Apps.
+//! Current test- or production-credential terminal event feed for developer Apps.
 
 use axum::{
     extract::{Path, Query, State},
@@ -32,13 +32,13 @@ async fn list_terminal_events(
     headers: HeaderMap,
     Query(query): Query<DeveloperTerminalEventQuery>,
 ) -> Response {
-    let app = match authenticated_app(&state, &headers) {
-        Ok(app) => app,
+    let credential = match authenticated_credential(&state, &headers) {
+        Ok(credential) => credential,
         Err(response) => return response,
     };
     service_response(open_commerce_developer_event_service::list_terminal_events(
         &state.store,
-        &app,
+        &credential.app,
         query,
     ))
 }
@@ -48,27 +48,30 @@ async fn terminal_event_detail(
     headers: HeaderMap,
     Path(invocation_id): Path<String>,
 ) -> Response {
-    let app = match authenticated_app(&state, &headers) {
-        Ok(app) => app,
+    let credential = match authenticated_credential(&state, &headers) {
+        Ok(credential) => credential,
         Err(response) => return response,
     };
     service_response(
         open_commerce_developer_event_service::terminal_event_detail(
             &state.store,
-            &app,
+            &credential.app,
             &invocation_id,
         ),
     )
 }
 
-fn authenticated_app(
+fn authenticated_credential(
     state: &AppState,
     headers: &HeaderMap,
-) -> Result<crate::open_commerce_developer_model::OpenCommerceDeveloperApp, Response> {
+) -> Result<
+    crate::open_commerce_developer_credential_model::AuthenticatedDeveloperCredential,
+    Response,
+> {
     let token = bearer_token(headers)?;
     state
         .store
-        .authenticate_open_commerce_developer_app(&token)
+        .authenticate_open_commerce_developer_credential(&token)
         .map_err(|error| json_error(StatusCode::UNAUTHORIZED, error))
 }
 

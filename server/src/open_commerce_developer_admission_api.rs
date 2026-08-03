@@ -16,6 +16,7 @@ use crate::{
         ReviewDeveloperAppAdmissionRequest, SubmitDeveloperAppAdmissionRequest,
     },
     open_commerce_developer_admission_service as service,
+    open_commerce_developer_credential_model::production_credentials_enabled,
     open_commerce_service::OpenCommerceActor,
     project_auth::{auth_from_headers, json_error, project_access},
     types::AppState,
@@ -53,11 +54,14 @@ async fn current_admission(
     service_response(
         service::current_admission(&state.store, &project_id, &app_record_id, &actor(&caller)).map(
             |admission| {
+                let production_credential_issued = admission
+                    .as_ref()
+                    .is_some_and(|value| value.production_credential_issued);
                 json!({
                     "schema": "open_commerce.developer_app_admission_state.v1",
                     "admission": admission,
-                    "production_credential_issued": false,
-                    "network_access_enabled": false,
+                    "production_credential_issued": production_credential_issued,
+                    "network_access_enabled": production_credential_issued && production_credentials_enabled(),
                 })
             },
         ),
@@ -95,7 +99,7 @@ async fn list_reviewable_admissions(
             json!({
                 "schema": "open_commerce.developer_app_admission_review_queue.v1",
                 "items": items,
-                "production_credential_issued": false,
+                "production_credentials_enabled": production_credentials_enabled(),
             })
         }),
     )

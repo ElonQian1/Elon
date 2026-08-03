@@ -337,10 +337,17 @@ async fn developer_invoke(
         Ok(token) => token,
         Err(response) => return response,
     };
-    let app = match state.store.authenticate_open_commerce_developer_app(&token) {
-        Ok(app) => app,
+    let credential = match state
+        .store
+        .authenticate_open_commerce_developer_credential(&token)
+    {
+        Ok(credential) => credential,
         Err(error) => return json_error(StatusCode::UNAUTHORIZED, error),
     };
+    if let Err(error) = credential.ensure_scope(&request.capability_key) {
+        return service_error(error);
+    }
+    let app = &credential.app;
     let merchant = match state.store.open_commerce_merchant(&request.merchant_id) {
         Ok(merchant) => merchant,
         Err(error) => return service_error(error),
@@ -392,7 +399,7 @@ pub(crate) fn bearer_token(headers: &HeaderMap) -> Result<String, Response> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_string)
-        .ok_or_else(|| json_error(StatusCode::UNAUTHORIZED, "缺少开发者测试凭据"))
+        .ok_or_else(|| json_error(StatusCode::UNAUTHORIZED, "缺少开发者应用凭据"))
 }
 
 fn service_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response {
@@ -417,7 +424,10 @@ fn service_error(error: anyhow::Error) -> Response {
         StatusCode::TOO_MANY_REQUESTS
     } else if app_blocked || grant_budget_exceeded {
         StatusCode::FORBIDDEN
-    } else if message.contains("权限") || message.contains("不能代表") {
+    } else if message.contains("生产凭据")
+        || message.contains("权限")
+        || message.contains("不能代表")
+    {
         StatusCode::FORBIDDEN
     } else if message.contains("不存在") {
         StatusCode::NOT_FOUND

@@ -144,6 +144,12 @@ impl Store {
               WHERE app_record_id=?2 AND status IN ('submitted', 'approved')",
             params![timestamp, current.id],
         )?;
+        super::open_commerce_developer_credentials::revoke_active_production_credentials(
+            &tx,
+            &current.id,
+            "developer_app_disabled",
+            &timestamp,
+        )?;
         tx.commit()?;
         drop(conn);
         Ok((

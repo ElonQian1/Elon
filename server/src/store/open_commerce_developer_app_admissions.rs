@@ -3,7 +3,10 @@
 use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension, Row};
 
-use crate::open_commerce_developer_admission_model::DeveloperAppAdmission;
+use crate::{
+    open_commerce_developer_admission_model::DeveloperAppAdmission,
+    open_commerce_developer_credential_model::production_credentials_enabled,
+};
 
 use super::{new_id, now, Store};
 
@@ -148,7 +151,9 @@ impl Store {
         } else {
             "submitted"
         };
-        let changed = self.conn()?.execute(
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let changed = tx.execute(
             "UPDATE open_commerce_developer_app_admissions
                 SET status=?1, reviewed_at=?2, reviewed_by_user_id=?3,
                     review_note=?4,
@@ -181,12 +186,23 @@ impl Store {
         if changed != 1 {
             bail!("准入申请已变化、已被处理或不再满足当前资料条件");
         }
+        if decision == "suspended" {
+            super::open_commerce_developer_credentials::revoke_active_production_credentials(
+                &tx,
+                app_record_id,
+                "admission_suspended",
+                &timestamp,
+            )?;
+        }
+        tx.commit()?;
+        drop(conn);
         self.open_commerce_developer_app_admission(app_record_id)?
             .ok_or_else(|| anyhow!("准入审核结果不可读取"))
     }
 }
 
 fn admission_from_row(row: &Row<'_>) -> rusqlite::Result<DeveloperAppAdmission> {
+    let production_credential_issued: bool = row.get(17)?;
     Ok(DeveloperAppAdmission {
         schema: "open_commerce.developer_app_admission.v1",
         id: row.get(0)?,
@@ -204,8 +220,8 @@ fn admission_from_row(row: &Row<'_>) -> rusqlite::Result<DeveloperAppAdmission> 
         review_note: row.get(12)?,
         risk_tier: row.get(13)?,
         suspended_at: row.get(14)?,
-        production_credential_issued: false,
-        network_access_enabled: false,
+        production_credential_issued,
+        network_access_enabled: production_credential_issued && production_credentials_enabled(),
         created_at: row.get(15)?,
         updated_at: row.get(16)?,
     })
@@ -214,5 +230,10 @@ fn admission_from_row(row: &Row<'_>) -> rusqlite::Result<DeveloperAppAdmission> 
 const ADMISSION_SELECT: &str = "SELECT id, app_record_id, project_id, manifest_revision,
             organization_name, jurisdiction, registration_id, attested_at,
             status, requested_at, reviewed_at, reviewed_by_user_id,
-            review_note, risk_tier, suspended_at, created_at, updated_at
+            review_note, risk_tier, suspended_at, created_at, updated_at,
+            EXISTS(
+                SELECT 1 FROM open_commerce_developer_production_credentials credential
+                 WHERE credential.app_record_id=open_commerce_developer_app_admissions.app_record_id
+                   AND credential.status='active'
+            )
        FROM open_commerce_developer_app_admissions";

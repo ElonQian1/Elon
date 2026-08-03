@@ -63,6 +63,12 @@ impl Store {
               WHERE app_record_id=?2 AND status IN ('submitted', 'approved')",
             params![timestamp, app_record_id.trim()],
         )?;
+        super::open_commerce_developer_credentials::revoke_active_production_credentials(
+            &tx,
+            app_record_id,
+            "manifest_revision_changed",
+            &timestamp,
+        )?;
         tx.commit()?;
         drop(conn);
         self.open_commerce_developer_app_for_project(project_id, app_record_id)

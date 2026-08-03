@@ -17,7 +17,10 @@ impl Store {
         challenge_hash: &str,
         expires_at: &str,
     ) -> Result<OpenCommerceDeveloperApp> {
-        let changed = self.conn()?.execute(
+        let timestamp = now();
+        let mut conn = self.conn()?;
+        let tx = conn.transaction()?;
+        let changed = tx.execute(
             "UPDATE open_commerce_developer_apps
                 SET domain_verification_status='pending',
                     domain_verification_host=?1,
@@ -33,7 +36,7 @@ impl Store {
                 verification_host.trim(),
                 challenge_hash.trim(),
                 expires_at.trim(),
-                now(),
+                timestamp,
                 project_id.trim(),
                 app_record_id.trim(),
                 expected_revision,
@@ -42,6 +45,14 @@ impl Store {
         if changed != 1 {
             bail!("App 资料已变化、主页缺失或应用已停用，请刷新后重试");
         }
+        super::open_commerce_developer_credentials::revoke_active_production_credentials(
+            &tx,
+            app_record_id,
+            "domain_reverification_started",
+            &timestamp,
+        )?;
+        tx.commit()?;
+        drop(conn);
         self.open_commerce_developer_app_for_project(project_id, app_record_id)
     }
 
