@@ -18,6 +18,8 @@ mod debug_package;
 mod deployment_serialization;
 mod design_bootstrap;
 mod design_diff_regions;
+mod design_target_discovery;
+mod design_targets;
 mod desktop_task;
 mod emulator_start;
 mod fit_learning;
@@ -60,6 +62,8 @@ mod window_insets_sequence;
 mod debug_integration_tests;
 #[cfg(test)]
 mod design_diff_regions_tests;
+#[cfg(test)]
+mod design_targets_tests;
 #[cfg(test)]
 mod mcp_tests;
 #[cfg(test)]
