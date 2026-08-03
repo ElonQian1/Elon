@@ -520,6 +520,13 @@ export const openCommerceClientApi = {
       { 'x-elon-app-id': appId },
     ),
 
+  cancelActionConfirmation: (appId: string, confirmationId: string) =>
+    api.postWithHeaders<OpenCommerceActionConfirmation>(
+      `/api/open-commerce/action-confirmations/${encodeURIComponent(confirmationId)}/cancel`,
+      { confirmation_phrase: 'CANCEL_ACTION' },
+      { 'x-elon-app-id': appId },
+    ),
+
   developerPrepareActionConfirmation: (testToken: string, request: DeveloperInvokeRequest) =>
     api.postWithHeaders<OpenCommerceActionConfirmation>(
       '/api/open-commerce/developer/action-confirmations',
@@ -531,6 +538,13 @@ export const openCommerceClientApi = {
     api.postWithHeaders<OpenCommerceActionConfirmation>(
       `/api/open-commerce/developer/action-confirmations/${encodeURIComponent(confirmationId)}/confirm`,
       { confirmation_phrase: 'CONFIRM_ACTION' },
+      { Authorization: `Bearer ${testToken}` },
+    ),
+
+  developerCancelActionConfirmation: (testToken: string, confirmationId: string) =>
+    api.postWithHeaders<OpenCommerceActionConfirmation>(
+      `/api/open-commerce/developer/action-confirmations/${encodeURIComponent(confirmationId)}/cancel`,
+      { confirmation_phrase: 'CANCEL_ACTION' },
       { Authorization: `Bearer ${testToken}` },
     ),
 

@@ -562,6 +562,7 @@ export interface OpenCommerceActionConfirmation {
   idempotency_key: string
   status: 'pending' | 'confirmed' | 'consumed' | 'expired'
   expires_at: string
+  canceled_at?: string
 }
 
 export interface UpsertOpenCommerceRateLimit {

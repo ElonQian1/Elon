@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, KeyRound, Play, RefreshCw, Search } from 'lucide-react'
+import { Download, KeyRound, Play, RefreshCw, Search, X } from 'lucide-react'
 import { openCommerceApi } from './openCommerceApi'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import ConsumerRelationshipManager from './ConsumerRelationshipManager'
@@ -26,6 +26,7 @@ import type {
   DirectoryCapability,
   OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
+import type { OpenCommerceActionConfirmation } from './openCommerceTypes'
 import { errorText, formatMicros, splitValues } from './openCommerceUi'
 import base from './OpenCommercePanel.module.css'
 import {
@@ -35,6 +36,13 @@ import {
   errorMessageStyle,
   listItemStyle,
 } from './openCommerceStyles'
+
+interface PendingActionConfirmation {
+  confirmation: OpenCommerceActionConfirmation
+  appId: string
+  merchantLabel: string
+  capabilityLabel: string
+}
 
 export default function ConsumerCommerceSandbox({ projectId }: { projectId: string }) {
   const [apps, setApps] = useState<OpenCommerceDeveloperApp[]>([])
@@ -64,6 +72,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   const [message, setMessage] = useState('')
   const [receiptRefreshKey, setReceiptRefreshKey] = useState(0)
   const [selectedMatch, setSelectedMatch] = useState<ConsumerDiscoveryMatch | null>(null)
+  const [pendingActionConfirmation, setPendingActionConfirmation] = useState<PendingActionConfirmation | null>(null)
 
   const loadApps = useCallback(async () => {
     try {
@@ -207,9 +216,21 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         const prepared = appId === 'pc-web'
           ? await openCommerceApi.prepareActionConfirmation(request)
           : await openCommerceClientApi.prepareActionConfirmation(appId, request)
+        setPendingActionConfirmation({
+          confirmation: prepared,
+          appId,
+          merchantLabel: match.merchant.display_name,
+          capabilityLabel: match.capability.display_name,
+        })
         const confirmed = appId === 'pc-web'
           ? await openCommerceApi.confirmActionConfirmation(prepared.id)
           : await openCommerceClientApi.confirmActionConfirmation(appId, prepared.id)
+        setPendingActionConfirmation({
+          confirmation: confirmed,
+          appId,
+          merchantLabel: match.merchant.display_name,
+          capabilityLabel: match.capability.display_name,
+        })
         actionConfirmationId = confirmed.id
       }
       const response = appId === 'pc-web'
@@ -219,12 +240,37 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
             action_confirmation_id: actionConfirmationId,
           })
       setInvocation(response)
+      setPendingActionConfirmation(null)
       setReceiptRefreshKey((value) => value + 1)
       setMessage('调用已完成，结果和本人调用凭证已更新。')
       return true
     } catch (error) {
       setMessage(errorText(error))
       return false
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function cancelPendingActionConfirmation() {
+    const pending = pendingActionConfirmation
+    if (!pending) return
+    setBusy(true)
+    setMessage('')
+    try {
+      if (pending.appId === 'pc-web') {
+        await openCommerceApi.cancelActionConfirmation(pending.confirmation.id)
+      } else {
+        await openCommerceClientApi.cancelActionConfirmation(
+          pending.appId,
+          pending.confirmation.id,
+        )
+      }
+      setPendingActionConfirmation(null)
+      setSelectedMatch(null)
+      setMessage('本次经营操作已取消，没有创建新的调用。')
+    } catch (error) {
+      setMessage(errorText(error))
     } finally {
       setBusy(false)
     }
@@ -248,7 +294,11 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
           <form className={base.formCard} style={commerceStyles.sectionBody} onSubmit={(event) => { event.preventDefault(); discover() }}>
             <label>
               请求应用
-              <select value={appId} onChange={(event) => { setAppId(event.target.value); setSelectedMatch(null) }}>
+              <select
+                value={appId}
+                onChange={(event) => { setAppId(event.target.value); setSelectedMatch(null) }}
+                disabled={busy || Boolean(pendingActionConfirmation)}
+              >
                 <option value="pc-web">公共网页身份（仅公开能力）</option>
                 {activeApps.map((app) => <option key={app.id} value={app.app_id}>{app.display_name}</option>)}
               </select>
@@ -382,7 +432,15 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
                       </button>
                     )}
                     {['not_required', 'granted'].includes(match.authorization.status) && (
-                      <button style={actionStyle('primary', busy)} type="button" onClick={() => setSelectedMatch(match)} disabled={busy}>
+                      <button
+                        style={actionStyle(
+                          'primary',
+                          busy || (match.capability.kind === 'action' && Boolean(pendingActionConfirmation)),
+                        )}
+                        type="button"
+                        onClick={() => setSelectedMatch(match)}
+                        disabled={busy || (match.capability.kind === 'action' && Boolean(pendingActionConfirmation))}
+                      >
                         <Play size={13} />填写并调用
                       </button>
                     )}
@@ -404,6 +462,32 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
           onCancel={() => setSelectedMatch(null)}
           onInvoke={invoke}
         />
+      )}
+
+      {pendingActionConfirmation && (
+        <section className={base.integrationSection}>
+          <header>
+            <strong>待处理经营操作</strong>
+            <span style={badgeStyle('danger')} data-tone="danger">等待处理</span>
+          </header>
+          <div style={commerceStyles.sectionBody}>
+            <p style={commerceStyles.itemText}>
+              {pendingActionConfirmation.merchantLabel} · {pendingActionConfirmation.capabilityLabel}
+            </p>
+            <small style={commerceStyles.itemMeta}>
+              调用未完成。可以保留相同幂等键重试，或明确取消本次动作确认。
+            </small>
+            <button
+              style={actionStyle('secondary', busy)}
+              type="button"
+              onClick={cancelPendingActionConfirmation}
+              disabled={busy}
+              title="取消本次经营操作"
+            >
+              <X size={14} />取消本次动作
+            </button>
+          </div>
+        </section>
       )}
 
       <ConsumerPreferenceProfilePanel

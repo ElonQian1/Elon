@@ -31,12 +31,20 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(confirm_authenticated),
         )
         .route(
+            "/api/open-commerce/action-confirmations/:confirmation_id/cancel",
+            post(cancel_authenticated),
+        )
+        .route(
             "/api/open-commerce/developer/action-confirmations",
             post(prepare_developer),
         )
         .route(
             "/api/open-commerce/developer/action-confirmations/:confirmation_id/confirm",
             post(confirm_developer),
+        )
+        .route(
+            "/api/open-commerce/developer/action-confirmations/:confirmation_id/cancel",
+            post(cancel_developer),
         )
 }
 
@@ -78,6 +86,28 @@ async fn confirm_authenticated(
         Err(response) => return response,
     };
     service_response(open_commerce_action_confirmation_service::confirm(
+        &state.store,
+        &OpenCommerceActor {
+            user_id: &user_id,
+            app_id: &app_id,
+            project_role: None,
+        },
+        &confirmation_id,
+        &request.confirmation_phrase,
+    ))
+}
+
+async fn cancel_authenticated(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(confirmation_id): Path<String>,
+    Json(request): Json<ConfirmActionConfirmationRequest>,
+) -> Response {
+    let (user_id, app_id) = match authenticated_actor_identity(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    service_response(open_commerce_action_confirmation_service::cancel(
         &state.store,
         &OpenCommerceActor {
             user_id: &user_id,
@@ -172,6 +202,50 @@ async fn confirm_developer(
     }
     let app = &credential.app;
     service_response(open_commerce_action_confirmation_service::confirm(
+        &state.store,
+        &OpenCommerceActor {
+            user_id: &app.owner_user_id,
+            app_id: &app.app_id,
+            project_role: None,
+        },
+        &confirmation_id,
+        &request.confirmation_phrase,
+    ))
+}
+
+async fn cancel_developer(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(confirmation_id): Path<String>,
+    Json(request): Json<ConfirmActionConfirmationRequest>,
+) -> Response {
+    let credential = match developer_credential(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let app = &credential.app;
+    let confirmation = match state.store.open_commerce_action_confirmation_for_actor(
+        &confirmation_id,
+        &app.owner_user_id,
+        &app.app_id,
+    ) {
+        Ok(value) => value,
+        Err(error) => return service_error(error),
+    };
+    if let Err(error) = credential.ensure_scope(&confirmation.capability_key) {
+        return service_error(error);
+    }
+    let capability = match state
+        .store
+        .open_commerce_capability(&confirmation.capability_id)
+    {
+        Ok(value) => value,
+        Err(error) => return service_error(error),
+    };
+    if let Err(error) = credential.ensure_runtime_access(&capability.handler_type) {
+        return service_error(error);
+    }
+    service_response(open_commerce_action_confirmation_service::cancel(
         &state.store,
         &OpenCommerceActor {
             user_id: &app.owner_user_id,

@@ -97,6 +97,12 @@ export const openCommerceApi = {
       { confirmation_phrase: 'CONFIRM_ACTION' },
     ),
 
+  cancelActionConfirmation: (confirmationId: string) =>
+    api.post<OpenCommerceActionConfirmation>(
+      `/api/open-commerce/action-confirmations/${encodeURIComponent(confirmationId)}/cancel`,
+      { confirmation_phrase: 'CANCEL_ACTION' },
+    ),
+
   createIntegration: (projectId: string, request: CreateOpenCommerceIntegration) =>
     api.post<OpenCommerceIntegration>(`${projectBase(projectId)}/integrations`, request),
 
