@@ -71,7 +71,7 @@ Provider 发布的不可变版本，包含支持的任务类型、模型/工件�
 
 共享 CapacityPool 和追加式容量账本已经成为已接受设计，权威决定见 `docs/decisions/distributed-compute-capacity-ledger-v1.md`，完整对象与事务边界见 `docs/distributed-compute/capacity-ledger.md`。CapacityPool 表达会互相争用的物理资源边界，不保存实时余额；同一物理资源的全部 Offer 必须绑定同一 pool/epoch/bucket，防止跨模型、SKU 或销售渠道重复出售。
 
-V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v172 SQLite schema，以及隔离的容量、Provider、Offer、不可变 Price Snapshot 和版本化 Job Store 已经写入但未编译、未执行迁移；预算统一 Reserve、报价生成、快照与 Reservation 原子锁定、Broker 与运行协议接线仍未实现。
+V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v174 SQLite schema，以及隔离的容量、Provider、Offer、不可变 Price Snapshot、版本化 Job 和 Reservation Store 已经写入但未编译、未执行迁移；预算统一 Reserve、报价生成、Broker 与运行协议接线仍未实现。
 
 ### WorkloadSpec
 
@@ -85,7 +85,9 @@ V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多�
 
 ### ComputeReservation
 
-在派发前原子占用所选 Offer 背后的容量和消费者预算。Reservation 有明确的到期时间；失败或到期后幂等释放。Offer Registry 与 Broker 落地后，实时剩余量必须从所选 Pool 和精确半开窗口的原子容量账本得出，而不是从 Provider 包络、Offer 静态字段或候选观察结果反推。
+在派发前原子占用所选 Offer 背后的容量和消费者预算。Reservation 有明确的到期时间；失败或到期后幂等释放。实时剩余量必须从所选 Pool 和精确半开窗口的原子容量账本得出，而不是从 Provider 包络、Offer 静态字段或候选观察结果反推。
+
+当前 `implementation_uncompiled` 的 v173/v174 已形成 Capacity Claim 不可变版本历史和 ComputeReservation 版本注册表。Reservation 精确绑定 Job、Offer、Price Snapshot 与 Claim revision/digest，使用消费者级幂等、`expected_revision`、revision/digest CAS、受限状态机和完整历史依赖审计。该 Store 只验证并登记调用方已经准备好的依赖，不会自行 hold Claim、冻结消费者预算或移动账本余额，因此不能把独立 `register_compute_reservation` 描述成原子 Broker Reserve。
 
 ### ComputeAttemptLease
 
@@ -167,4 +169,4 @@ Adapter 必须把外部错误归一为稳定错误码，并保存原始 Provider
 
 ## 9. 当前未验证声明
 
-本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；Provider/Offer、Attempt command/events、CapacityPool、Claim、账本 reducer 和 v165 schema 都尚未编译或接线，数据库迁移也未执行。文档、合同或 migration 文件存在不代表运行时已经采用这些能力。
+本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；Provider/Offer、Attempt command/events、CapacityPool、Claim/Reservation、账本 reducer 和 v165-v174 schema 都尚未编译或接线，数据库迁移也未执行。文档、合同或 migration 文件存在不代表运行时已经采用这些能力。
