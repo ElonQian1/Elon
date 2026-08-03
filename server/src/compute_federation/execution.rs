@@ -96,6 +96,7 @@ pub(crate) struct ComputeReservation {
     pub consumer_authorization_ref: String,
     pub status: String,
     pub created_at: String,
+    pub updated_at: String,
     pub expires_at: String,
     pub consumed_at: Option<String>,
     pub released_at: Option<String>,
