@@ -166,15 +166,8 @@ impl Store {
             bail!("算力提供者 ID 不能为空");
         }
         let conn = self.conn()?;
-        let (projection, stored) = current_provider_version_on(&conn, provider_id.trim())?
-            .ok_or_else(|| anyhow!("算力提供者不存在"))?;
-        let provider = audited_provider(&projection, &stored)?;
-        let provider_digest = stored.provider_digest;
-        Ok(ComputeProviderRegistrationReceipt {
-            provider,
-            provider_digest,
-            replayed: false,
-        })
+        current_registered_provider_on(&conn, provider_id.trim())?
+            .ok_or_else(|| anyhow!("算力提供者不存在"))
     }
 }
 
@@ -182,6 +175,21 @@ impl Store {
 struct StoredProviderVersion {
     provider_digest: String,
     provider_json: String,
+}
+
+pub(super) fn current_registered_provider_on(
+    conn: &Connection,
+    provider_id: &str,
+) -> Result<Option<ComputeProviderRegistrationReceipt>> {
+    let Some((projection, stored)) = current_provider_version_on(conn, provider_id)? else {
+        return Ok(None);
+    };
+    let provider = audited_provider(&projection, &stored)?;
+    Ok(Some(ComputeProviderRegistrationReceipt {
+        provider,
+        provider_digest: stored.provider_digest,
+        replayed: false,
+    }))
 }
 
 fn current_projection_on(
