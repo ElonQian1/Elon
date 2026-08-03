@@ -6,11 +6,12 @@ use serde_json::{json, Value};
 
 use super::broker::LiveUiSession;
 use super::design_session_store::{
-    persist_record, read_record, read_verified_tree, validate_design_session_id,
-    DesignSessionRecord,
+    list_records, persist_record, read_record, read_verified_pixels, read_verified_tree,
+    validate_design_session_id, DesignSessionRecord, VerifiedPixelArtifact,
 };
 
 const LIST_TOOL: &str = "ui_list_design_targets";
+const LIST_SESSIONS_TOOL: &str = "ui_list_design_sessions";
 const OPEN_TOOL: &str = "ui_open_design_target";
 const CAPTURE_TOOL: &str = "ui_capture_design_surface";
 const GET_TOOL: &str = "ui_get_design_surface";
@@ -60,15 +61,26 @@ pub(super) struct DesignTarget {
 }
 
 pub(super) fn tool_definitions() -> Vec<Value> {
-    let capture_schema = crate::node_agent_pwa_runtime::tool_definition()
+    let mut capture_schema = crate::node_agent_pwa_runtime::tool_definition()
         .get("inputSchema")
         .cloned()
         .unwrap_or_else(|| json!({"type":"object"}));
+    if let Some(schema) = capture_schema.as_object_mut() {
+        schema.remove("required");
+    }
     vec![
         tool(
             LIST_TOOL,
             "发现项目可由 AI 后台设计的 Web、PWA、Tauri 和 Android 目标；只返回小型技术栈与适配器索引，不读取页面正文。",
             json!({"type":"object","additionalProperties":false,"properties":{}}),
+            true,
+        ),
+        tool(
+            LIST_SESSIONS_TOOL,
+            "列出项目最近的后台设计会话，使 AI 与 PC 画布可恢复同一 designSessionId；只返回小型会话摘要和工件引用状态。",
+            json!({"type":"object","additionalProperties":false,"properties":{
+                "limit":{"type":"integer","minimum":1,"maximum":50,"default":20}
+            }}),
             true,
         ),
         tool(
@@ -91,7 +103,7 @@ pub(super) fn tool_definitions() -> Vec<Value> {
         ),
         tool(
             CAPTURE_TOOL,
-            "在后台设计会话中执行受限点击/等待/文本断言并捕获 PNG 与 UI 语义树。Web/PWA/Tauri 复用受控无头浏览器；Tauri 第一阶段只证明前端 WebView，不冒充原生宿主验证。",
+            "在后台设计会话中执行受限点击/等待/文本断言并捕获 PNG 与 UI 语义树。open 时已保存 url/viewport，可只传 designSessionId；Tauri 第一阶段只证明前端 WebView。",
             json!({
                 "type":"object","additionalProperties":false,"required":["designSessionId"],
                 "properties":{
@@ -118,17 +130,30 @@ pub(super) fn tool_definitions() -> Vec<Value> {
 }
 
 pub(super) fn is_tool(name: &str) -> bool {
-    matches!(name, LIST_TOOL | OPEN_TOOL | CAPTURE_TOOL | GET_TOOL)
+    matches!(
+        name,
+        LIST_TOOL | LIST_SESSIONS_TOOL | OPEN_TOOL | CAPTURE_TOOL | GET_TOOL
+    )
 }
 
 pub(super) async fn call(session: &LiveUiSession, name: &str, arguments: Value) -> Result<Value> {
     match name {
         LIST_TOOL => list(session),
+        LIST_SESSIONS_TOOL => list_sessions(session, &arguments),
         OPEN_TOOL => open(session, &arguments).await,
         CAPTURE_TOOL => capture(session, &arguments).await,
         GET_TOOL => get_surface(session, &arguments),
         _ => bail!("未知后台设计工具: {name}"),
     }
+}
+
+pub(super) fn pixel_artifact(
+    session: &LiveUiSession,
+    design_session_id: &str,
+) -> Result<VerifiedPixelArtifact> {
+    let root = canonical_project_root(session)?;
+    let record = read_record(&root, design_session_id)?;
+    read_verified_pixels(&root, &record)
 }
 
 fn list(session: &LiveUiSession) -> Result<Value> {
@@ -138,8 +163,45 @@ fn list(session: &LiveUiSession) -> Result<Value> {
         "schemaVersion":1,
         "targets":targets,
         "scan":{"filesInspected":inspected,"truncated":truncated,"contentEmbedded":false},
-        "defaultWorkflow":[OPEN_TOOL, CAPTURE_TOOL, GET_TOOL],
+        "defaultWorkflow":[LIST_SESSIONS_TOOL, OPEN_TOOL, CAPTURE_TOOL, GET_TOOL],
     }))
+}
+
+fn list_sessions(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
+    let root = canonical_project_root(session)?;
+    let limit = arguments
+        .get("limit")
+        .and_then(Value::as_u64)
+        .unwrap_or(20)
+        .clamp(1, 50) as usize;
+    let (records, invalid) = list_records(&root, limit)?;
+    let sessions = records.iter().map(session_summary).collect::<Vec<_>>();
+    Ok(json!({
+        "schemaVersion":1,
+        "sessions":sessions,
+        "invalidRecordCount":invalid,
+        "contentEmbedded":false,
+    }))
+}
+
+fn session_summary(record: &DesignSessionRecord) -> Value {
+    json!({
+        "designSessionId":record.design_session_id,
+        "platform":record.platform,
+        "label":record.target.label,
+        "adapter":record.target.adapter,
+        "evidenceLevel":record.target.evidence_level,
+        "nativeHostVerified":record.target.native_host_verified,
+        "route":record.route,
+        "url":record.url,
+        "viewport":record.viewport,
+        "state":record.state,
+        "hasEvidence":record.last_evidence.is_some(),
+        "pixels":record.last_evidence.as_ref().and_then(|value| value.get("artifact")),
+        "uiTree":record.last_evidence.as_ref().and_then(|value| value.get("uiTree")),
+        "createdAt":record.created_at,
+        "updatedAt":record.updated_at,
+    })
 }
 
 async fn open(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
@@ -198,7 +260,6 @@ async fn capture(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
     let root = canonical_project_root(session)?;
     let design_session_id = required_design_session_id(arguments)?;
     let mut record = read_record(&root, design_session_id)?;
-    ensure_mcp_session(session, &record)?;
     if record.platform == DesignPlatform::Android {
         return Ok(json!({
             "designSessionId":design_session_id,
@@ -208,10 +269,7 @@ async fn capture(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
             "message":"Android 继续复用真实 Runtime；后台会话不会用浏览器画面冒充 Android。"
         }));
     }
-    let capture_arguments = arguments
-        .get("capture")
-        .cloned()
-        .ok_or_else(|| anyhow!("Web/PWA/Tauri 后台捕获缺少 capture"))?;
+    let capture_arguments = capture_arguments(&record, arguments)?;
     let root_text = root.to_string_lossy().to_string();
     let mut result =
         crate::node_agent_pwa_runtime::capture_tool(Some(&root_text), capture_arguments).await;
@@ -232,7 +290,6 @@ fn get_surface(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
     let root = canonical_project_root(session)?;
     let design_session_id = required_design_session_id(arguments)?;
     let record = read_record(&root, design_session_id)?;
-    ensure_mcp_session(session, &record)?;
     let Some(evidence) = record.last_evidence.as_ref() else {
         return Ok(json!({
             "session":record,
@@ -280,6 +337,35 @@ fn get_surface(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
     }))
 }
 
+fn capture_arguments(record: &DesignSessionRecord, arguments: &Value) -> Result<Value> {
+    let mut capture = arguments
+        .get("capture")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let input = capture
+        .as_object_mut()
+        .ok_or_else(|| anyhow!("capture 必须是对象"))?;
+    if !input.contains_key("url") {
+        input.insert(
+            "url".to_string(),
+            json!(record
+                .url
+                .as_deref()
+                .ok_or_else(|| anyhow!("后台设计会话没有 URL；请重新 open 并提供 url"))?),
+        );
+    }
+    input
+        .entry("viewport".to_string())
+        .or_insert_with(|| record.viewport.clone());
+    input.entry("evidence".to_string()).or_insert_with(|| {
+        json!({
+            "sourceRevision":"design-session-source-unverified",
+            "routeRevision":format!("design-session:{}", record.design_session_id),
+        })
+    });
+    Ok(capture)
+}
+
 fn compact_evidence(value: &Value) -> Value {
     json!({
         "status":value.get("status"),"artifact":value.get("artifact"),"uiTree":value.get("uiTree"),
@@ -309,13 +395,6 @@ fn required_design_session_id(arguments: &Value) -> Result<&str> {
     let value = required_string(arguments, "designSessionId")?;
     validate_design_session_id(value)?;
     Ok(value)
-}
-
-fn ensure_mcp_session(session: &LiveUiSession, record: &DesignSessionRecord) -> Result<()> {
-    if record.mcp_session_id != session.id {
-        bail!("后台设计会话不属于当前 MCP session");
-    }
-    Ok(())
 }
 
 fn required_string<'a>(value: &'a Value, key: &str) -> Result<&'a str> {

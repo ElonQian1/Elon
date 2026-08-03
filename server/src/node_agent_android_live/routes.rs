@@ -126,6 +126,7 @@ pub(crate) fn protected_routes() -> Router<Arc<NodeRuntime>> {
             get(capability_gap_handler).post(capability_gap_command_handler),
         )
         .merge(super::fit_run::protected_routes())
+        .merge(super::design_http::routes())
 }
 
 async fn capabilities_handler(

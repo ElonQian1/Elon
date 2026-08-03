@@ -95,6 +95,58 @@ async fn opens_headless_session_without_android_runtime_or_pc_canvas() {
     assert_eq!(opened["session"]["state"], "READY_FOR_CAPTURE");
     assert_eq!(surface["status"], "AWAITING_CAPTURE");
     assert_eq!(surface["nodes"], json!([]));
-    assert_eq!(design_targets::tool_definitions().len(), 4);
+    assert_eq!(design_targets::tool_definitions().len(), 5);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn project_session_can_be_resumed_by_another_mcp_session() {
+    let root = fixture_root("resume");
+    fs::create_dir_all(root.join("web")).unwrap();
+    fs::write(
+        root.join("web/package.json"),
+        r#"{"scripts":{"dev":"vite"}}"#,
+    )
+    .unwrap();
+    let broker = LiveUiBroker::new();
+    let creator = broker
+        .create_session(
+            "ui-design-bootstrap-a".into(),
+            "ui.design.bootstrap".into(),
+            Some(root.display().to_string()),
+            38917,
+        )
+        .await;
+    let reader = broker
+        .create_session(
+            "ui-design-bootstrap-b".into(),
+            "ui.design.bootstrap".into(),
+            Some(root.display().to_string()),
+            38918,
+        )
+        .await;
+
+    let opened = design_targets::call(
+        &creator,
+        "ui_open_design_target",
+        json!({"platform":"web","route":"/dashboard","url":"http://127.0.0.1:4173/dashboard"}),
+    )
+    .await
+    .unwrap();
+    let id = opened["session"]["designSessionId"].as_str().unwrap();
+    let surface = design_targets::call(
+        &reader,
+        "ui_get_design_surface",
+        json!({"designSessionId":id}),
+    )
+    .await
+    .unwrap();
+    let listed = design_targets::call(&reader, "ui_list_design_sessions", json!({}))
+        .await
+        .unwrap();
+
+    assert_eq!(surface["status"], "AWAITING_CAPTURE");
+    assert_eq!(listed["sessions"][0]["designSessionId"], id);
+    assert_eq!(listed["sessions"][0]["route"], "/dashboard");
     fs::remove_dir_all(root).unwrap();
 }
