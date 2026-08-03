@@ -1,9 +1,12 @@
 use anyhow::{bail, Result};
+use chrono::Utc;
+use serde_json::json;
+use sha2::{Digest, Sha256};
 
 use crate::{
     open_commerce_consumer_model::{
         ConsumerAuthorizationState, ConsumerDiscoveryMatch, ConsumerDiscoveryRequest,
-        ConsumerDiscoveryResponse, ConsumerPreferences,
+        ConsumerDiscoveryResponse, ConsumerPreferences, ConsumerRankingReceipt,
     },
     open_commerce_consumer_preference_service,
     open_commerce_consumer_ranking::{self, ConsumerRankingPolicy},
@@ -32,18 +35,34 @@ pub(crate) fn discover(
     let ranking_policy = ConsumerRankingPolicy::parse(request.ranking_policy.as_deref())?;
     request.preferences =
         open_commerce_consumer_preference_service::normalize_preferences(request.preferences)?;
+    let candidate_limit = request.limit.clamp(1, 50).saturating_mul(4).min(100);
     let candidates = open_commerce_directory_service::discover_merchants(
         store,
         request.query.as_deref(),
         request.capability_key.as_deref(),
-        request.limit.clamp(1, 50).saturating_mul(4),
+        candidate_limit,
     )?;
+    let directory_candidate_count = candidates.len();
     let mut matches = candidates
         .into_iter()
         .filter_map(|detail| best_match(store, detail, &request, ranking_policy).transpose())
         .collect::<Result<Vec<_>>>()?;
+    let eligible_match_count = matches.len();
     ranking_policy.sort_matches(&mut matches);
     matches.truncate(request.limit.clamp(1, 50));
+    let ranking_receipt = request
+        .include_ranking_receipt
+        .then(|| {
+            build_ranking_receipt(
+                &request,
+                ranking_policy,
+                candidate_limit,
+                directory_candidate_count,
+                eligible_match_count,
+                &matches,
+            )
+        })
+        .transpose()?;
     Ok(ConsumerDiscoveryResponse {
         schema: "open_commerce.consumer_discovery.v1",
         capability_contract_profile: "open_commerce.capability_schema.v1",
@@ -54,8 +73,82 @@ pub(crate) fn discover(
         ranking_is_paid: false,
         ranking_is_user_selected,
         available_ranking_policies: open_commerce_consumer_ranking::available_ranking_policies(),
+        ranking_receipt,
         matches,
     })
+}
+
+fn build_ranking_receipt(
+    request: &ConsumerDiscoveryRequest,
+    ranking_policy: ConsumerRankingPolicy,
+    candidate_limit: usize,
+    directory_candidate_count: usize,
+    eligible_match_count: usize,
+    matches: &[ConsumerDiscoveryMatch],
+) -> Result<ConsumerRankingReceipt> {
+    let request_fingerprint_payload = json!({
+        "schema": "open_commerce.consumer_discovery_input.v1",
+        "query": normalized_optional(request.query.as_deref()),
+        "capability_key": normalized_optional(request.capability_key.as_deref()),
+        "requester_app_id": request.requester_app_id.as_str(),
+        "ranking_policy": ranking_policy.key(),
+        "preferences": &request.preferences,
+        "limit": request.limit.clamp(1, 50)
+    });
+    let request_fingerprint_json = serde_json::to_string(&request_fingerprint_payload)?;
+    let ordered_results = matches
+        .iter()
+        .enumerate()
+        .map(|(index, item)| {
+            json!({
+                "position": index + 1,
+                "merchant_id": item.merchant.id.as_str(),
+                "capability_key": item.capability.capability_key.as_str(),
+                "capability_version": item.capability.version,
+                "score": item.score,
+                "access_level": item.capability.access_level.as_str(),
+                "unit_price_micros": item.capability.unit_price_micros,
+                "currency": item.capability.currency.as_str(),
+                "directory_updated_at": item.capability.updated_at.as_str()
+            })
+        })
+        .collect::<Vec<_>>();
+    let payload = json!({
+        "schema": "open_commerce.consumer_ranking_receipt_payload.v1",
+        "generated_at": Utc::now().to_rfc3339(),
+        "candidate_scope": {
+            "kind": "current_operator_public_directory.v1",
+            "operator_exhaustive": false,
+            "candidate_cap": candidate_limit,
+            "directory_candidate_count": directory_candidate_count
+        },
+        "ranking": {
+            "policy": ranking_policy.key(),
+            "label": ranking_policy.label(),
+            "explanation": ranking_policy.explanation(),
+            "paid_placement": false
+        },
+        "request_fingerprint_sha256": sha256_hex(&request_fingerprint_json),
+        "eligible_match_count": eligible_match_count,
+        "returned_match_count": matches.len(),
+        "ordered_results": ordered_results
+    });
+    let canonical_payload_json = serde_json::to_string(&payload)?;
+    Ok(ConsumerRankingReceipt {
+        schema: "open_commerce.consumer_ranking_receipt.v1",
+        hash_algorithm: "sha256",
+        payload_sha256: sha256_hex(&canonical_payload_json),
+        canonical_payload_json,
+        signed_by_operator: false,
+    })
+}
+
+fn normalized_optional(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
+}
+
+fn sha256_hex(value: &str) -> String {
+    hex::encode(Sha256::digest(value.as_bytes()))
 }
 
 pub(crate) fn create_authorization_request(

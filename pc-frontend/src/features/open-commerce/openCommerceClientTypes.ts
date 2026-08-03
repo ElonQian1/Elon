@@ -663,6 +663,7 @@ export interface ConsumerDiscoveryRequest {
   capability_key?: string
   requester_app_id: string
   ranking_policy?: ConsumerRankingPolicyKey
+  include_ranking_receipt?: boolean
   preferences: ConsumerPreferences
   limit: number
 }
@@ -679,6 +680,14 @@ export interface ConsumerRankingPolicyDescriptor {
   label: string
   explanation: string
   paid_placement: false
+}
+
+export interface ConsumerRankingReceipt {
+  schema: 'open_commerce.consumer_ranking_receipt.v1'
+  hash_algorithm: 'sha256'
+  canonical_payload_json: string
+  payload_sha256: string
+  signed_by_operator: false
 }
 
 export interface ConsumerAuthorizationState {
@@ -766,6 +775,7 @@ export interface ConsumerDiscoveryResponse {
   ranking_is_paid: boolean
   ranking_is_user_selected: boolean
   available_ranking_policies: ConsumerRankingPolicyDescriptor[]
+  ranking_receipt?: ConsumerRankingReceipt
   matches: ConsumerDiscoveryMatch[]
 }
 

@@ -29,6 +29,8 @@ pub(crate) struct ConsumerDiscoveryRequest {
     #[serde(default)]
     pub ranking_policy: Option<String>,
     #[serde(default)]
+    pub include_ranking_receipt: bool,
+    #[serde(default)]
     pub preferences: ConsumerPreferences,
     #[serde(default = "default_limit")]
     pub limit: usize,
@@ -62,6 +64,8 @@ pub(crate) struct ConsumerDiscoveryResponse {
     pub ranking_is_paid: bool,
     pub ranking_is_user_selected: bool,
     pub available_ranking_policies: Vec<ConsumerRankingPolicyDescriptor>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ranking_receipt: Option<ConsumerRankingReceipt>,
     pub matches: Vec<ConsumerDiscoveryMatch>,
 }
 
@@ -71,6 +75,15 @@ pub(crate) struct ConsumerRankingPolicyDescriptor {
     pub label: String,
     pub explanation: String,
     pub paid_placement: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ConsumerRankingReceipt {
+    pub schema: &'static str,
+    pub hash_algorithm: &'static str,
+    pub canonical_payload_json: String,
+    pub payload_sha256: String,
+    pub signed_by_operator: bool,
 }
 
 fn default_limit() -> usize {

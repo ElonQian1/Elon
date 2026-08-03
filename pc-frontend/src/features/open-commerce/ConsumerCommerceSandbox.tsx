@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { KeyRound, Play, RefreshCw, Search } from 'lucide-react'
+import { Download, KeyRound, Play, RefreshCw, Search } from 'lucide-react'
 import { openCommerceApi } from './openCommerceApi'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import ConsumerRelationshipManager from './ConsumerRelationshipManager'
@@ -12,6 +12,7 @@ import ConsumerDataVaultPanel from './ConsumerDataVaultPanel'
 import ConsumerPreferenceProfilePanel from './ConsumerPreferenceProfilePanel'
 import ConsumerInvocationReceipts from './ConsumerInvocationReceipts'
 import CapabilityInvocationComposer from './CapabilityInvocationComposer'
+import { downloadConsumerRankingReceipt, verifyConsumerRankingReceipt } from './consumerRankingReceipt'
 import type {
   ConsumerDiscoveryMatch,
   ConsumerDiscoveryResponse,
@@ -39,6 +40,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   const [tags, setTags] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
   const [rankingPolicy, setRankingPolicy] = useState<ConsumerRankingPolicyKey>('transparent_preference_match.v1')
+  const [includeRankingReceipt, setIncludeRankingReceipt] = useState(false)
   const [result, setResult] = useState<ConsumerDiscoveryResponse | null>(null)
   const [invocation, setInvocation] = useState<Record<string, unknown> | null>(null)
   const [busy, setBusy] = useState(false)
@@ -85,6 +87,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         capability_key: capabilityKey.trim() || undefined,
         requester_app_id: appId,
         ranking_policy: rankingPolicy,
+        include_ranking_receipt: includeRankingReceipt,
         preferences: {
           categories: splitValues(categories),
           tags: splitValues(tags),
@@ -96,13 +99,14 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         },
         limit: 20,
       })
+      if (response.ranking_receipt) await verifyConsumerRankingReceipt(response.ranking_receipt)
       setResult(response)
     } catch (error) {
       setMessage(errorText(error))
     } finally {
       setBusy(false)
     }
-  }, [appId, capabilityKey, categories, city, maxPrice, query, rankingPolicy, tags])
+  }, [appId, capabilityKey, categories, city, includeRankingReceipt, maxPrice, query, rankingPolicy, tags])
 
   const applyProfile = useCallback((preferences: ConsumerPreferences) => {
     setCategories(preferences.categories.join(', '))
@@ -134,6 +138,16 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
       setMessage(errorText(error))
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function downloadRankingReceipt() {
+    if (!result?.ranking_receipt) return
+    try {
+      await downloadConsumerRankingReceipt(result.ranking_receipt)
+      setMessage('排序凭证已复核并下载。')
+    } catch (error) {
+      setMessage(errorText(error))
     }
   }
 
@@ -214,6 +228,10 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
                 <option value="merchant_name.v1">商户名称</option>
               </select>
             </label>
+            <label>
+              <span>保存排序凭证</span>
+              <input type="checkbox" checked={includeRankingReceipt} onChange={(event) => setIncludeRankingReceipt(event.target.checked)} />
+            </label>
             <label>搜索词<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="咖啡、维修、零售" /></label>
             <label>能力 Key<input value={capabilityKey} onChange={(event) => setCapabilityKey(event.target.value)} placeholder="menu.preview" /></label>
             <label>城市<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ji'an" /></label>
@@ -242,6 +260,16 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
           </header>
           <div className={base.formCard} style={{ ...commerceStyles.sectionBody, ...commerceStyles.scrollArea }}>
             {result?.ranking_explanation && <small style={commerceStyles.itemMeta}>{result.ranking_explanation}</small>}
+            {result?.ranking_receipt && (
+              <article className={base.formCard} style={listItemStyle()}>
+                <header style={commerceStyles.itemHeader}>
+                  <h3 style={commerceStyles.itemTitle}>排序凭证</h3>
+                  <span style={badgeStyle()}>SHA-256 已复核</span>
+                </header>
+                <small style={commerceStyles.itemMeta}>摘要 {result.ranking_receipt.payload_sha256.slice(0, 24)}… · 未含运营方签名</small>
+                <button style={actionStyle('secondary')} type="button" onClick={downloadRankingReceipt}><Download size={13} />下载凭证</button>
+              </article>
+            )}
             {result?.matches.map((match) => (
               <article className={base.formCard} style={listItemStyle()} key={`${match.merchant.id}:${match.capability.capability_key}`}>
                 <header style={commerceStyles.itemHeader}>
