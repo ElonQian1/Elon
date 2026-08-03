@@ -4,6 +4,7 @@ use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::{
+    open_commerce_consumer_constraints,
     open_commerce_consumer_model::{
         ConsumerAuthorizationState, ConsumerCapabilityFilter, ConsumerDiscoveryMatch,
         ConsumerDiscoveryRequest, ConsumerDiscoveryResponse, ConsumerPreferences,
@@ -44,6 +45,7 @@ pub(crate) fn discover(
     normalize_source_filters(&mut request)?;
     normalize_price_filter(&mut request)?;
     normalize_capability_filter(&mut request)?;
+    open_commerce_consumer_constraints::validate(&request)?;
     let candidate_limit = request.limit.clamp(1, 50).saturating_mul(4).min(100);
     let candidates = open_commerce_directory_service::discover_merchants(
         store,
@@ -95,6 +97,7 @@ pub(crate) fn discover(
         source_filter_options,
         price_filter: price_filter(&request),
         capability_filter: capability_filter(&request),
+        preference_constraints: open_commerce_consumer_constraints::response(&request),
         available_ranking_policies: open_commerce_consumer_ranking::available_ranking_policies(),
         ranking_receipt,
         matches,
@@ -120,6 +123,7 @@ fn build_ranking_receipt(
         "source_filter": source_filter(request),
         "price_filter": price_filter(request),
         "capability_filter": capability_filter(request),
+        "preference_constraints": open_commerce_consumer_constraints::response(request),
         "preferences": &request.preferences,
         "limit": request.limit.clamp(1, 50)
     });
@@ -163,6 +167,7 @@ fn build_ranking_receipt(
         "source_filter": source_filter(request),
         "price_filter": price_filter(request),
         "capability_filter": capability_filter(request),
+        "preference_constraints": open_commerce_consumer_constraints::response(request),
         "request_fingerprint_sha256": sha256_hex(&request_fingerprint_json),
         "eligible_match_count": eligible_match_count,
         "returned_match_count": matches.len(),
@@ -219,6 +224,10 @@ fn best_match(
     ranking_policy: ConsumerRankingPolicy,
     discovery_time: &DateTime<Utc>,
 ) -> Result<Option<ConsumerDiscoveryMatch>> {
+    let Some(constraint_reasons) = open_commerce_consumer_constraints::evaluate(&detail, request)
+    else {
+        return Ok(None);
+    };
     let candidates = detail
         .capabilities
         .iter()
@@ -292,6 +301,7 @@ fn best_match(
         return Ok(None);
     };
     let (score, mut reasons) = score_match(&detail, &capability, &request.preferences);
+    reasons.extend(constraint_reasons);
     reasons.push(ranking_policy.ranking_reason());
     if request.require_current_declaration {
         reasons.push("符合消费者要求的商户声明有效期".to_string());

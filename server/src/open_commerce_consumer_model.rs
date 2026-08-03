@@ -47,6 +47,12 @@ pub(crate) struct ConsumerDiscoveryRequest {
     #[serde(default)]
     pub access_level: Option<String>,
     #[serde(default)]
+    pub require_city_match: bool,
+    #[serde(default)]
+    pub require_category_match: bool,
+    #[serde(default)]
+    pub require_all_tags_match: bool,
+    #[serde(default)]
     pub preferences: ConsumerPreferences,
     #[serde(default = "default_limit")]
     pub limit: usize,
@@ -85,6 +91,7 @@ pub(crate) struct ConsumerDiscoveryResponse {
     pub source_filter_options: ConsumerSourceFilterOptions,
     pub price_filter: ConsumerPriceFilter,
     pub capability_filter: ConsumerCapabilityFilter,
+    pub preference_constraints: ConsumerPreferenceConstraints,
     pub available_ranking_policies: Vec<ConsumerRankingPolicyDescriptor>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ranking_receipt: Option<ConsumerRankingReceipt>,
@@ -131,6 +138,13 @@ pub(crate) struct ConsumerPriceFilter {
 pub(crate) struct ConsumerCapabilityFilter {
     pub kind: Option<String>,
     pub access_level: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ConsumerPreferenceConstraints {
+    pub require_city_match: bool,
+    pub require_category_match: bool,
+    pub require_all_tags_match: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
