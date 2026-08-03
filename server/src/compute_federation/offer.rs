@@ -18,7 +18,11 @@ pub(crate) struct ComputeOfferCapacity {
     pub meter: String,
     pub total_units: i64,
     pub reservable_units: i64,
-    pub committed_units: i64,
+}
+
+/// Offer-level execution limits are stated once and cannot disagree across meter rows.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ComputeOfferExecutionLimits {
     pub max_concurrent_attempts: i64,
     pub max_attempt_runtime_seconds: i64,
 }
@@ -59,6 +63,7 @@ pub(crate) struct ComputeOffer {
     pub runtime: ComputeRuntimeRef,
     pub resource_profile: ComputeOfferResourceProfile,
     pub capacity: Vec<ComputeOfferCapacity>,
+    pub execution_limits: ComputeOfferExecutionLimits,
     pub authorization: ComputeOfferAuthorization,
     pub delivery_windows: Vec<ComputeDeliveryWindow>,
     pub price_terms: ComputePriceTerms,

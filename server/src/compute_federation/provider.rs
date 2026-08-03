@@ -41,7 +41,6 @@ pub(crate) struct ComputeProviderCapabilities {
     pub allowed_data_classes: Vec<String>,
     pub supports_streaming: bool,
     pub supports_checkpointing: bool,
-    pub max_parallel_attempts: i64,
 }
 
 /// Contains routing references only. Provider credentials never enter this contract.
