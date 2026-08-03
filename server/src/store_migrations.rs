@@ -185,6 +185,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (148, "开放商业开发者 Webhook 死信人工重试证据", crate::open_commerce_webhook_replay_migration::migration_v148),
     (149, "开放商业开发者 Webhook 终态事件筛选", crate::open_commerce_webhook_event_filter_migration::migration_v149),
     (150, "开放商业开发者 Webhook 有界历史事件补发", crate::open_commerce_webhook_history_migration::migration_v150),
+    (151, "开放商业开发者 App 资料清单与审核状态", crate::open_commerce_developer_manifest_migration::migration_v151),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

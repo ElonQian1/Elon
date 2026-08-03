@@ -7,6 +7,17 @@ export interface OpenCommerceDeveloperApp {
   environment: 'sandbox'
   status: 'active' | 'disabled'
   token_hint: string
+  homepage_url: string | null
+  privacy_policy_url: string | null
+  terms_url: string | null
+  support_email: string | null
+  requested_scopes: string[]
+  manifest_status: 'draft' | 'submitted' | 'changes_requested' | 'approved'
+  manifest_revision: number
+  submitted_at: string | null
+  reviewed_at: string | null
+  reviewed_by_user_id: string | null
+  review_note: string | null
   created_at: string
   updated_at: string
 }
@@ -78,6 +89,11 @@ export interface DeveloperWebhookDelivery {
   last_manual_retry_at?: string
   history_replay_requested_at?: string
   delivered_at?: string
+}
+
+export interface DeveloperAppManifestReviewQueue {
+  schema: string
+  apps: OpenCommerceDeveloperApp[]
 }
 
 export interface DeveloperWebhookDeliveryList {

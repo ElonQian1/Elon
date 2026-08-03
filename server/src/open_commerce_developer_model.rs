@@ -11,6 +11,17 @@ pub(crate) struct OpenCommerceDeveloperApp {
     pub environment: String,
     pub status: String,
     pub token_hint: String,
+    pub homepage_url: Option<String>,
+    pub privacy_policy_url: Option<String>,
+    pub terms_url: Option<String>,
+    pub support_email: Option<String>,
+    pub requested_scopes: Vec<String>,
+    pub manifest_status: String,
+    pub manifest_revision: i64,
+    pub submitted_at: Option<String>,
+    pub reviewed_at: Option<String>,
+    pub reviewed_by_user_id: Option<String>,
+    pub review_note: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -27,6 +38,34 @@ pub(crate) struct OpenCommerceDeveloperAppCredential {
 pub(crate) struct CreateDeveloperAppRequest {
     pub app_id: String,
     pub display_name: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct UpdateDeveloperAppManifestRequest {
+    pub expected_manifest_revision: i64,
+    #[serde(default)]
+    pub homepage_url: Option<String>,
+    #[serde(default)]
+    pub privacy_policy_url: Option<String>,
+    #[serde(default)]
+    pub terms_url: Option<String>,
+    #[serde(default)]
+    pub support_email: Option<String>,
+    #[serde(default)]
+    pub requested_scopes: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SubmitDeveloperAppManifestRequest {
+    pub expected_manifest_revision: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ReviewDeveloperAppManifestRequest {
+    pub expected_manifest_revision: i64,
+    pub decision: String,
+    #[serde(default)]
+    pub note: String,
 }
 
 #[derive(Debug, Clone, Serialize)]

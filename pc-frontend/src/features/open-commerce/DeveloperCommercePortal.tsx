@@ -24,6 +24,7 @@ import {
 import OutboundAuthorizationRequests from './OutboundAuthorizationRequests'
 import DeveloperInvocationEvents from './DeveloperInvocationEvents'
 import DeveloperWebhookPanel from './DeveloperWebhookPanel'
+import DeveloperAppManifestPanel from './DeveloperAppManifestPanel'
 import type {
   AuthorizationRequest,
   OpenCommerceDeveloperApp,
@@ -347,6 +348,8 @@ export default function DeveloperCommercePortal({
       </section>
 
       <DeveloperInvocationEvents testToken={testToken} refreshKey={eventRefreshKey} />
+
+      <DeveloperAppManifestPanel projectId={projectId} apps={apps} canEdit={canEdit} onChanged={refresh} />
 
       <DeveloperWebhookPanel projectId={projectId} apps={apps} canEdit={canEdit} />
 

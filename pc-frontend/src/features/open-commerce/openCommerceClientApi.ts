@@ -1,5 +1,6 @@
 import { api } from '../../api/client'
 import { developerWebhookClientApi } from './developerWebhookClientApi'
+import { developerAppManifestClientApi } from './developerAppManifestClientApi'
 import type {
   AuthorizationRequest,
   AuthorizationRequestList,
@@ -52,6 +53,7 @@ function projectBase(projectId: string) {
 }
 
 export const openCommerceClientApi = {
+  ...developerAppManifestClientApi,
   ...developerWebhookClientApi,
   searchDirectoryMerchants: (query: string, limit = 20) => {
     const params = new URLSearchParams({ limit: String(limit) })

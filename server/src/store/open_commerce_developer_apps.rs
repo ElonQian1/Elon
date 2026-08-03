@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Result};
-use rusqlite::{params, OptionalExtension, Row};
+use rusqlite::{params, types::Type, OptionalExtension, Row};
 use sha2::{Digest, Sha256};
 
 use crate::{
@@ -256,7 +256,11 @@ impl Store {
     }
 }
 
-fn app_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceDeveloperApp> {
+pub(super) fn app_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceDeveloperApp> {
+    let scopes_json: String = row.get(12)?;
+    let requested_scopes = serde_json::from_str(&scopes_json).map_err(|error| {
+        rusqlite::Error::FromSqlConversionFailure(12, Type::Text, Box::new(error))
+    })?;
     Ok(OpenCommerceDeveloperApp {
         id: row.get(0)?,
         project_id: row.get(1)?,
@@ -266,8 +270,19 @@ fn app_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceDeveloperApp> {
         environment: row.get(5)?,
         status: row.get(6)?,
         token_hint: row.get(7)?,
-        created_at: row.get(8)?,
-        updated_at: row.get(9)?,
+        homepage_url: row.get(8)?,
+        privacy_policy_url: row.get(9)?,
+        terms_url: row.get(10)?,
+        support_email: row.get(11)?,
+        requested_scopes,
+        manifest_status: row.get(13)?,
+        manifest_revision: row.get(14)?,
+        submitted_at: row.get(15)?,
+        reviewed_at: row.get(16)?,
+        reviewed_by_user_id: row.get(17)?,
+        review_note: row.get(18)?,
+        created_at: row.get(19)?,
+        updated_at: row.get(20)?,
     })
 }
 
@@ -295,6 +310,9 @@ fn map_app_conflict(error: rusqlite::Error) -> anyhow::Error {
     }
 }
 
-const APP_SELECT: &str = "SELECT id, project_id, owner_user_id, app_id, display_name,
-           environment, status, token_hint, created_at, updated_at
+pub(super) const APP_SELECT: &str = "SELECT id, project_id, owner_user_id, app_id, display_name,
+           environment, status, token_hint, homepage_url, privacy_policy_url,
+           terms_url, support_email, requested_scopes_json, manifest_status,
+           manifest_revision, submitted_at, reviewed_at, reviewed_by_user_id,
+           review_note, created_at, updated_at
       FROM open_commerce_developer_apps";
