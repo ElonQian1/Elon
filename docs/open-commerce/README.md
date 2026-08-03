@@ -115,6 +115,8 @@
 105. `docs/open-commerce-webhook-operational-health-v1-acceptance.md`：查看 Webhook 健康代码状态与后置统一回归清单。
 106. `docs/decisions/open-commerce-webhook-dead-letter-acknowledgement-v1.md`：查看死信人工确认、不可覆盖处理证据和健康告警收口决定。
 107. `docs/open-commerce-webhook-dead-letter-acknowledgement-v1-acceptance.md`：查看死信确认代码状态与后置统一回归清单。
+108. `docs/decisions/open-commerce-developer-production-readiness-v1.md`：查看 App 生产就绪步骤、稳定阻断顺序和只读派生边界。
+109. `docs/open-commerce-developer-production-readiness-v1-acceptance.md`：查看生产就绪总览代码状态与后置统一回归清单。
 
 ## 专题地图
 

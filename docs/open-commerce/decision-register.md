@@ -37,6 +37,7 @@
 | Webhook 必须验证精确回调处理权后才激活 | 新订阅先停用；接收端对签名 challenge 原样回显后才从当前终态序号开始，失败可重试但不补发验证前历史 | `docs/decisions/open-commerce-developer-webhook-verification-v1.md` |
 | 调用结果必须保留凭据来源并隔离环境 | 调用账本、幂等重放、商户运行时信封、终态事件与游标绑定平台、沙箱或具体生产凭据；沙箱不得触达真实商户运行时 | `docs/decisions/open-commerce-invocation-credential-provenance-v1.md` |
 | 生产 Webhook 必须是独立且环境固定的通知通道 | 既有订阅迁移为沙箱；生产订阅默认关闭，持续复核 App、资料、域名、准入和生产凭据，所有入队、补发、重试和读取不得跨环境 | `docs/decisions/open-commerce-production-webhooks-v1.md` |
+| App 生产就绪必须由既有真源只读派生 | 按固定依赖顺序聚合 App、资料、域名、准入、凭据和生产 Webhook，分别判断调用与通知就绪，不建立第二套审批状态 | `docs/decisions/open-commerce-developer-production-readiness-v1.md` |
 | Webhook 运行健康必须从订阅和投递真源只读派生 | 按沙箱/生产聚合订阅、积压、重试、死信和生产阻断码，不保存第二套健康状态，不自动处罚或修改订阅 | `docs/decisions/open-commerce-webhook-operational-health-v1.md` |
 | Webhook 死信确认必须保留原失败证据 | 人工确认只记录操作人、时间和原因，不删除或改写失败；健康区分待处理与已确认，重试时重新打开处理链路 | `docs/decisions/open-commerce-webhook-dead-letter-acknowledgement-v1.md` |
 | 商户业务结果先形成证据层再进入 ERP/CRM | 从终态 Invocation 派生项目内证据、结果摘要、可选商户标准回执和 ERP 实例关联；不复制订单库，不把调用成功冒充为支付或履约 | `docs/decisions/open-commerce-merchant-business-evidence-v1.md` |
