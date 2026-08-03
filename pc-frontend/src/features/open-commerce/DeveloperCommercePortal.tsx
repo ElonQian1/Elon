@@ -25,6 +25,8 @@ import OutboundAuthorizationRequests from './OutboundAuthorizationRequests'
 import DeveloperInvocationEvents from './DeveloperInvocationEvents'
 import DeveloperWebhookPanel from './DeveloperWebhookPanel'
 import DeveloperAppManifestPanel from './DeveloperAppManifestPanel'
+import DeveloperAppManifestReviewPanel from './DeveloperAppManifestReviewPanel'
+import { useAuthStore } from '../../store/auth'
 import type {
   AuthorizationRequest,
   OpenCommerceDeveloperApp,
@@ -64,6 +66,7 @@ export default function DeveloperCommercePortal({
   const [eventRefreshKey, setEventRefreshKey] = useState(0)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const systemRole = useAuthStore((state) => state.user?.role)
 
   const refresh = useCallback(async () => {
     try {
@@ -350,6 +353,8 @@ export default function DeveloperCommercePortal({
       <DeveloperInvocationEvents testToken={testToken} refreshKey={eventRefreshKey} />
 
       <DeveloperAppManifestPanel projectId={projectId} apps={apps} canEdit={canEdit} onChanged={refresh} />
+
+      {(systemRole === 'admin' || systemRole === 'owner') && <DeveloperAppManifestReviewPanel />}
 
       <DeveloperWebhookPanel projectId={projectId} apps={apps} canEdit={canEdit} />
 

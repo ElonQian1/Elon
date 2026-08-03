@@ -27,4 +27,5 @@ implementation_status: implementation_uncompiled
 - `server/src/open_commerce_developer_manifest_service.rs`
 - `server/src/store/open_commerce_developer_app_manifests.rs`
 - `pc-frontend/src/features/open-commerce/DeveloperAppManifestPanel.tsx`
+- `pc-frontend/src/features/open-commerce/DeveloperAppManifestReviewPanel.tsx`
 - `docs/open-commerce-developer-app-manifest-review-v1-acceptance.md`
