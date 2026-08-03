@@ -32,6 +32,7 @@ mod compute_capacity_ledger;
 mod compute_capacity_posting;
 mod compute_capacity_registry;
 mod compute_capacity_rows;
+mod compute_capacity_supply_withdrawal;
 mod compute_metering;
 mod conversation_forks;
 mod conversations;
@@ -216,6 +217,9 @@ pub(crate) use compute_capacity_claims::{
 };
 pub(crate) use compute_capacity_ledger::{
     AddComputeCapacitySupply, AddComputeCapacitySupplyLine, ComputeCapacityLedgerWriteReceipt,
+};
+pub(crate) use compute_capacity_supply_withdrawal::{
+    WithdrawComputeCapacitySupply, WithdrawComputeCapacitySupplyLine,
 };
 pub use compute_metering::ComputeMeterEvent;
 pub(crate) use external_app_tool_executions::{
