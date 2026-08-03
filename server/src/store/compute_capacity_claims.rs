@@ -4,20 +4,20 @@ use anyhow::{anyhow, bail, Result};
 use chrono::DateTime;
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 
 use crate::compute_federation::{
     capacity::{
-        validate_capacity_claim, ComputeCapacityAccount, ComputeCapacityCausalBinding,
-        ComputeCapacityClaim, ComputeCapacityClaimEffectBinding, ComputeCapacityClaimKind,
-        ComputeCapacityClaimLine, ComputeCapacityClaimState, ComputeCapacityEventKind,
-        ComputeCapacityLedgerTransaction, ComputeCapacityMovementLine, ComputeCapacityPoolBinding,
-        COMPUTE_CAPACITY_CLAIM_SCHEMA, COMPUTE_CAPACITY_TRANSACTION_SCHEMA,
+        ComputeCapacityAccount, ComputeCapacityCausalBinding, ComputeCapacityClaim,
+        ComputeCapacityClaimEffectBinding, ComputeCapacityClaimKind, ComputeCapacityClaimLine,
+        ComputeCapacityClaimState, ComputeCapacityEventKind, ComputeCapacityLedgerTransaction,
+        ComputeCapacityMovementLine, ComputeCapacityPoolBinding, COMPUTE_CAPACITY_CLAIM_SCHEMA,
+        COMPUTE_CAPACITY_TRANSACTION_SCHEMA,
     },
     market::ComputeDeliveryWindowBinding,
 };
 
 use super::{
+    compute_capacity_claim_rows::{claim_kind_value, finalize_claim_digest, insert_claim_on},
     compute_capacity_ledger::ComputeCapacityLedgerWriteReceipt,
     compute_capacity_posting::{
         balances_for_transaction_on, event_kind_value, finalize_transaction_digest,
@@ -141,8 +141,7 @@ impl Store {
                 .map(ToOwned::to_owned),
             terminal_at: None,
         };
-        validate_capacity_claim(&claim).map_err(anyhow::Error::new)?;
-        claim.claim_digest = claim_digest(&claim)?;
+        finalize_claim_digest(&mut claim)?;
         insert_claim_on(&tx, &claim)?;
 
         let mut ledger_transaction = ComputeCapacityLedgerTransaction {
@@ -332,54 +331,6 @@ fn replay_existing_hold_on(
     })
 }
 
-fn insert_claim_on(conn: &Connection, claim: &ComputeCapacityClaim) -> Result<()> {
-    conn.execute(
-        "INSERT INTO compute_capacity_claims (
-            claim_id, claim_digest, pool_id, capacity_epoch,
-            delivery_window_id, claim_kind, subject_kind, subject_id,
-            status, revision, parent_claim_id, idempotency_scope,
-            idempotency_key, request_digest, created_at, updated_at,
-            expires_at, terminal_at
-         ) VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'held', ?9, NULL,
-            ?10, ?11, ?12, ?13, ?14, ?15, NULL
-         )",
-        params![
-            claim.claim_id,
-            claim.claim_digest,
-            claim.pool.pool_id,
-            claim.pool.capacity_epoch,
-            claim.delivery_window.window_id,
-            claim_kind_value(claim.claim_kind),
-            claim.subject_kind,
-            claim.subject_id,
-            claim.revision,
-            claim.idempotency_scope,
-            claim.idempotency_key,
-            claim.request_digest,
-            claim.created_at,
-            claim.updated_at,
-            claim.expires_at,
-        ],
-    )?;
-    for line in &claim.lines {
-        conn.execute(
-            "INSERT INTO compute_capacity_claim_lines (
-                claim_id, line_no, bucket_id, meter, quantity_units, created_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                claim.claim_id,
-                line.line_no,
-                line.bucket.bucket_id,
-                line.bucket.meter,
-                line.quantity_units,
-                claim.created_at,
-            ],
-        )?;
-    }
-    Ok(())
-}
-
 fn validate_hold_input(input: &HoldComputeCapacityClaim) -> Result<()> {
     for (label, value) in [
         ("容量池 ID", input.pool.pool_id.as_str()),
@@ -436,38 +387,4 @@ fn parse_utc(label: &str, value: &str) -> Result<DateTime<chrono::FixedOffset>> 
         bail!("{label}必须使用 UTC 时区");
     }
     Ok(parsed)
-}
-
-fn claim_digest(claim: &ComputeCapacityClaim) -> Result<String> {
-    let payload = serde_json::json!({
-        "schema": claim.schema,
-        "claim_id": claim.claim_id,
-        "pool": claim.pool,
-        "delivery_window": claim.delivery_window,
-        "claim_kind": claim.claim_kind,
-        "state": claim.state,
-        "revision": claim.revision,
-        "parent_claim_id": claim.parent_claim_id,
-        "subject_kind": claim.subject_kind,
-        "subject_id": claim.subject_id,
-        "idempotency_scope": claim.idempotency_scope,
-        "idempotency_key": claim.idempotency_key,
-        "request_digest": claim.request_digest,
-        "lines": claim.lines,
-        "created_at": claim.created_at,
-        "updated_at": claim.updated_at,
-        "expires_at": claim.expires_at,
-        "terminal_at": claim.terminal_at,
-    });
-    Ok(hex::encode(Sha256::digest(serde_json::to_vec(&payload)?)))
-}
-
-fn claim_kind_value(kind: ComputeCapacityClaimKind) -> &'static str {
-    match kind {
-        ComputeCapacityClaimKind::QuoteHold => "quote_hold",
-        ComputeCapacityClaimKind::Reservation => "reservation",
-        ComputeCapacityClaimKind::CapacityCommitment => "capacity_commitment",
-        ComputeCapacityClaimKind::DeliveryAllocation => "delivery_allocation",
-        ComputeCapacityClaimKind::Attempt => "attempt",
-    }
 }
