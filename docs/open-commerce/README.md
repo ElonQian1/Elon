@@ -145,6 +145,8 @@
 135. `docs/open-commerce-consumer-freshness-filter-v1-acceptance.md`：查看声明期筛选代码状态及后置统一回归矩阵。
 136. `docs/decisions/open-commerce-capability-source-link-v1.md`：查看能力与内部同步回执绑定、能力版本失效和未外部核验边界。
 137. `docs/open-commerce-capability-source-link-v1-acceptance.md`：查看 V164 来源绑定代码状态及后置统一回归矩阵。
+138. `docs/decisions/open-commerce-consumer-source-requirement-v1.md`：查看消费者主动要求内部回执来源和默认不隐藏边界。
+139. `docs/open-commerce-consumer-source-requirement-v1-acceptance.md`：查看来源筛选代码状态及后置统一回归矩阵。
 
 ## 专题地图
 
