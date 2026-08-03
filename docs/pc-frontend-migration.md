@@ -49,7 +49,7 @@ server/src/
 | 统一实时刷新架构（事件标准化 + 资源 key + 共享刷新 hook） | 🔴 高 | `src/features/realtime/` | ✅ P1.8 完成 |
 | 消息附件上传（图片/文件） | 🟡 中 | `src/features/conversation/AttachmentButton.tsx` | ✅ P1.4 完成：支持不限扩展名选择、整会话区拖放、粘贴、多附件预览，并随 AI 任务发送结构化 attachments |
 | 任务状态实时更新（task_done 事件） | 🟡 中 | `src/features/dev/` | 🟡 P1.7 已补过程覆盖诊断、当前卡点阶段、结构化命令/文件/测试过程卡、侧栏心跳陈旧提示、运行中停止入口、恢复控制面、项目级多任务现场总览；task_done 细化仍继续 |
-| 多端后台微调画布 | 🔴 高 | `src/features/ui-tuner/headless-design/` | 🟡 已接入项目级 Web/PWA/Tauri/Android designSession、持久浏览器、草稿即时预览/恢复、源码候选两步确认、Tauri 分层证据、验证矩阵、AI 任务期间画布自动跟随和右侧默认对话；代码尚未编译或平台运行验收，安装节点仍待升级到 MCP schema v1.8 |
+| 多端后台微调画布 | 🔴 高 | `src/features/ui-tuner/headless-design/` | 🟡 已接入项目级 Web/PWA/Tauri/Android designSession、AI task lease、cursor 事件跟随、DraftOperation v2、源码多候选哈希/范围两步确认、Tauri 分层证据、验证矩阵和右侧默认对话；画布跟随指定任务而非最近会话。代码尚未编译或平台运行验收，安装节点仍待升级到 MCP schema v1.9 |
 | 本机任务桌面监督证据 | 🔴 高 | `src/features/local-tasks/` | ✅ 识别 `elon.desktop_pc_supervision.v1`，展示执行/监督分工、验收条件、精确命令退出码/文件证据/失败摘要和最新桌面验收结论；运行卡显示 phase、脱敏 current command、last progress、heartbeat、idle duration 与 timeout policy，并识别 `resume_required`；普通本机任务保持兼容 |
 
 ### 阶段 P2 — 项目管理

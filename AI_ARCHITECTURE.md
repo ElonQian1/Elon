@@ -131,18 +131,20 @@ PTY/ConPTY sidecar 仍然保留，但定位是辅助路：
 AI / PC Canvas
   -> list targets / list recent sessions
   -> resume or open project-scoped design session
+  -> bind AI taskId + bounded exclusive lease
+  -> cursor-based compact design event stream
   -> Web/PWA/Tauri frontend: controlled Chromium
   -> Tauri native host: project runtime + descendant window capture
   -> Android: Live Runtime
   -> semantic UI tree + PNG path/hash
-  -> revisioned design draft + reversible live preview
-  -> verified UI tree / selector -> bounded source binding candidates
+  -> DraftOperation v2 + per-platform capability tier
+  -> verified UI tree / selector -> reviewable source binding candidates
   -> source change + evidence-gated platform writeback receipt
 ```
 
 代理先用 `ui_get_design_capabilities` 验证当前节点实际安装的 schema，再读取 Web、PWA、Tauri、Android 小型目标索引。无需打开 PC 页面即可恢复/打开项目 `designSessionId`；单次捕获之外，Web/PWA/Tauri 可用持久浏览器在同一 page 中导航和执行有界 selector 交互，非秘密表单值只引用项目 fixture。Android 不使用浏览器替代。Tauri 原生链路按项目发现命令启动，仅访问登记 Runtime 后代进程，窗口像素、菜单/候选对话框和项目 command trace 分层，且不开放任意菜单点击或 command 执行。
 
-设计意图通过项目级、乐观 revision 的 Design Draft 表达。草稿 patch 可在持久浏览器中白名单预览并恢复，但页面内联预览永远不是源码证据；源码绑定器只在目标声明的项目源码根内扫描已校验 UI tree/selector/route，返回带 SHA-256、行号和字节范围的 `CANDIDATE`，必须显式确认才成为 `BOUND`。写回回执固定 Git/source 基线并要求分平台证据。`ui_get_design_verification_matrix` 把草稿、当前会话工件与回执分开，不把“代码能力已存在”显示成“运行已验证”。PC `/pc/ui-tuner` 消费同一 session/draft/receipt/capability/matrix：左侧目标与 UI 树，中间 WebView/原生画面，右侧默认持续对话；普通 AI 任务期间按最新项目 session 自动恢复画布，不创建平行状态机。具体契约、安装节点仍待升级和未执行真实编译/平台验收的边界见 `docs/headless-ui-design-mcp.md`。
+设计意图通过项目级、乐观 revision 的 Design Draft v2 表达。`SET_STYLE` 可在持久浏览器中白名单预览并恢复；文字、资源、variant、结构和响应式操作按平台能力分级进入源码 handoff，页面内联预览永远不是源码证据。源码绑定器只在目标声明的项目源码根内扫描已校验 UI tree/selector/route，返回带 SHA-256、行号和字节范围的多个 `CANDIDATE`，必须先采用再显式确认才成为 `BOUND`。AI taskId 通过有界独占 lease 绑定 designSession/draft，后台或 PC 以 taskId/cursor 增量读取紧凑事件；PC 因此跟随指定任务切换 session，而不是轮询项目最近会话。写回回执继续固定 Git/source 基线并要求分平台证据。具体契约、安装节点仍待升级和未执行真实编译/平台验收的边界见 `docs/headless-ui-design-mcp.md`。
 
 ## 项目理解 / RAG 架构
 

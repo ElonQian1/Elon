@@ -20,6 +20,8 @@ reviewed_at: 2026-08-04
 
 - 发现 Web、PWA、Tauri 和 Android 设计目标，并返回来源目录、配置文件、适配器和证据级别。
 - 在项目内创建 `designSessionId`；同一 canonical Git 项目的新 MCP 会话或 PC 客户端可用 `ui_list_design_sessions` 恢复，无需保留创建时连接或打开 PC 画布。
+- AI 任务可用 `ui_bind_design_task` 把 `taskId` 持久绑定到 designSession/draft，并获取 60–3600 秒 lease。同一 designSession 同时只允许一个未过期任务 lease；重新绑定必须提交当前 `expectedLeaseId`，运行中可续租，终态显式结算。
+- `ui_list_design_events` 按 `taskId + afterCursor` 增量读取紧凑事件，支持最长 15 秒有界等待；事件只含工具、session/draft、平台/route、revision、工件哈希等摘要，项目内最多保留 1,000 条，不保存截图正文或工具完整结果。
 - Web、PWA 和 Tauri 前端既可单次捕获，也可按 `designSessionId` 启动持久有界 Chromium。持久模式保留同一 page、Cookie、localStorage、滚动和组件状态，最多 4 个活跃会话、空闲 15 分钟、总生命周期 60 分钟或 128 次操作。
 - 安全交互支持 `click`、`waitFor`、`assertText`、`scrollIntoView`、白名单键盘键、checkbox/radio、select 和非秘密表单填入。表单值只能引用项目内已审查 `fixtureProfile.formValues` 的 key，MCP/PC 不传真实值；password、hidden、file 与疑似秘密键值失败关闭。
 - 每次成功捕获同时生成 PNG 和紧凑语义 UI 树，两者都只返回绝对路径、SHA-256 和小型元数据，不返回 Base64。
@@ -27,17 +29,17 @@ reviewed_at: 2026-08-04
 - Android 继续复用既有 Android Live Runtime；Runtime 未连接时明确返回 `PREPARATION_REQUIRED`，不会用浏览器画面冒充 Android。
 - Tauri 目标可按 `ui_prepare_tauri_runtime -> ui_capture_tauri_host -> ui_capture_tauri_behavior -> ui_stop_tauri_runtime` 管理项目发现出的开发命令，且只枚举该 Runtime 的后代进程。Windows 原生窗口通过 `PrintWindow` 保存 PNG、边界、PID 和 SHA-256；行为层另外只读原生菜单、候选系统对话框和项目显式写入的严格 command trace。
 - Tauri 证据分层为 `TAURI_NATIVE_WINDOW`、`WIN32_NATIVE_MENU_OBSERVED`、`DESCENDANT_TOP_LEVEL_WINDOWS_OBSERVED` 与 `PROJECT_INSTRUMENTED_TRACE/NOT_INSTRUMENTED`。项目 trace 不含 command 参数或结果正文，不能冒充操作系统证明；数据面不提供任意菜单点击或任意 Rust command 执行。
-- Web、PWA、Tauri 和 Android 共用项目级 Design Draft：支持 selector/scope/style patch、目标平台、源码绑定、乐观 revision、最多 50 层内部历史和单步撤销；MCP 只返回紧凑当前状态与 `historyDepth`，不回传完整历史。
+- Web、PWA、Tauri 和 Android 共用项目级 Design Draft v2：除兼容 style patch 外，可表达 `SET_STYLE`、`SET_TEXT`、`REPLACE_ASSET`、`SET_VARIANT`、节点增删移动和 `SET_RESPONSIVE_STYLE`；每项按平台标记 `LIVE_PREVIEW`、`SOURCE_HANDOFF` 或 `UNSUPPORTED`。草稿继续使用乐观 revision、最多 50 层内部历史和单步撤销，MCP 不回传完整历史。
 - `ui_preview_design_draft` 把最多 32 个白名单视觉属性临时应用到当前持久浏览器，`ui_restore_design_draft_preview` 恢复首次预览前的内联值。它们拒绝外部 CSS 资源、脚本型值和任意 JavaScript，只生成新 PNG/UI tree；响应固定声明 `previewOnly=true`、`sourceModified=false`。
 - `ui_suggest_design_source_binding` 先验证会话 UI tree 的路径和 SHA-256，再结合 selector、可访问 label、role、tag 和 route，只扫描 designSession 声明的 `sourceRoots`。候选最多检查 2,000 个、单文件 512 KiB，遵守 Git ignore，跳过构建目录和秘密形态行；只返回局部 excerpt、行号、字节范围、来源 SHA-256、命中信号和 `CANDIDATE` 建议，不自动确认 `BOUND`。
 - 写回前通过 `ui_begin_design_writeback` 固定 Git/source 基线；AI 修改真实源码并完成分平台验证后，通过 `ui_complete_design_writeback` 持久化 changed files、source hashes、Git revision 和平台证据。草稿及截图不能冒充源码写回完成。
 - `ui_get_project_profile` 的 schema v3 包含相同的多端目标摘要，其他代理可以先读小型档案再决定调用什么工具。
 - Node Admin 提供与 MCP 工具同源的项目级 HTTP 适配层；PC 不复制目标发现、会话、Tauri Runtime、草稿或证据状态机。
-- `ui_get_design_capabilities` 返回节点实际安装的 `yilong-ui-live@1.8.0` schema、能力 ID、安全边界和项目已发现平台；调用成功本身才是当前节点已升级的证据。v1.8 新增 `DESIGN_DRAFT_LIVE_PREVIEW` 和 `DESIGN_SOURCE_BINDING_CANDIDATES`。
+- `ui_get_design_capabilities` 返回节点实际安装的 `yilong-ui-live@1.9.0` schema、能力 ID、安全边界和项目已发现平台；调用成功本身才是当前节点已升级的证据。v1.9 新增 task lease、cursor 事件、DraftOperation v2 和多候选审查能力 ID。
 - `ui_get_design_verification_matrix` 把草稿、当前 designSession 工件和写回回执汇总为 Web/PWA/Tauri/Android 行，明确区分 `READY`、`IN_PROGRESS`、`BLOCKED` 与 `PASSED`。只有写回回执中所有目标平台均为 `BUILD_VERIFIED + evidenceComplete=true` 才是通过。
-- PC `/pc/ui-tuner` 默认进入“多端后台”：左侧平台/会话/UI 树，中间最终 UI 与语义选区，右侧常驻项目 Codex 对话；运行控制条展示节点 schema、持久浏览器、草稿预览/恢复、源码候选两步确认、fixture、Tauri 行为证据和验证矩阵。普通 AI 源码任务运行期间，画布每 1.5 秒有界恢复同项目最新 designSession，任务成功或失败终止后停止跟随。AI context pack 携带紧凑状态、路径与哈希，不嵌入 Base64、秘密表单值或完整历史。
+- PC `/pc/ui-tuner` 默认进入“多端后台”：左侧平台/会话/UI 树，中间最终 UI 与语义选区，右侧常驻项目 Codex 对话；运行控制条展示节点 schema、持久浏览器、草稿预览/恢复、源码候选列表、fixture、Tauri 行为证据和验证矩阵。普通 AI 源码任务启动后绑定当前 session，并按 taskId/cursor 长轮询事件；若代理切换并绑定另一 designSession，中间画布跟随该事件切换，不再简单选择项目最新 session。源码候选可逐项查看 confidence、score、命中信号、SHA-256、byte range 和 excerpt，且必须先采用再确认 `BOUND`。
 
-本阶段代码尚未执行真实编译、TypeScript/ESLint、浏览器/Tauri/Android 启动、模拟器、真机、人工视觉、完整 E2E 或发布验收；这是本轮“代码优先”的明确边界，不得从源码存在推断运行成功。当前已安装 PC 节点实查仍是旧 schema：`ui_get_design_capabilities` 和 `ui_get_project_profile` 均由本机桥接返回未知/缺失，无法形成运行工件。因此仓库中的 1.8 工具必须经过 Windows 节点构建、发布、自动升级和能力回读后才可用于真实任务。
+本阶段代码尚未执行真实编译、TypeScript/ESLint、浏览器/Tauri/Android 启动、模拟器、真机、人工视觉、完整 E2E 或发布验收；这是本轮“代码优先”的明确边界，不得从源码存在推断运行成功。当前已安装 PC 节点实查仍是旧 schema：`ui_get_design_capabilities` 和 `ui_get_project_profile` 均由本机桥接返回未知/缺失，无法形成运行工件。因此仓库中的 1.9 工具必须经过 Windows 节点构建、发布、自动升级和能力回读后才可用于真实任务。
 
 Tauri 前端截图仍只能证明 WebView；只有 `ui_capture_tauri_host` 返回带 SHA-256 的原生工件时才能声明原生窗口证据。菜单、对话框和 command trace 是额外分层证据，不会单独把 `nativeHostVerified` 变为 true。
 
@@ -48,12 +50,14 @@ ui_get_design_capabilities
   -> ui_list_design_targets
   -> ui_list_design_sessions(limit?)
   -> 恢复已有 designSessionId 或 ui_open_design_target(platform, route, url?, viewport?)
+  -> ui_bind_design_task(taskId, designSessionId, draftId?, leaseSeconds?)
+  -> 消费者并行 ui_list_design_events(taskId, afterCursor?, waitMs?)
   -> 单次：ui_capture_design_surface(designSessionId, capture)
      或持久：ui_prepare_design_browser(designSessionId, capture?)
              -> ui_interact_design_browser(designSessionId, capture/navigateTo?)
              -> ui_stop_design_browser(designSessionId)
   -> ui_get_design_surface(designSessionId, query?, limit?)
-  -> ui_create_design_draft(designSessionId, ...)
+  -> ui_create_design_draft(designSessionId, operations?, patches?, ...)
   -> 可选 ui_preview_design_draft(draftId) -> ui_restore_design_draft_preview(draftId)
   -> ui_suggest_design_source_binding(draftId, limit?)
   -> ui_update_design_draft(... sourceBinding.status=CANDIDATE)
@@ -63,6 +67,7 @@ ui_get_design_capabilities
   -> 按目标平台重新捕获或验证
   -> ui_complete_design_writeback(draftId, expectedRevision, receiptId, changedFiles, evidence)
   -> ui_get_design_verification_matrix(draftId)
+  -> ui_settle_design_task_binding(taskId, leaseId, succeeded?)
 ```
 
 Tauri 需要原生窗口证据时，在前端捕获之外执行：
@@ -87,6 +92,8 @@ ui_prepare_tauri_runtime(designSessionId)
 8. 默认先读取语义 UI 树；只有布局、颜色、间距或像素差需要视觉判断时，再按路径读取 PNG。
 9. Design Draft 只是意图与撤销边界。开始写回前必须具备 `BOUND` 源码绑定；完成后必须读验证矩阵，不按 UI 上“已有截图”推断全平台通过。
 10. 草稿预览只适用于 Web/PWA/Tauri 前端持久浏览器；Android 继续使用 Live Runtime。预览和恢复都不写源码，源码绑定候选也不会自动升级为 `BOUND`。
+11. 一个 designSession 同时只允许一个有效 AI task lease。事件消费者必须保存返回 cursor 并增量读取；断线重连不应回读全部历史，任务终态必须 settle。
+12. `SET_STYLE` 仅在 Web/PWA/Tauri 标记为 `LIVE_PREVIEW`；Android 样式、文字/资源/variant/结构操作和响应式写回均按 capability entry 交给源码适配器，不能因已有机器契约就宣称运行完成。
 
 ## 4. 目标模型
 
@@ -126,6 +133,13 @@ ui_prepare_tauri_runtime(designSessionId)
 ```text
 .elon/ui-tuner/headless-design/drafts/draft_<uuid>.json
 .elon/ui-tuner/writeback-receipts/<receipt>.json
+```
+
+任务绑定和增量事件分别保存在：
+
+```text
+.elon/ui-tuner/headless-design/task-bindings/<sha256(taskId)>.json
+.elon/ui-tuner/headless-design/events/<cursor>.json
 ```
 
 记录包含平台、目标、route、脱敏 URL、viewport、状态、最近证据引用和时间戳。它必须同时满足：
@@ -169,6 +183,7 @@ Web/PWA/Tauri 前端捕获会在 PNG 旁生成 `.ui.json`。语义树单个工�
 - 单次浏览器捕获结束即回收；持久浏览器严格绑定项目、origin、认证、fixture 和 viewport，并受会话数、空闲、寿命和操作数上限约束。
 - Tauri 只能启动项目目标发现形成的命令，只跟踪和停止已登记 Runtime 的进程树；原生截图不读取整张桌面，行为工具只读证据。
 - 草稿更新要求 `expectedRevision`，源码绑定路径必须位于项目内且绑定范围有效；候选扫描只读已声明源码根并给出 source SHA-256，写回完成前会重新验证源码文件、摘要和平台证据。
+- taskId 仅允许有界 ASCII 标识；lease 冲突、过期和不匹配均失败关闭。事件目录 canonical path 必须位于项目内，单条事件最多 64 KiB，超过 1,000 条时按 cursor 删除最旧机器事件。
 - 截图、UI 树、manifest 和 session 文件都不能作为“源码已经修改”的证明。
 
 平台覆盖必须单独声明。浏览器证据不能证明 Android Runtime，Tauri 前端证据不能证明原生宿主，模拟器不能冒充用户要求的真机。写回回执的最低证据为：Web 需要 `browserCaptured` 与 `routeRevision`；PWA 需要 `runtimeReloaded` 与 `routeRevision`；Tauri 需要 `frontendCaptured`、`nativeHostVerified` 与 64 位 `nativeArtifactSha256`；Android/APK 需要 `runtimeConnected` 与 `apkPath`。任一目标平台缺证据时返回 `EVIDENCE_MISSING`，不得标记完成。
@@ -189,14 +204,14 @@ PC 端现在是后台会话的可选客户端，而不是第二套状态机：
 
 当前界面保持三个稳定区域：左侧平台、最近会话和紧凑 UI 树，中间实际像素证据与语义选区，右侧默认打开的 AI 对话。用户说“修改 Web 登录页”或“看 Tauri 设置页”时，客户端或代理先切换后台目标和 route，再读取/捕获同一 session；用户不打开画布时，同一工具链仍可完全后台运行。
 
-PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作为设计真源。项目 session、draft、writeback receipt、平台覆盖和证据引用来自 Node 数据面；对话 context pack 引用 selector、route、节点能力、持久浏览器摘要、草稿预览状态、最多 8 个源码候选、Tauri 分层证据、验证矩阵和工件哈希，不内嵌整张 PNG、fixture 值或完整撤销历史。“后台点击”保留一次性兼容路径；需要边点边看时使用同一 designSession 的持久浏览器。任务活动回调只驱动画布恢复，不改变 AI 会话状态；失败结算同样停止轮询。Tauri 页签明确区分 WebView 与原生窗口，未取得原生工件时保持未验证状态。
+PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作为设计真源。项目 session、draft、task binding、event cursor、writeback receipt、平台覆盖和证据引用来自 Node 数据面；对话 context pack 引用 selector、route、节点能力、task lease、最多 8 条最近紧凑事件、DraftOperation capability、多候选、Tauri 分层证据、验证矩阵和工件哈希，不内嵌整张 PNG、fixture 值或完整撤销历史。任务活动回调携带真实 taskId；启动时尝试绑定当前 session，代理也可后台打开并绑定另一 session，画布按事件中的 designSessionId 定向恢复。失败结算同样释放 lease 并停止跟随。Tauri 页签明确区分 WebView 与原生窗口，未取得原生工件时保持未验证状态。
 
 ## 9. 后续验收与增强顺序
 
 1. 静态门禁：完成源码大小、文档权威性、Git 收尾；本轮不补跑真实编译或平台测试。
-2. 节点候选版：构建包含 MCP schema v1.8 的 Windows 节点，升级后必须由 `ui_get_design_capabilities` 回读精确 schema 与能力 ID。
+2. 节点候选版：构建包含 MCP schema v1.9 的 Windows 节点，升级后必须由 `ui_get_design_capabilities` 回读精确 schema 与能力 ID。
 3. 隔离平台验收：Web/PWA 真实浏览器 fixture、Tauri 原生窗口/菜单/对话框/插桩 trace、Android 隔离模拟器分别形成验证矩阵回执。
-4. 灰度发布：验证旧节点已有 CLI/Exec 不受影响、1.8 新工具只在升级节点开放；只有用户明确要求或反馈视觉不正确时再做真机复核。
+4. 灰度发布：验证旧节点已有 CLI/Exec 不受影响、1.9 新工具只在升级节点开放；只有用户明确要求或反馈视觉不正确时再做真机复核。
 
 每一阶段都先扩展相同 MCP 契约；不得通过让代理操控 Windows 桌面来绕过缺失的数据面。
 
@@ -211,6 +226,9 @@ PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作
 - `file:server/src/node_agent_android_live/tauri_host_runtime.rs`
 - `file:server/src/node_agent_android_live/tauri_host_windows.rs`
 - `file:server/src/node_agent_android_live/design_drafts.rs`
+- `file:server/src/node_agent_android_live/design_draft_operations.rs`
+- `file:server/src/node_agent_android_live/design_task_binding.rs`
+- `file:server/src/node_agent_android_live/design_event_stream.rs`
 - `file:server/src/node_agent_android_live/design_draft_preview.rs`
 - `file:server/src/node_agent_android_live/design_source_binding.rs`
 - `file:server/src/node_agent_android_live/design_browser_runtime.rs`
