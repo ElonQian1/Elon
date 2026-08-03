@@ -5,6 +5,7 @@ use crate::{
     open_commerce_consumer_preference_model::{
         ConsumerPreferenceDisclosure, ConsumerPreferenceProfile,
     },
+    open_commerce_data_erasure_evidence_model::OpenCommerceDataErasureEvidence,
     open_commerce_data_request_model::OpenCommerceConsumerDataRequest,
     open_commerce_model::OpenCommerceInvocation,
     open_commerce_portability_model::{
@@ -20,6 +21,7 @@ use super::{
         preference_disclosure_from_row, preference_profile_from_row,
     },
     open_commerce_consumer_relationships::relationship_from_row,
+    open_commerce_data_erasure_evidence::{erasure_evidence_from_row, ERASURE_EVIDENCE_SELECT},
     open_commerce_invocations::{invocation_from_row, INVOCATION_SELECT},
     Store,
 };
@@ -30,6 +32,7 @@ pub(crate) struct ConsumerPortabilitySnapshotSources {
     pub relationships: Vec<OpenCommerceConsumerRelationship>,
     pub relationship_renewals: Vec<ConsumerRelationshipRenewalLink>,
     pub data_requests: Vec<OpenCommerceConsumerDataRequest>,
+    pub data_erasure_evidence: Vec<OpenCommerceDataErasureEvidence>,
     pub preference_profile: Option<ConsumerPreferenceProfile>,
     pub preference_disclosures: Vec<ConsumerPreferenceDisclosure>,
     pub terminal_invocations: Vec<OpenCommerceInvocation>,
@@ -97,6 +100,26 @@ impl Store {
             bail!("消费者数据请求超过单个导出包的 5000 条上限");
         }
 
+        let mut evidence_stmt = tx.prepare(&format!(
+            "{ERASURE_EVIDENCE_SELECT}
+              JOIN open_commerce_consumer_data_requests r ON r.id=e.data_request_id
+             WHERE r.consumer_project_id=?1 AND r.consumer_user_id=?2
+             ORDER BY e.created_at ASC, e.rowid ASC LIMIT ?3"
+        ))?;
+        let evidence_rows = evidence_stmt.query_map(
+            params![
+                consumer_project_id.trim(),
+                consumer_user_id.trim(),
+                (MAX_CONSUMER_PORTABILITY_RECORDS + 1) as i64
+            ],
+            erasure_evidence_from_row,
+        )?;
+        let data_erasure_evidence = evidence_rows.collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(evidence_stmt);
+        if data_erasure_evidence.len() > MAX_CONSUMER_PORTABILITY_RECORDS {
+            bail!("消费者删除证明超过单个 V5 导出包的 5000 条上限");
+        }
+
         let preference_profile = tx
             .query_row(
                 "SELECT preferences_json, revision, created_at, updated_at
@@ -155,6 +178,7 @@ impl Store {
             relationships,
             relationship_renewals,
             data_requests,
+            data_erasure_evidence,
             preference_profile,
             preference_disclosures,
             terminal_invocations,

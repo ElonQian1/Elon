@@ -138,7 +138,9 @@ impl Store {
     }
 }
 
-fn erasure_evidence_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceDataErasureEvidence> {
+pub(super) fn erasure_evidence_from_row(
+    row: &Row<'_>,
+) -> rusqlite::Result<OpenCommerceDataErasureEvidence> {
     Ok(OpenCommerceDataErasureEvidence {
         id: row.get(0)?,
         data_request_id: row.get(1)?,
@@ -154,7 +156,7 @@ fn erasure_evidence_from_row(row: &Row<'_>) -> rusqlite::Result<OpenCommerceData
     })
 }
 
-const ERASURE_EVIDENCE_SELECT: &str = "SELECT e.id, e.data_request_id, e.merchant_id,
+pub(super) const ERASURE_EVIDENCE_SELECT: &str = "SELECT e.id, e.data_request_id, e.merchant_id,
        e.evidence_kind, e.external_system, e.reference_id, e.receipt_sha256,
        e.summary, e.created_at
   FROM open_commerce_data_erasure_evidence e";

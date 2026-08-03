@@ -164,7 +164,8 @@ export default function ConsumerPortabilityImports({ projectId }: { projectId: s
             </header>
             <small style={commerceStyles.itemMeta}>
               {new Date(item.imported_at).toLocaleString()} · 关系 {item.relationship_count}
-              {' · '}请求 {item.data_request_count} · 调用凭证 {item.invocation_receipt_count}
+              {' · '}请求 {item.data_request_count} · 删除证明 {item.data_erasure_evidence_count}
+              {' · '}调用凭证 {item.invocation_receipt_count}
               {' · '}商户身份声明 {item.merchant_identity_claim_count}
             </small>
             <p style={{ ...commerceStyles.itemText, overflowWrap: 'anywhere' }}>{item.envelope_sha256}</p>

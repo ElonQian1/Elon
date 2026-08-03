@@ -266,6 +266,8 @@ export interface ConsumerPortableMerchantIdentityClaim {
   authority: 'merchant_private_key_possession'
 }
 
+export type ConsumerPortableDataErasureEvidence = ConsumerDataErasureEvidence
+
 export interface ConsumerPortabilityPayload {
   schema: string
   source_project_id: string
@@ -273,6 +275,7 @@ export interface ConsumerPortabilityPayload {
   relationships: ConsumerRelationship[]
   relationship_renewals: ConsumerRelationshipRenewalLink[]
   data_requests: ConsumerDataRequest[]
+  data_erasure_evidence?: ConsumerPortableDataErasureEvidence[]
   preference_profile?: ConsumerPreferenceProfile
   preference_disclosures?: ConsumerPreferenceDisclosure[]
   invocation_receipt_scope?: 'authenticated_user_account'
@@ -299,6 +302,7 @@ export interface ConsumerPortabilityExportSummary {
   relationship_count: number
   renewal_count: number
   data_request_count: number
+  data_erasure_evidence_count: number
   preference_profile_included: boolean
   preference_disclosure_count: number
   invocation_receipt_count: number
@@ -340,6 +344,7 @@ export interface ConsumerPortabilityImportSummary {
   payload_sha256: string
   relationship_count: number
   data_request_count: number
+  data_erasure_evidence_count: number
   preference_profile_included: boolean
   invocation_receipt_count: number
   merchant_identity_claim_count: number

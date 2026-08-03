@@ -66,7 +66,7 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
       <header>
         <span>
           <strong>我的可携带数据包</strong>
-          <small>导出关系、偏好、披露和本人调用凭证；不含原始输入、商户完整订单、联系方式、真实支付或账号标识。</small>
+          <small>导出关系、偏好、披露、删除证明和本人调用凭证；不含原始回执、商户完整订单、联系方式、真实支付或账号标识。</small>
         </span>
         <div style={commerceStyles.headerActions}>
           <button style={actionStyle('icon', busy)} type="button" onClick={refresh} disabled={busy} title="刷新数据包">
@@ -99,6 +99,7 @@ export default function ConsumerPortabilityExports({ projectId }: { projectId: s
             <p style={{ ...commerceStyles.itemText, overflowWrap: 'anywhere' }}>{item.payload_sha256}</p>
             <small style={commerceStyles.itemMeta}>
               关系 {item.relationship_count} · 续期 {item.renewal_count} · 删除请求 {item.data_request_count}
+              {' · '}删除证明 {item.data_erasure_evidence_count}
               {' · '}偏好档案 {item.preference_profile_included ? '1' : '0'} · 披露 {item.preference_disclosure_count}
               {' · '}调用凭证 {item.invocation_receipt_count}
               {' · '}商户身份声明 {item.merchant_identity_claim_count}

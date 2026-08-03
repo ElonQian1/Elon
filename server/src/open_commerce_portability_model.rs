@@ -9,8 +9,12 @@ use crate::{
 };
 
 pub(crate) const CONSUMER_PORTABILITY_EXPORT_SCHEMA: &str =
-    "open_commerce.consumer_portability_export.v4";
+    "open_commerce.consumer_portability_export.v5";
 pub(crate) const CONSUMER_PORTABILITY_PAYLOAD_SCHEMA: &str =
+    "open_commerce.consumer_portability_payload.v5";
+pub(crate) const CONSUMER_PORTABILITY_EXPORT_SCHEMA_V4: &str =
+    "open_commerce.consumer_portability_export.v4";
+pub(crate) const CONSUMER_PORTABILITY_PAYLOAD_SCHEMA_V4: &str =
     "open_commerce.consumer_portability_payload.v4";
 pub(crate) const CONSUMER_PORTABILITY_EXPORT_SCHEMA_V3: &str =
     "open_commerce.consumer_portability_export.v3";
@@ -51,6 +55,21 @@ pub(crate) struct ConsumerPortableMerchantIdentityClaim {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct ConsumerPortableDataErasureEvidence {
+    pub id: String,
+    pub data_request_id: String,
+    pub merchant_id: String,
+    pub evidence_kind: String,
+    pub external_system: String,
+    pub reference_id: String,
+    pub receipt_sha256: String,
+    pub summary: String,
+    pub source_authority: String,
+    pub platform_verified: bool,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ConsumerPortabilityPayload {
     pub schema: String,
     pub source_project_id: String,
@@ -58,6 +77,8 @@ pub(crate) struct ConsumerPortabilityPayload {
     pub relationships: Vec<OpenCommerceConsumerRelationship>,
     pub relationship_renewals: Vec<ConsumerRelationshipRenewalLink>,
     pub data_requests: Vec<OpenCommerceConsumerDataRequest>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub data_erasure_evidence: Vec<ConsumerPortableDataErasureEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preference_profile: Option<ConsumerPreferenceProfile>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -91,6 +112,7 @@ pub(crate) struct ConsumerPortabilityExportSummary {
     pub relationship_count: usize,
     pub renewal_count: usize,
     pub data_request_count: usize,
+    pub data_erasure_evidence_count: usize,
     pub preference_profile_included: bool,
     pub preference_disclosure_count: usize,
     pub invocation_receipt_count: usize,
@@ -108,6 +130,7 @@ impl ConsumerPortabilityExport {
             relationship_count: self.payload.relationships.len(),
             renewal_count: self.payload.relationship_renewals.len(),
             data_request_count: self.payload.data_requests.len(),
+            data_erasure_evidence_count: self.payload.data_erasure_evidence.len(),
             preference_profile_included: self.payload.preference_profile.is_some(),
             preference_disclosure_count: self.payload.preference_disclosures.len(),
             invocation_receipt_count: self.payload.invocation_receipts.len(),

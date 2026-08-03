@@ -2,19 +2,24 @@ use anyhow::{anyhow, bail, Context, Result};
 use chrono::Utc;
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     open_commerce_consumer_receipt_model::{
         CONSUMER_RECEIPT_PAYLOAD_SCHEMA, CONSUMER_RECEIPT_SCHEMA,
     },
     open_commerce_consumer_receipt_service,
+    open_commerce_data_erasure_evidence_model::{
+        ERASURE_EVIDENCE_KIND_EXTERNAL_RECEIPT, ERASURE_EVIDENCE_KIND_MERCHANT_ATTESTATION,
+        ERASURE_EVIDENCE_SOURCE_AUTHORITY,
+    },
     open_commerce_model::SETTLEMENT_RECORDED_NOT_CHARGED,
     open_commerce_portability_model::{
         ConsumerPortabilityExport, ConsumerPortabilityExportSummary, ConsumerPortabilityPayload,
-        ConsumerPortableInvocationReceipt, ConsumerPortableMerchantIdentityClaim,
-        CreateConsumerPortabilityExportRequest, CONSUMER_PORTABILITY_EXPORT_SCHEMA,
-        CONSUMER_PORTABILITY_PAYLOAD_SCHEMA,
+        ConsumerPortableDataErasureEvidence, ConsumerPortableInvocationReceipt,
+        ConsumerPortableMerchantIdentityClaim, CreateConsumerPortabilityExportRequest,
+        CONSUMER_PORTABILITY_EXPORT_SCHEMA, CONSUMER_PORTABILITY_EXPORT_SCHEMA_V4,
+        CONSUMER_PORTABILITY_PAYLOAD_SCHEMA, CONSUMER_PORTABILITY_PAYLOAD_SCHEMA_V4,
     },
     open_commerce_service::OpenCommerceActor,
     store::Store,
@@ -54,6 +59,11 @@ pub(crate) fn create_export(
         .collect::<Result<Vec<_>>>()?;
     let merchant_identity_claims =
         portable_merchant_identity_claims(store, &sources.relationships)?;
+    let data_erasure_evidence = sources
+        .data_erasure_evidence
+        .into_iter()
+        .map(portable_data_erasure_evidence)
+        .collect();
     let payload = ConsumerPortabilityPayload {
         schema: CONSUMER_PORTABILITY_PAYLOAD_SCHEMA.to_string(),
         source_project_id: consumer_project_id.trim().to_string(),
@@ -61,6 +71,7 @@ pub(crate) fn create_export(
         relationships: sources.relationships,
         relationship_renewals: sources.relationship_renewals,
         data_requests: sources.data_requests,
+        data_erasure_evidence,
         preference_profile: sources.preference_profile,
         preference_disclosures: sources.preference_disclosures,
         invocation_receipt_scope: Some("authenticated_user_account".to_string()),
@@ -91,6 +102,7 @@ pub(crate) fn create_export(
                 "relationship_count": export.payload.relationships.len(),
                 "renewal_count": export.payload.relationship_renewals.len(),
                 "data_request_count": export.payload.data_requests.len(),
+                "data_erasure_evidence_count": export.payload.data_erasure_evidence.len(),
                 "preference_profile_included": export.payload.preference_profile.is_some(),
                 "preference_disclosure_count": export.payload.preference_disclosures.len()
                 ,"invocation_receipt_count": export.payload.invocation_receipts.len()
@@ -204,6 +216,9 @@ fn verify_export_contents(export: ConsumerPortabilityExport) -> Result<ConsumerP
             CONSUMER_PORTABILITY_EXPORT_SCHEMA,
             CONSUMER_PORTABILITY_PAYLOAD_SCHEMA
         ) | (
+            CONSUMER_PORTABILITY_EXPORT_SCHEMA_V4,
+            CONSUMER_PORTABILITY_PAYLOAD_SCHEMA_V4
+        ) | (
             crate::open_commerce_portability_model::CONSUMER_PORTABILITY_EXPORT_SCHEMA_V3,
             crate::open_commerce_portability_model::CONSUMER_PORTABILITY_PAYLOAD_SCHEMA_V3
         ) | (
@@ -217,8 +232,10 @@ fn verify_export_contents(export: ConsumerPortabilityExport) -> Result<ConsumerP
     if !supported_version {
         bail!("消费者可携带数据负载版本不受支持");
     }
-    let is_v4 = export.schema == CONSUMER_PORTABILITY_EXPORT_SCHEMA;
-    let has_invocation_receipts = is_v4
+    let is_v5 = export.schema == CONSUMER_PORTABILITY_EXPORT_SCHEMA;
+    let is_v4 = export.schema == CONSUMER_PORTABILITY_EXPORT_SCHEMA_V4;
+    let has_invocation_receipts = is_v5
+        || is_v4
         || export.schema
             == crate::open_commerce_portability_model::CONSUMER_PORTABILITY_EXPORT_SCHEMA_V3;
     if has_invocation_receipts {
@@ -234,10 +251,15 @@ fn verify_export_contents(export: ConsumerPortabilityExport) -> Result<ConsumerP
     {
         bail!("旧版消费者可携带数据包不能包含 V3 调用凭证字段");
     }
-    if is_v4 {
+    if is_v5 || is_v4 {
         verify_merchant_identity_claims(&export.payload)?;
     } else if !export.payload.merchant_identity_claims.is_empty() {
         bail!("旧版消费者可携带数据包不能包含 V4 商户身份声明");
+    }
+    if is_v5 {
+        verify_data_erasure_evidence(&export.payload)?;
+    } else if !export.payload.data_erasure_evidence.is_empty() {
+        bail!("旧版消费者可携带数据包不能包含 V5 删除证明");
     }
     if export.source_project_id != export.source_project_id.trim()
         || export.payload.source_project_id != export.source_project_id
@@ -331,6 +353,76 @@ fn portable_merchant_identity_claims(
         }
     }
     Ok(claims)
+}
+
+fn portable_data_erasure_evidence(
+    evidence: crate::open_commerce_data_erasure_evidence_model::OpenCommerceDataErasureEvidence,
+) -> ConsumerPortableDataErasureEvidence {
+    ConsumerPortableDataErasureEvidence {
+        id: evidence.id,
+        data_request_id: evidence.data_request_id,
+        merchant_id: evidence.merchant_id,
+        evidence_kind: evidence.evidence_kind,
+        external_system: evidence.external_system,
+        reference_id: evidence.reference_id,
+        receipt_sha256: evidence.receipt_sha256,
+        summary: evidence.summary,
+        source_authority: evidence.source_authority.to_string(),
+        platform_verified: evidence.platform_verified,
+        created_at: evidence.created_at,
+    }
+}
+
+fn verify_data_erasure_evidence(payload: &ConsumerPortabilityPayload) -> Result<()> {
+    if payload.data_erasure_evidence.len() > 5_000 {
+        bail!("消费者可携带数据包的删除证明超过 5000 条上限");
+    }
+    let requests = payload
+        .data_requests
+        .iter()
+        .map(|request| {
+            (
+                request.id.as_str(),
+                (request.merchant_id.as_str(), request.status.as_str()),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut evidence_ids = BTreeSet::new();
+    for evidence in &payload.data_erasure_evidence {
+        if !evidence_ids.insert(evidence.id.as_str())
+            || !valid_portable_text(&evidence.id, 120)
+            || requests.get(evidence.data_request_id.as_str()).copied()
+                != Some((evidence.merchant_id.as_str(), "completed"))
+            || !matches!(
+                evidence.evidence_kind.as_str(),
+                ERASURE_EVIDENCE_KIND_EXTERNAL_RECEIPT | ERASURE_EVIDENCE_KIND_MERCHANT_ATTESTATION
+            )
+            || !valid_portable_text(&evidence.external_system, 80)
+            || !valid_portable_text(&evidence.reference_id, 160)
+            || !valid_portable_text(&evidence.summary, 500)
+            || evidence.source_authority != ERASURE_EVIDENCE_SOURCE_AUTHORITY
+            || evidence.platform_verified
+            || !valid_lower_sha256(&evidence.receipt_sha256)
+            || chrono::DateTime::parse_from_rfc3339(&evidence.created_at).is_err()
+        {
+            bail!("消费者可携带数据包包含无效删除证明");
+        }
+    }
+    Ok(())
+}
+
+fn valid_portable_text(value: &str, max_len: usize) -> bool {
+    value == value.trim()
+        && !value.is_empty()
+        && value.chars().count() <= max_len
+        && !value.chars().any(char::is_control)
+}
+
+fn valid_lower_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn verify_merchant_identity_claims(payload: &ConsumerPortabilityPayload) -> Result<()> {
