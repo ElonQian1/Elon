@@ -246,6 +246,16 @@ Windows 节点复用 `yilong_ui_live` Streamable HTTP MCP，通过 `ui_capture_p
 
 PC 网页登录的 `remember_device=true` 只用于用户主动登录的可信 PC：服务端发放十年有效、仍可注销或管理员撤销的长期 session；已登录的旧 PC session 会在 `/api/me` 成功后通过 `/api/auth/trust-current-device` 原位升级，不要求重新输入密码或轮换 token。普通客户端与旧调用保持 30 天。这里的“长期记住”不是保存密码，也不是不可撤销的永久凭据；PC 主动退出时同时尽力删除 Windows DPAPI 保存的 PWA 凭据。
 
+### 2.7 后台多端 UI 设计 MCP
+
+`yilong-ui-live` 现在把微调画布的数据面独立为后台设计会话。代理先通过 `ui_list_design_targets` 发现项目的 Web、PWA、Tauri 和 Android 目标，再用 `ui_open_design_target` 建立与当前 MCP session 绑定的 `designSessionId`；用户是否打开 PC 画布不影响这条链路。`ui_get_project_profile` schema v3 同时返回相同的小型目标索引，避免代理先全仓搜索技术栈。
+
+Web、PWA 与 Tauri 第一阶段复用 PWA Runtime 的受控无头 Chromium、origin 白名单、临时 profile、认证和受限交互策略。`ui_capture_design_surface` 同时保存 PNG 与紧凑语义 UI 树；`ui_get_design_surface` 按 selector、role、label 或 tag 分页式查询节点，读取前复核项目内路径、512 KiB 上限和 SHA-256。响应不嵌入 PNG/Base64，代理默认先读 UI 树，再按需读取像素工件。
+
+平台证据不互相冒充：Android 仍走 Android Live Runtime，未连接时返回 `PREPARATION_REQUIRED`；Tauri 当前只覆盖前端 WebView，固定返回 `TAURI_FRONTEND_WEBVIEW_ONLY` 和 `nativeHostVerified=false`，没有证明原生窗口、系统菜单、Rust command 或系统对话框。设计会话记录位于 `.elon/ui-tuner/headless-design/sessions/`，并绑定项目 canonical root 与创建它的 MCP session。
+
+PC 微调画布的目标形态是消费相同 `designSessionId` 的可选客户端：中间显示实际页面和选区，右侧默认保持 AI 对话，平台与 route 由代理根据自然语言切换。当前批次尚未把 PC UI 接入该会话，也尚未实现通用多端草稿、撤销和源码写回。完整契约、信任边界、实现引用与分阶段路线见 `docs/headless-ui-design-mcp.md`。
+
 ## 3. 代码仓库结构（目标结构）
 
 ```
