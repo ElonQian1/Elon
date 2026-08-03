@@ -2502,7 +2502,7 @@
         "view": "architecture",
         "kind": "planned_component",
         "label": "共享算力容量池与账本 V1",
-        "detail": "单池单窗口、跨 Offer 共享余额、多 meter Claim、六账户 reducer、v165/v167-v168 schema、Store-canonical Supply/Claim 请求摘要、供给、Claim、审计、恢复和 Pool 控制面已写且未编译；不可变首次响应与 Broker Reserve 尚未实现",
+        "detail": "单池单窗口、跨 Offer 共享余额、多 meter Claim、六账户 reducer、v165/v167-v168 schema、Store-canonical V1/V2 请求摘要、事务内 Claim kernel、因果绑定继承、审计、恢复和 Pool 控制面已写且未编译；不可变首次响应与完整 Broker Reserve 尚未实现",
         "parent_id": "arch-server",
         "order": 36,
         "color": "#D0A34F",
@@ -2518,6 +2518,7 @@
           "file:server/src/store/compute_capacity_request_digest.rs",
           "file:server/src/store/compute_capacity_claims.rs",
           "file:server/src/store/compute_capacity_claim_transitions.rs",
+          "file:server/src/store/compute_capacity_posting.rs",
           "file:server/src/store/compute_capacity_audit.rs",
           "file:server/src/store/compute_capacity_expiry_recovery.rs"
         ],

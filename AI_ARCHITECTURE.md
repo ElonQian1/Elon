@@ -198,7 +198,7 @@ AI_PROJECT / AI_INDEX / AGENTS
 - 验证与计量面：节点声明、平台观测、挑战/复算和最终验证事实；
 - 市场与结算面：标准 Compute SKU、期货交付窗口、不可变价格快照和双价格腿回执。
 
-当前 `server/src/compute_federation/` 提供未编译、未接线的云端领域合同；`server/src/store/compute_capacity_*.rs`、`compute_provider_registry.rs`、`compute_offer_registry.rs`、`compute_price_snapshot_registry.rs` 与 `compute_job_registry.rs` 已形成隔离的 CapacityPool、Provider/Offer Registry、供给、Claim、Store-canonical 请求摘要、账本审计、到期恢复、生命周期、不可变锁价快照和版本化 Job Store。这些路径尚未编译、执行迁移或接入 Reservation/Broker。`server/src/node_agent_compute_plugin_host/` 已增加未编译的 Manifest、InstallPlan、双槽生命周期、ReadyCapability、Attempt 命令和 typed event 合同，但尚无下载器、Sidecar 或通用协议接线。现有节点模型白名单、Token 预留和流租约继续作为 `user_node + llm_chat` 兼容路径。权威架构与阶段见 `docs/distributed-compute/README.md`。
+当前 `server/src/compute_federation/` 提供未编译、未接线的云端领域合同；`server/src/store/compute_capacity_*.rs`、`compute_provider_registry.rs`、`compute_offer_registry.rs`、`compute_price_snapshot_registry.rs` 与 `compute_job_registry.rs` 已形成隔离的 CapacityPool、Provider/Offer Registry、供给、Claim、Store-canonical 请求摘要、可组合事务内 Claim kernel、账本审计、到期恢复、生命周期、不可变锁价快照和版本化 Job Store。Reservation-bound Hold 可固定 Offer/Job/Reservation 并由 Finish 继承，但预算、Reservation 与 Job 尚未进入同一 Broker 事务。这些路径尚未编译、执行迁移或接入真实 Broker。`server/src/node_agent_compute_plugin_host/` 已增加未编译的 Manifest、InstallPlan、双槽生命周期、ReadyCapability、Attempt 命令和 typed event 合同，但尚无下载器、Sidecar 或通用协议接线。现有节点模型白名单、Token 预留和流租约继续作为 `user_node + llm_chat` 兼容路径。权威架构与阶段见 `docs/distributed-compute/README.md`。
 
 ## 关键模块边界
 

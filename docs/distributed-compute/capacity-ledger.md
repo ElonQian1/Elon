@@ -78,6 +78,8 @@ Transaction 固定 pool、epoch、window、事件类型、幂等键、请求摘�
 
 任何一步失败全部回滚。候选查询、Quote 和 ReadyCapability 只提供观察事实，不能跳过 Reserve 的再次检查。
 
+当前容量 Store 已把 Claim Hold/Finish 拆出不自行提交的事务内 kernel。公开 standalone 方法仍以 `BEGIN IMMEDIATE` 包住 kernel 并负责 commit；未来 Broker 可在自己持有的同一事务中调用 Reservation-bound Hold。该入口用独立 V2 摘要固定 Offer、Job 与 Reservation causal binding，重放逐字段复核；Finish 从原 held 事务继承绑定并引用它作为因果前序。它只解决容量腿的可组合性，还没有冻结预算、写 Reservation 或推进 Job，因此不能称为 Broker Reserve 已实现。
+
 ## 5. Attempt 与容量
 
 Attempt 创建在独立事务中把 Reservation Claim 从 `held` 推到 `active`，同时检查：
@@ -104,7 +106,7 @@ reusable:   issued = available + held + active + retired
 ## 7. 到期、恢复与对账
 
 - Quote hold、Reservation 和 Commitment 都有明确 expires_at；
-- 恢复器按 Claim 而非汇总余额追加 release/expired transaction；
+- 恢复器按 Claim 而非汇总余额追加 release/expired transaction；通用恢复器跳过 `compute_reservation` 主体，避免在未来 Broker 之外单独归还容量；
 - 相同 effect 使用唯一幂等键，不会重复归还；
 - Supply Add/Withdraw 与 Claim Hold/Finish 的 request digest 已由 Store 按版本化字段、排序 bucket 数量和规范 UTC 计算；代码级重放仍返回当前 Claim/余额，尚未保存不可变首次响应，因此不能描述为严格幂等闭环；
 - 账本与余额投影不一致时停止新 Reserve，重放 ledger 重建投影并形成审计报告；
@@ -116,4 +118,4 @@ reusable:   issued = available + held + active + retired
 
 ## 9. 当前实现边界
 
-2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v171 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、窗口与 TTL 有界的 Claim hold、Claim-local held-only 释放/到期、Supply/Claim 四类写入的 Store-canonical request digest、双分录落库、余额 CAS、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、版本化 Provider/Offer 注册和历史审计，以及不可变 Price Snapshot 登记与读取。Offer 只保存静态销售上限并交叉核验真实 bucket，不成为实时余额真源；Price Snapshot Registry 接收已构造快照，不生成报价，也不与容量/预算原子锁定。这些新增路径尚未编译、执行迁移、调度、并发验证或真实容量操作。Hold/Finish 的 causal binding 当前仍为空，standalone Reservation/Commitment 不等于与预算、Price Snapshot、Reservation 原子完成的 Broker Reserve。Offer 发现/撮合、价格源与报价生成、统一 Reserve、Attempt 激活、不可变 Claim 首次响应、事务内 Broker API、受控自动修复和运行协议仍未写入或接线。
+2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v171 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、窗口与 TTL 有界的 Claim hold、Claim-local held-only 释放/到期、Supply/Claim 四类写入的 Store-canonical request digest、双分录落库、余额 CAS、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、版本化 Provider/Offer 注册和历史审计，以及不可变 Price Snapshot 登记与读取。Claim Hold/Finish 还形成调用方事务内 kernel：standalone 保持 V1 摘要和空 binding，Reservation-bound Hold 使用含 Offer/Job/Reservation 的 V2 摘要与显式 binding，Finish 继承原 held 绑定，通用恢复器跳过 Reservation 主体。Offer 只保存静态销售上限并交叉核验真实 bucket，不成为实时余额真源；Price Snapshot Registry 接收已构造快照，不生成报价，也不与容量/预算原子锁定。这些新增路径尚未编译、执行迁移、调度、并发验证或真实容量操作。standalone Reservation/Commitment 不等于与预算、Price Snapshot、Reservation 原子完成的 Broker Reserve。Offer 发现/撮合、价格源与报价生成、统一 Reserve、Attempt 激活、不可变 Claim 首次响应、完整事务内 Broker API、受控自动修复和运行协议仍未写入或接线。
