@@ -1,6 +1,6 @@
 # 消费者发现与第三方应用沙盒
 
-本文说明已实现的消费者发现、应用注册、授权审批和开发者调用闭环。沙盒边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定，跨项目目录发布由 `docs/decisions/open-commerce-directory-publication-v1.md` 决定，应用与申请生命周期由 `docs/decisions/open-commerce-developer-lifecycle-v1.md` 决定，商户紧急封禁由 `docs/decisions/open-commerce-app-blocks-v1.md` 决定，授权期限由 `docs/decisions/open-commerce-grant-expiration-v1.md` 决定，消费者关系及续期由 `docs/decisions/open-commerce-consumer-relationships-v1.md` 和 `docs/decisions/open-commerce-consumer-relationship-renewal-v1.md` 决定，偏好档案与关系级披露由 `docs/decisions/open-commerce-consumer-preference-disclosures-v1.md` 决定，关联数据删除请求及外部证明由 `docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` 和 `docs/decisions/open-commerce-consumer-data-erasure-evidence-v1.md` 决定，本人可验证导出由 `docs/decisions/open-commerce-consumer-portability-exports-v3.md` 决定，消费者调用凭证由 `docs/decisions/open-commerce-consumer-invocation-receipts-v1.md` 决定，开发者终态事件流由 `docs/decisions/open-commerce-developer-terminal-events-v1.md` 决定，Schema 驱动调用表单由 `docs/decisions/open-commerce-schema-driven-invocation-form-v1.md` 决定，授权总预算由 `docs/decisions/open-commerce-grant-budgets-v1.md` 决定，商户侧调用活动证据由 `docs/decisions/open-commerce-app-activity-health-v1.md` 决定。
+本文说明消费者发现、应用注册、授权审批和开发者调用闭环。沙盒总边界由 `docs/decisions/open-commerce-consumer-developer-sandbox-v1.md` 决定；目录、关系、偏好、删除请求与证明分别由 `docs/decisions/open-commerce-directory-publication-v1.md`、`docs/decisions/open-commerce-consumer-relationships-v1.md`、`docs/decisions/open-commerce-consumer-preference-disclosures-v1.md`、`docs/decisions/open-commerce-consumer-data-erasure-requests-v1.md` 和 `docs/decisions/open-commerce-consumer-data-erasure-evidence-v1.md` 决定；当前本人导出由 `docs/decisions/open-commerce-consumer-portability-exports-v5.md` 决定。应用生命周期、动作确认、授权预算、调用凭证、终态事件和活动证据继续按 `docs/open-commerce/README.md` 所列专项 ADR 执行。
 
 ## 使用入口
 
@@ -83,4 +83,4 @@ Set-Location pc-frontend
 npm run test:open-commerce
 ```
 
-当前已实现商户主动选择的跨项目基础目录、限时授权、消费者可撤销及安全续期的关系凭证、低敏偏好字段披露、匿名删除请求与商户履约声明、含账户级调用凭证的本人 V3 可验证导出、Schema 驱动填写、服务端短时一次性动作确认、持久化能力调用配额、近 24 小时可解释活动证据、商户级手动 App 封禁，以及沙盒 App 生命周期闭环。通过该验收仍不代表生产公共网络已经完成；生产应用审核、跨运营方身份互认、数据包导入、完整订单迁移、外部通知、自动全网滥用处置、敏感数据保险箱、外部删除适配器、支付和真实平台适配器仍是后续模块。
+当前已形成商户主动发布目录、限时授权、消费者可撤销关系、低敏偏好字段披露、匿名删除请求、商户未核验证明、含证明与调用凭证的本人 V5 可验证导出、隔离导入、Schema 驱动填写、短时动作确认、持久化调用配额、活动证据、商户级手动 App 封禁和沙盒 App 生命周期闭环。新增 V5 等批次尚未编译或回归；生产应用审核、完整订单迁移、外部通知、敏感数据保险箱、真实删除适配器、支付和真实平台适配器仍是后续模块。
