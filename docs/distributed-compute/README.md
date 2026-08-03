@@ -57,9 +57,9 @@ owners: backend, node, ai-economy
 
 ### F2：Broker、验证和真实结算
 
-共享 CapacityPool 与追加式容量账本已经形成领域合同、checked-i128 reducer 与 v165 SQLite schema 骨架，但尚未编译或执行迁移。Offer 发布、复制或续期都不会铸造容量；只有 Pool bucket 的 `supply_added` 进入账本后才形成可用余额。V1 一份 Reservation 只绑定一个 Pool 和一个精确 UTC 半开窗口 `[starts_at, ends_at)`，再在同一事务中完成多 meter 容量、消费者预算、Price Snapshot 与 Reservation 的原子预留。
+共享 CapacityPool 与追加式容量账本已经形成领域合同、checked-i128 reducer、v165 SQLite schema 和隔离的本地 Store 写入路径。Store 可登记池版本与零余额 bucket，原子追加多 meter 发行/撤出双分录，并通过稳定 Claim 完成 hold、revision 栅栏释放和到期归还；幂等重放返回当前余额。上述代码尚未编译、执行迁移或接入运行路由。Offer 发布、复制或续期都不会铸造容量；只有 Pool bucket 的 `supply_added` 进入账本后才形成可用余额。V1 最终仍要求一份 Reservation 只绑定一个 Pool 和一个精确 UTC 半开窗口 `[starts_at, ends_at)`，并在同一事务中完成多 meter 容量、消费者预算、Price Snapshot 与 Reservation 的原子预留。
 
-后续实现 Offer Registry、报价锁定、容量账本 Store/恢复器、原子预留、带 `fencing_generation` 的尝试租约、多源计量、挑战任务、争议状态和可提取收益账本。
+后续实现 Offer Registry、报价锁定、容量审计与恢复器、容量和预算统一 Reserve、带 `fencing_generation` 的尝试租约、多源计量、挑战任务、争议状态和可提取收益账本。
 
 ### F3：外部矿池与企业集群
 
