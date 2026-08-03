@@ -196,6 +196,40 @@ POST /api/projects/{project_id}/economy/sui-correction-projections/{projection_i
 
 接口不保存新的交接状态，不创建交易字节，也不授权任何外部服务提交网络。未来适配器仍须使用独立机器身份和租约状态机。
 
+## Sui 离线预检适配器与报告
+
+项目成员可读取适配器档案和历史报告，项目编辑者可在明确确认后签发、轮换或停用机器凭据：
+
+```http
+GET  /api/projects/{project_id}/economy/sui-preflight-adapters
+POST /api/projects/{project_id}/economy/sui-preflight-adapters
+POST /api/projects/{project_id}/economy/sui-preflight-adapters/{adapter_id}/rotate
+POST /api/projects/{project_id}/economy/sui-preflight-adapters/{adapter_id}/disable
+GET  /api/projects/{project_id}/economy/sui-preflight-reports
+```
+
+签发请求明确选择名称、目标网络、标准或纠正包、1–366 天期限和用户确认。完整 `sui_preflight_` 凭据只在签发或轮换响应中返回一次，服务端只保存摘要；停用不删除历史报告。
+
+显式启用 `ELON_SUI_OFFLINE_PREFLIGHT_ENABLED` 后，已鉴权机器可提交离线预检结果：
+
+```http
+POST /api/economy/sui-preflight/reports
+Authorization: Bearer sui_preflight_...
+Content-Type: application/json
+
+{
+  "package_kind": "standard",
+  "projection_package_id": "sui_projection_...",
+  "handoff_digest": "64位SHA-256",
+  "outcome": "passed",
+  "summary": "离线结构与约束检查通过",
+  "tool_version": "adapter-preflight/1.0",
+  "idempotency_key": "preflight-job-001"
+}
+```
+
+服务端按包类型只读重建交接包并要求摘要、项目、网络和适配器权限一致。同一适配器与幂等键只接受完全相同的内容。报告不调用投影复核写操作，不改变完整性、争议、就绪、网络提交或次数，也不代表签名、广播、最终性和资金移动。
+
 ## 纠正链与当前有效凭证
 
 项目成员可从任意标准、冲销或替换凭证解析完整纠正链：
