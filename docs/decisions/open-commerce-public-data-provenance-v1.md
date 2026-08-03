@@ -22,6 +22,7 @@ implementation_status: implementation_uncompiled
 6. 商户 PC 可在发布能力时填写有效秒数，并明确显示零代表不声明；消费者 PC 显示来源类型、商户声明身份及新鲜度状态。
 7. 消费者显式生成排序凭证时，每条有序结果同时固化来源声明和新鲜度快照，使下载文件与当次页面展示保持一致。
 8. V1 不新增数据库表，不改变调用授权、计量、结算、业务回执或连接器同步语义。
+9. 消费者是否排除 `stale/unknown` 由 `open-commerce-consumer-freshness-filter-v1` 单独决定；来源声明层本身不自动隐藏能力。
 
 ## 信任边界
 

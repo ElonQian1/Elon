@@ -141,6 +141,8 @@
 131. `docs/open-commerce-consumer-ranking-receipts-v1-acceptance.md`：查看排序凭证代码状态与后置统一回归矩阵。
 132. `docs/decisions/open-commerce-public-data-provenance-v1.md`：查看商户声明来源、新鲜度派生和未外部核验边界。
 133. `docs/open-commerce-public-data-provenance-v1-acceptance.md`：查看来源与新鲜度代码状态及后置统一回归矩阵。
+134. `docs/decisions/open-commerce-consumer-freshness-filter-v1.md`：查看消费者主动筛选声明期内能力和默认不隐藏边界。
+135. `docs/open-commerce-consumer-freshness-filter-v1-acceptance.md`：查看声明期筛选代码状态及后置统一回归矩阵。
 
 ## 专题地图
 
