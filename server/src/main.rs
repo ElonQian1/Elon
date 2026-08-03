@@ -257,6 +257,7 @@ mod open_commerce_invocation_protocol;
 mod open_commerce_invocation_recovery;
 #[cfg(test)]
 mod open_commerce_invocation_recovery_tests;
+mod open_commerce_invocation_service;
 mod open_commerce_mcp;
 mod open_commerce_mcp_tools;
 mod open_commerce_merchant_evidence_api;
