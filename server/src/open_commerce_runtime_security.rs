@@ -19,6 +19,9 @@ pub(crate) fn validate_endpoint_base_url(value: &str) -> Result<String> {
     if url.scheme() != "https" && !local_test {
         bail!("商户运行地址必须使用 HTTPS");
     }
+    if !local_test && url.port_or_known_default() != Some(443) {
+        bail!("商户运行地址必须使用标准 HTTPS 443 端口");
+    }
     if !local_test && !allowed_hosts().iter().any(|allowed| allowed == &host) {
         bail!("商户运行主机未加入 OPEN_COMMERCE_RUNTIME_ALLOWED_HOSTS 白名单");
     }

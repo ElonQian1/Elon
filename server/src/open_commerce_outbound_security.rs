@@ -53,6 +53,31 @@ pub(crate) async fn pinned_public_https_target(
     })
 }
 
+#[cfg(test)]
+pub(crate) async fn pinned_public_https_target_or_local_test(
+    value: &str,
+    connect_timeout: Duration,
+    request_timeout: Duration,
+) -> Result<PinnedHttpsTarget> {
+    let url = reqwest::Url::parse(value).map_err(|_| anyhow!("HTTPS 出站地址无效"))?;
+    let local_host = url
+        .host_str()
+        .is_some_and(|host| matches!(host, "127.0.0.1" | "localhost" | "::1"));
+    if local_host && matches!(url.scheme(), "http" | "https") {
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .connect_timeout(connect_timeout)
+            .timeout(request_timeout)
+            .redirect(reqwest::redirect::Policy::none())
+            .build()?;
+        return Ok(PinnedHttpsTarget {
+            client,
+            url: url.to_string(),
+        });
+    }
+    pinned_public_https_target(value, connect_timeout, request_timeout).await
+}
+
 fn preferred_address(addresses: &[SocketAddr]) -> SocketAddr {
     addresses
         .iter()

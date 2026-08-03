@@ -20,13 +20,32 @@ pub(crate) async fn invoke_runtime(
     let body = serde_json::to_vec(envelope).map_err(RuntimeCallError::infrastructure)?;
     let timestamp = envelope.issued_at_unix.to_string();
     let signature = sign(&secret, &timestamp, &body).map_err(RuntimeCallError::infrastructure)?;
-    let endpoint = format!("{}/commerce/v1/invoke", binding.endpoint_base_url);
-    let response = reqwest::Client::builder()
-        .timeout(Duration::from_millis(binding.timeout_ms as u64))
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(RuntimeCallError::infrastructure)?
-        .post(endpoint)
+    let endpoint_base = crate::open_commerce_runtime_security::validate_endpoint_base_url(
+        &binding.endpoint_base_url,
+    )
+    .map_err(RuntimeCallError::infrastructure)?;
+    let endpoint = format!("{endpoint_base}/commerce/v1/invoke");
+    let request_timeout = Duration::from_millis(binding.timeout_ms as u64);
+    let connect_timeout = request_timeout.min(Duration::from_secs(5));
+    #[cfg(not(test))]
+    let target = crate::open_commerce_outbound_security::pinned_public_https_target(
+        &endpoint,
+        connect_timeout,
+        request_timeout,
+    )
+    .await
+    .map_err(RuntimeCallError::infrastructure)?;
+    #[cfg(test)]
+    let target = crate::open_commerce_outbound_security::pinned_public_https_target_or_local_test(
+        &endpoint,
+        connect_timeout,
+        request_timeout,
+    )
+    .await
+    .map_err(RuntimeCallError::infrastructure)?;
+    let response = target
+        .client
+        .post(&target.url)
         .header("content-type", "application/json")
         .header("x-yilong-runtime-key-id", &binding.credential_ref)
         .header("x-yilong-runtime-timestamp", &timestamp)

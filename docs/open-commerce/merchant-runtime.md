@@ -26,7 +26,7 @@ APK 或网页是商户管理入口，真实能力由持续在线的商户后端�
 ## 平台配置
 
 1. 在项目开放商业工作区创建商户节点。
-2. 配置 `merchant_runtime` 运行绑定：白名单 HTTPS 地址、凭据环境变量引用、可选 Manifest SHA-256 和超时。
+2. 配置 `merchant_runtime` 运行绑定：白名单标准 443 HTTPS 地址、凭据环境变量引用、可选 Manifest SHA-256 和超时。
 3. 在平台服务端设置该凭据引用对应的共享密钥，并将主机加入 `OPEN_COMMERCE_RUNTIME_ALLOWED_HOSTS`。
 4. 执行“签名验证”；只有状态为 `active` 才能调用真实能力。
 5. 发布 `merchant_runtime` 能力。交易能力使用 `authorized`，并为调用 App 创建最小范围 Grant。
@@ -96,6 +96,7 @@ HMAC-SHA256(secret, unix_timestamp + "." + raw_json_body)
 - 报价过期、商品停售或库存不足：拒绝提交，要求重新报价。
 - 未获得用户明确确认：拒绝 `order.commit`。
 - 商户后端超时或返回身份不匹配：平台记录失败审计并把运行绑定标为 `degraded`。
+- 每次健康验证和业务调用都会重新核对当前白名单、解析全部 DNS 地址并拒绝任一私网或特殊用途结果；本次连接固定到已检查地址且不使用环境代理或重定向。
 
 ## 参考节点
 
@@ -111,3 +112,5 @@ powershell -NoProfile -File scripts\test-open-commerce-merchant-runtime-contract
 ```
 
 平台 Rust 测试还会启动临时商户服务，验证签名、Manifest、真实处理器调用、计量、审计和平台幂等重放。
+
+商户运行时出站地址固定的代码状态和统一回归范围见 `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`；当前该批次为 `implementation_uncompiled`。

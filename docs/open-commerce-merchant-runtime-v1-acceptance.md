@@ -19,6 +19,8 @@ reviewed_at: 2026-07-31
 - `cofficethinking` 编译通过，签名、防占位令牌、整数金额和用户确认单测通过。
 - 两仓库共享契约文件 SHA-256 一致。
 
+补充的运行时公网 DNS 拒绝和单次连接地址固定代码尚未编译，见 `docs/open-commerce-merchant-runtime-egress-pinning-v1-acceptance.md`。
+
 ## 仍需环境配置
 
 生产启用仍需要：商户运行 HTTPS 域名、平台主机白名单、双方一致的随机共享密钥、平台商户 ID、咖啡店门店 ID和至少一个在售商品。没有这些部署参数时，代码存在但运行时保持关闭，不能宣传为公开生产网络。
