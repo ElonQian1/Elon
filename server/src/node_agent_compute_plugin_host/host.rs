@@ -5,23 +5,23 @@ use crate::node_agent_config::NodeConfig;
 
 use super::{
     contract::{
-        ComputePluginTask, InternalComputeRunnerDescriptor, COMPUTE_PLUGIN_HOST_SCHEMA,
-        COMPUTE_PLUGIN_MODE_IN_PROCESS_LEGACY, COMPUTE_TASK_KIND_LLM_CHAT,
+        ComputePluginTask, InternalRunnerRegistration, COMPUTE_PLUGIN_MODE_IN_PROCESS_LEGACY,
+        COMPUTE_TASK_KIND_LLM_CHAT, INTERNAL_COMPUTE_HOST_REVISION,
     },
     legacy_llm::{LegacyLocalLlmAdapter, LEGACY_LOCAL_LLM_RUNNER_ID},
 };
 
 /// Node-internal execution seam. It does not advertise a new wire capability yet.
 pub(crate) struct ComputePluginHost {
-    descriptors: Vec<InternalComputeRunnerDescriptor>,
+    registrations: Vec<InternalRunnerRegistration>,
     legacy_local_llm: LegacyLocalLlmAdapter,
 }
 
 impl ComputePluginHost {
     pub(crate) fn new(cfg: NodeConfig) -> Self {
         Self {
-            descriptors: vec![InternalComputeRunnerDescriptor {
-                host_schema: COMPUTE_PLUGIN_HOST_SCHEMA,
+            registrations: vec![InternalRunnerRegistration {
+                host_revision: INTERNAL_COMPUTE_HOST_REVISION,
                 runner_id: LEGACY_LOCAL_LLM_RUNNER_ID,
                 task_kinds: vec![COMPUTE_TASK_KIND_LLM_CHAT],
                 mode: COMPUTE_PLUGIN_MODE_IN_PROCESS_LEGACY,
@@ -30,8 +30,8 @@ impl ComputePluginHost {
         }
     }
 
-    pub(crate) fn descriptor_count(&self) -> usize {
-        self.descriptors.len()
+    pub(crate) fn registration_count(&self) -> usize {
+        self.registrations.len()
     }
 
     /// Preserve the existing fire-and-stream behavior while routing through the Host seam.

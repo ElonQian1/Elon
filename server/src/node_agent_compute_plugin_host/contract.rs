@@ -1,13 +1,11 @@
-use serde::Serialize;
-
-pub(crate) const COMPUTE_PLUGIN_HOST_SCHEMA: &str = "elon.compute-plugin-host.v1";
+pub(crate) const INTERNAL_COMPUTE_HOST_REVISION: u32 = 1;
 pub(crate) const COMPUTE_TASK_KIND_LLM_CHAT: &str = "llm_chat";
 pub(crate) const COMPUTE_PLUGIN_MODE_IN_PROCESS_LEGACY: &str = "in_process_legacy";
 
 /// Internal runner registration only; this is not a downloadable plugin manifest or ready offer.
-#[derive(Debug, Clone, Serialize)]
-pub(crate) struct InternalComputeRunnerDescriptor {
-    pub host_schema: &'static str,
+#[derive(Debug, Clone)]
+pub(crate) struct InternalRunnerRegistration {
+    pub host_revision: u32,
     pub runner_id: &'static str,
     pub task_kinds: Vec<&'static str>,
     pub mode: &'static str,

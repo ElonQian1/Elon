@@ -51,7 +51,7 @@ pub(super) async fn run_session(
     let models = discover_models(cfg).await;
     runtime.set_models(models.clone()).await;
     tracing::debug!(
-        plugins = runtime.compute_plugin_host.descriptor_count(),
+        runners = runtime.compute_plugin_host.registration_count(),
         "本机 Compute Plugin Host 已初始化；尚未向云端发布新 capability"
     );
     if models.is_empty() {
