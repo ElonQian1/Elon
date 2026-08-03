@@ -11,6 +11,7 @@ mod cdp;
 mod fixture;
 mod process;
 mod security;
+mod semantic_tree;
 
 #[cfg(test)]
 mod tests;
@@ -305,10 +306,13 @@ pub(crate) async fn capture(project_root: &str, input: PwaCaptureInput) -> Value
         Ok(result) => {
             let context_path = result.artifact.path.clone();
             let context_sha256 = result.artifact.sha256.clone();
+            let ui_tree_path = result.semantic_tree.path.clone();
+            let ui_tree_sha256 = result.semantic_tree.sha256.clone();
             json!({
                 "ok": true,
                 "status": "CAPTURED",
                 "artifact": result.artifact,
+                "uiTree": result.semantic_tree,
                 "route": result.route,
                 "revision": prepared.evidence,
                 "browser": result.browser,
@@ -321,7 +325,10 @@ pub(crate) async fn capture(project_root: &str, input: PwaCaptureInput) -> Value
                 "contextPackReference": {
                     "path": context_path,
                     "sha256": context_sha256,
-                    "embedBase64": false
+                    "pixels": {"path": context_path, "sha256": context_sha256},
+                    "uiTree": {"path": ui_tree_path, "sha256": ui_tree_sha256},
+                    "embedBase64": false,
+                    "preferredReadOrder": ["uiTree", "pixels"]
                 },
                 "base64Embedded": false,
             })

@@ -2,7 +2,7 @@ use super::{
     cdp::{number, safe_browser_field, short_pause, CdpClient, NetworkState},
     process::{locate_browser, BrowserProcess},
     security::{self, PreparedCapture, SanitizedRoute},
-    CaptureDiagnostic, CaptureInteractionStep,
+    semantic_tree, CaptureDiagnostic, CaptureInteractionStep,
 };
 use base64::Engine as _;
 use serde::Serialize;
@@ -21,6 +21,7 @@ pub(super) struct RenderedCapture {
     pub(super) css_height: f64,
     pub(super) blocked_request_count: u32,
     pub(super) executed_step_count: usize,
+    pub(super) semantic_tree: Value,
     pub(super) process_cleanup: ProcessCleanup,
 }
 
@@ -249,6 +250,7 @@ async fn render_page(
         ));
     }
     let route = security::sanitize_url(&final_url)?;
+    let semantic_tree = semantic_tree::capture(cdp, &session, deadline).await?;
     let (clip, css_width, css_height) = capture_geometry(prepared, cdp, &session, deadline).await?;
     validate_geometry(css_width, css_height, prepared.viewport.device_scale_factor)?;
     let mut params = json!({
@@ -282,6 +284,7 @@ async fn render_page(
         css_height,
         blocked_request_count: cdp.blocked_request_count,
         executed_step_count,
+        semantic_tree,
         process_cleanup: ProcessCleanup {
             browser_process_reaped: false,
             temporary_profile_removed: false,

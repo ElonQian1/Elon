@@ -15,12 +15,25 @@ const MAX_IMAGE_PIXELS: u64 = 40_000_000;
 
 pub(super) struct PersistedCapture {
     pub(super) artifact: PwaPngArtifact,
+    pub(super) semantic_tree: PwaSemanticTreeArtifact,
     pub(super) route: SanitizedRoute,
     pub(super) browser: BrowserIdentity,
     pub(super) viewport: CaptureViewportMetadata,
     pub(super) network_policy: NetworkPolicyMetadata,
     pub(super) process_cleanup: ProcessCleanup,
     pub(super) executed_step_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct PwaSemanticTreeArtifact {
+    pub(super) path: String,
+    pub(super) sha256: String,
+    pub(super) node_count: usize,
+    pub(super) interactive_count: usize,
+    pub(super) truncated: bool,
+    pub(super) schema: &'static str,
+    pub(super) base64_embedded: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -63,6 +76,7 @@ pub(super) struct NetworkPolicyMetadata {
 struct CaptureManifest<'a> {
     schema: &'static str,
     artifact: &'a PwaPngArtifact,
+    semantic_tree: &'a PwaSemanticTreeArtifact,
     route: &'a SanitizedRoute,
     revision: &'a CaptureEvidence,
     browser: &'a BrowserIdentity,
@@ -122,6 +136,7 @@ pub(super) fn persist(
     let id = uuid::Uuid::new_v4().simple().to_string();
     let png_path = root.join(format!("capture-{id}-{}.png", &sha256[..16]));
     let manifest_path = png_path.with_extension("json");
+    let semantic_tree_path = png_path.with_extension("ui.json");
     if fs::write(&png_path, &rendered.png).is_err() {
         let _ = fs::remove_file(&png_path);
         return Err(artifact_error(
@@ -138,6 +153,45 @@ pub(super) fn persist(
         bytes: rendered.png.len(),
         media_type: "image/png",
         captured_at,
+    };
+    let semantic_tree_bytes = match serde_json::to_vec_pretty(&rendered.semantic_tree) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            let _ = fs::remove_file(&png_path);
+            return Err(artifact_error(
+                "SEMANTIC_TREE_WRITE_FAILED",
+                "无法序列化页面 UI 语义树",
+            ));
+        }
+    };
+    if fs::write(&semantic_tree_path, &semantic_tree_bytes).is_err() {
+        let _ = fs::remove_file(&png_path);
+        let _ = fs::remove_file(&semantic_tree_path);
+        return Err(artifact_error(
+            "SEMANTIC_TREE_WRITE_FAILED",
+            "无法写入页面 UI 语义树工件",
+        ));
+    }
+    let semantic_tree = PwaSemanticTreeArtifact {
+        path: semantic_tree_path.display().to_string(),
+        sha256: hex::encode(Sha256::digest(&semantic_tree_bytes)),
+        node_count: rendered
+            .semantic_tree
+            .get("nodeCount")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or_default() as usize,
+        interactive_count: rendered
+            .semantic_tree
+            .get("interactiveCount")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or_default() as usize,
+        truncated: rendered
+            .semantic_tree
+            .get("truncated")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false),
+        schema: "elon.web.semantic-tree.v1",
+        base64_embedded: false,
     };
     let viewport = CaptureViewportMetadata {
         requested_width: prepared.viewport.width,
@@ -158,6 +212,7 @@ pub(super) fn persist(
     let manifest = CaptureManifest {
         schema: "elon.pwa.runtime-capture.v1",
         artifact: &artifact,
+        semantic_tree: &semantic_tree,
         route: &rendered.route,
         revision: &prepared.evidence,
         browser: &rendered.browser,
@@ -178,6 +233,7 @@ pub(super) fn persist(
     {
         let _ = fs::remove_file(&png_path);
         let _ = fs::remove_file(&manifest_path);
+        let _ = fs::remove_file(&semantic_tree_path);
         return Err(artifact_error(
             "ARTIFACT_WRITE_FAILED",
             "无法写入 PWA PNG manifest",
@@ -185,6 +241,7 @@ pub(super) fn persist(
     }
     Ok(PersistedCapture {
         artifact,
+        semantic_tree,
         route: rendered.route,
         browser: rendered.browser,
         viewport,
