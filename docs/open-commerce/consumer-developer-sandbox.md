@@ -56,6 +56,8 @@
 | 列出本人调用凭证 | `GET /api/open-commerce/consumer-invocation-receipts` |
 | 读取本人单条调用凭证 | `GET /api/open-commerce/consumer-invocation-receipts/{invocation_id}` |
 
+MCP 消费者 AI 可使用 `open_commerce_discover_for_consumer` 获取与上述消费者发现同源的排序、来源、筛选、候选范围和授权状态。默认 MCP 身份只按 `pc-web` 做公开发现；显式 `x-elon-app-id` 必须属于当前用户。该工具只读，不会自动申请授权、调用能力、创建订单或结算。
+
 开发者调用和事件读取只使用 `Authorization: Bearer <test-token>`，App 身份由 Token 唯一确定，不能用额外请求头切换。Token 不得进入 URL、日志、项目文档、浏览器本地存储或商户能力元数据。
 
 批准申请时，商户可选择 7 天、30 天、90 天、1 年或长期有效，并可填写授权期内的总调用次数和总预算（人民币元）。PC 默认 30 天；长期有效必须显式选择。用尽或到期后不能由 App 自行扩容、续期，商户需要重新授权。调用失败会退回刚预留的预算，重复请求不会再次占用。批准后的实际期限和预算会同时展示给商户与申请方。

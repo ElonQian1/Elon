@@ -163,6 +163,8 @@
 153. `docs/open-commerce-consumer-candidate-scope-v1-acceptance.md`：查看候选范围摘要代码状态及后置统一回归矩阵。
 154. `docs/decisions/open-commerce-consumer-discovery-inputs-v1.md`：查看第三方 App 消费者发现请求的服务端规范化边界。
 155. `docs/open-commerce-consumer-discovery-inputs-v1-acceptance.md`：查看发现输入规范化代码状态及后置统一回归矩阵。
+156. `docs/decisions/open-commerce-consumer-discovery-mcp-v1.md`：查看消费者 AI 完整发现 MCP 的身份和只读边界。
+157. `docs/open-commerce-consumer-discovery-mcp-v1-acceptance.md`：查看消费者发现 MCP 代码状态及后置统一回归矩阵。
 
 ## 专题地图
 
