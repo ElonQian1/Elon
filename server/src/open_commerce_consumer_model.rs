@@ -35,6 +35,10 @@ pub(crate) struct ConsumerDiscoveryRequest {
     #[serde(default)]
     pub require_internal_sync_receipt: bool,
     #[serde(default)]
+    pub source_provider_key: Option<String>,
+    #[serde(default)]
+    pub source_data_domain: Option<String>,
+    #[serde(default)]
     pub preferences: ConsumerPreferences,
     #[serde(default = "default_limit")]
     pub limit: usize,
@@ -69,6 +73,7 @@ pub(crate) struct ConsumerDiscoveryResponse {
     pub ranking_is_user_selected: bool,
     pub freshness_requirement: &'static str,
     pub source_requirement: &'static str,
+    pub source_filter: ConsumerSourceFilter,
     pub available_ranking_policies: Vec<ConsumerRankingPolicyDescriptor>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ranking_receipt: Option<ConsumerRankingReceipt>,
@@ -81,6 +86,12 @@ pub(crate) struct ConsumerRankingPolicyDescriptor {
     pub label: String,
     pub explanation: String,
     pub paid_placement: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ConsumerSourceFilter {
+    pub provider_key: Option<String>,
+    pub data_domain: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

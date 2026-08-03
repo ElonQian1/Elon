@@ -7,6 +7,7 @@ use crate::{
     open_commerce_consumer_model::{
         ConsumerAuthorizationState, ConsumerDiscoveryMatch, ConsumerDiscoveryRequest,
         ConsumerDiscoveryResponse, ConsumerPreferences, ConsumerRankingReceipt,
+        ConsumerSourceFilter,
     },
     open_commerce_consumer_preference_service,
     open_commerce_consumer_ranking::{self, ConsumerRankingPolicy},
@@ -15,6 +16,7 @@ use crate::{
         OpenCommerceDirectoryCapability, OpenCommerceDirectoryMerchantDetail,
     },
     open_commerce_directory_service,
+    open_commerce_integration_model::{normalize_provider_key, normalize_string_list},
     open_commerce_model::{ACCESS_AUTHORIZED, ACCESS_PUBLIC},
     store::Store,
 };
@@ -35,6 +37,7 @@ pub(crate) fn discover(
     let ranking_policy = ConsumerRankingPolicy::parse(request.ranking_policy.as_deref())?;
     request.preferences =
         open_commerce_consumer_preference_service::normalize_preferences(request.preferences)?;
+    normalize_source_filters(&mut request)?;
     let candidate_limit = request.limit.clamp(1, 50).saturating_mul(4).min(100);
     let candidates = open_commerce_directory_service::discover_merchants(
         store,
@@ -73,7 +76,8 @@ pub(crate) fn discover(
         ranking_is_paid: false,
         ranking_is_user_selected,
         freshness_requirement: freshness_requirement(request.require_current_declaration),
-        source_requirement: source_requirement(request.require_internal_sync_receipt),
+        source_requirement: source_requirement(&request),
+        source_filter: source_filter(&request),
         available_ranking_policies: open_commerce_consumer_ranking::available_ranking_policies(),
         ranking_receipt,
         matches,
@@ -96,6 +100,7 @@ fn build_ranking_receipt(
         "ranking_policy": ranking_policy.key(),
         "require_current_declaration": request.require_current_declaration,
         "require_internal_sync_receipt": request.require_internal_sync_receipt,
+        "source_filter": source_filter(request),
         "preferences": &request.preferences,
         "limit": request.limit.clamp(1, 50)
     });
@@ -135,7 +140,8 @@ fn build_ranking_receipt(
             "paid_placement": false
         },
         "freshness_requirement": freshness_requirement(request.require_current_declaration),
-        "source_requirement": source_requirement(request.require_internal_sync_receipt),
+        "source_requirement": source_requirement(request),
+        "source_filter": source_filter(request),
         "request_fingerprint_sha256": sha256_hex(&request_fingerprint_json),
         "eligible_match_count": eligible_match_count,
         "returned_match_count": matches.len(),
@@ -215,6 +221,20 @@ fn best_match(
             !request.require_internal_sync_receipt
                 || capability.source.kind == "integration_sync_receipt"
         })
+        .filter(|capability| {
+            request
+                .source_provider_key
+                .as_deref()
+                .map(|provider| capability.source.provider_key.as_deref() == Some(provider))
+                .unwrap_or(true)
+        })
+        .filter(|capability| {
+            request
+                .source_data_domain
+                .as_deref()
+                .map(|domain| capability.source.data_domain.as_deref() == Some(domain))
+                .unwrap_or(true)
+        })
         .collect::<Vec<_>>();
     let selected = ranking_policy
         .select_capability(candidates, &request.preferences, capability_score)
@@ -227,8 +247,14 @@ fn best_match(
     if request.require_current_declaration {
         reasons.push("符合消费者要求的商户声明有效期".to_string());
     }
-    if request.require_internal_sync_receipt {
+    if source_requirement(request) == "internal_sync_receipt" {
         reasons.push("已关联商户项目内部业务同步回执".to_string());
+    }
+    if let Some(provider) = request.source_provider_key.as_deref() {
+        reasons.push(format!("来源厂商标识匹配 {provider}"));
+    }
+    if let Some(domain) = request.source_data_domain.as_deref() {
+        reasons.push(format!("来源数据域匹配 {domain}"));
     }
     let authorization =
         authorization_state(store, &detail, &capability, &request.requester_app_id)?;
@@ -249,11 +275,39 @@ fn freshness_requirement(required: bool) -> &'static str {
     }
 }
 
-fn source_requirement(required: bool) -> &'static str {
-    if required {
+fn source_requirement(request: &ConsumerDiscoveryRequest) -> &'static str {
+    if request.require_internal_sync_receipt
+        || request.source_provider_key.is_some()
+        || request.source_data_domain.is_some()
+    {
         "internal_sync_receipt"
     } else {
         "any_merchant_source"
+    }
+}
+
+fn normalize_source_filters(request: &mut ConsumerDiscoveryRequest) -> Result<()> {
+    request.source_provider_key = request
+        .source_provider_key
+        .take()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| normalize_provider_key(&value))
+        .transpose()?;
+    request.source_data_domain = request
+        .source_data_domain
+        .take()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| {
+            normalize_string_list(&[value], "来源数据域", 1).map(|mut values| values.remove(0))
+        })
+        .transpose()?;
+    Ok(())
+}
+
+fn source_filter(request: &ConsumerDiscoveryRequest) -> ConsumerSourceFilter {
+    ConsumerSourceFilter {
+        provider_key: request.source_provider_key.clone(),
+        data_domain: request.source_data_domain.clone(),
     }
 }
 

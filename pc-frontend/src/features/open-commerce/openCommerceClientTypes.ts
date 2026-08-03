@@ -666,6 +666,8 @@ export interface ConsumerDiscoveryRequest {
   include_ranking_receipt?: boolean
   require_current_declaration?: boolean
   require_internal_sync_receipt?: boolean
+  source_provider_key?: string
+  source_data_domain?: string
   preferences: ConsumerPreferences
   limit: number
 }
@@ -804,6 +806,10 @@ export interface ConsumerDiscoveryResponse {
   ranking_is_user_selected: boolean
   freshness_requirement: 'any_declaration' | 'current_declaration'
   source_requirement: 'any_merchant_source' | 'internal_sync_receipt'
+  source_filter: {
+    provider_key: string | null
+    data_domain: string | null
+  }
   available_ranking_policies: ConsumerRankingPolicyDescriptor[]
   ranking_receipt?: ConsumerRankingReceipt
   matches: ConsumerDiscoveryMatch[]
