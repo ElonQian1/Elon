@@ -113,4 +113,4 @@ reusable:   issued = available + held + active + retired
 
 ## 9. 当前实现边界
 
-2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165 SQLite schema，以及隔离的本地 Store 写入路径已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、Claim hold、revision 栅栏释放/到期、双分录落库和余额 CAS；这些新增路径尚未编译、执行迁移、并发验证或真实容量操作。Offer Registry、消费者预算与 Reservation 的统一 Reserve、Attempt 激活、容量审计/恢复器、Broker 和运行协议仍未写入或接线。
+2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v168 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、Claim hold、revision 栅栏释放/到期、双分录落库、余额 CAS、只读账本重算、有界到期批处理、状态门卫、追加式生命周期和排空后的 epoch 轮换；这些新增路径尚未编译、执行迁移、调度、并发验证或真实容量操作。Offer Registry、消费者预算与 Reservation 的统一 Reserve、Attempt 激活、受控自动修复、Broker 和运行协议仍未写入或接线。

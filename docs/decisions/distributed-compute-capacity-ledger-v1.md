@@ -3,7 +3,7 @@ title: 分布式算力共享容量池与追加式账本 V1
 status: accepted
 date: 2026-08-04
 owners: backend, ai-economy
-implementation_status: sqlite_store_write_paths_uncompiled
+implementation_status: lifecycle_and_audit_store_uncompiled
 ---
 
 # 分布式算力共享容量池与追加式账本 V1
@@ -76,4 +76,4 @@ SQLite 路径使用 `BEGIN IMMEDIATE`、稳定 meter 顺序和条件更新。节
 
 ## 验证状态
 
-本决定已接受。领域合同、纯状态投影和 v165 SQLite schema 已写入；本地 Store 还形成了池版本与 bucket 登记、供给发行/撤出、Claim 原子 hold、revision 栅栏释放/到期，以及共用的双分录落库和余额 CAS。上述新增路径均未编译、执行迁移或并发验证。Offer Registry、消费者预算与 Reservation 的统一 Reserve、Attempt 激活、恢复器、Broker、外部 Provider saga 和运行接线仍未实现。
+本决定已接受。领域合同、纯状态投影和 v165 SQLite schema 已写入；本地 Store 还形成了池版本与 bucket 登记、供给发行/撤出、Claim 原子 hold、revision 栅栏释放/到期，以及共用的双分录落库和余额 CAS。只读审计可从账本重算余额投影，有界批处理可逐 Claim 恢复到期容量；状态门卫、v167 追加式生命周期和 v168 epoch 轮换也已形成代码。上述新增路径均未编译、执行迁移、调度或并发验证。Offer Registry、消费者预算与 Reservation 的统一 Reserve、Attempt 激活、自动修复、Broker、外部 Provider saga 和运行接线仍未实现。
