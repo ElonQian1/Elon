@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Copy, Power, PowerOff, RefreshCw, Webhook } from 'lucide-react'
+import { Copy, Power, PowerOff, RefreshCw, ShieldCheck, Webhook } from 'lucide-react'
 import { openCommerceClientApi } from './openCommerceClientApi'
 import type {
   DeveloperWebhookDelivery,
@@ -14,6 +14,12 @@ import {
   commerceStyles,
   listItemStyle,
 } from './openCommerceStyles'
+
+function webhookStatusLabel(webhook: DeveloperWebhookSubscription) {
+  if (webhook.verification_status === 'pending') return '待验证'
+  if (webhook.verification_status === 'failed') return '验证失败'
+  return webhook.status === 'active' ? '投递中' : '已停用'
+}
 
 export default function DeveloperWebhookPanel({
   projectId,
@@ -100,7 +106,7 @@ export default function DeveloperWebhookPanel({
       setVisibleSecret(credential.signing_secret)
       setSelectedWebhookId(credential.subscription.id)
       setCallbackUrl('')
-      setMessage('签名密钥只显示本次，请立即保存。')
+      setMessage('签名密钥只显示本次。保存密钥并配置接收端后，请验证回调地址。')
       await refreshWebhooks()
     } catch (error) {
       setMessage(errorText(error))
@@ -123,6 +129,23 @@ export default function DeveloperWebhookPanel({
       await refreshDeliveries()
     } catch (error) {
       setMessage(errorText(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function verifyWebhook(webhook: DeveloperWebhookSubscription) {
+    if (!selectedApp) return
+    setBusy(true)
+    setMessage('')
+    try {
+      await openCommerceClientApi.verifyDeveloperWebhook(projectId, selectedApp.id, webhook.id)
+      setMessage('回调地址验证通过，后续终态事件将开始签名投递。')
+      await refreshWebhooks()
+      await refreshDeliveries()
+    } catch (error) {
+      setMessage(errorText(error))
+      await refreshWebhooks()
     } finally {
       setBusy(false)
     }
@@ -202,16 +225,27 @@ export default function DeveloperWebhookPanel({
                   {new URL(webhook.callback_url).host}
                 </button>
                 <span style={badgeStyle(webhook.status === 'active' ? 'neutral' : 'warn')}>
-                  {webhook.status === 'active' ? '投递中' : '已停用'}
+                  {webhookStatusLabel(webhook)}
                 </span>
               </header>
               <code style={commerceStyles.itemMeta}>{webhook.callback_url}</code>
               <small style={commerceStyles.itemMeta}>
-                失败 {webhook.consecutive_failures} 次 · {webhook.last_error_code ?? '无错误'}
+                失败 {webhook.consecutive_failures} 次 ·{' '}
+                {webhook.verification_error_code ?? webhook.last_error_code ?? '无错误'}
               </small>
               <footer style={commerceStyles.itemHeader}>
                 <small style={commerceStyles.itemMeta}>{webhook.signing_key_id.slice(0, 24)}</small>
-                {webhook.status === 'active' ? (
+                {webhook.verification_status !== 'verified' ? (
+                  <button
+                    style={actionStyle('primary', !canEdit || busy || selectedApp?.status !== 'active')}
+                    type="button"
+                    onClick={() => verifyWebhook(webhook)}
+                    disabled={!canEdit || busy || selectedApp?.status !== 'active'}
+                    title="验证回调地址"
+                  >
+                    <ShieldCheck size={13} />验证
+                  </button>
+                ) : webhook.status === 'active' ? (
                   <button
                     style={actionStyle('icon', !canEdit || busy)}
                     type="button"

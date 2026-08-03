@@ -3,6 +3,7 @@ export const CONNECTOR_CONTRACT_VERSION: '1.0'
 export const MAX_SYNC_PAGE_RECORDS: 500
 export const MAX_RECEIPT_KEY_LENGTH: 128
 export const DEVELOPER_WEBHOOK_EVENT_SCHEMA: 'open_commerce.developer_webhook_event.v1'
+export const DEVELOPER_WEBHOOK_VERIFICATION_SCHEMA: 'open_commerce.developer_webhook_verification.v1'
 export const DEVELOPER_WEBHOOK_MAX_CLOCK_SKEW_SECONDS: 300
 
 export class DeveloperWebhookSignatureError extends Error {
@@ -22,6 +23,10 @@ export function verifyDeveloperWebhookSignature(options: {
   nowUnix?: number
   maxClockSkewSeconds?: number
 }): { eventId: string; timestampUnix: number }
+
+export function createDeveloperWebhookVerificationResponse(
+  body: string | Uint8Array,
+): { challenge: string }
 export const ADAPTER_HANDOFF_CLAIM_SCHEMA: 'open_commerce.adapter_business_handoff_claim.v1'
 export const ADAPTER_HANDOFF_CLAIM_POLL_SCHEMA: 'open_commerce.adapter_business_handoff_claim_poll.v1'
 export const ADAPTER_HANDOFF_CLAIM_RELEASE_SCHEMA: 'open_commerce.adapter_business_handoff_claim_release.v1'

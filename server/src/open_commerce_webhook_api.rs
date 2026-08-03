@@ -30,6 +30,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(enable_webhook),
         )
         .route(
+            "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks/:subscription_id/verify",
+            post(verify_webhook),
+        )
+        .route(
             "/api/projects/:project_id/open-commerce/developer-apps/:app_record_id/webhooks/:subscription_id/deliveries",
             get(list_deliveries),
         )
@@ -126,6 +130,48 @@ async fn enable_webhook(
         &subscription_id,
         true,
     )
+}
+
+async fn verify_webhook(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, app_record_id, subscription_id)): Path<(String, String, String)>,
+) -> Response {
+    let (user_id, app) =
+        match editable_caller_app(&state, &headers, &project_id, &app_record_id, true) {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
+    let subscription = match state.store.open_commerce_developer_webhook_for_app(
+        &project_id,
+        &app_record_id,
+        &subscription_id,
+    ) {
+        Ok(value) => value,
+        Err(error) => return json_error(StatusCode::NOT_FOUND, error),
+    };
+    let verified = match crate::open_commerce_webhook_verification::verify_endpoint(
+        &state.store,
+        &app,
+        &subscription,
+    )
+    .await
+    {
+        Ok(value) => value,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
+    };
+    if let Err(error) = state.store.record_open_commerce_audit(
+        &project_id,
+        &user_id,
+        Some("pc-web"),
+        "developer_webhook.verified",
+        "developer_webhook",
+        &verified.id,
+        &json!({"app_id":verified.app_id,"signing_key_id":verified.signing_key_id}),
+    ) {
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, error);
+    }
+    Json(verified).into_response()
 }
 
 async fn list_deliveries(

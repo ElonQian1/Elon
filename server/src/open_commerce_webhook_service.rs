@@ -72,6 +72,17 @@ pub(crate) fn set_webhook_enabled(
     subscription_id: &str,
     enabled: bool,
 ) -> Result<DeveloperWebhookSubscription> {
+    if enabled {
+        let subscription = store.open_commerce_developer_webhook_for_app(
+            &app.project_id,
+            &app.id,
+            subscription_id,
+        )?;
+        let current_key_id = crate::open_commerce_webhook_security::webhook_master_key_id()?;
+        if subscription.signing_key_id != current_key_id {
+            bail!("Webhook 签名主密钥已变化，请创建新订阅");
+        }
+    }
     store.set_open_commerce_developer_webhook_enabled(
         &app.project_id,
         &app.id,

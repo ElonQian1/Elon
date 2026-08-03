@@ -314,6 +314,8 @@ mod open_commerce_webhook_migration;
 mod open_commerce_webhook_model;
 mod open_commerce_webhook_security;
 mod open_commerce_webhook_service;
+mod open_commerce_webhook_verification;
+mod open_commerce_webhook_verification_migration;
 mod open_commerce_webhook_worker;
 mod pc_agent_runtime_choice;
 mod pc_node_capacity;

@@ -14,8 +14,9 @@ use super::{new_id, now, Store};
 
 const SUBSCRIPTION_SELECT: &str =
     "SELECT id, project_id, app_record_id, app_id, callback_url, signing_key_id,
-            status, consecutive_failures, last_delivery_at, last_error_code,
-            created_at, updated_at, disabled_at
+            status, verification_status, verification_attempted_at,
+            verification_error_code, verified_at, consecutive_failures,
+            last_delivery_at, last_error_code, created_at, updated_at, disabled_at
        FROM open_commerce_developer_webhook_subscriptions";
 
 const DELIVERY_SELECT: &str =
@@ -61,9 +62,9 @@ impl Store {
         tx.execute(
             "INSERT INTO open_commerce_developer_webhook_subscriptions(
                id, project_id, owner_user_id, app_record_id, app_id,
-               callback_url, signing_key_id, status, start_sequence,
-               consecutive_failures, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'active', ?8, 0, ?9, ?9)",
+               callback_url, signing_key_id, status, verification_status,
+               start_sequence, consecutive_failures, created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'disabled', 'pending', ?8, 0, ?9, ?9)",
             params![
                 id,
                 app.project_id,
@@ -148,6 +149,20 @@ impl Store {
             )?;
             if app_status != "active" {
                 bail!("开发者 App 已停用，不能启用 Webhook");
+            }
+            let verification_status: String = tx.query_row(
+                "SELECT verification_status
+                   FROM open_commerce_developer_webhook_subscriptions
+                  WHERE project_id=?1 AND app_record_id=?2 AND id=?3",
+                params![
+                    project_id.trim(),
+                    app_record_id.trim(),
+                    subscription_id.trim()
+                ],
+                |row| row.get(0),
+            )?;
+            if verification_status != "verified" {
+                bail!("Webhook 回调端点尚未验证");
             }
             let active_count: i64 = tx.query_row(
                 "SELECT COUNT(*) FROM open_commerce_developer_webhook_subscriptions
@@ -440,12 +455,16 @@ fn subscription_from_row(row: &Row<'_>) -> rusqlite::Result<DeveloperWebhookSubs
         callback_url: row.get(4)?,
         signing_key_id: row.get(5)?,
         status: row.get(6)?,
-        consecutive_failures: row.get(7)?,
-        last_delivery_at: row.get(8)?,
-        last_error_code: row.get(9)?,
-        created_at: row.get(10)?,
-        updated_at: row.get(11)?,
-        disabled_at: row.get(12)?,
+        verification_status: row.get(7)?,
+        verification_attempted_at: row.get(8)?,
+        verification_error_code: row.get(9)?,
+        verified_at: row.get(10)?,
+        consecutive_failures: row.get(11)?,
+        last_delivery_at: row.get(12)?,
+        last_error_code: row.get(13)?,
+        created_at: row.get(14)?,
+        updated_at: row.get(15)?,
+        disabled_at: row.get(16)?,
     })
 }
 
