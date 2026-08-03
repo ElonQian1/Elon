@@ -264,6 +264,10 @@ mod open_commerce_portability_import_model;
 mod open_commerce_portability_import_service;
 mod open_commerce_portability_migration;
 mod open_commerce_portability_model;
+mod open_commerce_portability_reauthorization_api;
+mod open_commerce_portability_reauthorization_migration;
+mod open_commerce_portability_reauthorization_model;
+mod open_commerce_portability_reauthorization_service;
 mod open_commerce_portability_service;
 #[cfg(test)]
 mod open_commerce_portability_tests;

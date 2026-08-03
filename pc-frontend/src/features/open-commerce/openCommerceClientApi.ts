@@ -24,6 +24,9 @@ import type {
   ConsumerPortabilityAdoption,
   ConsumerPortabilityAdoptionList,
   ConsumerPortabilityAdoptionPlan,
+  PortabilityReauthorizationResult,
+  PortabilityRelationshipMapping,
+  PortabilityRelationshipMappingList,
   ConsumerRelationship,
   ConsumerRelationshipList,
   DeveloperAppCredential,
@@ -239,6 +242,34 @@ export const openCommerceClientApi = {
   ) => api.post<ConsumerPortabilityAdoption>(
     `${projectBase(projectId)}/consumer-portability-adoptions/${encodeURIComponent(adoptionId)}/rollback`,
     { expected_current_revision: expectedCurrentRevision, confirmed_by_user: true },
+  ),
+
+  listPortabilityRelationshipMappings: (projectId: string) =>
+    api.get<PortabilityRelationshipMappingList>(
+      `${projectBase(projectId)}/portability-relationship-mappings`,
+    ),
+
+  createPortabilityRelationshipMapping: (
+    projectId: string,
+    request: { import_id: string; source_relationship_id: string; target_merchant_id: string },
+  ) => api.post<PortabilityRelationshipMapping>(
+    `${projectBase(projectId)}/portability-relationship-mappings`,
+    { ...request, confirmed_by_user: true },
+  ),
+
+  revokePortabilityRelationshipMapping: (projectId: string, mappingId: string) =>
+    api.post<PortabilityRelationshipMapping>(
+      `${projectBase(projectId)}/portability-relationship-mappings/${encodeURIComponent(mappingId)}/revoke`,
+      {},
+    ),
+
+  createPortabilityReauthorization: (
+    projectId: string,
+    mappingId: string,
+    request: { requester_app_id: string; scopes: string[]; purpose: string },
+  ) => api.post<PortabilityReauthorizationResult>(
+    `${projectBase(projectId)}/portability-relationship-mappings/${encodeURIComponent(mappingId)}/reauthorize`,
+    { ...request, confirmed_by_user: true },
   ),
 
   listConsumerInvocationReceipts: () =>
