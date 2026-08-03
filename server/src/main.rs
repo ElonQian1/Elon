@@ -208,6 +208,7 @@ mod open_commerce_client_service_tests;
 mod open_commerce_connector_contract;
 mod open_commerce_consumer;
 mod open_commerce_consumer_app_mcp;
+mod open_commerce_consumer_authorization_mcp;
 mod open_commerce_consumer_constraints;
 mod open_commerce_consumer_discovery_mcp;
 mod open_commerce_consumer_execution_plan;

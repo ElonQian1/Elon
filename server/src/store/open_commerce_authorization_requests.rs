@@ -123,6 +123,46 @@ impl Store {
         Ok(requests)
     }
 
+    pub(crate) fn list_user_project_open_commerce_authorization_requests(
+        &self,
+        requester_project_id: &str,
+        requester_user_id: &str,
+        status: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<OpenCommerceAuthorizationRequest>> {
+        let status = status.map(str::trim).filter(|value| !value.is_empty());
+        if status
+            .is_some_and(|value| !matches!(value, "pending" | "approved" | "rejected" | "canceled"))
+        {
+            bail!("授权申请状态筛选无效");
+        }
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(&format!(
+            "{REQUEST_SELECT}
+             WHERE requester_user_id = ?1
+               AND requester_app_id IN (
+                 SELECT app_id FROM open_commerce_developer_apps
+                  WHERE project_id = ?2 AND owner_user_id = ?1
+               )
+               AND (?3 IS NULL OR status = ?3)
+             ORDER BY CASE status WHEN 'pending' THEN 0 ELSE 1 END, updated_at DESC
+             LIMIT ?4"
+        ))?;
+        let requests = stmt
+            .query_map(
+                params![
+                    requester_user_id.trim(),
+                    requester_project_id.trim(),
+                    status,
+                    limit.clamp(1, 100) as i64
+                ],
+                request_from_row,
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(anyhow::Error::from)?;
+        Ok(requests)
+    }
+
     pub(crate) fn list_pending_open_commerce_authorization_requests_for_app(
         &self,
         requester_app_id: &str,
