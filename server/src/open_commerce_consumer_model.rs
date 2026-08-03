@@ -27,6 +27,8 @@ pub(crate) struct ConsumerDiscoveryRequest {
     #[serde(default)]
     pub requester_app_id: String,
     #[serde(default)]
+    pub ranking_policy: Option<String>,
+    #[serde(default)]
     pub preferences: ConsumerPreferences,
     #[serde(default = "default_limit")]
     pub limit: usize,
@@ -54,9 +56,21 @@ pub(crate) struct ConsumerDiscoveryResponse {
     pub schema: &'static str,
     pub capability_contract_profile: &'static str,
     pub requester_app_id: String,
-    pub ranking_policy: &'static str,
+    pub ranking_policy: String,
+    pub ranking_policy_label: String,
+    pub ranking_explanation: String,
     pub ranking_is_paid: bool,
+    pub ranking_is_user_selected: bool,
+    pub available_ranking_policies: Vec<ConsumerRankingPolicyDescriptor>,
     pub matches: Vec<ConsumerDiscoveryMatch>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ConsumerRankingPolicyDescriptor {
+    pub key: String,
+    pub label: String,
+    pub explanation: String,
+    pub paid_placement: bool,
 }
 
 fn default_limit() -> usize {

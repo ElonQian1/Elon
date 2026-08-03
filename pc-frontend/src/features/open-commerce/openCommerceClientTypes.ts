@@ -654,8 +654,23 @@ export interface ConsumerDiscoveryRequest {
   query?: string
   capability_key?: string
   requester_app_id: string
+  ranking_policy?: ConsumerRankingPolicyKey
   preferences: ConsumerPreferences
   limit: number
+}
+
+export type ConsumerRankingPolicyKey =
+  | 'transparent_preference_match.v1'
+  | 'lowest_unit_price.v1'
+  | 'public_access_first.v1'
+  | 'recently_updated.v1'
+  | 'merchant_name.v1'
+
+export interface ConsumerRankingPolicyDescriptor {
+  key: ConsumerRankingPolicyKey
+  label: string
+  explanation: string
+  paid_placement: false
 }
 
 export interface ConsumerAuthorizationState {
@@ -737,8 +752,12 @@ export interface ConsumerDiscoveryResponse {
   schema: string
   capability_contract_profile: string
   requester_app_id: string
-  ranking_policy: string
+  ranking_policy: ConsumerRankingPolicyKey
+  ranking_policy_label: string
+  ranking_explanation: string
   ranking_is_paid: boolean
+  ranking_is_user_selected: boolean
+  available_ranking_policies: ConsumerRankingPolicyDescriptor[]
   matches: ConsumerDiscoveryMatch[]
 }
 

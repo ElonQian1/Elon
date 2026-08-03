@@ -16,6 +16,7 @@ import type {
   ConsumerDiscoveryMatch,
   ConsumerDiscoveryResponse,
   ConsumerPreferences,
+  ConsumerRankingPolicyKey,
   OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
 import { errorText, formatMicros, splitValues } from './openCommerceUi'
@@ -37,6 +38,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
   const [categories, setCategories] = useState('')
   const [tags, setTags] = useState('')
   const [maxPrice, setMaxPrice] = useState('')
+  const [rankingPolicy, setRankingPolicy] = useState<ConsumerRankingPolicyKey>('transparent_preference_match.v1')
   const [result, setResult] = useState<ConsumerDiscoveryResponse | null>(null)
   const [invocation, setInvocation] = useState<Record<string, unknown> | null>(null)
   const [busy, setBusy] = useState(false)
@@ -82,6 +84,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
         query: query.trim() || undefined,
         capability_key: capabilityKey.trim() || undefined,
         requester_app_id: appId,
+        ranking_policy: rankingPolicy,
         preferences: {
           categories: splitValues(categories),
           tags: splitValues(tags),
@@ -99,7 +102,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
     } finally {
       setBusy(false)
     }
-  }, [appId, capabilityKey, categories, city, maxPrice, query, tags])
+  }, [appId, capabilityKey, categories, city, maxPrice, query, rankingPolicy, tags])
 
   const applyProfile = useCallback((preferences: ConsumerPreferences) => {
     setCategories(preferences.categories.join(', '))
@@ -201,6 +204,16 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
                 {activeApps.map((app) => <option key={app.id} value={app.app_id}>{app.display_name}</option>)}
               </select>
             </label>
+            <label>
+              排序器
+              <select value={rankingPolicy} onChange={(event) => setRankingPolicy(event.target.value as ConsumerRankingPolicyKey)}>
+                <option value="transparent_preference_match.v1">偏好匹配</option>
+                <option value="lowest_unit_price.v1">最低调用价</option>
+                <option value="public_access_first.v1">公开能力优先</option>
+                <option value="recently_updated.v1">最近更新</option>
+                <option value="merchant_name.v1">商户名称</option>
+              </select>
+            </label>
             <label>搜索词<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="咖啡、维修、零售" /></label>
             <label>能力 Key<input value={capabilityKey} onChange={(event) => setCapabilityKey(event.target.value)} placeholder="menu.preview" /></label>
             <label>城市<input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ji'an" /></label>
@@ -218,6 +231,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
             <strong>匹配结果</strong>
             <div style={commerceStyles.headerActions}>
               {result?.capability_contract_profile && <span style={badgeStyle()}>契约校验</span>}
+              {result?.ranking_policy_label && <span style={badgeStyle()}>{result.ranking_policy_label}</span>}
               <span
                 style={badgeStyle(result?.ranking_is_paid ? 'danger' : 'neutral')}
                 data-tone={result?.ranking_is_paid ? 'danger' : 'neutral'}
@@ -227,6 +241,7 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
             </div>
           </header>
           <div className={base.formCard} style={{ ...commerceStyles.sectionBody, ...commerceStyles.scrollArea }}>
+            {result?.ranking_explanation && <small style={commerceStyles.itemMeta}>{result.ranking_explanation}</small>}
             {result?.matches.map((match) => (
               <article className={base.formCard} style={listItemStyle()} key={`${match.merchant.id}:${match.capability.capability_key}`}>
                 <header style={commerceStyles.itemHeader}>

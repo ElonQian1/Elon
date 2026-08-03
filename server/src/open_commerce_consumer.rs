@@ -6,6 +6,7 @@ use crate::{
         ConsumerDiscoveryResponse, ConsumerPreferences,
     },
     open_commerce_consumer_preference_service,
+    open_commerce_consumer_ranking::{self, ConsumerRankingPolicy},
     open_commerce_developer_model::{CreateAuthorizationRequest, OpenCommerceAuthorizationRequest},
     open_commerce_directory_model::{
         OpenCommerceDirectoryCapability, OpenCommerceDirectoryMerchantDetail,
@@ -24,6 +25,11 @@ pub(crate) fn discover(
         request.requester_app_id = "pc-web".to_string();
     }
     ensure_app_owned_by_user(store, user_id, &request.requester_app_id)?;
+    let ranking_is_user_selected = request
+        .ranking_policy
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty());
+    let ranking_policy = ConsumerRankingPolicy::parse(request.ranking_policy.as_deref())?;
     request.preferences =
         open_commerce_consumer_preference_service::normalize_preferences(request.preferences)?;
     let candidates = open_commerce_directory_service::discover_merchants(
@@ -34,21 +40,20 @@ pub(crate) fn discover(
     )?;
     let mut matches = candidates
         .into_iter()
-        .filter_map(|detail| best_match(store, detail, &request).transpose())
+        .filter_map(|detail| best_match(store, detail, &request, ranking_policy).transpose())
         .collect::<Result<Vec<_>>>()?;
-    matches.sort_by(|left, right| {
-        right
-            .score
-            .cmp(&left.score)
-            .then_with(|| left.merchant.display_name.cmp(&right.merchant.display_name))
-    });
+    ranking_policy.sort_matches(&mut matches);
     matches.truncate(request.limit.clamp(1, 50));
     Ok(ConsumerDiscoveryResponse {
         schema: "open_commerce.consumer_discovery.v1",
         capability_contract_profile: "open_commerce.capability_schema.v1",
         requester_app_id: request.requester_app_id,
-        ranking_policy: "transparent_preference_match.v1",
+        ranking_policy: ranking_policy.key().to_string(),
+        ranking_policy_label: ranking_policy.label().to_string(),
+        ranking_explanation: ranking_policy.explanation().to_string(),
         ranking_is_paid: false,
+        ranking_is_user_selected,
+        available_ranking_policies: open_commerce_consumer_ranking::available_ranking_policies(),
         matches,
     })
 }
@@ -83,8 +88,9 @@ fn best_match(
     store: &Store,
     detail: OpenCommerceDirectoryMerchantDetail,
     request: &ConsumerDiscoveryRequest,
+    ranking_policy: ConsumerRankingPolicy,
 ) -> Result<Option<ConsumerDiscoveryMatch>> {
-    let selected = detail
+    let candidates = detail
         .capabilities
         .iter()
         .filter(|capability| {
@@ -101,12 +107,15 @@ fn best_match(
                 .map(|maximum| capability.unit_price_micros <= maximum)
                 .unwrap_or(true)
         })
-        .max_by_key(|capability| capability_score(capability, &request.preferences))
+        .collect::<Vec<_>>();
+    let selected = ranking_policy
+        .select_capability(candidates, &request.preferences, capability_score)
         .cloned();
     let Some(capability) = selected else {
         return Ok(None);
     };
-    let (score, reasons) = score_match(&detail, &capability, &request.preferences);
+    let (score, mut reasons) = score_match(&detail, &capability, &request.preferences);
+    reasons.push(ranking_policy.ranking_reason());
     let authorization =
         authorization_state(store, &detail, &capability, &request.requester_app_id)?;
     Ok(Some(ConsumerDiscoveryMatch {

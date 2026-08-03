@@ -210,6 +210,7 @@ mod open_commerce_consumer_preference_model;
 mod open_commerce_consumer_preference_service;
 #[cfg(test)]
 mod open_commerce_consumer_preference_tests;
+mod open_commerce_consumer_ranking;
 mod open_commerce_consumer_receipt_api;
 mod open_commerce_consumer_receipt_mcp;
 mod open_commerce_consumer_receipt_migration;
