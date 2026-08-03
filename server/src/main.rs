@@ -194,6 +194,10 @@ mod open_commerce_capability_contract_tests;
 mod open_commerce_capability_schema;
 #[cfg(test)]
 mod open_commerce_capability_schema_tests;
+mod open_commerce_capability_source_api;
+mod open_commerce_capability_source_migration;
+mod open_commerce_capability_source_model;
+mod open_commerce_capability_source_service;
 mod open_commerce_client_api;
 mod open_commerce_client_lifecycle_api;
 mod open_commerce_client_lifecycle_service;

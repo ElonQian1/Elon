@@ -1,10 +1,13 @@
 //! Public, merchant-approved directory contracts.
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
+    open_commerce_capability_source_model::OpenCommerceCapabilitySourceLink,
     open_commerce_merchant_identity_model::OpenCommercePublicMerchantIdentityKey,
     open_commerce_model::{OpenCommerceCapability, OpenCommerceMerchant},
 };
@@ -66,6 +69,12 @@ pub(crate) struct OpenCommerceDirectorySourceDeclaration {
     pub assertion_authority: &'static str,
     pub externally_verified: bool,
     pub integration_receipt_id: Option<String>,
+    pub provider_key: Option<String>,
+    pub connection_mode: Option<String>,
+    pub data_domain: Option<String>,
+    pub receipt_status: Option<String>,
+    pub receipt_completed_at: Option<String>,
+    pub receipt_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -93,7 +102,12 @@ impl OpenCommerceDirectoryMerchantDetail {
         capabilities: Vec<OpenCommerceCapability>,
         publication: OpenCommerceDirectoryPublication,
         portable_identity_keys: Vec<OpenCommercePublicMerchantIdentityKey>,
+        capability_source_links: Vec<OpenCommerceCapabilitySourceLink>,
     ) -> Self {
+        let source_links = capability_source_links
+            .into_iter()
+            .map(|link| (link.capability_id.clone(), link))
+            .collect::<HashMap<_, _>>();
         Self {
             schema: "open_commerce.directory_merchant.v1",
             merchant: OpenCommerceDirectoryMerchant {
@@ -109,9 +123,24 @@ impl OpenCommerceDirectoryMerchantDetail {
             capabilities: capabilities
                 .into_iter()
                 .map(|capability| {
-                    let source = source_declaration(&capability.handler_type);
-                    let freshness =
-                        directory_freshness(&capability.updated_at, capability.freshness_seconds);
+                    let linked_source = source_links.get(&capability.id);
+                    let source = source_declaration(&capability.handler_type, linked_source);
+                    let (freshness_updated_at, freshness_basis) = linked_source
+                        .map(|link| {
+                            (
+                                link.receipt_completed_at.as_str(),
+                                "sync_receipt_completed_at",
+                            )
+                        })
+                        .unwrap_or((
+                            capability.updated_at.as_str(),
+                            "capability_declaration_updated_at",
+                        ));
+                    let freshness = directory_freshness(
+                        freshness_updated_at,
+                        capability.freshness_seconds,
+                        freshness_basis,
+                    );
                     OpenCommerceDirectoryCapability {
                         capability_key: capability.capability_key,
                         display_name: capability.display_name,
@@ -135,7 +164,25 @@ impl OpenCommerceDirectoryMerchantDetail {
     }
 }
 
-fn source_declaration(handler_type: &str) -> OpenCommerceDirectorySourceDeclaration {
+fn source_declaration(
+    handler_type: &str,
+    linked_source: Option<&OpenCommerceCapabilitySourceLink>,
+) -> OpenCommerceDirectorySourceDeclaration {
+    if let Some(link) = linked_source {
+        return OpenCommerceDirectorySourceDeclaration {
+            schema: "open_commerce.directory_source_declaration.v1",
+            kind: "integration_sync_receipt".to_string(),
+            assertion_authority: "merchant_project",
+            externally_verified: false,
+            integration_receipt_id: Some(link.sync_receipt_id.clone()),
+            provider_key: Some(link.provider_key.clone()),
+            connection_mode: Some(link.connection_mode.clone()),
+            data_domain: Some(link.data_domain.clone()),
+            receipt_status: Some(link.receipt_status.clone()),
+            receipt_completed_at: Some(link.receipt_completed_at.clone()),
+            receipt_sha256: Some(link.receipt_sha256.clone()),
+        };
+    }
     let kind = match handler_type {
         "merchant_profile" => "merchant_profile",
         "static_json" => "merchant_static_data",
@@ -148,10 +195,20 @@ fn source_declaration(handler_type: &str) -> OpenCommerceDirectorySourceDeclarat
         assertion_authority: "merchant_project",
         externally_verified: false,
         integration_receipt_id: None,
+        provider_key: None,
+        connection_mode: None,
+        data_domain: None,
+        receipt_status: None,
+        receipt_completed_at: None,
+        receipt_sha256: None,
     }
 }
 
-fn directory_freshness(updated_at: &str, declared_seconds: i64) -> OpenCommerceDirectoryFreshness {
+fn directory_freshness(
+    updated_at: &str,
+    declared_seconds: i64,
+    basis: &'static str,
+) -> OpenCommerceDirectoryFreshness {
     let valid_until = (declared_seconds > 0)
         .then(|| {
             DateTime::parse_from_rfc3339(updated_at)
@@ -174,7 +231,7 @@ fn directory_freshness(updated_at: &str, declared_seconds: i64) -> OpenCommerceD
         declared_seconds,
         declaration_updated_at: updated_at.to_string(),
         valid_until,
-        basis: "capability_declaration_updated_at",
+        basis,
         externally_verified: false,
     }
 }

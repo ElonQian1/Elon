@@ -133,11 +133,14 @@ impl Store {
             .collect();
         let portable_identity_keys =
             self.list_public_open_commerce_merchant_identity_keys(merchant_id)?;
+        let capability_source_links =
+            self.list_publishable_open_commerce_capability_source_links(merchant_id)?;
         Ok(OpenCommerceDirectoryMerchantDetail::from_domain(
             merchant,
             capabilities,
             publication,
             portable_identity_keys,
+            capability_source_links,
         ))
     }
 

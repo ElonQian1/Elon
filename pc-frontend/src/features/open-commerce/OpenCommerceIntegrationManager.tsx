@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { openCommerceApi } from './openCommerceApi'
 import type {
+  OpenCommerceCapability,
+  OpenCommerceCapabilitySourceLink,
   OpenCommerceIntegration,
   OpenCommerceSyncReceipt,
 } from './openCommerceTypes'
@@ -13,6 +15,8 @@ interface Props {
   merchantId: string
   integrations: OpenCommerceIntegration[]
   receipts: OpenCommerceSyncReceipt[]
+  capabilities: OpenCommerceCapability[]
+  sourceLinks: OpenCommerceCapabilitySourceLink[]
   canEdit: boolean
   onChanged: () => Promise<void>
 }
@@ -22,6 +26,8 @@ export default function OpenCommerceIntegrationManager({
   merchantId,
   integrations,
   receipts,
+  capabilities,
+  sourceLinks,
   canEdit,
   onChanged,
 }: Props) {
@@ -32,12 +38,32 @@ export default function OpenCommerceIntegrationManager({
     useState<OpenCommerceIntegration['connection_mode']>('merchant_export')
   const [scopes, setScopes] = useState('read.orders')
   const [dataDomains, setDataDomains] = useState('orders')
+  const [sourceCapabilityId, setSourceCapabilityId] = useState('')
+  const [sourceReceiptId, setSourceReceiptId] = useState('')
+  const [sourceDataDomain, setSourceDataDomain] = useState('')
   const [busy, setBusy] = useState('')
   const [message, setMessage] = useState('')
 
   const merchantIntegrations = useMemo(
     () => integrations.filter((integration) => integration.merchant_id === merchantId),
     [integrations, merchantId],
+  )
+  const merchantIntegrationIds = useMemo(
+    () => new Set(merchantIntegrations.map((integration) => integration.id)),
+    [merchantIntegrations],
+  )
+  const eligibleReceipts = useMemo(
+    () => receipts.filter((receipt) =>
+      merchantIntegrationIds.has(receipt.integration_id)
+      && receipt.sync_kind !== 'health_check'
+      && ['succeeded', 'partial'].includes(receipt.status)),
+    [merchantIntegrationIds, receipts],
+  )
+  const selectedSourceReceipt = eligibleReceipts.find(
+    (receipt) => receipt.id === sourceReceiptId,
+  )
+  const selectedSourceIntegration = merchantIntegrations.find(
+    (integration) => integration.id === selectedSourceReceipt?.integration_id,
   )
 
   async function createIntegration(event: React.FormEvent) {
@@ -75,6 +101,46 @@ export default function OpenCommerceIntegrationManager({
         integration.id,
         integration.status === 'disabled',
       )
+      await onChanged()
+    } catch (error) {
+      setMessage(errorMessage(error))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function linkCapabilitySource(event: React.FormEvent) {
+    event.preventDefault()
+    if (!sourceCapabilityId || !selectedSourceReceipt || !sourceDataDomain) {
+      setMessage('请选择能力、同步回执和数据域。')
+      return
+    }
+    setBusy('link-source')
+    setMessage('')
+    try {
+      await openCommerceApi.linkCapabilitySource(projectId, sourceCapabilityId, {
+        integration_id: selectedSourceReceipt.integration_id,
+        sync_receipt_id: selectedSourceReceipt.id,
+        data_domain: sourceDataDomain,
+      })
+      setMessage('能力已关联内部同步回执；该声明不代表外部平台验证。')
+      setSourceCapabilityId('')
+      setSourceReceiptId('')
+      setSourceDataDomain('')
+      await onChanged()
+    } catch (error) {
+      setMessage(errorMessage(error))
+    } finally {
+      setBusy('')
+    }
+  }
+
+  async function removeCapabilitySource(link: OpenCommerceCapabilitySourceLink) {
+    setBusy(`unlink-source:${link.id}`)
+    setMessage('')
+    try {
+      await openCommerceApi.removeCapabilitySource(projectId, link.capability_id)
+      setMessage('能力来源回执绑定已移除。')
       await onChanged()
     } catch (error) {
       setMessage(errorMessage(error))
@@ -153,6 +219,70 @@ export default function OpenCommerceIntegrationManager({
           </button>
         </form>
       </div>
+      <div className={styles.integrationGrid}>
+        <div className={styles.integrationList}>
+          {sourceLinks.map((link) => (
+            <article key={link.id}>
+              <div>
+                <strong>{capabilityLabel(capabilities, link.capability_id)}</strong>
+                <code>{link.provider_key} · {link.data_domain}</code>
+              </div>
+              <span data-status={link.publishable ? 'connected' : 'degraded'}>
+                {link.publishable ? '可公开' : '需重绑'}
+              </span>
+              <p>回执：{receiptLabel(link.receipt_status)} · {link.sync_kind}</p>
+              <small>
+                {new Date(link.receipt_completed_at).toLocaleString('zh-CN')} · SHA-256 {link.receipt_sha256.slice(0, 16)}…
+              </small>
+              <footer>
+                <small>{link.publishable ? '内部回执，未经外部平台验证' : blockingReasonLabel(link.blocking_reason)}</small>
+                <button
+                  type="button"
+                  onClick={() => removeCapabilitySource(link)}
+                  disabled={!canEdit || busy !== ''}
+                >
+                  移除
+                </button>
+              </footer>
+            </article>
+          ))}
+          {sourceLinks.length === 0 && (
+            <p className={styles.empty}>尚未将公开能力关联到内部同步回执。</p>
+          )}
+        </div>
+
+        <form className={styles.formCard} onSubmit={linkCapabilitySource}>
+          <header>
+            <strong>声明能力数据来源</strong>
+            <small>绑定项目内部回执，不代表外部平台签名或回读验证</small>
+          </header>
+          <label>商业能力<select value={sourceCapabilityId} onChange={(event) => setSourceCapabilityId(event.target.value)} required disabled={!canEdit}>
+            <option value="">选择能力</option>
+            {capabilities.map((capability) => (
+              <option key={capability.id} value={capability.id}>{capability.display_name} · v{capability.version}</option>
+            ))}
+          </select></label>
+          <label>同步回执<select value={sourceReceiptId} onChange={(event) => {
+            setSourceReceiptId(event.target.value)
+            setSourceDataDomain('')
+          }} required disabled={!canEdit}>
+            <option value="">选择成功回执</option>
+            {eligibleReceipts.map((receipt) => {
+              const integration = merchantIntegrations.find((item) => item.id === receipt.integration_id)
+              return <option key={receipt.id} value={receipt.id}>{integration?.display_name ?? receipt.integration_id} · {receiptLabel(receipt.status)} · {new Date(receipt.completed_at).toLocaleString('zh-CN')}</option>
+            })}
+          </select></label>
+          <label>数据域<select value={sourceDataDomain} onChange={(event) => setSourceDataDomain(event.target.value)} required disabled={!canEdit || !selectedSourceIntegration}>
+            <option value="">选择该接入的数据域</option>
+            {(selectedSourceIntegration?.data_domains ?? []).map((domain) => (
+              <option key={domain} value={domain}>{domain}</option>
+            ))}
+          </select></label>
+          <button type="submit" disabled={!canEdit || busy !== '' || !sourceCapabilityId || !sourceReceiptId || !sourceDataDomain}>
+            {busy === 'link-source' ? '绑定中…' : '绑定来源回执'}
+          </button>
+        </form>
+      </div>
       <OpenCommerceAdapterCredentialManager
         projectId={projectId}
         integrations={merchantIntegrations}
@@ -191,6 +321,19 @@ function receiptLabel(status: OpenCommerceSyncReceipt['status']) {
   if (status === 'succeeded') return '成功'
   if (status === 'partial') return '部分成功'
   return '失败'
+}
+
+function capabilityLabel(capabilities: OpenCommerceCapability[], capabilityId: string) {
+  const capability = capabilities.find((item) => item.id === capabilityId)
+  return capability ? `${capability.display_name} · v${capability.version}` : capabilityId
+}
+
+function blockingReasonLabel(reason?: string) {
+  if (reason === 'capability_version_changed') return '能力版本已变化，请重新绑定'
+  if (reason === 'integration_disabled') return '数据接入已停用'
+  if (reason === 'health_check_not_business_data') return '健康检查不能作为业务来源'
+  if (reason === 'receipt_not_eligible') return '回执状态不再符合公开条件'
+  return '当前绑定不可公开'
 }
 
 function errorMessage(error: unknown) {

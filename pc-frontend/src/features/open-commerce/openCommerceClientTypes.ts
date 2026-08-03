@@ -762,10 +762,16 @@ export interface DirectoryCapability {
 
 export interface DirectoryCapabilitySourceDeclaration {
   schema: 'open_commerce.directory_source_declaration.v1'
-  kind: 'merchant_profile' | 'merchant_static_data' | 'merchant_runtime' | 'merchant_declared'
+  kind: 'merchant_profile' | 'merchant_static_data' | 'merchant_runtime' | 'merchant_declared' | 'integration_sync_receipt'
   assertion_authority: 'merchant_project'
   externally_verified: false
-  integration_receipt_id: null
+  integration_receipt_id: string | null
+  provider_key: string | null
+  connection_mode: 'official_api' | 'merchant_export' | 'local_adapter' | 'manual_import' | null
+  data_domain: string | null
+  receipt_status: 'succeeded' | 'partial' | null
+  receipt_completed_at: string | null
+  receipt_sha256: string | null
 }
 
 export interface DirectoryCapabilityFreshness {
@@ -774,7 +780,7 @@ export interface DirectoryCapabilityFreshness {
   declared_seconds: number
   declaration_updated_at: string
   valid_until: string | null
-  basis: 'capability_declaration_updated_at'
+  basis: 'capability_declaration_updated_at' | 'sync_receipt_completed_at'
   externally_verified: false
 }
 

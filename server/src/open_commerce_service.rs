@@ -40,6 +40,8 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
     let integrations = store.list_project_open_commerce_integrations(project_id)?;
     let runtime_bindings = store.list_project_open_commerce_runtime_bindings(project_id)?;
     let recent_sync_receipts = store.list_project_open_commerce_sync_receipts(project_id, 100)?;
+    let capability_source_links =
+        store.list_project_open_commerce_capability_source_links(project_id)?;
     let recent_audit_events = store.list_project_open_commerce_audit(project_id, 100)?;
     let rate_limit_policies = store.list_project_open_commerce_rate_limits(project_id)?;
     let rate_limit_usage = store.list_project_open_commerce_rate_limit_usage(project_id)?;
@@ -111,6 +113,7 @@ pub(crate) fn overview(store: &Store, project_id: &str) -> Result<OpenCommerceOv
         integrations,
         runtime_bindings,
         recent_sync_receipts,
+        capability_source_links,
         recent_audit_events,
         rate_limit_policies,
         rate_limit_usage,

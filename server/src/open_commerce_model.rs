@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::open_commerce_app_activity_health_model::OpenCommerceAppActivityHealth;
+use crate::open_commerce_capability_source_model::OpenCommerceCapabilitySourceLink;
 use crate::open_commerce_directory_model::OpenCommerceDirectoryPublication;
 use crate::open_commerce_integration_model::{OpenCommerceIntegration, OpenCommerceSyncReceipt};
 use crate::open_commerce_rate_limit_model::{
@@ -141,6 +142,7 @@ pub(crate) struct OpenCommerceOverview {
     pub integrations: Vec<OpenCommerceIntegration>,
     pub runtime_bindings: Vec<OpenCommerceRuntimeBinding>,
     pub recent_sync_receipts: Vec<OpenCommerceSyncReceipt>,
+    pub capability_source_links: Vec<OpenCommerceCapabilitySourceLink>,
     pub recent_audit_events: Vec<OpenCommerceAuditEvent>,
     pub rate_limit_policies: Vec<OpenCommerceRateLimitPolicy>,
     pub rate_limit_usage: Vec<OpenCommerceRateLimitUsage>,

@@ -198,6 +198,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (161, "消费者多来源偏好冲突预演、采用与回滚", crate::open_commerce_portability_merge_migration::migration_v161),
     (162, "消费者客户端加密数据保险箱", crate::open_commerce_consumer_vault_migration::migration_v162),
     (163, "消费者删除请求催办与升级关注记录", crate::open_commerce_data_request_followup_migration::migration_v163),
+    (164, "开放商业能力与数据同步回执来源绑定", crate::open_commerce_capability_source_migration::migration_v164),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

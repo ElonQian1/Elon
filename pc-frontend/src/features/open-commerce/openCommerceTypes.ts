@@ -404,6 +404,32 @@ export interface OpenCommerceSyncReceipt {
   created_at: string
 }
 
+export interface OpenCommerceCapabilitySourceLink {
+  id: string
+  project_id: string
+  merchant_id: string
+  capability_id: string
+  capability_key: string
+  capability_version: number
+  current_capability_version: number
+  integration_id: string
+  sync_receipt_id: string
+  data_domain: string
+  provider_key: string
+  connection_mode: OpenCommerceIntegration['connection_mode']
+  integration_status: OpenCommerceIntegration['status']
+  sync_kind: OpenCommerceSyncReceipt['sync_kind']
+  receipt_status: OpenCommerceSyncReceipt['status']
+  receipt_sha256: string
+  receipt_completed_at: string
+  revision: number
+  linked_by_user_id: string
+  created_at: string
+  updated_at: string
+  publishable: boolean
+  blocking_reason?: string
+}
+
 export interface OpenCommerceRuntimeBinding {
   id: string
   project_id: string
@@ -430,6 +456,7 @@ export interface OpenCommerceOverview {
   integrations: OpenCommerceIntegration[]
   runtime_bindings: OpenCommerceRuntimeBinding[]
   recent_sync_receipts: OpenCommerceSyncReceipt[]
+  capability_source_links: OpenCommerceCapabilitySourceLink[]
   recent_audit_events: OpenCommerceAuditEvent[]
   rate_limit_policies: OpenCommerceRateLimitPolicy[]
   rate_limit_usage: OpenCommerceRateLimitUsage[]

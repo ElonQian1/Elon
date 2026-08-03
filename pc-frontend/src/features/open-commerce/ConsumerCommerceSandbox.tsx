@@ -18,6 +18,7 @@ import type {
   ConsumerDiscoveryResponse,
   ConsumerPreferences,
   ConsumerRankingPolicyKey,
+  DirectoryCapability,
   OpenCommerceDeveloperApp,
 } from './openCommerceClientTypes'
 import { errorText, formatMicros, splitValues } from './openCommerceUi'
@@ -293,7 +294,9 @@ export default function ConsumerCommerceSandbox({ projectId }: { projectId: stri
                     <span style={badgeStyle(freshnessTone(match.capability.freshness.status))} data-tone={freshnessTone(match.capability.freshness.status)}>
                       {freshnessLabel(match.capability.freshness.status)}
                     </span>
-                    <span style={badgeStyle('neutral')}>{sourceLabel(match.capability.source.kind)} · 商户声明</span>
+                    <span style={badgeStyle('neutral')} title={sourceDetail(match.capability.source)}>
+                      {sourceLabel(match.capability.source.kind)} · 商户声明
+                    </span>
                   </div>
                   <div style={commerceStyles.headerActions}>
                     {match.authorization.status === 'request_required' && (
@@ -370,11 +373,25 @@ function freshnessTone(status: 'current' | 'stale' | 'unknown') {
   return 'neutral' as const
 }
 
-function sourceLabel(kind: 'merchant_profile' | 'merchant_static_data' | 'merchant_runtime' | 'merchant_declared') {
+function sourceLabel(kind: DirectoryCapability['source']['kind']) {
   if (kind === 'merchant_profile') return '商户公开资料'
   if (kind === 'merchant_static_data') return '商户静态数据'
   if (kind === 'merchant_runtime') return '商户运行时'
+  if (kind === 'integration_sync_receipt') return '内部同步回执'
   return '商户声明数据'
+}
+
+function sourceDetail(source: DirectoryCapability['source']) {
+  if (source.kind !== 'integration_sync_receipt') return '由商户项目声明，未经外部平台验证'
+  return [
+    source.provider_key,
+    source.data_domain,
+    source.receipt_status,
+    source.receipt_completed_at
+      ? new Date(source.receipt_completed_at).toLocaleString('zh-CN')
+      : null,
+    '内部回执，未经外部平台验证',
+  ].filter(Boolean).join(' · ')
 }
 
 function authorizationLabel(status: string) {

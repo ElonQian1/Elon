@@ -213,6 +213,10 @@ export default function OpenCommerceMerchantWorkspace({
                 merchantId={selectedMerchant.merchant.id}
                 integrations={overview?.integrations ?? []}
                 receipts={overview?.recent_sync_receipts ?? []}
+                capabilities={selectedMerchant.capabilities}
+                sourceLinks={(overview?.capability_source_links ?? []).filter(
+                  (link) => link.merchant_id === selectedMerchant.merchant.id,
+                )}
                 canEdit={canEdit}
                 onChanged={refresh}
               />

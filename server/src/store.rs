@@ -68,6 +68,7 @@ mod open_commerce_app_blocks;
 mod open_commerce_authorization_requests;
 mod open_commerce_business_handoffs;
 mod open_commerce_capabilities;
+mod open_commerce_capability_sources;
 mod open_commerce_consumer_data_requests;
 mod open_commerce_consumer_portability;
 mod open_commerce_consumer_portability_adoptions;

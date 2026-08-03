@@ -8,6 +8,7 @@ import type {
   InvokeOpenCommerceCapability,
   OpenCommerceActionConfirmation,
   OpenCommerceCapability,
+  OpenCommerceCapabilitySourceLink,
   OpenCommerceAppBlock,
   OpenCommerceAppBlockOutcome,
   OpenCommerceGrant,
@@ -52,6 +53,21 @@ export const openCommerceApi = {
     api.post<OpenCommerceCapability>(
       `${projectBase(projectId)}/merchants/${encodeURIComponent(merchantId)}/capabilities`,
       request,
+    ),
+
+  linkCapabilitySource: (
+    projectId: string,
+    capabilityId: string,
+    request: { integration_id: string; sync_receipt_id: string; data_domain: string },
+  ) =>
+    api.put<OpenCommerceCapabilitySourceLink>(
+      `${projectBase(projectId)}/capabilities/${encodeURIComponent(capabilityId)}/source-link`,
+      request,
+    ),
+
+  removeCapabilitySource: (projectId: string, capabilityId: string) =>
+    api.delete<{ schema: string; capability_id: string; removed: boolean }>(
+      `${projectBase(projectId)}/capabilities/${encodeURIComponent(capabilityId)}/source-link`,
     ),
 
   setDirectoryPublication: (projectId: string, merchantId: string, published: boolean) =>
