@@ -19,6 +19,9 @@ use crate::compute_federation::{
 use super::{
     compute_capacity_claim_rows::{claim_kind_value, finalize_claim_digest, insert_claim_on},
     compute_capacity_ledger::ComputeCapacityLedgerWriteReceipt,
+    compute_capacity_pool_guards::{
+        ensure_pool_operation_allowed_on, ComputeCapacityPoolOperation,
+    },
     compute_capacity_posting::{
         balances_for_transaction_on, event_kind_value, finalize_transaction_digest,
         next_ledger_sequence_on, post_capacity_transaction_on,
@@ -79,6 +82,11 @@ impl Store {
             tx.commit()?;
             return Ok(receipt);
         }
+        ensure_pool_operation_allowed_on(
+            &tx,
+            &input.pool,
+            ComputeCapacityPoolOperation::HoldClaim,
+        )?;
 
         let mut balances = BTreeMap::new();
         let mut claim_lines = Vec::with_capacity(input.lines.len());

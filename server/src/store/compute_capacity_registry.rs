@@ -13,6 +13,9 @@ use crate::compute_federation::{
 };
 
 use super::{
+    compute_capacity_pool_guards::{
+        ensure_pool_operation_allowed_on, ComputeCapacityPoolOperation,
+    },
     compute_capacity_rows::{meter_mode_value, stored_bucket_on},
     now, Store,
 };
@@ -178,6 +181,11 @@ impl Store {
             tx.commit()?;
             return Ok(existing.balance);
         }
+        ensure_pool_operation_allowed_on(
+            &tx,
+            &bucket.binding.pool,
+            ComputeCapacityPoolOperation::ConfigureBucket,
+        )?;
 
         let overlap = tx
             .query_row(

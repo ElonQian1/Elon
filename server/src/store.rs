@@ -31,6 +31,7 @@ mod compute_capacity_claim_transitions;
 mod compute_capacity_claims;
 mod compute_capacity_expiry_recovery;
 mod compute_capacity_ledger;
+mod compute_capacity_pool_guards;
 mod compute_capacity_posting;
 mod compute_capacity_registry;
 mod compute_capacity_rows;

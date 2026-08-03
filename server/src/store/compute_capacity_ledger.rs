@@ -15,6 +15,9 @@ use crate::compute_federation::{
 };
 
 use super::{
+    compute_capacity_pool_guards::{
+        ensure_pool_operation_allowed_on, ComputeCapacityPoolOperation,
+    },
     compute_capacity_posting::{
         balances_for_transaction_on, event_kind_value, finalize_transaction_digest,
         next_ledger_sequence_on, post_capacity_transaction_on,
@@ -111,6 +114,11 @@ impl Store {
                 current_balances: balances,
             });
         }
+        ensure_pool_operation_allowed_on(
+            &tx,
+            &input.pool,
+            ComputeCapacityPoolOperation::AddSupply,
+        )?;
 
         let mut balances = BTreeMap::new();
         let mut movements = Vec::with_capacity(input.lines.len());
