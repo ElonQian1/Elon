@@ -19,6 +19,7 @@ mod deployment_serialization;
 mod design_bootstrap;
 mod design_browser_runtime;
 mod design_diff_regions;
+mod design_draft_operations;
 mod design_draft_preview;
 mod design_drafts;
 mod design_event_stream;

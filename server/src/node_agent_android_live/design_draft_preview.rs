@@ -77,14 +77,10 @@ pub(super) async fn call(session: &LiveUiSession, name: &str, arguments: Value) 
 }
 
 fn preview_step(draft: &Value, selector: &str) -> Result<Value> {
-    let patches = draft
+    let mut patches = draft
         .get("patches")
         .and_then(Value::as_array)
-        .context("设计草稿缺少 patches")?;
-    if patches.is_empty() || patches.len() > 32 {
-        bail!("DESIGN_DRAFT_PREVIEW_PATCH_LIMIT：预览需要 1..32 个样式 patch");
-    }
-    let patches = patches
+        .context("设计草稿缺少 patches")?
         .iter()
         .map(|patch| {
             Ok(json!({
@@ -93,6 +89,21 @@ fn preview_step(draft: &Value, selector: &str) -> Result<Value> {
             }))
         })
         .collect::<Result<Vec<_>>>()?;
+    if let Some(operations) = draft.get("operations") {
+        for operation in super::design_draft_operations::live_style_patches_from_value(operations)?
+        {
+            let property = operation.get("property").and_then(Value::as_str);
+            if !patches
+                .iter()
+                .any(|patch| patch.get("property").and_then(Value::as_str) == property)
+            {
+                patches.push(operation);
+            }
+        }
+    }
+    if patches.is_empty() || patches.len() > 32 {
+        bail!("DESIGN_DRAFT_PREVIEW_PATCH_LIMIT：预览需要 1..32 个可实时预览的样式操作");
+    }
     Ok(json!({"action":"previewStyle","selector":selector,"patches":patches}))
 }
 

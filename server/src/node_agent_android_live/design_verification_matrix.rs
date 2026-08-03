@@ -108,7 +108,11 @@ fn verification_matrix(session: &LiveUiSession, arguments: &Value) -> Result<Val
     let patches_ready = draft
         .get("patches")
         .and_then(Value::as_array)
-        .is_some_and(|patches| !patches.is_empty());
+        .is_some_and(|patches| !patches.is_empty())
+        || draft
+            .get("operations")
+            .and_then(Value::as_array)
+            .is_some_and(|operations| !operations.is_empty());
     let draft_ready = binding_ready && patches_ready;
     let rows = target_platforms
         .iter()

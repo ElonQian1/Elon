@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 
 use super::{
     broker::LiveUiSession,
+    design_draft_operations::{self, DraftOperation},
     design_session_store::{read_record, validate_design_session_id},
 };
 use crate::node_agent_source_preview::{
@@ -60,6 +61,8 @@ struct SourceRange {
 struct DraftSnapshot {
     revision: u64,
     patches: Vec<DesignStylePatch>,
+    #[serde(default)]
+    operations: Vec<DraftOperation>,
     source_binding: Option<DesignSourceBinding>,
     target_platforms: Vec<String>,
     status: String,
@@ -77,6 +80,8 @@ pub(super) struct DesignDraft {
     selector: String,
     scope: String,
     patches: Vec<DesignStylePatch>,
+    #[serde(default)]
+    operations: Vec<DraftOperation>,
     source_binding: Option<DesignSourceBinding>,
     target_platforms: Vec<String>,
     revision: u64,
@@ -96,6 +101,8 @@ struct CreateDraftRequest {
     scope: String,
     #[serde(default)]
     patches: Vec<DesignStylePatch>,
+    #[serde(default)]
+    operations: Vec<DraftOperation>,
     source_binding: Option<DesignSourceBinding>,
     #[serde(default)]
     target_platforms: Vec<String>,
@@ -107,6 +114,7 @@ struct UpdateDraftRequest {
     draft_id: String,
     expected_revision: u64,
     patches: Option<Vec<DesignStylePatch>>,
+    operations: Option<Vec<DraftOperation>>,
     source_binding: Option<DesignSourceBinding>,
     target_platforms: Option<Vec<String>>,
 }
@@ -114,9 +122,9 @@ struct UpdateDraftRequest {
 pub(super) fn tool_definitions() -> Vec<Value> {
     vec![
         tool(LIST_TOOL, "列出项目最近的通用多端设计草稿；只返回 selector、revision、平台和绑定状态，不返回历史正文。", json!({"type":"object","additionalProperties":false,"properties":{"limit":{"type":"integer","minimum":1,"maximum":50,"default":20},"designSessionId":{"type":"string","pattern":"^design_[a-f0-9]{32}$"}}}), true),
-        tool(CREATE_TOOL, "基于 designSession selector 创建项目持久的多端设计草稿；草稿只描述可撤销意图，不直接冒充源码修改。", draft_create_schema(), false),
+        tool(CREATE_TOOL, "基于 designSession selector 创建项目持久的多端 DraftOperation v2 草稿；草稿只描述可撤销意图，不直接冒充源码修改。", draft_create_schema(), false),
         tool(GET_TOOL, "读取单个设计草稿、源码绑定、样式 patch、revision 和写回回执引用。", draft_id_schema(true), true),
-        tool(UPDATE_TOOL, "以 expectedRevision 乐观并发更新样式 patch、source binding 或目标平台；旧快照进入有界撤销历史。", draft_update_schema(), false),
+        tool(UPDATE_TOOL, "以 expectedRevision 乐观并发更新 DraftOperation、兼容样式 patch、source binding 或目标平台；旧快照进入有界撤销历史。", draft_update_schema(), false),
         tool(UNDO_TOOL, "撤销设计草稿的最近一次更新；revision 仍单调递增，避免旧客户端覆盖新状态。", draft_id_schema(false), false),
         tool(BEGIN_WRITEBACK_TOOL, "固定当前草稿 revision 和 Git/sourceRevision，开始 Web/PWA/Tauri/Android 分平台写回机器回执。", draft_id_schema(false), false),
         tool(COMPLETE_WRITEBACK_TOOL, "根据实际 changedFiles、源码哈希与分平台 build evidence 更新写回回执；没有证据不会显示完成。", complete_writeback_schema(), false),
@@ -195,10 +203,11 @@ fn list(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
         "draftId":draft.draft_id,"designSessionId":draft.design_session_id,"platform":draft.platform,
         "route":draft.route,"selector":draft.selector,"scope":draft.scope,"revision":draft.revision,
         "status":draft.status,"targetPlatforms":draft.target_platforms,
+        "operationCount":draft.operations.len(),
         "sourceBindingStatus":draft.source_binding.as_ref().map(|binding| binding.status.as_str()),
         "writebackReceiptId":draft.writeback_receipt_id,"updatedAt":draft.updated_at,
     })).collect::<Vec<_>>();
-    Ok(json!({"schemaVersion":1,"drafts":summaries,"contentEmbedded":false}))
+    Ok(json!({"schemaVersion":2,"drafts":summaries,"contentEmbedded":false}))
 }
 
 fn create(session: &LiveUiSession, mut request: CreateDraftRequest) -> Result<Value> {
@@ -208,6 +217,7 @@ fn create(session: &LiveUiSession, mut request: CreateDraftRequest) -> Result<Va
     request.selector = clean_text(&request.selector, 1_000, "selector")?;
     request.scope = normalize_scope(&request.scope)?;
     request.patches = normalize_patches(request.patches)?;
+    request.operations = design_draft_operations::normalize_operations(request.operations)?;
     request.source_binding = request.source_binding.map(normalize_binding).transpose()?;
     let fallback = vec![design_session.platform.as_str().to_string()];
     let target_platforms = normalize_platforms(if request.target_platforms.is_empty() {
@@ -217,7 +227,7 @@ fn create(session: &LiveUiSession, mut request: CreateDraftRequest) -> Result<Va
     })?;
     let now = chrono::Utc::now().to_rfc3339();
     let draft = DesignDraft {
-        schema_version: 1,
+        schema_version: 2,
         draft_id: format!("draft_{}", uuid::Uuid::new_v4().simple()),
         design_session_id: request.design_session_id,
         platform: design_session.platform.as_str().into(),
@@ -225,6 +235,7 @@ fn create(session: &LiveUiSession, mut request: CreateDraftRequest) -> Result<Va
         selector: request.selector,
         scope: request.scope,
         patches: request.patches,
+        operations: request.operations,
         source_binding: request.source_binding,
         target_platforms,
         revision: 1,
@@ -257,6 +268,9 @@ fn update(session: &LiveUiSession, request: UpdateDraftRequest) -> Result<Value>
     if let Some(patches) = request.patches {
         draft.patches = normalize_patches(patches)?;
     }
+    if let Some(operations) = request.operations {
+        draft.operations = design_draft_operations::normalize_operations(operations)?;
+    }
     if let Some(binding) = request.source_binding {
         draft.source_binding = Some(normalize_binding(binding)?);
     }
@@ -264,6 +278,7 @@ fn update(session: &LiveUiSession, request: UpdateDraftRequest) -> Result<Value>
         draft.target_platforms = normalize_platforms(platforms)?;
     }
     draft.revision += 1;
+    draft.schema_version = 2;
     draft.status = "DRAFT".into();
     draft.writeback_receipt_id = None;
     draft.updated_at = chrono::Utc::now().to_rfc3339();
@@ -280,11 +295,13 @@ fn undo(session: &LiveUiSession, draft_id: &str, expected: u64) -> Result<Value>
         .pop()
         .context("DESIGN_DRAFT_UNDO_EMPTY：没有可撤销修改")?;
     draft.patches = snapshot.patches;
+    draft.operations = snapshot.operations;
     draft.source_binding = snapshot.source_binding;
     draft.target_platforms = snapshot.target_platforms;
     draft.status = "DRAFT".into();
     draft.writeback_receipt_id = None;
     draft.revision += 1;
+    draft.schema_version = 2;
     draft.updated_at = chrono::Utc::now().to_rfc3339();
     persist(&root, &draft)?;
     Ok(json!({"draft":draft_view(&draft),"undidRevision":snapshot.revision}))
@@ -294,8 +311,8 @@ fn begin_writeback(session: &LiveUiSession, draft_id: &str, expected: u64) -> Re
     let root = canonical_root(session)?;
     let mut draft = read(&root, draft_id)?;
     expect_revision(&draft, expected)?;
-    if draft.patches.is_empty() {
-        bail!("DESIGN_DRAFT_EMPTY：草稿没有样式 patch");
+    if draft.patches.is_empty() && draft.operations.is_empty() {
+        bail!("DESIGN_DRAFT_EMPTY：草稿没有 patch 或 DraftOperation");
     }
     let binding = draft
         .source_binding
@@ -358,6 +375,8 @@ fn draft_view(draft: &DesignDraft) -> Value {
         "schemaVersion":draft.schema_version,"draftId":draft.draft_id,
         "designSessionId":draft.design_session_id,"platform":draft.platform,"route":draft.route,
         "selector":draft.selector,"scope":draft.scope,"patches":draft.patches,
+        "operations":draft.operations,
+        "operationCapabilities":design_draft_operations::capability_view(&draft.operations, &draft.target_platforms),
         "sourceBinding":draft.source_binding,"targetPlatforms":draft.target_platforms,
         "revision":draft.revision,"status":draft.status,
         "writebackReceiptId":draft.writeback_receipt_id,"historyDepth":draft.history.len(),
@@ -369,6 +388,7 @@ fn push_history(draft: &mut DesignDraft) {
     draft.history.push(DraftSnapshot {
         revision: draft.revision,
         patches: draft.patches.clone(),
+        operations: draft.operations.clone(),
         source_binding: draft.source_binding.clone(),
         target_platforms: draft.target_platforms.clone(),
         status: draft.status.clone(),
@@ -614,11 +634,11 @@ fn source_binding_schema() -> Value {
 }
 
 fn draft_create_schema() -> Value {
-    json!({"type":"object","additionalProperties":false,"required":["designSessionId","selector"],"properties":{"designSessionId":{"type":"string","pattern":"^design_[a-f0-9]{32}$"},"selector":{"type":"string","minLength":1,"maxLength":1000},"scope":{"enum":["instance","component","route","project"],"default":"instance"},"patches":{"type":"array","maxItems":64,"items":style_patch_schema()},"sourceBinding":source_binding_schema(),"targetPlatforms":{"type":"array","minItems":1,"maxItems":4,"uniqueItems":true,"items":{"enum":["web","pwa","tauri","android"]}}}})
+    json!({"type":"object","additionalProperties":false,"required":["designSessionId","selector"],"properties":{"designSessionId":{"type":"string","pattern":"^design_[a-f0-9]{32}$"},"selector":{"type":"string","minLength":1,"maxLength":1000},"scope":{"enum":["instance","component","route","project"],"default":"instance"},"patches":{"type":"array","maxItems":64,"items":style_patch_schema()},"operations":design_draft_operations::operations_schema(),"sourceBinding":source_binding_schema(),"targetPlatforms":{"type":"array","minItems":1,"maxItems":4,"uniqueItems":true,"items":{"enum":["web","pwa","tauri","android"]}}}})
 }
 
 fn draft_update_schema() -> Value {
-    json!({"type":"object","additionalProperties":false,"required":["draftId","expectedRevision"],"properties":{"draftId":{"type":"string","pattern":"^draft_[a-f0-9]{32}$"},"expectedRevision":{"type":"integer","minimum":1},"patches":{"type":"array","maxItems":64,"items":style_patch_schema()},"sourceBinding":source_binding_schema(),"targetPlatforms":{"type":"array","minItems":1,"maxItems":4,"uniqueItems":true,"items":{"enum":["web","pwa","tauri","android"]}}}})
+    json!({"type":"object","additionalProperties":false,"required":["draftId","expectedRevision"],"properties":{"draftId":{"type":"string","pattern":"^draft_[a-f0-9]{32}$"},"expectedRevision":{"type":"integer","minimum":1},"patches":{"type":"array","maxItems":64,"items":style_patch_schema()},"operations":design_draft_operations::operations_schema(),"sourceBinding":source_binding_schema(),"targetPlatforms":{"type":"array","minItems":1,"maxItems":4,"uniqueItems":true,"items":{"enum":["web","pwa","tauri","android"]}}}})
 }
 
 fn draft_id_schema(read_only: bool) -> Value {
