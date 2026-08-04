@@ -240,7 +240,7 @@
 }
 
 [data-grid='withdrawal'] {
-  grid-template-columns: minmax(170px, 1.2fr) minmax(100px, .7fr) minmax(125px, .8fr) minmax(110px, .7fr) minmax(155px, 1fr);
+  grid-template-columns: minmax(170px, 1.2fr) minmax(100px, .7fr) minmax(125px, .8fr) minmax(110px, .7fr) minmax(155px, 1fr) 48px;
 }
 
 .tableHeader {
@@ -313,6 +313,22 @@
 .status[data-tone='muted'] {
   color: var(--text-muted);
   background: rgba(255, 255, 255, .05);
+}
+
+.rowAction {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: #9fc4f4;
+  background: var(--bg-elevated);
+}
+
+.rowAction:hover {
+  border-color: rgba(121, 168, 232, .5);
+  background: rgba(121, 168, 232, .1);
 }
 
 .tabs {
@@ -405,12 +421,20 @@
     grid-template-columns: minmax(150px, 1fr) minmax(120px, .8fr);
   }
 
+  [data-grid='withdrawal'] {
+    grid-template-columns: minmax(150px, 1fr) minmax(120px, .8fr) 48px;
+  }
+
   .tableHeader span:nth-child(n+3) {
     display: none;
   }
 
   .dataRow > :nth-child(n+3) {
     display: none;
+  }
+
+  [data-grid='withdrawal'] > :nth-child(6) {
+    display: block;
   }
 }
 

@@ -74,13 +74,43 @@ export interface SettlementWithdrawalRequest {
   currency: 'CNY'
   destination_kind: string
   destination_ref: string
+  request_posting_id: string
+  request_posting_digest: string
+  event_digest: string
   requested_at: string
+}
+
+export type WithdrawalTerminalAction = 'rejected' | 'external_paid_attested'
+
+export type WithdrawalEvidenceKind =
+  | 'bank_receipt'
+  | 'payment_provider_receipt'
+  | 'sui_transaction_digest'
+  | 'other_receipt'
+
+export interface TerminalizeSettlementWithdrawalBody {
+  expected_withdrawal_event_digest: string
+  expected_request_posting_id: string
+  expected_request_posting_digest: string
+  action: WithdrawalTerminalAction
+  reason_code: string
+  reason_detail?: string | null
+  external_evidence_kind?: WithdrawalEvidenceKind | null
+  external_evidence_ref?: string | null
+  external_evidence_digest?: string | null
+  idempotency_key: string
+  confirm_refund_or_attestation_only: boolean
+  confirm_external_payment_already_completed: boolean
+  confirm_evidence_ref_contains_no_secret: boolean
 }
 
 export interface SettlementWithdrawalTerminal {
   action: Exclude<WithdrawalStatus, 'all' | 'pending'>
   reason_code: string
   reason_detail?: string | null
+  external_evidence_kind?: WithdrawalEvidenceKind | null
+  external_evidence_ref?: string | null
+  external_evidence_digest?: string | null
   terminal_at: string
 }
 
@@ -113,5 +143,13 @@ export const computeSettlementApi = {
   withdrawals: (status: WithdrawalStatus, limit = 50) =>
     api.get<SettlementWithdrawalQueuePage>(
       `/api/admin/compute/settlement-withdrawals?status=${encodeURIComponent(status)}&limit=${limit}`,
+    ),
+  terminalizeWithdrawal: (
+    withdrawalId: string,
+    body: TerminalizeSettlementWithdrawalBody,
+  ) =>
+    api.post<SettlementWithdrawalTerminal>(
+      `/api/admin/compute/settlement-withdrawals/${encodeURIComponent(withdrawalId)}/terminal`,
+      body,
     ),
 }

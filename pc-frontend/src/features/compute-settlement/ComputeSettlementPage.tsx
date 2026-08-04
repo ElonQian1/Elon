@@ -3,6 +3,7 @@ import {
   ArrowRight,
   CircleCheck,
   Clock3,
+  FileCheck2,
   RefreshCw,
   ShieldCheck,
   TriangleAlert,
@@ -14,9 +15,12 @@ import {
   type PlatformSettlementAccount,
   type SettlementReleaseBatchReport,
   type SettlementReleaseCandidatePage,
+  type SettlementWithdrawalRequest,
   type SettlementWithdrawalQueuePage,
+  type TerminalizeSettlementWithdrawalBody,
   type WithdrawalStatus,
 } from './computeSettlementApi'
+import WithdrawalTerminalDialog from './WithdrawalTerminalDialog'
 import styles from './ComputeSettlementPage.module.css'
 
 const WITHDRAWAL_FILTERS: Array<{ value: WithdrawalStatus; label: string }> = [
@@ -36,6 +40,8 @@ export default function ComputeSettlementPage() {
   const [withdrawalStatus, setWithdrawalStatus] = useState<WithdrawalStatus>('pending')
   const [loading, setLoading] = useState(false)
   const [releasing, setReleasing] = useState(false)
+  const [terminalizing, setTerminalizing] = useState(false)
+  const [selectedWithdrawal, setSelectedWithdrawal] = useState<SettlementWithdrawalRequest | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
@@ -85,6 +91,26 @@ export default function ComputeSettlementPage() {
       setError(messageOf(reason, '到期结算释放失败'))
     } finally {
       setReleasing(false)
+    }
+  }
+
+  async function terminalizeWithdrawal(body: TerminalizeSettlementWithdrawalBody) {
+    if (!selectedWithdrawal || terminalizing) return
+    setTerminalizing(true)
+    setError('')
+    setNotice('')
+    try {
+      const terminal = await computeSettlementApi.terminalizeWithdrawal(
+        selectedWithdrawal.withdrawal_id,
+        body,
+      )
+      setNotice(terminal.action === 'rejected' ? '提款已拒绝，内部余额已退回。' : '外部付款证明已登记。')
+      setSelectedWithdrawal(null)
+      await load()
+    } catch (reason) {
+      setError(messageOf(reason, '提款处理失败'))
+    } finally {
+      setTerminalizing(false)
     }
   }
 
@@ -184,7 +210,7 @@ export default function ComputeSettlementPage() {
           ))}
         </div>
         <div className={styles.tableHeader} data-grid="withdrawal">
-          <span>Provider</span><span>金额</span><span>目标</span><span>状态</span><span>申请时间</span>
+          <span>Provider</span><span>金额</span><span>目标</span><span>状态</span><span>申请时间</span><span>操作</span>
         </div>
         <div className={styles.rows}>
           {withdrawals?.items.map((item) => (
@@ -194,11 +220,34 @@ export default function ComputeSettlementPage() {
               <span>{destinationLabel(item.request.destination_kind)}</span>
               <span className={styles.status} data-tone={withdrawalTone(item.status)}>{withdrawalLabel(item.status)}</span>
               <span>{formatTime(item.request.requested_at)}</span>
+              <span>
+                {item.status === 'pending' ? (
+                  <button
+                    type="button"
+                    className={styles.rowAction}
+                    onClick={() => setSelectedWithdrawal(item.request)}
+                    aria-label={`处理提款 ${shortId(item.request.withdrawal_id)}`}
+                    title="处理提款"
+                  >
+                    <FileCheck2 size={15} aria-hidden="true" />
+                  </button>
+                ) : '—'}
+              </span>
             </div>
           ))}
           {!loading && (withdrawals?.items.length ?? 0) === 0 && <EmptyRow icon={<WalletCards size={18} />} text="当前筛选下没有提款记录" />}
         </div>
       </section>
+
+      {selectedWithdrawal && (
+        <WithdrawalTerminalDialog
+          request={selectedWithdrawal}
+          busy={terminalizing}
+          error={error}
+          onClose={() => setSelectedWithdrawal(null)}
+          onSubmit={terminalizeWithdrawal}
+        />
+      )}
     </main>
   )
 }
