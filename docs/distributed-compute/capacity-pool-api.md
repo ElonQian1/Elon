@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-本人 CapacityPool 控制面已写入代码，但尚未编译、执行 v165 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它允许用户在本人 `user_node` 或 `managed_cluster` Provider 下登记、读取和列出共享物理资源边界，但只创建 `registering` Pool，不激活 Provider、不发行容量、不创建交付窗口、Bucket、Offer 或 Price Snapshot。
+本人 CapacityPool 控制面已写入代码，但尚未编译、执行 v165 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它允许用户在本人 `user_node` 或 `managed_cluster` Provider 下登记、读取、列出和审计共享物理资源边界，但只创建 `registering` Pool，不激活 Provider、不发行容量、不创建交付窗口、Bucket、Offer 或 Price Snapshot。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最终写入既有 CapacityPool Registry。服务端固定初始 `capacity_epoch=1`、`pool_revision=1`、状态、时间和全部摘要，客户端不能直接提交摘要或生命周期状态。
 
@@ -23,6 +23,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最
 | POST | `/api/me/compute/providers/:provider_id/capacity-pools` | 在本人 Provider 下登记一份 registering Pool |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools?limit=20` | 列出该 Provider 的 Pool 脱敏视图 |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id` | 读取该 Provider 的一份 Pool 脱敏视图 |
+| GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/audit` | 重算当前 epoch 账本并返回一致性报告 |
 
 创建请求提供稳定 `pool_id`、仅用于生成摘要的 `resource_scope_key`、区域、32 KiB 以内的 JSON 资源档案和 1 至 64 项计量策略。计量策略明确 meter 名称、`consumable/reusable` 模式和正整数最小量子。
 
@@ -35,6 +36,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最
 | `compute_create_my_capacity_pool` | 幂等写入 | 在本人 Provider 下登记 registering Pool |
 | `compute_get_my_capacity_pool` | 只读 | 读取本人一份 Pool 脱敏视图 |
 | `compute_list_my_capacity_pools` | 只读 | 列出本人 Provider 的 Pool |
+| `compute_audit_my_capacity_pool` | 只读 | 重算本人当前 Pool epoch 的账本并返回一致性报告 |
 
 ## 4. 摘要与隐私边界
 
@@ -44,7 +46,13 @@ HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最
 
 相同 `pool_id` 只能重放同一 Provider、资源范围、档案、区域和 meter 合同；同一 Provider 的相同资源范围也只能绑定一个 Pool。已有 Pool 属于另一 Provider 或合同不同即拒绝。
 
-## 5. 失败关闭边界
+## 5. 账本审计边界
+
+审计入口只读取当前 Pool 的 `capacity_epoch`，从不可变 LedgerTransaction/Leg 重算每个 Bucket 的 issued、available、held、active、consumed 和 retired 余额，再与物化投影、revision 和 ledger sequence 对比。报告返回交易数、分录数、Bucket 差异和总体 `healthy` 状态，不修改 Pool、账本或余额。
+
+`healthy=true` 只表示账本分录、守恒关系与当前投影在内部一致，不证明硬件真实存在、节点在线、性能达到声明、路由可达或平台已经完成 verified 审核。该报告可作为未来激活审核的材料之一，但不能单独触发激活或 Offer 发布。
+
+## 6. 失败关闭边界
 
 - Provider 不属于当前用户时拒绝；
 - `external_pool` 必须由服务端 Adapter 管理，本人接口拒绝；
@@ -54,11 +62,11 @@ HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最
 - 资源档案不是对象或超过 32 KiB、meter 重复、模式不受支持或量子非正数时拒绝；
 - 查询到的 Pool 不属于路径 Provider 时拒绝。
 
-## 6. 尚未实现
+## 7. 尚未实现
 
 - Cargo 编译、v165 迁移执行和 HTTP/MCP 真实调用验证；
 - Pool 版本更新、epoch 轮换的本人控制面；
-- supply 发行控制面；CapacityBucket 登记与读取已写入，边界见 `docs/distributed-compute/capacity-bucket-api.md`；
+- CapacityBucket 与 Supply Add/Withdraw 控制面已写入，边界见 `docs/distributed-compute/capacity-bucket-api.md` 和 `docs/distributed-compute/capacity-supply-api.md`；
 - Provider/Pool 观测验证、人工审批和受控激活；
 - Offer、Price Snapshot、自动撮合和真实任务派发；
 - 实际用量验证、Provider 收益和链上结算。
