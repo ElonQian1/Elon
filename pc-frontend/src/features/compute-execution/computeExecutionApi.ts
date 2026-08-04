@@ -1,9 +1,18 @@
 import { api } from '../../api/client'
 import {
+  type ComputeAttemptTerminalCandidateReceipt,
+  type ComputeDeclaredResultArtifactInput,
+} from '../compute-attempt/terminalContracts'
+import {
   type ComputeCapacityClaimBinding,
   type ComputeJobVersionBinding,
   type ComputeReservationReceipt,
 } from '../compute-market/computeMarketApi'
+
+export type {
+  ComputeAttemptTerminalCandidateReceipt,
+  ComputeDeclaredResultArtifactInput,
+} from '../compute-attempt/terminalContracts'
 
 export interface ComputeAttemptLease {
   schema: string
@@ -187,16 +196,6 @@ export interface ComputeAttemptUsageDeclarationReceipt {
   replayed: boolean
 }
 
-export interface ComputeDeclaredResultArtifactInput {
-  artifact_id: string
-  digest_algorithm: 'sha256'
-  digest: string
-  media_type: string
-  size_bytes: number
-  location_ref: string
-  encryption_profile: string | null
-}
-
 export interface DeclareComputeAttemptTerminalCandidateBody {
   expected_lease_revision: number
   expected_lease_digest: string
@@ -212,27 +211,6 @@ export interface DeclareComputeAttemptTerminalCandidateBody {
   result_artifacts: ComputeDeclaredResultArtifactInput[]
   idempotency_key: string
   confirm_provider_declaration_only: true
-}
-
-export interface ComputeAttemptTerminalCandidateReceipt {
-  terminal_candidate_id: string
-  lease_id: string
-  final_usage_snapshot_id: string
-  final_usage_sequence_no: number
-  final_cumulative_usage_digest: string
-  executor_terminal_ref: string
-  outcome: string
-  reason_code: string
-  diagnostic_ref: string | null
-  output_digest: string | null
-  result_artifacts: ComputeDeclaredResultArtifactInput[]
-  event_digest: string
-  declared_at: string
-  verification_status: string
-  execution_effect: string
-  lease_effect: string
-  money_effect: string
-  replayed: boolean
 }
 
 interface ActivationCandidateResponse {
