@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Bot, Boxes, CircleDollarSign, FileCheck2, Gauge, GitBranch, HardDrive, Landmark, MonitorCog, PackageCheck, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
+import { Bot, Boxes, CircleDollarSign, FileCheck2, Gauge, GitBranch, HardDrive, Landmark, MonitorCog, PackageCheck, Search, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -25,6 +25,7 @@ const RAIL_ITEMS: RailItem[] = [
   { path: '/ui-tuner', Icon: SlidersHorizontal, label: '微调画布', color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/node',    Icon: MonitorCog,   label: '分享算力',  color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/compute-supply', Icon: Gauge, label: '供给管理', color: '#2b3138', hoverColor: '#35404a' },
+  { path: '/compute-market', Icon: Search, label: '算力市场', color: '#30312d', hoverColor: '#3b3d36' },
   { path: '/my-compute-settlement', Icon: CircleDollarSign, label: '我的算力收益', color: '#26342d', hoverColor: '#30463a' },
   { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2a2b2f', hoverColor: '#34363b' },
 ]
