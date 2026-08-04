@@ -255,10 +255,19 @@ impl Store {
     ) -> Result<ComputeAttemptVerificationDecisionReceipt> {
         support::validate_exact("Attempt Lease ID", lease_id, 200)?;
         let conn = self.conn()?;
-        let stored = verification_decision_by_lease_on(&*conn, lease_id)?
-            .ok_or_else(|| anyhow!("Attempt 尚无 Verification 决定"))?;
-        verification_decision_receipt_on(&*conn, stored, false)
+        compute_attempt_verification_decision_on(&*conn, lease_id)?
+            .ok_or_else(|| anyhow!("Attempt 尚无 Verification 决定"))
     }
+}
+
+pub(crate) fn compute_attempt_verification_decision_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeAttemptVerificationDecisionReceipt>> {
+    let Some(stored) = verification_decision_by_lease_on(conn, lease_id)? else {
+        return Ok(None);
+    };
+    Ok(Some(verification_decision_receipt_on(conn, stored, false)?))
 }
 
 fn verification_decision_receipt_on(

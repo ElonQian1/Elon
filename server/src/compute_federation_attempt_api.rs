@@ -10,6 +10,7 @@ use axum::{
 use serde_json::json;
 
 use crate::{
+    compute_federation_attempt_receipt_service::{self, IssueComputeAttemptExecutionReceiptBody},
     compute_federation_attempt_service::{
         self, AbortMyComputeAttemptRequest, ActivateMyComputeAttemptRequest,
         DecideComputeAttemptVerificationBody, DeclareMyComputeAttemptTerminalCandidateRequest,
@@ -85,6 +86,14 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/compute/attempt-leases/:lease_id/verification-decision",
             get(get_verification),
+        )
+        .route(
+            "/api/admin/compute/attempt-leases/:lease_id/execution-receipt",
+            post(issue_execution_receipt),
+        )
+        .route(
+            "/api/me/compute/attempt-leases/:lease_id/execution-receipt",
+            get(get_execution_receipt),
         )
 }
 
@@ -406,6 +415,44 @@ async fn get_verification(
     };
     attempt_response(
         compute_federation_attempt_service::get_verification_for_participant(
+            &state.store,
+            &user_id,
+            &lease_id,
+        ),
+    )
+}
+
+async fn issue_execution_receipt(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+    Json(request): Json<IssueComputeAttemptExecutionReceiptBody>,
+) -> Response {
+    let admin_user_id = match platform_admin(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_receipt_service::issue_for_platform_admin(
+            &state.store,
+            &admin_user_id,
+            &lease_id,
+            request,
+        ),
+    )
+}
+
+async fn get_execution_receipt(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_receipt_service::get_for_attempt_participant(
             &state.store,
             &user_id,
             &lease_id,
