@@ -1,0 +1,20 @@
+{
+  "name": "yilong-project",
+  "interface": {
+    "displayName": "Yilong Project"
+  },
+  "plugins": [
+    {
+      "name": "yilong-project-memory",
+      "source": {
+        "source": "local",
+        "path": "./plugins/yilong-project-memory"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

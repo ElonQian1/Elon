@@ -74,9 +74,29 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\project-memory-ci.ps
 | 节点托管的普通 Codex 宽任务 | 自动注入只读 context、只写 receipt 和会话级 Hook 配置 | 不注入完整治理 schema，不绕过 Hook 信任 |
 | 直接运行的 Codex Desktop/CLI | 可手动 bootstrap 描述符，或安装仓库内 `plugins/yilong-project-memory` 接入 context/receipt | 仓库只提供插件包，不替用户安装、不自动信任 Hook |
 | 其他支持 HTTP MCP 的代理 | 可使用 vendor-neutral governance 描述符；context/receipt 可由适配器手动接入 | 无可靠工具过滤时不自动注入普通任务；Hook 需供应商适配 |
-| Codex plugin bundle | 已生成并通过静态校验；两个 stdio 代理已在隔离节点完成 bootstrap、initialize 与 tools/list 运行冒烟 | 尚未安装到真实 Codex 会话，未完成 Hook 信任与卸载验证，也不声称 Hook 已加载 |
+| Codex plugin bundle | 已生成并通过静态校验；仓库 marketplace 可被 Codex 桌面端发现；两个 stdio 代理已在隔离节点完成 bootstrap、initialize 与 tools/list 运行冒烟 | 尚未在当前真实 Codex 会话安装，未完成 Hook 信任与卸载验证，也不声称 Hook 已加载 |
 
 context、receipt、governance profile 与短期 session/token 固定；修改 URL 查询参数不能提升权限。普通任务只使用两个极小 profile，因此不会每次积压完整治理工具 schema 或项目全文。`project_context_plan` 可传 `task_paths`、`scope_id` 和 `release`；服务端另从当前 Git 工作区绑定 branch 与 clean/dirty 状态，这些范围也进入缓存键和 plan receipt。
+
+## Codex 桌面端安装与就绪门禁
+
+仓库在 `.agents/plugins/marketplace.json` 发布 `yilong-project-memory` 本地插件条目，源路径固定为 `./plugins/yilong-project-memory`。Codex 桌面端重启后可读取 repo marketplace；在 Plugins 中选择 `Yilong Project`、安装并启用插件，再新建任务让新的 MCP 工具进入会话。不要把“marketplace 可发现”误报成“插件已安装”，也不要把“插件已启用”误报成“Hook 已信任”。
+
+只读检查入口：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-project-memory-codex-readiness.ps1
+```
+
+默认只要仓库内 marketplace、manifest、两个 MCP profile、三个有界 Hook 事件和 Node.js 18+ 合同正确就退出 0，并另外报告本机安装与运行状态。需要把未安装或未启用视为失败时传 `-RequireInstalled`；还要验证一龙节点 loopback `/api/health` 时传 `-RequireRuntime`。输出明确分开：
+
+- `static_ready`：仓库插件源可以交付；
+- `installed_ready`：当前项目已信任、Codex cache 中存在与仓库逐文件一致的安装副本、插件配置已启用；
+- `runtime_ready`：在 installed 基础上还能发现本机节点；
+- `hook_trust_verified=false`：脚本永远不读取或伪造 Codex Hook 信任；必须在新任务的 `/hooks` 中人工确认；
+- `end_to_end_verified=false`：就绪检查不冒充真实任务验收。
+
+Codex 安装的是 cache 副本，不会直接执行 marketplace 源目录。更新插件内容后应重新安装并新建任务；只修改仓库 marketplace、文档或仓库外测试脚本时不需要为了“刷新”而随意递增插件版本。
 
 ## Hook 生命周期
 
@@ -96,6 +116,20 @@ context、receipt、governance profile 与短期 session/token 固定；修改 U
 `scripts/project-memory-app-server-observer.mjs` 已提供 stdin 事件接入器：它在进入 loopback API 前先缩减为方法名、token 累计计数或 item 类型/工具名；服务端再次白名单校验，并只在工作区外 SQLite 保存不可逆 session 指纹、baseline/enabled 窗口、事件计数、input/cached-input/output token 计数、返回元数据字节、选择记忆数和耗时。原始事件对象处理后立即丢弃；prompt、聊天、transcript、assistant message、tool input/output、源码正文和命令文本不落库。24 小时未完成的窗口标为 abandoned；非活动窗口只保留最近 2000 条，避免观测索引无限增长。
 
 当前状态是 `ingest_adapter_available`，不是“已经产生效果数据”。只有同一个 `benchmark_key` 同时取得 `baseline_without_project_memory` 与 `with_project_memory` 两个完整窗口后，接口才返回输入 token、耗时和原生文件读取次数的差值；否则只报告无测量或部分测量，不能宣称真实节省，也不能冒充供应商账单或完整任务 token。
+
+为了避免人为复用 `benchmark_key` 把不同代码、模型、Codex 版本或任务误配在一起，先生成不含任务正文的 A/B manifest：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\new-project-memory-benchmark-plan.ps1 `
+  -CaseId project-orientation `
+  -ModelId gpt-5.6 `
+  -TaskFile .ai-tmp\project-memory-task.txt `
+  -CodexBuild 26.727.6591.0
+```
+
+脚本只在 tracked worktree clean 时生成 manifest。`benchmark_key` 由 case ID、模型、任务文件 SHA-256、Git HEAD 和 Codex build 共同派生；manifest 保存任务哈希，不保存任务正文。baseline 和 enabled 两次观察都必须向 observer 传同一个 `--benchmark-manifest`、`--task-file`、`--model-id` 与 `--codex-build`。observer 会重新计算所有哈希、核对当前 Git HEAD/clean 状态，并只在通过后输出 `benchmark_protocol_verified=true`；可先用 `--validate-manifest-only` 离线校验，不连接节点。
+
+直接手写 `benchmark_key` 的旧入口继续兼容合成和诊断，但不能作为严格 A/B 结论。对外报告节省时必须同时保留成对窗口、observer 的协议验证标记以及限定 case，不把单个任务的负 delta 外推为普遍比例。
 
 ## 审核质量反馈
 
@@ -122,6 +156,7 @@ Codex 官方 Memories 是供应商自己的本机生成状态，与项目 Git �
 - `project-memory-ci.ps1` 通过 loopback 接口取得 `pass` 与退出码 0，返回 0 条当前记忆且不返回正文；这证明空库和节点发现链路可用，不证明已有共享记忆质量。
 - Hook 执行程序的 PostToolUse→Stop→SessionEnd 独立冒烟通过：只回传两个相对证据路径，未泄漏测试 session 文本，SessionEnd 后账本为 0。它没有经过真实 Codex `/hooks` 信任流程，因此不等于 Codex 已加载 Hook。
 - app-server 观察器用白名单合成事件验证了 baseline/enabled 配对、token/文件读取计数聚合和 `raw_event_payloads_stored=false`。合成窗口只验证接入器与比较合同，不能用其中的负差值宣称真实节省。
+- repo marketplace、空 Codex home 与精确 cache 安装 fixture 已通过离线合同检查；哈希绑定 A/B manifest 已在临时 clean Git 仓库通过 plan→observer 双向复算。它们证明“可发现条件”和“配对条件”可机器检查，不证明当前桌面会话已经安装插件。
 
 因此目前可以确认“代理无需主动打开页面即可使用最小 MCP、CI 与 Hook 执行程序”；仍不能确认真实 Codex 安装后的端到端任务节省比例。
 
@@ -130,7 +165,7 @@ Codex 官方 Memories 是供应商自己的本机生成状态，与项目 Git �
 以下工作仍依赖真实 Codex、跨 PC 或浏览器环境：
 
 - 完整仓库 Rust/npm 全量回归；本轮只构建节点并运行项目文档相关 Rust 用例与独立 Node/PowerShell 冒烟；
-- 真实 Codex Desktop/CLI 安装插件后的工具发现、相对脚本解析、重启新会话与卸载；
+- 真实 Codex Desktop/CLI 从 repo marketplace 安装插件后的工具发现、相对脚本解析、重启新会话与卸载；
 - 真实 Codex `/hooks` 信任、PostToolUse/Stop/SessionEnd 触发；compact/subagent 事件仍未配置，只保留 no-op 适配缝；
 - 官方 app-server 事件流的真实任务 A/B，使用同一 benchmark 测得 input token、原生文件读取和总耗时，而不是合成事件；
 - 跨 PC clone/apply 后的 Git 对象、换行与重定位验证；
