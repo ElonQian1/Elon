@@ -51,7 +51,7 @@ owners: backend, node, ai-economy
 | Attempt Execution Receipt | v193、追加式 Store、管理员 HTTP 与 PC `/compute-receipts` 已写；待签发队列只返回重新审计的 accepted Verification 与候选，管理员确认后固定执行身份、工件、用量和证明。回执不改状态、容量和资金，尚未编译、执行迁移或运行验证 |
 | Attempt 可信终态与容量收口 | v194、追加式 Store、管理员 HTTP 与 PC `/compute-finalization` 已写；待收口队列重新审计 v193 及当前状态并返回精确提交模板，管理员逐笔确认后才在单事务推进 Lease/Job/Reservation/Claim，并按 meter mode 消费或归还容量。预授权和 Provider 收益不变，尚未编译、执行迁移、接口联调、页面验收或发布 |
 | Attempt 待结算回执 | v195、追加式 Store、独立 pending 账本、管理员 HTTP 与 PC `/compute-settlement-issuance` 已写；待办队列重审计完整资金来源并复用权威价格函数返回精确模板和金额预览，管理员逐笔确认后才在单事务结清消费者 CNY 预授权、退款、登记 Provider/平台 pending 收益并推进 Job settled。pending 不可提现，不是外部资金转移，尚未编译、执行迁移、接口联调、页面验收或发布 |
-| Attempt 结算挑战 | v196、追加式 Store 与消费者/管理员 HTTP 已写；消费者可在固定 72 小时内提交一份不可覆盖的挑战。它只阻断未来 pending 释放，不退款、不裁决、不移动余额，尚未编译、执行迁移或运行验证 |
+| Attempt 结算挑战 | v196、追加式 Store、消费者待申诉队列、消费者/管理员 HTTP 与 PC `/compute-challenges` 已写；队列只返回本人仍在固定 72 小时窗口内且未挑战、未释放的 v195 回执，并逐条重审计消费者 ledger 腿、pending 状态和释放门卫。消费者可提交一份不可覆盖的挑战；它只阻断未来 pending 释放，不退款、不裁决、不移动余额，尚未编译、执行迁移、接口联调、页面验收或发布 |
 | Attempt 挑战终态决议 | v197、追加式 Store 与消费者/管理员 HTTP 已写；消费者可撤回，管理员可接受或驳回。open/accepted 阻断，withdrawn/rejected 解除挑战门卫，但均不移动余额，尚未编译、执行迁移或运行验证 |
 | Attempt 待结算原子释放 | v198、追加式 Store、Release Posting/账本腿与消费者/管理员 HTTP 已写；满 72 小时且挑战为 none/rejected/withdrawn/accepted_corrected 时，管理员可把 Provider/平台原金额或纠正净额从 pending 原子转入 available。open/accepted 阻断，available 不等于提现或外部付款，尚未编译、执行迁移或运行验证 |
 | 到期结算释放队列与管理员批处理 | 管理员 HTTP 可读取已满 72 小时且尚无 v198 Release 的有界候选，并逐笔复用 v198 原子释放；候选重审计当前挑战门卫，blocked、失败和成功分别报告。它不是整批原子事务或后台定时器，不提现、不外部付款，尚未编译或运行验证 |
