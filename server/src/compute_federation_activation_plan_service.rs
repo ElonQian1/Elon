@@ -4,12 +4,21 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    compute_federation::provider::{ComputeProviderEndpointRef, PROVIDER_STATUS_ACTIVE},
+    compute_federation::{
+        capacity::ComputeCapacityPoolStatus,
+        provider::{
+            ComputeProviderEndpointRef, PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_REGISTERING,
+        },
+    },
     compute_federation_activation_model::ACTIVATION_REQUEST_STATUS_APPROVED,
     compute_federation_activation_plan_model::{
-        ComputeActivationPlan, ComputeActivationPlanReceipt,
+        ComputeActivationPlan, ComputeActivationPlanPreflightReport, ComputeActivationPlanReceipt,
+        ACTIVATION_PLAN_STATUS_PREPARED,
     },
-    store::{validate_compute_provider_contract, PrepareComputeActivationPlan, Store},
+    store::{
+        stable_compute_capacity_pool_audit_digest, validate_compute_provider_contract,
+        PrepareComputeActivationPlan, Store,
+    },
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -86,6 +95,161 @@ pub(crate) fn get_for_review(
 ) -> Result<Option<ComputeActivationPlan>> {
     store.compute_activation_evidence_request(request_id)?;
     store.compute_activation_plan_for_request(request_id)
+}
+
+pub(crate) fn preflight_for_review(
+    store: &Store,
+    request_id: &str,
+) -> Result<ComputeActivationPlanPreflightReport> {
+    let request = store.compute_activation_evidence_request(request_id)?;
+    let plan = store
+        .compute_activation_plan_for_request(request_id)?
+        .ok_or_else(|| anyhow::anyhow!("激活计划不存在"))?;
+    let provider = store.compute_provider(&plan.provider_id)?;
+    let pool = store.compute_capacity_pool(&plan.pool_id)?;
+    let audit =
+        store.audit_compute_capacity_pool_epoch(&plan.pool_id, plan.expected_capacity_epoch)?;
+
+    let plan_status_prepared = plan.status == ACTIVATION_PLAN_STATUS_PREPARED;
+    let request_approved = request.status == ACTIVATION_REQUEST_STATUS_APPROVED;
+    let request_digest_matches = request.request_digest == plan.expected_request_digest;
+    let request_binding_matches = request.provider_id == plan.provider_id
+        && request.pool_id == plan.pool_id
+        && request.expected_provider_policy_revision == plan.expected_provider_policy_revision
+        && request.expected_provider_digest == plan.expected_provider_digest
+        && request.expected_capacity_epoch == plan.expected_capacity_epoch
+        && request.expected_pool_revision == plan.expected_pool_revision
+        && request.expected_pool_digest == plan.expected_pool_digest;
+    let provider_version_matches = provider.provider.policy_revision
+        == plan.expected_provider_policy_revision
+        && provider.provider_digest == plan.expected_provider_digest;
+    let provider_status_registering = provider.provider.status == PROVIDER_STATUS_REGISTERING;
+    let target_provider_identity_matches = plan.target_provider.provider_id
+        == provider.provider.provider_id
+        && plan.target_provider.provider_kind == provider.provider.provider_kind
+        && plan.target_provider.owner_account_id == provider.provider.owner_account_id
+        && plan.target_provider.created_at == provider.provider.created_at;
+    let expected_target_revision = provider.provider.policy_revision.checked_add(1);
+    let target_provider_revision_matches = expected_target_revision
+        == Some(plan.target_provider_policy_revision)
+        && plan.target_provider.policy_revision == plan.target_provider_policy_revision;
+    let target_provider_contract_ready = plan.target_provider.status == PROVIDER_STATUS_ACTIVE
+        && plan.target_provider.endpoint.is_some()
+        && plan.target_provider.adapter.is_none()
+        && plan
+            .target_provider
+            .evidence_profile
+            .verified_hardware_digest
+            .is_some()
+        && plan
+            .target_provider
+            .evidence_profile
+            .last_verified_at
+            .is_some()
+        && plan.target_provider.trust_tier != "self_declared"
+        && !plan.target_provider.capabilities.regions.is_empty();
+    let pool_provider_matches = pool.provider_id == plan.provider_id;
+    let pool_version_matches = pool.binding.capacity_epoch == plan.expected_capacity_epoch
+        && pool.binding.pool_revision == plan.expected_pool_revision
+        && pool.binding.pool_digest == plan.expected_pool_digest;
+    let pool_status_registering = pool.status == ComputeCapacityPoolStatus::Registering;
+    let ledger_audit_healthy =
+        audit.healthy && audit.current_capacity_epoch == plan.expected_capacity_epoch;
+    let ledger_audit_digest_matches =
+        stable_compute_capacity_pool_audit_digest(&audit)? == request.ledger_audit_digest;
+
+    let mut blockers = Vec::new();
+    block_unless(&mut blockers, plan_status_prepared, "plan_not_prepared");
+    block_unless(&mut blockers, request_approved, "request_not_approved");
+    block_unless(
+        &mut blockers,
+        request_digest_matches,
+        "request_digest_changed",
+    );
+    block_unless(
+        &mut blockers,
+        request_binding_matches,
+        "request_binding_changed",
+    );
+    block_unless(
+        &mut blockers,
+        provider_version_matches,
+        "provider_version_changed",
+    );
+    block_unless(
+        &mut blockers,
+        provider_status_registering,
+        "provider_not_registering",
+    );
+    block_unless(
+        &mut blockers,
+        target_provider_identity_matches,
+        "target_provider_identity_changed",
+    );
+    block_unless(
+        &mut blockers,
+        target_provider_revision_matches,
+        "target_provider_revision_invalid",
+    );
+    block_unless(
+        &mut blockers,
+        target_provider_contract_ready,
+        "target_provider_not_ready",
+    );
+    block_unless(
+        &mut blockers,
+        pool_provider_matches,
+        "pool_provider_changed",
+    );
+    block_unless(&mut blockers, pool_version_matches, "pool_version_changed");
+    block_unless(
+        &mut blockers,
+        pool_status_registering,
+        "pool_not_registering",
+    );
+    block_unless(
+        &mut blockers,
+        ledger_audit_healthy,
+        "ledger_audit_unhealthy",
+    );
+    block_unless(
+        &mut blockers,
+        ledger_audit_digest_matches,
+        "ledger_audit_changed",
+    );
+
+    Ok(ComputeActivationPlanPreflightReport {
+        schema: "compute_federation.activation_plan_preflight.v1",
+        plan_id: plan.plan_id,
+        request_id: plan.request_id,
+        provider_id: plan.provider_id,
+        pool_id: plan.pool_id,
+        plan_status: plan.status,
+        checked_at: Utc::now().to_rfc3339(),
+        plan_status_prepared,
+        request_approved,
+        request_digest_matches,
+        request_binding_matches,
+        provider_version_matches,
+        provider_status_registering,
+        target_provider_identity_matches,
+        target_provider_revision_matches,
+        target_provider_contract_ready,
+        pool_provider_matches,
+        pool_version_matches,
+        pool_status_registering,
+        ledger_audit_healthy,
+        ledger_audit_digest_matches,
+        ready_for_apply: blockers.is_empty(),
+        blockers,
+        activation_effect: "none",
+    })
+}
+
+fn block_unless(blockers: &mut Vec<String>, condition: bool, code: &str) {
+    if !condition {
+        blockers.push(code.to_string());
+    }
 }
 
 fn validate_body(body: &PrepareComputeActivationPlanBody) -> Result<()> {

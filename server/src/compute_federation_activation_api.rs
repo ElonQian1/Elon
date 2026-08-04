@@ -61,6 +61,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/admin/compute/activation-evidence-requests/:request_id/activation-plan",
             get(get_activation_plan).post(prepare_activation_plan),
         )
+        .route(
+            "/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/preflight",
+            get(preflight_activation_plan),
+        )
 }
 
 #[derive(Debug, Deserialize)]
@@ -275,6 +279,19 @@ async fn get_activation_plan(
     activation_response(
         compute_federation_activation_plan_service::get_for_review(&state.store, &request_id)
             .map(|plan| json!({"activation_plan":plan,"activation_effect":"none"})),
+    )
+}
+
+async fn preflight_activation_plan(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    activation_response(
+        compute_federation_activation_plan_service::preflight_for_review(&state.store, &request_id),
     )
 }
 

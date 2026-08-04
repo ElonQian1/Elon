@@ -38,3 +38,31 @@ pub(crate) struct ComputeActivationPlanReceipt {
     pub replayed: bool,
     pub activation_effect: &'static str,
 }
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ComputeActivationPlanPreflightReport {
+    pub schema: &'static str,
+    pub plan_id: String,
+    pub request_id: String,
+    pub provider_id: String,
+    pub pool_id: String,
+    pub plan_status: String,
+    pub checked_at: String,
+    pub plan_status_prepared: bool,
+    pub request_approved: bool,
+    pub request_digest_matches: bool,
+    pub request_binding_matches: bool,
+    pub provider_version_matches: bool,
+    pub provider_status_registering: bool,
+    pub target_provider_identity_matches: bool,
+    pub target_provider_revision_matches: bool,
+    pub target_provider_contract_ready: bool,
+    pub pool_provider_matches: bool,
+    pub pool_version_matches: bool,
+    pub pool_status_registering: bool,
+    pub ledger_audit_healthy: bool,
+    pub ledger_audit_digest_matches: bool,
+    pub ready_for_apply: bool,
+    pub blockers: Vec<String>,
+    pub activation_effect: &'static str,
+}
