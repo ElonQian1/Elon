@@ -85,6 +85,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(observe_terminal_candidate),
         )
         .route(
+            "/api/admin/compute/attempt-terminal-candidates/pending-platform-observation",
+            get(list_pending_platform_observation_candidates),
+        )
+        .route(
             "/api/me/compute/attempt-leases/:lease_id/terminal-candidate/platform-observation",
             get(get_platform_observation),
         )
@@ -462,6 +466,23 @@ async fn observe_terminal_candidate(
             &lease_id,
             request,
         ),
+    )
+}
+
+async fn list_pending_platform_observation_candidates(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    attempt_response(
+        compute_federation_attempt_service::list_terminal_candidates_pending_platform_observation(
+            &state.store,
+            query.limit,
+        )
+        .map(|candidates| json!({"observation_candidates":candidates})),
     )
 }
 

@@ -6,11 +6,19 @@ use serde::{Deserialize, Serialize};
 use crate::compute_federation::receipts::ComputeMeterReading;
 
 use super::{
-    compute_attempt_terminals::compute_attempt_terminal_candidate_on,
-    compute_attempt_usage::compute_attempt_usage_declaration_on, new_id, Store,
+    compute_attempt_terminals::{
+        compute_attempt_terminal_candidate_on, ComputeAttemptTerminalCandidateReceipt,
+    },
+    compute_attempt_usage::{
+        compute_attempt_usage_declaration_on, ComputeAttemptUsageDeclarationReceipt,
+    },
+    new_id, Store,
 };
 
+mod pending_queue;
 mod support;
+
+use pending_queue::list_pending_platform_observation_lease_ids_on;
 
 use support::{
     build_observed_readings, ensure_candidate_binding, ensure_observed_usage_binding,
@@ -99,6 +107,12 @@ pub(crate) struct ComputeAttemptPlatformObservationReceipt {
     pub reservation_effect: &'static str,
     pub money_effect: &'static str,
     pub replayed: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ComputePendingPlatformObservationCandidate {
+    pub terminal_candidate: ComputeAttemptTerminalCandidateReceipt,
+    pub provider_usage: ComputeAttemptUsageDeclarationReceipt,
 }
 
 impl Store {
@@ -257,6 +271,31 @@ impl Store {
         let conn = self.conn()?;
         compute_attempt_platform_observation_on(&*conn, lease_id)?
             .ok_or_else(|| anyhow!("Attempt 尚无平台终态观测证据"))
+    }
+
+    pub(crate) fn list_pending_compute_attempt_platform_observations(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<ComputePendingPlatformObservationCandidate>> {
+        let conn = self.conn()?;
+        list_pending_platform_observation_lease_ids_on(&conn, limit.clamp(1, 100))?
+            .into_iter()
+            .map(|lease_id| {
+                let candidate = compute_attempt_terminal_candidate_on(&conn, &lease_id)?
+                    .ok_or_else(|| anyhow!("待观测队列引用的 Provider 候选不存在"))?;
+                let provider_usage = compute_attempt_usage_declaration_on(
+                    &conn,
+                    &candidate.lease_id,
+                    candidate.final_usage_sequence_no,
+                )?
+                .ok_or_else(|| anyhow!("待观测队列引用的 Provider 用量快照不存在"))?;
+                ensure_provider_usage_binding(&candidate, &provider_usage)?;
+                Ok(ComputePendingPlatformObservationCandidate {
+                    terminal_candidate: candidate,
+                    provider_usage,
+                })
+            })
+            .collect()
     }
 }
 

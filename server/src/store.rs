@@ -287,7 +287,7 @@ pub(crate) use compute_attempt_leases::{
 };
 pub(crate) use compute_attempt_platform_observations::{
     ComputeAttemptPlatformObservationReceipt, ComputeObservedUsageInput,
-    ObserveComputeAttemptTerminalCandidateRequest,
+    ComputePendingPlatformObservationCandidate, ObserveComputeAttemptTerminalCandidateRequest,
 };
 pub(crate) use compute_attempt_settlement_challenge_resolutions::{
     ComputeSettlementChallengeResolutionReceipt, ResolveComputeSettlementChallengeRequest,

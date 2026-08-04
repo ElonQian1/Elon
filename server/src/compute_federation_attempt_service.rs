@@ -8,7 +8,8 @@ use crate::store::{
     ComputeAttemptPlatformObservationReceipt, ComputeAttemptTerminalCandidateReceipt,
     ComputeAttemptUsageDeclarationReceipt, ComputeAttemptUsageTemplateReceipt,
     ComputeAttemptVerificationDecisionReceipt, ComputeDeclaredResultArtifactInput,
-    ComputeDeclaredUsageInput, ComputeObservedUsageInput, ComputeReservationRegistrationReceipt,
+    ComputeDeclaredUsageInput, ComputeObservedUsageInput,
+    ComputePendingPlatformObservationCandidate, ComputeReservationRegistrationReceipt,
     DecideComputeAttemptVerificationRequest, DeclareComputeAttemptTerminalCandidateRequest,
     DeclareComputeAttemptUsageRequest, ObserveComputeAttemptTerminalCandidateRequest,
     RenewComputeAttemptLeaseRequest, ReviewComputeAttemptTerminalCandidateRequest, Store,
@@ -468,6 +469,13 @@ pub(crate) fn observe_terminal_candidate_for_platform_admin(
             observed_by_user_id: admin_user_id.to_string(),
         },
     )
+}
+
+pub(crate) fn list_terminal_candidates_pending_platform_observation(
+    store: &Store,
+    limit: usize,
+) -> Result<Vec<ComputePendingPlatformObservationCandidate>> {
+    store.list_pending_compute_attempt_platform_observations(limit)
 }
 
 pub(crate) fn get_platform_observation_for_participant(
