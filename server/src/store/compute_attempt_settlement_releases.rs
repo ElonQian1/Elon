@@ -124,3 +124,13 @@ pub(super) fn compute_settlement_release_on(
         .ok_or_else(|| anyhow::anyhow!("Attempt 结算尚未释放到 available"))?;
     stored.into_receipt(conn, false)
 }
+
+pub(super) fn compute_settlement_release_optional_on(
+    conn: &Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeSettlementReleaseReceipt>> {
+    support::validate_exact("Attempt Lease ID", lease_id, 200)?;
+    release_by_lease_on(conn, lease_id)?
+        .map(|stored| stored.into_receipt(conn, false))
+        .transpose()
+}

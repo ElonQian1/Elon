@@ -4,8 +4,9 @@ use serde::Deserialize;
 use crate::{
     compute_federation_attempt_service::get_for_participant,
     store::{
-        ComputeSettlementChallengeReceipt, ComputeSettlementChallengeResolutionReceipt,
-        ResolveComputeSettlementChallengeRequest, Store,
+        ComputeSettlementChallengeHistoryItem, ComputeSettlementChallengeReceipt,
+        ComputeSettlementChallengeResolutionReceipt, ResolveComputeSettlementChallengeRequest,
+        Store,
     },
 };
 
@@ -102,4 +103,19 @@ pub(crate) fn list_open_for_platform_admin(
     limit: usize,
 ) -> Result<Vec<ComputeSettlementChallengeReceipt>> {
     store.list_open_compute_settlement_challenges_for_platform_admin(limit)
+}
+
+pub(crate) fn list_history_for_consumer(
+    store: &Store,
+    consumer_user_id: &str,
+    limit: usize,
+) -> Result<Vec<ComputeSettlementChallengeHistoryItem>> {
+    store.list_compute_settlement_challenge_history_for_consumer(consumer_user_id, limit)
+}
+
+pub(crate) fn list_history_for_platform_admin(
+    store: &Store,
+    limit: usize,
+) -> Result<Vec<ComputeSettlementChallengeHistoryItem>> {
+    store.list_compute_settlement_challenge_history_for_platform_admin(limit)
 }

@@ -40,6 +40,14 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/admin/compute/settlement-challenges/open",
             get(list_admin_open_challenges),
         )
+        .route(
+            "/api/me/compute/settlement-challenges/history",
+            get(list_consumer_challenge_history),
+        )
+        .route(
+            "/api/admin/compute/settlement-challenges/history",
+            get(list_admin_challenge_history),
+        )
 }
 
 #[derive(Debug, Deserialize)]
@@ -159,6 +167,42 @@ async fn list_admin_open_challenges(
             query.limit,
         )
         .map(|challenges| json!({"challenge_candidates":challenges})),
+    )
+}
+
+async fn list_consumer_challenge_history(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    resolution_response(
+        compute_federation_attempt_settlement_challenge_resolution_service::list_history_for_consumer(
+            &state.store,
+            &user_id,
+            query.limit,
+        )
+        .map(|history| json!({"challenge_history":history})),
+    )
+}
+
+async fn list_admin_challenge_history(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    resolution_response(
+        compute_federation_attempt_settlement_challenge_resolution_service::list_history_for_platform_admin(
+            &state.store,
+            query.limit,
+        )
+        .map(|history| json!({"challenge_history":history})),
     )
 }
 

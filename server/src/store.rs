@@ -291,7 +291,8 @@ pub(crate) use compute_attempt_platform_observations::{
     ComputePendingPlatformObservationCandidate, ObserveComputeAttemptTerminalCandidateRequest,
 };
 pub(crate) use compute_attempt_settlement_challenge_resolutions::{
-    ComputeSettlementChallengeResolutionReceipt, ResolveComputeSettlementChallengeRequest,
+    ComputeSettlementChallengeHistoryItem, ComputeSettlementChallengeResolutionReceipt,
+    ResolveComputeSettlementChallengeRequest,
 };
 pub(crate) use compute_attempt_settlement_challenges::{
     ComputePendingSettlementChallengeCandidate, ComputeSettlementChallengeReceipt,
