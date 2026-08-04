@@ -3,6 +3,7 @@ import { CircleCheck, FileCheck2, RefreshCw, ShieldAlert, ShieldCheck, TriangleA
 import { useAuthStore } from '../../store/auth'
 import { type ComputeActivationEvidenceRequest, type ComputeActivationPreflightReport } from '../compute-supply/computeActivationApi'
 import ActivationReviewDialog from './ActivationReviewDialog'
+import ActivationPlanPanel from './ActivationPlanPanel'
 import {
   computeActivationAdminApi,
   type ActivationRequestStatus,
@@ -75,6 +76,7 @@ export default function ComputeActivationAdminPage() {
         {selected.review_note && <section className={styles.note}><h3>审核说明</h3><p>{selected.review_note}</p></section>}
         {preflight && <section className={preflight.ready_for_activation ? styles.ready : styles.blocked}>{preflight.ready_for_activation ? <CircleCheck size={18} /> : <ShieldAlert size={18} />}<div><strong>{preflight.ready_for_activation ? '当前预检无阻断项' : `当前有 ${preflight.blockers.length} 项阻断`}</strong><span>{preflight.blockers.length ? preflight.blockers.map(blockerLabel).join('、') : '审核后仍需准备并应用不可变计划'}</span></div></section>}
         <footer className={styles.detailFooter}><span>审核只改变申请状态，不触发资源激活。</span>{selected.status === 'submitted' && <button type="button" onClick={() => { setError(''); setReviewOpen(true) }}><ShieldCheck size={15} />审核申请</button>}</footer>
+        <ActivationPlanPanel key={selected.request_id} request={selected} onChanged={async (message) => { setNotice(message); await load() }} />
       </> : <div className={styles.detailEmpty}><FileCheck2 size={24} /><h2>选择一份申请</h2></div>}</div>
     </section>
     {reviewOpen && selected && <ActivationReviewDialog request={selected} busy={reviewing} error={error} onClose={() => setReviewOpen(false)} onSubmit={review} />}

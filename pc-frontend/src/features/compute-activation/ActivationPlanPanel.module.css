@@ -1,0 +1,31 @@
+.panel { display: grid; gap: 14px; padding: 16px; border-top: 1px solid #e1e4e8; background: #fbfcfd; }
+.panel > header, .panel > header > div, .ready, .blocked, .receipt, .actions, .loading { display: flex; align-items: center; }
+.panel > header { justify-content: space-between; }
+.panel > header > div { gap: 9px; }
+.panel h3 { margin: 0; color: #24272c; font-size: 14px; }
+.panel header span { color: #737981; font-size: 11px; }
+.panel header button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid #d9dde1; border-radius: 6px; background: #fff; color: #596069; cursor: pointer; }
+.empty { padding: 13px; border: 1px dashed #cdd3d9; border-radius: 6px; background: #fff; }
+.empty p { margin: 0 0 10px; color: #5b6068; font-size: 12px; }
+.empty button, .actions button { height: 34px; padding: 0 12px; border: 1px solid #2d6952; border-radius: 6px; background: #347b5f; color: #fff; font-weight: 650; cursor: pointer; }
+.planFacts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.planFacts div { display: grid; gap: 3px; padding: 9px; border: 1px solid #e1e4e7; border-radius: 6px; background: #fff; }
+.planFacts span, .digest span { color: #777d84; font-size: 10px; }
+.planFacts strong { overflow: hidden; text-overflow: ellipsis; color: #2e3237; font-size: 12px; }
+.digest { display: grid; gap: 5px; min-width: 0; }
+.digest code, .receipt code { overflow-wrap: anywhere; color: #4d535b; font-size: 10px; }
+.ready, .blocked { align-items: flex-start; gap: 9px; padding: 10px 11px; border-radius: 6px; }
+.ready { background: #eef8f2; color: #276247; }
+.blocked { background: #fff4ef; color: #8b4930; }
+.ready div, .blocked div, .receipt div { display: grid; gap: 3px; }
+.ready strong, .blocked strong, .receipt strong { font-size: 12px; }
+.ready span, .blocked span, .receipt span { font-size: 11px; line-height: 1.45; }
+.actions { justify-content: space-between; gap: 12px; }
+.actions span { color: #676d74; font-size: 11px; }
+.actions button:disabled { cursor: not-allowed; opacity: .5; }
+.receipt { align-items: flex-start; gap: 9px; padding: 11px; border: 1px solid #badcc9; border-radius: 6px; background: #f2faf5; color: #256145; }
+.error { padding: 9px 10px; border-radius: 6px; background: #fff1f1; color: #9c2f2f; font-size: 12px; }
+.loading { justify-content: center; gap: 8px; padding: 20px; color: #6b7179; font-size: 12px; }
+.spinning { animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 760px) { .planFacts { grid-template-columns: 1fr 1fr; } .actions { align-items: stretch; flex-direction: column; } }
