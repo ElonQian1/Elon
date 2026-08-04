@@ -5,9 +5,8 @@ use chrono::{DateTime, Duration, SecondsFormat, Utc};
 
 use super::{
     keyring::{
-        ComputePluginBootstrapRootKeyResolver, ComputePluginControlPlaneKeyResolver,
-        ComputePluginKeyring, ComputePluginKeyringBinding, ComputePluginKeyringKey,
-        ComputePluginPublisherKeyResolver, ResolvedComputePluginVerificationKey,
+        ComputePluginBootstrapRootKeyResolver, ComputePluginKeyring, ComputePluginKeyringBinding,
+        ComputePluginKeyringKey, ResolvedComputePluginVerificationKey,
         SignedComputePluginKeyringBundle, ValidatedComputePluginKeyringBundle,
         COMPUTE_PLUGIN_KEYRING_BUNDLE_SCHEMA, COMPUTE_PLUGIN_KEYRING_SCHEMA,
         COMPUTE_PLUGIN_KEYRING_SIGNATURE_DOMAIN, KEY_PURPOSE_CONTROL_INSTALL_PLAN,
@@ -27,6 +26,24 @@ const MAX_SIGNING_KEY_ID_BYTES: usize = 160;
 pub(crate) fn verify_and_validate_keyring_bundle(
     signed: &SignedComputePluginKeyringBundle,
     trusted_now: DateTime<Utc>,
+    roots: &dyn ComputePluginBootstrapRootKeyResolver,
+) -> Result<ValidatedComputePluginKeyringBundle> {
+    verify_and_validate_keyring_bundle_inner(signed, Some(trusted_now), roots)
+}
+
+/// Used only to authenticate the previously active history tip while installing a newer bundle.
+/// It preserves every signature, shape and lifetime invariant without requiring the old bundle to
+/// still be current. It is not a usable leaf-key resolver until a current-time check succeeds.
+pub(super) fn verify_and_validate_archived_keyring_bundle(
+    signed: &SignedComputePluginKeyringBundle,
+    roots: &dyn ComputePluginBootstrapRootKeyResolver,
+) -> Result<ValidatedComputePluginKeyringBundle> {
+    verify_and_validate_keyring_bundle_inner(signed, None, roots)
+}
+
+fn verify_and_validate_keyring_bundle_inner(
+    signed: &SignedComputePluginKeyringBundle,
+    trusted_now: Option<DateTime<Utc>>,
     roots: &dyn ComputePluginBootstrapRootKeyResolver,
 ) -> Result<ValidatedComputePluginKeyringBundle> {
     if signed.schema != SIGNED_COMPUTE_PLUGIN_KEYRING_BUNDLE_SCHEMA
@@ -51,7 +68,11 @@ pub(crate) fn verify_and_validate_keyring_bundle(
         COMPUTE_PLUGIN_KEYRING_SIGNATURE_DOMAIN,
         &root_key,
     )?;
-    validate_bundle_window(signed, trusted_now, true)?;
+    if let Some(trusted_now) = trusted_now {
+        validate_bundle_window(signed, trusted_now, true)?;
+    } else {
+        validate_bundle_window_shape(signed)?;
+    }
 
     let mut fingerprints = HashSet::new();
     validate_ring(
@@ -80,43 +101,39 @@ pub(crate) fn verify_and_validate_keyring_bundle(
     ))
 }
 
-impl ComputePluginPublisherKeyResolver for ValidatedComputePluginKeyringBundle {
-    fn resolve_publisher_key(
-        &self,
-        publisher_id: &str,
-        signing_key_id: &str,
-        expected_keyring: &ComputePluginKeyringBinding,
-        trusted_now: DateTime<Utc>,
-    ) -> Result<Option<ResolvedComputePluginVerificationKey>> {
-        resolve_key(
-            self,
-            &self.signed().bundle.publisher_keyring,
-            self.publisher_binding(),
-            expected_keyring,
-            Some(publisher_id),
-            signing_key_id,
-            trusted_now,
-        )
-    }
+pub(super) fn resolve_validated_publisher_key(
+    bundle: &ValidatedComputePluginKeyringBundle,
+    publisher_id: &str,
+    signing_key_id: &str,
+    expected_keyring: &ComputePluginKeyringBinding,
+    trusted_now: DateTime<Utc>,
+) -> Result<Option<ResolvedComputePluginVerificationKey>> {
+    resolve_key(
+        bundle,
+        &bundle.signed().bundle.publisher_keyring,
+        bundle.publisher_binding(),
+        expected_keyring,
+        Some(publisher_id),
+        signing_key_id,
+        trusted_now,
+    )
 }
 
-impl ComputePluginControlPlaneKeyResolver for ValidatedComputePluginKeyringBundle {
-    fn resolve_control_plane_key(
-        &self,
-        signing_key_id: &str,
-        expected_keyring: &ComputePluginKeyringBinding,
-        trusted_now: DateTime<Utc>,
-    ) -> Result<Option<ResolvedComputePluginVerificationKey>> {
-        resolve_key(
-            self,
-            &self.signed().bundle.control_keyring,
-            self.control_binding(),
-            expected_keyring,
-            None,
-            signing_key_id,
-            trusted_now,
-        )
-    }
+pub(super) fn resolve_validated_control_key(
+    bundle: &ValidatedComputePluginKeyringBundle,
+    signing_key_id: &str,
+    expected_keyring: &ComputePluginKeyringBinding,
+    trusted_now: DateTime<Utc>,
+) -> Result<Option<ResolvedComputePluginVerificationKey>> {
+    resolve_key(
+        bundle,
+        &bundle.signed().bundle.control_keyring,
+        bundle.control_binding(),
+        expected_keyring,
+        None,
+        signing_key_id,
+        trusted_now,
+    )
 }
 
 fn resolve_key(
@@ -166,14 +183,7 @@ fn validate_bundle_window(
     trusted_now: DateTime<Utc>,
     allow_generated_at_skew: bool,
 ) -> Result<()> {
-    let generated = parse_canonical_utc(
-        "COMPUTE_PLUGIN_KEYRING_GENERATED_AT",
-        &signed.bundle.generated_at,
-    )?;
-    let expires = parse_canonical_utc(
-        "COMPUTE_PLUGIN_KEYRING_EXPIRES_AT",
-        &signed.bundle.expires_at,
-    )?;
+    let (generated, expires) = validate_bundle_window_shape(signed)?;
     let earliest_now = if allow_generated_at_skew {
         generated
             .clone()
@@ -182,14 +192,27 @@ fn validate_bundle_window(
     } else {
         generated.clone()
     };
-    if generated >= expires
-        || expires - generated > Duration::days(MAX_BUNDLE_LIFETIME_DAYS)
-        || trusted_now < earliest_now
-        || trusted_now >= expires
-    {
+    if trusted_now < earliest_now || trusted_now >= expires {
         bail!("COMPUTE_PLUGIN_KEYRING_EXPIRED: keyring bundle is not currently valid");
     }
     Ok(())
+}
+
+fn validate_bundle_window_shape(
+    signed: &SignedComputePluginKeyringBundle,
+) -> Result<(DateTime<Utc>, DateTime<Utc>)> {
+    let generated = parse_canonical_utc(
+        "COMPUTE_PLUGIN_KEYRING_GENERATED_AT",
+        &signed.bundle.generated_at,
+    )?;
+    let expires = parse_canonical_utc(
+        "COMPUTE_PLUGIN_KEYRING_EXPIRES_AT",
+        &signed.bundle.expires_at,
+    )?;
+    if generated >= expires || expires - generated > Duration::days(MAX_BUNDLE_LIFETIME_DAYS) {
+        bail!("COMPUTE_PLUGIN_KEYRING_EXPIRED: keyring bundle lifetime is invalid");
+    }
+    Ok((generated, expires))
 }
 
 fn validate_ring(

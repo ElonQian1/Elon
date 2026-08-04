@@ -10,6 +10,7 @@ const REQUIRED_TABLES: &[&str] = &[
     "fetch_claims",
     "keyring_bundles",
     "keyring_keys",
+    "keyring_seals",
     "plan_applications",
     "plan_events",
     "planned_downloads",
@@ -19,14 +20,25 @@ const REQUIRED_INDEXES: &[&str] = &[
     "one_prepared_claim_per_download",
 ];
 const REQUIRED_TRIGGERS: &[&str] = &[
+    "authority_keyring_binding_fenced",
+    "authority_keyring_binding_monotonic",
+    "authority_trusted_time_recovery_fenced",
+    "authority_trusted_time_monotonic",
     "immutable_keyring_bundles_delete",
     "immutable_keyring_bundles_update",
     "immutable_keyring_keys_delete",
     "immutable_keyring_keys_update",
+    "immutable_keyring_seals_delete",
+    "immutable_keyring_seals_update",
     "immutable_plan_applications_delete",
     "immutable_plan_applications_update",
     "immutable_plan_events_delete",
     "immutable_plan_events_update",
+    "keyring_bundle_revision_monotonic",
+    "keyring_control_revision_consistent",
+    "keyring_publisher_revision_consistent",
+    "keyring_seal_counts",
+    "sealed_keyring_keys_insert",
 ];
 
 pub(super) fn ensure_schema(connection: &mut Connection) -> Result<()> {
@@ -89,6 +101,19 @@ fn verify_required_objects(connection: &Connection) -> Result<()> {
     verify_named_objects(connection, "table", REQUIRED_TABLES)?;
     verify_named_objects(connection, "index", REQUIRED_INDEXES)?;
     verify_named_objects(connection, "trigger", REQUIRED_TRIGGERS)?;
+    let mut statement = connection
+        .prepare("PRAGMA foreign_key_check")
+        .context("COMPUTE_PLUGIN_AUTHORITY_FOREIGN_KEY_CHECK_PREPARE")?;
+    let mut violations = statement
+        .query([])
+        .context("COMPUTE_PLUGIN_AUTHORITY_FOREIGN_KEY_CHECK")?;
+    if violations
+        .next()
+        .context("COMPUTE_PLUGIN_AUTHORITY_FOREIGN_KEY_CHECK_READ")?
+        .is_some()
+    {
+        bail!("COMPUTE_PLUGIN_AUTHORITY_FOREIGN_KEY_VIOLATION");
+    }
     Ok(())
 }
 
@@ -121,6 +146,7 @@ const SCHEMA_V1: &str = r#"
 CREATE TABLE keyring_bundles (
     bundle_revision          INTEGER PRIMARY KEY CHECK (bundle_revision > 0),
     bundle_digest            TEXT NOT NULL UNIQUE,
+    signed_envelope_digest   TEXT NOT NULL UNIQUE,
     signed_bundle_json       TEXT NOT NULL,
     root_signing_key_id      TEXT NOT NULL,
     root_key_fingerprint     TEXT NOT NULL,
@@ -128,6 +154,12 @@ CREATE TABLE keyring_bundles (
     publisher_digest         TEXT NOT NULL,
     control_revision         INTEGER NOT NULL CHECK (control_revision > 0),
     control_digest           TEXT NOT NULL,
+    publisher_key_count      INTEGER NOT NULL CHECK (
+        publisher_key_count >= 0 AND publisher_key_count <= 4096
+    ),
+    control_key_count        INTEGER NOT NULL CHECK (
+        control_key_count >= 0 AND control_key_count <= 4096
+    ),
     generated_at_ms          INTEGER NOT NULL,
     expires_at_ms            INTEGER NOT NULL,
     installed_at_ms          INTEGER NOT NULL,
@@ -167,6 +199,13 @@ CREATE TABLE keyring_keys (
     )
 );
 
+CREATE TABLE keyring_seals (
+    bundle_revision          INTEGER PRIMARY KEY,
+    sealed_at_ms             INTEGER NOT NULL,
+    FOREIGN KEY (bundle_revision)
+        REFERENCES keyring_bundles(bundle_revision) ON DELETE RESTRICT
+);
+
 CREATE TABLE authority_meta (
     singleton                       INTEGER PRIMARY KEY CHECK (singleton = 1),
     schema_version                  INTEGER NOT NULL CHECK (schema_version = 1),
@@ -185,14 +224,17 @@ CREATE TABLE authority_meta (
     target_id                       TEXT NOT NULL,
     host_api_protocol_id            TEXT NOT NULL,
     host_api_revision               INTEGER NOT NULL CHECK (host_api_revision >= 0),
-    active_bundle_revision          INTEGER,
+    active_bundle_revision          INTEGER REFERENCES keyring_seals(bundle_revision)
+                                        ON DELETE RESTRICT,
     publisher_keyring_revision      INTEGER,
     publisher_keyring_digest        TEXT,
     control_keyring_revision        INTEGER,
     control_keyring_digest          TEXT,
     authority_epoch                 INTEGER NOT NULL CHECK (authority_epoch >= 0),
     process_owner_epoch             INTEGER NOT NULL CHECK (process_owner_epoch >= 0),
-    trusted_time_high_water_ms      INTEGER,
+    trusted_time_high_water_ms      INTEGER CHECK (
+        trusted_time_high_water_ms IS NULL OR trusted_time_high_water_ms >= 0
+    ),
     clock_status                    TEXT NOT NULL CHECK (
         clock_status IN ('uninitialized', 'trusted', 'clock_untrusted')
     ),
@@ -228,6 +270,12 @@ CREATE TABLE authority_meta (
          AND publisher_keyring_digest IS NOT NULL
          AND control_keyring_revision IS NOT NULL
          AND control_keyring_digest IS NOT NULL)
+    ),
+    CHECK (
+        (clock_status = 'uninitialized' AND trusted_time_high_water_ms IS NULL)
+        OR
+        (clock_status IN ('trusted', 'clock_untrusted')
+         AND trusted_time_high_water_ms IS NOT NULL)
     )
 );
 
@@ -262,7 +310,9 @@ CREATE TABLE plan_applications (
         bundle_revision,
         publisher_revision, publisher_digest,
         control_revision, control_digest
-    ) ON DELETE RESTRICT
+    ) ON DELETE RESTRICT,
+    FOREIGN KEY (keyring_bundle_revision)
+        REFERENCES keyring_seals(bundle_revision) ON DELETE RESTRICT
 );
 
 CREATE TABLE plan_events (
@@ -373,6 +423,113 @@ CREATE TABLE fetch_claims (
 CREATE UNIQUE INDEX one_prepared_claim_per_download
     ON fetch_claims(plan_id, ordinal) WHERE state = 'prepared';
 
+CREATE TRIGGER keyring_bundle_revision_monotonic
+BEFORE INSERT ON keyring_bundles
+WHEN EXISTS (
+    SELECT 1 FROM keyring_bundles
+    WHERE bundle_revision > NEW.bundle_revision
+) BEGIN
+    SELECT RAISE(ABORT, 'keyring bundle revision cannot roll back');
+END;
+CREATE TRIGGER keyring_publisher_revision_consistent
+BEFORE INSERT ON keyring_bundles
+WHEN EXISTS (
+    SELECT 1 FROM keyring_bundles
+    WHERE publisher_revision > NEW.publisher_revision
+       OR (publisher_revision = NEW.publisher_revision
+           AND publisher_digest <> NEW.publisher_digest)
+) BEGIN
+    SELECT RAISE(ABORT, 'publisher keyring revision cannot roll back or change digest');
+END;
+CREATE TRIGGER keyring_control_revision_consistent
+BEFORE INSERT ON keyring_bundles
+WHEN EXISTS (
+    SELECT 1 FROM keyring_bundles
+    WHERE control_revision > NEW.control_revision
+       OR (control_revision = NEW.control_revision
+           AND control_digest <> NEW.control_digest)
+) BEGIN
+    SELECT RAISE(ABORT, 'control keyring revision cannot roll back or change digest');
+END;
+CREATE TRIGGER sealed_keyring_keys_insert
+BEFORE INSERT ON keyring_keys
+WHEN EXISTS (
+    SELECT 1 FROM keyring_seals WHERE bundle_revision = NEW.bundle_revision
+) BEGIN
+    SELECT RAISE(ABORT, 'sealed keyring bundle cannot accept keys');
+END;
+CREATE TRIGGER keyring_seal_counts
+BEFORE INSERT ON keyring_seals
+WHEN (
+    (SELECT COUNT(*) FROM keyring_keys
+     WHERE bundle_revision = NEW.bundle_revision
+       AND purpose = 'publisher_manifest')
+        <> (SELECT publisher_key_count FROM keyring_bundles
+            WHERE bundle_revision = NEW.bundle_revision)
+    OR
+    (SELECT COUNT(*) FROM keyring_keys
+     WHERE bundle_revision = NEW.bundle_revision
+       AND purpose = 'control_install_plan')
+        <> (SELECT control_key_count FROM keyring_bundles
+            WHERE bundle_revision = NEW.bundle_revision)
+) BEGIN
+    SELECT RAISE(ABORT, 'keyring bundle cannot seal with incomplete keys');
+END;
+CREATE TRIGGER authority_keyring_binding_monotonic
+BEFORE UPDATE OF
+    active_bundle_revision,
+    publisher_keyring_revision, publisher_keyring_digest,
+    control_keyring_revision, control_keyring_digest
+ON authority_meta
+WHEN OLD.active_bundle_revision IS NOT NULL AND (
+    NEW.active_bundle_revision IS NULL
+    OR NEW.active_bundle_revision < OLD.active_bundle_revision
+    OR NEW.publisher_keyring_revision IS NULL
+    OR NEW.publisher_keyring_revision < OLD.publisher_keyring_revision
+    OR (NEW.publisher_keyring_revision = OLD.publisher_keyring_revision
+        AND NEW.publisher_keyring_digest <> OLD.publisher_keyring_digest)
+    OR NEW.control_keyring_revision IS NULL
+    OR NEW.control_keyring_revision < OLD.control_keyring_revision
+    OR (NEW.control_keyring_revision = OLD.control_keyring_revision
+        AND NEW.control_keyring_digest <> OLD.control_keyring_digest)
+) BEGIN
+    SELECT RAISE(ABORT, 'active keyring binding cannot roll back');
+END;
+CREATE TRIGGER authority_keyring_binding_fenced
+BEFORE UPDATE OF
+    active_bundle_revision,
+    publisher_keyring_revision, publisher_keyring_digest,
+    control_keyring_revision, control_keyring_digest
+ON authority_meta
+WHEN (
+    OLD.active_bundle_revision IS NOT NEW.active_bundle_revision
+    OR OLD.publisher_keyring_revision IS NOT NEW.publisher_keyring_revision
+    OR OLD.publisher_keyring_digest IS NOT NEW.publisher_keyring_digest
+    OR OLD.control_keyring_revision IS NOT NEW.control_keyring_revision
+    OR OLD.control_keyring_digest IS NOT NEW.control_keyring_digest
+) AND (
+    NEW.state_revision <> OLD.state_revision + 1
+    OR NEW.authority_epoch <> OLD.authority_epoch + 1
+) BEGIN
+    SELECT RAISE(ABORT, 'active keyring binding change must advance fences');
+END;
+CREATE TRIGGER authority_trusted_time_monotonic
+BEFORE UPDATE OF trusted_time_high_water_ms ON authority_meta
+WHEN OLD.trusted_time_high_water_ms IS NOT NULL AND (
+    NEW.trusted_time_high_water_ms IS NULL
+    OR NEW.trusted_time_high_water_ms < OLD.trusted_time_high_water_ms
+) BEGIN
+    SELECT RAISE(ABORT, 'trusted time high-water cannot roll back');
+END;
+CREATE TRIGGER authority_trusted_time_recovery_fenced
+BEFORE UPDATE OF trusted_time_high_water_ms, clock_status ON authority_meta
+WHEN OLD.clock_status = 'clock_untrusted'
+ AND NEW.clock_status = 'trusted'
+ AND NEW.trusted_time_high_water_ms <= OLD.trusted_time_high_water_ms
+BEGIN
+    SELECT RAISE(ABORT, 'clock recovery must advance trusted time');
+END;
+
 CREATE TRIGGER immutable_keyring_bundles_update
 BEFORE UPDATE ON keyring_bundles BEGIN
     SELECT RAISE(ABORT, 'keyring bundles are immutable');
@@ -388,6 +545,14 @@ END;
 CREATE TRIGGER immutable_keyring_keys_delete
 BEFORE DELETE ON keyring_keys BEGIN
     SELECT RAISE(ABORT, 'keyring keys are immutable');
+END;
+CREATE TRIGGER immutable_keyring_seals_update
+BEFORE UPDATE ON keyring_seals BEGIN
+    SELECT RAISE(ABORT, 'keyring seals are immutable');
+END;
+CREATE TRIGGER immutable_keyring_seals_delete
+BEFORE DELETE ON keyring_seals BEGIN
+    SELECT RAISE(ABORT, 'keyring seals are immutable');
 END;
 CREATE TRIGGER immutable_plan_applications_update
 BEFORE UPDATE ON plan_applications BEGIN

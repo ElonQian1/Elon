@@ -31,6 +31,7 @@ owners: node, security
 | `plugin_slots` | release、内容摘要、阶段、候选 token/代次及 owner plan binding |
 | `keyring_bundles` | 经 Bootstrap 根公钥验证的原始 signed bundle、用途 revision/digest、有效期与激活事实 |
 | `keyring_keys` | publisher/control 用途、主体、key ID、公钥指纹、有效期、状态与撤销事实 |
+| `keyring_seals` | 两类 key 数量完成后的不可变封存点；封存后禁止为历史 bundle 追加 key |
 | `plan_applications` | 不可变 signed plan、signed manifests、准入绑定、应用 inventory revision 与幂等回执 |
 | `plan_events` | prepared/applied/canceled/failed 等追加式恢复和审计事实 |
 | `planned_downloads` | ordinal、工件 binding、长度、committed offset、cursor generation 与状态 |
@@ -48,6 +49,8 @@ owners: node, security
 4. 整包拒绝未知字段、非规范 UTC/Base64、重复 identity、重复指纹和跨用途/跨主体公钥复用；指纹必须由公钥重新计算；
 5. resolver 只返回与可信时间、预期 revision/digest、purpose、publisher 和 key ID 全部吻合的 active key；缺包、过期、回滚、撤销、损坏和错误用途均失败关闭；
 6. keyring 替换必须先验根签名与整包不变量，再以 revision/digest CAS 原子提交，commit 后才发布内存快照。
+
+本机安装事务还必须强制：`bundle_revision` 只能前进；Publisher/Control ring revision 不能下降；同一 ring revision 永远只能对应同一 digest；同一 bundle revision 只有完整 signed-envelope digest、root key ID/指纹和双 ring binding 全部相同才作为重放。root 轮换或重新签名必须发布更高 bundle revision。bundle、全部规范化 key 与 seal 写完后，才能把 `authority_meta` 指向新 binding；切换时 `state_revision` 与 `authority_epoch` 同时加一。重启加载时从 `signed_bundle_json` 重新用当前发布内置的根公钥验签，并逐字段、逐 key、安装/封存时间对账分解列；SQLite 行本身不是信任根。只有当前活动的持久快照实现 leaf resolver，且快照自身拒绝低于创建时可信时间下界的解析；单纯验根成功的未安装 bundle 和 archived tip 都不能直接充当 Manifest/Plan resolver。安装新 bundle 时允许旧活动 bundle 已经过期，但仍必须通过归档签名与内容完整性检查；客户端 root 集合必须在该次轮换完成前保留验证旧活动 tip 所需的 root。
 
 当前仓库没有生产 Compute 根公钥。代码可以先形成 DTO、验证接口和可注入的 Bootstrap root resolver，但在真实 root pin 进入受信客户端发布前必须保持运行路径未接线；禁止用测试 key、任意 AppData key 或环境变量 fallback 冒充生产信任。
 
@@ -113,6 +116,10 @@ abort/revoke 不推进 cursor；重试创建新 generation 并仍从 committed o
 
 可信时间取 `max(墙钟, 启动基线 + monotonic elapsed, persisted high-water)`，每次 plan 应用、claim 和 commit 都在同一事务推进 high-water。重启后若墙钟显著落后高水位，状态变为 `clock_untrusted` 并阻断下载，直到经认证的服务端 time attestation 刷新；不能仅停在旧高水位，否则反复重启可能延长计划寿命。
 
+Keyring 安装和活动快照加载现在也必须在事务中读取、拒绝回退并 CAS 推进 `trusted_time_high_water_ms`；传入的 `trusted_now` 是未来可信时间内核的前置条件，不能由 Host 直接拿普通墙钟冒充。当前尚未形成启动基线、服务端 time attestation 或产生该可信观察值的公开入口，因此本层仍不接运行路径。
+
+SQLite 内部 revision、trigger 和 CAS 只能阻止当前数据库中的正常写入回退，不能独立识别“整个数据库文件被替换成一份更旧但内部自洽的副本”。Host 接线前必须增加数据库外的认证单调锚点，例如服务端保存并签回 installation digest + bundle revision/digest + authority epoch checkpoint，或平台受保护的单调存储；启动恢复低于锚点时失败关闭。不得把现有本机历史检查描述成已解决整库回滚。
+
 恢复顺序固定为：
 
 1. 取得 NodeAgent 独占实例锁；
@@ -129,4 +136,4 @@ abort/revoke 不推进 cursor；重试创建新 generation 并仍从 committed o
 
 本合同已接受。当前已有严格网络 DTO、JCS/SHA-256/Ed25519 验签、Manifest 校验、InstallPlan 首次准入及旧的逐段权威 trait；root-signed keyring bundle DTO、Bootstrap root resolver seam、整包校验与两类 ring binding 派生已形成代码。经整包验证的不可变快照只按预期 revision/digest、可信时间、用途、主体、状态和 key 有效期返回公钥；InstallPlan 与 live state 也已改为同时绑定 Publisher/Control 两类 ring revision/digest。
 
-独立 `compute-plugin-state.sqlite3` 的路径型 facade、WAL/FULL/foreign-key 配置、拒绝接管未版本化同名表的 v1 schema 与私有 `BEGIN IMMEDIATE` seam 已形成代码；schema 覆盖 meta、不可变 keyring、不可变 plan application/event、candidate owner、download cursor 和 fetch claim。它尚未在 NodeAgent 启动路径打开，未执行真实建库或迁移，也没有 purpose-specific 写操作。仓库仍没有生产 root pin；防回滚 keyring 安装、meta 初始化、原子计划应用、候选 token、三段式 fetch claim、可信时间、恢复与 Host 接线仍待实现。
+独立 `compute-plugin-state.sqlite3` 的路径型 facade、WAL/FULL/foreign-key/foreign-key-check 配置、拒绝接管未版本化同名表的 v1 schema 与私有 `BEGIN IMMEDIATE` seam 已形成代码；schema 覆盖 meta、不可变并可封存的 keyring、不可变 plan application/event、candidate owner、download cursor 和 fetch claim。禁用且空库存的 singleton 初始化、root 重验后的 keyring 持久化安装、bundle/ring 防回滚与同 revision signed-envelope 防分叉、binding CAS、可信时间高水位 CAS、旧活动 tip 归档校验、仅供 authority 子内核使用的不可变活动快照和规范化行对账也已形成 purpose-specific 代码。它尚未在 NodeAgent 启动路径打开，未执行真实建库或迁移；仓库仍没有生产 root pin，可信时间观察值生成/attestation、数据库外防整库回滚锚点、原子计划应用、候选 token、三段式 fetch claim、恢复编排与 Host 接线仍待实现。

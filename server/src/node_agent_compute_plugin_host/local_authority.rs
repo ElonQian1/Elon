@@ -5,6 +5,18 @@ use rusqlite::{Connection, Transaction, TransactionBehavior};
 
 use super::local_authority_schema;
 
+mod initialization;
+mod keyring_integrity;
+mod keyring_snapshot;
+mod keyring_store;
+
+pub(crate) use initialization::{
+    ComputePluginAuthorityInitialization, ComputePluginAuthorityInitializationOutcome,
+};
+pub(crate) use keyring_store::{
+    ComputePluginKeyringInstallDisposition, ComputePluginKeyringInstallResult,
+};
+
 const COMPUTE_PLUGIN_STATE_FILE: &str = "compute-plugin-state.sqlite3";
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -35,9 +47,9 @@ impl ComputePluginLocalAuthority {
         self.connect().map(drop)
     }
 
-    /// Only sibling authority kernels may use the generic transaction seam. Host and downloader
+    /// Only nested authority kernels may use the generic transaction seam. Host and downloader
     /// code receive purpose-specific operations so they cannot partially update authority tables.
-    pub(super) fn with_immediate<T>(
+    fn with_immediate<T>(
         &self,
         operation: impl FnOnce(&Transaction<'_>) -> Result<T>,
     ) -> Result<T> {
