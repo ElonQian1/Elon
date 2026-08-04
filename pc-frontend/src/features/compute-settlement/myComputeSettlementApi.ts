@@ -1,0 +1,93 @@
+import { api } from '../../api/client'
+import {
+  type SettlementWithdrawalQueuePage,
+  type SettlementWithdrawalRequest,
+  type SettlementWithdrawalTerminal,
+  type WithdrawalStatus,
+} from './computeSettlementApi'
+
+export interface MyComputeProvider {
+  provider_id: string
+  provider_kind: string
+  display_name: string
+  status: string
+  trust_tier: string
+  home_region?: string | null
+  policy_revision: number
+  has_routing: boolean
+  provider_digest: string
+}
+
+export interface ProviderSettlementAccount {
+  schema: string
+  provider_id: string
+  provider_policy_revision: number
+  provider_digest: string
+  provider_account_id: string
+  currency: 'CNY'
+  pending_micros: number
+  available_micros: number
+  disputed_micros: number
+  withdrawn_micros: number
+  account_revision: number
+  updated_at?: string | null
+  withdrawal_request_count: number
+  pending_terminal_count: number
+  pending_terminal_micros: number
+  external_paid_attested_count: number
+  returned_to_available_micros: number
+  projection_digest: string
+  audit_status: string
+}
+
+export type WithdrawalDestinationKind =
+  | 'bank_account_vault_ref'
+  | 'digital_wallet_vault_ref'
+  | 'sui_address_ref'
+  | 'other_vault_ref'
+
+export interface CreateMyWithdrawalBody {
+  amount_micros: number
+  destination_kind: WithdrawalDestinationKind
+  destination_ref: string
+  idempotency_key: string
+  confirm_internal_reserve_only: boolean
+  confirm_destination_ref_contains_no_secret: boolean
+}
+
+export interface CancelMyWithdrawalBody {
+  expected_withdrawal_event_digest: string
+  expected_request_posting_id: string
+  expected_request_posting_digest: string
+  reason_code: string
+  reason_detail?: string | null
+  idempotency_key: string
+  confirm_internal_refund_only: boolean
+}
+
+export const myComputeSettlementApi = {
+  providers: (limit = 100) =>
+    api.get<MyComputeProvider[]>(`/api/me/compute/providers?limit=${limit}`),
+  account: (providerId: string) =>
+    api.get<ProviderSettlementAccount>(
+      `/api/me/compute/providers/${encodeURIComponent(providerId)}/settlement-account`,
+    ),
+  withdrawals: (providerId: string, status: WithdrawalStatus, limit = 50) =>
+    api.get<SettlementWithdrawalQueuePage>(
+      `/api/me/compute/providers/${encodeURIComponent(providerId)}/settlement-withdrawal-queue?status=${encodeURIComponent(status)}&limit=${limit}`,
+    ),
+  createWithdrawal: (providerId: string, body: CreateMyWithdrawalBody) =>
+    api.post<SettlementWithdrawalRequest>(
+      `/api/me/compute/providers/${encodeURIComponent(providerId)}/settlement-withdrawals`,
+      body,
+    ),
+  cancelWithdrawal: (
+    providerId: string,
+    withdrawalId: string,
+    body: CancelMyWithdrawalBody,
+  ) =>
+    api.post<SettlementWithdrawalTerminal>(
+      `/api/me/compute/providers/${encodeURIComponent(providerId)}/settlement-withdrawals/${encodeURIComponent(withdrawalId)}/cancellation`,
+      body,
+    ),
+}

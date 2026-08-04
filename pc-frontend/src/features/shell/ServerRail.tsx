@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Bot, Boxes, GitBranch, HardDrive, Landmark, MonitorCog, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
+import { Bot, Boxes, CircleDollarSign, GitBranch, HardDrive, Landmark, MonitorCog, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -24,6 +24,7 @@ const RAIL_ITEMS: RailItem[] = [
   { path: '/git-worktrees', Icon: GitBranch, label: 'Git 现场', color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/ui-tuner', Icon: SlidersHorizontal, label: '微调画布', color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/node',    Icon: MonitorCog,   label: '分享算力',  color: '#2a2b2f', hoverColor: '#34363b' },
+  { path: '/my-compute-settlement', Icon: CircleDollarSign, label: '我的算力收益', color: '#26342d', hoverColor: '#30463a' },
   { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2a2b2f', hoverColor: '#34363b' },
 ]
 
