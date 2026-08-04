@@ -302,10 +302,15 @@
     if (state.loading) return '<div class="project-plaza-empty">加载中...</div>';
     if (state.error) return `<div class="project-plaza-error">${escapeHtml(state.status)}</div>`;
     if (!state.projects.length) return '<div class="project-plaza-empty">暂无匹配项目</div>';
+    const featuredProjects = state.projects.slice(0, 5);
     return `
+      <div class="project-plaza-featured-label">
+        <strong>精选项目</strong>
+        <span>滑动浏览 · ${escapeHtml(featuredProjects.length)} 个精选</span>
+      </div>
       <div class="project-plaza-featured-scroller" aria-label="精选项目">
         <div class="project-plaza-featured-track">
-          ${state.projects.slice(0, 5).map(renderFeaturedCard).join('')}
+          ${featuredProjects.map((project, index) => renderFeaturedCard(project, index)).join('')}
         </div>
       </div>
       ${renderResultsHeading()}
@@ -344,24 +349,53 @@
     render();
   }
 
-  function renderFeaturedCard(project) {
+  function featuredStatus(project) {
+    if (state.joinedIds.has(project.id) || cleanText(project.viewer_role)) {
+      return { label: '已加入', danger: false };
+    }
+    if (cleanText(project.latest_apk_url) || cleanText(project.last_apk_url)) {
+      return { label: '可安装', danger: false };
+    }
+    if (normalizeJoinMode(project.join_mode) === 'approval') {
+      return { label: '需审批', danger: true };
+    }
+    return { label: '无需审批', danger: false };
+  }
+
+  function renderFeaturedCard(project, index) {
     const identity = projectIdentity(project);
     const description = identity.subtitle || cleanText(project.description) || '这个项目还没有填写简介。';
+    const status = featuredStatus(project);
+    const cover = Array.from(identity.title.trim())[0] || '项';
+    const owner = cleanText(project.owner_account) || '未知';
+    const members = Math.max(0, Number(project.member_count || 0));
     return `
       <article class="project-plaza-featured-card" data-id="${escapeHtml(project.id)}">
-        <div class="project-plaza-featured-top">
-          <span class="project-plaza-featured-avatar" aria-hidden="true"></span>
+        <header class="project-plaza-featured-head">
+          <div class="project-plaza-featured-rank"><strong>精选</strong><span>${escapeHtml(String(index + 1).padStart(2, '0'))}</span></div>
+          <div class="project-plaza-featured-status ${status.danger ? 'is-danger' : ''}"><i aria-hidden="true"></i><span>${escapeHtml(status.label)}</span></div>
+        </header>
+        <div class="project-plaza-featured-body">
+          <div class="project-plaza-featured-identity">
+            <span class="project-plaza-featured-cover" aria-hidden="true">${escapeHtml(cover)}</span>
+            <div class="project-plaza-featured-copy">
+              <h3>${escapeHtml(identity.title)}</h3>
+              <p>${escapeHtml(description)}</p>
+            </div>
+          </div>
+          <div class="project-plaza-featured-facts">
+            <span class="project-plaza-featured-fact"><small>创建者</small><b>${escapeHtml(owner)}</b></span>
+            <span class="project-plaza-featured-fact"><small>成员</small><b>${escapeHtml(members)} 人</b></span>
+            <span class="project-plaza-featured-fact"><small>加入方式</small><b>${escapeHtml(approvalLabel(project.join_mode))}</b></span>
+          </div>
+        </div>
+        <div class="project-plaza-featured-actions">
+          <button class="project-plaza-featured-primary" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="进入${escapeHtml(identity.title)}">进入空间</button>
           <div class="project-plaza-reactions" aria-label="项目偏好">
             <button class="project-plaza-reaction is-star ${reactionSelected(project, 'favorite') ? 'is-selected' : ''}" type="button" data-plaza-action="favorite" data-id="${escapeHtml(project.id)}" aria-label="${reactionSelected(project, 'favorite') ? '取消收藏' : '收藏'}${escapeHtml(identity.title)}"></button>
             <button class="project-plaza-reaction is-heart ${reactionSelected(project, 'liked') ? 'is-selected' : ''}" type="button" data-plaza-action="liked" data-id="${escapeHtml(project.id)}" aria-label="${reactionSelected(project, 'liked') ? '取消点赞' : '点赞'}${escapeHtml(identity.title)}"></button>
           </div>
         </div>
-        <h3>${escapeHtml(identity.title)}</h3>
-        <p>${escapeHtml(description)}</p>
-        <div class="project-plaza-featured-media" aria-hidden="true">
-          <span></span><span></span>
-        </div>
-        <button class="project-plaza-featured-open" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="进入${escapeHtml(identity.title)}"><img src="/assets/project_view_chevron.png" alt="" /></button>
       </article>
     `;
   }

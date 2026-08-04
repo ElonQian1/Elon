@@ -32,21 +32,28 @@ class ProjectPlazaLayoutContractTest {
     }
 
     @Test
-    fun androidKeepsTheApkFeaturedCarouselAsThePrimaryDesign() {
-        val source = readRepositoryFile(
+    fun androidKeepsTheApkProjectDossierAsThePrimaryDesign() {
+        val marketplace = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
         )
+        val featured = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/ProjectPlazaFeaturedSection.kt"
+        )
         listOf(
-            "R.drawable.project_plaza_ui1_card",
-            "R.drawable.project_plaza_ui2_thumbnail",
-            "R.drawable.project_plaza_ui3_avatar",
             "R.drawable.project_plaza_ui4_heart",
             "R.drawable.project_plaza_ui5_star"
-        ).forEach { resource -> assertTrue(source.contains(resource)) }
-        assertTrue(source.contains("buildFeaturedStrip(projects.take(5))"))
-        assertTrue(source.contains("FEATURED_CARD_WIDTH_FRACTION = 0.6564706f"))
-        assertTrue(source.contains("FEATURED_CARD_HEIGHT_RATIO = 1.1266428f"))
-        assertTrue(source.contains("FEATURED_CARD_GAP_DP = 9"))
+        ).forEach { resource -> assertTrue(featured.contains(resource)) }
+        assertTrue(marketplace.contains("featuredSection.build(projects.take(5))"))
+        assertTrue(featured.contains("text = \"精选项目\""))
+        assertTrue(featured.contains("text = \"进入空间\""))
+        assertTrue(featured.contains("FEATURED_CARD_WIDTH_FRACTION = 0.6871795f"))
+        assertTrue(featured.contains("FEATURED_CARD_HEIGHT_RATIO = 1.2014925f"))
+        assertTrue(featured.contains("FEATURED_CARD_GAP_DP = 10"))
+        assertTrue(featured.contains("COLOR_HEADER = \"#1F2023\""))
+        assertTrue(featured.contains("COLOR_STATUS_SUCCESS = \"#58BE6A\""))
+        assertTrue(featured.contains("COLOR_STATUS_DANGER = \"#E62129\""))
+        assertFalse(featured.contains("R.drawable.project_plaza_ui1_card"))
+        assertFalse(featured.contains("R.drawable.project_plaza_ui3_avatar"))
     }
 
     @Test
@@ -56,14 +63,20 @@ class ProjectPlazaLayoutContractTest {
         val page = readRepositoryFile("server/src/assets/web_page.html")
 
         assertTrue(script.contains("project-plaza-featured-scroller"))
-        assertTrue(script.contains("state.projects.slice(0, 5).map(renderFeaturedCard)"))
-        assertTrue(script.contains("project-plaza-featured-media"))
-        assertTrue(styles.contains("width: 65.647vw;"))
-        assertTrue(styles.contains("aspect-ratio: 837 / 943;"))
-        assertTrue(styles.contains("gap: 9px;"))
+        assertTrue(script.contains("const featuredProjects = state.projects.slice(0, 5)"))
+        assertTrue(script.contains("project-plaza-featured-status"))
+        assertTrue(script.contains("project-plaza-featured-cover"))
+        assertTrue(script.contains("project-plaza-featured-facts"))
+        assertTrue(script.contains("project-plaza-featured-primary"))
+        assertFalse(script.contains("project-plaza-featured-media"))
+        assertTrue(styles.contains("width: 68.718vw;"))
+        assertTrue(styles.contains("aspect-ratio: 268 / 322;"))
+        assertTrue(styles.contains("gap: 10px;"))
         assertTrue(styles.contains("padding: 0 98px 0 20px;"))
-        assertTrue(page.contains("data-ui-design=\"apk-featured-carousel-v1\""))
-        assertFalse(script.contains("project-plaza-status-spine"))
+        assertTrue(styles.contains("--plaza-header: #1f2023;"))
+        assertTrue(styles.contains("--plaza-success: #58be6a;"))
+        assertTrue(styles.contains("--plaza-danger: #e62129;"))
+        assertTrue(page.contains("data-ui-design=\"apk-project-dossier-v2\""))
     }
 
     @Test
@@ -80,8 +93,8 @@ class ProjectPlazaLayoutContractTest {
             "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
         )
         val webScript = readRepositoryFile("server/src/assets/project_plaza.js")
-        assertEquals(2, Regex(Regex.escape("R.drawable.project_view_chevron")).findAll(androidSource).count())
-        assertEquals(2, Regex(Regex.escape("/assets/project_view_chevron.png")).findAll(webScript).count())
+        assertEquals(1, Regex(Regex.escape("R.drawable.project_view_chevron")).findAll(androidSource).count())
+        assertEquals(1, Regex(Regex.escape("/assets/project_view_chevron.png")).findAll(webScript).count())
         assertFalse(androidSource.contains("text = \"›\""))
         assertFalse(webScript.contains(">›<"))
     }
@@ -91,13 +104,18 @@ class ProjectPlazaLayoutContractTest {
         val androidSource = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
         )
+        val featuredSource = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/ProjectPlazaFeaturedSection.kt"
+        )
         val webStyles = readRepositoryFile("server/src/assets/project_plaza.css")
         val projectListRow = androidSource.substringAfter("private fun buildProjectListRow")
             .substringBefore("private fun projectThumbnail")
 
         assertTrue(projectListRow.contains("LinearLayout.LayoutParams(dp(48), dp(48))"))
-        assertTrue(androidSource.contains("FrameLayout.LayoutParams(dp(27), dp(27)"))
-        assertTrue(webStyles.contains(".project-plaza-featured-open"))
+        assertTrue(featuredSource.contains("ACTION_HEIGHT_DP = 48"))
+        assertTrue(featuredSource.contains("LinearLayout.LayoutParams(0, dp(ACTION_HEIGHT_DP), 1f)"))
+        assertTrue(webStyles.contains(".project-plaza-featured-primary"))
+        assertTrue(webStyles.contains(".project-plaza-reaction"))
         assertTrue(webStyles.contains(".project-plaza-open"))
         assertTrue(Regex("width:\\s*48px;[\\s\\S]*?height:\\s*48px;").containsMatchIn(webStyles))
     }

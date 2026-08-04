@@ -2,8 +2,10 @@ package com.elon.app
 
 import android.content.SharedPreferences
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.text.Layout
 import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
@@ -21,14 +23,53 @@ internal class ProjectPlazaFeaturedSection(
     private val selectableForeground: () -> Drawable?,
     private val reactionPrefs: SharedPreferences,
     private val openProjectSpace: (StoreProject) -> Unit,
-    @Suppress("unused") private val isProjectJoined: (StoreProject) -> Boolean
+    private val isProjectJoined: (StoreProject) -> Boolean
 ) {
-    fun build(projects: List<StoreProject>): View = ProjectPlazaCarousel(activity).apply {
+    private data class StatusStyle(val label: String, val dotColor: String)
+
+    fun build(projects: List<StoreProject>): View = LinearLayout(activity).apply {
+        orientation = LinearLayout.VERTICAL
+        addView(buildSectionHeading(projects.size), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(SECTION_HEADING_HEIGHT_DP)
+        ))
+        addView(buildCarousel(projects), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            cardHeightPx()
+        ))
+    }
+
+    fun heightPx(): Int = dp(SECTION_HEADING_HEIGHT_DP) + cardHeightPx()
+
+    private fun buildSectionHeading(projectCount: Int) = LinearLayout(activity).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(PLAZA_SIDE_MARGIN_DP), 0, dp(PLAZA_SIDE_MARGIN_DP), 0)
+        addView(TextView(activity).apply {
+            text = "精选项目"
+            includeFontPadding = false
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER_VERTICAL
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+        addView(TextView(activity).apply {
+            text = "滑动浏览 · $projectCount 个精选"
+            includeFontPadding = false
+            setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            gravity = Gravity.CENTER_VERTICAL
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.MATCH_PARENT
+        ))
+    }
+
+    private fun buildCarousel(projects: List<StoreProject>) = ProjectPlazaCarousel(activity).apply {
         configureContentInsets(dp(PLAZA_SIDE_MARGIN_DP), dp(PLAZA_TRAILING_PADDING_DP))
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             projects.forEachIndexed { index, project ->
-                val card = buildCard(project).apply {
+                val card = buildCard(project, index).apply {
                     val initialScale = if (index == 0) 1f else PROJECT_PLAZA_CARD_MIN_SCALE
                     scaleX = initialScale
                     scaleY = initialScale
@@ -41,86 +82,224 @@ internal class ProjectPlazaFeaturedSection(
         post { refreshCardScales() }
     }
 
-    fun heightPx(): Int = cardHeightPx()
-
-    private fun buildCard(project: StoreProject) = FrameLayout(activity).apply {
+    private fun buildCard(project: StoreProject, index: Int) = FrameLayout(activity).apply {
+        background = rect(COLOR_CARD, CARD_RADIUS_DP)
+        clipToOutline = true
         isClickable = true
         foreground = selectableForeground()
         contentDescription = "查看${project.displayTitle()}"
         setOnClickListener { openProjectSpace(project) }
-        addView(ImageView(activity).apply {
-            setImageResource(R.drawable.project_plaza_ui1_card)
-            scaleType = ImageView.ScaleType.FIT_XY
-            contentDescription = null
-        }, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        addView(LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(19), dp(21), dp(19), dp(14))
-            addView(LinearLayout(activity).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                addView(ImageView(activity).apply {
-                    setImageResource(R.drawable.project_plaza_ui3_avatar)
-                    scaleType = ImageView.ScaleType.FIT_XY
-                    contentDescription = "${project.displayTitle()}头像"
-                }, LinearLayout.LayoutParams(dp(36), dp(36)))
-                addView(LinearLayout(activity).apply {
-                    gravity = Gravity.END or Gravity.CENTER_VERTICAL
-                    addView(reactionImageButton(project, "favorite", R.drawable.project_plaza_ui5_star, "收藏"))
-                    addView(reactionImageButton(project, "liked", R.drawable.project_plaza_ui4_heart, "点赞"), LinearLayout.LayoutParams(dp(30), dp(36)).apply {
-                        marginStart = dp(1)
-                    })
-                }, LinearLayout.LayoutParams(0, dp(36), 1f))
-            })
-            addView(TextView(activity).apply {
-                text = project.displayTitle()
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                topMargin = dp(11)
-            })
-            addView(TextView(activity).apply {
-                text = project.description?.takeIf { it.isNotBlank() } ?: "这个项目还没有填写简介。"
-                maxLines = 2
-                ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                setLineSpacing(0f, 1.05f)
-            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(28)).apply {
-                topMargin = dp(6)
-            })
-            addView(LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                repeat(2) { index ->
-                    addView(mediaPlaceholder(), LinearLayout.LayoutParams(dp(60), dp(85)).apply {
-                        if (index == 1) marginStart = dp(7)
-                    })
-                }
-            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(85)).apply {
-                topMargin = dp(9)
-            })
-        }, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        addView(ImageView(activity).apply {
-            setImageResource(R.drawable.project_view_chevron)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            setColorFilter(Color.parseColor("#454545"))
-            background = rect("#D9D9D9", 18)
-            setPadding(dp(6), dp(6), dp(6), dp(6))
-            contentDescription = "进入${project.displayTitle()}"
-        }, FrameLayout.LayoutParams(dp(27), dp(27), Gravity.END or Gravity.BOTTOM).apply {
-            marginEnd = dp(20)
-            bottomMargin = dp(17)
+        addView(buildCardHeader(project, index), FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            dp(CARD_HEADER_HEIGHT_DP),
+            Gravity.TOP
+        ))
+        addView(buildCardBody(project), FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.TOP
+        ).apply {
+            topMargin = dp(CARD_HEADER_HEIGHT_DP)
+        })
+        addView(buildActions(project), FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            dp(ACTION_HEIGHT_DP),
+            Gravity.BOTTOM
+        ).apply {
+            marginStart = dp(CARD_CONTENT_PADDING_DP)
+            marginEnd = dp(CARD_CONTENT_PADDING_DP)
+            bottomMargin = dp(CARD_ACTION_BOTTOM_DP)
         })
     }
 
-    private fun mediaPlaceholder() = FrameLayout(activity).apply {
-        background = rect("#676767", 10)
-        addView(ImageView(activity).apply {
-            setImageResource(R.drawable.ic_attach_photos)
-            setColorFilter(Color.parseColor("#D9D9D9"))
+    private fun buildCardHeader(project: StoreProject, index: Int) = LinearLayout(activity).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        background = rect(COLOR_HEADER)
+        setPadding(dp(CARD_CONTENT_PADDING_DP), 0, dp(CARD_CONTENT_PADDING_DP), 0)
+        addView(LinearLayout(activity).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(activity).apply {
+                text = "精选"
+                includeFontPadding = false
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                typeface = Typeface.DEFAULT_BOLD
+            })
+            addView(TextView(activity).apply {
+                text = (index + 1).toString().padStart(2, '0')
+                includeFontPadding = false
+                setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginStart = dp(8)
+            })
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        val status = statusStyle(project)
+        addView(LinearLayout(activity).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(View(activity).apply {
+                background = rect(status.dotColor, STATUS_DOT_DP / 2)
+                contentDescription = null
+            }, LinearLayout.LayoutParams(dp(STATUS_DOT_DP), dp(STATUS_DOT_DP)))
+            addView(TextView(activity).apply {
+                text = status.label
+                includeFontPadding = false
+                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                marginStart = dp(7)
+            })
+        })
+    }
+
+    private fun buildCardBody(project: StoreProject) = LinearLayout(activity).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(
+            dp(CARD_CONTENT_PADDING_DP),
+            dp(CARD_CONTENT_PADDING_DP),
+            dp(CARD_CONTENT_PADDING_DP),
+            0
+        )
+        addView(buildIdentity(project))
+        addView(View(activity).apply {
+            background = rect(COLOR_DIVIDER)
             contentDescription = null
-        }, FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER))
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(1)
+        ).apply {
+            topMargin = dp(18)
+        })
+        addView(buildFacts(project), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(12)
+        })
+    }
+
+    private fun buildIdentity(project: StoreProject) = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.TOP
+        addView(TextView(activity).apply {
+            text = project.displayTitle().trim().firstOrNull()?.toString() ?: "项"
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            background = rect(Color.WHITE, COVER_RADIUS_DP)
+            setTextColor(Color.BLACK)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
+            typeface = Typeface.DEFAULT_BOLD
+            contentDescription = "${project.displayTitle()}项目封面"
+        }, LinearLayout.LayoutParams(dp(COVER_SIZE_DP), dp(COVER_SIZE_DP)))
+        addView(LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(TextView(activity).apply {
+                text = project.displayTitle()
+                includeFontPadding = false
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+                setLineSpacing(0f, 1.02f)
+                breakStrategy = Layout.BREAK_STRATEGY_BALANCED
+                typeface = Typeface.DEFAULT_BOLD
+            })
+            addView(TextView(activity).apply {
+                text = project.description?.takeIf { it.isNotBlank() } ?: "这个项目还没有填写简介。"
+                includeFontPadding = false
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setLineSpacing(0f, 1.08f)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(8)
+            })
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+            marginStart = dp(16)
+            topMargin = dp(2)
+        })
+    }
+
+    private fun buildFacts(project: StoreProject) = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        addView(factColumn("创建者", project.ownerLabel()), LinearLayout.LayoutParams(
+            0,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            1.2f
+        ))
+        addView(factColumn("成员", "${project.memberCount.coerceAtLeast(0)} 人"), LinearLayout.LayoutParams(
+            0,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            0.8f
+        ))
+        addView(factColumn("加入方式", project.joinModeLabel()), LinearLayout.LayoutParams(
+            0,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            1.2f
+        ))
+    }
+
+    private fun factColumn(label: String, value: String) = LinearLayout(activity).apply {
+        orientation = LinearLayout.VERTICAL
+        addView(TextView(activity).apply {
+            text = label
+            includeFontPadding = false
+            setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+        })
+        addView(TextView(activity).apply {
+            text = value
+            includeFontPadding = false
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            topMargin = dp(3)
+        })
+    }
+
+    private fun buildActions(project: StoreProject) = LinearLayout(activity).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        addView(TextView(activity).apply {
+            text = "进入空间"
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            background = rect(Color.WHITE, ACTION_HEIGHT_DP / 2)
+            foreground = selectableForeground()
+            isClickable = true
+            setTextColor(Color.BLACK)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            typeface = Typeface.DEFAULT_BOLD
+            contentDescription = "进入${project.displayTitle()}"
+            setOnClickListener { openProjectSpace(project) }
+        }, LinearLayout.LayoutParams(0, dp(ACTION_HEIGHT_DP), 1f))
+        addView(reactionImageButton(project, "favorite", R.drawable.project_plaza_ui5_star, "收藏"), LinearLayout.LayoutParams(
+            dp(ACTION_HEIGHT_DP),
+            dp(ACTION_HEIGHT_DP)
+        ).apply {
+            marginStart = dp(8)
+        })
+        addView(reactionImageButton(project, "liked", R.drawable.project_plaza_ui4_heart, "点赞"), LinearLayout.LayoutParams(
+            dp(ACTION_HEIGHT_DP),
+            dp(ACTION_HEIGHT_DP)
+        ).apply {
+            marginStart = dp(8)
+        })
     }
 
     private fun reactionImageButton(
@@ -147,11 +326,27 @@ internal class ProjectPlazaFeaturedSection(
                 .apply()
             render()
         }
-        val iconWidth = if (drawableRes == R.drawable.project_plaza_ui5_star) designPx(65) else designPx(59)
-        val iconHeight = if (drawableRes == R.drawable.project_plaza_ui5_star) designPx(59) else designPx(55)
+        val iconWidth = if (drawableRes == R.drawable.project_plaza_ui5_star) dp(22) else dp(21)
+        val iconHeight = dp(20)
         addView(icon, FrameLayout.LayoutParams(iconWidth, iconHeight, Gravity.CENTER))
         render()
-    }.also { it.layoutParams = LinearLayout.LayoutParams(dp(30), dp(36)) }
+    }
+
+    private fun statusStyle(project: StoreProject): StatusStyle = when {
+        isProjectJoined(project) -> StatusStyle("已加入", COLOR_STATUS_SUCCESS)
+        !project.latestApkUrl.isNullOrBlank() -> StatusStyle("可安装", COLOR_STATUS_SUCCESS)
+        normalizeProjectJoinMode(project.joinMode) == PROJECT_JOIN_MODE_APPROVAL -> {
+            StatusStyle("需审批", COLOR_STATUS_DANGER)
+        }
+        else -> StatusStyle("无需审批", COLOR_STATUS_SUCCESS)
+    }
+
+    private fun StoreProject.ownerLabel(): String = ownerAccount.trim()
+        .takeIf { it.isNotBlank() && it != "?" }
+        ?: "未知"
+
+    private fun StoreProject.joinModeLabel(): String =
+        if (normalizeProjectJoinMode(joinMode) == PROJECT_JOIN_MODE_APPROVAL) "需审批" else "无需审批"
 
     private fun cardWidthPx(): Int {
         val width = activity.resources.displayMetrics.widthPixels.takeIf { it > 0 } ?: dp(360)
@@ -160,27 +355,39 @@ internal class ProjectPlazaFeaturedSection(
 
     private fun cardHeightPx(): Int = (cardWidthPx() * FEATURED_CARD_HEIGHT_RATIO).roundToInt()
 
-    private fun rect(color: String, radiusDp: Int = 0): GradientDrawable {
+    private fun rect(color: String, radiusDp: Int = 0): GradientDrawable =
+        rect(Color.parseColor(color), radiusDp)
+
+    private fun rect(color: Int, radiusDp: Int = 0): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            setColor(Color.parseColor(color))
+            setColor(color)
             if (radiusDp > 0) cornerRadius = dp(radiusDp).toFloat()
         }
     }
 
-    private fun designPx(value: Int): Int {
-        val width = activity.resources.displayMetrics.widthPixels.takeIf { it > 0 } ?: DESIGN_WIDTH_PX
-        return (value * (width / DESIGN_WIDTH_PX.toFloat())).roundToInt()
-    }
-
     private companion object {
+        const val COLOR_CARD = "#1A1A1A"
+        const val COLOR_HEADER = "#1F2023"
+        const val COLOR_DIVIDER = "#6D6E6F"
         const val COLOR_TEXT_PRIMARY = "#D9D9D9"
+        const val COLOR_TEXT_SECONDARY = "#B8B8B8"
         const val COLOR_TEXT_TERTIARY = "#777777"
+        const val COLOR_STATUS_SUCCESS = "#58BE6A"
+        const val COLOR_STATUS_DANGER = "#E62129"
         const val PLAZA_SIDE_MARGIN_DP = 20
         const val PLAZA_TRAILING_PADDING_DP = 98
-        const val FEATURED_CARD_GAP_DP = 9
-        const val FEATURED_CARD_WIDTH_FRACTION = 0.6564706f
-        const val FEATURED_CARD_HEIGHT_RATIO = 1.1266428f
-        const val DESIGN_WIDTH_PX = 1275
+        const val SECTION_HEADING_HEIGHT_DP = 42
+        const val FEATURED_CARD_GAP_DP = 10
+        const val FEATURED_CARD_WIDTH_FRACTION = 0.6871795f
+        const val FEATURED_CARD_HEIGHT_RATIO = 1.2014925f
+        const val CARD_RADIUS_DP = 20
+        const val CARD_HEADER_HEIGHT_DP = 54
+        const val CARD_CONTENT_PADDING_DP = 18
+        const val CARD_ACTION_BOTTOM_DP = 16
+        const val COVER_SIZE_DP = 76
+        const val COVER_RADIUS_DP = 12
+        const val ACTION_HEIGHT_DP = 48
+        const val STATUS_DOT_DP = 7
     }
 }
