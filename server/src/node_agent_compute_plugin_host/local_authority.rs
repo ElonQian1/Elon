@@ -6,6 +6,7 @@ use rusqlite::{Connection, Transaction, TransactionBehavior};
 use super::local_authority_schema;
 
 mod fetch_claim_revocation;
+mod fetch_store;
 mod initialization;
 mod keyring_integrity;
 mod keyring_snapshot;
@@ -17,6 +18,10 @@ mod plan_application_replay_children;
 mod plan_application_writes;
 mod process_ownership;
 
+pub(in crate::node_agent_compute_plugin_host) use fetch_store::{
+    ComputePluginFetchAuthorityFacts, ComputePluginFetchAuthoritySession,
+    ComputePluginPreparedFetchClaimFacts,
+};
 pub(crate) use initialization::{
     ComputePluginAuthorityInitialization, ComputePluginAuthorityInitializationOutcome,
 };
@@ -73,6 +78,21 @@ impl ComputePluginLocalAuthority {
         transaction
             .commit()
             .context("COMPUTE_PLUGIN_AUTHORITY_COMMIT")?;
+        Ok(value)
+    }
+
+    /// Opens a stable, side-effect-free SQLite read snapshot for one authority decision. Only
+    /// nested authority kernels may use this seam; all durable changes still require a
+    /// purpose-specific immediate transaction.
+    fn with_deferred<T>(&self, operation: impl FnOnce(&Transaction<'_>) -> Result<T>) -> Result<T> {
+        let mut connection = self.connect()?;
+        let transaction = connection
+            .transaction_with_behavior(TransactionBehavior::Deferred)
+            .context("COMPUTE_PLUGIN_AUTHORITY_BEGIN_DEFERRED")?;
+        let value = operation(&transaction)?;
+        transaction
+            .commit()
+            .context("COMPUTE_PLUGIN_AUTHORITY_READ_COMMIT")?;
         Ok(value)
     }
 

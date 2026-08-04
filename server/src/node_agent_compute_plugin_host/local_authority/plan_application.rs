@@ -383,7 +383,7 @@ pub(super) fn prepare_application_request(
     })
 }
 
-fn read_authority_plan_application_state(
+pub(super) fn read_authority_plan_application_state(
     transaction: &Transaction<'_>,
     trusted_now: &DateTime<Utc>,
 ) -> Result<AuthorityPlanApplicationState> {

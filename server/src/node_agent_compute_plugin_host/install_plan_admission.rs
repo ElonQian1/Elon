@@ -121,6 +121,60 @@ impl AdmittedComputePluginInstallPlan {
     }
 }
 
+/// Re-checks an immutable sealed capsule against the currently active key resolvers without
+/// re-running inventory admission. Fetch authority calls this at the trusted time of every new
+/// byte-range claim, when the current inventory may legitimately be newer than the plan input.
+pub(super) fn reverify_admitted_artifacts(
+    admitted: &AdmittedComputePluginInstallPlan,
+    signed_manifests: &[SignedComputePluginManifest],
+    trusted_now: DateTime<Utc>,
+    control_keys: &dyn ComputePluginControlPlaneKeyResolver,
+    publisher_keys: &dyn ComputePluginPublisherKeyResolver,
+) -> Result<()> {
+    validate_plan_window(admitted.plan(), trusted_now.clone(), false)?;
+    let verified_plan = verify_install_plan_signature(
+        admitted.signed_plan(),
+        &admitted.plan().control_keyring,
+        trusted_now.clone(),
+        control_keys,
+    )?;
+    if verified_plan.signed() != admitted.signed_plan()
+        || verified_plan.verification_key_fingerprint()
+            != admitted.control_signing_key_fingerprint()
+        || signed_manifests.len() != admitted.manifests().len()
+    {
+        bail!("COMPUTE_PLUGIN_CURRENT_PLAN_SIGNATURE_CHANGED");
+    }
+    let validated = signed_manifests
+        .iter()
+        .map(|manifest| {
+            verify_and_validate_manifest(
+                manifest,
+                &admitted.plan().publisher_keyring,
+                trusted_now.clone(),
+                publisher_keys,
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
+    for binding in admitted.manifests() {
+        let matches = validated
+            .iter()
+            .filter(|manifest| {
+                manifest.release_ref() == binding.release
+                    && manifest.manifest().publisher_id == binding.publisher_id
+                    && manifest.signed().signature.signing_key_id == binding.signing_key_id
+                    && manifest.verification_key_fingerprint() == binding.signing_key_fingerprint
+            })
+            .count();
+        if matches != 1
+            || binding.signing_key_fingerprint == admitted.control_signing_key_fingerprint()
+        {
+            bail!("COMPUTE_PLUGIN_CURRENT_MANIFEST_SIGNATURE_CHANGED");
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn admit_install_plan(
     signed_plan: &SignedComputePluginInstallPlan,
     signed_manifests: &[SignedComputePluginManifest],
