@@ -11,7 +11,7 @@ owners: ai-economy, backend
 
 v198、追加式 Store、独立 Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
 
-v198 在 v195 Settlement Receipt 创建满 72 小时且挑战门卫允许时，把该笔 Provider 与平台收益从 `pending` 原子转入 `available`。它保存独立 Release Receipt、Posting 和四条不可变账本腿，不改写 v195 Settlement Receipt、v196 Challenge 或 v197 Resolution。
+v198 在 v195 Settlement Receipt 创建满 72 小时且挑战门卫允许时，把该笔 Provider 与平台收益从 `pending` 原子转入 `available`。它保存独立 Release Receipt、Posting 和四条不可变账本腿，不改写 v195 Settlement Receipt、v196 Challenge、v197 Resolution 或 v199 Correction Receipt。
 
 ## 2. HTTP 路由
 
@@ -30,11 +30,11 @@ v198 在 v195 Settlement Receipt 创建满 72 小时且挑战门卫允许时，�
 1. v195 Settlement Receipt 及其上游 v193/v194、价格快照、预授权和 Posting 可完整重审计；
 2. 服务端当前时间不早于 `settled_at + 72 小时`；
 3. 同一 Settlement Receipt、Posting 和 Lease 尚无 Release Receipt；
-4. 挑战状态为 `none`、`rejected` 或 `withdrawn`；
+4. 挑战状态为 `none`、`rejected`、`withdrawn` 或带有有效 v199 回执的 `accepted_corrected`；
 5. Provider 和平台 pending 余额分别足以覆盖该笔不可变结算金额；
 6. 请求中的全部预期 ID、摘要、操作人和幂等作用域一致。
 
-`open` 与 `accepted` 挑战均失败关闭。释放成功后，消费者不能再为该 Settlement Receipt 创建新挑战，避免挑战截止点附近出现“先释放、后挑战”的竞态。
+`open` 与尚未纠正的 `accepted` 挑战均失败关闭。`accepted_corrected` 只释放 v199 纠正后的 Provider/平台净额。释放成功后，消费者不能再为该 Settlement Receipt 创建新挑战，避免挑战截止点附近出现“先释放、后挑战”的竞态。
 
 ## 4. 原子账本
 
@@ -54,8 +54,8 @@ v198 在 v195 Settlement Receipt 创建满 72 小时且挑战门卫允许时，�
 每次读取都会重新核对：
 
 - 请求 JSON、回执 JSON、数据库列和事件摘要；
-- v195 Settlement Receipt、原 Posting 和双价格腿金额；
-- 72 小时挑战截止时间和 v196/v197 当前挑战门卫；
+- v195 Settlement Receipt、原 Posting、双价格腿金额以及可选 v199 纠正净额；
+- 72 小时挑战截止时间和 v196/v197/v199 当前挑战门卫；
 - Release Posting、四条账本腿、历史余额快照与账户 revision；
 - Provider/平台当前 pending 与 available 是否可由不可变账本重建。
 

@@ -30,7 +30,7 @@ v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以
 |---|---|---|
 | 无挑战 | 不由挑战阻断 | 无 |
 | `open` | 阻断 | 无 |
-| `accepted` | 继续阻断，等待未来纠正 | 无 |
+| `accepted` | 继续阻断，等待 v199 纠正回执 | 无 |
 | `rejected` | 不再由挑战阻断 | 无 |
 | `withdrawn` | 不再由挑战阻断 | 无 |
 
@@ -57,7 +57,7 @@ v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以
 - available 余额的提现、外部转账与清算；
 - 外部支付、银行、钱包、Sui 或矿池清算。
 
-因此，`accepted` 只表示挑战成立并继续阻断释放，不表示退款已经发生；`rejected/withdrawn` 只解除挑战门卫，是否已经释放必须以独立 v198 Release Receipt 为准。
+因此，`accepted` 只表示挑战成立并继续阻断释放，不表示退款已经发生；只有独立 v199 Correction Receipt 才证明消费者退款和 pending 冲减已执行。`rejected/withdrawn` 只解除挑战门卫，是否已经释放必须以独立 v198 Release Receipt 为准。
 
 ## 7. 代码入口
 
@@ -68,3 +68,5 @@ v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以
 - `server/src/compute_federation_attempt_settlement_challenge_resolution_api.rs`
 
 上游挑战见 `docs/distributed-compute/attempt-settlement-challenge-api.md`；完整市场目标见 `docs/distributed-compute/market-and-settlement.md`。
+
+accepted 挑战纠正边界见 `docs/distributed-compute/attempt-settlement-correction-api.md`。
