@@ -63,12 +63,14 @@ v189、追加式 Store、Service 与 HTTP 路由已经写入代码，但尚未�
 
 因此，v189 不表示任务成功、失败责任成立、消费者已获得结果、用量可信、容量已消费、余额已扣除或 Provider 已获得收入。
 
+v190 已允许候选绑定的 Job 消费者登记第一份 `accepted/rejected/disputed` 审核证据，见 `docs/distributed-compute/attempt-consumer-review-api.md`。该证据不修改本候选，消费者 `accepted` 也不把 Provider 声明提升为平台验证结果。
+
 ## 6. 尚未实现
 
 - Cargo 编译、v189 迁移执行、HTTP 真实调用、并发和故障注入验证；
 - NodeAgent Host 到云端的签名 Terminal 事件、outbox、断点续传和真实节点身份；
 - 输出工件导入、服务端重算摘要、恶意内容扫描、数据授权和可读取性验证；
-- `observed_usage`、`verified_usage`、Execution Receipt、挑战与争议流程；
+- `observed_usage`、`verified_usage`、Execution Receipt、平台验证决定以及争议裁决流程；
 - Lease `result_reported/verifying/terminal`、Job `verification_pending`、Capacity Claim `UsageConsumed` 等真实状态推进；
 - 消费者扣款、Provider 收益、失败退款、重试、多次 Attempt、外部矿池、多币种和 Sui 链上资产。
 
