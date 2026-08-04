@@ -125,6 +125,7 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
         .route("/api/android-live/design/events", post(list_design_events))
         .merge(super::design_planning_http::routes())
         .merge(super::design_source_patch_http::routes())
+        .merge(super::design_regression_http::routes())
 }
 
 async fn get_capabilities(

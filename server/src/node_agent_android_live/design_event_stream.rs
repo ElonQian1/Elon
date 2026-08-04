@@ -114,9 +114,17 @@ pub(super) fn record_tool_event(
         return Ok(());
     };
     let root = canonical_root(session)?;
-    let draft_id = first_text(result, &["/draft/draftId", "/draftId", "/proposal/draftId"])
-        .or_else(|| optional_text(arguments, "draftId"))
-        .map(str::to_string);
+    let draft_id = first_text(
+        result,
+        &[
+            "/draft/draftId",
+            "/draftId",
+            "/proposal/draftId",
+            "/baseline/draftId",
+        ],
+    )
+    .or_else(|| optional_text(arguments, "draftId"))
+    .map(str::to_string);
     let design_session_id = first_text(
         result,
         &[
@@ -125,6 +133,8 @@ pub(super) fn record_tool_event(
             "/session/designSessionId",
             "/designSession/designSessionId",
             "/draft/designSessionId",
+            "/baseline/designSessionId",
+            "/comparison/afterDesignSessionId",
         ],
     )
     .or_else(|| optional_text(arguments, "designSessionId"))
@@ -157,18 +167,35 @@ pub(super) fn record_tool_event(
         draft_id,
         platform: first_text(
             result,
-            &["/session/platform", "/designSession/platform", "/platform"],
+            &[
+                "/session/platform",
+                "/designSession/platform",
+                "/platform",
+                "/baseline/platform",
+                "/comparison/platform",
+            ],
         )
         .map(str::to_string),
         route: first_text(
             result,
-            &["/session/route", "/designSession/route", "/route"],
+            &[
+                "/session/route",
+                "/designSession/route",
+                "/route",
+                "/baseline/route",
+                "/comparison/route",
+            ],
         )
         .map(str::to_string),
         revision: result
             .pointer("/draft/revision")
             .and_then(Value::as_u64)
             .or_else(|| result.pointer("/proposal/revision").and_then(Value::as_u64))
+            .or_else(|| {
+                result
+                    .pointer("/comparison/revision")
+                    .and_then(Value::as_u64)
+            })
             .or_else(|| result.get("revision").and_then(Value::as_u64)),
         created_at: now.to_rfc3339(),
         payload: compact_payload(result),
@@ -253,6 +280,7 @@ fn compact_payload(result: &Value) -> Value {
                 "/draft/status",
                 "/receipt/status",
                 "/proposal/status",
+                "/comparison/status",
             ],
         ),
         ("sourceModified", &["/sourceModified"]),
@@ -260,6 +288,8 @@ fn compact_payload(result: &Value) -> Value {
         ("overallStatus", &["/overallStatus"]),
         ("proposalId", &["/proposal/proposalId"]),
         ("proposalRevision", &["/proposal/revision"]),
+        ("baselineId", &["/baseline/baselineId"]),
+        ("comparisonId", &["/comparison/comparisonId"]),
         (
             "artifactSha256",
             &["/artifact/sha256", "/capture/artifact/sha256"],
@@ -322,6 +352,9 @@ fn event_type(tool: &str) -> Option<&'static str> {
         "ui_decide_design_source_patch" => "SOURCE_PATCH_DECIDED",
         "ui_apply_design_source_patch" => "SOURCE_PATCH_APPLIED",
         "ui_plan_design_source_rollback" => "SOURCE_ROLLBACK_PLANNED",
+        "ui_create_design_regression_baseline" => "REGRESSION_BASELINE_CREATED",
+        "ui_plan_design_regression_comparison" => "REGRESSION_COMPARISON_PLANNED",
+        "ui_complete_design_regression_comparison" => "REGRESSION_COMPARISON_COMPLETED",
         _ => return None,
     })
 }
