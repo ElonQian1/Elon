@@ -135,6 +135,8 @@ export function buildHeadlessDesignContext(input: {
       ],
       acceptance: [
         'AI 任务通过 taskId lease 绑定 designSession，并用 cursor 增量发布设计事件',
+        '存在 DesignIntentPlan 时，在打开匹配 platform/route 的 designSession 后以 expectedRevision 启动计划',
+        '每个计划动作写入 RUNNING/SUCCEEDED/FAILED/SKIPPED 回执和紧凑证据引用；失败、暂停或意图变化时显式转换或重规划',
         '通过 designSessionId 读取当前语义 UI 树和截图哈希',
         '为选中 selector 建立可审查的源码绑定并修改源码',
         '重新捕获同一 platform/route 并给出新的 UI tree 与 PNG 哈希',

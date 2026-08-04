@@ -11,6 +11,7 @@
 
 .summary,
 .actions,
+.lifecycle,
 .plan,
 .plan > div,
 .adapters {
@@ -18,6 +19,38 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+.lifecycle {
+  min-width: 0;
+}
+
+.receipts {
+  display: flex;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.receipts span {
+  padding: 2px 5px;
+  border: 1px solid #303238;
+  border-radius: 999px;
+  color: #747882;
+  white-space: nowrap;
+}
+
+.receipts span[data-status='SUCCEEDED'] {
+  color: #7dd9a6;
+}
+
+.receipts span[data-status='FAILED'] {
+  color: #ff8b8b;
+}
+
+.receipts span[data-status='RUNNING'] {
+  color: #7eb6ff;
 }
 
 .summary strong,

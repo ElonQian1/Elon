@@ -27,6 +27,76 @@ export function getDesignIntentPlan(projectRoot: string, planId: string) {
   )
 }
 
+interface DesignIntentPlanMutationResult {
+  schema: 'elon.ui-design-intent-plan.v1'
+  action: string
+  plan: DesignIntentPlan
+  taskBinding?: unknown
+  sourceModified: false
+  runtimeStarted: false
+}
+
+export function startDesignIntentPlan(input: {
+  projectRoot: string
+  planId: string
+  expectedRevision: number
+  taskId: string
+  designSessionId?: string
+  draftId?: string
+  leaseSeconds?: number
+}) {
+  const { planId, ...body } = input
+  return callDesignNode<DesignIntentPlanMutationResult>(
+    `/api/android-live/design/intents/${encodeURIComponent(planId)}/start`, body,
+  )
+}
+
+export function transitionDesignIntentPlan(input: {
+  projectRoot: string
+  planId: string
+  expectedRevision: number
+  transition: 'PAUSE' | 'RESUME' | 'CANCEL' | 'FAIL' | 'COMPLETE'
+  reason?: string
+}) {
+  const { planId, ...body } = input
+  return callDesignNode<DesignIntentPlanMutationResult>(
+    `/api/android-live/design/intents/${encodeURIComponent(planId)}/transition`, body,
+  )
+}
+
+export function recordDesignIntentAction(input: {
+  projectRoot: string
+  planId: string
+  expectedRevision: number
+  actionOrder: number
+  status: 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'SKIPPED'
+  summary?: string
+  errorCode?: string
+  evidenceRefs?: string[]
+}) {
+  const { planId, actionOrder, ...body } = input
+  return callDesignNode<DesignIntentPlanMutationResult>(
+    `/api/android-live/design/intents/${encodeURIComponent(planId)}/actions/${actionOrder}`, body,
+  )
+}
+
+export function replanDesignIntent(input: {
+  projectRoot: string
+  planId: string
+  expectedRevision: number
+  intent: string
+  taskId?: string
+  platform?: DesignPlatform
+  route?: string
+  state?: string
+  designSessionId?: string
+}) {
+  const { planId, ...body } = input
+  return callDesignNode<DesignIntentPlanMutationResult & { previousPlan: DesignIntentPlan }>(
+    `/api/android-live/design/intents/${encodeURIComponent(planId)}/replan`, body,
+  )
+}
+
 export function checkDesignSourceBinding(input: {
   projectRoot: string
   draftId: string

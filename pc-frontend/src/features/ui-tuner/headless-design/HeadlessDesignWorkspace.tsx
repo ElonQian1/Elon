@@ -22,7 +22,7 @@ import { DesignPlanningReview } from './DesignPlanningReview'
 import type { DesignPlatform, SemanticUiNode } from './types'
 import type { DesignIntentPlan } from './designPlanningTypes'
 import { useHeadlessDesignSession } from './useHeadlessDesignSession'
-import { useDesignTaskEventSync } from './useDesignTaskEventSync'
+import { useDesignTaskEventSync, type DesignTaskActivity } from './useDesignTaskEventSync'
 import { useDesignRuntimeControls } from './useDesignRuntimeControls'
 import { useDesignPlanningControls } from './useDesignPlanningControls'
 import styles from './HeadlessDesignWorkspace.module.css'
@@ -77,6 +77,22 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
     draft: model.designDraft,
     onPlan: followIntentPlan,
   })
+  const handleTaskActivity = useCallback(async (activity: DesignTaskActivity) => {
+    try {
+      if (activity.running) {
+        await planningControls.startIntentPlan(activity.taskId, model.session?.designSessionId)
+      } else {
+        await planningControls.settleIntentPlan(activity.succeeded)
+      }
+    } finally {
+      await taskFollow.onTaskActivityChange(activity)
+    }
+  }, [model.session?.designSessionId, planningControls.settleIntentPlan, planningControls.startIntentPlan, taskFollow.onTaskActivityChange])
+  useEffect(() => {
+    if (taskFollow.cursor && planningControls.intentPlan) {
+      void planningControls.refreshIntentPlan()
+    }
+  }, [planningControls.intentPlan?.planId, planningControls.refreshIntentPlan, taskFollow.cursor])
   const pack = useMemo(() => buildHeadlessDesignContext({
     projectRoot: initialProjectRoot,
     target: model.target,
@@ -354,7 +370,7 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           defaultConversationOpen
           onMutationTaskStarted={() => undefined}
           onTaskSettled={() => { void model.reload() }}
-          onTaskActivityChange={taskFollow.onTaskActivityChange}
+          onTaskActivityChange={handleTaskActivity}
           onDesignIntentPlan={planningControls.planIntent}
         />
       </aside>

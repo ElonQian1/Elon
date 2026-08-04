@@ -10,16 +10,32 @@ interface Props {
 export function DesignPlanningReview({ model, hasDraft }: Props) {
   const [rejectionReason, setRejectionReason] = useState('')
   const plan = model.writebackPlan
+  const intentPlan = model.intentPlan
   const busy = Boolean(model.busyAction)
   return (
     <section className={styles.review} aria-label="设计意图和写回审查">
       <div className={styles.summary}>
         <strong>AI 设计计划</strong>
-        <span>{model.intentPlan
-          ? `${model.intentPlan.primaryPlatform?.toUpperCase() ?? '待确认'} ${model.intentPlan.route} · ${model.intentPlan.sessionAction}`
+        <span>{intentPlan
+          ? `${intentPlan.primaryPlatform?.toUpperCase() ?? '待确认'} ${intentPlan.route} · ${intentPlan.status} · r${intentPlan.revision}`
           : '发送聊天后自动生成 DesignIntentPlan'}</span>
-        {model.intentPlan?.needsClarification && <em>{model.intentPlan.clarifications.join('；')}</em>}
+        {intentPlan?.needsClarification && <em>{intentPlan.clarifications.join('；')}</em>}
       </div>
+
+      {intentPlan && (
+        <div className={styles.lifecycle}>
+          <div className={styles.receipts} aria-label="设计计划动作回执">
+            {intentPlan.actionReceipts.map((receipt) => (
+              <span key={receipt.order} data-status={receipt.status} title={receipt.summary ?? undefined}>
+                {receipt.order} · {receipt.status}
+              </span>
+            ))}
+          </div>
+          <button type="button" disabled={busy || intentPlan.status !== 'RUNNING'} onClick={() => void model.transitionIntentPlan('PAUSE')}>暂停</button>
+          <button type="button" disabled={busy || !['PAUSED', 'FAILED'].includes(intentPlan.status)} onClick={() => void model.transitionIntentPlan('RESUME')}>恢复</button>
+          <button type="button" disabled={busy || !['PLANNED', 'RUNNING', 'PAUSED', 'FAILED'].includes(intentPlan.status)} onClick={() => void model.transitionIntentPlan('CANCEL', '用户从 PC 微调画布取消')}>取消</button>
+        </div>
+      )}
 
       <div className={styles.actions}>
         <button type="button" disabled={!hasDraft || busy} onClick={() => void model.checkBinding()}>检查绑定漂移</button>

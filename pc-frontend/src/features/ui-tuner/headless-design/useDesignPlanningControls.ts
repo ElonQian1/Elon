@@ -2,8 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   checkDesignSourceBinding,
   decideDesignWritebackPlan,
+  getDesignIntentPlan,
   planDesignIntent,
   planDesignWriteback,
+  replanDesignIntent,
+  startDesignIntentPlan,
+  transitionDesignIntentPlan,
 } from './designPlanningApi'
 import type { DesignBindingHealth, DesignIntentPlan, DesignWritebackPlan } from './designPlanningTypes'
 import type { DesignDraft, DesignPlatform, DesignSessionIdentity } from './types'
@@ -48,13 +52,23 @@ export function useDesignPlanningControls(input: Input) {
   }, [])
 
   const planIntent = useCallback(async (intent: string) => run('intent', async () => {
-    const result = await planDesignIntent({
-      projectRoot: input.projectRoot,
-      intent,
-      ...(input.session?.designSessionId
-        ? { designSessionId: input.session.designSessionId }
-        : { platform: input.platform, route: input.route }),
-    })
+    const target = input.session?.designSessionId
+      ? { designSessionId: input.session.designSessionId }
+      : { platform: input.platform, route: input.route }
+    const reusablePlan = intentPlan && !['RUNNING', 'SUPERSEDED'].includes(intentPlan.status)
+    const result = reusablePlan
+      ? await replanDesignIntent({
+        projectRoot: input.projectRoot,
+        planId: intentPlan.planId,
+        expectedRevision: intentPlan.revision,
+        intent,
+        ...target,
+      })
+      : await planDesignIntent({
+        projectRoot: input.projectRoot,
+        intent,
+        ...target,
+      })
     setIntentPlan(result.plan)
     try {
       await input.onPlan?.(result.plan)
@@ -71,7 +85,82 @@ export function useDesignPlanningControls(input: Input) {
       `目标：${result.plan.primaryPlatform ?? '未确定'} ${result.plan.route}；会话策略：${result.plan.sessionAction}${clarification}`,
       `按计划工具链执行：${actions}。`,
     ].join('\n')
-  }), [input.onPlan, input.platform, input.projectRoot, input.route, input.session?.designSessionId, run])
+  }), [input.onPlan, input.platform, input.projectRoot, input.route, input.session?.designSessionId, intentPlan, run])
+
+  const refreshIntentPlan = useCallback(async () => {
+    if (!intentPlan?.planId) return null
+    try {
+      const result = await getDesignIntentPlan(input.projectRoot, intentPlan.planId)
+      setIntentPlan(result.plan)
+      return result.plan
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '设计计划刷新失败')
+      return null
+    }
+  }, [input.projectRoot, intentPlan?.planId])
+
+  const startIntentPlan = useCallback(async (taskId: string, designSessionId?: string) => {
+    if (!intentPlan || intentPlan.status !== 'PLANNED' || !designSessionId) return null
+    return run('intent-start', async () => {
+      const result = await startDesignIntentPlan({
+        projectRoot: input.projectRoot,
+        planId: intentPlan.planId,
+        expectedRevision: intentPlan.revision,
+        taskId,
+        designSessionId,
+        ...(input.draft?.draftId ? { draftId: input.draft.draftId } : {}),
+        leaseSeconds: 900,
+      })
+      setIntentPlan(result.plan)
+      setMessage(`计划已开始执行 · r${result.plan.revision}`)
+      return result.plan
+    })
+  }, [input.draft?.draftId, input.projectRoot, intentPlan, run])
+
+  const transitionIntentPlan = useCallback(async (
+    transition: 'PAUSE' | 'RESUME' | 'CANCEL' | 'FAIL' | 'COMPLETE',
+    reason?: string,
+  ) => {
+    if (!intentPlan) return null
+    return run(`intent-${transition.toLowerCase()}`, async () => {
+      const result = await transitionDesignIntentPlan({
+        projectRoot: input.projectRoot,
+        planId: intentPlan.planId,
+        expectedRevision: intentPlan.revision,
+        transition,
+        reason,
+      })
+      setIntentPlan(result.plan)
+      setMessage(`计划状态：${result.plan.status} · r${result.plan.revision}`)
+      return result.plan
+    })
+  }, [input.projectRoot, intentPlan, run])
+
+  const settleIntentPlan = useCallback(async (succeeded?: boolean) => {
+    if (!intentPlan) return null
+    return run('intent-settle', async () => {
+      const refreshed = await getDesignIntentPlan(input.projectRoot, intentPlan.planId)
+      setIntentPlan(refreshed.plan)
+      if (refreshed.plan.status !== 'RUNNING') return refreshed.plan
+      const receiptsSettled = refreshed.plan.actionReceipts.every((receipt) => (
+        receipt.status === 'SUCCEEDED' || receipt.status === 'SKIPPED'
+      ))
+      const transition = succeeded === false ? 'FAIL' : receiptsSettled ? 'COMPLETE' : 'PAUSE'
+      const reason = succeeded === false
+        ? '关联 AI 任务执行失败'
+        : receiptsSettled ? undefined : 'AI 任务已结束，但仍有动作回执未结算'
+      const result = await transitionDesignIntentPlan({
+        projectRoot: input.projectRoot,
+        planId: refreshed.plan.planId,
+        expectedRevision: refreshed.plan.revision,
+        transition,
+        reason,
+      })
+      setIntentPlan(result.plan)
+      setMessage(`AI 任务已结算，计划状态：${result.plan.status}`)
+      return result.plan
+    })
+  }, [input.projectRoot, intentPlan, run])
 
   const checkBinding = useCallback(async () => {
     if (!input.draft) return null
@@ -132,6 +221,10 @@ export function useDesignPlanningControls(input: Input) {
     message,
     error,
     planIntent,
+    refreshIntentPlan,
+    startIntentPlan,
+    transitionIntentPlan,
+    settleIntentPlan,
     checkBinding,
     compileWritebackPlan,
     decideWriteback,
