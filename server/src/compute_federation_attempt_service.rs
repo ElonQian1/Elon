@@ -405,6 +405,14 @@ pub(crate) fn get_terminal_candidate_for_participant(
     store.compute_attempt_terminal_candidate(lease_id)
 }
 
+pub(crate) fn list_terminal_candidates_pending_consumer_review(
+    store: &Store,
+    user_id: &str,
+    limit: usize,
+) -> Result<Vec<ComputeAttemptTerminalCandidateReceipt>> {
+    store.list_compute_attempt_terminal_candidates_pending_consumer_review(user_id, limit)
+}
+
 pub(crate) fn review_terminal_candidate_for_consumer(
     store: &Store,
     user_id: &str,

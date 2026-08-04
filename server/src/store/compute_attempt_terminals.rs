@@ -25,7 +25,8 @@ mod support;
 
 use support::{
     artifacts_digest, candidate_by_idempotency_on, candidate_by_lease_on,
-    normalize_terminal_request, terminal_event_digest, terminal_request_digest,
+    list_pending_consumer_review_candidates_on, normalize_terminal_request, terminal_event_digest,
+    terminal_request_digest,
 };
 
 pub(crate) const COMPUTE_ATTEMPT_TERMINAL_CANDIDATE_SCHEMA: &str =
@@ -254,6 +255,22 @@ impl Store {
     ) -> Result<ComputeAttemptTerminalCandidateReceipt> {
         compute_attempt_terminal_candidate_on(&*self.conn()?, lease_id)?
             .ok_or_else(|| anyhow!("Attempt 尚无终态候选"))
+    }
+
+    pub(crate) fn list_compute_attempt_terminal_candidates_pending_consumer_review(
+        &self,
+        consumer_account_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ComputeAttemptTerminalCandidateReceipt>> {
+        support::validate_exact("消费者账户 ID", consumer_account_id, 200)?;
+        list_pending_consumer_review_candidates_on(
+            &*self.conn()?,
+            consumer_account_id,
+            limit.clamp(1, 100),
+        )?
+        .into_iter()
+        .map(|stored| stored.into_receipt(false))
+        .collect()
     }
 }
 

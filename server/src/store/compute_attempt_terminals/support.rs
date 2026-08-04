@@ -14,6 +14,9 @@ use super::{
 };
 
 mod audit;
+mod consumer_queue;
+
+pub(super) use consumer_queue::list_pending_consumer_review_candidates_on;
 
 const COMPUTE_JSON_SAFE_SEQUENCE_MAX: i64 = 9_007_199_254_740_991;
 const MAX_RESULT_ARTIFACTS: usize = 32;

@@ -69,6 +69,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(declare_terminal_candidate),
         )
         .route(
+            "/api/me/compute/attempt-terminal-candidates/pending-consumer-review",
+            get(list_pending_consumer_review_candidates),
+        )
+        .route(
             "/api/me/compute/attempt-leases/:lease_id/terminal-candidate",
             get(get_terminal_candidate),
         )
@@ -381,6 +385,25 @@ async fn get_terminal_candidate(
             &user_id,
             &lease_id,
         ),
+    )
+}
+
+async fn list_pending_consumer_review_candidates(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::list_terminal_candidates_pending_consumer_review(
+            &state.store,
+            &user_id,
+            query.limit,
+        )
+        .map(|candidates| json!({"terminal_candidates":candidates})),
     )
 }
 
