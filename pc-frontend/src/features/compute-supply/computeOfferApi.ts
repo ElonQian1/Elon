@@ -118,13 +118,18 @@ export interface MyComputeOfferView {
   market_effect: 'none'
 }
 
+interface ComputeOfferListResponse {
+  offers: MyComputeOfferView[]
+}
+
 function base(providerId: string, poolId: string) {
   return `/api/me/compute/providers/${encodeURIComponent(providerId)}/capacity-pools/${encodeURIComponent(poolId)}/offers`
 }
 
 export const computeOfferApi = {
   list: (providerId: string, poolId: string, limit = 50) =>
-    api.get<MyComputeOfferView[]>(`${base(providerId, poolId)}?limit=${limit}`),
+    api.get<ComputeOfferListResponse>(`${base(providerId, poolId)}?limit=${limit}`)
+      .then((response) => response.offers),
   create: (providerId: string, poolId: string, body: ComputeOfferDraftBody) =>
     api.post<MyComputeOfferView>(base(providerId, poolId), body),
   revise: (providerId: string, poolId: string, offerId: string, body: ReviseComputeOfferDraftBody) =>
