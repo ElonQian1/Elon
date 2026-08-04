@@ -19,7 +19,13 @@ mod abort;
 mod begin;
 mod closure;
 mod outcome;
+mod post_hash;
 mod read;
+
+pub(in crate::node_agent_compute_plugin_host) use post_hash::{
+    ComputePluginPostHashVerificationAuthoritySession,
+    ComputePluginPostHashVerificationBindingFacts,
+};
 
 /// A fresh trusted-time session observed strictly after all candidate file handles were pinned.
 /// It carries no filesystem or generic Store-write capability. Its only mutation seam accepts the

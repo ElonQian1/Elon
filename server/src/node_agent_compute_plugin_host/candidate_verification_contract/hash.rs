@@ -18,6 +18,10 @@ use crate::{
 
 const OBSERVED_ARTIFACT_SET_SCHEMA: &str = "elon.compute_plugin.candidate_observed_artifact_set.v1";
 
+mod evidence;
+use evidence::CandidateArtifactDigestMismatch;
+pub(super) use evidence::CandidateArtifactSetHashEvidence;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host) enum CandidateArtifactSetHashDisposition {
     Matched,
@@ -35,6 +39,7 @@ pub(super) struct CandidateVerificationHashPermit {
     _private: (),
 }
 
+#[must_use = "hashed candidate custody must be trusted-time bound or explicitly abandoned"]
 pub(in crate::node_agent_compute_plugin_host) struct HashedComputePluginCandidateArtifactSet {
     prepared:
         crate::node_agent_compute_plugin_host::local_authority::ComputePluginPreparedCandidateVerificationFacts,
@@ -49,20 +54,6 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateVerificationHashFa
     ordinal: Option<usize>,
     error: Error,
     recovery: CandidateVerificationBeginRecoveryCustody,
-}
-
-struct CandidateArtifactSetHashEvidence {
-    disposition: CandidateArtifactSetHashDisposition,
-    hashed_artifact_count: usize,
-    hashed_artifact_bytes: u64,
-    observed_artifact_set_digest: String,
-    mismatch: Option<CandidateArtifactDigestMismatch>,
-}
-
-struct CandidateArtifactDigestMismatch {
-    ordinal: usize,
-    expected_digest: String,
-    observed_digest: String,
 }
 
 struct HashedCandidateArtifact {
@@ -104,6 +95,25 @@ impl HashedComputePluginCandidateArtifactSet {
     ) -> CandidateArtifactSetHashDisposition {
         self.evidence.disposition
     }
+
+    pub(super) fn into_post_hash_parts(
+        self,
+        _permit: super::post_hash::CandidateVerificationPostHashBindPermit,
+    ) -> (
+        crate::node_agent_compute_plugin_host::local_authority::ComputePluginPreparedCandidateVerificationFacts,
+        super::ComputePluginCandidateVerificationRecoveryKey,
+        PinnedComputePluginCandidateArtifactSet,
+        CandidateArtifactSetHashEvidence,
+        Instant,
+    ){
+        (
+            self.prepared,
+            self.recovery_key,
+            self.pinned,
+            self.evidence,
+            self.hash_completed_at,
+        )
+    }
 }
 
 impl CandidateVerificationHashPermit {
@@ -126,32 +136,6 @@ impl fmt::Debug for HashedComputePluginCandidateArtifactSet {
             .field("pinned", &self.pinned)
             .field("evidence", &self.evidence)
             .field("hash_completed_at", &barrier_state)
-            .finish()
-    }
-}
-
-impl fmt::Debug for CandidateArtifactSetHashEvidence {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("CandidateArtifactSetHashEvidence")
-            .field("disposition", &self.disposition)
-            .field("hashed_artifact_count", &self.hashed_artifact_count)
-            .field("hashed_artifact_bytes", &self.hashed_artifact_bytes)
-            .field("observed_artifact_set_digest", &"<redacted>")
-            .field("mismatch", &self.mismatch)
-            .finish()
-    }
-}
-
-impl fmt::Debug for CandidateArtifactDigestMismatch {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("CandidateArtifactDigestMismatch")
-            .field("ordinal", &self.ordinal)
-            .field("expected_digest", &"<redacted>")
-            .field("observed_digest", &"<redacted>")
-            .field("expected_digest_len", &self.expected_digest.len())
-            .field("observed_digest_len", &self.observed_digest.len())
             .finish()
     }
 }
@@ -243,11 +227,11 @@ pub(in crate::node_agent_compute_plugin_host) fn hash_authorized_candidate_artif
         };
         last_file_hash_completed_at = Some(hashed.completed_at);
         if mismatch.is_none() && hashed.observed_digest != hashed.expected_digest {
-            mismatch = Some(CandidateArtifactDigestMismatch {
-                ordinal: hashed.ordinal,
-                expected_digest: hashed.expected_digest.clone(),
-                observed_digest: hashed.observed_digest.clone(),
-            });
+            mismatch = Some(CandidateArtifactDigestMismatch::new(
+                hashed.ordinal,
+                hashed.expected_digest.clone(),
+                hashed.observed_digest.clone(),
+            ));
         }
         observations.push(ObservedArtifactDigest {
             ordinal: hashed.ordinal,
@@ -307,13 +291,13 @@ pub(in crate::node_agent_compute_plugin_host) fn hash_authorized_candidate_artif
     } else {
         CandidateArtifactSetHashDisposition::Matched
     };
-    let evidence = CandidateArtifactSetHashEvidence {
+    let evidence = CandidateArtifactSetHashEvidence::new(
         disposition,
         hashed_artifact_count,
         hashed_artifact_bytes,
         observed_artifact_set_digest,
         mismatch,
-    };
+    );
     if let Err(error) = pinned.cancellation_guard.ensure_current() {
         return Err(hash_failure(
             CandidateVerificationHashPhase::PostHashBinding,
@@ -381,7 +365,7 @@ fn hash_one_artifact(
     })
 }
 
-fn validate_hash_binding(
+pub(super) fn validate_hash_binding(
     pinned: &mut PinnedComputePluginCandidateArtifactSet,
     prepared: &crate::node_agent_compute_plugin_host::local_authority::ComputePluginPreparedCandidateVerificationFacts,
     key: &super::ComputePluginCandidateVerificationRecoveryKey,

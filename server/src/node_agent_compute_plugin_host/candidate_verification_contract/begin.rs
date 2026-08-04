@@ -49,7 +49,8 @@ impl<'permit> ValidatedCandidateVerificationBeginPermit<'permit> {
     }
 }
 
-/// Linear hash authorization. No hashing method exists until the purpose-specific binder lands.
+/// Linear hash authorization. Only the hash module can consume it, and successful hashing must
+/// still cross the separate post-hash trusted-time binder before any resolution is reachable.
 pub(in crate::node_agent_compute_plugin_host) struct AuthorizedComputePluginCandidateArtifactSet {
     prepared: ComputePluginPreparedCandidateVerificationFacts,
     recovery_key: ComputePluginCandidateVerificationRecoveryKey,
@@ -77,6 +78,7 @@ pub(in crate::node_agent_compute_plugin_host) struct UnclaimedCandidateArtifactS
 
 /// Recovery-only custody. `NotCreated` and terminal outcomes close this attempt; a new begin must
 /// re-pin under a new verification ID rather than converting these handles back into Observed.
+#[must_use = "prepared verification custody must be inspected or explicitly recovered"]
 pub(in crate::node_agent_compute_plugin_host) struct CandidateVerificationBeginRecoveryCustody {
     pub(super) key: ComputePluginCandidateVerificationRecoveryKey,
     pub(super) pinned: PinnedComputePluginCandidateArtifactSet,

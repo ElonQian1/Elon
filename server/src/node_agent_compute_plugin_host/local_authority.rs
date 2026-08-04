@@ -39,6 +39,8 @@ pub(in crate::node_agent_compute_plugin_host) use verification_store::{
     ComputePluginCandidateArtifactAuthorityFacts, ComputePluginCandidateVerificationAuthorityFacts,
     ComputePluginCandidateVerificationOutcomeReadFailure,
     ComputePluginCandidateVerificationRecoveryAuthoritySession,
+    ComputePluginPostHashVerificationAuthoritySession,
+    ComputePluginPostHashVerificationBindingFacts,
     ComputePluginPostPinVerificationAuthoritySession,
     ComputePluginPreparedCandidateVerificationFacts,
 };
