@@ -289,6 +289,7 @@ pub(crate) use compute_offer_publications::PublishComputeOfferDraft;
 pub(crate) use compute_offer_registry::ComputeOfferRegistrationReceipt;
 pub(crate) use compute_offer_terminal::TerminateComputeOffer;
 pub(crate) use compute_price_snapshot_registry::ComputePriceSnapshotRegistrationReceipt;
+pub(crate) use compute_price_snapshot_validation::compute_price_snapshot_digest;
 pub(crate) use compute_provider_registry::validate_compute_provider_contract;
 pub(crate) use compute_provider_registry::ComputeProviderRegistrationReceipt;
 pub(crate) use compute_quote_candidates::ComputeJobQuoteCandidatePage;

@@ -28,7 +28,7 @@ pub(super) fn validate_price_snapshot_contract(
     Ok(computed_digest)
 }
 
-pub(super) fn compute_price_snapshot_digest(snapshot: &ComputePriceSnapshot) -> Result<String> {
+pub(crate) fn compute_price_snapshot_digest(snapshot: &ComputePriceSnapshot) -> Result<String> {
     let mut canonical = snapshot.clone();
     canonical.snapshot_digest.clear();
     let encoded = serde_json::to_vec(&canonical)?;

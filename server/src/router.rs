@@ -579,6 +579,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .merge(crate::compute_federation_activation_api::routes())
         .merge(crate::compute_federation_broker_api::routes())
         .merge(crate::compute_federation_offer_api::routes())
+        .merge(crate::compute_federation_price_snapshot_api::routes())
         .merge(crate::compute_federation_provider_api::routes())
         .merge(crate::open_commerce_mcp::routes())
         .merge(crate::erp_blueprint_api::routes())

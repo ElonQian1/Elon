@@ -10,6 +10,7 @@ pub(crate) fn definitions() -> Vec<Value> {
     tools.extend(crate::compute_federation_capacity_supply_mcp::definitions());
     tools.extend(crate::compute_federation_activation_mcp::definitions());
     tools.extend(crate::compute_federation_offer_mcp::definitions());
+    tools.extend(crate::compute_federation_price_snapshot_mcp::definitions());
     tools.extend(crate::compute_federation_broker_mcp::definitions());
     tools
 }
@@ -62,6 +63,14 @@ pub(crate) fn call_if_handled(
         return Ok(Some(value));
     }
     if let Some(value) = crate::compute_federation_offer_mcp::call_if_handled(
+        store,
+        user_id,
+        name,
+        arguments.clone(),
+    )? {
+        return Ok(Some(value));
+    }
+    if let Some(value) = crate::compute_federation_price_snapshot_mcp::call_if_handled(
         store,
         user_id,
         name,

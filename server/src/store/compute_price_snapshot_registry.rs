@@ -152,6 +152,24 @@ impl Store {
             replayed: false,
         })
     }
+
+    pub(crate) fn compute_price_snapshot_if_exists(
+        &self,
+        snapshot_id: &str,
+    ) -> Result<Option<ComputePriceSnapshotRegistrationReceipt>> {
+        if snapshot_id.trim().is_empty() {
+            bail!("算力价格快照 ID 不能为空");
+        }
+        let conn = self.conn()?;
+        registered_price_snapshot_on(&conn, snapshot_id.trim())?
+            .map(|snapshot| {
+                Ok(ComputePriceSnapshotRegistrationReceipt {
+                    snapshot,
+                    replayed: false,
+                })
+            })
+            .transpose()
+    }
 }
 
 pub(super) fn registered_price_snapshot_on(
