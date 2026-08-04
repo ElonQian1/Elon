@@ -34,6 +34,7 @@ implementation_status: implementation_uncompiled
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/activation-evidence-requests?limit=20` | 列出该 Pool 的本人申请历史 |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/activation-evidence-requests/:request_id` | 读取一份本人申请 |
 | POST | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/activation-evidence-requests/:request_id/cancel` | 以当前申请摘要和显式确认取消 submitted 申请 |
+| GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/activation-evidence-requests/:request_id/preflight` | 只读检查后续激活条件并返回阻断码 |
 
 提交请求必须带稳定 `idempotency_key`。幂等范围按用户、Provider 和 Pool 隔离；相同键只重放相同证据材料。已成功写入的同一请求可在 Provider/Pool 后续变化后继续重放，但新申请必须重新满足当前依赖。
 
@@ -47,6 +48,7 @@ implementation_status: implementation_uncompiled
 | `compute_get_my_activation_evidence_request` | 只读 | 读取一份本人申请 |
 | `compute_list_my_activation_evidence_requests` | 只读 | 列出本人 Pool 的申请历史 |
 | `compute_cancel_my_activation_evidence_request` | 显式确认、CAS 写入 | 取消仍为 submitted 的本人申请 |
+| `compute_preflight_my_activation_evidence_request` | 只读 | 检查本人申请的后续激活条件并返回阻断码 |
 
 管理员审核不向 MCP 开放，避免普通 AI 代理获得信任升级审批能力。
 
@@ -56,10 +58,17 @@ implementation_status: implementation_uncompiled
 |---|---|---|
 | GET | `/api/admin/compute/activation-evidence-requests?status=submitted&limit=20` | `admin/owner` 按状态读取审核队列 |
 | POST | `/api/admin/compute/activation-evidence-requests/:request_id/review` | 以当前申请摘要、决定和显式确认执行审核 |
+| GET | `/api/admin/compute/activation-evidence-requests/:request_id/preflight` | `admin/owner` 只读检查后续激活条件 |
 
 决定只支持 `approved`、`changes_requested` 或 `rejected`。退回和拒绝必须填写说明；只有 `submitted` 可以审核。批准时如果 Provider/Pool 所有权、状态、版本或账本审计发生变化，服务端失败关闭，要求供给者重新提交。
 
-## 6. 状态与并发边界
+## 6. 激活就绪预检
+
+本人 HTTP/MCP 和管理员 HTTP 可生成 `compute_federation.activation_preflight.v1` 只读报告。报告逐项检查申请已批准、Provider 所有权和精确版本未变化、Provider 仍为 registering、存在路由、存在 verified 硬件摘要及验证时间、信任层不再是 `self_declared`、服务区域非空、Pool 归属/版本/状态未变化，以及当前账本审计健康且稳定摘要一致。
+
+失败项以稳定阻断码返回，例如 `request_not_approved`、`provider_routing_missing`、`verified_hardware_missing`、`provider_trust_tier_self_declared`、`pool_version_changed` 或 `ledger_audit_changed`。只有没有阻断项时 `ready_for_activation=true`；该值仍只是当前快照，不是授权、锁、SLA 或激活执行。预检的 `activation_effect` 同样固定为 `none`。
+
+## 7. 状态与并发边界
 
 - 首次状态固定为 `submitted`；同一 Provider/Pool 同时只允许一份 `submitted` 或 `approved` 申请。
 - 本人只能把 `submitted` 改为 `canceled`，并必须提供当前 `request_digest`。
@@ -67,7 +76,7 @@ implementation_status: implementation_uncompiled
 - `changes_requested`、`rejected` 和 `canceled` 结束当前申请；用户可使用新幂等键重新提交。
 - `activated` 与 `superseded` 仅为后续生命周期保留，当前控制面没有进入这两个状态的入口。
 
-## 7. 尚未实现
+## 8. 尚未实现
 
 - Cargo 编译、v177 迁移执行、并发和 HTTP/MCP 真实调用验证；
 - 节点绑定引用、ReadyCapability、路由证明和硬件观测的真实采集与密码学验证；

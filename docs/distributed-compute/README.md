@@ -28,7 +28,7 @@ owners: backend, node, ai-economy
 | CapacityPool 本人控制面 | HTTP/MCP 已可在本人 Provider 下登记、读取、列出和审计 `registering` Pool，并按稳定序号分页读取脱敏账本历史；审计健康不等于硬件 verified，历史省略消费者和业务因果字段；尚未编译和运行验证 |
 | CapacityBucket 本人控制面 | HTTP/MCP 已可在本人当前 Pool 版本下创建 open、零发行余额 Bucket，并读取当前余额；窗口和 Bucket 摘要由服务端生成，不发行容量、不预留、不交易，尚未编译和运行验证 |
 | Capacity Supply 本人控制面 | HTTP/MCP 已可显式确认后向同一窗口的多个 open Bucket 原子追加 self-declared 供给，或把尚在 available 的供给原子撤入 retired；服务端固定首次时间并复用现有双分录账本，available 不等于 verified 或可交易，尚未编译和运行验证 |
-| 激活证据申请控制面 | v177、本人 HTTP/MCP 与管理员 HTTP 审核队列已写；申请锁定 Provider/Pool 精确版本和稳定账本审计摘要，批准前再次复核，但 `activation_effect=none`，不激活、不写 verified 事实、不发布 Offer，状态为 `implementation_uncompiled` |
+| 激活证据申请控制面 | v177、本人 HTTP/MCP、管理员 HTTP 审核队列及双方只读就绪预检已写；申请锁定 Provider/Pool 精确版本和稳定账本审计摘要，预检解释路由、verified 硬件、信任层、版本与账本阻断，但 `activation_effect=none`，状态为 `implementation_uncompiled` |
 | 节点插件治理合同 | Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 与短期 ReadyCapability 合同已写，尚未编译或接线 |
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
