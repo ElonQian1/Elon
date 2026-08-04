@@ -9,13 +9,14 @@ owners: ai-economy, backend
 
 ## 1. 当前实现
 
-Provider 本人结算账户视图和平台管理员提款队列已经写入独立 Store、Service 与 HTTP 路由，但尚未编译或运行接口验证，状态固定为 `implementation_uncompiled`。该能力复用 v195、v198-v201 数据表，不增加新迁移，也不修改任何余额。
+Provider 本人结算账户视图、平台结算账户视图和管理员提款队列已经写入独立 Store、Service 与 HTTP 路由，但尚未编译或运行接口验证，状态固定为 `implementation_uncompiled`。这些能力复用 v195、v198-v201 数据表，不增加新迁移，也不修改任何余额。
 
 ## 2. HTTP 路由
 
 | 方法 | 路径 | 调用者 | 作用 |
 |---|---|---|---|
 | GET | `/api/me/compute/providers/:provider_id/settlement-account` | Provider 所有者 | 读取经不可变账本重建的本人结算账户 |
+| GET | `/api/admin/compute/settlement-account` | 平台 `admin/owner` | 读取平台算力市场结算账户审计投影 |
 | GET | `/api/admin/compute/settlement-withdrawals` | 平台 `admin/owner` | 按状态读取有界提款处理队列 |
 
 管理员队列默认 `status=pending`、`limit=50`。状态只允许 `all`、`pending`、`cancelled`、`rejected` 或 `external_paid_attested`，单次上限为 100。每个队列项都重新审计 v200 Request Receipt；存在终态时同时重审计 v201 Terminal Receipt。
@@ -50,7 +51,19 @@ Provider 本人结算账户视图和平台管理员提款队列已经写入独�
 
 全部运算使用有溢出检查的整数微单位。当前账户投影、不可变账本和生命周期聚合任一不一致时读取失败关闭，不返回未经验证的余额。
 
-## 5. 非付款边界
+## 5. 平台账户视图
+
+平台管理员可读取固定账户 `platform:compute_market` 的 CNY 投影。服务端分别从以下不可变账本重建：
+
+- v195 `platform_pending` 贷记形成累计平台价差；
+- v199 `platform_pending_reversal` 借记形成累计纠正冲减；
+- v198 `platform_pending_release` 借记与 `platform_available_credit` 贷记必须笔数和金额同时守恒；
+- `pending = 累计价差 - 累计纠正 - 累计释放`；
+- `available = 累计释放`。
+
+视图同时返回各类 Posting 数量、累计金额、账户 revision、更新时间、投影摘要和审计状态。平台账户当前没有提现入口，因此 `disputed` 与 `withdrawn` 必须为零；任一投影不一致时读取失败关闭。
+
+## 6. 非付款边界
 
 账户视图和队列均为只读能力：
 
@@ -58,9 +71,10 @@ Provider 本人结算账户视图和平台管理员提款队列已经写入独�
 - 不触发银行、钱包、支付机构或 Sui 网络；
 - 不自动验证外部证据；
 - 不把 `external_paid_attested` 解释为平台已经验证付款；
+- 不允许通过平台账户视图提取平台 available；
 - 不改变 v200/v201 唯一终态规则。
 
-## 6. 尚未实现
+## 7. 尚未实现
 
 - Cargo 编译和 HTTP 真实调用；
 - 游标分页、队列总数、处理时效和风险标签；
@@ -68,9 +82,10 @@ Provider 本人结算账户视图和平台管理员提款队列已经写入独�
 - 外部付款适配器、回执核验和自动对账；
 - 平台账户提款、多币种及 Sui 链上资产视图。
 
-## 7. 代码入口
+## 8. 代码入口
 
 - `server/src/store/compute_settlement_account_views.rs`
+- `server/src/store/compute_platform_settlement_account_view.rs`
 - `server/src/compute_federation_settlement_account_service.rs`
 - `server/src/compute_federation_settlement_account_api.rs`
 

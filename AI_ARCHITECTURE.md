@@ -234,7 +234,7 @@ v200 为 Provider 本人增加追加式 Withdrawal Request Receipt。服务端�
 
 v201 为每份 v200 申请增加唯一追加式 Terminal Receipt。Provider 所有者可取消，平台管理员可拒绝；两者都把 withdrawn 全额原子返还 available 并写入两条返还账本腿。管理员也可登记 `external_paid_attested` 及外部证据引用/摘要，此动作不移动余额、没有资金腿，且明确不代表平台发起或验证了银行、钱包或 Sui 付款。状态为 `implementation_uncompiled`，边界见 `docs/distributed-compute/settlement-withdrawal-terminal-api.md`。
 
-结算账户只读控制面再从 v195、v198-v201 不可变账本重建 Provider pending、available 和 withdrawn，并把 withdrawn 拆成待终态冻结额与外部已付款声明额；管理员可按派生状态读取有界提款队列。余额、生命周期或回执审计不一致时读取失败关闭。该视图不新增迁移、不移动资金，状态为 `implementation_uncompiled`，边界见 `docs/distributed-compute/settlement-account-view-api.md`。
+结算账户只读控制面再从 v195、v198-v201 不可变账本重建 Provider pending、available 和 withdrawn，并把 withdrawn 拆成待终态冻结额与外部已付款声明额；平台管理员可从 v195、v199 和 v198 账本重建固定平台账户的 pending 与 available，核对释放借贷守恒，并按派生状态读取有界提款队列。余额、生命周期、回执或平台投影审计不一致时读取失败关闭。该视图不新增迁移、不移动资金，也不提供平台提款，状态为 `implementation_uncompiled`，边界见 `docs/distributed-compute/settlement-account-view-api.md`。
 
 到期结算释放控制面再从尚无 v198 Release Receipt 且已满 72 小时的 v195 Settlement 派生有界候选，逐项重审计 Settlement 与当前 v196-v199 挑战门卫。管理员批处理只对 eligible 项逐笔调用既有 v198 原子释放，每笔拥有独立事务，blocked、失败和成功分别报告；它不形成整批原子承诺，也不启动后台定时器或执行提现、外部支付、链上结算。状态为 `implementation_uncompiled`，边界见 `docs/distributed-compute/settlement-release-batch-api.md`。
 
