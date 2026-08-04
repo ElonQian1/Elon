@@ -19,6 +19,7 @@ pub(crate) const PLAN_ACTION_UPGRADE: &str = "upgrade";
 pub(crate) const PLAN_ACTION_KEEP: &str = "keep";
 pub(crate) const PLAN_ACTION_DISABLE: &str = "disable";
 pub(crate) const PLAN_ACTION_REMOVE: &str = "remove";
+pub(crate) const PLAN_ACTION_CANCEL_CANDIDATE: &str = "cancel_candidate";
 
 pub(crate) const PLAN_TARGET_ENABLED: &str = "enabled";
 pub(crate) const PLAN_TARGET_DISABLED: &str = "disabled";
@@ -31,11 +32,13 @@ pub(crate) struct ComputePluginInstallPlan {
     pub schema: String,
     pub plan_id: String,
     pub expected_inventory_revision: i64,
+    pub expected_inventory_digest: String,
     pub desired_policy_revision: i64,
     pub sharing_enabled: bool,
     pub sharing_authorization: Option<ComputeSharingAuthorizationBinding>,
     pub node_profile_digest: String,
     pub manifest_catalog_revision: i64,
+    pub control_keyring_revision: i64,
     pub items: Vec<ComputePluginPlanItem>,
     pub total_download_bytes: i64,
     pub required_disk_bytes: i64,
@@ -69,6 +72,7 @@ pub(crate) struct SignedComputePluginInstallPlan {
 #[serde(deny_unknown_fields)]
 pub(crate) struct ComputePluginPlanItem {
     pub expected_current_release: Option<ComputePluginReleaseRef>,
+    pub expected_candidate_release: Option<ComputePluginReleaseRef>,
     pub expected_install_generation: Option<i64>,
     pub target_release: Option<ComputePluginReleaseRef>,
     pub action: String,
@@ -105,6 +109,7 @@ pub(crate) fn install_plan_shape_is_valid(plan: &ComputePluginInstallPlan) -> bo
     if plan.expected_inventory_revision < 0
         || plan.desired_policy_revision < 0
         || plan.manifest_catalog_revision < 0
+        || plan.control_keyring_revision < 0
         || plan.total_download_bytes < 0
         || plan.required_disk_bytes < 0
         || plan.previous_versions_to_keep < 0
@@ -139,10 +144,16 @@ fn plan_item_shape_is_valid(item: &ComputePluginPlanItem) -> bool {
     {
         return false;
     }
-    let same_plugin = match (&item.expected_current_release, &item.target_release) {
-        (Some(current), Some(target)) => current.plugin_id == target.plugin_id,
-        _ => true,
-    };
+    let plugin_ids = [
+        item.expected_current_release.as_ref(),
+        item.expected_candidate_release.as_ref(),
+        item.target_release.as_ref(),
+    ]
+    .into_iter()
+    .flatten()
+    .map(|release| release.plugin_id.as_str())
+    .collect::<Vec<_>>();
+    let same_plugin = plugin_ids.windows(2).all(|pair| pair[0] == pair[1]);
     let grant_is_valid = item
         .grant
         .as_ref()
@@ -152,6 +163,7 @@ fn plan_item_shape_is_valid(item: &ComputePluginPlanItem) -> bool {
         && match item.action.as_str() {
             PLAN_ACTION_INSTALL => {
                 item.expected_current_release.is_none()
+                    && item.expected_candidate_release.is_none()
                     && item.expected_install_generation.is_none()
                     && item.target_release.is_some()
                     && item.grant.is_some()
@@ -159,6 +171,7 @@ fn plan_item_shape_is_valid(item: &ComputePluginPlanItem) -> bool {
             }
             PLAN_ACTION_UPGRADE => {
                 item.expected_current_release.is_some()
+                    && item.expected_candidate_release.is_none()
                     && item.expected_install_generation.is_some()
                     && item.target_release.is_some()
                     && item.grant.is_some()
@@ -166,9 +179,11 @@ fn plan_item_shape_is_valid(item: &ComputePluginPlanItem) -> bool {
             }
             PLAN_ACTION_KEEP => {
                 item.expected_current_release.is_some()
+                    && item.expected_candidate_release.is_none()
                     && item.expected_install_generation.is_some()
                     && item.target_release.is_none()
                     && item.downloads.is_empty()
+                    && item.grant.is_none()
                     && matches!(
                         item.target_activation.as_str(),
                         PLAN_TARGET_ENABLED | PLAN_TARGET_DISABLED
@@ -176,6 +191,7 @@ fn plan_item_shape_is_valid(item: &ComputePluginPlanItem) -> bool {
             }
             PLAN_ACTION_DISABLE => {
                 item.expected_current_release.is_some()
+                    && item.expected_candidate_release.is_none()
                     && item.expected_install_generation.is_some()
                     && item.target_release.is_none()
                     && item.downloads.is_empty()
@@ -184,11 +200,20 @@ fn plan_item_shape_is_valid(item: &ComputePluginPlanItem) -> bool {
             }
             PLAN_ACTION_REMOVE => {
                 item.expected_current_release.is_some()
+                    && item.expected_candidate_release.is_none()
                     && item.expected_install_generation.is_some()
                     && item.target_release.is_none()
                     && item.downloads.is_empty()
                     && item.grant.is_none()
                     && item.target_activation == PLAN_TARGET_ABSENT
+            }
+            PLAN_ACTION_CANCEL_CANDIDATE => {
+                item.expected_candidate_release.is_some()
+                    && item.expected_install_generation.is_some()
+                    && item.target_release.is_none()
+                    && item.downloads.is_empty()
+                    && item.grant.is_none()
+                    && item.target_activation == PLAN_TARGET_DISABLED
             }
             _ => false,
         }
@@ -206,7 +231,10 @@ pub(crate) fn install_plan_respects_sharing_intent(plan: &ComputePluginInstallPl
             item.downloads.is_empty()
                 && matches!(
                     item.action.as_str(),
-                    PLAN_ACTION_KEEP | PLAN_ACTION_DISABLE | PLAN_ACTION_REMOVE
+                    PLAN_ACTION_KEEP
+                        | PLAN_ACTION_DISABLE
+                        | PLAN_ACTION_REMOVE
+                        | PLAN_ACTION_CANCEL_CANDIDATE
                 )
                 && matches!(
                     item.target_activation.as_str(),

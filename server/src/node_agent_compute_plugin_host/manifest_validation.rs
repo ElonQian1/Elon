@@ -23,6 +23,7 @@ const MAX_REASONABLE_LIST_ITEMS: usize = 4_096;
 #[derive(Debug, Clone)]
 pub(crate) struct ValidatedComputePluginManifest {
     signed: SignedComputePluginManifest,
+    verification_key_fingerprint: String,
 }
 
 impl ValidatedComputePluginManifest {
@@ -32,6 +33,10 @@ impl ValidatedComputePluginManifest {
 
     pub(crate) fn manifest(&self) -> &ComputePluginManifest {
         &self.signed.manifest
+    }
+
+    pub(crate) fn verification_key_fingerprint(&self) -> &str {
+        &self.verification_key_fingerprint
     }
 
     pub(crate) fn release_ref(&self) -> ComputePluginReleaseRef {
@@ -72,6 +77,7 @@ fn validate_verified_manifest(
     validate_state_compatibility(manifest)?;
     Ok(ValidatedComputePluginManifest {
         signed: verified.signed().clone(),
+        verification_key_fingerprint: verified.verification_key_fingerprint().to_string(),
     })
 }
 
@@ -195,9 +201,12 @@ fn validate_dependencies(manifest: &ComputePluginManifest) -> Result<()> {
         previous_system = Some(&dependency.dependency_id);
     }
     let mut previous_download: Option<&str> = None;
+    let mut content_digests = HashSet::from([manifest.package.package_digest.as_str()]);
     for dependency in &manifest.download_dependencies {
         validate_download_dependency(dependency)?;
-        if previous_download.is_some_and(|value| value >= dependency.artifact_id.as_str()) {
+        if previous_download.is_some_and(|value| value >= dependency.artifact_id.as_str())
+            || !content_digests.insert(dependency.digest.as_str())
+        {
             bail!("MANIFEST_DOWNLOAD_DEPENDENCY_ORDER: dependencies must be sorted and unique");
         }
         previous_download = Some(&dependency.artifact_id);
@@ -231,8 +240,8 @@ fn validate_resource_limits(limits: &ComputePluginResourceLimits) -> Result<()> 
 }
 
 fn validate_permissions(permissions: &ComputePluginPermissionProfile) -> Result<()> {
-    if !permissions.allow_network_egress && !permissions.allowed_egress_domains.is_empty() {
-        bail!("MANIFEST_NETWORK_SCOPE: domains require network egress permission");
+    if permissions.allow_network_egress == permissions.allowed_egress_domains.is_empty() {
+        bail!("MANIFEST_NETWORK_SCOPE: network egress requires an explicit non-empty domain set");
     }
     validate_sorted_strings(
         "MANIFEST_EGRESS_DOMAINS",
@@ -246,20 +255,18 @@ fn validate_permissions(permissions: &ComputePluginPermissionProfile) -> Result<
     {
         bail!("MANIFEST_EGRESS_DOMAIN_INVALID: domains must be exact lowercase DNS names");
     }
-    let filesystem = permissions
-        .filesystem_scopes
-        .iter()
-        .map(|scope| format!("{scope:?}"))
-        .collect::<HashSet<_>>();
-    let devices = permissions
-        .device_scopes
-        .iter()
-        .map(|scope| format!("{scope:?}"))
-        .collect::<HashSet<_>>();
-    if filesystem.len() != permissions.filesystem_scopes.len()
-        || devices.len() != permissions.device_scopes.len()
-    {
-        bail!("MANIFEST_PERMISSION_DUPLICATE: permission scopes must be unique");
+    if !strictly_sorted_wire(
+        permissions
+            .filesystem_scopes
+            .iter()
+            .map(|scope| scope.wire_name()),
+    ) || !strictly_sorted_wire(
+        permissions
+            .device_scopes
+            .iter()
+            .map(|scope| scope.wire_name()),
+    ) {
+        bail!("MANIFEST_PERMISSION_ORDER: permission scopes must be sorted and unique");
     }
     Ok(())
 }
@@ -298,6 +305,17 @@ fn validate_identifier(code: &str, value: &str) -> Result<()> {
         bail!("{code}: identifier is empty, oversized or non-canonical");
     }
     Ok(())
+}
+
+fn strictly_sorted_wire<'a>(values: impl Iterator<Item = &'a str>) -> bool {
+    let mut previous: Option<&str> = None;
+    for value in values {
+        if previous.is_some_and(|prior| prior >= value) {
+            return false;
+        }
+        previous = Some(value);
+    }
+    true
 }
 
 pub(super) fn is_sha256(value: &str) -> bool {

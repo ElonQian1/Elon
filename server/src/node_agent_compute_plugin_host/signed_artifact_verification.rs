@@ -33,6 +33,10 @@ impl ComputePluginEd25519PublicKey {
         })?;
         Ok(Self(bytes))
     }
+
+    fn fingerprint(&self) -> String {
+        hex::encode(Sha256::digest(self.0))
+    }
 }
 
 /// Implementations return only currently trusted publisher keys. Unknown, revoked or wrong-purpose
@@ -56,22 +60,32 @@ pub(crate) trait ComputePluginControlPlaneKeyResolver {
 #[derive(Debug, Clone)]
 pub(super) struct SignatureVerifiedComputePluginManifest {
     signed: SignedComputePluginManifest,
+    verification_key_fingerprint: String,
 }
 
 impl SignatureVerifiedComputePluginManifest {
     pub(super) fn signed(&self) -> &SignedComputePluginManifest {
         &self.signed
     }
+
+    pub(super) fn verification_key_fingerprint(&self) -> &str {
+        &self.verification_key_fingerprint
+    }
 }
 
 #[derive(Debug, Clone)]
 pub(super) struct SignatureVerifiedComputePluginInstallPlan {
     signed: SignedComputePluginInstallPlan,
+    verification_key_fingerprint: String,
 }
 
 impl SignatureVerifiedComputePluginInstallPlan {
     pub(super) fn signed(&self) -> &SignedComputePluginInstallPlan {
         &self.signed
+    }
+
+    pub(super) fn verification_key_fingerprint(&self) -> &str {
+        &self.verification_key_fingerprint
     }
 }
 
@@ -105,6 +119,7 @@ pub(super) fn verify_manifest_signature(
     )?;
     Ok(SignatureVerifiedComputePluginManifest {
         signed: signed.clone(),
+        verification_key_fingerprint: key.fingerprint(),
     })
 }
 
@@ -135,6 +150,7 @@ pub(super) fn verify_install_plan_signature(
     )?;
     Ok(SignatureVerifiedComputePluginInstallPlan {
         signed: signed.clone(),
+        verification_key_fingerprint: key.fingerprint(),
     })
 }
 
@@ -216,6 +232,10 @@ fn jcs_bytes(payload: &impl Serialize) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     write_jcs_value(&value, &mut output)?;
     Ok(output)
+}
+
+pub(super) fn jcs_sha256_hex(payload: &impl Serialize) -> Result<String> {
+    Ok(hex::encode(Sha256::digest(jcs_bytes(payload)?)))
 }
 
 fn write_jcs_value(value: &Value, output: &mut Vec<u8>) -> Result<()> {

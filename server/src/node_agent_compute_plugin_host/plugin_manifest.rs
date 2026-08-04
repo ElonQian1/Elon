@@ -169,12 +169,34 @@ pub(crate) enum ComputePluginFilesystemScope {
     ScratchReadWrite,
 }
 
+impl ComputePluginFilesystemScope {
+    pub(crate) const fn wire_name(&self) -> &'static str {
+        match self {
+            Self::PluginPackageReadOnly => "plugin_package_read_only",
+            Self::PluginStateReadWrite => "plugin_state_read_write",
+            Self::WorkloadInputReadOnly => "workload_input_read_only",
+            Self::WorkloadOutputWriteOnly => "workload_output_write_only",
+            Self::ScratchReadWrite => "scratch_read_write",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ComputePluginDeviceScope {
     Accelerator,
     VideoEncoder,
     VideoDecoder,
+}
+
+impl ComputePluginDeviceScope {
+    pub(crate) const fn wire_name(&self) -> &'static str {
+        match self {
+            Self::Accelerator => "accelerator",
+            Self::VideoEncoder => "video_encoder",
+            Self::VideoDecoder => "video_decoder",
+        }
+    }
 }
 
 /// Upgrade retention, draining and rollback are local InstallPlan policy, not publisher authority.
