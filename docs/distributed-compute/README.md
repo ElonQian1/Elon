@@ -28,7 +28,7 @@ owners: backend, node, ai-economy
 | CapacityPool 本人控制面 | HTTP/MCP 已可在本人 Provider 下登记、读取、列出和审计 `registering` Pool，并按稳定序号分页读取脱敏账本历史；PC `/compute-supply` 已写入列表、登记、审计健康和事务双分录分页源码。审计健康不等于硬件 verified，历史省略消费者和业务因果字段；尚未编译和运行验证 |
 | CapacityBucket 本人控制面 | HTTP/MCP 已可在本人当前 Pool 版本下创建 open、零发行余额 Bucket，并读取当前余额；PC 已写入交付窗口登记和余额列表源码。窗口和 Bucket 摘要由服务端生成，不发行容量、不预留、不交易；尚未编译和运行验证 |
 | Capacity Supply 本人控制面 | HTTP/MCP 已可显式确认后向同一窗口的多个 open Bucket 原子追加 self-declared 供给，或把尚在 available 的供给原子撤入 retired；PC 已写入单 Bucket 追加/撤出源码。服务端固定首次时间并复用现有双分录账本，available 不等于 verified 或可交易；尚未编译和运行验证 |
-| 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；应用单事务激活内部 Provider/Pool，隔离单事务把其当前 active 状态转为 quarantined。两者均不发送节点命令、不直接改写 Offer、不移动资金，恢复尚未实现，状态为 `implementation_uncompiled` |
+| 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；PC `/compute-supply` 已写入本人申请、历史、预检和取消源码。应用单事务激活内部 Provider/Pool，隔离单事务把其当前 active 状态转为 quarantined；两者均不发送节点命令、不直接改写 Offer、不移动资金，恢复尚未实现，状态为 `implementation_uncompiled` |
 | Offer 草稿、发布与生命周期控制面 | HTTP/MCP 已可创建、精确修订和撤销本人 draft Offer；管理员 HTTP 可原子发布 active、转为 draining，并在无 pending/active Reservation 时终结。v182-v184 保存追加式回执和依赖索引，所有写入口均不移动资金，状态为 `implementation_uncompiled` |
 | 节点插件治理合同 | Signed Manifest、InstallPlan、双槽 lifecycle 与短期 ReadyCapability 合同已写；独立 SQLite v2、root-signed 双 keyring、库存/计划/候选原子应用、begin/redirect/commit/abort、跨代撤销、稳定 outcome 与 prepared recovery-abort 已形成代码。claim identity 与原 Store provenance recovery key 在 mutation 前固定；初始回滚只有在旧 authority/download 快照及冲突 claim 均精确对账后才分类 `NotCreated`。结果不确定时不返还旧 capability，commit 失败保留原打开文件句柄。均未编译接线或执行建库；生产 root pin、文件安全根/游标对账、全量摘要、候选 promotion 与运行接线尚未完成 |
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
