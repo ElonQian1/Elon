@@ -17,6 +17,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use crate::node_agent_project_docs_mcp_profile::DescriptorProfile;
 use crate::node_agent_project_docs_mcp_tools::{call_tool, tool_definitions};
 use crate::NodeRuntime;
 
@@ -51,13 +52,6 @@ pub(crate) struct McpRequest {
     pub(crate) method: String,
     #[serde(default)]
     pub(crate) params: Value,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum DescriptorProfile {
-    Governance,
-    Context,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -96,6 +90,11 @@ pub(crate) fn descriptor_for_project(project_root: &str, host_port: u16) -> Resu
 pub(crate) fn descriptor_for_project_context(project_root: &str, host_port: u16) -> Result<Value> {
     let root = validate_project_root(project_root)?;
     create_descriptor(&root, None, host_port, DescriptorProfile::Context)
+}
+
+pub(crate) fn descriptor_for_project_receipt(project_root: &str, host_port: u16) -> Result<Value> {
+    let root = validate_project_root(project_root)?;
+    create_descriptor(&root, None, host_port, DescriptorProfile::Receipt)
 }
 
 pub(crate) fn descriptor_for_vault(vault_id: &str, host_port: u16) -> Result<Value> {
@@ -147,7 +146,7 @@ fn create_descriptor(
         let _ = fs::remove_dir_all(&staging_dir);
         return Err(error);
     }
-    let operation_id = if profile == DescriptorProfile::Governance {
+    let operation_id = if profile.is_governance() {
         match crate::project_document_observability::mark_session_ready(&root, &session.id) {
             Ok(operation_id) => Some(operation_id),
             Err(error) => {
@@ -162,14 +161,10 @@ fn create_descriptor(
         "http://127.0.0.1:{host_port}/api/project-docs/mcp/{}?token={}",
         session.id, session.token
     );
-    let url = if profile == DescriptorProfile::Context {
-        format!(
-            "{base_url}&profile={}",
-            crate::node_agent_project_context_mcp::PROFILE
-        )
-    } else {
-        base_url
-    };
+    let url = profile
+        .query_name()
+        .map(|name| format!("{base_url}&profile={name}"))
+        .unwrap_or(base_url);
     let config_path = final_session_dir.join("mcp.json");
     let copilot_config_path = final_session_dir.join("copilot-mcp.json");
     let claude_config_path = final_session_dir.join("claude-mcp.json");
@@ -191,11 +186,7 @@ fn create_descriptor(
         "managedVaultId": session.managed_vault_id,
         "expiresAt": session.expires_at,
         "protocolVersion": MCP_PROTOCOL_VERSION,
-        "purpose": if profile == DescriptorProfile::Context {
-            "普通编码任务的单工具、零正文、revision 感知项目导航；真实搜索与读取继续使用代理原生工具。"
-        } else {
-            "低 token 分析项目文档权威性、质量与联邦节点；支持项目 Git 工作区和平台托管版本的个人知识库。"
-        },
+        "purpose": profile.purpose(),
     }))
 }
 
@@ -210,14 +201,11 @@ fn write_session_files(
         "http://127.0.0.1:{host_port}/api/project-docs/mcp/{}?token={}",
         session.id, session.token
     );
-    if profile == DescriptorProfile::Context {
-        url.push_str("&profile=context");
+    if let Some(name) = profile.query_name() {
+        url.push_str("&profile=");
+        url.push_str(name);
     }
-    let server_name = if profile == DescriptorProfile::Context {
-        "yilong_project_context"
-    } else {
-        "yilong_project_docs"
-    };
+    let server_name = profile.server_name();
     write_private_json(
         &directory.join("mcp.json"),
         &named_mcp_config(
@@ -282,6 +270,8 @@ async fn handle_request_for_profile(
             &request,
             context_receipt_path,
         )
+    } else if crate::node_agent_project_receipt_mcp::handles(profile) {
+        crate::node_agent_project_receipt_mcp::handle_request(workspace, &request)
     } else if !matches!(profile, None | Some("governance")) {
         Err(anyhow!("未知项目文档 MCP profile"))
     } else {
@@ -310,25 +300,17 @@ async fn handle_request_for_profile(
 
 async fn bootstrap_handler(Json(request): Json<BootstrapRequest>) -> Response {
     let host_port = crate::node_agent_admin_open::admin_port_from_env();
-    let context_profile = request.profile.as_deref() == Some("context");
-    let unknown_profile = request
-        .profile
-        .as_deref()
-        .is_some_and(|profile| !matches!(profile, "context" | "governance"));
-    let descriptor = match (
-        request.project_root.as_deref(),
-        request.vault_id.as_deref(),
-        context_profile,
-        unknown_profile,
-    ) {
-        (_, _, _, true) => Err(anyhow!("profile 只支持 governance 或 context")),
-        (Some(project_root), None, true, false) => {
-            descriptor_for_project_context(project_root, host_port)
-        }
-        (Some(project_root), None, false, false) => descriptor_for_project(project_root, host_port),
-        (None, Some(vault_id), false, false) => descriptor_for_vault(vault_id, host_port),
-        (None, Some(_), true, false) => Err(anyhow!("context profile 当前只支持 Git 项目")),
-        _ => Err(anyhow!("必须且只能提供 projectRoot 或 vaultId")),
+    let descriptor = match DescriptorProfile::parse(request.profile.as_deref()) {
+        Err(error) => Err(error),
+        Ok(profile) => match (request.project_root.as_deref(), request.vault_id.as_deref()) {
+            (Some(project_root), None) => validate_project_root(project_root)
+                .and_then(|root| create_descriptor(&root, None, host_port, profile)),
+            (None, Some(vault_id)) if profile.supports_vault() => {
+                descriptor_for_vault(vault_id, host_port)
+            }
+            (None, Some(_)) => Err(anyhow!("context/receipt profile 当前只支持 Git 项目")),
+            _ => Err(anyhow!("必须且只能提供 projectRoot 或 vaultId")),
+        },
     };
     match descriptor {
         Ok(mcp) => Json(json!({ "ok": true, "mcp": mcp })).into_response(),
@@ -345,10 +327,9 @@ async fn mcp_handler(
         Ok(session) => session,
         Err(error) => return json_error(StatusCode::UNAUTHORIZED, format!("{error:#}")),
     };
-    let requested_profile = match query.profile.as_deref() {
-        None | Some("governance") => DescriptorProfile::Governance,
-        Some("context") => DescriptorProfile::Context,
-        Some(_) => return json_error(StatusCode::BAD_REQUEST, "未知项目文档 MCP profile"),
+    let requested_profile = match DescriptorProfile::parse(query.profile.as_deref()) {
+        Ok(profile) => profile,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, format!("{error:#}")),
     };
     if requested_profile != session_profile {
         return json_error(StatusCode::UNAUTHORIZED, "MCP 会话不允许切换 profile");

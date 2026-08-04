@@ -155,14 +155,18 @@ mod node_agent_project_docs_mcp_discussion_tools;
 mod node_agent_project_docs_mcp_graph_tools;
 mod node_agent_project_docs_mcp_knowledge_tools;
 mod node_agent_project_docs_mcp_native_context_tools;
+mod node_agent_project_docs_mcp_profile;
 mod node_agent_project_docs_mcp_review_tools;
 mod node_agent_project_docs_mcp_tools;
 mod node_agent_project_documents;
 mod node_agent_project_manifest_identity;
+mod node_agent_project_memory_hook;
+mod node_agent_project_memory_hook_config;
 mod node_agent_project_picker;
 mod node_agent_project_profile;
 mod node_agent_project_profile_node;
 mod node_agent_project_profile_python;
+mod node_agent_project_receipt_mcp;
 mod node_agent_proxy;
 mod node_agent_pwa_auth_profile;
 mod node_agent_pwa_runtime;
@@ -353,6 +357,9 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
 // ── 入口 ─────────────────────────────────────────────────────────────────────
 
 fn main() -> Result<()> {
+    if node_agent_project_memory_hook::is_hook_invocation() {
+        return node_agent_project_memory_hook::run_stdio();
+    }
     if let Some(config_path) = cli_sidecar_config_arg() {
         return tokio::runtime::Builder::new_multi_thread()
             .enable_all()

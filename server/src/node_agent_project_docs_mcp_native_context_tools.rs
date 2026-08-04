@@ -11,7 +11,7 @@ use crate::project_document_native_context::{
 use crate::project_document_native_context_receipt::record_receipt;
 
 const RECORD_TOOL: &str = "project_docs_record_native_context_candidate";
-const RECEIPT_TOOL: &str = "project_docs_record_native_context_receipt";
+pub(crate) const RECEIPT_TOOL: &str = "project_docs_record_native_context_receipt";
 const LIST_TOOL: &str = "project_docs_list_native_context_candidates";
 
 #[derive(Debug, Deserialize)]
@@ -66,18 +66,7 @@ pub(crate) fn definitions() -> Vec<Value> {
             "把 Codex Desktop/CLI 已核对的单条项目理解保存为本机待审核候选。content_hash 可省略，服务端会对工作区内当前文件绑定 SHA-256。不保存源码正文、命令输出、聊天、prompt 或 Codex 私有 memories。",
             candidate_input_schema(true),
         ),
-        tool(
-            RECEIPT_TOOL,
-            "在一次显式任务结束后，批量回执 1–8 条已由原生工具核对的项目理解。批次原子写入本机候选索引；只提交证据路径即可由服务端绑定当前 SHA-256，不建立第二项目真源。",
-            json!({
-                "type":"object",
-                "required":["candidates"],
-                "properties":{
-                    "candidates":{"type":"array","minItems":1,"maxItems":8,"items":candidate_input_schema(false)},
-                    "producer":{"type":"string","maxLength":40,"default":"codex_native_tools"}
-                }
-            }),
-        ),
+        receipt_definition(),
         tool(
             LIST_TOOL,
             "列出外部本机索引中的原生工具理解候选，供项目文档工作台审核并入 suggestions.proposed_context_memories。候选本身不是项目真源；跨 PC 生效必须经过既有 revision、authorization 和 apply 流程。",
@@ -107,15 +96,7 @@ pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result
                 "next":"Review in the project document workspace or list with project_docs_list_native_context_candidates, then use the existing suggestions/apply flow."
             })))
         }
-        RECEIPT_TOOL => {
-            let input: ReceiptArguments = serde_json::from_value(arguments)?;
-            let memories = input
-                .candidates
-                .into_iter()
-                .map(CandidateArguments::into_memory)
-                .collect();
-            Ok(Some(record_receipt(workspace, memories, &input.producer)?))
-        }
+        RECEIPT_TOOL => Ok(Some(record_receipt_arguments(workspace, arguments)?)),
         LIST_TOOL => {
             let input: ListArguments = serde_json::from_value(arguments)?;
             if input.limit == 0 || input.limit > 20 {
@@ -133,6 +114,48 @@ pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result
         }
         _ => Ok(None),
     }
+}
+
+pub(crate) fn receipt_definition() -> Value {
+    tool(
+        RECEIPT_TOOL,
+        "在一次显式任务结束后，批量回执 1–8 条已由原生工具核对的项目理解。批次原子写入本机候选索引；只提交证据路径即可由服务端绑定当前身份，不建立第二项目真源。没有新结论时不要调用。",
+        json!({
+            "type":"object",
+            "required":["candidates"],
+            "properties":{
+                "candidates":{"type":"array","minItems":1,"maxItems":8,"items":candidate_input_schema(false)},
+                "producer":{"type":"string","maxLength":40,"default":"codex_native_tools"}
+            }
+        }),
+    )
+}
+
+pub(crate) fn call_receipt_tool(workspace: &Path, params: Value) -> Result<Value> {
+    let name = params
+        .get("name")
+        .and_then(Value::as_str)
+        .ok_or_else(|| anyhow::anyhow!("tools/call 缺少 name"))?;
+    if name != RECEIPT_TOOL {
+        bail!("receipt profile 只允许 {RECEIPT_TOOL}");
+    }
+    record_receipt_arguments(
+        workspace,
+        params
+            .get("arguments")
+            .cloned()
+            .unwrap_or_else(|| json!({})),
+    )
+}
+
+fn record_receipt_arguments(workspace: &Path, arguments: Value) -> Result<Value> {
+    let input: ReceiptArguments = serde_json::from_value(arguments)?;
+    let memories = input
+        .candidates
+        .into_iter()
+        .map(CandidateArguments::into_memory)
+        .collect();
+    record_receipt(workspace, memories, &input.producer)
 }
 
 pub(crate) fn memory_schema() -> Value {

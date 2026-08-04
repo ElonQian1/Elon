@@ -106,6 +106,19 @@ pub(crate) fn project_docs_mcp_launch_config(
     };
     match descriptor {
         Ok(descriptor) => {
+            let receipt_descriptor = if full_governance {
+                None
+            } else {
+                match crate::node_agent_project_docs_mcp::descriptor_for_project_receipt(
+                    cwd, host_port,
+                ) {
+                    Ok(descriptor) => Some(descriptor),
+                    Err(error) => {
+                        tracing::warn!(error = %error, "无法为普通 Codex 任务准备项目理解回执 MCP");
+                        return None;
+                    }
+                }
+            };
             let config_path = |provider: &str| {
                 descriptor
                     .pointer(&format!("/configPaths/{provider}"))
@@ -117,15 +130,34 @@ pub(crate) fn project_docs_mcp_launch_config(
                 env: Vec::new(),
             };
             match cli_name.as_str() {
-                "codex" => append_http_mcp_args(
-                    &mut config.args,
-                    if full_governance {
-                        "yilong_project_docs"
-                    } else {
-                        "yilong_project_context"
-                    },
-                    descriptor.get("url")?.as_str()?,
-                ),
+                "codex" => {
+                    append_http_mcp_args(
+                        &mut config.args,
+                        if full_governance {
+                            "yilong_project_docs"
+                        } else {
+                            "yilong_project_context"
+                        },
+                        descriptor.get("url")?.as_str()?,
+                    );
+                    if let Some(receipt_descriptor) = receipt_descriptor.as_ref() {
+                        append_http_mcp_args(
+                            &mut config.args,
+                            "yilong_project_receipt",
+                            receipt_descriptor.get("url")?.as_str()?,
+                        );
+                    }
+                    if !full_governance
+                        && crate::node_agent_project_memory_hook_config::enabled(prompt)
+                    {
+                        match crate::node_agent_project_memory_hook_config::codex_config_args() {
+                            Ok(args) => config.args.extend(args),
+                            Err(error) => {
+                                tracing::warn!(error = %error, "无法为普通 Codex 任务准备项目记忆 Hook");
+                            }
+                        }
+                    }
+                }
                 "copilot" => config.args.push(format!(
                     "--additional-mcp-config=@{}",
                     config_path("copilot")?
@@ -276,7 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn injects_one_context_tool_for_plain_codex_and_full_mcp_for_document_tasks() {
+    fn injects_context_receipt_and_hooks_for_plain_codex_but_full_mcp_for_document_tasks() {
         let root = std::env::temp_dir().join(format!(
             "elon_project_docs_cli_mcp_{}",
             uuid::Uuid::new_v4().simple()
@@ -289,6 +321,16 @@ mod tests {
             .iter()
             .any(|arg| arg.contains("mcp_servers.yilong_project_context.url")));
         assert!(plain.args.iter().any(|arg| arg.contains("profile=context")));
+        assert!(plain
+            .args
+            .iter()
+            .any(|arg| arg.contains("mcp_servers.yilong_project_receipt.url")));
+        assert!(plain.args.iter().any(|arg| arg.contains("profile=receipt")));
+        assert!(plain
+            .args
+            .iter()
+            .any(|arg| arg.starts_with("hooks.PostToolUse=")));
+        assert!(plain.args.iter().any(|arg| arg.starts_with("hooks.Stop=")));
         assert!(project_docs_mcp_launch_config(
             "请只修改 server/src/exact.rs:42 不要读取其他文件",
             root.to_str(),
@@ -310,6 +352,10 @@ mod tests {
             .args
             .iter()
             .any(|arg| arg.contains("mcp_servers.yilong_project_docs.url")));
+        assert!(!config
+            .args
+            .iter()
+            .any(|arg| arg.contains("yilong_project_receipt")));
         let copilot = project_docs_mcp_launch_config(
             "<elon-project-docs-task version=\"1\">",
             root.to_str(),
