@@ -32,9 +32,11 @@ use super::{
     Store,
 };
 
+mod candidates;
 mod rows;
 mod validation;
 
+use candidates::list_activation_candidates_on;
 use rows::{attempt_activation_on, persist_attempt_activation_on};
 use validation::{normalize_activation, parse_utc, NormalizedAttemptActivation};
 
@@ -90,6 +92,18 @@ pub(crate) struct ComputeAttemptActivationReceipt {
 }
 
 impl Store {
+    pub(crate) fn list_compute_attempt_activation_candidates(
+        &self,
+        provider_id: &str,
+        limit: usize,
+    ) -> Result<Vec<super::compute_reservation_registry::ComputeReservationRegistrationReceipt>>
+    {
+        if provider_id.is_empty() || provider_id.trim() != provider_id {
+            bail!("算力 Provider ID 无效");
+        }
+        list_activation_candidates_on(&*self.conn()?, provider_id, limit.clamp(1, 100))
+    }
+
     pub(crate) fn activate_compute_attempt(
         &self,
         request: &ActivateComputeAttemptRequest,

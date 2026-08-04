@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
@@ -25,7 +26,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
     Router::new()
         .route(
             "/api/me/compute/providers/:provider_id/attempt-activations",
-            post(activate),
+            get(list_activation_candidates).post(activate),
         )
         .route(
             "/api/me/compute/attempt-leases/:lease_id/activation",
@@ -95,6 +96,37 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/me/compute/attempt-leases/:lease_id/execution-receipt",
             get(get_execution_receipt),
         )
+}
+
+#[derive(Debug, Deserialize)]
+struct ListQuery {
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
+fn default_limit() -> usize {
+    50
+}
+
+async fn list_activation_candidates(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(provider_id): Path<String>,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::list_activation_candidates_for_provider_owner(
+            &state.store,
+            &user_id,
+            &provider_id,
+            query.limit,
+        )
+        .map(|candidates| json!({"attempt_activation_candidates":candidates})),
+    )
 }
 
 async fn activate(

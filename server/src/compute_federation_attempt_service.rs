@@ -8,9 +8,10 @@ use crate::store::{
     ComputeAttemptPlatformObservationReceipt, ComputeAttemptTerminalCandidateReceipt,
     ComputeAttemptUsageDeclarationReceipt, ComputeAttemptVerificationDecisionReceipt,
     ComputeDeclaredResultArtifactInput, ComputeDeclaredUsageInput, ComputeObservedUsageInput,
-    DecideComputeAttemptVerificationRequest, DeclareComputeAttemptTerminalCandidateRequest,
-    DeclareComputeAttemptUsageRequest, ObserveComputeAttemptTerminalCandidateRequest,
-    RenewComputeAttemptLeaseRequest, ReviewComputeAttemptTerminalCandidateRequest, Store,
+    ComputeReservationRegistrationReceipt, DecideComputeAttemptVerificationRequest,
+    DeclareComputeAttemptTerminalCandidateRequest, DeclareComputeAttemptUsageRequest,
+    ObserveComputeAttemptTerminalCandidateRequest, RenewComputeAttemptLeaseRequest,
+    ReviewComputeAttemptTerminalCandidateRequest, Store,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -179,6 +180,19 @@ pub(crate) fn activate_for_provider_owner(
         idempotency_key: request.idempotency_key,
         activated_by_user_id: user_id.to_string(),
     })
+}
+
+pub(crate) fn list_activation_candidates_for_provider_owner(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    limit: usize,
+) -> Result<Vec<ComputeReservationRegistrationReceipt>> {
+    let provider = store.compute_provider(provider_id)?;
+    if provider.provider.owner_account_id != user_id {
+        bail!("算力 Provider 不属于当前登录用户");
+    }
+    store.list_compute_attempt_activation_candidates(provider_id, limit)
 }
 
 pub(crate) fn get_for_participant(
