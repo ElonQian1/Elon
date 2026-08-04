@@ -51,7 +51,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_capacity_bucket_service`，�
 ## 5. 尚未实现
 
 - Cargo 编译、v165 迁移执行和 HTTP/MCP 真实调用验证；
-- Supply Add/Withdraw 本人控制面；
+- Supply Withdraw 本人控制面；Supply Add 已写入，边界见 `docs/distributed-compute/capacity-supply-api.md`；
 - Bucket 关闭、退役和窗口批量管理；
 - Provider/Pool 验证与受控激活；
 - Offer、Price Snapshot、撮合、预留和任务派发；
