@@ -72,8 +72,8 @@ v188、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执
 - Cargo 编译、v188 迁移执行、HTTP 真实调用、并发和故障注入验证；
 - NodeAgent Host 到云端的签名事件传输、outbox、断点续传和真实身份校验；
 - 平台 `observed_usage`、重新分词、计时器、确定性复算和挑战任务；
-- `verified_usage`、`compensable_usage`、Execution Receipt 和争议流程；
-- running Attempt 终态、Capacity Claim `UsageConsumed`、消费者扣款、Provider 收益和最终结算；
+- `verified_usage`、`compensable_usage`、Execution Receipt 和争议流程；v189 只保存绑定本快照的 Provider 终态候选，见 `docs/distributed-compute/attempt-terminal-candidate-api.md`；
+- running Attempt 可信终态、Capacity Claim `UsageConsumed`、消费者扣款、Provider 收益和最终结算；
 - 多次 Attempt、自动重试、外部矿池、多币种和 Sui 链上资产。
 
 ## 8. 实现入口
