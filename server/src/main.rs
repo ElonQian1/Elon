@@ -54,6 +54,7 @@ mod compute_capacity_lifecycle_migration;
 mod compute_capacity_migration;
 mod compute_federation;
 mod compute_federation_broker_api;
+mod compute_federation_broker_mcp;
 mod compute_federation_broker_service;
 mod compute_job_migration;
 mod compute_offer_migration;

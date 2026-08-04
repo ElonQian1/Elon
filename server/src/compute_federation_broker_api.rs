@@ -38,7 +38,10 @@ async fn reserve(
         Err(response) => return response,
     };
     broker_response(compute_federation_broker_service::reserve_for_user(
-        &state, &user_id, request,
+        &state.store,
+        &user_id,
+        None,
+        request,
     ))
 }
 
@@ -84,8 +87,9 @@ fn finish(
         Err(response) => return response,
     };
     broker_response(compute_federation_broker_service::finish_for_user(
-        state,
+        &state.store,
         &user_id,
+        None,
         reservation_id,
         action,
         request,
