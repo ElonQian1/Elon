@@ -23,6 +23,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             get(get_account),
         )
         .route(
+            "/api/me/compute/providers/:provider_id/settlement-withdrawal-queue",
+            get(list_owner_withdrawal_queue),
+        )
+        .route(
             "/api/admin/compute/settlement-withdrawals",
             get(list_withdrawal_queue),
         )
@@ -54,6 +58,27 @@ async fn get_account(
             &state.store,
             &user_id,
             &provider_id,
+        ),
+    )
+}
+
+async fn list_owner_withdrawal_queue(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(provider_id): Path<String>,
+    Query(query): Query<QueueQuery>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    account_response(
+        compute_federation_settlement_account_service::list_withdrawal_queue_for_provider_owner(
+            &state.store,
+            &user_id,
+            &provider_id,
+            &query.status,
+            query.limit,
         ),
     )
 }

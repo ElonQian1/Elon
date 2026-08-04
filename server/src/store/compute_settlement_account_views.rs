@@ -74,35 +74,62 @@ impl Store {
         let status = normalize_status(status)?;
         let limit = limit.clamp(1, 100);
         let conn = self.conn()?;
-        let ids = withdrawal_ids_on(&conn, &status, limit)?;
-        let mut items = Vec::with_capacity(ids.len());
-        for (withdrawal_id, terminal_action) in ids {
-            let request = compute_settlement_withdrawal_request_on(&conn, &withdrawal_id)?;
-            let terminal = terminal_action
-                .as_ref()
-                .map(|_| compute_settlement_withdrawal_terminal_on(&conn, &withdrawal_id))
-                .transpose()?;
-            let derived_status = terminal
-                .as_ref()
-                .map(|receipt| receipt.action.clone())
-                .unwrap_or_else(|| "pending".to_string());
-            if terminal_action.as_deref().unwrap_or("pending") != derived_status {
-                bail!("提现队列状态与终态回执不一致");
-            }
-            items.push(ComputeSettlementWithdrawalQueueItem {
-                status: derived_status,
-                request,
-                terminal,
-            });
-        }
-        Ok(ComputeSettlementWithdrawalQueuePage {
-            schema: "compute_federation.settlement_withdrawal_queue.v1".to_string(),
-            status_filter: status,
-            limit,
-            items,
-            external_transfer_effect: "read_only_no_external_transfer".to_string(),
-        })
+        withdrawal_queue_on(&conn, &status, limit, None)
     }
+
+    pub(crate) fn list_compute_settlement_withdrawal_queue_for_provider(
+        &self,
+        provider_id: &str,
+        status: &str,
+        limit: usize,
+    ) -> Result<ComputeSettlementWithdrawalQueuePage> {
+        validate_exact("Provider ID", provider_id, 160)?;
+        let status = normalize_status(status)?;
+        let limit = limit.clamp(1, 100);
+        let conn = self.conn()?;
+        withdrawal_queue_on(&conn, &status, limit, Some(provider_id))
+    }
+}
+
+fn withdrawal_queue_on(
+    conn: &Connection,
+    status: &str,
+    limit: usize,
+    provider_id: Option<&str>,
+) -> Result<ComputeSettlementWithdrawalQueuePage> {
+    let ids = withdrawal_ids_on(conn, status, limit, provider_id)?;
+    let mut items = Vec::with_capacity(ids.len());
+    for (withdrawal_id, terminal_action) in ids {
+        let request = compute_settlement_withdrawal_request_on(conn, &withdrawal_id)?;
+        let terminal = terminal_action
+            .as_ref()
+            .map(|_| compute_settlement_withdrawal_terminal_on(conn, &withdrawal_id))
+            .transpose()?;
+        let derived_status = terminal
+            .as_ref()
+            .map(|receipt| receipt.action.clone())
+            .unwrap_or_else(|| "pending".to_string());
+        if terminal_action.as_deref().unwrap_or("pending") != derived_status {
+            bail!("提现队列状态与终态回执不一致");
+        }
+        if let Some(expected) = provider_id {
+            if request.provider_id != expected {
+                bail!("Provider 提现队列返回了越界申请");
+            }
+        }
+        items.push(ComputeSettlementWithdrawalQueueItem {
+            status: derived_status,
+            request,
+            terminal,
+        });
+    }
+    Ok(ComputeSettlementWithdrawalQueuePage {
+        schema: "compute_federation.settlement_withdrawal_queue.v1".to_string(),
+        status_filter: status.to_string(),
+        limit,
+        items,
+        external_transfer_effect: "read_only_no_external_transfer".to_string(),
+    })
 }
 
 fn account_view_on(conn: &Connection, provider_id: &str) -> Result<ComputeSettlementAccountView> {
@@ -320,19 +347,23 @@ fn withdrawal_ids_on(
     conn: &Connection,
     status: &str,
     limit: usize,
+    provider_id: Option<&str>,
 ) -> Result<Vec<(String, Option<String>)>> {
     let mut stmt = conn.prepare(
         "SELECT r.withdrawal_id, t.action
            FROM compute_settlement_withdrawal_requests r
            LEFT JOIN compute_settlement_withdrawal_terminals t
              ON t.withdrawal_id=r.withdrawal_id
-          WHERE ?1='all'
+          WHERE (
+                ?1='all'
              OR (?1='pending' AND t.withdrawal_id IS NULL)
              OR t.action=?1
+          )
+            AND (?2 IS NULL OR r.provider_id=?2)
           ORDER BY r.requested_at DESC, r.withdrawal_id DESC
-          LIMIT ?2",
+          LIMIT ?3",
     )?;
-    let rows = stmt.query_map(params![status, limit as i64], |row| {
+    let rows = stmt.query_map(params![status, provider_id, limit as i64], |row| {
         Ok((row.get(0)?, row.get(1)?))
     })?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
