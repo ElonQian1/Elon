@@ -198,7 +198,7 @@ AI_PROJECT / AI_INDEX / AGENTS
 - 验证与计量面：节点声明、平台观测、挑战/复算和最终验证事实；
 - 市场与结算面：标准 Compute SKU、期货交付窗口、不可变价格快照和双价格腿回执。
 
-当前 `server/src/compute_federation/` 提供未编译、未接线的云端领域合同；`server/src/store/compute_capacity_*.rs` 与 Provider、Offer、Price Snapshot、Job、Reservation Registry 已形成隔离的 CapacityPool、供给、Claim、Store-canonical 请求摘要、可组合事务内 Claim kernel、账本审计、到期恢复、生命周期、不可变历史与锁价快照。Hold V2 固定完整 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承并审计原始 held 绑定；Job 与 Reservation 登记也已有不提交的事务内入口，但消费者预算冻结/退款尚不能组合，因此仍没有完整 Broker 原子事务。这些路径尚未编译、执行迁移或接入真实 Broker。`server/src/node_agent_compute_plugin_host/` 已增加未编译的 Manifest、InstallPlan、双槽生命周期、ReadyCapability、Attempt 命令和 typed event 合同，但尚无下载器、Sidecar 或通用协议接线。现有节点模型白名单、Token 预留和流租约继续作为 `user_node + llm_chat` 兼容路径。权威架构与阶段见 `docs/distributed-compute/README.md`。
+当前 `server/src/compute_federation/` 提供未编译、未接线的云端领域合同；`server/src/store/compute_capacity_*.rs` 与 Provider、Offer、Price Snapshot、Job、Reservation Registry 已形成隔离的 CapacityPool、供给、Claim、Store-canonical 请求摘要、可组合事务内 Claim kernel、账本审计、到期恢复、生命周期、不可变历史与锁价快照。Hold V2 固定完整 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承并审计原始 held 绑定；Job、Reservation 登记和余额预授权均已有不提交的事务内入口。余额入口支持显式到期与严格合同重放，但完整 Broker 仍须同事务编排这些构件、拒绝非 `reserved` 结果，并补齐退款/结算联动。这些路径尚未编译、执行迁移或接入真实 Broker。`server/src/node_agent_compute_plugin_host/` 已增加未编译的 Manifest、InstallPlan、双槽生命周期、ReadyCapability、Attempt 命令和 typed event 合同，但尚无下载器、Sidecar 或通用协议接线。现有节点模型白名单、Token 预留和流租约继续作为 `user_node + llm_chat` 兼容路径。权威架构与阶段见 `docs/distributed-compute/README.md`。
 
 ## 关键模块边界
 
