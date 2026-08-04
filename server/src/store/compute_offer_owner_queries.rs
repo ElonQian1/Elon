@@ -2,7 +2,9 @@ use anyhow::{bail, Result};
 use rusqlite::params;
 
 use super::{
-    compute_offer_registry::{current_registered_offer_on, ComputeOfferRegistrationReceipt},
+    compute_offer_registry::{
+        current_registered_offer_on, registered_offer_version_on, ComputeOfferRegistrationReceipt,
+    },
     Store,
 };
 
@@ -13,6 +15,18 @@ impl Store {
     ) -> Result<Option<ComputeOfferRegistrationReceipt>> {
         validate_offer_id(offer_id)?;
         current_registered_offer_on(&self.conn()?, offer_id.trim())
+    }
+
+    pub(crate) fn compute_offer_version_if_exists(
+        &self,
+        offer_id: &str,
+        offer_version: i64,
+    ) -> Result<Option<ComputeOfferRegistrationReceipt>> {
+        validate_offer_id(offer_id)?;
+        if offer_version <= 0 {
+            bail!("算力 Offer 版本必须为正整数");
+        }
+        registered_offer_version_on(&self.conn()?, offer_id.trim(), offer_version)
     }
 
     pub(crate) fn list_compute_offers_for_provider(

@@ -71,3 +71,11 @@ pub(crate) struct ComputeOfferDraftPriceTermsInput {
     pub components: Vec<ComputePriceComponent>,
     pub fee_rules: Vec<ComputeFeeRule>,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RevokeMyComputeOfferDraftRequest {
+    pub expected_offer_version: i64,
+    pub expected_offer_digest: String,
+    pub confirm_revoke: bool,
+}

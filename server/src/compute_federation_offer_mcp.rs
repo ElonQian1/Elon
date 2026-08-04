@@ -3,13 +3,17 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{
-    compute_federation_offer_draft_model::CreateMyComputeOfferDraftRequest,
-    compute_federation_offer_service, store::Store,
+    compute_federation_offer_draft_model::{
+        CreateMyComputeOfferDraftRequest, RevokeMyComputeOfferDraftRequest,
+    },
+    compute_federation_offer_service,
+    store::Store,
 };
 
 const CREATE_DRAFT_TOOL: &str = "compute_create_my_offer_draft";
 const GET_OFFER_TOOL: &str = "compute_get_my_offer";
 const LIST_OFFERS_TOOL: &str = "compute_list_my_offers";
+const REVOKE_DRAFT_TOOL: &str = "compute_revoke_my_offer_draft";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -36,6 +40,15 @@ struct ListArguments {
     limit: usize,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RevokeDraftArguments {
+    provider_id: String,
+    pool_id: String,
+    offer_id: String,
+    request: RevokeMyComputeOfferDraftRequest,
+}
+
 pub(crate) fn definitions() -> Vec<Value> {
     vec![
         tool(
@@ -55,6 +68,12 @@ pub(crate) fn definitions() -> Vec<Value> {
             "列出当前用户 Provider/CapacityPool 下的 Offer。不会修改市场状态。",
             list_schema(),
             true,
+        ),
+        tool(
+            REVOKE_DRAFT_TOOL,
+            "按精确版本与摘要撤销当前用户的 draft Offer。必须显式确认；不允许撤销 active Offer，不移动容量或资金。",
+            revoke_schema(),
+            false,
         ),
     ]
 }
@@ -101,6 +120,19 @@ pub(crate) fn call_if_handled(
                     input.limit,
                 )?
             })))
+        }
+        REVOKE_DRAFT_TOOL => {
+            let input: RevokeDraftArguments = decode(arguments, name)?;
+            Ok(Some(serde_json::to_value(
+                compute_federation_offer_service::revoke_draft_for_user(
+                    store,
+                    user_id,
+                    &input.provider_id,
+                    &input.pool_id,
+                    &input.offer_id,
+                    input.request,
+                )?,
+            )?))
         }
         _ => Ok(None),
     }
@@ -310,6 +342,29 @@ fn list_schema() -> Value {
             "provider_id":bounded_string(160),
             "pool_id":bounded_string(160),
             "limit":{"type":"integer","minimum":1,"maximum":100,"default":20}
+        },
+        "additionalProperties":false
+    })
+}
+
+fn revoke_schema() -> Value {
+    json!({
+        "type":"object",
+        "required":["provider_id","pool_id","offer_id","request"],
+        "properties":{
+            "provider_id":bounded_string(160),
+            "pool_id":bounded_string(160),
+            "offer_id":bounded_string(200),
+            "request":{
+                "type":"object",
+                "required":["expected_offer_version","expected_offer_digest","confirm_revoke"],
+                "properties":{
+                    "expected_offer_version":{"type":"integer","minimum":1},
+                    "expected_offer_digest":bounded_string(256),
+                    "confirm_revoke":{"type":"boolean","const":true}
+                },
+                "additionalProperties":false
+            }
         },
         "additionalProperties":false
     })

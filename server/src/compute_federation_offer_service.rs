@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use chrono::Utc;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -8,13 +8,15 @@ use sha2::{Digest, Sha256};
 use crate::{
     compute_federation::{
         capacity::ComputeCapacityPoolStatus,
-        offer::{ComputeOffer, OFFER_STATUS_DRAFT},
+        offer::{ComputeOffer, OFFER_STATUS_DRAFT, OFFER_STATUS_REVOKED},
         provider::PROVIDER_STATUS_ACTIVE,
     },
     compute_federation_capacity_pool_service,
     compute_federation_offer_draft_builder::{build_offer_draft, ResolvedDraftCapacity},
-    compute_federation_offer_draft_model::CreateMyComputeOfferDraftRequest,
-    store::{ComputeOfferRegistrationReceipt, Store},
+    compute_federation_offer_draft_model::{
+        CreateMyComputeOfferDraftRequest, RevokeMyComputeOfferDraftRequest,
+    },
+    store::{compute_offer_digest, ComputeOfferRegistrationReceipt, Store},
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -97,6 +99,68 @@ pub(crate) fn get_for_user(
         .ok_or_else(|| anyhow::anyhow!("算力 Offer 不存在"))?;
     ensure_offer_scope(&receipt.offer, provider_id, pool_id)?;
     Ok(offer_view(receipt, false))
+}
+
+pub(crate) fn revoke_draft_for_user(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    pool_id: &str,
+    offer_id: &str,
+    request: RevokeMyComputeOfferDraftRequest,
+) -> Result<MyComputeOfferView> {
+    if !request.confirm_revoke {
+        bail!("撤销 draft Offer 前必须显式确认");
+    }
+    if request.expected_offer_version <= 0 {
+        bail!("预期 Offer 版本必须为正整数");
+    }
+    validate_exact("预期 Offer 摘要", &request.expected_offer_digest, 256)?;
+    owned_active_or_historical_provider(store, user_id, provider_id)?;
+    validate_exact("算力 Offer ID", offer_id, 200)?;
+    let current = store
+        .compute_offer_if_exists(offer_id)?
+        .ok_or_else(|| anyhow::anyhow!("算力 Offer 不存在"))?;
+    ensure_offer_scope(&current.offer, provider_id, pool_id)?;
+
+    if current.offer.status == OFFER_STATUS_REVOKED {
+        let replay_version = request
+            .expected_offer_version
+            .checked_add(1)
+            .context("算力 Offer 版本溢出")?;
+        if current.offer.offer_version != replay_version {
+            bail!("draft Offer 已终结，且不是本请求的幂等结果");
+        }
+        let previous = store
+            .compute_offer_version_if_exists(offer_id, request.expected_offer_version)?
+            .ok_or_else(|| anyhow::anyhow!("draft Offer 撤销前历史版本缺失"))?;
+        ensure_offer_scope(&previous.offer, provider_id, pool_id)?;
+        if previous.offer.status != OFFER_STATUS_DRAFT
+            || previous.offer.offer_digest != request.expected_offer_digest
+        {
+            bail!("draft Offer 撤销重放与历史合同不一致");
+        }
+        return Ok(offer_view(current, true));
+    }
+
+    if current.offer.status != OFFER_STATUS_DRAFT {
+        bail!("本入口只能撤销 draft Offer");
+    }
+    if current.offer.offer_version != request.expected_offer_version
+        || current.offer.offer_digest != request.expected_offer_digest
+    {
+        bail!("draft Offer 当前版本或摘要已变化");
+    }
+
+    let mut revoked = current.offer;
+    revoked.offer_version = revoked
+        .offer_version
+        .checked_add(1)
+        .context("算力 Offer 版本溢出")?;
+    revoked.status = OFFER_STATUS_REVOKED.to_string();
+    revoked.offer_digest.clear();
+    revoked.offer_digest = compute_offer_digest(&revoked)?;
+    Ok(offer_view(store.register_compute_offer(&revoked)?, false))
 }
 
 pub(crate) fn list_for_user(

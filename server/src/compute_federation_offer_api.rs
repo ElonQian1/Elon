@@ -4,14 +4,16 @@ use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    compute_federation_offer_draft_model::CreateMyComputeOfferDraftRequest,
+    compute_federation_offer_draft_model::{
+        CreateMyComputeOfferDraftRequest, RevokeMyComputeOfferDraftRequest,
+    },
     compute_federation_offer_service,
     project_auth::{auth_from_headers, json_error},
     types::AppState,
@@ -26,6 +28,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id",
             get(get_offer),
+        )
+        .route(
+            "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/revoke",
+            post(revoke_offer_draft),
         )
 }
 
@@ -92,6 +98,26 @@ async fn list_offers(
         )
         .map(|offers| json!({"offers":offers})),
     )
+}
+
+async fn revoke_offer_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, pool_id, offer_id)): Path<(String, String, String)>,
+    Json(request): Json<RevokeMyComputeOfferDraftRequest>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    offer_response(compute_federation_offer_service::revoke_draft_for_user(
+        &state.store,
+        &user_id,
+        &provider_id,
+        &pool_id,
+        &offer_id,
+        request,
+    ))
 }
 
 fn authenticated_user(state: &AppState, headers: &HeaderMap) -> Result<String, Response> {
