@@ -30,7 +30,7 @@ owners: backend, node, ai-economy
 | Capacity Supply 本人控制面 | HTTP/MCP 已可显式确认后向同一窗口的多个 open Bucket 原子追加 self-declared 供给，或把尚在 available 的供给原子撤入 retired；PC 已写入单 Bucket 追加/撤出源码。服务端固定首次时间并复用现有双分录账本，available 不等于 verified 或可交易；尚未编译和运行验证 |
 | 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；PC `/compute-supply` 已写入本人申请、历史、预检和取消源码。应用单事务激活内部 Provider/Pool，隔离单事务把其当前 active 状态转为 quarantined；两者均不发送节点命令、不直接改写 Offer、不移动资金，恢复尚未实现，状态为 `implementation_uncompiled` |
 | Offer 草稿、发布与生命周期控制面 | HTTP/MCP 已可创建、精确修订和撤销本人 draft Offer；管理员 HTTP 可原子发布 active、转为 draining，并在无 pending/active Reservation 时终结。v182-v184 保存追加式回执和依赖索引，所有写入口均不移动资金，状态为 `implementation_uncompiled` |
-| 节点插件治理合同 | Signed Manifest、InstallPlan、双槽 lifecycle 与短期 ReadyCapability 合同已写；独立 SQLite authority v3、root-signed 双 keyring、库存/计划/候选原子应用、三段式取数、跨代撤销与不确定结果恢复已形成代码。Windows Volume GUID 卷根、父句柄相对打开、同句柄游标协调和耐久分段写入也已形成。候选验证现覆盖 sealed closure S1、全文件 share-none pin、内容与本机 binding、pin 后 S2、消费线性句柄的事务内第三读/prepared begin、稳定 `NotCreated/Prepared/Aborted/Revoked` outcome 和不确定 begin 的 recovery abort；缺少新增必需 abort trigger 的旧 v3 失败关闭，同名定义 fingerprint 仍待补齐。真实 hash/Hashed capability、post-hash binder、verified/rejected 和槽转换仍未实现；全部未编译、建库或接线 |
+| 节点插件治理合同 | Signed Manifest、InstallPlan、双槽 lifecycle 与短期 ReadyCapability 合同已写；独立 SQLite authority v3、root-signed 双 keyring、库存/计划/候选原子应用、三段式取数、跨代撤销与不确定结果恢复已形成代码。Windows Volume GUID 卷根、父句柄相对打开、同句柄游标协调和耐久分段写入也已形成。候选验证现覆盖 sealed closure S1、全文件 share-none pin、内容与本机 binding、pin 后 S2、事务内第三读/prepared begin、稳定 outcome/recovery abort，以及复用受管文件底座的完整 ordinal hash 与线性 Hashed capability；完整观察另生成绑定 verification/file-set 的 JCS digest，错误只返还 recovery custody。缺少新增必需 abort trigger 的旧 v3 失败关闭，同名定义 fingerprint 仍待补齐。post-hash binder、verified/rejected 和槽转换仍未实现；全部未编译、建库或接线 |
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 共享 CapacityPool 与追加式容量账本 | 领域合同、v165-v168 schema、隔离 Store、Store-canonical Supply/Claim 请求摘要、事务内 Claim kernel、只读审计、到期批处理、状态门卫和 epoch 轮换已写；v173 追加 Claim 完整历史，Hold V2 固定 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承原 held 绑定；尚未编译、执行迁移或接线 |
@@ -120,7 +120,7 @@ owners: backend, node, ai-economy
 
 节点内部已经形成 Plugin Host 兼容 seam、Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架，并写入真实 Ed25519/JCS 验证、Manifest 语义校验及本机 InstallPlan 准入内核；云端还形成 v169 版本化 Provider Registry、v170 追加式 Offer Registry及 v182-v184 发布/生命周期控制。本人可创建规范化 draft Offer；平台管理员可发布 active、转为 draining，并在无活动预留时终结为 expired/revoked。这些入口均尚未编译、执行迁移或运行验证。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**。
 
-目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。本机耐久真源已经选定为独立 SQLite，根签名双 keyring、原子计划应用、候选所有权、三段式下载认领、候选级全工件验证和可信时间边界见 `docs/distributed-compute/node-plugin-local-authority.md`；其中 Store 认领/终结/恢复、verification schema/fence、candidate closure 双读与全文件 pin，以及 prepared begin/outcome/abort recovery 已写但未编译、建库或接线。真实逐文件 hash、verified/rejected resolution、下载器、Sidecar 进程与 IPC、动态健康状态、云端 capability gate 和通用 Attempt 协议接线目前仍未实现。
+目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。本机耐久真源已经选定为独立 SQLite，根签名双 keyring、原子计划应用、候选所有权、三段式下载认领、候选级全工件验证和可信时间边界见 `docs/distributed-compute/node-plugin-local-authority.md`；其中 Store 认领/终结/恢复、verification schema/fence、candidate closure 双读与全文件 pin、prepared begin/outcome/abort recovery，以及逐文件 hash/Hashed capability 已写但未编译、建库或接线。post-hash trusted binder、verified/rejected resolution、下载器、Sidecar 进程与 IPC、动态健康状态、云端 capability gate 和通用 Attempt 协议接线目前仍未实现。
 
 ### F2：Broker、验证和真实结算
 

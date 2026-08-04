@@ -24,6 +24,7 @@ use super::{
 };
 
 mod begin;
+mod hash;
 mod recovery;
 
 pub(in crate::node_agent_compute_plugin_host) use begin::{
@@ -31,6 +32,11 @@ pub(in crate::node_agent_compute_plugin_host) use begin::{
     BeginCandidateVerificationFailure, CandidateVerificationBeginMutationPhase,
     CandidateVerificationBeginRecoveryCustody, UnclaimedCandidateArtifactSetCustody,
     ValidatedCandidateVerificationBeginPermit,
+};
+pub(in crate::node_agent_compute_plugin_host) use hash::{
+    abandon_hashed_candidate_artifact_set, hash_authorized_candidate_artifact_set,
+    CandidateArtifactSetHashDisposition, CandidateVerificationHashFailure,
+    CandidateVerificationHashPhase, HashedComputePluginCandidateArtifactSet,
 };
 pub(in crate::node_agent_compute_plugin_host) use recovery::{
     abort_recovered_candidate_verification, inspect_candidate_verification_outcome,

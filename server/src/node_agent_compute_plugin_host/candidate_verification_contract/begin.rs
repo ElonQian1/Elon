@@ -56,6 +56,19 @@ pub(in crate::node_agent_compute_plugin_host) struct AuthorizedComputePluginCand
     pinned: PinnedComputePluginCandidateArtifactSet,
 }
 
+impl AuthorizedComputePluginCandidateArtifactSet {
+    pub(super) fn into_hash_parts(
+        self,
+        _permit: super::hash::CandidateVerificationHashPermit,
+    ) -> (
+        ComputePluginPreparedCandidateVerificationFacts,
+        ComputePluginCandidateVerificationRecoveryKey,
+        PinnedComputePluginCandidateArtifactSet,
+    ) {
+        (self.prepared, self.recovery_key, self.pinned)
+    }
+}
+
 /// Abandon-only custody. A rejected begin must be dropped and a new attempt must re-pin every
 /// file under a new verification ID; this type deliberately has no observe/begin/hash conversion.
 pub(in crate::node_agent_compute_plugin_host) struct UnclaimedCandidateArtifactSetCustody {
