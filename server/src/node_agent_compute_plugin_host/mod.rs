@@ -5,6 +5,7 @@
 
 pub(crate) mod attempt_contract;
 mod contract;
+pub(crate) mod fetch_contract;
 mod host;
 pub(crate) mod identity;
 pub(crate) mod install_plan;
