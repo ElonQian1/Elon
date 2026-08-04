@@ -2,6 +2,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Changelog,
     [string]$BaseSha = '',
+    [switch]$StaticRuntimePwa,
     [switch]$PlanOnly,
     [switch]$NoResume
 )
@@ -27,6 +28,10 @@ if ([string]::IsNullOrWhiteSpace($BaseSha)) {
     $BaseSha = '0000000000000000000000000000000000000000'
 }
 $scope = Resolve-ElonAppUiChangeScope -RepoRoot $repoRoot -BaseSha $BaseSha -HeadSha $headSha
+if ($StaticRuntimePwa -and $scope.MobilePwaMode -eq 'full_server') {
+    $scope.MobilePwaMode = 'static_template'
+    $scope.Reason = 'explicit_static_runtime_pwa_without_server_release'
+}
 $receipt = New-ElonReleaseReceipt -RepoRoot $repoRoot -Kind 'app-ui' -SourceSha $headSha
 $watch = [System.Diagnostics.Stopwatch]::StartNew()
 
@@ -38,6 +43,7 @@ Write-Host "APP_UI_HEAD_SHA=$headSha"
 Write-Host "APP_UI_MOBILE_PWA_MODE=$($scope.MobilePwaMode)"
 Write-Host "APP_UI_SCOPE_REASON=$($scope.Reason)"
 Write-Host "APP_UI_CHANGED_PATHS=$($scope.ChangedPaths.Count)"
+Write-Host "APP_UI_SERVER_RELEASE=$(if ($StaticRuntimePwa) { 'deferred_explicitly' } else { 'scope_driven' })"
 
 if ($PlanOnly) {
     Write-Host 'APP_UI_PUBLISH_RESULT=planned'

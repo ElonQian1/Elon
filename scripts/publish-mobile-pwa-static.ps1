@@ -8,6 +8,7 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'native-command-timeout.ps1')
 . (Join-Path $PSScriptRoot 'direct-network.ps1')
+. (Join-Path $PSScriptRoot 'mobile-pwa-runtime-template.ps1')
 Set-ElonProjectDirectNetwork
 
 $repoRoot = (& git -C $PSScriptRoot rev-parse --show-toplevel 2>$null).Trim()
@@ -23,13 +24,20 @@ if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
 }
 
 $sourceSha = (& git -C $repoRoot rev-parse HEAD).Trim()
-$localHash = (Get-FileHash -LiteralPath $SourcePath -Algorithm SHA256).Hash.ToLowerInvariant()
+$assetDirectory = Split-Path -Parent $SourcePath
+$stylesPath = Join-Path $assetDirectory 'project_plaza.css'
+$scriptPath = Join-Path $assetDirectory 'project_plaza.js'
+$runtimeTemplatePath = Join-Path $repoRoot ".ai-tmp\mobile-pwa-static\web_page.$sourceSha.$PID.html"
+$runtimeTemplate = New-ElonMobilePwaRuntimeTemplate -TemplatePath $SourcePath `
+    -StylesPath $stylesPath -ScriptPath $scriptPath -OutputPath $runtimeTemplatePath
+$localHash = (Get-FileHash -LiteralPath $runtimeTemplate.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
 $remoteSeparator = $RemotePath.LastIndexOf('/')
 if ($remoteSeparator -le 0) { throw "RemotePath must be an absolute POSIX path: $RemotePath" }
 $remoteDirectory = $RemotePath.Substring(0, $remoteSeparator)
 $stagingPath = "$RemotePath.$sourceSha.tmp"
 
 Write-Host 'MOBILE_PWA_STATIC_POLICY=atomic_template_without_server_rebuild'
+Write-Host 'MOBILE_PWA_STATIC_TEMPLATE=self_contained_runtime_assets'
 Write-Host "MOBILE_PWA_STATIC_SOURCE_SHA=$sourceSha"
 Write-Host "MOBILE_PWA_STATIC_SHA256=$localHash"
 if ($PlanOnly) {
@@ -53,7 +61,7 @@ $prepare = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Labe
 Assert-ElonNativeCommand -Result $prepare -FailureMessage 'Unable to prepare mobile PWA directory.'
 
 $upload = Invoke-ElonNativeCommand -FilePath 'scp.exe' -TimeoutSeconds 180 -Label 'mobile-pwa-upload' `
-    -ArgumentList ($scpOptions + @($SourcePath, "${ServerHost}:${stagingPath}"))
+    -ArgumentList ($scpOptions + @($runtimeTemplate.FullName, "${ServerHost}:${stagingPath}"))
 Assert-ElonNativeCommand -Result $upload -FailureMessage 'Unable to upload mobile PWA template.'
 
 $swapCommand = "set -eu; actual=`$(sha256sum '$stagingPath' | awk '{print `$1}'); " +
@@ -67,7 +75,7 @@ $verify = Invoke-ElonNativeCommand -FilePath 'ssh.exe' -TimeoutSeconds 30 -Label
     -ArgumentList ($sshOptions + @($ServerHost, $verifyCommand))
 Assert-ElonNativeCommand -Result $verify -FailureMessage 'Unable to verify mobile PWA template.'
 $parts = $verify.Stdout.Trim() -split '\s+'
-$expectedSize = (Get-Item -LiteralPath $SourcePath).Length
+$expectedSize = $runtimeTemplate.Length
 if ($parts.Count -lt 2 -or $parts[0] -ne $localHash -or [int64]$parts[1] -ne $expectedSize) {
     throw "Mobile PWA verification mismatch: $($verify.Stdout.Trim())"
 }

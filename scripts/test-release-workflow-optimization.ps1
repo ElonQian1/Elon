@@ -8,10 +8,12 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($repoRoot)) {
 $nativeCommandHelper = Join-Path $repoRoot 'scripts\native-command-timeout.ps1'
 $releaseReceiptHelper = Join-Path $repoRoot 'scripts\release-stage-receipt.ps1'
 $changeScopeHelper = Join-Path $repoRoot 'scripts\app-ui-change-scope.ps1'
+$runtimeTemplateHelper = Join-Path $repoRoot 'scripts\mobile-pwa-runtime-template.ps1'
 $apkTransportHelper = Join-Path $repoRoot 'scripts\apk-publish-transport.ps1'
 . $nativeCommandHelper
 . $releaseReceiptHelper
 . $changeScopeHelper
+. $runtimeTemplateHelper
 . $apkTransportHelper
 
 if (-not (Get-Command New-ElonApkAtomicDeployScript -ErrorAction SilentlyContinue)) {
@@ -83,5 +85,27 @@ if ($LASTEXITCODE -ne 0) { throw 'Static mobile PWA plan failed.' }
 $staticPublisher = Get-Content -LiteralPath (Join-Path $repoRoot 'scripts\publish-mobile-pwa-static.ps1') -Raw
 Assert-True (-not $staticPublisher.Contains('Split-Path $RemotePath')) `
     'The static publisher treats a POSIX remote path as a Windows path.'
+Assert-True ($staticPublisher.Contains('New-ElonMobilePwaRuntimeTemplate')) `
+    'The static publisher does not compose modular project plaza assets.'
+
+$runtimeTemplatePath = Join-Path $repoRoot ".ai-tmp\tests\mobile-pwa-runtime-template.$PID.html"
+try {
+    $runtimeTemplate = New-ElonMobilePwaRuntimeTemplate `
+        -TemplatePath (Join-Path $repoRoot 'server\src\assets\web_page.html') `
+        -StylesPath (Join-Path $repoRoot 'server\src\assets\project_plaza.css') `
+        -ScriptPath (Join-Path $repoRoot 'server\src\assets\project_plaza.js') `
+        -OutputPath $runtimeTemplatePath
+    $runtimeText = Get-Content -LiteralPath $runtimeTemplate.FullName -Raw
+    Assert-True ($runtimeText.Contains('<style data-elon-runtime-asset="/assets/project_plaza.css">')) `
+        'Runtime template did not embed project plaza styles.'
+    Assert-True ($runtimeText.Contains('<script data-elon-runtime-asset="/assets/project_plaza.js">')) `
+        'Runtime template did not embed project plaza script.'
+    Assert-True (-not $runtimeText.Contains('<link rel="stylesheet" href="/assets/project_plaza.css" />')) `
+        'Runtime template still depends on the compiled project plaza stylesheet route.'
+    Assert-True (-not $runtimeText.Contains('<script src="/assets/project_plaza.js"></script>')) `
+        'Runtime template still depends on the compiled project plaza script route.'
+} finally {
+    Remove-Item -LiteralPath $runtimeTemplatePath -Force -ErrorAction SilentlyContinue
+}
 
 Write-Host 'RELEASE_WORKFLOW_OPTIMIZATION_TESTS=passed'
