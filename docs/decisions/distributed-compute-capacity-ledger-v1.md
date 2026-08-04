@@ -57,7 +57,7 @@ Reservation Claim 在 Hold V2 中必须固定 Offer ID/version/digest、Job ID �
 
 ### 8. 事务内禁止外部网络
 
-SQLite 路径使用 `BEGIN IMMEDIATE`、稳定 meter 顺序和条件更新。公开 standalone API 继续拥有连接、事务与 commit，但拒绝 `compute_reservation` 主体或任何 Reservation causal binding；供 Store sibling 调用的 Claim kernel 只接受调用方已有的 `Transaction`，内部不得重新取连接、开启嵌套事务或提交。最外层 Broker 将来负责把 Job、预算、Reservation 与该 kernel 组合成唯一线性化点。节点 WebSocket、价格远程源或外部矿池 reserve 不得在数据库事务内调用。外部 Provider 使用 pending Reservation + outbox + 补偿动作；重放始终沿用同一远程幂等身份。通用容量到期恢复器依据 held 账本中持久化的 Reservation causal binding 跳过 Broker 管理的 Claim，不信任可伪造的主体字符串；这类 Claim 必须由未来 Broker 在同一事务内同步推进预算、Reservation 与 Job。
+SQLite 路径使用 `BEGIN IMMEDIATE`、稳定 meter 顺序和条件更新。公开 standalone API 继续拥有连接、事务与 commit，但拒绝 `compute_reservation` 主体或任何 Reservation causal binding；供 Store sibling 调用的 Claim kernel 只接受调用方已有的 `Transaction`，内部不得重新取连接、开启嵌套事务或提交。v175 最外层 Broker 已把 Job、平台人民币余额预算、Reservation 与该 kernel 组合成唯一线性化点。节点 WebSocket、价格远程源或外部矿池 reserve 不得在数据库事务内调用。外部 Provider 使用 pending Reservation + outbox + 补偿动作；重放始终沿用同一远程幂等身份。通用容量到期恢复器依据 held 账本中持久化的 Reservation causal binding 跳过 Broker 管理的 Claim，不信任可伪造的主体字符串；这类 Claim 必须由 Broker 在同一事务内同步推进预算、Reservation 与 Job。
 
 ## 核心不变量
 
@@ -79,4 +79,4 @@ SQLite 路径使用 `BEGIN IMMEDIATE`、稳定 meter 顺序和条件更新。公
 
 ## 验证状态
 
-本决定已接受。领域合同、纯状态投影和 v165 SQLite schema 已写入；本地 Store 还形成了池版本与 bucket 登记、供给发行/撤出、窗口有界 Claim hold、Claim-local held-only 释放/到期、四类写入的 Store-canonical request digest，以及共用的双分录落库和余额 CAS。只读审计可从账本重算余额投影，有界批处理可逐 Claim 恢复到期容量；状态门卫、v167 追加式生命周期、v168 epoch 轮换、v169 Provider Registry、Offer 规范合同校验、v170 Offer Registry、v171 不可变 Price Snapshot Registry、v173 Claim 历史与 v174 Reservation Registry 也已形成代码。Claim Hold/Finish、Job 登记、Reservation 登记与余额预授权已提供不自行提交的事务内入口；Hold V2 固定 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，终态继承并审计原始 held 绑定，预算入口支持显式到期与严格重放。上述新增路径均未编译、执行迁移、调度或并发验证。不可变首次响应、各构件的统一 Broker Reserve、预算结果 fail-closed 检查、退款/结算联动、Attempt 激活、自动修复、外部 Provider saga 和运行接线仍未实现。
+本决定已接受。领域合同、纯状态投影和 v165 SQLite schema 已写入；本地 Store 还形成了池版本与 bucket 登记、供给发行/撤出、窗口有界 Claim hold、Claim-local held-only 释放/到期、四类写入的 Store-canonical request digest，以及共用的双分录落库和余额 CAS。只读审计可从账本重算余额投影，有界批处理可逐 Claim 恢复到期容量；状态门卫、v167 追加式生命周期、v168 epoch 轮换、v169 Provider Registry、Offer 规范合同校验、v170 Offer Registry、v171 不可变 Price Snapshot Registry、v173 Claim 历史与 v174 Reservation Registry 也已形成代码。Claim Hold/Finish、Job 登记、Reservation 登记与余额预授权提供不自行提交的事务内入口；Hold V2 固定 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，终态继承并审计原始 held 绑定。v175 第一版 Broker 已在单一事务中组合平台人民币余额预授权、容量 Hold、Reservation 和 Job，并用不可变回执保证严格重放与历史绑定复核。上述新增路径均为 `implementation_uncompiled`，尚未执行迁移、调度或并发验证。通用不可变 Claim 首次响应、退款/结算联动、Attempt 激活、自动修复、外部 Provider saga 和运行接线仍未实现。

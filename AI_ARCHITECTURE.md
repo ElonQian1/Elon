@@ -198,7 +198,7 @@ AI_PROJECT / AI_INDEX / AGENTS
 - 验证与计量面：节点声明、平台观测、挑战/复算和最终验证事实；
 - 市场与结算面：标准 Compute SKU、期货交付窗口、不可变价格快照和双价格腿回执。
 
-当前 `server/src/compute_federation/` 提供未编译、未接线的云端领域合同；`server/src/store/compute_capacity_*.rs` 与 Provider、Offer、Price Snapshot、Job、Reservation Registry 已形成隔离的 CapacityPool、供给、Claim、Store-canonical 请求摘要、可组合事务内 Claim kernel、账本审计、到期恢复、生命周期、不可变历史与锁价快照。Hold V2 固定完整 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承并审计原始 held 绑定；Job、Reservation 登记和余额预授权均已有不提交的事务内入口。余额入口支持显式到期与严格合同重放，但完整 Broker 仍须同事务编排这些构件、拒绝非 `reserved` 结果，并补齐退款/结算联动。这些路径尚未编译、执行迁移或接入真实 Broker。`server/src/node_agent_compute_plugin_host/` 已增加未编译的 Manifest、InstallPlan、双槽生命周期、ReadyCapability、Attempt 命令和 typed event 合同，但尚无下载器、Sidecar 或通用协议接线。现有节点模型白名单、Token 预留和流租约继续作为 `user_node + llm_chat` 兼容路径。权威架构与阶段见 `docs/distributed-compute/README.md`。
+当前 `server/src/compute_federation/` 提供未编译、未接线的云端领域合同；`server/src/store/compute_capacity_*.rs` 与 Provider、Offer、Price Snapshot、Job、Reservation Registry 已形成隔离的 CapacityPool、供给、Claim、Store-canonical 请求摘要、可组合事务内 Claim kernel、账本审计、到期恢复、生命周期、不可变历史与锁价快照。Hold V2 固定完整 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承并审计原始 held 绑定；Job、Reservation 登记和余额预授权均已有不提交的事务内入口。v175 `compute_broker_reservation` 已将这些构件组合为单一事务的第一版 Reserve，并强制预算结果为 `reserved`；不可变回执绑定原 quoted Job、reserved Job、Capacity Claim、active Reservation 和平台人民币余额预授权。该实现仍是 `implementation_uncompiled`，只支持 `platform_balance_cny`，尚未执行迁移、接入 HTTP/MCP、激活 Attempt 或补齐退款/结算联动。`server/src/node_agent_compute_plugin_host/` 已增加未编译的 Manifest、InstallPlan、双槽生命周期、ReadyCapability、Attempt 命令和 typed event 合同，但尚无下载器、Sidecar 或通用协议接线。现有节点模型白名单、Token 预留和流租约继续作为 `user_node + llm_chat` 兼容路径。权威架构与阶段见 `docs/distributed-compute/README.md`。
 
 ## 关键模块边界
 
@@ -211,7 +211,7 @@ AI_PROJECT / AI_INDEX / AGENTS
 | `server/src/agent_config.rs` | 用户模型/API key 配置和加密持久化 |
 | `server/src/agent_llm_call.rs` | OpenAI-compatible chat 调用和用量记录 |
 | `server/src/compute_federation/` | 分布式算力 Provider、Offer、Job、Lease、价格与回执领域合同；当前未接运行路径 |
-| `server/src/store/compute_capacity_*.rs`、`compute_provider_registry.rs`、`compute_offer_registry.rs` | 共享容量池、版本化 Provider/Offer、供给双分录、Claim Hold/终态、账本审计、恢复和 Pool 控制面；当前未编译、未迁移、未接 Broker |
+| `server/src/store/compute_capacity_*.rs`、`compute_provider_registry.rs`、`compute_offer_registry.rs`、`compute_broker_reservation.rs` | 共享容量池、版本化 Provider/Offer、供给双分录、Claim Hold/终态、账本审计、恢复、Pool 控制面与首版平台人民币余额原子 Reserve；当前未编译、未迁移、未接 HTTP/MCP 或终态结算 |
 | `server/src/node_agent_compute_plugin_host/` | Windows 节点 legacy Host seam 与按需插件、Attempt、Runner event 合同；当前只有旧 LLM 接入，正式合同未接运行路径 |
 | `scripts/publish-server.ps1` | 后端构建、版本 claim、上传、部署、验证 |
 | `scripts/publish-apk.ps1` | APK 构建、签名、上传和版本发布 |

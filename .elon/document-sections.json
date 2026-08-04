@@ -2273,6 +2273,13 @@
   },
   "audit_log": [
     {
+      "id": "distributed-compute-broker-reserve-v175-20260804",
+      "action": "document.knowledge_graph.update",
+      "target": ".elon/document-sections.json",
+      "summary": "登记 implementation_uncompiled 的 v175 平台人民币余额原子 Broker Reserve、不可变回执和严格历史重放，并保留 Attempt、退款结算、外部 Provider 与运行接线缺口",
+      "at": "2026-08-04T00:12:35Z"
+    },
+    {
       "id": "distributed-compute-remote-dedup-hardening-20260804",
       "action": "document.knowledge_graph.update",
       "target": ".elon/document-sections.json",
@@ -2410,7 +2417,7 @@
         "view": "capabilities",
         "kind": "planned_capability",
         "label": "任务级算力联邦 V1",
-        "detail": "云端领域合同、v165/v167-v172 schema、隔离 Capacity Store、Provider/Offer/Price Snapshot/Job Registry 与节点 Manifest、Plan、Attempt、typed event 合同已写入且未编译；Reservation、Broker、外部 Provider 和运行接线尚未实现",
+        "detail": "云端领域合同、v165-v175 schema、隔离 Capacity Store、Provider/Offer/Price Snapshot/Job/Reservation Registry、首版平台人民币余额原子 Broker Reserve 与节点 Manifest、Plan、Attempt、typed event 合同已写入且未编译；外部 Provider、Attempt 编排、退款结算和运行接线尚未实现",
         "parent_id": "cap-distributed-compute",
         "order": 20,
         "color": "#48A889",
@@ -2433,6 +2440,10 @@
           "file:server/src/store/compute_job_contract_validation.rs",
           "file:server/src/store/compute_job_registry.rs",
           "file:server/src/compute_job_migration.rs",
+          "file:server/src/store/compute_reservation_registry.rs",
+          "file:server/src/compute_reservation_migration.rs",
+          "file:server/src/store/compute_broker_reservation.rs",
+          "file:server/src/compute_broker_reservation_migration.rs",
           "file:server/src/node_agent_compute_plugin_host/attempt_contract.rs"
         ],
         "tags": [
@@ -2475,7 +2486,7 @@
         "view": "architecture",
         "kind": "component",
         "label": "算力联邦领域合同",
-        "detail": "未编译未接线的 Provider、Offer、Workload、Job、Lease、容量、价格和回执模型；版本化 Job Registry 已写，Reservation/Broker 尚缺",
+        "detail": "未编译未接线的 Provider、Offer、Workload、Job、Reservation、Lease、容量、价格和回执模型；版本化 Job/Reservation Registry 与首版平台人民币余额原子 Broker Reserve 已写，Attempt、终态结算和运行接线尚缺",
         "parent_id": "arch-server",
         "order": 35,
         "color": "#48A889",
@@ -2489,7 +2500,10 @@
           "file:server/src/compute_federation/capacity/reducer.rs",
           "file:server/src/store/compute_job_contract_validation.rs",
           "file:server/src/store/compute_job_registry.rs",
-          "file:server/src/compute_job_migration.rs"
+          "file:server/src/compute_job_migration.rs",
+          "file:server/src/store/compute_reservation_contract_validation.rs",
+          "file:server/src/store/compute_reservation_registry.rs",
+          "file:server/src/store/compute_broker_reservation.rs"
         ],
         "tags": [
           "contract",
@@ -2502,7 +2516,7 @@
         "view": "architecture",
         "kind": "planned_component",
         "label": "共享算力容量池与账本 V1",
-        "detail": "单池单窗口、跨 Offer 共享余额、多 meter Claim、六账户 reducer、v165/v167-v168 schema、Store-canonical V1/V2 请求摘要、事务内 Claim kernel、因果绑定继承、审计、恢复和 Pool 控制面已写且未编译；不可变首次响应与完整 Broker Reserve 尚未实现",
+        "detail": "单池单窗口、跨 Offer 共享余额、多 meter Claim、六账户 reducer、v165-v175 schema、Store-canonical V1/V2 请求摘要、事务内 Claim kernel、因果绑定继承、审计、恢复、Pool 控制面与首版平台人民币余额原子 Broker Reserve 已写且未编译；通用 Claim 不可变首次响应、Attempt、退款结算与运行接线尚未实现",
         "parent_id": "arch-server",
         "order": 36,
         "color": "#D0A34F",
@@ -2520,7 +2534,9 @@
           "file:server/src/store/compute_capacity_claim_transitions.rs",
           "file:server/src/store/compute_capacity_posting.rs",
           "file:server/src/store/compute_capacity_audit.rs",
-          "file:server/src/store/compute_capacity_expiry_recovery.rs"
+          "file:server/src/store/compute_capacity_expiry_recovery.rs",
+          "file:server/src/store/compute_broker_reservation.rs",
+          "file:server/src/compute_broker_reservation_migration.rs"
         ],
         "tags": [
           "planned",

@@ -78,7 +78,7 @@ Transaction 固定 pool、epoch、window、事件类型、幂等键、请求摘�
 
 任何一步失败全部回滚。候选查询、Quote 和 ReadyCapability 只提供观察事实，不能跳过 Reserve 的再次检查。
 
-当前容量 Store 已把 Claim Hold/Finish 拆出不自行提交的事务内 kernel。公开 standalone 方法仍以 `BEGIN IMMEDIATE` 包住 kernel 并负责 commit，但拒绝 Reservation 主体或绑定；未来 Broker 可在自己持有的同一事务中调用通用 Hold kernel。Hold V2 摘要固定完整 causal binding，Reservation Claim 强制绑定 Offer、Job 与同主体 Reservation，重放逐字段复核并只接受未到期的初始 held 版本；回执返回账本规范化后的记录与到期时间。Reservation-bound Finish 必须再次提供并核对同一绑定，再从原始 held 事务继承绑定并精确引用它作为因果前序。余额预授权、Job 登记和 Reservation 登记现也有不自行提交的入口，但尚无 Broker 把它们与容量腿统一编排并 fail-closed 检查预算结果，不能称为 Broker Reserve 已实现。
+当前容量 Store 已把 Claim Hold/Finish 拆出不自行提交的事务内 kernel。公开 standalone 方法仍以 `BEGIN IMMEDIATE` 包住 kernel 并负责 commit，但拒绝 Reservation 主体或绑定；v175 Broker 在自己持有的同一事务中调用通用 Hold kernel。Hold V2 摘要固定完整 causal binding，Reservation Claim 强制绑定 Offer、Job 与同主体 Reservation，重放逐字段复核并只接受未到期的初始 held 版本；回执返回账本规范化后的记录与到期时间。Reservation-bound Finish 必须再次提供并核对同一绑定，再从原始 held 事务继承绑定并精确引用它作为因果前序。v175 第一版 Broker 还组合余额预授权、Job 登记和 Reservation 登记，预算结果不是 `reserved` 时失败关闭；其状态为 `implementation_uncompiled`，只覆盖 `platform_balance_cny` 的 Reserve，不覆盖退款、结算或 Attempt。
 
 ## 5. Attempt 与容量
 
@@ -106,7 +106,7 @@ reusable:   issued = available + held + active + retired
 ## 7. 到期、恢复与对账
 
 - Quote hold、Reservation 和 Commitment 都有明确 expires_at；
-- 恢复器按 Claim 而非汇总余额追加 release/expired transaction；standalone 入口拒绝保留的 `compute_reservation` 主体，通用恢复器按 held 账本中真实的 Reservation causal binding 跳过 Broker 管理的 Claim，避免信任主体字符串或在未来 Broker 之外单独归还容量；
+- 恢复器按 Claim 而非汇总余额追加 release/expired transaction；standalone 入口拒绝保留的 `compute_reservation` 主体，通用恢复器按 held 账本中真实的 Reservation causal binding 跳过 Broker 管理的 Claim，避免信任主体字符串或在 Broker 之外单独归还容量；
 - 相同 effect 使用唯一幂等键，不会重复归还；
 - Supply Add/Withdraw 与 Claim Hold/Finish 的 request digest 已由 Store 按版本化字段、排序 bucket 数量和规范 UTC 计算；代码级重放仍返回当前 Claim/余额，尚未保存不可变首次响应，因此不能描述为严格幂等闭环；
 - 账本与余额投影不一致时停止新 Reserve，重放 ledger 重建投影并形成审计报告；
@@ -118,4 +118,4 @@ reusable:   issued = available + held + active + retired
 
 ## 9. 当前实现边界
 
-2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v174 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、窗口与 TTL 有界的 Claim hold、Claim-local held-only 释放/到期、Supply/Claim 四类写入的 Store-canonical request digest、双分录落库、余额 CAS、Claim 历史、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、Provider/Offer/Price Snapshot/Job/Reservation 注册和历史审计。Claim Hold/Finish 形成调用方事务内 kernel：Hold V2 固定完整 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承原 held 绑定，通用恢复器按真实绑定跳过 Broker Claim。Job、Reservation 登记与余额预授权也已有事务内入口；预算入口支持显式到期和严格重放，但退款/结算仍未提供同等可组合终态，Broker 也尚未统一编排并拒绝非 `reserved` 结果。上述路径尚未编译、执行迁移、调度、并发验证或真实容量操作；统一 Reserve、Attempt 激活、不可变首次响应、完整 Broker、受控自动修复和运行协议仍未写入或接线。
+2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v175 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、窗口与 TTL 有界的 Claim hold、Claim-local held-only 释放/到期、Supply/Claim 四类写入的 Store-canonical request digest、双分录落库、余额 CAS、Claim 历史、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、Provider/Offer/Price Snapshot/Job/Reservation 注册和历史审计。Claim Hold/Finish 形成调用方事务内 kernel：Hold V2 固定完整 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承原 held 绑定，通用恢复器按真实绑定跳过 Broker Claim。v175 Broker 以不可变回执把平台人民币余额预授权、容量 Hold、pending/active Reservation 和 quoted/reserved Job 统一为一个原子 Reserve，并拒绝非 `reserved` 预算结果。上述路径状态为 `implementation_uncompiled`，尚未执行迁移、调度、并发验证或真实容量操作；Attempt 激活、退款/最终结算、通用不可变 Claim 首次响应、受控自动修复和运行协议仍未写入或接线。
