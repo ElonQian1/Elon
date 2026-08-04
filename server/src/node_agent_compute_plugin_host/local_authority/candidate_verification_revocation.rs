@@ -1,18 +1,6 @@
+use crate::node_agent_compute_plugin_host::candidate_verification_terminal_result::encode_candidate_verification_revocation;
 use anyhow::{bail, Context, Result};
 use rusqlite::{named_params, params, Transaction};
-use serde::Serialize;
-
-use crate::node_agent_compute_plugin_host::signed_artifact_verification::jcs_sha256_hex;
-
-const REVOCATION_RESULT_SCHEMA: &str = "elon.compute_plugin.candidate_verification_revocation.v1";
-
-#[derive(Serialize)]
-struct CandidateVerificationRevocationResult<'reason> {
-    schema: &'static str,
-    state: &'static str,
-    reason: &'reason str,
-    resolved_at_ms: i64,
-}
 
 pub(super) fn revoke_for_process_owner_epoch_advance(
     transaction: &Transaction<'_>,
@@ -159,13 +147,7 @@ fn revoke_matching(
 }
 
 fn revocation_result(reason: &str, resolved_at_ms: i64) -> Result<(String, String)> {
-    let result = CandidateVerificationRevocationResult {
-        schema: REVOCATION_RESULT_SCHEMA,
-        state: "revoked",
-        reason,
-        resolved_at_ms,
-    };
-    Ok((serde_json::to_string(&result)?, jcs_sha256_hex(&result)?))
+    encode_candidate_verification_revocation(reason, resolved_at_ms)
 }
 
 fn require_no_prepared(transaction: &Transaction<'_>) -> Result<()> {

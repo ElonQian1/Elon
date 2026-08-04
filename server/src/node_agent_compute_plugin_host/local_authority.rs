@@ -37,7 +37,10 @@ pub(crate) use plan_application::{
 pub(crate) use process_ownership::ComputePluginFetchProcessFence;
 pub(in crate::node_agent_compute_plugin_host) use verification_store::{
     ComputePluginCandidateArtifactAuthorityFacts, ComputePluginCandidateVerificationAuthorityFacts,
+    ComputePluginCandidateVerificationOutcomeReadFailure,
+    ComputePluginCandidateVerificationRecoveryAuthoritySession,
     ComputePluginPostPinVerificationAuthoritySession,
+    ComputePluginPreparedCandidateVerificationFacts,
 };
 
 const COMPUTE_PLUGIN_STATE_FILE: &str = "compute-plugin-state.sqlite3";

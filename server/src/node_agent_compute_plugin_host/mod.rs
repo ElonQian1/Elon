@@ -5,6 +5,7 @@
 
 pub(crate) mod attempt_contract;
 pub(crate) mod candidate_verification_contract;
+mod candidate_verification_terminal_result;
 mod contract;
 pub(crate) mod fetch_contract;
 pub(crate) mod fetch_file;

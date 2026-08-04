@@ -11,6 +11,7 @@ use super::{
     ComputePluginFetchProcessFence, ComputePluginLocalAuthority,
 };
 use crate::node_agent_compute_plugin_host::{
+    candidate_verification_contract::ValidatedCandidateVerificationBeginPermit,
     fetch_contract::{
         ComputePluginFetchCancellationGuard, ValidatedComputePluginFetchAbortPermit,
         ValidatedComputePluginFetchClaimPermit, ValidatedComputePluginFetchCommitPermit,
@@ -269,8 +270,8 @@ impl ComputePluginFetchAuthoritySession<'_> {
     }
 
     /// Reads one exact, signed candidate download closure without opening files or mutating Store.
-    /// The caller must acquire a fresh post-pin session and compare durable projections before any
-    /// future verification claim CAS.
+    /// The caller must acquire a fresh post-pin session and compare durable projections before the
+    /// linear verification begin CAS.
     pub(in crate::node_agent_compute_plugin_host) fn read_fresh_candidate_verification_authority(
         &self,
         plan_id: &str,
@@ -314,6 +315,23 @@ impl ComputePluginFetchAuthoritySession<'_> {
                 self.roots,
                 &command,
                 permit.facts(),
+            )
+        })
+    }
+
+    /// Candidate verification begin CAS. The caller owns the linear file capability and treats
+    /// every error after entering this method as outcome-uncertain.
+    pub(in crate::node_agent_compute_plugin_host) fn begin_validated_candidate_verification(
+        &self,
+        permit: ValidatedCandidateVerificationBeginPermit<'_>,
+    ) -> Result<super::verification_store::ComputePluginPreparedCandidateVerificationFacts> {
+        self.authority.with_immediate(|transaction| {
+            verification_store::begin_candidate_verification(
+                transaction,
+                self.process_fence,
+                self.trusted_now.clone(),
+                self.roots,
+                permit,
             )
         })
     }

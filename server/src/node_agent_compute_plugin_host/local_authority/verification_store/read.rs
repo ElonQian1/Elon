@@ -10,7 +10,6 @@ use super::{
     ComputePluginCandidateArtifactAuthorityFacts, ComputePluginCandidateVerificationAuthorityFacts,
 };
 use crate::node_agent_compute_plugin_host::{
-    identity::ComputePluginReleaseRef,
     install_plan::ComputePluginPlannedDownload,
     install_plan_admission::{
         reverify_admitted_artifacts, validate_inventory, validate_live_binding,
@@ -20,32 +19,14 @@ use crate::node_agent_compute_plugin_host::{
     keyring::ComputePluginBootstrapRootKeyResolver,
     lifecycle::SLOT_DOWNLOADING,
     manifest_validation::is_sha256,
-    plugin_manifest::SignedComputePluginManifest,
     signed_artifact_verification::jcs_sha256_hex,
 };
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, OptionalExtension, Transaction};
 const MAX_CANDIDATE_ARTIFACTS: usize = 4_096;
-struct StoredVerificationApplication {
-    plan_digest: String,
-    application_request_digest: String,
-    signed_manifests: Vec<SignedComputePluginManifest>,
-}
-struct CandidateRow {
-    token: String,
-    token_digest: String,
-    plugin_id: String,
-    slot_ref: String,
-    generation: i64,
-    release: ComputePluginReleaseRef,
-    permission_grant_digest: String,
-    owner_plan_id: String,
-    owner_plan_digest: String,
-    application_inventory_revision: i64,
-    state: String,
-    created_at_ms: i64,
-}
+mod types;
+use types::{CandidateRow, StoredVerificationApplication};
 pub(super) fn read_fresh_candidate_verification_authority(
     transaction: &Transaction<'_>,
     process_fence: &ComputePluginFetchProcessFence,
@@ -165,6 +146,7 @@ pub(super) fn read_fresh_candidate_verification_authority(
         candidate_state: candidate.state,
         candidate_plugin_id: candidate.plugin_id,
         candidate_slot_ref: candidate.slot_ref,
+        candidate_created_at_ms: candidate.created_at_ms,
         candidate_release: candidate.release,
         candidate_permission_grant_digest: candidate.permission_grant_digest,
         next_verification_generation,

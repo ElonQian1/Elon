@@ -23,6 +23,23 @@ use super::{
     signed_artifact_verification::jcs_sha256_hex,
 };
 
+mod begin;
+mod recovery;
+
+pub(in crate::node_agent_compute_plugin_host) use begin::{
+    begin_candidate_verification, AuthorizedComputePluginCandidateArtifactSet,
+    BeginCandidateVerificationFailure, CandidateVerificationBeginMutationPhase,
+    CandidateVerificationBeginRecoveryCustody, UnclaimedCandidateArtifactSetCustody,
+    ValidatedCandidateVerificationBeginPermit,
+};
+pub(in crate::node_agent_compute_plugin_host) use recovery::{
+    abort_recovered_candidate_verification, inspect_candidate_verification_outcome,
+    CandidateVerificationRecoveryAbortFailure, CandidateVerificationRecoveryAbortPhase,
+    ComputePluginCandidateVerificationInitialAbsence, ComputePluginCandidateVerificationOutcome,
+    ComputePluginCandidateVerificationOutcomeKind, ComputePluginCandidateVerificationRecoveryKey,
+    ResolvedCandidateArtifactSetCustody, ValidatedCandidateVerificationRecoveryAbortPermit,
+};
+
 const FILE_SET_BINDING_SCHEMA: &str = "elon.compute_plugin.candidate_file_set_binding.v1";
 
 /// Existing candidate files pinned before any verification Store mutation. This capability is
@@ -50,8 +67,8 @@ struct PinnedComputePluginCandidateArtifact {
 }
 
 /// A new authenticated time observation has re-read the same durable projection after pinning.
-/// A future begin kernel may consume this value, but must still perform a third read and CAS inside
-/// one `BEGIN IMMEDIATE` transaction.
+/// The begin contract consumes this value and still performs a third read and CAS inside one
+/// `BEGIN IMMEDIATE` transaction before returning a hash authorization.
 pub(in crate::node_agent_compute_plugin_host) struct ObservedComputePluginCandidateArtifactSet<
     'authority,
 > {
@@ -256,6 +273,7 @@ fn validate_candidate_authority(
         || facts.candidate_state != "owned"
         || facts.candidate_plugin_id != candidate.plugin_id()
         || facts.candidate_slot_ref != candidate.slot_ref()
+        || facts.candidate_created_at_ms < 0
         || facts.candidate_release.plugin_id != facts.candidate_plugin_id
         || facts.next_verification_generation <= 0
         || facts.artifacts.is_empty()
@@ -282,6 +300,7 @@ struct FileSetBinding<'binding> {
     owner_plan_digest: &'binding str,
     application_inventory_revision: i64,
     execution_inventory_revision: i64,
+    authority_state_revision: i64,
     inventory_digest: &'binding str,
     authority_epoch: i64,
     process_owner_epoch: i64,
@@ -332,6 +351,7 @@ fn compute_file_set_binding_digest(
         owner_plan_digest: &facts.candidate_owner_plan_digest,
         application_inventory_revision: facts.candidate_application_inventory_revision,
         execution_inventory_revision: facts.execution_inventory_revision,
+        authority_state_revision: facts.authority_state_revision,
         inventory_digest: &facts.inventory_digest,
         authority_epoch: facts.authority_epoch,
         process_owner_epoch: facts.process_owner_epoch,

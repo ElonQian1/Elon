@@ -56,6 +56,7 @@ const REQUIRED_TRIGGERS: &[&str] = &[
     "candidate_release_verification_fenced",
     "candidate_state_transition",
     "candidate_verification_begin_fenced",
+    "candidate_verification_abort_fenced",
     "candidate_verification_delete_forbidden",
     "candidate_verification_identity_immutable",
     "candidate_verification_initial_state",
