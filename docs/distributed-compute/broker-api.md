@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Broker HTTP 与 MCP 控制面
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: backend, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -34,6 +34,14 @@ HTTP 与项目级 MCP 共用 `compute_federation_broker_service`，最终都进�
 Create 请求提供稳定 `job_id`、消费者幂等键、Workload、Provider 范围、预算上限和币种；用户、项目、初始状态和时间由服务端固定。相同用户幂等键只能重放同一份不可变需求合同。Quote Candidates 最多返回 100 个候选、扫描 1000 份当前索引中的快照，逐个复核 Offer、Provider、Workload、受众、币种、预算、时间窗和历史版本关系；结果包含当前 Job revision/digest、价格快照与最小化 Provider 摘要，不包含节点路由、凭据、适配器配置或 Offer 授权名单。Quote 请求再提供该 Job revision/digest、`offer_id` 和 `price_snapshot_id` 完成 CAS 锁价。锁价本身不冻结余额或容量。
 
 Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 quoted Job 的 revision/digest、所需 meter 数量和 UTC 到期时间。Release/Expire 必须提供新的终态幂等键及当前 Reservation revision/digest。
+
+### 2.1 PC 消费者工作区
+
+所有登录用户可从 PC `/compute-market` 选择本人项目，查看该项目中自己的当前 Job，创建 submitted Job，发现通过完整合同校验的报价候选，并把当前 Job revision/digest 锁定到不可变 Price Snapshot。锁价仍不移动余额或容量。
+
+对 quoted Job，工作区要求先重新取得与当前 Job revision/digest 一致、且 snapshot ID 与锁价选择相同的候选，才开放 Reservation 确认。确认窗口逐 meter 校验 Job 上限、Price Snapshot 上限和计价粒度，并把到期时间限制在 Job 截止、报价失效和交付窗口结束三者的最早边界。Reserve 成功后显示预算预授权、Capacity Claim、Reservation revision/digest 和持有数量；active 且尚未到期的预留只能显式 Release，达到到期边界后只能显式 Expire。两类终态均提交当前精确版本和摘要，后端仍是资金与容量原子性的最终权威。
+
+该 PC 工作区状态为 `implementation_uncompiled`，尚未构建、接口联调、视觉验收或发布。它不创建 Attempt、不派发节点、不声明任务已执行，也不覆盖运行中取消、实际用量、最终结算或外部付款。
 
 ## 3. MCP 工具
 

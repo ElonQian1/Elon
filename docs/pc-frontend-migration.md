@@ -2,7 +2,7 @@
 
 > 本文记录 `/pc` PC 工作台从原生静态 HTML/CSS/JS 迁移到 `Vite + React + TypeScript` 的路线、边界和模块状态。硬规则见 `.github/instructions/pc-frontend-migration.instructions.md`。
 >
-> 最后状态校准：2026-07-27
+> 最后状态校准：2026-08-05
 
 ## 当前判断
 
@@ -69,6 +69,7 @@ server/src/
 | 算力供给工作区 | 🟡 中 | `src/features/compute-supply/`、`server/src/compute_federation_capacity_*` | 🟡 `/compute-supply` 已写入本人 Provider 下的 Pool/Bucket/Supply、账本审计，以及激活证据本人申请、历史、预检和取消源码。证据入口只收引用和摘要，不保存凭据正文；申请或 approved 均不自动激活，普通页面没有管理员审核权。不发布 Offer、不派发任务或结算收入，尚未构建、视觉验收或发布 |
 | 算力激活审核工作区 | 🔴 高 | `src/features/compute-activation/`、`server/src/compute_federation_activation_*` | 🟡 仅 `admin/owner` 可见的 `/compute-activation` 已写入审核队列、证据预检、批准/退回/拒绝、过期 approved 废止、不可变计划准备与二次预检、精确摘要应用、应用回执和 active 紧急隔离源码。准备不激活；应用只改变平台内部 Provider/Pool 状态且不发布 Offer；隔离不关机、不退款、不撤销既有合同。尚未构建、接口联调、视觉验收或发布 |
 | 算力 Offer 与报价工作区 | 🔴 高 | `src/features/compute-supply/`、`src/features/compute-offers/`、`server/src/compute_federation_{offer,price_snapshot}_*` | 🟡 `/compute-supply` 已写入本人 Offer 草稿生命周期，以及 active Offer 的 fallback_curve 报价历史和显式发布；仅 `admin/owner` 可见的 `/compute-offers` 已写入待审、发布、draining 退场及 expired/revoked 终结。操作绑定当前版本、摘要、稳定幂等键和明确确认；报价可进入候选发现，但不创建 Job、不预留容量、不冻结余额或自动成交，尚未构建、接口联调、视觉验收或发布 |
+| 消费者算力市场工作区 | 🔴 高 | `src/features/compute-market/`、`server/src/compute_federation_broker_*` | 🟡 所有登录用户可见的 `/compute-market` 已写入项目级本人 Job 列表、submitted 创建、候选发现、不可变锁价、Reservation 列表、逐 meter 预算与容量预留，以及未执行任务 Release/Expire 源码。金融动作要求稳定幂等键、精确版本/摘要和明确确认；不创建 Attempt、不派发节点、不处理运行中取消或最终结算，尚未构建、接口联调、视觉验收或发布 |
 
 ### 阶段 P3 — 个人 AI 对话
 
