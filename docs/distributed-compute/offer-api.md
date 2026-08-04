@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Offer 草稿、发布与安全退场控制面
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: backend, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-本控制面已写入代码，但尚未编译、执行 v182-v184 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。本人可创建、连续修订或撤销规范化 `draft` Offer；平台管理员可原子发布、将 active Offer 转为 draining，并在依赖清理后转入 expired 或 revoked 终态。
+本控制面及对应 PC 工作区已写入代码，但尚未编译、执行 v182-v184 迁移、运行 HTTP/MCP 验证或发布，状态固定为 `implementation_uncompiled`。本人可创建、连续修订或撤销规范化 `draft` Offer；平台管理员可原子发布、将 active Offer 转为 draining，并在依赖清理后转入 expired 或 revoked 终态。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写入已有 v170 版本化 Offer Registry。服务端从 Provider、Pool 和 Bucket 当前版本生成规范合同、SKU 摘要与 Offer 摘要，调用方不能自行声称 active 状态或改写供给身份。
 
@@ -35,6 +35,12 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 | GET/POST | `/api/admin/compute/offers/:offer_id/drain` | 管理员读取回执，或显式确认后执行 `active -> draining` |
 | GET/POST | `/api/admin/compute/offers/:offer_id/expire` | 管理员读取回执，或对已到期且无活动预留的 draining Offer 执行 `expired` |
 | GET/POST | `/api/admin/compute/offers/:offer_id/revoke` | 管理员读取回执，或对无活动预留的 draining Offer执行 `revoked` |
+
+## 2.1 PC 工作区
+
+本人在 `/compute-supply` 的 Pool 详情中管理 Offer 草稿：页面列出当前 Pool 的合同，可从 open Bucket 创建常用 `spot/CNY` 草稿，并按当前版本和摘要修订或撤销。页面不会替用户发布 Offer，也不会生成 Price Snapshot、预留容量或移动资金。
+
+仅 `admin/owner` 可见的 `/compute-offers` 提供待发布草稿队列和按 Offer ID 精确打开入口。管理员可在核对当前版本、摘要和依赖边界后显式确认发布，或将 active Offer 转为 draining，再在服务端依赖检查通过后终结为 expired/revoked；页面展示本次写入返回的不可变回执摘要。所有操作仍由服务端合同判定，前端权限隐藏不替代后端授权。
 
 创建请求提供业务意图，包括幂等键、SKU 类别、模型与运行时、资源参数、Bucket 容量、执行限制、授权范围、价格条款与有效期。`confirm_create` 必须为 `true`。
 
