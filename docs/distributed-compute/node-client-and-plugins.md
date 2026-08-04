@@ -75,7 +75,24 @@ runtime:    stopped -> starting -> ready -> draining -> stopped
 
 Manifest 只能声明请求，不能授予权限、证明本机已安装或健康，也不能携带下载凭据、本机路径、价格或 Offer。插件能力必须由实际健康检查生成，禁止根据“已安装”推断为“可执行”。
 
-## 7. 第一批插件路线
+## 7. 本机 InstallPlan 准入合同
+
+客户端必须在产生任何网络下载或安装副作用前完成一次失败关闭的本机准入，结果只是一份短期、可撤销的执行授权，不等于插件已经安装。准入固定以下边界：
+
+1. Publisher Manifest 与控制面 InstallPlan 使用彼此独立的 Ed25519 keyring。Manifest 不能使用控制面 key，InstallPlan 也不能借用 Publisher key；未知、重复、撤销或格式错误的 key 一律拒绝。
+2. 两类载荷都使用 RFC 8785 JCS 规范化并计算 SHA-256，对外摘要固定为 64 位小写十六进制。签名消息固定为 `DOMAIN || 0x00 || digest-raw-32-bytes`，不能把十六进制文本当作签名字节；签名字段永远位于被签载荷之外。签名载荷中的整数限制在 I-JSON/IEEE-754 安全整数范围，超出时改用版本化十进制字符串字段，不能让不同语言各自舍入。
+3. signed Manifest 必须精确绑定插件、版本、目标、包摘要、Host API、无 shell Sidecar 入口、文件清单、依赖和请求权限。相对路径必须规范且留在插件槽内；包、文件与下载依赖必须形成无重复、无额外工件的闭包。
+4. InstallPlan 必须绑定当前库存 revision、策略 revision、共享授权 revision/digest、节点硬件档案摘要、Manifest catalog revision 和有效期。任何事实漂移都要求重新取计划，客户端不得猜测或自动放宽。
+5. 本地 grant 只能是 Manifest 请求权限与资源上限的严格子集。计划签名不能把 Publisher 未请求的网络、文件、设备、子进程、CPU、内存、显存、磁盘或运行时长权限变成合法授权。
+6. 每个 install/upgrade 项必须绑定一份已验签且目标精确匹配的 Manifest；计划中的包与依赖下载必须和 Manifest 的 ID、摘要、长度一一对应。`source_ref` 只是凭据外的查找引用，不能是 URL、本机路径、token 或签名下载地址。
+7. 首次准入只冻结“允许执行这份计划”的事实。执行器在每个下载请求、重定向和断点续传下一段字节前，都重新读取当前共享开关、授权 binding、策略 revision、节点档案、catalog 与计划有效期；任一变化立即在下一字节前停止。
+8. 共享关闭时，计划与本机重读都必须同时证明关闭；总下载字节、所需新增磁盘和所有下载列表精确为零，只允许 keep/disable/remove，应用后不得留下仍期望启用的插件。
+9. 准入与计划应用必须分离。后续 inventory store 采用 `expected_inventory_revision` CAS，以“克隆旧状态、全量校验、原子写盘成功、最后发布内存”的顺序提交；写入失败保留旧文件和旧内存，不启动下载。
+10. 重启恢复必须持久化计划 ID/digest、已应用 inventory revision 和下载游标；恢复时重新验签并重读授权，不能因进程曾经准入就跳过撤销、过期或 keyring 变化。
+
+准入输出只包含已验证的不可变绑定、稳定原因码和按计划顺序排列的下载描述，不包含下载凭据。真实下载器仍须自行执行 HTTPS/重定向边界、分块摘要、临时文件、包解压防穿越、文件摘要和槽提交门禁。
+
+## 8. 第一批插件路线
 
 1. `bridge.ollama.v1`：复用用户已经运行的 Ollama；
 2. `bridge.lmstudio.v1`：复用 LM Studio OpenAI 兼容端点；
@@ -87,7 +104,7 @@ Manifest 只能声明请求，不能授予权限、证明本机已安装或健�
 
 本批又写入了 release identity、signed Manifest、满足共享关闭零下载约束的 signed `InstallPlan`、active/candidate 槽、本机正交生命周期、hashed 短 TTL `ReadyCapability`、Attempt `Start/RenewLease/Cancel` 命令和 typed Runner/Host 事件合同。它们均是尚未编译、尚未接线的 Rust 合同，不能据此宣称插件系统已经可下载安装或可调度。
 
-## 8. Host 与 Sidecar 边界
+## 9. Host 与 Sidecar 边界
 
 插件目标形态是独立 Sidecar 进程，通过 Windows Named Pipe 或等价本机 IPC 与 Plugin Host 通信，不暴露公网监听端口。Host 负责：
 
@@ -101,13 +118,13 @@ Manifest 只能声明请求，不能授予权限、证明本机已安装或健�
 
 第一批内部兼容 seam 仍直接调用现有 Rust 本地推理函数。下载器、Manifest/InstallPlan 验证器、原子槽切换、Sidecar 进程、IPC framing、资源沙箱、事件背压、`ReadyCapability` 上报与真实 Attempt 运行接线仍未实现。
 
-## 9. 模型与缓存
+## 10. 模型与缓存
 
 模型采用内容寻址标识，至少绑定 SHA-256、文件长度、格式、Tokenizer 摘要、许可元数据和来源。下载支持断点续传、分块校验、镜像切换和去重。
 
 缓存分为 pinned、active、warm 和 evictable。正在运行或已承诺交付窗口的工件不能被回收；其余根据用户磁盘配额和最近使用顺序回收。插件升级不能隐式下载任意模型，模型计划必须单独可见。
 
-## 10. 策略与资源保护
+## 11. 策略与资源保护
 
 控制面下发带 `policy_revision` 的期望策略，节点返回 `applied_revision` 和本机有效策略。每次任务开始前仍需本地重新检查：
 
@@ -119,10 +136,10 @@ Manifest 只能声明请求，不能授予权限、证明本机已安装或健�
 
 本地策略比云端期望更严格时，以本地为准。节点拒绝任务必须返回稳定原因码，使 Broker 能立即改派。
 
-## 11. 任务与数据
+## 12. 任务与数据
 
 V1 只运行平台批准的任务种类和签名 Runner，不接受请求方上传任意可执行代码。任务输入使用摘要和短期引用；日志默认不复制完整 Prompt 或模型输出。技术信任通过验证策略逐步提高，而不是把节点自报结果直接当成结算事实。
 
-## 12. 当前未验证声明
+## 13. 当前未验证声明
 
 本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam 与上述版本化合同已形成代码，但本批尚未编译或启动。真实 downloader、签名与摘要验证器、安装事务、Sidecar/IPC/沙箱、typed 事件运行链路、短 TTL `ReadyCapability` 上报和调度接线仍未实现；节点不直接发布商业 Offer，服务端 Offer 生成也未因本批合同自动接通。
