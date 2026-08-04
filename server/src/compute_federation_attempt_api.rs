@@ -12,9 +12,9 @@ use serde_json::json;
 use crate::{
     compute_federation_attempt_service::{
         self, AbortMyComputeAttemptRequest, ActivateMyComputeAttemptRequest,
-        DeclareMyComputeAttemptTerminalCandidateRequest, DeclareMyComputeAttemptUsageRequest,
-        ObserveComputeAttemptTerminalCandidateBody, RenewMyComputeAttemptLeaseRequest,
-        ReviewMyComputeAttemptTerminalCandidateRequest,
+        DecideComputeAttemptVerificationBody, DeclareMyComputeAttemptTerminalCandidateRequest,
+        DeclareMyComputeAttemptUsageRequest, ObserveComputeAttemptTerminalCandidateBody,
+        RenewMyComputeAttemptLeaseRequest, ReviewMyComputeAttemptTerminalCandidateRequest,
     },
     project_auth::{auth_from_headers, json_error},
     types::AppState,
@@ -77,6 +77,14 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/compute/attempt-leases/:lease_id/terminal-candidate/platform-observation",
             get(get_platform_observation),
+        )
+        .route(
+            "/api/admin/compute/attempt-leases/:lease_id/verification-decision",
+            post(decide_verification),
+        )
+        .route(
+            "/api/me/compute/attempt-leases/:lease_id/verification-decision",
+            get(get_verification),
         )
 }
 
@@ -367,6 +375,44 @@ async fn get_platform_observation(
     )
 }
 
+async fn decide_verification(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+    Json(request): Json<DecideComputeAttemptVerificationBody>,
+) -> Response {
+    let admin_user_id = match platform_admin(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::decide_verification_for_platform_admin(
+            &state.store,
+            &admin_user_id,
+            &lease_id,
+            request,
+        ),
+    )
+}
+
+async fn get_verification(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::get_verification_for_participant(
+            &state.store,
+            &user_id,
+            &lease_id,
+        ),
+    )
+}
+
 fn authenticated_user(state: &AppState, headers: &HeaderMap) -> Result<String, Response> {
     auth_from_headers(state, headers)
         .map(|user| user.id)
@@ -379,7 +425,7 @@ fn platform_admin(state: &AppState, headers: &HeaderMap) -> Result<String, Respo
     if !matches!(user.role.as_str(), "admin" | "owner") {
         return Err(json_error(
             StatusCode::FORBIDDEN,
-            "只有平台管理员可以登记算力 Attempt 观测证据",
+            "只有平台管理员可以管理算力 Attempt 观测与验证决定",
         ));
     }
     Ok(user.id)

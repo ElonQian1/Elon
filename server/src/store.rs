@@ -38,6 +38,7 @@ mod compute_attempt_leases;
 mod compute_attempt_platform_observations;
 mod compute_attempt_terminals;
 mod compute_attempt_usage;
+mod compute_attempt_verifications;
 mod compute_broker_reservation;
 mod compute_capacity_audit;
 mod compute_capacity_bucket_queries;
@@ -277,6 +278,9 @@ pub(crate) use compute_attempt_terminals::{
 pub(crate) use compute_attempt_usage::{
     ComputeAttemptUsageDeclarationReceipt, ComputeDeclaredUsageInput,
     DeclareComputeAttemptUsageRequest,
+};
+pub(crate) use compute_attempt_verifications::{
+    ComputeAttemptVerificationDecisionReceipt, DecideComputeAttemptVerificationRequest,
 };
 pub(crate) use compute_broker_reservation::{
     ComputeBrokerFinishAction, ComputeBrokerFinishReceipt, ComputeBrokerReservationReceipt,

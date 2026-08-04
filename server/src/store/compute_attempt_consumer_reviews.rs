@@ -205,10 +205,19 @@ impl Store {
     ) -> Result<ComputeAttemptConsumerReviewReceipt> {
         support::validate_exact("Attempt Lease ID", lease_id, 200)?;
         let conn = self.conn()?;
-        let stored = consumer_review_by_lease_on(&conn, lease_id)?
-            .ok_or_else(|| anyhow!("Attempt 尚无消费者终态审核证据"))?;
-        consumer_review_receipt_on(&*conn, stored, false)
+        compute_attempt_consumer_review_on(&*conn, lease_id)?
+            .ok_or_else(|| anyhow!("Attempt 尚无消费者终态审核证据"))
     }
+}
+
+pub(crate) fn compute_attempt_consumer_review_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeAttemptConsumerReviewReceipt>> {
+    let Some(stored) = consumer_review_by_lease_on(conn, lease_id)? else {
+        return Ok(None);
+    };
+    Ok(Some(consumer_review_receipt_on(conn, stored, false)?))
 }
 
 fn consumer_review_receipt_on(

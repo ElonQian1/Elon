@@ -255,10 +255,19 @@ impl Store {
     ) -> Result<ComputeAttemptPlatformObservationReceipt> {
         support::validate_exact("Attempt Lease ID", lease_id, 200)?;
         let conn = self.conn()?;
-        let stored = platform_observation_by_lease_on(&*conn, lease_id)?
-            .ok_or_else(|| anyhow!("Attempt 尚无平台终态观测证据"))?;
-        platform_observation_receipt_on(&*conn, stored, false)
+        compute_attempt_platform_observation_on(&*conn, lease_id)?
+            .ok_or_else(|| anyhow!("Attempt 尚无平台终态观测证据"))
     }
+}
+
+pub(crate) fn compute_attempt_platform_observation_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeAttemptPlatformObservationReceipt>> {
+    let Some(stored) = platform_observation_by_lease_on(conn, lease_id)? else {
+        return Ok(None);
+    };
+    Ok(Some(platform_observation_receipt_on(conn, stored, false)?))
 }
 
 fn platform_observation_receipt_on(

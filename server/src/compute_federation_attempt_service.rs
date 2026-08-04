@@ -6,11 +6,11 @@ use crate::store::{
     ComputeAttemptActivationReceipt, ComputeAttemptConsumerReviewReceipt,
     ComputeAttemptLeaseRenewalReceipt, ComputeAttemptLeaseStateReceipt,
     ComputeAttemptPlatformObservationReceipt, ComputeAttemptTerminalCandidateReceipt,
-    ComputeAttemptUsageDeclarationReceipt, ComputeDeclaredResultArtifactInput,
-    ComputeDeclaredUsageInput, ComputeObservedUsageInput,
-    DeclareComputeAttemptTerminalCandidateRequest, DeclareComputeAttemptUsageRequest,
-    ObserveComputeAttemptTerminalCandidateRequest, RenewComputeAttemptLeaseRequest,
-    ReviewComputeAttemptTerminalCandidateRequest, Store,
+    ComputeAttemptUsageDeclarationReceipt, ComputeAttemptVerificationDecisionReceipt,
+    ComputeDeclaredResultArtifactInput, ComputeDeclaredUsageInput, ComputeObservedUsageInput,
+    DecideComputeAttemptVerificationRequest, DeclareComputeAttemptTerminalCandidateRequest,
+    DeclareComputeAttemptUsageRequest, ObserveComputeAttemptTerminalCandidateRequest,
+    RenewComputeAttemptLeaseRequest, ReviewComputeAttemptTerminalCandidateRequest, Store,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -124,6 +124,24 @@ pub(crate) struct ObserveComputeAttemptTerminalCandidateBody {
     pub evidence_refs: Vec<String>,
     pub idempotency_key: String,
     pub confirm_platform_observation_only: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DecideComputeAttemptVerificationBody {
+    pub expected_terminal_candidate_id: String,
+    pub expected_terminal_candidate_event_digest: String,
+    pub expected_consumer_review_id: String,
+    pub expected_consumer_review_event_digest: String,
+    pub expected_platform_observation_id: String,
+    pub expected_platform_observation_event_digest: String,
+    pub policy_id: String,
+    pub policy_version: i64,
+    pub decision: String,
+    pub reason_codes: Vec<String>,
+    pub decision_ref: String,
+    pub idempotency_key: String,
+    pub confirm_no_state_or_settlement_effect: bool,
 }
 
 pub(crate) fn activate_for_provider_owner(
@@ -415,4 +433,41 @@ pub(crate) fn get_platform_observation_for_participant(
 ) -> Result<ComputeAttemptPlatformObservationReceipt> {
     get_for_participant(store, user_id, lease_id)?;
     store.compute_attempt_platform_observation(lease_id)
+}
+
+pub(crate) fn decide_verification_for_platform_admin(
+    store: &Store,
+    admin_user_id: &str,
+    lease_id: &str,
+    request: DecideComputeAttemptVerificationBody,
+) -> Result<ComputeAttemptVerificationDecisionReceipt> {
+    if !request.confirm_no_state_or_settlement_effect {
+        bail!("提交 Verification 决定前必须确认本操作不推进状态、容量或结算");
+    }
+    store.decide_compute_attempt_verification(&DecideComputeAttemptVerificationRequest {
+        lease_id: lease_id.to_string(),
+        expected_terminal_candidate_id: request.expected_terminal_candidate_id,
+        expected_terminal_candidate_event_digest: request.expected_terminal_candidate_event_digest,
+        expected_consumer_review_id: request.expected_consumer_review_id,
+        expected_consumer_review_event_digest: request.expected_consumer_review_event_digest,
+        expected_platform_observation_id: request.expected_platform_observation_id,
+        expected_platform_observation_event_digest: request
+            .expected_platform_observation_event_digest,
+        policy_id: request.policy_id,
+        policy_version: request.policy_version,
+        decision: request.decision,
+        reason_codes: request.reason_codes,
+        decision_ref: request.decision_ref,
+        idempotency_key: request.idempotency_key,
+        decided_by_user_id: admin_user_id.to_string(),
+    })
+}
+
+pub(crate) fn get_verification_for_participant(
+    store: &Store,
+    user_id: &str,
+    lease_id: &str,
+) -> Result<ComputeAttemptVerificationDecisionReceipt> {
+    get_for_participant(store, user_id, lease_id)?;
+    store.compute_attempt_verification_decision(lease_id)
 }
