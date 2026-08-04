@@ -170,6 +170,40 @@ impl Store {
             })
             .transpose()
     }
+
+    pub(crate) fn list_compute_price_snapshots_for_offer(
+        &self,
+        offer_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ComputePriceSnapshotRegistrationReceipt>> {
+        if offer_id.trim().is_empty() {
+            bail!("算力 Offer ID 不能为空");
+        }
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT snapshot_id FROM compute_price_snapshots
+              WHERE offer_id=?1
+              ORDER BY quoted_at DESC, snapshot_id ASC
+              LIMIT ?2",
+        )?;
+        let snapshot_ids = stmt
+            .query_map(
+                params![offer_id.trim(), limit.clamp(1, 100) as i64],
+                |row| row.get::<_, String>(0),
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        snapshot_ids
+            .into_iter()
+            .map(|snapshot_id| {
+                let snapshot = registered_price_snapshot_on(&conn, &snapshot_id)?
+                    .ok_or_else(|| anyhow!("报价快照列表项在审计期间消失"))?;
+                Ok(ComputePriceSnapshotRegistrationReceipt {
+                    snapshot,
+                    replayed: false,
+                })
+            })
+            .collect()
+    }
 }
 
 pub(super) fn registered_price_snapshot_on(

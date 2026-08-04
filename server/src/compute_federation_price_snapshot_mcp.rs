@@ -9,6 +9,7 @@ use crate::{
 
 const PUBLISH_TOOL: &str = "compute_publish_my_price_snapshot";
 const GET_TOOL: &str = "compute_get_my_price_snapshot";
+const LIST_TOOL: &str = "compute_list_my_price_snapshots";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -28,6 +29,16 @@ struct GetArguments {
     snapshot_id: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ListArguments {
+    provider_id: String,
+    pool_id: String,
+    offer_id: String,
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
 pub(crate) fn definitions() -> Vec<Value> {
     vec![
         tool(
@@ -40,6 +51,12 @@ pub(crate) fn definitions() -> Vec<Value> {
             GET_TOOL,
             "读取当前用户 Offer 下的一份不可变价格快照并重新审计历史绑定。",
             get_schema(),
+            true,
+        ),
+        tool(
+            LIST_TOOL,
+            "按稳定顺序列出当前用户 Offer 下的不可变价格快照，并逐份复核历史绑定。",
+            list_schema(),
             true,
         ),
     ]
@@ -77,6 +94,19 @@ pub(crate) fn call_if_handled(
                     &input.snapshot_id,
                 )?,
             )?))
+        }
+        LIST_TOOL => {
+            let input: ListArguments = decode(arguments, name)?;
+            Ok(Some(json!({
+                "snapshots":compute_federation_price_snapshot_service::list_for_user(
+                    store,
+                    user_id,
+                    &input.provider_id,
+                    &input.pool_id,
+                    &input.offer_id,
+                    input.limit,
+                )?
+            })))
         }
         _ => Ok(None),
     }
@@ -129,12 +159,30 @@ fn get_schema() -> Value {
     })
 }
 
+fn list_schema() -> Value {
+    json!({
+        "type":"object",
+        "required":["provider_id","pool_id","offer_id"],
+        "properties":{
+            "provider_id":bounded_string(160),
+            "pool_id":bounded_string(160),
+            "offer_id":bounded_string(200),
+            "limit":{"type":"integer","minimum":1,"maximum":100,"default":20}
+        },
+        "additionalProperties":false
+    })
+}
+
 fn bounded_string(max_length: usize) -> Value {
     json!({"type":"string","minLength":1,"maxLength":max_length})
 }
 
 fn decode<T: for<'de> Deserialize<'de>>(arguments: Value, name: &str) -> Result<T> {
     serde_json::from_value(arguments).with_context(|| format!("{name} 参数无效"))
+}
+
+fn default_limit() -> usize {
+    20
 }
 
 fn tool(name: &str, description: &str, input_schema: Value, read_only: bool) -> Value {

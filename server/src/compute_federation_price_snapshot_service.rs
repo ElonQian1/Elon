@@ -128,6 +128,28 @@ pub(crate) fn get_for_user(
     Ok(snapshot_view(receipt, false))
 }
 
+pub(crate) fn list_for_user(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    pool_id: &str,
+    offer_id: &str,
+    limit: usize,
+) -> Result<Vec<MyComputePriceSnapshotView>> {
+    compute_federation_offer_service::get_for_user(store, user_id, provider_id, pool_id, offer_id)?;
+    store
+        .list_compute_price_snapshots_for_offer(offer_id, limit)?
+        .into_iter()
+        .map(|receipt| {
+            if receipt.snapshot.provider_id != provider_id || receipt.snapshot.offer_id != offer_id
+            {
+                bail!("价格快照列表项不属于指定 Provider/Offer");
+            }
+            Ok(snapshot_view(receipt, false))
+        })
+        .collect()
+}
+
 fn validate_replay(
     snapshot: &ComputePriceSnapshot,
     offer: &crate::compute_federation::offer::ComputeOffer,
