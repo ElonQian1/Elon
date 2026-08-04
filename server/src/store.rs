@@ -225,7 +225,8 @@ use common::{
     safe_external_id, validate_password, verify_password,
 };
 pub(crate) use compute_broker_reservation::{
-    ComputeBrokerReservationReceipt, ReserveComputeBrokerRequest,
+    ComputeBrokerFinishAction, ComputeBrokerFinishReceipt, ComputeBrokerReservationReceipt,
+    FinishComputeBrokerRequest, ReserveComputeBrokerRequest,
 };
 pub(crate) use compute_capacity_audit::{
     ComputeCapacityBucketAudit, ComputeCapacityDerivedBalance, ComputeCapacityPoolAuditReport,

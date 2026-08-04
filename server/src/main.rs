@@ -46,6 +46,7 @@ mod codex_vault_api;
 mod codex_vault_emergency_api;
 mod codex_vault_emergency_migration;
 mod codex_vault_slot_migration;
+mod compute_broker_finish_migration;
 mod compute_broker_reservation_migration;
 mod compute_capacity_claim_history_migration;
 mod compute_capacity_epoch_migration;

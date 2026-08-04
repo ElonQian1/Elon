@@ -43,6 +43,69 @@ struct StoredBrokerReserveReceipt {
     reservation_digest: String,
 }
 
+pub(super) struct BrokerReserveBinding {
+    pub budget_reservation_id: String,
+    pub budget_reserved_fen: i64,
+    pub capacity_claim: ComputeCapacityClaimBinding,
+    pub reserved_job: ComputeJobVersionBinding,
+    pub reservation_revision: i64,
+    pub reservation_digest: String,
+}
+
+pub(super) fn broker_reserve_binding_on(
+    conn: &Connection,
+    reservation_id: &str,
+    consumer_account_id: &str,
+) -> Result<BrokerReserveBinding> {
+    let stored = conn
+        .query_row(
+            "SELECT budget_reservation_id, budget_reserved_fen,
+                    capacity_claim_id, capacity_claim_revision,
+                    capacity_claim_digest, job_id, reserved_job_revision,
+                    reserved_job_digest, reservation_revision,
+                    reservation_digest, budget_adapter
+               FROM compute_broker_reserve_receipts
+              WHERE reservation_id=?1 AND consumer_account_id=?2",
+            params![reservation_id.trim(), consumer_account_id.trim()],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, i64>(6)?,
+                    row.get::<_, String>(7)?,
+                    row.get::<_, i64>(8)?,
+                    row.get::<_, String>(9)?,
+                    row.get::<_, String>(10)?,
+                ))
+            },
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("Reservation 缺少平台余额 Broker 原子预留回执"))?;
+    if stored.10 != BROKER_BUDGET_ADAPTER {
+        bail!("Reservation 的 Broker 预算适配器不受当前终态入口支持");
+    }
+    Ok(BrokerReserveBinding {
+        budget_reservation_id: stored.0,
+        budget_reserved_fen: stored.1,
+        capacity_claim: ComputeCapacityClaimBinding {
+            claim_id: stored.2,
+            claim_revision: stored.3,
+            claim_digest: stored.4,
+        },
+        reserved_job: ComputeJobVersionBinding {
+            job_id: stored.5,
+            job_revision: stored.6,
+            job_digest: stored.7,
+        },
+        reservation_revision: stored.8,
+        reservation_digest: stored.9,
+    })
+}
+
 pub(super) fn replay_broker_reserve_on(
     conn: &Connection,
     request: &NormalizedBrokerReserveRequest,
