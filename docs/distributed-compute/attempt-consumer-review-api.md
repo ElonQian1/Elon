@@ -1,15 +1,16 @@
 ---
 title: 分布式算力 Attempt 消费者终态审核证据
 status: current
-reviewed_at: 2026-08-04
-owners: ai-economy, backend
+reviewed_at: 2026-08-05
+owners: ai-economy, backend, pc
+implementation_status: implementation_uncompiled
 ---
 
 # 分布式算力 Attempt 消费者终态审核证据
 
 ## 1. 当前实现
 
-v190、追加式 Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。本控制面允许 Job 消费者对 v189 Provider 终态候选登记第一份 `accepted`、`rejected` 或 `disputed` 审核证据。
+v190、追加式 Store、Service、HTTP 路由、本人待审核队列与 PC `/compute-reviews` 已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面允许 Job 消费者发现自己的 v189 Provider 终态候选，并登记第一份 `accepted`、`rejected` 或 `disputed` 审核证据。
 
 消费者审核只是一方证明，不是平台 Verification 决定。即使消费者选择 `accepted`，也不会生成 Execution Receipt、扣除预授权、释放 Provider 收益、消费容量或推进 Lease、Job、Reservation、Claim 状态。
 
@@ -17,10 +18,15 @@ v190、追加式 Store、Service 与 HTTP 路由已经写入代码，但尚未�
 
 | 方法 | 路径 | 调用者 | 作用 |
 |---|---|---|---|
+| GET | `/api/me/compute/attempt-terminal-candidates/pending-consumer-review` | 登录消费者 | 按最早候选优先列出本人尚未审核的候选 |
 | POST | `/api/me/compute/attempt-leases/:lease_id/terminal-candidate/consumer-review` | Job 消费者 | 登记第一份消费者审核证据 |
 | GET | `/api/me/compute/attempt-leases/:lease_id/terminal-candidate/consumer-review` | Job 消费者或 Provider 所有者 | 读取并重新审计审核回执 |
 
 POST 请求必须提供精确终态候选 ID、候选事件摘要、决定、规范原因码、消费者侧审核引用、可选证据引用、稳定幂等键，并显式设置 `confirm_consumer_attestation_only=true`。
+
+待审核队列直接按候选冻结的 `consumer_account_id` 过滤，并使用 `NOT EXISTS` 排除已有 v190 回执；读取不会改变候选或审核状态。队列结果可能在并发提交后过期，因此 POST 仍会在事务内重新审计身份、候选摘要、唯一性和幂等键，不能把列表命中视为写入授权。
+
+PC `/compute-reviews` 展示候选结果、最终用量摘要和工件引用，允许提交接受、拒绝或争议证据。页面不下载工件正文、不验证摘要真实性，也不会把 `accepted` 显示为平台验证或付款结果。
 
 ## 3. 失败关闭边界
 
@@ -61,6 +67,7 @@ POST 请求必须提供精确终态候选 ID、候选事件摘要、决定、规
 ## 6. 尚未实现
 
 - Cargo 编译、v190 迁移执行、HTTP 真实调用、并发与故障注入验证；
+- PC 构建、接口联调、视觉验收和发布；
 - 消费者审核 MCP 入口、结果工件真实取回与内容验证；
 - 平台观测自动接线、独立验证器和多策略治理；v191 已提供管理员平台观测，v192 已提供管理员保守 Verification 决定，见 `docs/distributed-compute/attempt-platform-observation-api.md` 和 `docs/distributed-compute/attempt-verification-api.md`；
 - rejected/disputed 的举证、仲裁、超时和追加式裁决流程；
@@ -74,3 +81,5 @@ POST 请求必须提供精确终态候选 ID、候选事件摘要、决定、规
 - `server/src/compute_attempt_consumer_review_migration.rs`
 - `server/src/compute_federation_attempt_service.rs`
 - `server/src/compute_federation_attempt_api.rs`
+- `pc-frontend/src/features/compute-market/ComputeConsumerReviewPage.tsx`
+- `pc-frontend/src/features/compute-market/ReviewTerminalCandidateDialog.tsx`
