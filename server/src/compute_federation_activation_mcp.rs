@@ -13,6 +13,7 @@ const SUBMIT_TOOL: &str = "compute_submit_my_activation_evidence_request";
 const GET_TOOL: &str = "compute_get_my_activation_evidence_request";
 const LIST_TOOL: &str = "compute_list_my_activation_evidence_requests";
 const CANCEL_TOOL: &str = "compute_cancel_my_activation_evidence_request";
+const PREFLIGHT_TOOL: &str = "compute_preflight_my_activation_evidence_request";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -79,6 +80,12 @@ pub(crate) fn definitions() -> Vec<Value> {
             "显式取消本人仍处于 submitted 的激活证据申请；不能取消已批准、退回或拒绝的申请。",
             cancel_schema(),
             false,
+        ),
+        tool(
+            PREFLIGHT_TOOL,
+            "只读复核本人激活证据申请及当前 Provider/CapacityPool 是否满足后续激活前置条件，返回稳定阻断代码；不会执行激活或写入验证事实。",
+            request_schema(),
+            true,
         ),
     ]
 }
@@ -147,6 +154,18 @@ pub(crate) fn call_if_handled(
                         expected_request_digest: input.expected_request_digest,
                         confirm_cancel: input.confirm_cancel,
                     },
+                )?,
+            )?))
+        }
+        PREFLIGHT_TOOL => {
+            let input: RequestArguments = decode(arguments, name)?;
+            Ok(Some(serde_json::to_value(
+                compute_federation_activation_service::preflight_for_user(
+                    store,
+                    user_id,
+                    &input.provider_id,
+                    &input.pool_id,
+                    &input.request_id,
                 )?,
             )?))
         }

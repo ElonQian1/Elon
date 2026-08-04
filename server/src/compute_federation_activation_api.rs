@@ -34,12 +34,20 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(cancel_my_request),
         )
         .route(
+            "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/activation-evidence-requests/:request_id/preflight",
+            get(preflight_my_request),
+        )
+        .route(
             "/api/admin/compute/activation-evidence-requests",
             get(list_reviewable_requests),
         )
         .route(
             "/api/admin/compute/activation-evidence-requests/:request_id/review",
             post(review_request),
+        )
+        .route(
+            "/api/admin/compute/activation-evidence-requests/:request_id/preflight",
+            get(preflight_review_request),
         )
 }
 
@@ -136,6 +144,24 @@ async fn cancel_my_request(
     ))
 }
 
+async fn preflight_my_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, pool_id, request_id)): Path<(String, String, String)>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    activation_response(compute_federation_activation_service::preflight_for_user(
+        &state.store,
+        &user_id,
+        &provider_id,
+        &pool_id,
+        &request_id,
+    ))
+}
+
 async fn list_reviewable_requests(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -169,6 +195,20 @@ async fn review_request(
         &reviewer_user_id,
         &request_id,
         request,
+    ))
+}
+
+async fn preflight_review_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    activation_response(compute_federation_activation_service::preflight_for_review(
+        &state.store,
+        &request_id,
     ))
 }
 
