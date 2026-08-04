@@ -20,7 +20,7 @@ reviewed_at: 2026-08-04
 
 - 发现 Web、PWA、Tauri 和 Android 设计目标，并返回来源目录、配置文件、适配器和证据级别。
 - 在项目内创建 `designSessionId`；同一 canonical Git 项目的新 MCP 会话或 PC 客户端可用 `ui_list_design_sessions` 恢复，无需保留创建时连接或打开 PC 画布。
-- `ui_plan_design_intent` 把自然语言编译为项目持久的 `DesignIntentPlan`：保存意图摘要和 SHA-256，不保存完整聊天；计划明确 Web/PWA/Tauri/Android、route、state hints、会话复用/打开策略和有序工具动作。规划本身不启动 Runtime、不修改源码。
+- `ui_plan_design_intent` 把自然语言编译为项目持久的 `DesignIntentPlan`：保存意图摘要和 SHA-256，不保存完整聊天；计划明确 Web/PWA/Tauri/Android、route、state hints、会话复用/打开策略和有序工具动作。计划使用单调 `revision`；`ui_start_design_intent_plan` 绑定真实 task lease，`ui_record_design_intent_action` 保存逐动作回执，`ui_transition_design_intent_plan` 管理暂停/恢复/取消/失败/完成，`ui_replan_design_intent` 用 `replannedFrom/supersededBy` 保留替代链。规划本身不启动 Runtime、不修改源码。
 - AI 任务可用 `ui_bind_design_task` 把 `taskId` 持久绑定到 designSession/draft，并获取 60–3600 秒 lease。同一 designSession 同时只允许一个未过期任务 lease；重新绑定必须提交当前 `expectedLeaseId`，运行中可续租，终态显式结算。
 - `ui_list_design_events` 按 `taskId + afterCursor` 增量读取紧凑事件，支持最长 15 秒有界等待；事件只含工具、session/draft、平台/route、revision、工件哈希等摘要，项目内最多保留 1,000 条，不保存截图正文或工具完整结果。
 - 每个 `consumerId + taskId` 可用 `ui_get_design_event_checkpoint` 恢复已确认 cursor，并以 `expectedRevision` 调用 `ui_commit_design_event_checkpoint` 单调提交。checkpoint 只确认已成功消费的事件，不删除事件；PC 重开后无需从头读取。
@@ -36,13 +36,15 @@ reviewed_at: 2026-08-04
 - `ui_suggest_design_source_binding` 先验证会话 UI tree 的路径和 SHA-256，再结合 selector、可访问 label、role、tag 和 route，只扫描 designSession 声明的 `sourceRoots`。候选最多检查 2,000 个、单文件 512 KiB，遵守 Git ignore，跳过构建目录和秘密形态行；只返回局部 excerpt、行号、字节范围、来源 SHA-256、命中信号和 `CANDIDATE` 建议，不自动确认 `BOUND`。
 - `ui_check_design_source_binding` 在写回前重新读取绑定文件，校验普通文件、2 MiB 上限、SHA-256 和 byte range，区分 `HEALTHY`、`SOURCE_CHANGED`、`RANGE_STALE`、`FILE_MISSING` 等状态。失败时可复用候选器给出有界恢复候选，但固定 `autoRebound=false`。
 - `ui_plan_design_writeback` 把 DraftOperation 按目标平台编译成持久写回计划，展示框架适配器、mutation kind、确定性/AI handoff、阻塞项和 LOW/MEDIUM/HIGH 风险。`ui_decide_design_writeback_plan` 必须显式批准或带原因拒绝；批准不修改源码。`ui_begin_design_writeback` 只接受已批准且 draft revision、绑定 SHA/range 未漂移的 `writebackPlanId`，再固定 Git/source 基线。AI 修改源码并完成分平台验证后，仍由 `ui_complete_design_writeback` 持久化 changed files、source hashes、Git revision 和平台证据。
+- `ui_propose_design_source_patch` 只接受已批准写回计划、已确认 binding、精确 UTF-8 byte range、片段 SHA-256 和有界 replacement。提案把完整审查内容留在项目 review artifact，API 只返回范围/摘要哈希；`ui_decide_design_source_patch` 二次批准后，`ui_apply_design_source_patch` 才能按 `APPROVED -> APPLYING -> APPLIED` journal 原子替换源码。应用后 `ui_plan_design_source_rollback` 生成精确逆向审查计划，但不自动回滚。
+- `ui_create_design_regression_baseline` 只固化已通过文件哈希复核的 PNG/UI tree。重新捕获后，`ui_plan_design_regression_comparison` 固定前后证据、平台、route、viewport、允许变化 selector 和阈值；比较器通过 `ui_complete_design_regression_comparison` 提交项目内视觉/语义 diff artifact，节点复核 artifact SHA 后计算 `PASSED/FAILED`。创建契约不等于已执行比较。
 - `ui_get_project_profile` 的 schema v3 包含相同的多端目标摘要，其他代理可以先读小型档案再决定调用什么工具。
 - Node Admin 提供与 MCP 工具同源的项目级 HTTP 适配层；PC 不复制目标发现、会话、Tauri Runtime、草稿或证据状态机。
-- `ui_get_design_capabilities` 返回节点实际安装的 `yilong-ui-live@1.10.0` schema、能力 ID、安全边界和项目已发现平台；调用成功本身才是当前节点已升级的证据。v1.10 增加 `DESIGN_INTENT_PLANS`、`DESIGN_EVENT_CHECKPOINTS`、`SOURCE_BINDING_HEALTH` 和 `REVIEWED_WRITEBACK_PLANS`。
+- `ui_get_design_capabilities` 返回节点实际安装的 `yilong-ui-live@1.11.0` schema、能力 ID、安全边界和项目已发现平台；调用成功本身才是当前节点已升级的证据。v1.11 新增意图执行生命周期、受审确定性源码补丁/回滚计划和视觉/语义回归契约。
 - `ui_get_design_verification_matrix` 把草稿、当前 designSession 工件和写回回执汇总为 Web/PWA/Tauri/Android 行，明确区分 `READY`、`IN_PROGRESS`、`BLOCKED` 与 `PASSED`。只有写回回执中所有目标平台均为 `BUILD_VERIFIED + evidenceComplete=true` 才是通过。
-- PC `/pc/ui-tuner` 默认进入“多端后台”：左侧平台/会话/UI 树，中间最终 UI 与语义选区，右侧常驻项目 Codex 对话。用户发送聊天时先生成 DesignIntentPlan，并切换到计划匹配的平台、route 或可复用 session；计划 ID 和工具顺序随任务发送。画布另外展示源码绑定健康、分平台写回适配器、影响风险和批准/拒绝；只有已批准且未漂移的计划才能固定写回基线。普通 AI 任务按 taskId/cursor 长轮询，并在页面处理成功后提交 `pc-ui-tuner` checkpoint；若代理绑定另一 designSession，中间画布按事件定向恢复。
+- PC `/pc/ui-tuner` 默认进入“多端后台”：左侧平台/会话/UI 树，中间最终 UI 与语义选区，右侧常驻项目 Codex 对话。用户发送聊天时先生成或重规划 DesignIntentPlan；画布显示 plan revision、逐动作回执和暂停/恢复/取消，自动跟随 source patch、rollback、regression 事件。源码补丁必须在画布二次批准后由用户明确点击应用；回滚只生成审查计划。普通 AI 任务按 taskId/cursor 长轮询并提交 `pc-ui-tuner` checkpoint；若代理绑定另一 designSession，中间画布按事件定向恢复。
 
-本阶段代码尚未执行真实编译、TypeScript/ESLint、浏览器/Tauri/Android 启动、模拟器、真机、人工视觉、完整 E2E 或发布验收；这是本轮“代码优先”的明确边界，不得从源码存在推断运行成功。当前已安装 PC 节点实查仍是旧 schema：`ui_get_design_capabilities` 和 `ui_get_project_profile` 均由本机桥接返回未知/缺失，无法形成运行工件。因此仓库中的 1.10 工具必须经过 Windows 节点构建、发布、自动升级和能力回读后才可用于真实任务。
+本阶段代码尚未执行真实编译、TypeScript/ESLint、浏览器/Tauri/Android 启动、模拟器、真机、人工视觉、比较器、完整 E2E 或发布验收；这是本轮“代码优先”的明确边界，不得从源码存在推断运行成功。当前已安装 PC 节点仍无 v1.11 能力回读证据。因此仓库中的 1.11 工具必须经过 Windows 节点构建、发布、自动升级和 `ui_get_design_capabilities` 回读后才可用于真实任务。
 
 Tauri 前端截图仍只能证明 WebView；只有 `ui_capture_tauri_host` 返回带 SHA-256 的原生工件时才能声明原生窗口证据。菜单、对话框和 command trace 是额外分层证据，不会单独把 `nativeHostVerified` 变为 true。
 
@@ -54,7 +56,7 @@ ui_get_design_capabilities
   -> ui_list_design_targets
   -> ui_list_design_sessions(limit?)
   -> 恢复已有 designSessionId 或 ui_open_design_target(platform, route, url?, viewport?)
-  -> ui_bind_design_task(taskId, designSessionId, draftId?, leaseSeconds?)
+  -> ui_start_design_intent_plan(planId, expectedRevision, taskId, designSessionId)
   -> 消费者读取 ui_get_design_event_checkpoint(consumerId, taskId)
   -> 并行 ui_list_design_events(taskId, afterCursor=resumeAfterCursor?, waitMs?)
   -> 每批处理成功后 ui_commit_design_event_checkpoint(consumerId, taskId, cursor, expectedRevision)
@@ -63,6 +65,7 @@ ui_get_design_capabilities
              -> ui_interact_design_browser(designSessionId, capture/navigateTo?)
              -> ui_stop_design_browser(designSessionId)
   -> ui_get_design_surface(designSessionId, query?, limit?)
+  -> ui_create_design_regression_baseline(designSessionId, draftId?)
   -> ui_create_design_draft(designSessionId, operations?, patches?, ...)
   -> 可选 ui_preview_design_draft(draftId) -> ui_restore_design_draft_preview(draftId)
   -> ui_suggest_design_source_binding(draftId, limit?)
@@ -72,10 +75,18 @@ ui_get_design_capabilities
   -> ui_plan_design_writeback(draftId)
   -> ui_decide_design_writeback_plan(planId, expectedPlanRevision, APPROVE)
   -> ui_begin_design_writeback(draftId, expectedRevision, writebackPlanId=planId)
-  -> AI 修改绑定的真实源码
-  -> 按目标平台重新捕获或验证
+  -> ui_propose_design_source_patch(writebackPlanId, draftId, exact ranges + SHA)
+  -> 审查 reviewArtifactPath
+  -> ui_decide_design_source_patch(proposalId, expectedRevision, APPROVE)
+  -> ui_apply_design_source_patch(proposalId, expectedRevision)
+  -> ui_plan_design_source_rollback(proposalId, expectedRevision)
+  -> 按目标平台重新捕获
+  -> ui_plan_design_regression_comparison(baselineId, afterDesignSessionId)
+  -> 比较器执行后 ui_complete_design_regression_comparison(... diff artifacts)
   -> ui_complete_design_writeback(draftId, expectedRevision, receiptId, changedFiles, evidence)
   -> ui_get_design_verification_matrix(draftId)
+  -> ui_record_design_intent_action(planId, expectedRevision, actionOrder, status, evidenceRefs?)
+  -> ui_transition_design_intent_plan(planId, expectedRevision, COMPLETE)
   -> ui_settle_design_task_binding(taskId, leaseId, succeeded?)
 ```
 
@@ -103,6 +114,16 @@ ui_prepare_tauri_runtime(designSessionId)
 10. 草稿预览只适用于 Web/PWA/Tauri 前端持久浏览器；Android 继续使用 Live Runtime。预览和恢复都不写源码，源码绑定候选也不会自动升级为 `BOUND`。
 11. 一个 designSession 同时只允许一个有效 AI task lease。事件消费者必须在实际处理成功后提交自己的 checkpoint；断线重连从 `resumeAfterCursor` 继续，任务终态必须 settle。
 12. `SET_STYLE` 仅在 Web/PWA/Tauri 标记为 `LIVE_PREVIEW`；Android 样式、文字/资源/variant/结构操作和响应式写回均按 capability entry 交给源码适配器，不能因已有机器契约就宣称运行完成。
+
+### 3.1 Node Admin 同源路由
+
+PC 使用本机 Admin token 调用与 MCP 相同的状态机，关键新增路由是：
+
+- `POST /api/android-live/design/intents/:plan_id/start|transition|replan` 与 `.../actions/:action_order`。
+- `POST /api/android-live/design/source-patches/propose`，以及 `.../:proposal_id/decision|apply|rollback/plan`。
+- `POST /api/android-live/design/regressions/baselines`、`.../comparisons/plan` 与 `.../:comparison_id/complete`。
+
+路由只负责把路径 ID 注入同名 MCP 参数并调用 `design_tools`；审批、revision、项目 canonical path、SHA 和状态迁移仍由同一 Rust 契约校验。PC 不实现第二套业务逻辑。
 
 ## 4. 目标模型
 
@@ -159,6 +180,16 @@ ui_prepare_tauri_runtime(designSessionId)
 .elon/ui-tuner/headless-design/writeback-plans/writeplan_<digest>.json
 ```
 
+受审源码补丁、review artifact、逆向计划和回归契约保存在：
+
+```text
+.elon/ui-tuner/headless-design/source-patches/sourcepatch_<digest>.json
+.elon/ui-tuner/headless-design/source-patches/<id>.review.patch
+.elon/ui-tuner/headless-design/source-patches/rollback_<digest>.json
+.elon/ui-tuner/headless-design/regressions/baseline_<digest>.json
+.elon/ui-tuner/headless-design/regressions/compare_<digest>.json
+```
+
 记录包含平台、目标、route、脱敏 URL、viewport、状态、最近证据引用和时间戳。它必须同时满足：
 
 - `designSessionId` 使用固定格式并通过路径校验。
@@ -202,6 +233,9 @@ Web/PWA/Tauri 前端捕获会在 PNG 旁生成 `.ui.json`。语义树单个工�
 - 草稿更新要求 `expectedRevision`，源码绑定路径必须位于项目内且绑定范围有效；候选扫描只读已声明源码根并给出 source SHA-256。写回规划和批准都会检查绑定健康，开始写回时再检查批准计划、draft revision、文件摘要和范围，完成时仍验证源码与平台证据。
 - taskId 仅允许有界 ASCII 标识；lease 冲突、过期和不匹配均失败关闭。事件目录 canonical path 必须位于项目内，单条事件最多 64 KiB，超过 1,000 条时按 cursor 删除最旧机器事件。
 - checkpoint 的 consumerId/taskId、cursor 所属任务、乐观 revision 和 cursor 单调性全部验证；不得提交其他任务的 cursor 或倒退 checkpoint。
+- DesignIntentPlan 的启动、状态转换、动作回执和重规划都要求 `expectedRevision`；终态只在动作回执全部成功/跳过或明确失败/取消时形成，计划替代链不可覆盖。
+- source patch 只能修改草稿已确认绑定的单个项目内 UTF-8 文件；range 不重叠、片段 SHA、整文件前后 SHA、写回审批和 draft revision 任一漂移即拒绝。`APPLYING` journal 只接受应用前或应用后两个已知 SHA 以恢复。
+- regression baseline 会重新读取 PNG/UI tree 并验证磁盘 SHA；比较回执的视觉/语义 artifact 必须是项目内普通文件且哈希匹配。没有比较器回执时只能是 `READY_TO_COMPARE`，不得宣称回归通过。
 - 截图、UI 树、manifest 和 session 文件都不能作为“源码已经修改”的证明。
 
 平台覆盖必须单独声明。浏览器证据不能证明 Android Runtime，Tauri 前端证据不能证明原生宿主，模拟器不能冒充用户要求的真机。写回回执的最低证据为：Web 需要 `browserCaptured` 与 `routeRevision`；PWA 需要 `runtimeReloaded` 与 `routeRevision`；Tauri 需要 `frontendCaptured`、`nativeHostVerified` 与 64 位 `nativeArtifactSha256`；Android/APK 需要 `runtimeConnected` 与 `apkPath`。任一目标平台缺证据时返回 `EVIDENCE_MISSING`，不得标记完成。
@@ -217,19 +251,21 @@ PC 端现在是后台会话的可选客户端，而不是第二套状态机：
   -> 中央 UI 画面与选区
   -> 右侧连续对话
   -> 可撤销草稿 -> 绑定健康 -> 分平台写回审批 -> 修改源码
-  -> 同一 session 重新捕获证据
+  -> 修改前基线 -> 同目标重新捕获 -> 视觉/语义比较任务
 ```
 
 当前界面保持三个稳定区域：左侧平台、最近会话和紧凑 UI 树，中间实际像素证据与语义选区，右侧默认打开的 AI 对话。用户说“修改 Web 登录页”或“看 Tauri 设置页”时，聊天发送前先保存计划并切换后台目标、route 或可复用 session；中间计划审查条显示绑定 SHA/range 健康、适配器、风险和审批。用户不打开画布时，代理调用相同 MCP/HTTP 状态机仍可完全后台运行。
 
-PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作为设计真源。项目 intent plan、session、draft、task binding、event/checkpoint、writeback plan/receipt、平台覆盖和证据引用来自 Node 数据面；context pack 只引用紧凑计划、selector、route、绑定健康、审批、task lease/checkpoint、最多 8 条事件、Tauri 分层证据、验证矩阵和工件哈希，不内嵌完整聊天、整张 PNG、fixture 值或撤销历史。旧节点缺少 planning/checkpoint API 时保留原有 AI handoff 与 cursor 跟随，但不会显示新能力已安装。任务活动回调携带真实 taskId；启动时绑定计划选中的可复用 session，代理也可后台打开并绑定另一 session，画布按事件中的 designSessionId 定向恢复。
+PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作为设计真源。项目 intent plan、session、draft、task binding、event/checkpoint、writeback plan/receipt、source patch/rollback、regression baseline/comparison、平台覆盖和证据引用来自 Node 数据面；context pack 只引用紧凑状态、路径和哈希，不内嵌完整聊天、补丁正文、整张 PNG、fixture 值或撤销历史。任务活动回调携带真实 taskId；已有 session 时 PC 先启动 plan，再让 task follower 复用同一 lease；尚未打开 session 时由后台代理打开后启动。事件游标推进会刷新 plan、patch 和 regression 状态。
 
 ## 9. 后续验收与增强顺序
 
 1. 静态门禁：完成源码大小、文档权威性、Git 收尾；本轮不补跑真实编译或平台测试。
-2. 节点候选版：构建包含 MCP schema v1.10 的 Windows 节点，升级后必须由 `ui_get_design_capabilities` 回读精确 schema 与能力 ID。
-3. 隔离平台验收：Web/PWA 真实浏览器 fixture、Tauri 原生窗口/菜单/对话框/插桩 trace、Android 隔离模拟器分别形成验证矩阵回执。
-4. 灰度发布：验证旧节点已有 CLI/Exec 不受影响、1.10 新工具只在升级节点开放；只有用户明确要求或反馈视觉不正确时再做真机复核。
+2. 编译门禁：Rust/Cargo、TypeScript、ESLint 和 Node Admin 路由编译；修复所有类型或依赖错误后才进入运行验收。
+3. 节点候选版：构建包含 MCP schema v1.11 的 Windows 节点，升级后必须由 `ui_get_design_capabilities` 回读精确 schema 与新增 capability ID。
+4. 隔离契约验收：覆盖 plan revision 冲突、lease 补偿、patch 漂移/APPLYING 恢复、rollback offset、baseline artifact SHA 和 comparison 阈值结算。
+5. 平台验收：Web/PWA 真实浏览器 fixture、Tauri 原生窗口/菜单/对话框/插桩 trace、Android 隔离模拟器分别形成回归与验证矩阵回执。
+6. 灰度发布：验证旧节点已有 CLI/Exec 不受影响、1.11 新工具只在升级节点开放；只有用户明确要求或反馈视觉不正确时再做真机复核。
 
 每一阶段都先扩展相同 MCP 契约；不得通过让代理操控 Windows 桌面来绕过缺失的数据面。
 
@@ -249,10 +285,15 @@ PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作
 - `file:server/src/node_agent_android_live/design_event_stream.rs`
 - `file:server/src/node_agent_android_live/design_event_checkpoint.rs`
 - `file:server/src/node_agent_android_live/design_intent_plan.rs`
+- `file:server/src/node_agent_android_live/design_intent_execution.rs`
 - `file:server/src/node_agent_android_live/design_draft_preview.rs`
 - `file:server/src/node_agent_android_live/design_source_binding.rs`
 - `file:server/src/node_agent_android_live/design_binding_health.rs`
 - `file:server/src/node_agent_android_live/design_writeback_plan.rs`
+- `file:server/src/node_agent_android_live/design_source_patch.rs`
+- `file:server/src/node_agent_android_live/design_source_patch_store.rs`
+- `file:server/src/node_agent_android_live/design_regression_contract.rs`
+- `file:server/src/node_agent_android_live/design_regression_store.rs`
 - `file:server/src/node_agent_android_live/design_browser_runtime.rs`
 - `file:server/src/node_agent_android_live/design_verification_matrix.rs`
 - `file:server/src/node_agent_android_live/tauri_behavior.rs`

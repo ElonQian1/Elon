@@ -8,7 +8,7 @@ use crate::node_agent_source_preview::{get_writeback_receipt, WritebackReceipt};
 
 const CAPABILITIES_TOOL: &str = "ui_get_design_capabilities";
 const MATRIX_TOOL: &str = "ui_get_design_verification_matrix";
-const RUNTIME_SCHEMA: &str = "yilong-ui-live@1.10.0";
+const RUNTIME_SCHEMA: &str = "yilong-ui-live@1.11.0";
 
 pub(super) fn tool_definitions() -> Vec<Value> {
     vec![
@@ -48,7 +48,7 @@ fn capabilities(session: &LiveUiSession) -> Result<Value> {
     Ok(json!({
         "schema":"elon.ui-design-capabilities.v1",
         "runtimeSchema":RUNTIME_SCHEMA,
-        "protocolRevision":"1.10",
+        "protocolRevision":"1.11",
         "installedRuntimeEvidence":{"source":"MCP_TOOL_RESPONSE","tool":CAPABILITIES_TOOL},
         "capabilityIds":[
             "PROJECT_SCOPED_DESIGN_SESSIONS",
@@ -66,9 +66,13 @@ fn capabilities(session: &LiveUiSession) -> Result<Value> {
             "DESIGN_DRAFT_OPERATIONS_V2",
             "MULTI_CANDIDATE_SOURCE_REVIEW",
             "DESIGN_INTENT_PLANS",
+            "DESIGN_INTENT_EXECUTION_LIFECYCLE",
             "DESIGN_EVENT_CHECKPOINTS",
             "SOURCE_BINDING_HEALTH",
             "REVIEWED_WRITEBACK_PLANS",
+            "REVIEWED_DETERMINISTIC_SOURCE_PATCHES",
+            "REVIEWABLE_SOURCE_ROLLBACK_PLANS",
+            "VISUAL_SEMANTIC_REGRESSION_CONTRACTS",
             "EVIDENCE_GATED_WRITEBACK",
             "PLATFORM_VERIFICATION_MATRIX"
         ],
