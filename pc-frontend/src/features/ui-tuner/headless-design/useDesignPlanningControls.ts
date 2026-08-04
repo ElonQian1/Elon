@@ -4,7 +4,7 @@ import {
   decideDesignWritebackPlan,
   planDesignIntent,
   planDesignWriteback,
-} from './designSessionApi'
+} from './designPlanningApi'
 import type { DesignBindingHealth, DesignIntentPlan, DesignWritebackPlan } from './designPlanningTypes'
 import type { DesignDraft, DesignPlatform, DesignSessionIdentity } from './types'
 

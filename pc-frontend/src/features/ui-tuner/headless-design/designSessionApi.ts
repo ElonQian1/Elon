@@ -22,12 +22,6 @@ import type {
   TauriBehaviorEvidence,
   TauriRuntimeResult,
 } from './types'
-import type {
-  DesignBindingHealth,
-  DesignEventCheckpoint,
-  DesignIntentPlan,
-  DesignWritebackPlan,
-} from './designPlanningTypes'
 
 interface NodeResult<T> {
   ok: boolean
@@ -39,7 +33,7 @@ function adminUrl() {
   return safeNodeAdminUrl()
 }
 
-async function call<T>(path: string, body: Record<string, unknown>, timeoutMs = 30000): Promise<T> {
+export async function callDesignNode<T>(path: string, body: Record<string, unknown>, timeoutMs = 30000): Promise<T> {
   const baseUrl = adminUrl()
   await probeLocalNode(baseUrl)
   const response = await nodeApi<NodeResult<T>>(baseUrl, path, {
@@ -49,6 +43,8 @@ async function call<T>(path: string, body: Record<string, unknown>, timeoutMs = 
   if (!response.ok) throw new Error(response.error || '后台设计节点请求失败')
   return response.result
 }
+
+const call = callDesignNode
 
 export function listDesignTargets(projectRoot: string) {
   return call<DesignTargetListResult>('/api/android-live/design/targets', { projectRoot })
@@ -346,97 +342,4 @@ export function listDesignEvents(input: {
   waitMs?: number
 }) {
   return call<DesignEventPage>('/api/android-live/design/events', input, Math.max(30_000, (input.waitMs ?? 0) + 5_000))
-}
-
-export function planDesignIntent(input: {
-  projectRoot: string
-  intent: string
-  taskId?: string
-  platform?: DesignPlatform
-  route?: string
-  state?: string
-  designSessionId?: string
-}) {
-  return call<{ schema: 'elon.ui-design-intent-plan.v1'; plan: DesignIntentPlan; sourceModified: false; runtimeStarted: false }>(
-    '/api/android-live/design/intents/plan', input,
-  )
-}
-
-export function getDesignIntentPlan(projectRoot: string, planId: string) {
-  return call<{ schema: 'elon.ui-design-intent-plan.v1'; plan: DesignIntentPlan; contentEmbedded: false }>(
-    `/api/android-live/design/intents/${encodeURIComponent(planId)}`, { projectRoot },
-  )
-}
-
-export function checkDesignSourceBinding(input: {
-  projectRoot: string
-  draftId: string
-  includeRecoveryCandidates?: boolean
-  limit?: number
-}) {
-  const { draftId, ...body } = input
-  return call<{
-    schema: 'elon.ui-design-binding-health.v1'
-    draftId: string
-    health: DesignBindingHealth
-    recovery: { candidates: unknown[]; error?: string | null; autoRebound: false }
-    sourceModified: false
-    contentEmbedded: false
-  }>(`/api/android-live/design/drafts/${encodeURIComponent(draftId)}/source-binding/health`, body)
-}
-
-export function planDesignWriteback(projectRoot: string, draftId: string) {
-  return call<{ schema: 'elon.ui-design-writeback-plan.v1'; plan: DesignWritebackPlan; action: 'PLANNED' | 'UNCHANGED'; sourceModified: false }>(
-    `/api/android-live/design/drafts/${encodeURIComponent(draftId)}/writeback/plan`, { projectRoot },
-  )
-}
-
-export function getDesignWritebackPlan(projectRoot: string, planId: string) {
-  return call<{ schema: 'elon.ui-design-writeback-plan.v1'; plan: DesignWritebackPlan; contentEmbedded: false }>(
-    `/api/android-live/design/writeback/plans/${encodeURIComponent(planId)}`, { projectRoot },
-  )
-}
-
-export function decideDesignWritebackPlan(input: {
-  projectRoot: string
-  planId: string
-  expectedPlanRevision: number
-  decision: 'APPROVE' | 'REJECT'
-  reason?: string
-}) {
-  const { planId, ...body } = input
-  return call<{ schema: 'elon.ui-design-writeback-plan.v1'; action: 'APPROVED' | 'REJECTED'; plan: DesignWritebackPlan; sourceModified: false }>(
-    `/api/android-live/design/writeback/plans/${encodeURIComponent(planId)}/decision`, body,
-  )
-}
-
-export function getDesignEventCheckpoint(projectRoot: string, consumerId: string, taskId: string) {
-  return call<{
-    schema: 'elon.ui-design-event-checkpoint.v1'
-    checkpoint?: DesignEventCheckpoint | null
-    resumeAfterCursor: string
-    revision: number
-    contentEmbedded: false
-  }>(
-    `/api/android-live/design/events/checkpoints/${encodeURIComponent(consumerId)}/${encodeURIComponent(taskId)}`,
-    { projectRoot },
-  )
-}
-
-export function commitDesignEventCheckpoint(input: {
-  projectRoot: string
-  consumerId: string
-  taskId: string
-  cursor: string
-  expectedRevision: number
-}) {
-  const { consumerId, taskId, ...body } = input
-  return call<{
-    schema: 'elon.ui-design-event-checkpoint.v1'
-    action: 'COMMITTED' | 'UNCHANGED'
-    checkpoint: DesignEventCheckpoint
-  }>(
-    `/api/android-live/design/events/checkpoints/${encodeURIComponent(consumerId)}/${encodeURIComponent(taskId)}/commit`,
-    body,
-  )
 }
