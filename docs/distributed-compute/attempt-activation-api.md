@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt 已接受激活控制面
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: backend, node, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -10,18 +10,23 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-v185、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。本控制面登记“外部执行器已经接受任务”这一调用方声明，并把既有 Broker Reservation 推进到首个 Attempt；它不发送节点命令，也不验证外部执行器签名，不能描述为通用节点派发已经完成。v186 会在同一激活事务中初始化 Lease 当前状态；从未心跳的 staging Lease 无用量中止边界见 `attempt-abort-api.md`。
+v185、Store、Service、HTTP 路由与 PC `/compute-execution` 工作区已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面登记“外部执行器已经接受任务”这一调用方声明，并把既有 Broker Reservation 推进到首个 Attempt；它不发送节点命令，也不验证外部执行器签名，不能描述为通用节点派发已经完成。v186 会在同一激活事务中初始化 Lease 当前状态；从未心跳的 staging Lease 无用量中止边界见 `attempt-abort-api.md`。
 
 ## 2. HTTP 接口
 
 | 方法 | 路径 | 权限 | 作用 |
 |---|---|---|---|
+| GET | `/api/me/compute/providers/:provider_id/attempt-activations?limit=...` | Provider 所有者 | 列出当前仍可登记首次 Attempt 的本人 Reservation 候选 |
 | POST | `/api/me/compute/providers/:provider_id/attempt-activations` | Provider 所有者 | 登记首个已被执行器接受的 Attempt |
 | GET | `/api/me/compute/attempt-leases/:lease_id/activation` | Provider 所有者或 Job 消费者 | 读取并重新审计不可变激活回执 |
 
 写请求提供稳定 `lease_id`、`reservation_id`、`executor_id`、可选 `shard_id`、执行器接受证明引用、Lease 凭据引用与脱敏提示、Job/Reservation/Claim 的精确 revision/digest、Lease 到期时间、hard deadline 和幂等键。当前首次入口要求 `attempt_no=1`、`fencing_generation=1`，并要求 `confirm_executor_accepted=true`。
 
 `executor_acceptance_ref` 只是外部证明的引用，不是证明正文或平台验证结果。`lease_credential_ref` 同样只保存凭据引用；接口不接收、返回或持久化 Lease 密钥正文。
+
+候选读取只返回当前 Provider 自有、Reservation 仍为 `active` 且未过期、Job 仍为 `reserved`、并且尚不存在 Attempt 激活回执的记录。每条候选在返回前重新审计当前注册表；读取不冻结资金、不改变容量或状态，也不代表外部执行器已经接受任务。
+
+PC `/compute-execution` 允许 Provider 所有者选择本人 Provider、读取候选并显式填写外部执行器接受引用、Lease 凭据引用、期限和精确版本后提交激活。页面不采集凭据正文，不发送 Start 命令，也不验证执行器、节点在线状态或证明真实性。
 
 ## 3. 原子效果
 
@@ -63,6 +68,7 @@ v185、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执
 ## 6. 尚未实现
 
 - Cargo 编译、v185 迁移执行、HTTP 真实调用和并发验证；
+- PC 构建、接口联调、视觉验收和发布；
 - 执行器接受证明的签名校验、可信节点身份绑定和服务器 outbox；
 - Start Attempt 真实派发、送达确认、心跳与 `running` Attempt 事件；
 - 自动超时取消、已出现心跳后的 active 容量处理或实际消耗；v187 只覆盖从未心跳的 staging 无用量中止；

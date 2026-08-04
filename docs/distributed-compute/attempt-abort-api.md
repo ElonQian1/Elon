@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 staging Attempt 无用量安全中止控制面
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: backend, node, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-v187、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。本控制面只处理已登记 v185 激活、仍处于 `staging`、从未记录心跳且外部执行器尚未开始执行的 Attempt。
+v187、Store、Service、HTTP 路由与 PC `/compute-execution` 中止入口已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面只处理已登记 v185 激活、仍处于 `staging`、从未记录心跳且外部执行器尚未开始执行的 Attempt。
 
 它用于修复“Broker Finish 已因 Claim 进入 active 而拒绝，但外部执行器实际上尚未开工”这一狭窄状态。它不是运行中取消、超时回收、实际用量结算或节点命令通道。
 
@@ -24,6 +24,8 @@ v187、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执
 写请求必须提供 Lease、Job、Reservation 和 Capacity Claim 的当前精确 revision/digest、当前 `fencing_generation`、外部中止凭据引用、原因码、幂等键，并显式设置 `confirm_no_execution_started=true`。
 
 `executor_abort_ref` 只是外部凭据引用。当前平台不读取证明正文、不验证执行器签名，也不发送 `Cancel` 命令；确认字段表示 Provider 所有者主动声明“执行从未开始”，不是平台验证结果。
+
+PC `/compute-execution` 仅在当前 Lease 仍为 revision 1、`staging` 且没有心跳时显示中止入口，并从激活回执和当前状态带入 Lease、Job、Reservation、Claim 的精确版本。操作者仍需填写外部中止引用和原因，并明确确认没有执行、用量或输出；界面条件不是服务端授权替代，最终仍由服务端重新审计后原子退款和归还容量。
 
 ## 3. 允许条件
 
@@ -83,6 +85,7 @@ v187、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执
 ## 7. 尚未实现
 
 - Cargo 编译、v187 迁移执行、HTTP 真实调用、并发和故障注入验证；
+- PC 构建、接口联调、视觉验收和发布；
 - 外部中止证明签名校验、可信节点身份、服务器 outbox 和真实 `Cancel` 送达；
 - 已出现心跳或 `running` Lease 的安全取消、检查点、实际用量和部分结算；
 - Lease 超时扫描、自动回收、重试 Attempt 和 fencing generation 单调递增；

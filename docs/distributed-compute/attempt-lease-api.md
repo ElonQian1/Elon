@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt Lease 状态与续租控制面
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: backend, node, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-v186、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。本控制面在 v185 激活回执之外维护可版本化的 Lease 当前状态，并允许 Provider 所有者依据外部执行器心跳声明延长软期限。
+v186、Store、Service、HTTP 路由与 PC `/compute-execution` Lease 控制面已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面在 v185 激活回执之外维护可版本化的 Lease 当前状态，并允许 Provider 所有者依据外部执行器心跳声明延长软期限。
 
 `executor_heartbeat_ref` 只是调用方提交的外部证据引用。当前平台不读取证明正文、不验证执行器签名，也不发送 `RenewLease` 节点命令，因此续租成功不能证明节点真实在线或任务真实运行。
 
@@ -22,6 +22,8 @@ v186、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执
 | GET | `/api/me/compute/attempt-leases/:lease_id/state` | Provider 所有者或 Job 消费者 | 读取并重新审计 Lease 当前状态 |
 
 写请求必须提供当前 `expected_lease_revision`、`expected_lease_digest`、`expected_fencing_generation`、外部心跳引用、新软期限、幂等键，并显式设置 `confirm_executor_alive=true`。确认字段只表示操作者主动声明，不替代可信执行器签名。
+
+PC `/compute-execution` 可按稳定 Lease ID 读取激活回执和当前状态，并在界面中带入当前 revision、digest 与 fencing generation 发起续租。页面只登记外部心跳引用和新的软期限，不发送 `RenewLease` 命令，也不把续租成功展示为实际执行或平台验证。
 
 ## 3. 状态与时间边界
 
@@ -69,6 +71,7 @@ v186 为每个 v185 激活回执建立 Lease 当前状态投影；历史激活�
 ## 7. 尚未实现
 
 - Cargo 编译、v186 迁移执行、HTTP 真实调用、并发和时钟边界验证；
+- PC 构建、接口联调、视觉验收和发布；
 - 外部心跳证明签名校验、可信节点身份、服务器 outbox 和真实 `RenewLease` 送达；
 - 自动超时扫描、已出现心跳后的运行中取消确认与部分收费；staging 无心跳安全中止已由 v187 覆盖，v189 只保存 Provider 终态候选但不更新本 Lease，分别见 `docs/distributed-compute/attempt-abort-api.md`、`docs/distributed-compute/attempt-terminal-candidate-api.md`；
 - observed、verified 用量及可消耗 meter 结算仍未实现；v188 已写入 running Lease 的累计 `provider_declared` 快照，但不更新本 Lease 状态，见 `docs/distributed-compute/attempt-usage-api.md`；
