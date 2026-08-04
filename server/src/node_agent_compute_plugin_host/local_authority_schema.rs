@@ -2,15 +2,17 @@ use anyhow::{bail, Context, Result};
 use rusqlite::{params, Connection, TransactionBehavior};
 
 mod authority_fences;
+mod candidate_verification;
 mod fetch_claims;
 mod plan_application;
 
-pub(super) const COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION: i64 = 2;
+pub(super) const COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION: i64 = 3;
 const COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID: i64 = 0x454c_4350;
 
 const REQUIRED_TABLES: &[&str] = &[
     "authority_meta",
     "candidate_owners",
+    "candidate_verification_runs",
     "fetch_claims",
     "keyring_bundles",
     "keyring_keys",
@@ -23,6 +25,8 @@ const REQUIRED_TABLES: &[&str] = &[
 const REQUIRED_INDEXES: &[&str] = &[
     "one_owned_candidate_per_plugin",
     "one_prepared_claim_per_download",
+    "one_prepared_verification_per_candidate",
+    "one_verified_artifact_set_per_candidate",
 ];
 const REQUIRED_TRIGGERS: &[&str] = &[
     "authority_inventory_change_fenced",
@@ -48,7 +52,14 @@ const REQUIRED_TRIGGERS: &[&str] = &[
     "candidate_identity_immutable",
     "candidate_initial_state",
     "candidate_owner_delete_forbidden",
+    "candidate_promotion_requires_receipt",
+    "candidate_release_verification_fenced",
     "candidate_state_transition",
+    "candidate_verification_begin_fenced",
+    "candidate_verification_delete_forbidden",
+    "candidate_verification_identity_immutable",
+    "candidate_verification_initial_state",
+    "candidate_verification_transition",
     "candidate_close_plan_open",
     "fetch_claim_begin_fenced",
     "fetch_claim_delete_forbidden",
@@ -80,7 +91,7 @@ pub(super) fn ensure_schema(connection: &mut Connection) -> Result<()> {
         .pragma_query_value(None, "application_id", |row| row.get::<_, i64>(0))
         .context("COMPUTE_PLUGIN_AUTHORITY_APPLICATION_ID_READ")?;
     match version {
-        0 if application_id == 0 => install_schema_v2(connection),
+        0 if application_id == 0 => install_schema_v3(connection),
         COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION
             if application_id == COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID =>
         {
@@ -98,7 +109,7 @@ pub(super) fn ensure_schema(connection: &mut Connection) -> Result<()> {
     }
 }
 
-fn install_schema_v2(connection: &mut Connection) -> Result<()> {
+fn install_schema_v3(connection: &mut Connection) -> Result<()> {
     if count_required_tables(connection)? != 0 {
         bail!("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_UNVERSIONED: refusing to adopt unversioned tables");
     }
@@ -106,17 +117,20 @@ fn install_schema_v2(connection: &mut Connection) -> Result<()> {
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_BEGIN")?;
     transaction
-        .execute_batch(SCHEMA_V2)
-        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_CREATE_V2")?;
+        .execute_batch(SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_CREATE_V3")?;
     transaction
-        .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V2)
-        .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V2")?;
+        .execute_batch(candidate_verification::CANDIDATE_VERIFICATION_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_VERIFICATION_SCHEMA_CREATE_V3")?;
     transaction
-        .execute_batch(authority_fences::AUTHORITY_FENCE_SCHEMA_V2)
-        .context("COMPUTE_PLUGIN_AUTHORITY_FENCE_SCHEMA_CREATE_V2")?;
+        .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V3")?;
     transaction
-        .execute_batch(fetch_claims::FETCH_CLAIM_SCHEMA_V2)
-        .context("COMPUTE_PLUGIN_AUTHORITY_FETCH_CLAIM_SCHEMA_CREATE_V2")?;
+        .execute_batch(authority_fences::AUTHORITY_FENCE_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_FENCE_SCHEMA_CREATE_V3")?;
+    transaction
+        .execute_batch(fetch_claims::FETCH_CLAIM_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_FETCH_CLAIM_SCHEMA_CREATE_V3")?;
     transaction
         .pragma_update(
             None,
@@ -182,7 +196,7 @@ fn object_exists(connection: &Connection, object_type: &str, name: &str) -> Resu
         .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_INSPECT")
 }
 
-const SCHEMA_V2: &str = r#"
+const SCHEMA_V3: &str = r#"
 CREATE TABLE keyring_bundles (
     bundle_revision          INTEGER PRIMARY KEY CHECK (bundle_revision > 0),
     bundle_digest            TEXT NOT NULL UNIQUE,
@@ -248,7 +262,7 @@ CREATE TABLE keyring_seals (
 
 CREATE TABLE authority_meta (
     singleton                       INTEGER PRIMARY KEY CHECK (singleton = 1),
-    schema_version                  INTEGER NOT NULL CHECK (schema_version = 2),
+    schema_version                  INTEGER NOT NULL CHECK (schema_version = 3),
     installation_id_digest         TEXT NOT NULL,
     state_revision                  INTEGER NOT NULL CHECK (state_revision >= 0),
     inventory_revision              INTEGER NOT NULL CHECK (inventory_revision >= 0),

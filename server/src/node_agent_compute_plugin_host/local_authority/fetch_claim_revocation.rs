@@ -1,6 +1,8 @@
 use anyhow::{bail, Context, Result};
 use rusqlite::{params, Transaction};
 
+use super::candidate_verification_revocation;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum AuthorityEpochRevocationReason {
     AuthorityEpochAdvancedByKeyring,
@@ -87,6 +89,12 @@ pub(super) fn revoke_for_process_owner_epoch_advance(
             ],
         )
         .context("COMPUTE_PLUGIN_FETCH_REVOKE_PROCESS_EPOCH")?;
+    candidate_verification_revocation::revoke_for_process_owner_epoch_advance(
+        transaction,
+        expected_authority_epoch,
+        expected_old_process_epoch,
+        resolved_at_ms,
+    )?;
     let remaining = transaction
         .query_row(
             "SELECT COUNT(*) FROM fetch_claims WHERE state = 'prepared'",
@@ -189,6 +197,13 @@ fn revoke_for_authority_epoch_advance(
             params![resolved_at_ms, reason.as_str(), expected_old_epoch],
         )
         .context("COMPUTE_PLUGIN_FETCH_REVOKE_AUTHORITY_EPOCH")?;
+    candidate_verification_revocation::revoke_for_authority_epoch_advance(
+        transaction,
+        expected_old_epoch,
+        process_owner_epoch,
+        reason.as_str(),
+        resolved_at_ms,
+    )?;
     let remaining = transaction
         .query_row(
             "SELECT COUNT(*) FROM fetch_claims WHERE state = 'prepared'",

@@ -36,6 +36,7 @@ owners: node, security
 | `candidate_owners` | 本机随机 candidate token、插件/槽/release、单调代次、grant、owner/closing plan 与终态 |
 | `planned_downloads` | ordinal、工件 binding、长度、committed offset、cursor generation 与状态 |
 | `fetch_claims` | claim ID、authority epoch、cursor generation、range、redirect generation、状态与时间 |
+| `candidate_verification_runs` | candidate 级 verification ID/generation、完整工件集摘要、本机 pinned file-set binding、authority/process fence、prepared/terminal 状态与不可变结果；当前 schema 只开放撤销，验证终结尚不可达 |
 
 启动配置复用节点现有 SQLite 模式：有界 `busy_timeout`、WAL、`synchronous=FULL`、外键和 `BEGIN IMMEDIATE`。数据库打开与恢复发生在 NodeAgent 取得实例锁之后、Plugin Host 可接收任务或上报 capability 之前。
 
@@ -69,7 +70,7 @@ InstallPlan 必须绑定 Publisher 与 Control 两类 keyring 的 revision 和 d
 
 幂等键是 `plan_id`，但不可变身份同时包含 plan digest 与完整 application request digest；后者覆盖 signed plan envelope 和规范排序后的完整 signed Manifest 集。同一请求重放返回原应用回执，不再递增 revision；同一 plan ID 的任一规范字段、JCS envelope 身份或规范排序后的 Manifest 集身份不同都永久冲突。回放会重新对账 v2 inventory、sealed keyring row、typed admission、候选/关闭记录、完整下载身份、event、seal、回执和当前 fencing 状态，而不是只相信单行 JSON 或摘要。
 
-`last_plan_id` 只供审计，不能授权候选槽。每个 downloading/verifying/staged 槽必须恰好由当前 candidate 指针引用，并绑定本机随机 candidate token、owner plan ID/digest、application inventory revision 和单调 candidate generation。普通新计划不能接管既有候选；`cancel_candidate` 必须精确绑定完整候选所有权。active 槽切换只在内容完整验证和健康门禁通过后原子换指针并增加 activation generation。
+`last_plan_id` 只供审计，不能授权候选槽。每个 downloading/verifying/staged 槽必须恰好由当前 candidate 指针引用，并绑定本机随机 candidate token、owner plan ID/digest、application inventory revision 和单调 candidate generation。普通新计划不能接管既有候选；`cancel_candidate` 必须精确绑定完整候选所有权。`complete` download 只代表耐久字节游标到达签名长度，不代表摘要正确。candidate 只有在完整下载闭包形成唯一 verified artifact-set run 后才能进入内容验证；安全解包、无额外文件的 Manifest closure、逐文件摘要、预热和 candidate health 仍是后续门禁。active 槽切换只能消费完整内容与健康回执，原子换指针并增加 activation generation；authority v3 在这些回执尚未实现前直接阻断 `owned -> promoted`。
 
 当前 reducer 对 action 的耐久语义固定为：install/upgrade 创建新 candidate owner 与精确下载闭包；keep/disable 更新期望存在/激活与审计字段，但不创建候选或下载；remove 写入 `desired_presence=absent`，仅在已停止、零 attempt 且无 candidate 时立即把槽推进 removing，否则保留明确的待卸载意图；cancel_candidate 关闭精确 owner、撤销 prepared claim、取消未完成下载并把候选槽推进 removing。库存最多 256 条，投影生成第 257 条时整笔事务失败。每次首次 applied（非 replay）都推进 authority epoch，并在封存前撤销旧 epoch 的 prepared claim；任何残留 prepared claim 都阻止 seal。
 
@@ -104,7 +105,11 @@ fsync 后的结果先成为只含 Authorized、`PinnedManagedFile` 与进程内 
 
 ### abort、崩溃与完整工件
 
-abort/revoke 不推进 cursor；重试创建新 generation 并仍从 committed offset 开始。恢复时文件长于 cursor 则截断未提交尾部，短于 cursor 则把候选标为损坏。完整工件重新计算全量 SHA-256 后才能进入 verifying；不持久化跨版本不可移植的 SHA 内部状态。
+abort/revoke 不推进 cursor；重试创建新 generation 并仍从 committed offset 开始。恢复时文件长于 cursor 则截断未提交尾部，短于 cursor 则把候选标为损坏。每个 planned download 的 `complete` 只表示字节闭合；不能把最后一段的长度事实冒充完整摘要。
+
+候选验证采用独立的 candidate-level run：只有同一 candidate 的精确计划闭包全部 `complete`、无 prepared fetch、当前 owner/plan/keyring/共享/inventory 仍一致时，才允许先从长期 pinned root 以父句柄相对方式打开全部 read-only/share-none 文件，再把规范 artifact-set digest 与本机 file-set binding digest CAS 为 prepared run。事务外必须从每个文件 byte 0 以有界 buffer 重算原始字节 SHA-256，每次 read 前检查同一 cancellation guard，检查 exact EOF，并在同一句柄复验 FileId、类型、reparse、卷、单链接与长度；不持久化跨版本不可移植的 SHA 内部状态。
+
+完整文件集 hash 后必须取得严格晚于最后 hash barrier 的新 sealed trusted-time observation。未来短事务只有在 fresh authority 与 prepared run 全部未漂移时，才能把 run 终结为 verified 并把唯一 candidate 槽从 downloading 原子推进 verifying；任一摘要错配则终结为 rejected 并推进 failed。崩溃、取消、进程/authority 代次变化或 Store 结果不确定时不能复用内存 digest 或盲重试，只能凭 verification recovery key 查询、撤销旧 run 并从 byte 0 重算。raw artifact-set verified 仍不等于安全解包、staged、installed、健康或可 promotion。
 
 ## 6. 共享关闭与下一字节边界
 
@@ -112,6 +117,7 @@ abort/revoke 不推进 cursor；重试创建新 generation 并仍从 committed o
 
 - 写入 `sharing_enabled=false` 并增加 authority epoch；
 - 撤销所有 active fetch claim；
+- 撤销所有 prepared candidate verification run；
 - 停止所有 candidate，不遗漏“desired 已 disabled 但仍在 downloading”的记录；
 - 把期望激活态推进为 disabled/draining；
 - 阻止未提交 segment 的 commit。
@@ -131,11 +137,11 @@ SQLite 内部 revision、trigger 和 CAS 只能阻止当前数据库中的正常
 恢复顺序固定为：
 
 1. 取得 NodeAgent 独占实例锁；
-2. 打开数据库、执行有界迁移和完整性检查；
-3. 建立可信时钟并递增进程 owner epoch，栅栏旧 claim；
+2. 打开数据库、验证 authority schema 与完整性；当前预生产 v3 对旧版失败关闭，不执行原地迁移；
+3. 建立可信时钟并递增进程 owner epoch，栅栏旧 fetch claim 与 prepared verification run；
 4. 用当前 root/keyring 重验未终结 plan/manifests；
 5. 对齐 fetch claim、文件长度与 committed cursor；
-6. 对齐 candidate 指针、槽 marker 和内容摘要；
+6. 对齐 candidate 指针、槽 marker、唯一 verified artifact-set run 和当前文件集合；没有终态 run 时绝不自动进入 verifying；
 7. 只恢复 owner、授权、期限和 keyring 全部未漂移的工作，其余撤销并等待显式清理。
 
 恢复不得自动接管孤儿候选、自动激活、静默清空库存或根据旧内存快照继续下载。
@@ -144,7 +150,7 @@ SQLite 内部 revision、trigger 和 CAS 只能阻止当前数据库中的正常
 
 本合同已接受。当前已有严格网络 DTO、JCS/SHA-256/Ed25519 验签、Manifest 校验、InstallPlan 首次准入、root-signed keyring bundle DTO、Bootstrap root resolver seam、整包校验与两类 ring binding 派生。经整包验证的不可变快照只按预期 revision/digest、可信时间、用途、主体、状态和 key 有效期返回公钥；InstallPlan 与 live state 同时绑定 Publisher/Control 两类 ring revision/digest。
 
-独立 `compute-plugin-state.sqlite3` 的路径型 facade、WAL/FULL/foreign-key/foreign-key-check 配置、私有 `BEGIN IMMEDIATE` seam、authority schema v2 与 inventory payload v2 已形成代码。v2 覆盖 meta、不可变 sealed keyring、不可变 plan application/event/seal、candidate owner、download cursor 和 fetch claim；singleton 初始化、root 重验后的 keyring 持久化、防回滚/防分叉、binding 与可信时间 CAS、旧活动 tip 归档校验和规范化行对账也已形成 purpose-specific 代码。由于此前 v1 从未接入 NodeAgent、未真实建库，本批采用明确的预生产 fail-close/rebuild 边界，不提供 v1 原地迁移；发现 v1 或未知数据库版本直接拒绝打开，不能静默采用。
+独立 `compute-plugin-state.sqlite3` 的路径型 facade、WAL/FULL/foreign-key/foreign-key-check 配置、私有 `BEGIN IMMEDIATE` seam、authority schema v3 与 inventory payload v2 已形成代码。v3 在原 meta、不可变 keyring/plan journal、candidate owner、download cursor 和 fetch claim 之上加入 candidate verification run、单 candidate prepared/verified 唯一性、跨 authority/process/cancel 的撤销门卫，并在内容与健康回执落地前禁止 promotion。此前 v1/v2 都从未接入 NodeAgent、未真实建库；本批采用明确的预生产 fail-close/rebuild 边界，不提供旧 schema 原地迁移，发现旧版或未知数据库直接拒绝打开，不能同版本静默采用。
 
 原子 PlanApply 内核也已形成代码：它以完整 request digest 幂等封存 signed plan/Manifest 集和 typed admission，执行 install/upgrade/keep/disable/remove/cancel_candidate 投影，生成本机随机候选 token、下载闭包、inventory v2、receipt、event 与 seal，推进 state/inventory/authority fences，并可从 sealed application 恢复仍需 fresh authority read 的 execution capsule。回放会逐字段交叉验证 key 指纹/有效期、库存、候选、下载、时间和当前 epoch；两阶段 read + validated CAS claim 合同及 typed prepared claim 句柄已替代先写 claim 后校验的接口形状。
 
@@ -152,4 +158,4 @@ SQLite 内部 revision、trigger 和 CAS 只能阻止当前数据库中的正常
 
 Windows 文件安全层现已形成代码：`NodeDataPaths` 把 `compute-plugin` 作为不会被 cache/temp 清理的第五个受管根；类型化 `ComputePluginInstallationIdentity` 从原始 installation ID 唯一派生 Store digest，installation marker、受管根和 Authority 初始化不能再各自传入互不相干的身份。启动层可在实例锁后构造长期 `PinnedComputePluginRoot`，先取得并校验 Volume GUID 卷根句柄；卷根以下每个目录和最终文件都通过 `NtCreateFile` 的 `OBJECT_ATTRIBUTES.RootDirectory` 相对已钉住父句柄打开或创建，并对最终分量使用 `FILE_OPEN_REPARSE_POINT`。完整字符串路径只用于失败诊断和稳定卷检查，不参与根以下的授权性 lookup；UNC/DFS、reparse、目录型最终文件、跨卷和 hardlink 均失败关闭。claim 文件路径必须重新精确等于 `compute-plugin/candidates/{candidate}/downloads/{ordinal:04}-{artifact}.part`，文件身份只从同一句柄 `FileIdInfo` 派生并绑定 installation/root。offset 为零只允许 `create_new`；若文件已存在，Authorized 会先被消费，再以同一父目录 capability 安全重开并只返回恢复结果。正游标缺文件或短文件产出不可写 damage evidence；长于 Store cursor 的尾部只在同一句柄截断、`sync_all` 并复验身份/长度后返回线性 `ReconciledComputePluginPartFile`。目录创建、最终文件 create-new 或长尾截断中的任一变更会被带入后续 prior-mutation 判断。分段写入现在沿用该同一文件句柄，执行精确 payload/range、每 write buffer 取消检查、flush、fsync 和最终 identity/type/reparse/link-count/volume/length 复验；发生任何既有或本次变更后，失败只保留 recovery key 与原句柄。commit 前还会再次对原句柄做精确复核，不按路径重开。非 Windows 当前明确失败关闭，尚未宣称 portable beneath 实现。
 
-以上新增代码仍未编译、未测试、未执行 DDL，也未在 NodeAgent 启动或 Host 路径接线，因此没有真实数据库、网络下载、插件安装或 Sidecar 运行。代码层已形成 fence-owned canonical cancellation source、认领前 guard、同句柄有界分段写入、fsync 后 capability、一次性 bind permit、可信 observation binder、单一 durable capability 和不可重试 commit 失败边界；所有 mutation 后失败只公开不可写、不可解包的 pinned-file recovery wrapper。但生产启动路径尚未构造 root/fence/cancellation capability，也没有任何网络层调用这些函数。可信时间 observation 生成/attestation、数据库外防整库回滚锚点、短文件 damage 的 Store 终结、每次 socket read 取消检查、真实 HTTPS/redirect downloader、全工件摘要验证、候选 promotion/GC、跨重启恢复枚举和 Host/Sidecar/IPC/沙箱接线仍待实现。由于 `ComputePluginTrustedTimeObservation` 刻意没有生产构造器，fetch fence/session 与 `DurablyWrittenComputePluginSegment` 目前仍不可从生产路径生成；本节只代表内部合同已铺设，不代表下载器已经可用。
+以上新增代码仍未编译、未测试、未执行 DDL，也未在 NodeAgent 启动或 Host 路径接线，因此没有真实数据库、网络下载、插件安装或 Sidecar 运行。代码层已形成 fence-owned cancellation、分段耐久写入与 commit 恢复边界；authority v3 还形成 candidate verification journal、撤销 fence、promotion 禁入门卫，以及受管独占句柄从 byte 0 有界 SHA-256、每次 read 取消检查、exact EOF 和 hash 后身份复验底座。verification 的 fresh file-set read、prepared CAS、线性 Authorized/Hashed capability、post-hash trusted binder、verified/rejected 原子 resolution 和 outcome recovery 尚未形成，因此 schema 当前只允许 prepared run 被既有 fence 撤销，不能写出 verified/rejected 或推进槽。可信时间 observation 生成/attestation、数据库外防整库回滚锚点、短文件 damage 终结、socket-read 取消、真实 HTTPS downloader、安全解包/逐文件 closure、candidate health/promotion/GC、跨重启恢复和 Host/Sidecar/IPC/沙箱仍待实现；本节不代表下载器或插件系统已经可用。

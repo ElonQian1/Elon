@@ -120,6 +120,11 @@ pub(super) fn release_candidates(
     applied_at_ms: i64,
 ) -> Result<()> {
     for closure in closures {
+        super::candidate_verification_revocation::revoke_for_candidate_release(
+            transaction,
+            &closure.candidate_token,
+            applied_at_ms,
+        )?;
         transaction
             .execute(
                 r#"UPDATE fetch_claims SET state = 'revoked', resolved_at_ms = ?1,

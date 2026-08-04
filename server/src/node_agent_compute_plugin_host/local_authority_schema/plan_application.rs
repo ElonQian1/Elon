@@ -1,7 +1,7 @@
 /// Cross-table fences for the immutable plan-application journal.
 ///
 /// Kept separate from the base table declarations so the schema entrypoint remains assembly-only.
-pub(super) const PLAN_APPLICATION_SCHEMA_V2: &str = r#"
+pub(super) const PLAN_APPLICATION_SCHEMA_V3: &str = r#"
 CREATE TRIGGER authority_inventory_change_fenced
 BEFORE UPDATE OF inventory_revision, inventory_digest, inventory_json ON authority_meta
 WHEN (
@@ -126,6 +126,7 @@ OR EXISTS (
       AND download.created_at_ms <> application.applied_at_ms
 )
 OR EXISTS (SELECT 1 FROM fetch_claims WHERE state = 'prepared')
+OR EXISTS (SELECT 1 FROM candidate_verification_runs WHERE state = 'prepared')
 BEGIN
     SELECT RAISE(ABORT, 'plan application cannot seal with incomplete child rows');
 END;
@@ -177,6 +178,15 @@ BEGIN
     SELECT RAISE(ABORT, 'candidate owner may close exactly once');
 END;
 
+CREATE TRIGGER candidate_promotion_requires_receipt
+BEFORE UPDATE OF
+    state, closed_at_ms, closed_by_plan_id, closed_by_plan_digest, close_reason
+ON candidate_owners
+WHEN NEW.state = 'promoted'
+BEGIN
+    SELECT RAISE(ABORT, 'candidate promotion is unavailable without content and health receipts');
+END;
+
 CREATE TRIGGER candidate_close_plan_open
 BEFORE UPDATE OF
     state, closed_at_ms, closed_by_plan_id, closed_by_plan_digest, close_reason
@@ -187,6 +197,18 @@ WHEN NEW.state = 'released' AND EXISTS (
 )
 BEGIN
     SELECT RAISE(ABORT, 'sealed plan cannot acquire candidate closures');
+END;
+
+CREATE TRIGGER candidate_release_verification_fenced
+BEFORE UPDATE OF
+    state, closed_at_ms, closed_by_plan_id, closed_by_plan_digest, close_reason
+ON candidate_owners
+WHEN NEW.state = 'released' AND EXISTS (
+    SELECT 1 FROM candidate_verification_runs
+    WHERE candidate_token = OLD.candidate_token AND state = 'prepared'
+)
+BEGIN
+    SELECT RAISE(ABORT, 'candidate release must revoke its prepared verification');
 END;
 
 CREATE TRIGGER candidate_owner_delete_forbidden

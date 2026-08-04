@@ -3,7 +3,7 @@
 /// The write order is intentional: begin advances trusted time, inserts a prepared claim, then
 /// advances the download cursor; commit advances trusted time and the download before terminalizing
 /// that same claim. A failed statement rolls the surrounding transaction back.
-pub(super) const FETCH_CLAIM_SCHEMA_V2: &str = r#"
+pub(super) const FETCH_CLAIM_SCHEMA_V3: &str = r#"
 CREATE TRIGGER fetch_claim_initial_state
 BEFORE INSERT ON fetch_claims
 WHEN NEW.state <> 'prepared'

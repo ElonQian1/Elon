@@ -7,6 +7,7 @@ use crate::node_agent_compute_plugin_host::{
     identity::ComputePluginInstallationIdentity,
     install_plan_admission_validation::is_identifier,
     lifecycle::{ComputePluginInventorySnapshot, COMPUTE_PLUGIN_INVENTORY_SCHEMA},
+    local_authority_schema::COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION,
     manifest_validation::is_sha256,
     signed_artifact_verification::jcs_sha256_hex,
 };
@@ -72,7 +73,7 @@ impl ComputePluginLocalAuthority {
                         authority_epoch, process_owner_epoch,
                         trusted_time_high_water_ms, clock_status, updated_at_ms
                     ) VALUES (
-                        1, 2, ?1,
+                        1, ?11, ?1,
                         0, 0, ?2, ?3,
                         ?4, 0,
                         NULL, NULL,
@@ -95,6 +96,7 @@ impl ComputePluginLocalAuthority {
                         &initial.host_api_protocol_id,
                         i64::from(initial.host_api_revision),
                         initial.initialized_at.timestamp_millis(),
+                        COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION,
                     ],
                 )
                 .context("COMPUTE_PLUGIN_AUTHORITY_META_INSERT")?;

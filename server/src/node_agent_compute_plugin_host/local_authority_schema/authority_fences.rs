@@ -1,5 +1,5 @@
 /// Cross-cutting monotonic fences for authority and process ownership transitions.
-pub(super) const AUTHORITY_FENCE_SCHEMA_V2: &str = r#"
+pub(super) const AUTHORITY_FENCE_SCHEMA_V3: &str = r#"
 CREATE TRIGGER authority_state_revision_monotonic
 BEFORE UPDATE OF state_revision ON authority_meta
 WHEN NEW.state_revision IS NOT OLD.state_revision
@@ -16,6 +16,7 @@ WHEN NEW.authority_epoch IS NOT OLD.authority_epoch
     OR NEW.state_revision <> OLD.state_revision + 1
     OR NEW.process_owner_epoch <> OLD.process_owner_epoch
     OR EXISTS (SELECT 1 FROM fetch_claims WHERE state = 'prepared')
+    OR EXISTS (SELECT 1 FROM candidate_verification_runs WHERE state = 'prepared')
  )
 BEGIN
     SELECT RAISE(ABORT, 'authority epoch change must fence every prepared claim');
@@ -29,6 +30,7 @@ WHEN NEW.process_owner_epoch IS NOT OLD.process_owner_epoch
     OR NEW.state_revision <> OLD.state_revision + 1
     OR NEW.authority_epoch <> OLD.authority_epoch
     OR EXISTS (SELECT 1 FROM fetch_claims WHERE state = 'prepared')
+    OR EXISTS (SELECT 1 FROM candidate_verification_runs WHERE state = 'prepared')
  )
 BEGIN
     SELECT RAISE(ABORT, 'process owner change must fence every prepared claim');
