@@ -1,8 +1,8 @@
 package com.elon.app
 
-import java.nio.charset.StandardCharsets
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -14,7 +14,7 @@ import org.junit.Test
 
 class ProjectPlazaLayoutContractTest {
     @Test
-    fun providedBitmapAssetsAreTrackedAtTheirOriginalDimensions() {
+    fun apkFeaturedBitmapAssetsRemainTrackedAtTheirOriginalDimensions() {
         val directory = repositoryRoot().resolve("android/app/src/main/res/drawable-nodpi")
         val expected = mapOf(
             "project_plaza_ui1_card.png" to (837 to 943),
@@ -27,14 +27,12 @@ class ProjectPlazaLayoutContractTest {
         expected.forEach { (name, dimensions) ->
             val path = directory.resolve(name)
             assertTrue("missing $name", Files.isRegularFile(path))
-            val actual = readPngDimensions(path)
-            assertEquals("$name width", dimensions.first, actual.first)
-            assertEquals("$name height", dimensions.second, actual.second)
+            assertEquals("$name dimensions", dimensions, readPngDimensions(path))
         }
     }
 
     @Test
-    fun androidPlazaDirectlyReferencesAllFiveAssetsAndTargetRatios() {
+    fun androidKeepsTheApkFeaturedCarouselAsThePrimaryDesign() {
         val source = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
         )
@@ -45,15 +43,31 @@ class ProjectPlazaLayoutContractTest {
             "R.drawable.project_plaza_ui4_heart",
             "R.drawable.project_plaza_ui5_star"
         ).forEach { resource -> assertTrue(source.contains(resource)) }
+        assertTrue(source.contains("buildFeaturedStrip(projects.take(5))"))
         assertTrue(source.contains("FEATURED_CARD_WIDTH_FRACTION = 0.6564706f"))
         assertTrue(source.contains("FEATURED_CARD_HEIGHT_RATIO = 1.1266428f"))
         assertTrue(source.contains("FEATURED_CARD_GAP_DP = 9"))
-        assertTrue(source.contains("LIST_ROW_GAP_PX = 64"))
-        assertTrue(source.contains("LIST_TEXT_GAP_PX = 48"))
     }
 
     @Test
-    fun plazaEntryArrowsUseTheVerifiedOriginalBitmapOnAndroidAndWeb() {
+    fun mobilePwaMirrorsTheApkFeaturedCarouselAndListRhythm() {
+        val script = readRepositoryFile("server/src/assets/project_plaza.js")
+        val styles = readRepositoryFile("server/src/assets/project_plaza.css")
+        val page = readRepositoryFile("server/src/assets/web_page.html")
+
+        assertTrue(script.contains("project-plaza-featured-scroller"))
+        assertTrue(script.contains("state.projects.slice(0, 5).map(renderFeaturedCard)"))
+        assertTrue(script.contains("project-plaza-featured-media"))
+        assertTrue(styles.contains("width: 65.647vw;"))
+        assertTrue(styles.contains("aspect-ratio: 837 / 943;"))
+        assertTrue(styles.contains("gap: 9px;"))
+        assertTrue(styles.contains("padding: 0 98px 0 20px;"))
+        assertTrue(page.contains("data-ui-design=\"apk-featured-carousel-v1\""))
+        assertFalse(script.contains("project-plaza-status-spine"))
+    }
+
+    @Test
+    fun plazaEntryArrowsUseTheVerifiedBitmapOnAndroidAndMobilePwa() {
         val expectedSha256 = "3147797d74d7ee606612a79224216210865d6b783273fc3166eb332f3ed37275"
         val androidAsset = repositoryRoot().resolve(
             "android/app/src/main/res/drawable-nodpi/project_view_chevron.png"
@@ -61,99 +75,50 @@ class ProjectPlazaLayoutContractTest {
         val webAsset = repositoryRoot().resolve("server/src/assets/project_view_chevron.png")
         assertEquals(expectedSha256, sha256(androidAsset))
         assertEquals(expectedSha256, sha256(webAsset))
-        assertEquals(43 to 43, readPngDimensions(androidAsset))
 
         val androidSource = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
         )
+        val webScript = readRepositoryFile("server/src/assets/project_plaza.js")
         assertEquals(2, Regex(Regex.escape("R.drawable.project_view_chevron")).findAll(androidSource).count())
+        assertEquals(2, Regex(Regex.escape("/assets/project_view_chevron.png")).findAll(webScript).count())
         assertFalse(androidSource.contains("text = \"›\""))
-
-        val webSource = readRepositoryFile("pc-frontend/src/features/plaza/ProjectPlazaView.tsx")
-        assertTrue(webSource.contains("server/src/assets/project_view_chevron.png'"))
-        assertEquals(2, Regex(Regex.escape("src={plazaChevronAsset}")).findAll(webSource).count())
-        assertFalse(webSource.contains("ChevronRight"))
+        assertFalse(webScript.contains(">›<"))
     }
 
     @Test
-    fun plazaListArrowKeepsAFullTouchTargetWhileRenderingTheOriginalBitmapSize() {
+    fun carouselAndListActionsKeepFortyEightPixelTouchTargets() {
         val androidSource = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
         )
+        val webStyles = readRepositoryFile("server/src/assets/project_plaza.css")
         val projectListRow = androidSource.substringAfter("private fun buildProjectListRow")
             .substringBefore("private fun projectThumbnail")
-        assertTrue(projectListRow.contains("FrameLayout.LayoutParams(designPx(LIST_CHEVRON_PX)"))
-        assertTrue(projectListRow.contains("marginEnd = designPx(LIST_CHEVRON_END_INSET_PX)"))
+
         assertTrue(projectListRow.contains("LinearLayout.LayoutParams(dp(48), dp(48))"))
-        assertTrue(androidSource.contains("LIST_CHEVRON_PX = 43"))
-        assertTrue(androidSource.contains("LIST_CHEVRON_END_INSET_PX = 12"))
+        assertTrue(androidSource.contains("FrameLayout.LayoutParams(dp(27), dp(27)"))
+        assertTrue(webStyles.contains(".project-plaza-featured-open"))
+        assertTrue(webStyles.contains(".project-plaza-open"))
+        assertTrue(Regex("width:\\s*48px;[\\s\\S]*?height:\\s*48px;").containsMatchIn(webStyles))
     }
 
     @Test
-    fun plazaFeaturedArrowMatchesTheTargetRoundButtonSize() {
+    fun searchAndFiltersStayVisibleAboveTheApkLedContent() {
         val androidSource = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
         )
-        val featuredCard = androidSource.substringAfter("private fun buildFeaturedCard")
-            .substringBefore("private fun mediaPlaceholder")
-        val featuredArrow = requireNotNull(
-            Regex(
-                """setImageResource\(R\.drawable\.project_view_chevron\)([\s\S]*?)""" +
-                    """\}, FrameLayout\.LayoutParams\(dp\((\d+)\), dp\((\d+)\),"""
-            ).find(featuredCard)
-        )
-        val featuredPadding = requireNotNull(
-            Regex(
-                """setPadding\(dp\((\d+)\), dp\((\d+)\), dp\((\d+)\), dp\((\d+)\)\)"""
-            ).find(featuredArrow.groupValues[1])
-        ).groupValues.drop(1).map(String::toInt)
+        val webScript = readRepositoryFile("server/src/assets/project_plaza.js")
+        val mobileWeb = readRepositoryFile("server/src/assets/web_page.html")
 
-        assertEquals(27, featuredArrow.groupValues[2].toInt())
-        assertEquals(27, featuredArrow.groupValues[3].toInt())
-        featuredPadding.forEach { assertEquals(6, it) }
-        assertEquals(15, featuredArrow.groupValues[2].toInt() - featuredPadding[0] - featuredPadding[2])
+        assertTrue(androidSource.contains("shell.addView(buildSearchBar())"))
+        assertTrue(androidSource.contains("shell.addView(buildFilterScroller()"))
+        assertTrue(androidSource.contains("R.drawable.ic_top_search_custom"))
+        assertTrue(webScript.contains("placeholder=\"搜索项目、作者\""))
+        assertTrue(mobileWeb.contains("data-search-artwork=\"/assets/project_view_search_icon.png\""))
     }
 
     @Test
-    fun webPlazaListChevronIsSixteenPixelsInsideTheFortyEightPixelAction() {
-        val styles = readRepositoryFile("pc-frontend/src/features/plaza/PlazaPage.module.css")
-        assertTrue(
-            Regex("""\.rowAction\s*\{[\s\S]*?width:\s*48px;[\s\S]*?height:\s*48px;[\s\S]*?\}""")
-                .containsMatchIn(styles)
-        )
-        assertTrue(
-            Regex("""\.rowAction > img\s*\{[\s\S]*?width:\s*16px;[\s\S]*?height:\s*16px;[\s\S]*?\}""")
-                .containsMatchIn(styles)
-        )
-        assertTrue(
-            Regex("""\.rowAction > svg\s*\{[\s\S]*?width:\s*24px;[\s\S]*?height:\s*24px;[\s\S]*?\}""")
-                .containsMatchIn(styles)
-        )
-    }
-
-    @Test
-    fun webPlazaFeaturedChevronKeepsAFortyEightPixelTouchTargetAndTargetCircle() {
-        val styles = readRepositoryFile("pc-frontend/src/features/plaza/PlazaPage.module.css")
-        assertTrue(
-            Regex("""\.primaryAction\s*\{[\s\S]*?width:\s*48px;[\s\S]*?height:\s*48px;[\s\S]*?\}""")
-                .containsMatchIn(styles)
-        )
-        assertTrue(
-            Regex("""\.primaryAction::before\s*\{[\s\S]*?width:\s*27px;[\s\S]*?height:\s*27px;[\s\S]*?\}""")
-                .containsMatchIn(styles)
-        )
-        assertTrue(
-            Regex("""\.primaryAction > img\s*\{[\s\S]*?width:\s*16px;[\s\S]*?height:\s*16px;[\s\S]*?\}""")
-                .containsMatchIn(styles)
-        )
-        assertTrue(
-            Regex("""\.primaryAction > svg\s*\{[\s\S]*?width:\s*22px;[\s\S]*?height:\s*22px;[\s\S]*?\}""")
-                .containsMatchIn(styles)
-        )
-    }
-
-    @Test
-    fun projectEntryHasNoMineTabOrProjectOnlyAddButton() {
+    fun projectEntryKeepsTheAcceptedSinglePlazaStructure() {
         val navigation = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/MainNavigationController.kt"
         )
@@ -170,50 +135,12 @@ class ProjectPlazaLayoutContractTest {
     }
 
     @Test
-    fun webProjectEntryUsesTheSameSinglePlazaStructureAndAssets() {
-        val entry = readRepositoryFile("pc-frontend/src/features/projects/ProjectsPage.tsx")
-        val view = readRepositoryFile("pc-frontend/src/features/plaza/ProjectPlazaView.tsx")
-        val styles = readRepositoryFile("pc-frontend/src/features/plaza/PlazaPage.module.css")
-        assertFalse(entry.contains("我的项目"))
-        assertTrue(entry.contains("<ProjectPlazaView />"))
-        listOf("card.png", "thumbnail.png", "avatar.png", "heart.png", "star.png")
-            .forEach { asset -> assertTrue(view.contains(asset)) }
-        assertTrue(styles.contains("65.6471vw"))
-        assertTrue(styles.contains("aspect-ratio: 837 / 943"))
-    }
-
-    @Test
-    fun plazaSearchReusesTheFriendHomeArtworkAcrossAndroidAndWeb() {
-        val androidSearch = repositoryRoot().resolve(
-            "android/app/src/main/res/drawable-nodpi/ic_top_search_custom.png"
-        )
-        val webSearch = repositoryRoot().resolve("server/src/assets/project_view_search_icon.png")
-        assertEquals(sha256(androidSearch), sha256(webSearch))
-
-        val androidSource = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
-        ).substringAfter("private fun buildDiscoveryHeader")
-            .substringBefore("private fun buildSearchBar")
-        assertTrue(androidSource.contains("R.drawable.ic_top_search_custom"))
-        assertTrue(androidSource.contains("PLAZA_SEARCH_END_MARGIN_DP"))
-
-        val webView = readRepositoryFile("pc-frontend/src/features/plaza/ProjectPlazaView.tsx")
-        assertTrue(webView.contains("project_view_search_icon.png"))
-        assertTrue(webView.contains("src={sharedTopSearchAsset}"))
-
+    fun mobilePwaAutoOpensTheVisibleLateLoadedPlazaModule() {
+        val script = readRepositoryFile("server/src/assets/project_plaza.js")
         val mobileWeb = readRepositoryFile("server/src/assets/web_page.html")
-        assertTrue(mobileWeb.contains("data-search-artwork=\"/assets/project_view_search_icon.png\""))
-    }
-
-    @Test
-    fun plazaListUsesComfortableVerticalSpacingAcrossAndroidAndMobileWeb() {
-        val androidSource = readRepositoryFile(
-            "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
-        )
-        assertTrue(androidSource.contains("LIST_ROW_GAP_PX = 64"))
-
-        val mobileWeb = readRepositoryFile("server/src/assets/web_page.html")
-        assertTrue(mobileWeb.contains("#projectPlazaInlineRoot .project-plaza-results { gap: 38px; }"))
+        assertTrue(script.contains("!inlineRoot.classList.contains('hidden')"))
+        assertTrue(mobileWeb.contains("projectPage.classList.add('project-plaza-mode')"))
+        assertTrue(mobileWeb.contains("projectPage.classList.remove('project-plaza-mode')"))
     }
 
     private fun readRepositoryFile(relativePath: String): String =

@@ -279,7 +279,7 @@
         <span class="project-plaza-search-icon" aria-hidden="true">
           <img src="${escapeHtml(searchArtwork)}" alt="" />
         </span>
-        <input class="project-plaza-search-input" type="search" placeholder="搜索应用" value="${escapeHtml(state.query)}" data-plaza-action="search" />
+        <input class="project-plaza-search-input" type="search" placeholder="搜索项目、作者" value="${escapeHtml(state.query)}" data-plaza-action="search" aria-label="搜索项目或作者" />
       </div>
       <div class="project-plaza-filter-row">
         ${filters.map(renderFilter).join('')}
@@ -302,51 +302,82 @@
     if (state.loading) return '<div class="project-plaza-empty">加载中...</div>';
     if (state.error) return `<div class="project-plaza-error">${escapeHtml(state.status)}</div>`;
     if (!state.projects.length) return '<div class="project-plaza-empty">暂无匹配项目</div>';
-    return state.projects.map(renderCard).join('');
+    return `
+      <div class="project-plaza-featured-scroller" aria-label="精选项目">
+        <div class="project-plaza-featured-track">
+          ${state.projects.slice(0, 5).map(renderFeaturedCard).join('')}
+        </div>
+      </div>
+      ${renderResultsHeading()}
+      <div class="project-plaza-list">
+        ${state.projects.map(renderCard).join('')}
+      </div>
+    `;
   }
 
-  function renderDescription(project, identity) {
-    const desc = identity.subtitle || cleanText(project.description) || '暂无简介';
-    const collapsible = Array.from(desc).length > 46;
-    const shown = collapsible
-      ? Array.from(desc).slice(0, 46).join('').trimEnd() + '...'
-      : desc;
-    return `<div class="project-plaza-desc ${collapsible ? 'is-collapsed' : ''}">应用介绍：${escapeHtml(shown)}</div>`;
+  function renderResultsHeading() {
+    if (state.loading || state.error) return '';
+    const installableCount = state.projects.filter((project) => cleanText(project.latest_apk_url) || cleanText(project.last_apk_url)).length;
+    return `
+      <div class="project-plaza-section-heading">
+        <h2>全部</h2>
+        <span>${escapeHtml(state.projects.length)} 个项目 · ${escapeHtml(installableCount)} 个可安装</span>
+      </div>
+    `;
+  }
+
+  function reactionSelected(project, key) {
+    try {
+      return window.localStorage.getItem(`project-plaza-reaction:${project.id}:${key}`) === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function toggleReaction(id, key) {
+    const project = state.projects.find((item) => item.id === id);
+    if (!project) return;
+    const storageKey = `project-plaza-reaction:${project.id}:${key}`;
+    try {
+      window.localStorage.setItem(storageKey, reactionSelected(project, key) ? '0' : '1');
+    } catch (_) {}
+    render();
+  }
+
+  function renderFeaturedCard(project) {
+    const identity = projectIdentity(project);
+    const description = identity.subtitle || cleanText(project.description) || '这个项目还没有填写简介。';
+    return `
+      <article class="project-plaza-featured-card" data-id="${escapeHtml(project.id)}">
+        <div class="project-plaza-featured-top">
+          <span class="project-plaza-featured-avatar" aria-hidden="true"></span>
+          <div class="project-plaza-reactions" aria-label="项目偏好">
+            <button class="project-plaza-reaction is-star ${reactionSelected(project, 'favorite') ? 'is-selected' : ''}" type="button" data-plaza-action="favorite" data-id="${escapeHtml(project.id)}" aria-label="${reactionSelected(project, 'favorite') ? '取消收藏' : '收藏'}${escapeHtml(identity.title)}"></button>
+            <button class="project-plaza-reaction is-heart ${reactionSelected(project, 'liked') ? 'is-selected' : ''}" type="button" data-plaza-action="liked" data-id="${escapeHtml(project.id)}" aria-label="${reactionSelected(project, 'liked') ? '取消点赞' : '点赞'}${escapeHtml(identity.title)}"></button>
+          </div>
+        </div>
+        <h3>${escapeHtml(identity.title)}</h3>
+        <p>${escapeHtml(description)}</p>
+        <div class="project-plaza-featured-media" aria-hidden="true">
+          <span></span><span></span>
+        </div>
+        <button class="project-plaza-featured-open" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="进入${escapeHtml(identity.title)}"><img src="/assets/project_view_chevron.png" alt="" /></button>
+      </article>
+    `;
   }
 
   function renderCard(project) {
     const identity = projectIdentity(project);
+    const description = identity.subtitle || cleanText(project.description) || '这个项目还没有填写简介。';
     return `
-      <div class="project-plaza-card" data-id="${escapeHtml(project.id)}">
-        <div class="project-plaza-card-top">
-          ${renderThumb(project, identity.title)}
-          <div class="project-plaza-title-block">
-            <div class="project-plaza-name">${escapeHtml(identity.title)}</div>
-            <div class="project-plaza-owner">创建者：${escapeHtml(project.owner_account || '未知')}</div>
-          </div>
-          <div class="project-plaza-actions">
-            <button class="project-plaza-btn" type="button" data-plaza-action="share" data-id="${escapeHtml(project.id)}" aria-label="分享项目" title="分享项目">分享项目</button>
-          </div>
+      <article class="project-plaza-card" data-id="${escapeHtml(project.id)}">
+        <span class="project-plaza-list-thumb" aria-hidden="true"></span>
+        <div class="project-plaza-title-block">
+          <h3 class="project-plaza-name">${escapeHtml(identity.title)}</h3>
+          <p class="project-plaza-desc">${escapeHtml(description)}</p>
         </div>
-        <div class="project-plaza-stats">
-          <div class="project-plaza-stat project-plaza-stat-member">
-            <span class="project-plaza-stat-top">
-              <span class="project-plaza-member-icon" aria-hidden="true">
-                <img src="/assets/ic_plaza_member_stat.png" alt="" loading="lazy" />
-              </span>
-            </span>
-            <span class="project-plaza-stat-label">成员：${escapeHtml(projectMemberCount(project))}</span>
-          </div>
-          <span class="project-plaza-stat-sep" aria-hidden="true"></span>
-          <div class="project-plaza-stat"><span class="project-plaza-stat-top"><strong>${escapeHtml(projectInstallCount(project))}</strong></span><span>次安装</span></div>
-          <span class="project-plaza-stat-sep" aria-hidden="true"></span>
-          <div class="project-plaza-stat project-plaza-stat-size"><span class="project-plaza-stat-top"><strong>${escapeHtml(projectApkSize(project))}</strong></span><span>大小</span></div>
-          <span class="project-plaza-stat-sep" aria-hidden="true"></span>
-          <div class="project-plaza-stat"><span class="project-plaza-stat-top"><strong>${escapeHtml(projectCommentCount(project))}</strong></span><span>评论</span></div>
-        </div>
-        ${renderDescription(project, identity)}
-        <span class="project-plaza-divider" aria-hidden="true"></span>
-      </div>
+        <button class="project-plaza-open" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="打开${escapeHtml(identity.title)}"><img src="/assets/project_view_chevron.png" alt="" /></button>
+      </article>
     `;
   }
 
@@ -497,10 +528,12 @@
         shareProject(id);
       } else if (action === 'download') {
         downloadProjectApk(id);
+      } else if (action === 'favorite' || action === 'liked') {
+        toggleReaction(id, action);
       }
       return;
     }
-    const card = event.target.closest('.project-plaza-card[data-id]');
+    const card = event.target.closest('.project-plaza-card[data-id], .project-plaza-featured-card[data-id]');
     if (!card) return;
     event.preventDefault();
     openJoinedProject(card.dataset.id || '');
@@ -513,6 +546,8 @@
       if (typeof app.openProjectPlaza === 'function') app.openProjectPlaza();
       else openInline();
     });
+    const inlineRoot = root();
+    if (inlineRoot && !inlineRoot.classList.contains('hidden')) openInline();
   }
 
   window.ElonProjectPlaza = {
