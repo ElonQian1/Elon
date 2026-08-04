@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt 结算挑战决议
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: ai-economy, backend
 ---
 
@@ -34,7 +34,7 @@ v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以
 | `rejected` | 不再由挑战阻断 | 无 |
 | `withdrawn` | 不再由挑战阻断 | 无 |
 
-解除挑战阻断不等于立即释放。未来释放仍需检查 72 小时窗口、原结算审计、余额投影、幂等和其他风险门卫。
+解除挑战阻断不等于立即释放。v198 释放入口还会检查 72 小时窗口、原结算审计、余额投影、幂等和其他风险门卫，边界见 `docs/distributed-compute/attempt-settlement-release-api.md`。
 
 ## 4. 权限与原子性
 
@@ -54,11 +54,10 @@ v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以
 
 - Cargo 编译、v197 迁移执行、HTTP 真实调用、并发和故障注入验证；
 - accepted 挑战的纠正、退款、冲正或替换 Settlement Receipt；
-- 挑战期届满后的 pending 原子释放；
-- Provider/平台可用余额与提现；
+- available 余额的提现、外部转账与清算；
 - 外部支付、银行、钱包、Sui 或矿池清算。
 
-因此，`accepted` 只表示挑战成立并继续阻断释放，不表示退款已经发生；`rejected/withdrawn` 也不表示资金已经释放。
+因此，`accepted` 只表示挑战成立并继续阻断释放，不表示退款已经发生；`rejected/withdrawn` 只解除挑战门卫，是否已经释放必须以独立 v198 Release Receipt 为准。
 
 ## 7. 代码入口
 
