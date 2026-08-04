@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use elon_pc_dev_runtime::NodeDataPaths;
 use std::path::Path;
 
-pub(super) const ROOT_MARKER_FILE: &str = ".elon-node-data-root.json";
+pub(crate) const ROOT_MARKER_FILE: &str = ".elon-node-data-root.json";
 const ROOT_MARKER_SCHEMA_VERSION: u64 = 1;
 
 pub(super) fn claim_or_verify_root_marker(paths: &NodeDataPaths, install_id: &str) -> Result<()> {
@@ -55,6 +55,17 @@ pub(crate) fn verify_root_marker(paths: &NodeDataPaths, install_id: &str) -> Res
     Ok(())
 }
 
+/// Validates marker bytes read from an already pinned file handle. Callers that need a
+/// time-of-check/time-of-use resistant root must not reopen the marker by path after pinning.
+pub(crate) fn verify_root_marker_payload(existing: &str, install_id: &str) -> Result<()> {
+    let expected = require_install_id(install_id)?;
+    let actual = parse_root_marker_payload(existing)?;
+    if actual != expected {
+        bail!("节点数据根标记属于另一台一龙节点");
+    }
+    Ok(())
+}
+
 pub(super) fn read_existing_root_marker(marker: &Path) -> Result<Option<String>> {
     let metadata = match std::fs::symlink_metadata(marker) {
         Ok(metadata) => metadata,
@@ -75,21 +86,20 @@ pub(super) fn read_existing_root_marker(marker: &Path) -> Result<Option<String>>
     }
     let existing = std::fs::read_to_string(marker)
         .with_context(|| format!("无法读取节点数据根标记 {}", marker.display()))?;
-    let value: serde_json::Value = serde_json::from_str(&existing)
+    let install_id = parse_root_marker_payload(&existing)
         .with_context(|| format!("节点数据根标记损坏: {}", marker.display()))?;
+    Ok(Some(install_id))
+}
+
+fn parse_root_marker_payload(existing: &str) -> Result<String> {
+    let value: serde_json::Value = serde_json::from_str(existing)?;
     let schema_version = value
         .get("schema_version")
         .and_then(serde_json::Value::as_u64)
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "节点数据根标记缺少有效 schema_version: {}",
-                marker.display()
-            )
-        })?;
+        .ok_or_else(|| anyhow::anyhow!("节点数据根标记缺少有效 schema_version"))?;
     if schema_version != ROOT_MARKER_SCHEMA_VERSION {
         bail!(
-            "节点数据根标记 schema_version 不受支持: {} (expected {}, actual {})",
-            marker.display(),
+            "节点数据根标记 schema_version 不受支持 (expected {}, actual {})",
             ROOT_MARKER_SCHEMA_VERSION,
             schema_version
         );
@@ -99,10 +109,8 @@ pub(super) fn read_existing_root_marker(marker: &Path) -> Result<Option<String>>
         .and_then(serde_json::Value::as_str)
         .map(str::trim)
         .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            anyhow::anyhow!("节点数据根标记缺少有效 install_id: {}", marker.display())
-        })?;
-    Ok(Some(install_id.to_string()))
+        .ok_or_else(|| anyhow::anyhow!("节点数据根标记缺少有效 install_id"))?;
+    Ok(install_id.to_string())
 }
 
 pub(super) fn root_marker_belongs_to(root: &Path, install_id: &str) -> bool {

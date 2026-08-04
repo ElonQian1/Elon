@@ -1,0 +1,253 @@
+use std::{
+    ffi::{OsStr, OsString},
+    fs::{File, OpenOptions},
+    mem::{size_of, MaybeUninit},
+    os::windows::{
+        ffi::{OsStrExt, OsStringExt},
+        fs::OpenOptionsExt,
+        io::{AsRawHandle, FromRawHandle, RawHandle},
+    },
+    path::{Path, PathBuf},
+};
+
+use windows_sys::{
+    Wdk::{
+        Foundation::OBJECT_ATTRIBUTES,
+        Storage::FileSystem::{
+            NtCreateFile, FILE_CREATE, FILE_DIRECTORY_FILE, FILE_NON_DIRECTORY_FILE, FILE_OPEN,
+            FILE_OPEN_REPARSE_POINT as NT_FILE_OPEN_REPARSE_POINT, FILE_SYNCHRONOUS_IO_NONALERT,
+        },
+    },
+    Win32::{
+        Foundation::{
+            RtlNtStatusToDosError, HANDLE, INVALID_HANDLE_VALUE, NTSTATUS, UNICODE_STRING,
+        },
+        Storage::FileSystem::{
+            FileIdInfo, GetFileInformationByHandle, GetFileInformationByHandleEx,
+            GetFinalPathNameByHandleW, BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_DIRECTORY,
+            FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
+            FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_ID_INFO,
+            FILE_NAME_NORMALIZED, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_TRAVERSE,
+            SYNCHRONIZE, VOLUME_NAME_GUID,
+        },
+        System::{Kernel::OBJ_CASE_INSENSITIVE, IO::IO_STATUS_BLOCK},
+    },
+};
+
+use super::PlatformFileIdentity;
+
+const MAX_FINAL_PATH_UTF16: usize = 32_768;
+
+/// The configured namespace is used only to acquire the first volume-root handle. Every child
+/// below it is opened relative to its already pinned parent handle.
+pub(super) fn open_initial_directory(path: &Path) -> std::io::Result<File> {
+    OpenOptions::new()
+        .access_mode(FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRONIZE)
+        .share_mode(FILE_SHARE_READ)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS)
+        .open(path)
+}
+
+pub(super) fn open_directory_relative(parent: &File, name: &OsStr) -> std::io::Result<File> {
+    open_relative(
+        parent,
+        name,
+        FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRONIZE,
+        FILE_OPEN,
+        FILE_DIRECTORY_FILE | NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
+        FILE_SHARE_READ,
+    )
+}
+
+pub(super) fn create_new_directory_relative(parent: &File, name: &OsStr) -> std::io::Result<File> {
+    open_relative(
+        parent,
+        name,
+        FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRONIZE,
+        FILE_CREATE,
+        FILE_DIRECTORY_FILE | NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
+        FILE_SHARE_READ,
+    )
+}
+
+pub(super) fn open_existing_file_relative(
+    parent: &File,
+    name: &OsStr,
+    writable: bool,
+) -> std::io::Result<File> {
+    let access = if writable {
+        FILE_GENERIC_READ | FILE_GENERIC_WRITE
+    } else {
+        FILE_GENERIC_READ
+    };
+    open_relative(
+        parent,
+        name,
+        access,
+        FILE_OPEN,
+        FILE_NON_DIRECTORY_FILE | NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
+        0,
+    )
+}
+
+pub(super) fn create_new_file_relative(parent: &File, name: &OsStr) -> std::io::Result<File> {
+    open_relative(
+        parent,
+        name,
+        FILE_GENERIC_READ | FILE_GENERIC_WRITE,
+        FILE_CREATE,
+        FILE_NON_DIRECTORY_FILE | NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
+        0,
+    )
+}
+
+fn open_relative(
+    parent: &File,
+    name: &OsStr,
+    desired_access: u32,
+    create_disposition: u32,
+    create_options: u32,
+    share_access: u32,
+) -> std::io::Result<File> {
+    let mut name_utf16 = name.encode_wide().collect::<Vec<_>>();
+    if name_utf16.is_empty()
+        || name_utf16.contains(&0)
+        || name_utf16.len() > usize::from(u16::MAX) / size_of::<u16>()
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "NODE_MANAGED_RELATIVE_NAME_INVALID",
+        ));
+    }
+    let name_bytes = (name_utf16.len() * size_of::<u16>()) as u16;
+    let object_name = UNICODE_STRING {
+        Length: name_bytes,
+        MaximumLength: name_bytes,
+        Buffer: name_utf16.as_mut_ptr(),
+    };
+    let object_attributes = OBJECT_ATTRIBUTES {
+        Length: size_of::<OBJECT_ATTRIBUTES>() as u32,
+        RootDirectory: parent.as_raw_handle() as HANDLE,
+        ObjectName: &object_name,
+        Attributes: OBJ_CASE_INSENSITIVE as u32,
+        SecurityDescriptor: std::ptr::null(),
+        SecurityQualityOfService: std::ptr::null(),
+    };
+    let mut handle: HANDLE = std::ptr::null_mut();
+    let mut io_status = MaybeUninit::<IO_STATUS_BLOCK>::uninit();
+    // SAFETY: the parent File remains live, the relative UTF-16 name and object structures outlive
+    // the synchronous call, and a successful handle is transferred exactly once into `File`.
+    let status = unsafe {
+        NtCreateFile(
+            &mut handle,
+            desired_access,
+            &object_attributes,
+            io_status.as_mut_ptr(),
+            std::ptr::null(),
+            FILE_ATTRIBUTE_NORMAL,
+            share_access,
+            create_disposition,
+            create_options,
+            std::ptr::null(),
+            0,
+        )
+    };
+    if status < 0 {
+        return Err(ntstatus_error(status));
+    }
+    if handle.is_null() || handle == INVALID_HANDLE_VALUE {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "NODE_MANAGED_RELATIVE_OPEN_INVALID_HANDLE",
+        ));
+    }
+    // SAFETY: NtCreateFile returned one owned live handle and no other owner was constructed.
+    Ok(unsafe { File::from_raw_handle(handle as RawHandle) })
+}
+
+fn ntstatus_error(status: NTSTATUS) -> std::io::Error {
+    // SAFETY: RtlNtStatusToDosError is a pure conversion for the returned NTSTATUS.
+    let code = unsafe { RtlNtStatusToDosError(status) };
+    std::io::Error::from_raw_os_error(code as i32)
+}
+
+pub(super) fn canonical_path(file: &File) -> std::io::Result<PathBuf> {
+    let handle = file.as_raw_handle() as HANDLE;
+    let flags = FILE_NAME_NORMALIZED | VOLUME_NAME_GUID;
+    // SAFETY: a null/zero buffer is the documented size query for this live handle.
+    let required = unsafe { GetFinalPathNameByHandleW(handle, std::ptr::null_mut(), 0, flags) };
+    if required == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let required = required as usize;
+    if required > MAX_FINAL_PATH_UTF16 {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "NODE_MANAGED_FINAL_PATH_TOO_LONG",
+        ));
+    }
+    let mut buffer = vec![0u16; required + 1];
+    // SAFETY: `buffer` is writable for its advertised length and the File remains live.
+    let written = unsafe {
+        GetFinalPathNameByHandleW(handle, buffer.as_mut_ptr(), buffer.len() as u32, flags)
+    } as usize;
+    if written == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    if written >= buffer.len() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "NODE_MANAGED_FINAL_PATH_CHANGED_DURING_READ",
+        ));
+    }
+    buffer.truncate(written);
+    let path = PathBuf::from(OsString::from_wide(&buffer));
+    let stable_volume_prefix = r"\\?\Volume{";
+    let path_text = path.to_string_lossy();
+    let has_stable_volume_prefix = path_text
+        .get(..stable_volume_prefix.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(stable_volume_prefix));
+    if !path.is_absolute() || !has_stable_volume_prefix {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "NODE_MANAGED_FINAL_PATH_NOT_STABLE_VOLUME_GUID",
+        ));
+    }
+    Ok(path)
+}
+
+pub(super) fn inspect(file: &File) -> std::io::Result<PlatformFileIdentity> {
+    let handle = file.as_raw_handle() as HANDLE;
+    let mut basic = MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::uninit();
+    // SAFETY: `handle` belongs to the borrowed live File and `basic` is a correctly sized output.
+    if unsafe { GetFileInformationByHandle(handle, basic.as_mut_ptr()) } == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    // SAFETY: the successful Windows call initialized the complete structure.
+    let basic = unsafe { basic.assume_init() };
+
+    let mut extended = MaybeUninit::<FILE_ID_INFO>::uninit();
+    // SAFETY: `extended` matches FileIdInfo and the buffer remains live for the call.
+    if unsafe {
+        GetFileInformationByHandleEx(
+            handle,
+            FileIdInfo,
+            extended.as_mut_ptr().cast(),
+            size_of::<FILE_ID_INFO>() as u32,
+        )
+    } == 0
+    {
+        return Err(std::io::Error::last_os_error());
+    }
+    // SAFETY: a successful FileIdInfo query initialized the complete structure.
+    let extended = unsafe { extended.assume_init() };
+    let file_size = (u64::from(basic.nFileSizeHigh) << 32) | u64::from(basic.nFileSizeLow);
+    Ok(PlatformFileIdentity {
+        volume_serial: extended.VolumeSerialNumber,
+        file_id: extended.FileId.Identifier,
+        number_of_links: basic.nNumberOfLinks,
+        file_size,
+        is_directory: basic.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0,
+        is_reparse_point: basic.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT != 0,
+    })
+}

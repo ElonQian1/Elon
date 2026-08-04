@@ -4,6 +4,7 @@ use rusqlite::{params, OptionalExtension};
 
 use super::ComputePluginLocalAuthority;
 use crate::node_agent_compute_plugin_host::{
+    identity::ComputePluginInstallationIdentity,
     install_plan_admission_validation::is_identifier,
     lifecycle::{ComputePluginInventorySnapshot, COMPUTE_PLUGIN_INVENTORY_SCHEMA},
     manifest_validation::is_sha256,
@@ -12,7 +13,7 @@ use crate::node_agent_compute_plugin_host::{
 
 #[derive(Debug, Clone)]
 pub(crate) struct ComputePluginAuthorityInitialization {
-    pub installation_id_digest: String,
+    pub installation_identity: ComputePluginInstallationIdentity,
     pub inventory: ComputePluginInventorySnapshot,
     pub node_profile_digest: String,
     pub manifest_catalog_revision: i64,
@@ -49,7 +50,7 @@ impl ComputePluginLocalAuthority {
                 .optional()
                 .context("COMPUTE_PLUGIN_AUTHORITY_META_READ")?;
             if let Some(existing_digest) = existing {
-                if existing_digest != initial.installation_id_digest {
+                if existing_digest != initial.installation_identity.digest() {
                     bail!(
                         "COMPUTE_PLUGIN_AUTHORITY_INSTALLATION_CHANGED: database belongs to another node installation"
                     );
@@ -84,7 +85,7 @@ impl ComputePluginLocalAuthority {
                         NULL, 'uninitialized', ?10
                     )"#,
                     params![
-                        &initial.installation_id_digest,
+                        initial.installation_identity.digest(),
                         inventory_digest,
                         inventory_json,
                         initial.inventory.desired_policy_revision,
@@ -113,7 +114,7 @@ fn validate_initial_state(initial: &ComputePluginAuthorityInitialization) -> Res
         || initial.inventory.desired_policy_revision < 0
         || initial.inventory.sharing_enabled
         || !initial.inventory.plugins.is_empty()
-        || !is_sha256(&initial.installation_id_digest)
+        || !is_sha256(initial.installation_identity.digest())
         || !is_sha256(&initial.node_profile_digest)
         || initial.manifest_catalog_revision < 0
         || !is_identifier(&initial.target_id)

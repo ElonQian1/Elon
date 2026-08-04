@@ -29,6 +29,12 @@ impl NodeDataPaths {
         self.root.join("storage")
     }
 
+    /// Signed compute plugins, resumable artifacts and installed slots live outside cache/temp so
+    /// routine cache cleanup cannot remove an active download or an installed runtime.
+    pub fn compute_plugins(&self) -> PathBuf {
+        self.root.join("compute-plugin")
+    }
+
     pub fn cache(&self) -> PathBuf {
         self.root.join("cache")
     }
@@ -93,8 +99,14 @@ impl NodeDataPaths {
         self.temp().join(safe_path_part(task_key, "task", 96))
     }
 
-    pub fn managed_roots(&self) -> [PathBuf; 4] {
-        [self.workspaces(), self.storage(), self.cache(), self.temp()]
+    pub fn managed_roots(&self) -> [PathBuf; 5] {
+        [
+            self.workspaces(),
+            self.storage(),
+            self.cache(),
+            self.temp(),
+            self.compute_plugins(),
+        ]
     }
 }
 
@@ -112,6 +124,10 @@ mod tests {
             PathBuf::from("D:/ElonNodeData/workspaces")
         );
         assert_eq!(paths.storage(), PathBuf::from("D:/ElonNodeData/storage"));
+        assert_eq!(
+            paths.compute_plugins(),
+            PathBuf::from("D:/ElonNodeData/compute-plugin")
+        );
         assert_eq!(
             paths.gradle_home(),
             PathBuf::from("D:/ElonNodeData/cache/gradle-home")

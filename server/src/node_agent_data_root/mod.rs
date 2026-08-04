@@ -13,10 +13,10 @@ mod marker;
 
 pub(crate) use automatic::{automatic_fallback_parent, prepare_automatic_root};
 pub(crate) use cleanup::{cleanup, CleanupEntry, CleanupResult};
-pub(crate) use marker::verify_root_marker;
-use marker::{claim_or_verify_root_marker, root_marker_belongs_to};
 #[cfg(test)]
-use marker::{read_existing_root_marker, ROOT_MARKER_FILE};
+use marker::read_existing_root_marker;
+use marker::{claim_or_verify_root_marker, root_marker_belongs_to};
+pub(crate) use marker::{verify_root_marker, verify_root_marker_payload, ROOT_MARKER_FILE};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -168,6 +168,7 @@ impl NodeDataRootState {
             "root_path": self.configured_root().map(path_text),
             "workspace_root": self.paths.as_ref().map(|paths| path_text(&paths.workspaces())),
             "storage_root": self.paths.as_ref().map(|paths| path_text(&paths.storage())),
+            "compute_plugin_root": self.paths.as_ref().map(|paths| path_text(&paths.compute_plugins())),
             "cache_root": self.paths.as_ref().map(|paths| path_text(&paths.cache())),
             "temp_root": self.paths.as_ref().map(|paths| path_text(&paths.temp())),
             "invalid_reason": self.invalid_reason,

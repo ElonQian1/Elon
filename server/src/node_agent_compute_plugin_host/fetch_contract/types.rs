@@ -69,6 +69,34 @@ impl AuthorizedComputePluginDownloadSegment {
     pub(crate) fn redirect_hop(&self) -> u8 {
         self.redirect_hop
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn ordinal(&self) -> usize {
+        self.claim.ordinal
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn candidate_token_digest(&self) -> &str {
+        &self.claim.candidate_token_digest
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn part_relative_path(&self) -> &str {
+        &self.claim.part_relative_path
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn artifact_digest(&self) -> &str {
+        &self.download.download.digest
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn artifact_size_bytes(&self) -> i64 {
+        self.download.download.size_bytes
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn end_offset_bytes(&self) -> i64 {
+        self.claim.end_offset_bytes
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
+        self.recovery_key.installation_id_digest()
+    }
 }
 
 #[derive(PartialEq, Eq)]

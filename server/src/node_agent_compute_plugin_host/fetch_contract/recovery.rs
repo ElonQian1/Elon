@@ -133,7 +133,9 @@ impl AuthorizedComputePluginDownloadSegment {
     }
 
     /// Consumes the old mutation capability and leaves only a non-authorizing outcome probe.
-    pub(super) fn into_recovery_key(self) -> ComputePluginFetchClaimRecoveryKey {
+    pub(in crate::node_agent_compute_plugin_host) fn into_recovery_key(
+        self,
+    ) -> ComputePluginFetchClaimRecoveryKey {
         self.recovery_key
     }
 }

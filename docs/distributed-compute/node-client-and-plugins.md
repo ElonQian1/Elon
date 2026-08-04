@@ -117,7 +117,7 @@ Manifest 只能声明请求，不能授予权限、证明本机已安装或健�
 
 本批合同把 Attempt 控制固定为 `Start`、`RenewLease` 和 `Cancel`，秘密租约引用只留在 Host，不转发给 Runner。Runner 只产生 typed `Started/Heartbeat/Progress/StreamChunk/CheckpointReady/UsageSnapshot/Terminal` 事件；Host 校验大小、顺序和摘要，补写 Attempt 身份与 fencing generation，再转换成 Host 侧 typed 事件。云端 v188/v189 已写入累计 `provider_declared` 快照和首次 Provider 终态候选 Store/HTTP，但尚未与本 Host 事件接线。Runner 自报用量和终态始终只是声明，不是执行回执或结算决定。
 
-第一批内部兼容 seam 仍直接调用现有 Rust 本地推理函数。本机权威库已确定为独立 SQLite，并固定了 root-signed 双 keyring、库存/计划/候选原子事务和三段式下载认领合同；keyring DTO/校验/快照 resolver、InstallPlan 双 binding，以及 SQLite 路径、v1 DDL 与私有 `BEGIN IMMEDIATE` seam 已形成代码，但没有生产 root pin、防回滚 keyring 安装、meta 初始化、purpose-specific Store 或运行接线，真实数据库也未创建。真实下载器、原子槽切换、Sidecar 进程、IPC framing、资源沙箱、事件背压、`ReadyCapability` 上报与真实 Attempt 运行接线仍未实现；旧式单调用取数权威 trait 也还不能被真实下载器使用。
+第一批内部兼容 seam 仍直接调用现有 Rust 本地推理函数。本机权威库已确定为独立 SQLite，并已形成 root-signed 双 keyring、authority schema v2、库存/计划/候选原子事务、PlanApply、三段式 claim/cursor Store 与类型化不确定结果恢复。Windows 文件层又形成单一类型化 installation identity、长期 root capability、Volume GUID 卷根、父目录句柄相对 `NtCreateFile`、同句柄 marker/文件身份、精确 `.part` 路径、offset-zero `create_new` 恢复、游标短缺 evidence 和长尾同句柄截断/sync 合同；非 Windows 暂时失败关闭。这些能力尚未由启动或 Host 接线，真实数据库和真实下载仍未发生。分段写入、可信时间绑定后的 durable proof、原子槽切换、Sidecar 进程、IPC framing、资源沙箱、事件背压、`ReadyCapability` 上报与真实 Attempt 运行接线仍未实现。
 
 ## 10. 模型与缓存
 
@@ -143,4 +143,4 @@ V1 只运行平台批准的任务种类和签名 Runner，不接受请求方上�
 
 ## 13. 当前未验证声明
 
-本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam、版本化合同、签名与摘要验证器、Manifest 语义校验、InstallPlan 双 keyring binding 准入、root-signed keyring bundle/快照 resolver 以及 SQLite v1 schema/私有事务 seam 已形成代码，但本批尚未编译、启动、建库或迁移。生产 root pin、防回滚 keyring 安装、meta 初始化、计划应用与恢复事务、三段式取数权威、真实 downloader、Sidecar/IPC/沙箱、typed 事件运行链路、短 TTL `ReadyCapability` 上报和调度接线仍未实现；节点不直接发布商业 Offer，服务端 Offer 生成也未因本批合同自动接通。
+本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam、版本化合同、签名与摘要验证器、Manifest/InstallPlan 准入、双 keyring、本机 authority v2、PlanApply、逐段 claim Store，以及 Windows Volume GUID 卷根、父句柄相对打开和同句柄游标对账能力已形成代码，但尚未编译、启动、建库、迁移或接入 Host。启动路径仍未持有 root capability，真实 downloader、写后可信时间与 durable proof、短文件 Store 终结、全工件校验、Sidecar/IPC/沙箱、typed 事件运行链路、短 TTL `ReadyCapability` 上报和调度接线仍未实现；节点不直接发布商业 Offer，服务端 Offer 生成也未因本批合同自动接通。

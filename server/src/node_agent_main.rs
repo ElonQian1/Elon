@@ -128,6 +128,7 @@ mod node_agent_local_task_store;
 mod node_agent_local_task_supervision;
 mod node_agent_local_tasks;
 mod node_agent_local_terminal_reconcile;
+mod node_agent_managed_fs;
 mod node_agent_supervision_finalized_identity;
 mod node_agent_supervision_project_identity;
 mod node_agent_supervision_protocol;
