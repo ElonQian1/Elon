@@ -299,8 +299,20 @@ fn audit_account_projection(
     } else {
         0
     };
+    let returned_withdrawals = if account_kind == "provider" {
+        conn.query_row(
+            "SELECT COALESCE(SUM(amount_micros),0)
+               FROM compute_settlement_withdrawal_terminal_ledger_legs
+              WHERE account_kind='provider' AND account_id=?1 AND currency='CNY'
+                AND balance_state='available' AND direction='credit'",
+            params![account_id],
+            |row| row.get::<_, i64>(0),
+        )?
+    } else {
+        0
+    };
     if current.0 != credited_pending - corrected_pending - released_pending
-        || current.1 != credited_available - reserved_withdrawals
+        || current.1 != credited_available - reserved_withdrawals + returned_withdrawals
         || current.0 < 0
         || current.1 < 0
     {

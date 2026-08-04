@@ -187,8 +187,16 @@ fn audit_account_projection(conn: &Connection, account_id: &str) -> Result<()> {
         params![account_id],
         |row| row.get::<_, i64>(0),
     )?;
-    if current.0 != released_available - reserved
-        || current.1 != reserved
+    let returned = conn.query_row(
+        "SELECT COALESCE(SUM(amount_micros),0)
+           FROM compute_settlement_withdrawal_terminal_ledger_legs
+          WHERE account_kind='provider' AND account_id=?1 AND currency='CNY'
+            AND balance_state='available' AND direction='credit'",
+        params![account_id],
+        |row| row.get::<_, i64>(0),
+    )?;
+    if current.0 != released_available - reserved + returned
+        || current.1 != reserved - returned
         || current.0 < 0
         || current.1 < 0
     {
