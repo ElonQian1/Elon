@@ -29,6 +29,7 @@ mod compute_activation_applications;
 mod compute_activation_lifecycle;
 mod compute_activation_plan_dependencies;
 mod compute_activation_plans;
+mod compute_activation_quarantines;
 mod compute_activation_requests;
 mod compute_broker_reservation;
 mod compute_capacity_audit;
@@ -237,6 +238,7 @@ use common::{
 pub(crate) use compute_activation_applications::ApplyComputeActivationPlan;
 pub(crate) use compute_activation_lifecycle::SupersedeComputeActivationEvidenceRequest;
 pub(crate) use compute_activation_plans::PrepareComputeActivationPlan;
+pub(crate) use compute_activation_quarantines::QuarantineComputeActivationApplication;
 pub(crate) use compute_activation_requests::{
     ReviewComputeActivationEvidenceRequest, SubmitComputeActivationEvidenceRequest,
 };

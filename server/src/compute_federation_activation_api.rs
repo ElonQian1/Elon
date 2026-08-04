@@ -16,6 +16,9 @@ use crate::{
         self, SupersedeComputeActivationEvidenceRequestBody,
     },
     compute_federation_activation_plan_service::{self, PrepareComputeActivationPlanBody},
+    compute_federation_activation_quarantine_service::{
+        self, QuarantineComputeActivationApplicationBody,
+    },
     compute_federation_activation_service::{
         self, CancelMyComputeActivationEvidenceRequest, ReviewComputeActivationEvidenceRequestBody,
         SubmitMyComputeActivationEvidenceRequest,
@@ -69,6 +72,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/application",
             get(get_activation_application).post(apply_activation_plan),
+        )
+        .route(
+            "/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/application/quarantine",
+            get(get_activation_quarantine).post(quarantine_activation_application),
         )
 }
 
@@ -334,6 +341,40 @@ async fn get_activation_application(
             &request_id,
         )
         .map(|application| json!({"activation_application":application})),
+    )
+}
+
+async fn quarantine_activation_application(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+    Json(request): Json<QuarantineComputeActivationApplicationBody>,
+) -> Response {
+    let actor_user_id = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    activation_response(
+        compute_federation_activation_quarantine_service::quarantine_for_review(
+            &state.store,
+            &actor_user_id,
+            &request_id,
+            request,
+        ),
+    )
+}
+
+async fn get_activation_quarantine(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    activation_response(
+        compute_federation_activation_quarantine_service::get_for_review(&state.store, &request_id)
+            .map(|quarantine| json!({"activation_quarantine":quarantine})),
     )
 }
 

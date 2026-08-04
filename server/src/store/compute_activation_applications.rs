@@ -172,17 +172,17 @@ impl Store {
 }
 
 #[derive(Debug, Clone)]
-struct StoredApplication {
-    application_id: String,
+pub(super) struct StoredApplication {
+    pub(super) application_id: String,
     plan_id: String,
-    request_id: String,
-    provider_id: String,
-    pool_id: String,
+    pub(super) request_id: String,
+    pub(super) provider_id: String,
+    pub(super) pool_id: String,
     plan_digest: String,
     target_provider_policy_revision: i64,
     target_provider_digest: String,
     pool_lifecycle_event_id: String,
-    application_digest: String,
+    pub(super) application_digest: String,
     applied_by_user_id: String,
     applied_at: String,
 }
@@ -223,7 +223,7 @@ fn validate_replay(
     audit_applied_state_on(conn, existing)
 }
 
-fn audit_applied_state_on(conn: &Connection, stored: &StoredApplication) -> Result<()> {
+pub(super) fn audit_applied_state_on(conn: &Connection, stored: &StoredApplication) -> Result<()> {
     let plan = plan_by_request_on(conn, &stored.request_id)?
         .ok_or_else(|| anyhow!("激活应用回执引用的计划不存在"))?;
     let request = request_on(conn, &stored.request_id)?
@@ -297,7 +297,7 @@ fn application_by_plan_on(conn: &Connection, plan_id: &str) -> Result<Option<Sto
     application_on(conn, "WHERE plan_id=?1", params![plan_id])
 }
 
-fn application_by_request_on(
+pub(super) fn application_by_request_on(
     conn: &Connection,
     request_id: &str,
 ) -> Result<Option<StoredApplication>> {

@@ -215,6 +215,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (178, "分布式算力过期激活批准显式废止审计", crate::compute_activation_request_migration::migration_v178),
     (179, "分布式算力不可变激活计划", crate::compute_activation_plan_migration::migration_v179),
     (180, "分布式算力激活计划原子应用回执", crate::compute_activation_application_migration::migration_v180),
+    (181, "分布式算力激活结果紧急隔离回执", crate::compute_activation_quarantine_migration::migration_v181),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
