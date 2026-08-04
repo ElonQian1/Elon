@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, Banknote, Bot, Boxes, CircleDollarSign, ClipboardCheck, FileCheck2, Gauge, GitBranch, HardDrive, Landmark, LockKeyhole, MonitorCog, PackageCheck, Radar, ReceiptText, Search, ShieldCheck, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
+import { Activity, Banknote, Bot, Boxes, CircleDollarSign, ClipboardCheck, FileCheck2, Gauge, GitBranch, HardDrive, Landmark, LockKeyhole, MonitorCog, PackageCheck, Radar, ReceiptText, Scale, Search, ShieldCheck, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -29,6 +29,7 @@ const RAIL_ITEMS: RailItem[] = [
   { path: '/compute-reviews', Icon: ClipboardCheck, label: '算力验收', color: '#342f28', hoverColor: '#463d31' },
   { path: '/compute-execution', Icon: Activity, label: '算力执行', color: '#28343a', hoverColor: '#34464f' },
   { path: '/my-compute-settlement', Icon: CircleDollarSign, label: '我的算力收益', color: '#26342d', hoverColor: '#30463a' },
+  { path: '/compute-challenges', Icon: Scale, label: '结算申诉', color: '#362d29', hoverColor: '#493a33' },
   { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2a2b2f', hoverColor: '#34363b' },
 ]
 
