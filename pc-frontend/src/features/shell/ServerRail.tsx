@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, Bot, Boxes, CircleDollarSign, ClipboardCheck, FileCheck2, Gauge, GitBranch, HardDrive, Landmark, LockKeyhole, MonitorCog, PackageCheck, Radar, ReceiptText, Search, ShieldCheck, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
+import { Activity, Banknote, Bot, Boxes, CircleDollarSign, ClipboardCheck, FileCheck2, Gauge, GitBranch, HardDrive, Landmark, LockKeyhole, MonitorCog, PackageCheck, Radar, ReceiptText, Search, ShieldCheck, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -64,6 +64,10 @@ const FINALIZATION_ITEM: RailItem = {
   path: '/compute-finalization', Icon: LockKeyhole, label: '可信终态', color: '#3b2924', hoverColor: '#50362e',
 }
 
+const SETTLEMENT_ISSUANCE_ITEM: RailItem = {
+  path: '/compute-settlement-issuance', Icon: Banknote, label: '待结算回执', color: '#393826', hoverColor: '#4d4b31',
+}
+
 export default function ServerRail() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -72,7 +76,7 @@ export default function ServerRail() {
   const presence = useMyPresence(!localMode)
   const [tooltip, setTooltip] = useState<{ text: string; y: number } | null>(null)
   const railItems = user && ['admin', 'owner'].includes(user.role ?? '')
-    ? [...RAIL_ITEMS, ACTIVATION_ITEM, OFFER_ITEM, OBSERVATION_ITEM, VERIFICATION_ITEM, RECEIPT_ITEM, FINALIZATION_ITEM, SETTLEMENT_ITEM]
+    ? [...RAIL_ITEMS, ACTIVATION_ITEM, OFFER_ITEM, OBSERVATION_ITEM, VERIFICATION_ITEM, RECEIPT_ITEM, FINALIZATION_ITEM, SETTLEMENT_ISSUANCE_ITEM, SETTLEMENT_ITEM]
     : RAIL_ITEMS
 
   // 项目列表（从 store 读取，实时响应）
