@@ -2,7 +2,10 @@ use anyhow::{bail, Result};
 use rusqlite::{Connection, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 
-use super::Store;
+use super::{
+    compute_attempt_settlement_challenge_resolutions::settlement_challenge_resolution_by_challenge_on,
+    Store,
+};
 
 mod support;
 
@@ -128,6 +131,15 @@ pub(super) fn settlement_has_open_challenge_on(
     let Some(stored) = challenge_by_settlement_on(conn, settlement_receipt_id)? else {
         return Ok(false);
     };
-    stored.into_receipt(conn, false)?;
-    Ok(true)
+    let challenge = stored.into_receipt(conn, false)?;
+    let Some(resolution) =
+        settlement_challenge_resolution_by_challenge_on(conn, &challenge.challenge_id)?
+    else {
+        return Ok(true);
+    };
+    match resolution.action.as_str() {
+        "accepted" => Ok(true),
+        "rejected" | "withdrawn" => Ok(false),
+        _ => bail!("算力结算挑战决议包含未知终态"),
+    }
 }
