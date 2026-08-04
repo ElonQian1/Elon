@@ -97,6 +97,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(decide_verification),
         )
         .route(
+            "/api/admin/compute/attempt-terminal-candidates/pending-verification",
+            get(list_pending_verification_candidates),
+        )
+        .route(
             "/api/me/compute/attempt-leases/:lease_id/verification-decision",
             get(get_verification),
         )
@@ -521,6 +525,23 @@ async fn decide_verification(
             &lease_id,
             request,
         ),
+    )
+}
+
+async fn list_pending_verification_candidates(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    attempt_response(
+        compute_federation_attempt_service::list_pending_verifications_for_platform_admin(
+            &state.store,
+            query.limit,
+        )
+        .map(|candidates| json!({"verification_candidates":candidates})),
     )
 }
 

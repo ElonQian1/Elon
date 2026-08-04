@@ -313,7 +313,8 @@ pub(crate) use compute_attempt_usage::{
     ComputeDeclaredUsageInput, DeclareComputeAttemptUsageRequest,
 };
 pub(crate) use compute_attempt_verifications::{
-    ComputeAttemptVerificationDecisionReceipt, DecideComputeAttemptVerificationRequest,
+    ComputeAttemptVerificationDecisionReceipt, ComputePendingAttemptVerificationCandidate,
+    DecideComputeAttemptVerificationRequest,
 };
 pub(crate) use compute_broker_reservation::{
     ComputeBrokerFinishAction, ComputeBrokerFinishReceipt, ComputeBrokerReservationReceipt,

@@ -9,10 +9,11 @@ use crate::store::{
     ComputeAttemptUsageDeclarationReceipt, ComputeAttemptUsageTemplateReceipt,
     ComputeAttemptVerificationDecisionReceipt, ComputeDeclaredResultArtifactInput,
     ComputeDeclaredUsageInput, ComputeObservedUsageInput,
-    ComputePendingPlatformObservationCandidate, ComputeReservationRegistrationReceipt,
-    DecideComputeAttemptVerificationRequest, DeclareComputeAttemptTerminalCandidateRequest,
-    DeclareComputeAttemptUsageRequest, ObserveComputeAttemptTerminalCandidateRequest,
-    RenewComputeAttemptLeaseRequest, ReviewComputeAttemptTerminalCandidateRequest, Store,
+    ComputePendingAttemptVerificationCandidate, ComputePendingPlatformObservationCandidate,
+    ComputeReservationRegistrationReceipt, DecideComputeAttemptVerificationRequest,
+    DeclareComputeAttemptTerminalCandidateRequest, DeclareComputeAttemptUsageRequest,
+    ObserveComputeAttemptTerminalCandidateRequest, RenewComputeAttemptLeaseRequest,
+    ReviewComputeAttemptTerminalCandidateRequest, Store,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -513,6 +514,13 @@ pub(crate) fn decide_verification_for_platform_admin(
         idempotency_key: request.idempotency_key,
         decided_by_user_id: admin_user_id.to_string(),
     })
+}
+
+pub(crate) fn list_pending_verifications_for_platform_admin(
+    store: &Store,
+    limit: usize,
+) -> Result<Vec<ComputePendingAttemptVerificationCandidate>> {
+    store.list_pending_compute_attempt_verifications(limit)
 }
 
 pub(crate) fn get_verification_for_participant(
