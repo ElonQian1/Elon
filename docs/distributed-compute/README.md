@@ -30,7 +30,7 @@ owners: backend, node, ai-economy
 | Capacity Supply 本人控制面 | HTTP/MCP 已可显式确认后向同一窗口的多个 open Bucket 原子追加 self-declared 供给，或把尚在 available 的供给原子撤入 retired；服务端固定首次时间并复用现有双分录账本，available 不等于 verified 或可交易，尚未编译和运行验证 |
 | 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；应用单事务激活内部 Provider/Pool，隔离单事务把其当前 active 状态转为 quarantined。两者均不发送节点命令、不直接改写 Offer、不移动资金，恢复尚未实现，状态为 `implementation_uncompiled` |
 | Offer 草稿、发布与生命周期控制面 | HTTP/MCP 已可创建、精确修订和撤销本人 draft Offer；管理员 HTTP 可原子发布 active、转为 draining，并在无 pending/active Reservation 时终结。v182-v184 保存追加式回执和依赖索引，所有写入口均不移动资金，状态为 `implementation_uncompiled` |
-| 节点插件治理合同 | Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 与短期 ReadyCapability 合同已写，尚未编译或接线 |
+| 节点插件治理合同 | Signed Manifest、InstallPlan、双槽 lifecycle 与短期 ReadyCapability 合同已写；RFC 8785 JCS、SHA-256、Ed25519 验签、Manifest 语义校验和失败关闭的本机计划准入内核已形成代码，尚未编译或接线 |
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 共享 CapacityPool 与追加式容量账本 | 领域合同、v165-v168 schema、隔离 Store、Store-canonical Supply/Claim 请求摘要、事务内 Claim kernel、只读审计、到期批处理、状态门卫和 epoch 轮换已写；v173 追加 Claim 完整历史，Hold V2 固定 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承原 held 绑定；尚未编译、执行迁移或接线 |
@@ -47,6 +47,14 @@ owners: backend, node, ai-economy
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
 
 “已接受设计”不等于“已上线”。任何代理都必须保留实现状态，不得把文档中的目标合同描述成当前生产能力。
+
+## 并行开发与远程去重协议
+
+仓库级同步、提交与 rebase 时点严格复用 `WF-DEDUP`、`WF-PUSH`、`WF-REBASE`，操作细节见 `docs/ai-agent-workflow.md`，本目录不复制另一套 Git 流程。算力域只追加以下语义查重规则：
+
+- 查重必须沿 Provider/Pool/Offer/Price Snapshot/Job/Reservation/Claim/Attempt/Lease/Receipt 整条能力链检查领域合同、迁移、Store、service、HTTP/MCP 与权威文档；文件名不同但推进同一状态或生成同一回执仍算重叠。
+- 上游已有完整能力时转为复用和审查，只补不相交的层；命中同一符号、迁移版本、状态转换或事务边界时停止平行实现，不用改名制造第二套类型。
+- 算力代理任务包记录 `TASK_BASE_SHA`、最近观察的远程 SHA、负责的能力/路径和禁止重叠区；代码进入远程后更新本页“当前事实”，继续区分已写、未编译、未接线和未实现。
 
 ## 阅读顺序
 
@@ -75,9 +83,9 @@ owners: backend, node, ai-economy
 
 ### F1：用户节点成为可插拔 Provider
 
-节点内部已经形成 Plugin Host 兼容 seam，以及 Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架；云端还形成 v169 版本化 Provider Registry、v170 追加式 Offer Registry及 v182-v184 发布/生命周期控制。本人可创建规范化 draft Offer；平台管理员可发布 active、转为 draining，并在无活动预留时终结为 expired/revoked。这些入口均尚未编译、执行迁移或运行验证。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**。
+节点内部已经形成 Plugin Host 兼容 seam、Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架，并写入真实 Ed25519/JCS 验证、Manifest 语义校验及本机 InstallPlan 准入内核；云端还形成 v169 版本化 Provider Registry、v170 追加式 Offer Registry及 v182-v184 发布/生命周期控制。本人可创建规范化 draft Offer；平台管理员可发布 active、转为 draining，并在无活动预留时终结为 expired/revoked。这些入口均尚未编译、执行迁移或运行验证。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**。
 
-目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。真实下载器、Sidecar 进程与 IPC、动态健康状态、云端 capability gate 和通用 Attempt 协议接线目前都未实现。
+目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。Publisher/Control key resolver 的耐久实现、耐久 inventory store、计划应用 journal、逐段取数权威源、真实下载器、Sidecar 进程与 IPC、动态健康状态、云端 capability gate 和通用 Attempt 协议接线目前都未实现。
 
 ### F2：Broker、验证和真实结算
 
