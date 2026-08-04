@@ -14,6 +14,8 @@ use crate::{
     compute_federation_offer_draft_model::{
         CreateMyComputeOfferDraftRequest, RevokeMyComputeOfferDraftRequest,
     },
+    compute_federation_offer_lifecycle_model::DrainComputeOfferRequest,
+    compute_federation_offer_lifecycle_service,
     compute_federation_offer_publication_model::PublishComputeOfferDraftRequest,
     compute_federation_offer_publication_service, compute_federation_offer_service,
     project_auth::{auth_from_headers, json_error},
@@ -39,6 +41,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             get(get_my_offer_publication),
         )
         .route(
+            "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/drain",
+            get(get_my_offer_drain),
+        )
+        .route(
             "/api/admin/compute/offers/:offer_id/publication",
             get(get_offer_publication_for_review).post(publish_offer_for_review),
         )
@@ -49,6 +55,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/offers/:offer_id",
             get(get_offer_for_review),
+        )
+        .route(
+            "/api/admin/compute/offers/:offer_id/drain",
+            get(get_offer_drain_for_review).post(drain_offer_for_review),
         )
 }
 
@@ -155,6 +165,26 @@ async fn get_my_offer_publication(
     ))
 }
 
+async fn get_my_offer_drain(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, pool_id, offer_id)): Path<(String, String, String)>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    offer_response(
+        compute_federation_offer_lifecycle_service::get_drain_for_user(
+            &state.store,
+            &user_id,
+            &provider_id,
+            &pool_id,
+            &offer_id,
+        ),
+    )
+}
+
 async fn publish_offer_for_review(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -185,6 +215,39 @@ async fn get_offer_publication_for_review(
     }
     offer_response(
         compute_federation_offer_publication_service::get_for_review(&state.store, &offer_id),
+    )
+}
+
+async fn drain_offer_for_review(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(offer_id): Path<String>,
+    Json(request): Json<DrainComputeOfferRequest>,
+) -> Response {
+    let actor_user_id = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    offer_response(
+        compute_federation_offer_lifecycle_service::drain_for_review(
+            &state.store,
+            &actor_user_id,
+            &offer_id,
+            request,
+        ),
+    )
+}
+
+async fn get_offer_drain_for_review(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(offer_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    offer_response(
+        compute_federation_offer_lifecycle_service::get_drain_for_review(&state.store, &offer_id),
     )
 }
 
@@ -228,7 +291,7 @@ fn platform_admin(state: &AppState, headers: &HeaderMap) -> Result<String, Respo
     if !matches!(user.role.as_str(), "admin" | "owner") {
         return Err(json_error(
             StatusCode::FORBIDDEN,
-            "只有平台管理员可以发布算力 Offer",
+            "只有平台管理员可以审核或变更算力 Offer",
         ));
     }
     Ok(user.id)
