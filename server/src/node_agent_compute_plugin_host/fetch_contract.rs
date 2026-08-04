@@ -5,23 +5,24 @@ use super::{
     install_plan_admission::{
         validate_inventory, validate_live_binding, validate_plan_window,
         AdmittedComputePluginDownload, AdmittedComputePluginInstallPlan,
-        ComputePluginLiveAdmissionState,
     },
     install_plan_admission_validation::is_identifier,
-    lifecycle::{ComputePluginInventorySnapshot, SLOT_DOWNLOADING},
+    lifecycle::SLOT_DOWNLOADING,
+    local_authority::{
+        ComputePluginFetchAuthorityFacts, ComputePluginFetchAuthoritySession,
+        ComputePluginPreparedFetchClaimFacts,
+    },
     manifest_validation::is_sha256,
     signed_artifact_verification::jcs_sha256_hex,
 };
 
 mod types;
 
+pub(in crate::node_agent_compute_plugin_host) use types::ValidatedComputePluginFetchClaimPermit;
 pub(crate) use types::{
     AuthorizedComputePluginDownloadSegment, ComputePluginDownloadSegmentRequest,
 };
-use types::{
-    ComputePluginFetchAuthoritySnapshot, ComputePluginPreparedFetchClaimSnapshot,
-    PreparedComputePluginFetchClaim,
-};
+use types::{ComputePluginFetchAuthoritySnapshot, PreparedComputePluginFetchClaim};
 
 const MAX_DOWNLOAD_SEGMENT_BYTES: i64 = 16 * 1_024 * 1_024;
 const MAX_REDIRECT_HOPS: u8 = 5;
@@ -44,17 +45,14 @@ trait ComputePluginFetchAuthorityBackend {
     /// validation after this method returns is defense-in-depth, not a rollback mechanism.
     fn claim_validated_segment(
         &self,
-        plan_id: &str,
-        plan_digest: &str,
         download: &AdmittedComputePluginDownload,
-        request: &ComputePluginDownloadSegmentRequest,
-        validated: &ComputePluginFetchAuthoritySnapshot,
+        permit: ValidatedComputePluginFetchClaimPermit<'_>,
     ) -> Result<PreparedComputePluginFetchClaim>;
 }
 
 /// Opaque access to the one concrete Store backend. Its constructor and backend implementation
 /// live in this module once the Store lands, so crate callers cannot invoke read/CAS primitives.
-pub(crate) struct ComputePluginFetchAuthorityPort<'authority> {
+struct ComputePluginFetchAuthorityPort<'authority> {
     backend: &'authority dyn ComputePluginFetchAuthorityBackend,
 }
 
@@ -72,24 +70,78 @@ impl ComputePluginFetchAuthorityPort<'_> {
 
     fn claim_validated_segment(
         &self,
+        download: &AdmittedComputePluginDownload,
+        permit: ValidatedComputePluginFetchClaimPermit<'_>,
+    ) -> Result<PreparedComputePluginFetchClaim> {
+        self.backend.claim_validated_segment(download, permit)
+    }
+}
+
+impl ComputePluginFetchAuthorityBackend for ComputePluginFetchAuthoritySession<'_> {
+    fn read_fresh_segment_authority(
+        &self,
         plan_id: &str,
         plan_digest: &str,
         download: &AdmittedComputePluginDownload,
         request: &ComputePluginDownloadSegmentRequest,
-        validated: &ComputePluginFetchAuthoritySnapshot,
+    ) -> Result<ComputePluginFetchAuthoritySnapshot> {
+        if download.ordinal != request.ordinal {
+            bail!("COMPUTE_PLUGIN_FETCH_BACKEND_ORDINAL_CHANGED");
+        }
+        Ok(ComputePluginFetchAuthoritySnapshot {
+            store: ComputePluginFetchAuthoritySession::read_fresh_segment_authority(
+                self,
+                plan_id,
+                plan_digest,
+                request.ordinal,
+            )?,
+        })
+    }
+
+    fn claim_validated_segment(
+        &self,
+        download: &AdmittedComputePluginDownload,
+        permit: ValidatedComputePluginFetchClaimPermit<'_>,
     ) -> Result<PreparedComputePluginFetchClaim> {
-        self.backend
-            .claim_validated_segment(plan_id, plan_digest, download, request, validated)
+        if download.ordinal != permit.ordinal() {
+            bail!("COMPUTE_PLUGIN_FETCH_BACKEND_ORDINAL_CHANGED");
+        }
+        let prepared = ComputePluginFetchAuthoritySession::claim_validated_segment(self, permit)?;
+        Ok(prepared.into())
+    }
+}
+
+impl From<ComputePluginPreparedFetchClaimFacts> for PreparedComputePluginFetchClaim {
+    fn from(claim: ComputePluginPreparedFetchClaimFacts) -> Self {
+        Self {
+            claim_id: claim.claim_id,
+            plan_id: claim.plan_id,
+            plan_digest: claim.plan_digest,
+            ordinal: claim.ordinal,
+            candidate_token_digest: claim.candidate_token_digest,
+            part_relative_path: claim.part_relative_path,
+            authority_epoch: claim.authority_epoch,
+            process_owner_epoch: claim.process_owner_epoch,
+            cursor_generation: claim.cursor_generation,
+            redirect_generation: claim.redirect_generation,
+            offset_bytes: claim.offset_bytes,
+            length_bytes: claim.length_bytes,
+            end_offset_bytes: claim.end_offset_bytes,
+            prepared_at_ms: claim.prepared_at_ms,
+        }
     }
 }
 
 /// Call immediately before every request, redirect and resumed byte range. The authority owns the
 /// durable cursor claim; callers cannot authorize from the DTOs retained after initial admission.
-pub(crate) fn authorize_download_segment(
+pub(in crate::node_agent_compute_plugin_host) fn authorize_download_segment(
     admitted: &AdmittedComputePluginInstallPlan,
     request: &ComputePluginDownloadSegmentRequest,
-    authority: &ComputePluginFetchAuthorityPort<'_>,
+    authority_session: &ComputePluginFetchAuthoritySession<'_>,
 ) -> Result<AuthorizedComputePluginDownloadSegment> {
+    let authority = ComputePluginFetchAuthorityPort {
+        backend: authority_session,
+    };
     let plan = admitted.plan();
     let download = admitted
         .downloads()
@@ -120,13 +172,13 @@ pub(crate) fn authorize_download_segment(
         request,
     )?;
     validate_download_segment_authority(admitted, download, request, &facts)?;
-    let claim = authority.claim_validated_segment(
+    let permit = ValidatedComputePluginFetchClaimPermit::new(
         &plan.plan_id,
         admitted.plan_digest(),
-        download,
         request,
         &facts,
-    )?;
+    );
+    let claim = authority.claim_validated_segment(download, permit)?;
     validate_returned_fetch_claim(admitted, download, request, &facts, &claim)?;
     Ok(AuthorizedComputePluginDownloadSegment {
         download: download.clone(),
@@ -139,10 +191,10 @@ pub(crate) fn authorize_download_segment(
 
 /// Consumes the prior handle and returns its next redirect generation. Every error drops the handle
 /// and enters authority recovery, so an uncertain Store outcome cannot leave a usable stale claim.
-pub(crate) fn authorize_download_redirect(
+pub(in crate::node_agent_compute_plugin_host) fn authorize_download_redirect(
     admitted: &AdmittedComputePluginInstallPlan,
     authorized: AuthorizedComputePluginDownloadSegment,
-    authority: &ComputePluginFetchAuthorityPort<'_>,
+    authority: &ComputePluginFetchAuthoritySession<'_>,
 ) -> Result<AuthorizedComputePluginDownloadSegment> {
     let redirect_hop = authorized
         .redirect_hop
@@ -163,8 +215,9 @@ pub(super) fn validate_download_segment_authority(
     admitted: &AdmittedComputePluginInstallPlan,
     download: &AdmittedComputePluginDownload,
     request: &ComputePluginDownloadSegmentRequest,
-    facts: &ComputePluginFetchAuthoritySnapshot,
+    snapshot: &ComputePluginFetchAuthoritySnapshot,
 ) -> Result<()> {
+    let facts = &snapshot.store;
     let plan = admitted.plan();
     validate_plan_window(plan, facts.trusted_now.clone(), false)?;
     validate_live_binding(plan, &facts.live)?;
@@ -250,7 +303,7 @@ pub(super) fn validate_download_segment_authority(
 fn validate_prepared_claim_lineage(
     plan: &ComputePluginInstallPlan,
     request: &ComputePluginDownloadSegmentRequest,
-    facts: &ComputePluginFetchAuthoritySnapshot,
+    facts: &ComputePluginFetchAuthorityFacts,
 ) -> Result<()> {
     match (
         request.redirect_hop,
@@ -295,9 +348,10 @@ fn validate_returned_fetch_claim(
     admitted: &AdmittedComputePluginInstallPlan,
     download: &AdmittedComputePluginDownload,
     request: &ComputePluginDownloadSegmentRequest,
-    facts: &ComputePluginFetchAuthoritySnapshot,
+    snapshot: &ComputePluginFetchAuthoritySnapshot,
     claim: &PreparedComputePluginFetchClaim,
 ) -> Result<()> {
+    let facts = &snapshot.store;
     let expected_end = request
         .offset_bytes
         .checked_add(request.length_bytes)

@@ -1,13 +1,17 @@
+use std::fmt;
+
 use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 
 use super::{ComputePluginFetchProcessFence, ComputePluginLocalAuthority};
 use crate::node_agent_compute_plugin_host::{
-    identity::ComputePluginReleaseRef, install_plan::ComputePluginPlannedDownload,
+    fetch_contract::ValidatedComputePluginFetchClaimPermit, identity::ComputePluginReleaseRef,
+    install_plan::ComputePluginPlannedDownload,
     install_plan_admission::ComputePluginLiveAdmissionState,
     keyring::ComputePluginBootstrapRootKeyResolver, lifecycle::ComputePluginInventorySnapshot,
 };
 
+mod claim;
 mod read;
 
 /// One authenticated trusted-time observation paired with the process-owner fence that may later
@@ -54,7 +58,7 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginFetchAuthority
     pub prepared_claim: Option<ComputePluginPreparedFetchClaimFacts>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginPreparedFetchClaimFacts {
     pub claim_id: String,
     pub plan_id: String,
@@ -72,10 +76,26 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginPreparedFetchC
     pub prepared_at_ms: i64,
 }
 
+impl fmt::Debug for ComputePluginPreparedFetchClaimFacts {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ComputePluginPreparedFetchClaimFacts")
+            .field("claim_id", &"<redacted>")
+            .field("plan_id", &self.plan_id)
+            .field("ordinal", &self.ordinal)
+            .field("cursor_generation", &self.cursor_generation)
+            .field("redirect_generation", &self.redirect_generation)
+            .field("offset_bytes", &self.offset_bytes)
+            .field("length_bytes", &self.length_bytes)
+            .field("prepared_at_ms", &self.prepared_at_ms)
+            .finish()
+    }
+}
+
 impl ComputePluginLocalAuthority {
     /// The caller must supply trusted time from the authenticated time kernel and a fence acquired
     /// after the NodeAgent instance lock. Opening a session does not touch SQLite.
-    pub(crate) fn fetch_authority_session<'authority>(
+    pub(in crate::node_agent_compute_plugin_host) fn fetch_authority_session<'authority>(
         &'authority self,
         process_fence: &'authority ComputePluginFetchProcessFence,
         trusted_now: DateTime<Utc>,
@@ -114,6 +134,36 @@ impl ComputePluginFetchAuthoritySession<'_> {
                 plan_id,
                 plan_digest,
                 ordinal,
+            )
+        })
+    }
+
+    /// Contract-only CAS seam. A commit error has an uncertain outcome and never returns a usable
+    /// claim; the caller must discard the session and enter authority recovery.
+    pub(in crate::node_agent_compute_plugin_host) fn claim_validated_segment(
+        &self,
+        permit: ValidatedComputePluginFetchClaimPermit<'_>,
+    ) -> Result<ComputePluginPreparedFetchClaimFacts> {
+        let new_claim_id = (permit.redirect_hop() == 0)
+            .then(|| format!("fetch_{}", uuid::Uuid::new_v4().simple()));
+        let command = claim::FetchClaimCommand {
+            plan_id: permit.plan_id(),
+            plan_digest: permit.plan_digest(),
+            ordinal: permit.ordinal(),
+            offset_bytes: permit.offset_bytes(),
+            length_bytes: permit.length_bytes(),
+            redirect_generation: i64::from(permit.redirect_hop()),
+            redirect_from_claim_id: permit.redirect_from_claim_id(),
+            new_claim_id: new_claim_id.as_deref(),
+        };
+        self.authority.with_immediate(|transaction| {
+            claim::claim_validated_segment(
+                transaction,
+                self.process_fence,
+                self.trusted_now.clone(),
+                self.roots,
+                &command,
+                permit.facts(),
             )
         })
     }

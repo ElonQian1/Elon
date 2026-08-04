@@ -1,12 +1,8 @@
 use std::fmt;
 
-use chrono::{DateTime, Utc};
-
 use crate::node_agent_compute_plugin_host::{
-    identity::ComputePluginReleaseRef,
-    install_plan::ComputePluginPlannedDownload,
-    install_plan_admission::{AdmittedComputePluginDownload, ComputePluginLiveAdmissionState},
-    lifecycle::ComputePluginInventorySnapshot,
+    install_plan_admission::AdmittedComputePluginDownload,
+    local_authority::ComputePluginFetchAuthorityFacts,
 };
 
 #[derive(PartialEq, Eq)]
@@ -113,67 +109,69 @@ impl fmt::Debug for PreparedComputePluginFetchClaim {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
-pub(super) struct ComputePluginPreparedFetchClaimSnapshot {
-    pub claim_id: String,
-    pub plan_id: String,
-    pub plan_digest: String,
-    pub ordinal: usize,
-    pub candidate_token_digest: String,
-    pub part_relative_path: String,
-    pub authority_epoch: i64,
-    pub process_owner_epoch: i64,
-    pub cursor_generation: i64,
-    pub redirect_generation: i64,
-    pub offset_bytes: i64,
-    pub length_bytes: i64,
-    pub end_offset_bytes: i64,
-    pub prepared_at_ms: i64,
-}
-
-impl fmt::Debug for ComputePluginPreparedFetchClaimSnapshot {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("ComputePluginPreparedFetchClaimSnapshot")
-            .field("claim_id", &"<redacted>")
-            .field("plan_id", &self.plan_id)
-            .field("ordinal", &self.ordinal)
-            .field("cursor_generation", &self.cursor_generation)
-            .field("redirect_generation", &self.redirect_generation)
-            .field("offset_bytes", &self.offset_bytes)
-            .field("length_bytes", &self.length_bytes)
-            .finish()
-    }
-}
-
 /// A side-effect-free authoritative read of persisted plan, key, candidate, download, inventory,
 /// trusted-time and process fences.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ComputePluginFetchAuthoritySnapshot {
-    pub(super) inventory: ComputePluginInventorySnapshot,
-    pub(super) live: ComputePluginLiveAdmissionState,
-    pub(super) trusted_now: DateTime<Utc>,
-    pub(super) applied_plan_id: String,
-    pub(super) applied_plan_digest: String,
-    pub(super) application_inventory_revision: i64,
-    pub(super) execution_inventory_revision: i64,
-    pub(super) authority_state_revision: i64,
-    pub(super) inventory_digest: String,
-    pub(super) authority_epoch: i64,
-    pub(super) process_owner_epoch: i64,
-    pub(super) candidate_token_digest: String,
-    pub(super) candidate_generation: i64,
-    pub(super) candidate_owner_plan_id: String,
-    pub(super) candidate_owner_plan_digest: String,
-    pub(super) candidate_application_inventory_revision: i64,
-    pub(super) candidate_state: String,
-    pub(super) candidate_release: ComputePluginReleaseRef,
-    pub(super) candidate_permission_grant_digest: String,
-    pub(super) slot_ref: String,
-    pub(super) planned_download: ComputePluginPlannedDownload,
-    pub(super) part_relative_path: String,
-    pub(super) committed_offset: i64,
-    pub(super) download_cursor_generation: i64,
-    pub(super) download_state: String,
-    pub(super) prepared_claim: Option<ComputePluginPreparedFetchClaimSnapshot>,
+pub(super) struct ComputePluginFetchAuthoritySnapshot {
+    pub(super) store: ComputePluginFetchAuthorityFacts,
+}
+
+/// Unforgeable proof that the contract validated this exact request against this exact fresh
+/// snapshot. Store CAS accepts this permit instead of caller-provided scalar authority facts.
+pub(in crate::node_agent_compute_plugin_host) struct ValidatedComputePluginFetchClaimPermit<'permit>
+{
+    plan_id: &'permit str,
+    plan_digest: &'permit str,
+    request: &'permit ComputePluginDownloadSegmentRequest,
+    snapshot: &'permit ComputePluginFetchAuthoritySnapshot,
+}
+
+impl<'permit> ValidatedComputePluginFetchClaimPermit<'permit> {
+    pub(super) fn new(
+        plan_id: &'permit str,
+        plan_digest: &'permit str,
+        request: &'permit ComputePluginDownloadSegmentRequest,
+        snapshot: &'permit ComputePluginFetchAuthoritySnapshot,
+    ) -> Self {
+        Self {
+            plan_id,
+            plan_digest,
+            request,
+            snapshot,
+        }
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn plan_id(&self) -> &str {
+        self.plan_id
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn plan_digest(&self) -> &str {
+        self.plan_digest
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn ordinal(&self) -> usize {
+        self.request.ordinal
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn offset_bytes(&self) -> i64 {
+        self.request.offset_bytes
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn length_bytes(&self) -> i64 {
+        self.request.length_bytes
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn redirect_hop(&self) -> u8 {
+        self.request.redirect_hop
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn redirect_from_claim_id(&self) -> Option<&str> {
+        self.request.redirect_from_claim_id.as_deref()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn facts(
+        &self,
+    ) -> &ComputePluginFetchAuthorityFacts {
+        &self.snapshot.store
+    }
 }
