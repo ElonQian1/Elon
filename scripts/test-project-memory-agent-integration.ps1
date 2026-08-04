@@ -12,15 +12,19 @@ Assert-True $nodeServer.Contains('"/api/health"') 'Node admin server must expose
 $proxyPath = Join-Path $repoRoot 'plugins\yilong-project-memory\scripts\project-memory-mcp-proxy.mjs'
 $observerPath = Join-Path $repoRoot 'scripts\project-memory-app-server-observer.mjs'
 $ciPath = Join-Path $repoRoot 'scripts\project-memory-ci.ps1'
+$dispatchPath = Join-Path $repoRoot 'scripts\dispatch-document-organization.ps1'
 $proxy = Get-Content -Raw -LiteralPath $proxyPath
 $observer = Get-Content -Raw -LiteralPath $observerPath
 $ci = Get-Content -Raw -LiteralPath $ciPath
+$dispatch = Get-Content -Raw -LiteralPath $dispatchPath
 Assert-True $proxy.Contains('`${candidate}/api/health') 'Plugin proxy must discover the node through /api/health.'
 Assert-True (-not $proxy.Contains('`${candidate}/health')) 'Plugin proxy still contains the obsolete /health probe.'
 Assert-True $observer.Contains('`${candidate}/api/health') 'Observer must discover the node through /api/health.'
 Assert-True (-not $observer.Contains('`${candidate}/health')) 'Observer still contains the obsolete /health probe.'
 Assert-True $ci.Contains('$candidate/api/health') 'Memory CI must discover the node through /api/health.'
 Assert-True (-not $ci.Contains('$candidate/health')) 'Memory CI still contains the obsolete /health probe.'
+Assert-True $dispatch.Contains('$candidate/api/health') 'Document automation must discover the node through /api/health.'
+Assert-True (-not $dispatch.Contains('$candidate/health')) 'Document automation still contains the obsolete /health probe.'
 
 foreach ($script in @(
     $proxyPath,

@@ -15,7 +15,7 @@ function Resolve-NodeAdminUrl {
     foreach ($port in 7799..7819) {
         $candidate = "http://127.0.0.1:$port"
         try {
-            $health = Invoke-RestMethod -Uri "$candidate/health" -Method Get -TimeoutSec 1
+            $health = Invoke-RestMethod -Uri "$candidate/api/health" -Method Get -TimeoutSec 1
             if ($null -ne $health) { return $candidate }
         } catch {
             continue
