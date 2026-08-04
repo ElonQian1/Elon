@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Bot, Boxes, GitBranch, HardDrive, MonitorCog, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
+import { Bot, Boxes, GitBranch, HardDrive, Landmark, MonitorCog, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -31,6 +31,10 @@ const LOCAL_TASK_ITEM: RailItem = {
   path: '/local-tasks', Icon: HardDrive, label: '本机任务', color: '#26342d', hoverColor: '#30463a',
 }
 
+const SETTLEMENT_ITEM: RailItem = {
+  path: '/compute-settlement', Icon: Landmark, label: '算力结算', color: '#2d3431', hoverColor: '#37433e',
+}
+
 export default function ServerRail() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -38,6 +42,9 @@ export default function ServerRail() {
   const localMode = isLocalWorkbench()
   const presence = useMyPresence(!localMode)
   const [tooltip, setTooltip] = useState<{ text: string; y: number } | null>(null)
+  const railItems = user && ['admin', 'owner'].includes(user.role ?? '')
+    ? [...RAIL_ITEMS, SETTLEMENT_ITEM]
+    : RAIL_ITEMS
 
   // 项目列表（从 store 读取，实时响应）
   const projects = useProjectStore((s) => s.projects)
@@ -64,7 +71,7 @@ export default function ServerRail() {
 
   return (
     <nav className={styles.rail}>
-      {(localMode ? [LOCAL_TASK_ITEM] : RAIL_ITEMS).map((item) => {
+      {(localMode ? [LOCAL_TASK_ITEM] : railItems).map((item) => {
         const active = isActive(item.path)
         const Icon = item.Icon
         return (
