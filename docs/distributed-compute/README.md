@@ -23,7 +23,7 @@ owners: backend, node, ai-economy
 | 能力 | 2026-08-04 状态 |
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
-| Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码、v169-v176 注册表、Broker Reserve/未执行任务终态、v185-v193 Attempt 激活、续租、中止、证据链、Verification 与 Execution Receipt 已写，状态为 `implementation_uncompiled`，尚未迁移、完整接线和运行验证 |
+| Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码、v169-v176 注册表、Broker Reserve/未执行任务终态、v185-v194 Attempt 激活、续租、中止、证据链、Verification、Execution Receipt、可信终态与容量收口已写，状态为 `implementation_uncompiled`，尚未迁移、完整接线和运行验证 |
 | Provider 本人控制面 | HTTP/MCP 已可登记、读取和列出本人 `user_node` 或 `managed_cluster` 的脱敏视图；只生成 `registering/self_declared` 记录，不接受路由、凭据、适配器或验证证据，尚未编译和运行验证 |
 | CapacityPool 本人控制面 | HTTP/MCP 已可在本人 Provider 下登记、读取、列出和审计 `registering` Pool，并按稳定序号分页读取脱敏账本历史；审计健康不等于硬件 verified，历史省略消费者和业务因果字段；尚未编译和运行验证 |
 | CapacityBucket 本人控制面 | HTTP/MCP 已可在本人当前 Pool 版本下创建 open、零发行余额 Bucket，并读取当前余额；窗口和 Bucket 摘要由服务端生成，不发行容量、不预留、不交易，尚未编译和运行验证 |
@@ -49,6 +49,7 @@ owners: backend, node, ai-economy
 | Attempt 平台终态观测 | v191、追加式 Store 与管理员 HTTP 已写；平台累计 meter 绑定精确 v188/v189 并保存差异，但仍不等于 verified usage、可信终态或结算，尚未编译、执行迁移或运行验证 |
 | Attempt Verification 决定 | v192、追加式 Store 与管理员 HTTP 已写；精确绑定 v189-v191，按保守策略记录 verified/compensable usage，但不生成 Execution Receipt、不改状态和资金，尚未编译、执行迁移或运行验证 |
 | Attempt Execution Receipt | v193、追加式 Store 与管理员 HTTP 已写；仅 accepted Verification 可签发，固定执行身份、工件、用量和证明，但不改状态、容量和资金，尚未编译、执行迁移或运行验证 |
+| Attempt 可信终态与容量收口 | v194、追加式 Store 与管理员 HTTP 已写；仅由 accepted Verification 签发的精确 Execution Receipt 可在单事务推进 Lease/Job/Reservation/Claim，并按 meter mode 消费或归还容量。预授权和 Provider 收益不变，尚未编译、执行迁移或运行验证 |
 | 外部算力池适配器与统一报价 | 已接受设计，尚未实现 |
 | 多源验证、期货曲线与真实结算 | 已接受设计，尚未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
@@ -88,7 +89,8 @@ owners: backend, node, ai-economy
 21. `docs/distributed-compute/attempt-platform-observation-api.md`：平台首次终态观测、累计 meter 差异、不可覆盖与非验证/非结算边界。
 22. `docs/distributed-compute/attempt-verification-api.md`：保守 Verification policy、verified/compensable usage、不可覆盖与非状态/非结算边界。
 23. `docs/distributed-compute/attempt-execution-receipt-api.md`：accepted Verification 的执行回执、完整源证据重审计与非状态/非结算边界。
-20. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
+24. `docs/distributed-compute/attempt-finalization-api.md`：精确 Execution Receipt 的可信终态、容量消费/归还与资金不变边界。
+25. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
 
 ## 分阶段落地
 
@@ -108,7 +110,7 @@ owners: backend, node, ai-economy
 
 v187 继续补齐最窄的 staging 无用量中止：只有激活回执对应的首版、无心跳 Lease 才能由 Provider 所有者显式声明外部执行器未开始执行，并在一个事务内全额退回预授权、把 active Claim 归还 available、推进 Job/Reservation/Lease 终态并保存追加式回执。它不验证 `executor_abort_ref`、不发送取消命令，也不覆盖已开始执行、部分扣费、自动超时、调度重试或最终结算，状态仍为 `implementation_uncompiled`。
 
-v188 再补齐 running Attempt 的累计声明用量证据：Provider 所有者只能在当前 Lease 精确 revision/digest/fencing 下追加完整 meter 快照，序号严格递增、累计值不得回退；高于预留合同的 meter 被保留并标记为 overage。回执明确为 `unverified_provider_declaration`，不更新 Lease/Job/Reservation/Claim，不消费容量、不扣款，也不产生 Provider 收益。真实 Host 事件接线、`observed_usage`、`verified_usage`、Execution Receipt 和结算仍未实现。
+v188 再补齐 running Attempt 的累计声明用量证据：Provider 所有者只能在当前 Lease 精确 revision/digest/fencing 下追加完整 meter 快照，序号严格递增、累计值不得回退；高于预留合同的 meter 被保留并标记为 overage。回执明确为 `unverified_provider_declaration`，该阶段不更新 Lease/Job/Reservation/Claim，不消费容量、不扣款，也不产生 Provider 收益。后续 v191-v194 已分别写入平台观测、Verification、Execution Receipt 与可信终态，但真实 Host 事件接线和结算仍未实现。
 
 v189 再保存 Provider 首次终态候选：当前 running Lease 必须已有最新 v188 用量快照，且 Lease、Job、Reservation、Claim 版本和摘要完全一致；`succeeded` 结果按 Workload 输出合同校验，`failed/canceled` 不得携带伪最终产物。候选只保存为 `unverified_provider_declaration`，不更新状态、容量或资金，也不等于 Execution Receipt。
 
@@ -119,9 +121,11 @@ v191 再保存平台第一份终态观测证据：平台 `admin/owner` 可登记
 v192 首次保存平台 Verification 决定：管理员精确绑定 v189-v191 后，`conservative_min_v1` 仅在消费者接受且 Provider/平台 outcome 一致时允许 accepted；verified usage 逐 meter 取双方较小值，compensable usage 再受 Reservation 预留上限约束。rejected/disputed 记录零用量。回执不可覆盖，但不生成 Execution Receipt、不推进状态、不消费容量、不移动资金。
 
 v193 再基于 accepted v192 签发 Execution Receipt：回执重新审计 Attempt 激活、Job/Reservation 历史及 v188-v192，固定 executor、Offer、runner/plugin/model、输入输出、四类用量、三方证明和 Verification。回执不可覆盖，但不推进 Lease/Job、不消费 Claim/Reservation、不移动资金。
+
+v194 再基于由 accepted Verification 签发的精确 v193 Execution Receipt 应用可信终态：单一事务把 Lease 推进为 terminal、Job 推进为 `verification_pending`、Reservation/Claim 推进为 consumed；consumable meter 消费 compensable usage 并归还余量，reusable meter 全量归还。回执不可覆盖，预授权与 Provider 收益仍不变，Settlement Receipt 尚未实现。
 Offer 所有者 HTTP/MCP 可发布服务端规范化的 fallback_curve Price Snapshot；项目级 HTTP/MCP 可创建 submitted Job、发现当前有效候选，再把当前 revision/digest 锁定到所选报价。候选返回价格合同和最小 Provider 摘要，不返回节点路由、凭据或适配器配置。报价发布、候选发现和锁价均不移动资金或容量；真实价格源、批量报价和自动撮合仍未实现。
 
-Provider 本人控制面由 `docs/distributed-compute/provider-api.md` 维护，Pool、Bucket 和 Supply 控制面分别由 `docs/distributed-compute/capacity-pool-api.md`、`docs/distributed-compute/capacity-bucket-api.md`、`docs/distributed-compute/capacity-supply-api.md` 维护；激活证据申请、计划与“内部激活不等于市场可交易”边界由 `docs/distributed-compute/activation-evidence-api.md` 维护；Offer 规范化草稿与无市场效果边界由 `docs/distributed-compute/offer-api.md` 维护；Job、报价和预留控制面由 `docs/distributed-compute/broker-api.md` 维护；Attempt 激活、续租、中止、声明用量、Provider 候选、消费者审核、平台观测、Verification 与 Execution Receipt 分别见 `docs/distributed-compute/attempt-activation-api.md`、`docs/distributed-compute/attempt-lease-api.md`、`docs/distributed-compute/attempt-abort-api.md`、`docs/distributed-compute/attempt-usage-api.md`、`docs/distributed-compute/attempt-terminal-candidate-api.md`、`docs/distributed-compute/attempt-consumer-review-api.md`、`docs/distributed-compute/attempt-platform-observation-api.md`、`docs/distributed-compute/attempt-verification-api.md`、`docs/distributed-compute/attempt-execution-receipt-api.md`。
+Provider 本人控制面由 `docs/distributed-compute/provider-api.md` 维护，Pool、Bucket 和 Supply 控制面分别由 `docs/distributed-compute/capacity-pool-api.md`、`docs/distributed-compute/capacity-bucket-api.md`、`docs/distributed-compute/capacity-supply-api.md` 维护；激活证据申请、计划与“内部激活不等于市场可交易”边界由 `docs/distributed-compute/activation-evidence-api.md` 维护；Offer 规范化草稿与无市场效果边界由 `docs/distributed-compute/offer-api.md` 维护；Job、报价和预留控制面由 `docs/distributed-compute/broker-api.md` 维护；Attempt 激活、续租、中止、声明用量、Provider 候选、消费者审核、平台观测、Verification、Execution Receipt 与可信终态分别见 `docs/distributed-compute/attempt-activation-api.md`、`docs/distributed-compute/attempt-lease-api.md`、`docs/distributed-compute/attempt-abort-api.md`、`docs/distributed-compute/attempt-usage-api.md`、`docs/distributed-compute/attempt-terminal-candidate-api.md`、`docs/distributed-compute/attempt-consumer-review-api.md`、`docs/distributed-compute/attempt-platform-observation-api.md`、`docs/distributed-compute/attempt-verification-api.md`、`docs/distributed-compute/attempt-execution-receipt-api.md`、`docs/distributed-compute/attempt-finalization-api.md`。
 
 v172 ComputeJob Registry 已把需求身份、所选 Offer 历史版本、不可变 Price Snapshot、消费者预算上限和生命周期状态写入版本化 Store。新 Job 必须从 `submitted` 创建；项目控制面已接入该创建路径。进入 `quoted` 时只接受当前 active Offer、active Provider 与未过期快照，项目控制面可显式绑定或刷新既有锁价选择；进入 reserved 或后续状态后锁价合同不能更换。消费者幂等键、`expected_revision` 与 revision/digest CAS 防止重复或并发覆盖；当前和历史读取都会重新审计 Workload 合同及 Provider/Offer/Snapshot 依赖。该路径仍为 `implementation_uncompiled`，不代表预算已冻结、容量已预留或任务已派发。
 

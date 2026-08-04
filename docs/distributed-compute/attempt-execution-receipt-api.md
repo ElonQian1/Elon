@@ -62,8 +62,10 @@ v193 在一个事务中重新读取并审计 Attempt 激活、精确 Job/Reserva
 - Cargo 编译、v193 迁移执行、HTTP 真实调用、并发与故障注入验证；
 - NodeAgent 到云端的签名事件传输、真实工件取回与恶意内容扫描；
 - 自动签发、多独立回执、挑战和争议裁决；
-- Lease/Job 可信终态、Capacity Claim 与 Reservation 的原子消费；
+- v193 本身不推进 Lease/Job，也不消费 Capacity Claim 与 Reservation；后续 v194 已写入独立可信终态事务，但仍为 `implementation_uncompiled`；
 - Settlement Receipt、消费者扣款、Provider 收益、退款和纠正回执。
+
+后续状态与容量效果见 `docs/distributed-compute/attempt-finalization-api.md`。
 
 ## 7. 代码入口
 
