@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-本控制面已写入代码，但尚未编译、执行 v165-v176 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它开放项目级 Job 创建、既有 Offer/Price Snapshot 候选发现与锁价、平台人民币余额的原子 Reserve，以及 Attempt 尚未激活时的 Release/Expire；不能描述为完整算力交易或结算系统。
+本控制面已写入代码，但尚未编译、执行 v165-v176 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它开放项目级 Job 创建、既有 Offer/Price Snapshot 候选发现与锁价、平台人民币余额的原子 Reserve，以及 Attempt 尚未激活时的 Release/Expire；v185 首次 Attempt 已接受激活由独立的 Provider HTTP 控制面承接，见 `attempt-activation-api.md`。两者都不能描述为完整算力交易或结算系统。
 
 HTTP 与项目级 MCP 共用 `compute_federation_broker_service`，最终都进入同一版本化 Job Store、Broker 和不可变回执。客户端不能提交 `consumer_account_id`、`project_id`、Job 状态或服务端时间；声明 `merchant_id` 时，该商户必须真实属于当前项目。Release/Expire 的 `occurred_at` 也由服务端生成。
 
@@ -82,7 +82,7 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 
 - Cargo 编译、迁移执行、HTTP/MCP 真实调用与并发验证；
 - 真实价格源、批量报价和自动撮合；Offer 派生 fallback_curve 快照见 `price-snapshot-api.md`；
-- Attempt 激活、续租、取消、fencing 与节点派发；
+- Attempt 已接受激活以独立 v185 HTTP 入口形成基础代码；续租、取消、真实节点派发、多次 Attempt 与 fencing 递增仍未实现；
 - 运行中任务的容量归还、实际用量、验证和最终结算；
 - 多币种、Sui 资产、外部矿池和 Provider 收益提现；
 - 服务器持久化的独立真人确认凭证。
