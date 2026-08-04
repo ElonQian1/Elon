@@ -1,6 +1,7 @@
 use std::fmt;
 
 use crate::node_agent_compute_plugin_host::{
+    fetch_contract::recovery::ComputePluginFetchClaimRecoveryKey,
     install_plan_admission::AdmittedComputePluginDownload,
     local_authority::{ComputePluginFetchAuthorityFacts, ComputePluginFetchAuthoritySession},
 };
@@ -49,6 +50,7 @@ pub(crate) struct AuthorizedComputePluginDownloadSegment {
     pub(super) length_bytes: i64,
     pub(super) redirect_hop: u8,
     pub(super) claim: PreparedComputePluginFetchClaim,
+    pub(super) recovery_key: ComputePluginFetchClaimRecoveryKey,
 }
 
 impl AuthorizedComputePluginDownloadSegment {
@@ -197,6 +199,7 @@ pub(in crate::node_agent_compute_plugin_host) struct ValidatedComputePluginFetch
 {
     plan_id: &'permit str,
     plan_digest: &'permit str,
+    claim_id: &'permit str,
     request: &'permit ComputePluginDownloadSegmentRequest,
     snapshot: &'permit ComputePluginFetchAuthoritySnapshot,
 }
@@ -205,12 +208,14 @@ impl<'permit> ValidatedComputePluginFetchClaimPermit<'permit> {
     pub(super) fn new(
         plan_id: &'permit str,
         plan_digest: &'permit str,
+        claim_id: &'permit str,
         request: &'permit ComputePluginDownloadSegmentRequest,
         snapshot: &'permit ComputePluginFetchAuthoritySnapshot,
     ) -> Self {
         Self {
             plan_id,
             plan_digest,
+            claim_id,
             request,
             snapshot,
         }
@@ -222,6 +227,10 @@ impl<'permit> ValidatedComputePluginFetchClaimPermit<'permit> {
 
     pub(in crate::node_agent_compute_plugin_host) fn plan_digest(&self) -> &str {
         self.plan_digest
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn claim_id(&self) -> &str {
+        self.claim_id
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn ordinal(&self) -> usize {

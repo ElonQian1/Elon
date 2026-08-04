@@ -2,10 +2,54 @@ use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host) enum ComputePluginFetchClaimOutcomeKind {
+    NotCreated,
     Prepared,
     Committed,
     Aborted,
     Revoked,
+}
+
+/// Exact pre-mutation facts retained only while an initial claim Store result may still be an
+/// actual rollback. A successful Store return removes this snapshot before any handle escapes.
+#[derive(PartialEq, Eq)]
+pub(in crate::node_agent_compute_plugin_host) struct ComputePluginFetchInitialClaimAbsenceSnapshot {
+    pub(super) expected_redirect_generation: i64,
+    pub(super) authority_state_revision: i64,
+    pub(super) trusted_time_high_water_ms: i64,
+    pub(super) download_committed_offset: i64,
+    pub(super) download_cursor_generation: i64,
+    pub(super) download_state: String,
+    pub(super) download_updated_at_ms: i64,
+}
+
+impl ComputePluginFetchInitialClaimAbsenceSnapshot {
+    pub(in crate::node_agent_compute_plugin_host) fn expected_redirect_generation(&self) -> i64 {
+        self.expected_redirect_generation
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn authority_state_revision(&self) -> i64 {
+        self.authority_state_revision
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn trusted_time_high_water_ms(&self) -> i64 {
+        self.trusted_time_high_water_ms
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn download_committed_offset(&self) -> i64 {
+        self.download_committed_offset
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn download_cursor_generation(&self) -> i64 {
+        self.download_cursor_generation
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn download_state(&self) -> &str {
+        &self.download_state
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn download_updated_at_ms(&self) -> i64 {
+        self.download_updated_at_ms
+    }
 }
 
 /// Non-authorizing, non-serializable identity probe retained before a claim handle is consumed.
@@ -30,6 +74,7 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginFetchClaimReco
     pub(super) length_bytes: i64,
     pub(super) end_offset_bytes: i64,
     pub(super) prepared_at_ms: i64,
+    pub(super) initial_absence: Option<ComputePluginFetchInitialClaimAbsenceSnapshot>,
 }
 
 impl fmt::Debug for ComputePluginFetchClaimRecoveryKey {
@@ -47,6 +92,10 @@ impl fmt::Debug for ComputePluginFetchClaimRecoveryKey {
             )
             .field("offset_bytes", &self.offset_bytes)
             .field("end_offset_bytes", &self.end_offset_bytes)
+            .field(
+                "initial_absence",
+                &self.initial_absence.as_ref().map(|_| "<retained>"),
+            )
             .finish()
     }
 }
@@ -119,13 +168,19 @@ impl ComputePluginFetchClaimRecoveryKey {
     pub(in crate::node_agent_compute_plugin_host) fn prepared_at_ms(&self) -> i64 {
         self.prepared_at_ms
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn initial_absence(
+        &self,
+    ) -> Option<&ComputePluginFetchInitialClaimAbsenceSnapshot> {
+        self.initial_absence.as_ref()
+    }
 }
 
 #[derive(PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginFetchClaimOutcome {
     kind: ComputePluginFetchClaimOutcomeKind,
     ordinal: usize,
-    actual_redirect_generation: i64,
+    actual_redirect_generation: Option<i64>,
     current_authority_epoch: i64,
     current_process_owner_epoch: i64,
     current_cursor_generation: i64,
@@ -159,7 +214,7 @@ impl ComputePluginFetchClaimOutcome {
     pub(in crate::node_agent_compute_plugin_host) fn from_store(
         kind: ComputePluginFetchClaimOutcomeKind,
         ordinal: usize,
-        actual_redirect_generation: i64,
+        actual_redirect_generation: Option<i64>,
         current_authority_epoch: i64,
         current_process_owner_epoch: i64,
         current_cursor_generation: i64,
@@ -188,7 +243,9 @@ impl ComputePluginFetchClaimOutcome {
         self.kind
     }
 
-    pub(in crate::node_agent_compute_plugin_host) fn actual_redirect_generation(&self) -> i64 {
+    pub(in crate::node_agent_compute_plugin_host) fn actual_redirect_generation(
+        &self,
+    ) -> Option<i64> {
         self.actual_redirect_generation
     }
 

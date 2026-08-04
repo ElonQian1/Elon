@@ -22,15 +22,48 @@ use crate::node_agent_compute_plugin_host::{
     signed_artifact_verification::jcs_sha256_hex,
 };
 
+mod failure;
+
+pub(super) use failure::{
+    ComputePluginFetchAbortFailure, ComputePluginFetchAbortResult, ComputePluginFetchCommitFailure,
+    ComputePluginFetchCommitResult, ComputePluginFetchStoreMutationPhase,
+};
+
 /// Terminalizes a segment only after a future file-handle layer supplies opaque durable-write
 /// evidence. This function is intentionally unreachable from production until that layer lands.
-pub(super) fn commit_download_segment(
+pub(super) fn commit_download_segment<'authority>(
     admitted: &AdmittedComputePluginInstallPlan,
     authorized: AuthorizedComputePluginDownloadSegment,
-    durable: DurablyWrittenComputePluginSegment<'_>,
-) -> Result<CommittedComputePluginDownloadSegment> {
-    let download = validate_authorized_binding(admitted, &authorized)?;
-    validate_durable_binding(&authorized.claim, &durable)?;
+    durable: DurablyWrittenComputePluginSegment<'authority>,
+) -> ComputePluginFetchCommitResult<'authority> {
+    if let Err(error) = authorized.validate_recovery_session(&durable.resolution_session) {
+        return Err(
+            ComputePluginFetchCommitFailure::recovery_binding_unavailable(
+                error, authorized, durable,
+            ),
+        );
+    }
+    let download = match validate_authorized_binding(admitted, &authorized) {
+        Ok(download) => download,
+        Err(error) => {
+            let recovery_key = authorized.into_recovery_key();
+            return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
+                ComputePluginFetchStoreMutationPhase::StoreNotCalled,
+                error,
+                recovery_key,
+                durable,
+            ));
+        }
+    };
+    if let Err(error) = validate_durable_binding(&authorized.claim, &durable) {
+        let recovery_key = authorized.into_recovery_key();
+        return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
+            ComputePluginFetchStoreMutationPhase::StoreNotCalled,
+            error,
+            recovery_key,
+            durable,
+        ));
+    }
     let authority = ComputePluginFetchAuthorityPort {
         backend: &durable.resolution_session,
     };
@@ -42,22 +75,56 @@ pub(super) fn commit_download_segment(
         redirect_from_claim_id: (authorized.redirect_hop > 0)
             .then(|| authorized.claim.claim_id.clone()),
     };
-    let snapshot = authority.read_fresh_segment_authority(
+    let snapshot = match authority.read_fresh_segment_authority(
         &authorized.claim.plan_id,
         &authorized.claim.plan_digest,
         download,
         &request,
-    )?;
-    validate_commit_authority(admitted, download, &authorized.claim, &snapshot)?;
+    ) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            let recovery_key = authorized.into_recovery_key();
+            return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
+                ComputePluginFetchStoreMutationPhase::StoreNotCalled,
+                error,
+                recovery_key,
+                durable,
+            ));
+        }
+    };
+    if let Err(error) = validate_commit_authority(admitted, download, &authorized.claim, &snapshot)
+    {
+        let recovery_key = authorized.into_recovery_key();
+        return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
+            ComputePluginFetchStoreMutationPhase::StoreNotCalled,
+            error,
+            recovery_key,
+            durable,
+        ));
+    }
     if snapshot.store.trusted_now.timestamp_millis() != durable.durably_synced_at_ms
         || durable.durably_synced_at_ms <= authorized.claim.prepared_at_ms
         || durable.durably_synced_at_ms <= snapshot.store.observed_trusted_time_high_water_ms
     {
-        bail!("COMPUTE_PLUGIN_FETCH_COMMIT_TIME_OBSERVATION_STALE");
+        let recovery_key = authorized.into_recovery_key();
+        return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
+            ComputePluginFetchStoreMutationPhase::StoreNotCalled,
+            anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_COMMIT_TIME_OBSERVATION_STALE"),
+            recovery_key,
+            durable,
+        ));
     }
     let permit =
         ValidatedComputePluginFetchCommitPermit::new(&authorized.claim, &snapshot, &durable);
-    authority.commit_validated_segment(permit)?;
+    if let Err(error) = authority.commit_validated_segment(permit) {
+        let recovery_key = authorized.into_recovery_key();
+        return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
+            ComputePluginFetchStoreMutationPhase::StoreOutcomeUncertain,
+            error,
+            recovery_key,
+            durable,
+        ));
+    }
     Ok(CommittedComputePluginDownloadSegment {
         ordinal: authorized.claim.ordinal,
         committed_offset: authorized.claim.end_offset_bytes,
@@ -67,18 +134,43 @@ pub(super) fn commit_download_segment(
 
 /// Consumes the network authorization without advancing the durable byte cursor. Only a fixed
 /// internal reason crosses into SQLite; transport error text remains outside authority state.
-pub(super) fn abort_download_segment(
+pub(super) fn abort_download_segment<'authority>(
     admitted: &AdmittedComputePluginInstallPlan,
     authorized: AuthorizedComputePluginDownloadSegment,
     reason: ComputePluginFetchAbortReason,
-    authority_session: ComputePluginFetchAuthoritySession<'_>,
-) -> Result<AbortedComputePluginDownloadSegment> {
-    validate_authorized_binding(admitted, &authorized)?;
+    authority_session: ComputePluginFetchAuthoritySession<'authority>,
+) -> ComputePluginFetchAbortResult<'authority> {
+    if let Err(error) = authorized.validate_recovery_session(&authority_session) {
+        return Err(
+            ComputePluginFetchAbortFailure::recovery_binding_unavailable(
+                error,
+                authorized,
+                authority_session,
+            ),
+        );
+    }
+    if let Err(error) = validate_authorized_binding(admitted, &authorized) {
+        let recovery_key = authorized.into_recovery_key();
+        return Err(ComputePluginFetchAbortFailure::outcome_recovery_required(
+            ComputePluginFetchStoreMutationPhase::StoreNotCalled,
+            error,
+            recovery_key,
+            authority_session,
+        ));
+    }
     let permit = ValidatedComputePluginFetchAbortPermit::new(&authorized.claim, reason);
     let authority = ComputePluginFetchAuthorityPort {
         backend: &authority_session,
     };
-    authority.abort_validated_segment(permit)?;
+    if let Err(error) = authority.abort_validated_segment(permit) {
+        let recovery_key = authorized.into_recovery_key();
+        return Err(ComputePluginFetchAbortFailure::outcome_recovery_required(
+            ComputePluginFetchStoreMutationPhase::StoreOutcomeUncertain,
+            error,
+            recovery_key,
+            authority_session,
+        ));
+    }
     Ok(AbortedComputePluginDownloadSegment {
         ordinal: authorized.claim.ordinal,
         committed_offset: authorized.claim.offset_bytes,

@@ -151,8 +151,6 @@ impl ComputePluginFetchAuthoritySession<'_> {
         &self,
         permit: ValidatedComputePluginFetchClaimPermit<'_>,
     ) -> Result<ComputePluginPreparedFetchClaimFacts> {
-        let new_claim_id = (permit.redirect_hop() == 0)
-            .then(|| format!("fetch_{}", uuid::Uuid::new_v4().simple()));
         let command = claim::FetchClaimCommand {
             plan_id: permit.plan_id(),
             plan_digest: permit.plan_digest(),
@@ -161,7 +159,7 @@ impl ComputePluginFetchAuthoritySession<'_> {
             length_bytes: permit.length_bytes(),
             redirect_generation: i64::from(permit.redirect_hop()),
             redirect_from_claim_id: permit.redirect_from_claim_id(),
-            new_claim_id: new_claim_id.as_deref(),
+            new_claim_id: (permit.redirect_hop() == 0).then(|| permit.claim_id()),
         };
         self.authority.with_immediate(|transaction| {
             claim::claim_validated_segment(

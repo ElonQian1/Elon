@@ -18,13 +18,23 @@ use super::{
 
 // Kept private until outcome recovery and file-cursor reconciliation can close every consumed
 // handle error without reusing a stale mutation capability.
+mod authorization;
+mod authorization_failure;
 mod recovery;
 mod resolution;
 mod types;
 
+pub(in crate::node_agent_compute_plugin_host) use authorization::{
+    authorize_download_redirect, authorize_download_segment,
+};
+pub(in crate::node_agent_compute_plugin_host) use authorization_failure::{
+    ComputePluginFetchAuthorizationFailure, ComputePluginFetchAuthorizationResult,
+    ComputePluginFetchRedirectFailure, ComputePluginFetchRedirectResult,
+};
 pub(in crate::node_agent_compute_plugin_host) use recovery::{
     ComputePluginFetchClaimOutcome, ComputePluginFetchClaimOutcomeKind,
-    ComputePluginFetchClaimRecoveryKey, ValidatedComputePluginFetchRecoveryAbortPermit,
+    ComputePluginFetchClaimRecoveryKey, ComputePluginFetchInitialClaimAbsenceSnapshot,
+    ValidatedComputePluginFetchRecoveryAbortPermit,
 };
 pub(crate) use types::{
     AuthorizedComputePluginDownloadSegment, ComputePluginDownloadSegmentRequest,
@@ -181,85 +191,6 @@ impl From<ComputePluginPreparedFetchClaimFacts> for PreparedComputePluginFetchCl
     }
 }
 
-/// Call immediately before every request, redirect and resumed byte range. The authority owns the
-/// durable cursor claim; callers cannot authorize from the DTOs retained after initial admission.
-pub(in crate::node_agent_compute_plugin_host) fn authorize_download_segment(
-    admitted: &AdmittedComputePluginInstallPlan,
-    request: &ComputePluginDownloadSegmentRequest,
-    authority_session: &ComputePluginFetchAuthoritySession<'_>,
-) -> Result<AuthorizedComputePluginDownloadSegment> {
-    let authority = ComputePluginFetchAuthorityPort {
-        backend: authority_session,
-    };
-    let plan = admitted.plan();
-    let download = admitted
-        .downloads()
-        .get(request.ordinal)
-        .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_ORDINAL: download is not in plan"))?;
-    let segment_end = request
-        .offset_bytes
-        .checked_add(request.length_bytes)
-        .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_RANGE_OVERFLOW"))?;
-    if download.ordinal != request.ordinal
-        || request.offset_bytes < 0
-        || request.length_bytes <= 0
-        || request.length_bytes > MAX_DOWNLOAD_SEGMENT_BYTES
-        || segment_end > download.download.size_bytes
-        || request.redirect_hop > MAX_REDIRECT_HOPS
-        || (request.redirect_hop == 0) != request.redirect_from_claim_id.is_none()
-        || request
-            .redirect_from_claim_id
-            .as_deref()
-            .is_some_and(|claim_id| !is_identifier(claim_id))
-    {
-        bail!("COMPUTE_PLUGIN_FETCH_RANGE: segment or redirect hop is outside the plan");
-    }
-    let facts = authority.read_fresh_segment_authority(
-        &plan.plan_id,
-        admitted.plan_digest(),
-        download,
-        request,
-    )?;
-    validate_download_segment_authority(admitted, download, request, &facts)?;
-    let permit = ValidatedComputePluginFetchClaimPermit::new(
-        &plan.plan_id,
-        admitted.plan_digest(),
-        request,
-        &facts,
-    );
-    let claim = authority.claim_validated_segment(download, permit)?;
-    validate_returned_fetch_claim(admitted, download, request, &facts, &claim)?;
-    Ok(AuthorizedComputePluginDownloadSegment {
-        download: download.clone(),
-        offset_bytes: request.offset_bytes,
-        length_bytes: request.length_bytes,
-        redirect_hop: request.redirect_hop,
-        claim,
-    })
-}
-
-/// Consumes the prior handle and returns its next redirect generation. Every error drops the handle
-/// and enters authority recovery, so an uncertain Store outcome cannot leave a usable stale claim.
-pub(in crate::node_agent_compute_plugin_host) fn authorize_download_redirect(
-    admitted: &AdmittedComputePluginInstallPlan,
-    authorized: AuthorizedComputePluginDownloadSegment,
-    authority: &ComputePluginFetchAuthoritySession<'_>,
-) -> Result<AuthorizedComputePluginDownloadSegment> {
-    let redirect_hop = authorized
-        .redirect_hop
-        .checked_add(1)
-        .filter(|hop| *hop <= MAX_REDIRECT_HOPS)
-        .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_REDIRECT_LIMIT"))?;
-    let request = ComputePluginDownloadSegmentRequest {
-        ordinal: authorized.download.ordinal,
-        offset_bytes: authorized.offset_bytes,
-        length_bytes: authorized.length_bytes,
-        redirect_hop,
-        redirect_from_claim_id: Some(authorized.claim.claim_id.clone()),
-    };
-    authorize_download_segment(admitted, &request, authority)
-}
-
 pub(super) fn validate_download_segment_authority(
     admitted: &AdmittedComputePluginInstallPlan,
     download: &AdmittedComputePluginDownload,
@@ -391,61 +322,6 @@ fn validate_prepared_claim_lineage(
         }
         _ => bail!("COMPUTE_PLUGIN_FETCH_REDIRECT_LINEAGE_CHANGED"),
     }
-}
-
-fn validate_returned_fetch_claim(
-    admitted: &AdmittedComputePluginInstallPlan,
-    download: &AdmittedComputePluginDownload,
-    request: &ComputePluginDownloadSegmentRequest,
-    snapshot: &ComputePluginFetchAuthoritySnapshot,
-    claim: &PreparedComputePluginFetchClaim,
-) -> Result<()> {
-    let facts = &snapshot.store;
-    let expected_end = request
-        .offset_bytes
-        .checked_add(request.length_bytes)
-        .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_RANGE_OVERFLOW"))?;
-    let expected_cursor = if request.redirect_hop == 0 {
-        facts
-            .download_cursor_generation
-            .checked_add(1)
-            .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_CURSOR_EXHAUSTED"))?
-    } else {
-        facts.download_cursor_generation
-    };
-    let prepared_at_matches = if let Some(prepared) = facts.prepared_claim.as_ref() {
-        claim.prepared_at_ms == prepared.prepared_at_ms
-    } else {
-        claim.prepared_at_ms == facts.trusted_now.timestamp_millis()
-    };
-    let redirect_claim_matches = if request.redirect_hop == 0 {
-        facts.prepared_claim.is_none()
-    } else {
-        facts.prepared_claim.as_ref().is_some_and(|prepared| {
-            claim.claim_id == prepared.claim_id
-                && request.redirect_from_claim_id.as_deref() == Some(prepared.claim_id.as_str())
-        })
-    };
-    if !is_identifier(&claim.claim_id)
-        || claim.plan_id != admitted.plan().plan_id
-        || claim.plan_digest != admitted.plan_digest()
-        || claim.ordinal != request.ordinal
-        || claim.ordinal != download.ordinal
-        || claim.candidate_token_digest != facts.candidate_token_digest
-        || claim.part_relative_path != facts.part_relative_path
-        || claim.authority_epoch != facts.authority_epoch
-        || claim.process_owner_epoch != facts.process_owner_epoch
-        || claim.cursor_generation != expected_cursor
-        || claim.redirect_generation != i64::from(request.redirect_hop)
-        || claim.offset_bytes != request.offset_bytes
-        || claim.length_bytes != request.length_bytes
-        || claim.end_offset_bytes != expected_end
-        || !prepared_at_matches
-        || !redirect_claim_matches
-    {
-        bail!("COMPUTE_PLUGIN_FETCH_CLAIM_RETURN_BINDING_MISMATCH");
-    }
-    Ok(())
 }
 
 fn relative_fetch_path_is_valid(value: &str) -> bool {

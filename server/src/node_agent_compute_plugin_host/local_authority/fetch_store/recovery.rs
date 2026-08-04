@@ -19,6 +19,8 @@ use super::super::{
 
 const RECOVERY_ABORT_REASON: &str = "authority_recovery";
 
+mod absence;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RecoveryAuthorityRow {
     installation_id_digest: String,
@@ -51,7 +53,7 @@ struct RecoveryDownloadRow {
 
 struct RecoverySnapshot {
     authority: RecoveryAuthorityRow,
-    claim: RecoveryClaimRow,
+    claim: Option<RecoveryClaimRow>,
     download: RecoveryDownloadRow,
     outcome: ComputePluginFetchClaimOutcome,
 }
@@ -61,6 +63,10 @@ impl ComputePluginFetchAuthoritySession<'_> {
         &self,
     ) -> &str {
         self.process_fence.installation_id_digest()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn recovery_process_owner_epoch(&self) -> i64 {
+        self.process_fence.process_owner_epoch()
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn read_claim_outcome(
@@ -95,13 +101,37 @@ fn read_outcome_snapshot(
     validate_recovery_key(key)?;
     let authority = read_recovery_authority(transaction)?;
     validate_reader(&authority, process_fence, key)?;
+    if !absence::exact_claim_exists(transaction, key)? {
+        let download = absence::read_not_created_download(transaction, &authority, key)?;
+        let outcome = ComputePluginFetchClaimOutcome::from_store(
+            ComputePluginFetchClaimOutcomeKind::NotCreated,
+            key.ordinal(),
+            None,
+            authority.authority_epoch,
+            authority.process_owner_epoch,
+            download.cursor_generation,
+            download.committed_offset,
+            download.state.clone(),
+            None,
+            None,
+        );
+        return Ok(RecoverySnapshot {
+            authority,
+            claim: None,
+            download,
+            outcome,
+        });
+    }
     let (claim, download) = read_claim_and_download(transaction, key)?;
+    if authority.trusted_time_high_water_ms < key.prepared_at_ms() {
+        bail!("COMPUTE_PLUGIN_FETCH_OUTCOME_READER_CHANGED");
+    }
     validate_claim_and_download(&authority, key, &claim, &download)?;
     let (kind, reason) = classify_claim(&authority, key, &claim, &download)?;
     let outcome = ComputePluginFetchClaimOutcome::from_store(
         kind,
         key.ordinal(),
-        claim.redirect_generation,
+        Some(claim.redirect_generation),
         authority.authority_epoch,
         authority.process_owner_epoch,
         download.cursor_generation,
@@ -112,7 +142,7 @@ fn read_outcome_snapshot(
     );
     Ok(RecoverySnapshot {
         authority,
-        claim,
+        claim: Some(claim),
         download,
         outcome,
     })
@@ -197,7 +227,7 @@ fn validate_reader(
         || authority.process_owner_epoch != process_fence.process_owner_epoch()
         || process_fence.acquired_at_ms() < 0
         || process_fence.acquired_at_ms() > authority.trusted_time_high_water_ms
-        || authority.trusted_time_high_water_ms < key.prepared_at_ms()
+        || authority.trusted_time_high_water_ms < 0
         || !matches!(
             authority.clock_status.as_str(),
             "trusted" | "clock_untrusted"
@@ -359,6 +389,7 @@ fn classify_claim(
 ) -> Result<(ComputePluginFetchClaimOutcomeKind, Option<&'static str>)> {
     let (kind, reason) = classify_terminal_fields(claim)?;
     let progress_valid = match kind {
+        ComputePluginFetchClaimOutcomeKind::NotCreated => false,
         ComputePluginFetchClaimOutcomeKind::Prepared => {
             authority.authority_epoch == key.authority_epoch()
                 && authority.process_owner_epoch == key.process_owner_epoch()
@@ -441,6 +472,10 @@ fn abort_recovered_prepared_claim(
     permit: ValidatedComputePluginFetchRecoveryAbortPermit<'_>,
 ) -> Result<ComputePluginFetchClaimOutcome> {
     let before = read_outcome_snapshot(transaction, process_fence, permit.key())?;
+    let before_claim = before
+        .claim
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_RECOVERY_CLAIM_MISSING"))?;
     if &before.outcome != permit.observed()
         || before.outcome.kind() != ComputePluginFetchClaimOutcomeKind::Prepared
         || trusted_now_ms <= before.authority.trusted_time_high_water_ms
@@ -458,12 +493,12 @@ fn abort_recovered_prepared_claim(
         bail!("COMPUTE_PLUGIN_FETCH_RECOVERY_TIME_CHANGED");
     }
     advance_trusted_time(transaction, &state, trusted_now_ms)?;
-    terminalize_recovered_claim(transaction, permit.key(), &before.claim, trusted_now_ms)?;
+    terminalize_recovered_claim(transaction, permit.key(), before_claim, trusted_now_ms)?;
     let after = read_outcome_snapshot(transaction, process_fence, permit.key())?;
     let expected = ComputePluginFetchClaimOutcome::from_store(
         ComputePluginFetchClaimOutcomeKind::Aborted,
         permit.key().ordinal(),
-        before.claim.redirect_generation,
+        Some(before_claim.redirect_generation),
         before.authority.authority_epoch,
         before.authority.process_owner_epoch,
         before.download.cursor_generation,
