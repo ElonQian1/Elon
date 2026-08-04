@@ -3164,6 +3164,33 @@
         ]
       },
       {
+        "id": "cap-open-commerce-baseline",
+        "view": "capabilities",
+        "kind": "capability",
+        "label": "一龙开放商业能力基线",
+        "detail": "权威区分项目当前已实现、正在建设、仅为提案或已经否决的开放商业能力",
+        "parent_id": "cap-open-commerce",
+        "order": 5,
+        "color": "#C78B55",
+        "entrypoint": "docs/open-commerce/capability-baseline.md",
+        "document_paths": [
+          "docs/open-commerce/capability-baseline.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/open_commerce_service.rs",
+          "file:server/src/group_ai/actions/assignment_actions.rs",
+          "file:server/src/store/node_ledger.rs"
+        ],
+        "tags": [
+          "capability-baseline",
+          "current-status",
+          "implemented",
+          "planned",
+          "proposed",
+          "rejected"
+        ]
+      },
+      {
         "id": "cap-open-commerce-v1",
         "view": "capabilities",
         "kind": "capability",
@@ -4331,7 +4358,7 @@
         "view": "capabilities",
         "kind": "workflow",
         "label": "桌面监督与 PC 执行",
-        "detail": "Codex 桌面派发和验收、PC 节点执行、证据回传及平台改进续跑",
+        "detail": "已暂停的 Codex 桌面与 PC 节点协作开发、项目文档治理、证据回传工作流；仅用于历史理解，不得派发或续跑",
         "parent_id": "cap-collaboration",
         "order": 50,
         "color": "#A884ED",
@@ -4349,6 +4376,8 @@
           "dogfooding",
           "evidence",
           "pc-node",
+          "paused",
+          "project-document-governance",
           "recovery",
           "route-a",
           "supervision"
@@ -4532,13 +4561,6 @@
         "target": "arch-compute-capacity-ledger-v1",
         "relation": "uses",
         "label": "Offer 与 Reservation 绑定同一共享容量真源"
-      },
-      {
-        "id": "arch-compute-capacity-ledger-market",
-        "source": "arch-compute-capacity-ledger-v1",
-        "target": "cap-compute-market-settlement-v1",
-        "relation": "feeds",
-        "label": "容量 Claim 与追加式账本支撑现货和未来锁价交付"
       },
       {
         "id": "cap-erp-blueprint-commerce-v1",

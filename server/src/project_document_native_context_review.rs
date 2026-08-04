@@ -339,8 +339,7 @@ fn load_or_create_suggestions(
     workspace: &Path,
 ) -> Result<(DocumentOrganizationSuggestions, Option<String>)> {
     if workspace.join(SUGGESTIONS_CONFIG_PATH).is_file() {
-        let file = read_project_document_file(workspace, SUGGESTIONS_CONFIG_PATH)
-            .map_err(|error| anyhow!(error.message))?;
+        let file = read_project_document_file(workspace, SUGGESTIONS_CONFIG_PATH)?;
         let suggestions = parse_suggestions(Some(&file.content))?
             .ok_or_else(|| anyhow!("AI 整理建议文件为空"))?;
         Ok((suggestions, Some(file.revision)))

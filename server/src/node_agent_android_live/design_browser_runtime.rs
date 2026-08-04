@@ -188,10 +188,10 @@ async fn capture_input(
         crate::node_agent_pwa_runtime::stateful_browser_binding(&record.design_session_id).await
     {
         input
-            .entry("authProfile".into())
+            .entry("authProfile")
             .or_insert_with(|| json!(binding.auth_profile));
         input
-            .entry("fixtureProfile".into())
+            .entry("fixtureProfile")
             .or_insert_with(|| json!(binding.fixture_profile));
     }
     Ok(capture)

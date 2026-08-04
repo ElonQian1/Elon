@@ -50,7 +50,7 @@ async function resolveNodeAdminUrl() {
   for (let port = 7799; port <= 7819; port += 1) {
     const candidate = `http://127.0.0.1:${port}`
     try {
-      const response = await fetch(`${candidate}/health`, { signal: AbortSignal.timeout(800) })
+      const response = await fetch(`${candidate}/api/health`, { signal: AbortSignal.timeout(800) })
       if (response.ok) return candidate
     } catch {
       // Continue bounded loopback discovery without logging local responses.

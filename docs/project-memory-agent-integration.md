@@ -1,6 +1,6 @@
 # 项目记忆与桌面 AI 代理接入
 
-最后更新：2026-08-04
+最后更新：2026-08-05
 
 本文只回答 Codex Desktop/CLI、直接安装的 Codex 和其他 MCP 代理如何复用项目文档记忆。完整文档治理接口见 `docs/project-document-governance-mcp.md`。
 
@@ -74,7 +74,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\project-memory-ci.ps
 | 节点托管的普通 Codex 宽任务 | 自动注入只读 context、只写 receipt 和会话级 Hook 配置 | 不注入完整治理 schema，不绕过 Hook 信任 |
 | 直接运行的 Codex Desktop/CLI | 可手动 bootstrap 描述符，或安装仓库内 `plugins/yilong-project-memory` 接入 context/receipt | 仓库只提供插件包，不替用户安装、不自动信任 Hook |
 | 其他支持 HTTP MCP 的代理 | 可使用 vendor-neutral governance 描述符；context/receipt 可由适配器手动接入 | 无可靠工具过滤时不自动注入普通任务；Hook 需供应商适配 |
-| Codex plugin bundle | 已生成并通过静态 plugin manifest 校验；含两个最小权限 MCP server 与路径账本 Hook | 未安装、未启动、未做真实 Codex 兼容验证，也不声称 Hook 已加载 |
+| Codex plugin bundle | 已生成并通过静态校验；两个 stdio 代理已在隔离节点完成 bootstrap、initialize 与 tools/list 运行冒烟 | 尚未安装到真实 Codex 会话，未完成 Hook 信任与卸载验证，也不声称 Hook 已加载 |
 
 context、receipt、governance profile 与短期 session/token 固定；修改 URL 查询参数不能提升权限。普通任务只使用两个极小 profile，因此不会每次积压完整治理工具 schema 或项目全文。`project_context_plan` 可传 `task_paths`、`scope_id` 和 `release`；服务端另从当前 Git 工作区绑定 branch 与 clean/dirty 状态，这些范围也进入缓存键和 plan receipt。
 
@@ -112,14 +112,26 @@ Codex 官方 Memories 是供应商自己的本机生成状态，与项目 Git �
 
 因此“换 PC 后免除全部理解成本”不是承诺。可实现的是：新代理先获得小而可验证的导航层，再按任务只打开少量当前文件；这既保留供应商原生搜索优势，也避免把旧私有状态复制成冲突信源。
 
+## 2026-08-05 隔离运行验收
+
+本轮在独立 worktree 和独立 `127.0.0.1:7817` 节点完成真实编译与传输冒烟，没有打开 PC 项目文档页面，也没有停止现有节点：
+
+- `elon-pc-node` 调试二进制构建通过，`project_document` Rust 回归与 context/receipt profile 固定隔离测试通过；仓库图谱中唯一一条跨产品功能图与技术架构图的重复关系已删除，9 组版本化检索案例重新全部通过。
+- context/receipt stdio 代理从进程启动、loopback bootstrap 到 initialize/tools/list 分别耗时 171ms 和 166ms；每个 profile 只返回一个工具。尝试把 context 会话 URL 改成 receipt 返回 HTTP 401。
+- context 首次宽任务计划耗时 3595ms，MCP tool result 为 4652 字节；同一短期会话、同一 revision 的重复调用耗时 1196ms、2839 字节，返回 `status=not_modified`、相同 `plan_id` 和自动会话复用回执。响应合同固定 `source_bodies_returned=0`；这里的 token 数仍是本地 UTF-8 结构估算，不是供应商账单或完整任务 token。
+- `project-memory-ci.ps1` 通过 loopback 接口取得 `pass` 与退出码 0，返回 0 条当前记忆且不返回正文；这证明空库和节点发现链路可用，不证明已有共享记忆质量。
+- Hook 执行程序的 PostToolUse→Stop→SessionEnd 独立冒烟通过：只回传两个相对证据路径，未泄漏测试 session 文本，SessionEnd 后账本为 0。它没有经过真实 Codex `/hooks` 信任流程，因此不等于 Codex 已加载 Hook。
+- app-server 观察器用白名单合成事件验证了 baseline/enabled 配对、token/文件读取计数聚合和 `raw_event_payloads_stored=false`。合成窗口只验证接入器与比较合同，不能用其中的负差值宣称真实节省。
+
+因此目前可以确认“代理无需主动打开页面即可使用最小 MCP、CI 与 Hook 执行程序”；仍不能确认真实 Codex 安装后的端到端任务节省比例。
+
 ## 仍需真实验收的项目
 
-以下工作依赖实际运行，不属于代码静态落位阶段：
+以下工作仍依赖真实 Codex、跨 PC 或浏览器环境：
 
-- Cargo/npm 编译和单元测试；
-- Codex Desktop/CLI 对 context/receipt profile 的真实 schema 与 token 对比；
-- 仓库内 Codex plugin 的安装、相对脚本解析、MCP 启动与卸载；
-- Hook 信任、触发、SessionEnd 清理以及 compact/subagent 生命周期行为；
-- app-server 事件流接线和匹配 baseline 测量；
+- 完整仓库 Rust/npm 全量回归；本轮只构建节点并运行项目文档相关 Rust 用例与独立 Node/PowerShell 冒烟；
+- 真实 Codex Desktop/CLI 安装插件后的工具发现、相对脚本解析、重启新会话与卸载；
+- 真实 Codex `/hooks` 信任、PostToolUse/Stop/SessionEnd 触发；compact/subagent 事件仍未配置，只保留 no-op 适配缝；
+- 官方 app-server 事件流的真实任务 A/B，使用同一 benchmark 测得 input token、原生文件读取和总耗时，而不是合成事件；
 - 跨 PC clone/apply 后的 Git 对象、换行与重定位验证；
 - PC 浏览器中的分页、修复计划和旧节点降级体验。

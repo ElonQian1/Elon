@@ -425,9 +425,15 @@ fn elapsed_ms(started: Instant) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{definition, handle_request, handles, PROFILE, TOOL_NAME};
-    use crate::node_agent_project_docs_mcp::McpRequest;
+    use crate::{
+        node_agent_project_docs_mcp::{
+            descriptor_for_project_context, descriptor_for_project_receipt, test_transport_routes,
+            McpRequest,
+        },
+        node_agent_project_docs_mcp_native_context_tools::RECEIPT_TOOL,
+    };
     use serde_json::json;
-    use std::path::Path;
+    use std::{fs, path::Path};
 
     #[test]
     fn context_profile_exposes_one_bounded_read_only_tool() {
@@ -462,5 +468,62 @@ mod tests {
         let response = handle_request(Path::new("."), &request, None).unwrap();
         assert_eq!(response["tools"].as_array().unwrap().len(), 1);
         assert_eq!(response["tools"][0]["name"], TOOL_NAME);
+    }
+
+    #[tokio::test]
+    async fn streamable_transport_keeps_minimal_profiles_fixed_and_separate() {
+        let root = std::env::temp_dir().join(format!(
+            "elon_project_memory_profile_{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(root.join(".git")).unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, test_transport_routes())
+                .await
+                .unwrap();
+        });
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let context = descriptor_for_project_context(root.to_str().unwrap(), port).unwrap();
+        let receipt = descriptor_for_project_receipt(root.to_str().unwrap(), port).unwrap();
+
+        for (descriptor, expected_tool) in [(&context, TOOL_NAME), (&receipt, RECEIPT_TOOL)] {
+            let response = client
+                .post(descriptor["url"].as_str().unwrap())
+                .json(&json!({"jsonrpc":"2.0","id":1,"method":"tools/list"}))
+                .send()
+                .await
+                .unwrap();
+            assert!(response.status().is_success());
+            let body: serde_json::Value = response.json().await.unwrap();
+            let tools = body["result"]["tools"].as_array().unwrap();
+            assert_eq!(tools.len(), 1);
+            assert_eq!(tools[0]["name"], expected_tool);
+        }
+
+        let switched_url = context["url"]
+            .as_str()
+            .unwrap()
+            .replace("profile=context", "profile=receipt");
+        let switched = client
+            .post(switched_url)
+            .json(&json!({"jsonrpc":"2.0","id":2,"method":"tools/list"}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(switched.status(), reqwest::StatusCode::UNAUTHORIZED);
+
+        server.abort();
+        for descriptor in [&context, &receipt] {
+            let session_id = descriptor["sessionId"].as_str().unwrap();
+            fs::remove_dir_all(
+                std::env::temp_dir()
+                    .join("elon-project-docs-mcp")
+                    .join(session_id),
+            )
+            .unwrap();
+        }
+        fs::remove_dir_all(root).unwrap();
     }
 }
