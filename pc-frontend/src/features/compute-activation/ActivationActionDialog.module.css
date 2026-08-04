@@ -1,29 +1,31 @@
-.backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgb(13 15 18 / 58%); backdrop-filter: blur(4px); }
-.dialog { width: min(680px, 100%); max-height: min(840px, calc(100vh - 48px)); overflow: auto; border: 1px solid #d7dbe0; border-radius: 8px; background: #fff; box-shadow: 0 24px 70px rgb(0 0 0 / 20%); }
-.header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid #e5e7eb; }
+.backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgba(0,0,0,.68); }
+.dialog { width: min(680px, 100%); max-height: min(840px, calc(100vh - 48px)); overflow: auto; border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); background: var(--bg-elevated); box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+.header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--border); }
 .header div, .footer, .confirm { display: flex; align-items: center; gap: 10px; }
 .header h2 { margin: 0; font-size: 18px; font-weight: 690; }
-.header button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; background: transparent; color: #60656d; cursor: pointer; }
+.header button { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text-secondary); cursor: pointer; }
 .dialog form { display: grid; gap: 16px; padding: 20px; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.grid label { display: grid; gap: 6px; min-width: 0; color: #4c5158; font-size: 12px; }
-.grid input { min-width: 0; height: 38px; padding: 0 10px; border: 1px solid #cfd4da; border-radius: 6px; background: #fff; color: #17191c; font: inherit; }
+.grid label { display: grid; gap: 6px; min-width: 0; color: var(--text-muted); font-size: 12px; }
+.grid input { min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-base); color: var(--text-primary); font: inherit; }
 .wide { grid-column: 1 / -1; }
-.error { padding: 10px 12px; border: 1px solid #efb2b2; border-radius: 6px; background: #fff4f4; color: #9e2626; font-size: 13px; }
-.boundary { padding: 11px 12px; border-left: 3px solid #d69b33; background: #fff9ed; color: #5f4a25; font-size: 13px; line-height: 1.55; }
-.confirm { align-items: flex-start; color: #34383e; font-size: 13px; line-height: 1.5; }
+.error { padding: 10px 12px; border: 1px solid rgba(224,92,92,.3); border-radius: 6px; background: rgba(224,92,92,.09); color: #ffcaca; font-size: 13px; }
+.boundary { padding: 11px 12px; border: 1px solid rgba(216,169,79,.25); border-radius: 6px; background: rgba(216,169,79,.06); color: #efc878; font-size: 13px; line-height: 1.55; }
+.confirm { align-items: flex-start; color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
 .confirm input { margin-top: 3px; }
 .footer { justify-content: flex-end; padding-top: 2px; }
 .footer button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 96px; height: 38px; padding: 0 14px; border-radius: 6px; font-weight: 650; cursor: pointer; }
-.secondary { border: 1px solid #cdd2d8; background: #fff; color: #31353a; }
+.secondary { border: 1px solid var(--border); background: transparent; color: var(--text-secondary); }
 .primary { border: 1px solid #1f6a4a; background: #237a55; color: #fff; }
 .danger { border: 1px solid #8f352e; background: #a63f35; color: #fff; }
 .footer button:disabled { cursor: not-allowed; opacity: .5; }
 .summary { display: grid; gap: 8px; margin: 0; }
 .summary div { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; }
-.summary dt { color: #6b7078; font-size: 12px; }
-.summary dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: #24272b; font-size: 13px; }
+.summary dt { color: var(--text-muted); font-size: 12px; }
+.summary dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: var(--text-primary); font-size: 13px; }
 .summary code { font-size: 11px; }
+.reason { display: grid; gap: 6px; color: var(--text-muted); font-size: 12px; }
+.reason textarea { resize: vertical; min-height: 100px; border: 1px solid var(--border); border-radius: 6px; padding: 9px 10px; color: var(--text-primary); background: var(--bg-base); font: inherit; line-height: 1.5; }
 .spinning { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 620px) { .backdrop { padding: 10px; } .grid { grid-template-columns: 1fr; } .wide { grid-column: auto; } }

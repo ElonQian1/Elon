@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CircleCheck, FileCheck2, RefreshCw, ShieldAlert, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { CircleCheck, FileCheck2, RefreshCw, ShieldAlert, ShieldCheck, ShieldX, TriangleAlert } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { type ComputeActivationEvidenceRequest, type ComputeActivationPreflightReport } from '../compute-supply/computeActivationApi'
 import ActivationReviewDialog from './ActivationReviewDialog'
 import ActivationPlanPanel from './ActivationPlanPanel'
+import LifecycleReasonDialog from './LifecycleReasonDialog'
 import {
   computeActivationAdminApi,
   type ActivationRequestStatus,
@@ -28,6 +29,7 @@ export default function ComputeActivationAdminPage() {
   const [loading, setLoading] = useState(false)
   const [reviewing, setReviewing] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [supersedeOpen, setSupersedeOpen] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const selected = useMemo(() => requests.find((request) => request.request_id === selectedId) ?? null, [requests, selectedId])
@@ -60,6 +62,15 @@ export default function ComputeActivationAdminPage() {
     } catch (reason) { setError(messageOf(reason, '激活证据审核失败')) } finally { setReviewing(false) }
   }
 
+  async function supersede(reason: string) {
+    if (!selected || selected.status !== 'approved' || reviewing) return
+    setReviewing(true); setError(''); setNotice('')
+    try {
+      await computeActivationAdminApi.supersede(selected.request_id, selected.request_digest, reason)
+      setSupersedeOpen(false); setNotice('已废止过期批准申请；对应 prepared 计划同步废止，未撤销任何已发生激活。'); await load()
+    } catch (failure) { setError(messageOf(failure, '批准申请废止失败')) } finally { setReviewing(false) }
+  }
+
   if (!isAdmin) return <main className={styles.denied}><ShieldCheck size={24} /><h1>需要平台管理员权限</h1><p>当前账号不能审核算力激活证据。</p></main>
 
   return <main className={styles.page}>
@@ -75,11 +86,12 @@ export default function ComputeActivationAdminPage() {
         <section className={styles.evidence}><h3>证据引用</h3><div><span>节点绑定</span><code>{selected.node_binding_ref}</code></div><div><span>ReadyCapability</span><code>{selected.ready_capability_digest}</code></div><div><span>路由证明</span><code>{selected.route_proof_digest}</code></div><div><span>硬件观测</span><code>{selected.hardware_observation_digest}</code></div><div><span>账本审计</span><code>{selected.ledger_audit_digest}</code></div></section>
         {selected.review_note && <section className={styles.note}><h3>审核说明</h3><p>{selected.review_note}</p></section>}
         {preflight && <section className={preflight.ready_for_activation ? styles.ready : styles.blocked}>{preflight.ready_for_activation ? <CircleCheck size={18} /> : <ShieldAlert size={18} />}<div><strong>{preflight.ready_for_activation ? '当前预检无阻断项' : `当前有 ${preflight.blockers.length} 项阻断`}</strong><span>{preflight.blockers.length ? preflight.blockers.map(blockerLabel).join('、') : '审核后仍需准备并应用不可变计划'}</span></div></section>}
-        <footer className={styles.detailFooter}><span>审核只改变申请状态，不触发资源激活。</span>{selected.status === 'submitted' && <button type="button" onClick={() => { setError(''); setReviewOpen(true) }}><ShieldCheck size={15} />审核申请</button>}</footer>
+        <footer className={styles.detailFooter}><span>状态变更均保留申请、计划和应用审计历史。</span>{selected.status === 'submitted' && <button type="button" onClick={() => { setError(''); setReviewOpen(true) }}><ShieldCheck size={15} />审核申请</button>}{selected.status === 'approved' && <button type="button" data-tone="danger" onClick={() => { setError(''); setSupersedeOpen(true) }}><ShieldX size={15} />废止批准</button>}</footer>
         <ActivationPlanPanel key={selected.request_id} request={selected} onChanged={async (message) => { setNotice(message); await load() }} />
       </> : <div className={styles.detailEmpty}><FileCheck2 size={24} /><h2>选择一份申请</h2></div>}</div>
     </section>
     {reviewOpen && selected && <ActivationReviewDialog request={selected} busy={reviewing} error={error} onClose={() => setReviewOpen(false)} onSubmit={review} />}
+    {supersedeOpen && selected && <LifecycleReasonDialog title="废止已批准申请" description="仅用于申请依赖已变化、无法继续应用的情况。操作会释放同一 Provider/Pool 的活跃申请约束，并同步废止 prepared 计划；不会撤销已经发生的激活。" confirmLabel="确认废止" busy={reviewing} error={error} onClose={() => setSupersedeOpen(false)} onSubmit={supersede} />}
   </main>
 }
 

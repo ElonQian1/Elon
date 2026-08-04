@@ -88,6 +88,30 @@ export interface ComputeActivationApplication {
   offer_effect: 'none'
 }
 
+export interface ComputeActivationQuarantine {
+  schema: string
+  quarantine_id: string
+  application_id: string
+  request_id: string
+  provider_id: string
+  pool_id: string
+  application_digest: string
+  previous_provider_policy_revision: number
+  previous_provider_digest: string
+  quarantined_provider_policy_revision: number
+  quarantined_provider_digest: string
+  capacity_epoch: number
+  pool_lifecycle_event_id: string
+  reason: string
+  quarantine_digest: string
+  quarantined_by_user_id: string
+  quarantined_at: string
+  replayed: boolean
+  provider_effect: 'quarantined'
+  pool_effect: 'quarantined'
+  offer_effect: 'none_direct'
+}
+
 export interface PrepareActivationPlanBody {
   idempotency_key: string
   expected_request_digest: string
@@ -101,6 +125,7 @@ export interface PrepareActivationPlanBody {
 interface ActivationPlanResponse { activation_plan: ComputeActivationPlan | null; activation_effect: 'none' }
 interface ActivationPlanReceipt { plan: ComputeActivationPlan; replayed: boolean; activation_effect: 'none' }
 interface ActivationApplicationResponse { activation_application: ComputeActivationApplication | null }
+interface ActivationQuarantineResponse { activation_quarantine: ComputeActivationQuarantine | null }
 
 function activationBase(requestId: string) {
   return `/api/admin/compute/activation-evidence-requests/${encodeURIComponent(requestId)}`
@@ -129,6 +154,12 @@ export const computeActivationAdminApi = {
       confirm_review: true,
     },
   ),
+  supersede: (requestId: string, expectedRequestDigest: string, reason: string) =>
+    api.post<ComputeActivationEvidenceRequest>(`${activationBase(requestId)}/supersede`, {
+      expected_request_digest: expectedRequestDigest,
+      reason,
+      confirm_supersede: true,
+    }),
   plan: (requestId: string) =>
     api.get<ActivationPlanResponse>(`${activationBase(requestId)}/activation-plan`),
   preparePlan: (requestId: string, body: PrepareActivationPlanBody) =>
@@ -143,4 +174,20 @@ export const computeActivationAdminApi = {
       expected_plan_digest: expectedPlanDigest,
       confirm_apply: true,
     }),
+  quarantine: (requestId: string) =>
+    api.get<ActivationQuarantineResponse>(`${activationBase(requestId)}/activation-plan/application/quarantine`),
+  quarantineApplication: (
+    requestId: string,
+    idempotencyKey: string,
+    expectedApplicationDigest: string,
+    reason: string,
+  ) => api.post<ComputeActivationQuarantine>(
+    `${activationBase(requestId)}/activation-plan/application/quarantine`,
+    {
+      idempotency_key: idempotencyKey,
+      expected_application_digest: expectedApplicationDigest,
+      reason,
+      confirm_quarantine: true,
+    },
+  ),
 }

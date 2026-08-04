@@ -31,7 +31,7 @@ export default function PrepareActivationPlanDialog({ request, busy, error, onCl
     event.preventDefault()
     if (!valid) return
     await onSubmit({
-      idempotency_key: `activation-plan:${request.request_id}:${request.request_digest.slice(0, 12)}`,
+      idempotency_key: `activation-plan:${request.request_digest}`,
       expected_request_digest: request.request_digest,
       endpoint: {
         endpoint_id: endpointId.trim(), transport: transport.trim(),
