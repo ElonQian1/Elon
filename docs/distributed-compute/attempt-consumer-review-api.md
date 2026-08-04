@@ -62,7 +62,7 @@ POST 请求必须提供精确终态候选 ID、候选事件摘要、决定、规
 
 - Cargo 编译、v190 迁移执行、HTTP 真实调用、并发与故障注入验证；
 - 消费者审核 MCP 入口、结果工件真实取回与内容验证；
-- 平台 `observed_usage`、`verified_usage`、独立验证器和 Verification 决定；
+- 平台观测自动接线、`verified_usage`、独立验证器和 Verification 决定；v191 已提供管理员写入的第一份待验证平台观测，见 `docs/distributed-compute/attempt-platform-observation-api.md`；
 - rejected/disputed 的举证、仲裁、超时和追加式裁决流程；
 - Execution Receipt、运行中终态推进、容量消费、扣款与 Provider 收益；
 - 自动重试、替代交付和结算纠正回执。
