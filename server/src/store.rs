@@ -33,6 +33,7 @@ mod compute_activation_quarantines;
 mod compute_activation_requests;
 mod compute_attempt_aborts;
 mod compute_attempt_activations;
+mod compute_attempt_consumer_reviews;
 mod compute_attempt_leases;
 mod compute_attempt_terminals;
 mod compute_attempt_usage;
@@ -256,6 +257,9 @@ pub(crate) use compute_activation_requests::{
 pub(crate) use compute_attempt_aborts::{AbortComputeAttemptRequest, ComputeAttemptAbortReceipt};
 pub(crate) use compute_attempt_activations::{
     ActivateComputeAttemptRequest, ComputeAttemptActivationReceipt,
+};
+pub(crate) use compute_attempt_consumer_reviews::{
+    ComputeAttemptConsumerReviewReceipt, ReviewComputeAttemptTerminalCandidateRequest,
 };
 pub(crate) use compute_attempt_leases::{
     ComputeAttemptLeaseRenewalReceipt, ComputeAttemptLeaseStateReceipt,

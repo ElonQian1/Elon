@@ -13,7 +13,7 @@ use crate::{
     compute_federation_attempt_service::{
         self, AbortMyComputeAttemptRequest, ActivateMyComputeAttemptRequest,
         DeclareMyComputeAttemptTerminalCandidateRequest, DeclareMyComputeAttemptUsageRequest,
-        RenewMyComputeAttemptLeaseRequest,
+        RenewMyComputeAttemptLeaseRequest, ReviewMyComputeAttemptTerminalCandidateRequest,
     },
     project_auth::{auth_from_headers, json_error},
     types::AppState,
@@ -64,6 +64,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/compute/attempt-leases/:lease_id/terminal-candidate",
             get(get_terminal_candidate),
+        )
+        .route(
+            "/api/me/compute/attempt-leases/:lease_id/terminal-candidate/consumer-review",
+            get(get_consumer_review).post(review_terminal_candidate),
         )
 }
 
@@ -271,6 +275,44 @@ async fn get_terminal_candidate(
     };
     attempt_response(
         compute_federation_attempt_service::get_terminal_candidate_for_participant(
+            &state.store,
+            &user_id,
+            &lease_id,
+        ),
+    )
+}
+
+async fn review_terminal_candidate(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+    Json(request): Json<ReviewMyComputeAttemptTerminalCandidateRequest>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::review_terminal_candidate_for_consumer(
+            &state.store,
+            &user_id,
+            &lease_id,
+            request,
+        ),
+    )
+}
+
+async fn get_consumer_review(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::get_consumer_review_for_participant(
             &state.store,
             &user_id,
             &lease_id,

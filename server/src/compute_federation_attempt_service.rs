@@ -3,11 +3,12 @@ use serde::Deserialize;
 
 use crate::store::{
     AbortComputeAttemptRequest, ActivateComputeAttemptRequest, ComputeAttemptAbortReceipt,
-    ComputeAttemptActivationReceipt, ComputeAttemptLeaseRenewalReceipt,
-    ComputeAttemptLeaseStateReceipt, ComputeAttemptTerminalCandidateReceipt,
-    ComputeAttemptUsageDeclarationReceipt, ComputeDeclaredResultArtifactInput,
-    ComputeDeclaredUsageInput, DeclareComputeAttemptTerminalCandidateRequest,
-    DeclareComputeAttemptUsageRequest, RenewComputeAttemptLeaseRequest, Store,
+    ComputeAttemptActivationReceipt, ComputeAttemptConsumerReviewReceipt,
+    ComputeAttemptLeaseRenewalReceipt, ComputeAttemptLeaseStateReceipt,
+    ComputeAttemptTerminalCandidateReceipt, ComputeAttemptUsageDeclarationReceipt,
+    ComputeDeclaredResultArtifactInput, ComputeDeclaredUsageInput,
+    DeclareComputeAttemptTerminalCandidateRequest, DeclareComputeAttemptUsageRequest,
+    RenewComputeAttemptLeaseRequest, ReviewComputeAttemptTerminalCandidateRequest, Store,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -94,6 +95,19 @@ pub(crate) struct DeclareMyComputeAttemptTerminalCandidateRequest {
     pub result_artifacts: Vec<ComputeDeclaredResultArtifactInput>,
     pub idempotency_key: String,
     pub confirm_provider_declaration_only: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReviewMyComputeAttemptTerminalCandidateRequest {
+    pub expected_terminal_candidate_id: String,
+    pub expected_terminal_candidate_event_digest: String,
+    pub decision: String,
+    pub reason_code: String,
+    pub consumer_review_ref: String,
+    pub evidence_refs: Vec<String>,
+    pub idempotency_key: String,
+    pub confirm_consumer_attestation_only: bool,
 }
 
 pub(crate) fn activate_for_provider_owner(
@@ -319,4 +333,35 @@ pub(crate) fn get_terminal_candidate_for_participant(
 ) -> Result<ComputeAttemptTerminalCandidateReceipt> {
     get_for_participant(store, user_id, lease_id)?;
     store.compute_attempt_terminal_candidate(lease_id)
+}
+
+pub(crate) fn review_terminal_candidate_for_consumer(
+    store: &Store,
+    user_id: &str,
+    lease_id: &str,
+    request: ReviewMyComputeAttemptTerminalCandidateRequest,
+) -> Result<ComputeAttemptConsumerReviewReceipt> {
+    if !request.confirm_consumer_attestation_only {
+        bail!("提交终态审核前必须确认该记录只是消费者证据，不是平台验证或结算决定");
+    }
+    store.review_compute_attempt_terminal_candidate(&ReviewComputeAttemptTerminalCandidateRequest {
+        lease_id: lease_id.to_string(),
+        expected_terminal_candidate_id: request.expected_terminal_candidate_id,
+        expected_terminal_candidate_event_digest: request.expected_terminal_candidate_event_digest,
+        decision: request.decision,
+        reason_code: request.reason_code,
+        consumer_review_ref: request.consumer_review_ref,
+        evidence_refs: request.evidence_refs,
+        idempotency_key: request.idempotency_key,
+        reviewed_by_user_id: user_id.to_string(),
+    })
+}
+
+pub(crate) fn get_consumer_review_for_participant(
+    store: &Store,
+    user_id: &str,
+    lease_id: &str,
+) -> Result<ComputeAttemptConsumerReviewReceipt> {
+    get_for_participant(store, user_id, lease_id)?;
+    store.compute_attempt_consumer_review(lease_id)
 }

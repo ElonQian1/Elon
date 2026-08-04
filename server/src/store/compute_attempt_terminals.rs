@@ -252,11 +252,19 @@ impl Store {
         &self,
         lease_id: &str,
     ) -> Result<ComputeAttemptTerminalCandidateReceipt> {
-        support::validate_exact("Attempt Lease ID", lease_id, 200)?;
-        candidate_by_lease_on(&*self.conn()?, lease_id)?
-            .ok_or_else(|| anyhow!("Attempt 尚无终态候选"))?
-            .into_receipt(false)
+        compute_attempt_terminal_candidate_on(&*self.conn()?, lease_id)?
+            .ok_or_else(|| anyhow!("Attempt 尚无终态候选"))
     }
+}
+
+pub(crate) fn compute_attempt_terminal_candidate_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeAttemptTerminalCandidateReceipt>> {
+    support::validate_exact("Attempt Lease ID", lease_id, 200)?;
+    candidate_by_lease_on(conn, lease_id)?
+        .map(|stored| stored.into_receipt(false))
+        .transpose()
 }
 
 fn ensure_live_running_lease(
