@@ -109,6 +109,9 @@ pub(crate) fn is_valid_slot_transition(from: Option<&str>, to: Option<&str>) -> 
                 | (Some(SLOT_VERIFYING), Some(SLOT_STAGED))
                 | (Some(SLOT_STAGED), Some(SLOT_INSTALLED))
                 | (Some(SLOT_INSTALLED), Some(SLOT_REMOVING))
+                | (Some(SLOT_DOWNLOADING), Some(SLOT_REMOVING))
+                | (Some(SLOT_VERIFYING), Some(SLOT_REMOVING))
+                | (Some(SLOT_STAGED), Some(SLOT_REMOVING))
                 | (Some(SLOT_REMOVING), None)
                 | (Some(SLOT_DOWNLOADING), Some(SLOT_FAILED))
                 | (Some(SLOT_VERIFYING), Some(SLOT_FAILED))
@@ -180,7 +183,14 @@ pub(crate) fn local_record_shape_is_valid(record: &ComputePluginLocalRecord) -> 
                 .any(|slot| &slot.slot_ref == wanted && slot.phase == phase)
         })
     };
-    slot_with_phase(&record.active_slot_ref, SLOT_INSTALLED)
+    let transient_slots_are_owned = record.slots.iter().all(|slot| {
+        !matches!(
+            slot.phase.as_str(),
+            SLOT_DOWNLOADING | SLOT_VERIFYING | SLOT_STAGED
+        ) || record.candidate_slot_ref.as_deref() == Some(slot.slot_ref.as_str())
+    });
+    transient_slots_are_owned
+        && slot_with_phase(&record.active_slot_ref, SLOT_INSTALLED)
         && record.candidate_slot_ref.as_ref().is_none_or(|wanted| {
             record.slots.iter().any(|slot| {
                 &slot.slot_ref == wanted
