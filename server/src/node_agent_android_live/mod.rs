@@ -93,6 +93,8 @@ mod design_diff_regions_tests;
 #[cfg(test)]
 mod design_targets_tests;
 #[cfg(test)]
+mod design_workflow_contract_tests;
+#[cfg(test)]
 mod mcp_tests;
 #[cfg(test)]
 mod source_commit_tests;
