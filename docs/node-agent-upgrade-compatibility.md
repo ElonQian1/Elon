@@ -50,6 +50,8 @@
 21. 项目记忆生命周期与 Memory CI 必须向后兼容：旧 manifest/建议/SQLite 候选缺少 `owner`、`scope`、`review` 或 `expires_at` 时使用 serde 默认值继续读取，规范化时空 scope 降级为 repository；不得因为升级而批量改写旧 manifest。缺失治理字段只由 advisory health 标记，`fail_on_drift` 只对证据漂移和过期给出失败建议，只有调用方显式选择 `strict` 才把复核逾期、治理缺口或共享事实冲突纳入失败。旧 health 响应缺少 v2 计数、repair plan、capabilities 或 policy outcome 时 PC 按零值/隐藏处理，候选审核仍可用。
 22. 本机发布激活器只能把由正式安装路径 `LocalAppData\ElonNode\一龙开发平台.exe` 持有的 loopback Admin listener 作为安装节点；读取 `/api/status` 后必须再次确认同端口仍由同一 PID 和安装路径持有。调试节点、隔离候选、release fixture 或其它端口即使回报目标 `release_identity`，也不得把正式发布状态推进为 `activated`，不得跳过 repair、精确 health check 或 rollback。正式 listener 缺失、所有权变化或路径无法读取时保持 `status_unavailable` 并失败关闭。
 
+2026-08-05 正式发布复验已覆盖本条合同：7800 候选节点在线且回报目标身份时，激活帮助程序仍选中 7799 正式安装 listener；关闭桌面壳后发布从 `0.3.69+067ec391…` 激活到 `0.3.69+e30818e6…`，状态为 `activated`、`rollback_state=not_required`。重开桌面壳后只有一个安装目录 `elon-desktop.exe`，7799 仍由安装目录 `一龙开发平台.exe` 持有并保持目标 `build_git_sha`、`release_identity` 和云连接。
+
 ## 配置与缓存迁移合同
 
 升级读取旧版 `node.json` 时：
