@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, Bot, Boxes, CircleDollarSign, ClipboardCheck, FileCheck2, Gauge, GitBranch, HardDrive, Landmark, MonitorCog, PackageCheck, Radar, Search, ShieldCheck, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
+import { Activity, Bot, Boxes, CircleDollarSign, ClipboardCheck, FileCheck2, Gauge, GitBranch, HardDrive, Landmark, MonitorCog, PackageCheck, Radar, ReceiptText, Search, ShieldCheck, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -56,6 +56,10 @@ const VERIFICATION_ITEM: RailItem = {
   path: '/compute-verification', Icon: ShieldCheck, label: '算力验证', color: '#29352f', hoverColor: '#35483e',
 }
 
+const RECEIPT_ITEM: RailItem = {
+  path: '/compute-receipts', Icon: ReceiptText, label: '执行回执', color: '#373226', hoverColor: '#4a4331',
+}
+
 export default function ServerRail() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -64,7 +68,7 @@ export default function ServerRail() {
   const presence = useMyPresence(!localMode)
   const [tooltip, setTooltip] = useState<{ text: string; y: number } | null>(null)
   const railItems = user && ['admin', 'owner'].includes(user.role ?? '')
-    ? [...RAIL_ITEMS, ACTIVATION_ITEM, OFFER_ITEM, OBSERVATION_ITEM, VERIFICATION_ITEM, SETTLEMENT_ITEM]
+    ? [...RAIL_ITEMS, ACTIVATION_ITEM, OFFER_ITEM, OBSERVATION_ITEM, VERIFICATION_ITEM, RECEIPT_ITEM, SETTLEMENT_ITEM]
     : RAIL_ITEMS
 
   // 项目列表（从 store 读取，实时响应）
