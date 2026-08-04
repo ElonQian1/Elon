@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-激活证据申请的 v177 状态机、本人 HTTP/MCP 控制面和管理员 HTTP 审核队列已写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
+激活证据申请的 v177 状态机、v178 过期批准废止审计、本人 HTTP/MCP 控制面和管理员 HTTP 审核队列已写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
 
 这套控制面只记录“供给者提交了哪些证据摘要、审核人作出了什么决定”。`approved` 只表示当前证据包通过人工审核，`activation_effect` 始终为 `none`；它不会把 Provider 或 CapacityPool 改为 active，不会写入 verified 硬件事实，不会配置路由、发布 Offer、开放预留或移动资金。
 
@@ -59,6 +59,7 @@ implementation_status: implementation_uncompiled
 | GET | `/api/admin/compute/activation-evidence-requests?status=submitted&limit=20` | `admin/owner` 按状态读取审核队列 |
 | POST | `/api/admin/compute/activation-evidence-requests/:request_id/review` | 以当前申请摘要、决定和显式确认执行审核 |
 | GET | `/api/admin/compute/activation-evidence-requests/:request_id/preflight` | `admin/owner` 只读检查后续激活条件 |
+| POST | `/api/admin/compute/activation-evidence-requests/:request_id/supersede` | 以当前摘要、原因和显式确认废止过期 approved 申请 |
 
 决定只支持 `approved`、`changes_requested` 或 `rejected`。退回和拒绝必须填写说明；只有 `submitted` 可以审核。批准时如果 Provider/Pool 所有权、状态、版本或账本审计发生变化，服务端失败关闭，要求供给者重新提交。
 
@@ -74,11 +75,13 @@ implementation_status: implementation_uncompiled
 - 本人只能把 `submitted` 改为 `canceled`，并必须提供当前 `request_digest`。
 - 管理员审核使用 `request_digest` 比较交换，申请内容或状态并发变化时拒绝覆盖。
 - `changes_requested`、`rejected` 和 `canceled` 结束当前申请；用户可使用新幂等键重新提交。
-- `activated` 与 `superseded` 仅为后续生命周期保留，当前控制面没有进入这两个状态的入口。
+- 当 `approved` 因 Provider/Pool 版本或其他依赖变化而不再可用时，平台 `admin/owner` 可显式执行 `approved -> superseded`。操作要求当前 `request_digest`、非空原因和 `confirm_supersede=true`，保留原审核字段，并另存废止时间、执行人和原因；相同执行人和原因可幂等重放。
+- `superseded` 会释放同一 Provider/Pool 的活跃申请唯一约束，使用户可以基于当前版本重新提交；它不撤销任何已发生的激活，因为当前没有激活执行入口。
+- `activated` 仍只为后续生命周期保留，当前控制面没有进入该状态的入口。
 
 ## 8. 尚未实现
 
-- Cargo 编译、v177 迁移执行、并发和 HTTP/MCP 真实调用验证；
+- Cargo 编译、v177-v178 迁移执行、并发和 HTTP/MCP 真实调用验证；
 - 节点绑定引用、ReadyCapability、路由证明和硬件观测的真实采集与密码学验证；
 - 审核员查看原始证据工件、签名链和挑战任务的界面；
 - approved 之后受控激活 Provider/Pool 的独立状态迁移；
