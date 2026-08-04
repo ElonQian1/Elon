@@ -262,6 +262,7 @@
     "docs/distributed-compute/attempt-finalization-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-settlement-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-settlement-challenge-api.md": "custom:distributed-compute",
+    "docs/distributed-compute/attempt-settlement-challenge-resolution-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-lease-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-terminal-candidate-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-usage-api.md": "custom:distributed-compute",
@@ -414,6 +415,7 @@
     "docs/distributed-compute/attempt-finalization-api.md": "current",
     "docs/distributed-compute/attempt-settlement-api.md": "current",
     "docs/distributed-compute/attempt-settlement-challenge-api.md": "current",
+    "docs/distributed-compute/attempt-settlement-challenge-resolution-api.md": "current",
     "docs/distributed-compute/attempt-lease-api.md": "current",
     "docs/distributed-compute/attempt-terminal-candidate-api.md": "current",
     "docs/distributed-compute/attempt-usage-api.md": "current",
@@ -872,6 +874,8 @@
         "file:server/src/compute_attempt_settlement_migration.rs",
         "file:server/src/store/compute_attempt_settlement_challenges.rs",
         "file:server/src/compute_settlement_challenge_migration.rs",
+        "file:server/src/store/compute_attempt_settlement_challenge_resolutions.rs",
+        "file:server/src/compute_settlement_challenge_resolution_migration.rs",
         "file:server/src/node_agent_compute_plugin_host/mod.rs",
         "file:server/src/node_compute_sharing.rs"
       ],
@@ -887,6 +891,7 @@
         "docs/distributed-compute/attempt-finalization-api.md",
         "docs/distributed-compute/attempt-settlement-api.md",
         "docs/distributed-compute/attempt-settlement-challenge-api.md",
+        "docs/distributed-compute/attempt-settlement-challenge-resolution-api.md",
         "docs/distributed-compute/attempt-terminal-candidate-api.md",
         "docs/distributed-compute/attempt-usage-api.md",
         "docs/distributed-compute/capacity-ledger.md",
@@ -962,6 +967,8 @@
         "file:server/src/compute_attempt_settlement_migration.rs",
         "file:server/src/store/compute_attempt_settlement_challenges.rs",
         "file:server/src/compute_settlement_challenge_migration.rs",
+        "file:server/src/store/compute_attempt_settlement_challenge_resolutions.rs",
+        "file:server/src/compute_settlement_challenge_resolution_migration.rs",
         "file:server/src/node_agent_compute_plugin_host/runner_events.rs",
         "file:server/src/node_router.rs"
       ],
@@ -971,6 +978,7 @@
         "docs/distributed-compute/capacity-ledger.md",
         "docs/distributed-compute/attempt-settlement-api.md",
         "docs/distributed-compute/attempt-settlement-challenge-api.md",
+        "docs/distributed-compute/attempt-settlement-challenge-resolution-api.md",
         "docs/system-architecture.md"
       ]
     },
@@ -1238,6 +1246,35 @@
       ],
       "related": [
         "docs/distributed-compute/attempt-settlement-api.md",
+        "docs/distributed-compute/attempt-settlement-challenge-resolution-api.md",
+        "docs/distributed-compute/market-and-settlement.md"
+      ]
+    },
+    "docs/distributed-compute/attempt-settlement-challenge-resolution-api.md": {
+      "doc_type": "api_contract",
+      "audience": [
+        "后端开发者",
+        "结算开发者",
+        "AI 代理"
+      ],
+      "owner": "算力市场与结算",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 30,
+      "implementation_refs": [
+        "file:server/src/store/compute_attempt_settlement_challenge_resolutions.rs",
+        "file:server/src/store/compute_attempt_settlement_challenge_resolutions/support.rs",
+        "file:server/src/store/compute_attempt_settlement_challenge_resolutions/support/audit.rs",
+        "file:server/src/compute_settlement_challenge_resolution_migration.rs",
+        "file:server/src/compute_federation_attempt_settlement_challenge_resolution_service.rs",
+        "file:server/src/compute_federation_attempt_settlement_challenge_resolution_api.rs",
+        "route:POST /api/me/compute/attempt-leases/:lease_id/settlement-challenge/withdrawal",
+        "route:GET /api/me/compute/attempt-leases/:lease_id/settlement-challenge/resolution",
+        "route:POST /api/admin/compute/attempt-leases/:lease_id/settlement-challenge/resolution",
+        "route:GET /api/admin/compute/attempt-leases/:lease_id/settlement-challenge/resolution"
+      ],
+      "related": [
+        "docs/distributed-compute/attempt-settlement-challenge-api.md",
+        "docs/distributed-compute/attempt-settlement-api.md",
         "docs/distributed-compute/market-and-settlement.md"
       ]
     },
@@ -1269,6 +1306,7 @@
         "docs/distributed-compute/architecture.md",
         "docs/distributed-compute/attempt-finalization-api.md",
         "docs/distributed-compute/attempt-settlement-challenge-api.md",
+        "docs/distributed-compute/attempt-settlement-challenge-resolution-api.md",
         "docs/distributed-compute/market-and-settlement.md"
       ]
     },
@@ -1318,6 +1356,8 @@
         "file:server/src/compute_attempt_settlement_migration.rs",
         "file:server/src/store/compute_attempt_settlement_challenges.rs",
         "file:server/src/compute_settlement_challenge_migration.rs",
+        "file:server/src/store/compute_attempt_settlement_challenge_resolutions.rs",
+        "file:server/src/compute_settlement_challenge_resolution_migration.rs",
         "file:server/src/compute_federation/receipts.rs"
       ],
       "related": [
@@ -1327,6 +1367,7 @@
         "docs/distributed-compute/attempt-finalization-api.md",
         "docs/distributed-compute/attempt-settlement-api.md",
         "docs/distributed-compute/attempt-settlement-challenge-api.md",
+        "docs/distributed-compute/attempt-settlement-challenge-resolution-api.md",
         "docs/decisions/task-shadow-settlement-v1.md"
       ]
     },
@@ -2614,6 +2655,13 @@
   },
   "audit_log": [
     {
+      "id": "distributed-compute-attempt-settlement-challenge-resolution-v197-20260804",
+      "action": "document.knowledge_graph.update",
+      "target": ".elon/document-sections.json",
+      "summary": "登记 implementation_uncompiled 的 v197 挑战撤回、管理员接受或驳回及释放门卫终态，并保留纠正、pending 释放、提现和外部资金缺口",
+      "at": "2026-08-04T16:20:00Z"
+    },
+    {
       "id": "distributed-compute-attempt-settlement-challenge-v196-20260804",
       "action": "document.knowledge_graph.update",
       "target": ".elon/document-sections.json",
@@ -2828,7 +2876,7 @@
         "view": "capabilities",
         "kind": "planned_capability",
         "label": "任务级算力联邦 V1",
-        "detail": "云端领域合同、v165-v196 schema、隔离 Capacity Store、Provider/Offer/Price Snapshot/Job/Reservation Registry、平台人民币余额 Broker、Attempt 证据链、可信终态、容量收口、CNY 待结算回执与消费者挑战已写入且未编译；外部 Provider、真实派发、自动可信事件、挑战裁决、pending 释放/提现和外部资金清算尚未实现",
+        "detail": "云端领域合同、v165-v197 schema、隔离 Capacity Store、Provider/Offer/Price Snapshot/Job/Reservation Registry、平台人民币余额 Broker、Attempt 证据链、可信终态、容量收口、CNY 待结算回执、消费者挑战与终态决议已写入且未编译；外部 Provider、真实派发、自动可信事件、纠正、pending 释放/提现和外部资金清算尚未实现",
         "parent_id": "cap-distributed-compute",
         "order": 20,
         "color": "#48A889",
@@ -2846,6 +2894,7 @@
           "docs/distributed-compute/attempt-finalization-api.md",
           "docs/distributed-compute/attempt-settlement-api.md",
           "docs/distributed-compute/attempt-settlement-challenge-api.md",
+          "docs/distributed-compute/attempt-settlement-challenge-resolution-api.md",
           "docs/distributed-compute/attempt-terminal-candidate-api.md",
           "docs/distributed-compute/attempt-usage-api.md",
           "docs/distributed-compute/broker-api.md",
@@ -2898,6 +2947,9 @@
           "file:server/src/store/compute_attempt_settlement_challenges.rs",
           "file:server/src/compute_settlement_challenge_migration.rs",
           "file:server/src/compute_federation_attempt_settlement_challenge_api.rs",
+          "file:server/src/store/compute_attempt_settlement_challenge_resolutions.rs",
+          "file:server/src/compute_settlement_challenge_resolution_migration.rs",
+          "file:server/src/compute_federation_attempt_settlement_challenge_resolution_api.rs",
           "file:server/src/node_agent_compute_plugin_host/attempt_contract.rs"
         ],
         "tags": [
@@ -2912,7 +2964,7 @@
         "view": "capabilities",
         "kind": "planned_capability",
         "label": "算力期货锁价与结算",
-        "detail": "标准 Compute SKU、期货交付窗口、v171 不可变 Price Snapshot Registry、v195 CNY 基础组件待结算回执与 v196 消费者挑战已写且未编译；真实价格源、复杂费用、挑战裁决、pending 释放/提现、持仓与外部清算仍是目标市场",
+        "detail": "标准 Compute SKU、期货交付窗口、v171 不可变 Price Snapshot Registry、v195 CNY 基础组件待结算回执及 v196/v197 消费者挑战与决议已写且未编译；真实价格源、复杂费用、纠正、pending 释放/提现、持仓与外部清算仍是目标市场",
         "parent_id": "cap-distributed-compute",
         "order": 30,
         "color": "#D0A34F",
@@ -2921,6 +2973,7 @@
           "docs/distributed-compute/market-and-settlement.md",
           "docs/distributed-compute/attempt-settlement-api.md",
           "docs/distributed-compute/attempt-settlement-challenge-api.md",
+          "docs/distributed-compute/attempt-settlement-challenge-resolution-api.md",
           "docs/decisions/distributed-compute-federation-v1.md"
         ],
         "implementation_refs": [
@@ -2932,7 +2985,9 @@
           "file:server/src/store/compute_attempt_settlements.rs",
           "file:server/src/compute_attempt_settlement_migration.rs",
           "file:server/src/store/compute_attempt_settlement_challenges.rs",
-          "file:server/src/compute_settlement_challenge_migration.rs"
+          "file:server/src/compute_settlement_challenge_migration.rs",
+          "file:server/src/store/compute_attempt_settlement_challenge_resolutions.rs",
+          "file:server/src/compute_settlement_challenge_resolution_migration.rs"
         ],
         "tags": [
           "planned",
@@ -2946,7 +3001,7 @@
         "view": "architecture",
         "kind": "component",
         "label": "算力联邦领域合同",
-        "detail": "未编译未运行的 Provider、Offer、Workload、Job、Reservation、Lease、容量、价格和回执模型；版本化 Registry、平台人民币余额 Broker、Attempt 证据链、可信终态、容量收口、CNY 待结算回执与消费者挑战已写，真实派发、自动可信事件、挑战裁决、pending 释放/提现和外部资金清算尚缺",
+        "detail": "未编译未运行的 Provider、Offer、Workload、Job、Reservation、Lease、容量、价格和回执模型；版本化 Registry、平台人民币余额 Broker、Attempt 证据链、可信终态、容量收口、CNY 待结算回执、消费者挑战与终态决议已写，真实派发、自动可信事件、纠正、pending 释放/提现和外部资金清算尚缺",
         "parent_id": "arch-server",
         "order": 35,
         "color": "#48A889",
@@ -2961,6 +3016,7 @@
           "docs/distributed-compute/attempt-finalization-api.md",
           "docs/distributed-compute/attempt-settlement-api.md",
           "docs/distributed-compute/attempt-settlement-challenge-api.md",
+          "docs/distributed-compute/attempt-settlement-challenge-resolution-api.md",
           "docs/distributed-compute/attempt-terminal-candidate-api.md",
           "docs/distributed-compute/attempt-usage-api.md",
           "docs/distributed-compute/broker-api.md"
@@ -2999,7 +3055,9 @@
           "file:server/src/store/compute_attempt_settlements.rs",
           "file:server/src/compute_attempt_settlement_migration.rs",
           "file:server/src/store/compute_attempt_settlement_challenges.rs",
-          "file:server/src/compute_settlement_challenge_migration.rs"
+          "file:server/src/compute_settlement_challenge_migration.rs",
+          "file:server/src/store/compute_attempt_settlement_challenge_resolutions.rs",
+          "file:server/src/compute_settlement_challenge_resolution_migration.rs"
         ],
         "tags": [
           "contract",
@@ -3012,7 +3070,7 @@
         "view": "architecture",
         "kind": "planned_component",
         "label": "共享算力容量池与账本 V1",
-        "detail": "单池单窗口、跨 Offer 共享余额、多 meter Claim、六账户 reducer、v165-v196 schema、事务内 Claim kernel、审计恢复、Broker、Attempt 证据链、可信终态容量收口、独立 CNY pending 结算账本及消费者挑战门卫已写且未编译；通用 Claim 不可变首次响应、自动可信事件、挑战裁决、pending 释放/提现与运行接线尚未实现",
+        "detail": "单池单窗口、跨 Offer 共享余额、多 meter Claim、六账户 reducer、v165-v197 schema、事务内 Claim kernel、审计恢复、Broker、Attempt 证据链、可信终态容量收口、独立 CNY pending 结算账本、消费者挑战及终态门卫已写且未编译；通用 Claim 不可变首次响应、自动可信事件、纠正、pending 释放/提现与运行接线尚未实现",
         "parent_id": "arch-server",
         "order": 36,
         "color": "#D0A34F",

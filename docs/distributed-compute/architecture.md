@@ -71,7 +71,7 @@ Provider 发布的不可变版本，包含支持的任务类型、模型/工件�
 
 共享 CapacityPool 和追加式容量账本已经成为已接受设计，权威决定见 `docs/decisions/distributed-compute-capacity-ledger-v1.md`，完整对象与事务边界见 `docs/distributed-compute/capacity-ledger.md`。CapacityPool 表达会互相争用的物理资源边界，不保存实时余额；同一物理资源的全部 Offer 必须绑定同一 pool/epoch/bucket，防止跨模型、SKU 或销售渠道重复出售。
 
-V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v196 SQLite schema，以及容量、Provider、Offer、Price Snapshot、Job、Reservation 和 Attempt v185-v196 Store 已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker；v185-v193 形成激活与多方证据；v194 原子推进可信终态并收口容量；v195 结清消费者 CNY 预授权并登记 Provider/平台 pending 收益；v196 只增加固定 72 小时消费者挑战门卫，尚无裁决、释放、提现或外部资金效果。本人 HTTP/MCP 可生成 fallback_curve 快照但未运行，真实价格源和完整节点运行协议仍未实现。
+V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v197 SQLite schema，以及容量、Provider、Offer、Price Snapshot、Job、Reservation 和 Attempt v185-v197 Store 已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker；v185-v194 形成证据、可信终态与容量收口；v195 结清消费者 CNY 预授权并登记 Provider/平台 pending 收益；v196/v197 增加固定 72 小时消费者挑战与终态决议门卫，尚无纠正、释放、提现或外部资金效果。
 
 ### WorkloadSpec
 
@@ -117,7 +117,7 @@ v193 仅把 accepted v192 与 Attempt 激活、Job/Reservation 历史、运行�
 
 v194 仅接受由 accepted Verification 签发的精确 v193 Execution Receipt，并在单一事务内应用可信终态与容量收口。consumable meter 的 compensable usage 进入 consumed、余量归还 available；reusable meter 全量归还但仍保留可结算用量。Job 停在 `verification_pending`，消费者预授权和 Provider 收益不变。
 
-v195 以 v194/v193 和不可变 Price Snapshot 为输入，在单一事务内按 verified usage 结清消费者 CNY 预授权、按 compensable usage 登记 Provider pending 收益、退回未用余额并把 Job 推进 `settled`。首版拒绝非空 `fee_rules`；Provider/平台 pending 账本与现有消费者余额分离。v196 允许消费者在固定 72 小时内追加一份结算挑战，挑战只阻断未来释放，不撤销结算、不退款、不裁决或移动余额。
+v195 以 v194/v193 和不可变 Price Snapshot 为输入，在单一事务内按 verified usage 结清消费者 CNY 预授权、按 compensable usage 登记 Provider pending 收益、退回未用余额并把 Job 推进 `settled`。首版拒绝非空 `fee_rules`；Provider/平台 pending 账本与现有消费者余额分离。v196 允许消费者在固定 72 小时内追加一份结算挑战；v197 允许原消费者撤回或管理员接受/驳回。`open/accepted` 继续阻断未来释放，`withdrawn/rejected` 解除挑战门卫，但不撤销结算、不退款或移动余额。
 
 ### PriceSnapshot 与 SettlementReceipt
 
@@ -183,4 +183,4 @@ Adapter 必须把外部错误归一为稳定错误码，并保存原始 Provider
 
 ## 9. 当前未验证声明
 
-本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；Provider/Offer、Attempt command/events、CapacityPool、Claim/Reservation、账本 reducer、Broker Reserve/Finish、v185-v196 Attempt 激活/证据/Verification/Execution Receipt/可信终态/容量收口/待结算回执/挑战、登录用户 HTTP 控制面和 v165-v196 schema 都尚未编译或运行验证，数据库迁移也未执行。文档、合同、路由或 migration 文件存在不代表运行时已经采用这些能力。
+本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；Provider/Offer、Attempt command/events、CapacityPool、Claim/Reservation、账本 reducer、Broker Reserve/Finish、v185-v197 Attempt 激活/证据/Verification/Execution Receipt/可信终态/容量收口/待结算回执/挑战/决议、登录用户 HTTP 控制面和 v165-v197 schema 都尚未编译或运行验证，数据库迁移也未执行。文档、合同、路由或 migration 文件存在不代表运行时已经采用这些能力。

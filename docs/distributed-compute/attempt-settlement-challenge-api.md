@@ -44,7 +44,7 @@ POST 必须精确绑定 v195 Settlement Receipt、posting、Lease、Job 与消�
 - Job、Reservation、Lease、Claim 或 Execution Receipt；
 - 外部银行、支付机构、钱包、Sui 或矿池状态。
 
-当前的唯一经济效果是：v196 查询能证明该 Settlement Receipt 存在未解决挑战，后续 pending 释放实现必须先调用该门卫并失败关闭。
+当前的唯一经济效果是：v196 查询能证明该 Settlement Receipt 存在挑战，后续 pending 释放实现必须结合 v197 决议门卫判断是否失败关闭。决议合同见 `docs/distributed-compute/attempt-settlement-challenge-resolution-api.md`。
 
 ## 5. 审计
 
@@ -53,8 +53,6 @@ POST 必须精确绑定 v195 Settlement Receipt、posting、Lease、Job 与消�
 ## 6. 尚未实现
 
 - Cargo 编译、v196 迁移执行、HTTP 真实调用、并发和故障注入验证；
-- 消费者撤回挑战；
-- 平台接受或驳回挑战；
 - 纠正、退款、冲正与替换 Settlement Receipt；
 - 挑战期届满后的 pending 自动释放；
 - Provider 可用余额、提现与真实外部资金清算。
