@@ -10,15 +10,43 @@ use axum::{
 use serde_json::json;
 
 use crate::{
-    compute_federation_capacity_supply_service::{self, AddMyComputeCapacitySupplyRequest},
+    compute_federation_capacity_supply_service::{
+        self, AddMyComputeCapacitySupplyRequest, WithdrawMyComputeCapacitySupplyRequest,
+    },
     project_auth::{auth_from_headers, json_error},
     types::AppState,
 };
 
 pub(crate) fn routes() -> Router<Arc<AppState>> {
-    Router::new().route(
-        "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/supply",
-        post(add_supply),
+    Router::new()
+        .route(
+            "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/supply",
+            post(add_supply),
+        )
+        .route(
+            "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/supply/withdraw",
+            post(withdraw_supply),
+        )
+}
+
+async fn withdraw_supply(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, pool_id)): Path<(String, String)>,
+    Json(request): Json<WithdrawMyComputeCapacitySupplyRequest>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    supply_response(
+        compute_federation_capacity_supply_service::withdraw_for_user(
+            &state.store,
+            &user_id,
+            &provider_id,
+            &pool_id,
+            request,
+        ),
     )
 }
 

@@ -36,7 +36,10 @@ pub(super) fn ensure_pool_operation_allowed_on(
         }
         ComputeCapacityPoolOperation::HoldClaim => status == "active",
         ComputeCapacityPoolOperation::WithdrawSupply => {
-            matches!(status.as_str(), "active" | "draining" | "quarantined")
+            matches!(
+                status.as_str(),
+                "registering" | "active" | "draining" | "quarantined"
+            )
         }
     };
     if !allowed {

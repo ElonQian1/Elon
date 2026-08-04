@@ -15,7 +15,7 @@ use crate::{
     compute_federation_capacity_pool_service,
     store::{
         AddComputeCapacitySupply, AddComputeCapacitySupplyLine, ComputeCapacityLedgerWriteReceipt,
-        Store,
+        Store, WithdrawComputeCapacitySupply, WithdrawComputeCapacitySupplyLine,
     },
 };
 
@@ -30,6 +30,21 @@ pub(crate) struct AddMyComputeCapacitySupplyRequest {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AddMyComputeCapacitySupplyLineRequest {
+    pub bucket_id: String,
+    pub quantity_units: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WithdrawMyComputeCapacitySupplyRequest {
+    pub idempotency_key: String,
+    pub lines: Vec<WithdrawMyComputeCapacitySupplyLineRequest>,
+    pub confirm_withdrawal: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WithdrawMyComputeCapacitySupplyLineRequest {
     pub bucket_id: String,
     pub quantity_units: i64,
 }
@@ -104,6 +119,67 @@ pub(crate) fn add_for_user(
     }
 }
 
+pub(crate) fn withdraw_for_user(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    pool_id: &str,
+    request: WithdrawMyComputeCapacitySupplyRequest,
+) -> Result<ComputeCapacityLedgerWriteReceipt> {
+    if !request.confirm_withdrawal {
+        bail!("撤出容量供给前必须显式确认 confirm_withdrawal=true");
+    }
+    validate_bounded("容量撤出幂等键", &request.idempotency_key, 160)?;
+    if request.lines.is_empty() || request.lines.len() > 64 {
+        bail!("容量撤出明细数量必须在 1 到 64 之间");
+    }
+    let pool = compute_federation_capacity_pool_service::owned_pool_for_user(
+        store,
+        user_id,
+        provider_id,
+        pool_id,
+    )?;
+    let (delivery_window, lines) = validated_withdrawal_lines(store, &pool.binding, request.lines)?;
+    let idempotency_scope = withdrawal_scope(user_id, &pool.binding.pool_id)?;
+    let existing_occurred_at = store.compute_capacity_supply_withdrawal_occurred_at(
+        &idempotency_scope,
+        &request.idempotency_key,
+    )?;
+    let occurred_at = existing_occurred_at
+        .clone()
+        .unwrap_or_else(|| Utc::now().to_rfc3339());
+    let input = WithdrawComputeCapacitySupply {
+        pool: pool.binding,
+        delivery_window,
+        subject_kind: "compute_provider_owner".to_string(),
+        subject_id: user_id.to_string(),
+        idempotency_scope: idempotency_scope.clone(),
+        idempotency_key: request.idempotency_key.clone(),
+        lines,
+        occurred_at,
+    };
+    let mut concurrent_retry = input.clone();
+    match store.withdraw_compute_capacity_supply(input) {
+        Ok(receipt) => Ok(receipt),
+        Err(first_error) => {
+            let Some(stored_occurred_at) = store.compute_capacity_supply_withdrawal_occurred_at(
+                &idempotency_scope,
+                &request.idempotency_key,
+            )?
+            else {
+                return Err(first_error);
+            };
+            if concurrent_retry.occurred_at == stored_occurred_at {
+                return Err(first_error);
+            }
+            concurrent_retry.occurred_at = stored_occurred_at;
+            store
+                .withdraw_compute_capacity_supply(concurrent_retry)
+                .context("容量撤出并发首写后幂等重放失败")
+        }
+    }
+}
+
 fn validated_supply_lines(
     store: &Store,
     pool: &ComputeCapacityPoolBinding,
@@ -162,6 +238,54 @@ fn validated_supply_lines(
     ))
 }
 
+fn validated_withdrawal_lines(
+    store: &Store,
+    pool: &ComputeCapacityPoolBinding,
+    requests: Vec<WithdrawMyComputeCapacitySupplyLineRequest>,
+) -> Result<(
+    ComputeDeliveryWindowBinding,
+    Vec<WithdrawComputeCapacitySupplyLine>,
+)> {
+    let mut bucket_ids = BTreeSet::new();
+    let mut delivery_window = None;
+    let mut lines = Vec::with_capacity(requests.len());
+    for request in requests {
+        validate_bounded("容量 bucket ID", &request.bucket_id, 160)?;
+        if !bucket_ids.insert(request.bucket_id.clone()) {
+            bail!("同一容量撤出请求不能重复 bucket");
+        }
+        if request.quantity_units <= 0 {
+            bail!("容量撤出数量必须为正整数");
+        }
+        let bucket = store.compute_capacity_bucket(&request.bucket_id)?;
+        if bucket.balance.binding.pool != *pool {
+            bail!("容量撤出 bucket 不属于当前 Pool 版本");
+        }
+        if bucket.balance.status != ComputeCapacityBucketStatus::Open {
+            bail!("容量撤出只能作用于 open bucket");
+        }
+        if request.quantity_units % bucket.balance.binding.quantum_units != 0 {
+            bail!("容量撤出数量必须是 bucket 最小量子的整数倍");
+        }
+        match &delivery_window {
+            Some(current) if current != &bucket.balance.binding.delivery_window => {
+                bail!("一次容量撤出的全部 bucket 必须属于同一交付窗口");
+            }
+            None => delivery_window = Some(bucket.balance.binding.delivery_window.clone()),
+            _ => {}
+        }
+        lines.push(WithdrawComputeCapacitySupplyLine {
+            bucket_id: request.bucket_id,
+            quantity_units: request.quantity_units,
+        });
+    }
+    lines.sort_by(|left, right| left.bucket_id.cmp(&right.bucket_id));
+    Ok((
+        delivery_window.ok_or_else(|| anyhow::anyhow!("容量撤出缺少交付窗口"))?,
+        lines,
+    ))
+}
+
 fn ensure_window_open(ends_at_utc: &str) -> Result<()> {
     let ends = DateTime::parse_from_rfc3339(ends_at_utc).context("交付窗口结束时间无效")?;
     if ends.with_timezone(&Utc) <= Utc::now() {
@@ -178,6 +302,18 @@ fn supply_scope(user_id: &str, pool_id: &str) -> Result<String> {
     }))?;
     Ok(format!(
         "compute_owner_supply:{}",
+        hex::encode(Sha256::digest(payload))
+    ))
+}
+
+fn withdrawal_scope(user_id: &str, pool_id: &str) -> Result<String> {
+    let payload = serde_json::to_vec(&json!({
+        "schema":"compute_federation.owner_supply_withdrawal_scope.v1",
+        "user_id":user_id,
+        "pool_id":pool_id,
+    }))?;
+    Ok(format!(
+        "compute_owner_supply_withdrawal:{}",
         hex::encode(Sha256::digest(payload))
     ))
 }

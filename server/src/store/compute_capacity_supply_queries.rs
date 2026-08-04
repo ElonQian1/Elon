@@ -9,8 +9,36 @@ impl Store {
         idempotency_scope: &str,
         idempotency_key: &str,
     ) -> Result<Option<String>> {
+        self.compute_capacity_event_occurred_at(
+            idempotency_scope,
+            idempotency_key,
+            "supply_added",
+            "容量发行",
+        )
+    }
+
+    pub(crate) fn compute_capacity_supply_withdrawal_occurred_at(
+        &self,
+        idempotency_scope: &str,
+        idempotency_key: &str,
+    ) -> Result<Option<String>> {
+        self.compute_capacity_event_occurred_at(
+            idempotency_scope,
+            idempotency_key,
+            "supply_withdrawn",
+            "容量撤出",
+        )
+    }
+
+    fn compute_capacity_event_occurred_at(
+        &self,
+        idempotency_scope: &str,
+        idempotency_key: &str,
+        expected_event_kind: &str,
+        operation_label: &str,
+    ) -> Result<Option<String>> {
         if idempotency_scope.trim().is_empty() || idempotency_key.trim().is_empty() {
-            bail!("容量发行幂等范围和键不能为空");
+            bail!("{operation_label}幂等范围和键不能为空");
         }
         let stored = self
             .conn()?
@@ -23,8 +51,8 @@ impl Store {
             )
             .optional()?;
         match stored {
-            Some((event_kind, _)) if event_kind != "supply_added" => {
-                bail!("容量发行幂等键已被其他账本事件使用")
+            Some((event_kind, _)) if event_kind != expected_event_kind => {
+                bail!("{operation_label}幂等键已被其他账本事件使用")
             }
             Some((_, occurred_at)) => Ok(Some(occurred_at)),
             None => Ok(None),
