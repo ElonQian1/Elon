@@ -48,6 +48,7 @@ mod compute_offer_registry;
 mod compute_price_snapshot_registry;
 mod compute_price_snapshot_validation;
 mod compute_provider_registry;
+mod compute_quote_candidates;
 mod compute_reservation_contract_validation;
 mod compute_reservation_registry;
 mod conversation_forks;
@@ -258,6 +259,7 @@ pub use compute_metering::ComputeMeterEvent;
 pub(crate) use compute_offer_registry::ComputeOfferRegistrationReceipt;
 pub(crate) use compute_price_snapshot_registry::ComputePriceSnapshotRegistrationReceipt;
 pub(crate) use compute_provider_registry::ComputeProviderRegistrationReceipt;
+pub(crate) use compute_quote_candidates::ComputeJobQuoteCandidatePage;
 pub(crate) use compute_reservation_registry::ComputeReservationRegistrationReceipt;
 pub(crate) use external_app_tool_executions::{
     AdminExternalAppToolExecutionSummary, ExternalAppToolExecutionWrite,

@@ -153,7 +153,7 @@ pub(super) fn register_compute_job_on(
         let selection = registered_selection_on(conn, job)?;
         let job_digest = validate_with_selection(job, selection.as_ref())?;
         if job.status == JOB_STATUS_QUOTED && selected_contract_changed(&current_job, job) {
-            ensure_live_selection_on(conn, selection.as_ref())?;
+            ensure_live_selection_on(conn, job, selection.as_ref())?;
         }
         let next_revision = current
             .current_revision
@@ -333,6 +333,7 @@ fn validate_with_selection(
 
 fn ensure_live_selection_on(
     conn: &Connection,
+    job: &ComputeJob,
     selection: Option<&RegisteredJobSelection>,
 ) -> Result<()> {
     let selection = selection.ok_or_else(|| anyhow!("quoted Job 缺少锁价合同"))?;
@@ -349,6 +350,11 @@ fn ensure_live_selection_on(
             .ok_or_else(|| anyhow!("quoted Job 的当前 Provider 不存在"))?;
     if current_provider.provider.status != PROVIDER_STATUS_ACTIVE {
         bail!("quoted Job 只能选择当前 active Provider");
+    }
+    let deadline = DateTime::parse_from_rfc3339(&job.workload.deadline_at)
+        .context("quoted Job 的截止时间不是 RFC3339")?;
+    if deadline <= chrono::Utc::now() {
+        bail!("已经超过截止时间的 Job 不能锁价");
     }
     ensure_not_expired(
         "Offer",

@@ -48,6 +48,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/projects/:project_id/compute/jobs/:job_id/quote",
             post(quote_project_job),
         )
+        .route(
+            "/api/projects/:project_id/compute/jobs/:job_id/quote-candidates",
+            get(list_project_job_quote_candidates),
+        )
 }
 
 #[derive(Debug, Deserialize)]
@@ -182,6 +186,27 @@ async fn quote_project_job(
         &job_id,
         request,
     ))
+}
+
+async fn list_project_job_quote_candidates(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, job_id)): Path<(String, String)>,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    let user_id = match authenticated_project_user(&state, &headers, &project_id) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    broker_response(
+        compute_federation_broker_service::list_quote_candidates_for_project(
+            &state.store,
+            &user_id,
+            &project_id,
+            &job_id,
+            query.limit,
+        ),
+    )
 }
 
 async fn release(

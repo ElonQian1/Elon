@@ -12,8 +12,9 @@ use crate::{
     },
     store::{
         ComputeBrokerFinishAction, ComputeBrokerFinishReceipt, ComputeBrokerReservationReceipt,
-        ComputeJobRegistrationReceipt, ComputeReservationRegistrationReceipt,
-        FinishComputeBrokerRequest, ReserveComputeBrokerRequest, Store,
+        ComputeJobQuoteCandidatePage, ComputeJobRegistrationReceipt,
+        ComputeReservationRegistrationReceipt, FinishComputeBrokerRequest,
+        ReserveComputeBrokerRequest, Store,
     },
 };
 
@@ -132,6 +133,18 @@ pub(crate) fn quote_job_for_project(
     quoted.updated_at =
         immutable_timestamp_after(&quoted.updated_at, &snapshot.snapshot.quoted_at)?;
     store.register_compute_job(&quoted, source.revision)
+}
+
+pub(crate) fn list_quote_candidates_for_project(
+    store: &Store,
+    user_id: &str,
+    project_id: &str,
+    job_id: &str,
+    limit: usize,
+) -> Result<ComputeJobQuoteCandidatePage> {
+    let job = store.compute_job(job_id)?;
+    ensure_job_receipt_scope(&job, user_id, Some(project_id))?;
+    store.list_compute_job_quote_candidates(&job, limit)
 }
 
 pub(crate) fn reserve_for_user(

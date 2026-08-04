@@ -14,6 +14,7 @@ mod schemas;
 
 const CREATE_JOB_TOOL: &str = "compute_create_my_job";
 const QUOTE_JOB_TOOL: &str = "compute_quote_my_job";
+const LIST_QUOTE_CANDIDATES_TOOL: &str = "compute_list_my_job_quote_candidates";
 const RESERVE_TOOL: &str = "compute_reserve_my_job";
 const RELEASE_TOOL: &str = "compute_release_my_reservation";
 const EXPIRE_TOOL: &str = "compute_expire_my_reservation";
@@ -52,6 +53,14 @@ struct QuoteArguments {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QuoteCandidateArguments {
+    job_id: String,
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
+#[derive(Debug, Deserialize)]
 struct ReserveArguments {
     #[serde(flatten)]
     request: ReserveMyComputeRequest,
@@ -81,6 +90,13 @@ pub(crate) fn definitions() -> Vec<Value> {
             "把当前项目中的本人 submitted/quoted 算力 Job 绑定到已经登记且仍有效的 Offer 与不可变 Price Snapshot。不会冻结余额或容量。",
             schemas::quote_job_schema(),
             false,
+            false,
+        ),
+        tool(
+            LIST_QUOTE_CANDIDATES_TOOL,
+            "列出当前项目中本人 submitted/quoted Job 可绑定的既有 Offer 与 Price Snapshot。只返回通过完整合同校验的当前有效候选，不创建报价或冻结资金。",
+            quote_candidate_schema(),
+            true,
             false,
         ),
         tool(
@@ -179,6 +195,18 @@ pub(crate) fn call_if_handled(
                         expected_job_revision: input.expected_job_revision,
                         expected_job_digest: input.expected_job_digest,
                     },
+                )?,
+            )?))
+        }
+        LIST_QUOTE_CANDIDATES_TOOL => {
+            let input: QuoteCandidateArguments = decode(arguments, name)?;
+            Ok(Some(serde_json::to_value(
+                compute_federation_broker_service::list_quote_candidates_for_project(
+                    store,
+                    user_id,
+                    project_id,
+                    &input.job_id,
+                    input.limit,
                 )?,
             )?))
         }
@@ -323,6 +351,18 @@ fn list_schema() -> Value {
     json!({
         "type":"object",
         "properties":{"limit":{"type":"integer","minimum":1,"maximum":100,"default":20}},
+        "additionalProperties":false
+    })
+}
+
+fn quote_candidate_schema() -> Value {
+    json!({
+        "type":"object",
+        "required":["job_id"],
+        "properties":{
+            "job_id":{"type":"string","minLength":1,"maxLength":160},
+            "limit":{"type":"integer","minimum":1,"maximum":100,"default":20}
+        },
         "additionalProperties":false
     })
 }
