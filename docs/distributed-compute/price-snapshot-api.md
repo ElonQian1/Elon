@@ -19,9 +19,11 @@ implementation_status: implementation_uncompiled
 | 类型 | 名称或路径 | 作用 |
 |---|---|---|
 | HTTP POST | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/price-snapshots` | 显式确认后发布报价快照 |
+| HTTP GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/price-snapshots?limit=20` | 按报价时间倒序列出 1 至 100 份快照 |
 | HTTP GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/price-snapshots/:snapshot_id` | 所有者读取并审计快照 |
 | MCP 写入 | `compute_publish_my_price_snapshot` | 发布规范化 fallback_curve 快照 |
 | MCP 只读 | `compute_get_my_price_snapshot` | 读取本人 Offer 的快照 |
+| MCP 只读 | `compute_list_my_price_snapshots` | 按稳定顺序列出本人 Offer 的快照 |
 
 接口要求一龙用户会话，并复用 Offer 所有权检查。项目成员身份不能越权发布他人的报价。
 
@@ -46,7 +48,7 @@ implementation_status: implementation_uncompiled
 - 报价时间由服务端生成，失效时间不晚于请求 TTL、Offer 有效期或价格条款有效期；
 - Snapshot 摘要和来源摘要由服务端生成。
 
-相同幂等键重放时，会重新核对 Offer、窗口、金额、TTL、舍入方式、来源摘要和最终失效时间。任何字段变化都会被拒绝。
+相同幂等键重放时，会重新核对 Offer、窗口、金额、TTL、舍入方式、来源摘要和最终失效时间。任何字段变化都会被拒绝。列表按 `quoted_at DESC, snapshot_id ASC` 稳定排序，并逐份复用历史审计读取，不直接信任索引行。
 
 ## 4. 市场与资金边界
 

@@ -35,7 +35,7 @@ owners: backend, node, ai-economy
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 共享 CapacityPool 与追加式容量账本 | 领域合同、v165-v168 schema、隔离 Store、Store-canonical Supply/Claim 请求摘要、事务内 Claim kernel、只读审计、到期批处理、状态门卫和 epoch 轮换已写；v173 追加 Claim 完整历史，Hold V2 固定 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承原 held 绑定；尚未编译、执行迁移或接线 |
 | Provider 与 Offer 版本注册表 | v169/v170 schema、Provider/Offer 当前投影、追加式历史版本、规范摘要和容量引用审计已写；尚未编译、执行迁移或接线 |
-| Price Snapshot 锁价控制面 | v171 不可变 Registry 及本人 HTTP/MCP 已写，可从当前 active Offer 生成规范化 fallback_curve 快照并进入候选；不预留容量、不冻结余额，也不代表真实市场价格，状态为 `implementation_uncompiled` |
+| Price Snapshot 锁价控制面 | v171 不可变 Registry 及本人 HTTP/MCP 已写，可发布、读取和稳定列出 active Offer 的规范化 fallback_curve 快照；不预留容量、不冻结余额，也不代表真实市场价格，状态为 `implementation_uncompiled` |
 | ComputeJob 版本注册表 | v172 schema、Workload/范围/预算合同校验、当前投影、不可变历史、幂等、CAS、状态机和依赖审计已写；项目级 HTTP/MCP 可创建 Job、发现并绑定 Offer/Price Snapshot，v175/v176 Broker 已组合写入；尚未编译、执行迁移或接入自动撮合 |
 | ComputeReservation 版本注册表 | v174 schema、Job/Offer/Price Snapshot/Claim 精确版本绑定、当前投影、不可变历史、消费者幂等、CAS、状态机、完整依赖审计及事务内登记入口已写；HTTP/MCP 可读取本人或当前项目的最新列表与详情，独立写入口不移动容量或资金，v175/v176 Broker 已组合调用 |
 | 消费者余额预授权 | v175 Broker 将显式到期预授权与 Job/Claim/Reservation 在同一事务内编排，并要求结果为 `reserved` 且含余额结果；v176 可在 Attempt 尚未激活时按精确预授权 ID 严格退款。仅支持 `platform_balance_cny`，不覆盖运行中任务或实际用量结算 |
