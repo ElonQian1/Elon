@@ -3,7 +3,9 @@ use chrono::Utc;
 use rusqlite::{params, Connection, TransactionBehavior};
 use serde::Serialize;
 
-use crate::compute_federation::execution::{ComputeAttemptLease, ATTEMPT_STATUS_RUNNING};
+use crate::compute_federation::execution::{
+    ComputeAttemptLease, ATTEMPT_STATUS_RUNNING, ATTEMPT_STATUS_STAGING, ATTEMPT_STATUS_TERMINAL,
+};
 
 use super::{new_id, Store};
 
@@ -187,11 +189,78 @@ impl Store {
         lease_id: &str,
     ) -> Result<ComputeAttemptLeaseStateReceipt> {
         validate_exact("Attempt Lease ID", lease_id, 200)?;
-        current_lease_state_on(&self.conn()?, lease_id)?
-            .map(StoredLeaseState::into_receipt)
-            .transpose()?
-            .ok_or_else(|| anyhow!("Attempt Lease 当前状态不存在"))
+        compute_attempt_lease_state_on(&self.conn()?, lease_id)
     }
+}
+
+pub(super) struct TerminateStagingAttemptLease<'a> {
+    pub lease_id: &'a str,
+    pub expected_revision: i64,
+    pub expected_digest: &'a str,
+    pub expected_fencing_generation: i64,
+    pub reason_code: &'a str,
+    pub actor_user_id: &'a str,
+    pub terminated_at: &'a str,
+}
+
+pub(super) fn compute_attempt_lease_state_on(
+    conn: &Connection,
+    lease_id: &str,
+) -> Result<ComputeAttemptLeaseStateReceipt> {
+    validate_exact("Attempt Lease ID", lease_id, 200)?;
+    current_lease_state_on(conn, lease_id)?
+        .map(StoredLeaseState::into_receipt)
+        .transpose()?
+        .ok_or_else(|| anyhow!("Attempt Lease 当前状态不存在"))
+}
+
+pub(super) fn terminate_staging_attempt_lease_on(
+    conn: &Connection,
+    input: TerminateStagingAttemptLease<'_>,
+) -> Result<ComputeAttemptLeaseStateReceipt> {
+    validate_exact("Attempt Lease ID", input.lease_id, 200)?;
+    validate_exact("Attempt 中止原因码", input.reason_code, 160)?;
+    validate_exact("Attempt 中止执行人", input.actor_user_id, 160)?;
+    let current = current_lease_state_on(conn, input.lease_id)?
+        .ok_or_else(|| anyhow!("Attempt Lease 当前状态不存在"))?;
+    if current.lease_revision != input.expected_revision
+        || current.lease_digest != input.expected_digest
+        || current.lease.fencing_generation != input.expected_fencing_generation
+        || current.lease.status != ATTEMPT_STATUS_STAGING
+        || current.lease.last_heartbeat_at.is_some()
+    {
+        bail!("只有当前精确版本且从未记录心跳的 staging Lease 可以无用量中止");
+    }
+    let mut terminal = current.lease.clone();
+    terminal.status = ATTEMPT_STATUS_TERMINAL.to_string();
+    terminal.terminal_reason_code = Some(input.reason_code.to_string());
+    let target_revision = current
+        .lease_revision
+        .checked_add(1)
+        .context("Attempt Lease 修订号溢出")?;
+    let target_digest = compute_attempt_lease_digest(&terminal)?;
+    let changed = conn.execute(
+        "UPDATE compute_attempt_lease_states
+            SET lease_revision=?1, lease_digest=?2, lease_json=?3,
+                status=?4, updated_by_user_id=?5, updated_at=?6
+          WHERE lease_id=?7 AND lease_revision=?8 AND lease_digest=?9
+            AND status='staging' AND last_heartbeat_at IS NULL",
+        params![
+            target_revision,
+            target_digest,
+            serde_json::to_string(&terminal)?,
+            terminal.status,
+            input.actor_user_id,
+            input.terminated_at,
+            input.lease_id,
+            current.lease_revision,
+            current.lease_digest,
+        ],
+    )?;
+    if changed != 1 {
+        bail!("Attempt Lease 已被并发修改，请重新读取当前状态");
+    }
+    compute_attempt_lease_state_on(conn, input.lease_id)
 }
 
 pub(super) fn initialize_compute_attempt_lease_state_on(

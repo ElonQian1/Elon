@@ -31,12 +31,14 @@ mod compute_activation_plan_dependencies;
 mod compute_activation_plans;
 mod compute_activation_quarantines;
 mod compute_activation_requests;
+mod compute_attempt_aborts;
 mod compute_attempt_activations;
 mod compute_attempt_leases;
 mod compute_broker_reservation;
 mod compute_capacity_audit;
 mod compute_capacity_bucket_queries;
 mod compute_capacity_claim_activation;
+mod compute_capacity_claim_return;
 mod compute_capacity_claim_rows;
 mod compute_capacity_claim_transitions;
 mod compute_capacity_claims;
@@ -249,6 +251,7 @@ pub(crate) use compute_activation_quarantines::QuarantineComputeActivationApplic
 pub(crate) use compute_activation_requests::{
     ReviewComputeActivationEvidenceRequest, SubmitComputeActivationEvidenceRequest,
 };
+pub(crate) use compute_attempt_aborts::{AbortComputeAttemptRequest, ComputeAttemptAbortReceipt};
 pub(crate) use compute_attempt_activations::{
     ActivateComputeAttemptRequest, ComputeAttemptActivationReceipt,
 };

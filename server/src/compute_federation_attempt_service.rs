@@ -2,9 +2,9 @@ use anyhow::{bail, Result};
 use serde::Deserialize;
 
 use crate::store::{
-    ActivateComputeAttemptRequest, ComputeAttemptActivationReceipt,
-    ComputeAttemptLeaseRenewalReceipt, ComputeAttemptLeaseStateReceipt,
-    RenewComputeAttemptLeaseRequest, Store,
+    AbortComputeAttemptRequest, ActivateComputeAttemptRequest, ComputeAttemptAbortReceipt,
+    ComputeAttemptActivationReceipt, ComputeAttemptLeaseRenewalReceipt,
+    ComputeAttemptLeaseStateReceipt, RenewComputeAttemptLeaseRequest, Store,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -41,6 +41,24 @@ pub(crate) struct RenewMyComputeAttemptLeaseRequest {
     pub expires_at: String,
     pub idempotency_key: String,
     pub confirm_executor_alive: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct AbortMyComputeAttemptRequest {
+    pub expected_lease_revision: i64,
+    pub expected_lease_digest: String,
+    pub expected_fencing_generation: i64,
+    pub expected_job_revision: i64,
+    pub expected_job_digest: String,
+    pub expected_reservation_revision: i64,
+    pub expected_reservation_digest: String,
+    pub expected_claim_revision: i64,
+    pub expected_claim_digest: String,
+    pub executor_abort_ref: String,
+    pub reason_code: String,
+    pub idempotency_key: String,
+    pub confirm_no_execution_started: bool,
 }
 
 pub(crate) fn activate_for_provider_owner(
@@ -132,4 +150,46 @@ pub(crate) fn get_state_for_participant(
 ) -> Result<ComputeAttemptLeaseStateReceipt> {
     get_for_participant(store, user_id, lease_id)?;
     store.compute_attempt_lease_state(lease_id)
+}
+
+pub(crate) fn abort_for_provider_owner(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    lease_id: &str,
+    request: AbortMyComputeAttemptRequest,
+) -> Result<ComputeAttemptAbortReceipt> {
+    if !request.confirm_no_execution_started {
+        bail!("无用量中止前必须显式确认外部执行器从未开始执行");
+    }
+    let provider = store.compute_provider(provider_id)?;
+    if provider.provider.owner_account_id != user_id {
+        bail!("算力 Provider 不属于当前登录用户");
+    }
+    store.abort_compute_attempt(&AbortComputeAttemptRequest {
+        lease_id: lease_id.to_string(),
+        provider_id: provider_id.to_string(),
+        expected_lease_revision: request.expected_lease_revision,
+        expected_lease_digest: request.expected_lease_digest,
+        expected_fencing_generation: request.expected_fencing_generation,
+        expected_job_revision: request.expected_job_revision,
+        expected_job_digest: request.expected_job_digest,
+        expected_reservation_revision: request.expected_reservation_revision,
+        expected_reservation_digest: request.expected_reservation_digest,
+        expected_claim_revision: request.expected_claim_revision,
+        expected_claim_digest: request.expected_claim_digest,
+        executor_abort_ref: request.executor_abort_ref,
+        reason_code: request.reason_code,
+        idempotency_key: request.idempotency_key,
+        aborted_by_user_id: user_id.to_string(),
+    })
+}
+
+pub(crate) fn get_abort_for_participant(
+    store: &Store,
+    user_id: &str,
+    lease_id: &str,
+) -> Result<ComputeAttemptAbortReceipt> {
+    get_for_participant(store, user_id, lease_id)?;
+    store.compute_attempt_abort(lease_id)
 }

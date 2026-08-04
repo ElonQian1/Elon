@@ -109,7 +109,7 @@ pub(super) fn timestamp_after(value: &str) -> Result<String> {
     Ok(std::cmp::max(Utc::now(), minimum).to_rfc3339())
 }
 
-pub(super) fn broker_compute_call_id(reservation_id: &str) -> String {
+pub(in crate::store) fn broker_compute_call_id(reservation_id: &str) -> String {
     format!("compute_broker:{reservation_id}")
 }
 

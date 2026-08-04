@@ -322,6 +322,28 @@ pub(super) fn held_claim_causal_transaction_on(
         .transpose()
 }
 
+pub(super) fn active_attempt_causal_transaction_on(
+    conn: &Connection,
+    claim_id: &str,
+    attempt_lease_id: &str,
+) -> Result<Option<StoredCapacityCausalTransaction>> {
+    let transaction_id = conn
+        .query_row(
+            "SELECT transaction_id
+               FROM compute_capacity_ledger_transactions
+              WHERE claim_id=?1
+                AND claim_effect='active'
+                AND claim_effect_key=?2
+                AND event_kind='attempt_activated'",
+            params![claim_id.trim(), attempt_lease_id.trim()],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    transaction_id
+        .map(|transaction_id| capacity_causal_transaction_on(conn, &transaction_id))
+        .transpose()
+}
+
 fn validate_stored_causal_binding(binding: &ComputeCapacityCausalBinding) -> Result<()> {
     if binding.offer.as_ref().is_some_and(|offer| {
         offer.offer_id.trim().is_empty()

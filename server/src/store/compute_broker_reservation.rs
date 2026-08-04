@@ -22,6 +22,7 @@ use finish_validation::normalize_broker_finish_request;
 use orchestrate::reserve_new_broker_contract_on;
 use receipt::replay_broker_reserve_on;
 pub(super) use receipt::{broker_reserve_binding_on, BrokerReserveBinding};
+pub(super) use validation::broker_compute_call_id;
 use validation::normalize_broker_reserve_request;
 
 pub(super) const BROKER_BUDGET_ADAPTER: &str = "platform_balance_cny";

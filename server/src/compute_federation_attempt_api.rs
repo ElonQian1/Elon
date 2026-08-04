@@ -11,7 +11,8 @@ use serde_json::json;
 
 use crate::{
     compute_federation_attempt_service::{
-        self, ActivateMyComputeAttemptRequest, RenewMyComputeAttemptLeaseRequest,
+        self, AbortMyComputeAttemptRequest, ActivateMyComputeAttemptRequest,
+        RenewMyComputeAttemptLeaseRequest,
     },
     project_auth::{auth_from_headers, json_error},
     types::AppState,
@@ -34,6 +35,14 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/compute/attempt-leases/:lease_id/state",
             get(get_lease_state),
+        )
+        .route(
+            "/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/abort",
+            post(abort_attempt),
+        )
+        .route(
+            "/api/me/compute/attempt-leases/:lease_id/abort",
+            get(get_abort),
         )
 }
 
@@ -105,6 +114,45 @@ async fn get_lease_state(
     };
     attempt_response(
         compute_federation_attempt_service::get_state_for_participant(
+            &state.store,
+            &user_id,
+            &lease_id,
+        ),
+    )
+}
+
+async fn abort_attempt(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, lease_id)): Path<(String, String)>,
+    Json(request): Json<AbortMyComputeAttemptRequest>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::abort_for_provider_owner(
+            &state.store,
+            &user_id,
+            &provider_id,
+            &lease_id,
+            request,
+        ),
+    )
+}
+
+async fn get_abort(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::get_abort_for_participant(
             &state.store,
             &user_id,
             &lease_id,

@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Result};
 use chrono::{Duration, Utc};
-use rusqlite::{params, OptionalExtension, TransactionBehavior};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
 
 use crate::compute_federation::{
@@ -244,9 +244,19 @@ impl Store {
         if lease_id.is_empty() || lease_id.trim() != lease_id {
             bail!("Attempt Lease ID 无效");
         }
-        attempt_activation_on(&self.conn()?, "", lease_id, None)?
-            .ok_or_else(|| anyhow!("Attempt 激活回执不存在"))
+        compute_attempt_activation_on(&self.conn()?, lease_id)
     }
+}
+
+pub(super) fn compute_attempt_activation_on(
+    conn: &Connection,
+    lease_id: &str,
+) -> Result<ComputeAttemptActivationReceipt> {
+    if lease_id.is_empty() || lease_id.trim() != lease_id {
+        bail!("Attempt Lease ID 无效");
+    }
+    attempt_activation_on(conn, "", lease_id, None)?
+        .ok_or_else(|| anyhow!("Attempt 激活回执不存在"))
 }
 
 fn ensure_reservation_matches(
