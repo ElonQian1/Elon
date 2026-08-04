@@ -13,7 +13,8 @@ use serde_json::json;
 use crate::{
     compute_federation::offer::{OFFER_STATUS_EXPIRED, OFFER_STATUS_REVOKED},
     compute_federation_offer_draft_model::{
-        CreateMyComputeOfferDraftRequest, RevokeMyComputeOfferDraftRequest,
+        CreateMyComputeOfferDraftRequest, ReviseMyComputeOfferDraftRequest,
+        RevokeMyComputeOfferDraftRequest,
     },
     compute_federation_offer_lifecycle_model::{
         DrainComputeOfferRequest, TerminateComputeOfferRequest,
@@ -38,6 +39,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/revoke",
             get(get_my_offer_revocation).post(revoke_offer_draft),
+        )
+        .route(
+            "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/revise",
+            post(revise_offer_draft),
         )
         .route(
             "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/expiration",
@@ -153,6 +158,26 @@ async fn revoke_offer_draft(
         Err(response) => return response,
     };
     offer_response(compute_federation_offer_service::revoke_draft_for_user(
+        &state.store,
+        &user_id,
+        &provider_id,
+        &pool_id,
+        &offer_id,
+        request,
+    ))
+}
+
+async fn revise_offer_draft(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, pool_id, offer_id)): Path<(String, String, String)>,
+    Json(request): Json<ReviseMyComputeOfferDraftRequest>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    offer_response(compute_federation_offer_service::revise_draft_for_user(
         &state.store,
         &user_id,
         &provider_id,

@@ -4,7 +4,8 @@ use serde_json::{json, Value};
 
 use crate::{
     compute_federation_offer_draft_model::{
-        CreateMyComputeOfferDraftRequest, RevokeMyComputeOfferDraftRequest,
+        CreateMyComputeOfferDraftRequest, ReviseMyComputeOfferDraftRequest,
+        RevokeMyComputeOfferDraftRequest,
     },
     compute_federation_offer_service,
     store::Store,
@@ -14,6 +15,7 @@ const CREATE_DRAFT_TOOL: &str = "compute_create_my_offer_draft";
 const GET_OFFER_TOOL: &str = "compute_get_my_offer";
 const LIST_OFFERS_TOOL: &str = "compute_list_my_offers";
 const REVOKE_DRAFT_TOOL: &str = "compute_revoke_my_offer_draft";
+const REVISE_DRAFT_TOOL: &str = "compute_revise_my_offer_draft";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -49,6 +51,15 @@ struct RevokeDraftArguments {
     request: RevokeMyComputeOfferDraftRequest,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReviseDraftArguments {
+    provider_id: String,
+    pool_id: String,
+    offer_id: String,
+    request: ReviseMyComputeOfferDraftRequest,
+}
+
 pub(crate) fn definitions() -> Vec<Value> {
     vec![
         tool(
@@ -73,6 +84,12 @@ pub(crate) fn definitions() -> Vec<Value> {
             REVOKE_DRAFT_TOOL,
             "按精确版本与摘要撤销当前用户的 draft Offer。必须显式确认；不允许撤销 active Offer，不移动容量或资金。",
             revoke_schema(),
+            false,
+        ),
+        tool(
+            REVISE_DRAFT_TOOL,
+            "按精确版本与摘要修订当前用户的 draft Offer。必须显式确认；Offer 稳定身份不能改变，不允许修改 active Offer，也不移动容量或资金。",
+            revise_schema(),
             false,
         ),
     ]
@@ -125,6 +142,19 @@ pub(crate) fn call_if_handled(
             let input: RevokeDraftArguments = decode(arguments, name)?;
             Ok(Some(serde_json::to_value(
                 compute_federation_offer_service::revoke_draft_for_user(
+                    store,
+                    user_id,
+                    &input.provider_id,
+                    &input.pool_id,
+                    &input.offer_id,
+                    input.request,
+                )?,
+            )?))
+        }
+        REVISE_DRAFT_TOOL => {
+            let input: ReviseDraftArguments = decode(arguments, name)?;
+            Ok(Some(serde_json::to_value(
+                compute_federation_offer_service::revise_draft_for_user(
                     store,
                     user_id,
                     &input.provider_id,
@@ -362,6 +392,43 @@ fn revoke_schema() -> Value {
                     "expected_offer_version":{"type":"integer","minimum":1},
                     "expected_offer_digest":bounded_string(256),
                     "confirm_revoke":{"type":"boolean","const":true}
+                },
+                "additionalProperties":false
+            }
+        },
+        "additionalProperties":false
+    })
+}
+
+fn revise_schema() -> Value {
+    json!({
+        "type":"object",
+        "required":["provider_id","pool_id","offer_id","request"],
+        "properties":{
+            "provider_id":bounded_string(160),
+            "pool_id":bounded_string(160),
+            "offer_id":bounded_string(200),
+            "request":{
+                "type":"object",
+                "required":[
+                    "expected_offer_version","expected_offer_digest","sku","runtime",
+                    "resource_profile","capacity","execution_limits","authorization",
+                    "price_terms","valid_from","valid_until","confirm_revise"
+                ],
+                "properties":{
+                    "expected_offer_version":{"type":"integer","minimum":1},
+                    "expected_offer_digest":bounded_string(256),
+                    "sku":sku_schema(),
+                    "model":{"anyOf":[model_schema(),{"type":"null"}]},
+                    "runtime":runtime_schema(),
+                    "resource_profile":resource_schema(),
+                    "capacity":{"type":"array","minItems":1,"maxItems":256,"items":capacity_schema()},
+                    "execution_limits":execution_limits_schema(),
+                    "authorization":authorization_schema(),
+                    "price_terms":price_terms_schema(),
+                    "valid_from":{"type":"string","format":"date-time"},
+                    "valid_until":{"type":"string","format":"date-time"},
+                    "confirm_revise":{"type":"boolean","const":true}
                 },
                 "additionalProperties":false
             }

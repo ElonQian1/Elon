@@ -79,3 +79,21 @@ pub(crate) struct RevokeMyComputeOfferDraftRequest {
     pub expected_offer_digest: String,
     pub confirm_revoke: bool,
 }
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ReviseMyComputeOfferDraftRequest {
+    pub expected_offer_version: i64,
+    pub expected_offer_digest: String,
+    pub sku: ComputeOfferDraftSkuInput,
+    pub model: Option<ComputeModelRef>,
+    pub runtime: ComputeRuntimeRef,
+    pub resource_profile: ComputeOfferDraftResourceProfileInput,
+    pub capacity: Vec<ComputeOfferDraftCapacityInput>,
+    pub execution_limits: ComputeOfferExecutionLimits,
+    pub authorization: ComputeOfferDraftAuthorizationInput,
+    pub price_terms: ComputeOfferDraftPriceTermsInput,
+    pub valid_from: String,
+    pub valid_until: String,
+    pub confirm_revise: bool,
+}

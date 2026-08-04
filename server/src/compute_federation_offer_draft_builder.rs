@@ -18,6 +18,7 @@ use crate::{
     },
     compute_federation_offer_draft_model::{
         ComputeOfferDraftCapacityInput, CreateMyComputeOfferDraftRequest,
+        ReviseMyComputeOfferDraftRequest,
     },
     store::{compute_offer_digest, compute_sku_digest, ComputeCapacityBucketRead},
 };
@@ -147,6 +148,38 @@ pub(crate) fn build_offer_draft(
     };
     offer.offer_digest = compute_offer_digest(&offer)?;
     Ok(offer)
+}
+
+pub(crate) fn build_revised_offer_draft(
+    offer_id: String,
+    created_at: String,
+    provider: &ComputeProvider,
+    pool: &ComputeCapacityPool,
+    request: &ReviseMyComputeOfferDraftRequest,
+    resolved_capacity: Vec<ResolvedDraftCapacity<'_>>,
+) -> Result<ComputeOffer> {
+    let create = CreateMyComputeOfferDraftRequest {
+        idempotency_key: "draft_revision_builder".to_string(),
+        sku: request.sku.clone(),
+        model: request.model.clone(),
+        runtime: request.runtime.clone(),
+        resource_profile: request.resource_profile.clone(),
+        capacity: request.capacity.clone(),
+        execution_limits: request.execution_limits.clone(),
+        authorization: request.authorization.clone(),
+        price_terms: request.price_terms.clone(),
+        valid_from: request.valid_from.clone(),
+        valid_until: request.valid_until.clone(),
+        confirm_create: true,
+    };
+    build_offer_draft(
+        offer_id,
+        created_at,
+        provider,
+        pool,
+        &create,
+        resolved_capacity,
+    )
 }
 
 fn validate_request_bounds(request: &CreateMyComputeOfferDraftRequest) -> Result<()> {
