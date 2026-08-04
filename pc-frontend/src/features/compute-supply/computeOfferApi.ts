@@ -35,6 +35,15 @@ export interface ComputeRuntimeRef {
   plugin_digest: string | null
 }
 
+export interface ComputeDeliveryWindow {
+  binding: {
+    window_id: string
+    window_digest: string
+  }
+  starts_at_utc: string
+  ends_at_utc: string
+}
+
 export interface ComputeOfferDraftBody {
   idempotency_key: string
   sku: {
@@ -107,6 +116,7 @@ export interface MyComputeOfferView {
     capacity: Array<{ bucket: CapacityBucketBinding; total_units: number; reservable_units: number }>
     execution_limits: { max_concurrent_attempts: number; max_attempt_runtime_seconds: number }
     authorization: { public: boolean; allowed_account_ids: string[]; allowed_project_ids: string[]; allowed_data_classes: string[]; policy_revision: number }
+    delivery_windows: ComputeDeliveryWindow[]
     price_terms: { pricing_mode: 'spot' | 'index_locked' | 'capacity_forward' | 'capacity_future'; currency: string; curve_id: string | null; curve_version: number | null; instrument_id: string | null; components: ComputePriceComponent[]; fee_rules: ComputeFeeRule[]; valid_until: string }
     valid_from: string
     valid_until: string
