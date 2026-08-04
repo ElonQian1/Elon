@@ -1,7 +1,7 @@
 ---
 title: 分布式算力激活证据申请控制面
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: backend, node, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -14,7 +14,7 @@ implementation_status: implementation_uncompiled
 
 这套控制面记录“供给者提交了哪些证据摘要、审核人作出了什么决定、激活应写入哪一个精确 Provider 合同，以及该计划是否被受控应用”。`approved` 只表示证据包通过人工审核，`prepared` 只表示不可变候选合同已生成；两者的 `activation_effect` 均为 `none`。只有平台 `admin/owner` 以精确计划摘要和显式确认应用计划后，代码才会在一个事务内把 Provider 下一版本和 CapacityPool 改为 active，并保存不可变回执。该内部状态变化不连接节点、不读取凭据正文、不发布 Offer、不开放预留、不派发任务，也不移动资金。
 
-PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说明、预检阻断项和 submitted 取消源码；提交对话框只接受节点绑定引用和三个 64 位 SHA-256 摘要，并明确拒绝把凭据、密钥或原始硬件报告放入引用字段。管理员审核、计划准备、应用和隔离未下放到本人页面。该页面尚未构建、运行或发布。
+PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说明、预检阻断项和 submitted 取消源码；提交对话框只接受节点绑定引用和三个 64 位 SHA-256 摘要，并明确拒绝把凭据、密钥或原始硬件报告放入引用字段。仅平台 `admin/owner` 可见的 `/compute-activation` 已写入按状态审核队列、申请预检、批准/退回/拒绝、approved 废止、计划准备、计划二次预检、精确摘要应用、应用回执和紧急隔离源码。管理员能力没有下放到本人页面或 MCP。两个页面均尚未构建、运行或发布。
 
 ## 2. 申请流程
 
@@ -74,6 +74,8 @@ PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说�
 | GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/application/quarantine` | 读取并审计不可变隔离回执 |
 
 决定只支持 `approved`、`changes_requested` 或 `rejected`。退回和拒绝必须填写说明；只有 `submitted` 可以审核。批准时如果 Provider/Pool 所有权、状态、版本或账本审计发生变化，服务端失败关闭，要求供给者重新提交。
+
+PC `/compute-activation` 复用上述管理员 HTTP 合同，不另建前端状态真源。工作区按状态筛选申请，先显示证据引用和申请预检，再把审核、计划准备、计划应用、过期批准废止和已激活资源隔离拆成独立确认动作。计划表单只接收 Endpoint、Gateway、地址提示和凭据引用，不接收凭据正文；应用按钮只有在当前计划预检 `ready_for_apply=true` 时可用，但服务端写事务仍会重新审计，不能把前端快照当成授权或锁。应用后展示不可变应用摘要；隔离后继续保留申请、计划和原应用回执。
 
 ## 6. 激活就绪预检
 

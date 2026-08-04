@@ -67,6 +67,7 @@ server/src/
 | AI 原生开放商业网络 | 🔴 高 | `src/features/open-commerce/`、`server/src/open_commerce_*` | ✅ 已形成五工作区；消费者沙盒可按有限能力 Schema 生成表单，动作修改后重新确认。公共网络、真实调度、真实平台适配器和链上提交仍按各自边界推进 |
 | 算力结算页 | 🟡 中 | `src/features/compute-settlement/`、`server/src/compute_federation_settlement_*` | 🟡 `/my-compute-settlement` 已写入 Provider 自助登记、本人余额、提款状态、申请和 pending 取消源码；管理员 `/compute-settlement` 已写入平台账户、到期释放、全局队列、拒绝退款和外部已付款证明登记源码。登记只创建 self-declared 记录，两页不执行真实付款，尚未构建、视觉验收或发布 |
 | 算力供给工作区 | 🟡 中 | `src/features/compute-supply/`、`server/src/compute_federation_capacity_*` | 🟡 `/compute-supply` 已写入本人 Provider 下的 Pool/Bucket/Supply、账本审计，以及激活证据本人申请、历史、预检和取消源码。证据入口只收引用和摘要，不保存凭据正文；申请或 approved 均不自动激活，普通页面没有管理员审核权。不发布 Offer、不派发任务或结算收入，尚未构建、视觉验收或发布 |
+| 算力激活审核工作区 | 🔴 高 | `src/features/compute-activation/`、`server/src/compute_federation_activation_*` | 🟡 仅 `admin/owner` 可见的 `/compute-activation` 已写入审核队列、证据预检、批准/退回/拒绝、过期 approved 废止、不可变计划准备与二次预检、精确摘要应用、应用回执和 active 紧急隔离源码。准备不激活；应用只改变平台内部 Provider/Pool 状态且不发布 Offer；隔离不关机、不退款、不撤销既有合同。尚未构建、接口联调、视觉验收或发布 |
 
 ### 阶段 P3 — 个人 AI 对话
 
