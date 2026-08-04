@@ -82,13 +82,14 @@ Manifest 只能声明请求，不能授予权限、证明本机已安装或健�
 1. Publisher Manifest 与控制面 InstallPlan 使用彼此独立的 Ed25519 keyring。Manifest 不能使用控制面 key，InstallPlan 也不能借用 Publisher key；除按用途、状态和有效期解析 key 外，本机还拒绝本次 Manifest 与 InstallPlan 复用同一份原始公钥指纹。未知、重复、撤销、跨用途或格式错误的 key 一律拒绝。
 2. 两类载荷都使用 RFC 8785 JCS 规范化并计算 SHA-256，对外摘要固定为 64 位小写十六进制。签名消息固定为 `DOMAIN || 0x00 || digest-raw-32-bytes`，不能把十六进制文本当作签名字节；签名字段永远位于被签载荷之外。签名载荷中的整数限制在 I-JSON/IEEE-754 安全整数范围，超出时改用版本化十进制字符串字段，不能让不同语言各自舍入。
 3. signed Manifest 必须精确绑定插件、版本、目标、包摘要、Host API、无 shell Sidecar 入口、文件清单、依赖和请求权限。相对路径必须规范且留在插件槽内；包、文件与下载依赖必须形成无重复、无额外工件的闭包。
-4. InstallPlan 必须同时绑定当前库存 revision 与 JCS SHA-256 摘要、策略 revision、共享授权 revision/digest、节点硬件档案摘要、Manifest catalog revision、控制面 keyring revision 和有效期。计划寿命最多 24 小时；首次准入只容忍可信时间相对 `generated_at` 最多提前 5 分钟，真实取数不得早于 `generated_at`。任何事实漂移都要求重新取计划，客户端不得猜测或自动放宽。
+4. InstallPlan 必须同时绑定当前库存 revision 与 JCS SHA-256 摘要、策略 revision、共享授权 revision/digest、节点硬件档案摘要、Manifest catalog revision、Publisher/Control 两类 keyring 的 revision/digest 和有效期。计划寿命最多 24 小时；首次准入只容忍可信时间相对 `generated_at` 最多提前 5 分钟，真实取数不得早于 `generated_at`。任何事实漂移都要求重新取计划，客户端不得猜测或自动放宽。
 5. 本地 grant 只能是 Manifest 请求权限与资源上限的严格子集。计划签名不能把 Publisher 未请求的网络、文件、设备、子进程、CPU、内存、显存、磁盘或运行时长权限变成合法授权。
 6. 每个 install/upgrade 项必须绑定一份已验签且目标精确匹配的 Manifest；插件包工件 ID 固定为 `sha256:<package_digest>`，依赖使用 Manifest 的显式 ID，全部摘要、长度和顺序必须形成无重复、无额外工件的精确闭包。`source_ref` 只是有界 ASCII 查找引用，不能是 URL、本机路径、token 或签名下载地址。计划声明的磁盘需求不得低于下载压缩字节与包解压字节之和。
-7. 首次准入只冻结“允许执行这份计划”的事实。执行器在每个下载请求、重定向和断点续传下一段字节前，都通过持久权威源重新读取当前共享开关、授权 binding、策略 revision、节点档案、catalog、keyring revision、应用计划和有效期，并原子认领下载 ordinal/range 游标；单段最多 16 MiB，range 不得越过工件长度，重定向最多 5 跳，可信时间必须持久保持单调高水位。任一变化立即在下一字节前停止。
+7. 首次准入只冻结“允许应用这份计划”的事实。真实取数使用 `begin_claim -> fsync .part -> commit_segment` 三段式事务，在认领和提交时都重新读取当前共享开关、授权 binding、策略 revision、节点档案、catalog、两类 keyring binding/签名 key、应用计划、候选 owner 和有效期；offset 必须等于耐久 committed cursor，claim 携带 authority epoch 与 generation fence。单段最多 16 MiB，range 不得越过工件长度，redirect 严格递增且不推进游标，可信时间持久保持单调高水位。下载循环还在每次 socket read/write buffer 前检查 cancellation epoch，使任一变化在下一字节前停止。
 8. 共享关闭时，计划与本机重读都必须同时证明关闭；总下载字节、所需新增磁盘和所有下载列表精确为零，只允许 keep/disable/remove/cancel_candidate，应用后不得留下仍期望启用的插件。`cancel_candidate` 精确绑定候选 release、活动 release（可为空）和安装代次，用于清理首次安装或升级中断后的候选槽，不能借机下载或激活新版本。
-9. 准入与计划应用必须分离。后续 inventory store 采用 `expected_inventory_revision` CAS，以“克隆旧状态、全量校验、原子写盘成功、最后发布内存”的顺序提交；写入失败保留旧文件和旧内存，不启动下载。
-10. 重启恢复必须持久化计划 ID/digest、已应用 inventory revision、候选槽归属和下载游标；恢复时重新验签并重读授权，不能因进程曾经准入就跳过撤销、过期或 keyring 变化。恢复器只能继续仍被当前计划拥有的候选，或等待显式 `cancel_candidate` 清理。
+9. 准入与计划应用必须分离。独立 SQLite 权威库在单一 `BEGIN IMMEDIATE` 内以 `expected_inventory_revision` CAS，同事务保存不可变应用、候选所有权、下载游标和库存；提交顺序固定为“克隆旧状态、全量校验、原子提交成功、最后发布内存”。写入失败保留旧数据库和旧内存，不启动下载。
+10. 候选授权不能依赖审计字段 `last_plan_id`。candidate 必须绑定本机随机 token、owner plan ID/digest、应用 revision 和 generation；每个未完成槽恰好由 candidate 指针引用，普通新计划不能接管，取消也必须精确绑定所有权。
+11. 重启恢复必须持久化计划 ID/digest、已应用 inventory revision、候选槽归属、三段式 claim/cursor、authority/owner epoch 和可信时间高水位；恢复时重新验签并重读授权，不能因进程曾经准入就跳过撤销、过期或 keyring 变化。恢复器只能继续仍被当前计划拥有的候选，或等待显式 `cancel_candidate` 清理。完整权威合同见 `docs/distributed-compute/node-plugin-local-authority.md`。
 
 准入输出只包含已验证的不可变绑定、稳定原因码和按计划顺序排列的下载描述，不包含下载凭据。真实下载器仍须自行执行 HTTPS/重定向边界、分块摘要、临时文件、包解压防穿越、文件摘要和槽提交门禁。
 
@@ -116,7 +117,7 @@ Manifest 只能声明请求，不能授予权限、证明本机已安装或健�
 
 本批合同把 Attempt 控制固定为 `Start`、`RenewLease` 和 `Cancel`，秘密租约引用只留在 Host，不转发给 Runner。Runner 只产生 typed `Started/Heartbeat/Progress/StreamChunk/CheckpointReady/UsageSnapshot/Terminal` 事件；Host 校验大小、顺序和摘要，补写 Attempt 身份与 fencing generation，再转换成 Host 侧 typed 事件。Runner 自报用量只是声明，终态事件也不是执行回执或结算决定。
 
-第一批内部兼容 seam 仍直接调用现有 Rust 本地推理函数。Publisher/Control key resolver 的耐久实现、真实下载器、耐久 inventory store、计划应用 journal、逐段取数权威源、原子槽切换、Sidecar 进程、IPC framing、资源沙箱、事件背压、`ReadyCapability` 上报与真实 Attempt 运行接线仍未实现。当前准入内核只有 key/取数权威 trait 合同，没有可被下载器调用的持久实现。
+第一批内部兼容 seam 仍直接调用现有 Rust 本地推理函数。本机权威库已确定为独立 SQLite，并固定了 root-signed 双 keyring、库存/计划/候选原子事务和三段式下载认领合同；对应 resolver/store、真实下载器、原子槽切换、Sidecar 进程、IPC framing、资源沙箱、事件背压、`ReadyCapability` 上报与真实 Attempt 运行接线仍未实现。当前准入内核只有抽象 key resolver 和旧式单调用取数权威 trait，没有可被下载器调用的持久实现。
 
 ## 10. 模型与缓存
 
@@ -142,4 +143,4 @@ V1 只运行平台批准的任务种类和签名 Runner，不接受请求方上�
 
 ## 13. 当前未验证声明
 
-本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam、版本化合同、签名与摘要验证器、Manifest 语义校验和 InstallPlan 本机准入内核已形成代码，但本批尚未编译或启动。Publisher/Control key resolver 的耐久实现、真实 downloader、耐久 inventory store、计划应用与恢复事务、逐段取数权威源、Sidecar/IPC/沙箱、typed 事件运行链路、短 TTL `ReadyCapability` 上报和调度接线仍未实现；节点不直接发布商业 Offer，服务端 Offer 生成也未因本批合同自动接通。
+本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam、版本化合同、签名与摘要验证器、Manifest 语义校验和 InstallPlan 本机准入内核已形成代码，但本批尚未编译或启动。SQLite 本机权威库和 root-signed 双 keyring 已形成权威设计，具体 resolver/store、计划应用与恢复事务、三段式取数权威、真实 downloader、Sidecar/IPC/沙箱、typed 事件运行链路、短 TTL `ReadyCapability` 上报和调度接线仍未实现；节点不直接发布商业 Offer，服务端 Offer 生成也未因本批合同自动接通。

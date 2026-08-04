@@ -30,7 +30,7 @@ owners: backend, node, ai-economy
 | Capacity Supply 本人控制面 | HTTP/MCP 已可显式确认后向同一窗口的多个 open Bucket 原子追加 self-declared 供给，或把尚在 available 的供给原子撤入 retired；服务端固定首次时间并复用现有双分录账本，available 不等于 verified 或可交易，尚未编译和运行验证 |
 | 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；应用单事务激活内部 Provider/Pool，隔离单事务把其当前 active 状态转为 quarantined。两者均不发送节点命令、不直接改写 Offer、不移动资金，恢复尚未实现，状态为 `implementation_uncompiled` |
 | Offer 草稿、发布与生命周期控制面 | HTTP/MCP 已可创建、精确修订和撤销本人 draft Offer；管理员 HTTP 可原子发布 active、转为 draining，并在无 pending/active Reservation 时终结。v182-v184 保存追加式回执和依赖索引，所有写入口均不移动资金，状态为 `implementation_uncompiled` |
-| 节点插件治理合同 | Signed Manifest、InstallPlan、双槽 lifecycle 与短期 ReadyCapability 合同已写；RFC 8785 JCS、SHA-256、Ed25519 验签、Manifest 语义校验和失败关闭的本机计划准入内核已形成代码，尚未编译或接线 |
+| 节点插件治理合同 | Signed Manifest、InstallPlan、双槽 lifecycle 与短期 ReadyCapability 合同已写；RFC 8785 JCS、SHA-256、Ed25519 验签、Manifest 语义校验和失败关闭的本机计划准入内核已形成代码；本机权威库已选择独立 SQLite，并固定根签名双 keyring、库存 CAS、候选所有权、三段式下载认领与可信时间合同，代码与运行接线尚未完成 |
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 共享 CapacityPool 与追加式容量账本 | 领域合同、v165-v168 schema、隔离 Store、Store-canonical Supply/Claim 请求摘要、事务内 Claim kernel、只读审计、到期批处理、状态门卫和 epoch 轮换已写；v173 追加 Claim 完整历史，Hold V2 固定 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承原 held 绑定；尚未编译、执行迁移或接线 |
@@ -62,20 +62,21 @@ owners: backend, node, ai-economy
 1. `docs/decisions/distributed-compute-federation-v1.md`：不可随意改变的架构决定。
 2. `docs/distributed-compute/architecture.md`：Provider、控制面、数据面和任务状态。
 3. `docs/distributed-compute/node-client-and-plugins.md`：客户端按需启用与插件边界。
-4. `docs/decisions/distributed-compute-capacity-ledger-v1.md` 与 `docs/distributed-compute/capacity-ledger.md`：共享容量池、跨 Offer 防超卖和追加式容量账本。
-5. `docs/distributed-compute/market-and-settlement.md`：标准化 SKU、期货锁价和结算回执。
-6. `docs/distributed-compute/provider-api.md`：Provider 本人登记、查询和信任边界。
-7. `docs/distributed-compute/capacity-pool-api.md`：本人共享物理资源边界及摘要隐私合同。
-8. `docs/distributed-compute/capacity-bucket-api.md`：交付窗口 Bucket 登记、余额读取和窗口不变量。
-9. `docs/distributed-compute/capacity-supply-api.md`：本人供给追加、撤回、幂等和信任边界。
-10. `docs/distributed-compute/activation-evidence-api.md`：证据申请、人工审核、版本复核和“批准不等于激活”边界。
-11. `docs/distributed-compute/offer-api.md`：Offer 本人规范化草稿、管理员发布、安全退场与资金边界。
-12. `docs/distributed-compute/price-snapshot-api.md`：Offer 派生 fallback_curve 报价、候选效果与无资金效果边界。
-13. `docs/distributed-compute/broker-api.md`：Job、报价与预留 HTTP/MCP 控制面。
-14. `docs/distributed-compute/attempt-activation-api.md`：首次 Attempt 已接受登记、fencing、原子状态变化与无节点命令效果边界。
-15. `docs/distributed-compute/attempt-lease-api.md`：Lease 状态投影、受控续租、过期不可复活与无执行效果边界。
-16. `docs/distributed-compute/attempt-abort-api.md`：staging 无用量中止、容量归还、退款和外部声明边界。
-17. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
+4. `docs/distributed-compute/node-plugin-local-authority.md`：节点 SQLite 真源、根签名 keyring、计划应用、候选所有权与下载栅栏。
+5. `docs/decisions/distributed-compute-capacity-ledger-v1.md` 与 `docs/distributed-compute/capacity-ledger.md`：共享容量池、跨 Offer 防超卖和追加式容量账本。
+6. `docs/distributed-compute/market-and-settlement.md`：标准化 SKU、期货锁价和结算回执。
+7. `docs/distributed-compute/provider-api.md`：Provider 本人登记、查询和信任边界。
+8. `docs/distributed-compute/capacity-pool-api.md`：本人共享物理资源边界及摘要隐私合同。
+9. `docs/distributed-compute/capacity-bucket-api.md`：交付窗口 Bucket 登记、余额读取和窗口不变量。
+10. `docs/distributed-compute/capacity-supply-api.md`：本人供给追加、撤回、幂等和信任边界。
+11. `docs/distributed-compute/activation-evidence-api.md`：证据申请、人工审核、版本复核和“批准不等于激活”边界。
+12. `docs/distributed-compute/offer-api.md`：Offer 本人规范化草稿、管理员发布、安全退场与资金边界。
+13. `docs/distributed-compute/price-snapshot-api.md`：Offer 派生 fallback_curve 报价、候选效果与无资金效果边界。
+14. `docs/distributed-compute/broker-api.md`：Job、报价与预留 HTTP/MCP 控制面。
+15. `docs/distributed-compute/attempt-activation-api.md`：首次 Attempt 已接受登记、fencing、原子状态变化与无节点命令效果边界。
+16. `docs/distributed-compute/attempt-lease-api.md`：Lease 状态投影、受控续租、过期不可复活与无执行效果边界。
+17. `docs/distributed-compute/attempt-abort-api.md`：staging 无用量中止、容量归还、退款和外部声明边界。
+18. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
 
 ## 分阶段落地
 
@@ -87,7 +88,7 @@ owners: backend, node, ai-economy
 
 节点内部已经形成 Plugin Host 兼容 seam、Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架，并写入真实 Ed25519/JCS 验证、Manifest 语义校验及本机 InstallPlan 准入内核；云端还形成 v169 版本化 Provider Registry、v170 追加式 Offer Registry及 v182-v184 发布/生命周期控制。本人可创建规范化 draft Offer；平台管理员可发布 active、转为 draining，并在无活动预留时终结为 expired/revoked。这些入口均尚未编译、执行迁移或运行验证。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**。
 
-目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。Publisher/Control key resolver 的耐久实现、耐久 inventory store、计划应用 journal、逐段取数权威源、真实下载器、Sidecar 进程与 IPC、动态健康状态、云端 capability gate 和通用 Attempt 协议接线目前都未实现。
+目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。本机耐久真源已经选定为独立 SQLite，根签名双 keyring、原子计划应用、候选所有权、三段式下载认领与可信时间边界见 `docs/distributed-compute/node-plugin-local-authority.md`；对应 Store、真实下载器、Sidecar 进程与 IPC、动态健康状态、云端 capability gate 和通用 Attempt 协议接线目前都未实现。
 
 ### F2：Broker、验证和真实结算
 
