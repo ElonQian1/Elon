@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-本控制面已写入代码，但尚未编译、执行 v182-v184 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。本人可为已激活的 Provider/CapacityPool 创建规范化 `draft` Offer，并按精确版本撤销未发布草稿；平台管理员可原子发布、将 active Offer 转为 draining，并在依赖清理后转入 expired 或 revoked 终态。
+本控制面已写入代码，但尚未编译、执行 v182-v184 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。本人可创建、连续修订或撤销规范化 `draft` Offer；平台管理员可原子发布、将 active Offer 转为 draining，并在依赖清理后转入 expired 或 revoked 终态。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写入已有 v170 版本化 Offer Registry。服务端从 Provider、Pool 和 Bucket 当前版本生成规范合同、SKU 摘要与 Offer 摘要，调用方不能自行声称 active 状态或改写供给身份。
 
@@ -24,6 +24,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers?limit=20` | 列出该 Provider/Pool 下的 Offer |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id` | 读取一份 Offer 并重新审计当前投影和历史版本 |
 | POST | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/revoke` | 按精确版本和摘要执行 `draft -> revoked` |
+| POST | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/revise` | 按精确版本和摘要追加 draft 下一版本 |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/publication` | 所有者读取该 Offer 的发布回执 |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/drain` | 所有者读取该 Offer 的安全退场回执 |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/expiration` | 所有者读取 expired 回执 |
@@ -49,6 +50,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 | `compute_get_my_offer` | 只读 | 读取本人 Provider/Pool 下一份 Offer |
 | `compute_list_my_offers` | 只读 | 列出本人 Provider/Pool 下的 Offer |
 | `compute_revoke_my_offer_draft` | 显式确认的幂等写入 | 仅撤销本人当前 draft Offer |
+| `compute_revise_my_offer_draft` | 显式确认的幂等写入 | 完整替换本人当前 draft 合同并追加下一版本 |
 
 ## 4. 创建前置条件
 
@@ -77,6 +79,8 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 同一幂等键只能重放同一份规范合同。如果重放请求的业务字段变化，服务端拒绝把稳定 Offer ID 重绑到另一份合同。
 
 撤销要求 `expected_offer_version`、`expected_offer_digest` 和 `confirm_revoke=true`。服务端只允许当前 `draft -> revoked`，以连续下一版本保留不可变历史；对同一前置版本的重放会重新审计撤销前的 draft 摘要。本入口明确拒绝 active、draining、expired 或已被其他合同终结的 Offer。
+
+修订要求完整提交替换合同、`expected_offer_version`、`expected_offer_digest` 和 `confirm_revise=true`。服务端重新解析当前 active Provider/Pool/Bucket，追加连续 draft 版本并递增授权策略修订号；重放必须与预期历史和已写入合同完全一致。Offer ID、Provider、Pool、SKU ID 与 SKU 摘要属于稳定身份，不能原地改变；如需改变任务类型、模型/运行时身份、区域或 meter 集合，应创建新的 Offer。修订不会发布、生成 Price Snapshot、预留容量或移动资金。
 
 ## 6. 原子发布与回执
 
@@ -115,7 +119,7 @@ active Offer 只是生成报价的前置合同。现有候选查询从未过期 
 ## 9. 尚未实现
 
 - Cargo 编译、迁移执行、并发幂等和 HTTP/MCP 真实调用验证；
-- draft 原位修订、自动终态调度，以及已有 Reservation 的自动取消、退款和 Claim 归还；
+- 自动终态调度，以及已有 Reservation 的自动取消、退款和 Claim 归还；
 - Price Snapshot 生成、报价曲线、自动撮合与候选暴露；
 - 容量动态校准、Attempt 派发、用量验证和运行中结算；
 - 外部矿池适配器、多币种、Sui 资产和真实提现。
