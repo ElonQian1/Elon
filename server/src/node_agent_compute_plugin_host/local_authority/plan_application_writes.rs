@@ -171,35 +171,6 @@ pub(super) fn release_candidates(
     Ok(())
 }
 
-pub(super) fn revoke_prepared_fetch_claims(
-    transaction: &Transaction<'_>,
-    new_authority_epoch: i64,
-    applied_at_ms: i64,
-) -> Result<()> {
-    if new_authority_epoch <= 0 {
-        bail!("COMPUTE_PLUGIN_PLAN_AUTHORITY_EPOCH_INVALID");
-    }
-    transaction
-        .execute(
-            r#"UPDATE fetch_claims SET state = 'revoked', resolved_at_ms = ?1,
-            resolution_reason = 'authority_epoch_advanced_by_plan'
-        WHERE state = 'prepared' AND authority_epoch < ?2"#,
-            params![applied_at_ms, new_authority_epoch],
-        )
-        .context("COMPUTE_PLUGIN_PLAN_STALE_FETCH_CLAIMS_REVOKE")?;
-    let remaining = transaction
-        .query_row(
-            "SELECT COUNT(*) FROM fetch_claims WHERE state = 'prepared'",
-            [],
-            |row| row.get::<_, i64>(0),
-        )
-        .context("COMPUTE_PLUGIN_PLAN_PREPARED_FETCH_CLAIMS_CHECK")?;
-    if remaining != 0 {
-        bail!("COMPUTE_PLUGIN_PLAN_PREPARED_FETCH_CLAIMS_FUTURE_EPOCH");
-    }
-    Ok(())
-}
-
 pub(super) fn insert_candidates_and_downloads(
     transaction: &Transaction<'_>,
     projected: &ProjectedPlanApplication,

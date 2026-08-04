@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, Transaction};
 
 use super::{
+    fetch_claim_revocation::{revoke_for_authority_epoch_advance, FetchClaimRevocationReason},
     keyring_integrity::timestamp_millis,
     keyring_snapshot::{
         advance_trusted_time, load_snapshot_for_state, read_authority_keyring_state,
@@ -110,6 +111,13 @@ impl ComputePluginLocalAuthority {
                 bail!("COMPUTE_PLUGIN_AUTHORITY_FENCE_EXHAUSTED");
             }
             insert_validated_bundle(transaction, &candidate, trusted_now.timestamp_millis())?;
+            revoke_for_authority_epoch_advance(
+                transaction,
+                state.authority_epoch,
+                state.authority_epoch + 1,
+                trusted_now.timestamp_millis(),
+                FetchClaimRevocationReason::AuthorityEpochAdvancedByKeyring,
+            )?;
             activate_bundle(
                 transaction,
                 &state,

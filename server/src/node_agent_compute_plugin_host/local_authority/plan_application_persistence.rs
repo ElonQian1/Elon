@@ -4,6 +4,7 @@ use rusqlite::{params, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
 
 use super::{
+    fetch_claim_revocation::{revoke_for_authority_epoch_advance, FetchClaimRevocationReason},
     keyring_snapshot::PersistedComputePluginKeyringSnapshot,
     plan_application::{
         prepare_application_request, AuthorityPlanApplicationState,
@@ -20,7 +21,7 @@ use super::{
     },
     plan_application_writes::{
         insert_candidates_and_downloads, insert_event_and_seal, insert_plan_application,
-        release_candidates, revoke_prepared_fetch_claims, update_authority_meta,
+        release_candidates, update_authority_meta,
     },
 };
 use crate::node_agent_compute_plugin_host::{
@@ -340,7 +341,13 @@ pub(super) fn persist_plan_application(
         admitted.plan_digest(),
         applied_at_ms,
     )?;
-    revoke_prepared_fetch_claims(transaction, authority_epoch, applied_at_ms)?;
+    revoke_for_authority_epoch_advance(
+        transaction,
+        authority.authority_epoch,
+        authority_epoch,
+        applied_at_ms,
+        FetchClaimRevocationReason::AuthorityEpochAdvancedByPlan,
+    )?;
     insert_candidates_and_downloads(
         transaction,
         &projected,

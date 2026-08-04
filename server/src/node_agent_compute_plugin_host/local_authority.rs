@@ -5,6 +5,7 @@ use rusqlite::{Connection, Transaction, TransactionBehavior};
 
 use super::local_authority_schema;
 
+mod fetch_claim_revocation;
 mod initialization;
 mod keyring_integrity;
 mod keyring_snapshot;
