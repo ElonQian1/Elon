@@ -12,9 +12,13 @@ use serde::Serialize;
 
 use super::{now, Store};
 
+mod compute_settlement;
 mod release;
 mod reserve;
 
+pub(super) use compute_settlement::{
+    settle_compute_billing_reservation_on, ComputeBillingSettlementOutcome,
+};
 use release::release_billing_call_compat_on;
 pub(super) use release::release_billing_call_reservation_on;
 use reserve::reserve_billing_call_compat_on;
