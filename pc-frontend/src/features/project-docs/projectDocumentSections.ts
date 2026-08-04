@@ -13,6 +13,10 @@ import {
   type DocumentGovernanceFacets,
   type DocumentRelation,
 } from './projectDocumentGovernance'
+import {
+  sanitizeProjectContextMemories,
+  type ProjectContextMemory,
+} from './projectDocumentNativeContextModel'
 
 export const SECTION_CONFIG_PATH = '.elon/document-sections.json'
 export const ORGANIZATION_SUGGESTIONS_PATH = '.elon/document-organization-suggestions.json'
@@ -73,6 +77,7 @@ export interface DocumentSectionManifest {
   document_metadata: Record<string, DocumentKnowledgeMetadata>
   audit_log: DocumentOrganizationAuditEntry[]
   knowledge_graph: ProjectKnowledgeGraphConfig
+  context_memories: ProjectContextMemory[]
 }
 
 export interface DocumentSection {
@@ -137,6 +142,7 @@ export interface DocumentOrganizationSuggestions {
   governance_facets: Record<string, DocumentGovernanceFacets>
   file_operations: SuggestedFileOperation[]
   proposed_knowledge_graph: ProjectKnowledgeGraphConfig
+  proposed_context_memories: ProjectContextMemory[]
   documents_read: number
   estimated_tokens_used: number
 }
@@ -153,6 +159,7 @@ export const EMPTY_SECTION_MANIFEST: DocumentSectionManifest = {
   document_metadata: {},
   audit_log: [],
   knowledge_graph: EMPTY_KNOWLEDGE_GRAPH,
+  context_memories: [],
 }
 
 export const SYSTEM_DOCUMENT_SECTIONS: DocumentSection[] = [
@@ -286,6 +293,7 @@ export function parseSectionManifest(content: string): DocumentSectionManifest {
       document_metadata: documentMetadata,
       audit_log: sanitizeAuditLog(value.audit_log),
       knowledge_graph: sanitizeKnowledgeGraphConfig(value.knowledge_graph),
+      context_memories: sanitizeProjectContextMemories(value.context_memories),
     }
   } catch {
     return cloneEmptyManifest()
@@ -367,6 +375,7 @@ export function parseOrganizationSuggestions(content: string): DocumentOrganizat
       governance_facets: sanitizeGovernanceFacetsMap(value.governance_facets),
       file_operations: fileOperations,
       proposed_knowledge_graph: sanitizeKnowledgeGraphConfig(value.proposed_knowledge_graph),
+      proposed_context_memories: sanitizeProjectContextMemories(value.proposed_context_memories),
       documents_read: safeNonNegativeNumber(value.documents_read),
       estimated_tokens_used: safeNonNegativeNumber(value.estimated_tokens_used),
     }
@@ -564,5 +573,6 @@ function cloneEmptyManifest(): DocumentSectionManifest {
     document_metadata: {},
     audit_log: [],
     knowledge_graph: { nodes: [], edges: [] },
+    context_memories: [],
   }
 }

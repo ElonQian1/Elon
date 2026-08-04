@@ -2,13 +2,17 @@ import { CheckCircle2, FileWarning, Lightbulb, RefreshCw, Sparkles } from 'lucid
 
 import { formatNumber } from './projectDocumentModel'
 import ProjectDocumentFileOperations from './ProjectDocumentFileOperations'
+import ProjectDocumentNativeContextInbox from './ProjectDocumentNativeContextInbox'
 import { DOCUMENT_AUTOMATION_OPTIONS } from './projectDocumentAutomationPolicy'
 import type { DocumentAutomationMode, DocumentOrganizationSuggestions } from './projectDocumentSections'
-import type { DocumentOrganizationTrace } from './projectDocumentOrganizationStatus'
+import type { DocumentOrganizationTrace, DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
 import styles from './ProjectDocumentsWorkspace.module.css'
 
 interface Props {
   suggestions: DocumentOrganizationSuggestions | null
+  runtime: DocumentOrganizationTrackingRuntime
+  catalogRevision?: string
+  suggestionsRevision?: string
   trace: DocumentOrganizationTrace | null
   trackingAvailable: boolean
   trackingError: string
@@ -27,6 +31,9 @@ interface Props {
 
 export default function ProjectDocumentSuggestions({
   suggestions,
+  runtime,
+  catalogRevision,
+  suggestionsRevision,
   trace,
   trackingAvailable,
   trackingError,
@@ -50,6 +57,7 @@ export default function ProjectDocumentSuggestions({
     + (suggestions?.proposed_home ? 1 : 0)
     + (suggestions?.proposed_knowledge_graph.nodes.length ?? 0)
     + (suggestions?.proposed_knowledge_graph.edges.length ?? 0)
+    + (suggestions?.proposed_context_memories.length ?? 0)
   return (
     <main className={styles.suggestionsPane}>
       <header className={styles.suggestionsHeader}>
@@ -75,6 +83,14 @@ export default function ProjectDocumentSuggestions({
       <div className={styles.suggestionsBody}>
         {error && <div className={styles.errorBox}>{error}</div>}
         {trackingError && <div className={styles.errorBox}>{trackingError}</div>}
+        <ProjectDocumentNativeContextInbox
+          runtime={runtime}
+          canEdit={canEdit}
+          catalogRevision={catalogRevision}
+          suggestionsRevision={suggestionsRevision}
+          authorizationMode={automationMode}
+          onSuggestionsChanged={onRefresh}
+        />
         {trace && (
           <section className={styles.organizationTrace} data-status={trace.status}>
             <header>
@@ -173,6 +189,22 @@ export default function ProjectDocumentSuggestions({
                   ))}
                 </div>
                 <p className={styles.safetyNote}>图谱只保存节点和证据引用，不复制 Markdown 正文；应用后网页与 MCP 同时生效。</p>
+              </section>
+            )}
+
+            {!!suggestions.proposed_context_memories.length && (
+              <section>
+                <h3>待共享项目记忆 <em>{suggestions.proposed_context_memories.length}</em></h3>
+                <div className={styles.assignmentList}>
+                  {suggestions.proposed_context_memories.map((memory) => (
+                    <article key={memory.candidate_id}>
+                      <code>{memory.topics.join(' · ')}</code>
+                      <strong>{memory.summary}</strong>
+                      <span>证据：{memory.evidence.map((evidence) => `${evidence.path}${evidence.locator ? `#${evidence.locator}` : ''}`).join('；')}</span>
+                    </article>
+                  ))}
+                </div>
+                <p className={styles.safetyNote}>这里只保存短结论与 hash 证据；应用后写入 Git 共享 manifest，源码变化会使对应记忆失效。</p>
               </section>
             )}
 

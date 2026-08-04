@@ -51,11 +51,11 @@ pub(crate) fn definitions() -> Vec<Value> {
         ),
         tool(
             LIST_TOOL,
-            "列出外部本机索引中的原生工具理解候选，供项目文档治理任务审核后复制到 suggestions.proposed_context_memories。候选本身不是项目真源；跨 PC 生效必须经过既有 revision、authorization 和 apply 流程。",
+            "列出外部本机索引中的原生工具理解候选，供项目文档工作台审核并入 suggestions.proposed_context_memories。候选本身不是项目真源；跨 PC 生效必须经过既有 revision、authorization 和 apply 流程。",
             json!({
                 "type":"object",
                 "properties":{
-                    "status":{"type":"string","enum":["pending","applied","all"],"default":"pending"},
+                    "status":{"type":"string","enum":["pending","reviewed","rejected","applied","all"],"default":"pending"},
                     "limit":{"type":"integer","minimum":1,"maximum":20,"default":10}
                 }
             }),
@@ -84,7 +84,7 @@ pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result
                 "storage":"external_project_document_index",
                 "repository_changed":false,
                 "source_bodies_stored":0,
-                "next":"Review with project_docs_list_native_context_candidates, then include accepted entries in suggestions.proposed_context_memories and use the existing save/apply flow."
+                "next":"Review in the project document workspace or list with project_docs_list_native_context_candidates, then use the existing suggestions/apply flow."
             })))
         }
         LIST_TOOL => {

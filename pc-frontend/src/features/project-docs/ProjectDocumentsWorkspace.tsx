@@ -649,7 +649,8 @@ export default function ProjectDocumentsWorkspace({
           canEdit={!!catalog?.can_edit} onOpenDocument={openDocumentFromGovernance} onSave={saveGovernance} />
       ) : activeSection === 'suggestions' ? (
         <ProjectDocumentSuggestions
-          suggestions={organization.suggestions}
+          suggestions={organization.suggestions} runtime={organizationTracking}
+          catalogRevision={organization.trace?.catalog_revision || catalog?.revision} suggestionsRevision={organization.suggestionsRevision}
           trace={organization.trace}
           trackingAvailable={organization.trackingAvailable}
           trackingError={organization.trackingError}

@@ -80,6 +80,7 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
         .route("/api/project-docs/mcp/:session_id", post(mcp_handler))
         .merge(crate::project_document_observability_api::routes())
         .merge(crate::project_document_governance_api::routes())
+        .merge(crate::project_document_native_context_api::routes())
 }
 
 #[cfg(test)]

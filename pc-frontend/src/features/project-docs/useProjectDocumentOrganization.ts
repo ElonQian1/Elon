@@ -345,6 +345,7 @@ export function useProjectDocumentOrganization(
     manifest: manifestFile.value,
     manifestRevision: manifestFile.revision,
     suggestions: suggestionsFile.value,
+    suggestionsRevision: suggestionsFile.revision,
     loading,
     error,
     trace,

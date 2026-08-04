@@ -1,0 +1,269 @@
+.inbox {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, #8a6fe8 18%);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 94%, #8a6fe8 6%);
+}
+
+.header,
+.header > div,
+.candidateTitle,
+.actions,
+.actions > div,
+.candidate footer {
+  display: flex;
+  align-items: center;
+}
+
+.header,
+.actions,
+.candidate footer {
+  justify-content: space-between;
+}
+
+.header > div {
+  gap: 8px;
+}
+
+.header > div > span,
+.candidate footer,
+.intro,
+.unavailable {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.header button,
+.filters button,
+.actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.header button {
+  width: 32px;
+  padding: 0;
+}
+
+.intro,
+.unavailable {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.filters {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+}
+
+.filters button {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  color: var(--text-muted);
+}
+
+.filters button[data-active='true'] {
+  border-color: #8a6fe8;
+  background: color-mix(in srgb, #8a6fe8 14%, var(--surface));
+  color: var(--text);
+}
+
+.filters em {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.list {
+  display: grid;
+  gap: 9px;
+}
+
+.selectAll {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.candidate {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+}
+
+.candidate[data-current='false'] {
+  opacity: .68;
+}
+
+.candidateTitle {
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.candidateTitle > span {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+
+.candidateTitle strong {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.candidateTitle code,
+.evidence code {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidateTitle i {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #5eac7a;
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.candidate[data-current='false'] .candidateTitle i {
+  color: #cf6d73;
+}
+
+.topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.topics span {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #6ca7ff 12%, var(--surface));
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.evidence {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+}
+
+.evidence span,
+.evidence small {
+  color: var(--text-muted);
+}
+
+.error,
+.empty {
+  padding: 10px;
+  border-radius: 9px;
+  background: color-mix(in srgb, #cf6d73 10%, var(--surface));
+  color: #cf6d73;
+  font-size: 12px;
+}
+
+.empty {
+  background: color-mix(in srgb, var(--border) 25%, var(--surface));
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.actions {
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.actions > div {
+  gap: 7px;
+}
+
+.actions span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.actions button {
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+.actions .accept {
+  border-color: #6e59c6;
+  background: #6e59c6;
+  color: #fff;
+}
+
+.actions .reject {
+  color: #cf6d73;
+}
+
+.header button:disabled,
+.actions button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.spinning {
+  animation: spin .8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 720px) {
+  .actions,
+  .actions > div {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .actions > div {
+    flex-wrap: wrap;
+  }
+
+  .evidence li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .evidence small {
+    display: none;
+  }
+}

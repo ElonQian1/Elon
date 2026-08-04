@@ -17,6 +17,17 @@ const governanceOutput = ts.transpileModule(fs.readFileSync(governancePath, 'utf
 const governanceLoaded = { exports: {} }
 new Function('module', 'exports', 'require', governanceOutput)(governanceLoaded, governanceLoaded.exports, require)
 
+const nativeContextModelPath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentNativeContextModel.ts')
+const nativeContextModelOutput = ts.transpileModule(fs.readFileSync(nativeContextModelPath, 'utf8'), {
+  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+}).outputText
+const nativeContextModelLoaded = { exports: {} }
+new Function('module', 'exports', 'require', nativeContextModelOutput)(
+  nativeContextModelLoaded,
+  nativeContextModelLoaded.exports,
+  (request) => request === '../node/localNodeApi' ? { nodeApi: async () => ({}) } : require(request),
+)
+
 const sourcePath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentSections.ts')
 const source = fs.readFileSync(sourcePath, 'utf8')
 const output = ts.transpileModule(source, {
@@ -29,6 +40,7 @@ new Function('module', 'exports', 'require', output)(
   (request) => {
     if (request === './projectDocumentKnowledgeGraphModel') return graphModelLoaded.exports
     if (request === './projectDocumentGovernance') return governanceLoaded.exports
+    if (request === './projectDocumentNativeContextModel') return nativeContextModelLoaded.exports
     return require(request)
   },
 )
@@ -82,6 +94,11 @@ const manifest = parseSectionManifest(JSON.stringify({
   knowledge_graph: { nodes: [{
     id: 'cap-research', view: 'capabilities', label: '研究能力', document_paths: ['docs/research.md'],
   }], edges: [] },
+  context_memories: [{
+    candidate_id: 'native-shared', summary: 'Shared project routing is verified by the current source file.',
+    topics: ['routing'], evidence: [{ path: 'src/routes.rs', content_hash: 'a'.repeat(64), locator: 'routes', evidence_kind: 'source' }],
+    reviewed_at: 'catalog:one',
+  }],
   audit_log: [{ id: 'one', action: 'test', target: 'docs/research.md', summary: '测试审计', at: '2026-07-17T00:00:00Z' }],
 }))
 assert.equal(manifest.assignments['docs/research.md'], 'custom:research')
@@ -95,6 +112,7 @@ assert.equal(manifest.document_metadata['docs/research.md'].pinned, true)
 assert.equal(manifest.document_metadata['docs/unknown.md'].version_status, 'archived')
 assert.equal(manifest.audit_log[0].action, 'test')
 assert.equal(manifest.knowledge_graph.nodes[0].id, 'cap-research')
+assert.equal(manifest.context_memories[0].candidate_id, 'native-shared')
 const documents = [
   document('AGENTS.md', 'router'),
   document('.github/agents/reviewer.agent.md', 'agent_definition'),
@@ -147,6 +165,11 @@ const suggestions = parseOrganizationSuggestions(JSON.stringify({
     nodes: [{ id: 'cap-api', view: 'capabilities', label: 'API 能力', document_paths: ['docs/unknown.md'] }],
     edges: [],
   },
+  proposed_context_memories: [{
+    candidate_id: 'native-api', summary: 'API routing is verified by the current source and its hash.',
+    topics: ['api'], evidence: [{ path: 'src/api.rs', content_hash: 'b'.repeat(64), locator: 'api_routes', evidence_kind: 'source' }],
+    reviewed_at: 'catalog:two',
+  }],
   documents_read: 1,
   estimated_tokens_used: 20,
 }))
@@ -158,6 +181,7 @@ assert.equal(suggestions.governance_facets['docs/unknown.md'].lifecycle, 'draft'
 assert.equal(suggestions.file_operations.length, 1)
 assert.equal(suggestions.file_operations[0].status, 'proposed')
 assert.equal(suggestions.proposed_knowledge_graph.nodes[0].id, 'cap-api')
+assert.equal(suggestions.proposed_context_memories[0].candidate_id, 'native-api')
 
 const boundedSuggestions = parseOrganizationSuggestions(JSON.stringify({
   status: 'ready',
@@ -587,5 +611,13 @@ const suggestionsSource = fs.readFileSync(path.join(
 assert(suggestionsSource.includes('AI 分区治理建议'))
 assert(suggestionsSource.includes('理由：'))
 assert(suggestionsSource.includes('影响：'))
+assert(suggestionsSource.includes('ProjectDocumentNativeContextInbox'))
+assert(suggestionsSource.includes('待共享项目记忆'))
+const nativeContextSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentNativeContextInbox.tsx',
+), 'utf8')
+assert(nativeContextSource.includes('/api/project-docs/native-context') === false, '候选 API 应封装在模型客户端中')
+assert(nativeContextSource.includes('接受并入建议'))
+assert(nativeContextSource.includes('证据已漂移'))
 
 console.log('project document section model tests passed')

@@ -180,9 +180,13 @@ pub(crate) fn list_candidates(
     initialize_candidate_schema(&index)?;
     let status = match requested_status.trim() {
         "" | "pending" => Some("pending"),
+        "reviewed" => Some("reviewed"),
+        "rejected" => Some("rejected"),
         "applied" => Some("applied"),
         "all" => None,
-        _ => bail!("native context candidate status 仅支持 pending、applied 或 all"),
+        _ => bail!(
+            "native context candidate status 仅支持 pending、reviewed、rejected、applied 或 all"
+        ),
     };
     let mut statement = index.conn.prepare(
         "SELECT status,candidate_json FROM native_context_candidates
@@ -334,7 +338,7 @@ fn sha256_file(path: &Path) -> Result<String> {
     Ok(format!("{:x}", digest.finalize()))
 }
 
-fn initialize_candidate_schema(index: &ProjectDocumentIndex) -> Result<()> {
+pub(crate) fn initialize_candidate_schema(index: &ProjectDocumentIndex) -> Result<()> {
     index.conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS native_context_candidates(
            id TEXT PRIMARY KEY,status TEXT NOT NULL,candidate_json TEXT NOT NULL,
