@@ -30,6 +30,9 @@ pub(super) fn capture_expected_claim_recovery_key(
 ) -> ComputePluginFetchClaimRecoveryKey {
     let facts = &snapshot.store;
     ComputePluginFetchClaimRecoveryKey {
+        authority_instance_binding: authority_session
+            .recovery_authority_instance_binding()
+            .clone(),
         installation_id_digest: authority_session
             .recovery_installation_id_digest()
             .to_string(),
@@ -87,7 +90,13 @@ impl AuthorizedComputePluginDownloadSegment {
             .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_RECOVERY_RANGE_OVERFLOW"))?;
         let installation_id_digest = authority_session.recovery_installation_id_digest();
         let key = &self.recovery_key;
-        if !is_sha256(installation_id_digest)
+        if authority_session
+            .validate_fetch_cancellation_guard(&self.cancellation)
+            .is_err()
+            || !key
+                .authority_instance_binding()
+                .matches(authority_session.recovery_authority_instance_binding())
+            || !is_sha256(installation_id_digest)
             || installation_id_digest != key.installation_id_digest
             || authority_session.recovery_process_owner_epoch() != key.process_owner_epoch
             || key.claim_id != self.claim.claim_id
@@ -146,6 +155,7 @@ pub(super) fn inspect_claim_outcome(
     key: &ComputePluginFetchClaimRecoveryKey,
     authority_session: &ComputePluginFetchAuthoritySession<'_>,
 ) -> Result<ComputePluginFetchClaimOutcome> {
+    validate_recovery_authority_instance(key, authority_session)?;
     authority_session.read_claim_outcome(key)
 }
 
@@ -156,6 +166,7 @@ pub(super) fn abort_recovered_prepared_claim(
     observed: &ComputePluginFetchClaimOutcome,
     authority_session: ComputePluginFetchAuthoritySession<'_>,
 ) -> Result<ComputePluginFetchClaimOutcome> {
+    validate_recovery_authority_instance(key, &authority_session)?;
     if observed.kind() != ComputePluginFetchClaimOutcomeKind::Prepared {
         bail!("COMPUTE_PLUGIN_FETCH_RECOVERY_NOT_PREPARED");
     }
@@ -165,4 +176,17 @@ pub(super) fn abort_recovered_prepared_claim(
     }
     let permit = ValidatedComputePluginFetchRecoveryAbortPermit::new(key, &fresh);
     authority_session.abort_recovered_prepared_claim(permit)
+}
+
+fn validate_recovery_authority_instance(
+    key: &ComputePluginFetchClaimRecoveryKey,
+    authority_session: &ComputePluginFetchAuthoritySession<'_>,
+) -> Result<()> {
+    if !key
+        .authority_instance_binding()
+        .matches(authority_session.recovery_authority_instance_binding())
+    {
+        bail!("COMPUTE_PLUGIN_FETCH_RECOVERY_AUTHORITY_INSTANCE_CHANGED");
+    }
+    Ok(())
 }

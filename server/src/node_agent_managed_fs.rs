@@ -16,11 +16,13 @@ use sha2::{Digest, Sha256};
 #[path = "node_agent_managed_fs/unsupported.rs"]
 mod platform;
 mod types;
+mod write;
 
 pub(crate) use types::{
     ManagedDirectoryPrepareFailure, ManagedFileOpenFailure, PinnedManagedDirectory,
     PinnedManagedFile, PinnedManagedRoot, QuarantinedManagedFile,
 };
+pub(crate) use write::{ManagedFileSegmentWriteFailure, ManagedFileSegmentWritePhase};
 #[cfg(windows)]
 #[path = "node_agent_managed_fs/windows.rs"]
 mod platform;
@@ -325,22 +327,6 @@ impl PinnedManagedFile {
             bail!("NODE_MANAGED_FILE_READ_LIMIT");
         }
         String::from_utf8(bytes).map_err(|_| anyhow!("NODE_MANAGED_FILE_NOT_UTF8"))
-    }
-
-    pub(crate) fn truncate_sync_and_revalidate(&mut self, expected_len: u64) -> Result<()> {
-        self.file.set_len(expected_len)?;
-        self.file.sync_all()?;
-        self.revalidate_exact(expected_len)
-    }
-
-    fn revalidate_exact(&mut self, expected_len: u64) -> Result<()> {
-        let identity = platform::inspect(&self.file)?;
-        validate_regular_file_identity(identity, self.identity.volume_serial)?;
-        if !same_file_identity(identity, self.identity) || identity.file_size != expected_len {
-            bail!("NODE_MANAGED_FILE_IDENTITY_OR_LENGTH_CHANGED");
-        }
-        self.identity = identity;
-        Ok(())
     }
 }
 

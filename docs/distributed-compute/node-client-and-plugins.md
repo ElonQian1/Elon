@@ -1,7 +1,7 @@
 ---
 title: 分布式算力节点客户端与按需插件
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: node, pc
 ---
 
@@ -117,7 +117,7 @@ Manifest 只能声明请求，不能授予权限、证明本机已安装或健�
 
 本批合同把 Attempt 控制固定为 `Start`、`RenewLease` 和 `Cancel`，秘密租约引用只留在 Host，不转发给 Runner。Runner 只产生 typed `Started/Heartbeat/Progress/StreamChunk/CheckpointReady/UsageSnapshot/Terminal` 事件；Host 校验大小、顺序和摘要，补写 Attempt 身份与 fencing generation，再转换成 Host 侧 typed 事件。云端 v188/v189 已写入累计 `provider_declared` 快照和首次 Provider 终态候选 Store/HTTP，但尚未与本 Host 事件接线。Runner 自报用量和终态始终只是声明，不是执行回执或结算决定。
 
-第一批内部兼容 seam 仍直接调用现有 Rust 本地推理函数。本机权威库已确定为独立 SQLite，并已形成 root-signed 双 keyring、authority schema v2、库存/计划/候选原子事务、PlanApply、三段式 claim/cursor Store 与类型化不确定结果恢复。Windows 文件层又形成单一类型化 installation identity、长期 root capability、Volume GUID 卷根、父目录句柄相对 `NtCreateFile`、同句柄 marker/文件身份、精确 `.part` 路径、offset-zero `create_new` 恢复、游标短缺 evidence 和长尾同句柄截断/sync 合同；非 Windows 暂时失败关闭。这些能力尚未由启动或 Host 接线，真实数据库和真实下载仍未发生。分段写入、可信时间绑定后的 durable proof、原子槽切换、Sidecar 进程、IPC framing、资源沙箱、事件背压、`ReadyCapability` 上报与真实 Attempt 运行接线仍未实现。
+第一批内部兼容 seam 仍直接调用现有 Rust 本地推理函数。本机权威库已确定为独立 SQLite，并已形成 root-signed 双 keyring、authority schema v2、库存/计划/候选原子事务、PlanApply、三段式 claim/cursor Store 与类型化不确定结果恢复。Windows 文件层又形成单一类型化 installation identity、长期 root capability、Volume GUID 卷根、父目录句柄相对 `NtCreateFile`、同句柄 marker/文件身份、精确 `.part` 路径、offset-zero `create_new` 恢复、游标短缺 evidence 和长尾同句柄截断/sync 合同；非 Windows 暂时失败关闭。本批继续形成了 process-fence 唯一持有且绑定 authority/installation/process epoch 的 canonical cancellation source、认领前 guard、最多 64 KiB 的同句柄分段写入、每 write syscall 前取消检查、flush/fsync、写后同句柄完整身份与精确长度复核，以及 synced capability 到单一 durable capability 的 post-sync 可信时间绑定。一次性 bind permit 防止拆出 synced 内部能力；Durable 直接拥有 Authorized、`PinnedManagedFile` 和 authority session，commit 不再接收可错配的 claim/file 双参数；文件变更后的 write/bind/commit 失败只返回不可写、不可解包的 recovery wrapper。进程内 authority facade identity 贯穿 fence、claim recovery 与 session，防止相同标量的另一 facade 混入；fetch fence 与全部 fetch session 还只能消费同 clock epoch 的 sealed trusted-time observation，不再接裸 `DateTime`。这些能力仍未由启动或 Host 接线，真实数据库和网络下载没有发生；该 observation 目前也没有生产生成器。每次 socket read 取消检查、真实 downloader、全工件摘要、原子槽切换、Sidecar 进程、IPC framing、资源沙箱、事件背压、`ReadyCapability` 上报与真实 Attempt 运行接线仍未实现。
 
 ## 10. 模型与缓存
 
@@ -143,4 +143,4 @@ V1 只运行平台批准的任务种类和签名 Runner，不接受请求方上�
 
 ## 13. 当前未验证声明
 
-本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam、版本化合同、签名与摘要验证器、Manifest/InstallPlan 准入、双 keyring、本机 authority v2、PlanApply、逐段 claim Store，以及 Windows Volume GUID 卷根、父句柄相对打开和同句柄游标对账能力已形成代码，但尚未编译、启动、建库、迁移或接入 Host。启动路径仍未持有 root capability，真实 downloader、写后可信时间与 durable proof、短文件 Store 终结、全工件校验、Sidecar/IPC/沙箱、typed 事件运行链路、短 TTL `ReadyCapability` 上报和调度接线仍未实现；节点不直接发布商业 Offer，服务端 Offer 生成也未因本批合同自动接通。
+本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam、版本化合同、签名与摘要验证器、Manifest/InstallPlan 准入、双 keyring、本机 authority v2、PlanApply、逐段 claim Store，以及 Windows Volume GUID 卷根、父句柄相对打开、同句柄游标对账、分段写入/fsync、写后 capability 与可信时间 binder 已形成代码，但尚未编译、启动、建库、迁移或接入 Host。启动路径仍未持有 root/cancellation capability，可信时间内核尚不能生产 observation，因此 durable proof 只有不可绕过的类型路径而没有生产调用；真实 HTTPS downloader、socket-read 取消检查、短文件 Store 终结、全工件校验、Sidecar/IPC/沙箱、typed 事件运行链路、短 TTL `ReadyCapability` 上报和调度接线仍未实现。节点不直接发布商业 Offer，服务端 Offer 生成也未因本批合同自动接通。

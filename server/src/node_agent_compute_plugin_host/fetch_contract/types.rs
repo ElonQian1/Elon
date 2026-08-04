@@ -1,9 +1,17 @@
 use std::fmt;
 
-use crate::node_agent_compute_plugin_host::{
-    fetch_contract::recovery::ComputePluginFetchClaimRecoveryKey,
-    install_plan_admission::AdmittedComputePluginDownload,
-    local_authority::{ComputePluginFetchAuthorityFacts, ComputePluginFetchAuthoritySession},
+use crate::{
+    node_agent_compute_plugin_host::{
+        fetch_contract::{
+            cancellation::ComputePluginFetchCancellationGuard,
+            recovery::ComputePluginFetchClaimRecoveryKey,
+        },
+        install_plan_admission::AdmittedComputePluginDownload,
+        local_authority::{
+            ComputePluginFetchAuthorityFacts, ComputePluginPostSyncFetchAuthoritySession,
+        },
+    },
+    node_agent_managed_fs::PinnedManagedFile,
 };
 
 #[derive(PartialEq, Eq)]
@@ -51,6 +59,7 @@ pub(crate) struct AuthorizedComputePluginDownloadSegment {
     pub(super) redirect_hop: u8,
     pub(super) claim: PreparedComputePluginFetchClaim,
     pub(super) recovery_key: ComputePluginFetchClaimRecoveryKey,
+    pub(super) cancellation: ComputePluginFetchCancellationGuard,
 }
 
 impl AuthorizedComputePluginDownloadSegment {
@@ -96,6 +105,24 @@ impl AuthorizedComputePluginDownloadSegment {
 
     pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
         self.recovery_key.installation_id_digest()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn claim_id(&self) -> &str {
+        &self.claim.claim_id
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn cursor_generation(&self) -> i64 {
+        self.claim.cursor_generation
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn prepared_at_ms(&self) -> i64 {
+        self.claim.prepared_at_ms
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn ensure_not_canceled(
+        &self,
+    ) -> anyhow::Result<()> {
+        self.cancellation.ensure_current()
     }
 }
 
@@ -162,22 +189,14 @@ impl ComputePluginFetchAbortReason {
     }
 }
 
-/// Opaque evidence that a future downloader kept the exact `.part` file open through a successful
-/// durability barrier and observed the claimed end offset on that same file identity. There is no
-/// production constructor until the downloader/file-handle layer lands, so Store commit cannot be
-/// reached from a caller-provided `fsynced: bool` or scalar length assertion.
+/// Opaque linear evidence that the exact authorized `.part` file crossed a same-handle durability
+/// barrier and was then bound to a trusted-time observation. It owns the authorization so callers
+/// cannot pair file evidence with another claim or retry either mutation independently.
 pub(crate) struct DurablyWrittenComputePluginSegment<'authority> {
-    pub(super) _file: std::fs::File,
-    pub(super) resolution_session: ComputePluginFetchAuthoritySession<'authority>,
-    pub(super) claim_id: String,
-    pub(super) part_relative_path: String,
-    pub(super) file_identity_digest: String,
-    pub(super) cursor_generation: i64,
-    pub(super) offset_bytes: i64,
-    pub(super) end_offset_bytes: i64,
-    pub(super) durable_file_length_bytes: i64,
-    pub(super) fsync_through_offset_bytes: i64,
-    pub(super) durably_synced_at_ms: i64,
+    pub(super) authorized: AuthorizedComputePluginDownloadSegment,
+    pub(super) file: PinnedManagedFile,
+    pub(super) resolution_session: ComputePluginPostSyncFetchAuthoritySession<'authority>,
+    pub(super) sync_completed_at: std::time::Instant,
 }
 
 impl fmt::Debug for DurablyWrittenComputePluginSegment<'_> {
@@ -185,17 +204,15 @@ impl fmt::Debug for DurablyWrittenComputePluginSegment<'_> {
         formatter
             .debug_struct("DurablyWrittenComputePluginSegment")
             .field("claim_id", &"<redacted>")
-            .field("part_relative_path", &self.part_relative_path)
+            .field("part_relative_path", &self.authorized.part_relative_path())
             .field("file_identity_digest", &"<redacted>")
-            .field("cursor_generation", &self.cursor_generation)
-            .field("offset_bytes", &self.offset_bytes)
-            .field("end_offset_bytes", &self.end_offset_bytes)
-            .field("durable_file_length_bytes", &self.durable_file_length_bytes)
+            .field("cursor_generation", &self.authorized.cursor_generation())
+            .field("offset_bytes", &self.authorized.offset_bytes())
+            .field("end_offset_bytes", &self.authorized.end_offset_bytes())
             .field(
-                "fsync_through_offset_bytes",
-                &self.fsync_through_offset_bytes,
+                "post_sync_trusted_at_ms",
+                &self.resolution_session.trusted_now_ms(),
             )
-            .field("durably_synced_at_ms", &self.durably_synced_at_ms)
             .finish()
     }
 }
@@ -302,12 +319,12 @@ impl<'permit> ValidatedComputePluginFetchCommitPermit<'permit> {
     pub(super) fn new(
         claim: &'permit PreparedComputePluginFetchClaim,
         snapshot: &'permit ComputePluginFetchAuthoritySnapshot,
-        durable: &'permit DurablyWrittenComputePluginSegment<'_>,
+        file_identity_digest: &'permit str,
     ) -> Self {
         Self {
             claim,
             snapshot,
-            file_identity_digest: &durable.file_identity_digest,
+            file_identity_digest,
         }
     }
 

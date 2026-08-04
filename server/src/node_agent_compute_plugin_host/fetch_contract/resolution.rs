@@ -24,24 +24,38 @@ use crate::node_agent_compute_plugin_host::{
 
 mod failure;
 
-pub(super) use failure::{
-    ComputePluginFetchAbortFailure, ComputePluginFetchAbortResult, ComputePluginFetchCommitFailure,
-    ComputePluginFetchCommitResult, ComputePluginFetchStoreMutationPhase,
+pub(super) use failure::{ComputePluginFetchAbortFailure, ComputePluginFetchAbortResult};
+pub(in crate::node_agent_compute_plugin_host) use failure::{
+    ComputePluginFetchCommitFailure, ComputePluginFetchCommitResult,
+    ComputePluginFetchStoreMutationPhase,
 };
 
-/// Terminalizes a segment only after a future file-handle layer supplies opaque durable-write
-/// evidence. This function is intentionally unreachable from production until that layer lands.
-pub(super) fn commit_download_segment<'authority>(
+/// Terminalizes a segment from one linear capability that owns the exact authorization, pinned
+/// file and post-fsync trusted authority session. Every failure consumes authorization and leaves
+/// only outcome recovery identity plus the still-open file.
+pub(super) fn commit_download_segment(
     admitted: &AdmittedComputePluginInstallPlan,
-    authorized: AuthorizedComputePluginDownloadSegment,
-    durable: DurablyWrittenComputePluginSegment<'authority>,
-) -> ComputePluginFetchCommitResult<'authority> {
-    if let Err(error) = authorized.validate_recovery_session(&durable.resolution_session) {
-        return Err(
-            ComputePluginFetchCommitFailure::recovery_binding_unavailable(
-                error, authorized, durable,
-            ),
-        );
+    durable: DurablyWrittenComputePluginSegment<'_>,
+) -> ComputePluginFetchCommitResult {
+    let DurablyWrittenComputePluginSegment {
+        authorized,
+        mut file,
+        resolution_session,
+        sync_completed_at,
+    } = durable;
+    if let Err(error) = authorized
+        .validate_recovery_session(resolution_session.authority_session())
+        .and_then(|_| authorized.ensure_not_canceled())
+        .and_then(|_| {
+            validate_durable_binding(&authorized, &file, &resolution_session, sync_completed_at)
+        })
+    {
+        return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
+            ComputePluginFetchStoreMutationPhase::StoreNotCalled,
+            error,
+            authorized.into_recovery_key(),
+            file,
+        ));
     }
     let download = match validate_authorized_binding(admitted, &authorized) {
         Ok(download) => download,
@@ -51,21 +65,32 @@ pub(super) fn commit_download_segment<'authority>(
                 ComputePluginFetchStoreMutationPhase::StoreNotCalled,
                 error,
                 recovery_key,
-                durable,
+                file,
             ));
         }
     };
-    if let Err(error) = validate_durable_binding(&authorized.claim, &durable) {
+    let expected_end = match u64::try_from(authorized.claim.end_offset_bytes) {
+        Ok(expected_end) => expected_end,
+        Err(error) => {
+            return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
+                ComputePluginFetchStoreMutationPhase::StoreNotCalled,
+                error.into(),
+                authorized.into_recovery_key(),
+                file,
+            ));
+        }
+    };
+    if let Err(error) = file.revalidate_exact_len(expected_end) {
         let recovery_key = authorized.into_recovery_key();
         return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
             ComputePluginFetchStoreMutationPhase::StoreNotCalled,
             error,
             recovery_key,
-            durable,
+            file,
         ));
     }
     let authority = ComputePluginFetchAuthorityPort {
-        backend: &durable.resolution_session,
+        backend: resolution_session.authority_session(),
     };
     let request = ComputePluginDownloadSegmentRequest {
         ordinal: authorized.claim.ordinal,
@@ -88,7 +113,7 @@ pub(super) fn commit_download_segment<'authority>(
                 ComputePluginFetchStoreMutationPhase::StoreNotCalled,
                 error,
                 recovery_key,
-                durable,
+                file,
             ));
         }
     };
@@ -99,30 +124,45 @@ pub(super) fn commit_download_segment<'authority>(
             ComputePluginFetchStoreMutationPhase::StoreNotCalled,
             error,
             recovery_key,
-            durable,
+            file,
         ));
     }
-    if snapshot.store.trusted_now.timestamp_millis() != durable.durably_synced_at_ms
-        || durable.durably_synced_at_ms <= authorized.claim.prepared_at_ms
-        || durable.durably_synced_at_ms <= snapshot.store.observed_trusted_time_high_water_ms
+    let post_sync_trusted_at_ms = resolution_session.trusted_now_ms();
+    if snapshot.store.trusted_now.timestamp_millis() != post_sync_trusted_at_ms
+        || post_sync_trusted_at_ms <= authorized.claim.prepared_at_ms
+        || post_sync_trusted_at_ms <= snapshot.store.observed_trusted_time_high_water_ms
     {
         let recovery_key = authorized.into_recovery_key();
         return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
             ComputePluginFetchStoreMutationPhase::StoreNotCalled,
             anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_COMMIT_TIME_OBSERVATION_STALE"),
             recovery_key,
-            durable,
+            file,
         ));
     }
-    let permit =
-        ValidatedComputePluginFetchCommitPermit::new(&authorized.claim, &snapshot, &durable);
+    if let Err(error) = file
+        .revalidate_exact_len(expected_end)
+        .and_then(|_| authorized.ensure_not_canceled())
+    {
+        return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
+            ComputePluginFetchStoreMutationPhase::StoreNotCalled,
+            error,
+            authorized.into_recovery_key(),
+            file,
+        ));
+    }
+    let permit = ValidatedComputePluginFetchCommitPermit::new(
+        &authorized.claim,
+        &snapshot,
+        file.identity_digest(),
+    );
     if let Err(error) = authority.commit_validated_segment(permit) {
         let recovery_key = authorized.into_recovery_key();
         return Err(ComputePluginFetchCommitFailure::outcome_recovery_required(
             ComputePluginFetchStoreMutationPhase::StoreOutcomeUncertain,
             error,
             recovery_key,
-            durable,
+            file,
         ));
     }
     Ok(CommittedComputePluginDownloadSegment {
@@ -215,18 +255,16 @@ fn validate_authorized_binding<'admitted>(
 }
 
 fn validate_durable_binding(
-    claim: &PreparedComputePluginFetchClaim,
-    durable: &DurablyWrittenComputePluginSegment<'_>,
+    authorized: &AuthorizedComputePluginDownloadSegment,
+    file: &crate::node_agent_managed_fs::PinnedManagedFile,
+    resolution_session: &crate::node_agent_compute_plugin_host::local_authority::ComputePluginPostSyncFetchAuthoritySession<'_>,
+    sync_completed_at: std::time::Instant,
 ) -> Result<()> {
-    if durable.claim_id != claim.claim_id
-        || durable.part_relative_path != claim.part_relative_path
-        || !is_sha256(&durable.file_identity_digest)
-        || durable.cursor_generation != claim.cursor_generation
-        || durable.offset_bytes != claim.offset_bytes
-        || durable.end_offset_bytes != claim.end_offset_bytes
-        || durable.durable_file_length_bytes != claim.end_offset_bytes
-        || durable.fsync_through_offset_bytes != claim.end_offset_bytes
-        || durable.durably_synced_at_ms < 0
+    let expected_len = u64::try_from(authorized.claim.end_offset_bytes)?;
+    if !is_sha256(file.identity_digest())
+        || file.len_bytes() != expected_len
+        || !resolution_session.was_observed_strictly_after(sync_completed_at)
+        || resolution_session.trusted_now_ms() <= authorized.claim.prepared_at_ms
     {
         bail!("COMPUTE_PLUGIN_FETCH_DURABLE_FILE_BINDING_CHANGED");
     }

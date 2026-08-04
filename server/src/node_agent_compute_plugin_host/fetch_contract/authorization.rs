@@ -5,6 +5,7 @@ use super::{
         ComputePluginFetchAuthorizationFailure, ComputePluginFetchAuthorizationResult,
         ComputePluginFetchRedirectFailure, ComputePluginFetchRedirectResult,
     },
+    cancellation::ComputePluginFetchCancellationGuard,
     recovery,
     types::{
         AuthorizedComputePluginDownloadSegment, ComputePluginDownloadSegmentRequest,
@@ -25,8 +26,13 @@ use crate::node_agent_compute_plugin_host::{
 pub(in crate::node_agent_compute_plugin_host) fn authorize_download_segment(
     admitted: &AdmittedComputePluginInstallPlan,
     request: &ComputePluginDownloadSegmentRequest,
+    cancellation: ComputePluginFetchCancellationGuard,
     authority_session: &ComputePluginFetchAuthoritySession<'_>,
 ) -> ComputePluginFetchAuthorizationResult {
+    authority_session
+        .validate_fetch_cancellation_guard(&cancellation)
+        .and_then(|_| cancellation.ensure_current())
+        .map_err(ComputePluginFetchAuthorizationFailure::rejected)?;
     let authority = ComputePluginFetchAuthorityPort {
         backend: authority_session,
     };
@@ -63,6 +69,9 @@ pub(in crate::node_agent_compute_plugin_host) fn authorize_download_segment(
         .read_fresh_segment_authority(&plan.plan_id, admitted.plan_digest(), download, request)
         .map_err(ComputePluginFetchAuthorizationFailure::rejected)?;
     validate_download_segment_authority(admitted, download, request, &facts)
+        .map_err(ComputePluginFetchAuthorizationFailure::rejected)?;
+    cancellation
+        .ensure_current()
         .map_err(ComputePluginFetchAuthorizationFailure::rejected)?;
     let claim_id = request
         .redirect_from_claim_id
@@ -109,6 +118,11 @@ pub(in crate::node_agent_compute_plugin_host) fn authorize_download_segment(
             ComputePluginFetchAuthorizationFailure::outcome_recovery_required(error, recovery_key),
         );
     }
+    if let Err(error) = cancellation.ensure_current() {
+        return Err(
+            ComputePluginFetchAuthorizationFailure::outcome_recovery_required(error, recovery_key),
+        );
+    }
     Ok(AuthorizedComputePluginDownloadSegment {
         download: download.clone(),
         offset_bytes: request.offset_bytes,
@@ -116,6 +130,7 @@ pub(in crate::node_agent_compute_plugin_host) fn authorize_download_segment(
         redirect_hop: request.redirect_hop,
         claim,
         recovery_key,
+        cancellation,
     })
 }
 
@@ -151,7 +166,12 @@ pub(in crate::node_agent_compute_plugin_host) fn authorize_download_redirect(
         redirect_hop,
         redirect_from_claim_id: Some(authorized.claim.claim_id.clone()),
     };
-    match authorize_download_segment(admitted, &request, authority) {
+    match authorize_download_segment(
+        admitted,
+        &request,
+        authorized.cancellation.clone(),
+        authority,
+    ) {
         Ok(next) => Ok(next),
         Err(ComputePluginFetchAuthorizationFailure::RejectedBeforeClaim { error }) => Err(
             ComputePluginFetchRedirectFailure::store_not_called(error, authorized),

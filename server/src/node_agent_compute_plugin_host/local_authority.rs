@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::{fmt, path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use rusqlite::{Connection, Transaction, TransactionBehavior};
@@ -20,7 +20,7 @@ mod process_ownership;
 
 pub(in crate::node_agent_compute_plugin_host) use fetch_store::{
     ComputePluginFetchAuthorityFacts, ComputePluginFetchAuthoritySession,
-    ComputePluginPreparedFetchClaimFacts,
+    ComputePluginPostSyncFetchAuthoritySession, ComputePluginPreparedFetchClaimFacts,
 };
 pub(crate) use initialization::{
     ComputePluginAuthorityInitialization, ComputePluginAuthorityInitializationOutcome,
@@ -37,11 +37,49 @@ pub(crate) use process_ownership::ComputePluginFetchProcessFence;
 const COMPUTE_PLUGIN_STATE_FILE: &str = "compute-plugin-state.sqlite3";
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Non-serializable identity shared only by clones of one in-process authority facade. It prevents
+/// a process fence or recovery handle from being replayed against another facade with matching
+/// scalar facts; it is not a database rollback anchor.
+#[derive(Clone)]
+pub(in crate::node_agent_compute_plugin_host) struct ComputePluginAuthorityInstanceBinding {
+    identity: Arc<()>,
+}
+
+impl ComputePluginAuthorityInstanceBinding {
+    fn new() -> Self {
+        Self {
+            identity: Arc::new(()),
+        }
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn matches(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.identity, &other.identity)
+    }
+}
+
+impl PartialEq for ComputePluginAuthorityInstanceBinding {
+    fn eq(&self, other: &Self) -> bool {
+        self.matches(other)
+    }
+}
+
+impl Eq for ComputePluginAuthorityInstanceBinding {}
+
+impl fmt::Debug for ComputePluginAuthorityInstanceBinding {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ComputePluginAuthorityInstanceBinding")
+            .field("identity", &"<process-local>")
+            .finish()
+    }
+}
+
 /// Path-based facade for the plugin control-state authority. It is intentionally not wired into
 /// the Host yet; opening the database must happen only after the NodeAgent instance lock is held.
 #[derive(Debug, Clone)]
 pub(crate) struct ComputePluginLocalAuthority {
     path: PathBuf,
+    instance_binding: ComputePluginAuthorityInstanceBinding,
 }
 
 impl Default for ComputePluginLocalAuthority {
@@ -52,11 +90,18 @@ impl Default for ComputePluginLocalAuthority {
 
 impl ComputePluginLocalAuthority {
     pub(crate) fn new(path: impl Into<PathBuf>) -> Self {
-        Self { path: path.into() }
+        Self {
+            path: path.into(),
+            instance_binding: ComputePluginAuthorityInstanceBinding::new(),
+        }
     }
 
     pub(crate) fn path(&self) -> &std::path::Path {
         &self.path
+    }
+
+    fn instance_binding(&self) -> &ComputePluginAuthorityInstanceBinding {
+        &self.instance_binding
     }
 
     /// Opens and validates schema only; this does not initialize authority facts or enable sharing.

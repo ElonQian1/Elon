@@ -25,6 +25,36 @@ pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginRoot {
     pub(super) installation_id_digest: String,
 }
 
+/// Non-writable recovery custody for an exact pinned file. It intentionally exposes neither the
+/// raw handle nor an unwrap operation; future recovery transitions must be implemented beside this
+/// type and consume it through a purpose-specific API.
+pub(in crate::node_agent_compute_plugin_host) struct ComputePluginPinnedFileRecovery {
+    file: PinnedManagedFile,
+}
+
+impl ComputePluginPinnedFileRecovery {
+    pub(in crate::node_agent_compute_plugin_host) fn from_pinned(file: PinnedManagedFile) -> Self {
+        Self { file }
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn file_identity_digest(&self) -> &str {
+        self.file.identity_digest()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn len_bytes(&self) -> u64 {
+        self.file.len_bytes()
+    }
+}
+
+impl fmt::Debug for ComputePluginPinnedFileRecovery {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ComputePluginPinnedFileRecovery")
+            .field("file", &"<retained-non-writable>")
+            .finish()
+    }
+}
+
 impl fmt::Debug for PinnedComputePluginRoot {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -66,6 +96,12 @@ impl ReconciledComputePluginPartFile {
 
     pub(in crate::node_agent_compute_plugin_host) fn truncated_uncommitted_tail(&self) -> bool {
         self.truncated_uncommitted_tail
+    }
+
+    pub(super) fn filesystem_mutated_before_write(&self) -> bool {
+        self.authorized.offset_bytes() == 0
+            || self.truncated_uncommitted_tail
+            || self.file.directory_filesystem_mutated()
     }
 }
 
@@ -139,7 +175,7 @@ pub(in crate::node_agent_compute_plugin_host) enum ComputePluginPartReconcileFai
     UnreconciledFile {
         error: Error,
         authorized: AuthorizedComputePluginDownloadSegment,
-        file: PinnedManagedFile,
+        file: ComputePluginPinnedFileRecovery,
     },
     RecoveryRequiredWithoutFile {
         error: Error,
@@ -153,12 +189,12 @@ pub(in crate::node_agent_compute_plugin_host) enum ComputePluginPartReconcileFai
     UnexpectedExistingZeroCursorFile {
         error: Error,
         recovery_key: ComputePluginFetchClaimRecoveryKey,
-        file: PinnedManagedFile,
+        file: ComputePluginPinnedFileRecovery,
     },
     FileRecoveryRequired {
         error: Error,
         recovery_key: ComputePluginFetchClaimRecoveryKey,
-        file: PinnedManagedFile,
+        file: ComputePluginPinnedFileRecovery,
     },
 }
 
@@ -218,7 +254,7 @@ impl ComputePluginPartReconcileFailure {
         Self::UnreconciledFile {
             error: error.into(),
             authorized,
-            file,
+            file: ComputePluginPinnedFileRecovery::from_pinned(file),
         }
     }
 
@@ -252,7 +288,7 @@ impl ComputePluginPartReconcileFailure {
         Self::UnexpectedExistingZeroCursorFile {
             error: error.into(),
             recovery_key,
-            file,
+            file: ComputePluginPinnedFileRecovery::from_pinned(file),
         }
     }
 
@@ -264,7 +300,7 @@ impl ComputePluginPartReconcileFailure {
         Self::FileRecoveryRequired {
             error: error.into(),
             recovery_key,
-            file,
+            file: ComputePluginPinnedFileRecovery::from_pinned(file),
         }
     }
 }

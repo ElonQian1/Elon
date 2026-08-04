@@ -16,10 +16,12 @@ use super::{
     signed_artifact_verification::jcs_sha256_hex,
 };
 
-// Kept private until outcome recovery and file-cursor reconciliation can close every consumed
-// handle error without reusing a stale mutation capability.
+// Submodules keep Store, cancellation, file and durable capabilities linear across every failure
+// boundary; only purpose-specific seams are re-exported to the future Host/downloader.
 mod authorization;
 mod authorization_failure;
+mod cancellation;
+mod durable;
 mod recovery;
 mod resolution;
 mod types;
@@ -31,13 +33,25 @@ pub(in crate::node_agent_compute_plugin_host) use authorization_failure::{
     ComputePluginFetchAuthorizationFailure, ComputePluginFetchAuthorizationResult,
     ComputePluginFetchRedirectFailure, ComputePluginFetchRedirectResult,
 };
+pub(in crate::node_agent_compute_plugin_host) use cancellation::{
+    ComputePluginFetchCancellationGuard, ComputePluginFetchCancellationSource,
+};
+pub(in crate::node_agent_compute_plugin_host) use durable::{
+    bind_durable_download_segment, commit_durable_download_segment, ComputePluginDurableBindPermit,
+    ComputePluginPostSyncBindingFailure,
+};
 pub(in crate::node_agent_compute_plugin_host) use recovery::{
     ComputePluginFetchClaimOutcome, ComputePluginFetchClaimOutcomeKind,
     ComputePluginFetchClaimRecoveryKey, ComputePluginFetchInitialClaimAbsenceSnapshot,
     ValidatedComputePluginFetchRecoveryAbortPermit,
 };
+pub(in crate::node_agent_compute_plugin_host) use resolution::{
+    ComputePluginFetchCommitFailure, ComputePluginFetchCommitResult,
+    ComputePluginFetchStoreMutationPhase,
+};
 pub(crate) use types::{
-    AuthorizedComputePluginDownloadSegment, ComputePluginDownloadSegmentRequest,
+    AuthorizedComputePluginDownloadSegment, CommittedComputePluginDownloadSegment,
+    ComputePluginDownloadSegmentRequest, DurablyWrittenComputePluginSegment,
 };
 use types::{ComputePluginFetchAuthoritySnapshot, PreparedComputePluginFetchClaim};
 pub(in crate::node_agent_compute_plugin_host) use types::{

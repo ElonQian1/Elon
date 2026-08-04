@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, time::Instant};
 
 use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
@@ -6,14 +6,16 @@ use chrono::{DateTime, Utc};
 use super::{ComputePluginFetchProcessFence, ComputePluginLocalAuthority};
 use crate::node_agent_compute_plugin_host::{
     fetch_contract::{
-        ValidatedComputePluginFetchAbortPermit, ValidatedComputePluginFetchClaimPermit,
-        ValidatedComputePluginFetchCommitPermit,
+        ComputePluginFetchCancellationGuard, ValidatedComputePluginFetchAbortPermit,
+        ValidatedComputePluginFetchClaimPermit, ValidatedComputePluginFetchCommitPermit,
     },
     identity::ComputePluginReleaseRef,
     install_plan::ComputePluginPlannedDownload,
     install_plan_admission::ComputePluginLiveAdmissionState,
     keyring::ComputePluginBootstrapRootKeyResolver,
     lifecycle::ComputePluginInventorySnapshot,
+    manifest_validation::is_sha256,
+    trusted_time::ComputePluginTrustedTimeObservation,
 };
 
 mod claim;
@@ -29,6 +31,17 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginFetchAuthority
     process_fence: &'authority ComputePluginFetchProcessFence,
     trusted_now: DateTime<Utc>,
     roots: &'authority dyn ComputePluginBootstrapRootKeyResolver,
+}
+
+/// A fetch authority session that can only be minted from a sealed trusted-time observation. Its
+/// process-local monotonic point is retained so durable binding can prove the observation happened
+/// after the exact file handle crossed its fsync and identity barrier.
+pub(in crate::node_agent_compute_plugin_host) struct ComputePluginPostSyncFetchAuthoritySession<
+    'authority,
+> {
+    authority_session: ComputePluginFetchAuthoritySession<'authority>,
+    observed_at: Instant,
+    clock_epoch_digest: String,
 }
 
 /// Store-native projection used by the fetch contract. The candidate token never leaves the
@@ -100,16 +113,34 @@ impl fmt::Debug for ComputePluginPreparedFetchClaimFacts {
 }
 
 impl ComputePluginLocalAuthority {
-    /// The caller must supply trusted time from the authenticated time kernel and a fence acquired
-    /// after the NodeAgent instance lock. Opening a session does not touch SQLite.
+    /// Consumes one sealed trusted-time observation and a fence acquired after the NodeAgent
+    /// instance lock. Opening a session does not touch SQLite.
     pub(in crate::node_agent_compute_plugin_host) fn fetch_authority_session<'authority>(
         &'authority self,
         process_fence: &'authority ComputePluginFetchProcessFence,
-        trusted_now: DateTime<Utc>,
+        observation: ComputePluginTrustedTimeObservation,
         roots: &'authority dyn ComputePluginBootstrapRootKeyResolver,
     ) -> Result<ComputePluginFetchAuthoritySession<'authority>> {
-        if process_fence.process_owner_epoch() <= 0
+        self.fetch_authority_session_from_observation(process_fence, &observation, roots)
+    }
+
+    fn fetch_authority_session_from_observation<'authority>(
+        &'authority self,
+        process_fence: &'authority ComputePluginFetchProcessFence,
+        observation: &ComputePluginTrustedTimeObservation,
+        roots: &'authority dyn ComputePluginBootstrapRootKeyResolver,
+    ) -> Result<ComputePluginFetchAuthoritySession<'authority>> {
+        let trusted_now = observation.trusted_now().clone();
+        if !self
+            .instance_binding()
+            .matches(process_fence.authority_instance_binding())
+            || !is_sha256(observation.installation_id_digest())
+            || observation.installation_id_digest() != process_fence.installation_id_digest()
+            || !is_sha256(observation.clock_epoch_digest())
+            || observation.clock_epoch_digest() != process_fence.clock_epoch_digest()
+            || process_fence.process_owner_epoch() <= 0
             || process_fence.acquired_at_ms() < 0
+            || observation.observed_at() <= process_fence.acquired_observed_at()
             || trusted_now.timestamp_millis() < process_fence.acquired_at_ms()
         {
             bail!("COMPUTE_PLUGIN_FETCH_SESSION_FENCE_INVALID");
@@ -121,9 +152,66 @@ impl ComputePluginLocalAuthority {
             roots,
         })
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn bind_post_sync_fetch_authority_session<
+        'authority,
+    >(
+        &'authority self,
+        process_fence: &'authority ComputePluginFetchProcessFence,
+        observation: ComputePluginTrustedTimeObservation,
+        roots: &'authority dyn ComputePluginBootstrapRootKeyResolver,
+    ) -> Result<ComputePluginPostSyncFetchAuthoritySession<'authority>> {
+        if !is_sha256(observation.installation_id_digest())
+            || observation.installation_id_digest() != process_fence.installation_id_digest()
+            || !is_sha256(observation.clock_epoch_digest())
+        {
+            bail!("COMPUTE_PLUGIN_POST_SYNC_TIME_BINDING_INVALID");
+        }
+        let observed_at = observation.observed_at();
+        let clock_epoch_digest = observation.clock_epoch_digest().to_string();
+        let authority_session =
+            self.fetch_authority_session_from_observation(process_fence, &observation, roots)?;
+        Ok(ComputePluginPostSyncFetchAuthoritySession {
+            authority_session,
+            observed_at,
+            clock_epoch_digest,
+        })
+    }
+}
+
+impl<'authority> ComputePluginPostSyncFetchAuthoritySession<'authority> {
+    pub(in crate::node_agent_compute_plugin_host) fn authority_session(
+        &self,
+    ) -> &ComputePluginFetchAuthoritySession<'authority> {
+        &self.authority_session
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn trusted_now_ms(&self) -> i64 {
+        self.authority_session.trusted_now.timestamp_millis()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn was_observed_strictly_after(
+        &self,
+        barrier: Instant,
+    ) -> bool {
+        self.observed_at > barrier && is_sha256(&self.clock_epoch_digest)
+    }
 }
 
 impl ComputePluginFetchAuthoritySession<'_> {
+    pub(in crate::node_agent_compute_plugin_host) fn validate_fetch_cancellation_guard(
+        &self,
+        guard: &ComputePluginFetchCancellationGuard,
+    ) -> Result<()> {
+        guard.validate_source(self.process_fence.cancellation_source())
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn recovery_authority_instance_binding(
+        &self,
+    ) -> &super::ComputePluginAuthorityInstanceBinding {
+        self.process_fence.authority_instance_binding()
+    }
+
     /// Rebuilds all authority from one stable read snapshot. This method never advances trusted
     /// time and never creates or mutates a fetch claim.
     pub(in crate::node_agent_compute_plugin_host) fn read_fresh_segment_authority(

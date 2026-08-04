@@ -1,9 +1,9 @@
 //! Security boundary between an authorized Store claim and its resumable `.part` file.
 //!
-//! This layer does not write downloaded bytes and cannot construct durable commit evidence. It
-//! only binds the exact claim path to the installation-owned data root, pins every Windows path
-//! component, opens or creates the final file without following reparse points, and reconciles the
-//! same-handle length with the committed cursor.
+//! It binds the exact claim path to the installation-owned data root, pins every Windows path
+//! component, reconciles the same-handle length with the committed cursor, and writes one bounded
+//! segment through flush/fsync/identity revalidation. Trusted-time binding and Store commit remain
+//! in the fetch contract.
 
 use std::{ffi::OsStr, path::Path};
 
@@ -22,11 +22,17 @@ use crate::{
 };
 
 mod types;
+mod write;
 
 pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginPartCursorDamage, ComputePluginPartCursorDamageKind,
     ComputePluginPartReconcileFailure, ComputePluginPartReconcileOutcome,
-    ComputePluginPartReconcileResult, PinnedComputePluginRoot, ReconciledComputePluginPartFile,
+    ComputePluginPartReconcileResult, ComputePluginPinnedFileRecovery, PinnedComputePluginRoot,
+    ReconciledComputePluginPartFile,
+};
+pub(in crate::node_agent_compute_plugin_host) use write::{
+    write_compute_plugin_part_segment, ComputePluginSegmentWriteFailure,
+    ComputePluginSegmentWritePhase, SyncedComputePluginPartFile,
 };
 
 const COMPUTE_PLUGIN_DIRECTORY: &str = "compute-plugin";

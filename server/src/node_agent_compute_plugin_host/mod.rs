@@ -23,6 +23,7 @@ pub(crate) mod plugin_manifest;
 pub(crate) mod ready_capability;
 pub(crate) mod runner_events;
 mod signed_artifact_verification;
+mod trusted_time;
 
 pub(crate) use contract::{ComputePluginTask, LlmChatTask};
 pub(crate) use host::ComputePluginHost;

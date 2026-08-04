@@ -1,5 +1,7 @@
 use std::fmt;
 
+use crate::node_agent_compute_plugin_host::local_authority::ComputePluginAuthorityInstanceBinding;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host) enum ComputePluginFetchClaimOutcomeKind {
     NotCreated,
@@ -57,6 +59,7 @@ impl ComputePluginFetchInitialClaimAbsenceSnapshot {
 /// identity, because a redirect CAS may have succeeded even when its commit result was uncertain.
 #[derive(PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginFetchClaimRecoveryKey {
+    pub(super) authority_instance_binding: ComputePluginAuthorityInstanceBinding,
     pub(super) installation_id_digest: String,
     pub(super) claim_id: String,
     pub(super) plan_id: String,
@@ -101,6 +104,12 @@ impl fmt::Debug for ComputePluginFetchClaimRecoveryKey {
 }
 
 impl ComputePluginFetchClaimRecoveryKey {
+    pub(in crate::node_agent_compute_plugin_host) fn authority_instance_binding(
+        &self,
+    ) -> &ComputePluginAuthorityInstanceBinding {
+        &self.authority_instance_binding
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
         &self.installation_id_digest
     }
