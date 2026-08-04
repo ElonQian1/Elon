@@ -1,6 +1,9 @@
 use anyhow::{bail, Result};
 
-use crate::store::{ComputeSettlementAccountView, ComputeSettlementWithdrawalQueuePage, Store};
+use crate::store::{
+    ComputePlatformSettlementAccountView, ComputeSettlementAccountView,
+    ComputeSettlementWithdrawalQueuePage, Store,
+};
 
 pub(crate) fn get_for_provider_owner(
     store: &Store,
@@ -20,4 +23,10 @@ pub(crate) fn list_withdrawal_queue_for_platform_admin(
     limit: usize,
 ) -> Result<ComputeSettlementWithdrawalQueuePage> {
     store.list_compute_settlement_withdrawal_queue(status, limit)
+}
+
+pub(crate) fn get_for_platform_admin(
+    store: &Store,
+) -> Result<ComputePlatformSettlementAccountView> {
+    store.compute_platform_settlement_account_view()
 }
