@@ -54,6 +54,7 @@ mod compute_job_contract_validation;
 mod compute_job_registry;
 mod compute_metering;
 mod compute_offer_contract_validation;
+mod compute_offer_owner_queries;
 mod compute_offer_registry;
 mod compute_price_snapshot_registry;
 mod compute_price_snapshot_validation;
@@ -279,6 +280,7 @@ pub(crate) use compute_capacity_supply_withdrawal::{
 };
 pub(crate) use compute_job_registry::ComputeJobRegistrationReceipt;
 pub use compute_metering::ComputeMeterEvent;
+pub(crate) use compute_offer_contract_validation::{compute_offer_digest, compute_sku_digest};
 pub(crate) use compute_offer_registry::ComputeOfferRegistrationReceipt;
 pub(crate) use compute_price_snapshot_registry::ComputePriceSnapshotRegistrationReceipt;
 pub(crate) use compute_provider_registry::validate_compute_provider_contract;

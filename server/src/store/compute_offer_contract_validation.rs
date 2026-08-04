@@ -43,9 +43,16 @@ pub(super) fn validate_offer_contract(
     Ok(computed_digest)
 }
 
-pub(super) fn compute_offer_digest(offer: &ComputeOffer) -> Result<String> {
+pub(crate) fn compute_offer_digest(offer: &ComputeOffer) -> Result<String> {
     let mut canonical = offer.clone();
     canonical.offer_digest.clear();
+    let encoded = serde_json::to_vec(&canonical)?;
+    Ok(hex::encode(Sha256::digest(encoded)))
+}
+
+pub(crate) fn compute_sku_digest(sku: &ComputeSku) -> Result<String> {
+    let mut canonical = sku.clone();
+    canonical.sku_digest.clear();
     let encoded = serde_json::to_vec(&canonical)?;
     Ok(hex::encode(Sha256::digest(encoded)))
 }
