@@ -127,4 +127,4 @@ abort/revoke 不推进 cursor；重试创建新 generation 并仍从 committed o
 
 ## 8. 当前实现状态
 
-本合同已接受。当前已有严格网络 DTO、JCS/SHA-256/Ed25519 验签、Manifest 校验、InstallPlan 首次准入及旧的逐段权威 trait；专用 SQLite schema/store、root-signed keyring bundle、双 keyring binding、原子计划应用、候选 token、三段式 fetch claim、可信时间和启动恢复仍待分阶段形成代码并接线。所有新代码在统一验证阶段前继续标记 `implementation_uncompiled`。
+本合同已接受。当前已有严格网络 DTO、JCS/SHA-256/Ed25519 验签、Manifest 校验、InstallPlan 首次准入及旧的逐段权威 trait；root-signed keyring bundle DTO、Bootstrap root resolver seam、整包签名/时间/用途/状态/指纹/唯一性校验与两类 ring binding 派生已形成代码，未编译、未接线。仓库仍没有生产 root pin；专用 SQLite schema/store、带可信时间与预期 binding 的实际 key resolver、InstallPlan 双 binding、原子计划应用、候选 token、三段式 fetch claim、可信时间和启动恢复仍待分阶段形成代码并接线。

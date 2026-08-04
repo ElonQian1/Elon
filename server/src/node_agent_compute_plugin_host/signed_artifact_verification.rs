@@ -34,7 +34,7 @@ impl ComputePluginEd25519PublicKey {
         Ok(Self(bytes))
     }
 
-    fn fingerprint(&self) -> String {
+    pub(super) fn fingerprint(&self) -> String {
         hex::encode(Sha256::digest(self.0))
     }
 }
@@ -154,7 +154,7 @@ pub(super) fn verify_install_plan_signature(
     })
 }
 
-fn verify_jcs_ed25519(
+pub(super) fn verify_jcs_ed25519(
     payload: &impl Serialize,
     canonicalization: &str,
     digest_algorithm: &str,

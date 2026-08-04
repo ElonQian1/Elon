@@ -117,7 +117,7 @@ Manifest 只能声明请求，不能授予权限、证明本机已安装或健�
 
 本批合同把 Attempt 控制固定为 `Start`、`RenewLease` 和 `Cancel`，秘密租约引用只留在 Host，不转发给 Runner。Runner 只产生 typed `Started/Heartbeat/Progress/StreamChunk/CheckpointReady/UsageSnapshot/Terminal` 事件；Host 校验大小、顺序和摘要，补写 Attempt 身份与 fencing generation，再转换成 Host 侧 typed 事件。Runner 自报用量只是声明，终态事件也不是执行回执或结算决定。
 
-第一批内部兼容 seam 仍直接调用现有 Rust 本地推理函数。本机权威库已确定为独立 SQLite，并固定了 root-signed 双 keyring、库存/计划/候选原子事务和三段式下载认领合同；对应 resolver/store、真实下载器、原子槽切换、Sidecar 进程、IPC framing、资源沙箱、事件背压、`ReadyCapability` 上报与真实 Attempt 运行接线仍未实现。当前准入内核只有抽象 key resolver 和旧式单调用取数权威 trait，没有可被下载器调用的持久实现。
+第一批内部兼容 seam 仍直接调用现有 Rust 本地推理函数。本机权威库已确定为独立 SQLite，并固定了 root-signed 双 keyring、库存/计划/候选原子事务和三段式下载认领合同；keyring DTO、Bootstrap root resolver seam 与整包校验内核已形成代码，但没有生产 root pin、耐久 resolver/store 或运行接线。真实下载器、原子槽切换、Sidecar 进程、IPC framing、资源沙箱、事件背压、`ReadyCapability` 上报与真实 Attempt 运行接线仍未实现；旧式单调用取数权威 trait 也还不能被真实下载器使用。
 
 ## 10. 模型与缓存
 
@@ -143,4 +143,4 @@ V1 只运行平台批准的任务种类和签名 Runner，不接受请求方上�
 
 ## 13. 当前未验证声明
 
-本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam、版本化合同、签名与摘要验证器、Manifest 语义校验和 InstallPlan 本机准入内核已形成代码，但本批尚未编译或启动。SQLite 本机权威库和 root-signed 双 keyring 已形成权威设计，具体 resolver/store、计划应用与恢复事务、三段式取数权威、真实 downloader、Sidecar/IPC/沙箱、typed 事件运行链路、短 TTL `ReadyCapability` 上报和调度接线仍未实现；节点不直接发布商业 Offer，服务端 Offer 生成也未因本批合同自动接通。
+本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam、版本化合同、签名与摘要验证器、Manifest 语义校验、InstallPlan 本机准入以及 root-signed keyring bundle 校验内核已形成代码，但本批尚未编译或启动。SQLite 本机权威库、生产 root pin、具体 resolver/store、计划应用与恢复事务、三段式取数权威、真实 downloader、Sidecar/IPC/沙箱、typed 事件运行链路、短 TTL `ReadyCapability` 上报和调度接线仍未实现；节点不直接发布商业 Offer，服务端 Offer 生成也未因本批合同自动接通。
