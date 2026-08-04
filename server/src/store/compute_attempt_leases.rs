@@ -203,6 +203,16 @@ pub(super) struct TerminateStagingAttemptLease<'a> {
     pub terminated_at: &'a str,
 }
 
+pub(super) struct FinalizeVerifiedAttemptLease<'a> {
+    pub lease_id: &'a str,
+    pub expected_revision: i64,
+    pub expected_digest: &'a str,
+    pub expected_fencing_generation: i64,
+    pub reason_code: &'a str,
+    pub actor_user_id: &'a str,
+    pub finalized_at: &'a str,
+}
+
 pub(super) fn compute_attempt_lease_state_on(
     conn: &Connection,
     lease_id: &str,
@@ -252,6 +262,56 @@ pub(super) fn terminate_staging_attempt_lease_on(
             terminal.status,
             input.actor_user_id,
             input.terminated_at,
+            input.lease_id,
+            current.lease_revision,
+            current.lease_digest,
+        ],
+    )?;
+    if changed != 1 {
+        bail!("Attempt Lease 已被并发修改，请重新读取当前状态");
+    }
+    compute_attempt_lease_state_on(conn, input.lease_id)
+}
+
+pub(super) fn finalize_verified_attempt_lease_on(
+    conn: &Connection,
+    input: FinalizeVerifiedAttemptLease<'_>,
+) -> Result<ComputeAttemptLeaseStateReceipt> {
+    validate_exact("Attempt Lease ID", input.lease_id, 200)?;
+    validate_exact("Attempt 终态原因码", input.reason_code, 160)?;
+    validate_exact("Attempt 终态执行人", input.actor_user_id, 200)?;
+    let current = current_lease_state_on(conn, input.lease_id)?
+        .ok_or_else(|| anyhow!("Attempt Lease 当前状态不存在"))?;
+    if current.lease_revision != input.expected_revision
+        || current.lease_digest != input.expected_digest
+        || current.lease.fencing_generation != input.expected_fencing_generation
+        || current.lease.status != ATTEMPT_STATUS_RUNNING
+        || current.lease.last_heartbeat_at.is_none()
+    {
+        bail!("只有当前精确版本、已心跳且仍为 running 的 Lease 可以应用可信终态");
+    }
+
+    let mut terminal = current.lease.clone();
+    terminal.status = ATTEMPT_STATUS_TERMINAL.to_string();
+    terminal.terminal_reason_code = Some(input.reason_code.to_string());
+    let target_revision = current
+        .lease_revision
+        .checked_add(1)
+        .context("Attempt Lease 修订号溢出")?;
+    let target_digest = compute_attempt_lease_digest(&terminal)?;
+    let changed = conn.execute(
+        "UPDATE compute_attempt_lease_states
+            SET lease_revision=?1, lease_digest=?2, lease_json=?3,
+                status=?4, updated_by_user_id=?5, updated_at=?6
+          WHERE lease_id=?7 AND lease_revision=?8 AND lease_digest=?9
+            AND status='running' AND last_heartbeat_at IS NOT NULL",
+        params![
+            target_revision,
+            target_digest,
+            serde_json::to_string(&terminal)?,
+            terminal.status,
+            input.actor_user_id,
+            input.finalized_at,
             input.lease_id,
             current.lease_revision,
             current.lease_digest,

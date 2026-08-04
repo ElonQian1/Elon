@@ -19,7 +19,7 @@ use crate::store::compute_attempt_execution_receipts::{
 
 impl StoredExecutionReceipt {
     #[allow(clippy::too_many_arguments)]
-    pub(super) fn into_envelope(
+    pub(in crate::store::compute_attempt_execution_receipts) fn into_envelope(
         self,
         verification: &ComputeAttemptVerificationDecisionReceipt,
         candidate: &ComputeAttemptTerminalCandidateReceipt,

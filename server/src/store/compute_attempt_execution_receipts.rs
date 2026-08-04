@@ -178,6 +178,16 @@ impl Store {
     }
 }
 
+pub(super) fn compute_attempt_execution_receipt_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<ComputeAttemptExecutionReceiptEnvelope> {
+    support::validate_exact("Attempt Lease ID", lease_id, 200)?;
+    let stored = execution_receipt_by_lease_on(conn, lease_id)?
+        .ok_or_else(|| anyhow!("Attempt 尚无 Execution Receipt"))?;
+    execution_receipt_envelope_on(conn, stored, false)
+}
+
 fn execution_receipt_envelope_on(
     conn: &rusqlite::Connection,
     stored: StoredExecutionReceipt,

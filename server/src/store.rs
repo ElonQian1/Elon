@@ -35,6 +35,7 @@ mod compute_attempt_aborts;
 mod compute_attempt_activations;
 mod compute_attempt_consumer_reviews;
 mod compute_attempt_execution_receipts;
+mod compute_attempt_finalizations;
 mod compute_attempt_leases;
 mod compute_attempt_platform_observations;
 mod compute_attempt_terminals;
@@ -266,6 +267,9 @@ pub(crate) use compute_attempt_consumer_reviews::{
 };
 pub(crate) use compute_attempt_execution_receipts::{
     ComputeAttemptExecutionReceiptEnvelope, IssueComputeAttemptExecutionReceiptRequest,
+};
+pub(crate) use compute_attempt_finalizations::{
+    ComputeAttemptFinalizationReceipt, FinalizeComputeAttemptRequest,
 };
 pub(crate) use compute_attempt_leases::{
     ComputeAttemptLeaseRenewalReceipt, ComputeAttemptLeaseStateReceipt,

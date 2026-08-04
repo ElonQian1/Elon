@@ -117,6 +117,7 @@ pub(crate) fn apply_capacity_transaction(
                 ComputeCapacityEventKind::ReservationReleased
                     | ComputeCapacityEventKind::ReservationExpired
                     | ComputeCapacityEventKind::AttemptReturned
+                    | ComputeCapacityEventKind::UsageConsumed
             )
         {
             return Err(ComputeCapacityContractError::ClosedBucket(
