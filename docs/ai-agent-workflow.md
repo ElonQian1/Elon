@@ -233,17 +233,14 @@ npm run lint
 
 ```powershell
 git add <修改的文件列表>
-git commit -m "feat(用户需求): <用中文简洁描述本次修改内容>
-
-用户ID: {user_id}
-需求原文: {original_request}
-修改文件: {file_list}"
+git commit -m "feat(<模块>): <用中文简洁描述本次修改内容>"
 ```
 
 **commit message 规范**：
 - 前缀：`feat` 新功能 / `fix` 修复 / `style` 样式 / `refactor` 重构
 - 主体：中文，一句话描述用户看到的变化
-- 必须包含：用户ID、需求原文
+- 作者名：统一使用 `一龙1060ai助手`
+- 禁止附加：用户姓名、用户 ID、需求原文；这些属于任务上下文，不属于提交信息
 
 如果本次提交已 push，使用统一收尾完成主基线同步、文件审计和 worktree 回收：
 
