@@ -72,6 +72,7 @@ server/src/
 | 消费者算力市场工作区 | 🔴 高 | `src/features/compute-market/`、`server/src/compute_federation_broker_*` | 🟡 所有登录用户可见的 `/compute-market` 已写入项目级本人 Job 列表、submitted 创建、候选发现、不可变锁价、Reservation 列表、逐 meter 预算与容量预留，以及未执行任务 Release/Expire 源码。金融动作要求稳定幂等键、精确版本/摘要和明确确认；不创建 Attempt、不派发节点、不处理运行中取消或最终结算，尚未构建、接口联调、视觉验收或发布 |
 | 消费者算力验收工作区 | 🔴 高 | `src/features/compute-market/ComputeConsumerReview*`、`server/src/compute_federation_attempt_*` | 🟡 所有登录用户可见的 `/compute-reviews` 已写入本人待审核 Provider 终态候选队列，以及 `accepted/rejected/disputed` 第一份消费者证据表单。队列按消费者过滤并排除已有审核；页面只展示候选摘要与工件引用，不下载或验证工件，不触发 Verification、付款、退款、容量消费或结算，尚未构建、接口联调、视觉验收或发布 |
 | 算力执行工作区 | 🔴 高 | `src/features/compute-execution/`、`server/src/compute_federation_attempt_*` | 🟡 所有登录用户可见的 `/compute-execution` 已写入本人 Provider 选择、“执行 Lease/待激活”分段队列、首次 Attempt 激活、Lease 查询/续租、revision 1 无心跳 staging 中止、逐 meter 累计用量和首份 Provider 终态候选源码。用量模板由服务端从当前合同生成；激活、心跳、用量和候选均只是外部声明，中止才原子退款并归还容量。不发送节点命令、不验证外部证明、不形成可信用量或结算，尚未构建、接口联调、视觉验收或发布 |
+| 平台算力观测工作区 | 🔴 高 | `src/features/compute-observations/`、`server/src/compute_federation_attempt_*` | 🟡 仅 `admin/owner` 显示的 `/compute-observations` 已写入待观测候选、最终 Provider meter 模板，以及来源、结果、完整累计 meter 和证据引用表单。保存只形成第一份 `unverified_platform_observation`，不自动验证来源或证据，不推进 Attempt/Job/容量，不移动资金或生成结算，尚未构建、接口联调、视觉验收或发布 |
 
 ### 阶段 P3 — 个人 AI 对话
 

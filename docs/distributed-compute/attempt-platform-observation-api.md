@@ -1,15 +1,16 @@
 ---
 title: 分布式算力 Attempt 平台终态观测证据
 status: current
-reviewed_at: 2026-08-04
-owners: ai-economy, backend
+reviewed_at: 2026-08-05
+owners: ai-economy, backend, pc
+implementation_status: implementation_uncompiled
 ---
 
 # 分布式算力 Attempt 平台终态观测证据
 
 ## 1. 当前实现
 
-v191、追加式 Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。本控制面允许平台 `admin/owner` 为精确 v189 Provider 终态候选登记第一份平台观测证据，并保存与最终 v188 Provider 声明不同的 meter。
+v191、追加式 Store、Service、HTTP 路由、管理员待观测模板队列与 PC `/compute-observations` 已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面允许平台 `admin/owner` 发现尚无观测的 v189 Provider 终态候选，为其登记第一份平台观测证据，并保存与最终 v188 Provider 声明不同的 meter。
 
 平台观测值仍是 Verification 的输入，不是 `verified_usage`。即使来源标记为 `server_metering`，v191 也不会生成 Execution Receipt、推进可信终态、消费容量、扣除预授权或释放 Provider 收益。
 
@@ -17,10 +18,15 @@ v191、追加式 Store、Service 与 HTTP 路由已经写入代码，但尚未�
 
 | 方法 | 路径 | 调用者 | 作用 |
 |---|---|---|---|
+| GET | `/api/admin/compute/attempt-terminal-candidates/pending-platform-observation` | 平台 `admin/owner` | 读取尚无 v191 观测的候选及其最终 Provider meter 模板 |
 | POST | `/api/admin/compute/attempt-leases/:lease_id/terminal-candidate/platform-observation` | 平台 `admin/owner` | 登记第一份平台终态观测证据 |
 | GET | `/api/me/compute/attempt-leases/:lease_id/terminal-candidate/platform-observation` | Job 消费者或 Provider 所有者 | 读取并重新审计平台观测回执 |
 
 写请求必须提供精确候选 ID/事件摘要、观测来源、观测系统引用、观测 outcome、完整累计 meter、至少一个外部证据引用、稳定幂等键，并显式设置 `confirm_platform_observation_only=true`。
+
+待观测队列排除已有 v191 的候选，并在同一 Store 连接内重新审计 v189 候选及其最终 v188 Provider 用量。队列返回完整 meter 作为填写模板，但不改变任何状态；并发写入后列表可能过期，因此 POST 仍会在事务内重新检查候选、最终快照、唯一性和幂等键。
+
+PC `/compute-observations` 仅向 `admin/owner` 显示导航，允许选择控制面、传输网关或服务端计量来源，调整完整 meter、记录 observed outcome 和外部证据引用。页面不读取证据正文，也不会把 meter 一致展示为 Verification 通过。
 
 ## 3. 观测来源与结果
 
@@ -55,6 +61,7 @@ Store 会比较 Provider 声明和平台观测，将数量不同的 meter 保存
 ## 6. 尚未实现
 
 - Cargo 编译、v191 迁移执行、HTTP 真实调用、并发与故障注入验证；
+- PC 构建、接口联调、视觉验收和发布；
 - 控制面、网关和 server metering 组件自动写入及签名验证；
 - 多份独立平台观测、跨来源仲裁和可信时间证明；
 - 自动 Verification、独立验证器、多策略治理与可信终态；v192 已提供管理员触发的首版保守决定，见 `docs/distributed-compute/attempt-verification-api.md`；
@@ -68,3 +75,5 @@ Store 会比较 Provider 声明和平台观测，将数量不同的 meter 保存
 - `server/src/compute_attempt_platform_observation_migration.rs`
 - `server/src/compute_federation_attempt_service.rs`
 - `server/src/compute_federation_attempt_api.rs`
+- `pc-frontend/src/features/compute-observations/ComputePlatformObservationPage.tsx`
+- `pc-frontend/src/features/compute-observations/ObserveTerminalCandidateDialog.tsx`
