@@ -17,6 +17,16 @@
 .queue h2, .leasePanel h2 { margin: 0; font-size: 11px; letter-spacing: 0; }
 .queue header span, .leasePanel header span { color: var(--text-muted); font-size: 8px; }
 .queue header b { color: #9bc8d5; font-size: 10px; }
+.queueTabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 3px; border-bottom: 1px solid var(--border); padding: 5px; }
+.queueTabs button { min-height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border-radius: 4px; color: var(--text-muted); font-size: 8px; }
+.queueTabs button[data-active='true'] { color: var(--text-primary); background: var(--bg-elevated); }
+.queueTabs b { font-size: 8px; }
+.leaseRow { width: 100%; min-height: 48px; display: grid; grid-template-columns: 24px minmax(0,1fr) auto; align-items: center; gap: 7px; border-bottom: 1px solid var(--border); padding: 7px 12px; color: var(--text-secondary); text-align: left; }
+.leaseRow[data-active='true'] { color: #a8d5df; background: rgba(120,183,201,.07); box-shadow: inset 3px 0 0 #78b7c9; }
+.leaseRow > span { min-width: 0; display: grid; gap: 3px; }
+.leaseRow strong, .leaseRow small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaseRow strong { font-size: 9px; }
+.leaseRow small, .leaseRow > b { color: var(--text-muted); font-size: 8px; }
 .candidate { display: grid; grid-template-columns: 30px minmax(0,1fr) minmax(115px,.45fr) auto; align-items: center; gap: 9px; border-bottom: 1px solid var(--border); padding: 9px 13px; }
 .candidateIcon { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid rgba(120,183,201,.24); border-radius: 6px; color: #78b7c9; background: rgba(120,183,201,.06); }
 .candidate > div { min-width: 0; }

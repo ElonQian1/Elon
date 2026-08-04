@@ -106,6 +106,26 @@ pub(crate) fn current_lease_state_on(
     .map_err(Into::into)
 }
 
+pub(crate) fn list_current_lease_states_on(
+    conn: &Connection,
+    provider_id: &str,
+    limit: usize,
+) -> Result<Vec<StoredLeaseState>> {
+    let mut statement = conn.prepare(
+        "SELECT provider_id, consumer_account_id, lease_revision, lease_digest,
+                lease_json, status, fencing_generation, expires_at,
+                hard_deadline_at, last_heartbeat_at, updated_by_user_id, updated_at
+           FROM compute_attempt_lease_states
+          WHERE provider_id=?1
+          ORDER BY updated_at DESC, lease_id ASC
+          LIMIT ?2",
+    )?;
+    statement
+        .query_map(params![provider_id, limit as i64], stored_state_from_row)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(Into::into)
+}
+
 fn stored_state_from_row(row: &Row<'_>) -> rusqlite::Result<StoredLeaseState> {
     let lease_json: String = row.get(4)?;
     let lease = serde_json::from_str(&lease_json).map_err(|error| {

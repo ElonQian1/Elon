@@ -11,9 +11,9 @@ import {
 } from './computeExecutionApi'
 import styles from './ComputeExecutionPage.module.css'
 
-interface Props { providerId: string; initialLeaseId: string }
+interface Props { providerId: string; initialLeaseId: string; onStateChanged: () => Promise<void> }
 
-export default function AttemptLeasePanel({ providerId, initialLeaseId }: Props) {
+export default function AttemptLeasePanel({ providerId, initialLeaseId, onStateChanged }: Props) {
   const [leaseId, setLeaseId] = useState(initialLeaseId)
   const [activation, setActivation] = useState<ComputeAttemptActivationReceipt | null>(null)
   const [state, setState] = useState<ComputeAttemptLeaseStateReceipt | null>(null)
@@ -42,14 +42,14 @@ export default function AttemptLeasePanel({ providerId, initialLeaseId }: Props)
   async function renew(body: RenewComputeAttemptLeaseBody) {
     if (!state || busy) return
     setBusy(true); setError('')
-    try { const receipt = await computeExecutionApi.renew(providerId, state, body); setState(receipt.state); setRenewOpen(false); setNotice(`Lease 已续租到 revision ${receipt.state.lease_revision}。`) }
+    try { const receipt = await computeExecutionApi.renew(providerId, state, body); setState(receipt.state); setRenewOpen(false); await onStateChanged(); setNotice(`Lease 已续租到 revision ${receipt.state.lease_revision}。`) }
     catch (reason) { setError(messageOf(reason, 'Lease 续租失败')) } finally { setBusy(false) }
   }
 
   async function abort(body: AbortComputeAttemptBody) {
     if (!activation || !state || busy) return
     setBusy(true); setError('')
-    try { const receipt = await computeExecutionApi.abort(providerId, state.lease.lease_id, body); setAbortOpen(false); await load(state.lease.lease_id); setNotice(`Attempt 已安全中止，退回 CNY ${(receipt.budget_refunded_fen / 100).toFixed(2)}。`) }
+    try { const receipt = await computeExecutionApi.abort(providerId, state.lease.lease_id, body); setAbortOpen(false); await Promise.all([load(state.lease.lease_id), onStateChanged()]); setNotice(`Attempt 已安全中止，退回 CNY ${(receipt.budget_refunded_fen / 100).toFixed(2)}。`) }
     catch (reason) { setError(messageOf(reason, 'Attempt 中止失败')) } finally { setBusy(false) }
   }
 

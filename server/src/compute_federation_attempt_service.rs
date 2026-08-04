@@ -195,6 +195,19 @@ pub(crate) fn list_activation_candidates_for_provider_owner(
     store.list_compute_attempt_activation_candidates(provider_id, limit)
 }
 
+pub(crate) fn list_leases_for_provider_owner(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    limit: usize,
+) -> Result<Vec<ComputeAttemptLeaseStateReceipt>> {
+    let provider = store.compute_provider(provider_id)?;
+    if provider.provider.owner_account_id != user_id {
+        bail!("算力 Provider 不属于当前登录用户");
+    }
+    store.list_compute_attempt_lease_states(provider_id, limit)
+}
+
 pub(crate) fn get_for_participant(
     store: &Store,
     user_id: &str,

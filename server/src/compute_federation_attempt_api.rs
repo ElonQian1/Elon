@@ -33,6 +33,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             get(get_activation),
         )
         .route(
+            "/api/me/compute/providers/:provider_id/attempt-leases",
+            get(list_leases),
+        )
+        .route(
             "/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/renewals",
             post(renew_lease),
         )
@@ -146,6 +150,27 @@ async fn activate(
             &provider_id,
             request,
         ),
+    )
+}
+
+async fn list_leases(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(provider_id): Path<String>,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::list_leases_for_provider_owner(
+            &state.store,
+            &user_id,
+            &provider_id,
+            query.limit,
+        )
+        .map(|leases| json!({"attempt_leases":leases})),
     )
 }
 

@@ -13,8 +13,8 @@ mod support;
 
 use support::{
     audit_renewal, ensure_expected_state, ensure_renewal_owner, ensure_renewal_window,
-    renewal_by_idempotency_on, renewal_event_digest, renewal_request_digest, validate_exact,
-    validate_renewal_input,
+    list_current_lease_states_on, renewal_by_idempotency_on, renewal_event_digest,
+    renewal_request_digest, validate_exact, validate_renewal_input,
 };
 pub(super) use support::{compute_attempt_lease_digest, current_lease_state_on, StoredLeaseState};
 
@@ -66,6 +66,18 @@ pub(crate) struct ComputeAttemptLeaseRenewalReceipt {
 }
 
 impl Store {
+    pub(crate) fn list_compute_attempt_lease_states(
+        &self,
+        provider_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ComputeAttemptLeaseStateReceipt>> {
+        validate_exact("算力 Provider ID", provider_id, 200)?;
+        list_current_lease_states_on(&*self.conn()?, provider_id, limit.clamp(1, 100))?
+            .into_iter()
+            .map(StoredLeaseState::into_receipt)
+            .collect()
+    }
+
     pub(crate) fn renew_compute_attempt_lease(
         &self,
         input: &RenewComputeAttemptLeaseRequest,

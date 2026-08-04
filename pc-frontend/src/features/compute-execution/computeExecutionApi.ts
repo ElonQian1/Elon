@@ -142,6 +142,10 @@ interface ActivationCandidateResponse {
   attempt_activation_candidates: ComputeReservationReceipt[]
 }
 
+interface AttemptLeaseListResponse {
+  attempt_leases: ComputeAttemptLeaseStateReceipt[]
+}
+
 function providerBase(providerId: string) {
   return `/api/me/compute/providers/${encodeURIComponent(providerId)}`
 }
@@ -154,6 +158,9 @@ export const computeExecutionApi = {
   candidates: (providerId: string, limit = 100) =>
     api.get<ActivationCandidateResponse>(`${providerBase(providerId)}/attempt-activations?limit=${limit}`)
       .then((response) => response.attempt_activation_candidates),
+  leases: (providerId: string, limit = 100) =>
+    api.get<AttemptLeaseListResponse>(`${providerBase(providerId)}/attempt-leases?limit=${limit}`)
+      .then((response) => response.attempt_leases),
   activate: (providerId: string, body: ActivateComputeAttemptBody) =>
     api.post<ComputeAttemptActivationReceipt>(`${providerBase(providerId)}/attempt-activations`, body),
   activation: (leaseId: string) =>
