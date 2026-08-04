@@ -1,6 +1,8 @@
 use anyhow::{bail, Context, Result};
 use rusqlite::{params, Connection, TransactionBehavior};
 
+mod authority_fences;
+mod fetch_claims;
 mod plan_application;
 
 pub(super) const COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION: i64 = 2;
@@ -24,8 +26,11 @@ const REQUIRED_INDEXES: &[&str] = &[
 ];
 const REQUIRED_TRIGGERS: &[&str] = &[
     "authority_inventory_change_fenced",
+    "authority_epoch_transition_fenced",
     "authority_keyring_binding_fenced",
     "authority_keyring_binding_monotonic",
+    "authority_process_owner_transition_fenced",
+    "authority_state_revision_monotonic",
     "authority_trusted_time_recovery_fenced",
     "authority_trusted_time_monotonic",
     "immutable_keyring_bundles_delete",
@@ -45,6 +50,11 @@ const REQUIRED_TRIGGERS: &[&str] = &[
     "candidate_owner_delete_forbidden",
     "candidate_state_transition",
     "candidate_close_plan_open",
+    "fetch_claim_begin_fenced",
+    "fetch_claim_delete_forbidden",
+    "fetch_claim_identity_immutable",
+    "fetch_claim_initial_state",
+    "fetch_claim_transition",
     "keyring_bundle_revision_monotonic",
     "keyring_control_revision_consistent",
     "keyring_publisher_revision_consistent",
@@ -56,6 +66,7 @@ const REQUIRED_TRIGGERS: &[&str] = &[
     "planned_download_initial_state",
     "planned_download_state_transition",
     "planned_download_delete_forbidden",
+    "planned_download_fetch_progress_fenced",
     "sealed_plan_candidate_insert",
     "sealed_plan_download_insert",
     "sealed_keyring_keys_insert",
@@ -100,6 +111,12 @@ fn install_schema_v2(connection: &mut Connection) -> Result<()> {
     transaction
         .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V2)
         .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V2")?;
+    transaction
+        .execute_batch(authority_fences::AUTHORITY_FENCE_SCHEMA_V2)
+        .context("COMPUTE_PLUGIN_AUTHORITY_FENCE_SCHEMA_CREATE_V2")?;
+    transaction
+        .execute_batch(fetch_claims::FETCH_CLAIM_SCHEMA_V2)
+        .context("COMPUTE_PLUGIN_AUTHORITY_FETCH_CLAIM_SCHEMA_CREATE_V2")?;
     transaction
         .pragma_update(
             None,
@@ -481,19 +498,23 @@ CREATE TABLE fetch_claims (
     claim_id                TEXT PRIMARY KEY,
     plan_id                 TEXT NOT NULL,
     plan_digest             TEXT NOT NULL,
-    ordinal                 INTEGER NOT NULL,
+    ordinal                 INTEGER NOT NULL CHECK (ordinal >= 0),
     candidate_token         TEXT NOT NULL,
-    authority_epoch         INTEGER NOT NULL,
-    process_owner_epoch     INTEGER NOT NULL,
+    authority_epoch         INTEGER NOT NULL CHECK (authority_epoch > 0),
+    process_owner_epoch     INTEGER NOT NULL CHECK (process_owner_epoch > 0),
     cursor_generation       INTEGER NOT NULL CHECK (cursor_generation > 0),
-    redirect_generation     INTEGER NOT NULL DEFAULT 0,
+    redirect_generation     INTEGER NOT NULL DEFAULT 0 CHECK (
+        redirect_generation >= 0 AND redirect_generation <= 5
+    ),
     offset_bytes            INTEGER NOT NULL CHECK (offset_bytes >= 0),
-    length_bytes            INTEGER NOT NULL CHECK (length_bytes > 0),
+    length_bytes            INTEGER NOT NULL CHECK (
+        length_bytes > 0 AND length_bytes <= 16777216
+    ),
     end_offset_bytes        INTEGER NOT NULL,
     state                   TEXT NOT NULL CHECK (
         state IN ('prepared', 'committed', 'aborted', 'revoked')
     ),
-    prepared_at_ms          INTEGER NOT NULL,
+    prepared_at_ms          INTEGER NOT NULL CHECK (prepared_at_ms >= 0),
     resolved_at_ms          INTEGER,
     resolution_reason       TEXT,
     UNIQUE (plan_id, ordinal, cursor_generation),
@@ -505,6 +526,17 @@ CREATE TABLE fetch_claims (
     CHECK (
         end_offset_bytes > offset_bytes
         AND length_bytes = end_offset_bytes - offset_bytes
+    ),
+    CHECK (
+        (state = 'prepared'
+         AND resolved_at_ms IS NULL
+         AND resolution_reason IS NULL)
+        OR
+        (state IN ('committed', 'aborted', 'revoked')
+         AND resolved_at_ms IS NOT NULL
+         AND resolved_at_ms >= prepared_at_ms
+         AND resolution_reason IS NOT NULL
+         AND resolution_reason <> '')
     )
 );
 
