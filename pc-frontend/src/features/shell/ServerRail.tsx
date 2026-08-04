@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, Bot, Boxes, CircleDollarSign, FileCheck2, Gauge, GitBranch, HardDrive, Landmark, MonitorCog, PackageCheck, Search, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
+import { Activity, Bot, Boxes, CircleDollarSign, ClipboardCheck, FileCheck2, Gauge, GitBranch, HardDrive, Landmark, MonitorCog, PackageCheck, Search, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -26,6 +26,7 @@ const RAIL_ITEMS: RailItem[] = [
   { path: '/node',    Icon: MonitorCog,   label: '分享算力',  color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/compute-supply', Icon: Gauge, label: '供给管理', color: '#2b3138', hoverColor: '#35404a' },
   { path: '/compute-market', Icon: Search, label: '算力市场', color: '#30312d', hoverColor: '#3b3d36' },
+  { path: '/compute-reviews', Icon: ClipboardCheck, label: '算力验收', color: '#342f28', hoverColor: '#463d31' },
   { path: '/compute-execution', Icon: Activity, label: '算力执行', color: '#28343a', hoverColor: '#34464f' },
   { path: '/my-compute-settlement', Icon: CircleDollarSign, label: '我的算力收益', color: '#26342d', hoverColor: '#30463a' },
   { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2a2b2f', hoverColor: '#34363b' },
