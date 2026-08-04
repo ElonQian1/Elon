@@ -251,7 +251,7 @@ fn named_mcp_config(name: &str, server: Value) -> Value {
 }
 
 pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Option<Value> {
-    handle_request_for_profile(workspace, request, None, None).await
+    handle_request_for_profile(workspace, request, None, None, None).await
 }
 
 async fn handle_request_for_profile(
@@ -259,6 +259,7 @@ async fn handle_request_for_profile(
     request: McpRequest,
     profile: Option<&str>,
     context_receipt_path: Option<&Path>,
+    session_id: Option<&str>,
 ) -> Option<Value> {
     let id = request.id.clone().unwrap_or(Value::Null);
     if request.method == "notifications/initialized" {
@@ -271,7 +272,7 @@ async fn handle_request_for_profile(
             context_receipt_path,
         )
     } else if crate::node_agent_project_receipt_mcp::handles(profile) {
-        crate::node_agent_project_receipt_mcp::handle_request(workspace, &request)
+        crate::node_agent_project_receipt_mcp::handle_request(workspace, &request, session_id)
     } else if !matches!(profile, None | Some("governance")) {
         Err(anyhow!("未知项目文档 MCP profile"))
     } else {
@@ -340,6 +341,7 @@ async fn mcp_handler(
         request,
         query.profile.as_deref(),
         Some(&context_receipt_path),
+        Some(&session_id),
     )
     .await
     {

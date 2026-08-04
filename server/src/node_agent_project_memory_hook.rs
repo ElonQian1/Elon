@@ -21,6 +21,8 @@ const MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_PATHS_PER_EVENT: usize = 24;
 const MAX_OBSERVATIONS_PER_TURN: usize = 64;
 const MAX_PROMPT_PATHS: usize = 6;
+const MAX_PROMPT_PATH_CHARS: usize = 360;
+const MAX_SESSION_PROMPTS: usize = 3;
 const SESSION_RETENTION_SECS: u64 = 24 * 60 * 60;
 
 #[derive(Debug, Default, Deserialize)]
@@ -358,7 +360,7 @@ fn handle_stop(session_dir: &Path, input: &HookInput) -> Result<()> {
     if prompted.exists() {
         return write_json(&json!({"continue": true}));
     }
-    let observations = read_observations(&session_dir.join("observations").join(turn_hash));
+    let observations = read_observations(&session_dir.join("observations").join(&turn_hash));
     let read_count = observations
         .values()
         .filter(|observation| observation.kind == "read")
@@ -366,14 +368,27 @@ fn handle_stop(session_dir: &Path, input: &HookInput) -> Result<()> {
     if observations.len() < 2 || read_count == 0 {
         return write_json(&json!({"continue": true}));
     }
+    if session_prompt_count(session_dir) >= MAX_SESSION_PROMPTS
+        || !contains_session_novel_path(session_dir, &turn_hash, &observations)
+    {
+        return write_json(&json!({"continue": true}));
+    }
     if let Some(parent) = prompted.parent() {
         fs::create_dir_all(parent)?;
     }
     crate::node_agent_atomic_file::write(&prompted, b"prompted")?;
+    let mut path_chars = 0usize;
     let paths = observations
         .values()
+        .filter_map(|observation| {
+            let next = path_chars.saturating_add(observation.path.chars().count());
+            if next > MAX_PROMPT_PATH_CHARS {
+                return None;
+            }
+            path_chars = next;
+            Some(observation.path.as_str())
+        })
         .take(MAX_PROMPT_PATHS)
-        .map(|observation| observation.path.as_str())
         .collect::<Vec<_>>();
     let reason = format!(
         "Project-memory receipt gate: this turn inspected {} distinct repository paths ({}). Only if those native reads established a reusable navigation fact that is not already present, stale, task-local, speculative, or conflicting, call project_docs_record_native_context_receipt from yilong_project_receipt with 1-8 concise candidates. Use evidence paths/locators only; never include source bodies, commands, outputs, prompts, chat, or Codex private memories. If nothing is genuinely novel, finish now without calling it.",
@@ -381,6 +396,34 @@ fn handle_stop(session_dir: &Path, input: &HookInput) -> Result<()> {
         paths.join(", ")
     );
     write_json(&json!({"decision": "block", "reason": reason}))
+}
+
+fn session_prompt_count(session_dir: &Path) -> usize {
+    fs::read_dir(session_dir.join("prompted"))
+        .map(|entries| entries.flatten().take(MAX_SESSION_PROMPTS).count())
+        .unwrap_or_default()
+}
+
+fn contains_session_novel_path(
+    session_dir: &Path,
+    current_turn_hash: &str,
+    current: &BTreeMap<String, PathObservation>,
+) -> bool {
+    let root = session_dir.join("observations");
+    let Ok(turns) = fs::read_dir(root) else {
+        return true;
+    };
+    let mut prior_paths = BTreeMap::new();
+    for turn in turns.flatten().take(8) {
+        if turn.file_name().to_string_lossy() == current_turn_hash {
+            continue;
+        }
+        let observations = read_observations(&turn.path());
+        for path in observations.keys() {
+            prior_paths.insert(path.clone(), ());
+        }
+    }
+    current.keys().any(|path| !prior_paths.contains_key(path))
 }
 
 fn read_observations(directory: &Path) -> BTreeMap<String, PathObservation> {

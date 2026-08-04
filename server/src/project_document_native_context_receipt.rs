@@ -12,7 +12,8 @@ use crate::{
     project_document_index::ProjectDocumentIndex,
     project_document_native_context::{
         initialize_candidate_schema, normalize_memories, record_candidates,
-        validate_memories_current, NativeContextCandidate, ProjectContextMemory,
+        record_candidates_attested, validate_memories_current, NativeContextCandidate,
+        ProjectContextMemory,
     },
 };
 
@@ -23,17 +24,71 @@ pub(crate) fn record_receipt(
     memories: Vec<ProjectContextMemory>,
     producer: &str,
 ) -> Result<Value> {
+    record_receipt_internal(workspace, memories, producer, None)
+}
+
+pub(crate) fn record_attested_receipt(
+    workspace: &Path,
+    memories: Vec<ProjectContextMemory>,
+    producer: &str,
+    session_id: &str,
+) -> Result<Value> {
+    record_receipt_internal(workspace, memories, producer, Some(session_id))
+}
+
+fn record_receipt_internal(
+    workspace: &Path,
+    memories: Vec<ProjectContextMemory>,
+    producer: &str,
+    session_id: Option<&str>,
+) -> Result<Value> {
     if memories.is_empty() || memories.len() > MAX_RECEIPT_CANDIDATES {
         bail!("一次原生理解回执需要 1 至 {MAX_RECEIPT_CANDIDATES} 条候选");
     }
-    let candidates = record_candidates(workspace, memories, producer)?;
+    let candidates = match session_id {
+        Some(session_id) => record_candidates_attested(workspace, memories, producer, session_id)?,
+        None => record_candidates(workspace, memories, producer)?,
+    };
+    let count = |action: &str| {
+        candidates
+            .iter()
+            .filter(|candidate| candidate.ingest_action == action)
+            .count()
+    };
+    let recorded_count = count("created") + count("updated") + count("replacement");
+    let deduplicated_count = count("deduplicated") + count("shared_duplicate");
+    let evidence_path_count = candidates
+        .iter()
+        .map(|candidate| candidate.memory.evidence.len())
+        .sum::<usize>();
+    let conflict_hint_count = candidates
+        .iter()
+        .map(|candidate| candidate.conflicts.len())
+        .sum::<usize>();
     Ok(json!({
-        "status": "pending_review",
-        "recorded_count": candidates.len(),
+        "status": if recorded_count == 0 { "no_new_candidate" } else { "pending_review" },
+        "recorded_count": recorded_count,
+        "created_count": count("created"),
+        "updated_count": count("updated"),
+        "replacement_count": count("replacement"),
+        "deduplicated_count": deduplicated_count,
+        "shared_duplicate_count": count("shared_duplicate"),
         "candidates": candidates,
-        "hash_binding": "server_current_file_sha256",
+        "identity_binding": "server_current_file_sha256_plus_git_object_when_available",
         "storage": "external_project_document_index",
         "authority": "candidate_only",
+        "lifecycle": "candidate -> reviewed suggestion -> applied Git memory -> drifted/replacement",
+        "effect_receipt": {
+            "submitted_candidate_count": candidates.len(),
+            "evidence_path_count": evidence_path_count,
+            "recorded_count": recorded_count,
+            "deduplicated_count": deduplicated_count,
+            "conflict_hint_count": conflict_hint_count,
+            "source_bodies_stored": 0,
+            "measurement_kind": "local_structural_count",
+            "not_vendor_billing": true,
+            "not_total_task_tokens": true
+        },
         "repository_changed": false,
         "source_bodies_stored": 0,
         "next": "Review in the project document workspace, then use the existing suggestions/apply flow."
@@ -80,8 +135,15 @@ pub(crate) fn revise_candidate(
     candidate.memory.topics = topics;
     candidate.memory.reviewed_at.clear();
     candidate.memory = normalize_memories(vec![candidate.memory])?.remove(0);
+    candidate.conflicts =
+        crate::project_document_native_context_conflict::inspect(workspace, &candidate.memory);
+    candidate.provenance.last_editor = "pc_document_review".to_string();
+    candidate.provenance.last_edited_at_ms = now_millis();
     candidate.status = stored_status.clone();
-    candidate.updated_at_ms = now_millis().max(expected_updated_at_ms.saturating_add(1));
+    candidate.updated_at_ms = candidate
+        .provenance
+        .last_edited_at_ms
+        .max(expected_updated_at_ms.saturating_add(1));
     candidate.evidence_current =
         validate_memories_current(workspace, std::slice::from_ref(&candidate.memory)).is_ok();
     let changed = index.conn.execute(

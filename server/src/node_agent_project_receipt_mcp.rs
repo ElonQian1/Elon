@@ -12,7 +12,11 @@ pub(crate) fn handles(profile: Option<&str>) -> bool {
     profile == Some(PROFILE)
 }
 
-pub(crate) fn handle_request(workspace: &Path, request: &McpRequest) -> Result<Value> {
+pub(crate) fn handle_request(
+    workspace: &Path,
+    request: &McpRequest,
+    session_id: Option<&str>,
+) -> Result<Value> {
     match request.method.as_str() {
         "initialize" => Ok(json!({
             "protocolVersion": "2025-03-26",
@@ -26,6 +30,7 @@ pub(crate) fn handle_request(workspace: &Path, request: &McpRequest) -> Result<V
         "tools/call" => crate::node_agent_project_docs_mcp_native_context_tools::call_receipt_tool(
             workspace,
             request.params.clone(),
+            session_id,
         ),
         "ping" => Ok(json!({})),
         _ => bail!("项目理解回执 MCP 不支持 method: {}", request.method),

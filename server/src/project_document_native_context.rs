@@ -6,7 +6,7 @@
 //! source bodies.
 
 use anyhow::{bail, Context, Result};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
@@ -24,7 +24,6 @@ use crate::{
 
 const MAX_MEMORIES: usize = 64;
 const MAX_EVIDENCE_PER_MEMORY: usize = 8;
-const MAX_CANDIDATES: usize = 200;
 const MAX_EVIDENCE_BYTES: u64 = 8 * 1024 * 1024;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -36,6 +35,8 @@ pub(crate) struct ProjectContextEvidence {
     pub locator: String,
     #[serde(default)]
     pub evidence_kind: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_identity: Option<crate::project_document_native_context_git::ProjectContextGitIdentity>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -60,7 +61,37 @@ pub(crate) struct NativeContextCandidate {
     pub updated_at_ms: u64,
     #[serde(default)]
     pub evidence_current: bool,
+    #[serde(default)]
+    pub ingest_action: String,
+    #[serde(default)]
+    pub provenance: NativeContextProvenance,
+    #[serde(default)]
+    pub conflicts: Vec<crate::project_document_native_context_conflict::NativeContextConflict>,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct NativeContextProvenance {
+    #[serde(default)]
+    pub schema: String,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub assurance: String,
+    #[serde(default)]
+    pub session_fingerprint: String,
+    #[serde(default)]
+    pub evidence_path_count: usize,
+    #[serde(default)]
+    pub recorded_at_ms: u64,
+    #[serde(default)]
+    pub last_editor: String,
+    #[serde(default)]
+    pub last_edited_at_ms: u64,
+}
+
+pub(crate) use crate::project_document_native_context_ingest::{
+    record_candidate, record_candidates, record_candidates_attested,
+};
 
 pub(crate) fn normalize_memories(
     memories: Vec<ProjectContextMemory>,
@@ -124,85 +155,23 @@ pub(crate) fn validate_reviewed_memories_current(
     validate_memories_current(workspace, memories)
 }
 
-pub(crate) fn record_candidate(
-    workspace: &Path,
-    memory: ProjectContextMemory,
-    producer: &str,
-) -> Result<NativeContextCandidate> {
-    Ok(record_candidates(workspace, vec![memory], producer)?.remove(0))
-}
-
-pub(crate) fn record_candidates(
-    workspace: &Path,
-    memories: Vec<ProjectContextMemory>,
-    producer: &str,
-) -> Result<Vec<NativeContextCandidate>> {
-    let memories = memories
-        .into_iter()
-        .map(|memory| bind_current_evidence_hashes(workspace, memory))
-        .collect::<Result<Vec<_>>>()?;
-    let memories = normalize_memories(memories)?;
-    validate_memories_current(workspace, &memories)?;
-    let producer = bounded_text(producer, 40);
-    if producer.is_empty() {
-        bail!("native context candidate producer 不能为空");
-    }
-    let index = ProjectDocumentIndex::open(workspace)?;
-    initialize_candidate_schema(&index)?;
-    let now = now_millis();
-    let transaction = index.conn.unchecked_transaction()?;
-    let mut candidates = Vec::with_capacity(memories.len());
-    for memory in memories {
-        let created_at_ms = transaction
-            .query_row(
-                "SELECT created_at_ms FROM native_context_candidates WHERE id=?1",
-                params![memory.candidate_id],
-                |row| row.get::<_, i64>(0),
-            )
-            .optional()?
-            .map(|value| value.max(0) as u64)
-            .unwrap_or(now);
-        let candidate = NativeContextCandidate {
-            memory,
-            status: "pending".to_string(),
-            producer: producer.clone(),
-            created_at_ms,
-            updated_at_ms: now,
-            evidence_current: true,
-        };
-        transaction.execute(
-            "INSERT INTO native_context_candidates(id,status,candidate_json,created_at_ms,updated_at_ms)
-             VALUES(?1,'pending',?2,?3,?4)
-             ON CONFLICT(id) DO UPDATE SET status='pending',candidate_json=excluded.candidate_json,
-             updated_at_ms=excluded.updated_at_ms",
-            params![
-                candidate.memory.candidate_id,
-                serde_json::to_string(&candidate)?,
-                to_i64(created_at_ms),
-                to_i64(now)
-            ],
-        )?;
-        candidates.push(candidate);
-    }
-    transaction.execute(
-        "DELETE FROM native_context_candidates WHERE id IN (
-           SELECT id FROM native_context_candidates ORDER BY updated_at_ms DESC LIMIT -1 OFFSET ?1
-         )",
-        params![MAX_CANDIDATES as i64],
-    )?;
-    transaction.commit()?;
-    Ok(candidates)
-}
-
 pub(crate) fn bind_current_evidence_hashes(
     workspace: &Path,
     mut memory: ProjectContextMemory,
 ) -> Result<ProjectContextMemory> {
     for evidence in &mut memory.evidence {
+        evidence.path = normalize_document_path(&evidence.path)?;
+        let current_hash = sha256_file(&canonical_evidence_path(workspace, evidence)?)?;
         if evidence.content_hash.trim().is_empty() {
-            evidence.path = normalize_document_path(&evidence.path)?;
-            evidence.content_hash = sha256_file(&canonical_evidence_path(workspace, evidence)?)?;
+            evidence.content_hash = current_hash;
+        } else if !evidence.content_hash.eq_ignore_ascii_case(&current_hash) {
+            bail!(
+                "显式 evidence.content_hash 与当前文件不一致：{}",
+                evidence.path
+            );
         }
+        evidence.git_identity =
+            crate::project_document_native_context_git::capture(workspace, &evidence.path);
     }
     Ok(memory)
 }
@@ -311,6 +280,8 @@ fn normalize_evidence(mut evidence: ProjectContextEvidence) -> Result<ProjectCon
         "test" | "document" | "configuration" => evidence.evidence_kind.trim().to_string(),
         _ => bail!("evidence_kind 仅支持 source、test、document 或 configuration"),
     };
+    evidence.git_identity =
+        crate::project_document_native_context_git::normalize(evidence.git_identity)?;
     Ok(evidence)
 }
 
@@ -326,8 +297,18 @@ fn normalize_or_derive_id(memory: &ProjectContextMemory) -> Result<String> {
         }
         return Ok(supplied.to_string());
     }
-    let material =
-        serde_json::to_vec(&(memory.summary.as_str(), &memory.topics, &memory.evidence))?;
+    let stable_evidence = memory
+        .evidence
+        .iter()
+        .map(|evidence| {
+            (
+                evidence.path.as_str(),
+                evidence.locator.as_str(),
+                evidence.evidence_kind.as_str(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let material = serde_json::to_vec(&(memory.summary.as_str(), &memory.topics, stable_evidence))?;
     Ok(format!("native-{:x}", Sha256::digest(material))
         .chars()
         .take(31)
@@ -338,12 +319,18 @@ pub(crate) fn validate_evidence_current(
     workspace: &Path,
     evidence: &ProjectContextEvidence,
 ) -> Result<()> {
-    let canonical_path = canonical_evidence_path(workspace, evidence)?;
-    let actual = sha256_file(&canonical_path)?;
-    if actual != evidence.content_hash {
-        bail!("证据 hash 与当前文件不一致：{}", evidence.path);
+    let raw_result = canonical_evidence_path(workspace, evidence)
+        .and_then(|canonical_path| sha256_file(&canonical_path));
+    if matches!(&raw_result, Ok(actual) if actual == &evidence.content_hash) {
+        return Ok(());
     }
-    Ok(())
+    if crate::project_document_native_context_git::is_current(workspace, evidence) == Some(true) {
+        return Ok(());
+    }
+    match raw_result {
+        Ok(_) => bail!("证据 hash 与当前文件不一致：{}", evidence.path),
+        Err(error) => Err(error),
+    }
 }
 
 fn canonical_evidence_path(

@@ -314,7 +314,7 @@ fn portable_memory_projection(workspace: &Path, query: &str) -> Value {
     };
     let Ok(manifest) = parse_manifest(Some(&content)) else {
         return json!({
-            "schema":"elon.project_context_memory.v1",
+            "schema":"elon.project_context_memory.v2",
             "status":"manifest_invalid",
             "selected":[],
             "selected_count":0,

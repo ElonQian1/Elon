@@ -7,6 +7,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use crate::{
     project_document_authorization::DocumentAutomationMode,
+    project_document_native_context_health::shared_memory_health,
     project_document_native_context_receipt::revise_candidate,
     project_document_native_context_review::{candidate_page, review_candidates},
     NodeRuntime,
@@ -55,6 +56,10 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/project-docs/native-context/revise",
             post(revise_handler),
         )
+        .route(
+            "/api/project-docs/native-context/health",
+            post(health_handler),
+        )
 }
 
 async fn candidates_handler(Json(request): Json<NativeContextRequest>) -> axum::response::Response {
@@ -88,6 +93,10 @@ async fn revise_handler(Json(request): Json<NativeContextRequest>) -> axum::resp
         request.summary,
         request.topics,
     ))
+}
+
+async fn health_handler(Json(request): Json<NativeContextRequest>) -> axum::response::Response {
+    response(shared_memory_health(&workspace(&request)))
 }
 
 fn workspace(request: &NativeContextRequest) -> PathBuf {

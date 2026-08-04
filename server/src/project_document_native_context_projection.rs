@@ -3,7 +3,10 @@
 use serde_json::{json, Value};
 use std::path::Path;
 
-use crate::project_document_native_context::{validate_evidence_current, ProjectContextMemory};
+use crate::{
+    project_document_native_context::{validate_evidence_current, ProjectContextMemory},
+    project_document_native_context_git::{relocation_candidates_from_index, relocation_index},
+};
 
 const MAX_VALIDATION_CANDIDATES: usize = 8;
 const MAX_SELECTED_MEMORIES: usize = 3;
@@ -32,6 +35,7 @@ pub(crate) fn relevant_memories(
     let mut selected = Vec::new();
     let mut invalidated = Vec::new();
     let mut invalidated_count = 0usize;
+    let mut relocation_cache = None;
     for (score, memory) in ranked.into_iter().take(MAX_VALIDATION_CANDIDATES) {
         if memory.reviewed_at.trim().is_empty() {
             invalidated_count += 1;
@@ -48,10 +52,14 @@ pub(crate) fn relevant_memories(
             .find(|evidence| validate_evidence_current(workspace, evidence).is_err());
         if let Some(evidence) = drifted {
             invalidated_count += 1;
+            let index = relocation_cache.get_or_insert_with(|| relocation_index(workspace));
+            let relocations = relocation_candidates_from_index(evidence, index);
             invalidated.push(json!({
                 "candidate_id": memory.candidate_id,
                 "drifted_path": evidence.path,
-                "action": "Re-open with native tools before proposing a replacement."
+                "reason": if relocations.is_empty() { "evidence_drifted" } else { "path_relocation_suggested" },
+                "relocation_candidates": relocations,
+                "action": "Re-open current files with native tools before proposing a reviewed replacement; never rewrite evidence automatically."
             }));
             continue;
         }
@@ -70,7 +78,7 @@ pub(crate) fn relevant_memories(
     }
     let selected_count = selected.len();
     json!({
-        "schema": "elon.project_context_memory.v1",
+        "schema": "elon.project_context_memory.v2",
         "selected": selected,
         "selected_count": selected_count,
         "invalidated": invalidated,

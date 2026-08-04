@@ -274,6 +274,7 @@ fn reviewed_native_context_memory_uses_existing_suggestion_apply_flow() {
             content_hash: "a".repeat(64),
             locator: "project document routes".into(),
             evidence_kind: "source".into(),
+            git_identity: None,
         }],
         reviewed_at: "catalog-revision-1".into(),
         ..ProjectContextMemory::default()

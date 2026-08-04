@@ -19,6 +19,7 @@ fn memory_normalization_derives_stable_id_without_bodies() {
             content_hash: "a".repeat(64),
             locator: "routes".into(),
             evidence_kind: "source".into(),
+            git_identity: None,
         }],
         reviewed_at: "catalog-revision-1".into(),
         ..Default::default()
@@ -77,6 +78,7 @@ fn portable_memory_is_returned_only_while_evidence_hash_matches() {
             content_hash: format!("{:x}", Sha256::digest(source)),
             locator: "project_routes".into(),
             evidence_kind: "source".into(),
+            git_identity: None,
         }],
         reviewed_at: "catalog-revision-1".into(),
         ..Default::default()

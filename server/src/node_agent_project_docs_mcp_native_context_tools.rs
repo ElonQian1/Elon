@@ -8,7 +8,7 @@ use std::path::Path;
 use crate::project_document_native_context::{
     list_candidates, record_candidate, ProjectContextEvidence, ProjectContextMemory,
 };
-use crate::project_document_native_context_receipt::record_receipt;
+use crate::project_document_native_context_receipt::{record_attested_receipt, record_receipt};
 
 const RECORD_TOOL: &str = "project_docs_record_native_context_candidate";
 pub(crate) const RECEIPT_TOOL: &str = "project_docs_record_native_context_receipt";
@@ -131,7 +131,11 @@ pub(crate) fn receipt_definition() -> Value {
     )
 }
 
-pub(crate) fn call_receipt_tool(workspace: &Path, params: Value) -> Result<Value> {
+pub(crate) fn call_receipt_tool(
+    workspace: &Path,
+    params: Value,
+    session_id: Option<&str>,
+) -> Result<Value> {
     let name = params
         .get("name")
         .and_then(Value::as_str)
@@ -139,13 +143,22 @@ pub(crate) fn call_receipt_tool(workspace: &Path, params: Value) -> Result<Value
     if name != RECEIPT_TOOL {
         bail!("receipt profile 只允许 {RECEIPT_TOOL}");
     }
-    record_receipt_arguments(
-        workspace,
-        params
-            .get("arguments")
-            .cloned()
-            .unwrap_or_else(|| json!({})),
-    )
+    let arguments = params
+        .get("arguments")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let input: ReceiptArguments = serde_json::from_value(arguments)?;
+    let memories = input
+        .candidates
+        .into_iter()
+        .map(CandidateArguments::into_memory)
+        .collect();
+    match session_id {
+        Some(session_id) => {
+            record_attested_receipt(workspace, memories, &input.producer, session_id)
+        }
+        None => record_receipt(workspace, memories, &input.producer),
+    }
 }
 
 fn record_receipt_arguments(workspace: &Path, arguments: Value) -> Result<Value> {
@@ -200,15 +213,31 @@ fn evidence_schema(require_hash: bool) -> Value {
     } else {
         json!(["path"])
     };
+    let mut properties = json!({
+        "path":{"type":"string","description":"工作区内规范相对路径。"},
+        "content_hash":{"type":"string","pattern":"^$|^[0-9A-Fa-f]{64}$","description":"候选回执可省略；服务端会绑定当前文件 SHA-256。"},
+        "locator":{"type":"string","maxLength":120,"description":"可选 symbol、heading 或行附近定位；不是正文。"},
+        "evidence_kind":{"type":"string","enum":["source","test","document","configuration"],"default":"source"}
+    });
+    if require_hash {
+        properties["git_identity"] = json!({
+            "type":"object",
+            "readOnly":true,
+            "description":"服务端绑定的 Git 对象身份；与工作区 SHA-256 共同用于跨 PC 漂移判断。",
+            "required":["schema","state"],
+            "properties":{
+                "schema":{"type":"string","const":"elon.project_context_git_identity.v1"},
+                "head_commit":{"type":"string","pattern":"^$|^[0-9A-Fa-f]{40}$|^[0-9A-Fa-f]{64}$"},
+                "head_blob_oid":{"type":"string","pattern":"^$|^[0-9A-Fa-f]{40}$|^[0-9A-Fa-f]{64}$"},
+                "worktree_blob_oid":{"type":"string","pattern":"^$|^[0-9A-Fa-f]{40}$|^[0-9A-Fa-f]{64}$"},
+                "state":{"type":"string","enum":["tracked_clean","tracked_modified","index_only","untracked"]}
+            }
+        });
+    }
     json!({
         "type":"object",
         "required":required,
-        "properties":{
-            "path":{"type":"string","description":"工作区内规范相对路径。"},
-            "content_hash":{"type":"string","pattern":"^$|^[0-9A-Fa-f]{64}$","description":"候选回执可省略；服务端会绑定当前文件 SHA-256。"},
-            "locator":{"type":"string","maxLength":120,"description":"可选 symbol、heading 或行附近定位；不是正文。"},
-            "evidence_kind":{"type":"string","enum":["source","test","document","configuration"],"default":"source"}
-        }
+        "properties":properties
     })
 }
 

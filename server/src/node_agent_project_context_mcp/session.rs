@@ -166,6 +166,11 @@ pub(super) fn finish(mut plan: Value, input: DeliveryInput<'_>) -> Result<Value>
         "cache_reused": input.cache_status == "hit",
         "estimated_full_plan_tokens": full_plan_tokens,
         "estimated_tokens_avoided": 0,
+        "measurement_kind": "local_structural_estimate",
+        "token_estimate_method": "utf8_bytes_div_4",
+        "baseline": "same locally generated full plan before delivery projection",
+        "not_vendor_billing": true,
+        "not_total_task_tokens": true,
     });
     refresh_response_estimate(&mut plan, full_plan_tokens);
     Ok(plan)
@@ -187,7 +192,10 @@ pub(super) fn attach_tool_result_size(response: &mut Value) -> Result<()> {
             "mcp_tool_result_bytes": bytes,
             "estimated_mcp_tool_result_tokens": bytes.div_ceil(4),
             "structured_content_bytes": structured_bytes,
+            "measurement_kind": "local_structural_estimate",
             "token_estimate_method": "utf8_bytes_div_4",
+            "not_vendor_billing": true,
+            "not_total_task_tokens": true,
         });
         if performance.get("transport") == Some(&receipt) {
             break;
