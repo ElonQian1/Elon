@@ -3,7 +3,8 @@ use std::fs;
 
 use crate::{
     project_document_native_context::{
-        normalize_memories, ProjectContextEvidence, ProjectContextMemory,
+        bind_current_evidence_hashes, normalize_memories, ProjectContextEvidence,
+        ProjectContextMemory,
     },
     project_document_native_context_projection::relevant_memories,
 };
@@ -26,6 +27,37 @@ fn memory_normalization_derives_stable_id_without_bodies() {
     .remove(0);
     assert!(memory.candidate_id.starts_with("native-"));
     assert_eq!(memory.topics, vec!["api"]);
+}
+
+#[test]
+fn candidate_receipt_can_bind_current_hash_from_evidence_path() {
+    let root = std::env::temp_dir().join(format!(
+        "elon_native_receipt_{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    fs::create_dir_all(root.join("src")).unwrap();
+    let source = b"pub fn native_receipt() {}\n";
+    fs::write(root.join("src/receipt.rs"), source).unwrap();
+    let memory = bind_current_evidence_hashes(
+        &root,
+        ProjectContextMemory {
+            summary: "Native receipt evidence hashes are bound by the local server.".into(),
+            topics: vec!["native receipt".into()],
+            evidence: vec![ProjectContextEvidence {
+                path: "src/receipt.rs".into(),
+                locator: "native_receipt".into(),
+                evidence_kind: "source".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        memory.evidence[0].content_hash,
+        format!("{:x}", Sha256::digest(source))
+    );
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]

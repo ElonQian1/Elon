@@ -30,6 +30,7 @@ const MAX_EVIDENCE_BYTES: u64 = 8 * 1024 * 1024;
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct ProjectContextEvidence {
     pub path: String,
+    #[serde(default)]
     pub content_hash: String,
     #[serde(default)]
     pub locator: String,
@@ -128,8 +129,20 @@ pub(crate) fn record_candidate(
     memory: ProjectContextMemory,
     producer: &str,
 ) -> Result<NativeContextCandidate> {
-    let memory = normalize_memory(memory)?;
-    validate_memories_current(workspace, std::slice::from_ref(&memory))?;
+    Ok(record_candidates(workspace, vec![memory], producer)?.remove(0))
+}
+
+pub(crate) fn record_candidates(
+    workspace: &Path,
+    memories: Vec<ProjectContextMemory>,
+    producer: &str,
+) -> Result<Vec<NativeContextCandidate>> {
+    let memories = memories
+        .into_iter()
+        .map(|memory| bind_current_evidence_hashes(workspace, memory))
+        .collect::<Result<Vec<_>>>()?;
+    let memories = normalize_memories(memories)?;
+    validate_memories_current(workspace, &memories)?;
     let producer = bounded_text(producer, 40);
     if producer.is_empty() {
         bail!("native context candidate producer 不能为空");
@@ -137,38 +150,61 @@ pub(crate) fn record_candidate(
     let index = ProjectDocumentIndex::open(workspace)?;
     initialize_candidate_schema(&index)?;
     let now = now_millis();
-    let created_at_ms = index
-        .conn
-        .query_row(
-            "SELECT created_at_ms FROM native_context_candidates WHERE id=?1",
-            params![memory.candidate_id],
-            |row| row.get::<_, i64>(0),
-        )
-        .optional()?
-        .map(|value| value.max(0) as u64)
-        .unwrap_or(now);
-    let candidate = NativeContextCandidate {
-        memory,
-        status: "pending".to_string(),
-        producer,
-        created_at_ms,
-        updated_at_ms: now,
-        evidence_current: true,
-    };
-    index.conn.execute(
-        "INSERT INTO native_context_candidates(id,status,candidate_json,created_at_ms,updated_at_ms)
-         VALUES(?1,'pending',?2,?3,?4)
-         ON CONFLICT(id) DO UPDATE SET status='pending',candidate_json=excluded.candidate_json,
-         updated_at_ms=excluded.updated_at_ms",
-        params![
-            candidate.memory.candidate_id,
-            serde_json::to_string(&candidate)?,
-            to_i64(created_at_ms),
-            to_i64(now)
-        ],
+    let transaction = index.conn.unchecked_transaction()?;
+    let mut candidates = Vec::with_capacity(memories.len());
+    for memory in memories {
+        let created_at_ms = transaction
+            .query_row(
+                "SELECT created_at_ms FROM native_context_candidates WHERE id=?1",
+                params![memory.candidate_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?
+            .map(|value| value.max(0) as u64)
+            .unwrap_or(now);
+        let candidate = NativeContextCandidate {
+            memory,
+            status: "pending".to_string(),
+            producer: producer.clone(),
+            created_at_ms,
+            updated_at_ms: now,
+            evidence_current: true,
+        };
+        transaction.execute(
+            "INSERT INTO native_context_candidates(id,status,candidate_json,created_at_ms,updated_at_ms)
+             VALUES(?1,'pending',?2,?3,?4)
+             ON CONFLICT(id) DO UPDATE SET status='pending',candidate_json=excluded.candidate_json,
+             updated_at_ms=excluded.updated_at_ms",
+            params![
+                candidate.memory.candidate_id,
+                serde_json::to_string(&candidate)?,
+                to_i64(created_at_ms),
+                to_i64(now)
+            ],
+        )?;
+        candidates.push(candidate);
+    }
+    transaction.execute(
+        "DELETE FROM native_context_candidates WHERE id IN (
+           SELECT id FROM native_context_candidates ORDER BY updated_at_ms DESC LIMIT -1 OFFSET ?1
+         )",
+        params![MAX_CANDIDATES as i64],
     )?;
-    prune_candidates(&index)?;
-    Ok(candidate)
+    transaction.commit()?;
+    Ok(candidates)
+}
+
+pub(crate) fn bind_current_evidence_hashes(
+    workspace: &Path,
+    mut memory: ProjectContextMemory,
+) -> Result<ProjectContextMemory> {
+    for evidence in &mut memory.evidence {
+        if evidence.content_hash.trim().is_empty() {
+            evidence.path = normalize_document_path(&evidence.path)?;
+            evidence.content_hash = sha256_file(&canonical_evidence_path(workspace, evidence)?)?;
+        }
+    }
+    Ok(memory)
 }
 
 pub(crate) fn list_candidates(
@@ -302,6 +338,18 @@ pub(crate) fn validate_evidence_current(
     workspace: &Path,
     evidence: &ProjectContextEvidence,
 ) -> Result<()> {
+    let canonical_path = canonical_evidence_path(workspace, evidence)?;
+    let actual = sha256_file(&canonical_path)?;
+    if actual != evidence.content_hash {
+        bail!("证据 hash 与当前文件不一致：{}", evidence.path);
+    }
+    Ok(())
+}
+
+fn canonical_evidence_path(
+    workspace: &Path,
+    evidence: &ProjectContextEvidence,
+) -> Result<std::path::PathBuf> {
     let canonical_workspace = workspace
         .canonicalize()
         .with_context(|| format!("无法解析项目工作区：{}", workspace.display()))?;
@@ -317,11 +365,7 @@ pub(crate) fn validate_evidence_current(
     if !metadata.is_file() || metadata.len() > MAX_EVIDENCE_BYTES {
         bail!("证据文件不是普通文件或超过 8 MiB：{}", evidence.path);
     }
-    let actual = sha256_file(&canonical_path)?;
-    if actual != evidence.content_hash {
-        bail!("证据 hash 与当前文件不一致：{}", evidence.path);
-    }
-    Ok(())
+    Ok(canonical_path)
 }
 
 fn sha256_file(path: &Path) -> Result<String> {
@@ -345,16 +389,6 @@ pub(crate) fn initialize_candidate_schema(index: &ProjectDocumentIndex) -> Resul
            created_at_ms INTEGER NOT NULL,updated_at_ms INTEGER NOT NULL);
          CREATE INDEX IF NOT EXISTS native_context_candidates_status
            ON native_context_candidates(status,updated_at_ms);",
-    )?;
-    Ok(())
-}
-
-fn prune_candidates(index: &ProjectDocumentIndex) -> Result<()> {
-    index.conn.execute(
-        "DELETE FROM native_context_candidates WHERE id IN (
-           SELECT id FROM native_context_candidates ORDER BY updated_at_ms DESC LIMIT -1 OFFSET ?1
-         )",
-        params![MAX_CANDIDATES as i64],
     )?;
     Ok(())
 }

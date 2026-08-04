@@ -188,11 +188,11 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 读取当前结构化建议和 revision，不读取正文。
 
-### `project_docs_record_native_context_candidate` / `project_docs_list_native_context_candidates`
+### `project_docs_record_native_context_candidate` / `project_docs_record_native_context_receipt` / `project_docs_list_native_context_candidates`
 
-前者接收 Codex Desktop、Codex CLI 或其他代理已经用原生文件工具核对出的短摘要，并强制附带 1–8 个当前工作区证据路径及 SHA-256。候选保存在工作区外的项目文档 SQLite，只记录摘要、topic、路径、定位符、hash、producer 和时间，不记录 prompt、聊天、命令输出或源码正文，也不修改 Git。后者每次限额列出 `pending`、`applied` 或全部候选。
+单条工具保留用于局部结论；显式任务结束时优先用 receipt 一次回执 1–8 条已经原生文件工具核对的短摘要。两者都可只提交工作区相对证据路径：本机服务端在原子写入前检查路径越界、普通文件和 8 MiB 上限，然后绑定当前 SHA-256；调用方显式给出 hash 时则必须与当前文件一致。候选保存在工作区外的项目文档 SQLite，只记录摘要、topic、路径、定位符、hash、producer 和时间，不记录任务文本、prompt、聊天、命令输出、Codex 私有 memories 或源码正文，也不修改 Git。列表工具每次限额返回 `pending`、`reviewed`、`rejected`、`applied` 或全部候选。
 
-候选不是项目事实，也不会自动进入普通编码上下文。显式文档治理任务审核候选后，把接受项复制到 `suggestions.proposed_context_memories`；只有既有 `project_docs_save_suggestions` 和 `project_docs_apply_suggestions` 的 catalog/manifest/suggestions revision、authorization 和 Git 事务全部通过，才合并为跨 PC 的 `context_memories`。应用成功后本机候选只更新为 `applied` 回执；新 PC 无需复制这份 SQLite，直接从 Git manifest 获取已审核导航记忆。
+候选不是项目事实，也不会自动进入普通编码上下文。PC 收件箱只允许修订 `pending/rejected` 候选的 summary/topics，保留 evidence 和 producer，并以 `updated_at_ms` CAS 防止并发覆盖；证据漂移项可拒绝清理，但不能接受。显式文档治理任务审核候选后，把接受项复制到 `suggestions.proposed_context_memories`；只有既有 `project_docs_save_suggestions` 和 `project_docs_apply_suggestions` 的 catalog/manifest/suggestions revision、authorization 和 Git 事务全部通过，才合并为跨 PC 的 `context_memories`。应用成功后本机候选只更新为 `applied` 回执；新 PC 无需复制这份 SQLite，直接从 Git manifest 获取已审核导航记忆。普通 `context` profile 仍只有一个只读工具，不会因此增加治理 schema 或自动写入。
 
 ### `project_docs_apply_suggestions`
 

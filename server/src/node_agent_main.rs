@@ -271,6 +271,7 @@ mod project_document_modularity_review;
 mod project_document_native_context;
 mod project_document_native_context_api;
 mod project_document_native_context_projection;
+mod project_document_native_context_receipt;
 mod project_document_native_context_review;
 #[cfg(test)]
 mod project_document_native_context_tests;

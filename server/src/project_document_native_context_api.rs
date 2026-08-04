@@ -3,10 +3,11 @@
 use axum::{response::IntoResponse, routing::post, Json, Router};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{path::Path, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use crate::{
     project_document_authorization::DocumentAutomationMode,
+    project_document_native_context_receipt::revise_candidate,
     project_document_native_context_review::{candidate_page, review_candidates},
     NodeRuntime,
 };
@@ -30,6 +31,14 @@ struct NativeContextRequest {
     expected_catalog_revision: Option<String>,
     #[serde(default)]
     expected_suggestions_revision: Option<String>,
+    #[serde(default)]
+    candidate_id: String,
+    #[serde(default)]
+    expected_updated_at_ms: u64,
+    #[serde(default)]
+    summary: String,
+    #[serde(default)]
+    topics: Vec<String>,
 }
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
@@ -42,11 +51,16 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/project-docs/native-context/review",
             post(review_handler),
         )
+        .route(
+            "/api/project-docs/native-context/revise",
+            post(revise_handler),
+        )
 }
 
 async fn candidates_handler(Json(request): Json<NativeContextRequest>) -> axum::response::Response {
+    let workspace = workspace(&request);
     response(candidate_page(
-        workspace(&request),
+        &workspace,
         &request.status,
         request.offset,
         request.limit,
@@ -54,8 +68,9 @@ async fn candidates_handler(Json(request): Json<NativeContextRequest>) -> axum::
 }
 
 async fn review_handler(Json(request): Json<NativeContextRequest>) -> axum::response::Response {
+    let workspace = workspace(&request);
     response(review_candidates(
-        workspace(&request),
+        &workspace,
         request.candidate_ids,
         &request.action,
         request.authorization_mode,
@@ -64,8 +79,19 @@ async fn review_handler(Json(request): Json<NativeContextRequest>) -> axum::resp
     ))
 }
 
-fn workspace(request: &NativeContextRequest) -> &Path {
-    Path::new(request.project_root.trim())
+async fn revise_handler(Json(request): Json<NativeContextRequest>) -> axum::response::Response {
+    let workspace = workspace(&request);
+    response(revise_candidate(
+        &workspace,
+        &request.candidate_id,
+        request.expected_updated_at_ms,
+        request.summary,
+        request.topics,
+    ))
+}
+
+fn workspace(request: &NativeContextRequest) -> PathBuf {
+    PathBuf::from(request.project_root.trim())
 }
 
 fn response(result: anyhow::Result<Value>) -> axum::response::Response {
