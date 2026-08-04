@@ -1,6 +1,8 @@
 use anyhow::{bail, Context, Result};
 use rusqlite::{params, Connection, TransactionBehavior};
 
+mod plan_application;
+
 pub(super) const COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION: i64 = 1;
 const COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID: i64 = 0x454c_4350;
 
@@ -12,6 +14,7 @@ const REQUIRED_TABLES: &[&str] = &[
     "keyring_keys",
     "keyring_seals",
     "plan_applications",
+    "plan_application_seals",
     "plan_events",
     "planned_downloads",
 ];
@@ -20,6 +23,7 @@ const REQUIRED_INDEXES: &[&str] = &[
     "one_prepared_claim_per_download",
 ];
 const REQUIRED_TRIGGERS: &[&str] = &[
+    "authority_inventory_change_fenced",
     "authority_keyring_binding_fenced",
     "authority_keyring_binding_monotonic",
     "authority_trusted_time_recovery_fenced",
@@ -32,12 +36,27 @@ const REQUIRED_TRIGGERS: &[&str] = &[
     "immutable_keyring_seals_update",
     "immutable_plan_applications_delete",
     "immutable_plan_applications_update",
+    "immutable_plan_application_seals_delete",
+    "immutable_plan_application_seals_update",
     "immutable_plan_events_delete",
     "immutable_plan_events_update",
+    "candidate_identity_immutable",
+    "candidate_owner_delete_forbidden",
+    "candidate_state_transition",
+    "candidate_close_plan_open",
     "keyring_bundle_revision_monotonic",
     "keyring_control_revision_consistent",
     "keyring_publisher_revision_consistent",
     "keyring_seal_counts",
+    "plan_application_matches_authority",
+    "plan_application_seal_complete",
+    "plan_event_contiguous",
+    "planned_download_identity_immutable",
+    "planned_download_initial_state",
+    "planned_download_state_transition",
+    "planned_download_delete_forbidden",
+    "sealed_plan_candidate_insert",
+    "sealed_plan_download_insert",
     "sealed_keyring_keys_insert",
 ];
 
@@ -77,6 +96,9 @@ fn install_schema_v1(connection: &mut Connection) -> Result<()> {
     transaction
         .execute_batch(SCHEMA_V1)
         .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_CREATE_V1")?;
+    transaction
+        .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V1)
+        .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V1")?;
     transaction
         .pragma_update(
             None,
@@ -282,13 +304,18 @@ CREATE TABLE authority_meta (
 CREATE TABLE plan_applications (
     plan_id                         TEXT PRIMARY KEY,
     plan_digest                     TEXT NOT NULL,
+    application_request_digest      TEXT NOT NULL UNIQUE,
+    signed_plan_envelope_digest     TEXT NOT NULL,
+    signed_manifest_set_digest      TEXT NOT NULL,
     signed_plan_json                TEXT NOT NULL,
     signed_manifests_json           TEXT NOT NULL,
     admission_bindings_json         TEXT NOT NULL,
+    admission_bindings_digest       TEXT NOT NULL,
     expected_inventory_revision     INTEGER NOT NULL,
     expected_inventory_digest       TEXT NOT NULL,
     application_inventory_revision  INTEGER NOT NULL UNIQUE,
     inventory_after_digest          TEXT NOT NULL,
+    inventory_after_json            TEXT NOT NULL,
     application_state_revision      INTEGER NOT NULL,
     authority_epoch_at_apply        INTEGER NOT NULL,
     keyring_bundle_revision         INTEGER NOT NULL,
@@ -296,12 +323,30 @@ CREATE TABLE plan_applications (
     publisher_keyring_digest        TEXT NOT NULL,
     control_keyring_revision        INTEGER NOT NULL,
     control_keyring_digest          TEXT NOT NULL,
+    control_signing_key_fingerprint TEXT NOT NULL,
+    new_candidate_count             INTEGER NOT NULL,
+    closed_candidate_count          INTEGER NOT NULL,
+    download_count                  INTEGER NOT NULL,
+    download_bytes                  INTEGER NOT NULL,
     applied_at_ms                   INTEGER NOT NULL,
     expires_at_ms                   INTEGER NOT NULL,
     receipt_json                    TEXT NOT NULL,
+    receipt_digest                  TEXT NOT NULL,
     UNIQUE (plan_id, plan_digest),
     UNIQUE (plan_id, plan_digest, application_inventory_revision),
     CHECK (application_inventory_revision = expected_inventory_revision + 1),
+    CHECK (
+        expected_inventory_revision >= 0
+        AND application_state_revision > 0
+        AND authority_epoch_at_apply > 0
+    ),
+    CHECK (
+        new_candidate_count >= 0
+        AND closed_candidate_count >= 0
+        AND download_count >= 0
+        AND download_bytes >= 0
+    ),
+    CHECK (applied_at_ms >= 0 AND applied_at_ms < expires_at_ms),
     FOREIGN KEY (
         keyring_bundle_revision,
         publisher_keyring_revision, publisher_keyring_digest,
@@ -313,6 +358,17 @@ CREATE TABLE plan_applications (
     ) ON DELETE RESTRICT,
     FOREIGN KEY (keyring_bundle_revision)
         REFERENCES keyring_seals(bundle_revision) ON DELETE RESTRICT
+);
+
+CREATE TABLE plan_application_seals (
+    plan_id                     TEXT PRIMARY KEY,
+    plan_digest                 TEXT NOT NULL,
+    application_request_digest  TEXT NOT NULL,
+    receipt_digest              TEXT NOT NULL,
+    sealed_at_ms                INTEGER NOT NULL CHECK (sealed_at_ms >= 0),
+    UNIQUE (plan_id, plan_digest),
+    FOREIGN KEY (plan_id, plan_digest)
+        REFERENCES plan_applications(plan_id, plan_digest) ON DELETE RESTRICT
 );
 
 CREATE TABLE plan_events (
@@ -349,11 +405,37 @@ CREATE TABLE candidate_owners (
     close_reason                    TEXT,
     UNIQUE (candidate_token, owner_plan_id, owner_plan_digest),
     UNIQUE (plugin_id, slot_ref),
+    UNIQUE (plugin_id, candidate_generation),
     FOREIGN KEY (
         owner_plan_id, owner_plan_digest, application_inventory_revision
     ) REFERENCES plan_applications (
         plan_id, plan_digest, application_inventory_revision
-    ) ON DELETE RESTRICT
+    ) ON DELETE RESTRICT,
+    FOREIGN KEY (closed_by_plan_id, closed_by_plan_digest)
+        REFERENCES plan_applications(plan_id, plan_digest) ON DELETE RESTRICT,
+    CHECK (
+        (state = 'owned'
+         AND closed_at_ms IS NULL
+         AND closed_by_plan_id IS NULL
+         AND closed_by_plan_digest IS NULL
+         AND close_reason IS NULL)
+        OR
+        (state = 'released'
+         AND closed_at_ms IS NOT NULL
+         AND closed_at_ms >= created_at_ms
+         AND closed_by_plan_id IS NOT NULL
+         AND closed_by_plan_digest IS NOT NULL
+         AND close_reason IS NOT NULL
+         AND close_reason <> '')
+        OR
+        (state = 'promoted'
+         AND closed_at_ms IS NOT NULL
+         AND closed_at_ms >= created_at_ms
+         AND closed_by_plan_id IS NULL
+         AND closed_by_plan_digest IS NULL
+         AND close_reason IS NOT NULL
+         AND close_reason <> '')
+    )
 );
 
 CREATE UNIQUE INDEX one_owned_candidate_per_plugin
@@ -381,12 +463,17 @@ CREATE TABLE planned_downloads (
     updated_at_ms           INTEGER NOT NULL,
     PRIMARY KEY (plan_id, ordinal),
     UNIQUE (plan_id, plan_digest, ordinal),
+    UNIQUE (part_relative_path),
     FOREIGN KEY (plan_id, plan_digest)
         REFERENCES plan_applications(plan_id, plan_digest) ON DELETE RESTRICT,
     FOREIGN KEY (candidate_token, plan_id, plan_digest)
         REFERENCES candidate_owners(candidate_token, owner_plan_id, owner_plan_digest)
         ON DELETE RESTRICT,
-    CHECK (committed_offset >= 0 AND committed_offset <= size_bytes)
+    CHECK (size_bytes > 0),
+    CHECK (cursor_generation >= 0),
+    CHECK (updated_at_ms >= created_at_ms),
+    CHECK (committed_offset >= 0 AND committed_offset <= size_bytes),
+    CHECK (state <> 'complete' OR committed_offset = size_bytes)
 );
 
 CREATE TABLE fetch_claims (
@@ -561,6 +648,14 @@ END;
 CREATE TRIGGER immutable_plan_applications_delete
 BEFORE DELETE ON plan_applications BEGIN
     SELECT RAISE(ABORT, 'plan applications are immutable');
+END;
+CREATE TRIGGER immutable_plan_application_seals_update
+BEFORE UPDATE ON plan_application_seals BEGIN
+    SELECT RAISE(ABORT, 'plan application seals are immutable');
+END;
+CREATE TRIGGER immutable_plan_application_seals_delete
+BEFORE DELETE ON plan_application_seals BEGIN
+    SELECT RAISE(ABORT, 'plan application seals are immutable');
 END;
 CREATE TRIGGER immutable_plan_events_update
 BEFORE UPDATE ON plan_events BEGIN
