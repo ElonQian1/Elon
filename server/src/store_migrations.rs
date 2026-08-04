@@ -211,6 +211,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (174, "分布式算力 Reservation 版本化注册表", crate::compute_reservation_migration::migration_v174),
     (175, "分布式算力 Broker 原子预留回执", crate::compute_broker_reservation_migration::migration_v175),
     (176, "分布式算力 Broker 原子终态回执", crate::compute_broker_finish_migration::migration_v176),
+    (177, "分布式算力激活证据申请与人工审核", crate::compute_activation_request_migration::migration_v177),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
