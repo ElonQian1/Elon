@@ -62,5 +62,5 @@ HTTP 与开放商业 MCP 共用 `compute_federation_provider_service`，最终�
 - 真实 PC 节点、企业集群或外部矿池与 Provider 的绑定；
 - Endpoint/Adapter 路由提案、证明、审批、轮换和撤销；
 - 节点绑定、ReadyCapability、路由与硬件观测摘要的申请及人工审核控制面已写，见 `docs/distributed-compute/activation-evidence-api.md`；真实证据采集、密码学验证、信任升级和激活仍未实现；
-- CapacityPool、供给账本、Offer 与 Price Snapshot 的本人发布控制面；
+- Offer active 审批与发布、Price Snapshot 生成和报价暴露；本人 CapacityPool、供给账本和 draft Offer 控制面已另行写入代码，但仍为 `implementation_uncompiled`；
 - 节点在线状态、动态容量、任务派发、用量验证和收益结算。
