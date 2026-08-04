@@ -298,7 +298,8 @@ pub(crate) use compute_attempt_settlement_challenges::{
     OpenComputeSettlementChallengeRequest,
 };
 pub(crate) use compute_attempt_settlement_corrections::{
-    ComputeSettlementCorrectionReceipt, CorrectComputeAttemptSettlementRequest,
+    ComputePendingSettlementCorrectionCandidate, ComputeSettlementCorrectionReceipt,
+    CorrectComputeAttemptSettlementRequest,
 };
 pub(crate) use compute_attempt_settlement_releases::{
     ComputeSettlementReleaseReceipt, ReleaseComputeAttemptSettlementRequest,

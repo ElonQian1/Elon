@@ -2,10 +2,18 @@ use anyhow::{bail, Result};
 use rusqlite::{Connection, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 
-use super::Store;
+use super::{
+    compute_attempt_settlement_challenge_resolutions::ComputeSettlementChallengeResolutionReceipt,
+    compute_attempt_settlement_challenges::ComputeSettlementChallengeReceipt,
+    compute_attempt_settlements::ComputeAttemptSettlementReceipt, Store,
+};
 
+mod pending_candidate;
+mod pending_queue;
 mod support;
 
+use pending_candidate::build_pending_correction_candidate_on;
+use pending_queue::list_pending_correction_lease_ids_on;
 use support::{
     correction_by_id_on, correction_by_idempotency_on, correction_by_lease_on,
     correction_by_resolution_on, correction_request_digest, normalize_correction_request,
@@ -86,6 +94,16 @@ pub(crate) struct ComputeSettlementCorrectionReceipt {
     pub replayed: bool,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub(crate) struct ComputePendingSettlementCorrectionCandidate {
+    pub settlement: ComputeAttemptSettlementReceipt,
+    pub challenge: ComputeSettlementChallengeReceipt,
+    pub resolution: ComputeSettlementChallengeResolutionReceipt,
+    pub balance_effect: &'static str,
+    pub settlement_release_effect: &'static str,
+    pub external_payment_effect: &'static str,
+}
+
 impl Store {
     pub(crate) fn correct_compute_attempt_settlement(
         &self,
@@ -135,6 +153,17 @@ impl Store {
         support::validate_exact("Attempt Lease ID", lease_id, 200)?;
         let conn = self.conn()?;
         compute_settlement_correction_on(&*conn, lease_id)
+    }
+
+    pub(crate) fn list_pending_compute_settlement_corrections(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<ComputePendingSettlementCorrectionCandidate>> {
+        let conn = self.conn()?;
+        list_pending_correction_lease_ids_on(&conn, limit.clamp(1, 100))?
+            .into_iter()
+            .map(|lease_id| build_pending_correction_candidate_on(&conn, &lease_id))
+            .collect()
     }
 }
 

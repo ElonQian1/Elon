@@ -3,7 +3,10 @@ use serde::Deserialize;
 
 use crate::{
     compute_federation_attempt_service::get_for_participant,
-    store::{ComputeSettlementCorrectionReceipt, CorrectComputeAttemptSettlementRequest, Store},
+    store::{
+        ComputePendingSettlementCorrectionCandidate, ComputeSettlementCorrectionReceipt,
+        CorrectComputeAttemptSettlementRequest, Store,
+    },
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -65,4 +68,11 @@ pub(crate) fn get_for_platform_admin(
     lease_id: &str,
 ) -> Result<ComputeSettlementCorrectionReceipt> {
     store.compute_settlement_correction(lease_id)
+}
+
+pub(crate) fn list_pending_for_platform_admin(
+    store: &Store,
+    limit: usize,
+) -> Result<Vec<ComputePendingSettlementCorrectionCandidate>> {
+    store.list_pending_compute_settlement_corrections(limit)
 }
