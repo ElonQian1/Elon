@@ -3,7 +3,10 @@ use serde::Deserialize;
 
 use crate::{
     compute_federation_attempt_service::get_for_participant,
-    store::{ComputeAttemptFinalizationReceipt, FinalizeComputeAttemptRequest, Store},
+    store::{
+        ComputeAttemptFinalizationReceipt, ComputePendingAttemptFinalizationCandidate,
+        FinalizeComputeAttemptRequest, Store,
+    },
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -58,4 +61,11 @@ pub(crate) fn get_for_attempt_participant(
 ) -> Result<ComputeAttemptFinalizationReceipt> {
     get_for_participant(store, user_id, lease_id)?;
     store.compute_attempt_finalization(lease_id)
+}
+
+pub(crate) fn list_pending_for_platform_admin(
+    store: &Store,
+    limit: usize,
+) -> Result<Vec<ComputePendingAttemptFinalizationCandidate>> {
+    store.list_pending_compute_attempt_finalizations(limit)
 }

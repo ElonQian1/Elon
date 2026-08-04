@@ -246,7 +246,7 @@ pub(super) fn finalize_attempt_on(
 }
 
 #[allow(clippy::too_many_arguments)]
-fn ensure_effective_time(
+pub(super) fn ensure_effective_time(
     effective_at: &str,
     lease_updated_at: &str,
     job_updated_at: &str,
