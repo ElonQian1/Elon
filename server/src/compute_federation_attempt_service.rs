@@ -5,10 +5,12 @@ use crate::store::{
     AbortComputeAttemptRequest, ActivateComputeAttemptRequest, ComputeAttemptAbortReceipt,
     ComputeAttemptActivationReceipt, ComputeAttemptConsumerReviewReceipt,
     ComputeAttemptLeaseRenewalReceipt, ComputeAttemptLeaseStateReceipt,
-    ComputeAttemptTerminalCandidateReceipt, ComputeAttemptUsageDeclarationReceipt,
-    ComputeDeclaredResultArtifactInput, ComputeDeclaredUsageInput,
+    ComputeAttemptPlatformObservationReceipt, ComputeAttemptTerminalCandidateReceipt,
+    ComputeAttemptUsageDeclarationReceipt, ComputeDeclaredResultArtifactInput,
+    ComputeDeclaredUsageInput, ComputeObservedUsageInput,
     DeclareComputeAttemptTerminalCandidateRequest, DeclareComputeAttemptUsageRequest,
-    RenewComputeAttemptLeaseRequest, ReviewComputeAttemptTerminalCandidateRequest, Store,
+    ObserveComputeAttemptTerminalCandidateRequest, RenewComputeAttemptLeaseRequest,
+    ReviewComputeAttemptTerminalCandidateRequest, Store,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -108,6 +110,20 @@ pub(crate) struct ReviewMyComputeAttemptTerminalCandidateRequest {
     pub evidence_refs: Vec<String>,
     pub idempotency_key: String,
     pub confirm_consumer_attestation_only: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ObserveComputeAttemptTerminalCandidateBody {
+    pub expected_terminal_candidate_id: String,
+    pub expected_terminal_candidate_event_digest: String,
+    pub observation_source: String,
+    pub observer_ref: String,
+    pub observed_outcome: String,
+    pub cumulative_observed_usage: Vec<ComputeObservedUsageInput>,
+    pub evidence_refs: Vec<String>,
+    pub idempotency_key: String,
+    pub confirm_platform_observation_only: bool,
 }
 
 pub(crate) fn activate_for_provider_owner(
@@ -364,4 +380,39 @@ pub(crate) fn get_consumer_review_for_participant(
 ) -> Result<ComputeAttemptConsumerReviewReceipt> {
     get_for_participant(store, user_id, lease_id)?;
     store.compute_attempt_consumer_review(lease_id)
+}
+
+pub(crate) fn observe_terminal_candidate_for_platform_admin(
+    store: &Store,
+    admin_user_id: &str,
+    lease_id: &str,
+    request: ObserveComputeAttemptTerminalCandidateBody,
+) -> Result<ComputeAttemptPlatformObservationReceipt> {
+    if !request.confirm_platform_observation_only {
+        bail!("登记平台观测前必须确认该记录只是待验证证据，不是可信终态或结算决定");
+    }
+    store.observe_compute_attempt_terminal_candidate(
+        &ObserveComputeAttemptTerminalCandidateRequest {
+            lease_id: lease_id.to_string(),
+            expected_terminal_candidate_id: request.expected_terminal_candidate_id,
+            expected_terminal_candidate_event_digest: request
+                .expected_terminal_candidate_event_digest,
+            observation_source: request.observation_source,
+            observer_ref: request.observer_ref,
+            observed_outcome: request.observed_outcome,
+            cumulative_observed_usage: request.cumulative_observed_usage,
+            evidence_refs: request.evidence_refs,
+            idempotency_key: request.idempotency_key,
+            observed_by_user_id: admin_user_id.to_string(),
+        },
+    )
+}
+
+pub(crate) fn get_platform_observation_for_participant(
+    store: &Store,
+    user_id: &str,
+    lease_id: &str,
+) -> Result<ComputeAttemptPlatformObservationReceipt> {
+    get_for_participant(store, user_id, lease_id)?;
+    store.compute_attempt_platform_observation(lease_id)
 }

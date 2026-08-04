@@ -238,9 +238,8 @@ impl Store {
         if sequence_no <= 0 {
             bail!("Attempt 用量声明序号必须为正整数");
         }
-        declaration_by_sequence_on(&*self.conn()?, lease_id, sequence_no)?
-            .ok_or_else(|| anyhow!("Attempt 指定序号的用量声明不存在"))?
-            .into_receipt(false)
+        compute_attempt_usage_declaration_on(&*self.conn()?, lease_id, sequence_no)?
+            .ok_or_else(|| anyhow!("Attempt 指定序号的用量声明不存在"))
     }
 }
 
@@ -249,6 +248,20 @@ pub(super) fn latest_compute_attempt_usage_declaration_on(
     lease_id: &str,
 ) -> Result<Option<ComputeAttemptUsageDeclarationReceipt>> {
     latest_declaration_on(conn, lease_id)?
+        .map(|stored| stored.into_receipt(false))
+        .transpose()
+}
+
+pub(crate) fn compute_attempt_usage_declaration_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+    sequence_no: i64,
+) -> Result<Option<ComputeAttemptUsageDeclarationReceipt>> {
+    support::validate_exact("Attempt Lease ID", lease_id, 200)?;
+    if sequence_no <= 0 {
+        bail!("Attempt 用量声明序号必须为正整数");
+    }
+    declaration_by_sequence_on(conn, lease_id, sequence_no)?
         .map(|stored| stored.into_receipt(false))
         .transpose()
 }

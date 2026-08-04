@@ -13,7 +13,8 @@ use crate::{
     compute_federation_attempt_service::{
         self, AbortMyComputeAttemptRequest, ActivateMyComputeAttemptRequest,
         DeclareMyComputeAttemptTerminalCandidateRequest, DeclareMyComputeAttemptUsageRequest,
-        RenewMyComputeAttemptLeaseRequest, ReviewMyComputeAttemptTerminalCandidateRequest,
+        ObserveComputeAttemptTerminalCandidateBody, RenewMyComputeAttemptLeaseRequest,
+        ReviewMyComputeAttemptTerminalCandidateRequest,
     },
     project_auth::{auth_from_headers, json_error},
     types::AppState,
@@ -68,6 +69,14 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/compute/attempt-leases/:lease_id/terminal-candidate/consumer-review",
             get(get_consumer_review).post(review_terminal_candidate),
+        )
+        .route(
+            "/api/admin/compute/attempt-leases/:lease_id/terminal-candidate/platform-observation",
+            post(observe_terminal_candidate),
+        )
+        .route(
+            "/api/me/compute/attempt-leases/:lease_id/terminal-candidate/platform-observation",
+            get(get_platform_observation),
         )
 }
 
@@ -320,10 +329,60 @@ async fn get_consumer_review(
     )
 }
 
+async fn observe_terminal_candidate(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+    Json(request): Json<ObserveComputeAttemptTerminalCandidateBody>,
+) -> Response {
+    let admin_user_id = match platform_admin(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::observe_terminal_candidate_for_platform_admin(
+            &state.store,
+            &admin_user_id,
+            &lease_id,
+            request,
+        ),
+    )
+}
+
+async fn get_platform_observation(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::get_platform_observation_for_participant(
+            &state.store,
+            &user_id,
+            &lease_id,
+        ),
+    )
+}
+
 fn authenticated_user(state: &AppState, headers: &HeaderMap) -> Result<String, Response> {
     auth_from_headers(state, headers)
         .map(|user| user.id)
         .map_err(|_| json_error(StatusCode::UNAUTHORIZED, "未登录"))
+}
+
+fn platform_admin(state: &AppState, headers: &HeaderMap) -> Result<String, Response> {
+    let user = auth_from_headers(state, headers)
+        .map_err(|error| json_error(StatusCode::UNAUTHORIZED, error))?;
+    if !matches!(user.role.as_str(), "admin" | "owner") {
+        return Err(json_error(
+            StatusCode::FORBIDDEN,
+            "只有平台管理员可以登记算力 Attempt 观测证据",
+        ));
+    }
+    Ok(user.id)
 }
 
 fn attempt_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response {
