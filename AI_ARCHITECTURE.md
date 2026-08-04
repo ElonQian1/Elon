@@ -130,21 +130,22 @@ PTY/ConPTY sidecar 仍然保留，但定位是辅助路：
 ```text
 AI / PC Canvas
   -> list targets / list recent sessions
+  -> persist DesignIntentPlan(platform / route / state / session action)
   -> resume or open project-scoped design session
   -> bind AI taskId + bounded exclusive lease
-  -> cursor-based compact design event stream
+  -> cursor-based compact design event stream + consumer checkpoint
   -> Web/PWA/Tauri frontend: controlled Chromium
   -> Tauri native host: project runtime + descendant window capture
   -> Android: Live Runtime
   -> semantic UI tree + PNG path/hash
   -> DraftOperation v2 + per-platform capability tier
-  -> verified UI tree / selector -> reviewable source binding candidates
-  -> source change + evidence-gated platform writeback receipt
+  -> verified UI tree / selector -> reviewable source binding candidates + drift health
+  -> reviewed per-platform writeback plan -> source change + evidence-gated receipt
 ```
 
 代理先用 `ui_get_design_capabilities` 验证当前节点实际安装的 schema，再读取 Web、PWA、Tauri、Android 小型目标索引。无需打开 PC 页面即可恢复/打开项目 `designSessionId`；单次捕获之外，Web/PWA/Tauri 可用持久浏览器在同一 page 中导航和执行有界 selector 交互，非秘密表单值只引用项目 fixture。Android 不使用浏览器替代。Tauri 原生链路按项目发现命令启动，仅访问登记 Runtime 后代进程，窗口像素、菜单/候选对话框和项目 command trace 分层，且不开放任意菜单点击或 command 执行。
 
-设计意图通过项目级、乐观 revision 的 Design Draft v2 表达。`SET_STYLE` 可在持久浏览器中白名单预览并恢复；文字、资源、variant、结构和响应式操作按平台能力分级进入源码 handoff，页面内联预览永远不是源码证据。源码绑定器只在目标声明的项目源码根内扫描已校验 UI tree/selector/route，返回带 SHA-256、行号和字节范围的多个 `CANDIDATE`，必须先采用再显式确认才成为 `BOUND`。AI taskId 通过有界独占 lease 绑定 designSession/draft，后台或 PC 以 taskId/cursor 增量读取紧凑事件；PC 因此跟随指定任务切换 session，而不是轮询项目最近会话。写回回执继续固定 Git/source 基线并要求分平台证据。具体契约、安装节点仍待升级和未执行真实编译/平台验收的边界见 `docs/headless-ui-design-mcp.md`。
+自然语言先进入项目持久的 `DesignIntentPlan`，只保存摘要和 SHA-256，不保存完整聊天；它把平台、route、state、会话复用/打开策略和工具顺序交给 PC 与代理共用。具体修改继续由乐观 revision 的 Design Draft v2 表达。`SET_STYLE` 可在持久浏览器中白名单预览并恢复；其他操作按平台能力进入源码 handoff，页面内联预览永远不是源码证据。源码候选必须先采用再确认 `BOUND`，写回前还要重新检查文件存在性、SHA-256 和 byte range；漂移只返回有界恢复候选，不自动改绑定。AI taskId 通过有界独占 lease 绑定 designSession/draft，消费者用 taskId/cursor 和持久 checkpoint 断点续读。写回必须先形成按平台/适配器拆分的影响计划并显式批准，开始写回时重新校验 plan、draft revision 和绑定健康；回执继续固定 Git/source 基线并要求分平台证据。具体契约、安装节点仍待升级和未执行真实编译/平台验收的边界见 `docs/headless-ui-design-mcp.md`。
 
 ## 项目理解 / RAG 架构
 
