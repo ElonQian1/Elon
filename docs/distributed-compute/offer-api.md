@@ -1,16 +1,16 @@
 ---
-title: 分布式算力 Offer 本人草稿控制面
+title: 分布式算力 Offer 草稿与发布控制面
 status: current
 reviewed_at: 2026-08-04
 owners: backend, ai-economy
 implementation_status: implementation_uncompiled
 ---
 
-# 分布式算力 Offer 本人草稿控制面
+# 分布式算力 Offer 草稿与发布控制面
 
 ## 1. 当前状态
 
-本人 Offer 草稿控制面已写入代码，但尚未编译、执行迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它只为当前用户已激活的 Provider 和 CapacityPool 创建服务端规范化 `draft` Offer，并允许所有者按精确版本撤销未发布草稿；它不是 Offer 发布、报价生成或算力交易。
+本控制面已写入代码，但尚未编译、执行 v182 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。本人可为已激活的 Provider/CapacityPool 创建规范化 `draft` Offer，并按精确版本撤销未发布草稿；平台管理员可查看待审草稿，再以单事务追加 active 版本和不可变发布回执。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写入已有 v170 版本化 Offer Registry。服务端从 Provider、Pool 和 Bucket 当前版本生成规范合同、SKU 摘要与 Offer 摘要，调用方不能自行声称 active 状态或改写供给身份。
 
@@ -24,12 +24,18 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers?limit=20` | 列出该 Provider/Pool 下的 Offer |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id` | 读取一份 Offer 并重新审计当前投影和历史版本 |
 | POST | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/revoke` | 按精确版本和摘要执行 `draft -> revoked` |
+| GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/publication` | 所有者读取该 Offer 的发布回执 |
+| GET | `/api/admin/compute/offers?limit=20` | 管理员列出当前 draft 待审队列 |
+| GET | `/api/admin/compute/offers/:offer_id` | 管理员读取待审 Offer 完整合同 |
+| GET/POST | `/api/admin/compute/offers/:offer_id/publication` | 管理员读取回执，或显式确认后原子发布 |
 
 创建请求提供业务意图，包括幂等键、SKU 类别、模型与运行时、资源参数、Bucket 容量、执行限制、授权范围、价格条款与有效期。`confirm_create` 必须为 `true`。
 
 ## 3. MCP 工具
 
 工具加入现有项目级开放商业 MCP：`/api/projects/:project_id/open-commerce/mcp`。Provider 归属仍按登录用户判断，项目成员身份不能越权读写他人 Offer。
+
+管理员发布不向 MCP 开放。AI 可协助准备和审阅草稿，但不能代替平台 `admin/owner` 通过 HTTP 执行最终发布。
 
 | 工具 | 类型 | 作用 |
 |---|---|---|
@@ -66,11 +72,23 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 
 撤销要求 `expected_offer_version`、`expected_offer_digest` 和 `confirm_revoke=true`。服务端只允许当前 `draft -> revoked`，以连续下一版本保留不可变历史；对同一前置版本的重放会重新审计撤销前的 draft 摘要。本入口明确拒绝 active、draining、expired 或已被其他合同终结的 Offer。
 
-## 6. 市场与资金边界
+## 6. 原子发布与回执
 
-成功响应显式返回 `market_effect: "none"`。本入口不会：
+管理员发布请求必须提供 `expected_offer_version`、`expected_offer_digest`、`idempotency_key` 和 `confirm_publish=true`。写入在一个 `BEGIN IMMEDIATE` 事务中完成：
 
-- 将 Offer 变为 `active` 或加入消费者候选集；
+1. 重新审计当前 draft 版本和摘要。
+2. 复用 Offer Registry 核验 active Provider、active Pool、open Bucket、已发行容量、合同有效期与状态转换。
+3. 追加连续下一版本的 active Offer，不覆盖 draft 历史。
+4. 写入 v182 `compute_offer_publications` 不可变回执，绑定草稿/活动版本、Provider 策略版本、审批人、时间与规范摘要。
+
+任一步失败时，active 版本和发布回执整体回滚。相同幂等键或已发布 Offer 只能重放同一 draft 合同；回执后续读取只审计不可变历史，不要求 Offer 永远停留在 active。
+
+## 7. 市场与资金边界
+
+草稿创建、读取和撤销响应返回 `market_effect: "none"`。发布回执返回 `offer_effect: "active"`，同时明确返回 Price Snapshot、容量移动和资金效果均为 `none`。
+
+active Offer 只是生成报价的前置合同。现有候选查询从未过期 Price Snapshot 出发，并要求快照精确绑定当前 active Offer 和 active Provider；因此只发布 Offer 不会自动出现在消费者可锁价候选中。整个控制面不会：
+
 - 生成 Price Snapshot、曲线或可交易工具；
 - 创建 Claim/Reservation 或预留容量；
 - 冻结余额、移动资金或触发链上动作；
@@ -80,10 +98,10 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 
 `draft` 只是可审计的商业与容量意图，不是对消费者的可交易承诺。
 
-## 7. 尚未实现
+## 8. 尚未实现
 
 - Cargo 编译、迁移执行、并发幂等和 HTTP/MCP 真实调用验证；
-- draft 修订、撤销、人工审批与 `active` 发布状态机；
+- draft 原位修订，以及 active Offer 的 draining、expire、revoke 与已有 Reservation 处理；
 - Price Snapshot 生成、报价曲线、自动撮合与候选暴露；
 - 容量动态校准、Attempt 派发、用量验证和运行中结算；
 - 外部矿池适配器、多币种、Sui 资产和真实提现。

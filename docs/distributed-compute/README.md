@@ -29,7 +29,7 @@ owners: backend, node, ai-economy
 | CapacityBucket 本人控制面 | HTTP/MCP 已可在本人当前 Pool 版本下创建 open、零发行余额 Bucket，并读取当前余额；窗口和 Bucket 摘要由服务端生成，不发行容量、不预留、不交易，尚未编译和运行验证 |
 | Capacity Supply 本人控制面 | HTTP/MCP 已可显式确认后向同一窗口的多个 open Bucket 原子追加 self-declared 供给，或把尚在 available 的供给原子撤入 retired；服务端固定首次时间并复用现有双分录账本，available 不等于 verified 或可交易，尚未编译和运行验证 |
 | 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；应用单事务激活内部 Provider/Pool，隔离单事务把其当前 active 状态转为 quarantined。两者均不发送节点命令、不直接改写 Offer、不移动资金，恢复尚未实现，状态为 `implementation_uncompiled` |
-| Offer 本人草稿控制面 | HTTP/MCP 已可在本人 active、具备路由与 verified 证据的 Provider/Pool 下创建、读取、列出和精确撤销 draft Offer；固定版本、状态、绑定和摘要，不产生 Price Snapshot、候选暴露、容量预留或资金动作，状态为 `implementation_uncompiled` |
+| Offer 草稿与发布控制面 | HTTP/MCP 已可创建、查询和撤销本人规范化 draft Offer；管理员 HTTP 可读待审队列，并以单事务追加 active 版本与 v182 不可变回执。发布不生成 Price Snapshot、不预留容量也不移动资金，状态为 `implementation_uncompiled` |
 | 节点插件治理合同 | Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 与短期 ReadyCapability 合同已写，尚未编译或接线 |
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
@@ -70,9 +70,9 @@ owners: backend, node, ai-economy
 
 ### F1：用户节点成为可插拔 Provider
 
-节点内部已经形成 Plugin Host 兼容 seam，以及 Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架；云端还形成 v169 版本化 Provider Registry、Offer 规范合同校验和 v170 追加式 Offer Registry。本人 HTTP/MCP 控制面可登记和查询 `user_node` 或 `managed_cluster`，但只产生服务端固定的 `registering/self_declared` 记录，响应不暴露路由、凭据、适配器或结算账户；还可在本人 Provider 下登记和查询 `registering` CapacityPool，服务端生成 epoch、revision 和摘要，响应不返回原始资源档案。已激活且具备路由和 verified 证据的本人 Provider/Pool 还可创建服务端规范化 draft Offer；该草稿不进入市场。这些入口均尚未编译、执行迁移或运行验证。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**。
+节点内部已经形成 Plugin Host 兼容 seam，以及 Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架；云端还形成 v169 版本化 Provider Registry、v170 追加式 Offer Registry 和 v182 发布回执。本人可登记 Provider/Pool/Bucket/供给，并为已激活、具备路由和 verified 证据的 Provider/Pool 创建规范化 draft Offer；平台管理员可原子追加 active 版本与回执。这些入口均尚未编译、执行迁移或运行验证。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**。
 
-目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。真实下载器、Sidecar 进程与 IPC、动态健康状态、云端 capability gate、通用 Attempt 协议接线和 Offer active 审批/发布目前都未实现。
+目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。真实下载器、Sidecar 进程与 IPC、动态健康状态、云端 capability gate 和通用 Attempt 协议接线目前都未实现。
 
 ### F2：Broker、验证和真实结算
 

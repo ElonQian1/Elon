@@ -22,7 +22,7 @@ implementation_status: implementation_uncompiled
 4. 管理员只能通过登录后的平台 HTTP 队列审核。批准前，服务端再次核对所有权、状态、精确版本和稳定账本审计摘要。
 5. 审核通过后，管理员可显式准备一个 v179 激活计划。服务端在同一事务内再次核对申请、Provider、Pool 和稳定账本审计摘要，并生成下一 Provider revision 的不可变目标合同。
 6. 管理员以当前 `plan_digest`、稳定幂等键和 `confirm_apply=true` 应用计划；Store 在同一 `BEGIN IMMEDIATE` 事务内重新核对全部依赖，写入 Provider 下一版本、Pool 生命周期事件、申请/计划终态和 v180 不可变应用回执。
-7. Provider/Pool 的内部激活与市场发布分离。Offer 发布、节点连接、可预留容量、任务派发和资金结算仍需后续独立流程。
+7. Provider/Pool 的内部激活与市场发布分离。Offer 已有后续 v182 管理员原子发布流程；节点真实连接、Price Snapshot、可预留容量、任务派发和资金结算仍是独立边界。
 8. 若已应用结果需要紧急停止，管理员可按当前 `application_digest` 和明确原因执行 v181 隔离；Provider 当前 active 版本和 Pool 当前 active epoch 在一个事务内转为 quarantined，并保存不可变回执。
 
 提交的引用和摘要是待审核材料，不是平台已验证事实。服务端不在这张表内保存节点端点、访问凭据、原始硬件报告或完整路由证明。
@@ -122,4 +122,4 @@ implementation_status: implementation_uncompiled
 - 节点绑定引用、ReadyCapability、路由证明和硬件观测的真实采集与密码学验证；
 - 审核员查看原始证据工件、签名链和挑战任务的界面；
 - prepared 计划的双人复核，以及 quarantined 激活结果的恢复、回滚和异常修复控制面；
-- verified 硬件事实、路由凭据轮换、Offer 发布、任务派发和真实结算。
+- verified 硬件事实、路由凭据轮换、Price Snapshot、任务派发和真实结算；Offer 原子发布已由 `docs/distributed-compute/offer-api.md` 独立维护。
