@@ -78,7 +78,7 @@ Transaction 固定 pool、epoch、window、事件类型、幂等键、请求摘�
 
 任何一步失败全部回滚。候选查询、Quote 和 ReadyCapability 只提供观察事实，不能跳过 Reserve 的再次检查。
 
-当前容量 Store 已把 Claim Hold/Finish/Activation 拆出不自行提交的事务内 kernel。公开 standalone 方法仍以 `BEGIN IMMEDIATE` 包住 Hold/Finish kernel 并负责 commit，但拒绝 Reservation 主体或绑定；v175/v176 Broker 在自己持有的同一事务中调用这些 kernel。Hold V2 摘要固定完整 causal binding，Reservation Claim 强制绑定 Offer、Job 与同主体 Reservation；Finish 继承原始 held 绑定并精确引用因果前序。v175 第一版 Broker 组合余额预授权、Job 登记和 Reservation 登记；v176 对尚未激活 Attempt 的 active Reservation 原子完成退款、held Claim Release/Expire、Job canceled/failed 和 Reservation released/expired。v185 通过仅供外层事务使用的 Activation kernel 将既有 Claim `held -> active`，并把 Attempt Lease ID 和 fencing generation 写入容量因果链，再与 Job/Reservation 新版本和不可变激活回执一同提交。上述状态均为 `implementation_uncompiled`，只覆盖 `platform_balance_cny`；v185 不发送节点命令、不新增扣款，也不覆盖续租、归还、实际用量或运行中结算。
+当前容量 Store 已把 Claim Hold/Finish/Activation 拆出不自行提交的事务内 kernel。公开 standalone 方法仍以 `BEGIN IMMEDIATE` 包住 Hold/Finish kernel 并负责 commit，但拒绝 Reservation 主体或绑定；v175/v176 Broker 在自己持有的同一事务中调用这些 kernel。Hold V2 摘要固定完整 causal binding，Reservation Claim 强制绑定 Offer、Job 与同主体 Reservation；Finish 继承原始 held 绑定并精确引用因果前序。v175 第一版 Broker 组合余额预授权、Job 登记和 Reservation 登记；v176 对尚未激活 Attempt 的 active Reservation 原子完成退款、held Claim Release/Expire、Job canceled/failed 和 Reservation released/expired。v185 通过仅供外层事务使用的 Activation kernel 将既有 Claim `held -> active`，并把 Attempt Lease ID 和 fencing generation 写入容量因果链，再与 Job/Reservation 新版本和不可变激活回执一同提交。v186 只更新 Lease 状态投影和追加续租回执，不触碰容量账本。上述状态均为 `implementation_uncompiled`，只覆盖 `platform_balance_cny`；v185/v186 不发送节点命令、不新增扣款，也不覆盖 active 容量归还、实际用量或运行中结算。
 
 ## 5. Attempt 与容量
 
@@ -118,4 +118,4 @@ reusable:   issued = available + held + active + retired
 
 ## 9. 当前实现边界
 
-2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v176 与 v185 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、窗口与 TTL 有界的 Claim hold、Claim-local held-only 释放/到期、Store-canonical request digest、双分录落库、余额 CAS、Claim 历史、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、Provider/Offer/Price Snapshot/Job/Reservation 注册和历史审计。v175 Broker 统一原子 Reserve；v176 统一未执行任务退款与终态；v185 统一首个已接受 Attempt 的 held/active 容量、reserved/running Job、active Reservation 和不可变 Lease 回执，并保持预算预授权不变。上述路径状态为 `implementation_uncompiled`，尚未执行迁移、调度、并发验证或真实容量操作；节点派发、接受证明验证、Lease 续期/归还、运行中实际用量结算、受控自动修复和完整运行协议仍未接线。
+2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v186 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、窗口与 TTL 有界的 Claim hold、Claim-local held-only 释放/到期、Store-canonical request digest、双分录落库、余额 CAS、Claim 历史、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、Provider/Offer/Price Snapshot/Job/Reservation 注册和历史审计。v175 Broker 统一原子 Reserve；v176 统一未执行任务退款与终态；v185 统一首个已接受 Attempt 的 held/active 容量、reserved/running Job、active Reservation 和不可变 Lease 回执，并保持预算预授权不变；v186 增加 Lease 状态投影和外部心跳声明续租，但不改变容量或资金。上述路径状态为 `implementation_uncompiled`，尚未执行迁移、调度、并发验证或真实容量操作；节点派发、接受/心跳证明验证、Lease 超时归还、运行中实际用量结算、受控自动修复和完整运行协议仍未接线。

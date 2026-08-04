@@ -82,7 +82,7 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 
 - Cargo 编译、迁移执行、HTTP/MCP 真实调用与并发验证；
 - 真实价格源、批量报价和自动撮合；Offer 派生 fallback_curve 快照见 `price-snapshot-api.md`；
-- Attempt 已接受激活以独立 v185 HTTP 入口形成基础代码；续租、取消、真实节点派发、多次 Attempt 与 fencing 递增仍未实现；
+- Attempt 已接受激活以独立 v185 HTTP 入口形成基础代码，v186 HTTP 已增加 Lease 状态投影和外部心跳声明续租；真实节点续租命令、取消、派发、多次 Attempt 与 fencing 递增仍未实现；
 - 运行中任务的容量归还、实际用量、验证和最终结算；
 - 多币种、Sui 资产、外部矿池和 Provider 收益提现；
 - 服务器持久化的独立真人确认凭证。
