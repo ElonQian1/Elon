@@ -584,6 +584,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .merge(crate::compute_federation_attempt_settlement_challenge_resolution_api::routes())
         .merge(crate::compute_federation_attempt_settlement_correction_api::routes())
         .merge(crate::compute_federation_attempt_settlement_release_api::routes())
+        .merge(crate::compute_federation_settlement_withdrawal_request_api::routes())
         .merge(crate::compute_federation_broker_api::routes())
         .merge(crate::compute_federation_offer_api::routes())
         .merge(crate::compute_federation_price_snapshot_api::routes())

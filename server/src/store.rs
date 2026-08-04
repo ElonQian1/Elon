@@ -82,6 +82,7 @@ mod compute_provider_registry;
 mod compute_quote_candidates;
 mod compute_reservation_contract_validation;
 mod compute_reservation_registry;
+mod compute_settlement_withdrawal_requests;
 mod conversation_forks;
 mod conversations;
 pub(crate) mod default_joint_projects;
@@ -358,6 +359,9 @@ pub(crate) use compute_provider_registry::validate_compute_provider_contract;
 pub(crate) use compute_provider_registry::ComputeProviderRegistrationReceipt;
 pub(crate) use compute_quote_candidates::ComputeJobQuoteCandidatePage;
 pub(crate) use compute_reservation_registry::ComputeReservationRegistrationReceipt;
+pub(crate) use compute_settlement_withdrawal_requests::{
+    ComputeSettlementWithdrawalRequestReceipt, CreateComputeSettlementWithdrawalRequest,
+};
 pub(crate) use external_app_tool_executions::{
     AdminExternalAppToolExecutionSummary, ExternalAppToolExecutionWrite,
 };
