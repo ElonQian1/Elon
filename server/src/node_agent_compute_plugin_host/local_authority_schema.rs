@@ -3,7 +3,7 @@ use rusqlite::{params, Connection, TransactionBehavior};
 
 mod plan_application;
 
-pub(super) const COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION: i64 = 1;
+pub(super) const COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION: i64 = 2;
 const COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID: i64 = 0x454c_4350;
 
 const REQUIRED_TABLES: &[&str] = &[
@@ -41,6 +41,7 @@ const REQUIRED_TRIGGERS: &[&str] = &[
     "immutable_plan_events_delete",
     "immutable_plan_events_update",
     "candidate_identity_immutable",
+    "candidate_initial_state",
     "candidate_owner_delete_forbidden",
     "candidate_state_transition",
     "candidate_close_plan_open",
@@ -68,7 +69,7 @@ pub(super) fn ensure_schema(connection: &mut Connection) -> Result<()> {
         .pragma_query_value(None, "application_id", |row| row.get::<_, i64>(0))
         .context("COMPUTE_PLUGIN_AUTHORITY_APPLICATION_ID_READ")?;
     match version {
-        0 if application_id == 0 => install_schema_v1(connection),
+        0 if application_id == 0 => install_schema_v2(connection),
         COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION
             if application_id == COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID =>
         {
@@ -86,7 +87,7 @@ pub(super) fn ensure_schema(connection: &mut Connection) -> Result<()> {
     }
 }
 
-fn install_schema_v1(connection: &mut Connection) -> Result<()> {
+fn install_schema_v2(connection: &mut Connection) -> Result<()> {
     if count_required_tables(connection)? != 0 {
         bail!("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_UNVERSIONED: refusing to adopt unversioned tables");
     }
@@ -94,11 +95,11 @@ fn install_schema_v1(connection: &mut Connection) -> Result<()> {
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_BEGIN")?;
     transaction
-        .execute_batch(SCHEMA_V1)
-        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_CREATE_V1")?;
+        .execute_batch(SCHEMA_V2)
+        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_CREATE_V2")?;
     transaction
-        .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V1)
-        .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V1")?;
+        .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V2)
+        .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V2")?;
     transaction
         .pragma_update(
             None,
@@ -164,7 +165,7 @@ fn object_exists(connection: &Connection, object_type: &str, name: &str) -> Resu
         .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_INSPECT")
 }
 
-const SCHEMA_V1: &str = r#"
+const SCHEMA_V2: &str = r#"
 CREATE TABLE keyring_bundles (
     bundle_revision          INTEGER PRIMARY KEY CHECK (bundle_revision > 0),
     bundle_digest            TEXT NOT NULL UNIQUE,
@@ -230,7 +231,7 @@ CREATE TABLE keyring_seals (
 
 CREATE TABLE authority_meta (
     singleton                       INTEGER PRIMARY KEY CHECK (singleton = 1),
-    schema_version                  INTEGER NOT NULL CHECK (schema_version = 1),
+    schema_version                  INTEGER NOT NULL CHECK (schema_version = 2),
     installation_id_digest         TEXT NOT NULL,
     state_revision                  INTEGER NOT NULL CHECK (state_revision >= 0),
     inventory_revision              INTEGER NOT NULL CHECK (inventory_revision >= 0),

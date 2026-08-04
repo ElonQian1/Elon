@@ -9,12 +9,21 @@ mod initialization;
 mod keyring_integrity;
 mod keyring_snapshot;
 mod keyring_store;
+mod plan_application;
+mod plan_application_persistence;
+mod plan_application_projection;
+mod plan_application_replay_children;
+mod plan_application_writes;
 
 pub(crate) use initialization::{
     ComputePluginAuthorityInitialization, ComputePluginAuthorityInitializationOutcome,
 };
 pub(crate) use keyring_store::{
     ComputePluginKeyringInstallDisposition, ComputePluginKeyringInstallResult,
+};
+pub(crate) use plan_application::{
+    ComputePluginCandidateHandle, ComputePluginPlanApplicationDisposition,
+    ComputePluginPlanApplicationReceipt, ComputePluginPlanApplicationResult,
 };
 
 const COMPUTE_PLUGIN_STATE_FILE: &str = "compute-plugin-state.sqlite3";

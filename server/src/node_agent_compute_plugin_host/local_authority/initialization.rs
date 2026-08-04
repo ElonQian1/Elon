@@ -71,7 +71,7 @@ impl ComputePluginLocalAuthority {
                         authority_epoch, process_owner_epoch,
                         trusted_time_high_water_ms, clock_status, updated_at_ms
                     ) VALUES (
-                        1, 1, ?1,
+                        1, 2, ?1,
                         0, 0, ?2, ?3,
                         ?4, 0,
                         NULL, NULL,

@@ -1,7 +1,7 @@
 /// Cross-table fences for the immutable plan-application journal.
 ///
 /// Kept separate from the base table declarations so the schema entrypoint remains assembly-only.
-pub(super) const PLAN_APPLICATION_SCHEMA_V1: &str = r#"
+pub(super) const PLAN_APPLICATION_SCHEMA_V2: &str = r#"
 CREATE TRIGGER authority_inventory_change_fenced
 BEFORE UPDATE OF inventory_revision, inventory_digest, inventory_json ON authority_meta
 WHEN (
@@ -58,10 +58,16 @@ WHEN NOT EXISTS (
       AND application.plan_digest = NEW.plan_digest
       AND application.application_request_digest = NEW.application_request_digest
       AND application.receipt_digest = NEW.receipt_digest
-      AND NEW.sealed_at_ms >= application.applied_at_ms
+      AND NEW.sealed_at_ms = application.applied_at_ms
 )
 OR (SELECT COUNT(*) FROM candidate_owners
-    WHERE owner_plan_id = NEW.plan_id AND owner_plan_digest = NEW.plan_digest)
+    WHERE owner_plan_id = NEW.plan_id
+      AND owner_plan_digest = NEW.plan_digest)
+   <> (SELECT new_candidate_count FROM plan_applications WHERE plan_id = NEW.plan_id)
+OR (SELECT COUNT(*) FROM candidate_owners
+    WHERE owner_plan_id = NEW.plan_id
+      AND owner_plan_digest = NEW.plan_digest
+      AND state = 'owned')
    <> (SELECT new_candidate_count FROM plan_applications WHERE plan_id = NEW.plan_id)
 OR (SELECT COUNT(*) FROM candidate_owners
     WHERE state = 'released'
@@ -82,15 +88,44 @@ OR NOT EXISTS (
       AND event_type = 'applied'
 )
 OR EXISTS (
-    SELECT 1
-    FROM fetch_claims AS claim
-    JOIN candidate_owners AS candidate
-      ON candidate.candidate_token = claim.candidate_token
-    WHERE candidate.state = 'released'
-      AND candidate.closed_by_plan_id = NEW.plan_id
-      AND candidate.closed_by_plan_digest = NEW.plan_digest
-      AND claim.state = 'prepared'
+    SELECT 1 FROM plan_events AS event
+    JOIN plan_applications AS application
+      ON application.plan_id = event.plan_id
+     AND application.plan_digest = event.plan_digest
+    WHERE event.plan_id = NEW.plan_id
+      AND event.plan_digest = NEW.plan_digest
+      AND event.event_index = 0
+      AND event.recorded_at_ms <> application.applied_at_ms
 )
+OR EXISTS (
+    SELECT 1 FROM candidate_owners AS candidate
+    JOIN plan_applications AS application
+      ON application.plan_id = candidate.owner_plan_id
+     AND application.plan_digest = candidate.owner_plan_digest
+    WHERE candidate.owner_plan_id = NEW.plan_id
+      AND candidate.owner_plan_digest = NEW.plan_digest
+      AND candidate.created_at_ms <> application.applied_at_ms
+)
+OR EXISTS (
+    SELECT 1 FROM candidate_owners AS candidate
+    JOIN plan_applications AS application
+      ON application.plan_id = candidate.closed_by_plan_id
+     AND application.plan_digest = candidate.closed_by_plan_digest
+    WHERE candidate.closed_by_plan_id = NEW.plan_id
+      AND candidate.closed_by_plan_digest = NEW.plan_digest
+      AND (candidate.closed_at_ms <> application.applied_at_ms
+           OR candidate.close_reason <> 'cancel_candidate')
+)
+OR EXISTS (
+    SELECT 1 FROM planned_downloads AS download
+    JOIN plan_applications AS application
+      ON application.plan_id = download.plan_id
+     AND application.plan_digest = download.plan_digest
+    WHERE download.plan_id = NEW.plan_id
+      AND download.plan_digest = NEW.plan_digest
+      AND download.created_at_ms <> application.applied_at_ms
+)
+OR EXISTS (SELECT 1 FROM fetch_claims WHERE state = 'prepared')
 BEGIN
     SELECT RAISE(ABORT, 'plan application cannot seal with incomplete child rows');
 END;
@@ -111,6 +146,17 @@ WHEN EXISTS (
     WHERE plan_id = NEW.plan_id AND plan_digest = NEW.plan_digest
 ) BEGIN
     SELECT RAISE(ABORT, 'sealed plan cannot accept planned downloads');
+END;
+
+CREATE TRIGGER candidate_initial_state
+BEFORE INSERT ON candidate_owners
+WHEN NEW.state <> 'owned'
+  OR NEW.closed_at_ms IS NOT NULL
+  OR NEW.closed_by_plan_id IS NOT NULL
+  OR NEW.closed_by_plan_digest IS NOT NULL
+  OR NEW.close_reason IS NOT NULL
+BEGIN
+    SELECT RAISE(ABORT, 'candidate owner must start open and owned');
 END;
 
 CREATE TRIGGER candidate_identity_immutable

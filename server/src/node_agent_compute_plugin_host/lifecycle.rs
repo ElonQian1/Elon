@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use super::identity::ComputePluginReleaseRef;
 
-pub(crate) const COMPUTE_PLUGIN_INVENTORY_SCHEMA: &str = "elon.compute_plugin.inventory.v1";
+pub(crate) const COMPUTE_PLUGIN_INVENTORY_SCHEMA: &str = "elon.compute_plugin.inventory.v2";
+pub(crate) const MAX_COMPUTE_PLUGIN_INVENTORY_RECORDS: usize = 256;
 
 pub(crate) const SLOT_DOWNLOADING: &str = "downloading";
 pub(crate) const SLOT_VERIFYING: &str = "verifying";
@@ -15,6 +16,8 @@ pub(crate) const SLOT_FAILED: &str = "failed";
 
 pub(crate) const ACTIVATION_ENABLED: &str = "enabled";
 pub(crate) const ACTIVATION_DISABLED: &str = "disabled";
+pub(crate) const DESIRED_PRESENCE_PRESENT: &str = "present";
+pub(crate) const DESIRED_PRESENCE_ABSENT: &str = "absent";
 
 pub(crate) const ADMISSION_ALLOWED: &str = "allowed";
 pub(crate) const ADMISSION_QUARANTINED: &str = "quarantined";
@@ -48,6 +51,7 @@ pub(crate) struct ComputePluginLocalRecord {
     pub active_slot_ref: Option<String>,
     pub candidate_slot_ref: Option<String>,
     pub slots: Vec<ComputePluginSlotRecord>,
+    pub desired_presence: String,
     pub desired_activation: String,
     pub admission: String,
     pub runtime: ComputePluginRuntimeObservation,
@@ -148,6 +152,9 @@ pub(crate) fn local_record_shape_is_valid(record: &ComputePluginLocalRecord) -> 
         return false;
     }
     if !matches!(
+        record.desired_presence.as_str(),
+        DESIRED_PRESENCE_PRESENT | DESIRED_PRESENCE_ABSENT
+    ) || !matches!(
         record.desired_activation.as_str(),
         ACTIVATION_ENABLED | ACTIVATION_DISABLED
     ) || !matches!(
@@ -189,7 +196,12 @@ pub(crate) fn local_record_shape_is_valid(record: &ComputePluginLocalRecord) -> 
             SLOT_DOWNLOADING | SLOT_VERIFYING | SLOT_STAGED
         ) || record.candidate_slot_ref.as_deref() == Some(slot.slot_ref.as_str())
     });
-    transient_slots_are_owned
+    let desired_state_is_consistent = record.desired_presence == DESIRED_PRESENCE_PRESENT
+        || (record.desired_presence == DESIRED_PRESENCE_ABSENT
+            && record.desired_activation == ACTIVATION_DISABLED
+            && record.candidate_slot_ref.is_none());
+    desired_state_is_consistent
+        && transient_slots_are_owned
         && slot_with_phase(&record.active_slot_ref, SLOT_INSTALLED)
         && record.candidate_slot_ref.as_ref().is_none_or(|wanted| {
             record.slots.iter().any(|slot| {
@@ -210,6 +222,7 @@ pub(crate) fn can_remove_active_slot(record: &ComputePluginLocalRecord) -> bool 
     local_record_shape_is_valid(record)
         && record.active_slot_ref.is_some()
         && record.candidate_slot_ref.is_none()
+        && record.desired_presence == DESIRED_PRESENCE_ABSENT
         && record.desired_activation == ACTIVATION_DISABLED
         && record.runtime.phase == RUNTIME_STOPPED
         && record.active_attempts == 0

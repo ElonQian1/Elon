@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, fmt};
 
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Duration, Utc};
@@ -20,7 +20,7 @@ use super::{
     },
     lifecycle::{
         local_record_shape_is_valid, ComputePluginInventorySnapshot, ACTIVATION_ENABLED,
-        COMPUTE_PLUGIN_INVENTORY_SCHEMA, SLOT_DOWNLOADING,
+        COMPUTE_PLUGIN_INVENTORY_SCHEMA, MAX_COMPUTE_PLUGIN_INVENTORY_RECORDS, SLOT_DOWNLOADING,
     },
     manifest_validation::{is_sha256, verify_and_validate_manifest},
     plugin_manifest::SignedComputePluginManifest,
@@ -89,6 +89,45 @@ pub(crate) struct AuthorizedComputePluginDownloadSegment {
     pub offset_bytes: i64,
     pub length_bytes: i64,
     pub redirect_hop: u8,
+    pub claim: PreparedComputePluginFetchClaim,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub(crate) struct PreparedComputePluginFetchClaim {
+    pub claim_id: String,
+    pub plan_id: String,
+    pub plan_digest: String,
+    pub ordinal: usize,
+    pub candidate_token_digest: String,
+    pub authority_epoch: i64,
+    pub process_owner_epoch: i64,
+    pub cursor_generation: i64,
+    pub redirect_generation: i64,
+    pub offset_bytes: i64,
+    pub length_bytes: i64,
+    pub end_offset_bytes: i64,
+    pub prepared_at_ms: i64,
+}
+
+impl fmt::Debug for PreparedComputePluginFetchClaim {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PreparedComputePluginFetchClaim")
+            .field("claim_id", &"<redacted>")
+            .field("plan_id", &self.plan_id)
+            .field("plan_digest", &self.plan_digest)
+            .field("ordinal", &self.ordinal)
+            .field("candidate_token_digest", &self.candidate_token_digest)
+            .field("authority_epoch", &self.authority_epoch)
+            .field("process_owner_epoch", &self.process_owner_epoch)
+            .field("cursor_generation", &self.cursor_generation)
+            .field("redirect_generation", &self.redirect_generation)
+            .field("offset_bytes", &self.offset_bytes)
+            .field("length_bytes", &self.length_bytes)
+            .field("end_offset_bytes", &self.end_offset_bytes)
+            .field("prepared_at_ms", &self.prepared_at_ms)
+            .finish()
+    }
 }
 
 /// Returned only by the durable InventoryStore after it atomically re-reads live authority,
@@ -102,20 +141,60 @@ pub(crate) struct ComputePluginFetchAuthoritySnapshot {
     pub applied_plan_digest: String,
     pub application_inventory_revision: i64,
     pub execution_inventory_revision: i64,
+    pub authority_state_revision: i64,
+    pub inventory_digest: String,
+    pub authority_epoch: i64,
+    pub process_owner_epoch: i64,
+    pub candidate_token_digest: String,
+    pub candidate_generation: i64,
+    pub slot_ref: String,
+    pub committed_offset: i64,
+    pub download_cursor_generation: i64,
+    pub download_state: String,
 }
 
 pub(crate) trait ComputePluginFetchAuthority {
-    /// Must perform a fresh authoritative read and atomically claim the supplied cursor. A cached
-    /// admission snapshot or wall clock without a persisted monotonic high-water is not valid.
-    fn claim_fresh_segment(
+    /// Performs a fresh side-effect-free authoritative read. A cached admission snapshot or wall
+    /// clock without a persisted monotonic high-water is not valid.
+    fn read_fresh_segment_authority(
         &self,
         plan_id: &str,
         plan_digest: &str,
+        download: &AdmittedComputePluginDownload,
         request: &ComputePluginDownloadSegmentRequest,
     ) -> Result<ComputePluginFetchAuthoritySnapshot>;
+
+    /// Atomically re-reads every field and fence in `validated`, then creates the durable claim
+    /// only if they are unchanged. A mismatch must fail without inserting a prepared claim.
+    fn claim_validated_segment(
+        &self,
+        plan_id: &str,
+        plan_digest: &str,
+        download: &AdmittedComputePluginDownload,
+        request: &ComputePluginDownloadSegmentRequest,
+        validated: &ComputePluginFetchAuthoritySnapshot,
+    ) -> Result<PreparedComputePluginFetchClaim>;
 }
 
 impl AdmittedComputePluginInstallPlan {
+    /// Rehydrates a capsule only after the local authority has verified an immutable sealed
+    /// application and all of its typed child bindings.
+    pub(super) fn from_sealed_application(
+        signed_plan: SignedComputePluginInstallPlan,
+        admitted_at: String,
+        manifests: Vec<AdmittedComputePluginManifestBinding>,
+        downloads: Vec<AdmittedComputePluginDownload>,
+        control_signing_key_fingerprint: String,
+    ) -> Self {
+        Self {
+            signed_plan,
+            admitted_at,
+            manifests,
+            downloads,
+            control_signing_key_fingerprint,
+        }
+    }
+
     pub(crate) fn signed_plan(&self) -> &SignedComputePluginInstallPlan {
         &self.signed_plan
     }
@@ -277,10 +356,15 @@ pub(crate) fn authorize_download_segment(
     {
         bail!("COMPUTE_PLUGIN_FETCH_RANGE: segment or redirect hop is outside the plan");
     }
-    let facts = authority.claim_fresh_segment(&plan.plan_id, admitted.plan_digest(), request)?;
+    let facts = authority.read_fresh_segment_authority(
+        &plan.plan_id,
+        admitted.plan_digest(),
+        download,
+        request,
+    )?;
     validate_plan_window(plan, facts.trusted_now.clone(), false)?;
     validate_live_binding(plan, &facts.live)?;
-    validate_inventory(&facts.inventory, facts.trusted_now)?;
+    validate_inventory(&facts.inventory, facts.trusted_now.clone())?;
     let expected_application_revision = plan
         .expected_inventory_revision
         .checked_add(1)
@@ -290,6 +374,20 @@ pub(crate) fn authorize_download_segment(
         || facts.application_inventory_revision != expected_application_revision
         || facts.inventory.inventory_revision != facts.execution_inventory_revision
         || facts.inventory.inventory_revision < facts.application_inventory_revision
+        || facts.authority_state_revision <= 0
+        || facts.inventory_digest != jcs_sha256_hex(&facts.inventory)?
+        || facts.authority_epoch <= 0
+        || facts.process_owner_epoch < 0
+        || !is_sha256(&facts.candidate_token_digest)
+        || facts.candidate_generation <= 0
+        || !is_identifier(&facts.slot_ref)
+        || facts.slot_ref != format!("candidate_{}", facts.candidate_token_digest)
+        || facts.committed_offset != request.offset_bytes
+        || facts.download_cursor_generation < 0
+        || !matches!(
+            facts.download_state.as_str(),
+            "pending" | "downloading" | "failed"
+        )
         || facts.inventory.desired_policy_revision != plan.desired_policy_revision
         || facts.inventory.sharing_enabled != plan.sharing_enabled
     {
@@ -313,11 +411,24 @@ pub(crate) fn authorize_download_segment(
     if record.last_plan_id.as_deref() != Some(plan.plan_id.as_str()) || !candidate_matches {
         bail!("COMPUTE_PLUGIN_FETCH_SLOT_CHANGED: candidate slot is no longer owned by this plan");
     }
+    if record.candidate_slot_ref.as_deref() != Some(facts.slot_ref.as_str())
+        || facts.candidate_generation <= record.install_generation
+    {
+        bail!("COMPUTE_PLUGIN_FETCH_CANDIDATE_FENCE_CHANGED");
+    }
+    let claim = authority.claim_validated_segment(
+        &plan.plan_id,
+        admitted.plan_digest(),
+        download,
+        request,
+        &facts,
+    )?;
     Ok(AuthorizedComputePluginDownloadSegment {
         download: download.clone(),
         offset_bytes: request.offset_bytes,
         length_bytes: request.length_bytes,
         redirect_hop: request.redirect_hop,
+        claim,
     })
 }
 
@@ -406,7 +517,7 @@ fn validate_inventory(
     if inventory.schema != COMPUTE_PLUGIN_INVENTORY_SCHEMA
         || inventory.inventory_revision < 0
         || inventory.desired_policy_revision < 0
-        || inventory.plugins.len() > MAX_PLAN_ITEMS
+        || inventory.plugins.len() > MAX_COMPUTE_PLUGIN_INVENTORY_RECORDS
         || parse_utc(
             "COMPUTE_PLUGIN_INVENTORY_OBSERVED_AT",
             &inventory.observed_at,
