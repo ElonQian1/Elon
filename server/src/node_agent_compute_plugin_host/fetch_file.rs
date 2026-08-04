@@ -27,7 +27,8 @@ mod write;
 pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginPartCursorDamage, ComputePluginPartCursorDamageKind,
     ComputePluginPartReconcileFailure, ComputePluginPartReconcileOutcome,
-    ComputePluginPartReconcileResult, ComputePluginPinnedFileRecovery, PinnedComputePluginRoot,
+    ComputePluginPartReconcileResult, ComputePluginPinnedFileRecovery,
+    PinnedComputePluginCandidateDownloads, PinnedComputePluginRoot,
     ReconciledComputePluginPartFile,
 };
 pub(in crate::node_agent_compute_plugin_host) use write::{
@@ -53,6 +54,33 @@ pub(in crate::node_agent_compute_plugin_host) fn pin_compute_plugin_root(
     Ok(PinnedComputePluginRoot {
         root,
         installation_id_digest: installation.digest().to_string(),
+    })
+}
+
+pub(in crate::node_agent_compute_plugin_host) fn pin_existing_candidate_downloads(
+    root: &PinnedComputePluginRoot,
+    candidate_token_digest: &str,
+) -> Result<PinnedComputePluginCandidateDownloads> {
+    if !is_sha256(candidate_token_digest)
+        || root.root.installation_binding_digest() != root.installation_id_digest
+        || !is_sha256(root.root.root_identity_digest())
+    {
+        bail!("COMPUTE_PLUGIN_VERIFICATION_ROOT_BINDING_INVALID");
+    }
+    let relative_directory = format!(
+        "{COMPUTE_PLUGIN_DIRECTORY}/{CANDIDATES_DIRECTORY}/{candidate_token_digest}/{DOWNLOADS_DIRECTORY}"
+    );
+    let directory = root
+        .root
+        .pin_existing_directory(Path::new(&relative_directory))?;
+    if directory.filesystem_mutated() {
+        bail!("COMPUTE_PLUGIN_VERIFICATION_DIRECTORY_MUTATED");
+    }
+    Ok(PinnedComputePluginCandidateDownloads {
+        directory,
+        relative_directory,
+        installation_id_digest: root.installation_id_digest.clone(),
+        root_identity_digest: root.root.root_identity_digest().to_string(),
     })
 }
 

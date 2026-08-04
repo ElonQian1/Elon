@@ -95,7 +95,7 @@ impl ComputePluginFetchCancellationGuard {
         Ok(())
     }
 
-    pub(super) fn ensure_current(&self) -> Result<()> {
+    pub(in crate::node_agent_compute_plugin_host) fn ensure_current(&self) -> Result<()> {
         let current = self.epoch.load(Ordering::Acquire);
         if current == EXHAUSTED_CANCELLATION_EPOCH || current != self.observed_epoch {
             bail!("COMPUTE_PLUGIN_FETCH_CANCELED");

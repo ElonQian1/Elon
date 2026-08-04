@@ -18,6 +18,7 @@ mod plan_application_projection;
 mod plan_application_replay_children;
 mod plan_application_writes;
 mod process_ownership;
+mod verification_store;
 
 pub(in crate::node_agent_compute_plugin_host) use fetch_store::{
     ComputePluginFetchAuthorityFacts, ComputePluginFetchAuthoritySession,
@@ -34,6 +35,10 @@ pub(crate) use plan_application::{
     ComputePluginPlanApplicationReceipt, ComputePluginPlanApplicationResult,
 };
 pub(crate) use process_ownership::ComputePluginFetchProcessFence;
+pub(in crate::node_agent_compute_plugin_host) use verification_store::{
+    ComputePluginCandidateArtifactAuthorityFacts, ComputePluginCandidateVerificationAuthorityFacts,
+    ComputePluginPostPinVerificationAuthoritySession,
+};
 
 const COMPUTE_PLUGIN_STATE_FILE: &str = "compute-plugin-state.sqlite3";
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);

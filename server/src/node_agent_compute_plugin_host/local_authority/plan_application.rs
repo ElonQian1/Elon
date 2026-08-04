@@ -136,8 +136,16 @@ impl ComputePluginCandidateHandle {
         &self.candidate_token
     }
 
+    pub(crate) fn candidate_token_digest(&self) -> &str {
+        &self.candidate_token_digest
+    }
+
     pub(crate) fn slot_ref(&self) -> &str {
         &self.slot_ref
+    }
+
+    pub(crate) fn candidate_generation(&self) -> i64 {
+        self.candidate_generation
     }
 }
 

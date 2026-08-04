@@ -4,6 +4,7 @@
 //! protocol, publish a new capability, download plugins or claim sidecar isolation.
 
 pub(crate) mod attempt_contract;
+pub(crate) mod candidate_verification_contract;
 mod contract;
 pub(crate) mod fetch_contract;
 pub(crate) mod fetch_file;

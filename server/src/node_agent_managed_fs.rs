@@ -4,9 +4,9 @@
 
 use std::{
     ffi::{OsStr, OsString},
-    fs::File,
     io::{Read, Seek, SeekFrom},
     path::{Component, Path, PathBuf},
+    sync::Arc,
 };
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -56,16 +56,17 @@ impl PinnedManagedRoot {
         let expected_volume = initial_identity.volume_serial;
         let mut root_identity = initial_identity;
         let mut root_handles = Vec::with_capacity(components.len() + 1);
-        root_handles.push(initial_file);
+        root_handles.push(Arc::new(initial_file));
         for component in components {
             current_path.push(&component);
             let parent = root_handles
                 .last()
                 .ok_or_else(|| anyhow!("NODE_MANAGED_ROOT_PARENT_HANDLE_MISSING"))?;
-            let file =
-                platform::open_directory_relative(parent, &component).with_context(|| {
-                    format!("NODE_MANAGED_ROOT_PREFIX_OPEN {}", current_path.display())
-                })?;
+            let file = Arc::new(
+                platform::open_directory_relative(parent.as_ref(), &component).with_context(
+                    || format!("NODE_MANAGED_ROOT_PREFIX_OPEN {}", current_path.display()),
+                )?,
+            );
             let identity = platform::inspect(&file).with_context(|| {
                 format!(
                     "NODE_MANAGED_ROOT_PREFIX_INSPECT {}",
@@ -85,9 +86,18 @@ impl PinnedManagedRoot {
         Ok(Self {
             root_path: current_path,
             root_volume_serial: root_identity.volume_serial,
+            installation_binding_digest: installation_binding_digest.to_string(),
             root_identity_digest: identity_digest(installation_binding_digest, None, root_identity),
             root_handles,
         })
+    }
+
+    pub(crate) fn installation_binding_digest(&self) -> &str {
+        &self.installation_binding_digest
+    }
+
+    pub(crate) fn root_identity_digest(&self) -> &str {
+        &self.root_identity_digest
     }
 
     pub(crate) fn open_existing_read_only(
@@ -106,8 +116,7 @@ impl PinnedManagedRoot {
         let components = normal_relative_components(relative, true)
             .map_err(ManagedDirectoryPrepareFailure::Unchanged)?;
         let mut path = self.root_path.clone();
-        let mut handles =
-            clone_handles(&self.root_handles).map_err(ManagedDirectoryPrepareFailure::Unchanged)?;
+        let mut handles = self.root_handles.clone();
         let mut filesystem_mutated = false;
         for component in components {
             path.push(&component);
@@ -120,10 +129,10 @@ impl PinnedManagedRoot {
                     ));
                 }
             };
-            let file = match platform::open_directory_relative(parent, &component) {
+            let file = match platform::open_directory_relative(parent.as_ref(), &component) {
                 Ok(file) => file,
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                    match platform::create_new_directory_relative(parent, &component) {
+                    match platform::create_new_directory_relative(parent.as_ref(), &component) {
                         Ok(file) => {
                             filesystem_mutated = true;
                             file
@@ -132,7 +141,7 @@ impl PinnedManagedRoot {
                             if create_error.kind() == std::io::ErrorKind::AlreadyExists =>
                         {
                             filesystem_mutated = true;
-                            match platform::open_directory_relative(parent, &component) {
+                            match platform::open_directory_relative(parent.as_ref(), &component) {
                                 Ok(file) => file,
                                 Err(error) => {
                                     return Err(directory_prepare_failure(
@@ -164,6 +173,7 @@ impl PinnedManagedRoot {
                     ));
                 }
             };
+            let file = Arc::new(file);
             let identity = match platform::inspect(&file) {
                 Ok(identity) => identity,
                 Err(error) => {
@@ -198,17 +208,19 @@ impl PinnedManagedRoot {
         })
     }
 
-    fn pin_existing_directory(&self, relative: &Path) -> Result<PinnedManagedDirectory> {
+    pub(crate) fn pin_existing_directory(&self, relative: &Path) -> Result<PinnedManagedDirectory> {
         let components = normal_relative_components(relative, true)?;
         let mut path = self.root_path.clone();
-        let mut handles = clone_handles(&self.root_handles)?;
+        let mut handles = self.root_handles.clone();
         for component in components {
             path.push(&component);
             let parent = handles
                 .last()
                 .ok_or_else(|| anyhow!("NODE_MANAGED_DIRECTORY_PARENT_HANDLE_MISSING"))?;
-            let file = platform::open_directory_relative(parent, &component)
-                .with_context(|| format!("NODE_MANAGED_DIRECTORY_OPEN {}", path.display()))?;
+            let file = Arc::new(
+                platform::open_directory_relative(parent.as_ref(), &component)
+                    .with_context(|| format!("NODE_MANAGED_DIRECTORY_OPEN {}", path.display()))?,
+            );
             let identity = platform::inspect(&file)
                 .with_context(|| format!("NODE_MANAGED_DIRECTORY_INSPECT {}", path.display()))?;
             validate_directory_identity(identity, Some(self.root_volume_serial))?;
@@ -241,8 +253,18 @@ impl PinnedManagedDirectory {
         self.open_file(name, true, true)
     }
 
+    /// Opens one existing child read-only with share-none semantics while retaining this pinned
+    /// directory for subsequent siblings. Returned files share the parent handle chain through
+    /// process-local `Arc`s rather than cloning operating-system handles per artifact.
+    pub(crate) fn open_existing_read_only_child(
+        &self,
+        name: &OsStr,
+    ) -> std::result::Result<PinnedManagedFile, ManagedFileOpenFailure> {
+        self.open_file(name, false, false)
+    }
+
     fn open_file(
-        self,
+        &self,
         name: &OsStr,
         writable: bool,
         create_new: bool,
@@ -250,7 +272,7 @@ impl PinnedManagedDirectory {
         if let Err(error) = require_single_normal_component(name) {
             return Err(ManagedFileOpenFailure::FileNotOpened {
                 error: std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string()),
-                directory: self,
+                directory: self.shared_clone(),
             });
         }
         let parent = match self.directory_handles.last() {
@@ -258,21 +280,21 @@ impl PinnedManagedDirectory {
             None => {
                 return Err(ManagedFileOpenFailure::FileNotOpened {
                     error: std::io::Error::other("NODE_MANAGED_FILE_PARENT_HANDLE_MISSING"),
-                    directory: self,
+                    directory: self.shared_clone(),
                 });
             }
         };
         let opened = if create_new {
-            platform::create_new_file_relative(parent, name)
+            platform::create_new_file_relative(parent.as_ref(), name)
         } else {
-            platform::open_existing_file_relative(parent, name, writable)
+            platform::open_existing_file_relative(parent.as_ref(), name, writable)
         };
         let file = match opened {
             Ok(file) => file,
             Err(error) => {
                 return Err(ManagedFileOpenFailure::FileNotOpened {
                     error,
-                    directory: self,
+                    directory: self.shared_clone(),
                 });
             }
         };
@@ -288,7 +310,7 @@ impl PinnedManagedDirectory {
                     error,
                     file: QuarantinedManagedFile {
                         _file: file,
-                        _directory_handles: self.directory_handles,
+                        _directory_handles: self.directory_handles.clone(),
                         directory_filesystem_mutated: self.filesystem_mutated,
                     },
                 });
@@ -297,11 +319,21 @@ impl PinnedManagedDirectory {
         let identity_digest = identity_digest(&self.root_identity_digest, None, identity);
         Ok(PinnedManagedFile {
             file,
-            _directory_handles: self.directory_handles,
+            _directory_handles: self.directory_handles.clone(),
             identity,
             identity_digest,
             directory_filesystem_mutated: self.filesystem_mutated,
         })
+    }
+
+    fn shared_clone(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            root_volume_serial: self.root_volume_serial,
+            root_identity_digest: self.root_identity_digest.clone(),
+            directory_handles: self.directory_handles.clone(),
+            filesystem_mutated: self.filesystem_mutated,
+        }
     }
 }
 
@@ -387,14 +419,6 @@ fn require_single_normal_component(name: &OsStr) -> Result<()> {
         bail!("NODE_MANAGED_FILE_NAME_INVALID");
     }
     Ok(())
-}
-
-fn clone_handles(handles: &[File]) -> Result<Vec<File>> {
-    handles
-        .iter()
-        .map(File::try_clone)
-        .collect::<std::io::Result<Vec<_>>>()
-        .context("NODE_MANAGED_ROOT_HANDLE_CLONE")
 }
 
 fn validate_directory_identity(

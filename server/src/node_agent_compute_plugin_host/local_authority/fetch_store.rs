@@ -3,7 +3,13 @@ use std::{fmt, time::Instant};
 use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 
-use super::{ComputePluginFetchProcessFence, ComputePluginLocalAuthority};
+use super::{
+    verification_store::{
+        self, ComputePluginCandidateVerificationAuthorityFacts,
+        ComputePluginPostPinVerificationAuthoritySession,
+    },
+    ComputePluginFetchProcessFence, ComputePluginLocalAuthority,
+};
 use crate::node_agent_compute_plugin_host::{
     fetch_contract::{
         ComputePluginFetchCancellationGuard, ValidatedComputePluginFetchAbortPermit,
@@ -177,6 +183,31 @@ impl ComputePluginLocalAuthority {
             clock_epoch_digest,
         })
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn bind_post_pin_verification_authority_session<
+        'authority,
+    >(
+        &'authority self,
+        process_fence: &'authority ComputePluginFetchProcessFence,
+        observation: ComputePluginTrustedTimeObservation,
+        roots: &'authority dyn ComputePluginBootstrapRootKeyResolver,
+    ) -> Result<ComputePluginPostPinVerificationAuthoritySession<'authority>> {
+        if !is_sha256(observation.installation_id_digest())
+            || observation.installation_id_digest() != process_fence.installation_id_digest()
+            || !is_sha256(observation.clock_epoch_digest())
+        {
+            bail!("COMPUTE_PLUGIN_POST_PIN_TIME_BINDING_INVALID");
+        }
+        let observed_at = observation.observed_at();
+        let clock_epoch_digest = observation.clock_epoch_digest().to_string();
+        let authority_session =
+            self.fetch_authority_session_from_observation(process_fence, &observation, roots)?;
+        Ok(ComputePluginPostPinVerificationAuthoritySession::new(
+            authority_session,
+            observed_at,
+            clock_epoch_digest,
+        ))
+    }
 }
 
 impl<'authority> ComputePluginPostSyncFetchAuthoritySession<'authority> {
@@ -199,6 +230,10 @@ impl<'authority> ComputePluginPostSyncFetchAuthoritySession<'authority> {
 }
 
 impl ComputePluginFetchAuthoritySession<'_> {
+    pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
+        self.process_fence.installation_id_digest()
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn validate_fetch_cancellation_guard(
         &self,
         guard: &ComputePluginFetchCancellationGuard,
@@ -229,6 +264,28 @@ impl ComputePluginFetchAuthoritySession<'_> {
                 plan_id,
                 plan_digest,
                 ordinal,
+            )
+        })
+    }
+
+    /// Reads one exact, signed candidate download closure without opening files or mutating Store.
+    /// The caller must acquire a fresh post-pin session and compare durable projections before any
+    /// future verification claim CAS.
+    pub(in crate::node_agent_compute_plugin_host) fn read_fresh_candidate_verification_authority(
+        &self,
+        plan_id: &str,
+        plan_digest: &str,
+        candidate_token: &str,
+    ) -> Result<ComputePluginCandidateVerificationAuthorityFacts> {
+        self.authority.with_deferred(|transaction| {
+            verification_store::read_fresh_candidate_verification_authority(
+                transaction,
+                self.process_fence,
+                self.trusted_now.clone(),
+                self.roots,
+                plan_id,
+                plan_digest,
+                candidate_token,
             )
         })
     }

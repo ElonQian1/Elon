@@ -1,12 +1,15 @@
-use std::fmt;
+use std::{fmt, path::Path};
 
-use anyhow::Error;
+use anyhow::{bail, Error, Result};
 
 use crate::{
     node_agent_compute_plugin_host::fetch_contract::{
         AuthorizedComputePluginDownloadSegment, ComputePluginFetchClaimRecoveryKey,
     },
-    node_agent_managed_fs::{PinnedManagedFile, PinnedManagedRoot, QuarantinedManagedFile},
+    node_agent_managed_fs::{
+        ManagedFileOpenFailure, PinnedManagedDirectory, PinnedManagedFile, PinnedManagedRoot,
+        QuarantinedManagedFile,
+    },
 };
 
 pub(in crate::node_agent_compute_plugin_host) type ComputePluginPartReconcileResult =
@@ -23,6 +26,55 @@ pub(in crate::node_agent_compute_plugin_host) enum ComputePluginPartReconcileOut
 pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginRoot {
     pub(super) root: PinnedManagedRoot,
     pub(super) installation_id_digest: String,
+}
+
+/// Existing-only capability for one candidate's downloads directory. It can open only direct
+/// children whose original normalized relative path names this exact candidate directory.
+pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginCandidateDownloads {
+    pub(super) directory: PinnedManagedDirectory,
+    pub(super) relative_directory: String,
+    pub(super) installation_id_digest: String,
+    pub(super) root_identity_digest: String,
+}
+
+impl PinnedComputePluginCandidateDownloads {
+    pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
+        &self.installation_id_digest
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn root_identity_digest(&self) -> &str {
+        &self.root_identity_digest
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn open_existing_artifact(
+        &self,
+        original_relative_path: &str,
+    ) -> Result<PinnedManagedFile> {
+        if original_relative_path.contains('\\') {
+            bail!("COMPUTE_PLUGIN_VERIFICATION_PATH_NOT_CANONICAL");
+        }
+        let relative = Path::new(original_relative_path);
+        let parent_matches = relative
+            .parent()
+            .is_some_and(|parent| parent == Path::new(&self.relative_directory));
+        let file_name = relative
+            .file_name()
+            .filter(|_| parent_matches)
+            .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_VERIFICATION_FILE_PATH_CHANGED"))?;
+        self.directory
+            .open_existing_read_only_child(file_name)
+            .map_err(managed_open_error)
+    }
+}
+
+impl fmt::Debug for PinnedComputePluginCandidateDownloads {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PinnedComputePluginCandidateDownloads")
+            .field("directory", &"<retained>")
+            .field("binding", &"<redacted>")
+            .finish()
+    }
 }
 
 /// Non-writable recovery custody for an exact pinned file. It intentionally exposes neither the
@@ -62,6 +114,14 @@ impl fmt::Debug for PinnedComputePluginRoot {
             .field("root", &"<retained>")
             .field("installation_id_digest", &"<redacted>")
             .finish()
+    }
+}
+
+fn managed_open_error(failure: ManagedFileOpenFailure) -> Error {
+    match failure {
+        ManagedFileOpenFailure::NotOpened(error)
+        | ManagedFileOpenFailure::FileNotOpened { error, .. } => Error::new(error),
+        ManagedFileOpenFailure::Opened { error, .. } => error,
     }
 }
 

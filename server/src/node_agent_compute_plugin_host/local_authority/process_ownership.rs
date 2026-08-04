@@ -251,7 +251,10 @@ fn verify_process_ownership(
               AND meta.trusted_time_high_water_ms = ?5
               AND meta.updated_at_ms = ?5
               AND meta.clock_status = 'trusted'
-              AND NOT EXISTS (SELECT 1 FROM fetch_claims WHERE state = 'prepared')"#,
+              AND NOT EXISTS (SELECT 1 FROM fetch_claims WHERE state = 'prepared')
+              AND NOT EXISTS (
+                  SELECT 1 FROM candidate_verification_runs WHERE state = 'prepared'
+              )"#,
             params![
                 installation_id_digest,
                 state_revision,
