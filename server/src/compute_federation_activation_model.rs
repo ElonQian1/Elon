@@ -6,6 +6,7 @@ pub(crate) const COMPUTE_ACTIVATION_EVIDENCE_REQUEST_SCHEMA: &str =
 pub(crate) const ACTIVATION_REQUEST_STATUS_SUBMITTED: &str = "submitted";
 pub(crate) const ACTIVATION_REQUEST_STATUS_CHANGES_REQUESTED: &str = "changes_requested";
 pub(crate) const ACTIVATION_REQUEST_STATUS_APPROVED: &str = "approved";
+pub(crate) const ACTIVATION_REQUEST_STATUS_ACTIVATED: &str = "activated";
 pub(crate) const ACTIVATION_REQUEST_STATUS_REJECTED: &str = "rejected";
 pub(crate) const ACTIVATION_REQUEST_STATUS_CANCELED: &str = "canceled";
 pub(crate) const ACTIVATION_REQUEST_STATUS_SUPERSEDED: &str = "superseded";

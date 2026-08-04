@@ -4,6 +4,7 @@ use crate::compute_federation::provider::ComputeProvider;
 
 pub(crate) const COMPUTE_ACTIVATION_PLAN_SCHEMA: &str = "compute_federation.activation_plan.v1";
 pub(crate) const ACTIVATION_PLAN_STATUS_PREPARED: &str = "prepared";
+pub(crate) const ACTIVATION_PLAN_STATUS_APPLIED: &str = "applied";
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ComputeActivationPlan {

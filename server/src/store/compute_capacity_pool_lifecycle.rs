@@ -39,104 +39,110 @@ impl Store {
         &self,
         input: TransitionComputeCapacityPoolStatus,
     ) -> Result<ComputeCapacityPoolStatusReceipt> {
-        validate_transition_input(&input)?;
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let receipt = transition_compute_capacity_pool_status_on(&tx, &input)?;
+        tx.commit()?;
+        Ok(receipt)
+    }
+}
 
-        if let Some(existing) = read_existing_event_on(
-            &tx,
+pub(super) fn transition_compute_capacity_pool_status_on(
+    conn: &Connection,
+    input: &TransitionComputeCapacityPoolStatus,
+) -> Result<ComputeCapacityPoolStatusReceipt> {
+    validate_transition_input(input)?;
+    if let Some(existing) = read_existing_event_on(
+        conn,
+        input.idempotency_scope.trim(),
+        input.idempotency_key.trim(),
+    )? {
+        validate_replay(input, &existing)?;
+        let current_status = current_pool_status_on(conn, &existing.pool_id)?;
+        return Ok(ComputeCapacityPoolStatusReceipt {
+            event_id: existing.event_id,
+            pool_id: existing.pool_id,
+            capacity_epoch: existing.capacity_epoch,
+            previous_status: existing.previous_status,
+            target_status: existing.target_status,
+            current_status,
+            request_digest: existing.request_digest,
+            replayed: true,
+        });
+    }
+
+    let current = conn
+        .query_row(
+            "SELECT status, current_capacity_epoch
+               FROM compute_capacity_pools WHERE pool_id=?1",
+            params![input.pool_id.trim()],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("容量池不存在"))?;
+    let expected_status = pool_status_value(input.expected_status);
+    let target_status = pool_status_value(input.target_status);
+    if current.0 != expected_status || current.1 != input.expected_capacity_epoch {
+        bail!("容量池状态或 epoch 已变化，拒绝执行旧生命周期请求");
+    }
+    if !is_allowed_transition(input.expected_status, input.target_status) {
+        bail!("容量池生命周期转换不受支持");
+    }
+    if input.target_status == ComputeCapacityPoolStatus::Active {
+        ensure_pool_has_version_on(conn, input.pool_id.trim(), input.expected_capacity_epoch)?;
+    }
+    if input.target_status == ComputeCapacityPoolStatus::Retired {
+        ensure_pool_drained_on(conn, input.pool_id.trim(), input.expected_capacity_epoch)?;
+    }
+
+    let event_id = new_id("capacity_pool_event");
+    let recorded_at = now();
+    conn.execute(
+        "INSERT INTO compute_capacity_pool_lifecycle_events (
+            event_id, pool_id, capacity_epoch, previous_status, target_status,
+            reason_code, subject_kind, subject_id, idempotency_scope,
+            idempotency_key, request_digest, occurred_at, recorded_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+        params![
+            event_id,
+            input.pool_id.trim(),
+            input.expected_capacity_epoch,
+            expected_status,
+            target_status,
+            input.reason_code.trim(),
+            input.subject_kind.trim(),
+            input.subject_id.trim(),
             input.idempotency_scope.trim(),
             input.idempotency_key.trim(),
-        )? {
-            validate_replay(&input, &existing)?;
-            let current_status = current_pool_status_on(&tx, &existing.pool_id)?;
-            tx.commit()?;
-            return Ok(ComputeCapacityPoolStatusReceipt {
-                event_id: existing.event_id,
-                pool_id: existing.pool_id,
-                capacity_epoch: existing.capacity_epoch,
-                previous_status: existing.previous_status,
-                target_status: existing.target_status,
-                current_status,
-                request_digest: existing.request_digest,
-                replayed: true,
-            });
-        }
-
-        let current = tx
-            .query_row(
-                "SELECT status, current_capacity_epoch
-                   FROM compute_capacity_pools WHERE pool_id=?1",
-                params![input.pool_id.trim()],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
-            )
-            .optional()?
-            .ok_or_else(|| anyhow!("容量池不存在"))?;
-        let expected_status = pool_status_value(input.expected_status);
-        let target_status = pool_status_value(input.target_status);
-        if current.0 != expected_status || current.1 != input.expected_capacity_epoch {
-            bail!("容量池状态或 epoch 已变化，拒绝执行旧生命周期请求");
-        }
-        if !is_allowed_transition(input.expected_status, input.target_status) {
-            bail!("容量池生命周期转换不受支持");
-        }
-        if input.target_status == ComputeCapacityPoolStatus::Active {
-            ensure_pool_has_version_on(&tx, input.pool_id.trim(), input.expected_capacity_epoch)?;
-        }
-        if input.target_status == ComputeCapacityPoolStatus::Retired {
-            ensure_pool_drained_on(&tx, input.pool_id.trim(), input.expected_capacity_epoch)?;
-        }
-
-        let event_id = new_id("capacity_pool_event");
-        let recorded_at = now();
-        tx.execute(
-            "INSERT INTO compute_capacity_pool_lifecycle_events (
-                event_id, pool_id, capacity_epoch, previous_status, target_status,
-                reason_code, subject_kind, subject_id, idempotency_scope,
-                idempotency_key, request_digest, occurred_at, recorded_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
-            params![
-                event_id,
-                input.pool_id.trim(),
-                input.expected_capacity_epoch,
-                expected_status,
-                target_status,
-                input.reason_code.trim(),
-                input.subject_kind.trim(),
-                input.subject_id.trim(),
-                input.idempotency_scope.trim(),
-                input.idempotency_key.trim(),
-                input.request_digest.trim(),
-                input.occurred_at.trim(),
-                recorded_at,
-            ],
-        )?;
-        let changed = tx.execute(
-            "UPDATE compute_capacity_pools SET status=?1, updated_at=?2
-              WHERE pool_id=?3 AND current_capacity_epoch=?4 AND status=?5",
-            params![
-                target_status,
-                recorded_at,
-                input.pool_id.trim(),
-                input.expected_capacity_epoch,
-                expected_status,
-            ],
-        )?;
-        if changed != 1 {
-            bail!("容量池状态发生并发变化，生命周期事件未提交");
-        }
-        tx.commit()?;
-        Ok(ComputeCapacityPoolStatusReceipt {
-            event_id,
-            pool_id: input.pool_id.trim().to_string(),
-            capacity_epoch: input.expected_capacity_epoch,
-            previous_status: expected_status.to_string(),
-            target_status: target_status.to_string(),
-            current_status: target_status.to_string(),
-            request_digest: input.request_digest.trim().to_string(),
-            replayed: false,
-        })
+            input.request_digest.trim(),
+            input.occurred_at.trim(),
+            recorded_at,
+        ],
+    )?;
+    let changed = conn.execute(
+        "UPDATE compute_capacity_pools SET status=?1, updated_at=?2
+          WHERE pool_id=?3 AND current_capacity_epoch=?4 AND status=?5",
+        params![
+            target_status,
+            recorded_at,
+            input.pool_id.trim(),
+            input.expected_capacity_epoch,
+            expected_status,
+        ],
+    )?;
+    if changed != 1 {
+        bail!("容量池状态发生并发变化，生命周期事件未提交");
     }
+    Ok(ComputeCapacityPoolStatusReceipt {
+        event_id,
+        pool_id: input.pool_id.trim().to_string(),
+        capacity_epoch: input.expected_capacity_epoch,
+        previous_status: expected_status.to_string(),
+        target_status: target_status.to_string(),
+        current_status: target_status.to_string(),
+        request_digest: input.request_digest.trim().to_string(),
+        replayed: false,
+    })
 }
 
 struct ExistingLifecycleEvent {

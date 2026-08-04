@@ -44,118 +44,11 @@ impl Store {
         &self,
         provider: &ComputeProvider,
     ) -> Result<ComputeProviderRegistrationReceipt> {
-        validate_provider(provider)?;
-        let provider_json = serde_json::to_string(provider)?;
-        let provider_digest = sha256_hex(provider_json.as_bytes());
         let mut conn = self.conn()?;
         let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let current = current_projection_on(&tx, provider.provider_id.trim())?;
-
-        if let Some(current) = current {
-            let current_version = provider_version_on(
-                &tx,
-                provider.provider_id.trim(),
-                current.current_policy_revision,
-            )?
-            .ok_or_else(|| anyhow!("算力提供者当前历史版本缺失，拒绝继续写入"))?;
-            audited_provider(&current, &current_version)?;
-            if provider.policy_revision <= current.current_policy_revision {
-                let stored = provider_version_on(
-                    &tx,
-                    provider.provider_id.trim(),
-                    provider.policy_revision,
-                )?
-                .ok_or_else(|| anyhow!("算力提供者历史版本缺失，拒绝覆盖"))?;
-                ensure_replay_matches(provider, &provider_json, &provider_digest, &stored)?;
-                if provider.policy_revision == current.current_policy_revision
-                    && (current.current_provider_digest != provider_digest
-                        || current.status != provider.status)
-                {
-                    bail!("算力提供者当前投影与历史版本不一致");
-                }
-                tx.commit()?;
-                return Ok(ComputeProviderRegistrationReceipt {
-                    provider: provider.clone(),
-                    provider_digest,
-                    replayed: true,
-                });
-            }
-
-            ensure_stable_identity(provider, &current)?;
-            if provider.policy_revision != current.current_policy_revision + 1 {
-                bail!(
-                    "算力提供者策略版本必须连续递增，当前版本为 {}",
-                    current.current_policy_revision
-                );
-            }
-            if !status_transition_allowed(&current.status, &provider.status) {
-                bail!(
-                    "算力提供者状态不允许从 {} 变更为 {}",
-                    current.status,
-                    provider.status
-                );
-            }
-
-            insert_provider_version(&tx, provider, &provider_digest, &provider_json)?;
-            let updated = tx.execute(
-                "UPDATE compute_providers
-                    SET settlement_account_id=?1, display_name=?2, status=?3,
-                        trust_tier=?4, home_region=?5, current_policy_revision=?6,
-                        current_provider_digest=?7, updated_at=?8
-                  WHERE provider_id=?9 AND current_policy_revision=?10
-                    AND current_provider_digest=?11",
-                params![
-                    clean_optional(provider.settlement_account_id.as_deref()),
-                    provider.display_name.trim(),
-                    provider.status.trim(),
-                    provider.trust_tier.trim(),
-                    clean_optional(provider.home_region.as_deref()),
-                    provider.policy_revision,
-                    provider_digest,
-                    provider.updated_at.trim(),
-                    provider.provider_id.trim(),
-                    current.current_policy_revision,
-                    current.current_provider_digest,
-                ],
-            )?;
-            if updated != 1 {
-                bail!("算力提供者当前投影已变化，请基于最新版本重试");
-            }
-        } else {
-            if provider.policy_revision != 1 || provider.status != PROVIDER_STATUS_REGISTERING {
-                bail!("新算力提供者必须以 registering 状态和策略版本 1 创建");
-            }
-            tx.execute(
-                "INSERT INTO compute_providers (
-                    provider_id, provider_kind, owner_account_id,
-                    settlement_account_id, display_name, status, trust_tier,
-                    home_region, current_policy_revision, current_provider_digest,
-                    created_at, updated_at
-                 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
-                params![
-                    provider.provider_id.trim(),
-                    provider.provider_kind.trim(),
-                    provider.owner_account_id.trim(),
-                    clean_optional(provider.settlement_account_id.as_deref()),
-                    provider.display_name.trim(),
-                    provider.status.trim(),
-                    provider.trust_tier.trim(),
-                    clean_optional(provider.home_region.as_deref()),
-                    provider.policy_revision,
-                    provider_digest,
-                    provider.created_at.trim(),
-                    provider.updated_at.trim(),
-                ],
-            )?;
-            insert_provider_version(&tx, provider, &provider_digest, &provider_json)?;
-        }
-
+        let receipt = register_compute_provider_on(&tx, provider)?;
         tx.commit()?;
-        Ok(ComputeProviderRegistrationReceipt {
-            provider: provider.clone(),
-            provider_digest,
-            replayed: false,
-        })
+        Ok(receipt)
     }
 
     pub(crate) fn compute_provider(
@@ -211,6 +104,121 @@ impl Store {
             })
             .collect()
     }
+}
+
+pub(super) fn register_compute_provider_on(
+    conn: &Connection,
+    provider: &ComputeProvider,
+) -> Result<ComputeProviderRegistrationReceipt> {
+    validate_provider(provider)?;
+    let provider_json = serde_json::to_string(provider)?;
+    let provider_digest = sha256_hex(provider_json.as_bytes());
+    let current = current_projection_on(conn, provider.provider_id.trim())?;
+
+    if let Some(current) = current {
+        let current_version = provider_version_on(
+            conn,
+            provider.provider_id.trim(),
+            current.current_policy_revision,
+        )?
+        .ok_or_else(|| anyhow!("算力提供者当前历史版本缺失，拒绝继续写入"))?;
+        audited_provider(&current, &current_version)?;
+        if provider.policy_revision <= current.current_policy_revision {
+            let stored =
+                provider_version_on(conn, provider.provider_id.trim(), provider.policy_revision)?
+                    .ok_or_else(|| anyhow!("算力提供者历史版本缺失，拒绝覆盖"))?;
+            ensure_replay_matches(provider, &provider_json, &provider_digest, &stored)?;
+            if provider.policy_revision == current.current_policy_revision
+                && (current.current_provider_digest != provider_digest
+                    || current.status != provider.status)
+            {
+                bail!("算力提供者当前投影与历史版本不一致");
+            }
+            return Ok(ComputeProviderRegistrationReceipt {
+                provider: provider.clone(),
+                provider_digest,
+                replayed: true,
+            });
+        }
+
+        ensure_stable_identity(provider, &current)?;
+        let expected_revision = current
+            .current_policy_revision
+            .checked_add(1)
+            .ok_or_else(|| anyhow!("算力提供者策略版本溢出"))?;
+        if provider.policy_revision != expected_revision {
+            bail!(
+                "算力提供者策略版本必须连续递增，当前版本为 {}",
+                current.current_policy_revision
+            );
+        }
+        if !status_transition_allowed(&current.status, &provider.status) {
+            bail!(
+                "算力提供者状态不允许从 {} 变更为 {}",
+                current.status,
+                provider.status
+            );
+        }
+
+        insert_provider_version(conn, provider, &provider_digest, &provider_json)?;
+        let updated = conn.execute(
+            "UPDATE compute_providers
+                SET settlement_account_id=?1, display_name=?2, status=?3,
+                    trust_tier=?4, home_region=?5, current_policy_revision=?6,
+                    current_provider_digest=?7, updated_at=?8
+              WHERE provider_id=?9 AND current_policy_revision=?10
+                AND current_provider_digest=?11",
+            params![
+                clean_optional(provider.settlement_account_id.as_deref()),
+                provider.display_name.trim(),
+                provider.status.trim(),
+                provider.trust_tier.trim(),
+                clean_optional(provider.home_region.as_deref()),
+                provider.policy_revision,
+                provider_digest,
+                provider.updated_at.trim(),
+                provider.provider_id.trim(),
+                current.current_policy_revision,
+                current.current_provider_digest,
+            ],
+        )?;
+        if updated != 1 {
+            bail!("算力提供者当前投影已变化，请基于最新版本重试");
+        }
+    } else {
+        if provider.policy_revision != 1 || provider.status != PROVIDER_STATUS_REGISTERING {
+            bail!("新算力提供者必须以 registering 状态和策略版本 1 创建");
+        }
+        conn.execute(
+            "INSERT INTO compute_providers (
+                provider_id, provider_kind, owner_account_id,
+                settlement_account_id, display_name, status, trust_tier,
+                home_region, current_policy_revision, current_provider_digest,
+                created_at, updated_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![
+                provider.provider_id.trim(),
+                provider.provider_kind.trim(),
+                provider.owner_account_id.trim(),
+                clean_optional(provider.settlement_account_id.as_deref()),
+                provider.display_name.trim(),
+                provider.status.trim(),
+                provider.trust_tier.trim(),
+                clean_optional(provider.home_region.as_deref()),
+                provider.policy_revision,
+                provider_digest,
+                provider.created_at.trim(),
+                provider.updated_at.trim(),
+            ],
+        )?;
+        insert_provider_version(conn, provider, &provider_digest, &provider_json)?;
+    }
+
+    Ok(ComputeProviderRegistrationReceipt {
+        provider: provider.clone(),
+        provider_digest,
+        replayed: false,
+    })
 }
 
 #[derive(Debug)]

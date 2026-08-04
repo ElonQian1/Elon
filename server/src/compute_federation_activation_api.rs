@@ -11,6 +11,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
+    compute_federation_activation_application_service::{self, ApplyComputeActivationPlanBody},
     compute_federation_activation_lifecycle_service::{
         self, SupersedeComputeActivationEvidenceRequestBody,
     },
@@ -64,6 +65,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/preflight",
             get(preflight_activation_plan),
+        )
+        .route(
+            "/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/application",
+            get(get_activation_application).post(apply_activation_plan),
         )
 }
 
@@ -292,6 +297,43 @@ async fn preflight_activation_plan(
     }
     activation_response(
         compute_federation_activation_plan_service::preflight_for_review(&state.store, &request_id),
+    )
+}
+
+async fn apply_activation_plan(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+    Json(request): Json<ApplyComputeActivationPlanBody>,
+) -> Response {
+    let actor_user_id = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    activation_response(
+        compute_federation_activation_application_service::apply_for_review(
+            &state.store,
+            &actor_user_id,
+            &request_id,
+            request,
+        ),
+    )
+}
+
+async fn get_activation_application(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    activation_response(
+        compute_federation_activation_application_service::get_for_review(
+            &state.store,
+            &request_id,
+        )
+        .map(|application| json!({"activation_application":application})),
     )
 }
 
