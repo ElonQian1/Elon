@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt Provider 终态候选控制面
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: backend, node, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-v189、追加式 Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。本控制面只保存 Provider 对 `succeeded`、`failed` 或 `canceled` 的首次终态声明，形成待验证候选；它不是 Execution Receipt，也不会把 Lease、Job、Reservation 或 Capacity Claim 推进到终态。
+v189、追加式 Store、Service、HTTP 路由与 PC `/compute-execution` 入口已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面只保存 Provider 对 `succeeded`、`failed` 或 `canceled` 的首次终态声明，形成待验证候选；它不是 Execution Receipt，也不会把 Lease、Job、Reservation 或 Capacity Claim 推进到终态。
 
 本批不接 NodeAgent 线协议。`executor_terminal_ref` 与 `diagnostic_ref` 只是外部 Host 事件或诊断材料的引用；平台不读取正文、不验证签名，也不据此扣款、退款或生成 Provider 收益。
 
@@ -22,6 +22,8 @@ v189、追加式 Store、Service 与 HTTP 路由已经写入代码，但尚未�
 | GET | `/api/me/compute/attempt-leases/:lease_id/terminal-candidate` | Provider 所有者或 Job 消费者 | 读取并审计终态候选 |
 
 写请求必须提供当前 Lease 的精确 revision/digest/fencing、最新 v188 用量快照 ID/序号/摘要、外部终态引用、outcome、规范 reason code、可选诊断引用、可选输出摘要、结果工件、幂等键，并显式设置 `confirm_provider_declaration_only=true`。
+
+PC `/compute-execution` 只在本人 Provider 的 live running Lease 已有最新 v188 快照且尚无候选时开放提交。页面从只读用量模板取得 Workload 输出合同；`succeeded` 按合同要求填写确定性 SHA-256 和最多 32 个结果工件，`failed/canceled` 不携带输出，全部操作均需再次明确确认。
 
 ## 3. 失败关闭条件
 
@@ -72,6 +74,7 @@ v192 已允许平台管理员精确绑定 v189-v191，以首版保守策略记�
 ## 6. 尚未实现
 
 - Cargo 编译、v189 迁移执行、HTTP 真实调用、并发和故障注入验证；
+- PC 构建、接口联调、视觉验收和发布；
 - NodeAgent Host 到云端的签名 Terminal 事件、outbox、断点续传和真实节点身份；
 - 输出工件导入、服务端重算摘要、恶意内容扫描、数据授权和可读取性验证；
 - 自动平台观测接线、独立验证器、Execution Receipt 自动签发、争议裁决与多策略治理；

@@ -70,7 +70,7 @@ server/src/
 | 算力激活审核工作区 | 🔴 高 | `src/features/compute-activation/`、`server/src/compute_federation_activation_*` | 🟡 仅 `admin/owner` 可见的 `/compute-activation` 已写入审核队列、证据预检、批准/退回/拒绝、过期 approved 废止、不可变计划准备与二次预检、精确摘要应用、应用回执和 active 紧急隔离源码。准备不激活；应用只改变平台内部 Provider/Pool 状态且不发布 Offer；隔离不关机、不退款、不撤销既有合同。尚未构建、接口联调、视觉验收或发布 |
 | 算力 Offer 与报价工作区 | 🔴 高 | `src/features/compute-supply/`、`src/features/compute-offers/`、`server/src/compute_federation_{offer,price_snapshot}_*` | 🟡 `/compute-supply` 已写入本人 Offer 草稿生命周期，以及 active Offer 的 fallback_curve 报价历史和显式发布；仅 `admin/owner` 可见的 `/compute-offers` 已写入待审、发布、draining 退场及 expired/revoked 终结。操作绑定当前版本、摘要、稳定幂等键和明确确认；报价可进入候选发现，但不创建 Job、不预留容量、不冻结余额或自动成交，尚未构建、接口联调、视觉验收或发布 |
 | 消费者算力市场工作区 | 🔴 高 | `src/features/compute-market/`、`server/src/compute_federation_broker_*` | 🟡 所有登录用户可见的 `/compute-market` 已写入项目级本人 Job 列表、submitted 创建、候选发现、不可变锁价、Reservation 列表、逐 meter 预算与容量预留，以及未执行任务 Release/Expire 源码。金融动作要求稳定幂等键、精确版本/摘要和明确确认；不创建 Attempt、不派发节点、不处理运行中取消或最终结算，尚未构建、接口联调、视觉验收或发布 |
-| 算力执行工作区 | 🔴 高 | `src/features/compute-execution/`、`server/src/compute_federation_attempt_*` | 🟡 所有登录用户可见的 `/compute-execution` 已写入本人 Provider 选择、“执行 Lease/待激活”分段队列、首次 Attempt 激活、Lease 查询/续租及 revision 1 无心跳 staging 中止源码。列表只读且由服务端逐条审计；激活只登记外部执行器已接受声明，续租只登记外部心跳，中止才原子退款并归还容量。不发送节点命令、不验证外部证明、不登记用量或结算，尚未构建、接口联调、视觉验收或发布 |
+| 算力执行工作区 | 🔴 高 | `src/features/compute-execution/`、`server/src/compute_federation_attempt_*` | 🟡 所有登录用户可见的 `/compute-execution` 已写入本人 Provider 选择、“执行 Lease/待激活”分段队列、首次 Attempt 激活、Lease 查询/续租、revision 1 无心跳 staging 中止、逐 meter 累计用量和首份 Provider 终态候选源码。用量模板由服务端从当前合同生成；激活、心跳、用量和候选均只是外部声明，中止才原子退款并归还容量。不发送节点命令、不验证外部证明、不形成可信用量或结算，尚未构建、接口联调、视觉验收或发布 |
 
 ### 阶段 P3 — 个人 AI 对话
 

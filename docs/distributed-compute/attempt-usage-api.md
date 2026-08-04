@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt 累计声明用量控制面
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: backend, node, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-v188、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。本控制面只把 Provider 或未来节点 Host 上报的累计 meter 保存为 `provider_declared` 证据，不把它提升为平台观测、验证用量或结算依据。
+v188、Store、Service、HTTP 路由、只读填写模板与 PC `/compute-execution` 入口已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面只把 Provider 或未来节点 Host 上报的累计 meter 保存为 `provider_declared` 证据，不把它提升为平台观测、验证用量或结算依据。
 
 本批不接 NodeAgent 线协议。`executor_usage_ref` 只是外部 Host 事件的引用；平台不读取其正文、不验证签名，也不据此改变 Lease、Job、Reservation、Capacity Claim、消费者余额或 Provider 收益。
 
@@ -18,11 +18,16 @@ v188、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执
 
 | 方法 | 路径 | 权限 | 作用 |
 |---|---|---|---|
+| GET | `/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/declared-usage` | Provider 所有者 | 读取当前 meter 合同、上一累计值、下一序号和输出合同模板 |
 | POST | `/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/declared-usage` | Provider 所有者 | 追加一份累计声明用量快照 |
 | GET | `/api/me/compute/attempt-leases/:lease_id/declared-usage/latest` | Provider 所有者或 Job 消费者 | 读取并审计最新快照 |
 | GET | `/api/me/compute/attempt-leases/:lease_id/declared-usage/by-sequence/:sequence_no` | Provider 所有者或 Job 消费者 | 按序号读取并审计历史快照 |
 
 写请求必须提供当前 Lease 的精确 revision/digest/fencing、JSON 安全正整数序号、外部用量引用、每个 meter 的累计数量、幂等键，并显式设置 `confirm_provider_declaration_only=true`。
+
+GET 模板从当前已心跳且未过期的 running Lease、v185 激活回执、当前 Job/Reservation 和 active Claim 重新构建，不接收调用方提供的 meter。它只返回本人 Provider 的 Lease 精确版本、任务和输出合同、逐 meter 预留量/上一累计值、下一安全序号及最新快照最小绑定，不返回独立消费者账户字段，`read_effect` 固定为 `none`。
+
+PC `/compute-execution` 使用该模板生成逐 meter 数字输入，限制累计值不能回退，并在明确确认后提交；最新快照只显示为 `provider_declared`，超额 meter 继续由服务端标记。
 
 ## 3. 失败关闭条件
 
@@ -70,6 +75,7 @@ v188、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执
 ## 7. 尚未实现
 
 - Cargo 编译、v188 迁移执行、HTTP 真实调用、并发和故障注入验证；
+- PC 构建、接口联调、视觉验收和发布；
 - NodeAgent Host 到云端的签名事件传输、outbox、断点续传和真实身份校验；
 - 自动接入控制面、网关、重新分词、计时器、确定性复算和挑战任务；v191 已允许管理员保存第一份待验证平台观测，见 `docs/distributed-compute/attempt-platform-observation-api.md`；
 - 自动可信 `verified_usage`、Execution Receipt 自动签发和争议流程；v192 已提供管理员保守验证量，v193 已提供管理员签发回执，见 `docs/distributed-compute/attempt-verification-api.md` 和 `docs/distributed-compute/attempt-execution-receipt-api.md`；

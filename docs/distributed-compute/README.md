@@ -43,8 +43,8 @@ owners: backend, node, ai-economy
 | Attempt 已接受激活回执 | v185、Provider HTTP 与 PC `/compute-execution` 已写；本人 Provider 可读取当前 active、未过期、Job 仍 reserved 且无既有 Attempt 的候选，外部执行器接受后再显式登记首个 staging Lease。激活单事务推进 held Claim、reserved Job 和 active Reservation，但不发送节点命令、不验证接受证明、不新增扣款，尚未编译、执行迁移或运行验证 |
 | Attempt Lease 状态与续租 | v186、Provider HTTP 与 PC `/compute-execution` 已写；本人 Provider 可按更新时间列出当前 Lease，再按 Lease ID 读取状态，并在精确 revision/digest/fencing 栅栏下登记外部心跳声明、延长软期限。列表只读且逐条审计；续租不验证心跳签名、不发送节点命令、不改变容量或资金，尚未编译、执行迁移或运行验证 |
 | staging Attempt 无用量安全中止 | v187、Provider HTTP 与 PC `/compute-execution` 已写；仅当前 revision 1、无心跳的 staging Lease 可在显式无执行声明下单事务全额退款、归还 active Claim、终结 Job/Reservation/Lease。它不发送取消命令、不验证外部中止证明，尚未编译、执行迁移或运行验证 |
-| running Attempt 累计声明用量 | v188、Store 与 Provider HTTP 已写；只接受精确 running Lease、完整 meter 集合、递增序号和不回退累计值，保存 `provider_declared` 与超额标记。它不改变状态、容量或资金，也不等于 verified usage，尚未编译、执行迁移或运行验证 |
-| Attempt Provider 终态候选 | v189、追加式 Store 与 Provider HTTP 已写；第一份候选必须绑定当前 running Lease、最新 v188 快照和 Workload 输出合同。它不推进状态、不消费容量、不移动资金，也不等于 Execution Receipt，尚未编译、执行迁移或运行验证 |
+| running Attempt 累计声明用量 | v188、Provider HTTP 与 PC `/compute-execution` 已写；只读模板从当前合同返回 meter、上一累计值和下一序号，写入口只接受精确 running Lease、完整 meter 集合和不回退累计值，保存 `provider_declared` 与超额标记。它不改变状态、容量或资金，也不等于 verified usage，尚未编译、执行迁移或运行验证 |
+| Attempt Provider 终态候选 | v189、追加式 Store、Provider HTTP 与 PC `/compute-execution` 已写；第一份候选必须绑定当前 running Lease、最新 v188 快照和服务端返回的 Workload 输出合同。页面支持 succeeded 工件或 failed/canceled 原因，但不推进状态、不消费容量、不移动资金，也不等于 Execution Receipt，尚未编译、执行迁移或运行验证 |
 | Attempt 消费者终态审核 | v190、追加式 Store 与消费者 HTTP 已写；第一份 `accepted/rejected/disputed` 必须绑定精确 v189 候选，消费者接受仍不等于平台验证或结算，尚未编译、执行迁移或运行验证 |
 | Attempt 平台终态观测 | v191、追加式 Store 与管理员 HTTP 已写；平台累计 meter 绑定精确 v188/v189 并保存差异，但仍不等于 verified usage、可信终态或结算，尚未编译、执行迁移或运行验证 |
 | Attempt Verification 决定 | v192、追加式 Store 与管理员 HTTP 已写；精确绑定 v189-v191，按保守策略记录 verified/compensable usage，但不生成 Execution Receipt、不改状态和资金，尚未编译、执行迁移或运行验证 |
