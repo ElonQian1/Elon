@@ -61,6 +61,6 @@ HTTP 与开放商业 MCP 共用 `compute_federation_provider_service`，最终�
 - Cargo 编译、迁移执行和 HTTP/MCP 真实调用验证；
 - 真实 PC 节点、企业集群或外部矿池与 Provider 的绑定；
 - Endpoint/Adapter 路由提案、证明、审批、轮换和撤销；
-- observed/verified 证据采集、平台验证、信任升级和激活；
+- 节点绑定、ReadyCapability、路由与硬件观测摘要的申请及人工审核控制面已写，见 `docs/distributed-compute/activation-evidence-api.md`；真实证据采集、密码学验证、信任升级和激活仍未实现；
 - CapacityPool、供给账本、Offer 与 Price Snapshot 的本人发布控制面；
 - 节点在线状态、动态容量、任务派发、用量验证和收益结算。

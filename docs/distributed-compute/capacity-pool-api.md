@@ -71,6 +71,6 @@ HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最
 - Cargo 编译、v165 迁移执行和 HTTP/MCP 真实调用验证；
 - Pool 版本更新、epoch 轮换的本人控制面；
 - CapacityBucket 与 Supply Add/Withdraw 控制面已写入，边界见 `docs/distributed-compute/capacity-bucket-api.md` 和 `docs/distributed-compute/capacity-supply-api.md`；
-- Provider/Pool 观测验证、人工审批和受控激活；
+- Provider/Pool 激活证据申请与人工审核控制面已写，见 `docs/distributed-compute/activation-evidence-api.md`；真实观测验证和 approved 后受控激活仍未实现；
 - Offer、Price Snapshot、自动撮合和真实任务派发；
 - 实际用量验证、Provider 收益和链上结算。
