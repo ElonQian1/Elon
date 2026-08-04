@@ -19,9 +19,10 @@ use crate::{
         enforce_response_projection, project_navigation_plan, source_conflict_summary,
     },
     node_agent_project_docs_mcp::McpRequest,
+    project_document_file_operation_model::normalize_document_path,
     project_document_governance::{parse_manifest, SECTION_CONFIG_PATH},
-    project_document_knowledge_graph_service::plan_context,
-    project_document_native_context_projection::relevant_memories,
+    project_document_knowledge_graph_service::plan_context_scoped,
+    project_document_native_context_projection::{relevant_memories, MemoryRetrievalScope},
     project_document_response::{compact_text, project_tool_response},
 };
 
@@ -35,6 +36,12 @@ const MAX_RESPONSE_TOKENS: u64 = 2_000;
 #[derive(Debug, Deserialize)]
 struct ContextPlanArguments {
     query: String,
+    #[serde(default)]
+    task_paths: Vec<String>,
+    #[serde(default)]
+    scope_id: String,
+    #[serde(default)]
+    release: String,
     #[serde(default = "default_token_budget")]
     max_tokens: u64,
     #[serde(default = "default_document_limit")]
@@ -83,6 +90,22 @@ pub(crate) fn definition() -> Value {
                     "minLength": 1,
                     "maxLength": 500,
                     "description": "当前用户任务或要理解的问题。"
+                },
+                "task_paths": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {"type":"string","maxLength":500},
+                    "description": "可选的工作区相对任务路径；用于严格排除其他模块的 path-scoped 记忆。"
+                },
+                "scope_id": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "description": "可选 knowledge federation scope_id；大型仓库只规划该分片。"
+                },
+                "release": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "description": "可选 release/channel 标识；只选择显式匹配的 release-scoped 记忆。"
                 },
                 "max_tokens": {
                     "type": "integer",
@@ -175,7 +198,18 @@ fn build_plan(
     let max_response_tokens = input
         .max_response_tokens
         .clamp(MIN_RESPONSE_TOKENS, MAX_RESPONSE_TOKENS);
+    let task_paths = normalize_task_paths(input.task_paths)?;
+    let scope_id = bounded_scope_value(&input.scope_id, 80, "scope_id")?;
+    let release = bounded_scope_value(&input.release, 120, "release")?;
     let revision = inspect_workspace(workspace);
+    let retrieval_scope = MemoryRetrievalScope {
+        task_paths,
+        scope_id,
+        git_branch: revision.git_branch.clone().unwrap_or_default(),
+        release,
+        worktree_clean: revision.git_clean,
+    };
+    let task_scope_key = serde_json::to_string(&retrieval_scope)?;
     let cache_key = request_cache_key(
         workspace,
         &revision,
@@ -183,6 +217,7 @@ fn build_plan(
         max_tokens,
         max_documents,
         max_response_tokens,
+        &task_scope_key,
     );
 
     let cached = (!input.force_refresh)
@@ -198,6 +233,7 @@ fn build_plan(
             max_documents,
             max_response_tokens,
             &revision,
+            &retrieval_scope,
             cache_key.is_some(),
         )?;
         if let Some(key) = cache_key.clone() {
@@ -221,6 +257,7 @@ fn build_plan(
         session::DeliveryInput {
             receipt_path,
             query,
+            task_scope_key: &task_scope_key,
             max_tokens,
             max_documents,
             max_response_tokens,
@@ -241,14 +278,25 @@ fn build_fresh_plan(
     max_documents: usize,
     max_response_tokens: u64,
     revision: &WorkspaceRevision,
+    retrieval_scope: &MemoryRetrievalScope,
     cacheable: bool,
 ) -> Result<Value> {
-    let raw = plan_context(workspace, query, None, max_tokens, max_documents, 1_600)?;
+    let scope_id =
+        (!retrieval_scope.scope_id.is_empty()).then_some(retrieval_scope.scope_id.as_str());
+    let raw = plan_context_scoped(
+        workspace,
+        query,
+        None,
+        scope_id,
+        max_tokens,
+        max_documents,
+        1_600,
+    )?;
     let mut plan = project_navigation_plan(&raw);
-    plan["verified_project_memory"] = portable_memory_projection(workspace, query);
+    plan["verified_project_memory"] = portable_memory_projection(workspace, query, retrieval_scope);
     let catalog_revision = plan.get("catalog_revision").cloned().unwrap_or(Value::Null);
     plan["contract"] = json!({
-        "schema": "elon.project_context_plan.v5",
+        "schema": "elon.project_context_plan.v6",
         "read_only": true,
         "source_bodies_returned": 0,
         "native_search_replaced": false,
@@ -266,6 +314,7 @@ fn build_fresh_plan(
         "catalog_revision": catalog_revision,
         "replan_when_revision_changes": true,
     });
+    plan["task_scope"] = serde_json::to_value(retrieval_scope)?;
     plan["source_policy"] = json!({
         "precedence": [
             {"rank":1,"role":"implementation_truth","sources":["current_files","tests","runtime_evidence"]},
@@ -294,6 +343,7 @@ fn build_fresh_plan(
         "relevant_documents": plan.get("relevant_documents"),
         "verified_project_memory": plan.get("verified_project_memory"),
         "selected_paths": plan.get("selected_paths"),
+        "task_scope": plan.get("task_scope"),
     });
     let estimated_full_plan_tokens = serde_json::to_vec(&plan)?.len().div_ceil(4);
     plan["plan_receipt"] = json!({
@@ -307,10 +357,14 @@ fn build_fresh_plan(
     Ok(plan)
 }
 
-fn portable_memory_projection(workspace: &Path, query: &str) -> Value {
+fn portable_memory_projection(
+    workspace: &Path,
+    query: &str,
+    retrieval_scope: &MemoryRetrievalScope,
+) -> Value {
     let path = workspace.join(SECTION_CONFIG_PATH);
     let Some(content) = fs::read_to_string(path).ok() else {
-        return relevant_memories(workspace, query, &[], 3);
+        return relevant_memories(workspace, query, retrieval_scope, &[], 3);
     };
     let Ok(manifest) = parse_manifest(Some(&content)) else {
         return json!({
@@ -322,7 +376,34 @@ fn portable_memory_projection(workspace: &Path, query: &str) -> Value {
             "action":"Run full project document governance analysis before trusting portable memory."
         });
     };
-    relevant_memories(workspace, query, &manifest.context_memories, 3)
+    relevant_memories(
+        workspace,
+        query,
+        retrieval_scope,
+        &manifest.context_memories,
+        3,
+    )
+}
+
+fn normalize_task_paths(paths: Vec<String>) -> Result<Vec<String>> {
+    if paths.len() > 16 {
+        bail!("project_context_plan.task_paths 最多 16 条");
+    }
+    let mut paths = paths
+        .into_iter()
+        .map(|path| normalize_document_path(&path))
+        .collect::<Result<Vec<_>>>()?;
+    paths.sort();
+    paths.dedup();
+    Ok(paths)
+}
+
+fn bounded_scope_value(value: &str, limit: usize, field: &str) -> Result<String> {
+    let value = value.trim();
+    if value.chars().count() > limit || value.chars().any(char::is_control) {
+        bail!("project_context_plan.{field} 最多 {limit} 个字符且不能包含控制字符");
+    }
+    Ok(value.to_string())
 }
 
 fn default_token_budget() -> u64 {

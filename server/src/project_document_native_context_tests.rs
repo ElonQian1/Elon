@@ -9,7 +9,7 @@ use crate::{
     project_document_native_context_health::{
         memory_health_report_with_options, MemoryHealthOptions,
     },
-    project_document_native_context_projection::relevant_memories,
+    project_document_native_context_projection::{relevant_memories, MemoryRetrievalScope},
 };
 
 #[test]
@@ -71,6 +71,7 @@ fn memory_ci_paginates_and_recommends_strict_failure_without_mutation() {
         scope: ProjectContextMemoryScope {
             kind: "repository".into(),
             paths: Vec::new(),
+            ..Default::default()
         },
         review: ProjectContextMemoryReview {
             reviewed_on: "2099-01-01".into(),
@@ -139,7 +140,13 @@ fn conflicting_shared_memories_are_not_injected_into_project_context() {
         },
     ])
     .unwrap();
-    let projection = relevant_memories(&root, "authority", &memories, 3);
+    let projection = relevant_memories(
+        &root,
+        "authority",
+        &MemoryRetrievalScope::default(),
+        &memories,
+        3,
+    );
     assert_eq!(projection["selected_count"], 0);
     assert_eq!(projection["invalidated_count"], 2);
     fs::remove_dir_all(root).unwrap();
@@ -201,11 +208,75 @@ fn portable_memory_is_returned_only_while_evidence_hash_matches() {
     .unwrap()
     .remove(0);
 
-    let current = relevant_memories(&root, "project routes", &[memory.clone()], 3);
+    let current = relevant_memories(
+        &root,
+        "project routes",
+        &MemoryRetrievalScope::default(),
+        &[memory.clone()],
+        3,
+    );
     assert_eq!(current["selected_count"], 1);
     fs::write(root.join("src/routes.rs"), "pub fn changed_routes() {}\n").unwrap();
-    let drifted = relevant_memories(&root, "project routes", &[memory], 3);
+    let drifted = relevant_memories(
+        &root,
+        "project routes",
+        &MemoryRetrievalScope::default(),
+        &[memory],
+        3,
+    );
     assert_eq!(drifted["selected_count"], 0);
     assert_eq!(drifted["invalidated_count"], 1);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn path_scoped_memory_requires_an_overlapping_task_path() {
+    let root = std::env::temp_dir().join(format!(
+        "elon_native_scope_{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    fs::create_dir_all(root.join("server/src")).unwrap();
+    let source = b"pub fn scoped_route() {}\n";
+    fs::write(root.join("server/src/scoped.rs"), source).unwrap();
+    let memory = normalize_memories(vec![ProjectContextMemory {
+        summary: "The scoped server route is owned by the project memory module.".into(),
+        topics: vec!["project memory".into()],
+        evidence: vec![ProjectContextEvidence {
+            path: "server/src/scoped.rs".into(),
+            content_hash: format!("{:x}", Sha256::digest(source)),
+            ..Default::default()
+        }],
+        reviewed_at: "catalog:scope".into(),
+        scope: ProjectContextMemoryScope {
+            kind: "paths".into(),
+            paths: vec!["server/src".into()],
+            ..Default::default()
+        },
+        ..Default::default()
+    }])
+    .unwrap();
+    let unrelated = relevant_memories(
+        &root,
+        "project memory",
+        &MemoryRetrievalScope {
+            task_paths: vec!["pc-frontend/src".into()],
+            ..Default::default()
+        },
+        &memory,
+        3,
+    );
+    assert_eq!(unrelated["selected_count"], 0);
+    assert_eq!(unrelated["scope_filtered_count"], 1);
+    let related = relevant_memories(
+        &root,
+        "project memory",
+        &MemoryRetrievalScope {
+            task_paths: vec!["server/src/node_agent.rs".into()],
+            ..Default::default()
+        },
+        &memory,
+        3,
+    );
+    assert_eq!(related["selected_count"], 1);
     fs::remove_dir_all(root).unwrap();
 }

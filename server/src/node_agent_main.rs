@@ -279,8 +279,10 @@ mod project_document_native_context_conflict;
 mod project_document_native_context_git;
 mod project_document_native_context_health;
 mod project_document_native_context_ingest;
+mod project_document_native_context_observation;
 mod project_document_native_context_projection;
 mod project_document_native_context_receipt;
+mod project_document_native_context_repair;
 mod project_document_native_context_review;
 #[cfg(test)]
 mod project_document_native_context_tests;

@@ -8,7 +8,11 @@ use std::{path::PathBuf, sync::Arc};
 use crate::{
     project_document_authorization::DocumentAutomationMode,
     project_document_native_context_health::{shared_memory_health, MemoryHealthOptions},
+    project_document_native_context_observation::{
+        finish_window, ingest_event, overview, start_window,
+    },
     project_document_native_context_receipt::revise_candidate,
+    project_document_native_context_repair::create_relocation_repair_candidate,
     project_document_native_context_review::{candidate_page, review_candidates},
     NodeRuntime,
 };
@@ -44,6 +48,28 @@ struct NativeContextRequest {
     failure_policy: String,
     #[serde(default)]
     include_capabilities: bool,
+    #[serde(default)]
+    review_reason: String,
+    #[serde(default)]
+    source_path: String,
+    #[serde(default)]
+    replacement_path: String,
+    #[serde(default)]
+    producer: String,
+    #[serde(default)]
+    benchmark_key: String,
+    #[serde(default)]
+    measurement_window: String,
+    #[serde(default)]
+    window_id: String,
+    #[serde(default)]
+    session_id: String,
+    #[serde(default)]
+    event: Value,
+    #[serde(default)]
+    selected_memory_count: usize,
+    #[serde(default)]
+    returned_metadata_bytes: usize,
 }
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
@@ -63,6 +89,26 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
         .route(
             "/api/project-docs/native-context/health",
             post(health_handler),
+        )
+        .route(
+            "/api/project-docs/native-context/repair-relocation",
+            post(repair_relocation_handler),
+        )
+        .route(
+            "/api/project-docs/native-context/observation/start",
+            post(observation_start_handler),
+        )
+        .route(
+            "/api/project-docs/native-context/observation/event",
+            post(observation_event_handler),
+        )
+        .route(
+            "/api/project-docs/native-context/observation/finish",
+            post(observation_finish_handler),
+        )
+        .route(
+            "/api/project-docs/native-context/observation/summary",
+            post(observation_summary_handler),
         )
 }
 
@@ -85,6 +131,7 @@ async fn review_handler(Json(request): Json<NativeContextRequest>) -> axum::resp
         request.authorization_mode,
         request.expected_catalog_revision.as_deref(),
         request.expected_suggestions_revision.as_deref(),
+        &request.review_reason,
     ))
 }
 
@@ -111,6 +158,60 @@ async fn health_handler(Json(request): Json<NativeContextRequest>) -> axum::resp
         include_capabilities: request.include_capabilities,
     };
     response(shared_memory_health(&workspace(&request), &options))
+}
+
+async fn repair_relocation_handler(
+    Json(request): Json<NativeContextRequest>,
+) -> axum::response::Response {
+    response(create_relocation_repair_candidate(
+        &workspace(&request),
+        &request.candidate_id,
+        &request.source_path,
+        &request.replacement_path,
+        if request.producer.trim().is_empty() {
+            "pc_memory_repair"
+        } else {
+            &request.producer
+        },
+    ))
+}
+
+async fn observation_start_handler(
+    Json(request): Json<NativeContextRequest>,
+) -> axum::response::Response {
+    response(start_window(
+        &workspace(&request),
+        &request.benchmark_key,
+        &request.measurement_window,
+        &request.session_id,
+    ))
+}
+
+async fn observation_event_handler(
+    Json(request): Json<NativeContextRequest>,
+) -> axum::response::Response {
+    let workspace = workspace(&request);
+    response(ingest_event(&workspace, &request.window_id, request.event))
+}
+
+async fn observation_finish_handler(
+    Json(request): Json<NativeContextRequest>,
+) -> axum::response::Response {
+    response(finish_window(
+        &workspace(&request),
+        &request.window_id,
+        request.selected_memory_count,
+        request.returned_metadata_bytes,
+    ))
+}
+
+async fn observation_summary_handler(
+    Json(request): Json<NativeContextRequest>,
+) -> axum::response::Response {
+    response(overview(
+        &workspace(&request),
+        (!request.benchmark_key.trim().is_empty()).then_some(request.benchmark_key.as_str()),
+    ))
 }
 
 fn workspace(request: &NativeContextRequest) -> PathBuf {

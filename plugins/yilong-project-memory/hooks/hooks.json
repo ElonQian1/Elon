@@ -1,0 +1,40 @@
+{
+  "description": "Bounded project-memory receipt prompts. Review and trust before enabling.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/project-memory-hook.mjs\"",
+            "timeout": 5,
+            "statusMessage": "Tracking bounded project evidence"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/project-memory-hook.mjs\"",
+            "timeout": 5,
+            "statusMessage": "Checking for reusable project memory"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/scripts/project-memory-hook.mjs\"",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

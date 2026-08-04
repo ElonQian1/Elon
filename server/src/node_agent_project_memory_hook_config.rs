@@ -43,7 +43,7 @@ pub(crate) fn capability_manifest() -> Value {
             "SubagentStop"
         ],
         "handler_type": "command",
-        "plugin_bundle_status": "not_installed",
+        "plugin_bundle_status": "repository_bundle_available_not_installed",
         "trust_required": true,
         "trust_bypass_enabled": false,
         "future_event_behavior": "bounded_noop_until_runtime_verified",

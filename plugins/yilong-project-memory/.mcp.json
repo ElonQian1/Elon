@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "yilong-project-context": {
+      "command": "node",
+      "args": ["./scripts/project-memory-mcp-proxy.mjs", "context"]
+    },
+    "yilong-project-memory-receipt": {
+      "command": "node",
+      "args": ["./scripts/project-memory-mcp-proxy.mjs", "receipt"]
+    }
+  }
+}

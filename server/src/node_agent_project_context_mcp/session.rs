@@ -21,7 +21,7 @@ use crate::{
     node_agent_project_context_projection::not_modified_response,
 };
 
-const RECEIPT_SCHEMA: &str = "elon.project_context_session.v1";
+const RECEIPT_SCHEMA: &str = "elon.project_context_session.v2";
 const MAX_RECEIPT_BYTES: u64 = 64 * 1024;
 const MAX_ENTRIES: usize = 8;
 const MAX_SOURCES: usize = 16;
@@ -53,6 +53,7 @@ struct SourceReceipt {
 pub(super) struct DeliveryInput<'a> {
     pub(super) receipt_path: Option<&'a Path>,
     pub(super) query: &'a str,
+    pub(super) task_scope_key: &'a str,
     pub(super) max_tokens: u64,
     pub(super) max_documents: usize,
     pub(super) max_response_tokens: u64,
@@ -76,6 +77,7 @@ pub(super) fn finish(mut plan: Value, input: DeliveryInput<'_>) -> Result<Value>
         .unwrap_or_default();
     let scope_key = request_scope_key(
         input.query,
+        input.task_scope_key,
         input.max_tokens,
         input.max_documents,
         input.max_response_tokens,
@@ -343,6 +345,7 @@ fn refresh_response_estimate(response: &mut Value, full_plan_tokens: u64) {
 
 fn request_scope_key(
     query: &str,
+    task_scope_key: &str,
     max_tokens: u64,
     max_documents: usize,
     max_response_tokens: u64,
@@ -353,7 +356,7 @@ fn request_scope_key(
         .join(" ")
         .to_lowercase();
     let material = format!(
-        "elon.project_context.session.scope.v1\0{normalized}\0{max_tokens}\0{max_documents}\0{max_response_tokens}"
+        "elon.project_context.session.scope.v2\0{normalized}\0{task_scope_key}\0{max_tokens}\0{max_documents}\0{max_response_tokens}"
     );
     hex::encode(Sha256::digest(material.as_bytes()))
 }

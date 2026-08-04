@@ -23,7 +23,7 @@ use crate::{
     project_document_index::ProjectDocumentIndex,
 };
 
-const MAX_MEMORIES: usize = 64;
+const MAX_MEMORIES: usize = 256;
 const MAX_EVIDENCE_PER_MEMORY: usize = 8;
 const MAX_EVIDENCE_BYTES: u64 = 8 * 1024 * 1024;
 
@@ -67,6 +67,14 @@ pub(crate) struct ProjectContextMemoryScope {
     pub kind: String,
     #[serde(default)]
     pub paths: Vec<String>,
+    #[serde(default)]
+    pub scope_ids: Vec<String>,
+    #[serde(default)]
+    pub branches: Vec<String>,
+    #[serde(default)]
+    pub releases: Vec<String>,
+    #[serde(default)]
+    pub worktree_state: String,
 }
 
 impl Default for ProjectContextMemoryScope {
@@ -74,13 +82,22 @@ impl Default for ProjectContextMemoryScope {
         Self {
             kind: "repository".to_string(),
             paths: Vec::new(),
+            scope_ids: Vec::new(),
+            branches: Vec::new(),
+            releases: Vec::new(),
+            worktree_state: "any".to_string(),
         }
     }
 }
 
 impl ProjectContextMemoryScope {
     fn is_repository(&self) -> bool {
-        matches!(self.kind.trim(), "" | "repository") && self.paths.is_empty()
+        matches!(self.kind.trim(), "" | "repository")
+            && self.paths.is_empty()
+            && self.scope_ids.is_empty()
+            && self.branches.is_empty()
+            && self.releases.is_empty()
+            && matches!(self.worktree_state.trim(), "" | "any")
     }
 }
 
@@ -121,6 +138,20 @@ pub(crate) struct NativeContextCandidate {
     pub provenance: NativeContextProvenance,
     #[serde(default)]
     pub conflicts: Vec<crate::project_document_native_context_conflict::NativeContextConflict>,
+    #[serde(default)]
+    pub review_feedback: NativeContextReviewFeedback,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct NativeContextReviewFeedback {
+    #[serde(default)]
+    pub decision: String,
+    #[serde(default)]
+    pub reason: String,
+    #[serde(default)]
+    pub decided_at: String,
+    #[serde(default)]
+    pub decided_by: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -341,6 +372,15 @@ fn normalize_scope(mut scope: ProjectContextMemoryScope) -> Result<ProjectContex
     } else if scope.paths.is_empty() {
         bail!("scope.kind=paths 时至少需要一个 scope.paths");
     }
+    scope.scope_ids = unique_bounded_strings(scope.scope_ids, 8, 80);
+    scope.branches = unique_bounded_strings(scope.branches, 8, 120);
+    scope.releases = unique_bounded_strings(scope.releases, 8, 120);
+    scope.worktree_state = match scope.worktree_state.trim() {
+        "" | "any" => "any".to_string(),
+        "clean" => "clean".to_string(),
+        "dirty" => "dirty".to_string(),
+        _ => bail!("项目导航记忆 scope.worktree_state 仅支持 any、clean 或 dirty"),
+    };
     Ok(scope)
 }
 

@@ -84,6 +84,7 @@ pub(crate) fn request_cache_key(
     max_tokens: u64,
     max_documents: usize,
     max_response_tokens: u64,
+    task_scope_key: &str,
 ) -> Option<String> {
     let git_head = revision.git_head.as_deref()?;
     let source_revision = match revision.git_clean {
@@ -93,8 +94,9 @@ pub(crate) fn request_cache_key(
     };
     let canonical = fs::canonicalize(workspace).unwrap_or_else(|_| workspace.to_path_buf());
     let seed = format!(
-        "elon.project_context.cache.v3\0{}\0{git_head}\0{source_revision}\0{}\0{max_tokens}\0{max_documents}\0{max_response_tokens}",
+        "elon.project_context.cache.v4\0{}\0{git_head}\0{}\0{source_revision}\0{}\0{max_tokens}\0{max_documents}\0{max_response_tokens}\0{task_scope_key}",
         canonical.to_string_lossy().to_lowercase(),
+        revision.git_branch.as_deref().unwrap_or_default(),
         normalize_query(query),
     );
     Some(sha256_hex(seed.as_bytes()))
@@ -186,13 +188,13 @@ mod tests {
     #[test]
     fn dirty_workspace_requires_a_complete_fingerprint() {
         let revision = dirty_revision(None);
-        assert!(request_cache_key(Path::new("."), &revision, "task", 1200, 6, 1200).is_none());
+        assert!(request_cache_key(Path::new("."), &revision, "task", 1200, 6, 1200, "").is_none());
     }
 
     #[test]
     fn fingerprinted_dirty_workspace_is_cacheable() {
         let revision = dirty_revision(Some("fingerprint"));
-        assert!(request_cache_key(Path::new("."), &revision, "task", 1200, 6, 1200).is_some());
+        assert!(request_cache_key(Path::new("."), &revision, "task", 1200, 6, 1200, "").is_some());
     }
 
     #[test]

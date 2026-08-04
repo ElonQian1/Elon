@@ -228,6 +228,7 @@ fn compact_budget_fallback(plan: &Value) -> Value {
         "query": plan.get("query"),
         "contract": plan.get("contract"),
         "workspace_revision": plan.get("workspace_revision"),
+        "task_scope": plan.get("task_scope"),
         "source_policy": plan.get("source_policy"),
         "verified_project_memory": {
             "selected_count": plan.pointer("/verified_project_memory/selected_count"),
@@ -291,6 +292,7 @@ pub(crate) fn not_modified_response(
         "contract": plan.get("contract"),
         "plan_receipt": plan.get("plan_receipt"),
         "workspace_revision": plan.get("workspace_revision"),
+        "task_scope": plan.get("task_scope"),
         "source_conflict_summary": {
             "metadata_warning_count": plan.pointer("/source_conflict_summary/metadata_warning_count"),
             "requires_native_resolution": plan.pointer("/source_conflict_summary/requires_native_resolution"),

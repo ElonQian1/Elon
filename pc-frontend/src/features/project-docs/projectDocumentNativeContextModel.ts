@@ -8,6 +8,7 @@ export {
 
 export type NativeContextCandidateStatus = 'pending' | 'reviewed' | 'rejected' | 'applied'
 export type NativeContextReviewAction = 'accept' | 'reject' | 'restore'
+export type NativeContextRejectionReason = 'duplicate' | 'task_local' | 'unsupported' | 'conflict' | 'stale' | 'not_reusable'
 export type NativeContextAuthorizationMode = 'git_backed_full' | 'trusted_reversible' | 'review_all' | 'suggestions_only'
 
 export interface ProjectContextEvidence {
@@ -40,6 +41,10 @@ export interface ProjectContextMemory {
 export interface ProjectContextMemoryScope {
   kind: 'repository' | 'paths'
   paths: string[]
+  scope_ids: string[]
+  branches: string[]
+  releases: string[]
+  worktree_state: 'any' | 'clean' | 'dirty'
 }
 
 export interface ProjectContextMemoryReview {
@@ -58,6 +63,14 @@ export interface NativeContextCandidate extends ProjectContextMemory {
   ingest_action: 'created' | 'updated' | 'replacement' | 'deduplicated' | 'shared_duplicate' | ''
   provenance: NativeContextProvenance
   conflicts: NativeContextConflict[]
+  review_feedback: NativeContextReviewFeedback
+}
+
+export interface NativeContextReviewFeedback {
+  decision: '' | 'rejected'
+  reason: '' | NativeContextRejectionReason
+  decided_at: string
+  decided_by: string
 }
 
 export interface NativeContextProvenance {
@@ -87,6 +100,11 @@ export interface NativeContextCandidatePage {
     next_offset?: number
   }
   candidates: NativeContextCandidate[]
+  producer_quality: {
+    schema: string
+    producers: Record<string, Partial<Record<NativeContextCandidateStatus, number>>>
+    interpretation: string
+  }
 }
 
 interface NativeContextEnvelope<T> {
@@ -98,7 +116,7 @@ interface NativeContextEnvelope<T> {
 export function sanitizeProjectContextMemories(value: unknown): ProjectContextMemory[] {
   if (!Array.isArray(value)) return []
   const unique = new Map<string, ProjectContextMemory>()
-  value.slice(0, 64).forEach((entry) => {
+  value.slice(0, 256).forEach((entry) => {
     const memory = sanitizeMemory(entry)
     if (memory) unique.set(memory.candidate_id, memory)
   })
@@ -137,6 +155,7 @@ export async function reviewNativeContextCandidates(input: {
   authorizationMode: NativeContextAuthorizationMode
   catalogRevision?: string
   suggestionsRevision?: string
+  reviewReason?: NativeContextRejectionReason
 }): Promise<Record<string, unknown>> {
   const envelope = await nodeApi<NativeContextEnvelope<Record<string, unknown>>>(
     input.adminUrl,
@@ -150,6 +169,7 @@ export async function reviewNativeContextCandidates(input: {
         authorization_mode: input.authorizationMode,
         expected_catalog_revision: input.catalogRevision,
         expected_suggestions_revision: input.suggestionsRevision,
+        review_reason: input.reviewReason,
       }),
     },
   )
@@ -220,6 +240,7 @@ function sanitizeCandidatePage(
       next_offset: optionalNumber(pagination.next_offset),
     },
     candidates,
+    producer_quality: sanitizeProducerQuality(page.producer_quality),
   }
 }
 
@@ -238,6 +259,42 @@ function sanitizeCandidate(value: unknown): NativeContextCandidate | null {
     ingest_action: sanitizeIngestAction(candidate.ingest_action),
     provenance: sanitizeProvenance(candidate.provenance),
     conflicts: sanitizeConflicts(candidate.conflicts),
+    review_feedback: sanitizeReviewFeedback(candidate.review_feedback),
+  }
+}
+
+function sanitizeProducerQuality(value: unknown): NativeContextCandidatePage['producer_quality'] {
+  const quality = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const rawProducers = quality.producers && typeof quality.producers === 'object'
+    ? quality.producers as Record<string, unknown>
+    : {}
+  const producers: NativeContextCandidatePage['producer_quality']['producers'] = {}
+  Object.entries(rawProducers).slice(0, 32).forEach(([rawProducer, rawCounts]) => {
+    const producer = boundedText(rawProducer, 40)
+    if (!producer || !rawCounts || typeof rawCounts !== 'object') return
+    const counts = rawCounts as Record<string, unknown>
+    producers[producer] = {
+      pending: safeNumber(counts.pending),
+      reviewed: safeNumber(counts.reviewed),
+      rejected: safeNumber(counts.rejected),
+      applied: safeNumber(counts.applied),
+    }
+  })
+  return {
+    schema: boundedText(quality.schema, 80),
+    producers,
+    interpretation: boundedText(quality.interpretation, 240),
+  }
+}
+
+function sanitizeReviewFeedback(value: unknown): NativeContextReviewFeedback {
+  const feedback = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const reason = boundedText(feedback.reason, 32)
+  return {
+    decision: feedback.decision === 'rejected' ? 'rejected' : '',
+    reason: isRejectionReason(reason) ? reason : '',
+    decided_at: boundedText(feedback.decided_at, 48),
+    decided_by: boundedText(feedback.decided_by, 80),
   }
 }
 
@@ -271,7 +328,40 @@ function sanitizeMemoryScope(value: unknown): ProjectContextMemoryScope {
   return {
     kind: kind === 'paths' ? 'paths' : 'repository',
     paths: uniqueStrings(scope.paths, 8, 500).map((path) => path.replace(/\\/g, '/')),
+    scope_ids: uniqueStrings(scope.scope_ids, 8, 80),
+    branches: uniqueStrings(scope.branches, 8, 120),
+    releases: uniqueStrings(scope.releases, 8, 120),
+    worktree_state: ['clean', 'dirty'].includes(String(scope.worktree_state))
+      ? scope.worktree_state as ProjectContextMemoryScope['worktree_state']
+      : 'any',
   }
+}
+
+export async function createNativeContextRelocationRepair(input: {
+  adminUrl: string
+  projectRoot: string
+  candidateId: string
+  sourcePath: string
+  replacementPath: string
+}): Promise<NativeContextCandidate> {
+  const envelope = await nodeApi<NativeContextEnvelope<Record<string, unknown>>>(
+    input.adminUrl,
+    '/api/project-docs/native-context/repair-relocation',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        project_root: input.projectRoot,
+        candidate_id: input.candidateId,
+        source_path: input.sourcePath,
+        replacement_path: input.replacementPath,
+        producer: 'pc_memory_repair',
+      }),
+    },
+  )
+  if (!envelope.ok || !envelope.result) throw new Error(envelope.error || '创建共享记忆修复候选失败')
+  const candidate = sanitizeCandidate(envelope.result.candidate)
+  if (!candidate) throw new Error('共享记忆修复候选响应无效')
+  return candidate
 }
 
 function sanitizeMemoryReview(value: unknown): ProjectContextMemoryReview {
@@ -362,6 +452,10 @@ function boundedOid(value: unknown): string {
 
 function isCandidateStatus(value: unknown): value is NativeContextCandidateStatus {
   return ['pending', 'reviewed', 'rejected', 'applied'].includes(String(value))
+}
+
+function isRejectionReason(value: unknown): value is NativeContextRejectionReason {
+  return ['duplicate', 'task_local', 'unsupported', 'conflict', 'stale', 'not_reusable'].includes(String(value))
 }
 
 function uniqueStrings(value: unknown, limit: number, charLimit: number): string[] {

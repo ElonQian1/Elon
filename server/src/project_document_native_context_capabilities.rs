@@ -25,9 +25,9 @@ pub(crate) fn manifest() -> Value {
             },
             {
                 "id": "direct_codex_install",
-                "status": "manual_descriptor_available",
-                "context_profile": "manual",
-                "receipt_profile": "manual",
+                "status": "plugin_bundle_available_not_installed",
+                "context_profile": "plugin_bootstrap",
+                "receipt_profile": "plugin_bootstrap",
                 "hook_configuration": "not_installed_globally",
                 "trust_required": true
             },
@@ -41,8 +41,10 @@ pub(crate) fn manifest() -> Value {
             },
             {
                 "id": "codex_plugin_bundle",
-                "status": "future_adapter_contract_only",
-                "hook_configuration": "not_generated_or_installed"
+                "status": "repository_bundle_available_not_installed",
+                "path": "plugins/yilong-project-memory",
+                "profiles": ["context", "receipt"],
+                "hook_configuration": "bundled_non_managed_review_required"
             }
         ],
         "hook_lifecycle": crate::node_agent_project_memory_hook_config::capability_manifest(),
@@ -71,14 +73,17 @@ pub(crate) fn manifest() -> Value {
 fn runtime_observation_contract() -> Value {
     json!({
         "schema": "elon.project_context_runtime_observation.v1",
-        "status": "adapter_not_connected",
+        "status": "ingest_adapter_available",
         "source": "codex_app_server_jsonrpc",
+        "adapter": "scripts/project-memory-app-server-observer.mjs",
         "accepted_notifications": [
             "hook/started",
             "hook/completed",
             "thread/tokenUsage/updated",
             "turn/started",
-            "turn/completed"
+            "turn/completed",
+            "item/started",
+            "item/completed"
         ],
         "accepted_fields": [
             "irreversible_session_fingerprint",
@@ -95,8 +100,7 @@ fn runtime_observation_contract() -> Value {
         "derived_metrics": [
             "input_token_delta",
             "elapsed_ms_delta",
-            "native_file_read_delta",
-            "receipt_acceptance_rate"
+            "native_file_read_delta"
         ],
         "excluded_payloads": [
             "prompt",
@@ -108,7 +112,7 @@ fn runtime_observation_contract() -> Value {
             "source_body",
             "command_text"
         ],
-        "claim_rule": "Do not claim token or time savings until matched baseline and enabled windows were observed from app-server events.",
+        "claim_rule": "Do not claim token or time savings until matched baseline and enabled windows for the same benchmark key were observed from app-server events.",
         "not_vendor_billing": true,
         "not_total_task_tokens": true
     })
@@ -127,7 +131,7 @@ mod tests {
         );
         assert_eq!(
             value["runtime_observation"]["status"],
-            "adapter_not_connected"
+            "ingest_adapter_available"
         );
         let encoded = serde_json::to_string(&value).unwrap();
         assert!(!encoded.contains("source_body\":"));

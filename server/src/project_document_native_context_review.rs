@@ -56,6 +56,7 @@ pub(crate) fn candidate_page(
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
+    drop(statement);
     let candidates = rows
         .into_iter()
         .map(|(stored_status, encoded)| {
@@ -81,6 +82,7 @@ pub(crate) fn candidate_page(
             "next_offset": (offset + returned < total).then_some(offset + returned),
         },
         "candidates": candidates,
+        "producer_quality": producer_quality(&index)?,
         "authority": "candidate_only",
         "storage": "external_project_document_index",
         "repository_changed": false,
@@ -95,14 +97,20 @@ pub(crate) fn review_candidates(
     authorization_mode: DocumentAutomationMode,
     expected_catalog_revision: Option<&str>,
     expected_suggestions_revision: Option<&str>,
+    review_reason: &str,
 ) -> Result<Value> {
     let ids = normalize_candidate_ids(candidate_ids)?;
     let index = ProjectDocumentIndex::open(workspace)?;
     initialize_candidate_schema(&index)?;
     let candidates = load_candidates(&index, &ids)?;
     match action.trim() {
-        "reject" => change_local_status(index, candidates, "rejected"),
-        "restore" => change_local_status(index, candidates, "pending"),
+        "reject" => change_local_status(
+            index,
+            candidates,
+            "rejected",
+            normalized_rejection_reason(review_reason)?,
+        ),
+        "restore" => change_local_status(index, candidates, "pending", ""),
         "accept" => accept_into_suggestions(
             workspace,
             index,
@@ -152,8 +160,6 @@ fn accept_into_suggestions(
         if memory.owner.trim().is_empty() {
             memory.owner = "project_maintainers".to_string();
         }
-        memory.scope.kind = "repository".to_string();
-        memory.scope.paths.clear();
         memory.review.reviewed_on = Utc::now().format("%Y-%m-%d").to_string();
         memory.review.reviewed_by = "project_document_review_flow".to_string();
         if memory.review.review_interval_days == 0 {
@@ -200,8 +206,9 @@ fn accept_into_suggestions(
 
 fn change_local_status(
     mut index: ProjectDocumentIndex,
-    candidates: Vec<NativeContextCandidate>,
+    mut candidates: Vec<NativeContextCandidate>,
     target: &str,
+    reason: &str,
 ) -> Result<Value> {
     let action = if target == "rejected" {
         "reject"
@@ -224,11 +231,29 @@ fn change_local_status(
         }
     }
     let transaction = index.conn.transaction()?;
-    for candidate in &candidates {
+    let decided_at = Utc::now().to_rfc3339();
+    for candidate in &mut candidates {
+        let previous_status = candidate.status.clone();
+        candidate.status = target.to_string();
+        candidate.updated_at_ms = candidate.updated_at_ms.saturating_add(1);
+        if target == "rejected" {
+            candidate.review_feedback.decision = "rejected".to_string();
+            candidate.review_feedback.reason = reason.to_string();
+            candidate.review_feedback.decided_at = decided_at.clone();
+            candidate.review_feedback.decided_by = "pc_document_review".to_string();
+        } else {
+            candidate.review_feedback = Default::default();
+        }
         let changed = transaction.execute(
-            "UPDATE native_context_candidates SET status=?1,updated_at_ms=updated_at_ms+1
-             WHERE id=?2 AND status=?3",
-            params![target, candidate.memory.candidate_id, candidate.status],
+            "UPDATE native_context_candidates SET status=?1,candidate_json=?2,updated_at_ms=?3
+             WHERE id=?4 AND status=?5",
+            params![
+                target,
+                serde_json::to_string(candidate)?,
+                candidate.updated_at_ms.min(i64::MAX as u64) as i64,
+                candidate.memory.candidate_id,
+                previous_status,
+            ],
         )?;
         if changed != 1 {
             bail!(
@@ -243,8 +268,48 @@ fn change_local_status(
         "changed": candidates.len(),
         "candidate_ids": candidates.iter().map(|candidate| candidate.memory.candidate_id.as_str()).collect::<Vec<_>>(),
         "candidate_status": target,
+        "review_reason": reason,
         "repository_changed": false,
         "source_bodies_stored": 0,
+    }))
+}
+
+fn normalized_rejection_reason(value: &str) -> Result<&'static str> {
+    match value.trim() {
+        "duplicate" => Ok("duplicate"),
+        "task_local" => Ok("task_local"),
+        "unsupported" => Ok("unsupported"),
+        "conflict" => Ok("conflict"),
+        "stale" => Ok("stale"),
+        "not_reusable" | "" => Ok("not_reusable"),
+        _ => bail!("候选拒绝原因仅支持 duplicate、task_local、unsupported、conflict、stale 或 not_reusable"),
+    }
+}
+
+fn producer_quality(index: &ProjectDocumentIndex) -> Result<Value> {
+    let mut statement = index.conn.prepare(
+        "SELECT status,candidate_json FROM native_context_candidates ORDER BY updated_at_ms DESC LIMIT 200",
+    )?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut producers = BTreeMap::<String, BTreeMap<String, usize>>::new();
+    for (status, encoded) in rows {
+        let candidate: NativeContextCandidate = serde_json::from_str(&encoded)?;
+        let producer = if candidate.producer.trim().is_empty() {
+            "unknown".to_string()
+        } else {
+            candidate.producer
+        };
+        let counts = producers.entry(producer).or_default();
+        *counts.entry(status).or_default() += 1;
+    }
+    Ok(json!({
+        "schema":"elon.native_context_producer_quality.v1",
+        "producers":producers,
+        "interpretation":"Descriptive local review outcomes only; never auto-block a producer without an explicit policy."
     }))
 }
 

@@ -1,6 +1,7 @@
 //! Bounded query projection for reviewed project navigation memory.
 
 use chrono::{NaiveDate, Utc};
+use serde::Serialize;
 use serde_json::{json, Value};
 use std::path::Path;
 
@@ -10,18 +11,33 @@ use crate::{
     project_document_native_context_git::{relocation_candidates_from_index, relocation_index},
 };
 
-const MAX_VALIDATION_CANDIDATES: usize = 8;
+const MAX_VALIDATION_CANDIDATES: usize = 24;
 const MAX_SELECTED_MEMORIES: usize = 3;
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub(crate) struct MemoryRetrievalScope {
+    pub(crate) task_paths: Vec<String>,
+    pub(crate) scope_id: String,
+    pub(crate) git_branch: String,
+    pub(crate) release: String,
+    pub(crate) worktree_clean: Option<bool>,
+}
 
 pub(crate) fn relevant_memories(
     workspace: &Path,
     query: &str,
+    retrieval_scope: &MemoryRetrievalScope,
     memories: &[ProjectContextMemory],
     limit: usize,
 ) -> Value {
+    let mut scope_filtered_count = 0usize;
     let mut ranked = memories
         .iter()
         .filter_map(|memory| {
+            if !scope_matches(query, retrieval_scope, memory) {
+                scope_filtered_count += 1;
+                return None;
+            }
             let score = relevance_score(query, memory);
             (score > 0).then_some((score, memory))
         })
@@ -108,10 +124,76 @@ pub(crate) fn relevant_memories(
         "selected_count": selected_count,
         "invalidated": invalidated,
         "invalidated_count": invalidated_count,
+        "scope_filtered_count": scope_filtered_count,
+        "task_scope": retrieval_scope,
         "validation_candidate_limit": MAX_VALIDATION_CANDIDATES,
         "source_bodies_returned": 0,
         "conflict_rule": "Current files/tests and binding project documents always override this navigation memory."
     })
+}
+
+fn scope_matches(
+    query: &str,
+    retrieval: &MemoryRetrievalScope,
+    memory: &ProjectContextMemory,
+) -> bool {
+    let scope = &memory.scope;
+    if scope.kind == "paths" && !path_scope_matches(query, &retrieval.task_paths, &scope.paths) {
+        return false;
+    }
+    if !scope.scope_ids.is_empty()
+        && (retrieval.scope_id.is_empty()
+            || !scope
+                .scope_ids
+                .iter()
+                .any(|value| value.eq_ignore_ascii_case(&retrieval.scope_id)))
+    {
+        return false;
+    }
+    if !scope.branches.is_empty()
+        && (retrieval.git_branch.is_empty()
+            || !scope
+                .branches
+                .iter()
+                .any(|value| value.eq_ignore_ascii_case(&retrieval.git_branch)))
+    {
+        return false;
+    }
+    if !scope.releases.is_empty()
+        && (retrieval.release.is_empty()
+            || !scope
+                .releases
+                .iter()
+                .any(|value| value.eq_ignore_ascii_case(&retrieval.release)))
+    {
+        return false;
+    }
+    match scope.worktree_state.as_str() {
+        "clean" => retrieval.worktree_clean == Some(true),
+        "dirty" => retrieval.worktree_clean == Some(false),
+        _ => true,
+    }
+}
+
+fn path_scope_matches(query: &str, task_paths: &[String], scope_paths: &[String]) -> bool {
+    let query = query.replace('\\', "/").to_ascii_lowercase();
+    scope_paths.iter().any(|scope_path| {
+        let scope_path = scope_path.to_ascii_lowercase();
+        query.contains(&scope_path)
+            || task_paths
+                .iter()
+                .any(|task_path| paths_overlap(&scope_path, &task_path.to_ascii_lowercase()))
+    })
+}
+
+fn paths_overlap(left: &str, right: &str) -> bool {
+    left == right
+        || right
+            .strip_prefix(left)
+            .is_some_and(|suffix| suffix.starts_with('/'))
+        || left
+            .strip_prefix(right)
+            .is_some_and(|suffix| suffix.starts_with('/'))
 }
 
 fn memory_expired(memory: &ProjectContextMemory) -> bool {

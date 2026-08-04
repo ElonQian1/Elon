@@ -59,11 +59,17 @@ pub(crate) fn shared_memory_health(
         "node_policy_enabled": crate::node_agent_project_memory_hook_config::enabled(""),
         "trust_mode": "codex_non_managed_hook_review",
         "trust_bypass_enabled": false,
-        "runtime_execution_observation_available": false,
+        "runtime_execution_observation_adapter_available": true,
+        "runtime_execution_observed": false,
         "status_rule": "Configured does not mean trusted or executed; verify with Codex /hooks and an explicit app-server observation adapter."
     });
     if options.include_capabilities {
         report["capabilities"] = crate::project_document_native_context_capabilities::manifest();
+        report["runtime_observation"] =
+            crate::project_document_native_context_observation::overview(workspace, None)
+                .unwrap_or_else(
+                    |error| json!({"measurement_status":"unavailable","error":format!("{error:#}")}),
+                );
     }
     Ok(report)
 }

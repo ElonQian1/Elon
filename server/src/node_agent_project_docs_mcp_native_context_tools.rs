@@ -7,6 +7,7 @@ use std::path::Path;
 
 use crate::project_document_native_context::{
     list_candidates, record_candidate, ProjectContextEvidence, ProjectContextMemory,
+    ProjectContextMemoryScope,
 };
 use crate::project_document_native_context_health::{shared_memory_health, MemoryHealthOptions};
 use crate::project_document_native_context_receipt::{record_attested_receipt, record_receipt};
@@ -24,6 +25,8 @@ struct CandidateArguments {
     #[serde(default)]
     topics: Vec<String>,
     evidence: Vec<ProjectContextEvidence>,
+    #[serde(default)]
+    scope: ProjectContextMemoryScope,
 }
 
 impl CandidateArguments {
@@ -33,6 +36,7 @@ impl CandidateArguments {
             summary: self.summary,
             topics: self.topics,
             evidence: self.evidence,
+            scope: self.scope,
             reviewed_at: String::new(),
             ..Default::default()
         }
@@ -214,7 +218,7 @@ fn record_receipt_arguments(workspace: &Path, arguments: Value) -> Result<Value>
 pub(crate) fn memory_schema() -> Value {
     json!({
         "type":"array",
-        "maxItems":64,
+        "maxItems":256,
         "items":{
             "type":"object",
             "required":["summary","topics","evidence","reviewed_at"],
@@ -229,7 +233,11 @@ pub(crate) fn memory_schema() -> Value {
                     "type":"object",
                     "properties":{
                         "kind":{"type":"string","enum":["repository","paths"],"default":"repository"},
-                        "paths":{"type":"array","maxItems":8,"items":{"type":"string"}}
+                        "paths":{"type":"array","maxItems":8,"items":{"type":"string"}},
+                        "scope_ids":{"type":"array","maxItems":8,"items":{"type":"string","maxLength":80}},
+                        "branches":{"type":"array","maxItems":8,"items":{"type":"string","maxLength":120}},
+                        "releases":{"type":"array","maxItems":8,"items":{"type":"string","maxLength":120}},
+                        "worktree_state":{"type":"string","enum":["any","clean","dirty"],"default":"any"}
                     }
                 },
                 "review":{
@@ -251,7 +259,19 @@ fn candidate_input_schema(include_producer: bool) -> Value {
         "candidate_id":{"type":"string","maxLength":80,"description":"可选稳定 id；省略时根据摘要与证据派生。"},
         "summary":{"type":"string","minLength":12,"maxLength":800,"description":"仅陈述已由 evidence 支持的导航结论；不得粘贴源码。"},
         "topics":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string","maxLength":48}},
-        "evidence":{"type":"array","minItems":1,"maxItems":8,"items":evidence_schema(false)}
+        "evidence":{"type":"array","minItems":1,"maxItems":8,"items":evidence_schema(false)},
+        "scope":{
+            "type":"object",
+            "description":"可选适用范围；省略为整个仓库。path/scope/branch/release/worktree 不匹配时不会注入。",
+            "properties":{
+                "kind":{"type":"string","enum":["repository","paths"],"default":"repository"},
+                "paths":{"type":"array","maxItems":8,"items":{"type":"string","maxLength":500}},
+                "scope_ids":{"type":"array","maxItems":8,"items":{"type":"string","maxLength":80}},
+                "branches":{"type":"array","maxItems":8,"items":{"type":"string","maxLength":120}},
+                "releases":{"type":"array","maxItems":8,"items":{"type":"string","maxLength":120}},
+                "worktree_state":{"type":"string","enum":["any","clean","dirty"],"default":"any"}
+            }
+        }
     });
     if include_producer {
         properties["producer"] =

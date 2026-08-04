@@ -80,6 +80,7 @@ fn record_candidates_internal(
                 ingest_action: "shared_duplicate".to_string(),
                 provenance,
                 conflicts,
+                review_feedback: Default::default(),
             });
             continue;
         }
@@ -132,6 +133,7 @@ fn record_candidates_internal(
             ingest_action: ingest_action.to_string(),
             provenance,
             conflicts,
+            review_feedback: Default::default(),
         };
         transaction.execute(
             "INSERT INTO native_context_candidates(id,status,candidate_json,created_at_ms,updated_at_ms)

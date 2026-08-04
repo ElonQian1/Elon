@@ -24,12 +24,14 @@
 - 最多 800 字符的导航摘要和最多 8 个 topic；
 - 1–8 个工作区相对证据路径、定位符、SHA-256，以及可用时的 Git 对象身份；
 - owner；
-- repository 或 paths scope；
+- repository 或 paths scope，并可进一步限制 federation `scope_id`、Git branch、release/channel 与 clean/dirty worktree；
 - 审核回执、审核日期、审核者、复核周期和可选到期日。
 
 新 PC 不需要复制旧 PC 的 SQLite 候选。SQLite 只是本机审核收件箱；只有 suggestions/revision/authorization/apply/Git 链路通过后的共享记忆才可移植。
 
 旧共享记忆缺少生命周期字段时继续可读，不自动改写；Memory CI 会提示补齐。到期、漂移或与另一条共享事实存在潜在冲突的记忆不进入 `verified_project_memory`。
+
+共享 manifest 最多保存 256 条记忆。轻量规划先按任务路径、联邦分片、当前分支、release 和工作区状态零 I/O 排除不适用项，再只对相关性最高的 24 条做证据验证，最终最多注入 3 条。调用方没有提供某个限定值时，显式依赖该限定值的记忆失败关闭，不会作为“可能相关”混入上下文。
 
 ## Memory CI
 
@@ -54,24 +56,33 @@ Content-Type: application/json
 - `fail_on_drift`：证据漂移或记忆过期返回建议退出码 1；
 - `strict`：复核逾期、治理缺口和共享事实潜在冲突也返回建议退出码 1。
 
-响应包含全量计数、当前页、next offset/cursor、逐项状态和 repair plan。repair plan 永远 `automatic=false`：重定位只给候选路径，冲突只要求按当前源码和约束文档人工裁决，更新仍走审核链路。服务本身不终止 CI 进程；调用脚本读取 `policy_outcome.recommended_exit_code` 后自行退出。能力矩阵默认省略，只有需要代理/Hook/app-server/Memories 接入合同时传 `include_capabilities=true`，避免分页 CI 重复消耗响应 token。
+响应包含全量计数、当前页、next offset/cursor、逐项状态和 repair plan。repair plan 永远 `automatic=false`：重定位只给候选路径，冲突只要求按当前源码和约束文档人工裁决，更新仍走审核链路。PC 仅在“一条漂移路径恰好对应一个 Git 对象验证过的新路径”时显示显式确认按钮；确认后也只生成 pending 候选，仍需审核与 apply。
+
+仓库提供可执行包装器，由它读取服务端建议退出码并结束 CI 进程：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\project-memory-ci.ps1 `
+  -ProjectRoot D:\repo -FailurePolicy strict
+```
+
+能力矩阵默认省略，只有需要代理/Hook/app-server/Memories 接入合同时传 `include_capabilities=true`，避免分页 CI 重复消耗响应 token。
 
 ## 代理接入矩阵
 
 | 入口 | 当前能力 | 不自动做的事 |
 |---|---|---|
 | 节点托管的普通 Codex 宽任务 | 自动注入只读 context、只写 receipt 和会话级 Hook 配置 | 不注入完整治理 schema，不绕过 Hook 信任 |
-| 直接运行的 Codex Desktop/CLI | 可手动 bootstrap context/receipt/governance 描述符 | 不改用户全局配置，不全局安装 Hook |
+| 直接运行的 Codex Desktop/CLI | 可手动 bootstrap 描述符，或安装仓库内 `plugins/yilong-project-memory` 接入 context/receipt | 仓库只提供插件包，不替用户安装、不自动信任 Hook |
 | 其他支持 HTTP MCP 的代理 | 可使用 vendor-neutral governance 描述符；context/receipt 可由适配器手动接入 | 无可靠工具过滤时不自动注入普通任务；Hook 需供应商适配 |
-| Codex plugin bundle | 只有未来适配合同 | 当前不生成、不安装 plugin，也不声称 Hook 已加载 |
+| Codex plugin bundle | 已生成并通过静态 plugin manifest 校验；含两个最小权限 MCP server 与路径账本 Hook | 未安装、未启动、未做真实 Codex 兼容验证，也不声称 Hook 已加载 |
 
-context、receipt、governance profile 与短期 session/token 固定；修改 URL 查询参数不能提升权限。普通任务只使用两个极小 profile，因此不会每次积压完整治理工具 schema 或项目全文。
+context、receipt、governance profile 与短期 session/token 固定；修改 URL 查询参数不能提升权限。普通任务只使用两个极小 profile，因此不会每次积压完整治理工具 schema 或项目全文。`project_context_plan` 可传 `task_paths`、`scope_id` 和 `release`；服务端另从当前 Git 工作区绑定 branch 与 clean/dirty 状态，这些范围也进入缓存键和 plan receipt。
 
 ## Hook 生命周期
 
 当前会话只配置 `PostToolUse`、`Stop`、`SessionEnd`。`SessionStart`、`PreCompact`、`PostCompact`、`SubagentStart`、`SubagentStop` 在执行程序中仅作为有界 no-op 适配缝，真实运行验收前不配置。
 
-Hook 配置不等于执行。Codex 首次或定义变化后仍需用户在 `/hooks` 审核；项目不写信任记录，也不使用 trust bypass。未来若由 plugin bundle 提供 Hook，仍遵守同一信任和数据最小化规则。
+节点会话与仓库插件包都只配置这三个事件。插件 Hook 的账本位于 `PLUGIN_DATA`（没有时退回系统临时目录），只保留最多 48 个规范相对路径及 read/write 类型；SessionEnd 删除，异常残留 24 小时后清理。Hook 配置不等于执行：Codex 首次或定义变化后仍需用户在 `/hooks` 审核；项目不写信任记录，也不使用 trust bypass。
 
 ## 真实 token 与时间观测
 
@@ -79,11 +90,16 @@ Hook 配置不等于执行。Codex 首次或定义变化后仍需用户在 `/hoo
 
 - `hook/started`、`hook/completed`；
 - `thread/tokenUsage/updated`；
-- `turn/started`、`turn/completed`。
+- `turn/started`、`turn/completed`；
+- `item/started`、`item/completed`，只保留 item 类型和工具名以聚合原生文件读取次数。
 
-未来适配器只能保存不可逆 session 指纹、baseline/enabled 测量窗口、事件计数、input/cached-input/output token 计数、返回元数据字节、选择记忆数和耗时。prompt、聊天、transcript、assistant message、tool input/output、源码正文和命令文本必须丢弃。
+`scripts/project-memory-app-server-observer.mjs` 已提供 stdin 事件接入器：它在进入 loopback API 前先缩减为方法名、token 累计计数或 item 类型/工具名；服务端再次白名单校验，并只在工作区外 SQLite 保存不可逆 session 指纹、baseline/enabled 窗口、事件计数、input/cached-input/output token 计数、返回元数据字节、选择记忆数和耗时。原始事件对象处理后立即丢弃；prompt、聊天、transcript、assistant message、tool input/output、源码正文和命令文本不落库。24 小时未完成的窗口标为 abandoned；非活动窗口只保留最近 2000 条，避免观测索引无限增长。
 
-当前状态固定为 `adapter_not_connected`。只有同类任务同时取得 `baseline_without_project_memory` 与 `with_project_memory` 两个匹配窗口后，才能报告输入 token、耗时和原生文件读取次数的差值；否则只能报告结构估算，不能宣称真实节省，也不能冒充供应商账单或完整任务 token。
+当前状态是 `ingest_adapter_available`，不是“已经产生效果数据”。只有同一个 `benchmark_key` 同时取得 `baseline_without_project_memory` 与 `with_project_memory` 两个完整窗口后，接口才返回输入 token、耗时和原生文件读取次数的差值；否则只报告无测量或部分测量，不能宣称真实节省，也不能冒充供应商账单或完整任务 token。
+
+## 审核质量反馈
+
+拒绝候选时必须从 duplicate、task_local、unsupported、conflict、stale、not_reusable 中选择原因；原因与人工决定时间只保存在本机候选索引。候选列表同时聚合最近最多 200 条的 producer 状态计数，帮助发现某种回执来源是否经常生成重复或任务局部内容。该统计只描述本机审核结果，不自动封禁 producer，也不能改变信源优先级。
 
 ## Codex 官方 Memories 边界
 
@@ -102,7 +118,8 @@ Codex 官方 Memories 是供应商自己的本机生成状态，与项目 Git �
 
 - Cargo/npm 编译和单元测试；
 - Codex Desktop/CLI 对 context/receipt profile 的真实 schema 与 token 对比；
+- 仓库内 Codex plugin 的安装、相对脚本解析、MCP 启动与卸载；
 - Hook 信任、触发、SessionEnd 清理以及 compact/subagent 生命周期行为；
-- app-server 事件适配器和匹配 baseline 测量；
+- app-server 事件流接线和匹配 baseline 测量；
 - 跨 PC clone/apply 后的 Git 对象、换行与重定位验证；
 - PC 浏览器中的分页、修复计划和旧节点降级体验。

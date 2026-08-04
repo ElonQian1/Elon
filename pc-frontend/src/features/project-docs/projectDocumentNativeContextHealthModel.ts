@@ -27,12 +27,22 @@ export interface NativeContextMemoryHealth {
     private_memories_relationship: string
     private_memories_read: boolean
   }
+  runtime_observation: {
+    adapter_status: string
+    measurement_status: string
+    completed_window_count: number
+    baseline_window_count: number
+    enabled_window_count: number
+    matched_benchmark_count: number
+  }
 }
 
 export interface NativeContextMemoryHealthItem {
   candidate_id: string
   status: 'current' | 'drifted' | 'relocation_suggested' | 'expired' | 'review_overdue' | 'governance_incomplete' | 'potential_conflict'
   owner: string
+  drifted_paths: string[]
+  relocation_candidates: string[]
   repair_plan: Array<{ code: string; action: string; automatic: boolean }>
 }
 
@@ -77,6 +87,19 @@ export async function loadNativeContextMemoryHealth(input: {
     items: sanitizeHealthItems(result.items),
     receipt_automation: sanitizeReceiptAutomation(result.receipt_automation),
     capabilities: sanitizeCapabilities(result.capabilities),
+    runtime_observation: sanitizeRuntimeObservation(result.runtime_observation),
+  }
+}
+
+function sanitizeRuntimeObservation(value: unknown): NativeContextMemoryHealth['runtime_observation'] {
+  const observation = objectValue(value)
+  return {
+    adapter_status: boundedText(observation.adapter_status, 64),
+    measurement_status: boundedText(observation.measurement_status, 64),
+    completed_window_count: safeNumber(observation.completed_window_count),
+    baseline_window_count: safeNumber(observation.baseline_window_count),
+    enabled_window_count: safeNumber(observation.enabled_window_count),
+    matched_benchmark_count: safeNumber(observation.matched_benchmark_count),
   }
 }
 
@@ -117,6 +140,8 @@ function sanitizeHealthItems(value: unknown): NativeContextMemoryHealthItem[] {
       candidate_id: boundedText(item.candidate_id, 80),
       status: status as NativeContextMemoryHealthItem['status'],
       owner: boundedText(item.owner, 80),
+      drifted_paths: uniqueStrings(item.drifted_paths, 8, 500),
+      relocation_candidates: uniqueStrings(item.relocation_candidates, 3, 500),
       repair_plan: repairPlan,
     }]
   })

@@ -15,6 +15,9 @@ use std::{
 use crate::{
     project_docs_scan::{collect_project_documents_with_options, ProjectDocumentScanOptions},
     project_document_analysis_model::compact_document,
+    project_document_federation::{
+        analyze_federation, health_node_matches_path, KnowledgeNodeHealth,
+    },
     project_document_files::content_revision,
     project_document_governance::{parse_manifest, DocumentSectionManifest, SECTION_CONFIG_PATH},
     project_document_governance_facets::effective_facets_with_metadata,
@@ -188,6 +191,26 @@ pub(crate) fn plan_context(
     max_documents: usize,
     max_rule_tokens: u64,
 ) -> Result<Value> {
+    plan_context_scoped(
+        workspace,
+        query,
+        node_id,
+        None,
+        max_tokens,
+        max_documents,
+        max_rule_tokens,
+    )
+}
+
+pub(crate) fn plan_context_scoped(
+    workspace: &Path,
+    query: &str,
+    node_id: Option<&str>,
+    federation_scope_id: Option<&str>,
+    max_tokens: u64,
+    max_documents: usize,
+    max_rule_tokens: u64,
+) -> Result<Value> {
     let query = query.trim();
     if query.is_empty() && node_id.is_none() {
         bail!("project_docs_plan_context 必须提供 query 或 node_id");
@@ -195,6 +218,16 @@ pub(crate) fn plan_context(
     let (snapshot, manifest, manifest_revision) = load(workspace)?;
     let maps = build_knowledge_maps(workspace, &snapshot.documents, &manifest);
     let identity = graph_identity(workspace, &snapshot, manifest_revision.as_deref(), &maps)?;
+    let federation_scope = federation_scope_id
+        .filter(|value| !value.trim().is_empty())
+        .map(|scope_id| {
+            analyze_federation(workspace, &snapshot.documents, &manifest)?
+                .nodes
+                .into_iter()
+                .find(|node| node.id == scope_id)
+                .ok_or_else(|| anyhow!("未知知识节点：{scope_id}"))
+        })
+        .transpose()?;
     let all_maps = [&maps.capabilities, &maps.architecture, &maps.topics];
     let query_lower = query.to_lowercase();
     let query_terms = context_query_terms(&query_lower);
@@ -203,6 +236,12 @@ pub(crate) fn plan_context(
         .iter()
         .flat_map(|map| map.nodes.iter())
         .filter_map(|node| {
+            if federation_scope
+                .as_ref()
+                .is_some_and(|scope| !graph_node_in_scope(node, scope))
+            {
+                return None;
+            }
             if let Some(id) = node_id {
                 return (id == node.id).then_some((usize::MAX, node));
             }
@@ -327,6 +366,12 @@ pub(crate) fn plan_context(
         .documents
         .iter()
         .filter(|document| {
+            if federation_scope
+                .as_ref()
+                .is_some_and(|scope| !health_node_matches_path(scope, &document.path))
+            {
+                return false;
+            }
             !mandatory_rules.iter().any(|rule| {
                 rule.pointer("/document/path").and_then(Value::as_str)
                     == Some(document.path.as_str())
@@ -469,6 +514,7 @@ pub(crate) fn plan_context(
         "identity": identity,
         "query": query,
         "node_id": node_id,
+        "federation_scope_id": federation_scope_id,
         "matched_nodes": matched_nodes.iter().map(|(score, node)| json!({
             "id":node.id,
             "view":node.view,
@@ -488,6 +534,13 @@ pub(crate) fn plan_context(
         },
         "read_instruction": "按顺序只读取当前任务真正需要的文档；先读标题层级，仍有歧义再调用 project_docs_read。"
     }))
+}
+
+fn graph_node_in_scope(node: &ProjectKnowledgeMapNode, scope: &KnowledgeNodeHealth) -> bool {
+    std::iter::once(node.entrypoint.as_str())
+        .chain(node.document_paths.iter().map(String::as_str))
+        .filter(|path| !path.trim().is_empty())
+        .any(|path| health_node_matches_path(scope, path))
 }
 
 fn load(

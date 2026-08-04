@@ -39,6 +39,7 @@
 .filters button,
 .actions button,
 .candidate footer button,
+.repairButton,
 .editor button {
   display: inline-flex;
   align-items: center;
@@ -292,6 +293,14 @@
   text-align: center;
 }
 
+.feedback {
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #cf6d73 7%, var(--surface));
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
 .actions {
   flex-wrap: wrap;
   gap: 10px;
@@ -322,12 +331,38 @@
   color: #cf6d73;
 }
 
+.rejectReason {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rejectReason select {
+  min-height: 30px;
+  max-width: 168px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+}
+
 .header button:disabled,
 .actions button:disabled,
 .candidate footer button:disabled,
+.repairButton:disabled,
 .editor button:disabled {
   cursor: not-allowed;
   opacity: .45;
+}
+
+.evidence .repairButton {
+  grid-column: 1 / -1;
+  justify-self: start;
+  min-height: 27px;
+  padding: 3px 8px;
+  font-size: 11px;
 }
 
 .spinning {
