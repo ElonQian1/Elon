@@ -66,7 +66,7 @@ v198 在 v195 Settlement Receipt 创建满 72 小时且挑战门卫允许时，�
 - Cargo 编译、v198 迁移执行、HTTP 真实调用、并发和故障注入验证；
 - 定时扫描并自动释放到期 Settlement Receipt；
 - accepted 挑战的纠正、冲正、退款或替换 Settlement Receipt；
-- 提款取消、拒绝、外部已付款证明、提现风控、外部支付或银行清算；
+- 提现风控、真实外部支付、银行清算或外部证据自动核验；
 - Sui、代币、多币种、矿池或其他链上结算。
 
 因此，本实现不能被描述为真实付款或可提现收益已经上线。
@@ -79,4 +79,4 @@ v198 在 v195 Settlement Receipt 创建满 72 小时且挑战门卫允许时，�
 - `server/src/compute_federation_attempt_settlement_release_service.rs`
 - `server/src/compute_federation_attempt_settlement_release_api.rs`
 
-上游待结算、挑战和决议分别见 `docs/distributed-compute/attempt-settlement-api.md`、`docs/distributed-compute/attempt-settlement-challenge-api.md` 与 `docs/distributed-compute/attempt-settlement-challenge-resolution-api.md`。下游提款申请见 `docs/distributed-compute/settlement-withdrawal-request-api.md`。
+上游待结算、挑战和决议分别见 `docs/distributed-compute/attempt-settlement-api.md`、`docs/distributed-compute/attempt-settlement-challenge-api.md` 与 `docs/distributed-compute/attempt-settlement-challenge-resolution-api.md`。下游提款申请与终态分别见 `docs/distributed-compute/settlement-withdrawal-request-api.md` 和 `docs/distributed-compute/settlement-withdrawal-terminal-api.md`。

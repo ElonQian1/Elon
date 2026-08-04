@@ -52,7 +52,7 @@ Provider 所有者可把本人结算账户中的一笔 CNY `available` 余额原
 - Withdrawal Request Posting 与两条不可变账本腿写入；
 - Provider 版本引用、请求 JSON、回执 JSON、请求摘要和事件摘要写入。
 
-任一步失败时全部回滚。读取时重新核对历史 Provider 版本、所有权、Posting 摘要、两条账本腿、历史余额快照，以及当前 available/withdrawn 是否可由 v198 Release 与 v200 Withdrawal Request 的不可变账本重建。
+任一步失败时全部回滚。读取时重新核对历史 Provider 版本、所有权、Posting 摘要、两条账本腿、历史余额快照，以及当前 available/withdrawn 是否可由 v198 Release、v200 Withdrawal Request 与可选 v201 Terminal 的不可变账本重建。
 
 ## 5. 状态语义
 
@@ -63,14 +63,13 @@ v200 回执固定声明：
 - `fund_effect=provider_available_moved_to_withdrawn_reserve`；
 - `external_transfer_effect=not_executed`。
 
-后续终态必须使用独立追加式记录表达取消、拒绝或“管理员登记外部付款证据”，不得改写 v200 申请，也不得把管理员声明伪装成链上或银行系统的自动证明。
+v201 使用独立追加式记录表达取消、拒绝或“管理员登记外部付款证据”，不改写 v200 申请，也不把管理员声明伪装成链上或银行系统的自动证明。边界见 `docs/distributed-compute/settlement-withdrawal-terminal-api.md`。
 
 ## 6. 尚未实现
 
 - Cargo 编译、v200 迁移执行、HTTP 真实调用、并发与故障注入验证；
-- Provider 主动取消、管理员拒绝及其 withdrawn 到 available 原子返还；
-- 管理员登记外部付款证据和唯一终态；
 - 自动银行打款、支付机构清算、钱包签名或 Sui 链上提交；
+- 外部付款证据自动拉取、签名验证或链上确认；
 - 提现风控、KYC、多币种、手续费、税务、生产密钥和对账文件。
 
 因此，v200 不能被描述为“真实提现已经完成”。
@@ -83,4 +82,4 @@ v200 回执固定声明：
 - `server/src/compute_federation_settlement_withdrawal_request_service.rs`
 - `server/src/compute_federation_settlement_withdrawal_request_api.rs`
 
-上游 pending 到 available 释放见 `docs/distributed-compute/attempt-settlement-release-api.md`。
+上游 pending 到 available 释放见 `docs/distributed-compute/attempt-settlement-release-api.md`，下游唯一终态见 `docs/distributed-compute/settlement-withdrawal-terminal-api.md`。
