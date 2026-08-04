@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Price Snapshot 控制面
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: backend, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-本人 HTTP 和项目级 MCP 已写入代码，可基于当前 active Offer 发布或读取一份服务端规范化的不可变 Price Snapshot。代码尚未编译、执行 v171 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。
+本人 HTTP、项目级 MCP 和 PC 工作区已写入代码，可基于当前 active Offer 发布或读取一份服务端规范化的不可变 Price Snapshot。代码尚未编译、执行 v171 迁移、运行 HTTP/MCP 验证或发布页面，状态固定为 `implementation_uncompiled`。
 
 首版来源固定为 `fallback_curve`：它冻结 Offer 已声明的价格组件和费用规则，使现有 Job 候选查询可以发现该报价，但不代表真实成交价、指数价格、市场 mark 或期货曲线。
 
@@ -26,6 +26,12 @@ implementation_status: implementation_uncompiled
 | MCP 只读 | `compute_list_my_price_snapshots` | 按稳定顺序列出本人 Offer 的快照 |
 
 接口要求一龙用户会话，并复用 Offer 所有权检查。项目成员身份不能越权发布他人的报价。
+
+### PC 入口
+
+本人在 `/compute-supply` 的 Offer 详情中读取报价历史；只有当前 active Offer 显示发布入口。表单要求选择 Offer 自带的交付窗口，以币种金额填写消费者和 Provider 上限，并在本地精确转换为整数微单位；TTL、舍入方式、当前 Offer 版本与摘要、单次稳定幂等键和人工确认一并提交。返回结果展示来源、双方金额上限、失效时间和不可变摘要。
+
+页面只提供本人控制面，不代替服务端重新核验所有权、active 状态、窗口、金额关系和有效期。关闭表单后再次创建会得到新的幂等键；同一次打开和重试保留原键，避免网络重试生成重复快照。
 
 ## 3. 请求与服务端固定字段
 
