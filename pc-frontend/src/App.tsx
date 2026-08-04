@@ -24,6 +24,7 @@ const LocalTasksPage = lazy(() => import('./features/local-tasks/LocalTasksPage'
 const ComputeSettlementPage = lazy(() => import('./features/compute-settlement/ComputeSettlementPage'))
 const MyComputeSettlementPage = lazy(() => import('./features/compute-settlement/MyComputeSettlementPage'))
 const ComputeSupplyPage = lazy(() => import('./features/compute-supply/ComputeSupplyPage'))
+const ComputeActivationAdminPage = lazy(() => import('./features/compute-activation/ComputeActivationAdminPage'))
 
 function RouteFallback() {
   return <div className={styles.routeFallback} role="status" aria-label="正在加载页面" />
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="compute-settlement" element={lazyRoute(<ComputeSettlementPage />)} />
         <Route path="my-compute-settlement" element={lazyRoute(<MyComputeSettlementPage />)} />
         <Route path="compute-supply" element={lazyRoute(<ComputeSupplyPage />)} />
+        <Route path="compute-activation" element={lazyRoute(<ComputeActivationAdminPage />)} />
         <Route path="voice" element={lazyRoute(<VoicePage />)} />
         <Route path="doctor" element={lazyRoute(<DoctorPage />)} />
         <Route path="node/public-dev-smoke" element={lazyRoute(<PublicDevSmokePage />)} />

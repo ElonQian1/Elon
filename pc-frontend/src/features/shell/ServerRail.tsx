@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Bot, Boxes, CircleDollarSign, Gauge, GitBranch, HardDrive, Landmark, MonitorCog, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
+import { Bot, Boxes, CircleDollarSign, FileCheck2, Gauge, GitBranch, HardDrive, Landmark, MonitorCog, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -37,6 +37,10 @@ const SETTLEMENT_ITEM: RailItem = {
   path: '/compute-settlement', Icon: Landmark, label: '算力结算', color: '#2d3431', hoverColor: '#37433e',
 }
 
+const ACTIVATION_ITEM: RailItem = {
+  path: '/compute-activation', Icon: FileCheck2, label: '算力激活审核', color: '#30333b', hoverColor: '#3b414d',
+}
+
 export default function ServerRail() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -45,7 +49,7 @@ export default function ServerRail() {
   const presence = useMyPresence(!localMode)
   const [tooltip, setTooltip] = useState<{ text: string; y: number } | null>(null)
   const railItems = user && ['admin', 'owner'].includes(user.role ?? '')
-    ? [...RAIL_ITEMS, SETTLEMENT_ITEM]
+    ? [...RAIL_ITEMS, ACTIVATION_ITEM, SETTLEMENT_ITEM]
     : RAIL_ITEMS
 
   // 项目列表（从 store 读取，实时响应）
