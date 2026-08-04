@@ -161,7 +161,7 @@ fn create_plan(root: &Path, arguments: &Value) -> Result<Value> {
     } else {
         "OPEN_SESSION"
     };
-    let actions = build_actions(session_action, task_id.is_some());
+    let actions = build_actions(session_action);
     let now = chrono::Utc::now().to_rfc3339();
     let plan = DesignIntentPlan {
         schema_version: 1,
@@ -213,7 +213,7 @@ fn persist(root: &Path, plan: &DesignIntentPlan) -> Result<()> {
     Ok(())
 }
 
-fn build_actions(session_action: &str, bind_task: bool) -> Vec<IntentAction> {
+fn build_actions(session_action: &str) -> Vec<IntentAction> {
     let mut specs = vec![
         (
             session_action,
@@ -232,14 +232,12 @@ fn build_actions(session_action: &str, bind_task: bool) -> Vec<IntentAction> {
             false,
         ),
     ];
-    if bind_task {
-        specs.push((
-            "BIND_TASK",
-            "ui_bind_design_task",
-            "让 PC 和后台消费者跟随同一 AI task",
-            false,
-        ));
-    }
+    specs.push((
+        "BIND_TASK",
+        "ui_bind_design_task",
+        "获得 taskId 后让 PC 和后台消费者跟随同一 AI task",
+        false,
+    ));
     specs.extend([
         (
             "SELECT_NODE",

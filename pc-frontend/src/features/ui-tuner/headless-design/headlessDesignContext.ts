@@ -16,6 +16,12 @@ import type {
   SemanticUiNode,
   TauriBehaviorEvidence,
 } from './types'
+import type {
+  DesignBindingHealth,
+  DesignEventCheckpoint,
+  DesignIntentPlan,
+  DesignWritebackPlan,
+} from './designPlanningTypes'
 
 export function buildHeadlessDesignContext(input: {
   projectRoot: string
@@ -31,11 +37,15 @@ export function buildHeadlessDesignContext(input: {
   verificationMatrix: DesignVerificationMatrix | null
   draftPreview: DesignDraftPreviewResult | null
   sourceBindingCandidates: DesignSourceBindingCandidate[]
+  intentPlan: DesignIntentPlan | null
+  bindingHealth: DesignBindingHealth | null
+  writebackPlan: DesignWritebackPlan | null
   liveFollow: {
     active: boolean
     taskId: string
     binding: DesignTaskBinding | null
     cursor: string
+    checkpoint: DesignEventCheckpoint | null
     latestEvents: DesignEvent[]
     lastSyncedAt: string
     error: string
@@ -43,7 +53,7 @@ export function buildHeadlessDesignContext(input: {
 }): UiTunerCodexContextPack {
   const { projectRoot, target, session, surface, selectedNode, designDraft, writebackReceipt,
     capabilities, browserRuntime, tauriBehavior, verificationMatrix,
-    draftPreview, sourceBindingCandidates, liveFollow } = input
+    draftPreview, sourceBindingCandidates, intentPlan, bindingHealth, writebackPlan, liveFollow } = input
   const viewport = surface?.surface?.viewport ?? session?.viewport ?? { width: 1280, height: 800, deviceScaleFactor: 1 }
   const sourceRoots = target?.sourceRoots ?? []
   const configFiles = target?.configFiles ?? []
@@ -151,11 +161,15 @@ export function buildHeadlessDesignContext(input: {
       verificationMatrix: verificationMatrix ?? undefined,
       draftPreview: draftPreview ?? undefined,
       sourceBindingCandidates: sourceBindingCandidates.slice(0, 8),
+      intentPlan: intentPlan ?? undefined,
+      bindingHealth: bindingHealth ?? undefined,
+      writebackPlan: writebackPlan ?? undefined,
       liveFollow: {
         active: liveFollow.active,
         taskId: liveFollow.taskId || undefined,
         binding: liveFollow.binding ?? undefined,
         cursor: liveFollow.cursor || undefined,
+        checkpoint: liveFollow.checkpoint ?? undefined,
         latestEvents: liveFollow.latestEvents.slice(-8),
         lastSyncedAt: liveFollow.lastSyncedAt || undefined,
         error: liveFollow.error || undefined,

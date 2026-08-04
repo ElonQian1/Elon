@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   bindDesignTask,
+  commitDesignEventCheckpoint,
+  getDesignEventCheckpoint,
   getDesignTaskBinding,
   listDesignEvents,
   renewDesignTaskBinding,
   settleDesignTaskBinding,
 } from './designSessionApi'
+import type { DesignEventCheckpoint } from './designPlanningTypes'
 import type { DesignEvent, DesignTaskBinding } from './types'
+
+const CHECKPOINT_CONSUMER_ID = 'pc-ui-tuner'
 
 export interface DesignTaskActivity {
   running: boolean
@@ -27,33 +32,55 @@ export function useDesignTaskEventSync(input: Input) {
   const [binding, setBinding] = useState<DesignTaskBinding | null>(null)
   const [cursor, setCursor] = useState('')
   const [latestEvents, setLatestEvents] = useState<DesignEvent[]>([])
+  const [checkpoint, setCheckpoint] = useState<DesignEventCheckpoint | null>(null)
   const [lastSyncedAt, setLastSyncedAt] = useState('')
   const [error, setError] = useState('')
   const cursorRef = useRef('')
+  const checkpointRevisionRef = useRef(0)
+  const checkpointSupportedRef = useRef(true)
   const taskIdRef = useRef('')
+  const designSessionIdRef = useRef(input.designSessionId)
+  const draftIdRef = useRef(input.draftId)
+  designSessionIdRef.current = input.designSessionId
+  draftIdRef.current = input.draftId
 
   const follow = useCallback(async (nextTaskId: string) => {
     taskIdRef.current = nextTaskId
     cursorRef.current = ''
-    setTaskId(nextTaskId)
+    checkpointRevisionRef.current = 0
+    checkpointSupportedRef.current = true
+    setTaskId('')
     setBinding(null)
     setCursor('')
+    setCheckpoint(null)
     setLatestEvents([])
     setError('')
-    if (!input.designSessionId) return
     try {
-      const result = await bindDesignTask({
-        projectRoot: input.projectRoot,
-        taskId: nextTaskId,
-        designSessionId: input.designSessionId,
-        draftId: input.draftId,
-        leaseSeconds: 900,
-      })
-      setBinding(result.binding ?? null)
+      const restored = await getDesignEventCheckpoint(input.projectRoot, CHECKPOINT_CONSUMER_ID, nextTaskId)
+      cursorRef.current = restored.resumeAfterCursor
+      checkpointRevisionRef.current = restored.revision
+      setCursor(restored.resumeAfterCursor)
+      setCheckpoint(restored.checkpoint ?? null)
+    } catch {
+      checkpointSupportedRef.current = false
+    }
+    try {
+      if (designSessionIdRef.current) {
+        const result = await bindDesignTask({
+          projectRoot: input.projectRoot,
+          taskId: nextTaskId,
+          designSessionId: designSessionIdRef.current,
+          draftId: draftIdRef.current,
+          leaseSeconds: 900,
+        })
+        setBinding(result.binding ?? null)
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : '设计任务绑定失败')
+    } finally {
+      if (taskIdRef.current === nextTaskId) setTaskId(nextTaskId)
     }
-  }, [input.designSessionId, input.draftId, input.projectRoot])
+  }, [input.projectRoot])
 
   const settle = useCallback(async (activity: DesignTaskActivity) => {
     const activeBinding = binding?.taskId === activity.taskId ? binding : null
@@ -96,9 +123,6 @@ export function useDesignTaskEventSync(input: Input) {
         })
         if (cancelled) return
         if (page.events.length) {
-          cursorRef.current = page.cursor
-          setCursor(page.cursor)
-          setLatestEvents((previous) => [...previous, ...page.events].slice(-20))
           const designSessionId = [...page.events].reverse()
             .find((event) => event.designSessionId)?.designSessionId ?? binding?.designSessionId
           if (page.events.some((event) => event.eventType === 'TASK_BOUND')) {
@@ -106,7 +130,23 @@ export function useDesignTaskEventSync(input: Input) {
             if (!cancelled) setBinding(result.binding ?? null)
           }
           await input.reload(designSessionId ?? undefined)
-          if (!cancelled) setLastSyncedAt(new Date().toISOString())
+          if (!cancelled) {
+            if (checkpointSupportedRef.current) {
+              const committed = await commitDesignEventCheckpoint({
+                projectRoot: input.projectRoot,
+                consumerId: CHECKPOINT_CONSUMER_ID,
+                taskId,
+                cursor: page.cursor,
+                expectedRevision: checkpointRevisionRef.current,
+              })
+              checkpointRevisionRef.current = committed.checkpoint.revision
+              setCheckpoint(committed.checkpoint)
+            }
+            cursorRef.current = page.cursor
+            setCursor(page.cursor)
+            setLatestEvents((previous) => [...previous, ...page.events].slice(-20))
+            setLastSyncedAt(new Date().toISOString())
+          }
         }
         if (!cancelled) setError('')
       } catch (reason) {
@@ -137,7 +177,7 @@ export function useDesignTaskEventSync(input: Input) {
   }, [binding, input.active, input.projectRoot, taskId])
 
   return {
-    active: Boolean(taskId), taskId, binding, cursor, latestEvents,
+    active: Boolean(taskId), taskId, binding, cursor, checkpoint, latestEvents,
     lastSyncedAt, error, onTaskActivityChange,
   }
 }

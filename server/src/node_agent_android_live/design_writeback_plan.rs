@@ -121,6 +121,9 @@ fn plan(session: &LiveUiSession, draft_id: &str) -> Result<Value> {
     let health = design_binding_health::evaluate_draft(session, &draft)?;
     let platforms = strings(draft.get("targetPlatforms"));
     let operations = operation_views(&draft);
+    if operations.is_empty() {
+        bail!("DESIGN_WRITEBACK_PLAN_EMPTY：草稿没有可写回的 DraftOperation");
+    }
     let range = source_binding
         .and_then(|value| value.get("range"))
         .filter(|value| !value.is_null())

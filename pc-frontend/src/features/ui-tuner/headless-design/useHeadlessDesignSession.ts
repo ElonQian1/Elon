@@ -211,6 +211,29 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     }
   }, [query, readSurface])
 
+  const prepareIntentTarget = useCallback(async (nextPlatform: DesignPlatform, nextRoute: string) => {
+    const normalizedRoute = normalizeRoute(nextRoute)
+    const reusable = sessions.find((item) => item.platform === nextPlatform && item.route === normalizedRoute)
+    setPlatform(nextPlatform)
+    setViewport(reusable?.viewport ?? DEFAULT_VIEWPORT[nextPlatform])
+    setRoute(normalizedRoute)
+    setUrl(reusable?.url ?? '')
+    if (reusable) {
+      setSession(reusable)
+      await readSurface(reusable.designSessionId, query)
+      return
+    }
+    setSession(null)
+    setSurface(null)
+    selectedNodeRef.current = null
+    setSelectedNode(null)
+    setDesignDraft(null)
+    setWritebackReceipt(null)
+    clearPixel()
+    clearNativePixel()
+    setTauriRuntimeStatus('')
+  }, [clearNativePixel, clearPixel, query, readSurface, sessions])
+
   const open = useCallback(async () => {
     if (!projectRoot) throw new Error('当前项目缺少本机工作区路径')
     const next = await openDesignSession({
@@ -394,12 +417,17 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     }
   }, [designDraft, projectRoot])
 
-  const beginDraftWriteback = useCallback(async () => {
+  const beginDraftWriteback = useCallback(async (writebackPlanId: string) => {
     if (!designDraft) return
     setBusy(true)
     setError('')
     try {
-      const result = await beginDesignWriteback({ projectRoot, draftId: designDraft.draftId, expectedRevision: designDraft.revision })
+      const result = await beginDesignWriteback({
+        projectRoot,
+        draftId: designDraft.draftId,
+        expectedRevision: designDraft.revision,
+        writebackPlanId,
+      })
       setDesignDraft(result.draft)
       setWritebackReceipt(result.receipt)
       setStatus(`已固定 ${result.receipt.sourceRevisionBefore.slice(0, 12)} 的写回基线；等待 AI 修改源码和提交分平台证据`)
@@ -433,7 +461,7 @@ export function useHeadlessDesignSession(active: boolean, projectRoot: string) {
     selectedNode, drafts, designDraft, writebackReceipt, query, pixelUrl, nativePixelUrl,
     tauriRuntimeStatus, busy, status, error,
     setRoute, setUrl, setViewport, setQuery, setSelectedNode: selectNode,
-    selectPlatform, selectSession, capture, interactSelected, prepareTauri, captureTauri,
+    selectPlatform, selectSession, prepareIntentTarget, capture, interactSelected, prepareTauri, captureTauri,
     stopTauri, saveDraftPatch, undoDraft, beginDraftWriteback, search, reload: load,
   }
 }

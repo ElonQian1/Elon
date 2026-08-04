@@ -50,6 +50,7 @@ interface UiTunerProjectSessionPanelProps {
   conversationLayout?: 'drawer' | 'panel'
   defaultConversationOpen?: boolean
   onTaskActivityChange?: (activity: UiTunerTaskActivity) => Promise<void> | void
+  onDesignIntentPlan?: (intent: string) => Promise<string | void>
 }
 
 export interface UiTunerTaskActivity {
@@ -83,6 +84,7 @@ export function UiTunerProjectSessionPanel({
   conversationLayout = 'drawer',
   defaultConversationOpen = false,
   onTaskActivityChange,
+  onDesignIntentPlan,
 }: UiTunerProjectSessionPanelProps) {
   const [nodeAdminUrl, setNodeAdminUrl] = useState(uiTunerNodeAdminUrl)
   const user = useAuthStore((state) => state.user)
@@ -307,7 +309,7 @@ export function UiTunerProjectSessionPanel({
     let taskActivityStarted = false
     let activityTaskId = ''
     try {
-      const taskIntent = overrideIntent?.trim() || intent.trim() || '继续优化微调画布和 APK UI 标准闭环。'
+      const requestedIntent = overrideIntent?.trim() || intent.trim() || '继续优化微调画布和 APK UI 标准闭环。'
       const activePack = options?.contextPack ?? pack
       if (!activePack) {
         setStatus('当前 UI 草稿缺少 AI Context Artifact，无法启动源码接力')
@@ -321,6 +323,15 @@ export function UiTunerProjectSessionPanel({
         setStatus(!executionWorkspace.workspacePath ? '当前 UI 草稿缺少本机源码目录' : localNodeStatusText)
         return null
       }
+      let designPlanInstruction = ''
+      if (!options?.fitRun && onDesignIntentPlan) {
+        try {
+          designPlanInstruction = await onDesignIntentPlan(requestedIntent) ?? ''
+        } catch {
+          // Mixed-version nodes may not expose DesignIntentPlan yet; keep the existing AI handoff usable.
+        }
+      }
+      const taskIntent = [requestedIntent, designPlanInstruction].filter(Boolean).join('\n\n')
       const session = mode === 'fork'
         ? await forkUiTunerConversation({
             projectId: activeProject.id,

@@ -1,0 +1,95 @@
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #292a2d;
+  background: #101115;
+  color: #8c8e95;
+  font-size: 10px;
+}
+
+.summary,
+.actions,
+.plan,
+.plan > div,
+.adapters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.summary strong,
+.plan strong {
+  color: #d8dae1;
+}
+
+.summary span,
+.actions > span,
+.plan > div:first-child span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary em {
+  color: #e4b56b;
+  font-style: normal;
+}
+
+.review button,
+.review input {
+  min-height: 24px;
+  border: 1px solid #35363a;
+  border-radius: 6px;
+  background: #1a1b1e;
+  color: #d9d9dc;
+  font-size: 10px;
+}
+
+.review button {
+  padding: 0 7px;
+  white-space: nowrap;
+}
+
+.review button:disabled {
+  opacity: .42;
+}
+
+.actions > span {
+  flex: 1;
+}
+
+.actions > span[data-ready='true'] {
+  color: #7dd9a6;
+}
+
+.plan input {
+  width: 150px;
+  padding: 0 7px;
+  outline: none;
+}
+
+.plan > div:first-child {
+  flex: 1;
+}
+
+.plan code {
+  color: #737783;
+}
+
+.adapters span {
+  padding: 2px 5px;
+  border: 1px solid #33353a;
+  border-radius: 999px;
+  color: #aeb2bd;
+}
+
+.review > small {
+  color: #686b74;
+}
+
+.error {
+  color: #ff8b8b !important;
+}

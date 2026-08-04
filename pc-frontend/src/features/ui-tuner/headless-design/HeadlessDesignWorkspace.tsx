@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AppWindow,
   Camera,
@@ -18,10 +18,13 @@ import { UiWorkspaceModeBar } from '../workspace/UiWorkspaceModeBar'
 import type { SourcePreviewMode } from '../source-preview/types'
 import { buildHeadlessDesignContext } from './headlessDesignContext'
 import { DesignRuntimeControls } from './DesignRuntimeControls'
+import { DesignPlanningReview } from './DesignPlanningReview'
 import type { DesignPlatform, SemanticUiNode } from './types'
+import type { DesignIntentPlan } from './designPlanningTypes'
 import { useHeadlessDesignSession } from './useHeadlessDesignSession'
 import { useDesignTaskEventSync } from './useDesignTaskEventSync'
 import { useDesignRuntimeControls } from './useDesignRuntimeControls'
+import { useDesignPlanningControls } from './useDesignPlanningControls'
 import styles from './HeadlessDesignWorkspace.module.css'
 
 interface Props {
@@ -43,6 +46,14 @@ const PLATFORM_OPTIONS: Array<{
 
 export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChange }: Props) {
   const model = useHeadlessDesignSession(active, initialProjectRoot)
+  const followIntentPlan = useCallback(async (plan: DesignIntentPlan) => {
+    const reusable = model.sessions.find((item) => item.designSessionId === plan.designSessionId)
+    if (reusable) {
+      await model.selectSession(reusable)
+      return
+    }
+    await model.prepareIntentTarget(plan.primaryPlatform ?? model.platform, plan.route)
+  }, [model])
   const taskFollow = useDesignTaskEventSync({
     active,
     projectRoot: initialProjectRoot,
@@ -58,6 +69,14 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
     initialTauriBehavior: model.surface?.nativeBehavior ?? null,
     onEvidenceChanged: model.reload,
   })
+  const planningControls = useDesignPlanningControls({
+    projectRoot: initialProjectRoot,
+    platform: model.platform,
+    route: model.route,
+    session: model.session,
+    draft: model.designDraft,
+    onPlan: followIntentPlan,
+  })
   const pack = useMemo(() => buildHeadlessDesignContext({
     projectRoot: initialProjectRoot,
     target: model.target,
@@ -72,8 +91,11 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
     verificationMatrix: runtimeControls.verificationMatrix,
     draftPreview: runtimeControls.draftPreview,
     sourceBindingCandidates: runtimeControls.bindingCandidates,
+    intentPlan: planningControls.intentPlan,
+    bindingHealth: planningControls.bindingHealth,
+    writebackPlan: planningControls.writebackPlan,
     liveFollow: taskFollow,
-  }), [initialProjectRoot, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt, runtimeControls.bindingCandidates, runtimeControls.browserResult?.runtime, runtimeControls.capabilities, runtimeControls.draftPreview, runtimeControls.tauriBehavior, runtimeControls.verificationMatrix, taskFollow])
+  }), [initialProjectRoot, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt, planningControls.bindingHealth, planningControls.intentPlan, planningControls.writebackPlan, runtimeControls.bindingCandidates, runtimeControls.browserResult?.runtime, runtimeControls.capabilities, runtimeControls.draftPreview, runtimeControls.tauriBehavior, runtimeControls.verificationMatrix, taskFollow])
   const intent = useMemo(() => [
     `修改 ${model.platform.toUpperCase()} 端 ${model.route || '/'} 页面。`,
     model.selectedNode
@@ -216,6 +238,8 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           model={runtimeControls}
         />
 
+        <DesignPlanningReview model={planningControls} hasDraft={Boolean(model.designDraft)} />
+
         {model.platform === 'tauri' && (
           <div className={styles.tauriBar}>
             <span>原生宿主</span>
@@ -262,7 +286,15 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           <button type="button" disabled={!model.designDraft?.historyDepth || model.busy} onClick={() => void model.undoDraft()}>
             <RotateCcw size={13} aria-hidden="true" />撤销
           </button>
-          <button type="button" disabled={model.designDraft?.sourceBinding?.status !== 'BOUND' || model.busy} onClick={() => void model.beginDraftWriteback()}>
+          <button
+            type="button"
+            disabled={planningControls.writebackPlan?.decision !== 'APPROVED'
+              || planningControls.writebackPlan.draftRevision !== model.designDraft?.revision
+              || !planningControls.bindingHealth?.readyForWriteback
+              || model.busy}
+            onClick={() => planningControls.writebackPlan
+              && void model.beginDraftWriteback(planningControls.writebackPlan.planId)}
+          >
             固定写回基线
           </button>
           <small>
@@ -323,6 +355,7 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           onMutationTaskStarted={() => undefined}
           onTaskSettled={() => { void model.reload() }}
           onTaskActivityChange={taskFollow.onTaskActivityChange}
+          onDesignIntentPlan={planningControls.planIntent}
         />
       </aside>
     </div>

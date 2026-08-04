@@ -25,6 +25,12 @@ import type {
   TauriNativeHostEvidence,
   TauriBehaviorEvidence,
 } from './headless-design/types'
+import type {
+  DesignBindingHealth,
+  DesignEventCheckpoint,
+  DesignIntentPlan,
+  DesignWritebackPlan,
+} from './headless-design/designPlanningTypes'
 
 export interface UiTunerCodexContextPack {
   version: 4
@@ -198,11 +204,15 @@ export interface UiTunerCodexContextPack {
     verificationMatrix?: DesignVerificationMatrix
     draftPreview?: DesignDraftPreviewResult
     sourceBindingCandidates?: DesignSourceBindingCandidate[]
+    intentPlan?: DesignIntentPlan
+    bindingHealth?: DesignBindingHealth
+    writebackPlan?: DesignWritebackPlan
     liveFollow?: {
       active: boolean
       taskId?: string
       binding?: DesignTaskBinding
       cursor?: string
+      checkpoint?: DesignEventCheckpoint
       latestEvents?: DesignEvent[]
       lastSyncedAt?: string
       error?: string
@@ -464,13 +474,14 @@ function buildHeadlessDesignTaskPrompt(pack: UiTunerCodexContextPack, userIntent
     `用户意图：${userIntent.trim() || '请修改当前页面并重新捕获后台证据。'}`,
     '',
     '执行顺序：',
-    '1. 先用 ui_get_design_capabilities 确认已安装节点 schema，再用 ui_list_design_sessions 恢复 designSessionId；不要先操控 PC 桌面。',
-    '2. 结合 route、selector 和 UI tree 调用 ui_suggest_design_source_binding；候选先保持 CANDIDATE，核对文件哈希与范围后才更新为 BOUND。',
-    '3. 若 context pack 含 designDraft，可先用 ui_preview_design_draft / ui_restore_design_draft_preview 对话式查看；预览不修改源码，也不是完成证明。',
-    '4. Web/PWA/Tauri 前端调试优先复用 ui_prepare_design_browser / ui_interact_design_browser 的同一页面状态；fill/select 只能引用 fixtureProfile.formValues，禁止在参数中传秘密。',
-    '5. Tauri 原生层按窗口、菜单/对话框、项目插桩 command trace 分层取证；不得点击任意系统菜单或执行任意 Rust command。',
-    '6. 用 ui_complete_design_writeback 提交 changedFiles、源码哈希和各平台 evidence，再读取 ui_get_design_verification_matrix；只有 receipt.complete=true 且矩阵 PASSED 才声明完成。',
-    '7. 明确平台覆盖：只有 nativeHost.nativeHostVerified=true 才能声明 Tauri 原生窗口证据；Android 必须使用 Android Runtime。',
+    '1. 先读取 context pack 的 intentPlan；没有时调用 ui_plan_design_intent，再按 primaryPlatform、route 和 sessionAction 恢复或打开 designSession。',
+    '2. 用 ui_get_design_capabilities 确认已安装节点 schema；通过 task binding、事件 cursor 和 checkpoint 增量跟随，不要先操控 PC 桌面。',
+    '3. 结合 route、selector 和 UI tree 调用 ui_suggest_design_source_binding；候选保持 CANDIDATE，确认 BOUND 后再用 ui_check_design_source_binding 检查文件 SHA 与 range 漂移。',
+    '4. 若 context pack 含 designDraft，可先用 ui_preview_design_draft / ui_restore_design_draft_preview 对话式查看；预览不修改源码，也不是完成证明。',
+    '5. Web/PWA/Tauri 前端调试优先复用 ui_prepare_design_browser / ui_interact_design_browser 的同一页面状态；fill/select 只能引用 fixtureProfile.formValues，禁止在参数中传秘密。',
+    '6. 源码写回前必须调用 ui_plan_design_writeback，审查每个平台适配器和风险，再显式 APPROVE；只有批准且未漂移的 planId 才能 ui_begin_design_writeback。',
+    '7. 用 ui_complete_design_writeback 提交 changedFiles、源码哈希和各平台 evidence，再读取 ui_get_design_verification_matrix；只有 receipt.complete=true 且矩阵 PASSED 才声明完成。',
+    '8. 明确平台覆盖：只有 nativeHost.nativeHostVerified=true 才能声明 Tauri 原生窗口证据；Android 必须使用 Android Runtime。',
     '',
     'Compact context pack JSON:',
     '```json',
