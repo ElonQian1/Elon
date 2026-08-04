@@ -49,7 +49,7 @@ impl Store {
                     superseded_by_user_id=?2, supersede_reason=?3, updated_at=?1
               WHERE request_id=?4 AND status='approved' AND request_digest=?5",
             params![
-                superseded_at,
+                superseded_at.as_str(),
                 input.actor_user_id.trim(),
                 input.reason.trim(),
                 input.request_id.trim(),
@@ -59,6 +59,12 @@ impl Store {
         if changed != 1 {
             bail!("激活证据申请状态已并发变化");
         }
+        tx.execute(
+            "UPDATE compute_activation_plans
+                SET status='superseded', superseded_at=?1, updated_at=?1
+              WHERE request_id=?2 AND status='prepared'",
+            params![superseded_at.as_str(), input.request_id.trim()],
+        )?;
         let request = request_on(&tx, input.request_id.trim())?
             .ok_or_else(|| anyhow!("激活证据申请废止后无法读取"))?;
         tx.commit()?;

@@ -60,7 +60,7 @@ impl Store {
     }
 }
 
-fn current_capacity_pool_on(
+pub(super) fn current_capacity_pool_on(
     conn: &Connection,
     pool_id: &str,
 ) -> Result<Option<ComputeCapacityPool>> {

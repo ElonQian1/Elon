@@ -14,6 +14,7 @@ use crate::{
     compute_federation_activation_lifecycle_service::{
         self, SupersedeComputeActivationEvidenceRequestBody,
     },
+    compute_federation_activation_plan_service::{self, PrepareComputeActivationPlanBody},
     compute_federation_activation_service::{
         self, CancelMyComputeActivationEvidenceRequest, ReviewComputeActivationEvidenceRequestBody,
         SubmitMyComputeActivationEvidenceRequest,
@@ -55,6 +56,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/activation-evidence-requests/:request_id/supersede",
             post(supersede_request),
+        )
+        .route(
+            "/api/admin/compute/activation-evidence-requests/:request_id/activation-plan",
+            get(get_activation_plan).post(prepare_activation_plan),
         )
 }
 
@@ -236,6 +241,40 @@ async fn supersede_request(
             &request_id,
             request,
         ),
+    )
+}
+
+async fn prepare_activation_plan(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+    Json(request): Json<PrepareComputeActivationPlanBody>,
+) -> Response {
+    let actor_user_id = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    activation_response(
+        compute_federation_activation_plan_service::prepare_for_review(
+            &state.store,
+            &actor_user_id,
+            &request_id,
+            request,
+        ),
+    )
+}
+
+async fn get_activation_plan(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    activation_response(
+        compute_federation_activation_plan_service::get_for_review(&state.store, &request_id)
+            .map(|plan| json!({"activation_plan":plan,"activation_effect":"none"})),
     )
 }
 

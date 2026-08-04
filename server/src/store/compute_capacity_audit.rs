@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use anyhow::{bail, Result};
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 
 use crate::compute_federation::capacity::{ComputeCapacityBucketBalance, ComputeCapacityMeterMode};
 
@@ -56,6 +57,14 @@ impl Store {
             bail!("容量池 epoch 必须为正整数");
         }
         let conn = self.conn()?;
+        Self::audit_compute_capacity_pool_epoch_on(&conn, pool_id.trim(), capacity_epoch)
+    }
+
+    pub(super) fn audit_compute_capacity_pool_epoch_on(
+        conn: &rusqlite::Connection,
+        pool_id: &str,
+        capacity_epoch: i64,
+    ) -> Result<ComputeCapacityPoolAuditReport> {
         let pool = conn
             .query_row(
                 "SELECT status, current_capacity_epoch
@@ -66,9 +75,9 @@ impl Store {
             .optional()?
             .ok_or_else(|| anyhow::anyhow!("容量池不存在"))?;
         let stored_buckets =
-            stored_buckets_for_pool_epoch_on(&conn, pool_id.trim(), capacity_epoch)?;
-        let transactions = read_transactions(&conn, pool_id.trim(), capacity_epoch)?;
-        let legs = read_ledger_legs(&conn, pool_id.trim(), capacity_epoch)?;
+            stored_buckets_for_pool_epoch_on(conn, pool_id.trim(), capacity_epoch)?;
+        let transactions = read_transactions(conn, pool_id.trim(), capacity_epoch)?;
+        let legs = read_ledger_legs(conn, pool_id.trim(), capacity_epoch)?;
 
         let mut issues = Vec::new();
         if stored_buckets.is_empty() {
@@ -187,6 +196,17 @@ impl Store {
             issues,
         })
     }
+}
+
+pub(crate) fn stable_compute_capacity_pool_audit_digest(
+    report: &ComputeCapacityPoolAuditReport,
+) -> Result<String> {
+    let mut value = serde_json::to_value(report)?;
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("容量池账本审计结果不是对象"))?;
+    object.remove("checked_at");
+    Ok(hex::encode(Sha256::digest(serde_json::to_vec(&value)?)))
 }
 
 struct TransactionAuditRow {

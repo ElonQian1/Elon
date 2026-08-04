@@ -452,6 +452,10 @@ fn status_transition_allowed(current: &str, next: &str) -> bool {
         )
 }
 
+pub(crate) fn validate_compute_provider_contract(provider: &ComputeProvider) -> Result<()> {
+    validate_provider(provider)
+}
+
 fn validate_provider(provider: &ComputeProvider) -> Result<()> {
     if provider.schema != COMPUTE_PROVIDER_SCHEMA {
         bail!("算力提供者 schema 不受支持");

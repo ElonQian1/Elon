@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -13,8 +13,8 @@ use crate::{
         ACTIVATION_REQUEST_STATUS_APPROVED,
     },
     store::{
-        ComputeCapacityPoolAuditReport, ReviewComputeActivationEvidenceRequest, Store,
-        SubmitComputeActivationEvidenceRequest,
+        stable_compute_capacity_pool_audit_digest, ComputeCapacityPoolAuditReport,
+        ReviewComputeActivationEvidenceRequest, Store, SubmitComputeActivationEvidenceRequest,
     },
 };
 
@@ -118,7 +118,7 @@ pub(crate) fn submit_for_user(
         bail!("只有 registering CapacityPool 可以提交激活证据申请");
     }
     let audit = healthy_current_audit(store, pool_id, pool.binding.capacity_epoch)?;
-    let ledger_audit_digest = stable_audit_digest(&audit)?;
+    let ledger_audit_digest = stable_compute_capacity_pool_audit_digest(&audit)?;
 
     store.submit_compute_activation_evidence_request(SubmitComputeActivationEvidenceRequest {
         provider_id: provider_id.to_string(),
@@ -244,7 +244,7 @@ pub(crate) fn review(
     })
 }
 
-fn validate_approval_dependencies(
+pub(crate) fn validate_approval_dependencies(
     store: &Store,
     request: &ComputeActivationEvidenceRequest,
 ) -> Result<()> {
@@ -266,7 +266,7 @@ fn validate_approval_dependencies(
         bail!("CapacityPool 归属、状态或版本已变化，不能批准当前证据申请");
     }
     let audit = healthy_current_audit(store, &request.pool_id, request.expected_capacity_epoch)?;
-    if stable_audit_digest(&audit)? != request.ledger_audit_digest {
+    if stable_compute_capacity_pool_audit_digest(&audit)? != request.ledger_audit_digest {
         bail!("CapacityPool 账本审计结果已变化，不能批准当前证据申请");
     }
     Ok(())
@@ -308,7 +308,8 @@ fn activation_preflight(
     let pool_status_registering = pool.status == ComputeCapacityPoolStatus::Registering;
     let ledger_audit_healthy =
         audit.healthy && audit.current_capacity_epoch == request.expected_capacity_epoch;
-    let ledger_audit_digest_matches = stable_audit_digest(&audit)? == request.ledger_audit_digest;
+    let ledger_audit_digest_matches =
+        stable_compute_capacity_pool_audit_digest(&audit)? == request.ledger_audit_digest;
 
     let mut blockers = Vec::new();
     block_unless(&mut blockers, request_approved, "request_not_approved");
@@ -416,15 +417,6 @@ fn healthy_current_audit(
         bail!("CapacityPool 当前 epoch 的账本审计未通过");
     }
     Ok(audit)
-}
-
-fn stable_audit_digest(report: &ComputeCapacityPoolAuditReport) -> Result<String> {
-    let mut value = serde_json::to_value(report).context("容量池账本审计结果无法序列化")?;
-    let object = value
-        .as_object_mut()
-        .ok_or_else(|| anyhow::anyhow!("容量池账本审计结果不是对象"))?;
-    object.remove("checked_at");
-    digest_value(&value)
 }
 
 fn idempotency_scope(user_id: &str, provider_id: &str, pool_id: &str) -> Result<String> {

@@ -26,6 +26,7 @@ mod codex_vault_sharing_regression_tests;
 pub(crate) mod codex_vault_usage_estimation;
 mod common;
 mod compute_activation_lifecycle;
+mod compute_activation_plans;
 mod compute_activation_requests;
 mod compute_broker_reservation;
 mod compute_capacity_audit;
@@ -232,6 +233,7 @@ use common::{
     safe_external_id, validate_password, verify_password,
 };
 pub(crate) use compute_activation_lifecycle::SupersedeComputeActivationEvidenceRequest;
+pub(crate) use compute_activation_plans::PrepareComputeActivationPlan;
 pub(crate) use compute_activation_requests::{
     ReviewComputeActivationEvidenceRequest, SubmitComputeActivationEvidenceRequest,
 };
@@ -240,7 +242,8 @@ pub(crate) use compute_broker_reservation::{
     FinishComputeBrokerRequest, ReserveComputeBrokerRequest,
 };
 pub(crate) use compute_capacity_audit::{
-    ComputeCapacityBucketAudit, ComputeCapacityDerivedBalance, ComputeCapacityPoolAuditReport,
+    stable_compute_capacity_pool_audit_digest, ComputeCapacityBucketAudit,
+    ComputeCapacityDerivedBalance, ComputeCapacityPoolAuditReport,
 };
 pub(crate) use compute_capacity_bucket_queries::ComputeCapacityBucketRead;
 pub(crate) use compute_capacity_claim_transitions::{
@@ -273,6 +276,7 @@ pub(crate) use compute_job_registry::ComputeJobRegistrationReceipt;
 pub use compute_metering::ComputeMeterEvent;
 pub(crate) use compute_offer_registry::ComputeOfferRegistrationReceipt;
 pub(crate) use compute_price_snapshot_registry::ComputePriceSnapshotRegistrationReceipt;
+pub(crate) use compute_provider_registry::validate_compute_provider_contract;
 pub(crate) use compute_provider_registry::ComputeProviderRegistrationReceipt;
 pub(crate) use compute_quote_candidates::ComputeJobQuoteCandidatePage;
 pub(crate) use compute_reservation_registry::ComputeReservationRegistrationReceipt;
