@@ -12,8 +12,11 @@ use serde::Serialize;
 
 use super::{now, Store};
 
+mod release;
 mod reserve;
 
+use release::release_billing_call_compat_on;
+pub(super) use release::release_billing_call_reservation_on;
 use reserve::reserve_billing_call_compat_on;
 pub(super) use reserve::reserve_billing_call_until_on;
 
@@ -296,45 +299,11 @@ impl Store {
         compute_call_id: &str,
         status: &str,
     ) -> Result<Option<BillingReservationOutcome>> {
-        let compute_call_id = normalize_compute_call_id(compute_call_id)?;
-        let release_status = normalize_release_status(status);
-        let ts = now();
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction()?;
-        let existing = tx
-            .query_row(
-                "SELECT id, reserved_fen
-                 FROM billing_reservations
-                 WHERE user_id = ?1 AND compute_call_id = ?2 AND status = 'reserved'",
-                params![user_id, compute_call_id],
-                |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
-            )
-            .optional()?;
-        let Some((reservation_id, reserved_fen)) = existing else {
-            tx.commit()?;
-            return Ok(None);
-        };
-
-        let balance_after = refund_reserved_fen(&tx, user_id, reserved_fen, &ts)?;
-        tx.execute(
-            "UPDATE billing_reservations
-             SET status = ?2,
-                 refunded_fen = reserved_fen,
-                 balance_after_fen = ?3,
-                 updated_at = ?4
-             WHERE id = ?1 AND status = 'reserved'",
-            params![reservation_id, release_status, balance_after, ts],
-        )?;
+        let outcome = release_billing_call_compat_on(&tx, user_id, compute_call_id, status)?;
         tx.commit()?;
-
-        Ok(Some(BillingReservationOutcome {
-            reservation_id,
-            compute_call_id,
-            reserved_fen,
-            balance_after_fen: Some(balance_after),
-            status: release_status.to_string(),
-            deduplicated: false,
-        }))
+        Ok(outcome)
     }
 
     fn release_held_billing_call(
