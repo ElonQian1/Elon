@@ -74,28 +74,37 @@ impl Store {
         &self,
         offer: &ComputeOffer,
     ) -> Result<ComputeOfferRegistrationReceipt> {
+        let mut conn = self.conn()?;
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let receipt = self.register_compute_offer_on(&tx, offer)?;
+        tx.commit()?;
+        Ok(receipt)
+    }
+
+    pub(crate) fn register_compute_offer_on(
+        &self,
+        conn: &Connection,
+        offer: &ComputeOffer,
+    ) -> Result<ComputeOfferRegistrationReceipt> {
         if offer.offer_id.trim().is_empty() || offer.offer_version <= 0 {
             bail!("算力 Offer ID 或版本无效");
         }
         let offer_json = serde_json::to_string(offer)?;
-        let mut conn = self.conn()?;
-        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let current = current_offer_projection_on(&tx, offer.offer_id.trim())?;
+        let current = current_offer_projection_on(conn, offer.offer_id.trim())?;
 
         if let Some(current) = current {
             let current_version =
-                offer_version_on(&tx, offer.offer_id.trim(), current.current_offer_version)?
+                offer_version_on(conn, offer.offer_id.trim(), current.current_offer_version)?
                     .ok_or_else(|| anyhow!("算力 Offer 当前历史版本缺失，拒绝继续写入"))?;
-            audited_offer_on(&tx, Some(&current), &current_version)?;
+            audited_offer_on(conn, Some(&current), &current_version)?;
 
             if offer.offer_version <= current.current_offer_version {
-                let stored = offer_version_on(&tx, offer.offer_id.trim(), offer.offer_version)?
+                let stored = offer_version_on(conn, offer.offer_id.trim(), offer.offer_version)?
                     .ok_or_else(|| anyhow!("算力 Offer 历史版本缺失，拒绝覆盖"))?;
-                let stored_offer = audited_offer_on(&tx, None, &stored)?;
+                let stored_offer = audited_offer_on(conn, None, &stored)?;
                 if stored.offer_json != offer_json || stored.offer_digest != offer.offer_digest {
                     bail!("相同算力 Offer 版本不能绑定不同合同");
                 }
-                tx.commit()?;
                 return Ok(ComputeOfferRegistrationReceipt {
                     offer: stored_offer,
                     provider_policy_revision: stored.provider_policy_revision,
@@ -109,18 +118,18 @@ impl Store {
                 OFFER_STATUS_EXPIRED | OFFER_STATUS_REVOKED
             ) {
                 registered_provider_version_on(
-                    &tx,
+                    conn,
                     &current_version.provider_id,
                     current_version.provider_policy_revision,
                 )?
                 .ok_or_else(|| anyhow!("算力 Offer 当前版本的 Provider 历史版本不存在"))?
             } else {
-                current_registered_provider_on(&tx, offer.provider_id.trim())?
+                current_registered_provider_on(conn, offer.provider_id.trim())?
                     .ok_or_else(|| anyhow!("算力 Offer Provider 不存在"))?
             };
             validate_offer_contract(offer, &provider.provider)?;
             validate_provider_state_for_publish(offer, &provider.provider.status)?;
-            ensure_offer_capacity_references_on(&tx, offer, true)?;
+            ensure_offer_capacity_references_on(conn, offer, true)?;
             ensure_stable_offer_identity(offer, &current)?;
             if offer.offer_version != current.current_offer_version + 1 {
                 bail!(
@@ -137,8 +146,8 @@ impl Store {
             }
             ensure_version_time_monotonic(&current.current_version_created_at, &offer.created_at)?;
 
-            insert_offer_version(&tx, offer, &offer_json, &provider)?;
-            let updated = tx.execute(
+            insert_offer_version(conn, offer, &offer_json, &provider)?;
+            let updated = conn.execute(
                 "UPDATE compute_offers
                     SET current_offer_version=?1, current_offer_digest=?2,
                         current_provider_policy_revision=?3, current_provider_digest=?4,
@@ -164,7 +173,6 @@ impl Store {
             if updated != 1 {
                 bail!("算力 Offer 当前投影已变化，请基于最新版本重试");
             }
-            tx.commit()?;
             return Ok(ComputeOfferRegistrationReceipt {
                 offer: offer.clone(),
                 provider_policy_revision: provider.provider.policy_revision,
@@ -173,15 +181,15 @@ impl Store {
             });
         }
 
-        let provider = current_registered_provider_on(&tx, offer.provider_id.trim())?
+        let provider = current_registered_provider_on(conn, offer.provider_id.trim())?
             .ok_or_else(|| anyhow!("算力 Offer Provider 不存在"))?;
         validate_offer_contract(offer, &provider.provider)?;
         validate_provider_state_for_publish(offer, &provider.provider.status)?;
-        ensure_offer_capacity_references_on(&tx, offer, true)?;
+        ensure_offer_capacity_references_on(conn, offer, true)?;
         if offer.offer_version != 1 || offer.status != OFFER_STATUS_DRAFT {
             bail!("新算力 Offer 必须以 draft 状态和版本 1 创建");
         }
-        tx.execute(
+        conn.execute(
             "INSERT INTO compute_offers (
                 offer_id, provider_id, provider_kind, sku_id, sku_digest,
                 capacity_pool_id, current_offer_version, current_offer_digest,
@@ -210,8 +218,7 @@ impl Store {
                 now(),
             ],
         )?;
-        insert_offer_version(&tx, offer, &offer_json, &provider)?;
-        tx.commit()?;
+        insert_offer_version(conn, offer, &offer_json, &provider)?;
         Ok(ComputeOfferRegistrationReceipt {
             offer: offer.clone(),
             provider_policy_revision: provider.provider.policy_revision,

@@ -101,6 +101,25 @@ pub(crate) fn get_for_user(
     Ok(offer_view(receipt, false))
 }
 
+pub(crate) fn get_for_review(store: &Store, offer_id: &str) -> Result<MyComputeOfferView> {
+    validate_exact("算力 Offer ID", offer_id, 200)?;
+    store
+        .compute_offer_if_exists(offer_id)?
+        .map(|receipt| offer_view(receipt, false))
+        .ok_or_else(|| anyhow::anyhow!("算力 Offer 不存在"))
+}
+
+pub(crate) fn list_drafts_for_review(
+    store: &Store,
+    limit: usize,
+) -> Result<Vec<MyComputeOfferView>> {
+    Ok(store
+        .list_compute_offer_drafts_for_review(limit)?
+        .into_iter()
+        .map(|receipt| offer_view(receipt, false))
+        .collect())
+}
+
 pub(crate) fn revoke_draft_for_user(
     store: &Store,
     user_id: &str,

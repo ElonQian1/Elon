@@ -63,6 +63,32 @@ impl Store {
             })
             .collect()
     }
+
+    pub(crate) fn list_compute_offer_drafts_for_review(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<ComputeOfferRegistrationReceipt>> {
+        let conn = self.conn()?;
+        let offer_ids = {
+            let mut stmt = conn.prepare(
+                "SELECT offer_id FROM compute_offers
+                  WHERE status='draft'
+                  ORDER BY recorded_at ASC, offer_id ASC
+                  LIMIT ?1",
+            )?;
+            let rows = stmt.query_map(params![limit.clamp(1, 100) as i64], |row| {
+                row.get::<_, String>(0)
+            })?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        offer_ids
+            .into_iter()
+            .map(|offer_id| {
+                current_registered_offer_on(&conn, &offer_id)?
+                    .ok_or_else(|| anyhow::anyhow!("算力 Offer 在审核队列读取期间消失"))
+            })
+            .collect()
+    }
 }
 
 fn validate_offer_id(offer_id: &str) -> Result<()> {
