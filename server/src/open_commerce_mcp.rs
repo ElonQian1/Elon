@@ -203,6 +203,7 @@ async fn mcp_handler(
             tools.extend(crate::open_commerce_business_handoff_mcp::definitions());
             tools.extend(crate::erp_blueprint_mcp_tools::definitions());
             tools.extend(crate::compute_federation_provider_mcp::definitions());
+            tools.extend(crate::compute_federation_capacity_pool_mcp::definitions());
             tools.extend(crate::compute_federation_broker_mcp::definitions());
             Ok(json!({"tools": tools}))
         }
@@ -248,6 +249,14 @@ pub(crate) async fn call_tool(
         .cloned()
         .unwrap_or_else(|| json!({}));
     if let Some(value) = crate::compute_federation_provider_mcp::call_if_handled(
+        store,
+        user_id,
+        name,
+        arguments.clone(),
+    )? {
+        return tool_response(value);
+    }
+    if let Some(value) = crate::compute_federation_capacity_pool_mcp::call_if_handled(
         store,
         user_id,
         name,

@@ -35,6 +35,7 @@ mod compute_capacity_ledger;
 mod compute_capacity_pool_epoch;
 mod compute_capacity_pool_guards;
 mod compute_capacity_pool_lifecycle;
+mod compute_capacity_pool_queries;
 mod compute_capacity_posting;
 mod compute_capacity_registry;
 mod compute_capacity_request_digest;
