@@ -8,7 +8,7 @@ use crate::compute_federation::{
 
 use super::Store;
 
-mod calculation;
+pub(super) mod calculation;
 mod money;
 mod orchestrate;
 mod support;

@@ -9,6 +9,7 @@ use super::{
             settlement_challenge_gate_on, ComputeSettlementChallengeGate,
             COMPUTE_SETTLEMENT_CHALLENGE_WINDOW_SECONDS,
         },
+        compute_attempt_settlement_corrections::compute_settlement_correction_by_id_on,
         compute_attempt_settlements::compute_attempt_settlement_on,
         new_id,
     },
@@ -124,6 +125,8 @@ pub(super) fn release_settlement_on(
             challenge_gate.status
         );
     }
+    let (provider_release_micros, platform_release_micros) =
+        effective_release_amounts_on(tx, &settlement, &challenge_gate)?;
 
     let release_id = new_id("compute_settlement_release");
     let money = money::post_release_money_on(
@@ -132,8 +135,8 @@ pub(super) fn release_settlement_on(
             release_id: &release_id,
             settlement_receipt_id: &settlement.settlement.settlement_receipt_id,
             provider_account_id: &settlement.settlement.provider_account_id,
-            provider_released_micros: settlement.settlement.amounts.provider_payable_micros,
-            platform_released_micros: settlement.settlement.amounts.platform_margin_micros,
+            provider_released_micros: provider_release_micros,
+            platform_released_micros: platform_release_micros,
             released_at: &released_at.to_rfc3339(),
         },
     )?;
@@ -150,8 +153,8 @@ pub(super) fn release_settlement_on(
         provider_account_id: settlement.settlement.provider_account_id,
         platform_account_id: money::PLATFORM_ACCOUNT_ID.to_string(),
         currency: "CNY".to_string(),
-        provider_released_micros: settlement.settlement.amounts.provider_payable_micros,
-        platform_released_micros: settlement.settlement.amounts.platform_margin_micros,
+        provider_released_micros: provider_release_micros,
+        platform_released_micros: platform_release_micros,
         provider_pending_balance_after_micros: money.provider.pending_after_micros,
         provider_available_balance_after_micros: money.provider.available_after_micros,
         provider_account_revision_after: money.provider.revision_after,
@@ -175,6 +178,42 @@ pub(super) fn release_settlement_on(
     };
     receipt.event_digest = release_event_digest(&receipt)?;
     Ok(receipt)
+}
+
+pub(super) fn effective_release_amounts_on(
+    conn: &Connection,
+    settlement: &super::super::compute_attempt_settlements::ComputeAttemptSettlementReceipt,
+    gate: &ComputeSettlementChallengeGate,
+) -> Result<(i64, i64)> {
+    if gate.status == "accepted_corrected" {
+        let correction_id = gate
+            .correction_id
+            .as_deref()
+            .context("已纠正挑战门卫缺少 Correction ID")?;
+        let correction_digest = gate
+            .correction_event_digest
+            .as_deref()
+            .context("已纠正挑战门卫缺少 Correction Event Digest")?;
+        let correction = compute_settlement_correction_by_id_on(conn, correction_id)?
+            .context("已纠正挑战门卫引用的 Correction Receipt 不存在")?;
+        if correction.event_digest != correction_digest
+            || correction.settlement_receipt_id != settlement.settlement.settlement_receipt_id
+            || correction.settlement_event_digest != settlement.event_digest
+        {
+            bail!("已纠正挑战门卫与 Correction Receipt 或 Settlement Receipt 不一致");
+        }
+        return Ok((
+            correction.corrected_provider_payable_micros,
+            correction.corrected_platform_margin_micros,
+        ));
+    }
+    if gate.correction_id.is_some() || gate.correction_event_digest.is_some() {
+        bail!("未纠正挑战门卫不能携带 Correction Receipt 引用");
+    }
+    Ok((
+        settlement.settlement.amounts.provider_payable_micros,
+        settlement.settlement.amounts.platform_margin_micros,
+    ))
 }
 
 pub(super) fn release_request_digest(

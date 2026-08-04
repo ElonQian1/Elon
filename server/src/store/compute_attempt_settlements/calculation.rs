@@ -9,7 +9,7 @@ use crate::compute_federation::{
     receipts::{ComputeExecutionReceipt, ComputeMeterReading, ComputeSettlementAmounts},
 };
 
-pub(super) const MICROS_PER_CNY_FEN: i64 = 10_000;
+pub(crate) const MICROS_PER_CNY_FEN: i64 = 10_000;
 
 #[derive(Debug, Clone)]
 pub(super) struct ComputedSettlement {

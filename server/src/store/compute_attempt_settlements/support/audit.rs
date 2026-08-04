@@ -348,7 +348,15 @@ fn audit_pending_projection(
         params![account_kind, account_id],
         |row| row.get::<_, i64>(0),
     )?;
-    let rebuilt = credited - released;
+    let corrected = conn.query_row(
+        "SELECT COALESCE(SUM(amount_micros),0)
+           FROM compute_settlement_correction_ledger_legs
+          WHERE account_kind=?1 AND account_id=?2 AND currency='CNY'
+            AND balance_state='pending' AND direction='debit'",
+        params![account_kind, account_id],
+        |row| row.get::<_, i64>(0),
+    )?;
+    let rebuilt = credited - corrected - released;
     if projected != rebuilt || projected < 0 {
         bail!("Attempt 结算待结算余额投影与不可变账本不一致");
     }

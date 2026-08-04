@@ -13,8 +13,8 @@ use super::{
         ComputeSettlementReleaseReceipt, COMPUTE_SETTLEMENT_RELEASE_POLICY_ID,
         COMPUTE_SETTLEMENT_RELEASE_POLICY_VERSION, COMPUTE_SETTLEMENT_RELEASE_SCHEMA,
     },
-    challenge_gate_digest, money, normalize_release_request, parse_time, release_event_digest,
-    release_request_digest, StoredRelease,
+    challenge_gate_digest, effective_release_amounts_on, money, normalize_release_request,
+    parse_time, release_event_digest, release_request_digest, StoredRelease,
 };
 
 pub(super) fn audited_release_on(
@@ -74,8 +74,6 @@ pub(super) fn audited_release_on(
         || settlement.posting_digest != stored.source_posting_digest
         || settlement.settlement.consumer_account_id != stored.consumer_account_id
         || settlement.settlement.provider_account_id != stored.provider_account_id
-        || settlement.settlement.amounts.provider_payable_micros != stored.provider_released_micros
-        || settlement.settlement.amounts.platform_margin_micros != stored.platform_released_micros
         || settlement.settlement.balance_state != "pending"
     {
         bail!("待结算释放上游 Settlement Receipt 审计失败");
@@ -99,6 +97,12 @@ pub(super) fn audited_release_on(
         || current_gate.correction_required
     {
         bail!("待结算释放后的消费者挑战门卫状态不一致");
+    }
+    let expected_release_amounts = effective_release_amounts_on(conn, &settlement, &current_gate)?;
+    if expected_release_amounts.0 != receipt.provider_released_micros
+        || expected_release_amounts.1 != receipt.platform_released_micros
+    {
+        bail!("待结算释放金额未采用原结算或 accepted 挑战纠正后的净额");
     }
     audit_posting(conn, &receipt)?;
     audit_account_projection(
@@ -267,6 +271,14 @@ fn audit_account_projection(
         params![account_kind, account_id],
         |row| row.get::<_, i64>(0),
     )?;
+    let corrected_pending = conn.query_row(
+        "SELECT COALESCE(SUM(amount_micros),0)
+           FROM compute_settlement_correction_ledger_legs
+          WHERE account_kind=?1 AND account_id=?2 AND currency='CNY'
+            AND balance_state='pending' AND direction='debit'",
+        params![account_kind, account_id],
+        |row| row.get::<_, i64>(0),
+    )?;
     let credited_available = conn.query_row(
         "SELECT COALESCE(SUM(amount_micros),0)
            FROM compute_settlement_release_ledger_legs
@@ -275,7 +287,7 @@ fn audit_account_projection(
         params![account_kind, account_id],
         |row| row.get::<_, i64>(0),
     )?;
-    if current.0 != credited_pending - released_pending
+    if current.0 != credited_pending - corrected_pending - released_pending
         || current.1 != credited_available
         || current.0 < 0
         || current.1 < 0

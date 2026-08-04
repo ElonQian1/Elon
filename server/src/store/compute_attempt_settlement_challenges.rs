@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     compute_attempt_settlement_challenge_resolutions::settlement_challenge_resolution_by_challenge_on,
-    Store,
+    compute_attempt_settlement_corrections::compute_settlement_correction_by_resolution_on, Store,
 };
 
 mod support;
@@ -74,6 +74,8 @@ pub(crate) struct ComputeSettlementChallengeGate {
     pub challenge_event_digest: Option<String>,
     pub resolution_id: Option<String>,
     pub resolution_event_digest: Option<String>,
+    pub correction_id: Option<String>,
+    pub correction_event_digest: Option<String>,
 }
 
 impl Store {
@@ -156,6 +158,8 @@ pub(super) fn settlement_challenge_gate_on(
             challenge_event_digest: None,
             resolution_id: None,
             resolution_event_digest: None,
+            correction_id: None,
+            correction_event_digest: None,
         });
     };
     let challenge = stored.into_receipt(conn, false)?;
@@ -170,8 +174,27 @@ pub(super) fn settlement_challenge_gate_on(
             challenge_event_digest: Some(challenge.event_digest),
             resolution_id: None,
             resolution_event_digest: None,
+            correction_id: None,
+            correction_event_digest: None,
         });
     };
+    if resolution.action == "accepted" {
+        if let Some(correction) =
+            compute_settlement_correction_by_resolution_on(conn, &resolution.resolution_id)?
+        {
+            return Ok(ComputeSettlementChallengeGate {
+                status: "accepted_corrected".to_string(),
+                blocked: false,
+                correction_required: false,
+                challenge_id: Some(challenge.challenge_id),
+                challenge_event_digest: Some(challenge.event_digest),
+                resolution_id: Some(resolution.resolution_id),
+                resolution_event_digest: Some(resolution.event_digest),
+                correction_id: Some(correction.correction_id),
+                correction_event_digest: Some(correction.event_digest),
+            });
+        }
+    }
     let (blocked, correction_required) = match resolution.action.as_str() {
         "accepted" => (true, true),
         "rejected" | "withdrawn" => (false, false),
@@ -185,5 +208,7 @@ pub(super) fn settlement_challenge_gate_on(
         challenge_event_digest: Some(challenge.event_digest),
         resolution_id: Some(resolution.resolution_id),
         resolution_event_digest: Some(resolution.event_digest),
+        correction_id: None,
+        correction_event_digest: None,
     })
 }
