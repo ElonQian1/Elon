@@ -9,6 +9,15 @@ export interface ProjectContextEvidence {
   content_hash: string
   locator: string
   evidence_kind: 'source' | 'test' | 'document' | 'configuration'
+  git_identity?: ProjectContextGitIdentity
+}
+
+export interface ProjectContextGitIdentity {
+  schema: 'elon.project_context_git_identity.v1'
+  head_commit: string
+  head_blob_oid: string
+  worktree_blob_oid: string
+  state: 'tracked_clean' | 'tracked_modified' | 'index_only' | 'untracked'
 }
 
 export interface ProjectContextMemory {
@@ -25,6 +34,25 @@ export interface NativeContextCandidate extends ProjectContextMemory {
   created_at_ms: number
   updated_at_ms: number
   evidence_current: boolean
+  ingest_action: 'created' | 'updated' | 'replacement' | 'deduplicated' | 'shared_duplicate' | ''
+  provenance: NativeContextProvenance
+  conflicts: NativeContextConflict[]
+}
+
+export interface NativeContextProvenance {
+  source: string
+  assurance: string
+  session_fingerprint: string
+  evidence_path_count: number
+  recorded_at_ms: number
+  last_editor: string
+  last_edited_at_ms: number
+}
+
+export interface NativeContextConflict {
+  kind: 'shared_duplicate' | 'shared_replacement' | 'potential_semantic_conflict'
+  shared_candidate_id: string
+  overlapping_paths: string[]
 }
 
 export interface NativeContextCandidatePage {
@@ -38,6 +66,19 @@ export interface NativeContextCandidatePage {
     next_offset?: number
   }
   candidates: NativeContextCandidate[]
+}
+
+export interface NativeContextMemoryHealth {
+  checked_count: number
+  current_count: number
+  drifted_count: number
+  relocation_suggested_count: number
+  truncated: boolean
+  receipt_automation: {
+    node_policy_enabled: boolean
+    trust_mode: string
+    trust_bypass_enabled: boolean
+  }
 }
 
 interface NativeContextEnvelope<T> {
@@ -78,6 +119,38 @@ export async function listNativeContextCandidates(input: {
   )
   if (!envelope.ok || !envelope.result) throw new Error(envelope.error || '读取原生理解候选失败')
   return sanitizeCandidatePage(envelope.result, input.status, input.offset, input.limit ?? 10)
+}
+
+export async function loadNativeContextMemoryHealth(input: {
+  adminUrl: string
+  projectRoot: string
+}): Promise<NativeContextMemoryHealth> {
+  const envelope = await nodeApi<NativeContextEnvelope<Record<string, unknown>>>(
+    input.adminUrl,
+    '/api/project-docs/native-context/health',
+    {
+      method: 'POST',
+      body: JSON.stringify({ project_root: input.projectRoot }),
+    },
+  )
+  if (!envelope.ok || !envelope.result) throw new Error(envelope.error || '读取共享项目记忆健康状态失败')
+  return {
+    checked_count: safeNumber(envelope.result.checked_count),
+    current_count: safeNumber(envelope.result.current_count),
+    drifted_count: safeNumber(envelope.result.drifted_count),
+    relocation_suggested_count: safeNumber(envelope.result.relocation_suggested_count),
+    truncated: envelope.result.truncated === true,
+    receipt_automation: sanitizeReceiptAutomation(envelope.result.receipt_automation),
+  }
+}
+
+function sanitizeReceiptAutomation(value: unknown): NativeContextMemoryHealth['receipt_automation'] {
+  const automation = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  return {
+    node_policy_enabled: automation.node_policy_enabled === true,
+    trust_mode: boundedText(automation.trust_mode, 64),
+    trust_bypass_enabled: automation.trust_bypass_enabled === true,
+  }
 }
 
 export async function reviewNativeContextCandidates(input: {
@@ -186,6 +259,9 @@ function sanitizeCandidate(value: unknown): NativeContextCandidate | null {
     created_at_ms: safeNumber(candidate.created_at_ms),
     updated_at_ms: safeNumber(candidate.updated_at_ms),
     evidence_current: candidate.evidence_current === true,
+    ingest_action: sanitizeIngestAction(candidate.ingest_action),
+    provenance: sanitizeProvenance(candidate.provenance),
+    conflicts: sanitizeConflicts(candidate.conflicts),
   }
 }
 
@@ -223,7 +299,67 @@ function sanitizeEvidence(value: unknown): ProjectContextEvidence | null {
     content_hash: contentHash,
     locator: boundedText(evidence.locator, 120),
     evidence_kind: kind as ProjectContextEvidence['evidence_kind'],
+    git_identity: sanitizeGitIdentity(evidence.git_identity),
   }
+}
+
+function sanitizeIngestAction(value: unknown): NativeContextCandidate['ingest_action'] {
+  const action = boundedText(value, 32)
+  return ['created', 'updated', 'replacement', 'deduplicated', 'shared_duplicate'].includes(action)
+    ? action as NativeContextCandidate['ingest_action']
+    : ''
+}
+
+function sanitizeProvenance(value: unknown): NativeContextProvenance {
+  const provenance = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  return {
+    source: boundedText(provenance.source, 40),
+    assurance: boundedText(provenance.assurance, 48),
+    session_fingerprint: boundedText(provenance.session_fingerprint, 24),
+    evidence_path_count: safeNumber(provenance.evidence_path_count),
+    recorded_at_ms: safeNumber(provenance.recorded_at_ms),
+    last_editor: boundedText(provenance.last_editor, 40),
+    last_edited_at_ms: safeNumber(provenance.last_edited_at_ms),
+  }
+}
+
+function sanitizeConflicts(value: unknown): NativeContextConflict[] {
+  if (!Array.isArray(value)) return []
+  return value.slice(0, 4).flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return []
+    const conflict = entry as Record<string, unknown>
+    const kind = boundedText(conflict.kind, 40)
+    if (!['shared_duplicate', 'shared_replacement', 'potential_semantic_conflict'].includes(kind)) return []
+    return [{
+      kind: kind as NativeContextConflict['kind'],
+      shared_candidate_id: boundedText(conflict.shared_candidate_id, 80),
+      overlapping_paths: uniqueStrings(conflict.overlapping_paths, 4, 500),
+    }]
+  })
+}
+
+function sanitizeGitIdentity(value: unknown): ProjectContextGitIdentity | undefined {
+  if (!value || typeof value !== 'object') return undefined
+  const identity = value as Record<string, unknown>
+  const schema = boundedText(identity.schema, 80)
+  const state = boundedText(identity.state, 32)
+  const headCommit = boundedOid(identity.head_commit)
+  const headBlobOid = boundedOid(identity.head_blob_oid)
+  const worktreeBlobOid = boundedOid(identity.worktree_blob_oid)
+  if (schema !== 'elon.project_context_git_identity.v1') return undefined
+  if (!['tracked_clean', 'tracked_modified', 'index_only', 'untracked'].includes(state)) return undefined
+  return {
+    schema,
+    state: state as ProjectContextGitIdentity['state'],
+    head_commit: headCommit,
+    head_blob_oid: headBlobOid,
+    worktree_blob_oid: worktreeBlobOid,
+  }
+}
+
+function boundedOid(value: unknown): string {
+  const oid = boundedText(value, 64).toLowerCase()
+  return /^([a-f0-9]{40}|[a-f0-9]{64})$/.test(oid) ? oid : ''
 }
 
 function isCandidateStatus(value: unknown): value is NativeContextCandidateStatus {

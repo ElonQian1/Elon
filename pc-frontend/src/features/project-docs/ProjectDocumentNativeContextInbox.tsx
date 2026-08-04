@@ -5,11 +5,13 @@ import type { DocumentAutomationMode } from './projectDocumentSections'
 import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
 import {
   listNativeContextCandidates,
+  loadNativeContextMemoryHealth,
   reviseNativeContextCandidate,
   reviewNativeContextCandidates,
   type NativeContextCandidate,
   type NativeContextCandidatePage,
   type NativeContextCandidateStatus,
+  type NativeContextMemoryHealth,
   type NativeContextReviewAction,
 } from './projectDocumentNativeContextModel'
 import ProjectDocumentNativeContextEditor from './ProjectDocumentNativeContextEditor'
@@ -42,6 +44,7 @@ export default function ProjectDocumentNativeContextInbox({
   const [status, setStatus] = useState<NativeContextCandidateStatus>('pending')
   const [offset, setOffset] = useState(0)
   const [page, setPage] = useState<NativeContextCandidatePage | null>(null)
+  const [health, setHealth] = useState<NativeContextMemoryHealth | null>(null)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [loading, setLoading] = useState(false)
   const [action, setAction] = useState<NativeContextReviewAction | ''>('')
@@ -69,7 +72,17 @@ export default function ProjectDocumentNativeContextInbox({
     }
   }, [offset, runtime.adminUrl, runtime.enabled, runtime.projectRoot, status])
 
+  const loadHealth = useCallback(async () => {
+    if (!runtime.enabled || !runtime.adminUrl || !runtime.projectRoot) return
+    const memoryHealth = await loadNativeContextMemoryHealth({
+      adminUrl: runtime.adminUrl,
+      projectRoot: runtime.projectRoot,
+    }).catch(() => null)
+    setHealth(memoryHealth)
+  }, [runtime.adminUrl, runtime.enabled, runtime.projectRoot])
+
   useEffect(() => { void load() }, [load])
+  useEffect(() => { void loadHealth() }, [loadHealth])
 
   const chooseStatus = (nextStatus: NativeContextCandidateStatus) => {
     setStatus(nextStatus)
@@ -164,10 +177,22 @@ export default function ProjectDocumentNativeContextInbox({
     <section className={styles.inbox} data-status={status}>
       <header className={styles.header}>
         <div><FileSearch size={18} aria-hidden="true" /><strong>原生理解候选</strong><span>本机 SQLite · 不含源码正文</span></div>
-        <button type="button" onClick={() => { void load() }} disabled={loading || !!action} title="刷新候选">
+        <button type="button" onClick={() => { void Promise.all([load(), loadHealth()]) }} disabled={loading || !!action} title="刷新候选与共享记忆健康状态">
           <RefreshCw size={15} className={loading ? styles.spinning : ''} aria-hidden="true" />
         </button>
       </header>
+      {health && (
+        <p className={styles.intro}>共享记忆健康：{health.current_count}/{health.checked_count} 有效
+          {health.drifted_count > 0 ? ` · ${health.drifted_count} 条漂移` : ''}
+          {health.relocation_suggested_count > 0 ? ` · ${health.relocation_suggested_count} 条有重定位建议` : ''}
+          {health.truncated ? ' · 仅检查前 64 条' : ''}。这是诊断结果，不会自动改写证据。</p>
+      )}
+      {health && (
+        <p className={styles.intro}>任务后回执 Hook：{health.receipt_automation.node_policy_enabled ? '节点策略开启' : '节点策略关闭'}；
+          {health.receipt_automation.trust_mode === 'codex_non_managed_hook_review'
+            ? 'Codex 首次或定义变化后仍需在 /hooks 审核信任'
+            : '当前节点未报告信任模式'}；不会绕过 Hook trust。此状态不证明 Hook 已真实执行。</p>
+      )}
       <p className={styles.intro}>Codex Desktop/CLI 核对过的短结论先进入这里。接受只会并入现有建议；应用后才进入 Git 共享记忆，且源码优先、hash 漂移立即失效。</p>
       <nav className={styles.filters} aria-label="候选状态">
         {FILTERS.map((filter) => (
@@ -202,12 +227,21 @@ export default function ProjectDocumentNativeContextInbox({
                 <i>{candidate.evidence_current ? <><ShieldCheck size={14} />证据有效</> : <>证据已漂移</>}</i>
               </label>
               <div className={styles.topics}>{candidate.topics.map((topic) => <span key={topic}>{topic}</span>)}</div>
+              {!!candidate.conflicts.length && (
+                <div className={styles.error}>需要人工处理：{candidate.conflicts.map((conflict) => (
+                  conflict.kind === 'shared_replacement'
+                    ? `替换共享记忆 ${conflict.shared_candidate_id}`
+                    : `与共享记忆 ${conflict.shared_candidate_id} 可能冲突`
+                )).join('；')}</div>
+              )}
               <ul className={styles.evidence}>
                 {candidate.evidence.map((evidence) => (
                   <li key={`${evidence.path}:${evidence.locator}`}>
                     <code>{evidence.path}</code>
                     <span>{evidence.locator || evidence.evidence_kind}</span>
-                    <small>{evidence.content_hash.slice(0, 12)}…</small>
+                    <small>{evidence.git_identity?.head_blob_oid
+                      ? `Git ${evidence.git_identity.head_blob_oid.slice(0, 10)}… · SHA ${evidence.content_hash.slice(0, 8)}…`
+                      : `${evidence.content_hash.slice(0, 12)}…`}</small>
                   </li>
                 ))}
               </ul>
@@ -217,7 +251,9 @@ export default function ProjectDocumentNativeContextInbox({
                   onSave={(summary, topics) => runRevision(candidate, summary, topics)} />
               )}
               <footer>
-                <span>来源 {candidate.producer || 'native tools'}</span>
+                <span>来源 {candidate.producer || 'native tools'} · {candidate.provenance.assurance === 'local_mcp_session_attested'
+                  ? '本机会话已认证'
+                  : '来源自述'}{candidate.provenance.last_editor ? ' · 已人工修订' : ''}</span>
                 <div><time>{formatTime(candidate.updated_at_ms)}</time>
                   {(status === 'pending' || status === 'rejected') && canEdit && (
                     <button type="button" className={styles.editButton} disabled={!!action || revising}
