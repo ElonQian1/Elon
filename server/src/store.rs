@@ -276,7 +276,8 @@ pub(crate) use compute_attempt_consumer_reviews::{
     ComputeAttemptConsumerReviewReceipt, ReviewComputeAttemptTerminalCandidateRequest,
 };
 pub(crate) use compute_attempt_execution_receipts::{
-    ComputeAttemptExecutionReceiptEnvelope, IssueComputeAttemptExecutionReceiptRequest,
+    ComputeAttemptExecutionReceiptEnvelope, ComputePendingExecutionReceiptCandidate,
+    IssueComputeAttemptExecutionReceiptRequest,
 };
 pub(crate) use compute_attempt_finalizations::{
     ComputeAttemptFinalizationReceipt, FinalizeComputeAttemptRequest,

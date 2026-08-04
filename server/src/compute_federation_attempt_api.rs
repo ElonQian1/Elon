@@ -109,6 +109,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             post(issue_execution_receipt),
         )
         .route(
+            "/api/admin/compute/attempt-verifications/pending-execution-receipt",
+            get(list_pending_execution_receipts),
+        )
+        .route(
             "/api/me/compute/attempt-leases/:lease_id/execution-receipt",
             get(get_execution_receipt),
         )
@@ -580,6 +584,23 @@ async fn issue_execution_receipt(
             &lease_id,
             request,
         ),
+    )
+}
+
+async fn list_pending_execution_receipts(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    attempt_response(
+        compute_federation_attempt_receipt_service::list_pending_for_platform_admin(
+            &state.store,
+            query.limit,
+        )
+        .map(|candidates| json!({"execution_receipt_candidates":candidates})),
     )
 }
 

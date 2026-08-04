@@ -4,7 +4,8 @@ use serde::Deserialize;
 use crate::{
     compute_federation_attempt_service::get_for_participant,
     store::{
-        ComputeAttemptExecutionReceiptEnvelope, IssueComputeAttemptExecutionReceiptRequest, Store,
+        ComputeAttemptExecutionReceiptEnvelope, ComputePendingExecutionReceiptCandidate,
+        IssueComputeAttemptExecutionReceiptRequest, Store,
     },
 };
 
@@ -33,6 +34,13 @@ pub(crate) fn issue_for_platform_admin(
         idempotency_key: request.idempotency_key,
         issued_by_user_id: admin_user_id.to_string(),
     })
+}
+
+pub(crate) fn list_pending_for_platform_admin(
+    store: &Store,
+    limit: usize,
+) -> Result<Vec<ComputePendingExecutionReceiptCandidate>> {
+    store.list_pending_compute_attempt_execution_receipts(limit)
 }
 
 pub(crate) fn get_for_attempt_participant(

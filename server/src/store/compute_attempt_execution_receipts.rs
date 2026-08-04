@@ -9,14 +9,22 @@ use super::{
     compute_attempt_activations::compute_attempt_activation_on,
     compute_attempt_consumer_reviews::compute_attempt_consumer_review_on,
     compute_attempt_platform_observations::compute_attempt_platform_observation_on,
-    compute_attempt_terminals::compute_attempt_terminal_candidate_on,
+    compute_attempt_terminals::{
+        compute_attempt_terminal_candidate_on, ComputeAttemptTerminalCandidateReceipt,
+    },
     compute_attempt_usage::compute_attempt_usage_declaration_on,
-    compute_attempt_verifications::compute_attempt_verification_decision_on,
+    compute_attempt_verifications::{
+        compute_attempt_verification_decision_on, ComputeAttemptVerificationDecisionReceipt,
+    },
     compute_job_registry::registered_job_version_on,
-    compute_reservation_registry::registered_reservation_version_on, new_id, Store,
+    compute_reservation_registry::registered_reservation_version_on,
+    new_id, Store,
 };
 
+mod pending_queue;
 mod support;
+
+use pending_queue::list_pending_execution_receipt_lease_ids_on;
 
 use support::{
     build_execution_receipt, ensure_expected_verification, ensure_receipt_sources,
@@ -49,6 +57,12 @@ pub(crate) struct ComputeAttemptExecutionReceiptEnvelope {
     pub reservation_effect: &'static str,
     pub money_effect: &'static str,
     pub replayed: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ComputePendingExecutionReceiptCandidate {
+    pub verification_decision: ComputeAttemptVerificationDecisionReceipt,
+    pub terminal_candidate: ComputeAttemptTerminalCandidateReceipt,
 }
 
 impl Store {
@@ -175,6 +189,57 @@ impl Store {
         let stored = execution_receipt_by_lease_on(&*conn, lease_id)?
             .ok_or_else(|| anyhow!("Attempt 尚无 Execution Receipt"))?;
         execution_receipt_envelope_on(&*conn, stored, false)
+    }
+
+    pub(crate) fn list_pending_compute_attempt_execution_receipts(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<ComputePendingExecutionReceiptCandidate>> {
+        let conn = self.conn()?;
+        list_pending_execution_receipt_lease_ids_on(&conn, limit.clamp(1, 100))?
+            .into_iter()
+            .map(|lease_id| {
+                let verification = compute_attempt_verification_decision_on(&conn, &lease_id)?
+                    .ok_or_else(|| anyhow!("待签发队列引用的 Verification 决定不存在"))?;
+                let candidate = compute_attempt_terminal_candidate_on(&conn, &lease_id)?
+                    .ok_or_else(|| anyhow!("待签发队列引用的 Provider 候选不存在"))?;
+                let consumer_review = compute_attempt_consumer_review_on(&conn, &lease_id)?
+                    .ok_or_else(|| anyhow!("待签发队列引用的消费者审核不存在"))?;
+                let platform_observation =
+                    compute_attempt_platform_observation_on(&conn, &lease_id)?
+                        .ok_or_else(|| anyhow!("待签发队列引用的平台观测不存在"))?;
+                let provider_usage = compute_attempt_usage_declaration_on(
+                    &conn,
+                    &lease_id,
+                    candidate.final_usage_sequence_no,
+                )?
+                .ok_or_else(|| anyhow!("待签发队列引用的 Provider 用量不存在"))?;
+                let activation = compute_attempt_activation_on(&conn, &lease_id)?;
+                let job =
+                    registered_job_version_on(&conn, &candidate.job_id, candidate.job_revision)?
+                        .ok_or_else(|| anyhow!("待签发队列引用的 Job 历史版本不存在"))?;
+                let reservation = registered_reservation_version_on(
+                    &conn,
+                    &candidate.reservation_id,
+                    candidate.reservation_revision,
+                )?
+                .ok_or_else(|| anyhow!("待签发队列引用的 Reservation 历史版本不存在"))?;
+                ensure_receipt_sources(
+                    &verification,
+                    &candidate,
+                    &consumer_review,
+                    &platform_observation,
+                    &provider_usage,
+                    &activation,
+                    &job,
+                    &reservation,
+                )?;
+                Ok(ComputePendingExecutionReceiptCandidate {
+                    verification_decision: verification,
+                    terminal_candidate: candidate,
+                })
+            })
+            .collect()
     }
 }
 
