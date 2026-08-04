@@ -7,6 +7,7 @@ import {
 import { type SupplyAction } from './BucketSupplyDialog'
 import ActivationEvidencePanel from './ActivationEvidencePanel'
 import CapacityLedgerPanel from './CapacityLedgerPanel'
+import CapacityOfferPanel from './CapacityOfferPanel'
 import styles from './CapacityPoolDetail.module.css'
 
 interface Props {
@@ -45,6 +46,7 @@ export default function CapacityPoolDetail({ pool, provider, buckets, selectedBu
     </section>
     <CapacityLedgerPanel key={`${pool.provider_id}:${pool.pool_id}`} providerId={pool.provider_id} poolId={pool.pool_id} refreshKey={buckets.map((bucket) => `${bucket.balance.binding.bucket_id}:${bucket.balance.balance_revision}`).join('|')} />
     <ActivationEvidencePanel key={`activation:${pool.provider_id}:${pool.pool_id}`} providerId={pool.provider_id} poolId={pool.pool_id} poolStatus={pool.status} />
+    <CapacityOfferPanel key={`offers:${pool.provider_id}:${pool.pool_id}`} provider={provider} pool={pool} buckets={buckets} />
     <section className={styles.digests}><h3>合同摘要</h3><div><span>Pool</span><code>{pool.pool_digest}</code></div><div><span>Scope</span><code>{pool.resource_scope_digest}</code></div><div><span>Profile</span><code>{pool.resource_profile_digest}</code></div></section>
   </div>
 }

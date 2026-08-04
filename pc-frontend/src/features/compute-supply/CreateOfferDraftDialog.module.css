@@ -1,0 +1,38 @@
+.backdrop { position: fixed; z-index: 70; inset: 0; display: grid; place-items: center; padding: 18px; background: rgba(0,0,0,.7); }
+.dialog { width: min(880px,100%); max-height: calc(100vh - 36px); overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; color: var(--text-primary); background: var(--bg-elevated); box-shadow: 0 20px 60px rgba(0,0,0,.45); }
+.dialog > header { min-height: 64px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding: 12px 18px; }
+.dialog > header > div, .dialog footer, .toggle { display: flex; align-items: center; gap: 9px; }
+.dialog h2 { margin: 0; font-size: 16px; }
+.dialog > header button { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); }
+.dialog form { display: grid; gap: 14px; padding: 16px 18px 18px; }
+.dialog fieldset { min-width: 0; display: grid; gap: 10px; margin: 0; border: 1px solid var(--border); border-radius: 7px; padding: 12px; }
+.dialog legend { padding: 0 6px; color: var(--text-secondary); font-size: 11px; font-weight: 750; }
+.grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.grid label, .prices label { min-width: 0; display: grid; align-content: start; gap: 5px; color: var(--text-muted); font-size: 9px; }
+.grid label[data-wide='true'] { grid-column: 1 / -1; }
+.grid input, .grid select, .grid textarea, .prices input { width: 100%; min-width: 0; min-height: 36px; border: 1px solid var(--border); border-radius: 5px; padding: 0 9px; color: var(--text-primary); background: var(--bg-base); font: inherit; }
+.grid textarea { resize: vertical; padding-top: 8px; line-height: 1.45; }
+.capacity { display: grid; gap: 6px; }
+.capacity > div { display: grid; grid-template-columns: minmax(0,1fr) 140px; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,.05); padding: 7px 0; }
+.capacity span { min-width: 0; display: grid; gap: 3px; }
+.capacity strong { font-size: 11px; }
+.capacity small { overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.capacity input { min-height: 34px; border: 1px solid var(--border); border-radius: 5px; padding: 0 8px; color: var(--text-primary); background: var(--bg-base); }
+.prices { display: grid; gap: 7px; }
+.prices > div { display: grid; grid-template-columns: minmax(90px,.6fr) 1fr 1fr; align-items: end; gap: 10px; }
+.prices > div > strong { align-self: center; font-size: 10px; }
+.toggle { color: var(--text-secondary); font-size: 11px; }
+.confirm { display: grid; grid-template-columns: 17px minmax(0,1fr); align-items: start; gap: 8px; color: var(--text-secondary); font-size: 11px; line-height: 1.5; }
+.confirm input { margin-top: 2px; accent-color: #69c78d; }
+.error, .validation, .boundary { border: 1px solid; border-radius: 6px; padding: 9px 10px; font-size: 11px; line-height: 1.5; }
+.error, .validation { color: #ffcaca; border-color: rgba(224,92,92,.3); background: rgba(224,92,92,.09); }
+.boundary { color: #d9e5f5; border-color: rgba(121,168,232,.22); background: rgba(121,168,232,.06); }
+.dialog footer { justify-content: flex-end; border-top: 1px solid var(--border); padding-top: 14px; }
+.dialog footer button { min-height: 36px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 6px; padding: 0 13px; font-weight: 750; }
+.secondary { color: var(--text-secondary); }
+.primary { color: #08140d; border-color: #52b77b; background: #69c78d; }
+.dialog footer button:disabled { cursor: not-allowed; opacity: .45; }
+.spinning { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 720px) { .grid { grid-template-columns: 1fr 1fr; } .prices > div { grid-template-columns: 1fr 1fr; } .prices > div > strong { grid-column: 1 / -1; } }
+@media (max-width: 500px) { .backdrop { padding: 8px; } .grid { grid-template-columns: 1fr; } .grid label[data-wide='true'] { grid-column: auto; } .capacity > div { grid-template-columns: 1fr; } }

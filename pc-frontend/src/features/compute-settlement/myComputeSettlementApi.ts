@@ -16,6 +16,14 @@ export interface MyComputeProvider {
   policy_revision: number
   has_routing: boolean
   provider_digest: string
+  capabilities?: {
+    task_kinds: string[]
+    accelerator_kinds: string[]
+    regions: string[]
+    allowed_data_classes: string[]
+    supports_streaming: boolean
+    supports_checkpointing: boolean
+  }
 }
 
 export type MyComputeProviderKind = 'user_node' | 'managed_cluster'
