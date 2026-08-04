@@ -15,6 +15,7 @@ mod plan_application_persistence;
 mod plan_application_projection;
 mod plan_application_replay_children;
 mod plan_application_writes;
+mod process_ownership;
 
 pub(crate) use initialization::{
     ComputePluginAuthorityInitialization, ComputePluginAuthorityInitializationOutcome,
@@ -26,6 +27,7 @@ pub(crate) use plan_application::{
     ComputePluginCandidateHandle, ComputePluginPlanApplicationDisposition,
     ComputePluginPlanApplicationReceipt, ComputePluginPlanApplicationResult,
 };
+pub(crate) use process_ownership::ComputePluginFetchProcessFence;
 
 const COMPUTE_PLUGIN_STATE_FILE: &str = "compute-plugin-state.sqlite3";
 const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
