@@ -25,6 +25,22 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/design/events/checkpoints/:consumer_id/:task_id/commit",
             post(commit_event_checkpoint),
         )
+        .route(
+            "/api/android-live/design/drafts/:draft_id/source-binding/health",
+            post(check_binding_health),
+        )
+        .route(
+            "/api/android-live/design/drafts/:draft_id/writeback/plan",
+            post(plan_writeback),
+        )
+        .route(
+            "/api/android-live/design/writeback/plans/:plan_id",
+            post(get_writeback_plan),
+        )
+        .route(
+            "/api/android-live/design/writeback/plans/:plan_id/decision",
+            post(decide_writeback_plan),
+        )
 }
 
 async fn plan_intent(
@@ -64,4 +80,40 @@ async fn commit_event_checkpoint(
 fn inject_checkpoint(arguments: &mut Value, consumer_id: String, task_id: String) {
     arguments["consumerId"] = json!(consumer_id);
     arguments["taskId"] = json!(task_id);
+}
+
+async fn check_binding_health(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(draft_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["draftId"] = json!(draft_id);
+    super::design_http::call(&runtime, "ui_check_design_source_binding", arguments).await
+}
+
+async fn plan_writeback(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(draft_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["draftId"] = json!(draft_id);
+    super::design_http::call(&runtime, "ui_plan_design_writeback", arguments).await
+}
+
+async fn get_writeback_plan(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(plan_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["planId"] = json!(plan_id);
+    super::design_http::call(&runtime, "ui_get_design_writeback_plan", arguments).await
+}
+
+async fn decide_writeback_plan(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(plan_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["planId"] = json!(plan_id);
+    super::design_http::call(&runtime, "ui_decide_design_writeback_plan", arguments).await
 }

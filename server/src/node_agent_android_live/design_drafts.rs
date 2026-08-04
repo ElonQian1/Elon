@@ -126,7 +126,7 @@ pub(super) fn tool_definitions() -> Vec<Value> {
         tool(GET_TOOL, "读取单个设计草稿、源码绑定、样式 patch、revision 和写回回执引用。", draft_id_schema(true), true),
         tool(UPDATE_TOOL, "以 expectedRevision 乐观并发更新 DraftOperation、兼容样式 patch、source binding 或目标平台；旧快照进入有界撤销历史。", draft_update_schema(), false),
         tool(UNDO_TOOL, "撤销设计草稿的最近一次更新；revision 仍单调递增，避免旧客户端覆盖新状态。", draft_id_schema(false), false),
-        tool(BEGIN_WRITEBACK_TOOL, "固定当前草稿 revision 和 Git/sourceRevision，开始 Web/PWA/Tauri/Android 分平台写回机器回执。", draft_id_schema(false), false),
+        tool(BEGIN_WRITEBACK_TOOL, "验证已批准且未漂移的写回计划，固定当前草稿 revision 和 Git/sourceRevision，并开始分平台写回机器回执。", begin_writeback_schema(), false),
         tool(COMPLETE_WRITEBACK_TOOL, "根据实际 changedFiles、源码哈希与分平台 build evidence 更新写回回执；没有证据不会显示完成。", complete_writeback_schema(), false),
     ]
 }
@@ -165,6 +165,7 @@ pub(super) fn call(session: &LiveUiSession, name: &str, arguments: Value) -> Res
             session,
             required_draft_id(&arguments)?,
             required_revision(&arguments)?,
+            required_text(&arguments, "writebackPlanId")?,
         ),
         COMPLETE_WRITEBACK_TOOL => complete_writeback(session, &arguments),
         _ => bail!("未知设计草稿工具: {name}"),
@@ -247,7 +248,7 @@ fn create(session: &LiveUiSession, mut request: CreateDraftRequest) -> Result<Va
     };
     persist(&root, &draft)?;
     let next = if draft.source_binding.is_some() {
-        BEGIN_WRITEBACK_TOOL
+        "ui_plan_design_writeback"
     } else {
         UPDATE_TOOL
     };
@@ -307,7 +308,12 @@ fn undo(session: &LiveUiSession, draft_id: &str, expected: u64) -> Result<Value>
     Ok(json!({"draft":draft_view(&draft),"undidRevision":snapshot.revision}))
 }
 
-fn begin_writeback(session: &LiveUiSession, draft_id: &str, expected: u64) -> Result<Value> {
+fn begin_writeback(
+    session: &LiveUiSession,
+    draft_id: &str,
+    expected: u64,
+    writeback_plan_id: &str,
+) -> Result<Value> {
     let root = canonical_root(session)?;
     let mut draft = read(&root, draft_id)?;
     expect_revision(&draft, expected)?;
@@ -322,8 +328,17 @@ fn begin_writeback(session: &LiveUiSession, draft_id: &str, expected: u64) -> Re
         bail!("DESIGN_SOURCE_BINDING_UNCONFIRMED：写回前 binding.status 必须是 BOUND");
     }
     validate_binding_target(&root, binding)?;
+    super::design_writeback_plan::validate_approved_plan(
+        session,
+        writeback_plan_id,
+        draft_id,
+        expected,
+    )?;
     let receipt = begin_writeback_receipt(BeginWritebackReceiptRequest {
-        operation_id: format!("design-draft:{}:r{}", draft.draft_id, draft.revision),
+        operation_id: format!(
+            "design-draft:{}:r{}:{}",
+            draft.draft_id, draft.revision, writeback_plan_id
+        ),
         project_root: root.to_string_lossy().to_string(),
         draft_revision: draft.revision,
         target_platforms: draft.target_platforms.clone(),
@@ -332,7 +347,9 @@ fn begin_writeback(session: &LiveUiSession, draft_id: &str, expected: u64) -> Re
     draft.writeback_receipt_id = Some(receipt.receipt_id.clone());
     draft.updated_at = chrono::Utc::now().to_rfc3339();
     persist(&root, &draft)?;
-    Ok(json!({"draft":draft_view(&draft),"receipt":receipt,"next":COMPLETE_WRITEBACK_TOOL}))
+    Ok(
+        json!({"draft":draft_view(&draft),"writebackPlanId":writeback_plan_id,"receipt":receipt,"next":COMPLETE_WRITEBACK_TOOL}),
+    )
 }
 
 fn complete_writeback(session: &LiveUiSession, arguments: &Value) -> Result<Value> {
@@ -554,6 +571,15 @@ fn required_draft_id(arguments: &Value) -> Result<&str> {
     Ok(id)
 }
 
+fn required_text<'a>(arguments: &'a Value, key: &str) -> Result<&'a str> {
+    arguments
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow!("缺少 {key}"))
+}
+
 fn required_revision(arguments: &Value) -> Result<u64> {
     arguments
         .get("expectedRevision")
@@ -647,6 +673,15 @@ fn draft_id_schema(read_only: bool) -> Value {
         properties["expectedRevision"] = json!({"type":"integer","minimum":1});
     }
     json!({"type":"object","additionalProperties":false,"required":if read_only {vec!["draftId"]} else {vec!["draftId","expectedRevision"]},"properties":properties})
+}
+
+fn begin_writeback_schema() -> Value {
+    json!({"type":"object","additionalProperties":false,
+    "required":["draftId","expectedRevision","writebackPlanId"],"properties":{
+        "draftId":{"type":"string","pattern":"^draft_[a-f0-9]{32}$"},
+        "expectedRevision":{"type":"integer","minimum":1},
+        "writebackPlanId":{"type":"string","pattern":"^writeplan_[a-f0-9]{32}$"}
+    }})
 }
 
 fn platform_update_schema() -> Value {
