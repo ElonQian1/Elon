@@ -42,7 +42,7 @@ param(
     [string]$CurrentInstalledVersionName = '', [switch]$AllowAdbVerificationDeferred
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"; if (-not $SkipBuild) { & (Join-Path $PSScriptRoot "check-build-prerequisites.ps1") -Scope Android; if ($LASTEXITCODE -ne 0) { throw "Android build prerequisites failed; APK release was not started." } }
 . (Join-Path $PSScriptRoot 'release-publish-lease.ps1')
 . (Join-Path $PSScriptRoot 'apk-release-freshness.ps1')
 . (Join-Path $PSScriptRoot "direct-network.ps1")

@@ -11,7 +11,9 @@ use std::sync::Arc;
 use tracing::warn;
 
 use crate::{
-    agent_llm_call::{call_chat_llm_with_options, call_llm, start_chat_llm_stream},
+    agent_llm_call::{
+        call_chat_llm_with_options, call_llm, call_llm_with_tools, start_chat_llm_stream,
+    },
     types::{AgentConfig, AgentsConfig, AppState},
 };
 
@@ -134,6 +136,49 @@ pub(crate) async fn call_tool_llm_with_default_fallback_options(
     let mut last_retryable_error = None;
     for (index, agent) in agents.iter().enumerate() {
         match call_llm(state, agent, messages, user_id, feature).await {
+            Ok(response) => return Ok((response, agent.clone(), index > 0)),
+            Err(error) => {
+                let message = error.to_string();
+                let has_next = index + 1 < agents.len();
+                if !is_retryable_agent_error(&message) || !has_next {
+                    return Err(anyhow!(message));
+                }
+                warn!(
+                    feature,
+                    agent = %agent.name,
+                    model = %agent.model,
+                    "AI agent failed, trying fallback: {}",
+                    message
+                );
+                last_retryable_error = Some(message);
+            }
+        }
+    }
+
+    Err(anyhow!(
+        "{}",
+        last_retryable_error.unwrap_or_else(|| "未配置可用 AI 代理".to_string())
+    ))
+}
+
+/// 使用调用方提供的受限工具目录执行一次工具型 LLM 请求，并沿用首页/项目的备用代理策略。
+pub(crate) async fn call_tool_llm_with_definitions(
+    state: &Arc<AppState>,
+    preferred: &AgentConfig,
+    allow_fallback: bool,
+    messages: &[Value],
+    user_id: &str,
+    feature: &str,
+    tools: &Value,
+) -> Result<(Value, AgentConfig, bool)> {
+    let mut agents = vec![preferred.clone()];
+    if allow_fallback {
+        append_fallback_agents(state, preferred, &mut agents).await;
+    }
+
+    let mut last_retryable_error = None;
+    for (index, agent) in agents.iter().enumerate() {
+        match call_llm_with_tools(state, agent, messages, user_id, feature, tools.clone()).await {
             Ok(response) => return Ok((response, agent.clone(), index > 0)),
             Err(error) => {
                 let message = error.to_string();

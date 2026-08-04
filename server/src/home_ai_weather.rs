@@ -3,7 +3,7 @@
 //! 天气不能依赖普通网页搜索或模型猜测：先确定地点，再调用天气服务，
 //! 最后用结构化数据生成简短回答。地点不明确时直接追问，不进入模型链路。
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -64,9 +64,31 @@ pub(crate) fn is_weather_request(message: &str) -> bool {
         "下雪",
         "空气质量",
         "天气预警",
+        "天气预报",
+        "降水",
+        "雷雨",
+        "阵雨",
+        "雨",
     ]
     .iter()
     .any(|keyword| normalized.contains(keyword))
+}
+
+/// 判断用户是在询问降雨的具体时间，而不是只要一条天气概况。
+/// 这里只负责选择更精确的小时预报数据，回答内容仍由结构化天气数据生成。
+pub(crate) fn is_hourly_weather_request(message: &str) -> bool {
+    let compact: String = message.chars().filter(|ch| !ch.is_whitespace()).collect();
+    if compact.is_empty() {
+        return false;
+    }
+    let asks_time = ["几点", "什么时候", "何时", "多久", "时段", "下到", "停雨"]
+        .iter()
+        .any(|marker| compact.contains(marker));
+    asks_time
+        && (compact.contains("雨")
+            || compact.contains("降水")
+            || compact.contains("下")
+            || compact.contains("雷阵雨"))
 }
 
 pub(crate) fn is_weather_request_with_history(
@@ -164,6 +186,7 @@ pub(crate) fn extract_location(message: &str) -> Option<String> {
         "降雪",
         "下雨",
         "下雪",
+        "雨",
     ]
     .iter()
     .filter_map(|marker| normalized.find(marker).map(|index| (index, *marker)))
@@ -312,11 +335,13 @@ fn is_weather_context_follow_up(message: &str, history: &[ConversationMessage]) 
     let compact = message
         .trim()
         .trim_matches(|ch: char| "，。？！?：:、".contains(ch));
-    if compact.is_empty()
-        || !["今天", "现在", "明天", "明日", "后天"]
-            .iter()
-            .any(|marker| compact.contains(marker))
-    {
+    if compact.is_empty() {
+        return false;
+    }
+    let relative_day = ["今天", "现在", "明天", "明日", "后天"]
+        .iter()
+        .any(|marker| compact.contains(marker));
+    if !relative_day && !is_hourly_weather_request(&compact) {
         return false;
     }
     history.iter().rev().any(|item| {
@@ -327,6 +352,7 @@ fn is_weather_context_follow_up(message: &str, history: &[ConversationMessage]) 
 fn extract_location_from_weather_answer(message: &str) -> Option<String> {
     let looks_like_structured_weather = message.contains("数据更新时间：")
         || message.contains("预报日期：")
+        || message.contains("按小时预报")
         || (message.contains("℃")
             && (message.contains("当前")
                 || (message.contains("最高") && message.contains("最低"))));
@@ -340,9 +366,19 @@ fn extract_location_from_weather_answer(message: &str) -> Option<String> {
         .and_then(|index| clean_location_candidate(&message[..index]))
 }
 
-pub(crate) async fn lookup(state: &AppState, location: &str, day_offset: usize) -> WeatherLookup {
+pub(crate) async fn lookup(
+    state: &AppState,
+    location: &str,
+    day_offset: usize,
+    hourly_detail: bool,
+) -> WeatherLookup {
     let day_offset = day_offset.min(2);
-    let cache_key = format!("{}|{}", location.trim().to_lowercase(), day_offset);
+    let cache_key = format!(
+        "{}|{}|{}",
+        location.trim().to_lowercase(),
+        day_offset,
+        hourly_detail
+    );
     if let Ok(mut entries) = cache().lock() {
         if let Some(entry) = entries.get(&cache_key) {
             if entry.expires_at > Instant::now() {
@@ -416,6 +452,10 @@ pub(crate) async fn lookup(state: &AppState, location: &str, day_offset: usize) 
                 "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
                     .to_string(),
             ),
+            (
+                "hourly",
+                "precipitation_probability,rain,showers,weather_code".to_string(),
+            ),
             ("forecast_days", (day_offset + 1).to_string()),
             ("timezone", "auto".to_string()),
         ],
@@ -467,12 +507,38 @@ pub(crate) async fn lookup(state: &AppState, location: &str, day_offset: usize) 
         };
     };
 
-    let condition = weather_description(weather_code);
     let period = match day_offset {
         1 => "明天",
         2 => "后天",
         _ => "今天",
     };
+    if hourly_detail {
+        if let Some(reply) = hourly_rain_reply(
+            &display_location,
+            period,
+            forecast_date.unwrap_or_default(),
+            current.and_then(|value| value["time"].as_str()),
+            payload["hourly"].as_object(),
+        ) {
+            let answer = WeatherAnswer {
+                reply,
+                source_title: "Open-Meteo 小时天气数据".to_string(),
+                source_url: SOURCE_URL.to_string(),
+            };
+            if let Ok(mut entries) = cache().lock() {
+                entries.insert(
+                    cache_key,
+                    CachedWeather {
+                        expires_at: Instant::now() + CACHE_TTL,
+                        answer: answer.clone(),
+                    },
+                );
+            }
+            return WeatherLookup::Answer(answer);
+        }
+    }
+
+    let condition = weather_description(weather_code);
     let mut reply = if day_offset == 0 {
         let Some(temperature) = current.and_then(|value| value["temperature_2m"].as_f64()) else {
             return WeatherLookup::Unavailable {
@@ -520,6 +586,120 @@ pub(crate) async fn lookup(state: &AppState, location: &str, day_offset: usize) 
         );
     }
     WeatherLookup::Answer(answer)
+}
+
+fn hourly_rain_reply(
+    display_location: &str,
+    period: &str,
+    forecast_date: &str,
+    current_time: Option<&str>,
+    hourly: Option<&Map<String, Value>>,
+) -> Option<String> {
+    let hourly = hourly?;
+    let times = hourly.get("time")?.as_array()?;
+    let probabilities = hourly
+        .get("precipitation_probability")
+        .and_then(Value::as_array);
+    let rain = hourly.get("rain").and_then(Value::as_array);
+    let showers = hourly.get("showers").and_then(Value::as_array);
+    let weather_codes = hourly.get("weather_code").and_then(Value::as_array);
+    let mut target_hours = Vec::new();
+
+    for (index, time) in times.iter().enumerate() {
+        let Some(time) = time.as_str() else {
+            continue;
+        };
+        if !forecast_date.is_empty() && !time.starts_with(forecast_date) {
+            continue;
+        }
+        if forecast_date != ""
+            && current_time.is_some_and(|current_time| {
+                current_time.starts_with(forecast_date) && time <= current_time
+            })
+        {
+            continue;
+        }
+        let probability = value_at(probabilities, index)
+            .unwrap_or(0.0)
+            .clamp(0.0, 100.0);
+        let rain_amount = value_at(rain, index).unwrap_or(0.0);
+        let shower_amount = value_at(showers, index).unwrap_or(0.0);
+        let weather_code = value_at(weather_codes, index).unwrap_or_default() as i64;
+        let rainy = probability >= 50.0
+            || rain_amount > 0.01
+            || shower_amount > 0.01
+            || matches!(weather_code, 51..=67 | 80..=82 | 95..=99);
+        let label = time
+            .split_once('T')
+            .map(|(_, clock)| clock.get(..5).unwrap_or(clock))
+            .unwrap_or(time)
+            .to_string();
+        target_hours.push((label, rainy, probability));
+    }
+
+    if target_hours.is_empty() {
+        return None;
+    }
+
+    let mut intervals: Vec<(String, String, f64)> = Vec::new();
+    let mut active_start: Option<usize> = None;
+    let mut active_probability: f64 = 0.0;
+    for (index, (_, rainy, probability)) in target_hours.iter().enumerate() {
+        if *rainy {
+            if active_start.is_none() {
+                active_start = Some(index);
+                active_probability = 0.0;
+            }
+            active_probability = active_probability.max(*probability);
+        } else if let Some(start) = active_start.take() {
+            intervals.push((
+                target_hours[start].0.clone(),
+                target_hours[index - 1].0.clone(),
+                active_probability,
+            ));
+        }
+    }
+    if let Some(start) = active_start {
+        intervals.push((
+            target_hours[start].0.clone(),
+            target_hours[target_hours.len() - 1].0.clone(),
+            active_probability,
+        ));
+    }
+
+    if intervals.is_empty() {
+        return Some(format!(
+            "{display_location}{period}按小时预报暂未发现明显降雨时段，出行前仍建议留意临近预报。"
+        ));
+    }
+
+    let ranges = intervals
+        .iter()
+        .map(|(start, end, _)| {
+            if start == end {
+                start.clone()
+            } else {
+                format!("{start}—{end}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("、");
+    let max_probability = intervals
+        .iter()
+        .map(|(_, _, probability)| *probability)
+        .fold(0.0, f64::max);
+    let probability_note = if max_probability > 0.0 {
+        format!("，对应时段降雨概率最高约 {:.0}%", max_probability)
+    } else {
+        String::new()
+    };
+    Some(format!(
+        "{display_location}{period}按小时预报，预计可能在 {ranges} 出现降雨{probability_note}。"
+    ))
+}
+
+fn value_at(values: Option<&Vec<Value>>, index: usize) -> Option<f64> {
+    values?.get(index).and_then(Value::as_f64)
 }
 
 async fn build_weather_client(fallback: &reqwest::Client) -> reqwest::Client {
@@ -601,138 +781,5 @@ fn weather_description(code: i64) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    fn history(items: &[(&str, &str)]) -> Vec<ConversationMessage> {
-        items
-            .iter()
-            .map(|(role, content)| ConversationMessage {
-                role: (*role).to_string(),
-                content: (*content).to_string(),
-            })
-            .collect()
-    }
-
-    #[test]
-    fn detects_weather_questions() {
-        assert!(is_weather_request("北京今天天气怎么样"));
-        assert!(is_weather_request("上海明天会下雨吗"));
-        assert!(!is_weather_request("今天星期几"));
-    }
-
-    #[test]
-    fn extracts_explicit_location() {
-        assert_eq!(
-            extract_location("北京今天天气怎么样").as_deref(),
-            Some("北京")
-        );
-        assert_eq!(
-            extract_location("帮我查一下上海的天气").as_deref(),
-            Some("上海")
-        );
-        assert_eq!(
-            extract_location("上海明天会下雨吗").as_deref(),
-            Some("上海")
-        );
-        assert_eq!(extract_location("今天天气怎么样").as_deref(), None);
-    }
-
-    #[test]
-    fn reuses_recent_user_location() {
-        let recent = history(&[("user", "我人在杭州"), ("assistant", "好的")]);
-        assert_eq!(
-            resolve_location("今天会下雨吗", &recent).as_deref(),
-            Some("杭州")
-        );
-    }
-
-    #[test]
-    fn treats_city_only_reply_as_weather_follow_up() {
-        let recent = history(&[("assistant", WEATHER_LOCATION_PROMPT)]);
-        assert!(is_weather_request_with_history("广州", &recent));
-        assert_eq!(resolve_location("广州", &recent).as_deref(), Some("广州"));
-    }
-
-    #[test]
-    fn reuses_location_from_successful_weather_answer() {
-        let recent = history(&[(
-            "assistant",
-            "广东广州今天多云，当前 28.1℃。数据更新时间：2026-07-30T17:30。",
-        )]);
-        assert!(is_weather_request_with_history("明天天气情况", &recent));
-        assert_eq!(
-            resolve_location("明天天气情况", &recent).as_deref(),
-            Some("广东广州")
-        );
-        assert_eq!(
-            resolve_location("后天呢", &recent).as_deref(),
-            Some("广东广州")
-        );
-    }
-
-    #[test]
-    fn parses_forecast_day_from_follow_up() {
-        assert_eq!(day_offset("今天天气"), 0);
-        assert_eq!(day_offset("明天天气情况"), 1);
-        assert_eq!(day_offset("后天呢"), 2);
-    }
-
-    #[test]
-    fn reuses_location_from_future_weather_answer() {
-        let recent = history(&[(
-            "assistant",
-            "广东广州明天多云。最高 30.0℃，最低 25.0℃。预报日期：2026-07-31。",
-        )]);
-        assert_eq!(
-            resolve_location("后天天气", &recent).as_deref(),
-            Some("广东广州")
-        );
-    }
-
-    #[test]
-    fn does_not_treat_relative_day_as_a_city() {
-        let recent = history(&[("assistant", WEATHER_LOCATION_PROMPT)]);
-        assert!(!is_weather_location_follow_up("明天呢", &recent));
-        assert_eq!(extract_standalone_location("明天呢"), None);
-        assert_eq!(extract_standalone_location("现在是什么情况"), None);
-    }
-
-    #[test]
-    fn ignores_stale_relative_day_when_restoring_location() {
-        let recent = history(&[
-            ("user", "广州"),
-            ("assistant", WEATHER_LOCATION_PROMPT),
-            ("user", "明天呢"),
-        ]);
-        assert_eq!(
-            resolve_location("现在是什么情况", &recent).as_deref(),
-            Some("广州")
-        );
-    }
-
-    #[test]
-    fn restores_location_from_wrapped_weather_answer_and_prior_city() {
-        let recent = history(&[
-            ("user", "广州"),
-            (
-                "assistant",
-                "广东广州今天多云，当前 28.1℃，体感 33.9℃。\n最高 28.9℃，最低 24.7℃。",
-            ),
-        ]);
-        assert_eq!(
-            extract_location_from_weather_answer(&recent[1].content).as_deref(),
-            Some("广东广州")
-        );
-        assert_eq!(
-            resolve_location("明天天气情况", &recent).as_deref(),
-            Some("广州")
-        );
-        assert_eq!(resolve_location("后天呢", &recent).as_deref(), Some("广州"));
-    }
-
-    #[test]
-    fn maps_weather_codes() {
-        assert_eq!(weather_description(0), "晴");
-        assert_eq!(weather_description(95), "有雷雨");
-    }
+    include!("home_ai_weather_tests.rs");
 }

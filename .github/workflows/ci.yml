@@ -34,6 +34,18 @@ jobs:
         shell: pwsh
         run: scripts\check-source-size.ps1
 
+      - name: Source Ownership Guard
+        shell: pwsh
+        run: scripts\check-source-ownership.ps1
+
+      - name: PC Entrypoint Contract
+        shell: pwsh
+        run: scripts\check-pc-entrypoint-contract.ps1
+
+      - name: Feature Parity Audit
+        shell: pwsh
+        run: scripts\check-feature-parity.ps1
+
       - name: Document Modularity Guard
         shell: pwsh
         run: scripts\check-document-modularity.ps1
@@ -61,6 +73,10 @@ jobs:
       - name: Realtime Diagnostics Snapshot Guard
         shell: pwsh
         run: scripts\check-realtime-diagnostics-snapshot.ps1
+
+      - name: Server Build Prerequisites
+        shell: pwsh
+        run: scripts\check-build-prerequisites.ps1 -Scope Server
 
       - name: Cache Cargo Audit
         id: cargo-audit-cache
@@ -148,3 +164,27 @@ jobs:
 
       - name: Admin Realtime Smoke
         run: npm run test:admin-realtime
+
+  android:
+    name: Android
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Android Build Prerequisites
+        shell: pwsh
+        run: ..\scripts\check-build-prerequisites.ps1 -Scope Android
+
+      - name: Unit Tests and Debug APK
+        working-directory: android
+        shell: pwsh
+        run: .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug

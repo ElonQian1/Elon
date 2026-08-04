@@ -11,6 +11,8 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 -- check --manifest-path server\Cargo.toml --locked
 #>
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "ensure-msvc-environment.ps1")
+if (-not (Get-Command link.exe -CommandType Application -ErrorAction SilentlyContinue)) { Ensure-ElonMsvcEnvironment | Out-Null }
 $argumentModule = Join-Path $PSScriptRoot "validation\Validation.Arguments.psm1"
 Import-Module $argumentModule -Force -DisableNameChecking
 $parsed = Split-ValidationCargoArguments -Arguments $args -ValueOptions @{

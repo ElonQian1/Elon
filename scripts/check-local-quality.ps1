@@ -7,7 +7,7 @@
     expand the check surface before release or risky refactors.
 #>
 param(
-    [ValidateSet("Static", "Server", "Frontend", "All")]
+    [ValidateSet("Static", "Server", "Frontend", "Android", "All")]
     [string]$Scope = "Static",
     [switch]$SkipDependencyAudit,
     [switch]$SkipRustWarningBudget,
@@ -92,12 +92,16 @@ Set-Location $repoRoot
 
 $runsServer = $Scope -eq "Server" -or $Scope -eq "All"
 $runsFrontend = $Scope -eq "Frontend" -or $Scope -eq "All"
+$runsAndroid = $Scope -eq "Android" -or $Scope -eq "All"
 $snapshotArgs = @()
 if ($Scope -eq "Static" -or $SkipCargoTest) {
     $snapshotArgs += "-SkipCargoTest"
 }
 
 Invoke-RepoPowerShellScript -Name "Source Size Guard" -ScriptPath "scripts\check-source-size.ps1"
+Invoke-RepoPowerShellScript -Name "Source Ownership Guard" -ScriptPath "scripts\check-source-ownership.ps1"
+Invoke-RepoPowerShellScript -Name "PC Entrypoint Contract" -ScriptPath "scripts\check-pc-entrypoint-contract.ps1"
+Invoke-RepoPowerShellScript -Name "Feature Parity Audit" -ScriptPath "scripts\check-feature-parity.ps1"
 Invoke-RepoPowerShellScript -Name "Document Modularity Guard" -ScriptPath "scripts\check-document-modularity.ps1"
 Invoke-RepoPowerShellScript -Name "Release Runbook Guard" -ScriptPath "scripts\check-release-runbook.ps1"
 Invoke-RepoPowerShellScript -Name "CI Quality Gates Guard" -ScriptPath "scripts\check-ci-quality-gates.ps1"
@@ -107,6 +111,8 @@ Invoke-RepoPowerShellScript -Name "Realtime Ownership Guard" -ScriptPath "script
 Invoke-RepoPowerShellScript -Name "Realtime Diagnostics Snapshot Guard" -ScriptPath "scripts\check-realtime-diagnostics-snapshot.ps1" -Arguments $snapshotArgs
 
 if ($runsServer) {
+    Invoke-RepoPowerShellScript -Name "Server Build Prerequisites" -ScriptPath "scripts\check-build-prerequisites.ps1" -Arguments @("-Scope", "Server")
+
     if ([string]::IsNullOrWhiteSpace($env:RUST_TEST_THREADS)) {
         $env:RUST_TEST_THREADS = "1"
     }
@@ -155,4 +161,13 @@ if ($runsFrontend) {
     Invoke-NpmCommand -Name "Admin Realtime Smoke" -Arguments @("run", "test:admin-realtime")
 }
 
-Write-Host "LOCAL_QUALITY_GATES=passed scope=$Scope server=$runsServer frontend=$runsFrontend"
+if ($runsAndroid) {
+    Invoke-RepoPowerShellScript -Name "Android Build Prerequisites" -ScriptPath "scripts\check-build-prerequisites.ps1" -Arguments @("-Scope", "Android")
+
+    Invoke-CheckedCommand -Name "Android Unit Tests and Debug APK" -FilePath (Join-Path $repoRoot "android\gradlew.bat") -Arguments @(
+        ":app:testDebugUnitTest",
+        ":app:assembleDebug"
+    ) -WorkingDirectory (Join-Path $repoRoot "android")
+}
+
+Write-Host "LOCAL_QUALITY_GATES=passed scope=$Scope server=$runsServer frontend=$runsFrontend android=$runsAndroid"

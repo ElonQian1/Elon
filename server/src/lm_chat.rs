@@ -11,18 +11,15 @@
 //!   - 意图分析（携带意图分类 prompt）
 
 use axum::{
-    body::{Body, Bytes},
-    extract::{Path, Query, State},
+    extract::State,
     http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
 use futures::StreamExt;
-use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{collections::HashMap, convert::Infallible, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 
 use crate::{
     agent_api_loop::resolve_agent,
@@ -30,53 +27,19 @@ use crate::{
         call_chat_llm_with_default_fallback_options, start_chat_llm_stream_with_default_fallback,
     },
     conversation_router::{resolve_system_conversation_route, ConversationEntryKind},
-    home_ai_search, home_ai_tools, home_ai_weather,
+    home_ai_orchestrator, home_ai_search, home_ai_tools, home_ai_weather,
+    lm_chat_prompt::{append_system_prompt_note, CHAT_MEMORY_LOCAL_CLI_NOTE},
+    lm_chat_request::LmChatRequest,
+    lm_chat_stream_support::{send_stream_error, send_stream_event, stream_response},
     pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_auth::{auth_from_headers, json_error},
     types::{AppState, UserAgentConfig},
     user_memory_extract::extract_and_save_memories_scoped,
 };
 
-#[derive(Deserialize)]
-pub struct LmChatRequest {
-    /// OpenAI 格式的消息数组，如 [{role:"system",content:"..."},{role:"user",content:"..."}]
-    pub messages: Vec<Value>,
-    /// 可选：指定使用哪个 agent（model）
-    pub agent: Option<String>,
-    /// 可选：会话 ID；客户端要开启新会话时应传入新的 ID。
-    pub conversation_id: Option<String>,
-    /// 可选：会话标题，用于普通聊天历史列表展示。
-    pub conversation_title: Option<String>,
-    /// 可选：聊天归档作用域。默认 phone_control；普通聊天传 chat_memory。
-    pub scope: Option<String>,
-    /// 可选：PC 端 AI 来源选择。普通聊天支持 auto / route_b / route_c。
-    #[serde(
-        default,
-        alias = "runtimeRoute",
-        alias = "pcRuntimeRoute",
-        alias = "pc_runtime_route"
-    )]
-    pub runtime_route: Option<String>,
-}
-
-const CHAT_MEMORY_LOCAL_CLI_NOTE: &str = "=== PC 本机 CLI 使用规则 ===
-普通聊天本身不能直接执行用户电脑命令，也不能直接读取 C 盘、D 盘或其它本机文件。
-当用户询问本机目录、Windows 命令、cmd、PowerShell、文件读写、Win 端 CLI 或“为什么网页端不能访问我的电脑”时，不要只回答“我无法访问你的电脑”。
-应明确告诉用户：在 PC 工作台里，AI 回复下方会出现“本机开发 CLI”快捷卡，用户可以点击“检测 Win 端”“使用默认目录”或由项目 owner/管理员确认“开启完整命令行”；账号绑定会在这些动作里自动使用当前网页账号完成，不需要单独步骤。
-只有本机 Win 端节点绑定到当前网页账号、项目默认目录已准备，并且项目开发频道真实返回了本机工具执行结果后，才可以声称已经执行命令或读写文件。
-如果当前对话还没有本机工具结果，只能引导用户完成授权流程，或说明需要到项目开发频道继续。";
-
-fn append_system_prompt_note(messages: &mut Vec<Value>, note: &str) {
-    let has_system = messages.first().and_then(|m| m["role"].as_str()) == Some("system");
-    if has_system {
-        if let Some(sys) = messages.first_mut() {
-            let orig = sys["content"].as_str().unwrap_or("").to_string();
-            sys["content"] = json!(format!("{orig}\n\n{note}"));
-        }
-    } else {
-        messages.insert(0, json!({"role": "system", "content": note}));
-    }
-}
+pub(crate) use crate::lm_chat_history::{
+    list_ai_chat_conversation_messages, list_ai_chat_conversations,
+};
 
 /// POST /api/llm/chat
 pub async fn lm_chat_handler(
@@ -226,8 +189,12 @@ pub async fn lm_chat_handler(
         None
     };
     let weather_day_offset = home_ai_weather::day_offset(&user_msg);
+    let weather_hourly_detail = home_ai_weather::is_hourly_weather_request(&user_msg);
     let weather_lookup = if let Some(location) = weather_location.as_deref() {
-        Some(home_ai_weather::lookup(&state, location, weather_day_offset).await)
+        Some(
+            home_ai_weather::lookup(&state, location, weather_day_offset, weather_hourly_detail)
+                .await,
+        )
     } else {
         None
     };
@@ -270,6 +237,7 @@ pub async fn lm_chat_handler(
     } else {
         None
     };
+    let mut orchestrated_sources = Vec::new();
     let (reply, used_agent_name, used_model, used_fallback, assistant_mode, tool_used) =
         if weather_requested {
             let reply = match weather_lookup.as_ref() {
@@ -341,52 +309,66 @@ pub async fn lm_chat_handler(
                 }
             };
             let allow_agent_fallback = req.agent.as_deref().map(str::trim).unwrap_or("").is_empty();
-            let (response, used_agent, used_fallback) =
-                match call_chat_llm_with_default_fallback_options(
+            if entry_kind == ConversationEntryKind::ChatMemory && !search_requested {
+                match home_ai_orchestrator::run(
                     &state,
                     &agent,
                     allow_agent_fallback,
                     &messages,
                     &user.id,
-                    "lm_chat",
-                    0.8,
-                    900,
+                    &history,
                 )
                 .await
                 {
+                    Ok(answer) => {
+                        orchestrated_sources = answer.sources;
+                        (
+                            answer.reply,
+                            answer.agent_name,
+                            answer.model,
+                            answer.used_fallback,
+                            "model".to_string(),
+                            answer.tool_used,
+                        )
+                    }
+                    Err(error) => {
+                        tracing::warn!(
+                            user_id = %user.id,
+                            error = %error,
+                            "首页工具编排不可用，回退到普通聊天"
+                        );
+                        match regular_home_chat(
+                            &state,
+                            &agent,
+                            allow_agent_fallback,
+                            &messages,
+                            &user.id,
+                        )
+                        .await
+                        {
+                            Ok(result) => result,
+                            Err(error) => {
+                                return json_error(
+                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                    format!("LLM 调用失败：{error}"),
+                                );
+                            }
+                        }
+                    }
+                }
+            } else {
+                match regular_home_chat(&state, &agent, allow_agent_fallback, &messages, &user.id)
+                    .await
+                {
                     Ok(result) => result,
-                    Err(e) => {
+                    Err(error) => {
                         return json_error(
                             StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("LLM 调用失败：{e}"),
+                            format!("LLM 调用失败：{error}"),
                         );
                     }
-                };
-            if used_fallback {
-                tracing::warn!(
-                    user_id = %user.id,
-                    preferred_agent = %agent.name,
-                    used_agent = %used_agent.name,
-                    model = %used_agent.model,
-                    "默认聊天模型失败后已自动切换备用代理"
-                );
+                }
             }
-            (
-                response["choices"][0]["message"]["content"]
-                    .as_str()
-                    .unwrap_or("")
-                    .trim()
-                    .to_string(),
-                used_agent.name.clone(),
-                used_agent.model.clone(),
-                used_fallback,
-                "model".to_string(),
-                if search_result.is_some() {
-                    Some("web_search".to_string())
-                } else {
-                    None
-                },
-            )
         };
 
     // ── 5. 保存消息到会话记录 ────────────────────────────────────────────────
@@ -412,7 +394,7 @@ pub async fn lm_chat_handler(
         let state2 = state.clone();
         let uid = user.id.clone();
         let umsg = user_msg.clone();
-        let rep = reply.clone();
+        let rep = reply.to_string();
         let scope_type = route.memory_scope_type.clone();
         let scope_id = route.memory_scope_id.clone();
         let source_conv_id = Some(conversation_id.clone());
@@ -446,6 +428,8 @@ pub async fn lm_chat_handler(
                 "title": answer.source_title,
                 "url": answer.source_url,
             })]
+        } else if !orchestrated_sources.is_empty() {
+            orchestrated_sources.clone()
         } else {
             search_result.as_ref().map(|result| result.sources.iter().map(|source| json!({
                 "title": source.title,
@@ -457,40 +441,45 @@ pub async fn lm_chat_handler(
     .into_response()
 }
 
-fn stream_response(rx: mpsc::Receiver<String>) -> Response {
-    let stream = ReceiverStream::new(rx).map(|chunk| Ok::<Bytes, Infallible>(Bytes::from(chunk)));
-    let mut response = Response::new(Body::from_stream(stream));
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("text/event-stream; charset=utf-8"),
-    );
-    response.headers_mut().insert(
-        header::CACHE_CONTROL,
-        HeaderValue::from_static("no-cache, no-transform"),
-    );
-    response
-        .headers_mut()
-        .insert(header::CONNECTION, HeaderValue::from_static("keep-alive"));
-    response.headers_mut().insert(
-        header::HeaderName::from_static("x-accel-buffering"),
-        HeaderValue::from_static("no"),
-    );
-    response
-}
-
-async fn send_stream_event(tx: &mpsc::Sender<String>, payload: Value) -> bool {
-    tx.send(format!("data: {}\n\n", payload)).await.is_ok()
-}
-
-async fn send_stream_error(tx: &mpsc::Sender<String>, message: impl Into<String>) {
-    let _ = send_stream_event(
-        tx,
-        json!({
-            "type": "error",
-            "message": message.into(),
-        }),
+async fn regular_home_chat(
+    state: &Arc<AppState>,
+    agent: &crate::types::AgentConfig,
+    allow_fallback: bool,
+    messages: &[Value],
+    user_id: &str,
+) -> anyhow::Result<(String, String, String, bool, String, Option<String>)> {
+    let (response, used_agent, used_fallback) = call_chat_llm_with_default_fallback_options(
+        state,
+        agent,
+        allow_fallback,
+        messages,
+        user_id,
+        "lm_chat",
+        0.8,
+        900,
     )
-    .await;
+    .await?;
+    if used_fallback {
+        tracing::warn!(
+            user_id = %user_id,
+            preferred_agent = %agent.name,
+            used_agent = %used_agent.name,
+            model = %used_agent.model,
+            "默认聊天模型失败后已自动切换备用代理"
+        );
+    }
+    Ok((
+        response["choices"][0]["message"]["content"]
+            .as_str()
+            .unwrap_or("")
+            .trim()
+            .to_string(),
+        used_agent.name,
+        used_agent.model,
+        used_fallback,
+        "model".to_string(),
+        None,
+    ))
 }
 
 /// POST /api/llm/chat/stream — 首页 AI 的流式兼容入口。
@@ -676,6 +665,7 @@ async fn run_lm_chat_stream(
         None
     };
     let weather_day_offset = home_ai_weather::day_offset(&user_msg);
+    let weather_hourly_detail = home_ai_weather::is_hourly_weather_request(&user_msg);
     if weather_requested {
         let Some(location) = weather_location.as_deref() else {
             let reply = home_ai_weather::missing_location_reply();
@@ -731,7 +721,9 @@ async fn run_lm_chat_stream(
         {
             return;
         }
-        let weather_lookup = home_ai_weather::lookup(&state, location, weather_day_offset).await;
+        let weather_lookup =
+            home_ai_weather::lookup(&state, location, weather_day_offset, weather_hourly_detail)
+                .await;
         let (reply, tool_used, source_values) = match &weather_lookup {
             home_ai_weather::WeatherLookup::Answer(answer) => (
                 answer.reply.clone(),
@@ -1036,6 +1028,78 @@ async fn run_lm_chat_stream(
         }
     };
     let allow_agent_fallback = req.agent.as_deref().map(str::trim).unwrap_or("").is_empty();
+    if entry_kind == ConversationEntryKind::ChatMemory && !search_requested {
+        let _ = send_stream_event(
+            &tx,
+            json!({
+                "type": "status",
+                "phase": "capability",
+                "message": "正在判断是否需要联网能力…",
+                "elapsed_ms": started_at.elapsed().as_millis(),
+            }),
+        )
+        .await;
+        match home_ai_orchestrator::run(
+            &state,
+            &agent,
+            allow_agent_fallback,
+            &messages,
+            &user_id,
+            &history,
+        )
+        .await
+        {
+            Ok(answer) => {
+                let reply = answer.reply;
+                if !answer.sources.is_empty() {
+                    let _ = send_stream_event(
+                        &tx,
+                        json!({ "type": "sources", "sources": answer.sources.clone() }),
+                    )
+                    .await;
+                }
+                let _ = send_stream_event(&tx, json!({ "type": "delta", "content": reply })).await;
+                persist_stream_chat_turn(
+                    &state,
+                    &route.project_id,
+                    &conversation_id,
+                    &user_id,
+                    &user_msg,
+                    &reply,
+                    &route.memory_scope_type,
+                    route.memory_scope_id.as_deref(),
+                )
+                .await;
+                let _ = send_stream_event(
+                    &tx,
+                    json!({
+                        "type": "done",
+                        "reply": reply,
+                        "conversation_id": conversation_id,
+                        "project_id": route.project_id,
+                        "project_name": route.project_name,
+                        "assistant_mode": "model",
+                        "agent_used": answer.agent_name,
+                        "model_used": answer.model,
+                        "agent_fallback": answer.used_fallback,
+                        "tool_used": answer.tool_used,
+                        "sources": answer.sources,
+                        "handoff": Value::Null,
+                        "elapsed_ms": started_at.elapsed().as_millis(),
+                    }),
+                )
+                .await;
+                return;
+            }
+            Err(error) => {
+                tracing::warn!(
+                    user_id = %user_id,
+                    error = %error,
+                    "首页流式工具编排不可用，回退到普通流式聊天"
+                );
+            }
+        }
+    }
     let (response, used_agent, used_fallback) = match start_chat_llm_stream_with_default_fallback(
         &state,
         &agent,
@@ -1216,86 +1280,5 @@ async fn run_lm_chat_stream(
             }),
         )
         .await;
-    }
-}
-
-pub async fn list_ai_chat_conversations(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Query(query): Query<HashMap<String, String>>,
-) -> Response {
-    let user = match auth_from_headers(&state, &headers) {
-        Ok(u) => u,
-        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
-    };
-    let route = match resolve_system_conversation_route(
-        &state.store,
-        &user.id,
-        ConversationEntryKind::ChatMemory,
-    ) {
-        Ok(route) => route,
-        Err(e) => {
-            tracing::warn!("确保普通聊天归档项目失败 user={}: {e}", user.id);
-            return json_error(StatusCode::INTERNAL_SERVER_ERROR, "创建聊天归档项目失败");
-        }
-    };
-    let limit = query
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(50);
-    match state
-        .store
-        .list_user_conversations(&route.project_id, &user.id, limit)
-    {
-        Ok(conversations) => Json(json!({
-            "conversations": conversations,
-            "project_id": route.project_id,
-            "project_name": route.project_name,
-            "scope": route.entry_key,
-        }))
-        .into_response(),
-        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    }
-}
-
-pub async fn list_ai_chat_conversation_messages(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Path(conversation_id): Path<String>,
-    Query(query): Query<HashMap<String, String>>,
-) -> Response {
-    let user = match auth_from_headers(&state, &headers) {
-        Ok(u) => u,
-        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
-    };
-    let route = match resolve_system_conversation_route(
-        &state.store,
-        &user.id,
-        ConversationEntryKind::ChatMemory,
-    ) {
-        Ok(route) => route,
-        Err(e) => {
-            tracing::warn!("确保普通聊天归档项目失败 user={}: {e}", user.id);
-            return json_error(StatusCode::INTERNAL_SERVER_ERROR, "创建聊天归档项目失败");
-        }
-    };
-    let limit = query
-        .get("limit")
-        .and_then(|value| value.parse::<i64>().ok())
-        .unwrap_or(120);
-    match state.store.list_user_conversation_messages(
-        &route.project_id,
-        &user.id,
-        &conversation_id,
-        limit,
-    ) {
-        Ok(messages) => Json(json!({
-            "messages": messages,
-            "conversation_id": conversation_id,
-            "project_id": route.project_id,
-            "scope": route.entry_key,
-        }))
-        .into_response(),
-        Err(e) => json_error(StatusCode::NOT_FOUND, e.to_string()),
     }
 }

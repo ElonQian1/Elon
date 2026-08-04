@@ -30,16 +30,12 @@ class BorderlessRippleContractTest {
     @Test
     fun webMirrorDisablesNativeTapHighlightGlobally() {
         val web = readRepositoryFile("server/src/assets/web_page.html")
+            .replace("\r\n", "\n")
 
         assertTrue(
-            web.contains(
-                """
-                * {
-                  box-sizing: border-box;
-                  -webkit-tap-highlight-color: transparent;
-                }
-                """.trimIndent()
-            )
+            Regex(
+                """(?s)\*\s*\{\s*box-sizing:\s*border-box;\s*-webkit-tap-highlight-color:\s*transparent;\s*}"""
+            ).containsMatchIn(web)
         )
     }
 

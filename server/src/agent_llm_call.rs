@@ -27,13 +27,28 @@ pub(crate) async fn call_llm(
     user_id: &str,
     feature: &str,
 ) -> Result<Value> {
+    call_llm_with_tools(state, agent, messages, user_id, feature, tool_definitions()).await
+}
+
+/// 调用 LLM API，并允许调用方提供受限的工具目录。
+///
+/// 首页总 AI 与项目 AI 共用 OpenAI-compatible 协议，但工具权限不能混用：
+/// 首页只传入搜索、天气等只读工具，项目 AI 才传入文件和命令工具。
+pub(crate) async fn call_llm_with_tools(
+    state: &Arc<AppState>,
+    agent: &AgentConfig,
+    messages: &[Value],
+    user_id: &str,
+    feature: &str,
+    tools: Value,
+) -> Result<Value> {
     ensure_api_call_allowed(state, agent, user_id)?;
     let url = format!("{}/chat/completions", agent.api_base);
 
     let body = json!({
         "model": agent.model,
         "messages": messages,
-        "tools": tool_definitions(),
+        "tools": tools,
         "tool_choice": "auto",
     });
 

@@ -15,10 +15,10 @@
 
 | 发布对象 | 触发场景 | 发布前本地检查 | 发布脚本 | 脚本内阻断门禁 | 完成验收 |
 | --- | --- | --- | --- | --- | --- |
-| Rust server | `server/` 后端行为、API、任务调度、计费、存储、AI CLI 流程变更 | `scripts\check-rust-warning-budget.ps1 -MaxWarnings 0`；`scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml`；`scripts\check-source-size.ps1` | `scripts\publish-server.ps1` | release claim；git 最新性；musl build 注入版本和 git SHA；上传前 SHA 顺序检查；flock CAS；重启后 `/health`、`/api/server/version` 阻断式 smoke | `scripts\check-task-complete.ps1 -Kind Server` |
+| Rust server | `server/` 后端行为、API、任务调度、计费、存储、AI CLI 流程变更 | `scripts\check-build-prerequisites.ps1 -Scope Server`；`scripts\check-rust-warning-budget.ps1 -MaxWarnings 0`；`scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml`；`scripts\check-source-size.ps1` | `scripts\publish-server.ps1` | release claim；git 最新性；musl build 注入版本和 git SHA；上传前 SHA 顺序检查；flock CAS；重启后 `/health`、`/api/server/version` 阻断式 smoke | `scripts\check-task-complete.ps1 -Kind Server` |
 | PC frontend `/pc` | `pc-frontend/`、用户可见 Web 工作台、路由、样式、会话页、模型/节点/项目页面变更 | `npm run build`；`npm run check:bundle-budget`；相关前端专项测试，例如 `npm run test:message-flow`、`npm run test:admin-realtime` | `scripts\publish-server.ps1` | PC dist rebuild 或复用旧 dist；bundle budget；server post-deploy smoke；上传 `/pc` dist 前预算检查 | `scripts\check-task-complete.ps1 -Kind PcFrontend` |
 | PC node agent | `server/src/node_*`、Windows 客户端、launcher、节点自动更新、内置 PC 工作台包变更 | Rust/前端相关测试按变更面选择；确认 `pc-frontend` 可构建 | `scripts\publish-node-agent.ps1` | Linux/Windows agent build；内置 PC 工作台 build；bundle budget；manifest 写入；上传后 node-agent manifest 与下载端点 HEAD smoke；广播前公开开发节点握手等待 | `scripts\check-task-complete.ps1 -Kind NodeAgent` |
-| Android APK | `android/`、移动端可安装能力、APK 更新、Android 原生交互或 APK 发布脚本变更 | Android/后端相关测试按变更面选择；先用 `scripts\check-task-complete.ps1 -Kind CodePushed` 确认业务提交已进入 `origin/main` | `scripts\publish-apk.ps1 -Changelog "<说明>"` | release claim 分配 `versionName/versionCode`；临时写入 Gradle 且不提交；`assembleRelease`；本地 APK manifest 版本校验；origin/main freshness；服务器 APK freshness；上传后 `/app/version.json` 和远端 APK manifest 校验 | `scripts\check-task-complete.ps1 -Kind AndroidFeature` |
+| Android APK | `android/`、移动端可安装能力、APK 更新、Android 原生交互或 APK 发布脚本变更 | `scripts\check-build-prerequisites.ps1 -Scope Android`；Android/后端相关测试按变更面选择；先用 `scripts\check-task-complete.ps1 -Kind CodePushed` 确认业务提交已进入 `origin/main` | `scripts\publish-apk.ps1 -Changelog "<说明>"` | release claim 分配 `versionName/versionCode`；临时写入 Gradle 且不提交；`assembleRelease`；本地 APK manifest 版本校验；origin/main freshness；服务器 APK freshness；上传后 `/app/version.json` 和远端 APK manifest 校验 | `scripts\check-task-complete.ps1 -Kind AndroidFeature` |
 
 ## 轻量流程
 
@@ -66,6 +66,7 @@ SMOKE=<health/version/download result>
 - `scripts\check-pc-frontend-bundle-budget.js`：Vite 产物分级预算门禁；入口、关键页面和最大单分包保护真实加载性能，全项目懒加载资产总量只报告增长趋势。
 - `scripts\test-pc-frontend-bundle-budget.js`：预算门禁夹具测试，覆盖正常、单分包软/硬线，以及全项目原始和 Gzip 总量只告警的扩展场景。
 - `scripts\check-source-size.ps1`：源码体积门禁，阻止巨型文件继续扩张。
+- `scripts\check-build-prerequisites.ps1`：发布前检查 Rust/MSVC、JDK 和 Android SDK，阻止在未具备编译条件时 claim 或上传发布槽位。
 - `scripts\check-document-modularity.ps1`：正式 Markdown 增量门禁；允许保留讨论原稿，但阻止新增巨型正式文档、跨入红区或在红区继续增长。
 - `scripts\check-dependency-audit.ps1`：Rust/npm dependency audit 汇总门禁。
 - `scripts\check-rust-warning-budget.ps1`：Rust warning budget 门禁，当前预算为 0。

@@ -30,5 +30,9 @@ git diff --cached --check
   -AutomationHandoff
 "$PS_CMD" -NoProfile -ExecutionPolicy Bypass \
   -File scripts/check-ai-project-entrypoints.ps1
+"$PS_CMD" -NoProfile -ExecutionPolicy Bypass \
+  -File scripts/check-source-ownership.ps1 \
+  -Staged \
+  -EnforceLegacy
 
 echo -e "${GREEN}pre-commit document modularity gate passed or handed off to post-commit automation${NC}"

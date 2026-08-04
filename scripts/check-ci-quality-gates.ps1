@@ -57,6 +57,12 @@ $requiredEntries = @(
     "RUST_TEST_THREADS: 1",
     "Source Size Guard",
     "scripts\check-source-size.ps1",
+    "Source Ownership Guard",
+    "scripts\check-source-ownership.ps1",
+    "PC Entrypoint Contract",
+    "scripts\check-pc-entrypoint-contract.ps1",
+    "Feature Parity Audit",
+    "scripts\check-feature-parity.ps1",
     "Document Modularity Guard",
     "scripts\check-document-modularity.ps1",
     "Release Runbook Guard",
@@ -71,6 +77,8 @@ $requiredEntries = @(
     "scripts\check-realtime-ownership.ps1",
     "Realtime Diagnostics Snapshot Guard",
     "scripts\check-realtime-diagnostics-snapshot.ps1",
+    "Server Build Prerequisites",
+    "scripts\check-build-prerequisites.ps1 -Scope Server",
     "Cache Cargo Audit",
     "actions/cache@v4",
     "~\.cargo\bin\cargo-audit.exe",
@@ -110,7 +118,16 @@ $requiredEntries = @(
     "Workspace Access Tests",
     "npm run test:workspace-access",
     "Admin Realtime Smoke",
-    "npm run test:admin-realtime"
+    "npm run test:admin-realtime",
+    "android:",
+    "name: Android",
+    "runs-on: windows-latest",
+    "actions/setup-java@v4",
+    "java-version: '17'",
+    "android-actions/setup-android@v3",
+    "Android Build Prerequisites",
+    "..\scripts\check-build-prerequisites.ps1 -Scope Android",
+    ":app:testDebugUnitTest :app:assembleDebug"
 )
 
 foreach ($entry in $requiredEntries) {

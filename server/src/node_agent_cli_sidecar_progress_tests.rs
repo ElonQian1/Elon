@@ -187,7 +187,7 @@ fn scaled_progress_command(with_progress: bool) -> (String, Vec<String>) {
             "& { param([Parameter(ValueFromRemainingArguments=$true)]$rest) Start-Sleep -Seconds 5 }"
         };
         (
-            "powershell".to_string(),
+            powershell_program(),
             vec![
                 "-NoProfile".to_string(),
                 "-Command".to_string(),
@@ -206,6 +206,16 @@ fn scaled_progress_command(with_progress: bool) -> (String, Vec<String>) {
             vec!["-c".to_string(), script.to_string(), "--json".to_string()],
         )
     }
+}
+
+#[cfg(windows)]
+fn powershell_program() -> String {
+    std::env::var_os("WINDIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\Windows"))
+        .join(r"System32\WindowsPowerShell\v1.0\powershell.exe")
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn scaled_pipe_config(

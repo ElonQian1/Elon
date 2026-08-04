@@ -19,6 +19,7 @@
 |---|---|---|
 | 项目总览 | `AI_PROJECT.md` | 项目目标、范围、任务如何开始 |
 | 平台架构 | `AI_ARCHITECTURE.md`、`docs/system-architecture.md` | 模块边界、数据流、改动落点 |
+| 代码归属与迁移 | `docs/architecture/source-of-truth.md`、`docs/architecture/legacy-inventory.md`、`docs/architecture/feature-parity-matrix.md` | 新旧入口、兼容代码和功能迁移判定 |
 | 后端与 API | `AI_INDEX.md` | 路由、接口、服务端实现与验证入口 |
 | PC Web 工作台 | `docs/pc-frontend-migration.md` | `/pc`、React/Vite、项目文档工作台 |
 | 后台多端 UI 设计 | `docs/headless-ui-design-mcp.md` | AI 无需打开画布即可发现、捕获和读取 Web/PWA/Tauri/Android 页面 |

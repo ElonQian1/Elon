@@ -651,7 +651,7 @@ fn pipe_json_echo_command() -> (String, Vec<String>) {
 fn codex_approval_prompt_command() -> (String, Vec<String>) {
     if cfg!(windows) {
         (
-            "powershell".to_string(),
+            powershell_program(),
             vec![
                 "-NoProfile".to_string(),
                 "-Command".to_string(),
@@ -672,7 +672,7 @@ fn codex_approval_prompt_command() -> (String, Vec<String>) {
 fn codex_approval_text_command() -> (String, Vec<String>) {
     if cfg!(windows) {
         (
-            "powershell".to_string(),
+            powershell_program(),
             vec![
                 "-NoProfile".to_string(),
                 "-Command".to_string(),
@@ -693,7 +693,7 @@ fn codex_approval_text_command() -> (String, Vec<String>) {
 fn codex_session_echo_command(session_id: &str) -> (String, Vec<String>) {
     if cfg!(windows) {
         (
-            "powershell".to_string(),
+            powershell_program(),
             vec![
                 "-NoProfile".to_string(),
                 "-Command".to_string(),
@@ -711,6 +711,16 @@ fn codex_session_echo_command(session_id: &str) -> (String, Vec<String>) {
             ],
         )
     }
+}
+
+#[cfg(windows)]
+fn powershell_program() -> String {
+    std::env::var_os("WINDIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\Windows"))
+        .join(r"System32\WindowsPowerShell\v1.0\powershell.exe")
+        .to_string_lossy()
+        .into_owned()
 }
 
 fn interactive_shell_command() -> (String, Vec<String>, String) {
@@ -732,7 +742,7 @@ fn interactive_shell_command() -> (String, Vec<String>, String) {
 fn approval_read_command() -> (String, Vec<String>) {
     if cfg!(windows) {
         (
-            "powershell".to_string(),
+            powershell_program(),
             vec![
                 "-NoProfile".to_string(),
                 "-Command".to_string(),

@@ -75,7 +75,7 @@ param(
     [switch]$SkipVersionBump
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"; . (Join-Path $PSScriptRoot "ensure-msvc-environment.ps1"); if (-not $SkipBuild) { Ensure-ElonMsvcEnvironment | Out-Null; & (Join-Path $PSScriptRoot "check-build-prerequisites.ps1") -Scope Server; if ($LASTEXITCODE -ne 0) { throw "Server build prerequisites failed; release was not started." } }
 . (Join-Path $PSScriptRoot 'release-publish-lease.ps1')
 . (Join-Path $PSScriptRoot 'local-env.ps1')
 . (Join-Path $PSScriptRoot 'node-storage-paths.ps1')
