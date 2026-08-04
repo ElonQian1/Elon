@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     identity::ComputePluginReleaseRef,
+    keyring::ComputePluginKeyringBinding,
     plugin_manifest::{
         resource_limits_are_non_negative, ComputePluginPermissionProfile,
         ComputePluginResourceLimits, ComputePluginSignature,
@@ -38,7 +39,8 @@ pub(crate) struct ComputePluginInstallPlan {
     pub sharing_authorization: Option<ComputeSharingAuthorizationBinding>,
     pub node_profile_digest: String,
     pub manifest_catalog_revision: i64,
-    pub control_keyring_revision: i64,
+    pub publisher_keyring: ComputePluginKeyringBinding,
+    pub control_keyring: ComputePluginKeyringBinding,
     pub items: Vec<ComputePluginPlanItem>,
     pub total_download_bytes: i64,
     pub required_disk_bytes: i64,
@@ -109,7 +111,8 @@ pub(crate) fn install_plan_shape_is_valid(plan: &ComputePluginInstallPlan) -> bo
     if plan.expected_inventory_revision < 0
         || plan.desired_policy_revision < 0
         || plan.manifest_catalog_revision < 0
-        || plan.control_keyring_revision < 0
+        || !keyring_binding_shape_is_valid(&plan.publisher_keyring)
+        || !keyring_binding_shape_is_valid(&plan.control_keyring)
         || plan.total_download_bytes < 0
         || plan.required_disk_bytes < 0
         || plan.previous_versions_to_keep < 0
@@ -135,6 +138,15 @@ pub(crate) fn install_plan_shape_is_valid(plan: &ComputePluginInstallPlan) -> bo
     downloads_total == Some(plan.total_download_bytes)
         && plan.items.iter().all(plan_item_shape_is_valid)
         && install_plan_respects_sharing_intent(plan)
+}
+
+fn keyring_binding_shape_is_valid(binding: &ComputePluginKeyringBinding) -> bool {
+    binding.revision > 0
+        && binding.digest.len() == 64
+        && binding
+            .digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn plan_item_shape_is_valid(item: &ComputePluginPlanItem) -> bool {

@@ -5,12 +5,14 @@ use chrono::{DateTime, Duration, SecondsFormat, Utc};
 
 use super::{
     keyring::{
-        ComputePluginBootstrapRootKeyResolver, ComputePluginKeyring, ComputePluginKeyringBinding,
-        ComputePluginKeyringKey, SignedComputePluginKeyringBundle,
-        ValidatedComputePluginKeyringBundle, COMPUTE_PLUGIN_KEYRING_BUNDLE_SCHEMA,
-        COMPUTE_PLUGIN_KEYRING_SCHEMA, COMPUTE_PLUGIN_KEYRING_SIGNATURE_DOMAIN,
-        KEY_PURPOSE_CONTROL_INSTALL_PLAN, KEY_PURPOSE_PUBLISHER_MANIFEST, KEY_STATUS_ACTIVE,
-        KEY_STATUS_REVOKED, SIGNED_COMPUTE_PLUGIN_KEYRING_BUNDLE_SCHEMA,
+        ComputePluginBootstrapRootKeyResolver, ComputePluginControlPlaneKeyResolver,
+        ComputePluginKeyring, ComputePluginKeyringBinding, ComputePluginKeyringKey,
+        ComputePluginPublisherKeyResolver, ResolvedComputePluginVerificationKey,
+        SignedComputePluginKeyringBundle, ValidatedComputePluginKeyringBundle,
+        COMPUTE_PLUGIN_KEYRING_BUNDLE_SCHEMA, COMPUTE_PLUGIN_KEYRING_SCHEMA,
+        COMPUTE_PLUGIN_KEYRING_SIGNATURE_DOMAIN, KEY_PURPOSE_CONTROL_INSTALL_PLAN,
+        KEY_PURPOSE_PUBLISHER_MANIFEST, KEY_STATUS_ACTIVE, KEY_STATUS_REVOKED,
+        SIGNED_COMPUTE_PLUGIN_KEYRING_BUNDLE_SCHEMA,
     },
     plugin_manifest::COMPUTE_PLUGIN_SIGNATURE_ALGORITHM,
     signed_artifact_verification::{jcs_sha256_hex, verify_jcs_ed25519},
@@ -49,7 +51,7 @@ pub(crate) fn verify_and_validate_keyring_bundle(
         COMPUTE_PLUGIN_KEYRING_SIGNATURE_DOMAIN,
         &root_key,
     )?;
-    validate_bundle_window(signed, trusted_now)?;
+    validate_bundle_window(signed, trusted_now, true)?;
 
     let mut fingerprints = HashSet::new();
     validate_ring(
@@ -78,9 +80,91 @@ pub(crate) fn verify_and_validate_keyring_bundle(
     ))
 }
 
+impl ComputePluginPublisherKeyResolver for ValidatedComputePluginKeyringBundle {
+    fn resolve_publisher_key(
+        &self,
+        publisher_id: &str,
+        signing_key_id: &str,
+        expected_keyring: &ComputePluginKeyringBinding,
+        trusted_now: DateTime<Utc>,
+    ) -> Result<Option<ResolvedComputePluginVerificationKey>> {
+        resolve_key(
+            self,
+            &self.signed().bundle.publisher_keyring,
+            self.publisher_binding(),
+            expected_keyring,
+            Some(publisher_id),
+            signing_key_id,
+            trusted_now,
+        )
+    }
+}
+
+impl ComputePluginControlPlaneKeyResolver for ValidatedComputePluginKeyringBundle {
+    fn resolve_control_plane_key(
+        &self,
+        signing_key_id: &str,
+        expected_keyring: &ComputePluginKeyringBinding,
+        trusted_now: DateTime<Utc>,
+    ) -> Result<Option<ResolvedComputePluginVerificationKey>> {
+        resolve_key(
+            self,
+            &self.signed().bundle.control_keyring,
+            self.control_binding(),
+            expected_keyring,
+            None,
+            signing_key_id,
+            trusted_now,
+        )
+    }
+}
+
+fn resolve_key(
+    bundle: &ValidatedComputePluginKeyringBundle,
+    ring: &ComputePluginKeyring,
+    actual_binding: &ComputePluginKeyringBinding,
+    expected_binding: &ComputePluginKeyringBinding,
+    publisher_id: Option<&str>,
+    signing_key_id: &str,
+    trusted_now: DateTime<Utc>,
+) -> Result<Option<ResolvedComputePluginVerificationKey>> {
+    if actual_binding != expected_binding {
+        bail!("COMPUTE_PLUGIN_KEYRING_BINDING_CHANGED: required keyring revision or digest is unavailable");
+    }
+    validate_bundle_window(bundle.signed(), trusted_now.clone(), false)?;
+    let Some(record) = ring.keys.iter().find(|key| {
+        key.publisher_id.as_deref() == publisher_id && key.signing_key_id == signing_key_id
+    }) else {
+        return Ok(None);
+    };
+    if record.status != KEY_STATUS_ACTIVE {
+        return Ok(None);
+    }
+    let not_before = parse_canonical_utc("COMPUTE_PLUGIN_KEY_NOT_BEFORE", &record.not_before)?;
+    let not_after = parse_canonical_utc("COMPUTE_PLUGIN_KEY_NOT_AFTER", &record.not_after)?;
+    if trusted_now < not_before || trusted_now >= not_after {
+        return Ok(None);
+    }
+    let key =
+        super::signed_artifact_verification::ComputePluginEd25519PublicKey::from_standard_base64(
+            &record.public_key_base64,
+        )?;
+    Ok(Some(ResolvedComputePluginVerificationKey::new(
+        key,
+        actual_binding.clone(),
+        record.purpose.clone(),
+        record.publisher_id.clone(),
+        record.signing_key_id.clone(),
+        record.fingerprint_sha256.clone(),
+        not_before,
+        not_after,
+    )))
+}
+
 fn validate_bundle_window(
     signed: &SignedComputePluginKeyringBundle,
     trusted_now: DateTime<Utc>,
+    allow_generated_at_skew: bool,
 ) -> Result<()> {
     let generated = parse_canonical_utc(
         "COMPUTE_PLUGIN_KEYRING_GENERATED_AT",
@@ -90,9 +174,14 @@ fn validate_bundle_window(
         "COMPUTE_PLUGIN_KEYRING_EXPIRES_AT",
         &signed.bundle.expires_at,
     )?;
-    let earliest_now = generated
-        .checked_sub_signed(Duration::minutes(MAX_GENERATED_AT_SKEW_MINUTES))
-        .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_KEYRING_TIME_RANGE"))?;
+    let earliest_now = if allow_generated_at_skew {
+        generated
+            .clone()
+            .checked_sub_signed(Duration::minutes(MAX_GENERATED_AT_SKEW_MINUTES))
+            .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_KEYRING_TIME_RANGE"))?
+    } else {
+        generated.clone()
+    };
     if generated >= expires
         || expires - generated > Duration::days(MAX_BUNDLE_LIFETIME_DAYS)
         || trusted_now < earliest_now

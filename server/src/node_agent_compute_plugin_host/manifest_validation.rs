@@ -1,9 +1,11 @@
 use std::collections::HashSet;
 
 use anyhow::{bail, Result};
+use chrono::{DateTime, Utc};
 
 use super::{
     identity::ComputePluginReleaseRef,
+    keyring::{ComputePluginKeyringBinding, ComputePluginPublisherKeyResolver},
     plugin_manifest::{
         resource_limits_are_non_negative, ComputePluginDownloadDependency, ComputePluginManifest,
         ComputePluginPermissionProfile, ComputePluginResourceLimits, ComputePluginTarget,
@@ -12,8 +14,7 @@ use super::{
         COMPUTE_PLUGIN_MAX_PACKAGE_FILES,
     },
     signed_artifact_verification::{
-        verify_manifest_signature, ComputePluginPublisherKeyResolver,
-        SignatureVerifiedComputePluginManifest,
+        verify_manifest_signature, SignatureVerifiedComputePluginManifest,
     },
 };
 
@@ -53,9 +54,11 @@ impl ValidatedComputePluginManifest {
 
 pub(crate) fn verify_and_validate_manifest(
     signed: &SignedComputePluginManifest,
+    expected_keyring: &ComputePluginKeyringBinding,
+    trusted_now: DateTime<Utc>,
     resolver: &dyn ComputePluginPublisherKeyResolver,
 ) -> Result<ValidatedComputePluginManifest> {
-    let verified = verify_manifest_signature(signed, resolver)?;
+    let verified = verify_manifest_signature(signed, expected_keyring, trusted_now, resolver)?;
     validate_verified_manifest(verified)
 }
 

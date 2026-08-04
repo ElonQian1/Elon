@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
+use chrono::{DateTime, Utc};
 use ring::signature::{UnparsedPublicKey, ED25519};
 use serde::Serialize;
 use serde_json::Value;
@@ -9,6 +10,11 @@ use super::{
     install_plan::{
         SignedComputePluginInstallPlan, COMPUTE_PLUGIN_INSTALL_PLAN_SCHEMA,
         COMPUTE_PLUGIN_INSTALL_PLAN_SIGNATURE_DOMAIN, SIGNED_COMPUTE_PLUGIN_INSTALL_PLAN_SCHEMA,
+    },
+    keyring::{
+        ComputePluginControlPlaneKeyResolver, ComputePluginKeyringBinding,
+        ComputePluginPublisherKeyResolver, ResolvedComputePluginVerificationKey,
+        KEY_PURPOSE_CONTROL_INSTALL_PLAN, KEY_PURPOSE_PUBLISHER_MANIFEST,
     },
     plugin_manifest::{
         ComputePluginSignature, SignedComputePluginManifest, COMPUTE_PLUGIN_DIGEST_ALGORITHM,
@@ -37,24 +43,6 @@ impl ComputePluginEd25519PublicKey {
     pub(super) fn fingerprint(&self) -> String {
         hex::encode(Sha256::digest(self.0))
     }
-}
-
-/// Implementations return only currently trusted publisher keys. Unknown, revoked or wrong-purpose
-/// keys return None; callers must not fall back to a key embedded in the manifest.
-pub(crate) trait ComputePluginPublisherKeyResolver {
-    fn resolve_publisher_key(
-        &self,
-        publisher_id: &str,
-        signing_key_id: &str,
-    ) -> Result<Option<ComputePluginEd25519PublicKey>>;
-}
-
-/// Control-plane InstallPlan keys intentionally use a separate resolver and namespace.
-pub(crate) trait ComputePluginControlPlaneKeyResolver {
-    fn resolve_control_plane_key(
-        &self,
-        signing_key_id: &str,
-    ) -> Result<Option<ComputePluginEd25519PublicKey>>;
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +79,8 @@ impl SignatureVerifiedComputePluginInstallPlan {
 
 pub(super) fn verify_manifest_signature(
     signed: &SignedComputePluginManifest,
+    expected_keyring: &ComputePluginKeyringBinding,
+    trusted_now: DateTime<Utc>,
     resolver: &dyn ComputePluginPublisherKeyResolver,
 ) -> Result<SignatureVerifiedComputePluginManifest> {
     if signed.schema != SIGNED_COMPUTE_PLUGIN_MANIFEST_SCHEMA
@@ -98,16 +88,27 @@ pub(super) fn verify_manifest_signature(
     {
         bail!("COMPUTE_PLUGIN_MANIFEST_SCHEMA: unsupported signed manifest schema");
     }
+    validate_key_lookup(expected_keyring, &signed.signature.signing_key_id)?;
     let key = resolver
         .resolve_publisher_key(
             &signed.manifest.publisher_id,
             &signed.signature.signing_key_id,
+            expected_keyring,
+            trusted_now.clone(),
         )?
         .ok_or_else(|| {
             anyhow::anyhow!(
                 "COMPUTE_PLUGIN_PUBLISHER_KEY_UNTRUSTED: publisher key is unknown or inactive"
             )
         })?;
+    validate_resolved_key(
+        &key,
+        expected_keyring,
+        KEY_PURPOSE_PUBLISHER_MANIFEST,
+        Some(&signed.manifest.publisher_id),
+        &signed.signature.signing_key_id,
+        trusted_now,
+    )?;
     verify_jcs_ed25519(
         &signed.manifest,
         &signed.canonicalization,
@@ -115,16 +116,18 @@ pub(super) fn verify_manifest_signature(
         &signed.manifest_digest,
         &signed.signature,
         COMPUTE_PLUGIN_MANIFEST_SIGNATURE_DOMAIN,
-        &key,
+        key.key(),
     )?;
     Ok(SignatureVerifiedComputePluginManifest {
         signed: signed.clone(),
-        verification_key_fingerprint: key.fingerprint(),
+        verification_key_fingerprint: key.key().fingerprint(),
     })
 }
 
 pub(super) fn verify_install_plan_signature(
     signed: &SignedComputePluginInstallPlan,
+    expected_keyring: &ComputePluginKeyringBinding,
+    trusted_now: DateTime<Utc>,
     resolver: &dyn ComputePluginControlPlaneKeyResolver,
 ) -> Result<SignatureVerifiedComputePluginInstallPlan> {
     if signed.schema != SIGNED_COMPUTE_PLUGIN_INSTALL_PLAN_SCHEMA
@@ -132,13 +135,26 @@ pub(super) fn verify_install_plan_signature(
     {
         bail!("COMPUTE_PLUGIN_PLAN_SCHEMA: unsupported signed InstallPlan schema");
     }
+    validate_key_lookup(expected_keyring, &signed.signature.signing_key_id)?;
     let key = resolver
-        .resolve_control_plane_key(&signed.signature.signing_key_id)?
+        .resolve_control_plane_key(
+            &signed.signature.signing_key_id,
+            expected_keyring,
+            trusted_now.clone(),
+        )?
         .ok_or_else(|| {
             anyhow::anyhow!(
                 "COMPUTE_PLUGIN_CONTROL_KEY_UNTRUSTED: control-plane key is unknown or inactive"
             )
         })?;
+    validate_resolved_key(
+        &key,
+        expected_keyring,
+        KEY_PURPOSE_CONTROL_INSTALL_PLAN,
+        None,
+        &signed.signature.signing_key_id,
+        trusted_now,
+    )?;
     verify_jcs_ed25519(
         &signed.plan,
         &signed.canonicalization,
@@ -146,12 +162,51 @@ pub(super) fn verify_install_plan_signature(
         &signed.plan_digest,
         &signed.signature,
         COMPUTE_PLUGIN_INSTALL_PLAN_SIGNATURE_DOMAIN,
-        &key,
+        key.key(),
     )?;
     Ok(SignatureVerifiedComputePluginInstallPlan {
         signed: signed.clone(),
-        verification_key_fingerprint: key.fingerprint(),
+        verification_key_fingerprint: key.key().fingerprint(),
     })
+}
+
+fn validate_key_lookup(
+    expected_keyring: &ComputePluginKeyringBinding,
+    signing_key_id: &str,
+) -> Result<()> {
+    validate_identifier("COMPUTE_PLUGIN_SIGNING_KEY_ID", signing_key_id, 160)?;
+    if expected_keyring.revision <= 0
+        || expected_keyring.digest.len() != 64
+        || !expected_keyring
+            .digest
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        bail!("COMPUTE_PLUGIN_KEYRING_BINDING: keyring lookup binding is invalid");
+    }
+    Ok(())
+}
+
+fn validate_resolved_key(
+    resolved: &ResolvedComputePluginVerificationKey,
+    expected_keyring: &ComputePluginKeyringBinding,
+    expected_purpose: &str,
+    expected_publisher_id: Option<&str>,
+    expected_signing_key_id: &str,
+    trusted_now: DateTime<Utc>,
+) -> Result<()> {
+    let actual_fingerprint = resolved.key().fingerprint();
+    if resolved.keyring_binding() != expected_keyring
+        || resolved.purpose() != expected_purpose
+        || resolved.publisher_id() != expected_publisher_id
+        || resolved.signing_key_id() != expected_signing_key_id
+        || resolved.fingerprint_sha256() != actual_fingerprint.as_str()
+        || trusted_now < resolved.not_before()
+        || trusted_now >= resolved.not_after()
+    {
+        bail!("COMPUTE_PLUGIN_RESOLVED_KEY_BINDING: resolver returned a mismatched key");
+    }
+    Ok(())
 }
 
 pub(super) fn verify_jcs_ed25519(

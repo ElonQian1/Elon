@@ -22,7 +22,5 @@ mod signed_artifact_verification;
 
 pub(crate) use contract::{ComputePluginTask, LlmChatTask};
 pub(crate) use host::ComputePluginHost;
-pub(crate) use signed_artifact_verification::{
-    ComputePluginControlPlaneKeyResolver, ComputePluginEd25519PublicKey,
-    ComputePluginPublisherKeyResolver,
-};
+pub(crate) use keyring::{ComputePluginControlPlaneKeyResolver, ComputePluginPublisherKeyResolver};
+pub(crate) use signed_artifact_verification::ComputePluginEd25519PublicKey;

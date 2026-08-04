@@ -1,4 +1,5 @@
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -81,6 +82,96 @@ pub(crate) trait ComputePluginBootstrapRootKeyResolver {
         &self,
         signing_key_id: &str,
     ) -> Result<Option<ComputePluginEd25519PublicKey>>;
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ResolvedComputePluginVerificationKey {
+    key: ComputePluginEd25519PublicKey,
+    keyring_binding: ComputePluginKeyringBinding,
+    purpose: String,
+    publisher_id: Option<String>,
+    signing_key_id: String,
+    fingerprint_sha256: String,
+    not_before: DateTime<Utc>,
+    not_after: DateTime<Utc>,
+}
+
+impl ResolvedComputePluginVerificationKey {
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn new(
+        key: ComputePluginEd25519PublicKey,
+        keyring_binding: ComputePluginKeyringBinding,
+        purpose: String,
+        publisher_id: Option<String>,
+        signing_key_id: String,
+        fingerprint_sha256: String,
+        not_before: DateTime<Utc>,
+        not_after: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            key,
+            keyring_binding,
+            purpose,
+            publisher_id,
+            signing_key_id,
+            fingerprint_sha256,
+            not_before,
+            not_after,
+        }
+    }
+
+    pub(crate) fn key(&self) -> &ComputePluginEd25519PublicKey {
+        &self.key
+    }
+
+    pub(crate) fn fingerprint_sha256(&self) -> &str {
+        &self.fingerprint_sha256
+    }
+
+    pub(crate) fn keyring_binding(&self) -> &ComputePluginKeyringBinding {
+        &self.keyring_binding
+    }
+
+    pub(crate) fn purpose(&self) -> &str {
+        &self.purpose
+    }
+
+    pub(crate) fn publisher_id(&self) -> Option<&str> {
+        self.publisher_id.as_deref()
+    }
+
+    pub(crate) fn signing_key_id(&self) -> &str {
+        &self.signing_key_id
+    }
+
+    pub(crate) fn not_before(&self) -> DateTime<Utc> {
+        self.not_before.clone()
+    }
+
+    pub(crate) fn not_after(&self) -> DateTime<Utc> {
+        self.not_after.clone()
+    }
+}
+
+/// Implementations return keys only from the exact, currently trusted Publisher ring binding.
+pub(crate) trait ComputePluginPublisherKeyResolver {
+    fn resolve_publisher_key(
+        &self,
+        publisher_id: &str,
+        signing_key_id: &str,
+        expected_keyring: &ComputePluginKeyringBinding,
+        trusted_now: DateTime<Utc>,
+    ) -> Result<Option<ResolvedComputePluginVerificationKey>>;
+}
+
+/// InstallPlan verification uses an independent Control ring and namespace.
+pub(crate) trait ComputePluginControlPlaneKeyResolver {
+    fn resolve_control_plane_key(
+        &self,
+        signing_key_id: &str,
+        expected_keyring: &ComputePluginKeyringBinding,
+        trusted_now: DateTime<Utc>,
+    ) -> Result<Option<ResolvedComputePluginVerificationKey>>;
 }
 
 #[derive(Debug, Clone)]

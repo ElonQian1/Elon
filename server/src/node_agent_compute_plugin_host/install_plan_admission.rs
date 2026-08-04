@@ -14,16 +14,17 @@ use super::{
         validate_expected_local_state, validate_grant, validate_reason_codes,
         validate_target_compatibility,
     },
+    keyring::{
+        ComputePluginControlPlaneKeyResolver, ComputePluginKeyringBinding,
+        ComputePluginPublisherKeyResolver,
+    },
     lifecycle::{
         local_record_shape_is_valid, ComputePluginInventorySnapshot, ACTIVATION_ENABLED,
         COMPUTE_PLUGIN_INVENTORY_SCHEMA, SLOT_DOWNLOADING,
     },
     manifest_validation::{is_sha256, verify_and_validate_manifest},
     plugin_manifest::SignedComputePluginManifest,
-    signed_artifact_verification::{
-        jcs_sha256_hex, verify_install_plan_signature, ComputePluginControlPlaneKeyResolver,
-        ComputePluginPublisherKeyResolver,
-    },
+    signed_artifact_verification::{jcs_sha256_hex, verify_install_plan_signature},
 };
 
 const MAX_PLAN_ITEMS: usize = 256;
@@ -41,7 +42,8 @@ pub(crate) struct ComputePluginLiveAdmissionState {
     pub desired_policy_revision: i64,
     pub node_profile_digest: String,
     pub manifest_catalog_revision: i64,
-    pub control_keyring_revision: i64,
+    pub publisher_keyring: ComputePluginKeyringBinding,
+    pub control_keyring: ComputePluginKeyringBinding,
     pub target_id: String,
     pub host_api_protocol_id: String,
     pub host_api_revision: u32,
@@ -114,6 +116,10 @@ pub(crate) trait ComputePluginFetchAuthority {
 }
 
 impl AdmittedComputePluginInstallPlan {
+    pub(crate) fn signed_plan(&self) -> &SignedComputePluginInstallPlan {
+        &self.signed_plan
+    }
+
     pub(crate) fn plan(&self) -> &ComputePluginInstallPlan {
         &self.signed_plan.plan
     }
@@ -148,7 +154,12 @@ pub(crate) fn admit_install_plan(
     control_keys: &dyn ComputePluginControlPlaneKeyResolver,
     publisher_keys: &dyn ComputePluginPublisherKeyResolver,
 ) -> Result<AdmittedComputePluginInstallPlan> {
-    let verified_plan = verify_install_plan_signature(signed_plan, control_keys)?;
+    let verified_plan = verify_install_plan_signature(
+        signed_plan,
+        &signed_plan.plan.control_keyring,
+        now.clone(),
+        control_keys,
+    )?;
     let plan = &verified_plan.signed().plan;
     validate_plan_shape_and_window(plan, now.clone())?;
     validate_live_binding(plan, live)?;
@@ -165,7 +176,14 @@ pub(crate) fn admit_install_plan(
     validate_disabled_plan_coverage(plan, inventory)?;
     let validated_manifests = signed_manifests
         .iter()
-        .map(|manifest| verify_and_validate_manifest(manifest, publisher_keys))
+        .map(|manifest| {
+            verify_and_validate_manifest(
+                manifest,
+                &plan.publisher_keyring,
+                now.clone(),
+                publisher_keys,
+            )
+        })
         .collect::<Result<Vec<_>>>()?;
     reject_duplicate_manifests(&validated_manifests)?;
     if validated_manifests.iter().any(|manifest| {
@@ -362,7 +380,8 @@ fn validate_live_binding(
         || live.desired_policy_revision != plan.desired_policy_revision
         || live.node_profile_digest != plan.node_profile_digest
         || live.manifest_catalog_revision != plan.manifest_catalog_revision
-        || live.control_keyring_revision != plan.control_keyring_revision
+        || live.publisher_keyring != plan.publisher_keyring
+        || live.control_keyring != plan.control_keyring
         || live.host_api_revision == 0
         || !is_identifier(&live.target_id)
         || !is_identifier(&live.host_api_protocol_id)
