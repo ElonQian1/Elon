@@ -10,6 +10,7 @@ use super::{
     ComputePluginCandidateArtifactAuthorityFacts, ComputePluginCandidateVerificationAuthorityFacts,
 };
 use crate::node_agent_compute_plugin_host::{
+    candidate_verification_contract::ComputePluginCandidateVerificationRecoveryKey,
     install_plan::ComputePluginPlannedDownload,
     install_plan_admission::{
         reverify_admitted_artifacts, validate_inventory, validate_live_binding,
@@ -27,6 +28,12 @@ use rusqlite::{params, OptionalExtension, Transaction};
 const MAX_CANDIDATE_ARTIFACTS: usize = 4_096;
 mod types;
 use types::{CandidateRow, StoredVerificationApplication};
+
+enum CandidateVerificationReplayMode<'key> {
+    NextGeneration,
+    ExactPrepared(&'key ComputePluginCandidateVerificationRecoveryKey),
+}
+
 pub(super) fn read_fresh_candidate_verification_authority(
     transaction: &Transaction<'_>,
     process_fence: &ComputePluginFetchProcessFence,
@@ -35,6 +42,51 @@ pub(super) fn read_fresh_candidate_verification_authority(
     plan_id: &str,
     plan_digest: &str,
     candidate_token: &str,
+) -> Result<ComputePluginCandidateVerificationAuthorityFacts> {
+    read_fresh_candidate_verification_authority_with_mode(
+        transaction,
+        process_fence,
+        trusted_now,
+        roots,
+        plan_id,
+        plan_digest,
+        candidate_token,
+        CandidateVerificationReplayMode::NextGeneration,
+    )
+}
+
+/// Replays the same current keyring, signed plan, live, inventory and candidate closure used by
+/// begin, but requires the exact target verification to remain prepared instead of requiring the
+/// next generation to be free. Resolution uses this only inside its `BEGIN IMMEDIATE` snapshot.
+pub(super) fn read_fresh_prepared_candidate_verification_authority(
+    transaction: &Transaction<'_>,
+    process_fence: &ComputePluginFetchProcessFence,
+    trusted_now: DateTime<Utc>,
+    roots: &dyn ComputePluginBootstrapRootKeyResolver,
+    key: &ComputePluginCandidateVerificationRecoveryKey,
+) -> Result<ComputePluginCandidateVerificationAuthorityFacts> {
+    read_fresh_candidate_verification_authority_with_mode(
+        transaction,
+        process_fence,
+        trusted_now,
+        roots,
+        key.owner_plan_id(),
+        key.owner_plan_digest(),
+        key.candidate_token(),
+        CandidateVerificationReplayMode::ExactPrepared(key),
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn read_fresh_candidate_verification_authority_with_mode(
+    transaction: &Transaction<'_>,
+    process_fence: &ComputePluginFetchProcessFence,
+    trusted_now: DateTime<Utc>,
+    roots: &dyn ComputePluginBootstrapRootKeyResolver,
+    plan_id: &str,
+    plan_digest: &str,
+    candidate_token: &str,
+    replay_mode: CandidateVerificationReplayMode<'_>,
 ) -> Result<ComputePluginCandidateVerificationAuthorityFacts> {
     if !is_identifier(plan_id) || !is_sha256(plan_digest) || !is_identifier(candidate_token) {
         bail!("COMPUTE_PLUGIN_VERIFICATION_IDENTITY_INVALID");
@@ -116,8 +168,20 @@ pub(super) fn read_fresh_candidate_verification_authority(
         trusted_now.timestamp_millis(),
     )?;
     require_no_prepared_fetch(transaction, &candidate.token)?;
-    let next_verification_generation =
-        read_next_verification_generation(transaction, &candidate.token)?;
+    let next_verification_generation = match replay_mode {
+        CandidateVerificationReplayMode::NextGeneration => {
+            read_next_verification_generation(transaction, &candidate.token)?
+        }
+        CandidateVerificationReplayMode::ExactPrepared(key) => {
+            let prepared = super::begin::read_exact_prepared_run(transaction, key)?;
+            if !prepared.matches_recovery_key(key)
+                || !exact_prepared_verification_is_only_open_run(transaction, key)?
+            {
+                bail!("COMPUTE_PLUGIN_VERIFICATION_RESOLUTION_RUN_CHANGED");
+            }
+            key.verification_generation()
+        }
+    };
     let artifact_bytes = artifacts.iter().try_fold(0_i64, |total, artifact| {
         total.checked_add(artifact.planned_download.size_bytes)
     });
@@ -479,4 +543,34 @@ fn read_next_verification_generation(
     last_generation
         .checked_add(1)
         .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_VERIFICATION_GENERATION_EXHAUSTED"))
+}
+
+fn exact_prepared_verification_is_only_open_run(
+    transaction: &Transaction<'_>,
+    key: &ComputePluginCandidateVerificationRecoveryKey,
+) -> Result<bool> {
+    let (prepared_count, verified_count, exact_target_count) = transaction
+        .query_row(
+            r#"SELECT
+                COALESCE(SUM(CASE WHEN state = 'prepared' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN state = 'verified' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN state = 'prepared'
+                    AND verification_id = ?2 AND verification_generation = ?3
+                    THEN 1 ELSE 0 END), 0)
+            FROM candidate_verification_runs WHERE candidate_token = ?1"#,
+            params![
+                key.candidate_token(),
+                key.verification_id(),
+                key.verification_generation()
+            ],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            },
+        )
+        .context("COMPUTE_PLUGIN_VERIFICATION_RESOLUTION_OPEN_SET_READ")?;
+    Ok(prepared_count == 1 && verified_count == 0 && exact_target_count == 1)
 }

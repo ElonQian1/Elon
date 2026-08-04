@@ -1,7 +1,7 @@
 /// Candidate-level raw artifact verification journal for authority schema v3.
 ///
 /// A `complete` planned download only proves its byte cursor reached the signed size. One prepared
-/// run binds the complete candidate closure to an exact set of pinned local files; only a future
+/// run binds the complete candidate closure to an exact set of pinned local files; only the
 /// purpose-specific resolver may terminalize it and advance the inventory slot phase.
 pub(super) const CANDIDATE_VERIFICATION_SCHEMA_V3: &str = r#"
 CREATE TABLE candidate_verification_runs (
@@ -37,8 +37,9 @@ CREATE TABLE candidate_verification_runs (
     resolution_reason              TEXT,
     result_json                    TEXT,
     result_digest                  TEXT,
+    observed_artifact_set_digest   TEXT,
     mismatch_ordinal               INTEGER CHECK (mismatch_ordinal >= 0),
-    observed_digest                TEXT,
+    mismatch_observed_digest       TEXT,
     UNIQUE (candidate_token, verification_generation),
     FOREIGN KEY (candidate_token, owner_plan_id, owner_plan_digest)
         REFERENCES candidate_owners(candidate_token, owner_plan_id, owner_plan_digest)
@@ -49,8 +50,9 @@ CREATE TABLE candidate_verification_runs (
          AND resolution_reason IS NULL
          AND result_json IS NULL
          AND result_digest IS NULL
+         AND observed_artifact_set_digest IS NULL
          AND mismatch_ordinal IS NULL
-         AND observed_digest IS NULL THEN 1
+         AND mismatch_observed_digest IS NULL THEN 1
         WHEN state = 'verified'
          AND resolved_at_ms IS NOT NULL
          AND resolved_at_ms >= prepared_at_ms
@@ -58,8 +60,10 @@ CREATE TABLE candidate_verification_runs (
          AND length(result_json) > 0
          AND length(result_digest) = 64
          AND result_digest NOT GLOB '*[^0-9a-f]*'
+         AND length(observed_artifact_set_digest) = 64
+         AND observed_artifact_set_digest NOT GLOB '*[^0-9a-f]*'
          AND mismatch_ordinal IS NULL
-         AND observed_digest IS NULL THEN 1
+         AND mismatch_observed_digest IS NULL THEN 1
         WHEN state = 'rejected'
          AND resolved_at_ms IS NOT NULL
          AND resolved_at_ms >= prepared_at_ms
@@ -68,8 +72,10 @@ CREATE TABLE candidate_verification_runs (
          AND length(result_digest) = 64
          AND result_digest NOT GLOB '*[^0-9a-f]*'
          AND mismatch_ordinal IS NOT NULL
-         AND length(observed_digest) = 64
-         AND observed_digest NOT GLOB '*[^0-9a-f]*' THEN 1
+         AND length(observed_artifact_set_digest) = 64
+         AND observed_artifact_set_digest NOT GLOB '*[^0-9a-f]*'
+         AND length(mismatch_observed_digest) = 64
+         AND mismatch_observed_digest NOT GLOB '*[^0-9a-f]*' THEN 1
         WHEN state = 'aborted'
          AND resolved_at_ms IS NOT NULL
          AND resolved_at_ms >= prepared_at_ms
@@ -77,22 +83,25 @@ CREATE TABLE candidate_verification_runs (
          AND length(result_json) > 0
          AND length(result_digest) = 64
          AND result_digest NOT GLOB '*[^0-9a-f]*'
+         AND observed_artifact_set_digest IS NULL
          AND mismatch_ordinal IS NULL
-         AND observed_digest IS NULL THEN 1
+         AND mismatch_observed_digest IS NULL THEN 1
         WHEN state = 'revoked'
          AND resolved_at_ms IS NOT NULL
          AND resolved_at_ms >= prepared_at_ms
          AND resolution_reason IN (
              'authority_epoch_advanced_by_keyring',
              'authority_epoch_advanced_by_plan',
+             'authority_epoch_advanced_by_verification',
              'process_owner_epoch_advanced',
              'candidate_released_by_plan'
          )
          AND length(result_json) > 0
          AND length(result_digest) = 64
          AND result_digest NOT GLOB '*[^0-9a-f]*'
+         AND observed_artifact_set_digest IS NULL
          AND mismatch_ordinal IS NULL
-         AND observed_digest IS NULL THEN 1
+         AND mismatch_observed_digest IS NULL THEN 1
         ELSE 0 END = 1
     )
 );
@@ -110,8 +119,9 @@ WHEN CASE WHEN NEW.state = 'prepared'
   AND NEW.resolution_reason IS NULL
   AND NEW.result_json IS NULL
   AND NEW.result_digest IS NULL
+  AND NEW.observed_artifact_set_digest IS NULL
   AND NEW.mismatch_ordinal IS NULL
-  AND NEW.observed_digest IS NULL
+  AND NEW.mismatch_observed_digest IS NULL
   AND NEW.verification_generation = COALESCE((
       SELECT MAX(verification_generation) + 1
       FROM candidate_verification_runs
@@ -197,18 +207,112 @@ END;
 CREATE TRIGGER candidate_verification_transition
 BEFORE UPDATE OF
     state, resolved_at_ms, resolution_reason, result_json, result_digest,
-    mismatch_ordinal, observed_digest
+    observed_artifact_set_digest, mismatch_ordinal, mismatch_observed_digest
 ON candidate_verification_runs
 WHEN CASE WHEN OLD.state = 'prepared'
- AND NEW.state IN ('aborted', 'revoked') THEN 0 ELSE 1 END
+ AND NEW.state IN ('verified', 'rejected', 'aborted', 'revoked') THEN 0 ELSE 1 END
 BEGIN
     SELECT RAISE(ABORT, 'candidate verification transition is not available');
+END;
+
+CREATE TRIGGER candidate_verification_resolution_fenced
+BEFORE UPDATE OF
+    state, resolved_at_ms, resolution_reason, result_json, result_digest,
+    observed_artifact_set_digest, mismatch_ordinal, mismatch_observed_digest
+ON candidate_verification_runs
+WHEN NEW.state IN ('verified', 'rejected') AND CASE WHEN
+    OLD.state = 'prepared'
+    AND OLD.resolved_at_ms IS NULL
+    AND OLD.resolution_reason IS NULL
+    AND OLD.result_json IS NULL
+    AND OLD.result_digest IS NULL
+    AND OLD.observed_artifact_set_digest IS NULL
+    AND OLD.mismatch_ordinal IS NULL
+    AND OLD.mismatch_observed_digest IS NULL
+    AND NEW.resolved_at_ms IS NOT NULL
+    AND NEW.resolved_at_ms > OLD.prepared_at_ms
+    AND length(NEW.result_json) > 0
+    AND length(NEW.result_digest) = 64
+    AND NEW.result_digest NOT GLOB '*[^0-9a-f]*'
+    AND length(NEW.observed_artifact_set_digest) = 64
+    AND NEW.observed_artifact_set_digest NOT GLOB '*[^0-9a-f]*'
+    AND (
+        (NEW.state = 'verified'
+         AND NEW.resolution_reason = 'artifact_set_verified'
+         AND NEW.mismatch_ordinal IS NULL
+         AND NEW.mismatch_observed_digest IS NULL)
+        OR
+        (NEW.state = 'rejected'
+         AND NEW.resolution_reason = 'artifact_digest_mismatch'
+         AND NEW.mismatch_ordinal IS NOT NULL
+         AND NEW.mismatch_ordinal >= 0
+         AND length(NEW.mismatch_observed_digest) = 64
+         AND NEW.mismatch_observed_digest NOT GLOB '*[^0-9a-f]*'
+         AND EXISTS (
+             SELECT 1 FROM planned_downloads AS mismatch
+             WHERE mismatch.candidate_token = OLD.candidate_token
+               AND mismatch.ordinal = NEW.mismatch_ordinal
+               AND mismatch.artifact_digest <> NEW.mismatch_observed_digest
+         ))
+    )
+    AND EXISTS (
+        SELECT 1
+        FROM authority_meta AS meta
+        JOIN plan_applications AS application
+          ON application.plan_id = OLD.owner_plan_id
+         AND application.plan_digest = OLD.owner_plan_digest
+        JOIN plan_application_seals AS seal
+          ON seal.plan_id = application.plan_id
+         AND seal.plan_digest = application.plan_digest
+        JOIN candidate_owners AS candidate
+          ON candidate.candidate_token = OLD.candidate_token
+         AND candidate.owner_plan_id = application.plan_id
+         AND candidate.owner_plan_digest = application.plan_digest
+         AND candidate.application_inventory_revision = OLD.application_inventory_revision
+        WHERE meta.singleton = 1
+          AND meta.clock_status = 'trusted'
+          AND meta.trusted_time_high_water_ms = NEW.resolved_at_ms
+          AND meta.sharing_enabled = 1
+          AND meta.inventory_revision >= OLD.application_inventory_revision
+          AND meta.active_bundle_revision = application.keyring_bundle_revision
+          AND meta.publisher_keyring_revision = application.publisher_keyring_revision
+          AND meta.publisher_keyring_digest = application.publisher_keyring_digest
+          AND meta.control_keyring_revision = application.control_keyring_revision
+          AND meta.control_keyring_digest = application.control_keyring_digest
+          AND meta.state_revision = OLD.authority_state_revision
+          AND meta.authority_epoch = OLD.authority_epoch
+          AND meta.process_owner_epoch = OLD.process_owner_epoch
+          AND NEW.resolved_at_ms >= application.applied_at_ms
+          AND NEW.resolved_at_ms < application.expires_at_ms
+          AND candidate.state = 'owned'
+          AND candidate.candidate_generation = OLD.candidate_generation
+          AND (SELECT COUNT(*) FROM planned_downloads AS download
+               WHERE download.candidate_token = candidate.candidate_token)
+              = OLD.artifact_count
+          AND (SELECT COALESCE(SUM(size_bytes), 0) FROM planned_downloads AS download
+               WHERE download.candidate_token = candidate.candidate_token)
+              = OLD.artifact_bytes
+          AND NOT EXISTS (
+              SELECT 1 FROM planned_downloads AS download
+              WHERE download.candidate_token = candidate.candidate_token
+                AND (download.state <> 'complete'
+                     OR download.committed_offset <> download.size_bytes)
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM fetch_claims AS claim
+              WHERE claim.candidate_token = candidate.candidate_token
+                AND claim.state = 'prepared'
+          )
+    )
+THEN 0 ELSE 1 END
+BEGIN
+    SELECT RAISE(ABORT, 'candidate verification resolution lost its authority fence');
 END;
 
 CREATE TRIGGER candidate_verification_abort_fenced
 BEFORE UPDATE OF
     state, resolved_at_ms, resolution_reason, result_json, result_digest,
-    mismatch_ordinal, observed_digest
+    observed_artifact_set_digest, mismatch_ordinal, mismatch_observed_digest
 ON candidate_verification_runs
 WHEN NEW.state = 'aborted' AND CASE WHEN
     OLD.state = 'prepared'
@@ -216,16 +320,18 @@ WHEN NEW.state = 'aborted' AND CASE WHEN
     AND OLD.resolution_reason IS NULL
     AND OLD.result_json IS NULL
     AND OLD.result_digest IS NULL
+    AND OLD.observed_artifact_set_digest IS NULL
     AND OLD.mismatch_ordinal IS NULL
-    AND OLD.observed_digest IS NULL
+    AND OLD.mismatch_observed_digest IS NULL
     AND NEW.resolved_at_ms IS NOT NULL
     AND NEW.resolved_at_ms >= OLD.prepared_at_ms
     AND NEW.resolution_reason IN ('verification_aborted', 'authority_recovery')
     AND length(NEW.result_json) > 0
     AND length(NEW.result_digest) = 64
     AND NEW.result_digest NOT GLOB '*[^0-9a-f]*'
+    AND NEW.observed_artifact_set_digest IS NULL
     AND NEW.mismatch_ordinal IS NULL
-    AND NEW.observed_digest IS NULL
+    AND NEW.mismatch_observed_digest IS NULL
     AND EXISTS (
         SELECT 1 FROM authority_meta AS meta
         WHERE meta.singleton = 1

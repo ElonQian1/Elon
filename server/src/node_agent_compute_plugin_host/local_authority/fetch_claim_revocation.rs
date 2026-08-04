@@ -7,6 +7,7 @@ use super::candidate_verification_revocation;
 enum AuthorityEpochRevocationReason {
     AuthorityEpochAdvancedByKeyring,
     AuthorityEpochAdvancedByPlan,
+    AuthorityEpochAdvancedByVerification,
 }
 
 impl AuthorityEpochRevocationReason {
@@ -14,6 +15,9 @@ impl AuthorityEpochRevocationReason {
         match self {
             Self::AuthorityEpochAdvancedByKeyring => "authority_epoch_advanced_by_keyring",
             Self::AuthorityEpochAdvancedByPlan => "authority_epoch_advanced_by_plan",
+            Self::AuthorityEpochAdvancedByVerification => {
+                "authority_epoch_advanced_by_verification"
+            }
         }
     }
 }
@@ -135,6 +139,21 @@ pub(super) fn revoke_for_plan_authority_epoch_advance(
         expected_new_epoch,
         resolved_at_ms,
         AuthorityEpochRevocationReason::AuthorityEpochAdvancedByPlan,
+    )
+}
+
+pub(super) fn revoke_for_verification_authority_epoch_advance(
+    transaction: &Transaction<'_>,
+    expected_old_epoch: i64,
+    expected_new_epoch: i64,
+    resolved_at_ms: i64,
+) -> Result<()> {
+    revoke_for_authority_epoch_advance(
+        transaction,
+        expected_old_epoch,
+        expected_new_epoch,
+        resolved_at_ms,
+        AuthorityEpochRevocationReason::AuthorityEpochAdvancedByVerification,
     )
 }
 

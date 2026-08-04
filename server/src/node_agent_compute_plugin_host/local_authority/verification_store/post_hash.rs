@@ -7,6 +7,7 @@ use crate::node_agent_compute_plugin_host::{
     candidate_verification_contract::{
         ComputePluginCandidateVerificationOutcome, ComputePluginCandidateVerificationOutcomeKind,
         ComputePluginCandidateVerificationRecoveryKey,
+        ValidatedCandidateVerificationResolutionPermit,
     },
     fetch_contract::ComputePluginFetchCancellationGuard,
     keyring::ComputePluginBootstrapRootKeyResolver,
@@ -151,6 +152,38 @@ impl ComputePluginPostHashVerificationAuthoritySession<'_> {
                     trusted_time_high_water_ms: snapshot.authority.trusted_time_high_water_ms,
                     durable_candidate_closure_digest: closure.durable_closure_digest,
                 })
+            })
+    }
+
+    /// The only durable resolution seam. The contract layer retains the pinned handles while this
+    /// consumes its private linear permit; every Store error is therefore outcome-uncertain and
+    /// must be recovered through the exact verification key rather than retried blindly.
+    pub(in crate::node_agent_compute_plugin_host) fn resolve_candidate_verification(
+        &self,
+        permit: ValidatedCandidateVerificationResolutionPermit<'_>,
+    ) -> Result<ComputePluginCandidateVerificationOutcome> {
+        let key = permit.key();
+        if !key
+            .authority_instance_binding()
+            .matches(self.authority_instance_binding())
+            || key.installation_id_digest() != self.installation_id_digest()
+            || key.clock_epoch_digest() != self.clock_epoch_digest()
+            || key.process_owner_epoch() != self.process_owner_epoch()
+            || self.trusted_now_ms() <= key.prepared_at_ms()
+        {
+            anyhow::bail!("COMPUTE_PLUGIN_VERIFICATION_RESOLUTION_PROVENANCE_CHANGED");
+        }
+        self.validate_post_hash_source(permit.cancellation_guard())?;
+        self.recovery_session
+            .authority
+            .with_immediate(|transaction| {
+                super::resolution::resolve_candidate_verification(
+                    transaction,
+                    self.recovery_session.process_fence,
+                    self.recovery_session.trusted_now.clone(),
+                    self.roots,
+                    permit,
+                )
             })
     }
 }

@@ -50,7 +50,9 @@ pub(super) fn revoke_for_authority_epoch_advance(
 ) -> Result<()> {
     if !matches!(
         reason,
-        "authority_epoch_advanced_by_keyring" | "authority_epoch_advanced_by_plan"
+        "authority_epoch_advanced_by_keyring"
+            | "authority_epoch_advanced_by_plan"
+            | "authority_epoch_advanced_by_verification"
     ) {
         bail!("COMPUTE_PLUGIN_VERIFICATION_REVOKE_AUTHORITY_REASON_INVALID");
     }

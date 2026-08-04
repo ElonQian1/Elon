@@ -64,6 +64,14 @@ impl CandidateArtifactSetHashEvidence {
             .map(|mismatch| mismatch.observed_digest.as_str())
     }
 
+    pub(in crate::node_agent_compute_plugin_host::candidate_verification_contract) fn mismatch_expected_digest(
+        &self,
+    ) -> Option<&str> {
+        self.mismatch
+            .as_ref()
+            .map(|mismatch| mismatch.expected_digest.as_str())
+    }
+
     pub(in crate::node_agent_compute_plugin_host::candidate_verification_contract) fn validate(
         &self,
         key: &super::super::ComputePluginCandidateVerificationRecoveryKey,

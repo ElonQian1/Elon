@@ -18,6 +18,7 @@ use crate::node_agent_compute_plugin_host::{
 use super::super::ComputePluginFetchProcessFence;
 
 mod absence;
+mod resolution;
 mod revocation;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,8 +57,9 @@ pub(super) struct VerificationRunRow {
     pub resolution_reason: Option<String>,
     pub result_json: Option<String>,
     pub result_digest: Option<String>,
+    pub observed_artifact_set_digest: Option<String>,
     pub mismatch_ordinal: Option<i64>,
-    pub observed_digest: Option<String>,
+    pub mismatch_observed_digest: Option<String>,
 }
 
 pub(super) struct VerificationOutcomeSnapshot {
@@ -223,7 +225,8 @@ fn read_run(
                 authority_state_revision, authority_epoch, process_owner_epoch,
                 artifact_count, artifact_bytes, expected_artifact_set_digest,
                 file_set_binding_digest, state, prepared_at_ms, resolved_at_ms,
-                resolution_reason, result_json, result_digest, mismatch_ordinal, observed_digest
+                resolution_reason, result_json, result_digest,
+                observed_artifact_set_digest, mismatch_ordinal, mismatch_observed_digest
             FROM candidate_verification_runs WHERE verification_id = ?1"#,
             [key.verification_id()],
             |row| {
@@ -248,8 +251,9 @@ fn read_run(
                     resolution_reason: row.get(17)?,
                     result_json: row.get(18)?,
                     result_digest: row.get(19)?,
-                    mismatch_ordinal: row.get(20)?,
-                    observed_digest: row.get(21)?,
+                    observed_artifact_set_digest: row.get(20)?,
+                    mismatch_ordinal: row.get(21)?,
+                    mismatch_observed_digest: row.get(22)?,
                 })
             },
         )
@@ -320,9 +324,20 @@ fn classify_run(
             CandidateVerificationTerminalKind::Revoked,
             ComputePluginCandidateVerificationOutcomeKind::Revoked,
         ),
-        "verified" | "rejected" => {
-            bail!("COMPUTE_PLUGIN_VERIFICATION_OUTCOME_RESULT_UNSUPPORTED")
-        }
+        "verified" => resolution::classify_resolution(
+            transaction,
+            authority,
+            run,
+            key,
+            crate::node_agent_compute_plugin_host::candidate_verification_terminal_result::CandidateVerificationResolutionKind::Verified,
+        ),
+        "rejected" => resolution::classify_resolution(
+            transaction,
+            authority,
+            run,
+            key,
+            crate::node_agent_compute_plugin_host::candidate_verification_terminal_result::CandidateVerificationResolutionKind::Rejected,
+        ),
         _ => bail!("COMPUTE_PLUGIN_VERIFICATION_OUTCOME_STATE_CORRUPT"),
     }
 }
@@ -347,8 +362,9 @@ fn classify_prepared(
         || run.resolution_reason.is_some()
         || run.result_json.is_some()
         || run.result_digest.is_some()
+        || run.observed_artifact_set_digest.is_some()
         || run.mismatch_ordinal.is_some()
-        || run.observed_digest.is_some()
+        || run.mismatch_observed_digest.is_some()
     {
         bail!("COMPUTE_PLUGIN_VERIFICATION_OUTCOME_PREPARED_CORRUPT");
     }
@@ -397,8 +413,9 @@ fn classify_terminal(
     let parsed_reason = parse_terminal_reason(terminal_kind, reason)?;
     if resolved_at_ms < key.prepared_at_ms()
         || resolved_at_ms > authority.trusted_time_high_water_ms
+        || run.observed_artifact_set_digest.is_some()
         || run.mismatch_ordinal.is_some()
-        || run.observed_digest.is_some()
+        || run.mismatch_observed_digest.is_some()
     {
         bail!("COMPUTE_PLUGIN_VERIFICATION_OUTCOME_TERMINAL_CORRUPT");
     }
@@ -438,6 +455,10 @@ fn parse_terminal_reason(
         (CandidateVerificationTerminalKind::Revoked, "authority_epoch_advanced_by_plan") => {
             Ok("authority_epoch_advanced_by_plan")
         }
+        (
+            CandidateVerificationTerminalKind::Revoked,
+            "authority_epoch_advanced_by_verification",
+        ) => Ok("authority_epoch_advanced_by_verification"),
         (CandidateVerificationTerminalKind::Revoked, "process_owner_epoch_advanced") => {
             Ok("process_owner_epoch_advanced")
         }

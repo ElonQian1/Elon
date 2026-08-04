@@ -21,6 +21,7 @@ mod closure;
 mod outcome;
 mod post_hash;
 mod read;
+mod resolution;
 
 pub(in crate::node_agent_compute_plugin_host) use post_hash::{
     ComputePluginPostHashVerificationAuthoritySession,

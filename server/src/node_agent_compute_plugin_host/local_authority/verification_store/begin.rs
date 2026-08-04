@@ -224,14 +224,15 @@ fn insert_prepared_run(
                 authority_epoch, process_owner_epoch, artifact_count, artifact_bytes,
                 expected_artifact_set_digest, file_set_binding_digest,
                 state, prepared_at_ms, resolved_at_ms, resolution_reason,
-                result_json, result_digest, mismatch_ordinal, observed_digest
+                result_json, result_digest, observed_artifact_set_digest,
+                mismatch_ordinal, mismatch_observed_digest
             ) VALUES (
                 :verification_id, :candidate_token, :owner_plan_id, :owner_plan_digest,
                 :verification_generation, :candidate_generation,
                 :application_inventory_revision, :authority_state_revision,
                 :authority_epoch, :process_owner_epoch, :artifact_count, :artifact_bytes,
                 :expected_artifact_set_digest, :file_set_binding_digest,
-                'prepared', :prepared_at_ms, NULL, NULL, NULL, NULL, NULL, NULL
+                'prepared', :prepared_at_ms, NULL, NULL, NULL, NULL, NULL, NULL, NULL
             )"#,
             named_params! {
                 ":verification_id": key.verification_id(),
@@ -286,6 +287,7 @@ pub(super) fn read_exact_prepared_run(
         Option<String>,
         Option<i64>,
         Option<String>,
+        Option<String>,
     );
     let row: Row = transaction
         .query_row(
@@ -294,7 +296,8 @@ pub(super) fn read_exact_prepared_run(
                 authority_state_revision, authority_epoch, process_owner_epoch,
                 artifact_count, artifact_bytes, expected_artifact_set_digest,
                 file_set_binding_digest, state, prepared_at_ms, resolved_at_ms,
-                resolution_reason, result_json, result_digest, mismatch_ordinal, observed_digest
+                resolution_reason, result_json, result_digest,
+                observed_artifact_set_digest, mismatch_ordinal, mismatch_observed_digest
             FROM candidate_verification_runs WHERE verification_id = ?1"#,
             [key.verification_id()],
             |row| {
@@ -321,6 +324,7 @@ pub(super) fn read_exact_prepared_run(
                     row.get(19)?,
                     row.get(20)?,
                     row.get(21)?,
+                    row.get(22)?,
                 ))
             },
         )
@@ -351,6 +355,7 @@ pub(super) fn read_exact_prepared_run(
         || row.19.is_some()
         || row.20.is_some()
         || row.21.is_some()
+        || row.22.is_some()
         || jcs_sha256_hex(&row.1)? != key.candidate_token_digest()
     {
         bail!("COMPUTE_PLUGIN_VERIFICATION_BEGIN_READ_BACK_CHANGED");

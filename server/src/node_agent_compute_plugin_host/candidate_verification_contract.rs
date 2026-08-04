@@ -27,6 +27,7 @@ mod begin;
 mod hash;
 mod post_hash;
 mod recovery;
+mod resolution;
 
 pub(in crate::node_agent_compute_plugin_host) use begin::{
     begin_candidate_verification, AuthorizedComputePluginCandidateArtifactSet,
@@ -47,9 +48,18 @@ pub(in crate::node_agent_compute_plugin_host) use post_hash::{
 pub(in crate::node_agent_compute_plugin_host) use recovery::{
     abort_recovered_candidate_verification, inspect_candidate_verification_outcome,
     CandidateVerificationRecoveryAbortFailure, CandidateVerificationRecoveryAbortPhase,
+    ComputePluginCandidateVerificationDigestMismatch,
     ComputePluginCandidateVerificationInitialAbsence, ComputePluginCandidateVerificationOutcome,
     ComputePluginCandidateVerificationOutcomeKind, ComputePluginCandidateVerificationRecoveryKey,
     ResolvedCandidateArtifactSetCustody, ValidatedCandidateVerificationRecoveryAbortPermit,
+};
+pub(in crate::node_agent_compute_plugin_host) use resolution::{
+    adopt_recovered_candidate_verification_resolution,
+    resolve_trusted_hashed_candidate_artifact_set, CandidateVerificationResolutionAdoptionFailure,
+    CandidateVerificationResolutionAdoptionPhase, CandidateVerificationResolutionCustody,
+    CandidateVerificationResolutionFailure, CandidateVerificationResolutionPhase,
+    RejectedComputePluginCandidateArtifactSetCustody,
+    ValidatedCandidateVerificationResolutionPermit, VerifiedComputePluginCandidateArtifactSet,
 };
 
 const FILE_SET_BINDING_SCHEMA: &str = "elon.compute_plugin.candidate_file_set_binding.v1";

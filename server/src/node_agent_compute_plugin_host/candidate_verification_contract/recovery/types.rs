@@ -6,8 +6,44 @@ use crate::node_agent_compute_plugin_host::local_authority::ComputePluginAuthori
 pub(in crate::node_agent_compute_plugin_host) enum ComputePluginCandidateVerificationOutcomeKind {
     NotCreated,
     Prepared,
+    Verified,
+    Rejected,
     Aborted,
     Revoked,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateVerificationDigestMismatch
+{
+    ordinal: usize,
+    expected_digest: String,
+    observed_digest: String,
+}
+
+impl ComputePluginCandidateVerificationDigestMismatch {
+    pub(in crate::node_agent_compute_plugin_host) fn from_store(
+        ordinal: usize,
+        expected_digest: String,
+        observed_digest: String,
+    ) -> Self {
+        Self {
+            ordinal,
+            expected_digest,
+            observed_digest,
+        }
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn ordinal(&self) -> usize {
+        self.ordinal
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn expected_digest(&self) -> &str {
+        &self.expected_digest
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn observed_digest(&self) -> &str {
+        &self.observed_digest
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -254,6 +290,13 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateVerif
     resolved_at_ms: Option<i64>,
     resolution_reason: Option<&'static str>,
     result_digest: Option<String>,
+    observed_artifact_set_digest: Option<String>,
+    mismatch: Option<ComputePluginCandidateVerificationDigestMismatch>,
+    authority_state_revision_after: Option<i64>,
+    inventory_revision_after: Option<i64>,
+    inventory_digest_after: Option<String>,
+    authority_epoch_after: Option<i64>,
+    slot_phase_after: Option<String>,
 }
 
 impl ComputePluginCandidateVerificationOutcome {
@@ -278,7 +321,72 @@ impl ComputePluginCandidateVerificationOutcome {
             resolved_at_ms,
             resolution_reason,
             result_digest,
+            observed_artifact_set_digest: None,
+            mismatch: None,
+            authority_state_revision_after: None,
+            inventory_revision_after: None,
+            inventory_digest_after: None,
+            authority_epoch_after: None,
+            slot_phase_after: None,
         }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(in crate::node_agent_compute_plugin_host) fn verified_from_store(
+        key: &ComputePluginCandidateVerificationRecoveryKey,
+        resolved_at_ms: i64,
+        result_digest: String,
+        observed_artifact_set_digest: String,
+        authority_state_revision_after: i64,
+        inventory_revision_after: i64,
+        inventory_digest_after: String,
+        authority_epoch_after: i64,
+        slot_phase_after: String,
+    ) -> Self {
+        let mut outcome = Self::from_store(
+            ComputePluginCandidateVerificationOutcomeKind::Verified,
+            key,
+            Some(resolved_at_ms),
+            Some("artifact_set_verified"),
+            Some(result_digest),
+        );
+        outcome.observed_artifact_set_digest = Some(observed_artifact_set_digest);
+        outcome.authority_state_revision_after = Some(authority_state_revision_after);
+        outcome.inventory_revision_after = Some(inventory_revision_after);
+        outcome.inventory_digest_after = Some(inventory_digest_after);
+        outcome.authority_epoch_after = Some(authority_epoch_after);
+        outcome.slot_phase_after = Some(slot_phase_after);
+        outcome
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(in crate::node_agent_compute_plugin_host) fn rejected_from_store(
+        key: &ComputePluginCandidateVerificationRecoveryKey,
+        resolved_at_ms: i64,
+        result_digest: String,
+        observed_artifact_set_digest: String,
+        mismatch: ComputePluginCandidateVerificationDigestMismatch,
+        authority_state_revision_after: i64,
+        inventory_revision_after: i64,
+        inventory_digest_after: String,
+        authority_epoch_after: i64,
+        slot_phase_after: String,
+    ) -> Self {
+        let mut outcome = Self::from_store(
+            ComputePluginCandidateVerificationOutcomeKind::Rejected,
+            key,
+            Some(resolved_at_ms),
+            Some("artifact_digest_mismatch"),
+            Some(result_digest),
+        );
+        outcome.observed_artifact_set_digest = Some(observed_artifact_set_digest);
+        outcome.mismatch = Some(mismatch);
+        outcome.authority_state_revision_after = Some(authority_state_revision_after);
+        outcome.inventory_revision_after = Some(inventory_revision_after);
+        outcome.inventory_digest_after = Some(inventory_digest_after);
+        outcome.authority_epoch_after = Some(authority_epoch_after);
+        outcome.slot_phase_after = Some(slot_phase_after);
+        outcome
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn kind(
@@ -295,6 +403,46 @@ impl ComputePluginCandidateVerificationOutcome {
         &self,
     ) -> Option<&'static str> {
         self.resolution_reason
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn result_digest(&self) -> Option<&str> {
+        self.result_digest.as_deref()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn observed_artifact_set_digest(
+        &self,
+    ) -> Option<&str> {
+        self.observed_artifact_set_digest.as_deref()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn mismatch(
+        &self,
+    ) -> Option<&ComputePluginCandidateVerificationDigestMismatch> {
+        self.mismatch.as_ref()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn authority_state_revision_after(
+        &self,
+    ) -> Option<i64> {
+        self.authority_state_revision_after
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn inventory_revision_after(
+        &self,
+    ) -> Option<i64> {
+        self.inventory_revision_after
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn inventory_digest_after(&self) -> Option<&str> {
+        self.inventory_digest_after.as_deref()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn authority_epoch_after(&self) -> Option<i64> {
+        self.authority_epoch_after
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn slot_phase_after(&self) -> Option<&str> {
+        self.slot_phase_after.as_deref()
     }
 }
 

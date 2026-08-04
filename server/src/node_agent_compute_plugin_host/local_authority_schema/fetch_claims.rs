@@ -217,6 +217,7 @@ AND NOT (
     AND NEW.resolution_reason IN (
         'authority_epoch_advanced_by_keyring',
         'authority_epoch_advanced_by_plan',
+        'authority_epoch_advanced_by_verification',
         'process_owner_epoch_advanced',
         'candidate_released_by_plan'
     )

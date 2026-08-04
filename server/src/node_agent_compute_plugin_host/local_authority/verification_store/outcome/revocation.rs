@@ -22,6 +22,13 @@ pub(super) fn validate_durable_state(
                 bail!("COMPUTE_PLUGIN_VERIFICATION_OUTCOME_REVOKE_FENCE_MISSING");
             }
         }
+        "authority_epoch_advanced_by_verification" => {
+            if authority.authority_epoch <= key.authority_epoch()
+                || authority.inventory_revision <= key.execution_inventory_revision()
+            {
+                bail!("COMPUTE_PLUGIN_VERIFICATION_OUTCOME_REVOKE_FENCE_MISSING");
+            }
+        }
         "process_owner_epoch_advanced" => {
             if authority.process_owner_epoch <= key.process_owner_epoch() {
                 bail!("COMPUTE_PLUGIN_VERIFICATION_OUTCOME_REVOKE_FENCE_MISSING");

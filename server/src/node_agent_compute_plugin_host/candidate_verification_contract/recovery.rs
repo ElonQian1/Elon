@@ -8,6 +8,7 @@ use crate::node_agent_compute_plugin_host::local_authority::ComputePluginCandida
 mod types;
 
 pub(in crate::node_agent_compute_plugin_host) use types::{
+    ComputePluginCandidateVerificationDigestMismatch,
     ComputePluginCandidateVerificationInitialAbsence, ComputePluginCandidateVerificationOutcome,
     ComputePluginCandidateVerificationOutcomeKind, ComputePluginCandidateVerificationRecoveryKey,
     ValidatedCandidateVerificationRecoveryAbortPermit,

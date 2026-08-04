@@ -81,6 +81,23 @@ impl TrustedHashedComputePluginCandidateArtifactSet<'_> {
     }
 }
 
+impl<'authority> TrustedHashedComputePluginCandidateArtifactSet<'authority> {
+    pub(super) fn into_resolution_parts(
+        self,
+        _permit: super::resolution::CandidateVerificationResolutionPermit,
+    ) -> super::resolution::CandidateVerificationResolutionParts<'authority> {
+        super::resolution::CandidateVerificationResolutionParts::new(
+            self.prepared,
+            self.recovery_key,
+            self.pinned,
+            self.evidence,
+            self.binding_facts,
+            self.authority_session,
+            self.hash_completed_at,
+        )
+    }
+}
+
 impl fmt::Debug for TrustedHashedComputePluginCandidateArtifactSet<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -283,7 +300,7 @@ pub(in crate::node_agent_compute_plugin_host) fn abandon_trusted_hashed_candidat
     }
 }
 
-fn revalidate_hashed_parts(
+pub(super) fn revalidate_hashed_parts(
     prepared: &ComputePluginPreparedCandidateVerificationFacts,
     key: &ComputePluginCandidateVerificationRecoveryKey,
     pinned: &mut PinnedComputePluginCandidateArtifactSet,
@@ -312,7 +329,7 @@ fn validate_observation(
     Ok(())
 }
 
-fn validate_session(
+pub(super) fn validate_session(
     session: &ComputePluginPostHashVerificationAuthoritySession<'_>,
     key: &ComputePluginCandidateVerificationRecoveryKey,
     cancellation_guard: &crate::node_agent_compute_plugin_host::fetch_contract::ComputePluginFetchCancellationGuard,

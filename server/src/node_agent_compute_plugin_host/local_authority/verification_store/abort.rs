@@ -109,7 +109,8 @@ fn terminalize_prepared_run(
               AND state = 'prepared'
               AND resolved_at_ms IS NULL AND resolution_reason IS NULL
               AND result_json IS NULL AND result_digest IS NULL
-              AND mismatch_ordinal IS NULL AND observed_digest IS NULL"#,
+              AND observed_artifact_set_digest IS NULL
+              AND mismatch_ordinal IS NULL AND mismatch_observed_digest IS NULL"#,
             named_params! {
                 ":resolved_at": resolved_at_ms,
                 ":result_json": result_json,

@@ -60,6 +60,7 @@ const REQUIRED_TRIGGERS: &[&str] = &[
     "candidate_verification_delete_forbidden",
     "candidate_verification_identity_immutable",
     "candidate_verification_initial_state",
+    "candidate_verification_resolution_fenced",
     "candidate_verification_transition",
     "candidate_close_plan_open",
     "fetch_claim_begin_fenced",
@@ -558,6 +559,7 @@ CREATE TABLE fetch_claims (
         OR resolution_reason IN (
             'authority_epoch_advanced_by_keyring',
             'authority_epoch_advanced_by_plan',
+            'authority_epoch_advanced_by_verification',
             'process_owner_epoch_advanced',
             'candidate_released_by_plan'
         )

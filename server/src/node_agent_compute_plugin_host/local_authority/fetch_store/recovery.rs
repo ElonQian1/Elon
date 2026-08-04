@@ -459,6 +459,9 @@ fn parse_revocation_reason(reason: &str) -> Result<&'static str> {
     match reason {
         "authority_epoch_advanced_by_keyring" => Ok("authority_epoch_advanced_by_keyring"),
         "authority_epoch_advanced_by_plan" => Ok("authority_epoch_advanced_by_plan"),
+        "authority_epoch_advanced_by_verification" => {
+            Ok("authority_epoch_advanced_by_verification")
+        }
         "process_owner_epoch_advanced" => Ok("process_owner_epoch_advanced"),
         "candidate_released_by_plan" => Ok("candidate_released_by_plan"),
         _ => bail!("COMPUTE_PLUGIN_FETCH_OUTCOME_REVOKE_REASON_CORRUPT"),
