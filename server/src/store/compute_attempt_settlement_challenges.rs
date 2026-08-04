@@ -64,6 +64,18 @@ pub(crate) struct ComputeSettlementChallengeReceipt {
     pub replayed: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ComputeSettlementChallengeGate {
+    pub status: String,
+    pub blocked: bool,
+    pub correction_required: bool,
+    pub challenge_id: Option<String>,
+    pub challenge_event_digest: Option<String>,
+    pub resolution_id: Option<String>,
+    pub resolution_event_digest: Option<String>,
+}
+
 impl Store {
     pub(crate) fn open_compute_settlement_challenge(
         &self,
@@ -127,19 +139,51 @@ pub(super) fn settlement_has_open_challenge_on(
     conn: &Connection,
     settlement_receipt_id: &str,
 ) -> Result<bool> {
+    Ok(settlement_challenge_gate_on(conn, settlement_receipt_id)?.blocked)
+}
+
+pub(super) fn settlement_challenge_gate_on(
+    conn: &Connection,
+    settlement_receipt_id: &str,
+) -> Result<ComputeSettlementChallengeGate> {
     support::validate_exact("Settlement Receipt ID", settlement_receipt_id, 240)?;
     let Some(stored) = challenge_by_settlement_on(conn, settlement_receipt_id)? else {
-        return Ok(false);
+        return Ok(ComputeSettlementChallengeGate {
+            status: "none".to_string(),
+            blocked: false,
+            correction_required: false,
+            challenge_id: None,
+            challenge_event_digest: None,
+            resolution_id: None,
+            resolution_event_digest: None,
+        });
     };
     let challenge = stored.into_receipt(conn, false)?;
     let Some(resolution) =
         settlement_challenge_resolution_by_challenge_on(conn, &challenge.challenge_id)?
     else {
-        return Ok(true);
+        return Ok(ComputeSettlementChallengeGate {
+            status: "open".to_string(),
+            blocked: true,
+            correction_required: false,
+            challenge_id: Some(challenge.challenge_id),
+            challenge_event_digest: Some(challenge.event_digest),
+            resolution_id: None,
+            resolution_event_digest: None,
+        });
     };
-    match resolution.action.as_str() {
-        "accepted" => Ok(true),
-        "rejected" | "withdrawn" => Ok(false),
+    let (blocked, correction_required) = match resolution.action.as_str() {
+        "accepted" => (true, true),
+        "rejected" | "withdrawn" => (false, false),
         _ => bail!("算力结算挑战决议包含未知终态"),
-    }
+    };
+    Ok(ComputeSettlementChallengeGate {
+        status: resolution.action,
+        blocked,
+        correction_required,
+        challenge_id: Some(challenge.challenge_id),
+        challenge_event_digest: Some(challenge.event_digest),
+        resolution_id: Some(resolution.resolution_id),
+        resolution_event_digest: Some(resolution.event_digest),
+    })
 }

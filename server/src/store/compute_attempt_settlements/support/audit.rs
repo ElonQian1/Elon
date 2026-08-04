@@ -332,7 +332,7 @@ fn audit_pending_projection(
         )
         .optional()?
         .unwrap_or(0);
-    let rebuilt = conn.query_row(
+    let credited = conn.query_row(
         "SELECT COALESCE(SUM(CASE direction WHEN 'credit' THEN amount_micros
                                              WHEN 'debit' THEN -amount_micros ELSE 0 END),0)
            FROM compute_settlement_ledger_legs
@@ -340,6 +340,15 @@ fn audit_pending_projection(
         params![account_id, leg_kind],
         |row| row.get::<_, i64>(0),
     )?;
+    let released = conn.query_row(
+        "SELECT COALESCE(SUM(amount_micros),0)
+           FROM compute_settlement_release_ledger_legs
+          WHERE account_kind=?1 AND account_id=?2 AND currency='CNY'
+            AND balance_state='pending' AND direction='debit'",
+        params![account_kind, account_id],
+        |row| row.get::<_, i64>(0),
+    )?;
+    let rebuilt = credited - released;
     if projected != rebuilt || projected < 0 {
         bail!("Attempt 结算待结算余额投影与不可变账本不一致");
     }

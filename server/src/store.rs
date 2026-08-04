@@ -40,6 +40,7 @@ mod compute_attempt_leases;
 mod compute_attempt_platform_observations;
 mod compute_attempt_settlement_challenge_resolutions;
 mod compute_attempt_settlement_challenges;
+mod compute_attempt_settlement_releases;
 mod compute_attempt_settlements;
 mod compute_attempt_terminals;
 mod compute_attempt_usage;
@@ -287,6 +288,9 @@ pub(crate) use compute_attempt_settlement_challenge_resolutions::{
 };
 pub(crate) use compute_attempt_settlement_challenges::{
     ComputeSettlementChallengeReceipt, OpenComputeSettlementChallengeRequest,
+};
+pub(crate) use compute_attempt_settlement_releases::{
+    ComputeSettlementReleaseReceipt, ReleaseComputeAttemptSettlementRequest,
 };
 pub(crate) use compute_attempt_settlements::{
     ComputeAttemptSettlementReceipt, SettleComputeAttemptRequest,

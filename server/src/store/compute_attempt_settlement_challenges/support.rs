@@ -115,6 +115,17 @@ pub(super) fn open_challenge_on(
     {
         bail!("结算挑战引用的 Settlement Receipt、Posting 或消费者身份不匹配");
     }
+    let already_released = tx.query_row(
+        "SELECT EXISTS(
+           SELECT 1 FROM compute_settlement_releases
+            WHERE settlement_receipt_id=?1
+         )",
+        params![settlement.settlement.settlement_receipt_id],
+        |row| row.get::<_, bool>(0),
+    )?;
+    if already_released {
+        bail!("Settlement Receipt 已经释放到 available，不能再创建消费者挑战");
+    }
     let settled_at = parse_time("Settlement 结算时间", &settlement.settled_at)?;
     let challenge_deadline = settled_at
         .checked_add_signed(Duration::seconds(

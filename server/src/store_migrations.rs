@@ -232,6 +232,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (195, "分布式算力 Attempt 原子待结算回执", crate::compute_attempt_settlement_migration::migration_v195),
     (196, "分布式算力 Attempt 结算消费者挑战", crate::compute_settlement_challenge_migration::migration_v196),
     (197, "分布式算力 Attempt 结算挑战终态决议", crate::compute_settlement_challenge_resolution_migration::migration_v197),
+    (198, "分布式算力 Attempt 待结算原子释放", crate::compute_settlement_release_migration::migration_v198),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
