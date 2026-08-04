@@ -169,6 +169,48 @@ impl Store {
         current_registered_provider_on(&conn, provider_id.trim())?
             .ok_or_else(|| anyhow!("算力提供者不存在"))
     }
+
+    pub(crate) fn compute_provider_if_exists(
+        &self,
+        provider_id: &str,
+    ) -> Result<Option<ComputeProviderRegistrationReceipt>> {
+        if provider_id.trim().is_empty() {
+            bail!("算力提供者 ID 不能为空");
+        }
+        let conn = self.conn()?;
+        current_registered_provider_on(&conn, provider_id.trim())
+    }
+
+    pub(crate) fn list_compute_providers_for_owner(
+        &self,
+        owner_account_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ComputeProviderRegistrationReceipt>> {
+        if owner_account_id.trim().is_empty() {
+            bail!("算力提供者所有者不能为空");
+        }
+        let conn = self.conn()?;
+        let provider_ids = {
+            let mut stmt = conn.prepare(
+                "SELECT provider_id FROM compute_providers
+                  WHERE owner_account_id=?1
+                  ORDER BY updated_at DESC, provider_id ASC
+                  LIMIT ?2",
+            )?;
+            let rows = stmt.query_map(
+                params![owner_account_id.trim(), limit.clamp(1, 100) as i64],
+                |row| row.get::<_, String>(0),
+            )?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        provider_ids
+            .into_iter()
+            .map(|provider_id| {
+                current_registered_provider_on(&conn, &provider_id)?
+                    .ok_or_else(|| anyhow!("算力提供者当前投影在列表读取期间消失"))
+            })
+            .collect()
+    }
 }
 
 #[derive(Debug)]
