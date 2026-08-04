@@ -14,7 +14,7 @@ impl Store {
         offer_id: &str,
     ) -> Result<Option<ComputeOfferRegistrationReceipt>> {
         validate_offer_id(offer_id)?;
-        current_registered_offer_on(&self.conn()?, offer_id.trim())
+        current_registered_offer_on(&*self.conn()?, offer_id.trim())
     }
 
     pub(crate) fn compute_offer_version_if_exists(
@@ -26,7 +26,7 @@ impl Store {
         if offer_version <= 0 {
             bail!("算力 Offer 版本必须为正整数");
         }
-        registered_offer_version_on(&self.conn()?, offer_id.trim(), offer_version)
+        registered_offer_version_on(&*self.conn()?, offer_id.trim(), offer_version)
     }
 
     pub(crate) fn list_compute_offers_for_provider(

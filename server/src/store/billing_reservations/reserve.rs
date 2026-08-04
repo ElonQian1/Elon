@@ -16,7 +16,7 @@ pub(super) fn reserve_billing_call_compat_on(
     reserve_billing_call_on(conn, request, expires_at, false)
 }
 
-pub(super) fn reserve_billing_call_until_on(
+pub(crate) fn reserve_billing_call_until_on(
     conn: &Connection,
     request: &BillingReservationRequest<'_>,
     expires_at: &str,

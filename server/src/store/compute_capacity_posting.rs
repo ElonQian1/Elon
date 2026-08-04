@@ -116,8 +116,10 @@ pub(super) fn post_capacity_transaction_on(
     mut balances: BTreeMap<String, ComputeCapacityBucketBalance>,
 ) -> Result<Vec<ComputeCapacityBucketBalance>> {
     let before = balances.clone();
-    let legs = expand_capacity_ledger_legs(transaction).map_err(anyhow::Error::new)?;
-    apply_capacity_transaction(&mut balances, transaction).map_err(anyhow::Error::new)?;
+    let legs = expand_capacity_ledger_legs(transaction)
+        .map_err(|error| anyhow!("容量账本分录校验失败：{error:?}"))?;
+    apply_capacity_transaction(&mut balances, transaction)
+        .map_err(|error| anyhow!("容量账本余额应用失败：{error:?}"))?;
 
     let claim_effect = transaction.claim_effect.as_ref();
     let offer = transaction.causal_binding.offer.as_ref();

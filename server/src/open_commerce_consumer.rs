@@ -95,7 +95,7 @@ pub(crate) fn discover(
     Ok(ConsumerDiscoveryResponse {
         schema: "open_commerce.consumer_discovery.v1",
         capability_contract_profile: "open_commerce.capability_schema.v1",
-        requester_app_id: request.requester_app_id,
+        requester_app_id: request.requester_app_id.clone(),
         ranking_policy: ranking_policy.key().to_string(),
         ranking_policy_label: ranking_policy.label().to_string(),
         ranking_explanation: ranking_policy.explanation().to_string(),

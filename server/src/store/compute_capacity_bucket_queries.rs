@@ -31,7 +31,7 @@ impl Store {
             bail!("容量 bucket ID 不能为空");
         }
         Ok(
-            stored_bucket_on(&self.conn()?, bucket_id.trim())?.map(|stored| {
+            stored_bucket_on(&*self.conn()?, bucket_id.trim())?.map(|stored| {
                 ComputeCapacityBucketRead {
                     balance: stored.balance,
                     starts_at_utc: stored.starts_at,
@@ -52,7 +52,7 @@ impl Store {
             bail!("容量池身份、epoch 或 revision 无效");
         }
         Ok(stored_buckets_for_pool_epoch_limited_on(
-            &self.conn()?,
+            &*self.conn()?,
             pool_id.trim(),
             capacity_epoch,
             pool_revision,

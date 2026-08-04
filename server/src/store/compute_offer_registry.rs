@@ -510,7 +510,7 @@ fn ensure_offer_capacity_references_on(
     {
         bail!("算力 Offer 与容量池 Provider、摘要、区域或资源档案不一致");
     }
-    if publishing && !pool_state_allows_offer(&pool.1, pool.2, offer)? {
+    if publishing && !pool_state_allows_offer(&pool.1, pool.2, offer) {
         bail!("容量池当前状态或 epoch 不允许发布该状态的 Offer");
     }
 

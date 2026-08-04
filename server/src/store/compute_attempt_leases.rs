@@ -12,9 +12,9 @@ use super::{new_id, Store};
 mod support;
 
 use support::{
-    audit_renewal, current_lease_state_on, ensure_expected_state, ensure_renewal_owner,
-    ensure_renewal_window, renewal_by_idempotency_on, renewal_event_digest, renewal_request_digest,
-    validate_exact, validate_renewal_input, StoredLeaseState,
+    audit_renewal, ensure_expected_state, ensure_renewal_owner, ensure_renewal_window,
+    renewal_by_idempotency_on, renewal_event_digest, renewal_request_digest, validate_exact,
+    validate_renewal_input,
 };
 pub(super) use support::{compute_attempt_lease_digest, current_lease_state_on, StoredLeaseState};
 
@@ -189,7 +189,7 @@ impl Store {
         lease_id: &str,
     ) -> Result<ComputeAttemptLeaseStateReceipt> {
         validate_exact("Attempt Lease ID", lease_id, 200)?;
-        compute_attempt_lease_state_on(&self.conn()?, lease_id)
+        compute_attempt_lease_state_on(&*self.conn()?, lease_id)
     }
 }
 

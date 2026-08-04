@@ -169,7 +169,7 @@ fn provenance(
             format!("{:x}", Sha256::digest(value.as_bytes()))
                 .chars()
                 .take(24)
-                .collect()
+                .collect::<String>()
         })
         .unwrap_or_default();
     NativeContextProvenance {

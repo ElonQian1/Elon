@@ -253,7 +253,7 @@ impl Store {
         lease_id: &str,
     ) -> Result<ComputeAttemptTerminalCandidateReceipt> {
         support::validate_exact("Attempt Lease ID", lease_id, 200)?;
-        candidate_by_lease_on(&self.conn()?, lease_id)?
+        candidate_by_lease_on(&*self.conn()?, lease_id)?
             .ok_or_else(|| anyhow!("Attempt 尚无终态候选"))?
             .into_receipt(false)
     }

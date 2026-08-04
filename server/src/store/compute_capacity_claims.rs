@@ -129,7 +129,7 @@ pub(super) fn hold_compute_capacity_claim_on(
     let mut claim_lines = Vec::with_capacity(input.lines.len());
     let mut movements = Vec::with_capacity(input.lines.len());
     let mut bucket_ids = BTreeSet::new();
-    let mut meters = BTreeSet::new();
+    let mut meters = BTreeSet::<String>::new();
     let mut window_bounds: Option<(String, String)> = None;
     for (line_no, input_line) in input.lines.iter().enumerate() {
         if !bucket_ids.insert(input_line.bucket_id.trim()) {
@@ -159,7 +159,7 @@ pub(super) fn hold_compute_capacity_claim_on(
             bail!("同一容量 Claim 的 bucket 必须共享精确交付窗口边界");
         }
         window_bounds = Some((stored.starts_at.clone(), stored.ends_at.clone()));
-        if !meters.insert(stored.balance.binding.meter.as_str()) {
+        if !meters.insert(stored.balance.binding.meter.clone()) {
             bail!("同一容量 Claim 不能重复 meter");
         }
         let line_no = i64::try_from(line_no)?;

@@ -49,7 +49,7 @@ impl Store {
         validate_exact("激活证据幂等范围", idempotency_scope, 200)?;
         validate_exact("激活证据幂等键", idempotency_key, 160)?;
         request_by_idempotency_on(
-            &self.conn()?,
+            &*self.conn()?,
             idempotency_scope.trim(),
             idempotency_key.trim(),
         )
@@ -143,7 +143,7 @@ impl Store {
         request_id: &str,
     ) -> Result<ComputeActivationEvidenceRequest> {
         validate_exact("激活证据申请 ID", request_id, 160)?;
-        request_on(&self.conn()?, request_id.trim())?.ok_or_else(|| anyhow!("激活证据申请不存在"))
+        request_on(&*self.conn()?, request_id.trim())?.ok_or_else(|| anyhow!("激活证据申请不存在"))
     }
 
     pub(crate) fn list_compute_activation_evidence_requests_for_owner(
@@ -157,7 +157,7 @@ impl Store {
         validate_exact("算力 Provider ID", provider_id, 160)?;
         validate_exact("容量池 ID", pool_id, 160)?;
         list_requests(
-            &self.conn()?,
+            &*self.conn()?,
             "WHERE owner_user_id=?1 AND provider_id=?2 AND pool_id=?3
              ORDER BY requested_at DESC, request_id DESC LIMIT ?4",
             params![
@@ -176,7 +176,7 @@ impl Store {
     ) -> Result<Vec<ComputeActivationEvidenceRequest>> {
         validate_review_status(status)?;
         list_requests(
-            &self.conn()?,
+            &*self.conn()?,
             "WHERE status=?1 ORDER BY requested_at ASC, request_id ASC LIMIT ?2",
             params![status.trim(), i64::try_from(limit.clamp(1, 100))?],
         )
@@ -395,10 +395,10 @@ fn list_requests<P: rusqlite::Params>(
     params: P,
 ) -> Result<Vec<ComputeActivationEvidenceRequest>> {
     let mut statement = conn.prepare(&format!("{REQUEST_SELECT} {suffix}"))?;
-    statement
+    let rows = statement
         .query_map(params, request_from_row)?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(Into::into)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
 }
 
 fn request_from_row(row: &Row<'_>) -> rusqlite::Result<ComputeActivationEvidenceRequest> {

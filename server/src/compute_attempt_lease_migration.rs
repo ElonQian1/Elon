@@ -90,7 +90,7 @@ pub(crate) fn migration_v186(conn: &Connection) -> Result<()> {
                FROM compute_attempt_activations
               WHERE lease_id NOT IN (SELECT lease_id FROM compute_attempt_lease_states)",
         )?;
-        statement
+        let rows = statement
             .query_map([], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
@@ -102,7 +102,8 @@ pub(crate) fn migration_v186(conn: &Connection) -> Result<()> {
                     row.get::<_, String>(6)?,
                 ))
             })?
-            .collect::<rusqlite::Result<Vec<_>>>()?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
     };
     for (lease_id, provider_id, consumer_id, digest, lease_json, actor, activated_at) in activations
     {

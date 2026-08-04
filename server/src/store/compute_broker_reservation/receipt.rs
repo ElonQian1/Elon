@@ -210,7 +210,7 @@ fn matching_receipts_on(
              OR (consumer_account_id=?2 AND idempotency_key=?3)
           ORDER BY reservation_id LIMIT 2",
     )?;
-    statement
+    let rows = statement
         .query_map(
             params![
                 request.reservation_id,
@@ -239,8 +239,8 @@ fn matching_receipts_on(
                 })
             },
         )?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(Into::into)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
 }
 
 fn audit_stored_receipt_on(

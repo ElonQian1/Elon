@@ -113,9 +113,10 @@ impl Store {
         let mut stmt = conn.prepare(&format!(
             "{CAPABILITY_SOURCE_SELECT} WHERE l.project_id = ?1 ORDER BY l.updated_at DESC"
         ))?;
-        Ok(stmt
+        let rows = stmt
             .query_map(params![project_id.trim()], capability_source_from_row)?
-            .collect::<rusqlite::Result<Vec<_>>>()?)
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 
     pub(crate) fn list_publishable_open_commerce_capability_source_links(

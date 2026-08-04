@@ -244,7 +244,7 @@ impl Store {
         if lease_id.is_empty() || lease_id.trim() != lease_id {
             bail!("Attempt Lease ID 无效");
         }
-        compute_attempt_activation_on(&self.conn()?, lease_id)
+        compute_attempt_activation_on(&*self.conn()?, lease_id)
     }
 }
 

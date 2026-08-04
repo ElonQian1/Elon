@@ -17,11 +17,13 @@ pub(super) fn list_current_jobs_on(
               ORDER BY recorded_at DESC, job_id ASC
               LIMIT ?3",
         )?;
-        stmt.query_map(
-            params![consumer_account_id, project_id, limit as i64],
-            |row| row.get::<_, String>(0),
-        )?
-        .collect::<rusqlite::Result<Vec<_>>>()?
+        let rows = stmt
+            .query_map(
+                params![consumer_account_id, project_id, limit as i64],
+                |row| row.get::<_, String>(0),
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
     } else {
         let mut stmt = conn.prepare(
             "SELECT job_id
@@ -30,10 +32,12 @@ pub(super) fn list_current_jobs_on(
               ORDER BY recorded_at DESC, job_id ASC
               LIMIT ?2",
         )?;
-        stmt.query_map(params![consumer_account_id, limit as i64], |row| {
-            row.get::<_, String>(0)
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?
+        let rows = stmt
+            .query_map(params![consumer_account_id, limit as i64], |row| {
+                row.get::<_, String>(0)
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
     };
 
     job_ids

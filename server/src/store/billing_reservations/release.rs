@@ -16,7 +16,7 @@ pub(super) fn release_billing_call_compat_on(
     release_billing_call_on(tx, user_id, compute_call_id, None, status, false)
 }
 
-pub(super) fn release_billing_call_reservation_on(
+pub(crate) fn release_billing_call_reservation_on(
     tx: &Transaction<'_>,
     user_id: &str,
     compute_call_id: &str,

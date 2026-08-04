@@ -77,7 +77,7 @@ pub(crate) fn definitions() -> Vec<Value> {
                             },
                             "city": {"type":"string","maxLength":120},
                             "max_unit_price_micros": {
-                                "type":"integer","minimum":0,"maximum":1000000000000000
+                                "type":"integer","minimum":0,"maximum":1000000000000000i64
                             },
                             "prefer_public": {"type":"boolean","default":false}
                         },

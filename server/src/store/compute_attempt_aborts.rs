@@ -97,7 +97,7 @@ impl Store {
         if lease_id.is_empty() || lease_id.trim() != lease_id {
             bail!("Attempt Lease ID 无效");
         }
-        attempt_abort_by_lease_on(&self.conn()?, lease_id)?
+        attempt_abort_by_lease_on(&*self.conn()?, lease_id)?
             .ok_or_else(|| anyhow::anyhow!("Attempt 中止回执不存在"))
     }
 }

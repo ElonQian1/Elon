@@ -127,7 +127,7 @@ impl Store {
         request_id: &str,
     ) -> Result<Option<ComputeActivationPlan>> {
         validate_exact("激活证据申请 ID", request_id, 160)?;
-        plan_by_request_on(&self.conn()?, request_id.trim())
+        plan_by_request_on(&*self.conn()?, request_id.trim())
     }
 }
 

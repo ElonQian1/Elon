@@ -276,7 +276,7 @@ fn stored_aborts_on<P: rusqlite::Params>(
                 idempotency_scope, idempotency_key, aborted_by_user_id, aborted_at
            FROM compute_attempt_aborts {filter} ORDER BY abort_id LIMIT 2"
     ))?;
-    statement
+    let rows = statement
         .query_map(parameters, |row| {
             Ok(StoredAttemptAbort {
                 abort_id: row.get(0)?,
@@ -320,6 +320,6 @@ fn stored_aborts_on<P: rusqlite::Params>(
                 aborted_at: row.get(38)?,
             })
         })?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(Into::into)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
 }

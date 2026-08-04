@@ -293,15 +293,15 @@ fn read_transactions(
           WHERE pool_id=?1 AND capacity_epoch=?2
           ORDER BY ledger_sequence",
     )?;
-    statement
+    let rows = statement
         .query_map(params![pool_id, capacity_epoch], |row| {
             Ok(TransactionAuditRow {
                 transaction_id: row.get(0)?,
                 ledger_sequence: row.get(1)?,
             })
         })?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(Into::into)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
 }
 
 fn read_ledger_legs(
@@ -318,7 +318,7 @@ fn read_ledger_legs(
           WHERE t.pool_id=?1 AND t.capacity_epoch=?2
           ORDER BY t.ledger_sequence, l.line_no, l.leg_role",
     )?;
-    statement
+    let rows = statement
         .query_map(params![pool_id, capacity_epoch], |row| {
             Ok(LedgerLegAuditRow {
                 transaction_id: row.get(0)?,
@@ -331,8 +331,8 @@ fn read_ledger_legs(
                 delta_units: row.get(7)?,
             })
         })?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(Into::into)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
 }
 
 fn validate_transaction_sequence(transactions: &[TransactionAuditRow], issues: &mut Vec<String>) {

@@ -118,7 +118,7 @@ fn read_transactions(
           ORDER BY ledger_sequence DESC
           LIMIT ?4",
     )?;
-    statement
+    let rows = statement
         .query_map(
             params![pool_id, capacity_epoch, before_sequence, limit],
             |row| {
@@ -134,8 +134,8 @@ fn read_transactions(
                 })
             },
         )?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(Into::into)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
 }
 
 fn read_legs(
@@ -162,7 +162,7 @@ fn read_legs(
           ORDER BY t.ledger_sequence DESC, l.line_no,
                    CASE l.leg_role WHEN 'from' THEN 0 ELSE 1 END",
     )?;
-    statement
+    let rows = statement
         .query_map(
             params![pool_id, capacity_epoch, before_sequence, limit],
             |row| {
@@ -179,6 +179,6 @@ fn read_legs(
                 ))
             },
         )?
-        .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(Into::into)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
 }

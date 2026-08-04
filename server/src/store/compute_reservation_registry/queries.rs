@@ -18,11 +18,13 @@ pub(super) fn list_current_reservations_on(
               ORDER BY reservation.recorded_at DESC, reservation.reservation_id ASC
               LIMIT ?3",
         )?;
-        stmt.query_map(
-            params![consumer_account_id, project_id, limit as i64],
-            |row| row.get::<_, String>(0),
-        )?
-        .collect::<rusqlite::Result<Vec<_>>>()?
+        let rows = stmt
+            .query_map(
+                params![consumer_account_id, project_id, limit as i64],
+                |row| row.get::<_, String>(0),
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
     } else {
         let mut stmt = conn.prepare(
             "SELECT reservation_id
@@ -31,10 +33,12 @@ pub(super) fn list_current_reservations_on(
               ORDER BY recorded_at DESC, reservation_id ASC
               LIMIT ?2",
         )?;
-        stmt.query_map(params![consumer_account_id, limit as i64], |row| {
-            row.get::<_, String>(0)
-        })?
-        .collect::<rusqlite::Result<Vec<_>>>()?
+        let rows = stmt
+            .query_map(params![consumer_account_id, limit as i64], |row| {
+                row.get::<_, String>(0)
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        rows
     };
 
     reservation_ids

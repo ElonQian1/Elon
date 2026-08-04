@@ -14,7 +14,7 @@ impl Store {
         if pool_id.trim().is_empty() {
             bail!("容量池 ID 不能为空");
         }
-        current_capacity_pool_on(&self.conn()?, pool_id.trim())?
+        current_capacity_pool_on(&*self.conn()?, pool_id.trim())?
             .ok_or_else(|| anyhow!("容量池不存在"))
     }
 
@@ -25,7 +25,7 @@ impl Store {
         if pool_id.trim().is_empty() {
             bail!("容量池 ID 不能为空");
         }
-        current_capacity_pool_on(&self.conn()?, pool_id.trim())
+        current_capacity_pool_on(&*self.conn()?, pool_id.trim())
     }
 
     pub(crate) fn list_compute_capacity_pools_for_provider(

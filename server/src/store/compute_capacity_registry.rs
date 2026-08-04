@@ -287,7 +287,7 @@ impl Store {
         &self,
         bucket_id: &str,
     ) -> Result<ComputeCapacityBucketBalance> {
-        stored_bucket_on(&self.conn()?, bucket_id)?
+        stored_bucket_on(&*self.conn()?, bucket_id)?
             .map(|stored| stored.balance)
             .ok_or_else(|| anyhow!("容量 bucket 不存在"))
     }

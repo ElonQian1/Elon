@@ -224,7 +224,7 @@ impl Store {
         lease_id: &str,
     ) -> Result<ComputeAttemptUsageDeclarationReceipt> {
         support::validate_exact("Attempt Lease ID", lease_id, 200)?;
-        latest_declaration_on(&self.conn()?, lease_id)?
+        latest_declaration_on(&*self.conn()?, lease_id)?
             .ok_or_else(|| anyhow!("Attempt 尚无累计用量声明"))?
             .into_receipt(false)
     }
@@ -238,7 +238,7 @@ impl Store {
         if sequence_no <= 0 {
             bail!("Attempt 用量声明序号必须为正整数");
         }
-        declaration_by_sequence_on(&self.conn()?, lease_id, sequence_no)?
+        declaration_by_sequence_on(&*self.conn()?, lease_id, sequence_no)?
             .ok_or_else(|| anyhow!("Attempt 指定序号的用量声明不存在"))?
             .into_receipt(false)
     }

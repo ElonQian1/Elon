@@ -17,7 +17,7 @@ use super::{
 };
 
 #[derive(Debug, Clone)]
-pub(super) struct StoredLeaseState {
+pub(crate) struct StoredLeaseState {
     pub(in crate::store) provider_id: String,
     pub(in crate::store) consumer_account_id: String,
     pub(in crate::store) lease_revision: i64,
@@ -90,7 +90,7 @@ impl StoredRenewal {
     }
 }
 
-pub(super) fn current_lease_state_on(
+pub(crate) fn current_lease_state_on(
     conn: &Connection,
     lease_id: &str,
 ) -> Result<Option<StoredLeaseState>> {
@@ -304,7 +304,7 @@ pub(super) fn renewal_event_digest(
     }))
 }
 
-pub(super) fn compute_attempt_lease_digest(lease: &ComputeAttemptLease) -> Result<String> {
+pub(crate) fn compute_attempt_lease_digest(lease: &ComputeAttemptLease) -> Result<String> {
     digest_json(lease)
 }
 
