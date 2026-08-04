@@ -18,7 +18,8 @@ const governanceLoaded = { exports: {} }
 new Function('module', 'exports', 'require', governanceOutput)(governanceLoaded, governanceLoaded.exports, require)
 
 const nativeContextModelPath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentNativeContextModel.ts')
-const nativeContextModelOutput = ts.transpileModule(fs.readFileSync(nativeContextModelPath, 'utf8'), {
+const nativeContextModelSource = fs.readFileSync(nativeContextModelPath, 'utf8')
+const nativeContextModelOutput = ts.transpileModule(nativeContextModelSource, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText
 const nativeContextModelLoaded = { exports: {} }
@@ -619,5 +620,12 @@ const nativeContextSource = fs.readFileSync(path.join(
 assert(nativeContextSource.includes('/api/project-docs/native-context') === false, '候选 API 应封装在模型客户端中')
 assert(nativeContextSource.includes('接受并入建议'))
 assert(nativeContextSource.includes('证据已漂移'))
+assert(nativeContextSource.includes('漂移项只能拒绝'))
+assert(nativeContextSource.includes('ProjectDocumentNativeContextEditor'))
+assert(nativeContextModelSource.includes('/api/project-docs/native-context/revise'))
+const nativeContextEditorSource = fs.readFileSync(path.join(
+  __dirname, '..', 'src', 'features', 'project-docs', 'ProjectDocumentNativeContextEditor.tsx',
+), 'utf8')
+assert(nativeContextEditorSource.includes('证据路径和 hash 保持不变'))
 
 console.log('project document section model tests passed')

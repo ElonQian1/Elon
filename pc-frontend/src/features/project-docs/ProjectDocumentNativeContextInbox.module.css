@@ -37,7 +37,9 @@
 
 .header button,
 .filters button,
-.actions button {
+.actions button,
+.candidate footer button,
+.editor button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -189,6 +191,92 @@
   color: var(--text-muted);
 }
 
+.candidate footer > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.candidate footer .editButton {
+  min-height: 25px;
+  padding: 3px 7px;
+  font-size: 11px;
+}
+
+.editor {
+  display: grid;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, #8a6fe8 42%, var(--border));
+  border-radius: 9px;
+  background: color-mix(in srgb, #8a6fe8 5%, var(--surface));
+}
+
+.editor label {
+  display: grid;
+  gap: 5px;
+}
+
+.editor label > span {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.editor textarea,
+.editor input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.editor textarea {
+  min-height: 70px;
+  padding: 8px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.editor input {
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.editor textarea:focus,
+.editor input:focus {
+  border-color: #8a6fe8;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #8a6fe8 14%, transparent);
+}
+
+.editor small {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.editor > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.editor button {
+  min-height: 29px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.editor .saveEdit {
+  border-color: #6e59c6;
+  background: #6e59c6;
+  color: #fff;
+}
+
 .error,
 .empty {
   padding: 10px;
@@ -235,7 +323,9 @@
 }
 
 .header button:disabled,
-.actions button:disabled {
+.actions button:disabled,
+.candidate footer button:disabled,
+.editor button:disabled {
   cursor: not-allowed;
   opacity: .45;
 }

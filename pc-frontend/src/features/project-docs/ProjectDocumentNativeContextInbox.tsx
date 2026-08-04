@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, FileSearch, RefreshCw, RotateCcw, ShieldCheck, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, FileSearch, Pencil, RefreshCw, RotateCcw, ShieldCheck, X } from 'lucide-react'
 
 import type { DocumentAutomationMode } from './projectDocumentSections'
 import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
 import {
   listNativeContextCandidates,
+  reviseNativeContextCandidate,
   reviewNativeContextCandidates,
+  type NativeContextCandidate,
   type NativeContextCandidatePage,
   type NativeContextCandidateStatus,
   type NativeContextReviewAction,
 } from './projectDocumentNativeContextModel'
+import ProjectDocumentNativeContextEditor from './ProjectDocumentNativeContextEditor'
 import styles from './ProjectDocumentNativeContextInbox.module.css'
 
 interface Props {
@@ -42,6 +45,8 @@ export default function ProjectDocumentNativeContextInbox({
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [loading, setLoading] = useState(false)
   const [action, setAction] = useState<NativeContextReviewAction | ''>('')
+  const [editingId, setEditingId] = useState('')
+  const [revising, setRevising] = useState(false)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
@@ -70,6 +75,7 @@ export default function ProjectDocumentNativeContextInbox({
     setStatus(nextStatus)
     setOffset(0)
     setSelected(new Set())
+    setEditingId('')
   }
 
   const toggle = (candidateId: string) => {
@@ -85,6 +91,12 @@ export default function ProjectDocumentNativeContextInbox({
     if (!selected.size || action) return
     if (nextAction === 'accept' && !catalogRevision) {
       setError('目录 revision 尚未加载，刷新项目文档后再接受候选。')
+      return
+    }
+    if (nextAction === 'accept' && (page?.candidates ?? []).some(
+      (candidate) => selected.has(candidate.candidate_id) && !candidate.evidence_current,
+    )) {
+      setError('已选候选中存在证据漂移项；可以拒绝清理，但不能接受。')
       return
     }
     setAction(nextAction)
@@ -108,6 +120,28 @@ export default function ProjectDocumentNativeContextInbox({
     }
   }
 
+  const runRevision = async (candidate: NativeContextCandidate, summary: string, topics: string[]) => {
+    if (revising) return
+    setRevising(true)
+    setError('')
+    try {
+      await reviseNativeContextCandidate({
+        adminUrl: runtime.adminUrl,
+        projectRoot: runtime.projectRoot,
+        candidateId: candidate.candidate_id,
+        expectedUpdatedAtMs: candidate.updated_at_ms,
+        summary,
+        topics,
+      })
+      setEditingId('')
+      await load()
+    } catch (reason) {
+      setError(errorMessage(reason, '修订原生理解候选失败'))
+    } finally {
+      setRevising(false)
+    }
+  }
+
   if (!runtime.enabled || !runtime.adminUrl || !runtime.projectRoot) {
     return (
       <section className={styles.inbox}>
@@ -118,7 +152,12 @@ export default function ProjectDocumentNativeContextInbox({
   }
 
   const currentCandidates = page?.candidates ?? []
-  const selectableCandidates = currentCandidates.filter((candidate) => candidate.evidence_current)
+  const selectableCandidates = status === 'pending'
+    ? currentCandidates
+    : currentCandidates.filter((candidate) => candidate.evidence_current)
+  const selectedEvidenceCurrent = currentCandidates
+    .filter((candidate) => selected.has(candidate.candidate_id))
+    .every((candidate) => candidate.evidence_current)
   const allCurrentSelected = selectableCandidates.length > 0
     && selectableCandidates.every((candidate) => selected.has(candidate.candidate_id))
   return (
@@ -148,14 +187,15 @@ export default function ProjectDocumentNativeContextInbox({
                   ? new Set()
                   : new Set(selectableCandidates.map((candidate) => candidate.candidate_id)))
               }} />
-              选择本页证据仍有效的候选
+              {status === 'pending' ? '选择本页候选（漂移项只能拒绝）' : '选择本页证据仍有效的候选'}
             </label>
           )}
           {currentCandidates.map((candidate) => (
             <article key={candidate.candidate_id} className={styles.candidate} data-current={candidate.evidence_current}>
               <label className={styles.candidateTitle}>
                 {(status === 'pending' || status === 'rejected') && (
-                  <input type="checkbox" checked={selected.has(candidate.candidate_id)} disabled={!candidate.evidence_current}
+                  <input type="checkbox" checked={selected.has(candidate.candidate_id)}
+                    disabled={status === 'rejected' && !candidate.evidence_current}
                     onChange={() => toggle(candidate.candidate_id)} />
                 )}
                 <span><strong>{candidate.summary}</strong><code>{candidate.candidate_id}</code></span>
@@ -171,7 +211,22 @@ export default function ProjectDocumentNativeContextInbox({
                   </li>
                 ))}
               </ul>
-              <footer><span>来源 {candidate.producer || 'native tools'}</span><time>{formatTime(candidate.updated_at_ms)}</time></footer>
+              {editingId === candidate.candidate_id && (
+                <ProjectDocumentNativeContextEditor candidate={candidate} disabled={revising}
+                  onCancel={() => setEditingId('')}
+                  onSave={(summary, topics) => runRevision(candidate, summary, topics)} />
+              )}
+              <footer>
+                <span>来源 {candidate.producer || 'native tools'}</span>
+                <div><time>{formatTime(candidate.updated_at_ms)}</time>
+                  {(status === 'pending' || status === 'rejected') && canEdit && (
+                    <button type="button" className={styles.editButton} disabled={!!action || revising}
+                      onClick={() => setEditingId(editingId === candidate.candidate_id ? '' : candidate.candidate_id)}>
+                      <Pencil size={13} />{editingId === candidate.candidate_id ? '收起编辑' : '修订'}
+                    </button>
+                  )}
+                </div>
+              </footer>
             </article>
           ))}
         </div>
@@ -193,7 +248,9 @@ export default function ProjectDocumentNativeContextInbox({
             <button type="button" className={styles.reject} disabled={!selected.size || !canEdit || !!action} onClick={() => { void runAction('reject') }}>
               <X size={15} />{action === 'reject' ? '拒绝中…' : '拒绝'}
             </button>
-            <button type="button" className={styles.accept} disabled={!selected.size || !canEdit || !catalogRevision || !!action} onClick={() => { void runAction('accept') }}>
+            <button type="button" className={styles.accept}
+              disabled={!selected.size || !selectedEvidenceCurrent || !canEdit || !catalogRevision || !!action}
+              onClick={() => { void runAction('accept') }}>
               <Check size={15} />{action === 'accept' ? '并入中…' : '接受并入建议'}
             </button>
           </>}

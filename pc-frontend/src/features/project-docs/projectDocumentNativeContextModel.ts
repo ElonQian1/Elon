@@ -108,6 +108,34 @@ export async function reviewNativeContextCandidates(input: {
   return envelope.result
 }
 
+export async function reviseNativeContextCandidate(input: {
+  adminUrl: string
+  projectRoot: string
+  candidateId: string
+  expectedUpdatedAtMs: number
+  summary: string
+  topics: string[]
+}): Promise<NativeContextCandidate> {
+  const envelope = await nodeApi<NativeContextEnvelope<Record<string, unknown>>>(
+    input.adminUrl,
+    '/api/project-docs/native-context/revise',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        project_root: input.projectRoot,
+        candidate_id: input.candidateId,
+        expected_updated_at_ms: input.expectedUpdatedAtMs,
+        summary: input.summary,
+        topics: input.topics,
+      }),
+    },
+  )
+  if (!envelope.ok || !envelope.result) throw new Error(envelope.error || '修订原生理解候选失败')
+  const candidate = sanitizeCandidate(envelope.result.candidate)
+  if (!candidate) throw new Error('修订后的原生理解候选响应无效')
+  return candidate
+}
+
 function sanitizeCandidatePage(
   value: unknown,
   fallbackStatus: NativeContextCandidateStatus,
