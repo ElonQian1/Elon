@@ -127,4 +127,6 @@ abort/revoke 不推进 cursor；重试创建新 generation 并仍从 committed o
 
 ## 8. 当前实现状态
 
-本合同已接受。当前已有严格网络 DTO、JCS/SHA-256/Ed25519 验签、Manifest 校验、InstallPlan 首次准入及旧的逐段权威 trait；root-signed keyring bundle DTO、Bootstrap root resolver seam、整包校验与两类 ring binding 派生已形成代码。经整包验证的不可变快照只按预期 revision/digest、可信时间、用途、主体、状态和 key 有效期返回公钥；InstallPlan 与 live state 也已改为同时绑定 Publisher/Control 两类 ring revision/digest。代码未编译、未接线，仓库仍没有生产 root pin；专用 SQLite schema/store、防回滚安装、原子计划应用、候选 token、三段式 fetch claim、可信时间和启动恢复仍待分阶段实现。
+本合同已接受。当前已有严格网络 DTO、JCS/SHA-256/Ed25519 验签、Manifest 校验、InstallPlan 首次准入及旧的逐段权威 trait；root-signed keyring bundle DTO、Bootstrap root resolver seam、整包校验与两类 ring binding 派生已形成代码。经整包验证的不可变快照只按预期 revision/digest、可信时间、用途、主体、状态和 key 有效期返回公钥；InstallPlan 与 live state 也已改为同时绑定 Publisher/Control 两类 ring revision/digest。
+
+独立 `compute-plugin-state.sqlite3` 的路径型 facade、WAL/FULL/foreign-key 配置、拒绝接管未版本化同名表的 v1 schema 与私有 `BEGIN IMMEDIATE` seam 已形成代码；schema 覆盖 meta、不可变 keyring、不可变 plan application/event、candidate owner、download cursor 和 fetch claim。它尚未在 NodeAgent 启动路径打开，未执行真实建库或迁移，也没有 purpose-specific 写操作。仓库仍没有生产 root pin；防回滚 keyring 安装、meta 初始化、原子计划应用、候选 token、三段式 fetch claim、可信时间、恢复与 Host 接线仍待实现。

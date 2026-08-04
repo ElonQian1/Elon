@@ -14,6 +14,8 @@ pub(crate) mod keyring;
 pub(crate) mod keyring_validation;
 mod legacy_llm;
 pub(crate) mod lifecycle;
+pub(crate) mod local_authority;
+mod local_authority_schema;
 pub(crate) mod manifest_validation;
 pub(crate) mod plugin_manifest;
 pub(crate) mod ready_capability;

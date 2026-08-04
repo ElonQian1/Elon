@@ -30,7 +30,7 @@ owners: backend, node, ai-economy
 | Capacity Supply 本人控制面 | HTTP/MCP 已可显式确认后向同一窗口的多个 open Bucket 原子追加 self-declared 供给，或把尚在 available 的供给原子撤入 retired；服务端固定首次时间并复用现有双分录账本，available 不等于 verified 或可交易，尚未编译和运行验证 |
 | 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；应用单事务激活内部 Provider/Pool，隔离单事务把其当前 active 状态转为 quarantined。两者均不发送节点命令、不直接改写 Offer、不移动资金，恢复尚未实现，状态为 `implementation_uncompiled` |
 | Offer 草稿、发布与生命周期控制面 | HTTP/MCP 已可创建、精确修订和撤销本人 draft Offer；管理员 HTTP 可原子发布 active、转为 draining，并在无 pending/active Reservation 时终结。v182-v184 保存追加式回执和依赖索引，所有写入口均不移动资金，状态为 `implementation_uncompiled` |
-| 节点插件治理合同 | Signed Manifest、InstallPlan、双槽 lifecycle 与短期 ReadyCapability 合同已写；JCS/SHA-256/Ed25519、Manifest/计划准入以及 root-signed 双 keyring 校验与精确 binding/time resolver 已形成代码，InstallPlan 同时绑定两类 ring revision/digest；本机权威库已选择独立 SQLite，生产 root pin、耐久 store、防回滚、库存 CAS、候选所有权、三段式下载认领与运行接线尚未完成 |
+| 节点插件治理合同 | Signed Manifest、InstallPlan、双槽 lifecycle 与短期 ReadyCapability 合同已写；双 keyring 校验、精确 binding/time resolver 以及独立 SQLite v1 schema/私有事务 seam 已形成代码，均未编译接线或执行建库；生产 root pin、防回滚 keyring 安装、库存 CAS、计划应用、候选所有权、三段式下载认领与运行接线尚未完成 |
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 共享 CapacityPool 与追加式容量账本 | 领域合同、v165-v168 schema、隔离 Store、Store-canonical Supply/Claim 请求摘要、事务内 Claim kernel、只读审计、到期批处理、状态门卫和 epoch 轮换已写；v173 追加 Claim 完整历史，Hold V2 固定 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承原 held 绑定；尚未编译、执行迁移或接线 |
