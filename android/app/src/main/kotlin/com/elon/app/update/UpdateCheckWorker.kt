@@ -5,152 +5,91 @@ import android.util.Log
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.elon.app.BuildConfig
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import org.json.JSONObject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.concurrent.TimeUnit
 
 /**
- * 后台周期性检查 APP 更新。
+ * Activity 不在前台时仍可运行的更新检查。
  *
- * - 每 [INTERVAL_MINUTES] 分钟执行一次（系统调度，最快 15 分钟）
- * - 仅在有网络时执行
- * - 发现新版本：在通知栏显示更新提示，用户点击后打开 APP 触发下载
- * - 不自动下载，不强制弹窗（减少对用户的打扰）
+ * WebSocket 更新信号会触发一次性检查；六小时周期任务只是推送丢失后的兜底。
+ * 两条路径都重新读取 version.json、持久化最新版本，并使用同一通知渠道提醒用户。
  */
 class UpdateCheckWorker(
     private val context: Context,
-    params: WorkerParameters
+    params: WorkerParameters,
 ) : CoroutineWorker(context, params) {
-
-    override suspend fun doWork(): Result {
+    override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         if (!appUpdatePolicy(BuildConfig.DEBUG).selfUpdateEnabled) {
             Log.d(TAG, "UI 调试版由 PC 节点管理，跳过正式版更新检查")
-            return Result.success()
+            return@withContext Result.success()
         }
-        return try {
-            Log.d(TAG, "后台检查更新开始")
-            val info = fetchVersionInfo() ?: return Result.success()
-            if (info.versionCode > BuildConfig.VERSION_CODE) {
-                Log.i(TAG, "发现新版本 v${info.versionName}(${info.versionCode})，推送通知")
-                showNotification(info)
-            } else {
-                Log.d(TAG, "当前已是最新版本")
-            }
-            Result.success()
-        } catch (e: Exception) {
-            Log.w(TAG, "后台检查异常（静默）", e)
-            Result.retry()
+        val expectedVersionCode = inputData.getInt(KEY_EXPECTED_VERSION_CODE, 0)
+        if (expectedVersionCode in 1..BuildConfig.VERSION_CODE) {
+            return@withContext Result.success()
         }
+
+        val store = AppUpdateStore(context)
+        store.markCheckAttempt()
+        val version = AppUpdateRepository().fetchLatest() ?: return@withContext Result.retry()
+        if (version.versionCode <= BuildConfig.VERSION_CODE) {
+            return@withContext Result.success()
+        }
+
+        store.recordAvailable(version)
+        AppUpdateNotifications.notifyAvailable(context, version)
+        Log.i(TAG, "发现新版本 v${version.versionName}(${version.versionCode})")
+        Result.success()
     }
-
-    private fun fetchVersionInfo(): VersionInfo? {
-        return try {
-            val http = OkHttpClient.Builder()
-                .connectTimeout(10, TimeUnit.SECONDS)
-                .readTimeout(15, TimeUnit.SECONDS)
-                .build()
-            val resp = http.newCall(
-                Request.Builder()
-                    .url(VERSION_URL)
-                    .addHeader("Cache-Control", "no-cache")
-                    .build()
-            ).execute()
-            if (!resp.isSuccessful) return null
-            val body = resp.body?.string() ?: return null
-            val json = JSONObject(body)
-            VersionInfo(
-                versionCode = json.optInt("versionCode", 0),
-                versionName = json.optString("versionName", ""),
-                changelog = json.optString("changelog", "")
-            )
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun showNotification(info: VersionInfo) {
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE)
-            as android.app.NotificationManager
-
-        // 通知渠道（Android 8+）
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            val channel = android.app.NotificationChannel(
-                CHANNEL_ID,
-                "应用更新",
-                android.app.NotificationManager.IMPORTANCE_DEFAULT
-            ).apply { description = "一龙 APP 有新版本时通知" }
-            manager.createNotificationChannel(channel)
-        }
-
-        // 点击通知 → 打开 APP 主界面
-        val intent = context.packageManager
-            .getLaunchIntentForPackage(context.packageName)
-            ?.addFlags(android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        val pendingIntent = android.app.PendingIntent.getActivity(
-            context, 0, intent,
-            android.app.PendingIntent.FLAG_UPDATE_CURRENT or
-                    android.app.PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notification = androidx.core.app.NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("一龙有新版本 v${info.versionName}")
-            .setContentText(
-                if (info.changelog.isNotEmpty()) info.changelog
-                else "打开 APP 查看更新内容"
-            )
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .build()
-
-        manager.notify(NOTIFICATION_ID, notification)
-    }
-
-    private data class VersionInfo(
-        val versionCode: Int,
-        val versionName: String,
-        val changelog: String
-    )
 
     companion object {
         private const val TAG = "UpdateCheckWorker"
-        private const val WORK_NAME = "elon_update_check_periodic"
-        private const val VERSION_URL = "http://43.139.149.158:8080/app/version.json"
-        private const val CHANNEL_ID = "elon_update"
-        private const val NOTIFICATION_ID = 9001
+        private const val PERIODIC_WORK_NAME = "elon_update_check_periodic"
+        private const val IMMEDIATE_WORK_NAME = "elon_update_check_realtime"
+        private const val KEY_EXPECTED_VERSION_CODE = "expected_version_code"
+        private const val INTERVAL_HOURS = 6L
 
-        /** Android 最小允许 15 分钟，此处用 6 小时（后台检查不需要太频繁） */
-        private const val INTERVAL_MINUTES = 360L
-
-        /** 应用启动时注册周期任务（已存在则保留，不重复注册） */
         fun schedule(context: Context) {
             if (!appUpdatePolicy(BuildConfig.DEBUG).selfUpdateEnabled) {
-                WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
-                Log.d(TAG, "UI 调试版由 PC 节点管理，已取消正式版更新任务")
+                WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_WORK_NAME)
                 return
             }
             val request = PeriodicWorkRequestBuilder<UpdateCheckWorker>(
-                INTERVAL_MINUTES, TimeUnit.MINUTES
+                INTERVAL_HOURS,
+                TimeUnit.HOURS,
             )
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .build()
-                )
+                .setConstraints(networkConstraints())
                 .build()
-
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                WORK_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
-                request
+                PERIODIC_WORK_NAME,
+                ExistingPeriodicWorkPolicy.UPDATE,
+                request,
             )
-            Log.d(TAG, "已注册后台更新检查（每 ${INTERVAL_MINUTES} 分钟）")
         }
+
+        fun enqueueImmediate(context: Context, expectedVersionCode: Int = 0) {
+            if (!appUpdatePolicy(BuildConfig.DEBUG).selfUpdateEnabled) return
+            val request = OneTimeWorkRequestBuilder<UpdateCheckWorker>()
+                .setInputData(workDataOf(KEY_EXPECTED_VERSION_CODE to expectedVersionCode))
+                .setConstraints(networkConstraints())
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                IMMEDIATE_WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                request,
+            )
+        }
+
+        private fun networkConstraints(): Constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
     }
 }

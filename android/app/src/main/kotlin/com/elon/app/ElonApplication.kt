@@ -3,6 +3,8 @@ package com.elon.app
 import android.app.Application
 import android.content.Context
 import com.elon.app.mcp.*
+import com.elon.app.update.AppUpdateNotifications
+import com.elon.app.update.UpdateCheckWorker
 
 class ElonApplication : Application() {
 
@@ -41,6 +43,11 @@ class ElonApplication : Application() {
                         message = event.message,
                         apkUrl = event.apkUrl,
                     )
+                is GlobalWsEvent.AppUpdateAvailable ->
+                    UpdateCheckWorker.enqueueImmediate(
+                        context = this@ElonApplication,
+                        expectedVersionCode = event.versionCode,
+                    )
                 else -> Unit
             }
         }
@@ -50,6 +57,7 @@ class ElonApplication : Application() {
         super.onCreate()
         ChatMessageNotifications.createChannel(this)
         ChatBackgroundService.ensureChannel(this)
+        AppUpdateNotifications.createChannels(this)
         globalWs.addListener(chatNotificationListener)
         globalWs.start(this)
         DebugTraceStore.init(this)

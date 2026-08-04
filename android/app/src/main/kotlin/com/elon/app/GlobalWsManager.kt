@@ -37,6 +37,8 @@ class GlobalWsManager(private val serverUrl: String) {
     private var retryCount = 0
     private var connectedToken: String? = null
     private var appCtx: Context? = null
+    @Volatile
+    private var latestAppUpdate: GlobalWsEvent.AppUpdateAvailable? = null
 
     fun start(ctx: Context) {
         appCtx = ctx.applicationContext
@@ -72,7 +74,12 @@ class GlobalWsManager(private val serverUrl: String) {
     }
 
     fun addListener(listener: Listener) {
-        listeners.add(listener)
+        listeners.addIfAbsent(listener)
+        latestAppUpdate?.let { event ->
+            handler.post {
+                if (listeners.contains(listener)) listener.onGlobalWsEvent(event)
+            }
+        }
     }
 
     fun removeListener(listener: Listener) {
@@ -124,6 +131,9 @@ class GlobalWsManager(private val serverUrl: String) {
     }
 
     private fun dispatch(event: GlobalWsEvent) {
+        if (event is GlobalWsEvent.AppUpdateAvailable) {
+            latestAppUpdate = event
+        }
         handler.post { listeners.forEach { it.onGlobalWsEvent(event) } }
     }
 
