@@ -10,7 +10,9 @@ use axum::{
 use serde_json::json;
 
 use crate::{
-    compute_federation_attempt_service::{self, ActivateMyComputeAttemptRequest},
+    compute_federation_attempt_service::{
+        self, ActivateMyComputeAttemptRequest, RenewMyComputeAttemptLeaseRequest,
+    },
     project_auth::{auth_from_headers, json_error},
     types::AppState,
 };
@@ -24,6 +26,14 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/compute/attempt-leases/:lease_id/activation",
             get(get_activation),
+        )
+        .route(
+            "/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/renewals",
+            post(renew_lease),
+        )
+        .route(
+            "/api/me/compute/attempt-leases/:lease_id/state",
+            get(get_lease_state),
         )
 }
 
@@ -61,6 +71,45 @@ async fn get_activation(
         &user_id,
         &lease_id,
     ))
+}
+
+async fn renew_lease(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, lease_id)): Path<(String, String)>,
+    Json(request): Json<RenewMyComputeAttemptLeaseRequest>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::renew_for_provider_owner(
+            &state.store,
+            &user_id,
+            &provider_id,
+            &lease_id,
+            request,
+        ),
+    )
+}
+
+async fn get_lease_state(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::get_state_for_participant(
+            &state.store,
+            &user_id,
+            &lease_id,
+        ),
+    )
 }
 
 fn authenticated_user(state: &AppState, headers: &HeaderMap) -> Result<String, Response> {

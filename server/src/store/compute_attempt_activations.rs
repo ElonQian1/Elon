@@ -2,7 +2,6 @@ use anyhow::{anyhow, bail, Result};
 use chrono::{Duration, Utc};
 use rusqlite::{params, OptionalExtension, TransactionBehavior};
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 
 use crate::compute_federation::{
     capacity::{ComputeCapacityClaimBinding, ComputeCapacityOfferBinding},
@@ -16,6 +15,9 @@ use crate::compute_federation::{
 };
 
 use super::{
+    compute_attempt_leases::{
+        compute_attempt_lease_digest, initialize_compute_attempt_lease_state_on,
+    },
     compute_broker_reservation::{broker_reserve_binding_on, BrokerReserveBinding},
     compute_capacity_claim_activation::{
         activate_reservation_capacity_claim_on, ActivateReservationCapacityClaim,
@@ -207,7 +209,7 @@ impl Store {
         active_reservation.updated_at = activated_at.clone();
         let active_reservation =
             register_compute_reservation_on(&tx, &active_reservation, source_reservation.revision)?;
-        let lease_digest = lease_digest(&lease)?;
+        let lease_digest = compute_attempt_lease_digest(&lease)?;
         let receipt = persist_attempt_activation_on(
             &tx,
             &request,
@@ -221,6 +223,14 @@ impl Store {
             &source_claim,
             &active_capacity,
             &broker,
+            &activated_at,
+        )?;
+        initialize_compute_attempt_lease_state_on(
+            &tx,
+            &source_job.job.consumer_account_id,
+            &lease,
+            &lease_digest,
+            &request.activated_by_user_id,
             &activated_at,
         )?;
         tx.commit()?;
@@ -368,8 +378,4 @@ fn activation_timestamp(job_updated_at: &str, reservation_updated_at: &str) -> R
     .checked_add_signed(Duration::nanoseconds(1))
     .ok_or_else(|| anyhow!("Attempt 激活时间溢出"))?;
     Ok(std::cmp::max(Utc::now(), floor).to_rfc3339())
-}
-
-fn lease_digest(lease: &ComputeAttemptLease) -> Result<String> {
-    Ok(hex::encode(Sha256::digest(serde_json::to_vec(lease)?)))
 }
