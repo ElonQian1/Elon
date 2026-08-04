@@ -8,6 +8,7 @@ use crate::compute_federation::{
         ComputeJobVersionBinding, ComputeReservedCapacity, ATTEMPT_STATUS_RUNNING,
         JOB_STATUS_RUNNING, RESERVATION_STATUS_ACTIVE,
     },
+    receipts::ComputeMeterReading,
 };
 
 use super::{
@@ -90,7 +91,7 @@ pub(crate) struct ComputeAttemptFinalizationReceipt {
     pub terminal_reservation: ComputeAttemptRevisionBinding,
     pub source_claim: ComputeCapacityClaimBinding,
     pub terminal_claim: ComputeCapacityClaimBinding,
-    pub compensable_usage: Vec<ComputeReservedCapacity>,
+    pub compensable_usage: Vec<ComputeMeterReading>,
     pub capacity_consumed: Vec<ComputeReservedCapacity>,
     pub capacity_returned: Vec<ComputeReservedCapacity>,
     pub capacity_transactions: Vec<ComputeAttemptCapacityTransactionRef>,
