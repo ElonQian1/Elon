@@ -18,11 +18,11 @@ use super::{
 
 #[derive(Debug, Clone)]
 pub(super) struct StoredLeaseState {
-    pub(super) provider_id: String,
-    pub(super) consumer_account_id: String,
-    pub(super) lease_revision: i64,
-    pub(super) lease_digest: String,
-    pub(super) lease: ComputeAttemptLease,
+    pub(in crate::store) provider_id: String,
+    pub(in crate::store) consumer_account_id: String,
+    pub(in crate::store) lease_revision: i64,
+    pub(in crate::store) lease_digest: String,
+    pub(in crate::store) lease: ComputeAttemptLease,
     status: String,
     fencing_generation: i64,
     expires_at: String,

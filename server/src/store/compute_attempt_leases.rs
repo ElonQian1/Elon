@@ -11,12 +11,12 @@ use super::{new_id, Store};
 
 mod support;
 
-pub(super) use support::compute_attempt_lease_digest;
 use support::{
     audit_renewal, current_lease_state_on, ensure_expected_state, ensure_renewal_owner,
     ensure_renewal_window, renewal_by_idempotency_on, renewal_event_digest, renewal_request_digest,
     validate_exact, validate_renewal_input, StoredLeaseState,
 };
+pub(super) use support::{compute_attempt_lease_digest, current_lease_state_on, StoredLeaseState};
 
 pub(crate) const COMPUTE_ATTEMPT_LEASE_STATE_SCHEMA: &str =
     "compute_federation.attempt_lease_state.v1";

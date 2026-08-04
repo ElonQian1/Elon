@@ -12,7 +12,7 @@ use serde_json::json;
 use crate::{
     compute_federation_attempt_service::{
         self, AbortMyComputeAttemptRequest, ActivateMyComputeAttemptRequest,
-        RenewMyComputeAttemptLeaseRequest,
+        DeclareMyComputeAttemptUsageRequest, RenewMyComputeAttemptLeaseRequest,
     },
     project_auth::{auth_from_headers, json_error},
     types::AppState,
@@ -43,6 +43,18 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/compute/attempt-leases/:lease_id/abort",
             get(get_abort),
+        )
+        .route(
+            "/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/declared-usage",
+            post(declare_usage),
+        )
+        .route(
+            "/api/me/compute/attempt-leases/:lease_id/declared-usage/latest",
+            get(get_latest_usage),
+        )
+        .route(
+            "/api/me/compute/attempt-leases/:lease_id/declared-usage/by-sequence/:sequence_no",
+            get(get_usage_by_sequence),
         )
 }
 
@@ -156,6 +168,64 @@ async fn get_abort(
             &state.store,
             &user_id,
             &lease_id,
+        ),
+    )
+}
+
+async fn declare_usage(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, lease_id)): Path<(String, String)>,
+    Json(request): Json<DeclareMyComputeAttemptUsageRequest>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::declare_usage_for_provider_owner(
+            &state.store,
+            &user_id,
+            &provider_id,
+            &lease_id,
+            request,
+        ),
+    )
+}
+
+async fn get_latest_usage(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::get_latest_usage_for_participant(
+            &state.store,
+            &user_id,
+            &lease_id,
+        ),
+    )
+}
+
+async fn get_usage_by_sequence(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((lease_id, sequence_no)): Path<(String, i64)>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::get_usage_for_participant(
+            &state.store,
+            &user_id,
+            &lease_id,
+            sequence_no,
         ),
     )
 }

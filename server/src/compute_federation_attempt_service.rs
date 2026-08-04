@@ -4,7 +4,9 @@ use serde::Deserialize;
 use crate::store::{
     AbortComputeAttemptRequest, ActivateComputeAttemptRequest, ComputeAttemptAbortReceipt,
     ComputeAttemptActivationReceipt, ComputeAttemptLeaseRenewalReceipt,
-    ComputeAttemptLeaseStateReceipt, RenewComputeAttemptLeaseRequest, Store,
+    ComputeAttemptLeaseStateReceipt, ComputeAttemptUsageDeclarationReceipt,
+    ComputeDeclaredUsageInput, DeclareComputeAttemptUsageRequest, RenewComputeAttemptLeaseRequest,
+    Store,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -59,6 +61,19 @@ pub(crate) struct AbortMyComputeAttemptRequest {
     pub reason_code: String,
     pub idempotency_key: String,
     pub confirm_no_execution_started: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeclareMyComputeAttemptUsageRequest {
+    pub expected_lease_revision: i64,
+    pub expected_lease_digest: String,
+    pub expected_fencing_generation: i64,
+    pub sequence_no: i64,
+    pub executor_usage_ref: String,
+    pub cumulative_declared_usage: Vec<ComputeDeclaredUsageInput>,
+    pub idempotency_key: String,
+    pub confirm_provider_declaration_only: bool,
 }
 
 pub(crate) fn activate_for_provider_owner(
@@ -192,4 +207,51 @@ pub(crate) fn get_abort_for_participant(
 ) -> Result<ComputeAttemptAbortReceipt> {
     get_for_participant(store, user_id, lease_id)?;
     store.compute_attempt_abort(lease_id)
+}
+
+pub(crate) fn declare_usage_for_provider_owner(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    lease_id: &str,
+    request: DeclareMyComputeAttemptUsageRequest,
+) -> Result<ComputeAttemptUsageDeclarationReceipt> {
+    if !request.confirm_provider_declaration_only {
+        bail!("登记用量前必须确认该快照只是 Provider 声明，不是验证或结算结果");
+    }
+    let provider = store.compute_provider(provider_id)?;
+    if provider.provider.owner_account_id != user_id {
+        bail!("算力 Provider 不属于当前登录用户");
+    }
+    store.declare_compute_attempt_usage(&DeclareComputeAttemptUsageRequest {
+        lease_id: lease_id.to_string(),
+        provider_id: provider_id.to_string(),
+        expected_lease_revision: request.expected_lease_revision,
+        expected_lease_digest: request.expected_lease_digest,
+        expected_fencing_generation: request.expected_fencing_generation,
+        sequence_no: request.sequence_no,
+        executor_usage_ref: request.executor_usage_ref,
+        cumulative_declared_usage: request.cumulative_declared_usage,
+        idempotency_key: request.idempotency_key,
+        declared_by_user_id: user_id.to_string(),
+    })
+}
+
+pub(crate) fn get_latest_usage_for_participant(
+    store: &Store,
+    user_id: &str,
+    lease_id: &str,
+) -> Result<ComputeAttemptUsageDeclarationReceipt> {
+    get_for_participant(store, user_id, lease_id)?;
+    store.latest_compute_attempt_usage_declaration(lease_id)
+}
+
+pub(crate) fn get_usage_for_participant(
+    store: &Store,
+    user_id: &str,
+    lease_id: &str,
+    sequence_no: i64,
+) -> Result<ComputeAttemptUsageDeclarationReceipt> {
+    get_for_participant(store, user_id, lease_id)?;
+    store.compute_attempt_usage_declaration(lease_id, sequence_no)
 }
