@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt 待结算回执
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: ai-economy, backend
 ---
 
@@ -9,7 +9,7 @@ owners: ai-economy, backend
 
 ## 1. 当前实现
 
-v195、追加式 Store、独立 Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 只能基于精确的 v194 可信终态和 v193 Execution Receipt，为一个 Attempt 原子生成一次 Settlement Receipt。
+v195、追加式 Store、独立 Service、HTTP 路由和 PC 管理员工作区已经写入代码，但尚未编译、执行迁移、运行接口验证或完成页面验收，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 只能基于精确的 v194 可信终态和 v193 Execution Receipt，为一个 Attempt 原子生成一次 Settlement Receipt。
 
 这是 Attempt 链中第一项实际结清消费者平台人民币预授权、并为 Provider 与平台登记待结算收益的操作。Provider 收益只进入独立的 `pending` 余额，不是可提现余额，也不代表真实银行、支付机构或链上资金已经转移。
 
@@ -17,10 +17,13 @@ v195、追加式 Store、独立 Service 与 HTTP 路由已经写入代码，但�
 
 | 方法 | 路径 | 调用者 | 作用 |
 |---|---|---|---|
+| GET | `/api/admin/compute/attempt-finalizations/pending-settlement-receipt` | 平台 `admin/owner` | 读取重新审计的待结算模板和服务端金额预览 |
 | POST | `/api/admin/compute/attempt-leases/:lease_id/settlement-receipt` | 平台 `admin/owner` | 原子计算并登记首份待结算回执 |
 | GET | `/api/me/compute/attempt-leases/:lease_id/settlement-receipt` | Attempt 消费者或 Provider 所有者 | 读取并重新审计已有回执 |
 
 POST 必须提供精确的 v194 Finalization ID/摘要、v193 Execution Receipt ID/摘要、当前 `verification_pending` Job revision/digest、Broker 预算预授权 ID、Price Snapshot ID/摘要、稳定幂等键，并显式设置 `confirm_consumer_capture_and_provider_pending=true`。
+
+待办 GET 不让前端自行计算金额或猜测资金绑定。Store 会重新审计 v194、v193、当前 Job、consumed Reservation、不可变 Price Snapshot、Broker 预授权、Offer 和 Provider 结算账户，再复用 v195 价格函数返回消费者扣结、退款、Provider 应得与平台价差预览。POST 仍在立即事务中重新完成同一组检查和计算；列表加载后发生任何漂移都会失败关闭。
 
 ## 3. 价格与用量规则
 
@@ -65,7 +68,13 @@ v195 只处理以下最窄合同：
 
 历史、金额、投影或摘要不一致时读取失败关闭，不返回未经审计的资金结果。消费者挑战入口与期限见 `docs/distributed-compute/attempt-settlement-challenge-api.md`。
 
-## 6. 尚未实现
+## 6. PC 管理员工作区
+
+仅 `admin/owner` 可见的 `/compute-settlement-issuance` 已写入待结算列表与逐笔确认对话框。页面展示预授权、实际扣结、退款、Provider pending、平台 pending，以及 Finalization、Execution Receipt、Job、Price Snapshot 和预算预授权的精确绑定。管理员必须勾选资金影响并输入“确认扣结”后才能提交。
+
+该页面不会批量或自动结算，也不提供 pending 释放、提现或外部付款。它目前仅为源码实现，尚未构建、联调、视觉验收或发布。
+
+## 7. 尚未实现
 
 - Cargo 编译、v195 迁移执行、HTTP 真实调用、并发与故障注入验证；
 - `fee_rules`、多币种、外部成本、奖励、罚款和复杂舍入策略；
@@ -75,7 +84,7 @@ v195 只处理以下最窄合同：
 - 外部矿池结算、法币托管、Sui 链上凭证或链上资产；
 - 自动结算调度和 NodeAgent 可信事件自动触发。
 
-## 7. 代码入口
+## 8. 代码入口
 
 - `server/src/store/compute_attempt_settlements.rs`
 - `server/src/store/compute_attempt_settlements/`
@@ -83,5 +92,8 @@ v195 只处理以下最窄合同：
 - `server/src/compute_attempt_settlement_migration.rs`
 - `server/src/compute_federation_attempt_settlement_service.rs`
 - `server/src/compute_federation_attempt_settlement_api.rs`
+- `pc-frontend/src/features/compute-attempt/settlementContracts.ts`
+- `pc-frontend/src/features/compute-settlement/ComputeSettlementIssuancePage.tsx`
+- `pc-frontend/src/features/compute-settlement/IssueSettlementReceiptDialog.tsx`
 
 上游可信终态见 `docs/distributed-compute/attempt-finalization-api.md`；完整市场目标与后续清算边界见 `docs/distributed-compute/market-and-settlement.md`。
