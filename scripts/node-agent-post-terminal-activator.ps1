@@ -18,31 +18,39 @@ function Write-ActivatorLog {
     [System.IO.File]::AppendAllText((Join-Path $logDir 'post-terminal-activator.log'), $line, (New-Object System.Text.UTF8Encoding($false)))
 }
 
-function Get-LoopbackNodeStatus {
-    $ports = @(7800,7799) + @(7801..7819)
-    foreach ($port in $ports) {
+function Get-InstalledNodeStatus {
+    $listener = Get-NodeAgentInstalledAdminListener
+    if ($null -eq $listener) { return $null }
+    try {
+        $request = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$($listener.Port)/api/status")
+        $request.Proxy = $null
+        $request.Timeout = 1200
+        $request.ReadWriteTimeout = 1200
+        $response = $request.GetResponse()
         try {
-            $request = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$port/api/status")
-            $request.Proxy = $null
-            $request.Timeout = 1200
-            $request.ReadWriteTimeout = 1200
-            $response = $request.GetResponse()
-            try {
-                $reader = New-Object System.IO.StreamReader($response.GetResponseStream(), [System.Text.Encoding]::UTF8)
-                $value = $reader.ReadToEnd() | ConvertFrom-Json
-                if ($value.PSObject.Properties.Name -contains 'release_identity') {
-                    return [pscustomobject]@{ Port = $port; Status = $value }
-                }
-            } finally {
-                $response.Dispose()
+            $reader = New-Object System.IO.StreamReader($response.GetResponseStream(), [System.Text.Encoding]::UTF8)
+            $value = $reader.ReadToEnd() | ConvertFrom-Json
+            if ($value.PSObject.Properties.Name -notcontains 'release_identity') { return $null }
+            $confirmed = Get-NodeAgentInstalledAdminListener -Ports @([int]$listener.Port)
+            if ($null -eq $confirmed -or [int]$confirmed.ProcessId -ne [int]$listener.ProcessId) {
+                return $null
             }
-        } catch {}
+            return [pscustomobject]@{
+                Port = [int]$listener.Port
+                ProcessId = [int]$listener.ProcessId
+                ExecutablePath = [string]$listener.ExecutablePath
+                Status = $value
+            }
+        } finally {
+            $response.Dispose()
+        }
+    } catch {
+        return $null
     }
-    return $null
 }
 
 function Test-LoopbackNodeActivationOwnerGate {
-    $node = Get-LoopbackNodeStatus
+    $node = Get-InstalledNodeStatus
     if ($null -eq $node) {
         return [pscustomobject]@{
             Safe = $false
@@ -107,7 +115,7 @@ function Wait-ExactNodeHealth {
     param([string]$ReleaseIdentity, [int]$TimeoutSeconds = 90)
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
-        $node = Get-LoopbackNodeStatus
+        $node = Get-InstalledNodeStatus
         if ($node -and [string]$node.Status.release_identity -eq $ReleaseIdentity) { return $true }
         Start-Sleep -Milliseconds 500
     } while ([DateTime]::UtcNow -lt $deadline)
@@ -131,7 +139,7 @@ try {
             Write-ActivatorLog 'no verified scheduled release remains; exiting'
             exit 0
         }
-        $node = Get-LoopbackNodeStatus
+        $node = Get-InstalledNodeStatus
         if ($null -eq $node) {
             Write-ActivatorLog 'node status unavailable; activation remains fail-closed'
             Start-Sleep -Seconds $PollSeconds

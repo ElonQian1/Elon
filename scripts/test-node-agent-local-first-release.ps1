@@ -61,10 +61,25 @@ $activatorSource = [System.IO.File]::ReadAllText(
 )
 Assert-True $activatorSource.Contains('function Test-LoopbackNodeActivationOwnerGate') `
     'post-terminal activation must handle a node disappearing between owner-gate checks'
-Assert-True (-not $activatorSource.Contains('(Get-LoopbackNodeStatus).Status')) `
+Assert-True (-not $activatorSource.Contains('Get-LoopbackNodeStatus')) `
+    'post-terminal activation must not accept an arbitrary loopback candidate as the installed node'
+Assert-True $activatorSource.Contains('Get-NodeAgentInstalledAdminListener') `
+    'post-terminal activation must resolve status through the installed executable listener'
+Assert-True $activatorSource.Contains('confirmed.ProcessId') `
+    'post-terminal activation must recheck listener ownership after reading status'
+Assert-True (-not $activatorSource.Contains('(Get-InstalledNodeStatus).Status')) `
     'post-terminal activation must not dereference a missing loopback node under StrictMode'
 Assert-True $activatorSource.Contains('desktop_shell_running') `
     'post-terminal activation must wait while the desktop shell keeps the package repair entrypoint from closing the UI'
+
+$installedClient = 'C:\Users\fixture\AppData\Local\ElonNode\一龙开发平台.exe'
+$candidateClient = 'D:\repo\target\release\elon-pc-node.exe'
+Assert-True (Test-NodeAgentInstalledExecutablePath `
+    -ActualPath $installedClient -ExpectedPath $installedClient.ToUpperInvariant()) `
+    'installed executable identity must compare canonical paths case-insensitively'
+Assert-True (-not (Test-NodeAgentInstalledExecutablePath `
+    -ActualPath $candidateClient -ExpectedPath $installedClient)) `
+    'an alternate-port release candidate must not satisfy installed runtime ownership'
 
 $root = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-local-first-release-test-" + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root | Out-Null

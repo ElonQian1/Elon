@@ -14,6 +14,57 @@ function Get-NodeAgentLocalActivationRoot {
     return (Join-Path $local 'Elon\local-node-releases-v1')
 }
 
+function Test-NodeAgentInstalledExecutablePath {
+    param(
+        [Parameter(Mandatory = $true)][string]$ActualPath,
+        [Parameter(Mandatory = $true)][string]$ExpectedPath
+    )
+    if ([string]::IsNullOrWhiteSpace($ActualPath) -or [string]::IsNullOrWhiteSpace($ExpectedPath)) {
+        return $false
+    }
+    try {
+        return ([System.IO.Path]::GetFullPath($ActualPath)).Equals(
+            [System.IO.Path]::GetFullPath($ExpectedPath),
+            [System.StringComparison]::OrdinalIgnoreCase
+        )
+    } catch {
+        return $false
+    }
+}
+
+function Get-NodeAgentInstalledAdminListener {
+    param(
+        [int[]]$Ports = (@(7799) + @(7800..7819)),
+        [string]$ExpectedClientPath = ''
+    )
+    if ([string]::IsNullOrWhiteSpace($ExpectedClientPath)) {
+        $local = [System.Environment]::GetFolderPath(
+            [System.Environment+SpecialFolder]::LocalApplicationData
+        )
+        if ([string]::IsNullOrWhiteSpace($local)) { return $null }
+        $ExpectedClientPath = Join-Path $local 'ElonNode\一龙开发平台.exe'
+    }
+    foreach ($port in $Ports) {
+        $listeners = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
+        foreach ($listener in $listeners) {
+            if ([string]$listener.LocalAddress -notin @('127.0.0.1', '::1')) { continue }
+            try {
+                $process = Get-Process -Id ([int]$listener.OwningProcess) -ErrorAction Stop
+                if (-not (Test-NodeAgentInstalledExecutablePath `
+                    -ActualPath ([string]$process.Path) -ExpectedPath $ExpectedClientPath)) {
+                    continue
+                }
+                return [pscustomobject]@{
+                    Port = [int]$port
+                    ProcessId = [int]$listener.OwningProcess
+                    ExecutablePath = [string]$process.Path
+                }
+            } catch {}
+        }
+    }
+    return $null
+}
+
 function Read-NodeAgentLocalReleaseState {
     param([Parameter(Mandatory = $true)][string]$StatePath)
     $json = [System.IO.File]::ReadAllText($StatePath, [System.Text.Encoding]::UTF8)
