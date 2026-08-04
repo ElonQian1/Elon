@@ -100,6 +100,20 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
     const proposalId = latestSourcePatchEvent?.payload.proposalId
     if (typeof proposalId === 'string') void planningControls.loadSourcePatch(proposalId)
   }, [latestSourcePatchEvent?.eventId, planningControls.loadSourcePatch])
+  const latestBaselineEvent = useMemo(() => [...taskFollow.latestEvents].reverse().find((event) => (
+    typeof event.payload.baselineId === 'string'
+  )), [taskFollow.latestEvents])
+  const latestComparisonEvent = useMemo(() => [...taskFollow.latestEvents].reverse().find((event) => (
+    typeof event.payload.comparisonId === 'string'
+  )), [taskFollow.latestEvents])
+  useEffect(() => {
+    const baselineId = latestBaselineEvent?.payload.baselineId
+    if (typeof baselineId === 'string') void planningControls.loadRegressionBaseline(baselineId)
+  }, [latestBaselineEvent?.eventId, planningControls.loadRegressionBaseline])
+  useEffect(() => {
+    const comparisonId = latestComparisonEvent?.payload.comparisonId
+    if (typeof comparisonId === 'string') void planningControls.loadRegressionComparison(comparisonId)
+  }, [latestComparisonEvent?.eventId, planningControls.loadRegressionComparison])
   const pack = useMemo(() => buildHeadlessDesignContext({
     projectRoot: initialProjectRoot,
     target: model.target,
@@ -119,8 +133,10 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
     writebackPlan: planningControls.writebackPlan,
     sourcePatch: planningControls.sourcePatch,
     rollbackPlan: planningControls.rollbackPlan,
+    regressionBaseline: planningControls.regressionBaseline,
+    regressionComparison: planningControls.regressionComparison,
     liveFollow: taskFollow,
-  }), [initialProjectRoot, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt, planningControls.bindingHealth, planningControls.intentPlan, planningControls.rollbackPlan, planningControls.sourcePatch, planningControls.writebackPlan, runtimeControls.bindingCandidates, runtimeControls.browserResult?.runtime, runtimeControls.capabilities, runtimeControls.draftPreview, runtimeControls.tauriBehavior, runtimeControls.verificationMatrix, taskFollow])
+  }), [initialProjectRoot, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt, planningControls.bindingHealth, planningControls.intentPlan, planningControls.regressionBaseline, planningControls.regressionComparison, planningControls.rollbackPlan, planningControls.sourcePatch, planningControls.writebackPlan, runtimeControls.bindingCandidates, runtimeControls.browserResult?.runtime, runtimeControls.capabilities, runtimeControls.draftPreview, runtimeControls.tauriBehavior, runtimeControls.verificationMatrix, taskFollow])
   const intent = useMemo(() => [
     `修改 ${model.platform.toUpperCase()} 端 ${model.route || '/'} 页面。`,
     model.selectedNode
@@ -263,7 +279,11 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
           model={runtimeControls}
         />
 
-        <DesignPlanningReview model={planningControls} hasDraft={Boolean(model.designDraft)} />
+        <DesignPlanningReview
+          model={planningControls}
+          hasDraft={Boolean(model.designDraft)}
+          hasSession={Boolean(model.session)}
+        />
 
         {model.platform === 'tauri' && (
           <div className={styles.tauriBar}>

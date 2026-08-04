@@ -151,6 +151,60 @@ export interface DesignSourceRollbackPlan {
   contentEmbedded: false
 }
 
+export interface DesignRegressionEvidenceRef {
+  path: string
+  sha256: string
+  width?: number | null
+  height?: number | null
+  nodeCount?: number | null
+}
+
+export interface DesignRegressionBaseline {
+  schemaVersion: 1
+  baselineId: string
+  revision: number
+  designSessionId: string
+  draftId?: string | null
+  platform: DesignPlatform
+  route: string
+  state: string
+  viewport: Record<string, unknown>
+  pixels: DesignRegressionEvidenceRef
+  uiTree: DesignRegressionEvidenceRef
+  nativeHost?: DesignRegressionEvidenceRef | null
+  label?: string | null
+  createdAt: string
+  contentEmbedded: false
+}
+
+export interface DesignRegressionComparison {
+  schemaVersion: 1
+  comparisonId: string
+  revision: number
+  baselineId: string
+  beforeDesignSessionId: string
+  afterDesignSessionId: string
+  platform: DesignPlatform
+  route: string
+  beforePixels: DesignRegressionEvidenceRef
+  afterPixels: DesignRegressionEvidenceRef
+  beforeUiTree: DesignRegressionEvidenceRef
+  afterUiTree: DesignRegressionEvidenceRef
+  thresholds: {
+    maxPixelDiffRatio: number
+    maxMissingSelectors: number
+    maxChangedSelectors: number
+    requireSameViewport: boolean
+    ignoreSelectors: string[]
+  }
+  changedSelectors: string[]
+  status: 'READY_TO_COMPARE' | 'PASSED' | 'FAILED'
+  result?: Record<string, unknown> | null
+  createdAt: string
+  updatedAt: string
+  contentEmbedded: false
+}
+
 export interface DesignEventCheckpoint {
   schemaVersion: 1
   consumerId: string

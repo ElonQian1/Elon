@@ -2,6 +2,8 @@ import type {
   DesignBindingHealth,
   DesignEventCheckpoint,
   DesignIntentPlan,
+  DesignRegressionBaseline,
+  DesignRegressionComparison,
   DesignSourcePatchProposal,
   DesignSourceRollbackPlan,
   DesignWritebackPlan,
@@ -190,6 +192,63 @@ export function planDesignSourceRollback(input: {
     rollback: DesignSourceRollbackPlan
     sourceModified: false
   }>(`/api/android-live/design/source-patches/${encodeURIComponent(proposalId)}/rollback/plan`, body)
+}
+
+interface DesignRegressionBaselineResult {
+  schema: 'elon.ui-design-regression-baseline.v1'
+  action: string
+  baseline: DesignRegressionBaseline
+  runtimeStarted: false
+  sourceModified: false
+}
+
+interface DesignRegressionComparisonResult {
+  schema: 'elon.ui-design-regression-comparison.v1'
+  action: string
+  comparison: DesignRegressionComparison
+  runtimeStarted: false
+  sourceModified: false
+}
+
+export function createDesignRegressionBaseline(input: {
+  projectRoot: string
+  designSessionId: string
+  draftId?: string
+  label?: string
+}) {
+  return callDesignNode<DesignRegressionBaselineResult>(
+    '/api/android-live/design/regressions/baselines', input,
+  )
+}
+
+export function getDesignRegressionBaseline(projectRoot: string, baselineId: string) {
+  return callDesignNode<DesignRegressionBaselineResult>(
+    `/api/android-live/design/regressions/baselines/${encodeURIComponent(baselineId)}`, { projectRoot },
+  )
+}
+
+export function planDesignRegressionComparison(input: {
+  projectRoot: string
+  baselineId: string
+  afterDesignSessionId: string
+  changedSelectors?: string[]
+  thresholds?: {
+    maxPixelDiffRatio?: number
+    maxMissingSelectors?: number
+    maxChangedSelectors?: number
+    requireSameViewport?: boolean
+    ignoreSelectors?: string[]
+  }
+}) {
+  return callDesignNode<DesignRegressionComparisonResult>(
+    '/api/android-live/design/regressions/comparisons/plan', input,
+  )
+}
+
+export function getDesignRegressionComparison(projectRoot: string, comparisonId: string) {
+  return callDesignNode<DesignRegressionComparisonResult>(
+    `/api/android-live/design/regressions/comparisons/${encodeURIComponent(comparisonId)}`, { projectRoot },
+  )
 }
 
 export function getDesignEventCheckpoint(projectRoot: string, consumerId: string, taskId: string) {

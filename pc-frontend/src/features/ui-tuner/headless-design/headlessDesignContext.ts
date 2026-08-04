@@ -20,6 +20,8 @@ import type {
   DesignBindingHealth,
   DesignEventCheckpoint,
   DesignIntentPlan,
+  DesignRegressionBaseline,
+  DesignRegressionComparison,
   DesignSourcePatchProposal,
   DesignSourceRollbackPlan,
   DesignWritebackPlan,
@@ -44,6 +46,8 @@ export function buildHeadlessDesignContext(input: {
   writebackPlan: DesignWritebackPlan | null
   sourcePatch: DesignSourcePatchProposal | null
   rollbackPlan: DesignSourceRollbackPlan | null
+  regressionBaseline: DesignRegressionBaseline | null
+  regressionComparison: DesignRegressionComparison | null
   liveFollow: {
     active: boolean
     taskId: string
@@ -58,7 +62,7 @@ export function buildHeadlessDesignContext(input: {
   const { projectRoot, target, session, surface, selectedNode, designDraft, writebackReceipt,
     capabilities, browserRuntime, tauriBehavior, verificationMatrix,
     draftPreview, sourceBindingCandidates, intentPlan, bindingHealth, writebackPlan,
-    sourcePatch, rollbackPlan, liveFollow } = input
+    sourcePatch, rollbackPlan, regressionBaseline, regressionComparison, liveFollow } = input
   const viewport = surface?.surface?.viewport ?? session?.viewport ?? { width: 1280, height: 800, deviceScaleFactor: 1 }
   const sourceRoots = target?.sourceRoots ?? []
   const configFiles = target?.configFiles ?? []
@@ -143,6 +147,7 @@ export function buildHeadlessDesignContext(input: {
         '存在 DesignIntentPlan 时，在打开匹配 platform/route 的 designSession 后以 expectedRevision 启动计划',
         '每个计划动作写入 RUNNING/SUCCEEDED/FAILED/SKIPPED 回执和紧凑证据引用；失败、暂停或意图变化时显式转换或重规划',
         '源码变更使用精确 range/SHA 的 source patch 提案；读取 review artifact，显式批准后才应用，并为已应用补丁生成回滚计划',
+        '修改前固化已验证 PNG/UI tree 基线；修改后用同平台、route、viewport 证据创建回归比较任务，并以比较 artifact 结算',
         '通过 designSessionId 读取当前语义 UI 树和截图哈希',
         '为选中 selector 建立可审查的源码绑定并修改源码',
         '重新捕获同一 platform/route 并给出新的 UI tree 与 PNG 哈希',
@@ -174,6 +179,8 @@ export function buildHeadlessDesignContext(input: {
       writebackPlan: writebackPlan ?? undefined,
       sourcePatch: sourcePatch ?? undefined,
       rollbackPlan: rollbackPlan ?? undefined,
+      regressionBaseline: regressionBaseline ?? undefined,
+      regressionComparison: regressionComparison ?? undefined,
       liveFollow: {
         active: liveFollow.active,
         taskId: liveFollow.taskId || undefined,

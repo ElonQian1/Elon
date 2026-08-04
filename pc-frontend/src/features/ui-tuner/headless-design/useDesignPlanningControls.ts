@@ -2,11 +2,15 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   applyDesignSourcePatch,
   checkDesignSourceBinding,
+  createDesignRegressionBaseline,
   decideDesignSourcePatch,
   decideDesignWritebackPlan,
   getDesignSourcePatch,
   getDesignIntentPlan,
+  getDesignRegressionBaseline,
+  getDesignRegressionComparison,
   planDesignIntent,
+  planDesignRegressionComparison,
   planDesignSourceRollback,
   planDesignWriteback,
   replanDesignIntent,
@@ -16,6 +20,8 @@ import {
 import type {
   DesignBindingHealth,
   DesignIntentPlan,
+  DesignRegressionBaseline,
+  DesignRegressionComparison,
   DesignSourcePatchProposal,
   DesignSourceRollbackPlan,
   DesignWritebackPlan,
@@ -37,6 +43,8 @@ export function useDesignPlanningControls(input: Input) {
   const [writebackPlan, setWritebackPlan] = useState<DesignWritebackPlan | null>(null)
   const [sourcePatch, setSourcePatch] = useState<DesignSourcePatchProposal | null>(null)
   const [rollbackPlan, setRollbackPlan] = useState<DesignSourceRollbackPlan | null>(null)
+  const [regressionBaseline, setRegressionBaseline] = useState<DesignRegressionBaseline | null>(null)
+  const [regressionComparison, setRegressionComparison] = useState<DesignRegressionComparison | null>(null)
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -50,6 +58,8 @@ export function useDesignPlanningControls(input: Input) {
 
   useEffect(() => {
     setIntentPlan(null)
+    setRegressionBaseline(null)
+    setRegressionComparison(null)
   }, [input.projectRoot])
 
   const run = useCallback(async <T,>(action: string, work: () => Promise<T>) => {
@@ -282,12 +292,73 @@ export function useDesignPlanningControls(input: Input) {
     })
   }, [input.projectRoot, run, sourcePatch])
 
+  const createRegressionBaseline = useCallback(async () => {
+    if (!input.session) return null
+    return run('regression-baseline', async () => {
+      const result = await createDesignRegressionBaseline({
+        projectRoot: input.projectRoot,
+        designSessionId: input.session!.designSessionId,
+        ...(input.draft?.draftId ? { draftId: input.draft.draftId } : {}),
+        label: `${input.platform.toUpperCase()} ${input.route} 修改前`,
+      })
+      setRegressionBaseline(result.baseline)
+      setRegressionComparison(null)
+      setMessage('已固化当前 PNG/UI tree 为修改前基线')
+      return result.baseline
+    })
+  }, [input.draft?.draftId, input.platform, input.projectRoot, input.route, input.session, run])
+
+  const planRegressionComparison = useCallback(async () => {
+    if (!input.session || !regressionBaseline) return null
+    return run('regression-comparison', async () => {
+      const result = await planDesignRegressionComparison({
+        projectRoot: input.projectRoot,
+        baselineId: regressionBaseline.baselineId,
+        afterDesignSessionId: input.session!.designSessionId,
+        changedSelectors: input.draft?.selector ? [input.draft.selector] : [],
+        thresholds: {
+          maxPixelDiffRatio: 0.01,
+          maxMissingSelectors: 0,
+          maxChangedSelectors: 0,
+          requireSameViewport: true,
+        },
+      })
+      setRegressionComparison(result.comparison)
+      setMessage('已创建视觉/语义比较任务；等待后台比较器提交证据')
+      return result.comparison
+    })
+  }, [input.draft?.selector, input.projectRoot, input.session, regressionBaseline, run])
+
+  const loadRegressionBaseline = useCallback(async (baselineId: string) => {
+    try {
+      const result = await getDesignRegressionBaseline(input.projectRoot, baselineId)
+      setRegressionBaseline(result.baseline)
+      return result.baseline
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '设计回归基线读取失败')
+      return null
+    }
+  }, [input.projectRoot])
+
+  const loadRegressionComparison = useCallback(async (comparisonId: string) => {
+    try {
+      const result = await getDesignRegressionComparison(input.projectRoot, comparisonId)
+      setRegressionComparison(result.comparison)
+      return result.comparison
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '设计回归比较任务读取失败')
+      return null
+    }
+  }, [input.projectRoot])
+
   return {
     intentPlan,
     bindingHealth,
     writebackPlan,
     sourcePatch,
     rollbackPlan,
+    regressionBaseline,
+    regressionComparison,
     busyAction,
     message,
     error,
@@ -303,6 +374,10 @@ export function useDesignPlanningControls(input: Input) {
     decideSourcePatch,
     applySourcePatch,
     compileRollbackPlan,
+    createRegressionBaseline,
+    planRegressionComparison,
+    loadRegressionBaseline,
+    loadRegressionComparison,
   }
 }
 

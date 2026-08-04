@@ -5,9 +5,10 @@ import styles from './DesignPlanningReview.module.css'
 interface Props {
   model: DesignPlanningControlsModel
   hasDraft: boolean
+  hasSession: boolean
 }
 
-export function DesignPlanningReview({ model, hasDraft }: Props) {
+export function DesignPlanningReview({ model, hasDraft, hasSession }: Props) {
   const [rejectionReason, setRejectionReason] = useState('')
   const [sourcePatchReason, setSourcePatchReason] = useState('')
   const plan = model.writebackPlan
@@ -94,6 +95,18 @@ export function DesignPlanningReview({ model, hasDraft }: Props) {
           <code>{model.rollbackPlan.reviewArtifactPath}</code>
         </div>
       )}
+
+      <div className={styles.actions}>
+        <button type="button" disabled={busy || !hasSession} onClick={() => void model.createRegressionBaseline()}>固化修改前基线</button>
+        <button type="button" disabled={busy || !hasSession || !model.regressionBaseline} onClick={() => void model.planRegressionComparison()}>创建前后比较任务</button>
+        <span>
+          {model.regressionComparison
+            ? `${model.regressionComparison.status} · pixel ≤ ${model.regressionComparison.thresholds.maxPixelDiffRatio}`
+            : model.regressionBaseline
+              ? `基线 ${model.regressionBaseline.pixels.sha256.slice(0, 12)} · ${model.regressionBaseline.route}`
+              : '尚未固化修改前 PNG / UI tree'}
+        </span>
+      </div>
 
       <small className={model.error ? styles.error : ''}>{model.error || model.message || '规划和审批不会直接修改源码'}</small>
     </section>
