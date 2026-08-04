@@ -18,12 +18,15 @@ v186、Store、Service、HTTP 路由与 PC `/compute-execution` Lease 控制面�
 
 | 方法 | 路径 | 权限 | 作用 |
 |---|---|---|---|
+| GET | `/api/me/compute/providers/:provider_id/attempt-leases?limit=...` | Provider 所有者 | 按最近更新时间列出本人 Provider 的当前 Lease 状态 |
 | POST | `/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/renewals` | Provider 所有者 | 基于当前精确状态登记一次外部心跳声明并续租 |
 | GET | `/api/me/compute/attempt-leases/:lease_id/state` | Provider 所有者或 Job 消费者 | 读取并重新审计 Lease 当前状态 |
 
 写请求必须提供当前 `expected_lease_revision`、`expected_lease_digest`、`expected_fencing_generation`、外部心跳引用、新软期限、幂等键，并显式设置 `confirm_executor_alive=true`。确认字段只表示操作者主动声明，不替代可信执行器签名。
 
-PC `/compute-execution` 可按稳定 Lease ID 读取激活回执和当前状态，并在界面中带入当前 revision、digest 与 fencing generation 发起续租。页面只登记外部心跳引用和新的软期限，不发送 `RenewLease` 命令，也不把续租成功展示为实际执行或平台验证。
+本人 Provider 列表最多返回 100 条当前状态投影，按 `updated_at` 倒序和稳定 Lease ID 排序；服务端先核对 Provider 所有权，再逐条重算摘要并审计投影。该读取不返回独立消费者账户字段，不修改 Lease、Job、Reservation、容量或资金。
+
+PC `/compute-execution` 可在“执行 Lease/待激活”分段队列中选择本人 Provider 的当前 Lease，也可按稳定 Lease ID 读取激活回执和当前状态，并在界面中带入当前 revision、digest 与 fencing generation 发起续租。页面只登记外部心跳引用和新的软期限，不发送 `RenewLease` 命令，也不把续租成功展示为实际执行或平台验证。
 
 ## 3. 状态与时间边界
 

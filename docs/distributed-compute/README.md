@@ -41,7 +41,7 @@ owners: backend, node, ai-economy
 | 消费者余额预授权 | v175 Broker 将显式到期预授权与 Job/Claim/Reservation 在同一事务内编排，并要求结果为 `reserved` 且含余额结果；v176 可在 Attempt 尚未激活时按精确预授权 ID 严格退款。仅支持 `platform_balance_cny`，不覆盖运行中任务或实际用量结算 |
 | Broker 原子 Reserve 与未执行任务终态 | v175/v176 schema、不可变回执、严格请求重放与历史绑定审计已写；Reserve 单事务完成预算、容量、Reservation 和 Job，Finish 单事务完成退款、held Claim Release/Expire 与 Job/Reservation 终态。项目级 Job 创建/锁价、本人查询及 Reserve/Release/Expire HTTP/MCP 已接线；PC `/compute-market` 已写入 Job、候选锁价、逐 meter 预留和未执行终态源码。状态为 `implementation_uncompiled`，尚未执行迁移、构建或运行验证 |
 | Attempt 已接受激活回执 | v185、Provider HTTP 与 PC `/compute-execution` 已写；本人 Provider 可读取当前 active、未过期、Job 仍 reserved 且无既有 Attempt 的候选，外部执行器接受后再显式登记首个 staging Lease。激活单事务推进 held Claim、reserved Job 和 active Reservation，但不发送节点命令、不验证接受证明、不新增扣款，尚未编译、执行迁移或运行验证 |
-| Attempt Lease 状态与续租 | v186、Provider HTTP 与 PC `/compute-execution` 已写；可按 Lease ID 读取状态，并在精确 revision/digest/fencing 栅栏下登记外部心跳声明、延长软期限。它不验证心跳签名、不发送节点命令、不改变容量或资金，尚未编译、执行迁移或运行验证 |
+| Attempt Lease 状态与续租 | v186、Provider HTTP 与 PC `/compute-execution` 已写；本人 Provider 可按更新时间列出当前 Lease，再按 Lease ID 读取状态，并在精确 revision/digest/fencing 栅栏下登记外部心跳声明、延长软期限。列表只读且逐条审计；续租不验证心跳签名、不发送节点命令、不改变容量或资金，尚未编译、执行迁移或运行验证 |
 | staging Attempt 无用量安全中止 | v187、Provider HTTP 与 PC `/compute-execution` 已写；仅当前 revision 1、无心跳的 staging Lease 可在显式无执行声明下单事务全额退款、归还 active Claim、终结 Job/Reservation/Lease。它不发送取消命令、不验证外部中止证明，尚未编译、执行迁移或运行验证 |
 | running Attempt 累计声明用量 | v188、Store 与 Provider HTTP 已写；只接受精确 running Lease、完整 meter 集合、递增序号和不回退累计值，保存 `provider_declared` 与超额标记。它不改变状态、容量或资金，也不等于 verified usage，尚未编译、执行迁移或运行验证 |
 | Attempt Provider 终态候选 | v189、追加式 Store 与 Provider HTTP 已写；第一份候选必须绑定当前 running Lease、最新 v188 快照和 Workload 输出合同。它不推进状态、不消费容量、不移动资金，也不等于 Execution Receipt，尚未编译、执行迁移或运行验证 |
