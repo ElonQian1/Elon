@@ -3,7 +3,7 @@ use rusqlite::{params, Connection, OptionalExtension, Row};
 
 use super::StoredPlatformObservation;
 
-pub(super) fn platform_observation_by_idempotency_on(
+pub(in crate::store::compute_attempt_platform_observations) fn platform_observation_by_idempotency_on(
     conn: &Connection,
     scope: &str,
     key: &str,
@@ -15,7 +15,7 @@ pub(super) fn platform_observation_by_idempotency_on(
     )
 }
 
-pub(super) fn platform_observation_by_candidate_on(
+pub(in crate::store::compute_attempt_platform_observations) fn platform_observation_by_candidate_on(
     conn: &Connection,
     candidate_id: &str,
 ) -> Result<Option<StoredPlatformObservation>> {
@@ -26,7 +26,7 @@ pub(super) fn platform_observation_by_candidate_on(
     )
 }
 
-pub(super) fn platform_observation_by_lease_on(
+pub(in crate::store::compute_attempt_platform_observations) fn platform_observation_by_lease_on(
     conn: &Connection,
     lease_id: &str,
 ) -> Result<Option<StoredPlatformObservation>> {

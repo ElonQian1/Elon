@@ -20,7 +20,7 @@ use crate::store::compute_attempt_verifications::{
 };
 
 impl StoredVerificationDecision {
-    pub(super) fn into_receipt(
+    pub(in crate::store::compute_attempt_verifications) fn into_receipt(
         self,
         candidate: &ComputeAttemptTerminalCandidateReceipt,
         consumer_review: &ComputeAttemptConsumerReviewReceipt,

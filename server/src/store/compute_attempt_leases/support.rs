@@ -29,7 +29,7 @@ pub(crate) struct StoredLeaseState {
     hard_deadline_at: String,
     last_heartbeat_at: Option<String>,
     pub(super) updated_by_user_id: String,
-    pub(super) updated_at: String,
+    pub(in crate::store) updated_at: String,
 }
 
 impl StoredLeaseState {

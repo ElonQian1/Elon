@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Result};
 use rusqlite::{params, OptionalExtension, Transaction};
 
 #[derive(Debug, Clone)]
-pub(super) struct ComputeBillingSettlementOutcome {
+pub(in crate::store) struct ComputeBillingSettlementOutcome {
     pub reservation_id: String,
     pub reserved_fen: i64,
     pub charged_fen: i64,
@@ -10,7 +10,7 @@ pub(super) struct ComputeBillingSettlementOutcome {
     pub consumer_balance_after_fen: i64,
 }
 
-pub(super) fn settle_compute_billing_reservation_on(
+pub(in crate::store) fn settle_compute_billing_reservation_on(
     tx: &Transaction<'_>,
     reservation_id: &str,
     consumer_user_id: &str,

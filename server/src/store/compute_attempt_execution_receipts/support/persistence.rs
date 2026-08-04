@@ -5,7 +5,7 @@ use crate::compute_federation::receipts::ComputeExecutionReceipt;
 
 use super::StoredExecutionReceipt;
 
-pub(super) fn execution_receipt_by_idempotency_on(
+pub(in crate::store::compute_attempt_execution_receipts) fn execution_receipt_by_idempotency_on(
     conn: &Connection,
     idempotency_scope: &str,
     idempotency_key: &str,
@@ -22,7 +22,7 @@ pub(super) fn execution_receipt_by_idempotency_on(
     )
 }
 
-pub(super) fn execution_receipt_by_verification_on(
+pub(in crate::store::compute_attempt_execution_receipts) fn execution_receipt_by_verification_on(
     conn: &Connection,
     verification_decision_id: &str,
 ) -> Result<Option<StoredExecutionReceipt>> {
@@ -38,7 +38,7 @@ pub(super) fn execution_receipt_by_verification_on(
     )
 }
 
-pub(super) fn execution_receipt_by_lease_on(
+pub(in crate::store::compute_attempt_execution_receipts) fn execution_receipt_by_lease_on(
     conn: &Connection,
     lease_id: &str,
 ) -> Result<Option<StoredExecutionReceipt>> {

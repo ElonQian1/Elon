@@ -5,7 +5,7 @@ use crate::compute_federation::receipts::ComputeMeterReading;
 
 use super::StoredVerificationDecision;
 
-pub(super) fn verification_decision_by_idempotency_on(
+pub(in crate::store::compute_attempt_verifications) fn verification_decision_by_idempotency_on(
     conn: &Connection,
     idempotency_scope: &str,
     idempotency_key: &str,
@@ -28,7 +28,7 @@ pub(super) fn verification_decision_by_idempotency_on(
     )
 }
 
-pub(super) fn verification_decision_by_candidate_on(
+pub(in crate::store::compute_attempt_verifications) fn verification_decision_by_candidate_on(
     conn: &Connection,
     terminal_candidate_id: &str,
 ) -> Result<Option<StoredVerificationDecision>> {
@@ -50,7 +50,7 @@ pub(super) fn verification_decision_by_candidate_on(
     )
 }
 
-pub(super) fn verification_decision_by_lease_on(
+pub(in crate::store::compute_attempt_verifications) fn verification_decision_by_lease_on(
     conn: &Connection,
     lease_id: &str,
 ) -> Result<Option<StoredVerificationDecision>> {
