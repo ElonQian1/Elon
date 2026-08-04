@@ -58,7 +58,7 @@ GET 与 POST 的 `limit` 默认 50，服务端限制为 1 至 100。POST 必须�
 
 - Cargo 编译、HTTP 真实调用、并发竞争和故障注入验证；
 - 后台定时扫描、任务租约、失败退避和运维告警；
-- 管理工作台 UI、游标分页、总数和批次历史；
+- PC 管理页源码已写但尚未构建、视觉验收或发布；游标分页、总数和批次历史仍未实现；
 - accepted 挑战的非金额补救和 available 事后追索；
 - 真实提款、外部支付、自动对账、多币种或 Sui 链上结算。
 
@@ -68,5 +68,6 @@ GET 与 POST 的 `limit` 默认 50，服务端限制为 1 至 100。POST 必须�
 - `server/src/compute_federation_settlement_release_batch_service.rs`
 - `server/src/compute_federation_settlement_release_batch_api.rs`
 - `server/src/store/compute_attempt_settlement_releases.rs`
+- `pc-frontend/src/features/compute-settlement/ComputeSettlementPage.tsx`
 
 单笔原子释放合同见 `docs/distributed-compute/attempt-settlement-release-api.md`，账户与提款队列见 `docs/distributed-compute/settlement-account-view-api.md`。

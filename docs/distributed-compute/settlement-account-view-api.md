@@ -63,7 +63,11 @@ Provider 本人结算账户视图、平台结算账户视图和管理员提款�
 
 视图同时返回各类 Posting 数量、累计金额、账户 revision、更新时间、投影摘要和审计状态。平台账户当前没有提现入口，因此 `disputed` 与 `withdrawn` 必须为零；任一投影不一致时读取失败关闭。
 
-## 6. 非付款边界
+## 6. PC 管理入口
+
+`pc-frontend/src/features/compute-settlement/` 已写入管理员页面源码，并注册 `/compute-settlement`。只有本地用户角色为 `admin/owner` 时显示导航；服务端仍独立执行最终鉴权。页面读取平台账户、到期释放候选和提款队列，并可在二次确认后调用到期逐笔释放。该页面尚未执行 TypeScript 构建、浏览器视觉验收或发布，不能描述为线上可用。
+
+## 7. 非付款边界
 
 账户视图和队列均为只读能力：
 
@@ -74,19 +78,20 @@ Provider 本人结算账户视图、平台结算账户视图和管理员提款�
 - 不允许通过平台账户视图提取平台 available；
 - 不改变 v200/v201 唯一终态规则。
 
-## 7. 尚未实现
+## 8. 尚未实现
 
 - Cargo 编译和 HTTP 真实调用；
 - 游标分页、队列总数、处理时效和风险标签；
-- 管理工作台 UI、通知和批量处理；
+- PC 管理页的构建、视觉验收、发布、实时通知和提款终态操作；
 - 外部付款适配器、回执核验和自动对账；
 - 平台账户提款、多币种及 Sui 链上资产视图。
 
-## 8. 代码入口
+## 9. 代码入口
 
 - `server/src/store/compute_settlement_account_views.rs`
 - `server/src/store/compute_platform_settlement_account_view.rs`
 - `server/src/compute_federation_settlement_account_service.rs`
 - `server/src/compute_federation_settlement_account_api.rs`
+- `pc-frontend/src/features/compute-settlement/`
 
 提款申请和唯一终态分别见 `docs/distributed-compute/settlement-withdrawal-request-api.md` 与 `docs/distributed-compute/settlement-withdrawal-terminal-api.md`。
