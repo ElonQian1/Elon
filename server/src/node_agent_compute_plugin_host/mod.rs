@@ -10,9 +10,15 @@ pub(crate) mod identity;
 pub(crate) mod install_plan;
 mod legacy_llm;
 pub(crate) mod lifecycle;
+pub(crate) mod manifest_validation;
 pub(crate) mod plugin_manifest;
 pub(crate) mod ready_capability;
 pub(crate) mod runner_events;
+mod signed_artifact_verification;
 
 pub(crate) use contract::{ComputePluginTask, LlmChatTask};
 pub(crate) use host::ComputePluginHost;
+pub(crate) use signed_artifact_verification::{
+    ComputePluginControlPlaneKeyResolver, ComputePluginEd25519PublicKey,
+    ComputePluginPublisherKeyResolver,
+};

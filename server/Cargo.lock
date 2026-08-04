@@ -523,6 +523,7 @@ dependencies = [
  "portable-pty",
  "quick-xml",
  "reqwest",
+ "ring",
  "rsa",
  "rusqlite",
  "serde",
