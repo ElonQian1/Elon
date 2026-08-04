@@ -63,6 +63,7 @@ implementation_status: implementation_uncompiled
 | POST | `/api/admin/compute/activation-evidence-requests/:request_id/supersede` | 以当前摘要、原因和显式确认废止过期 approved 申请 |
 | GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan` | 读取该申请已准备的不可变激活计划 |
 | POST | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan` | 显式确认后准备下一 Provider revision，不执行激活 |
+| GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/preflight` | 只读复核 prepared 计划当前是否仍具备应用条件 |
 
 决定只支持 `approved`、`changes_requested` 或 `rejected`。退回和拒绝必须填写说明；只有 `submitted` 可以审核。批准时如果 Provider/Pool 所有权、状态、版本或账本审计发生变化，服务端失败关闭，要求供给者重新提交。
 
@@ -80,7 +81,13 @@ implementation_status: implementation_uncompiled
 
 计划初始状态为 `prepared`。它是后续受控激活的输入，不是当前 Provider 事实；GET/POST 都返回 `activation_effect=none`。当对应 approved 申请被废止时，仍为 prepared 的计划在同一事务内转为 `superseded`。当前没有把计划改为 `applied` 的入口。
 
-## 8. 状态与并发边界
+## 8. 计划应用预检
+
+管理员可读取 `compute_federation.activation_plan_preflight.v1` 报告。服务端重新核对计划仍为 prepared、申请仍为 approved 且摘要和依赖绑定一致、当前 Provider 仍为原 registering 版本、目标 Provider 身份和下一 revision 有效、目标合同具备路由与 verified 事实、Pool 仍为原 registering 版本，以及当前账本审计健康且稳定摘要一致。
+
+失败项使用稳定阻断码，例如 `plan_not_prepared`、`request_digest_changed`、`provider_version_changed`、`target_provider_not_ready`、`pool_version_changed` 或 `ledger_audit_changed`。只有没有阻断项时 `ready_for_apply=true`；该值只是读取时快照，不是授权、锁、SLA 或执行结果，`activation_effect` 固定为 `none`。
+
+## 9. 状态与并发边界
 
 - 首次状态固定为 `submitted`；同一 Provider/Pool 同时只允许一份 `submitted` 或 `approved` 申请。
 - 本人只能把 `submitted` 改为 `canceled`，并必须提供当前 `request_digest`。
@@ -90,7 +97,7 @@ implementation_status: implementation_uncompiled
 - `superseded` 会释放同一 Provider/Pool 的活跃申请唯一约束，使用户可以基于当前版本重新提交；它不撤销任何已发生的激活，因为当前没有激活执行入口。
 - `activated` 仍只为后续生命周期保留，当前控制面没有进入该状态的入口。
 
-## 9. 尚未实现
+## 10. 尚未实现
 
 - Cargo 编译、v177-v179 迁移执行、并发和 HTTP/MCP 真实调用验证；
 - 节点绑定引用、ReadyCapability、路由证明和硬件观测的真实采集与密码学验证；
