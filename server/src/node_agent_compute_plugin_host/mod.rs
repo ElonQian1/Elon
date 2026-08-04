@@ -8,6 +8,8 @@ mod contract;
 mod host;
 pub(crate) mod identity;
 pub(crate) mod install_plan;
+pub(crate) mod install_plan_admission;
+mod install_plan_admission_validation;
 mod legacy_llm;
 pub(crate) mod lifecycle;
 pub(crate) mod manifest_validation;
