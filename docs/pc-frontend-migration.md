@@ -66,7 +66,7 @@ server/src/
 | 发布历史 / APK 管理 | 🟢 低 | `src/features/projects/ProjectReleasesTab.tsx`、`server/src/project_releases.rs` | ✅ 已完成第一版：项目详情页可查看 releases、下载 APK、上传 APK 并记录版本/渠道/变更说明 |
 | AI 原生开放商业网络 | 🔴 高 | `src/features/open-commerce/`、`server/src/open_commerce_*` | ✅ 已形成五工作区；消费者沙盒可按有限能力 Schema 生成表单，动作修改后重新确认。公共网络、真实调度、真实平台适配器和链上提交仍按各自边界推进 |
 | 算力结算页 | 🟡 中 | `src/features/compute-settlement/`、`server/src/compute_federation_settlement_*` | 🟡 `/my-compute-settlement` 已写入 Provider 自助登记、本人余额、提款状态、申请和 pending 取消源码；管理员 `/compute-settlement` 已写入平台账户、到期释放、全局队列、拒绝退款和外部已付款证明登记源码。登记只创建 self-declared 记录，两页不执行真实付款，尚未构建、视觉验收或发布 |
-| 算力供给工作区 | 🟡 中 | `src/features/compute-supply/`、`server/src/compute_federation_capacity_*` | 🟡 `/compute-supply` 已写入本人 Provider 下的 Pool 列表/登记、Bucket 交付窗口登记和单 Bucket 供给追加/撤出源码。Bucket 初始供给为 0，追加/撤出只写内部容量账本，不激活资源、不发布 Offer、不派发任务或结算收入；尚未构建、视觉验收或发布 |
+| 算力供给工作区 | 🟡 中 | `src/features/compute-supply/`、`server/src/compute_federation_capacity_*` | 🟡 `/compute-supply` 已写入本人 Provider 下的 Pool 列表/登记、Bucket 交付窗口登记、单 Bucket 供给追加/撤出、账本重算健康和脱敏事务/双分录分页源码。Bucket 初始供给为 0，写操作只改变内部容量账本，审计只证明内部一致；不激活资源、不发布 Offer、不派发任务或结算收入，尚未构建、视觉验收或发布 |
 
 ### 阶段 P3 — 个人 AI 对话
 
