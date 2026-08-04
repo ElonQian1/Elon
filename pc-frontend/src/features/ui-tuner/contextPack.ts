@@ -29,6 +29,8 @@ import type {
   DesignBindingHealth,
   DesignEventCheckpoint,
   DesignIntentPlan,
+  DesignSourcePatchProposal,
+  DesignSourceRollbackPlan,
   DesignWritebackPlan,
 } from './headless-design/designPlanningTypes'
 
@@ -207,6 +209,8 @@ export interface UiTunerCodexContextPack {
     intentPlan?: DesignIntentPlan
     bindingHealth?: DesignBindingHealth
     writebackPlan?: DesignWritebackPlan
+    sourcePatch?: DesignSourcePatchProposal
+    rollbackPlan?: DesignSourceRollbackPlan
     liveFollow?: {
       active: boolean
       taskId?: string
@@ -479,9 +483,10 @@ function buildHeadlessDesignTaskPrompt(pack: UiTunerCodexContextPack, userIntent
     '3. 结合 route、selector 和 UI tree 调用 ui_suggest_design_source_binding；候选保持 CANDIDATE，确认 BOUND 后再用 ui_check_design_source_binding 检查文件 SHA 与 range 漂移。',
     '4. 若 context pack 含 designDraft，可先用 ui_preview_design_draft / ui_restore_design_draft_preview 对话式查看；预览不修改源码，也不是完成证明。',
     '5. Web/PWA/Tauri 前端调试优先复用 ui_prepare_design_browser / ui_interact_design_browser 的同一页面状态；fill/select 只能引用 fixtureProfile.formValues，禁止在参数中传秘密。',
-    '6. 源码写回前必须调用 ui_plan_design_writeback，审查每个平台适配器和风险，再显式 APPROVE；只有批准且未漂移的 planId 才能 ui_begin_design_writeback。',
-    '7. 用 ui_complete_design_writeback 提交 changedFiles、源码哈希和各平台 evidence，再读取 ui_get_design_verification_matrix；只有 receipt.complete=true 且矩阵 PASSED 才声明完成。',
-    '8. 明确平台覆盖：只有 nativeHost.nativeHostVerified=true 才能声明 Tauri 原生窗口证据；Android 必须使用 Android Runtime。',
+    '6. 源码写回前必须调用 ui_plan_design_writeback，审查每个平台适配器和风险，再显式 APPROVE；批准且未漂移后，用精确 byte range/SHA 调用 ui_propose_design_source_patch。',
+    '7. 读取 source patch 的 reviewArtifactPath；补丁需再次显式批准后才能 ui_apply_design_source_patch。应用后调用 ui_plan_design_source_rollback 保存可审查逆向计划，禁止未经审批自动回滚。',
+    '8. 用 ui_complete_design_writeback 提交 changedFiles、源码哈希和各平台 evidence，再读取 ui_get_design_verification_matrix；只有 receipt.complete=true 且矩阵 PASSED 才声明完成。',
+    '9. 明确平台覆盖：只有 nativeHost.nativeHostVerified=true 才能声明 Tauri 原生窗口证据；Android 必须使用 Android Runtime。',
     '',
     'Compact context pack JSON:',
     '```json',

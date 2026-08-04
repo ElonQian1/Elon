@@ -20,6 +20,8 @@ import type {
   DesignBindingHealth,
   DesignEventCheckpoint,
   DesignIntentPlan,
+  DesignSourcePatchProposal,
+  DesignSourceRollbackPlan,
   DesignWritebackPlan,
 } from './designPlanningTypes'
 
@@ -40,6 +42,8 @@ export function buildHeadlessDesignContext(input: {
   intentPlan: DesignIntentPlan | null
   bindingHealth: DesignBindingHealth | null
   writebackPlan: DesignWritebackPlan | null
+  sourcePatch: DesignSourcePatchProposal | null
+  rollbackPlan: DesignSourceRollbackPlan | null
   liveFollow: {
     active: boolean
     taskId: string
@@ -53,7 +57,8 @@ export function buildHeadlessDesignContext(input: {
 }): UiTunerCodexContextPack {
   const { projectRoot, target, session, surface, selectedNode, designDraft, writebackReceipt,
     capabilities, browserRuntime, tauriBehavior, verificationMatrix,
-    draftPreview, sourceBindingCandidates, intentPlan, bindingHealth, writebackPlan, liveFollow } = input
+    draftPreview, sourceBindingCandidates, intentPlan, bindingHealth, writebackPlan,
+    sourcePatch, rollbackPlan, liveFollow } = input
   const viewport = surface?.surface?.viewport ?? session?.viewport ?? { width: 1280, height: 800, deviceScaleFactor: 1 }
   const sourceRoots = target?.sourceRoots ?? []
   const configFiles = target?.configFiles ?? []
@@ -137,6 +142,7 @@ export function buildHeadlessDesignContext(input: {
         'AI 任务通过 taskId lease 绑定 designSession，并用 cursor 增量发布设计事件',
         '存在 DesignIntentPlan 时，在打开匹配 platform/route 的 designSession 后以 expectedRevision 启动计划',
         '每个计划动作写入 RUNNING/SUCCEEDED/FAILED/SKIPPED 回执和紧凑证据引用；失败、暂停或意图变化时显式转换或重规划',
+        '源码变更使用精确 range/SHA 的 source patch 提案；读取 review artifact，显式批准后才应用，并为已应用补丁生成回滚计划',
         '通过 designSessionId 读取当前语义 UI 树和截图哈希',
         '为选中 selector 建立可审查的源码绑定并修改源码',
         '重新捕获同一 platform/route 并给出新的 UI tree 与 PNG 哈希',
@@ -166,6 +172,8 @@ export function buildHeadlessDesignContext(input: {
       intentPlan: intentPlan ?? undefined,
       bindingHealth: bindingHealth ?? undefined,
       writebackPlan: writebackPlan ?? undefined,
+      sourcePatch: sourcePatch ?? undefined,
+      rollbackPlan: rollbackPlan ?? undefined,
       liveFollow: {
         active: liveFollow.active,
         taskId: liveFollow.taskId || undefined,

@@ -1,15 +1,25 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
+  applyDesignSourcePatch,
   checkDesignSourceBinding,
+  decideDesignSourcePatch,
   decideDesignWritebackPlan,
+  getDesignSourcePatch,
   getDesignIntentPlan,
   planDesignIntent,
+  planDesignSourceRollback,
   planDesignWriteback,
   replanDesignIntent,
   startDesignIntentPlan,
   transitionDesignIntentPlan,
 } from './designPlanningApi'
-import type { DesignBindingHealth, DesignIntentPlan, DesignWritebackPlan } from './designPlanningTypes'
+import type {
+  DesignBindingHealth,
+  DesignIntentPlan,
+  DesignSourcePatchProposal,
+  DesignSourceRollbackPlan,
+  DesignWritebackPlan,
+} from './designPlanningTypes'
 import type { DesignDraft, DesignPlatform, DesignSessionIdentity } from './types'
 
 interface Input {
@@ -25,6 +35,8 @@ export function useDesignPlanningControls(input: Input) {
   const [intentPlan, setIntentPlan] = useState<DesignIntentPlan | null>(null)
   const [bindingHealth, setBindingHealth] = useState<DesignBindingHealth | null>(null)
   const [writebackPlan, setWritebackPlan] = useState<DesignWritebackPlan | null>(null)
+  const [sourcePatch, setSourcePatch] = useState<DesignSourcePatchProposal | null>(null)
+  const [rollbackPlan, setRollbackPlan] = useState<DesignSourceRollbackPlan | null>(null)
   const [busyAction, setBusyAction] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -32,6 +44,8 @@ export function useDesignPlanningControls(input: Input) {
   useEffect(() => {
     setBindingHealth(null)
     setWritebackPlan(null)
+    setSourcePatch(null)
+    setRollbackPlan(null)
   }, [input.draft?.draftId, input.draft?.revision])
 
   useEffect(() => {
@@ -213,10 +227,67 @@ export function useDesignPlanningControls(input: Input) {
     })
   }, [input.projectRoot, run, writebackPlan])
 
+  const loadSourcePatch = useCallback(async (proposalId: string) => {
+    try {
+      const result = await getDesignSourcePatch(input.projectRoot, proposalId)
+      setSourcePatch(result.proposal)
+      return result.proposal
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '源码补丁提案读取失败')
+      return null
+    }
+  }, [input.projectRoot])
+
+  const decideSourcePatch = useCallback(async (decision: 'APPROVE' | 'REJECT', reason?: string) => {
+    if (!sourcePatch) return null
+    return run('source-patch-decision', async () => {
+      const result = await decideDesignSourcePatch({
+        projectRoot: input.projectRoot,
+        proposalId: sourcePatch.proposalId,
+        expectedRevision: sourcePatch.revision,
+        decision,
+        reason,
+      })
+      setSourcePatch(result.proposal)
+      setMessage(decision === 'APPROVE' ? '确定性源码补丁已批准，等待用户应用' : '源码补丁已拒绝')
+      return result.proposal
+    })
+  }, [input.projectRoot, run, sourcePatch])
+
+  const applySourcePatch = useCallback(async () => {
+    if (!sourcePatch) return null
+    return run('source-patch-apply', async () => {
+      const result = await applyDesignSourcePatch({
+        projectRoot: input.projectRoot,
+        proposalId: sourcePatch.proposalId,
+        expectedRevision: sourcePatch.revision,
+      })
+      setSourcePatch(result.proposal)
+      setMessage(`源码补丁状态：${result.proposal.status}`)
+      return result.proposal
+    })
+  }, [input.projectRoot, run, sourcePatch])
+
+  const compileRollbackPlan = useCallback(async () => {
+    if (!sourcePatch) return null
+    return run('source-rollback', async () => {
+      const result = await planDesignSourceRollback({
+        projectRoot: input.projectRoot,
+        proposalId: sourcePatch.proposalId,
+        expectedRevision: sourcePatch.revision,
+      })
+      setRollbackPlan(result.rollback)
+      setMessage('已生成可审查回滚计划；尚未修改源码')
+      return result.rollback
+    })
+  }, [input.projectRoot, run, sourcePatch])
+
   return {
     intentPlan,
     bindingHealth,
     writebackPlan,
+    sourcePatch,
+    rollbackPlan,
     busyAction,
     message,
     error,
@@ -228,6 +299,10 @@ export function useDesignPlanningControls(input: Input) {
     checkBinding,
     compileWritebackPlan,
     decideWriteback,
+    loadSourcePatch,
+    decideSourcePatch,
+    applySourcePatch,
+    compileRollbackPlan,
   }
 }
 

@@ -2,6 +2,8 @@ import type {
   DesignBindingHealth,
   DesignEventCheckpoint,
   DesignIntentPlan,
+  DesignSourcePatchProposal,
+  DesignSourceRollbackPlan,
   DesignWritebackPlan,
 } from './designPlanningTypes'
 import { callDesignNode } from './designSessionApi'
@@ -137,6 +139,57 @@ export function decideDesignWritebackPlan(input: {
   return callDesignNode<{ schema: 'elon.ui-design-writeback-plan.v1'; action: 'APPROVED' | 'REJECTED'; plan: DesignWritebackPlan; sourceModified: false }>(
     `/api/android-live/design/writeback/plans/${encodeURIComponent(planId)}/decision`, body,
   )
+}
+
+interface DesignSourcePatchResult {
+  schema: 'elon.ui-design-source-patch.v1'
+  action: string
+  proposal: DesignSourcePatchProposal
+  sourceModified: boolean
+}
+
+export function getDesignSourcePatch(projectRoot: string, proposalId: string) {
+  return callDesignNode<DesignSourcePatchResult>(
+    `/api/android-live/design/source-patches/${encodeURIComponent(proposalId)}`, { projectRoot },
+  )
+}
+
+export function decideDesignSourcePatch(input: {
+  projectRoot: string
+  proposalId: string
+  expectedRevision: number
+  decision: 'APPROVE' | 'REJECT'
+  reason?: string
+}) {
+  const { proposalId, ...body } = input
+  return callDesignNode<DesignSourcePatchResult>(
+    `/api/android-live/design/source-patches/${encodeURIComponent(proposalId)}/decision`, body,
+  )
+}
+
+export function applyDesignSourcePatch(input: {
+  projectRoot: string
+  proposalId: string
+  expectedRevision: number
+}) {
+  const { proposalId, ...body } = input
+  return callDesignNode<DesignSourcePatchResult>(
+    `/api/android-live/design/source-patches/${encodeURIComponent(proposalId)}/apply`, body,
+  )
+}
+
+export function planDesignSourceRollback(input: {
+  projectRoot: string
+  proposalId: string
+  expectedRevision: number
+}) {
+  const { proposalId, ...body } = input
+  return callDesignNode<{
+    schema: 'elon.ui-design-source-rollback-plan.v1'
+    action: 'PLANNED'
+    rollback: DesignSourceRollbackPlan
+    sourceModified: false
+  }>(`/api/android-live/design/source-patches/${encodeURIComponent(proposalId)}/rollback/plan`, body)
 }
 
 export function getDesignEventCheckpoint(projectRoot: string, consumerId: string, taskId: string) {

@@ -9,6 +9,7 @@ interface Props {
 
 export function DesignPlanningReview({ model, hasDraft }: Props) {
   const [rejectionReason, setRejectionReason] = useState('')
+  const [sourcePatchReason, setSourcePatchReason] = useState('')
   const plan = model.writebackPlan
   const intentPlan = model.intentPlan
   const busy = Boolean(model.busyAction)
@@ -63,6 +64,34 @@ export function DesignPlanningReview({ model, hasDraft }: Props) {
           />
           <button type="button" disabled={busy || plan.decision === 'APPROVED' || plan.impact.blockedItemCount > 0} onClick={() => void model.decideWriteback('APPROVE')}>批准</button>
           <button type="button" disabled={busy || !rejectionReason.trim()} onClick={() => void model.decideWriteback('REJECT', rejectionReason.trim())}>拒绝</button>
+        </div>
+      )}
+
+      {model.sourcePatch && (
+        <div className={styles.plan}>
+          <div>
+            <strong>{model.sourcePatch.status}</strong>
+            <span>{model.sourcePatch.sourceFile} · {model.sourcePatch.edits.length} 个精确编辑 · r{model.sourcePatch.revision}</span>
+            <code title="本地补丁审查产物">{model.sourcePatch.reviewArtifactPath}</code>
+          </div>
+          <input
+            value={sourcePatchReason}
+            onChange={(event) => setSourcePatchReason(event.currentTarget.value)}
+            placeholder="补丁拒绝原因"
+            aria-label="源码补丁拒绝原因"
+          />
+          <button type="button" disabled={busy || model.sourcePatch.status !== 'PROPOSED'} onClick={() => void model.decideSourcePatch('APPROVE')}>批准补丁</button>
+          <button type="button" disabled={busy || model.sourcePatch.status !== 'PROPOSED' || !sourcePatchReason.trim()} onClick={() => void model.decideSourcePatch('REJECT', sourcePatchReason.trim())}>拒绝补丁</button>
+          <button type="button" disabled={busy || model.sourcePatch.status !== 'APPROVED'} onClick={() => void model.applySourcePatch()}>应用源码</button>
+          <button type="button" disabled={busy || model.sourcePatch.status !== 'APPLIED'} onClick={() => void model.compileRollbackPlan()}>生成回滚计划</button>
+        </div>
+      )}
+
+      {model.rollbackPlan && (
+        <div className={styles.summary}>
+          <strong>回滚计划</strong>
+          <span>{model.rollbackPlan.status} · {model.rollbackPlan.sourceFile}</span>
+          <code>{model.rollbackPlan.reviewArtifactPath}</code>
         </div>
       )}
 

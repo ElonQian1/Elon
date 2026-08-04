@@ -93,6 +93,13 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
       void planningControls.refreshIntentPlan()
     }
   }, [planningControls.intentPlan?.planId, planningControls.refreshIntentPlan, taskFollow.cursor])
+  const latestSourcePatchEvent = useMemo(() => [...taskFollow.latestEvents].reverse().find((event) => (
+    typeof event.payload.proposalId === 'string'
+  )), [taskFollow.latestEvents])
+  useEffect(() => {
+    const proposalId = latestSourcePatchEvent?.payload.proposalId
+    if (typeof proposalId === 'string') void planningControls.loadSourcePatch(proposalId)
+  }, [latestSourcePatchEvent?.eventId, planningControls.loadSourcePatch])
   const pack = useMemo(() => buildHeadlessDesignContext({
     projectRoot: initialProjectRoot,
     target: model.target,
@@ -110,8 +117,10 @@ export function HeadlessDesignWorkspace({ active, initialProjectRoot, onModeChan
     intentPlan: planningControls.intentPlan,
     bindingHealth: planningControls.bindingHealth,
     writebackPlan: planningControls.writebackPlan,
+    sourcePatch: planningControls.sourcePatch,
+    rollbackPlan: planningControls.rollbackPlan,
     liveFollow: taskFollow,
-  }), [initialProjectRoot, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt, planningControls.bindingHealth, planningControls.intentPlan, planningControls.writebackPlan, runtimeControls.bindingCandidates, runtimeControls.browserResult?.runtime, runtimeControls.capabilities, runtimeControls.draftPreview, runtimeControls.tauriBehavior, runtimeControls.verificationMatrix, taskFollow])
+  }), [initialProjectRoot, model.designDraft, model.selectedNode, model.session, model.surface, model.target, model.writebackReceipt, planningControls.bindingHealth, planningControls.intentPlan, planningControls.rollbackPlan, planningControls.sourcePatch, planningControls.writebackPlan, runtimeControls.bindingCandidates, runtimeControls.browserResult?.runtime, runtimeControls.capabilities, runtimeControls.draftPreview, runtimeControls.tauriBehavior, runtimeControls.verificationMatrix, taskFollow])
   const intent = useMemo(() => [
     `修改 ${model.platform.toUpperCase()} 端 ${model.route || '/'} 页面。`,
     model.selectedNode

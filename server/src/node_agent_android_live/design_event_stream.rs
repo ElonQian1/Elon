@@ -114,6 +114,9 @@ pub(super) fn record_tool_event(
         return Ok(());
     };
     let root = canonical_root(session)?;
+    let draft_id = first_text(result, &["/draft/draftId", "/draftId", "/proposal/draftId"])
+        .or_else(|| optional_text(arguments, "draftId"))
+        .map(str::to_string);
     let design_session_id = first_text(
         result,
         &[
@@ -124,12 +127,18 @@ pub(super) fn record_tool_event(
             "/draft/designSessionId",
         ],
     )
-    .or_else(|| optional_text(arguments, "designSessionId"));
+    .or_else(|| optional_text(arguments, "designSessionId"))
+    .map(str::to_string)
+    .or_else(|| {
+        draft_id
+            .as_deref()
+            .and_then(|draft_id| design_session_for_draft(session, draft_id))
+    });
     let task_id = first_text(result, &["/binding/taskId"])
         .or_else(|| optional_text(arguments, "taskId"))
         .map(str::to_string)
         .or_else(|| {
-            design_session_id.and_then(|id| {
+            design_session_id.as_deref().and_then(|id| {
                 super::design_task_binding::find_active_for_session(session, id)
                     .map(|binding| binding.task_id)
             })
@@ -144,10 +153,8 @@ pub(super) fn record_tool_event(
         event_type: event_type.to_string(),
         tool: tool.to_string(),
         task_id,
-        design_session_id: design_session_id.map(str::to_string),
-        draft_id: first_text(result, &["/draft/draftId", "/draftId"])
-            .or_else(|| optional_text(arguments, "draftId"))
-            .map(str::to_string),
+        design_session_id,
+        draft_id,
         platform: first_text(
             result,
             &["/session/platform", "/designSession/platform", "/platform"],
@@ -161,6 +168,7 @@ pub(super) fn record_tool_event(
         revision: result
             .pointer("/draft/revision")
             .and_then(Value::as_u64)
+            .or_else(|| result.pointer("/proposal/revision").and_then(Value::as_u64))
             .or_else(|| result.get("revision").and_then(Value::as_u64)),
         created_at: now.to_rfc3339(),
         payload: compact_payload(result),
@@ -238,10 +246,20 @@ fn compact_payload(result: &Value) -> Value {
     let mut payload = Map::new();
     for (name, pointers) in [
         ("action", &["/action"] as &[&str]),
-        ("status", &["/status", "/draft/status", "/receipt/status"]),
+        (
+            "status",
+            &[
+                "/status",
+                "/draft/status",
+                "/receipt/status",
+                "/proposal/status",
+            ],
+        ),
         ("sourceModified", &["/sourceModified"]),
         ("candidateCount", &["/candidateCount"]),
         ("overallStatus", &["/overallStatus"]),
+        ("proposalId", &["/proposal/proposalId"]),
+        ("proposalRevision", &["/proposal/revision"]),
         (
             "artifactSha256",
             &["/artifact/sha256", "/capture/artifact/sha256"],
@@ -260,6 +278,14 @@ fn compact_payload(result: &Value) -> Value {
         }
     }
     Value::Object(payload)
+}
+
+fn design_session_for_draft(session: &LiveUiSession, draft_id: &str) -> Option<String> {
+    super::design_drafts::call(session, "ui_get_design_draft", json!({"draftId":draft_id}))
+        .ok()?
+        .pointer("/draft/designSessionId")
+        .and_then(Value::as_str)
+        .map(str::to_string)
 }
 
 fn event_type(tool: &str) -> Option<&'static str> {

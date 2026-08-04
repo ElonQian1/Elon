@@ -109,6 +109,48 @@ export interface DesignWritebackPlan {
   updatedAt: string
 }
 
+export interface DesignSourcePatchProposal {
+  schemaVersion: 1
+  proposalId: string
+  revision: number
+  writebackPlanId: string
+  draftId: string
+  draftRevision: number
+  sourceFile: string
+  sourceShaBefore: string
+  sourceShaAfter: string
+  status: 'PROPOSED' | 'APPROVED' | 'REJECTED' | 'APPLYING' | 'APPLIED'
+  decisionReason?: string | null
+  reviewArtifactPath: string
+  edits: Array<{
+    start: number
+    end: number
+    beforeSha256: string
+    replacementSha256: string
+    beforeBytes: number
+    replacementBytes: number
+  }>
+  createdAt: string
+  updatedAt: string
+  appliedAt?: string | null
+  contentEmbedded: false
+}
+
+export interface DesignSourceRollbackPlan {
+  schemaVersion: 1
+  rollbackId: string
+  revision: number
+  proposalId: string
+  proposalRevision: number
+  sourceFile: string
+  expectedSourceRevision: string
+  targetSourceRevision: string
+  status: 'PLANNED'
+  reviewArtifactPath: string
+  edits: DesignSourcePatchProposal['edits']
+  contentEmbedded: false
+}
+
 export interface DesignEventCheckpoint {
   schemaVersion: 1
   consumerId: string
