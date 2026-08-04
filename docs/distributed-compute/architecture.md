@@ -71,7 +71,7 @@ Provider 发布的不可变版本，包含支持的任务类型、模型/工件�
 
 共享 CapacityPool 和追加式容量账本已经成为已接受设计，权威决定见 `docs/decisions/distributed-compute-capacity-ledger-v1.md`，完整对象与事务边界见 `docs/distributed-compute/capacity-ledger.md`。CapacityPool 表达会互相争用的物理资源边界，不保存实时余额；同一物理资源的全部 Offer 必须绑定同一 pool/epoch/bucket，防止跨模型、SKU 或销售渠道重复出售。
 
-V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v176 SQLite schema，以及隔离的容量、Provider、Offer、不可变 Price Snapshot、版本化 Job 和 Reservation Store 已经写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker Reserve 与未执行任务 Finish；报价生成、HTTP/MCP 和运行协议接线仍未实现。
+V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v176 SQLite schema，以及隔离的容量、Provider、Offer、不可变 Price Snapshot、版本化 Job 和 Reservation Store 已经写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker Reserve 与未执行任务 Finish；本人 HTTP 和项目级 MCP 已写但未运行，报价生成和节点运行协议接线仍未实现。
 
 ### WorkloadSpec
 

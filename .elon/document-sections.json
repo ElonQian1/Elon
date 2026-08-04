@@ -253,6 +253,7 @@
     "docs/discussion-knowledge-compiler.md": "custom:pc-workbench",
     "docs/distributed-compute/README.md": "custom:distributed-compute",
     "docs/distributed-compute/architecture.md": "custom:distributed-compute",
+    "docs/distributed-compute/broker-api.md": "custom:distributed-compute",
     "docs/distributed-compute/capacity-ledger.md": "custom:distributed-compute",
     "docs/distributed-compute/market-and-settlement.md": "custom:distributed-compute",
     "docs/distributed-compute/node-client-and-plugins.md": "custom:distributed-compute",
@@ -392,6 +393,7 @@
     "docs/discussion-knowledge-compiler.md": "on-demand",
     "docs/distributed-compute/README.md": "current",
     "docs/distributed-compute/architecture.md": "current",
+    "docs/distributed-compute/broker-api.md": "current",
     "docs/distributed-compute/capacity-ledger.md": "current",
     "docs/distributed-compute/market-and-settlement.md": "current",
     "docs/distributed-compute/node-client-and-plugins.md": "current",
@@ -2417,7 +2419,7 @@
         "view": "capabilities",
         "kind": "planned_capability",
         "label": "任务级算力联邦 V1",
-        "detail": "云端领域合同、v165-v176 schema、隔离 Capacity Store、Provider/Offer/Price Snapshot/Job/Reservation Registry、平台人民币余额原子 Broker Reserve、未执行任务原子退款终态与节点 Manifest、Plan、Attempt、typed event 合同已写入且未编译；外部 Provider、Attempt 编排、运行中结算和运行接线尚未实现",
+        "detail": "云端领域合同、v165-v176 schema、隔离 Capacity Store、Provider/Offer/Price Snapshot/Job/Reservation Registry、平台人民币余额原子 Broker Reserve、未执行任务原子退款终态、本人 HTTP、项目级 MCP 与节点 Manifest、Plan、Attempt、typed event 合同已写入且未编译；外部 Provider、Attempt 编排、运行中结算和运行接线尚未实现",
         "parent_id": "cap-distributed-compute",
         "order": 20,
         "color": "#48A889",
@@ -2425,6 +2427,7 @@
         "document_paths": [
           "docs/decisions/distributed-compute-federation-v1.md",
           "docs/distributed-compute/architecture.md",
+          "docs/distributed-compute/broker-api.md",
           "docs/distributed-compute/capacity-ledger.md",
           "docs/distributed-compute/node-client-and-plugins.md"
         ],
@@ -2445,6 +2448,9 @@
           "file:server/src/store/compute_broker_reservation.rs",
           "file:server/src/compute_broker_reservation_migration.rs",
           "file:server/src/compute_broker_finish_migration.rs",
+          "file:server/src/compute_federation_broker_api.rs",
+          "file:server/src/compute_federation_broker_mcp.rs",
+          "file:server/src/compute_federation_broker_service.rs",
           "file:server/src/node_agent_compute_plugin_host/attempt_contract.rs"
         ],
         "tags": [
@@ -2487,13 +2493,14 @@
         "view": "architecture",
         "kind": "component",
         "label": "算力联邦领域合同",
-        "detail": "未编译未接线的 Provider、Offer、Workload、Job、Reservation、Lease、容量、价格和回执模型；版本化 Job/Reservation Registry、平台人民币余额原子 Broker Reserve 与未执行任务原子终态已写，Attempt、运行中结算和运行接线尚缺",
+        "detail": "未编译未运行的 Provider、Offer、Workload、Job、Reservation、Lease、容量、价格和回执模型；版本化 Job/Reservation Registry、平台人民币余额原子 Broker、本人 HTTP 与项目级 MCP 已写，Attempt、运行中结算和节点运行接线尚缺",
         "parent_id": "arch-server",
         "order": 35,
         "color": "#48A889",
         "entrypoint": "docs/distributed-compute/architecture.md",
         "document_paths": [
-          "docs/distributed-compute/architecture.md"
+          "docs/distributed-compute/architecture.md",
+          "docs/distributed-compute/broker-api.md"
         ],
         "implementation_refs": [
           "file:server/src/compute_federation/mod.rs",
@@ -2505,7 +2512,10 @@
           "file:server/src/store/compute_reservation_contract_validation.rs",
           "file:server/src/store/compute_reservation_registry.rs",
           "file:server/src/store/compute_broker_reservation.rs",
-          "file:server/src/compute_broker_finish_migration.rs"
+          "file:server/src/compute_broker_finish_migration.rs",
+          "file:server/src/compute_federation_broker_api.rs",
+          "file:server/src/compute_federation_broker_mcp.rs",
+          "file:server/src/compute_federation_broker_service.rs"
         ],
         "tags": [
           "contract",
