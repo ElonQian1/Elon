@@ -71,7 +71,7 @@ Provider 发布的不可变版本，包含支持的任务类型、模型/工件�
 
 共享 CapacityPool 和追加式容量账本已经成为已接受设计，权威决定见 `docs/decisions/distributed-compute-capacity-ledger-v1.md`，完整对象与事务边界见 `docs/distributed-compute/capacity-ledger.md`。CapacityPool 表达会互相争用的物理资源边界，不保存实时余额；同一物理资源的全部 Offer 必须绑定同一 pool/epoch/bucket，防止跨模型、SKU 或销售渠道重复出售。
 
-V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v186 SQLite schema，以及容量、Provider、Offer、Price Snapshot、Job、Reservation、首次 Attempt 激活和 Lease 续租 Store 已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker，v185 可登记外部执行器已接受的首个 Attempt，v186 可登记外部心跳声明并延长软期限；两者都不发送节点命令。本人 HTTP/MCP 可生成 fallback_curve 快照但未运行，真实价格源和完整节点运行协议仍未实现。
+V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v187 SQLite schema，以及容量、Provider、Offer、Price Snapshot、Job、Reservation、首次 Attempt 激活、Lease 续租和 staging 无用量中止 Store 已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker，v185 可登记外部执行器已接受的首个 Attempt，v186 可登记外部心跳声明并延长软期限，v187 可在 Lease 从未心跳且 Provider 确认尚未执行时原子退款并将 active 容量归还 available；三者都不发送节点命令。本人 HTTP/MCP 可生成 fallback_curve 快照但未运行，真实价格源和完整节点运行协议仍未实现。
 
 ### WorkloadSpec
 
@@ -93,7 +93,7 @@ V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多�
 
 一次具体执行尝试。每次重试递增 `attempt_no` 和 `fencing_generation`，续租不能复活已过期尝试。迟到结果可以留作审计，但不能覆盖拥有更高 `fencing_generation` 的结果。秘密租约凭据只用于鉴权，不承担代次语义。
 
-NodeAgent Host 内部已形成 Attempt command 与 typed event 合同：`start`、`renew_lease`、`cancel` 命令绑定不可变 Attempt 身份、Offer、Runner、模型、资源限制和截止时间；Runner 事件不自带可信 Attempt 身份，由 Host 根据活动命令补写租约、Attempt 编号和 `fencing_generation`。云端 v185 另形成 Provider HTTP 的首次已接受激活回执，原子记录 staging Lease、`held -> active` Claim 和 `reserved -> running` Job；v186 建立 Lease 当前状态投影，并允许 Provider 所有者在精确 revision/digest/fencing 栅栏下提交外部心跳引用、延长软期限。两者均明确返回无节点命令效果，v186 也不验证心跳签名、不改变容量或资金。两侧尚未编译，也未通过 outbox、线协议或 Sidecar IPC 接通，不能视为通用任务通道已经可用。
+NodeAgent Host 内部已形成 Attempt command 与 typed event 合同：`start`、`renew_lease`、`cancel` 命令绑定不可变 Attempt 身份、Offer、Runner、模型、资源限制和截止时间；Runner 事件不自带可信 Attempt 身份，由 Host 根据活动命令补写租约、Attempt 编号和 `fencing_generation`。云端 v185 另形成 Provider HTTP 的首次已接受激活回执，原子记录 staging Lease、`held -> active` Claim 和 `reserved -> running` Job；v186 建立 Lease 当前状态投影，并允许 Provider 所有者在精确 revision/digest/fencing 栅栏下提交外部心跳引用、延长软期限；v187 只对 v185 原始、从未心跳的 staging Lease 接受“尚未执行”声明，原子退款、归还 active 容量并终结 Job/Reservation/Claim/Lease。三者均明确不发送节点命令，也不验证外部证明签名。两侧尚未编译，也未通过 outbox、线协议或 Sidecar IPC 接通，不能视为通用任务通道已经可用。
 
 ### ExecutionReceipt
 
@@ -169,4 +169,4 @@ Adapter 必须把外部错误归一为稳定错误码，并保存原始 Provider
 
 ## 9. 当前未验证声明
 
-本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；Provider/Offer、Attempt command/events、CapacityPool、Claim/Reservation、账本 reducer、Broker Reserve/Finish、v185 Attempt 激活、v186 Lease 状态/续租、登录用户 HTTP 控制面和 v165-v186 schema 都尚未编译或运行验证，数据库迁移也未执行。文档、合同、路由或 migration 文件存在不代表运行时已经采用这些能力。
+本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；Provider/Offer、Attempt command/events、CapacityPool、Claim/Reservation、账本 reducer、Broker Reserve/Finish、v185 Attempt 激活、v186 Lease 状态/续租、v187 staging 无用量中止、登录用户 HTTP 控制面和 v165-v187 schema 都尚未编译或运行验证，数据库迁移也未执行。文档、合同、路由或 migration 文件存在不代表运行时已经采用这些能力。

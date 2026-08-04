@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-v185、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。本控制面登记“外部执行器已经接受任务”这一调用方声明，并把既有 Broker Reservation 推进到首个 Attempt；它不发送节点命令，也不验证外部执行器签名，不能描述为通用节点派发已经完成。v186 会在同一激活事务中初始化 Lease 当前状态，后续边界见 `attempt-lease-api.md`。
+v185、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。本控制面登记“外部执行器已经接受任务”这一调用方声明，并把既有 Broker Reservation 推进到首个 Attempt；它不发送节点命令，也不验证外部执行器签名，不能描述为通用节点派发已经完成。v186 会在同一激活事务中初始化 Lease 当前状态；从未心跳的 staging Lease 无用量中止边界见 `attempt-abort-api.md`。
 
 ## 2. HTTP 接口
 
@@ -65,7 +65,7 @@ v185、Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执
 - Cargo 编译、v185 迁移执行、HTTP 真实调用和并发验证；
 - 执行器接受证明的签名校验、可信节点身份绑定和服务器 outbox；
 - Start Attempt 真实派发、送达确认、心跳与 `running` Attempt 事件；
-- 超时取消、active 容量安全归还或实际消耗；
+- 自动超时取消、已出现心跳后的 active 容量处理或实际消耗；v187 只覆盖从未心跳的 staging 无用量中止；
 - 多次 Attempt、分片重试和 fencing generation 单调递增；
 - verification pending、实际用量、消费者扣款和 Provider 收益结算；
 - 项目 MCP 写入口、外部矿池、多币种和 Sui 链上资产。

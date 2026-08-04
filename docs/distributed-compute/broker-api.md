@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-本控制面已写入代码，但尚未编译、执行 v165-v176 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它开放项目级 Job 创建、既有 Offer/Price Snapshot 候选发现与锁价、平台人民币余额的原子 Reserve，以及 Attempt 尚未激活时的 Release/Expire；v185 首次 Attempt 已接受激活由独立的 Provider HTTP 控制面承接，见 `attempt-activation-api.md`。两者都不能描述为完整算力交易或结算系统。
+本控制面已写入代码，但尚未编译、执行 v165-v176 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它开放项目级 Job 创建、既有 Offer/Price Snapshot 候选发现与锁价、平台人民币余额的原子 Reserve，以及 Attempt 尚未激活时的 Release/Expire；v185 首次 Attempt 已接受激活、v186 Lease 续租和 v187 staging 无用量中止由独立的 Provider HTTP 控制面承接，分别见 `attempt-activation-api.md`、`attempt-lease-api.md` 与 `attempt-abort-api.md`。这些能力仍不能描述为完整算力交易或结算系统。
 
 HTTP 与项目级 MCP 共用 `compute_federation_broker_service`，最终都进入同一版本化 Job Store、Broker 和不可变回执。客户端不能提交 `consumer_account_id`、`project_id`、Job 状态或服务端时间；声明 `merchant_id` 时，该商户必须真实属于当前项目。Release/Expire 的 `occurred_at` 也由服务端生成。
 
@@ -72,7 +72,7 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 - 客户端声明的商户不属于当前项目时拒绝，避免 Job 记录错误的商户归属。
 - Job、Reservation、Offer、Price Snapshot、Claim 或余额历史绑定不一致时拒绝。
 - Reserve 不是完整 `reserved` 结果或缺少余额结果时整笔事务回滚。
-- Finish 遇到 active Claim 或已经启动的 Attempt 时拒绝。
+- Broker Finish 遇到 active Claim 或已经启动的 Attempt 时拒绝；只有独立 v187 路径可在 Lease 从未心跳且 Provider 明确确认尚未执行时处理 staging 无用量中止。
 - 同一 ID 或幂等键只允许相同规范请求重放。
 - 只有首次 Reserve 要求未来到期；不可变首次回执在合同到期或预算后来进入终态后仍按历史语义重放，不依赖余额表的可变到期字段。
 - 通用余额释放和到期器跳过 Broker 管理的预授权；只有核对精确预授权 ID 的 Broker Finish 可以退款，避免预算、容量、Job 与 Reservation 被拆成单腿终态。
@@ -82,7 +82,7 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 
 - Cargo 编译、迁移执行、HTTP/MCP 真实调用与并发验证；
 - 真实价格源、批量报价和自动撮合；Offer 派生 fallback_curve 快照见 `price-snapshot-api.md`；
-- Attempt 已接受激活以独立 v185 HTTP 入口形成基础代码，v186 HTTP 已增加 Lease 状态投影和外部心跳声明续租；真实节点续租命令、取消、派发、多次 Attempt 与 fencing 递增仍未实现；
-- 运行中任务的容量归还、实际用量、验证和最终结算；
+- Attempt 已接受激活以独立 v185 HTTP 入口形成基础代码，v186 HTTP 已增加 Lease 状态投影和外部心跳声明续租，v187 HTTP 已增加从未心跳的 staging 无用量中止；真实节点命令、自动超时回收、多次 Attempt 与 fencing 递增仍未实现；
+- 已出现心跳或真实运行任务的安全取消、容量处理、实际用量、验证和最终结算；
 - 多币种、Sui 资产、外部矿池和 Provider 收益提现；
 - 服务器持久化的独立真人确认凭证。
