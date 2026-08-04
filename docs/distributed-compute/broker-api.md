@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-本控制面已写入代码，但尚未编译、执行 v165-v176 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它开放项目级 Job 创建、绑定既有 Offer/Price Snapshot 的锁价、平台人民币余额的原子 Reserve，以及 Attempt 尚未激活时的 Release/Expire；不能描述为完整算力交易或结算系统。
+本控制面已写入代码，但尚未编译、执行 v165-v176 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它开放项目级 Job 创建、既有 Offer/Price Snapshot 候选发现与锁价、平台人民币余额的原子 Reserve，以及 Attempt 尚未激活时的 Release/Expire；不能描述为完整算力交易或结算系统。
 
 HTTP 与项目级 MCP 共用 `compute_federation_broker_service`，最终都进入同一版本化 Job Store、Broker 和不可变回执。客户端不能提交 `consumer_account_id`、`project_id`、Job 状态或服务端时间；声明 `merchant_id` 时，该商户必须真实属于当前项目。Release/Expire 的 `occurred_at` 也由服务端生成。
 
@@ -22,6 +22,7 @@ HTTP 与项目级 MCP 共用 `compute_federation_broker_service`，最终都进�
 |---|---|---|
 | POST | `/api/projects/:project_id/compute/jobs` | 在当前成员项目中创建本人 submitted Job |
 | POST | `/api/projects/:project_id/compute/jobs/:job_id/quote` | 把本人 Job 绑定到既有 Offer 与不可变 Price Snapshot |
+| GET | `/api/projects/:project_id/compute/jobs/:job_id/quote-candidates?limit=20` | 列出本人 Job 可锁定的当前有效候选 |
 | GET | `/api/me/compute/jobs?limit=20` | 列出本人最近的当前 Job |
 | GET | `/api/me/compute/jobs/:job_id` | 读取本人 Job 的当前 revision、digest 与合同 |
 | GET | `/api/me/compute/reservations?limit=20` | 列出本人最近的当前 Reservation |
@@ -30,7 +31,7 @@ HTTP 与项目级 MCP 共用 `compute_federation_broker_service`，最终都进�
 | POST | `/api/me/compute/reservations/:reservation_id/release` | 主动取消尚未执行的预留并退款 |
 | POST | `/api/me/compute/reservations/:reservation_id/expire` | 到期后终结尚未执行的预留并退款 |
 
-Create 请求提供稳定 `job_id`、消费者幂等键、Workload、Provider 范围、预算上限和币种；用户、项目、初始状态和时间由服务端固定。相同用户幂等键只能重放同一份不可变需求合同。Quote 请求提供当前 Job revision/digest，以及已经登记的 `offer_id` 和 `price_snapshot_id`；Store 会校验 Offer、快照、Provider、资源要求、受众、币种、预算、有效期和历史版本关系。锁价本身不冻结余额或容量。
+Create 请求提供稳定 `job_id`、消费者幂等键、Workload、Provider 范围、预算上限和币种；用户、项目、初始状态和时间由服务端固定。相同用户幂等键只能重放同一份不可变需求合同。Quote Candidates 最多返回 100 个候选、扫描 1000 份当前索引中的快照，逐个复核 Offer、Provider、Workload、受众、币种、预算、时间窗和历史版本关系；结果包含当前 Job revision/digest、价格快照与最小化 Provider 摘要，不包含节点路由、凭据、适配器配置或 Offer 授权名单。Quote 请求再提供该 Job revision/digest、`offer_id` 和 `price_snapshot_id` 完成 CAS 锁价。锁价本身不冻结余额或容量。
 
 Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 quoted Job 的 revision/digest、所需 meter 数量和 UTC 到期时间。Release/Expire 必须提供新的终态幂等键及当前 Reservation revision/digest。
 
@@ -42,6 +43,7 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 |---|---|---|
 | `compute_create_my_job` | 普通写入 | 在当前项目中创建归属本人的 submitted Job |
 | `compute_quote_my_job` | 普通写入 | 把本人 Job 绑定到既有 Offer 与 Price Snapshot，不冻结资金 |
+| `compute_list_my_job_quote_candidates` | 只读 | 列出本人 Job 可锁定的当前有效候选 |
 | `compute_get_my_job` | 只读 | 读取本人当前项目的一份 Job |
 | `compute_list_my_jobs` | 只读 | 列出本人当前项目的 Job |
 | `compute_get_my_reservation` | 只读 | 读取本人当前项目的一份 Reservation |
@@ -55,7 +57,7 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 ## 4. 推荐调用顺序
 
 1. 使用稳定 Job ID 和幂等键创建 submitted Job；网络响应丢失时原样重放。
-2. 当前阶段由内部或管理流程取得已经登记的 Offer 与 Price Snapshot，再使用 Job revision/digest 锁价。
+2. 调用 Quote Candidates，只在返回的当前有效候选中选择 Offer 与 Price Snapshot。
 3. 用只读列表或单条读取确认最新 revision、digest、锁价合同和预算。
 4. 向用户展示拟冻结金额、meter、到期时间或取消影响。
 5. 用户确认后，用新的稳定幂等键调用 Reserve 或 Release。
@@ -67,7 +69,7 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 
 - 登录用户与 Job 消费者不一致时拒绝。
 - 项目 MCP 的 Job 不属于当前项目时拒绝。
-- 客户端声明的商户不属于当前项目时拒绝，防止借用商户身份取得定向 Offer。
+- 客户端声明的商户不属于当前项目时拒绝，避免 Job 记录错误的商户归属。
 - Job、Reservation、Offer、Price Snapshot、Claim 或余额历史绑定不一致时拒绝。
 - Reserve 不是完整 `reserved` 结果或缺少余额结果时整笔事务回滚。
 - Finish 遇到 active Claim 或已经启动的 Attempt 时拒绝。
@@ -79,7 +81,7 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 ## 6. 尚未实现
 
 - Cargo 编译、迁移执行、HTTP/MCP 真实调用与并发验证；
-- Offer/Price Snapshot 的消费者搜索、报价生成和自动撮合控制面；
+- 新 Price Snapshot 的报价生成和自动撮合控制面；
 - Attempt 激活、续租、取消、fencing 与节点派发；
 - 运行中任务的容量归还、实际用量、验证和最终结算；
 - 多币种、Sui 资产、外部矿池和 Provider 收益提现；
