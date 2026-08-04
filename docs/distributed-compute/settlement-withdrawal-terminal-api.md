@@ -69,7 +69,18 @@ v201、追加式 Store、独立 Service 与 Provider/管理员 HTTP 路由已经
 - 取消/拒绝必须恰好有两条返还账本腿，付款声明必须没有资金腿；
 - 当前 available/withdrawn 是否可由 v198 Release、v200 Request 和 v201 Terminal 的不可变账本重建。
 
-## 6. 尚未实现
+## 6. PC 管理操作
+
+`pc-frontend/src/features/compute-settlement/` 已写入管理员终态操作源码。`/compute-settlement` 的 pending 提款行可打开独立对话框：
+
+- 拒绝操作要求管理员确认只执行内部余额返还，不携带任何外部付款证据；
+- 外部已付款声明要求管理员确认付款已经在系统外完成，并确认公开证据引用中不含密码、私钥或助记词；
+- 页面把 v200 Withdrawal Event Digest、Request Posting ID/Digest 和稳定幂等键交给 v201，而不是自行计算或修改余额；
+- 接口失败会保留当前申请并显示错误，不把失败视为已处理。
+
+该页面源码尚未执行 TypeScript 构建、真实 HTTP 调用、视觉验收或发布，状态仍为 `implementation_uncompiled`。
+
+## 7. 尚未实现
 
 - Cargo 编译、v201 迁移执行、HTTP 真实调用、并发与故障注入验证；
 - 银行、支付机构、钱包或 Sui 网络的真实付款适配器；
@@ -79,12 +90,14 @@ v201、追加式 Store、独立 Service 与 Provider/管理员 HTTP 路由已经
 
 因此，v201 不能被描述为生产提现通道已经上线。
 
-## 7. 代码入口
+## 8. 代码入口
 
 - `server/src/store/compute_settlement_withdrawal_terminals.rs`
 - `server/src/store/compute_settlement_withdrawal_terminals/`
 - `server/src/compute_settlement_withdrawal_terminal_migration.rs`
 - `server/src/compute_federation_settlement_withdrawal_terminal_service.rs`
 - `server/src/compute_federation_settlement_withdrawal_terminal_api.rs`
+- `pc-frontend/src/features/compute-settlement/WithdrawalTerminalDialog.tsx`
+- `pc-frontend/src/features/compute-settlement/computeSettlementApi.ts`
 
 上游提款申请见 `docs/distributed-compute/settlement-withdrawal-request-api.md`。
