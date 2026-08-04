@@ -16,13 +16,18 @@ use super::{
     signed_artifact_verification::jcs_sha256_hex,
 };
 
+// Kept private until the outcome/recovery layer can classify every consumed-handle error.
+mod resolution;
 mod types;
 
-pub(in crate::node_agent_compute_plugin_host) use types::ValidatedComputePluginFetchClaimPermit;
 pub(crate) use types::{
     AuthorizedComputePluginDownloadSegment, ComputePluginDownloadSegmentRequest,
 };
 use types::{ComputePluginFetchAuthoritySnapshot, PreparedComputePluginFetchClaim};
+pub(in crate::node_agent_compute_plugin_host) use types::{
+    ValidatedComputePluginFetchAbortPermit, ValidatedComputePluginFetchClaimPermit,
+    ValidatedComputePluginFetchCommitPermit,
+};
 
 const MAX_DOWNLOAD_SEGMENT_BYTES: i64 = 16 * 1_024 * 1_024;
 const MAX_REDIRECT_HOPS: u8 = 5;
@@ -48,6 +53,16 @@ trait ComputePluginFetchAuthorityBackend {
         download: &AdmittedComputePluginDownload,
         permit: ValidatedComputePluginFetchClaimPermit<'_>,
     ) -> Result<PreparedComputePluginFetchClaim>;
+
+    fn commit_validated_segment(
+        &self,
+        permit: ValidatedComputePluginFetchCommitPermit<'_>,
+    ) -> Result<()>;
+
+    fn abort_validated_segment(
+        &self,
+        permit: ValidatedComputePluginFetchAbortPermit<'_>,
+    ) -> Result<()>;
 }
 
 /// Opaque access to the one concrete Store backend. Its constructor and backend implementation
@@ -74,6 +89,20 @@ impl ComputePluginFetchAuthorityPort<'_> {
         permit: ValidatedComputePluginFetchClaimPermit<'_>,
     ) -> Result<PreparedComputePluginFetchClaim> {
         self.backend.claim_validated_segment(download, permit)
+    }
+
+    fn commit_validated_segment(
+        &self,
+        permit: ValidatedComputePluginFetchCommitPermit<'_>,
+    ) -> Result<()> {
+        self.backend.commit_validated_segment(permit)
+    }
+
+    fn abort_validated_segment(
+        &self,
+        permit: ValidatedComputePluginFetchAbortPermit<'_>,
+    ) -> Result<()> {
+        self.backend.abort_validated_segment(permit)
     }
 }
 
@@ -108,6 +137,20 @@ impl ComputePluginFetchAuthorityBackend for ComputePluginFetchAuthoritySession<'
         }
         let prepared = ComputePluginFetchAuthoritySession::claim_validated_segment(self, permit)?;
         Ok(prepared.into())
+    }
+
+    fn commit_validated_segment(
+        &self,
+        permit: ValidatedComputePluginFetchCommitPermit<'_>,
+    ) -> Result<()> {
+        ComputePluginFetchAuthoritySession::commit_validated_segment(self, permit)
+    }
+
+    fn abort_validated_segment(
+        &self,
+        permit: ValidatedComputePluginFetchAbortPermit<'_>,
+    ) -> Result<()> {
+        ComputePluginFetchAuthoritySession::abort_validated_segment(self, permit)
     }
 }
 

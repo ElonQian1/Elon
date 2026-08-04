@@ -5,14 +5,20 @@ use chrono::{DateTime, Utc};
 
 use super::{ComputePluginFetchProcessFence, ComputePluginLocalAuthority};
 use crate::node_agent_compute_plugin_host::{
-    fetch_contract::ValidatedComputePluginFetchClaimPermit, identity::ComputePluginReleaseRef,
+    fetch_contract::{
+        ValidatedComputePluginFetchAbortPermit, ValidatedComputePluginFetchClaimPermit,
+        ValidatedComputePluginFetchCommitPermit,
+    },
+    identity::ComputePluginReleaseRef,
     install_plan::ComputePluginPlannedDownload,
     install_plan_admission::ComputePluginLiveAdmissionState,
-    keyring::ComputePluginBootstrapRootKeyResolver, lifecycle::ComputePluginInventorySnapshot,
+    keyring::ComputePluginBootstrapRootKeyResolver,
+    lifecycle::ComputePluginInventorySnapshot,
 };
 
 mod claim;
 mod read;
+mod resolution;
 
 /// One authenticated trusted-time observation paired with the process-owner fence that may later
 /// perform the exact claim CAS. It carries no network or filesystem capability.
@@ -164,6 +170,39 @@ impl ComputePluginFetchAuthoritySession<'_> {
                 self.roots,
                 &command,
                 permit.facts(),
+            )
+        })
+    }
+
+    /// Contract-only commit seam. The permit is unreachable until the downloader can prove an
+    /// exact file identity was durably synchronized through the claimed end offset.
+    pub(in crate::node_agent_compute_plugin_host) fn commit_validated_segment(
+        &self,
+        permit: ValidatedComputePluginFetchCommitPermit<'_>,
+    ) -> Result<()> {
+        self.authority.with_immediate(|transaction| {
+            resolution::commit_validated_segment(
+                transaction,
+                self.process_fence,
+                self.trusted_now.clone(),
+                self.roots,
+                permit,
+            )
+        })
+    }
+
+    /// Contract-only abort seam. A commit error is outcome-uncertain and consumes the old permit;
+    /// callers must use the subsequent outcome/recovery layer instead of retrying this mutation.
+    pub(in crate::node_agent_compute_plugin_host) fn abort_validated_segment(
+        &self,
+        permit: ValidatedComputePluginFetchAbortPermit<'_>,
+    ) -> Result<()> {
+        self.authority.with_immediate(|transaction| {
+            resolution::abort_validated_segment(
+                transaction,
+                self.process_fence,
+                self.trusted_now.clone(),
+                permit,
             )
         })
     }
