@@ -11,7 +11,7 @@ owners: ai-economy, backend
 
 v194、追加式 Store、独立 Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 只能基于由 accepted Verification 签发的精确 v193 Execution Receipt 应用一次可信终态。
 
-这是 Attempt 链中第一项会同时修改业务状态和容量账本的操作。它不会扣除消费者预授权、释放 Provider 收益或生成 Settlement Receipt，不能描述为“任务已经完成付款”。
+这是 Attempt 链中第一项会同时修改业务状态和容量账本的操作。它本身不会扣除消费者预授权、释放 Provider 收益或生成 Settlement Receipt，不能描述为“任务已经完成付款”；后续 v195 待结算回执是独立事务，见 `docs/distributed-compute/attempt-settlement-api.md`。
 
 ## 2. HTTP 路由
 
@@ -59,7 +59,7 @@ POST 必须提供精确 Execution Receipt ID 和摘要、当前 Lease/Job/Reserv
 - Cargo 编译、v194 迁移执行、HTTP 真实调用、并发与故障注入验证；
 - NodeAgent 到云端的可信事件传输、签名验证和自动触发；
 - Lease 超时、重试、迟到结果、挑战及争议的完整状态机；
-- Settlement Receipt、消费者实际扣款、Provider 收益、退款和纠正回执；
+- v195 已另行形成首版 CNY Settlement Receipt、消费者预授权扣结/退款和 Provider pending 收益；复杂费用、争议、释放、提现和纠正回执仍未实现；
 - 自动结算、可提现余额、多币种、外部矿池和链上资产。
 
 ## 7. 代码入口
