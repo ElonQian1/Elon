@@ -1,6 +1,6 @@
 ---
 version_status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 ---
 
 # 后台多端 UI 设计 MCP
@@ -44,7 +44,9 @@ reviewed_at: 2026-08-04
 - `ui_get_design_verification_matrix` 把草稿、当前 designSession 工件和写回回执汇总为 Web/PWA/Tauri/Android 行，明确区分 `READY`、`IN_PROGRESS`、`BLOCKED` 与 `PASSED`。只有写回回执中所有目标平台均为 `BUILD_VERIFIED + evidenceComplete=true` 才是通过。
 - PC `/pc/ui-tuner` 默认进入“多端后台”：左侧平台/会话/UI 树，中间最终 UI 与语义选区，右侧常驻项目 Codex 对话。用户发送聊天时先生成或重规划 DesignIntentPlan；画布显示 plan revision、逐动作回执和暂停/恢复/取消，自动跟随 source patch、rollback、regression 事件。源码补丁必须在画布二次批准后由用户明确点击应用；回滚只生成审查计划。普通 AI 任务按 taskId/cursor 长轮询并提交 `pc-ui-tuner` checkpoint；若代理绑定另一 designSession，中间画布按事件定向恢复。
 
-本阶段代码尚未执行真实编译、TypeScript/ESLint、浏览器/Tauri/Android 启动、模拟器、真机、人工视觉、比较器、完整 E2E 或发布验收；这是本轮“代码优先”的明确边界，不得从源码存在推断运行成功。当前已安装 PC 节点仍无 v1.11 能力回读证据。因此仓库中的 1.11 工具必须经过 Windows 节点构建、发布、自动升级和 `ui_get_design_capabilities` 回读后才可用于真实任务。
+2026-08-05 已完成隔离 Windows 候选节点的首轮真实验收：Rust `--locked` check、目标契约测试、PC TypeScript 构建、ESLint、微调画布测试和 MCP bridge 测试通过；候选节点实际回读 `yilong-ui-live@1.11.0` 与 24 个 capability ID。代理未打开 PC 画布或可见浏览器，即完成 Web/Tauri 目标发现、Web 会话打开、PNG 与 5 节点语义树捕获、按钮点击与文本断言、回归基线、可逆样式草稿预览/恢复、写回安全阻断及六步 DesignIntentPlan 回执闭环。Tauri 前端也完成后台捕获，并准确返回 `TAURI_FRONTEND_WEBVIEW_ONLY`、`nativeHostVerified=false`。小型控制调用约 0.9–1.8 秒；首次冷浏览器捕获约 33 秒，后续捕获/交互约 3–8 秒。响应只返回路径、哈希和紧凑节点，不嵌入 Base64。
+
+本轮仍未验证 Tauri 原生窗口、菜单、对话框或 command trace，未执行 Android Runtime、模拟器、真机、人工视觉和视觉/语义比较器回执；写回计划因 fixture 未确认源码绑定而按设计返回 `BLOCKED_BINDING`，没有修改源码。正式安装节点的发布与升级回读仍是发布阶段门禁；隔离候选节点证据不能冒充所有平台已经验收。
 
 Tauri 前端截图仍只能证明 WebView；只有 `ui_capture_tauri_host` 返回带 SHA-256 的原生工件时才能声明原生窗口证据。菜单、对话框和 command trace 是额外分层证据，不会单独把 `nativeHostVerified` 变为 true。
 
@@ -260,12 +262,12 @@ PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作
 
 ## 9. 后续验收与增强顺序
 
-1. 静态门禁：完成源码大小、文档权威性、Git 收尾；本轮不补跑真实编译或平台测试。
-2. 编译门禁：Rust/Cargo、TypeScript、ESLint 和 Node Admin 路由编译；修复所有类型或依赖错误后才进入运行验收。
-3. 节点候选版：构建包含 MCP schema v1.11 的 Windows 节点，升级后必须由 `ui_get_design_capabilities` 回读精确 schema 与新增 capability ID。
-4. 隔离契约验收：覆盖 plan revision 冲突、lease 补偿、patch 漂移/APPLYING 恢复、rollback offset、baseline artifact SHA 和 comparison 阈值结算。
-5. 平台验收：Web/PWA 真实浏览器 fixture、Tauri 原生窗口/菜单/对话框/插桩 trace、Android 隔离模拟器分别形成回归与验证矩阵回执。
-6. 灰度发布：验证旧节点已有 CLI/Exec 不受影响、1.11 新工具只在升级节点开放；只有用户明确要求或反馈视觉不正确时再做真机复核。
+1. 已完成：源码大小与文档门禁、Rust/Cargo `--locked` check、TypeScript 构建、ESLint、画布测试和 MCP bridge 测试。
+2. 已完成：隔离 Windows 候选节点回读 schema v1.11 与全部 capability ID。
+3. 已完成首轮：Web 真实浏览器 fixture 的无界面发现、捕获、受限交互、断言、基线、草稿预览/恢复和 DesignIntentPlan 回执；Tauri 已验证前端 WebView 分层证据。
+4. 待补：正式节点发布、自动升级和能力回读；旧节点 CLI/Exec 兼容仍需发布验收。
+5. 待补：source patch 漂移/`APPLYING` 恢复、rollback offset、比较器 artifact 与阈值结算的运行验收。
+6. 待补：Tauri 原生窗口/菜单/对话框/插桩 trace、Android 隔离模拟器、PWA 独立目标和四端验证矩阵回执；只有用户明确要求或反馈视觉不正确时再做真机复核。
 
 每一阶段都先扩展相同 MCP 契约；不得通过让代理操控 Windows 桌面来绕过缺失的数据面。
 
