@@ -11,8 +11,11 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
-    compute_federation_broker_service::{self, FinishMyComputeRequest, ReserveMyComputeRequest},
-    project_auth::{auth_from_headers, json_error},
+    compute_federation_broker_service::{
+        self, CreateMyComputeJobRequest, FinishMyComputeRequest, QuoteMyComputeJobRequest,
+        ReserveMyComputeRequest,
+    },
+    project_auth::{auth_from_headers, json_error, project_access},
     store::ComputeBrokerFinishAction,
     types::AppState,
 };
@@ -36,6 +39,14 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/compute/reservations/:reservation_id/expire",
             post(expire),
+        )
+        .route(
+            "/api/projects/:project_id/compute/jobs",
+            post(create_project_job),
+        )
+        .route(
+            "/api/projects/:project_id/compute/jobs/:job_id/quote",
+            post(quote_project_job),
         )
 }
 
@@ -136,6 +147,43 @@ async fn reserve(
     ))
 }
 
+async fn create_project_job(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(request): Json<CreateMyComputeJobRequest>,
+) -> Response {
+    let user_id = match authenticated_project_user(&state, &headers, &project_id) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    broker_response(compute_federation_broker_service::create_job_for_project(
+        &state.store,
+        &user_id,
+        &project_id,
+        request,
+    ))
+}
+
+async fn quote_project_job(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, job_id)): Path<(String, String)>,
+    Json(request): Json<QuoteMyComputeJobRequest>,
+) -> Response {
+    let user_id = match authenticated_project_user(&state, &headers, &project_id) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    broker_response(compute_federation_broker_service::quote_job_for_project(
+        &state.store,
+        &user_id,
+        &project_id,
+        &job_id,
+        request,
+    ))
+}
+
 async fn release(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -191,6 +239,17 @@ fn authenticated_user(state: &AppState, headers: &HeaderMap) -> Result<String, R
     auth_from_headers(state, headers)
         .map(|user| user.id)
         .map_err(|_| json_error(StatusCode::UNAUTHORIZED, "未登录"))
+}
+
+fn authenticated_project_user(
+    state: &AppState,
+    headers: &HeaderMap,
+    project_id: &str,
+) -> Result<String, Response> {
+    let user_id = authenticated_user(state, headers)?;
+    project_access(state, &user_id, project_id)
+        .map_err(|error| json_error(StatusCode::FORBIDDEN, error))?;
+    Ok(user_id)
 }
 
 fn broker_response<T: serde::Serialize>(result: anyhow::Result<T>) -> Response {

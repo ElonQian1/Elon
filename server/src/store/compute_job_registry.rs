@@ -69,6 +69,36 @@ impl Store {
         current_registered_job_on(&conn, job_id.trim())?.ok_or_else(|| anyhow!("算力 Job 不存在"))
     }
 
+    pub(crate) fn compute_job_version(
+        &self,
+        job_id: &str,
+        revision: i64,
+    ) -> Result<ComputeJobRegistrationReceipt> {
+        if job_id.trim().is_empty() || revision <= 0 {
+            bail!("算力 Job ID 或历史版本无效");
+        }
+        let conn = self.conn()?;
+        registered_job_version_on(&conn, job_id.trim(), revision)?
+            .ok_or_else(|| anyhow!("算力 Job 历史版本不存在"))
+    }
+
+    pub(crate) fn compute_job_for_consumer_idempotency(
+        &self,
+        consumer_account_id: &str,
+        idempotency_key: &str,
+    ) -> Result<Option<ComputeJobRegistrationReceipt>> {
+        if consumer_account_id.trim().is_empty() || idempotency_key.trim().is_empty() {
+            bail!("消费者账户 ID 和幂等键不能为空");
+        }
+        let conn = self.conn()?;
+        let Some(job_id) =
+            job_id_for_idempotency_on(&conn, consumer_account_id.trim(), idempotency_key.trim())?
+        else {
+            return Ok(None);
+        };
+        current_registered_job_on(&conn, &job_id)
+    }
+
     pub(crate) fn list_compute_jobs_for_consumer(
         &self,
         consumer_account_id: &str,

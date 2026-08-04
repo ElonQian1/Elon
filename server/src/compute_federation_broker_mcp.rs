@@ -3,10 +3,17 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{
-    compute_federation_broker_service::{self, FinishMyComputeRequest, ReserveMyComputeRequest},
+    compute_federation_broker_service::{
+        self, CreateMyComputeJobRequest, FinishMyComputeRequest, QuoteMyComputeJobRequest,
+        ReserveMyComputeRequest,
+    },
     store::{ComputeBrokerFinishAction, Store},
 };
 
+mod schemas;
+
+const CREATE_JOB_TOOL: &str = "compute_create_my_job";
+const QUOTE_JOB_TOOL: &str = "compute_quote_my_job";
 const RESERVE_TOOL: &str = "compute_reserve_my_job";
 const RELEASE_TOOL: &str = "compute_release_my_reservation";
 const EXPIRE_TOOL: &str = "compute_expire_my_reservation";
@@ -35,6 +42,16 @@ struct ListArguments {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct QuoteArguments {
+    job_id: String,
+    offer_id: String,
+    price_snapshot_id: String,
+    expected_job_revision: i64,
+    expected_job_digest: String,
+}
+
+#[derive(Debug, Deserialize)]
 struct ReserveArguments {
     #[serde(flatten)]
     request: ReserveMyComputeRequest,
@@ -53,28 +70,46 @@ struct FinishArguments {
 pub(crate) fn definitions() -> Vec<Value> {
     vec![
         tool(
+            CREATE_JOB_TOOL,
+            "在当前项目中创建一份归属当前登录用户的 submitted 算力 Job。项目、消费者、状态和时间由服务端固定；相同幂等键只能绑定同一需求。",
+            schemas::create_job_schema(),
+            false,
+            false,
+        ),
+        tool(
+            QUOTE_JOB_TOOL,
+            "把当前项目中的本人 submitted/quoted 算力 Job 绑定到已经登记且仍有效的 Offer 与不可变 Price Snapshot。不会冻结余额或容量。",
+            schemas::quote_job_schema(),
+            false,
+            false,
+        ),
+        tool(
             GET_JOB_TOOL,
             "读取当前登录用户在当前项目中的一份算力 Job，并返回最新 revision、digest、状态、报价和预算合同。不会修改数据。",
             id_schema("job_id"),
             true,
+            false,
         ),
         tool(
             LIST_JOBS_TOOL,
             "列出当前登录用户在当前项目中的最新算力 Job。用于在预留前取得当前 revision 与 digest；不会修改数据。",
             list_schema(),
             true,
+            false,
         ),
         tool(
             GET_RESERVATION_TOOL,
             "读取当前登录用户在当前项目中的一份算力 Reservation，并返回最新 revision、digest、状态和容量绑定。不会修改数据。",
             id_schema("reservation_id"),
             true,
+            false,
         ),
         tool(
             LIST_RESERVATIONS_TOOL,
             "列出当前登录用户在当前项目中的最新算力 Reservation。用于在释放或到期前取得当前 revision 与 digest；不会修改数据。",
             list_schema(),
             true,
+            false,
         ),
         tool(
             RESERVE_TOOL,
@@ -95,18 +130,21 @@ pub(crate) fn definitions() -> Vec<Value> {
                 "additionalProperties":false
             }),
             false,
+            true,
         ),
         tool(
             RELEASE_TOOL,
             "取消当前项目中尚未启动 Attempt 的本人算力 Reservation，并在同一事务退款、归还 held 容量和终结 Job。仅在用户明确确认取消后调用。",
             finish_schema(true),
             false,
+            true,
         ),
         tool(
             EXPIRE_TOOL,
             "在到期时间已经到达后，幂等终结当前项目中尚未启动 Attempt 的本人算力 Reservation，并退款和归还 held 容量。不能提前到期。",
             finish_schema(false),
             false,
+            true,
         ),
     ]
 }
@@ -119,6 +157,31 @@ pub(crate) fn call_if_handled(
     arguments: Value,
 ) -> Result<Option<Value>> {
     match name {
+        CREATE_JOB_TOOL => {
+            let input: CreateMyComputeJobRequest = decode(arguments, name)?;
+            Ok(Some(serde_json::to_value(
+                compute_federation_broker_service::create_job_for_project(
+                    store, user_id, project_id, input,
+                )?,
+            )?))
+        }
+        QUOTE_JOB_TOOL => {
+            let input: QuoteArguments = decode(arguments, name)?;
+            Ok(Some(serde_json::to_value(
+                compute_federation_broker_service::quote_job_for_project(
+                    store,
+                    user_id,
+                    project_id,
+                    &input.job_id,
+                    QuoteMyComputeJobRequest {
+                        offer_id: input.offer_id,
+                        price_snapshot_id: input.price_snapshot_id,
+                        expected_job_revision: input.expected_job_revision,
+                        expected_job_digest: input.expected_job_digest,
+                    },
+                )?,
+            )?))
+        }
         GET_JOB_TOOL => {
             let input: JobArguments = decode(arguments, name)?;
             Ok(Some(serde_json::to_value(
@@ -268,14 +331,20 @@ fn default_limit() -> usize {
     20
 }
 
-fn tool(name: &str, description: &str, input_schema: Value, read_only: bool) -> Value {
+fn tool(
+    name: &str,
+    description: &str,
+    input_schema: Value,
+    read_only: bool,
+    destructive: bool,
+) -> Value {
     json!({
         "name":name,
         "description":description,
         "inputSchema":input_schema,
         "annotations":{
             "readOnlyHint":read_only,
-            "destructiveHint":!read_only,
+            "destructiveHint":destructive,
             "idempotentHint":true,
             "openWorldHint":false
         }
