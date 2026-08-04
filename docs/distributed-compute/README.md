@@ -25,6 +25,7 @@ owners: backend, node, ai-economy
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
 | Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码、v169-v176 注册表、首版 Broker Reserve 与未执行任务终态已写，状态为 `implementation_uncompiled`，尚未迁移、接线和运行验证 |
 | Provider 本人控制面 | HTTP/MCP 已可登记、读取和列出本人 `user_node` 或 `managed_cluster` 的脱敏视图；只生成 `registering/self_declared` 记录，不接受路由、凭据、适配器或验证证据，尚未编译和运行验证 |
+| CapacityPool 本人控制面 | HTTP/MCP 已可在本人 Provider 下登记、读取和列出 `registering` Pool；epoch、revision、状态、时间和摘要由服务端固定，响应不返回原始资源范围密钥或资源档案，尚未编译和运行验证 |
 | 节点插件治理合同 | Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 与短期 ReadyCapability 合同已写，尚未编译或接线 |
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
@@ -49,8 +50,9 @@ owners: backend, node, ai-economy
 4. `docs/decisions/distributed-compute-capacity-ledger-v1.md` 与 `docs/distributed-compute/capacity-ledger.md`：共享容量池、跨 Offer 防超卖和追加式容量账本。
 5. `docs/distributed-compute/market-and-settlement.md`：标准化 SKU、期货锁价和结算回执。
 6. `docs/distributed-compute/provider-api.md`：Provider 本人登记、查询和信任边界。
-7. `docs/distributed-compute/broker-api.md`：Job、报价与预留 HTTP/MCP 控制面。
-8. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
+7. `docs/distributed-compute/capacity-pool-api.md`：本人共享物理资源边界及摘要隐私合同。
+8. `docs/distributed-compute/broker-api.md`：Job、报价与预留 HTTP/MCP 控制面。
+9. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
 
 ## 分阶段落地
 
@@ -60,7 +62,7 @@ owners: backend, node, ai-economy
 
 ### F1：用户节点成为可插拔 Provider
 
-节点内部已经形成 Plugin Host 兼容 seam，以及 Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架；云端还形成 v169 版本化 Provider Registry、Offer 规范合同校验和 v170 追加式 Offer Registry。本人 HTTP/MCP 控制面可登记和查询 `user_node` 或 `managed_cluster`，但只产生服务端固定的 `registering/self_declared` 记录，响应不暴露路由、凭据、适配器或结算账户。它们均尚未编译、执行迁移或运行验证。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**；只有控制面结合 Provider、策略、容量和价格后才能登记版本化 Offer。
+节点内部已经形成 Plugin Host 兼容 seam，以及 Signed Manifest、InstallPlan、双槽安装/切换/回滚 lifecycle 和 ReadyCapability 合同骨架；云端还形成 v169 版本化 Provider Registry、Offer 规范合同校验和 v170 追加式 Offer Registry。本人 HTTP/MCP 控制面可登记和查询 `user_node` 或 `managed_cluster`，但只产生服务端固定的 `registering/self_declared` 记录，响应不暴露路由、凭据、适配器或结算账户；还可在本人 Provider 下登记和查询 `registering` CapacityPool，服务端生成 epoch、revision 和摘要，响应不返回原始资源档案。它们均尚未编译、执行迁移或运行验证。ReadyCapability 只是有明确过期时间的本机技术就绪证据，不包含市场价格、可预留容量或账户授权，**不等于 Compute Offer**；只有控制面结合 Provider、策略、容量和价格后才能登记版本化 Offer。
 
 目标流程仍是：共享关闭时不下载重型组件；开启后按硬件和任务选择签名插件、运行时与模型工件。真实下载器、Sidecar 进程与 IPC、动态健康状态、云端 capability gate、通用 Attempt 协议接线和 Offer 发布目前都未实现。
 
@@ -69,7 +71,7 @@ owners: backend, node, ai-economy
 共享 CapacityPool 与追加式容量账本已经形成领域合同、checked-i128 reducer、v165-v168 SQLite schema 和隔离的本地 Store。Store 可登记池版本与零余额 bucket，原子追加多 meter 发行/撤出双分录，并通过稳定 Claim 完成 hold、revision 栅栏释放和到期归还。Supply Add/Withdraw 与 Claim Hold/Finish 不再接收调用方摘要；Hold V2 固定完整 causal binding，Reservation Claim 强制绑定 Offer、Job 与同主体 Reservation。Finish 摘要绑定 claim ID、expected revision、终态 action 和发生时间，并从原始 held 事务继承业务绑定。普通重放仍返回当前 Claim/余额，Reservation Hold 只重放未到期的初始 held 版本，尚未保存通用不可变首次响应。公开 standalone 方法继续拥有 `BEGIN IMMEDIATE` 与 commit，但拒绝单独创建或终结 Reservation Claim；事务内 kernel 不自行提交。Hold 必须显式到期、不允许在窗口结束后创建或晚于窗口结束；Release/Expire 只允许 `held -> available`，并用 checked `i128` 证明 Claim 自有归属，不能释放 active Attempt 容量。通用恢复器按 held 账本真实 Reservation binding 跳过 Broker Claim。v169-v174 还形成 Provider、Offer、Price Snapshot、Job、Claim 历史与 Reservation Registry；v175 第一版 Broker 已在一个 `BEGIN IMMEDIATE` 事务中组合余额预授权、Reservation Claim Hold、pending/active Reservation 与 quoted/reserved Job，并保存不可变回执。预算结果不是 `reserved`、缺少余额结果、任何依赖过期或任一步写入失败时，整笔事务回滚；同 Reservation ID 或消费者幂等键重放时必须匹配规范请求摘要并重新审计历史绑定。只有首次创建要求未来到期；首次回执在合同到期或预算后来进入终态后仍按历史语义重放，不依赖余额表的可变 `expires_at`。v176 为尚未激活 Attempt 的 Reservation 增加 Release/Expire 编排：严格核对 v175 原始绑定后，在一个事务中退款、归还 held Claim、把 Job 推进为 canceled/failed、把 Reservation 推进为 released/expired，并保存不可变终态回执；Claim 的持久化 `recorded_at` 是三个终态的共同时间边界。通用余额释放与到期器排除 Broker 预算，v176 通过精确预授权 ID 的严格入口终结，避免单腿退款。登录用户 HTTP 与项目 MCP 均可列出或读取本人最新 Job/Reservation，并发起 Reserve、Release、Expire；MCP 对 Reserve、Release 要求显式确认。该路径只支持 `platform_balance_cny`，按 Price Snapshot 的消费者最高微单位金额向上取整到人民币分；它仍为 `implementation_uncompiled`，尚未执行迁移、HTTP/MCP 运行验证、编排 Attempt 或完成运行中任务和实际用量结算，因此不构成完整算力交易运行系统。
 项目级 HTTP 与 MCP 已可创建归属当前用户的 submitted Job，按完整 Job 合同发现当前有效的既有 Offer/Price Snapshot，再把当前 revision/digest 锁定到所选候选。候选返回价格合同和最小 Provider 摘要，不返回节点路由、凭据、适配器配置或授权名单。用户、项目、状态和时间由服务端固定，商户身份必须属于当前项目，相同消费者幂等键只能重放相同需求。候选发现和锁价均不移动资金或容量；新报价生成和自动撮合仍未实现。
 
-Provider 本人控制面由 `docs/distributed-compute/provider-api.md` 维护；Job、报价、预留与未执行任务终态控制面由 `docs/distributed-compute/broker-api.md` 维护。
+Provider 本人控制面由 `docs/distributed-compute/provider-api.md` 维护，Pool 控制面由 `docs/distributed-compute/capacity-pool-api.md` 维护；Job、报价、预留与未执行任务终态控制面由 `docs/distributed-compute/broker-api.md` 维护。
 
 v172 ComputeJob Registry 已把需求身份、所选 Offer 历史版本、不可变 Price Snapshot、消费者预算上限和生命周期状态写入版本化 Store。新 Job 必须从 `submitted` 创建；项目控制面已接入该创建路径。进入 `quoted` 时只接受当前 active Offer、active Provider 与未过期快照，项目控制面可显式绑定或刷新既有锁价选择；进入 reserved 或后续状态后锁价合同不能更换。消费者幂等键、`expected_revision` 与 revision/digest CAS 防止重复或并发覆盖；当前和历史读取都会重新审计 Workload 合同及 Provider/Offer/Snapshot 依赖。该路径仍为 `implementation_uncompiled`，不代表预算已冻结、容量已预留或任务已派发。
 
