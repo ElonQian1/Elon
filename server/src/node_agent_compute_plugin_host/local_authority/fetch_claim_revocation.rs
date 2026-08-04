@@ -2,18 +2,16 @@ use anyhow::{bail, Context, Result};
 use rusqlite::{params, Transaction};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum FetchClaimRevocationReason {
+enum AuthorityEpochRevocationReason {
     AuthorityEpochAdvancedByKeyring,
     AuthorityEpochAdvancedByPlan,
-    ProcessOwnerEpochAdvanced,
 }
 
-impl FetchClaimRevocationReason {
+impl AuthorityEpochRevocationReason {
     fn as_str(self) -> &'static str {
         match self {
             Self::AuthorityEpochAdvancedByKeyring => "authority_epoch_advanced_by_keyring",
             Self::AuthorityEpochAdvancedByPlan => "authority_epoch_advanced_by_plan",
-            Self::ProcessOwnerEpochAdvanced => "process_owner_epoch_advanced",
         }
     }
 }
@@ -84,7 +82,7 @@ pub(super) fn revoke_for_process_owner_epoch_advance(
             WHERE state = 'prepared' AND process_owner_epoch <= ?3"#,
             params![
                 resolved_at_ms,
-                FetchClaimRevocationReason::ProcessOwnerEpochAdvanced.as_str(),
+                "process_owner_epoch_advanced",
                 expected_old_process_epoch
             ],
         )
@@ -102,12 +100,42 @@ pub(super) fn revoke_for_process_owner_epoch_advance(
     Ok(())
 }
 
-pub(super) fn revoke_for_authority_epoch_advance(
+pub(super) fn revoke_for_keyring_authority_epoch_advance(
     transaction: &Transaction<'_>,
     expected_old_epoch: i64,
     expected_new_epoch: i64,
     resolved_at_ms: i64,
-    reason: FetchClaimRevocationReason,
+) -> Result<()> {
+    revoke_for_authority_epoch_advance(
+        transaction,
+        expected_old_epoch,
+        expected_new_epoch,
+        resolved_at_ms,
+        AuthorityEpochRevocationReason::AuthorityEpochAdvancedByKeyring,
+    )
+}
+
+pub(super) fn revoke_for_plan_authority_epoch_advance(
+    transaction: &Transaction<'_>,
+    expected_old_epoch: i64,
+    expected_new_epoch: i64,
+    resolved_at_ms: i64,
+) -> Result<()> {
+    revoke_for_authority_epoch_advance(
+        transaction,
+        expected_old_epoch,
+        expected_new_epoch,
+        resolved_at_ms,
+        AuthorityEpochRevocationReason::AuthorityEpochAdvancedByPlan,
+    )
+}
+
+fn revoke_for_authority_epoch_advance(
+    transaction: &Transaction<'_>,
+    expected_old_epoch: i64,
+    expected_new_epoch: i64,
+    resolved_at_ms: i64,
+    reason: AuthorityEpochRevocationReason,
 ) -> Result<()> {
     let calculated_new_epoch = expected_old_epoch
         .checked_add(1)

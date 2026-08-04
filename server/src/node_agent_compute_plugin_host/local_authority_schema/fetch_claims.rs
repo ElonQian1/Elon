@@ -214,8 +214,12 @@ AND NOT (
     AND NEW.state = 'revoked'
     AND NEW.redirect_generation = OLD.redirect_generation
     AND NEW.resolved_at_ms IS NOT NULL
-    AND NEW.resolution_reason IS NOT NULL
-    AND NEW.resolution_reason <> ''
+    AND NEW.resolution_reason IN (
+        'authority_epoch_advanced_by_keyring',
+        'authority_epoch_advanced_by_plan',
+        'process_owner_epoch_advanced',
+        'candidate_released_by_plan'
+    )
     AND EXISTS (
         SELECT 1 FROM authority_meta AS meta
         WHERE meta.singleton = 1

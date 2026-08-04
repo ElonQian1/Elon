@@ -4,7 +4,7 @@ use rusqlite::{params, OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    fetch_claim_revocation::{revoke_for_authority_epoch_advance, FetchClaimRevocationReason},
+    fetch_claim_revocation::revoke_for_plan_authority_epoch_advance,
     keyring_snapshot::PersistedComputePluginKeyringSnapshot,
     plan_application::{
         prepare_application_request, AuthorityPlanApplicationState,
@@ -341,12 +341,11 @@ pub(super) fn persist_plan_application(
         admitted.plan_digest(),
         applied_at_ms,
     )?;
-    revoke_for_authority_epoch_advance(
+    revoke_for_plan_authority_epoch_advance(
         transaction,
         authority.authority_epoch,
         authority_epoch,
         applied_at_ms,
-        FetchClaimRevocationReason::AuthorityEpochAdvancedByPlan,
     )?;
     insert_candidates_and_downloads(
         transaction,

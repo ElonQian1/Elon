@@ -537,6 +537,15 @@ CREATE TABLE fetch_claims (
          AND resolved_at_ms >= prepared_at_ms
          AND resolution_reason IS NOT NULL
          AND resolution_reason <> '')
+    ),
+    CHECK (
+        state <> 'revoked'
+        OR resolution_reason IN (
+            'authority_epoch_advanced_by_keyring',
+            'authority_epoch_advanced_by_plan',
+            'process_owner_epoch_advanced',
+            'candidate_released_by_plan'
+        )
     )
 );
 
