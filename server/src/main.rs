@@ -97,6 +97,7 @@ mod compute_job_migration;
 mod compute_offer_lifecycle_migration;
 mod compute_offer_migration;
 mod compute_offer_publication_migration;
+mod compute_offer_terminal_migration;
 mod compute_price_snapshot_migration;
 mod compute_provider_migration;
 mod compute_reservation_migration;

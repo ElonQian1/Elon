@@ -12,6 +12,16 @@ pub(crate) struct DrainComputeOfferRequest {
     pub confirm_drain: bool,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TerminateComputeOfferRequest {
+    pub expected_offer_version: i64,
+    pub expected_offer_digest: String,
+    pub reason: String,
+    pub idempotency_key: String,
+    pub confirm_terminal: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ComputeOfferLifecycleReceipt {
     pub schema: &'static str,

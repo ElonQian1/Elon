@@ -11,10 +11,13 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
+    compute_federation::offer::{OFFER_STATUS_EXPIRED, OFFER_STATUS_REVOKED},
     compute_federation_offer_draft_model::{
         CreateMyComputeOfferDraftRequest, RevokeMyComputeOfferDraftRequest,
     },
-    compute_federation_offer_lifecycle_model::DrainComputeOfferRequest,
+    compute_federation_offer_lifecycle_model::{
+        DrainComputeOfferRequest, TerminateComputeOfferRequest,
+    },
     compute_federation_offer_lifecycle_service,
     compute_federation_offer_publication_model::PublishComputeOfferDraftRequest,
     compute_federation_offer_publication_service, compute_federation_offer_service,
@@ -34,7 +37,11 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         )
         .route(
             "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/revoke",
-            post(revoke_offer_draft),
+            get(get_my_offer_revocation).post(revoke_offer_draft),
+        )
+        .route(
+            "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/expiration",
+            get(get_my_offer_expiration),
         )
         .route(
             "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/publication",
@@ -59,6 +66,14 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/offers/:offer_id/drain",
             get(get_offer_drain_for_review).post(drain_offer_for_review),
+        )
+        .route(
+            "/api/admin/compute/offers/:offer_id/expire",
+            get(get_offer_expiration_for_review).post(expire_offer_for_review),
+        )
+        .route(
+            "/api/admin/compute/offers/:offer_id/revoke",
+            get(get_offer_revocation_for_review).post(revoke_offer_for_review),
         )
 }
 
@@ -185,6 +200,36 @@ async fn get_my_offer_drain(
     )
 }
 
+async fn get_my_offer_expiration(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, pool_id, offer_id)): Path<(String, String, String)>,
+) -> Response {
+    get_my_offer_terminal(
+        &state,
+        &headers,
+        &provider_id,
+        &pool_id,
+        &offer_id,
+        OFFER_STATUS_EXPIRED,
+    )
+}
+
+async fn get_my_offer_revocation(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, pool_id, offer_id)): Path<(String, String, String)>,
+) -> Response {
+    get_my_offer_terminal(
+        &state,
+        &headers,
+        &provider_id,
+        &pool_id,
+        &offer_id,
+        OFFER_STATUS_REVOKED,
+    )
+}
+
 async fn publish_offer_for_review(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -251,6 +296,62 @@ async fn get_offer_drain_for_review(
     )
 }
 
+async fn expire_offer_for_review(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(offer_id): Path<String>,
+    Json(request): Json<TerminateComputeOfferRequest>,
+) -> Response {
+    let actor_user_id = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    offer_response(
+        compute_federation_offer_lifecycle_service::expire_for_review(
+            &state.store,
+            &actor_user_id,
+            &offer_id,
+            request,
+        ),
+    )
+}
+
+async fn revoke_offer_for_review(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(offer_id): Path<String>,
+    Json(request): Json<TerminateComputeOfferRequest>,
+) -> Response {
+    let actor_user_id = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    offer_response(
+        compute_federation_offer_lifecycle_service::revoke_for_review(
+            &state.store,
+            &actor_user_id,
+            &offer_id,
+            request,
+        ),
+    )
+}
+
+async fn get_offer_expiration_for_review(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(offer_id): Path<String>,
+) -> Response {
+    get_offer_terminal_for_review(&state, &headers, &offer_id, OFFER_STATUS_EXPIRED)
+}
+
+async fn get_offer_revocation_for_review(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(offer_id): Path<String>,
+) -> Response {
+    get_offer_terminal_for_review(&state, &headers, &offer_id, OFFER_STATUS_REVOKED)
+}
+
 async fn list_offers_for_review(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -277,6 +378,48 @@ async fn get_offer_for_review(
         &state.store,
         &offer_id,
     ))
+}
+
+fn get_my_offer_terminal(
+    state: &AppState,
+    headers: &HeaderMap,
+    provider_id: &str,
+    pool_id: &str,
+    offer_id: &str,
+    target_status: &str,
+) -> Response {
+    let user_id = match authenticated_user(state, headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    offer_response(
+        compute_federation_offer_lifecycle_service::get_terminal_for_user(
+            &state.store,
+            &user_id,
+            provider_id,
+            pool_id,
+            offer_id,
+            target_status,
+        ),
+    )
+}
+
+fn get_offer_terminal_for_review(
+    state: &AppState,
+    headers: &HeaderMap,
+    offer_id: &str,
+    target_status: &str,
+) -> Response {
+    if let Err(response) = platform_admin(state, headers) {
+        return response;
+    }
+    offer_response(
+        compute_federation_offer_lifecycle_service::get_terminal_for_review(
+            &state.store,
+            offer_id,
+            target_status,
+        ),
+    )
 }
 
 fn authenticated_user(state: &AppState, headers: &HeaderMap) -> Result<String, Response> {

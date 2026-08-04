@@ -58,6 +58,7 @@ mod compute_offer_lifecycle;
 mod compute_offer_owner_queries;
 mod compute_offer_publications;
 mod compute_offer_registry;
+mod compute_offer_terminal;
 mod compute_price_snapshot_registry;
 mod compute_price_snapshot_validation;
 mod compute_provider_registry;
@@ -286,6 +287,7 @@ pub(crate) use compute_offer_contract_validation::{compute_offer_digest, compute
 pub(crate) use compute_offer_lifecycle::DrainComputeOffer;
 pub(crate) use compute_offer_publications::PublishComputeOfferDraft;
 pub(crate) use compute_offer_registry::ComputeOfferRegistrationReceipt;
+pub(crate) use compute_offer_terminal::TerminateComputeOffer;
 pub(crate) use compute_price_snapshot_registry::ComputePriceSnapshotRegistrationReceipt;
 pub(crate) use compute_provider_registry::validate_compute_provider_contract;
 pub(crate) use compute_provider_registry::ComputeProviderRegistrationReceipt;

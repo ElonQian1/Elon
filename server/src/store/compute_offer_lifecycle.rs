@@ -144,25 +144,25 @@ impl Store {
 }
 
 #[derive(Debug, Clone)]
-struct StoredLifecycleEvent {
-    event_id: String,
-    offer_id: String,
-    provider_id: String,
-    pool_id: String,
-    previous_status: String,
-    target_status: String,
-    previous_offer_version: i64,
-    previous_offer_digest: String,
-    target_offer_version: i64,
-    target_offer_digest: String,
-    reason: String,
-    event_digest: String,
-    changed_by_user_id: String,
-    changed_at: String,
+pub(super) struct StoredLifecycleEvent {
+    pub(super) event_id: String,
+    pub(super) offer_id: String,
+    pub(super) provider_id: String,
+    pub(super) pool_id: String,
+    pub(super) previous_status: String,
+    pub(super) target_status: String,
+    pub(super) previous_offer_version: i64,
+    pub(super) previous_offer_digest: String,
+    pub(super) target_offer_version: i64,
+    pub(super) target_offer_digest: String,
+    pub(super) reason: String,
+    pub(super) event_digest: String,
+    pub(super) changed_by_user_id: String,
+    pub(super) changed_at: String,
 }
 
 impl StoredLifecycleEvent {
-    fn into_receipt(self, replayed: bool) -> ComputeOfferLifecycleReceipt {
+    pub(super) fn into_receipt(self, replayed: bool) -> ComputeOfferLifecycleReceipt {
         ComputeOfferLifecycleReceipt {
             schema: COMPUTE_OFFER_LIFECYCLE_SCHEMA,
             event_id: self.event_id,
@@ -204,7 +204,7 @@ fn validate_replay(
     audit_lifecycle_on(conn, existing)
 }
 
-fn audit_lifecycle_on(conn: &Connection, stored: &StoredLifecycleEvent) -> Result<()> {
+pub(super) fn audit_lifecycle_on(conn: &Connection, stored: &StoredLifecycleEvent) -> Result<()> {
     let previous =
         registered_offer_version_on(conn, &stored.offer_id, stored.previous_offer_version)?
             .ok_or_else(|| anyhow!("Offer 退场前历史版本不存在"))?;
@@ -241,7 +241,7 @@ fn audit_lifecycle_on(conn: &Connection, stored: &StoredLifecycleEvent) -> Resul
     Ok(())
 }
 
-fn lifecycle_by_idempotency_on(
+pub(super) fn lifecycle_by_idempotency_on(
     conn: &Connection,
     scope: &str,
     key: &str,
@@ -253,7 +253,7 @@ fn lifecycle_by_idempotency_on(
     )
 }
 
-fn lifecycle_by_offer_target_on(
+pub(super) fn lifecycle_by_offer_target_on(
     conn: &Connection,
     offer_id: &str,
     target_status: &str,
@@ -306,7 +306,7 @@ fn stored_lifecycle_from_row(row: &Row<'_>) -> rusqlite::Result<StoredLifecycleE
 }
 
 #[allow(clippy::too_many_arguments)]
-fn lifecycle_digest(
+pub(super) fn lifecycle_digest(
     event_id: &str,
     offer_id: &str,
     provider_id: &str,
