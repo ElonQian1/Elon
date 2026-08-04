@@ -54,7 +54,7 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         )
         .route(
             "/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/declared-usage",
-            post(declare_usage),
+            get(get_usage_template).post(declare_usage),
         )
         .route(
             "/api/me/compute/attempt-leases/:lease_id/declared-usage/latest",
@@ -285,6 +285,25 @@ async fn declare_usage(
             &provider_id,
             &lease_id,
             request,
+        ),
+    )
+}
+
+async fn get_usage_template(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, lease_id)): Path<(String, String)>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::get_usage_template_for_provider_owner(
+            &state.store,
+            &user_id,
+            &provider_id,
+            &lease_id,
         ),
     )
 }

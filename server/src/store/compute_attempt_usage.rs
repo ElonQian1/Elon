@@ -21,6 +21,9 @@ use super::{
 };
 
 mod support;
+mod template;
+
+pub(crate) use template::ComputeAttemptUsageTemplateReceipt;
 
 use support::{
     build_contract, build_readings, declaration_by_idempotency_on, declaration_by_sequence_on,
@@ -271,10 +274,31 @@ fn ensure_live_running_lease(
     input: &DeclareComputeAttemptUsageRequest,
     current: &StoredLeaseState,
 ) -> Result<()> {
-    let provider = current_registered_provider_on(conn, &input.provider_id)?
+    ensure_live_running_lease_owner(
+        conn,
+        &input.provider_id,
+        &input.declared_by_user_id,
+        current,
+    )?;
+    if current.lease_revision != input.expected_lease_revision
+        || current.lease_digest != input.expected_lease_digest
+        || current.lease.fencing_generation != input.expected_fencing_generation
+    {
+        bail!("用量声明必须绑定当前 running Lease 的精确版本、摘要和 fencing 代次");
+    }
+    Ok(())
+}
+
+fn ensure_live_running_lease_owner(
+    conn: &rusqlite::Connection,
+    provider_id: &str,
+    user_id: &str,
+    current: &StoredLeaseState,
+) -> Result<()> {
+    let provider = current_registered_provider_on(conn, provider_id)?
         .ok_or_else(|| anyhow!("Attempt Lease Provider 不存在"))?;
-    if provider.provider.owner_account_id != input.declared_by_user_id
-        || current.provider_id != input.provider_id
+    if provider.provider.owner_account_id != user_id
+        || current.provider_id != provider_id
         || !matches!(
             provider.provider.status.as_str(),
             PROVIDER_STATUS_ACTIVE | PROVIDER_STATUS_DRAINING
@@ -282,13 +306,8 @@ fn ensure_live_running_lease(
     {
         bail!("只有当前 Provider 所有者可为 active/draining Provider 声明用量");
     }
-    if current.lease_revision != input.expected_lease_revision
-        || current.lease_digest != input.expected_lease_digest
-        || current.lease.fencing_generation != input.expected_fencing_generation
-        || current.lease.status != ATTEMPT_STATUS_RUNNING
-        || current.lease.last_heartbeat_at.is_none()
-    {
-        bail!("用量声明必须绑定当前 running Lease 的精确版本、摘要和 fencing 代次");
+    if current.lease.status != ATTEMPT_STATUS_RUNNING || current.lease.last_heartbeat_at.is_none() {
+        bail!("只有已心跳的当前 running Lease 可以读取或追加用量声明");
     }
     let now = Utc::now();
     let expires_at = DateTime::parse_from_rfc3339(&current.lease.expires_at)?.with_timezone(&Utc);

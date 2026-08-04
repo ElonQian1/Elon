@@ -138,6 +138,103 @@ export interface ComputeAttemptAbortReceipt {
   replayed: boolean
 }
 
+export interface ComputeOutputContract {
+  media_type: string
+  max_output_bytes: number
+  streaming: boolean
+  result_artifact_required: boolean
+  deterministic_digest_expected: boolean
+}
+
+export interface ComputeAttemptUsageTemplateReceipt {
+  schema: string
+  lease_id: string
+  provider_id: string
+  lease_revision: number
+  lease_digest: string
+  fencing_generation: number
+  task_kind: string
+  output_contract: ComputeOutputContract
+  next_sequence_no: number
+  meters: Array<{ meter: string; reserved_quantity: number; previous_cumulative_quantity: number }>
+  latest_snapshot: { snapshot_id: string; sequence_no: number; cumulative_usage_digest: string } | null
+  read_effect: 'none'
+}
+
+export interface DeclareComputeAttemptUsageBody {
+  expected_lease_revision: number
+  expected_lease_digest: string
+  expected_fencing_generation: number
+  sequence_no: number
+  executor_usage_ref: string
+  cumulative_declared_usage: Array<{ meter: string; cumulative_quantity: number }>
+  idempotency_key: string
+  confirm_provider_declaration_only: true
+}
+
+export interface ComputeAttemptUsageDeclarationReceipt {
+  snapshot_id: string
+  lease_id: string
+  sequence_no: number
+  cumulative_declared_usage: Array<{ meter: string; quantity: number; reading_digest: string; observed_at: string }>
+  cumulative_usage_digest: string
+  overage_meters: string[]
+  event_digest: string
+  declared_at: string
+  verification_status: string
+  execution_effect: string
+  money_effect: string
+  replayed: boolean
+}
+
+export interface ComputeDeclaredResultArtifactInput {
+  artifact_id: string
+  digest_algorithm: 'sha256'
+  digest: string
+  media_type: string
+  size_bytes: number
+  location_ref: string
+  encryption_profile: string | null
+}
+
+export interface DeclareComputeAttemptTerminalCandidateBody {
+  expected_lease_revision: number
+  expected_lease_digest: string
+  expected_fencing_generation: number
+  final_usage_snapshot_id: string
+  final_usage_sequence_no: number
+  final_cumulative_usage_digest: string
+  executor_terminal_ref: string
+  outcome: 'succeeded' | 'failed' | 'canceled'
+  reason_code: string
+  diagnostic_ref: string | null
+  output_digest: string | null
+  result_artifacts: ComputeDeclaredResultArtifactInput[]
+  idempotency_key: string
+  confirm_provider_declaration_only: true
+}
+
+export interface ComputeAttemptTerminalCandidateReceipt {
+  terminal_candidate_id: string
+  lease_id: string
+  final_usage_snapshot_id: string
+  final_usage_sequence_no: number
+  final_cumulative_usage_digest: string
+  executor_terminal_ref: string
+  outcome: string
+  reason_code: string
+  diagnostic_ref: string | null
+  output_digest: string | null
+  result_artifacts: ComputeDeclaredResultArtifactInput[]
+  event_digest: string
+  declared_at: string
+  verification_status: string
+  execution_effect: string
+  lease_effect: string
+  money_effect: string
+  replayed: boolean
+}
+
 interface ActivationCandidateResponse {
   attempt_activation_candidates: ComputeReservationReceipt[]
 }
@@ -171,4 +268,14 @@ export const computeExecutionApi = {
     api.post<ComputeAttemptLeaseRenewalReceipt>(`${providerBase(providerId)}/attempt-leases/${encodeURIComponent(lease.lease.lease_id)}/renewals`, body),
   abort: (providerId: string, leaseId: string, body: AbortComputeAttemptBody) =>
     api.post<ComputeAttemptAbortReceipt>(`${providerBase(providerId)}/attempt-leases/${encodeURIComponent(leaseId)}/abort`, body),
+  usageTemplate: (providerId: string, leaseId: string) =>
+    api.get<ComputeAttemptUsageTemplateReceipt>(`${providerBase(providerId)}/attempt-leases/${encodeURIComponent(leaseId)}/declared-usage`),
+  declareUsage: (providerId: string, leaseId: string, body: DeclareComputeAttemptUsageBody) =>
+    api.post<ComputeAttemptUsageDeclarationReceipt>(`${providerBase(providerId)}/attempt-leases/${encodeURIComponent(leaseId)}/declared-usage`, body),
+  latestUsage: (leaseId: string) =>
+    api.get<ComputeAttemptUsageDeclarationReceipt>(`${leaseBase(leaseId)}/declared-usage/latest`),
+  terminalCandidate: (leaseId: string) =>
+    api.get<ComputeAttemptTerminalCandidateReceipt>(`${leaseBase(leaseId)}/terminal-candidate`),
+  declareTerminalCandidate: (providerId: string, leaseId: string, body: DeclareComputeAttemptTerminalCandidateBody) =>
+    api.post<ComputeAttemptTerminalCandidateReceipt>(`${providerBase(providerId)}/attempt-leases/${encodeURIComponent(leaseId)}/terminal-candidate`, body),
 }

@@ -54,8 +54,13 @@
 .leaseFacts strong { overflow: hidden; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .bindings { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
 .bindings span { border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px; color: var(--text-secondary); font-size: 8px; }
+.evidence { display: flex; align-items: center; gap: 7px; margin-top: 8px; border-left: 2px solid #78b7c9; padding: 6px 8px; color: #a8d5df; background: rgba(120,183,201,.05); }
+.evidence > span { min-width: 0; display: grid; gap: 2px; }
+.evidence strong, .evidence small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evidence strong { font-size: 8px; }
+.evidence small { color: var(--text-muted); font-size: 7px; }
 .leaseBody code { display: block; margin-top: 9px; overflow-wrap: anywhere; color: #9fc4f4; font-size: 8px; }
-.leaseBody footer { display: flex; justify-content: flex-end; gap: 6px; margin-top: 11px; }
+.leaseBody footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-top: 11px; }
 .leaseBody footer button[data-tone='danger'] { color: #ffcaca; border-color: rgba(224,92,92,.32); background: rgba(224,92,92,.07); }
 .scopeWarning { margin-top: 10px; border: 1px solid rgba(216,169,79,.25); border-radius: 6px; padding: 8px; color: #efc878; background: rgba(216,169,79,.06); font-size: 8px; }
 .spinning { animation: spin .8s linear infinite; }

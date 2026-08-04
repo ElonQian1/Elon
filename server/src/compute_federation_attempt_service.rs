@@ -6,12 +6,12 @@ use crate::store::{
     ComputeAttemptActivationReceipt, ComputeAttemptConsumerReviewReceipt,
     ComputeAttemptLeaseRenewalReceipt, ComputeAttemptLeaseStateReceipt,
     ComputeAttemptPlatformObservationReceipt, ComputeAttemptTerminalCandidateReceipt,
-    ComputeAttemptUsageDeclarationReceipt, ComputeAttemptVerificationDecisionReceipt,
-    ComputeDeclaredResultArtifactInput, ComputeDeclaredUsageInput, ComputeObservedUsageInput,
-    ComputeReservationRegistrationReceipt, DecideComputeAttemptVerificationRequest,
-    DeclareComputeAttemptTerminalCandidateRequest, DeclareComputeAttemptUsageRequest,
-    ObserveComputeAttemptTerminalCandidateRequest, RenewComputeAttemptLeaseRequest,
-    ReviewComputeAttemptTerminalCandidateRequest, Store,
+    ComputeAttemptUsageDeclarationReceipt, ComputeAttemptUsageTemplateReceipt,
+    ComputeAttemptVerificationDecisionReceipt, ComputeDeclaredResultArtifactInput,
+    ComputeDeclaredUsageInput, ComputeObservedUsageInput, ComputeReservationRegistrationReceipt,
+    DecideComputeAttemptVerificationRequest, DeclareComputeAttemptTerminalCandidateRequest,
+    DeclareComputeAttemptUsageRequest, ObserveComputeAttemptTerminalCandidateRequest,
+    RenewComputeAttemptLeaseRequest, ReviewComputeAttemptTerminalCandidateRequest, Store,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -330,6 +330,15 @@ pub(crate) fn declare_usage_for_provider_owner(
         idempotency_key: request.idempotency_key,
         declared_by_user_id: user_id.to_string(),
     })
+}
+
+pub(crate) fn get_usage_template_for_provider_owner(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    lease_id: &str,
+) -> Result<ComputeAttemptUsageTemplateReceipt> {
+    store.compute_attempt_usage_template(provider_id, user_id, lease_id)
 }
 
 pub(crate) fn get_latest_usage_for_participant(

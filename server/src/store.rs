@@ -309,8 +309,8 @@ pub(crate) use compute_attempt_terminals::{
     DeclareComputeAttemptTerminalCandidateRequest,
 };
 pub(crate) use compute_attempt_usage::{
-    ComputeAttemptUsageDeclarationReceipt, ComputeDeclaredUsageInput,
-    DeclareComputeAttemptUsageRequest,
+    ComputeAttemptUsageDeclarationReceipt, ComputeAttemptUsageTemplateReceipt,
+    ComputeDeclaredUsageInput, DeclareComputeAttemptUsageRequest,
 };
 pub(crate) use compute_attempt_verifications::{
     ComputeAttemptVerificationDecisionReceipt, DecideComputeAttemptVerificationRequest,
