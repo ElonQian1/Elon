@@ -18,6 +18,7 @@ use crate::node_agent_compute_plugin_host::{
 
 mod claim;
 mod read;
+mod recovery;
 mod resolution;
 
 /// One authenticated trusted-time observation paired with the process-owner fence that may later

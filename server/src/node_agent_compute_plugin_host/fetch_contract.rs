@@ -16,10 +16,16 @@ use super::{
     signed_artifact_verification::jcs_sha256_hex,
 };
 
-// Kept private until the outcome/recovery layer can classify every consumed-handle error.
+// Kept private until outcome recovery and file-cursor reconciliation can close every consumed
+// handle error without reusing a stale mutation capability.
+mod recovery;
 mod resolution;
 mod types;
 
+pub(in crate::node_agent_compute_plugin_host) use recovery::{
+    ComputePluginFetchClaimOutcome, ComputePluginFetchClaimOutcomeKind,
+    ComputePluginFetchClaimRecoveryKey, ValidatedComputePluginFetchRecoveryAbortPermit,
+};
 pub(crate) use types::{
     AuthorizedComputePluginDownloadSegment, ComputePluginDownloadSegmentRequest,
 };
