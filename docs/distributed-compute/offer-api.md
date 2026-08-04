@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-本人 Offer 草稿控制面已写入代码，但尚未编译、执行迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它只为当前用户已激活的 Provider 和 CapacityPool 创建服务端规范化 `draft` Offer，不是 Offer 发布、报价生成或算力交易。
+本人 Offer 草稿控制面已写入代码，但尚未编译、执行迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它只为当前用户已激活的 Provider 和 CapacityPool 创建服务端规范化 `draft` Offer，并允许所有者按精确版本撤销未发布草稿；它不是 Offer 发布、报价生成或算力交易。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写入已有 v170 版本化 Offer Registry。服务端从 Provider、Pool 和 Bucket 当前版本生成规范合同、SKU 摘要与 Offer 摘要，调用方不能自行声称 active 状态或改写供给身份。
 
@@ -23,6 +23,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 | POST | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers` | 创建或幂等重放一份规范化 draft Offer |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers?limit=20` | 列出该 Provider/Pool 下的 Offer |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id` | 读取一份 Offer 并重新审计当前投影和历史版本 |
+| POST | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/revoke` | 按精确版本和摘要执行 `draft -> revoked` |
 
 创建请求提供业务意图，包括幂等键、SKU 类别、模型与运行时、资源参数、Bucket 容量、执行限制、授权范围、价格条款与有效期。`confirm_create` 必须为 `true`。
 
@@ -35,6 +36,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 | `compute_create_my_offer_draft` | 显式确认的幂等写入 | 创建服务端规范化 draft Offer |
 | `compute_get_my_offer` | 只读 | 读取本人 Provider/Pool 下一份 Offer |
 | `compute_list_my_offers` | 只读 | 列出本人 Provider/Pool 下的 Offer |
+| `compute_revoke_my_offer_draft` | 显式确认的幂等写入 | 仅撤销本人当前 draft Offer |
 
 ## 4. 创建前置条件
 
@@ -62,6 +64,8 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 
 同一幂等键只能重放同一份规范合同。如果重放请求的业务字段变化，服务端拒绝把稳定 Offer ID 重绑到另一份合同。
 
+撤销要求 `expected_offer_version`、`expected_offer_digest` 和 `confirm_revoke=true`。服务端只允许当前 `draft -> revoked`，以连续下一版本保留不可变历史；对同一前置版本的重放会重新审计撤销前的 draft 摘要。本入口明确拒绝 active、draining、expired 或已被其他合同终结的 Offer。
+
 ## 6. 市场与资金边界
 
 成功响应显式返回 `market_effect: "none"`。本入口不会：
@@ -71,6 +75,8 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 - 创建 Claim/Reservation 或预留容量；
 - 冻结余额、移动资金或触发链上动作；
 - 派发 Attempt、下发节点命令或证明节点在线。
+
+撤销 draft 只关闭未发布意图，不解释为取消 active 供给、退还 Reservation 或触发赔付。
 
 `draft` 只是可审计的商业与容量意图，不是对消费者的可交易承诺。
 
