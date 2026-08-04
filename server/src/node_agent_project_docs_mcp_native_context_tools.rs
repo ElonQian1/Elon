@@ -8,11 +8,13 @@ use std::path::Path;
 use crate::project_document_native_context::{
     list_candidates, record_candidate, ProjectContextEvidence, ProjectContextMemory,
 };
+use crate::project_document_native_context_health::{shared_memory_health, MemoryHealthOptions};
 use crate::project_document_native_context_receipt::{record_attested_receipt, record_receipt};
 
 const RECORD_TOOL: &str = "project_docs_record_native_context_candidate";
 pub(crate) const RECEIPT_TOOL: &str = "project_docs_record_native_context_receipt";
 const LIST_TOOL: &str = "project_docs_list_native_context_candidates";
+const HEALTH_TOOL: &str = "project_docs_check_native_context_memory";
 
 #[derive(Debug, Deserialize)]
 struct CandidateArguments {
@@ -32,6 +34,7 @@ impl CandidateArguments {
             topics: self.topics,
             evidence: self.evidence,
             reviewed_at: String::new(),
+            ..Default::default()
         }
     }
 }
@@ -59,6 +62,18 @@ struct ListArguments {
     limit: usize,
 }
 
+#[derive(Debug, Deserialize)]
+struct HealthArguments {
+    #[serde(default)]
+    offset: usize,
+    #[serde(default = "default_health_limit")]
+    limit: usize,
+    #[serde(default = "default_failure_policy")]
+    failure_policy: String,
+    #[serde(default)]
+    include_capabilities: bool,
+}
+
 pub(crate) fn definitions() -> Vec<Value> {
     vec![
         tool(
@@ -75,6 +90,19 @@ pub(crate) fn definitions() -> Vec<Value> {
                 "properties":{
                     "status":{"type":"string","enum":["pending","reviewed","rejected","applied","all"],"default":"pending"},
                     "limit":{"type":"integer","minimum":1,"maximum":20,"default":10}
+                }
+            }),
+        ),
+        tool(
+            HEALTH_TOOL,
+            "分页检查 Git 共享导航记忆的证据漂移、重定位、owner/scope/review/expiry 生命周期，并返回结构化人工修复计划与可供 CI 使用的建议退出码。诊断不会改文件，也不会返回源码正文。",
+            json!({
+                "type":"object",
+                "properties":{
+                    "offset":{"type":"integer","minimum":0,"maximum":10000,"default":0},
+                    "limit":{"type":"integer","minimum":1,"maximum":200,"default":50},
+                    "failure_policy":{"type":"string","enum":["advisory","fail_on_drift","strict"],"default":"advisory"},
+                    "include_capabilities":{"type":"boolean","default":false,"description":"仅在需要代理/Hook/app-server/Memories 接入矩阵时返回静态能力合同，分页 CI 默认省略以减少响应。"}
                 }
             }),
         ),
@@ -111,6 +139,18 @@ pub(crate) fn try_call(workspace: &Path, name: &str, arguments: Value) -> Result
                 "repository_changed":false,
                 "source_bodies_returned":0
             })))
+        }
+        HEALTH_TOOL => {
+            let input: HealthArguments = serde_json::from_value(arguments)?;
+            Ok(Some(shared_memory_health(
+                workspace,
+                &MemoryHealthOptions {
+                    offset: input.offset,
+                    limit: input.limit,
+                    failure_policy: input.failure_policy,
+                    include_capabilities: input.include_capabilities,
+                },
+            )?))
         }
         _ => Ok(None),
     }
@@ -183,7 +223,24 @@ pub(crate) fn memory_schema() -> Value {
                 "summary":{"type":"string","minLength":12,"maxLength":800},
                 "topics":{"type":"array","minItems":1,"maxItems":8,"items":{"type":"string","maxLength":48}},
                 "evidence":{"type":"array","minItems":1,"maxItems":8,"items":evidence_schema(true)},
-                "reviewed_at":{"type":"string","minLength":1,"maxLength":40,"description":"审核时间或审核 revision；进入共享 manifest 前必填。"}
+                "reviewed_at":{"type":"string","minLength":1,"maxLength":40,"description":"审核 revision；进入共享 manifest 前必填。"},
+                "owner":{"type":"string","maxLength":80,"description":"该导航记忆的维护责任组；旧 manifest 缺失时按空值兼容并由 Memory CI 提醒。"},
+                "scope":{
+                    "type":"object",
+                    "properties":{
+                        "kind":{"type":"string","enum":["repository","paths"],"default":"repository"},
+                        "paths":{"type":"array","maxItems":8,"items":{"type":"string"}}
+                    }
+                },
+                "review":{
+                    "type":"object",
+                    "properties":{
+                        "reviewed_on":{"type":"string","pattern":"^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+                        "reviewed_by":{"type":"string","maxLength":80},
+                        "review_interval_days":{"type":"integer","minimum":0,"maximum":3650,"default":0},
+                        "expires_at":{"type":"string","pattern":"^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}
+                    }
+                }
             }
         }
     })
@@ -257,6 +314,14 @@ fn default_limit() -> usize {
     10
 }
 
+fn default_health_limit() -> usize {
+    50
+}
+
+fn default_failure_policy() -> String {
+    "advisory".to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264,7 +329,7 @@ mod tests {
     #[test]
     fn tools_never_accept_source_bodies() {
         let definitions = definitions();
-        assert_eq!(definitions.len(), 3);
+        assert_eq!(definitions.len(), 4);
         let encoded = serde_json::to_string(&definitions).unwrap();
         assert!(!encoded.contains("source_body"));
         assert!(!encoded.contains("tool_output"));

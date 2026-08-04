@@ -1,7 +1,11 @@
 //! Duplicate and conflict hints against the Git-backed shared memory manifest.
 
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeSet, fs, path::Path};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs,
+    path::Path,
+};
 
 use crate::{
     project_document_governance::{parse_manifest, SECTION_CONFIG_PATH},
@@ -40,6 +44,39 @@ pub(crate) fn is_shared_duplicate(conflicts: &[NativeContextConflict]) -> bool {
     conflicts
         .iter()
         .any(|conflict| conflict.kind == "shared_duplicate")
+}
+
+pub(crate) fn inspect_shared_set(
+    memories: &[ProjectContextMemory],
+) -> BTreeMap<String, Vec<NativeContextConflict>> {
+    let mut conflicts = BTreeMap::<String, Vec<NativeContextConflict>>::new();
+    for (index, memory) in memories.iter().enumerate() {
+        for other in memories.iter().skip(index + 1) {
+            let Some(mut conflict) = classify(memory, other) else {
+                continue;
+            };
+            if conflict.kind == "shared_duplicate" {
+                conflict.kind = "duplicate_shared_fact".to_string();
+            }
+            let reverse = NativeContextConflict {
+                kind: conflict.kind.clone(),
+                shared_candidate_id: memory.candidate_id.clone(),
+                overlapping_paths: conflict.overlapping_paths.clone(),
+            };
+            conflicts
+                .entry(memory.candidate_id.clone())
+                .or_default()
+                .push(conflict);
+            conflicts
+                .entry(other.candidate_id.clone())
+                .or_default()
+                .push(reverse);
+        }
+    }
+    for values in conflicts.values_mut() {
+        values.truncate(4);
+    }
+    conflicts
 }
 
 fn classify(

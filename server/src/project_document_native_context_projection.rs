@@ -1,10 +1,12 @@
 //! Bounded query projection for reviewed project navigation memory.
 
+use chrono::{NaiveDate, Utc};
 use serde_json::{json, Value};
 use std::path::Path;
 
 use crate::{
     project_document_native_context::{validate_evidence_current, ProjectContextMemory},
+    project_document_native_context_conflict::inspect_shared_set,
     project_document_native_context_git::{relocation_candidates_from_index, relocation_index},
 };
 
@@ -36,6 +38,7 @@ pub(crate) fn relevant_memories(
     let mut invalidated = Vec::new();
     let mut invalidated_count = 0usize;
     let mut relocation_cache = None;
+    let shared_conflicts = inspect_shared_set(memories);
     for (score, memory) in ranked.into_iter().take(MAX_VALIDATION_CANDIDATES) {
         if memory.reviewed_at.trim().is_empty() {
             invalidated_count += 1;
@@ -43,6 +46,15 @@ pub(crate) fn relevant_memories(
                 "candidate_id": memory.candidate_id,
                 "reason": "missing_review_receipt",
                 "action": "Review through the project document suggestion/apply flow."
+            }));
+            continue;
+        }
+        if memory_expired(memory) {
+            invalidated_count += 1;
+            invalidated.push(json!({
+                "candidate_id": memory.candidate_id,
+                "reason": "memory_expired",
+                "action": "Reverify the evidence and renew or retire this memory through the reviewed suggestions/apply flow."
             }));
             continue;
         }
@@ -63,11 +75,24 @@ pub(crate) fn relevant_memories(
             }));
             continue;
         }
+        if let Some(conflicts) = shared_conflicts.get(&memory.candidate_id) {
+            invalidated_count += 1;
+            invalidated.push(json!({
+                "candidate_id": memory.candidate_id,
+                "reason": "shared_memory_conflict",
+                "conflicts": conflicts,
+                "action": "Resolve against current source and binding documents through a reviewed replacement; do not inject either conflicting memory."
+            }));
+            continue;
+        }
         selected.push(json!({
             "candidate_id": memory.candidate_id,
             "summary": memory.summary,
             "topics": memory.topics,
             "evidence": memory.evidence,
+            "owner": memory.owner,
+            "scope": memory.scope,
+            "review": memory.review,
             "score": score,
             "authority": "navigation_only",
             "native_verification_required_before_edit": true
@@ -78,7 +103,7 @@ pub(crate) fn relevant_memories(
     }
     let selected_count = selected.len();
     json!({
-        "schema": "elon.project_context_memory.v2",
+        "schema": "elon.project_context_memory.v3",
         "selected": selected,
         "selected_count": selected_count,
         "invalidated": invalidated,
@@ -87,6 +112,11 @@ pub(crate) fn relevant_memories(
         "source_bodies_returned": 0,
         "conflict_rule": "Current files/tests and binding project documents always override this navigation memory."
     })
+}
+
+fn memory_expired(memory: &ProjectContextMemory) -> bool {
+    NaiveDate::parse_from_str(memory.review.expires_at.trim(), "%Y-%m-%d")
+        .is_ok_and(|expires| expires < Utc::now().date_naive())
 }
 
 fn relevance_score(query: &str, memory: &ProjectContextMemory) -> usize {

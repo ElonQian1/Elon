@@ -74,6 +74,9 @@ pub(crate) fn run_stdio() -> Result<()> {
             let _ = fs::remove_dir_all(session_dir);
             Ok(())
         }
+        // Reserved adapter seam. These official lifecycle events are deliberately
+        // not configured until real runtime verification proves a bounded benefit.
+        "SessionStart" | "PreCompact" | "PostCompact" | "SubagentStart" | "SubagentStop" => Ok(()),
         _ => Ok(()),
     }
 }

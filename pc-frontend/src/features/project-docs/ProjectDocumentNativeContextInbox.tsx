@@ -182,16 +182,36 @@ export default function ProjectDocumentNativeContextInbox({
         </button>
       </header>
       {health && (
-        <p className={styles.intro}>共享记忆健康：{health.current_count}/{health.checked_count} 有效
+        <p className={styles.intro}>共享记忆健康：{health.current_count}/{health.checked_count} 可用于导航
           {health.drifted_count > 0 ? ` · ${health.drifted_count} 条漂移` : ''}
           {health.relocation_suggested_count > 0 ? ` · ${health.relocation_suggested_count} 条有重定位建议` : ''}
-          {health.truncated ? ' · 仅检查前 64 条' : ''}。这是诊断结果，不会自动改写证据。</p>
+          {health.expired_count > 0 ? ` · ${health.expired_count} 条过期` : ''}
+          {health.review_overdue_count > 0 ? ` · ${health.review_overdue_count} 条待复核` : ''}
+          {health.governance_incomplete_count > 0 ? ` · ${health.governance_incomplete_count} 条生命周期信息不完整` : ''}
+          {health.potential_conflict_count > 0 ? ` · ${health.potential_conflict_count} 条潜在冲突` : ''}
+          {health.truncated ? ' · 结果已分页' : ''}。Memory CI：{health.policy_outcome.status}，建议退出码 {health.policy_outcome.recommended_exit_code}；诊断不会自动改写证据。</p>
       )}
       {health && (
         <p className={styles.intro}>任务后回执 Hook：{health.receipt_automation.node_policy_enabled ? '节点策略开启' : '节点策略关闭'}；
           {health.receipt_automation.trust_mode === 'codex_non_managed_hook_review'
             ? 'Codex 首次或定义变化后仍需在 /hooks 审核信任'
             : '当前节点未报告信任模式'}；不会绕过 Hook trust。此状态不证明 Hook 已真实执行。</p>
+      )}
+      {health && health.items.some((item) => item.status !== 'current') && (
+        <ul className={styles.evidence} aria-label="共享记忆修复计划">
+          {health.items.filter((item) => item.status !== 'current').slice(0, 3).map((item) => (
+            <li key={item.candidate_id}>
+              <code>{item.candidate_id}</code>
+              <span>{item.repair_plan[0]?.action || '需要人工复核后通过 suggestions/apply 流程更新。'}</span>
+              <small>{item.owner ? `owner ${item.owner}` : '尚未指定 owner'} · 不会自动修复</small>
+            </li>
+          ))}
+        </ul>
+      )}
+      {health && health.capabilities.runtime_observation_status && (
+        <p className={styles.intro}>真实收益观测：{health.capabilities.runtime_observation_status === 'adapter_not_connected'
+          ? '仅有 app-server 事件合同，尚未连接真实观测'
+          : health.capabilities.runtime_observation_status}；项目文档不会读取、复制或备份 Codex 私有 Memories，跨 PC 只使用 Git 已审核共享记忆。</p>
       )}
       <p className={styles.intro}>Codex Desktop/CLI 核对过的短结论先进入这里。接受只会并入现有建议；应用后才进入 Git 共享记忆，且源码优先、hash 漂移立即失效。</p>
       <nav className={styles.filters} aria-label="候选状态">

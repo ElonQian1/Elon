@@ -6,6 +6,7 @@
 //! source bodies.
 
 use anyhow::{bail, Context, Result};
+use chrono::NaiveDate;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -49,6 +50,59 @@ pub(crate) struct ProjectContextMemory {
     pub evidence: Vec<ProjectContextEvidence>,
     #[serde(default)]
     pub reviewed_at: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub owner: String,
+    #[serde(
+        default,
+        skip_serializing_if = "ProjectContextMemoryScope::is_repository"
+    )]
+    pub scope: ProjectContextMemoryScope,
+    #[serde(default, skip_serializing_if = "ProjectContextMemoryReview::is_empty")]
+    pub review: ProjectContextMemoryReview,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ProjectContextMemoryScope {
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub paths: Vec<String>,
+}
+
+impl Default for ProjectContextMemoryScope {
+    fn default() -> Self {
+        Self {
+            kind: "repository".to_string(),
+            paths: Vec::new(),
+        }
+    }
+}
+
+impl ProjectContextMemoryScope {
+    fn is_repository(&self) -> bool {
+        matches!(self.kind.trim(), "" | "repository") && self.paths.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct ProjectContextMemoryReview {
+    #[serde(default)]
+    pub reviewed_on: String,
+    #[serde(default)]
+    pub reviewed_by: String,
+    #[serde(default)]
+    pub review_interval_days: u16,
+    #[serde(default)]
+    pub expires_at: String,
+}
+
+impl ProjectContextMemoryReview {
+    fn is_empty(&self) -> bool {
+        self.reviewed_on.is_empty()
+            && self.reviewed_by.is_empty()
+            && self.review_interval_days == 0
+            && self.expires_at.is_empty()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -259,8 +313,61 @@ fn normalize_memory(mut memory: ProjectContextMemory) -> Result<ProjectContextMe
         .evidence
         .dedup_by(|left, right| left.path == right.path && left.locator == right.locator);
     memory.reviewed_at = bounded_text(&memory.reviewed_at, 40);
+    memory.owner = bounded_text(&memory.owner, 80);
+    memory.scope = normalize_scope(memory.scope)?;
+    memory.review = normalize_review(memory.review)?;
     memory.candidate_id = normalize_or_derive_id(&memory)?;
     Ok(memory)
+}
+
+fn normalize_scope(mut scope: ProjectContextMemoryScope) -> Result<ProjectContextMemoryScope> {
+    scope.kind = match scope.kind.trim() {
+        "" | "repository" => "repository".to_string(),
+        "paths" => "paths".to_string(),
+        _ => bail!("项目导航记忆 scope.kind 仅支持 repository 或 paths"),
+    };
+    scope.paths = scope
+        .paths
+        .into_iter()
+        .map(|path| normalize_document_path(&path))
+        .collect::<Result<Vec<_>>>()?;
+    scope.paths.sort();
+    scope.paths.dedup();
+    if scope.paths.len() > MAX_EVIDENCE_PER_MEMORY {
+        bail!("项目导航记忆 scope.paths 最多 {MAX_EVIDENCE_PER_MEMORY} 条");
+    }
+    if scope.kind == "repository" {
+        scope.paths.clear();
+    } else if scope.paths.is_empty() {
+        bail!("scope.kind=paths 时至少需要一个 scope.paths");
+    }
+    Ok(scope)
+}
+
+fn normalize_review(mut review: ProjectContextMemoryReview) -> Result<ProjectContextMemoryReview> {
+    review.reviewed_on = normalized_date(&review.reviewed_on, "review.reviewed_on")?;
+    review.reviewed_by = bounded_text(&review.reviewed_by, 80);
+    if review.review_interval_days > 3_650 {
+        bail!("项目导航记忆 review_interval_days 不能超过 3650 天");
+    }
+    review.expires_at = normalized_date(&review.expires_at, "review.expires_at")?;
+    if !review.reviewed_on.is_empty()
+        && !review.expires_at.is_empty()
+        && review.expires_at < review.reviewed_on
+    {
+        bail!("项目导航记忆 expires_at 不能早于 reviewed_on");
+    }
+    Ok(review)
+}
+
+fn normalized_date(value: &str, field: &str) -> Result<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(String::new());
+    }
+    NaiveDate::parse_from_str(value, "%Y-%m-%d")
+        .with_context(|| format!("项目导航记忆 {field} 必须是 YYYY-MM-DD"))?;
+    Ok(value.to_string())
 }
 
 fn normalize_evidence(mut evidence: ProjectContextEvidence) -> Result<ProjectContextEvidence> {

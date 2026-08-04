@@ -1,6 +1,7 @@
 //! Session-level Codex hook configuration for the project-memory receipt gate.
 
 use anyhow::{Context, Result};
+use serde_json::{json, Value};
 
 const SKIP_MARKER: &str = "<elon-project-memory-receipt-skip version=\"1\">";
 
@@ -30,6 +31,26 @@ pub(crate) fn codex_config_args() -> Result<Vec<String>> {
     ])
 }
 
+pub(crate) fn capability_manifest() -> Value {
+    json!({
+        "schema": "elon.project_memory_hook_capabilities.v1",
+        "configured_events": ["PostToolUse", "Stop", "SessionEnd"],
+        "recognized_not_configured": [
+            "SessionStart",
+            "PreCompact",
+            "PostCompact",
+            "SubagentStart",
+            "SubagentStop"
+        ],
+        "handler_type": "command",
+        "plugin_bundle_status": "not_installed",
+        "trust_required": true,
+        "trust_bypass_enabled": false,
+        "future_event_behavior": "bounded_noop_until_runtime_verified",
+        "configured_is_not_executed": true
+    })
+}
+
 fn toml_string(value: &str) -> String {
     serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_string())
 }
@@ -47,4 +68,24 @@ fn env_bool(name: &str, default: bool) -> bool {
             _ => default,
         })
         .unwrap_or(default)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn future_lifecycle_events_are_declared_but_not_enabled() {
+        let manifest = capability_manifest();
+        assert!(manifest["configured_events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "PostToolUse"));
+        assert!(manifest["recognized_not_configured"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "PostCompact"));
+    }
 }

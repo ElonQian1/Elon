@@ -1,6 +1,7 @@
 //! Review bridge between local native-agent context candidates and shared suggestions.
 
 use anyhow::{anyhow, bail, Result};
+use chrono::Utc;
 use rusqlite::{params, OptionalExtension};
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, path::Path};
@@ -148,6 +149,16 @@ fn accept_into_suggestions(
     );
     for memory in &mut memories {
         memory.reviewed_at = review_revision.clone();
+        if memory.owner.trim().is_empty() {
+            memory.owner = "project_maintainers".to_string();
+        }
+        memory.scope.kind = "repository".to_string();
+        memory.scope.paths.clear();
+        memory.review.reviewed_on = Utc::now().format("%Y-%m-%d").to_string();
+        memory.review.reviewed_by = "project_document_review_flow".to_string();
+        if memory.review.review_interval_days == 0 {
+            memory.review.review_interval_days = 90;
+        }
     }
 
     let (mut suggestions, current_revision) = load_or_create_suggestions(workspace)?;

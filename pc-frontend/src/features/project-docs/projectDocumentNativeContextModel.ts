@@ -1,5 +1,11 @@
 import { nodeApi } from '../node/localNodeApi'
 
+export {
+  loadNativeContextMemoryHealth,
+  type NativeContextMemoryHealth,
+  type NativeContextMemoryHealthItem,
+} from './projectDocumentNativeContextHealthModel'
+
 export type NativeContextCandidateStatus = 'pending' | 'reviewed' | 'rejected' | 'applied'
 export type NativeContextReviewAction = 'accept' | 'reject' | 'restore'
 export type NativeContextAuthorizationMode = 'git_backed_full' | 'trusted_reversible' | 'review_all' | 'suggestions_only'
@@ -26,6 +32,21 @@ export interface ProjectContextMemory {
   topics: string[]
   evidence: ProjectContextEvidence[]
   reviewed_at: string
+  owner: string
+  scope: ProjectContextMemoryScope
+  review: ProjectContextMemoryReview
+}
+
+export interface ProjectContextMemoryScope {
+  kind: 'repository' | 'paths'
+  paths: string[]
+}
+
+export interface ProjectContextMemoryReview {
+  reviewed_on: string
+  reviewed_by: string
+  review_interval_days: number
+  expires_at: string
 }
 
 export interface NativeContextCandidate extends ProjectContextMemory {
@@ -68,19 +89,6 @@ export interface NativeContextCandidatePage {
   candidates: NativeContextCandidate[]
 }
 
-export interface NativeContextMemoryHealth {
-  checked_count: number
-  current_count: number
-  drifted_count: number
-  relocation_suggested_count: number
-  truncated: boolean
-  receipt_automation: {
-    node_policy_enabled: boolean
-    trust_mode: string
-    trust_bypass_enabled: boolean
-  }
-}
-
 interface NativeContextEnvelope<T> {
   ok: boolean
   result?: T
@@ -119,38 +127,6 @@ export async function listNativeContextCandidates(input: {
   )
   if (!envelope.ok || !envelope.result) throw new Error(envelope.error || '读取原生理解候选失败')
   return sanitizeCandidatePage(envelope.result, input.status, input.offset, input.limit ?? 10)
-}
-
-export async function loadNativeContextMemoryHealth(input: {
-  adminUrl: string
-  projectRoot: string
-}): Promise<NativeContextMemoryHealth> {
-  const envelope = await nodeApi<NativeContextEnvelope<Record<string, unknown>>>(
-    input.adminUrl,
-    '/api/project-docs/native-context/health',
-    {
-      method: 'POST',
-      body: JSON.stringify({ project_root: input.projectRoot }),
-    },
-  )
-  if (!envelope.ok || !envelope.result) throw new Error(envelope.error || '读取共享项目记忆健康状态失败')
-  return {
-    checked_count: safeNumber(envelope.result.checked_count),
-    current_count: safeNumber(envelope.result.current_count),
-    drifted_count: safeNumber(envelope.result.drifted_count),
-    relocation_suggested_count: safeNumber(envelope.result.relocation_suggested_count),
-    truncated: envelope.result.truncated === true,
-    receipt_automation: sanitizeReceiptAutomation(envelope.result.receipt_automation),
-  }
-}
-
-function sanitizeReceiptAutomation(value: unknown): NativeContextMemoryHealth['receipt_automation'] {
-  const automation = value && typeof value === 'object' ? value as Record<string, unknown> : {}
-  return {
-    node_policy_enabled: automation.node_policy_enabled === true,
-    trust_mode: boundedText(automation.trust_mode, 64),
-    trust_bypass_enabled: automation.trust_bypass_enabled === true,
-  }
 }
 
 export async function reviewNativeContextCandidates(input: {
@@ -283,6 +259,28 @@ function sanitizeMemory(value: unknown): ProjectContextMemory | null {
     topics,
     evidence,
     reviewed_at: boundedText(memory.reviewed_at, 40),
+    owner: boundedText(memory.owner, 80),
+    scope: sanitizeMemoryScope(memory.scope),
+    review: sanitizeMemoryReview(memory.review),
+  }
+}
+
+function sanitizeMemoryScope(value: unknown): ProjectContextMemoryScope {
+  const scope = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  const kind = boundedText(scope.kind, 20)
+  return {
+    kind: kind === 'paths' ? 'paths' : 'repository',
+    paths: uniqueStrings(scope.paths, 8, 500).map((path) => path.replace(/\\/g, '/')),
+  }
+}
+
+function sanitizeMemoryReview(value: unknown): ProjectContextMemoryReview {
+  const review = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  return {
+    reviewed_on: boundedText(review.reviewed_on, 10),
+    reviewed_by: boundedText(review.reviewed_by, 80),
+    review_interval_days: safeNumber(review.review_interval_days),
+    expires_at: boundedText(review.expires_at, 10),
   }
 }
 

@@ -274,6 +274,7 @@ mod project_document_maintenance;
 mod project_document_modularity_review;
 mod project_document_native_context;
 mod project_document_native_context_api;
+mod project_document_native_context_capabilities;
 mod project_document_native_context_conflict;
 mod project_document_native_context_git;
 mod project_document_native_context_health;

@@ -47,6 +47,7 @@
 18. 普通视觉和设备分类任务默认直接使用 PWA 或明确的隔离模拟器槽，不探测物理设备。只有用户反馈修改结果不正确或明确要求真机复核时才启用 `realDeviceRequired`；同一 MCP 会话只做一次最长 30 秒准备，离线、占用、遮挡、授权/安装确认、Runtime 失败或超时立即延期且禁止回退冒充。同一节点按设备 serial 独占写入，package 后缀不能绕过；未绑定明确 Runtime 身份时不能只按 projectRoot 猜测。Node-local operation lease 只能作为本机阶段证据，不能冒充跨 PC 全局 lease。
 19. 后台多端设计 schema v1.8 必须显式能力协商：旧节点没有 `ui_get_design_capabilities` 时，现有 CLI/Exec 和旧 UI 工具继续兼容，新持久浏览器、草稿预览、源码绑定候选、Tauri 行为和验证矩阵显示“节点待升级”并失败关闭；不得从仓库版本、PC 前端版本或工具文档推断节点已经安装。升级成功必须回读 `runtimeSchema=yilong-ui-live@1.8.0` 和所需 capability ID；更新不迁移、删除或跨项目复用 `.elon/ui-tuner/headless-design` 会话、草稿、工件或 fixture。预览只改变当前页面且可恢复，源码候选只能在 session 声明的项目源码根内产生并保持 `CANDIDATE`，升级不得替用户自动确认 `BOUND`。
 20. 项目记忆 Hook 与双身份证据必须向后兼容：旧 SQLite 候选缺少 `git_identity`、provenance、conflicts 或 ingest action 时按空值读取并继续用工作区 SHA-256；旧节点没有 `/api/project-docs/native-context/health` 时 PC 收件箱继续加载候选，只隐藏 Memory CI。升级不得导入、复制或删除 `~/.codex/memories`，不得把聊天、prompt、transcript、命令或工具输出写入候选；Hook 临时路径账本不属于节点持久数据或 Git 项目。新节点只能通过 Codex 正式非托管 Hook 信任执行，不能在升级时替用户写入信任记录或绕过 Hook trust。receipt/context/governance 会话 profile 必须与 token 固定，旧 URL 不能通过查询参数提升权限。
+21. 项目记忆生命周期与 Memory CI 必须向后兼容：旧 manifest/建议/SQLite 候选缺少 `owner`、`scope`、`review` 或 `expires_at` 时使用 serde 默认值继续读取，规范化时空 scope 降级为 repository；不得因为升级而批量改写旧 manifest。缺失治理字段只由 advisory health 标记，`fail_on_drift` 只对证据漂移和过期给出失败建议，只有调用方显式选择 `strict` 才把复核逾期、治理缺口或共享事实冲突纳入失败。旧 health 响应缺少 v2 计数、repair plan、capabilities 或 policy outcome 时 PC 按零值/隐藏处理，候选审核仍可用。
 
 ## 配置与缓存迁移合同
 
