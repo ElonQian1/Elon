@@ -43,7 +43,7 @@ struct StoredBrokerReserveReceipt {
     reservation_digest: String,
 }
 
-pub(super) struct BrokerReserveBinding {
+pub(crate) struct BrokerReserveBinding {
     pub budget_reservation_id: String,
     pub budget_reserved_fen: i64,
     pub capacity_claim: ComputeCapacityClaimBinding,
@@ -52,7 +52,7 @@ pub(super) struct BrokerReserveBinding {
     pub reservation_digest: String,
 }
 
-pub(super) fn broker_reserve_binding_on(
+pub(crate) fn broker_reserve_binding_on(
     conn: &Connection,
     reservation_id: &str,
     consumer_account_id: &str,
