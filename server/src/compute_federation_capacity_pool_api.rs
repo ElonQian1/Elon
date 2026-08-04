@@ -30,12 +30,23 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/audit",
             get(audit_pool),
         )
+        .route(
+            "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/ledger-transactions",
+            get(list_ledger_history),
+        )
 }
 
 #[derive(Debug, Deserialize)]
 struct ListQuery {
     #[serde(default = "default_limit")]
     limit: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct LedgerHistoryQuery {
+    #[serde(default = "default_limit")]
+    limit: usize,
+    before_sequence: Option<i64>,
 }
 
 async fn create_pool(
@@ -106,6 +117,28 @@ async fn audit_pool(
         &provider_id,
         &pool_id,
     ))
+}
+
+async fn list_ledger_history(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, pool_id)): Path<(String, String)>,
+    Query(query): Query<LedgerHistoryQuery>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    pool_response(
+        compute_federation_capacity_pool_service::list_ledger_history_for_user(
+            &state.store,
+            &user_id,
+            &provider_id,
+            &pool_id,
+            query.before_sequence,
+            query.limit,
+        ),
+    )
 }
 
 fn authenticated_user(state: &AppState, headers: &HeaderMap) -> Result<String, Response> {

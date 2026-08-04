@@ -32,6 +32,7 @@ mod compute_capacity_claim_rows;
 mod compute_capacity_claim_transitions;
 mod compute_capacity_claims;
 mod compute_capacity_expiry_recovery;
+mod compute_capacity_history_queries;
 mod compute_capacity_ledger;
 mod compute_capacity_pool_epoch;
 mod compute_capacity_pool_guards;
@@ -245,6 +246,10 @@ pub(crate) use compute_capacity_claims::{
 };
 pub(crate) use compute_capacity_expiry_recovery::{
     ComputeCapacityExpiryRecoveryItem, ComputeCapacityExpiryRecoveryReport,
+};
+pub(crate) use compute_capacity_history_queries::{
+    ComputeCapacityLedgerHistoryLeg, ComputeCapacityLedgerHistoryPage,
+    ComputeCapacityLedgerHistoryTransaction,
 };
 pub(crate) use compute_capacity_ledger::{
     AddComputeCapacitySupply, AddComputeCapacitySupplyLine, ComputeCapacityLedgerWriteReceipt,

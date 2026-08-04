@@ -16,7 +16,7 @@ use crate::{
             PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_REGISTERING,
         },
     },
-    store::{ComputeCapacityPoolAuditReport, Store},
+    store::{ComputeCapacityLedgerHistoryPage, ComputeCapacityPoolAuditReport, Store},
 };
 
 const MAX_RESOURCE_PROFILE_BYTES: usize = 32 * 1024;
@@ -118,6 +118,23 @@ pub(crate) fn audit_for_user(
 ) -> Result<ComputeCapacityPoolAuditReport> {
     let pool = owned_pool_for_user(store, user_id, provider_id, pool_id)?;
     store.audit_compute_capacity_pool_epoch(&pool.binding.pool_id, pool.binding.capacity_epoch)
+}
+
+pub(crate) fn list_ledger_history_for_user(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    pool_id: &str,
+    before_sequence: Option<i64>,
+    limit: usize,
+) -> Result<ComputeCapacityLedgerHistoryPage> {
+    let pool = owned_pool_for_user(store, user_id, provider_id, pool_id)?;
+    store.list_compute_capacity_ledger_history(
+        &pool.binding.pool_id,
+        pool.binding.capacity_epoch,
+        before_sequence,
+        limit,
+    )
 }
 
 pub(crate) fn owned_pool_for_user(

@@ -11,6 +11,7 @@ const CREATE_POOL_TOOL: &str = "compute_create_my_capacity_pool";
 const GET_POOL_TOOL: &str = "compute_get_my_capacity_pool";
 const LIST_POOLS_TOOL: &str = "compute_list_my_capacity_pools";
 const AUDIT_POOL_TOOL: &str = "compute_audit_my_capacity_pool";
+const LIST_LEDGER_HISTORY_TOOL: &str = "compute_list_my_capacity_ledger_transactions";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -40,6 +41,16 @@ struct ListArguments {
     limit: usize,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LedgerHistoryArguments {
+    provider_id: String,
+    pool_id: String,
+    #[serde(default = "default_limit")]
+    limit: usize,
+    before_sequence: Option<i64>,
+}
+
 pub(crate) fn definitions() -> Vec<Value> {
     vec![
         tool(
@@ -64,6 +75,12 @@ pub(crate) fn definitions() -> Vec<Value> {
             AUDIT_POOL_TOOL,
             "按不可变账本重新计算本人当前 CapacityPool epoch 的余额，返回健康状态、差异和审计计数；不修改账本或 Pool 状态。",
             pool_schema(),
+            true,
+        ),
+        tool(
+            LIST_LEDGER_HISTORY_TOOL,
+            "分页列出本人当前 CapacityPool epoch 的脱敏账本事务与双分录；不返回消费者、Job、Reservation、主体或幂等信息。",
+            ledger_history_schema(),
             true,
         ),
     ]
@@ -126,6 +143,19 @@ pub(crate) fn call_if_handled(
                 )?,
             )?))
         }
+        LIST_LEDGER_HISTORY_TOOL => {
+            let input: LedgerHistoryArguments = decode(arguments, name)?;
+            Ok(Some(serde_json::to_value(
+                compute_federation_capacity_pool_service::list_ledger_history_for_user(
+                    store,
+                    user_id,
+                    &input.provider_id,
+                    &input.pool_id,
+                    input.before_sequence,
+                    input.limit,
+                )?,
+            )?))
+        }
         _ => Ok(None),
     }
 }
@@ -182,6 +212,20 @@ fn list_schema() -> Value {
         "properties":{
             "provider_id":{"type":"string","minLength":1,"maxLength":160},
             "limit":{"type":"integer","minimum":1,"maximum":100,"default":20}
+        },
+        "additionalProperties":false
+    })
+}
+
+fn ledger_history_schema() -> Value {
+    json!({
+        "type":"object",
+        "required":["provider_id","pool_id"],
+        "properties":{
+            "provider_id":{"type":"string","minLength":1,"maxLength":160},
+            "pool_id":{"type":"string","minLength":1,"maxLength":160},
+            "limit":{"type":"integer","minimum":1,"maximum":100,"default":20},
+            "before_sequence":{"type":"integer","minimum":1}
         },
         "additionalProperties":false
     })
