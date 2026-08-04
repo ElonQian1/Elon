@@ -81,7 +81,7 @@ V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多�
 
 用户需求的持久身份。Job 保存所选 Offer 版本、Price Snapshot、预算和状态，但不等同于某次机器执行。
 
-当前 v172 Registry 已实现 `submitted -> quoted -> reserved -> running -> verification_pending -> settled` 的受限主路径及失败/取消终态，保存当前投影和不可变历史版本。每次写入和读取都会复核 Workload、Provider 范围、消费者预算以及 Offer/Price Snapshot/Provider 历史链；消费者幂等键和 revision/digest CAS 防止重复或并发覆盖。quoted 可以显式刷新锁价选择，离开 quoted 后不得更换。该实现状态为 `implementation_uncompiled`，尚未冻结预算或容量，也未接入 Reservation、Attempt、HTTP 或 Broker。
+当前 v172 Registry 已实现 `submitted -> quoted -> reserved -> running -> verification_pending -> settled` 的受限主路径及失败/取消终态，保存当前投影和不可变历史版本。每次写入和读取都会复核 Workload、Provider 范围、消费者预算以及 Offer/Price Snapshot/Provider 历史链；消费者幂等键和 revision/digest CAS 防止重复或并发覆盖。quoted 可以显式刷新锁价选择，离开 quoted 后不得更换。该实现状态为 `implementation_uncompiled`；HTTP/MCP 可按本人或当前项目读取最新 Job/Reservation 列表与详情，v175/v176 Broker 会组合事务内写入口，但 Job 提交/报价、Attempt 和运行验证尚未接线。
 
 ### ComputeReservation
 
@@ -109,7 +109,7 @@ Receipt 同时绑定 Job、Attempt、Offer、插件摘要、模型摘要、输�
 
 Price Snapshot 冻结报价来源、交付窗口、消费者价格腿、Provider 价格腿、币种/积分单位和费用规则。Settlement Receipt 只引用快照与验证用量，不能回头读取“当前价格”重算历史任务。
 
-当前 v171 Registry 已把规范校验接入不可变快照登记与读取：按快照 ID 精确幂等重放，quote ID 唯一，读取复核历史 Offer，数据库拒绝更新和删除。它只接收已构造快照，尚无价格源/期货曲线、报价生成、HTTP 或 Broker 原子锁定接线。
+当前 v171 Registry 已把规范校验接入不可变快照登记与读取：按快照 ID 精确幂等重放，quote ID 唯一，读取复核历史 Offer，数据库拒绝更新和删除。它只接收已构造快照，尚无价格源/期货曲线、报价生成或 HTTP；v175 本地 Broker 会复核并锁定 Job 已选择的既有快照，但不在 Reserve 事务内生成报价。
 
 ## 5. 标准任务生命周期
 
@@ -169,4 +169,4 @@ Adapter 必须把外部错误归一为稳定错误码，并保存原始 Provider
 
 ## 9. 当前未验证声明
 
-本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；Provider/Offer、Attempt command/events、CapacityPool、Claim/Reservation、账本 reducer 和 v165-v174 schema 都尚未编译或接线，数据库迁移也未执行。文档、合同或 migration 文件存在不代表运行时已经采用这些能力。
+本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；Provider/Offer、Attempt command/events、CapacityPool、Claim/Reservation、账本 reducer、Broker Reserve/Finish、登录用户 HTTP 控制面和 v165-v176 schema 都尚未编译或运行验证，数据库迁移也未执行。文档、合同、路由或 migration 文件存在不代表运行时已经采用这些能力。

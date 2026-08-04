@@ -72,13 +72,13 @@ Transaction 固定 pool、epoch、window、事件类型、幂等键、请求摘�
 2. 重新读取精确 Offer、Provider、授权、交付窗口和价格来源；
 3. 按稳定 meter 顺序对共享 bucket 做条件扣减；
 4. 追加一笔多 meter ledger transaction，创建或推进 Claim；
-5. 同事务冻结消费者预算并创建不可变 PriceSnapshot；
+5. 同事务冻结消费者预算并锁定 Quote 阶段已经登记的不可变 PriceSnapshot；
 6. 创建 Reservation，把 Job 绑定到精确 Offer 与快照；
 7. 写幂等结果并提交。
 
 任何一步失败全部回滚。候选查询、Quote 和 ReadyCapability 只提供观察事实，不能跳过 Reserve 的再次检查。
 
-当前容量 Store 已把 Claim Hold/Finish 拆出不自行提交的事务内 kernel。公开 standalone 方法仍以 `BEGIN IMMEDIATE` 包住 kernel 并负责 commit，但拒绝 Reservation 主体或绑定；v175/v176 Broker 在自己持有的同一事务中调用这些 kernel。Hold V2 摘要固定完整 causal binding，Reservation Claim 强制绑定 Offer、Job 与同主体 Reservation，重放逐字段复核并只接受未到期的初始 held 版本；回执返回账本规范化后的记录与到期时间。Reservation-bound Finish 必须再次提供并核对同一绑定，再从原始 held 事务继承绑定并精确引用它作为因果前序。v175 第一版 Broker 组合余额预授权、Job 登记和 Reservation 登记，预算结果不是 `reserved` 时失败关闭；v176 对尚未激活 Attempt 的 active Reservation 以单一事务完成严格退款、held Claim Release/Expire、Job canceled/failed 和 Reservation released/expired，并写不可变终态回执。其状态为 `implementation_uncompiled`，只覆盖 `platform_balance_cny`，不覆盖运行中任务、实际用量结算或 Attempt。
+当前容量 Store 已把 Claim Hold/Finish 拆出不自行提交的事务内 kernel。公开 standalone 方法仍以 `BEGIN IMMEDIATE` 包住 kernel 并负责 commit，但拒绝 Reservation 主体或绑定；v175/v176 Broker 在自己持有的同一事务中调用这些 kernel。Hold V2 摘要固定完整 causal binding，Reservation Claim 强制绑定 Offer、Job 与同主体 Reservation，重放逐字段复核并只接受未到期的初始 held 版本；回执返回账本规范化后的记录与到期时间。Reservation-bound Finish 必须再次提供并核对同一绑定，再从原始 held 事务继承绑定并精确引用它作为因果前序。v175 第一版 Broker 组合余额预授权、Job 登记和 Reservation 登记，预算结果不是 `reserved` 或缺少余额结果时失败关闭；只有首次创建要求未来到期，首次不可变回执在合同到期或预算后来进入终态后仍按历史语义重放。v176 对尚未激活 Attempt 的 active Reservation 以单一事务完成严格退款、held Claim Release/Expire、Job canceled/failed 和 Reservation released/expired，并写不可变终态回执。其状态为 `implementation_uncompiled`，只覆盖 `platform_balance_cny`，不覆盖运行中任务、实际用量结算或 Attempt。
 
 ## 5. Attempt 与容量
 
@@ -106,7 +106,7 @@ reusable:   issued = available + held + active + retired
 ## 7. 到期、恢复与对账
 
 - Quote hold、Reservation 和 Commitment 都有明确 expires_at；
-- 恢复器按 Claim 而非汇总余额追加 release/expired transaction；standalone 入口拒绝保留的 `compute_reservation` 主体，通用恢复器按 held 账本中真实的 Reservation causal binding 跳过 Broker 管理的 Claim，避免信任主体字符串或在 Broker 之外单独归还容量；
+- 恢复器按 Claim 而非汇总余额追加 release/expired transaction；standalone 入口拒绝保留的 `compute_reservation` 主体，通用容量恢复器按 held 账本中真实的 Reservation causal binding 跳过 Broker 管理的 Claim，通用余额到期器也排除 v175 Broker 回执引用的预授权，避免任一资源腿在统一 Broker 终态之外单独归还；
 - 相同 effect 使用唯一幂等键，不会重复归还；
 - Supply Add/Withdraw 与 Claim Hold/Finish 的 request digest 已由 Store 按版本化字段、排序 bucket 数量和规范 UTC 计算；代码级重放仍返回当前 Claim/余额，尚未保存不可变首次响应，因此不能描述为严格幂等闭环；
 - 账本与余额投影不一致时停止新 Reserve，重放 ledger 重建投影并形成审计报告；
@@ -118,4 +118,4 @@ reusable:   issued = available + held + active + retired
 
 ## 9. 当前实现边界
 
-2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v176 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、窗口与 TTL 有界的 Claim hold、Claim-local held-only 释放/到期、Supply/Claim 四类写入的 Store-canonical request digest、双分录落库、余额 CAS、Claim 历史、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、Provider/Offer/Price Snapshot/Job/Reservation 注册和历史审计。Claim Hold/Finish 形成调用方事务内 kernel：Hold V2 固定完整 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承原 held 绑定，通用恢复器按真实绑定跳过 Broker Claim。v175 Broker 以不可变回执把平台人民币余额预授权、容量 Hold、pending/active Reservation 和 quoted/reserved Job 统一为一个原子 Reserve，并拒绝非 `reserved` 预算结果。v176 在 Attempt 尚未激活时，以另一不可变回执把退款、held 容量归还和 Job/Reservation 终态统一为一个原子 Finish。上述路径状态为 `implementation_uncompiled`，尚未执行迁移、调度、并发验证或真实容量操作；Attempt 激活、运行中任务与实际用量结算、通用不可变 Claim 首次响应、受控自动修复和运行协议仍未写入或接线。
+2026-08-04 本文与 ADR 已接受；领域合同、checked-i128 reducer、v165-v176 SQLite schema，以及隔离的本地 Store 已经形成。Store 当前覆盖池版本与 bucket 登记、多 meter 供给发行/撤出、窗口与 TTL 有界的 Claim hold、Claim-local held-only 释放/到期、Supply/Claim 四类写入的 Store-canonical request digest、双分录落库、余额 CAS、Claim 历史、只读账本重算、有界到期批处理、状态门卫、追加式生命周期、排空后的 epoch 轮换、Provider/Offer/Price Snapshot/Job/Reservation 注册和历史审计。Claim Hold/Finish 形成调用方事务内 kernel：Hold V2 固定完整 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承原 held 绑定，通用恢复器按真实绑定跳过 Broker Claim。v175 Broker 以不可变回执把平台人民币余额预授权、容量 Hold、pending/active Reservation 和 quoted/reserved Job 统一为一个原子 Reserve，并拒绝非 `reserved` 或缺少余额结果的预算结果；首次回执在到期后仍可按不可变历史语义重放。v176 在 Attempt 尚未激活时，以另一不可变回执把退款、held 容量归还和 Job/Reservation 终态统一为一个原子 Finish。通用余额释放与到期器排除 Broker 预算，只允许 v176 严格入口按精确预授权 ID 退款。上述路径状态为 `implementation_uncompiled`，尚未执行迁移、调度、并发验证或真实容量操作；Attempt 激活、运行中任务与实际用量结算、通用不可变 Claim 首次响应、受控自动修复和运行协议仍未写入或接线。

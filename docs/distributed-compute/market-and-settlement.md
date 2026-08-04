@@ -81,7 +81,7 @@ Reservation 必须绑定不可变快照，至少包含：
 
 所有价格使用 `i64/u64` 微单位，比例使用 basis points；禁止 `f32/f64`。历史任务永远引用原快照，不因未来曲线变化而重算。
 
-2026-08-04 已形成 v171 不可变 Price Snapshot Registry：合同校验会核验快照与 active Offer、Provider、SKU、交付窗口和价格条款的精确绑定，约束 trade/index/mark/fallback 来源及观察窗口，并用 checked `i128` 检查整数金额上限。Store 可登记和读取完整快照；相同快照 ID 只能精确重放，quote ID 唯一，读取会按历史 Offer 复核摘要与索引字段，数据库触发器拒绝更新和删除。当前 Registry 只接收已构造快照，没有价格源注册、期货曲线、报价生成、HTTP 或 Broker 原子锁价接线。
+2026-08-04 已形成 v171 不可变 Price Snapshot Registry：合同校验会核验快照与 active Offer、Provider、SKU、交付窗口和价格条款的精确绑定，约束 trade/index/mark/fallback 来源及观察窗口，并用 checked `i128` 检查整数金额上限。Store 可登记和读取完整快照；相同快照 ID 只能精确重放，quote ID 唯一，读取会按历史 Offer 复核摘要与索引字段，数据库触发器拒绝更新和删除。v175 本地 Broker 会复核并锁定 quoted Job 已选择的既有 CNY 快照；Registry 仍没有价格源注册、期货曲线、报价生成或 HTTP。
 
 ## 7. 双价格腿与平台价差
 

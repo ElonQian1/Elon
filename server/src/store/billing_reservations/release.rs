@@ -73,6 +73,11 @@ fn release_billing_call_on(
     if expected_reservation_id.is_some_and(|value| value != existing.reservation_id.as_str()) {
         bail!("Broker 余额预授权 ID 与原子预留回执不一致");
     }
+    if expected_reservation_id.is_none()
+        && is_compute_broker_reservation_on(tx, &existing.reservation_id)?
+    {
+        return Ok(None);
+    }
     if existing.status != "reserved" {
         if strict_replay
             && existing.status == release_status
@@ -111,6 +116,18 @@ fn release_billing_call_on(
         status: release_status.to_string(),
         deduplicated: false,
     }))
+}
+
+fn is_compute_broker_reservation_on(tx: &Transaction<'_>, reservation_id: &str) -> Result<bool> {
+    tx.query_row(
+        "SELECT 1 FROM compute_broker_reserve_receipts
+          WHERE budget_reservation_id=?1 LIMIT 1",
+        params![reservation_id],
+        |_| Ok(()),
+    )
+    .optional()
+    .map(|value| value.is_some())
+    .map_err(Into::into)
 }
 
 struct ExistingBillingRelease {

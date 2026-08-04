@@ -60,9 +60,11 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 - 登录用户与 Job 消费者不一致时拒绝。
 - 项目 MCP 的 Job 不属于当前项目时拒绝。
 - Job、Reservation、Offer、Price Snapshot、Claim 或余额历史绑定不一致时拒绝。
-- Reserve 不是完整 `reserved` 结果时整笔事务回滚。
+- Reserve 不是完整 `reserved` 结果或缺少余额结果时整笔事务回滚。
 - Finish 遇到 active Claim 或已经启动的 Attempt 时拒绝。
 - 同一 ID 或幂等键只允许相同规范请求重放。
+- 只有首次 Reserve 要求未来到期；不可变首次回执在合同到期或预算后来进入终态后仍按历史语义重放，不依赖余额表的可变到期字段。
+- 通用余额释放和到期器跳过 Broker 管理的预授权；只有核对精确预授权 ID 的 Broker Finish 可以退款，避免预算、容量、Job 与 Reservation 被拆成单腿终态。
 - 当前接口不接受客户端传入用户身份、终态时间、币种或任意退款金额。
 
 ## 6. 尚未实现

@@ -250,11 +250,15 @@ impl Store {
         let tx = conn.unchecked_transaction()?;
         let rows = {
             let mut stmt = tx.prepare(
-                "SELECT id, user_id, reserved_fen
-                 FROM billing_reservations
-                 WHERE status = 'reserved'
-                   AND expires_at IS NOT NULL
-                   AND expires_at < ?1",
+                "SELECT b.id, b.user_id, b.reserved_fen
+                 FROM billing_reservations AS b
+                 WHERE b.status = 'reserved'
+                   AND b.expires_at IS NOT NULL
+                   AND b.expires_at < ?1
+                   AND NOT EXISTS (
+                     SELECT 1 FROM compute_broker_reserve_receipts AS broker
+                      WHERE broker.budget_reservation_id = b.id
+                   )",
             )?;
             let mapped = stmt.query_map(params![&ts], |row| {
                 Ok((

@@ -31,7 +31,8 @@ use super::super::{
 use super::{
     receipt::persist_broker_reserve_receipt_on,
     validation::{
-        broker_compute_call_id, cny_micros_to_fen, timestamp_after, NormalizedBrokerReserveRequest,
+        broker_compute_call_id, cny_micros_to_fen, ensure_future_expiry, timestamp_after,
+        NormalizedBrokerReserveRequest,
     },
     ComputeBrokerReservationReceipt, BROKER_BILLING_FEATURE, BROKER_BILLING_USAGE_MODE,
 };
@@ -40,6 +41,7 @@ pub(super) fn reserve_new_broker_contract_on(
     conn: &Transaction<'_>,
     request: &NormalizedBrokerReserveRequest,
 ) -> Result<ComputeBrokerReservationReceipt> {
+    ensure_future_expiry(&request.expires_at)?;
     let source_job = current_registered_job_on(conn, &request.job_id)?
         .ok_or_else(|| anyhow!("Broker 绑定的算力 Job 不存在"))?;
     ensure_source_job_matches(request, &source_job)?;
@@ -86,7 +88,7 @@ pub(super) fn reserve_new_broker_contract_on(
         },
         &request.expires_at,
     )?;
-    if budget.status != "reserved" {
+    if budget.status != "reserved" || budget.balance_after_fen.is_none() {
         bail!("Broker 平台人民币余额预授权未进入 reserved 状态");
     }
 

@@ -287,8 +287,14 @@ fn audit_stored_receipt_on(
         || billing.compute_call_id != broker_compute_call_id(&stored.reservation_id)
         || billing.feature != BROKER_BILLING_FEATURE
         || billing.usage_mode != BROKER_BILLING_USAGE_MODE
+        || billing.model.as_deref()
+            != source_job
+                .job
+                .workload
+                .model
+                .as_ref()
+                .map(|value| value.model_id.as_str())
         || billing.reserved_fen != stored.budget_reserved_fen
-        || billing.expires_at.as_deref() != Some(request.expires_at.as_str())
     {
         bail!("Broker 原子预留回执的历史绑定审计失败");
     }
@@ -300,14 +306,14 @@ struct BillingContract {
     compute_call_id: String,
     feature: String,
     usage_mode: String,
+    model: Option<String>,
     reserved_fen: i64,
-    expires_at: Option<String>,
 }
 
 fn billing_contract_on(conn: &Connection, reservation_id: &str) -> Result<Option<BillingContract>> {
     conn.query_row(
         "SELECT user_id, compute_call_id, feature, usage_mode,
-                reserved_fen, expires_at
+                model, reserved_fen
            FROM billing_reservations WHERE id=?1",
         params![reservation_id],
         |row| {
@@ -316,8 +322,8 @@ fn billing_contract_on(conn: &Connection, reservation_id: &str) -> Result<Option
                 compute_call_id: row.get(1)?,
                 feature: row.get(2)?,
                 usage_mode: row.get(3)?,
-                reserved_fen: row.get(4)?,
-                expires_at: row.get(5)?,
+                model: row.get(4)?,
+                reserved_fen: row.get(5)?,
             })
         },
     )

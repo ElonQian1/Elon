@@ -62,7 +62,7 @@ pub(super) fn normalize_broker_reserve_request(
         }
     }
     reserved_capacity.sort_by(|left, right| left.meter.cmp(&right.meter));
-    let expires_at = canonical_future_utc(&request.expires_at)?;
+    let expires_at = canonical_utc(&request.expires_at)?;
     let canonical = CanonicalBrokerReserveRequest {
         schema: BROKER_RESERVE_REQUEST_SCHEMA,
         reservation_id: &reservation_id,
@@ -113,6 +113,15 @@ pub(super) fn broker_compute_call_id(reservation_id: &str) -> String {
     format!("compute_broker:{reservation_id}")
 }
 
+pub(super) fn ensure_future_expiry(value: &str) -> Result<()> {
+    let parsed =
+        DateTime::parse_from_rfc3339(value).context("Broker Reservation 到期时间不是 RFC3339")?;
+    if parsed <= Utc::now() {
+        bail!("Broker Reservation 到期时间必须晚于当前时间");
+    }
+    Ok(())
+}
+
 fn required(label: &str, value: &str, max_len: usize) -> Result<String> {
     let normalized = value.trim();
     if normalized.is_empty()
@@ -124,11 +133,11 @@ fn required(label: &str, value: &str, max_len: usize) -> Result<String> {
     Ok(normalized.to_string())
 }
 
-fn canonical_future_utc(value: &str) -> Result<String> {
+fn canonical_utc(value: &str) -> Result<String> {
     let parsed = DateTime::parse_from_rfc3339(value.trim())
         .context("Broker Reservation 到期时间不是 RFC3339")?;
-    if parsed.offset().local_minus_utc() != 0 || parsed <= Utc::now() {
-        bail!("Broker Reservation 到期时间必须使用 UTC 且晚于当前时间");
+    if parsed.offset().local_minus_utc() != 0 {
+        bail!("Broker Reservation 到期时间必须使用 UTC");
     }
     Ok(parsed.with_timezone(&Utc).to_rfc3339())
 }
