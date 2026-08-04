@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/updateSheetRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_update_sheet"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="28dp">
+
+    <View
+        android:layout_width="36dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:background="@drawable/bg_update_info"
+        android:importantForAccessibility="no" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:fontFamily="sans-serif-medium"
+        android:includeFontPadding="false"
+        android:text="应用更新"
+        android:textColor="@color/elon_text_accent"
+        android:textSize="12sp" />
+
+    <TextView
+        android:id="@+id/updateTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:fontFamily="sans-serif-medium"
+        android:includeFontPadding="false"
+        android:text="发现新版本"
+        android:textColor="@color/elon_text_primary"
+        android:textSize="24sp" />
+
+    <TextView
+        android:id="@+id/updateVersionMeta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:includeFontPadding="false"
+        android:textColor="@color/elon_text_secondary"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <View
+            android:id="@+id/updateStatusDot"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:background="@drawable/bg_update_status_dot"
+            android:importantForAccessibility="no" />
+
+        <TextView
+            android:id="@+id/updateStatusText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:includeFontPadding="false"
+            android:textColor="@color/elon_text_primary"
+            android:textSize="15sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/updateProgressGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_update_info"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:id="@+id/updateProgress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="6dp"
+            android:indeterminateTint="@color/elon_button_primary_bg"
+            android:max="100"
+            android:progressBackgroundTint="@color/elon_surface_soft"
+            android:progressTint="@color/elon_button_primary_bg" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/updateProgressPercent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:includeFontPadding="false"
+                android:textColor="@color/elon_text_primary"
+                android:textSize="17sp" />
+
+            <TextView
+                android:id="@+id/updateProgressDetail"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_weight="1"
+                android:gravity="end"
+                android:includeFontPadding="false"
+                android:textColor="@color/elon_text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/updateSourceText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:includeFontPadding="false"
+            android:textColor="@color/elon_text_tertiary"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/updateChangelogGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_update_info"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:includeFontPadding="false"
+            android:text="本次更新"
+            android:textColor="@color/elon_text_primary"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/updateChangelog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:includeFontPadding="false"
+            android:lineSpacingExtra="3dp"
+            android:maxLines="5"
+            android:textColor="@color/elon_text_secondary"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/updatePrimaryButton"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="22dp"
+        android:background="@drawable/bg_update_primary"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:textColor="@color/elon_button_primary_text"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/updateSecondaryButton"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/bg_update_secondary"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:textColor="@color/elon_text_secondary"
+        android:textSize="14sp" />
+
+</LinearLayout>

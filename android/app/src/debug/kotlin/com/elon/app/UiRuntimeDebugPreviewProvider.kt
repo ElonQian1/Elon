@@ -24,6 +24,7 @@ class UiRuntimeDebugPreviewProvider : ContentProvider() {
     override fun onCreate(): Boolean {
         UiRuntimePreviewRegistry.register(viewGalleryScenario())
         UiRuntimePreviewRegistry.register(socialSidebarScenario())
+        UiRuntimePreviewRegistry.register(appUpdatePreviewScenario())
         UiRuntimePreviewRegistry.register(defaultComposeRuntimePreviewScenario())
         return true
     }

@@ -86,7 +86,7 @@ internal class MainCreateActions(
     fun handleLaunchIntent(intent: Intent?) {
         if (intent?.getBooleanExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE, false) == true) {
             intent.removeExtra(TaskWorkService.EXTRA_SHOW_APP_UPDATE)
-            AppUpdateManager(activity).realtimeCheck()
+            AppUpdateManager(activity).openFromNotification()
         }
         val projectId = intent?.getStringExtra(EXTRA_OPEN_PROJECT_SPACE_ID)?.trim().orEmpty()
         if (projectId.isNotBlank()) {

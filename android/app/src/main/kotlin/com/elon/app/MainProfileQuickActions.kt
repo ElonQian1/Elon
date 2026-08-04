@@ -2,14 +2,16 @@ package com.elon.app
 
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.elon.app.databinding.ActivityMainBinding
+import com.elon.app.update.AppUpdateManager
 import okhttp3.OkHttpClient
 
 internal class MainProfileQuickActions(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
     private val http: OkHttpClient,
-    private val serverVersionUrl: String,
     private val serverUrl: String,
     private val isBindingInitialized: () -> Boolean,
     private val refreshAccountUi: () -> Unit,
@@ -42,6 +44,19 @@ internal class MainProfileQuickActions(
     private val myNodesCard by lazy { MyNodesCard(activity, binding, http, serverUrl) }
     private val userMemoriesCard by lazy { UserMemoriesCard(activity, binding, http, serverUrl) }
     private var nodeResourceExpanded = false
+    private val stopObservingUpdate = AppUpdateManager.observeProfileStatus(activity) { status ->
+        activity.runOnUiThread {
+            if (isBindingInitialized()) binding.profileVersionText.text = status
+        }
+    }
+
+    init {
+        activity.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                stopObservingUpdate()
+            }
+        })
+    }
 
     fun setupQuickActions() {
         MainQuickActionBindings(
@@ -61,9 +76,7 @@ internal class MainProfileQuickActions(
         setupNodeResourcePanel()
         refreshAccountUi()
         refreshProfileSummary()
-        binding.profileVersionText.text =
-            "${localAppVersionLine()}\n服务器版本读取中..."
-        refreshServerVersion()
+        refreshUpdateStatus()
     }
 
     fun refreshProfileSummary() {
@@ -81,20 +94,18 @@ internal class MainProfileQuickActions(
                 refreshNodeResourceCards()
             }
             userMemoriesCard.attachAndRefresh()
+            refreshUpdateStatus()
         }
     }
 
-    fun refreshServerVersion() {
-        Thread {
-            val info = fetchServerVersionInfo(http, serverVersionUrl)
-            val serverLine = info?.let { serverVersionLine(it) } ?: "服务器版本暂不可用"
-            activity.runOnUiThread {
-                if (isBindingInitialized()) {
-                    binding.profileVersionText.text = "${localAppVersionLine()}\n$serverLine"
-                }
-            }
-        }.start()
+    private fun refreshUpdateStatus() {
+        if (isBindingInitialized()) {
+            binding.profileVersionText.text = AppUpdateManager.profileStatusLine(activity)
+        }
     }
+
+    /** 保留导航控制器的旧入口名；个人页这里现在展示的是 APK 更新状态。 */
+    fun refreshServerVersion() = refreshUpdateStatus()
 
     private fun setupNodeResourcePanel() {
         binding.profileNodeResourceHeader.setOnClickListener {

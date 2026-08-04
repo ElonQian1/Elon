@@ -4769,7 +4769,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           <span class="profile-action-icon" aria-hidden="true">
             <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4v13m0 0-5-5m5 5 5-5"/><path d="M6 19v4a4 4 0 0 0 4 4h12a4 4 0 0 0 4-4v-4"/></svg>
           </span>
-          <span class="profile-action-copy"><span class="profile-action-title">检测更新</span><span class="profile-version" id="versionText">一龙网页版</span></span>
+          <span class="profile-action-copy"><span class="profile-action-title">APK 安装包</span><span class="profile-version" id="versionText">网页版自动更新 · 正在读取 APK 版本</span></span>
           <span class="profile-action-chevron" aria-hidden="true">›</span>
           <span class="hidden" id="updateArrow"></span>
         </button>
@@ -9675,10 +9675,10 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
     try {
       const res = await fetch('/app/version.json');
       const data = await res.json();
-      versionText.textContent = '一龙 · 当前版本 v' + (data.version_name || data.version || '?') +
-        ' (build ' + (data.version_code || data.build || '?') + ')';
+      versionText.textContent = 'APK v' + (data.version_name || data.version || '?') +
+        ' · 网页版已自动更新';
     } catch {
-      versionText.textContent = '一龙网页版';
+      versionText.textContent = '网页版已自动更新 · APK 版本暂不可用';
     }
   }
 
@@ -11028,17 +11028,17 @@ __UI_TUNER_PWA_AUTH_BOOTSTRAP_JS__
   // ====== 检查更新 ======
   checkUpdateRow.addEventListener('click', async () => {
     updateArrow.textContent = '检查中…';
-    versionText.textContent = '正在检查更新…';
+    versionText.textContent = '正在读取 APK 发布版本…';
     try {
       const res = await fetch('/app/version.json');
       const data = await res.json();
       const v = data.version_name || data.version || '?';
       const b = data.version_code || data.build || '?';
       updateArrow.textContent = '最新 v' + v + ' (' + b + ')';
-      versionText.textContent = '一龙 v' + v + ' (build ' + b + ')';
+      versionText.textContent = 'APK v' + v + ' · 网页版已自动更新';
     } catch {
       updateArrow.textContent = '检查失败';
-      versionText.textContent = '检查失败，请稍后重试';
+      versionText.textContent = '网页版已自动更新 · APK 版本暂不可用';
     }
   });
 

@@ -129,7 +129,6 @@ class MainActivity : AppCompatActivity() {
     }
     private val apkDownloadUrl: String get() = "$serverUrl/app/ElonSpeed-latest.apk"
     private val apkDownloadPageUrl: String get() = "$serverUrl/app/download"
-    private val serverVersionUrl: String get() = "$serverUrl/api/server/version"
     private var homeRows: MainHomeRows? = null
     private var stageHintShimmer: MainStageHintShimmer? = null
     private var actionPopup: PopupWindow? = null
@@ -390,6 +389,7 @@ class MainActivity : AppCompatActivity() {
         val gws = (application as ElonApplication).globalWs
         gws.addListener(globalWsListener)
         gws.start(this)
+        AppUpdateManager(this).resumeCheck()
         if (::binding.isInitialized) {
             homeListActions.renderConversationList()
             profileQuickActions.refreshProfileSummary()
@@ -1280,7 +1280,6 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             http = s.http,
-            serverVersionUrl = serverVersionUrl,
             serverUrl = serverUrl,
             isBindingInitialized = { ::binding.isInitialized },
             refreshAccountUi = {
