@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, Banknote, Bot, Boxes, CircleDollarSign, ClipboardCheck, FileCheck2, Gauge, Gavel, GitBranch, HardDrive, Landmark, LockKeyhole, MonitorCog, PackageCheck, Radar, ReceiptText, Scale, Search, ShieldCheck, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
+import { Activity, Banknote, Bot, Boxes, CircleDollarSign, CircleMinus, ClipboardCheck, FileCheck2, Gauge, Gavel, GitBranch, HardDrive, Landmark, LockKeyhole, MonitorCog, PackageCheck, Radar, ReceiptText, Scale, Search, ShieldCheck, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -73,6 +73,10 @@ const CHALLENGE_RESOLUTION_ITEM: RailItem = {
   path: '/compute-challenge-resolution', Icon: Gavel, label: '申诉裁决', color: '#3b2c28', hoverColor: '#503a34',
 }
 
+const SETTLEMENT_CORRECTION_ITEM: RailItem = {
+  path: '/compute-corrections', Icon: CircleMinus, label: '结算纠正', color: '#3b292b', hoverColor: '#503438',
+}
+
 export default function ServerRail() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -81,7 +85,7 @@ export default function ServerRail() {
   const presence = useMyPresence(!localMode)
   const [tooltip, setTooltip] = useState<{ text: string; y: number } | null>(null)
   const railItems = user && ['admin', 'owner'].includes(user.role ?? '')
-    ? [...RAIL_ITEMS, ACTIVATION_ITEM, OFFER_ITEM, OBSERVATION_ITEM, VERIFICATION_ITEM, RECEIPT_ITEM, FINALIZATION_ITEM, SETTLEMENT_ISSUANCE_ITEM, CHALLENGE_RESOLUTION_ITEM, SETTLEMENT_ITEM]
+    ? [...RAIL_ITEMS, ACTIVATION_ITEM, OFFER_ITEM, OBSERVATION_ITEM, VERIFICATION_ITEM, RECEIPT_ITEM, FINALIZATION_ITEM, SETTLEMENT_ISSUANCE_ITEM, CHALLENGE_RESOLUTION_ITEM, SETTLEMENT_CORRECTION_ITEM, SETTLEMENT_ITEM]
     : RAIL_ITEMS
 
   // 项目列表（从 store 读取，实时响应）

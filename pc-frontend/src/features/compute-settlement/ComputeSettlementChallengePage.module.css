@@ -60,6 +60,15 @@
 .textField > span { display: flex; justify-content: space-between; gap: 8px; color: var(--text-muted); font-size: 8px; }
 .textField small { color: #9fc4f4; font-size: 8px; }
 .textField textarea { width: 100%; resize: vertical; border: 1px solid var(--border); border-radius: 5px; padding: 8px 9px; color: var(--text-primary); background: var(--bg-base); font: inherit; font-size: 9px; line-height: 1.5; }
+.numberGrid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.numberGrid label { min-width: 0; display: grid; gap: 6px; color: var(--text-muted); font-size: 8px; }
+.numberGrid input { min-width: 0; height: 36px; border: 1px solid var(--border); border-radius: 5px; padding: 0 9px; color: var(--text-primary); background: var(--bg-base); font: inherit; font-size: 9px; }
+.preview { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.preview span { min-width: 0; display: grid; gap: 4px; border: 1px solid rgba(224,92,92,.3); border-radius: 5px; padding: 8px; color: var(--text-muted); font-size: 8px; }
+.preview[data-valid='true'] span { border-color: rgba(82,183,123,.3); }
+.preview b { overflow: hidden; color: var(--text-primary); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.confirmationField { display: grid; grid-template-columns: 150px minmax(0,1fr); align-items: center; gap: 10px; color: var(--text-muted); font-size: 8px; }
+.confirmationField input { min-width: 0; height: 34px; border: 1px solid var(--border); border-radius: 5px; padding: 0 9px; color: var(--text-primary); background: var(--bg-base); font-size: 9px; }
 .boundary { display: grid; gap: 4px; border: 1px solid rgba(208,136,85,.32); border-radius: 6px; padding: 9px; color: #f0d8c3; background: rgba(208,136,85,.07); font-size: 8px; line-height: 1.5; }
 .confirm { display: flex; align-items: flex-start; gap: 7px; color: var(--text-secondary); font-size: 8px; line-height: 1.5; }
 .confirm input { margin-top: 2px; accent-color: #cf8658; }
@@ -68,4 +77,4 @@
 .dialog footer .primary { color: #1c0d05; border-color: #b97447; background: #db9668; font-weight: 760; }
 .spinning { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (max-width: 760px) { .pageHeader { flex-direction: column; } .candidateList { grid-template-columns: 1fr; } .candidate { border-right: 0; } .evidenceTable > div { grid-template-columns: 95px minmax(0,1fr); } .evidenceTable > div code:last-child { grid-column: 1 / -1; } .fieldGrid { grid-template-columns: 1fr; } .summaryField { grid-column: 1; } .backdrop { align-items: start; padding: 10px; } .dialog { max-height: calc(100vh - 20px); } }
+@media (max-width: 760px) { .pageHeader { flex-direction: column; } .candidateList { grid-template-columns: 1fr; } .candidate { border-right: 0; } .evidenceTable > div { grid-template-columns: 95px minmax(0,1fr); } .evidenceTable > div code:last-child { grid-column: 1 / -1; } .fieldGrid, .numberGrid, .preview { grid-template-columns: 1fr; } .summaryField { grid-column: 1; } .confirmationField { grid-template-columns: 1fr; } .backdrop { align-items: start; padding: 10px; } .dialog { max-height: calc(100vh - 20px); } }
