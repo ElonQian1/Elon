@@ -24,6 +24,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools?limit=20` | 列出该 Provider 的 Pool 脱敏视图 |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id` | 读取该 Provider 的一份 Pool 脱敏视图 |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/audit` | 重算当前 epoch 账本并返回一致性报告 |
+| GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/ledger-transactions?limit=20&before_sequence=...` | 分页读取当前 epoch 的脱敏账本历史 |
 
 创建请求提供稳定 `pool_id`、仅用于生成摘要的 `resource_scope_key`、区域、32 KiB 以内的 JSON 资源档案和 1 至 64 项计量策略。计量策略明确 meter 名称、`consumable/reusable` 模式和正整数最小量子。
 
@@ -37,6 +38,7 @@ HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最
 | `compute_get_my_capacity_pool` | 只读 | 读取本人一份 Pool 脱敏视图 |
 | `compute_list_my_capacity_pools` | 只读 | 列出本人 Provider 的 Pool |
 | `compute_audit_my_capacity_pool` | 只读 | 重算本人当前 Pool epoch 的账本并返回一致性报告 |
+| `compute_list_my_capacity_ledger_transactions` | 只读 | 分页列出本人当前 Pool epoch 的脱敏事务与双分录 |
 
 ## 4. 摘要与隐私边界
 
@@ -51,6 +53,8 @@ HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最
 审计入口只读取当前 Pool 的 `capacity_epoch`，从不可变 LedgerTransaction/Leg 重算每个 Bucket 的 issued、available、held、active、consumed 和 retired 余额，再与物化投影、revision 和 ledger sequence 对比。报告返回交易数、分录数、Bucket 差异和总体 `healthy` 状态，不修改 Pool、账本或余额。
 
 `healthy=true` 只表示账本分录、守恒关系与当前投影在内部一致，不证明硬件真实存在、节点在线、性能达到声明、路由可达或平台已经完成 verified 审核。该报告可作为未来激活审核的材料之一，但不能单独触发激活或 Offer 发布。
+
+账本历史入口按 `ledger_sequence` 倒序返回事务 ID/摘要、事件类型、交付窗口、服务端时间和原始双分录，并使用 `next_before_sequence` 继续翻页。它省略 subject、消费者、Claim、Offer、Job、Reservation、Attempt、幂等键和请求摘要，避免供给者通过审计接口获得消费者或内部业务关系。历史查询同样只读，不构成硬件验证、收益结算或链上证明。
 
 ## 6. 失败关闭边界
 
