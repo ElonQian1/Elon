@@ -9,17 +9,18 @@ owners: ai-economy, backend
 
 ## 1. 当前实现
 
-Provider 本人结算账户视图、平台结算账户视图和管理员提款队列已经写入独立 Store、Service 与 HTTP 路由，但尚未编译或运行接口验证，状态固定为 `implementation_uncompiled`。这些能力复用 v195、v198-v201 数据表，不增加新迁移，也不修改任何余额。
+Provider 本人结算账户视图、按 Provider 过滤的本人提款队列、平台结算账户视图和管理员全局提款队列已经写入独立 Store、Service 与 HTTP 路由，但尚未编译或运行接口验证，状态固定为 `implementation_uncompiled`。这些能力复用 v195、v198-v201 数据表，不增加新迁移，也不修改任何余额。
 
 ## 2. HTTP 路由
 
 | 方法 | 路径 | 调用者 | 作用 |
 |---|---|---|---|
 | GET | `/api/me/compute/providers/:provider_id/settlement-account` | Provider 所有者 | 读取经不可变账本重建的本人结算账户 |
+| GET | `/api/me/compute/providers/:provider_id/settlement-withdrawal-queue` | Provider 所有者 | 按状态读取并重审计指定本人 Provider 的提款队列 |
 | GET | `/api/admin/compute/settlement-account` | 平台 `admin/owner` | 读取平台算力市场结算账户审计投影 |
 | GET | `/api/admin/compute/settlement-withdrawals` | 平台 `admin/owner` | 按状态读取有界提款处理队列 |
 
-管理员队列默认 `status=pending`、`limit=50`。状态只允许 `all`、`pending`、`cancelled`、`rejected` 或 `external_paid_attested`，单次上限为 100。每个队列项都重新审计 v200 Request Receipt；存在终态时同时重审计 v201 Terminal Receipt。
+本人和管理员队列默认 `status=pending`、`limit=50`。状态只允许 `all`、`pending`、`cancelled`、`rejected` 或 `external_paid_attested`，单次上限为 100。本人入口先验证 Provider 账户归属，在 SQL 层限制 Provider ID，并对每个返回回执再次核对 Provider，不能跨 Provider 读取。每个队列项都重新审计 v200 Request Receipt；存在终态时同时重审计 v201 Terminal Receipt。
 
 ## 3. 账户视图
 
@@ -65,11 +66,11 @@ Provider 本人结算账户视图、平台结算账户视图和管理员提款�
 
 ## 6. PC 管理入口
 
-`pc-frontend/src/features/compute-settlement/` 已写入管理员页面源码，并注册 `/compute-settlement`。只有本地用户角色为 `admin/owner` 时显示导航；服务端仍独立执行最终鉴权。页面读取平台账户、到期释放候选和提款队列，并可在二次确认后调用到期逐笔释放。对于 pending 提款，管理员还可打开独立终态对话框，选择拒绝并把 withdrawn 全额返还 available，或在确认系统外付款已经完成后登记证据类型、公开引用和 64 位证据摘要。终态请求精确携带 v200 Event/Posting 摘要并复用 v201 幂等与唯一终态门卫。该页面尚未执行 TypeScript 构建、浏览器视觉验收或发布，不能描述为线上可用。
+`pc-frontend/src/features/compute-settlement/` 已写入两个页面源码。所有登录用户可从 `/my-compute-settlement` 切换本人 Provider，查看 pending/available/withdrawn、按终态读取本人队列、申请把 available 转入 withdrawn，并在二次确认后取消 pending 申请。只有本地用户角色为 `admin/owner` 时显示 `/compute-settlement` 管理导航；服务端仍独立执行最终鉴权。管理员页读取平台账户、到期释放候选和全局提款队列，并可在二次确认后调用到期逐笔释放。对于 pending 提款，管理员还可选择拒绝并把 withdrawn 全额返还 available，或在确认系统外付款已经完成后登记证据类型、公开引用和 64 位证据摘要。两页的写请求都精确携带既有摘要并复用 v198-v201 幂等与唯一终态门卫。页面尚未执行 TypeScript 构建、浏览器视觉验收或发布，不能描述为线上可用。
 
 ## 7. 非付款边界
 
-账户视图和队列接口本身均为只读能力。PC 页面另行复用 v201 终态写入口，但仍遵守以下非付款边界：
+账户视图和队列接口本身均为只读能力。PC 本人页另行复用 v200 申请与 v201 取消，管理页复用 v201 管理员终态，但仍遵守以下非付款边界：
 
 - 不触发银行、钱包、支付机构或 Sui 网络；
 - 不自动验证外部证据；
@@ -82,7 +83,7 @@ Provider 本人结算账户视图、平台结算账户视图和管理员提款�
 
 - Cargo 编译和 HTTP 真实调用；
 - 游标分页、队列总数、处理时效和风险标签；
-- PC 管理页的构建、视觉验收、发布和实时通知；
+- PC 本人页与管理页的构建、视觉验收、发布和实时通知；
 - 外部付款适配器、回执核验和自动对账；
 - 平台账户提款、多币种及 Sui 链上资产视图。
 

@@ -71,7 +71,7 @@ v201、追加式 Store、独立 Service 与 Provider/管理员 HTTP 路由已经
 
 ## 6. PC 管理操作
 
-`pc-frontend/src/features/compute-settlement/` 已写入管理员终态操作源码。`/compute-settlement` 的 pending 提款行可打开独立对话框：
+`pc-frontend/src/features/compute-settlement/` 已写入所有者和管理员终态操作源码。`/my-compute-settlement` 允许 Provider 所有者在二次确认后取消本人 pending 申请，把 withdrawn 全额返还 available；请求精确携带 v200 Event/Posting 摘要并使用稳定幂等键。`/compute-settlement` 的 pending 提款行可打开管理员独立对话框：
 
 - 拒绝操作要求管理员确认只执行内部余额返还，不携带任何外部付款证据；
 - 外部已付款声明要求管理员确认付款已经在系统外完成，并确认公开证据引用中不含密码、私钥或助记词；

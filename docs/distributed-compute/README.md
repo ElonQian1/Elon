@@ -58,7 +58,7 @@ owners: backend, node, ai-economy
 | Attempt accepted 挑战纠正 | v199、追加式 Store、Correction Posting/账本腿与消费者/管理员 HTTP 已写；管理员可对 accepted 挑战提交守恒的向下金额纠正，原子退款消费者并冲减 Provider/平台 pending。纠正后 v198 只释放净额，尚未编译、执行迁移或运行验证 |
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；从当前 Provider 回执校验所有权和结算账户，把 CNY available 原子转入 withdrawn 保留区。它只冻结内部余额，不执行或证明外部付款，尚未编译、执行迁移或运行验证 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 管理页已接入拒绝与外部已付款证明登记源码。它不发起或验证外部付款，尚未编译、执行迁移、运行或页面验证 |
-| 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可重建固定平台账户的 pending/available，并按 pending/cancelled/rejected/external_paid_attested/all 读取有界队列。只读、不提供平台提款、不移动资金，尚未编译或运行验证 |
+| 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期，并按 Provider/状态读取本人队列；管理员 HTTP 可重建固定平台账户的 pending/available，并按状态读取全局队列。PC 已写入本人收益与管理员结算两套页面源码。视图和队列只读、不提供平台提款、不移动资金，尚未编译或运行验证 |
 | 外部算力池适配器与统一报价 | 已接受设计，尚未实现 |
 | 多源验证、期货曲线与真实结算 | 已接受设计，尚未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |

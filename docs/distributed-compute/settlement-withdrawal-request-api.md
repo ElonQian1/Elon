@@ -65,7 +65,13 @@ v200 回执固定声明：
 
 v201 使用独立追加式记录表达取消、拒绝或“管理员登记外部付款证据”，不改写 v200 申请，也不把管理员声明伪装成链上或银行系统的自动证明。边界见 `docs/distributed-compute/settlement-withdrawal-terminal-api.md`。
 
-## 6. 尚未实现
+## 6. PC 本人入口
+
+`pc-frontend/src/features/compute-settlement/` 已写入 `/my-compute-settlement` 页面源码。登录用户可切换本人 Provider、查看经账本重建的余额和提款终态，并在 available 大于零时打开提款申请对话框。表单把人民币输入转换为整数微单位，要求目标引用非空，并强制确认“只冻结内部余额”和“引用不含秘密”；成功后重新读取账户与队列。
+
+本人可对仍为 pending 的申请执行显式取消。页面使用 v200 Event Digest 与 Request Posting ID/Digest 构造 v201 取消请求，服务端仍负责最终所有权、唯一终态和余额审计。该页面尚未构建、运行、视觉验收或发布。
+
+## 7. 尚未实现
 
 - Cargo 编译、v200 迁移执行、HTTP 真实调用、并发与故障注入验证；
 - 自动银行打款、支付机构清算、钱包签名或 Sui 链上提交；
@@ -74,12 +80,14 @@ v201 使用独立追加式记录表达取消、拒绝或“管理员登记外部
 
 因此，v200 不能被描述为“真实提现已经完成”。
 
-## 7. 代码入口
+## 8. 代码入口
 
 - `server/src/store/compute_settlement_withdrawal_requests.rs`
 - `server/src/store/compute_settlement_withdrawal_requests/`
 - `server/src/compute_settlement_withdrawal_request_migration.rs`
 - `server/src/compute_federation_settlement_withdrawal_request_service.rs`
 - `server/src/compute_federation_settlement_withdrawal_request_api.rs`
+- `pc-frontend/src/features/compute-settlement/MyComputeSettlementPage.tsx`
+- `pc-frontend/src/features/compute-settlement/WithdrawalRequestDialog.tsx`
 
 上游 pending 到 available 释放见 `docs/distributed-compute/attempt-settlement-release-api.md`，下游唯一终态见 `docs/distributed-compute/settlement-withdrawal-terminal-api.md`。
