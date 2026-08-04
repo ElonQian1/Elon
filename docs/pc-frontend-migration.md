@@ -78,6 +78,7 @@ server/src/
 | 可信终态收口工作区 | 🔴 高 | `src/features/compute-finalization/`、`server/src/compute_federation_attempt_finalization_*` | 🟡 仅 `admin/owner` 显示的 `/compute-finalization` 已写入待收口 Execution Receipt 队列、精确 Lease/Job/Reservation/Claim 版本与摘要、可补偿用量和状态/容量影响。管理员必须逐笔勾选并输入确认文本；服务端在立即事务中再次核对模板后才推进状态和容量，预授权与结算仍不变。页面尚未构建、接口联调、视觉验收或发布 |
 | 待结算回执工作区 | 🔴 高 | `src/features/compute-settlement/ComputeSettlementIssuancePage*`、`server/src/compute_federation_attempt_settlement_*` | 🟡 仅 `admin/owner` 显示的 `/compute-settlement-issuance` 已写入 v194 待结算队列、服务端金额预览和精确资金绑定。管理员必须逐笔勾选并输入确认文本；v195 会结清消费者平台内预授权、退款并登记 Provider/平台 pending，但不释放、提现或调用外部付款。页面尚未构建、接口联调、视觉验收或发布 |
 | 消费者结算申诉工作区 | 🔴 高 | `src/features/compute-settlement/ComputeSettlementChallengePage*`、`src/features/compute-attempt/settlementChallengeContracts.ts`、`server/src/compute_federation_attempt_settlement_challenge_*` | 🟡 所有登录用户可见的 `/compute-challenges` 已写入本人 v195 待申诉队列、既有扣结/退款/pending 金额、原因、事实摘要、证据引用和明确确认。候选只包含 72 小时内未挑战、未释放的本人回执；提交 v196 只登记不可变申诉并阻断后续释放，不立即退款、不移动余额、不调用银行、钱包或 Sui。页面尚未构建、接口联调、视觉验收或发布 |
+| 结算申诉撤回与裁决工作区 | 🔴 高 | `src/features/compute-settlement/*ChallengeResolution*`、`src/features/compute-settlement/WithdrawSettlementChallengeDialog.tsx`、`server/src/compute_federation_attempt_settlement_challenge_resolution_*` | 🟡 `/compute-challenges` 已写入本人 open 申诉及不可变撤回，只有 `admin/owner` 显示的 `/compute-challenge-resolution` 已写入全局 open 队列和 accepted/rejected 裁决。withdrawn/rejected 只解除门卫，accepted 继续阻断并要求 v199；所有 v197 操作均不退款、不纠正、不移动余额，页面尚未构建、接口联调、视觉验收或发布 |
 
 ### 阶段 P3 — 个人 AI 对话
 
