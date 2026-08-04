@@ -3,7 +3,10 @@ use serde::Deserialize;
 
 use crate::{
     compute_federation_attempt_service::get_for_participant,
-    store::{ComputeSettlementChallengeReceipt, OpenComputeSettlementChallengeRequest, Store},
+    store::{
+        ComputePendingSettlementChallengeCandidate, ComputeSettlementChallengeReceipt,
+        OpenComputeSettlementChallengeRequest, Store,
+    },
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -59,4 +62,12 @@ pub(crate) fn get_for_platform_admin(
     lease_id: &str,
 ) -> Result<ComputeSettlementChallengeReceipt> {
     store.compute_settlement_challenge(lease_id)
+}
+
+pub(crate) fn list_pending_for_consumer(
+    store: &Store,
+    consumer_user_id: &str,
+    limit: usize,
+) -> Result<Vec<ComputePendingSettlementChallengeCandidate>> {
+    store.list_pending_compute_settlement_challenges(consumer_user_id, limit)
 }

@@ -7,8 +7,12 @@ use super::{
     compute_attempt_settlement_corrections::compute_settlement_correction_by_resolution_on, Store,
 };
 
+mod pending_candidate;
+mod pending_queue;
 mod support;
 
+use pending_candidate::build_pending_challenge_candidate_on;
+use pending_queue::list_pending_challenge_lease_ids_on;
 use support::{
     challenge_by_idempotency_on, challenge_by_lease_on, challenge_by_settlement_on,
     normalize_challenge_request, persist_challenge_on, settlement_challenge_request_digest,
@@ -78,6 +82,15 @@ pub(crate) struct ComputeSettlementChallengeGate {
     pub correction_event_digest: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub(crate) struct ComputePendingSettlementChallengeCandidate {
+    pub settlement: super::compute_attempt_settlements::ComputeAttemptSettlementReceipt,
+    pub challenge_deadline: String,
+    pub balance_effect: &'static str,
+    pub settlement_release_effect: &'static str,
+    pub external_payment_effect: &'static str,
+}
+
 impl Store {
     pub(crate) fn open_compute_settlement_challenge(
         &self,
@@ -124,6 +137,34 @@ impl Store {
         support::validate_exact("Attempt Lease ID", lease_id, 200)?;
         let conn = self.conn()?;
         compute_settlement_challenge_on(&*conn, lease_id)
+    }
+
+    pub(crate) fn list_pending_compute_settlement_challenges(
+        &self,
+        consumer_user_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ComputePendingSettlementChallengeCandidate>> {
+        support::validate_exact("消费者用户 ID", consumer_user_id, 240)?;
+        let limit = limit.clamp(1, 100);
+        let as_of = chrono::Utc::now();
+        let cutoff = as_of
+            .checked_sub_signed(chrono::Duration::seconds(
+                COMPUTE_SETTLEMENT_CHALLENGE_WINDOW_SECONDS,
+            ))
+            .ok_or_else(|| anyhow::anyhow!("结算挑战候选扫描截止时间超出范围"))?;
+        let conn = self.conn()?;
+        list_pending_challenge_lease_ids_on(
+            &conn,
+            consumer_user_id,
+            &cutoff.to_rfc3339(),
+            &as_of.to_rfc3339(),
+            limit,
+        )?
+        .into_iter()
+        .map(|lease_id| {
+            build_pending_challenge_candidate_on(&conn, &lease_id, consumer_user_id, &as_of)
+        })
+        .collect()
     }
 }
 

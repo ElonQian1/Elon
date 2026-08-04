@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
@@ -27,6 +28,20 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/admin/compute/attempt-leases/:lease_id/settlement-challenge",
             get(get_admin_challenge),
         )
+        .route(
+            "/api/me/compute/settlement-receipts/pending-challenge",
+            get(list_pending_challenges),
+        )
+}
+
+#[derive(Debug, Deserialize)]
+struct ListQuery {
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
+fn default_limit() -> usize {
+    50
 }
 
 async fn open_challenge(
@@ -80,6 +95,25 @@ async fn get_admin_challenge(
             &state.store,
             &lease_id,
         ),
+    )
+}
+
+async fn list_pending_challenges(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    challenge_response(
+        compute_federation_attempt_settlement_challenge_service::list_pending_for_consumer(
+            &state.store,
+            &user_id,
+            query.limit,
+        )
+        .map(|candidates| json!({"challenge_candidates":candidates})),
     )
 }
 
