@@ -126,6 +126,7 @@ const PROJECT_VIEW_CHEVRON_PNG: &[u8] = include_bytes!("assets/project_view_chev
 const POPUP_NEW_PROJECT_PNG_B64: &str = include_str!("assets/ic_popup_new_project.b64");
 const CHAT_SIDE_MENU_HANDLE_PNG_B64: &str = include_str!("assets/ic_chat_side_menu_handle.b64");
 const PROJECT_PLAZA_CSS: &str = include_str!("assets/project_plaza.css");
+const PROJECT_PLAZA_CACHE_JS: &str = include_str!("assets/project_plaza_cache.js");
 const PROJECT_PLAZA_JS: &str = include_str!("assets/project_plaza.js");
 const PROJECT_HOME_CSS: &str = include_str!("assets/project_home.css");
 const PROJECT_HOME_JS: &str = include_str!("assets/project_home.js");
@@ -423,6 +424,19 @@ pub async fn project_plaza_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PROJECT_PLAZA_JS,
+    )
+}
+
+pub async fn project_plaza_cache_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PROJECT_PLAZA_CACHE_JS,
     )
 }
 

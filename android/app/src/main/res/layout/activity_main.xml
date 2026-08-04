@@ -1100,7 +1100,7 @@
             android:id="@+id/marketplacePage"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@color/elon_bg_app"
+            android:background="@color/elon_bg_plaza"
             android:fillViewport="true"
             android:visibility="gone">
 

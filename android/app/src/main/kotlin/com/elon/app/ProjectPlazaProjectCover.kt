@@ -18,7 +18,7 @@ internal fun projectPlazaProjectCover(
 ): FrameLayout = FrameLayout(activity).apply {
     background = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
-        setColor(activity.elonColor(R.color.elon_button_primary_bg))
+        setColor(activity.elonColor(R.color.elon_plaza_action))
         cornerRadius = radiusPx
     }
     clipToOutline = true
@@ -27,7 +27,7 @@ internal fun projectPlazaProjectCover(
         text = project.displayTitle().trim().firstOrNull()?.toString() ?: "项"
         gravity = Gravity.CENTER
         includeFontPadding = false
-        setTextColor(activity.elonColor(R.color.elon_button_primary_text))
+        setTextColor(activity.elonColor(R.color.elon_plaza_action_ink))
         setTextSize(TypedValue.COMPLEX_UNIT_SP, fallbackTextSp)
         typeface = Typeface.DEFAULT_BOLD
         contentDescription = null

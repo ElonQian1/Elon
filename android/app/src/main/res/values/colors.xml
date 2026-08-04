@@ -3,7 +3,7 @@
     <color name="ic_launcher_background">#0B1017</color>
     <color name="elon_bg_app">#0B1017</color>
     <color name="elon_bg_canvas">#0B1017</color>
-    <color name="elon_bg_plaza">#0B1017</color>
+    <color name="elon_bg_plaza">#04070B</color>
     <color name="elon_bg_chrome">#070B10</color>
     <color name="elon_side_menu_bg">#0A0F16</color>
     <color name="elon_surface_card">#111923</color>
@@ -16,6 +16,21 @@
     <color name="elon_border_subtle">#3397AECC</color>
     <color name="elon_border_primary">#4D7AA7FF</color>
     <color name="elon_divider_card">#1C97AECC</color>
+    <color name="elon_plaza_surface_card">#08111C</color>
+    <color name="elon_plaza_surface_header">#0C1724</color>
+    <color name="elon_plaza_surface_search">#0A1522</color>
+    <color name="elon_plaza_segment_selected">#10263D</color>
+    <color name="elon_plaza_border">#405C7EA6</color>
+    <color name="elon_plaza_divider">#205C7EA6</color>
+    <color name="elon_plaza_signal">#6ED8FF</color>
+    <color name="elon_plaza_signal_soft">#1F6ED8FF</color>
+    <color name="elon_plaza_text_primary">#E8F0F7</color>
+    <color name="elon_plaza_text_secondary">#A8BECAD6</color>
+    <color name="elon_plaza_text_quiet">#758FA2B3</color>
+    <color name="elon_plaza_action">#C9E7F5</color>
+    <color name="elon_plaza_action_ink">#041018</color>
+    <color name="elon_plaza_constellation">#2E6ED8FF</color>
+    <color name="elon_plaza_star">#52C9E7F5</color>
 
     <color name="elon_text_primary">#F0F3F8FB</color>
     <color name="elon_text_list_title">#F3F8FB</color>

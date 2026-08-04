@@ -32,7 +32,7 @@ internal class ProjectPlazaFeedbackSection(
     fun buildEmpty(actionLabel: String, onAction: () -> Unit): View = messagePanel(
         title = "没有找到匹配项目",
         message = "可以清除搜索与筛选条件，再看看项目广场的全部内容。",
-        toneColor = activity.elonColor(R.color.elon_text_tertiary),
+        toneColor = activity.elonColor(R.color.elon_plaza_text_quiet),
         actionLabel = actionLabel,
         onAction = onAction
     )
@@ -45,25 +45,48 @@ internal class ProjectPlazaFeedbackSection(
         onAction = onRetry
     )
 
+    fun buildCacheNotice(message: String, onRetry: () -> Unit): View = TextView(activity).apply {
+        text = message
+        gravity = Gravity.CENTER_VERTICAL
+        includeFontPadding = false
+        setPadding(dp(14), 0, dp(14), 0)
+        setTextColor(activity.elonColor(R.color.elon_plaza_signal))
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        background = rect(activity.elonColor(R.color.elon_plaza_signal_soft), 12)
+        foreground = selectableForeground()
+        isClickable = true
+        contentDescription = "$message。点击重新同步"
+        setOnClickListener { onRetry() }
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(CACHE_NOTICE_HEIGHT_DP)
+        ).apply {
+            marginStart = dp(SIDE_MARGIN_DP)
+            marginEnd = dp(SIDE_MARGIN_DP)
+            topMargin = dp(8)
+            bottomMargin = dp(4)
+        }
+    }
+
     private fun skeletonRow(): View = LinearLayout(activity).apply {
         gravity = Gravity.CENTER_VERTICAL
-        background = rect(activity.elonColor(R.color.elon_surface_card), 18)
+        background = rect(activity.elonColor(R.color.elon_plaza_surface_card), 18)
         setPadding(dp(16), dp(14), dp(16), dp(14))
         addView(View(activity).apply {
-            background = rect(activity.elonColor(R.color.elon_surface_search), 12)
+            background = rect(activity.elonColor(R.color.elon_plaza_surface_search), 12)
             contentDescription = null
         }, LinearLayout.LayoutParams(dp(60), dp(60)))
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            addView(skeletonLine(activity.elonColor(R.color.elon_surface_search)), LinearLayout.LayoutParams(
+            addView(skeletonLine(activity.elonColor(R.color.elon_plaza_surface_search)), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(12)
             ))
-            addView(skeletonLine(activity.elonColor(R.color.elon_divider_card)), LinearLayout.LayoutParams(
+            addView(skeletonLine(activity.elonColor(R.color.elon_plaza_divider)), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(10)
             ).apply { topMargin = dp(10) })
-            addView(skeletonLine(activity.elonColor(R.color.elon_divider_card)), LinearLayout.LayoutParams(
+            addView(skeletonLine(activity.elonColor(R.color.elon_plaza_divider)), LinearLayout.LayoutParams(
                 dp(132),
                 dp(10)
             ).apply { topMargin = dp(8) })
@@ -86,7 +109,7 @@ internal class ProjectPlazaFeedbackSection(
     ): View = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER_HORIZONTAL
-        background = rect(activity.elonColor(R.color.elon_surface_card), 20)
+        background = rect(activity.elonColor(R.color.elon_plaza_surface_card), 20)
         setPadding(dp(20), dp(24), dp(20), dp(20))
         addView(View(activity).apply {
             background = rect(toneColor, 4)
@@ -96,7 +119,7 @@ internal class ProjectPlazaFeedbackSection(
             text = title
             includeFontPadding = false
             gravity = Gravity.CENTER
-            setTextColor(activity.elonColor(R.color.elon_text_primary))
+            setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             typeface = Typeface.DEFAULT_BOLD
         }, LinearLayout.LayoutParams(
@@ -107,7 +130,7 @@ internal class ProjectPlazaFeedbackSection(
             text = message
             includeFontPadding = false
             gravity = Gravity.CENTER
-            setTextColor(activity.elonColor(R.color.elon_text_secondary))
+            setTextColor(activity.elonColor(R.color.elon_plaza_text_secondary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setLineSpacing(0f, 1.12f)
         }, LinearLayout.LayoutParams(
@@ -118,10 +141,10 @@ internal class ProjectPlazaFeedbackSection(
             text = actionLabel
             gravity = Gravity.CENTER
             includeFontPadding = false
-            background = rect(activity.elonColor(R.color.elon_button_primary_bg), ACTION_HEIGHT_DP / 2)
+            background = rect(activity.elonColor(R.color.elon_plaza_action), ACTION_HEIGHT_DP / 2)
             foreground = selectableForeground()
             isClickable = true
-            setTextColor(activity.elonColor(R.color.elon_button_primary_text))
+            setTextColor(activity.elonColor(R.color.elon_plaza_action_ink))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             typeface = Typeface.DEFAULT_BOLD
             setOnClickListener { onAction() }
@@ -151,5 +174,6 @@ internal class ProjectPlazaFeedbackSection(
         const val SIDE_MARGIN_DP = 20
         const val SKELETON_ROW_HEIGHT_DP = 88
         const val ACTION_HEIGHT_DP = 48
+        const val CACHE_NOTICE_HEIGHT_DP = 40
     }
 }

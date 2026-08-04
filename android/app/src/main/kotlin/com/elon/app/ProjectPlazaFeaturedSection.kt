@@ -48,7 +48,7 @@ internal class ProjectPlazaFeaturedSection(
         addView(TextView(activity).apply {
             text = "精选项目"
             includeFontPadding = false
-            setTextColor(activity.elonColor(R.color.elon_text_primary))
+            setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER_VERTICAL
@@ -57,7 +57,7 @@ internal class ProjectPlazaFeaturedSection(
             positionIndicator = this
             text = if (projectCount > 0) "01 / ${projectCount.toString().padStart(2, '0')}" else "00 / 00"
             includeFontPadding = false
-            setTextColor(activity.elonColor(R.color.elon_text_tertiary))
+            setTextColor(activity.elonColor(R.color.elon_plaza_text_quiet))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             gravity = Gravity.CENTER_VERTICAL
             contentDescription = "精选项目位置"
@@ -90,9 +90,9 @@ internal class ProjectPlazaFeaturedSection(
 
     private fun buildCard(project: StoreProject, index: Int) = FrameLayout(activity).apply {
         background = rect(
-            activity.elonColor(R.color.elon_surface_card),
+            activity.elonColor(R.color.elon_plaza_surface_card),
             CARD_RADIUS_DP,
-            activity.elonColor(R.color.elon_border_subtle)
+            activity.elonColor(R.color.elon_plaza_border)
         )
         clipToOutline = true
         isClickable = true
@@ -124,10 +124,10 @@ internal class ProjectPlazaFeaturedSection(
 
     private fun buildCardHeader(project: StoreProject, index: Int) = LinearLayout(activity).apply {
         gravity = Gravity.CENTER_VERTICAL
-        background = rect(activity.elonColor(R.color.elon_surface_header))
+        background = rect(activity.elonColor(R.color.elon_plaza_surface_header))
         setPadding(dp(CARD_CONTENT_PADDING_DP), 0, dp(CARD_CONTENT_PADDING_DP), 0)
         addView(View(activity).apply {
-            background = rect(activity.elonColor(R.color.elon_button_primary_bg), FEATURE_RAIL_WIDTH_DP / 2)
+            background = rect(activity.elonColor(R.color.elon_plaza_signal), FEATURE_RAIL_WIDTH_DP / 2)
             contentDescription = null
         }, LinearLayout.LayoutParams(dp(FEATURE_RAIL_WIDTH_DP), dp(FEATURE_RAIL_HEIGHT_DP)).apply {
             marginEnd = dp(12)
@@ -137,14 +137,14 @@ internal class ProjectPlazaFeaturedSection(
             addView(TextView(activity).apply {
                 text = "精选"
                 includeFontPadding = false
-                setTextColor(activity.elonColor(R.color.elon_text_primary))
+                setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
                 typeface = Typeface.DEFAULT_BOLD
             })
             addView(TextView(activity).apply {
                 text = (index + 1).toString().padStart(2, '0')
                 includeFontPadding = false
-                setTextColor(activity.elonColor(R.color.elon_text_secondary))
+                setTextColor(activity.elonColor(R.color.elon_plaza_text_secondary))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -163,7 +163,7 @@ internal class ProjectPlazaFeaturedSection(
             addView(TextView(activity).apply {
                 text = status.label
                 includeFontPadding = false
-                setTextColor(activity.elonColor(R.color.elon_text_primary))
+                setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -184,7 +184,7 @@ internal class ProjectPlazaFeaturedSection(
         )
         addView(buildIdentity(project))
         addView(View(activity).apply {
-            background = rect(activity.elonColor(R.color.elon_divider_card))
+            background = rect(activity.elonColor(R.color.elon_plaza_divider))
             contentDescription = null
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -217,7 +217,7 @@ internal class ProjectPlazaFeaturedSection(
                 includeFontPadding = false
                 maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
-                setTextColor(activity.elonColor(R.color.elon_text_primary))
+                setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
                 setLineSpacing(0f, 1.02f)
                 breakStrategy = Layout.BREAK_STRATEGY_BALANCED
@@ -228,7 +228,7 @@ internal class ProjectPlazaFeaturedSection(
                 includeFontPadding = false
                 maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
-                setTextColor(activity.elonColor(R.color.elon_text_secondary))
+                setTextColor(activity.elonColor(R.color.elon_plaza_text_secondary))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                 setLineSpacing(0f, 1.08f)
             }, LinearLayout.LayoutParams(
@@ -266,13 +266,13 @@ internal class ProjectPlazaFeaturedSection(
     private fun factColumn(
         label: String,
         value: String,
-        valueColor: Int = activity.elonColor(R.color.elon_text_primary)
+        valueColor: Int = activity.elonColor(R.color.elon_plaza_text_primary)
     ) = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
         addView(TextView(activity).apply {
             text = label
             includeFontPadding = false
-            setTextColor(activity.elonColor(R.color.elon_text_secondary))
+            setTextColor(activity.elonColor(R.color.elon_plaza_text_secondary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
         })
         addView(TextView(activity).apply {
@@ -300,7 +300,7 @@ internal class ProjectPlazaFeaturedSection(
             includeFontPadding = false
             background = rect(
                 activity.elonColor(
-                    if (action.enabled) R.color.elon_button_primary_bg else R.color.elon_surface_soft
+                    if (action.enabled) R.color.elon_plaza_action else R.color.elon_plaza_surface_search
                 ),
                 ACTION_HEIGHT_DP / 2
             )
@@ -309,7 +309,7 @@ internal class ProjectPlazaFeaturedSection(
             isEnabled = action.enabled
             setTextColor(
                 activity.elonColor(
-                    if (action.enabled) R.color.elon_button_primary_text else R.color.elon_text_tertiary
+                    if (action.enabled) R.color.elon_plaza_action_ink else R.color.elon_plaza_text_quiet
                 )
             )
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
@@ -367,7 +367,7 @@ internal class ProjectPlazaFeaturedSection(
     private fun toneColor(tone: ProjectPlazaTone): Int = when (tone) {
         ProjectPlazaTone.SUCCESS -> activity.elonColor(R.color.elon_status_success)
         ProjectPlazaTone.DANGER -> activity.elonColor(R.color.elon_status_danger)
-        ProjectPlazaTone.NEUTRAL -> activity.elonColor(R.color.elon_text_tertiary)
+        ProjectPlazaTone.NEUTRAL -> activity.elonColor(R.color.elon_plaza_text_quiet)
     }
 
     private fun StoreProject.ownerLabel(): String = ownerAccount.trim()

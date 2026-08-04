@@ -915,7 +915,7 @@ internal class MainNavigationController(
     }
 
     private fun applyMarketplaceChrome() {
-        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_plaza))
         updateBottomTabSelection(binding.tabProject)
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.GONE

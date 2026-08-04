@@ -51,7 +51,9 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(featured.contains("FEATURED_CARD_WIDTH_FRACTION = 0.6871795f"))
         assertTrue(featured.contains("FEATURED_CARD_HEIGHT_RATIO = 1.2014925f"))
         assertTrue(featured.contains("FEATURED_CARD_GAP_DP = 10"))
-        assertTrue(featured.contains("R.color.elon_surface_header"))
+        assertTrue(featured.contains("R.color.elon_plaza_surface_header"))
+        assertTrue(featured.contains("R.color.elon_plaza_signal"))
+        assertTrue(featured.contains("R.color.elon_plaza_action"))
         assertTrue(featured.contains("R.color.elon_status_success"))
         assertTrue(featured.contains("R.color.elon_status_danger"))
         assertTrue(featured.contains("FEATURE_RAIL_WIDTH_DP = 3"))
@@ -79,12 +81,14 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(styles.contains("aspect-ratio: 268 / 322;"))
         assertTrue(styles.contains("gap: 10px;"))
         assertTrue(styles.contains("padding: 0 98px 0 20px;"))
-        assertTrue(styles.contains("--plaza-header: #172231;"))
-        assertTrue(styles.contains("--plaza-primary: #7aa7ff;"))
+        assertTrue(styles.contains("--plaza-bg: #04070b;"))
+        assertTrue(styles.contains("--plaza-header: #0c1724;"))
+        assertTrue(styles.contains("--plaza-primary: #6ed8ff;"))
+        assertTrue(styles.contains("--plaza-action: #c9e7f5;"))
         assertTrue(styles.contains("--plaza-success: #5ac8a0;"))
         assertTrue(styles.contains("--plaza-danger: #f07884;"))
         assertTrue(styles.contains("border-left: 3px solid var(--plaza-primary);"))
-        assertTrue(page.contains("data-ui-design=\"apk-project-dossier-v3\""))
+        assertTrue(page.contains("data-ui-design=\"apk-deep-space-observatory-v4\""))
     }
 
     @Test
@@ -171,6 +175,34 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(styles.contains("min-height: 112px;"))
         assertTrue(styles.contains(".project-plaza-feedback"))
         assertTrue(styles.contains(".project-plaza-skeleton-row"))
+    }
+
+    @Test
+    fun plazaUsesCacheFirstRefreshAndDelayedSkeletonOnBothSurfaces() {
+        val marketplace = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
+        )
+        val coordinator = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/ProjectPlazaLoadCoordinator.kt"
+        )
+        val cache = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/ProjectPlazaCache.kt"
+        )
+        val script = readRepositoryFile("server/src/assets/project_plaza.js")
+        val webCache = readRepositoryFile("server/src/assets/project_plaza_cache.js")
+        val styles = readRepositoryFile("server/src/assets/project_plaza.css")
+
+        assertTrue(marketplace.contains("ProjectPlazaLoadCoordinator"))
+        assertTrue(coordinator.contains("onCached(fallback, exact != null)"))
+        assertTrue(coordinator.contains("PROJECT_PLAZA_SKELETON_DELAY_MS"))
+        assertTrue(cache.contains("PROJECT_PLAZA_FRESH_MS = 60_000L"))
+        assertTrue(cache.contains("AuthManager.userDataPrefs(context)"))
+        assertTrue(script.contains("const CACHE_KEY = 'elon_project_plaza_snapshot_v1'"))
+        assertTrue(script.contains("const SKELETON_DELAY_MS = 180"))
+        assertTrue(script.contains("ElonProjectPlazaCache.write(CACHE_KEY, snapshot)"))
+        assertTrue(webCache.contains("window.ElonProjectPlazaCache"))
+        assertTrue(script.contains("state.cacheNotice = '使用缓存 · 同步失败，点击重试'"))
+        assertTrue(styles.contains(".project-plaza-cache-notice"))
     }
 
     @Test

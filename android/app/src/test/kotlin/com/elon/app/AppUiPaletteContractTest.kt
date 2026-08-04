@@ -54,12 +54,33 @@ class AppUiPaletteContractTest {
 
         assertTrue(projectHome.contains("R.color.elon_bg_app"))
         assertTrue(projectHome.contains("R.color.elon_segment_selected"))
-        assertTrue(marketplace.contains("R.color.elon_surface_search"))
-        assertTrue(marketplace.contains("R.color.elon_border_primary"))
-        assertTrue(featured.contains("R.color.elon_button_primary_bg"))
+        assertTrue(marketplace.contains("R.color.elon_plaza_surface_search"))
+        assertTrue(marketplace.contains("R.color.elon_plaza_signal"))
+        assertTrue(featured.contains("R.color.elon_plaza_action"))
         assertTrue(featured.contains("R.color.elon_status_success"))
         assertFalse(projectHome.contains("const val COLOR_BG ="))
         assertFalse(featured.contains("const val COLOR_CARD ="))
+    }
+
+    @Test
+    fun projectPlazaSharesTheDeepSpaceObservatoryPalette() {
+        val colors = readRepositoryFile("android/app/src/main/res/values/colors.xml")
+        val styles = readRepositoryFile("server/src/assets/project_plaza.css")
+
+        listOf(
+            "<color name=\"elon_bg_plaza\">#04070B</color>",
+            "<color name=\"elon_plaza_surface_card\">#08111C</color>",
+            "<color name=\"elon_plaza_surface_header\">#0C1724</color>",
+            "<color name=\"elon_plaza_signal\">#6ED8FF</color>",
+            "<color name=\"elon_plaza_action\">#C9E7F5</color>"
+        ).forEach { token -> assertTrue("missing Android plaza token $token", colors.contains(token)) }
+        listOf(
+            "--plaza-bg: #04070b;",
+            "--plaza-card: #08111c;",
+            "--plaza-header: #0c1724;",
+            "--plaza-primary: #6ed8ff;",
+            "--plaza-action: #c9e7f5;"
+        ).forEach { token -> assertTrue("missing PWA plaza token $token", styles.contains(token)) }
     }
 
     private fun readRepositoryFile(relativePath: String): String =

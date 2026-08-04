@@ -19,7 +19,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import okhttp3.OkHttpClient
-import kotlin.concurrent.thread
 
 internal class MainMarketplaceActions(
     private val activity: AppCompatActivity,
@@ -42,6 +41,8 @@ internal class MainMarketplaceActions(
 
     private val joinedIds = mutableSetOf<String>()
     private val reactionPrefs by lazy { activity.getSharedPreferences("project_plaza_reactions", 0) }
+    private val loadCoordinator by lazy { ProjectPlazaLoadCoordinator(activity, http, serverUrl) }
+    private val backdrop by lazy { ProjectPlazaBackdropDrawable(activity) }
     private val feedbackSection by lazy {
         ProjectPlazaFeedbackSection(activity, dp, selectableForeground)
     }
@@ -74,8 +75,9 @@ internal class MainMarketplaceActions(
     private var searchQuery = ""
     private var activeFilterKey = FILTER_ALL
     private var currentProjects: List<StoreProject> = emptyList()
-    @Volatile
-    private var loadSerial = 0
+    private var currentRawProjects: List<StoreProject> = emptyList()
+    private var currentCriteriaKey = ""
+    private var refreshNotice: String? = null
 
     private val filters = listOf(
         MarketplaceFilter(FILTER_ALL, "全部"),
@@ -85,41 +87,56 @@ internal class MainMarketplaceActions(
         MarketplaceFilter("popular", "最热门", sort = "members")
     )
 
-    fun loadProjects(search: String? = null) {
+    fun loadProjects(search: String? = null, force: Boolean = false) {
         if (search != null) searchQuery = search.trim()
-        val serial = ++loadSerial
-        renderLoading()
-        thread(name = "project-plaza-list") {
-            val filter = activeFilter()
-            val storeResult = runCatching {
-                fetchAllStoreProjects(
-                    http = http,
-                    serverUrl = serverUrl,
-                    search = searchQuery.ifBlank { null },
-                    joinMode = filter.joinMode,
-                    hasApk = filter.hasApk,
-                    sort = filter.sort,
-                    ctx = activity
-                )
-            }
-            val alreadyJoined = runCatching {
-                if (!AuthManager.isLoggedIn(activity)) emptySet()
-                else fetchJoinedProjectIds(http, serverUrl, activity)
-            }.getOrDefault(emptySet())
-
-            activity.runOnUiThread {
-                if (serial != loadSerial) return@runOnUiThread
+        val filter = activeFilter()
+        val criteriaKey = criteriaKey(searchQuery, filter)
+        val alreadyShowingCriteria = currentCriteriaKey == criteriaKey && currentProjects.isNotEmpty()
+        currentCriteriaKey = criteriaKey
+        ensureDiscoveryShell()
+        loadCoordinator.load(
+            request = ProjectPlazaLoadRequest(
+                key = criteriaKey,
+                search = searchQuery.ifBlank { null },
+                joinMode = filter.joinMode,
+                hasApk = filter.hasApk,
+                sort = filter.sort,
+                isDefault = criteriaKey == DEFAULT_CRITERIA_KEY
+            ),
+            force = force,
+            hasVisibleContent = alreadyShowingCriteria,
+            onCached = { snapshot, exact ->
                 joinedIds.clear()
-                joinedIds.addAll(alreadyJoined)
-                storeResult
-                    .onSuccess { renderProjects(applyClientFilter(it, activeFilter())) }
-                    .onFailure { renderError(it.message ?: "加载失败") }
+                joinedIds.addAll(snapshot.joinedIds)
+                currentRawProjects = snapshot.projects
+                if (!alreadyShowingCriteria) {
+                    refreshNotice = if (exact) null else "正在静默同步最新项目"
+                    renderProjects(applyClientFilter(snapshot.projects, filter, searchQuery))
+                }
+                currentProjects.isNotEmpty()
+            },
+            onLoading = ::renderLoading,
+            onSuccess = { projects ->
+                currentRawProjects = projects
+                refreshNotice = null
+                renderProjects(applyClientFilter(projects, filter, searchQuery))
+            },
+            onStaleFailure = {
+                refreshNotice = "使用缓存 · 同步失败，点击重试"
+                renderProjects(currentProjects)
+            },
+            onEmptyFailure = ::renderError,
+            onJoined = { refreshed ->
+                joinedIds.clear()
+                joinedIds.addAll(refreshed)
+                renderProjects(applyClientFilter(currentRawProjects, activeFilter(), searchQuery))
             }
-        }
+        )
     }
 
     private fun ensureDiscoveryShell(): LinearLayout {
         val container = getListContainer()
+        (container.parent as? View)?.background = backdrop
         val currentResults = resultsContainer
         if (currentResults != null && currentResults.parent != null) {
             updateFilterChipVisuals()
@@ -161,9 +178,9 @@ internal class MainMarketplaceActions(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             background = rect(
-                activity.elonColor(R.color.elon_surface_search),
+                activity.elonColor(R.color.elon_plaza_surface_search),
                 SEARCH_RADIUS_DP,
-                activity.elonColor(R.color.elon_border_subtle)
+                activity.elonColor(R.color.elon_plaza_border)
             )
             setPadding(dp(20), 0, dp(18), 0)
             layoutParams = LinearLayout.LayoutParams(
@@ -176,7 +193,7 @@ internal class MainMarketplaceActions(
             }
             addView(ImageView(activity).apply {
                 setImageResource(R.drawable.ic_top_search_custom)
-                setColorFilter(activity.elonColor(R.color.elon_text_placeholder))
+                setColorFilter(activity.elonColor(R.color.elon_plaza_text_quiet))
                 contentDescription = null
             }, LinearLayout.LayoutParams(dp(24), dp(24)).apply {
                 marginEnd = dp(12)
@@ -184,10 +201,10 @@ internal class MainMarketplaceActions(
             val field = buildSearchField().apply {
                 setOnFocusChangeListener { _, focused ->
                     searchBar.background = rect(
-                        activity.elonColor(R.color.elon_surface_search),
+                        activity.elonColor(R.color.elon_plaza_surface_search),
                         SEARCH_RADIUS_DP,
                         activity.elonColor(
-                            if (focused) R.color.elon_border_primary else R.color.elon_border_subtle
+                            if (focused) R.color.elon_plaza_signal else R.color.elon_plaza_border
                         )
                     )
                 }
@@ -212,8 +229,8 @@ internal class MainMarketplaceActions(
             includeFontPadding = false
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, 0)
-            setTextColor(activity.elonColor(R.color.elon_text_primary))
-            setHintTextColor(activity.elonColor(R.color.elon_text_placeholder))
+            setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
+            setHintTextColor(activity.elonColor(R.color.elon_plaza_text_quiet))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -279,12 +296,12 @@ internal class MainMarketplaceActions(
         filterChipViews.forEach { (key, chip) ->
             val selected = key == activeFilterKey
             chip.setTextColor(
-                activity.elonColor(if (selected) R.color.elon_text_accent else R.color.elon_text_primary)
+                activity.elonColor(if (selected) R.color.elon_plaza_signal else R.color.elon_plaza_text_primary)
             )
             chip.paint.isUnderlineText = false
             chip.setTypeface(chip.typeface, Typeface.NORMAL)
             chip.background = if (selected) {
-                rect(activity.elonColor(R.color.elon_segment_selected), FILTER_CHIP_RADIUS_DP)
+                rect(activity.elonColor(R.color.elon_plaza_segment_selected), FILTER_CHIP_RADIUS_DP)
             } else {
                 null
             }
@@ -307,13 +324,18 @@ internal class MainMarketplaceActions(
     private fun renderError(msg: String) {
         val container = ensureDiscoveryShell()
         container.removeAllViews()
-        container.addView(feedbackSection.buildError(msg) { loadProjects(searchQuery) })
+        container.addView(feedbackSection.buildError(msg) { loadProjects(searchQuery, force = true) })
     }
 
     private fun renderProjects(projects: List<StoreProject>) {
         currentProjects = projects
         val container = ensureDiscoveryShell()
         container.removeAllViews()
+        refreshNotice?.let { notice ->
+            container.addView(feedbackSection.buildCacheNotice(notice) {
+                loadProjects(searchQuery, force = true)
+            })
+        }
         if (projects.isEmpty()) {
             val hasActiveCriteria = searchQuery.isNotBlank() || activeFilterKey != FILTER_ALL
             container.addView(feedbackSection.buildEmpty(
@@ -352,7 +374,7 @@ internal class MainMarketplaceActions(
         addView(TextView(activity).apply {
             text = "全部"
             includeFontPadding = false
-            setTextColor(activity.elonColor(R.color.elon_text_primary))
+            setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
         }, LinearLayout.LayoutParams(0, dp(38), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
         addView(TextView(activity).apply {
@@ -360,7 +382,7 @@ internal class MainMarketplaceActions(
             text = "${projects.size} 个项目 · $installableCount 个可安装"
             includeFontPadding = false
             gravity = Gravity.CENTER_VERTICAL
-            setTextColor(activity.elonColor(R.color.elon_text_tertiary))
+            setTextColor(activity.elonColor(R.color.elon_plaza_text_quiet))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)))
     }
@@ -384,12 +406,12 @@ internal class MainMarketplaceActions(
             orientation = LinearLayout.VERTICAL
             addView(TextView(activity).apply {
                 text = project.displayTitle(); maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-                setTextColor(activity.elonColor(R.color.elon_text_primary)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setTextColor(activity.elonColor(R.color.elon_plaza_text_primary)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             })
             addView(TextView(activity).apply {
                 text = project.description?.takeIf { it.isNotBlank() } ?: "这个项目还没有填写简介。"
                 maxLines = 1; ellipsize = TextUtils.TruncateAt.END; includeFontPadding = false
-                setTextColor(activity.elonColor(R.color.elon_text_tertiary)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextColor(activity.elonColor(R.color.elon_plaza_text_quiet)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(5) })
             addView(buildProjectListMeta(project), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -416,7 +438,7 @@ internal class MainMarketplaceActions(
             includeFontPadding = false
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(activity.elonColor(R.color.elon_text_tertiary))
+            setTextColor(activity.elonColor(R.color.elon_plaza_text_quiet))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         val build = projectPlazaBuildStatus(project.lastTaskStatus)
@@ -450,25 +472,45 @@ internal class MainMarketplaceActions(
         activeFilterKey = FILTER_ALL
         searchField?.setText("")
         updateFilterChipVisuals()
-        loadProjects()
+        loadProjects(force = true)
     }
 
     private fun toneColor(tone: ProjectPlazaTone): Int = when (tone) {
         ProjectPlazaTone.SUCCESS -> activity.elonColor(R.color.elon_status_success)
         ProjectPlazaTone.DANGER -> activity.elonColor(R.color.elon_status_danger)
-        ProjectPlazaTone.NEUTRAL -> activity.elonColor(R.color.elon_text_tertiary)
+        ProjectPlazaTone.NEUTRAL -> activity.elonColor(R.color.elon_plaza_text_quiet)
     }
 
     private fun activeFilter(): MarketplaceFilter {
         return filters.firstOrNull { it.key == activeFilterKey } ?: filters.first()
     }
 
-    private fun applyClientFilter(projects: List<StoreProject>, filter: MarketplaceFilter): List<StoreProject> {
-        return projects.filter { project ->
-            (!filter.joinedOnly || isProjectJoined(project)) &&
+    private fun applyClientFilter(
+        projects: List<StoreProject>,
+        filter: MarketplaceFilter,
+        query: String = searchQuery
+    ): List<StoreProject> {
+        val normalizedQuery = query.trim().lowercase()
+        val filtered = projects.filter { project ->
+            val matchesQuery = normalizedQuery.isBlank() || listOf(
+                project.displayTitle(),
+                project.description.orEmpty(),
+                project.ownerAccount
+            ).any { it.lowercase().contains(normalizedQuery) }
+            matchesQuery &&
+                (filter.hasApk != true || !project.latestApkUrl.isNullOrBlank()) &&
+                (!filter.joinedOnly || isProjectJoined(project)) &&
                 (!filter.noApprovalOnly || normalizeProjectJoinMode(project.joinMode) != PROJECT_JOIN_MODE_APPROVAL)
         }
+        return if (filter.sort == "members") {
+            filtered.sortedWith(compareByDescending<StoreProject> { it.memberCount }.thenBy { it.displayTitle() })
+        } else {
+            filtered
+        }
     }
+
+    private fun criteriaKey(query: String, filter: MarketplaceFilter): String =
+        "${filter.key}|${query.trim().lowercase()}"
 
     private fun rect(color: Int, radiusDp: Int = 0, strokeColor: Int? = null): GradientDrawable {
         return GradientDrawable().apply {
@@ -481,6 +523,7 @@ internal class MainMarketplaceActions(
 
     private companion object {
         const val FILTER_ALL = "all"
+        const val DEFAULT_CRITERIA_KEY = "all|"
         const val FONT_PAGE_TITLE_SP = 16f
         const val SEARCH_HEIGHT_DP = 56
         const val SEARCH_RADIUS_DP = 28

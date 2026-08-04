@@ -131,6 +131,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/manifest.json", get(web::pwa_manifest))
         .route("/sw.js", get(web::service_worker))
         .route("/assets/project_plaza.css", get(web::project_plaza_css))
+        .route(
+            "/assets/project_plaza_cache.js",
+            get(web::project_plaza_cache_js),
+        )
         .route("/assets/project_plaza.js", get(web::project_plaza_js))
         .route(
             "/assets/ic_plaza_enter_space.png",

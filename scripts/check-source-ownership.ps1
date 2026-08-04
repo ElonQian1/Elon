@@ -45,6 +45,7 @@ $changed = @($changed | ForEach-Object { $_.Trim().Replace('\', '/') } | Where-O
 $legacyPaths = @(
     "server/src/assets/web_page.html",
     "server/src/assets/project_plaza.js",
+    "server/src/assets/project_plaza_cache.js",
     "server/src/assets/project_plaza.css",
     "server/src/assets/project_home.js",
     "server/src/assets/project_home.css"

@@ -2,6 +2,9 @@
   const ROOT_ID = 'projectPlazaInlineRoot';
   const PAGE_LIMIT = 50;
   const MAX_PROJECTS = 200;
+  const CACHE_KEY = 'elon_project_plaza_snapshot_v1';
+  const FRESH_MS = 60 * 1000;
+  const SKELETON_DELAY_MS = 180;
   const filters = [
     { key: 'all', label: '全部' },
     { key: 'installable', label: '可安装', hasApk: true },
@@ -20,10 +23,14 @@
     filterKey: 'all',
     query: '',
     status: '',
-    error: false
+    error: false,
+    cacheNotice: ''
   };
 
   let searchTimer = 0;
+  let loadingTimer = 0;
+  let requestSerial = 0;
+  const snapshots = new Map();
 
   function bridge() {
     return window.ElonWebApp || {};
@@ -78,6 +85,15 @@
 
   function activeFilter() {
     return filters.find((item) => item.key === state.filterKey) || filters[0];
+  }
+
+  function criteriaKey(filter, query) { return `${filter.key}|${String(query || '').trim().toLowerCase()}`; }
+
+  function restorePersistentSnapshot() {
+    if (snapshots.has('all|')) return;
+    const snapshot = window.ElonProjectPlazaCache && window.ElonProjectPlazaCache.read(CACHE_KEY);
+    if (!snapshot) return;
+    snapshots.set('all|', snapshot);
   }
 
   function normalizeJoinMode(mode) {
@@ -227,22 +243,58 @@
     state.joinedIds = ids;
   }
 
-  async function loadProjects() {
-    state.loading = true;
+  async function loadProjects(force) {
+    restorePersistentSnapshot();
+    const filter = activeFilter();
+    const key = criteriaKey(filter, state.query);
+    const cached = snapshots.get(key);
+    const fallback = cached || snapshots.get('all|');
+    if (fallback) {
+      state.projects = applyClientFilter(fallback.projects, filter);
+      state.cacheNotice = cached ? '' : '正在静默同步最新项目';
+      state.loading = false;
+      state.error = false;
+      render();
+    }
     state.loaded = true;
     state.status = '';
     state.error = false;
-    render();
+    if (!force && cached && Date.now() - cached.savedAt <= FRESH_MS) return;
+    const serial = ++requestSerial;
+    window.clearTimeout(loadingTimer);
+    loadingTimer = window.setTimeout(() => {
+      if (serial !== requestSerial || state.projects.length) return;
+      state.loading = true;
+      render();
+    }, SKELETON_DELAY_MS);
     try {
-      const filter = activeFilter();
       const projects = await fetchAllProjects(filter);
+      const snapshot = { projects, savedAt: Date.now() };
+      snapshots.set(key, snapshot);
+      if (key === 'all|' && window.ElonProjectPlazaCache) {
+        window.ElonProjectPlazaCache.write(CACHE_KEY, snapshot);
+      }
+      if (serial !== requestSerial) return;
+      state.projects = applyClientFilter(projects, filter);
+      state.loading = false;
+      state.cacheNotice = '';
+      render();
       await loadJoinedIds();
+      if (serial !== requestSerial) return;
       state.projects = applyClientFilter(projects, filter);
     } catch (e) {
-      state.projects = [];
       state.status = e.message || '加载失败';
-      state.error = true;
+      if (state.projects.length) {
+        state.cacheNotice = '使用缓存 · 同步失败，点击重试';
+        state.error = false;
+      } else {
+        state.projects = [];
+        state.error = true;
+      }
     } finally {
+      window.clearTimeout(loadingTimer);
+      loadingTimer = 0;
+      if (serial !== requestSerial) return;
       state.loading = false;
       render();
     }
@@ -281,17 +333,33 @@
   }
 
   function applyClientFilter(projects, filter) {
-    return projects.filter((project) => {
+    const query = state.query.trim().toLowerCase();
+    const filtered = projects.filter((project) => {
       const joined = state.joinedIds.has(project.id);
-      return (!filter.joinedOnly || joined) &&
+      const identity = projectIdentity(project);
+      const matchesQuery = !query || [
+        identity.title,
+        identity.subtitle,
+        cleanText(project.owner_account)
+      ].some((value) => String(value || '').toLowerCase().includes(query));
+      const hasApk = cleanText(project.latest_apk_url) || cleanText(project.last_apk_url);
+      return matchesQuery &&
+        (!filter.hasApk || hasApk) &&
+        (!filter.joinedOnly || joined) &&
         (!filter.noApprovalOnly || normalizeJoinMode(project.join_mode) !== 'approval');
     });
+    if (filter.sort === 'members') {
+      return filtered.slice().sort((left, right) =>
+        projectMemberCount(right) - projectMemberCount(left) ||
+        projectIdentity(left).title.localeCompare(projectIdentity(right).title, 'zh-CN')
+      );
+    }
+    return filtered;
   }
 
   function openInline() {
     attachEvents();
-    if (!state.loaded) loadProjects();
-    else render();
+    loadProjects();
   }
 
   function render() {
@@ -312,6 +380,9 @@
         ${renderResults()}
       </div>
     `;
+    if (!state.loading && !state.error && state.projects.length) {
+      window.requestAnimationFrame(configureFeaturedCarousel);
+    }
   }
 
   function renderFilter(filter) {
@@ -340,6 +411,7 @@
     );
     const featuredProjects = state.projects.slice(0, 5);
     return `
+      ${state.cacheNotice ? renderCacheNotice(state.cacheNotice) : ''}
       <div class="project-plaza-featured-label">
         <strong>精选项目</strong>
         <span data-plaza-featured-position>01 / ${escapeHtml(String(featuredProjects.length).padStart(2, '0'))}</span>
@@ -356,6 +428,10 @@
     `;
   }
 
+  function renderCacheNotice(message) {
+    return `<button class="project-plaza-cache-notice" type="button" data-plaza-action="retry">${escapeHtml(message)}</button>`;
+  }
+
   function renderLoadingState() {
     return `
       <div class="project-plaza-skeleton" aria-label="正在加载项目">
@@ -367,7 +443,6 @@
         `).join('')}
       </div>
     `;
-    window.requestAnimationFrame(configureFeaturedCarousel);
   }
 
   function configureFeaturedCarousel() {
@@ -686,11 +761,11 @@
       } else if (action === 'favorite' || action === 'liked') {
         toggleReaction(id, action);
       } else if (action === 'retry') {
-        loadProjects();
+        loadProjects(true);
       } else if (action === 'clear') {
         state.query = '';
         state.filterKey = 'all';
-        loadProjects();
+        loadProjects(true);
       }
       return;
     }
