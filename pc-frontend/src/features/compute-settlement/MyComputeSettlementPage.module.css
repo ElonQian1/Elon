@@ -75,8 +75,10 @@
 }
 
 .iconButton,
+.secondaryButton,
 .primaryButton,
-.cancelAction {
+.cancelAction,
+.emptyAction {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -98,6 +100,17 @@
   color: #08140d;
   border-color: #52b77b;
   background: #69c78d;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.secondaryButton,
+.emptyAction {
+  min-height: 36px;
+  gap: 7px;
+  padding: 0 11px;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
   font-size: 12px;
   font-weight: 750;
 }
@@ -377,6 +390,10 @@
 }
 
 .emptyState svg { color: #79a8e8; }
+
+.emptyAction {
+  margin-top: 8px;
+}
 
 .spinning { animation: spin .8s linear infinite; }
 

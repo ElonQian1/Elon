@@ -18,6 +18,24 @@ export interface MyComputeProvider {
   provider_digest: string
 }
 
+export type MyComputeProviderKind = 'user_node' | 'managed_cluster'
+
+export type ComputeDataClass = 'public' | 'low_sensitivity' | 'restricted'
+
+export interface CreateMyComputeProviderBody {
+  provider_id: string
+  provider_kind: MyComputeProviderKind
+  display_name: string
+  home_region?: string | null
+  task_kinds: string[]
+  accelerator_kinds: string[]
+  regions: string[]
+  allowed_data_classes: ComputeDataClass[]
+  supports_streaming: boolean
+  supports_checkpointing: boolean
+  declared_hardware_digest?: string | null
+}
+
 export interface ProviderSettlementAccount {
   schema: string
   provider_id: string
@@ -68,6 +86,8 @@ export interface CancelMyWithdrawalBody {
 export const myComputeSettlementApi = {
   providers: (limit = 100) =>
     api.get<MyComputeProvider[]>(`/api/me/compute/providers?limit=${limit}`),
+  createProvider: (body: CreateMyComputeProviderBody) =>
+    api.post<MyComputeProvider>('/api/me/compute/providers', body),
   account: (providerId: string) =>
     api.get<ProviderSettlementAccount>(
       `/api/me/compute/providers/${encodeURIComponent(providerId)}/settlement-account`,

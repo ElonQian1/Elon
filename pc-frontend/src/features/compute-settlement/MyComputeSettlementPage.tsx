@@ -3,6 +3,7 @@ import {
   CircleCheck,
   CircleDollarSign,
   Clock3,
+  Plus,
   RefreshCw,
   RotateCcw,
   ShieldCheck,
@@ -17,9 +18,11 @@ import {
 import {
   myComputeSettlementApi,
   type CreateMyWithdrawalBody,
+  type CreateMyComputeProviderBody,
   type MyComputeProvider,
   type ProviderSettlementAccount,
 } from './myComputeSettlementApi'
+import CreateComputeProviderDialog from './CreateComputeProviderDialog'
 import WithdrawalRequestDialog from './WithdrawalRequestDialog'
 import styles from './MyComputeSettlementPage.module.css'
 
@@ -40,6 +43,8 @@ export default function MyComputeSettlementPage() {
   const [loadingProviders, setLoadingProviders] = useState(false)
   const [loadingAccount, setLoadingAccount] = useState(false)
   const [requestOpen, setRequestOpen] = useState(false)
+  const [providerDialogOpen, setProviderDialogOpen] = useState(false)
+  const [creatingProvider, setCreatingProvider] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [cancellingId, setCancellingId] = useState('')
   const [error, setError] = useState('')
@@ -110,6 +115,24 @@ export default function MyComputeSettlementPage() {
     }
   }
 
+  async function createProvider(body: CreateMyComputeProviderBody) {
+    if (creatingProvider) return
+    setCreatingProvider(true)
+    setError('')
+    setNotice('')
+    try {
+      const provider = await myComputeSettlementApi.createProvider(body)
+      await loadProviders()
+      setProviderId(provider.provider_id)
+      setProviderDialogOpen(false)
+      setNotice(`Provider“${provider.display_name}”已登记，当前状态为登记中。`)
+    } catch (reason) {
+      setError(messageOf(reason, 'Provider 登记失败'))
+    } finally {
+      setCreatingProvider(false)
+    }
+  }
+
   async function cancelWithdrawal(request: SettlementWithdrawalRequest) {
     if (!providerId || cancellingId) return
     if (!window.confirm(`取消 ${formatCny(request.amount_micros)} 提款申请并退回 available？`)) return
@@ -161,13 +184,16 @@ export default function MyComputeSettlementPage() {
           <button type="button" className={styles.iconButton} onClick={() => void refresh()} disabled={loading} aria-label="刷新" title="刷新">
             <RefreshCw size={16} className={loading ? styles.spinning : ''} aria-hidden="true" />
           </button>
+          <button type="button" className={styles.secondaryButton} onClick={() => { setError(''); setProviderDialogOpen(true) }}>
+            <Plus size={16} aria-hidden="true" />登记 Provider
+          </button>
           <button type="button" className={styles.primaryButton} onClick={() => { setError(''); setRequestOpen(true) }} disabled={!account || account.available_micros <= 0}>
             <CircleDollarSign size={16} aria-hidden="true" />申请提款
           </button>
         </div>
       </header>
 
-      {error && !requestOpen && <div className={styles.alert} data-tone="error"><TriangleAlert size={15} />{error}</div>}
+      {error && !requestOpen && !providerDialogOpen && <div className={styles.alert} data-tone="error"><TriangleAlert size={15} />{error}</div>}
       {notice && <div className={styles.alert} data-tone="success"><CircleCheck size={15} />{notice}</div>}
 
       {providers.length === 0 && !loadingProviders ? (
@@ -175,6 +201,7 @@ export default function MyComputeSettlementPage() {
           <WalletCards size={24} aria-hidden="true" />
           <h2>尚未登记算力 Provider</h2>
           <p>账户建立后，结算收益和提款申请会显示在这里。</p>
+          <button type="button" className={styles.emptyAction} onClick={() => { setError(''); setProviderDialogOpen(true) }}><Plus size={16} />登记 Provider</button>
         </section>
       ) : (
         <>
@@ -235,6 +262,14 @@ export default function MyComputeSettlementPage() {
           error={error}
           onClose={() => setRequestOpen(false)}
           onSubmit={createWithdrawal}
+        />
+      )}
+      {providerDialogOpen && (
+        <CreateComputeProviderDialog
+          busy={creatingProvider}
+          error={error}
+          onClose={() => setProviderDialogOpen(false)}
+          onSubmit={createProvider}
         />
       )}
     </main>
