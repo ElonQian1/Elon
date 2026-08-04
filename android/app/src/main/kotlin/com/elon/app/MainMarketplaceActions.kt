@@ -21,7 +21,6 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import okhttp3.OkHttpClient
 import kotlin.concurrent.thread
-import kotlin.math.roundToInt
 
 internal class MainMarketplaceActions(
     private val activity: AppCompatActivity,
@@ -44,6 +43,19 @@ internal class MainMarketplaceActions(
 
     private val joinedIds = mutableSetOf<String>()
     private val reactionPrefs by lazy { activity.getSharedPreferences("project_plaza_reactions", 0) }
+    private val feedbackSection by lazy {
+        ProjectPlazaFeedbackSection(activity, dp, selectableForeground)
+    }
+    private val membershipActions by lazy {
+        ProjectPlazaMembershipActionController(
+            activity = activity,
+            http = http,
+            serverUrl = serverUrl,
+            isJoined = ::isProjectJoined,
+            onJoined = { project -> joinedIds.add(project.id) },
+            onStateChanged = ::rerenderCurrentProjects
+        )
+    }
     private val featuredSection by lazy {
         ProjectPlazaFeaturedSection(
             activity = activity,
@@ -51,7 +63,9 @@ internal class MainMarketplaceActions(
             selectableForeground = selectableForeground,
             reactionPrefs = reactionPrefs,
             openProjectSpace = openProjectSpace,
-            isProjectJoined = ::isProjectJoined
+            isProjectJoined = ::isProjectJoined,
+            primaryAction = membershipActions::presentation,
+            onPrimaryAction = { project -> membershipActions.handle(project, openProjectSpace) }
         )
     }
     private val filterChipViews = LinkedHashMap<String, TextView>()
@@ -60,6 +74,7 @@ internal class MainMarketplaceActions(
     private var searchDebounce: Runnable? = null
     private var searchQuery = ""
     private var activeFilterKey = FILTER_ALL
+    private var currentProjects: List<StoreProject> = emptyList()
     @Volatile
     private var loadSerial = 0
 
@@ -269,20 +284,25 @@ internal class MainMarketplaceActions(
     private fun renderLoading() {
         val container = ensureDiscoveryShell()
         container.removeAllViews()
-        container.addView(centerMessage("加载中...", COLOR_TEXT_TERTIARY))
+        container.addView(feedbackSection.buildLoading())
     }
 
     private fun renderError(msg: String) {
         val container = ensureDiscoveryShell()
         container.removeAllViews()
-        container.addView(centerMessage(msg, "#FF7A7A"))
+        container.addView(feedbackSection.buildError(msg) { loadProjects(searchQuery) })
     }
 
     private fun renderProjects(projects: List<StoreProject>) {
+        currentProjects = projects
         val container = ensureDiscoveryShell()
         container.removeAllViews()
         if (projects.isEmpty()) {
-            container.addView(centerMessage("暂无匹配项目", COLOR_TEXT_SECONDARY))
+            val hasActiveCriteria = searchQuery.isNotBlank() || activeFilterKey != FILTER_ALL
+            container.addView(feedbackSection.buildEmpty(
+                actionLabel = if (hasActiveCriteria) "清除筛选" else "刷新项目",
+                onAction = ::resetDiscovery
+            ))
             return
         }
         container.addView(featuredSection.build(projects.take(5)), LinearLayout.LayoutParams(
@@ -304,7 +324,7 @@ internal class MainMarketplaceActions(
             ).apply {
                 marginStart = dp(PLAZA_SIDE_MARGIN_DP)
                 marginEnd = dp(PLAZA_SIDE_MARGIN_DP)
-                topMargin = designPx(if (index == 0) LIST_FIRST_ROW_TOP_PX else LIST_ROW_GAP_PX)
+                topMargin = dp(if (index == 0) LIST_FIRST_ROW_TOP_DP else LIST_ROW_GAP_DP)
             })
         }
     }
@@ -331,11 +351,18 @@ internal class MainMarketplaceActions(
     private fun buildProjectListRow(project: StoreProject) = LinearLayout(activity).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(9), 0, 0, 0)
+        minimumHeight = dp(LIST_ROW_MIN_HEIGHT_DP)
+        setPadding(0, dp(14), 0, dp(14))
         isClickable = true
         foreground = selectableForeground()
         setOnClickListener { openProjectSpace(project) }
-        addView(projectThumbnail(project), LinearLayout.LayoutParams(designPx(159), designPx(155)))
+        addView(projectPlazaProjectCover(
+            activity = activity,
+            project = project,
+            sizePx = dp(LIST_COVER_SIZE_DP),
+            radiusPx = dp(LIST_COVER_RADIUS_DP).toFloat(),
+            fallbackTextSp = 22f
+        ), LinearLayout.LayoutParams(dp(LIST_COVER_SIZE_DP), dp(LIST_COVER_SIZE_DP)))
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             addView(TextView(activity).apply {
@@ -344,46 +371,75 @@ internal class MainMarketplaceActions(
             })
             addView(TextView(activity).apply {
                 text = project.description?.takeIf { it.isNotBlank() } ?: "这个项目还没有填写简介。"
-                maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+                maxLines = 1; ellipsize = TextUtils.TruncateAt.END; includeFontPadding = false
                 setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(5) })
-        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = designPx(LIST_TEXT_GAP_PX) })
+            addView(buildProjectListMeta(project), LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(7) })
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(16) })
         addView(FrameLayout(activity).apply {
             contentDescription = "进入${project.displayTitle()}"
             addView(ImageView(activity).apply {
                 setImageResource(R.drawable.project_view_chevron)
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 contentDescription = null
-            }, FrameLayout.LayoutParams(designPx(LIST_CHEVRON_PX), designPx(LIST_CHEVRON_PX), Gravity.END or Gravity.CENTER_VERTICAL).apply {
-                marginEnd = designPx(LIST_CHEVRON_END_INSET_PX)
+            }, FrameLayout.LayoutParams(dp(LIST_CHEVRON_DP), dp(LIST_CHEVRON_DP), Gravity.END or Gravity.CENTER_VERTICAL).apply {
+                marginEnd = dp(LIST_CHEVRON_END_INSET_DP)
             })
         }, LinearLayout.LayoutParams(dp(48), dp(48)))
     }
 
-    private fun projectThumbnail(project: StoreProject): View {
-        return ImageView(activity).apply {
-            setImageResource(R.drawable.project_plaza_ui2_thumbnail)
-            scaleType = ImageView.ScaleType.FIT_XY
-            contentDescription = "${project.displayTitle()}缩略图"
-        }
+    private fun buildProjectListMeta(project: StoreProject) = LinearLayout(activity).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        addView(TextView(activity).apply {
+            val owner = project.ownerAccount.trim().takeIf { it.isNotBlank() && it != "?" } ?: "未知"
+            text = "$owner · ${project.memberCount.coerceAtLeast(0)} 人"
+            includeFontPadding = false
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        val build = projectPlazaBuildStatus(project.lastTaskStatus)
+        addView(View(activity).apply {
+            background = rect(toneColor(build.tone), 3)
+            contentDescription = null
+        }, LinearLayout.LayoutParams(dp(6), dp(6)).apply { marginStart = dp(8) })
+        addView(TextView(activity).apply {
+            text = build.label
+            includeFontPadding = false
+            setTextColor(Color.parseColor(toneColor(build.tone)))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { marginStart = dp(6) })
     }
 
     private fun isProjectJoined(project: StoreProject): Boolean {
         return !project.viewerRole.isNullOrBlank() || joinedIds.contains(project.id)
     }
 
-    private fun centerMessage(text: String, color: String): TextView {
-        return TextView(activity).apply {
-            this.text = text
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor(color))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
-            setPadding(dp(20), dp(58), dp(20), dp(58))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
+    private fun rerenderCurrentProjects() {
+        if (currentProjects.isNotEmpty()) renderProjects(currentProjects)
+    }
+
+    private fun resetDiscovery() {
+        searchDebounce?.let { activity.window.decorView.removeCallbacks(it) }
+        searchDebounce = null
+        searchQuery = ""
+        activeFilterKey = FILTER_ALL
+        searchField?.setText("")
+        updateFilterChipVisuals()
+        loadProjects()
+    }
+
+    private fun toneColor(tone: ProjectPlazaTone): String = when (tone) {
+        ProjectPlazaTone.SUCCESS -> COLOR_STATUS_SUCCESS
+        ProjectPlazaTone.DANGER -> COLOR_STATUS_DANGER
+        ProjectPlazaTone.NEUTRAL -> COLOR_TEXT_TERTIARY
     }
 
     private fun activeFilter(): MarketplaceFilter {
@@ -405,33 +461,30 @@ internal class MainMarketplaceActions(
         }
     }
 
-    private fun designPx(value: Int): Int {
-        val width = activity.resources.displayMetrics.widthPixels.takeIf { it > 0 } ?: DESIGN_WIDTH_PX
-        return (value * (width / DESIGN_WIDTH_PX.toFloat())).roundToInt()
-    }
-
     private companion object {
         const val FILTER_ALL = "all"
         const val COLOR_SEARCH_BG = "#272727"
         const val COLOR_SEGMENT_SELECTED = "#1A1A1A"
         const val COLOR_TEXT_PRIMARY = "#D9D9D9"
-        const val COLOR_TEXT_SECONDARY = "#B8B8B8"
         const val COLOR_TEXT_PLACEHOLDER = "#AFAFAF"
         const val COLOR_TEXT_TERTIARY = "#777777"
         const val FONT_PAGE_TITLE_SP = 16f
-        const val SEARCH_HEIGHT_DP = 48
-        const val SEARCH_RADIUS_DP = 24
+        const val COLOR_STATUS_SUCCESS = "#58BE6A"
+        const val COLOR_STATUS_DANGER = "#E62129"
+        const val SEARCH_HEIGHT_DP = 56
+        const val SEARCH_RADIUS_DP = 28
         const val PLAZA_SIDE_MARGIN_DP = 20
         const val FILTER_CHIP_HEIGHT_DP = 48
         const val FILTER_CHIP_SELECTED_WIDTH_DP = 70
         const val FILTER_CHIP_RADIUS_DP = 24
         const val FILTER_SIDE_PADDING_DP = 16
         const val FILTER_ITEM_GAP_DP = 14
-        const val DESIGN_WIDTH_PX = 1275
-        const val LIST_FIRST_ROW_TOP_PX = 28
-        const val LIST_ROW_GAP_PX = 64
-        const val LIST_TEXT_GAP_PX = 48
-        const val LIST_CHEVRON_PX = 43
-        const val LIST_CHEVRON_END_INSET_PX = 12
+        const val LIST_FIRST_ROW_TOP_DP = 2
+        const val LIST_ROW_GAP_DP = 4
+        const val LIST_ROW_MIN_HEIGHT_DP = 112
+        const val LIST_COVER_SIZE_DP = 60
+        const val LIST_COVER_RADIUS_DP = 12
+        const val LIST_CHEVRON_DP = 16
+        const val LIST_CHEVRON_END_INSET_DP = 4
     }
 }

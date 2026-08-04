@@ -45,7 +45,9 @@ class ProjectPlazaLayoutContractTest {
         ).forEach { resource -> assertTrue(featured.contains(resource)) }
         assertTrue(marketplace.contains("featuredSection.build(projects.take(5))"))
         assertTrue(featured.contains("text = \"精选项目\""))
-        assertTrue(featured.contains("text = \"进入空间\""))
+        assertTrue(featured.contains("val action = primaryAction(project)"))
+        assertTrue(featured.contains("projectPlazaProjectCover("))
+        assertTrue(featured.contains("val build = projectPlazaBuildStatus(project.lastTaskStatus)"))
         assertTrue(featured.contains("FEATURED_CARD_WIDTH_FRACTION = 0.6871795f"))
         assertTrue(featured.contains("FEATURED_CARD_HEIGHT_RATIO = 1.2014925f"))
         assertTrue(featured.contains("FEATURED_CARD_GAP_DP = 10"))
@@ -68,6 +70,9 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(script.contains("project-plaza-featured-cover"))
         assertTrue(script.contains("project-plaza-featured-facts"))
         assertTrue(script.contains("project-plaza-featured-primary"))
+        assertTrue(script.contains("const action = primaryAction(project)"))
+        assertTrue(script.contains("const build = projectBuildStatus(project)"))
+        assertTrue(script.contains("data-plaza-featured-position"))
         assertFalse(script.contains("project-plaza-featured-media"))
         assertTrue(styles.contains("width: 68.718vw;"))
         assertTrue(styles.contains("aspect-ratio: 268 / 322;"))
@@ -76,7 +81,7 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(styles.contains("--plaza-header: #1f2023;"))
         assertTrue(styles.contains("--plaza-success: #58be6a;"))
         assertTrue(styles.contains("--plaza-danger: #e62129;"))
-        assertTrue(page.contains("data-ui-design=\"apk-project-dossier-v2\""))
+        assertTrue(page.contains("data-ui-design=\"apk-project-dossier-v3\""))
     }
 
     @Test
@@ -131,8 +136,38 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(androidSource.contains("shell.addView(buildSearchBar())"))
         assertTrue(androidSource.contains("shell.addView(buildFilterScroller()"))
         assertTrue(androidSource.contains("R.drawable.ic_top_search_custom"))
+        assertTrue(androidSource.contains("SEARCH_HEIGHT_DP = 56"))
+        assertTrue(androidSource.contains("SEARCH_RADIUS_DP = 28"))
         assertTrue(webScript.contains("placeholder=\"搜索项目、作者\""))
         assertTrue(mobileWeb.contains("data-search-artwork=\"/assets/project_view_search_icon.png\""))
+    }
+
+    @Test
+    fun feedbackAndListDossierRemainActionableAndDataDriven() {
+        val marketplace = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainMarketplaceActions.kt"
+        )
+        val feedback = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/ProjectPlazaFeedbackSection.kt"
+        )
+        val membership = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/ProjectPlazaMembershipActionController.kt"
+        )
+        val script = readRepositoryFile("server/src/assets/project_plaza.js")
+        val styles = readRepositoryFile("server/src/assets/project_plaza.css")
+
+        assertTrue(marketplace.contains("LIST_ROW_MIN_HEIGHT_DP = 112"))
+        assertTrue(marketplace.contains("projectPlazaProjectCover("))
+        assertTrue(marketplace.contains("buildProjectListMeta(project)"))
+        assertTrue(feedback.contains("没有找到匹配项目"))
+        assertTrue(feedback.contains("重新加载"))
+        assertTrue(membership.contains("requestJoinStoreProject"))
+        assertTrue(membership.contains("joinStoreProject"))
+        assertTrue(script.contains("state.pendingIds.add(id)"))
+        assertTrue(script.contains("project-plaza-list-meta"))
+        assertTrue(styles.contains("min-height: 112px;"))
+        assertTrue(styles.contains(".project-plaza-feedback"))
+        assertTrue(styles.contains(".project-plaza-skeleton-row"))
     }
 
     @Test

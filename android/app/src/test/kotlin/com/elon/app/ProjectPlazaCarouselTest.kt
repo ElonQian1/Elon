@@ -8,7 +8,7 @@ class ProjectPlazaCarouselTest {
     @Test
     fun scaleInterpolatesContinuouslyFromCenterToAdjacentCard() {
         assertEquals(1f, projectPlazaCardScale(0f, 300f), 0.0001f)
-        assertEquals(0.95f, projectPlazaCardScale(150f, 300f), 0.0001f)
+        assertEquals(0.98f, projectPlazaCardScale(150f, 300f), 0.0001f)
         assertEquals(PROJECT_PLAZA_CARD_MIN_SCALE, projectPlazaCardScale(300f, 300f), 0.0001f)
     }
 
@@ -35,5 +35,15 @@ class ProjectPlazaCarouselTest {
         assertEquals(107, projectPlazaTrailingPadding(360, 17, 236, 98))
         assertEquals(122, projectPlazaTrailingPadding(412, 20, 270, 98))
         assertEquals(98, projectPlazaTrailingPadding(320, 20, 220, 98))
+    }
+
+    @Test
+    fun velocityProjectionCanAdvanceBeyondTheNearestRestingCard() {
+        val offsets = listOf(0, 278, 556, 834)
+        assertEquals(0, projectedProjectPlazaCardIndex(offsets, scrollX = 80, velocityX = 0))
+        assertEquals(1, projectedProjectPlazaCardIndex(offsets, scrollX = 80, velocityX = 1_500))
+        assertEquals(2, projectedProjectPlazaCardIndex(offsets, scrollX = 80, velocityX = 2_600))
+        assertEquals(0, projectedProjectPlazaCardIndex(offsets, scrollX = 80, velocityX = -2_000))
+        assertNull(projectedProjectPlazaCardIndex(emptyList(), scrollX = 0, velocityX = 1_000))
     }
 }

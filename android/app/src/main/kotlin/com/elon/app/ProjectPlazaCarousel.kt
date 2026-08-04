@@ -9,7 +9,7 @@ import android.widget.HorizontalScrollView
 import kotlin.math.abs
 import kotlin.math.max
 
-internal const val PROJECT_PLAZA_CARD_MIN_SCALE = 0.90f
+internal const val PROJECT_PLAZA_CARD_MIN_SCALE = 0.96f
 
 internal fun projectPlazaCardScale(
     centerDistancePx: Float,
@@ -42,14 +42,31 @@ internal fun projectPlazaTrailingPadding(
     viewportWidthPx - leadingPaddingPx - cardWidthPx
 )
 
+internal fun projectedProjectPlazaCardIndex(
+    cardOffsetsPx: List<Int>,
+    scrollX: Int,
+    velocityX: Int,
+    projectionSeconds: Float = 0.18f
+): Int? {
+    if (cardOffsetsPx.isEmpty()) return null
+    val projectedX = (scrollX + velocityX * projectionSeconds)
+        .coerceIn(cardOffsetsPx.first().toFloat(), cardOffsetsPx.last().toFloat())
+    return cardOffsetsPx.indices.minByOrNull { index ->
+        abs(cardOffsetsPx[index] - projectedX)
+    }
+}
+
 /**
  * Keeps fixed layout/snap slots while scaling each complete featured card around its visual center.
  * Fixed slots preserve the half-preview geometry and touch semantics; only drawing is transformed.
  */
 internal class ProjectPlazaCarousel(context: Context) : HorizontalScrollView(context) {
+    var onActiveCardChanged: ((Int) -> Unit)? = null
+
     private var touchActive = false
     private var snapTargetX: Int? = null
     private var minimumTrailingPaddingPx = 0
+    private var activeCardIndex = -1
     private val settleRunnable = Runnable { snapToNearestCard() }
 
     init {
@@ -84,6 +101,13 @@ internal class ProjectPlazaCarousel(context: Context) : HorizontalScrollView(con
             card.scaleX = scale
             card.scaleY = scale
         }
+        nearestProjectPlazaCardIndex(
+            (0 until row.childCount).map { index ->
+                val card = row.getChildAt(index)
+                card.left + card.width / 2f - scrollX
+            },
+            previewCenter
+        )?.let(::updateActiveCard)
     }
 
     override fun onScrollChanged(left: Int, top: Int, oldLeft: Int, oldTop: Int) {
@@ -115,6 +139,21 @@ internal class ProjectPlazaCarousel(context: Context) : HorizontalScrollView(con
         return super.onTouchEvent(event)
     }
 
+    override fun fling(velocityX: Int) {
+        val row = cardRow()
+        if (row == null || row.childCount == 0) {
+            super.fling(velocityX)
+            return
+        }
+        removeCallbacks(settleRunnable)
+        val first = row.getChildAt(0)
+        val offsets = (0 until row.childCount).map { index ->
+            (row.getChildAt(index).left - first.left).coerceAtLeast(0)
+        }
+        val targetIndex = projectedProjectPlazaCardIndex(offsets, scrollX, velocityX) ?: return
+        snapToCard(row, targetIndex)
+    }
+
     override fun onDetachedFromWindow() {
         removeCallbacks(settleRunnable)
         super.onDetachedFromWindow()
@@ -135,7 +174,13 @@ internal class ProjectPlazaCarousel(context: Context) : HorizontalScrollView(con
             card.left + card.width / 2f - scrollX
         }
         val nearestIndex = nearestProjectPlazaCardIndex(centers, previewCenter) ?: return
-        val targetX = (row.getChildAt(nearestIndex).left - first.left).coerceAtLeast(0)
+        snapToCard(row, nearestIndex)
+    }
+
+    private fun snapToCard(row: ViewGroup, index: Int) {
+        val first = row.getChildAt(0)
+        val targetX = (row.getChildAt(index).left - first.left).coerceAtLeast(0)
+        updateActiveCard(index)
         if (abs(scrollX - targetX) <= SNAP_EPSILON_PX) {
             if (scrollX != targetX) scrollTo(targetX, 0)
             snapTargetX = null
@@ -151,6 +196,12 @@ internal class ProjectPlazaCarousel(context: Context) : HorizontalScrollView(con
             snapTargetX = null
             refreshCardScales()
         }
+    }
+
+    private fun updateActiveCard(index: Int) {
+        if (activeCardIndex == index) return
+        activeCardIndex = index
+        onActiveCardChanged?.invoke(index)
     }
 
     private fun cardRow(): ViewGroup? = getChildAt(0) as? ViewGroup

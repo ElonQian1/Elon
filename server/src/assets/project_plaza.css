@@ -28,10 +28,10 @@
 }
 
 .project-plaza-search-bar {
-  height: 48px;
+  height: 56px;
   margin: 16px 20px 0;
   padding: 0 18px 0 20px;
-  border-radius: 24px;
+  border-radius: 28px;
   background: var(--plaza-search);
   display: flex;
   align-items: center;
@@ -65,7 +65,7 @@
   color: var(--plaza-text);
   font: inherit;
   font-size: 15px;
-  line-height: 48px;
+  line-height: 56px;
   padding: 0;
 }
 
@@ -161,7 +161,7 @@
   width: 100%;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
-  scroll-snap-type: x proximity;
+  scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
 
@@ -185,8 +185,14 @@
   box-sizing: border-box;
   overflow: hidden;
   scroll-snap-align: start;
+  scroll-snap-stop: normal;
   cursor: pointer;
+  transform: scale(0.96);
   transition: transform 160ms var(--plaza-ease-out), opacity 160ms var(--plaza-ease-out);
+}
+
+.project-plaza-featured-card.is-active {
+  transform: scale(1);
 }
 
 .project-plaza-featured-head {
@@ -216,7 +222,7 @@
 }
 
 .project-plaza-featured-rank span {
-  color: var(--plaza-text-tertiary);
+  color: var(--plaza-text-secondary);
   font-size: 12px;
 }
 
@@ -237,6 +243,10 @@
   background: var(--plaza-danger);
 }
 
+.project-plaza-featured-status.is-neutral i {
+  background: var(--plaza-text-tertiary);
+}
+
 .project-plaza-featured-body {
   padding: 18px;
 }
@@ -248,6 +258,7 @@
 }
 
 .project-plaza-featured-cover {
+  position: relative;
   width: 76px;
   height: 76px;
   flex: none;
@@ -258,6 +269,17 @@
   place-items: center;
   font-size: 28px;
   font-weight: 700;
+  overflow: hidden;
+}
+
+.project-plaza-featured-cover img,
+.project-plaza-list-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
 }
 
 .project-plaza-featured-copy {
@@ -305,7 +327,7 @@
 }
 
 .project-plaza-featured-fact small {
-  color: var(--plaza-text-tertiary);
+  color: var(--plaza-text-secondary);
   font-size: 11px;
   line-height: 1.2;
 }
@@ -318,6 +340,21 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.project-plaza-featured-fact b.is-success,
+.project-plaza-list-meta b.is-success {
+  color: var(--plaza-success);
+}
+
+.project-plaza-featured-fact b.is-danger,
+.project-plaza-list-meta b.is-danger {
+  color: var(--plaza-danger);
+}
+
+.project-plaza-featured-fact b.is-neutral,
+.project-plaza-list-meta b.is-neutral {
+  color: var(--plaza-text-tertiary);
 }
 
 .project-plaza-featured-actions {
@@ -344,6 +381,11 @@
   font-weight: 700;
   cursor: pointer;
   transition: transform 160ms var(--plaza-ease-out), opacity 160ms var(--plaza-ease-out);
+}
+
+.project-plaza-featured-primary[aria-disabled="true"] {
+  background: var(--plaza-text-secondary);
+  cursor: default;
 }
 
 .project-plaza-reactions {
@@ -414,10 +456,10 @@
 
 .project-plaza-card {
   width: 100%;
-  min-height: 60px;
+  min-height: 112px;
   display: flex;
   align-items: center;
-  padding-left: 9px;
+  padding: 14px 0;
   color: var(--plaza-text);
   box-sizing: border-box;
   cursor: pointer;
@@ -425,21 +467,28 @@
 }
 
 .project-plaza-card + .project-plaza-card {
-  margin-top: 20px;
+  margin-top: 4px;
 }
 
 .project-plaza-list-thumb {
-  width: 50px;
-  height: 49px;
+  position: relative;
+  width: 60px;
+  height: 60px;
   flex: none;
-  border-radius: 13px;
-  background: var(--plaza-thumb);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #000000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-size: 22px;
+  font-weight: 700;
 }
 
 .project-plaza-title-block {
   flex: 1 1 auto;
   min-width: 0;
-  margin-left: 15px;
+  margin-left: 16px;
 }
 
 .project-plaza-name {
@@ -461,6 +510,40 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.project-plaza-list-meta {
+  min-width: 0;
+  margin-top: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--plaza-text-tertiary);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.project-plaza-list-meta > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-plaza-list-meta b {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+}
+
+.project-plaza-list-meta b i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .project-plaza-open {
@@ -492,17 +575,102 @@
   opacity: 0.82;
 }
 
-.project-plaza-empty,
-.project-plaza-error {
-  padding: 58px 20px;
-  color: var(--plaza-text-tertiary);
-  text-align: center;
-  font-size: 16px;
-  line-height: 1.5;
+.project-plaza-skeleton {
+  padding: 20px 20px 28px;
 }
 
-.project-plaza-error {
-  color: var(--plaza-danger);
+.project-plaza-skeleton-row {
+  height: 88px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--plaza-surface);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.project-plaza-skeleton-row + .project-plaza-skeleton-row {
+  margin-top: 8px;
+}
+
+.project-plaza-skeleton-row > i {
+  width: 60px;
+  height: 60px;
+  flex: none;
+  border-radius: 12px;
+  background: var(--plaza-search);
+}
+
+.project-plaza-skeleton-row > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.project-plaza-skeleton-row b {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--plaza-divider);
+}
+
+.project-plaza-skeleton-row b:first-child {
+  height: 12px;
+  background: var(--plaza-search);
+}
+
+.project-plaza-skeleton-row b:last-child {
+  width: 54%;
+}
+
+.project-plaza-feedback {
+  margin: 24px 20px;
+  padding: 24px 20px 20px;
+  border-radius: 20px;
+  background: var(--plaza-surface);
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.project-plaza-feedback > i {
+  width: 8px;
+  height: 8px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: var(--plaza-text-tertiary);
+  display: block;
+}
+
+.project-plaza-feedback.is-danger > i {
+  background: var(--plaza-danger);
+}
+
+.project-plaza-feedback h2 {
+  margin: 14px 0 0;
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.project-plaza-feedback p {
+  margin: 8px 0 0;
+  color: var(--plaza-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.project-plaza-feedback button {
+  width: 100%;
+  height: 48px;
+  margin-top: 20px;
+  border: 0;
+  border-radius: 24px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 @media (hover: hover) and (pointer: fine) {

@@ -23,9 +23,11 @@ internal class ProjectPlazaFeaturedSection(
     private val selectableForeground: () -> Drawable?,
     private val reactionPrefs: SharedPreferences,
     private val openProjectSpace: (StoreProject) -> Unit,
-    private val isProjectJoined: (StoreProject) -> Boolean
+    private val isProjectJoined: (StoreProject) -> Boolean,
+    private val primaryAction: (StoreProject) -> ProjectPlazaPrimaryAction,
+    private val onPrimaryAction: (StoreProject) -> Unit
 ) {
-    private data class StatusStyle(val label: String, val dotColor: String)
+    private var positionIndicator: TextView? = null
 
     fun build(projects: List<StoreProject>): View = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
@@ -53,11 +55,13 @@ internal class ProjectPlazaFeaturedSection(
             gravity = Gravity.CENTER_VERTICAL
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         addView(TextView(activity).apply {
-            text = "滑动浏览 · $projectCount 个精选"
+            positionIndicator = this
+            text = if (projectCount > 0) "01 / ${projectCount.toString().padStart(2, '0')}" else "00 / 00"
             includeFontPadding = false
             setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             gravity = Gravity.CENTER_VERTICAL
+            contentDescription = "精选项目位置"
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.MATCH_PARENT
@@ -66,6 +70,9 @@ internal class ProjectPlazaFeaturedSection(
 
     private fun buildCarousel(projects: List<StoreProject>) = ProjectPlazaCarousel(activity).apply {
         configureContentInsets(dp(PLAZA_SIDE_MARGIN_DP), dp(PLAZA_TRAILING_PADDING_DP))
+        onActiveCardChanged = { index ->
+            positionIndicator?.text = "${(index + 1).toString().padStart(2, '0')} / ${projects.size.toString().padStart(2, '0')}"
+        }
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             projects.forEachIndexed { index, project ->
@@ -128,7 +135,7 @@ internal class ProjectPlazaFeaturedSection(
             addView(TextView(activity).apply {
                 text = (index + 1).toString().padStart(2, '0')
                 includeFontPadding = false
-                setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
+                setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -141,7 +148,7 @@ internal class ProjectPlazaFeaturedSection(
         addView(LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(View(activity).apply {
-                background = rect(status.dotColor, STATUS_DOT_DP / 2)
+                background = rect(toneColor(status.tone), STATUS_DOT_DP / 2)
                 contentDescription = null
             }, LinearLayout.LayoutParams(dp(STATUS_DOT_DP), dp(STATUS_DOT_DP)))
             addView(TextView(activity).apply {
@@ -187,16 +194,13 @@ internal class ProjectPlazaFeaturedSection(
     private fun buildIdentity(project: StoreProject) = LinearLayout(activity).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.TOP
-        addView(TextView(activity).apply {
-            text = project.displayTitle().trim().firstOrNull()?.toString() ?: "项"
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            background = rect(Color.WHITE, COVER_RADIUS_DP)
-            setTextColor(Color.BLACK)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
-            typeface = Typeface.DEFAULT_BOLD
-            contentDescription = "${project.displayTitle()}项目封面"
-        }, LinearLayout.LayoutParams(dp(COVER_SIZE_DP), dp(COVER_SIZE_DP)))
+        addView(projectPlazaProjectCover(
+            activity = activity,
+            project = project,
+            sizePx = dp(COVER_SIZE_DP),
+            radiusPx = dp(COVER_RADIUS_DP).toFloat(),
+            fallbackTextSp = 28f
+        ), LinearLayout.LayoutParams(dp(COVER_SIZE_DP), dp(COVER_SIZE_DP)))
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             addView(TextView(activity).apply {
@@ -232,6 +236,7 @@ internal class ProjectPlazaFeaturedSection(
 
     private fun buildFacts(project: StoreProject) = LinearLayout(activity).apply {
         orientation = LinearLayout.HORIZONTAL
+        val build = projectPlazaBuildStatus(project.lastTaskStatus)
         addView(factColumn("创建者", project.ownerLabel()), LinearLayout.LayoutParams(
             0,
             LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -242,19 +247,19 @@ internal class ProjectPlazaFeaturedSection(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             0.8f
         ))
-        addView(factColumn("加入方式", project.joinModeLabel()), LinearLayout.LayoutParams(
+        addView(factColumn("最近构建", build.label, toneColor(build.tone)), LinearLayout.LayoutParams(
             0,
             LinearLayout.LayoutParams.WRAP_CONTENT,
             1.2f
         ))
     }
 
-    private fun factColumn(label: String, value: String) = LinearLayout(activity).apply {
+    private fun factColumn(label: String, value: String, valueColor: String = COLOR_TEXT_PRIMARY) = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
         addView(TextView(activity).apply {
             text = label
             includeFontPadding = false
-            setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
+            setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
         })
         addView(TextView(activity).apply {
@@ -262,7 +267,7 @@ internal class ProjectPlazaFeaturedSection(
             includeFontPadding = false
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
+            setTextColor(Color.parseColor(valueColor))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -275,18 +280,20 @@ internal class ProjectPlazaFeaturedSection(
     private fun buildActions(project: StoreProject) = LinearLayout(activity).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
+        val action = primaryAction(project)
         addView(TextView(activity).apply {
-            text = "进入空间"
+            text = action.label
             gravity = Gravity.CENTER
             includeFontPadding = false
-            background = rect(Color.WHITE, ACTION_HEIGHT_DP / 2)
-            foreground = selectableForeground()
-            isClickable = true
+            background = rect(if (action.enabled) Color.WHITE else Color.parseColor(COLOR_TEXT_SECONDARY), ACTION_HEIGHT_DP / 2)
+            foreground = if (action.enabled) selectableForeground() else null
+            isClickable = action.enabled
+            isEnabled = action.enabled
             setTextColor(Color.BLACK)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             typeface = Typeface.DEFAULT_BOLD
-            contentDescription = "进入${project.displayTitle()}"
-            setOnClickListener { openProjectSpace(project) }
+            contentDescription = "${action.label}${project.displayTitle()}"
+            setOnClickListener { onPrimaryAction(project) }
         }, LinearLayout.LayoutParams(0, dp(ACTION_HEIGHT_DP), 1f))
         addView(reactionImageButton(project, "favorite", R.drawable.project_plaza_ui5_star, "收藏"), LinearLayout.LayoutParams(
             dp(ACTION_HEIGHT_DP),
@@ -332,28 +339,29 @@ internal class ProjectPlazaFeaturedSection(
         render()
     }
 
-    private fun statusStyle(project: StoreProject): StatusStyle = when {
-        isProjectJoined(project) -> StatusStyle("已加入", COLOR_STATUS_SUCCESS)
-        !project.latestApkUrl.isNullOrBlank() -> StatusStyle("可安装", COLOR_STATUS_SUCCESS)
-        normalizeProjectJoinMode(project.joinMode) == PROJECT_JOIN_MODE_APPROVAL -> {
-            StatusStyle("需审批", COLOR_STATUS_DANGER)
-        }
-        else -> StatusStyle("无需审批", COLOR_STATUS_SUCCESS)
+    private fun statusStyle(project: StoreProject): ProjectPlazaStatus =
+        projectPlazaAccessStatus(project, isProjectJoined(project))
+
+    private fun toneColor(tone: ProjectPlazaTone): String = when (tone) {
+        ProjectPlazaTone.SUCCESS -> COLOR_STATUS_SUCCESS
+        ProjectPlazaTone.DANGER -> COLOR_STATUS_DANGER
+        ProjectPlazaTone.NEUTRAL -> COLOR_TEXT_TERTIARY
     }
 
     private fun StoreProject.ownerLabel(): String = ownerAccount.trim()
         .takeIf { it.isNotBlank() && it != "?" }
         ?: "未知"
 
-    private fun StoreProject.joinModeLabel(): String =
-        if (normalizeProjectJoinMode(joinMode) == PROJECT_JOIN_MODE_APPROVAL) "需审批" else "无需审批"
-
     private fun cardWidthPx(): Int {
         val width = activity.resources.displayMetrics.widthPixels.takeIf { it > 0 } ?: dp(360)
         return (width * FEATURED_CARD_WIDTH_FRACTION).roundToInt()
     }
 
-    private fun cardHeightPx(): Int = (cardWidthPx() * FEATURED_CARD_HEIGHT_RATIO).roundToInt()
+    private fun cardHeightPx(): Int {
+        val baseHeight = (cardWidthPx() * FEATURED_CARD_HEIGHT_RATIO).roundToInt()
+        val fontScale = activity.resources.configuration.fontScale
+        return baseHeight + if (fontScale >= LARGE_TEXT_SCALE) dp(LARGE_TEXT_EXTRA_HEIGHT_DP) else 0
+    }
 
     private fun rect(color: String, radiusDp: Int = 0): GradientDrawable =
         rect(Color.parseColor(color), radiusDp)
@@ -389,5 +397,7 @@ internal class ProjectPlazaFeaturedSection(
         const val COVER_RADIUS_DP = 12
         const val ACTION_HEIGHT_DP = 48
         const val STATUS_DOT_DP = 7
+        const val LARGE_TEXT_SCALE = 1.15f
+        const val LARGE_TEXT_EXTRA_HEIGHT_DP = 54
     }
 }

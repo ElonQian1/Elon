@@ -15,6 +15,7 @@
     loading: false,
     projects: [],
     joinedIds: new Set(),
+    pendingIds: new Set(),
     busyId: '',
     filterKey: 'all',
     query: '',
@@ -85,12 +86,35 @@
   }
 
   function approvalLabel(mode) {
-    return normalizeJoinMode(mode) === 'approval' ? '需审批' : '无需审批';
+    const normalized = normalizeJoinMode(mode);
+    if (normalized === 'approval') return '需审批';
+    if (normalized === 'invite') return '仅限邀请';
+    if (normalized === 'readonly') return '只读体验';
+    return '无需审批';
   }
 
   function joinActionLabel(mode, joined) {
-    if (joined || normalizeJoinMode(mode) !== 'approval') return '进入空间';
-    return '申请加入';
+    if (joined) return '进入空间';
+    const normalized = normalizeJoinMode(mode);
+    if (normalized === 'approval') return '申请加入';
+    if (normalized === 'open') return '加入项目';
+    if (normalized === 'readonly') return '进入体验';
+    return '查看项目';
+  }
+
+  function primaryAction(project) {
+    const joined = state.joinedIds.has(project.id) || cleanText(project.viewer_role) || cleanText(project.viewerRole);
+    const mode = normalizeJoinMode(project.join_mode || project.joinMode);
+    let action = 'open';
+    if (!joined && mode === 'approval') action = 'apply';
+    else if (!joined && mode === 'open') action = 'join';
+    const pending = state.pendingIds.has(project.id);
+    const busy = state.busyId === project.id;
+    return {
+      action,
+      label: busy ? '处理中…' : (pending ? '申请已提交' : joinActionLabel(mode, joined)),
+      disabled: busy || pending
+    };
   }
 
   function projectIdentity(project) {
@@ -299,14 +323,26 @@
   }
 
   function renderResults() {
-    if (state.loading) return '<div class="project-plaza-empty">加载中...</div>';
-    if (state.error) return `<div class="project-plaza-error">${escapeHtml(state.status)}</div>`;
-    if (!state.projects.length) return '<div class="project-plaza-empty">暂无匹配项目</div>';
+    if (state.loading) return renderLoadingState();
+    if (state.error) return renderFeedbackState(
+      '项目暂时没有加载出来',
+      state.status || '请检查网络连接后重试。',
+      '重新加载',
+      'retry',
+      true
+    );
+    if (!state.projects.length) return renderFeedbackState(
+      '没有找到匹配项目',
+      '可以清除搜索与筛选条件，再看看项目广场的全部内容。',
+      state.query.trim() || state.filterKey !== 'all' ? '清除筛选' : '刷新项目',
+      'clear',
+      false
+    );
     const featuredProjects = state.projects.slice(0, 5);
     return `
       <div class="project-plaza-featured-label">
         <strong>精选项目</strong>
-        <span>滑动浏览 · ${escapeHtml(featuredProjects.length)} 个精选</span>
+        <span data-plaza-featured-position>01 / ${escapeHtml(String(featuredProjects.length).padStart(2, '0'))}</span>
       </div>
       <div class="project-plaza-featured-scroller" aria-label="精选项目">
         <div class="project-plaza-featured-track">
@@ -317,6 +353,60 @@
       <div class="project-plaza-list">
         ${state.projects.map(renderCard).join('')}
       </div>
+    `;
+  }
+
+  function renderLoadingState() {
+    return `
+      <div class="project-plaza-skeleton" aria-label="正在加载项目">
+        ${[0, 1, 2].map(() => `
+          <div class="project-plaza-skeleton-row">
+            <i aria-hidden="true"></i>
+            <span aria-hidden="true"><b></b><b></b><b></b></span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    window.requestAnimationFrame(configureFeaturedCarousel);
+  }
+
+  function configureFeaturedCarousel() {
+    const el = root();
+    const scroller = el && el.querySelector('.project-plaza-featured-scroller');
+    if (!scroller) return;
+    const cards = Array.from(scroller.querySelectorAll('.project-plaza-featured-card'));
+    const indicator = el.querySelector('[data-plaza-featured-position]');
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      if (!cards.length) return;
+      const firstOffset = cards[0].offsetLeft;
+      let activeIndex = 0;
+      let activeDistance = Number.POSITIVE_INFINITY;
+      cards.forEach((card, index) => {
+        const distance = Math.abs((card.offsetLeft - firstOffset) - scroller.scrollLeft);
+        if (distance < activeDistance) {
+          activeIndex = index;
+          activeDistance = distance;
+        }
+      });
+      cards.forEach((card, index) => card.classList.toggle('is-active', index === activeIndex));
+      if (indicator) indicator.textContent = String(activeIndex + 1).padStart(2, '0') + ' / ' + String(cards.length).padStart(2, '0');
+    };
+    scroller.addEventListener('scroll', () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    }, { passive: true });
+    update();
+  }
+
+  function renderFeedbackState(title, message, actionLabel, action, danger) {
+    return `
+      <section class="project-plaza-feedback ${danger ? 'is-danger' : ''}">
+        <i aria-hidden="true"></i>
+        <h2>${escapeHtml(title)}</h2>
+        <p>${escapeHtml(message)}</p>
+        <button type="button" data-plaza-action="${escapeHtml(action)}">${escapeHtml(actionLabel)}</button>
+      </section>
     `;
   }
 
@@ -350,34 +440,56 @@
   }
 
   function featuredStatus(project) {
-    if (state.joinedIds.has(project.id) || cleanText(project.viewer_role)) {
-      return { label: '已加入', danger: false };
+    if (state.joinedIds.has(project.id) || cleanText(project.viewer_role) || cleanText(project.viewerRole)) {
+      return { label: '已加入', tone: 'success' };
     }
+    const mode = normalizeJoinMode(project.join_mode || project.joinMode);
+    if (mode === 'approval') return { label: '需审批', tone: 'danger' };
+    if (mode === 'invite') return { label: '仅限邀请', tone: 'neutral' };
+    if (mode === 'readonly') return { label: '只读体验', tone: 'neutral' };
     if (cleanText(project.latest_apk_url) || cleanText(project.last_apk_url)) {
-      return { label: '可安装', danger: false };
+      return { label: '可安装', tone: 'success' };
     }
-    if (normalizeJoinMode(project.join_mode) === 'approval') {
-      return { label: '需审批', danger: true };
+    return { label: '无需审批', tone: 'success' };
+  }
+
+  function projectBuildStatus(project) {
+    const raw = cleanText(project.last_task_status) || cleanText(project.lastTaskStatus);
+    const normalized = raw.toLowerCase().replace(/-/g, '_');
+    if (['success', 'succeeded', 'completed', 'complete', 'passed', 'ready', 'done'].includes(normalized)) {
+      return { label: '构建成功', tone: 'success' };
     }
-    return { label: '无需审批', danger: false };
+    if (['failed', 'failure', 'error', 'cancelled', 'canceled', 'blocked'].includes(normalized)) {
+      return { label: '构建异常', tone: 'danger' };
+    }
+    if (['running', 'building', 'pending', 'queued', 'in_progress', 'processing', 'working'].includes(normalized)) {
+      return { label: '构建中', tone: 'neutral' };
+    }
+    return { label: '暂无构建', tone: 'neutral' };
   }
 
   function renderFeaturedCard(project, index) {
     const identity = projectIdentity(project);
     const description = identity.subtitle || cleanText(project.description) || '这个项目还没有填写简介。';
     const status = featuredStatus(project);
+    const action = primaryAction(project);
+    const build = projectBuildStatus(project);
     const cover = Array.from(identity.title.trim())[0] || '项';
+    const icon = iconUrlOf(project);
     const owner = cleanText(project.owner_account) || '未知';
     const members = Math.max(0, Number(project.member_count || 0));
     return `
-      <article class="project-plaza-featured-card" data-id="${escapeHtml(project.id)}">
+      <article class="project-plaza-featured-card ${index === 0 ? 'is-active' : ''}" data-id="${escapeHtml(project.id)}">
         <header class="project-plaza-featured-head">
           <div class="project-plaza-featured-rank"><strong>精选</strong><span>${escapeHtml(String(index + 1).padStart(2, '0'))}</span></div>
-          <div class="project-plaza-featured-status ${status.danger ? 'is-danger' : ''}"><i aria-hidden="true"></i><span>${escapeHtml(status.label)}</span></div>
+          <div class="project-plaza-featured-status is-${escapeHtml(status.tone)}"><i aria-hidden="true"></i><span>${escapeHtml(status.label)}</span></div>
         </header>
         <div class="project-plaza-featured-body">
           <div class="project-plaza-featured-identity">
-            <span class="project-plaza-featured-cover" aria-hidden="true">${escapeHtml(cover)}</span>
+            <span class="project-plaza-featured-cover" aria-hidden="true">
+              ${escapeHtml(cover)}
+              ${icon ? `<img src="${escapeHtml(icon)}" alt="" loading="lazy" onerror="this.remove()" />` : ''}
+            </span>
             <div class="project-plaza-featured-copy">
               <h3>${escapeHtml(identity.title)}</h3>
               <p>${escapeHtml(description)}</p>
@@ -386,11 +498,11 @@
           <div class="project-plaza-featured-facts">
             <span class="project-plaza-featured-fact"><small>创建者</small><b>${escapeHtml(owner)}</b></span>
             <span class="project-plaza-featured-fact"><small>成员</small><b>${escapeHtml(members)} 人</b></span>
-            <span class="project-plaza-featured-fact"><small>加入方式</small><b>${escapeHtml(approvalLabel(project.join_mode))}</b></span>
+            <span class="project-plaza-featured-fact"><small>最近构建</small><b class="is-${escapeHtml(build.tone)}">${escapeHtml(build.label)}</b></span>
           </div>
         </div>
         <div class="project-plaza-featured-actions">
-          <button class="project-plaza-featured-primary" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="进入${escapeHtml(identity.title)}">进入空间</button>
+          <button class="project-plaza-featured-primary" type="button" data-plaza-action="${escapeHtml(action.action)}" data-id="${escapeHtml(project.id)}" aria-label="${escapeHtml(action.label)}${escapeHtml(identity.title)}" aria-disabled="${action.disabled ? 'true' : 'false'}" ${action.disabled ? 'disabled' : ''}>${escapeHtml(action.label)}</button>
           <div class="project-plaza-reactions" aria-label="项目偏好">
             <button class="project-plaza-reaction is-star ${reactionSelected(project, 'favorite') ? 'is-selected' : ''}" type="button" data-plaza-action="favorite" data-id="${escapeHtml(project.id)}" aria-label="${reactionSelected(project, 'favorite') ? '取消收藏' : '收藏'}${escapeHtml(identity.title)}"></button>
             <button class="project-plaza-reaction is-heart ${reactionSelected(project, 'liked') ? 'is-selected' : ''}" type="button" data-plaza-action="liked" data-id="${escapeHtml(project.id)}" aria-label="${reactionSelected(project, 'liked') ? '取消点赞' : '点赞'}${escapeHtml(identity.title)}"></button>
@@ -403,12 +515,20 @@
   function renderCard(project) {
     const identity = projectIdentity(project);
     const description = identity.subtitle || cleanText(project.description) || '这个项目还没有填写简介。';
+    const icon = iconUrlOf(project);
+    const build = projectBuildStatus(project);
+    const owner = cleanText(project.owner_account) || cleanText(project.ownerAccount) || '未知';
+    const members = projectMemberCount(project);
     return `
       <article class="project-plaza-card" data-id="${escapeHtml(project.id)}">
-        <span class="project-plaza-list-thumb" aria-hidden="true"></span>
+        <span class="project-plaza-list-thumb" aria-hidden="true">
+          ${escapeHtml(projectInitial(identity.title))}
+          ${icon ? `<img src="${escapeHtml(icon)}" alt="" loading="lazy" onerror="this.remove()" />` : ''}
+        </span>
         <div class="project-plaza-title-block">
           <h3 class="project-plaza-name">${escapeHtml(identity.title)}</h3>
           <p class="project-plaza-desc">${escapeHtml(description)}</p>
+          <div class="project-plaza-list-meta"><span>${escapeHtml(owner)} · ${escapeHtml(members)} 人</span><b class="is-${escapeHtml(build.tone)}"><i aria-hidden="true"></i>${escapeHtml(build.label)}</b></div>
         </div>
         <button class="project-plaza-open" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="打开${escapeHtml(identity.title)}"><img src="/assets/project_view_chevron.png" alt="" /></button>
       </article>
@@ -431,7 +551,7 @@
       if (!res.ok || data.ok === false) throw new Error(data.error || data.message || '加入失败');
       state.joinedIds.add(id);
       await reloadMainProjects();
-      await openJoinedProject(id);
+      window.alert('已加入项目，点击按钮进入空间');
     } catch (e) {
       window.alert(e.message || '加入失败');
     } finally {
@@ -454,6 +574,7 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok === false) throw new Error(data.error || data.message || '申请失败');
+      state.pendingIds.add(id);
       window.alert(data.message || '申请已提交，等待审核');
     } catch (e) {
       window.alert(e.message || '申请失败');
@@ -564,6 +685,12 @@
         downloadProjectApk(id);
       } else if (action === 'favorite' || action === 'liked') {
         toggleReaction(id, action);
+      } else if (action === 'retry') {
+        loadProjects();
+      } else if (action === 'clear') {
+        state.query = '';
+        state.filterKey = 'all';
+        loadProjects();
       }
       return;
     }
