@@ -70,7 +70,7 @@ v186 为每个 v185 激活回执建立 Lease 当前状态投影；历史激活�
 
 - Cargo 编译、v186 迁移执行、HTTP 真实调用、并发和时钟边界验证；
 - 外部心跳证明签名校验、可信节点身份、服务器 outbox 和真实 `RenewLease` 送达；
-- 超时扫描、取消确认、staging 安全中止与 active 容量归还；
+- 自动超时扫描、已出现心跳后的运行中取消确认与部分收费；staging 无心跳安全中止及 active 容量归还已由未编译的 v187 合同覆盖，见 `docs/distributed-compute/attempt-abort-api.md`；
 - declared、observed、verified 用量分层及可消耗 meter 结算；
 - 多次 Attempt、分片重试和 fencing generation 单调递增；
 - 项目 MCP 写入口、外部矿池、多币种和 Sui 链上资产。
