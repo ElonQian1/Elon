@@ -71,7 +71,7 @@ Provider 发布的不可变版本，包含支持的任务类型、模型/工件�
 
 共享 CapacityPool 和追加式容量账本已经成为已接受设计，权威决定见 `docs/decisions/distributed-compute-capacity-ledger-v1.md`，完整对象与事务边界见 `docs/distributed-compute/capacity-ledger.md`。CapacityPool 表达会互相争用的物理资源边界，不保存实时余额；同一物理资源的全部 Offer 必须绑定同一 pool/epoch/bucket，防止跨模型、SKU 或销售渠道重复出售。
 
-V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v192 SQLite schema，以及容量、Provider、Offer、Price Snapshot、Job、Reservation 和 Attempt v185-v192 Store 已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker；v185-v187 覆盖首次激活、续租与 staging 无用量中止；v188-v191 追加多方证据，v192 记录保守 Verification 决定和验证/补偿用量，但均不触碰状态、容量与资金。本人 HTTP/MCP 可生成 fallback_curve 快照但未运行，真实价格源和完整节点运行协议仍未实现。
+V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多个 meter。窗口统一为规范 UTC 半开区间 `[starts_at, ends_at)`；真实余额由不可变 ledger transaction/leg 与可重建投影共同维护。领域合同、checked-i128 reducer、v165-v193 SQLite schema，以及容量、Provider、Offer、Price Snapshot、Job、Reservation 和 Attempt v185-v193 Store 已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker；v185-v187 覆盖首次激活、续租与 staging 无用量中止；v188-v192 形成多方证据和保守 Verification，v193 形成 Execution Receipt，但均不触碰状态、容量与资金。本人 HTTP/MCP 可生成 fallback_curve 快照但未运行，真实价格源和完整节点运行协议仍未实现。
 
 ### WorkloadSpec
 
@@ -93,7 +93,7 @@ V1 一份 Reservation 只绑定一个 Pool、一个精确 DeliveryWindow 和多�
 
 一次具体执行尝试。每次重试递增 `attempt_no` 和 `fencing_generation`，续租不能复活已过期尝试。迟到结果可以留作审计，但不能覆盖拥有更高 `fencing_generation` 的结果。秘密租约凭据只用于鉴权，不承担代次语义。
 
-NodeAgent Host 内部已形成 Attempt command 与 typed event 合同：`start`、`renew_lease`、`cancel` 命令绑定不可变 Attempt 身份、Offer、Runner、模型、资源限制和截止时间；Runner 事件不自带可信 Attempt 身份，由 Host 根据活动命令补写租约、Attempt 编号和 `fencing_generation`。云端 v185-v187 覆盖首次激活、续租和 staging 无用量中止；v188-v191 保存 Provider、消费者和平台证据，v192 保存保守 Verification 决定。v185-v192 均不发送节点命令、不验证外部证明签名；v192 的 verified usage 也不会直接形成可信运行终态或 Execution Receipt。两侧尚未通过 outbox、线协议或 Sidecar IPC 接通，不能视为通用任务通道已经可用。
+NodeAgent Host 内部已形成 Attempt command 与 typed event 合同：`start`、`renew_lease`、`cancel` 命令绑定不可变 Attempt 身份、Offer、Runner、模型、资源限制和截止时间；Runner 事件不自带可信 Attempt 身份，由 Host 根据活动命令补写租约、Attempt 编号和 `fencing_generation`。云端 v185-v192 覆盖 Attempt 激活、续租、中止、证据与 Verification，v193 保存 Execution Receipt。v185-v193 均不发送节点命令、不验证外部证明签名；Execution Receipt 也不会直接形成可信运行终态或结算。两侧尚未通过 outbox、线协议或 Sidecar IPC 接通，不能视为通用任务通道已经可用。
 
 ### ExecutionReceipt
 
@@ -112,6 +112,8 @@ v190 的消费者审核把 `accepted/rejected/disputed` 与精确 v189 候选绑
 v191 的平台观测把 control plane、transport gateway 或 server metering 的累计 meter 与同一候选绑定，并显式保存差异 meter。该证据仍需 Verification policy 评估来源、签名、重复执行和争议状态，不能直接写入 `verified_usage`。
 
 v192 的 `conservative_min_v1` 首次把精确 v189-v191 证据裁决为 accepted/rejected/disputed，并确定 verified/compensable usage。它仍是独立验证回执，不是 Execution Receipt；来源可信、挑战与争议、任务终态、容量消费和资金结算仍需后续阶段完成。
+
+v193 仅把 accepted v192 与 Attempt 激活、Job/Reservation 历史、运行工件和用量组合为不可变 Execution Receipt。回执读取时重建并重算摘要，但它仍只是后续状态机和 Settlement 的输入，不直接更新任何状态或账本。
 
 ### PriceSnapshot 与 SettlementReceipt
 
@@ -177,4 +179,4 @@ Adapter 必须把外部错误归一为稳定错误码，并保存原始 Provider
 
 ## 9. 当前未验证声明
 
-本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；Provider/Offer、Attempt command/events、CapacityPool、Claim/Reservation、账本 reducer、Broker Reserve/Finish、v185-v192 Attempt 激活/续租/中止/证据/Verification、登录用户 HTTP 控制面和 v165-v192 schema 都尚未编译或运行验证，数据库迁移也未执行。文档、合同、路由或 migration 文件存在不代表运行时已经采用这些能力。
+本文描述目标架构和首批领域合同。2026-08-04 的铺设阶段不执行编译、迁移或端到端验证；Provider/Offer、Attempt command/events、CapacityPool、Claim/Reservation、账本 reducer、Broker Reserve/Finish、v185-v193 Attempt 激活/续租/中止/证据/Verification/Execution Receipt、登录用户 HTTP 控制面和 v165-v193 schema 都尚未编译或运行验证，数据库迁移也未执行。文档、合同、路由或 migration 文件存在不代表运行时已经采用这些能力。

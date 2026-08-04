@@ -67,14 +67,14 @@ v190 已允许候选绑定的 Job 消费者登记第一份 `accepted/rejected/di
 
 v191 已允许平台管理员登记第一份终态观测和累计 meter 差异，见 `docs/distributed-compute/attempt-platform-observation-api.md`。平台观测同样不修改本候选，也不直接形成 verified usage 或可信终态。
 
-v192 已允许平台管理员精确绑定 v189-v191，以首版保守策略记录 Verification 决定和 verified/compensable usage，见 `docs/distributed-compute/attempt-verification-api.md`。该决定仍不修改本候选，也不形成 Execution Receipt。
+v192 已允许平台管理员精确绑定 v189-v191，以首版保守策略记录 Verification 决定和 verified/compensable usage，见 `docs/distributed-compute/attempt-verification-api.md`。v193 可基于 accepted 决定另行签发 Execution Receipt，但两者都不修改本候选。
 
 ## 6. 尚未实现
 
 - Cargo 编译、v189 迁移执行、HTTP 真实调用、并发和故障注入验证；
 - NodeAgent Host 到云端的签名 Terminal 事件、outbox、断点续传和真实节点身份；
 - 输出工件导入、服务端重算摘要、恶意内容扫描、数据授权和可读取性验证；
-- 自动平台观测接线、独立验证器、Execution Receipt、争议裁决与多策略治理；
+- 自动平台观测接线、独立验证器、Execution Receipt 自动签发、争议裁决与多策略治理；
 - Lease `result_reported/verifying/terminal`、Job `verification_pending`、Capacity Claim `UsageConsumed` 等真实状态推进；
 - 消费者扣款、Provider 收益、失败退款、重试、多次 Attempt、外部矿池、多币种和 Sui 链上资产。
 

@@ -11,7 +11,7 @@ owners: ai-economy, backend
 
 v192、追加式 Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 可把精确 v189 Provider 候选、v190 消费者审核和 v191 平台观测绑定为第一份不可变 Verification 决定。
 
-v192 只记录 `accepted/rejected/disputed` 及其确定性 `verified_usage`、`compensable_usage`。它不会生成 Execution Receipt，不会推进 Lease、Job、Reservation 或 Claim，不会消费容量，也不会扣除预授权或释放 Provider 收益。
+v192 只记录 `accepted/rejected/disputed` 及其确定性 `verified_usage`、`compensable_usage`。它本身不会生成 Execution Receipt，不会推进 Lease、Job、Reservation 或 Claim，不会消费容量，也不会扣除预授权或释放 Provider 收益；v193 可另行基于 accepted 决定签发回执。
 
 ## 2. HTTP 路由
 
@@ -61,7 +61,7 @@ v192 只支持 `conservative_min_v1@1`：
 - Cargo 编译、v192 迁移执行、HTTP 真实调用、并发与故障注入验证；
 - 平台观测来源签名、可信时钟、自动采集、独立验证器和多策略版本治理；
 - 多份观测、重复执行、挑战任务、异常检测和争议裁决；
-- Execution Receipt、Lease/Job 终态、Capacity Claim 消费和 Reservation 消费；
+- Execution Receipt 自动签发、Lease/Job 终态、Capacity Claim 消费和 Reservation 消费；v193 已提供管理员签发入口，见 `docs/distributed-compute/attempt-execution-receipt-api.md`；
 - 消费者扣款、Provider 收益、退款、Settlement Receipt 和纠正回执。
 
 ## 7. 代码入口
