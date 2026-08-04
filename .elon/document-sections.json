@@ -257,6 +257,7 @@
     "docs/distributed-compute/attempt-activation-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-consumer-review-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-platform-observation-api.md": "custom:distributed-compute",
+    "docs/distributed-compute/attempt-verification-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-lease-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-terminal-candidate-api.md": "custom:distributed-compute",
     "docs/distributed-compute/attempt-usage-api.md": "custom:distributed-compute",
@@ -404,6 +405,7 @@
     "docs/distributed-compute/attempt-activation-api.md": "current",
     "docs/distributed-compute/attempt-consumer-review-api.md": "current",
     "docs/distributed-compute/attempt-platform-observation-api.md": "current",
+    "docs/distributed-compute/attempt-verification-api.md": "current",
     "docs/distributed-compute/attempt-lease-api.md": "current",
     "docs/distributed-compute/attempt-terminal-candidate-api.md": "current",
     "docs/distributed-compute/attempt-usage-api.md": "current",
@@ -852,6 +854,8 @@
         "file:server/src/compute_attempt_consumer_review_migration.rs",
         "file:server/src/store/compute_attempt_platform_observations.rs",
         "file:server/src/compute_attempt_platform_observation_migration.rs",
+        "file:server/src/store/compute_attempt_verifications.rs",
+        "file:server/src/compute_attempt_verification_migration.rs",
         "file:server/src/node_agent_compute_plugin_host/mod.rs",
         "file:server/src/node_compute_sharing.rs"
       ],
@@ -862,6 +866,7 @@
         "docs/distributed-compute/attempt-abort-api.md",
         "docs/distributed-compute/attempt-consumer-review-api.md",
         "docs/distributed-compute/attempt-platform-observation-api.md",
+        "docs/distributed-compute/attempt-verification-api.md",
         "docs/distributed-compute/attempt-terminal-candidate-api.md",
         "docs/distributed-compute/attempt-usage-api.md",
         "docs/distributed-compute/capacity-ledger.md",
@@ -1016,6 +1021,7 @@
         "docs/distributed-compute/attempt-usage-api.md",
         "docs/distributed-compute/attempt-consumer-review-api.md",
         "docs/distributed-compute/attempt-platform-observation-api.md",
+        "docs/distributed-compute/attempt-verification-api.md",
         "docs/distributed-compute/node-client-and-plugins.md",
         "docs/distributed-compute/market-and-settlement.md"
       ]
@@ -1041,6 +1047,7 @@
         "docs/distributed-compute/attempt-terminal-candidate-api.md",
         "docs/distributed-compute/attempt-usage-api.md",
         "docs/distributed-compute/attempt-platform-observation-api.md",
+        "docs/distributed-compute/attempt-verification-api.md",
         "docs/distributed-compute/market-and-settlement.md"
       ]
     },
@@ -1065,6 +1072,32 @@
         "docs/distributed-compute/attempt-usage-api.md",
         "docs/distributed-compute/attempt-terminal-candidate-api.md",
         "docs/distributed-compute/attempt-consumer-review-api.md",
+        "docs/distributed-compute/attempt-verification-api.md",
+        "docs/distributed-compute/market-and-settlement.md"
+      ]
+    },
+    "docs/distributed-compute/attempt-verification-api.md": {
+      "doc_type": "api_contract",
+      "audience": [
+        "后端开发者",
+        "结算开发者",
+        "AI 代理"
+      ],
+      "owner": "分布式算力联邦",
+      "reviewed_at": "2026-08-04",
+      "review_interval_days": 30,
+      "implementation_refs": [
+        "file:server/src/store/compute_attempt_verifications.rs",
+        "file:server/src/store/compute_attempt_verifications/support.rs",
+        "file:server/src/compute_attempt_verification_migration.rs",
+        "route:POST /api/admin/compute/attempt-leases/:lease_id/verification-decision",
+        "route:GET /api/me/compute/attempt-leases/:lease_id/verification-decision"
+      ],
+      "related": [
+        "docs/distributed-compute/attempt-usage-api.md",
+        "docs/distributed-compute/attempt-terminal-candidate-api.md",
+        "docs/distributed-compute/attempt-consumer-review-api.md",
+        "docs/distributed-compute/attempt-platform-observation-api.md",
         "docs/distributed-compute/market-and-settlement.md"
       ]
     },
@@ -2429,6 +2462,13 @@
   },
   "audit_log": [
     {
+      "id": "distributed-compute-attempt-verification-v192-20260804",
+      "action": "document.knowledge_graph.update",
+      "target": ".elon/document-sections.json",
+      "summary": "登记 implementation_uncompiled 的 v192 保守 Verification 决定、精确 v189-v191 绑定和 verified/compensable usage，并保留 Execution Receipt、状态推进、容量消费与结算缺口",
+      "at": "2026-08-04T12:37:32Z"
+    },
+    {
       "id": "distributed-compute-attempt-platform-observation-v191-20260804",
       "action": "document.knowledge_graph.update",
       "target": ".elon/document-sections.json",
@@ -2608,7 +2648,7 @@
         "view": "capabilities",
         "kind": "planned_capability",
         "label": "任务级算力联邦 V1",
-        "detail": "云端领域合同、v165-v191 schema、隔离 Capacity Store、Provider/Offer/Price Snapshot/Job/Reservation Registry、平台人民币余额 Broker、Attempt 激活、续租、staging 中止、running 累计声明用量、Provider 终态候选、消费者审核及平台观测已写入且未编译；外部 Provider、真实派发、自动可信观测、verified 用量、可信运行终态和结算尚未实现",
+        "detail": "云端领域合同、v165-v192 schema、隔离 Capacity Store、Provider/Offer/Price Snapshot/Job/Reservation Registry、平台人民币余额 Broker、Attempt 激活、续租、staging 中止、多方证据及保守 Verification 决定已写入且未编译；外部 Provider、真实派发、自动可信观测、Execution Receipt、可信运行终态和结算尚未实现",
         "parent_id": "cap-distributed-compute",
         "order": 20,
         "color": "#48A889",
@@ -2621,6 +2661,7 @@
           "docs/distributed-compute/attempt-abort-api.md",
           "docs/distributed-compute/attempt-consumer-review-api.md",
           "docs/distributed-compute/attempt-platform-observation-api.md",
+          "docs/distributed-compute/attempt-verification-api.md",
           "docs/distributed-compute/attempt-terminal-candidate-api.md",
           "docs/distributed-compute/attempt-usage-api.md",
           "docs/distributed-compute/broker-api.md",
@@ -2660,6 +2701,8 @@
           "file:server/src/compute_attempt_consumer_review_migration.rs",
           "file:server/src/store/compute_attempt_platform_observations.rs",
           "file:server/src/compute_attempt_platform_observation_migration.rs",
+          "file:server/src/store/compute_attempt_verifications.rs",
+          "file:server/src/compute_attempt_verification_migration.rs",
           "file:server/src/node_agent_compute_plugin_host/attempt_contract.rs"
         ],
         "tags": [
@@ -2702,7 +2745,7 @@
         "view": "architecture",
         "kind": "component",
         "label": "算力联邦领域合同",
-        "detail": "未编译未运行的 Provider、Offer、Workload、Job、Reservation、Lease、容量、价格和回执模型；版本化 Registry、平台人民币余额 Broker、Attempt 激活、续租、staging 中止、running 累计声明用量、Provider 终态候选、消费者审核与平台观测已写，真实派发、自动可信观测、验证用量、可信运行终态和结算尚缺",
+        "detail": "未编译未运行的 Provider、Offer、Workload、Job、Reservation、Lease、容量、价格和回执模型；版本化 Registry、平台人民币余额 Broker、Attempt 激活、续租、staging 中止、多方证据与保守 Verification 决定已写，真实派发、自动可信观测、Execution Receipt、可信运行终态和结算尚缺",
         "parent_id": "arch-server",
         "order": 35,
         "color": "#48A889",
@@ -2712,6 +2755,7 @@
           "docs/distributed-compute/attempt-abort-api.md",
           "docs/distributed-compute/attempt-consumer-review-api.md",
           "docs/distributed-compute/attempt-platform-observation-api.md",
+          "docs/distributed-compute/attempt-verification-api.md",
           "docs/distributed-compute/attempt-terminal-candidate-api.md",
           "docs/distributed-compute/attempt-usage-api.md",
           "docs/distributed-compute/broker-api.md"
@@ -2740,7 +2784,9 @@
           "file:server/src/store/compute_attempt_consumer_reviews.rs",
           "file:server/src/compute_attempt_consumer_review_migration.rs",
           "file:server/src/store/compute_attempt_platform_observations.rs",
-          "file:server/src/compute_attempt_platform_observation_migration.rs"
+          "file:server/src/compute_attempt_platform_observation_migration.rs",
+          "file:server/src/store/compute_attempt_verifications.rs",
+          "file:server/src/compute_attempt_verification_migration.rs"
         ],
         "tags": [
           "contract",
@@ -2753,7 +2799,7 @@
         "view": "architecture",
         "kind": "planned_component",
         "label": "共享算力容量池与账本 V1",
-        "detail": "单池单窗口、跨 Offer 共享余额、多 meter Claim、六账户 reducer、v165-v191 schema、事务内 Claim kernel、审计恢复、Broker、Attempt 激活、从未心跳的 active 容量归还、running 累计声明用量及无容量效果的终态候选/消费者审核/平台观测已写且未编译；通用 Claim 不可变首次响应、自动可信观测、verified 用量、可信运行终态结算与运行接线尚未实现",
+        "detail": "单池单窗口、跨 Offer 共享余额、多 meter Claim、六账户 reducer、v165-v192 schema、事务内 Claim kernel、审计恢复、Broker、Attempt 激活、从未心跳的 active 容量归还、多方证据及无容量效果的保守 Verification 决定已写且未编译；通用 Claim 不可变首次响应、自动可信观测、Execution Receipt、可信运行终态结算与运行接线尚未实现",
         "parent_id": "arch-server",
         "order": 36,
         "color": "#D0A34F",

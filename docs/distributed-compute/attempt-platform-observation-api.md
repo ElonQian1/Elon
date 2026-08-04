@@ -57,7 +57,7 @@ Store 会比较 Provider 声明和平台观测，将数量不同的 meter 保存
 - Cargo 编译、v191 迁移执行、HTTP 真实调用、并发与故障注入验证；
 - 控制面、网关和 server metering 组件自动写入及签名验证；
 - 多份独立平台观测、跨来源仲裁和可信时间证明；
-- Verification policy 执行、`verified_usage`、`compensable_usage` 与可信终态；
+- 自动 Verification、独立验证器、多策略治理与可信终态；v192 已提供管理员触发的首版保守决定，见 `docs/distributed-compute/attempt-verification-api.md`；
 - 消费者争议裁决、挑战任务、重复执行和异常检测；
 - Execution Receipt、容量消费、扣款、Provider 收益和结算纠正。
 

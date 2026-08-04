@@ -120,7 +120,7 @@ platform_margin
 
 容量市场底层统一使用已接受的共享 CapacityPool 与追加式账本设计，见 `docs/decisions/distributed-compute-capacity-ledger-v1.md` 和 `docs/distributed-compute/capacity-ledger.md`。Offer 只声明静态出售上限；发布、复制或续期 Offer 不会铸造任何可用容量。只有 Pool bucket 的发行事件进入账本后才形成余额，所有现货 Reservation 与未来 Commitment 必须争用同一容量真源。
 
-V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v191 schema、各版本化 Registry 及 fallback_curve 报价入口已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker，v185-v187 已形成首次 Attempt 激活、Lease 续租和 staging 无用量中止；v188-v191 只保存 Provider 声明、消费者审核及平台观测证据。真实价格源、自动撮合、节点真实运行接线、验证用量、可信运行终态和实际结算仍未实现。
+V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v192 schema、各版本化 Registry 及 fallback_curve 报价入口已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker，v185-v187 已形成首次 Attempt 激活、Lease 续租和 staging 无用量中止；v188-v191 保存多方证据，v192 保存首版保守 verified/compensable usage。真实价格源、自动撮合、节点真实运行接线、可信运行终态、Execution Receipt 和实际结算仍未实现。
 
 市场对象分层：
 
@@ -169,4 +169,4 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 
 ## 13. 当前未验证声明
 
-本文是已接受的目标市场合同。当前代码已写入 fallback_curve 报价、v175 平台人民币余额预授权、v176 未激活任务严格退款及 v185-v191 Attempt 激活/续租/staging 中止/Provider 声明/消费者审核/平台观测，但均为 `implementation_uncompiled`。v187 的退款只指现有平台预授权，v188/v189 为 `unverified_provider_declaration`，v190 为 `consumer_attestation_only`，v191 为 `unverified_platform_observation`；它们均不代表生产支付、验证用量、可信终态或 Provider 收益。真实价格源、自动撮合、节点真实运行接线、验证用量、已运行任务结算、期货曲线、订单簿、持仓和真实清算仍未实现。
+本文是已接受的目标市场合同。当前代码已写入 fallback_curve 报价、v175 平台人民币余额预授权、v176 未激活任务严格退款及 v185-v192 Attempt 激活/续租/staging 中止/多方证据/Verification，但均为 `implementation_uncompiled`。v188/v189 为 `unverified_provider_declaration`，v190 为 `consumer_attestation_only`，v191 为 `unverified_platform_observation`；v192 虽记录 verified/compensable usage，仍不代表生产支付、可信运行终态、Execution Receipt 或 Provider 收益。真实价格源、自动撮合、节点真实运行接线、可信终态、已运行任务结算、期货曲线、订单簿、持仓和真实清算仍未实现。
