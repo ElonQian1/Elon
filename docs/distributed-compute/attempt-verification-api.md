@@ -1,15 +1,16 @@
 ---
 title: 分布式算力 Attempt Verification 决定
 status: current
-reviewed_at: 2026-08-04
-owners: ai-economy, backend
+reviewed_at: 2026-08-05
+owners: ai-economy, backend, pc
+implementation_status: implementation_uncompiled
 ---
 
 # 分布式算力 Attempt Verification 决定
 
 ## 1. 当前实现
 
-v192、追加式 Store、Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 可把精确 v189 Provider 候选、v190 消费者审核和 v191 平台观测绑定为第一份不可变 Verification 决定。
+v192、追加式 Store、Service、HTTP 路由、管理员待验证证据链队列与 PC `/compute-verification` 已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 可发现已经具备 v189 Provider 候选、v190 消费者审核和 v191 平台观测且尚无 v192 的证据链，并把三者绑定为第一份不可变 Verification 决定。
 
 v192 只记录 `accepted/rejected/disputed` 及其确定性 `verified_usage`、`compensable_usage`。它本身不会生成 Execution Receipt，不会推进 Lease、Job、Reservation 或 Claim，不会消费容量，也不会扣除预授权或释放 Provider 收益；v193 可另行基于 accepted 决定签发回执。
 
@@ -17,10 +18,15 @@ v192 只记录 `accepted/rejected/disputed` 及其确定性 `verified_usage`、`
 
 | 方法 | 路径 | 调用者 | 作用 |
 |---|---|---|---|
+| GET | `/api/admin/compute/attempt-terminal-candidates/pending-verification` | 平台 `admin/owner` | 读取尚无 v192 决定的完整 v189-v191 证据链 |
 | POST | `/api/admin/compute/attempt-leases/:lease_id/verification-decision` | 平台 `admin/owner` | 写入第一份 Verification 决定 |
 | GET | `/api/me/compute/attempt-leases/:lease_id/verification-decision` | Job 消费者或 Provider 所有者 | 读取并重新审计 Verification 回执 |
 
 POST 必须提供 v189-v191 三份证据的精确 ID 和事件摘要、policy ID/version、决定、至少一个 reason code、外部决定引用、稳定幂等键，并显式设置 `confirm_no_state_or_settlement_effect=true`。
+
+待验证队列只选择消费者审核和平台观测均已存在、且尚无 Verification 决定的候选。Store 在同一连接内重新读取候选、最终 Provider 用量、消费者审核、平台观测和 Reservation 历史版本，并复用 v192 证据绑定审计；队列只读且可能随并发写入过期，因此 POST 仍会在 `BEGIN IMMEDIATE` 事务中重新验证全部 ID、摘要、meter 和唯一性条件。
+
+PC `/compute-verification` 仅向 `admin/owner` 显示导航，展示三方 outcome、Provider/平台 meter、差异与保守计量预览。前端会在消费者未接受、双方 outcome 不一致或平台结果为 `indeterminate` 时禁用 `accepted`，但这只是操作防错，服务端 policy 才是最终权威。
 
 ## 3. 保守策略
 
@@ -59,6 +65,7 @@ v192 只支持 `conservative_min_v1@1`：
 ## 6. 尚未实现
 
 - Cargo 编译、v192 迁移执行、HTTP 真实调用、并发与故障注入验证；
+- PC 构建、接口联调、视觉验收和发布；
 - 平台观测来源签名、可信时钟、自动采集、独立验证器和多策略版本治理；
 - 多份观测、重复执行、挑战任务、异常检测和争议裁决；
 - Execution Receipt 自动签发、Lease/Job 终态、Capacity Claim 消费和 Reservation 消费；v193 已提供管理员签发入口，见 `docs/distributed-compute/attempt-execution-receipt-api.md`；
@@ -71,3 +78,5 @@ v192 只支持 `conservative_min_v1@1`：
 - `server/src/compute_attempt_verification_migration.rs`
 - `server/src/compute_federation_attempt_service.rs`
 - `server/src/compute_federation_attempt_api.rs`
+- `pc-frontend/src/features/compute-attempt/verificationContracts.ts`
+- `pc-frontend/src/features/compute-verification/`
