@@ -104,7 +104,87 @@ export interface ComputeQuoteCandidatePage {
   scan_truncated: boolean
 }
 
+export interface ComputeCapacityClaimBinding {
+  claim_id: string
+  claim_revision: number
+  claim_digest: string
+}
+
+export interface ComputeJobVersionBinding {
+  job_id: string
+  job_revision: number
+  job_digest: string
+}
+
+export interface ComputeReservedCapacity {
+  meter: string
+  quantity: number
+}
+
+export interface ComputeReservationReceipt {
+  reservation: {
+    schema: string
+    reservation_id: string
+    job: ComputeJobVersionBinding
+    idempotency_key: string
+    offer: { provider_id: string; offer_id: string; offer_version: number; offer_digest: string }
+    price_snapshot: MyComputePriceSnapshotView['snapshot']
+    capacity_claim: ComputeCapacityClaimBinding
+    reserved_capacity: ComputeReservedCapacity[]
+    consumer_authorization_ref: string
+    status: string
+    created_at: string
+    updated_at: string
+    expires_at: string
+    consumed_at: string | null
+    released_at: string | null
+  }
+  revision: number
+  reservation_digest: string
+  replayed: boolean
+}
+
+export interface ReserveComputeJobBody {
+  reservation_id: string
+  idempotency_key: string
+  job_id: string
+  expected_job_revision: number
+  expected_job_digest: string
+  reserved_capacity: ComputeReservedCapacity[]
+  expires_at: string
+}
+
+export interface ComputeBrokerReservationReceipt {
+  reservation_id: string
+  consumer_account_id: string
+  budget_adapter: string
+  budget_reservation_id: string
+  budget_reserved_fen: number
+  capacity_claim: ComputeCapacityClaimBinding
+  reserved_job: ComputeJobVersionBinding
+  reservation_revision: number
+  reservation_digest: string
+  status: string
+  replayed: boolean
+}
+
+export interface ComputeBrokerFinishReceipt {
+  reservation_id: string
+  consumer_account_id: string
+  action: 'release' | 'expire'
+  budget_reservation_id: string
+  budget_refunded_fen: number
+  capacity_claim: ComputeCapacityClaimBinding
+  terminal_job: ComputeJobVersionBinding
+  reservation_revision: number
+  reservation_digest: string
+  status: string
+  recorded_at: string
+  replayed: boolean
+}
+
 interface JobListResponse { jobs: ComputeJobReceipt[] }
+interface ReservationListResponse { reservations: ComputeReservationReceipt[] }
 
 function projectBase(projectId: string) {
   return `/api/projects/${encodeURIComponent(projectId)}/compute/jobs`
@@ -120,5 +200,15 @@ export const computeMarketApi = {
       price_snapshot_id: candidate.price_snapshot.snapshot_id,
       expected_job_revision: page.job_revision,
       expected_job_digest: page.job_digest,
+    }),
+  listReservations: (limit = 100) =>
+    api.get<ReservationListResponse>(`/api/me/compute/reservations?limit=${limit}`).then((response) => response.reservations),
+  reserve: (body: ReserveComputeJobBody) =>
+    api.post<ComputeBrokerReservationReceipt>('/api/me/compute/reservations', body),
+  finishReservation: (receipt: ComputeReservationReceipt, action: 'release' | 'expire', idempotencyKey: string) =>
+    api.post<ComputeBrokerFinishReceipt>(`/api/me/compute/reservations/${encodeURIComponent(receipt.reservation.reservation_id)}/${action}`, {
+      idempotency_key: idempotencyKey,
+      expected_reservation_revision: receipt.revision,
+      expected_reservation_digest: receipt.reservation_digest,
     }),
 }
