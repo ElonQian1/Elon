@@ -13,6 +13,8 @@ pub(super) fn tool_definitions() -> Vec<Value> {
     definitions.extend(super::design_source_binding::tool_definitions());
     definitions.extend(super::design_task_binding::tool_definitions());
     definitions.extend(super::design_event_stream::tool_definitions());
+    definitions.extend(super::design_event_checkpoint::tool_definitions());
+    definitions.extend(super::design_intent_plan::tool_definitions());
     definitions.extend(super::design_verification_matrix::tool_definitions());
     definitions
 }
@@ -27,6 +29,8 @@ pub(super) fn is_tool(name: &str) -> bool {
         || super::design_source_binding::is_tool(name)
         || super::design_task_binding::is_tool(name)
         || super::design_event_stream::is_tool(name)
+        || super::design_event_checkpoint::is_tool(name)
+        || super::design_intent_plan::is_tool(name)
         || super::design_verification_matrix::is_tool(name)
 }
 
@@ -51,6 +55,10 @@ pub(super) async fn call(session: &LiveUiSession, name: &str, arguments: Value) 
         super::design_source_binding::call(session, arguments)
     } else if super::design_task_binding::is_tool(name) {
         super::design_task_binding::call(session, name, arguments)
+    } else if super::design_event_checkpoint::is_tool(name) {
+        super::design_event_checkpoint::call(session, name, arguments)
+    } else if super::design_intent_plan::is_tool(name) {
+        super::design_intent_plan::call(session, name, arguments)
     } else if super::design_verification_matrix::is_tool(name) {
         super::design_verification_matrix::call(session, name, arguments)
     } else {

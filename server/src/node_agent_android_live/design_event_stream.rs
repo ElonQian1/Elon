@@ -35,6 +35,24 @@ struct DesignEvent {
     payload: Value,
 }
 
+pub(super) fn cursor_belongs_to_task(
+    session: &LiveUiSession,
+    cursor: &str,
+    task_id: &str,
+) -> Result<bool> {
+    validate_cursor(cursor)?;
+    super::design_task_binding::validate_task_id(task_id)?;
+    let root = canonical_root(session)?;
+    let directory = event_directory(&root, false)?;
+    let path = directory.join(format!("{cursor}.json"));
+    let event = fs::metadata(&path)
+        .ok()
+        .filter(|metadata| metadata.is_file() && metadata.len() <= MAX_EVENT_BYTES)
+        .and_then(|_| fs::read(path).ok())
+        .and_then(|bytes| serde_json::from_slice::<DesignEvent>(&bytes).ok());
+    Ok(event.is_some_and(|event| event.task_id.as_deref() == Some(task_id)))
+}
+
 pub(super) fn tool_definitions() -> Vec<Value> {
     vec![json!({
         "name":LIST_TOOL,
@@ -330,7 +348,7 @@ fn first_text<'a>(value: &'a Value, pointers: &[&str]) -> Option<&'a str> {
         .filter(|value| !value.is_empty())
 }
 
-fn validate_cursor(value: &str) -> Result<()> {
+pub(super) fn validate_cursor(value: &str) -> Result<()> {
     if value.len() > 96
         || !value
             .chars()

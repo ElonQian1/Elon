@@ -123,6 +123,7 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
             post(settle_design_task_binding),
         )
         .route("/api/android-live/design/events", post(list_design_events))
+        .merge(super::design_planning_http::routes())
 }
 
 async fn get_capabilities(
@@ -418,7 +419,7 @@ fn artifact_response(artifact: super::design_session_store::VerifiedPixelArtifac
     response
 }
 
-async fn call(runtime: &Arc<NodeRuntime>, name: &str, mut arguments: Value) -> Response {
+pub(super) async fn call(runtime: &Arc<NodeRuntime>, name: &str, mut arguments: Value) -> Response {
     let session = match project_session(runtime, &mut arguments).await {
         Ok(session) => session,
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
