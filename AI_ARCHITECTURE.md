@@ -234,6 +234,8 @@ v200 为 Provider 本人增加追加式 Withdrawal Request Receipt。服务端�
 
 v201 为每份 v200 申请增加唯一追加式 Terminal Receipt。Provider 所有者可取消，平台管理员可拒绝；两者都把 withdrawn 全额原子返还 available 并写入两条返还账本腿。管理员也可登记 `external_paid_attested` 及外部证据引用/摘要，此动作不移动余额、没有资金腿，且明确不代表平台发起或验证了银行、钱包或 Sui 付款。状态为 `implementation_uncompiled`，边界见 `docs/distributed-compute/settlement-withdrawal-terminal-api.md`。
 
+结算账户只读控制面再从 v195、v198-v201 不可变账本重建 Provider pending、available 和 withdrawn，并把 withdrawn 拆成待终态冻结额与外部已付款声明额；管理员可按派生状态读取有界提款队列。余额、生命周期或回执审计不一致时读取失败关闭。该视图不新增迁移、不移动资金，状态为 `implementation_uncompiled`，边界见 `docs/distributed-compute/settlement-account-view-api.md`。
+
 v177-v181 另行保存 Provider/Pool 激活证据申请、过期批准废止审计、不可变计划、原子应用回执和紧急隔离回执。本人 HTTP/MCP 可显式提交、查询和取消；平台 `admin/owner` 通过 HTTP 审核、废止、准备、应用或隔离，双方可只读预检申请，管理员还可预检计划。准备阶段固定下一 Provider revision、路由引用、verified 硬件摘要和规范计划摘要，仍无激活效果。应用阶段在一个 `BEGIN IMMEDIATE` 内重新审计依赖，组合 Provider 版本登记与 Pool 生命周期 kernel，把申请/计划推进为 activated/applied，并写入 v180 回执。v181 隔离再次审计应用，以当前 active Provider/Pool 为起点，原子登记 quarantined Provider 下一版本、Pool 隔离事件和追加式回执；它保留原激活历史且不直接改写 Offer。任一步失败整笔回滚，历史回执均审计不可变版本和事件，不依赖当前状态。两类效果都不发送节点命令、不读取凭据正文、不开放预留、不派发任务或移动资金；隔离恢复尚未实现，控制面仍为 `implementation_uncompiled`。
 Offer 控制面允许当前用户为 active Provider/Pool 创建、精确修订或撤销规范化 draft；修订追加连续版本，Offer/Provider/Pool/SKU 稳定身份不能原地改变。管理员 HTTP 可原子追加 active 与 v182 发布回执，用 v183 转为 draining，并在 v184 索引确认无 pending/active Reservation 后转入 expired/revoked。状态转换不取消预留、归还 Claim 或退款，管理员写入口不向 MCP 开放。当前为 `implementation_uncompiled`。
 本人 HTTP/MCP 可从当前 active Offer 发布规范化 fallback_curve Price Snapshot，服务端固定 SKU、窗口、价格条款、来源和到期上限；快照可进入现有 Job 候选，但不预留容量或资金。项目级 HTTP/MCP 可创建 submitted Job、发现并绑定候选。该能力仍为 `implementation_uncompiled`，不包含真实价格源、批量报价或自动撮合。

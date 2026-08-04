@@ -57,6 +57,7 @@ owners: backend, node, ai-economy
 | Attempt accepted 挑战纠正 | v199、追加式 Store、Correction Posting/账本腿与消费者/管理员 HTTP 已写；管理员可对 accepted 挑战提交守恒的向下金额纠正，原子退款消费者并冲减 Provider/平台 pending。纠正后 v198 只释放净额，尚未编译、执行迁移或运行验证 |
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；从当前 Provider 回执校验所有权和结算账户，把 CNY available 原子转入 withdrawn 保留区。它只冻结内部余额，不执行或证明外部付款，尚未编译、执行迁移或运行验证 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。它不发起或验证外部付款，尚未编译、执行迁移或运行验证 |
+| 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期；管理员 HTTP 可按 pending/cancelled/rejected/external_paid_attested/all 读取有界队列。只读、不移动资金，尚未编译或运行验证 |
 | 外部算力池适配器与统一报价 | 已接受设计，尚未实现 |
 | 多源验证、期货曲线与真实结算 | 已接受设计，尚未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
@@ -104,6 +105,7 @@ owners: backend, node, ai-economy
 29. `docs/distributed-compute/attempt-settlement-release-api.md`：72 小时后纠正净额从 pending 到 available 的原子释放、账本与非提现边界。
 30. `docs/distributed-compute/settlement-withdrawal-request-api.md`：Provider available 提款申请、withdrawn 内部冻结与非付款边界。
 31. `docs/distributed-compute/settlement-withdrawal-terminal-api.md`：提款取消、拒绝、外部已付款声明和唯一终态边界。
+32. `docs/distributed-compute/settlement-account-view-api.md`：Provider 结算账户账本重建与管理员提款队列边界。
 30. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
 
 ## 分阶段落地
