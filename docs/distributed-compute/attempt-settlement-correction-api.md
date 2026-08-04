@@ -2,14 +2,14 @@
 title: 分布式算力 Attempt accepted 挑战结算纠正
 status: current
 reviewed_at: 2026-08-05
-owners: ai-economy, backend
+owners: ai-economy, backend, pc-frontend
 ---
 
 # 分布式算力 Attempt accepted 挑战结算纠正
 
 ## 1. 当前实现
 
-v199、追加式 Store、独立 Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
+v199、追加式 Store、独立 Service、HTTP 路由、accepted 待纠正队列和 PC `/compute-corrections` 管理员工作区已经写入代码，但尚未编译、执行迁移、接口联调、页面验收或发布，状态固定为 `implementation_uncompiled`。
 
 v199 只处理 v197 已裁决为 `accepted` 的消费者挑战。平台管理员给出向下修正后的消费者费用、Provider 应得和平台价差，系统在单一事务中向消费者余额退款，并从 Provider 与平台 pending 余额冲减对应金额。原 v195 Settlement Receipt、v196 Challenge、v197 Resolution 和 `billing_reservation` 均保持历史原貌。
 
@@ -18,10 +18,13 @@ v199 只处理 v197 已裁决为 `accepted` 的消费者挑战。平台管理员
 | 方法 | 路径 | 调用者 | 作用 |
 |---|---|---|---|
 | POST | `/api/admin/compute/attempt-leases/:lease_id/settlement-correction` | 平台 `admin/owner` | 对 accepted 挑战执行一次向下金额纠正 |
+| GET | `/api/admin/compute/settlement-challenges/accepted/pending-correction` | 平台 `admin/owner` | 列出 accepted 且尚无 v199、尚未 v198 释放的待纠正候选 |
 | GET | `/api/admin/compute/attempt-leases/:lease_id/settlement-correction` | 平台 `admin/owner` | 管理侧读取并重新审计纠正回执 |
 | GET | `/api/me/compute/attempt-leases/:lease_id/settlement-correction` | 消费者或 Provider 所有者 | 参与方读取并重新审计纠正回执 |
 
 写请求必须精确绑定 Challenge ID/事件摘要、Resolution ID/事件摘要和 Settlement Receipt ID/事件摘要，提供 8 至 1000 字说明、最多 16 条有界证据引用、稳定幂等键，并显式确认消费者退款和 pending 冲减效果。
+
+候选 GET 先筛选 accepted 且无 Correction/Release 的 v197 决议，再逐条重放 v195 Settlement Receipt、v196 Challenge 和 v197 Resolution 审计。候选读取不改变余额；PC 端只做整数和守恒预检查，POST 事务仍是金额与并发权威。
 
 ## 3. 金额合同
 
@@ -80,9 +83,12 @@ Provider 可释放金额 = 原 Provider 应得 - Provider 纠正冲减
 
 消费者额外退款由独立纠正账本证明，不篡改 v195 已发生的预授权结清事实。
 
+PC 工作区要求管理员输入非负整数 fen/micros，满足 `消费者 fen × 10000 = Provider micros + 平台 micros`，并同时勾选资金影响、输入确认文本。该前端门卫不能替代服务端旧余额比较、revision 栅栏和单事务回滚。
+
 ## 7. 尚未实现
 
 - Cargo 编译、v199 迁移执行、HTTP 真实调用、并发和故障注入验证；
+- PC 构建、接口联调、桌面与移动视口验收及发布；
 - 非金额类 accepted 挑战的补救任务或履约重做；
 - 已进入 available 后发现新问题时的追索、负余额或保证金制度；
 - 自动裁决、自动纠正或自动释放；
@@ -97,5 +103,8 @@ Provider 可释放金额 = 原 Provider 应得 - Provider 纠正冲减
 - `server/src/compute_settlement_correction_migration.rs`
 - `server/src/compute_federation_attempt_settlement_correction_service.rs`
 - `server/src/compute_federation_attempt_settlement_correction_api.rs`
+- `pc-frontend/src/features/compute-attempt/settlementCorrectionContracts.ts`
+- `pc-frontend/src/features/compute-settlement/ComputeSettlementCorrectionPage.tsx`
+- `pc-frontend/src/features/compute-settlement/CorrectSettlementDialog.tsx`
 
 上游决议见 `docs/distributed-compute/attempt-settlement-challenge-resolution-api.md`；后续净额释放见 `docs/distributed-compute/attempt-settlement-release-api.md`。

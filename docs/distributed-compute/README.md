@@ -55,7 +55,7 @@ owners: backend, node, ai-economy
 | Attempt 挑战终态决议 | v197、追加式 Store、消费者/管理员 open 队列、角色 HTTP 与 PC 控制面已写；消费者在 `/compute-challenges` 可撤回本人 open 申诉，管理员在 `/compute-challenge-resolution` 可接受或驳回。队列逐条重审计 v196/v195 且排除已有终态；open/accepted 阻断，withdrawn/rejected 解除挑战门卫，但均不移动余额，尚未编译、执行迁移、接口联调、页面验收或发布 |
 | Attempt 待结算原子释放 | v198、追加式 Store、Release Posting/账本腿与消费者/管理员 HTTP 已写；满 72 小时且挑战为 none/rejected/withdrawn/accepted_corrected 时，管理员可把 Provider/平台原金额或纠正净额从 pending 原子转入 available。open/accepted 阻断，available 不等于提现或外部付款，尚未编译、执行迁移或运行验证 |
 | 到期结算释放队列与管理员批处理 | 管理员 HTTP 可读取已满 72 小时且尚无 v198 Release 的有界候选，并逐笔复用 v198 原子释放；候选重审计当前挑战门卫，blocked、失败和成功分别报告。它不是整批原子事务或后台定时器，不提现、不外部付款，尚未编译或运行验证 |
-| Attempt accepted 挑战纠正 | v199、追加式 Store、Correction Posting/账本腿与消费者/管理员 HTTP 已写；管理员可对 accepted 挑战提交守恒的向下金额纠正，原子退款消费者并冲减 Provider/平台 pending。纠正后 v198 只释放净额，尚未编译、执行迁移或运行验证 |
+| Attempt accepted 挑战纠正 | v199、追加式 Store、accepted 待纠正队列、Correction Posting/账本腿、角色 HTTP 与 PC `/compute-corrections` 已写；候选逐条重审计 v195-v197 并排除已有 Correction/Release。管理员以整数 fen/micros、守恒预览和双重确认提交向下金额纠正，原子退款消费者平台内余额并冲减 Provider/平台 pending；纠正后 v198 只释放净额，但不等于外部退款到账，尚未编译、执行迁移、接口联调、页面验收或发布 |
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；从当前 Provider 回执校验所有权和结算账户，把 CNY available 原子转入 withdrawn 保留区。它只冻结内部余额，不执行或证明外部付款，尚未编译、执行迁移或运行验证 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 管理页已接入拒绝与外部已付款证明登记源码。它不发起或验证外部付款，尚未编译、执行迁移、运行或页面验证 |
 | 结算账户审计视图与提款队列 | Provider 本人 HTTP 可从 v195、v198-v201 不可变账本重建账户和提款生命周期，并按 Provider/状态读取本人队列；管理员 HTTP 可重建固定平台账户的 pending/available，并按状态读取全局队列。PC 已写入本人收益与管理员结算两套页面源码。视图和队列只读、不提供平台提款、不移动资金，尚未编译或运行验证 |
