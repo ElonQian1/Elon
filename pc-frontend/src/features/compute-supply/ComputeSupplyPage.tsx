@@ -3,10 +3,16 @@ import { DatabaseZap, Gauge, Plus, RefreshCw, ShieldCheck, TriangleAlert } from 
 import { useNavigate } from 'react-router-dom'
 import {
   computeSupplyApi,
+  type ChangeCapacitySupplyBody,
+  type CreateMyComputeCapacityBucketBody,
   type CreateMyComputeCapacityPoolBody,
+  type MyComputeCapacityBucket,
   type MyComputeCapacityPool,
 } from './computeSupplyApi'
 import { type MyComputeProvider } from '../compute-settlement/myComputeSettlementApi'
+import BucketSupplyDialog, { type SupplyAction } from './BucketSupplyDialog'
+import CapacityPoolDetail from './CapacityPoolDetail'
+import CreateCapacityBucketDialog from './CreateCapacityBucketDialog'
 import CreateCapacityPoolDialog from './CreateCapacityPoolDialog'
 import styles from './ComputeSupplyPage.module.css'
 
@@ -16,9 +22,14 @@ export default function ComputeSupplyPage() {
   const [providerId, setProviderId] = useState('')
   const [pools, setPools] = useState<MyComputeCapacityPool[]>([])
   const [poolId, setPoolId] = useState('')
+  const [buckets, setBuckets] = useState<MyComputeCapacityBucket[]>([])
+  const [bucketId, setBucketId] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingBuckets, setLoadingBuckets] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [dialogOpen, setDialogOpen] = useState(false)
+  const [poolDialogOpen, setPoolDialogOpen] = useState(false)
+  const [bucketDialogOpen, setBucketDialogOpen] = useState(false)
+  const [supplyDialog, setSupplyDialog] = useState<{ bucket: MyComputeCapacityBucket; action: SupplyAction } | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const selectedProvider = useMemo(() => providers.find((item) => item.provider_id === providerId) ?? null, [providerId, providers])
@@ -53,8 +64,24 @@ export default function ComputeSupplyPage() {
     }
   }, [providerId])
 
+  const loadBuckets = useCallback(async () => {
+    if (!providerId || !poolId) { setBuckets([]); setBucketId(''); return }
+    setLoadingBuckets(true)
+    setError('')
+    try {
+      const next = await computeSupplyApi.buckets(providerId, poolId)
+      setBuckets(next)
+      setBucketId((current) => next.some((item) => item.balance.binding.bucket_id === current) ? current : next[0]?.balance.binding.bucket_id ?? '')
+    } catch (reason) {
+      setError(messageOf(reason, 'CapacityBucket 读取失败'))
+    } finally {
+      setLoadingBuckets(false)
+    }
+  }, [poolId, providerId])
+
   useEffect(() => { void loadProviders() }, [loadProviders])
   useEffect(() => { void loadPools() }, [loadPools])
+  useEffect(() => { void loadBuckets() }, [loadBuckets])
 
   async function createPool(body: CreateMyComputeCapacityPoolBody) {
     if (!providerId || creating) return
@@ -65,13 +92,38 @@ export default function ComputeSupplyPage() {
       const pool = await computeSupplyApi.createPool(providerId, body)
       await loadPools()
       setPoolId(pool.pool_id)
-      setDialogOpen(false)
+      setPoolDialogOpen(false)
       setNotice(`CapacityPool ${shortId(pool.pool_id)} 已登记。`)
     } catch (reason) {
       setError(messageOf(reason, 'CapacityPool 登记失败'))
     } finally {
       setCreating(false)
     }
+  }
+
+  async function createBucket(body: CreateMyComputeCapacityBucketBody) {
+    if (!providerId || !poolId || creating) return
+    setCreating(true); setError(''); setNotice('')
+    try {
+      const bucket = await computeSupplyApi.createBucket(providerId, poolId, body)
+      await loadBuckets()
+      setBucketId(bucket.balance.binding.bucket_id)
+      setBucketDialogOpen(false)
+      setNotice(`交付窗口 ${shortId(bucket.balance.binding.delivery_window.window_id)} 已登记，当前供给为 0。`)
+    } catch (reason) { setError(messageOf(reason, '交付窗口登记失败')) } finally { setCreating(false) }
+  }
+
+  async function changeSupply(action: SupplyAction, quantityUnits: number, idempotencyKey: string) {
+    if (!providerId || !poolId || !supplyDialog || creating) return
+    setCreating(true); setError(''); setNotice('')
+    const body: ChangeCapacitySupplyBody = { idempotency_key: idempotencyKey, lines: [{ bucket_id: supplyDialog.bucket.balance.binding.bucket_id, quantity_units: quantityUnits }] }
+    try {
+      const receipt = action === 'add' ? await computeSupplyApi.addSupply(providerId, poolId, body) : await computeSupplyApi.withdrawSupply(providerId, poolId, body)
+      await loadBuckets()
+      setBucketId(supplyDialog.bucket.balance.binding.bucket_id)
+      setSupplyDialog(null)
+      setNotice(`${action === 'add' ? '供给已追加' : '可用供给已撤出'}，账本序号 ${receipt.ledger_sequence}${receipt.replayed ? '（幂等重放）' : ''}。`)
+    } catch (reason) { setError(messageOf(reason, action === 'add' ? '供给追加失败' : '供给撤出失败')) } finally { setCreating(false) }
   }
 
   return (
@@ -81,10 +133,10 @@ export default function ComputeSupplyPage() {
         <div className={styles.controls}>
           <label><span>Provider</span><select value={providerId} onChange={(event) => setProviderId(event.target.value)} disabled={loading || providers.length === 0}>{providers.length === 0 && <option value="">暂无 Provider</option>}{providers.map((provider) => <option key={provider.provider_id} value={provider.provider_id}>{provider.display_name}</option>)}</select></label>
           <button type="button" className={styles.iconButton} onClick={() => void loadPools()} disabled={loading || !providerId} aria-label="刷新" title="刷新"><RefreshCw size={16} className={loading ? styles.spinning : ''} /></button>
-          <button type="button" className={styles.primaryButton} onClick={() => { setError(''); setDialogOpen(true) }} disabled={!selectedProvider}><Plus size={16} />登记 Pool</button>
+          <button type="button" className={styles.primaryButton} onClick={() => { setError(''); setPoolDialogOpen(true) }} disabled={!selectedProvider}><Plus size={16} />登记 Pool</button>
         </div>
       </header>
-      {error && !dialogOpen && <div className={styles.alert}><TriangleAlert size={15} />{error}</div>}
+      {error && !poolDialogOpen && !bucketDialogOpen && !supplyDialog && <div className={styles.alert}><TriangleAlert size={15} />{error}</div>}
       {notice && <div className={styles.notice}><ShieldCheck size={15} />{notice}</div>}
 
       {providers.length === 0 && !loading ? (
@@ -97,27 +149,17 @@ export default function ComputeSupplyPage() {
             {pools.length === 0 && !loading && <div className={styles.listEmpty}>当前 Provider 尚无 Pool</div>}
           </aside>
           <div className={styles.detail}>
-            {selectedPool ? <PoolDetail pool={selectedPool} provider={selectedProvider} /> : <div className={styles.detailEmpty}><DatabaseZap size={24} /><h2>选择或登记 CapacityPool</h2></div>}
+            {selectedPool ? <CapacityPoolDetail pool={selectedPool} provider={selectedProvider} buckets={buckets} selectedBucketId={bucketId} loadingBuckets={loadingBuckets} onSelectBucket={setBucketId} onCreateBucket={() => { setError(''); setBucketDialogOpen(true) }} onChangeSupply={(bucket, action) => { setError(''); setBucketId(bucket.balance.binding.bucket_id); setSupplyDialog({ bucket, action }) }} /> : <div className={styles.detailEmpty}><DatabaseZap size={24} /><h2>选择或登记 CapacityPool</h2></div>}
           </div>
         </section>
       )}
 
-      {dialogOpen && selectedProvider && <CreateCapacityPoolDialog providerName={selectedProvider.display_name} defaultRegion={selectedProvider.home_region ?? ''} busy={creating} error={error} onClose={() => setDialogOpen(false)} onSubmit={createPool} />}
+      {poolDialogOpen && selectedProvider && <CreateCapacityPoolDialog providerName={selectedProvider.display_name} defaultRegion={selectedProvider.home_region ?? ''} busy={creating} error={error} onClose={() => setPoolDialogOpen(false)} onSubmit={createPool} />}
+      {bucketDialogOpen && selectedPool && <CreateCapacityBucketDialog pool={selectedPool} busy={creating} error={error} onClose={() => setBucketDialogOpen(false)} onSubmit={createBucket} />}
+      {supplyDialog && <BucketSupplyDialog bucket={supplyDialog.bucket} initialAction={supplyDialog.action} busy={creating} error={error} onClose={() => setSupplyDialog(null)} onSubmit={changeSupply} />}
     </main>
   )
 }
-
-function PoolDetail({ pool, provider }: { pool: MyComputeCapacityPool; provider: MyComputeProvider | null }) {
-  return <div className={styles.poolDetail}>
-    <header><div><span>{provider?.display_name ?? 'Provider'}</span><h2>{pool.pool_id}</h2></div><span className={styles.status}>{statusLabel(pool.status)}</span></header>
-    <div className={styles.facts}><div><span>区域</span><strong>{pool.region_or_data_zone}</strong></div><div><span>Epoch</span><strong>{pool.capacity_epoch}</strong></div><div><span>Revision</span><strong>{pool.pool_revision}</strong></div><div><span>创建时间</span><strong>{formatTime(pool.created_at)}</strong></div></div>
-    <section className={styles.meters}><header><h3>计量策略</h3><span>{pool.meter_policies.length}</span></header>{pool.meter_policies.map((meter) => <div className={styles.meter} key={meter.meter}><strong>{meter.meter}</strong><span>{meter.meter_mode === 'consumable' ? '消耗型' : '复用型'}</span><span>量子 {meter.quantum_units}</span><code>{shortDigest(meter.policy_digest)}</code></div>)}</section>
-    <section className={styles.digests}><h3>合同摘要</h3><div><span>Pool</span><code>{pool.pool_digest}</code></div><div><span>Scope</span><code>{pool.resource_scope_digest}</code></div><div><span>Profile</span><code>{pool.resource_profile_digest}</code></div></section>
-  </div>
-}
-
 function statusLabel(value: string) { return ({ registering: '登记中', active: '已激活', draining: '排空中', retired: '已退场', quarantined: '已隔离' } as Record<string, string>)[value] ?? value }
 function shortId(value: string) { return value.length <= 24 ? value : `${value.slice(0, 12)}…${value.slice(-8)}` }
-function shortDigest(value: string) { return value.length <= 22 ? value : `${value.slice(0, 10)}…${value.slice(-8)}` }
-function formatTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString('zh-CN', { hour12: false }) }
 function messageOf(reason: unknown, fallback: string) { if (reason instanceof Error && reason.message) return reason.message; if (reason && typeof reason === 'object' && 'message' in reason && typeof reason.message === 'string') return reason.message; return fallback }
