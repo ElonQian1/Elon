@@ -40,6 +40,20 @@ pub(crate) struct ReviewComputeActivationEvidenceRequest {
 }
 
 impl Store {
+    pub(crate) fn compute_activation_evidence_request_by_idempotency(
+        &self,
+        idempotency_scope: &str,
+        idempotency_key: &str,
+    ) -> Result<Option<ComputeActivationEvidenceRequest>> {
+        validate_exact("激活证据幂等范围", idempotency_scope, 200)?;
+        validate_exact("激活证据幂等键", idempotency_key, 160)?;
+        request_by_idempotency_on(
+            &self.conn()?,
+            idempotency_scope.trim(),
+            idempotency_key.trim(),
+        )
+    }
+
     pub(crate) fn submit_compute_activation_evidence_request(
         &self,
         input: SubmitComputeActivationEvidenceRequest,
