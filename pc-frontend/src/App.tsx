@@ -30,6 +30,7 @@ const ComputeMarketPage = lazy(() => import('./features/compute-market/ComputeMa
 const ComputeConsumerReviewPage = lazy(() => import('./features/compute-market/ComputeConsumerReviewPage'))
 const ComputeExecutionPage = lazy(() => import('./features/compute-execution/ComputeExecutionPage'))
 const ComputePlatformObservationPage = lazy(() => import('./features/compute-observations/ComputePlatformObservationPage'))
+const ComputeVerificationPage = lazy(() => import('./features/compute-verification/ComputeVerificationPage'))
 
 function RouteFallback() {
   return <div className={styles.routeFallback} role="status" aria-label="正在加载页面" />
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="compute-reviews" element={lazyRoute(<ComputeConsumerReviewPage />)} />
         <Route path="compute-execution" element={lazyRoute(<ComputeExecutionPage />)} />
         <Route path="compute-observations" element={lazyRoute(<ComputePlatformObservationPage />)} />
+        <Route path="compute-verification" element={lazyRoute(<ComputeVerificationPage />)} />
         <Route path="voice" element={lazyRoute(<VoicePage />)} />
         <Route path="doctor" element={lazyRoute(<DoctorPage />)} />
         <Route path="node/public-dev-smoke" element={lazyRoute(<PublicDevSmokePage />)} />

@@ -1,0 +1,73 @@
+.page { min-height: 100%; overflow-y: auto; padding: 24px clamp(18px,4vw,44px) 48px; color: var(--text-primary); background: var(--bg-base); }
+.pageHeader, .alert, .queue { max-width: 1120px; margin-right: auto; margin-left: auto; }
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 13px; }
+.pageHeader span { color: #7ccaa5; font-size: 9px; font-weight: 800; }
+.pageHeader h1 { margin: 4px 0 5px; font-size: 22px; letter-spacing: 0; }
+.pageHeader p { margin: 0; color: var(--text-muted); font-size: 10px; }
+.pageHeader button, .iconButton { min-height: 36px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); border-radius: 6px; padding: 0 9px; color: var(--text-secondary); background: var(--bg-elevated); }
+.alert { display: flex; align-items: center; gap: 7px; margin-bottom: 10px; border: 1px solid; border-radius: 6px; padding: 8px 10px; font-size: 9px; }
+.alert[data-tone='error'] { color: #ffcaca; border-color: rgba(224,92,92,.3); background: rgba(224,92,92,.08); }
+.alert[data-tone='success'] { color: #d8f5e2; border-color: rgba(82,183,123,.3); background: rgba(82,183,123,.08); }
+.queue { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.queue > header { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 12px; }
+.queue > header div { display: flex; align-items: center; gap: 7px; }
+.queue h2 { margin: 0; font-size: 11px; letter-spacing: 0; }
+.queue > header > span { min-width: 24px; border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; color: #7ccaa5; font-size: 9px; text-align: center; }
+.candidateList { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); border-top: 1px solid var(--border); }
+.candidate { min-width: 0; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 12px; }
+.candidate:nth-child(2n) { border-right: 0; }
+.candidate > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.candidate > header > div { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.candidate header strong, .candidate header span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.candidate header strong { font-size: 9px; }
+.candidate header span { color: var(--text-muted); font-size: 8px; }
+.candidate header button { min-height: 30px; flex: 0 0 auto; border: 1px solid #67b98f; border-radius: 5px; padding: 0 8px; color: #07130d; background: #84d1aa; font-size: 8px; font-weight: 760; }
+.evidenceStrip { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); margin-top: 11px; border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+.evidenceStrip div { min-width: 0; display: grid; gap: 4px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 7px; }
+.evidenceStrip span, .facts span { color: var(--text-muted); font-size: 8px; }
+.evidenceStrip b { overflow: hidden; color: #d8f5e2; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.evidenceStrip b[data-decision='rejected'], .evidenceStrip b[data-decision='failed'] { color: #ffcaca; }
+.evidenceStrip b[data-decision='disputed'], .evidenceStrip b[data-decision='indeterminate'] { color: #efd7ad; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; border-left: 1px solid var(--border); }
+.facts div { min-width: 0; display: grid; gap: 3px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 7px; }
+.facts strong { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.meters { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+.meters span { border: 1px solid var(--border); border-radius: 5px; padding: 4px 6px; color: #d8c89e; font-size: 8px; }
+.empty { min-height: 180px; display: flex; align-items: center; justify-content: center; gap: 7px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 9px; }
+.backdrop { position: fixed; z-index: 70; inset: 0; display: grid; place-items: center; overflow-y: auto; padding: 24px; background: rgba(5,7,9,.76); }
+.dialog { width: min(760px,100%); max-height: calc(100vh - 48px); overflow-y: auto; border: 1px solid var(--border); border-radius: 7px; background: var(--bg-elevated); box-shadow: 0 24px 70px rgba(0,0,0,.42); }
+.dialog > header { min-height: 52px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); padding: 0 13px; }
+.dialog > header > div { display: flex; align-items: center; gap: 7px; }
+.dialog h2 { margin: 0; font-size: 12px; letter-spacing: 0; }
+.iconButton { min-width: 34px; min-height: 34px; justify-content: center; padding: 0; }
+.dialog form { display: grid; gap: 12px; padding: 13px; }
+.dialogError, .validation, .boundary { border: 1px solid; border-radius: 6px; padding: 8px 9px; font-size: 8px; line-height: 1.5; }
+.dialogError, .validation { color: #ffcaca; border-color: rgba(224,92,92,.3); background: rgba(224,92,92,.07); }
+.boundary { color: #efd7ad; border-color: rgba(214,169,99,.3); background: rgba(214,169,99,.07); }
+.decisionTabs { display: grid; grid-template-columns: repeat(3,1fr); border: 1px solid var(--border); border-radius: 6px; padding: 3px; background: var(--bg-base); }
+.decisionTabs button { min-height: 34px; border-radius: 4px; color: var(--text-muted); font-size: 8px; }
+.decisionTabs button[data-active='true'] { color: var(--text-primary); background: rgba(124,202,165,.14); box-shadow: inset 0 0 0 1px rgba(124,202,165,.24); }
+.decisionTabs button:disabled { cursor: not-allowed; opacity: .34; }
+.evidenceTable, .meterTable { border-top: 1px solid var(--border); }
+.evidenceTable > header, .meterTable > header { min-height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 8px; }
+.evidenceTable > header span, .meterTable > header span { color: var(--text-muted); }
+.evidenceTable > div { display: grid; grid-template-columns: 120px minmax(0,1fr); gap: 10px; border-top: 1px solid var(--border); padding: 7px 0; }
+.evidenceTable span { color: var(--text-muted); font-size: 8px; }
+.evidenceTable b { overflow-wrap: anywhere; font-size: 9px; }
+.meterTable > div { display: grid; grid-template-columns: minmax(110px,1fr) repeat(4,minmax(58px,.42fr)); gap: 8px; border-top: 1px solid var(--border); padding: 7px 0; }
+.meterTable span { overflow: hidden; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.meterTable code { color: #d8c89e; font-size: 8px; text-align: right; }
+.formGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.formGrid label { min-width: 0; display: grid; align-content: start; gap: 5px; }
+.formGrid span { color: var(--text-muted); font-size: 8px; }
+.formGrid input, .formGrid textarea { width: 100%; border: 1px solid var(--border); border-radius: 5px; padding: 8px; color: var(--text-primary); background: var(--bg-base); font-size: 9px; }
+.formGrid textarea { resize: vertical; }
+.confirm { display: flex; align-items: flex-start; gap: 7px; color: var(--text-secondary); font-size: 8px; line-height: 1.5; }
+.confirm input { margin-top: 2px; accent-color: #7ccaa5; }
+.eventDigest { overflow-wrap: anywhere; color: #9fc4f4; font-size: 7px; }
+.dialog footer { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
+.dialog footer button { min-height: 34px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border); border-radius: 5px; padding: 0 10px; color: var(--text-secondary); }
+.dialog footer .primary { color: #07130d; border-color: #67b98f; background: #84d1aa; font-weight: 760; }
+.spinning { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 760px) { .pageHeader { flex-direction: column; } .candidateList { grid-template-columns: 1fr; } .candidate { border-right: 0; } .formGrid { grid-template-columns: 1fr; } .meterTable > div { grid-template-columns: minmax(90px,1fr) repeat(4,48px); gap: 5px; } .backdrop { align-items: start; padding: 10px; } .dialog { max-height: calc(100vh - 20px); } }
