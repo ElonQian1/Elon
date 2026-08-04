@@ -202,9 +202,7 @@ async fn mcp_handler(
             tools.extend(crate::open_commerce_merchant_evidence_mcp::definitions());
             tools.extend(crate::open_commerce_business_handoff_mcp::definitions());
             tools.extend(crate::erp_blueprint_mcp_tools::definitions());
-            tools.extend(crate::compute_federation_provider_mcp::definitions());
-            tools.extend(crate::compute_federation_capacity_pool_mcp::definitions());
-            tools.extend(crate::compute_federation_broker_mcp::definitions());
+            tools.extend(crate::compute_federation_mcp::definitions());
             Ok(json!({"tools": tools}))
         }
         "tools/call" => {
@@ -248,23 +246,7 @@ pub(crate) async fn call_tool(
         .get("arguments")
         .cloned()
         .unwrap_or_else(|| json!({}));
-    if let Some(value) = crate::compute_federation_provider_mcp::call_if_handled(
-        store,
-        user_id,
-        name,
-        arguments.clone(),
-    )? {
-        return tool_response(value);
-    }
-    if let Some(value) = crate::compute_federation_capacity_pool_mcp::call_if_handled(
-        store,
-        user_id,
-        name,
-        arguments.clone(),
-    )? {
-        return tool_response(value);
-    }
-    if let Some(value) = crate::compute_federation_broker_mcp::call_if_handled(
+    if let Some(value) = crate::compute_federation_mcp::call_if_handled(
         store,
         project_id,
         user_id,

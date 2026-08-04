@@ -27,6 +27,7 @@ pub(crate) mod codex_vault_usage_estimation;
 mod common;
 mod compute_broker_reservation;
 mod compute_capacity_audit;
+mod compute_capacity_bucket_queries;
 mod compute_capacity_claim_rows;
 mod compute_capacity_claim_transitions;
 mod compute_capacity_claims;
@@ -233,6 +234,7 @@ pub(crate) use compute_broker_reservation::{
 pub(crate) use compute_capacity_audit::{
     ComputeCapacityBucketAudit, ComputeCapacityDerivedBalance, ComputeCapacityPoolAuditReport,
 };
+pub(crate) use compute_capacity_bucket_queries::ComputeCapacityBucketRead;
 pub(crate) use compute_capacity_claim_transitions::{
     ComputeCapacityClaimTerminalAction, FinishComputeCapacityClaim,
     FinishComputeCapacityClaimReceipt,

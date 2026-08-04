@@ -43,6 +43,33 @@ pub(super) fn stored_buckets_for_pool_epoch_on(
     rows.into_iter().map(stored_bucket_from_row).collect()
 }
 
+pub(super) fn stored_buckets_for_pool_epoch_limited_on(
+    conn: &Connection,
+    pool_id: &str,
+    capacity_epoch: i64,
+    pool_revision: i64,
+    limit: usize,
+) -> Result<Vec<StoredComputeCapacityBucket>> {
+    let mut statement = conn.prepare(&format!(
+        "{BUCKET_SELECT}
+          WHERE b.pool_id=?1 AND b.capacity_epoch=?2 AND b.pool_revision=?3
+          ORDER BY b.delivery_window_starts_at DESC, b.meter, b.bucket_id
+          LIMIT ?4"
+    ))?;
+    let rows = statement
+        .query_map(
+            params![
+                pool_id.trim(),
+                capacity_epoch,
+                pool_revision,
+                limit.clamp(1, 100) as i64
+            ],
+            bucket_row,
+        )?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    rows.into_iter().map(stored_bucket_from_row).collect()
+}
+
 struct BucketRow {
     bucket_id: String,
     bucket_digest: String,

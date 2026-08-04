@@ -196,6 +196,36 @@ impl Store {
             ComputeCapacityPoolOperation::ConfigureBucket,
         )?;
 
+        let existing_window = tx
+            .query_row(
+                "SELECT delivery_window_digest, delivery_window_starts_at,
+                        delivery_window_ends_at
+                   FROM compute_capacity_buckets
+                  WHERE pool_id=?1 AND capacity_epoch=?2 AND delivery_window_id=?3
+                  LIMIT 1",
+                params![
+                    bucket.binding.pool.pool_id.trim(),
+                    bucket.binding.pool.capacity_epoch,
+                    bucket.binding.delivery_window.window_id.trim(),
+                ],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                },
+            )
+            .optional()?;
+        if let Some((window_digest, starts_at, ends_at)) = existing_window {
+            if window_digest != bucket.binding.delivery_window.window_digest
+                || starts_at != window.starts_at_utc
+                || ends_at != window.ends_at_utc
+            {
+                bail!("同一容量池 epoch 的交付窗口 ID 不能绑定不同时间或摘要");
+            }
+        }
+
         let overlap = tx
             .query_row(
                 "SELECT bucket_id FROM compute_capacity_buckets

@@ -89,9 +89,7 @@ pub(crate) fn get_for_user(
     provider_id: &str,
     pool_id: &str,
 ) -> Result<MyComputeCapacityPoolView> {
-    owned_provider(store, user_id, provider_id)?;
-    let pool = store.compute_capacity_pool(pool_id)?;
-    ensure_pool_provider(&pool, provider_id)?;
+    let pool = owned_pool_for_user(store, user_id, provider_id, pool_id)?;
     Ok(pool_view(pool, false))
 }
 
@@ -110,6 +108,19 @@ pub(crate) fn list_for_user(
             Ok(pool_view(pool, false))
         })
         .collect()
+}
+
+pub(crate) fn owned_pool_for_user(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    pool_id: &str,
+) -> Result<ComputeCapacityPool> {
+    owned_provider(store, user_id, provider_id)?;
+    validate_bounded("容量池 ID", pool_id, 160)?;
+    let pool = store.compute_capacity_pool(pool_id)?;
+    ensure_pool_provider(&pool, provider_id)?;
+    Ok(pool)
 }
 
 fn owned_provider(
