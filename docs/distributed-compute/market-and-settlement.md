@@ -120,7 +120,7 @@ platform_margin
 
 容量市场底层统一使用已接受的共享 CapacityPool 与追加式账本设计，见 `docs/decisions/distributed-compute-capacity-ledger-v1.md` 和 `docs/distributed-compute/capacity-ledger.md`。Offer 只声明静态出售上限；发布、复制或续期 Offer 不会铸造任何可用容量。只有 Pool bucket 的发行事件进入账本后才形成余额，所有现货 Reservation 与未来 Commitment 必须争用同一容量真源。
 
-V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v199 schema、各版本化 Registry 及 fallback_curve 报价入口已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker，v185-v194 已形成 Attempt 证据、可信终态和容量收口；v195 已形成首版 CNY 基础组件待结算回执；v196/v197 已形成固定 72 小时消费者挑战及撤回/裁决门卫；v199 已形成 accepted 挑战向下金额纠正；v198 已形成门卫允许时把原金额或纠正净额从 pending 转入 available 的原子释放回执。真实价格源、自动撮合、节点真实运行接线、非金额补救、available 追索、自动释放、提现和外部资金清算仍未实现。
+V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v200 schema、各版本化 Registry 及 fallback_curve 报价入口已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker，v185-v194 已形成 Attempt 证据、可信终态和容量收口；v195 已形成首版 CNY 基础组件待结算回执；v196/v197 已形成固定 72 小时消费者挑战及撤回/裁决门卫；v199 已形成 accepted 挑战向下金额纠正；v198 已形成门卫允许时把原金额或纠正净额从 pending 转入 available 的原子释放回执；v200 已形成 Provider 本人 available 到 withdrawn 保留区的提款申请。真实价格源、自动撮合、节点真实运行接线、非金额补救、available 追索、自动释放、提款终态和外部资金清算仍未实现。
 
 市场对象分层：
 
@@ -169,4 +169,4 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 
 ## 13. 当前未验证声明
 
-本文是已接受的目标市场合同。当前代码已写入 fallback_curve 报价、v175 平台人民币余额预授权、v176 未激活任务严格退款及 v185-v199 Attempt 证据、可信终态、容量收口、待结算回执、挑战、决议、纠正与释放，但均为 `implementation_uncompiled`。v195 只结清预授权并登记 pending；v196/v197 只记录挑战和终态门卫；v199 只在内部账本退款消费者并冲减 accepted 挑战对应的 pending；v198 只把合格原金额或纠正净额从 pending 转入 available。它们都不代表收益已提现或生产支付完成。真实价格源、自动撮合、节点真实运行接线、复杂费用、非金额补救、available 追索、自动释放、提现、期货曲线、订单簿、持仓和真实外部清算仍未实现。
+本文是已接受的目标市场合同。当前代码已写入 fallback_curve 报价、v175 平台人民币余额预授权、v176 未激活任务严格退款及 v185-v200 Attempt 证据、可信终态、容量收口、待结算回执、挑战、决议、纠正、释放与 Provider 提款申请，但均为 `implementation_uncompiled`。v195 只结清预授权并登记 pending；v196/v197 只记录挑战和终态门卫；v199 只在内部账本退款消费者并冲减 accepted 挑战对应的 pending；v198 只把合格原金额或纠正净额从 pending 转入 available；v200 只把 Provider 本人的 available 转入 withdrawn 保留区。它们都不代表收益已提现或生产支付完成。真实价格源、自动撮合、节点真实运行接线、复杂费用、非金额补救、available 追索、自动释放、提款终态、期货曲线、订单簿、持仓和真实外部清算仍未实现。

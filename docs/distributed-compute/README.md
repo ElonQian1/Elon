@@ -23,7 +23,7 @@ owners: backend, node, ai-economy
 | 能力 | 2026-08-04 状态 |
 |---|---|
 | 节点模型白名单、最大并发、每日 Token 预算与执行租约 | 已实现，是兼容供给入口 |
-| Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码、v169-v176 注册表、Broker Reserve/未执行任务终态、v185-v199 Attempt 激活、证据链、可信终态、容量收口、待结算、挑战、决议、纠正与 pending 释放已写，状态为 `implementation_uncompiled`，尚未迁移、完整接线和运行验证 |
+| Provider / Offer / Job / Reservation / Lease / Receipt 统一领域合同 | 基础代码、v169-v176 注册表、Broker Reserve/未执行任务终态、v185-v200 Attempt 激活、证据链、可信终态、容量收口、待结算、挑战、决议、纠正、pending 释放与 Provider 提款冻结已写，状态为 `implementation_uncompiled`，尚未迁移、完整接线和运行验证 |
 | Provider 本人控制面 | HTTP/MCP 已可登记、读取和列出本人 `user_node` 或 `managed_cluster` 的脱敏视图；只生成 `registering/self_declared` 记录，不接受路由、凭据、适配器或验证证据，尚未编译和运行验证 |
 | CapacityPool 本人控制面 | HTTP/MCP 已可在本人 Provider 下登记、读取、列出和审计 `registering` Pool，并按稳定序号分页读取脱敏账本历史；审计健康不等于硬件 verified，历史省略消费者和业务因果字段；尚未编译和运行验证 |
 | CapacityBucket 本人控制面 | HTTP/MCP 已可在本人当前 Pool 版本下创建 open、零发行余额 Bucket，并读取当前余额；窗口和 Bucket 摘要由服务端生成，不发行容量、不预留、不交易，尚未编译和运行验证 |
@@ -55,6 +55,7 @@ owners: backend, node, ai-economy
 | Attempt 挑战终态决议 | v197、追加式 Store 与消费者/管理员 HTTP 已写；消费者可撤回，管理员可接受或驳回。open/accepted 阻断，withdrawn/rejected 解除挑战门卫，但均不移动余额，尚未编译、执行迁移或运行验证 |
 | Attempt 待结算原子释放 | v198、追加式 Store、Release Posting/账本腿与消费者/管理员 HTTP 已写；满 72 小时且挑战为 none/rejected/withdrawn/accepted_corrected 时，管理员可把 Provider/平台原金额或纠正净额从 pending 原子转入 available。open/accepted 阻断，available 不等于提现或外部付款，尚未编译、执行迁移或运行验证 |
 | Attempt accepted 挑战纠正 | v199、追加式 Store、Correction Posting/账本腿与消费者/管理员 HTTP 已写；管理员可对 accepted 挑战提交守恒的向下金额纠正，原子退款消费者并冲减 Provider/平台 pending。纠正后 v198 只释放净额，尚未编译、执行迁移或运行验证 |
+| Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；从当前 Provider 回执校验所有权和结算账户，把 CNY available 原子转入 withdrawn 保留区。它只冻结内部余额，不执行或证明外部付款，尚未编译、执行迁移或运行验证 |
 | 外部算力池适配器与统一报价 | 已接受设计，尚未实现 |
 | 多源验证、期货曲线与真实结算 | 已接受设计，尚未实现 |
 | 二级容量市场与自动清算 | 目标架构，尚未实现 |
@@ -100,6 +101,7 @@ owners: backend, node, ai-economy
 27. `docs/distributed-compute/attempt-settlement-challenge-resolution-api.md`：消费者撤回、管理员裁决与释放门卫边界。
 28. `docs/distributed-compute/attempt-settlement-correction-api.md`：accepted 挑战向下金额纠正、消费者退款和 pending 冲减边界。
 29. `docs/distributed-compute/attempt-settlement-release-api.md`：72 小时后纠正净额从 pending 到 available 的原子释放、账本与非提现边界。
+30. `docs/distributed-compute/settlement-withdrawal-request-api.md`：Provider available 提款申请、withdrawn 内部冻结与非付款边界。
 30. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
 
 ## 分阶段落地
@@ -134,7 +136,7 @@ v193 再基于 accepted v192 签发 Execution Receipt：回执重新审计 Attem
 
 v194 再基于由 accepted Verification 签发的精确 v193 Execution Receipt 应用可信终态：单一事务把 Lease 推进为 terminal、Job 推进为 `verification_pending`、Reservation/Claim 推进为 consumed；consumable meter 消费 compensable usage 并归还余量，reusable meter 全量归还。回执不可覆盖，预授权与 Provider 收益仍不变。
 
-v195 再基于精确 v194/v193、Broker 预授权和 Price Snapshot 生成不可变 Settlement Receipt：消费者价格腿使用 verified usage 并按快照舍入到人民币分，Provider 价格腿使用 compensable usage；单事务扣结预授权、退回未用余额、登记 Provider/平台 pending 收益并把 Job 推进为 `settled`。首版仅支持 CNY 基础组件，pending 不可提现，不调用真实支付或链上网络。v196 允许消费者在回执创建后的固定 72 小时内提交一份不可覆盖挑战；v197 再把撤回、接受或驳回保存为唯一终态。两者都不改写结算或余额。v199 对 accepted 挑战追加向下金额纠正，原子退款消费者并冲减 Provider/平台 pending；v198 在 72 小时窗口结束且挑战门卫允许时，用独立 Release Receipt 和四条账本腿把原金额或纠正净额从 pending 原子转入 available。两者都不提现、不调用外部支付或链上网络。
+v195 再基于精确 v194/v193、Broker 预授权和 Price Snapshot 生成不可变 Settlement Receipt：消费者价格腿使用 verified usage 并按快照舍入到人民币分，Provider 价格腿使用 compensable usage；单事务扣结预授权、退回未用余额、登记 Provider/平台 pending 收益并把 Job 推进为 `settled`。首版仅支持 CNY 基础组件，pending 不可提现，不调用真实支付或链上网络。v196 允许消费者在回执创建后的固定 72 小时内提交一份不可覆盖挑战；v197 再把撤回、接受或驳回保存为唯一终态。两者都不改写结算或余额。v199 对 accepted 挑战追加向下金额纠正，原子退款消费者并冲减 Provider/平台 pending；v198 在 72 小时窗口结束且挑战门卫允许时，用独立 Release Receipt 和四条账本腿把原金额或纠正净额从 pending 原子转入 available。v200 再允许 Provider 所有者把本人 available 原子转入 withdrawn 提款保留区，并保存不可变申请回执；它仍不执行或证明外部付款。
 Offer 所有者 HTTP/MCP 可发布服务端规范化的 fallback_curve Price Snapshot；项目级 HTTP/MCP 可创建 submitted Job、发现当前有效候选，再把当前 revision/digest 锁定到所选报价。候选返回价格合同和最小 Provider 摘要，不返回节点路由、凭据或适配器配置。报价发布、候选发现和锁价均不移动资金或容量；真实价格源、批量报价和自动撮合仍未实现。
 
 Provider 本人控制面由 `docs/distributed-compute/provider-api.md` 维护，Pool、Bucket 和 Supply 控制面分别由 `docs/distributed-compute/capacity-pool-api.md`、`docs/distributed-compute/capacity-bucket-api.md`、`docs/distributed-compute/capacity-supply-api.md` 维护；激活证据申请、计划与“内部激活不等于市场可交易”边界由 `docs/distributed-compute/activation-evidence-api.md` 维护；Offer 规范化草稿与无市场效果边界由 `docs/distributed-compute/offer-api.md` 维护；Job、报价和预留控制面由 `docs/distributed-compute/broker-api.md` 维护；Attempt 激活、续租、中止、声明用量、Provider 候选、消费者审核、平台观测、Verification、Execution Receipt、可信终态、待结算、挑战、决议、纠正与释放边界见本页“阅读顺序”第 15 至 29 项。

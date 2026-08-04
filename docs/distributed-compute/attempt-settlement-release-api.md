@@ -59,14 +59,14 @@ v198 在 v195 Settlement Receipt 创建满 72 小时且挑战门卫允许时，�
 - Release Posting、四条账本腿、历史余额快照与账户 revision；
 - Provider/平台当前 pending 与 available 是否可由不可变账本重建。
 
-`available` 仅表示平台内部账本已度过本轮挑战释放门卫，不等于现金到账、银行付款、钱包转账、链上资产或可无条件提现。
+`available` 仅表示平台内部账本已度过本轮挑战释放门卫。v200 可由 Provider 所有者把本人 available 转入 withdrawn 提款保留区，但该申请仍不等于现金到账、银行付款、钱包转账或链上资产。
 
 ## 6. 尚未实现
 
 - Cargo 编译、v198 迁移执行、HTTP 真实调用、并发和故障注入验证；
 - 定时扫描并自动释放到期 Settlement Receipt；
 - accepted 挑战的纠正、冲正、退款或替换 Settlement Receipt；
-- available 提现、提现风控、外部支付或银行清算；
+- 提款取消、拒绝、外部已付款证明、提现风控、外部支付或银行清算；
 - Sui、代币、多币种、矿池或其他链上结算。
 
 因此，本实现不能被描述为真实付款或可提现收益已经上线。
@@ -79,4 +79,4 @@ v198 在 v195 Settlement Receipt 创建满 72 小时且挑战门卫允许时，�
 - `server/src/compute_federation_attempt_settlement_release_service.rs`
 - `server/src/compute_federation_attempt_settlement_release_api.rs`
 
-上游待结算、挑战和决议分别见 `docs/distributed-compute/attempt-settlement-api.md`、`docs/distributed-compute/attempt-settlement-challenge-api.md` 与 `docs/distributed-compute/attempt-settlement-challenge-resolution-api.md`。
+上游待结算、挑战和决议分别见 `docs/distributed-compute/attempt-settlement-api.md`、`docs/distributed-compute/attempt-settlement-challenge-api.md` 与 `docs/distributed-compute/attempt-settlement-challenge-resolution-api.md`。下游提款申请见 `docs/distributed-compute/settlement-withdrawal-request-api.md`。
