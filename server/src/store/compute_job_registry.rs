@@ -23,9 +23,11 @@ use super::{
     now, Store,
 };
 
+mod queries;
 mod rows;
 mod transitions;
 
+use queries::list_current_jobs_on;
 use rows::{
     current_job_projection_on, job_id_for_idempotency_on, job_version_on, CurrentJobProjection,
     StoredJobVersion,
@@ -65,6 +67,24 @@ impl Store {
         }
         let conn = self.conn()?;
         current_registered_job_on(&conn, job_id.trim())?.ok_or_else(|| anyhow!("算力 Job 不存在"))
+    }
+
+    pub(crate) fn list_compute_jobs_for_consumer(
+        &self,
+        consumer_account_id: &str,
+        project_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ComputeJobRegistrationReceipt>> {
+        if consumer_account_id.trim().is_empty() {
+            bail!("消费者账户 ID 不能为空");
+        }
+        let conn = self.conn()?;
+        list_current_jobs_on(
+            &conn,
+            consumer_account_id.trim(),
+            project_id.map(str::trim),
+            limit.clamp(1, 100),
+        )
     }
 }
 

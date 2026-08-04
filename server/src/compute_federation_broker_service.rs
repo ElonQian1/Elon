@@ -6,6 +6,7 @@ use crate::{
     compute_federation::execution::ComputeReservedCapacity,
     store::{
         ComputeBrokerFinishAction, ComputeBrokerFinishReceipt, ComputeBrokerReservationReceipt,
+        ComputeJobRegistrationReceipt, ComputeReservationRegistrationReceipt,
         FinishComputeBrokerRequest, ReserveComputeBrokerRequest, Store,
     },
 };
@@ -73,6 +74,51 @@ pub(crate) fn finish_for_user(
     })
 }
 
+pub(crate) fn get_job_for_user(
+    store: &Store,
+    user_id: &str,
+    expected_project_id: Option<&str>,
+    job_id: &str,
+) -> Result<ComputeJobRegistrationReceipt> {
+    let job = store.compute_job(job_id)?;
+    ensure_job_receipt_scope(&job, user_id, expected_project_id)?;
+    Ok(job)
+}
+
+pub(crate) fn list_jobs_for_user(
+    store: &Store,
+    user_id: &str,
+    expected_project_id: Option<&str>,
+    limit: usize,
+) -> Result<Vec<ComputeJobRegistrationReceipt>> {
+    store.list_compute_jobs_for_consumer(user_id, expected_project_id, limit)
+}
+
+pub(crate) fn get_reservation_for_user(
+    store: &Store,
+    user_id: &str,
+    expected_project_id: Option<&str>,
+    reservation_id: &str,
+) -> Result<ComputeReservationRegistrationReceipt> {
+    let reservation = store.compute_reservation(reservation_id)?;
+    ensure_job_scope(
+        store,
+        user_id,
+        expected_project_id,
+        &reservation.reservation.job.job_id,
+    )?;
+    Ok(reservation)
+}
+
+pub(crate) fn list_reservations_for_user(
+    store: &Store,
+    user_id: &str,
+    expected_project_id: Option<&str>,
+    limit: usize,
+) -> Result<Vec<ComputeReservationRegistrationReceipt>> {
+    store.list_compute_reservations_for_consumer(user_id, expected_project_id, limit)
+}
+
 fn ensure_job_scope(
     store: &Store,
     user_id: &str,
@@ -80,6 +126,14 @@ fn ensure_job_scope(
     job_id: &str,
 ) -> Result<()> {
     let job = store.compute_job(job_id)?;
+    ensure_job_receipt_scope(&job, user_id, expected_project_id)
+}
+
+fn ensure_job_receipt_scope(
+    job: &ComputeJobRegistrationReceipt,
+    user_id: &str,
+    expected_project_id: Option<&str>,
+) -> Result<()> {
     if job.job.consumer_account_id != user_id {
         bail!("只能操作当前登录用户自己的算力 Job");
     }

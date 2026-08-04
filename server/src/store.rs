@@ -253,10 +253,12 @@ pub(crate) use compute_capacity_pool_lifecycle::{
 pub(crate) use compute_capacity_supply_withdrawal::{
     WithdrawComputeCapacitySupply, WithdrawComputeCapacitySupplyLine,
 };
+pub(crate) use compute_job_registry::ComputeJobRegistrationReceipt;
 pub use compute_metering::ComputeMeterEvent;
 pub(crate) use compute_offer_registry::ComputeOfferRegistrationReceipt;
 pub(crate) use compute_price_snapshot_registry::ComputePriceSnapshotRegistrationReceipt;
 pub(crate) use compute_provider_registry::ComputeProviderRegistrationReceipt;
+pub(crate) use compute_reservation_registry::ComputeReservationRegistrationReceipt;
 pub(crate) use external_app_tool_executions::{
     AdminExternalAppToolExecutionSummary, ExternalAppToolExecutionWrite,
 };

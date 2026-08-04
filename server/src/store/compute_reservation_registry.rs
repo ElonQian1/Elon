@@ -8,6 +8,7 @@ use super::{now, Store};
 
 mod audit;
 mod dependencies;
+mod queries;
 mod rows;
 mod transitions;
 
@@ -16,6 +17,7 @@ use dependencies::{
     ensure_current_job_and_claim_on, ensure_live_creation_dependencies_on,
     registered_dependencies_on, validate_with_dependencies,
 };
+use queries::list_current_reservations_on;
 use rows::{
     current_reservation_projection_on, reservation_id_for_idempotency_on, reservation_version_on,
 };
@@ -52,6 +54,24 @@ impl Store {
         let conn = self.conn()?;
         current_registered_reservation_on(&conn, reservation_id.trim())?
             .ok_or_else(|| anyhow!("算力 Reservation 不存在"))
+    }
+
+    pub(crate) fn list_compute_reservations_for_consumer(
+        &self,
+        consumer_account_id: &str,
+        project_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ComputeReservationRegistrationReceipt>> {
+        if consumer_account_id.trim().is_empty() {
+            bail!("消费者账户 ID 不能为空");
+        }
+        let conn = self.conn()?;
+        list_current_reservations_on(
+            &conn,
+            consumer_account_id.trim(),
+            project_id.map(str::trim),
+            limit.clamp(1, 100),
+        )
     }
 }
 
