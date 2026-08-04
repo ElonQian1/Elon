@@ -1,6 +1,8 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
+use crate::store_migrations::add_column_if_missing;
+
 pub(crate) fn migration_v177(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS compute_activation_evidence_requests (
@@ -45,6 +47,28 @@ pub(crate) fn migration_v177(conn: &Connection) -> Result<()> {
            );
          CREATE INDEX IF NOT EXISTS idx_compute_activation_request_review
            ON compute_activation_evidence_requests(status, requested_at ASC, request_id);",
+    )?;
+    Ok(())
+}
+
+pub(crate) fn migration_v178(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "compute_activation_evidence_requests",
+        "superseded_at",
+        "superseded_at TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "compute_activation_evidence_requests",
+        "superseded_by_user_id",
+        "superseded_by_user_id TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "compute_activation_evidence_requests",
+        "supersede_reason",
+        "supersede_reason TEXT",
     )?;
     Ok(())
 }

@@ -11,6 +11,9 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
+    compute_federation_activation_lifecycle_service::{
+        self, SupersedeComputeActivationEvidenceRequestBody,
+    },
     compute_federation_activation_service::{
         self, CancelMyComputeActivationEvidenceRequest, ReviewComputeActivationEvidenceRequestBody,
         SubmitMyComputeActivationEvidenceRequest,
@@ -48,6 +51,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/activation-evidence-requests/:request_id/preflight",
             get(preflight_review_request),
+        )
+        .route(
+            "/api/admin/compute/activation-evidence-requests/:request_id/supersede",
+            post(supersede_request),
         )
 }
 
@@ -210,6 +217,26 @@ async fn preflight_review_request(
         &state.store,
         &request_id,
     ))
+}
+
+async fn supersede_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+    Json(request): Json<SupersedeComputeActivationEvidenceRequestBody>,
+) -> Response {
+    let actor_user_id = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    activation_response(
+        compute_federation_activation_lifecycle_service::supersede_for_review(
+            &state.store,
+            &actor_user_id,
+            &request_id,
+            request,
+        ),
+    )
 }
 
 fn authenticated_user(state: &AppState, headers: &HeaderMap) -> Result<String, Response> {

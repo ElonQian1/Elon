@@ -6,7 +6,8 @@ use crate::compute_federation_activation_model::{
     ComputeActivationEvidenceRequest, ComputeActivationEvidenceRequestReceipt,
     ACTIVATION_REQUEST_STATUS_APPROVED, ACTIVATION_REQUEST_STATUS_CANCELED,
     ACTIVATION_REQUEST_STATUS_CHANGES_REQUESTED, ACTIVATION_REQUEST_STATUS_REJECTED,
-    ACTIVATION_REQUEST_STATUS_SUBMITTED, COMPUTE_ACTIVATION_EVIDENCE_REQUEST_SCHEMA,
+    ACTIVATION_REQUEST_STATUS_SUBMITTED, ACTIVATION_REQUEST_STATUS_SUPERSEDED,
+    COMPUTE_ACTIVATION_EVIDENCE_REQUEST_SCHEMA,
 };
 
 use super::{new_id, now, Store};
@@ -327,6 +328,7 @@ fn validate_review_status(status: &str) -> Result<()> {
             | ACTIVATION_REQUEST_STATUS_APPROVED
             | ACTIVATION_REQUEST_STATUS_REJECTED
             | ACTIVATION_REQUEST_STATUS_CANCELED
+            | ACTIVATION_REQUEST_STATUS_SUPERSEDED
     ) {
         bail!("激活证据申请查询状态不受支持");
     }
@@ -374,7 +376,7 @@ fn request_by_idempotency_on(
         .map(Option::flatten)
 }
 
-fn request_on(
+pub(super) fn request_on(
     conn: &Connection,
     request_id: &str,
 ) -> Result<Option<ComputeActivationEvidenceRequest>> {
@@ -425,6 +427,9 @@ fn request_from_row(row: &Row<'_>) -> rusqlite::Result<ComputeActivationEvidence
         canceled_at: row.get(20)?,
         created_at: row.get(21)?,
         updated_at: row.get(22)?,
+        superseded_at: row.get(23)?,
+        superseded_by_user_id: row.get(24)?,
+        supersede_reason: row.get(25)?,
     })
 }
 
@@ -462,5 +467,6 @@ const REQUEST_SELECT: &str = "SELECT request_id, provider_id, pool_id, owner_use
             node_binding_ref, ready_capability_digest, route_proof_digest,
             hardware_observation_digest, ledger_audit_digest, status,
             request_digest, requested_at, reviewed_at, reviewed_by_user_id,
-            review_note, canceled_at, created_at, updated_at
+            review_note, canceled_at, created_at, updated_at,
+            superseded_at, superseded_by_user_id, supersede_reason
        FROM compute_activation_evidence_requests";

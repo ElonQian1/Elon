@@ -8,6 +8,7 @@ pub(crate) const ACTIVATION_REQUEST_STATUS_CHANGES_REQUESTED: &str = "changes_re
 pub(crate) const ACTIVATION_REQUEST_STATUS_APPROVED: &str = "approved";
 pub(crate) const ACTIVATION_REQUEST_STATUS_REJECTED: &str = "rejected";
 pub(crate) const ACTIVATION_REQUEST_STATUS_CANCELED: &str = "canceled";
+pub(crate) const ACTIVATION_REQUEST_STATUS_SUPERSEDED: &str = "superseded";
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ComputeActivationEvidenceRequest {
@@ -33,6 +34,9 @@ pub(crate) struct ComputeActivationEvidenceRequest {
     pub reviewed_by_user_id: Option<String>,
     pub review_note: Option<String>,
     pub canceled_at: Option<String>,
+    pub superseded_at: Option<String>,
+    pub superseded_by_user_id: Option<String>,
+    pub supersede_reason: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }

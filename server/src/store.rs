@@ -25,6 +25,7 @@ mod codex_vault_sharing_health;
 mod codex_vault_sharing_regression_tests;
 pub(crate) mod codex_vault_usage_estimation;
 mod common;
+mod compute_activation_lifecycle;
 mod compute_activation_requests;
 mod compute_broker_reservation;
 mod compute_capacity_audit;
@@ -230,6 +231,7 @@ use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,
 };
+pub(crate) use compute_activation_lifecycle::SupersedeComputeActivationEvidenceRequest;
 pub(crate) use compute_activation_requests::{
     ReviewComputeActivationEvidenceRequest, SubmitComputeActivationEvidenceRequest,
 };

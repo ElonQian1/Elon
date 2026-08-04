@@ -55,6 +55,7 @@ mod compute_capacity_lifecycle_migration;
 mod compute_capacity_migration;
 mod compute_federation;
 mod compute_federation_activation_api;
+mod compute_federation_activation_lifecycle_service;
 mod compute_federation_activation_mcp;
 mod compute_federation_activation_model;
 mod compute_federation_activation_service;
