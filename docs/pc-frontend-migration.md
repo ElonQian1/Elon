@@ -65,7 +65,7 @@ server/src/
 | 频道管理（新建/改名/删除）| 🟢 低 | `src/features/projects/ProjectChannelsTab.tsx`、`server/src/project_channels.rs` | ✅ 已完成：支持频道新建、改名、删除自定义频道；默认频道有删除保护，改动后刷新项目空间 |
 | 发布历史 / APK 管理 | 🟢 低 | `src/features/projects/ProjectReleasesTab.tsx`、`server/src/project_releases.rs` | ✅ 已完成第一版：项目详情页可查看 releases、下载 APK、上传 APK 并记录版本/渠道/变更说明 |
 | AI 原生开放商业网络 | 🔴 高 | `src/features/open-commerce/`、`server/src/open_commerce_*` | ✅ 已形成五工作区；消费者沙盒可按有限能力 Schema 生成表单，动作修改后重新确认。公共网络、真实调度、真实平台适配器和链上提交仍按各自边界推进 |
-| 算力结算页 | 🟡 中 | `src/features/compute-settlement/`、`server/src/compute_federation_settlement_*` | 🟡 `/my-compute-settlement` 已写入本人 Provider 余额、提款状态、申请和 pending 取消源码；管理员 `/compute-settlement` 已写入平台账户、到期释放、全局队列、拒绝退款和外部已付款证明登记源码。两页复用 v198-v201 且不执行真实付款，尚未构建、视觉验收或发布 |
+| 算力结算页 | 🟡 中 | `src/features/compute-settlement/`、`server/src/compute_federation_settlement_*` | 🟡 `/my-compute-settlement` 已写入 Provider 自助登记、本人余额、提款状态、申请和 pending 取消源码；管理员 `/compute-settlement` 已写入平台账户、到期释放、全局队列、拒绝退款和外部已付款证明登记源码。登记只创建 self-declared 记录，两页不执行真实付款，尚未构建、视觉验收或发布 |
 
 ### 阶段 P3 — 个人 AI 对话
 

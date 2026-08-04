@@ -56,7 +56,19 @@ HTTP 与开放商业 MCP 共用 `compute_federation_provider_service`，最终�
 
 相同 `provider_id` 可以重放相同声明；如果类型、名称、区域、能力或声明硬件摘要不同，服务端拒绝把同一 ID 改绑到另一份供给声明。已存在 Provider 不属于当前用户时同样拒绝。
 
-## 6. 尚未实现
+## 6. PC 自助登记入口
+
+`pc-frontend/src/features/compute-settlement/` 已在 `/my-compute-settlement` 写入 Provider 自助登记源码。所有登录用户都可创建 `user_node` 或 `managed_cluster` 声明，填写显示名称、区域、任务类型、加速器类型、允许的数据分类、流式/检查点能力和可选硬件摘要。前端为本次对话生成稳定 Provider ID，创建成功后刷新本人列表并切换到新 Provider。
+
+该表单不能提交 `external_pool`、路由、凭据、适配器、观测证据、验证状态或激活状态。服务端规则仍是最终权限边界。页面尚未执行 TypeScript 构建、真实 HTTP 调用、视觉验收或发布，不能描述为 Provider 已可接单。
+
+代码入口：
+
+- `pc-frontend/src/features/compute-settlement/CreateComputeProviderDialog.tsx`
+- `pc-frontend/src/features/compute-settlement/MyComputeSettlementPage.tsx`
+- `pc-frontend/src/features/compute-settlement/myComputeSettlementApi.ts`
+
+## 7. 尚未实现
 
 - Cargo 编译、迁移执行和 HTTP/MCP 真实调用验证；
 - 真实 PC 节点、企业集群或外部矿池与 Provider 的绑定；
