@@ -209,6 +209,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (172, "分布式算力 Job 版本化注册表", crate::compute_job_migration::migration_v172),
     (173, "分布式算力 Capacity Claim 不可变版本历史", crate::compute_capacity_claim_history_migration::migration_v173),
     (174, "分布式算力 Reservation 版本化注册表", crate::compute_reservation_migration::migration_v174),
+    (175, "分布式算力 Broker 原子预留回执", crate::compute_broker_reservation_migration::migration_v175),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
