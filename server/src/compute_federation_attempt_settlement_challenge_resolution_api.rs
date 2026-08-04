@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
@@ -31,6 +32,24 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/admin/compute/attempt-leases/:lease_id/settlement-challenge/resolution",
             get(get_admin_resolution).post(resolve_challenge),
         )
+        .route(
+            "/api/me/compute/settlement-challenges/open",
+            get(list_consumer_open_challenges),
+        )
+        .route(
+            "/api/admin/compute/settlement-challenges/open",
+            get(list_admin_open_challenges),
+        )
+}
+
+#[derive(Debug, Deserialize)]
+struct ListQuery {
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
+fn default_limit() -> usize {
+    50
 }
 
 async fn withdraw_challenge(
@@ -104,6 +123,42 @@ async fn get_admin_resolution(
             &state.store,
             &lease_id,
         ),
+    )
+}
+
+async fn list_consumer_open_challenges(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    resolution_response(
+        compute_federation_attempt_settlement_challenge_resolution_service::list_open_for_consumer(
+            &state.store,
+            &user_id,
+            query.limit,
+        )
+        .map(|challenges| json!({"challenge_candidates":challenges})),
+    )
+}
+
+async fn list_admin_open_challenges(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    resolution_response(
+        compute_federation_attempt_settlement_challenge_resolution_service::list_open_for_platform_admin(
+            &state.store,
+            query.limit,
+        )
+        .map(|challenges| json!({"challenge_candidates":challenges})),
     )
 }
 

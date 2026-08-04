@@ -2,10 +2,17 @@ use anyhow::{bail, Result};
 use rusqlite::{Connection, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 
-use super::Store;
+use super::{
+    compute_attempt_settlement_challenges::{
+        compute_settlement_challenge_on, ComputeSettlementChallengeReceipt,
+    },
+    Store,
+};
 
+mod pending_queue;
 mod support;
 
+use pending_queue::list_open_challenge_lease_ids_on;
 use support::{
     normalize_resolution_request, persist_resolution_on, resolution_by_challenge_on,
     resolution_by_idempotency_on, resolution_by_lease_on, resolution_request_digest,
@@ -102,6 +109,47 @@ impl Store {
         support::validate_exact("Attempt Lease ID", lease_id, 200)?;
         let conn = self.conn()?;
         compute_settlement_challenge_resolution_on(&*conn, lease_id)
+    }
+
+    pub(crate) fn list_open_compute_settlement_challenges_for_consumer(
+        &self,
+        consumer_user_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ComputeSettlementChallengeReceipt>> {
+        support::validate_exact("消费者用户 ID", consumer_user_id, 240)?;
+        self.list_open_compute_settlement_challenges(Some(consumer_user_id), limit)
+    }
+
+    pub(crate) fn list_open_compute_settlement_challenges_for_platform_admin(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<ComputeSettlementChallengeReceipt>> {
+        self.list_open_compute_settlement_challenges(None, limit)
+    }
+
+    fn list_open_compute_settlement_challenges(
+        &self,
+        consumer_user_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ComputeSettlementChallengeReceipt>> {
+        let conn = self.conn()?;
+        list_open_challenge_lease_ids_on(&conn, consumer_user_id, limit.clamp(1, 100))?
+            .into_iter()
+            .map(|lease_id| {
+                let challenge = compute_settlement_challenge_on(&conn, &lease_id)?;
+                if settlement_challenge_resolution_by_challenge_on(&conn, &challenge.challenge_id)?
+                    .is_some()
+                {
+                    bail!("待决议挑战队列返回了已有终态决议的挑战");
+                }
+                if let Some(expected_consumer_user_id) = consumer_user_id {
+                    if challenge.consumer_account_id != expected_consumer_user_id {
+                        bail!("待决议挑战队列返回了其他消费者的挑战");
+                    }
+                }
+                Ok(challenge)
+            })
+            .collect()
     }
 }
 
