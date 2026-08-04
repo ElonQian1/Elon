@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-本控制面已写入代码，但尚未编译、执行 v182/v183 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。本人可为已激活的 Provider/CapacityPool 创建规范化 `draft` Offer，并按精确版本撤销未发布草稿；平台管理员可查看待审草稿，以单事务追加 active 版本和不可变发布回执，也可将当前 active Offer 原子转为 draining。
+本控制面已写入代码，但尚未编译、执行 v182-v184 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。本人可为已激活的 Provider/CapacityPool 创建规范化 `draft` Offer，并按精确版本撤销未发布草稿；平台管理员可原子发布、将 active Offer 转为 draining，并在依赖清理后转入 expired 或 revoked 终态。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写入已有 v170 版本化 Offer Registry。服务端从 Provider、Pool 和 Bucket 当前版本生成规范合同、SKU 摘要与 Offer 摘要，调用方不能自行声称 active 状态或改写供给身份。
 
@@ -26,10 +26,14 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 | POST | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/revoke` | 按精确版本和摘要执行 `draft -> revoked` |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/publication` | 所有者读取该 Offer 的发布回执 |
 | GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/drain` | 所有者读取该 Offer 的安全退场回执 |
+| GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/expiration` | 所有者读取 expired 回执 |
+| GET | `/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/offers/:offer_id/revoke` | 所有者读取 active Offer 的 revoked 回执；同路径 POST 仍只撤销 draft |
 | GET | `/api/admin/compute/offers?limit=20` | 管理员列出当前 draft 待审队列 |
 | GET | `/api/admin/compute/offers/:offer_id` | 管理员读取待审 Offer 完整合同 |
 | GET/POST | `/api/admin/compute/offers/:offer_id/publication` | 管理员读取回执，或显式确认后原子发布 |
 | GET/POST | `/api/admin/compute/offers/:offer_id/drain` | 管理员读取回执，或显式确认后执行 `active -> draining` |
+| GET/POST | `/api/admin/compute/offers/:offer_id/expire` | 管理员读取回执，或对已到期且无活动预留的 draining Offer 执行 `expired` |
+| GET/POST | `/api/admin/compute/offers/:offer_id/revoke` | 管理员读取回执，或对无活动预留的 draining Offer执行 `revoked` |
 
 创建请求提供业务意图，包括幂等键、SKU 类别、模型与运行时、资源参数、Bucket 容量、执行限制、授权范围、价格条款与有效期。`confirm_create` 必须为 `true`。
 
@@ -91,6 +95,8 @@ HTTP 与开放商业 MCP 共用 `compute_federation_offer_service`，最终写�
 
 draining 状态用于停止接受新的报价和预留。现有候选查询只接受当前 active Offer，因此转换成功后该 Offer 不再进入新候选；已有 Reservation、Claim、Attempt 和余额均不在本事务中修改。该边界避免把“停止新增业务”误解为“强制取消已有履约”。所有者只有只读权限，管理员写入口不向 MCP 开放。
 
+终态请求使用同样的精确版本、摘要、原因、幂等键和 `confirm_terminal=true` 约束，只接受当前 draining Offer。v184 为 Reservation 依赖检查增加查询索引；只要任意历史版本仍关联 `pending` 或 `active` Reservation，整个终态事务就失败。`expired` 还要求当前时间不早于 `valid_until`，提前退出只能选择 `revoked`。转换只追加 Offer 下一版本和 v183 生命周期回执，不替调用方取消预留、归还 Claim 或退款。
+
 ## 8. 市场与资金边界
 
 草稿创建、读取和撤销响应返回 `market_effect: "none"`。发布回执返回 `offer_effect: "active"`，同时明确返回 Price Snapshot、容量移动和资金效果均为 `none`。
@@ -109,7 +115,7 @@ active Offer 只是生成报价的前置合同。现有候选查询从未过期 
 ## 9. 尚未实现
 
 - Cargo 编译、迁移执行、并发幂等和 HTTP/MCP 真实调用验证；
-- draft 原位修订，以及 draining Offer 的 expire/revoke、依赖检查和已有 Reservation 最终处理；
+- draft 原位修订、自动终态调度，以及已有 Reservation 的自动取消、退款和 Claim 归还；
 - Price Snapshot 生成、报价曲线、自动撮合与候选暴露；
 - 容量动态校准、Attempt 派发、用量验证和运行中结算；
 - 外部矿池适配器、多币种、Sui 资产和真实提现。
