@@ -1,19 +1,28 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CircleCheck, LoaderCircle, RefreshCw, Scale, ShieldAlert } from 'lucide-react'
+import { CircleCheck, LoaderCircle, RefreshCw, Scale, ShieldAlert, Undo2 } from 'lucide-react'
 import OpenSettlementChallengeDialog from './OpenSettlementChallengeDialog'
+import WithdrawSettlementChallengeDialog from './WithdrawSettlementChallengeDialog'
 import {
   computeSettlementChallengeApi,
   type ComputePendingSettlementChallengeCandidate,
   type ComputeSettlementChallengeReceipt,
   type OpenComputeSettlementChallengeBody,
 } from './computeSettlementChallengeApi'
+import {
+  computeSettlementChallengeResolutionApi,
+  type ComputeSettlementChallengeResolutionReceipt,
+  type WithdrawComputeSettlementChallengeBody,
+} from './computeSettlementChallengeResolutionApi'
 import { formatFen, formatMicros } from './settlementFormatting'
 import styles from './ComputeSettlementChallengePage.module.css'
 
 export default function ComputeSettlementChallengePage() {
   const [candidates, setCandidates] = useState<ComputePendingSettlementChallengeCandidate[]>([])
   const [selected, setSelected] = useState<ComputePendingSettlementChallengeCandidate | null>(null)
+  const [openChallenges, setOpenChallenges] = useState<ComputeSettlementChallengeReceipt[]>([])
+  const [selectedWithdrawal, setSelectedWithdrawal] = useState<ComputeSettlementChallengeReceipt | null>(null)
   const [latest, setLatest] = useState<ComputeSettlementChallengeReceipt | null>(null)
+  const [latestResolution, setLatestResolution] = useState<ComputeSettlementChallengeResolutionReceipt | null>(null)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -23,7 +32,12 @@ export default function ComputeSettlementChallengePage() {
     setLoading(true)
     setError('')
     try {
-      setCandidates(await computeSettlementChallengeApi.listPending())
+      const [pending, open] = await Promise.all([
+        computeSettlementChallengeApi.listPending(),
+        computeSettlementChallengeResolutionApi.listConsumerOpen(),
+      ])
+      setCandidates(pending)
+      setOpenChallenges(open)
     } catch (reason) {
       setError(messageOf(reason, '待申诉结算读取失败'))
     } finally {
@@ -49,6 +63,22 @@ export default function ComputeSettlementChallengePage() {
     }
   }
 
+  async function withdrawChallenge(body: WithdrawComputeSettlementChallengeBody) {
+    if (!selectedWithdrawal || busy) return
+    setBusy(true)
+    setDialogError('')
+    try {
+      const receipt = await computeSettlementChallengeResolutionApi.withdraw(selectedWithdrawal, body)
+      setLatestResolution(receipt)
+      setSelectedWithdrawal(null)
+      await loadCandidates()
+    } catch (reason) {
+      setDialogError(messageOf(reason, '结算申诉撤回失败'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <main className={styles.page}>
       <header className={styles.pageHeader}>
@@ -59,6 +89,7 @@ export default function ComputeSettlementChallengePage() {
       <div className={styles.warning}><ShieldAlert size={16} /><span>提出申诉只会阻断该笔 pending 收益后续释放，不会立即退款、撤销结算或调用银行、钱包和链上支付。</span></div>
       {error && <div className={styles.alert} data-tone="error"><ShieldAlert size={15} />{error}</div>}
       {latest && <div className={styles.alert} data-tone="success"><CircleCheck size={15} />申诉已登记 · {shortId(latest.challenge_id)}</div>}
+      {latestResolution && <div className={styles.alert} data-tone="success"><CircleCheck size={15} />申诉已撤回 · {shortId(latestResolution.resolution_id)}</div>}
 
       <section className={styles.queue}>
         <header><div><Scale size={17} /><h2>可申诉结算</h2></div><span>{candidates.length}</span></header>
@@ -87,7 +118,31 @@ export default function ComputeSettlementChallengePage() {
         </div>
       </section>
 
+      <section className={styles.queue}>
+        <header><div><Undo2 size={17} /><h2>待处理申诉</h2></div><span>{openChallenges.length}</span></header>
+        {!loading && !openChallenges.length && <div className={styles.empty}>暂无可撤回的 open 申诉</div>}
+        <div className={styles.candidateList}>
+          {openChallenges.map((challenge) => (
+            <article className={styles.candidate} key={challenge.challenge_id}>
+              <header>
+                <div><b>open</b><span>截止 {formatTime(challenge.challenge_deadline)}</span></div>
+                <button type="button" onClick={() => { setDialogError(''); setSelectedWithdrawal(challenge) }}>核对并撤回</button>
+              </header>
+              <div className={styles.facts}>
+                <div><span>原因</span><strong>{challenge.reason_code}</strong></div>
+                <div><span>提交时间</span><strong>{formatTime(challenge.opened_at)}</strong></div>
+                <div><span>消费者</span><strong>{shortId(challenge.consumer_account_id)}</strong></div>
+                <div><span>Provider</span><strong>{shortId(challenge.provider_account_id)}</strong></div>
+              </div>
+              <p className={styles.summary}>{challenge.summary}</p>
+              <code className={styles.digest}>{challenge.event_digest}</code>
+            </article>
+          ))}
+        </div>
+      </section>
+
       {selected && <OpenSettlementChallengeDialog candidate={selected} busy={busy} error={dialogError} onClose={() => { if (!busy) setSelected(null) }} onSubmit={openChallenge} />}
+      {selectedWithdrawal && <WithdrawSettlementChallengeDialog challenge={selectedWithdrawal} busy={busy} error={dialogError} onClose={() => { if (!busy) setSelectedWithdrawal(null) }} onSubmit={withdrawChallenge} />}
     </main>
   )
 }

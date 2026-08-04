@@ -35,6 +35,7 @@ const ComputeExecutionReceiptPage = lazy(() => import('./features/compute-receip
 const ComputeAttemptFinalizationPage = lazy(() => import('./features/compute-finalization/ComputeAttemptFinalizationPage'))
 const ComputeSettlementIssuancePage = lazy(() => import('./features/compute-settlement/ComputeSettlementIssuancePage'))
 const ComputeSettlementChallengePage = lazy(() => import('./features/compute-settlement/ComputeSettlementChallengePage'))
+const ComputeSettlementChallengeResolutionPage = lazy(() => import('./features/compute-settlement/ComputeSettlementChallengeResolutionPage'))
 
 function RouteFallback() {
   return <div className={styles.routeFallback} role="status" aria-label="正在加载页面" />
@@ -79,6 +80,7 @@ export default function App() {
         <Route path="compute-finalization" element={lazyRoute(<ComputeAttemptFinalizationPage />)} />
         <Route path="compute-settlement-issuance" element={lazyRoute(<ComputeSettlementIssuancePage />)} />
         <Route path="compute-challenges" element={lazyRoute(<ComputeSettlementChallengePage />)} />
+        <Route path="compute-challenge-resolution" element={lazyRoute(<ComputeSettlementChallengeResolutionPage />)} />
         <Route path="voice" element={lazyRoute(<VoicePage />)} />
         <Route path="doctor" element={lazyRoute(<DoctorPage />)} />
         <Route path="node/public-dev-smoke" element={lazyRoute(<PublicDevSmokePage />)} />
