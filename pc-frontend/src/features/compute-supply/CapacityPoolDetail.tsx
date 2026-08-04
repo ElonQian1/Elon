@@ -5,6 +5,7 @@ import {
   type MyComputeCapacityPool,
 } from './computeSupplyApi'
 import { type SupplyAction } from './BucketSupplyDialog'
+import CapacityLedgerPanel from './CapacityLedgerPanel'
 import styles from './CapacityPoolDetail.module.css'
 
 interface Props {
@@ -41,6 +42,7 @@ export default function CapacityPoolDetail({ pool, provider, buckets, selectedBu
         </article>
       })}</div>}
     </section>
+    <CapacityLedgerPanel key={`${pool.provider_id}:${pool.pool_id}`} providerId={pool.provider_id} poolId={pool.pool_id} refreshKey={buckets.map((bucket) => `${bucket.balance.binding.bucket_id}:${bucket.balance.balance_revision}`).join('|')} />
     <section className={styles.digests}><h3>合同摘要</h3><div><span>Pool</span><code>{pool.pool_digest}</code></div><div><span>Scope</span><code>{pool.resource_scope_digest}</code></div><div><span>Profile</span><code>{pool.resource_profile_digest}</code></div></section>
   </div>
 }

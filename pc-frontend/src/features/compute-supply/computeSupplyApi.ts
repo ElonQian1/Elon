@@ -103,6 +103,65 @@ export interface ChangeCapacitySupplyBody {
   lines: Array<{ bucket_id: string; quantity_units: number }>
 }
 
+export interface CapacityDerivedBalance {
+  issued_units: number
+  available_units: number
+  held_units: number
+  active_units: number
+  consumed_units: number
+  retired_units: number
+}
+
+export interface CapacityBucketAudit {
+  bucket_id: string
+  meter: string
+  stored: CapacityBucketBalance
+  derived: CapacityDerivedBalance
+  ledger_transaction_count: number
+  derived_through_ledger_sequence: number | null
+  issues: string[]
+}
+
+export interface CapacityPoolAuditReport {
+  pool_id: string
+  capacity_epoch: number
+  pool_status: string
+  current_capacity_epoch: number
+  checked_at: string
+  healthy: boolean
+  transaction_count: number
+  ledger_leg_count: number
+  buckets: CapacityBucketAudit[]
+  issues: string[]
+}
+
+export interface CapacityLedgerHistoryLeg {
+  line_no: number
+  leg_role: 'from' | 'to' | string
+  bucket_id: string
+  meter: string
+  account: string
+  delta_units: number
+}
+
+export interface CapacityLedgerHistoryTransaction {
+  transaction_id: string
+  transaction_digest: string
+  delivery_window_id: string
+  ledger_sequence: number
+  event_kind: string
+  occurred_at: string
+  recorded_at: string
+  legs: CapacityLedgerHistoryLeg[]
+}
+
+export interface CapacityLedgerHistoryPage {
+  pool_id: string
+  capacity_epoch: number
+  next_before_sequence: number | null
+  transactions: CapacityLedgerHistoryTransaction[]
+}
+
 export const computeSupplyApi = {
   providers: (limit = 100) =>
     api.get<MyComputeProvider[]>(`/api/me/compute/providers?limit=${limit}`),
@@ -134,4 +193,15 @@ export const computeSupplyApi = {
       `/api/me/compute/providers/${encodeURIComponent(providerId)}/capacity-pools/${encodeURIComponent(poolId)}/supply/withdraw`,
       { ...body, confirm_withdrawal: true },
     ),
+  auditPool: (providerId: string, poolId: string) =>
+    api.get<CapacityPoolAuditReport>(
+      `/api/me/compute/providers/${encodeURIComponent(providerId)}/capacity-pools/${encodeURIComponent(poolId)}/audit`,
+    ),
+  ledgerHistory: (providerId: string, poolId: string, beforeSequence?: number, limit = 20) => {
+    const query = new URLSearchParams({ limit: String(limit) })
+    if (beforeSequence !== undefined) query.set('before_sequence', String(beforeSequence))
+    return api.get<CapacityLedgerHistoryPage>(
+      `/api/me/compute/providers/${encodeURIComponent(providerId)}/capacity-pools/${encodeURIComponent(poolId)}/ledger-transactions?${query}`,
+    )
+  },
 }

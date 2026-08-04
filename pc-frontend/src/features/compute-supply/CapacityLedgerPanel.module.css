@@ -1,0 +1,46 @@
+.panel { padding: 16px; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.header > div { display: grid; gap: 3px; }
+.header h3 { margin: 0; font-size: 13px; letter-spacing: 0; }
+.header span { color: var(--text-muted); font-size: 10px; }
+.header button { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 6px; color: var(--text-secondary); }
+.audit { display: grid; grid-template-columns: minmax(180px,.8fr) minmax(300px,1.2fr); align-items: stretch; border: 1px solid var(--border); border-radius: 6px; }
+.healthy, .unhealthy { display: flex; align-items: center; gap: 8px; border-right: 1px solid var(--border); padding: 10px; }
+.healthy { color: #7fd69e; }
+.unhealthy { color: #ef9c9c; }
+.healthy span, .unhealthy span { display: grid; gap: 3px; }
+.healthy strong, .unhealthy strong { font-size: 11px; }
+.healthy small, .unhealthy small { color: var(--text-muted); font-size: 9px; }
+.auditFacts { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); }
+.auditFacts span { min-width: 0; display: grid; gap: 3px; border-right: 1px solid var(--border); padding: 9px; }
+.auditFacts span:last-child { border-right: 0; }
+.auditFacts small { color: var(--text-muted); font-size: 9px; }
+.auditFacts strong { font-size: 11px; }
+.issues { grid-column: 1 / -1; display: grid; gap: 4px; border-top: 1px solid var(--border); padding: 9px 10px; color: #ffcaca; font-size: 10px; }
+.boundary, .error { margin-top: 8px; border: 1px solid; border-radius: 6px; padding: 8px 9px; font-size: 10px; line-height: 1.55; }
+.boundary { color: #d9e5f5; border-color: rgba(121,168,232,.2); background: rgba(121,168,232,.05); }
+.error { color: #ffcaca; border-color: rgba(224,92,92,.3); background: rgba(224,92,92,.09); }
+.transactions { display: grid; gap: 6px; margin-top: 10px; }
+.transaction { border: 1px solid var(--border); border-radius: 6px; background: rgba(255,255,255,.012); }
+.transaction summary { min-height: 40px; display: grid; grid-template-columns: 44px 90px minmax(120px,1fr) minmax(125px,.8fr) 16px; align-items: center; gap: 8px; padding: 7px 9px; cursor: pointer; list-style: none; }
+.transaction summary::-webkit-details-marker { display: none; }
+.transaction[open] summary > svg { transform: rotate(180deg); }
+.sequence { color: #9fc4f4; font-size: 10px; font-weight: 800; }
+.event { color: var(--text-primary); font-size: 10px; font-weight: 750; }
+.window, .transaction time { overflow: hidden; color: var(--text-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.legs { display: grid; border-top: 1px solid var(--border); }
+.leg { min-height: 34px; display: grid; grid-template-columns: 42px 70px 72px minmax(0,1fr); align-items: center; gap: 8px; border-bottom: 1px solid rgba(255,255,255,.045); padding: 5px 9px; font-size: 9px; }
+.leg > span, .leg small { color: var(--text-muted); }
+.leg code { color: #9fc4f4; }
+.leg small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.digest { display: grid; grid-template-columns: 68px minmax(0,1fr); gap: 8px; padding: 7px 9px; }
+.digest span { color: var(--text-muted); font-size: 9px; }
+.digest code { overflow: hidden; color: var(--text-secondary); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.empty { min-height: 70px; display: grid; place-items: center; color: var(--text-muted); font-size: 10px; }
+.more { min-height: 32px; display: flex; align-items: center; justify-content: center; gap: 5px; margin: 8px auto 0; border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; color: var(--text-secondary); font-size: 10px; }
+.more:disabled, .header button:disabled { cursor: not-allowed; opacity: .45; }
+.spinning { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinning { animation: none; } }
+@media (max-width: 700px) { .audit { grid-template-columns: 1fr; } .healthy, .unhealthy { border-right: 0; border-bottom: 1px solid var(--border); } .transaction summary { grid-template-columns: 42px 80px minmax(0,1fr) 16px; } .transaction time { display: none; } }
+@media (max-width: 480px) { .auditFacts { grid-template-columns: repeat(2,minmax(0,1fr)); } .transaction summary { grid-template-columns: 38px minmax(0,1fr) 16px; } .window { display: none; } .leg { grid-template-columns: 38px 64px 60px; } .leg small { display: none; } }
