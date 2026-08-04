@@ -10,9 +10,9 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-激活证据申请的 v177 状态机、v178 过期批准废止审计、v179 不可变激活计划、本人 HTTP/MCP 控制面和管理员 HTTP 审核队列已写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
+激活证据申请的 v177 状态机、v178 过期批准废止审计、v179 不可变激活计划、v180 原子应用回执、本人 HTTP/MCP 控制面和管理员 HTTP 审核队列已写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
 
-这套控制面记录“供给者提交了哪些证据摘要、审核人作出了什么决定、后续激活应写入哪一个精确 Provider 合同”。`approved` 只表示当前证据包通过人工审核，`prepared` 只表示不可变候选合同已生成；两者的 `activation_effect` 均为 `none`。当前代码不会把 Provider 或 CapacityPool 改为 active，不会发布 Offer、开放预留或移动资金。
+这套控制面记录“供给者提交了哪些证据摘要、审核人作出了什么决定、激活应写入哪一个精确 Provider 合同，以及该计划是否被受控应用”。`approved` 只表示证据包通过人工审核，`prepared` 只表示不可变候选合同已生成；两者的 `activation_effect` 均为 `none`。只有平台 `admin/owner` 以精确计划摘要和显式确认应用计划后，代码才会在一个事务内把 Provider 下一版本和 CapacityPool 改为 active，并保存不可变回执。该内部状态变化不连接节点、不读取凭据正文、不发布 Offer、不开放预留、不派发任务，也不移动资金。
 
 ## 2. 申请流程
 
@@ -21,7 +21,8 @@ implementation_status: implementation_uncompiled
 3. 服务端确认 Provider/Pool 归属和 `registering` 状态，重新审计当前 Pool epoch，并锁定 Provider/Pool 精确版本及不含检查时间的稳定账本审计摘要。
 4. 管理员只能通过登录后的平台 HTTP 队列审核。批准前，服务端再次核对所有权、状态、精确版本和稳定账本审计摘要。
 5. 审核通过后，管理员可显式准备一个 v179 激活计划。服务端在同一事务内再次核对申请、Provider、Pool 和稳定账本审计摘要，并生成下一 Provider revision 的不可变目标合同。
-6. 后续真正应用计划、激活 Provider/Pool 和发布 Offer 仍需独立、尚未实现的受控状态迁移。
+6. 管理员以当前 `plan_digest`、稳定幂等键和 `confirm_apply=true` 应用计划；Store 在同一 `BEGIN IMMEDIATE` 事务内重新核对全部依赖，写入 Provider 下一版本、Pool 生命周期事件、申请/计划终态和 v180 不可变应用回执。
+7. Provider/Pool 的内部激活与市场发布分离。Offer 发布、节点连接、可预留容量、任务派发和资金结算仍需后续独立流程。
 
 提交的引用和摘要是待审核材料，不是平台已验证事实。服务端不在这张表内保存节点端点、访问凭据、原始硬件报告或完整路由证明。
 
@@ -64,6 +65,8 @@ implementation_status: implementation_uncompiled
 | GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan` | 读取该申请已准备的不可变激活计划 |
 | POST | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan` | 显式确认后准备下一 Provider revision，不执行激活 |
 | GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/preflight` | 只读复核 prepared 计划当前是否仍具备应用条件 |
+| POST | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/application` | 以精确计划摘要和显式确认原子应用计划 |
+| GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/application` | 读取并审计该计划的不可变应用回执 |
 
 决定只支持 `approved`、`changes_requested` 或 `rejected`。退回和拒绝必须填写说明；只有 `submitted` 可以审核。批准时如果 Provider/Pool 所有权、状态、版本或账本审计发生变化，服务端失败关闭，要求供给者重新提交。
 
@@ -79,7 +82,7 @@ implementation_status: implementation_uncompiled
 
 计划固定申请摘要、Provider/Pool 精确版本、稳定账本审计依赖、下一 Provider revision、目标 Provider 规范 JSON、目标 Provider 摘要、Endpoint 摘要、准备人和计划摘要。相同申请只能绑定同一份规范计划；相同幂等键不能改写目标合同。首次写入前，Store 在同一 `BEGIN IMMEDIATE` 事务内复核全部依赖，避免预检后到写入前发生版本漂移。
 
-计划初始状态为 `prepared`。它是后续受控激活的输入，不是当前 Provider 事实；GET/POST 都返回 `activation_effect=none`。当对应 approved 申请被废止时，仍为 prepared 的计划在同一事务内转为 `superseded`。当前没有把计划改为 `applied` 的入口。
+计划初始状态为 `prepared`。它是后续受控激活的输入，不是当前 Provider 事实；准备和读取均返回 `activation_effect=none`。当对应 approved 申请被废止时，仍为 prepared 的计划在同一事务内转为 `superseded`。只有 v180 应用入口可以把精确摘要匹配的 prepared 计划改为 `applied`。
 
 ## 8. 计划应用预检
 
@@ -87,20 +90,28 @@ implementation_status: implementation_uncompiled
 
 失败项使用稳定阻断码，例如 `plan_not_prepared`、`request_digest_changed`、`provider_version_changed`、`target_provider_not_ready`、`pool_version_changed` 或 `ledger_audit_changed`。只有没有阻断项时 `ready_for_apply=true`；该值只是读取时快照，不是授权、锁、SLA 或执行结果，`activation_effect` 固定为 `none`。
 
-## 9. 状态与并发边界
+## 9. 受控应用与不可变回执
+
+应用请求必须由平台 `admin/owner` 发起，并提交稳定 `idempotency_key`、当前 64 位小写 `plan_digest` 和 `confirm_apply=true`。应用入口不信任此前的预检快照，而是在写事务内重新审计申请、当前 Provider、目标 Provider 合同、Pool 精确版本和稳定账本摘要。
+
+首次成功应用在同一事务内完成五项变化：登记计划锁定的 active Provider 下一版本；追加 `registering -> active` Pool 生命周期事件；把申请改为 `activated`；把计划改为 `applied`；写入 v180 追加式应用回执。任一步失败均不提交。相同申请和计划只能产生一份应用回执；相同幂等请求只能重放相同计划摘要。
+
+回执返回 `activation_effect=provider_and_pool_active` 与 `offer_effect=none`。回执审计绑定当时的不可变 Provider 历史版本和 Pool 生命周期事件，不要求 Provider/Pool 永远保持 active，因此后续合法升级、draining 或 retired 不会使历史回执失效。该回执只证明平台内部状态迁移已原子提交，不证明节点公网可达、硬件证据经过密码学验证、Offer 已发布、容量已可交易或资金已结算。
+
+## 10. 状态与并发边界
 
 - 首次状态固定为 `submitted`；同一 Provider/Pool 同时只允许一份 `submitted` 或 `approved` 申请。
 - 本人只能把 `submitted` 改为 `canceled`，并必须提供当前 `request_digest`。
 - 管理员审核使用 `request_digest` 比较交换，申请内容或状态并发变化时拒绝覆盖。
 - `changes_requested`、`rejected` 和 `canceled` 结束当前申请；用户可使用新幂等键重新提交。
 - 当 `approved` 因 Provider/Pool 版本或其他依赖变化而不再可用时，平台 `admin/owner` 可显式执行 `approved -> superseded`。操作要求当前 `request_digest`、非空原因和 `confirm_supersede=true`，保留原审核字段，并另存废止时间、执行人和原因；相同执行人和原因可幂等重放，对应 prepared 计划同时转为 `superseded`。
-- `superseded` 会释放同一 Provider/Pool 的活跃申请唯一约束，使用户可以基于当前版本重新提交；它不撤销任何已发生的激活，因为当前没有激活执行入口。
-- `activated` 仍只为后续生命周期保留，当前控制面没有进入该状态的入口。
+- `superseded` 会释放同一 Provider/Pool 的活跃申请唯一约束，使用户可以基于当前版本重新提交；它只适用于尚未应用的 approved 申请，不撤销已发生的激活。
+- 受控应用以一个写事务执行 `approved -> activated` 和 `prepared -> applied`；应用回执、Provider 版本与 Pool 生命周期事件均必须匹配，否则失败关闭。
 
-## 10. 尚未实现
+## 11. 尚未实现
 
-- Cargo 编译、v177-v179 迁移执行、并发和 HTTP/MCP 真实调用验证；
+- Cargo 编译、v177-v180 迁移执行、并发和 HTTP/MCP 真实调用验证；
 - 节点绑定引用、ReadyCapability、路由证明和硬件观测的真实采集与密码学验证；
 - 审核员查看原始证据工件、签名链和挑战任务的界面；
-- prepared 计划的独立复核、受控应用、回滚和 Provider/Pool 激活状态迁移；
+- prepared 计划的双人复核、回滚和异常恢复控制面；
 - verified 硬件事实、路由凭据轮换、Offer 发布、任务派发和真实结算。
