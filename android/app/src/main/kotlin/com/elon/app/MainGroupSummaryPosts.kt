@@ -215,7 +215,7 @@ internal class MainGroupSummaryPosts(
         val group = activeGroup ?: return
         val status = TextView(activity).apply {
             text = "正在读取总结帖..."
-            setTextColor(Color.parseColor("#AFAFAF"))
+            setTextColor(activity.elonColor(R.color.elon_text_placeholder))
             textSize = 14f
             gravity = Gravity.CENTER
             setPadding(dp(18), dp(36), dp(18), dp(36))
@@ -291,7 +291,7 @@ internal class MainGroupSummaryPosts(
         }
         column.addView(textBlock(detail.post.stripMeta(), quiet = true))
         val summary = TextView(activity).apply {
-            setTextColor(Color.parseColor("#D9D9D9"))
+            setTextColor(activity.elonColor(R.color.elon_text_primary))
             textSize = 15f
             setLineSpacing(dp(3).toFloat(), 1f)
             linksClickable = true
@@ -310,7 +310,7 @@ internal class MainGroupSummaryPosts(
     private fun postRow(post: GroupSummaryPost, onClick: () -> Unit): View {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = roundedBg("#1F2023", dp(16))
+            background = roundedBg(activity.elonColor(R.color.elon_surface_header), dp(16))
             setPadding(dp(16), dp(14), dp(16), dp(14))
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -320,14 +320,14 @@ internal class MainGroupSummaryPosts(
             layoutParams = lp
             addView(TextView(activity).apply {
                 text = "${if (post.isPinned) "置顶" else "总结"} · ${post.title}"
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(activity.elonColor(R.color.elon_text_primary))
                 textSize = 16f
                 typeface = Typeface.DEFAULT_BOLD
                 maxLines = 1
             })
             addView(TextView(activity).apply {
                 text = post.stripMeta()
-                setTextColor(Color.parseColor("#AFAFAF"))
+                setTextColor(activity.elonColor(R.color.elon_text_placeholder))
                 textSize = 13f
                 setPadding(0, dp(8), 0, 0)
             })
@@ -338,7 +338,7 @@ internal class MainGroupSummaryPosts(
     private fun sectionTitle(text: String): TextView {
         return TextView(activity).apply {
             this.text = text
-            setTextColor(Color.parseColor("#D9D9D9"))
+            setTextColor(activity.elonColor(R.color.elon_text_primary))
             textSize = 16f
             typeface = Typeface.DEFAULT_BOLD
             setPadding(0, dp(18), 0, dp(6))
@@ -348,7 +348,9 @@ internal class MainGroupSummaryPosts(
     private fun textBlock(text: String, quiet: Boolean = false): TextView {
         return TextView(activity).apply {
             this.text = text
-            setTextColor(Color.parseColor(if (quiet) "#AFAFAF" else "#D9D9D9"))
+            setTextColor(
+                activity.elonColor(if (quiet) R.color.elon_text_placeholder else R.color.elon_text_primary)
+            )
             textSize = if (quiet) 13f else 15f
             setLineSpacing(dp(3).toFloat(), 1f)
             setPadding(dp(16), dp(14), dp(16), dp(14))
@@ -378,9 +380,9 @@ internal class MainGroupSummaryPosts(
             .build()
     }
 
-    private fun roundedBg(color: String, radius: Int): GradientDrawable {
+    private fun roundedBg(color: Int, radius: Int): GradientDrawable {
         return GradientDrawable().apply {
-            setColor(Color.parseColor(color))
+            setColor(color)
             cornerRadius = radius.toFloat()
         }
     }

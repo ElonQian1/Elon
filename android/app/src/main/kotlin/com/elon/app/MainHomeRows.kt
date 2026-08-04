@@ -85,7 +85,7 @@ internal class MainHomeRows(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(76)
             )
-            setBackgroundColor(Color.parseColor("#000000"))
+            setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(16), 0, dp(14), 0)
@@ -139,7 +139,7 @@ internal class MainHomeRows(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(76)
             )
-            setBackgroundColor(Color.parseColor("#000000"))
+            setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(16), 0, dp(14), 0)
@@ -234,7 +234,7 @@ internal class MainHomeRows(
 
     private fun startProjectMarkerWorkingPulse(icon: ImageView) {
         val idleColor = Color.parseColor(HOME_LIST_PREVIEW_COLOR)
-        val activeColor = Color.WHITE
+        val activeColor = activity.elonColor(R.color.elon_button_primary_bg)
         updateProjectMarkerWorkingPulse(icon, idleColor, activeColor)
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = PROJECT_MARKER_WORK_PULSE_MS
@@ -286,7 +286,7 @@ internal class MainHomeRows(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(66)
             )
-            setBackgroundColor(Color.parseColor("#000000"))
+            setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(14), 0, dp(14), 0)
@@ -627,9 +627,9 @@ internal class MainHomeRows(
                 addView(createUnreadBadge(unreadCount))
             }
             if (showProjectMarker) {
-                addView(createAvatarCornerDot("#F2C94C"))
+                addView(createAvatarCornerDot("#E7B86A"))
             } else if (friend.isOnline) {
-                addView(createAvatarCornerDot("#58BE6A"))
+                addView(createAvatarCornerDot("#5AC8A0"))
             }
         }
     }
@@ -655,7 +655,7 @@ internal class MainHomeRows(
                 addView(createUnreadBadge(unreadCount))
             }
             if (showProjectMarker) {
-                addView(createAvatarCornerDot("#F2C94C"))
+                addView(createAvatarCornerDot("#E7B86A"))
             }
         }
     }
@@ -693,7 +693,7 @@ internal class MainHomeRows(
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = badgeHeight / 2f
-                setColor(Color.parseColor("#F04B4F"))
+                setColor(activity.elonColor(R.color.elon_status_danger))
             }
             gravity = Gravity.CENTER
             includeFontPadding = false

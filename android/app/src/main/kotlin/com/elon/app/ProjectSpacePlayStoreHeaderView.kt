@@ -206,15 +206,15 @@ internal class ProjectSpacePlayStoreHeaderView(
             }
         }
         return FrameLayout(activity).apply {
-            background = roundedBackground("#FFFFFF", 18)
+            background = roundedBackground("#172231", 18)
             addView(TextView(activity).apply {
                 text = project.name.firstOrNull()?.toString() ?: "项"
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 textSize = 20f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.WHITE)
-                background = roundedBackground("#2EA7DF", 999)
+                setTextColor(Color.parseColor("#070B10"))
+                background = roundedBackground("#7AA7FF", 999)
             }, FrameLayout.LayoutParams(dp(50), dp(50), Gravity.CENTER))
         }
     }

@@ -346,7 +346,7 @@ internal class MainHomeListActions(
             text = "取消"
             textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#58BE6A"))
+            setTextColor(Color.parseColor("#5AC8A0"))
             setOnClickListener { exitFriendLocalSearch() }
         }
         root.addView(searchBox)

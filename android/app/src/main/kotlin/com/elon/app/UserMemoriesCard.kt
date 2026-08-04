@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -186,7 +185,7 @@ internal class UserMemoriesCard(
                     addView(TextView(activity).apply {
                         includeFontPadding = false
                         text = "AI 记忆"
-                        setTextColor(Color.parseColor("#D9D9D9"))
+                        setTextColor(activity.elonColor(R.color.elon_text_primary))
                         textSize = 16f
                     })
 
@@ -197,7 +196,7 @@ internal class UserMemoriesCard(
                         ).also { it.topMargin = dp(5) }
                         includeFontPadding = false
                         text = "逐渐记住你的偏好"
-                        setTextColor(Color.parseColor("#676767"))
+                        setTextColor(activity.elonColor(R.color.elon_text_tertiary))
                         textSize = 12f
                     })
                 })
@@ -234,7 +233,7 @@ internal class UserMemoriesCard(
                         includeFontPadding = false
                         text = "加载中…"
                         textSize = 11f
-                        setTextColor(Color.parseColor("#8DDC9B"))
+                        setTextColor(activity.elonColor(R.color.elon_status_success))
                     }
                     addView(statusPill)
 
@@ -242,10 +241,10 @@ internal class UserMemoriesCard(
                         includeFontPadding = false
                         text = "＋ 主动告诉 AI"
                         textSize = 12f
-                        setTextColor(Color.parseColor("#D9D9D9"))
+                        setTextColor(activity.elonColor(R.color.elon_text_accent))
                         setPadding(dp(10), dp(6), dp(10), dp(6))
                         background = GradientDrawable().apply {
-                            setColor(Color.parseColor("#272727"))
+                            setColor(activity.elonColor(R.color.elon_surface_search))
                             cornerRadius = dp(16).toFloat()
                         }
                         setOnClickListener { showAddDialog() }
@@ -274,7 +273,7 @@ internal class UserMemoriesCard(
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(12), dp(9), dp(8), dp(9))
         background = GradientDrawable().apply {
-            setColor(Color.parseColor("#222222"))
+            setColor(activity.elonColor(R.color.elon_surface_header))
             cornerRadius = dp(6).toFloat()
         }
 
@@ -284,7 +283,7 @@ internal class UserMemoriesCard(
                 it.marginEnd = dp(10)
             }
             background = GradientDrawable().apply {
-                setColor(Color.parseColor(categoryColor(item.category)))
+                setColor(categoryColor(item.category))
                 cornerRadius = dp(2).toFloat()
             }
         })
@@ -295,7 +294,7 @@ internal class UserMemoriesCard(
             includeFontPadding = false
             text = item.content
             textSize = 13f
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(activity.elonColor(R.color.elon_text_primary))
             maxLines = 3
             ellipsize = android.text.TextUtils.TruncateAt.END
         })
@@ -306,7 +305,7 @@ internal class UserMemoriesCard(
                 it.marginStart = dp(6)
             }
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
-            setColorFilter(Color.parseColor("#777777"))
+            setColorFilter(activity.elonColor(R.color.elon_text_tertiary))
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             setPadding(dp(6), dp(6), dp(6), dp(6))
             background = null
@@ -324,7 +323,7 @@ internal class UserMemoriesCard(
         includeFontPadding = false
         text = "还没有记忆\n多和 AI 对话，它会逐渐记住你的偏好"
         textSize = 12f
-        setTextColor(Color.parseColor("#777777"))
+        setTextColor(activity.elonColor(R.color.elon_text_tertiary))
         gravity = Gravity.CENTER
         setPadding(0, dp(8), 0, dp(8))
     }
@@ -362,10 +361,10 @@ internal class UserMemoriesCard(
             inputType = android.text.InputType.TYPE_CLASS_TEXT or
                     android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE
             setPadding(dp(16), dp(12), dp(16), dp(12))
-            setTextColor(Color.parseColor("#D6D6D6"))
-            setHintTextColor(Color.parseColor("#777777"))
+            setTextColor(activity.elonColor(R.color.elon_text_primary))
+            setHintTextColor(activity.elonColor(R.color.elon_text_placeholder))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#222222"))
+                setColor(activity.elonColor(R.color.elon_surface_header))
                 cornerRadius = dp(6).toFloat()
             }
         }
@@ -413,11 +412,11 @@ internal class UserMemoriesCard(
 
     // ─── 工具 ────────────────────────────────────────────────────────────────
 
-    private fun categoryColor(category: String): String = when (category) {
-        "preference" -> "#8DDC9B"
-        "profile"    -> "#58BE6A"
-        "goal"       -> "#FCD34D"
-        else         -> "#777777"  // fact
+    private fun categoryColor(category: String): Int = when (category) {
+        "preference" -> activity.elonColor(R.color.elon_status_info)
+        "profile" -> activity.elonColor(R.color.elon_status_success)
+        "goal" -> activity.elonColor(R.color.elon_status_project)
+        else -> activity.elonColor(R.color.elon_text_tertiary)
     }
 
     private fun dp(n: Int): Int =

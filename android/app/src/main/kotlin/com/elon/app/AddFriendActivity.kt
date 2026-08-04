@@ -40,8 +40,8 @@ class AddFriendActivity : AppCompatActivity() {
     private lateinit var resultText: TextView
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.BLACK
+        window.statusBarColor = elonColor(R.color.elon_bg_chrome)
+        window.navigationBarColor = elonColor(R.color.elon_bg_chrome)
         if (!AuthManager.isLoggedIn(this)) {
             Toast.makeText(this, "添加好友需要先登录账号", Toast.LENGTH_SHORT).show()
             startActivity(Intent(this, LoginActivity::class.java))
@@ -55,7 +55,7 @@ class AddFriendActivity : AppCompatActivity() {
     private fun buildContent(): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.BLACK)
+            setBackgroundColor(elonColor(R.color.elon_bg_app))
             addView(topBar(), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(50)))
             addView(searchBar(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -81,13 +81,13 @@ class AddFriendActivity : AppCompatActivity() {
     }
     private fun topBar(): FrameLayout {
         return FrameLayout(this).apply {
-            setBackgroundColor(Color.BLACK)
+            setBackgroundColor(elonColor(R.color.elon_bg_chrome))
             addView(TextView(this@AddFriendActivity).apply {
                 text = "‹"
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 textSize = 27f
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(elonColor(R.color.elon_text_primary))
                 isClickable = true
                 isFocusable = true
                 foreground = selectableForeground()
@@ -101,7 +101,7 @@ class AddFriendActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 textSize = 16f
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(elonColor(R.color.elon_text_primary))
             }, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT).apply {
                 gravity = Gravity.CENTER
             })
@@ -113,8 +113,8 @@ class AddFriendActivity : AppCompatActivity() {
             setSingleLine(true)
             textSize = 16f
             imeOptions = EditorInfo.IME_ACTION_SEARCH
-            setTextColor(Color.parseColor("#D9D9D9"))
-            setHintTextColor(Color.parseColor("#777777"))
+            setTextColor(elonColor(R.color.elon_text_primary))
+            setHintTextColor(elonColor(R.color.elon_text_placeholder))
             backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
             background = null
             includeFontPadding = false
@@ -138,11 +138,11 @@ class AddFriendActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = roundedRect("#272727", 20)
+            background = roundedRect(elonColor(R.color.elon_surface_search), 20)
             setPadding(dp(14), 0, dp(14), 0)
             addView(ImageView(this@AddFriendActivity).apply {
                 setImageResource(R.drawable.ic_search_simple)
-                imageTintList = ColorStateList.valueOf(Color.parseColor("#777777"))
+                imageTintList = ColorStateList.valueOf(elonColor(R.color.elon_text_tertiary))
                 contentDescription = null
             }, LinearLayout.LayoutParams(dp(22), dp(22)))
             addView(searchInput, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
@@ -164,7 +164,7 @@ class AddFriendActivity : AppCompatActivity() {
                 text = "正在加载推荐好友..."
                 minHeight = dp(24)
                 textSize = 13f
-                setTextColor(Color.parseColor("#777777"))
+                setTextColor(elonColor(R.color.elon_text_tertiary))
             }
             addView(resultText, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -183,7 +183,7 @@ class AddFriendActivity : AppCompatActivity() {
                 text = "推荐"
                 includeFontPadding = false
                 textSize = 16f
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(elonColor(R.color.elon_text_primary))
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(scanButton(), LinearLayout.LayoutParams(dp(88), dp(36)))
         }
@@ -204,14 +204,14 @@ class AddFriendActivity : AppCompatActivity() {
                 includeFontPadding = false
                 maxLines = 1
                 textSize = 16f
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(elonColor(R.color.elon_text_primary))
             })
             addView(TextView(this@AddFriendActivity).apply {
                 text = item.account
                 includeFontPadding = false
                 maxLines = 1
                 textSize = 13f
-                setTextColor(Color.parseColor("#777777"))
+                setTextColor(elonColor(R.color.elon_text_tertiary))
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -237,7 +237,7 @@ class AddFriendActivity : AppCompatActivity() {
     private fun avatarView(item: AddFriendRecommendation): View {
         val bitmap = UserProfileStore.decodeAvatar(item.avatarDataUrl)
         return ImageView(this).apply {
-            background = roundedRect("#D9D9D9", 6)
+            background = roundedRect(elonColor(R.color.elon_surface_header), 6)
             scaleType = ImageView.ScaleType.CENTER_CROP
             contentDescription = "${item.name}头像"
             bitmap?.let { setImageBitmap(it) }
@@ -256,7 +256,7 @@ class AddFriendActivity : AppCompatActivity() {
                 text = "${count}名共同好友"
                 includeFontPadding = false
                 textSize = 12f
-                setTextColor(Color.parseColor("#777777"))
+                setTextColor(elonColor(R.color.elon_text_tertiary))
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -275,8 +275,8 @@ class AddFriendActivity : AppCompatActivity() {
             setTypeface(typeface, Typeface.BOLD)
             isEnabled = !item.alreadyFriend
             alpha = if (item.alreadyFriend) 0.48f else 1f
-            setTextColor(Color.BLACK)
-            background = roundedRect("#D9D9D9", 18)
+            setTextColor(elonColor(R.color.elon_button_primary_text))
+            background = roundedRect(elonColor(R.color.elon_button_primary_bg), 18)
             isClickable = !item.alreadyFriend
             isFocusable = !item.alreadyFriend
             foreground = selectableForeground()
@@ -288,7 +288,7 @@ class AddFriendActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = roundedRect("#000000", 18)
+            background = roundedRect(elonColor(R.color.elon_surface_header), 18)
             addView(ImageView(this@AddFriendActivity).apply {
                 setImageResource(R.drawable.ic_add_friend_scan)
                 contentDescription = null
@@ -298,7 +298,7 @@ class AddFriendActivity : AppCompatActivity() {
                 includeFontPadding = false
                 textSize = 13f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(elonColor(R.color.elon_text_primary))
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -336,7 +336,7 @@ class AddFriendActivity : AppCompatActivity() {
                     },
                     onFailure = {
                         resultText.text = it.message ?: "推荐好友加载失败"
-                        resultText.setTextColor(Color.parseColor("#D97A7A"))
+                        resultText.setTextColor(elonColor(R.color.elon_status_danger))
                     }
                 )
             }
@@ -360,7 +360,7 @@ class AddFriendActivity : AppCompatActivity() {
                 dp(76)
             ))
         }
-        resultText.setTextColor(Color.parseColor("#777777"))
+        resultText.setTextColor(elonColor(R.color.elon_text_tertiary))
         resultText.text = when {
             recommendations.isEmpty() -> "暂无可推荐的注册用户"
             items.isEmpty() -> "没有匹配的注册用户"
@@ -449,9 +449,9 @@ class AddFriendActivity : AppCompatActivity() {
         return ContextCompat.getDrawable(this, out.resourceId)
     }
 
-    private fun roundedRect(fillColor: String, radiusDp: Int): GradientDrawable =
+    private fun roundedRect(fillColor: Int, radiusDp: Int): GradientDrawable =
         GradientDrawable().apply {
-            setColor(Color.parseColor(fillColor))
+            setColor(fillColor)
             cornerRadius = dp(radiusDp).toFloat()
         }
 

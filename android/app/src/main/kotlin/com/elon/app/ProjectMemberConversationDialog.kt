@@ -197,7 +197,7 @@ internal object ProjectMemberConversationDialog {
                         addView(TextView(activity).apply {
                             text = "在此基础上分叉 →"
                             textSize = 13f
-                            setTextColor(Color.parseColor("#58BE6A"))
+                            setTextColor(Color.parseColor("#5AC8A0"))
                             setTypeface(typeface, Typeface.BOLD)
                             isClickable = true
                             setOnClickListener { onFork() }

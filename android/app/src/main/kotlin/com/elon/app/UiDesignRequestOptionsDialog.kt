@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.text.InputType
 import android.view.Gravity
@@ -64,9 +63,11 @@ internal class UiDesignRequestOptionsDialog(
             .create()
         dialog.setOnShowListener {
             dialog.window?.setBackgroundDrawable(dialogBackground())
-            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#B8B8B8"))
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(
+                activity.elonColor(R.color.elon_text_secondary)
+            )
             dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.apply {
-                setTextColor(Color.BLACK)
+                setTextColor(activity.elonColor(R.color.elon_button_primary_text))
                 background = actionBackground()
                 setOnClickListener {
                     val mode = selectedMode(modeGroup)
@@ -99,7 +100,7 @@ internal class UiDesignRequestOptionsDialog(
             ViewGroup.LayoutParams.WRAP_CONTENT
         ).apply { bottomMargin = dp(12) }
         text = "选择图片的真实用途。全新创建会先生成可运行页面，再使用真实 Android Renderer 拟合。"
-        setTextColor(Color.parseColor("#B8B8B8"))
+        setTextColor(activity.elonColor(R.color.elon_text_secondary))
         textSize = 14f
         setLineSpacing(0f, 1.2f)
     }
@@ -116,12 +117,14 @@ internal class UiDesignRequestOptionsDialog(
                 id = View.generateViewId()
                 tag = option.value
                 text = "${option.label}  ·  ${option.description}"
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(activity.elonColor(R.color.elon_text_primary))
                 textSize = 15f
                 minimumHeight = dp(48)
                 gravity = Gravity.CENTER_VERTICAL
                 isChecked = option.value == selected
-                buttonTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+                buttonTintList = android.content.res.ColorStateList.valueOf(
+                    activity.elonColor(R.color.elon_button_primary_bg)
+                )
             })
         }
     }
@@ -135,7 +138,7 @@ internal class UiDesignRequestOptionsDialog(
             bottomMargin = dp(4)
         }
         text = value
-        setTextColor(Color.WHITE)
+        setTextColor(activity.elonColor(R.color.elon_text_primary))
         textSize = 17f
     }
 
@@ -148,8 +151,8 @@ internal class UiDesignRequestOptionsDialog(
         setPadding(dp(14), dp(10), dp(14), dp(10))
         setText(value)
         this.hint = hint
-        setTextColor(Color.WHITE)
-        setHintTextColor(Color.parseColor("#777777"))
+        setTextColor(activity.elonColor(R.color.elon_text_primary))
+        setHintTextColor(activity.elonColor(R.color.elon_text_placeholder))
         textSize = 15f
         setSingleLine(singleLine)
         inputType = if (singleLine) {
@@ -173,18 +176,18 @@ internal class UiDesignRequestOptionsDialog(
     }
 
     private fun dialogBackground() = GradientDrawable().apply {
-        setColor(Color.parseColor("#1A1A1A"))
+        setColor(activity.elonColor(R.color.elon_surface_card))
         cornerRadius = dp(20).toFloat()
     }
 
     private fun inputBackground() = GradientDrawable().apply {
-        setColor(Color.parseColor("#272727"))
+        setColor(activity.elonColor(R.color.elon_surface_search))
         cornerRadius = dp(12).toFloat()
-        setStroke(dp(1), Color.parseColor("#4D4D4D"))
+        setStroke(dp(1), activity.elonColor(R.color.elon_border_subtle))
     }
 
     private fun actionBackground() = GradientDrawable().apply {
-        setColor(Color.WHITE)
+        setColor(activity.elonColor(R.color.elon_button_primary_bg))
         cornerRadius = dp(18).toFloat()
     }
 

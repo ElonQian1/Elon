@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -42,7 +41,7 @@ internal class ProjectManagementHomeView(
 
     fun render() {
         container.removeAllViews()
-        container.setBackgroundColor(Color.parseColor(COLOR_BG))
+        container.setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
         val indexed = projects().mapIndexed { index, project -> IndexedProject(index, project) }
         val personal = indexed
             .filter { !it.project.isJointDevelopmentProject() }
@@ -78,7 +77,7 @@ internal class ProjectManagementHomeView(
     private fun renderFixedSegment(showJoint: Boolean): Boolean {
         val target = segmentContainer ?: return false
         target.removeAllViews()
-        target.setBackgroundColor(Color.parseColor(COLOR_BG))
+        target.setBackgroundColor(activity.elonColor(R.color.elon_bg_app))
         target.layoutParams = target.layoutParams.apply {
             height = designPx(FIXED_SEGMENT_BAR_HEIGHT_PX)
         }
@@ -115,11 +114,17 @@ internal class ProjectManagementHomeView(
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { onClick() }
-            setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
+            setTextColor(
+                activity.elonColor(if (selected) R.color.elon_text_accent else R.color.elon_text_primary)
+            )
             setFontSizeSp(FONT_SEGMENT_SP)
             setTypeface(typeface, Typeface.NORMAL)
             setPadding(0, 0, 0, 0)
-            background = if (selected) roundedPx(COLOR_SEGMENT_SELECTED, SEGMENT_HEIGHT_PX / 2) else null
+            background = if (selected) {
+                roundedPx(activity.elonColor(R.color.elon_segment_selected), SEGMENT_HEIGHT_PX / 2)
+            } else {
+                null
+            }
             minWidth = 0
         }
     }
@@ -164,7 +169,7 @@ internal class ProjectManagementHomeView(
                 includeFontPadding = false
                 gravity = Gravity.CENTER
                 text = "›"
-                setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+                setTextColor(activity.elonColor(R.color.elon_text_placeholder))
                 setFontSizeSp(FONT_CHEVRON_SP)
             }, LinearLayout.LayoutParams(
                 designPx(CHEVRON_WIDTH_PX),
@@ -183,7 +188,7 @@ internal class ProjectManagementHomeView(
                 text = project.title.ifBlank { "项目名称" }
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor(COLOR_TEXT_LIST_TITLE))
+                setTextColor(activity.elonColor(R.color.elon_text_list_title))
                 setFontSizeSp(FONT_LIST_TITLE_SP)
                 setTypeface(typeface, Typeface.NORMAL)
             }, LinearLayout.LayoutParams(
@@ -196,7 +201,7 @@ internal class ProjectManagementHomeView(
                 text = projectIntroduction(project)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+                setTextColor(activity.elonColor(R.color.elon_text_placeholder))
                 setFontSizeSp(FONT_LIST_DESC_SP)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -225,7 +230,7 @@ internal class ProjectManagementHomeView(
             text = value
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+            setTextColor(activity.elonColor(R.color.elon_text_placeholder))
             setFontSizeSp(FONT_META_SP)
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -238,7 +243,7 @@ internal class ProjectManagementHomeView(
     private fun projectThumbnail(project: AppProject): View {
         return FrameLayout(activity).apply {
             contentDescription = "${project.title.ifBlank { "项目" }}封面"
-            background = roundedPx(COLOR_THUMB_BG, THUMB_RADIUS_PX)
+            background = roundedPx(activity.elonColor(R.color.elon_button_primary_bg), THUMB_RADIUS_PX)
             clipToOutline = true
             val iconBitmap = UserProfileStore.decodeAvatar(project.iconDataUrl)
             if (iconBitmap != null) {
@@ -254,7 +259,7 @@ internal class ProjectManagementHomeView(
                     includeFontPadding = false
                     gravity = Gravity.CENTER
                     text = projectInitial(project)
-                    setTextColor(Color.parseColor(COLOR_THUMB_TEXT))
+                    setTextColor(activity.elonColor(R.color.elon_button_primary_text))
                     setFontSizeSp(FONT_THUMB_INITIAL_SP)
                     setTypeface(typeface, Typeface.BOLD)
                 }, FrameLayout.LayoutParams(
@@ -276,7 +281,7 @@ internal class ProjectManagementHomeView(
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = if (showJoint) "暂无联合项目" else "还没有项目，点击 + 创建"
-                setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+                setTextColor(activity.elonColor(R.color.elon_text_placeholder))
                 setFontSizeSp(FONT_EMPTY_SP)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -386,31 +391,15 @@ internal class ProjectManagementHomeView(
         setTextSize(TypedValue.COMPLEX_UNIT_SP, value.toFloat())
     }
 
-    private fun roundedPx(color: String, radiusPx: Int): GradientDrawable {
+    private fun roundedPx(color: Int, radiusPx: Int): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            setColor(Color.parseColor(color))
+            setColor(color)
             cornerRadius = designPx(radiusPx).toFloat()
         }
     }
 
-    private fun rounded(color: String, radiusDp: Int): GradientDrawable {
-        return GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(Color.parseColor(color))
-            cornerRadius = dp(radiusDp).toFloat()
-        }
-    }
-
     private companion object {
-        const val COLOR_BG = "#000000"
-        const val COLOR_SEGMENT_SELECTED = "#1A1A1A"
-        const val COLOR_TEXT_PRIMARY = "#D9D9D9"
-        const val COLOR_TEXT_LIST_TITLE = "#FFFFFF"
-        const val COLOR_TEXT_PLACEHOLDER = "#AFAFAF"
-        const val COLOR_THUMB_BG = "#FFFFFF"
-        const val COLOR_THUMB_TEXT = "#000000"
-
         const val DESIGN_WIDTH_PX = 1272
         const val SEGMENT_SIDE_PX = 30
         const val ROW_SIDE_PX = 112

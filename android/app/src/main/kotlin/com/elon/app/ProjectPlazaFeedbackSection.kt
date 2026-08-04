@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -33,7 +32,7 @@ internal class ProjectPlazaFeedbackSection(
     fun buildEmpty(actionLabel: String, onAction: () -> Unit): View = messagePanel(
         title = "没有找到匹配项目",
         message = "可以清除搜索与筛选条件，再看看项目广场的全部内容。",
-        toneColor = COLOR_TEXT_TERTIARY,
+        toneColor = activity.elonColor(R.color.elon_text_tertiary),
         actionLabel = actionLabel,
         onAction = onAction
     )
@@ -41,30 +40,30 @@ internal class ProjectPlazaFeedbackSection(
     fun buildError(message: String, onRetry: () -> Unit): View = messagePanel(
         title = "项目暂时没有加载出来",
         message = message.ifBlank { "请检查网络连接后重试。" },
-        toneColor = COLOR_DANGER,
+        toneColor = activity.elonColor(R.color.elon_status_danger),
         actionLabel = "重新加载",
         onAction = onRetry
     )
 
     private fun skeletonRow(): View = LinearLayout(activity).apply {
         gravity = Gravity.CENTER_VERTICAL
-        background = rect(COLOR_SURFACE, 18)
+        background = rect(activity.elonColor(R.color.elon_surface_card), 18)
         setPadding(dp(16), dp(14), dp(16), dp(14))
         addView(View(activity).apply {
-            background = rect(COLOR_SKELETON_STRONG, 12)
+            background = rect(activity.elonColor(R.color.elon_surface_search), 12)
             contentDescription = null
         }, LinearLayout.LayoutParams(dp(60), dp(60)))
         addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            addView(skeletonLine(COLOR_SKELETON_STRONG), LinearLayout.LayoutParams(
+            addView(skeletonLine(activity.elonColor(R.color.elon_surface_search)), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(12)
             ))
-            addView(skeletonLine(COLOR_SKELETON_SOFT), LinearLayout.LayoutParams(
+            addView(skeletonLine(activity.elonColor(R.color.elon_divider_card)), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(10)
             ).apply { topMargin = dp(10) })
-            addView(skeletonLine(COLOR_SKELETON_SOFT), LinearLayout.LayoutParams(
+            addView(skeletonLine(activity.elonColor(R.color.elon_divider_card)), LinearLayout.LayoutParams(
                 dp(132),
                 dp(10)
             ).apply { topMargin = dp(8) })
@@ -73,7 +72,7 @@ internal class ProjectPlazaFeedbackSection(
         })
     }
 
-    private fun skeletonLine(color: String): View = View(activity).apply {
+    private fun skeletonLine(color: Int): View = View(activity).apply {
         background = rect(color, 5)
         contentDescription = null
     }
@@ -81,13 +80,13 @@ internal class ProjectPlazaFeedbackSection(
     private fun messagePanel(
         title: String,
         message: String,
-        toneColor: String,
+        toneColor: Int,
         actionLabel: String,
         onAction: () -> Unit
     ): View = LinearLayout(activity).apply {
         orientation = LinearLayout.VERTICAL
         gravity = Gravity.CENTER_HORIZONTAL
-        background = rect(COLOR_SURFACE, 20)
+        background = rect(activity.elonColor(R.color.elon_surface_card), 20)
         setPadding(dp(20), dp(24), dp(20), dp(20))
         addView(View(activity).apply {
             background = rect(toneColor, 4)
@@ -97,7 +96,7 @@ internal class ProjectPlazaFeedbackSection(
             text = title
             includeFontPadding = false
             gravity = Gravity.CENTER
-            setTextColor(Color.WHITE)
+            setTextColor(activity.elonColor(R.color.elon_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             typeface = Typeface.DEFAULT_BOLD
         }, LinearLayout.LayoutParams(
@@ -108,7 +107,7 @@ internal class ProjectPlazaFeedbackSection(
             text = message
             includeFontPadding = false
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
+            setTextColor(activity.elonColor(R.color.elon_text_secondary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             setLineSpacing(0f, 1.12f)
         }, LinearLayout.LayoutParams(
@@ -119,10 +118,10 @@ internal class ProjectPlazaFeedbackSection(
             text = actionLabel
             gravity = Gravity.CENTER
             includeFontPadding = false
-            background = rect(Color.WHITE, ACTION_HEIGHT_DP / 2)
+            background = rect(activity.elonColor(R.color.elon_button_primary_bg), ACTION_HEIGHT_DP / 2)
             foreground = selectableForeground()
             isClickable = true
-            setTextColor(Color.BLACK)
+            setTextColor(activity.elonColor(R.color.elon_button_primary_text))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             typeface = Typeface.DEFAULT_BOLD
             setOnClickListener { onAction() }
@@ -142,9 +141,6 @@ internal class ProjectPlazaFeedbackSection(
         }
     }
 
-    private fun rect(color: String, radiusDp: Int): GradientDrawable =
-        rect(Color.parseColor(color), radiusDp)
-
     private fun rect(color: Int, radiusDp: Int): GradientDrawable = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
         setColor(color)
@@ -152,12 +148,6 @@ internal class ProjectPlazaFeedbackSection(
     }
 
     private companion object {
-        const val COLOR_SURFACE = "#1A1A1A"
-        const val COLOR_SKELETON_STRONG = "#272727"
-        const val COLOR_SKELETON_SOFT = "#6D6E6F"
-        const val COLOR_TEXT_SECONDARY = "#B8B8B8"
-        const val COLOR_TEXT_TERTIARY = "#777777"
-        const val COLOR_DANGER = "#E62129"
         const val SIDE_MARGIN_DP = 20
         const val SKELETON_ROW_HEIGHT_DP = 88
         const val ACTION_HEIGHT_DP = 48

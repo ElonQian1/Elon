@@ -1,14 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.ElonApp" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/elon_bg_app</item>
-        <item name="colorPrimaryVariant">@color/elon_bg_app</item>
-        <item name="colorOnPrimary">@color/elon_text_primary</item>
+        <item name="colorPrimary">@color/elon_button_primary_bg</item>
+        <item name="colorPrimaryVariant">@color/elon_text_accent</item>
+        <item name="colorOnPrimary">@color/elon_button_primary_text</item>
+        <item name="colorSecondary">@color/elon_status_info</item>
+        <item name="colorOnSecondary">@color/elon_button_primary_text</item>
+        <item name="colorSurface">@color/elon_surface_card</item>
+        <item name="colorOnSurface">@color/elon_text_primary</item>
         <!-- 全局禁用系统无边界 Ripple；控件自身的状态切换与业务动画仍然保留。 -->
         <item name="selectableItemBackgroundBorderless">@null</item>
         <item name="android:selectableItemBackgroundBorderless">@null</item>
-        <item name="android:statusBarColor">@color/elon_bg_app</item>
-        <item name="android:navigationBarColor">@color/elon_bg_app</item>
+        <item name="android:windowBackground">@color/elon_bg_app</item>
+        <item name="android:statusBarColor">@color/elon_bg_chrome</item>
+        <item name="android:navigationBarColor">@color/elon_bg_chrome</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowSoftInputMode">adjustResize</item>
         <item name="android:windowAnimationStyle">@style/ElonPageAnimation</item>
         <item name="android:scrollbarSize">0dp</item>

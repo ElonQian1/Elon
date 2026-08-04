@@ -1,7 +1,7 @@
 .project-home-root {
   min-height: 100%;
-  background: #000000;
-  color: #D9D9D9;
+  background: var(--bg);
+  color: var(--ink);
   padding: 44px 32px 34px;
   box-sizing: border-box;
 }
@@ -16,7 +16,7 @@
   gap: 54px;
   margin-left: -26px;
   margin-bottom: 32px;
-  background: #000000;
+  background: var(--bg);
 }
 
 .project-home-segment {
@@ -27,7 +27,7 @@
   border-radius: 21px;
   box-sizing: border-box;
   background: transparent;
-  color: #D9D9D9;
+  color: var(--ink);
   display: grid;
   place-items: center;
   padding: 0;
@@ -37,7 +37,8 @@
 }
 
 .project-home-segment.active {
-  background: #1A1A1A;
+  background: var(--nav-active-bg);
+  color: var(--tab-active);
 }
 
 .project-home-list {
@@ -69,13 +70,13 @@
 
 .project-home-card:focus-visible,
 .project-home-empty-card:focus-visible {
-  outline: 2px solid rgba(214, 214, 214, 0.68);
-  outline-offset: -2px;
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 .project-home-name {
   min-width: 0;
-  color: #FFFFFF;
+  color: var(--ink-strong);
   font-size: 17px;
   font-weight: 500;
   line-height: 24px;
@@ -90,8 +91,8 @@
   width: 52px;
   height: 52px;
   border-radius: 6px;
-  background: #FFFFFF;
-  color: #000000;
+  background: var(--brand);
+  color: var(--brand-ink);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -122,7 +123,7 @@
 .project-home-desc {
   display: block;
   margin-top: 4px;
-  color: #AFAFAF;
+  color: var(--ink-muted);
   font-size: 13px;
   line-height: 18px;
   overflow: hidden;
@@ -134,7 +135,7 @@
   display: flex;
   gap: 30px;
   margin-top: 4px;
-  color: #AFAFAF;
+  color: var(--ink-muted);
   font-size: 12px;
   line-height: 18px;
   overflow: hidden;
@@ -150,7 +151,7 @@
 .project-home-chevron {
   flex: none;
   width: 22px;
-  color: #AFAFAF;
+  color: var(--ink-muted);
   font-size: 24px;
   line-height: 1;
   text-align: center;
@@ -164,7 +165,7 @@
 }
 
 .project-home-empty-plus {
-  color: #AFAFAF;
+  color: var(--ink-muted);
   font-size: 16px;
   line-height: 1;
 }
@@ -185,9 +186,10 @@
   max-height: min(72vh, 620px);
   overflow: hidden;
   border-radius: 8px;
-  background: #1F2023;
-  color: #d6d6d6;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.42);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
   display: flex;
   flex-direction: column;
 }
@@ -198,7 +200,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  border-bottom: 1px solid rgba(46, 46, 46, 0.78);
+  border-bottom: 1px solid var(--line);
 }
 
 .project-home-action-thumb {
@@ -207,8 +209,8 @@
   width: 48px;
   height: 48px;
   border-radius: 999px;
-  background: #d2d2d2;
-  color: #253140;
+  background: var(--brand);
+  color: var(--brand-ink);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -232,7 +234,7 @@
 }
 
 .project-home-action-title {
-  color: #d6d6d6;
+  color: var(--ink);
   font-size: 16px;
   font-weight: 800;
   line-height: 1.1;
@@ -242,7 +244,7 @@
 }
 
 .project-home-action-status {
-  color: #a8a8a8;
+  color: var(--ink-soft);
   font-size: 12px;
   line-height: 1;
 }
@@ -256,9 +258,9 @@
   width: 100%;
   min-height: 58px;
   border: 0;
-  border-bottom: 1px solid rgba(46, 46, 46, 0.72);
+  border-bottom: 1px solid var(--line);
   background: transparent;
-  color: #d6d6d6;
+  color: var(--ink);
   text-align: left;
   padding: 8px 18px;
   display: flex;
@@ -269,7 +271,7 @@
 
 .project-home-action-row:hover,
 .project-home-action-row:focus-visible {
-  background: #242424;
+  background: var(--panel-3);
   outline: none;
 }
 
@@ -278,8 +280,8 @@
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  background: #2a2a2a;
-  color: #d6d6d6;
+  background: var(--nav-active-bg);
+  color: var(--tab-active);
   display: grid;
   place-items: center;
   font-size: 13px;
@@ -295,7 +297,7 @@
 }
 
 .project-home-action-name {
-  color: #d6d6d6;
+  color: var(--ink);
   font-size: 16px;
   line-height: 1.2;
   overflow: hidden;
@@ -304,7 +306,7 @@
 }
 
 .project-home-action-subtitle {
-  color: #a8a8a8;
+  color: var(--ink-soft);
   font-size: 13px;
   line-height: 1.2;
   overflow: hidden;
@@ -314,7 +316,7 @@
 
 .project-home-action-row.danger .project-home-action-icon,
 .project-home-action-row.danger .project-home-action-name {
-  color: #ff7a7a;
+  color: var(--danger);
 }
 
 .project-progress-panel.hidden {

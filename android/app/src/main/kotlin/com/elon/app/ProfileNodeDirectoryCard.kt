@@ -1,7 +1,6 @@
 package com.elon.app
 
 import android.content.Context
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -94,9 +93,15 @@ internal class ProfileNodeDirectoryCard(
             summary.modelCount.toString()
         )
         statusLabel.text = if (summary.onlineNodes > 0) "在线 ${summary.onlineNodes}" else "暂无在线"
-        statusLabel.setTextColor(Color.parseColor(if (summary.onlineNodes > 0) "#58BE6A" else "#777777"))
+        statusLabel.setTextColor(
+            activity.elonColor(
+                if (summary.onlineNodes > 0) R.color.elon_status_success else R.color.elon_text_tertiary
+            )
+        )
         (statusLabel.background as? GradientDrawable)?.setColor(
-            Color.parseColor(if (summary.onlineNodes > 0) "#16251A" else "#222222")
+            activity.elonColor(
+                if (summary.onlineNodes > 0) R.color.elon_badge_success_bg else R.color.elon_badge_neutral_bg
+            )
         )
 
         previewContainer.removeAllViews()
@@ -116,7 +121,7 @@ internal class ProfileNodeDirectoryCard(
                 includeFontPadding = false
                 text = "还有 ${nodes.size - 2} 台节点，点击查看全部"
                 textSize = 12f
-                setTextColor(Color.parseColor("#58BE6A"))
+                setTextColor(activity.elonColor(R.color.elon_text_accent))
                 setPadding(0, dp(8), 0, 0)
             })
         }
@@ -150,7 +155,7 @@ internal class ProfileNodeDirectoryCard(
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     includeFontPadding = false
                     text = "全站 PC 节点"
-                    setTextColor(Color.parseColor("#D6D6D6"))
+                    setTextColor(activity.elonColor(R.color.elon_text_primary))
                     textSize = 16f
                     setTypeface(typeface, Typeface.BOLD)
                 })
@@ -160,9 +165,9 @@ internal class ProfileNodeDirectoryCard(
                     setPadding(dp(10), dp(4), dp(10), dp(4))
                     text = "加载中…"
                     textSize = 11f
-                    setTextColor(Color.parseColor("#8DDC9B"))
+                    setTextColor(activity.elonColor(R.color.elon_status_success))
                     background = GradientDrawable().apply {
-                        setColor(Color.parseColor("#16251A"))
+                        setColor(activity.elonColor(R.color.elon_badge_success_bg))
                         cornerRadius = dp(8).toFloat()
                     }
                 }
@@ -198,7 +203,7 @@ internal class ProfileNodeDirectoryCard(
                 ).also { it.topMargin = dp(10) }
                 includeFontPadding = false
                 text = "进入 PC 节点大厅  →"
-                setTextColor(Color.parseColor("#58BE6A"))
+                setTextColor(activity.elonColor(R.color.elon_text_accent))
                 textSize = 13f
             })
         }
@@ -209,7 +214,7 @@ internal class ProfileNodeDirectoryCard(
         val value = TextView(activity).apply {
             includeFontPadding = false
             text = "…"
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(activity.elonColor(R.color.elon_text_primary))
             textSize = 24f
             setTypeface(typeface, Typeface.BOLD)
         }
@@ -219,7 +224,7 @@ internal class ProfileNodeDirectoryCard(
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = label
-                setTextColor(Color.parseColor("#777777"))
+                setTextColor(activity.elonColor(R.color.elon_text_tertiary))
                 textSize = 11f
             })
             addView(value)
@@ -231,7 +236,7 @@ internal class ProfileNodeDirectoryCard(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(12), dp(10), dp(12), dp(10))
             background = GradientDrawable().apply {
-                setColor(Color.parseColor("#1F2023"))
+                setColor(activity.elonColor(R.color.elon_surface_header))
                 cornerRadius = dp(6).toFloat()
             }
             layoutParams = LinearLayout.LayoutParams(
@@ -242,7 +247,7 @@ internal class ProfileNodeDirectoryCard(
                 includeFontPadding = false
                 text = "${node.displayName} · ${node.capacityLabel.ifBlank { if (node.canAcceptProject) "可接项目" else "在线" }}"
                 textSize = 13f
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(activity.elonColor(R.color.elon_text_primary))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
@@ -250,7 +255,7 @@ internal class ProfileNodeDirectoryCard(
                 includeFontPadding = false
                 text = nodePreviewDetail(node)
                 textSize = 11f
-                setTextColor(Color.parseColor("#777777"))
+                setTextColor(activity.elonColor(R.color.elon_text_tertiary))
                 setPadding(0, dp(4), 0, 0)
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
@@ -267,7 +272,7 @@ internal class ProfileNodeDirectoryCard(
             includeFontPadding = false
             text = textValue
             textSize = 12f
-            setTextColor(Color.parseColor("#777777"))
+            setTextColor(activity.elonColor(R.color.elon_text_tertiary))
             gravity = Gravity.CENTER
             setPadding(0, dp(8), 0, dp(6))
         }
@@ -279,7 +284,7 @@ internal class ProfileNodeDirectoryCard(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(1)
             ).also { it.bottomMargin = dp(16) }
-            setBackgroundColor(Color.parseColor("#4D4D4D"))
+            setBackgroundColor(activity.elonColor(R.color.elon_border_subtle))
             alpha = 0.45f
         }
     }

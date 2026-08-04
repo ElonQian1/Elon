@@ -1,89 +1,85 @@
 # APP UI 设计规范
 
-最后更新：2026-07-29
+最后更新：2026-08-04
 
 本文件替代旧版“APP 颜色规范”，作为一龙 APP 的完整 UI 设计规范。文件名保留历史路径，方便现有 AI 路由、脚本和说明继续定位；内容以本版为准。任何 APP 页面、主题、颜色、按钮、卡片、列表、底部导航、弹窗、状态标签或项目空间 UI 调整，都必须先遵守本文件；除非任务本身是更新本规范。
 
-本规范基于 3 张项目管理参考图提炼，核心风格定义为 **Elon 墨黑项目工作台**：大面积纯黑背景，深灰承载结构，白色胶囊承担主要动作，红绿小圆点表达状态。整体要像一个安静、专业、可长期使用的移动端项目管理工具，不做营销页感、插画感或彩色装饰感。
+本规范以 APK 为设计主版本，并吸收 ElonSpeed Windows 的“静谧夜空”视觉系统，核心风格定义为 **Elon 静谧夜空项目工作台**：深蓝石墨画布承载长期工作，分层的不透明夜空表面建立结构，低饱和雾蓝承担主操作与焦点，青绿黄红分别表达信息、成功、提醒和危险。整体要像一个安静、可信、可长期使用的移动项目工作台，不做营销页感、游戏启动器感或彩色装饰感。
 
-颜色部分必须按截图采样值实现，不允许用“相近色”“更亮一点”“差不多的灰”替代。比如规范中底部导航是 `#1A1A1A`，实现时就必须使用 `#1A1A1A`，不能改成 `#202020` 或 `#222222`。
+颜色必须按本表的 Android ARGB / Web HEX 或 RGBA 精确实现，不允许用“相近色”“更亮一点”“差不多的蓝灰”替代。Windows 的桌面控件密度不直接搬到手机；APK 保留 48dp 触控、精选大卡和底部导航，PWA 再镜像 APK。
 
 ## 设计原则
 
-- 纯黑优先：我的项目列表、项目广场页面、详情页顶部 chrome、项目空间内容画布统一使用 `#000000`。
-- 结构克制：用深灰卡片、分区条、圆角和留白建立层级，不依赖彩色边框。
-- 白色动作：主要按钮统一为白底黑字胶囊，例如“进入空间”“下载APK”“AI 会话”。
-- 额度周期：个人页 Token 额度的周期按钮保持三等宽胶囊；选中态使用 `color.surface.quota.selected`，未选中态使用 `#D9D9D9`，默认选中“7天”。
-- 状态点缀：绿色和红色只用于状态点、在线、通过、需审批、异常，不作为大面积按钮底色。
+- 夜空优先：我的项目、项目广场、聊天和项目空间统一使用 `#0B1017`；系统 chrome 使用更深的 `#070B10`。
+- 结构克制：用 `#111923`、`#172231`、`#1D2A39` 三层不透明表面、细边框、圆角和留白建立层级。
+- 雾蓝动作：主要按钮统一为 `#7AA7FF` 底、`#070B10` 字胶囊，例如“进入空间”“下载 APK”“AI 会话”。
+- 额度周期：个人页 Token 周期按钮保持三等宽胶囊；选中态使用 `#7AA7FF`，未选中态使用 `#172231`，默认选中“7天”。
+- 状态点缀：青色、绿色、琥珀色、柔红只分别用于信息、成功、提醒、危险，不作为普通大面积装饰。
 - 大字导航：一级页面使用粗体大标题和短下划线表达选中，不使用传统顶部 Tab 条边框。
-- 胶囊筛选：搜索框、筛选项、分段控件均为圆角胶囊，选中态用深灰填充。
+- 胶囊筛选：搜索框、筛选项、分段控件均为圆角胶囊，选中态用雾蓝 13% 软底和浅雾蓝文字。
 - 信息密度适中：列表页保持扫描效率，卡片页允许更强留白和更大圆角。
-- 原生工具感：图标使用线性轮廓，菜单使用白色浮层，底部导航采用固定的悬浮胶囊，稳定、低干扰。
-- 不做渐变、阴影光效、蓝紫主色、彩色大按钮、装饰圆点背景。
+- 原生工具感：图标使用线性轮廓，菜单使用抬升夜空表面，底部导航采用固定悬浮胶囊，稳定、低干扰。
+- 不做大面积渐变、持续发光、毛玻璃、装饰圆点背景；雾蓝只出现在用户需要看见的动作和焦点上。
 
 ## 颜色系统
 
-### 截图采样颜色 Token
+### 静谧夜空颜色 Token
 
 | 用途 | 设计 Token | Android 建议名 | Web CSS 变量 | HEX | 来源 |
 |---|---|---|---|---:|---|
-| 我的项目列表背景 | `color.bg.mine` | `elon_bg_mine` | `--bg-mine` | `#000000` | 图 1 页面背景 |
-| 项目空间内容画布 | `color.bg.canvas` | `elon_bg_canvas` | `--bg-canvas` | `#000000` | 图 3 内容区 |
-| 项目广场页面背景 | `color.bg.plaza` | `elon_bg_plaza` | `--bg-plaza` | `#000000` | 图 2 页面背景，按图 1 纯黑背景统一 |
-| 详情页顶部背景 | `color.bg.chrome` | `elon_bg_chrome` | `--bg-chrome` | `#000000` | 图 3 顶部区域，按纯黑背景统一 |
-| 底部导航背景 | `color.nav.bg` | `elon_nav_bg` | `--nav-bg` | `#1A1A1A` | 2026-06-25 用户要求与上方提示条统一 |
-| 列表选中胶囊 | `color.surface.segment.selected` | `elon_segment_selected` | `--segment-selected` | `#1A1A1A` | 图 1 “独立”、图 2 “全部” |
-| 项目广场卡片主体 | `color.surface.card` | `elon_surface_card` | `--panel` | `#1A1A1A` | 图 2 卡片主体 |
-| 卡片头部 / 公告容器 | `color.surface.header` | `elon_surface_header` | `--panel-header` | `#1F2023` | 图 2 卡片头部、图 3 公告 |
-| 搜索框背景 | `color.surface.search` | `elon_surface_search` | `--search-bg` | `#272727` | 图 2 搜索框 |
-| 圆形悬浮暗按钮 | `color.surface.float` | `elon_surface_float` | `--float` | `#212121` | 图 1 顶部加号、图 3 内容加号 |
-| 圆形按钮描边 | `color.border.float` | `elon_border_float` | `--float-border` | `#4D4D4D` | 图 1 顶部加号边框 |
-| 卡片内分割线 | `color.divider.card` | `elon_divider_card` | `--divider-card` | `#6D6E6F` | 图 2 卡片内横线 |
-| 主操作按钮 / 菜单 / 封面占位 | `color.surface.inverse` | `elon_surface_inverse` | `--surface-inverse` | `#FFFFFF` | 图 1 封面、图 2 按钮、图 3 菜单 |
-| 一级 Tab / 广场卡片标题 / 状态文字 | `color.text.primary` | `elon_text_primary` | `--ink` | `#D9D9D9` | 图 1/2 大标题、图 2 卡片标题 |
-| 我的项目列表项标题 | `color.text.list.title` | `elon_text_list_title` | `--ink-list-title` | `#FFFFFF` | 图 1 “项目名称” |
-| 好友页列表摘要 / 时间 / 项目标识 | `color.text.list.preview` | `elon_text_list_preview` | `--ink-list-preview` | `#606060` | 微信会话列表摘要采样 |
-| 详情页居中标题 | `color.text.detail.title` | `elon_text_detail_title` | `--ink-detail-title` | `#F4F5FB` | 图 3 顶部“魔王” |
-| 正文元信息 | `color.text.secondary` | `elon_text_secondary` | `--ink-muted` | `#B8B8B8` | 图 2 创建者、简介 |
-| 搜索占位 / 空状态 / 公告正文 | `color.text.placeholder` | `elon_text_placeholder` | `--ink-placeholder` | `#AFAFAF` | 图 2 搜索占位、图 3 空状态 |
-| 底部导航图标文字 | `color.text.nav` | `elon_text_nav` | `--ink-nav` | `#D6D6D6` | 图 1/2 底部导航 |
-| 弱提示 / 次弱信息 | `color.text.quiet` | `elon_text_quiet` | `--ink-quiet` | `#777777` | 图 1 弱文字边缘采样 |
-| 白色按钮文字 | `color.text.inverse` | `elon_text_inverse` | `--ink-inverse` | `#000000` | 白色按钮上的纯黑文字 |
-| 弹出菜单文字 | `color.text.menu` | `elon_text_menu` | `--menu-ink` | `#2F3136` | 图 3 白色菜单文字 |
-| 顶部成员图标 | `color.icon.member` | `elon_icon_member` | `--icon-member` | `#A5AFBD` | 图 3 右上成员图标 |
-| 加号 / 主线性图标 | `color.icon.primary` | `elon_icon_primary` | `--icon-primary` | `#D9D9D9` | 图 3 内容加号 |
-| 顶部加号图标 | `color.icon.add.top` | `elon_icon_add_top` | `--icon-add-top` | `#D3D3D3` | 图 1 顶部加号 |
-| 底部主菜单抽屉展开图标 | `color.icon.menu.open` | `ic_bottom_nav_menu_active` | `__BOTTOM_NAV_MENU_ACTIVE_PNG_B64__` | `#5DA6FF` | 2026-07-24 用户提供三横杠素材 |
-| 个人页额度周期选中胶囊 | `color.surface.quota.selected` | `elon_profile_quota_selected` | `--profile-quota-selected` | `#5DA6FF` | 2026-07-29 用户提供个人页标注图 |
-| 个人页额度周期未选胶囊 | `color.surface.quota.control` | `elon_profile_quota_control` | `--profile-quota-control` | `#D9D9D9` | 2026-07-29 用户提供个人页标注图 |
-| 个人页额度周期胶囊描边 | `color.border.quota.control` | `elon_profile_quota_border` | `--profile-quota-border` | `#3E3E42` | 2026-07-29 用户提供个人页标注图 |
-| 我的页账号操作文字 | `color.text.profile.account.action` | `profile_account_action_text` | `--profile-account-action` | `#5DA6FF` | 2026-07-29 用户提供登录/退出板块参考图 |
-| 成功 / 无需审批 / 可安装状态点 | `color.status.success` | `elon_status_success` | `--success` | `#58BE6A` | 图 2 绿色状态点 |
-| 项目状态 / 好友页下拉筛选项目进度 | `color.status.project` | `elon_status_project` | `--pull-filter-project` | `#F2C94C` | 好友页项目角标与项目筛选进度 |
-| 需审批 / 异常状态点 | `color.status.danger` | `elon_status_danger` | `--danger` | `#E62129` | 图 2 红色状态点 |
-| 项目空间商店详情背景 | `color.store.detail.bg` | `elon_store_detail_bg` | `--store-detail-bg` | `#131313` | 2026-06-29 Google Play 详情页参考图 |
-| 项目空间商店详情主文字 | `color.store.detail.text.primary` | `elon_store_detail_text_primary` | `--store-detail-ink` | `#E3E3E3` | 2026-06-29 Google Play 详情页参考图 |
-| 项目空间商店详情次文字 | `color.store.detail.text.secondary` | `elon_store_detail_text_secondary` | `--store-detail-muted` | `#C6C6C6` | 2026-06-29 Google Play 详情页参考图 |
-| 项目空间商店详情链接蓝 | `color.store.detail.link` | `elon_store_detail_link` | `--store-detail-link` | `#A8C7FA` | 2026-06-29 Google Play 详情页参考图 |
-| 项目空间商店详情分隔线 | `color.store.detail.divider` | `elon_store_detail_divider` | `--store-detail-divider` | `#444444` | 2026-06-29 Google Play 详情页参考图 |
-| 项目空间商店详情安装按钮 | `color.store.detail.button` | `elon_store_detail_button` | `--store-detail-button` | `#AEC6F6` | 2026-06-29 Google Play 详情页参考图 |
-| 项目空间商店详情安装按钮文字 | `color.store.detail.button.text` | `elon_store_detail_button_text` | `--store-detail-button-ink` | `#182E63` | 2026-06-29 Google Play 详情页参考图 |
+| 我的项目列表背景 | `color.bg.mine` | `elon_bg_app` | `--bg` | `#0B1017` | Win 画布映射 |
+| 项目空间内容画布 | `color.bg.canvas` | `elon_bg_canvas` | `--project-space-panel-bg` | `#0B1017` | Win 画布映射 |
+| 项目广场页面背景 | `color.bg.plaza` | `elon_bg_plaza` | `--plaza-bg` | `#0B1017` | APK 主页面统一 |
+| 详情页顶部背景 | `color.bg.chrome` | `elon_bg_chrome` | `--bg-hint` | `#070B10` | Win 深画布 |
+| 底部导航背景 | `color.nav.bg` | `elon_nav_bg` | `--nav-bg` | `#0A0F16` | Win 侧栏映射 |
+| 列表选中胶囊 | `color.surface.segment.selected` | `elon_segment_selected` | `--nav-active-bg` | `#1F2B40` | 雾蓝 13% 合成表面 |
+| 项目广场卡片主体 | `color.surface.card` | `elon_surface_card` | `--panel` | `#111923` | Win Surface |
+| 卡片头部 / 公告容器 | `color.surface.header` | `elon_surface_header` | `--panel-2` | `#172231` | Win Raised |
+| 搜索框背景 | `color.surface.search` | `elon_surface_search` | `--input-pill-bg` | `#1D2A39` | Win Soft |
+| 圆形悬浮暗按钮 | `color.surface.float` | `elon_surface_float` | `--panel-2` | `#172231` | Win Raised |
+| 圆形按钮描边 | `color.border.float` | `elon_border_subtle` | `--line` | `#3397AECC` | Win border 20% ARGB |
+| 焦点 / 精选轨道 | `color.border.primary` | `elon_border_primary` | `--focus-ring` | `#4D7AA7FF` | Win brand border 30% ARGB |
+| 卡片内分割线 | `color.divider.card` | `elon_divider_card` | `--plaza-divider` | `#1C97AECC` | Win secondary border 11% ARGB |
+| 主操作按钮 / 封面占位 | `color.action.primary` | `elon_button_primary_bg` | `--brand` | `#7AA7FF` | Win 雾蓝品牌色 |
+| 信息提示 | `color.status.info` | `elon_status_info` | `--accent` | `#73C7E8` | Win 青色信号 |
+| 一级 Tab / 广场卡片标题 / 状态文字 | `color.text.primary` | `elon_text_primary` | `--ink` | `#F0F3F8FB` | Win 94% 主文字 ARGB |
+| 我的项目列表项标题 | `color.text.list.title` | `elon_text_list_title` | `--ink-strong` | `#F3F8FB` | Win 主文字实色 |
+| 好友页列表摘要 / 时间 / 项目标识 | `color.text.list.preview` | `elon_text_tertiary` | `--ink-list-preview` | `#7AB5C9D3` | Win 48% 弱文字 ARGB |
+| 详情页居中标题 | `color.text.detail.title` | `elon_text_detail_title` | `--ink-strong` | `#F4F9FC` | Win 高对比标题 |
+| 正文元信息 | `color.text.secondary` | `elon_text_secondary` | `--ink-soft` | `#ADCDDCE4` | Win 68% 次文字 ARGB |
+| 搜索占位 / 空状态 / 公告正文 | `color.text.placeholder` | `elon_text_placeholder` | `--ink-muted` | `#7AB5C9D3` | Win 48% 弱文字 ARGB |
+| 底部导航图标文字 | `color.text.nav` | `elon_text_nav` | `--tab-icon` | `#ADCDDCE4` | Win 68% 次文字 ARGB |
+| 弱提示 / 次弱信息 | `color.text.quiet` | `elon_text_tertiary` | `--ink-faint` | `#7AB5C9D3` | Win 48% 弱文字 ARGB |
+| 雾蓝按钮文字 | `color.text.inverse` | `elon_button_primary_text` | `--brand-ink` | `#070B10` | 主操作上的深色文字 |
+| 弹出菜单文字 | `color.text.menu` | `elon_text_menu` | `--ink` | `#F0F3F8FB` | 抬升夜空菜单文字 |
+| 顶部成员图标 | `color.icon.member` | `elon_icon_member` | `--tab-icon` | `#ADCDDCE4` | 次级图标 |
+| 加号 / 主线性图标 | `color.icon.primary` | `elon_icon_primary` | `--ink` | `#F0F3F8FB` | 主线性图标 |
+| 顶部加号图标 | `color.icon.add.top` | `elon_icon_add_top` | `--tab-icon` | `#ADCDDCE4` | 次级图标 |
+| 底部选中图标 | `color.icon.nav.selected` | `elon_text_accent` | `--tab-active` | `#A8C5FF` | Win selected text |
+| 个人页额度周期选中胶囊 | `color.surface.quota.selected` | `elon_profile_quota_selected` | `--profile-quota-selected` | `#7AA7FF` | 雾蓝主选中 |
+| 个人页额度周期未选胶囊 | `color.surface.quota.control` | `elon_profile_quota_control` | `--profile-quota-control` | `#172231` | Raised 表面 |
+| 个人页额度周期胶囊描边 | `color.border.quota.control` | `elon_profile_quota_border` | `--profile-quota-border` | `#4D7AA7FF` | 雾蓝 30% ARGB |
+| 我的页账号操作文字 | `color.text.profile.account.action` | `profile_account_action_text` | `--profile-account-action` | `#A8C5FF` | 雾蓝浅文字 |
+| 成功 / 无需审批 / 可安装状态点 | `color.status.success` | `elon_status_success` | `--success` | `#5AC8A0` | Win success |
+| 项目状态 / 待处理提醒 | `color.status.project` | `elon_status_project` | `--warning` | `#E7B86A` | Win warning |
+| 需审批 / 异常状态点 | `color.status.danger` | `elon_status_danger` | `--danger` | `#F07884` | Win danger |
+| 项目空间商店详情背景 | `color.store.detail.bg` | `elon_store_detail_bg` | `--store-detail-bg` | `#0B1017` | 统一画布 |
+| 项目空间商店详情主文字 | `color.store.detail.text.primary` | `elon_store_detail_text_primary` | `--store-detail-ink` | `#F0F3F8FB` | 主文字 |
+| 项目空间商店详情次文字 | `color.store.detail.text.secondary` | `elon_store_detail_text_secondary` | `--store-detail-muted` | `#ADCDDCE4` | 次文字 |
+| 项目空间商店详情链接蓝 | `color.store.detail.link` | `elon_store_detail_link` | `--store-detail-link` | `#A8C5FF` | 雾蓝浅文字 |
+| 项目空间商店详情分隔线 | `color.store.detail.divider` | `elon_store_detail_divider` | `--store-detail-divider` | `#3397AECC` | Win border 20% ARGB |
+| 项目空间商店详情安装按钮 | `color.store.detail.button` | `elon_store_detail_button` | `--store-detail-button` | `#7AA7FF` | 雾蓝主操作 |
+| 项目空间商店详情安装按钮文字 | `color.store.detail.button.text` | `elon_store_detail_button_text` | `--store-detail-button-ink` | `#070B10` | 深色按钮文字 |
 
 ### 颜色使用规则
 
-- 图 1 “我的项目”列表页根背景必须是 `#000000`。
-- 图 2 “项目广场”页面根背景必须与图 1 一致，使用 `#000000`。
-- 图 3 项目空间顶部 chrome 和内容画布都必须使用 `#000000`。
-- 底部导航使用 `#1A1A1A`；顶部圆形加号、内容区圆形加号继续使用 `#212121`。
-- 项目广场卡片主体和选中筛选胶囊统一使用 `#1A1A1A`。
-- 项目广场卡片头部、项目空间公告容器统一使用 `#1F2023`。
-- 搜索框只能使用 `#272727`，不能复用 `#1A1A1A` 或 `#212121`。
-- 白色 `#FFFFFF` 只用于主操作按钮、弹出菜单、白色封面占位。
-- 绿色 `#58BE6A` 仅用于成功状态点、在线点、可安装、无需审批、完成进度，以及好友页下拉切到好友筛选的进度提示。
-- 黄色 `#F2C94C` 仅用于项目角标和好友页下拉切到项目筛选的进度提示，不作为大面积装饰色。
-- 红色 `#E62129` 仅用于需审批、失败、危险状态点，不做整块红色警告卡。
-- 分割线使用图 2 卡片内采样色 `#6D6E6F`，长度不要贯穿整卡。
-- 禁止新增相近黑灰色阶；确实需要新增时，必须从新参考图中采样并补充本表。
+- 我的项目、项目广场、聊天和项目空间内容画布使用 `#0B1017`；顶部与系统 chrome 使用 `#070B10`。
+- 底部导航使用 `#0A0F16`；普通卡片使用 `#111923`，抬升容器使用 `#172231`，搜索和按下表面使用 `#1D2A39`。
+- 主操作、选中焦点和精选大卡的 3dp 轨道使用 `#7AA7FF`；普通页面不得把整块背景染成品牌蓝。
+- 青色 `#73C7E8` 仅用于信息和信号；绿色 `#5AC8A0` 仅用于成功、在线、可安装和完成。
+- 琥珀 `#E7B86A` 仅用于注意、项目进度和待处理；柔红 `#F07884` 仅用于需审批、失败和危险。
+- 分割线与边框使用表中带透明度的蓝灰，不新增脏灰；焦点使用雾蓝边界，同时保留文字或形状反馈。
+- 精选大卡保留 APK 的尺寸和交互节奏，只在头部加入窄雾蓝轨道；状态点仍按业务语义着色。
 
 ## 字体与层级
 
@@ -107,7 +103,7 @@ APP 字体尺寸以当前 **好友页面** 和 **我的页面** 的实际 UI 为
 - 主标题、好友会话标题、我的页功能入口使用 `color.text.primary`。
 - 好友页列表的会话摘要、项目摘要、右侧时间和项目标识使用 `color.text.list.preview`，用于和好友名称/项目名称拉开层级。
 - 我的页账号、签名、版本号使用 `color.text.secondary`、`color.text.placeholder` 或 `color.text.quiet`。
-- 白色按钮内文字使用 `color.text.inverse`，可沿用 `font.page.title` 并加粗。
+- 雾蓝按钮内文字使用 `color.text.inverse`，可沿用 `font.page.title` 并加粗。
 - 禁止用绿色表达普通标题或普通链接，绿色只表达状态或少数明确状态入口。
 
 ## 布局栅格
@@ -143,7 +139,7 @@ APP 字体尺寸以当前 **好友页面** 和 **我的页面** 的实际 UI 为
 | 卡片 | `16dp` 到 `18dp` |
 | 大卡片 / 公告容器 | `20dp` |
 | 圆形悬浮按钮 | `999dp` |
-| 白色浮层菜单 | `14dp` 到 `16dp` |
+| 抬升夜空浮层菜单 | `12dp` 到 `16dp` |
 | AI 会话胶囊 | `999dp` |
 
 圆角规则：
@@ -231,7 +227,7 @@ APP 字体尺寸以当前 **好友页面** 和 **我的页面** 的实际 UI 为
 
 ### 卡片按钮
 
-- 主操作按钮为白底黑字胶囊，最小高度 `44dp`。
+- 主操作按钮为雾蓝底深色字胶囊，最小高度 `44dp`。
 - 卡片内可并列两个按钮：“进入空间”“下载APK”。
 - 两按钮之间间距 `12dp` 到 `16dp`，宽度保持一致或按内容稍微自适应。
 - 按钮文字复用字体表中的主文本层级，字重可加粗。
@@ -270,7 +266,7 @@ APP 字体尺寸以当前 **好友页面** 和 **我的页面** 的实际 UI 为
 
 ### AI 会话按钮
 
-- 固定右下角，白底黑字。
+- 固定右下角，雾蓝底深色字。
 - 高度 `56dp` 到 `60dp`，圆角 `999dp`。
 - 左侧使用编辑/会话线性图标，右侧文字 `AI 会话`。
 - 文字复用字体表中的主文本层级，字重 `400`。
@@ -329,14 +325,14 @@ Web 变量建议：
 - `--panel-header` 对应 `color.surface.header`。
 - `--segment-selected` 对应 `color.surface.segment.selected`。
 - `--search-bg` 对应 `color.surface.search`。
-- `--brand` 对应白色主按钮背景，而不是绿色。
-- `--brand-ink` 对应黑色按钮文字。
-- `--success`、`--danger` 只用于状态点和状态文本。
+- `--brand` 对应雾蓝主按钮背景，`--brand-ink` 对应深夜按钮文字。
+- `--accent` 对应青色信息提示，不代替主操作。
+- `--success`、`--warning`、`--danger` 只用于状态点和状态文本。
 
 ## 禁止项
 
 - 禁止把绿色作为大面积主按钮背景，除非是明确的成功状态。
-- 禁止引入蓝色、紫色、橙色作为新的主辅助色；`color.icon.menu.open` 仅限底部主菜单抽屉展开反馈，`color.surface.quota.selected` 仅限个人页 Token 额度周期选中态。
+- 禁止在 `#7AA7FF`、`#A8C5FF`、`#73C7E8` 之外临时发明蓝紫辅助色；品牌蓝只用于动作、选中、焦点和精选轨道。
 - 禁止使用渐变背景、光斑、装饰球、拟物投影。
 - 禁止用卡片包裹所有列表项；我的项目列表应保持透明行。
 - 禁止在深色卡片内再套一层同样视觉重量的卡片。
@@ -347,11 +343,11 @@ Web 变量建议：
 
 | 页面 | 主结构 | 关键组件 |
 |---|---|---|
-| 我的项目 | 黑底无卡片列表 | 大 Tab、分段胶囊、项目封面、右箭头、底部导航 |
-| 项目广场 | 黑底大卡片流 | 搜索框、筛选胶囊、项目卡片、状态点、白色操作按钮 |
-| 项目空间 | 顶部导航 + 公告 + 深黑内容画布 | 公告容器、菜单浮层、空状态加号、右下 AI 会话按钮 |
-| 个人/我的 | 深色分组列表 | 底部导航、深灰行、白色或中性操作入口 |
-| 聊天/好友 | 黑底消息/列表 | 线性图标、白色主动作、深灰输入胶囊 |
+| 我的项目 | 夜空底无卡片列表 | 大 Tab、雾蓝软选中胶囊、项目封面、右箭头、底部导航 |
+| 项目广场 | 夜空底精选大卡流 | 搜索框、筛选胶囊、精选轨道、语义状态点、雾蓝操作按钮 |
+| 项目空间 | 顶部导航 + 公告 + 夜空内容画布 | 公告容器、抬升菜单、空状态加号、右下 AI 会话按钮 |
+| 个人/我的 | 夜空分组列表 | 底部导航、Raised 行、雾蓝或中性操作入口 |
+| 聊天/好友 | 夜空消息/列表 | 线性图标、雾蓝主动作、Soft 输入胶囊 |
 
 ## 更新流程
 

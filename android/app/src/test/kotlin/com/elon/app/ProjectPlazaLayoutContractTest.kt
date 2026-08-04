@@ -51,9 +51,10 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(featured.contains("FEATURED_CARD_WIDTH_FRACTION = 0.6871795f"))
         assertTrue(featured.contains("FEATURED_CARD_HEIGHT_RATIO = 1.2014925f"))
         assertTrue(featured.contains("FEATURED_CARD_GAP_DP = 10"))
-        assertTrue(featured.contains("COLOR_HEADER = \"#1F2023\""))
-        assertTrue(featured.contains("COLOR_STATUS_SUCCESS = \"#58BE6A\""))
-        assertTrue(featured.contains("COLOR_STATUS_DANGER = \"#E62129\""))
+        assertTrue(featured.contains("R.color.elon_surface_header"))
+        assertTrue(featured.contains("R.color.elon_status_success"))
+        assertTrue(featured.contains("R.color.elon_status_danger"))
+        assertTrue(featured.contains("FEATURE_RAIL_WIDTH_DP = 3"))
         assertFalse(featured.contains("R.drawable.project_plaza_ui1_card"))
         assertFalse(featured.contains("R.drawable.project_plaza_ui3_avatar"))
     }
@@ -78,9 +79,11 @@ class ProjectPlazaLayoutContractTest {
         assertTrue(styles.contains("aspect-ratio: 268 / 322;"))
         assertTrue(styles.contains("gap: 10px;"))
         assertTrue(styles.contains("padding: 0 98px 0 20px;"))
-        assertTrue(styles.contains("--plaza-header: #1f2023;"))
-        assertTrue(styles.contains("--plaza-success: #58be6a;"))
-        assertTrue(styles.contains("--plaza-danger: #e62129;"))
+        assertTrue(styles.contains("--plaza-header: #172231;"))
+        assertTrue(styles.contains("--plaza-primary: #7aa7ff;"))
+        assertTrue(styles.contains("--plaza-success: #5ac8a0;"))
+        assertTrue(styles.contains("--plaza-danger: #f07884;"))
+        assertTrue(styles.contains("border-left: 3px solid var(--plaza-primary);"))
         assertTrue(page.contains("data-ui-design=\"apk-project-dossier-v3\""))
     }
 

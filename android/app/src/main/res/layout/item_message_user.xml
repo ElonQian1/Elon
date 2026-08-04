@@ -91,7 +91,7 @@
         android:background="@drawable/bg_avatar_user"
         android:gravity="center"
         android:text="我"
-        android:textColor="@color/elon_text_primary"
+        android:textColor="@color/elon_button_primary_text"
         android:textSize="15sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"

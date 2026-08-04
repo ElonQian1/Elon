@@ -218,7 +218,7 @@ internal object ProjectWorkspaceRecoveryDialog {
 
     private fun statusHeader(activity: AppCompatActivity, health: ProjectWorkspaceHealth): LinearLayout {
         val color = when (health.healthTone) {
-            "ok" -> "#58BE6A"
+            "ok" -> "#5AC8A0"
             "bad" -> "#C44646"
             else -> "#C99630"
         }

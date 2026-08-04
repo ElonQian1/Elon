@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
@@ -19,7 +18,7 @@ internal fun projectPlazaProjectCover(
 ): FrameLayout = FrameLayout(activity).apply {
     background = GradientDrawable().apply {
         shape = GradientDrawable.RECTANGLE
-        setColor(Color.WHITE)
+        setColor(activity.elonColor(R.color.elon_button_primary_bg))
         cornerRadius = radiusPx
     }
     clipToOutline = true
@@ -28,7 +27,7 @@ internal fun projectPlazaProjectCover(
         text = project.displayTitle().trim().firstOrNull()?.toString() ?: "项"
         gravity = Gravity.CENTER
         includeFontPadding = false
-        setTextColor(Color.BLACK)
+        setTextColor(activity.elonColor(R.color.elon_button_primary_text))
         setTextSize(TypedValue.COMPLEX_UNIT_SP, fallbackTextSp)
         typeface = Typeface.DEFAULT_BOLD
         contentDescription = null

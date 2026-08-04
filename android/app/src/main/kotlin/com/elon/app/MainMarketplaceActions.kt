@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -157,10 +156,15 @@ internal class MainMarketplaceActions(
     }
 
     private fun buildSearchBar(): LinearLayout {
-        return LinearLayout(activity).apply {
+        val searchBar = LinearLayout(activity)
+        return searchBar.apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = rect(COLOR_SEARCH_BG, SEARCH_RADIUS_DP)
+            background = rect(
+                activity.elonColor(R.color.elon_surface_search),
+                SEARCH_RADIUS_DP,
+                activity.elonColor(R.color.elon_border_subtle)
+            )
             setPadding(dp(20), 0, dp(18), 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -172,12 +176,23 @@ internal class MainMarketplaceActions(
             }
             addView(ImageView(activity).apply {
                 setImageResource(R.drawable.ic_top_search_custom)
-                setColorFilter(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+                setColorFilter(activity.elonColor(R.color.elon_text_placeholder))
                 contentDescription = null
             }, LinearLayout.LayoutParams(dp(24), dp(24)).apply {
                 marginEnd = dp(12)
             })
-            addView(buildSearchField(), LinearLayout.LayoutParams(
+            val field = buildSearchField().apply {
+                setOnFocusChangeListener { _, focused ->
+                    searchBar.background = rect(
+                        activity.elonColor(R.color.elon_surface_search),
+                        SEARCH_RADIUS_DP,
+                        activity.elonColor(
+                            if (focused) R.color.elon_border_primary else R.color.elon_border_subtle
+                        )
+                    )
+                }
+            }
+            addView(field, LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 1f
@@ -197,8 +212,8 @@ internal class MainMarketplaceActions(
             includeFontPadding = false
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, 0)
-            setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-            setHintTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+            setTextColor(activity.elonColor(R.color.elon_text_primary))
+            setHintTextColor(activity.elonColor(R.color.elon_text_placeholder))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -263,11 +278,13 @@ internal class MainMarketplaceActions(
     private fun updateFilterChipVisuals() {
         filterChipViews.forEach { (key, chip) ->
             val selected = key == activeFilterKey
-            chip.setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
+            chip.setTextColor(
+                activity.elonColor(if (selected) R.color.elon_text_accent else R.color.elon_text_primary)
+            )
             chip.paint.isUnderlineText = false
             chip.setTypeface(chip.typeface, Typeface.NORMAL)
             chip.background = if (selected) {
-                rect(COLOR_SEGMENT_SELECTED, FILTER_CHIP_RADIUS_DP)
+                rect(activity.elonColor(R.color.elon_segment_selected), FILTER_CHIP_RADIUS_DP)
             } else {
                 null
             }
@@ -335,7 +352,7 @@ internal class MainMarketplaceActions(
         addView(TextView(activity).apply {
             text = "全部"
             includeFontPadding = false
-            setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
+            setTextColor(activity.elonColor(R.color.elon_text_primary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
         }, LinearLayout.LayoutParams(0, dp(38), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
         addView(TextView(activity).apply {
@@ -343,7 +360,7 @@ internal class MainMarketplaceActions(
             text = "${projects.size} 个项目 · $installableCount 个可安装"
             includeFontPadding = false
             gravity = Gravity.CENTER_VERTICAL
-            setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
+            setTextColor(activity.elonColor(R.color.elon_text_tertiary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(38)))
     }
@@ -367,12 +384,12 @@ internal class MainMarketplaceActions(
             orientation = LinearLayout.VERTICAL
             addView(TextView(activity).apply {
                 text = project.displayTitle(); maxLines = 1; ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setTextColor(activity.elonColor(R.color.elon_text_primary)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             })
             addView(TextView(activity).apply {
                 text = project.description?.takeIf { it.isNotBlank() } ?: "这个项目还没有填写简介。"
                 maxLines = 1; ellipsize = TextUtils.TruncateAt.END; includeFontPadding = false
-                setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextColor(activity.elonColor(R.color.elon_text_tertiary)); setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(5) })
             addView(buildProjectListMeta(project), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -399,7 +416,7 @@ internal class MainMarketplaceActions(
             includeFontPadding = false
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
+            setTextColor(activity.elonColor(R.color.elon_text_tertiary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         val build = projectPlazaBuildStatus(project.lastTaskStatus)
@@ -410,7 +427,7 @@ internal class MainMarketplaceActions(
         addView(TextView(activity).apply {
             text = build.label
             includeFontPadding = false
-            setTextColor(Color.parseColor(toneColor(build.tone)))
+            setTextColor(toneColor(build.tone))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -436,10 +453,10 @@ internal class MainMarketplaceActions(
         loadProjects()
     }
 
-    private fun toneColor(tone: ProjectPlazaTone): String = when (tone) {
-        ProjectPlazaTone.SUCCESS -> COLOR_STATUS_SUCCESS
-        ProjectPlazaTone.DANGER -> COLOR_STATUS_DANGER
-        ProjectPlazaTone.NEUTRAL -> COLOR_TEXT_TERTIARY
+    private fun toneColor(tone: ProjectPlazaTone): Int = when (tone) {
+        ProjectPlazaTone.SUCCESS -> activity.elonColor(R.color.elon_status_success)
+        ProjectPlazaTone.DANGER -> activity.elonColor(R.color.elon_status_danger)
+        ProjectPlazaTone.NEUTRAL -> activity.elonColor(R.color.elon_text_tertiary)
     }
 
     private fun activeFilter(): MarketplaceFilter {
@@ -453,24 +470,18 @@ internal class MainMarketplaceActions(
         }
     }
 
-    private fun rect(color: String, radiusDp: Int = 0): GradientDrawable {
+    private fun rect(color: Int, radiusDp: Int = 0, strokeColor: Int? = null): GradientDrawable {
         return GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            setColor(Color.parseColor(color))
+            setColor(color)
             if (radiusDp > 0) cornerRadius = dp(radiusDp).toFloat()
+            strokeColor?.let { setStroke(dp(1), it) }
         }
     }
 
     private companion object {
         const val FILTER_ALL = "all"
-        const val COLOR_SEARCH_BG = "#272727"
-        const val COLOR_SEGMENT_SELECTED = "#1A1A1A"
-        const val COLOR_TEXT_PRIMARY = "#D9D9D9"
-        const val COLOR_TEXT_PLACEHOLDER = "#AFAFAF"
-        const val COLOR_TEXT_TERTIARY = "#777777"
         const val FONT_PAGE_TITLE_SP = 16f
-        const val COLOR_STATUS_SUCCESS = "#58BE6A"
-        const val COLOR_STATUS_DANGER = "#E62129"
         const val SEARCH_HEIGHT_DP = 56
         const val SEARCH_RADIUS_DP = 28
         const val PLAZA_SIDE_MARGIN_DP = 20

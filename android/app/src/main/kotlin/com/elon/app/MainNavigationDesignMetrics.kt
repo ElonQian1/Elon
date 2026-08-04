@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.content.res.ColorStateList
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
@@ -91,6 +92,9 @@ internal class MainNavigationDesignMetrics(
                 if (selected) R.drawable.ic_bottom_nav_chat_active else R.drawable.ic_bottom_nav_chat
             )
         }
+        icon.imageTintList = ColorStateList.valueOf(
+            activity.elonColor(if (selected) R.color.elon_text_accent else R.color.elon_text_nav)
+        )
         icon.isSelected = selected
     }
 

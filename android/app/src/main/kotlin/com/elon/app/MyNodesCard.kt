@@ -1,7 +1,6 @@
 package com.elon.app
 
 import android.content.Context
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -55,16 +54,20 @@ internal class MyNodesCard(
         setRefreshLoading(true)
         if (!AuthManager.isLoggedIn(activity)) {
             statusPill.text = "未登录"
-            statusPill.setTextColor(Color.parseColor("#777777"))
-            (statusPill.background as? GradientDrawable)?.setColor(Color.parseColor("#1A1A1A"))
+            statusPill.setTextColor(activity.elonColor(R.color.elon_text_tertiary))
+            (statusPill.background as? GradientDrawable)?.setColor(
+                activity.elonColor(R.color.elon_badge_neutral_bg)
+            )
             statusPill.visibility = View.VISIBLE
             nodeListContainer.removeAllViews()
             setRefreshLoading(false)
             return
         }
         statusPill.text = "加载中…"
-        statusPill.setTextColor(Color.parseColor("#8DDC9B"))
-        (statusPill.background as? GradientDrawable)?.setColor(Color.parseColor("#16251A"))
+        statusPill.setTextColor(activity.elonColor(R.color.elon_status_success))
+        (statusPill.background as? GradientDrawable)?.setColor(
+            activity.elonColor(R.color.elon_badge_success_bg)
+        )
         statusPill.visibility = View.VISIBLE
 
         val ctx = activity.applicationContext
@@ -78,16 +81,26 @@ internal class MyNodesCard(
                         nodeListContainer.removeAllViews()
                         if (nodes.isEmpty()) {
                             statusPill.text = "无节点"
-                            statusPill.setTextColor(Color.parseColor("#777777"))
-                            (statusPill.background as? GradientDrawable)?.setColor(Color.parseColor("#1A1A1A"))
+                            statusPill.setTextColor(activity.elonColor(R.color.elon_text_tertiary))
+                            (statusPill.background as? GradientDrawable)?.setColor(
+                                activity.elonColor(R.color.elon_badge_neutral_bg)
+                            )
                             statusPill.visibility = View.VISIBLE
                             nodeListContainer.addView(buildEmptyHint())
                         } else {
                             val online = nodes.count { it.online }
                             statusPill.text = if (online > 0) "在线 $online/${nodes.size}" else "全部离线"
-                            statusPill.setTextColor(Color.parseColor(if (online > 0) "#58BE6A" else "#777777"))
+                            statusPill.setTextColor(
+                                activity.elonColor(
+                                    if (online > 0) R.color.elon_status_success else R.color.elon_text_tertiary
+                                )
+                            )
                             val pillBg = statusPill.background as? GradientDrawable
-                            pillBg?.setColor(Color.parseColor(if (online > 0) "#16251A" else "#222222"))
+                            pillBg?.setColor(
+                                activity.elonColor(
+                                    if (online > 0) R.color.elon_badge_success_bg else R.color.elon_badge_neutral_bg
+                                )
+                            )
                             statusPill.visibility = View.VISIBLE
                             nodes.forEach { node ->
                                 nodeListContainer.addView(buildNodeRow(node))
@@ -97,8 +110,10 @@ internal class MyNodesCard(
                     .onFailure {
                         setRefreshLoading(false)
                         statusPill.text = "暂不可用"
-                        statusPill.setTextColor(Color.parseColor("#777777"))
-                        (statusPill.background as? GradientDrawable)?.setColor(Color.parseColor("#1A1A1A"))
+                        statusPill.setTextColor(activity.elonColor(R.color.elon_text_tertiary))
+                        (statusPill.background as? GradientDrawable)?.setColor(
+                            activity.elonColor(R.color.elon_badge_neutral_bg)
+                        )
                         statusPill.visibility = View.VISIBLE
                     }
             }
@@ -206,7 +221,7 @@ internal class MyNodesCard(
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                     includeFontPadding = false
                     text = "我的节点"
-                    setTextColor(Color.parseColor("#D6D6D6"))
+                    setTextColor(activity.elonColor(R.color.elon_text_primary))
                     textSize = 15f
                     setTypeface(typeface, Typeface.BOLD)
                 })
@@ -221,9 +236,9 @@ internal class MyNodesCard(
                         setPadding(dp(10), dp(4), dp(10), dp(4))
                         text = "加载中…"
                         textSize = 11f
-                        setTextColor(Color.parseColor("#8DDC9B"))
+                        setTextColor(activity.elonColor(R.color.elon_status_success))
                         background = GradientDrawable().apply {
-                            setColor(Color.parseColor("#16251A"))
+                            setColor(activity.elonColor(R.color.elon_badge_success_bg))
                             cornerRadius = dp(8).toFloat()
                         }
                     }
@@ -241,7 +256,7 @@ internal class MyNodesCard(
                         setPadding(dp(12), 0, dp(12), 0)
                         text = "刷新"
                         textSize = 11f
-                        setTextColor(Color.parseColor("#8DDC9B"))
+                        setTextColor(activity.elonColor(R.color.elon_status_success))
                         isClickable = true
                         isFocusable = true
                         contentDescription = "刷新我的节点状态"
@@ -272,11 +287,11 @@ internal class MyNodesCard(
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(12), dp(10), dp(12), dp(10))
         background = GradientDrawable().apply {
-            setColor(Color.parseColor("#1F2023"))
+            setColor(activity.elonColor(R.color.elon_surface_header))
             cornerRadius = dp(6).toFloat()
             when (node.capacityTone.lowercase(Locale.US)) {
-                "bad" -> setStroke(dp(1), Color.parseColor("#784242"))
-                "warn" -> setStroke(dp(1), Color.parseColor("#6A5628"))
+                "bad" -> setStroke(dp(1), activity.elonColor(R.color.elon_status_danger))
+                "warn" -> setStroke(dp(1), activity.elonColor(R.color.elon_status_project))
             }
         }
 
@@ -287,7 +302,11 @@ internal class MyNodesCard(
             }
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor(if (node.online) "#58BE6A" else "#777777"))
+                setColor(
+                    activity.elonColor(
+                        if (node.online) R.color.elon_status_success else R.color.elon_text_tertiary
+                    )
+                )
             }
         })
 
@@ -301,7 +320,11 @@ internal class MyNodesCard(
                 text = node.displayName
                 textSize = 13f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor(if (node.online) "#D6D6D6" else "#777777"))
+                setTextColor(
+                    activity.elonColor(
+                        if (node.online) R.color.elon_text_primary else R.color.elon_text_tertiary
+                    )
+                )
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
@@ -314,7 +337,7 @@ internal class MyNodesCard(
                 includeFontPadding = false
                 text = nodeSubtitle(node)
                 textSize = 11f
-                setTextColor(Color.parseColor("#777777"))
+                setTextColor(activity.elonColor(R.color.elon_text_tertiary))
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
             })
@@ -329,7 +352,7 @@ internal class MyNodesCard(
                     text = node.models.take(3).joinToString("  ·  ") +
                             if (node.models.size > 3) "  +${node.models.size - 3}" else ""
                     textSize = 11f
-                    setTextColor(Color.parseColor("#777777"))
+                    setTextColor(activity.elonColor(R.color.elon_text_tertiary))
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
                 })
@@ -342,7 +365,7 @@ internal class MyNodesCard(
                     includeFontPadding = false
                     text = "暂无可用模型"
                     textSize = 11f
-                    setTextColor(Color.parseColor("#777777"))
+                    setTextColor(activity.elonColor(R.color.elon_text_tertiary))
                     maxLines = 1
                 })
             }
@@ -379,7 +402,7 @@ internal class MyNodesCard(
         includeFontPadding = false
         text = "暂无你提供的节点\n所有在线节点请看 PC 节点大厅"
         textSize = 12f
-        setTextColor(Color.parseColor("#777777"))
+        setTextColor(activity.elonColor(R.color.elon_text_tertiary))
         gravity = Gravity.CENTER
         setPadding(0, dp(8), 0, dp(8))
     }
@@ -418,12 +441,12 @@ internal class MyNodesCard(
     }
 
     private fun nodeCapacityTextColor(node: NodeItem): Int {
-        if (!node.online) return Color.parseColor("#777777")
+        if (!node.online) return activity.elonColor(R.color.elon_text_tertiary)
         return when (node.capacityTone.lowercase(Locale.US)) {
-            "ok" -> Color.parseColor("#58BE6A")
-            "bad" -> Color.parseColor("#E99191")
-            "warn" -> Color.parseColor("#F7D28A")
-            else -> Color.parseColor("#8DDC9B")
+            "ok" -> activity.elonColor(R.color.elon_status_success)
+            "bad" -> activity.elonColor(R.color.elon_status_danger)
+            "warn" -> activity.elonColor(R.color.elon_status_project)
+            else -> activity.elonColor(R.color.elon_status_success)
         }
     }
 
@@ -450,7 +473,7 @@ internal class MyNodesCard(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(1)
             ).also { it.bottomMargin = dp(16) }
-            setBackgroundColor(Color.parseColor("#4D4D4D"))
+            setBackgroundColor(activity.elonColor(R.color.elon_border_subtle))
             alpha = 0.45f
         }
     }

@@ -140,7 +140,7 @@ internal class ProfileTokenUsageCard(
         button.setTextColor(
             ContextCompat.getColor(
                 activity,
-                if (selected) R.color.elon_text_primary
+                if (selected) R.color.elon_button_primary_text
                 else R.color.elon_profile_quota_button_text
             )
         )

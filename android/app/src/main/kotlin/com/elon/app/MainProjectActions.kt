@@ -446,7 +446,7 @@ internal class MainProjectActions(
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = projectStatusText(project, isJoint)
-                    setTextColor(Color.parseColor(if (isJoint) "#58BE6A" else "#8DDC9B"))
+                    setTextColor(Color.parseColor(if (isJoint) "#5AC8A0" else "#73C7E8"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                     background = GradientDrawable().apply {
                         cornerRadius = dp(9).toFloat()

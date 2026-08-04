@@ -55,7 +55,7 @@ internal object UserProfileViews {
         if (bitmap != null) {
             return ImageView(context).apply {
                 layoutParams = ViewGroup.LayoutParams(size, size)
-                background = roundedRect(Color.parseColor("#D9D9D9"), size / 2)
+                background = roundedRect(context.elonColor(R.color.elon_surface_header), size / 2)
                 clipToOutline = true
                 contentDescription = "头像"
                 scaleType = ImageView.ScaleType.CENTER_CROP
@@ -64,11 +64,11 @@ internal object UserProfileViews {
         }
         return TextView(context).apply {
             layoutParams = ViewGroup.LayoutParams(size, size)
-            background = roundedRect(Color.parseColor("#D9D9D9"), size / 2)
+            background = roundedRect(context.elonColor(R.color.elon_button_primary_bg), size / 2)
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = UserProfileStore.avatarInitial(profile.displayName)
-            setTextColor(Color.parseColor("#151515"))
+            setTextColor(context.elonColor(R.color.elon_button_primary_text))
             textSize = textSizeSp
             setTypeface(typeface, Typeface.BOLD)
         }
@@ -89,7 +89,7 @@ internal object UserProfileViews {
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(context.dp(22), 0, context.dp(22), 0)
-            setBackgroundColor(Color.parseColor("#191919"))
+            setBackgroundColor(context.elonColor(R.color.elon_surface_card))
             if (onClick != null) {
                 isClickable = true
                 foreground = selectableForeground(context)
@@ -99,7 +99,7 @@ internal object UserProfileViews {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 includeFontPadding = false
                 text = title
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(context.elonColor(R.color.elon_text_primary))
                 textSize = 17f
             })
             if (trailing != null) {
@@ -108,7 +108,7 @@ internal object UserProfileViews {
                 addView(TextView(context).apply {
                     includeFontPadding = false
                     text = value.orEmpty()
-                    setTextColor(Color.parseColor("#777777"))
+                    setTextColor(context.elonColor(R.color.elon_text_tertiary))
                     textSize = 16f
                 })
             }
@@ -124,7 +124,7 @@ internal object UserProfileViews {
             ).apply {
                 marginStart = context.dp(22)
             }
-            setBackgroundColor(Color.parseColor("#222222"))
+            setBackgroundColor(context.elonColor(R.color.elon_divider_card))
         }
     }
 
@@ -134,7 +134,7 @@ internal object UserProfileViews {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 context.dp(heightDp)
             )
-            setBackgroundColor(Color.parseColor("#101010"))
+            setBackgroundColor(context.elonColor(R.color.elon_bg_app))
         }
     }
 
@@ -170,13 +170,13 @@ internal object UserProfileViews {
         val level = TextView(context).apply {
             includeFontPadding = false
             text = if (AuthManager.isLoggedIn(context)) "Lv.--" else "Lv.0"
-            setTextColor(Color.parseColor("#D9D9D9"))
+            setTextColor(context.elonColor(R.color.elon_text_primary))
             textSize = 11f
         }
         val percent = TextView(context).apply {
             includeFontPadding = false
             text = if (AuthManager.isLoggedIn(context)) "同步中" else "0%"
-            setTextColor(Color.parseColor("#D9D9D9"))
+            setTextColor(context.elonColor(R.color.elon_text_primary))
             textSize = 11f
         }
         val progress = ProfileLevelProgressView(context).apply {
@@ -195,14 +195,14 @@ internal object UserProfileViews {
                 includeFontPadding = false
                 maxLines = 1
                 text = profile.displayName
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(context.elonColor(R.color.elon_text_primary))
                 textSize = 16f
             })
             addView(TextView(context).apply {
                 includeFontPadding = false
                 maxLines = 1
                 text = "账号：${profile.wechatId}"
-                setTextColor(Color.parseColor("#777777"))
+                setTextColor(context.elonColor(R.color.elon_text_tertiary))
                 textSize = 11f
                 setPadding(0, context.dp(5), 0, 0)
             })
@@ -233,7 +233,7 @@ internal object UserProfileViews {
         )
         return ImageView(context).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
-            background = roundedRect(Color.parseColor("#D6D6D6"), context.dp(4))
+            background = roundedRect(context.elonColor(R.color.elon_text_primary), context.dp(4))
             contentDescription = "我的二维码"
             scaleType = ImageView.ScaleType.FIT_CENTER
             setPadding(context.dp(3), context.dp(3), context.dp(3), context.dp(3))
@@ -316,7 +316,7 @@ internal object UserProfileViews {
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "›"
-            setTextColor(Color.parseColor("#777777"))
+            setTextColor(context.elonColor(R.color.elon_text_tertiary))
             textSize = 32f
         }
     }
@@ -338,10 +338,10 @@ internal object UserProfileViews {
 private class ProfileLevelProgressView(context: Context) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val segmentColors = intArrayOf(
-        Color.parseColor("#58BE6A"),
-        Color.parseColor("#5DA6FF"),
-        Color.parseColor("#E58F46"),
-        Color.parseColor("#F2C94C")
+        context.elonColor(R.color.elon_status_success),
+        context.elonColor(R.color.elon_button_primary_bg),
+        context.elonColor(R.color.elon_status_info),
+        context.elonColor(R.color.elon_status_project)
     )
     private var segments = floatArrayOf(0f, 0f, 0f, 0f)
 
@@ -353,7 +353,7 @@ private class ProfileLevelProgressView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val radius = height / 2f
-        paint.color = Color.parseColor("#2E2E2E")
+        paint.color = context.elonColor(R.color.elon_surface_soft)
         canvas.drawRoundRect(0f, 0f, width.toFloat(), height.toFloat(), radius, radius, paint)
         var left = 0f
         val total = segments.sum().coerceAtMost(1f)

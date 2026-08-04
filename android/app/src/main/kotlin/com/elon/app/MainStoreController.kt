@@ -188,10 +188,10 @@ internal class MainStoreController(
             })
 
             val statusColor = when (project.lastTaskStatus) {
-                "done" -> "#58BE6A"
-                "running" -> "#58BE6A"
-                "error" -> "#D97A7A"
-                else -> "#777777"
+                "done" -> "#5AC8A0"
+                "running" -> "#73C7E8"
+                "error" -> "#F07884"
+                else -> "#7AB5C9D3"
             }
             addView(TextView(activity).apply {
                 text = "${project.memberCount} 人"
