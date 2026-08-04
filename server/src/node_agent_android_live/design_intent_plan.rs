@@ -10,6 +10,9 @@ use sha2::{Digest, Sha256};
 
 use super::{
     broker::LiveUiSession,
+    design_intent_inference::{
+        clean_summary, infer_platforms, infer_route, infer_states, normalize_route, push_unique,
+    },
     design_session_store::{list_records, read_record, validate_design_session_id},
 };
 
@@ -19,35 +22,63 @@ const MAX_RECORD_BYTES: u64 = 96 * 1024;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct DesignIntentPlan {
-    schema_version: u32,
-    plan_id: String,
-    task_id: Option<String>,
+pub(super) struct DesignIntentPlan {
+    pub(super) schema_version: u32,
+    #[serde(default = "initial_revision")]
+    pub(super) revision: u64,
+    pub(super) plan_id: String,
+    pub(super) task_id: Option<String>,
+    #[serde(default)]
+    pub(super) task_lease_id: Option<String>,
     intent_sha256: String,
     intent_summary: String,
-    requested_platforms: Vec<String>,
-    primary_platform: Option<String>,
-    route: String,
+    pub(super) requested_platforms: Vec<String>,
+    pub(super) primary_platform: Option<String>,
+    pub(super) route: String,
     state_hints: Vec<String>,
     target_id: Option<String>,
-    design_session_id: Option<String>,
+    pub(super) design_session_id: Option<String>,
     session_action: String,
-    actions: Vec<IntentAction>,
-    needs_clarification: bool,
+    pub(super) actions: Vec<IntentAction>,
+    #[serde(default)]
+    pub(super) action_receipts: Vec<IntentActionReceipt>,
+    pub(super) needs_clarification: bool,
     clarifications: Vec<String>,
-    status: String,
+    pub(super) status: String,
+    #[serde(default)]
+    pub(super) replanned_from: Option<String>,
+    #[serde(default)]
+    pub(super) superseded_by: Option<String>,
+    #[serde(default)]
+    pub(super) started_at: Option<String>,
+    #[serde(default)]
+    pub(super) finished_at: Option<String>,
+    #[serde(default)]
+    pub(super) execution_summary: Option<String>,
     created_at: String,
-    updated_at: String,
+    pub(super) updated_at: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct IntentAction {
-    order: u32,
+pub(super) struct IntentAction {
+    pub(super) order: u32,
     action: String,
-    tool: String,
+    pub(super) tool: String,
     reason: String,
     requires_approval: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct IntentActionReceipt {
+    pub(super) order: u32,
+    pub(super) status: String,
+    pub(super) attempt: u32,
+    pub(super) summary: Option<String>,
+    pub(super) error_code: Option<String>,
+    pub(super) evidence_refs: Vec<String>,
+    pub(super) updated_at: String,
 }
 
 pub(super) fn tool_definitions() -> Vec<Value> {
@@ -90,6 +121,17 @@ pub(super) fn call(session: &LiveUiSession, name: &str, arguments: Value) -> Res
 }
 
 fn create_plan(root: &Path, arguments: &Value) -> Result<Value> {
+    let plan = create_record(root, arguments, None)?;
+    Ok(
+        json!({"schema":"elon.ui-design-intent-plan.v1","plan":plan,"sourceModified":false,"runtimeStarted":false}),
+    )
+}
+
+pub(super) fn create_record(
+    root: &Path,
+    arguments: &Value,
+    replanned_from: Option<String>,
+) -> Result<DesignIntentPlan> {
     let intent = required_text(arguments, "intent")?;
     if intent.chars().count() > 4_000 || intent.contains('\0') {
         bail!("intent 过长或包含 NUL");
@@ -163,10 +205,24 @@ fn create_plan(root: &Path, arguments: &Value) -> Result<Value> {
     };
     let actions = build_actions(session_action);
     let now = chrono::Utc::now().to_rfc3339();
+    let action_receipts = actions
+        .iter()
+        .map(|action| IntentActionReceipt {
+            order: action.order,
+            status: "PENDING".to_string(),
+            attempt: 0,
+            summary: None,
+            error_code: None,
+            evidence_refs: Vec::new(),
+            updated_at: now.clone(),
+        })
+        .collect();
     let plan = DesignIntentPlan {
-        schema_version: 1,
+        schema_version: 2,
+        revision: 1,
         plan_id: format!("intent_{}", uuid::Uuid::new_v4().simple()),
         task_id: task_id.map(str::to_string),
+        task_lease_id: None,
         intent_sha256: hex::encode(Sha256::digest(intent.as_bytes())),
         intent_summary: clean_summary(intent, 240),
         requested_platforms,
@@ -177,19 +233,28 @@ fn create_plan(root: &Path, arguments: &Value) -> Result<Value> {
         design_session_id: reusable,
         session_action: session_action.to_string(),
         actions,
+        action_receipts,
         needs_clarification: !clarifications.is_empty(),
         clarifications,
         status: "PLANNED".to_string(),
+        replanned_from,
+        superseded_by: None,
+        started_at: None,
+        finished_at: None,
+        execution_summary: None,
         created_at: now.clone(),
         updated_at: now,
     };
-    persist(root, &plan)?;
-    Ok(
-        json!({"schema":"elon.ui-design-intent-plan.v1","plan":plan,"sourceModified":false,"runtimeStarted":false}),
-    )
+    persist_record(root, &plan)?;
+    Ok(plan)
 }
 
 fn get_plan(root: &Path, plan_id: &str) -> Result<Value> {
+    let plan = read_plan(root, plan_id)?;
+    Ok(json!({"schema":"elon.ui-design-intent-plan.v1","plan":plan,"contentEmbedded":false}))
+}
+
+pub(super) fn read_plan(root: &Path, plan_id: &str) -> Result<DesignIntentPlan> {
     validate_plan_id(plan_id)?;
     let path = plan_directory(root, false)?
         .context("设计意图计划目录不存在")?
@@ -198,19 +263,50 @@ fn get_plan(root: &Path, plan_id: &str) -> Result<Value> {
     if !metadata.is_file() || metadata.len() > MAX_RECORD_BYTES {
         bail!("DesignIntentPlan 无效或过大");
     }
-    let plan: DesignIntentPlan =
+    let mut plan: DesignIntentPlan =
         serde_json::from_slice(&fs::read(path)?).context("DesignIntentPlan JSON 无效")?;
-    Ok(json!({"schema":"elon.ui-design-intent-plan.v1","plan":plan,"contentEmbedded":false}))
+    hydrate_receipts(&mut plan);
+    Ok(plan)
 }
 
-fn persist(root: &Path, plan: &DesignIntentPlan) -> Result<()> {
+pub(super) fn persist_record(root: &Path, plan: &DesignIntentPlan) -> Result<()> {
     let directory = plan_directory(root, true)?.context("无法创建设计意图计划目录")?;
-    fs::write(
-        directory.join(format!("{}.json", plan.plan_id)),
-        serde_json::to_vec_pretty(plan)?,
+    crate::node_agent_atomic_file::write(
+        &directory.join(format!("{}.json", plan.plan_id)),
+        &serde_json::to_vec_pretty(plan)?,
     )?;
     prune(&directory)?;
     Ok(())
+}
+
+pub(super) fn remove_record(root: &Path, plan_id: &str) -> Result<()> {
+    validate_plan_id(plan_id)?;
+    if let Some(directory) = plan_directory(root, false)? {
+        let _ = fs::remove_file(directory.join(format!("{plan_id}.json")));
+    }
+    Ok(())
+}
+
+fn hydrate_receipts(plan: &mut DesignIntentPlan) {
+    let now = chrono::Utc::now().to_rfc3339();
+    for action in &plan.actions {
+        if !plan
+            .action_receipts
+            .iter()
+            .any(|receipt| receipt.order == action.order)
+        {
+            plan.action_receipts.push(IntentActionReceipt {
+                order: action.order,
+                status: "PENDING".to_string(),
+                attempt: 0,
+                summary: None,
+                error_code: None,
+                evidence_refs: Vec::new(),
+                updated_at: now.clone(),
+            });
+        }
+    }
+    plan.action_receipts.sort_by_key(|receipt| receipt.order);
 }
 
 fn build_actions(session_action: &str) -> Vec<IntentAction> {
@@ -271,78 +367,6 @@ fn build_actions(session_action: &str) -> Vec<IntentAction> {
         .collect()
 }
 
-fn infer_platforms(
-    intent: &str,
-    explicit: Option<&str>,
-    session: Option<&str>,
-) -> Result<Vec<String>> {
-    if let Some(platform) = explicit {
-        if !matches!(platform, "web" | "pwa" | "tauri" | "android") {
-            bail!("platform 无效");
-        }
-        return Ok(vec![platform.to_string()]);
-    }
-    let lower = intent.to_ascii_lowercase();
-    let mut values = Vec::new();
-    for (platform, markers) in [
-        ("tauri", &["tauri", "桌面客户端", "桌面端应用"] as &[&str]),
-        ("android", &["android", "安卓", "apk"]),
-        ("pwa", &["pwa", "移动网页", "手机网页"]),
-        ("web", &["web", "网页端", "浏览器端"]),
-    ] {
-        if markers.iter().any(|marker| lower.contains(marker)) {
-            values.push(platform.to_string());
-        }
-    }
-    if values.is_empty() {
-        if let Some(platform) = session {
-            values.push(platform.to_string());
-        }
-    }
-    Ok(values)
-}
-
-fn infer_route(intent: &str) -> Option<String> {
-    intent.split_whitespace().find_map(|token| {
-        let token =
-            token.trim_matches(|ch: char| matches!(ch, '，' | '。' | ',' | ';' | ')' | ']' | '}'));
-        (token.starts_with('/') && token.len() <= 2_048).then(|| token.to_string())
-    })
-}
-
-fn infer_states(intent: &str) -> Vec<String> {
-    let lower = intent.to_ascii_lowercase();
-    let mut values = Vec::new();
-    for (state, markers) in [
-        (
-            "AUTHENTICATED",
-            &["已登录", "authenticated", "signed in"] as &[&str],
-        ),
-        ("ANONYMOUS", &["未登录", "anonymous", "signed out"]),
-        ("LOADING", &["加载状态", "loading"]),
-        ("EMPTY", &["空状态", "empty state"]),
-        ("ERROR", &["错误状态", "error state"]),
-        ("DARK_THEME", &["暗色", "深色", "dark mode"]),
-    ] {
-        if markers.iter().any(|marker| lower.contains(marker)) {
-            values.push(state.to_string());
-        }
-    }
-    values
-}
-
-fn normalize_route(value: &str) -> Result<String> {
-    let value = value.trim();
-    if value.is_empty()
-        || value.len() > 2_048
-        || value.chars().any(|ch| matches!(ch, '\0' | '\r' | '\n'))
-        || !value.starts_with('/')
-    {
-        bail!("route 必须是以 / 开头的安全路径");
-    }
-    Ok(value.to_string())
-}
-
 fn prune(directory: &Path) -> Result<()> {
     let mut entries = fs::read_dir(directory)?
         .filter_map(|entry| entry.ok())
@@ -370,7 +394,7 @@ fn plan_directory(root: &Path, create: bool) -> Result<Option<PathBuf>> {
     Ok(Some(canonical))
 }
 
-fn validate_plan_id(value: &str) -> Result<()> {
+pub(super) fn validate_plan_id(value: &str) -> Result<()> {
     if value.len() != 39
         || !value.starts_with("intent_")
         || !value[7..].chars().all(|ch| ch.is_ascii_hexdigit())
@@ -380,14 +404,6 @@ fn validate_plan_id(value: &str) -> Result<()> {
     Ok(())
 }
 
-fn clean_summary(value: &str, max: usize) -> String {
-    value.trim().chars().take(max).collect()
-}
-fn push_unique(values: &mut Vec<String>, value: String) {
-    if !value.is_empty() && !values.contains(&value) {
-        values.push(value);
-    }
-}
 fn required_text<'a>(value: &'a Value, key: &str) -> Result<&'a str> {
     optional_text(value, key).ok_or_else(|| anyhow::anyhow!("缺少 {key}"))
 }
@@ -398,7 +414,7 @@ fn optional_text<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
 }
-fn canonical_root(session: &LiveUiSession) -> Result<PathBuf> {
+pub(super) fn canonical_root(session: &LiveUiSession) -> Result<PathBuf> {
     PathBuf::from(
         session
             .project_root
@@ -407,6 +423,9 @@ fn canonical_root(session: &LiveUiSession) -> Result<PathBuf> {
     )
     .canonicalize()
     .context("项目目录不存在")
+}
+fn initial_revision() -> u64 {
+    1
 }
 fn tool(name: &str, description: &str, input_schema: Value, read_only: bool) -> Value {
     json!({"name":name,"description":description,"inputSchema":input_schema,"annotations":{"readOnlyHint":read_only,"destructiveHint":false,"idempotentHint":read_only,"openWorldHint":false}})

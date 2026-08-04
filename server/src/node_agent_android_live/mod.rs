@@ -26,6 +26,8 @@ mod design_drafts;
 mod design_event_checkpoint;
 mod design_event_stream;
 mod design_http;
+mod design_intent_execution;
+mod design_intent_inference;
 mod design_intent_plan;
 mod design_planning_http;
 mod design_session_store;
