@@ -81,7 +81,7 @@ Reservation 必须绑定不可变快照，至少包含：
 
 所有价格使用 `i64/u64` 微单位，比例使用 basis points；禁止 `f32/f64`。历史任务永远引用原快照，不因未来曲线变化而重算。
 
-2026-08-04 已形成 v171 不可变 Price Snapshot Registry：合同校验会核验快照与 active Offer、Provider、SKU、交付窗口和价格条款的精确绑定，约束 trade/index/mark/fallback 来源及观察窗口，并用 checked `i128` 检查整数金额上限。Store 可登记和读取完整快照；相同快照 ID 只能精确重放，quote ID 唯一，读取会按历史 Offer 复核摘要与索引字段，数据库触发器拒绝更新和删除。v175 本地 Broker 会复核并锁定 quoted Job 已选择的既有 CNY 快照；Registry 仍没有价格源注册、期货曲线、报价生成或 HTTP。
+2026-08-04 已形成 v171 不可变 Price Snapshot Registry：合同校验会核验快照与 active Offer、Provider、SKU、交付窗口和价格条款的精确绑定，并用 checked `i128` 检查金额上限。本人 HTTP/MCP 可从 Offer 生成 fallback_curve 快照，服务端固定来源、时间和摘要；v175 Broker 会复核并锁定 Job 已选择的既有 CNY 快照。真实价格源注册、期货曲线和自动撮合仍未实现。
 
 ## 7. 双价格腿与平台价差
 
@@ -120,7 +120,7 @@ platform_margin
 
 容量市场底层统一使用已接受的共享 CapacityPool 与追加式账本设计，见 `docs/decisions/distributed-compute-capacity-ledger-v1.md` 和 `docs/distributed-compute/capacity-ledger.md`。Offer 只声明静态出售上限；发布、复制或续期 Offer 不会铸造任何可用容量。只有 Pool bucket 的发行事件进入账本后才形成余额，所有现货 Reservation 与未来 Commitment 必须争用同一容量真源。
 
-V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v176 SQLite schema、容量 Store、版本化 Provider/Offer/Job/Reservation Registry，以及不可变 Price Snapshot Registry 已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额的原子 Reserve 和未执行任务退款终态；本人 HTTP 和项目级 MCP 已写但未运行，价格源、报价生成、Attempt、运行中任务和真实用量结算仍未实现。
+V1 每份 Reservation 只绑定一个 Pool、一个精确 UTC 半开交付窗口 `[starts_at, ends_at)` 和多个 meter；不在一个 Reservation 内跨 Pool 或跨窗口。领域合同、reducer、v165-v184 schema、各版本化 Registry 及 fallback_curve 报价入口已写入但未编译、未执行迁移。v175/v176 已形成平台人民币余额 Broker；真实价格源、自动撮合、Attempt、运行中任务和实际用量结算仍未实现。
 
 市场对象分层：
 
@@ -157,7 +157,7 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 ## 12. 演进顺序
 
 1. 版本化 Price Snapshot 注册、持久化与整数微单位（代码已写，尚未验证接线）；
-2. 平台发布的价格源、期货曲线、报价生成和固定交付窗口；
+2. 平台签名价格源、期货曲线、批量报价和自动撮合；
 3. Provider Capacity Commitment 与需求方 Delivery Allocation；
 4. 限价订单簿、成交、持仓和净额；
 5. YCI 指数、标记价、替代交付和自动清算；
@@ -167,4 +167,4 @@ Provider 收益不能在收到节点自报终态时立即成为可提取余额�
 
 ## 13. 当前未验证声明
 
-本文是已接受的目标市场合同。当前代码已写入 v175 平台人民币余额预授权、v176 未执行任务严格退款，以及本人 HTTP 和项目级 MCP 控制面，但均为 `implementation_uncompiled`，尚未执行迁移或运行验证。价格源、报价生成、Attempt、验证用量、运行中结算、期货曲线、订单簿、持仓和真实清算仍未实现；现有代码不执行生产资金或积分移动。
+本文是已接受的目标市场合同。当前代码已写入 fallback_curve 报价、v175 平台人民币余额预授权、v176 未执行任务严格退款，以及本人 HTTP 和项目级 MCP 控制面，但均为 `implementation_uncompiled`。真实价格源、自动撮合、Attempt、验证用量、运行中结算、期货曲线、订单簿、持仓和真实清算仍未实现；现有代码不执行生产资金或积分移动。

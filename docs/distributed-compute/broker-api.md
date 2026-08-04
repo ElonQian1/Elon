@@ -81,7 +81,7 @@ Reserve 请求必须提供稳定 `reservation_id`、消费者幂等键、当前 
 ## 6. 尚未实现
 
 - Cargo 编译、迁移执行、HTTP/MCP 真实调用与并发验证；
-- 新 Price Snapshot 的报价生成和自动撮合控制面；
+- 真实价格源、批量报价和自动撮合；Offer 派生 fallback_curve 快照见 `price-snapshot-api.md`；
 - Attempt 激活、续租、取消、fencing 与节点派发；
 - 运行中任务的容量归还、实际用量、验证和最终结算；
 - 多币种、Sui 资产、外部矿池和 Provider 收益提现；

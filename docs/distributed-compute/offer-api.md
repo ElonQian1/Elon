@@ -120,6 +120,6 @@ active Offer 只是生成报价的前置合同。现有候选查询从未过期 
 
 - Cargo 编译、迁移执行、并发幂等和 HTTP/MCP 真实调用验证；
 - 自动终态调度，以及已有 Reservation 的自动取消、退款和 Claim 归还；
-- Price Snapshot 生成、报价曲线、自动撮合与候选暴露；
+- 真实价格源、期货曲线、批量报价和自动撮合；fallback_curve Price Snapshot 见 `price-snapshot-api.md`；
 - 容量动态校准、Attempt 派发、用量验证和运行中结算；
 - 外部矿池适配器、多币种、Sui 资产和真实提现。
