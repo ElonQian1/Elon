@@ -123,6 +123,8 @@ mod compute_federation_price_snapshot_service;
 mod compute_federation_provider_api;
 mod compute_federation_provider_mcp;
 mod compute_federation_provider_service;
+mod compute_federation_settlement_account_api;
+mod compute_federation_settlement_account_service;
 mod compute_federation_settlement_withdrawal_request_api;
 mod compute_federation_settlement_withdrawal_request_service;
 mod compute_federation_settlement_withdrawal_terminal_api;
