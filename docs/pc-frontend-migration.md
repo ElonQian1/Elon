@@ -75,6 +75,7 @@ server/src/
 | 平台算力观测工作区 | 🔴 高 | `src/features/compute-observations/`、`server/src/compute_federation_attempt_*` | 🟡 仅 `admin/owner` 显示的 `/compute-observations` 已写入待观测候选、最终 Provider meter 模板，以及来源、结果、完整累计 meter 和证据引用表单。保存只形成第一份 `unverified_platform_observation`，不自动验证来源或证据，不推进 Attempt/Job/容量，不移动资金或生成结算，尚未构建、接口联调、视觉验收或发布 |
 | 平台算力验证工作区 | 🔴 高 | `src/features/compute-verification/`、`server/src/compute_federation_attempt_*` | 🟡 仅 `admin/owner` 显示的 `/compute-verification` 已写入待验证 v189-v191 证据链、三方 outcome、声明/观测/验证/可补偿 meter 预览，以及 `accepted/rejected/disputed` 人工决定表单。前端限制明显不满足保守策略的接受操作，服务端仍在事务内重新审计；决定不签发 Execution Receipt、不推进任务或容量、不移动资金或形成结算，尚未构建、接口联调、视觉验收或发布 |
 | 执行回执签发工作区 | 🔴 高 | `src/features/compute-receipts/`、`server/src/compute_federation_attempt_*` | 🟡 仅 `admin/owner` 显示的 `/compute-receipts` 已写入 accepted Verification 待签发队列、终态与输出工件引用、verified/compensable meter 和显式确认。队列与签发事务都会重新审计上游证据；页面不下载或验证工件正文，签发不推进 Attempt/Job/容量、不移动资金或形成结算，尚未构建、接口联调、视觉验收或发布 |
+| 可信终态收口工作区 | 🔴 高 | `src/features/compute-finalization/`、`server/src/compute_federation_attempt_finalization_*` | 🟡 仅 `admin/owner` 显示的 `/compute-finalization` 已写入待收口 Execution Receipt 队列、精确 Lease/Job/Reservation/Claim 版本与摘要、可补偿用量和状态/容量影响。管理员必须逐笔勾选并输入确认文本；服务端在立即事务中再次核对模板后才推进状态和容量，预授权与结算仍不变。页面尚未构建、接口联调、视觉验收或发布 |
 
 ### 阶段 P3 — 个人 AI 对话
 

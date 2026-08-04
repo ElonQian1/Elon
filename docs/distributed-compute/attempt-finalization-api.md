@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt 可信终态与容量收口
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: ai-economy, backend
 ---
 
@@ -9,7 +9,7 @@ owners: ai-economy, backend
 
 ## 1. 当前实现
 
-v194、追加式 Store、独立 Service 与 HTTP 路由已经写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 只能基于由 accepted Verification 签发的精确 v193 Execution Receipt 应用一次可信终态。
+v194、追加式 Store、独立 Service、HTTP 路由和 PC 管理员工作区已经写入代码，但尚未编译、执行迁移、运行接口验证或完成页面验收，状态固定为 `implementation_uncompiled`。平台 `admin/owner` 只能基于由 accepted Verification 签发的精确 v193 Execution Receipt 应用一次可信终态。
 
 这是 Attempt 链中第一项会同时修改业务状态和容量账本的操作。它本身不会扣除消费者预授权、释放 Provider 收益或生成 Settlement Receipt，不能描述为“任务已经完成付款”；后续 v195 待结算回执是独立事务，见 `docs/distributed-compute/attempt-settlement-api.md`。
 
@@ -17,10 +17,13 @@ v194、追加式 Store、独立 Service 与 HTTP 路由已经写入代码，但�
 
 | 方法 | 路径 | 调用者 | 作用 |
 |---|---|---|---|
+| GET | `/api/admin/compute/attempt-execution-receipts/pending-trusted-finalization` | 平台 `admin/owner` | 读取重新审计且尚未收口的 Execution Receipt 与精确提交模板 |
 | POST | `/api/admin/compute/attempt-leases/:lease_id/trusted-finalization` | 平台 `admin/owner` | 原子应用可信终态和容量收口 |
 | GET | `/api/me/compute/attempt-leases/:lease_id/trusted-finalization` | Job 消费者或 Provider 所有者 | 读取并重新审计终态回执 |
 
 POST 必须提供精确 Execution Receipt ID 和摘要、当前 Lease/Job/Reservation/Claim 的 revision/digest、`fencing_generation`、稳定幂等键，并显式设置 `confirm_trusted_terminal_and_capacity=true`。
+
+待办 GET 不要求前端自行推导当前版本。Store 会先重新审计 v193 完整来源链，再读取当前 running Lease、running Job、active Reservation 与 active Claim，核对候选绑定、时间边界和 fencing generation，最后返回 POST 所需的精确 revision/digest 模板。列表加载后若任一状态漂移，POST 的立即事务仍会重新检查并失败关闭。
 
 ## 3. 原子效果
 
@@ -54,7 +57,13 @@ POST 必须提供精确 Execution Receipt ID 和摘要、当前 Lease/Job/Reserv
 
 同一 Lease 只允许一份可信终态回执；相同幂等键不能绑定不同请求。任何历史、投影或账本腿不一致都会失败关闭。
 
-## 6. 尚未实现
+## 6. PC 管理员工作区
+
+仅 `admin/owner` 可见的 `/compute-finalization` 已写入待收口列表和逐笔确认对话框。页面展示 Execution Receipt、Lease/Job/Reservation/Claim 的精确版本与摘要、fencing generation、可补偿用量及预期状态变化，并要求勾选风险确认后输入“确认收口”。页面不会自动批量提交，也不会把 v194 描述为付款或结算。
+
+该入口目前仅为源码实现，尚未构建、联调、视觉验收或发布；它不能作为接口可用、数据库已迁移或用户已经能够访问的证据。
+
+## 7. 尚未实现
 
 - Cargo 编译、v194 迁移执行、HTTP 真实调用、并发与故障注入验证；
 - NodeAgent 到云端的可信事件传输、签名验证和自动触发；
@@ -62,10 +71,12 @@ POST 必须提供精确 Execution Receipt ID 和摘要、当前 Lease/Job/Reserv
 - v195 已另行形成首版 CNY Settlement Receipt、消费者预授权扣结/退款和 Provider pending 收益；复杂费用、争议、释放、提现和纠正回执仍未实现；
 - 自动结算、可提现余额、多币种、外部矿池和链上资产。
 
-## 7. 代码入口
+## 8. 代码入口
 
 - `server/src/store/compute_attempt_finalizations.rs`
 - `server/src/store/compute_attempt_finalizations/`
 - `server/src/compute_attempt_finalization_migration.rs`
 - `server/src/compute_federation_attempt_finalization_service.rs`
 - `server/src/compute_federation_attempt_finalization_api.rs`
+- `pc-frontend/src/features/compute-attempt/finalizationContracts.ts`
+- `pc-frontend/src/features/compute-finalization/`
