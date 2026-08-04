@@ -244,6 +244,15 @@ impl Store {
     }
 }
 
+pub(super) fn latest_compute_attempt_usage_declaration_on(
+    conn: &rusqlite::Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeAttemptUsageDeclarationReceipt>> {
+    latest_declaration_on(conn, lease_id)?
+        .map(|stored| stored.into_receipt(false))
+        .transpose()
+}
+
 fn ensure_live_running_lease(
     conn: &rusqlite::Connection,
     input: &DeclareComputeAttemptUsageRequest,

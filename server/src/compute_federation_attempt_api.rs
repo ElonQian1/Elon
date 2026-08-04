@@ -12,7 +12,8 @@ use serde_json::json;
 use crate::{
     compute_federation_attempt_service::{
         self, AbortMyComputeAttemptRequest, ActivateMyComputeAttemptRequest,
-        DeclareMyComputeAttemptUsageRequest, RenewMyComputeAttemptLeaseRequest,
+        DeclareMyComputeAttemptTerminalCandidateRequest, DeclareMyComputeAttemptUsageRequest,
+        RenewMyComputeAttemptLeaseRequest,
     },
     project_auth::{auth_from_headers, json_error},
     types::AppState,
@@ -55,6 +56,14 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/me/compute/attempt-leases/:lease_id/declared-usage/by-sequence/:sequence_no",
             get(get_usage_by_sequence),
+        )
+        .route(
+            "/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/terminal-candidate",
+            post(declare_terminal_candidate),
+        )
+        .route(
+            "/api/me/compute/attempt-leases/:lease_id/terminal-candidate",
+            get(get_terminal_candidate),
         )
 }
 
@@ -226,6 +235,45 @@ async fn get_usage_by_sequence(
             &user_id,
             &lease_id,
             sequence_no,
+        ),
+    )
+}
+
+async fn declare_terminal_candidate(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, lease_id)): Path<(String, String)>,
+    Json(request): Json<DeclareMyComputeAttemptTerminalCandidateRequest>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::declare_terminal_candidate_for_provider_owner(
+            &state.store,
+            &user_id,
+            &provider_id,
+            &lease_id,
+            request,
+        ),
+    )
+}
+
+async fn get_terminal_candidate(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(lease_id): Path<String>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    attempt_response(
+        compute_federation_attempt_service::get_terminal_candidate_for_participant(
+            &state.store,
+            &user_id,
+            &lease_id,
         ),
     )
 }

@@ -223,6 +223,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (186, "分布式算力 Attempt Lease 状态与续租回执", crate::compute_attempt_lease_migration::migration_v186),
     (187, "分布式算力 staging Attempt 无用量安全中止", crate::compute_attempt_abort_migration::migration_v187),
     (188, "分布式算力 Attempt 累计声明用量快照", crate::compute_attempt_usage_migration::migration_v188),
+    (189, "分布式算力 Attempt Provider 终态候选", crate::compute_attempt_terminal_migration::migration_v189),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

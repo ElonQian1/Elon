@@ -4,9 +4,10 @@ use serde::Deserialize;
 use crate::store::{
     AbortComputeAttemptRequest, ActivateComputeAttemptRequest, ComputeAttemptAbortReceipt,
     ComputeAttemptActivationReceipt, ComputeAttemptLeaseRenewalReceipt,
-    ComputeAttemptLeaseStateReceipt, ComputeAttemptUsageDeclarationReceipt,
-    ComputeDeclaredUsageInput, DeclareComputeAttemptUsageRequest, RenewComputeAttemptLeaseRequest,
-    Store,
+    ComputeAttemptLeaseStateReceipt, ComputeAttemptTerminalCandidateReceipt,
+    ComputeAttemptUsageDeclarationReceipt, ComputeDeclaredResultArtifactInput,
+    ComputeDeclaredUsageInput, DeclareComputeAttemptTerminalCandidateRequest,
+    DeclareComputeAttemptUsageRequest, RenewComputeAttemptLeaseRequest, Store,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -72,6 +73,25 @@ pub(crate) struct DeclareMyComputeAttemptUsageRequest {
     pub sequence_no: i64,
     pub executor_usage_ref: String,
     pub cumulative_declared_usage: Vec<ComputeDeclaredUsageInput>,
+    pub idempotency_key: String,
+    pub confirm_provider_declaration_only: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeclareMyComputeAttemptTerminalCandidateRequest {
+    pub expected_lease_revision: i64,
+    pub expected_lease_digest: String,
+    pub expected_fencing_generation: i64,
+    pub final_usage_snapshot_id: String,
+    pub final_usage_sequence_no: i64,
+    pub final_cumulative_usage_digest: String,
+    pub executor_terminal_ref: String,
+    pub outcome: String,
+    pub reason_code: String,
+    pub diagnostic_ref: Option<String>,
+    pub output_digest: Option<String>,
+    pub result_artifacts: Vec<ComputeDeclaredResultArtifactInput>,
     pub idempotency_key: String,
     pub confirm_provider_declaration_only: bool,
 }
@@ -254,4 +274,49 @@ pub(crate) fn get_usage_for_participant(
 ) -> Result<ComputeAttemptUsageDeclarationReceipt> {
     get_for_participant(store, user_id, lease_id)?;
     store.compute_attempt_usage_declaration(lease_id, sequence_no)
+}
+
+pub(crate) fn declare_terminal_candidate_for_provider_owner(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    lease_id: &str,
+    request: DeclareMyComputeAttemptTerminalCandidateRequest,
+) -> Result<ComputeAttemptTerminalCandidateReceipt> {
+    if !request.confirm_provider_declaration_only {
+        bail!("登记终态候选前必须确认该事件只是 Provider 声明，不是验证或结算结果");
+    }
+    let provider = store.compute_provider(provider_id)?;
+    if provider.provider.owner_account_id != user_id {
+        bail!("算力 Provider 不属于当前登录用户");
+    }
+    store.declare_compute_attempt_terminal_candidate(
+        &DeclareComputeAttemptTerminalCandidateRequest {
+            lease_id: lease_id.to_string(),
+            provider_id: provider_id.to_string(),
+            expected_lease_revision: request.expected_lease_revision,
+            expected_lease_digest: request.expected_lease_digest,
+            expected_fencing_generation: request.expected_fencing_generation,
+            final_usage_snapshot_id: request.final_usage_snapshot_id,
+            final_usage_sequence_no: request.final_usage_sequence_no,
+            final_cumulative_usage_digest: request.final_cumulative_usage_digest,
+            executor_terminal_ref: request.executor_terminal_ref,
+            outcome: request.outcome,
+            reason_code: request.reason_code,
+            diagnostic_ref: request.diagnostic_ref,
+            output_digest: request.output_digest,
+            result_artifacts: request.result_artifacts,
+            idempotency_key: request.idempotency_key,
+            declared_by_user_id: user_id.to_string(),
+        },
+    )
+}
+
+pub(crate) fn get_terminal_candidate_for_participant(
+    store: &Store,
+    user_id: &str,
+    lease_id: &str,
+) -> Result<ComputeAttemptTerminalCandidateReceipt> {
+    get_for_participant(store, user_id, lease_id)?;
+    store.compute_attempt_terminal_candidate(lease_id)
 }
