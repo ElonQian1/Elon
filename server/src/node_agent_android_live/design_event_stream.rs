@@ -292,6 +292,10 @@ fn event_type(tool: &str) -> Option<&'static str> {
         "ui_decide_design_writeback_plan" => "WRITEBACK_PLAN_DECIDED",
         "ui_begin_design_writeback" => "WRITEBACK_STARTED",
         "ui_complete_design_writeback" => "WRITEBACK_UPDATED",
+        "ui_propose_design_source_patch" => "SOURCE_PATCH_PROPOSED",
+        "ui_decide_design_source_patch" => "SOURCE_PATCH_DECIDED",
+        "ui_apply_design_source_patch" => "SOURCE_PATCH_APPLIED",
+        "ui_plan_design_source_rollback" => "SOURCE_ROLLBACK_PLANNED",
         _ => return None,
     })
 }
