@@ -345,7 +345,7 @@ function Get-LocalSigningProperty {
 function Set-EnvFromLocalSigningProperty {
     param([string]$Name)
 
-    if (-not [string]::IsNullOrWhiteSpace((Get-Item "Env:$Name" -ErrorAction SilentlyContinue).Value)) {
+    if (-not [string]::IsNullOrWhiteSpace([System.Environment]::GetEnvironmentVariable($Name, 'Process'))) {
         return
     }
     $value = Get-LocalSigningProperty $Name

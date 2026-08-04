@@ -67,6 +67,8 @@ Assert-True (Test-ElonReleaseStagePassed -Receipt $receipt -Stage 'powershell_on
 
 $apkPublisher = Get-Content -LiteralPath (Join-Path $repoRoot 'scripts\publish-apk.ps1') -Raw
 Assert-True ($apkPublisher.Contains('Assert-RemoteApkArtifact')) 'APK publisher is missing server-side artifact verification.'
+Assert-True ($apkPublisher.Contains("GetEnvironmentVariable(`$Name, 'Process')")) `
+    'APK signing lookup is not safe when an environment variable is absent.'
 Assert-True ($apkPublisher.Contains('sha256      = $apkSha256')) 'APK version metadata is missing SHA-256.'
 Assert-True (-not $apkPublisher.Contains('elon-remote-apk-')) 'APK publisher still downloads the full remote APK.'
 $script:ServerDir = '/tmp/elon-app-test'
