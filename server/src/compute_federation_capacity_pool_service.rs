@@ -16,7 +16,7 @@ use crate::{
             PROVIDER_KIND_EXTERNAL_POOL, PROVIDER_STATUS_ACTIVE, PROVIDER_STATUS_REGISTERING,
         },
     },
-    store::Store,
+    store::{ComputeCapacityPoolAuditReport, Store},
 };
 
 const MAX_RESOURCE_PROFILE_BYTES: usize = 32 * 1024;
@@ -108,6 +108,16 @@ pub(crate) fn list_for_user(
             Ok(pool_view(pool, false))
         })
         .collect()
+}
+
+pub(crate) fn audit_for_user(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    pool_id: &str,
+) -> Result<ComputeCapacityPoolAuditReport> {
+    let pool = owned_pool_for_user(store, user_id, provider_id, pool_id)?;
+    store.audit_compute_capacity_pool_epoch(&pool.binding.pool_id, pool.binding.capacity_epoch)
 }
 
 pub(crate) fn owned_pool_for_user(

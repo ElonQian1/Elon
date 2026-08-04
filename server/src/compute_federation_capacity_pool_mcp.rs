@@ -10,6 +10,7 @@ use crate::{
 const CREATE_POOL_TOOL: &str = "compute_create_my_capacity_pool";
 const GET_POOL_TOOL: &str = "compute_get_my_capacity_pool";
 const LIST_POOLS_TOOL: &str = "compute_list_my_capacity_pools";
+const AUDIT_POOL_TOOL: &str = "compute_audit_my_capacity_pool";
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -57,6 +58,12 @@ pub(crate) fn definitions() -> Vec<Value> {
             LIST_POOLS_TOOL,
             "列出本人 Provider 的容量池脱敏视图。",
             list_schema(),
+            true,
+        ),
+        tool(
+            AUDIT_POOL_TOOL,
+            "按不可变账本重新计算本人当前 CapacityPool epoch 的余额，返回健康状态、差异和审计计数；不修改账本或 Pool 状态。",
+            pool_schema(),
             true,
         ),
     ]
@@ -107,6 +114,17 @@ pub(crate) fn call_if_handled(
                     input.limit,
                 )?
             })))
+        }
+        AUDIT_POOL_TOOL => {
+            let input: PoolArguments = decode(arguments, name)?;
+            Ok(Some(serde_json::to_value(
+                compute_federation_capacity_pool_service::audit_for_user(
+                    store,
+                    user_id,
+                    &input.provider_id,
+                    &input.pool_id,
+                )?,
+            )?))
         }
         _ => Ok(None),
     }

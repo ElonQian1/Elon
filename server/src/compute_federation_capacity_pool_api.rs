@@ -26,6 +26,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id",
             get(get_pool),
         )
+        .route(
+            "/api/me/compute/providers/:provider_id/capacity-pools/:pool_id/audit",
+            get(audit_pool),
+        )
 }
 
 #[derive(Debug, Deserialize)]
@@ -84,6 +88,23 @@ async fn list_pools(
         &user_id,
         &provider_id,
         query.limit,
+    ))
+}
+
+async fn audit_pool(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((provider_id, pool_id)): Path<(String, String)>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    pool_response(compute_federation_capacity_pool_service::audit_for_user(
+        &state.store,
+        &user_id,
+        &provider_id,
+        &pool_id,
     ))
 }
 
