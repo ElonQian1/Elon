@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 CapacityPool 本人控制面
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: backend, node, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -13,6 +13,8 @@ implementation_status: implementation_uncompiled
 本人 CapacityPool 控制面已写入代码，但尚未编译、执行 v165 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它允许用户在本人 `user_node` 或 `managed_cluster` Provider 下登记、读取、列出和审计共享物理资源边界，但只创建 `registering` Pool，不激活 Provider、不发行容量、不创建交付窗口、Bucket、Offer 或 Price Snapshot。
 
 HTTP 与开放商业 MCP 共用 `compute_federation_capacity_pool_service`，最终写入既有 CapacityPool Registry。服务端固定初始 `capacity_epoch=1`、`pool_revision=1`、状态、时间和全部摘要，客户端不能直接提交摘要或生命周期状态。
+
+PC `/compute-supply` 已写入本人 Provider 的 Pool 列表、当前合同摘要和登记表单源码；表单只提交资源范围、区域、资源档案和 meter 策略，不提供激活、Offer、节点任务或结算入口。页面尚未构建、运行或发布。
 
 ## 2. HTTP 接口
 

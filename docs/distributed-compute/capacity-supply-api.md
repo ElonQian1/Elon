@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Capacity Supply 本人控制面
 status: current
-reviewed_at: 2026-08-04
+reviewed_at: 2026-08-05
 owners: backend, node, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -11,6 +11,8 @@ implementation_status: implementation_uncompiled
 ## 1. 当前状态
 
 本人 Capacity Supply 追加与撤回控制面已写入代码，但尚未编译、执行 v165 迁移或运行 HTTP/MCP 验证，状态固定为 `implementation_uncompiled`。它允许用户向本人 Provider 当前 Pool 版本、同一交付窗口的一组 open Bucket 原子追加 self-declared 供给，也允许把尚在 `available` 的供给原子撤入 `retired`。两类操作复用既有双分录账本；它们不激活 Provider/Pool、不发布 Offer，也不代表容量已经被平台验证或消费者可以预留。
+
+PC `/compute-supply` 已写入单 Bucket 追加和撤出表单源码，提交前检查正整数、最小量子、当前 available 上限和显式确认，并为同一弹窗重试保留稳定幂等键。当前页面只操作单 Bucket，后端 1 至 64 个同窗口 Bucket 的原子批量能力仍保留给未来批量界面和 MCP；页面尚未构建、运行或发布。
 
 ## 2. HTTP 与 MCP
 
