@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
@@ -25,6 +26,20 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/me/compute/attempt-leases/:lease_id/settlement-receipt",
             get(get_settlement),
         )
+        .route(
+            "/api/admin/compute/attempt-finalizations/pending-settlement-receipt",
+            get(list_pending_settlements),
+        )
+}
+
+#[derive(Debug, Deserialize)]
+struct ListQuery {
+    #[serde(default = "default_limit")]
+    limit: usize,
+}
+
+fn default_limit() -> usize {
+    50
 }
 
 async fn settle_attempt(
@@ -62,6 +77,23 @@ async fn get_settlement(
             &user_id,
             &lease_id,
         ),
+    )
+}
+
+async fn list_pending_settlements(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    settlement_response(
+        compute_federation_attempt_settlement_service::list_pending_for_platform_admin(
+            &state.store,
+            query.limit,
+        )
+        .map(|candidates| json!({"settlement_candidates":candidates})),
     )
 }
 

@@ -3,16 +3,25 @@ use rusqlite::{Connection, TransactionBehavior};
 use serde::{Deserialize, Serialize};
 
 use crate::compute_federation::{
-    execution::ComputeJobVersionBinding, receipts::ComputeSettlementReceipt,
+    execution::ComputeJobVersionBinding,
+    market::ComputePriceSnapshot,
+    receipts::{ComputeSettlementAmounts, ComputeSettlementReceipt},
 };
 
-use super::Store;
+use super::{
+    compute_attempt_execution_receipts::ComputeAttemptExecutionReceiptEnvelope,
+    compute_attempt_finalizations::ComputeAttemptFinalizationReceipt, Store,
+};
 
 pub(super) mod calculation;
 mod money;
 mod orchestrate;
+mod pending_candidate;
+mod pending_queue;
 mod support;
 
+use pending_candidate::build_pending_settlement_candidate_on;
+use pending_queue::list_pending_settlement_lease_ids_on;
 use support::{
     normalize_settlement_request, persist_settlement_on, settlement_by_idempotency_on,
     settlement_by_lease_on, settlement_request_digest,
@@ -67,6 +76,30 @@ pub(crate) struct ComputeAttemptSettlementReceipt {
     pub replayed: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ComputePendingAttemptSettlementPreview {
+    pub currency: &'static str,
+    pub budget_reserved_fen: i64,
+    pub consumer_charge_fen: i64,
+    pub consumer_refund_fen: i64,
+    pub amounts: ComputeSettlementAmounts,
+    pub reason_codes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ComputePendingAttemptSettlementCandidate {
+    pub finalization: ComputeAttemptFinalizationReceipt,
+    pub execution_receipt: ComputeAttemptExecutionReceiptEnvelope,
+    pub expected_job: ComputeJobVersionBinding,
+    pub expected_budget_reservation_id: String,
+    pub price_snapshot: ComputePriceSnapshot,
+    pub provider_account_id: String,
+    pub preview: ComputePendingAttemptSettlementPreview,
+    pub money_effect: &'static str,
+    pub provider_balance_effect: &'static str,
+    pub external_payment_effect: &'static str,
+}
+
 impl Store {
     pub(crate) fn settle_compute_attempt(
         &self,
@@ -114,6 +147,17 @@ impl Store {
         support::validate_exact("Attempt Lease ID", lease_id, 200)?;
         let conn = self.conn()?;
         compute_attempt_settlement_on(&*conn, lease_id)
+    }
+
+    pub(crate) fn list_pending_compute_attempt_settlements(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<ComputePendingAttemptSettlementCandidate>> {
+        let conn = self.conn()?;
+        list_pending_settlement_lease_ids_on(&conn, limit.clamp(1, 100))?
+            .into_iter()
+            .map(|lease_id| build_pending_settlement_candidate_on(&conn, &lease_id))
+            .collect()
     }
 }
 
