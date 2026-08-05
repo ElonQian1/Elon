@@ -89,7 +89,8 @@ internal class ProjectPlazaFeaturedSection(
     }
 
     private fun buildCard(project: StoreProject, index: Int) = FrameLayout(activity).apply {
-        background = rect(
+        background = gradientRect(
+            activity.elonColor(R.color.elon_plaza_surface_card_high),
             activity.elonColor(R.color.elon_plaza_surface_card),
             CARD_RADIUS_DP,
             activity.elonColor(R.color.elon_plaza_border)
@@ -298,12 +299,15 @@ internal class ProjectPlazaFeaturedSection(
             text = action.label
             gravity = Gravity.CENTER
             includeFontPadding = false
-            background = rect(
-                activity.elonColor(
-                    if (action.enabled) R.color.elon_plaza_action else R.color.elon_plaza_surface_search
-                ),
-                ACTION_HEIGHT_DP / 2
-            )
+            background = if (action.enabled) {
+                gradientRect(
+                    activity.elonColor(R.color.elon_plaza_action),
+                    activity.elonColor(R.color.elon_plaza_action_end),
+                    ACTION_HEIGHT_DP / 2
+                )
+            } else {
+                rect(activity.elonColor(R.color.elon_plaza_surface_search), ACTION_HEIGHT_DP / 2)
+            }
             foreground = if (action.enabled) selectableForeground() else null
             isClickable = action.enabled
             isEnabled = action.enabled
@@ -365,8 +369,8 @@ internal class ProjectPlazaFeaturedSection(
         projectPlazaAccessStatus(project, isProjectJoined(project))
 
     private fun toneColor(tone: ProjectPlazaTone): Int = when (tone) {
-        ProjectPlazaTone.SUCCESS -> activity.elonColor(R.color.elon_status_success)
-        ProjectPlazaTone.DANGER -> activity.elonColor(R.color.elon_status_danger)
+        ProjectPlazaTone.SUCCESS -> activity.elonColor(R.color.elon_plaza_status_success)
+        ProjectPlazaTone.DANGER -> activity.elonColor(R.color.elon_plaza_status_danger)
         ProjectPlazaTone.NEUTRAL -> activity.elonColor(R.color.elon_plaza_text_quiet)
     }
 
@@ -392,6 +396,20 @@ internal class ProjectPlazaFeaturedSection(
             if (radiusDp > 0) cornerRadius = dp(radiusDp).toFloat()
             strokeColor?.let { setStroke(dp(1), it) }
         }
+    }
+
+    private fun gradientRect(
+        startColor: Int,
+        endColor: Int,
+        radiusDp: Int,
+        strokeColor: Int? = null
+    ): GradientDrawable = GradientDrawable(
+        GradientDrawable.Orientation.TL_BR,
+        intArrayOf(startColor, endColor)
+    ).apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = dp(radiusDp).toFloat()
+        strokeColor?.let { setStroke(dp(1), it) }
     }
 
     private companion object {

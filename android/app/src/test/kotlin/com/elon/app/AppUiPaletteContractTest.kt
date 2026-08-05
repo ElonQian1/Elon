@@ -57,7 +57,7 @@ class AppUiPaletteContractTest {
         assertTrue(marketplace.contains("R.color.elon_plaza_surface_search"))
         assertTrue(marketplace.contains("R.color.elon_plaza_signal"))
         assertTrue(featured.contains("R.color.elon_plaza_action"))
-        assertTrue(featured.contains("R.color.elon_status_success"))
+        assertTrue(featured.contains("R.color.elon_plaza_status_success"))
         assertFalse(projectHome.contains("const val COLOR_BG ="))
         assertFalse(featured.contains("const val COLOR_CARD ="))
     }
@@ -68,18 +68,20 @@ class AppUiPaletteContractTest {
         val styles = readRepositoryFile("server/src/assets/project_plaza.css")
 
         listOf(
-            "<color name=\"elon_bg_plaza\">#04070B</color>",
-            "<color name=\"elon_plaza_surface_card\">#08111C</color>",
-            "<color name=\"elon_plaza_surface_header\">#0C1724</color>",
-            "<color name=\"elon_plaza_signal\">#6ED8FF</color>",
-            "<color name=\"elon_plaza_action\">#C9E7F5</color>"
+            "<color name=\"elon_bg_plaza\">#0C0E12</color>",
+            "<color name=\"elon_plaza_surface_card\">#111318</color>",
+            "<color name=\"elon_plaza_surface_card_high\">#1F232B</color>",
+            "<color name=\"elon_plaza_surface_header\">#171A20</color>",
+            "<color name=\"elon_plaza_signal\">#8EA7D5</color>",
+            "<color name=\"elon_plaza_action_end\">#8BB8C3</color>"
         ).forEach { token -> assertTrue("missing Android plaza token $token", colors.contains(token)) }
         listOf(
-            "--plaza-bg: #04070b;",
-            "--plaza-card: #08111c;",
-            "--plaza-header: #0c1724;",
-            "--plaza-primary: #6ed8ff;",
-            "--plaza-action: #c9e7f5;"
+            "--plaza-bg: #0c0e12;",
+            "--plaza-card: #111318;",
+            "--plaza-card-high: #1f232b;",
+            "--plaza-header: #171a20;",
+            "--plaza-primary: #8ea7d5;",
+            "--plaza-accent: #8bb8c3;"
         ).forEach { token -> assertTrue("missing PWA plaza token $token", styles.contains(token)) }
     }
 

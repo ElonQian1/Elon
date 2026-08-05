@@ -476,8 +476,8 @@ internal class MainMarketplaceActions(
     }
 
     private fun toneColor(tone: ProjectPlazaTone): Int = when (tone) {
-        ProjectPlazaTone.SUCCESS -> activity.elonColor(R.color.elon_status_success)
-        ProjectPlazaTone.DANGER -> activity.elonColor(R.color.elon_status_danger)
+        ProjectPlazaTone.SUCCESS -> activity.elonColor(R.color.elon_plaza_status_success)
+        ProjectPlazaTone.DANGER -> activity.elonColor(R.color.elon_plaza_status_danger)
         ProjectPlazaTone.NEUTRAL -> activity.elonColor(R.color.elon_plaza_text_quiet)
     }
 

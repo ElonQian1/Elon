@@ -40,7 +40,7 @@ internal class ProjectPlazaFeedbackSection(
     fun buildError(message: String, onRetry: () -> Unit): View = messagePanel(
         title = "项目暂时没有加载出来",
         message = message.ifBlank { "请检查网络连接后重试。" },
-        toneColor = activity.elonColor(R.color.elon_status_danger),
+        toneColor = activity.elonColor(R.color.elon_plaza_status_danger),
         actionLabel = "重新加载",
         onAction = onRetry
     )
