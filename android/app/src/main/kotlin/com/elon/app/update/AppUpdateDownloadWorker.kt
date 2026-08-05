@@ -1,6 +1,7 @@
 package com.elon.app.update
 
 import android.content.Context
+import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.Data
@@ -20,6 +21,7 @@ import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 
 internal class AppUpdateDownloadWorker(
     context: Context,
@@ -35,11 +37,21 @@ internal class AppUpdateDownloadWorker(
         val partFile = File(applicationContext.getExternalFilesDir(null), PART_FILE_NAME)
         val apkFile = File(applicationContext.getExternalFilesDir(null), APK_FILE_NAME)
         val initialBytes = partFile.takeIf { it.isFile }?.length() ?: 0L
-        val queued = snapshot(version, AppUpdatePhase.QUEUED, initialBytes, version.fileSize)
+        val queued = snapshot(
+            version,
+            AppUpdatePhase.QUEUED,
+            initialBytes,
+            version.fileSize,
+            source = if (initialBytes > 0L) "准备从断点继续" else "正在启动系统下载服务",
+        )
         store.saveSnapshot(queued)
-        setForeground(AppUpdateNotifications.foregroundInfo(applicationContext, queued))
 
         try {
+            try {
+                setForeground(AppUpdateNotifications.foregroundInfo(applicationContext, queued))
+            } catch (error: Throwable) {
+                throw AppUpdateBackgroundServiceException(error)
+            }
             if (apkFile.isFile && verifyFile(apkFile, version)) {
                 publishReady(version, apkFile)
                 return@withContext Result.success()
@@ -52,7 +64,7 @@ internal class AppUpdateDownloadWorker(
                 try {
                     downloadSource(version, source, partFile)
                     if (!verifyFile(partFile, version)) {
-                        throw IllegalStateException("文件校验失败，已停止安装")
+                        throw AppUpdateIntegrityException("文件校验失败，已停止安装")
                     }
                     if (apkFile.exists()) apkFile.delete()
                     if (!partFile.renameTo(apkFile)) {
@@ -70,16 +82,23 @@ internal class AppUpdateDownloadWorker(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Throwable) {
+            val disposition = classifyAppUpdateFailure(error, runAttemptCount)
+            val willRetry = disposition == AppUpdateFailureDisposition.RETRY
             val failed = snapshot(
                 version = version,
-                phase = AppUpdatePhase.FAILED,
+                phase = if (willRetry) AppUpdatePhase.QUEUED else AppUpdatePhase.FAILED,
                 downloaded = partFile.takeIf { it.exists() }?.length() ?: 0L,
                 total = version.fileSize,
-                error = readableError(error),
+                source = if (willRetry) "等待网络恢复后自动续传" else "",
+                error = appUpdateFailureMessage(error),
             )
             store.saveSnapshot(failed)
-            AppUpdateNotifications.notifyFailed(applicationContext, failed)
-            Result.failure(workDataOf(KEY_ERROR to failed.errorMessage))
+            if (willRetry) {
+                Result.retry()
+            } else {
+                AppUpdateNotifications.notifyFailed(applicationContext, failed)
+                Result.failure(workDataOf(KEY_ERROR to failed.errorMessage))
+            }
         }
     }
 
@@ -102,7 +121,7 @@ internal class AppUpdateDownloadWorker(
                 partFile.delete()
                 return downloadSource(version, source, partFile, allowResume = false)
             }
-            if (!response.isSuccessful) throw IllegalStateException("下载源返回 HTTP ${response.code}")
+            if (!response.isSuccessful) throw AppUpdateHttpException(response.code)
             val body = response.body ?: throw IllegalStateException("下载源没有返回文件")
             val append = response.code == 206 && resumeBytes > 0L
             if (!append) resumeBytes = 0L
@@ -229,12 +248,6 @@ internal class AppUpdateDownloadWorker(
         KEY_TOTAL to snapshot.totalBytes,
     )
 
-    private fun readableError(error: Throwable): String = when {
-        error.message?.contains("校验") == true -> "安装包校验失败，请重新下载"
-        error.message?.contains("HTTP") == true -> "服务器暂时不可用，请稍后重试"
-        else -> "网络中断，已保留进度，可稍后继续"
-    }
-
     companion object {
         private const val UNIQUE_WORK_NAME = "elon_app_update_download"
         private const val KEY_VERSION_JSON = "version_json"
@@ -253,6 +266,11 @@ internal class AppUpdateDownloadWorker(
                     Constraints.Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)
                         .build()
+                )
+                .setBackoffCriteria(
+                    BackoffPolicy.EXPONENTIAL,
+                    15L,
+                    TimeUnit.SECONDS,
                 )
                 .build()
             AppUpdateStore(context).saveSnapshot(

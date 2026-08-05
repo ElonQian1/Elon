@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.pm.ServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -70,7 +71,11 @@ internal object AppUpdateNotifications {
 
     fun foregroundInfo(context: Context, snapshot: AppUpdateSnapshot): ForegroundInfo {
         createChannels(context)
-        return ForegroundInfo(DOWNLOAD_NOTIFICATION_ID, downloadNotification(context, snapshot))
+        return ForegroundInfo(
+            DOWNLOAD_NOTIFICATION_ID,
+            downloadNotification(context, snapshot),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+        )
     }
 
     fun notifyProgress(context: Context, snapshot: AppUpdateSnapshot) {
