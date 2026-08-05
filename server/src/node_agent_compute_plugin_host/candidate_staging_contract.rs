@@ -1,6 +1,7 @@
 mod authorization;
 mod capability;
 mod revalidation;
+mod store;
 
 pub(in crate::node_agent_compute_plugin_host) use authorization::{
     authorize_revalidated_candidate_staging, CandidateStagingAuthorityBindingFailure,
@@ -13,4 +14,8 @@ pub(in crate::node_agent_compute_plugin_host) use capability::{
 pub(in crate::node_agent_compute_plugin_host) use revalidation::{
     revalidate_extracted_candidate_for_staging, CandidateStagingRevalidationFailure,
     CandidateStagingRevalidationPhase,
+};
+pub(in crate::node_agent_compute_plugin_host) use store::{
+    store_authorized_candidate_staging, CandidateStagingOutcomeUncertainCustody,
+    CandidateStagingStoreFailure, CandidateStagingStorePhase, StagedComputePluginCandidateArchive,
 };

@@ -187,6 +187,24 @@ impl ComputePluginCandidateStagingRecoveryKey {
         &self.staging_id
     }
 
+    pub(in crate::node_agent_compute_plugin_host) fn authority_instance_binding(
+        &self,
+    ) -> &ComputePluginAuthorityInstanceBinding {
+        &self.authority_instance_binding
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
+        &self.installation_id_digest
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn clock_epoch_digest(&self) -> &str {
+        &self.clock_epoch_digest
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn candidate_token(&self) -> &str {
+        &self.candidate_token
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn candidate_token_digest(&self) -> &str {
         &self.candidate_token_digest
     }
@@ -197,5 +215,9 @@ impl ComputePluginCandidateStagingRecoveryKey {
 
     pub(in crate::node_agent_compute_plugin_host) fn staging_run_digest(&self) -> &str {
         &self.staging_run_digest
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn process_owner_epoch(&self) -> i64 {
+        self.process_owner_epoch
     }
 }
