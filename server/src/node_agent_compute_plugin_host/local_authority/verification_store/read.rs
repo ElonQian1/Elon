@@ -18,7 +18,7 @@ use crate::node_agent_compute_plugin_host::{
     },
     install_plan_admission_validation::is_identifier,
     keyring::ComputePluginBootstrapRootKeyResolver,
-    lifecycle::SLOT_DOWNLOADING,
+    lifecycle::{SLOT_DOWNLOADING, SLOT_VERIFYING},
     manifest_validation::is_sha256,
     signed_artifact_verification::jcs_sha256_hex,
 };
@@ -29,9 +29,14 @@ const MAX_CANDIDATE_ARTIFACTS: usize = 4_096;
 mod types;
 use types::{CandidateRow, StoredVerificationApplication};
 
+#[derive(Clone, Copy)]
 enum CandidateVerificationReplayMode<'key> {
     NextGeneration,
     ExactPrepared(&'key ComputePluginCandidateVerificationRecoveryKey),
+    ExactVerified {
+        key: &'key ComputePluginCandidateVerificationRecoveryKey,
+        result_digest: &'key str,
+    },
 }
 
 pub(in crate::node_agent_compute_plugin_host::local_authority) fn read_fresh_candidate_verification_authority(
@@ -74,6 +79,29 @@ pub(super) fn read_fresh_prepared_candidate_verification_authority(
         key.owner_plan_digest(),
         key.candidate_token(),
         CandidateVerificationReplayMode::ExactPrepared(key),
+    )
+}
+
+pub(super) fn read_fresh_verified_candidate_staging_authority(
+    transaction: &Transaction<'_>,
+    process_fence: &ComputePluginFetchProcessFence,
+    trusted_now: DateTime<Utc>,
+    roots: &dyn ComputePluginBootstrapRootKeyResolver,
+    key: &ComputePluginCandidateVerificationRecoveryKey,
+    result_digest: &str,
+) -> Result<ComputePluginCandidateVerificationAuthorityFacts> {
+    if !is_sha256(result_digest) {
+        bail!("COMPUTE_PLUGIN_STAGING_VERIFICATION_RESULT_INVALID");
+    }
+    read_fresh_candidate_verification_authority_with_mode(
+        transaction,
+        process_fence,
+        trusted_now,
+        roots,
+        key.owner_plan_id(),
+        key.owner_plan_digest(),
+        key.candidate_token(),
+        CandidateVerificationReplayMode::ExactVerified { key, result_digest },
     )
 }
 
@@ -154,12 +182,18 @@ fn read_fresh_candidate_verification_authority_with_mode(
     }
 
     let candidate = read_candidate(transaction, plan_id, plan_digest, candidate_token)?;
+    let expected_slot_phase = match replay_mode {
+        CandidateVerificationReplayMode::NextGeneration
+        | CandidateVerificationReplayMode::ExactPrepared(_) => SLOT_DOWNLOADING,
+        CandidateVerificationReplayMode::ExactVerified { .. } => SLOT_VERIFYING,
+    };
     validate_candidate(
         &candidate,
         replayed.execution_plan(),
         &authority.inventory,
         expected_application_revision,
         trusted_now.timestamp_millis(),
+        expected_slot_phase,
     )?;
     let artifacts = read_candidate_artifacts(
         transaction,
@@ -178,6 +212,12 @@ fn read_fresh_candidate_verification_authority_with_mode(
                 || !exact_prepared_verification_is_only_open_run(transaction, key)?
             {
                 bail!("COMPUTE_PLUGIN_VERIFICATION_RESOLUTION_RUN_CHANGED");
+            }
+            key.verification_generation()
+        }
+        CandidateVerificationReplayMode::ExactVerified { key, result_digest } => {
+            if !exact_verified_run_is_only_open_run(transaction, key, result_digest)? {
+                bail!("COMPUTE_PLUGIN_STAGING_VERIFIED_RUN_CHANGED");
             }
             key.verification_generation()
         }
@@ -341,6 +381,7 @@ fn validate_candidate(
     inventory: &crate::node_agent_compute_plugin_host::lifecycle::ComputePluginInventorySnapshot,
     expected_application_revision: i64,
     trusted_now_ms: i64,
+    expected_slot_phase: &str,
 ) -> Result<()> {
     let manifest_matches = admitted
         .manifests()
@@ -353,7 +394,7 @@ fn validate_candidate(
             && record.slots.iter().any(|slot| {
                 slot.slot_ref == candidate.slot_ref
                     && slot.release == candidate.release
-                    && slot.phase == SLOT_DOWNLOADING
+                    && slot.phase == expected_slot_phase
             })
             && candidate.generation > record.install_generation
     });
@@ -573,4 +614,61 @@ fn exact_prepared_verification_is_only_open_run(
         )
         .context("COMPUTE_PLUGIN_VERIFICATION_RESOLUTION_OPEN_SET_READ")?;
     Ok(prepared_count == 1 && verified_count == 0 && exact_target_count == 1)
+}
+
+fn exact_verified_run_is_only_open_run(
+    transaction: &Transaction<'_>,
+    key: &ComputePluginCandidateVerificationRecoveryKey,
+    result_digest: &str,
+) -> Result<bool> {
+    let (prepared_count, verified_count, exact_target_count) = transaction
+        .query_row(
+            r#"SELECT
+                COALESCE(SUM(CASE WHEN state = 'prepared' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN state = 'verified' THEN 1 ELSE 0 END), 0),
+                COALESCE(SUM(CASE WHEN state = 'verified'
+                    AND verification_id = ?2
+                    AND owner_plan_id = ?3 AND owner_plan_digest = ?4
+                    AND verification_generation = ?5
+                    AND candidate_generation = ?6
+                    AND application_inventory_revision = ?7
+                    AND authority_state_revision = ?8
+                    AND authority_epoch = ?9 AND process_owner_epoch = ?10
+                    AND artifact_count = ?11 AND artifact_bytes = ?12
+                    AND expected_artifact_set_digest = ?13
+                    AND file_set_binding_digest = ?14
+                    AND prepared_at_ms = ?15
+                    AND resolution_reason = 'artifact_set_verified'
+                    AND result_digest = ?16
+                    THEN 1 ELSE 0 END), 0)
+            FROM candidate_verification_runs WHERE candidate_token = ?1"#,
+            params![
+                key.candidate_token(),
+                key.verification_id(),
+                key.owner_plan_id(),
+                key.owner_plan_digest(),
+                key.verification_generation(),
+                key.candidate_generation(),
+                key.application_inventory_revision(),
+                key.authority_state_revision(),
+                key.authority_epoch(),
+                key.process_owner_epoch(),
+                i64::try_from(key.artifact_count())
+                    .context("COMPUTE_PLUGIN_STAGING_ARTIFACT_COUNT")?,
+                key.artifact_bytes(),
+                key.expected_artifact_set_digest(),
+                key.file_set_binding_digest(),
+                key.prepared_at_ms(),
+                result_digest,
+            ],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                ))
+            },
+        )
+        .context("COMPUTE_PLUGIN_STAGING_VERIFIED_RUN_READ")?;
+    Ok(prepared_count == 0 && verified_count == 1 && exact_target_count == 1)
 }

@@ -6,7 +6,12 @@ use serde::{Deserialize, Serialize};
 use super::super::ValidatedComputePluginArchiveExtractionPlan;
 use crate::{
     node_agent_compute_plugin_host::{
-        candidate_verification_contract::VerifiedComputePluginCandidateArtifactSet,
+        candidate_verification_contract::{
+            ComputePluginCandidateVerificationOutcome,
+            ComputePluginCandidateVerificationRecoveryKey,
+            VerifiedComputePluginCandidateArtifactSet,
+        },
+        fetch_contract::ComputePluginFetchCancellationGuard,
         fetch_file::PreparedComputePluginCandidateStaging,
     },
     node_agent_managed_fs::{PinnedManagedDirectory, PinnedManagedFile},
@@ -172,5 +177,23 @@ impl ExtractedComputePluginCandidateArchive<'_> {
         &self,
     ) -> &ComputePluginStagingSealEvidence {
         &self.seal_evidence
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn verification_recovery_key(
+        &self,
+    ) -> &ComputePluginCandidateVerificationRecoveryKey {
+        self.verified.recovery_key()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn verification_outcome(
+        &self,
+    ) -> &ComputePluginCandidateVerificationOutcome {
+        self.verified.outcome()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn snapshot_cancellation_guard(
+        &self,
+    ) -> ComputePluginFetchCancellationGuard {
+        self.verified.snapshot_cancellation_guard()
     }
 }

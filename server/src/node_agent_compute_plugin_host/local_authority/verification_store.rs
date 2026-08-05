@@ -22,6 +22,11 @@ mod outcome;
 mod post_hash;
 mod read;
 mod resolution;
+mod staging_read;
+
+pub(super) use staging_read::{
+    read_verified_candidate_staging_snapshot, VerifiedCandidateStagingSnapshot,
+};
 
 pub(in crate::node_agent_compute_plugin_host) use post_hash::{
     ComputePluginPostHashVerificationAuthoritySession,

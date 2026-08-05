@@ -19,6 +19,7 @@ mod plan_application_replay_children;
 mod plan_application_writes;
 mod process_ownership;
 mod rollback_checkpoint;
+mod staging_store;
 mod verification_store;
 
 pub(in crate::node_agent_compute_plugin_host) use fetch_store::{
@@ -40,6 +41,10 @@ pub(crate) use rollback_checkpoint::{
     ComputePluginAuthorityRollbackCheckpoint, HashedComputePluginAuthorityRollbackCheckpoint,
     COMPUTE_PLUGIN_AUTHORITY_ROLLBACK_CHECKPOINT_SCHEMA,
     HASHED_COMPUTE_PLUGIN_AUTHORITY_ROLLBACK_CHECKPOINT_SCHEMA,
+};
+pub(in crate::node_agent_compute_plugin_host) use staging_store::{
+    ComputePluginCandidateStagingAuthorityFacts,
+    ComputePluginPostRevalidationStagingAuthoritySession,
 };
 pub(in crate::node_agent_compute_plugin_host) use verification_store::{
     ComputePluginCandidateArtifactAuthorityFacts, ComputePluginCandidateVerificationAuthorityFacts,
