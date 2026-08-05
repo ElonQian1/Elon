@@ -15,6 +15,7 @@ use super::{
 
 mod attestation;
 mod comparison;
+mod publication;
 
 pub(in crate::node_agent_compute_plugin_host) use attestation::{
     begin_rollback_anchor_challenge, verify_rollback_anchor_attestation,
@@ -26,6 +27,13 @@ pub(in crate::node_agent_compute_plugin_host) use attestation::{
 pub(in crate::node_agent_compute_plugin_host) use comparison::{
     assess_rollback_anchor, ComputePluginRollbackAnchorAssessment,
     ComputePluginRollbackAnchorPublishRequired, ComputePluginRollbackAnchorStartupPermit,
+};
+pub(in crate::node_agent_compute_plugin_host) use publication::{
+    begin_rollback_anchor_publication, verify_rollback_anchor_publication_receipt,
+    ComputePluginRollbackAnchorPublicationChallenge, ComputePluginRollbackAnchorPublicationPayload,
+    ComputePluginRollbackAnchorPublicationReceipt, ComputePluginRollbackAnchorPublicationRequest,
+    ComputePluginSignedRollbackAnchorPublicationReceipt,
+    ConfirmedComputePluginRollbackAnchorPublication,
 };
 
 pub(super) fn validate_checkpoint_envelope(

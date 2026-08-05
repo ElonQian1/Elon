@@ -25,17 +25,28 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginRollbackAnchor
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginRollbackAnchorPublishRequired {
     anchor_id: String,
     anchor_sequence: i64,
+    anchored_checkpoint_digest: String,
     anchored_high_water_ms: i64,
     local_high_water_ms: i64,
     local_checkpoint: HashedComputePluginAuthorityRollbackCheckpoint,
     verified_at: Instant,
 }
 
+pub(super) struct ComputePluginRollbackAnchorPublicationParts {
+    pub(super) anchor_id: String,
+    pub(super) anchor_sequence: i64,
+    pub(super) anchored_checkpoint_digest: String,
+    pub(super) local_checkpoint: HashedComputePluginAuthorityRollbackCheckpoint,
+}
+
 impl ComputePluginRollbackAnchorPublishRequired {
-    pub(in crate::node_agent_compute_plugin_host) fn into_checkpoint(
-        self,
-    ) -> HashedComputePluginAuthorityRollbackCheckpoint {
-        self.local_checkpoint
+    pub(super) fn into_publication_parts(self) -> ComputePluginRollbackAnchorPublicationParts {
+        ComputePluginRollbackAnchorPublicationParts {
+            anchor_id: self.anchor_id,
+            anchor_sequence: self.anchor_sequence,
+            anchored_checkpoint_digest: self.anchored_checkpoint_digest,
+            local_checkpoint: self.local_checkpoint,
+        }
     }
 }
 
@@ -59,6 +70,7 @@ impl fmt::Debug for ComputePluginRollbackAnchorPublishRequired {
             .debug_struct("ComputePluginRollbackAnchorPublishRequired")
             .field("anchor_id", &self.anchor_id)
             .field("anchor_sequence", &self.anchor_sequence)
+            .field("anchored_checkpoint_digest", &"<redacted>")
             .field("anchored_high_water_ms", &self.anchored_high_water_ms)
             .field("local_high_water_ms", &self.local_high_water_ms)
             .field("local_checkpoint_digest", &"<redacted>")
@@ -102,6 +114,7 @@ pub(in crate::node_agent_compute_plugin_host) fn assess_rollback_anchor(
         ComputePluginRollbackAnchorPublishRequired {
             anchor_id: verified.attestation().anchor_id.clone(),
             anchor_sequence: verified.attestation().anchor_sequence,
+            anchored_checkpoint_digest: anchored.checkpoint_digest.clone(),
             anchored_high_water_ms: anchored_high_water,
             local_high_water_ms: local_high_water,
             local_checkpoint: local,
