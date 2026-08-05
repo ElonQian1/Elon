@@ -17,15 +17,18 @@ use crate::{
     node_agent_managed_fs::{PinnedManagedDirectory, PinnedManagedFile},
 };
 
-pub(super) const EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA: &str =
+pub(in crate::node_agent_compute_plugin_host) const EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA: &str =
     "elon.compute_plugin.extracted_archive_evidence.v1";
-pub(super) const HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA: &str =
+pub(in crate::node_agent_compute_plugin_host) const HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA: &str =
     "elon.compute_plugin.hashed_extracted_archive_evidence.v1";
-pub(super) const STAGING_SEAL_PAYLOAD_SCHEMA: &str = "elon.compute_plugin.staging_seal_payload.v1";
-pub(super) const STAGING_SEAL_EVIDENCE_SCHEMA: &str =
+pub(in crate::node_agent_compute_plugin_host) const STAGING_SEAL_PAYLOAD_SCHEMA: &str =
+    "elon.compute_plugin.staging_seal_payload.v1";
+pub(in crate::node_agent_compute_plugin_host) const STAGING_SEAL_EVIDENCE_SCHEMA: &str =
     "elon.compute_plugin.staging_seal_evidence.v1";
-pub(super) const STAGING_EVIDENCE_CANONICALIZATION: &str = "RFC8785-JCS";
-pub(super) const STAGING_EVIDENCE_DIGEST_ALGORITHM: &str = "sha256";
+pub(in crate::node_agent_compute_plugin_host) const STAGING_EVIDENCE_CANONICALIZATION: &str =
+    "RFC8785-JCS";
+pub(in crate::node_agent_compute_plugin_host) const STAGING_EVIDENCE_DIGEST_ALGORITHM: &str =
+    "sha256";
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]

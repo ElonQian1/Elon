@@ -20,12 +20,15 @@ pub(in crate::node_agent_compute_plugin_host) use zip::{
     extract_verified_compute_plugin_zip_archive, scan_verified_compute_plugin_zip_archive,
     ComputePluginArchiveExtractionFailure, ComputePluginStagingSealEvidence,
     ExtractedComputePluginCandidateArchive, HashedComputePluginExtractedArchiveEvidence,
+    EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA, HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA,
+    STAGING_EVIDENCE_CANONICALIZATION, STAGING_EVIDENCE_DIGEST_ALGORITHM,
+    STAGING_SEAL_EVIDENCE_SCHEMA, STAGING_SEAL_PAYLOAD_SCHEMA,
 };
 
-const COMPUTE_PLUGIN_EXTRACTION_PLAN_SCHEMA: &str =
+pub(in crate::node_agent_compute_plugin_host) const COMPUTE_PLUGIN_EXTRACTION_PLAN_SCHEMA: &str =
     "elon.compute_plugin.archive_extraction_plan.v1";
-const HASHED_COMPUTE_PLUGIN_EXTRACTION_PLAN_SCHEMA: &str =
-    "elon.compute_plugin.hashed_archive_extraction_plan.v1";
+pub(in crate::node_agent_compute_plugin_host) const HASHED_COMPUTE_PLUGIN_EXTRACTION_PLAN_SCHEMA:
+    &str = "elon.compute_plugin.hashed_archive_extraction_plan.v1";
 const MAX_EXTRACTION_DIRECTORIES: usize = 8_192;
 const MAX_EXTRACTION_ENTRIES: usize = COMPUTE_PLUGIN_MAX_PACKAGE_FILES + MAX_EXTRACTION_DIRECTORIES;
 const MAX_PORTABLE_PATH_SEGMENT_BYTES: usize = 255;
