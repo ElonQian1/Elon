@@ -121,15 +121,6 @@ pub(crate) fn is_rain_forecast_request(message: &str) -> bool {
     .any(|marker| compact.contains(marker))
 }
 
-pub(crate) fn is_weather_request_with_history(
-    message: &str,
-    history: &[ConversationMessage],
-) -> bool {
-    is_weather_request(message)
-        || is_weather_location_follow_up(message, history)
-        || is_weather_context_follow_up(message, history)
-}
-
 /// 从当前问题或近期用户消息中解析地点。没有明确地点时返回 None，
 /// 让上层向用户追问，而不是猜测所在地。
 pub(crate) fn resolve_location(message: &str, history: &[ConversationMessage]) -> Option<String> {

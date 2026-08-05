@@ -67,7 +67,6 @@ fn reuses_recent_user_location() {
 #[test]
 fn treats_city_only_reply_as_weather_follow_up() {
     let recent = history(&[("assistant", WEATHER_LOCATION_PROMPT)]);
-    assert!(is_weather_request_with_history("广州", &recent));
     assert_eq!(resolve_location("广州", &recent).as_deref(), Some("广州"));
 }
 
@@ -77,7 +76,6 @@ fn reuses_location_from_successful_weather_answer() {
         "assistant",
         "广东广州今天多云，当前 28.1℃。数据更新时间：2026-07-30T17:30。",
     )]);
-    assert!(is_weather_request_with_history("明天天气情况", &recent));
     assert_eq!(
         resolve_location("明天天气情况", &recent).as_deref(),
         Some("广东广州")
@@ -160,7 +158,6 @@ fn restores_location_for_hourly_rain_follow_up() {
         "assistant",
         "广东广州今天有雷雨，当前 26.2℃，最高 28.7℃，最低 24.2℃。数据更新时间：2026-08-01T14:45。",
     )]);
-    assert!(is_weather_request_with_history("雨几点下到几点", &recent));
     assert_eq!(
         resolve_location("雨几点下到几点", &recent).as_deref(),
         Some("广东广州")
@@ -179,7 +176,6 @@ fn restores_location_for_future_rain_follow_up() {
         "assistant",
         "广东广州今天有雷雨，当前 26.2℃，最高 28.7℃，最低 24.2℃。数据更新时间：2026-08-01T14:45。",
     )]);
-    assert!(is_weather_request_with_history("未来哪一天会下雨", &recent));
     assert_eq!(
         resolve_location("未来哪一天会下雨", &recent).as_deref(),
         Some("广东广州")

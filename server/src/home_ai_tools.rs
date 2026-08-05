@@ -25,7 +25,7 @@ pub(crate) fn now() -> DateTime<FixedOffset> {
 
 pub(crate) fn runtime_note(current: DateTime<FixedOffset>) -> String {
     format!(
-        "=== 首页总 AI 运行环境 ===\n当前日期时间：{}（UTC{}，默认按北京时间 Asia/Shanghai）\n你可以回答普通知识；涉及最新新闻、天气、价格等实时信息时，优先使用首页提供的联网搜索结果，并明确区分搜索资料与确定事实。日期、时间和简单计算由服务端确定性处理。涉及代码修改、项目文件或构建任务时，引导用户进入对应项目 AI。",
+        "=== 首页总 AI 运行环境 ===\n当前日期时间：{}（UTC{}，默认按北京时间 Asia/Shanghai）\n你可以回答普通知识；涉及实时或外部事实时，自主选择首页提供的联网/天气工具，并明确区分工具资料与确定事实。日期、时间和简单计算由服务端确定性处理。涉及代码修改、项目文件或构建任务时，引导用户进入对应项目 AI。",
         format_datetime(current),
         format_offset(current.offset().local_minus_utc())
     )

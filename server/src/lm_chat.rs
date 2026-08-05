@@ -27,7 +27,7 @@ use crate::{
         call_chat_llm_with_default_fallback_options, start_chat_llm_stream_with_default_fallback,
     },
     conversation_router::{resolve_system_conversation_route, ConversationEntryKind},
-    home_ai_orchestrator, home_ai_search, home_ai_tools, home_ai_weather,
+    home_ai_orchestrator, home_ai_tools,
     lm_chat_prompt::{append_system_prompt_note, CHAT_MEMORY_LOCAL_CLI_NOTE},
     lm_chat_request::LmChatRequest,
     lm_chat_stream_support::{send_stream_error, send_stream_event, stream_response},
@@ -173,33 +173,6 @@ pub async fn lm_chat_handler(
         .and_then(|m| m["content"].as_str())
         .unwrap_or("")
         .to_string();
-    let weather_history = if entry_kind == ConversationEntryKind::ChatMemory {
-        state
-            .store
-            .list_recent_conversation_messages(&route.project_id, Some(&conversation_id), 100)
-            .unwrap_or_else(|_| history.clone())
-    } else {
-        history.clone()
-    };
-    let weather_requested = entry_kind == ConversationEntryKind::ChatMemory
-        && home_ai_weather::is_weather_request_with_history(&user_msg, &weather_history);
-    let search_requested = !weather_requested
-        && entry_kind == ConversationEntryKind::ChatMemory
-        && home_ai_search::should_search(&user_msg);
-    let search_result = if search_requested {
-        home_ai_search::search(&state, &user_msg).await
-    } else {
-        None
-    };
-    if let Some(result) = &search_result {
-        append_system_prompt_note(&mut messages, &home_ai_search::prompt_context(result));
-    } else if search_requested {
-        append_system_prompt_note(
-            &mut messages,
-            "=== 首页总 AI 搜索状态 ===\n本轮联网搜索没有返回可用结果。不要编造最新事实；请明确告诉用户当前无法核实，或建议提供更具体的查询对象。",
-        );
-    }
-
     let handoff = if entry_kind == ConversationEntryKind::ChatMemory
         && home_ai_tools::needs_project_handoff(&user_msg)
     {
@@ -217,7 +190,7 @@ pub async fn lm_chat_handler(
         None
     };
 
-    let deterministic = if handoff.is_none() && !search_requested && !weather_requested {
+    let deterministic = if handoff.is_none() {
         home_ai_tools::deterministic_answer(&user_msg, home_ai_tools::now())
     } else {
         None
@@ -267,7 +240,7 @@ pub async fn lm_chat_handler(
                 }
             };
             let allow_agent_fallback = req.agent.as_deref().map(str::trim).unwrap_or("").is_empty();
-            if entry_kind == ConversationEntryKind::ChatMemory && !search_requested {
+            if entry_kind == ConversationEntryKind::ChatMemory {
                 match home_ai_orchestrator::run(
                     &state,
                     &agent,
@@ -381,14 +354,7 @@ pub async fn lm_chat_handler(
         "scope": route.entry_key,
         "assistant_mode": assistant_mode,
         "tool_used": tool_used,
-        "sources": if !orchestrated_sources.is_empty() {
-            orchestrated_sources.clone()
-        } else {
-            search_result.as_ref().map(|result| result.sources.iter().map(|source| json!({
-                "title": source.title,
-                "url": source.url,
-            })).collect::<Vec<_>>()).unwrap_or_default()
-        },
+        "sources": orchestrated_sources,
         "handoff": handoff,
     }))
     .into_response()
@@ -600,27 +566,8 @@ async fn run_lm_chat_stream(
         .and_then(|m| m["content"].as_str())
         .unwrap_or("")
         .to_string();
-    let weather_history = if entry_kind == ConversationEntryKind::ChatMemory
-        && home_ai_weather::extract_location(&user_msg).is_none()
-    {
-        state
-            .store
-            .list_recent_conversation_messages(&route.project_id, Some(&conversation_id), 100)
-            .unwrap_or_default()
-    } else {
-        Vec::new()
-    };
-    let weather_requested = entry_kind == ConversationEntryKind::ChatMemory
-        && home_ai_weather::is_weather_request_with_history(&user_msg, &weather_history);
-    let search_requested = entry_kind == ConversationEntryKind::ChatMemory
-        && !weather_requested
-        && home_ai_search::should_search(&user_msg);
-
     // 快速问题不读取历史、不调用模型，避免简单请求被慢链路拖住。
-    let deterministic = if !search_requested
-        && !weather_requested
-        && !home_ai_tools::needs_project_handoff(&user_msg)
-    {
+    let deterministic = if !home_ai_tools::needs_project_handoff(&user_msg) {
         home_ai_tools::deterministic_answer(&user_msg, home_ai_tools::now())
     } else {
         None
@@ -741,44 +688,6 @@ async fn run_lm_chat_stream(
         return;
     }
 
-    if search_requested {
-        if !send_stream_event(
-            &tx,
-            json!({
-                "type": "status",
-                "phase": "searching",
-                "message": "正在查询最新信息…",
-                "elapsed_ms": started_at.elapsed().as_millis(),
-            }),
-        )
-        .await
-        {
-            return;
-        }
-    }
-    let search_result = if search_requested {
-        home_ai_search::search(&state, &user_msg).await
-    } else {
-        None
-    };
-    let source_values = search_result
-        .as_ref()
-        .map(|result| {
-            result
-                .sources
-                .iter()
-                .map(|source| json!({ "title": source.title, "url": source.url }))
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    if !source_values.is_empty() {
-        let _ = send_stream_event(
-            &tx,
-            json!({ "type": "sources", "sources": source_values.clone() }),
-        )
-        .await;
-    }
-
     let memories = state
         .store
         .get_user_memories_for_scope(
@@ -823,21 +732,12 @@ async fn run_lm_chat_stream(
             );
         }
     }
-    if let Some(result) = &search_result {
-        append_system_prompt_note(&mut messages, &home_ai_search::prompt_context(result));
-    } else if search_requested {
-        append_system_prompt_note(
-            &mut messages,
-            "=== 首页总 AI 搜索状态 ===\n本轮联网搜索没有返回可用结果。不要编造最新事实；请明确告诉用户当前无法核实。",
-        );
-    }
-
     if !send_stream_event(
         &tx,
         json!({
             "type": "status",
             "phase": "model",
-            "message": "正在生成回答…",
+            "message": "正在理解问题并准备回答…",
             "elapsed_ms": started_at.elapsed().as_millis(),
         }),
     )
@@ -858,13 +758,13 @@ async fn run_lm_chat_stream(
         }
     };
     let allow_agent_fallback = req.agent.as_deref().map(str::trim).unwrap_or("").is_empty();
-    if entry_kind == ConversationEntryKind::ChatMemory && !search_requested {
+    if entry_kind == ConversationEntryKind::ChatMemory {
         let _ = send_stream_event(
             &tx,
             json!({
                 "type": "status",
                 "phase": "capability",
-                "message": "正在判断是否需要联网能力…",
+                "message": "正在判断是否需要使用信息工具…",
                 "elapsed_ms": started_at.elapsed().as_millis(),
             }),
         )
@@ -1004,8 +904,8 @@ async fn run_lm_chat_stream(
                 "model_used": used_agent.model,
                 "agent_fallback": used_fallback,
                 "assistant_mode": "model",
-                "tool_used": if search_result.is_some() { "web_search" } else { "" },
-                "sources": source_values,
+                "tool_used": "",
+                "sources": [],
                 "handoff": Value::Null,
                 "elapsed_ms": started_at.elapsed().as_millis(),
             }),
@@ -1103,8 +1003,8 @@ async fn run_lm_chat_stream(
                 "model_used": used_agent.model,
                 "agent_fallback": used_fallback,
                 "assistant_mode": "model",
-                "tool_used": if search_result.is_some() { "web_search" } else { "" },
-                "sources": source_values,
+                "tool_used": "",
+                "sources": [],
                 "handoff": Value::Null,
                 "elapsed_ms": started_at.elapsed().as_millis(),
             }),

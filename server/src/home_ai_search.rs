@@ -22,30 +22,6 @@ pub(crate) struct SearchResult {
     pub(crate) sources: Vec<SearchSource>,
 }
 
-pub(crate) fn should_search(message: &str) -> bool {
-    let normalized = message.trim().to_lowercase();
-    if normalized.is_empty() {
-        return false;
-    }
-    [
-        "搜索",
-        "查一下",
-        "查询",
-        "帮我查",
-        "最新",
-        "新闻",
-        "汇率",
-        "股价",
-        "价格",
-        "现在怎么样",
-        "当前情况",
-        "今天有什么",
-        "最近发生",
-    ]
-    .iter()
-    .any(|keyword| normalized.contains(keyword))
-}
-
 pub(crate) async fn search(state: &Arc<AppState>, message: &str) -> Option<SearchResult> {
     let query = normalize_query(message)?;
     let response = state
@@ -148,14 +124,6 @@ pub(crate) fn prompt_context(result: &SearchResult) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn detects_current_information_questions() {
-        assert!(should_search("帮我查一下今天有什么新闻"));
-        assert!(should_search("现在的美元汇率"));
-        assert!(!should_search("北京今天天气怎么样"));
-        assert!(!should_search("请解释一下什么是 Rust"));
-    }
 
     #[test]
     fn parses_sources_without_accepting_non_https_urls() {
