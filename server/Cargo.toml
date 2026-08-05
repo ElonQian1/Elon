@@ -38,6 +38,7 @@ base64 = "0.22"
 ignore = "0.4"
 quick-xml = "0.41"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 # HTTP 客户端（调用 AI API）
 # 使用 rustls 而非 native-tls，方便 musl 交叉编译（不依赖系统 OpenSSL）

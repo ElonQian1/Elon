@@ -13,6 +13,10 @@ use super::{
     signed_artifact_verification::jcs_sha256_hex,
 };
 
+mod zip;
+
+pub(in crate::node_agent_compute_plugin_host) use zip::scan_verified_compute_plugin_zip_archive;
+
 const COMPUTE_PLUGIN_EXTRACTION_PLAN_SCHEMA: &str =
     "elon.compute_plugin.archive_extraction_plan.v1";
 const HASHED_COMPUTE_PLUGIN_EXTRACTION_PLAN_SCHEMA: &str =

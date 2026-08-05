@@ -1,6 +1,6 @@
 use std::{error::Error as StdError, fmt, time::Instant};
 
-use anyhow::{bail, Error, Result};
+use anyhow::{anyhow, bail, Error, Result};
 
 use super::{
     begin::CandidateVerificationBeginRecoveryCustody,
@@ -226,6 +226,39 @@ impl VerifiedComputePluginCandidateArtifactSet {
         &self,
     ) -> &ComputePluginCandidateVerificationOutcome {
         &self.outcome
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn with_verified_package_file<T>(
+        &mut self,
+        item_index: usize,
+        expected_digest: &str,
+        expected_len: u64,
+        operation: impl FnOnce(
+            &mut crate::node_agent_managed_fs::PinnedManagedFile,
+            crate::node_agent_compute_plugin_host::fetch_contract::ComputePluginFetchCancellationGuard,
+        ) -> Result<T>,
+    ) -> Result<T> {
+        let cancellation_guard = self.pinned.cancellation_guard.clone();
+        let package_ordinal = self
+            .pinned
+            .artifacts
+            .iter()
+            .filter(|artifact| artifact.item_index == item_index)
+            .map(|artifact| artifact.ordinal)
+            .min()
+            .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_VERIFIED_PACKAGE_MISSING"))?;
+        let package = self
+            .pinned
+            .artifacts
+            .iter_mut()
+            .find(|artifact| {
+                artifact.item_index == item_index && artifact.ordinal == package_ordinal
+            })
+            .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_VERIFIED_PACKAGE_MISSING"))?;
+        if package.expected_digest != expected_digest || package.expected_len != expected_len {
+            bail!("COMPUTE_PLUGIN_VERIFIED_PACKAGE_BINDING_CHANGED");
+        }
+        operation(&mut package.file, cancellation_guard)
     }
 }
 

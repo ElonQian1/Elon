@@ -16,10 +16,12 @@ mod hash;
 #[cfg(not(windows))]
 #[path = "node_agent_managed_fs/unsupported.rs"]
 mod platform;
+mod read;
 mod types;
 mod write;
 
 pub(crate) use hash::{ManagedFileHashFailure, ManagedFileHashPhase, ManagedFileHashResult};
+pub(crate) use read::ManagedFileReadCursor;
 pub(crate) use types::{
     ManagedDirectoryPrepareFailure, ManagedFileOpenFailure, PinnedManagedDirectory,
     PinnedManagedFile, PinnedManagedRoot, QuarantinedManagedFile,

@@ -9,9 +9,11 @@ use super::{
     plugin_manifest::{
         resource_limits_are_non_negative, ComputePluginDownloadDependency, ComputePluginManifest,
         ComputePluginPermissionProfile, ComputePluginResourceLimits, ComputePluginTarget,
-        SignedComputePluginManifest, COMPUTE_PLUGIN_DIGEST_ALGORITHM,
-        COMPUTE_PLUGIN_ENTRYPOINT_SIDECAR, COMPUTE_PLUGIN_MAX_ENTRYPOINT_ARGUMENTS,
-        COMPUTE_PLUGIN_MAX_PACKAGE_FILES,
+        SignedComputePluginManifest, COMPUTE_PLUGIN_ARCHIVE_FORMAT_ZIP,
+        COMPUTE_PLUGIN_DIGEST_ALGORITHM, COMPUTE_PLUGIN_ENTRYPOINT_SIDECAR,
+        COMPUTE_PLUGIN_MAX_ENTRYPOINT_ARGUMENTS, COMPUTE_PLUGIN_MAX_PACKAGE_BYTES,
+        COMPUTE_PLUGIN_MAX_PACKAGE_FILES, COMPUTE_PLUGIN_MAX_UNPACKED_BYTES,
+        COMPUTE_PLUGIN_PACKAGE_MEDIA_TYPE_ZIP,
     },
     signed_artifact_verification::{
         verify_manifest_signature, SignatureVerifiedComputePluginManifest,
@@ -88,10 +90,14 @@ fn validate_package(manifest: &ComputePluginManifest) -> Result<()> {
     let package = &manifest.package;
     validate_identifier("MANIFEST_PACKAGE_MEDIA_TYPE", &package.media_type)?;
     validate_identifier("MANIFEST_ARCHIVE_FORMAT", &package.archive_format)?;
-    if package.digest_algorithm != COMPUTE_PLUGIN_DIGEST_ALGORITHM
+    if package.media_type != COMPUTE_PLUGIN_PACKAGE_MEDIA_TYPE_ZIP
+        || package.archive_format != COMPUTE_PLUGIN_ARCHIVE_FORMAT_ZIP
+        || package.digest_algorithm != COMPUTE_PLUGIN_DIGEST_ALGORITHM
         || !is_sha256(&package.package_digest)
         || package.package_size_bytes <= 0
+        || package.package_size_bytes > COMPUTE_PLUGIN_MAX_PACKAGE_BYTES
         || package.unpacked_size_bytes <= 0
+        || package.unpacked_size_bytes > COMPUTE_PLUGIN_MAX_UNPACKED_BYTES
         || package.files.is_empty()
         || package.files.len() > COMPUTE_PLUGIN_MAX_PACKAGE_FILES
     {

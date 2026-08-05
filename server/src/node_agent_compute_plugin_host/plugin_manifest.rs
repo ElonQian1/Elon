@@ -9,6 +9,10 @@ pub(crate) const COMPUTE_PLUGIN_MANIFEST_SIGNATURE_DOMAIN: &str = "ELON-COMPUTE-
 pub(crate) const COMPUTE_PLUGIN_DIGEST_ALGORITHM: &str = "sha256";
 pub(crate) const COMPUTE_PLUGIN_SIGNATURE_ALGORITHM: &str = "ed25519";
 pub(crate) const COMPUTE_PLUGIN_MAX_PACKAGE_FILES: usize = 4_096;
+pub(crate) const COMPUTE_PLUGIN_PACKAGE_MEDIA_TYPE_ZIP: &str = "application/zip";
+pub(crate) const COMPUTE_PLUGIN_ARCHIVE_FORMAT_ZIP: &str = "zip";
+pub(crate) const COMPUTE_PLUGIN_MAX_PACKAGE_BYTES: i64 = 16 * 1024 * 1024 * 1024;
+pub(crate) const COMPUTE_PLUGIN_MAX_UNPACKED_BYTES: i64 = 64 * 1024 * 1024 * 1024;
 pub(crate) const COMPUTE_PLUGIN_MAX_ENTRYPOINT_ARGUMENTS: usize = 64;
 
 /// The signature is outside this canonical payload, so it never signs itself.
