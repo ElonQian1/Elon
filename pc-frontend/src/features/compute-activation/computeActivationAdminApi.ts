@@ -65,7 +65,28 @@ export interface ComputeActivationPlanPreflight {
   plan_status: string
   checked_at: string
   ready_for_apply: boolean
+  plan_review_present: boolean
+  plan_review_digest_matches: boolean
+  plan_review_separation_valid: boolean
   blockers: string[]
+  activation_effect: 'none'
+}
+
+export interface ComputeActivationPlanReview {
+  schema: string
+  review_id: string
+  plan_id: string
+  request_id: string
+  provider_id: string
+  pool_id: string
+  plan_digest: string
+  prepared_by_user_id: string
+  reviewed_by_user_id: string
+  review_note: string | null
+  request_digest: string
+  review_digest: string
+  reviewed_at: string
+  replayed: boolean
   activation_effect: 'none'
 }
 
@@ -124,6 +145,7 @@ export interface PrepareActivationPlanBody {
 
 interface ActivationPlanResponse { activation_plan: ComputeActivationPlan | null; activation_effect: 'none' }
 interface ActivationPlanReceipt { plan: ComputeActivationPlan; replayed: boolean; activation_effect: 'none' }
+interface ActivationPlanReviewResponse { activation_plan_review: ComputeActivationPlanReview | null; activation_effect: 'none' }
 interface ActivationApplicationResponse { activation_application: ComputeActivationApplication | null }
 interface ActivationQuarantineResponse { activation_quarantine: ComputeActivationQuarantine | null }
 
@@ -166,6 +188,15 @@ export const computeActivationAdminApi = {
     api.post<ActivationPlanReceipt>(`${activationBase(requestId)}/activation-plan`, body),
   planPreflight: (requestId: string) =>
     api.get<ComputeActivationPlanPreflight>(`${activationBase(requestId)}/activation-plan/preflight`),
+  planReview: (requestId: string) =>
+    api.get<ActivationPlanReviewResponse>(`${activationBase(requestId)}/activation-plan/review`),
+  reviewPlan: (requestId: string, idempotencyKey: string, expectedPlanDigest: string, reviewNote: string | null) =>
+    api.post<ComputeActivationPlanReview>(`${activationBase(requestId)}/activation-plan/review`, {
+      idempotency_key: idempotencyKey,
+      expected_plan_digest: expectedPlanDigest,
+      review_note: reviewNote,
+      confirm_review: true,
+    }),
   application: (requestId: string) =>
     api.get<ActivationApplicationResponse>(`${activationBase(requestId)}/activation-plan/application`),
   applyPlan: (requestId: string, idempotencyKey: string, expectedPlanDigest: string) =>
