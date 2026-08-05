@@ -78,7 +78,7 @@ owners: backend, node, ai-economy
 1. `docs/decisions/distributed-compute-federation-v1.md`：不可随意改变的架构决定。
 2. `docs/distributed-compute/architecture.md`：Provider、控制面、数据面和任务状态。
 3. `docs/distributed-compute/node-client-and-plugins.md`：客户端按需启用与插件边界。
-4. `docs/distributed-compute/node-plugin-local-authority.md`：节点 SQLite 真源、根签名 keyring、计划应用、候选所有权与下载栅栏。
+4. `docs/distributed-compute/node-plugin-local-authority.md` 与 `docs/distributed-compute/node-ready-capability.md`：节点 SQLite 真源、候选下载验证，以及短期技术就绪健康证明边界。
 5. `docs/decisions/distributed-compute-capacity-ledger-v1.md` 与 `docs/distributed-compute/capacity-ledger.md`：共享容量池、跨 Offer 防超卖和追加式容量账本。
 6. `docs/distributed-compute/market-and-settlement.md`：标准化 SKU、期货锁价和结算回执。
 7. `docs/distributed-compute/provider-api.md`：Provider 本人登记、查询和信任边界。
