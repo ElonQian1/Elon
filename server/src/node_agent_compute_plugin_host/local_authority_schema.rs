@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use rusqlite::{params, Connection, TransactionBehavior};
 
 mod authority_fences;
+mod candidate_staging;
 mod candidate_verification;
 mod fetch_claims;
 mod plan_application;
@@ -13,6 +14,7 @@ const COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID: i64 = 0x454c_4350;
 const REQUIRED_TABLES: &[&str] = &[
     "authority_meta",
     "candidate_owners",
+    "candidate_staging_receipts",
     "candidate_verification_runs",
     "fetch_claims",
     "keyring_bundles",
@@ -118,6 +120,9 @@ fn create_schema_objects(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(candidate_verification::CANDIDATE_VERIFICATION_SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_VERIFICATION_SCHEMA_CREATE_V3")?;
+    connection
+        .execute_batch(candidate_staging::CANDIDATE_STAGING_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_STAGING_SCHEMA_CREATE_V3")?;
     connection
         .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V3")?;
