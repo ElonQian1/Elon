@@ -184,7 +184,9 @@ export default function ComputeSettlementPage() {
       <section className={styles.section}>
         <header className={styles.sectionHeader}>
           <div><h2>到期释放</h2><p>每笔独立处理，挑战中的结算保持阻断。</p></div>
-          <span className={styles.count}>{due?.candidates.length ?? 0}</span>
+          <span className={styles.count}>
+            {due ? `本页 ${due.candidates.length} / 共 ${due.total_due_candidates}` : '—'}
+          </span>
         </header>
         <div className={styles.tableHeader} data-grid="release">
           <span>结算</span><span>到期时间</span><span>挑战状态</span><span>处理条件</span>

@@ -42,6 +42,7 @@ export interface SettlementReleaseCandidatePage {
   schema: string
   as_of: string
   limit: number
+  total_due_candidates: number
   has_more: boolean
   next_cursor?: string | null
   candidates: SettlementReleaseCandidate[]
@@ -53,6 +54,7 @@ export interface SettlementReleaseBatchReport {
   schema: string
   scanned: number
   eligible: number
+  total_due_candidates: number
   has_more: boolean
   next_cursor?: string | null
   released: Array<{ release_id: string; lease_id: string; replayed: boolean }>
