@@ -27,7 +27,8 @@ pub(super) const STAGING_SEAL_EVIDENCE_SCHEMA: &str =
 pub(super) const STAGING_EVIDENCE_CANONICALIZATION: &str = "RFC8785-JCS";
 pub(super) const STAGING_EVIDENCE_DIGEST_ALGORITHM: &str = "sha256";
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginExtractedFileEvidence {
     pub relative_path: String,
     pub digest: String,
@@ -35,7 +36,8 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginExtractedFileE
     pub file_identity_digest: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginExtractedArchiveEvidence {
     pub schema: String,
     pub installation_id_digest: String,
@@ -48,7 +50,8 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginExtractedArchi
     pub files: Vec<ComputePluginExtractedFileEvidence>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub(in crate::node_agent_compute_plugin_host) struct HashedComputePluginExtractedArchiveEvidence {
     pub schema: String,
     pub evidence: ComputePluginExtractedArchiveEvidence,
@@ -71,7 +74,8 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginStagingSealPay
     pub extracted_bytes: i64,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginStagingSealEvidence {
     pub schema: String,
     pub payload: ComputePluginStagingSealPayload,
