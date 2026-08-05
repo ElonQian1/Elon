@@ -15,6 +15,12 @@ use crate::node_agent_compute_plugin_host::{
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
+mod types;
+
+pub(in crate::node_agent_compute_plugin_host) use types::{
+    ComputePluginCandidateStagingReceipt, HashedComputePluginCandidateStagingReceipt,
+};
+
 /// A purpose-specific authority capability minted from authenticated time after file revalidation.
 /// It is read-only until a later linear staging permit is supplied.
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginPostRevalidationStagingAuthoritySession<

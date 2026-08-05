@@ -7,7 +7,8 @@ pub(in crate::node_agent_compute_plugin_host) use authorization::{
     CandidateStagingAuthorityBindingPhase,
 };
 pub(in crate::node_agent_compute_plugin_host) use capability::{
-    AuthorizedComputePluginCandidateStaging, RevalidatedComputePluginCandidateStaging,
+    AuthorizedComputePluginCandidateStaging, ComputePluginCandidateStagingRecoveryKey,
+    RevalidatedComputePluginCandidateStaging, ValidatedCandidateStagingStorePermit,
 };
 pub(in crate::node_agent_compute_plugin_host) use revalidation::{
     revalidate_extracted_candidate_for_staging, CandidateStagingRevalidationFailure,

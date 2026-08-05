@@ -18,7 +18,8 @@ mod zip;
 
 pub(in crate::node_agent_compute_plugin_host) use zip::{
     extract_verified_compute_plugin_zip_archive, scan_verified_compute_plugin_zip_archive,
-    ComputePluginArchiveExtractionFailure, ExtractedComputePluginCandidateArchive,
+    ComputePluginArchiveExtractionFailure, ComputePluginStagingSealEvidence,
+    ExtractedComputePluginCandidateArchive, HashedComputePluginExtractedArchiveEvidence,
 };
 
 const COMPUTE_PLUGIN_EXTRACTION_PLAN_SCHEMA: &str =
