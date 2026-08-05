@@ -140,7 +140,7 @@ Keyring 安装和活动快照加载现在也必须在事务中读取、拒绝回
 
 每个 `ComputePluginLocalAuthority` facade 还持有不可序列化的进程内 instance binding；只有该 facade 的 clone 才共享身份。process fence、claim recovery key 和后续 authority session 必须对账同一 binding，防止把标量恰好相同的另一 facade 当成原 Store。该绑定随进程消失，只解决进程内 provenance，不能替代数据库外认证单调锚点。
 
-SQLite 内部 revision、trigger 和 CAS 只能阻止当前数据库中的正常写入回退，不能独立识别“整个数据库文件被替换成一份更旧但内部自洽的副本”。Host 接线前必须增加数据库外的认证单调锚点，例如服务端保存并签回 installation digest + bundle revision/digest + authority epoch checkpoint，或平台受保护的单调存储；启动恢复低于锚点时失败关闭。不得把现有本机历史检查描述成已解决整库回滚。
+SQLite 内部 revision、trigger 和 CAS 只能阻止当前数据库中的正常写入回退，不能独立识别“整个数据库文件被替换成一份更旧但内部自洽的副本”。当前 `implementation_uncompiled` 代码已可在同一 deferred snapshot 中重读 `authority_meta` 与库存 JSON，重算 inventory JCS 摘要并核对插件结构、共享授权、keyring、环境摘要、全部 revision/epoch 和可信时间高水位，再生成不含库存正文及原始授权引用的规范回滚检查点与 JCS 摘要；时钟不可信或任一事实不一致都拒绝生成。但该值仍只是等待发布的本机检查点，不是外部锚。Host 接线前仍必须增加数据库外见证、签名回执、按安装身份查询最新锚和启动时精确比对；本机低于外部锚、同一高水位却摘要不同，或无法取得可信最新锚时均须失败关闭。不得把本机检查点描述成已解决整库回滚。
 
 恢复顺序固定为：
 
