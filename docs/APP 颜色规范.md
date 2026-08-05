@@ -10,7 +10,7 @@
 
 ## 设计原则
 
-- 夜空优先：我的项目、聊天和项目空间使用 `#0B1017`；项目广场使用更深的 `#04070B`，系统 chrome 使用 `#070B10`。
+- 夜空优先：我的项目、聊天和项目空间使用 `#0B1017`；项目广场映射 Win 端暖石墨深画布 `#0C0E12`，系统 chrome 使用 `#070B10`。
 - 结构克制：用 `#111923`、`#172231`、`#1D2A39` 三层不透明表面、细边框、圆角和留白建立层级。
 - 雾蓝动作：主要按钮统一为 `#7AA7FF` 底、`#070B10` 字胶囊，例如“进入空间”“下载 APK”“AI 会话”。
 - 额度周期：个人页 Token 周期按钮保持三等宽胶囊；选中态使用 `#7AA7FF`，未选中态使用 `#172231`，默认选中“7天”。
@@ -29,20 +29,24 @@
 |---|---|---|---|---:|---|
 | 我的项目列表背景 | `color.bg.mine` | `elon_bg_app` | `--bg` | `#0B1017` | Win 画布映射 |
 | 项目空间内容画布 | `color.bg.canvas` | `elon_bg_canvas` | `--project-space-panel-bg` | `#0B1017` | Win 画布映射 |
-| 项目广场页面背景 | `color.bg.plaza` | `elon_bg_plaza` | `--plaza-bg` | `#04070B` | 深空静默虚空 |
-| 项目广场卡片主体 | `color.surface.plaza.card` | `elon_plaza_surface_card` | `--plaza-card` | `#08111C` | 观测舱主体 |
-| 项目广场卡片头部 | `color.surface.plaza.header` | `elon_plaza_surface_header` | `--plaza-header` | `#0C1724` | 观测舱抬升层 |
-| 项目广场搜索表面 | `color.surface.plaza.search` | `elon_plaza_surface_search` | `--plaza-search` | `#0A1522` | 深空输入面板 |
-| 项目广场筛选选中 | `color.surface.plaza.segment` | `elon_plaza_segment_selected` | `--plaza-segment` | `#10263D` | 信号软选中层 |
-| 项目广场精密边界 | `color.border.plaza` | `elon_plaza_border` | `--plaza-border` | `#405C7EA6` | 25% 冷钢蓝边界 |
-| 项目广场信号色 | `color.signal.plaza` | `elon_plaza_signal` | `--plaza-signal` | `#6ED8FF` | 仅轨道、焦点与连接提示 |
-| 项目广场信号软底 | `color.signal.plaza.soft` | `elon_plaza_signal_soft` | `--plaza-signal-soft` | `#1F6ED8FF` | 12% 信号合成层 |
-| 项目广场主文字 | `color.text.plaza.primary` | `elon_plaza_text_primary` | `--plaza-text` | `#E8F0F7` | 冷白星光 |
-| 项目广场次文字 | `color.text.plaza.secondary` | `elon_plaza_text_secondary` | `--plaza-text-secondary` | `#A8BECAD6` | 66% 冷白次文字 |
-| 项目广场弱文字 | `color.text.plaza.quiet` | `elon_plaza_text_quiet` | `--plaza-text-tertiary` | `#758FA2B3` | 46% 冷灰弱文字 |
-| 项目广场主操作 | `color.action.plaza` | `elon_plaza_action` | `--plaza-action` | `#C9E7F5` | 无发光星光操作面 |
-| 项目广场主操作文字 | `color.action.plaza.ink` | `elon_plaza_action_ink` | `--plaza-action-ink` | `#041018` | 深空操作文字 |
-| 项目广场星讯 / 弧线 | `color.decoration.plaza` | `elon_plaza_constellation` | `--plaza-constellation` | `#2E6ED8FF` | 18% 静态装饰；不可动画 |
+| 项目广场页面背景 | `color.bg.plaza` | `elon_bg_plaza` | `--plaza-bg` | `#0C0E12` | Win 暖石墨深画布 |
+| 项目广场卡片主体 | `color.surface.plaza.card` | `elon_plaza_surface_card` | `--plaza-card` | `#111318` | Win 暖石墨观测舱 |
+| 项目广场卡片高点 | `color.surface.plaza.card.high` | `elon_plaza_surface_card_high` | `--plaza-card-high` | `#1F232B` | 仅用于舱体 145° 低差材质渐变 |
+| 项目广场卡片头部 | `color.surface.plaza.header` | `elon_plaza_surface_header` | `--plaza-header` | `#171A20` | Win 抬升层 |
+| 项目广场搜索表面 | `color.surface.plaza.search` | `elon_plaza_surface_search` | `--plaza-search` | `#171A20` | 暖石墨输入面板 |
+| 项目广场筛选选中 | `color.surface.plaza.segment` | `elon_plaza_segment_selected` | `--plaza-segment` | `#252A32` | Win Soft 选中层 |
+| 项目广场精密边界 | `color.border.plaza` | `elon_plaza_border` | `--plaza-border` | `#30C2B8A9` | 19% 暖金属边界 |
+| 项目广场信号色 | `color.signal.plaza` | `elon_plaza_signal` | `--plaza-primary` | `#8EA7D5` | Win 雾蓝；仅轨道、焦点与连接提示 |
+| 项目广场信号软底 | `color.signal.plaza.soft` | `elon_plaza_signal_soft` | `--plaza-primary-soft` | `#218EA7D5` | 13% 雾蓝合成层 |
+| 项目广场主文字 | `color.text.plaza.primary` | `elon_plaza_text_primary` | `--plaza-text` | `#F0F8F7F4` | 94% 暖冷白 |
+| 项目广场次文字 | `color.text.plaza.secondary` | `elon_plaza_text_secondary` | `--plaza-text-secondary` | `#B3DDDBD5` | 70% 暖灰次文字 |
+| 项目广场弱文字 | `color.text.plaza.quiet` | `elon_plaza_text_quiet` | `--plaza-text-tertiary` | `#80BEBEBA` | 50% 暖灰弱文字 |
+| 项目广场主操作起点 | `color.action.plaza` | `elon_plaza_action` | `--plaza-action` | `#8EA7D5` | Win 雾蓝操作面 |
+| 项目广场主操作终点 | `color.action.plaza.end` | `elon_plaza_action_end` | `--plaza-accent` | `#8BB8C3` | Win 灰青；仅用于 135° 低饱和渐变 |
+| 项目广场主操作文字 | `color.action.plaza.ink` | `elon_plaza_action_ink` | `--plaza-action-ink` | `#10151D` | 深石墨操作文字 |
+| 项目广场成功状态 | `color.status.plaza.success` | `elon_plaza_status_success` | `--plaza-success` | `#67BEA0` | Win 成功绿；仅状态点和状态文案 |
+| 项目广场危险状态 | `color.status.plaza.danger` | `elon_plaza_status_danger` | `--plaza-danger` | `#E07B84` | Win 柔红；仅异常与审批状态 |
+| 项目广场星讯 / 弧线 | `color.decoration.plaza` | `elon_plaza_constellation` | `--plaza-constellation` | `#218EA7D5` | 13% 静态装饰；不可动画 |
 | 详情页顶部背景 | `color.bg.chrome` | `elon_bg_chrome` | `--bg-hint` | `#070B10` | Win 深画布 |
 | 底部导航背景 | `color.nav.bg` | `elon_nav_bg` | `--nav-bg` | `#0A0F16` | Win 侧栏映射 |
 | 列表选中胶囊 | `color.surface.segment.selected` | `elon_segment_selected` | `--nav-active-bg` | `#1F2B40` | 雾蓝 13% 合成表面 |
@@ -86,9 +90,9 @@
 
 ### 颜色使用规则
 
-- 我的项目、聊天和项目空间内容画布使用 `#0B1017`；项目广场使用 `#04070B`；顶部与系统 chrome 使用 `#070B10`。
+- 我的项目、聊天和项目空间内容画布使用 `#0B1017`；项目广场使用 Win 暖石墨 `#0C0E12`；顶部与系统 chrome 使用 `#070B10`。
 - 底部导航使用 `#0A0F16`；普通卡片使用 `#111923`，抬升容器使用 `#172231`，搜索和按下表面使用 `#1D2A39`。
-- 主操作、选中焦点和精选大卡的 3dp 轨道使用 `#7AA7FF`；普通页面不得把整块背景染成品牌蓝。
+- 常规页面的主操作与选中焦点使用 `#7AA7FF`；项目广场精选大卡的 3dp 信号轨使用 Win 同源 `#8EA7D5`。任何页面都不得把整块背景染成品牌蓝。
 - 青色 `#73C7E8` 仅用于信息和信号；绿色 `#5AC8A0` 仅用于成功、在线、可安装和完成。
 - 琥珀 `#E7B86A` 仅用于注意、项目进度和待处理；柔红 `#F07884` 仅用于需审批、失败和危险。
 - 分割线与边框使用表中带透明度的蓝灰，不新增脏灰；焦点使用雾蓝边界，同时保留文字或形状反馈。
