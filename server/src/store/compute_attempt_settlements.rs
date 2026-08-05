@@ -14,12 +14,15 @@ use super::{
 };
 
 pub(super) mod calculation;
+mod lifecycle_history;
 mod money;
 mod orchestrate;
 mod pending_candidate;
 mod pending_queue;
 mod support;
 
+use lifecycle_history::list_settlement_lifecycle_history_on;
+pub(crate) use lifecycle_history::ComputeSettlementLifecycleHistoryItem;
 use pending_candidate::build_pending_settlement_candidate_on;
 use pending_queue::list_pending_settlement_lease_ids_on;
 use support::{
@@ -158,6 +161,46 @@ impl Store {
             .into_iter()
             .map(|lease_id| build_pending_settlement_candidate_on(&conn, &lease_id))
             .collect()
+    }
+
+    pub(crate) fn list_compute_settlement_lifecycle_history_for_consumer(
+        &self,
+        consumer_user_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ComputeSettlementLifecycleHistoryItem>> {
+        support::validate_exact("消费者用户 ID", consumer_user_id, 240)?;
+        self.list_compute_settlement_lifecycle_history(Some(consumer_user_id), None, limit)
+    }
+
+    pub(crate) fn list_compute_settlement_lifecycle_history_for_provider(
+        &self,
+        provider_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ComputeSettlementLifecycleHistoryItem>> {
+        support::validate_exact("Provider ID", provider_id, 240)?;
+        self.list_compute_settlement_lifecycle_history(None, Some(provider_id), limit)
+    }
+
+    pub(crate) fn list_compute_settlement_lifecycle_history_for_platform_admin(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<ComputeSettlementLifecycleHistoryItem>> {
+        self.list_compute_settlement_lifecycle_history(None, None, limit)
+    }
+
+    fn list_compute_settlement_lifecycle_history(
+        &self,
+        consumer_user_id: Option<&str>,
+        provider_account_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ComputeSettlementLifecycleHistoryItem>> {
+        let conn = self.conn()?;
+        list_settlement_lifecycle_history_on(
+            &conn,
+            consumer_user_id,
+            provider_account_id,
+            limit.clamp(1, 100),
+        )
     }
 }
 

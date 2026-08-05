@@ -9,7 +9,7 @@ use super::{
     Store,
 };
 
-mod history;
+pub(super) mod history;
 mod pending_queue;
 mod support;
 

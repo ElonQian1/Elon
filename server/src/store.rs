@@ -306,7 +306,8 @@ pub(crate) use compute_attempt_settlement_releases::{
     ComputeSettlementReleaseReceipt, ReleaseComputeAttemptSettlementRequest,
 };
 pub(crate) use compute_attempt_settlements::{
-    ComputeAttemptSettlementReceipt, SettleComputeAttemptRequest,
+    ComputeAttemptSettlementReceipt, ComputeSettlementLifecycleHistoryItem,
+    SettleComputeAttemptRequest,
 };
 pub(crate) use compute_attempt_terminals::{
     ComputeAttemptTerminalCandidateReceipt, ComputeDeclaredResultArtifactInput,

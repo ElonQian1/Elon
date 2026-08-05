@@ -5,7 +5,7 @@ use crate::{
     compute_federation_attempt_service::get_for_participant,
     store::{
         ComputeAttemptSettlementReceipt, ComputePendingAttemptSettlementCandidate,
-        SettleComputeAttemptRequest, Store,
+        ComputeSettlementLifecycleHistoryItem, SettleComputeAttemptRequest, Store,
     },
 };
 
@@ -64,4 +64,32 @@ pub(crate) fn list_pending_for_platform_admin(
     limit: usize,
 ) -> Result<Vec<ComputePendingAttemptSettlementCandidate>> {
     store.list_pending_compute_attempt_settlements(limit)
+}
+
+pub(crate) fn list_history_for_consumer(
+    store: &Store,
+    consumer_user_id: &str,
+    limit: usize,
+) -> Result<Vec<ComputeSettlementLifecycleHistoryItem>> {
+    store.list_compute_settlement_lifecycle_history_for_consumer(consumer_user_id, limit)
+}
+
+pub(crate) fn list_history_for_provider_owner(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    limit: usize,
+) -> Result<Vec<ComputeSettlementLifecycleHistoryItem>> {
+    let provider = store.compute_provider(provider_id)?;
+    if provider.provider.owner_account_id != user_id {
+        bail!("算力 Provider 不属于当前登录用户");
+    }
+    store.list_compute_settlement_lifecycle_history_for_provider(provider_id, limit)
+}
+
+pub(crate) fn list_history_for_platform_admin(
+    store: &Store,
+    limit: usize,
+) -> Result<Vec<ComputeSettlementLifecycleHistoryItem>> {
+    store.list_compute_settlement_lifecycle_history_for_platform_admin(limit)
 }

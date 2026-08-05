@@ -30,6 +30,18 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
             "/api/admin/compute/attempt-finalizations/pending-settlement-receipt",
             get(list_pending_settlements),
         )
+        .route(
+            "/api/me/compute/settlements/history",
+            get(list_consumer_settlement_history),
+        )
+        .route(
+            "/api/me/compute/providers/:provider_id/settlements/history",
+            get(list_provider_settlement_history),
+        )
+        .route(
+            "/api/admin/compute/settlements/history",
+            get(list_admin_settlement_history),
+        )
 }
 
 #[derive(Debug, Deserialize)]
@@ -94,6 +106,63 @@ async fn list_pending_settlements(
             query.limit,
         )
         .map(|candidates| json!({"settlement_candidates":candidates})),
+    )
+}
+
+async fn list_consumer_settlement_history(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    settlement_response(
+        compute_federation_attempt_settlement_service::list_history_for_consumer(
+            &state.store,
+            &user_id,
+            query.limit,
+        )
+        .map(|history| json!({"settlement_history":history})),
+    )
+}
+
+async fn list_provider_settlement_history(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(provider_id): Path<String>,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    let user_id = match authenticated_user(&state, &headers) {
+        Ok(user_id) => user_id,
+        Err(response) => return response,
+    };
+    settlement_response(
+        compute_federation_attempt_settlement_service::list_history_for_provider_owner(
+            &state.store,
+            &user_id,
+            &provider_id,
+            query.limit,
+        )
+        .map(|history| json!({"settlement_history":history})),
+    )
+}
+
+async fn list_admin_settlement_history(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<ListQuery>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    settlement_response(
+        compute_federation_attempt_settlement_service::list_history_for_platform_admin(
+            &state.store,
+            query.limit,
+        )
+        .map(|history| json!({"settlement_history":history})),
     )
 }
 

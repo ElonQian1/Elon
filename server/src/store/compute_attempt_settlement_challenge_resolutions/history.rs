@@ -60,7 +60,7 @@ pub(super) fn list_challenge_history_on(
         .collect()
 }
 
-fn build_history_item_on(
+pub(in crate::store) fn build_history_item_on(
     conn: &Connection,
     expected_consumer_user_id: Option<&str>,
     expected_provider_account_id: Option<&str>,

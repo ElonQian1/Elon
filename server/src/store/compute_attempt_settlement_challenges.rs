@@ -178,6 +178,16 @@ pub(super) fn compute_settlement_challenge_on(
     stored.into_receipt(conn, false)
 }
 
+pub(super) fn compute_settlement_challenge_optional_on(
+    conn: &Connection,
+    lease_id: &str,
+) -> Result<Option<ComputeSettlementChallengeReceipt>> {
+    support::validate_exact("Attempt Lease ID", lease_id, 200)?;
+    challenge_by_lease_on(conn, lease_id)?
+        .map(|stored| stored.into_receipt(conn, false))
+        .transpose()
+}
+
 pub(super) fn settlement_has_open_challenge_on(
     conn: &Connection,
     settlement_receipt_id: &str,
