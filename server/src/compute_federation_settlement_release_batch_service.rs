@@ -11,6 +11,8 @@ use crate::store::{
 pub(crate) struct ReleaseDueComputeSettlementsBody {
     #[serde(default = "default_limit")]
     pub limit: usize,
+    #[serde(default)]
+    pub cursor: Option<String>,
     pub confirm_each_item_uses_v198_internal_release_only: bool,
 }
 
@@ -26,6 +28,8 @@ pub(crate) struct ComputeSettlementReleaseBatchReport {
     pub schema: String,
     pub scanned: usize,
     pub eligible: usize,
+    pub has_more: bool,
+    pub next_cursor: Option<String>,
     pub released: Vec<ComputeSettlementReleaseReceipt>,
     pub skipped: Vec<ComputeSettlementReleaseCandidate>,
     pub failed: Vec<ComputeSettlementReleaseBatchFailure>,
@@ -37,8 +41,9 @@ pub(crate) struct ComputeSettlementReleaseBatchReport {
 pub(crate) fn list_due_for_platform_admin(
     store: &Store,
     limit: usize,
+    cursor: Option<&str>,
 ) -> Result<ComputeSettlementReleaseCandidatePage> {
-    store.list_due_compute_settlement_release_candidates(limit)
+    store.list_due_compute_settlement_release_candidates(limit, cursor)
 }
 
 pub(crate) fn release_due_for_platform_admin(
@@ -49,7 +54,8 @@ pub(crate) fn release_due_for_platform_admin(
     if !body.confirm_each_item_uses_v198_internal_release_only {
         bail!("批量释放前必须确认每笔只执行 v198 pending 到 available 内部转账");
     }
-    let page = store.list_due_compute_settlement_release_candidates(body.limit)?;
+    let page =
+        store.list_due_compute_settlement_release_candidates(body.limit, body.cursor.as_deref())?;
     let scanned = page.candidates.len();
     let eligible = page
         .candidates
@@ -86,6 +92,8 @@ pub(crate) fn release_due_for_platform_admin(
         schema: "compute_federation.settlement_release_batch_report.v1".to_string(),
         scanned,
         eligible,
+        has_more: page.has_more,
+        next_cursor: page.next_cursor,
         released,
         skipped,
         failed,

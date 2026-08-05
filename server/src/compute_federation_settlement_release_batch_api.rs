@@ -27,6 +27,8 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
 struct DueQuery {
     #[serde(default = "default_limit")]
     limit: usize,
+    #[serde(default)]
+    cursor: Option<String>,
 }
 
 async fn list_due(
@@ -41,6 +43,7 @@ async fn list_due(
         compute_federation_settlement_release_batch_service::list_due_for_platform_admin(
             &state.store,
             query.limit,
+            query.cursor.as_deref(),
         ),
     )
 }
