@@ -10,11 +10,11 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-激活证据申请的 v177 状态机、v178 过期批准废止审计、v179 不可变激活计划、v180 原子应用回执、v181 紧急隔离回执、v203 第二人复核回执、本人 HTTP/MCP 控制面和管理员 HTTP 审核队列已写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
+激活证据申请的 v177 状态机、v178 过期批准废止审计、v179 不可变激活计划、v180 原子应用回执、v181 紧急隔离回执、v203 第二人复核回执、v204 隔离恢复控制面、本人 HTTP/MCP 控制面和管理员 HTTP 审核队列已写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
 
 这套控制面记录“供给者提交了哪些证据摘要、审核人作出了什么决定、激活应写入哪一个精确 Provider 合同、谁独立复核了该计划，以及该计划是否被受控应用”。`approved` 只表示证据包通过人工审核，`prepared` 只表示不可变候选合同已生成，第二人复核只固定复核事实；三者的 `activation_effect` 均为 `none`。只有不同于计划准备人的第二名 `admin/owner` 已按精确 `plan_digest` 留下 v203 回执后，应用入口才可能在一个事务内把 Provider 下一版本和 CapacityPool 改为 active，并保存不可变回执。该内部状态变化不连接节点、不读取凭据正文、不发布 Offer、不开放预留、不派发任务，也不移动资金。
 
-PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说明、预检阻断项和 submitted 取消源码；提交对话框只接受节点绑定引用和三个 64 位 SHA-256 摘要，并明确拒绝把凭据、密钥或原始硬件报告放入引用字段。仅平台 `admin/owner` 可见的 `/compute-activation` 已写入按状态审核队列、申请预检、批准/退回/拒绝、approved 废止、计划准备、第二人复核、计划二次预检、精确摘要应用、应用回执和紧急隔离源码。当前账号若是计划准备人，PC 不提供复核按钮；服务端仍是最终强制边界。管理员能力没有下放到本人页面或 MCP。两个页面均尚未构建、运行或发布。
+PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说明、预检阻断项和 submitted 取消源码；提交对话框只接受节点绑定引用和三个 64 位 SHA-256 摘要，并明确拒绝把凭据、密钥或原始硬件报告放入引用字段。仅平台 `admin/owner` 可见的 `/compute-activation` 已写入按状态审核队列、申请预检、批准/退回/拒绝、approved 废止、计划准备、第二人复核、计划二次预检、精确摘要应用、应用回执、紧急隔离和三段式恢复源码。当前账号若是计划准备人或恢复计划准备人，PC 不提供对应复核按钮；服务端仍是最终强制边界。管理员能力没有下放到本人页面或 MCP。两个页面均尚未构建、运行或发布。
 
 ## 2. 申请流程
 
@@ -27,6 +27,7 @@ PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说�
 7. 管理员以当前 `plan_digest`、稳定幂等键和 `confirm_apply=true` 应用计划；Store 在同一 `BEGIN IMMEDIATE` 事务内重新核对第二人复核和全部业务依赖，写入 Provider 下一版本、Pool 生命周期事件、申请/计划终态和 v180 不可变应用回执。
 8. Provider/Pool 的内部激活与市场发布分离。Offer 已有后续 v182 管理员原子发布流程；节点真实连接、Price Snapshot、可预留容量、任务派发和资金结算仍是独立边界。
 9. 若已应用结果需要紧急停止，管理员可按当前 `application_digest` 和明确原因执行 v181 隔离；Provider 当前 active 版本和 Pool 当前 active epoch 在一个事务内转为 quarantined，并保存不可变回执。
+10. 修复证据和路由后，管理员可按 v204 准备恢复计划，由不同管理员复核；旧 active Offer 全部退场且恢复预检无阻断时，应用事务追加 active Provider 下一版本和 Pool `quarantined -> active` 事件。恢复不会重发旧 Offer。
 
 提交的引用和摘要是待审核材料，不是平台已验证事实。服务端不在这张表内保存节点端点、访问凭据、原始硬件报告或完整路由证明。
 
@@ -75,10 +76,17 @@ PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说�
 | GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/application` | 读取并审计该计划的不可变应用回执 |
 | POST | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/application/quarantine` | 以精确应用摘要、原因和显式确认紧急隔离 |
 | GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/application/quarantine` | 读取并审计不可变隔离回执 |
+| GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan` | 读取并审计隔离恢复计划 |
+| POST | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan` | 显式准备恢复计划，不解除隔离 |
+| GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/preflight` | 读取恢复阻断项和 active Offer 数量 |
+| GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/review` | 读取并审计恢复计划第二人复核 |
+| POST | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/review` | 不同于准备人的管理员复核恢复计划 |
+| GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/application` | 读取并审计恢复应用回执 |
+| POST | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/application` | 以精确摘要和显式确认原子应用恢复 |
 
 决定只支持 `approved`、`changes_requested` 或 `rejected`。退回和拒绝必须填写说明；只有 `submitted` 可以审核。批准时如果 Provider/Pool 所有权、状态、版本或账本审计发生变化，服务端失败关闭，要求供给者重新提交。
 
-PC `/compute-activation` 复用上述管理员 HTTP 合同，不另建前端状态真源。工作区按状态筛选申请，先显示证据引用和申请预检，再把审核、计划准备、第二人复核、计划应用、过期批准废止和已激活资源隔离拆成独立确认动作。计划表单只接收 Endpoint、Gateway、地址提示和凭据引用，不接收凭据正文；第二人复核展示准备人与复核人以及不可变复核摘要，应用按钮只有在当前计划预检 `ready_for_apply=true` 时可用。服务端写事务仍会重新审计，不能把前端快照当成授权或锁。应用后展示不可变应用摘要；隔离后继续保留申请、计划、复核和原应用回执。
+PC `/compute-activation` 复用上述管理员 HTTP 合同，不另建前端状态真源。工作区按状态筛选申请，先显示证据引用和申请预检，再把审核、计划准备、第二人复核、计划应用、过期批准废止、已激活资源隔离和隔离恢复拆成独立确认动作。激活和恢复表单只接收路由、Gateway、配置和凭据引用，不接收凭据正文；第二人复核展示准备人与复核人以及不可变复核摘要，应用按钮只有在对应预检 `ready_for_apply=true` 时可用。服务端写事务仍会重新审计，不能把前端快照当成授权或锁。恢复细节由 `docs/distributed-compute/activation-recovery-api.md` 维护。
 
 ## 6. 激活就绪预检
 
@@ -116,7 +124,7 @@ v203 回执绑定 `plan_id`、`request_id`、Provider/Pool、计划摘要、准�
 
 紧急隔离请求必须提交当前 `application_digest`、稳定幂等键、非空原因和 `confirm_quarantine=true`。Store 在写事务内重新审计应用回执并读取 Provider/Pool 当前状态；只有二者仍为 active 且归属一致时，才登记 quarantined Provider 下一版本、追加 Pool `active -> quarantined` 生命周期事件并写入 v181 追加式回执。任一步失败均不提交。
 
-隔离回执绑定应用摘要、隔离前后的不可变 Provider 版本、当前 Pool epoch、生命周期事件、原因、执行人和时间，返回 `provider_effect=quarantined`、`pool_effect=quarantined`、`offer_effect=none_direct`。它不删除或改写原应用、计划、申请或 Offer；现有候选发现会因当前 Provider 不再 active 而排除新选择，但隔离不等于撤销既有业务合同、退款或节点关机命令。当前隔离为单向紧急控制，恢复必须以后通过独立复核流程实现。
+隔离回执绑定应用摘要、隔离前后的不可变 Provider 版本、当前 Pool epoch、生命周期事件、原因、执行人和时间，返回 `provider_effect=quarantined`、`pool_effect=quarantined`、`offer_effect=none_direct`。它不删除或改写原应用、计划、申请或 Offer；现有候选发现会因当前 Provider 不再 active 而排除新选择，但隔离不等于撤销既有业务合同、退款或节点关机命令。v204 已用独立、追加式、第二人复核的流程实现最窄恢复，详见 `docs/distributed-compute/activation-recovery-api.md`。
 
 ## 10. 状态与并发边界
 
@@ -129,11 +137,12 @@ v203 回执绑定 `plan_id`、`request_id`、Provider/Pool、计划摘要、准�
 - 受控应用以一个写事务执行 `approved -> activated` 和 `prepared -> applied`；应用回执、Provider 版本与 Pool 生命周期事件均必须匹配，否则失败关闭。
 - prepared 计划只能由不同于准备人的第二名管理员复核；复核回执追加后不可修改或删除，后续废止只改变计划状态而不抹除复核历史。
 - 每份激活应用最多产生一份 v181 隔离回执；相同幂等键或相同应用只能重放相同应用摘要和原因。隔离保留申请 `activated`、计划 `applied` 和原应用回执，避免把历史事实伪装成未发生。
+- 每份 v181 隔离回执同时只允许一份 prepared v204 恢复计划；恢复前 Provider 下 active Offer 必须全部退场。恢复追加新 Provider 版本和 Pool 生命周期事件，不删除隔离历史，也不自动重新发布旧 Offer。
 
 ## 11. 尚未实现
 
-- Cargo 编译、v177-v181/v203 迁移执行、并发和 HTTP/MCP 真实调用验证；
+- Cargo/TypeScript 编译、v177-v181/v203/v204 迁移执行、并发、HTTP/MCP 和 PC 真实调用验证；
 - 节点绑定引用、ReadyCapability、路由证明和硬件观测的真实采集与密码学验证；
 - 审核员查看原始证据工件、签名链和挑战任务的界面；
-- 第三名独立应用人、组织级多级审批，以及 quarantined 激活结果的恢复、回滚和异常修复控制面；
+- 第三名独立应用人、组织级多级审批、prepared 恢复计划废止/替换、重复隔离恢复周期和通用回滚控制面；
 - verified 硬件事实、路由凭据轮换、Price Snapshot、任务派发和真实结算；Offer 原子发布已由 `docs/distributed-compute/offer-api.md` 独立维护。
