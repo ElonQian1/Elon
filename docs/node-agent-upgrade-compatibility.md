@@ -52,6 +52,8 @@
 
 2026-08-05 正式发布复验已覆盖本条合同：7800 候选节点在线且回报目标身份时，激活帮助程序仍选中 7799 正式安装 listener；关闭桌面壳后发布从 `0.3.69+067ec391…` 激活到 `0.3.69+e30818e6…`，状态为 `activated`、`rollback_state=not_required`。重开桌面壳后只有一个安装目录 `elon-desktop.exe`，7799 仍由安装目录 `一龙开发平台.exe` 持有并保持目标 `build_git_sha`、`release_identity` 和云连接。
 
+同日 v1.12 正式发布继续从 `0.3.69+1b5e8655…` 激活到 `0.3.69+a71da458500db5fb125ab57d9ef95dba37cfdee6`；7799 `/api/status` 的 `build_git_sha` 与 release identity 精确匹配，激活状态 `activated`、本机终态 `complete`、`rollback_state=not_required`，远端 outbox 首次尝试进入 `synced`。升级后 MCP 实际回读 schema v1.12、25 个 capability，并在不打开画布的独立连接中完成持久 Web 回归比较；重复 selector 的真实页面兼容修复也由该安装版本复验。
+
 ## 配置与缓存迁移合同
 
 升级读取旧版 `node.json` 时：
