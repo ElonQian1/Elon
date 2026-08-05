@@ -215,7 +215,7 @@ fn compare_semantics(before: &[u8], after: &[u8]) -> Result<SemanticMetrics> {
     })
 }
 
-fn semantic_nodes(tree: &Value) -> Result<BTreeMap<String, Value>> {
+fn semantic_nodes(tree: &Value) -> Result<BTreeMap<String, Vec<String>>> {
     let nodes = tree
         .get("nodes")
         .and_then(Value::as_array)
@@ -225,7 +225,7 @@ fn semantic_nodes(tree: &Value) -> Result<BTreeMap<String, Value>> {
         .filter_map(|node| node.get("parentSelector").and_then(Value::as_str))
         .map(str::to_string)
         .collect::<BTreeSet<_>>();
-    let mut result = BTreeMap::new();
+    let mut result = BTreeMap::<String, Vec<String>>::new();
     for node in nodes {
         let selector = node
             .get("selector")
@@ -233,21 +233,22 @@ fn semantic_nodes(tree: &Value) -> Result<BTreeMap<String, Value>> {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .context("UI tree node 缺少 selector")?;
-        if result.contains_key(selector) {
-            bail!("UI tree selector 重复，不能确定性比较: {selector}");
-        }
         let label = (!parents.contains(selector))
             .then(|| node.get("label").cloned().unwrap_or(Value::Null))
             .unwrap_or(Value::Null);
-        result.insert(
-            selector.to_string(),
-            json!({
-                "tag":node.get("tag"),"role":node.get("role"),"label":label,
-                "interactive":node.get("interactive"),"disabled":node.get("disabled"),
-                "checked":node.get("checked"),"selected":node.get("selected"),
-                "inputType":node.get("inputType"),"style":node.get("style")
-            }),
-        );
+        let signature = serde_json::to_string(&json!({
+            "tag":node.get("tag"),"role":node.get("role"),"label":label,
+            "interactive":node.get("interactive"),"disabled":node.get("disabled"),
+            "checked":node.get("checked"),"selected":node.get("selected"),
+            "inputType":node.get("inputType"),"style":node.get("style")
+        }))?;
+        result
+            .entry(selector.to_string())
+            .or_default()
+            .push(signature);
+    }
+    for signatures in result.values_mut() {
+        signatures.sort_unstable();
     }
     Ok(result)
 }

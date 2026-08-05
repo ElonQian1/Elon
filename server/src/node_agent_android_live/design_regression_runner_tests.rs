@@ -57,6 +57,21 @@ fn tree(status: &str) -> Vec<u8> {
     .unwrap()
 }
 
+fn duplicate_selector_tree(second_label: &str) -> Vec<u8> {
+    serde_json::to_vec_pretty(&json!({
+        "schema":"elon.web.semantic-tree.v1",
+        "nodes":[
+            {"selector":"main","parentSelector":null,"tag":"main","role":"main",
+                "label":"容器","interactive":false,"disabled":false,"style":{}},
+            {"selector":"main > button","parentSelector":"main","tag":"button","role":"button",
+                "label":"第一个","interactive":true,"disabled":false,"style":{}},
+            {"selector":"main > button","parentSelector":"main","tag":"button","role":"button",
+                "label":second_label,"interactive":true,"disabled":false,"style":{}}
+        ]
+    }))
+    .unwrap()
+}
+
 async fn fixture_session(root: &Path) -> std::sync::Arc<super::broker::LiveUiSession> {
     fs::write(root.join("package.json"), r#"{"scripts":{"dev":"vite"}}"#).unwrap();
     LiveUiBroker::new()
@@ -218,5 +233,42 @@ async fn local_comparator_fails_pixel_threshold_and_rejects_input_drift() {
         store::read_task(&root, &drift_id).unwrap().status,
         "READY_TO_COMPARE"
     );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn local_comparator_compares_duplicate_selectors_as_deterministic_multisets() {
+    let root = fixture_root("duplicate-selectors");
+    fs::create_dir_all(&root).unwrap();
+    let root = root.canonicalize().unwrap();
+    let session = fixture_session(&root).await;
+    let pixels = encode_png(vec![0, 0, 0, 255].repeat(4));
+    let regression_task = task(
+        &root,
+        'd',
+        &pixels,
+        &pixels,
+        &duplicate_selector_tree("第二个"),
+        &duplicate_selector_tree("已修改"),
+        0.0,
+        vec!["main > button".to_string()],
+    );
+    let comparison_id = regression_task.comparison_id.clone();
+    store::persist_task(&root, &regression_task).unwrap();
+
+    let result = design_tools::call(
+        &session,
+        "ui_run_design_regression_comparison",
+        json!({"comparisonId":comparison_id,"expectedRevision":1}),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(result["comparison"]["status"], "PASSED");
+    assert_eq!(
+        result["comparison"]["result"]["changedSelectors"],
+        json!(["main > button"])
+    );
+    assert_eq!(result["comparison"]["result"]["unexpectedChangedCount"], 0);
     fs::remove_dir_all(root).unwrap();
 }
