@@ -45,6 +45,7 @@ pub(crate) use rollback_checkpoint::{
 pub(in crate::node_agent_compute_plugin_host) use staging_store::{
     ComputePluginCandidateStagingAuthorityFacts,
     ComputePluginCandidateStagingRecoveryAuthoritySession,
+    ComputePluginCandidateStagingRecoveryOutcome,
     ComputePluginPostRevalidationStagingAuthoritySession,
 };
 pub(in crate::node_agent_compute_plugin_host) use verification_store::{

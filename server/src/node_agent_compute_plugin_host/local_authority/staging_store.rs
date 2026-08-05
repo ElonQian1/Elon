@@ -18,10 +18,12 @@ use crate::node_agent_compute_plugin_host::{
 mod meta;
 mod persistence;
 mod projection;
+mod recovery;
 mod recovery_session;
 mod types;
 mod write;
 
+pub(in crate::node_agent_compute_plugin_host) use recovery::ComputePluginCandidateStagingRecoveryOutcome;
 pub(in crate::node_agent_compute_plugin_host) use recovery_session::ComputePluginCandidateStagingRecoveryAuthoritySession;
 pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginCandidateStagingReceipt, HashedComputePluginCandidateStagingReceipt,
