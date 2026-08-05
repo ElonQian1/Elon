@@ -15,7 +15,10 @@ use super::{
 
 mod zip;
 
-pub(in crate::node_agent_compute_plugin_host) use zip::scan_verified_compute_plugin_zip_archive;
+pub(in crate::node_agent_compute_plugin_host) use zip::{
+    extract_verified_compute_plugin_zip_archive, scan_verified_compute_plugin_zip_archive,
+    ComputePluginArchiveExtractionFailure, ExtractedComputePluginCandidateArchive,
+};
 
 const COMPUTE_PLUGIN_EXTRACTION_PLAN_SCHEMA: &str =
     "elon.compute_plugin.archive_extraction_plan.v1";

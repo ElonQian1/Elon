@@ -228,6 +228,14 @@ impl VerifiedComputePluginCandidateArtifactSet {
         &self.outcome
     }
 
+    pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
+        self.recovery_key.installation_id_digest()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn candidate_token_digest(&self) -> &str {
+        self.recovery_key.candidate_token_digest()
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn with_verified_package_file<T>(
         &mut self,
         item_index: usize,

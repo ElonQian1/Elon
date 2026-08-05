@@ -28,6 +28,16 @@ pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginRoot {
     pub(super) installation_id_digest: String,
 }
 
+impl PinnedComputePluginRoot {
+    pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
+        &self.installation_id_digest
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn root_identity_digest(&self) -> &str {
+        self.root.root_identity_digest()
+    }
+}
+
 /// Existing-only capability for one candidate's downloads directory. It can open only direct
 /// children whose original normalized relative path names this exact candidate directory.
 pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginCandidateDownloads {

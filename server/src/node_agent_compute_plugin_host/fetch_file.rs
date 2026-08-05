@@ -21,9 +21,14 @@ use crate::{
     },
 };
 
+mod staging;
 mod types;
 mod write;
 
+pub(in crate::node_agent_compute_plugin_host) use staging::{
+    prepare_compute_plugin_candidate_staging, ComputePluginStagingPrepareFailure,
+    PreparedComputePluginCandidateStaging,
+};
 pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginPartCursorDamage, ComputePluginPartCursorDamageKind,
     ComputePluginPartReconcileFailure, ComputePluginPartReconcileOutcome,

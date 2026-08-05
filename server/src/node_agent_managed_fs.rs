@@ -12,6 +12,7 @@ use std::{
 use anyhow::{anyhow, bail, Context, Result};
 use sha2::{Digest, Sha256};
 
+mod copy;
 mod hash;
 #[cfg(not(windows))]
 #[path = "node_agent_managed_fs/unsupported.rs"]
@@ -20,6 +21,7 @@ mod read;
 mod types;
 mod write;
 
+pub(crate) use copy::ManagedFileCopyResult;
 pub(crate) use hash::{ManagedFileHashFailure, ManagedFileHashPhase, ManagedFileHashResult};
 pub(crate) use read::ManagedFileReadCursor;
 pub(crate) use types::{
@@ -241,6 +243,36 @@ impl PinnedManagedRoot {
 }
 
 impl PinnedManagedDirectory {
+    pub(crate) fn create_new_directory_child(
+        &self,
+        name: &OsStr,
+    ) -> std::result::Result<PinnedManagedDirectory, ManagedDirectoryPrepareFailure> {
+        require_single_normal_component(name).map_err(ManagedDirectoryPrepareFailure::Unchanged)?;
+        let parent = self.directory_handles.last().ok_or_else(|| {
+            ManagedDirectoryPrepareFailure::Unchanged(anyhow!(
+                "NODE_MANAGED_DIRECTORY_PARENT_HANDLE_MISSING"
+            ))
+        })?;
+        let file = platform::create_new_directory_relative(parent.as_ref(), name)
+            .map_err(|error| ManagedDirectoryPrepareFailure::Unchanged(error.into()))?;
+        let file = Arc::new(file);
+        let identity = platform::inspect(&file)
+            .map_err(|error| ManagedDirectoryPrepareFailure::Mutated(error.into()))?;
+        validate_directory_identity(identity, Some(self.root_volume_serial))
+            .map_err(ManagedDirectoryPrepareFailure::Mutated)?;
+        let path = platform::canonical_path(&file)
+            .map_err(|error| ManagedDirectoryPrepareFailure::Mutated(error.into()))?;
+        let mut handles = self.directory_handles.clone();
+        handles.push(file);
+        Ok(PinnedManagedDirectory {
+            path,
+            root_volume_serial: self.root_volume_serial,
+            root_identity_digest: self.root_identity_digest.clone(),
+            directory_handles: handles,
+            filesystem_mutated: true,
+        })
+    }
+
     pub(crate) fn open_existing_read_write(
         self,
         name: &OsStr,
