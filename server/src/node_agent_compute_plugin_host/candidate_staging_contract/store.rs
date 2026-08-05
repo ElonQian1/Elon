@@ -3,9 +3,12 @@ use std::{error::Error as StdError, fmt};
 use anyhow::{bail, Error, Result};
 use uuid::Uuid;
 
-use super::capability::{
-    AuthorizedComputePluginCandidateStaging, ComputePluginCandidateStagingRecoveryKey,
-    RevalidatedComputePluginCandidateStaging, ValidatedCandidateStagingStorePermit,
+use super::{
+    capability::{
+        AuthorizedComputePluginCandidateStaging, RevalidatedComputePluginCandidateStaging,
+        ValidatedCandidateStagingStorePermit,
+    },
+    recovery_key::ComputePluginCandidateStagingRecoveryKey,
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_extraction::ExtractedComputePluginCandidateArchive,

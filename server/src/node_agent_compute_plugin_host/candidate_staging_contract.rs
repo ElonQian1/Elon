@@ -1,5 +1,6 @@
 mod authorization;
 mod capability;
+mod recovery_key;
 mod revalidation;
 mod store;
 
@@ -8,9 +9,10 @@ pub(in crate::node_agent_compute_plugin_host) use authorization::{
     CandidateStagingAuthorityBindingPhase,
 };
 pub(in crate::node_agent_compute_plugin_host) use capability::{
-    AuthorizedComputePluginCandidateStaging, ComputePluginCandidateStagingRecoveryKey,
-    RevalidatedComputePluginCandidateStaging, ValidatedCandidateStagingStorePermit,
+    AuthorizedComputePluginCandidateStaging, RevalidatedComputePluginCandidateStaging,
+    ValidatedCandidateStagingStorePermit,
 };
+pub(in crate::node_agent_compute_plugin_host) use recovery_key::ComputePluginCandidateStagingRecoveryKey;
 pub(in crate::node_agent_compute_plugin_host) use revalidation::{
     revalidate_extracted_candidate_for_staging, CandidateStagingRevalidationFailure,
     CandidateStagingRevalidationPhase,
