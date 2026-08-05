@@ -7,7 +7,9 @@ use super::{
     begin::{
         AuthorizedComputePluginCandidateArtifactSet, CandidateVerificationBeginRecoveryCustody,
     },
-    compute_file_set_binding_digest, PinnedComputePluginCandidateArtifactSet,
+    compute_file_set_binding_digest,
+    hash_budget::ActiveCandidateVerificationHashBudget,
+    PinnedComputePluginCandidateArtifactSet,
 };
 use crate::{
     node_agent_compute_plugin_host::{
@@ -30,8 +32,10 @@ pub(in crate::node_agent_compute_plugin_host) enum CandidateArtifactSetHashDispo
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host) enum CandidateVerificationHashPhase {
+    BudgetAdmission,
     PreHashBinding,
     FileHash(ManagedFileHashPhase),
+    BudgetAccounting,
     PostHashBinding,
 }
 
@@ -180,11 +184,40 @@ impl CandidateVerificationHashFailure {
 
 pub(in crate::node_agent_compute_plugin_host) fn hash_authorized_candidate_artifact_set(
     authorized: AuthorizedComputePluginCandidateArtifactSet,
+    budget: super::CandidateVerificationHashBudget,
 ) -> std::result::Result<HashedComputePluginCandidateArtifactSet, CandidateVerificationHashFailure>
 {
     let (prepared, recovery_key, mut pinned) =
         authorized.into_hash_parts(CandidateVerificationHashPermit::new());
-    if let Err(error) = validate_hash_binding(&mut pinned, &prepared, &recovery_key) {
+    let expected_artifact_bytes = match u64::try_from(recovery_key.artifact_bytes()) {
+        Ok(bytes) if bytes > 0 => bytes,
+        _ => {
+            return Err(hash_failure(
+                CandidateVerificationHashPhase::BudgetAdmission,
+                None,
+                anyhow::anyhow!("COMPUTE_PLUGIN_VERIFICATION_HASH_BUDGET_BINDING_INVALID"),
+                recovery_key,
+                pinned,
+            ))
+        }
+    };
+    let mut active_budget = match budget.activate(expected_artifact_bytes) {
+        Ok(active) => active,
+        Err(error) => {
+            return Err(hash_failure(
+                CandidateVerificationHashPhase::BudgetAdmission,
+                None,
+                error,
+                recovery_key,
+                pinned,
+            ))
+        }
+    };
+    if let Err(error) =
+        validate_hash_binding_with_guard(&mut pinned, &prepared, &recovery_key, || {
+            active_budget.ensure_current()
+        })
+    {
         return Err(hash_failure(
             CandidateVerificationHashPhase::PreHashBinding,
             None,
@@ -200,7 +233,7 @@ pub(in crate::node_agent_compute_plugin_host) fn hash_authorized_candidate_artif
     let mut mismatch = None;
     let mut observations = Vec::with_capacity(recovery_key.artifact_count());
     for artifact_index in 0..pinned.artifacts.len() {
-        let hashed = match hash_one_artifact(&mut pinned, artifact_index) {
+        let hashed = match hash_one_artifact(&mut pinned, artifact_index, &active_budget) {
             Ok(hashed) => hashed,
             Err((ordinal, phase, error)) => {
                 return Err(hash_failure(
@@ -212,6 +245,15 @@ pub(in crate::node_agent_compute_plugin_host) fn hash_authorized_candidate_artif
                 ))
             }
         };
+        if let Err(error) = active_budget.record_hashed(hashed.expected_len) {
+            return Err(hash_failure(
+                CandidateVerificationHashPhase::BudgetAccounting,
+                Some(hashed.ordinal),
+                error,
+                recovery_key,
+                pinned,
+            ));
+        }
         hashed_artifact_count += 1;
         hashed_artifact_bytes = match hashed_artifact_bytes.checked_add(hashed.expected_len) {
             Some(total) => total,
@@ -243,7 +285,11 @@ pub(in crate::node_agent_compute_plugin_host) fn hash_authorized_candidate_artif
         });
     }
 
-    if let Err(error) = validate_hash_binding(&mut pinned, &prepared, &recovery_key) {
+    if let Err(error) =
+        validate_hash_binding_with_guard(&mut pinned, &prepared, &recovery_key, || {
+            active_budget.ensure_current()
+        })
+    {
         return Err(hash_failure(
             CandidateVerificationHashPhase::PostHashBinding,
             None,
@@ -298,6 +344,15 @@ pub(in crate::node_agent_compute_plugin_host) fn hash_authorized_candidate_artif
         observed_artifact_set_digest,
         mismatch,
     );
+    if let Err(error) = active_budget.finish(hashed_artifact_bytes) {
+        return Err(hash_failure(
+            CandidateVerificationHashPhase::BudgetAccounting,
+            None,
+            error,
+            recovery_key,
+            pinned,
+        ));
+    }
     if let Err(error) = pinned.cancellation_guard.ensure_current() {
         return Err(hash_failure(
             CandidateVerificationHashPhase::PostHashBinding,
@@ -342,13 +397,15 @@ pub(in crate::node_agent_compute_plugin_host) fn abandon_hashed_candidate_artifa
 fn hash_one_artifact(
     pinned: &mut PinnedComputePluginCandidateArtifactSet,
     artifact_index: usize,
+    budget: &ActiveCandidateVerificationHashBudget,
 ) -> std::result::Result<HashedCandidateArtifact, (usize, ManagedFileHashPhase, Error)> {
     let cancellation_guard = &pinned.cancellation_guard;
     let artifact = &mut pinned.artifacts[artifact_index];
     let hashed: ManagedFileHashResult = artifact
         .file
         .hash_sha256_and_revalidate(artifact.expected_len, || {
-            cancellation_guard.ensure_current()
+            cancellation_guard.ensure_current()?;
+            budget.ensure_current()
         })
         .map_err(|failure| {
             let phase = failure.phase();
@@ -370,6 +427,16 @@ pub(super) fn validate_hash_binding(
     prepared: &crate::node_agent_compute_plugin_host::local_authority::ComputePluginPreparedCandidateVerificationFacts,
     key: &super::ComputePluginCandidateVerificationRecoveryKey,
 ) -> Result<()> {
+    validate_hash_binding_with_guard(pinned, prepared, key, || Ok(()))
+}
+
+fn validate_hash_binding_with_guard(
+    pinned: &mut PinnedComputePluginCandidateArtifactSet,
+    prepared: &crate::node_agent_compute_plugin_host::local_authority::ComputePluginPreparedCandidateVerificationFacts,
+    key: &super::ComputePluginCandidateVerificationRecoveryKey,
+    mut ensure_budget: impl FnMut() -> Result<()>,
+) -> Result<()> {
+    ensure_budget()?;
     pinned.cancellation_guard.ensure_current()?;
     let artifact_bytes = pinned.artifacts.iter().try_fold(0_u64, |total, artifact| {
         total.checked_add(artifact.expected_len)
@@ -403,9 +470,11 @@ pub(super) fn validate_hash_binding(
         bail!("COMPUTE_PLUGIN_VERIFICATION_HASH_BINDING_INVALID");
     }
     for artifact in &mut pinned.artifacts {
+        ensure_budget()?;
         pinned.cancellation_guard.ensure_current()?;
         artifact.file.revalidate_exact_len(artifact.expected_len)?;
     }
+    ensure_budget()?;
     pinned.cancellation_guard.ensure_current()?;
     let rebound = compute_file_set_binding_digest(
         &pinned.verification_id,
@@ -417,6 +486,7 @@ pub(super) fn validate_hash_binding(
     if rebound != pinned.file_set_binding_digest {
         bail!("COMPUTE_PLUGIN_VERIFICATION_HASH_FILE_SET_CHANGED");
     }
+    ensure_budget()?;
     Ok(())
 }
 

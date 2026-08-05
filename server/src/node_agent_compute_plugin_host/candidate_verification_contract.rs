@@ -25,6 +25,7 @@ use super::{
 
 mod begin;
 mod hash;
+mod hash_budget;
 mod post_hash;
 mod recovery;
 mod resolution;
@@ -40,6 +41,7 @@ pub(in crate::node_agent_compute_plugin_host) use hash::{
     CandidateArtifactSetHashDisposition, CandidateVerificationHashFailure,
     CandidateVerificationHashPhase, HashedComputePluginCandidateArtifactSet,
 };
+pub(in crate::node_agent_compute_plugin_host) use hash_budget::CandidateVerificationHashBudget;
 pub(in crate::node_agent_compute_plugin_host) use post_hash::{
     abandon_trusted_hashed_candidate_artifact_set, bind_hashed_candidate_artifact_set,
     CandidateVerificationPostHashBindingFailure, CandidateVerificationPostHashBindingPhase,
