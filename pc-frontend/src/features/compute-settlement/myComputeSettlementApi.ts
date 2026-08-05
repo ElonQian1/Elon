@@ -5,14 +5,6 @@ import {
   type SettlementWithdrawalTerminal,
   type WithdrawalStatus,
 } from './computeSettlementApi'
-import {
-  type ComputeSettlementChallengeHistoryResponse,
-} from '../compute-attempt/settlementChallengeHistoryContracts'
-
-export type {
-  ComputeSettlementChallengeHistoryItem,
-} from '../compute-attempt/settlementChallengeHistoryContracts'
-
 export interface MyComputeProvider {
   provider_id: string
   provider_kind: string
@@ -111,10 +103,6 @@ export const myComputeSettlementApi = {
     api.get<SettlementWithdrawalQueuePage>(
       `/api/me/compute/providers/${encodeURIComponent(providerId)}/settlement-withdrawal-queue?status=${encodeURIComponent(status)}&limit=${limit}`,
     ),
-  challengeHistory: (providerId: string, limit = 100) =>
-    api.get<ComputeSettlementChallengeHistoryResponse>(
-      `/api/me/compute/providers/${encodeURIComponent(providerId)}/settlement-challenges/history?limit=${limit}`,
-    ).then((response) => response.challenge_history),
   createWithdrawal: (providerId: string, body: CreateMyWithdrawalBody) =>
     api.post<SettlementWithdrawalRequest>(
       `/api/me/compute/providers/${encodeURIComponent(providerId)}/settlement-withdrawals`,

@@ -19,13 +19,16 @@ import {
   myComputeSettlementApi,
   type CreateMyWithdrawalBody,
   type CreateMyComputeProviderBody,
-  type ComputeSettlementChallengeHistoryItem,
   type MyComputeProvider,
   type ProviderSettlementAccount,
 } from './myComputeSettlementApi'
 import CreateComputeProviderDialog from './CreateComputeProviderDialog'
 import WithdrawalRequestDialog from './WithdrawalRequestDialog'
-import SettlementChallengeHistoryList from './SettlementChallengeHistoryList'
+import SettlementLifecycleHistoryList from './SettlementLifecycleHistoryList'
+import {
+  computeSettlementLifecycleApi,
+  type ComputeSettlementLifecycleHistoryItem,
+} from './computeSettlementLifecycleApi'
 import styles from './MyComputeSettlementPage.module.css'
 
 const STATUS_FILTERS: Array<{ value: WithdrawalStatus; label: string }> = [
@@ -41,7 +44,7 @@ export default function MyComputeSettlementPage() {
   const [providerId, setProviderId] = useState('')
   const [account, setAccount] = useState<ProviderSettlementAccount | null>(null)
   const [queue, setQueue] = useState<SettlementWithdrawalQueuePage | null>(null)
-  const [challengeHistory, setChallengeHistory] = useState<ComputeSettlementChallengeHistoryItem[]>([])
+  const [settlementHistory, setSettlementHistory] = useState<ComputeSettlementLifecycleHistoryItem[]>([])
   const [status, setStatus] = useState<WithdrawalStatus>('all')
   const [loadingProviders, setLoadingProviders] = useState(false)
   const [loadingAccount, setLoadingAccount] = useState(false)
@@ -80,20 +83,20 @@ export default function MyComputeSettlementPage() {
     if (!providerId) {
       setAccount(null)
       setQueue(null)
-      setChallengeHistory([])
+      setSettlementHistory([])
       return
     }
     setLoadingAccount(true)
     setError('')
     try {
-      const [nextAccount, nextQueue, nextChallengeHistory] = await Promise.all([
+      const [nextAccount, nextQueue, nextSettlementHistory] = await Promise.all([
         myComputeSettlementApi.account(providerId),
         myComputeSettlementApi.withdrawals(providerId, status),
-        myComputeSettlementApi.challengeHistory(providerId),
+        computeSettlementLifecycleApi.listProvider(providerId),
       ])
       setAccount(nextAccount)
       setQueue(nextQueue)
-      setChallengeHistory(nextChallengeHistory)
+      setSettlementHistory(nextSettlementHistory)
     } catch (reason) {
       setError(messageOf(reason, '算力收益读取失败'))
     } finally {
@@ -225,7 +228,7 @@ export default function MyComputeSettlementPage() {
             <Balance label="已退回" value={account?.returned_to_available_micros} detail="取消或拒绝" tone="returned" />
           </section>
 
-          <SettlementChallengeHistoryList items={challengeHistory} loading={loadingAccount} />
+          <SettlementLifecycleHistoryList items={settlementHistory} loading={loadingAccount} />
 
           <section className={styles.section}>
             <header className={styles.sectionHeader}>

@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { CircleCheck, LoaderCircle, RefreshCw, Scale, ShieldAlert, Undo2 } from 'lucide-react'
 import OpenSettlementChallengeDialog from './OpenSettlementChallengeDialog'
 import WithdrawSettlementChallengeDialog from './WithdrawSettlementChallengeDialog'
-import SettlementChallengeHistoryList from './SettlementChallengeHistoryList'
+import SettlementLifecycleHistoryList from './SettlementLifecycleHistoryList'
+import {
+  computeSettlementLifecycleApi,
+  type ComputeSettlementLifecycleHistoryItem,
+} from './computeSettlementLifecycleApi'
 import {
   computeSettlementChallengeApi,
   type ComputePendingSettlementChallengeCandidate,
@@ -12,7 +16,6 @@ import {
 import {
   computeSettlementChallengeResolutionApi,
   type ComputeSettlementChallengeResolutionReceipt,
-  type ComputeSettlementChallengeHistoryItem,
   type WithdrawComputeSettlementChallengeBody,
 } from './computeSettlementChallengeResolutionApi'
 import { formatFen, formatMicros } from './settlementFormatting'
@@ -22,7 +25,7 @@ export default function ComputeSettlementChallengePage() {
   const [candidates, setCandidates] = useState<ComputePendingSettlementChallengeCandidate[]>([])
   const [selected, setSelected] = useState<ComputePendingSettlementChallengeCandidate | null>(null)
   const [openChallenges, setOpenChallenges] = useState<ComputeSettlementChallengeReceipt[]>([])
-  const [history, setHistory] = useState<ComputeSettlementChallengeHistoryItem[]>([])
+  const [history, setHistory] = useState<ComputeSettlementLifecycleHistoryItem[]>([])
   const [selectedWithdrawal, setSelectedWithdrawal] = useState<ComputeSettlementChallengeReceipt | null>(null)
   const [latest, setLatest] = useState<ComputeSettlementChallengeReceipt | null>(null)
   const [latestResolution, setLatestResolution] = useState<ComputeSettlementChallengeResolutionReceipt | null>(null)
@@ -38,7 +41,7 @@ export default function ComputeSettlementChallengePage() {
       const [pending, open, nextHistory] = await Promise.all([
         computeSettlementChallengeApi.listPending(),
         computeSettlementChallengeResolutionApi.listConsumerOpen(),
-        computeSettlementChallengeResolutionApi.listConsumerHistory(),
+        computeSettlementLifecycleApi.listConsumer(),
       ])
       setCandidates(pending)
       setOpenChallenges(open)
@@ -146,7 +149,7 @@ export default function ComputeSettlementChallengePage() {
         </div>
       </section>
 
-      <SettlementChallengeHistoryList items={history} loading={loading} />
+      <SettlementLifecycleHistoryList items={history} loading={loading} />
 
       {selected && <OpenSettlementChallengeDialog candidate={selected} busy={busy} error={dialogError} onClose={() => { if (!busy) setSelected(null) }} onSubmit={openChallenge} />}
       {selectedWithdrawal && <WithdrawSettlementChallengeDialog challenge={selectedWithdrawal} busy={busy} error={dialogError} onClose={() => { if (!busy) setSelectedWithdrawal(null) }} onSubmit={withdrawChallenge} />}

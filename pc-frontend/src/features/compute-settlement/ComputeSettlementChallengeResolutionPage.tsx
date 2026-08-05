@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { CircleCheck, Gavel, LoaderCircle, RefreshCw, ShieldAlert } from 'lucide-react'
 import ResolveSettlementChallengeDialog from './ResolveSettlementChallengeDialog'
-import SettlementChallengeHistoryList from './SettlementChallengeHistoryList'
+import SettlementLifecycleHistoryList from './SettlementLifecycleHistoryList'
+import {
+  computeSettlementLifecycleApi,
+  type ComputeSettlementLifecycleHistoryItem,
+} from './computeSettlementLifecycleApi'
 import {
   computeSettlementChallengeResolutionApi,
   type ComputeSettlementChallengeReceipt,
-  type ComputeSettlementChallengeHistoryItem,
   type ComputeSettlementChallengeResolutionReceipt,
   type ResolveComputeSettlementChallengeBody,
 } from './computeSettlementChallengeResolutionApi'
@@ -13,7 +16,7 @@ import styles from './ComputeSettlementChallengePage.module.css'
 
 export default function ComputeSettlementChallengeResolutionPage() {
   const [challenges, setChallenges] = useState<ComputeSettlementChallengeReceipt[]>([])
-  const [history, setHistory] = useState<ComputeSettlementChallengeHistoryItem[]>([])
+  const [history, setHistory] = useState<ComputeSettlementLifecycleHistoryItem[]>([])
   const [selected, setSelected] = useState<ComputeSettlementChallengeReceipt | null>(null)
   const [latest, setLatest] = useState<ComputeSettlementChallengeResolutionReceipt | null>(null)
   const [loading, setLoading] = useState(false)
@@ -27,7 +30,7 @@ export default function ComputeSettlementChallengeResolutionPage() {
     try {
       const [open, nextHistory] = await Promise.all([
         computeSettlementChallengeResolutionApi.listAdminOpen(),
-        computeSettlementChallengeResolutionApi.listAdminHistory(),
+        computeSettlementLifecycleApi.listAdmin(),
       ])
       setChallenges(open)
       setHistory(nextHistory)
@@ -89,7 +92,7 @@ export default function ComputeSettlementChallengeResolutionPage() {
           ))}
         </div>
       </section>
-      <SettlementChallengeHistoryList items={history} loading={loading} />
+      <SettlementLifecycleHistoryList items={history} loading={loading} />
       {selected && <ResolveSettlementChallengeDialog challenge={selected} busy={busy} error={dialogError} onClose={() => { if (!busy) setSelected(null) }} onSubmit={resolve} />}
     </main>
   )
