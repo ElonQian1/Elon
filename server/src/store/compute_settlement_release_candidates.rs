@@ -32,6 +32,7 @@ pub(crate) struct ComputeSettlementReleaseCandidatePage {
     pub schema: String,
     pub as_of: String,
     pub limit: usize,
+    pub total_due_candidates: usize,
     pub has_more: bool,
     pub next_cursor: Option<String>,
     pub candidates: Vec<ComputeSettlementReleaseCandidate>,
@@ -63,6 +64,7 @@ impl Store {
             ))
             .context("到期结算释放扫描截止时间超出范围")?;
         let conn = self.conn()?;
+        let total_due_candidates = total_due_candidates_on(&conn, &cutoff.to_rfc3339())?;
         let lease_ids = due_lease_ids_on(
             &conn,
             &cutoff.to_rfc3339(),
@@ -84,6 +86,7 @@ impl Store {
             schema: "compute_federation.settlement_release_candidate_page.v1".to_string(),
             as_of: as_of.to_rfc3339(),
             limit,
+            total_due_candidates,
             has_more,
             next_cursor,
             candidates,
@@ -91,6 +94,19 @@ impl Store {
             external_transfer_effect: "none".to_string(),
         })
     }
+}
+
+fn total_due_candidates_on(conn: &Connection, cutoff: &str) -> Result<usize> {
+    let count = conn.query_row(
+        "SELECT COUNT(*)
+           FROM compute_attempt_settlements s
+           LEFT JOIN compute_settlement_releases r
+             ON r.settlement_receipt_id=s.settlement_receipt_id
+          WHERE r.release_id IS NULL AND s.settled_at<=?1",
+        params![cutoff],
+        |row| row.get::<_, i64>(0),
+    )?;
+    usize::try_from(count).context("到期结算释放候选总数超出平台范围")
 }
 
 fn due_lease_ids_on(
