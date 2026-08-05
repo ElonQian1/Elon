@@ -185,21 +185,21 @@ impl Store {
 }
 
 #[derive(Debug, Clone)]
-struct StoredQuarantine {
-    quarantine_id: String,
-    application_id: String,
-    request_id: String,
-    provider_id: String,
-    pool_id: String,
+pub(super) struct StoredQuarantine {
+    pub(super) quarantine_id: String,
+    pub(super) application_id: String,
+    pub(super) request_id: String,
+    pub(super) provider_id: String,
+    pub(super) pool_id: String,
     application_digest: String,
     previous_provider_policy_revision: i64,
     previous_provider_digest: String,
-    quarantined_provider_policy_revision: i64,
-    quarantined_provider_digest: String,
-    capacity_epoch: i64,
+    pub(super) quarantined_provider_policy_revision: i64,
+    pub(super) quarantined_provider_digest: String,
+    pub(super) capacity_epoch: i64,
     pool_lifecycle_event_id: String,
     reason: String,
-    quarantine_digest: String,
+    pub(super) quarantine_digest: String,
     quarantined_by_user_id: String,
     quarantined_at: String,
 }
@@ -246,7 +246,7 @@ fn validate_replay(
     audit_quarantine_on(conn, existing)
 }
 
-fn audit_quarantine_on(conn: &Connection, stored: &StoredQuarantine) -> Result<()> {
+pub(super) fn audit_quarantine_on(conn: &Connection, stored: &StoredQuarantine) -> Result<()> {
     let application = application_by_request_on(conn, &stored.request_id)?
         .ok_or_else(|| anyhow!("隔离回执引用的激活应用不存在"))?;
     audit_applied_state_on(conn, &application)?;
@@ -331,7 +331,7 @@ fn quarantine_by_application_on(
     quarantine_on(conn, "WHERE application_id=?1", params![application_id])
 }
 
-fn quarantine_by_request_on(
+pub(super) fn quarantine_by_request_on(
     conn: &Connection,
     request_id: &str,
 ) -> Result<Option<StoredQuarantine>> {

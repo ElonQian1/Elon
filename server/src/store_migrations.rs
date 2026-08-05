@@ -238,6 +238,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (201, "分布式算力 Provider 提现唯一终态", crate::compute_settlement_withdrawal_terminal_migration::migration_v201),
     (202, "分布式算力到期释放批次意图与完成回执", crate::compute_settlement_release_batch_migration::migration_v202),
     (203, "分布式算力激活计划双人复核回执", crate::compute_activation_plan_review_migration::migration_v203),
+    (204, "分布式算力隔离恢复计划、复核与应用", crate::compute_activation_recovery_migration::migration_v204),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

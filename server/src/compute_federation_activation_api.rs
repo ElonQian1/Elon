@@ -20,6 +20,10 @@ use crate::{
     compute_federation_activation_quarantine_service::{
         self, QuarantineComputeActivationApplicationBody,
     },
+    compute_federation_activation_recovery_service::{
+        self, ApplyActivationRecoveryPlanBody, PrepareActivationRecoveryPlanBody,
+        ReviewActivationRecoveryPlanBody,
+    },
     compute_federation_activation_service::{
         self, CancelMyComputeActivationEvidenceRequest, ReviewComputeActivationEvidenceRequestBody,
         SubmitMyComputeActivationEvidenceRequest,
@@ -81,6 +85,18 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/application/quarantine",
             get(get_activation_quarantine).post(quarantine_activation_application),
+        )
+        .route(
+            "/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan",
+            get(get_activation_recovery_plan).post(prepare_activation_recovery_plan),
+        )
+        .route(
+            "/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/review",
+            get(get_activation_recovery_review).post(review_activation_recovery_plan),
+        )
+        .route(
+            "/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/application",
+            get(get_activation_recovery_application).post(apply_activation_recovery_plan),
         )
 }
 
@@ -414,6 +430,103 @@ async fn get_activation_quarantine(
     activation_response(
         compute_federation_activation_quarantine_service::get_for_review(&state.store, &request_id)
             .map(|quarantine| json!({"activation_quarantine":quarantine})),
+    )
+}
+
+async fn prepare_activation_recovery_plan(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+    Json(request): Json<PrepareActivationRecoveryPlanBody>,
+) -> Response {
+    let actor = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    activation_response(compute_federation_activation_recovery_service::prepare(
+        &state.store,
+        &actor,
+        &request_id,
+        request,
+    ))
+}
+async fn get_activation_recovery_plan(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    activation_response(
+        state
+            .store
+            .compute_activation_recovery_plan_for_request(&request_id)
+            .map(|plan| json!({"activation_recovery_plan":plan})),
+    )
+}
+async fn review_activation_recovery_plan(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+    Json(request): Json<ReviewActivationRecoveryPlanBody>,
+) -> Response {
+    let actor = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    activation_response(compute_federation_activation_recovery_service::review(
+        &state.store,
+        &actor,
+        &request_id,
+        request,
+    ))
+}
+async fn get_activation_recovery_review(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    activation_response(
+        state
+            .store
+            .compute_activation_recovery_review_for_request(&request_id)
+            .map(|review| json!({"activation_recovery_review":review})),
+    )
+}
+async fn apply_activation_recovery_plan(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+    Json(request): Json<ApplyActivationRecoveryPlanBody>,
+) -> Response {
+    let actor = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    activation_response(compute_federation_activation_recovery_service::apply(
+        &state.store,
+        &actor,
+        &request_id,
+        request,
+    ))
+}
+async fn get_activation_recovery_application(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    activation_response(
+        state
+            .store
+            .compute_activation_recovery_application_for_request(&request_id)
+            .map(|application| json!({"activation_recovery_application":application})),
     )
 }
 

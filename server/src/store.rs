@@ -31,6 +31,7 @@ mod compute_activation_plan_dependencies;
 mod compute_activation_plan_reviews;
 mod compute_activation_plans;
 mod compute_activation_quarantines;
+mod compute_activation_recoveries;
 mod compute_activation_requests;
 mod compute_attempt_aborts;
 mod compute_attempt_activations;
@@ -270,6 +271,10 @@ pub(crate) use compute_activation_plan_reviews::{
 };
 pub(crate) use compute_activation_plans::PrepareComputeActivationPlan;
 pub(crate) use compute_activation_quarantines::QuarantineComputeActivationApplication;
+pub(crate) use compute_activation_recoveries::{
+    ApplyComputeActivationRecoveryPlan, PrepareComputeActivationRecoveryPlan,
+    ReviewComputeActivationRecoveryPlan,
+};
 pub(crate) use compute_activation_requests::{
     ReviewComputeActivationEvidenceRequest, SubmitComputeActivationEvidenceRequest,
 };
