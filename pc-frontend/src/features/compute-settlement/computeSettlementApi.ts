@@ -42,6 +42,8 @@ export interface SettlementReleaseCandidatePage {
   schema: string
   as_of: string
   limit: number
+  has_more: boolean
+  next_cursor?: string | null
   candidates: SettlementReleaseCandidate[]
   money_effect: string
   external_transfer_effect: string
@@ -51,6 +53,8 @@ export interface SettlementReleaseBatchReport {
   schema: string
   scanned: number
   eligible: number
+  has_more: boolean
+  next_cursor?: string | null
   released: Array<{ release_id: string; lease_id: string; replayed: boolean }>
   skipped: SettlementReleaseCandidate[]
   failed: Array<{ lease_id: string; settlement_receipt_id: string; error: string }>
@@ -131,13 +135,17 @@ export interface SettlementWithdrawalQueuePage {
 export const computeSettlementApi = {
   platformAccount: () =>
     api.get<PlatformSettlementAccount>('/api/admin/compute/settlement-account'),
-  dueReleases: (limit = 50) =>
-    api.get<SettlementReleaseCandidatePage>(
-      `/api/admin/compute/settlement-releases/due?limit=${limit}`,
-    ),
-  releaseDue: (limit = 50) =>
+  dueReleases: (limit = 50, cursor?: string | null) => {
+    const query = new URLSearchParams({ limit: String(limit) })
+    if (cursor) query.set('cursor', cursor)
+    return api.get<SettlementReleaseCandidatePage>(
+      `/api/admin/compute/settlement-releases/due?${query.toString()}`,
+    )
+  },
+  releaseDue: (limit = 50, cursor?: string | null) =>
     api.post<SettlementReleaseBatchReport>('/api/admin/compute/settlement-releases/due', {
       limit,
+      cursor: cursor || undefined,
       confirm_each_item_uses_v198_internal_release_only: true,
     }),
   withdrawals: (status: WithdrawalStatus, limit = 50) =>

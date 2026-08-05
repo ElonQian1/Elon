@@ -366,6 +366,41 @@
   font-size: 12px;
 }
 
+.pageActions {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding: 8px 14px;
+}
+
+.pageActions button {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 0 9px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.pageActions button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.pageActions button:not(:disabled):hover {
+  border-color: rgba(121, 168, 232, .5);
+  color: var(--text-primary);
+}
+
 .denied {
   min-height: 100%;
   display: grid;

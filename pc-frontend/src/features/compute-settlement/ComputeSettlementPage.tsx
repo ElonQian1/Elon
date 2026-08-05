@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
   ArrowRight,
+  ChevronRight,
   CircleCheck,
   Clock3,
   FileCheck2,
   RefreshCw,
+  RotateCcw,
   ShieldCheck,
   TriangleAlert,
   WalletCards,
@@ -36,6 +38,7 @@ export default function ComputeSettlementPage() {
   const isAdmin = user?.role === 'admin' || user?.role === 'owner'
   const [account, setAccount] = useState<PlatformSettlementAccount | null>(null)
   const [due, setDue] = useState<SettlementReleaseCandidatePage | null>(null)
+  const [dueCursor, setDueCursor] = useState<string | null>(null)
   const [withdrawals, setWithdrawals] = useState<SettlementWithdrawalQueuePage | null>(null)
   const [withdrawalStatus, setWithdrawalStatus] = useState<WithdrawalStatus>('pending')
   const [loading, setLoading] = useState(false)
@@ -52,7 +55,7 @@ export default function ComputeSettlementPage() {
     try {
       const [nextAccount, nextDue, nextWithdrawals] = await Promise.all([
         computeSettlementApi.platformAccount(),
-        computeSettlementApi.dueReleases(),
+        computeSettlementApi.dueReleases(50, dueCursor),
         computeSettlementApi.withdrawals(withdrawalStatus),
       ])
       setAccount(nextAccount)
@@ -63,7 +66,7 @@ export default function ComputeSettlementPage() {
     } finally {
       setLoading(false)
     }
-  }, [isAdmin, withdrawalStatus])
+  }, [dueCursor, isAdmin, withdrawalStatus])
 
   useEffect(() => {
     void load()
@@ -74,19 +77,28 @@ export default function ComputeSettlementPage() {
     [due],
   )
 
+  function refreshFromFirstPage() {
+    if (dueCursor) {
+      setDueCursor(null)
+      return
+    }
+    void load()
+  }
+
   async function releaseDue() {
     if (eligibleCount === 0 || releasing) return
     const confirmed = window.confirm(
-      `将逐笔释放 ${eligibleCount} 笔已到期结算到内部可用余额。继续吗？`,
+      `将逐笔释放当前页 ${eligibleCount} 笔已到期结算到内部可用余额。继续吗？`,
     )
     if (!confirmed) return
     setReleasing(true)
     setError('')
     setNotice('')
     try {
-      const report = await computeSettlementApi.releaseDue()
+      const report = await computeSettlementApi.releaseDue(50, dueCursor)
       setNotice(batchMessage(report))
-      await load()
+      if (dueCursor) setDueCursor(null)
+      else await load()
     } catch (reason) {
       setError(messageOf(reason, '到期结算释放失败'))
     } finally {
@@ -133,13 +145,13 @@ export default function ComputeSettlementPage() {
           <p>核对平台收益、释放到期结算并查看 Provider 提款状态。</p>
         </div>
         <div className={styles.actions}>
-          <button type="button" className={styles.secondaryButton} onClick={() => void load()} disabled={loading}>
+          <button type="button" className={styles.secondaryButton} onClick={refreshFromFirstPage} disabled={loading}>
             <RefreshCw size={15} className={loading ? styles.spinning : ''} aria-hidden="true" />
             刷新
           </button>
           <button type="button" className={styles.primaryButton} onClick={() => void releaseDue()} disabled={releasing || eligibleCount === 0}>
             <CircleCheck size={15} aria-hidden="true" />
-            {releasing ? '正在释放' : `释放 ${eligibleCount} 笔`}
+            {releasing ? '正在释放' : `释放本页 ${eligibleCount} 笔`}
           </button>
         </div>
       </header>
@@ -188,6 +200,22 @@ export default function ComputeSettlementPage() {
           ))}
           {!loading && (due?.candidates.length ?? 0) === 0 && <EmptyRow icon={<Clock3 size={18} />} text="暂无到期结算" />}
         </div>
+        {(dueCursor || due?.has_more) && (
+          <div className={styles.pageActions} aria-label="到期释放分页">
+            {dueCursor && (
+              <button type="button" onClick={() => setDueCursor(null)} disabled={loading || releasing}>
+                <RotateCcw size={14} aria-hidden="true" />
+                返回第一页
+              </button>
+            )}
+            {due?.has_more && due.next_cursor && (
+              <button type="button" onClick={() => setDueCursor(due.next_cursor ?? null)} disabled={loading || releasing}>
+                下一页
+                <ChevronRight size={14} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       <section className={styles.section}>
