@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CircleCheck, LoaderCircle, RefreshCw, RotateCcw, ShieldAlert, UserRoundCheck } from 'lucide-react'
+import { CircleCheck, LoaderCircle, RefreshCw, RotateCcw, ShieldAlert, ShieldX, UserRoundCheck } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import ApplyActivationRecoveryDialog from './ApplyActivationRecoveryDialog'
+import LifecycleReasonDialog from './LifecycleReasonDialog'
 import PrepareActivationRecoveryDialog from './PrepareActivationRecoveryDialog'
 import ReviewActivationRecoveryDialog from './ReviewActivationRecoveryDialog'
 import {
@@ -11,6 +12,7 @@ import {
   type ComputeActivationRecoveryPlan,
   type ComputeActivationRecoveryPreflight,
   type ComputeActivationRecoveryReview,
+  type ComputeActivationRecoverySupersession,
   type PrepareActivationRecoveryPlanBody,
 } from './computeActivationAdminApi'
 import styles from './ActivationPlanPanel.module.css'
@@ -27,22 +29,30 @@ export default function ActivationRecoveryPanel({ requestId, quarantine, onChang
   const [review, setReview] = useState<ComputeActivationRecoveryReview | null>(null)
   const [preflight, setPreflight] = useState<ComputeActivationRecoveryPreflight | null>(null)
   const [application, setApplication] = useState<ComputeActivationRecoveryApplication | null>(null)
+  const [supersession, setSupersession] = useState<ComputeActivationRecoverySupersession | null>(null)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [prepareOpen, setPrepareOpen] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [applyOpen, setApplyOpen] = useState(false)
+  const [supersedeOpen, setSupersedeOpen] = useState(false)
   const [error, setError] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const nextPlan = (await computeActivationAdminApi.recoveryPlan(requestId)).activation_recovery_plan
+      const [planResponse, applicationResponse, supersessionResponse] = await Promise.all([
+        computeActivationAdminApi.recoveryPlan(requestId),
+        computeActivationAdminApi.recoveryApplication(requestId),
+        computeActivationAdminApi.recoverySupersession(requestId),
+      ])
+      const nextPlan = planResponse.activation_recovery_plan
       setPlan(nextPlan)
       setReview(nextPlan ? (await computeActivationAdminApi.recoveryReview(requestId)).activation_recovery_review : null)
       setPreflight(nextPlan?.status === 'prepared' ? await computeActivationAdminApi.recoveryPreflight(requestId) : null)
-      setApplication((await computeActivationAdminApi.recoveryApplication(requestId)).activation_recovery_application)
+      setApplication(applicationResponse.activation_recovery_application)
+      setSupersession(supersessionResponse.activation_recovery_supersession)
     } catch (reason) {
       setError(messageOf(reason, '隔离恢复状态读取失败'))
     } finally {
@@ -109,25 +119,48 @@ export default function ActivationRecoveryPanel({ requestId, quarantine, onChang
     }
   }
 
+  async function supersede(reason: string) {
+    if (!plan || plan.status !== 'prepared' || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      await computeActivationAdminApi.supersedeRecoveryPlan(
+        requestId,
+        `activation-recovery-supersede:${plan.plan_digest}`,
+        plan.plan_digest,
+        reason,
+      )
+      setSupersedeOpen(false)
+      await load()
+      await onChanged('恢复计划已废止并保留审计回执；现在可以按最新证据重新准备。')
+    } catch (reason) {
+      setError(messageOf(reason, '隔离恢复计划废止失败'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return <section className={styles.recoverySection}>
     <header className={styles.recoveryHeader}>
       <div><RotateCcw size={17} /><div><h4>隔离恢复</h4><span>准备、第二人复核和应用彼此分离</span></div></div>
       <button type="button" onClick={() => void load()} disabled={loading} title="刷新恢复状态"><RefreshCw size={14} className={loading ? styles.spinning : ''} /></button>
     </header>
-    {error && !prepareOpen && !reviewOpen && !applyOpen && <div className={styles.error}>{error}</div>}
+    {error && !prepareOpen && !reviewOpen && !applyOpen && !supersedeOpen && <div className={styles.error}>{error}</div>}
+    {supersession && <div className={styles.supersessionReceipt}><ShieldX size={17} /><div><strong>上一份恢复计划已废止</strong><span>{formatTime(supersession.superseded_at)} · {supersession.reason} · 执行人 {shortId(supersession.superseded_by_user_id)}</span><code>{supersession.supersession_digest}</code></div></div>}
     {!plan && !application && <div className={styles.empty}><p>修复路由或硬件证据后，可准备一份绑定当前隔离摘要的新 Provider 版本。</p><button type="button" onClick={() => { setError(''); setPrepareOpen(true) }}>准备恢复计划</button></div>}
     {plan && <>
       <div className={styles.planFacts}><div><span>恢复状态</span><strong>{plan.status}</strong></div><div><span>目标版本</span><strong>{plan.target_provider_policy_revision}</strong></div><div><span>信任层</span><strong>{plan.target_provider.trust_tier}</strong></div><div><span>证据引用</span><strong>{plan.evidence_refs.length}</strong></div></div>
       <div className={styles.digest}><span>恢复计划摘要</span><code>{plan.plan_digest}</code></div>
       {review ? <div className={styles.review}><UserRoundCheck size={17} /><div><strong>恢复计划已完成第二人复核</strong><span>{formatTime(review.reviewed_at)} · 准备人 {shortId(review.prepared_by_user_id)} · 复核人 {shortId(review.reviewed_by_user_id)}</span>{review.review_note && <span>{review.review_note}</span>}<code>{review.review_digest}</code></div></div> : plan.status === 'prepared' && <div className={styles.reviewPending}><ShieldAlert size={17} /><div><strong>等待第二名管理员复核</strong><span>{plan.prepared_by_user_id === currentUserId ? '当前账号是恢复计划准备人，请换另一名管理员。' : '复核只固定计划摘要，不会解除隔离。'}</span></div>{plan.prepared_by_user_id !== currentUserId && <button type="button" onClick={() => { setError(''); setReviewOpen(true) }}>复核恢复计划</button>}</div>}
       {preflight && <div className={preflight.ready_for_apply ? styles.ready : styles.blocked}>{preflight.ready_for_apply ? <CircleCheck size={17} /> : <ShieldAlert size={17} />}<div><strong>{preflight.ready_for_apply ? '恢复计划可应用' : `${preflight.blockers.length} 项阻断`}</strong><span>{preflight.blockers.length ? preflight.blockers.map(recoveryBlockerLabel).join('、') : '旧 active Offer 已清退；应用时服务端仍会重新核对'}</span></div></div>}
-      {plan.status === 'prepared' && <div className={styles.actions}><span>当前 active Offer：{preflight?.active_offer_count ?? '读取中'}。恢复不会重新发布旧 Offer。</span><button type="button" disabled={!preflight?.ready_for_apply || loading} onClick={() => { setError(''); setApplyOpen(true) }}>应用恢复</button></div>}
+      {plan.status === 'prepared' && <div className={styles.actions}><span>当前 active Offer：{preflight?.active_offer_count ?? '读取中'}。恢复不会重新发布旧 Offer。</span><div><button type="button" className={styles.dangerAction} disabled={loading || busy} onClick={() => { setError(''); setSupersedeOpen(true) }}><ShieldX size={14} />废止计划</button><button type="button" disabled={!preflight?.ready_for_apply || loading || busy} onClick={() => { setError(''); setApplyOpen(true) }}>应用恢复</button></div></div>}
     </>}
     {application && <div className={styles.recoveryReceipt}><CircleCheck size={17} /><div><strong>隔离恢复已应用</strong><span>{formatTime(application.applied_at)} · Provider revision {application.recovered_provider_policy_revision} · Offer 未恢复</span><code>{application.application_digest}</code></div></div>}
     {loading && !plan && !application && <div className={styles.loading}><LoaderCircle size={17} className={styles.spinning} />读取恢复状态</div>}
     {prepareOpen && <PrepareActivationRecoveryDialog quarantine={quarantine} busy={busy} error={error} onClose={() => setPrepareOpen(false)} onSubmit={prepare} />}
     {reviewOpen && plan && <ReviewActivationRecoveryDialog plan={plan} busy={busy} error={error} onClose={() => setReviewOpen(false)} onSubmit={confirmReview} />}
     {applyOpen && plan && preflight && <ApplyActivationRecoveryDialog plan={plan} preflight={preflight} busy={busy} error={error} onClose={() => setApplyOpen(false)} onSubmit={apply} />}
+    {supersedeOpen && plan && <LifecycleReasonDialog title="废止隔离恢复计划" description="该操作只会把当前 prepared 恢复计划标记为 superseded，并保留计划、复核和废止回执。不会恢复或修改 Provider、Pool、Offer、节点和资金；废止后必须重新准备并由第二名管理员重新复核。" confirmLabel="确认废止" busy={busy} error={error} onClose={() => setSupersedeOpen(false)} onSubmit={supersede} />}
   </section>
 }
 

@@ -230,6 +230,29 @@ export interface ComputeActivationRecoveryApplication {
   money_effect: 'none'
 }
 
+export interface ComputeActivationRecoverySupersession {
+  schema: string
+  recovery_supersession_id: string
+  recovery_plan_id: string
+  quarantine_id: string
+  request_id: string
+  provider_id: string
+  pool_id: string
+  plan_digest: string
+  reason: string
+  request_digest: string
+  supersession_digest: string
+  superseded_by_user_id: string
+  superseded_at: string
+  replayed: boolean
+  recovery_effect: 'plan_superseded'
+  provider_effect: 'none'
+  pool_effect: 'none'
+  offer_effect: 'none'
+  node_effect: 'none'
+  money_effect: 'none'
+}
+
 export interface PrepareActivationRecoveryPlanBody {
   idempotency_key: string
   expected_quarantine_digest: string
@@ -262,6 +285,7 @@ interface ActivationRecoveryPlanResponse { activation_recovery_plan: ComputeActi
 interface ActivationRecoveryPlanReceipt { plan: ComputeActivationRecoveryPlan; replayed: boolean }
 interface ActivationRecoveryReviewResponse { activation_recovery_review: ComputeActivationRecoveryReview | null }
 interface ActivationRecoveryApplicationResponse { activation_recovery_application: ComputeActivationRecoveryApplication | null }
+interface ActivationRecoverySupersessionResponse { activation_recovery_supersession: ComputeActivationRecoverySupersession | null }
 
 function activationBase(requestId: string) {
   return `/api/admin/compute/activation-evidence-requests/${encodeURIComponent(requestId)}`
@@ -341,6 +365,22 @@ export const computeActivationAdminApi = {
     api.post<ActivationRecoveryPlanReceipt>(`${activationBase(requestId)}/activation-recovery-plan`, body),
   recoveryPreflight: (requestId: string) =>
     api.get<ComputeActivationRecoveryPreflight>(`${activationBase(requestId)}/activation-recovery-plan/preflight`),
+  recoverySupersession: (requestId: string) =>
+    api.get<ActivationRecoverySupersessionResponse>(`${activationBase(requestId)}/activation-recovery-plan/supersession`),
+  supersedeRecoveryPlan: (
+    requestId: string,
+    idempotencyKey: string,
+    expectedPlanDigest: string,
+    reason: string,
+  ) => api.post<ComputeActivationRecoverySupersession>(
+    `${activationBase(requestId)}/activation-recovery-plan/supersession`,
+    {
+      idempotency_key: idempotencyKey,
+      expected_plan_digest: expectedPlanDigest,
+      reason,
+      confirm_supersede: true,
+    },
+  ),
   recoveryReview: (requestId: string) =>
     api.get<ActivationRecoveryReviewResponse>(`${activationBase(requestId)}/activation-recovery-plan/review`),
   reviewRecoveryPlan: (
