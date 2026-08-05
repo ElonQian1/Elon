@@ -13,9 +13,17 @@ use super::{
     signed_artifact_verification::jcs_sha256_hex,
 };
 
+mod absence;
 mod attestation;
 mod comparison;
+mod enrollment;
 mod publication;
+
+pub(in crate::node_agent_compute_plugin_host) use absence::{
+    verify_rollback_anchor_absence_attestation, ComputePluginRollbackAnchorAbsenceAttestation,
+    ComputePluginSignedRollbackAnchorAbsenceAttestation,
+    VerifiedComputePluginRollbackAnchorAbsence,
+};
 
 pub(in crate::node_agent_compute_plugin_host) use attestation::{
     begin_rollback_anchor_challenge, verify_rollback_anchor_attestation,
@@ -27,6 +35,13 @@ pub(in crate::node_agent_compute_plugin_host) use attestation::{
 pub(in crate::node_agent_compute_plugin_host) use comparison::{
     assess_rollback_anchor, ComputePluginRollbackAnchorAssessment,
     ComputePluginRollbackAnchorPublishRequired, ComputePluginRollbackAnchorStartupPermit,
+};
+pub(in crate::node_agent_compute_plugin_host) use enrollment::{
+    begin_rollback_anchor_enrollment, verify_rollback_anchor_enrollment_receipt,
+    ComputePluginRollbackAnchorEnrollmentChallenge, ComputePluginRollbackAnchorEnrollmentPayload,
+    ComputePluginRollbackAnchorEnrollmentReceipt, ComputePluginRollbackAnchorEnrollmentRequest,
+    ComputePluginSignedRollbackAnchorEnrollmentReceipt,
+    ConfirmedComputePluginRollbackAnchorEnrollment,
 };
 pub(in crate::node_agent_compute_plugin_host) use publication::{
     begin_rollback_anchor_publication, verify_rollback_anchor_publication_receipt,

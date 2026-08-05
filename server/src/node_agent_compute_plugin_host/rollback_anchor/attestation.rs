@@ -40,6 +40,7 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginRollbackAnchor
     pub challenge_id: String,
     pub challenge_nonce: String,
     pub installation_id_digest: String,
+    pub anchor_id: String,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -63,7 +64,11 @@ impl ComputePluginRollbackAnchorChallenge {
         &self.request
     }
 
-    fn ensure_live(&self, now: Instant) -> Result<()> {
+    pub(super) fn expires_at(&self) -> Instant {
+        self.expires_at
+    }
+
+    pub(super) fn ensure_live(&self, now: Instant) -> Result<()> {
         if now >= self.expires_at {
             bail!("COMPUTE_PLUGIN_ROLLBACK_ANCHOR_CHALLENGE_EXPIRED");
         }
@@ -78,6 +83,7 @@ impl fmt::Debug for ComputePluginRollbackAnchorChallenge {
             .field("challenge_id", &self.request.challenge.challenge_id)
             .field("challenge_nonce", &"<redacted>")
             .field("installation_id_digest", &"<redacted>")
+            .field("anchor_id", &self.request.challenge.anchor_id)
             .field("expires_at", &"<monotonic>")
             .finish()
     }
@@ -156,10 +162,12 @@ impl fmt::Debug for VerifiedComputePluginRollbackAnchor {
 
 pub(in crate::node_agent_compute_plugin_host) fn begin_rollback_anchor_challenge(
     installation: &ComputePluginInstallationIdentity,
+    anchor_id: &str,
 ) -> Result<ComputePluginRollbackAnchorChallenge> {
     if !is_sha256(installation.digest()) {
         bail!("COMPUTE_PLUGIN_ROLLBACK_ANCHOR_INSTALLATION_INVALID");
     }
+    validate_opaque_identifier("COMPUTE_PLUGIN_ROLLBACK_ANCHOR_ID", anchor_id, 160)?;
     let random = SystemRandom::new();
     let mut challenge_id = [0_u8; RANDOM_CHALLENGE_ID_BYTES];
     let mut challenge_nonce = [0_u8; RANDOM_CHALLENGE_NONCE_BYTES];
@@ -175,6 +183,7 @@ pub(in crate::node_agent_compute_plugin_host) fn begin_rollback_anchor_challenge
         challenge_id: hex::encode(challenge_id),
         challenge_nonce: hex::encode(challenge_nonce),
         installation_id_digest: installation.digest().to_string(),
+        anchor_id: anchor_id.to_string(),
     };
     let challenge_digest = jcs_sha256_hex(&challenge)?;
     let expires_at = Instant::now()
@@ -226,7 +235,9 @@ pub(in crate::node_agent_compute_plugin_host) fn verify_rollback_anchor_attestat
     })
 }
 
-fn validate_challenge(request: &ComputePluginRollbackAnchorChallengeRequest) -> Result<()> {
+pub(super) fn validate_challenge(
+    request: &ComputePluginRollbackAnchorChallengeRequest,
+) -> Result<()> {
     if request.schema != ROLLBACK_ANCHOR_CHALLENGE_REQUEST_SCHEMA
         || request.challenge.schema != ROLLBACK_ANCHOR_CHALLENGE_PAYLOAD_SCHEMA
         || request.canonicalization != COMPUTE_PLUGIN_MANIFEST_CANONICALIZATION
@@ -244,7 +255,11 @@ fn validate_challenge(request: &ComputePluginRollbackAnchorChallengeRequest) -> 
     {
         bail!("COMPUTE_PLUGIN_ROLLBACK_ANCHOR_CHALLENGE_INVALID");
     }
-    Ok(())
+    validate_opaque_identifier(
+        "COMPUTE_PLUGIN_ROLLBACK_ANCHOR_ID",
+        &request.challenge.anchor_id,
+        160,
+    )
 }
 
 fn validate_attestation_binding(
@@ -259,6 +274,7 @@ fn validate_attestation_binding(
         || signed.signature.algorithm != COMPUTE_PLUGIN_SIGNATURE_ALGORITHM
         || !is_sha256(&signed.attestation_digest)
         || attestation.anchor_sequence <= 0
+        || attestation.anchor_id != request.challenge.anchor_id
         || attestation.challenge_id != request.challenge.challenge_id
         || attestation.challenge_digest != request.challenge_digest
         || attestation.installation_id_digest != request.challenge.installation_id_digest
