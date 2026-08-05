@@ -5,6 +5,7 @@ mod authority_fences;
 mod candidate_verification;
 mod fetch_claims;
 mod plan_application;
+mod schema_integrity;
 
 pub(super) const COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION: i64 = 3;
 const COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID: i64 = 0x454c_4350;
@@ -22,69 +23,6 @@ const REQUIRED_TABLES: &[&str] = &[
     "plan_events",
     "planned_downloads",
 ];
-const REQUIRED_INDEXES: &[&str] = &[
-    "one_owned_candidate_per_plugin",
-    "one_prepared_claim_per_download",
-    "one_prepared_verification_per_candidate",
-    "one_verified_artifact_set_per_candidate",
-];
-const REQUIRED_TRIGGERS: &[&str] = &[
-    "authority_inventory_change_fenced",
-    "authority_epoch_transition_fenced",
-    "authority_keyring_binding_fenced",
-    "authority_keyring_binding_monotonic",
-    "authority_process_owner_transition_fenced",
-    "authority_state_revision_monotonic",
-    "authority_trusted_time_recovery_fenced",
-    "authority_trusted_time_monotonic",
-    "immutable_keyring_bundles_delete",
-    "immutable_keyring_bundles_update",
-    "immutable_keyring_keys_delete",
-    "immutable_keyring_keys_update",
-    "immutable_keyring_seals_delete",
-    "immutable_keyring_seals_update",
-    "immutable_plan_applications_delete",
-    "immutable_plan_applications_update",
-    "immutable_plan_application_seals_delete",
-    "immutable_plan_application_seals_update",
-    "immutable_plan_events_delete",
-    "immutable_plan_events_update",
-    "candidate_identity_immutable",
-    "candidate_initial_state",
-    "candidate_owner_delete_forbidden",
-    "candidate_promotion_requires_receipt",
-    "candidate_release_verification_fenced",
-    "candidate_state_transition",
-    "candidate_verification_begin_fenced",
-    "candidate_verification_abort_fenced",
-    "candidate_verification_delete_forbidden",
-    "candidate_verification_identity_immutable",
-    "candidate_verification_initial_state",
-    "candidate_verification_resolution_fenced",
-    "candidate_verification_transition",
-    "candidate_close_plan_open",
-    "fetch_claim_begin_fenced",
-    "fetch_claim_delete_forbidden",
-    "fetch_claim_identity_immutable",
-    "fetch_claim_initial_state",
-    "fetch_claim_transition",
-    "keyring_bundle_revision_monotonic",
-    "keyring_control_revision_consistent",
-    "keyring_publisher_revision_consistent",
-    "keyring_seal_counts",
-    "plan_application_matches_authority",
-    "plan_application_seal_complete",
-    "plan_event_contiguous",
-    "planned_download_identity_immutable",
-    "planned_download_initial_state",
-    "planned_download_state_transition",
-    "planned_download_delete_forbidden",
-    "planned_download_fetch_progress_fenced",
-    "sealed_plan_candidate_insert",
-    "sealed_plan_download_insert",
-    "sealed_keyring_keys_insert",
-];
-
 pub(super) fn ensure_schema(connection: &mut Connection) -> Result<()> {
     let version = connection
         .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
@@ -118,21 +56,7 @@ fn install_schema_v3(connection: &mut Connection) -> Result<()> {
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_BEGIN")?;
-    transaction
-        .execute_batch(SCHEMA_V3)
-        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_CREATE_V3")?;
-    transaction
-        .execute_batch(candidate_verification::CANDIDATE_VERIFICATION_SCHEMA_V3)
-        .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_VERIFICATION_SCHEMA_CREATE_V3")?;
-    transaction
-        .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V3)
-        .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V3")?;
-    transaction
-        .execute_batch(authority_fences::AUTHORITY_FENCE_SCHEMA_V3)
-        .context("COMPUTE_PLUGIN_AUTHORITY_FENCE_SCHEMA_CREATE_V3")?;
-    transaction
-        .execute_batch(fetch_claims::FETCH_CLAIM_SCHEMA_V3)
-        .context("COMPUTE_PLUGIN_AUTHORITY_FETCH_CLAIM_SCHEMA_CREATE_V3")?;
+    create_schema_objects(&transaction)?;
     transaction
         .pragma_update(
             None,
@@ -154,9 +78,7 @@ fn install_schema_v3(connection: &mut Connection) -> Result<()> {
 }
 
 fn verify_required_objects(connection: &Connection) -> Result<()> {
-    verify_named_objects(connection, "table", REQUIRED_TABLES)?;
-    verify_named_objects(connection, "index", REQUIRED_INDEXES)?;
-    verify_named_objects(connection, "trigger", REQUIRED_TRIGGERS)?;
+    schema_integrity::verify_schema_objects(connection)?;
     let mut statement = connection
         .prepare("PRAGMA foreign_key_check")
         .context("COMPUTE_PLUGIN_AUTHORITY_FOREIGN_KEY_CHECK_PREPARE")?;
@@ -179,15 +101,6 @@ fn count_required_tables(connection: &Connection) -> Result<i64> {
     })
 }
 
-fn verify_named_objects(connection: &Connection, object_type: &str, names: &[&str]) -> Result<()> {
-    for name in names {
-        if object_exists(connection, object_type, name)? != 1 {
-            bail!("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_INCOMPLETE: missing {object_type} {name}");
-        }
-    }
-    Ok(())
-}
-
 fn object_exists(connection: &Connection, object_type: &str, name: &str) -> Result<i64> {
     connection
         .query_row(
@@ -196,6 +109,25 @@ fn object_exists(connection: &Connection, object_type: &str, name: &str) -> Resu
             |row| row.get(0),
         )
         .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_INSPECT")
+}
+
+fn create_schema_objects(connection: &Connection) -> Result<()> {
+    connection
+        .execute_batch(SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_CREATE_V3")?;
+    connection
+        .execute_batch(candidate_verification::CANDIDATE_VERIFICATION_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_VERIFICATION_SCHEMA_CREATE_V3")?;
+    connection
+        .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V3")?;
+    connection
+        .execute_batch(authority_fences::AUTHORITY_FENCE_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_FENCE_SCHEMA_CREATE_V3")?;
+    connection
+        .execute_batch(fetch_claims::FETCH_CLAIM_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_FETCH_CLAIM_SCHEMA_CREATE_V3")?;
+    Ok(())
 }
 
 const SCHEMA_V3: &str = r#"
