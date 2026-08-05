@@ -18,6 +18,7 @@ mod plan_application_projection;
 mod plan_application_replay_children;
 mod plan_application_writes;
 mod process_ownership;
+mod rollback_checkpoint;
 mod verification_store;
 
 pub(in crate::node_agent_compute_plugin_host) use fetch_store::{
@@ -35,6 +36,9 @@ pub(crate) use plan_application::{
     ComputePluginPlanApplicationReceipt, ComputePluginPlanApplicationResult,
 };
 pub(crate) use process_ownership::ComputePluginFetchProcessFence;
+pub(crate) use rollback_checkpoint::{
+    ComputePluginAuthorityRollbackCheckpoint, HashedComputePluginAuthorityRollbackCheckpoint,
+};
 pub(in crate::node_agent_compute_plugin_host) use verification_store::{
     ComputePluginCandidateArtifactAuthorityFacts, ComputePluginCandidateVerificationAuthorityFacts,
     ComputePluginCandidateVerificationOutcomeReadFailure,
