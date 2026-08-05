@@ -52,6 +52,8 @@ export interface SettlementReleaseCandidatePage {
 
 export interface SettlementReleaseBatchReport {
   schema: string
+  batch_run_id: string
+  replayed: boolean
   scanned: number
   eligible: number
   total_due_candidates: number
@@ -61,6 +63,39 @@ export interface SettlementReleaseBatchReport {
   skipped: SettlementReleaseCandidate[]
   failed: Array<{ lease_id: string; settlement_receipt_id: string; error: string }>
   transaction_scope: string
+  money_effect: string
+  external_transfer_effect: string
+}
+
+export interface SettlementReleaseBatchHistoryItem {
+  batch_run_id: string
+  requested_by_user_id: string
+  requested_limit: number
+  requested_cursor_present: boolean
+  total_due_candidates: number
+  scanned: number
+  eligible: number
+  released?: number | null
+  skipped?: number | null
+  failed?: number | null
+  status: 'completed' | 'incomplete'
+  started_at: string
+  completed_at?: string | null
+  candidate_page_digest: string
+  report_digest?: string | null
+  audit_status: string
+  transaction_scope: string
+  money_effect: string
+  external_transfer_effect: string
+}
+
+export interface SettlementReleaseBatchHistoryPage {
+  schema: string
+  as_of: string
+  limit: number
+  has_more: boolean
+  next_cursor?: string | null
+  items: SettlementReleaseBatchHistoryItem[]
   money_effect: string
   external_transfer_effect: string
 }
@@ -144,12 +179,20 @@ export const computeSettlementApi = {
       `/api/admin/compute/settlement-releases/due?${query.toString()}`,
     )
   },
-  releaseDue: (limit = 50, cursor?: string | null) =>
+  releaseDue: (limit = 50, cursor?: string | null, idempotencyKey?: string) =>
     api.post<SettlementReleaseBatchReport>('/api/admin/compute/settlement-releases/due', {
       limit,
       cursor: cursor || undefined,
+      idempotency_key: idempotencyKey,
       confirm_each_item_uses_v198_internal_release_only: true,
     }),
+  releaseBatchHistory: (limit = 20, cursor?: string | null) => {
+    const query = new URLSearchParams({ limit: String(limit) })
+    if (cursor) query.set('cursor', cursor)
+    return api.get<SettlementReleaseBatchHistoryPage>(
+      `/api/admin/compute/settlement-releases/batches?${query.toString()}`,
+    )
+  },
   withdrawals: (status: WithdrawalStatus, limit = 50) =>
     api.get<SettlementWithdrawalQueuePage>(
       `/api/admin/compute/settlement-withdrawals?status=${encodeURIComponent(status)}&limit=${limit}`,

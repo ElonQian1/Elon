@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   ArrowRight,
   ChevronRight,
   CircleCheck,
   Clock3,
   FileCheck2,
+  History,
   RefreshCw,
   RotateCcw,
   ShieldCheck,
@@ -16,6 +17,7 @@ import {
   computeSettlementApi,
   type PlatformSettlementAccount,
   type SettlementReleaseBatchReport,
+  type SettlementReleaseBatchHistoryPage,
   type SettlementReleaseCandidatePage,
   type SettlementWithdrawalRequest,
   type SettlementWithdrawalQueuePage,
@@ -39,6 +41,8 @@ export default function ComputeSettlementPage() {
   const [account, setAccount] = useState<PlatformSettlementAccount | null>(null)
   const [due, setDue] = useState<SettlementReleaseCandidatePage | null>(null)
   const [dueCursor, setDueCursor] = useState<string | null>(null)
+  const [batchHistory, setBatchHistory] = useState<SettlementReleaseBatchHistoryPage | null>(null)
+  const [batchCursor, setBatchCursor] = useState<string | null>(null)
   const [withdrawals, setWithdrawals] = useState<SettlementWithdrawalQueuePage | null>(null)
   const [withdrawalStatus, setWithdrawalStatus] = useState<WithdrawalStatus>('pending')
   const [loading, setLoading] = useState(false)
@@ -47,26 +51,29 @@ export default function ComputeSettlementPage() {
   const [selectedWithdrawal, setSelectedWithdrawal] = useState<SettlementWithdrawalRequest | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const releaseAttempt = useRef<{ cursor: string | null; idempotencyKey: string } | null>(null)
 
   const load = useCallback(async () => {
     if (!isAdmin) return
     setLoading(true)
     setError('')
     try {
-      const [nextAccount, nextDue, nextWithdrawals] = await Promise.all([
+      const [nextAccount, nextDue, nextHistory, nextWithdrawals] = await Promise.all([
         computeSettlementApi.platformAccount(),
         computeSettlementApi.dueReleases(50, dueCursor),
+        computeSettlementApi.releaseBatchHistory(20, batchCursor),
         computeSettlementApi.withdrawals(withdrawalStatus),
       ])
       setAccount(nextAccount)
       setDue(nextDue)
+      setBatchHistory(nextHistory)
       setWithdrawals(nextWithdrawals)
     } catch (reason) {
       setError(messageOf(reason, '结算数据读取失败'))
     } finally {
       setLoading(false)
     }
-  }, [dueCursor, isAdmin, withdrawalStatus])
+  }, [batchCursor, dueCursor, isAdmin, withdrawalStatus])
 
   useEffect(() => {
     void load()
@@ -78,11 +85,18 @@ export default function ComputeSettlementPage() {
   )
 
   function refreshFromFirstPage() {
-    if (dueCursor) {
+    releaseAttempt.current = null
+    if (dueCursor || batchCursor) {
       setDueCursor(null)
+      setBatchCursor(null)
       return
     }
     void load()
+  }
+
+  function changeDueCursor(cursor: string | null) {
+    releaseAttempt.current = null
+    setDueCursor(cursor)
   }
 
   async function releaseDue() {
@@ -95,10 +109,24 @@ export default function ComputeSettlementPage() {
     setError('')
     setNotice('')
     try {
-      const report = await computeSettlementApi.releaseDue(50, dueCursor)
+      const attempt = releaseAttempt.current?.cursor === dueCursor
+        ? releaseAttempt.current
+        : {
+          cursor: dueCursor,
+          idempotencyKey: newIdempotencyKey(),
+        }
+      releaseAttempt.current = attempt
+      const report = await computeSettlementApi.releaseDue(
+        50,
+        dueCursor,
+        attempt.idempotencyKey,
+      )
+      releaseAttempt.current = null
       setNotice(batchMessage(report))
-      if (dueCursor) setDueCursor(null)
-      else await load()
+      if (dueCursor || batchCursor) {
+        setDueCursor(null)
+        setBatchCursor(null)
+      } else await load()
     } catch (reason) {
       setError(messageOf(reason, '到期结算释放失败'))
     } finally {
@@ -205,13 +233,52 @@ export default function ComputeSettlementPage() {
         {(dueCursor || due?.has_more) && (
           <div className={styles.pageActions} aria-label="到期释放分页">
             {dueCursor && (
-              <button type="button" onClick={() => setDueCursor(null)} disabled={loading || releasing}>
+              <button type="button" onClick={() => changeDueCursor(null)} disabled={loading || releasing}>
                 <RotateCcw size={14} aria-hidden="true" />
                 返回第一页
               </button>
             )}
             {due?.has_more && due.next_cursor && (
-              <button type="button" onClick={() => setDueCursor(due.next_cursor ?? null)} disabled={loading || releasing}>
+              <button type="button" onClick={() => changeDueCursor(due.next_cursor ?? null)} disabled={loading || releasing}>
+                下一页
+                <ChevronRight size={14} aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className={styles.section}>
+        <header className={styles.sectionHeader}>
+          <div><h2>释放批次历史</h2><p>批次意图和完成回执独立保存；未完成不代表余额未变化。</p></div>
+          <History size={19} aria-hidden="true" />
+        </header>
+        <div className={styles.tableHeader} data-grid="batch">
+          <span>批次</span><span>开始时间</span><span>候选页</span><span>扫描</span><span>结果</span><span>状态</span>
+        </div>
+        <div className={styles.rows}>
+          {batchHistory?.items.map((item) => (
+            <div className={styles.dataRow} data-grid="batch" key={item.batch_run_id}>
+              <div><strong>{shortId(item.batch_run_id)}</strong><small>{shortDigest(item.report_digest ?? item.candidate_page_digest)}</small></div>
+              <span>{formatTime(item.started_at)}</span>
+              <span>{item.requested_cursor_present ? '续页' : '第一页'} · 共 {item.total_due_candidates}</span>
+              <span>{item.scanned} / {item.eligible} 可释放</span>
+              <span>{item.status === 'completed' ? `成功 ${item.released ?? 0} · 跳过 ${item.skipped ?? 0} · 失败 ${item.failed ?? 0}` : '等待完成回执'}</span>
+              <span className={styles.status} data-tone={item.status === 'completed' ? 'clear' : 'pending'}>{item.status === 'completed' ? '已完成' : '未完成'}</span>
+            </div>
+          ))}
+          {!loading && (batchHistory?.items.length ?? 0) === 0 && <EmptyRow icon={<History size={18} />} text="暂无释放批次" />}
+        </div>
+        {(batchCursor || batchHistory?.has_more) && (
+          <div className={styles.pageActions} aria-label="释放批次历史分页">
+            {batchCursor && (
+              <button type="button" onClick={() => setBatchCursor(null)} disabled={loading || releasing}>
+                <RotateCcw size={14} aria-hidden="true" />
+                返回第一页
+              </button>
+            )}
+            {batchHistory?.has_more && batchHistory.next_cursor && (
+              <button type="button" onClick={() => setBatchCursor(batchHistory.next_cursor ?? null)} disabled={loading || releasing}>
                 下一页
                 <ChevronRight size={14} aria-hidden="true" />
               </button>
@@ -280,6 +347,7 @@ export default function ComputeSettlementPage() {
       )}
     </main>
   )
+
 }
 
 function EmptyRow({ icon, text }: { icon: ReactNode; text: string }) {
@@ -327,7 +395,15 @@ function destinationLabel(kind: string) {
 }
 
 function batchMessage(report: SettlementReleaseBatchReport) {
-  return `已释放 ${report.released.length} 笔，跳过 ${report.skipped.length} 笔，失败 ${report.failed.length} 笔。`
+  const replay = report.replayed ? '（幂等重放）' : ''
+  return `批次 ${shortId(report.batch_run_id)}${replay}：已释放 ${report.released.length} 笔，跳过 ${report.skipped.length} 笔，失败 ${report.failed.length} 笔。`
+}
+
+function newIdempotencyKey() {
+  const suffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  return `pc-release-batch:${suffix}`
 }
 
 function messageOf(reason: unknown, fallback: string) {
