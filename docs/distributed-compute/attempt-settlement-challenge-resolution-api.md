@@ -9,7 +9,7 @@ owners: ai-economy, backend, pc-frontend
 
 ## 1. 当前实现
 
-v197、追加式 Store、独立 Service、HTTP 路由、消费者/管理员 open 挑战队列、消费者撤回入口和 PC `/compute-challenge-resolution` 管理员工作区已经写入代码，但尚未编译、执行迁移、接口联调、页面验收或发布，状态固定为 `implementation_uncompiled`。
+v197、追加式 Store、独立 Service、HTTP 路由、消费者/管理员 open 挑战队列、角色历史队列、消费者撤回入口和 PC 角色工作区已经写入代码，但尚未编译、执行迁移、接口联调、页面验收或发布，状态固定为 `implementation_uncompiled`。
 
 v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以撤回，平台 `admin/owner` 可以接受或驳回。一个挑战只能产生一种终态，撤回与管理员裁决并发时只有一个事务能成功。
 
@@ -23,10 +23,14 @@ v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以
 | POST | `/api/admin/compute/attempt-leases/:lease_id/settlement-challenge/resolution` | 平台 `admin/owner` | 接受或驳回挑战 |
 | GET | `/api/admin/compute/settlement-challenges/open` | 平台 `admin/owner` | 列出全局尚无任何 v197 终态的 open 挑战 |
 | GET | `/api/admin/compute/attempt-leases/:lease_id/settlement-challenge/resolution` | 平台 `admin/owner` | 管理侧读取并重新审计决议 |
+| GET | `/api/me/compute/settlement-challenges/history` | 原 Job 消费者 | 按时间列出本人申诉及后续决议、纠正和释放证据链 |
+| GET | `/api/admin/compute/settlement-challenges/history` | 平台 `admin/owner` | 按时间列出全局申诉及后续证据链 |
 
 所有写入必须精确绑定 v196 Challenge ID/事件摘要，提供 8 至 1000 字说明、稳定幂等键，并显式确认不会退款、纠正或移动余额。
 
 两类 open 队列先按角色筛选无决议挑战，再逐条重放 v196 Challenge 与 v195 Settlement Receipt 审计；消费者队列额外核对 `consumer_account_id`。队列只是待办入口，撤回或裁决 POST 仍在事务内重新检查唯一终态。
+
+历史队列不是数据库 JSON 直出。它逐项重放 v195 Settlement、v196 Challenge、可选 v197 Resolution、可选 v199 Correction 和可选 v198 Release，并拒绝引用错位及不允许的状态组合。PC `/compute-challenges` 展示本人历史，`/compute-challenge-resolution` 展示全局历史；历史中的 available 仅表示平台内部余额，不证明银行、钱包、Sui 或其他外部付款。
 
 ## 3. 状态和释放门卫
 
@@ -73,8 +77,10 @@ v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以
 - `server/src/compute_federation_attempt_settlement_challenge_resolution_service.rs`
 - `server/src/compute_federation_attempt_settlement_challenge_resolution_api.rs`
 - `pc-frontend/src/features/compute-attempt/settlementChallengeResolutionContracts.ts`
+- `pc-frontend/src/features/compute-attempt/settlementChallengeHistoryContracts.ts`
 - `pc-frontend/src/features/compute-settlement/ComputeSettlementChallengePage.tsx`
 - `pc-frontend/src/features/compute-settlement/ComputeSettlementChallengeResolutionPage.tsx`
+- `pc-frontend/src/features/compute-settlement/SettlementChallengeHistoryList.tsx`
 
 上游挑战见 `docs/distributed-compute/attempt-settlement-challenge-api.md`；完整市场目标见 `docs/distributed-compute/market-and-settlement.md`。
 
