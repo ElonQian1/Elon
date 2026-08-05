@@ -54,7 +54,7 @@ owners: backend, node, ai-economy
 | Attempt 结算挑战 | v196、追加式 Store、消费者待申诉队列、消费者/管理员 HTTP 与 PC `/compute-challenges` 已写；队列只返回本人仍在固定 72 小时窗口内且未挑战、未释放的 v195 回执，并逐条重审计消费者 ledger 腿、pending 状态和释放门卫。消费者可提交一份不可覆盖的挑战；它只阻断未来 pending 释放，不退款、不裁决、不移动余额，尚未编译、执行迁移、接口联调、页面验收或发布 |
 | Attempt 结算生命周期历史 | v195-v199 角色 HTTP 与共享 PC 视图已写；消费者、Provider 和管理员分别读取本人、当前 Provider 与全局全部结算。正常路径重审计 Settlement/Release，申诉路径复用 Challenge/Resolution/Correction/Release 证据链；available 仅指内部余额且不证明外部付款，尚未编译、执行迁移、接口联调、页面验收或发布 |
 | Attempt 待结算原子释放 | v198、追加式 Store、Release Posting/账本腿与消费者/管理员 HTTP 已写；满 72 小时且挑战为 none/rejected/withdrawn/accepted_corrected 时，管理员可把 Provider/平台原金额或纠正净额从 pending 原子转入 available。open/accepted 阻断，available 不等于提现或外部付款，尚未编译、执行迁移或运行验证 |
-| 到期结算释放队列与管理员批处理 | 管理员 HTTP 可读取已满 72 小时且尚无 v198 Release 的有界候选，并逐笔复用 v198 原子释放；候选重审计当前挑战门卫，blocked、失败和成功分别报告。它不是整批原子事务或后台定时器，不提现、不外部付款，尚未编译或运行验证 |
+| 到期结算释放队列与管理员批处理 | 管理员 HTTP 可按不透明 keyset 游标读取已满 72 小时且尚无 v198 Release 的有界候选，并逐笔复用 v198 原子释放；PC 明确分页与当前页处理，候选重审计挑战门卫，blocked、失败和成功分别报告。它不是整批原子事务或后台定时器，不提现、不外部付款，尚未编译或运行验证 |
 | Attempt accepted 挑战纠正 | v199、追加式 Store、accepted 待纠正队列、Correction Posting/账本腿、角色 HTTP 与 PC `/compute-corrections` 已写；候选逐条重审计 v195-v197 并排除已有 Correction/Release。管理员以整数 fen/micros、守恒预览和双重确认提交向下金额纠正，原子退款消费者平台内余额并冲减 Provider/平台 pending；纠正后 v198 只释放净额，但不等于外部退款到账，尚未编译、执行迁移、接口联调、页面验收或发布 |
 | Provider 提款申请与内部冻结 | v200、追加式 Store、Withdrawal Request Posting/账本腿与 Provider 本人 HTTP 已写；从当前 Provider 回执校验所有权和结算账户，把 CNY available 原子转入 withdrawn 保留区。它只冻结内部余额，不执行或证明外部付款，尚未编译、执行迁移或运行验证 |
 | Provider 提款唯一终态 | v201、追加式 Store、Terminal Posting/账本腿与 Provider/管理员 HTTP 已写；取消或拒绝会全额返还 withdrawn，外部已付款声明只保存证据引用和摘要且不移动余额。PC 管理页已接入拒绝与外部已付款证明登记源码。它不发起或验证外部付款，尚未编译、执行迁移、运行或页面验证 |

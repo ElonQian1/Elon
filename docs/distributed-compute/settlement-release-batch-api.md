@@ -18,7 +18,7 @@ owners: ai-economy, backend
 | GET | `/api/admin/compute/settlement-releases/due` | 平台 `admin/owner` | 读取有界的到期候选及挑战阻断原因 |
 | POST | `/api/admin/compute/settlement-releases/due` | 平台 `admin/owner` | 对当前 eligible 候选逐笔执行 v198 内部释放 |
 
-GET 与 POST 的 `limit` 默认 50，服务端限制为 1 至 100。POST 必须显式确认每一笔只执行 v198 的 `pending -> available` 内部转账。
+GET 与 POST 的 `limit` 默认 50，服务端限制为 1 至 100；两者都接受响应返回的可选不透明 `cursor`。页面使用 `settled_at + lease_id` 的稳定 keyset 顺序扫描，响应返回 `has_more` 和可选 `next_cursor`。无效、损坏或版本不匹配的游标失败关闭。POST 必须显式确认每一笔只执行 v198 的 `pending -> available` 内部转账，并且只处理当前游标页。
 
 ## 3. 候选与门卫
 
@@ -28,7 +28,7 @@ GET 与 POST 的 `limit` 默认 50，服务端限制为 1 至 100。POST 必须�
 - `open` 或尚未完成 v199 纠正的 `accepted` 保留在队列中，但标记阻断原因；
 - 审计不一致、时间异常或依赖损坏时整个读取失败关闭，不返回未经验证的候选。
 
-该队列是实时派生视图，不保存“待处理任务”，也不保证读取后状态不会发生并发变化。真正写入时，v198 会再次执行全部回执、时间、挑战、余额和 revision 检查。
+该队列是实时派生视图，不保存“待处理任务”，也不保证读取后状态不会发生并发变化。游标只定位稳定排序键，不冻结候选快照；调用方处理一页后应继续使用该页返回的 `next_cursor`，或回到第一页重新读取。真正写入时，v198 会再次执行全部回执、时间、挑战、余额和 revision 检查。
 
 ## 4. 批处理语义
 
@@ -38,7 +38,7 @@ GET 与 POST 的 `limit` 默认 50，服务端限制为 1 至 100。POST 必须�
 - 某一笔失败不会回滚此前已经成功的释放；
 - blocked 项进入 `skipped`，写入失败或并发状态变化进入 `failed`；
 - 成功项返回完整 v198 Release Receipt；
-- 报告同时给出扫描数、eligible 数以及成功、跳过和失败明细。
+- 报告同时给出扫描数、eligible 数、`has_more`、`next_cursor` 以及成功、跳过和失败明细。
 
 因此，返回批处理报告不表示“整批原子成功”。调用方必须逐项处理结果，必要时重新读取到期队列。
 
@@ -58,7 +58,7 @@ GET 与 POST 的 `limit` 默认 50，服务端限制为 1 至 100。POST 必须�
 
 - Cargo 编译、HTTP 真实调用、并发竞争和故障注入验证；
 - 后台定时扫描、任务租约、失败退避和运维告警；
-- PC 管理页源码已写但尚未构建、视觉验收或发布；游标分页、总数和批次历史仍未实现；
+- PC 管理页已按服务端游标逐页读取，并明确只释放当前页；源码尚未构建、视觉验收或发布；总数和批次历史仍未实现；
 - accepted 挑战的非金额补救和 available 事后追索；
 - 真实提款、外部支付、自动对账、多币种或 Sui 链上结算。
 
