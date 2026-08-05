@@ -20,6 +20,32 @@ internal class AppUpdateStore(context: Context) {
         prefs.edit().putString(KEY_SNAPSHOT, snapshot.toJson()).apply()
     }
 
+    fun pruneInstalledOrOlder(installedVersionCode: Int): Boolean {
+        val latestCode = latestVersion()?.versionCode
+        val snapshotCode = snapshot()?.versionCode
+        val decision = appUpdatePruneDecision(installedVersionCode, latestCode, snapshotCode)
+        if (!decision.changed) return false
+        prefs.edit().apply {
+            if (decision.clearLatestVersion) remove(KEY_LATEST_VERSION)
+            if (decision.clearSnapshot) remove(KEY_SNAPSHOT)
+            if (prefs.getInt(KEY_DISMISSED_CODE, 0) <= installedVersionCode) {
+                remove(KEY_DISMISSED_CODE)
+                remove(KEY_DISMISSED_AT)
+            }
+            if (prefs.getInt(KEY_PROMPT_CODE, 0) <= installedVersionCode) {
+                remove(KEY_PROMPT_CODE)
+                remove(KEY_PROMPT_AT)
+            }
+        }.apply()
+        return true
+    }
+
+    fun clearSnapshot(versionCode: Int): Boolean {
+        if (snapshot()?.versionCode != versionCode) return false
+        prefs.edit().remove(KEY_SNAPSHOT).apply()
+        return true
+    }
+
     fun recordAvailable(version: AppUpdateVersion) {
         saveLatestVersion(version)
         val current = snapshot()

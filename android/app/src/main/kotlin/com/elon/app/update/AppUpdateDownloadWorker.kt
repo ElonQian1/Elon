@@ -1,6 +1,7 @@
 package com.elon.app.update
 
 import android.content.Context
+import com.elon.app.BuildConfig
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -34,6 +35,12 @@ internal class AppUpdateDownloadWorker(
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val version = AppUpdateVersion.parse(inputData.getString(KEY_VERSION_JSON).orEmpty())
             ?: return@withContext Result.failure()
+        if (version.versionCode <= BuildConfig.VERSION_CODE) {
+            store.pruneInstalledOrOlder(BuildConfig.VERSION_CODE)
+            deleteDownloadedArtifacts(applicationContext)
+            AppUpdateNotifications.cancelDownloadNotification(applicationContext)
+            return@withContext Result.success()
+        }
         val partFile = File(applicationContext.getExternalFilesDir(null), PART_FILE_NAME)
         val apkFile = File(applicationContext.getExternalFilesDir(null), APK_FILE_NAME)
         val initialBytes = partFile.takeIf { it.isFile }?.length() ?: 0L
@@ -292,6 +299,18 @@ internal class AppUpdateDownloadWorker(
             WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
             AppUpdateStore(context).recordAvailable(version)
             AppUpdateNotifications.cancelDownloadNotification(context)
+        }
+
+        fun discardDownloadedPackage(context: Context) {
+            WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
+            deleteDownloadedArtifacts(context)
+            AppUpdateNotifications.cancelDownloadNotification(context)
+        }
+
+        private fun deleteDownloadedArtifacts(context: Context) {
+            val directory = context.getExternalFilesDir(null) ?: return
+            File(directory, PART_FILE_NAME).delete()
+            File(directory, APK_FILE_NAME).delete()
         }
 
         private fun progressPercent(downloaded: Long, total: Long): Int =

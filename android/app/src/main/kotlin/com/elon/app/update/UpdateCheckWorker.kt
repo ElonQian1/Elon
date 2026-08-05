@@ -32,15 +32,17 @@ class UpdateCheckWorker(
             Log.d(TAG, "UI 调试版由 PC 节点管理，跳过正式版更新检查")
             return@withContext Result.success()
         }
+        val store = AppUpdateStore(context)
+        store.pruneInstalledOrOlder(BuildConfig.VERSION_CODE)
         val expectedVersionCode = inputData.getInt(KEY_EXPECTED_VERSION_CODE, 0)
         if (expectedVersionCode in 1..BuildConfig.VERSION_CODE) {
             return@withContext Result.success()
         }
 
-        val store = AppUpdateStore(context)
         store.markCheckAttempt()
         val version = AppUpdateRepository().fetchLatest() ?: return@withContext Result.retry()
         if (version.versionCode <= BuildConfig.VERSION_CODE) {
+            store.pruneInstalledOrOlder(BuildConfig.VERSION_CODE)
             return@withContext Result.success()
         }
 

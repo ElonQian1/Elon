@@ -46,6 +46,10 @@ internal class AppUpdateSheet(
     val isShowing: Boolean
         get() = dialog.isShowing
 
+    fun dismiss() {
+        if (dialog.isShowing) dialog.dismiss()
+    }
+
     init {
         dialog.setContentView(content)
         dialog.window?.navigationBarColor = ContextCompat.getColor(activity, R.color.elon_bg_chrome)

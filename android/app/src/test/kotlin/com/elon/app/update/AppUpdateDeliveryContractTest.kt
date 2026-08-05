@@ -68,6 +68,22 @@ class AppUpdateDeliveryContractTest {
         assertTrue(web.contains("APK 安装包"))
     }
 
+    @Test
+    fun obsoleteOrForeignApkCannotReachTheSystemInstaller() {
+        val manager = source("android/app/src/main/kotlin/com/elon/app/update/AppUpdateManager.kt")
+        val guard = source("android/app/src/main/kotlin/com/elon/app/update/AppUpdateInstallGuard.kt")
+        val worker = source("android/app/src/main/kotlin/com/elon/app/update/AppUpdateDownloadWorker.kt")
+
+        assertTrue(manager.contains("pruneObsoleteState()"))
+        assertTrue(manager.contains("readAppUpdateArchiveIdentity(activity, apkFile)"))
+        assertTrue(manager.contains("validateAppUpdateArchive("))
+        assertTrue(guard.contains("archive.packageName != expectedPackageName"))
+        assertTrue(guard.contains("archive.versionCode <= installedVersionCode"))
+        assertTrue(guard.contains("archive.versionCode != expectedVersionCode"))
+        assertTrue(worker.contains("version.versionCode <= BuildConfig.VERSION_CODE"))
+        assertTrue(worker.contains("discardDownloadedPackage"))
+    }
+
     private fun source(relativePath: String): String {
         val cwd = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize()
         val path: Path = generateSequence(cwd) { it.parent }

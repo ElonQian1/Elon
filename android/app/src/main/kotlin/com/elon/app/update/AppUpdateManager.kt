@@ -28,13 +28,15 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
 
     /** 每次回到前台都先恢复可安装/下载状态，再用短冷却刷新服务器版本。 */
     fun resumeCheck() {
+        pruneObsoleteState()
         showStoredUpdateIfNeeded()
         checkForUpdate(forceNetwork = false, userInitiated = false, prompt = true)
     }
 
     fun manualCheck() {
         if (!ensureSelfUpdateEnabled()) return
-        val storedVersion = store.latestVersion()
+        pruneObsoleteState()
+        val storedVersion = store.latestVersion()?.takeIf { it.versionCode > BuildConfig.VERSION_CODE }
         val storedSnapshot = store.snapshot()
         if (storedVersion != null &&
             storedSnapshot?.versionCode == storedVersion.versionCode &&
@@ -61,6 +63,7 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
 
     fun openFromNotification() {
         if (!ensureSelfUpdateEnabled()) return
+        pruneObsoleteState()
         val version = store.latestVersion()?.takeIf { it.versionCode > BuildConfig.VERSION_CODE }
         if (version != null) {
             showUpdateSheet(version, ignorePromptDedupe = true)
@@ -71,6 +74,7 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
 
     private fun checkForUpdate(forceNetwork: Boolean, userInitiated: Boolean, prompt: Boolean) {
         if (!ensureSelfUpdateEnabled(showMessage = userInitiated)) return
+        pruneObsoleteState()
         val now = System.currentTimeMillis()
         if (!forceNetwork && !store.shouldCheck(now, FOREGROUND_CHECK_INTERVAL_MS)) return
         if (!checkInFlight.compareAndSet(false, true)) return
@@ -86,9 +90,11 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
             when {
                 version == null && userInitiated -> toast("检查失败，请检查网络后重试")
                 version == null -> Unit
-                version.versionCode <= BuildConfig.VERSION_CODE && userInitiated ->
+                version.versionCode <= BuildConfig.VERSION_CODE && userInitiated -> {
+                    pruneObsoleteState()
                     toast("已是最新版本 v${BuildConfig.VERSION_NAME}")
-                version.versionCode <= BuildConfig.VERSION_CODE -> Unit
+                }
+                version.versionCode <= BuildConfig.VERSION_CODE -> pruneObsoleteState()
                 else -> {
                     store.recordAvailable(version)
                     if (prompt && canPrompt(version, userInitiated)) {
@@ -141,6 +147,16 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
             store.latestVersion()?.let { AppUpdateDownloadWorker.enqueue(activity, it) }
             return
         }
+        val installDecision = validateAppUpdateArchive(
+            expectedPackageName = activity.packageName,
+            installedVersionCode = BuildConfig.VERSION_CODE.toLong(),
+            expectedVersionCode = snapshot.versionCode.toLong(),
+            archive = readAppUpdateArchiveIdentity(activity, apkFile),
+        )
+        if (!installDecision.allowed) {
+            rejectDownloadedApk(snapshot, installDecision.message)
+            return
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !activity.packageManager.canRequestPackageInstalls()
         ) {
@@ -170,6 +186,22 @@ class AppUpdateManager(private val activity: AppCompatActivity) {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
             }
         )
+    }
+
+    private fun rejectDownloadedApk(snapshot: AppUpdateSnapshot, message: String) {
+        val latest = store.latestVersion()?.takeIf { it.versionCode > BuildConfig.VERSION_CODE }
+        store.clearSnapshot(snapshot.versionCode)
+        AppUpdateDownloadWorker.discardDownloadedPackage(activity)
+        latest?.let(store::recordAvailable)
+        activeSheet?.get()?.dismiss()
+        toast(message)
+    }
+
+    private fun pruneObsoleteState() {
+        if (store.pruneInstalledOrOlder(BuildConfig.VERSION_CODE)) {
+            AppUpdateDownloadWorker.discardDownloadedPackage(activity)
+            activeSheet?.get()?.dismiss()
+        }
     }
 
     private fun ensureSelfUpdateEnabled(showMessage: Boolean = true): Boolean {
