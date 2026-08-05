@@ -21,7 +21,6 @@ export default function DecideVerificationDialog({ candidate, busy, error, onClo
   const observation = candidate.platform_observation
   const canAccept = review.decision === 'accepted'
     && terminal.outcome === observation.observed_outcome
-    && observation.observed_outcome !== 'indeterminate'
   const [decision, setDecision] = useState<ComputeVerificationDecision>(canAccept ? 'accepted' : 'disputed')
   const [reasonText, setReasonText] = useState(canAccept ? 'evidence_chain_consistent' : 'evidence_chain_requires_review')
   const [decisionRef, setDecisionRef] = useState('')

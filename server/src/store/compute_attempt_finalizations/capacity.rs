@@ -48,7 +48,7 @@ pub(super) struct FinalizeAttemptCapacityInput<'a> {
 
 pub(super) struct FinalizeAttemptCapacityReceipt {
     pub terminal_claim: ComputeCapacityClaimBinding,
-    pub compensable_usage: Vec<ComputeReservedCapacity>,
+    pub compensable_usage: Vec<ComputeMeterReading>,
     pub capacity_consumed: Vec<ComputeReservedCapacity>,
     pub capacity_returned: Vec<ComputeReservedCapacity>,
     pub transactions: Vec<ComputeAttemptCapacityTransactionRef>,
@@ -91,7 +91,6 @@ pub(super) fn finalize_attempt_capacity_on(
         bail!("Execution Receipt 的 compensable usage 必须覆盖 Claim 全部 meter");
     }
 
-    let mut compensable_usage = Vec::with_capacity(claim.lines.len());
     let mut capacity_consumed = Vec::new();
     let mut capacity_returned = Vec::new();
     let mut consume_movements = Vec::new();
@@ -119,10 +118,6 @@ pub(super) fn finalize_attempt_capacity_on(
             bail!("Attempt 可信终态前 Capacity Bucket 绑定发生变化");
         }
 
-        compensable_usage.push(ComputeReservedCapacity {
-            meter: line.bucket.meter.clone(),
-            quantity,
-        });
         let consumed = match line.bucket.meter_mode {
             ComputeCapacityMeterMode::Consumable => quantity,
             ComputeCapacityMeterMode::Reusable => 0,
@@ -228,7 +223,7 @@ pub(super) fn finalize_attempt_capacity_on(
             claim_revision: claim.revision,
             claim_digest: claim.claim_digest,
         },
-        compensable_usage,
+        compensable_usage: input.compensable_usage.to_vec(),
         capacity_consumed,
         capacity_returned,
         transactions,

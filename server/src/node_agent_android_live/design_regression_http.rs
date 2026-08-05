@@ -32,6 +32,10 @@ pub(super) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/android-live/design/regressions/comparisons/:comparison_id/complete",
             post(complete_comparison),
         )
+        .route(
+            "/api/android-live/design/regressions/comparisons/:comparison_id/run",
+            post(run_comparison),
+        )
 }
 
 async fn create_baseline(
@@ -78,4 +82,13 @@ async fn complete_comparison(
         arguments,
     )
     .await
+}
+
+async fn run_comparison(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(comparison_id): Path<String>,
+    Json(mut arguments): Json<Value>,
+) -> Response {
+    arguments["comparisonId"] = json!(comparison_id);
+    super::design_http::call(&runtime, "ui_run_design_regression_comparison", arguments).await
 }

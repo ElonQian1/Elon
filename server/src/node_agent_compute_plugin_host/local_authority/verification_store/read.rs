@@ -34,7 +34,7 @@ enum CandidateVerificationReplayMode<'key> {
     ExactPrepared(&'key ComputePluginCandidateVerificationRecoveryKey),
 }
 
-pub(super) fn read_fresh_candidate_verification_authority(
+pub(in crate::node_agent_compute_plugin_host::local_authority) fn read_fresh_candidate_verification_authority(
     transaction: &Transaction<'_>,
     process_fence: &ComputePluginFetchProcessFence,
     trusted_now: DateTime<Utc>,

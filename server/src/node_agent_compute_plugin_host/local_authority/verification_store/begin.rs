@@ -32,7 +32,7 @@ struct BeginAuthorityRow {
     updated_at_ms: i64,
 }
 
-pub(super) fn begin_candidate_verification(
+pub(in crate::node_agent_compute_plugin_host::local_authority) fn begin_candidate_verification(
     transaction: &Transaction<'_>,
     process_fence: &ComputePluginFetchProcessFence,
     trusted_now: DateTime<Utc>,

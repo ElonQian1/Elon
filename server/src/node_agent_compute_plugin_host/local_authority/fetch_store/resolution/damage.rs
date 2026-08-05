@@ -10,7 +10,7 @@ use crate::node_agent_compute_plugin_host::fetch_contract::ValidatedComputePlugi
 
 use super::super::super::{keyring_snapshot::advance_trusted_time, ComputePluginFetchProcessFence};
 
-pub(super) fn fail_validated_cursor_damage(
+pub(in crate::node_agent_compute_plugin_host::local_authority::fetch_store) fn fail_validated_cursor_damage(
     transaction: &Transaction<'_>,
     process_fence: &ComputePluginFetchProcessFence,
     trusted_now: DateTime<Utc>,

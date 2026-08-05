@@ -119,7 +119,7 @@ pub(crate) struct ComputePendingAttemptFinalizationCandidate {
     pub expected_job: ComputeJobVersionBinding,
     pub expected_reservation: ComputeAttemptRevisionBinding,
     pub expected_claim: ComputeCapacityClaimBinding,
-    pub compensable_usage: Vec<ComputeReservedCapacity>,
+    pub compensable_usage: Vec<ComputeMeterReading>,
     pub lease_effect: &'static str,
     pub job_effect: &'static str,
     pub reservation_effect: &'static str,

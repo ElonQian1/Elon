@@ -256,7 +256,7 @@ Web、PWA 与 Tauri 前端复用 PWA Runtime 的受控无头 Chromium、origin �
 
 平台证据不互相冒充：Android 仍走 Android Live Runtime；Tauri WebView、原生窗口 PNG、Win32 菜单、Runtime 后代顶层窗口/候选对话框和项目插桩 Rust command trace 分层记录。只有原生窗口 PNG/SHA-256 能设置 `nativeHostVerified=true`；项目 trace 不含参数/结果正文，也不冒充操作系统证明。Tauri 数据面不开放任意菜单点击或任意 command 执行。设计会话记录位于 `.elon/ui-tuner/headless-design/sessions/`，以 canonical 项目根作为授权边界，创建时 MCP session 仅保留审计。
 
-自然语言先被编译为项目持久的 `DesignIntentPlan`，只保留摘要/哈希和 platform、route、state、sessionAction、工具顺序；PC 聊天与纯后台代理共用 revision、task lease、逐动作回执和重规划 lineage。Design Draft、源码绑定和写回回执由四端共用。源码候选确认 `BOUND` 后仍要复核文件、SHA-256 和 byte range；分平台写回计划批准后，确定性 source patch 以精确 range/SHA 二次审批并通过 `APPLYING` journal 原子替换，回滚只形成逆向审查计划。修改前 baseline 和修改后 comparison task 固定 PNG/UI tree 哈希、平台、route、viewport 和阈值；只有比较 artifact 验哈回执才能进入 PASSED。AI task 事件消费者以 checkpoint 单调确认 cursor，PC 从相同事件恢复 plan/patch/regression。`ui_get_design_capabilities` 回读 v1.11 才是安装证据；完整契约及尚未执行的真实编译、平台运行与节点发布边界见 `docs/headless-ui-design-mcp.md`。
+自然语言先被编译为项目持久的 `DesignIntentPlan`，只保留摘要/哈希和 platform、route、state、sessionAction、工具顺序；PC 聊天与纯后台代理共用 revision、task lease、逐动作回执和重规划 lineage。Design Draft、源码绑定和写回回执由四端共用。源码候选确认 `BOUND` 后仍要复核文件、SHA-256 和 byte range；分平台写回计划批准后，确定性 source patch 以精确 range/SHA 二次审批并通过 `APPLYING` journal 原子替换，回滚只形成逆向审查计划。修改前 baseline 和修改后 comparison task 固定 PNG/UI tree 哈希、平台、route、viewport 和阈值；v1.12 可用 `ui_run_design_regression_comparison` 在节点本机复核输入哈希、生成紧凑像素/语义 artifact 并按阈值结算。AI task 事件消费者以 checkpoint 单调确认 cursor，PC 从相同事件恢复 plan/patch/regression。`ui_get_design_capabilities` 回读 `yilong-ui-live@1.12.0` 与 `NODE_LOCAL_REGRESSION_COMPARATOR` 才是新能力安装证据；完整契约与平台验收边界见 `docs/headless-ui-design-mcp.md`。
 
 ## 3. 代码仓库结构（目标结构）
 

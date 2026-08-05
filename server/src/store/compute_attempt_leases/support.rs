@@ -120,10 +120,11 @@ pub(crate) fn list_current_lease_states_on(
           ORDER BY updated_at DESC, lease_id ASC
           LIMIT ?2",
     )?;
-    statement
+    let result = statement
         .query_map(params![provider_id, limit as i64], stored_state_from_row)?
         .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(Into::into)
+        .map_err(Into::into);
+    result
 }
 
 fn stored_state_from_row(row: &Row<'_>) -> rusqlite::Result<StoredLeaseState> {

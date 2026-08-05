@@ -225,7 +225,7 @@ fn audit_capacity_shape(
         .iter()
         .map(|reading| (reading.meter.as_str(), reading.quantity))
         .collect::<BTreeMap<_, _>>();
-    let compensable = capacity_map(&receipt.compensable_usage)?;
+    let compensable = meter_reading_map(&receipt.compensable_usage)?;
     let consumed = capacity_map(&receipt.capacity_consumed)?;
     let returned = capacity_map(&receipt.capacity_returned)?;
     if execution != compensable || !receipt_capacity_is_consistent(receipt) {
@@ -361,6 +361,23 @@ fn capacity_map(values: &[ComputeReservedCapacity]) -> Result<BTreeMap<&str, i64
                 .is_some()
         {
             bail!("Attempt 可信终态容量列表无效");
+        }
+    }
+    Ok(result)
+}
+
+fn meter_reading_map(
+    values: &[crate::compute_federation::receipts::ComputeMeterReading],
+) -> Result<BTreeMap<&str, i64>> {
+    let mut result = BTreeMap::new();
+    for value in values {
+        if value.meter.trim().is_empty()
+            || value.quantity < 0
+            || result
+                .insert(value.meter.as_str(), value.quantity)
+                .is_some()
+        {
+            bail!("Attempt 可补偿用量列表无效");
         }
     }
     Ok(result)

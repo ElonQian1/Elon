@@ -73,9 +73,9 @@ export interface ComputeOfferDraftBody {
   price_terms: {
     pricing_mode: 'spot' | 'index_locked' | 'capacity_forward' | 'capacity_future'
     currency: string
-    curve_id: null
-    curve_version: null
-    instrument_id: null
+    curve_id: string | null
+    curve_version: number | null
+    instrument_id: string | null
     components: ComputePriceComponent[]
     fee_rules: ComputeFeeRule[]
   }

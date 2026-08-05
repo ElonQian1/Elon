@@ -143,12 +143,12 @@ AI / PC Canvas
   -> verified UI tree / selector -> reviewable source binding candidates + drift health
   -> reviewed per-platform writeback plan -> source change + evidence-gated receipt
   -> exact source patch proposal -> second approval -> atomic apply -> rollback plan
-  -> before baseline -> after capture -> visual/semantic comparison contract
+  -> before baseline -> after capture -> node-local visual/semantic comparator -> threshold result
 ```
 
 代理先用 `ui_get_design_capabilities` 验证当前节点实际安装的 schema，再读取 Web、PWA、Tauri、Android 小型目标索引。无需打开 PC 页面即可恢复/打开项目 `designSessionId`；单次捕获之外，Web/PWA/Tauri 可用持久浏览器在同一 page 中导航和执行有界 selector 交互，非秘密表单值只引用项目 fixture。Android 不使用浏览器替代。Tauri 原生链路按项目发现命令启动，仅访问登记 Runtime 后代进程，窗口像素、菜单/候选对话框和项目 command trace 分层，且不开放任意菜单点击或 command 执行。
 
-自然语言先进入项目持久的 `DesignIntentPlan`，只保存摘要和 SHA-256；计划以乐观 revision 绑定 task lease、逐动作回执和暂停/恢复/取消/失败/完成状态，重规划通过双向 ID 保留 lineage。具体修改由 Design Draft v2 表达。源码候选必须显式确认 `BOUND`，写回前重新检查文件、SHA-256 和 byte range；分平台影响计划首次批准后，真实补丁还要以精确 range/片段 SHA 形成第二层审查，批准后通过 `APPLYING` journal 原子应用，逆向编辑只生成回滚计划。修改前后证据分别固定为已验哈希 baseline 和 comparison task，比较 artifact 回执通过阈值计算状态。PC、Node Admin 与 MCP 共用同一项目记录和事件流。2026-08-05 隔离 Windows 候选节点已完成 v1.11 能力回读、Web 无界面交互闭环与 Tauri WebView 分层捕获；正式节点发布、Tauri 原生宿主、Android 和比较器仍以 `docs/headless-ui-design-mcp.md` 的验收边界为准。
+自然语言先进入项目持久的 `DesignIntentPlan`，只保存摘要和 SHA-256；计划以乐观 revision 绑定 task lease、逐动作回执和暂停/恢复/取消/失败/完成状态，重规划通过双向 ID 保留 lineage。具体修改由 Design Draft v2 表达。源码候选必须显式确认 `BOUND`，写回前重新检查文件、SHA-256 和 byte range；分平台影响计划首次批准后，真实补丁还要以精确 range/片段 SHA 形成第二层审查，批准后通过 `APPLYING` journal 原子应用，逆向编辑只生成回滚计划。修改前后证据分别固定为已验哈希 baseline 和 comparison task；v1.12 的节点本机比较器先复核四个输入哈希，再生成不嵌入图片的像素/语义 artifact 并按阈值结算。PC、Node Admin 与 MCP 共用同一项目记录和事件流。安装与平台验收边界以 `docs/headless-ui-design-mcp.md` 为准。
 
 ## 项目理解 / RAG 架构
 

@@ -354,7 +354,9 @@ fn event_type(tool: &str) -> Option<&'static str> {
         "ui_plan_design_source_rollback" => "SOURCE_ROLLBACK_PLANNED",
         "ui_create_design_regression_baseline" => "REGRESSION_BASELINE_CREATED",
         "ui_plan_design_regression_comparison" => "REGRESSION_COMPARISON_PLANNED",
-        "ui_complete_design_regression_comparison" => "REGRESSION_COMPARISON_COMPLETED",
+        "ui_complete_design_regression_comparison" | "ui_run_design_regression_comparison" => {
+            "REGRESSION_COMPARISON_COMPLETED"
+        }
         _ => return None,
     })
 }

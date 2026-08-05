@@ -20,6 +20,7 @@ pub(super) fn tool_definitions() -> Vec<Value> {
     definitions.extend(super::design_writeback_plan::tool_definitions());
     definitions.extend(super::design_source_patch::tool_definitions());
     definitions.extend(super::design_regression_contract::tool_definitions());
+    definitions.extend(super::design_regression_runner::tool_definitions());
     definitions.extend(super::design_verification_matrix::tool_definitions());
     definitions
 }
@@ -41,6 +42,7 @@ pub(super) fn is_tool(name: &str) -> bool {
         || super::design_writeback_plan::is_tool(name)
         || super::design_source_patch::is_tool(name)
         || super::design_regression_contract::is_tool(name)
+        || super::design_regression_runner::is_tool(name)
         || super::design_verification_matrix::is_tool(name)
 }
 
@@ -79,6 +81,8 @@ pub(super) async fn call(session: &LiveUiSession, name: &str, arguments: Value) 
         super::design_source_patch::call(session, name, arguments)
     } else if super::design_regression_contract::is_tool(name) {
         super::design_regression_contract::call(session, name, arguments)
+    } else if super::design_regression_runner::is_tool(name) {
+        super::design_regression_runner::call(session, arguments)
     } else if super::design_verification_matrix::is_tool(name) {
         super::design_verification_matrix::call(session, name, arguments)
     } else {

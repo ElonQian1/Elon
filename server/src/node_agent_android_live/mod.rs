@@ -32,6 +32,7 @@ mod design_intent_plan;
 mod design_planning_http;
 mod design_regression_contract;
 mod design_regression_http;
+mod design_regression_runner;
 mod design_regression_store;
 mod design_session_store;
 mod design_source_binding;
@@ -90,6 +91,10 @@ mod window_insets_sequence;
 mod debug_integration_tests;
 #[cfg(test)]
 mod design_diff_regions_tests;
+#[cfg(test)]
+mod design_regression_runner_tests;
+#[cfg(test)]
+mod design_source_patch_recovery_tests;
 #[cfg(test)]
 mod design_targets_tests;
 #[cfg(test)]

@@ -290,7 +290,8 @@ pub(crate) use compute_attempt_execution_receipts::{
     IssueComputeAttemptExecutionReceiptRequest,
 };
 pub(crate) use compute_attempt_finalizations::{
-    ComputeAttemptFinalizationReceipt, FinalizeComputeAttemptRequest,
+    ComputeAttemptFinalizationReceipt, ComputePendingAttemptFinalizationCandidate,
+    FinalizeComputeAttemptRequest,
 };
 pub(crate) use compute_attempt_leases::{
     ComputeAttemptLeaseRenewalReceipt, ComputeAttemptLeaseStateReceipt,
@@ -316,8 +317,8 @@ pub(crate) use compute_attempt_settlement_releases::{
     ComputeSettlementReleaseReceipt, ReleaseComputeAttemptSettlementRequest,
 };
 pub(crate) use compute_attempt_settlements::{
-    ComputeAttemptSettlementReceipt, ComputeSettlementLifecycleHistoryItem,
-    SettleComputeAttemptRequest,
+    ComputeAttemptSettlementReceipt, ComputePendingAttemptSettlementCandidate,
+    ComputeSettlementLifecycleHistoryItem, SettleComputeAttemptRequest,
 };
 pub(crate) use compute_attempt_terminals::{
     ComputeAttemptTerminalCandidateReceipt, ComputeDeclaredResultArtifactInput,

@@ -97,7 +97,7 @@ impl HashedComputePluginCandidateArtifactSet {
     pub(in crate::node_agent_compute_plugin_host) fn disposition(
         &self,
     ) -> CandidateArtifactSetHashDisposition {
-        self.evidence.disposition
+        self.evidence.disposition()
     }
 
     pub(super) fn into_post_hash_parts(

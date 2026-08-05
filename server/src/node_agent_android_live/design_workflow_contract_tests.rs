@@ -42,13 +42,13 @@ async fn call(session: &super::broker::LiveUiSession, name: &str, arguments: Val
 }
 
 #[tokio::test]
-async fn capabilities_prove_v111_without_opening_pc_canvas() {
+async fn capabilities_prove_v112_without_opening_pc_canvas() {
     let (root, session) = fixture_session("capabilities").await;
 
     let result = call(&session, "ui_get_design_capabilities", json!({})).await;
 
-    assert_eq!(result["runtimeSchema"], "yilong-ui-live@1.11.0");
-    assert_eq!(result["protocolRevision"], "1.11");
+    assert_eq!(result["runtimeSchema"], "yilong-ui-live@1.12.0");
+    assert_eq!(result["protocolRevision"], "1.12");
     assert_eq!(result["contentEmbedded"], false);
     assert!(result["capabilityIds"]
         .as_array()
@@ -65,6 +65,11 @@ async fn capabilities_prove_v111_without_opening_pc_canvas() {
         .unwrap()
         .iter()
         .any(|value| value == "VISUAL_SEMANTIC_REGRESSION_CONTRACTS"));
+    assert!(result["capabilityIds"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|value| value == "NODE_LOCAL_REGRESSION_COMPARATOR"));
     assert_eq!(result["project"]["detectedPlatforms"][0], "web");
     fs::remove_dir_all(root).unwrap();
 }

@@ -3,7 +3,7 @@ use rusqlite::{params, Connection};
 
 use super::{select_sql, stored_from_row, StoredTerminalCandidate};
 
-pub(super) fn list_pending_consumer_review_candidates_on(
+pub(in crate::store::compute_attempt_terminals) fn list_pending_consumer_review_candidates_on(
     conn: &Connection,
     consumer_account_id: &str,
     limit: usize,

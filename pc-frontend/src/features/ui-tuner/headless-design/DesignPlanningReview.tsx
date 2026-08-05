@@ -99,6 +99,7 @@ export function DesignPlanningReview({ model, hasDraft, hasSession }: Props) {
       <div className={styles.actions}>
         <button type="button" disabled={busy || !hasSession} onClick={() => void model.createRegressionBaseline()}>固化修改前基线</button>
         <button type="button" disabled={busy || !hasSession || !model.regressionBaseline} onClick={() => void model.planRegressionComparison()}>创建前后比较任务</button>
+        <button type="button" disabled={busy || model.regressionComparison?.status !== 'READY_TO_COMPARE'} onClick={() => void model.runRegressionComparison()}>运行本机比较</button>
         <span>
           {model.regressionComparison
             ? `${model.regressionComparison.status} · pixel ≤ ${model.regressionComparison.thresholds.maxPixelDiffRatio}`

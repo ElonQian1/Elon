@@ -37,14 +37,16 @@ reviewed_at: 2026-08-05
 - `ui_check_design_source_binding` 在写回前重新读取绑定文件，校验普通文件、2 MiB 上限、SHA-256 和 byte range，区分 `HEALTHY`、`SOURCE_CHANGED`、`RANGE_STALE`、`FILE_MISSING` 等状态。失败时可复用候选器给出有界恢复候选，但固定 `autoRebound=false`。
 - `ui_plan_design_writeback` 把 DraftOperation 按目标平台编译成持久写回计划，展示框架适配器、mutation kind、确定性/AI handoff、阻塞项和 LOW/MEDIUM/HIGH 风险。`ui_decide_design_writeback_plan` 必须显式批准或带原因拒绝；批准不修改源码。`ui_begin_design_writeback` 只接受已批准且 draft revision、绑定 SHA/range 未漂移的 `writebackPlanId`，再固定 Git/source 基线。AI 修改源码并完成分平台验证后，仍由 `ui_complete_design_writeback` 持久化 changed files、source hashes、Git revision 和平台证据。
 - `ui_propose_design_source_patch` 只接受已批准写回计划、已确认 binding、精确 UTF-8 byte range、片段 SHA-256 和有界 replacement。提案把完整审查内容留在项目 review artifact，API 只返回范围/摘要哈希；`ui_decide_design_source_patch` 二次批准后，`ui_apply_design_source_patch` 才能按 `APPROVED -> APPLYING -> APPLIED` journal 原子替换源码。应用后 `ui_plan_design_source_rollback` 生成精确逆向审查计划，但不自动回滚。
-- `ui_create_design_regression_baseline` 只固化已通过文件哈希复核的 PNG/UI tree。重新捕获后，`ui_plan_design_regression_comparison` 固定前后证据、平台、route、viewport、允许变化 selector 和阈值；比较器通过 `ui_complete_design_regression_comparison` 提交项目内视觉/语义 diff artifact，节点复核 artifact SHA 后计算 `PASSED/FAILED`。创建契约不等于已执行比较。
+- `ui_create_design_regression_baseline` 只固化已通过文件哈希复核的 PNG/UI tree。重新捕获后，`ui_plan_design_regression_comparison` 固定前后证据、平台、route、viewport、允许变化 selector 和阈值；`ui_run_design_regression_comparison` 在节点本机重新复核四个输入哈希，执行确定性 RGBA 像素与 selector 语义比较，生成项目内紧凑 diff artifact 并按任务阈值计算 `PASSED/FAILED`。外部比较器仍可通过 `ui_complete_design_regression_comparison` 提交已验哈 artifact；规划比较任务本身不等于已执行比较。
 - `ui_get_project_profile` 的 schema v3 包含相同的多端目标摘要，其他代理可以先读小型档案再决定调用什么工具。
 - Node Admin 提供与 MCP 工具同源的项目级 HTTP 适配层；PC 不复制目标发现、会话、Tauri Runtime、草稿或证据状态机。
-- `ui_get_design_capabilities` 返回节点实际安装的 `yilong-ui-live@1.11.0` schema、能力 ID、安全边界和项目已发现平台；调用成功本身才是当前节点已升级的证据。v1.11 新增意图执行生命周期、受审确定性源码补丁/回滚计划和视觉/语义回归契约。
+- `ui_get_design_capabilities` 返回节点实际安装的 `yilong-ui-live@1.12.0` schema、能力 ID、安全边界和项目已发现平台；调用成功本身才是当前节点已升级的证据。v1.12 在 v1.11 的意图执行、受审源码补丁/回滚与回归契约之上新增 `NODE_LOCAL_REGRESSION_COMPARATOR`。
 - `ui_get_design_verification_matrix` 把草稿、当前 designSession 工件和写回回执汇总为 Web/PWA/Tauri/Android 行，明确区分 `READY`、`IN_PROGRESS`、`BLOCKED` 与 `PASSED`。只有写回回执中所有目标平台均为 `BUILD_VERIFIED + evidenceComplete=true` 才是通过。
 - PC `/pc/ui-tuner` 默认进入“多端后台”：左侧平台/会话/UI 树，中间最终 UI 与语义选区，右侧常驻项目 Codex 对话。用户发送聊天时先生成或重规划 DesignIntentPlan；画布显示 plan revision、逐动作回执和暂停/恢复/取消，自动跟随 source patch、rollback、regression 事件。源码补丁必须在画布二次批准后由用户明确点击应用；回滚只生成审查计划。普通 AI 任务按 taskId/cursor 长轮询并提交 `pc-ui-tuner` checkpoint；若代理绑定另一 designSession，中间画布按事件定向恢复。
 
 2026-08-05 已完成隔离 Windows 候选节点和正式安装节点的两阶段真实验收：Rust `--locked` check、目标契约测试、PC TypeScript 构建、ESLint、微调画布测试和 MCP bridge 测试通过；正式 7799 节点实际激活并回读 `release_identity=0.3.69+e30818e6abdd770c0f2b3fcf4affe1c0e1a294af`、`build_git_sha=e30818e6abdd770c0f2b3fcf4affe1c0e1a294af`、`yilong-ui-live@1.11.0` 与 24 个 capability ID。7799 listener 的进程路径复核为 `LocalAppData\ElonNode\一龙开发平台.exe`；激活回执从旧 `067ec391…` 精确推进到 `e30818e6…`，不会再因 7800 候选节点回报目标身份而误标正式安装成功。
+
+v1.12 发布前门禁已完成：PC 全量 TypeScript/Vite 构建、ESLint 与微调画布静态回归通过；Rust `--all-targets` 全量检查通过。本机比较器已运行验证允许 selector 变化时的 PASS、像素阈值 FAIL 和输入 SHA 漂移拒绝；源码补丁同时覆盖 `APPLYING` 前/后状态恢复、未知源码状态失败关闭与可变长度 rollback offset。此时正式 7799 安装节点的 v1.12 发布和后台 MCP 回读尚待该修订提交后执行，不从仓库源码推断已安装。
 
 代理未打开 PC 画布或可见浏览器，即在正式节点完成 Web/Tauri 目标发现、Web 会话打开、PNG 与 5 节点语义树捕获、按钮点击与文本断言、回归基线、可逆样式草稿预览/恢复、写回安全阻断及六步 DesignIntentPlan 回执闭环；计划最后进入 `COMPLETED`，task lease 进入 `SETTLED`。Web 语义查询读取到 `#status` 的“正式节点后台交互成功”；Tauri 前端也执行相同 2 步后台交互并准确返回 `TAURI_FRONTEND_WEBVIEW_ONLY`、`nativeHostVerified=false`。候选节点首次冷浏览器捕获约 33 秒，后续捕获/交互约 3–8 秒；正式节点本轮小型控制调用约 1.1–2.1 秒，页面捕获约 3.3–3.7 秒。响应只返回路径、哈希和紧凑节点，不嵌入 Base64。复验后已重新打开桌面壳，只有一个安装目录 `elon-desktop.exe`，正式 7799 节点仍保持目标 release identity 且云连接正常。
 
@@ -86,7 +88,8 @@ ui_get_design_capabilities
   -> ui_plan_design_source_rollback(proposalId, expectedRevision)
   -> 按目标平台重新捕获
   -> ui_plan_design_regression_comparison(baselineId, afterDesignSessionId)
-  -> 比较器执行后 ui_complete_design_regression_comparison(... diff artifacts)
+  -> 优先 ui_run_design_regression_comparison(comparisonId, expectedRevision)
+     或外部比较器执行后 ui_complete_design_regression_comparison(... diff artifacts)
   -> ui_complete_design_writeback(draftId, expectedRevision, receiptId, changedFiles, evidence)
   -> ui_get_design_verification_matrix(draftId)
   -> ui_record_design_intent_action(planId, expectedRevision, actionOrder, status, evidenceRefs?)
@@ -125,7 +128,7 @@ PC 使用本机 Admin token 调用与 MCP 相同的状态机，关键新增路�
 
 - `POST /api/android-live/design/intents/:plan_id/start|transition|replan` 与 `.../actions/:action_order`。
 - `POST /api/android-live/design/source-patches/propose`，以及 `.../:proposal_id/decision|apply|rollback/plan`。
-- `POST /api/android-live/design/regressions/baselines`、`.../comparisons/plan` 与 `.../:comparison_id/complete`。
+- `POST /api/android-live/design/regressions/baselines`、`.../comparisons/plan` 与 `.../:comparison_id/run|complete`。
 
 路由只负责把路径 ID 注入同名 MCP 参数并调用 `design_tools`；审批、revision、项目 canonical path、SHA 和状态迁移仍由同一 Rust 契约校验。PC 不实现第二套业务逻辑。
 
@@ -192,6 +195,8 @@ PC 使用本机 Admin token 调用与 MCP 相同的状态机，关键新增路�
 .elon/ui-tuner/headless-design/source-patches/rollback_<digest>.json
 .elon/ui-tuner/headless-design/regressions/baseline_<digest>.json
 .elon/ui-tuner/headless-design/regressions/compare_<digest>.json
+.elon/ui-tuner/headless-design/regressions/compare_<digest>.local-visual.json
+.elon/ui-tuner/headless-design/regressions/compare_<digest>.local-semantic.json
 ```
 
 记录包含平台、目标、route、脱敏 URL、viewport、状态、最近证据引用和时间戳。它必须同时满足：
@@ -268,7 +273,7 @@ PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作
 2. 已完成：隔离 Windows 候选节点与正式安装节点均回读 schema v1.11 和全部 24 个 capability ID；正式 release identity、7799 listener 安装路径、激活回执和桌面壳重启后健康均已复核。
 3. 已完成：正式节点上的 Web 真实浏览器 fixture 无界面发现、捕获、受限交互、断言、基线、草稿预览/恢复和 DesignIntentPlan 回执；Tauri 已验证前端 WebView 分层证据。
 4. 已完成：本机发布、自动激活和能力回读；激活器只接受正式安装 listener，7800 候选节点不能推进正式发布状态。旧节点 CLI/Exec 的独立兼容矩阵仍可继续扩展。
-5. 待补：source patch 漂移/`APPLYING` 恢复、rollback offset、比较器 artifact 与阈值结算的运行验收。
+5. 已完成代码运行验收：source patch 漂移/`APPLYING` 恢复、可变长度 rollback offset、本机比较器 artifact/SHA/阈值 PASS/FAIL；正式 7799 节点的 v1.12 MCP 回读待发布后复验。
 6. 待补：Tauri 原生窗口/菜单/对话框/插桩 trace、Android 隔离模拟器、PWA 独立目标和四端验证矩阵回执；只有用户明确要求或反馈视觉不正确时再做真机复核。
 
 每一阶段都先扩展相同 MCP 契约；不得通过让代理操控 Windows 桌面来绕过缺失的数据面。

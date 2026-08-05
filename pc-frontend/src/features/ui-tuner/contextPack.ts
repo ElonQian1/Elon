@@ -489,7 +489,7 @@ function buildHeadlessDesignTaskPrompt(pack: UiTunerCodexContextPack, userIntent
     '5. Web/PWA/Tauri 前端调试优先复用 ui_prepare_design_browser / ui_interact_design_browser 的同一页面状态；fill/select 只能引用 fixtureProfile.formValues，禁止在参数中传秘密。',
     '6. 源码写回前必须调用 ui_plan_design_writeback，审查每个平台适配器和风险，再显式 APPROVE；批准且未漂移后，用精确 byte range/SHA 调用 ui_propose_design_source_patch。',
     '7. 读取 source patch 的 reviewArtifactPath；补丁需再次显式批准后才能 ui_apply_design_source_patch。应用后调用 ui_plan_design_source_rollback 保存可审查逆向计划，禁止未经审批自动回滚。',
-    '8. 重新捕获修改后的同平台/route/viewport 证据，调用 ui_plan_design_regression_comparison；比较器必须用 ui_complete_design_regression_comparison 提交已落盘且哈希匹配的视觉/语义 diff artifact。',
+    '8. 重新捕获修改后的同平台/route/viewport 证据，调用 ui_plan_design_regression_comparison；优先用 ui_run_design_regression_comparison 让节点本机验证输入哈希、生成紧凑 diff artifact 并结算。外部比较器才使用 ui_complete_design_regression_comparison 提交已落盘且哈希匹配的视觉/语义 artifact。',
     '9. 用 ui_complete_design_writeback 提交 changedFiles、源码哈希和各平台 evidence，再读取 ui_get_design_verification_matrix；只有回归 PASSED、receipt.complete=true 且矩阵 PASSED 才声明完成。',
     '10. 明确平台覆盖：只有 nativeHost.nativeHostVerified=true 才能声明 Tauri 原生窗口证据；Android 必须使用 Android Runtime。',
     '',

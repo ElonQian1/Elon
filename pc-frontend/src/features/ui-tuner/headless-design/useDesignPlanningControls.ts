@@ -14,6 +14,7 @@ import {
   planDesignSourceRollback,
   planDesignWriteback,
   replanDesignIntent,
+  runDesignRegressionComparison,
   startDesignIntentPlan,
   transitionDesignIntentPlan,
 } from './designPlanningApi'
@@ -351,6 +352,22 @@ export function useDesignPlanningControls(input: Input) {
     }
   }, [input.projectRoot])
 
+  const runRegressionComparison = useCallback(async () => {
+    if (!regressionComparison || regressionComparison.status !== 'READY_TO_COMPARE') return null
+    return run('regression-comparator', async () => {
+      const result = await runDesignRegressionComparison({
+        projectRoot: input.projectRoot,
+        comparisonId: regressionComparison.comparisonId,
+        expectedRevision: regressionComparison.revision,
+      })
+      setRegressionComparison(result.comparison)
+      setMessage(result.comparison.status === 'PASSED'
+        ? '节点本机视觉/语义比较通过，diff artifact 已按哈希固化'
+        : '节点本机视觉/语义比较未通过，请检查差异证据')
+      return result.comparison
+    })
+  }, [input.projectRoot, regressionComparison, run])
+
   return {
     intentPlan,
     bindingHealth,
@@ -376,6 +393,7 @@ export function useDesignPlanningControls(input: Input) {
     compileRollbackPlan,
     createRegressionBaseline,
     planRegressionComparison,
+    runRegressionComparison,
     loadRegressionBaseline,
     loadRegressionComparison,
   }

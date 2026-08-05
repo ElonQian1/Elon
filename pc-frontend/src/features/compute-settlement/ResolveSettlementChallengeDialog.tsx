@@ -25,7 +25,7 @@ export default function ResolveSettlementChallengeDialog({ challenge, busy, erro
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!ready || busy || decision === '') return
+    if (!ready || busy) return
     await onSubmit({
       expected_challenge_id: challenge.challenge_id,
       expected_challenge_event_digest: challenge.event_digest,

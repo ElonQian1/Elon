@@ -251,6 +251,17 @@ export function getDesignRegressionComparison(projectRoot: string, comparisonId:
   )
 }
 
+export function runDesignRegressionComparison(input: {
+  projectRoot: string
+  comparisonId: string
+  expectedRevision: number
+}) {
+  const { comparisonId, ...body } = input
+  return callDesignNode<DesignRegressionComparisonResult>(
+    `/api/android-live/design/regressions/comparisons/${encodeURIComponent(comparisonId)}/run`, body,
+  )
+}
+
 export function getDesignEventCheckpoint(projectRoot: string, consumerId: string, taskId: string) {
   return callDesignNode<{
     schema: 'elon.ui-design-event-checkpoint.v1'
