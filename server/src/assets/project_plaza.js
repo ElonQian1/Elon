@@ -556,7 +556,7 @@
     return `
       <article class="project-plaza-featured-card ${index === 0 ? 'is-active' : ''}" data-id="${escapeHtml(project.id)}">
         <header class="project-plaza-featured-head">
-          <div class="project-plaza-featured-rank"><strong>精选</strong><span>${escapeHtml(String(index + 1).padStart(2, '0'))}</span></div>
+          <div class="project-plaza-featured-rank"><strong>精选节点</strong><span>NODE ${escapeHtml(String(index + 1).padStart(2, '0'))}</span></div>
           <div class="project-plaza-featured-status is-${escapeHtml(status.tone)}"><i aria-hidden="true"></i><span>${escapeHtml(status.label)}</span></div>
         </header>
         <div class="project-plaza-featured-body">

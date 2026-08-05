@@ -177,10 +177,9 @@ internal class MainMarketplaceActions(
         return searchBar.apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = rect(
-                activity.elonColor(R.color.elon_plaza_surface_search),
-                SEARCH_RADIUS_DP,
-                activity.elonColor(R.color.elon_plaza_border)
+            background = metalRoundedGradient(
+                radiusDp = SEARCH_RADIUS_DP,
+                strokeColor = activity.elonColor(R.color.elon_plaza_border),
             )
             setPadding(dp(20), 0, dp(18), 0)
             layoutParams = LinearLayout.LayoutParams(
@@ -200,12 +199,11 @@ internal class MainMarketplaceActions(
             })
             val field = buildSearchField().apply {
                 setOnFocusChangeListener { _, focused ->
-                    searchBar.background = rect(
-                        activity.elonColor(R.color.elon_plaza_surface_search),
-                        SEARCH_RADIUS_DP,
-                        activity.elonColor(
+                    searchBar.background = metalRoundedGradient(
+                        radiusDp = SEARCH_RADIUS_DP,
+                        strokeColor = activity.elonColor(
                             if (focused) R.color.elon_plaza_signal else R.color.elon_plaza_border
-                        )
+                        ),
                     )
                 }
             }
@@ -301,7 +299,12 @@ internal class MainMarketplaceActions(
             chip.paint.isUnderlineText = false
             chip.setTypeface(chip.typeface, Typeface.NORMAL)
             chip.background = if (selected) {
-                rect(activity.elonColor(R.color.elon_plaza_segment_selected), FILTER_CHIP_RADIUS_DP)
+                metalRoundedGradient(
+                    radiusDp = FILTER_CHIP_RADIUS_DP,
+                    strokeColor = activity.elonColor(R.color.elon_plaza_border),
+                    highColor = activity.elonColor(R.color.elon_plaza_surface_card_high),
+                    lowColor = activity.elonColor(R.color.elon_plaza_segment_selected),
+                )
             } else {
                 null
             }
@@ -519,6 +522,20 @@ internal class MainMarketplaceActions(
             if (radiusDp > 0) cornerRadius = dp(radiusDp).toFloat()
             strokeColor?.let { setStroke(dp(1), it) }
         }
+    }
+
+    private fun metalRoundedGradient(
+        radiusDp: Int,
+        strokeColor: Int,
+        highColor: Int = activity.elonColor(R.color.elon_plaza_surface_card_mid),
+        lowColor: Int = activity.elonColor(R.color.elon_plaza_surface_search),
+    ): GradientDrawable = GradientDrawable(
+        GradientDrawable.Orientation.TL_BR,
+        intArrayOf(highColor, lowColor, activity.elonColor(R.color.elon_plaza_surface_card)),
+    ).apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = dp(radiusDp).toFloat()
+        setStroke(dp(1), strokeColor)
     }
 
     private companion object {

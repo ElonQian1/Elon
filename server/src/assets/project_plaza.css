@@ -1,25 +1,30 @@
 .project-plaza-inline-root {
-  --plaza-bg: #0c0e12;
-  --plaza-card: #111318;
-  --plaza-card-high: #1f232b;
-  --plaza-surface: #1d2128;
-  --plaza-header: #171a20;
-  --plaza-search: #171a20;
-  --plaza-segment: #252a32;
+  --plaza-bg: #07090d;
+  --plaza-card: #0e1116;
+  --plaza-card-mid: #171c22;
+  --plaza-card-high: #252b33;
+  --plaza-surface: #171c22;
+  --plaza-header: #151a20;
+  --plaza-search: #12161c;
+  --plaza-segment: #20262e;
   --plaza-text: rgba(248, 247, 244, 0.94);
   --plaza-text-secondary: rgba(221, 219, 213, 0.70);
   --plaza-text-tertiary: rgba(190, 190, 186, 0.50);
   --plaza-thumb: #8ea7d5;
-  --plaza-divider: rgba(194, 184, 169, 0.11);
-  --plaza-border: rgba(194, 184, 169, 0.19);
+  --plaza-divider: rgba(127, 137, 148, 0.18);
+  --plaza-border: rgba(108, 120, 132, 0.32);
+  --plaza-metal-highlight: rgba(174, 184, 196, 0.24);
+  --plaza-calibration: rgba(127, 175, 186, 0.35);
   --plaza-primary: #8ea7d5;
   --plaza-primary-ink: #10151d;
   --plaza-primary-soft: rgba(142, 167, 213, 0.13);
   --plaza-accent-text: #b4c5e3;
   --plaza-accent: #8bb8c3;
-  --plaza-action: #8ea7d5;
-  --plaza-action-ink: #10151d;
-  --plaza-constellation: rgba(142, 167, 213, 0.13);
+  --plaza-action: #c2cbd6;
+  --plaza-action-mid: #95a6b9;
+  --plaza-action-end: #71879f;
+  --plaza-action-ink: #0b1118;
+  --plaza-constellation: rgba(127, 175, 186, 0.17);
   --plaza-success: #67bea0;
   --plaza-danger: #e07b84;
   --plaza-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -49,6 +54,8 @@
 .project-plaza-inline-root::before {
   inset: 0;
   background-image:
+    linear-gradient(rgba(127, 175, 186, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127, 175, 186, 0.045) 1px, transparent 1px),
     radial-gradient(circle at 8% 7%, rgba(201, 231, 245, 0.32) 0 1px, transparent 1.4px),
     radial-gradient(circle at 29% 16%, rgba(110, 216, 255, 0.20) 0 1px, transparent 1.5px),
     radial-gradient(circle at 74% 9%, rgba(201, 231, 245, 0.24) 0 1px, transparent 1.4px),
@@ -57,6 +64,7 @@
     radial-gradient(circle at 63% 61%, rgba(110, 216, 255, 0.16) 0 1px, transparent 1.5px),
     radial-gradient(circle at 86% 79%, rgba(201, 231, 245, 0.22) 0 1px, transparent 1.4px),
     radial-gradient(circle at 34% 91%, rgba(110, 216, 255, 0.14) 0 1px, transparent 1.5px);
+  background-size: 30vw 29vh, 30vw 29vh, auto, auto, auto, auto, auto, auto, auto, auto;
 }
 
 .project-plaza-inline-root::after {
@@ -87,7 +95,7 @@ main.app:has(.project-page.project-plaza-mode) > .toolbar {
   margin: 16px 20px 0;
   padding: 0 18px 0 20px;
   border-radius: 28px;
-  background: var(--plaza-search);
+  background: linear-gradient(145deg, var(--plaza-card-mid), var(--plaza-search) 62%, var(--plaza-card));
   border: 1px solid var(--plaza-border);
   display: flex;
   align-items: center;
@@ -173,7 +181,7 @@ main.app:has(.project-page.project-plaza-mode) > .toolbar {
 .project-plaza-filter.active {
   width: 70px;
   min-width: 70px;
-  background: var(--plaza-segment);
+  background: linear-gradient(145deg, var(--plaza-card-high), var(--plaza-segment) 54%, var(--plaza-card));
   color: var(--plaza-accent-text);
   box-shadow: inset 0 0 0 1px var(--plaza-border);
 }
@@ -213,6 +221,7 @@ main.app:has(.project-page.project-plaza-mode) > .toolbar {
   font-size: 12px;
   line-height: 1;
   white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .project-plaza-featured-scroller {
@@ -237,9 +246,10 @@ main.app:has(.project-page.project-plaza-mode) > .toolbar {
   width: 68.718vw;
   max-width: 296px;
   aspect-ratio: 268 / 322;
-  border-radius: 20px;
+  border-radius: 0;
   border: 1px solid var(--plaza-border);
-  background: linear-gradient(145deg, var(--plaza-card-high), var(--plaza-card));
+  background: linear-gradient(145deg, var(--plaza-card-high) 0%, var(--plaza-card-mid) 30%, var(--plaza-card) 72%, #0a0d11 100%);
+  clip-path: polygon(11px 0, calc(100% - 18px) 0, 100% 18px, 100% calc(100% - 11px), calc(100% - 11px) 100%, 18px 100%, 0 calc(100% - 18px), 0 11px);
   color: var(--plaza-text);
   box-sizing: border-box;
   overflow: hidden;
@@ -248,19 +258,36 @@ main.app:has(.project-page.project-plaza-mode) > .toolbar {
   cursor: pointer;
   transform: scale(0.96);
   transition: transform 160ms var(--plaza-ease-out), opacity 160ms var(--plaza-ease-out);
-  box-shadow: inset 0 1px 0 rgba(248, 247, 244, 0.035);
+  box-shadow: inset 0 1px 0 var(--plaza-metal-highlight);
 }
 
+.project-plaza-featured-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.project-plaza-featured-card::before,
 .project-plaza-featured-card::after {
   content: "";
   position: absolute;
-  top: 9px;
-  right: 9px;
-  width: 16px;
-  height: 16px;
-  border-top: 1px solid var(--plaza-constellation);
-  border-right: 1px solid var(--plaza-constellation);
   pointer-events: none;
+}
+
+.project-plaza-featured-card::before {
+  inset: 3px;
+  z-index: 0;
+  border: 1px solid var(--plaza-metal-highlight);
+  clip-path: polygon(9px 0, calc(100% - 15px) 0, 100% 15px, 100% calc(100% - 9px), calc(100% - 9px) 100%, 15px 100%, 0 calc(100% - 15px), 0 9px);
+}
+
+.project-plaza-featured-card::after {
+  z-index: 2;
+  top: 83px;
+  right: 7px;
+  width: 12px;
+  height: 44px;
+  background: repeating-linear-gradient(to bottom, var(--plaza-calibration) 0 1px, transparent 1px 9px);
+  clip-path: polygon(40% 0, 100% 0, 100% 100%, 40% 100%, 40% 55%, 0 55%, 0 45%, 40% 45%);
 }
 
 .project-plaza-featured-card.is-active {
@@ -271,7 +298,7 @@ main.app:has(.project-page.project-plaza-mode) > .toolbar {
   height: 54px;
   padding: 0 18px 0 15px;
   border-left: 3px solid var(--plaza-primary);
-  background: var(--plaza-header);
+  background: linear-gradient(145deg, var(--plaza-card-high), var(--plaza-header) 52%, var(--plaza-card));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -297,6 +324,7 @@ main.app:has(.project-page.project-plaza-mode) > .toolbar {
 .project-plaza-featured-rank span {
   color: var(--plaza-text-secondary);
   font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .project-plaza-featured-status {
@@ -447,13 +475,15 @@ main.app:has(.project-page.project-plaza-mode) > .toolbar {
   flex: 1 1 auto;
   border: 0;
   border-radius: 24px;
-  background: linear-gradient(135deg, var(--plaza-action), var(--plaza-accent));
+  border: 1px solid rgba(216, 224, 232, 0.66);
+  background: linear-gradient(135deg, var(--plaza-action), var(--plaza-action-mid) 48%, var(--plaza-action-end));
   color: var(--plaza-action-ink);
   padding: 0 14px;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
   transition: transform 160ms var(--plaza-ease-out), opacity 160ms var(--plaza-ease-out);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.42), inset 0 -1px 0 rgba(8, 14, 20, 0.32);
 }
 
 .project-plaza-featured-primary[aria-disabled="true"] {

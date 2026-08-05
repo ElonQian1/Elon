@@ -59,6 +59,7 @@ internal class ProjectPlazaFeaturedSection(
             includeFontPadding = false
             setTextColor(activity.elonColor(R.color.elon_plaza_text_quiet))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            typeface = Typeface.MONOSPACE
             gravity = Gravity.CENTER_VERTICAL
             contentDescription = "精选项目位置"
         }, LinearLayout.LayoutParams(
@@ -89,12 +90,7 @@ internal class ProjectPlazaFeaturedSection(
     }
 
     private fun buildCard(project: StoreProject, index: Int) = FrameLayout(activity).apply {
-        background = gradientRect(
-            activity.elonColor(R.color.elon_plaza_surface_card_high),
-            activity.elonColor(R.color.elon_plaza_surface_card),
-            CARD_RADIUS_DP,
-            activity.elonColor(R.color.elon_plaza_border)
-        )
+        background = ProjectPlazaMetalPanelDrawable(activity)
         clipToOutline = true
         isClickable = true
         foreground = selectableForeground()
@@ -125,7 +121,7 @@ internal class ProjectPlazaFeaturedSection(
 
     private fun buildCardHeader(project: StoreProject, index: Int) = LinearLayout(activity).apply {
         gravity = Gravity.CENTER_VERTICAL
-        background = rect(activity.elonColor(R.color.elon_plaza_surface_header))
+        background = metalHeader()
         setPadding(dp(CARD_CONTENT_PADDING_DP), 0, dp(CARD_CONTENT_PADDING_DP), 0)
         addView(View(activity).apply {
             background = rect(activity.elonColor(R.color.elon_plaza_signal), FEATURE_RAIL_WIDTH_DP / 2)
@@ -136,17 +132,18 @@ internal class ProjectPlazaFeaturedSection(
         addView(LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
             addView(TextView(activity).apply {
-                text = "精选"
+                text = "精选节点"
                 includeFontPadding = false
                 setTextColor(activity.elonColor(R.color.elon_plaza_text_primary))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
                 typeface = Typeface.DEFAULT_BOLD
             })
             addView(TextView(activity).apply {
-                text = (index + 1).toString().padStart(2, '0')
+                text = "NODE ${(index + 1).toString().padStart(2, '0')}"
                 includeFontPadding = false
                 setTextColor(activity.elonColor(R.color.elon_plaza_text_secondary))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+                typeface = Typeface.MONOSPACE
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -300,11 +297,7 @@ internal class ProjectPlazaFeaturedSection(
             gravity = Gravity.CENTER
             includeFontPadding = false
             background = if (action.enabled) {
-                gradientRect(
-                    activity.elonColor(R.color.elon_plaza_action),
-                    activity.elonColor(R.color.elon_plaza_action_end),
-                    ACTION_HEIGHT_DP / 2
-                )
+                ProjectPlazaMetalActionDrawable(activity)
             } else {
                 rect(activity.elonColor(R.color.elon_plaza_surface_search), ACTION_HEIGHT_DP / 2)
             }
@@ -398,18 +391,15 @@ internal class ProjectPlazaFeaturedSection(
         }
     }
 
-    private fun gradientRect(
-        startColor: Int,
-        endColor: Int,
-        radiusDp: Int,
-        strokeColor: Int? = null
-    ): GradientDrawable = GradientDrawable(
+    private fun metalHeader(): GradientDrawable = GradientDrawable(
         GradientDrawable.Orientation.TL_BR,
-        intArrayOf(startColor, endColor)
+        intArrayOf(
+            activity.elonColor(R.color.elon_plaza_surface_card_high),
+            activity.elonColor(R.color.elon_plaza_surface_header),
+            activity.elonColor(R.color.elon_plaza_surface_card),
+        )
     ).apply {
         shape = GradientDrawable.RECTANGLE
-        cornerRadius = dp(radiusDp).toFloat()
-        strokeColor?.let { setStroke(dp(1), it) }
     }
 
     private companion object {
@@ -419,7 +409,6 @@ internal class ProjectPlazaFeaturedSection(
         const val FEATURED_CARD_GAP_DP = 10
         const val FEATURED_CARD_WIDTH_FRACTION = 0.6871795f
         const val FEATURED_CARD_HEIGHT_RATIO = 1.2014925f
-        const val CARD_RADIUS_DP = 20
         const val CARD_HEADER_HEIGHT_DP = 54
         const val FEATURE_RAIL_WIDTH_DP = 3
         const val FEATURE_RAIL_HEIGHT_DP = 24

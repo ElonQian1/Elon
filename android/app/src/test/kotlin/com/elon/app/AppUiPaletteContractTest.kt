@@ -51,12 +51,16 @@ class AppUiPaletteContractTest {
         val featured = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/ProjectPlazaFeaturedSection.kt"
         )
+        val metal = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/ProjectPlazaMetalDrawables.kt"
+        )
 
         assertTrue(projectHome.contains("R.color.elon_bg_app"))
         assertTrue(projectHome.contains("R.color.elon_segment_selected"))
         assertTrue(marketplace.contains("R.color.elon_plaza_surface_search"))
         assertTrue(marketplace.contains("R.color.elon_plaza_signal"))
-        assertTrue(featured.contains("R.color.elon_plaza_action"))
+        assertTrue(featured.contains("ProjectPlazaMetalActionDrawable"))
+        assertTrue(metal.contains("R.color.elon_plaza_action"))
         assertTrue(featured.contains("R.color.elon_plaza_status_success"))
         assertFalse(projectHome.contains("const val COLOR_BG ="))
         assertFalse(featured.contains("const val COLOR_CARD ="))
@@ -68,20 +72,24 @@ class AppUiPaletteContractTest {
         val styles = readRepositoryFile("server/src/assets/project_plaza.css")
 
         listOf(
-            "<color name=\"elon_bg_plaza\">#0C0E12</color>",
-            "<color name=\"elon_plaza_surface_card\">#111318</color>",
-            "<color name=\"elon_plaza_surface_card_high\">#1F232B</color>",
-            "<color name=\"elon_plaza_surface_header\">#171A20</color>",
+            "<color name=\"elon_bg_plaza\">#07090D</color>",
+            "<color name=\"elon_plaza_surface_card\">#0E1116</color>",
+            "<color name=\"elon_plaza_surface_card_mid\">#171C22</color>",
+            "<color name=\"elon_plaza_surface_card_high\">#252B33</color>",
+            "<color name=\"elon_plaza_surface_header\">#151A20</color>",
             "<color name=\"elon_plaza_signal\">#8EA7D5</color>",
-            "<color name=\"elon_plaza_action_end\">#8BB8C3</color>"
+            "<color name=\"elon_plaza_action\">#C2CBD6</color>",
+            "<color name=\"elon_plaza_action_end\">#71879F</color>"
         ).forEach { token -> assertTrue("missing Android plaza token $token", colors.contains(token)) }
         listOf(
-            "--plaza-bg: #0c0e12;",
-            "--plaza-card: #111318;",
-            "--plaza-card-high: #1f232b;",
-            "--plaza-header: #171a20;",
+            "--plaza-bg: #07090d;",
+            "--plaza-card: #0e1116;",
+            "--plaza-card-mid: #171c22;",
+            "--plaza-card-high: #252b33;",
+            "--plaza-header: #151a20;",
             "--plaza-primary: #8ea7d5;",
-            "--plaza-accent: #8bb8c3;"
+            "--plaza-action: #c2cbd6;",
+            "--plaza-action-end: #71879f;"
         ).forEach { token -> assertTrue("missing PWA plaza token $token", styles.contains(token)) }
     }
 
