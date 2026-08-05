@@ -17,6 +17,7 @@ use crate::{
 
 use super::{
     compute_activation_plan_dependencies::validate_saved_plan_dependencies_on,
+    compute_activation_plan_reviews::require_activation_plan_review_on,
     compute_activation_plans::plan_by_request_on,
     compute_activation_requests::request_on,
     compute_capacity_pool_lifecycle::{
@@ -66,6 +67,7 @@ impl Store {
         {
             bail!("只有当前摘要匹配的 prepared 激活计划可以应用");
         }
+        require_activation_plan_review_on(&tx, &plan)?;
         validate_saved_plan_dependencies_on(&tx, &plan)?;
 
         let provider = register_compute_provider_on(&tx, &plan.target_provider)?;

@@ -109,6 +109,7 @@ pub(crate) fn preflight_for_review(
     let pool = store.compute_capacity_pool(&plan.pool_id)?;
     let audit =
         store.audit_compute_capacity_pool_epoch(&plan.pool_id, plan.expected_capacity_epoch)?;
+    let plan_review = store.compute_activation_plan_review_for_request(request_id)?;
 
     let plan_status_prepared = plan.status == ACTIVATION_PLAN_STATUS_PREPARED;
     let request_approved = request.status == ACTIVATION_REQUEST_STATUS_APPROVED;
@@ -157,6 +158,14 @@ pub(crate) fn preflight_for_review(
         audit.healthy && audit.current_capacity_epoch == plan.expected_capacity_epoch;
     let ledger_audit_digest_matches =
         stable_compute_capacity_pool_audit_digest(&audit)? == request.ledger_audit_digest;
+    let plan_review_present = plan_review.is_some();
+    let plan_review_digest_matches = plan_review.as_ref().is_some_and(|review| {
+        review.plan_id == plan.plan_id && review.plan_digest == plan.plan_digest
+    });
+    let plan_review_separation_valid = plan_review.as_ref().is_some_and(|review| {
+        review.prepared_by_user_id == plan.prepared_by_user_id
+            && review.reviewed_by_user_id != plan.prepared_by_user_id
+    });
 
     let mut blockers = Vec::new();
     block_unless(&mut blockers, plan_status_prepared, "plan_not_prepared");
@@ -217,9 +226,20 @@ pub(crate) fn preflight_for_review(
         ledger_audit_digest_matches,
         "ledger_audit_changed",
     );
+    block_unless(&mut blockers, plan_review_present, "plan_review_missing");
+    block_unless(
+        &mut blockers,
+        plan_review_digest_matches,
+        "plan_review_digest_changed",
+    );
+    block_unless(
+        &mut blockers,
+        plan_review_separation_valid,
+        "plan_review_separation_invalid",
+    );
 
     Ok(ComputeActivationPlanPreflightReport {
-        schema: "compute_federation.activation_plan_preflight.v1",
+        schema: "compute_federation.activation_plan_preflight.v2",
         plan_id: plan.plan_id,
         request_id: plan.request_id,
         provider_id: plan.provider_id,
@@ -240,6 +260,9 @@ pub(crate) fn preflight_for_review(
         pool_status_registering,
         ledger_audit_healthy,
         ledger_audit_digest_matches,
+        plan_review_present,
+        plan_review_digest_matches,
+        plan_review_separation_valid,
         ready_for_apply: blockers.is_empty(),
         blockers,
         activation_effect: "none",

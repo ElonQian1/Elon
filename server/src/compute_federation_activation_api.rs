@@ -15,6 +15,7 @@ use crate::{
     compute_federation_activation_lifecycle_service::{
         self, SupersedeComputeActivationEvidenceRequestBody,
     },
+    compute_federation_activation_plan_review_service::{self, ReviewComputeActivationPlanBody},
     compute_federation_activation_plan_service::{self, PrepareComputeActivationPlanBody},
     compute_federation_activation_quarantine_service::{
         self, QuarantineComputeActivationApplicationBody,
@@ -68,6 +69,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/preflight",
             get(preflight_activation_plan),
+        )
+        .route(
+            "/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/review",
+            get(get_activation_plan_review).post(review_activation_plan),
         )
         .route(
             "/api/admin/compute/activation-evidence-requests/:request_id/activation-plan/application",
@@ -304,6 +309,40 @@ async fn preflight_activation_plan(
     }
     activation_response(
         compute_federation_activation_plan_service::preflight_for_review(&state.store, &request_id),
+    )
+}
+
+async fn review_activation_plan(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+    Json(request): Json<ReviewComputeActivationPlanBody>,
+) -> Response {
+    let reviewer_user_id = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    activation_response(
+        compute_federation_activation_plan_review_service::review_for_admin(
+            &state.store,
+            &reviewer_user_id,
+            &request_id,
+            request,
+        ),
+    )
+}
+
+async fn get_activation_plan_review(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    activation_response(
+        compute_federation_activation_plan_review_service::get_for_admin(&state.store, &request_id)
+            .map(|review| json!({"activation_plan_review":review,"activation_effect":"none"})),
     )
 }
 
