@@ -47,6 +47,36 @@ pub(crate) struct ComputeActivationRecoveryPlanReceipt {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub(crate) struct ComputeActivationRecoveryPreflightReport {
+    pub schema: &'static str,
+    pub recovery_plan_id: String,
+    pub request_id: String,
+    pub provider_id: String,
+    pub pool_id: String,
+    pub plan_status: String,
+    pub checked_at: String,
+    pub plan_status_prepared: bool,
+    pub quarantine_digest_matches: bool,
+    pub quarantine_binding_matches: bool,
+    pub provider_version_matches: bool,
+    pub provider_status_quarantined: bool,
+    pub target_provider_identity_matches: bool,
+    pub target_provider_revision_matches: bool,
+    pub target_provider_contract_ready: bool,
+    pub pool_provider_matches: bool,
+    pub pool_version_matches: bool,
+    pub pool_status_quarantined: bool,
+    pub active_offer_count: i64,
+    pub active_offers_drained: bool,
+    pub plan_review_present: bool,
+    pub plan_review_digest_matches: bool,
+    pub plan_review_separation_valid: bool,
+    pub ready_for_apply: bool,
+    pub blockers: Vec<String>,
+    pub recovery_effect: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub(crate) struct ComputeActivationRecoveryReviewReceipt {
     pub schema: &'static str,
     pub recovery_review_id: String,

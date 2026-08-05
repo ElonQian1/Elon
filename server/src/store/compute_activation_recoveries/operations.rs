@@ -332,4 +332,18 @@ impl Store {
             })
             .transpose()
     }
+
+    pub(crate) fn compute_activation_recovery_active_offer_count(
+        &self,
+        provider_id: &str,
+    ) -> Result<i64> {
+        validate_exact("Provider ID", provider_id, 160)?;
+        self.conn()?
+            .query_row(
+                "SELECT COUNT(*) FROM compute_offers WHERE provider_id=?1 AND status='active'",
+                params![provider_id.trim()],
+                |row| row.get(0),
+            )
+            .map_err(Into::into)
+    }
 }

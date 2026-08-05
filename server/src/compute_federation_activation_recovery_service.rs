@@ -4,12 +4,14 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
 use crate::{
+    compute_federation::capacity::ComputeCapacityPoolStatus,
     compute_federation::provider::{
         ComputeProviderAdapterRef, ComputeProviderEndpointRef, PROVIDER_STATUS_ACTIVE,
+        PROVIDER_STATUS_QUARANTINED,
     },
     compute_federation_activation_recovery_model::{
         ComputeActivationRecoveryApplicationReceipt, ComputeActivationRecoveryPlanReceipt,
-        ComputeActivationRecoveryReviewReceipt,
+        ComputeActivationRecoveryPreflightReport, ComputeActivationRecoveryReviewReceipt,
     },
     store::{
         ApplyComputeActivationRecoveryPlan, PrepareComputeActivationRecoveryPlan,
@@ -127,6 +129,178 @@ pub(crate) fn review(
         reviewed_by_user_id: actor.to_string(),
     })
 }
+
+pub(crate) fn preflight(
+    store: &Store,
+    request_id: &str,
+) -> Result<ComputeActivationRecoveryPreflightReport> {
+    validate_exact("申请 ID", request_id, 160)?;
+    let plan = store
+        .compute_activation_recovery_plan_for_request(request_id)?
+        .ok_or_else(|| anyhow::anyhow!("隔离恢复计划不存在"))?;
+    let quarantine = store
+        .compute_activation_quarantine_for_request(request_id)?
+        .ok_or_else(|| anyhow::anyhow!("激活隔离回执不存在"))?;
+    let provider = store.compute_provider(&plan.provider_id)?;
+    let pool = store.compute_capacity_pool(&plan.pool_id)?;
+    let review = store.compute_activation_recovery_review_for_request(request_id)?;
+    let active_offer_count =
+        store.compute_activation_recovery_active_offer_count(&plan.provider_id)?;
+
+    let plan_status_prepared = plan.status == "prepared";
+    let quarantine_digest_matches = quarantine.quarantine_digest == plan.expected_quarantine_digest;
+    let quarantine_binding_matches = quarantine.quarantine_id == plan.quarantine_id
+        && quarantine.application_id == plan.application_id
+        && quarantine.request_id == plan.request_id
+        && quarantine.provider_id == plan.provider_id
+        && quarantine.pool_id == plan.pool_id
+        && quarantine.quarantined_provider_policy_revision
+            == plan.expected_provider_policy_revision
+        && quarantine.quarantined_provider_digest == plan.expected_provider_digest
+        && quarantine.capacity_epoch == plan.expected_capacity_epoch;
+    let provider_version_matches = provider.provider.policy_revision
+        == plan.expected_provider_policy_revision
+        && provider.provider_digest == plan.expected_provider_digest;
+    let provider_status_quarantined = provider.provider.status == PROVIDER_STATUS_QUARANTINED;
+    let target_provider_identity_matches = plan.target_provider.provider_id
+        == provider.provider.provider_id
+        && plan.target_provider.provider_kind == provider.provider.provider_kind
+        && plan.target_provider.owner_account_id == provider.provider.owner_account_id
+        && plan.target_provider.created_at == provider.provider.created_at;
+    let target_provider_revision_matches = provider
+        .provider
+        .policy_revision
+        .checked_add(1)
+        .is_some_and(|revision| {
+            revision == plan.target_provider_policy_revision
+                && plan.target_provider.policy_revision == revision
+        });
+    let target_provider_contract_ready = plan.target_provider.status == PROVIDER_STATUS_ACTIVE
+        && (plan.target_provider.endpoint.is_some() || plan.target_provider.adapter.is_some())
+        && plan.target_provider.trust_tier != "self_declared"
+        && plan
+            .target_provider
+            .evidence_profile
+            .verified_hardware_digest
+            .is_some()
+        && plan
+            .target_provider
+            .evidence_profile
+            .last_verified_at
+            .is_some();
+    let pool_provider_matches = pool.provider_id == plan.provider_id;
+    let pool_version_matches = pool.binding.capacity_epoch == plan.expected_capacity_epoch
+        && pool.binding.pool_revision == plan.expected_pool_revision
+        && pool.binding.pool_digest == plan.expected_pool_digest;
+    let pool_status_quarantined = pool.status == ComputeCapacityPoolStatus::Quarantined;
+    let active_offers_drained = active_offer_count == 0;
+    let plan_review_present = review.is_some();
+    let plan_review_digest_matches = review.as_ref().is_some_and(|review| {
+        review.recovery_plan_id == plan.recovery_plan_id && review.plan_digest == plan.plan_digest
+    });
+    let plan_review_separation_valid = review.as_ref().is_some_and(|review| {
+        review.prepared_by_user_id == plan.prepared_by_user_id
+            && review.reviewed_by_user_id != plan.prepared_by_user_id
+    });
+
+    let mut blockers = Vec::new();
+    block_unless(
+        &mut blockers,
+        plan_status_prepared,
+        "recovery_plan_not_prepared",
+    );
+    block_unless(
+        &mut blockers,
+        quarantine_digest_matches,
+        "quarantine_digest_changed",
+    );
+    block_unless(
+        &mut blockers,
+        quarantine_binding_matches,
+        "quarantine_binding_changed",
+    );
+    block_unless(
+        &mut blockers,
+        provider_version_matches,
+        "provider_version_changed",
+    );
+    block_unless(
+        &mut blockers,
+        provider_status_quarantined,
+        "provider_not_quarantined",
+    );
+    block_unless(
+        &mut blockers,
+        target_provider_identity_matches,
+        "target_provider_identity_changed",
+    );
+    block_unless(
+        &mut blockers,
+        target_provider_revision_matches,
+        "target_provider_revision_invalid",
+    );
+    block_unless(
+        &mut blockers,
+        target_provider_contract_ready,
+        "target_provider_not_ready",
+    );
+    block_unless(
+        &mut blockers,
+        pool_provider_matches,
+        "pool_provider_changed",
+    );
+    block_unless(&mut blockers, pool_version_matches, "pool_version_changed");
+    block_unless(
+        &mut blockers,
+        pool_status_quarantined,
+        "pool_not_quarantined",
+    );
+    block_unless(
+        &mut blockers,
+        active_offers_drained,
+        "active_offers_remaining",
+    );
+    block_unless(&mut blockers, plan_review_present, "plan_review_missing");
+    block_unless(
+        &mut blockers,
+        plan_review_digest_matches,
+        "plan_review_digest_changed",
+    );
+    block_unless(
+        &mut blockers,
+        plan_review_separation_valid,
+        "plan_review_separation_invalid",
+    );
+
+    Ok(ComputeActivationRecoveryPreflightReport {
+        schema: "compute_federation.activation_recovery_preflight.v1",
+        recovery_plan_id: plan.recovery_plan_id,
+        request_id: plan.request_id,
+        provider_id: plan.provider_id,
+        pool_id: plan.pool_id,
+        plan_status: plan.status,
+        checked_at: Utc::now().to_rfc3339(),
+        plan_status_prepared,
+        quarantine_digest_matches,
+        quarantine_binding_matches,
+        provider_version_matches,
+        provider_status_quarantined,
+        target_provider_identity_matches,
+        target_provider_revision_matches,
+        target_provider_contract_ready,
+        pool_provider_matches,
+        pool_version_matches,
+        pool_status_quarantined,
+        active_offer_count,
+        active_offers_drained,
+        plan_review_present,
+        plan_review_digest_matches,
+        plan_review_separation_valid,
+        ready_for_apply: blockers.is_empty(),
+        blockers,
+        recovery_effect: "none",
+    })
+}
 pub(crate) fn apply(
     store: &Store,
     actor: &str,
@@ -150,6 +324,11 @@ fn scope(purpose: &str, actor: &str, request_id: &str) -> Result<String> {
     Ok(hex::encode(Sha256::digest(serde_json::to_vec(
         &serde_json::json!({"purpose":format!("compute_activation_recovery_{purpose}"),"actor":actor,"request_id":request_id}),
     )?)))
+}
+fn block_unless(blockers: &mut Vec<String>, condition: bool, code: &str) {
+    if !condition {
+        blockers.push(code.to_string());
+    }
 }
 fn validate_digest(label: &str, value: &str) -> Result<()> {
     if value.len() != 64
