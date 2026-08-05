@@ -51,6 +51,7 @@ mod compute_activation_plan_migration;
 mod compute_activation_plan_review_migration;
 mod compute_activation_quarantine_migration;
 mod compute_activation_recovery_migration;
+mod compute_activation_recovery_supersession_migration;
 mod compute_activation_request_migration;
 mod compute_attempt_abort_migration;
 mod compute_attempt_activation_migration;

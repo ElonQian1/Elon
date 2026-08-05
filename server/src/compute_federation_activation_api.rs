@@ -22,7 +22,7 @@ use crate::{
     },
     compute_federation_activation_recovery_service::{
         self, ApplyActivationRecoveryPlanBody, PrepareActivationRecoveryPlanBody,
-        ReviewActivationRecoveryPlanBody,
+        ReviewActivationRecoveryPlanBody, SupersedeActivationRecoveryPlanBody,
     },
     compute_federation_activation_service::{
         self, CancelMyComputeActivationEvidenceRequest, ReviewComputeActivationEvidenceRequestBody,
@@ -93,6 +93,10 @@ pub(crate) fn routes() -> Router<Arc<AppState>> {
         .route(
             "/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/preflight",
             get(preflight_activation_recovery_plan),
+        )
+        .route(
+            "/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/supersession",
+            get(get_activation_recovery_supersession).post(supersede_activation_recovery_plan),
         )
         .route(
             "/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/review",
@@ -481,6 +485,36 @@ async fn preflight_activation_recovery_plan(
         &state.store,
         &request_id,
     ))
+}
+async fn supersede_activation_recovery_plan(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+    Json(request): Json<SupersedeActivationRecoveryPlanBody>,
+) -> Response {
+    let actor = match platform_admin(&state, &headers) {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    activation_response(compute_federation_activation_recovery_service::supersede(
+        &state.store,
+        &actor,
+        &request_id,
+        request,
+    ))
+}
+async fn get_activation_recovery_supersession(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(request_id): Path<String>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    activation_response(
+        compute_federation_activation_recovery_service::get_supersession(&state.store, &request_id)
+            .map(|supersession| json!({"activation_recovery_supersession":supersession})),
+    )
 }
 async fn review_activation_recovery_plan(
     State(state): State<Arc<AppState>>,

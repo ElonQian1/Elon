@@ -6,6 +6,8 @@ pub(crate) const RECOVERY_PLAN_SCHEMA: &str = "compute_federation.activation_rec
 pub(crate) const RECOVERY_REVIEW_SCHEMA: &str = "compute_federation.activation_recovery_review.v1";
 pub(crate) const RECOVERY_APPLICATION_SCHEMA: &str =
     "compute_federation.activation_recovery_application.v1";
+pub(crate) const RECOVERY_SUPERSESSION_SCHEMA: &str =
+    "compute_federation.activation_recovery_plan_supersession.v1";
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ComputeActivationRecoveryPlan {
@@ -44,6 +46,30 @@ pub(crate) struct ComputeActivationRecoveryPlanReceipt {
     pub provider_effect: &'static str,
     pub pool_effect: &'static str,
     pub offer_effect: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ComputeActivationRecoveryPlanSupersessionReceipt {
+    pub schema: &'static str,
+    pub recovery_supersession_id: String,
+    pub recovery_plan_id: String,
+    pub quarantine_id: String,
+    pub request_id: String,
+    pub provider_id: String,
+    pub pool_id: String,
+    pub plan_digest: String,
+    pub reason: String,
+    pub request_digest: String,
+    pub supersession_digest: String,
+    pub superseded_by_user_id: String,
+    pub superseded_at: String,
+    pub replayed: bool,
+    pub recovery_effect: &'static str,
+    pub provider_effect: &'static str,
+    pub pool_effect: &'static str,
+    pub offer_effect: &'static str,
+    pub node_effect: &'static str,
+    pub money_effect: &'static str,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -273,7 +273,7 @@ pub(crate) use compute_activation_plans::PrepareComputeActivationPlan;
 pub(crate) use compute_activation_quarantines::QuarantineComputeActivationApplication;
 pub(crate) use compute_activation_recoveries::{
     ApplyComputeActivationRecoveryPlan, PrepareComputeActivationRecoveryPlan,
-    ReviewComputeActivationRecoveryPlan,
+    ReviewComputeActivationRecoveryPlan, SupersedeComputeActivationRecoveryPlan,
 };
 pub(crate) use compute_activation_requests::{
     ReviewComputeActivationEvidenceRequest, SubmitComputeActivationEvidenceRequest,

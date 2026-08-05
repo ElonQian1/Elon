@@ -8,8 +8,9 @@ use crate::{
     },
     compute_federation_activation_recovery_model::{
         ComputeActivationRecoveryApplicationReceipt, ComputeActivationRecoveryPlan,
-        ComputeActivationRecoveryPlanReceipt, ComputeActivationRecoveryReviewReceipt,
-        RECOVERY_APPLICATION_SCHEMA, RECOVERY_PLAN_SCHEMA, RECOVERY_REVIEW_SCHEMA,
+        ComputeActivationRecoveryPlanReceipt, ComputeActivationRecoveryPlanSupersessionReceipt,
+        ComputeActivationRecoveryReviewReceipt, RECOVERY_APPLICATION_SCHEMA, RECOVERY_PLAN_SCHEMA,
+        RECOVERY_REVIEW_SCHEMA, RECOVERY_SUPERSESSION_SCHEMA,
     },
 };
 
@@ -59,8 +60,19 @@ pub(crate) struct ApplyComputeActivationRecoveryPlan {
     pub applied_by_user_id: String,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct SupersedeComputeActivationRecoveryPlan {
+    pub request_id: String,
+    pub expected_plan_digest: String,
+    pub reason: String,
+    pub idempotency_scope: String,
+    pub idempotency_key: String,
+    pub superseded_by_user_id: String,
+}
+
 mod integrity;
 mod operations;
+mod supersessions;
 
 use integrity::*;
 

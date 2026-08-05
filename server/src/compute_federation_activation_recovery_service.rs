@@ -11,11 +11,12 @@ use crate::{
     },
     compute_federation_activation_recovery_model::{
         ComputeActivationRecoveryApplicationReceipt, ComputeActivationRecoveryPlanReceipt,
-        ComputeActivationRecoveryPreflightReport, ComputeActivationRecoveryReviewReceipt,
+        ComputeActivationRecoveryPlanSupersessionReceipt, ComputeActivationRecoveryPreflightReport,
+        ComputeActivationRecoveryReviewReceipt,
     },
     store::{
         ApplyComputeActivationRecoveryPlan, PrepareComputeActivationRecoveryPlan,
-        ReviewComputeActivationRecoveryPlan, Store,
+        ReviewComputeActivationRecoveryPlan, Store, SupersedeComputeActivationRecoveryPlan,
     },
 };
 
@@ -47,6 +48,15 @@ pub(crate) struct ApplyActivationRecoveryPlanBody {
     pub idempotency_key: String,
     pub expected_plan_digest: String,
     pub confirm_apply: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SupersedeActivationRecoveryPlanBody {
+    pub idempotency_key: String,
+    pub expected_plan_digest: String,
+    pub reason: String,
+    pub confirm_supersede: bool,
 }
 
 pub(crate) fn prepare(
@@ -318,6 +328,33 @@ pub(crate) fn apply(
         applied_by_user_id: actor.to_string(),
     })
 }
+
+pub(crate) fn supersede(
+    store: &Store,
+    actor: &str,
+    request_id: &str,
+    body: SupersedeActivationRecoveryPlanBody,
+) -> Result<ComputeActivationRecoveryPlanSupersessionReceipt> {
+    if !body.confirm_supersede {
+        bail!("废止隔离恢复计划前必须显式确认")
+    }
+    store.supersede_compute_activation_recovery_plan(SupersedeComputeActivationRecoveryPlan {
+        request_id: request_id.to_string(),
+        expected_plan_digest: body.expected_plan_digest,
+        reason: body.reason,
+        idempotency_scope: scope("supersede", actor, request_id)?,
+        idempotency_key: body.idempotency_key,
+        superseded_by_user_id: actor.to_string(),
+    })
+}
+
+pub(crate) fn get_supersession(
+    store: &Store,
+    request_id: &str,
+) -> Result<Option<ComputeActivationRecoveryPlanSupersessionReceipt>> {
+    store.compute_activation_recovery_supersession_for_request(request_id)
+}
+
 fn scope(purpose: &str, actor: &str, request_id: &str) -> Result<String> {
     validate_exact("执行人", actor, 160)?;
     validate_exact("申请 ID", request_id, 160)?;
