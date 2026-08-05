@@ -31,7 +31,7 @@ v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以
 
 两类 open 队列先按角色筛选无决议挑战，再逐条重放 v196 Challenge 与 v195 Settlement Receipt 审计；消费者队列额外核对 `consumer_account_id`。队列只是待办入口，撤回或裁决 POST 仍在事务内重新检查唯一终态。
 
-历史队列不是数据库 JSON 直出。它逐项重放 v195 Settlement、v196 Challenge、可选 v197 Resolution、可选 v199 Correction 和可选 v198 Release，并拒绝引用错位及不允许的状态组合。PC `/compute-challenges` 展示消费者本人历史，`/my-compute-settlement` 按当前 Provider 展示受影响收益，`/compute-challenge-resolution` 展示管理员全局历史；历史中的 available 仅表示平台内部余额，不证明银行、钱包、Sui 或其他外部付款。
+挑战历史队列不是数据库 JSON 直出。它逐项重放 v195 Settlement、v196 Challenge、可选 v197 Resolution、可选 v199 Correction 和可选 v198 Release，并拒绝引用错位及不允许的状态组合。PC 三个角色页面现使用覆盖正常与申诉路径的 v203 结算生命周期历史；挑战专用历史 HTTP 仍保留供精确读取。两类历史中的 available 都只表示平台内部余额，不证明银行、钱包、Sui 或其他外部付款。
 
 ## 3. 状态和释放门卫
 
@@ -81,7 +81,7 @@ v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以
 - `pc-frontend/src/features/compute-attempt/settlementChallengeHistoryContracts.ts`
 - `pc-frontend/src/features/compute-settlement/ComputeSettlementChallengePage.tsx`
 - `pc-frontend/src/features/compute-settlement/ComputeSettlementChallengeResolutionPage.tsx`
-- `pc-frontend/src/features/compute-settlement/SettlementChallengeHistoryList.tsx`
+- `pc-frontend/src/features/compute-settlement/SettlementLifecycleHistoryList.tsx`
 
 上游挑战见 `docs/distributed-compute/attempt-settlement-challenge-api.md`；完整市场目标见 `docs/distributed-compute/market-and-settlement.md`。
 
