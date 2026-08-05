@@ -32,6 +32,13 @@ export interface ComputeProviderEndpointRef {
   credential_ref: string | null
 }
 
+export interface ComputeProviderAdapterRef {
+  adapter_id: string
+  adapter_version: string
+  config_revision: number
+  config_digest: string
+}
+
 export interface ComputeActivationPlan {
   schema: string
   plan_id: string
@@ -133,6 +140,109 @@ export interface ComputeActivationQuarantine {
   offer_effect: 'none_direct'
 }
 
+export interface ComputeActivationRecoveryPlan {
+  schema: string
+  recovery_plan_id: string
+  quarantine_id: string
+  application_id: string
+  request_id: string
+  provider_id: string
+  pool_id: string
+  expected_quarantine_digest: string
+  target_provider_policy_revision: number
+  target_provider_digest: string
+  target_provider: {
+    status: string
+    trust_tier: string
+    policy_revision: number
+    endpoint: ComputeProviderEndpointRef | null
+    adapter: ComputeProviderAdapterRef | null
+  }
+  routing_digest: string
+  remediation_summary: string
+  evidence_refs: string[]
+  evidence_refs_digest: string
+  status: string
+  plan_digest: string
+  prepared_by_user_id: string
+  prepared_at: string
+  applied_at: string | null
+  superseded_at: string | null
+}
+
+export interface ComputeActivationRecoveryPreflight {
+  schema: string
+  recovery_plan_id: string
+  request_id: string
+  provider_id: string
+  pool_id: string
+  plan_status: string
+  checked_at: string
+  active_offer_count: number
+  active_offers_drained: boolean
+  plan_review_present: boolean
+  plan_review_digest_matches: boolean
+  plan_review_separation_valid: boolean
+  ready_for_apply: boolean
+  blockers: string[]
+  recovery_effect: 'none'
+}
+
+export interface ComputeActivationRecoveryReview {
+  schema: string
+  recovery_review_id: string
+  recovery_plan_id: string
+  request_id: string
+  plan_digest: string
+  prepared_by_user_id: string
+  reviewed_by_user_id: string
+  review_note: string | null
+  request_digest: string
+  review_digest: string
+  reviewed_at: string
+  replayed: boolean
+  recovery_effect: 'none'
+}
+
+export interface ComputeActivationRecoveryApplication {
+  schema: string
+  recovery_application_id: string
+  recovery_plan_id: string
+  recovery_review_id: string
+  quarantine_id: string
+  request_id: string
+  provider_id: string
+  pool_id: string
+  plan_digest: string
+  review_digest: string
+  recovered_provider_policy_revision: number
+  recovered_provider_digest: string
+  capacity_epoch: number
+  pool_lifecycle_event_id: string
+  application_digest: string
+  applied_by_user_id: string
+  applied_at: string
+  replayed: boolean
+  provider_effect: 'active'
+  pool_effect: 'active'
+  offer_effect: 'none_active_offers_required'
+  node_effect: 'none'
+  money_effect: 'none'
+}
+
+export interface PrepareActivationRecoveryPlanBody {
+  idempotency_key: string
+  expected_quarantine_digest: string
+  endpoint: ComputeProviderEndpointRef | null
+  adapter: ComputeProviderAdapterRef | null
+  verified_hardware_digest: string
+  trust_tier: string
+  verified_at: string
+  remediation_summary: string
+  evidence_refs: string[]
+  confirm_prepare: true
+}
+
 export interface PrepareActivationPlanBody {
   idempotency_key: string
   expected_request_digest: string
@@ -148,6 +258,10 @@ interface ActivationPlanReceipt { plan: ComputeActivationPlan; replayed: boolean
 interface ActivationPlanReviewResponse { activation_plan_review: ComputeActivationPlanReview | null; activation_effect: 'none' }
 interface ActivationApplicationResponse { activation_application: ComputeActivationApplication | null }
 interface ActivationQuarantineResponse { activation_quarantine: ComputeActivationQuarantine | null }
+interface ActivationRecoveryPlanResponse { activation_recovery_plan: ComputeActivationRecoveryPlan | null }
+interface ActivationRecoveryPlanReceipt { plan: ComputeActivationRecoveryPlan; replayed: boolean }
+interface ActivationRecoveryReviewResponse { activation_recovery_review: ComputeActivationRecoveryReview | null }
+interface ActivationRecoveryApplicationResponse { activation_recovery_application: ComputeActivationRecoveryApplication | null }
 
 function activationBase(requestId: string) {
   return `/api/admin/compute/activation-evidence-requests/${encodeURIComponent(requestId)}`
@@ -221,4 +335,31 @@ export const computeActivationAdminApi = {
       confirm_quarantine: true,
     },
   ),
+  recoveryPlan: (requestId: string) =>
+    api.get<ActivationRecoveryPlanResponse>(`${activationBase(requestId)}/activation-recovery-plan`),
+  prepareRecoveryPlan: (requestId: string, body: PrepareActivationRecoveryPlanBody) =>
+    api.post<ActivationRecoveryPlanReceipt>(`${activationBase(requestId)}/activation-recovery-plan`, body),
+  recoveryPreflight: (requestId: string) =>
+    api.get<ComputeActivationRecoveryPreflight>(`${activationBase(requestId)}/activation-recovery-plan/preflight`),
+  recoveryReview: (requestId: string) =>
+    api.get<ActivationRecoveryReviewResponse>(`${activationBase(requestId)}/activation-recovery-plan/review`),
+  reviewRecoveryPlan: (
+    requestId: string,
+    idempotencyKey: string,
+    expectedPlanDigest: string,
+    reviewNote: string | null,
+  ) => api.post<ComputeActivationRecoveryReview>(`${activationBase(requestId)}/activation-recovery-plan/review`, {
+    idempotency_key: idempotencyKey,
+    expected_plan_digest: expectedPlanDigest,
+    review_note: reviewNote,
+    confirm_review: true,
+  }),
+  recoveryApplication: (requestId: string) =>
+    api.get<ActivationRecoveryApplicationResponse>(`${activationBase(requestId)}/activation-recovery-plan/application`),
+  applyRecoveryPlan: (requestId: string, idempotencyKey: string, expectedPlanDigest: string) =>
+    api.post<ComputeActivationRecoveryApplication>(`${activationBase(requestId)}/activation-recovery-plan/application`, {
+      idempotency_key: idempotencyKey,
+      expected_plan_digest: expectedPlanDigest,
+      confirm_apply: true,
+    }),
 }

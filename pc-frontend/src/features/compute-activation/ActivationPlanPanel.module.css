@@ -44,3 +44,14 @@
 .spinning { animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 760px) { .planFacts { grid-template-columns: 1fr 1fr; } .actions { align-items: stretch; flex-direction: column; } }
+.recoverySection { display: grid; gap: 12px; padding-top: 14px; border-top: 1px solid var(--border); }
+.recoveryHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.recoveryHeader > div { display: flex; align-items: center; gap: 9px; color: #efc878; }
+.recoveryHeader h4 { margin: 0; color: var(--text-primary); font-size: 13px; }
+.recoveryHeader span { display: block; color: var(--text-muted); font-size: 10px; }
+.recoveryHeader button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-elevated); color: var(--text-secondary); cursor: pointer; }
+.recoveryReceipt { display: flex; align-items: flex-start; gap: 9px; padding: 11px; border: 1px solid rgba(82,183,123,.25); border-radius: 6px; color: #7fd69e; background: rgba(82,183,123,.06); }
+.recoveryReceipt > div { display: grid; min-width: 0; gap: 3px; }
+.recoveryReceipt strong { font-size: 12px; }
+.recoveryReceipt span { color: var(--text-secondary); font-size: 11px; }
+.recoveryReceipt code { overflow-wrap: anywhere; color: #9fc4f4; font-size: 10px; }

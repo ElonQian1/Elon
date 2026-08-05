@@ -6,6 +6,7 @@ import ApplyActivationPlanDialog from './ApplyActivationPlanDialog'
 import PrepareActivationPlanDialog from './PrepareActivationPlanDialog'
 import ReviewActivationPlanDialog from './ReviewActivationPlanDialog'
 import LifecycleReasonDialog from './LifecycleReasonDialog'
+import ActivationRecoveryPanel from './ActivationRecoveryPanel'
 import {
   computeActivationAdminApi,
   type ComputeActivationApplication,
@@ -98,7 +99,8 @@ export default function ActivationPlanPanel({ request, onChanged }: Props) {
       {plan.status === 'prepared' && <div className={styles.actions}><span>应用后才会把 Provider 与 Pool 原子切换为 active。</span><button type="button" disabled={!preflight?.ready_for_apply || loading} onClick={() => { setError(''); setApplyOpen(true) }}>应用并激活</button></div>}
     </>}
     {application && <div className={styles.receipt}><CircleCheck size={17} /><div><strong>内部激活已提交</strong><span>{formatTime(application.applied_at)} · Offer 未发布</span><code>{application.application_digest}</code></div>{!quarantine && <button type="button" onClick={() => { setError(''); setQuarantineOpen(true) }}><ShieldX size={14} />紧急隔离</button>}</div>}
-    {quarantine && <div className={styles.quarantine}><ShieldAlert size={17} /><div><strong>资源已隔离</strong><span>{formatTime(quarantine.quarantined_at)} · {quarantine.reason}</span><code>{quarantine.quarantine_digest}</code></div></div>}
+    {quarantine && <div className={styles.quarantine}><ShieldAlert size={17} /><div><strong>隔离回执已固定</strong><span>{formatTime(quarantine.quarantined_at)} · {quarantine.reason}</span><code>{quarantine.quarantine_digest}</code></div></div>}
+    {quarantine && <ActivationRecoveryPanel key={quarantine.quarantine_id} requestId={request.request_id} quarantine={quarantine} onChanged={onChanged} />}
     {loading && !plan && <div className={styles.loading}><LoaderCircle size={17} className={styles.spinning} />读取计划</div>}
     {prepareOpen && <PrepareActivationPlanDialog request={request} busy={busy} error={error} onClose={() => setPrepareOpen(false)} onSubmit={prepare} />}
     {reviewOpen && plan && <ReviewActivationPlanDialog plan={plan} busy={busy} error={error} onClose={() => setReviewOpen(false)} onSubmit={confirmReview} />}

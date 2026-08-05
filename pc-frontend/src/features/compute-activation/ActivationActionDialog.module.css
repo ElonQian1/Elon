@@ -7,7 +7,7 @@
 .dialog form { display: grid; gap: 16px; padding: 20px; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .grid label { display: grid; gap: 6px; min-width: 0; color: var(--text-muted); font-size: 12px; }
-.grid input { min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-base); color: var(--text-primary); font: inherit; }
+.grid input, .grid select { min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-base); color: var(--text-primary); font: inherit; }
 .wide { grid-column: 1 / -1; }
 .error { padding: 10px 12px; border: 1px solid rgba(224,92,92,.3); border-radius: 6px; background: rgba(224,92,92,.09); color: #ffcaca; font-size: 13px; }
 .boundary { padding: 11px 12px; border: 1px solid rgba(216,169,79,.25); border-radius: 6px; background: rgba(216,169,79,.06); color: #efc878; font-size: 13px; line-height: 1.55; }
