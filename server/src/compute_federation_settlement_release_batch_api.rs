@@ -17,14 +17,27 @@ use crate::{
 };
 
 pub(crate) fn routes() -> Router<Arc<AppState>> {
-    Router::new().route(
-        "/api/admin/compute/settlement-releases/due",
-        get(list_due).post(release_due),
-    )
+    Router::new()
+        .route(
+            "/api/admin/compute/settlement-releases/due",
+            get(list_due).post(release_due),
+        )
+        .route(
+            "/api/admin/compute/settlement-releases/batches",
+            get(list_batch_history),
+        )
 }
 
 #[derive(Debug, Deserialize)]
 struct DueQuery {
+    #[serde(default = "default_limit")]
+    limit: usize,
+    #[serde(default)]
+    cursor: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct BatchHistoryQuery {
     #[serde(default = "default_limit")]
     limit: usize,
     #[serde(default)]
@@ -62,6 +75,23 @@ async fn release_due(
             &state.store,
             &admin_user_id,
             body,
+        ),
+    )
+}
+
+async fn list_batch_history(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<BatchHistoryQuery>,
+) -> Response {
+    if let Err(response) = platform_admin(&state, &headers) {
+        return response;
+    }
+    batch_response(
+        compute_federation_settlement_release_batch_service::list_batch_history_for_platform_admin(
+            &state.store,
+            query.limit,
+            query.cursor.as_deref(),
         ),
     )
 }

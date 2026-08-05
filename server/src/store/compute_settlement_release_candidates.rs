@@ -13,7 +13,7 @@ use super::{
     Store,
 };
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct ComputeSettlementReleaseCandidate {
     pub lease_id: String,
     pub settlement_receipt_id: String,
@@ -27,7 +27,7 @@ pub(crate) struct ComputeSettlementReleaseCandidate {
     pub blocked_reason: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct ComputeSettlementReleaseCandidatePage {
     pub schema: String,
     pub as_of: String,

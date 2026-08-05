@@ -84,6 +84,7 @@ mod compute_quote_candidates;
 mod compute_reservation_contract_validation;
 mod compute_reservation_registry;
 mod compute_settlement_account_views;
+mod compute_settlement_release_batch_runs;
 mod compute_settlement_release_candidates;
 mod compute_settlement_withdrawal_requests;
 mod compute_settlement_withdrawal_terminals;
@@ -372,6 +373,10 @@ pub(crate) use compute_quote_candidates::ComputeJobQuoteCandidatePage;
 pub(crate) use compute_reservation_registry::ComputeReservationRegistrationReceipt;
 pub(crate) use compute_settlement_account_views::{
     ComputeSettlementAccountView, ComputeSettlementWithdrawalQueuePage,
+};
+pub(crate) use compute_settlement_release_batch_runs::{
+    ComputeSettlementReleaseBatchFailure, ComputeSettlementReleaseBatchHistoryPage,
+    ComputeSettlementReleaseBatchReport, StartComputeSettlementReleaseBatch,
 };
 pub(crate) use compute_settlement_release_candidates::{
     ComputeSettlementReleaseCandidate, ComputeSettlementReleaseCandidatePage,

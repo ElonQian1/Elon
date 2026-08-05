@@ -142,6 +142,7 @@ mod compute_reservation_migration;
 mod compute_settlement_challenge_migration;
 mod compute_settlement_challenge_resolution_migration;
 mod compute_settlement_correction_migration;
+mod compute_settlement_release_batch_migration;
 mod compute_settlement_release_migration;
 mod compute_settlement_withdrawal_request_migration;
 mod compute_settlement_withdrawal_terminal_migration;
