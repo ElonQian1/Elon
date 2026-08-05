@@ -1,7 +1,7 @@
 //! 首页总 AI 的天气专用能力。
 //!
-//! 天气不能依赖普通网页搜索或模型猜测：先确定地点，再调用天气服务，
-//! 最后用结构化数据生成简短回答。地点不明确时直接追问，不进入模型链路。
+//! 天气不能依赖普通网页搜索或模型猜测：由首页总 AI 判断是否需要天气工具，
+//! 工具层负责校验地点并调用天气服务，最后用结构化数据生成简短回答。
 
 use serde_json::{Map, Value};
 use std::{
@@ -35,6 +35,13 @@ pub(crate) enum WeatherLookup {
     Answer(WeatherAnswer),
     NotFound { location: String },
     Unavailable { location: String },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum WeatherDetail {
+    Summary,
+    HourlyRain,
+    RainForecast,
 }
 
 #[derive(Debug, Clone)]
@@ -91,6 +98,29 @@ pub(crate) fn is_hourly_weather_request(message: &str) -> bool {
             || compact.contains("雷阵雨"))
 }
 
+/// 识别“未来几天哪天可能下雨”这一类多日降雨问题。
+/// 这是工具参数缺失时的兜底，不负责解析地点，也不替代首页总 AI 的意图判断。
+pub(crate) fn is_rain_forecast_request(message: &str) -> bool {
+    let compact: String = message.chars().filter(|ch| !ch.is_whitespace()).collect();
+    if compact.is_empty() || !(compact.contains('雨') || compact.contains("降水")) {
+        return false;
+    }
+    [
+        "未来",
+        "哪天",
+        "哪一天",
+        "最近几天",
+        "接下来几天",
+        "几天内",
+        "一周内",
+        "这周",
+        "本周",
+        "下周",
+    ]
+    .iter()
+    .any(|marker| compact.contains(marker))
+}
+
 pub(crate) fn is_weather_request_with_history(
     message: &str,
     history: &[ConversationMessage],
@@ -133,6 +163,12 @@ pub(crate) fn resolve_location(message: &str, history: &[ConversationMessage]) -
                 .filter(|item| item.role == "assistant")
                 .find_map(|item| extract_location_from_weather_answer(&item.content))
         })
+}
+
+/// Tool 参数来自模型，不能把完整自然语言问题当作地名交给地理编码服务。
+/// 这里只做安全边界校验，语言理解仍由首页总 AI 完成。
+pub(crate) fn is_location_candidate(candidate: &str) -> bool {
+    clean_location_candidate(candidate).is_some()
 }
 
 /// 返回当前问题对应的预报日：今天为 0，明天为 1，后天为 2。
@@ -254,6 +290,12 @@ fn clean_location_candidate(candidate: &str) -> Option<String> {
     let length = candidate.chars().count();
     if !(2..=32).contains(&length)
         || candidate.contains("天气")
+        || candidate.contains('哪')
+        || candidate.contains("什么")
+        || candidate.contains("何时")
+        || ["未来", "最近", "接下来", "下周", "本周", "会下"]
+            .iter()
+            .any(|marker| candidate.contains(marker))
         || candidate.chars().all(|ch| ch.is_ascii_digit())
     {
         return None;
@@ -372,12 +414,29 @@ pub(crate) async fn lookup(
     day_offset: usize,
     hourly_detail: bool,
 ) -> WeatherLookup {
+    let detail = if hourly_detail {
+        WeatherDetail::HourlyRain
+    } else {
+        WeatherDetail::Summary
+    };
+    lookup_with_detail(state, location, day_offset, detail, day_offset + 1).await
+}
+
+pub(crate) async fn lookup_with_detail(
+    state: &AppState,
+    location: &str,
+    day_offset: usize,
+    detail: WeatherDetail,
+    forecast_days: usize,
+) -> WeatherLookup {
     let day_offset = day_offset.min(2);
+    let forecast_days = forecast_days.clamp(day_offset + 1, 7);
     let cache_key = format!(
-        "{}|{}|{}",
+        "{}|{}|{:?}|{}",
         location.trim().to_lowercase(),
         day_offset,
-        hourly_detail
+        detail,
+        forecast_days,
     );
     if let Ok(mut entries) = cache().lock() {
         if let Some(entry) = entries.get(&cache_key) {
@@ -456,7 +515,7 @@ pub(crate) async fn lookup(
                 "hourly",
                 "precipitation_probability,rain,showers,weather_code".to_string(),
             ),
-            ("forecast_days", (day_offset + 1).to_string()),
+            ("forecast_days", forecast_days.to_string()),
             ("timezone", "auto".to_string()),
         ],
         "forecast",
@@ -501,6 +560,29 @@ pub(crate) async fn lookup(
         .and_then(|value| value["time"].as_array())
         .and_then(|values| values.get(day_offset))
         .and_then(Value::as_str);
+    if detail == WeatherDetail::RainForecast {
+        if let Some(reply) = rain_forecast_reply(&display_location, daily, forecast_days) {
+            let answer = WeatherAnswer {
+                reply,
+                source_title: "Open-Meteo 多日天气数据".to_string(),
+                source_url: SOURCE_URL.to_string(),
+            };
+            if let Ok(mut entries) = cache().lock() {
+                entries.insert(
+                    cache_key,
+                    CachedWeather {
+                        expires_at: Instant::now() + CACHE_TTL,
+                        answer: answer.clone(),
+                    },
+                );
+            }
+            return WeatherLookup::Answer(answer);
+        }
+        return WeatherLookup::Unavailable {
+            location: display_location,
+        };
+    }
+
     let Some(weather_code) = weather_code else {
         return WeatherLookup::Unavailable {
             location: display_location,
@@ -512,7 +594,7 @@ pub(crate) async fn lookup(
         2 => "后天",
         _ => "今天",
     };
-    if hourly_detail {
+    if detail == WeatherDetail::HourlyRain {
         if let Some(reply) = hourly_rain_reply(
             &display_location,
             period,
@@ -586,6 +668,51 @@ pub(crate) async fn lookup(
         );
     }
     WeatherLookup::Answer(answer)
+}
+
+fn rain_forecast_reply(
+    display_location: &str,
+    daily: Option<&Map<String, Value>>,
+    forecast_days: usize,
+) -> Option<String> {
+    let daily = daily?;
+    let dates = daily.get("time")?.as_array()?;
+    let probabilities = daily
+        .get("precipitation_probability_max")
+        .and_then(Value::as_array);
+    let weather_codes = daily.get("weather_code").and_then(Value::as_array);
+    let mut rainy_dates = Vec::new();
+
+    for index in 0..dates.len().min(forecast_days) {
+        let date = dates.get(index)?.as_str()?;
+        let probability = value_at(probabilities, index).unwrap_or_default();
+        let weather_code = value_at(weather_codes, index).unwrap_or_default() as i64;
+        if probability >= 50.0 || matches!(weather_code, 51..=67 | 80..=82 | 95..=99) {
+            rainy_dates.push(format_forecast_date(date));
+        }
+    }
+
+    if rainy_dates.is_empty() {
+        Some(format!(
+            "{display_location}未来 {forecast_days} 天暂未发现明显降雨，出行前仍建议查看临近预报。"
+        ))
+    } else {
+        Some(format!(
+            "{display_location}未来 {forecast_days} 天预计可能在 {} 出现降雨。",
+            rainy_dates.join("、")
+        ))
+    }
+}
+
+fn format_forecast_date(date: &str) -> String {
+    let mut parts = date.split('-');
+    let _year = parts.next();
+    let month = parts.next().and_then(|value| value.parse::<u32>().ok());
+    let day = parts.next().and_then(|value| value.parse::<u32>().ok());
+    match (month, day) {
+        (Some(month), Some(day)) => format!("{month}月{day}日"),
+        _ => date.to_string(),
+    }
 }
 
 fn hourly_rain_reply(

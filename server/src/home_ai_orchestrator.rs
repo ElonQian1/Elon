@@ -20,7 +20,7 @@ const HOME_AI_TOOL_NOTE: &str = r#"=== 首页总 AI 工具使用规则 ===
 你是首页总 AI，负责回答普通知识、分析问题和帮助用户获取信息。
 你可以按需使用只读工具：
 - 用户需要最新、实时、新闻、价格、地点或外部资料时，调用 web_search。
-- 用户询问天气、温度、下雨、降雨时段、是否需要带伞等时，调用 weather。
+- 用户询问天气、温度、下雨、未来哪天有雨、降雨时段、是否需要带伞等时，调用 weather。
 - 普通知识、解释、写作、翻译、方案建议等直接回答，不要为了调用工具而调用工具。
 - 工具调用结果是事实依据；不要编造工具没有返回的数据。
 - 如果天气问题缺少城市，先自然地询问城市，不要猜测用户位置。
@@ -64,7 +64,7 @@ pub(crate) fn tool_definitions() -> Value {
             "type": "function",
             "function": {
                 "name": "weather",
-                "description": "查询指定城市或地区的天气。可以查询今天、明天、后天的概况，也可以查询小时级降雨时段。",
+                "description": "查询指定城市或地区的天气。支持当前/指定日期概况、小时级降雨时段，以及未来几天哪一天可能下雨。地点和时间应根据当前对话上下文理解，不要把整句用户问题当作地点。",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -77,10 +77,16 @@ pub(crate) fn tool_definitions() -> Value {
                             "enum": [0, 1, 2],
                             "description": "今天为 0，明天为 1，后天为 2"
                         },
+                        "forecast_days": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 7,
+                            "description": "询问未来哪天可能下雨时，向前查询的天数，通常使用 7"
+                        },
                         "detail": {
                             "type": "string",
-                            "enum": ["summary", "hourly_rain"],
-                            "description": "普通天气概况使用 summary；询问几点下雨或降雨时段使用 hourly_rain"
+                            "enum": ["summary", "hourly_rain", "rain_forecast"],
+                            "description": "普通天气概况使用 summary；询问几点下雨使用 hourly_rain；询问未来哪天可能下雨使用 rain_forecast"
                         }
                     },
                     "required": ["location"]
@@ -231,6 +237,7 @@ async fn execute_tool(
                 .as_str()
                 .map(str::trim)
                 .filter(|value| !value.is_empty())
+                .filter(|value| home_ai_weather::is_location_candidate(value))
                 .map(str::to_string)
                 .or_else(|| home_ai_weather::resolve_location(query, history));
             let Some(location) = location else {
@@ -249,9 +256,29 @@ async fn execute_tool(
                 .as_u64()
                 .map(|value| value.min(2) as usize)
                 .unwrap_or_else(|| home_ai_weather::day_offset(query));
-            let hourly_detail = args["detail"].as_str() == Some("hourly_rain")
-                || home_ai_weather::is_hourly_weather_request(query);
-            let lookup = home_ai_weather::lookup(state, &location, day_offset, hourly_detail).await;
+            let detail = match args["detail"].as_str() {
+                Some("rain_forecast") => home_ai_weather::WeatherDetail::RainForecast,
+                Some("hourly_rain") => home_ai_weather::WeatherDetail::HourlyRain,
+                _ if home_ai_weather::is_rain_forecast_request(query) => {
+                    home_ai_weather::WeatherDetail::RainForecast
+                }
+                _ if home_ai_weather::is_hourly_weather_request(query) => {
+                    home_ai_weather::WeatherDetail::HourlyRain
+                }
+                _ => home_ai_weather::WeatherDetail::Summary,
+            };
+            let forecast_days = args["forecast_days"]
+                .as_u64()
+                .map(|value| value.clamp(1, 7) as usize)
+                .unwrap_or(7);
+            let lookup = home_ai_weather::lookup_with_detail(
+                state,
+                &location,
+                day_offset,
+                detail,
+                forecast_days,
+            )
+            .await;
             match lookup {
                 home_ai_weather::WeatherLookup::Answer(answer) => Ok(ToolExecution {
                     content: json!({

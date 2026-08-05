@@ -27,6 +27,14 @@ fn detects_hourly_rain_questions() {
 }
 
 #[test]
+fn detects_multi_day_rain_questions() {
+    assert!(is_rain_forecast_request("未来哪一天会下雨"));
+    assert!(is_rain_forecast_request("接下来几天有降水吗"));
+    assert!(!is_rain_forecast_request("今天温度怎么样"));
+    assert!(!is_rain_forecast_request("明天什么时候下雨"));
+}
+
+#[test]
 fn extracts_explicit_location() {
     assert_eq!(
         extract_location("北京今天天气怎么样").as_deref(),
@@ -157,6 +165,37 @@ fn restores_location_for_hourly_rain_follow_up() {
         resolve_location("雨几点下到几点", &recent).as_deref(),
         Some("广东广州")
     );
+}
+
+#[test]
+fn does_not_treat_future_rain_question_as_a_location() {
+    assert_eq!(extract_location("未来哪一天会下雨"), None);
+    assert!(!is_location_candidate("未来哪一天会下雨"));
+}
+
+#[test]
+fn restores_location_for_future_rain_follow_up() {
+    let recent = history(&[(
+        "assistant",
+        "广东广州今天有雷雨，当前 26.2℃，最高 28.7℃，最低 24.2℃。数据更新时间：2026-08-01T14:45。",
+    )]);
+    assert!(is_weather_request_with_history("未来哪一天会下雨", &recent));
+    assert_eq!(
+        resolve_location("未来哪一天会下雨", &recent).as_deref(),
+        Some("广东广州")
+    );
+}
+
+#[test]
+fn formats_multi_day_rain_forecast() {
+    let daily = serde_json::json!({
+        "time": ["2026-08-05", "2026-08-06", "2026-08-07"],
+        "precipitation_probability_max": [20, 80, 60],
+        "weather_code": [1, 61, 3]
+    });
+    let reply = rain_forecast_reply("广东广州", daily.as_object(), 3).expect("rain forecast");
+    assert!(reply.contains("8月6日"));
+    assert!(reply.contains("8月7日"));
 }
 
 #[test]

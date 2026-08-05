@@ -183,21 +183,6 @@ pub async fn lm_chat_handler(
     };
     let weather_requested = entry_kind == ConversationEntryKind::ChatMemory
         && home_ai_weather::is_weather_request_with_history(&user_msg, &weather_history);
-    let weather_location = if weather_requested {
-        home_ai_weather::resolve_location(&user_msg, &weather_history)
-    } else {
-        None
-    };
-    let weather_day_offset = home_ai_weather::day_offset(&user_msg);
-    let weather_hourly_detail = home_ai_weather::is_hourly_weather_request(&user_msg);
-    let weather_lookup = if let Some(location) = weather_location.as_deref() {
-        Some(
-            home_ai_weather::lookup(&state, location, weather_day_offset, weather_hourly_detail)
-                .await,
-        )
-    } else {
-        None
-    };
     let search_requested = !weather_requested
         && entry_kind == ConversationEntryKind::ChatMemory
         && home_ai_search::should_search(&user_msg);
@@ -239,34 +224,7 @@ pub async fn lm_chat_handler(
     };
     let mut orchestrated_sources = Vec::new();
     let (reply, used_agent_name, used_model, used_fallback, assistant_mode, tool_used) =
-        if weather_requested {
-            let reply = match weather_lookup.as_ref() {
-                Some(home_ai_weather::WeatherLookup::Answer(answer)) => answer.reply.clone(),
-                Some(home_ai_weather::WeatherLookup::NotFound { location }) => {
-                    home_ai_weather::not_found_reply(location)
-                }
-                Some(home_ai_weather::WeatherLookup::Unavailable { location }) => {
-                    home_ai_weather::unavailable_reply(location)
-                }
-                None => home_ai_weather::missing_location_reply().to_string(),
-            };
-            let tool = if weather_lookup
-                .as_ref()
-                .is_some_and(|result| matches!(result, home_ai_weather::WeatherLookup::Answer(_)))
-            {
-                "weather"
-            } else {
-                "weather_location_required"
-            };
-            (
-                reply,
-                "总 AI".to_string(),
-                "weather".to_string(),
-                false,
-                "deterministic".to_string(),
-                Some(tool.to_string()),
-            )
-        } else if let Some(answer) = deterministic {
+        if let Some(answer) = deterministic {
             (
                 answer.reply,
                 "总 AI".to_string(),
@@ -423,12 +381,7 @@ pub async fn lm_chat_handler(
         "scope": route.entry_key,
         "assistant_mode": assistant_mode,
         "tool_used": tool_used,
-        "sources": if let Some(home_ai_weather::WeatherLookup::Answer(answer)) = weather_lookup.as_ref() {
-            vec![json!({
-                "title": answer.source_title,
-                "url": answer.source_url,
-            })]
-        } else if !orchestrated_sources.is_empty() {
+        "sources": if !orchestrated_sources.is_empty() {
             orchestrated_sources.clone()
         } else {
             search_result.as_ref().map(|result| result.sources.iter().map(|source| json!({
@@ -659,138 +612,15 @@ async fn run_lm_chat_stream(
     };
     let weather_requested = entry_kind == ConversationEntryKind::ChatMemory
         && home_ai_weather::is_weather_request_with_history(&user_msg, &weather_history);
-    let weather_location = if weather_requested {
-        home_ai_weather::resolve_location(&user_msg, &weather_history)
-    } else {
-        None
-    };
-    let weather_day_offset = home_ai_weather::day_offset(&user_msg);
-    let weather_hourly_detail = home_ai_weather::is_hourly_weather_request(&user_msg);
-    if weather_requested {
-        let Some(location) = weather_location.as_deref() else {
-            let reply = home_ai_weather::missing_location_reply();
-            let _ = send_stream_event(
-                &tx,
-                json!({
-                    "type": "status",
-                    "phase": "weather_location",
-                    "message": "需要先确定城市…",
-                    "elapsed_ms": started_at.elapsed().as_millis(),
-                }),
-            )
-            .await;
-            let _ = send_stream_event(&tx, json!({ "type": "delta", "content": reply })).await;
-            persist_stream_chat_turn(
-                &state,
-                &route.project_id,
-                &conversation_id,
-                &user_id,
-                &user_msg,
-                reply,
-                &route.memory_scope_type,
-                route.memory_scope_id.as_deref(),
-            )
-            .await;
-            let _ = send_stream_event(
-                &tx,
-                json!({
-                    "type": "done",
-                    "conversation_id": conversation_id,
-                    "project_id": route.project_id,
-                    "project_name": route.project_name,
-                    "assistant_mode": "deterministic",
-                    "tool_used": "weather_location_required",
-                    "sources": [],
-                    "handoff": Value::Null,
-                    "elapsed_ms": started_at.elapsed().as_millis(),
-                }),
-            )
-            .await;
-            return;
-        };
-        if !send_stream_event(
-            &tx,
-            json!({
-                "type": "status",
-                "phase": "weather",
-                "message": format!("正在查询{location}天气…"),
-                "elapsed_ms": started_at.elapsed().as_millis(),
-            }),
-        )
-        .await
-        {
-            return;
-        }
-        let weather_lookup =
-            home_ai_weather::lookup(&state, location, weather_day_offset, weather_hourly_detail)
-                .await;
-        let (reply, tool_used, source_values) = match &weather_lookup {
-            home_ai_weather::WeatherLookup::Answer(answer) => (
-                answer.reply.clone(),
-                "weather",
-                vec![json!({ "title": answer.source_title, "url": answer.source_url })],
-            ),
-            home_ai_weather::WeatherLookup::NotFound { location } => (
-                home_ai_weather::not_found_reply(location),
-                "weather_location_required",
-                Vec::new(),
-            ),
-            home_ai_weather::WeatherLookup::Unavailable { location } => (
-                home_ai_weather::unavailable_reply(location),
-                "weather_unavailable",
-                Vec::new(),
-            ),
-        };
-        let _ = send_stream_event(&tx, json!({ "type": "delta", "content": reply })).await;
-        if !source_values.is_empty() {
-            let _ = send_stream_event(
-                &tx,
-                json!({ "type": "sources", "sources": source_values.clone() }),
-            )
-            .await;
-        }
-        persist_stream_chat_turn(
-            &state,
-            &route.project_id,
-            &conversation_id,
-            &user_id,
-            &user_msg,
-            &reply,
-            &route.memory_scope_type,
-            route.memory_scope_id.as_deref(),
-        )
-        .await;
-        tracing::info!(
-            feature = "lm_chat_stream",
-            user_id = %user_id,
-            mode = "weather",
-            location = %location,
-            elapsed_ms = started_at.elapsed().as_millis() as u64,
-            "首页 AI 天气查询完成"
-        );
-        let _ = send_stream_event(
-            &tx,
-            json!({
-                "type": "done",
-                "reply": reply,
-                "conversation_id": conversation_id,
-                "project_id": route.project_id,
-                "project_name": route.project_name,
-                "assistant_mode": "deterministic",
-                "tool_used": tool_used,
-                "sources": source_values,
-                "handoff": Value::Null,
-                "elapsed_ms": started_at.elapsed().as_millis(),
-            }),
-        )
-        .await;
-        return;
-    }
-    let search_requested =
-        entry_kind == ConversationEntryKind::ChatMemory && home_ai_search::should_search(&user_msg);
+    let search_requested = entry_kind == ConversationEntryKind::ChatMemory
+        && !weather_requested
+        && home_ai_search::should_search(&user_msg);
 
     // 快速问题不读取历史、不调用模型，避免简单请求被慢链路拖住。
-    let deterministic = if !search_requested && !home_ai_tools::needs_project_handoff(&user_msg) {
+    let deterministic = if !search_requested
+        && !weather_requested
+        && !home_ai_tools::needs_project_handoff(&user_msg)
+    {
         home_ai_tools::deterministic_answer(&user_msg, home_ai_tools::now())
     } else {
         None
