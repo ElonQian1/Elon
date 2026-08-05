@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-激活证据申请的 v177 状态机、v178 过期批准废止审计、v179 不可变激活计划、v180 原子应用回执、v181 紧急隔离回执、v203 第二人复核回执、v204 隔离恢复控制面、本人 HTTP/MCP 控制面和管理员 HTTP 审核队列已写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
+激活证据申请的 v177 状态机、v178 过期批准废止审计、v179 不可变激活计划、v180 原子应用回执、v181 紧急隔离回执、v203 第二人复核回执、v204 隔离恢复控制面、v205 恢复计划废止回执、本人 HTTP/MCP 控制面和管理员 HTTP 审核队列已写入代码，但尚未编译、执行迁移或运行接口验证，状态固定为 `implementation_uncompiled`。
 
 这套控制面记录“供给者提交了哪些证据摘要、审核人作出了什么决定、激活应写入哪一个精确 Provider 合同、谁独立复核了该计划，以及该计划是否被受控应用”。`approved` 只表示证据包通过人工审核，`prepared` 只表示不可变候选合同已生成，第二人复核只固定复核事实；三者的 `activation_effect` 均为 `none`。只有不同于计划准备人的第二名 `admin/owner` 已按精确 `plan_digest` 留下 v203 回执后，应用入口才可能在一个事务内把 Provider 下一版本和 CapacityPool 改为 active，并保存不可变回执。该内部状态变化不连接节点、不读取凭据正文、不发布 Offer、不开放预留、不派发任务，也不移动资金。
 
@@ -28,6 +28,7 @@ PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说�
 8. Provider/Pool 的内部激活与市场发布分离。Offer 已有后续 v182 管理员原子发布流程；节点真实连接、Price Snapshot、可预留容量、任务派发和资金结算仍是独立边界。
 9. 若已应用结果需要紧急停止，管理员可按当前 `application_digest` 和明确原因执行 v181 隔离；Provider 当前 active 版本和 Pool 当前 active epoch 在一个事务内转为 quarantined，并保存不可变回执。
 10. 修复证据和路由后，管理员可按 v204 准备恢复计划，由不同管理员复核；旧 active Offer 全部退场且恢复预检无阻断时，应用事务追加 active Provider 下一版本和 Pool `quarantined -> active` 事件。恢复不会重发旧 Offer。
+11. prepared 恢复计划内容错误或已过期时，管理员可按 v205 显式废止并保留不可变回执；旧计划和复核不删除，新计划必须重新准备、重新复核。
 
 提交的引用和摘要是待审核材料，不是平台已验证事实。服务端不在这张表内保存节点端点、访问凭据、原始硬件报告或完整路由证明。
 
@@ -79,6 +80,8 @@ PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说�
 | GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan` | 读取并审计隔离恢复计划 |
 | POST | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan` | 显式准备恢复计划，不解除隔离 |
 | GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/preflight` | 读取恢复阻断项和 active Offer 数量 |
+| GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/supersession` | 读取并审计最新恢复计划废止回执 |
+| POST | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/supersession` | 以精确计划摘要、原因和显式确认废止 prepared 计划 |
 | GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/review` | 读取并审计恢复计划第二人复核 |
 | POST | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/review` | 不同于准备人的管理员复核恢复计划 |
 | GET | `/api/admin/compute/activation-evidence-requests/:request_id/activation-recovery-plan/application` | 读取并审计恢复应用回执 |
@@ -86,7 +89,7 @@ PC `/compute-supply` 已写入供给者本人申请、历史状态、审核说�
 
 决定只支持 `approved`、`changes_requested` 或 `rejected`。退回和拒绝必须填写说明；只有 `submitted` 可以审核。批准时如果 Provider/Pool 所有权、状态、版本或账本审计发生变化，服务端失败关闭，要求供给者重新提交。
 
-PC `/compute-activation` 复用上述管理员 HTTP 合同，不另建前端状态真源。工作区按状态筛选申请，先显示证据引用和申请预检，再把审核、计划准备、第二人复核、计划应用、过期批准废止、已激活资源隔离和隔离恢复拆成独立确认动作。激活和恢复表单只接收路由、Gateway、配置和凭据引用，不接收凭据正文；第二人复核展示准备人与复核人以及不可变复核摘要，应用按钮只有在对应预检 `ready_for_apply=true` 时可用。服务端写事务仍会重新审计，不能把前端快照当成授权或锁。恢复细节由 `docs/distributed-compute/activation-recovery-api.md` 维护。
+PC `/compute-activation` 复用上述管理员 HTTP 合同，不另建前端状态真源。工作区按状态筛选申请，先显示证据引用和申请预检，再把审核、计划准备、第二人复核、计划应用、过期批准废止、已激活资源隔离、隔离恢复和恢复计划废止重做拆成独立确认动作。激活和恢复表单只接收路由、Gateway、配置和凭据引用，不接收凭据正文；第二人复核展示准备人与复核人以及不可变复核摘要，应用按钮只有在对应预检 `ready_for_apply=true` 时可用。服务端写事务仍会重新审计，不能把前端快照当成授权或锁。恢复细节由 `docs/distributed-compute/activation-recovery-api.md` 维护。
 
 ## 6. 激活就绪预检
 

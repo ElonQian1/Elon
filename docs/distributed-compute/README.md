@@ -28,7 +28,7 @@ owners: backend, node, ai-economy
 | CapacityPool 本人控制面 | HTTP/MCP 已可在本人 Provider 下登记、读取、列出和审计 `registering` Pool，并按稳定序号分页读取脱敏账本历史；PC `/compute-supply` 已写入列表、登记、审计健康和事务双分录分页源码。审计健康不等于硬件 verified，历史省略消费者和业务因果字段；尚未编译和运行验证 |
 | CapacityBucket 本人控制面 | HTTP/MCP 已可在本人当前 Pool 版本下创建 open、零发行余额 Bucket，并读取当前余额；PC 已写入交付窗口登记和余额列表源码。窗口和 Bucket 摘要由服务端生成，不发行容量、不预留、不交易；尚未编译和运行验证 |
 | Capacity Supply 本人控制面 | HTTP/MCP 已可显式确认后向同一窗口的多个 open Bucket 原子追加 self-declared 供给，或把尚在 available 的供给原子撤入 retired；PC 已写入单 Bucket 追加/撤出源码。服务端固定首次时间并复用现有双分录账本，available 不等于 verified 或可交易；尚未编译和运行验证 |
-| 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；v203 强制 prepared 激活计划第二人复核，v204 增加隔离恢复计划、第二人复核、预检和原子应用回执。PC `/compute-supply` 已写入本人申请、历史、预检和取消，`/compute-activation` 已写入激活与恢复三段式管理。恢复前旧 active Offer 必须先退场且不会自动重发；所有流程均不发送节点命令、不退款、不付款或移动资金，状态为 `implementation_uncompiled` |
+| 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；v203 强制 prepared 激活计划第二人复核，v204 增加隔离恢复计划、第二人复核、预检和原子应用回执，v205 增加恢复计划追加式废止和重做入口。PC `/compute-supply` 已写入本人申请、历史、预检和取消，`/compute-activation` 已写入激活、隔离、恢复和恢复计划废止管理。恢复前旧 active Offer 必须先退场且不会自动重发；所有流程均不发送节点命令、不退款、不付款或移动资金，状态为 `implementation_uncompiled` |
 | Offer 草稿、发布与生命周期控制面 | HTTP/MCP 已可创建、精确修订和撤销本人 draft Offer；管理员 HTTP 可原子发布 active、转为 draining，并在无 pending/active Reservation 时终结。v182-v184 保存追加式回执和依赖索引，所有写入口均不移动资金，状态为 `implementation_uncompiled` |
 | 节点插件治理合同 | Signed Manifest、InstallPlan、双槽 lifecycle 与短期 ReadyCapability 合同已写；独立 SQLite authority v3、root-signed 双 keyring、库存/计划/候选原子应用、三段式取数、跨代撤销与不确定结果恢复已形成代码。Windows Volume GUID 卷根、父句柄相对打开、同句柄游标协调和耐久分段写入也已形成。候选验证现覆盖 sealed closure S1、全文件 share-none pin、内容与本机 binding、pin 后 S2、事务内第三读/prepared begin、稳定 outcome/recovery abort、完整 ordinal hash、严格晚于 hash barrier 的 S3 binder，以及消费 TrustedHashed 的原子 resolution。resolver 在一个 `BEGIN IMMEDIATE` 中重放当前准入、比较 S3/S4、终结精确 run、撤销其余旧 claim/run、推进三类 fence，并把 slot 转为 `verifying` 或 `failed`；canonical JCS 回执保存 observed set、首个 mismatch 和 after fence，任一不确定结果只返 recovery custody。raw verified 不等于解包、健康、promotion 或商业 Verification。缺少新增必需 trigger 的旧形态 v3 失败关闭，同名定义 fingerprint 仍待补齐；全部未编译、建库或接线 |
 | 通用 Attempt 执行合同 | Start / RenewLease / Cancel 命令、Runner typed events 与 Host 盖章事件合同已写，尚未编译或接入云端协议 |
@@ -86,7 +86,7 @@ owners: backend, node, ai-economy
 9. `docs/distributed-compute/capacity-bucket-api.md`：交付窗口 Bucket 登记、余额读取和窗口不变量。
 10. `docs/distributed-compute/capacity-supply-api.md`：本人供给追加、撤回、幂等和信任边界。
 11. `docs/distributed-compute/activation-evidence-api.md`：证据申请、人工审核、版本复核和“批准不等于激活”边界。
-12. `docs/distributed-compute/activation-recovery-api.md`：隔离恢复计划、第二人复核、旧 Offer 退场门卫和追加式恢复边界。
+12. `docs/distributed-compute/activation-recovery-api.md`：隔离恢复计划、第二人复核、显式废止重做、旧 Offer 退场门卫和追加式恢复边界。
 13. `docs/distributed-compute/offer-api.md`：Offer 本人规范化草稿、管理员发布、安全退场与资金边界。
 14. `docs/distributed-compute/price-snapshot-api.md`：Offer 派生 fallback_curve 报价、候选效果与无资金效果边界。
 15. `docs/distributed-compute/broker-api.md`：Job、报价与预留 HTTP/MCP 控制面。
