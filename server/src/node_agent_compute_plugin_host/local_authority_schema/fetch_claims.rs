@@ -241,6 +241,29 @@ BEGIN
     SELECT RAISE(ABORT, 'fetch claim history is immutable');
 END;
 
+CREATE TRIGGER fetch_claim_cursor_damage_projects_failure
+AFTER UPDATE OF state, resolved_at_ms, resolution_reason ON fetch_claims
+WHEN OLD.state = 'prepared'
+ AND NEW.state = 'aborted'
+ AND NEW.resolution_reason IN (
+     'committed_file_missing',
+     'committed_file_shorter'
+ )
+BEGIN
+    UPDATE planned_downloads
+    SET state = 'failed', updated_at_ms = NEW.resolved_at_ms
+    WHERE plan_id = NEW.plan_id
+      AND plan_digest = NEW.plan_digest
+      AND ordinal = NEW.ordinal
+      AND candidate_token = NEW.candidate_token
+      AND committed_offset = NEW.offset_bytes
+      AND cursor_generation = NEW.cursor_generation
+      AND state = 'downloading'
+      AND updated_at_ms = NEW.prepared_at_ms;
+    SELECT RAISE(ABORT, 'cursor damage failed to project download failure')
+    WHERE changes() <> 1;
+END;
+
 CREATE TRIGGER planned_download_fetch_progress_fenced
 BEFORE UPDATE OF committed_offset, cursor_generation, state ON planned_downloads
 WHEN (
@@ -287,5 +310,33 @@ AND NOT (
 )
 BEGIN
     SELECT RAISE(ABORT, 'planned download progress lacks an exact prepared claim');
+END;
+
+CREATE TRIGGER planned_download_cursor_damage_fenced
+BEFORE UPDATE OF state, updated_at_ms ON planned_downloads
+WHEN OLD.state <> 'failed' AND NEW.state = 'failed'
+AND NOT (
+    OLD.state = 'downloading'
+    AND NEW.committed_offset = OLD.committed_offset
+    AND NEW.cursor_generation = OLD.cursor_generation
+    AND NEW.updated_at_ms >= OLD.updated_at_ms
+    AND EXISTS (
+        SELECT 1 FROM fetch_claims AS claim
+        WHERE claim.plan_id = OLD.plan_id
+          AND claim.plan_digest = OLD.plan_digest
+          AND claim.ordinal = OLD.ordinal
+          AND claim.candidate_token = OLD.candidate_token
+          AND claim.cursor_generation = OLD.cursor_generation
+          AND claim.offset_bytes = OLD.committed_offset
+          AND claim.state = 'aborted'
+          AND claim.resolution_reason IN (
+              'committed_file_missing',
+              'committed_file_shorter'
+          )
+          AND claim.resolved_at_ms = NEW.updated_at_ms
+    )
+)
+BEGIN
+    SELECT RAISE(ABORT, 'planned download failure lacks exact cursor damage evidence');
 END;
 "#;

@@ -17,6 +17,10 @@ use super::super::{
     ComputePluginFetchProcessFence,
 };
 
+mod damage;
+
+pub(super) use damage::fail_validated_cursor_damage;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ResolutionDownloadRow {
     candidate_token: String,

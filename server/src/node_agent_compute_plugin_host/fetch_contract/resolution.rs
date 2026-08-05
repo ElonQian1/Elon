@@ -180,6 +180,15 @@ pub(super) fn abort_download_segment<'authority>(
     reason: ComputePluginFetchAbortReason,
     authority_session: ComputePluginFetchAuthoritySession<'authority>,
 ) -> ComputePluginFetchAbortResult<'authority> {
+    if reason.is_cursor_damage() {
+        return Err(
+            ComputePluginFetchAbortFailure::recovery_binding_unavailable(
+                anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_DAMAGE_REASON_REQUIRES_EVIDENCE"),
+                authorized,
+                authority_session,
+            ),
+        );
+    }
     if let Err(error) = authorized.validate_recovery_session(&authority_session) {
         return Err(
             ComputePluginFetchAbortFailure::recovery_binding_unavailable(
@@ -218,7 +227,7 @@ pub(super) fn abort_download_segment<'authority>(
     })
 }
 
-fn validate_authorized_binding<'admitted>(
+pub(super) fn validate_authorized_binding<'admitted>(
     admitted: &'admitted AdmittedComputePluginInstallPlan,
     authorized: &AuthorizedComputePluginDownloadSegment,
 ) -> Result<&'admitted AdmittedComputePluginDownload> {

@@ -13,8 +13,9 @@ use super::{
 use crate::node_agent_compute_plugin_host::{
     candidate_verification_contract::ValidatedCandidateVerificationBeginPermit,
     fetch_contract::{
-        ComputePluginFetchCancellationGuard, ValidatedComputePluginFetchAbortPermit,
-        ValidatedComputePluginFetchClaimPermit, ValidatedComputePluginFetchCommitPermit,
+        ComputePluginFetchCancellationGuard, ValidatedComputePluginCursorDamagePermit,
+        ValidatedComputePluginFetchAbortPermit, ValidatedComputePluginFetchClaimPermit,
+        ValidatedComputePluginFetchCommitPermit,
     },
     identity::ComputePluginReleaseRef,
     install_plan::ComputePluginPlannedDownload,
@@ -361,6 +362,22 @@ impl ComputePluginFetchAuthoritySession<'_> {
     ) -> Result<()> {
         self.authority.with_immediate(|transaction| {
             resolution::abort_validated_segment(
+                transaction,
+                self.process_fence,
+                self.trusted_now.clone(),
+                permit,
+            )
+        })
+    }
+
+    /// Atomically terminalizes an exact prepared claim whose committed file is missing or shorter
+    /// than the persisted cursor, and moves that download into the stable failed state.
+    pub(in crate::node_agent_compute_plugin_host) fn fail_validated_cursor_damage(
+        &self,
+        permit: ValidatedComputePluginCursorDamagePermit<'_>,
+    ) -> Result<()> {
+        self.authority.with_immediate(|transaction| {
+            resolution::fail_validated_cursor_damage(
                 transaction,
                 self.process_fence,
                 self.trusted_now.clone(),

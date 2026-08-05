@@ -21,6 +21,7 @@ use super::{
 mod authorization;
 mod authorization_failure;
 mod cancellation;
+mod damage;
 mod durable;
 mod recovery;
 mod resolution;
@@ -35,6 +36,11 @@ pub(in crate::node_agent_compute_plugin_host) use authorization_failure::{
 };
 pub(in crate::node_agent_compute_plugin_host) use cancellation::{
     ComputePluginFetchCancellationGuard, ComputePluginFetchCancellationSource,
+};
+pub(in crate::node_agent_compute_plugin_host) use damage::{
+    fail_cursor_damaged_download, ComputePluginCursorDamageFailure,
+    ComputePluginCursorDamageResult, FailedComputePluginDownload,
+    ValidatedComputePluginCursorDamagePermit,
 };
 pub(in crate::node_agent_compute_plugin_host) use durable::{
     bind_durable_download_segment, commit_durable_download_segment, ComputePluginDurableBindPermit,
@@ -93,6 +99,11 @@ trait ComputePluginFetchAuthorityBackend {
         &self,
         permit: ValidatedComputePluginFetchAbortPermit<'_>,
     ) -> Result<()>;
+
+    fn fail_validated_cursor_damage(
+        &self,
+        permit: ValidatedComputePluginCursorDamagePermit<'_>,
+    ) -> Result<()>;
 }
 
 /// Opaque access to the one concrete Store backend. Its constructor and backend implementation
@@ -133,6 +144,13 @@ impl ComputePluginFetchAuthorityPort<'_> {
         permit: ValidatedComputePluginFetchAbortPermit<'_>,
     ) -> Result<()> {
         self.backend.abort_validated_segment(permit)
+    }
+
+    fn fail_validated_cursor_damage(
+        &self,
+        permit: ValidatedComputePluginCursorDamagePermit<'_>,
+    ) -> Result<()> {
+        self.backend.fail_validated_cursor_damage(permit)
     }
 }
 
@@ -181,6 +199,13 @@ impl ComputePluginFetchAuthorityBackend for ComputePluginFetchAuthoritySession<'
         permit: ValidatedComputePluginFetchAbortPermit<'_>,
     ) -> Result<()> {
         ComputePluginFetchAuthoritySession::abort_validated_segment(self, permit)
+    }
+
+    fn fail_validated_cursor_damage(
+        &self,
+        permit: ValidatedComputePluginCursorDamagePermit<'_>,
+    ) -> Result<()> {
+        ComputePluginFetchAuthoritySession::fail_validated_cursor_damage(self, permit)
     }
 }
 

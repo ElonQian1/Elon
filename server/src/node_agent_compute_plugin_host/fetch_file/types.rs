@@ -205,6 +205,57 @@ impl ComputePluginPartCursorDamage {
     pub(in crate::node_agent_compute_plugin_host) fn observed_length_bytes(&self) -> Option<i64> {
         self.observed_length_bytes
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn authorized(
+        &self,
+    ) -> &AuthorizedComputePluginDownloadSegment {
+        &self.authorized
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn validate_exact_evidence(
+        &mut self,
+    ) -> Result<()> {
+        if self.authorized.offset_bytes() <= 0 {
+            bail!("COMPUTE_PLUGIN_PART_CURSOR_DAMAGE_OFFSET_INVALID");
+        }
+        match self.kind {
+            ComputePluginPartCursorDamageKind::MissingCommittedFile => {
+                if self.file.is_some() || self.observed_length_bytes.is_some() {
+                    bail!("COMPUTE_PLUGIN_PART_CURSOR_DAMAGE_MISSING_EVIDENCE_INVALID");
+                }
+            }
+            ComputePluginPartCursorDamageKind::ShorterThanCommittedCursor => {
+                let observed = self.observed_length_bytes.ok_or_else(|| {
+                    anyhow::anyhow!("COMPUTE_PLUGIN_PART_CURSOR_DAMAGE_LENGTH_MISSING")
+                })?;
+                if observed < 0 || observed >= self.authorized.offset_bytes() {
+                    bail!("COMPUTE_PLUGIN_PART_CURSOR_DAMAGE_LENGTH_INVALID");
+                }
+                let expected = u64::try_from(observed).map_err(|_| {
+                    anyhow::anyhow!("COMPUTE_PLUGIN_PART_CURSOR_DAMAGE_LENGTH_RANGE")
+                })?;
+                self.file
+                    .as_mut()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("COMPUTE_PLUGIN_PART_CURSOR_DAMAGE_FILE_MISSING")
+                    })?
+                    .revalidate_exact_len(expected)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn into_recovery_custody(
+        self,
+    ) -> (
+        ComputePluginFetchClaimRecoveryKey,
+        Option<ComputePluginPinnedFileRecovery>,
+    ) {
+        (
+            self.authorized.into_recovery_key(),
+            self.file.map(ComputePluginPinnedFileRecovery::from_pinned),
+        )
+    }
 }
 
 impl fmt::Debug for ComputePluginPartCursorDamage {

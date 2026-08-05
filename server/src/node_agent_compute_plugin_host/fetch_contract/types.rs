@@ -124,6 +124,10 @@ impl AuthorizedComputePluginDownloadSegment {
     ) -> anyhow::Result<()> {
         self.cancellation.ensure_current()
     }
+
+    pub(super) fn prepared_claim(&self) -> &PreparedComputePluginFetchClaim {
+        &self.claim
+    }
 }
 
 #[derive(PartialEq, Eq)]
@@ -175,6 +179,8 @@ pub(crate) enum ComputePluginFetchAbortReason {
     DurableWriteFailed,
     FileBindingMismatch,
     AuthorityRecovery,
+    CommittedFileMissing,
+    CommittedFileShorter,
 }
 
 impl ComputePluginFetchAbortReason {
@@ -185,7 +191,16 @@ impl ComputePluginFetchAbortReason {
             Self::DurableWriteFailed => "durable_write_failed",
             Self::FileBindingMismatch => "file_binding_mismatch",
             Self::AuthorityRecovery => "authority_recovery",
+            Self::CommittedFileMissing => "committed_file_missing",
+            Self::CommittedFileShorter => "committed_file_shorter",
         }
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn is_cursor_damage(self) -> bool {
+        matches!(
+            self,
+            Self::CommittedFileMissing | Self::CommittedFileShorter
+        )
     }
 }
 

@@ -388,6 +388,15 @@ fn classify_claim(
     download: &RecoveryDownloadRow,
 ) -> Result<(ComputePluginFetchClaimOutcomeKind, Option<&'static str>)> {
     let (kind, reason) = classify_terminal_fields(claim)?;
+    if kind == ComputePluginFetchClaimOutcomeKind::Aborted
+        && matches!(
+            reason,
+            Some("committed_file_missing") | Some("committed_file_shorter")
+        )
+        && download.state != "failed"
+    {
+        bail!("COMPUTE_PLUGIN_FETCH_OUTCOME_DAMAGE_PROJECTION_CORRUPT");
+    }
     let progress_valid = match kind {
         ComputePluginFetchClaimOutcomeKind::NotCreated => false,
         ComputePluginFetchClaimOutcomeKind::Prepared => {
@@ -451,6 +460,8 @@ fn parse_abort_reason(reason: &str) -> Result<&'static str> {
         "durable_write_failed" => Ok("durable_write_failed"),
         "file_binding_mismatch" => Ok("file_binding_mismatch"),
         "authority_recovery" => Ok(RECOVERY_ABORT_REASON),
+        "committed_file_missing" => Ok("committed_file_missing"),
+        "committed_file_shorter" => Ok("committed_file_shorter"),
         _ => bail!("COMPUTE_PLUGIN_FETCH_OUTCOME_ABORT_REASON_CORRUPT"),
     }
 }
