@@ -24,13 +24,14 @@ v197 为 v196 挑战增加一份不可覆盖的终态决议：原消费者可以
 | GET | `/api/admin/compute/settlement-challenges/open` | 平台 `admin/owner` | 列出全局尚无任何 v197 终态的 open 挑战 |
 | GET | `/api/admin/compute/attempt-leases/:lease_id/settlement-challenge/resolution` | 平台 `admin/owner` | 管理侧读取并重新审计决议 |
 | GET | `/api/me/compute/settlement-challenges/history` | 原 Job 消费者 | 按时间列出本人申诉及后续决议、纠正和释放证据链 |
+| GET | `/api/me/compute/providers/:provider_id/settlement-challenges/history` | Provider 所有者 | 按 Provider 列出影响本人收益的申诉证据链 |
 | GET | `/api/admin/compute/settlement-challenges/history` | 平台 `admin/owner` | 按时间列出全局申诉及后续证据链 |
 
 所有写入必须精确绑定 v196 Challenge ID/事件摘要，提供 8 至 1000 字说明、稳定幂等键，并显式确认不会退款、纠正或移动余额。
 
 两类 open 队列先按角色筛选无决议挑战，再逐条重放 v196 Challenge 与 v195 Settlement Receipt 审计；消费者队列额外核对 `consumer_account_id`。队列只是待办入口，撤回或裁决 POST 仍在事务内重新检查唯一终态。
 
-历史队列不是数据库 JSON 直出。它逐项重放 v195 Settlement、v196 Challenge、可选 v197 Resolution、可选 v199 Correction 和可选 v198 Release，并拒绝引用错位及不允许的状态组合。PC `/compute-challenges` 展示本人历史，`/compute-challenge-resolution` 展示全局历史；历史中的 available 仅表示平台内部余额，不证明银行、钱包、Sui 或其他外部付款。
+历史队列不是数据库 JSON 直出。它逐项重放 v195 Settlement、v196 Challenge、可选 v197 Resolution、可选 v199 Correction 和可选 v198 Release，并拒绝引用错位及不允许的状态组合。PC `/compute-challenges` 展示消费者本人历史，`/my-compute-settlement` 按当前 Provider 展示受影响收益，`/compute-challenge-resolution` 展示管理员全局历史；历史中的 available 仅表示平台内部余额，不证明银行、钱包、Sui 或其他外部付款。
 
 ## 3. 状态和释放门卫
 
