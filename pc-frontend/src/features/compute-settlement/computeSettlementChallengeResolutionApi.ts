@@ -6,6 +6,9 @@ import {
   type ResolveComputeSettlementChallengeBody,
   type WithdrawComputeSettlementChallengeBody,
 } from '../compute-attempt/settlementChallengeResolutionContracts'
+import {
+  type ComputeSettlementChallengeHistoryResponse,
+} from '../compute-attempt/settlementChallengeHistoryContracts'
 
 export type {
   ComputeSettlementChallengeResolutionAction,
@@ -15,6 +18,9 @@ export type {
   WithdrawComputeSettlementChallengeBody,
 } from '../compute-attempt/settlementChallengeResolutionContracts'
 export type { ComputeSettlementChallengeReceipt } from '../compute-attempt/settlementChallengeContracts'
+export type {
+  ComputeSettlementChallengeHistoryItem,
+} from '../compute-attempt/settlementChallengeHistoryContracts'
 
 function participantBase(leaseId: string) {
   return `/api/me/compute/attempt-leases/${encodeURIComponent(leaseId)}/settlement-challenge`
@@ -31,6 +37,12 @@ export const computeSettlementChallengeResolutionApi = {
   listAdminOpen: (limit = 100) => api.get<OpenSettlementChallengeQueueResponse>(
     `/api/admin/compute/settlement-challenges/open?limit=${limit}`,
   ).then((response) => response.challenge_candidates),
+  listConsumerHistory: (limit = 100) => api.get<ComputeSettlementChallengeHistoryResponse>(
+    `/api/me/compute/settlement-challenges/history?limit=${limit}`,
+  ).then((response) => response.challenge_history),
+  listAdminHistory: (limit = 100) => api.get<ComputeSettlementChallengeHistoryResponse>(
+    `/api/admin/compute/settlement-challenges/history?limit=${limit}`,
+  ).then((response) => response.challenge_history),
   withdraw: (
     challenge: ComputeSettlementChallengeReceipt,
     body: WithdrawComputeSettlementChallengeBody,

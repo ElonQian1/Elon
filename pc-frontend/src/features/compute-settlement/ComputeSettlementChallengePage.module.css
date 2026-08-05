@@ -22,6 +22,7 @@
 .candidate > header > div { min-width: 0; display: flex; align-items: center; gap: 8px; }
 .candidate header b { border: 1px solid rgba(208,136,85,.35); border-radius: 5px; padding: 4px 6px; color: #f0d8c3; font-size: 8px; }
 .candidate header span { overflow: hidden; color: var(--text-muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.candidate header .historyId { max-width: 42%; color: #9fc4f4; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .candidate header button { min-height: 30px; flex: 0 0 auto; border: 1px solid #b97447; border-radius: 5px; padding: 0 8px; color: #1c0d05; background: #db9668; font-size: 8px; font-weight: 760; }
 .facts { display: grid; grid-template-columns: 1fr 1fr; margin-top: 11px; border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
 .facts div { min-width: 0; display: grid; gap: 3px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 7px; }
