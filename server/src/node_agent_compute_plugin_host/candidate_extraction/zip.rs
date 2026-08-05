@@ -1,4 +1,5 @@
 mod extract;
+mod revalidate;
 mod scan;
 mod types;
 

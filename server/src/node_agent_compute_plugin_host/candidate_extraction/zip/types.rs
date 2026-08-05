@@ -19,6 +19,8 @@ pub(super) const HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA: &str =
 pub(super) const STAGING_SEAL_PAYLOAD_SCHEMA: &str = "elon.compute_plugin.staging_seal_payload.v1";
 pub(super) const STAGING_SEAL_EVIDENCE_SCHEMA: &str =
     "elon.compute_plugin.staging_seal_evidence.v1";
+pub(super) const STAGING_EVIDENCE_CANONICALIZATION: &str = "RFC8785-JCS";
+pub(super) const STAGING_EVIDENCE_DIGEST_ALGORITHM: &str = "sha256";
 
 #[derive(Debug, Serialize)]
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginExtractedFileEvidence {

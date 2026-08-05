@@ -17,7 +17,8 @@ use super::{
         ComputePluginExtractedFileEvidence, ComputePluginStagingSealEvidence,
         ComputePluginStagingSealPayload, ExtractedComputePluginCandidateArchive,
         HashedComputePluginExtractedArchiveEvidence, EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA,
-        HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA, STAGING_SEAL_EVIDENCE_SCHEMA,
+        HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA, STAGING_EVIDENCE_CANONICALIZATION,
+        STAGING_EVIDENCE_DIGEST_ALGORITHM, STAGING_SEAL_EVIDENCE_SCHEMA,
         STAGING_SEAL_PAYLOAD_SCHEMA,
     },
 };
@@ -111,8 +112,8 @@ pub(in crate::node_agent_compute_plugin_host) fn extract_verified_compute_plugin
     let evidence = HashedComputePluginExtractedArchiveEvidence {
         schema: HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA.to_string(),
         evidence: extracted.evidence,
-        canonicalization: "RFC8785-JCS".to_string(),
-        digest_algorithm: "sha256".to_string(),
+        canonicalization: STAGING_EVIDENCE_CANONICALIZATION.to_string(),
+        digest_algorithm: STAGING_EVIDENCE_DIGEST_ALGORITHM.to_string(),
         evidence_digest,
     };
     let cancellation = verified.snapshot_cancellation_guard();
@@ -173,8 +174,8 @@ fn write_staging_seal(
     let seal_evidence = ComputePluginStagingSealEvidence {
         schema: STAGING_SEAL_EVIDENCE_SCHEMA.to_string(),
         payload,
-        canonicalization: "RFC8785-JCS".to_string(),
-        digest_algorithm: "sha256".to_string(),
+        canonicalization: STAGING_EVIDENCE_CANONICALIZATION.to_string(),
+        digest_algorithm: STAGING_EVIDENCE_DIGEST_ALGORITHM.to_string(),
         payload_digest,
         file_digest: copied.digest().to_string(),
         file_identity_digest: seal.identity_digest().to_string(),
