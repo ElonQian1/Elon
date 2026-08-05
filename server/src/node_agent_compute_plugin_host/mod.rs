@@ -23,6 +23,7 @@ mod local_authority_schema;
 pub(crate) mod manifest_validation;
 pub(crate) mod plugin_manifest;
 pub(crate) mod ready_capability;
+mod rollback_anchor;
 pub(crate) mod runner_events;
 mod signed_artifact_verification;
 mod trusted_time;
