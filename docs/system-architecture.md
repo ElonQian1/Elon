@@ -226,7 +226,7 @@ Windows 节点提供项目绑定、短期令牌保护的标准 Streamable HTTP M
 
 持续知识治理由工作区外 SQLite 派生索引、持久变更事件和 60 秒维护轮询组成。质量内核检查失效链接、孤立、重复/冲突标题、owner、复查周期、过期和 file/test/route/symbol/API 实现漂移；每项保留严重度、证据和修复建议。问题状态与健康快照同样位于工作区外，总分返回 finding、文档覆盖和实现证据组件；未声明实现证据时实现分为 0。服务端把架构、质量、维护、问题工作流和联邦节点合并为目录快照中的 `analysis`。大型仓库通过 `.elon/knowledge-federation.json` 的路径与 glob 分层，项目 → 子项目 → 模块/主题按父节点分页惰性展开，不受旧的 16 分区/500 文档窗口影响；个人笔记通过 `vaultId` 映射到无默认 remote 的托管 Git 知识库，初始化、整理前、整理后和恢复都由提交保护，失败时回到操作前 HEAD 和内容，用户界面不暴露 Git 复杂度。
 
-普通编码代理只接入 context/receipt 两个最小权限 profile。Git 共享导航记忆最多 256 条，可按任务路径、知识联邦节点、branch、release 和工作区状态失败关闭过滤；相关性排序后最多验证 24 条证据并只返回 3 条，不返回正文。Memory CI、显式 Git 对象重定位修复候选、候选拒绝原因与 producer 质量统计都复用工作区外索引和既有 suggestions/revision/authorization/apply 边界。仓库内 Codex plugin 只包装同一 loopback bootstrap 与路径账本，不建立新的服务端逻辑或信任真源。app-server 观测只持久化不可逆 session 指纹、窗口和聚合计数，原始事件在白名单提取后丢弃；只有同一 benchmark 的 baseline/enabled 窗口都完成时才允许报告局部差值。
+普通 Codex 编码代理只接入 context、feature、receipt 三个各含一个工具的最小权限 profile；feature 的详细 action schema 只有显式 `describe` 才返回。Git 共享导航记忆最多 256 条，可按任务路径、知识联邦节点、branch、release 和工作区状态失败关闭过滤；相关性排序后最多验证 24 条证据并只返回 3 条，不返回正文。Git 功能登记先做零正文排序、最多校验 12 个候选并只投影 3 条，需求正文与源码仍由原生工具按需读取。Memory CI、显式 Git 对象重定位修复候选、候选拒绝原因与 producer 质量统计都复用工作区外索引和既有 suggestions/revision/authorization/apply 边界。仓库内 Codex plugin 只包装同一 loopback bootstrap 与路径账本，不建立新的服务端逻辑或信任真源。app-server 观测只持久化不可逆 session 指纹、窗口和聚合计数，原始事件在白名单提取后丢弃；只有同一 benchmark 的 baseline/enabled 窗口都完成时才允许报告局部差值。
 
 ### 2.6 PWA Runtime 像素证据
 

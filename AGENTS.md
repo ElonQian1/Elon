@@ -15,6 +15,7 @@
 |---|---|
 | 项目定位、当前状态、架构、模块入口、任务模板 | `AI_CURRENT.md`、`AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
 | 文档、笔记、归档、低 token 整理 | `.github/instructions/document-authority.instructions.md` |
+| 新功能需求登记、待开发模块、代理认领、验收证据 | `docs/project-feature-registry.md`；普通 Codex 优先单工具 `project_feature_workflow`，完整治理会话使用 `project_features_list/plan`，不要全量读取或手改注册表 |
 | 长聊天拆分、讨论分叉、脑图 | `.github/instructions/discussion-knowledge.instructions.md` |
 | Git、worktree、提交、push、部署、发布 | `.github/instructions/git-deploy-workflow.instructions.md` |
 | Rust/Cargo | Git/发布手册；`scripts/validate-rust.ps1` |

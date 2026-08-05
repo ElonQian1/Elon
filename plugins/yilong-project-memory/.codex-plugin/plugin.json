@@ -1,19 +1,27 @@
 {
   "name": "yilong-project-memory",
-  "version": "0.1.0",
+  "version": "0.1.0+codex.20260805081915",
   "description": "Bounded, evidence-backed project navigation memory for Codex",
   "author": {
     "name": "Yilong Project"
   },
-  "keywords": ["project-memory", "context", "mcp", "codex"],
+  "keywords": [
+    "project-memory",
+    "context",
+    "mcp",
+    "codex"
+  ],
   "interface": {
     "displayName": "Yilong Project Memory",
     "shortDescription": "Open only the project context needed for this task.",
-    "longDescription": "Adds a bounded read-only context planner and a separate review-gated receipt channel backed by the local Yilong node. Current source and binding project rules always outrank shared navigation memory.",
+    "longDescription": "Adds a bounded read-only context planner, an on-demand single-tool feature workflow, and a separate review-gated receipt channel backed by the local Yilong node. Current source and binding project rules always outrank shared navigation memory.",
     "developerName": "Yilong Project",
     "category": "Productivity",
-    "capabilities": ["Read", "Write"],
-    "defaultPrompt": "Use project context only for broad or unfamiliar work, then verify current files with native tools. Record only durable evidence-backed navigation facts after the task."
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": "Use project context only for broad or unfamiliar work, then verify current files with native tools. Use the feature workflow only for explicit feature lifecycle work, describing its schema on demand. Record only durable evidence-backed navigation facts after the task."
   },
   "mcpServers": "./.mcp.json"
 }

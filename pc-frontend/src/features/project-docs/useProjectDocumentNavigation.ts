@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import {
   buildKnowledgeSections,
   DOCUMENT_HEALTH_SECTION,
+  FEATURE_REGISTRY_SECTION,
   knowledgeSectionCounts,
   topicSectionsForDocument,
   type DocumentNavigationMode,
@@ -28,10 +29,11 @@ interface Input {
   activeSection: string
   query: string
   viewPreferences: ProjectDocumentViewPreferences
+  featureCount: number
 }
 
 export function useProjectDocumentNavigation(input: Input) {
-  const { catalog, manifest, suggestions, navigationMode, activeSection, query, viewPreferences } = input
+  const { catalog, manifest, suggestions, navigationMode, activeSection, query, viewPreferences, featureCount } = input
   const governanceSections = useMemo(() => buildDocumentSections(manifest)
     .filter((section) => !section.custom), [manifest])
   const knowledgeSections = useMemo(() => buildKnowledgeSections(catalog, manifest), [catalog, manifest])
@@ -55,8 +57,9 @@ export function useProjectDocumentNavigation(input: Input) {
       : 0
     counts[DOCUMENT_HEALTH_SECTION] = catalog?.analysis?.governance_workflow?.total_issues
       ?? catalog?.analysis?.quality.summary.total_issues ?? 0
+    counts[FEATURE_REGISTRY_SECTION] = featureCount
     return counts
-  }, [catalog, governanceCounts, knowledgeSections, manifest, navigationMode, suggestions])
+  }, [catalog, featureCount, governanceCounts, knowledgeSections, manifest, navigationMode, suggestions])
   const sections = useMemo(() => navigationMode === 'knowledge'
     ? sortHierarchicalSections(baseSections, viewPreferences.sectionSort, sectionCounts)
     : baseSections, [baseSections, navigationMode, sectionCounts, viewPreferences.sectionSort])

@@ -53,14 +53,16 @@ foreach ($script in @(
 $mcp = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'plugins\yilong-project-memory\.mcp.json') |
     ConvertFrom-Json
 $servers = @($mcp.mcpServers.PSObject.Properties)
-Assert-True ($servers.Count -eq 2) 'Project-memory plugin must expose exactly two MCP servers.'
+Assert-True ($servers.Count -eq 3) 'Project-memory plugin must expose exactly three least-privilege MCP servers.'
 Assert-True ($servers.Name -contains 'yilong-project-context') 'Context MCP server is missing.'
+Assert-True ($servers.Name -contains 'yilong-project-features') 'Feature MCP server is missing.'
 Assert-True ($servers.Name -contains 'yilong-project-memory-receipt') 'Receipt MCP server is missing.'
 foreach ($server in $servers) {
     Assert-True ($server.Value.command -eq 'node') "MCP server $($server.Name) must use the bundled Node proxy."
     Assert-True (@($server.Value.args).Count -eq 2) "MCP server $($server.Name) must pass script and profile only."
 }
 Assert-True ($mcp.mcpServers.'yilong-project-context'.args[1] -eq 'context') 'Context server profile drifted.'
+Assert-True ($mcp.mcpServers.'yilong-project-features'.args[1] -eq 'feature') 'Feature server profile drifted.'
 Assert-True ($mcp.mcpServers.'yilong-project-memory-receipt'.args[1] -eq 'receipt') 'Receipt server profile drifted.'
 
 $hooks = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'plugins\yilong-project-memory\hooks\hooks.json') |

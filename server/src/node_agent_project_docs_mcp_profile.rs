@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub(crate) enum DescriptorProfile {
     Governance,
     Context,
+    Feature,
     Receipt,
 }
 
@@ -16,8 +17,9 @@ impl DescriptorProfile {
         match value.map(str::trim) {
             None | Some("") | Some("governance") => Ok(Self::Governance),
             Some("context") => Ok(Self::Context),
+            Some("feature") => Ok(Self::Feature),
             Some("receipt") => Ok(Self::Receipt),
-            Some(_) => bail!("profile 只支持 governance、context 或 receipt"),
+            Some(_) => bail!("profile 只支持 governance、context、feature 或 receipt"),
         }
     }
 
@@ -25,6 +27,7 @@ impl DescriptorProfile {
         match self {
             Self::Governance => None,
             Self::Context => Some("context"),
+            Self::Feature => Some("feature"),
             Self::Receipt => Some("receipt"),
         }
     }
@@ -33,6 +36,7 @@ impl DescriptorProfile {
         match self {
             Self::Governance => "yilong_project_docs",
             Self::Context => "yilong_project_context",
+            Self::Feature => "yilong_project_features",
             Self::Receipt => "yilong_project_receipt",
         }
     }
@@ -41,6 +45,7 @@ impl DescriptorProfile {
         match self {
             Self::Governance => "低 token 分析项目文档权威性、质量与联邦节点；支持项目 Git 工作区和平台托管版本的个人知识库。",
             Self::Context => "普通编码任务的单工具、零正文、revision 感知项目导航；真实搜索与读取继续使用代理原生工具。",
+            Self::Feature => "普通编码任务的单工具功能需求生命周期；详细字段契约只在显式 describe 时按需返回。",
             Self::Receipt => "普通编码任务的单工具、只写候选回执；只保存摘要、主题和证据路径身份，不保存源码正文、聊天、prompt 或工具输出。",
         }
     }
@@ -67,12 +72,19 @@ mod tests {
             "yilong_project_context"
         );
         assert_eq!(
+            DescriptorProfile::parse(Some("feature"))
+                .unwrap()
+                .server_name(),
+            "yilong_project_features"
+        );
+        assert_eq!(
             DescriptorProfile::parse(Some("receipt"))
                 .unwrap()
                 .server_name(),
             "yilong_project_receipt"
         );
         assert!(!DescriptorProfile::Receipt.supports_vault());
+        assert!(!DescriptorProfile::Feature.supports_vault());
         assert!(DescriptorProfile::Governance.supports_vault());
         assert!(DescriptorProfile::parse(Some("unknown")).is_err());
     }

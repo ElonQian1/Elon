@@ -5,8 +5,8 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
 const profile = process.argv[2]
-if (!['context', 'receipt'].includes(profile)) {
-  throw new Error('Expected project memory MCP profile: context or receipt')
+if (!['context', 'feature', 'receipt'].includes(profile)) {
+  throw new Error('Expected project memory MCP profile: context, feature, or receipt')
 }
 
 const adminUrl = await resolveNodeAdminUrl()

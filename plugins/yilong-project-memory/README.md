@@ -1,8 +1,9 @@
 # Yilong Project Memory Codex Plugin
 
-This plugin exposes two separate, least-privilege MCP servers backed by the local Yilong node:
+This plugin exposes three separate, least-privilege MCP servers backed by the local Yilong node:
 
 - `yilong-project-context` provides one bounded, read-only `project_context_plan` tool.
+- `yilong-project-features` provides one on-demand `project_feature_workflow` dispatcher; its detailed action schemas are returned only by an explicit `describe` action.
 - `yilong-project-memory-receipt` provides one review-gated candidate receipt tool.
 
 The plugin never reads or copies Codex private memories. It stores no source bodies, prompts,
@@ -20,3 +21,8 @@ Requirements:
 Installing or enabling the plugin does not trust its hooks. Review the hook definitions in Codex
 before enabling them. Current source, tests, binding rules, and current ADRs always outrank shared
 navigation memory.
+
+The context plan can also project at most three related, Git-backed feature records without
+returning requirement bodies. The separate feature dispatcher can register, update, rebind, claim,
+or transition an explicit feature without exposing the full document-governance catalog to every
+task. It uses the same server-side state machine and never returns requirement or source bodies.

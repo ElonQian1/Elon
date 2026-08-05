@@ -19,6 +19,7 @@ pub(crate) fn manifest() -> Value {
                 "id": "node_managed_codex",
                 "status": "available",
                 "context_profile": "automatic_for_broad_tasks",
+                "feature_profile": "automatic_single_tool_for_explicit_lifecycle_tasks",
                 "receipt_profile": "automatic_for_broad_tasks",
                 "hook_configuration": "session_scoped_non_managed",
                 "trust_required": true
@@ -27,6 +28,7 @@ pub(crate) fn manifest() -> Value {
                 "id": "direct_codex_install",
                 "status": "plugin_bundle_available_not_installed",
                 "context_profile": "plugin_bootstrap",
+                "feature_profile": "plugin_bootstrap",
                 "receipt_profile": "plugin_bootstrap",
                 "hook_configuration": "not_installed_globally",
                 "trust_required": true
@@ -36,6 +38,7 @@ pub(crate) fn manifest() -> Value {
                 "status": "manual_descriptor_available",
                 "governance_profile": "vendor_neutral_streamable_http",
                 "context_profile": "manual",
+                "feature_profile": "manual",
                 "receipt_profile": "manual",
                 "hook_configuration": "vendor_adapter_required"
             },
@@ -43,7 +46,7 @@ pub(crate) fn manifest() -> Value {
                 "id": "codex_plugin_bundle",
                 "status": "repository_bundle_available_not_installed",
                 "path": "plugins/yilong-project-memory",
-                "profiles": ["context", "receipt"],
+                "profiles": ["context", "feature", "receipt"],
                 "hook_configuration": "bundled_non_managed_review_required"
             }
         ],

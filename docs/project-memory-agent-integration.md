@@ -71,12 +71,12 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\project-memory-ci.ps
 
 | 入口 | 当前能力 | 不自动做的事 |
 |---|---|---|
-| 节点托管的普通 Codex 宽任务 | 自动注入只读 context、只写 receipt 和会话级 Hook 配置 | 不注入完整治理 schema，不绕过 Hook 信任 |
-| 直接运行的 Codex Desktop/CLI | 可手动 bootstrap 描述符，或安装仓库内 `plugins/yilong-project-memory` 接入 context/receipt | 仓库只提供插件包，不替用户安装、不自动信任 Hook |
-| 其他支持 HTTP MCP 的代理 | 可使用 vendor-neutral governance 描述符；context/receipt 可由适配器手动接入 | 无可靠工具过滤时不自动注入普通任务；Hook 需供应商适配 |
-| Codex plugin bundle | 已生成并通过静态校验；仓库 marketplace 可被 Codex 桌面端发现；两个 stdio 代理已在隔离节点完成 bootstrap、initialize 与 tools/list 运行冒烟 | 尚未在当前真实 Codex 会话安装，未完成 Hook 信任与卸载验证，也不声称 Hook 已加载 |
+| 节点托管的普通 Codex 宽任务 | 自动注入只读 context、按需 feature、只写 receipt 和会话级 Hook 配置 | 不注入完整治理 schema，不绕过 Hook 信任 |
+| 直接运行的 Codex Desktop/CLI | 可手动 bootstrap 描述符，或安装仓库内 `plugins/yilong-project-memory` 接入 context/feature/receipt | 仓库只提供插件包，不替用户安装、不自动信任 Hook |
+| 其他支持 HTTP MCP 的代理 | 可使用 vendor-neutral governance 描述符；context/feature/receipt 可由适配器手动接入 | 无可靠工具过滤时不自动注入普通任务；Hook 需供应商适配 |
+| Codex plugin bundle | 已生成仓库 marketplace；context/receipt 两个 stdio 代理曾在隔离节点完成 bootstrap、initialize 与 tools/list 运行冒烟；新增 feature 代理只有代码与静态合同 | 尚未在当前真实 Codex 会话安装，feature profile 尚未运行验收，未完成 Hook 信任与卸载验证，也不声称 Hook 已加载 |
 
-context、receipt、governance profile 与短期 session/token 固定；修改 URL 查询参数不能提升权限。普通任务只使用两个极小 profile，因此不会每次积压完整治理工具 schema 或项目全文。`project_context_plan` 可传 `task_paths`、`scope_id` 和 `release`；服务端另从当前 Git 工作区绑定 branch 与 clean/dirty 状态，这些范围也进入缓存键和 plan receipt。
+context、feature、receipt、governance profile 与短期 session/token 固定；修改 URL 查询参数不能提升权限。普通任务只使用三个各含一个工具的极小 profile，因此不会每次积压完整治理工具 schema 或项目全文；feature 的详细 action schema 只有显式 `describe` 才返回。`project_context_plan` 可传 `task_paths`、`scope_id` 和 `release`；服务端另从当前 Git 工作区绑定 branch 与 clean/dirty 状态，这些范围也进入缓存键和 plan receipt。若项目存在 `.elon/project-features.json`，同一只读工具会先排序、只校验前 12 个候选，再返回最多 3 个 query/task path 相关且需求 hash 有效的活动功能，不复制需求正文；详细状态机见 `docs/project-feature-registry.md`。
 
 ## Codex 桌面端安装与就绪门禁
 
@@ -88,7 +88,7 @@ context、receipt、governance profile 与短期 session/token 固定；修改 U
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-project-memory-codex-readiness.ps1
 ```
 
-默认只要仓库内 marketplace、manifest、两个 MCP profile、三个有界 Hook 事件和 Node.js 18+ 合同正确就退出 0，并另外报告本机安装与运行状态。需要把未安装或未启用视为失败时传 `-RequireInstalled`；还要验证一龙节点 loopback `/api/health` 时传 `-RequireRuntime`。输出明确分开：
+默认只要仓库内 marketplace、manifest、三个 MCP profile、三个有界 Hook 事件和 Node.js 18+ 合同正确就退出 0，并另外报告本机安装与运行状态。需要把未安装或未启用视为失败时传 `-RequireInstalled`；还要验证一龙节点 loopback `/api/health` 时传 `-RequireRuntime`。输出明确分开：
 
 - `static_ready`：仓库插件源可以交付；
 - `installed_ready`：当前项目已信任、Codex cache 中存在与仓库逐文件一致的安装副本、插件配置已启用；

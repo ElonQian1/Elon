@@ -75,6 +75,7 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
         .merge(crate::project_document_observability_api::routes())
         .merge(crate::project_document_governance_api::routes())
         .merge(crate::project_document_native_context_api::routes())
+        .merge(crate::project_feature_registry_api::routes())
 }
 
 #[cfg(test)]
@@ -95,6 +96,11 @@ pub(crate) fn descriptor_for_project_context(project_root: &str, host_port: u16)
 pub(crate) fn descriptor_for_project_receipt(project_root: &str, host_port: u16) -> Result<Value> {
     let root = validate_project_root(project_root)?;
     create_descriptor(&root, None, host_port, DescriptorProfile::Receipt)
+}
+
+pub(crate) fn descriptor_for_project_feature(project_root: &str, host_port: u16) -> Result<Value> {
+    let root = validate_project_root(project_root)?;
+    create_descriptor(&root, None, host_port, DescriptorProfile::Feature)
 }
 
 pub(crate) fn descriptor_for_vault(vault_id: &str, host_port: u16) -> Result<Value> {
@@ -271,6 +277,8 @@ async fn handle_request_for_profile(
             &request,
             context_receipt_path,
         )
+    } else if crate::node_agent_project_feature_mcp::handles(profile) {
+        crate::node_agent_project_feature_mcp::handle_request(workspace, &request)
     } else if crate::node_agent_project_receipt_mcp::handles(profile) {
         crate::node_agent_project_receipt_mcp::handle_request(workspace, &request, session_id)
     } else if !matches!(profile, None | Some("governance")) {
@@ -281,7 +289,7 @@ async fn handle_request_for_profile(
                 "protocolVersion": MCP_PROTOCOL_VERSION,
                 "capabilities": { "tools": { "listChanged": false } },
                 "serverInfo": { "name": "yilong-project-docs", "version": "1.0.0" },
-                "instructions": "先调用 project_docs_analyze；再按任务局部查询图谱、节点和 token 阅读计划。大型项目按 federation scope_id 分页。目录与图谱预分类不读正文且 classification_model_tokens=0；用 project_docs_get_issues 取得质量证据，只用 project_docs_read 按需读歧义文档。聊天整理使用 project_discussions_get_graph/get_node 先看已有讨论结构；新来源先 get_source_manifest，再按稳定 chunk id 逐块 read_source_chunk，每块只读一次并在 source.processed_chunk_ids 记录进度，expected_source_revision 必须逐字复制刚读取的 manifest.source_revision，禁止用普通文档读取截断长聊天。每个节点的 root_id 都填写所属根主题的稳定 ID，根节点自身 root_id=id。除 topic 外，每个新增或修改节点必须有 1 至 3 句话的可复用 summary；节点 status 只允许 open、exploring、accepted、rejected、superseded、implemented，不能使用 proposed。关系类型只使用 save_proposal schema 的 relation enum，不能自造 contains 等关系。回顾演化优先使用 project_discussions_get_history/get_graph_at_version/compare_versions/trace_node，禁止为了看版本而重读聊天正文。修改前调用 project_discussions_review_graph；确定性问题可 prepare_safe_repair→save_proposal→apply，语义问题只读取 issue 命中的来源后再生成 proposal。apply 始终创建可回看的新版本。save_proposal 保存来源、分支和晋升建议，apply 才更新讨论图和创建新文档。讨论来源默认无权威性，假设、意见、证据、决策和当前事实必须分开。authorization_mode 默认 git_backed_full：普通文档建议和讨论图应用均创建整理前后提交。普通 Git 与托管知识库均可 get_history/get_version_diff；restore 只创建新提交并拒绝混合代码版本。review_all 必须用户审核；suggestions_only 只保存建议。禁止覆盖、越界、修改代码或自动 push。"
+                "instructions": "先调用 project_docs_analyze；再按任务局部查询图谱、节点和 token 阅读计划。大型项目按 federation scope_id 分页。目录与图谱预分类不读正文且 classification_model_tokens=0；用 project_docs_get_issues 取得质量证据，只用 project_docs_read 按需读歧义文档。聊天整理使用 project_discussions_get_graph/get_node 先看已有讨论结构；新来源先 get_source_manifest，再按稳定 chunk id 逐块 read_source_chunk，每块只读一次并在 source.processed_chunk_ids 记录进度，expected_source_revision 必须逐字复制刚读取的 manifest.source_revision，禁止用普通文档读取截断长聊天。每个节点的 root_id 都填写所属根主题的稳定 ID，根节点自身 root_id=id。除 topic 外，每个新增或修改节点必须有 1 至 3 句话的可复用 summary；节点 status 只允许 open、exploring、accepted、rejected、superseded、implemented，不能使用 proposed。关系类型只使用 save_proposal schema 的 relation enum，不能自造 contains 等关系。回顾演化优先使用 project_discussions_get_history/get_graph_at_version/compare_versions/trace_node，禁止为了看版本而重读聊天正文。修改前调用 project_discussions_review_graph；确定性问题可 prepare_safe_repair→save_proposal→apply，语义问题只读取 issue 命中的来源后再生成 proposal。apply 始终创建可回看的新版本。save_proposal 保存来源、分支和晋升建议，apply 才更新讨论图和创建新文档。讨论来源默认无权威性，假设、意见、证据、决策和当前事实必须分开。功能需求正文先用原生工具写入正式 current Markdown，再用 project_features_register 登记；先 list/plan 取得 registry revision，范围变化用 update，需求变化用 rebind 并重新评审，ready 后才能 claim，完成后绑定实现和 test 证据。注册表不复制正文，也不能覆盖当前源码与测试。authorization_mode 默认 git_backed_full：普通文档建议和讨论图应用均创建整理前后提交。普通 Git 与托管知识库均可 get_history/get_version_diff；restore 只创建新提交并拒绝混合代码版本。review_all 必须用户审核；suggestions_only 只保存建议。禁止覆盖、越界、修改代码或自动 push。"
             })),
             "tools/list" => Ok(json!({ "tools": tool_definitions() })),
             "tools/call" => call_tool(workspace, request.params),
@@ -309,7 +317,7 @@ async fn bootstrap_handler(Json(request): Json<BootstrapRequest>) -> Response {
             (None, Some(vault_id)) if profile.supports_vault() => {
                 descriptor_for_vault(vault_id, host_port)
             }
-            (None, Some(_)) => Err(anyhow!("context/receipt profile 当前只支持 Git 项目")),
+            (None, Some(_)) => Err(anyhow!("非 governance profile 当前只支持 Git 项目")),
             _ => Err(anyhow!("必须且只能提供 projectRoot 或 vaultId")),
         },
     };
@@ -377,7 +385,7 @@ fn authorize_session_profile(
     ))
 }
 
-fn validate_project_root(project_root: &str) -> Result<PathBuf> {
+pub(crate) fn validate_project_root(project_root: &str) -> Result<PathBuf> {
     let root = PathBuf::from(project_root.trim())
         .canonicalize()
         .context("projectRoot 不存在或不可访问")?;

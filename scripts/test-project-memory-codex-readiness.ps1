@@ -184,8 +184,9 @@ if ($sourceEntry) {
 }
 
 $mcpServers = if ($mcp) { @($mcp.mcpServers.PSObject.Properties) } else { @() }
-if ($mcpServers.Count -ne 2) { $staticErrors.Add('mcp_server_count_mismatch') | Out-Null }
+if ($mcpServers.Count -ne 3) { $staticErrors.Add('mcp_server_count_mismatch') | Out-Null }
 if ($mcpServers.Name -notcontains 'yilong-project-context') { $staticErrors.Add('context_mcp_missing') | Out-Null }
+if ($mcpServers.Name -notcontains 'yilong-project-features') { $staticErrors.Add('feature_mcp_missing') | Out-Null }
 if ($mcpServers.Name -notcontains 'yilong-project-memory-receipt') { $staticErrors.Add('receipt_mcp_missing') | Out-Null }
 $hookEvents = if ($hooks) { @($hooks.hooks.PSObject.Properties.Name | Sort-Object) } else { @() }
 if (($hookEvents -join ',') -ne 'PostToolUse,SessionEnd,Stop') { $staticErrors.Add('hook_event_contract_mismatch') | Out-Null }

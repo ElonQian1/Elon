@@ -11,6 +11,7 @@ const PROJECT_DOCUMENT_CONFIG_PATHS: &[&str] = &[
     ".elon/knowledge-federation.json",
     ".elon/discussion-graph.json",
     ".elon/discussion-graph-suggestions.json",
+    ".elon/project-features.json",
 ];
 
 #[derive(Debug)]

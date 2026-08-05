@@ -89,6 +89,17 @@ fn bounded_strings(value: Option<&Value>, limit: usize) -> Vec<Value> {
 pub(crate) fn source_conflict_summary(plan: &Value, revision: &WorkspaceRevision) -> Value {
     let mut warnings = Vec::new();
     let mut seen = HashSet::new();
+    if plan
+        .pointer("/relevant_features/status")
+        .and_then(Value::as_str)
+        == Some("registry_invalid")
+    {
+        warnings.push(json!({
+            "path":".elon/project-features.json",
+            "code":"feature_registry_invalid",
+            "action":"Do not infer pending work from the registry; inspect and repair its bounded validation error explicitly."
+        }));
+    }
     for collection in ["mandatory_rules", "relevant_documents"] {
         for item in plan
             .get(collection)
@@ -106,6 +117,25 @@ pub(crate) fn source_conflict_summary(plan: &Value, revision: &WorkspaceRevision
                     warnings.push(json!({"path":path,"code":code,"action":action}));
                 }
             }
+        }
+    }
+    for feature in plan
+        .pointer("/relevant_features/invalidated")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let path = feature
+            .get("requirement_path")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let identity = format!("{path}:feature_requirement_drifted");
+        if seen.insert(identity) && warnings.len() < 6 {
+            warnings.push(json!({
+                "path":path,
+                "code":"feature_requirement_drifted",
+                "action":"Do not claim or implement from the registry until the current requirement is verified and explicitly rebound."
+            }));
         }
     }
     if revision.git_clean == Some(false) {
@@ -185,6 +215,8 @@ pub(crate) fn enforce_response_projection(mut plan: Value, max_response_tokens: 
     while serialized_len(&plan) > target_bytes {
         if pop_nested_array(&mut plan, "verified_project_memory", "selected", 0)
             || pop_nested_array(&mut plan, "verified_project_memory", "invalidated", 0)
+            || pop_nested_array(&mut plan, "relevant_features", "selected", 0)
+            || pop_nested_array(&mut plan, "relevant_features", "invalidated", 0)
             || pop_array(&mut plan, "relevant_documents", 1)
             || pop_array(&mut plan, "matched_nodes", 2)
             || pop_nested_array(&mut plan, "source_conflict_summary", "metadata_warnings", 1)
@@ -233,6 +265,13 @@ fn compact_budget_fallback(plan: &Value) -> Value {
         "verified_project_memory": {
             "selected_count": plan.pointer("/verified_project_memory/selected_count"),
             "invalidated_count": plan.pointer("/verified_project_memory/invalidated_count"),
+            "details_omitted": true,
+        },
+        "relevant_features": {
+            "selected_count": plan.pointer("/relevant_features/selected_count"),
+            "invalidated_count": plan.pointer("/relevant_features/invalidated_count"),
+            "selected": plan.pointer("/relevant_features/selected").and_then(Value::as_array)
+                .into_iter().flatten().take(1).cloned().collect::<Vec<_>>(),
             "details_omitted": true,
         },
         "selected_paths": selected_paths,

@@ -32,12 +32,14 @@ import ProjectDocumentKnowledgeHome from './ProjectDocumentKnowledgeHome'
 import ProjectDocumentNotebookRail from './ProjectDocumentNotebookRail'
 import ProjectDocumentPageList from './ProjectDocumentPageList'
 import ProjectDocumentSuggestions from './ProjectDocumentSuggestions'
+import ProjectFeatureRegistry from './ProjectFeatureRegistry'
 import type { DocumentOrganizationTrackingRuntime } from './projectDocumentOrganizationStatus'
 import {
   analyzeKnowledgeArchitecture,
   CAPABILITY_MAP_SECTION,
   DOCUMENT_HEALTH_SECTION,
   DISCUSSION_MAP_SECTION,
+  FEATURE_REGISTRY_SECTION,
   KNOWLEDGE_HOME_SECTION,
   knowledgeSectionCounts,
   serverArchitectureHealth,
@@ -118,6 +120,7 @@ export default function ProjectDocumentsWorkspace({
   const [menuPoint, setMenuPoint] = useState<ProjectDocumentMenuPoint>({ x: 0, y: 0 })
   const [dialogState, setDialogState] = useState<ProjectDocumentDialogState | null>(null)
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set())
+  const [featureCount, setFeatureCount] = useState(0)
   const [viewPreferences, setViewPreferences] = useState<ProjectDocumentViewPreferences>(() => loadDocumentViewPreferences(projectId))
   const organization = useProjectDocumentOrganization(projectId, organizationTracking)
   const automationPolicy = useProjectDocumentAutomationPolicy(projectId)
@@ -163,7 +166,7 @@ export default function ProjectDocumentsWorkspace({
     sections, activeSectionDefinition, sectionDocuments, visibleDocuments,
   } = useProjectDocumentNavigation({
     catalog, manifest: organization.manifest, suggestions: organization.suggestions,
-    navigationMode, activeSection, query, viewPreferences,
+    navigationMode, activeSection, query, viewPreferences, featureCount,
   })
 
   const selectedEntry = useMemo(
@@ -632,6 +635,15 @@ export default function ProjectDocumentsWorkspace({
             canStartAi={canStartAi} organizing={organizing} onOpenDocument={openDocumentFromHome}
             onOpenSection={setActiveSection} onAiOrganize={organizeCapability} onAiReview={reviewKnowledgeMap} />
         </Suspense>
+      ) : activeSection === FEATURE_REGISTRY_SECTION ? (
+        <ProjectFeatureRegistry runtime={organizationTracking} canStartAi={canStartAi}
+          onOpenDocument={openDocumentFromHome} onTotalChange={setFeatureCount}
+          onRunAi={(instruction) => {
+            setMessage('')
+            void onStartAiOrganize(instruction)
+              .then(() => setMessage('AI 功能任务已发起；普通 Codex 只加载 context、feature、receipt 三个单工具 profile。'))
+              .catch((error) => setMessage(errorMessage(error, '无法发起 AI 功能任务')))
+          }} />
       ) : activeSection === DISCUSSION_MAP_SECTION ? (
         <Suspense fallback={<div className={styles.capabilityLoading}>正在加载讨论推理图…</div>}>
           <ProjectDocumentDiscussionMap projectId={projectId} canEdit={!!catalog?.can_edit} automationMode={automationPolicy.mode}

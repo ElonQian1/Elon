@@ -27,6 +27,7 @@
 | Android 客户端 | `docs/android-setup.md` | APK、Compose、真机渲染与发布 |
 | 分布式算力联邦 | `docs/distributed-compute/README.md` | 用户节点、外部矿池、按需插件、任务调度和期货锁价结算 |
 | AI 与上下文 | `AGENTS.md` | 跨供应商入口、按需指令、Prompt/Agent/Skill |
+| 功能需求与代理任务 | `docs/project-feature-registry.md` | 正式需求登记、低 token 发现、认领、状态机、证据与漂移治理 |
 | 讨论知识与脑图演化 | `docs/discussion-knowledge-compiler.md` | 长聊天拆分、分叉、节点晋升、版本回看与修正 |
 | 用户与项目系统 | `docs/user-project-system.md` | 用户项目、频道、Git 工作区与文档知识库 |
 | 监督式 PC 项目开发 | `docs/supervised-pc-project-development.md` | Codex 桌面监督、PC 节点执行、证据验收和平台改进续跑 |

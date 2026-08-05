@@ -24,12 +24,13 @@ use crate::{
     project_document_knowledge_graph_service::plan_context_scoped,
     project_document_native_context_projection::{relevant_memories, MemoryRetrievalScope},
     project_document_response::{compact_text, project_tool_response},
+    project_feature_projection::context_projection as feature_context_projection,
 };
 
 pub(crate) const PROFILE: &str = "context";
 pub(crate) const TOOL_NAME: &str = "project_context_plan";
 
-const SERVER_INSTRUCTIONS: &str = "Use project_context_plan only for unfamiliar, cross-file, architecture, or current-status work. It returns bounded metadata, never source bodies. The short-lived MCP session remembers delivered plan/source hashes and automatically returns a small receipt or source delta; previous_plan_id remains an explicit cross-client fallback. Clean HEAD or a complete bounded dirty-content fingerprint controls cache reuse; incomplete dirty states fail closed. Open only added or changed paths with native tools. Current files/tests decide implementation truth; binding current docs/ADRs decide accepted direction. Skip precise single-file tasks.";
+const SERVER_INSTRUCTIONS: &str = "Use project_context_plan only for unfamiliar, cross-file, architecture, current-status, or pending-feature discovery. It returns bounded metadata, never source bodies. The short-lived MCP session remembers delivered plan/source hashes and automatically returns a small receipt or source delta; previous_plan_id remains an explicit cross-client fallback. Clean HEAD or a complete bounded dirty-content fingerprint controls cache reuse; incomplete dirty states fail closed. Open only added or changed paths with native tools. Current files/tests decide implementation truth; binding current docs/ADRs decide accepted direction. Use the separate single-tool feature workflow only for an explicit lifecycle action. Skip precise single-file tasks.";
 const MIN_RESPONSE_TOKENS: u64 = 800;
 const MAX_RESPONSE_TOKENS: u64 = 2_000;
 
@@ -80,7 +81,7 @@ pub(crate) fn handle_request(
 pub(crate) fn definition() -> Value {
     json!({
         "name": TOOL_NAME,
-        "description": "为陌生项目、跨文件、架构或当前状态任务返回严格限额的 Git/revision、权威性、图谱入口、实现引用和最多 3 条证据 hash 有效的已审核导航记忆。零正文、只读；同一短期会话自动复用 plan/source hash，只返回未变化或增量回执。精确单文件任务不要调用。",
+        "description": "为陌生项目、跨文件、架构、当前状态或待开发功能发现返回严格限额的 Git/revision、权威性、图谱入口、实现引用、最多 3 条已审核导航记忆和 3 条相关功能。零正文、只读；同一短期会话自动复用 plan/source hash，只返回未变化或增量回执。精确单文件任务不要调用。",
         "inputSchema": {
             "type": "object",
             "required": ["query"],
@@ -294,9 +295,11 @@ fn build_fresh_plan(
     )?;
     let mut plan = project_navigation_plan(&raw);
     plan["verified_project_memory"] = portable_memory_projection(workspace, query, retrieval_scope);
+    plan["relevant_features"] =
+        feature_context_projection(workspace, query, &retrieval_scope.task_paths);
     let catalog_revision = plan.get("catalog_revision").cloned().unwrap_or(Value::Null);
     plan["contract"] = json!({
-        "schema": "elon.project_context_plan.v6",
+        "schema": "elon.project_context_plan.v7",
         "read_only": true,
         "source_bodies_returned": 0,
         "native_search_replaced": false,
@@ -318,7 +321,7 @@ fn build_fresh_plan(
     plan["source_policy"] = json!({
         "precedence": [
             {"rank":1,"role":"implementation_truth","sources":["current_files","tests","runtime_evidence"]},
-            {"rank":2,"role":"accepted_direction","sources":["binding_rules","current_status","accepted_decisions"]},
+            {"rank":2,"role":"accepted_direction","sources":["binding_rules","current_status","accepted_decisions","hash_bound_feature_requirements"]},
             {"rank":3,"role":"navigation_only","sources":["verified_project_memory","knowledge_graph","indexes","generated_summaries"]}
         ],
         "default_excluded": ["drafts","discussions","history","archives","traces"],
@@ -330,6 +333,7 @@ fn build_fresh_plan(
         "before_edit": "Verify exact current source/tests; this response is navigation metadata.",
         "stop": "Stop expanding once one verified source resolves the task.",
         "memory_rule": "Reusable memory may narrow where to look, but never replaces current native reads before an edit.",
+        "feature_rule": "For a selected feature, use project_feature_workflow action=describe/plan when that least-privilege profile is available, or enter an explicit full-governance session; never edit registry JSON ad hoc.",
         "durable_handoff": "Submit stable verified navigation facts only in a later full-governance session; never copy tool output or source bodies."
     });
     plan = enforce_response_projection(plan, max_response_tokens);
@@ -342,6 +346,7 @@ fn build_fresh_plan(
         "mandatory_rules": plan.get("mandatory_rules"),
         "relevant_documents": plan.get("relevant_documents"),
         "verified_project_memory": plan.get("verified_project_memory"),
+        "relevant_features": plan.get("relevant_features"),
         "selected_paths": plan.get("selected_paths"),
         "task_scope": plan.get("task_scope"),
     });
@@ -427,10 +432,11 @@ mod tests {
     use super::{definition, handle_request, handles, PROFILE, TOOL_NAME};
     use crate::{
         node_agent_project_docs_mcp::{
-            descriptor_for_project_context, descriptor_for_project_receipt, test_transport_routes,
-            McpRequest,
+            descriptor_for_project_context, descriptor_for_project_feature,
+            descriptor_for_project_receipt, test_transport_routes, McpRequest,
         },
         node_agent_project_docs_mcp_native_context_tools::RECEIPT_TOOL,
+        node_agent_project_feature_mcp::TOOL_NAME as FEATURE_TOOL,
     };
     use serde_json::json;
     use std::{fs, path::Path};
@@ -486,9 +492,14 @@ mod tests {
         });
         let client = reqwest::Client::builder().no_proxy().build().unwrap();
         let context = descriptor_for_project_context(root.to_str().unwrap(), port).unwrap();
+        let feature = descriptor_for_project_feature(root.to_str().unwrap(), port).unwrap();
         let receipt = descriptor_for_project_receipt(root.to_str().unwrap(), port).unwrap();
 
-        for (descriptor, expected_tool) in [(&context, TOOL_NAME), (&receipt, RECEIPT_TOOL)] {
+        for (descriptor, expected_tool) in [
+            (&context, TOOL_NAME),
+            (&feature, FEATURE_TOOL),
+            (&receipt, RECEIPT_TOOL),
+        ] {
             let response = client
                 .post(descriptor["url"].as_str().unwrap())
                 .json(&json!({"jsonrpc":"2.0","id":1,"method":"tools/list"}))
@@ -515,7 +526,7 @@ mod tests {
         assert_eq!(switched.status(), reqwest::StatusCode::UNAUTHORIZED);
 
         server.abort();
-        for descriptor in [&context, &receipt] {
+        for descriptor in [&context, &feature, &receipt] {
             let session_id = descriptor["sessionId"].as_str().unwrap();
             fs::remove_dir_all(
                 std::env::temp_dir()

@@ -119,6 +119,19 @@ pub(crate) fn project_docs_mcp_launch_config(
                     }
                 }
             };
+            let feature_descriptor = if full_governance {
+                None
+            } else {
+                match crate::node_agent_project_docs_mcp::descriptor_for_project_feature(
+                    cwd, host_port,
+                ) {
+                    Ok(descriptor) => Some(descriptor),
+                    Err(error) => {
+                        tracing::warn!(error = %error, "无法为普通 Codex 任务准备功能需求 MCP");
+                        return None;
+                    }
+                }
+            };
             let config_path = |provider: &str| {
                 descriptor
                     .pointer(&format!("/configPaths/{provider}"))
@@ -145,6 +158,13 @@ pub(crate) fn project_docs_mcp_launch_config(
                             &mut config.args,
                             "yilong_project_receipt",
                             receipt_descriptor.get("url")?.as_str()?,
+                        );
+                    }
+                    if let Some(feature_descriptor) = feature_descriptor.as_ref() {
+                        append_http_mcp_args(
+                            &mut config.args,
+                            "yilong_project_features",
+                            feature_descriptor.get("url")?.as_str()?,
                         );
                     }
                     if !full_governance
@@ -308,7 +328,7 @@ mod tests {
     }
 
     #[test]
-    fn injects_context_receipt_and_hooks_for_plain_codex_but_full_mcp_for_document_tasks() {
+    fn injects_minimal_profiles_and_hooks_for_plain_codex_but_full_mcp_for_document_tasks() {
         let root = std::env::temp_dir().join(format!(
             "elon_project_docs_cli_mcp_{}",
             uuid::Uuid::new_v4().simple()
@@ -326,6 +346,11 @@ mod tests {
             .iter()
             .any(|arg| arg.contains("mcp_servers.yilong_project_receipt.url")));
         assert!(plain.args.iter().any(|arg| arg.contains("profile=receipt")));
+        assert!(plain
+            .args
+            .iter()
+            .any(|arg| arg.contains("mcp_servers.yilong_project_features.url")));
+        assert!(plain.args.iter().any(|arg| arg.contains("profile=feature")));
         assert!(plain
             .args
             .iter()
@@ -356,6 +381,10 @@ mod tests {
             .args
             .iter()
             .any(|arg| arg.contains("yilong_project_receipt")));
+        assert!(!config
+            .args
+            .iter()
+            .any(|arg| arg.contains("yilong_project_features")));
         let copilot = project_docs_mcp_launch_config(
             "<elon-project-docs-task version=\"1\">",
             root.to_str(),

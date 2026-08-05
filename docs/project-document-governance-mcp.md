@@ -15,6 +15,7 @@
 - `.elon/document-organization-suggestions.json` 保存待审核或已应用的 AI 建议，不是当前规则真源。
 - `.elon/knowledge-federation.json` 可为大型仓库声明“项目根 → 子项目 → 模块/主题”的知识节点；每个节点可用 `scope_path` 表示主目录、`include_globs` 纳入目录外的模块文档、`exclude_globs` 排除局部材料，并有独立 owner、项目类型、知识首页和健康度，最多 4096 个节点、六层。MCP 和网页端按 `parent_id + cursor/offset + limit` 惰性展开；旧的 16 分区或 500 文档窗口不参与联邦完整性判断。
 - `.elon/discussion-graph.json` 保存聊天编译后的讨论节点、来源和分叉关系；`.elon/discussion-graph-suggestions.json` 保存待应用增量。原始聊天位于 `docs/inbox/conversations/`，固定为无权威、默认不检索的来源材料。完整模型与晋升规则见 `docs/discussion-knowledge-compiler.md`。
+- `.elon/project-features.json` 保存需求模块的短工作流登记、依赖、认领和哈希证据，不复制需求或源码正文；状态机与代理使用方法见 `docs/project-feature-registry.md`。
 - “AI 整理建议”是独立虚拟分区；建议进入这里不代表已经采用。
 
 因此同一份项目可以在网页端按 OneNote 分区浏览，同时保留适合 Git、IDE 和所有 AI 供应商读取的普通目录结构。
@@ -44,7 +45,7 @@ Content-Type: application/json
 
 PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task version="1">` 标记。节点启动器据此为 Codex、Copilot、Claude 和 Gemini 分别使用会话级参数或临时设置注入同一个 MCP；普通开发任务不加载这些完整治理工具，不承担整套工具 schema token。新增供应商适配器也应识别同一标记并转换 `mcp.configPaths`，不能复制工具逻辑。
 
-普通 Codex 编码任务使用同一项目绑定和短期令牌，但把能力拆成两个互不升级的极小会话：`profile=context` 只发布一个只读 `project_context_plan`，`profile=receipt` 只发布一个只写待审核候选的 `project_docs_record_native_context_receipt`。任何一个 URL 都不能切换到另一 profile，完整治理、正文读取和讨论工具不会进入普通任务。context 只为陌生项目、跨文件、架构和当前状态任务返回 Git HEAD、catalog revision、权威性、少量路径/章节、图谱入口和实现引用；精确单文件任务连这两个 profile 都跳过。Codex 随后继续用原生文件搜索和读取核对真实工作区，索引与摘要不得替代源码。其他 CLI 的普通任务暂不自动注入，避免没有可靠工具过滤时重新引入 schema；显式文档整理任务保持上述完整 MCP。
+普通 Codex 编码任务使用同一项目绑定和短期令牌，但把能力拆成三个互不升级的极小会话：`profile=context` 只发布一个只读 `project_context_plan`，`profile=feature` 只发布一个按 action 分发的 `project_feature_workflow`，`profile=receipt` 只发布一个只写待审核候选的 `project_docs_record_native_context_receipt`。feature 的详细动作 schema 只有显式 `describe` 才返回；任何一个 URL 都不能切换到另一 profile，完整治理、正文读取和讨论工具不会进入普通任务。context 只为陌生项目、跨文件、架构、当前状态和待开发功能发现返回 Git HEAD、catalog revision、权威性、少量路径/章节、图谱入口和实现引用；精确单文件任务连这三个 profile 都跳过。Codex 随后继续用原生文件搜索和读取核对真实工作区，索引与摘要不得替代源码。其他 CLI 的普通任务暂不自动注入，避免没有可靠工具过滤时重新引入 schema；显式文档整理任务保持上述完整 MCP。
 
 需要由 Codex Desktop、插件或其他会话适配器主动 bootstrap 轻量 profile 时传：
 
@@ -52,9 +53,9 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 {"projectRoot":"D:\\path\\to\\git-worktree","profile":"context"}
 ```
 
-回执适配器使用同一 bootstrap，把 profile 改为 `receipt`。两个 profile 必须使用各自返回的 session/token；不得拼接 URL 参数切换权限。
+功能与回执适配器使用同一 bootstrap，分别把 profile 改为 `feature` 或 `receipt`。三个 profile 必须使用各自返回的 session/token；不得拼接 URL 参数切换权限。
 
-仓库内 `plugins/yilong-project-memory` 是直接 Codex Desktop/CLI 的可安装接入包：两个 MCP server 仍分别 bootstrap context 与 receipt，不复制服务端工具逻辑；Hook 只保存路径账本。该目录已通过静态 plugin manifest 校验，但仓库不会替用户安装、启用或信任插件，真实安装兼容性仍须单独验收。
+仓库内 `plugins/yilong-project-memory` 是直接 Codex Desktop/CLI 的可安装接入包：三个 MCP server 分别 bootstrap context、feature 与 receipt，不复制服务端工具逻辑；Hook 只保存路径账本。该目录已通过静态 plugin manifest 校验，但仓库不会替用户安装、启用或信任插件，真实安装兼容性仍须单独验收。
 
 返回 URL 和临时配置只在当前短期会话使用，不得把带 token 的 URL 提交到项目或长期配置。
 
@@ -70,11 +71,17 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 每个两小时短期 context MCP 会话还在自身临时目录保存最多 8 个查询范围的 `plan_id`、已投递路径和内容哈希，不保存任务文本、Markdown 或源码正文。相同计划即使调用方忘记传 `previous_plan_id` 也自动返回 `not_modified`；revision 变化时返回 `context_delta`，省略内容哈希未变的信源，并以计数和最多 4 个已移除路径报告来源集合/内容哈希漂移。该漂移是确定性字节事实，仍固定返回 `semantic_content_compared=false`。`force_refresh=true` 会忽略会话回执并完整重发。
 
-`performance_receipt.transport` 在最终 MCP tool result 组装后报告 `structured_content_bytes`、`mcp_tool_result_bytes` 和 UTF-8 字节除以 4 的估算 token；规划回执的基线只指同一次本地生成的完整计划在投影前后的差值。两者固定标注 `measurement_kind=local_structural_estimate`、`not_vendor_billing=true` 和 `not_total_task_tokens=true`，不是供应商账单，也不代表完整任务输入/输出 token。context/receipt/governance profile 固化在会话凭证中，修改 URL 查询参数不能升级权限。
+`performance_receipt.transport` 在最终 MCP tool result 组装后报告 `structured_content_bytes`、`mcp_tool_result_bytes` 和 UTF-8 字节除以 4 的估算 token；规划回执的基线只指同一次本地生成的完整计划在投影前后的差值。两者固定标注 `measurement_kind=local_structural_estimate`、`not_vendor_billing=true` 和 `not_total_task_tokens=true`，不是供应商账单，也不代表完整任务输入/输出 token。context/feature/receipt/governance profile 固化在会话凭证中，修改 URL 查询参数不能升级权限。
 
 `source_policy.precedence` 明确实现真源、接受方向和仅导航信源；`source_conflict_summary` 只根据元数据报告歧义、非当前、非权威和 dirty worktree 风险，并明确 `semantic_content_compared=false`，不得冒充已经比较过正文冲突。dirty 状态即使成功指纹化也必须用原生 Git/文件工具核对；指纹只允许安全复用导航计划。代理只打开结果中的少量路径、章节和 `implementation_refs`；已有精确文件/符号时不调用。Git HEAD、worktree 指纹、catalog revision 或任务范围变化后重新规划；否则复用回执。本工具减少首次宽搜和重复读取，不替代供应商自己的文件工具。
 
 `verified_project_memory` 最多返回 3 条与当前 query 相关的已审核导航摘要。共享 manifest 最多 256 条；每条只含 topic、owner、repository/path scope、可选 scope IDs/branches/releases/worktree state、复核生命周期、工作区相对证据路径、可选 symbol/heading 定位符、工作区 SHA-256 与可用时的 Git HEAD/blob/worktree 对象身份，不含源码正文。服务端先按任务范围失败关闭，再做零 I/O 相关性排序，只对前 24 个候选验证；原始字节 hash 相同即停止，字节不同时才用 Git 对象容忍跨 PC 行尾差异。任一证据漂移、记忆到期或共享事实潜在冲突都会令相关记忆失效；相同 HEAD blob 出现在新路径时只返回最多三个重定位候选，必须由原生工具重读并走新候选审核，不能自动改写。旧 manifest 缺少 owner/scope/review/expiry 时继续兼容读取，但 Memory CI 标为治理信息不完整。该层随 `.elon/document-sections.json` 进入 Git，因此换 PC 后可以复用，但每次编辑前仍须核对当前实现。Codex 的 `~/.codex/memories`、聊天记录和命令输出不导入这里，也不是该功能的备份源。
+
+`relevant_features` 从 `.elon/project-features.json` 最多投影 3 个 query/task path 相关的活动功能，只返回短摘要、状态、优先级、需求路径/哈希、少量验收标准和依赖阻塞。它先做零正文排序，再只校验前 12 个候选的需求身份；已检查候选中的哈希漂移项只进入 `invalidated` 和冲突摘要，不能认领或进入正常上下文。Feature Registry 是接受方向与工作流导航，固定低于当前源码、测试和运行证据；它不增加只读 context profile 的工具数量。普通 Codex 可另接一个单工具 feature profile，详细动作 schema 只在 `describe` 时返回。完整合同见 `docs/project-feature-registry.md`。
+
+### `project_features_*`
+
+完整 governance profile 提供 register、list、update、rebind_requirement、plan、claim、release_claim、transition、record_evidence、check_drift 和有界 history。Codex 先用原生工具写正式需求 Markdown，再登记路径；服务端绑定需求和实现证据的 SHA-256/Git 对象。已接受范围更新或需求重绑都会回退到 proposed、清除旧实现证据并要求重新评审。所有更新使用 `expected_registry_revision`，依赖、租约、状态转换和 verified test 证据失败关闭，不返回或保存正文；history 只分页返回最近最多 200 条 actor/原因/状态审计元数据。PC “功能需求”分区使用同一 loopback API，不在前端复制领域规则。
 
 完整 governance profile 的 `project_docs_check_native_context_memory` 与本机 `/api/project-docs/native-context/health` 使用同一份 Memory CI：支持 `offset/limit` 分页，以及 `advisory`、`fail_on_drift`、`strict` 三种失败策略；返回漂移、可重定位、过期、复核逾期、生命周期缺口、共享事实潜在冲突的总计和逐项结构化人工修复计划。`scripts/project-memory-ci.ps1` 读取 `recommended_exit_code` 并形成实际 CI 进程退出码；诊断接口自己不终止进程、不自动改路径、不自动裁决冲突。PC 只有在单一漂移路径存在单一 Git 对象验证重定位时，才允许用户明确确认并生成 pending 修复候选。详细接入与观测边界见 `docs/project-memory-agent-integration.md`。
 
@@ -206,7 +213,7 @@ Stop 只在当前 turn 至少观察两个有效路径、其中至少一个为读
 
 单条工具保留用于局部结论；显式任务结束时优先用 receipt 一次回执 1–8 条已经原生文件工具核对的短摘要。两者都可只提交工作区相对证据路径：本机服务端在原子写入前检查路径越界、普通文件和 8 MiB 上限，然后绑定当前 SHA-256 及可用时的 Git 对象身份；调用方显式给出 hash 时必须与当前文件一致。候选保存在工作区外的项目文档 SQLite，只记录摘要、topic、路径、定位符、双身份、producer、认证级别、不可逆 session 指纹、人工修订链和时间，不记录任务文本、prompt、聊天、命令输出、Codex 私有 memories 或源码正文，也不修改 Git。列表工具每次限额返回 `pending`、`reviewed`、`rejected`、`applied` 或全部候选。
 
-候选不是项目事实，也不会自动进入普通编码上下文。服务端先用稳定事实 ID、共享 manifest 和证据路径做重复/冲突门控：完全相同的本地或已共享事实只计入 deduplicated，不重新打开被拒绝、已审核或已共享的状态；同 ID 但证据或结论变化形成 `replacement`；路径和 topic 重叠但摘要不同只标 `potential_semantic_conflict`，不能自动裁决。PC 收件箱只允许修订 `pending/rejected` 候选的 summary/topics，保留 evidence 和原始 provenance，追加人工修订标记，并以 `updated_at_ms` CAS 防止并发覆盖；相同证据的后续代理回执不能覆盖人工修订。拒绝时记录 duplicate/task_local/unsupported/conflict/stale/not_reusable 之一，并按最近最多 200 条候选聚合 producer 状态计数；统计只辅助人工判断，不能自动屏蔽来源。证据漂移项可拒绝清理，但不能接受。显式文档治理任务审核候选后，把接受项复制到 `suggestions.proposed_context_memories`，并为新审核项补上默认维护组、仓库 scope、审核日期/审核者和 90 天复核周期；只有既有 catalog/manifest/suggestions revision、authorization 和 Git 事务全部通过，才合并为跨 PC 的 `context_memories`。生命周期为 `candidate -> reviewed suggestion -> applied Git memory -> review overdue/expired/drifted/conflict -> reviewed replacement or retirement`。应用成功后本机候选只更新为 `applied` 回执；新 PC 无需复制 SQLite，直接从 Git manifest 获取已审核导航记忆。普通 `context` profile 始终只有一个只读工具，`receipt` profile 始终只有一个候选写工具。
+候选不是项目事实，也不会自动进入普通编码上下文。服务端先用稳定事实 ID、共享 manifest 和证据路径做重复/冲突门控：完全相同的本地或已共享事实只计入 deduplicated，不重新打开被拒绝、已审核或已共享的状态；同 ID 但证据或结论变化形成 `replacement`；路径和 topic 重叠但摘要不同只标 `potential_semantic_conflict`，不能自动裁决。PC 收件箱只允许修订 `pending/rejected` 候选的 summary/topics，保留 evidence 和原始 provenance，追加人工修订标记，并以 `updated_at_ms` CAS 防止并发覆盖；相同证据的后续代理回执不能覆盖人工修订。拒绝时记录 duplicate/task_local/unsupported/conflict/stale/not_reusable 之一，并按最近最多 200 条候选聚合 producer 状态计数；统计只辅助人工判断，不能自动屏蔽来源。证据漂移项可拒绝清理，但不能接受。显式文档治理任务审核候选后，把接受项复制到 `suggestions.proposed_context_memories`，并为新审核项补上默认维护组、仓库 scope、审核日期/审核者和 90 天复核周期；只有既有 catalog/manifest/suggestions revision、authorization 和 Git 事务全部通过，才合并为跨 PC 的 `context_memories`。生命周期为 `candidate -> reviewed suggestion -> applied Git memory -> review overdue/expired/drifted/conflict -> reviewed replacement or retirement`。应用成功后本机候选只更新为 `applied` 回执；新 PC 无需复制 SQLite，直接从 Git manifest 获取已审核导航记忆。普通 `context`、`feature`、`receipt` profile 始终各只有一个工具；feature 只有显式 `describe` 才返回详细动作合同。
 
 receipt 的 `effect_receipt` 只报告提交数、实际新增/更新/replacement 数、去重数、证据路径数、冲突提示数和 `source_bodies_stored=0`；这些是本地结构计数，固定 `not_vendor_billing=true`、`not_total_task_tokens=true`，不宣称节省了多少真实供应商计费 token。
 

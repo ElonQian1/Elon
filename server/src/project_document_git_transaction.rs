@@ -20,6 +20,7 @@ const NON_DOCUMENT_PATHSPECS: &[&str] = &[
     ":(exclude,glob).elon/knowledge-federation.json",
     ":(exclude,glob).elon/discussion-graph.json",
     ":(exclude,glob).elon/discussion-graph-suggestions.json",
+    ":(exclude,glob).elon/project-features.json",
 ];
 
 pub(crate) fn commit_document_baseline(workspace: &Path) -> Result<String> {
@@ -245,6 +246,7 @@ fn document_paths(workspace: &Path) -> Result<Vec<String>> {
                 || normalized == ".elon/document-organization-suggestions.json"
                 || normalized == ".elon/discussion-graph.json"
                 || normalized == ".elon/discussion-graph-suggestions.json"
+                || normalized == ".elon/project-features.json"
         })
         .collect::<Vec<_>>();
     paths.sort();

@@ -320,6 +320,7 @@
     "docs/pc-node-offline-resilience.md": "custom:windows-node",
     "docs/powershell-version-policy.md": "custom:operations",
     "docs/project-document-governance-mcp.md": "custom:pc-workbench",
+    "docs/project-feature-registry.md": "custom:pc-workbench",
     "docs/project-landing-manifest.md": "custom:project-system",
     "docs/project-store-architecture.md": "custom:project-system",
     "docs/query-chat-records.md": "custom:operations",
@@ -450,6 +451,7 @@
     "docs/pc-node-offline-resilience.md": "on-demand",
     "docs/powershell-version-policy.md": "on-demand",
     "docs/project-document-governance-mcp.md": "on-demand",
+    "docs/project-feature-registry.md": "on-demand",
     "docs/project-landing-manifest.md": "current",
     "docs/project-store-architecture.md": "drafts",
     "docs/query-chat-records.md": "on-demand",
@@ -789,6 +791,12 @@
       "lifecycle": "active",
       "authority": "authoritative",
       "document_type": "guide"
+    },
+    "docs/project-feature-registry.md": {
+      "retrieval": "on_demand",
+      "lifecycle": "active",
+      "authority": "authoritative",
+      "document_type": "specification"
     },
     "docs/supervised-pc-project-development.md": {
       "retrieval": "on_demand",
@@ -4523,6 +4531,34 @@
           "channel",
           "member",
           "project"
+        ]
+      },
+      {
+        "id": "cap-feature-registry",
+        "view": "capabilities",
+        "kind": "workflow",
+        "label": "功能需求与代理任务生命周期",
+        "detail": "正式需求登记、依赖、租约认领、实现证据、验收状态与低 token 代理发现",
+        "parent_id": "cap-knowledge",
+        "order": 40,
+        "color": "#6F9EE8",
+        "entrypoint": "docs/project-feature-registry.md",
+        "document_paths": [
+          "docs/project-feature-registry.md",
+          "docs/project-document-governance-mcp.md"
+        ],
+        "implementation_refs": [
+          "file:server/src/project_feature_registry.rs",
+          "file:server/src/project_feature_registry_service.rs",
+          "file:server/src/node_agent_project_feature_tools.rs",
+          "file:pc-frontend/src/features/project-docs/ProjectFeatureRegistry.tsx"
+        ],
+        "tags": [
+          "agent",
+          "claim",
+          "feature",
+          "requirement",
+          "workflow"
         ]
       }
     ],
