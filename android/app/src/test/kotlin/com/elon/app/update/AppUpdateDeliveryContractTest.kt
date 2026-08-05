@@ -26,17 +26,28 @@ class AppUpdateDeliveryContractTest {
         val worker = source(
             "android/app/src/main/kotlin/com/elon/app/update/AppUpdateDownloadWorker.kt"
         )
+        val notifications = source(
+            "android/app/src/main/kotlin/com/elon/app/update/AppUpdateNotifications.kt"
+        )
+        val manifest = source("android/app/src/main/AndroidManifest.xml")
         assertTrue(worker.contains("CoroutineWorker"))
         assertTrue(worker.contains("setForeground("))
+        assertTrue(worker.contains("AppUpdateBackgroundServiceException"))
+        assertTrue(worker.contains("Result.retry()"))
+        assertTrue(worker.contains("setBackoffCriteria("))
         assertTrue(worker.contains("header(\"Range\""))
         assertTrue(worker.contains("MessageDigest.getInstance(\"SHA-256\")"))
         assertTrue(worker.contains("PART_FILE_NAME"))
         assertTrue(worker.contains("ExistingWorkPolicy.REPLACE"))
+        assertTrue(notifications.contains("FOREGROUND_SERVICE_TYPE_DATA_SYNC"))
+        assertTrue(manifest.contains("androidx.work.impl.foreground.SystemForegroundService"))
+        assertTrue(manifest.contains("android:foregroundServiceType=\"dataSync\""))
     }
 
     @Test
     fun activityFacadeNoLongerOwnsRawDownloadThreadOrGenericProgressDialog() {
         val manager = source("android/app/src/main/kotlin/com/elon/app/update/AppUpdateManager.kt")
+        val sheet = source("android/app/src/main/kotlin/com/elon/app/update/AppUpdateSheet.kt")
         val layout = source("android/app/src/main/res/layout/sheet_app_update.xml")
         val sheetBackground = source("android/app/src/main/res/drawable/bg_update_sheet.xml")
         val primaryBackground = source("android/app/src/main/res/drawable/bg_update_primary.xml")
@@ -45,6 +56,10 @@ class AppUpdateDeliveryContractTest {
         assertFalse(manager.contains("Thread {"))
         assertFalse(manager.contains("progressBarStyleHorizontal"))
         assertTrue(manager.contains("AppUpdateSheet("))
+        assertFalse(sheet.contains("moveTaskToBack"))
+        assertFalse(sheet.contains("finishAndRemoveTask"))
+        assertTrue(sheet.contains("primary = \"开始下载\""))
+        assertTrue(sheet.contains("primary = \"收起下载面板\""))
         assertTrue(layout.contains("@drawable/bg_update_sheet"))
         assertTrue(sheetBackground.contains("@color/elon_surface_card"))
         assertTrue(primaryBackground.contains("@color/elon_button_primary_bg"))

@@ -83,7 +83,7 @@ internal class AppUpdateSheet(
         versionMeta.text = buildString {
             append("v${updateVersion.versionName}")
             if (updateVersion.fileSize > 0L) append(" · ${formatUpdateBytes(updateVersion.fileSize)}")
-            append(" · 可后台下载")
+            append(" · 支持后台续传")
         }
         changelog.text = updateVersion.changelog.ifBlank { "稳定性与体验优化" }
         val snapshot = store.snapshot()?.takeIf { it.versionCode == updateVersion.versionCode }
@@ -112,11 +112,11 @@ internal class AppUpdateSheet(
 
     private fun renderAvailable(updateVersion: AppUpdateVersion) {
         title.text = "发现新版本"
-        setStatus("已准备好，可在后台下载", R.color.elon_status_success)
+        setStatus("已准备好，离开此页面仍可继续下载", R.color.elon_status_success)
         progressGroup.visibility = View.GONE
         changelogGroup.visibility = View.VISIBLE
         setButtons(
-            primary = "后台下载",
+            primary = "开始下载",
             secondary = if (updateVersion.forceUpdate) null else "稍后提醒",
             onPrimary = { startDownload(updateVersion) },
             onSecondary = {
@@ -128,20 +128,33 @@ internal class AppUpdateSheet(
     }
 
     private fun renderDownloading(snapshot: AppUpdateSnapshot, queued: Boolean) {
-        title.text = if (queued) "等待网络连接" else "正在后台下载"
+        val waitingForNetwork = queued && snapshot.errorMessage.isNotBlank()
+        title.text = when {
+            waitingForNetwork -> "等待网络恢复"
+            queued -> "正在启动下载"
+            else -> "正在后台下载"
+        }
         setStatus(
-            if (queued) "任务已加入后台队列" else "离开此页面也会继续下载",
-            if (queued) R.color.elon_status_project else R.color.elon_status_info,
+            when {
+                waitingForNetwork -> snapshot.errorMessage
+                queued -> "任务已交给系统下载服务，无需退出一龙"
+                else -> "离开此页面也会继续下载"
+            },
+            if (waitingForNetwork) R.color.elon_status_project else R.color.elon_status_info,
         )
         progressGroup.visibility = View.VISIBLE
         changelogGroup.visibility = View.GONE
-        progress.isIndeterminate = snapshot.totalBytes <= 0L || queued
+        progress.isIndeterminate = snapshot.totalBytes <= 0L
         progress.progress = snapshot.progressPercent
-        progressPercent.text = if (queued) "等待中" else "${snapshot.progressPercent}%"
+        progressPercent.text = when {
+            snapshot.totalBytes > 0L && snapshot.downloadedBytes > 0L -> "${snapshot.progressPercent}%"
+            queued -> "准备中"
+            else -> "${snapshot.progressPercent}%"
+        }
         progressDetail.text = progressDetail(snapshot)
-        sourceText.text = snapshot.sourceName.ifBlank { "正在选择稳定的下载源" }
+        sourceText.text = snapshot.sourceName.ifBlank { "正在连接官方下载源" }
         setButtons(
-            primary = "隐藏到后台",
+            primary = "收起下载面板",
             secondary = if (version?.forceUpdate == true) null else "取消下载",
             onPrimary = {
                 explicitAction = true
@@ -161,7 +174,7 @@ internal class AppUpdateSheet(
         progressDetail.text = formatUpdateBytes(snapshot.downloadedBytes)
         sourceText.text = "校验完成前不会启动系统安装器"
         setButtons(
-            primary = "隐藏到后台",
+            primary = "收起下载面板",
             secondary = null,
             onPrimary = {
                 explicitAction = true
