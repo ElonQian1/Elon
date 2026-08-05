@@ -15,7 +15,11 @@ use crate::node_agent_compute_plugin_host::{
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
+mod meta;
+mod persistence;
+mod projection;
 mod types;
+mod write;
 
 pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginCandidateStagingReceipt, HashedComputePluginCandidateStagingReceipt,
@@ -171,6 +175,16 @@ impl ComputePluginPostRevalidationStagingAuthoritySession<'_> {
                 candidate_slot_ref: current.candidate_slot_ref,
                 candidate_release: current.candidate_release,
             })
+        })
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn persist_candidate_staging(
+        &self,
+        permit: crate::node_agent_compute_plugin_host::candidate_staging_contract::ValidatedCandidateStagingStorePermit<'_>,
+    ) -> Result<HashedComputePluginCandidateStagingReceipt> {
+        self.validate_source(permit.cancellation_guard())?;
+        self.authority.with_immediate(|transaction| {
+            write::persist_candidate_staging(transaction, self, permit)
         })
     }
 }
