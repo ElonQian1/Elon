@@ -119,3 +119,16 @@ pub(crate) fn list_history_for_platform_admin(
 ) -> Result<Vec<ComputeSettlementChallengeHistoryItem>> {
     store.list_compute_settlement_challenge_history_for_platform_admin(limit)
 }
+
+pub(crate) fn list_history_for_provider_owner(
+    store: &Store,
+    user_id: &str,
+    provider_id: &str,
+    limit: usize,
+) -> Result<Vec<ComputeSettlementChallengeHistoryItem>> {
+    let provider = store.compute_provider(provider_id)?;
+    if provider.provider.owner_account_id != user_id {
+        bail!("算力 Provider 不属于当前登录用户");
+    }
+    store.list_compute_settlement_challenge_history_for_provider(provider_id, limit)
+}

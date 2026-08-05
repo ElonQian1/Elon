@@ -136,23 +136,38 @@ impl Store {
         limit: usize,
     ) -> Result<Vec<ComputeSettlementChallengeHistoryItem>> {
         support::validate_exact("消费者用户 ID", consumer_user_id, 240)?;
-        self.list_compute_settlement_challenge_history(Some(consumer_user_id), limit)
+        self.list_compute_settlement_challenge_history(Some(consumer_user_id), None, limit)
     }
 
     pub(crate) fn list_compute_settlement_challenge_history_for_platform_admin(
         &self,
         limit: usize,
     ) -> Result<Vec<ComputeSettlementChallengeHistoryItem>> {
-        self.list_compute_settlement_challenge_history(None, limit)
+        self.list_compute_settlement_challenge_history(None, None, limit)
+    }
+
+    pub(crate) fn list_compute_settlement_challenge_history_for_provider(
+        &self,
+        provider_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ComputeSettlementChallengeHistoryItem>> {
+        support::validate_exact("Provider ID", provider_id, 240)?;
+        self.list_compute_settlement_challenge_history(None, Some(provider_id), limit)
     }
 
     fn list_compute_settlement_challenge_history(
         &self,
         consumer_user_id: Option<&str>,
+        provider_account_id: Option<&str>,
         limit: usize,
     ) -> Result<Vec<ComputeSettlementChallengeHistoryItem>> {
         let conn = self.conn()?;
-        list_challenge_history_on(&conn, consumer_user_id, limit.clamp(1, 100))
+        list_challenge_history_on(
+            &conn,
+            consumer_user_id,
+            provider_account_id,
+            limit.clamp(1, 100),
+        )
     }
 
     fn list_open_compute_settlement_challenges(

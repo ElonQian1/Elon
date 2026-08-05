@@ -33,29 +33,37 @@ pub(crate) struct ComputeSettlementChallengeHistoryItem {
 pub(super) fn list_challenge_history_on(
     conn: &Connection,
     consumer_user_id: Option<&str>,
+    provider_account_id: Option<&str>,
     limit: usize,
 ) -> Result<Vec<ComputeSettlementChallengeHistoryItem>> {
     let mut statement = conn.prepare(
         "SELECT challenge.lease_id
            FROM compute_settlement_challenges challenge
           WHERE (?1 IS NULL OR challenge.consumer_account_id=?1)
+            AND (?2 IS NULL OR challenge.provider_account_id=?2)
           ORDER BY challenge.opened_at DESC,
                    challenge.challenge_id DESC
-          LIMIT ?2",
+          LIMIT ?3",
     )?;
     let lease_ids = statement
-        .query_map(params![consumer_user_id, limit as i64], |row| row.get(0))?
+        .query_map(
+            params![consumer_user_id, provider_account_id, limit as i64],
+            |row| row.get(0),
+        )?
         .collect::<rusqlite::Result<Vec<String>>>()?;
 
     lease_ids
         .into_iter()
-        .map(|lease_id| build_history_item_on(conn, consumer_user_id, &lease_id))
+        .map(|lease_id| {
+            build_history_item_on(conn, consumer_user_id, provider_account_id, &lease_id)
+        })
         .collect()
 }
 
 fn build_history_item_on(
     conn: &Connection,
     expected_consumer_user_id: Option<&str>,
+    expected_provider_account_id: Option<&str>,
     lease_id: &str,
 ) -> Result<ComputeSettlementChallengeHistoryItem> {
     let settlement = compute_attempt_settlement_on(conn, lease_id)?;
@@ -70,6 +78,11 @@ fn build_history_item_on(
     if let Some(expected) = expected_consumer_user_id {
         if challenge.consumer_account_id != expected {
             bail!("结算挑战历史返回了其他消费者的记录");
+        }
+    }
+    if let Some(expected) = expected_provider_account_id {
+        if challenge.provider_account_id != expected {
+            bail!("结算挑战历史返回了其他 Provider 的记录");
         }
     }
 
