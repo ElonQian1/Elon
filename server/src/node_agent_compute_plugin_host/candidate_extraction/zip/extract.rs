@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    io::Cursor,
     time::Instant,
 };
 
@@ -13,9 +14,11 @@ use super::{
     },
     types::{
         ComputePluginArchiveExtractionFailure, ComputePluginExtractedArchiveEvidence,
-        ComputePluginExtractedFileEvidence, ExtractedComputePluginCandidateArchive,
+        ComputePluginExtractedFileEvidence, ComputePluginStagingSealEvidence,
+        ComputePluginStagingSealPayload, ExtractedComputePluginCandidateArchive,
         HashedComputePluginExtractedArchiveEvidence, EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA,
-        HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA,
+        HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA, STAGING_SEAL_EVIDENCE_SCHEMA,
+        STAGING_SEAL_PAYLOAD_SCHEMA,
     },
 };
 use crate::{
@@ -105,21 +108,79 @@ pub(in crate::node_agent_compute_plugin_host) fn extract_verified_compute_plugin
             ));
         }
     };
+    let evidence = HashedComputePluginExtractedArchiveEvidence {
+        schema: HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA.to_string(),
+        evidence: extracted.evidence,
+        canonicalization: "RFC8785-JCS".to_string(),
+        digest_algorithm: "sha256".to_string(),
+        evidence_digest,
+    };
+    let cancellation = verified.snapshot_cancellation_guard();
+    let (seal, seal_evidence, seal_completed_at) =
+        match write_staging_seal(&staging, &plan, &evidence, || cancellation.ensure_current()) {
+            Ok(seal) => seal,
+            Err(error) => {
+                return Err(extraction_failure(
+                    error,
+                    verified,
+                    Some(staging_run_digest),
+                    true,
+                ));
+            }
+        };
     Ok(ExtractedComputePluginCandidateArchive {
         plan,
-        evidence: HashedComputePluginExtractedArchiveEvidence {
-            schema: HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA.to_string(),
-            evidence: extracted.evidence,
-            canonicalization: "RFC8785-JCS".to_string(),
-            digest_algorithm: "sha256".to_string(),
-            evidence_digest,
-        },
+        evidence,
         verified,
         staging,
         directories: extracted.directories,
         files: extracted.files,
-        completed_at: extracted.completed_at,
+        seal,
+        seal_evidence,
+        completed_at: extracted.completed_at.max(seal_completed_at),
     })
+}
+
+fn write_staging_seal(
+    staging: &PreparedComputePluginCandidateStaging<'_>,
+    plan: &ValidatedComputePluginArchiveExtractionPlan,
+    evidence: &HashedComputePluginExtractedArchiveEvidence,
+    mut ensure_current: impl FnMut() -> Result<()>,
+) -> Result<(PinnedManagedFile, ComputePluginStagingSealEvidence, Instant)> {
+    let payload = ComputePluginStagingSealPayload {
+        schema: STAGING_SEAL_PAYLOAD_SCHEMA.to_string(),
+        installation_id_digest: evidence.evidence.installation_id_digest.clone(),
+        root_identity_digest: evidence.evidence.root_identity_digest.clone(),
+        candidate_token_digest: evidence.evidence.candidate_token_digest.clone(),
+        staging_run_digest: evidence.evidence.staging_run_digest.clone(),
+        extraction_plan_digest: plan.envelope().plan_digest.clone(),
+        extraction_evidence_digest: evidence.evidence_digest.clone(),
+        extracted_file_count: evidence.evidence.extracted_file_count,
+        extracted_bytes: evidence.evidence.extracted_bytes,
+    };
+    let payload_digest = jcs_sha256_hex(&payload)?;
+    let bytes = serde_json::to_vec(&payload).context("COMPUTE_PLUGIN_STAGING_SEAL_JSON")?;
+    let expected_len = u64::try_from(bytes.len()).context("COMPUTE_PLUGIN_STAGING_SEAL_SIZE")?;
+    ensure_current()?;
+    let mut seal = staging.create_new_seal_file()?;
+    let copied = seal.copy_reader_sync_hash_and_revalidate(
+        &mut Cursor::new(bytes),
+        expected_len,
+        &mut ensure_current,
+    )?;
+    let size_bytes = i64::try_from(expected_len).context("COMPUTE_PLUGIN_STAGING_SEAL_SIZE")?;
+    let completed_at = copied.completed_at();
+    let seal_evidence = ComputePluginStagingSealEvidence {
+        schema: STAGING_SEAL_EVIDENCE_SCHEMA.to_string(),
+        payload,
+        canonicalization: "RFC8785-JCS".to_string(),
+        digest_algorithm: "sha256".to_string(),
+        payload_digest,
+        file_digest: copied.digest().to_string(),
+        file_identity_digest: seal.identity_digest().to_string(),
+        size_bytes,
+    };
+    Ok((seal, seal_evidence, completed_at))
 }
 
 struct ExtractedArchiveParts {

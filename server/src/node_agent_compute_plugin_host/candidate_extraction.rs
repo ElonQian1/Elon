@@ -12,6 +12,7 @@ use super::{
     },
     signed_artifact_verification::jcs_sha256_hex,
 };
+use crate::node_agent_compute_plugin_host::fetch_file::COMPUTE_PLUGIN_STAGING_SEAL_FILE;
 
 mod zip;
 
@@ -256,6 +257,10 @@ fn collect_expected_directories(
 fn portable_extraction_path_key(value: &str) -> Result<String> {
     if !is_normalized_relative_path(value)
         || !value.is_ascii()
+        || value
+            .split('/')
+            .next()
+            .is_some_and(|segment| segment.eq_ignore_ascii_case(COMPUTE_PLUGIN_STAGING_SEAL_FILE))
         || value.split('/').any(|segment| {
             segment.len() > MAX_PORTABLE_PATH_SEGMENT_BYTES
                 || segment.ends_with('.')
@@ -266,7 +271,7 @@ fn portable_extraction_path_key(value: &str) -> Result<String> {
                 || is_windows_reserved_segment(segment)
         })
     {
-        bail!("COMPUTE_PLUGIN_ARCHIVE_PATH_NOT_PORTABLE");
+        bail!("COMPUTE_PLUGIN_ARCHIVE_PATH_NOT_PORTABLE_OR_RESERVED");
     }
     Ok(value.to_ascii_lowercase())
 }

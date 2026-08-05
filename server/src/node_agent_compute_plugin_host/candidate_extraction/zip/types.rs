@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use anyhow::Error;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::super::ValidatedComputePluginArchiveExtractionPlan;
 use crate::{
@@ -16,6 +16,9 @@ pub(super) const EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA: &str =
     "elon.compute_plugin.extracted_archive_evidence.v1";
 pub(super) const HASHED_EXTRACTED_ARCHIVE_EVIDENCE_SCHEMA: &str =
     "elon.compute_plugin.hashed_extracted_archive_evidence.v1";
+pub(super) const STAGING_SEAL_PAYLOAD_SCHEMA: &str = "elon.compute_plugin.staging_seal_payload.v1";
+pub(super) const STAGING_SEAL_EVIDENCE_SCHEMA: &str =
+    "elon.compute_plugin.staging_seal_evidence.v1";
 
 #[derive(Debug, Serialize)]
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginExtractedFileEvidence {
@@ -47,6 +50,32 @@ pub(in crate::node_agent_compute_plugin_host) struct HashedComputePluginExtracte
     pub evidence_digest: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(in crate::node_agent_compute_plugin_host) struct ComputePluginStagingSealPayload {
+    pub schema: String,
+    pub installation_id_digest: String,
+    pub root_identity_digest: String,
+    pub candidate_token_digest: String,
+    pub staging_run_digest: String,
+    pub extraction_plan_digest: String,
+    pub extraction_evidence_digest: String,
+    pub extracted_file_count: i64,
+    pub extracted_bytes: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub(in crate::node_agent_compute_plugin_host) struct ComputePluginStagingSealEvidence {
+    pub schema: String,
+    pub payload: ComputePluginStagingSealPayload,
+    pub canonicalization: String,
+    pub digest_algorithm: String,
+    pub payload_digest: String,
+    pub file_digest: String,
+    pub file_identity_digest: String,
+    pub size_bytes: i64,
+}
+
 /// Extracted files remain handle-pinned beside the raw verified artifacts. This custody is not a
 /// durable Store receipt and cannot be used as an installed, healthy or promotable slot.
 #[must_use = "extracted archive custody must be resolved by the candidate staging Store"]
@@ -57,6 +86,8 @@ pub(in crate::node_agent_compute_plugin_host) struct ExtractedComputePluginCandi
     pub(super) staging: PreparedComputePluginCandidateStaging<'root>,
     pub(super) directories: Vec<PinnedManagedDirectory>,
     pub(super) files: Vec<PinnedManagedFile>,
+    pub(super) seal: PinnedManagedFile,
+    pub(super) seal_evidence: ComputePluginStagingSealEvidence,
     pub(super) completed_at: Instant,
 }
 
@@ -112,6 +143,7 @@ impl std::fmt::Debug for ExtractedComputePluginCandidateArchive<'_> {
             .field("staging", &self.staging)
             .field("directory_count", &self.directories.len())
             .field("file_count", &self.files.len())
+            .field("seal", &"<retained>")
             .field("completed_at", &"<monotonic>")
             .finish()
     }
@@ -132,5 +164,11 @@ impl ExtractedComputePluginCandidateArchive<'_> {
 
     pub(in crate::node_agent_compute_plugin_host) fn completed_at(&self) -> Instant {
         self.completed_at
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn seal_evidence(
+        &self,
+    ) -> &ComputePluginStagingSealEvidence {
+        &self.seal_evidence
     }
 }

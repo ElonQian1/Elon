@@ -15,6 +15,8 @@ use crate::{
 };
 
 const STAGING_DIRECTORY: &str = "staging";
+pub(in crate::node_agent_compute_plugin_host) const COMPUTE_PLUGIN_STAGING_SEAL_FILE: &str =
+    ".elon-staging-seal.json";
 
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginStagingPrepareFailure {
     error: Error,
@@ -85,6 +87,18 @@ impl PreparedComputePluginCandidateStaging<'_> {
             .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_STAGING_FILE_NAME_MISSING"))?;
         let directory = self.root.root.pin_existing_directory(parent)?;
         directory.create_new_read_write(name).map_err(open_error)
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn create_new_seal_file(
+        &self,
+    ) -> Result<PinnedManagedFile> {
+        let directory = self
+            .root
+            .root
+            .pin_existing_directory(Path::new(&self.relative_root))?;
+        directory
+            .create_new_read_write(OsStr::new(COMPUTE_PLUGIN_STAGING_SEAL_FILE))
+            .map_err(open_error)
     }
 
     fn descendant_path(&self, relative: &str) -> Result<std::path::PathBuf> {

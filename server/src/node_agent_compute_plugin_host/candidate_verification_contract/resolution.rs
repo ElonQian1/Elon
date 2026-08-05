@@ -236,6 +236,12 @@ impl VerifiedComputePluginCandidateArtifactSet {
         self.recovery_key.candidate_token_digest()
     }
 
+    pub(in crate::node_agent_compute_plugin_host) fn snapshot_cancellation_guard(
+        &self,
+    ) -> ComputePluginFetchCancellationGuard {
+        self.pinned.cancellation_guard.clone()
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn with_verified_package_file<T>(
         &mut self,
         item_index: usize,
