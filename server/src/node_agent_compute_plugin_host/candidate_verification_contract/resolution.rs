@@ -280,6 +280,15 @@ impl VerifiedComputePluginCandidateArtifactSet {
         }
         operation(&mut package.file, cancellation_guard)
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn into_cleanup_parts(
+        self,
+    ) -> (
+        Vec<super::PinnedComputePluginCleanupArtifact>,
+        crate::node_agent_compute_plugin_host::fetch_file::PinnedComputePluginCandidateDownloads,
+    ) {
+        self.pinned.into_cleanup_parts()
+    }
 }
 
 impl RejectedComputePluginCandidateArtifactSetCustody {

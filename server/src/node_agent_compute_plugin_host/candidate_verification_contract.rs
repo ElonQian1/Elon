@@ -94,6 +94,12 @@ struct PinnedComputePluginCandidateArtifact {
     file: PinnedManagedFile,
 }
 
+pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginCleanupArtifact {
+    pub(in crate::node_agent_compute_plugin_host) logical_path: String,
+    pub(in crate::node_agent_compute_plugin_host) expected_digest: String,
+    pub(in crate::node_agent_compute_plugin_host) file: PinnedManagedFile,
+}
+
 /// A new authenticated time observation has re-read the same durable projection after pinning.
 /// The begin contract consumes this value and still performs a third read and CAS inside one
 /// `BEGIN IMMEDIATE` transaction before returning a hash authorization.
@@ -115,6 +121,26 @@ impl fmt::Debug for PinnedComputePluginCandidateArtifactSet {
             .field("file_set_binding_digest", &"<redacted>")
             .field("pin_completed_at", &"<monotonic>")
             .finish()
+    }
+}
+
+impl PinnedComputePluginCandidateArtifactSet {
+    fn into_cleanup_parts(
+        self,
+    ) -> (
+        Vec<PinnedComputePluginCleanupArtifact>,
+        PinnedComputePluginCandidateDownloads,
+    ) {
+        let artifacts = self
+            .artifacts
+            .into_iter()
+            .map(|artifact| PinnedComputePluginCleanupArtifact {
+                logical_path: artifact.part_relative_path,
+                expected_digest: artifact.expected_digest,
+                file: artifact.file,
+            })
+            .collect();
+        (artifacts, self._candidate_directory)
     }
 }
 

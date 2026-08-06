@@ -105,6 +105,22 @@ pub(in crate::node_agent_compute_plugin_host) struct ExtractedComputePluginCandi
     pub(super) completed_at: Instant,
 }
 
+pub(in crate::node_agent_compute_plugin_host) struct ExtractedComputePluginCandidateCleanupParts<
+    'root,
+> {
+    pub(in crate::node_agent_compute_plugin_host) evidence:
+        HashedComputePluginExtractedArchiveEvidence,
+    pub(in crate::node_agent_compute_plugin_host) verified:
+        VerifiedComputePluginCandidateArtifactSet,
+    pub(in crate::node_agent_compute_plugin_host) staging:
+        PreparedComputePluginCandidateStaging<'root>,
+    pub(in crate::node_agent_compute_plugin_host) directories:
+        Vec<(String, PinnedManagedDirectory)>,
+    pub(in crate::node_agent_compute_plugin_host) files: Vec<(String, String, PinnedManagedFile)>,
+    pub(in crate::node_agent_compute_plugin_host) seal: PinnedManagedFile,
+    pub(in crate::node_agent_compute_plugin_host) seal_evidence: ComputePluginStagingSealEvidence,
+}
+
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginArchiveExtractionFailure {
     pub(super) error: Error,
     pub(super) verified: VerifiedComputePluginCandidateArtifactSet,
@@ -202,5 +218,63 @@ impl ExtractedComputePluginCandidateArchive<'_> {
         &self,
     ) -> ComputePluginFetchCancellationGuard {
         self.verified.snapshot_cancellation_guard()
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn pin_cleanup_ancestors(
+        &self,
+    ) -> anyhow::Result<(PinnedManagedDirectory, PinnedManagedDirectory)> {
+        self.staging
+            .pin_cleanup_ancestors(&self.evidence.evidence.candidate_token_digest)
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn validate_cleanup_custody(
+        &self,
+    ) -> anyhow::Result<()> {
+        if self.files.len() != self.evidence.evidence.files.len()
+            || self.directories.len() != self.plan.envelope().plan.directories.len()
+            || self.seal.identity_digest() != self.seal_evidence.file_identity_digest
+        {
+            anyhow::bail!("COMPUTE_PLUGIN_CLEANUP_STAGING_CUSTODY_CHANGED");
+        }
+        for (file, evidence) in self.files.iter().zip(&self.evidence.evidence.files) {
+            if file.identity_digest() != evidence.file_identity_digest {
+                anyhow::bail!("COMPUTE_PLUGIN_CLEANUP_STAGING_FILE_CHANGED");
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'root> ExtractedComputePluginCandidateArchive<'root> {
+    pub(in crate::node_agent_compute_plugin_host) fn into_cleanup_parts(
+        self,
+    ) -> ExtractedComputePluginCandidateCleanupParts<'root> {
+        let directories = self
+            .plan
+            .envelope()
+            .plan
+            .directories
+            .iter()
+            .cloned()
+            .zip(self.directories)
+            .collect();
+        let files = self
+            .evidence
+            .evidence
+            .files
+            .iter()
+            .map(|file| (file.relative_path.clone(), file.digest.clone()))
+            .zip(self.files)
+            .map(|((path, digest), file)| (path, digest, file))
+            .collect();
+        ExtractedComputePluginCandidateCleanupParts {
+            evidence: self.evidence,
+            verified: self.verified,
+            staging: self.staging,
+            directories,
+            files,
+            seal: self.seal,
+            seal_evidence: self.seal_evidence,
+        }
     }
 }

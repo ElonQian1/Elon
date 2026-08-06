@@ -85,6 +85,12 @@ impl PinnedComputePluginCandidateDownloads {
             .open_existing_read_only_cleanup_child(file_name)
             .map_err(managed_open_error)
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn into_cleanup_parts(
+        self,
+    ) -> (PinnedManagedDirectory, ComputePluginRootLockLease) {
+        (self.directory, self.root_lock_lease)
+    }
 }
 
 impl fmt::Debug for PinnedComputePluginCandidateDownloads {

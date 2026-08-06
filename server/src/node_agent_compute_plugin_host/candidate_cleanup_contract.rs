@@ -22,12 +22,19 @@ use super::{
 };
 
 mod adoption;
+mod execution;
 mod recovery_key;
 
 pub(in crate::node_agent_compute_plugin_host) use adoption::{
     adopt_recovered_candidate_cleanup_authorization,
     CandidateCleanupAuthorizationRecoveryAdoptionFailure,
     CandidateCleanupAuthorizationRecoveryAdoptionPhase,
+};
+pub(in crate::node_agent_compute_plugin_host) use execution::{
+    prepare_candidate_cleanup_execution, resume_candidate_cleanup_execution,
+    CandidateCleanupExecutionFailure, CandidateCleanupExecutionPreparationFailure,
+    CandidateCleanupExecutionState, ComputePluginCandidateCleanupExecutionEvidence,
+    HashedComputePluginCandidateCleanupExecutionEvidence, PhysicallyExecutedCandidateCleanup,
 };
 pub(in crate::node_agent_compute_plugin_host) use recovery_key::{
     CandidateCleanupAuthorizationReceiptExpectation, CandidateCleanupAuthorizationRecoveryKey,
@@ -247,6 +254,12 @@ impl<'permit, 'root> ValidatedCandidateCleanupAuthorizationPermit<'permit, 'root
 }
 
 impl AuthorizedCandidateCleanup<'_> {
+    pub(in crate::node_agent_compute_plugin_host) fn quarantined(
+        &self,
+    ) -> &DurableCandidateHealthQuarantine<'_> {
+        &self.quarantined
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn receipt(
         &self,
     ) -> &HashedComputePluginCandidateCleanupAuthorizationReceipt {
