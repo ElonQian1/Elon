@@ -28,6 +28,13 @@ pub(super) fn create_new_directory_relative(
     Err(unsupported())
 }
 
+pub(super) fn open_directory_relative_deletable(
+    _parent: &File,
+    _name: &OsStr,
+) -> std::io::Result<File> {
+    Err(unsupported())
+}
+
 pub(super) fn open_existing_file_relative(
     _parent: &File,
     _name: &OsStr,
@@ -41,6 +48,17 @@ pub(super) fn canonical_path(_file: &File) -> std::io::Result<PathBuf> {
 }
 
 pub(super) fn create_new_file_relative(_parent: &File, _name: &OsStr) -> std::io::Result<File> {
+    Err(unsupported())
+}
+
+pub(super) fn open_existing_file_relative_deletable(
+    _parent: &File,
+    _name: &OsStr,
+) -> std::io::Result<File> {
+    Err(unsupported())
+}
+
+pub(super) fn delete_by_handle(_file: &File) -> std::io::Result<()> {
     Err(unsupported())
 }
 

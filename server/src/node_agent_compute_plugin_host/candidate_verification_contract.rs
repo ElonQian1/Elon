@@ -8,7 +8,10 @@ use crate::node_agent_managed_fs::PinnedManagedFile;
 
 use super::{
     fetch_contract::ComputePluginFetchCancellationGuard,
-    fetch_file::{pin_existing_candidate_downloads, PinnedComputePluginRoot},
+    fetch_file::{
+        pin_existing_candidate_downloads, PinnedComputePluginCandidateDownloads,
+        PinnedComputePluginRoot,
+    },
     install_plan_admission::{
         validate_inventory, validate_live_binding, validate_plan_window,
         AdmittedComputePluginInstallPlan,
@@ -20,7 +23,6 @@ use super::{
         ComputePluginFetchAuthoritySession, ComputePluginPostPinVerificationAuthoritySession,
     },
     manifest_validation::is_sha256,
-    root_lock::ComputePluginRootLockLease,
     signed_artifact_verification::jcs_sha256_hex,
 };
 
@@ -80,7 +82,7 @@ pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginCandidat
     pin_completed_at: Instant,
     cancellation_guard: ComputePluginFetchCancellationGuard,
     artifacts: Vec<PinnedComputePluginCandidateArtifact>,
-    _root_lock: ComputePluginRootLockLease,
+    _candidate_directory: PinnedComputePluginCandidateDownloads,
 }
 
 struct PinnedComputePluginCandidateArtifact {
@@ -190,7 +192,6 @@ pub(in crate::node_agent_compute_plugin_host) fn pin_candidate_artifact_set(
         &root_identity_digest,
         &pinned_artifacts,
     )?;
-    let root_lock = candidate_directory.into_root_lock_lease();
     Ok(PinnedComputePluginCandidateArtifactSet {
         verification_id,
         candidate_token: candidate.candidate_token().to_string(),
@@ -201,7 +202,7 @@ pub(in crate::node_agent_compute_plugin_host) fn pin_candidate_artifact_set(
         pin_completed_at: Instant::now(),
         cancellation_guard,
         artifacts: pinned_artifacts,
-        _root_lock: root_lock,
+        _candidate_directory: candidate_directory,
     })
 }
 

@@ -23,12 +23,14 @@ use windows_sys::{
             RtlNtStatusToDosError, HANDLE, INVALID_HANDLE_VALUE, NTSTATUS, UNICODE_STRING,
         },
         Storage::FileSystem::{
-            FileIdInfo, GetFileInformationByHandle, GetFileInformationByHandleEx,
-            GetFinalPathNameByHandleW, BY_HANDLE_FILE_INFORMATION, FILE_ATTRIBUTE_DIRECTORY,
-            FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_BACKUP_SEMANTICS,
-            FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_ID_INFO,
-            FILE_NAME_NORMALIZED, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_TRAVERSE,
-            SYNCHRONIZE, VOLUME_NAME_GUID,
+            FileDispositionInfoEx, FileIdInfo, GetFileInformationByHandle,
+            GetFileInformationByHandleEx, GetFinalPathNameByHandleW, SetFileInformationByHandle,
+            BY_HANDLE_FILE_INFORMATION, DELETE, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL,
+            FILE_ATTRIBUTE_REPARSE_POINT, FILE_DISPOSITION_FLAG_DELETE,
+            FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE, FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
+            FILE_DISPOSITION_INFO_EX, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+            FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_ID_INFO, FILE_NAME_NORMALIZED,
+            FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_TRAVERSE, SYNCHRONIZE, VOLUME_NAME_GUID,
         },
         System::{Kernel::OBJ_CASE_INSENSITIVE, IO::IO_STATUS_BLOCK},
     },
@@ -63,8 +65,22 @@ pub(super) fn create_new_directory_relative(parent: &File, name: &OsStr) -> std:
     open_relative(
         parent,
         name,
-        FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRONIZE,
+        FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRONIZE | DELETE,
         FILE_CREATE,
+        FILE_DIRECTORY_FILE | NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
+        FILE_SHARE_READ,
+    )
+}
+
+pub(super) fn open_directory_relative_deletable(
+    parent: &File,
+    name: &OsStr,
+) -> std::io::Result<File> {
+    open_relative(
+        parent,
+        name,
+        FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRONIZE | DELETE,
+        FILE_OPEN,
         FILE_DIRECTORY_FILE | NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
         FILE_SHARE_READ,
     )
@@ -94,11 +110,47 @@ pub(super) fn create_new_file_relative(parent: &File, name: &OsStr) -> std::io::
     open_relative(
         parent,
         name,
-        FILE_GENERIC_READ | FILE_GENERIC_WRITE,
+        FILE_GENERIC_READ | FILE_GENERIC_WRITE | DELETE,
         FILE_CREATE,
         FILE_NON_DIRECTORY_FILE | NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
         0,
     )
+}
+
+pub(super) fn open_existing_file_relative_deletable(
+    parent: &File,
+    name: &OsStr,
+) -> std::io::Result<File> {
+    open_relative(
+        parent,
+        name,
+        FILE_GENERIC_READ | DELETE,
+        FILE_OPEN,
+        FILE_NON_DIRECTORY_FILE | NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
+        0,
+    )
+}
+
+pub(super) fn delete_by_handle(file: &File) -> std::io::Result<()> {
+    let disposition = FILE_DISPOSITION_INFO_EX {
+        Flags: FILE_DISPOSITION_FLAG_DELETE
+            | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS
+            | FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE,
+    };
+    // SAFETY: the borrowed File owns a live handle with DELETE access and the immutable input
+    // structure remains valid for the synchronous call.
+    if unsafe {
+        SetFileInformationByHandle(
+            file.as_raw_handle() as HANDLE,
+            FileDispositionInfoEx,
+            (&disposition as *const FILE_DISPOSITION_INFO_EX).cast(),
+            size_of::<FILE_DISPOSITION_INFO_EX>() as u32,
+        )
+    } == 0
+    {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(())
 }
 
 fn open_relative(

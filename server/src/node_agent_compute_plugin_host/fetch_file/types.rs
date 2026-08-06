@@ -82,14 +82,8 @@ impl PinnedComputePluginCandidateDownloads {
             .filter(|_| parent_matches)
             .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_VERIFICATION_FILE_PATH_CHANGED"))?;
         self.directory
-            .open_existing_read_only_child(file_name)
+            .open_existing_read_only_cleanup_child(file_name)
             .map_err(managed_open_error)
-    }
-
-    pub(in crate::node_agent_compute_plugin_host) fn into_root_lock_lease(
-        self,
-    ) -> ComputePluginRootLockLease {
-        self.root_lock_lease
     }
 }
 

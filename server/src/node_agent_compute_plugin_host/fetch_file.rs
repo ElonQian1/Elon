@@ -89,7 +89,7 @@ pub(in crate::node_agent_compute_plugin_host) fn pin_existing_candidate_download
     );
     let directory = root
         .root
-        .pin_existing_directory(Path::new(&relative_directory))?;
+        .pin_existing_directory_for_cleanup(Path::new(&relative_directory))?;
     if directory.filesystem_mutated() {
         bail!("COMPUTE_PLUGIN_VERIFICATION_DIRECTORY_MUTATED");
     }
