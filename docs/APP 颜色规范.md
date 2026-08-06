@@ -1,34 +1,34 @@
 # APP UI 设计规范
 
-最后更新：2026-08-05
+最后更新：2026-08-06
 
 本文件替代旧版“APP 颜色规范”，作为一龙 APP 的完整 UI 设计规范。文件名保留历史路径，方便现有 AI 路由、脚本和说明继续定位；内容以本版为准。任何 APP 页面、主题、颜色、按钮、卡片、列表、底部导航、弹窗、状态标签或项目空间 UI 调整，都必须先遵守本文件；除非任务本身是更新本规范。
 
-本规范以 APK 为设计主版本，并吸收 ElonSpeed Windows 的“静谧夜空”视觉系统，核心风格定义为 **Elon 静谧夜空项目工作台**：深蓝石墨画布承载长期工作，分层的不透明夜空表面建立结构，低饱和雾蓝承担主操作与焦点，青绿黄红分别表达信息、成功、提醒和危险。项目广场进一步收束为 **深空轨道观测舱**：真空黑、枪灰金属、钛色反射边、单一雾蓝信号、校准刻度和稀疏静态星讯。整体要像一件安静、可信的轨道仪器，不做营销页感、游戏启动器感、霓虹灯感或彩色装饰感。
+本规范以 APK 为设计主版本，并吸收 ElonSpeed Windows 的静谧配色，核心风格定义为 **Elon 轨道金属工程工作台**：真空黑画布承载长期工作，枪灰不透明承力面建立结构，窄钛色反射边和雾蓝信号表达操作与焦点，青绿黄红分别表达信息、成功、提醒和危险。项目广场是这套系统中信息密度最高的 **深空轨道观测舱**，额外拥有斜切舱体、校准刻度和稀疏静态星讯。整体要像一件安静、可信、死寂但可读的轨道仪器，不做营销页感、游戏启动器感、霓虹灯感或彩色装饰感。
 
 颜色必须按本表的 Android ARGB / Web HEX 或 RGBA 精确实现，不允许用“相近色”“更亮一点”“差不多的蓝灰”替代。Windows 的桌面控件密度不直接搬到手机；APK 保留 48dp 触控、精选大卡和底部导航，PWA 再镜像 APK。
 
 ## 设计原则
 
-- 夜空优先：我的项目、聊天和项目空间使用 `#0B1017`；项目广场使用更深的真空黑 `#07090D`，系统 chrome 使用 `#070B10`。
-- 结构克制：用 `#111923`、`#172231`、`#1D2A39` 三层不透明表面、细边框、圆角和留白建立层级。
-- 雾蓝动作：主要按钮统一为 `#7AA7FF` 底、`#070B10` 字胶囊，例如“进入空间”“下载 APK”“AI 会话”。
-- 额度周期：个人页 Token 周期按钮保持三等宽胶囊；选中态使用 `#7AA7FF`，未选中态使用 `#172231`，默认选中“7天”。
+- 真空优先：我的项目、聊天、项目空间、个人中心与项目广场统一使用 `#07090D`，系统 chrome 使用 `#05070A`。
+- 结构克制：用 `#0E1116`、`#171C22`、`#252B33` 三层不透明枪灰表面、细钢边、圆角和留白建立层级。
+- 钛金属动作：关键主操作统一使用 `#C2CBD6` → `#95A6B9` → `#71879F` 的低差钛金属面与 `#0B1118` 文字；`#8EA7D5` 雾蓝只承担信号、选中和焦点。
+- 额度周期：个人页 Token 周期按钮保持三等宽胶囊；选中态使用 `#8EA7D5`，未选中态使用 `#171C22`，默认选中“7天”。
 - 状态点缀：青色、绿色、琥珀色、柔红只分别用于信息、成功、提醒、危险，不作为普通大面积装饰。
 - 大字导航：一级页面使用粗体大标题和短下划线表达选中，不使用传统顶部 Tab 条边框。
 - 胶囊筛选：搜索框、筛选项、分段控件均为圆角胶囊，选中态用雾蓝 13% 软底和浅雾蓝文字。
 - 信息密度适中：列表页保持扫描效率，卡片页允许更强留白和更大圆角。
 - 原生工具感：图标使用线性轮廓，菜单使用抬升夜空表面，底部导航采用固定悬浮胶囊，稳定、低干扰。
-- 不做大面积彩色渐变、持续发光、毛玻璃或装饰球；项目广场只允许规范限定的枪灰材质渐变、窄钛色反射边、低透明观测网格与轨道弧线，信号色只出现在用户需要看见的焦点和状态上。
+- 不做大面积彩色渐变、持续发光、毛玻璃或装饰球；全应用允许规范限定的低色差枪灰材质和窄钛色结构缝，项目广场再额外允许低透明观测网格与轨道弧线。信号色只出现在用户需要看见的焦点和状态上。
 
 ## 颜色系统
 
-### 静谧夜空颜色 Token
+### 轨道金属颜色 Token
 
 | 用途 | 设计 Token | Android 建议名 | Web CSS 变量 | HEX | 来源 |
 |---|---|---|---|---:|---|
-| 我的项目列表背景 | `color.bg.mine` | `elon_bg_app` | `--bg` | `#0B1017` | Win 画布映射 |
-| 项目空间内容画布 | `color.bg.canvas` | `elon_bg_canvas` | `--project-space-panel-bg` | `#0B1017` | Win 画布映射 |
+| 全应用真空背景 | `color.bg.mine` | `elon_bg_app` | `--bg` | `#07090D` | APK 全局画布 |
+| 项目空间内容画布 | `color.bg.canvas` | `elon_bg_canvas` | `--project-space-panel-bg` | `#07090D` | APK 全局画布 |
 | 项目广场页面背景 | `color.bg.plaza` | `elon_bg_plaza` | `--plaza-bg` | `#07090D` | 真空黑观测画布 |
 | 项目广场卡片主体 | `color.surface.plaza.card` | `elon_plaza_surface_card` | `--plaza-card` | `#0E1116` | 枪灰舱体暗面 |
 | 项目广场卡片中点 | `color.surface.plaza.card.mid` | `elon_plaza_surface_card_mid` | `--plaza-card-mid` | `#171C22` | 枪灰舱体中间层 |
@@ -51,54 +51,56 @@
 | 项目广场成功状态 | `color.status.plaza.success` | `elon_plaza_status_success` | `--plaza-success` | `#67BEA0` | Win 成功绿；仅状态点和状态文案 |
 | 项目广场危险状态 | `color.status.plaza.danger` | `elon_plaza_status_danger` | `--plaza-danger` | `#E07B84` | Win 柔红；仅异常与审批状态 |
 | 项目广场星讯 / 弧线 | `color.decoration.plaza` | `elon_plaza_constellation` | `--plaza-constellation` | `#2B7FAFBA` | 17% 静态装饰；不可动画 |
-| 详情页顶部背景 | `color.bg.chrome` | `elon_bg_chrome` | `--bg-hint` | `#070B10` | Win 深画布 |
-| 底部导航背景 | `color.nav.bg` | `elon_nav_bg` | `--nav-bg` | `#0A0F16` | Win 侧栏映射 |
-| 列表选中胶囊 | `color.surface.segment.selected` | `elon_segment_selected` | `--nav-active-bg` | `#1F2B40` | 雾蓝 13% 合成表面 |
-| 项目广场卡片主体 | `color.surface.card` | `elon_surface_card` | `--panel` | `#111923` | Win Surface |
-| 卡片头部 / 公告容器 | `color.surface.header` | `elon_surface_header` | `--panel-2` | `#172231` | Win Raised |
-| 搜索框背景 | `color.surface.search` | `elon_surface_search` | `--input-pill-bg` | `#1D2A39` | Win Soft |
+| 详情页顶部背景 | `color.bg.chrome` | `elon_bg_chrome` | `--bg-hint` | `#05070A` | 真空 chrome |
+| 底部导航背景 | `color.nav.bg` | `elon_nav_bg` | `--nav-bg` | `#080B0F` | 枪灰暗舱 |
+| 列表选中胶囊 | `color.surface.segment.selected` | `elon_segment_selected` | `--nav-active-bg` | `#20262E` | 抬升枪灰选中面 |
+| 全应用卡片主体 | `color.surface.card` | `elon_surface_card` | `--panel` | `#0E1116` | 枪灰承力暗面 |
+| 卡片头部 / 公告容器 | `color.surface.header` | `elon_surface_header` | `--panel-2` | `#171C22` | 枪灰抬升层 |
+| 搜索框背景 | `color.surface.search` | `elon_surface_search` | `--input-pill-bg` | `#12161C` | 枪灰输入面 |
 | 圆形悬浮暗按钮 | `color.surface.float` | `elon_surface_float` | `--panel-2` | `#172231` | Win Raised |
-| 圆形按钮描边 | `color.border.float` | `elon_border_subtle` | `--line` | `#3397AECC` | Win border 20% ARGB |
-| 焦点 / 精选轨道 | `color.border.primary` | `elon_border_primary` | `--focus-ring` | `#4D7AA7FF` | Win brand border 30% ARGB |
-| 卡片内分割线 | `color.divider.card` | `elon_divider_card` | `--plaza-divider` | `#1C97AECC` | Win secondary border 11% ARGB |
-| 主操作按钮 / 封面占位 | `color.action.primary` | `elon_button_primary_bg` | `--brand` | `#7AA7FF` | Win 雾蓝品牌色 |
-| 信息提示 | `color.status.info` | `elon_status_info` | `--accent` | `#73C7E8` | Win 青色信号 |
-| 一级 Tab / 广场卡片标题 / 状态文字 | `color.text.primary` | `elon_text_primary` | `--ink` | `#F0F3F8FB` | Win 94% 主文字 ARGB |
-| 我的项目列表项标题 | `color.text.list.title` | `elon_text_list_title` | `--ink-strong` | `#F3F8FB` | Win 主文字实色 |
-| 好友页列表摘要 / 时间 / 项目标识 | `color.text.list.preview` | `elon_text_tertiary` | `--ink-list-preview` | `#7AB5C9D3` | Win 48% 弱文字 ARGB |
-| 详情页居中标题 | `color.text.detail.title` | `elon_text_detail_title` | `--ink-strong` | `#F4F9FC` | Win 高对比标题 |
-| 正文元信息 | `color.text.secondary` | `elon_text_secondary` | `--ink-soft` | `#ADCDDCE4` | Win 68% 次文字 ARGB |
-| 搜索占位 / 空状态 / 公告正文 | `color.text.placeholder` | `elon_text_placeholder` | `--ink-muted` | `#7AB5C9D3` | Win 48% 弱文字 ARGB |
-| 底部导航图标文字 | `color.text.nav` | `elon_text_nav` | `--tab-icon` | `#ADCDDCE4` | Win 68% 次文字 ARGB |
-| 弱提示 / 次弱信息 | `color.text.quiet` | `elon_text_tertiary` | `--ink-faint` | `#7AB5C9D3` | Win 48% 弱文字 ARGB |
-| 雾蓝按钮文字 | `color.text.inverse` | `elon_button_primary_text` | `--brand-ink` | `#070B10` | 主操作上的深色文字 |
-| 弹出菜单文字 | `color.text.menu` | `elon_text_menu` | `--ink` | `#F0F3F8FB` | 抬升夜空菜单文字 |
-| 顶部成员图标 | `color.icon.member` | `elon_icon_member` | `--tab-icon` | `#ADCDDCE4` | 次级图标 |
-| 加号 / 主线性图标 | `color.icon.primary` | `elon_icon_primary` | `--ink` | `#F0F3F8FB` | 主线性图标 |
-| 顶部加号图标 | `color.icon.add.top` | `elon_icon_add_top` | `--tab-icon` | `#ADCDDCE4` | 次级图标 |
-| 底部选中图标 | `color.icon.nav.selected` | `elon_text_accent` | `--tab-active` | `#A8C5FF` | Win selected text |
-| 个人页额度周期选中胶囊 | `color.surface.quota.selected` | `elon_profile_quota_selected` | `--profile-quota-selected` | `#7AA7FF` | 雾蓝主选中 |
+| 圆形按钮描边 | `color.border.float` | `elon_border_subtle` | `--line` | `#526C7884` | 32% 冷钢边界 |
+| 焦点 / 精选轨道 | `color.border.primary` | `elon_border_primary` | `--focus-ring` | `#667B8793` | 冷钢焦点边界 |
+| 卡片内分割线 | `color.divider.card` | `elon_divider_card` | `--plaza-divider` | `#2E7F8994` | 18% 仪器分割线 |
+| 主操作按钮 / 封面占位 | `color.action.primary` | `elon_button_primary_bg` | `--brand` | `#C2CBD6` | 钛金属亮面 |
+| 主操作中间层 | `color.action.primary.mid` | `elon_titanium_mid` | `--brand` 渐变中点 | `#95A6B9` | 钛金属中间层 |
+| 主操作暗面 | `color.action.primary.end` | `elon_titanium_end` | `--brand` 渐变终点 | `#71879F` | 冷钢暗面 |
+| 信息提示 / 校准 | `color.status.info` | `elon_status_info` | `--accent` | `#7FAFBA` | 仪器灰青信号 |
+| 一级 Tab / 广场卡片标题 / 状态文字 | `color.text.primary` | `elon_text_primary` | `--ink` | `#F0F8F7F4` | 94% 暖冷白 ARGB |
+| 我的项目列表项标题 | `color.text.list.title` | `elon_text_list_title` | `--ink-strong` | `#F8F7F4` | 主文字实色 |
+| 好友页列表摘要 / 时间 / 项目标识 | `color.text.list.preview` | `elon_text_tertiary` | `--ink-list-preview` | `#80BEBEBA` | 50% 暖灰弱文字 ARGB |
+| 详情页居中标题 | `color.text.detail.title` | `elon_text_detail_title` | `--ink-strong` | `#F8F7F4` | 高对比标题 |
+| 正文元信息 | `color.text.secondary` | `elon_text_secondary` | `--ink-soft` | `#B3DDDBD5` | 70% 暖灰次文字 ARGB |
+| 搜索占位 / 空状态 / 公告正文 | `color.text.placeholder` | `elon_text_placeholder` | `--ink-muted` | `#80BEBEBA` | 50% 暖灰弱文字 ARGB |
+| 底部导航图标文字 | `color.text.nav` | `elon_text_nav` | `--tab-icon` | `#B3DDDBD5` | 70% 次文字 ARGB |
+| 弱提示 / 次弱信息 | `color.text.quiet` | `elon_text_tertiary` | `--ink-faint` | `#80BEBEBA` | 50% 暖灰弱文字 ARGB |
+| 钛金属按钮文字 | `color.text.inverse` | `elon_button_primary_text` | `--brand-ink` | `#0B1118` | 主操作上的深色文字 |
+| 弹出菜单文字 | `color.text.menu` | `elon_text_menu` | `--ink` | `#F0F8F7F4` | 抬升枪灰菜单文字 |
+| 顶部成员图标 | `color.icon.member` | `elon_icon_member` | `--tab-icon` | `#B3DDDBD5` | 次级图标 |
+| 加号 / 主线性图标 | `color.icon.primary` | `elon_icon_primary` | `--ink` | `#F0F8F7F4` | 主线性图标 |
+| 顶部加号图标 | `color.icon.add.top` | `elon_icon_add_top` | `--tab-icon` | `#B3DDDBD5` | 次级图标 |
+| 底部选中图标 | `color.icon.nav.selected` | `elon_text_accent` | `--tab-active` | `#B4C5E3` | 雾蓝信号文字 |
+| 个人页额度周期选中胶囊 | `color.surface.quota.selected` | `elon_profile_quota_selected` | `--profile-quota-selected` | `#8EA7D5` | 雾蓝信号选中 |
 | 个人页额度周期未选胶囊 | `color.surface.quota.control` | `elon_profile_quota_control` | `--profile-quota-control` | `#172231` | Raised 表面 |
-| 个人页额度周期胶囊描边 | `color.border.quota.control` | `elon_profile_quota_border` | `--profile-quota-border` | `#4D7AA7FF` | 雾蓝 30% ARGB |
-| 我的页账号操作文字 | `color.text.profile.account.action` | `profile_account_action_text` | `--profile-account-action` | `#A8C5FF` | 雾蓝浅文字 |
-| 成功 / 无需审批 / 可安装状态点 | `color.status.success` | `elon_status_success` | `--success` | `#5AC8A0` | Win success |
-| 项目状态 / 待处理提醒 | `color.status.project` | `elon_status_project` | `--warning` | `#E7B86A` | Win warning |
-| 需审批 / 异常状态点 | `color.status.danger` | `elon_status_danger` | `--danger` | `#F07884` | Win danger |
-| 项目空间商店详情背景 | `color.store.detail.bg` | `elon_store_detail_bg` | `--store-detail-bg` | `#0B1017` | 统一画布 |
-| 项目空间商店详情主文字 | `color.store.detail.text.primary` | `elon_store_detail_text_primary` | `--store-detail-ink` | `#F0F3F8FB` | 主文字 |
-| 项目空间商店详情次文字 | `color.store.detail.text.secondary` | `elon_store_detail_text_secondary` | `--store-detail-muted` | `#ADCDDCE4` | 次文字 |
-| 项目空间商店详情链接蓝 | `color.store.detail.link` | `elon_store_detail_link` | `--store-detail-link` | `#A8C5FF` | 雾蓝浅文字 |
-| 项目空间商店详情分隔线 | `color.store.detail.divider` | `elon_store_detail_divider` | `--store-detail-divider` | `#3397AECC` | Win border 20% ARGB |
-| 项目空间商店详情安装按钮 | `color.store.detail.button` | `elon_store_detail_button` | `--store-detail-button` | `#7AA7FF` | 雾蓝主操作 |
-| 项目空间商店详情安装按钮文字 | `color.store.detail.button.text` | `elon_store_detail_button_text` | `--store-detail-button-ink` | `#070B10` | 深色按钮文字 |
+| 个人页额度周期胶囊描边 | `color.border.quota.control` | `elon_profile_quota_border` | `--profile-quota-border` | `#667B8793` | 冷钢边界 |
+| 我的页账号操作文字 | `color.text.profile.account.action` | `profile_account_action_text` | `--profile-account-action` | `#B4C5E3` | 雾蓝信号文字 |
+| 成功 / 无需审批 / 可安装状态点 | `color.status.success` | `elon_status_success` | `--success` | `#67BEA0` | 柔和成功绿 |
+| 项目状态 / 待处理提醒 | `color.status.project` | `elon_status_project` | `--warning` | `#D2B572` | 柔和提醒黄 |
+| 需审批 / 异常状态点 | `color.status.danger` | `elon_status_danger` | `--danger` | `#E07B84` | 柔红危险状态 |
+| 项目空间商店详情背景 | `color.store.detail.bg` | `elon_store_detail_bg` | `--store-detail-bg` | `#07090D` | 统一真空画布 |
+| 项目空间商店详情主文字 | `color.store.detail.text.primary` | `elon_store_detail_text_primary` | `--store-detail-ink` | `#F0F8F7F4` | 主文字 |
+| 项目空间商店详情次文字 | `color.store.detail.text.secondary` | `elon_store_detail_text_secondary` | `--store-detail-muted` | `#B3DDDBD5` | 次文字 |
+| 项目空间商店详情链接蓝 | `color.store.detail.link` | `elon_store_detail_link` | `--store-detail-link` | `#B4C5E3` | 雾蓝信号文字 |
+| 项目空间商店详情分隔线 | `color.store.detail.divider` | `elon_store_detail_divider` | `--store-detail-divider` | `#526C7884` | 冷钢边界 |
+| 项目空间商店详情安装按钮 | `color.store.detail.button` | `elon_store_detail_button` | `--store-detail-button` | `#C2CBD6` | 钛金属亮面 |
+| 项目空间商店详情安装按钮文字 | `color.store.detail.button.text` | `elon_store_detail_button_text` | `--store-detail-button-ink` | `#0B1118` | 深色按钮文字 |
 
 ### 颜色使用规则
 
-- 我的项目、聊天和项目空间内容画布使用 `#0B1017`；项目广场使用真空黑 `#07090D`；顶部与系统 chrome 使用 `#070B10`。
-- 底部导航使用 `#0A0F16`；普通卡片使用 `#111923`，抬升容器使用 `#172231`，搜索和按下表面使用 `#1D2A39`。
-- 常规页面的主操作与选中焦点使用 `#7AA7FF`；项目广场精选大卡的 3dp 信号轨使用 Win 同源 `#8EA7D5`。任何页面都不得把整块背景染成品牌蓝。
-- 青色 `#73C7E8` 仅用于信息和信号；绿色 `#5AC8A0` 仅用于成功、在线、可安装和完成。
-- 琥珀 `#E7B86A` 仅用于注意、项目进度和待处理；柔红 `#F07884` 仅用于需审批、失败和危险。
+- 所有主页面内容画布使用 `#07090D`，顶部与系统 chrome 使用 `#05070A`。
+- 底部导航使用 `#080B0F`；普通卡片使用 `#0E1116`，抬升容器使用 `#171C22`，搜索和按下表面使用 `#12161C` / `#20262E`。
+- 全应用的主操作使用钛金属三段面；`#8EA7D5` 只用于信号轨、选中和焦点。任何页面都不得把整块背景染成雾蓝。
+- 灰青 `#7FAFBA` 仅用于信息、连接和校准；绿色 `#67BEA0` 仅用于成功、在线、可安装和完成。
+- 琥珀 `#D2B572` 仅用于注意、项目进度和待处理；柔红 `#E07B84` 仅用于需审批、失败和危险。
 - 分割线与边框使用表中带透明度的蓝灰，不新增脏灰；焦点使用雾蓝边界，同时保留文字或形状反馈。
 - 精选大卡保留 APK 的尺寸和交互节奏，使用非对称斜切凸形、枪灰三段材质、内外双边、右侧校准轨和窄青蓝信号轨；状态点仍按业务语义着色。PWA 只能镜像，不能反向决定 APK 结构。
 
@@ -354,15 +356,15 @@ Web 变量建议：
 - `--panel-header` 对应 `color.surface.header`。
 - `--segment-selected` 对应 `color.surface.segment.selected`。
 - `--search-bg` 对应 `color.surface.search`。
-- `--brand` 对应雾蓝主按钮背景，`--brand-ink` 对应深夜按钮文字。
-- `--accent` 对应青色信息提示，不代替主操作。
+- `--brand` 对应钛金属主操作亮面，`--brand-ink` 对应深石墨按钮文字。
+- `--accent` 对应灰青信息与校准信号，不代替主操作。
 - `--success`、`--warning`、`--danger` 只用于状态点和状态文本。
 
 ## 禁止项
 
 - 禁止把绿色作为大面积主按钮背景，除非是明确的成功状态。
-- 禁止在规范 token 之外临时发明蓝紫辅助色；品牌蓝与项目广场信号色只用于动作、选中、焦点和精选轨道。
-- 禁止使用大面积彩色渐变、光斑、装饰球、拟物投影。项目广场可使用 `color.decoration.plaza` 绘制一个静态低透明星场和观测弧线，不得动画、发光或覆盖文字。
+- 禁止在规范 token 之外临时发明蓝紫辅助色；雾蓝信号色只用于选中、焦点、连接和精选轨道，不能替代钛金属主操作。
+- 禁止使用大面积彩色渐变、光斑、装饰球、拟物投影。全应用只允许低色差枪灰材质和一条与真实分区或状态绑定的结构缝；项目广场可另用 `color.decoration.plaza` 绘制静态低透明星场和观测弧线，不得动画、发光或覆盖文字。
 - 禁止用卡片包裹所有列表项；我的项目列表应保持透明行。
 - 禁止在深色卡片内再套一层同样视觉重量的卡片。
 - 禁止随意新增黑灰色阶，导致页面出现脏灰、层级混乱。
@@ -372,11 +374,12 @@ Web 变量建议：
 
 | 页面 | 主结构 | 关键组件 |
 |---|---|---|
-| 我的项目 | 夜空底无卡片列表 | 大 Tab、雾蓝软选中胶囊、项目封面、右箭头、底部导航 |
+| 我的项目 | 真空底无卡片列表 | 大 Tab、枪灰选中胶囊、项目封面、右箭头、轨道金属底部导航 |
 | 项目广场 | 深空轨道观测舱 + 精选大卡流 | 缓存优先首屏、斜切枪灰舱体、观测网格、校准刻度、语义状态点、钛金属操作按钮 |
-| 项目空间 | 顶部导航 + 公告 + 夜空内容画布 | 公告容器、抬升菜单、空状态加号、右下 AI 会话按钮 |
-| 个人/我的 | 夜空分组列表 | 底部导航、Raised 行、雾蓝或中性操作入口 |
-| 聊天/好友 | 夜空消息/列表 | 线性图标、雾蓝主动作、Soft 输入胶囊 |
+| 项目空间 | 顶部导航 + 公告 + 真空内容画布 | 枪灰公告容器、抬升菜单、空状态加号、钛金属 AI 会话按钮 |
+| 个人/我的 | 真空分组列表 | 轨道金属底部导航、枪灰结构组、雾蓝信号与钛金属操作入口 |
+| 聊天/好友 | 真空消息/列表 | 线性图标、钛金属用户气泡与发送动作、枪灰输入舱 |
+| 登录/设置/更新/Agent | 单列轨道工程面板 | 一条结构缝、低差枪灰面、深色错误面、钛金属关键动作 |
 
 ## 更新流程
 
