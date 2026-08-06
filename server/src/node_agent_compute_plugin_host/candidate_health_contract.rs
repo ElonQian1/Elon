@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, error::Error as StdError, fmt, time::Instant};
+use std::{error::Error as StdError, fmt, time::Instant};
 
 use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,10 @@ use super::{
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
+mod probe_state;
 mod validation;
+
+use probe_state::CandidateHealthProbeState;
 
 pub(in crate::node_agent_compute_plugin_host) const CANDIDATE_HEALTH_OBSERVATION_SCHEMA: &str =
     "elon.compute_plugin.candidate_health_observation.v1";
@@ -134,14 +137,7 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateHealthEvaluation<'
     staged: StagedComputePluginCandidateArchive<'root>,
     evaluation_id: String,
     binding: CandidateHealthBinding,
-    attempted_probes: i64,
-    successful_probes: i64,
-    consecutive_successes: i64,
-    consecutive_failures: i64,
-    healthy: bool,
-    terminal_unhealthy: bool,
-    reason_codes: BTreeSet<String>,
-    transcript_digest: String,
+    probes: CandidateHealthProbeState,
     started_at: Instant,
     last_probe_at: Option<Instant>,
 }
@@ -195,14 +191,7 @@ pub(in crate::node_agent_compute_plugin_host) fn finalize_candidate_health_evalu
 
 impl CandidateHealthEvaluation<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn progress(&self) -> CandidateHealthProgress {
-        CandidateHealthProgress {
-            attempted_probes: self.attempted_probes,
-            successful_probes: self.successful_probes,
-            consecutive_successes: self.consecutive_successes,
-            consecutive_failures: self.consecutive_failures,
-            healthy: self.healthy,
-            terminal_unhealthy: self.terminal_unhealthy,
-        }
+        self.probes.progress()
     }
 }
 
@@ -286,7 +275,7 @@ impl fmt::Debug for CandidateHealthEvaluation<'_> {
             .debug_struct("CandidateHealthEvaluation")
             .field("evaluation_id", &self.evaluation_id)
             .field("progress", &self.progress())
-            .field("transcript_digest", &"<redacted>")
+            .field("probe_transcript", &"<redacted>")
             .finish()
     }
 }

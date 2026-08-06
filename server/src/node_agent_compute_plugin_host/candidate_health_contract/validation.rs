@@ -6,15 +6,15 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use super::{
-    CandidateHealthBinding, CandidateHealthEvaluation, CandidateHealthEvaluationStartFailure,
-    CandidateHealthFinalizationFailure, CandidateHealthProbeObservation,
-    CandidateHealthProbeOutcome, CandidateHealthProgress, ComputePluginCandidateHealthObservation,
-    HashedComputePluginCandidateHealthObservation, ValidatedCandidateHealthPublication,
-    CANDIDATE_HEALTHY, CANDIDATE_HEALTH_CANONICALIZATION, CANDIDATE_HEALTH_DIGEST_ALGORITHM,
-    CANDIDATE_HEALTH_OBSERVATION_SCHEMA, CANDIDATE_HEALTH_TRANSCRIPT_SCHEMA,
-    HASHED_CANDIDATE_HEALTH_OBSERVATION_SCHEMA, MAX_CANDIDATE_HEALTH_INTERVAL_MS,
-    MAX_CANDIDATE_HEALTH_LIFETIME_SECONDS, MAX_CANDIDATE_HEALTH_PROBES,
-    MAX_CANDIDATE_HEALTH_REASON_CODES, MAX_CANDIDATE_HEALTH_TIMEOUT_MS,
+    probe_state::CandidateHealthProbeState, CandidateHealthBinding, CandidateHealthEvaluation,
+    CandidateHealthEvaluationStartFailure, CandidateHealthFinalizationFailure,
+    CandidateHealthProbeObservation, CandidateHealthProgress,
+    ComputePluginCandidateHealthObservation, HashedComputePluginCandidateHealthObservation,
+    ValidatedCandidateHealthPublication, CANDIDATE_HEALTHY, CANDIDATE_HEALTH_CANONICALIZATION,
+    CANDIDATE_HEALTH_DIGEST_ALGORITHM, CANDIDATE_HEALTH_OBSERVATION_SCHEMA,
+    CANDIDATE_HEALTH_TRANSCRIPT_SCHEMA, HASHED_CANDIDATE_HEALTH_OBSERVATION_SCHEMA,
+    MAX_CANDIDATE_HEALTH_INTERVAL_MS, MAX_CANDIDATE_HEALTH_LIFETIME_SECONDS,
+    MAX_CANDIDATE_HEALTH_PROBES, MAX_CANDIDATE_HEALTH_TIMEOUT_MS,
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_staging_contract::StagedComputePluginCandidateArchive,
@@ -39,18 +39,6 @@ struct CandidateHealthTranscriptAnchor<'a> {
     extraction_plan_digest: &'a str,
     runner_digest: &'a str,
     protocol: &'a str,
-}
-
-#[derive(Serialize)]
-struct CandidateHealthTranscriptLink<'a> {
-    schema: &'static str,
-    evaluation_id: &'a str,
-    previous_digest: &'a str,
-    sequence: i64,
-    outcome: CandidateHealthProbeOutcome,
-    latency_ms: i64,
-    response_digest: &'a str,
-    reason_code: Option<&'a str>,
 }
 
 pub(super) fn begin_evaluation<'root>(
@@ -81,14 +69,7 @@ pub(super) fn begin_evaluation<'root>(
         staged,
         evaluation_id,
         binding,
-        attempted_probes: 0,
-        successful_probes: 0,
-        consecutive_successes: 0,
-        consecutive_failures: 0,
-        healthy: false,
-        terminal_unhealthy: false,
-        reason_codes: Default::default(),
-        transcript_digest,
+        probes: CandidateHealthProbeState::new(transcript_digest),
         started_at: Instant::now(),
         last_probe_at: None,
     })
@@ -98,80 +79,15 @@ pub(super) fn record_probe(
     evaluation: &mut CandidateHealthEvaluation<'_>,
     observation: CandidateHealthProbeObservation,
 ) -> Result<CandidateHealthProgress> {
-    if evaluation.healthy || evaluation.terminal_unhealthy {
-        bail!("COMPUTE_PLUGIN_CANDIDATE_HEALTH_EVALUATION_TERMINAL");
-    }
-    let sequence = evaluation
-        .attempted_probes
-        .checked_add(1)
-        .context("COMPUTE_PLUGIN_CANDIDATE_HEALTH_PROBE_COUNT_OVERFLOW")?;
-    if sequence > MAX_CANDIDATE_HEALTH_PROBES
-        || observation.latency_ms < 0
-        || observation.latency_ms > evaluation.binding.timeout_ms
-        || !is_sha256(&observation.response_digest)
-    {
-        bail!("COMPUTE_PLUGIN_CANDIDATE_HEALTH_PROBE_INVALID");
-    }
-    match observation.outcome {
-        CandidateHealthProbeOutcome::Success if observation.reason_code.is_some() => {
-            bail!("COMPUTE_PLUGIN_CANDIDATE_HEALTH_SUCCESS_REASON_FORBIDDEN")
-        }
-        CandidateHealthProbeOutcome::Failure => {
-            let reason = observation.reason_code.as_deref().ok_or_else(|| {
-                anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_HEALTH_FAILURE_REASON_MISSING")
-            })?;
-            if !is_identifier(reason)
-                || (!evaluation.reason_codes.contains(reason)
-                    && evaluation.reason_codes.len() >= MAX_CANDIDATE_HEALTH_REASON_CODES)
-            {
-                bail!("COMPUTE_PLUGIN_CANDIDATE_HEALTH_FAILURE_REASON_INVALID");
-            }
-        }
-        _ => {}
-    }
-
-    let next_transcript_digest = jcs_sha256_hex(&CandidateHealthTranscriptLink {
-        schema: CANDIDATE_HEALTH_TRANSCRIPT_SCHEMA,
-        evaluation_id: &evaluation.evaluation_id,
-        previous_digest: &evaluation.transcript_digest,
-        sequence,
-        outcome: observation.outcome,
-        latency_ms: observation.latency_ms,
-        response_digest: &observation.response_digest,
-        reason_code: observation.reason_code.as_deref(),
-    })?;
-
-    evaluation.attempted_probes = sequence;
-    evaluation.transcript_digest = next_transcript_digest;
+    let progress = evaluation.probes.record(
+        &evaluation.evaluation_id,
+        evaluation.binding.timeout_ms,
+        evaluation.binding.required_consecutive_successes,
+        evaluation.binding.unhealthy_after_failures,
+        observation,
+    )?;
     evaluation.last_probe_at = Some(Instant::now());
-    match observation.outcome {
-        CandidateHealthProbeOutcome::Success => {
-            evaluation.successful_probes = evaluation
-                .successful_probes
-                .checked_add(1)
-                .context("COMPUTE_PLUGIN_CANDIDATE_HEALTH_SUCCESS_COUNT_OVERFLOW")?;
-            evaluation.consecutive_successes = evaluation
-                .consecutive_successes
-                .checked_add(1)
-                .context("COMPUTE_PLUGIN_CANDIDATE_HEALTH_SUCCESS_COUNT_OVERFLOW")?;
-            evaluation.consecutive_failures = 0;
-            evaluation.healthy = evaluation.consecutive_successes
-                >= evaluation.binding.required_consecutive_successes;
-        }
-        CandidateHealthProbeOutcome::Failure => {
-            evaluation.consecutive_successes = 0;
-            evaluation.consecutive_failures = evaluation
-                .consecutive_failures
-                .checked_add(1)
-                .context("COMPUTE_PLUGIN_CANDIDATE_HEALTH_FAILURE_COUNT_OVERFLOW")?;
-            if let Some(reason) = observation.reason_code {
-                evaluation.reason_codes.insert(reason);
-            }
-            evaluation.terminal_unhealthy =
-                evaluation.consecutive_failures >= evaluation.binding.unhealthy_after_failures;
-        }
-    }
-    Ok(evaluation.progress())
+    Ok(progress)
 }
 
 pub(super) fn finalize_evaluation<'root>(
@@ -310,9 +226,10 @@ fn build_health_observation(
     let last_probe_at = evaluation
         .last_probe_at
         .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_HEALTH_PROBE_MISSING"))?;
-    if !evaluation.healthy
-        || evaluation.terminal_unhealthy
-        || evaluation.consecutive_successes < evaluation.binding.required_consecutive_successes
+    let progress = evaluation.probes.progress();
+    if !progress.healthy
+        || progress.terminal_unhealthy
+        || progress.consecutive_successes < evaluation.binding.required_consecutive_successes
         || trusted_time.installation_id_digest() != evaluation.binding.installation_id_digest
         || trusted_time.clock_epoch_digest() != evaluation.binding.clock_epoch_digest
         || trusted_time.trusted_now().timestamp_millis() <= evaluation.binding.staged_at_ms
@@ -351,11 +268,11 @@ fn build_health_observation(
         interval_ms: evaluation.binding.interval_ms,
         required_consecutive_successes: evaluation.binding.required_consecutive_successes,
         unhealthy_after_failures: evaluation.binding.unhealthy_after_failures,
-        attempted_probes: evaluation.attempted_probes,
-        successful_probes: evaluation.successful_probes,
-        consecutive_successes: evaluation.consecutive_successes,
-        probe_transcript_digest: evaluation.transcript_digest.clone(),
-        reason_codes: evaluation.reason_codes.iter().cloned().collect(),
+        attempted_probes: progress.attempted_probes,
+        successful_probes: progress.successful_probes,
+        consecutive_successes: progress.consecutive_successes,
+        probe_transcript_digest: evaluation.probes.transcript_digest().to_string(),
+        reason_codes: evaluation.probes.reason_codes(),
         status: CANDIDATE_HEALTHY.to_string(),
         observed_at,
         expires_at,
