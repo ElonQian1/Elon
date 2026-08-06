@@ -11,6 +11,7 @@ use rusqlite::{Connection, Transaction, TransactionBehavior};
 use super::local_authority_schema;
 
 mod candidate_verification_revocation;
+mod cleanup_completion_store;
 mod cleanup_store;
 mod fetch_claim_revocation;
 mod fetch_store;
@@ -30,6 +31,17 @@ mod rollback_checkpoint;
 mod staging_store;
 mod verification_store;
 
+pub(in crate::node_agent_compute_plugin_host) use cleanup_completion_store::{
+    ComputePluginCandidateCleanupCompletionAuthorityFacts,
+    ComputePluginCandidateCleanupCompletionAuthoritySession,
+    ComputePluginCandidateCleanupCompletionRecoveryAuthoritySession,
+    ComputePluginCandidateCleanupCompletionRecoveryOutcome,
+    HashedComputePluginCandidateCleanupCompletionReceipt,
+    CANDIDATE_CLEANUP_COMPLETION_RECEIPT_CANONICALIZATION,
+    CANDIDATE_CLEANUP_COMPLETION_RECEIPT_DIGEST_ALGORITHM,
+    CANDIDATE_CLEANUP_COMPLETION_RECEIPT_SCHEMA,
+    HASHED_CANDIDATE_CLEANUP_COMPLETION_RECEIPT_SCHEMA,
+};
 pub(in crate::node_agent_compute_plugin_host) use cleanup_store::{
     ComputePluginCandidateCleanupAuthorityFacts, ComputePluginCandidateCleanupAuthoritySession,
     ComputePluginCandidateCleanupRecoveryAuthoritySession,

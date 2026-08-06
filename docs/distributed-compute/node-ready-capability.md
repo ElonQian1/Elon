@@ -60,7 +60,7 @@ Store 返回成功后产生继续持有 staged 文件句柄的 `DurableCandidate
 
 quarantine 授权先做无副作用 fresh authority read，精确核对 staged 槽、staging receipt、candidate owner、无未过期健康回执、inventory/state/authority/process fence 与 trusted-time high-water。Store 在单一 `BEGIN IMMEDIATE` 中推进可信时间，把槽从 `staged` 改为 `failed`，令 state、inventory 与 authority fence 各精确加一，并插入不可更新、不可删除的 `candidate_health_quarantine_receipts`。它保留 candidate owner、candidate pointer 和原 staged 文件 custody，不删除目录，也不授予下载、重试、安装或推广。
 
-提交结果不确定时，进程内 recovery key 只能得到稳定 `NotCreated` 或 exact `Quarantined`。前者不恢复写许可；后者必须 fresh read 精确的 failed inventory/fence，再从保留句柄重新哈希 staging 文件和 seal，才可恢复 `DurableCandidateHealthQuarantine`。底层同句柄删除原语、私有 cleanup authorization Store 和只消费授权 custody 的物理执行器已形成代码，但尚未接入生产 Host 或 completion Store；quarantine、cleanup authorization 和内存物理执行证据都不是耐久清理成功证明。精确边界见 `node-plugin-candidate-cleanup.md`。
+提交结果不确定时，进程内 recovery key 只能得到稳定 `NotCreated` 或 exact `Quarantined`。前者不恢复写许可；后者必须 fresh read 精确的 failed inventory/fence，再从保留句柄重新哈希 staging 文件和 seal，才可恢复 `DurableCandidateHealthQuarantine`。底层同句柄删除、cleanup authorization、旧线性物理执行器及 completion Store 内核已形成私有代码；completion 还必须消费 sealed topology 和全部 namespace-durability journal 的不透明终态能力，而该能力的 topology/journal Store 与目录 durability 生产者尚未实现。只有 durable completion receipt 才能证明 owner/pointer/inventory 已原子释放；整条流水线尚不可达且未接入生产 Host，quarantine、cleanup authorization 或内存物理证据都不能替代完成回执。精确边界见 `node-plugin-candidate-cleanup.md`。
 
 ## 8. 尚未实现
 

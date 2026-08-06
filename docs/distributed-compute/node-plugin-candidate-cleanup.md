@@ -2,7 +2,7 @@
 
 ## 1. 状态
 
-当前状态为 `partial_implementation_mixed`。Windows 受管文件系统已经具备同句柄删除原语，候选下载校验链也会保留可删除目录与文件 custody；私有 typed cleanup authorization Store、线性授权能力、进程内 outcome-uncertain recovery 和只消费固定句柄的物理执行器已经形成代码，远程 canonical 组合通过编译及 4 项定向测试。SQLite authority schema 又加入 expected-object topology、candidate-parent anchor、四阶段步骤 journal、completion receipt 及 `owned -> cleanup_pending -> cleaned` 门卫；本批 topology/journal schema 增量未重新编译、未运行 DDL 或测试。生产 Host、topology typed Store、受管目录及父级 identity、真实 namespace durability、既有执行器对 journal 的适配、completion Store 与跨重启恢复仍未接入，因此当前不会自动清理生产失败候选。
+当前状态为 `partial_implementation_compiled`。Windows 受管文件系统已经具备同句柄删除原语，候选下载校验链也会保留可删除目录与文件 custody；私有 cleanup authorization Store、线性授权能力、固定句柄物理执行器，以及原子 completion Store 内核和两阶段进程内 outcome-uncertain recovery 已形成代码并通过编译。SQLite authority schema 还固定了 expected-object topology、candidate-parent anchor、四阶段步骤 journal、completion receipt 及 `owned -> cleanup_pending -> cleaned` 门卫。completion 内核只能消费同时绑定 sealed plan、物理证据与 terminal namespace-durability journal 的不透明能力；该能力目前没有构造入口，因为 topology/journal typed Store、受管父目录 identity/absence、真实 namespace durability 和执行器 journal 适配仍未实现。生产 Host 与跨重启 custody 恢复也未接入，因此当前不会自动清理生产失败候选。
 
 本文只维护失败候选清理边界。候选本机真源见 `node-plugin-local-authority.md`，健康失败与 quarantine 见 `node-ready-capability.md`，staging 物化见 `node-plugin-archive-extraction.md`。
 
@@ -37,7 +37,9 @@ cleanup authorization Store 当前执行以下单一事务：fresh read failed s
 
 本批在远程 canonical API 上进一步加固组合语义：授权读与写事务都复验同一 process cancellation source；owner 对账绑定 plugin、slot、generation、release、owner plan 和 application inventory revision；恢复同时重放 quarantine→staging 的规范 JSON/JCS 链并拒绝已有 completion。PlanApply 投影继续把 `cleanup_pending` 计为占用 candidate pointer 的活动 owner，但拒绝任何直接修改该插件的 action；原计划历史重放接受 `cleanup_pending` 与未来 `cleaned`，只在 owner 仍为 `owned` 时返回可操作 candidate handle。当前 inventory invariant 也会让 `cleanup_pending` 期间的 sharing-off plan 失败关闭；“立即停止运行、后台继续保留清理 custody”的独立退出语义仍待设计。
 
-私有物理执行器在首次删除前会复验 retained staging 内容和 cleanup authorization，再从既有受管根预先固定 candidate 根与 staging 父目录。随后严格按 extracted 文件、staging seal、最深 extracted 目录、staging run、staging 父目录、download 文件、downloads 目录、candidate 根目录顺序消费句柄。每个成功步骤进入规范执行证据；任一系统删除失败都返回已完成步骤、失败对象的同一句柄、全部剩余句柄和根锁 lease。全树接受删除 disposition 后只产生 `PhysicallyExecutedCandidateCleanup`，该对象继续持有授权/隔离/staging 回执和根锁，等待未来 completion Store。
+私有物理执行器在首次删除前会复验 retained staging 内容和 cleanup authorization，再从既有受管根预先固定 candidate 根与 staging 父目录。随后严格按 extracted 文件、staging seal、最深 extracted 目录、staging run、staging 父目录、download 文件、downloads 目录、candidate 根目录顺序消费句柄。每个成功步骤进入规范执行证据；任一系统删除失败都返回已完成步骤、失败对象的同一句柄、全部剩余句柄和根锁 lease。全树接受删除 disposition 后产生的 `PhysicallyExecutedCandidateCleanup` 继续持有原始 staging recovery key、同一 cancellation guard、单调时钟完成点、授权/隔离/staging 回执、执行证据和根锁；完成事务因此不需要按路径或摘要猜回原始 candidate token，也不能使用物理删除前取得的可信时间观测。
+
+completion Store 内核当前执行一个 `BEGIN IMMEDIATE` 事务：先要求调用方交出不可伪造的 `DurableCandidateCleanupTerminalJournal`，再从 SQLite 重验 sealed plan、全部对象的 `namespace_durable` 计数、最终 journal 摘要、物理证据链、原授权行、`cleanup_pending` owner、failed slot、当前 inventory/state/authority/process fence、可信时间和无 prepared fetch/verification；随后移除精确 failed slot、清空 candidate pointer但保留插件记录和 active slot，推进可信时间及 inventory/state/authority revision，写入同时绑定 plan/evidence/journal 三类摘要的 JCS+SHA-256 completion receipt，并把 owner 原子推进到 `cleaned`。事务返回后还会重读 meta、inventory、completion 与 owner 后置条件；结果不确定时只能分类为 exact `NotCreated` 或 exact `Completed`。由于终态能力目前刻意没有构造函数，该内核不能被旧物理执行器直接调用。
 
 ## 3. 当前能力不代表什么
 
@@ -50,7 +52,7 @@ cleanup authorization Store 当前执行以下单一事务：fresh read failed s
 - `failed` slot phase；
 - 调用方传入的布尔值、路径或 candidate token。
 
-当前生产路径不会自动删除失败候选，也不会释放 candidate owner、清空 candidate pointer、创建新候选、恢复下载或允许重试。私有 Store 能签发 cleanup authorization，私有执行器也能消费该授权并形成物理执行证据，但二者都不等于 completion receipt；物理删除成功在完成事务落库前不能对外表现为 owner 已释放或候选可重建。
+当前生产路径不会自动删除失败候选，也不会创建新候选、恢复下载或允许重试。私有代码能够签发 cleanup authorization、消费固定句柄、形成物理执行证据，并具备终态 journal 之后的原子 completion 内核；但中间的 topology/journal 持久化链尚未实现，完整流水线不可达且未由 Host 调用。物理删除成功在 completion Store 落库前仍不能对外表现为 owner 已释放或候选可重建。
 
 当前 `namespace_durable` 只是 schema 合同名称。受管文件系统尚未提供父目录 identity 读取、父句柄相对 absence 复验或 namespace durability 原语，因此现有 `delete_exact()` 成功不能生成该事件，更不能据此写 completion；typed Store 也尚未实现对 plan/object/event JSON、路径摘要和 JCS 摘要的重算读回。
 
@@ -58,7 +60,7 @@ cleanup authorization Store 当前执行以下单一事务：fresh read failed s
 
 SQLite trigger 只能证明前序 event 在当前事务视图中存在，不能证明它已由更早事务 durable commit。未来 typed Store 必须禁止调用方传入或复用裸 `Transaction`：`delete_intent` 要独立提交、exact readback 后返回非 Clone `DurableDeleteIntent`，物理删除只能消费该 capability；disposition、absence、durability 与 completion 各自使用后续 fresh transaction。不得提供一次事务批量写完四阶段或 completion 的接口。
 
-## 4. 后续必须保持的事务顺序
+## 4. 已固定且后续必须保持的事务顺序
 
 完整清理必须拆成以下七个边界：
 
@@ -70,7 +72,7 @@ SQLite trigger 只能证明前序 event 在当前事务视图中存在，不能�
 6. **Completion Store**：只有所有对象都到达 `namespace_durable` 且 terminal hash 与执行证据一致后，才能把 owner 从 `cleanup_pending` 推进到 `cleaned`、移除 failed slot、清空 candidate pointer，并精确推进 inventory/state/authority fence。
 7. **Retry gate**：新候选或旧计划重试只能基于 durable completion outcome；cleanup authorization、quarantine、plan seal 或内存执行成功都不能代替完成回执。
 
-如果 completion Store 结果不确定，调用方必须只凭 recovery key 查询 `NotCreated` 或 exact `Completed`，不能重复删除、重复释放 owner 或直接开始新候选。
+上述 authorization、旧物理执行和 completion 三端已有私有类型或 Store，topology、durable intent、逐步 journal 与 namespace durability 中段仍缺。如果 completion Store 结果不确定，调用方必须只凭 recovery key 查询 `NotCreated` 或 exact `Completed`，不能重复删除、重复释放 owner 或直接开始新候选。
 
 ## 5. 目录清理规则
 
@@ -83,15 +85,19 @@ SQLite trigger 只能证明前序 event 在当前事务视图中存在，不能�
 
 ## 6. 当前验证
 
-`elon-pc-node` 已通过测试目标编译和 4 项定向测试：
+`elon-pc-node` 已通过测试目标编译和 8 项定向测试：
 
 1. 以 create-new 句柄删除精确文件，再删除目录；
 2. 非空目录删除失败后保留原目录 custody，删除子文件后用同一 custody 重试；
 3. 重新固定既有文件的 cleanup 句柄并完成文件与目录删除。
 4. staging 子目录按深度从深到浅、同深度按规范逻辑路径稳定排序。
+5. completion receipt JSON 往返后保持稳定 JCS 摘要；
+6. completion receipt 拒绝未知字段；
+7. completion 投影只删除 failed candidate，保留插件记录与 active slot；
+8. completion 投影拒绝重复 candidate slot identity。
 
-前三项 Windows 测试证明底层句柄语义，第四项证明既有执行器的目录顺序规则；远程 canonical 的 cancellation、exact chain、PlanApply/replay、schema fence 与物理执行器已通过 `elon-pc-node` 测试目标编译。既有 schema 定向测试还证明原 cleanup authorization/completion 两张表、六个不可变/写入 fence trigger、owner 两个转换门卫和活动候选唯一约束可以安装并按相同指纹重开；cleanup authorization 回执另有稳定摘要与拒绝未知字段测试。本批新增四张 execution topology/journal 表和相关 trigger 未重新编译、未运行 DDL 或定向测试；现有验证也不覆盖 topology typed Store、完整 authorization Store 事务夹具、journal 化执行、SQLite completion 事务、目录耐久 flush、跨重启恢复或生产 Host 接线。
+前三项 Windows 测试证明底层句柄语义，第四项证明既有执行器的目录顺序规则，后四项覆盖 completion 凭证和关键库存投影；当前组合已通过 `cargo check --bin elon-pc-node`。另有 1 项 schema 定向测试已证明 cleanup authorization/completion、四张 execution topology/journal 表及相关 trigger 可以安装并按相同指纹重开。现有验证仍不覆盖 topology typed Store、完整 authorization→journal→completion 事务夹具、journal 化执行、目录 durability、跨重启恢复或生产 Host 接线。
 
 ## 7. 下一批实现边界
 
-下一批应先实现只消费 `AuthorizedCandidateCleanup` 的 topology builder、typed Store、exact readback 与 sealed plan recovery；再把既有进程内执行器改造成逐对象消费 `DurableDeleteIntent`、以独立事务追加 disposition/absence/durability 事件并在部分失败时保留 terminal journal 位置与剩余句柄。随后补齐受管目录及父级 identity、真实 namespace durability、completion Store、结果不确定恢复和 owner/pointer/inventory 原子释放，最后接入生产 Host。不得先暴露“按 candidate token 删除目录”的管理接口，否则会绕过 quarantine、owner、topology 和 fence 合同。
+下一批应先实现只消费 `AuthorizedCandidateCleanup` 的 topology builder、typed Store、exact readback 与 sealed plan recovery；再把既有进程内执行器改造成逐对象消费 `DurableDeleteIntent`、以独立事务追加 disposition/absence/durability 事件，并在全部对象 durable 后构造 `DurableCandidateCleanupTerminalJournal`。同时补齐受管目录及父级 identity、真实 namespace durability和部分失败/跨重启恢复，随后构造完整 authorization→journal→completion 事务夹具，最后接入生产 Host。不得先暴露“按 candidate token 删除目录”的管理接口，否则会绕过 quarantine、owner、topology 和 fence 合同。

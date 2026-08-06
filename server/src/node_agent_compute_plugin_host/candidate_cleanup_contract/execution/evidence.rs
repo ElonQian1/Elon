@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::node_agent_compute_plugin_host::signed_artifact_verification::jcs_sha256_hex;
@@ -71,4 +71,29 @@ pub(super) fn build_hashed_execution_evidence(
         digest_algorithm: EVIDENCE_DIGEST_ALGORITHM.to_string(),
         evidence_digest,
     })
+}
+
+pub(in crate::node_agent_compute_plugin_host) fn validate_hashed_execution_evidence(
+    hashed: &HashedComputePluginCandidateCleanupExecutionEvidence,
+) -> Result<()> {
+    let evidence = &hashed.evidence;
+    let sequence_is_canonical = evidence
+        .steps
+        .iter()
+        .enumerate()
+        .all(|(index, step)| step.sequence == (index as i64) + 1);
+    if hashed.schema != HASHED_EVIDENCE_SCHEMA
+        || evidence.schema != EVIDENCE_SCHEMA
+        || hashed.canonicalization != EVIDENCE_CANONICALIZATION
+        || hashed.digest_algorithm != EVIDENCE_DIGEST_ALGORITHM
+        || !crate::node_agent_compute_plugin_host::manifest_validation::is_sha256(
+            &hashed.evidence_digest,
+        )
+        || jcs_sha256_hex(evidence)? != hashed.evidence_digest
+        || evidence.steps.is_empty()
+        || !sequence_is_canonical
+    {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_EXECUTION_EVIDENCE_CHANGED");
+    }
+    Ok(())
 }

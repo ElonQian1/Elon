@@ -87,7 +87,7 @@ pub(super) fn read_candidate_cleanup_binding(
     })
 }
 
-pub(super) fn validate_failed_candidate_inventory(
+pub(in crate::node_agent_compute_plugin_host::local_authority) fn validate_failed_candidate_inventory(
     inventory: &ComputePluginInventorySnapshot,
     plugin_id: &str,
     slot_ref: &str,

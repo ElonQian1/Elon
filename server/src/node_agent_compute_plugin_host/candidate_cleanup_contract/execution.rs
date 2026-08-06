@@ -1,9 +1,11 @@
-use std::{collections::VecDeque, error::Error as StdError, fmt};
+use std::{collections::VecDeque, error::Error as StdError, fmt, time::Instant};
 
 use anyhow::{bail, Error, Result};
 
 use super::AuthorizedCandidateCleanup;
 use crate::node_agent_compute_plugin_host::{
+    candidate_staging_contract::ComputePluginCandidateStagingRecoveryKey,
+    fetch_contract::ComputePluginFetchCancellationGuard,
     local_authority::{
         HashedComputePluginCandidateCleanupAuthorizationReceipt,
         HashedComputePluginCandidateHealthQuarantineReceipt,
@@ -22,7 +24,7 @@ use delete_steps::{
 };
 use evidence::{build_hashed_execution_evidence, ComputePluginCandidateCleanupStepEvidence};
 pub(in crate::node_agent_compute_plugin_host) use evidence::{
-    ComputePluginCandidateCleanupExecutionEvidence,
+    validate_hashed_execution_evidence, ComputePluginCandidateCleanupExecutionEvidence,
     HashedComputePluginCandidateCleanupExecutionEvidence,
 };
 
@@ -31,6 +33,8 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupExecutionSt
     authorization_receipt: HashedComputePluginCandidateCleanupAuthorizationReceipt,
     quarantine_receipt: HashedComputePluginCandidateHealthQuarantineReceipt,
     staging_receipt: HashedComputePluginCandidateStagingReceipt,
+    staging_recovery_key: ComputePluginCandidateStagingRecoveryKey,
+    cancellation_guard: ComputePluginFetchCancellationGuard,
     extraction_evidence_digest: String,
     root_lock_lease: ComputePluginRootLockLease,
     staging_files: VecDeque<PendingCleanupFile>,
@@ -63,8 +67,11 @@ pub(in crate::node_agent_compute_plugin_host) struct PhysicallyExecutedCandidate
     authorization_receipt: HashedComputePluginCandidateCleanupAuthorizationReceipt,
     quarantine_receipt: HashedComputePluginCandidateHealthQuarantineReceipt,
     staging_receipt: HashedComputePluginCandidateStagingReceipt,
+    staging_recovery_key: ComputePluginCandidateStagingRecoveryKey,
+    cancellation_guard: ComputePluginFetchCancellationGuard,
     root_lock_lease: ComputePluginRootLockLease,
     evidence: HashedComputePluginCandidateCleanupExecutionEvidence,
+    physical_completed_at: Instant,
 }
 
 pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_execution<'root>(
@@ -88,9 +95,14 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_execu
         }
     };
 
+    let cancellation_guard = authorized
+        .quarantined()
+        .staged()
+        .archive()
+        .snapshot_cancellation_guard();
     let (quarantined, authorization_receipt) = authorized.into_parts();
     let (staged, quarantine_receipt) = quarantined.into_parts();
-    let (archive, staging_receipt, _staging_recovery_key) = staged.into_parts();
+    let (archive, staging_receipt, staging_recovery_key) = staged.into_parts();
     let parts = archive.into_cleanup_parts();
     let candidate_token_digest = parts.evidence.evidence.candidate_token_digest.clone();
     let staging_run_digest = parts.evidence.evidence.staging_run_digest.clone();
@@ -138,6 +150,8 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_execu
         authorization_receipt,
         quarantine_receipt,
         staging_receipt,
+        staging_recovery_key,
+        cancellation_guard,
         extraction_evidence_digest,
         root_lock_lease,
         staging_files: ordered_files(staging_files),
@@ -265,8 +279,11 @@ fn finish_execution(
         authorization_receipt: state.authorization_receipt,
         quarantine_receipt: state.quarantine_receipt,
         staging_receipt: state.staging_receipt,
+        staging_recovery_key: state.staging_recovery_key,
+        cancellation_guard: state.cancellation_guard,
         root_lock_lease: state.root_lock_lease,
         evidence: hashed,
+        physical_completed_at: Instant::now(),
     })
 }
 
@@ -329,6 +346,40 @@ impl fmt::Debug for CandidateCleanupExecutionPreparationFailure<'_> {
 impl StdError for CandidateCleanupExecutionPreparationFailure<'_> {}
 
 impl PhysicallyExecutedCandidateCleanup {
+    pub(in crate::node_agent_compute_plugin_host) fn authorization_receipt(
+        &self,
+    ) -> &HashedComputePluginCandidateCleanupAuthorizationReceipt {
+        &self.authorization_receipt
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn quarantine_receipt(
+        &self,
+    ) -> &HashedComputePluginCandidateHealthQuarantineReceipt {
+        &self.quarantine_receipt
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn staging_receipt(
+        &self,
+    ) -> &HashedComputePluginCandidateStagingReceipt {
+        &self.staging_receipt
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn staging_recovery_key(
+        &self,
+    ) -> &ComputePluginCandidateStagingRecoveryKey {
+        &self.staging_recovery_key
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn cancellation_guard(
+        &self,
+    ) -> &ComputePluginFetchCancellationGuard {
+        &self.cancellation_guard
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn physical_completed_at(&self) -> Instant {
+        self.physical_completed_at
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn evidence(
         &self,
     ) -> &HashedComputePluginCandidateCleanupExecutionEvidence {
@@ -341,15 +392,21 @@ impl PhysicallyExecutedCandidateCleanup {
         HashedComputePluginCandidateCleanupAuthorizationReceipt,
         HashedComputePluginCandidateHealthQuarantineReceipt,
         HashedComputePluginCandidateStagingReceipt,
+        ComputePluginCandidateStagingRecoveryKey,
+        ComputePluginFetchCancellationGuard,
         ComputePluginRootLockLease,
         HashedComputePluginCandidateCleanupExecutionEvidence,
+        Instant,
     ) {
         (
             self.authorization_receipt,
             self.quarantine_receipt,
             self.staging_receipt,
+            self.staging_recovery_key,
+            self.cancellation_guard,
             self.root_lock_lease,
             self.evidence,
+            self.physical_completed_at,
         )
     }
 }

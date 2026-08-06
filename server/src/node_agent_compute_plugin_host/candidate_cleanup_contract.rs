@@ -22,14 +22,30 @@ use super::{
 };
 
 mod adoption;
+mod completion;
+mod completion_recovery_key;
 mod execution;
 mod recovery_key;
+mod terminal_journal;
 
 pub(in crate::node_agent_compute_plugin_host) use adoption::{
     adopt_recovered_candidate_cleanup_authorization,
     CandidateCleanupAuthorizationRecoveryAdoptionFailure,
     CandidateCleanupAuthorizationRecoveryAdoptionPhase,
 };
+pub(in crate::node_agent_compute_plugin_host) use completion::{
+    adopt_recovered_candidate_cleanup_completion, prepare_candidate_cleanup_completion,
+    store_candidate_cleanup_completion, CandidateCleanupCompletionOutcomeUncertainCustody,
+    CandidateCleanupCompletionPreparationFailure, CandidateCleanupCompletionRecoveryAdoption,
+    CandidateCleanupCompletionRecoveryAdoptionFailure,
+    CandidateCleanupCompletionRecoveryAdoptionPhase, CandidateCleanupCompletionStoreFailure,
+    CandidateCleanupCompletionStorePhase, DurableCandidateCleanupCompletion,
+    PreparedCandidateCleanupCompletion, ValidatedCandidateCleanupCompletionPermit,
+};
+pub(in crate::node_agent_compute_plugin_host) use completion_recovery_key::{
+    CandidateCleanupCompletionReceiptExpectation, CandidateCleanupCompletionRecoveryKey,
+};
+pub(in crate::node_agent_compute_plugin_host) use execution::validate_hashed_execution_evidence;
 pub(in crate::node_agent_compute_plugin_host) use execution::{
     prepare_candidate_cleanup_execution, resume_candidate_cleanup_execution,
     CandidateCleanupExecutionFailure, CandidateCleanupExecutionPreparationFailure,
@@ -40,6 +56,7 @@ pub(in crate::node_agent_compute_plugin_host) use recovery_key::{
     CandidateCleanupAuthorizationReceiptExpectation, CandidateCleanupAuthorizationRecoveryKey,
     CandidateCleanupSlotExpectation,
 };
+pub(in crate::node_agent_compute_plugin_host) use terminal_journal::DurableCandidateCleanupTerminalJournal;
 
 #[must_use = "prepared cleanup authorization must be stored or returned with candidate custody"]
 pub(in crate::node_agent_compute_plugin_host) struct PreparedCandidateCleanupAuthorization<

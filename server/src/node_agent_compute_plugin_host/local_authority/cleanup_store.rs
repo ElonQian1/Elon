@@ -14,7 +14,7 @@ use crate::node_agent_compute_plugin_host::{
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
-mod binding;
+pub(super) mod binding;
 mod recovery;
 mod types;
 mod write;
