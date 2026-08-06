@@ -11,7 +11,7 @@ owners: node, compute
 
 `ReadyCapability` 只表示某个节点插件在一个很短的时间窗口内具备技术执行条件。它不是安装完成标记、市场报价、可预留容量、账户授权或商业 `ComputeOffer`。
 
-当前代码状态为“局部实现已编译验证、生产路径未接线”：staged 候选的进程内健康评估、候选健康观察的规范校验、不可变健康回执 Store 与不确定结果恢复合同均已通过 `elon-pc-node` 编译，相关健康与 schema 定向测试共 9 项通过。测试只在内存 SQLite 中验证了新 schema 建库与重开；真实 Sidecar 探针、生产本地数据库、NodeRuntime/Host 接线及控制面上报仍未完成。
+当前代码状态为“局部实现已编译验证、生产路径未接线”：staged 候选的进程内健康评估、成功与终止失败观察的规范校验、不可变健康回执 Store、失败 quarantine Store 及两类不确定结果恢复合同均已通过 `elon-pc-node` 编译，相关健康与 schema 定向测试共 12 项通过。测试只在内存 SQLite 中验证了新 schema 建库与重开，尚未构造完整 Store 事务夹具；真实 Sidecar 探针、生产本地数据库、NodeRuntime/Host 接线及控制面上报仍未完成。
 
 ## 2. 已关闭的错误入口
 
@@ -54,11 +54,19 @@ staged 候选现可进入独立的进程内健康评估状态机。入口消费 
 
 Store 返回成功后产生继续持有 staged 文件句柄的 `DurableCandidateHealthPublication`。如果写入结果不确定，调用方只能使用进程内 recovery key 读出稳定的 `NotCreated` 或 exact `Recorded`；身份碰撞、fence 漂移或时间回退均失败关闭。exact `Recorded` adoption 会再做 fresh read，并从保留句柄重新哈希 staging 文件和 seal；`NotCreated` 只是结果证明，不恢复写入许可。该耐久结果仍不会修改槽位、安装或激活代次，也不会生成 `ReadyCapability` 或商业回执。
 
-## 7. 尚未实现
+## 7. 终止失败与 quarantine Store
+
+达到 Manifest 声明的连续失败阈值后，评估不能再走健康成功封存入口。独立失败入口要求终止不健康状态、足量连续失败、至少一个规范原因码、完整 transcript、严格晚于最后探针和 staging 的 authenticated trusted time，并继续检查安装身份和取消门卫。输出为不可 Clone、不可序列化且继续持有 staged 文件句柄的 `ValidatedCandidateHealthFailurePublication`；它不是调用方可拼装的失败布尔值。
+
+quarantine 授权先做无副作用 fresh authority read，精确核对 staged 槽、staging receipt、candidate owner、无未过期健康回执、inventory/state/authority/process fence 与 trusted-time high-water。Store 在单一 `BEGIN IMMEDIATE` 中推进可信时间，把槽从 `staged` 改为 `failed`，令 state、inventory 与 authority fence 各精确加一，并插入不可更新、不可删除的 `candidate_health_quarantine_receipts`。它保留 candidate owner、candidate pointer 和原 staged 文件 custody，不删除目录，也不授予下载、重试、安装或推广。
+
+提交结果不确定时，进程内 recovery key 只能得到稳定 `NotCreated` 或 exact `Quarantined`。前者不恢复写许可；后者必须 fresh read 精确的 failed inventory/fence，再从保留句柄重新哈希 staging 文件和 seal，才可恢复 `DurableCandidateHealthQuarantine`。后续物理删除必须另有 cleanup authorization、同句柄删除语义和完成回执，不能把 quarantine 回执当作清理成功。
+
+## 8. 尚未实现
 
 - Sidecar 启动、预热和动态健康探针；
 - Sidecar 到 Host 的认证 IPC、响应验证和真实探针调度；
-- 失败候选的 quarantine、清理授权与审计治理；
+- 失败候选的物理清理、重试授权、清理完成回执与跨重启治理；
 - 同时消费 staging 与健康回执的原子 installed/promotion 门卫；
 - 发布前 Store fresh read、CAS/fencing 和不确定结果恢复；
 - `ComputeReadyCapability` 的规范短 TTL 构建、认证上报和服务端验证；
