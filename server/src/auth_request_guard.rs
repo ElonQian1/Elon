@@ -4,14 +4,8 @@
 
 use axum::http::HeaderMap;
 use sha2::{Digest, Sha256};
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::{Mutex, OnceLock},
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 use thiserror::Error;
-
-const MAX_KEYS: usize = 4096;
 
 #[derive(Debug, Error)]
 #[error("请求过于频繁，请稍后再试")]
@@ -55,49 +49,15 @@ pub(crate) fn check_rate_limit(
     limit: usize,
     window: Duration,
 ) -> Result<(), AuthRateLimited> {
-    let now = Instant::now();
-    let limiter = LIMITER.get_or_init(|| Mutex::new(HashMap::new()));
-    let mut entries = limiter.lock().unwrap_or_else(|lock| lock.into_inner());
-    entries.retain(|_, timestamps| {
-        prune(timestamps, now, window);
-        !timestamps.is_empty()
-    });
-    if entries.len() >= MAX_KEYS && !entries.contains_key(&format!("{action}:{key}")) {
-        if let Some(oldest) = entries
-            .iter()
-            .min_by_key(|(_, timestamps)| timestamps.front().copied())
-            .map(|(entry_key, _)| entry_key.clone())
-        {
-            entries.remove(&oldest);
-        }
-    }
-    let timestamps = entries.entry(format!("{action}:{key}")).or_default();
-    prune(timestamps, now, window);
-    if timestamps.len() >= limit {
-        let retry_after_seconds = timestamps
-            .front()
-            .map(|started| window.saturating_sub(now.saturating_duration_since(*started)))
-            .unwrap_or(window)
-            .as_secs()
-            .max(1);
+    let decision = crate::auth_safety_store::auth_rate_limit_store()
+        .check_and_record(action, key, limit, window);
+    if !decision.allowed {
         return Err(AuthRateLimited {
-            retry_after_seconds,
+            retry_after_seconds: decision.retry_after_seconds,
         });
     }
-    timestamps.push_back(now);
     Ok(())
 }
-
-fn prune(timestamps: &mut VecDeque<Instant>, now: Instant, window: Duration) {
-    while timestamps
-        .front()
-        .is_some_and(|timestamp| now.saturating_duration_since(*timestamp) >= window)
-    {
-        timestamps.pop_front();
-    }
-}
-
-static LIMITER: OnceLock<Mutex<HashMap<String, VecDeque<Instant>>>> = OnceLock::new();
 
 #[cfg(test)]
 mod tests {

@@ -6,7 +6,9 @@ use std::{net::SocketAddr, sync::Arc};
 use tracing::info;
 
 mod account_identity_migration;
+mod account_lifecycle;
 mod account_security;
+mod account_security_events;
 mod account_security_migration;
 mod admin;
 mod admin_html;
@@ -32,6 +34,7 @@ mod api;
 mod app_update;
 mod auth_api;
 mod auth_request_guard;
+mod auth_safety_store;
 mod billing;
 mod billing_admin;
 mod billing_api;
