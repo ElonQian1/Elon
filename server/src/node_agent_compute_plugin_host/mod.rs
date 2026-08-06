@@ -4,6 +4,7 @@
 //! protocol, publish a new capability, download plugins or claim sidecar isolation.
 
 pub(crate) mod attempt_contract;
+mod bootstrap;
 mod candidate_extraction;
 mod candidate_staging_contract;
 pub(crate) mod candidate_verification_contract;
@@ -30,6 +31,7 @@ pub(crate) mod runner_events;
 mod signed_artifact_verification;
 mod trusted_time;
 
+pub(crate) use bootstrap::{ComputePluginBootstrap, ComputePluginBootstrapStatus};
 pub(crate) use contract::{ComputePluginTask, LlmChatTask};
 pub(crate) use host::ComputePluginHost;
 pub(crate) use keyring::{ComputePluginControlPlaneKeyResolver, ComputePluginPublisherKeyResolver};

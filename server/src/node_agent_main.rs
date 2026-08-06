@@ -521,6 +521,9 @@ async fn run_agent_runtime() -> Result<()> {
         node_data_root,
         install_id,
     ));
+    runtime
+        .compute_plugin_bootstrap
+        .bind_instance_lock(_instance_lock.liveness_witness())?;
     runtime.desktop_review_broker.spawn();
     // Bind the local management endpoint before any startup reconciliation.
     // Large stale-task inventories must not make the watchdog mistake a

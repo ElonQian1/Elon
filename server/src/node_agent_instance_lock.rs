@@ -5,20 +5,67 @@
 //! over each other. Acquire this guard before the first node.json read.
 
 use std::{
+    fmt,
     fs::{File, OpenOptions},
     path::{Path, PathBuf},
+    sync::{Arc, Weak},
 };
 
 use anyhow::{Context, Result};
 
 pub(crate) struct NodeAgentInstanceLock {
+    inner: Arc<NodeAgentInstanceLockInner>,
+}
+
+struct NodeAgentInstanceLockInner {
     _file: File,
     path: PathBuf,
 }
 
+/// Process-local proof that the real node instance lock is still retained. A weak witness cannot
+/// keep the lock alive and becomes unusable as soon as the owning guard is dropped.
+#[derive(Clone)]
+pub(crate) struct NodeAgentInstanceLockWitness {
+    inner: Weak<NodeAgentInstanceLockInner>,
+}
+
+/// Operation-scoped retention of the same file handle that owns the node state-directory lock.
+/// Bootstrap stores only a weak witness. This lease is a necessary process-liveness prerequisite,
+/// but it does not make a separately configured compute-plugin root exclusive.
+pub(crate) struct NodeAgentInstanceLockLease {
+    _inner: Arc<NodeAgentInstanceLockInner>,
+}
+
 impl NodeAgentInstanceLock {
     pub(crate) fn path(&self) -> &Path {
-        &self.path
+        &self.inner.path
+    }
+
+    pub(crate) fn liveness_witness(&self) -> NodeAgentInstanceLockWitness {
+        NodeAgentInstanceLockWitness {
+            inner: Arc::downgrade(&self.inner),
+        }
+    }
+}
+
+impl NodeAgentInstanceLockWitness {
+    pub(crate) fn is_live(&self) -> bool {
+        self.inner.strong_count() > 0
+    }
+
+    pub(crate) fn try_acquire_lease(&self) -> Option<NodeAgentInstanceLockLease> {
+        self.inner
+            .upgrade()
+            .map(|inner| NodeAgentInstanceLockLease { _inner: inner })
+    }
+}
+
+impl fmt::Debug for NodeAgentInstanceLockWitness {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NodeAgentInstanceLockWitness")
+            .field("liveness", &"<process-local>")
+            .finish()
     }
 }
 
@@ -35,7 +82,9 @@ pub(crate) fn acquire(state_path: &Path) -> Result<NodeAgentInstanceLock> {
             path.display()
         )
     })?;
-    Ok(NodeAgentInstanceLock { _file: file, path })
+    Ok(NodeAgentInstanceLock {
+        inner: Arc::new(NodeAgentInstanceLockInner { _file: file, path }),
+    })
 }
 
 #[cfg(windows)]

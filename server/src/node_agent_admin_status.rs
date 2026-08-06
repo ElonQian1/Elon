@@ -122,6 +122,8 @@ pub(super) async fn admin_status(
     let storage_settings = rt.storage_settings.read().await.clone();
     let storage = super::pc_storage_repo::storage_profile(&storage_settings);
     let node_data_root = rt.node_data_root.read().await.status_payload();
+    let compute_plugin_bootstrap: crate::node_agent_compute_plugin_host::ComputePluginBootstrapStatus =
+        rt.compute_plugin_bootstrap.status();
     let full_access_grant_count =
         match super::node_agent_full_access::current_grant_identity(&rt).await {
             Ok(identity) => rt.full_access_grants.list(&identity).await.len(),
@@ -212,6 +214,7 @@ pub(super) async fn admin_status(
         "hardware": hardware,
         "storage": storage,
         "node_data_root": node_data_root,
+        "compute_plugin_bootstrap": compute_plugin_bootstrap,
         "full_access_grant_count": full_access_grant_count,
         "runtime_policy": super::node_agent_full_access::runtime_policy_summary(),
         "cli_session_bridge": super::node_agent_cli_session_bridge::status_payload_for(
@@ -305,6 +308,7 @@ fn enforce_status_response_limit(payload: &mut serde_json::Value) {
             "restart_recovery": payload.get("restart_recovery").cloned(),
             "update_recovery": payload.get("update_recovery").cloned(),
             "lifecycle": payload.get("lifecycle").cloned(),
+            "compute_plugin_bootstrap": payload.get("compute_plugin_bootstrap").cloned(),
             "desktop_supervision": payload.get("desktop_supervision").cloned(),
             "desktop_review_broker": payload.get("desktop_review_broker").cloned(),
             "task_journal_supported": payload.get("task_journal_supported").cloned(),
@@ -336,6 +340,7 @@ fn enforce_status_response_limit(payload: &mut serde_json::Value) {
             "user_token_configured": payload.get("user_token_configured").cloned(),
             "active_cli_prompt_count": payload.get("active_cli_prompt_count").cloned(),
             "update_blocker_count": blocker_count,
+            "compute_plugin_bootstrap": payload.get("compute_plugin_bootstrap").cloned(),
             "desktop_supervision": payload.get("desktop_supervision").cloned(),
             "desktop_review_broker": payload.get("desktop_review_broker").cloned(),
             "task_journal_supported": payload.get("task_journal_supported").cloned(),
@@ -369,6 +374,7 @@ fn enforce_status_response_limit(payload: &mut serde_json::Value) {
         *payload = serde_json::json!({
             "service": "elon-node-agent",
             "status": "compacted",
+            "compute_plugin_bootstrap": payload.get("compute_plugin_bootstrap").cloned(),
             "response_limits": {
                 "schema": "elon.node_status_limits.v1",
                 "max_bytes": ADMIN_STATUS_MAX_BYTES,

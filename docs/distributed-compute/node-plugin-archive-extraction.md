@@ -2,7 +2,7 @@
 title: 节点插件候选归档受控解包边界
 status: current
 implementation_status: implementation_uncompiled
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-06
 owners: node, compute
 ---
 
@@ -10,9 +10,9 @@ owners: node, compute
 
 ## 1. 目标与状态
 
-本能力把已经完成候选闭包验证的 ZIP 包解压到该候选专属的随机 staging run，并形成逐文件证据和持续持有的文件句柄。它只关闭“已验证原始包如何落为受控文件”这一段，不把结果提升为 `staged`、`installed`、`ready`、可 promotion 或可结算状态。
+本能力把已经完成候选闭包验证的 ZIP 包解压到该候选专属的随机 staging run，并形成逐文件证据和持续持有的文件句柄。单独的解包结果仍不是 `staged`；只有后续 retained-handle 重验、fresh authority binding 与原子 Store 事务共同成功，才把候选推进到 `staged`。`staged` 仍不等于 `installed`、`ready`、可 promotion 或可结算状态。
 
-当前状态为 `implementation_uncompiled`：源码已经写入，尚未编译、运行归档样例、接入本地权威 Store、跨重启恢复或 Host 启动流程。
+当前状态为 `implementation_uncompiled`：ZIP 扫描/解包、staging seal、Store 前完整重验、不可变 staging receipt、`verifying -> staged` 原子事务和结果不确定读取均已写入；尚未编译、运行归档样例，也未完成结果的线性 adoption、目录耐久闭包、跨重启恢复或 Host 启动流程。
 
 ## 2. 唯一输入边界
 
@@ -59,7 +59,9 @@ owners: node, compute
 - 完成单调时间点；
 - 绑定安装身份、根身份、候选 token、staging run、计划摘要、逐文件摘要/大小/文件身份的 JCS/SHA-256 证据。
 
-这些句柄只证明本进程仍掌握本次输出，证据尚未进入耐久 Store。目录自身也没有独立的跨重启耐久回执，因此文档不得把该结果称为“已耐久 staged”。
+这些句柄先证明本进程仍掌握本次输出。Store 前必须从原句柄重新完整 hash 全部文件和 seal，再以 authenticated trusted-time observation 绑定当前 verified outcome、authority/inventory revision、candidate owner、process fence 和 cancellation source。只有线性 permit 被 `BEGIN IMMEDIATE` 事务消费后，才保存不可变 staging receipt、推进 state/inventory/authority fence、撤销旧 prepared claim/run，并把库存槽从 `verifying` 改为 `staged`。
+
+成功返回的 `StagedComputePluginCandidateArchive` 继续持有原解包句柄、hashed receipt 与 recovery key；Store 调用后任一错误都只能进入 outcome-uncertain custody。recovery session 已绑定 installation、authority instance、process/clock epoch 和可信时间，并可按 recovery key 读取：精确 mutation 前事实返回 `NotCreated`，完整重验不可变 receipt/evidence、inventory 和非回滚 authority 后返回 exact `Staged`；身份碰撞、字段漂移或权威变化都失败关闭。当前仍没有把读回结果和原文件 custody 线性合成为可继续使用的 `StagedComputePluginCandidateArchive`。目录自身也没有独立的跨重启耐久回执，因此不得把数据库中的 `staged` 夸大为已证明断电恢复、installed 或可运行。
 
 ## 6. 失败语义
 
@@ -69,8 +71,8 @@ owners: node, compute
 
 ## 7. 后续必须完成
 
-- 在本地权威 Store 中原子登记 extraction plan、输出证据、staging run 和精确库存 revision；
-- 定义 Store commit 成功、失败和结果不确定时的线性恢复保管权；
+- 完成 staging Store 结果读回后的线性 adoption，禁止丢失或复制原文件 custody；
+- 为 staging 目录、seal 和父目录补齐跨断电耐久证明；
 - 启动时识别完整、失败、孤立和未知 staging run，并提供安全隔离/清理策略；
 - 把可执行位、平台目标和 Runner 入口复核纳入 staged 事务；
 - 在 staged 之后实现 Sidecar 沙箱、健康探针、promotion、回滚和 GC；
@@ -86,4 +88,6 @@ owners: node, compute
 - `server/src/node_agent_compute_plugin_host/candidate_extraction/zip/extract.rs`
 - `server/src/node_agent_compute_plugin_host/candidate_extraction/zip/types.rs`
 - `server/src/node_agent_compute_plugin_host/fetch_file/staging.rs`
+- `server/src/node_agent_compute_plugin_host/candidate_staging_contract.rs`
+- `server/src/node_agent_compute_plugin_host/local_authority/staging_store.rs`
 - `server/src/node_agent_managed_fs/copy.rs`

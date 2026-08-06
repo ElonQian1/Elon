@@ -54,6 +54,8 @@ pub(crate) struct NodeStatus {
 pub(crate) struct NodeRuntime {
     pub(crate) cfg: NodeConfig,
     pub(crate) compute_plugin_host: crate::node_agent_compute_plugin_host::ComputePluginHost,
+    pub(crate) compute_plugin_bootstrap:
+        crate::node_agent_compute_plugin_host::ComputePluginBootstrap,
     pub(crate) install_id: String,
     pub(crate) creds: RwLock<Option<Credentials>>,
     pub(crate) status: RwLock<NodeStatus>,
@@ -131,9 +133,15 @@ impl NodeRuntime {
             );
         let compute_plugin_host =
             crate::node_agent_compute_plugin_host::ComputePluginHost::new(cfg.clone());
+        let compute_plugin_bootstrap =
+            crate::node_agent_compute_plugin_host::ComputePluginBootstrap::new_disabled(
+                &install_id,
+                node_data_root.paths.as_ref(),
+            );
         Self {
             cfg,
             compute_plugin_host,
+            compute_plugin_bootstrap,
             install_id,
             creds: RwLock::new(creds),
             status: RwLock::new(NodeStatus::default()),
@@ -626,6 +634,8 @@ impl NodeRuntime {
         // node.json is the durable single source. Publish the new process and
         // in-memory state only after its atomic replacement succeeds. There
         // must be no await between these publications.
+        self.compute_plugin_bootstrap
+            .note_node_data_root_changed(&paths);
         node_agent_data_root::apply_to_process(&paths);
         *storage_guard = storage;
         *data_root_guard = next.clone();

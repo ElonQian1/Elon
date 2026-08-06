@@ -1,4 +1,9 @@
-use std::{fmt, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    fmt,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::{bail, Context, Result};
 use rusqlite::{Connection, Transaction, TransactionBehavior};
@@ -118,6 +123,12 @@ impl ComputePluginLocalAuthority {
             path: path.into(),
             instance_binding: ComputePluginAuthorityInstanceBinding::new(),
         }
+    }
+
+    /// Derives the one authority location below an already validated node compute-plugin root.
+    /// Construction is path-only: it does not create directories, open SQLite or install schema.
+    pub(in crate::node_agent_compute_plugin_host) fn for_compute_plugin_root(root: &Path) -> Self {
+        Self::new(root.join(COMPUTE_PLUGIN_STATE_FILE))
     }
 
     pub(crate) fn path(&self) -> &std::path::Path {
