@@ -1,7 +1,7 @@
 ---
 title: 节点 ReadyCapability 健康证明边界
 status: current
-reviewed_at: 2026-08-06
+reviewed_at: 2026-08-07
 owners: node, compute
 ---
 
@@ -11,7 +11,7 @@ owners: node, compute
 
 `ReadyCapability` 只表示某个节点插件在一个很短的时间窗口内具备技术执行条件。它不是安装完成标记、市场报价、可预留容量、账户授权或商业 `ComputeOffer`。
 
-当前代码状态为 `implementation_uncompiled`：活动插件的 ReadyCapability 健康证明校验，以及 staged 候选的进程内健康评估合同均已写入；尚未编译、未运行真实 Sidecar 健康探针、未接入本地权威 Store，也未向控制面上报能力。
+当前代码状态为“局部实现已编译验证、生产路径未接线”：staged 候选的进程内健康评估、候选健康观察的规范校验、不可变健康回执 Store 与不确定结果恢复合同均已通过 `elon-pc-node` 编译，相关健康与 schema 定向测试共 9 项通过。测试只在内存 SQLite 中验证了新 schema 建库与重开；真实 Sidecar 探针、生产本地数据库、NodeRuntime/Host 接线及控制面上报仍未完成。
 
 ## 2. 已关闭的错误入口
 
@@ -44,15 +44,21 @@ staged 候选现可进入独立的进程内健康评估状态机。入口消费 
 
 每次 Host 侧探针观察必须提供成功或失败终态、耗时、响应摘要和失败原因码。状态机限制单次超时、探针总数、原因码数量以及 Manifest 声明的连续成功/失败阈值，并用前一摘要、严格序号和本次观察形成追加式 JCS/SHA-256 transcript。达到失败阈值后不能继续伪造成功；达到连续成功阈值后也不能继续改写历史。
 
-健康评估只有在 authenticated trusted-time observation 的单调时间严格晚于最后一次探针，且安装身份和取消门卫仍然有效时才能封存。输出绑定完整探针摘要、staging receipt、release、Runner、健康参数、规范原因码、可信时间证明和最长五分钟有效期，并继续持有原 staged custody。该 `ValidatedCandidateHealthPublication` 只是未来健康 Store 事务的线性输入，不是耐久健康回执、installed 状态、promotion permit、ReadyCapability 或商业算力证明。
+健康评估只有在 authenticated trusted-time observation 的单调时间严格晚于最后一次探针，且安装身份和取消门卫仍然有效时才能封存。输出绑定完整探针摘要、staging receipt、release、Runner、健康参数、规范原因码、可信时间证明和最长五分钟有效期，并继续持有原 staged custody。`ValidatedCandidateHealthPublication` 是健康 Store 事务的线性输入，本身仍不是耐久健康回执、installed 状态、promotion permit、ReadyCapability 或商业算力证明。
 
 当前 `CandidateHealthProbeObservation` 仍是 Host 进程内部观察，不证明真实 Sidecar 已经运行，也不替代尚未实现的认证 IPC、进程隔离、响应大小限制和探针调度器。调用方不能据此宣称插件已经可执行。
 
-## 6. 尚未实现
+## 6. 候选健康回执 Store
+
+存储前必须进行无副作用的 fresh authority read，并精确绑定当前 staged 候选、staging receipt、inventory revision/digest、authority epoch、process owner epoch 与 trusted-time high-water。只有这些事实未漂移时，Store 才能在同一 `BEGIN IMMEDIATE` 事务中写入不可变 `candidate_health_receipts` 并推进可信时间高水位。schema trigger 禁止回执更新或删除，并拒绝同一候选上有效期重叠的健康回执。
+
+Store 返回成功后产生继续持有 staged 文件句柄的 `DurableCandidateHealthPublication`。如果写入结果不确定，调用方只能使用进程内 recovery key 读出稳定的 `NotCreated` 或 exact `Recorded`；身份碰撞、fence 漂移或时间回退均失败关闭。exact `Recorded` adoption 会再做 fresh read，并从保留句柄重新哈希 staging 文件和 seal；`NotCreated` 只是结果证明，不恢复写入许可。该耐久结果仍不会修改槽位、安装或激活代次，也不会生成 `ReadyCapability` 或商业回执。
+
+## 7. 尚未实现
 
 - Sidecar 启动、预热和动态健康探针；
 - Sidecar 到 Host 的认证 IPC、响应验证和真实探针调度；
-- 候选健康观察的权威写入事务、不确定结果恢复及失败候选治理；
+- 失败候选的 quarantine、清理授权与审计治理；
 - 同时消费 staging 与健康回执的原子 installed/promotion 门卫；
 - 发布前 Store fresh read、CAS/fencing 和不确定结果恢复；
 - `ComputeReadyCapability` 的规范短 TTL 构建、认证上报和服务端验证；
