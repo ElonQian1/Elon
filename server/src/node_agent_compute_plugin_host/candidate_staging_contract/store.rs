@@ -17,6 +17,13 @@ use crate::node_agent_compute_plugin_host::{
     signed_artifact_verification::jcs_sha256_hex,
 };
 
+mod adoption;
+
+pub(in crate::node_agent_compute_plugin_host) use adoption::{
+    adopt_recovered_candidate_staging, CandidateStagingRecoveryAdoptionFailure,
+    CandidateStagingRecoveryAdoptionPhase,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host) enum CandidateStagingStorePhase {
     PreStorePreparation,

@@ -18,6 +18,8 @@ pub(in crate::node_agent_compute_plugin_host) use revalidation::{
     CandidateStagingRevalidationPhase,
 };
 pub(in crate::node_agent_compute_plugin_host) use store::{
-    store_authorized_candidate_staging, CandidateStagingOutcomeUncertainCustody,
-    CandidateStagingStoreFailure, CandidateStagingStorePhase, StagedComputePluginCandidateArchive,
+    adopt_recovered_candidate_staging, store_authorized_candidate_staging,
+    CandidateStagingOutcomeUncertainCustody, CandidateStagingRecoveryAdoptionFailure,
+    CandidateStagingRecoveryAdoptionPhase, CandidateStagingStoreFailure,
+    CandidateStagingStorePhase, StagedComputePluginCandidateArchive,
 };
