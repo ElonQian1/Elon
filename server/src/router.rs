@@ -19,9 +19,9 @@ use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
     billing_api, billing_pay, chat_attachments, codex_vault_api, context_compiler,
     conversation_forks, external_app_api, external_app_chat_bootstrap, external_app_mvp_chat,
-    external_app_route_c_sdk, external_app_tool_report_api, friend_api, global_ws, group_ai,
-    group_chat_retrieval_api, group_summary_api, lan_peer, lm_chat, open_commerce_api, peer_relay,
-    project_api, project_attachments, project_channels, project_chat,
+    external_app_route_c_sdk, external_app_tool_report_api, federated_auth, friend_api, global_ws,
+    group_ai, group_chat_retrieval_api, group_summary_api, lan_peer, lm_chat, open_commerce_api,
+    peer_relay, project_api, project_attachments, project_channels, project_chat,
     project_conversation_identity, project_deletion, project_docs,
     project_document_organization_api, project_git, project_join_requests, project_landing_api,
     project_membership, project_releases, project_runtime_permission_api, project_space,
@@ -222,6 +222,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/assets/ai_provider_accounts.js",
             get(web::ai_provider_accounts_js),
         )
+        .route("/assets/federated_auth.css", get(web::federated_auth_css))
+        .route("/assets/federated_auth.js", get(web::federated_auth_js))
         .route("/assets/voice_tts_sdk.js", get(web::voice_tts_sdk_js))
         .route("/assets/elon_route_c_sdk.js", get(web::elon_route_c_sdk_js))
         .route("/health", get(api::health))
@@ -254,6 +256,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(auth_api::trust_current_device),
         )
         .route("/api/me", get(auth_api::me))
+        .merge(federated_auth::routes())
         .merge(codex_vault_api::routes())
         .merge(ui_tuner_api::routes())
         .merge(ui_tuner_device_host_api::routes())

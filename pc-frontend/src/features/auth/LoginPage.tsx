@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../../store/auth'
 import type { ApiError } from '../../api/client'
 import { getPcLegacyUrl } from '../shell/pcLegacyUrl'
+import GoogleIdentityButton from './GoogleIdentityButton'
 import styles from './LoginPage.module.css'
 
 export default function LoginPage() {
@@ -10,6 +11,7 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams()
   const login = useAuthStore((s) => s.login)
   const register = useAuthStore((s) => s.register)
+  const acceptSession = useAuthStore((s) => s.acceptSession)
   const [mode, setMode] = useState<'login' | 'register'>(
     searchParams.get('mode') === 'register' ? 'register' : 'login',
   )
@@ -83,6 +85,19 @@ export default function LoginPage() {
               : (mode === 'register' ? '注册并登录' : '登录')}
           </button>
         </form>
+        {mode === 'login' && (
+          <>
+            <div className={styles.divider}><span>或</span></div>
+            <GoogleIdentityButton
+              mode="login"
+              onComplete={(result) => {
+                if (!result.session) throw new Error('服务端没有创建登录会话')
+                acceptSession(result.session.token, result.session.expires_at, result.user)
+                navigate('/', { replace: true })
+              }}
+            />
+          </>
+        )}
         <p className={styles.hint}>
           {mode === 'register' ? '已有账号？' : '还没有账号？'}
           <button

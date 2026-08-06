@@ -7,6 +7,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.util.UUID
 
 internal data class AiProviderNode(
     val id: String,
@@ -22,7 +23,9 @@ internal data class AiProviderLoginAttempt(
     val userCode: String?,
     val authUrl: String?,
     val remoteCompatible: Boolean,
+    val recovered: Boolean,
     val error: String?,
+    val errorCode: String?,
 ) {
     val active: Boolean get() = state == "starting" || state == "waiting_for_user"
 }
@@ -62,7 +65,10 @@ internal class AiProviderAccountsApi(
 
     fun startLogin(nodeId: String, providerId: String): AiProviderLoginAttempt {
         val flow = if (providerId == "codex_cli") "device_code" else "agent"
-        val body = JSONObject().put("flow", flow).toString()
+        val body = JSONObject()
+            .put("flow", flow)
+            .put("request_id", "apk:${UUID.randomUUID()}")
+            .toString()
             .toRequestBody(JSON_MEDIA_TYPE)
         val request = Request.Builder()
             .url(providerUrl(nodeId, providerId, "login"))
@@ -149,7 +155,9 @@ internal class AiProviderAccountsApi(
         userCode = value.optionalString("user_code"),
         authUrl = value.optionalString("auth_url"),
         remoteCompatible = value.optBoolean("remote_compatible", false),
+        recovered = value.optBoolean("recovered", false),
         error = value.optionalString("error"),
+        errorCode = value.optionalString("error_code"),
     )
 
     private fun JSONObject.optionalString(key: String): String? =

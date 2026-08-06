@@ -1,0 +1,21 @@
+.federated-login { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
+.federated-divider { display: flex; align-items: center; gap: 10px; color: var(--ink-faint); font-size: 12px; }
+.federated-divider::before, .federated-divider::after { content: ''; height: 1px; flex: 1; background: var(--line); }
+.federated-google-host { min-height: 44px; display: flex; justify-content: center; }
+.federated-status { color: var(--ink-faint); font-size: 12px; line-height: 1.5; text-align: center; }
+.federated-status.error { color: #ff7f7f; }
+.identity-mask { position: fixed; inset: 0; z-index: 180; display: none; align-items: flex-end; justify-content: center; background: rgba(0,0,0,.58); }
+.identity-mask.active { display: flex; }
+.identity-sheet { width: min(100%, 520px); max-height: 82vh; overflow: auto; padding: 22px 20px calc(24px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: var(--panel-2); color: var(--ink); }
+.identity-sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.identity-sheet-head h2 { margin: 0; font-size: 20px; }
+.identity-sheet-head button { width: 44px; height: 44px; border: 0; background: transparent; color: var(--ink); font-size: 24px; }
+.identity-copy { margin: 6px 0 18px; color: var(--ink-faint); font-size: 13px; line-height: 1.5; }
+.identity-row { display: grid; grid-template-columns: 40px minmax(0,1fr) auto; align-items: center; gap: 12px; min-height: 64px; border-top: 1px solid var(--line); }
+.identity-row img, .identity-provider-icon { width: 36px; height: 36px; border-radius: 50%; }
+.identity-provider-icon { display: grid; place-items: center; background: white; color: #4285f4; font-weight: 800; }
+.identity-row-copy { min-width: 0; }
+.identity-row-copy strong, .identity-row-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.identity-row-copy span { margin-top: 3px; color: var(--ink-faint); font-size: 12px; }
+.identity-row button { min-width: 48px; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--ink-soft); }
+.identity-security-note { margin: 18px 0 0; padding: 12px; border-radius: 12px; background: var(--panel-3); color: var(--ink-faint); font-size: 12px; line-height: 1.5; }

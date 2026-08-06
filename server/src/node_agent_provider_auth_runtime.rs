@@ -4,7 +4,6 @@
 //! handshake. This module never parses or exports provider credential files.
 
 use anyhow::{anyhow, Context, Result};
-use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
@@ -21,6 +20,8 @@ use tokio::{
 };
 use uuid::Uuid;
 
+pub(crate) use crate::node_agent_provider_auth_attempt::ProviderLoginAttempt;
+use crate::node_agent_provider_auth_attempt_store::ProviderAuthAttemptStore;
 use crate::node_agent_provider_auth_protocol::{
     client_info, codex_login_instructions, select_gemini_auth_method,
 };
@@ -30,31 +31,6 @@ const LOGIN_TIMEOUT: Duration = Duration::from_secs(15 * 60);
 const MAX_RPC_LINE_BYTES: usize = 256 * 1024;
 const ATTEMPT_RETENTION_MS: u64 = 24 * 60 * 60 * 1000;
 
-#[derive(Clone, Debug, Serialize)]
-pub(crate) struct ProviderLoginAttempt {
-    pub(crate) login_id: String,
-    pub(crate) provider_id: String,
-    pub(crate) flow: String,
-    pub(crate) state: String,
-    pub(crate) verification_url: Option<String>,
-    pub(crate) user_code: Option<String>,
-    pub(crate) auth_url: Option<String>,
-    pub(crate) remote_compatible: bool,
-    pub(crate) error: Option<String>,
-    pub(crate) started_at_ms: u64,
-    pub(crate) updated_at_ms: u64,
-}
-
-impl ProviderLoginAttempt {
-    pub(crate) fn is_active(&self) -> bool {
-        matches!(self.state.as_str(), "starting" | "waiting_for_user")
-    }
-
-    pub(crate) fn is_terminal(&self) -> bool {
-        !self.is_active()
-    }
-}
-
 struct AttemptControl {
     view: Arc<RwLock<ProviderLoginAttempt>>,
     stdin: Arc<Mutex<Option<ChildStdin>>>,
@@ -62,12 +38,42 @@ struct AttemptControl {
     upstream_login_id: Option<String>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(crate) struct ProviderAuthRuntime {
     attempts: Arc<RwLock<HashMap<String, Arc<AttemptControl>>>>,
+    journal: ProviderAuthAttemptStore,
+    start_gate: Arc<Mutex<()>>,
+}
+
+impl Default for ProviderAuthRuntime {
+    fn default() -> Self {
+        Self::new(crate::node_agent_provider_auth_attempt_store::default_journal_path(None))
+    }
 }
 
 impl ProviderAuthRuntime {
+    pub(crate) fn new(path: std::path::PathBuf) -> Self {
+        let (journal, recovered) = ProviderAuthAttemptStore::load(path);
+        let mut attempts = HashMap::new();
+        for view in recovered {
+            let (cancel_tx, _) = watch::channel(false);
+            attempts.insert(
+                view.login_id.clone(),
+                Arc::new(AttemptControl {
+                    view: Arc::new(RwLock::new(view)),
+                    stdin: Arc::new(Mutex::new(None)),
+                    cancel_tx,
+                    upstream_login_id: None,
+                }),
+            );
+        }
+        Self {
+            attempts: Arc::new(RwLock::new(attempts)),
+            journal,
+            start_gate: Arc::new(Mutex::new(())),
+        }
+    }
+
     pub(crate) async fn latest(&self, provider_id: &str) -> Option<ProviderLoginAttempt> {
         self.prune().await;
         let controls = self
@@ -101,7 +107,12 @@ impl ProviderAuthRuntime {
         &self,
         program: &Path,
         flow: &str,
+        request_id: Option<&str>,
     ) -> Result<ProviderLoginAttempt> {
+        let _start = self.start_gate.lock().await;
+        if let Some(existing) = self.idempotent_attempt("codex_cli", request_id).await {
+            return Ok(existing);
+        }
         if let Some(active) = self.active_attempt("codex_cli").await {
             return Ok(active);
         }
@@ -135,15 +146,19 @@ impl ProviderAuthRuntime {
         let instructions = codex_login_instructions(&result)?;
         let now = now_ms();
         let view = ProviderLoginAttempt {
+            schema_version: 2,
             login_id: Uuid::new_v4().to_string(),
             provider_id: "codex_cli".to_string(),
             flow: flow.to_string(),
             state: "waiting_for_user".to_string(),
+            request_id: request_id.map(ToOwned::to_owned),
             verification_url: instructions.verification_url,
             user_code: instructions.user_code,
             auth_url: instructions.auth_url,
             remote_compatible: flow == "device_code",
+            recovered: false,
             error: None,
+            error_code: None,
             started_at_ms: now,
             updated_at_ms: now,
         };
@@ -158,7 +173,15 @@ impl ProviderAuthRuntime {
         .await
     }
 
-    pub(crate) async fn start_gemini_login(&self, program: &Path) -> Result<ProviderLoginAttempt> {
+    pub(crate) async fn start_gemini_login(
+        &self,
+        program: &Path,
+        request_id: Option<&str>,
+    ) -> Result<ProviderLoginAttempt> {
+        let _start = self.start_gate.lock().await;
+        if let Some(existing) = self.idempotent_attempt("gemini_cli", request_id).await {
+            return Ok(existing);
+        }
         if let Some(active) = self.active_attempt("gemini_cli").await {
             return Ok(active);
         }
@@ -192,15 +215,19 @@ impl ProviderAuthRuntime {
         .await?;
         let now = now_ms();
         let view = ProviderLoginAttempt {
+            schema_version: 2,
             login_id: Uuid::new_v4().to_string(),
             provider_id: "gemini_cli".to_string(),
             flow: "agent".to_string(),
             state: "waiting_for_user".to_string(),
+            request_id: request_id.map(ToOwned::to_owned),
             verification_url: None,
             user_code: None,
             auth_url: None,
             remote_compatible: false,
+            recovered: false,
             error: None,
+            error_code: None,
             started_at_ms: now,
             updated_at_ms: now,
         };
@@ -208,14 +235,34 @@ impl ProviderAuthRuntime {
             .await
     }
 
-    pub(crate) async fn start_claude_login(&self, program: &Path) -> Result<ProviderLoginAttempt> {
-        self.start_process_login("claude_cli", "agent", program, &["auth", "login"])
-            .await
+    pub(crate) async fn start_claude_login(
+        &self,
+        program: &Path,
+        request_id: Option<&str>,
+    ) -> Result<ProviderLoginAttempt> {
+        self.start_process_login(
+            "claude_cli",
+            "agent",
+            program,
+            &["auth", "login"],
+            request_id,
+        )
+        .await
     }
 
-    pub(crate) async fn start_copilot_login(&self, program: &Path) -> Result<ProviderLoginAttempt> {
-        self.start_process_login("copilot_cli", "agent", program, &["login", "--web-flow"])
-            .await
+    pub(crate) async fn start_copilot_login(
+        &self,
+        program: &Path,
+        request_id: Option<&str>,
+    ) -> Result<ProviderLoginAttempt> {
+        self.start_process_login(
+            "copilot_cli",
+            "agent",
+            program,
+            &["login", "--web-flow"],
+            request_id,
+        )
+        .await
     }
 
     pub(crate) async fn cancel(&self, provider_id: &str, login_id: &str) -> Result<()> {
@@ -294,7 +341,12 @@ impl ProviderAuthRuntime {
         flow: &str,
         program: &Path,
         args: &[&str],
+        request_id: Option<&str>,
     ) -> Result<ProviderLoginAttempt> {
+        let _start = self.start_gate.lock().await;
+        if let Some(existing) = self.idempotent_attempt(provider_id, request_id).await {
+            return Ok(existing);
+        }
         if let Some(active) = self.active_attempt(provider_id).await {
             return Ok(active);
         }
@@ -311,15 +363,19 @@ impl ProviderAuthRuntime {
             .with_context(|| format!("无法启动官方 CLI：{}", program.display()))?;
         let now = now_ms();
         let view = ProviderLoginAttempt {
+            schema_version: 2,
             login_id: Uuid::new_v4().to_string(),
             provider_id: provider_id.to_string(),
             flow: flow.to_string(),
             state: "waiting_for_user".to_string(),
+            request_id: request_id.map(ToOwned::to_owned),
             verification_url: None,
             user_code: None,
             auth_url: None,
             remote_compatible: false,
+            recovered: false,
             error: None,
+            error_code: None,
             started_at_ms: now,
             updated_at_ms: now,
         };
@@ -334,7 +390,13 @@ impl ProviderAuthRuntime {
                 upstream_login_id: None,
             }),
         );
-        tokio::spawn(monitor_process_login(child, public, cancel_rx));
+        self.journal.upsert(&view);
+        tokio::spawn(monitor_process_login(
+            child,
+            public,
+            cancel_rx,
+            self.journal.clone(),
+        ));
         Ok(view)
     }
 
@@ -359,6 +421,7 @@ impl ProviderAuthRuntime {
             .write()
             .await
             .insert(view.login_id.clone(), control);
+        self.journal.upsert(&view);
         tokio::spawn(monitor_login(
             kind,
             child,
@@ -367,6 +430,7 @@ impl ProviderAuthRuntime {
             public,
             cancel_rx,
             upstream_login_id,
+            self.journal.clone(),
         ));
         Ok(view)
     }
@@ -375,6 +439,28 @@ impl ProviderAuthRuntime {
         self.latest(provider_id)
             .await
             .filter(|view| view.is_active())
+    }
+
+    async fn idempotent_attempt(
+        &self,
+        provider_id: &str,
+        request_id: Option<&str>,
+    ) -> Option<ProviderLoginAttempt> {
+        let request_id = request_id?;
+        let controls = self
+            .attempts
+            .read()
+            .await
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        for control in controls {
+            let view = control.view.read().await;
+            if view.provider_id == provider_id && view.request_id.as_deref() == Some(request_id) {
+                return Some(view.clone());
+            }
+        }
+        None
     }
 
     async fn cancel_active(&self, provider_id: &str) {
@@ -404,6 +490,7 @@ impl ProviderAuthRuntime {
                 .write()
                 .await
                 .retain(|id, _| !expired.contains(id));
+            self.journal.remove(&expired);
         }
     }
 }
@@ -418,10 +505,11 @@ async fn monitor_process_login(
     mut child: Child,
     view: Arc<RwLock<ProviderLoginAttempt>>,
     mut cancel_rx: watch::Receiver<bool>,
+    journal: ProviderAuthAttemptStore,
 ) {
     tokio::select! {
         _ = cancel_rx.changed() => {
-            set_attempt_state(&view, "canceled", None).await;
+            set_attempt_state(&view, "canceled", None, None, &journal).await;
             stop_child(&mut child).await;
         }
         _ = tokio::time::sleep(LOGIN_TIMEOUT) => {
@@ -429,18 +517,22 @@ async fn monitor_process_login(
                 &view,
                 "expired",
                 Some("登录等待已超过 15 分钟，请重新发起。".to_string()),
+                Some("login_expired"),
+                &journal,
             ).await;
             stop_child(&mut child).await;
         }
         result = child.wait() => {
             match result {
-                Ok(status) if status.success() => set_attempt_state(&view, "completed", None).await,
+                Ok(status) if status.success() => set_attempt_state(&view, "completed", None, None, &journal).await,
                 Ok(status) => set_attempt_state(
                     &view,
                     "failed",
                     Some(format!("官方 CLI 登录进程退出码 {:?}。", status.code())),
+                    Some("provider_process_failed"),
+                    &journal,
                 ).await,
-                Err(error) => set_attempt_state(&view, "failed", Some(safe_error(&error.to_string()))).await,
+                Err(error) => set_attempt_state(&view, "failed", Some(safe_error(&error.to_string())), Some("provider_process_failed"), &journal).await,
             }
         }
     }
@@ -454,6 +546,7 @@ async fn monitor_login(
     view: Arc<RwLock<ProviderLoginAttempt>>,
     mut cancel_rx: watch::Receiver<bool>,
     upstream_login_id: Option<String>,
+    journal: ProviderAuthAttemptStore,
 ) {
     let deadline = Instant::now() + LOGIN_TIMEOUT;
     loop {
@@ -467,35 +560,36 @@ async fn monitor_login(
                         })).await;
                     }
                 }
-                set_attempt_state(&view, "canceled", None).await;
+                set_attempt_state(&view, "canceled", None, None, &journal).await;
                 break;
             }
             _ = tokio::time::sleep_until(deadline) => {
-                set_attempt_state(&view, "expired", Some("登录等待已超过 15 分钟，请重新发起。".to_string())).await;
+                set_attempt_state(&view, "expired", Some("登录等待已超过 15 分钟，请重新发起。".to_string()), Some("login_expired"), &journal).await;
                 break;
             }
             read = reader.read_line(&mut line) => {
                 match read {
                     Ok(0) => {
                         if view.read().await.is_active() {
-                            set_attempt_state(&view, "failed", Some("官方 CLI 登录进程已提前退出。".to_string())).await;
+                            set_attempt_state(&view, "failed", Some("官方 CLI 登录进程已提前退出。".to_string()), Some("provider_process_failed"), &journal).await;
                         }
                         break;
                     }
                     Ok(_) if line.len() > MAX_RPC_LINE_BYTES => {
-                        set_attempt_state(&view, "failed", Some("官方 CLI 返回了超出限制的登录消息。".to_string())).await;
+                        set_attempt_state(&view, "failed", Some("官方 CLI 返回了超出限制的登录消息。".to_string()), Some("provider_protocol_error"), &journal).await;
                         break;
                     }
                     Ok(_) => {
                         if let Ok(message) = serde_json::from_str::<Value>(&line) {
                             if let Some((state, error)) = login_terminal_state(kind, &message, upstream_login_id.as_deref()) {
-                                set_attempt_state(&view, state, error).await;
+                                let code = (state == "failed").then_some("provider_login_failed");
+                                set_attempt_state(&view, state, error, code, &journal).await;
                                 break;
                             }
                         }
                     }
                     Err(error) => {
-                        set_attempt_state(&view, "failed", Some(safe_error(&error.to_string()))).await;
+                        set_attempt_state(&view, "failed", Some(safe_error(&error.to_string())), Some("provider_protocol_error"), &journal).await;
                         break;
                     }
                 }
@@ -553,11 +647,15 @@ async fn set_attempt_state(
     view: &Arc<RwLock<ProviderLoginAttempt>>,
     state: &str,
     error: Option<String>,
+    error_code: Option<&str>,
+    journal: &ProviderAuthAttemptStore,
 ) {
     let mut view = view.write().await;
     view.state = state.to_string();
     view.error = error;
+    view.error_code = error_code.map(ToOwned::to_owned);
     view.updated_at_ms = now_ms();
+    journal.upsert(&view);
 }
 
 async fn spawn_rpc_process(
@@ -685,7 +783,7 @@ async fn run_provider_command(program: &Path, args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-fn now_ms() -> u64 {
+pub(crate) fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as u64)

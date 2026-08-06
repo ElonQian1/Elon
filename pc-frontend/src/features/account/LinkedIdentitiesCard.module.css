@@ -1,0 +1,14 @@
+.card { padding: 16px; border: 1px solid var(--line-soft); border-radius: 10px; background: #202126; display: flex; flex-direction: column; gap: 12px; }
+.heading strong { color: var(--text); font-size: 14px; }
+.heading p, .notice, .muted, .message { margin: 4px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.identity { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 8px 0; border-top: 1px solid var(--line-soft); }
+.identity img, .providerIcon { width: 36px; height: 36px; border-radius: 50%; flex: 0 0 auto; }
+.providerIcon { display: grid; place-items: center; background: white; color: #4285f4; font-weight: 800; }
+.identityText { flex: 1; min-width: 0; }
+.identityText strong, .identityText span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.identityText strong { color: var(--text); font-size: 13px; }
+.identityText span { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+.identity button { min-height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--text-muted); }
+.identity button:hover { color: var(--red); border-color: var(--red); }
+.message { color: var(--green); }
+.notice { padding-top: 8px; border-top: 1px solid var(--line-soft); }

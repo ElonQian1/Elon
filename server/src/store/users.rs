@@ -70,7 +70,9 @@ impl Store {
             .query_row(
                 "SELECT id, phone, email, password_hash, nickname, role, status
                  FROM users
-                 WHERE (phone = ?1 OR email = ?1 OR id = ?1) AND status = 'active'",
+                 WHERE (phone = ?1 OR email = ?1 OR id = ?1)
+                   AND status = 'active'
+                   AND password_login_enabled = 1",
                 params![account],
                 |row| {
                     Ok((

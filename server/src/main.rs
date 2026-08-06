@@ -5,6 +5,7 @@ use dotenvy::dotenv;
 use std::{net::SocketAddr, sync::Arc};
 use tracing::info;
 
+mod account_identity_migration;
 mod admin;
 mod admin_html;
 mod admin_quota;
@@ -211,6 +212,8 @@ mod external_app_tool_manifest;
 mod external_app_tool_report_api;
 mod external_app_tool_report_contract;
 mod external_app_usage_policy;
+mod federated_auth;
+mod federated_auth_google;
 mod friend_api;
 mod friend_events;
 mod git_command_error;

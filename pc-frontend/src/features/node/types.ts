@@ -409,15 +409,19 @@ export interface LocalCliToolStatus {
 }
 
 export interface AiProviderLoginAttempt {
+  schema_version?: number
   login_id: string
   provider_id: string
   flow: string
   state: 'starting' | 'waiting_for_user' | 'completed' | 'failed' | 'canceled' | 'expired' | string
+  request_id?: string | null
   verification_url?: string | null
   user_code?: string | null
   auth_url?: string | null
   remote_compatible?: boolean
+  recovered?: boolean
   error?: string | null
+  error_code?: string | null
   started_at_ms?: number
   updated_at_ms?: number
 }
@@ -436,6 +440,17 @@ export interface AiProviderAccount {
   credential_owner?: string
   credential_storage?: string
   reason?: string | null
+  enabled?: boolean
+  blocked_reason_code?: string | null
+  capabilities?: {
+    login?: boolean
+    logout?: boolean
+    remote_login?: boolean
+    idempotent_start?: boolean
+    recoverable_status?: boolean
+    credential_export?: boolean
+    web_chat?: boolean
+  }
   cli?: LocalCliToolStatus | null
   active_login?: AiProviderLoginAttempt | null
 }
@@ -443,6 +458,7 @@ export interface AiProviderAccount {
 export interface AiProviderAccountsResponse {
   ok?: boolean
   schema?: string
+  schema_version?: number
   transport?: { local?: string; ownerRelay?: string }
   providers: AiProviderAccount[]
 }

@@ -50,6 +50,7 @@ interface AuthState {
   user: User | null
   login: (username: string, password: string) => Promise<void>
   register: (username: string, password: string, nickname?: string) => Promise<void>
+  acceptSession: (token: string, expiresAt: string, user: User) => void
   logout: () => void
   fetchMe: () => Promise<void>
 }
@@ -81,6 +82,10 @@ export const useAuthStore = create<AuthState>()(
           },
         )
         set({ token: res.token, expiresAt: res.expires_at, user: res.user })
+      },
+
+      acceptSession: (token, expiresAt, user) => {
+        set({ token, expiresAt, user })
       },
 
       logout: () => {

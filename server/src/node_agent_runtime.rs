@@ -139,6 +139,10 @@ impl NodeRuntime {
                 &install_id,
                 node_data_root.paths.as_ref(),
             );
+        let provider_auth_path =
+            crate::node_agent_provider_auth_attempt_store::default_journal_path(
+                node_data_root.paths.as_ref().map(|paths| paths.root()),
+            );
         Self {
             cfg,
             compute_plugin_host,
@@ -169,7 +173,9 @@ impl NodeRuntime {
             lifecycle: node_agent_lifecycle::NodeLifecycleTracker::start(env!("CARGO_PKG_VERSION")),
             tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
             full_access_grants: node_agent_full_access::FullAccessGrantState::load_default(),
-            provider_auth: crate::node_agent_provider_auth_runtime::ProviderAuthRuntime::default(),
+            provider_auth: crate::node_agent_provider_auth_runtime::ProviderAuthRuntime::new(
+                provider_auth_path,
+            ),
             live_ui,
             ui_fit_runs,
             wake: Notify::new(),

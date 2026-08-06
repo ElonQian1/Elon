@@ -67,6 +67,7 @@
 | Sui 离线预检适配器 / 显式任务 / 短时租约 / 摘要漂移阻断 / 追加式报告 / 参考 CLI | `docs/decisions/sui-offline-preflight-adapters-v1.md`、`docs/decisions/sui-offline-preflight-job-leases-v1.md`、`server/src/task_settlement/sui_preflight_*.rs`、`server/src/store/task_sui_preflight_*.rs`、`pc-frontend/src/features/open-commerce/SuiPreflightAdaptersPanel.tsx`、`SuiPreflightJobsPanel.tsx`、`sdk/open-commerce-connector/src/sui-preflight.js`、`sdk/open-commerce-connector/bin/sui-preflight.mjs` |
 | 开放商业能力包 / 现有能力、群体 AI、共享节点、Sui 提案和决策状态 | `docs/open-commerce/README.md`、`docs/open-commerce/capability-baseline.md`、`docs/open-commerce/integration-architecture.md`、`docs/open-commerce/decision-register.md` |
 | 模型供应商和自定义模型 | `server/src/model_*`、`server/src/agent_model_*` |
+| 一龙多身份联合登录 / Google OIDC / Win、APK、Web 登录方式 / AI CLI Provider 控制面 V2 | `docs/unified-account-and-ai-provider-architecture.md`、`server/src/federated_auth*.rs`、`server/src/store/account_identities.rs`、`server/src/node_agent_provider_auth_*.rs`、`pc-frontend/src/features/auth/`、`android/app/src/main/kotlin/com/elon/app/GoogleFederatedAuth.kt` |
 | 用户等级、经验条、token 消耗/分享算力经验 | `server/src/user_progression.rs`、`server/src/store/user_progression.rs`、`server/src/token_usage_api.rs`、`server/src/store/node_ledger.rs` |
 | context compiler / repo map | `server/src/context_compiler/` |
 | 项目 RAG 工具上下文 | `server/src/context_compiler/agent_rag_context.rs` |

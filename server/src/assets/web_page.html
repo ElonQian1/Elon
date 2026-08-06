@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/assets/project_home.css" />
   <link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />
   <link rel="stylesheet" href="/assets/ai_provider_accounts.css" />
+  <link rel="stylesheet" href="/assets/federated_auth.css" />
   <style>
     :root {
       color-scheme: dark;
@@ -4314,6 +4315,11 @@
     </div>
     <div id="loginError" class="error"></div>
     <button id="loginBtn" class="submit" type="submit">登录</button>
+    <div class="federated-login">
+      <div class="federated-divider"><span>或</span></div>
+      <div class="federated-google-host" id="federatedLoginGoogle"></div>
+      <div class="federated-status" id="federatedLoginStatus"></div>
+    </div>
     <div class="hint">网页版是 APK 版在电脑上的体现，所有数据与 APK 互通。</div>
   </form>
 </section>
@@ -4757,6 +4763,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <span class="profile-action-copy"><span class="profile-action-title">AI 厂商账号</span><span class="profile-action-subtitle">Codex / Gemini / Claude / Copilot</span></span>
         <span class="profile-action-chevron" aria-hidden="true">›</span>
       </button>
+      <button class="profile-row" id="accountIdentitiesRow" type="button">
+        <span class="profile-action-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2"><circle cx="16" cy="10" r="5"/><path d="M6 27c1-7 5-10 10-10s9 3 10 10"/></svg>
+        </span>
+        <span class="profile-action-copy"><span class="profile-action-title">账号与安全</span><span class="profile-action-subtitle">绑定多个登录方式</span></span>
+        <span class="profile-action-chevron" aria-hidden="true">›</span>
+      </button>
       <button class="profile-row" id="agentAutomationRow">
         <span class="profile-action-icon" aria-hidden="true">
           <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="16" cy="16" r="11"/><circle cx="16" cy="16" r="5" fill="currentColor" stroke="none"/></svg>
@@ -4798,6 +4811,17 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     </div>
 
   </section>
+
+  <div class="identity-mask" id="accountIdentityMask" aria-hidden="true">
+    <section class="identity-sheet" role="dialog" aria-label="账号与安全">
+      <div class="identity-sheet-head"><h2>登录方式</h2><button id="accountIdentityClose" type="button" aria-label="关闭">×</button></div>
+      <p class="identity-copy">多个登录方式可以进入同一个一龙账号；不会复制 Google 或 AI 厂商凭据。</p>
+      <div id="accountIdentityList"></div>
+      <div class="federated-google-host" id="federatedBindGoogle"></div>
+      <div class="federated-status" id="federatedBindStatus"></div>
+      <p class="identity-security-note">同邮箱不会自动合并。请先登录原一龙账号，再主动绑定。</p>
+    </section>
+  </div>
 
   <div id="webChatSideMenuMask" class="web-chat-side-menu-mask" aria-hidden="true">
     <aside class="web-chat-side-menu" role="dialog" aria-label="项目侧边栏">
@@ -11635,6 +11659,7 @@ if ('serviceWorker' in navigator) {
 <script src="/assets/project_plaza.js"></script>
 <script src="/assets/project_home.js"></script>
 <script src="/assets/ai_provider_accounts.js"></script>
+<script src="/assets/federated_auth.js"></script>
 <style>
   body.ui-tuner-preview-active #uiTunerPreviewSelection {
     position: fixed;

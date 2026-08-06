@@ -173,6 +173,8 @@ mod node_agent_project_profile_node;
 mod node_agent_project_profile_python;
 mod node_agent_project_receipt_mcp;
 mod node_agent_provider_accounts;
+mod node_agent_provider_auth_attempt;
+mod node_agent_provider_auth_attempt_store;
 mod node_agent_provider_auth_protocol;
 mod node_agent_provider_auth_runtime;
 mod node_agent_proxy;

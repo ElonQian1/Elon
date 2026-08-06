@@ -9,6 +9,8 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -18,7 +20,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 class LoginActivity : AppCompatActivity() {
-    private val serverUrl = "http://43.139.149.158:8080"
+    private val serverUrl get() = ElonApplication.activeServerUrl(this).trimEnd('/')
 
     private lateinit var tabLogin: TextView
     private lateinit var tabRegister: TextView
@@ -29,6 +31,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var submitButton: TextView
     private lateinit var skipButton: TextView
     private lateinit var errorText: TextView
+    private lateinit var googleButton: TextView
 
     private var isRegisterMode = false
     private var submitting = false
@@ -51,11 +54,13 @@ class LoginActivity : AppCompatActivity() {
         submitButton = findViewById(R.id.loginSubmitButton)
         skipButton = findViewById(R.id.loginSkipButton)
         errorText = findViewById(R.id.loginErrorText)
+        googleButton = findViewById(R.id.loginGoogleButton)
 
         tabLogin.setOnClickListener { switchMode(false) }
         tabRegister.setOnClickListener { switchMode(true) }
         submitButton.setOnClickListener { onSubmit() }
         skipButton.setOnClickListener { finishToMain() }
+        googleButton.setOnClickListener { signInWithGoogle() }
 
         switchMode(false)
     }
@@ -69,6 +74,7 @@ class LoginActivity : AppCompatActivity() {
             tabLogin.setTextColor(Color.parseColor("#80BEBEBA"))
             nicknameRow.visibility = View.VISIBLE
             submitButton.text = "注册并登录"
+            googleButton.visibility = View.GONE
         } else {
             tabLogin.setBackgroundColor(Color.parseColor("#20262E"))
             tabLogin.setTextColor(Color.parseColor("#F8F7F4"))
@@ -76,8 +82,30 @@ class LoginActivity : AppCompatActivity() {
             tabRegister.setTextColor(Color.parseColor("#80BEBEBA"))
             nicknameRow.visibility = View.GONE
             submitButton.text = "登录"
+            googleButton.visibility = View.VISIBLE
         }
         errorText.visibility = View.GONE
+    }
+
+    private fun signInWithGoogle() {
+        if (submitting) return
+        submitting = true
+        googleButton.isEnabled = false
+        googleButton.text = "正在打开 Google…"
+        errorText.visibility = View.GONE
+        lifecycleScope.launch {
+            try {
+                val result = GoogleFederatedAuth(this@LoginActivity).authenticate("login")
+                AuthManager.handleFederatedAuthResponse(this@LoginActivity, result)
+                finishToMain()
+            } catch (error: Throwable) {
+                showError(error.message ?: "Google 登录失败")
+            } finally {
+                submitting = false
+                googleButton.isEnabled = true
+                googleButton.text = "使用 Google 账号登录"
+            }
+        }
     }
 
     private fun onSubmit() {

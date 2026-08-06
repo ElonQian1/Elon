@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import UserAvatar from '../shell/UserAvatar'
+import LinkedIdentitiesCard from './LinkedIdentitiesCard'
 import styles from './AccountPage.module.css'
 
 interface Balance {
@@ -106,6 +107,11 @@ export default function AccountPage() {
               <span className={styles.userId}>ID：{user?.id}</span>
             </div>
           </div>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>账号与安全</h2>
+          <LinkedIdentitiesCard />
         </section>
 
         {/* 修改昵称 */}

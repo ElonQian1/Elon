@@ -3,6 +3,10 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard};
+mod account_identities;
+#[cfg(test)]
+mod account_identities_tests;
+pub(crate) use account_identities::*;
 mod admin_stats;
 mod admin_stats_quotas;
 mod ai_resource_policies;

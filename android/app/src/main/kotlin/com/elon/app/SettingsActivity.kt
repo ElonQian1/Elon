@@ -64,6 +64,9 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<Button>(R.id.aiProviderAccountsButton).setOnClickListener {
             startActivity(android.content.Intent(this, AiProviderAccountsActivity::class.java))
         }
+        findViewById<Button>(R.id.accountIdentitiesButton).setOnClickListener {
+            startActivity(android.content.Intent(this, AccountIdentityActivity::class.java))
+        }
         findViewById<Button>(R.id.checkUpdateButton).setOnClickListener {
             AppUpdateManager(this).manualCheck()
         }

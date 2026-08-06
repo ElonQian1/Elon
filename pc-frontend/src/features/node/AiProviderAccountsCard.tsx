@@ -70,13 +70,14 @@ export default function AiProviderAccountsCard({ adminUrl }: { adminUrl: string 
 
   async function startLogin(provider: AiProviderAccount) {
     const flow = provider.id === 'codex_cli' ? 'device_code' : 'agent'
+    const requestId = `pc:${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`
     const pendingWindow = provider.id === 'codex_cli' ? window.open('', '_blank') : null
     setBusyProvider(provider.id); setNotice('正在启动厂商官方登录…'); setError('')
     try {
       const data = await nodeApi<AiProviderLoginResponse>(
         adminUrl,
         `/api/ai-provider-accounts/${provider.id}/login`,
-        { method: 'POST', body: JSON.stringify({ flow }) },
+        { method: 'POST', body: JSON.stringify({ flow, request_id: requestId }) },
         25000,
       )
       setAttempt(data.attempt)

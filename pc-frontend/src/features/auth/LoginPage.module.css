@@ -74,6 +74,9 @@
   font-size: 13px;
 }
 
+.divider { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 12px; margin: 10px 0 2px; }
+.divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
 .hint {
   margin-top: 16px;
   font-size: 12px;

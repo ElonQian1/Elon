@@ -132,6 +132,24 @@ object AuthManager {
         return uid
     }
 
+    /** 解析联合登录响应；Provider token 只在服务端验证，不写入本机。 */
+    fun handleFederatedAuthResponse(ctx: Context, body: JSONObject): String {
+        val session = body.optJSONObject("session") ?: throw IllegalStateException("响应缺少 session")
+        val user = body.optJSONObject("user") ?: throw IllegalStateException("响应缺少 user")
+        val token = session.optString("token").trim()
+        val uid = user.optString("id").trim()
+        if (token.isBlank() || uid.isBlank()) throw IllegalStateException("响应缺少登录会话")
+        saveSession(
+            ctx,
+            token,
+            uid,
+            user.optString("account").trim().ifBlank { null },
+            user.optString("nickname").trim().ifBlank { null },
+            parseServerExpiryEpochMillis(session.optString("expires_at")),
+        )
+        return uid
+    }
+
     private fun refreshGlobalWsAuth(ctx: Context) {
         val app = ctx.applicationContext
         (app as? ElonApplication)?.globalWs?.reconnectWithNewToken()

@@ -90,6 +90,7 @@ async fn list_handler(State(runtime): State<Arc<NodeRuntime>>) -> Json<Value> {
 #[derive(Deserialize, Default)]
 struct StartLoginRequest {
     flow: Option<String>,
+    request_id: Option<String>,
 }
 
 async fn start_login_handler(
@@ -103,6 +104,16 @@ async fn start_login_handler(
             reserved_provider_message(&raw_provider_id),
         );
     };
+    let request_id = request.request_id.as_deref().map(str::trim);
+    if request_id.is_some_and(|value| {
+        value.is_empty()
+            || value.len() > 128
+            || !value
+                .chars()
+                .all(|character| character.is_ascii_alphanumeric() || "-_.:".contains(character))
+    }) {
+        return provider_error(StatusCode::BAD_REQUEST, "request_id 格式无效。");
+    }
     let probe = runtime.refresh_cli_probe_now().await;
     let Some(program) = runnable_program(&probe, provider_id) else {
         return provider_error(
@@ -120,7 +131,7 @@ async fn start_login_handler(
                 .unwrap_or("device_code");
             runtime
                 .provider_auth
-                .start_codex_login(&program, flow)
+                .start_codex_login(&program, flow, request_id)
                 .await
         }
         "gemini_cli" => {
@@ -134,10 +145,23 @@ async fn start_login_handler(
                     "Gemini ACP 公开登录目前只支持由 Gemini CLI 在 Win 端接管浏览器流程。",
                 );
             }
-            runtime.provider_auth.start_gemini_login(&program).await
+            runtime
+                .provider_auth
+                .start_gemini_login(&program, request_id)
+                .await
         }
-        "claude_cli" => runtime.provider_auth.start_claude_login(&program).await,
-        "copilot_cli" => runtime.provider_auth.start_copilot_login(&program).await,
+        "claude_cli" => {
+            runtime
+                .provider_auth
+                .start_claude_login(&program, request_id)
+                .await
+        }
+        "copilot_cli" => {
+            runtime
+                .provider_auth
+                .start_copilot_login(&program, request_id)
+                .await
+        }
         _ => unreachable!(),
     };
     match result {
@@ -145,7 +169,7 @@ async fn start_login_handler(
             StatusCode::ACCEPTED,
             Json(json!({
                 "ok": true,
-                "schema": "elon.ai_provider_login.v1",
+                "schema": "elon.ai_provider_login.v2",
                 "attempt": attempt,
             })),
         ),
@@ -170,7 +194,7 @@ async fn login_status_handler(
         StatusCode::OK,
         Json(json!({
             "ok": true,
-            "schema": "elon.ai_provider_login.v1",
+            "schema": "elon.ai_provider_login.v2",
             "attempt": attempt,
         })),
     )
@@ -240,7 +264,14 @@ pub(crate) fn accounts_payload(
 ) -> Value {
     json!({
         "ok": true,
-        "schema": "elon.ai_provider_accounts.v1",
+        "schema": "elon.ai_provider_accounts.v2",
+        "schema_version": 2,
+        "recovery": {
+            "journal": "sanitized_local_node_store",
+            "active_attempt_after_restart": "failed_node_restarted",
+            "retention_hours": 24,
+            "idempotency_key": "request_id"
+        },
         "transport": {
             "local": "/api/ai-provider-accounts",
             "ownerRelay": "/api/pc-relay/{agent_id}/api/ai-provider-accounts"
@@ -259,6 +290,7 @@ pub(crate) fn accounts_payload(
                 "logout_supported": true,
                 "credential_owner": "codex_cli",
                 "credential_storage": "official_cli_store_with_explicit_codex_vault_backup",
+                "capabilities": provider_capabilities(true, true, true, true),
                 "cli": cli_tool(probe, "codex_cli"),
                 "active_login": codex_attempt,
             },
@@ -275,6 +307,7 @@ pub(crate) fn accounts_payload(
                 "logout_supported": true,
                 "credential_owner": "gemini_cli",
                 "credential_storage": "official_cli_store_only",
+                "capabilities": provider_capabilities(true, true, false, true),
                 "cli": cli_tool(probe, "gemini_cli"),
                 "active_login": gemini_attempt,
             },
@@ -291,6 +324,7 @@ pub(crate) fn accounts_payload(
                 "logout_supported": true,
                 "credential_owner": "claude_code",
                 "credential_storage": "official_cli_store_only",
+                "capabilities": provider_capabilities(true, true, false, true),
                 "cli": cli_tool(probe, "claude_cli"),
                 "active_login": claude_attempt,
             },
@@ -307,6 +341,7 @@ pub(crate) fn accounts_payload(
                 "logout_supported": false,
                 "credential_owner": "copilot_cli",
                 "credential_storage": "official_cli_system_credential_store",
+                "capabilities": provider_capabilities(true, false, false, true),
                 "cli": cli_tool_with_attempt(probe, "copilot_cli", copilot_attempt.as_ref()),
                 "active_login": copilot_attempt,
             },
@@ -340,7 +375,29 @@ fn reserved_provider(id: &str, vendor: &str, label: &str, reason: &str) -> Value
         "logout_supported": false,
         "credential_owner": "vendor",
         "credential_storage": "not_available",
+        "enabled": false,
+        "blocked_reason_code": "official_web_chat_adapter_unavailable",
+        "capabilities": provider_capabilities(false, false, false, false),
         "reason": reason,
+    })
+}
+
+fn provider_capabilities(
+    login: bool,
+    logout: bool,
+    remote_login: bool,
+    recoverable_status: bool,
+) -> Value {
+    json!({
+        "login": login,
+        "login_status": login,
+        "cancel_login": login,
+        "logout": logout,
+        "remote_login": remote_login,
+        "idempotent_start": login,
+        "recoverable_status": recoverable_status,
+        "credential_export": false,
+        "web_chat": false
     })
 }
 

@@ -183,6 +183,27 @@
             android:textSize="15sp" />
 
         <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:gravity="center"
+            android:text="或"
+            android:textColor="@color/elon_text_tertiary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/loginGoogleButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_dark_button"
+            android:gravity="center"
+            android:text="使用 Google 账号登录"
+            android:textColor="@color/elon_text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <TextView
             android:id="@+id/loginSkipButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
