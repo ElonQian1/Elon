@@ -2,7 +2,7 @@
 
 ## 1. 状态
 
-当前状态为 `partial_implementation_compiled`。Windows 受管文件系统已经具备同句柄删除原语，候选下载校验链也会保留可删除目录与文件 custody；生产 Host 尚未接入清理入口，SQLite cleanup authorization、完成回执、目录树执行器和跨重启恢复仍未实现。
+当前状态为 `partial_implementation_compiled`。Windows 受管文件系统已经具备同句柄删除原语，候选下载校验链也会保留可删除目录与文件 custody；SQLite authority schema 已加入不可变 cleanup authorization、completion receipt 以及 `owned -> cleanup_pending -> cleaned` 状态门卫。生产 Host 尚未接入 typed Store、目录树执行器、完成事务和跨重启恢复，因此当前仍不会自动清理失败候选。
 
 本文只维护失败候选清理边界。候选本机真源见 `node-plugin-local-authority.md`，健康失败与 quarantine 见 `node-ready-capability.md`，staging 物化见 `node-plugin-archive-extraction.md`。
 
@@ -18,6 +18,16 @@
 
 `PinnedComputePluginCandidateArtifactSet` 现在保留完整 `PinnedComputePluginCandidateDownloads`，而不只保留根锁 lease。因此 verified、staged、健康评估和 quarantine 链没有提前丢失 downloads 目录句柄；新建 staging 文件与目录也天然保留删除权。
 
+SQLite v3 schema 还具备以下约束：
+
+1. `candidate_cleanup_authorizations` 只接受绑定 failed quarantine、staging receipt、candidate owner、inventory、authority/process fence 与可信时间的不可变授权回执。
+2. candidate owner 只有在授权回执已经持久化后，才能从 `owned` 进入 `cleanup_pending`。
+3. `cleanup_pending` 仍计入单插件活动候选唯一约束，清理未完成时不能创建替代候选。
+4. `candidate_cleanup_completions` 只接受绑定原授权、执行证据和新 inventory fence 的不可变完成回执。
+5. candidate owner 只有在完成回执已经持久化后，才能从 `cleanup_pending` 进入 `cleaned`。
+
+这些对象目前仍属于预生产 schema v3：缺少新对象或定义不一致的同版本库会失败关闭并要求重建，不提供旧 schema 原地迁移。
+
 ## 3. 当前能力不代表什么
 
 底层句柄拥有删除权，不等于业务层已经授权删除。以下对象都不能单独触发清理：
@@ -29,7 +39,7 @@
 - `failed` slot phase；
 - 调用方传入的布尔值、路径或 candidate token。
 
-当前生产路径不会自动删除失败候选，也不会释放 candidate owner、清空 candidate pointer、创建新候选、恢复下载或允许重试。
+当前生产路径不会自动删除失败候选，也不会释放 candidate owner、清空 candidate pointer、创建新候选、恢复下载或允许重试。schema 中存在授权表和完成表，不等于生产代码已经能够签发授权或写入真实完成证据。
 
 ## 4. 后续必须保持的事务顺序
 
@@ -60,8 +70,8 @@
 2. 非空目录删除失败后保留原目录 custody，删除子文件后用同一 custody 重试；
 3. 重新固定既有文件的 cleanup 句柄并完成文件与目录删除。
 
-这些测试证明底层 Windows 语义，不证明 cleanup authority、SQLite 完成事务、崩溃恢复或生产 Host 接线。
+上述 Windows 测试证明底层句柄语义。另有 schema 定向测试证明 cleanup 两张表、六个不可变/写入 fence trigger、owner 两个转换门卫、活动候选唯一约束可以安装并按相同指纹重开；这些测试仍不证明 typed cleanup Store、物理目录树执行、SQLite 完成事务、崩溃恢复或生产 Host 接线。
 
 ## 7. 下一批实现边界
 
-下一批应先增加 cleanup authorization schema、typed permit 与 outcome-uncertain recovery，再实现目录树线性执行器和 completion Store。不得先暴露“按 candidate token 删除目录”的管理接口，否则会绕过 quarantine、owner 和 fence 合同。
+下一批应先实现私有 cleanup authorization Store，把 schema 行转换成持有精确候选 custody 的 typed permit，并提供 outcome-uncertain recovery；之后再实现目录树线性执行器、completion Store 与失败恢复。不得先暴露“按 candidate token 删除目录”的管理接口，否则会绕过 quarantine、owner 和 fence 合同。
