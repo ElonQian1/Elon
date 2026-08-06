@@ -142,6 +142,7 @@ WHEN NOT EXISTS (
       AND candidate.state = 'owned'
       AND quarantine.slot_phase_after = 'failed'
       AND quarantine.failed_at_ms < NEW.authorized_at_ms
+      AND quarantine.failed_at_ms <= NEW.trusted_time_high_water_ms_before
       AND quarantine.authority_state_revision_after <= NEW.authority_state_revision_before
       AND quarantine.inventory_revision_after <= NEW.inventory_revision
       AND quarantine.authority_epoch_after <= NEW.authority_epoch_before
@@ -186,6 +187,7 @@ WHEN NOT EXISTS (
       AND meta.process_owner_epoch = NEW.process_owner_epoch
       AND candidate.state = 'cleanup_pending'
       AND authorization.authorized_at_ms < NEW.completed_at_ms
+      AND authorization.authorized_at_ms <= NEW.trusted_time_high_water_ms_before
       AND authorization.authority_state_revision_after <= NEW.authority_state_revision_before
       AND authorization.inventory_revision <= NEW.inventory_revision_before
       AND authorization.authority_epoch_after <= NEW.authority_epoch_before

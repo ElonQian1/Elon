@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use rusqlite::{named_params, params, Transaction};
 
 use super::{
-    binding::read_candidate_cleanup_binding,
+    binding::{read_candidate_cleanup_binding, validate_failed_candidate_inventory},
     types::{
         ComputePluginCandidateCleanupAuthorizationReceipt,
         HashedComputePluginCandidateCleanupAuthorizationReceipt,
@@ -28,6 +28,12 @@ pub(super) fn persist_candidate_cleanup_authorization(
     session: &ComputePluginCandidateCleanupAuthoritySession<'_>,
     permit: ValidatedCandidateCleanupAuthorizationPermit<'_, '_>,
 ) -> Result<HashedComputePluginCandidateCleanupAuthorizationReceipt> {
+    let guard = permit
+        .quarantined()
+        .staged()
+        .archive()
+        .snapshot_cancellation_guard();
+    session.validate_source(&guard)?;
     let current = read_candidate_cleanup_binding(transaction, session, permit.quarantined())?;
     if &current != permit.facts() {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_AUTHORITY_CHANGED");
@@ -44,6 +50,7 @@ pub(super) fn persist_candidate_cleanup_authorization(
     }
     advance_trusted_time(transaction, &time_state, current.authorized_at_ms())?;
     update_cleanup_authority_meta(transaction, &authority, &current)?;
+    session.validate_source(&guard)?;
 
     let receipt = ComputePluginCandidateCleanupAuthorizationReceipt {
         schema: CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA.to_string(),
@@ -72,8 +79,9 @@ pub(super) fn persist_candidate_cleanup_authorization(
         digest_algorithm: CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_DIGEST_ALGORITHM.to_string(),
     };
     insert_authorization(transaction, &permit, &hashed)?;
-    mark_owner_cleanup_pending(transaction, &permit)?;
-    validate_readback(transaction, &permit, &hashed)?;
+    mark_owner_cleanup_pending(transaction, &permit, &hashed)?;
+    validate_readback(transaction, session, &permit, &hashed)?;
+    session.validate_source(&guard)?;
     Ok(hashed)
 }
 
@@ -215,6 +223,7 @@ fn insert_authorization(
 fn mark_owner_cleanup_pending(
     transaction: &Transaction<'_>,
     permit: &ValidatedCandidateCleanupAuthorizationPermit<'_, '_>,
+    hashed: &HashedComputePluginCandidateCleanupAuthorizationReceipt,
 ) -> Result<()> {
     let candidate_token = permit
         .quarantined()
@@ -226,8 +235,16 @@ fn mark_owner_cleanup_pending(
             r#"UPDATE candidate_owners SET state = 'cleanup_pending'
                WHERE candidate_token = ?1 AND state = 'owned'
                  AND closed_at_ms IS NULL AND closed_by_plan_id IS NULL
-                 AND closed_by_plan_digest IS NULL AND close_reason IS NULL"#,
-            params![candidate_token],
+                 AND closed_by_plan_digest IS NULL AND close_reason IS NULL
+                 AND EXISTS (
+                     SELECT 1 FROM candidate_cleanup_authorizations
+                     WHERE candidate_token = ?1 AND cleanup_id = ?2 AND receipt_digest = ?3
+                 )"#,
+            params![
+                candidate_token,
+                hashed.receipt().cleanup_id(),
+                hashed.receipt_digest(),
+            ],
         )
         .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_OWNER_UPDATE")?;
     if updated != 1 {
@@ -238,33 +255,73 @@ fn mark_owner_cleanup_pending(
 
 fn validate_readback(
     transaction: &Transaction<'_>,
+    session: &ComputePluginCandidateCleanupAuthoritySession<'_>,
     permit: &ValidatedCandidateCleanupAuthorizationPermit<'_, '_>,
     hashed: &HashedComputePluginCandidateCleanupAuthorizationReceipt,
 ) -> Result<()> {
     let receipt = hashed.receipt();
-    let candidate_token = permit
-        .quarantined()
-        .staged()
-        .recovery_key()
-        .candidate_token();
+    let staging = permit.quarantined().staged().recovery_key();
+    let candidate_token = staging.candidate_token();
+    let slot = staging.slot_expectation();
+    let expected = staging.receipt_expectation();
+    let release_json = serde_json::to_string(&slot.release)
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_READBACK_RELEASE_SERIALIZE")?;
     let row_count = transaction
         .query_row(
             r#"SELECT COUNT(*) FROM candidate_cleanup_authorizations
                WHERE cleanup_id = ?1 AND candidate_token = ?2
-                 AND receipt_digest = ?3 AND authorized_at_ms = ?4"#,
+                 AND candidate_token_digest = ?3 AND quarantine_id = ?4
+                 AND quarantine_receipt_digest = ?5 AND staging_id = ?6
+                 AND staging_run_digest = ?7
+                 AND authority_state_revision_before = ?8
+                 AND authority_state_revision_after = ?9
+                 AND inventory_revision = ?10 AND inventory_digest = ?11
+                 AND authority_epoch_before = ?12 AND authority_epoch_after = ?13
+                 AND process_owner_epoch = ?14
+                 AND trusted_time_high_water_ms_before = ?15
+                 AND authorized_at_ms = ?16 AND slot_phase_before = 'failed'
+                 AND receipt_digest = ?17"#,
             params![
                 receipt.cleanup_id(),
                 candidate_token,
-                hashed.receipt_digest(),
+                receipt.candidate_token_digest(),
+                receipt.quarantine_id(),
+                receipt.quarantine_receipt_digest(),
+                receipt.staging_id(),
+                receipt.staging_run_digest(),
+                receipt.authority_state_revision_before(),
+                receipt.authority_state_revision_after(),
+                receipt.inventory_revision(),
+                receipt.inventory_digest(),
+                receipt.authority_epoch_before(),
+                receipt.authority_epoch_after(),
+                receipt.process_owner_epoch(),
+                receipt.trusted_time_high_water_ms_before(),
                 receipt.authorized_at_ms(),
+                hashed.receipt_digest(),
             ],
             |row| row.get::<_, i64>(0),
         )
         .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_AUTHORIZATION_READBACK")?;
     let owner_count = transaction
         .query_row(
-            "SELECT COUNT(*) FROM candidate_owners WHERE candidate_token = ?1 AND state = 'cleanup_pending'",
-            params![candidate_token],
+            r#"SELECT COUNT(*) FROM candidate_owners
+               WHERE candidate_token = ?1 AND plugin_id = ?2 AND slot_ref = ?3
+                 AND candidate_generation = ?4 AND release_json = ?5
+                 AND owner_plan_id = ?6 AND owner_plan_digest = ?7
+                 AND application_inventory_revision = ?8 AND state = 'cleanup_pending'
+                 AND closed_at_ms IS NULL AND closed_by_plan_id IS NULL
+                 AND closed_by_plan_digest IS NULL AND close_reason IS NULL"#,
+            params![
+                candidate_token,
+                slot.plugin_id.as_str(),
+                slot.slot_ref.as_str(),
+                expected.candidate_generation,
+                release_json,
+                expected.owner_plan_id.as_str(),
+                expected.owner_plan_digest.as_str(),
+                expected.application_inventory_revision,
+            ],
             |row| row.get::<_, i64>(0),
         )
         .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_OWNER_READBACK")?;
@@ -286,8 +343,24 @@ fn validate_readback(
             |row| row.get::<_, i64>(0),
         )
         .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_META_READBACK")?;
-    if row_count != 1 || owner_count != 1 || meta_count != 1 {
+    let authority = read_authority_plan_application_state(transaction, &session.trusted_now)?;
+    if row_count != 1
+        || owner_count != 1
+        || meta_count != 1
+        || authority.state_revision != receipt.authority_state_revision_after()
+        || authority.inventory.inventory_revision != receipt.inventory_revision()
+        || authority.inventory_digest != receipt.inventory_digest()
+        || authority.authority_epoch != receipt.authority_epoch_after()
+        || authority.process_owner_epoch != receipt.process_owner_epoch()
+        || authority.trusted_time_high_water_ms != receipt.authorized_at_ms()
+    {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_AUTHORIZATION_READBACK_CHANGED");
     }
+    validate_failed_candidate_inventory(
+        &authority.inventory,
+        &slot.plugin_id,
+        &slot.slot_ref,
+        &slot.release,
+    )?;
     Ok(())
 }

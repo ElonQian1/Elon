@@ -341,8 +341,10 @@ pub(super) fn read_created_candidates(
         let token_digest = jcs_sha256_hex(&token)?;
         let release: ComputePluginReleaseRef = serde_json::from_str(&release_json)
             .context("COMPUTE_PLUGIN_PLAN_REPLAY_CANDIDATE_RELEASE")?;
-        if !matches!(state.as_str(), "owned" | "released" | "promoted")
-            || !is_identifier(&token)
+        if !matches!(
+            state.as_str(),
+            "owned" | "cleanup_pending" | "released" | "promoted" | "cleaned"
+        ) || !is_identifier(&token)
             || !candidate_identity_is_valid(&token_digest, &slot_ref, generation)
             || !is_sha256(&grant)
             || owner_plan_digest != plan_digest

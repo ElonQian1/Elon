@@ -17,11 +17,13 @@ use super::{
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::CandidateCleanupAuthorizationRecoveryKey,
+    fetch_contract::ComputePluginFetchCancellationGuard,
     lifecycle::SLOT_FAILED,
     local_authority::{
+        health_quarantine_store::ComputePluginCandidateHealthQuarantineReceipt,
         plan_application::read_authority_plan_application_state,
-        ComputePluginAuthorityInstanceBinding, ComputePluginFetchProcessFence,
-        ComputePluginLocalAuthority,
+        staging_store::ComputePluginCandidateStagingReceipt, ComputePluginAuthorityInstanceBinding,
+        ComputePluginFetchProcessFence, ComputePluginLocalAuthority,
     },
     manifest_validation::is_sha256,
     signed_artifact_verification::jcs_sha256_hex,
@@ -115,6 +117,13 @@ impl ComputePluginCandidateCleanupRecoveryAuthoritySession<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn clock_epoch_digest(&self) -> &str {
         &self.clock_epoch_digest
     }
+    pub(in crate::node_agent_compute_plugin_host) fn validate_source(
+        &self,
+        guard: &ComputePluginFetchCancellationGuard,
+    ) -> Result<()> {
+        guard.validate_source(self.process_fence.cancellation_source())?;
+        guard.ensure_current()
+    }
     pub(in crate::node_agent_compute_plugin_host) fn read_candidate_cleanup_authorization_outcome(
         &self,
         key: &CandidateCleanupAuthorizationRecoveryKey,
@@ -163,7 +172,6 @@ fn read_outcome(
 ) -> Result<ComputePluginCandidateCleanupRecoveryOutcome> {
     let stored = read_exact_row(transaction, key)?;
     let identity_matches = count_identity_matches(transaction, key)?;
-    let owner_state = read_owner_state(transaction, key.candidate_token())?;
     let authority = read_authority_plan_application_state(transaction, &session.trusted_now)?;
     let expected = key.receipt_expectation();
     let slot = key.slot_expectation();
@@ -182,7 +190,8 @@ fn read_outcome(
     match stored {
         Some(row) => {
             if identity_matches != 1
-                || owner_state.as_deref() != Some("cleanup_pending")
+                || count_owner_state(transaction, key, "cleanup_pending")? != 1
+                || count_completion(transaction, key)? != 0
                 || authority.state_revision != expected.authority_state_revision_after
                 || authority.inventory.inventory_revision != expected.inventory_revision
                 || authority.inventory_digest != expected.inventory_digest
@@ -191,13 +200,15 @@ fn read_outcome(
             {
                 bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_RESULT_AMBIGUOUS");
             }
+            validate_recorded_chain(transaction, key)?;
             Ok(ComputePluginCandidateCleanupRecoveryOutcome::Authorized(
                 decode_recorded_row(key, row)?,
             ))
         }
         None => {
             if identity_matches != 0
-                || owner_state.as_deref() != Some("owned")
+                || count_owner_state(transaction, key, "owned")? != 1
+                || count_completion(transaction, key)? != 0
                 || authority.state_revision != expected.authority_state_revision_before
                 || authority.inventory.inventory_revision != expected.inventory_revision
                 || authority.inventory_digest != expected.inventory_digest
@@ -207,22 +218,40 @@ fn read_outcome(
             {
                 bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_ABSENCE_AMBIGUOUS");
             }
+            validate_recorded_chain(transaction, key)?;
             Ok(ComputePluginCandidateCleanupRecoveryOutcome::NotCreated)
         }
     }
 }
 
-fn read_owner_state(
+fn count_owner_state(
     transaction: &Transaction<'_>,
-    candidate_token: &str,
-) -> Result<Option<String>> {
+    key: &CandidateCleanupAuthorizationRecoveryKey,
+    state: &str,
+) -> Result<i64> {
+    let slot = key.slot_expectation();
+    let release_json = serde_json::to_string(&slot.release)
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_OWNER_RELEASE")?;
     transaction
         .query_row(
-            "SELECT state FROM candidate_owners WHERE candidate_token = ?1",
-            params![candidate_token],
+            r#"SELECT COUNT(*) FROM candidate_owners
+               WHERE candidate_token = ?1 AND plugin_id = ?2 AND slot_ref = ?3
+                 AND candidate_generation = ?4 AND release_json = ?5
+                 AND owner_plan_id = ?6 AND owner_plan_digest = ?7
+                 AND application_inventory_revision = ?8 AND state = ?9"#,
+            params![
+                key.candidate_token(),
+                slot.plugin_id.as_str(),
+                slot.slot_ref.as_str(),
+                key.candidate_generation(),
+                release_json,
+                key.owner_plan_id(),
+                key.owner_plan_digest(),
+                key.application_inventory_revision(),
+                state,
+            ],
             |row| row.get(0),
         )
-        .optional()
         .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_OWNER_READ")
 }
 
@@ -278,16 +307,105 @@ fn count_identity_matches(
         .query_row(
             r#"SELECT COUNT(*) FROM candidate_cleanup_authorizations
                WHERE cleanup_id = ?1 OR candidate_token = ?2
-                  OR quarantine_id = ?3 OR staging_id = ?4"#,
+                  OR quarantine_id = ?3 OR quarantine_receipt_digest = ?4
+                  OR staging_id = ?5"#,
             params![
                 key.cleanup_id(),
                 key.candidate_token(),
                 expected.quarantine_id,
+                expected.quarantine_receipt_digest,
                 expected.staging_id,
             ],
             |row| row.get(0),
         )
         .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_IDENTITY_READ")
+}
+
+fn count_completion(
+    transaction: &Transaction<'_>,
+    key: &CandidateCleanupAuthorizationRecoveryKey,
+) -> Result<i64> {
+    transaction
+        .query_row(
+            "SELECT COUNT(*) FROM candidate_cleanup_completions WHERE candidate_token = ?1",
+            params![key.candidate_token()],
+            |row| row.get(0),
+        )
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_COMPLETION_READ")
+}
+
+fn validate_recorded_chain(
+    transaction: &Transaction<'_>,
+    key: &CandidateCleanupAuthorizationRecoveryKey,
+) -> Result<()> {
+    let expected = key.receipt_expectation();
+    let row = transaction
+        .query_row(
+            r#"SELECT quarantine.receipt_json, quarantine.receipt_digest,
+                      quarantine.staging_receipt_digest,
+                      staging.receipt_json, staging.receipt_digest
+               FROM candidate_health_quarantine_receipts AS quarantine
+               JOIN candidate_staging_receipts AS staging
+                 ON staging.staging_id = quarantine.staging_id
+                AND staging.candidate_token = quarantine.candidate_token
+                AND staging.candidate_token_digest = quarantine.candidate_token_digest
+                AND staging.staging_run_digest = quarantine.staging_run_digest
+                AND staging.receipt_digest = quarantine.staging_receipt_digest
+               WHERE quarantine.quarantine_id = ?1
+                 AND quarantine.candidate_token = ?2
+                 AND quarantine.candidate_token_digest = ?3
+                 AND quarantine.receipt_digest = ?4
+                 AND quarantine.staging_id = ?5
+                 AND quarantine.staging_run_digest = ?6
+                 AND quarantine.slot_phase_after = 'failed'"#,
+            params![
+                expected.quarantine_id,
+                key.candidate_token(),
+                expected.candidate_token_digest,
+                expected.quarantine_receipt_digest,
+                expected.staging_id,
+                expected.staging_run_digest,
+            ],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                ))
+            },
+        )
+        .optional()
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_CHAIN_READ")?
+        .ok_or_else(|| {
+            anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_CHAIN_MISSING")
+        })?;
+    let (quarantine_json, quarantine_digest, staging_digest, staging_json, stored_staging_digest) =
+        row;
+    let quarantine: ComputePluginCandidateHealthQuarantineReceipt =
+        serde_json::from_str(&quarantine_json)
+            .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_QUARANTINE_PARSE")?;
+    let staging: ComputePluginCandidateStagingReceipt = serde_json::from_str(&staging_json)
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_STAGING_PARSE")?;
+    if serde_json::to_string(&quarantine)? != quarantine_json
+        || serde_json::to_string(&staging)? != staging_json
+        || quarantine_digest != expected.quarantine_receipt_digest
+        || jcs_sha256_hex(&quarantine)? != quarantine_digest
+        || quarantine.quarantine_id() != expected.quarantine_id
+        || quarantine.candidate_token_digest() != expected.candidate_token_digest
+        || quarantine.staging_id() != expected.staging_id
+        || quarantine.staging_run_digest() != expected.staging_run_digest
+        || quarantine.slot_phase_after() != SLOT_FAILED
+        || staging_digest != stored_staging_digest
+        || jcs_sha256_hex(&staging)? != stored_staging_digest
+        || staging.staging_id() != expected.staging_id
+        || staging.candidate_token_digest() != expected.candidate_token_digest
+        || staging.staging_run_digest() != expected.staging_run_digest
+    {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_CHAIN_CHANGED");
+    }
+    Ok(())
 }
 
 fn decode_recorded_row(

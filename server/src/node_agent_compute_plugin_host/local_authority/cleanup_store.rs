@@ -9,7 +9,8 @@ use super::{
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::ValidatedCandidateCleanupAuthorizationPermit,
-    candidate_health_contract::DurableCandidateHealthQuarantine, manifest_validation::is_sha256,
+    candidate_health_contract::DurableCandidateHealthQuarantine,
+    fetch_contract::ComputePluginFetchCancellationGuard, manifest_validation::is_sha256,
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
@@ -25,6 +26,10 @@ pub(in crate::node_agent_compute_plugin_host) use recovery::{
 pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginCandidateCleanupAuthorizationReceipt,
     HashedComputePluginCandidateCleanupAuthorizationReceipt,
+    CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_CANONICALIZATION,
+    CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_DIGEST_ALGORITHM,
+    CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA,
+    HASHED_CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA,
 };
 
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateCleanupAuthoritySession<
@@ -111,10 +116,19 @@ impl ComputePluginCandidateCleanupAuthoritySession<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn observed_at(&self) -> Instant {
         self.observed_at
     }
+    pub(in crate::node_agent_compute_plugin_host) fn validate_source(
+        &self,
+        guard: &ComputePluginFetchCancellationGuard,
+    ) -> Result<()> {
+        guard.validate_source(self.process_fence.cancellation_source())?;
+        guard.ensure_current()
+    }
     pub(in crate::node_agent_compute_plugin_host) fn read_candidate_cleanup_binding(
         &self,
         quarantined: &DurableCandidateHealthQuarantine<'_>,
     ) -> Result<ComputePluginCandidateCleanupAuthorityFacts> {
+        let guard = quarantined.staged().archive().snapshot_cancellation_guard();
+        self.validate_source(&guard)?;
         self.authority.with_deferred(|transaction| {
             binding::read_candidate_cleanup_binding(transaction, self, quarantined)
         })
@@ -123,6 +137,12 @@ impl ComputePluginCandidateCleanupAuthoritySession<'_> {
         &self,
         permit: ValidatedCandidateCleanupAuthorizationPermit<'_, '_>,
     ) -> Result<HashedComputePluginCandidateCleanupAuthorizationReceipt> {
+        let guard = permit
+            .quarantined()
+            .staged()
+            .archive()
+            .snapshot_cancellation_guard();
+        self.validate_source(&guard)?;
         self.authority.with_immediate(|transaction| {
             write::persist_candidate_cleanup_authorization(transaction, self, permit)
         })

@@ -35,6 +35,10 @@ pub(in crate::node_agent_compute_plugin_host) use cleanup_store::{
     ComputePluginCandidateCleanupRecoveryAuthoritySession,
     ComputePluginCandidateCleanupRecoveryOutcome,
     HashedComputePluginCandidateCleanupAuthorizationReceipt,
+    CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_CANONICALIZATION,
+    CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_DIGEST_ALGORITHM,
+    CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA,
+    HASHED_CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA,
 };
 pub(in crate::node_agent_compute_plugin_host) use fetch_store::{
     ComputePluginFetchAuthorityFacts, ComputePluginFetchAuthoritySession,

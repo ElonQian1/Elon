@@ -2,7 +2,7 @@
 
 ## 1. 状态
 
-当前状态为 `partial_implementation_compiled`。Windows 受管文件系统已经具备同句柄删除原语，候选下载校验链也会保留可删除目录与文件 custody；SQLite authority schema 已加入不可变 cleanup authorization、completion receipt 以及 `owned -> cleanup_pending -> cleaned` 状态门卫。私有 typed cleanup authorization Store、线性授权能力和进程内 outcome-uncertain recovery 已形成代码并通过编译；生产 Host、目录树执行器、completion Store 与跨重启 custody 恢复尚未接入，因此当前仍不会自动清理失败候选。
+当前状态为 `partial_implementation_mixed`。Windows 受管文件系统已经具备同句柄删除原语，候选下载校验链也会保留可删除目录与文件 custody；SQLite authority schema 已加入不可变 cleanup authorization、completion receipt 以及 `owned -> cleanup_pending -> cleaned` 状态门卫。私有 typed cleanup authorization Store、线性授权能力和进程内 outcome-uncertain recovery 的远程 canonical 基线已通过编译；本批 cancellation、exact chain、PlanApply/replay 与 schema fence 增量未重新编译或运行测试。生产 Host、目录树执行器、completion Store 与跨重启 custody 恢复尚未接入，因此当前仍不会自动清理失败候选。
 
 本文只维护失败候选清理边界。候选本机真源见 `node-plugin-local-authority.md`，健康失败与 quarantine 见 `node-ready-capability.md`，staging 物化见 `node-plugin-archive-extraction.md`。
 
@@ -29,6 +29,8 @@ SQLite v3 schema 还具备以下约束：
 这些对象目前仍属于预生产 schema v3：缺少新对象或定义不一致的同版本库会失败关闭并要求重建，不提供旧 schema 原地迁移。
 
 cleanup authorization Store 当前执行以下单一事务：fresh read failed slot、精确 quarantine/staging 回执、`owned` owner、inventory/state/authority/process fence 与可信时间；确认没有 prepared fetch/verification 后推进可信时间和 state/authority epoch，inventory 保持不变；随后写入 JCS+SHA-256 不可变授权回执，并把 owner 推进到 `cleanup_pending`。返回的 `AuthorizedCandidateCleanup` 继续持有原候选目录和文件句柄，不能序列化或克隆。提交结果不确定时，进程内 recovery key 只允许读取 `NotCreated` 或 exact `Authorized`；exact adoption 会重新读取权威状态并复验 retained staging 内容。
+
+本批在远程 canonical API 上进一步加固组合语义：授权读与写事务都复验同一 process cancellation source；owner 对账绑定 plugin、slot、generation、release、owner plan 和 application inventory revision；恢复同时重放 quarantine→staging 的规范 JSON/JCS 链并拒绝已有 completion。PlanApply 投影继续把 `cleanup_pending` 计为占用 candidate pointer 的活动 owner，但拒绝任何直接修改该插件的 action；原计划历史重放接受 `cleanup_pending` 与未来 `cleaned`，只在 owner 仍为 `owned` 时返回可操作 candidate handle。当前 inventory invariant 也会让 `cleanup_pending` 期间的 sharing-off plan 失败关闭；“立即停止运行、后台继续保留清理 custody”的独立退出语义仍待设计。
 
 ## 3. 当前能力不代表什么
 
@@ -72,7 +74,7 @@ cleanup authorization Store 当前执行以下单一事务：fresh read failed s
 2. 非空目录删除失败后保留原目录 custody，删除子文件后用同一 custody 重试；
 3. 重新固定既有文件的 cleanup 句柄并完成文件与目录删除。
 
-上述 Windows 测试证明底层句柄语义。另有 schema 定向测试证明 cleanup 两张表、六个不可变/写入 fence trigger、owner 两个转换门卫、活动候选唯一约束可以安装并按相同指纹重开；cleanup authorization 回执另有稳定摘要与拒绝未知字段测试，`elon-pc-node` 编译通过。这些验证仍不包含完整 authorization Store 事务夹具、物理目录树执行、SQLite completion 事务、跨重启 custody 恢复或生产 Host 接线。
+上述 Windows 测试证明底层句柄语义。另有 schema 定向测试证明 cleanup 两张表、六个不可变/写入 fence trigger、owner 两个转换门卫、活动候选唯一约束可以安装并按相同指纹重开；cleanup authorization 回执另有稳定摘要与拒绝未知字段测试，远程 canonical 基线已通过 `elon-pc-node` 编译。本批 cancellation、exact chain、PlanApply/replay 与 schema fence 加固按架构铺设策略未重新编译。这些验证仍不包含完整 authorization Store 事务夹具、物理目录树执行、SQLite completion 事务、跨重启 custody 恢复或生产 Host 接线。
 
 ## 7. 下一批实现边界
 

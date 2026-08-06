@@ -1,11 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-pub(super) const CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA: &str =
+pub(in crate::node_agent_compute_plugin_host) const CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA: &str =
     "elon.compute_plugin.candidate_cleanup_authorization_receipt.v1";
-pub(super) const HASHED_CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA: &str =
+pub(in crate::node_agent_compute_plugin_host) const HASHED_CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA: &str =
     "elon.compute_plugin.hashed_candidate_cleanup_authorization_receipt.v1";
-pub(super) const CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_CANONICALIZATION: &str = "RFC8785-JCS";
-pub(super) const CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_DIGEST_ALGORITHM: &str = "sha256";
+pub(in crate::node_agent_compute_plugin_host) const CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_CANONICALIZATION: &str = "RFC8785-JCS";
+pub(in crate::node_agent_compute_plugin_host) const CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_DIGEST_ALGORITHM: &str = "sha256";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -42,6 +42,9 @@ pub(in crate::node_agent_compute_plugin_host) struct HashedComputePluginCandidat
 }
 
 impl ComputePluginCandidateCleanupAuthorizationReceipt {
+    pub(in crate::node_agent_compute_plugin_host) fn schema(&self) -> &str {
+        &self.schema
+    }
     pub(in crate::node_agent_compute_plugin_host) fn cleanup_id(&self) -> &str {
         &self.cleanup_id
     }
@@ -95,6 +98,9 @@ impl ComputePluginCandidateCleanupAuthorizationReceipt {
 }
 
 impl HashedComputePluginCandidateCleanupAuthorizationReceipt {
+    pub(in crate::node_agent_compute_plugin_host) fn schema(&self) -> &str {
+        &self.schema
+    }
     pub(in crate::node_agent_compute_plugin_host) fn receipt(
         &self,
     ) -> &ComputePluginCandidateCleanupAuthorizationReceipt {
@@ -103,6 +109,12 @@ impl HashedComputePluginCandidateCleanupAuthorizationReceipt {
 
     pub(in crate::node_agent_compute_plugin_host) fn receipt_digest(&self) -> &str {
         &self.receipt_digest
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn canonicalization(&self) -> &str {
+        &self.canonicalization
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn digest_algorithm(&self) -> &str {
+        &self.digest_algorithm
     }
 }
 

@@ -186,8 +186,17 @@ BEFORE UPDATE OF
     state, closed_at_ms, closed_by_plan_id, closed_by_plan_digest, close_reason
 ON candidate_owners
 WHEN NEW.state = 'cleanup_pending' AND NOT EXISTS (
-    SELECT 1 FROM candidate_cleanup_authorizations AS authorization
+    SELECT 1
+    FROM candidate_cleanup_authorizations AS authorization
+    JOIN authority_meta AS meta ON meta.singleton = 1
     WHERE authorization.candidate_token = OLD.candidate_token
+      AND meta.state_revision = authorization.authority_state_revision_after
+      AND meta.inventory_revision = authorization.inventory_revision
+      AND meta.inventory_digest = authorization.inventory_digest
+      AND meta.authority_epoch = authorization.authority_epoch_after
+      AND meta.process_owner_epoch = authorization.process_owner_epoch
+      AND meta.trusted_time_high_water_ms = authorization.authorized_at_ms
+      AND meta.updated_at_ms = authorization.authorized_at_ms
 )
 BEGIN
     SELECT RAISE(ABORT, 'candidate cleanup requires durable authorization');
@@ -198,9 +207,18 @@ BEFORE UPDATE OF
     state, closed_at_ms, closed_by_plan_id, closed_by_plan_digest, close_reason
 ON candidate_owners
 WHEN NEW.state = 'cleaned' AND NOT EXISTS (
-    SELECT 1 FROM candidate_cleanup_completions AS completion
+    SELECT 1
+    FROM candidate_cleanup_completions AS completion
+    JOIN authority_meta AS meta ON meta.singleton = 1
     WHERE completion.candidate_token = OLD.candidate_token
       AND completion.completed_at_ms = NEW.closed_at_ms
+      AND meta.state_revision = completion.authority_state_revision_after
+      AND meta.inventory_revision = completion.inventory_revision_after
+      AND meta.inventory_digest = completion.inventory_digest_after
+      AND meta.authority_epoch = completion.authority_epoch_after
+      AND meta.process_owner_epoch = completion.process_owner_epoch
+      AND meta.trusted_time_high_water_ms = completion.completed_at_ms
+      AND meta.updated_at_ms = completion.completed_at_ms
 )
 BEGIN
     SELECT RAISE(ABORT, 'candidate cleanup requires durable completion');

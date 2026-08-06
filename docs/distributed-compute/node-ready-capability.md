@@ -11,7 +11,7 @@ owners: node, compute
 
 `ReadyCapability` 只表示某个节点插件在一个很短的时间窗口内具备技术执行条件。它不是安装完成标记、市场报价、可预留容量、账户授权或商业 `ComputeOffer`。
 
-当前代码状态为“局部实现已编译验证、生产路径未接线”：staged 候选的进程内健康评估、成功与终止失败观察的规范校验、不可变健康回执 Store、失败 quarantine Store 及两类不确定结果恢复合同均已通过 `elon-pc-node` 编译，相关健康与 schema 定向测试共 12 项通过。测试只在内存 SQLite 中验证了新 schema 建库与重开，尚未构造完整 Store 事务夹具；真实 Sidecar 探针、生产本地数据库、NodeRuntime/Host 接线及控制面上报仍未完成。
+当前代码状态为“远程 canonical 基线已编译验证、本批安全加固未重新编译、生产路径未接线”：staged 候选的进程内健康评估、成功与终止失败观察的规范校验、不可变健康回执 Store、失败 quarantine Store、cleanup authorization Store 及进程内不确定结果恢复均已通过 `elon-pc-node` 基线编译。当前增量只加固 cancellation、exact receipt/owner chain、PlanApply/replay 和 schema fence，按架构铺设策略未重新编译或执行事务夹具。真实 Sidecar 探针、生产本地数据库、NodeRuntime/Host 接线及控制面上报仍未完成。
 
 ## 2. 已关闭的错误入口
 

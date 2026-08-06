@@ -82,7 +82,26 @@ pub(in crate::node_agent_compute_plugin_host) fn adopt_recovered_candidate_clean
             ))
         }
     };
+    let guard = recovery
+        .quarantined
+        .staged()
+        .archive()
+        .snapshot_cancellation_guard();
+    if let Err(error) = authority_session.validate_source(&guard) {
+        return Err(adoption_failure(
+            CandidateCleanupAuthorizationRecoveryAdoptionPhase::RetainedContentChanged,
+            error,
+            recovery,
+        ));
+    }
     if let Err(error) = recovery.quarantined.revalidate_retained_content() {
+        return Err(adoption_failure(
+            CandidateCleanupAuthorizationRecoveryAdoptionPhase::RetainedContentChanged,
+            error,
+            recovery,
+        ));
+    }
+    if let Err(error) = authority_session.validate_source(&guard) {
         return Err(adoption_failure(
             CandidateCleanupAuthorizationRecoveryAdoptionPhase::RetainedContentChanged,
             error,
@@ -108,6 +127,11 @@ fn validate_provenance(
     session: &ComputePluginCandidateCleanupRecoveryAuthoritySession<'_>,
 ) -> Result<()> {
     let key = &recovery.recovery_key;
+    let guard = recovery
+        .quarantined
+        .staged()
+        .archive()
+        .snapshot_cancellation_guard();
     if !key
         .authority_instance_binding()
         .matches(session.authority_instance_binding())
@@ -118,6 +142,7 @@ fn validate_provenance(
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_ADOPTION_PROVENANCE_CHANGED");
     }
+    session.validate_source(&guard)?;
     Ok(())
 }
 

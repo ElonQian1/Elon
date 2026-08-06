@@ -155,6 +155,7 @@ struct ExistingCandidateOwner {
     release: ComputePluginReleaseRef,
     owner_plan_id: String,
     owner_plan_digest: String,
+    state: String,
 }
 
 pub(super) fn project_plan_application(
@@ -182,6 +183,12 @@ pub(super) fn project_plan_application(
 
     for (item_index, item) in plan.items.iter().enumerate() {
         let plugin_id = item_plugin_id(item)?.to_string();
+        if owned
+            .get(&plugin_id)
+            .is_some_and(|owner| owner.state == "cleanup_pending")
+        {
+            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_PENDING");
+        }
         match item.action.as_str() {
             PLAN_ACTION_INSTALL => {
                 let target = item.target_release.as_ref().ok_or_else(|| {
@@ -585,12 +592,13 @@ fn read_and_validate_owned_candidates(
             r#"SELECT candidate.candidate_token, candidate.plugin_id, candidate.slot_ref,
                 candidate.candidate_generation, candidate.release_json,
                 candidate.permission_grant_digest, candidate.owner_plan_id,
-                candidate.owner_plan_digest, candidate.application_inventory_revision
+                candidate.owner_plan_digest, candidate.application_inventory_revision,
+                candidate.state
             FROM candidate_owners AS candidate
             JOIN plan_application_seals AS seal
               ON seal.plan_id = candidate.owner_plan_id
              AND seal.plan_digest = candidate.owner_plan_digest
-            WHERE candidate.state = 'owned'
+            WHERE candidate.state IN ('owned', 'cleanup_pending')
             ORDER BY candidate.plugin_id"#,
         )
         .context("COMPUTE_PLUGIN_CANDIDATE_OWNERS_PREPARE")?;
@@ -606,6 +614,7 @@ fn read_and_validate_owned_candidates(
                 row.get::<_, String>(6)?,
                 row.get::<_, String>(7)?,
                 row.get::<_, i64>(8)?,
+                row.get::<_, String>(9)?,
             ))
         })
         .context("COMPUTE_PLUGIN_CANDIDATE_OWNERS_READ")?;
@@ -621,6 +630,7 @@ fn read_and_validate_owned_candidates(
             plan_id,
             plan_digest,
             revision,
+            state,
         ) = row.context("COMPUTE_PLUGIN_CANDIDATE_OWNER_ROW")?;
         let release: ComputePluginReleaseRef =
             serde_json::from_str(&release_json).context("COMPUTE_PLUGIN_CANDIDATE_RELEASE_JSON")?;
@@ -669,6 +679,7 @@ fn read_and_validate_owned_candidates(
             release,
             owner_plan_id: plan_id,
             owner_plan_digest: plan_digest,
+            state,
         };
         if owners.insert(plugin_id, owner).is_some() {
             bail!("COMPUTE_PLUGIN_CANDIDATE_OWNER_DUPLICATE");

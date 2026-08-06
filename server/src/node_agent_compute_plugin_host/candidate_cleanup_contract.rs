@@ -11,6 +11,10 @@ use super::{
         ComputePluginCandidateCleanupAuthorityFacts, ComputePluginCandidateCleanupAuthoritySession,
         ComputePluginFetchProcessFence, ComputePluginLocalAuthority,
         HashedComputePluginCandidateCleanupAuthorizationReceipt,
+        CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_CANONICALIZATION,
+        CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_DIGEST_ALGORITHM,
+        CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA,
+        HASHED_CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA,
     },
     manifest_validation::is_sha256,
     signed_artifact_verification::jcs_sha256_hex,
@@ -179,7 +183,11 @@ pub(super) fn validate_cleanup_authorization_receipt(
 ) -> Result<()> {
     let receipt = hashed.receipt();
     let expected = key.receipt_expectation();
-    if receipt.cleanup_id() != key.cleanup_id()
+    if hashed.schema() != HASHED_CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA
+        || receipt.schema() != CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA
+        || hashed.canonicalization() != CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_CANONICALIZATION
+        || hashed.digest_algorithm() != CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_DIGEST_ALGORITHM
+        || receipt.cleanup_id() != key.cleanup_id()
         || receipt.candidate_token_digest() != expected.candidate_token_digest
         || receipt.quarantine_id() != expected.quarantine_id
         || receipt.quarantine_receipt_digest() != expected.quarantine_receipt_digest

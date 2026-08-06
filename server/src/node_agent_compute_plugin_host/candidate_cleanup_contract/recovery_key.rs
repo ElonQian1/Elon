@@ -39,12 +39,17 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupAuthorizati
     candidate_token: String,
     receipt: CandidateCleanupAuthorizationReceiptExpectation,
     slot: CandidateCleanupSlotExpectation,
+    candidate_generation: i64,
+    owner_plan_id: String,
+    owner_plan_digest: String,
+    application_inventory_revision: i64,
 }
 
 impl CandidateCleanupAuthorizationRecoveryKey {
     pub(super) fn from_prepared(prepared: &PreparedCandidateCleanupAuthorization<'_, '_>) -> Self {
         let staging = prepared.quarantined.staged().recovery_key();
         let slot = staging.slot_expectation();
+        let staging_receipt = staging.receipt_expectation();
         let facts = &prepared.facts;
         Self {
             authority_instance_binding: prepared
@@ -79,6 +84,10 @@ impl CandidateCleanupAuthorizationRecoveryKey {
                 slot_ref: slot.slot_ref.clone(),
                 release: slot.release.clone(),
             },
+            candidate_generation: staging_receipt.candidate_generation,
+            owner_plan_id: staging_receipt.owner_plan_id.clone(),
+            owner_plan_digest: staging_receipt.owner_plan_digest.clone(),
+            application_inventory_revision: staging_receipt.application_inventory_revision,
         }
     }
 
@@ -108,6 +117,18 @@ impl CandidateCleanupAuthorizationRecoveryKey {
         &self,
     ) -> &CandidateCleanupSlotExpectation {
         &self.slot
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn candidate_generation(&self) -> i64 {
+        self.candidate_generation
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn owner_plan_id(&self) -> &str {
+        &self.owner_plan_id
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn owner_plan_digest(&self) -> &str {
+        &self.owner_plan_digest
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn application_inventory_revision(&self) -> i64 {
+        self.application_inventory_revision
     }
 }
 
