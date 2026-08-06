@@ -13,6 +13,7 @@ use super::local_authority_schema;
 mod candidate_verification_revocation;
 mod fetch_claim_revocation;
 mod fetch_store;
+mod health_store;
 mod initialization;
 mod keyring_integrity;
 mod keyring_snapshot;
@@ -30,6 +31,11 @@ mod verification_store;
 pub(in crate::node_agent_compute_plugin_host) use fetch_store::{
     ComputePluginFetchAuthorityFacts, ComputePluginFetchAuthoritySession,
     ComputePluginPostSyncFetchAuthoritySession, ComputePluginPreparedFetchClaimFacts,
+};
+pub(in crate::node_agent_compute_plugin_host) use health_store::{
+    ComputePluginCandidateHealthAuthorityFacts, ComputePluginCandidateHealthAuthoritySession,
+    ComputePluginCandidateHealthRecoveryAuthoritySession,
+    ComputePluginCandidateHealthRecoveryOutcome, HashedComputePluginCandidateHealthReceipt,
 };
 pub(crate) use initialization::{
     ComputePluginAuthorityInitialization, ComputePluginAuthorityInitializationOutcome,

@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use anyhow::{bail, Context, Result};
-use chrono::{Duration, SecondsFormat};
+use chrono::{DateTime, Duration, SecondsFormat, Utc};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -14,7 +14,8 @@ use super::{
     CANDIDATE_HEALTH_DIGEST_ALGORITHM, CANDIDATE_HEALTH_OBSERVATION_SCHEMA,
     CANDIDATE_HEALTH_TRANSCRIPT_SCHEMA, HASHED_CANDIDATE_HEALTH_OBSERVATION_SCHEMA,
     MAX_CANDIDATE_HEALTH_INTERVAL_MS, MAX_CANDIDATE_HEALTH_LIFETIME_SECONDS,
-    MAX_CANDIDATE_HEALTH_PROBES, MAX_CANDIDATE_HEALTH_TIMEOUT_MS,
+    MAX_CANDIDATE_HEALTH_PROBES, MAX_CANDIDATE_HEALTH_REASON_CODES,
+    MAX_CANDIDATE_HEALTH_TIMEOUT_MS,
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_staging_contract::StagedComputePluginCandidateArchive,
@@ -105,6 +106,77 @@ pub(super) fn finalize_evaluation<'root>(
         }),
         Err(error) => Err(CandidateHealthFinalizationFailure { error, evaluation }),
     }
+}
+
+pub(super) fn validate_hashed_observation(
+    hashed: &HashedComputePluginCandidateHealthObservation,
+) -> Result<()> {
+    let observation = &hashed.observation;
+    let observed_at = DateTime::parse_from_rfc3339(&observation.observed_at)
+        .context("COMPUTE_PLUGIN_CANDIDATE_HEALTH_OBSERVED_AT_INVALID")?
+        .with_timezone(&Utc);
+    let expires_at = DateTime::parse_from_rfc3339(&observation.expires_at)
+        .context("COMPUTE_PLUGIN_CANDIDATE_HEALTH_EXPIRES_AT_INVALID")?
+        .with_timezone(&Utc);
+    let mut normalized_reasons = observation.reason_codes.clone();
+    normalized_reasons.sort();
+    normalized_reasons.dedup();
+    if hashed.schema != HASHED_CANDIDATE_HEALTH_OBSERVATION_SCHEMA
+        || hashed.canonicalization != CANDIDATE_HEALTH_CANONICALIZATION
+        || hashed.digest_algorithm != CANDIDATE_HEALTH_DIGEST_ALGORITHM
+        || observation.schema != CANDIDATE_HEALTH_OBSERVATION_SCHEMA
+        || observation.status != CANDIDATE_HEALTHY
+        || !is_identifier(&observation.evaluation_id)
+        || !is_sha256(&observation.installation_id_digest)
+        || !is_sha256(&observation.candidate_token_digest)
+        || !is_identifier(&observation.staging_id)
+        || !is_sha256(&observation.staging_receipt_digest)
+        || !is_sha256(&observation.staging_run_digest)
+        || !is_sha256(&observation.root_identity_digest)
+        || !is_sha256(&observation.extraction_plan_digest)
+        || !is_sha256(&observation.runner_digest)
+        || !is_identifier(&observation.protocol)
+        || observation.timeout_ms <= 0
+        || observation.timeout_ms > MAX_CANDIDATE_HEALTH_TIMEOUT_MS
+        || observation.interval_ms <= 0
+        || observation.interval_ms > MAX_CANDIDATE_HEALTH_INTERVAL_MS
+        || observation.required_consecutive_successes <= 0
+        || observation.required_consecutive_successes > MAX_CANDIDATE_HEALTH_PROBES
+        || observation.unhealthy_after_failures <= 0
+        || observation.unhealthy_after_failures > MAX_CANDIDATE_HEALTH_PROBES
+        || observation.attempted_probes <= 0
+        || observation.attempted_probes > MAX_CANDIDATE_HEALTH_PROBES
+        || observation.successful_probes <= 0
+        || observation.successful_probes > observation.attempted_probes
+        || observation.consecutive_successes < observation.required_consecutive_successes
+        || observation.consecutive_successes > observation.successful_probes
+        || !is_sha256(&observation.probe_transcript_digest)
+        || observation.reason_codes.len() > MAX_CANDIDATE_HEALTH_REASON_CODES
+        || normalized_reasons != observation.reason_codes
+        || !observation
+            .reason_codes
+            .iter()
+            .all(|reason| is_identifier(reason))
+        || observation.observed_at != observed_at.to_rfc3339_opts(SecondsFormat::Millis, true)
+        || observation.expires_at != expires_at.to_rfc3339_opts(SecondsFormat::Millis, true)
+        || expires_at <= observed_at
+        || expires_at - observed_at > Duration::seconds(MAX_CANDIDATE_HEALTH_LIFETIME_SECONDS)
+        || !is_sha256(&observation.clock_epoch_digest)
+        || observation.process_owner_epoch <= 0
+        || observation.authority_state_revision <= 0
+        || observation.inventory_revision <= 0
+        || !is_sha256(&observation.inventory_digest)
+        || observation.authority_epoch <= 0
+        || !is_identifier(&observation.time_authority_id)
+        || !is_sha256(&observation.time_attestation_digest)
+        || observation.time_attestation_sequence <= 0
+        || !is_sha256(&observation.time_signing_key_fingerprint)
+        || !is_sha256(&hashed.observation_digest)
+        || jcs_sha256_hex(observation)? != hashed.observation_digest
+    {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_HEALTH_OBSERVATION_INVALID");
+    }
+    Ok(())
 }
 
 fn validate_start_binding(
@@ -288,11 +360,13 @@ fn build_health_observation(
         time_signing_key_fingerprint: trusted_time.signing_key_fingerprint().to_string(),
     };
     let observation_digest = jcs_sha256_hex(&observation)?;
-    Ok(HashedComputePluginCandidateHealthObservation {
+    let hashed = HashedComputePluginCandidateHealthObservation {
         schema: HASHED_CANDIDATE_HEALTH_OBSERVATION_SCHEMA.to_string(),
         observation,
         canonicalization: CANDIDATE_HEALTH_CANONICALIZATION.to_string(),
         digest_algorithm: CANDIDATE_HEALTH_DIGEST_ALGORITHM.to_string(),
         observation_digest,
-    })
+    };
+    validate_hashed_observation(&hashed)?;
+    Ok(hashed)
 }

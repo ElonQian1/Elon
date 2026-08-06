@@ -97,6 +97,12 @@ impl StagedComputePluginCandidateArchive<'_> {
     ) -> &ComputePluginCandidateStagingRecoveryKey {
         &self.recovery_key
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn revalidate_retained_content(
+        &mut self,
+    ) -> Result<()> {
+        self.archive.revalidate_for_staging_store().map(drop)
+    }
 }
 
 impl<'root> StagedComputePluginCandidateArchive<'root> {
