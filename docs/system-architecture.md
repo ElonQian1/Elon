@@ -142,6 +142,10 @@ PC 项目会话的 AI 运行路线分为五类：
 
 Codex Pro `auth.json` 云端保险箱默认只属于账号所有者自己的备份/恢复能力：本机节点上传密文，云端只存 AES-GCM 密文，本人节点用用户 token + 节点 secret 恢复到托管临时 `CODEX_HOME`。普通 Route C3 共享仍不允许远程用户下载、恢复或复制 provider 的 `auth.json` 明文，只允许把任务派发到 provider 的 PC 节点。
 
+Win 节点的统一 AI 厂商账号控制面使用 `elon.ai_provider_accounts.v1`：Codex 通过官方 `codex app-server` JSON-RPC 完成 `account/read/login/logout` 体系中的登录和退出，默认向 Win/手机提供设备码流程；Gemini 通过官方 `gemini --acp`、ACP v1 `initialize/authenticate/logout` 能力完成 Google 登录；Claude Code 通过官方 `claude auth login/status/logout` 管理 Anthropic/Claude 账号；GitHub Copilot CLI 通过官方 `copilot login --web-flow` 登录。Copilot 目前只公开了交互式 `/logout`，所以控制面明确返回 `logout_supported=false`，不伪造自动退出。凭据始终由对应 CLI 或系统凭据存储保存；一龙只保存登录任务状态和公开登录指令，不解析或复制 OAuth token。Codex 登录态如需跨节点恢复，仍由用户显式使用既有 Codex 保险箱。
+
+同一控制面预留 `chatgpt_web` 与 `gemini_web` provider adapter，但在厂商没有公开网页聊天嵌入协议或项目尚未取得获批文档时固定返回 `reserved`，不得把任一 CLI 登录态、浏览器 Cookie 或 WebView 会话冒充网页版聊天 API。APK 和移动网页版可用账号所有者 Bearer token 经既有 PC relay 调用相同控制面；Codex 设备码支持跨设备完成，Gemini、Claude 和 Copilot 的当前公开浏览器回调要求回到运行 CLI 的 Win 节点，因此标记为不可远程完成。APK/网页端只发起、轮询、取消和退出公开支持的操作，不保存厂商凭据。
+
 医疗机器人等高可用/协作场景使用 Codex 保险箱授权共享：provider 机器人必须在平台上显式授权 consumer 机器人，consumer 自己的在线节点必须用节点 secret 证明身份，云端才会下发短 TTL 租约。共享不要求一定是紧急场景，但必须是短租约、可撤销、可审计、可计费的授权行为。节点只把租约写入托管临时 `CODEX_HOME`，不覆盖默认 `~/.codex/auth.json`。租约、provider/consumer、槽位、token 账单和 provider 收益分别记录在 `codex_vault_emergency_grants`、`codex_vault_emergency_leases`、`token_usage_events` 和 `node_transactions`，计费来源统一为 `shared_codex`。表名保留 `emergency` 是历史兼容名，产品和 API 新入口使用 `sharing` 语义。
 
 Route A 本机 CLI 是否使用 PTY 是 CLI 会话 / 传输模式选择，不是新的运行路线。Route A / Route C3 都可以在对应节点里选择下面的传输模式：

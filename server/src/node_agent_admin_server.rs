@@ -18,9 +18,10 @@ use super::{
     node_agent_codex_vault, node_agent_data_root, node_agent_download_router,
     node_agent_full_access, node_agent_install_env, node_agent_local_admin,
     node_agent_local_pc_frontend, node_agent_local_tasks, node_agent_project_agent_runs,
-    node_agent_project_docs_mcp, node_agent_project_picker, node_agent_pwa_auth_profile,
-    node_agent_source_preview, node_agent_task_journal_api, pc_storage_git_http, pc_storage_repo,
-    project_landing, project_workspace_inspect, windows_doctor, NodeRuntime,
+    node_agent_project_docs_mcp, node_agent_project_picker, node_agent_provider_accounts,
+    node_agent_pwa_auth_profile, node_agent_source_preview, node_agent_task_journal_api,
+    pc_storage_git_http, pc_storage_repo, project_landing, project_workspace_inspect,
+    windows_doctor, NodeRuntime,
 };
 
 pub(super) async fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
@@ -168,10 +169,17 @@ pub(super) async fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 axum::routing::get(admin_tts_relay_get).post(admin_tts_relay_set),
             )
             .route_layer(local_admin_guard);
+        let provider_account_guard = axum::middleware::from_fn_with_state(
+            runtime.clone(),
+            node_agent_provider_accounts::require_provider_account_access,
+        );
+        let provider_account_routes =
+            node_agent_provider_accounts::routes().route_layer(provider_account_guard);
         let app = axum::Router::new()
             .merge(node_agent_local_pc_frontend::routes())
             .merge(node_agent_android_live::runtime_routes())
             .merge(node_agent_project_docs_mcp::routes())
+            .merge(provider_account_routes)
             .route(
                 "/api/health",
                 axum::routing::get(node_agent_admin_status::admin_health),

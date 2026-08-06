@@ -26,6 +26,8 @@ mod cli_usage;
 #[allow(dead_code)]
 mod errors;
 mod git_command_error;
+mod node_agent_acp_prompt;
+mod node_agent_acp_protocol;
 mod node_agent_active_task;
 mod node_agent_active_task_registry;
 mod node_agent_admin_open;
@@ -170,6 +172,9 @@ mod node_agent_project_profile;
 mod node_agent_project_profile_node;
 mod node_agent_project_profile_python;
 mod node_agent_project_receipt_mcp;
+mod node_agent_provider_accounts;
+mod node_agent_provider_auth_protocol;
+mod node_agent_provider_auth_runtime;
 mod node_agent_proxy;
 mod node_agent_pwa_auth_profile;
 mod node_agent_pwa_runtime;
@@ -188,6 +193,8 @@ mod node_agent_sidecar_recovery;
 mod node_agent_sidecar_recovery_replay;
 mod node_agent_supervision_worktree_lease;
 use node_agent_session::run_session;
+#[cfg(test)]
+mod node_agent_provider_accounts_tests;
 #[cfg(test)]
 mod node_agent_task_approval_cleanup_tests;
 mod node_agent_task_approval_snapshot;

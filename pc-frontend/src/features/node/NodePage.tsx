@@ -9,6 +9,7 @@ import NodeClientUpdateCard from './NodeClientUpdateCard'
 import CodexVaultCard from './CodexVaultCard'
 import CodexVaultUsageEstimateCard from './CodexVaultUsageEstimateCard'
 import CodexToolboxCard from './CodexToolboxCard'
+import AiProviderAccountsCard from './AiProviderAccountsCard'
 import NodeMarketPanel from './NodeMarketPanel'
 import NodeShareStatus, { publicDevHandshakeText } from './NodeShareStatus'
 import NodeComputeSharingCard from './NodeComputeSharingCard'
@@ -522,6 +523,7 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
           <LocalNodeHealthPanel status={status} onRefresh={() => refreshStatus()} />
           <NodeClientUpdateCard adminUrl={adminUrl} status={status} onStatus={setStatus} />
           <NodeStorageManagementCard adminUrl={adminUrl} />
+          <AiProviderAccountsCard adminUrl={adminUrl} />
           <CodexStatusCard
             status={codex}
             refreshing={!!status.cli_probe?.refreshing}

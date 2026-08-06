@@ -202,6 +202,15 @@ fn pc_copilot_extra_args_keep_session_and_model_flags() {
 }
 
 #[test]
+fn pc_gemini_extra_args_carry_stable_session_scope() {
+    let session_id = native_session_uuid("gemini", &test_scope("conversation-1"));
+    assert_eq!(
+        pc_route_a_extra_args("gemini", Some(&session_id), None, None),
+        vec![format!("--session-id={session_id}")]
+    );
+}
+
+#[test]
 fn pc_lightweight_chat_reply_ignores_terminal_noise() {
     let output = "\u{1b}[m\\\\?\\C:\\Users\\ELon\n\
 用作为当前目录的以上路径启动了 CMD.EXE。\n\

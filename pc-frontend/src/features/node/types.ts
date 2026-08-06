@@ -408,6 +408,52 @@ export interface LocalCliToolStatus {
   backend?: string
 }
 
+export interface AiProviderLoginAttempt {
+  login_id: string
+  provider_id: string
+  flow: string
+  state: 'starting' | 'waiting_for_user' | 'completed' | 'failed' | 'canceled' | 'expired' | string
+  verification_url?: string | null
+  user_code?: string | null
+  auth_url?: string | null
+  remote_compatible?: boolean
+  error?: string | null
+  started_at_ms?: number
+  updated_at_ms?: number
+}
+
+export interface AiProviderAccount {
+  id: string
+  vendor: string
+  label: string
+  surface: 'cli_agent' | 'web_chat' | string
+  protocol: string
+  implementation_state: 'available' | 'reserved' | string
+  official_login?: boolean
+  login_flows?: string[]
+  remote_login_supported?: boolean
+  logout_supported?: boolean
+  credential_owner?: string
+  credential_storage?: string
+  reason?: string | null
+  cli?: LocalCliToolStatus | null
+  active_login?: AiProviderLoginAttempt | null
+}
+
+export interface AiProviderAccountsResponse {
+  ok?: boolean
+  schema?: string
+  transport?: { local?: string; ownerRelay?: string }
+  providers: AiProviderAccount[]
+}
+
+export interface AiProviderLoginResponse {
+  ok?: boolean
+  schema?: string
+  attempt: AiProviderLoginAttempt
+  message?: string
+}
+
 export interface AutostartStatus {
   ok?: boolean
   supported?: boolean

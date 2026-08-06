@@ -54,7 +54,11 @@ impl Default for LocalCliProbeSnapshot {
                     version: None,
                     installed: false,
                     runnable: false,
-                    logged_in: if name == "codex" { Some(false) } else { None },
+                    logged_in: if matches!(name, "codex" | "claude" | "gemini") {
+                        Some(false)
+                    } else {
+                        None
+                    },
                     available: false,
                     status: "checking".to_string(),
                     detail: Some("正在后台检测，不阻塞 Win 端启动".to_string()),
@@ -128,8 +132,94 @@ fn probe_local_cli(name: &str) -> LocalCliToolStatus {
     let best_path = best_cli_path(name);
     match name {
         "codex" => probe_codex_cli(best_path),
+        "claude" => probe_claude_cli(best_path),
+        "copilot" => probe_copilot_cli(best_path),
+        "gemini" => probe_gemini_cli(best_path),
         _ => probe_generic_cli(name, best_path),
     }
+}
+
+fn probe_claude_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
+    let mut status = probe_generic_cli("claude", best_path);
+    if !status.runnable {
+        status.logged_in = Some(false);
+        return status;
+    }
+    let Some(path) = status.path.as_deref().map(PathBuf::from) else {
+        status.logged_in = Some(false);
+        return status;
+    };
+    let auth = quick_command_status(&path, &["auth", "status"], Duration::from_secs(4));
+    status.logged_in = Some(auth.success);
+    status.available = auth.success;
+    status.status = if auth.success {
+        "ready"
+    } else {
+        "not_logged_in"
+    }
+    .to_string();
+    status.detail = Some(if auth.success {
+        "Claude Code 可运行，官方 auth status 已确认登录。".to_string()
+    } else {
+        "Claude Code 可运行，但官方 auth status 未确认登录。".to_string()
+    });
+    status.reason = (!auth.success).then(|| "not_logged_in".to_string());
+    status.diagnosis = Some(if auth.success {
+        "Win 端已找到可运行且已登录的 Claude Code。".to_string()
+    } else {
+        "Claude Code 本身能启动，但需要通过官方 claude auth login 登录。".to_string()
+    });
+    status.fix_hint = (!auth.success)
+        .then(|| "请在节点页发起 Claude 官方登录；凭据继续由 Claude Code 保管。".to_string());
+    status.fix_action = if auth.success { "none" } else { "login" }.to_string();
+    status
+}
+
+fn probe_copilot_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
+    let mut status = probe_generic_cli("copilot", best_path);
+    if !status.runnable {
+        return status;
+    }
+    let env_auth = ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"]
+        .into_iter()
+        .any(env_key_present);
+    status.logged_in = env_auth.then_some(true);
+    status.detail = Some(if env_auth {
+        "Copilot CLI 可运行，且检测到官方支持的 GitHub token 环境变量。".to_string()
+    } else {
+        "Copilot CLI 可运行；官方 CLI 未提供非交互 auth status，系统凭据状态将在登录完成后更新。"
+            .to_string()
+    });
+    status
+}
+
+fn probe_gemini_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
+    let mut status = probe_generic_cli("gemini", best_path);
+    if !status.runnable {
+        status.logged_in = Some(false);
+        return status;
+    }
+    let auth = gemini_auth_configured();
+    status.logged_in = Some(auth);
+    status.available = auth;
+    status.status = if auth { "ready" } else { "not_logged_in" }.to_string();
+    status.detail = Some(if auth {
+        "Gemini CLI 可运行，且由 Gemini CLI 自己保管的 Google/API 鉴权已就绪".to_string()
+    } else {
+        "Gemini CLI 可运行，但未检测到 Google 登录缓存、Gemini API Key 或 Vertex AI 鉴权"
+            .to_string()
+    });
+    status.reason = (!auth).then(|| "not_logged_in".to_string());
+    status.diagnosis = Some(if auth {
+        "Win 端已找到可运行且已鉴权的 Gemini CLI。".to_string()
+    } else {
+        "Gemini CLI 本身能启动，但需要先通过官方 Gemini CLI 登录 Google 账号。".to_string()
+    });
+    status.fix_hint = (!auth)
+        .then(|| "请在节点页发起 Gemini 官方登录；凭据将继续由 Gemini CLI 保管。".to_string());
+    status.fix_action = if auth { "none" } else { "login" }.to_string();
+    status.backend = "acp";
+    status
 }
 
 fn probe_generic_cli(name: &str, best_path: Option<PathBuf>) -> LocalCliToolStatus {
@@ -462,6 +552,33 @@ fn codex_auth_configured() -> bool {
         .any(|home| codex_auth_file_present(&home))
 }
 
+fn gemini_auth_configured() -> bool {
+    if ["GEMINI_API_KEY", "GOOGLE_API_KEY"]
+        .into_iter()
+        .any(env_key_present)
+    {
+        return true;
+    }
+    if std::env::var("GOOGLE_APPLICATION_CREDENTIALS")
+        .ok()
+        .map(PathBuf::from)
+        .is_some_and(|path| non_empty_file(&path))
+    {
+        return true;
+    }
+    user_home_candidates().into_iter().any(|home| {
+        [
+            home.join(".gemini").join("oauth_creds.json"),
+            home.join(".gemini").join("google_accounts.json"),
+            home.join(".config")
+                .join("gcloud")
+                .join("application_default_credentials.json"),
+        ]
+        .into_iter()
+        .any(|path| non_empty_file(&path))
+    })
+}
+
 fn env_key_present(name: &str) -> bool {
     std::env::var(name)
         .map(|value| !value.trim().is_empty())
@@ -473,9 +590,17 @@ fn codex_home_candidates() -> Vec<PathBuf> {
     if let Ok(home) = std::env::var("CODEX_HOME") {
         push_unique_path(&mut candidates, PathBuf::from(home));
     }
+    for home in user_home_candidates() {
+        push_unique_path(&mut candidates, home.join(".codex"));
+    }
+    candidates
+}
+
+fn user_home_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
     for key in ["USERPROFILE", "HOME"] {
         if let Ok(home) = std::env::var(key) {
-            push_unique_path(&mut candidates, PathBuf::from(home).join(".codex"));
+            push_unique_path(&mut candidates, PathBuf::from(home));
         }
     }
     candidates

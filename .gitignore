@@ -35,6 +35,7 @@ scripts/_deploy_temp*.sh
 /.ai-tmp/
 .runtime/
 /.elon/ui-design/
+/.elon/ui-tuner/headless-design/
 .elon/ui-tuner/live/
 .elon/ui-tuner/fit-runs/
 /.elon/ui-tuner/pwa-runtime/

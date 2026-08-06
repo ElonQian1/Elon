@@ -365,6 +365,16 @@
             android:textColor="@color/elon_button_secondary_text"
             android:textSize="14sp" />
 
+        <Button
+            android:id="@+id/aiProviderAccountsButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="@color/elon_button_secondary_bg"
+            android:text="AI 厂商账号 · Codex / Gemini / Claude / Copilot"
+            android:textColor="@color/elon_button_secondary_text"
+            android:textSize="14sp" />
+
         <!-- ── 检查更新 ── -->
         <Button
             android:id="@+id/checkUpdateButton"

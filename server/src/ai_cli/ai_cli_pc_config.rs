@@ -253,6 +253,9 @@ pub(super) fn pc_route_a_extra_args(
             }
             args
         }
+        "gemini" => native_session_id
+            .map(|sid| vec![format!("--session-id={}", sid)])
+            .unwrap_or_default(),
         _ => vec![],
     }
 }

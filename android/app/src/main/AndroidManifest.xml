@@ -96,6 +96,11 @@
             android:parentActivityName=".MainActivity" />
 
         <activity
+            android:name=".AiProviderAccountsActivity"
+            android:exported="false"
+            android:parentActivityName=".SettingsActivity" />
+
+        <activity
             android:name=".VoiceEngineActivity"
             android:exported="false"
             android:parentActivityName=".SettingsActivity" />

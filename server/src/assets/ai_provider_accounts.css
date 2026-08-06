@@ -1,0 +1,87 @@
+.ai-provider-modal {
+  width: min(620px, calc(100vw - 28px));
+  max-height: 82vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-provider-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.ai-provider-toolbar select {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-provider-status {
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.ai-provider-list {
+  display: grid;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.ai-provider-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--panel-2);
+  padding: 14px;
+}
+
+.ai-provider-card h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.ai-provider-card-state {
+  margin-top: 5px;
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ai-provider-card-detail {
+  margin: 7px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.ai-provider-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 11px;
+}
+
+.ai-provider-card-actions button,
+.ai-provider-card-actions a {
+  min-height: 44px;
+  border: 0;
+  border-radius: 22px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand);
+  color: var(--brand-ink);
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ai-provider-card-actions button:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}

@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/assets/project_plaza.css" />
   <link rel="stylesheet" href="/assets/project_home.css" />
   <link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />
+  <link rel="stylesheet" href="/assets/ai_provider_accounts.css" />
   <style>
     :root {
       color-scheme: dark;
@@ -4749,6 +4750,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <span class="profile-action-copy"><span class="profile-action-title">AI 代理设置</span><span class="profile-action-subtitle">语音调节</span></span>
         <span class="profile-action-chevron" aria-hidden="true">›</span>
       </button>
+      <button class="profile-row" id="aiProviderAccountsRow">
+        <span class="profile-action-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="7" width="22" height="18" rx="6"/><path d="M11 16h10M16 11v10"/></svg>
+        </span>
+        <span class="profile-action-copy"><span class="profile-action-title">AI 厂商账号</span><span class="profile-action-subtitle">Codex / Gemini / Claude / Copilot</span></span>
+        <span class="profile-action-chevron" aria-hidden="true">›</span>
+      </button>
       <button class="profile-row" id="agentAutomationRow">
         <span class="profile-action-icon" aria-hidden="true">
           <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="16" cy="16" r="11"/><circle cx="16" cy="16" r="5" fill="currentColor" stroke="none"/></svg>
@@ -5229,6 +5237,23 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <button type="button" class="btn-cancel" id="cancelAgentBtn">关闭</button>
     </div>
   </form>
+</div>
+
+<!-- ============ AI 厂商账号 ============ -->
+<div class="modal-mask" id="aiProviderAccountsMask">
+  <div class="modal ai-provider-modal">
+    <h2>AI 厂商账号</h2>
+    <p class="ai-provider-status">通过自己的 Win 节点运行官方 CLI；一龙云端不保存厂商凭据。</p>
+    <div class="ai-provider-toolbar">
+      <select id="aiProviderNodeSelect" aria-label="选择 Win 节点"></select>
+      <button class="btn-cancel" id="aiProviderAccountsRefresh" type="button">刷新</button>
+    </div>
+    <div class="ai-provider-status" id="aiProviderAccountsStatus">正在读取节点…</div>
+    <div class="ai-provider-list" id="aiProviderAccountsList"></div>
+    <div class="actions">
+      <button type="button" class="btn-cancel" id="aiProviderAccountsClose">关闭</button>
+    </div>
+  </div>
 </div>
 
 <!-- ============ 充值额度对话框 ============ -->
@@ -11609,6 +11634,7 @@ if ('serviceWorker' in navigator) {
 <script src="/assets/project_plaza_cache.js"></script>
 <script src="/assets/project_plaza.js"></script>
 <script src="/assets/project_home.js"></script>
+<script src="/assets/ai_provider_accounts.js"></script>
 <style>
   body.ui-tuner-preview-active #uiTunerPreviewSelection {
     position: fixed;

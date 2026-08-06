@@ -127,6 +127,10 @@ pub(crate) fn validate_cli_extra_args(cli_name: &str, extra_args: &[String]) -> 
                 }
             }
             "claude" | "gemini" => {
+                if cli_name == "gemini" && valid_prefix_arg(arg, "--session-id=") {
+                    index += 1;
+                    continue;
+                }
                 if arg == "--attachment" {
                     validate_attachment_arg(extra_args.get(index + 1))?;
                     index += 2;

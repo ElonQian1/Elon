@@ -131,6 +131,8 @@ const PROJECT_PLAZA_JS: &str = include_str!("assets/project_plaza.js");
 const PROJECT_HOME_CSS: &str = include_str!("assets/project_home.css");
 const ORBITAL_MOBILE_THEME_CSS: &str = include_str!("assets/orbital_mobile_theme.css");
 const PROJECT_HOME_JS: &str = include_str!("assets/project_home.js");
+const AI_PROVIDER_ACCOUNTS_CSS: &str = include_str!("assets/ai_provider_accounts.css");
+const AI_PROVIDER_ACCOUNTS_JS: &str = include_str!("assets/ai_provider_accounts.js");
 const VOICE_TTS_SDK_JS: &str = include_str!("assets/voice_tts_sdk.js");
 const ELON_ROUTE_C_SDK_JS: &str = include_str!("assets/elon_route_c_sdk.js");
 const UI_TUNER_PWA_AUTH_BOOTSTRAP_JS: &str = include_str!("assets/ui_tuner_pwa_auth_bootstrap.js");
@@ -555,6 +557,29 @@ pub async fn project_home_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PROJECT_HOME_JS,
+    )
+}
+
+pub async fn ai_provider_accounts_css() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        AI_PROVIDER_ACCOUNTS_CSS,
+    )
+}
+
+pub async fn ai_provider_accounts_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        AI_PROVIDER_ACCOUNTS_JS,
     )
 }
 

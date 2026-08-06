@@ -460,6 +460,55 @@ pub(crate) async fn run_cli_prompt(run: CliPromptRun) {
         }
         return;
     }
+    if cli_name == "gemini" {
+        let result = crate::node_agent_acp_prompt::run_gemini_prompt(
+            crate::node_agent_acp_prompt::AcpPromptOptions {
+                req_id: &req_id,
+                program: bin,
+                cwd: cwd.as_deref(),
+                prompt: &prompt,
+                extra_args: &extra_args,
+                read_only: cli_prompt_read_only(runtime_permission.as_deref()),
+                timeout_secs: cli_prompt_timeout_secs(
+                    cli_name,
+                    runtime_permission.as_deref(),
+                    false,
+                ),
+                runtime: &runtime,
+                cancel_rx,
+                out_tx: out_tx.clone(),
+            },
+        )
+        .await;
+        let (exit_ok, error, workspace_status) =
+            finalize_cli_prompt_workspace(result.exit_ok, result.error, conversation_workspace);
+        let done = AgentToServer::CliDone {
+            req_id,
+            exit_ok,
+            error,
+            session_id: result.session_id.clone(),
+            prompt_tokens: None,
+            cached_input_tokens: None,
+            completion_tokens: None,
+            reasoning_tokens: None,
+            total_tokens: None,
+            model: result.model,
+            workspace_status,
+        };
+        if let Err(error) = persist_and_send_cli_done(
+            &runtime,
+            &completion_context,
+            cli_name,
+            result.session_id.as_deref(),
+            done,
+            &out_tx,
+        )
+        .await
+        {
+            warn!(%error, "failed to persist Gemini ACP completion");
+        }
+        return;
+    }
     let batch_wrapper = node_agent_cli_security::windows_batch_wrapper(bin);
     let actual_bin = batch_wrapper
         .as_ref()
