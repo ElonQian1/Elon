@@ -634,7 +634,7 @@ internal class MainModelActions(
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     text = subtitle
-                    setTextColor(Color.parseColor("#777777"))
+                    setTextColor(Color.parseColor("#80BEBEBA"))
                     textSize = 11.5f
                 })
             }

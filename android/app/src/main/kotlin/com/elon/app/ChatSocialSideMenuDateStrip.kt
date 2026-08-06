@@ -121,5 +121,5 @@ private fun socialSidebarDateLabel(
         text = value
         setSingleLine(true)
         textSize = size
-        setTextColor(Color.parseColor(if (selected) "#464646" else "#D9D9D9"))
+        setTextColor(Color.parseColor(if (selected) "#464646" else "#F8F7F4"))
     }

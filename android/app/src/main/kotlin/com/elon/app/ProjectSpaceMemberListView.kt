@@ -64,7 +64,7 @@ internal class ProjectSpaceMemberListView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(12), dp(20), dp(12))
-            background = panelBackground(if (isSelf) "#1E2A38" else "#222222")
+            background = panelBackground(if (isSelf) "#20262E" else "#0E1116")
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openMemberConversations(member) }
@@ -74,7 +74,7 @@ internal class ProjectSpaceMemberListView(
                     if (isSelf) append(" (我)")
                 }
                 textSize = 16f
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
@@ -85,7 +85,7 @@ internal class ProjectSpaceMemberListView(
                     if (convCount != null && convCount > 0) append(" · $convCount 个会话")
                 }
                 textSize = 12f
-                setTextColor(Color.parseColor("#777777"))
+                setTextColor(Color.parseColor("#80BEBEBA"))
                 setPadding(0, dp(5), 0, 0)
             })
             if (canManageProjectMembers(space.project.role) &&
@@ -127,9 +127,9 @@ internal class ProjectSpaceMemberListView(
         return TextView(activity).apply {
             text = "+ 新建个人 AI 会话"
             textSize = 15f
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#222222")
+            background = panelBackground("#0E1116")
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { showCreatePersonalConversation() }
@@ -140,9 +140,9 @@ internal class ProjectSpaceMemberListView(
         return TextView(activity).apply {
             text = "暂无个人会话"
             textSize = 13f
-            setTextColor(Color.parseColor("#777777"))
+            setTextColor(Color.parseColor("#80BEBEBA"))
             setPadding(dp(20), dp(14), dp(20), dp(14))
-            background = panelBackground("#222222")
+            background = panelBackground("#0E1116")
         }
     }
 }

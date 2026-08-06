@@ -110,7 +110,7 @@ class FloatingVoiceActivity : AppCompatActivity() {
             )
             
             val bg = GradientDrawable().apply {
-                setColor(Color.parseColor("#222222"))
+                setColor(Color.parseColor("#0E1116"))
                 cornerRadius = 24 * density
             }
             background = bg
@@ -133,7 +133,7 @@ class FloatingVoiceActivity : AppCompatActivity() {
         statusText = TextView(this).apply {
             text = "正在准备..."
             textSize = 16f
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             gravity = Gravity.CENTER
         }
         card.addView(statusText, LinearLayout.LayoutParams(
@@ -148,7 +148,7 @@ class FloatingVoiceActivity : AppCompatActivity() {
         resultText = TextView(this).apply {
             text = ""
             textSize = 18f
-            setTextColor(Color.parseColor("#58BE6A"))
+            setTextColor(Color.parseColor("#67BEA0"))
             gravity = Gravity.CENTER
             maxLines = 5
             minHeight = (60 * density).toInt()
@@ -165,9 +165,9 @@ class FloatingVoiceActivity : AppCompatActivity() {
         cancelButton = Button(this).apply {
             text = "❌ 取消"
             textSize = 14f
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             val bg = GradientDrawable().apply {
-                setColor(Color.parseColor("#2A2A2A"))
+                setColor(Color.parseColor("#20262E"))
                 cornerRadius = 20 * density
             }
             background = bg
@@ -186,7 +186,7 @@ class FloatingVoiceActivity : AppCompatActivity() {
         val tipText = TextView(this).apply {
             text = "说完会自动执行，点击空白处取消"
             textSize = 11f
-            setTextColor(Color.parseColor("#777777"))
+            setTextColor(Color.parseColor("#80BEBEBA"))
             gravity = Gravity.CENTER
         }
         card.addView(tipText, LinearLayout.LayoutParams(

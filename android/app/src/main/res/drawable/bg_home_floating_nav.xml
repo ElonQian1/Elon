@@ -3,15 +3,23 @@
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
             <corners android:radius="30dp" />
-            <solid android:color="@color/elon_surface_soft" />
+            <gradient
+                android:angle="135"
+                android:startColor="@color/elon_surface_soft"
+                android:centerColor="@color/elon_surface_header"
+                android:endColor="@color/elon_nav_bg" />
             <stroke android:width="1dp" android:color="@color/elon_border_primary" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
             <corners android:radius="30dp" />
-            <solid android:color="@color/elon_nav_bg" />
-            <stroke android:width="1dp" android:color="@color/elon_border_subtle" />
+            <gradient
+                android:angle="135"
+                android:startColor="@color/elon_surface_header"
+                android:centerColor="@color/elon_nav_bg"
+                android:endColor="@color/elon_bg_chrome" />
+            <stroke android:width="1dp" android:color="@color/elon_metal_edge" />
         </shape>
     </item>
 </selector>

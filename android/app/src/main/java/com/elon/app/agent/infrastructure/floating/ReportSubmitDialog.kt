@@ -64,7 +64,7 @@ class ReportSubmitDialog(private val context: Context) {
         val mainLayout = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(32, 24, 32, 24)
-            setBackgroundColor(Color.parseColor("#222222"))
+            setBackgroundColor(Color.parseColor("#0E1116"))
         }
         
         // 标题
@@ -127,7 +127,7 @@ class ReportSubmitDialog(private val context: Context) {
             addView(TextView(context).apply {
                 text = "执行报告"
                 textSize = 20f
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 typeface = Typeface.DEFAULT_BOLD
             })
             
@@ -138,15 +138,15 @@ class ReportSubmitDialog(private val context: Context) {
     
     private fun createPerformanceBadge(score: String): TextView {
         val (bgColor, text) = when (score) {
-            "GOOD" -> Pair(Color.parseColor("#58BE6A"), "优秀")
-            "FAIR" -> Pair(Color.parseColor("#8DDC9B"), "一般")
-            else -> Pair(Color.parseColor("#D97A7A"), "较差")
+            "GOOD" -> Pair(Color.parseColor("#67BEA0"), "优秀")
+            "FAIR" -> Pair(Color.parseColor("#67BEA0"), "一般")
+            else -> Pair(Color.parseColor("#E07B84"), "较差")
         }
         
         return TextView(context).apply {
             this.text = text
             textSize = 12f
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             setBackgroundColor(bgColor)
             setPadding(16, 8, 16, 8)
             gravity = Gravity.CENTER
@@ -187,14 +187,14 @@ class ReportSubmitDialog(private val context: Context) {
             addView(TextView(context).apply {
                 text = label
                 textSize = 14f
-                setTextColor(Color.parseColor("#A8A8A8"))
+                setTextColor(Color.parseColor("#B3DDDBD5"))
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             })
             
             addView(TextView(context).apply {
                 text = value
                 textSize = 14f
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
             })
         }
     }
@@ -212,8 +212,8 @@ class ReportSubmitDialog(private val context: Context) {
             addView(TextView(context).apply {
                 text = reportText
                 textSize = 12f
-                setTextColor(Color.parseColor("#D6D6D6"))
-                setBackgroundColor(Color.parseColor("#151515"))
+                setTextColor(Color.parseColor("#F8F7F4"))
+                setBackgroundColor(Color.parseColor("#080B0F"))
                 setPadding(16, 16, 16, 16)
                 movementMethod = ScrollingMovementMethod.getInstance()
                 typeface = Typeface.MONOSPACE
@@ -224,7 +224,7 @@ class ReportSubmitDialog(private val context: Context) {
     private fun createRecommendationBanner(): LinearLayout {
         return LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#16251A"))
+            setBackgroundColor(Color.parseColor("#151A20"))
             setPadding(16, 12, 16, 12)
             gravity = Gravity.CENTER_VERTICAL
             
@@ -237,7 +237,7 @@ class ReportSubmitDialog(private val context: Context) {
             addView(TextView(context).apply {
                 text = "检测到性能问题，建议提交报告帮助我们改进"
                 textSize = 13f
-                setTextColor(Color.parseColor("#8DDC9B"))
+                setTextColor(Color.parseColor("#67BEA0"))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -266,7 +266,7 @@ class ReportSubmitDialog(private val context: Context) {
             // 关闭按钮
             addView(Button(context).apply {
                 text = "关闭"
-                setTextColor(Color.parseColor("#A8A8A8"))
+                setTextColor(Color.parseColor("#B3DDDBD5"))
                 setBackgroundColor(Color.TRANSPARENT)
                 setOnClickListener {
                     dialog.dismiss()
@@ -276,8 +276,8 @@ class ReportSubmitDialog(private val context: Context) {
             // 提交按钮
             addView(Button(context).apply {
                 text = "📤 提交优化建议"
-                setTextColor(Color.parseColor("#D6D6D6"))
-                setBackgroundColor(Color.parseColor("#2A2A2A"))
+                setTextColor(Color.parseColor("#F8F7F4"))
+                setBackgroundColor(Color.parseColor("#20262E"))
                 setPadding(32, 16, 32, 16)
                 
                 setOnClickListener {
@@ -291,7 +291,7 @@ class ReportSubmitDialog(private val context: Context) {
     
     private fun createDivider(): View {
         return View(context).apply {
-            setBackgroundColor(Color.parseColor("#2A2A2A"))
+            setBackgroundColor(Color.parseColor("#20262E"))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 2

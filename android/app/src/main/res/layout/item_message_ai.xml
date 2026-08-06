@@ -137,7 +137,7 @@
             android:layout_marginTop="4dp"
             android:paddingStart="2dp"
             android:paddingEnd="2dp"
-            android:textColor="#5A5A5A"
+            android:textColor="#80BEBEBA"
             android:textSize="11sp"
             android:visibility="gone" />
 

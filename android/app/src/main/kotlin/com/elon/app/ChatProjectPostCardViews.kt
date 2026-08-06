@@ -44,7 +44,7 @@ private fun buildChatProjectPostCard(context: Context, post: ChatProjectPostCard
     return LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(context.postDp(18), context.postDp(18), context.postDp(18), context.postDp(14))
-        background = roundedPostBackground(context, "#222222", POST_CARD_RADIUS_DP)
+        background = roundedPostBackground(context, "#0E1116", POST_CARD_RADIUS_DP)
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -74,14 +74,14 @@ private fun postHeader(context: Context, post: ChatProjectPostCard): LinearLayou
             addView(TextView(context).apply {
                 text = post.authorName
                 textSize = 18f
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
             addView(TextView(context).apply {
                 text = post.timeText
                 textSize = 13f
-                setTextColor(Color.parseColor("#A8A8A8"))
+                setTextColor(Color.parseColor("#B3DDDBD5"))
                 setPadding(0, context.postDp(4), 0, 0)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
@@ -90,7 +90,7 @@ private fun postHeader(context: Context, post: ChatProjectPostCard): LinearLayou
         addView(TextView(context).apply {
             text = post.topic
             textSize = 17f
-            setTextColor(Color.parseColor("#A8A8A8"))
+            setTextColor(Color.parseColor("#B3DDDBD5"))
             gravity = Gravity.CENTER_VERTICAL
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
@@ -119,7 +119,7 @@ private fun postAvatar(context: Context, authorName: String, avatarDataUrl: Stri
         includeFontPadding = false
         textSize = 18f
         setTypeface(typeface, Typeface.BOLD)
-        setTextColor(Color.parseColor("#101010"))
+        setTextColor(Color.parseColor("#0B1118"))
         background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.parseColor("#D8D8D8"))
@@ -131,7 +131,7 @@ private fun postTitle(context: Context, titleText: String): TextView {
     return TextView(context).apply {
         text = titleText
         textSize = 19f
-        setTextColor(Color.parseColor("#D6D6D6"))
+        setTextColor(Color.parseColor("#F8F7F4"))
         setLineSpacing(context.postDp(4).toFloat(), 1f)
         setPadding(0, context.postDp(20), 0, 0)
     }
@@ -141,7 +141,7 @@ private fun postBody(context: Context, bodyText: String): TextView {
     return TextView(context).apply {
         text = bodyText
         textSize = 17f
-        setTextColor(Color.parseColor("#A8A8A8"))
+        setTextColor(Color.parseColor("#B3DDDBD5"))
         setLineSpacing(context.postDp(4).toFloat(), 1f)
         setPadding(0, context.postDp(10), 0, 0)
     }
@@ -195,7 +195,7 @@ private fun postMetric(context: Context, icon: String, value: String): TextView 
         textSize = 16f
         gravity = Gravity.CENTER
         includeFontPadding = false
-        setTextColor(Color.parseColor("#A8A8A8"))
+        setTextColor(Color.parseColor("#B3DDDBD5"))
     }
 }
 

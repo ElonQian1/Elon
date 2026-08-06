@@ -145,7 +145,7 @@ internal class ProjectSpacePlayStoreHeaderView(
             gravity = Gravity.CENTER
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             setTextColor(Color.parseColor(PLAY_TEXT_PRIMARY))
-            background = roundedStrokeBackground(PLAY_BG, 8, "#5A5A5A", 1)
+            background = roundedStrokeBackground(PLAY_BG, 8, "#80BEBEBA", 1)
             isClickable = true
             foreground = selectableForeground()
             contentDescription = "加入项目"
@@ -182,7 +182,7 @@ internal class ProjectSpacePlayStoreHeaderView(
             includeFontPadding = false
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor(PLAY_TEXT_PRIMARY))
-            background = roundedStrokeBackground(PLAY_BG, 8, "#5A5A5A", 1)
+            background = roundedStrokeBackground(PLAY_BG, 8, "#80BEBEBA", 1)
             isClickable = true
             foreground = selectableForeground()
             contentDescription = description
@@ -206,15 +206,15 @@ internal class ProjectSpacePlayStoreHeaderView(
             }
         }
         return FrameLayout(activity).apply {
-            background = roundedBackground("#172231", 18)
+            background = roundedBackground("#171C22", 18)
             addView(TextView(activity).apply {
                 text = project.name.firstOrNull()?.toString() ?: "项"
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 textSize = 20f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#070B10"))
-                background = roundedBackground("#7AA7FF", 999)
+                setTextColor(Color.parseColor("#0B1118"))
+                background = roundedBackground("#C2CBD6", 999)
             }, FrameLayout.LayoutParams(dp(50), dp(50), Gravity.CENTER))
         }
     }

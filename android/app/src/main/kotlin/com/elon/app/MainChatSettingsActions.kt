@@ -128,7 +128,7 @@ internal class MainChatSettingsActions(
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
         val root = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#101010"))
+            setBackgroundColor(Color.parseColor("#0B1118"))
             translationX = activity.resources.displayMetrics.widthPixels.toFloat()
         }
         root.addView(topBar(title) { dismissWithAnimation(dialog) })
@@ -217,7 +217,7 @@ internal class MainChatSettingsActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(50)
             )
-            setBackgroundColor(Color.parseColor("#101010"))
+            setBackgroundColor(Color.parseColor("#0B1118"))
             addView(TextView(activity).apply {
                 layoutParams = FrameLayout.LayoutParams(dp(50), FrameLayout.LayoutParams.MATCH_PARENT).apply {
                     gravity = Gravity.START or Gravity.CENTER_VERTICAL
@@ -225,7 +225,7 @@ internal class MainChatSettingsActions(
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "‹"
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = 31f
                 isClickable = true
                 foreground = selectableForeground()
@@ -241,7 +241,7 @@ internal class MainChatSettingsActions(
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = title
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = 17f
             })
         }
@@ -253,7 +253,7 @@ internal class MainChatSettingsActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(108)
             )
-            setBackgroundColor(Color.parseColor("#222222"))
+            setBackgroundColor(Color.parseColor("#0E1116"))
             overScrollMode = View.OVER_SCROLL_NEVER
             isHorizontalScrollBarEnabled = false
             addView(LinearLayout(activity).apply {
@@ -272,7 +272,7 @@ internal class MainChatSettingsActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(126)
             )
-            setBackgroundColor(Color.parseColor("#222222"))
+            setBackgroundColor(Color.parseColor("#0E1116"))
             overScrollMode = View.OVER_SCROLL_NEVER
             isHorizontalScrollBarEnabled = false
             addView(LinearLayout(activity).apply {
@@ -307,7 +307,7 @@ internal class MainChatSettingsActions(
                 maxLines = 1
                 ellipsize = android.text.TextUtils.TruncateAt.END
                 text = name
-                setTextColor(Color.parseColor("#A8A8A8"))
+                setTextColor(Color.parseColor("#B3DDDBD5"))
                 textSize = 12f
             })
         }
@@ -323,11 +323,11 @@ internal class MainChatSettingsActions(
             setOnClickListener { onClick() }
             addView(TextView(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(46), dp(46))
-                background = roundedBg("#2A2A2A", 8)
+                background = roundedBg("#20262E", 8)
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "+"
-                setTextColor(Color.parseColor("#CFCFCF"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = 27f
             })
             addView(TextView(activity).apply {
@@ -340,7 +340,7 @@ internal class MainChatSettingsActions(
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "添加"
-                setTextColor(Color.parseColor("#A8A8A8"))
+                setTextColor(Color.parseColor("#B3DDDBD5"))
                 textSize = 12f
             })
         }
@@ -360,11 +360,11 @@ internal class MainChatSettingsActions(
         }
         return TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
-            background = roundedBg("#D6D6D6", 8)
+            background = roundedBg("#F8F7F4", 8)
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = UserProfileStore.avatarInitial(name)
-            setTextColor(Color.parseColor("#2A2A2A"))
+            setTextColor(Color.parseColor("#20262E"))
             textSize = textSizeSp
             setTypeface(typeface, Typeface.BOLD)
         }
@@ -402,7 +402,7 @@ internal class MainChatSettingsActions(
                 includeFontPadding = false
                 background = toggleBg(enabled)
                 text = if (enabled) "开" else "关"
-                setTextColor(Color.parseColor(if (enabled) "#101010" else "#A8A8A8"))
+                setTextColor(Color.parseColor(if (enabled) "#0B1118" else "#B3DDDBD5"))
                 textSize = 13f
             }
             addView(status, LinearLayout.LayoutParams(dp(48), dp(26)))
@@ -411,7 +411,7 @@ internal class MainChatSettingsActions(
                 prefs.edit().putBoolean(key, enabled).apply()
                 status.background = toggleBg(enabled)
                 status.text = if (enabled) "开" else "关"
-                status.setTextColor(Color.parseColor(if (enabled) "#101010" else "#A8A8A8"))
+                status.setTextColor(Color.parseColor(if (enabled) "#0B1118" else "#B3DDDBD5"))
             }
         }
     }
@@ -425,7 +425,7 @@ internal class MainChatSettingsActions(
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(18), 0, dp(18), 0)
-            setBackgroundColor(Color.parseColor("#222222"))
+            setBackgroundColor(Color.parseColor("#0E1116"))
             isClickable = true
             foreground = selectableForeground()
         }
@@ -438,14 +438,14 @@ internal class MainChatSettingsActions(
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = title
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = 15.5f
             })
             if (!subtitle.isNullOrBlank()) {
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = subtitle
-                    setTextColor(Color.parseColor("#777777"))
+                    setTextColor(Color.parseColor("#80BEBEBA"))
                     textSize = 12f
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
@@ -458,7 +458,7 @@ internal class MainChatSettingsActions(
         return TextView(activity).apply {
             includeFontPadding = false
             text = "›"
-            setTextColor(Color.parseColor("#777777"))
+            setTextColor(Color.parseColor("#80BEBEBA"))
             textSize = 24f
         }
     }
@@ -481,7 +481,7 @@ internal class MainChatSettingsActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(10)
             )
-            setBackgroundColor(Color.parseColor("#101010"))
+            setBackgroundColor(Color.parseColor("#0B1118"))
         }
     }
 
@@ -495,7 +495,7 @@ internal class MainChatSettingsActions(
     private fun toggleBg(enabled: Boolean): GradientDrawable {
         return GradientDrawable().apply {
             cornerRadius = dp(13).toFloat()
-            setColor(Color.parseColor(if (enabled) "#D6D6D6" else "#2A2A2A"))
+            setColor(Color.parseColor(if (enabled) "#F8F7F4" else "#20262E"))
         }
     }
 

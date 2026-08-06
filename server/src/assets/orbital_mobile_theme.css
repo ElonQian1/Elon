@@ -1,0 +1,344 @@
+/*
+ * APK-led orbital metal workbench.
+ * Keep this layer declarative: Android colors.xml remains the canonical palette.
+ */
+:root {
+  --bg: #07090d;
+  --bg-hint: #05070a;
+  --side-menu-bg: #080b0f;
+  --panel: #0e1116;
+  --panel-2: #171c22;
+  --panel-3: #20262e;
+  --line: rgba(108, 120, 132, 0.32);
+  --metal-edge: rgba(123, 135, 147, 0.40);
+  --metal-highlight: rgba(174, 184, 196, 0.24);
+  --calibration: rgba(127, 175, 186, 0.35);
+  --ink: rgba(248, 247, 244, 0.94);
+  --ink-strong: #f8f7f4;
+  --ink-soft: rgba(221, 219, 213, 0.70);
+  --ink-muted: rgba(190, 190, 186, 0.50);
+  --ink-list-preview: rgba(190, 190, 186, 0.50);
+  --ink-faint: rgba(190, 190, 186, 0.50);
+  --ink-dim: rgba(190, 190, 186, 0.50);
+  --ink-quiet: rgba(190, 190, 186, 0.50);
+  --brand: #c2cbd6;
+  --brand-hover: #d2dae3;
+  --brand-ink: #0b1118;
+  --accent: #7fafba;
+  --link: #b4c5e3;
+  --success: #67bea0;
+  --warning: #d2b572;
+  --danger: #e07b84;
+  --secondary-btn: #171c22;
+  --secondary-btn-ink: rgba(248, 247, 244, 0.94);
+  --input-pill-bg: #12161c;
+  --project-space-page-bg: #07090d;
+  --project-space-panel-bg: #07090d;
+  --project-space-info-bg: #171c22;
+  --project-space-info-ink: rgba(248, 247, 244, 0.94);
+  --project-space-info-ink-soft: rgba(221, 219, 213, 0.70);
+  --project-space-info-ink-faint: rgba(190, 190, 186, 0.50);
+  --store-detail-bg: #07090d;
+  --store-detail-ink: rgba(248, 247, 244, 0.94);
+  --store-detail-muted: rgba(221, 219, 213, 0.70);
+  --store-detail-link: #b4c5e3;
+  --store-detail-divider: rgba(108, 120, 132, 0.32);
+  --store-detail-button: #c2cbd6;
+  --store-detail-button-ink: #0b1118;
+  --badge-info-bg: rgba(142, 167, 213, 0.13);
+  --badge-info-ink: #afc1e0;
+  --badge-neutral-bg: #171c22;
+  --badge-neutral-ink: rgba(248, 247, 244, 0.94);
+  --nav-bg: #080b0f;
+  --nav-active-bg: #20262e;
+  --system-nav-bg: #05070a;
+  --popup-panel-bg: #171c22;
+  --bubble-user: #c2cbd6;
+  --bubble-user-ink: #0b1118;
+  --bubble-ai-bg: #0e1116;
+  --bubble-ai-border: rgba(123, 135, 147, 0.40);
+  --bubble-ai-ink: rgba(248, 247, 244, 0.94);
+  --bubble-progress-bg: #171c22;
+  --bubble-progress-border: rgba(108, 120, 132, 0.32);
+  --bubble-progress-ink: rgba(221, 219, 213, 0.70);
+  --bubble-error-bg: rgba(224, 123, 132, 0.12);
+  --bubble-error-border: rgba(224, 123, 132, 0.50);
+  --bubble-error-ink: #e07b84;
+  --tab-icon: rgba(221, 219, 213, 0.70);
+  --tab-active: #b4c5e3;
+  --profile-quota-selected: #8ea7d5;
+  --profile-quota-control: #171c22;
+  --profile-quota-border: rgba(123, 135, 147, 0.40);
+  --profile-quota-control-ink: rgba(248, 247, 244, 0.94);
+  --profile-account-action: #b4c5e3;
+  --focus-ring: 0 0 0 2px #07090d, 0 0 0 4px rgba(142, 167, 213, 0.72);
+}
+
+html,
+body,
+.app,
+.content,
+.page,
+.tabs-bar,
+.project-space-ai-menu {
+  background-color: var(--bg);
+}
+
+.content {
+  background-image:
+    radial-gradient(circle at 9% 13%, rgba(222, 234, 242, 0.22) 0 1px, transparent 1.4px),
+    radial-gradient(circle at 84% 31%, rgba(127, 175, 186, 0.18) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 61% 82%, rgba(222, 234, 242, 0.14) 0 1px, transparent 1.4px),
+    linear-gradient(167deg, transparent 0 71%, rgba(127, 175, 186, 0.09) 71.1%, transparent 71.3%);
+}
+
+.toolbar {
+  background: linear-gradient(180deg, #05070a 0%, #080b0f 72%, #0e1116 100%);
+  border-bottom: 1px solid rgba(123, 135, 147, 0.18);
+}
+
+.toolbar h1,
+.project-top-tab,
+.agent-center-title {
+  letter-spacing: 0.035em;
+}
+
+.bubble.ai,
+.bubble.friend,
+.bubble.progress {
+  background: linear-gradient(145deg, #171c22 0%, #0e1116 54%, #080b0f 100%);
+  border-color: var(--metal-edge);
+  box-shadow: inset 0 1px 0 var(--metal-highlight);
+}
+
+.bubble.user {
+  background: linear-gradient(100deg, #c2cbd6 0%, #95a6b9 52%, #71879f 100%);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48);
+}
+
+.bubble.error {
+  background: var(--bubble-error-bg);
+  border-color: var(--bubble-error-border);
+}
+
+.login-card,
+.modal,
+.project-stage,
+.project-grid,
+.project-history,
+.usage-section,
+#profilePage .profile-user-card,
+#profilePage .profile-action-group,
+#profilePage .profile-node-resource-panel,
+.agent-step-card,
+.project-browser-sheet,
+.node-tx-sheet,
+.pwa-install-card,
+.home-nav-menu,
+.home-action-menu,
+.home-project-create-menu,
+.input-attachment-panel {
+  position: relative;
+  background: linear-gradient(145deg, #171c22 0%, #0e1116 58%, #080b0f 100%);
+  border: 1px solid var(--metal-edge);
+  box-shadow: inset 0 1px 0 var(--metal-highlight);
+}
+
+.login-card::before,
+.modal::before,
+.project-stage::before,
+.usage-section::before,
+#profilePage .profile-user-card::before,
+#profilePage .profile-action-group::before,
+.agent-step-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 20px;
+  right: 20px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--metal-highlight), transparent);
+}
+
+#profilePage .profile-user-card,
+#profilePage .profile-action-group,
+#profilePage .profile-node-resource-panel {
+  border-radius: 18px;
+}
+
+#profilePage .profile-avatar,
+.chat-avatar.user {
+  background: linear-gradient(145deg, #c2cbd6, #71879f);
+  color: var(--brand-ink);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+}
+
+#profilePage .profile-nickname,
+#profilePage .profile-level-row,
+#profilePage .profile-action-title,
+.usage-metric-value,
+.node-payout-title,
+.my-nodes-title,
+.my-node-id {
+  color: var(--ink-strong);
+}
+
+#profilePage .profile-account,
+#profilePage .profile-version,
+.usage-caption,
+.usage-progress-label,
+.usage-metric-label,
+.node-payout-meta,
+.my-node-subtitle,
+.my-node-models,
+.my-nodes-empty {
+  color: var(--ink-faint);
+}
+
+#profilePage .profile-level-track,
+.usage-bar {
+  background: #252b33;
+  border: 1px solid rgba(123, 135, 147, 0.28);
+}
+
+#profilePage .profile-level-track .own { background: #67bea0; }
+#profilePage .profile-level-track .platform { background: #8ea7d5; }
+#profilePage .profile-level-track .shared { background: #7fafba; }
+#profilePage .profile-level-track .provided { background: #d2b572; }
+
+.usage-progress,
+.usage-gauge-progress {
+  background: linear-gradient(90deg, #71879f, #8ea7d5, #b4c5e3);
+}
+
+.my-nodes-card,
+.my-node-row,
+.profile-memory-panel {
+  background: rgba(14, 17, 22, 0.72);
+  border-color: var(--line);
+}
+
+.input-bar {
+  background: linear-gradient(180deg, transparent 0%, rgba(5, 7, 10, 0.92) 18%, #05070a 100%);
+}
+
+.input-panel,
+.input-bar.has-text .input-panel,
+.input-bar.input-focused .input-panel,
+.input-bar.attachments-open .input-panel {
+  background: linear-gradient(145deg, #171c22 0%, #0e1116 58%, #080b0f 100%);
+  border: 1px solid var(--metal-edge);
+  box-shadow: inset 0 1px 0 var(--metal-highlight);
+}
+
+.input-bar .model-btn,
+.input-bar .plan-btn {
+  background: linear-gradient(145deg, #20262e, #12161c);
+  border: 1px solid var(--line);
+}
+
+.tabs-bar {
+  background: linear-gradient(180deg, transparent, #05070a 18%);
+}
+
+.tabs-panel {
+  background: linear-gradient(145deg, #171c22 0%, #080b0f 58%, #05070a 100%);
+  border: 1px solid var(--metal-edge);
+  border-radius: 30px;
+  box-shadow: inset 0 1px 0 var(--metal-highlight);
+}
+
+.bottom-compose-button {
+  border: 1px solid var(--metal-edge);
+  border-radius: 50%;
+  background: linear-gradient(145deg, #20262e 0%, #0e1116 62%, #05070a 100%);
+  box-shadow: inset 0 1px 0 var(--metal-highlight);
+}
+
+.bottom-compose-button::before,
+.bottom-compose-button::after {
+  background: #c2cbd6;
+}
+
+.modal input,
+.modal textarea,
+.modal select,
+.login-card input,
+.project-browser-search {
+  background: linear-gradient(145deg, #171c22, #12161c 58%, #080b0f);
+  border-color: var(--line);
+}
+
+.modal .btn-confirm,
+.login-card .submit,
+.download-btn,
+.pwa-install-primary,
+.usage-action.primary,
+.agent-step-action.primary,
+.project-space-ai-menu button,
+.project-space-install,
+.project-space-empty-post-btn {
+  background: linear-gradient(100deg, #c2cbd6 0%, #95a6b9 52%, #71879f 100%);
+  color: var(--brand-ink);
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42);
+}
+
+.modal .btn-cancel,
+.copy-btn,
+.pwa-install-later,
+.usage-action.secondary,
+.agent-step-action,
+#profilePage .profile-account-action,
+.project-refresh-btn {
+  background: linear-gradient(145deg, #20262e, #171c22 52%, #0e1116);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.project-space-summary,
+.project-space-intro-card,
+.project-space-post-card,
+.project-space-announcement {
+  border-color: var(--line);
+}
+
+.project-space-metric-divider,
+.usage-row,
+.profile-row {
+  border-color: var(--line);
+}
+
+.profile-row,
+.project-block {
+  background: rgba(14, 17, 22, 0.72);
+}
+
+.agent-step-dot,
+.project-space-topic-chip,
+.usage-period-button {
+  border-color: var(--metal-edge);
+}
+
+.usage-period-button.selected {
+  background: #8ea7d5;
+  color: #0b1118;
+}
+
+.chat-timeline-label,
+.usage-remaining,
+.project-space-metric-value,
+.profile-version {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usage-progress,
+  .usage-gauge-progress,
+  .input-panel,
+  .pwa-install-card {
+    transition-duration: 1ms !important;
+  }
+}

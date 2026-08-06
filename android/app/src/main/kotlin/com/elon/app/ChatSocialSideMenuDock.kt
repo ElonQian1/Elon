@@ -46,7 +46,7 @@ internal fun createSocialSidebarFilterDock(
         text = "设置"
         textSize = 15f
         setSingleLine(true)
-        setTextColor(Color.parseColor("#D9D9D9"))
+        setTextColor(Color.parseColor("#F8F7F4"))
         isClickable = true
         foreground = selectableForeground()
         contentDescription = "侧栏设置"
@@ -68,7 +68,7 @@ private fun socialSidebarFilterText(
     text = label
     textSize = 13f
     setSingleLine(true)
-    setTextColor(Color.parseColor(if (selectedFilter == type) "#4F9DFF" else "#D9D9D9"))
+    setTextColor(Color.parseColor(if (selectedFilter == type) "#8EA7D5" else "#F8F7F4"))
     isClickable = true
     foreground = selectableForeground()
     contentDescription = "$label${if (selectedFilter == type) "，已选中" else ""}"

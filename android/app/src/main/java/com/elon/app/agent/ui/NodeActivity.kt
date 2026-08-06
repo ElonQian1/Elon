@@ -27,18 +27,18 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
-private const val BG = "#101010"
-private const val CARD = "#222222"
-private const val TEXT_PRIMARY = "#D6D6D6"
-private const val TEXT_SECONDARY = "#A8A8A8"
-private const val TEXT_TERTIARY = "#777777"
-private const val PRIMARY_BG = "#58BE6A"
-private const val ACTION_BG = "#C8C8C8"
-private const val PRIMARY_TEXT = "#101010"
-private const val ACCENT_BG = "#2A2A2A"
-private const val SECONDARY_BG = "#2A2A2A"
-private const val SECONDARY_TEXT = "#D6D6D6"
-private const val BORDER = "#2E2E2E"
+private const val BG = "#0B1118"
+private const val CARD = "#0E1116"
+private const val TEXT_PRIMARY = "#F8F7F4"
+private const val TEXT_SECONDARY = "#B3DDDBD5"
+private const val TEXT_TERTIARY = "#80BEBEBA"
+private const val PRIMARY_BG = "#67BEA0"
+private const val ACTION_BG = "#F8F7F4"
+private const val PRIMARY_TEXT = "#0B1118"
+private const val ACCENT_BG = "#20262E"
+private const val SECONDARY_BG = "#20262E"
+private const val SECONDARY_TEXT = "#F8F7F4"
+private const val BORDER = "#667B8793"
 
 /**
  * 节点管理界面：
@@ -96,7 +96,7 @@ class NodeActivity : Activity() {
 
                 tvError = TextView(context).apply {
                     visibility = View.GONE
-                    setTextColor(Color.parseColor("#D97A7A"))
+                    setTextColor(Color.parseColor("#E07B84"))
                     textSize = 14f
                     gravity = Gravity.CENTER
                     layoutParams = LinearLayout.LayoutParams(

@@ -44,7 +44,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor("#101010"))
+            setBackgroundColor(Color.parseColor("#0B1118"))
             addView(topBar())
             addView(ScrollView(this@PersonalQrCodeActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(
@@ -77,13 +77,13 @@ class PersonalQrCodeActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(6), 0, dp(18), 0)
-            setBackgroundColor(Color.parseColor("#101010"))
+            setBackgroundColor(Color.parseColor("#0B1118"))
             addView(TextView(this@PersonalQrCodeActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(56), LinearLayout.LayoutParams.MATCH_PARENT)
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "‹"
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = 34f
                 setOnClickListener { finish() }
             })
@@ -92,7 +92,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "我的二维码"
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = 20f
             })
             addView(View(this@PersonalQrCodeActivity).apply {
@@ -104,7 +104,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
     private fun qrCard(profile: UserProfile, userId: String, qrSize: Int): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = roundedRect("#D6D6D6", 12)
+            background = roundedRect("#F8F7F4", 12)
             setPadding(dp(20), dp(20), dp(20), dp(18))
             addView(identityHeader(profile, userId))
             addView(ImageView(this@PersonalQrCodeActivity).apply {
@@ -126,7 +126,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "扫码识别我的一龙账号"
-                setTextColor(Color.parseColor("#2A2A2A"))
+                setTextColor(Color.parseColor("#20262E"))
                 textSize = 14f
             })
         }
@@ -150,7 +150,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
                     includeFontPadding = false
                     maxLines = 1
                     text = profile.displayName
-                    setTextColor(Color.parseColor("#101010"))
+                    setTextColor(Color.parseColor("#0B1118"))
                     textSize = 20f
                     setTypeface(typeface, Typeface.BOLD)
                 })
@@ -158,7 +158,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
                     includeFontPadding = false
                     maxLines = 1
                     text = "账号：${profile.wechatId}"
-                    setTextColor(Color.parseColor("#2A2A2A"))
+                    setTextColor(Color.parseColor("#20262E"))
                     textSize = 13f
                     setPadding(0, dp(8), 0, 0)
                 })
@@ -166,7 +166,7 @@ class PersonalQrCodeActivity : AppCompatActivity() {
                     includeFontPadding = false
                     maxLines = 1
                     text = "ID：$userId"
-                    setTextColor(Color.parseColor("#777777"))
+                    setTextColor(Color.parseColor("#80BEBEBA"))
                     textSize = 12f
                     setPadding(0, dp(6), 0, 0)
                 })
@@ -183,8 +183,8 @@ class PersonalQrCodeActivity : AppCompatActivity() {
             text = "复制账号 ID"
             textSize = 15f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#D6D6D6"))
-            background = roundedRect("#2A2A2A", 8, "#2E2E2E")
+            setTextColor(Color.parseColor("#F8F7F4"))
+            background = roundedRect("#20262E", 8, "#667B8793")
             isClickable = true
             isFocusable = true
             foreground = selectableForeground()

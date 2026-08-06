@@ -138,7 +138,7 @@ internal class ChatSocialSideMenuView(
             textSize = 18f
             setSingleLine(true)
             setTypeface(typeface, Typeface.NORMAL)
-            setTextColor(Color.parseColor(if (selected) "#4F9DFF" else "#D9D9D9"))
+            setTextColor(Color.parseColor(if (selected) "#8EA7D5" else "#F8F7F4"))
             isClickable = true
             foreground = selectableForeground()
             contentDescription = "$title${if (selected) "，已选中" else ""}"
@@ -152,7 +152,7 @@ internal class ChatSocialSideMenuView(
         }
         background = roundedRect("#272727", 24)
         setPadding(dp(18), 0, dp(18), 0)
-        setTextColor(Color.parseColor("#D9D9D9"))
+        setTextColor(Color.parseColor("#F8F7F4"))
         setHintTextColor(Color.parseColor("#AFAFAF"))
         textSize = 15f
         hint = "搜索名称或消息内容"
@@ -188,7 +188,7 @@ internal class ChatSocialSideMenuView(
                     gravity = Gravity.CENTER
                     text = if (selectedTab == SocialSidebarTab.DATE) "这一天暂无其他会话消息" else "暂无收藏内容"
                     textSize = 14f
-                    setTextColor(Color.parseColor("#777777"))
+                    setTextColor(Color.parseColor("#80BEBEBA"))
                 }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(140)))
             } else {
                 items.forEach { item ->
@@ -251,7 +251,7 @@ internal class ChatSocialSideMenuView(
                         text = item.name
                         textSize = SocialSidebarTimelineMetrics.NAME_TEXT_SP
                         setPadding(0, dp(4), 0, 0)
-                        setTextColor(Color.parseColor("#D9D9D9"))
+                        setTextColor(Color.parseColor("#F8F7F4"))
                     }, LinearLayout.LayoutParams(0, dp(SocialSidebarTimelineMetrics.HEADER_HEIGHT_DP), 1f).apply {
                         leftMargin = dp(SocialSidebarTimelineMetrics.NAME_START_DP)
                     })
@@ -280,7 +280,7 @@ internal class ChatSocialSideMenuView(
                     includeFontPadding = false
                     text = formatSidebarDate(item.lastReceivedAt)
                     textSize = SocialSidebarTimelineMetrics.FAVORITE_DATE_TEXT_SP
-                    setTextColor(Color.parseColor("#D9D9D9"))
+                    setTextColor(Color.parseColor("#F8F7F4"))
                 }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(SocialSidebarTimelineMetrics.FAVORITE_DATE_HEIGHT_DP)))
                 addView(messagePreview(item), LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -302,7 +302,7 @@ internal class ChatSocialSideMenuView(
     }
     private fun timelineSpine(): FrameLayout = FrameLayout(context).apply {
         addView(View(context).apply {
-            setBackgroundColor(Color.parseColor("#D9D9D9"))
+            setBackgroundColor(Color.parseColor("#F8F7F4"))
         }, LayoutParams(dp(2), LayoutParams.MATCH_PARENT).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             topMargin = dp(SocialSidebarTimelineMetrics.SPINE_LINE_TOP_DP)
@@ -359,7 +359,7 @@ internal class ChatSocialSideMenuView(
         text = java.text.SimpleDateFormat("HH:mm", Locale.getDefault()).format(java.util.Date(time))
         textSize = SocialSidebarTimelineMetrics.TIME_TEXT_SP
         setPadding(0, dp(4), 0, 0)
-        setTextColor(Color.parseColor("#D9D9D9"))
+        setTextColor(Color.parseColor("#F8F7F4"))
     }
 
     private fun messagePreview(item: SocialSidebarTimelineItem): View {
@@ -411,7 +411,7 @@ internal class ChatSocialSideMenuView(
         text = value
         textSize = SocialSidebarTimelineMetrics.BODY_TEXT_SP
         setLineSpacing(dp(SocialSidebarTimelineMetrics.BODY_LINE_EXTRA_DP).toFloat(), 1f)
-        setTextColor(Color.parseColor("#D9D9D9"))
+        setTextColor(Color.parseColor("#F8F7F4"))
         setPadding(0, dp(2), 0, dp(6))
     }
 
@@ -426,7 +426,7 @@ internal class ChatSocialSideMenuView(
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
                 setColor(Color.TRANSPARENT)
-                setStroke(dp(1), Color.parseColor("#606060"))
+                setStroke(dp(1), Color.parseColor("#80BEBEBA"))
             }
             if (isVideo) {
                 addView(ImageView(context).apply {
@@ -440,7 +440,7 @@ internal class ChatSocialSideMenuView(
                     gravity = Gravity.CENTER
                     text = "▧"
                     textSize = 34f
-                    setTextColor(Color.parseColor("#D9D9D9"))
+                    setTextColor(Color.parseColor("#F8F7F4"))
                 }, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
             }
         }

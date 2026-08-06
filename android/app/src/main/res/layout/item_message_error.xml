@@ -32,7 +32,7 @@
         android:background="@drawable/bg_error_message"
         android:gravity="center"
         android:padding="10dp"
-        android:textColor="#C62828"
+        android:textColor="#E07B84"
         android:textSize="13sp" />
 
     </LinearLayout>

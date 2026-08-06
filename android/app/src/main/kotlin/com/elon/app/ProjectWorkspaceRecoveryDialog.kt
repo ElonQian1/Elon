@@ -36,7 +36,7 @@ internal object ProjectWorkspaceRecoveryDialog {
             addView(TextView(activity).apply {
                 text = "正在检查 PC 工作区..."
                 textSize = 14f
-                setTextColor(Color.parseColor("#A8A8A8"))
+                setTextColor(Color.parseColor("#B3DDDBD5"))
                 gravity = Gravity.CENTER
                 setPadding(0, dp(activity, 12), 0, 0)
             })
@@ -89,7 +89,7 @@ internal object ProjectWorkspaceRecoveryDialog {
         content.removeAllViews()
         content.addView(statusHeader(activity, health))
         if (health.recommendedAction.isNotBlank()) {
-            content.addView(messageView(activity, health.recommendedAction, "#A8A8A8"))
+            content.addView(messageView(activity, health.recommendedAction, "#B3DDDBD5"))
         }
         listOf(
             "节点" to health.nodeDisplay,
@@ -102,7 +102,7 @@ internal object ProjectWorkspaceRecoveryDialog {
             content.addView(infoRow(activity, label, value))
         }
         if (health.warnings.isNotEmpty()) {
-            content.addView(messageView(activity, health.warnings.joinToString("\n") { "• $it" }, "#F7D28A"))
+            content.addView(messageView(activity, health.warnings.joinToString("\n") { "• $it" }, "#D2B572"))
         }
         val runnable = health.recoveryActions.filter { it.available && it.key != "repair_cli" }
         if (runnable.isNotEmpty()) {
@@ -125,8 +125,8 @@ internal object ProjectWorkspaceRecoveryDialog {
             actions.forEach { action ->
                 addView(Button(activity).apply {
                     text = action.label
-                    setTextColor(Color.parseColor("#101010"))
-                    backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#C8C8C8"))
+                    setTextColor(Color.parseColor("#0B1118"))
+                    backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#F8F7F4"))
                     setOnClickListener {
                         if (action.key == "migrate_workspace" || action.key == "bind_pc_node") {
                             chooseNodeAndRecover(activity, http, serverUrl, projectId, content, action, onProjectUpdated)
@@ -218,7 +218,7 @@ internal object ProjectWorkspaceRecoveryDialog {
 
     private fun statusHeader(activity: AppCompatActivity, health: ProjectWorkspaceHealth): LinearLayout {
         val color = when (health.healthTone) {
-            "ok" -> "#5AC8A0"
+            "ok" -> "#67BEA0"
             "bad" -> "#C44646"
             else -> "#C99630"
         }
@@ -234,12 +234,12 @@ internal object ProjectWorkspaceRecoveryDialog {
                 text = health.healthLabel
                 textSize = 17f
                 typeface = Typeface.DEFAULT_BOLD
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(TextView(activity).apply {
                 text = toneLabel
                 textSize = 12f
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 background = GradientDrawable().apply {
                     cornerRadius = dp(activity, 10).toFloat()
                     setColor(Color.parseColor(color))
@@ -253,7 +253,7 @@ internal object ProjectWorkspaceRecoveryDialog {
         return TextView(activity).apply {
             text = "$label：$value"
             textSize = 13f
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             setPadding(0, dp(activity, 8), 0, 0)
         }
     }

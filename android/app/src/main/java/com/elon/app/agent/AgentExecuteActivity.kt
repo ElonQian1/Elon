@@ -26,20 +26,20 @@ import com.elon.app.agent.infrastructure.floating.ReportSubmitDialog
 import com.elon.app.agent.infrastructure.floating.ConversationalVoiceActivity
 import com.elon.app.agent.infrastructure.voice.VoiceRecognitionHelper
 
-private const val APP_BG = "#101010"
-private const val CARD_BG = "#222222"
-private const val SUBTLE_BG = "#151515"
-private const val TEXT_PRIMARY = "#D6D6D6"
-private const val TEXT_SECONDARY = "#A8A8A8"
-private const val TEXT_TERTIARY = "#777777"
-private const val BUTTON_SECONDARY_BG = "#2A2A2A"
-private const val BUTTON_SECONDARY_TEXT = "#D6D6D6"
-private const val BUTTON_PRIMARY_BG = "#C8C8C8"
-private const val BUTTON_PRIMARY_TEXT = "#101010"
-private const val LINK_PRIMARY = "#58BE6A"
-private const val BADGE_INFO_BG = "#16251A"
-private const val BADGE_INFO_TEXT = "#8DDC9B"
-private const val DANGER_TEXT = "#D97A7A"
+private const val APP_BG = "#0B1118"
+private const val CARD_BG = "#0E1116"
+private const val SUBTLE_BG = "#080B0F"
+private const val TEXT_PRIMARY = "#F8F7F4"
+private const val TEXT_SECONDARY = "#B3DDDBD5"
+private const val TEXT_TERTIARY = "#80BEBEBA"
+private const val BUTTON_SECONDARY_BG = "#20262E"
+private const val BUTTON_SECONDARY_TEXT = "#F8F7F4"
+private const val BUTTON_PRIMARY_BG = "#F8F7F4"
+private const val BUTTON_PRIMARY_TEXT = "#0B1118"
+private const val LINK_PRIMARY = "#67BEA0"
+private const val BADGE_INFO_BG = "#151A20"
+private const val BADGE_INFO_TEXT = "#67BEA0"
+private const val DANGER_TEXT = "#E07B84"
 
 /**
  * 🎯 Agent 独立执行界面

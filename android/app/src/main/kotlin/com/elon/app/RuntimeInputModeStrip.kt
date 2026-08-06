@@ -45,7 +45,7 @@ internal class RuntimeInputModeStrip(
             includeFontPadding = false
             text = mode.label
             textSize = 14f
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             setOnClickListener { onModeSelected(mode) }
         }
     }
@@ -64,9 +64,9 @@ internal class RuntimeInputModeStrip(
         buttons.forEach { (mode, button) ->
             val active = mode == selected
             button.setTypeface(Typeface.DEFAULT, Typeface.NORMAL)
-            button.setTextColor(Color.parseColor(if (active) "#101010" else "#D6D6D6"))
+            button.setTextColor(Color.parseColor(if (active) "#0B1118" else "#F8F7F4"))
             button.background = if (active) {
-                roundedBg("#D6D6D6", "#D6D6D6")
+                roundedBg("#F8F7F4", "#F8F7F4")
             } else {
                 activity.getDrawable(R.drawable.bg_bottom_mode_pill_new)
             }

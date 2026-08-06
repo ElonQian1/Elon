@@ -55,7 +55,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="30dp"
-            android:background="@color/elon_surface_card"
+            android:background="@drawable/bg_orbital_panel"
             android:orientation="horizontal"
             android:padding="4dp">
 
@@ -75,7 +75,7 @@
                 android:layout_width="0dp"
                 android:layout_height="40dp"
                 android:layout_weight="1"
-                android:background="@color/elon_surface_card"
+                android:background="@drawable/bg_orbital_panel"
                 android:gravity="center"
                 android:text="注册"
                 android:textColor="@color/elon_text_tertiary"

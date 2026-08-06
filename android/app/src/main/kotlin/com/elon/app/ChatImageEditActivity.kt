@@ -111,7 +111,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "取消"
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = 16f
                 setOnClickListener { finish() }
             })
@@ -120,7 +120,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "完成"
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = 16f
                 setOnClickListener { finishWithEditedImage() }
             })
@@ -164,7 +164,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
             Color.parseColor("#E62129"),
             Color.parseColor("#F2C94C"),
             Color.parseColor("#2EA7FF"),
-            Color.parseColor("#58BE6A")
+            Color.parseColor("#67BEA0")
         )
         return FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
@@ -208,7 +208,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                         background = GradientDrawable().apply {
                             shape = GradientDrawable.OVAL
                             setColor(color)
-                            setStroke(dp(2), Color.parseColor("#D9D9D9"))
+                            setStroke(dp(2), Color.parseColor("#F8F7F4"))
                         }
                         setOnClickListener {
                             canvasView.setBrushColor(color)

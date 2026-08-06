@@ -22,15 +22,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-private const val LOGIN_BG = "#101010"
-private const val LOGIN_CARD = "#222222"
-private const val LOGIN_TEXT_PRIMARY = "#D6D6D6"
-private const val LOGIN_TEXT_SECONDARY = "#A8A8A8"
-private const val LOGIN_TEXT_TERTIARY = "#777777"
-private const val LOGIN_PRIMARY_BG = "#C8C8C8"
-private const val LOGIN_PRIMARY_TEXT = "#101010"
-private const val LOGIN_LINK = "#58BE6A"
-private const val LOGIN_ERROR = "#D97A7A"
+private const val LOGIN_BG = "#0B1118"
+private const val LOGIN_CARD = "#0E1116"
+private const val LOGIN_TEXT_PRIMARY = "#F8F7F4"
+private const val LOGIN_TEXT_SECONDARY = "#B3DDDBD5"
+private const val LOGIN_TEXT_TERTIARY = "#80BEBEBA"
+private const val LOGIN_PRIMARY_BG = "#F8F7F4"
+private const val LOGIN_PRIMARY_TEXT = "#0B1118"
+private const val LOGIN_LINK = "#67BEA0"
+private const val LOGIN_ERROR = "#E07B84"
 
 /**
  * 登录/注册界面（使用程序化布局）

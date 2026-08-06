@@ -149,21 +149,21 @@ internal object ProjectMemberConversationDialog {
             ).apply { bottomMargin = dp(8) }
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = panelBackground("#222222", dp)
+            background = panelBackground("#0E1116", dp)
             isClickable = true
             setOnClickListener { onClick() }
             addView(TextView(activity).apply {
                 text = conversation.title?.takeIf { it.isNotBlank() } ?: "会话 ${conversation.id.take(8)}"
                 textSize = 16f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
             })
             addView(TextView(activity).apply {
                 text = conversationMeta(conversation)
                 textSize = 12f
-                setTextColor(Color.parseColor("#A8A8A8"))
+                setTextColor(Color.parseColor("#B3DDDBD5"))
                 setPadding(0, dp(5), 0, 0)
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
@@ -172,7 +172,7 @@ internal object ProjectMemberConversationDialog {
                 addView(TextView(activity).apply {
                     text = preview
                     textSize = 13f
-                    setTextColor(Color.parseColor("#A8A8A8"))
+                    setTextColor(Color.parseColor("#B3DDDBD5"))
                     setPadding(0, dp(8), 0, 0)
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
@@ -187,7 +187,7 @@ internal object ProjectMemberConversationDialog {
                         addView(TextView(activity).apply {
                             text = "继续会话 →"
                             textSize = 13f
-                            setTextColor(Color.parseColor("#60A5FA"))
+                            setTextColor(Color.parseColor("#8EA7D5"))
                             setTypeface(typeface, Typeface.BOLD)
                             isClickable = true
                             setOnClickListener { onOpen() }
@@ -197,7 +197,7 @@ internal object ProjectMemberConversationDialog {
                         addView(TextView(activity).apply {
                             text = "在此基础上分叉 →"
                             textSize = 13f
-                            setTextColor(Color.parseColor("#5AC8A0"))
+                            setTextColor(Color.parseColor("#67BEA0"))
                             setTypeface(typeface, Typeface.BOLD)
                             isClickable = true
                             setOnClickListener { onFork() }
@@ -220,7 +220,7 @@ internal object ProjectMemberConversationDialog {
             ).apply { bottomMargin = dp(8) }
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = panelBackground("#222222", dp)
+            background = panelBackground("#0E1116", dp)
             addView(TextView(activity).apply {
                 val label = if (message.role == "discussion") {
                     message.senderName?.takeIf { it.isNotBlank() } ?: "讨论"
@@ -237,7 +237,7 @@ internal object ProjectMemberConversationDialog {
             addView(TextView(activity).apply {
                 text = message.content.ifBlank { "(空消息)" }
                 textSize = 14f
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 setPadding(0, dp(6), 0, 0)
             })
         }
@@ -254,7 +254,7 @@ internal object ProjectMemberConversationDialog {
             this.text = text
             textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#A8A8A8"))
+            setTextColor(Color.parseColor("#B3DDDBD5"))
             setPadding(dp(20), dp(42), dp(20), dp(42))
         })
     }
@@ -264,7 +264,7 @@ internal object ProjectMemberConversationDialog {
             this.text = text
             textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#A8A8A8"))
+            setTextColor(Color.parseColor("#B3DDDBD5"))
             setPadding(dp(20), dp(42), dp(20), dp(42))
         }
     }
@@ -274,7 +274,7 @@ internal object ProjectMemberConversationDialog {
             this.text = text
             textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#FF7A7A"))
+            setTextColor(Color.parseColor("#E07B84"))
             setPadding(dp(20), dp(42), dp(20), dp(42))
         }
     }
@@ -315,7 +315,7 @@ internal object ProjectMemberConversationDialog {
             "assistant" -> "#A7F3D0"
             "system" -> "#FCA5A5"
             "discussion" -> "#C4B5FD"
-            else -> "#A8A8A8"
+            else -> "#B3DDDBD5"
         }
     )
 
@@ -323,7 +323,7 @@ internal object ProjectMemberConversationDialog {
         return TextView(activity).apply {
             text = "+ 新建个人 AI 会话"
             textSize = 15f
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             setPadding(dp(14), dp(14), dp(14), dp(14))
             isClickable = true
             setOnClickListener { onClick() }

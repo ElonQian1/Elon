@@ -70,13 +70,13 @@ class MiniFloatingPanelView(context: Context) : FrameLayout(context),
         
         // 颜色
         private val COLOR_BG_DARK = Color.parseColor("#E8181B20")      // 深色背景 (90% 不透明)
-        private val COLOR_BG_HEADER = Color.parseColor("#30283140")    // 标题栏背景
-        private val COLOR_TEXT_PRIMARY = Color.parseColor("#D6D6D6")   // 主文字
-        private val COLOR_TEXT_SECONDARY = Color.parseColor("#A8A8A8") // 次要文字
-        private val COLOR_ACCENT = Color.parseColor("#58BE6A")         // 强调色
-        private val COLOR_STOP = Color.parseColor("#D97A7A")           // 停止按钮
-        private val COLOR_SUCCESS = Color.parseColor("#58BE6A")        // 成功
-        private val COLOR_FAILED = Color.parseColor("#D97A7A")         // 失败
+        private val COLOR_BG_HEADER = Color.parseColor("#2E7F8994")    // 标题栏背景
+        private val COLOR_TEXT_PRIMARY = Color.parseColor("#F8F7F4")   // 主文字
+        private val COLOR_TEXT_SECONDARY = Color.parseColor("#B3DDDBD5") // 次要文字
+        private val COLOR_ACCENT = Color.parseColor("#67BEA0")         // 强调色
+        private val COLOR_STOP = Color.parseColor("#E07B84")           // 停止按钮
+        private val COLOR_SUCCESS = Color.parseColor("#67BEA0")        // 成功
+        private val COLOR_FAILED = Color.parseColor("#E07B84")         // 失败
         
         // 触摸检测
         private const val CLICK_THRESHOLD = 10
@@ -227,7 +227,7 @@ class MiniFloatingPanelView(context: Context) : FrameLayout(context),
         
         // 分隔线
         expandedContent.addView(View(context).apply {
-            setBackgroundColor(Color.parseColor("#30283140"))
+            setBackgroundColor(Color.parseColor("#2E7F8994"))
         }, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(1)).apply {
             topMargin = dp(8)
             bottomMargin = dp(4)
@@ -249,7 +249,7 @@ class MiniFloatingPanelView(context: Context) : FrameLayout(context),
         stopButton = Button(context).apply {
             text = "⏹ 停止执行"
             textSize = 13f
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             background = createStopButtonBackground()
             setPadding(dp(16), dp(8), dp(16), dp(8))
             setOnClickListener { onStopClick?.invoke() }
@@ -322,7 +322,7 @@ class MiniFloatingPanelView(context: Context) : FrameLayout(context),
         val progressColor = when (info.state) {
             ExecutionState.SUCCESS -> COLOR_SUCCESS
             ExecutionState.FAILED, ExecutionState.STOPPED -> COLOR_FAILED
-            ExecutionState.STOPPING -> Color.parseColor("#8DDC9B")
+            ExecutionState.STOPPING -> Color.parseColor("#67BEA0")
             else -> COLOR_ACCENT
         }
         progressBar.progressDrawable.setTint(progressColor)
@@ -335,7 +335,7 @@ class MiniFloatingPanelView(context: Context) : FrameLayout(context),
             textSize = 10f
             setTextColor(when (entry.level) {
                 ExecutionLogEntry.LogLevel.ERROR -> COLOR_FAILED
-                ExecutionLogEntry.LogLevel.WARNING -> Color.parseColor("#8DDC9B")
+                ExecutionLogEntry.LogLevel.WARNING -> Color.parseColor("#67BEA0")
                 else -> COLOR_TEXT_SECONDARY
             })
             maxLines = 1
@@ -443,7 +443,7 @@ class MiniFloatingPanelView(context: Context) : FrameLayout(context),
             shape = GradientDrawable.RECTANGLE
             cornerRadius = 16 * density
             setColor(COLOR_BG_DARK)
-            setStroke((1 * density).toInt(), Color.parseColor("#30283140"))
+            setStroke((1 * density).toInt(), Color.parseColor("#2E7F8994"))
         }
     }
     

@@ -21,7 +21,7 @@ internal class MainCollapsedInputPreviewActions(
             else -> "输入内容"
         }
         preview.setTextColor(
-            Color.parseColor(if (hasDraft || hasAttachments) "#DCDCDC" else "#5E5E5E")
+            Color.parseColor(if (hasDraft || hasAttachments) "#DCDCDC" else "#80BEBEBA")
         )
     }
 }

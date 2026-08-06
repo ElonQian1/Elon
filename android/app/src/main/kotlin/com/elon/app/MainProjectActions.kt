@@ -65,8 +65,8 @@ internal class MainProjectActions(
         private const val PROJECT_DIALOG_ENTER_MS = 220L
         private const val PROJECT_DIALOG_EXIT_MS = 170L
         private const val PROJECT_DIALOG_START_SCALE = 0.22f
-        const val MENU_ICON_COLOR = "#D6D6D6"
-        const val MENU_ICON_BACKGROUND = "#2A2A2A"
+        const val MENU_ICON_COLOR = "#F8F7F4"
+        const val MENU_ICON_BACKGROUND = "#20262E"
     }
 
     fun showCreateProjectDialog() {
@@ -390,8 +390,8 @@ internal class MainProjectActions(
             orientation = LinearLayout.VERTICAL
             background = GradientDrawable().apply {
                 cornerRadius = dp(18).toFloat()
-                setColor(Color.parseColor("#222222"))
-                setStroke(dp(1), Color.parseColor("#2E2E2E"))
+                setColor(Color.parseColor("#0E1116"))
+                setStroke(dp(1), Color.parseColor("#667B8793"))
             }
             setPadding(0, dp(18), 0, dp(8))
 
@@ -437,7 +437,7 @@ internal class MainProjectActions(
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = project.title.ifBlank { "未命名项目" }
-                    setTextColor(Color.parseColor("#D6D6D6"))
+                    setTextColor(Color.parseColor("#F8F7F4"))
                     setTypeface(typeface, Typeface.BOLD)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
                     maxLines = 1
@@ -446,11 +446,11 @@ internal class MainProjectActions(
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = projectStatusText(project, isJoint)
-                    setTextColor(Color.parseColor(if (isJoint) "#5AC8A0" else "#73C7E8"))
+                    setTextColor(Color.parseColor(if (isJoint) "#67BEA0" else "#7FAFBA"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                     background = GradientDrawable().apply {
                         cornerRadius = dp(9).toFloat()
-                        setColor(Color.parseColor(if (isJoint) "#17351E" else "#16251A"))
+                        setColor(Color.parseColor(if (isJoint) "#17351E" else "#151A20"))
                     }
                     setPadding(dp(8), dp(4), dp(8), dp(4))
                 }, LinearLayout.LayoutParams(
@@ -505,7 +505,7 @@ internal class MainProjectActions(
                     }
                     addView(ImageView(activity).apply {
                         setImageResource(R.drawable.ic_attach_photos)
-                        imageTintList = ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
+                        imageTintList = ColorStateList.valueOf(Color.parseColor("#F8F7F4"))
                     }, FrameLayout.LayoutParams(dp(12), dp(12), Gravity.CENTER))
                 }, FrameLayout.LayoutParams(dp(18), dp(18), Gravity.BOTTOM or Gravity.END))
                 setOnClickListener {
@@ -559,7 +559,7 @@ internal class MainProjectActions(
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = action.title
-                    setTextColor(Color.parseColor("#D6D6D6"))
+                    setTextColor(Color.parseColor("#F8F7F4"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
@@ -567,7 +567,7 @@ internal class MainProjectActions(
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     text = action.subtitle
-                    setTextColor(Color.parseColor("#A8A8A8"))
+                    setTextColor(Color.parseColor("#B3DDDBD5"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
@@ -592,7 +592,7 @@ internal class MainProjectActions(
     private fun createProjectActionsDivider(marginStart: Int = 0, marginEnd: Int = 0): View {
         return View(activity).apply {
             alpha = 0.75f
-            setBackgroundColor(Color.parseColor("#2E2E2E"))
+            setBackgroundColor(Color.parseColor("#667B8793"))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 1

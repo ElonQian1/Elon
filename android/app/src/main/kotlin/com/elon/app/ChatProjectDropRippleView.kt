@@ -77,7 +77,7 @@ internal fun showChatSocialDropRipple(
     contentContainer.getLocationOnScreen(contentLocation)
     val localX = overlayLocation[0] + overlayX - contentLocation[0]
     val localY = overlayLocation[1] + overlayY - contentLocation[1]
-    val ripple = ChatProjectDropRippleView(contentContainer.context, Color.parseColor("#4F9DFF"))
+    val ripple = ChatProjectDropRippleView(contentContainer.context, Color.parseColor("#8EA7D5"))
     contentContainer.addView(
         ripple,
         FrameLayout.LayoutParams(

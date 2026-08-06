@@ -209,6 +209,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(web::project_view_chevron),
         )
         .route("/assets/project_home.css", get(web::project_home_css))
+        .route(
+            "/assets/orbital_mobile_theme.css",
+            get(web::orbital_mobile_theme_css),
+        )
         .route("/assets/project_home.js", get(web::project_home_js))
         .route("/assets/voice_tts_sdk.js", get(web::voice_tts_sdk_js))
         .route("/assets/elon_route_c_sdk.js", get(web::elon_route_c_sdk_js))

@@ -112,7 +112,7 @@ internal class ProjectSpaceFeedView(
                 text = bodyText
                 textSize = 16f
                 includeFontPadding = true
-                setTextColor(Color.parseColor(if (description == null) "#777777" else PROJECT_SPACE_STORE_MUTED))
+                setTextColor(Color.parseColor(if (description == null) "#80BEBEBA" else PROJECT_SPACE_STORE_MUTED))
                 setLineSpacing(dp(3).toFloat(), 1f)
                 maxLines = 4
                 ellipsize = TextUtils.TruncateAt.END
@@ -128,7 +128,7 @@ internal class ProjectSpaceFeedView(
     private fun aboutArrowButton(): FrameLayout {
         return FrameLayout(activity).apply {
             addView(FrameLayout(activity).apply {
-            background = roundedBackground("#172231", 12)
+            background = roundedBackground("#171C22", 12)
                 addView(ImageView(activity).apply {
                     setImageResource(R.drawable.ic_project_space_chevron_right)
                     scaleType = ImageView.ScaleType.CENTER
@@ -319,7 +319,7 @@ internal class ProjectSpaceFeedView(
                     textSize = 12f
                     includeFontPadding = false
                     gravity = Gravity.START
-                    setTextColor(Color.parseColor("#777777"))
+                    setTextColor(Color.parseColor("#80BEBEBA"))
                     setPadding(0, dp(2), 0, 0)
                 })
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -330,7 +330,7 @@ internal class ProjectSpaceFeedView(
                 setTextColor(activity.elonColor(R.color.elon_text_primary))
                 gravity = Gravity.CENTER
                 maxLines = 1
-                background = roundedBackground("#0B1017", 6)
+                background = roundedBackground("#07090D", 6)
                 setPadding(dp(8), 0, dp(8), 0)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -356,8 +356,8 @@ internal class ProjectSpaceFeedView(
             includeFontPadding = false
             textSize = 17f
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#101010"))
-            background = roundedBackground("#7AA7FF", 17)
+            setTextColor(Color.parseColor("#0B1118"))
+            background = roundedBackground("#C2CBD6", 17)
         }
     }
 
@@ -543,7 +543,7 @@ internal class ProjectSpaceFeedView(
                     includeFontPadding = false
                     gravity = Gravity.CENTER
                     setTextColor(activity.elonColor(R.color.elon_text_primary))
-                    background = roundedBackground("#172231", 24)
+                    background = roundedBackground("#171C22", 24)
                     isClickable = true
                     foreground = selectableForeground()
                     setOnClickListener { openPostComposer() }
@@ -580,10 +580,10 @@ internal class ProjectSpaceFeedView(
         const val PROJECT_PREVIEW_SLOT_COUNT = 4
         const val MAX_IMAGE_PREVIEW_BYTES = 5 * 1024 * 1024
         const val POST_METRIC_PREFS = "project_post_metrics"
-        const val PROJECT_SPACE_STORE_BG = "#0B1017"
-        const val PROJECT_SPACE_STORE_TEXT = "#F3F8FB"
+        const val PROJECT_SPACE_STORE_BG = "#07090D"
+        const val PROJECT_SPACE_STORE_TEXT = "#F8F7F4"
         const val PROJECT_SPACE_STORE_MUTED = "#ADCDDCE4"
-        const val PROJECT_SPACE_STORE_DIVIDER = "#3397AECC"
+        const val PROJECT_SPACE_STORE_DIVIDER = "#526C7884"
     }
 
     private data class MetricButtonViews(

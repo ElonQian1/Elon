@@ -25,8 +25,7 @@ class ProfilePageLayoutContractTest {
         assertTrue(layout.contains("android:paddingStart=\"16dp\""))
         assertTrue(layout.contains("android:paddingEnd=\"10dp\""))
         assertTrue(!layout.contains("android:paddingStart=\"36dp\""))
-        assertTrue(layout.contains("android:background=\"@drawable/profile_panel_primary_actions_stable\""))
-        assertTrue(layout.contains("android:background=\"@drawable/profile_panel_support_actions\""))
+        assertTrue(layout.contains("android:background=\"@drawable/bg_orbital_panel\""))
         assertTrue(layout.contains("android:id=\"@+id/profileLoginButton\""))
         assertTrue(layout.contains("android:id=\"@+id/profileLogoutButton\""))
         assertTrue(layout.contains("android:background=\"@drawable/bg_profile_account_action\""))
@@ -43,7 +42,7 @@ class ProfilePageLayoutContractTest {
         val tokenCard = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/ProfileTokenUsageCard.kt"
         )
-        assertTrue(tokenCard.contains("R.drawable.profile_panel_quota"))
+        assertTrue(tokenCard.contains("R.drawable.bg_orbital_panel"))
         assertTrue(tokenCard.contains("R.drawable.profile_pill_selected"))
         assertTrue(tokenCard.contains("R.drawable.profile_pill_unselected"))
         assertTrue(tokenCard.contains("private var selectedDays = 7"))
@@ -63,11 +62,12 @@ class ProfilePageLayoutContractTest {
     @Test
     fun webMirrorKeepsTheSameProfileGeometryAndSections() {
         val web = readRepositoryFile("server/src/assets/web_page.html")
+        val orbitalTheme = readRepositoryFile("server/src/assets/orbital_mobile_theme.css")
         assertTrue(web.contains("data-tab=\"profilePage\" data-title=\"个人中心\""))
         assertTrue(web.contains(".profile-action-group"))
         assertTrue(web.contains("min-height: 284px"))
         assertTrue(web.contains("grid-template-columns: repeat(3"))
-        assertTrue(web.contains("--profile-quota-selected: #5DA6FF"))
+        assertTrue(orbitalTheme.contains("--profile-quota-selected: #8ea7d5"))
         assertTrue(web.contains("class=\"usage-period-button selected\" id=\"usageWeekBtn\""))
         assertTrue(web.contains("let profileUsageDays = 7"))
         assertTrue(web.contains("class=\"usage-gauge-progress\""))
@@ -79,7 +79,7 @@ class ProfilePageLayoutContractTest {
         assertTrue(profileGroupCss.contains("border-radius: var(--profile-action-group-radius)"))
         assertTrue(web.contains("class=\"profile-account-action\""))
         assertTrue(web.contains("id=\"logoutRow\""))
-        assertTrue(web.contains("--profile-account-action: #5DA6FF"))
+        assertTrue(orbitalTheme.contains("--profile-account-action: #b4c5e3"))
         assertTrue(web.contains("color: var(--profile-account-action)"))
         listOf("PC 节点", "AI 记忆", "AI 代理设置", "Agent 自动化", "分享推广", "检测更新", "退出登录")
             .forEach { label -> assertTrue(web.contains(label)) }

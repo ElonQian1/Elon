@@ -242,7 +242,7 @@ internal class MainHomeListActions(
                 dp(92)
             )
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#777777"))
+            setTextColor(Color.parseColor("#80BEBEBA"))
             textSize = 14f
             text = when (homeListFilterMode) {
                 HomeListFilterMode.Projects -> "\u6682\u65e0\u9879\u76ee"
@@ -304,7 +304,7 @@ internal class MainHomeListActions(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(14), dp(8), dp(14), dp(8))
-            setBackgroundColor(Color.parseColor("#101010"))
+            setBackgroundColor(Color.parseColor("#0B1118"))
             alpha = if (animateEnter) 0f else 1f
             translationY = if (animateEnter) -dp(8).toFloat() else 0f
             clipToPadding = false
@@ -314,8 +314,8 @@ internal class MainHomeListActions(
             setSingleLine(true)
             textSize = 15f
             hint = "搜索好友、群聊、项目"
-            setTextColor(Color.parseColor("#D6D6D6"))
-            setHintTextColor(Color.parseColor("#777777"))
+            setTextColor(Color.parseColor("#F8F7F4"))
+            setHintTextColor(Color.parseColor("#80BEBEBA"))
             background = null
             setPadding(dp(12), 0, dp(12), 0)
             addTextChangedListener(object : TextWatcher {
@@ -333,12 +333,12 @@ internal class MainHomeListActions(
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            background = roundedRect("#222222", 8, "#2E2E2E")
+            background = roundedRect("#0E1116", 8, "#667B8793")
             addView(TextView(activity).apply {
                 text = "⌕"
                 textSize = 18f
                 gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#A8A8A8"))
+                setTextColor(Color.parseColor("#B3DDDBD5"))
             }, LinearLayout.LayoutParams(dp(30), LinearLayout.LayoutParams.MATCH_PARENT))
             addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         }
@@ -346,7 +346,7 @@ internal class MainHomeListActions(
             text = "取消"
             textSize = 15f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#5AC8A0"))
+            setTextColor(Color.parseColor("#67BEA0"))
             setOnClickListener { exitFriendLocalSearch() }
         }
         root.addView(searchBox)
@@ -393,7 +393,7 @@ internal class MainHomeListActions(
                 dp(92)
             )
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#777777"))
+            setTextColor(Color.parseColor("#80BEBEBA"))
             textSize = 14f
             text = if (friendSearchQuery.isBlank()) {
                 "输入关键词搜索好友、群聊或项目"

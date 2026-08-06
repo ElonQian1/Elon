@@ -67,14 +67,14 @@ internal class ChatProjectSideMenuView(
         includeFontPadding = false
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
-        setTextColor(Color.parseColor("#D9D9D9"))
+        setTextColor(Color.parseColor("#F8F7F4"))
         textSize = SIDE_MENU_PRIMARY_TEXT_SP
     }
     private val profileStatusText = TextView(context).apply {
         includeFontPadding = false
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
-        setTextColor(Color.parseColor("#777777"))
+        setTextColor(Color.parseColor("#80BEBEBA"))
         textSize = SIDE_MENU_META_TEXT_SP
         setPadding(0, dp(7), 0, 0)
     }
@@ -136,7 +136,7 @@ internal class ChatProjectSideMenuView(
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "项目"
-            setTextColor(Color.parseColor("#D9D9D9"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             textSize = SIDE_MENU_PRIMARY_TEXT_SP
             setTypeface(typeface, Typeface.NORMAL)
         })
@@ -162,7 +162,7 @@ internal class ChatProjectSideMenuView(
         box.addView(
             ImageView(context).apply {
                 setImageResource(R.drawable.ic_top_search_custom)
-                imageTintList = ColorStateList.valueOf(Color.parseColor("#D9D9D9"))
+                imageTintList = ColorStateList.valueOf(Color.parseColor("#F8F7F4"))
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             },
@@ -202,7 +202,7 @@ internal class ChatProjectSideMenuView(
                 gravity = Gravity.CENTER_VERTICAL or Gravity.START
                 includeFontPadding = false
                 text = "项目中心"
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = SIDE_MENU_PRIMARY_TEXT_SP
             })
             addView(TextView(context).apply {
@@ -210,7 +210,7 @@ internal class ChatProjectSideMenuView(
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "›"
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = SIDE_MENU_CHEVRON_TEXT_SP
             })
         }
@@ -227,13 +227,13 @@ internal class ChatProjectSideMenuView(
             addView(TextView(context).apply {
                 includeFontPadding = false
                 text = "推荐"
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = SIDE_MENU_PRIMARY_TEXT_SP
             })
             addView(TextView(context).apply {
                 includeFontPadding = false
                 text = " ↪"
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = SIDE_MENU_ICON_TEXT_SP
                 setPadding(dp(8), 0, 0, 0)
             })
@@ -261,7 +261,7 @@ internal class ChatProjectSideMenuView(
                 maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
                 text = "应用介绍：${project?.projectCardIntroduction() ?: "一款自动化电商工作流的AI智能"}"
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = SIDE_MENU_BODY_TEXT_SP
                 setLineSpacing(dp(3).toFloat(), 1f)
             })
@@ -275,7 +275,7 @@ internal class ChatProjectSideMenuView(
                     leftMargin = dp(48)
                     rightMargin = dp(48)
                 }
-                setBackgroundColor(Color.parseColor("#222222"))
+                setBackgroundColor(Color.parseColor("#0E1116"))
             })
         }
     }
@@ -308,7 +308,7 @@ internal class ChatProjectSideMenuView(
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     text = project?.title?.takeIf { it.isNotBlank() } ?: "项目名称"
-                    setTextColor(Color.parseColor("#D9D9D9"))
+                    setTextColor(Color.parseColor("#F8F7F4"))
                     textSize = SIDE_MENU_PRIMARY_TEXT_SP
                 })
                 addView(metaText("创建者：${projectCreatorLabel(project)}"))
@@ -319,7 +319,7 @@ internal class ChatProjectSideMenuView(
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "↗"
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = SIDE_MENU_OPEN_TEXT_SP
             })
         }
@@ -348,12 +348,12 @@ internal class ChatProjectSideMenuView(
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
                 setColor(Color.TRANSPARENT)
-                setStroke(dp(1), Color.parseColor("#5A5A5A"))
+                setStroke(dp(1), Color.parseColor("#80BEBEBA"))
             }
             addView(
                 ImageView(context).apply {
                     setImageResource(R.drawable.ic_project_preview_placeholder)
-                    imageTintList = ColorStateList.valueOf(Color.parseColor("#D9D9D9"))
+                    imageTintList = ColorStateList.valueOf(Color.parseColor("#F8F7F4"))
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     alpha = 0.9f
                     importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -422,7 +422,7 @@ internal class ChatProjectSideMenuView(
             foreground = selectableForeground()
             contentDescription = if (expanded) "收起$title" else "展开$title"
             addView(menuText(title).apply {
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = SIDE_MENU_PRIMARY_TEXT_SP
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -443,7 +443,7 @@ internal class ChatProjectSideMenuView(
                     R.drawable.ic_side_menu_folder_closed
                 }
             )
-            imageTintList = ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
+            imageTintList = ColorStateList.valueOf(Color.parseColor("#F8F7F4"))
             scaleType = ImageView.ScaleType.FIT_CENTER
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             layoutParams = LinearLayout.LayoutParams(dp(32), dp(32)).apply {
@@ -461,7 +461,7 @@ internal class ChatProjectSideMenuView(
             if (active) {
                 background = GradientDrawable().apply {
                     cornerRadius = dp(8).toFloat()
-                    setColor(Color.parseColor("#222222"))
+                    setColor(Color.parseColor("#0E1116"))
                 }
             }
             setOnClickListener { onClick() }
@@ -479,7 +479,7 @@ internal class ChatProjectSideMenuView(
 
     private fun emptyRow(text: String): TextView {
         return menuText(text).apply {
-            setTextColor(Color.parseColor("#777777"))
+            setTextColor(Color.parseColor("#80BEBEBA"))
             textSize = SIDE_MENU_META_TEXT_SP
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(34))
         }
@@ -492,7 +492,7 @@ internal class ChatProjectSideMenuView(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             text = title
-            setTextColor(Color.parseColor("#A8A8A8"))
+            setTextColor(Color.parseColor("#B3DDDBD5"))
             textSize = SIDE_MENU_PRIMARY_TEXT_SP
         }
     }
@@ -503,7 +503,7 @@ internal class ChatProjectSideMenuView(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             text = value
-            setTextColor(Color.parseColor("#777777"))
+            setTextColor(Color.parseColor("#80BEBEBA"))
             textSize = SIDE_MENU_SMALL_TEXT_SP
             setPadding(0, dp(6), 0, 0)
         }
@@ -553,7 +553,7 @@ internal class ChatProjectSideMenuView(
     private fun projectCover(project: AppProject?): FrameLayout {
         val cover = FrameLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(dp(64), dp(64))
-            background = roundedRect("#D9D9D9", dp(10))
+            background = roundedRect("#F8F7F4", dp(10))
             clipToOutline = true
         }
         decodeDataUrlBitmap(project?.iconDataUrl)?.let { bitmap ->
@@ -586,7 +586,7 @@ internal class ChatProjectSideMenuView(
         return TextView(context).apply {
             includeFontPadding = false
             text = value
-            setTextColor(Color.parseColor("#D9D9D9"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             textSize = SIDE_MENU_META_TEXT_SP
         }
     }
@@ -652,7 +652,7 @@ internal class ChatProjectSideMenuView(
             return ImageView(context).apply {
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
-                    setColor(Color.parseColor("#D9D9D9"))
+                    setColor(Color.parseColor("#F8F7F4"))
                 }
                 clipToOutline = true
                 scaleType = ImageView.ScaleType.CENTER_CROP
@@ -663,12 +663,12 @@ internal class ChatProjectSideMenuView(
         return TextView(context).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
-                setColor(Color.parseColor("#D9D9D9"))
+                setColor(Color.parseColor("#F8F7F4"))
             }
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = UserProfileStore.avatarInitial(profile.displayName)
-            setTextColor(Color.parseColor("#101010"))
+            setTextColor(Color.parseColor("#0B1118"))
             textSize = SIDE_MENU_PRIMARY_TEXT_SP
             setTypeface(typeface, Typeface.BOLD)
             contentDescription = "头像"

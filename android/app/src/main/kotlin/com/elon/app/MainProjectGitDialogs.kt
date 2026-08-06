@@ -86,13 +86,13 @@ internal class MainProjectGitDialogs(
         }
         root.addView(TextView(activity).apply {
             text = "仓库地址"
-            setTextColor(Color.parseColor("#2E2E2E"))
+            setTextColor(activity.elonColor(R.color.elon_text_secondary))
             textSize = 13f
         })
         root.addView(repoInput)
         root.addView(TextView(activity).apply {
             text = "分支"
-            setTextColor(Color.parseColor("#2E2E2E"))
+            setTextColor(activity.elonColor(R.color.elon_text_secondary))
             textSize = 13f
         })
         root.addView(branchInput)

@@ -17,7 +17,7 @@ internal class LevelProgressBarView(context: Context) : View(context) {
     private val trackRect = RectF()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val segmentColors = intArrayOf(
-        Color.parseColor("#58BE6A"),
+        Color.parseColor("#67BEA0"),
         Color.parseColor("#5DA6FF"),
         Color.parseColor("#E58F46"),
         Color.parseColor("#F2C94C")

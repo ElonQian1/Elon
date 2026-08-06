@@ -58,14 +58,14 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
         private const val LONG_PRESS_TIMEOUT = 500L    // 长按超时
         
         // 颜色主题
-        private val COLOR_IDLE_START = Color.parseColor("#58BE6A")      // 紫蓝渐变起点
-        private val COLOR_IDLE_END = Color.parseColor("#16251A")        // 紫蓝渐变终点
-        private val COLOR_LISTENING_START = Color.parseColor("#58BE6A") // 青绿渐变
-        private val COLOR_LISTENING_END = Color.parseColor("#8DDC9B")
-        private val COLOR_EXECUTING_START = Color.parseColor("#58BE6A") // 天蓝渐变
-        private val COLOR_EXECUTING_END = Color.parseColor("#8DDC9B")
-        private val COLOR_ERROR_START = Color.parseColor("#D97A7A")     // 红粉渐变
-        private val COLOR_ERROR_END = Color.parseColor("#D97A7A")
+        private val COLOR_IDLE_START = Color.parseColor("#67BEA0")      // 紫蓝渐变起点
+        private val COLOR_IDLE_END = Color.parseColor("#151A20")        // 紫蓝渐变终点
+        private val COLOR_LISTENING_START = Color.parseColor("#67BEA0") // 青绿渐变
+        private val COLOR_LISTENING_END = Color.parseColor("#67BEA0")
+        private val COLOR_EXECUTING_START = Color.parseColor("#67BEA0") // 天蓝渐变
+        private val COLOR_EXECUTING_END = Color.parseColor("#67BEA0")
+        private val COLOR_ERROR_START = Color.parseColor("#E07B84")     // 红粉渐变
+        private val COLOR_ERROR_END = Color.parseColor("#E07B84")
     }
     
     // 回调
@@ -185,7 +185,7 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
             text = "✨"  // 默认空闲状态图标
             textSize = 22f
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             // 添加文字阴影增强立体感
             setShadowLayer(4f, 0f, 2f, Color.parseColor("#40000000"))
         }
@@ -292,14 +292,14 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
             when (state) {
                 FloatingBallState.IDLE -> {
                     setGradientColors(COLOR_IDLE_START, COLOR_IDLE_END)
-                    setGlowColor("#58BE6A")
+                    setGlowColor("#67BEA0")
                     iconView.text = "✨"
                     startBreatheAnimation()
                 }
                 
                 FloatingBallState.LISTENING -> {
                     setGradientColors(COLOR_LISTENING_START, COLOR_LISTENING_END)
-                    setGlowColor("#58BE6A")
+                    setGlowColor("#67BEA0")
                     iconView.text = "🎙️"
                     startPulseAnimation()
                     startGlowAnimation()
@@ -307,7 +307,7 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
                 
                 FloatingBallState.EXECUTING -> {
                     setGradientColors(COLOR_EXECUTING_START, COLOR_EXECUTING_END)
-                    setGlowColor("#58BE6A")
+                    setGlowColor("#67BEA0")
                     iconView.text = "⚡"
                     startRotationAnimation()
                     startGlowAnimation()
@@ -315,7 +315,7 @@ class FloatingBallView(context: Context) : FrameLayout(context) {
                 
                 FloatingBallState.ERROR -> {
                     setGradientColors(COLOR_ERROR_START, COLOR_ERROR_END)
-                    setGlowColor("#D97A7A")
+                    setGlowColor("#E07B84")
                     iconView.text = "⚠️"
                     startShakeAnimation()
                 }

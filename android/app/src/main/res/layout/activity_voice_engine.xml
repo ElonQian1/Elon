@@ -10,7 +10,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="16dp"
-        android:background="@color/elon_surface_card">
+        android:background="@drawable/bg_orbital_panel">
 
         <TextView
             android:layout_width="wrap_content"

@@ -68,7 +68,7 @@ class AgentPageController(
         // 悬浮球状态
         val canStart = overlayOk && accessibilityOk
         page.floatingStatusIcon.text = if (floatingOk) "●" else "○"
-        page.floatingStatusIcon.setTextColor(android.graphics.Color.parseColor(if (floatingOk) "#58BE6A" else "#777777"))
+        page.floatingStatusIcon.setTextColor(android.graphics.Color.parseColor(if (floatingOk) "#67BEA0" else "#80BEBEBA"))
         page.floatingStatusText.text = when {
             floatingOk -> "运行中"
             !canStart -> "请先完成步骤 1 和 2"
@@ -135,9 +135,9 @@ class AgentPageController(
         btnOkText: String, btnNokText: String
     ) {
         icon.text = if (ok) "●" else "○"
-        icon.setTextColor(android.graphics.Color.parseColor(if (ok) "#58BE6A" else "#777777"))
+        icon.setTextColor(android.graphics.Color.parseColor(if (ok) "#67BEA0" else "#80BEBEBA"))
         statusText.text = if (ok) okLabel else nokLabel
-        statusText.setTextColor(android.graphics.Color.parseColor(if (ok) "#58BE6A" else "#777777"))
+        statusText.setTextColor(android.graphics.Color.parseColor(if (ok) "#67BEA0" else "#80BEBEBA"))
         btn.text = if (ok) btnOkText else btnNokText
         btn.alpha = if (ok) 0.5f else 1.0f
         btn.isEnabled = !ok

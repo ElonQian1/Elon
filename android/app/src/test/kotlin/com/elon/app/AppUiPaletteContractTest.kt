@@ -10,34 +10,34 @@ import org.junit.Test
 
 class AppUiPaletteContractTest {
     @Test
-    fun androidAndMobilePwaShareTheQuietNightPalette() {
+    fun androidAndMobilePwaShareTheOrbitalMetalPalette() {
         val colors = readRepositoryFile("android/app/src/main/res/values/colors.xml")
-        val web = readRepositoryFile("server/src/assets/web_page.html")
+        val web = readRepositoryFile("server/src/assets/orbital_mobile_theme.css")
 
         listOf(
-            "<color name=\"elon_bg_app\">#0B1017</color>",
-            "<color name=\"elon_surface_card\">#111923</color>",
-            "<color name=\"elon_surface_header\">#172231</color>",
-            "<color name=\"elon_button_primary_bg\">#7AA7FF</color>",
-            "<color name=\"elon_status_info\">#73C7E8</color>",
-            "<color name=\"elon_status_success\">#5AC8A0</color>",
-            "<color name=\"elon_status_project\">#E7B86A</color>",
-            "<color name=\"elon_status_danger\">#F07884</color>"
+            "<color name=\"elon_bg_app\">#07090D</color>",
+            "<color name=\"elon_surface_card\">#0E1116</color>",
+            "<color name=\"elon_surface_header\">#171C22</color>",
+            "<color name=\"elon_button_primary_bg\">#C2CBD6</color>",
+            "<color name=\"elon_signal_mist\">#8EA7D5</color>",
+            "<color name=\"elon_instrument_cyan\">#7FAFBA</color>",
+            "<color name=\"elon_status_success\">#67BEA0</color>",
+            "<color name=\"elon_status_danger\">#E07B84</color>"
         ).forEach { token -> assertTrue("missing Android token $token", colors.contains(token)) }
 
         listOf(
-            "--bg: #0B1017;",
-            "--panel: #111923;",
-            "--panel-2: #172231;",
-            "--brand: #7AA7FF;",
-            "--accent: #73C7E8;",
-            "--success: #5AC8A0;",
-            "--warning: #E7B86A;",
-            "--danger: #F07884;"
+            "--bg: #07090d;",
+            "--panel: #0e1116;",
+            "--panel-2: #171c22;",
+            "--brand: #c2cbd6;",
+            "--accent: #7fafba;",
+            "--success: #67bea0;",
+            "--warning: #d2b572;",
+            "--danger: #e07b84;"
         ).forEach { token -> assertTrue("missing PWA token $token", web.contains(token)) }
 
-        assertFalse(colors.contains("<color name=\"elon_bg_app\">#000000</color>"))
-        assertFalse(web.contains("--brand: #FFFFFF;"))
+        assertFalse(colors.contains("<color name=\"elon_button_primary_bg\">#7AA7FF</color>"))
+        assertFalse(web.contains("--brand: #7AA7FF;"))
     }
 
     @Test

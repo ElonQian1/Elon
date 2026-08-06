@@ -61,7 +61,7 @@ private fun createImageAttachmentView(context: Context, attachment: ChatAttachme
         layoutParams = imageAttachmentLayoutParams(context, attachment)
         background = GradientDrawable().apply {
             cornerRadius = context.dp(7).toFloat()
-            setColor(Color.parseColor("#222222"))
+            setColor(Color.parseColor("#0E1116"))
         }
         contentDescription = attachment.displayName ?: "图片"
         scaleType = ImageView.ScaleType.FIT_CENTER
@@ -139,9 +139,9 @@ private fun createVoiceAttachmentView(
         .coerceAtMost(VOICE_BUBBLE_MAX_WIDTH_DP)
 
     // 颜色匹配气泡：发送方绿色，接收方深色半透明
-    val bgColor = if (isSent) Color.parseColor("#C8C8C8") else Color.parseColor("#2A2A2A")
-    val textColor = if (isSent) Color.parseColor("#101010") else Color.parseColor("#D6D6D6")
-    val waveColor = if (isSent) Color.parseColor("#101010") else Color.parseColor("#D6D6D6")
+    val bgColor = if (isSent) Color.parseColor("#F8F7F4") else Color.parseColor("#20262E")
+    val textColor = if (isSent) Color.parseColor("#0B1118") else Color.parseColor("#F8F7F4")
+    val waveColor = if (isSent) Color.parseColor("#0B1118") else Color.parseColor("#F8F7F4")
 
     val container = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
@@ -331,7 +331,7 @@ private fun createFileAttachmentView(context: Context, attachment: ChatAttachmen
         includeFontPadding = false
         maxLines = 2
         setPadding(context.dp(10), context.dp(9), context.dp(10), context.dp(9))
-        setTextColor(Color.parseColor("#222222"))
+        setTextColor(Color.parseColor("#0E1116"))
         textSize = 13f
         text = buildString {
             append(attachment.displayName ?: attachment.fileName ?: "附件")

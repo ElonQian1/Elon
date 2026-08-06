@@ -19,12 +19,12 @@ internal class ProfileQuotaGaugeView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#D9D9D9")
+        color = Color.parseColor("#F8F7F4")
         textAlign = Paint.Align.CENTER
         typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL)
     }
     private val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#777777")
+        color = Color.parseColor("#80BEBEBA")
         textAlign = Paint.Align.CENTER
         typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL)
     }

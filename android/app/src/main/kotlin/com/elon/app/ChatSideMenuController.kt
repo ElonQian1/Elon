@@ -598,7 +598,7 @@ internal class ChatSideMenuController(
                 includeFontPadding = false
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
-                setTextColor(Color.parseColor("#777777"))
+                setTextColor(Color.parseColor("#80BEBEBA"))
                 textSize = 12.5f
                 setPadding(0, dp(6), 0, 0)
             }
@@ -662,8 +662,8 @@ internal class ChatSideMenuController(
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.RECTANGLE
                     cornerRadius = dp(8).toFloat()
-                    setColor(Color.parseColor("#343434"))
-                    setStroke(dp(1), Color.parseColor("#A8A8A8"))
+                    setColor(Color.parseColor("#20262E"))
+                    setStroke(dp(1), Color.parseColor("#B3DDDBD5"))
                 }
                 isClickable = false
                 clipChildren = false
@@ -831,7 +831,7 @@ internal class ChatSideMenuController(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             text = title
-            setTextColor(Color.parseColor("#A8A8A8"))
+            setTextColor(Color.parseColor("#B3DDDBD5"))
             textSize = 17.5f
         }
     }

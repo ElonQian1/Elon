@@ -38,14 +38,14 @@ internal fun projectSpaceQuickActions(
             background = GradientDrawable().apply {
                 cornerRadius = dp(28).toFloat()
                 setColor(Color.TRANSPARENT)
-                setStroke(dp(1), Color.parseColor("#A8A8A8"))
+                setStroke(dp(1), Color.parseColor("#B3DDDBD5"))
             }
             addView(TextView(activity).apply {
                 text = "安装应用"
                 textSize = 16f
                 gravity = Gravity.CENTER
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 isClickable = true
                 foreground = selectableForeground()
                 setOnClickListener {
@@ -58,7 +58,7 @@ internal fun projectSpaceQuickActions(
                 }
             }, LinearLayout.LayoutParams(dp(122), LinearLayout.LayoutParams.MATCH_PARENT))
             addView(View(activity).apply {
-                setBackgroundColor(Color.parseColor("#A8A8A8"))
+                setBackgroundColor(Color.parseColor("#B3DDDBD5"))
             }, LinearLayout.LayoutParams(1, dp(30)))
             addView(FrameLayout(activity).apply {
                 isClickable = true
@@ -67,7 +67,7 @@ internal fun projectSpaceQuickActions(
                 setOnClickListener { onOpenDocuments() }
                 addView(ImageView(activity).apply {
                     setImageResource(R.drawable.ic_project_documents_menu)
-                    setColorFilter(Color.parseColor("#D6D6D6"))
+                    setColorFilter(Color.parseColor("#F8F7F4"))
                     scaleType = ImageView.ScaleType.CENTER
                 }, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
@@ -108,7 +108,7 @@ internal fun projectSpaceAnnouncementMenuButton(
         }
         addView(ImageView(activity).apply {
             setImageResource(R.drawable.ic_project_documents_menu)
-            setColorFilter(Color.parseColor("#D6D6D6"))
+            setColorFilter(Color.parseColor("#F8F7F4"))
             scaleType = ImageView.ScaleType.CENTER
         }, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,

@@ -50,7 +50,7 @@ internal class ProfileTokenUsageCard(
             minimumHeight = activity.dp(284)
             orientation = LinearLayout.VERTICAL
             setPadding(activity.dp(14), activity.dp(20), activity.dp(14), activity.dp(12))
-            setBackgroundResource(R.drawable.profile_panel_quota)
+            setBackgroundResource(R.drawable.bg_orbital_panel)
             isClickable = true
             isFocusable = true
             contentDescription = "Token 额度，点按查看用量明细"
@@ -59,7 +59,7 @@ internal class ProfileTokenUsageCard(
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = "Token 额度"
-                setTextColor(Color.parseColor("#D9D9D9"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 textSize = 17f
             })
             addView(periodActions())

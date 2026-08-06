@@ -56,7 +56,7 @@ class PersonalProfileActivity : AppCompatActivity() {
     private fun buildContent(): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(android.graphics.Color.parseColor("#101010"))
+            setBackgroundColor(android.graphics.Color.parseColor("#0B1118"))
             addView(topBar())
             addView(ScrollView(this@PersonalProfileActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(
@@ -82,13 +82,13 @@ class PersonalProfileActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(6), 0, dp(18), 0)
-            setBackgroundColor(android.graphics.Color.parseColor("#101010"))
+            setBackgroundColor(android.graphics.Color.parseColor("#0B1118"))
             addView(TextView(this@PersonalProfileActivity).apply {
                 layoutParams = LinearLayout.LayoutParams(dp(56), LinearLayout.LayoutParams.MATCH_PARENT)
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "‹"
-                setTextColor(android.graphics.Color.parseColor("#D6D6D6"))
+                setTextColor(android.graphics.Color.parseColor("#F8F7F4"))
                 textSize = 34f
                 setOnClickListener { finish() }
             })
@@ -97,7 +97,7 @@ class PersonalProfileActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "个人资料"
-                setTextColor(android.graphics.Color.parseColor("#D6D6D6"))
+                setTextColor(android.graphics.Color.parseColor("#F8F7F4"))
                 textSize = 20f
             })
             addView(View(this@PersonalProfileActivity).apply {

@@ -63,17 +63,17 @@ class LoginActivity : AppCompatActivity() {
     private fun switchMode(register: Boolean) {
         isRegisterMode = register
         if (register) {
-            tabRegister.setBackgroundColor(Color.parseColor("#2A2A2A"))
-            tabRegister.setTextColor(Color.parseColor("#D6D6D6"))
-            tabLogin.setBackgroundColor(Color.parseColor("#222222"))
-            tabLogin.setTextColor(Color.parseColor("#777777"))
+            tabRegister.setBackgroundColor(Color.parseColor("#20262E"))
+            tabRegister.setTextColor(Color.parseColor("#F8F7F4"))
+            tabLogin.setBackgroundColor(Color.parseColor("#0E1116"))
+            tabLogin.setTextColor(Color.parseColor("#80BEBEBA"))
             nicknameRow.visibility = View.VISIBLE
             submitButton.text = "注册并登录"
         } else {
-            tabLogin.setBackgroundColor(Color.parseColor("#2A2A2A"))
-            tabLogin.setTextColor(Color.parseColor("#D6D6D6"))
-            tabRegister.setBackgroundColor(Color.parseColor("#222222"))
-            tabRegister.setTextColor(Color.parseColor("#777777"))
+            tabLogin.setBackgroundColor(Color.parseColor("#20262E"))
+            tabLogin.setTextColor(Color.parseColor("#F8F7F4"))
+            tabRegister.setBackgroundColor(Color.parseColor("#0E1116"))
+            tabRegister.setTextColor(Color.parseColor("#80BEBEBA"))
             nicknameRow.visibility = View.GONE
             submitButton.text = "登录"
         }

@@ -20,11 +20,11 @@ import android.widget.PopupWindow
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
-internal const val WECHAT_POPUP_PANEL_COLOR = "#172231"
-internal const val WECHAT_POPUP_TEXT_COLOR = "#F3F8FB"
-internal const val WECHAT_POPUP_DIVIDER_COLOR = "#3397AECC"
-internal const val LEGACY_MESSAGE_POPUP_COLOR = "#172231"
-private const val HOME_ACTION_POPUP_PANEL_COLOR = "#172231"
+internal const val WECHAT_POPUP_PANEL_COLOR = "#171C22"
+internal const val WECHAT_POPUP_TEXT_COLOR = "#F8F7F4"
+internal const val WECHAT_POPUP_DIVIDER_COLOR = "#526C7884"
+internal const val LEGACY_MESSAGE_POPUP_COLOR = "#171C22"
+private const val HOME_ACTION_POPUP_PANEL_COLOR = "#171C22"
 private const val HOME_ACTION_POPUP_TEXT_COLOR = "#ADCDDCE4"
 
 private const val MESSAGE_POPUP_DEFAULT_COLUMNS = 5

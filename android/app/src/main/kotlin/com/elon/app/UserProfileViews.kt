@@ -152,7 +152,7 @@ internal object UserProfileViews {
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(context.dp(16), context.dp(12), context.dp(10), context.dp(12))
-            setBackgroundResource(R.drawable.profile_panel_identity)
+            setBackgroundResource(R.drawable.bg_orbital_panel)
             isClickable = true
             foreground = selectableForeground(context)
             setOnClickListener { onClick() }
@@ -228,7 +228,7 @@ internal object UserProfileViews {
         val bitmap = QrCodeBitmap.create(
             UserProfileStore.personalQrPayload(context),
             size,
-            foreground = Color.parseColor("#101010"),
+            foreground = Color.parseColor("#0B1118"),
             background = Color.TRANSPARENT
         )
         return ImageView(context).apply {

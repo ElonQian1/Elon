@@ -272,7 +272,7 @@ class ChatAdapter(
         status.visibility = if (text == null) View.GONE else View.VISIBLE
         status.text = text.orEmpty()
         status.setTextColor(Color.parseColor(
-            if (canRetry) "#C62828" else if (message.isRead && message.role == "user") "#58BE6A" else "#66111111"
+            if (canRetry) "#E07B84" else if (message.isRead && message.role == "user") "#67BEA0" else "#66111111"
         ))
         status.isClickable = canRetry
         status.isFocusable = canRetry
@@ -542,11 +542,11 @@ class ChatAdapter(
     }
 
     private fun messageTextColor(role: String): Int = when (role) {
-        "ai", "ai-intent", "friend" -> Color.parseColor("#D6D6D6")
+        "ai", "ai-intent", "friend" -> Color.parseColor("#F8F7F4")
         "ai-stopped" -> Color.parseColor("#D9B66B")
-        "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete" -> Color.parseColor("#A8A8A8")
-        "error" -> Color.parseColor("#C62828")
-        else -> Color.parseColor("#101010")
+        "ai-working", "ai-progress", "ai-cli-log", "ai-tool", "ai-complete" -> Color.parseColor("#B3DDDBD5")
+        "error" -> Color.parseColor("#E07B84")
+        else -> Color.parseColor("#0B1118")
     }
 
     private fun startShimmer(holder: VH, expectedRole: String) {
@@ -563,11 +563,11 @@ class ChatAdapter(
                 width.toFloat(),
                 0f,
                 intArrayOf(
-                    Color.parseColor("#A8A8A8"),
-                    Color.parseColor("#CFCFCF"),
-                    Color.parseColor("#F6F6F6"),
-                    Color.parseColor("#D6D6D6"),
-                    Color.parseColor("#A8A8A8")
+                    Color.parseColor("#B3DDDBD5"),
+                    Color.parseColor("#F8F7F4"),
+                    Color.parseColor("#F8F7F4"),
+                    Color.parseColor("#F8F7F4"),
+                    Color.parseColor("#B3DDDBD5")
                 ),
                 floatArrayOf(0f, 0.28f, 0.5f, 0.72f, 1f),
                 Shader.TileMode.CLAMP
@@ -745,11 +745,11 @@ class ChatAdapter(
     private fun buildEvidenceShader(width: Int): LinearGradient = LinearGradient(
         0f, 0f, width.toFloat(), 0f,
         intArrayOf(
-            Color.parseColor("#777777"),
-            Color.parseColor("#CFCFCF"),
-            Color.parseColor("#F6F6F6"),
-            Color.parseColor("#D6D6D6"),
-            Color.parseColor("#777777")
+            Color.parseColor("#80BEBEBA"),
+            Color.parseColor("#F8F7F4"),
+            Color.parseColor("#F8F7F4"),
+            Color.parseColor("#F8F7F4"),
+            Color.parseColor("#80BEBEBA")
         ),
         floatArrayOf(0f, 0.28f, 0.5f, 0.72f, 1f),
         Shader.TileMode.CLAMP

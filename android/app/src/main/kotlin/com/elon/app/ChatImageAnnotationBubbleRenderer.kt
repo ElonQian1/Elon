@@ -17,7 +17,7 @@ internal class ChatImageAnnotationBubbleRenderer(context: Context) {
     private val density = context.resources.displayMetrics.density
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = Color.parseColor("#D9D9D9")
+        color = Color.parseColor("#F8F7F4")
     }
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -26,7 +26,7 @@ internal class ChatImageAnnotationBubbleRenderer(context: Context) {
         color = Color.parseColor("#3F3F3F")
     }
     private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#2E2E2E")
+        color = Color.parseColor("#667B8793")
         textSize = dp(14).toFloat()
     }
 

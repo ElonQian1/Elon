@@ -129,6 +129,7 @@ const PROJECT_PLAZA_CSS: &str = include_str!("assets/project_plaza.css");
 const PROJECT_PLAZA_CACHE_JS: &str = include_str!("assets/project_plaza_cache.js");
 const PROJECT_PLAZA_JS: &str = include_str!("assets/project_plaza.js");
 const PROJECT_HOME_CSS: &str = include_str!("assets/project_home.css");
+const ORBITAL_MOBILE_THEME_CSS: &str = include_str!("assets/orbital_mobile_theme.css");
 const PROJECT_HOME_JS: &str = include_str!("assets/project_home.js");
 const VOICE_TTS_SDK_JS: &str = include_str!("assets/voice_tts_sdk.js");
 const ELON_ROUTE_C_SDK_JS: &str = include_str!("assets/elon_route_c_sdk.js");
@@ -529,6 +530,16 @@ pub async fn project_home_css() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PROJECT_HOME_CSS,
+    )
+}
+
+pub async fn orbital_mobile_theme_css() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        ORBITAL_MOBILE_THEME_CSS,
     )
 }
 

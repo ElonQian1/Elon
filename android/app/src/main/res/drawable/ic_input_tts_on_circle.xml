@@ -8,24 +8,24 @@
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M13,3.6a9.4,9.4 0,1 0,0.1 0"
-        android:strokeColor="#D0D0D0"
+        android:strokeColor="#F8F7F4"
         android:strokeWidth="1.7" />
     <!-- 扬声器锥体（填充） -->
     <path
-        android:fillColor="#D0D0D0"
+        android:fillColor="#F8F7F4"
         android:pathData="M9.5,11.5 L9.5,14.5 L11.5,14.5 L13.5,16.5 L13.5,9.5 L11.5,11.5 Z" />
     <!-- 小音波 -->
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M15,11.5 Q16.8,13 15,14.5"
-        android:strokeColor="#D0D0D0"
+        android:strokeColor="#F8F7F4"
         android:strokeLineCap="round"
         android:strokeWidth="1.6" />
     <!-- 大音波 -->
     <path
         android:fillColor="@android:color/transparent"
         android:pathData="M16.5,10.5 Q19,13 16.5,15.5"
-        android:strokeColor="#D0D0D0"
+        android:strokeColor="#F8F7F4"
         android:strokeLineCap="round"
         android:strokeWidth="1.6" />
 </vector>

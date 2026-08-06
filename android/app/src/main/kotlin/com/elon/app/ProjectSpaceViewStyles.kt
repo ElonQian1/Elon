@@ -5,8 +5,7 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.view.View
 import android.widget.LinearLayout
-
-private const val PROJECT_SPACE_DIVIDER_COLOR = "#2E2E2E"
+import androidx.core.content.ContextCompat
 
 internal fun panelBackground(color: String): GradientDrawable {
     return GradientDrawable().apply {
@@ -17,7 +16,7 @@ internal fun panelBackground(color: String): GradientDrawable {
 
 internal fun projectSpaceDivider(context: Context, dp: (Int) -> Int): View {
     return View(context).apply {
-        setBackgroundColor(Color.parseColor(PROJECT_SPACE_DIVIDER_COLOR))
+        setBackgroundColor(ContextCompat.getColor(context, R.color.elon_divider_card))
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             1

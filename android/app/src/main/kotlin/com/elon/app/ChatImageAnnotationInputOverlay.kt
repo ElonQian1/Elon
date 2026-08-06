@@ -97,8 +97,8 @@ internal class ChatImageAnnotationInputOverlay(
             minLines = 1
             maxLines = Int.MAX_VALUE
             isVerticalScrollBarEnabled = false
-            setHintTextColor(Color.parseColor("#777777"))
-            setTextColor(Color.parseColor("#D9D9D9"))
+            setHintTextColor(Color.parseColor("#80BEBEBA"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             textSize = 15f
             setPadding(0, 0, 0, 0)
             addTextChangedListener(object : TextWatcher {
@@ -125,7 +125,7 @@ internal class ChatImageAnnotationInputOverlay(
             text = "完成"
             gravity = Gravity.CENTER
             includeFontPadding = false
-            setTextColor(Color.parseColor("#D9D9D9"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             textSize = 15f
             layoutParams = FrameLayout.LayoutParams(dp(64), dp(40), Gravity.END or Gravity.BOTTOM).apply {
                 rightMargin = dp(16)

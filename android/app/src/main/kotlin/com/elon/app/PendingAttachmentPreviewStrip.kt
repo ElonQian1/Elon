@@ -42,7 +42,7 @@ internal class PendingAttachmentPreviewStrip(
         isFillViewport = false
         overScrollMode = View.OVER_SCROLL_NEVER
         isHorizontalScrollBarEnabled = false
-        setBackgroundColor(Color.parseColor("#222222"))
+        setBackgroundColor(Color.parseColor("#0E1116"))
         addView(list)
     }
 
@@ -76,7 +76,7 @@ internal class PendingAttachmentPreviewStrip(
     private fun createImagePreview(attachment: PendingAttachment): ImageView {
         return ImageView(context).apply {
             layoutParams = FrameLayout.LayoutParams(context.dp(58), context.dp(58), Gravity.BOTTOM or Gravity.START)
-            background = roundedBackground("#2A2A2A")
+            background = roundedBackground("#20262E")
             contentDescription = attachment.displayName
             scaleType = ImageView.ScaleType.CENTER_CROP
             setOnClickListener { ChatImageViewer.show(context, attachment.toChatAttachment()) }
@@ -89,7 +89,7 @@ internal class PendingAttachmentPreviewStrip(
     private fun createFilePreview(attachment: PendingAttachment): TextView {
         return TextView(context).apply {
             layoutParams = FrameLayout.LayoutParams(context.dp(58), context.dp(58), Gravity.BOTTOM or Gravity.START)
-            background = roundedBackground("#2A2A2A").apply {
+            background = roundedBackground("#20262E").apply {
                 setStroke(context.dp(1), Color.parseColor("#3AFFFFFF"))
             }
             gravity = Gravity.CENTER
@@ -97,7 +97,7 @@ internal class PendingAttachmentPreviewStrip(
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
             setPadding(context.dp(6), 0, context.dp(6), 0)
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             text = attachment.displayName
             textSize = 11f
         }
@@ -129,7 +129,7 @@ internal class PendingAttachmentPreviewStrip(
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "×"
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             textSize = 14f
             setOnClickListener {
                 pendingAttachments.getOrNull(index)?.let { removed ->

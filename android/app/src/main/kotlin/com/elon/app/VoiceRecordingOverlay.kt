@@ -74,7 +74,7 @@ internal class VoiceRecordingOverlay(
             includeFontPadding = false
             textSize = 15f
             setLineSpacing(0f, 1.25f)
-            setTextColor(Color.parseColor("#DDEDEDED"))
+            setTextColor(Color.parseColor("#B3DDDBD5"))
             setPadding(0, 0, 0, 0)
         }
         val partial = ScrollView(activity).apply {
@@ -253,10 +253,10 @@ internal class VoiceRecordingOverlay(
                             (zone == Zone.SEND && mode == Mode.FRIEND_CHAT)
         val mainColor = Color.parseColor(
             when (zone) {
-                Zone.AI_REPLY -> "#DDEDEDED"
+                Zone.AI_REPLY -> "#B3DDDBD5"
                 Zone.TRANSCRIBE -> "#EAF7F0"
                 Zone.CANCEL -> "#FFE3E3"
-                Zone.SEND -> "#DDEDEDED"
+                Zone.SEND -> "#B3DDDBD5"
             }
         )
         // 有历史转写时：历史（半透明）+ 当前 partial 或状态提示
@@ -303,7 +303,7 @@ internal class VoiceRecordingOverlay(
 
 private class VoiceWaveBubbleView(context: Context) : View(context) {
     private val bubblePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#58BE6A")
+        color = Color.parseColor("#67BEA0")
         style = Paint.Style.FILL
     }
     private val cancelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -465,7 +465,7 @@ private class VoiceActionTrayView(
         style = Paint.Style.FILL
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#D6D6D6")
+        color = Color.parseColor("#F8F7F4")
         textAlign = Paint.Align.CENTER
         textSize = sp(15f)
     }
@@ -569,7 +569,7 @@ private class VoiceActionTrayView(
     }
 
     private fun drawOption(canvas: Canvas, label: String, x: Float, centerY: Float, selected: Boolean) {
-        textPaint.color = Color.parseColor(if (selected) "#D6D6D6" else "#D6D6D6")
+        textPaint.color = Color.parseColor(if (selected) "#F8F7F4" else "#F8F7F4")
         textPaint.isFakeBoldText = selected
         val fontMetrics = textPaint.fontMetrics
         val baseline = centerY - (fontMetrics.ascent + fontMetrics.descent) / 2f

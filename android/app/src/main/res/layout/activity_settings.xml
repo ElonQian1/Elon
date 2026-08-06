@@ -37,7 +37,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="@color/elon_surface_card"
+            android:background="@drawable/bg_orbital_panel"
             android:orientation="vertical"
             android:padding="4dp">
 
@@ -91,7 +91,7 @@
                 android:id="@+id/agentSpinner"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
-                android:background="@color/elon_surface_card"
+                android:background="@drawable/bg_orbital_panel"
                 android:padding="8dp" />
         </LinearLayout>
 
@@ -116,7 +116,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:background="@color/elon_surface_card"
+                android:background="@drawable/bg_orbital_panel"
                 android:hint="https://api.deepseek.com/v1"
                 android:inputType="textUri"
                 android:padding="12dp"
@@ -136,7 +136,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:background="@color/elon_surface_card"
+                android:background="@drawable/bg_orbital_panel"
                 android:hint="sk-..."
                 android:inputType="textPassword"
                 android:padding="12dp"
@@ -156,7 +156,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="12dp"
-                android:background="@color/elon_surface_card"
+                android:background="@drawable/bg_orbital_panel"
                 android:hint="deepseek-chat"
                 android:inputType="text"
                 android:padding="12dp"
@@ -188,7 +188,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"
-            android:background="@color/elon_surface_card"
+            android:background="@drawable/bg_orbital_panel"
             android:hint="输入昵称..."
             android:inputType="text"
             android:padding="12dp"
@@ -306,7 +306,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="20dp"
-            android:background="@color/elon_surface_card"
+            android:background="@drawable/bg_orbital_panel"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:padding="12dp">

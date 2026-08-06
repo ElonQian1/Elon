@@ -26,18 +26,18 @@ import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
 import java.net.URL
 
-private const val JR_BG = "#101010"
-private const val JR_CARD = "#222222"
-private const val JR_TEXT_PRIMARY = "#D6D6D6"
-private const val JR_TEXT_SECONDARY = "#A8A8A8"
-private const val JR_TEXT_TERTIARY = "#777777"
-private const val JR_PRIMARY_BG = "#58BE6A"
-private const val JR_ACTION_BG = "#C8C8C8"
-private const val JR_PRIMARY_TEXT = "#101010"
-private const val JR_SECONDARY_BG = "#2A2A2A"
-private const val JR_SECONDARY_TEXT = "#D6D6D6"
+private const val JR_BG = "#0B1118"
+private const val JR_CARD = "#0E1116"
+private const val JR_TEXT_PRIMARY = "#F8F7F4"
+private const val JR_TEXT_SECONDARY = "#B3DDDBD5"
+private const val JR_TEXT_TERTIARY = "#80BEBEBA"
+private const val JR_PRIMARY_BG = "#67BEA0"
+private const val JR_ACTION_BG = "#F8F7F4"
+private const val JR_PRIMARY_TEXT = "#0B1118"
+private const val JR_SECONDARY_BG = "#20262E"
+private const val JR_SECONDARY_TEXT = "#F8F7F4"
 private const val JR_PENDING = "#F0A030"
-private const val JR_DANGER = "#D97A7A"
+private const val JR_DANGER = "#E07B84"
 
 /**
  * 加入申请审批界面 — 项目 owner 专用。
@@ -103,7 +103,7 @@ class JoinRequestsActivity : Activity() {
             addView(Button(context).apply {
                 text = "← 返回"
                 setBackgroundColor(Color.TRANSPARENT)
-                setTextColor(Color.parseColor("#58BE6A"))
+                setTextColor(Color.parseColor("#67BEA0"))
                 setOnClickListener { finish() }
             })
 

@@ -202,7 +202,7 @@ internal class MainInputComposerSetup(
             ellipsize = TextUtils.TruncateAt.END
             setPadding(dp(4), 0, dp(4), 0)
             text = "输入内容"
-            setTextColor(Color.parseColor("#5E5E5E"))
+            setTextColor(Color.parseColor("#80BEBEBA"))
             textSize = 15f
             isClickable = true
             isFocusable = false
@@ -242,8 +242,8 @@ internal class MainInputComposerSetup(
             includeFontPadding = false
             setHorizontallyScrolling(false)
             setPadding(dp(4), dp(2), dp(42), dp(2))
-            setTextColor(Color.parseColor("#D6D6D6"))
-            setHintTextColor(Color.parseColor("#5E5E5E"))
+            setTextColor(Color.parseColor("#F8F7F4"))
+            setHintTextColor(Color.parseColor("#80BEBEBA"))
             textSize = 17f
             setOnFocusChangeListener { _, hasFocus ->
                 if (!isVoiceMode()) {
@@ -269,7 +269,7 @@ internal class MainInputComposerSetup(
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "按住 说话"
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             textSize = 15f
             visibility = View.GONE
             setOnTouchListener { _, event ->
@@ -318,7 +318,7 @@ internal class MainInputComposerSetup(
             ellipsize = TextUtils.TruncateAt.END
             setPadding(dp(16), 0, dp(24), 0)
             setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, 0, 0)
-            setTextColor(Color.parseColor("#D6D6D6"))
+            setTextColor(Color.parseColor("#F8F7F4"))
             textSize = 14f
             setOnClickListener { showModelPopupOrLoad() }
         }

@@ -16,18 +16,18 @@ import android.widget.*
 import com.elon.app.agent.AgentConfigActivity
 import com.elon.app.agent.infrastructure.auth.AuthService
 
-private const val SETTINGS_BG = "#101010"
-private const val SETTINGS_CARD = "#222222"
-private const val SETTINGS_BORDER = "#2E2E2E"
-private const val SETTINGS_TEXT_PRIMARY = "#D6D6D6"
-private const val SETTINGS_TEXT_SECONDARY = "#A8A8A8"
-private const val SETTINGS_TEXT_TERTIARY = "#777777"
-private const val SETTINGS_PRIMARY_BG = "#C8C8C8"
-private const val SETTINGS_PRIMARY_TEXT = "#101010"
-private const val SETTINGS_SECONDARY_BG = "#2A2A2A"
-private const val SETTINGS_SECONDARY_TEXT = "#D6D6D6"
-private const val SETTINGS_LINK = "#58BE6A"
-private const val SETTINGS_DANGER = "#D97A7A"
+private const val SETTINGS_BG = "#0B1118"
+private const val SETTINGS_CARD = "#0E1116"
+private const val SETTINGS_BORDER = "#667B8793"
+private const val SETTINGS_TEXT_PRIMARY = "#F8F7F4"
+private const val SETTINGS_TEXT_SECONDARY = "#B3DDDBD5"
+private const val SETTINGS_TEXT_TERTIARY = "#80BEBEBA"
+private const val SETTINGS_PRIMARY_BG = "#F8F7F4"
+private const val SETTINGS_PRIMARY_TEXT = "#0B1118"
+private const val SETTINGS_SECONDARY_BG = "#20262E"
+private const val SETTINGS_SECONDARY_TEXT = "#F8F7F4"
+private const val SETTINGS_LINK = "#67BEA0"
+private const val SETTINGS_DANGER = "#E07B84"
 
 /**
  * 设置页面
@@ -318,8 +318,8 @@ class SettingsActivity : Activity() {
             addView(Button(context).apply {
                 text = "🏪 项目广场"
                 textSize = 16f
-                setBackgroundColor(Color.parseColor("#2A2A2A"))
-                setTextColor(Color.parseColor("#D6D6D6"))
+                setBackgroundColor(Color.parseColor("#20262E"))
+                setTextColor(Color.parseColor("#F8F7F4"))
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, 120
                 ).apply { topMargin = 12 }

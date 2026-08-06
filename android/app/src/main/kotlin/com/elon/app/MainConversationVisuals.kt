@@ -17,11 +17,11 @@ internal fun avatarText(title: String): String {
 
 internal fun conversationSubtitleColor(text: String): Int {
     return when {
-        text.startsWith("已连接") -> Color.parseColor("#5AC8A0")
+        text.startsWith("已连接") -> Color.parseColor("#67BEA0")
         text.startsWith("未连接") -> Color.parseColor("#D93025")
-        text.startsWith("工作完成") -> Color.parseColor("#5AC8A0")
+        text.startsWith("工作完成") -> Color.parseColor("#67BEA0")
         text.startsWith("工作停止") -> Color.parseColor("#D93025")
-        text.startsWith("会话已结束") -> Color.parseColor("#777777")
-        else -> Color.parseColor("#A8A8A8")
+        text.startsWith("会话已结束") -> Color.parseColor("#80BEBEBA")
+        else -> Color.parseColor("#B3DDDBD5")
     }
 }
