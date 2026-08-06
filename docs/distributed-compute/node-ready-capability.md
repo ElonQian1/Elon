@@ -60,13 +60,13 @@ Store 返回成功后产生继续持有 staged 文件句柄的 `DurableCandidate
 
 quarantine 授权先做无副作用 fresh authority read，精确核对 staged 槽、staging receipt、candidate owner、无未过期健康回执、inventory/state/authority/process fence 与 trusted-time high-water。Store 在单一 `BEGIN IMMEDIATE` 中推进可信时间，把槽从 `staged` 改为 `failed`，令 state、inventory 与 authority fence 各精确加一，并插入不可更新、不可删除的 `candidate_health_quarantine_receipts`。它保留 candidate owner、candidate pointer 和原 staged 文件 custody，不删除目录，也不授予下载、重试、安装或推广。
 
-提交结果不确定时，进程内 recovery key 只能得到稳定 `NotCreated` 或 exact `Quarantined`。前者不恢复写许可；后者必须 fresh read 精确的 failed inventory/fence，再从保留句柄重新哈希 staging 文件和 seal，才可恢复 `DurableCandidateHealthQuarantine`。后续物理删除必须另有 cleanup authorization、同句柄删除语义和完成回执，不能把 quarantine 回执当作清理成功。
+提交结果不确定时，进程内 recovery key 只能得到稳定 `NotCreated` 或 exact `Quarantined`。前者不恢复写许可；后者必须 fresh read 精确的 failed inventory/fence，再从保留句柄重新哈希 staging 文件和 seal，才可恢复 `DurableCandidateHealthQuarantine`。底层同句柄删除原语已经实现，但尚未接入 cleanup authority；quarantine 回执本身仍不是删除许可或清理成功证明。精确边界见 `node-plugin-candidate-cleanup.md`。
 
 ## 8. 尚未实现
 
 - Sidecar 启动、预热和动态健康探针；
 - Sidecar 到 Host 的认证 IPC、响应验证和真实探针调度；
-- 失败候选的物理清理、重试授权、清理完成回执与跨重启治理；
+- 失败候选的 fresh cleanup authorization、目录树线性清理编排、清理完成回执、重试授权与跨重启治理；
 - 同时消费 staging 与健康回执的原子 installed/promotion 门卫；
 - 发布前 Store fresh read、CAS/fencing 和不确定结果恢复；
 - `ComputeReadyCapability` 的规范短 TTL 构建、认证上报和服务端验证；
