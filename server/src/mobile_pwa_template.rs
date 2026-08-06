@@ -7,6 +7,8 @@ use std::{
 };
 
 const TEMPLATE_RELATIVE_PATH: &str = "mobile-pwa/web_page.html";
+const ORBITAL_THEME_ASSET: &str = "/assets/orbital_mobile_theme.css";
+const ORBITAL_THEME_MARKER: &str = "apk-orbital-metal-workbench-v1";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct TemplateSignature {
@@ -65,6 +67,34 @@ where
     page_from_cache(&entry)
 }
 
+pub(crate) fn enforce_orbital_mobile_theme(mut html: String, theme_css: &str) -> String {
+    if !html.contains(ORBITAL_THEME_ASSET) {
+        let style = format!(
+            "\n<style data-elon-runtime-asset=\"{ORBITAL_THEME_ASSET}\">\n{theme_css}\n</style>\n"
+        );
+        if let Some(index) = html.rfind("</head>") {
+            html.insert_str(index, &style);
+        } else {
+            html.insert_str(0, &style);
+        }
+    }
+
+    if !html.contains(ORBITAL_THEME_MARKER) {
+        if let Some(index) = html.find("<body>") {
+            html.replace_range(
+                index..index + "<body>".len(),
+                &format!("<body data-ui-system=\"{ORBITAL_THEME_MARKER}\">"),
+            );
+        } else if let Some(index) = html.find("<body ") {
+            html.insert_str(
+                index + "<body".len(),
+                &format!(" data-ui-system=\"{ORBITAL_THEME_MARKER}\""),
+            );
+        }
+    }
+    html
+}
+
 fn page_from_cache(entry: &CachedTemplate) -> MobilePwaPage {
     MobilePwaPage {
         html: entry.rendered.clone(),
@@ -96,7 +126,7 @@ fn modified_nanos(modified: Option<SystemTime>) -> u128 {
 
 #[cfg(test)]
 mod tests {
-    use super::load_mobile_pwa_page;
+    use super::{enforce_orbital_mobile_theme, load_mobile_pwa_page};
     use std::{fs, time::SystemTime};
 
     fn temp_dir(label: &str) -> std::path::PathBuf {
@@ -139,5 +169,27 @@ mod tests {
         let changed = load_mobile_pwa_page(&root, "embedded", |value| value.to_owned());
         assert_eq!(changed.html, "a-longer-template");
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn injects_orbital_theme_into_a_legacy_runtime_template() {
+        let rendered = enforce_orbital_mobile_theme(
+            "<html><head><title>legacy</title></head><body class=\"app\"></body></html>".to_owned(),
+            ":root { --bg: #07090d; }",
+        );
+        assert!(rendered.contains("data-elon-runtime-asset=\"/assets/orbital_mobile_theme.css\""));
+        assert!(rendered.contains(":root { --bg: #07090d; }"));
+        assert!(rendered.contains("data-ui-system=\"apk-orbital-metal-workbench-v1\""));
+    }
+
+    #[test]
+    fn does_not_duplicate_an_existing_orbital_theme() {
+        let template = "<html><head><link href=\"/assets/orbital_mobile_theme.css\"></head><body data-ui-system=\"apk-orbital-metal-workbench-v1\"></body></html>";
+        let rendered = enforce_orbital_mobile_theme(template.to_owned(), "unused");
+        assert_eq!(
+            rendered.matches("/assets/orbital_mobile_theme.css").count(),
+            1
+        );
+        assert!(!rendered.contains("unused"));
     }
 }

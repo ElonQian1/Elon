@@ -12,7 +12,7 @@ use axum::{
     response::{Html, IntoResponse},
 };
 
-use crate::mobile_pwa_template::load_mobile_pwa_page;
+use crate::mobile_pwa_template::{enforce_orbital_mobile_theme, load_mobile_pwa_page};
 use crate::types::AppState;
 
 const BRAND_PNG_B64: &str = include_str!("assets/ic_app_brand.b64");
@@ -140,7 +140,9 @@ const UI_TUNER_PWA_VIEWPORT_BRIDGE_JS: &str =
 const UI_TUNER_PWA_BRIDGE_JS: &str = include_str!("assets/ui_tuner_pwa_bridge.js");
 
 pub async fn web_page(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let page = load_mobile_pwa_page(&state.data_dir, WEB_HTML_TEMPLATE, build_html);
+    let page = load_mobile_pwa_page(&state.data_dir, WEB_HTML_TEMPLATE, |template| {
+        enforce_orbital_mobile_theme(build_html(template), ORBITAL_MOBILE_THEME_CSS)
+    });
     let mut headers = HeaderMap::new();
     headers.insert(
         header::CACHE_CONTROL,

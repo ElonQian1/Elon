@@ -65,6 +65,7 @@ class OrbitalMetalAppContractTest {
         val theme = source("server/src/assets/orbital_mobile_theme.css")
         val router = source("server/src/router.rs")
         val web = source("server/src/web.rs")
+        val runtimeTemplate = source("server/src/mobile_pwa_template.rs")
 
         val projectHomeIndex = page.indexOf("/assets/project_home.css")
         val orbitalIndex = page.indexOf("/assets/orbital_mobile_theme.css")
@@ -72,6 +73,9 @@ class OrbitalMetalAppContractTest {
         assertTrue(page.contains("data-ui-system=\"apk-orbital-metal-workbench-v1\""))
         assertTrue(router.contains("/assets/orbital_mobile_theme.css"))
         assertTrue(web.contains("assets/orbital_mobile_theme.css"))
+        assertTrue(web.contains("enforce_orbital_mobile_theme"))
+        assertTrue(runtimeTemplate.contains("ORBITAL_THEME_MARKER"))
+        assertTrue(runtimeTemplate.contains("data-elon-runtime-asset"))
         assertTrue(theme.contains(".tabs-panel"))
         assertTrue(theme.contains(".input-panel"))
         assertTrue(theme.contains("#profilePage .profile-action-group"))
