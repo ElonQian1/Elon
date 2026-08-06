@@ -11,7 +11,9 @@ use super::{
 };
 
 mod authorization;
+mod failure;
 mod probe_state;
+mod quarantine;
 mod recovery_key;
 mod store;
 mod validation;
@@ -23,7 +25,23 @@ pub(in crate::node_agent_compute_plugin_host) use authorization::{
     authorize_candidate_health_store, AuthorizedCandidateHealthStore,
     CandidateHealthAuthorizationFailure, ValidatedCandidateHealthStorePermit,
 };
+pub(in crate::node_agent_compute_plugin_host) use failure::{
+    finalize_candidate_health_failure, validate_hashed_candidate_health_failure_observation,
+    CandidateHealthFailureFinalizationFailure, ComputePluginCandidateHealthFailureObservation,
+    HashedComputePluginCandidateHealthFailureObservation,
+    ValidatedCandidateHealthFailurePublication,
+};
 use probe_state::CandidateHealthProbeState;
+pub(in crate::node_agent_compute_plugin_host) use quarantine::{
+    adopt_recovered_candidate_health_quarantine, authorize_candidate_health_quarantine,
+    quarantine_authorized_candidate_health_failure, AuthorizedCandidateHealthQuarantine,
+    CandidateHealthQuarantineAuthorizationFailure,
+    CandidateHealthQuarantineOutcomeUncertainCustody,
+    CandidateHealthQuarantineRecoveryAdoptionFailure,
+    CandidateHealthQuarantineRecoveryAdoptionPhase, CandidateHealthQuarantineRecoveryKey,
+    CandidateHealthQuarantineStoreFailure, CandidateHealthQuarantineStorePhase,
+    DurableCandidateHealthQuarantine, ValidatedCandidateHealthQuarantinePermit,
+};
 pub(in crate::node_agent_compute_plugin_host) use recovery_key::{
     CandidateHealthReceiptExpectation, CandidateHealthStagingExpectation,
     ComputePluginCandidateHealthRecoveryKey,

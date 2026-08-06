@@ -3,6 +3,7 @@ use rusqlite::{params, Connection, TransactionBehavior};
 
 mod authority_fences;
 mod candidate_health;
+mod candidate_health_quarantine;
 mod candidate_staging;
 mod candidate_verification;
 mod fetch_claims;
@@ -15,6 +16,7 @@ const COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID: i64 = 0x454c_4350;
 const REQUIRED_TABLES: &[&str] = &[
     "authority_meta",
     "candidate_health_receipts",
+    "candidate_health_quarantine_receipts",
     "candidate_owners",
     "candidate_staging_receipts",
     "candidate_verification_runs",
@@ -128,6 +130,9 @@ fn create_schema_objects(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(candidate_health::CANDIDATE_HEALTH_SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_HEALTH_SCHEMA_CREATE_V3")?;
+    connection
+        .execute_batch(candidate_health_quarantine::CANDIDATE_HEALTH_QUARANTINE_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_QUARANTINE_SCHEMA_CREATE_V3")?;
     connection
         .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V3")?;
@@ -701,8 +706,24 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
+        let quarantine_table_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'candidate_health_quarantine_receipts'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let quarantine_trigger_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'candidate_health_quarantine_receipts'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
 
         assert_eq!(table_count, 1);
         assert_eq!(trigger_count, 3);
+        assert_eq!(quarantine_table_count, 1);
+        assert_eq!(quarantine_trigger_count, 3);
     }
 }
