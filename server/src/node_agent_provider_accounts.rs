@@ -18,7 +18,10 @@ use crate::{
     node_agent_provider_auth_runtime::ProviderLoginAttempt,
     node_agent_provider_diagnostics::state_machine_contract,
     node_agent_provider_vault_contract::provider_vault_contract,
-    node_agent_web_chat_adapter::{reserved_web_chat_adapters, WebChatAdapterDescriptor},
+    node_agent_web_chat_adapter::{
+        lifecycle_contract as web_chat_lifecycle_contract, reserved_web_chat_adapters,
+        WebChatAdapterDescriptor,
+    },
     NodeRuntime,
 };
 
@@ -272,6 +275,7 @@ pub(crate) fn accounts_payload(
         "schema": "elon.ai_provider_accounts.v2",
         "schema_version": 2,
         "state_machine": state_machine_contract(),
+        "web_chat_adapter_contract": web_chat_lifecycle_contract(),
         "recovery": {
             "journal": "sanitized_local_node_store",
             "active_attempt_after_restart": "failed_node_restarted",
@@ -377,6 +381,10 @@ fn reserved_provider(adapter: &WebChatAdapterDescriptor) -> Value {
         "credential_storage": "not_available",
         "enabled": adapter.enabled,
         "blocked_reason_code": adapter.blocked_reason_code,
+        "actual_state": adapter.actual_state,
+        "accepted_auth_source": adapter.accepted_auth_source,
+        "cli_login_reusable": adapter.cli_login_reusable,
+        "browser_cookie_reusable": adapter.browser_cookie_reusable,
         "credential_vault": provider_vault_contract(adapter.id),
         "capabilities": provider_capabilities(false, false, false, false),
         "reason": adapter.reason,

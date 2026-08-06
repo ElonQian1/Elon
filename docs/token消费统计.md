@@ -105,7 +105,7 @@ PC 项目会话里的 Codex CLI 需要同时记录 token 和资源来源，不�
 普通用户不需要知道 `auth.json` 明文内容，也不应该把文件复制给聊天模型。推荐入口固定为两条：
 
 1. PC 工作台 `/pc/node` 的“Codex Pro 保险箱”卡片：点击“备份本机登录”，本机 Win 端读取当前系统用户默认 Codex 登录文件并加密上传。
-2. PC 普通 AI 聊天页：用户明确说“帮我把本机 Codex auth.json 备份到云端保险箱”时，前端识别为保险箱快捷动作，直接调用本机 Win 端 `/api/codex-vault/backup`，不把 `auth.json` 明文交给云端模型或节点 CLI。
+2. PC 普通 AI 聊天页：用户明确说“帮我把本机 Codex auth.json 备份到云端保险箱”时，前端识别为保险箱快捷动作，生成一次性的显式同意和幂等请求后调用本机 Win 端 `/api/codex-vault/backup`，不把 `auth.json` 明文交给云端模型或节点 CLI。
 
 默认路径按本机系统用户计算，不保证每台电脑相同：
 

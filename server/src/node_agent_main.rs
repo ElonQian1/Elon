@@ -180,6 +180,7 @@ mod node_agent_provider_auth_monitor;
 mod node_agent_provider_auth_protocol;
 mod node_agent_provider_auth_runtime;
 mod node_agent_provider_diagnostics;
+mod node_agent_provider_simulator;
 mod node_agent_provider_vault_contract;
 mod node_agent_proxy;
 mod node_agent_pwa_auth_profile;

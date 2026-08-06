@@ -28,6 +28,7 @@ async fn diagnostics_handler(
         "ok": true,
         "schema": "elon.ai_provider_diagnostics.v1",
         "state_machine": state_machine_contract(),
+        "fake_provider_matrix": crate::node_agent_provider_simulator::simulation_contract(),
         "journal": {
             "sanitized": true,
             "retention_hours": 24,
