@@ -14,6 +14,7 @@ use sha2::{Digest, Sha256};
 
 mod copy;
 mod hash;
+mod lock;
 #[cfg(not(windows))]
 #[path = "node_agent_managed_fs/unsupported.rs"]
 mod platform;
@@ -25,8 +26,9 @@ pub(crate) use copy::ManagedFileCopyResult;
 pub(crate) use hash::{ManagedFileHashFailure, ManagedFileHashPhase, ManagedFileHashResult};
 pub(crate) use read::ManagedFileReadCursor;
 pub(crate) use types::{
-    ManagedDirectoryPrepareFailure, ManagedFileOpenFailure, PinnedManagedDirectory,
-    PinnedManagedFile, PinnedManagedRoot, QuarantinedManagedFile,
+    ManagedDirectoryPrepareFailure, ManagedExclusiveFileLockFailure, ManagedFileOpenFailure,
+    PinnedManagedDirectory, PinnedManagedExclusiveFileLock, PinnedManagedFile, PinnedManagedRoot,
+    QuarantinedManagedFile,
 };
 pub(crate) use write::{ManagedFileSegmentWriteFailure, ManagedFileSegmentWritePhase};
 #[cfg(windows)]

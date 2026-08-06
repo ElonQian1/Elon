@@ -7,12 +7,13 @@
 
 use std::{ffi::OsStr, path::Path};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use elon_pc_dev_runtime::NodeDataPaths;
 
 use super::identity::ComputePluginInstallationIdentity;
 use super::{
     fetch_contract::AuthorizedComputePluginDownloadSegment, manifest_validation::is_sha256,
+    root_lock::ComputePluginRootLock,
 };
 use crate::{
     node_agent_data_root::{verify_root_marker_payload, ROOT_MARKER_FILE},
@@ -21,10 +22,15 @@ use crate::{
     },
 };
 
+mod recovery;
 mod staging;
 mod types;
 mod write;
 
+pub(in crate::node_agent_compute_plugin_host) use recovery::{
+    ComputePluginCursorDamageRecoveryCustody, ComputePluginPinnedFileRecovery,
+    ComputePluginQuarantinedFileRecovery,
+};
 pub(in crate::node_agent_compute_plugin_host) use staging::{
     prepare_compute_plugin_candidate_staging, ComputePluginStagingPrepareFailure,
     PreparedComputePluginCandidateStaging, COMPUTE_PLUGIN_STAGING_SEAL_FILE,
@@ -32,9 +38,8 @@ pub(in crate::node_agent_compute_plugin_host) use staging::{
 pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginPartCursorDamage, ComputePluginPartCursorDamageKind,
     ComputePluginPartReconcileFailure, ComputePluginPartReconcileOutcome,
-    ComputePluginPartReconcileResult, ComputePluginPinnedFileRecovery,
-    PinnedComputePluginCandidateDownloads, PinnedComputePluginRoot,
-    ReconciledComputePluginPartFile,
+    ComputePluginPartReconcileResult, PinnedComputePluginCandidateDownloads,
+    PinnedComputePluginRoot, ReconciledComputePluginPartFile,
 };
 pub(in crate::node_agent_compute_plugin_host) use write::{
     write_compute_plugin_part_segment, ComputePluginSegmentWriteFailure,
@@ -54,10 +59,17 @@ pub(in crate::node_agent_compute_plugin_host) fn pin_compute_plugin_root(
     }
     let root = PinnedManagedRoot::pin(paths.root(), installation.digest())?;
     verify_pinned_root_marker(&root, installation.install_id())?;
-    root.prepare_directory(Path::new(COMPUTE_PLUGIN_DIRECTORY))
-        .map_err(|failure| failure.into_error())?;
+    let compute_plugin_directory = root
+        .pin_existing_directory(Path::new(COMPUTE_PLUGIN_DIRECTORY))
+        .context("COMPUTE_PLUGIN_ROOT_DIRECTORY_PIN")?;
+    let root_lock = ComputePluginRootLock::acquire(compute_plugin_directory)?;
+    // Close the marker/lock acquisition race for every cooperating process. The first read avoids
+    // creating a lock file below an already mismatched installation root; the second runs while
+    // this process owns the compute-plugin-root exclusion.
+    verify_pinned_root_marker(&root, installation.install_id())?;
     Ok(PinnedComputePluginRoot {
         root,
+        root_lock,
         installation_id_digest: installation.digest().to_string(),
     })
 }
@@ -83,6 +95,7 @@ pub(in crate::node_agent_compute_plugin_host) fn pin_existing_candidate_download
     }
     Ok(PinnedComputePluginCandidateDownloads {
         directory,
+        root_lock_lease: root.root_lock.lease(),
         relative_directory,
         installation_id_digest: root.installation_id_digest.clone(),
         root_identity_digest: root.root.root_identity_digest().to_string(),
@@ -126,6 +139,7 @@ pub(in crate::node_agent_compute_plugin_host) fn reconcile_compute_plugin_part_f
                 return Err(ComputePluginPartReconcileFailure::recovery_without_file(
                     error,
                     recovery_key,
+                    root.root_lock.lease(),
                 ));
             }
             return Err(ComputePluginPartReconcileFailure::before(error, authorized));
@@ -143,7 +157,12 @@ pub(in crate::node_agent_compute_plugin_host) fn reconcile_compute_plugin_part_f
             Err(ManagedFileOpenFailure::FileNotOpened { error, directory })
                 if error.kind() == std::io::ErrorKind::AlreadyExists =>
             {
-                return reconcile_unexpected_zero_cursor_file(directory, &file_name, authorized);
+                return reconcile_unexpected_zero_cursor_file(
+                    directory,
+                    &file_name,
+                    authorized,
+                    root.root_lock.lease(),
+                );
             }
             Err(ManagedFileOpenFailure::FileNotOpened { error, directory }) => {
                 if directory.filesystem_mutated() {
@@ -151,6 +170,7 @@ pub(in crate::node_agent_compute_plugin_host) fn reconcile_compute_plugin_part_f
                     return Err(ComputePluginPartReconcileFailure::recovery_without_file(
                         error,
                         recovery_key,
+                        root.root_lock.lease(),
                     ));
                 }
                 return Err(ComputePluginPartReconcileFailure::before(error, authorized));
@@ -161,6 +181,7 @@ pub(in crate::node_agent_compute_plugin_host) fn reconcile_compute_plugin_part_f
                     error,
                     recovery_key,
                     file,
+                    root.root_lock.lease(),
                 ));
             }
         }
@@ -175,6 +196,7 @@ pub(in crate::node_agent_compute_plugin_host) fn reconcile_compute_plugin_part_f
                         kind: ComputePluginPartCursorDamageKind::MissingCommittedFile,
                         authorized,
                         file: None,
+                        root_lock_lease: root.root_lock.lease(),
                         observed_length_bytes: None,
                     },
                 ));
@@ -191,6 +213,7 @@ pub(in crate::node_agent_compute_plugin_host) fn reconcile_compute_plugin_part_f
                         kind: ComputePluginPartCursorDamageKind::MissingCommittedFile,
                         authorized,
                         file: None,
+                        root_lock_lease: root.root_lock.lease(),
                         observed_length_bytes: None,
                     },
                 ));
@@ -201,6 +224,7 @@ pub(in crate::node_agent_compute_plugin_host) fn reconcile_compute_plugin_part_f
                     return Err(ComputePluginPartReconcileFailure::recovery_without_file(
                         error,
                         recovery_key,
+                        root.root_lock.lease(),
                     ));
                 }
                 return Err(ComputePluginPartReconcileFailure::before(error, authorized));
@@ -212,22 +236,27 @@ pub(in crate::node_agent_compute_plugin_host) fn reconcile_compute_plugin_part_f
                         error,
                         recovery_key,
                         file,
+                        root.root_lock.lease(),
                     ));
                 }
                 return Err(ComputePluginPartReconcileFailure::opened_rejected(
-                    error, authorized, file,
+                    error,
+                    authorized,
+                    file,
+                    root.root_lock.lease(),
                 ));
             }
         }
     };
 
-    reconcile_open_file(authorized, file, created)
+    reconcile_open_file(authorized, file, created, root.root_lock.lease())
 }
 
 fn reconcile_open_file(
     authorized: AuthorizedComputePluginDownloadSegment,
     mut file: PinnedManagedFile,
     created: bool,
+    root_lock_lease: super::root_lock::ComputePluginRootLockLease,
 ) -> ComputePluginPartReconcileResult {
     let observed = match i64::try_from(file.len_bytes()) {
         Ok(observed) => observed,
@@ -237,11 +266,15 @@ fn reconcile_open_file(
                 error,
                 recovery_key,
                 file,
+                root_lock_lease,
             ));
         }
         Err(error) => {
             return Err(ComputePluginPartReconcileFailure::unreconciled(
-                error, authorized, file,
+                error,
+                authorized,
+                file,
+                root_lock_lease,
             ));
         }
     };
@@ -252,6 +285,7 @@ fn reconcile_open_file(
                 kind: ComputePluginPartCursorDamageKind::ShorterThanCommittedCursor,
                 authorized,
                 file: Some(file),
+                root_lock_lease,
                 observed_length_bytes: Some(observed),
             },
         ));
@@ -262,6 +296,7 @@ fn reconcile_open_file(
             anyhow!("COMPUTE_PLUGIN_PART_CREATED_NON_EMPTY"),
             recovery_key,
             file,
+            root_lock_lease,
         ));
     }
 
@@ -273,6 +308,7 @@ fn reconcile_open_file(
                 error,
                 recovery_key,
                 file,
+                root_lock_lease,
             ));
         }
         truncated_uncommitted_tail = true;
@@ -281,6 +317,7 @@ fn reconcile_open_file(
         ReconciledComputePluginPartFile {
             authorized,
             file,
+            root_lock_lease,
             truncated_uncommitted_tail,
         },
     ))
@@ -290,6 +327,7 @@ fn reconcile_unexpected_zero_cursor_file(
     directory: PinnedManagedDirectory,
     file_name: &OsStr,
     authorized: AuthorizedComputePluginDownloadSegment,
+    root_lock_lease: super::root_lock::ComputePluginRootLockLease,
 ) -> ComputePluginPartReconcileResult {
     let recovery_key = authorized.into_recovery_key();
     let error = anyhow!("COMPUTE_PLUGIN_PART_ZERO_CURSOR_FILE_EXISTS");
@@ -298,18 +336,29 @@ fn reconcile_unexpected_zero_cursor_file(
             error,
             recovery_key,
             file,
+            root_lock_lease,
         )),
-        Err(ManagedFileOpenFailure::Opened { error, file }) => Err(
-            ComputePluginPartReconcileFailure::quarantined_recovery(error, recovery_key, file),
-        ),
-        Err(ManagedFileOpenFailure::NotOpened(open_error)) => Err(
-            ComputePluginPartReconcileFailure::recovery_without_file(open_error, recovery_key),
-        ),
+        Err(ManagedFileOpenFailure::Opened { error, file }) => {
+            Err(ComputePluginPartReconcileFailure::quarantined_recovery(
+                error,
+                recovery_key,
+                file,
+                root_lock_lease,
+            ))
+        }
+        Err(ManagedFileOpenFailure::NotOpened(open_error)) => {
+            Err(ComputePluginPartReconcileFailure::recovery_without_file(
+                open_error,
+                recovery_key,
+                root_lock_lease,
+            ))
+        }
         Err(ManagedFileOpenFailure::FileNotOpened {
             error: open_error, ..
         }) => Err(ComputePluginPartReconcileFailure::recovery_without_file(
             open_error,
             recovery_key,
+            root_lock_lease,
         )),
     }
 }

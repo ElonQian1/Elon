@@ -9,6 +9,7 @@ use crate::{
             ComputePluginFetchClaimRecoveryKey,
         },
         fetch_file::{ComputePluginPinnedFileRecovery, ReconciledComputePluginPartFile},
+        root_lock::ComputePluginRootLockLease,
     },
     node_agent_managed_fs::PinnedManagedFile,
 };
@@ -30,6 +31,7 @@ pub(in crate::node_agent_compute_plugin_host) enum ComputePluginSegmentWritePhas
 pub(in crate::node_agent_compute_plugin_host) struct SyncedComputePluginPartFile {
     pub(super) authorized: AuthorizedComputePluginDownloadSegment,
     pub(super) file: PinnedManagedFile,
+    pub(super) root_lock_lease: ComputePluginRootLockLease,
     pub(super) sync_completed_at: Instant,
 }
 
@@ -44,9 +46,15 @@ impl SyncedComputePluginPartFile {
     ) -> (
         AuthorizedComputePluginDownloadSegment,
         PinnedManagedFile,
+        ComputePluginRootLockLease,
         Instant,
     ) {
-        (self.authorized, self.file, self.sync_completed_at)
+        (
+            self.authorized,
+            self.file,
+            self.root_lock_lease,
+            self.sync_completed_at,
+        )
     }
 }
 
@@ -110,13 +118,16 @@ impl ComputePluginSegmentWriteFailure {
             };
         }
         let ReconciledComputePluginPartFile {
-            authorized, file, ..
+            authorized,
+            file,
+            root_lock_lease,
+            ..
         } = reconciled;
         Self::RecoveryRequired {
             phase,
             error: error.into(),
             recovery_key: authorized.into_recovery_key(),
-            file: ComputePluginPinnedFileRecovery::from_pinned(file),
+            file: ComputePluginPinnedFileRecovery::from_pinned(file, root_lock_lease),
         }
     }
 }

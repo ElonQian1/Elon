@@ -1,4 +1,4 @@
-use std::{fmt, fs::File, path::PathBuf, sync::Arc};
+use std::{error::Error as StdError, fmt, fs::File, path::PathBuf, sync::Arc};
 
 use super::PlatformFileIdentity;
 
@@ -76,6 +76,106 @@ pub(crate) struct PinnedManagedFile {
     pub(super) identity: PlatformFileIdentity,
     pub(super) identity_digest: String,
     pub(super) directory_filesystem_mutated: bool,
+}
+
+/// Opaque ownership of one share-none file handle opened below an already pinned directory.
+/// Holding this value is the lock; dropping it releases the operating-system exclusion but never
+/// removes the persistent lock file. No raw file or mutation interface is exposed to callers.
+#[must_use = "dropping the managed exclusive file lock releases operating-system exclusion"]
+pub(crate) struct PinnedManagedExclusiveFileLock {
+    pub(super) _file: File,
+    pub(super) _directory_handles: Vec<Arc<File>>,
+    pub(super) identity_digest: String,
+}
+
+impl fmt::Debug for PinnedManagedExclusiveFileLock {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PinnedManagedExclusiveFileLock")
+            .field("file", &"<exclusive-retained>")
+            .field("directory_handles", &"<retained>")
+            .field("identity_digest", &"<redacted>")
+            .finish()
+    }
+}
+
+/// Fail-closed result of acquiring an exclusive managed file lock. Once a handle was opened but
+/// could not be proven to be one regular, non-reparse, single-link file on the pinned volume, the
+/// rejected handle remains quarantined in this error for its lifetime.
+pub(crate) struct ManagedExclusiveFileLockFailure {
+    inner: ManagedExclusiveFileLockFailureInner,
+}
+
+enum ManagedExclusiveFileLockFailureInner {
+    NotAcquired {
+        error: std::io::Error,
+        _directory: PinnedManagedDirectory,
+    },
+    OpenedRejected {
+        error: anyhow::Error,
+        _file: QuarantinedManagedFile,
+    },
+}
+
+impl ManagedExclusiveFileLockFailure {
+    pub(super) fn not_acquired(error: std::io::Error, directory: PinnedManagedDirectory) -> Self {
+        Self {
+            inner: ManagedExclusiveFileLockFailureInner::NotAcquired {
+                error,
+                _directory: directory,
+            },
+        }
+    }
+
+    pub(super) fn opened_rejected(error: anyhow::Error, file: QuarantinedManagedFile) -> Self {
+        Self {
+            inner: ManagedExclusiveFileLockFailureInner::OpenedRejected { error, _file: file },
+        }
+    }
+}
+
+impl fmt::Debug for ManagedExclusiveFileLockFailure {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.inner {
+            ManagedExclusiveFileLockFailureInner::NotAcquired { error, .. } => formatter
+                .debug_struct("ManagedExclusiveFileLockFailure")
+                .field("phase", &"not_acquired")
+                .field("error_kind", &error.kind())
+                .field("raw_os_error", &error.raw_os_error())
+                .field("directory", &"<retained>")
+                .finish(),
+            ManagedExclusiveFileLockFailureInner::OpenedRejected { .. } => formatter
+                .debug_struct("ManagedExclusiveFileLockFailure")
+                .field("phase", &"opened_rejected")
+                .field("file", &"<quarantined-retained>")
+                .finish(),
+        }
+    }
+}
+
+impl fmt::Display for ManagedExclusiveFileLockFailure {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let code = match &self.inner {
+            ManagedExclusiveFileLockFailureInner::NotAcquired { .. } => {
+                "NODE_MANAGED_EXCLUSIVE_FILE_LOCK_NOT_ACQUIRED"
+            }
+            ManagedExclusiveFileLockFailureInner::OpenedRejected { .. } => {
+                "NODE_MANAGED_EXCLUSIVE_FILE_LOCK_OPENED_REJECTED"
+            }
+        };
+        formatter.write_str(code)
+    }
+}
+
+impl StdError for ManagedExclusiveFileLockFailure {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match &self.inner {
+            ManagedExclusiveFileLockFailureInner::NotAcquired { error, .. } => Some(error),
+            ManagedExclusiveFileLockFailureInner::OpenedRejected { error, .. } => {
+                Some(error.as_ref())
+            }
+        }
+    }
 }
 
 impl fmt::Debug for PinnedManagedFile {

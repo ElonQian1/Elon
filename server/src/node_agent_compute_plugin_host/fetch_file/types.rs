@@ -2,9 +2,17 @@ use std::{fmt, path::Path};
 
 use anyhow::{bail, Error, Result};
 
+use super::recovery::{
+    ComputePluginCursorDamageRecoveryCustody, ComputePluginPinnedFileRecovery,
+    ComputePluginQuarantinedFileRecovery,
+};
+
 use crate::{
     node_agent_compute_plugin_host::fetch_contract::{
         AuthorizedComputePluginDownloadSegment, ComputePluginFetchClaimRecoveryKey,
+    },
+    node_agent_compute_plugin_host::root_lock::{
+        ComputePluginRootLock, ComputePluginRootLockLease,
     },
     node_agent_managed_fs::{
         ManagedFileOpenFailure, PinnedManagedDirectory, PinnedManagedFile, PinnedManagedRoot,
@@ -25,6 +33,7 @@ pub(in crate::node_agent_compute_plugin_host) enum ComputePluginPartReconcileOut
 /// the root or marker by path.
 pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginRoot {
     pub(super) root: PinnedManagedRoot,
+    pub(super) root_lock: ComputePluginRootLock,
     pub(super) installation_id_digest: String,
 }
 
@@ -42,6 +51,7 @@ impl PinnedComputePluginRoot {
 /// children whose original normalized relative path names this exact candidate directory.
 pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginCandidateDownloads {
     pub(super) directory: PinnedManagedDirectory,
+    pub(super) root_lock_lease: ComputePluginRootLockLease,
     pub(super) relative_directory: String,
     pub(super) installation_id_digest: String,
     pub(super) root_identity_digest: String,
@@ -75,6 +85,12 @@ impl PinnedComputePluginCandidateDownloads {
             .open_existing_read_only_child(file_name)
             .map_err(managed_open_error)
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn into_root_lock_lease(
+        self,
+    ) -> ComputePluginRootLockLease {
+        self.root_lock_lease
+    }
 }
 
 impl fmt::Debug for PinnedComputePluginCandidateDownloads {
@@ -87,41 +103,12 @@ impl fmt::Debug for PinnedComputePluginCandidateDownloads {
     }
 }
 
-/// Non-writable recovery custody for an exact pinned file. It intentionally exposes neither the
-/// raw handle nor an unwrap operation; future recovery transitions must be implemented beside this
-/// type and consume it through a purpose-specific API.
-pub(in crate::node_agent_compute_plugin_host) struct ComputePluginPinnedFileRecovery {
-    file: PinnedManagedFile,
-}
-
-impl ComputePluginPinnedFileRecovery {
-    pub(in crate::node_agent_compute_plugin_host) fn from_pinned(file: PinnedManagedFile) -> Self {
-        Self { file }
-    }
-
-    pub(in crate::node_agent_compute_plugin_host) fn file_identity_digest(&self) -> &str {
-        self.file.identity_digest()
-    }
-
-    pub(in crate::node_agent_compute_plugin_host) fn len_bytes(&self) -> u64 {
-        self.file.len_bytes()
-    }
-}
-
-impl fmt::Debug for ComputePluginPinnedFileRecovery {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("ComputePluginPinnedFileRecovery")
-            .field("file", &"<retained-non-writable>")
-            .finish()
-    }
-}
-
 impl fmt::Debug for PinnedComputePluginRoot {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("PinnedComputePluginRoot")
             .field("root", &"<retained>")
+            .field("root_lock", &self.root_lock)
             .field("installation_id_digest", &"<redacted>")
             .finish()
     }
@@ -152,6 +139,7 @@ impl fmt::Debug for ComputePluginPartReconcileOutcome {
 pub(in crate::node_agent_compute_plugin_host) struct ReconciledComputePluginPartFile {
     pub(super) authorized: AuthorizedComputePluginDownloadSegment,
     pub(super) file: PinnedManagedFile,
+    pub(super) root_lock_lease: ComputePluginRootLockLease,
     pub(super) truncated_uncommitted_tail: bool,
 }
 
@@ -202,6 +190,7 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginPartCursorDama
     pub(super) kind: ComputePluginPartCursorDamageKind,
     pub(super) authorized: AuthorizedComputePluginDownloadSegment,
     pub(super) file: Option<PinnedManagedFile>,
+    pub(super) root_lock_lease: ComputePluginRootLockLease,
     pub(super) observed_length_bytes: Option<i64>,
 }
 
@@ -259,12 +248,16 @@ impl ComputePluginPartCursorDamage {
         self,
     ) -> (
         ComputePluginFetchClaimRecoveryKey,
-        Option<ComputePluginPinnedFileRecovery>,
+        ComputePluginCursorDamageRecoveryCustody,
     ) {
-        (
-            self.authorized.into_recovery_key(),
-            self.file.map(ComputePluginPinnedFileRecovery::from_pinned),
-        )
+        let recovery_key = self.authorized.into_recovery_key();
+        let custody = match self.file {
+            Some(file) => {
+                ComputePluginCursorDamageRecoveryCustody::pinned(file, self.root_lock_lease)
+            }
+            None => ComputePluginCursorDamageRecoveryCustody::missing(self.root_lock_lease),
+        };
+        (recovery_key, custody)
     }
 }
 
@@ -291,7 +284,7 @@ pub(in crate::node_agent_compute_plugin_host) enum ComputePluginPartReconcileFai
     OpenedFileRejected {
         error: Error,
         authorized: AuthorizedComputePluginDownloadSegment,
-        file: QuarantinedManagedFile,
+        file: ComputePluginQuarantinedFileRecovery,
     },
     UnreconciledFile {
         error: Error,
@@ -301,11 +294,12 @@ pub(in crate::node_agent_compute_plugin_host) enum ComputePluginPartReconcileFai
     RecoveryRequiredWithoutFile {
         error: Error,
         recovery_key: ComputePluginFetchClaimRecoveryKey,
+        root_lock_lease: ComputePluginRootLockLease,
     },
     QuarantinedFileRecoveryRequired {
         error: Error,
         recovery_key: ComputePluginFetchClaimRecoveryKey,
-        file: QuarantinedManagedFile,
+        file: ComputePluginQuarantinedFileRecovery,
     },
     UnexpectedExistingZeroCursorFile {
         error: Error,
@@ -359,11 +353,12 @@ impl ComputePluginPartReconcileFailure {
         error: Error,
         authorized: AuthorizedComputePluginDownloadSegment,
         file: QuarantinedManagedFile,
+        root_lock_lease: ComputePluginRootLockLease,
     ) -> Self {
         Self::OpenedFileRejected {
             error,
             authorized,
-            file,
+            file: ComputePluginQuarantinedFileRecovery::new(file, root_lock_lease),
         }
     }
 
@@ -371,21 +366,24 @@ impl ComputePluginPartReconcileFailure {
         error: impl Into<Error>,
         authorized: AuthorizedComputePluginDownloadSegment,
         file: PinnedManagedFile,
+        root_lock_lease: ComputePluginRootLockLease,
     ) -> Self {
         Self::UnreconciledFile {
             error: error.into(),
             authorized,
-            file: ComputePluginPinnedFileRecovery::from_pinned(file),
+            file: ComputePluginPinnedFileRecovery::from_pinned(file, root_lock_lease),
         }
     }
 
     pub(super) fn recovery_without_file(
         error: impl Into<Error>,
         recovery_key: ComputePluginFetchClaimRecoveryKey,
+        root_lock_lease: ComputePluginRootLockLease,
     ) -> Self {
         Self::RecoveryRequiredWithoutFile {
             error: error.into(),
             recovery_key,
+            root_lock_lease,
         }
     }
 
@@ -393,11 +391,12 @@ impl ComputePluginPartReconcileFailure {
         error: Error,
         recovery_key: ComputePluginFetchClaimRecoveryKey,
         file: QuarantinedManagedFile,
+        root_lock_lease: ComputePluginRootLockLease,
     ) -> Self {
         Self::QuarantinedFileRecoveryRequired {
             error,
             recovery_key,
-            file,
+            file: ComputePluginQuarantinedFileRecovery::new(file, root_lock_lease),
         }
     }
 
@@ -405,11 +404,12 @@ impl ComputePluginPartReconcileFailure {
         error: impl Into<Error>,
         recovery_key: ComputePluginFetchClaimRecoveryKey,
         file: PinnedManagedFile,
+        root_lock_lease: ComputePluginRootLockLease,
     ) -> Self {
         Self::UnexpectedExistingZeroCursorFile {
             error: error.into(),
             recovery_key,
-            file: ComputePluginPinnedFileRecovery::from_pinned(file),
+            file: ComputePluginPinnedFileRecovery::from_pinned(file, root_lock_lease),
         }
     }
 
@@ -417,11 +417,12 @@ impl ComputePluginPartReconcileFailure {
         error: impl Into<Error>,
         recovery_key: ComputePluginFetchClaimRecoveryKey,
         file: PinnedManagedFile,
+        root_lock_lease: ComputePluginRootLockLease,
     ) -> Self {
         Self::FileRecoveryRequired {
             error: error.into(),
             recovery_key,
-            file: ComputePluginPinnedFileRecovery::from_pinned(file),
+            file: ComputePluginPinnedFileRecovery::from_pinned(file, root_lock_lease),
         }
     }
 }

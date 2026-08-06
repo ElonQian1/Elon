@@ -28,6 +28,7 @@ pub(crate) mod manifest_validation;
 pub(crate) mod plugin_manifest;
 pub(crate) mod ready_capability;
 mod rollback_anchor;
+mod root_lock;
 pub(crate) mod runner_events;
 mod signed_artifact_verification;
 mod trusted_time;

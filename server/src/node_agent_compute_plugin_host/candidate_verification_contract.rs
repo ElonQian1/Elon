@@ -20,6 +20,7 @@ use super::{
         ComputePluginFetchAuthoritySession, ComputePluginPostPinVerificationAuthoritySession,
     },
     manifest_validation::is_sha256,
+    root_lock::ComputePluginRootLockLease,
     signed_artifact_verification::jcs_sha256_hex,
 };
 
@@ -79,6 +80,7 @@ pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginCandidat
     pin_completed_at: Instant,
     cancellation_guard: ComputePluginFetchCancellationGuard,
     artifacts: Vec<PinnedComputePluginCandidateArtifact>,
+    _root_lock: ComputePluginRootLockLease,
 }
 
 struct PinnedComputePluginCandidateArtifact {
@@ -188,6 +190,7 @@ pub(in crate::node_agent_compute_plugin_host) fn pin_candidate_artifact_set(
         &root_identity_digest,
         &pinned_artifacts,
     )?;
+    let root_lock = candidate_directory.into_root_lock_lease();
     Ok(PinnedComputePluginCandidateArtifactSet {
         verification_id,
         candidate_token: candidate.candidate_token().to_string(),
@@ -198,6 +201,7 @@ pub(in crate::node_agent_compute_plugin_host) fn pin_candidate_artifact_set(
         pin_completed_at: Instant::now(),
         cancellation_guard,
         artifacts: pinned_artifacts,
+        _root_lock: root_lock,
     })
 }
 

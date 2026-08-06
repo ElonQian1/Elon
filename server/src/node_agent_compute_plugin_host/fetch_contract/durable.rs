@@ -33,7 +33,7 @@ pub(in crate::node_agent_compute_plugin_host) fn bind_durable_download_segment<'
     DurablyWrittenComputePluginSegment<'authority>,
     ComputePluginPostSyncBindingFailure,
 > {
-    let (authorized, file, sync_completed_at) =
+    let (authorized, file, root_lock_lease, sync_completed_at) =
         synced.into_parts(ComputePluginDurableBindPermit::new());
     let binding = || -> Result<()> {
         if !is_sha256(authorized.installation_id_digest())
@@ -50,6 +50,7 @@ pub(in crate::node_agent_compute_plugin_host) fn bind_durable_download_segment<'
             error,
             authorized.into_recovery_key(),
             file,
+            root_lock_lease,
         ));
     }
     let resolution_session =
@@ -60,6 +61,7 @@ pub(in crate::node_agent_compute_plugin_host) fn bind_durable_download_segment<'
                     error,
                     authorized.into_recovery_key(),
                     file,
+                    root_lock_lease,
                 ));
             }
         };
@@ -79,11 +81,13 @@ pub(in crate::node_agent_compute_plugin_host) fn bind_durable_download_segment<'
             error,
             authorized.into_recovery_key(),
             file,
+            root_lock_lease,
         ));
     }
     Ok(DurablyWrittenComputePluginSegment {
         authorized,
         file,
+        root_lock_lease,
         resolution_session,
         sync_completed_at,
     })

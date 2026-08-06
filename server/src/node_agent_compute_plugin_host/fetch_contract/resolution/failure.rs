@@ -11,7 +11,7 @@ use super::super::{
 };
 use crate::node_agent_compute_plugin_host::{
     fetch_file::ComputePluginPinnedFileRecovery,
-    local_authority::ComputePluginFetchAuthoritySession,
+    local_authority::ComputePluginFetchAuthoritySession, root_lock::ComputePluginRootLockLease,
 };
 use crate::node_agent_managed_fs::PinnedManagedFile;
 
@@ -58,12 +58,13 @@ impl ComputePluginFetchCommitFailure {
         error: Error,
         recovery_key: ComputePluginFetchClaimRecoveryKey,
         file: PinnedManagedFile,
+        root_lock_lease: ComputePluginRootLockLease,
     ) -> Self {
         Self::OutcomeRecoveryRequired {
             store_phase,
             error,
             recovery_key,
-            file: ComputePluginPinnedFileRecovery::from_pinned(file),
+            file: ComputePluginPinnedFileRecovery::from_pinned(file, root_lock_lease),
         }
     }
 }

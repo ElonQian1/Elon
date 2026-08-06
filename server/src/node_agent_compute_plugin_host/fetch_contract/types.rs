@@ -10,6 +10,7 @@ use crate::{
         local_authority::{
             ComputePluginFetchAuthorityFacts, ComputePluginPostSyncFetchAuthoritySession,
         },
+        root_lock::ComputePluginRootLockLease,
     },
     node_agent_managed_fs::PinnedManagedFile,
 };
@@ -210,6 +211,7 @@ impl ComputePluginFetchAbortReason {
 pub(crate) struct DurablyWrittenComputePluginSegment<'authority> {
     pub(super) authorized: AuthorizedComputePluginDownloadSegment,
     pub(super) file: PinnedManagedFile,
+    pub(super) root_lock_lease: ComputePluginRootLockLease,
     pub(super) resolution_session: ComputePluginPostSyncFetchAuthoritySession<'authority>,
     pub(super) sync_completed_at: std::time::Instant,
 }

@@ -13,8 +13,8 @@ use super::{
 use crate::node_agent_compute_plugin_host::{
     fetch_contract::ComputePluginFetchClaimRecoveryKey,
     fetch_file::{
-        ComputePluginPartCursorDamage, ComputePluginPartCursorDamageKind,
-        ComputePluginPinnedFileRecovery,
+        ComputePluginCursorDamageRecoveryCustody, ComputePluginPartCursorDamage,
+        ComputePluginPartCursorDamageKind,
     },
     install_plan_admission::AdmittedComputePluginInstallPlan,
     local_authority::ComputePluginFetchAuthoritySession,
@@ -40,7 +40,7 @@ pub(in crate::node_agent_compute_plugin_host) enum ComputePluginCursorDamageFail
     OutcomeRecoveryRequired {
         error: Error,
         recovery_key: ComputePluginFetchClaimRecoveryKey,
-        file: Option<ComputePluginPinnedFileRecovery>,
+        custody: ComputePluginCursorDamageRecoveryCustody,
         damage_kind: ComputePluginPartCursorDamageKind,
         observed_length_bytes: Option<i64>,
         authority_session: ComputePluginFetchAuthoritySession<'authority>,
@@ -58,7 +58,7 @@ impl fmt::Debug for ComputePluginCursorDamageFailure<'_> {
                 .field("authority_session", &"<retained>")
                 .finish(),
             Self::OutcomeRecoveryRequired {
-                file,
+                custody,
                 damage_kind,
                 observed_length_bytes,
                 ..
@@ -67,7 +67,7 @@ impl fmt::Debug for ComputePluginCursorDamageFailure<'_> {
                 .field("phase", &"store_outcome_uncertain")
                 .field("error", &"<redacted>")
                 .field("recovery_key", &"<redacted>")
-                .field("file", &file.as_ref().map(|_| "<retained>"))
+                .field("file", &custody.has_pinned_file())
                 .field("damage_kind", damage_kind)
                 .field("observed_length_bytes", observed_length_bytes)
                 .field("authority_session", &"<retained>")
@@ -146,11 +146,11 @@ pub(in crate::node_agent_compute_plugin_host) fn fail_cursor_damaged_download<'a
         backend: &authority_session,
     };
     if let Err(error) = authority.fail_validated_cursor_damage(permit) {
-        let (recovery_key, file) = damage.into_recovery_custody();
+        let (recovery_key, custody) = damage.into_recovery_custody();
         return Err(ComputePluginCursorDamageFailure::OutcomeRecoveryRequired {
             error,
             recovery_key,
-            file,
+            custody,
             damage_kind,
             observed_length_bytes,
             authority_session,

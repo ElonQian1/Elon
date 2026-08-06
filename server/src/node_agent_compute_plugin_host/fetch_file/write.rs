@@ -52,11 +52,15 @@ pub(in crate::node_agent_compute_plugin_host) fn write_compute_plugin_part_segme
     match write_result {
         Ok(sync_completed_at) => {
             let ReconciledComputePluginPartFile {
-                authorized, file, ..
+                authorized,
+                file,
+                root_lock_lease,
+                ..
             } = reconciled;
             Ok(SyncedComputePluginPartFile {
                 authorized,
                 file,
+                root_lock_lease,
                 sync_completed_at,
             })
         }

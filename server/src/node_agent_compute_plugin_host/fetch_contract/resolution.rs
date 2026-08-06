@@ -40,6 +40,7 @@ pub(super) fn commit_download_segment(
     let DurablyWrittenComputePluginSegment {
         authorized,
         mut file,
+        root_lock_lease,
         resolution_session,
         sync_completed_at,
     } = durable;
@@ -55,6 +56,7 @@ pub(super) fn commit_download_segment(
             error,
             authorized.into_recovery_key(),
             file,
+            root_lock_lease,
         ));
     }
     let download = match validate_authorized_binding(admitted, &authorized) {
@@ -66,6 +68,7 @@ pub(super) fn commit_download_segment(
                 error,
                 recovery_key,
                 file,
+                root_lock_lease,
             ));
         }
     };
@@ -77,6 +80,7 @@ pub(super) fn commit_download_segment(
                 error.into(),
                 authorized.into_recovery_key(),
                 file,
+                root_lock_lease,
             ));
         }
     };
@@ -87,6 +91,7 @@ pub(super) fn commit_download_segment(
             error,
             recovery_key,
             file,
+            root_lock_lease,
         ));
     }
     let authority = ComputePluginFetchAuthorityPort {
@@ -114,6 +119,7 @@ pub(super) fn commit_download_segment(
                 error,
                 recovery_key,
                 file,
+                root_lock_lease,
             ));
         }
     };
@@ -125,6 +131,7 @@ pub(super) fn commit_download_segment(
             error,
             recovery_key,
             file,
+            root_lock_lease,
         ));
     }
     let post_sync_trusted_at_ms = resolution_session.trusted_now_ms();
@@ -138,6 +145,7 @@ pub(super) fn commit_download_segment(
             anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_COMMIT_TIME_OBSERVATION_STALE"),
             recovery_key,
             file,
+            root_lock_lease,
         ));
     }
     if let Err(error) = file
@@ -149,6 +157,7 @@ pub(super) fn commit_download_segment(
             error,
             authorized.into_recovery_key(),
             file,
+            root_lock_lease,
         ));
     }
     let permit = ValidatedComputePluginFetchCommitPermit::new(
@@ -163,13 +172,19 @@ pub(super) fn commit_download_segment(
             error,
             recovery_key,
             file,
+            root_lock_lease,
         ));
     }
-    Ok(CommittedComputePluginDownloadSegment {
+    let committed = CommittedComputePluginDownloadSegment {
         ordinal: authorized.claim.ordinal,
         committed_offset: authorized.claim.end_offset_bytes,
         artifact_complete: authorized.claim.end_offset_bytes == download.download.size_bytes,
-    })
+    };
+    // Close the exact artifact handle before releasing the last possible lease on the root lock.
+    // Pattern-bound locals otherwise have a different drop order from the custody structs.
+    drop(file);
+    drop(root_lock_lease);
+    Ok(committed)
 }
 
 /// Consumes the network authorization without advancing the durable byte cursor. Only a fixed

@@ -5,7 +5,7 @@ use anyhow::Error;
 use crate::{
     node_agent_compute_plugin_host::{
         fetch_contract::ComputePluginFetchClaimRecoveryKey,
-        fetch_file::ComputePluginPinnedFileRecovery,
+        fetch_file::ComputePluginPinnedFileRecovery, root_lock::ComputePluginRootLockLease,
     },
     node_agent_managed_fs::PinnedManagedFile,
 };
@@ -46,11 +46,12 @@ impl ComputePluginPostSyncBindingFailure {
         error: impl Into<Error>,
         recovery_key: ComputePluginFetchClaimRecoveryKey,
         file: PinnedManagedFile,
+        root_lock_lease: ComputePluginRootLockLease,
     ) -> Self {
         Self {
             error: error.into(),
             recovery_key,
-            file: ComputePluginPinnedFileRecovery::from_pinned(file),
+            file: ComputePluginPinnedFileRecovery::from_pinned(file, root_lock_lease),
         }
     }
 }
