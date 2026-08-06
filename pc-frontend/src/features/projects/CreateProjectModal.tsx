@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
 import { clean } from '../../lib/utils'
 import { nodeId, nodeCanAccept, nodeLabel } from './nodeHelpers'
@@ -19,6 +20,7 @@ interface Props extends CreateProjectOptions {
 }
 
 export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Props) {
+  const navigate = useNavigate()
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [template, setTemplate] = useState('android_kotlin')
@@ -35,11 +37,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    loadNodes()
-  }, [])
-
-  async function loadNodes() {
+  const loadNodes = useCallback(async () => {
     setNodesLoading(true)
     setNodesError('')
     setSelectedNode('')
@@ -71,7 +69,13 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
     } finally {
       setNodesLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    void loadNodes()
+    const poll = window.setInterval(() => void loadNodes(), 5000)
+    return () => window.clearInterval(poll)
+  }, [loadNodes])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -127,6 +131,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
       : selectableNodeCount === 0
         ? (firstBlockedWarning || '在线开发环境暂不能创建项目，请到节点页检查运行时和容量状态。')
         : ''
+  const showNodeRecovery = !nodesLoading && (!selectedNode || !!nodesError || selectableNodeCount === 0)
   const nodeSelect = (
     <label className={styles.field}>
       <span>开发环境</span>
@@ -147,6 +152,31 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
         })}
       </select>
       {nodeHint && <small className={styles.hint}>{nodeHint}</small>}
+      {showNodeRecovery && (
+        <div className={styles.nodeRecovery} role="status" aria-live="polite">
+          <div className={styles.nodeRecoveryText}>
+            <strong>{nodesError ? '节点状态读取失败' : nodeSelectStatus}</strong>
+            <span>
+              {nodesError
+                ? '可以重新检测；如果仍失败，请打开节点管理检查客户端连接。'
+                : '项目目录需要创建在在线 PC 节点上。启动客户端后，这个窗口会自动检测并恢复创建。'}
+            </span>
+          </div>
+          <div className={styles.nodeRecoveryActions}>
+            <button
+              type="button"
+              className={styles.secondaryBtn}
+              onClick={() => void loadNodes()}
+              disabled={nodesLoading}
+            >
+              重新检测
+            </button>
+            <button type="button" className={styles.linkBtn} onClick={() => navigate('/node')}>
+              打开节点管理
+            </button>
+          </div>
+        </div>
+      )}
     </label>
   )
   const submitDisabled = submitting || nodesLoading || !!nodesError || !selectedNode

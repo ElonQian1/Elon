@@ -105,6 +105,73 @@
   line-height: 1.4;
 }
 
+.nodeRecovery {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-elevated));
+}
+
+.nodeRecoveryText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  line-height: 1.4;
+}
+
+.nodeRecoveryText strong {
+  color: var(--text-primary);
+  font-size: 12px;
+}
+
+.nodeRecoveryText span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.nodeRecoveryActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
+}
+
+.secondaryBtn,
+.linkBtn {
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.secondaryBtn {
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.secondaryBtn:hover:not(:disabled) {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+.linkBtn {
+  color: var(--accent);
+}
+
+.linkBtn:hover {
+  background: var(--bg-surface);
+}
+
+.secondaryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .error {
   color: var(--danger);
   font-size: 13px;
@@ -148,4 +215,14 @@
 .cancelBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+@media (max-width: 560px) {
+  .nodeRecovery {
+    flex-direction: column;
+  }
+
+  .nodeRecoveryActions {
+    width: 100%;
+  }
 }
