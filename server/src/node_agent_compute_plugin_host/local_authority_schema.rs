@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use rusqlite::{params, Connection, TransactionBehavior};
 
 mod authority_fences;
+mod candidate_health;
 mod candidate_staging;
 mod candidate_verification;
 mod fetch_claims;
@@ -13,6 +14,7 @@ const COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID: i64 = 0x454c_4350;
 
 const REQUIRED_TABLES: &[&str] = &[
     "authority_meta",
+    "candidate_health_receipts",
     "candidate_owners",
     "candidate_staging_receipts",
     "candidate_verification_runs",
@@ -123,6 +125,9 @@ fn create_schema_objects(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(candidate_staging::CANDIDATE_STAGING_SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_STAGING_SCHEMA_CREATE_V3")?;
+    connection
+        .execute_batch(candidate_health::CANDIDATE_HEALTH_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_HEALTH_SCHEMA_CREATE_V3")?;
     connection
         .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V3")?;
@@ -662,3 +667,42 @@ BEFORE DELETE ON plan_events BEGIN
     SELECT RAISE(ABORT, 'plan events are append-only');
 END;
 "#;
+
+#[cfg(test)]
+mod tests {
+    use rusqlite::Connection;
+
+    use super::ensure_schema;
+
+    #[test]
+    fn schema_installs_and_reopens_with_candidate_health_objects() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        connection
+            .pragma_update(None, "foreign_keys", "ON")
+            .unwrap();
+        connection
+            .pragma_update(None, "trusted_schema", "OFF")
+            .unwrap();
+
+        ensure_schema(&mut connection).unwrap();
+        ensure_schema(&mut connection).unwrap();
+
+        let table_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'candidate_health_receipts'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let trigger_count: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'candidate_health_receipts'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+
+        assert_eq!(table_count, 1);
+        assert_eq!(trigger_count, 3);
+    }
+}

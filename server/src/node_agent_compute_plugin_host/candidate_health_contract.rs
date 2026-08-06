@@ -10,10 +10,30 @@ use super::{
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
+mod authorization;
 mod probe_state;
+mod recovery_key;
+mod store;
 mod validation;
 
+#[cfg(test)]
+mod observation_tests;
+
+pub(in crate::node_agent_compute_plugin_host) use authorization::{
+    authorize_candidate_health_store, AuthorizedCandidateHealthStore,
+    CandidateHealthAuthorizationFailure, ValidatedCandidateHealthStorePermit,
+};
 use probe_state::CandidateHealthProbeState;
+pub(in crate::node_agent_compute_plugin_host) use recovery_key::{
+    CandidateHealthReceiptExpectation, CandidateHealthStagingExpectation,
+    ComputePluginCandidateHealthRecoveryKey,
+};
+pub(in crate::node_agent_compute_plugin_host) use store::{
+    adopt_recovered_candidate_health, store_authorized_candidate_health,
+    CandidateHealthOutcomeUncertainCustody, CandidateHealthRecoveryAdoptionFailure,
+    CandidateHealthRecoveryAdoptionPhase, CandidateHealthStoreFailure, CandidateHealthStorePhase,
+    DurableCandidateHealthPublication,
+};
 
 pub(in crate::node_agent_compute_plugin_host) const CANDIDATE_HEALTH_OBSERVATION_SCHEMA: &str =
     "elon.compute_plugin.candidate_health_observation.v1";
@@ -189,6 +209,12 @@ pub(in crate::node_agent_compute_plugin_host) fn finalize_candidate_health_evalu
     validation::finalize_evaluation(evaluation, trusted_time)
 }
 
+pub(in crate::node_agent_compute_plugin_host) fn validate_hashed_candidate_health_observation(
+    observation: &HashedComputePluginCandidateHealthObservation,
+) -> Result<()> {
+    validation::validate_hashed_observation(observation)
+}
+
 impl CandidateHealthEvaluation<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn progress(&self) -> CandidateHealthProgress {
         self.probes.progress()
@@ -220,6 +246,12 @@ impl<'root> CandidateHealthFinalizationFailure<'root> {
 }
 
 impl ValidatedCandidateHealthPublication<'_> {
+    pub(in crate::node_agent_compute_plugin_host) fn staged(
+        &self,
+    ) -> &StagedComputePluginCandidateArchive<'_> {
+        &self.staged
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn observation(
         &self,
     ) -> &HashedComputePluginCandidateHealthObservation {
