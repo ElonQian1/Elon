@@ -110,13 +110,13 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
 
   const selectableNodeCount = nodes.filter(nodeCanAccept).length
   const nodeSelectStatus = nodesLoading
-    ? (quickMode ? '正在加载…' : '正在加载可用开发环境…')
+    ? (quickMode ? '正在查找你的电脑…' : '正在查找可用电脑…')
     : nodesError
-      ? nodesError
+      ? '暂时无法读取电脑状态'
       : nodes.length === 0
-        ? (knownNodeCount > 0 ? '开发环境离线' : '没有在线开发环境')
+        ? (knownNodeCount > 0 ? '你的电脑暂时未连接' : '还没有连接开发平台')
         : selectableNodeCount === 0
-          ? '暂无可创建项目的开发环境'
+          ? '电脑已连接，但暂时不能创建项目'
           : ''
   const firstBlockedNode = nodes.find((n) => !nodeCanAccept(n))
   const firstBlockedWarning = Array.isArray(firstBlockedNode?.capacity_warnings)
@@ -126,15 +126,22 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
     ? ''
     : nodes.length === 0
       ? (knownNodeCount > 0
-        ? '你的开发环境当前不在线。请启动本机 PC 节点，登录后再刷新页面。'
-        : '还没有检测到你的开发环境。请先启动本机 PC 节点，登录后它会自动绑定到当前账号。')
+        ? '你之前连接过一台电脑，但它现在不在线。请在那台电脑启动“一龙开发平台”，并登录当前账号。'
+        : '项目文件需要创建在你的电脑上。请先安装并启动“一龙开发平台”，登录当前账号。')
       : selectableNodeCount === 0
-        ? (firstBlockedWarning || '在线开发环境暂不能创建项目，请到节点页检查运行时和容量状态。')
+        ? (firstBlockedWarning
+          ? `电脑已连接，但暂时不能创建项目。原因：${firstBlockedWarning}`
+          : '电脑已连接，但暂时不能创建项目。请打开开发平台查看详情。')
         : ''
   const showNodeRecovery = !nodesLoading && (!selectedNode || !!nodesError || selectableNodeCount === 0)
+  const nodeRecoveryTitle = nodesError
+    ? '无法读取电脑状态'
+    : nodes.length === 0
+      ? (knownNodeCount > 0 ? '电脑暂时未连接' : '需要先连接你的电脑')
+      : '电脑已连接，但暂时不能创建项目'
   const nodeSelect = (
     <label className={styles.field}>
-      <span>开发环境</span>
+      <span>项目创建位置</span>
       <select
         value={selectedNode}
         onChange={(e) => setSelectedNode(e.target.value)}
@@ -155,11 +162,11 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
       {showNodeRecovery && (
         <div className={styles.nodeRecovery} role="status" aria-live="polite">
           <div className={styles.nodeRecoveryText}>
-            <strong>{nodesError ? '节点状态读取失败' : nodeSelectStatus}</strong>
+            <strong>{nodeRecoveryTitle}</strong>
             <span>
               {nodesError
-                ? '可以重新检测；如果仍失败，请打开节点管理检查客户端连接。'
-                : '项目目录需要创建在在线 PC 节点上。启动客户端后，这个窗口会自动检测并恢复创建。'}
+                ? '请先点击“我已启动，重新检测”；如果仍失败，再打开开发平台检查登录状态。'
+                : '项目文件会创建在你的电脑上。安装并启动“一龙开发平台”后，这个窗口会自动检测。'}
             </span>
           </div>
           <div className={styles.nodeRecoveryActions}>
@@ -169,10 +176,10 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
               onClick={() => void loadNodes()}
               disabled={nodesLoading}
             >
-              重新检测
+              我已启动，重新检测
             </button>
             <button type="button" className={styles.linkBtn} onClick={() => navigate('/node')}>
-              打开节点管理
+              安装/启动开发平台
             </button>
           </div>
         </div>
