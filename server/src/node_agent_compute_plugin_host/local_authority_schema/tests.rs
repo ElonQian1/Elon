@@ -57,6 +57,27 @@ fn schema_installs_and_reopens_with_candidate_health_and_cleanup_objects() {
             |row| row.get(0),
         )
         .unwrap();
+    let cleanup_execution_table_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('candidate_cleanup_execution_plans', 'candidate_cleanup_expected_objects', 'candidate_cleanup_execution_plan_seals', 'candidate_cleanup_step_events')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    let cleanup_execution_trigger_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND tbl_name IN ('candidate_cleanup_execution_plans', 'candidate_cleanup_expected_objects', 'candidate_cleanup_execution_plan_seals', 'candidate_cleanup_step_events')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    let cleanup_completion_journal_gate_count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND name = 'candidate_cleanup_completion_requires_execution_journal'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
     let owner_schema: String = connection
         .query_row(
             "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'candidate_owners'",
@@ -91,7 +112,10 @@ fn schema_installs_and_reopens_with_candidate_health_and_cleanup_objects() {
     assert_eq!(quarantine_table_count, 1);
     assert_eq!(quarantine_trigger_count, 3);
     assert_eq!(cleanup_table_count, 2);
-    assert_eq!(cleanup_trigger_count, 6);
+    assert_eq!(cleanup_trigger_count, 7);
+    assert_eq!(cleanup_execution_table_count, 4);
+    assert_eq!(cleanup_execution_trigger_count, 12);
+    assert_eq!(cleanup_completion_journal_gate_count, 1);
     assert!(owner_schema.contains("cleanup_pending"));
     assert!(owner_schema.contains("cleaned"));
     assert_eq!(owner_transition_count, 2);

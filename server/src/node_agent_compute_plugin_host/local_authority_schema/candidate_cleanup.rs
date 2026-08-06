@@ -65,9 +65,17 @@ CREATE TABLE candidate_cleanup_completions (
         length(authorization_receipt_digest) = 64
         AND authorization_receipt_digest NOT GLOB '*[^0-9a-f]*'
     ),
+    execution_plan_digest               TEXT NOT NULL UNIQUE CHECK (
+        length(execution_plan_digest) = 64
+        AND execution_plan_digest NOT GLOB '*[^0-9a-f]*'
+    ),
     execution_evidence_digest          TEXT NOT NULL UNIQUE CHECK (
         length(execution_evidence_digest) = 64
         AND execution_evidence_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    terminal_journal_digest            TEXT NOT NULL UNIQUE CHECK (
+        length(terminal_journal_digest) = 64
+        AND terminal_journal_digest NOT GLOB '*[^0-9a-f]*'
     ),
     authority_state_revision_before    INTEGER NOT NULL CHECK (
         authority_state_revision_before > 0

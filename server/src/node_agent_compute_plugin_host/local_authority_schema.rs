@@ -3,6 +3,8 @@ use rusqlite::{params, Connection, TransactionBehavior};
 
 mod authority_fences;
 mod candidate_cleanup;
+mod candidate_cleanup_execution;
+mod candidate_cleanup_journal;
 mod candidate_health;
 mod candidate_health_quarantine;
 mod candidate_staging;
@@ -20,6 +22,10 @@ const REQUIRED_TABLES: &[&str] = &[
     "candidate_health_quarantine_receipts",
     "candidate_cleanup_authorizations",
     "candidate_cleanup_completions",
+    "candidate_cleanup_execution_plan_seals",
+    "candidate_cleanup_execution_plans",
+    "candidate_cleanup_expected_objects",
+    "candidate_cleanup_step_events",
     "candidate_owners",
     "candidate_staging_receipts",
     "candidate_verification_runs",
@@ -139,6 +145,12 @@ fn create_schema_objects(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(candidate_cleanup::CANDIDATE_CLEANUP_SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_CLEANUP_SCHEMA_CREATE_V3")?;
+    connection
+        .execute_batch(candidate_cleanup_execution::CANDIDATE_CLEANUP_EXECUTION_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_CLEANUP_EXECUTION_SCHEMA_CREATE_V3")?;
+    connection
+        .execute_batch(candidate_cleanup_journal::CANDIDATE_CLEANUP_JOURNAL_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_CLEANUP_JOURNAL_SCHEMA_CREATE_V3")?;
     connection
         .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V3")?;
