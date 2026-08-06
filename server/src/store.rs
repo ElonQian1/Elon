@@ -7,6 +7,11 @@ mod account_identities;
 #[cfg(test)]
 mod account_identities_tests;
 pub(crate) use account_identities::*;
+mod account_security;
+mod account_security_support;
+#[cfg(test)]
+mod account_security_tests;
+pub(crate) use account_security::*;
 mod admin_stats;
 mod admin_stats_quotas;
 mod ai_resource_policies;
@@ -266,7 +271,7 @@ pub use codex_vault::{CodexVaultRecord, CodexVaultSlotRecord};
 pub(crate) use codex_vault_emergency_delivery_guard::CodexVaultEmergencyCredentialDeliveryClaim;
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
-    safe_external_id, validate_password, verify_password,
+    password_needs_rehash, safe_external_id, validate_password, verify_password,
 };
 pub(crate) use compute_activation_applications::ApplyComputeActivationPlan;
 pub(crate) use compute_activation_lifecycle::SupersedeComputeActivationEvidenceRequest;

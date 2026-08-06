@@ -439,6 +439,15 @@ export interface AiProviderAccount {
   logout_supported?: boolean
   credential_owner?: string
   credential_storage?: string
+  credential_vault?: {
+    schema?: string
+    backup_supported?: boolean
+    restore_supported?: boolean
+    explicit_consent_required?: boolean
+    automatic_backup?: boolean
+    credential_export_to_ui?: boolean
+    reason_code?: string
+  }
   reason?: string | null
   enabled?: boolean
   blocked_reason_code?: string | null
@@ -460,7 +469,28 @@ export interface AiProviderAccountsResponse {
   schema?: string
   schema_version?: number
   transport?: { local?: string; ownerRelay?: string }
+  state_machine?: Record<string, unknown>
   providers: AiProviderAccount[]
+}
+
+export interface AiProviderDiagnosticsResponse {
+  ok?: boolean
+  schema?: string
+  latest_attempts?: Array<{
+    login_id?: string
+    provider_id?: string
+    state?: string
+    recovered?: boolean
+    retryable?: boolean
+    next_action?: string
+    error_code?: string | null
+  }>
+  journal?: {
+    sanitized?: boolean
+    retention_hours?: number
+    max_attempts?: number
+    secrets_persisted?: boolean
+  }
 }
 
 export interface AiProviderLoginResponse {

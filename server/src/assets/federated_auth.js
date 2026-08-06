@@ -1,8 +1,22 @@
 (function () {
   'use strict';
   const TOKEN_KEY = 'lodex_token';
+  const CLIENT_KEY = 'elon_federated_auth_client_instance_id';
   const token = () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem('elon_token') || '';
   let googleScript;
+
+  function randomId() {
+    return crypto.randomUUID ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(16).slice(2);
+  }
+
+  function clientInstanceId() {
+    let value = localStorage.getItem(CLIENT_KEY);
+    if (!value) {
+      value = 'web:' + randomId();
+      localStorage.setItem(CLIENT_KEY, value);
+    }
+    return value;
+  }
 
   async function api(path, options) {
     const headers = Object.assign(
@@ -45,8 +59,12 @@
       }
       const challenge = await api('/api/auth/federation/google/challenges', {
         method: 'POST',
-        body: JSON.stringify({ mode, platform: 'web' })
+        body: JSON.stringify({
+          mode, platform: 'web', request_id: 'web:challenge:' + randomId(),
+          client_instance_id: clientInstanceId()
+        })
       });
+      const completionRequestId = 'web:complete:' + randomId();
       await loadGoogle();
       host.replaceChildren();
       window.google.accounts.id.initialize({
@@ -62,7 +80,9 @@
                 challenge_id: challenge.id,
                 id_token: credential.credential,
                 remember_device: true,
-                device_name: 'Mobile Web'
+                device_name: 'Mobile Web',
+                request_id: completionRequestId,
+                client_instance_id: clientInstanceId()
               })
             });
             await onComplete(result);

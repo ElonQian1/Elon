@@ -76,6 +76,33 @@ pub enum IdentityError {
 }
 
 impl Store {
+    pub fn record_identity_audit_event(
+        &self,
+        user_id: Option<&str>,
+        provider: &str,
+        action: &str,
+        outcome: &str,
+        request_id: Option<&str>,
+        reason_code: Option<&str>,
+    ) -> Result<(), IdentityError> {
+        self.conn()?.execute(
+            "INSERT INTO auth_identity_audit
+             (id, user_id, provider, action, outcome, request_id, reason_code, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![
+                new_id("ida"),
+                user_id,
+                provider,
+                action,
+                outcome,
+                request_id,
+                reason_code,
+                now()
+            ],
+        )?;
+        Ok(())
+    }
+
     pub fn create_identity_challenge(
         &self,
         provider: &str,

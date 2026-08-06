@@ -10,6 +10,7 @@
   const list = document.getElementById('aiProviderAccountsList');
   const refresh = document.getElementById('aiProviderAccountsRefresh');
   const close = document.getElementById('aiProviderAccountsClose');
+  const diagnostics = document.getElementById('aiProviderAccountsDiagnostics');
   let nodes = [];
   let pollTimer = 0;
 
@@ -98,6 +99,8 @@
     if (provider.implementation_state === 'reserved') return '接口已保留';
     if (isActive(provider.active_login)) return '等待用户完成登录';
     if (provider.active_login?.state === 'failed') return '上次登录失败';
+    if (provider.active_login?.state === 'canceled') return '登录已取消，可重新发起';
+    if (provider.active_login?.state === 'expired') return '登录已过期，可重新发起';
     if (provider.cli?.logged_in === true) return '已登录';
     if (!provider.cli?.runnable) return 'CLI 未安装或不可运行';
     return '未登录';
@@ -112,7 +115,10 @@
     if (isActive(attempt) && provider.id === 'gemini_cli') {
       return 'Google 官方登录已在所选 Win 节点启动，请回到该电脑完成浏览器授权。';
     }
-    if (attempt?.error) return attempt.error;
+    if (attempt?.error) return attempt.error + (['failed', 'canceled', 'expired'].includes(attempt.state) ? '\n可以安全地重新发起登录。' : '');
+    if (provider.cli?.logged_in === true && provider.credential_vault?.backup_supported) {
+      return '凭据由官方 CLI 保存；只有明确同意后才会进入现有 Codex 加密保险箱。';
+    }
     if (provider.cli?.logged_in === true) return '凭据由官方 CLI 保存在 Win 节点。';
     return provider.cli?.detail || provider.cli?.reason || '通过官方协议绑定所选 Win 节点。';
   }
@@ -193,7 +199,10 @@
       } else {
         const flow = provider.id === 'codex_cli' ? 'device_code' : 'agent';
         const result = await requestJson(relayUrl(node.id, provider.id, ['login']), {
-          method: 'POST', body: JSON.stringify({ flow })
+          method: 'POST', body: JSON.stringify({
+            flow,
+            request_id: 'mobile-web:' + (crypto.randomUUID ? crypto.randomUUID() : Date.now())
+          })
         });
         if (provider.id === 'codex_cli') await openOfficialLogin(result.attempt || {});
         if (provider.id === 'gemini_cli') {
@@ -230,6 +239,21 @@
     catch (error) { status.textContent = '加载失败：' + String(error.message || error).slice(0, 300); }
   }
 
+  async function loadDiagnostics() {
+    const node = selectedNode();
+    if (!node?.online) return;
+    status.textContent = '正在读取脱敏恢复诊断…';
+    try {
+      const result = await requestJson(relayUrl(node.id, null, ['diagnostics']), { cache: 'no-store' });
+      const retryable = (result.latest_attempts || []).filter((attempt) => attempt.retryable);
+      status.textContent = '脱敏日志保留 ' + (result.journal?.retention_hours || 24)
+        + ' 小时；可重试任务 ' + retryable.length
+        + ' 个。验证码、授权地址和厂商 token 均不会显示。';
+    } catch (error) {
+      status.textContent = '诊断失败：' + String(error.message || error).slice(0, 240);
+    }
+  }
+
   function closePanel() {
     clearTimeout(pollTimer);
     mask.classList.remove('active');
@@ -239,6 +263,7 @@
   refresh.addEventListener('click', () => loadNodes().catch((error) => {
     status.textContent = '刷新失败：' + String(error.message || error).slice(0, 300);
   }));
+  diagnostics?.addEventListener('click', loadDiagnostics);
   nodeSelect.addEventListener('change', () => loadAccounts().catch((error) => {
     status.textContent = '加载失败：' + String(error.message || error).slice(0, 300);
   }));

@@ -28,6 +28,7 @@ internal data class AiProviderLoginAttempt(
     val errorCode: String?,
 ) {
     val active: Boolean get() = state == "starting" || state == "waiting_for_user"
+    val retryable: Boolean get() = state == "failed" || state == "canceled" || state == "expired"
 }
 
 internal data class AiProviderAccount(
@@ -40,6 +41,7 @@ internal data class AiProviderAccount(
     val cliRunnable: Boolean,
     val cliLoggedIn: Boolean?,
     val cliDetail: String?,
+    val vaultBackupSupported: Boolean,
     val activeLogin: AiProviderLoginAttempt?,
 )
 
@@ -101,6 +103,20 @@ internal class AiProviderAccountsApi(
         executeJson(authenticated(request))
     }
 
+    fun diagnosticsSummary(nodeId: String): String {
+        val root = executeJson(authenticated(Request.Builder().url(providerUrl(nodeId, "diagnostics"))))
+        val attempts = root.optJSONArray("latest_attempts")
+        var retryable = 0
+        if (attempts != null) {
+            for (index in 0 until attempts.length()) {
+                if (attempts.optJSONObject(index)?.optBoolean("retryable") == true) retryable += 1
+            }
+        }
+        val journal = root.optJSONObject("journal")
+        val hours = journal?.optInt("retention_hours", 24) ?: 24
+        return "脱敏日志保留 ${hours} 小时；最近可重试任务 ${retryable} 个。验证码、授权地址和厂商 token 均不进入诊断。"
+    }
+
     private fun authenticated(builder: Request.Builder): Request =
         AuthManager.applyAuth(context, builder).build()
 
@@ -143,6 +159,8 @@ internal class AiProviderAccountsApi(
                 else null
             },
             cliDetail = cli?.optionalString("detail") ?: cli?.optionalString("reason"),
+            vaultBackupSupported = value.optJSONObject("credential_vault")
+                ?.optBoolean("backup_supported", false) ?: false,
             activeLogin = value.optJSONObject("active_login")?.let(::parseAttempt),
         )
     }

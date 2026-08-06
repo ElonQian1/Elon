@@ -62,6 +62,7 @@ class AiProviderAccountsActivity : AppCompatActivity() {
         status = findViewById(R.id.aiProviderStatus)
         providerContainer = findViewById(R.id.aiProviderContainer)
         findViewById<Button>(R.id.aiProviderRefresh).setOnClickListener { loadNodes() }
+        findViewById<Button>(R.id.aiProviderDiagnostics).setOnClickListener { loadDiagnostics() }
         nodeSpinner.onItemSelectedListener = SimpleItemSelectedListener { position ->
             if (spinnerReady) nodes.getOrNull(position)?.let(::loadAccounts)
         }
@@ -197,6 +198,13 @@ class AiProviderAccountsActivity : AppCompatActivity() {
         if (node?.online == true) return node
         Toast.makeText(this, "请选择在线 Win 节点", Toast.LENGTH_SHORT).show()
         return null
+    }
+
+    private fun loadDiagnostics() {
+        val node = selectedOnlineNode() ?: return
+        launchRequest("正在读取脱敏诊断…") {
+            status.text = withContext(Dispatchers.IO) { api.diagnosticsSummary(node.id) }
+        }
     }
 
     private fun launchRequest(message: String, block: suspend () -> Unit) {

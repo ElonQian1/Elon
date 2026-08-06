@@ -21,7 +21,9 @@
 ```text
 users (一龙账号)
   ├─ password_login_enabled
-  ├─ sessions (一龙会话，可撤销)
+  ├─ password_hash (PBKDF2-SHA256；旧 SHA256 登录成功后升级)
+  ├─ account_recovery_codes (只保存哈希，一次性使用)
+  ├─ sessions (一龙会话，可逐个撤销)
   └─ user_identities (0..N 个联合身份)
        └─ google / canonical issuer / immutable sub
 ```
@@ -35,6 +37,20 @@ users (一龙账号)
 5. 解绑后必须仍有密码入口或另一个联合身份，防止用户把自己锁在账号外。
 6. 所有创建、绑定、冲突和解绑操作写入身份审计表。
 
+## 账号安全中心 V1
+
+Win、Android 与移动 Web 共用以下一龙账号合同：
+
+- `GET /api/auth/security`：返回密码、离线恢复码数量和当前有效会话。
+- `PUT /api/auth/password`：联合登录账号可首次设置密码；已有密码必须验证当前密码。成功后保留当前会话并撤销其他会话。
+- `POST /api/auth/recovery-codes/rotate`：明确确认后生成 8 个一次性恢复码；旧码立即撤销，明文只在本次响应显示。
+- `POST /api/auth/password/recover`：用账号、离线恢复码和新密码恢复；成功后消费恢复码并撤销全部旧会话，用户必须重新登录。
+- `GET /api/auth/sessions`、`DELETE /api/auth/sessions/:session_id`、`POST /api/auth/sessions/revoke-others`：设备会话查看与撤销。
+- `POST /api/auth/logout`：撤销当前会话，而不是只清理客户端本地状态。
+- `POST /api/auth/password/recovery/start`：邮件/短信恢复预留合同。当前固定返回 `delivery_configured: false`，不查询并泄露账号是否存在。
+
+新密码使用带随机盐、版本和迭代次数的 PBKDF2-HMAC-SHA256；旧版盐化 SHA256 仍可验证，但只在一次成功密码登录后就地升级。恢复码服务端只保存 SHA256 哈希、末四位和审计信息，不提供再次读取。账号安全变更通过 `request_id` 保证存储级幂等，并写入追加式 `auth_security_audit`；恢复入口另有进程内速率限制，生产部署仍必须配置网关/IP/WAF 周边限流。
+
 ## Win / Android / Web 统一合同
 
 ### 发现公开能力
@@ -45,10 +61,10 @@ users (一龙账号)
 
 ### 登录或绑定
 
-1. 客户端请求 `POST /api/auth/federation/google/challenges`，提交 `mode`（`login` / `bind`）和 `platform`。
+1. 客户端请求 `POST /api/auth/federation/google/challenges`，提交 `mode`（`login` / `bind`）、`platform`、`request_id` 和稳定的非秘密 `client_instance_id`。
 2. 服务端返回十分钟有效的 challenge 与高熵 nonce；数据库仅保存 nonce 哈希。
 3. 客户端把 nonce 交给 Google 官方组件，获得 Google ID token。
-4. 客户端请求 `POST /api/auth/federation/google/complete`。
+4. 客户端请求 `POST /api/auth/federation/google/complete`，重试同一次完成请求时复用同一 `request_id`。
 5. 服务端从 Google JWKS 验证 RS256 签名、issuer、audience、有效期、已验证邮箱和 nonce。
 6. `login` 返回新的一龙 session；`bind` 必须同时携带当前一龙 Bearer session。
 
@@ -58,6 +74,8 @@ users (一龙账号)
 - `DELETE /api/auth/identities/:identity_id`
 
 Win React、Android APK 与移动 Web 使用相同响应字段。Android 不打开自建 WebView 登录 Google，而使用系统 Credential Manager；Web 使用 Google Identity Services JavaScript。
+
+联合登录创建 challenge 和完成操作均有进程内有界限流，超限返回稳定错误码及 `Retry-After` 并写入脱敏审计。完成响应使用 5 分钟、最多 256 项的进程内精确重放缓存，缓存键绑定 challenge、request、客户端指纹；它允许断线后拿回同一结果，但不跨服务进程持久化 Bearer session。生产多副本部署需要把幂等结果迁到共享短时存储，或者由会话粘性和周边重放防护补足。
 
 ## AI Provider 控制面 V2
 
@@ -69,6 +87,22 @@ Win React、Android APK 与移动 Web 使用相同响应字段。Android 不打�
 - 日志不保存验证码、带 query/fragment 的授权 URL 或厂商 token。
 - 节点重启后，原活动任务恢复为 `failed + node_restarted`，客户端可准确提示重新发起。
 - 日志保留 24 小时，且最多保存 64 条任务。
+- 状态机固定为 `starting -> waiting_for_user -> completed/failed/canceled/expired`；终态不可被迟到事件覆盖，失败/取消/过期会显式给出 `retryable` 和 `next_action`。
+- `GET /api/ai-provider-accounts/diagnostics` 只返回 CLI 探测摘要、最近任务的状态/错误码和日志合同，不返回验证码、授权地址或 token。
+- Provider journal 使用同目录临时文件原子替换并保留上一个有效备份；主文件损坏时只从合法备份恢复，活动任务仍转为安全失败而不是假定登录完成。
+
+### 凭据保险箱合同
+
+CLI 登录成功不等于同意上传凭据。Provider V2 为每个 Provider 返回 `credential_vault`：
+
+- 当前只有 Codex 声明可通过现有 AES 密文保险箱备份，而且必须由用户逐次明确同意；默认 `automatic_backup: false`。
+- Win/APK/Web UI 均不得读取或导出凭据正文。恢复只允许写入受管临时 `CODEX_HOME`，再交给官方 Codex CLI 使用。
+- Gemini、Claude 与 Copilot 在没有公开、稳定的凭据导出/恢复合同前固定 `backup_supported: false`。
+- 用户登录一龙账号不会自动把任一厂商凭据复制到云端，也不会使另一台设备自动获得厂商登录态。
+
+### 官方网页版聊天预留适配器
+
+`chatgpt_web` 与 `gemini_web` 有类型化 `WebChatAdapterDescriptor` 和启动错误合同，但固定 `enabled: false`、`login_satisfiable_by_cli: false`。后续只有在厂商或内部测试合同明确会话建立、撤销、刷新、存储与用户同意边界后，才能新建独立实现；环境变量、CLI 登录状态和保险箱内容都不能绕过禁用状态。
 
 公开 Provider：
 
@@ -83,7 +117,15 @@ Win React、Android APK 与移动 Web 使用相同响应字段。Android 不打�
 
 ## 暂缓统一实测的项目
 
-以下代码可先通过编译、静态测试与模拟数据库测试，统一在获得配置后实测：
+当前已完成的非真实账号验收：
+
+- Rust `elon-server` 与 `elon-pc-node` 编译检查。
+- 账号安全临时 SQLite 测试：联合登录账号设密码、改密幂等/会话撤销、恢复码一次性消费。
+- 联合登录假数据测试：限流边界、精确重放缓存、nonce/audience 校验、本地伪 RSA 签名 Google JWT；不访问 Google 网络。
+- Provider 假协议测试：状态机、重启恢复、损坏 journal 备份恢复、Codex/Gemini 消息脱敏、保险箱显式同意和禁用 Web Chat 适配器。
+- PC Vite/TypeScript 构建与 ESLint、Android `compileDebugKotlin`、移动 Web JavaScript 语法检查。
+
+以下项目统一在获得配置后实测：
 
 - Google Cloud OAuth client、Android 包名/SHA 指纹、Web Authorized JavaScript origins。
 - 真实 Google 账号登录、绑定、冲突和解绑。

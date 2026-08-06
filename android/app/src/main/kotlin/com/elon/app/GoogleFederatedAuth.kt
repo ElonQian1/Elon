@@ -14,6 +14,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.UUID
 
 internal data class LinkedLoginIdentity(
     val id: String,
@@ -98,7 +99,11 @@ internal class GoogleFederatedAuth(
     }
 
     private fun createChallenge(mode: String): JSONObject {
-        val body = JSONObject().put("mode", mode).put("platform", "android")
+        val body = JSONObject()
+            .put("mode", mode)
+            .put("platform", "android")
+            .put("request_id", "apk:challenge:${UUID.randomUUID()}")
+            .put("client_instance_id", clientInstanceId())
         val builder = Request.Builder()
             .url("${baseUrl()}/api/auth/federation/google/challenges")
             .post(body.toString().toRequestBody(JSON))
@@ -112,6 +117,8 @@ internal class GoogleFederatedAuth(
             .put("remember_device", true)
             .put("device_name", android.os.Build.MODEL)
             .put("apk_version", BuildConfig.VERSION_NAME)
+            .put("request_id", "apk:complete:${UUID.randomUUID()}")
+            .put("client_instance_id", clientInstanceId())
         val builder = Request.Builder()
             .url("${baseUrl()}/api/auth/federation/google/complete")
             .post(body.toString().toRequestBody(JSON))
@@ -122,6 +129,14 @@ internal class GoogleFederatedAuth(
         AuthManager.applyAuth(activity, builder)
 
     private fun baseUrl() = ElonApplication.activeServerUrl(activity).trimEnd('/')
+
+    private fun clientInstanceId(): String {
+        val preferences = activity.getSharedPreferences("elon_auth_security", Activity.MODE_PRIVATE)
+        return preferences.getString("client_instance_id", null)?.takeIf(String::isNotBlank)
+            ?: "apk:${UUID.randomUUID()}".also {
+                preferences.edit().putString("client_instance_id", it).apply()
+            }
+    }
 
     private fun execute(request: Request): JSONObject = http.newCall(request).execute().use { response ->
         val body = response.body?.string().orEmpty()

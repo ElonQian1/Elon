@@ -12,7 +12,13 @@ fn provider_catalog_keeps_web_chat_as_explicitly_reserved() {
     let providers = payload["providers"].as_array().unwrap();
     assert_eq!(payload["schema"], "elon.ai_provider_accounts.v2");
     assert_eq!(payload["schema_version"], 2);
+    assert_eq!(payload["state_machine"]["terminal_immutable"], true);
     assert_eq!(providers[0]["protocol"], "codex_app_server_jsonrpc");
+    assert_eq!(
+        providers[0]["credential_vault"]["explicit_consent_required"],
+        true
+    );
+    assert_eq!(providers[0]["credential_vault"]["automatic_backup"], false);
     assert_eq!(providers[1]["protocol"], "acp_v1_stdio");
     assert_eq!(providers[2]["protocol"], "claude_auth_cli_v1");
     assert_eq!(providers[3]["protocol"], "copilot_oauth_web_flow_v1");
@@ -21,6 +27,10 @@ fn provider_catalog_keeps_web_chat_as_explicitly_reserved() {
     assert_eq!(providers[4]["implementation_state"], "reserved");
     assert_eq!(providers[4]["official_login"], false);
     assert_eq!(providers[4]["enabled"], false);
+    assert_eq!(
+        providers[4]["protocol"],
+        "official_web_chat_adapter_reserved_v1"
+    );
     assert_eq!(providers[4]["capabilities"]["web_chat"], false);
     assert_eq!(providers[5]["id"], "gemini_web");
     assert_eq!(providers[5]["implementation_state"], "reserved");

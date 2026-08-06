@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />
   <link rel="stylesheet" href="/assets/ai_provider_accounts.css" />
   <link rel="stylesheet" href="/assets/federated_auth.css" />
+  <link rel="stylesheet" href="/assets/account_security.css" />
   <style>
     :root {
       color-scheme: dark;
@@ -4320,6 +4321,18 @@
       <div class="federated-google-host" id="federatedLoginGoogle"></div>
       <div class="federated-status" id="federatedLoginStatus"></div>
     </div>
+    <button class="account-recovery-toggle" id="accountRecoveryToggle" type="button">无法登录？使用恢复码</button>
+    <div class="account-recovery-panel" id="accountRecoveryPanel">
+      <input id="accountRecoveryAccount" autocomplete="username" placeholder="账号" />
+      <input id="accountRecoveryCode" autocomplete="off" placeholder="离线恢复码" />
+      <input id="accountRecoveryPassword" type="password" autocomplete="new-password" placeholder="新密码（至少 8 位）" />
+      <input id="accountRecoveryConfirm" type="password" autocomplete="new-password" placeholder="再次输入新密码" />
+      <div class="account-recovery-actions">
+        <button id="accountRecoverySubmit" type="button">重置密码</button>
+        <button id="accountExternalRecovery" type="button">检查邮件/短信恢复</button>
+      </div>
+      <div class="account-security-status" id="accountRecoveryStatus">恢复成功后，所有旧会话都会撤销。</div>
+    </div>
     <div class="hint">网页版是 APK 版在电脑上的体现，所有数据与 APK 互通。</div>
   </form>
 </section>
@@ -4820,6 +4833,27 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <div class="federated-google-host" id="federatedBindGoogle"></div>
       <div class="federated-status" id="federatedBindStatus"></div>
       <p class="identity-security-note">同邮箱不会自动合并。请先登录原一龙账号，再主动绑定。</p>
+      <section class="account-security-section">
+        <h3>密码与恢复</h3>
+        <p class="account-security-summary" id="accountSecuritySummary">读取账号安全状态…</p>
+        <div class="account-security-form">
+          <input id="accountCurrentPassword" type="password" autocomplete="current-password" placeholder="当前密码（首次设置可留空）" />
+          <input id="accountNewPassword" type="password" autocomplete="new-password" placeholder="新密码（至少 8 位）" />
+          <input id="accountConfirmPassword" type="password" autocomplete="new-password" placeholder="再次输入新密码" />
+          <div class="account-security-actions">
+            <button id="accountPasswordChange" type="button">设置或修改密码</button>
+            <button id="accountRecoveryCodesRotate" type="button">生成新恢复码</button>
+            <button id="accountRecoveryCodesCopy" type="button">复制恢复码</button>
+          </div>
+        </div>
+        <pre class="account-recovery-codes" id="accountRecoveryCodes"></pre>
+        <div class="account-security-status" id="accountSecurityStatus"></div>
+      </section>
+      <section class="account-security-section">
+        <h3>登录设备与会话</h3>
+        <div class="account-session-list" id="accountSessionList"></div>
+        <div class="account-security-actions"><button id="accountRevokeOthers" type="button">退出其他设备</button></div>
+      </section>
     </section>
   </div>
 
@@ -5273,6 +5307,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <button class="btn-cancel" id="aiProviderAccountsRefresh" type="button">刷新</button>
     </div>
     <div class="ai-provider-status" id="aiProviderAccountsStatus">正在读取节点…</div>
+    <button class="btn-cancel" id="aiProviderAccountsDiagnostics" type="button">读取脱敏恢复诊断</button>
     <div class="ai-provider-list" id="aiProviderAccountsList"></div>
     <div class="actions">
       <button type="button" class="btn-cancel" id="aiProviderAccountsClose">关闭</button>
@@ -11660,6 +11695,7 @@ if ('serviceWorker' in navigator) {
 <script src="/assets/project_home.js"></script>
 <script src="/assets/ai_provider_accounts.js"></script>
 <script src="/assets/federated_auth.js"></script>
+<script src="/assets/account_security.js"></script>
 <style>
   body.ui-tuner-preview-active #uiTunerPreviewSelection {
     position: fixed;

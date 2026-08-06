@@ -50,6 +50,7 @@ private fun AiProviderAccount.statusText(): String = when {
     activeLogin?.state == "waiting_for_user" -> "等待用户完成登录"
     activeLogin?.state == "failed" -> "上次登录失败"
     activeLogin?.state == "canceled" -> "登录已取消"
+    activeLogin?.state == "expired" -> "登录已过期"
     cliLoggedIn == true -> "已登录"
     !cliRunnable -> "CLI 未安装或不可运行"
     else -> "未登录"
@@ -67,7 +68,9 @@ private fun AiProviderAccount.detailText(): String = when {
         "Anthropic 官方登录已在所选 Win 节点启动，请回到该电脑完成浏览器授权。"
     activeLogin?.active == true && id == "copilot_cli" ->
         "GitHub 官方登录已在所选 Win 节点启动，请回到该电脑完成浏览器授权。"
-    activeLogin?.error != null -> activeLogin.error
+    activeLogin?.error != null -> activeLogin.error + if (activeLogin.retryable) "\n可以安全地重新发起登录。" else ""
+    cliLoggedIn == true && vaultBackupSupported ->
+        "凭据由官方 CLI 保存；只有用户明确同意时才会进入现有 Codex 加密保险箱。"
     cliLoggedIn == true -> "凭据仅由官方 CLI 保存在 Win 节点；APK 与云端不保存凭据。"
     !cliRunnable -> cliDetail ?: "请先在所选 Win 节点安装官方 CLI。"
     id == "gemini_cli" && !remoteLoginSupported ->

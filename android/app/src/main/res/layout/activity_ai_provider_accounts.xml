@@ -60,6 +60,16 @@
         android:textColor="@color/elon_text_tertiary"
         android:textSize="12sp" />
 
+    <Button
+        android:id="@+id/aiProviderDiagnostics"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="@color/elon_button_secondary_bg"
+        android:text="读取脱敏恢复诊断"
+        android:textColor="@color/elon_button_secondary_text"
+        android:textSize="12sp" />
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"

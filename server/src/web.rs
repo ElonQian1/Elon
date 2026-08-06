@@ -135,6 +135,8 @@ const AI_PROVIDER_ACCOUNTS_CSS: &str = include_str!("assets/ai_provider_accounts
 const AI_PROVIDER_ACCOUNTS_JS: &str = include_str!("assets/ai_provider_accounts.js");
 const FEDERATED_AUTH_CSS: &str = include_str!("assets/federated_auth.css");
 const FEDERATED_AUTH_JS: &str = include_str!("assets/federated_auth.js");
+const ACCOUNT_SECURITY_CSS: &str = include_str!("assets/account_security.css");
+const ACCOUNT_SECURITY_JS: &str = include_str!("assets/account_security.js");
 const VOICE_TTS_SDK_JS: &str = include_str!("assets/voice_tts_sdk.js");
 const ELON_ROUTE_C_SDK_JS: &str = include_str!("assets/elon_route_c_sdk.js");
 const UI_TUNER_PWA_AUTH_BOOTSTRAP_JS: &str = include_str!("assets/ui_tuner_pwa_auth_bootstrap.js");
@@ -605,6 +607,29 @@ pub async fn federated_auth_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         FEDERATED_AUTH_JS,
+    )
+}
+
+pub async fn account_security_css() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        ACCOUNT_SECURITY_CSS,
+    )
+}
+
+pub async fn account_security_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        ACCOUNT_SECURITY_JS,
     )
 }
 

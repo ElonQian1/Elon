@@ -204,6 +204,18 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/loginRecoveryButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:text="无法登录？使用恢复码"
+            android:textColor="@color/elon_text_secondary"
+            android:textSize="13sp" />
+
+        <TextView
             android:id="@+id/loginSkipButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

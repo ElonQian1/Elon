@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use super::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
-    validate_password, verify_password, AdminProjectDetail, AdminSessionEntry, AdminUserSummary,
-    PublicUser, Store,
+    password_needs_rehash, validate_password, verify_password, AdminProjectDetail,
+    AdminSessionEntry, AdminUserSummary, PublicUser, Store,
 };
 
 const STANDARD_SESSION_DAYS: i64 = 30;
@@ -92,6 +92,12 @@ impl Store {
         if !verify_password(password, &row.3) {
             return Err(anyhow!("密码错误"));
         }
+        if password_needs_rehash(&row.3) {
+            self.conn()?.execute(
+                "UPDATE users SET password_hash = ?1, password_changed_at = COALESCE(password_changed_at, ?2), updated_at = ?2 WHERE id = ?3",
+                params![hash_password(password), now(), row.0],
+            )?;
+        }
 
         let user = PublicUser {
             id: row.0,
@@ -130,8 +136,8 @@ impl Store {
         self.conn()?.execute(
             "INSERT INTO sessions (
                 id, user_id, token_hash, device_name, apk_version, expires_at, created_at,
-                trusted_device
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                trusted_device, last_seen_at
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?7)",
             params![
                 session_id,
                 user_id,
@@ -160,7 +166,8 @@ impl Store {
                  expires_at = ?1,
                  device_name = COALESCE(?2, device_name)
              WHERE token_hash = ?3
-               AND expires_at > ?4",
+               AND expires_at > ?4
+               AND revoked_at IS NULL",
             params![
                 expires_at,
                 clean_optional(device_name),
@@ -189,6 +196,7 @@ impl Store {
                  JOIN users u ON u.id = s.user_id
                  WHERE s.token_hash = ?1
                    AND s.expires_at > ?2
+                   AND s.revoked_at IS NULL
                    AND u.status = 'active'",
                 params![token_hash, now()],
                 |row| {
@@ -209,6 +217,14 @@ impl Store {
             .optional()?
             .ok_or_else(|| anyhow!("登录已过期，请重新登录"))?
         };
+        let seen_at = now();
+        let seen_cutoff = (Utc::now() - Duration::minutes(5)).to_rfc3339();
+        self.conn()?.execute(
+            "UPDATE sessions SET last_seen_at = ?1
+             WHERE token_hash = ?2 AND revoked_at IS NULL
+               AND (last_seen_at IS NULL OR last_seen_at < ?3)",
+            params![seen_at, token_hash, seen_cutoff],
+        )?;
         Ok(user)
     }
 
@@ -352,7 +368,7 @@ impl Store {
                     s.device_name, s.apk_version, s.expires_at, s.created_at
              FROM sessions s
              LEFT JOIN users u ON u.id = s.user_id
-             WHERE s.expires_at > ?1
+             WHERE s.expires_at > ?1 AND s.revoked_at IS NULL
              ORDER BY s.created_at DESC",
         )?;
 

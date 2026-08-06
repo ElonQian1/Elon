@@ -18,6 +18,7 @@
 }
 
 .header { justify-content: space-between; gap: 12px; }
+.headerActions { display: flex; gap: 6px; }
 .header span { display: block; color: var(--text-muted); font-size: 11px; font-weight: 800; margin-bottom: 3px; }
 .header h4 { margin: 0; font-size: 14px; }
 
@@ -107,6 +108,9 @@
   line-height: 1.45;
 }
 .safetyNote svg { flex: 0 0 auto; margin-top: 1px; color: #4caf78; }
+.diagnostics { display: grid; gap: 3px; padding: 9px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: rgba(76, 175, 120, .05); }
+.diagnostics strong { color: var(--text-primary); font-size: 11px; }
+.diagnostics span { color: var(--text-muted); font-size: 11px; line-height: 1.4; }
 .loading { color: var(--text-muted); font-size: 11px; padding: 8px 0; }
 
 @media (max-width: 640px) {

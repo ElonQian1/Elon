@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/auth'
 import type { ApiError } from '../../api/client'
 import { getPcLegacyUrl } from '../shell/pcLegacyUrl'
 import GoogleIdentityButton from './GoogleIdentityButton'
+import PasswordRecoveryPanel from './PasswordRecoveryPanel'
 import styles from './LoginPage.module.css'
 
 export default function LoginPage() {
@@ -87,6 +88,7 @@ export default function LoginPage() {
         </form>
         {mode === 'login' && (
           <>
+            <PasswordRecoveryPanel initialAccount={username} />
             <div className={styles.divider}><span>或</span></div>
             <GoogleIdentityButton
               mode="login"

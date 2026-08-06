@@ -4,6 +4,7 @@ import { nodeApi } from './localNodeApi'
 import type {
   AiProviderAccount,
   AiProviderAccountsResponse,
+  AiProviderDiagnosticsResponse,
   AiProviderLoginAttempt,
   AiProviderLoginResponse,
 } from './types'
@@ -17,6 +18,7 @@ export default function AiProviderAccountsCard({ adminUrl }: { adminUrl: string 
   const [busyProvider, setBusyProvider] = useState('')
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const [diagnostics, setDiagnostics] = useState<AiProviderDiagnosticsResponse | null>(null)
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setNotice('正在读取官方账号状态…'); setError('') }
@@ -140,6 +142,22 @@ export default function AiProviderAccountsCard({ adminUrl }: { adminUrl: string 
     }
   }
 
+  async function loadDiagnostics() {
+    setError('')
+    try {
+      const data = await nodeApi<AiProviderDiagnosticsResponse>(
+        adminUrl,
+        '/api/ai-provider-accounts/diagnostics',
+        {},
+        12000,
+      )
+      setDiagnostics(data)
+      setNotice('已读取脱敏诊断；不会显示验证码、授权 URL 或厂商 token。')
+    } catch (reason) {
+      setError((reason as Error).message)
+    }
+  }
+
   return (
     <section className={styles.card}>
       <header className={styles.header}>
@@ -147,9 +165,14 @@ export default function AiProviderAccountsCard({ adminUrl }: { adminUrl: string 
           <span>AI 厂商账号</span>
           <h4>官方 CLI 登录中心</h4>
         </div>
-        <button type="button" className={styles.iconButton} onClick={() => load()} aria-label="刷新厂商账号">
-          <RefreshCw size={15} />
-        </button>
+        <div className={styles.headerActions}>
+          <button type="button" className={styles.iconButton} onClick={loadDiagnostics} aria-label="读取脱敏诊断">
+            <ShieldCheck size={15} />
+          </button>
+          <button type="button" className={styles.iconButton} onClick={() => load()} aria-label="刷新厂商账号">
+            <RefreshCw size={15} />
+          </button>
+        </div>
       </header>
       <p className={styles.intro}>
         登录由各厂商公开的官方 CLI 流程完成。一龙不接管 OAuth token，也不会把 CLI 登录伪装成网页版聊天接口。
@@ -197,6 +220,18 @@ export default function AiProviderAccountsCard({ adminUrl }: { adminUrl: string 
         <ShieldCheck size={15} />
         <span>Codex 可显式进入现有加密保险箱；Gemini、Claude 和 Copilot 凭据继续留在各自官方 CLI 或系统凭据存储。</span>
       </div>
+      {diagnostics && (
+        <div className={styles.diagnostics}>
+          <strong>脱敏恢复诊断</strong>
+          <span>
+            日志保留 {diagnostics.journal?.retention_hours ?? 24} 小时；
+            最近任务 {(diagnostics.latest_attempts ?? []).length} 个；凭据正文不会持久化。
+          </span>
+          {(diagnostics.latest_attempts ?? []).filter((item) => item.retryable).map((item) => (
+            <span key={item.login_id}>{providerLabel(item.provider_id || '')}：{item.error_code || item.state}，可重新发起登录。</span>
+          ))}
+        </div>
+      )}
       {notice && <p className={styles.notice}>{notice}</p>}
       {error && <p className={styles.error}>{error}</p>}
     </section>
@@ -252,7 +287,7 @@ function ProviderRow({
 }
 
 function providerDescription(provider: AiProviderAccount): string {
-  if (provider.id === 'codex_cli') return 'App Server · 设备码/浏览器登录 · 可接 Codex 保险箱'
+  if (provider.id === 'codex_cli') return 'App Server · 设备码/浏览器登录 · 保险箱仅在明确同意后备份'
   if (provider.id === 'gemini_cli') return 'ACP v1 · Google 登录由 Gemini CLI 保管'
   if (provider.id === 'claude_cli') return '官方 auth login/status/logout · Claude Code 自主管理凭据'
   if (provider.id === 'copilot_cli') return '官方 OAuth Web Flow · Windows Credential Manager'

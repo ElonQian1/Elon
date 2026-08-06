@@ -1,0 +1,17 @@
+.account-recovery-toggle { min-height: 44px; border: 0; background: transparent; color: var(--ink-soft); font-size: 13px; }
+.account-recovery-panel { display: none; gap: 9px; margin-top: 6px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-3); }
+.account-recovery-panel.active { display: grid; }
+.account-recovery-panel input, .account-security-form input { min-height: 44px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); padding: 0 12px; }
+.account-recovery-actions, .account-security-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.account-recovery-actions button, .account-security-actions button, .account-session-row button { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); color: var(--ink-soft); padding: 0 12px; }
+.account-security-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+.account-security-section h3 { margin: 0 0 6px; font-size: 16px; }
+.account-security-summary, .account-security-status { margin: 0 0 10px; color: var(--ink-faint); font-size: 12px; line-height: 1.55; }
+.account-security-status.error { color: #ff7f7f; }
+.account-security-form { display: grid; gap: 8px; }
+.account-recovery-codes { display: none; margin: 10px 0 0; padding: 12px; overflow: auto; border-radius: 10px; background: var(--panel); color: var(--ink); font: 12px/1.7 monospace; user-select: text; }
+.account-recovery-codes.active { display: block; }
+.account-session-list { display: grid; gap: 8px; margin: 10px 0; }
+.account-session-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 10px; border-radius: 12px; background: var(--panel-3); }
+.account-session-copy strong, .account-session-copy span { display: block; }
+.account-session-copy span { margin-top: 3px; color: var(--ink-faint); font-size: 11px; }

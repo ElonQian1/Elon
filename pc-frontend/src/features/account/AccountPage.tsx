@@ -3,6 +3,7 @@ import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import UserAvatar from '../shell/UserAvatar'
 import LinkedIdentitiesCard from './LinkedIdentitiesCard'
+import AccountSecurityCard from './AccountSecurityCard'
 import styles from './AccountPage.module.css'
 
 interface Balance {
@@ -112,6 +113,7 @@ export default function AccountPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>账号与安全</h2>
           <LinkedIdentitiesCard />
+          <AccountSecurityCard />
         </section>
 
         {/* 修改昵称 */}

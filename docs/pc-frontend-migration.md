@@ -114,7 +114,7 @@ server/src/
 
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
-| 账号信息 + 登录方式 + 修改密码 | 🟡 中 | `src/features/account/AccountPage.tsx`、`src/features/account/LinkedIdentitiesCard.tsx`、`src/features/auth/GoogleIdentityButton.tsx` | 🟡 部分完成：账号信息、头像、昵称，以及 Google OIDC 登录、主动绑定、解绑和最后登录方式保护已完成并通过 PC 构建；真实 OAuth 配置/账号联调与修改密码入口仍待统一验收 |
+| 账号信息 + 登录方式 + 账号安全 | 🟡 中 | `src/features/account/AccountPage.tsx`、`src/features/account/LinkedIdentitiesCard.tsx`、`src/features/account/AccountSecurityCard.tsx`、`src/features/auth/GoogleIdentityButton.tsx`、`src/features/auth/PasswordRecoveryPanel.tsx` | 🟡 源码与编译级完成：账号信息、Google OIDC 登录/主动绑定/解绑/最后入口保护，以及设置或修改密码、一次性恢复码、设备会话撤销和登录页离线恢复均已接入并通过 PC 构建与 ESLint；真实 OAuth、真实账号、邮件/短信投递和页面视觉验收仍待统一执行 |
 | 绑定手机/邮箱 | 🟢 低 | `src/features/account/` | ⬜ 未开始 |
 | 积分/余额查看 | 🟢 低 | `src/features/account/AccountPage.tsx`、`src/features/billing/` | 🟡 部分完成：账号页已展示余额、试用额度和最近账单；独立账单分页/充值页继续补 |
 

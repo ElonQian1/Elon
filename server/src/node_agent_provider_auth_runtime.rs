@@ -20,8 +20,10 @@ use tokio::{
 };
 use uuid::Uuid;
 
+use crate::node_agent_provider_auth_attempt::transition_attempt as set_attempt_state;
 pub(crate) use crate::node_agent_provider_auth_attempt::ProviderLoginAttempt;
 use crate::node_agent_provider_auth_attempt_store::ProviderAuthAttemptStore;
+use crate::node_agent_provider_auth_monitor::{login_terminal_state, MonitorKind};
 use crate::node_agent_provider_auth_protocol::{
     client_info, codex_login_instructions, select_gemini_auth_method,
 };
@@ -495,12 +497,6 @@ impl ProviderAuthRuntime {
     }
 }
 
-#[derive(Clone, Copy)]
-enum MonitorKind {
-    Codex,
-    Gemini,
-}
-
 async fn monitor_process_login(
     mut child: Child,
     view: Arc<RwLock<ProviderLoginAttempt>>,
@@ -598,64 +594,6 @@ async fn monitor_login(
     }
     stdin.lock().await.take();
     stop_child(&mut child).await;
-}
-
-fn login_terminal_state(
-    kind: MonitorKind,
-    message: &Value,
-    upstream_login_id: Option<&str>,
-) -> Option<(&'static str, Option<String>)> {
-    match kind {
-        MonitorKind::Codex => {
-            if message.get("method")?.as_str()? != "account/login/completed" {
-                return None;
-            }
-            let params = message.get("params")?;
-            if let Some(expected) = upstream_login_id {
-                if params.get("loginId").and_then(Value::as_str) != Some(expected) {
-                    return None;
-                }
-            }
-            if params.get("success").and_then(Value::as_bool) == Some(true) {
-                Some(("completed", None))
-            } else {
-                Some((
-                    "failed",
-                    Some(safe_error(
-                        params
-                            .get("error")
-                            .and_then(Value::as_str)
-                            .unwrap_or("Codex 登录失败"),
-                    )),
-                ))
-            }
-        }
-        MonitorKind::Gemini => {
-            if message.get("id").and_then(Value::as_i64) != Some(2) {
-                return None;
-            }
-            if let Some(error) = message.get("error") {
-                Some(("failed", Some(rpc_error_message(error))))
-            } else {
-                Some(("completed", None))
-            }
-        }
-    }
-}
-
-async fn set_attempt_state(
-    view: &Arc<RwLock<ProviderLoginAttempt>>,
-    state: &str,
-    error: Option<String>,
-    error_code: Option<&str>,
-    journal: &ProviderAuthAttemptStore,
-) {
-    let mut view = view.write().await;
-    view.state = state.to_string();
-    view.error = error;
-    view.error_code = error_code.map(ToOwned::to_owned);
-    view.updated_at_ms = now_ms();
-    journal.upsert(&view);
 }
 
 async fn spawn_rpc_process(

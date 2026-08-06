@@ -115,10 +115,19 @@ pub async fn verify_google_id_token(
     expected_nonce_hash: &str,
 ) -> Result<VerifiedIdentity, GoogleIdentityError> {
     let config = GoogleOidcConfig::from_env().ok_or(GoogleIdentityError::NotConfigured)?;
-    let segments = token.trim().split('.').collect::<Vec<_>>();
-    if segments.len() != 3 || segments.iter().any(|segment| segment.is_empty()) {
-        return Err(GoogleIdentityError::MalformedToken);
-    }
+    let segments = token_segments(token)?;
+    let header: JwtHeader = decode_segment(segments[0])?;
+    let jwk = google_jwk(&header.kid).await?;
+    verify_google_id_token_with_jwk(token, expected_nonce_hash, &config, &jwk)
+}
+
+fn verify_google_id_token_with_jwk(
+    token: &str,
+    expected_nonce_hash: &str,
+    config: &GoogleOidcConfig,
+    jwk: &Jwk,
+) -> Result<VerifiedIdentity, GoogleIdentityError> {
+    let segments = token_segments(token)?;
     let header: JwtHeader = decode_segment(segments[0])?;
     if header.alg != "RS256" {
         return Err(GoogleIdentityError::UnsupportedAlgorithm);
@@ -129,18 +138,20 @@ pub async fn verify_google_id_token(
         .map_err(|_| GoogleIdentityError::MalformedToken)?;
     let signature = Signature::try_from(signature_bytes.as_slice())
         .map_err(|_| GoogleIdentityError::MalformedToken)?;
-    let jwk = google_jwk(&header.kid).await?;
+    if header.kid != jwk.kid {
+        return Err(GoogleIdentityError::InvalidSignature);
+    }
     if jwk.kty != "RSA" || jwk.alg.as_deref().is_some_and(|alg| alg != "RS256") {
         return Err(GoogleIdentityError::UnsupportedAlgorithm);
     }
     let modulus = BigUint::from_bytes_be(
         &URL_SAFE_NO_PAD
-            .decode(jwk.n)
+            .decode(&jwk.n)
             .map_err(|_| GoogleIdentityError::KeyServiceUnavailable)?,
     );
     let exponent = BigUint::from_bytes_be(
         &URL_SAFE_NO_PAD
-            .decode(jwk.e)
+            .decode(&jwk.e)
             .map_err(|_| GoogleIdentityError::KeyServiceUnavailable)?,
     );
     let public_key = RsaPublicKey::new(modulus, exponent)
@@ -152,7 +163,7 @@ pub async fn verify_google_id_token(
         )
         .map_err(|_| GoogleIdentityError::InvalidSignature)?;
 
-    validate_claims(&claims, &config, expected_nonce_hash)?;
+    validate_claims(&claims, config, expected_nonce_hash)?;
     Ok(VerifiedIdentity {
         provider: "google".to_string(),
         issuer: "https://accounts.google.com".to_string(),
@@ -162,6 +173,14 @@ pub async fn verify_google_id_token(
         avatar_url: claims.picture,
         nonce: claims.nonce.ok_or(GoogleIdentityError::InvalidNonce)?,
     })
+}
+
+fn token_segments(token: &str) -> Result<Vec<&str>, GoogleIdentityError> {
+    let segments = token.trim().split('.').collect::<Vec<_>>();
+    if segments.len() != 3 || segments.iter().any(|segment| segment.is_empty()) {
+        return Err(GoogleIdentityError::MalformedToken);
+    }
+    Ok(segments)
 }
 
 fn validate_claims(
@@ -298,6 +317,13 @@ fn parse_max_age(value: &str) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rsa::{
+        pkcs1v15::SigningKey,
+        rand_core::OsRng,
+        signature::{SignatureEncoding, Signer},
+        traits::PublicKeyParts,
+        RsaPrivateKey,
+    };
 
     #[test]
     fn cache_control_max_age_is_bounded_by_caller() {
@@ -337,5 +363,55 @@ mod tests {
             validate_claims(&claims, &wrong_config, &expected_nonce),
             Err(GoogleIdentityError::InvalidClaims)
         ));
+    }
+
+    #[test]
+    fn signed_rsa_token_verifies_without_calling_google_network() {
+        let nonce = "fake-oidc-nonce";
+        let client_id = "test-client.apps.googleusercontent.com";
+        let private_key = RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+        let public_key = private_key.to_public_key();
+        let header = URL_SAFE_NO_PAD.encode(
+            serde_json::to_vec(&serde_json::json!({"alg":"RS256","kid":"test-key"})).unwrap(),
+        );
+        let payload = URL_SAFE_NO_PAD.encode(
+            serde_json::to_vec(&serde_json::json!({
+                "iss":"https://accounts.google.com",
+                "sub":"signed-subject",
+                "aud":client_id,
+                "exp":Utc::now().timestamp() + 300,
+                "iat":Utc::now().timestamp(),
+                "nonce":nonce,
+                "email":"signed@example.com",
+                "email_verified":true,
+                "name":"Signed User"
+            }))
+            .unwrap(),
+        );
+        let signing_input = format!("{header}.{payload}");
+        let signature = SigningKey::<Sha256>::new(private_key).sign(signing_input.as_bytes());
+        let token = format!(
+            "{signing_input}.{}",
+            URL_SAFE_NO_PAD.encode(signature.to_bytes())
+        );
+        let jwk = Jwk {
+            kid: "test-key".to_string(),
+            kty: "RSA".to_string(),
+            alg: Some("RS256".to_string()),
+            n: URL_SAFE_NO_PAD.encode(public_key.n().to_bytes_be()),
+            e: URL_SAFE_NO_PAD.encode(public_key.e().to_bytes_be()),
+        };
+        let config = GoogleOidcConfig {
+            client_ids: vec![client_id.to_string()],
+        };
+        let verified = verify_google_id_token_with_jwk(
+            &token,
+            &hex::encode(Sha256::digest(nonce.as_bytes())),
+            &config,
+            &jwk,
+        )
+        .unwrap();
+        assert_eq!(verified.subject, "signed-subject");
+        assert_eq!(verified.email, "signed@example.com");
     }
 }

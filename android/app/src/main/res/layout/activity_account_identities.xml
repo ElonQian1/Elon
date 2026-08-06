@@ -61,5 +61,115 @@
             android:text="安全提示：同邮箱不会自动合并。请先登录原一龙账号，再从这里主动绑定。"
             android:textColor="@color/elon_text_tertiary"
             android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="密码与恢复"
+            android:textColor="@color/elon_text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/accountPasswordSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="读取账号安全状态…"
+            android:textColor="@color/elon_text_secondary"
+            android:textSize="13sp" />
+
+        <EditText
+            android:id="@+id/accountCurrentPassword"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/bg_input"
+            android:hint="当前密码（首次设置可留空）"
+            android:inputType="textPassword"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:textColor="@color/elon_text_primary"
+            android:textColorHint="@color/elon_text_tertiary" />
+
+        <EditText
+            android:id="@+id/accountNewPassword"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_input"
+            android:hint="新密码"
+            android:inputType="textPassword"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:textColor="@color/elon_text_primary"
+            android:textColorHint="@color/elon_text_tertiary" />
+
+        <EditText
+            android:id="@+id/accountConfirmPassword"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_input"
+            android:hint="再次输入新密码"
+            android:inputType="textPassword"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:textColor="@color/elon_text_primary"
+            android:textColorHint="@color/elon_text_tertiary" />
+
+        <Button
+            android:id="@+id/accountChangePasswordButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="@color/elon_button_secondary_bg"
+            android:text="设置或修改密码"
+            android:textColor="@color/elon_button_secondary_text" />
+
+        <Button
+            android:id="@+id/accountRotateRecoveryCodesButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="@color/elon_button_secondary_bg"
+            android:text="生成新的一组恢复码"
+            android:textColor="@color/elon_button_secondary_text" />
+
+        <TextView
+            android:id="@+id/accountSecurityStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center"
+            android:textColor="@color/elon_text_secondary"
+            android:textSize="12sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="登录设备与会话"
+            android:textColor="@color/elon_text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/accountSessionList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="vertical" />
+
+        <Button
+            android:id="@+id/accountRevokeOtherSessionsButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="20dp"
+            android:backgroundTint="@color/elon_button_secondary_bg"
+            android:text="退出其他设备"
+            android:textColor="@color/elon_button_secondary_text" />
     </LinearLayout>
 </ScrollView>

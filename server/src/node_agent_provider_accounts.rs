@@ -16,6 +16,9 @@ use std::{path::PathBuf, sync::Arc};
 use crate::{
     node_agent_cli_probe::{LocalCliProbeSnapshot, LocalCliToolStatus},
     node_agent_provider_auth_runtime::ProviderLoginAttempt,
+    node_agent_provider_diagnostics::state_machine_contract,
+    node_agent_provider_vault_contract::provider_vault_contract,
+    node_agent_web_chat_adapter::{reserved_web_chat_adapters, WebChatAdapterDescriptor},
     NodeRuntime,
 };
 
@@ -38,6 +41,7 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
             "/api/ai-provider-accounts/:provider_id/logout",
             post(logout_handler),
         )
+        .merge(crate::node_agent_provider_diagnostics::routes())
 }
 
 /// The provider account surface is callable either by the trusted local PC UI
@@ -262,10 +266,12 @@ pub(crate) fn accounts_payload(
     claude_attempt: Option<ProviderLoginAttempt>,
     copilot_attempt: Option<ProviderLoginAttempt>,
 ) -> Value {
+    let web_chat_adapters = reserved_web_chat_adapters();
     json!({
         "ok": true,
         "schema": "elon.ai_provider_accounts.v2",
         "schema_version": 2,
+        "state_machine": state_machine_contract(),
         "recovery": {
             "journal": "sanitized_local_node_store",
             "active_attempt_after_restart": "failed_node_restarted",
@@ -290,6 +296,7 @@ pub(crate) fn accounts_payload(
                 "logout_supported": true,
                 "credential_owner": "codex_cli",
                 "credential_storage": "official_cli_store_with_explicit_codex_vault_backup",
+                "credential_vault": provider_vault_contract("codex_cli"),
                 "capabilities": provider_capabilities(true, true, true, true),
                 "cli": cli_tool(probe, "codex_cli"),
                 "active_login": codex_attempt,
@@ -307,6 +314,7 @@ pub(crate) fn accounts_payload(
                 "logout_supported": true,
                 "credential_owner": "gemini_cli",
                 "credential_storage": "official_cli_store_only",
+                "credential_vault": provider_vault_contract("gemini_cli"),
                 "capabilities": provider_capabilities(true, true, false, true),
                 "cli": cli_tool(probe, "gemini_cli"),
                 "active_login": gemini_attempt,
@@ -324,6 +332,7 @@ pub(crate) fn accounts_payload(
                 "logout_supported": true,
                 "credential_owner": "claude_code",
                 "credential_storage": "official_cli_store_only",
+                "credential_vault": provider_vault_contract("claude_cli"),
                 "capabilities": provider_capabilities(true, true, false, true),
                 "cli": cli_tool(probe, "claude_cli"),
                 "active_login": claude_attempt,
@@ -341,44 +350,36 @@ pub(crate) fn accounts_payload(
                 "logout_supported": false,
                 "credential_owner": "copilot_cli",
                 "credential_storage": "official_cli_system_credential_store",
+                "credential_vault": provider_vault_contract("copilot_cli"),
                 "capabilities": provider_capabilities(true, false, false, true),
                 "cli": cli_tool_with_attempt(probe, "copilot_cli", copilot_attempt.as_ref()),
                 "active_login": copilot_attempt,
             },
-            reserved_provider(
-                "chatgpt_web",
-                "openai",
-                "ChatGPT 网页聊天",
-                "等待官方网页聊天嵌入或获批接口；Codex 登录不能冒充 ChatGPT 网页会话。"
-            ),
-            reserved_provider(
-                "gemini_web",
-                "google",
-                "Gemini 网页聊天",
-                "等待官方网页聊天嵌入或获批接口；Gemini CLI 登录不能冒充 Gemini 网页会话。"
-            )
+            reserved_provider(&web_chat_adapters[0]),
+            reserved_provider(&web_chat_adapters[1])
         ]
     })
 }
 
-fn reserved_provider(id: &str, vendor: &str, label: &str, reason: &str) -> Value {
+fn reserved_provider(adapter: &WebChatAdapterDescriptor) -> Value {
     json!({
-        "id": id,
-        "vendor": vendor,
-        "label": label,
+        "id": adapter.id,
+        "vendor": adapter.vendor,
+        "label": adapter.label,
         "surface": "web_chat",
-        "protocol": "reserved_provider_adapter_v1",
-        "implementation_state": "reserved",
+        "protocol": adapter.protocol,
+        "implementation_state": adapter.implementation_state,
         "official_login": false,
         "login_flows": [],
         "remote_login_supported": false,
         "logout_supported": false,
         "credential_owner": "vendor",
         "credential_storage": "not_available",
-        "enabled": false,
-        "blocked_reason_code": "official_web_chat_adapter_unavailable",
+        "enabled": adapter.enabled,
+        "blocked_reason_code": adapter.blocked_reason_code,
+        "credential_vault": provider_vault_contract(adapter.id),
         "capabilities": provider_capabilities(false, false, false, false),
-        "reason": reason,
+        "reason": adapter.reason,
     })
 }
 

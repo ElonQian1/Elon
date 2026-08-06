@@ -41,12 +41,8 @@ struct PersistedAttempt {
 
 impl ProviderAuthAttemptStore {
     pub(crate) fn load(path: PathBuf) -> (Self, Vec<ProviderLoginAttempt>) {
-        let parsed = std::fs::metadata(&path)
-            .ok()
-            .filter(|metadata| metadata.len() <= 1024 * 1024)
-            .and_then(|_| std::fs::read(&path).ok())
-            .and_then(|bytes| serde_json::from_slice::<JournalFile>(&bytes).ok())
-            .filter(|journal| journal.schema_version == JOURNAL_SCHEMA)
+        let parsed = read_journal(&path)
+            .or_else(|| read_journal(&backup_path(&path)))
             .map(|journal| journal.attempts)
             .unwrap_or_default();
         let attempts = parsed
@@ -109,11 +105,37 @@ impl ProviderAuthAttemptStore {
             schema_version: JOURNAL_SCHEMA,
             attempts: values,
         }) {
-            if let Err(error) = std::fs::write(self.path.as_ref(), bytes) {
+            if let Some(current) = read_journal(self.path.as_ref()) {
+                if let Ok(current) = serde_json::to_vec_pretty(&current) {
+                    let _ = crate::node_agent_atomic_file::write(
+                        &backup_path(self.path.as_ref()),
+                        &current,
+                    );
+                }
+            }
+            if let Err(error) = crate::node_agent_atomic_file::write(self.path.as_ref(), &bytes) {
                 tracing::warn!(error = %error, path = %self.path.display(), "无法持久化厂商登录日志");
             }
         }
     }
+}
+
+fn read_journal(path: &Path) -> Option<JournalFile> {
+    std::fs::metadata(path)
+        .ok()
+        .filter(|metadata| metadata.is_file() && metadata.len() <= 1024 * 1024)
+        .and_then(|_| std::fs::read(path).ok())
+        .and_then(|bytes| serde_json::from_slice::<JournalFile>(&bytes).ok())
+        .filter(|journal| journal.schema_version == JOURNAL_SCHEMA)
+}
+
+fn backup_path(path: &Path) -> PathBuf {
+    path.with_file_name(format!(
+        "{}.bak",
+        path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("provider-auth-attempts.json")
+    ))
 }
 
 impl PersistedAttempt {
@@ -133,19 +155,8 @@ impl PersistedAttempt {
         }
     }
 
-    fn recover(mut self) -> ProviderLoginAttempt {
-        let was_active = matches!(self.state.as_str(), "starting" | "waiting_for_user");
-        let updated_at_ms = if was_active {
-            crate::node_agent_provider_auth_runtime::now_ms()
-        } else {
-            self.updated_at_ms
-        };
-        if was_active {
-            self.state = "failed".to_string();
-            self.error = Some("节点重启中断了厂商登录，请重新发起。".to_string());
-            self.error_code = Some("node_restarted".to_string());
-        }
-        ProviderLoginAttempt {
+    fn recover(self) -> ProviderLoginAttempt {
+        let mut attempt = ProviderLoginAttempt {
             schema_version: JOURNAL_SCHEMA,
             login_id: self.login_id,
             provider_id: self.provider_id,
@@ -156,12 +167,14 @@ impl PersistedAttempt {
             user_code: None,
             auth_url: None,
             remote_compatible: self.remote_compatible,
-            recovered: true,
+            recovered: false,
             error: self.error,
             error_code: self.error_code,
             started_at_ms: self.started_at_ms,
-            updated_at_ms,
-        }
+            updated_at_ms: self.updated_at_ms,
+        };
+        attempt.recover_after_restart(crate::node_agent_provider_auth_runtime::now_ms());
+        attempt
     }
 }
 
@@ -232,5 +245,42 @@ mod tests {
         assert_eq!(recovered[0].error_code.as_deref(), Some("node_restarted"));
         assert!(recovered[0].recovered);
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn corrupt_primary_recovers_from_the_last_valid_backup() {
+        let path = std::env::temp_dir().join(format!(
+            "elon_provider_attempt_backup_{}.json",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let (store, _) = ProviderAuthAttemptStore::load(path.clone());
+        let mut attempt = ProviderLoginAttempt {
+            schema_version: 2,
+            login_id: "login-backup".to_string(),
+            provider_id: "gemini_cli".to_string(),
+            flow: "agent".to_string(),
+            state: "completed".to_string(),
+            request_id: Some("request-backup".to_string()),
+            verification_url: None,
+            user_code: None,
+            auth_url: None,
+            remote_compatible: false,
+            recovered: false,
+            error: None,
+            error_code: None,
+            started_at_ms: 1,
+            updated_at_ms: 1,
+        };
+        store.upsert(&attempt);
+        attempt.updated_at_ms = 2;
+        store.upsert(&attempt);
+        std::fs::write(&path, b"{broken").unwrap();
+
+        let (_, recovered) = ProviderAuthAttemptStore::load(path.clone());
+        assert_eq!(recovered.len(), 1);
+        assert_eq!(recovered[0].login_id, "login-backup");
+        assert_eq!(recovered[0].state, "completed");
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(backup_path(&path));
     }
 }
