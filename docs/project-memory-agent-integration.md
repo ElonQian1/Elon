@@ -1,6 +1,6 @@
 # 项目记忆与桌面 AI 代理接入
 
-最后更新：2026-08-05
+最后更新：2026-08-06
 
 本文只回答 Codex Desktop/CLI、直接安装的 Codex 和其他 MCP 代理如何复用项目文档记忆。完整文档治理接口见 `docs/project-document-governance-mcp.md`。
 
@@ -74,7 +74,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\project-memory-ci.ps
 | 节点托管的普通 Codex 宽任务 | 自动注入只读 context、按需 feature、只写 receipt 和会话级 Hook 配置 | 不注入完整治理 schema，不绕过 Hook 信任 |
 | 直接运行的 Codex Desktop/CLI | 可手动 bootstrap 描述符，或安装仓库内 `plugins/yilong-project-memory` 接入 context/feature/receipt | 仓库只提供插件包，不替用户安装、不自动信任 Hook |
 | 其他支持 HTTP MCP 的代理 | 可使用 vendor-neutral governance 描述符；context/feature/receipt 可由适配器手动接入 | 无可靠工具过滤时不自动注入普通任务；Hook 需供应商适配 |
-| Codex plugin bundle | 已生成仓库 marketplace；context/receipt 两个 stdio 代理曾在隔离节点完成 bootstrap、initialize 与 tools/list 运行冒烟；新增 feature 代理只有代码与静态合同 | 尚未在当前真实 Codex 会话安装，feature profile 尚未运行验收，未完成 Hook 信任与卸载验证，也不声称 Hook 已加载 |
+| Codex plugin bundle | 已从仓库 marketplace 安装到真实 Codex cache；app-server 发现三个 server，各只发布一个工具，并真实调用 feature list；删除、重装和新任务重载均已验证 | Hook 仍需用户在 `/hooks` 单独信任；安装成功不等于 Hook 已加载，也不等于模型已完成公平 A/B |
 
 context、feature、receipt、governance profile 与短期 session/token 固定；修改 URL 查询参数不能提升权限。普通任务只使用三个各含一个工具的极小 profile，因此不会每次积压完整治理工具 schema 或项目全文；feature 的详细 action schema 只有显式 `describe` 才返回。`project_context_plan` 可传 `task_paths`、`scope_id` 和 `release`；服务端另从当前 Git 工作区绑定 branch 与 clean/dirty 状态，这些范围也进入缓存键和 plan receipt。若项目存在 `.elon/project-features.json`，同一只读工具会先排序、只校验前 12 个候选，再返回最多 3 个 query/task path 相关且需求 hash 有效的活动功能，不复制需求正文；详细状态机见 `docs/project-feature-registry.md`。
 
@@ -96,13 +96,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts\test-project-memory-
 - `hook_trust_verified=false`：脚本永远不读取或伪造 Codex Hook 信任；必须在新任务的 `/hooks` 中人工确认；
 - `end_to_end_verified=false`：就绪检查不冒充真实任务验收。
 
-Codex 安装的是 cache 副本，不会直接执行 marketplace 源目录。更新插件内容后应重新安装并新建任务；只修改仓库 marketplace、文档或仓库外测试脚本时不需要为了“刷新”而随意递增插件版本。
+Codex 安装的是 cache 副本，不会直接执行 marketplace 源目录。更新插件内容后必须递增插件版本、先删除旧插件、再从 marketplace 安装并新建任务；只修改仓库 marketplace、插件外文档或仓库外测试脚本时不需要为了“刷新”而随意递增插件版本。不要只改 SemVer 的 build metadata 后直接重复 `add`：build metadata 不改变版本优先级，旧 cache 可能继续被选择。就绪门禁会逐文件比较当前仓库源和 cache，发现陈旧副本时失败关闭。
 
 ## Hook 生命周期
 
 当前会话只配置 `PostToolUse`、`Stop`、`SessionEnd`。`SessionStart`、`PreCompact`、`PostCompact`、`SubagentStart`、`SubagentStop` 在执行程序中仅作为有界 no-op 适配缝，真实运行验收前不配置。
 
-节点会话与仓库插件包都只配置这三个事件。插件 Hook 的账本位于 `PLUGIN_DATA`（没有时退回系统临时目录），只保留最多 48 个规范相对路径及 read/write 类型；SessionEnd 删除，异常残留 24 小时后清理。Hook 配置不等于执行：Codex 首次或定义变化后仍需用户在 `/hooks` 审核；项目不写信任记录，也不使用 trust bypass。
+节点会话与仓库插件包都只配置这三个事件。插件 Hook 的账本位于 `PLUGIN_DATA`（没有时退回系统临时目录），只保留最多 48 个规范相对路径及 read/write 类型；SessionEnd 删除，异常残留 24 小时后清理。直接生命周期集成测试已经覆盖 PostToolUse→Stop→SessionEnd，但 Hook 配置不等于真实 Codex 已执行：Codex 首次或定义变化后仍需用户在 `/hooks` 审核，项目不写信任记录。一次性测试进程可以显式使用 Codex 的 trust bypass 参数验证其他链路，但不得持久化或把它作为产品默认值。
 
 ## 真实 token 与时间观测
 
@@ -115,7 +115,9 @@ Codex 安装的是 cache 副本，不会直接执行 marketplace 源目录。更
 
 `scripts/project-memory-app-server-observer.mjs` 已提供 stdin 事件接入器：它在进入 loopback API 前先缩减为方法名、token 累计计数或 item 类型/工具名；服务端再次白名单校验，并只在工作区外 SQLite 保存不可逆 session 指纹、baseline/enabled 窗口、事件计数、input/cached-input/output token 计数、返回元数据字节、选择记忆数和耗时。原始事件对象处理后立即丢弃；prompt、聊天、transcript、assistant message、tool input/output、源码正文和命令文本不落库。24 小时未完成的窗口标为 abandoned；非活动窗口只保留最近 2000 条，避免观测索引无限增长。
 
-当前状态是 `ingest_adapter_available`，不是“已经产生效果数据”。只有同一个 `benchmark_key` 同时取得 `baseline_without_project_memory` 与 `with_project_memory` 两个完整窗口后，接口才返回输入 token、耗时和原生文件读取次数的差值；否则只报告无测量或部分测量，不能宣称真实节省，也不能冒充供应商账单或完整任务 token。
+当前已取得结构性预算数据，但尚未取得可对外宣称的同任务模型 A/B。102 条功能注册表全文为 146930 字节（约 36733 token），feature MCP 的有界列表响应为 1431 字节（约 358 token），减少 99.03%；针对同一条功能做理想的原生定向解析为 1483 字节（约 371 token），说明主要收益来自避免第一次全量扫描和稳定提供语义状态/漂移判断，而不是替代一次已经完美命中的原生读取。三个工具 schema 合计 4747 字节（约 1187 token）；`codex debug prompt-input` 启用/禁用插件均为 31634 字节，未观察到插件把项目正文或 schema 常驻复制进模型 prompt。以上 token 均按 UTF-8 字节本地估算，不是供应商账单或完整任务 token。
+
+只有同一个 `benchmark_key` 同时取得 `baseline_without_project_memory` 与 `with_project_memory` 两个完整窗口后，接口才返回输入 token、耗时和原生文件读取次数的差值；否则只报告无测量或部分测量，不能宣称真实任务节省。真实 `codex exec` 模型已经发现并正确选择单一 feature 工具，但非交互任务中的 MCP 审批被取消，另一次绕过审批的网络任务未在时限内完成，因此这些 turn token 不构成公平 A/B，也不写入效果结论。
 
 为了避免人为复用 `benchmark_key` 把不同代码、模型、Codex 版本或任务误配在一起，先生成不含任务正文的 A/B manifest：
 
@@ -160,13 +162,22 @@ Codex 官方 Memories 是供应商自己的本机生成状态，与项目 Git �
 
 因此目前可以确认“代理无需主动打开页面即可使用最小 MCP、CI 与 Hook 执行程序”；仍不能确认真实 Codex 安装后的端到端任务节省比例。
 
+## 2026-08-06 真实 Codex、浏览器与可移植性验收
+
+本轮继续在隔离节点和真实 Codex app-server 上完成端到端验收：
+
+- 真实 Codex 从 repo marketplace 安装插件后，三个 MCP server 全部进入 ready，每个只暴露一个工具；直接调用 `project_feature_workflow/list` 成功。典型冷启动约 4.3–8.6 秒，工具调用约 0.54–0.87 秒，响应 1431–1444 字节。
+- 真实安装发现并修复了三个可移植性缺口：MCP 进程显式以插件根为 `cwd`、只转发 `ELON_NODE_ADMIN_URL`/`ELON_PROJECT_ROOT`、插件默认 prompt 保持在 Codex manifest 限制内。测试脚本现在会同时门禁这些合同。
+- 同一临时 Git 提交的普通 clone 与附加 worktree 都能启动真实 app-server 并调用功能工具；修改 clone 中需求文件后，漂移检查返回 `requirement_drifted`、`requirement_current=false` 和 `automatic=false` 修复步骤。它证明同机可移植 Git 身份与失败关闭，不冒充不同操作系统或远端团队网络验收。
+- 功能注册表 Rust 测试覆盖 proposed→released、需求漂移/重绑、依赖阻塞、revision 冲突、租约过期重认领、历史分页、证据刷新和并发写者只能一个成功。Rust 检查、节点构建及 PC build/lint/文档合约测试通过。
+- PC 项目文档页面在真实浏览器中覆盖 101 条功能、两页分页、搜索/空态、AI 指令、打开需求、离线降级/恢复和刷新保持；控制台错误为 0。MCP 使用全程不要求主动打开该页面。
+- Hook 执行程序的真实进程生命周期集成通过；真实 Codex 的 `/hooks` 用户信任仍保留为人工安全边界，不由项目伪造。
+
 ## 仍需真实验收的项目
 
-以下工作仍依赖真实 Codex、跨 PC 或浏览器环境：
+以下项目仍需要生产环境或人工安全确认，不能由本轮自动化替代：
 
-- 完整仓库 Rust/npm 全量回归；本轮只构建节点并运行项目文档相关 Rust 用例与独立 Node/PowerShell 冒烟；
-- 真实 Codex Desktop/CLI 从 repo marketplace 安装插件后的工具发现、相对脚本解析、重启新会话与卸载；
-- 真实 Codex `/hooks` 信任、PostToolUse/Stop/SessionEnd 触发；compact/subagent 事件仍未配置，只保留 no-op 适配缝；
+- 真实 Codex `/hooks` 中由用户审核并信任，然后观察 Codex 自身触发 PostToolUse/Stop/SessionEnd；compact/subagent 事件仍未配置，只保留 no-op 适配缝；
 - 官方 app-server 事件流的真实任务 A/B，使用同一 benchmark 测得 input token、原生文件读取和总耗时，而不是合成事件；
-- 跨 PC clone/apply 后的 Git 对象、换行与重定位验证；
-- PC 浏览器中的分页、修复计划和旧节点降级体验。
+- 不同 PC/操作系统、真实远端 push/pull、换行策略和多人长期并发下的迁移验证；
+- 生产规模注册表、长期运行节点和故障恢复下的容量、延迟与资源曲线。

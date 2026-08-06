@@ -5,7 +5,10 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::path::Path;
 
-use crate::node_agent_project_docs_mcp::McpRequest;
+use crate::{
+    node_agent_project_docs_mcp::McpRequest,
+    project_document_response::{compact_text, project_tool_response},
+};
 
 pub(crate) const PROFILE: &str = "feature";
 pub(crate) const TOOL_NAME: &str = "project_feature_workflow";
@@ -65,16 +68,28 @@ fn call_tool(workspace: &Path, params: Value) -> Result<Value> {
             .cloned()
             .unwrap_or_else(|| json!({})),
     )?;
-    if input.action == "describe" {
-        return Ok(json!({
+    let value = if input.action == "describe" {
+        json!({
             "schema":"elon.project_feature_workflow_description.v1",
             "operations":crate::node_agent_project_feature_tools::definitions(),
             "instruction":"Choose one operation and pass its inputSchema fields as payload to project_feature_workflow."
-        }));
-    }
-    let tool_name = operation_tool_name(&input.action)?;
-    crate::node_agent_project_feature_tools::try_call(workspace, tool_name, input.payload)?
-        .ok_or_else(|| anyhow::anyhow!("功能动作没有处理器：{}", input.action))
+        })
+    } else {
+        let tool_name = operation_tool_name(&input.action)?;
+        let payload = if input.payload.is_null() {
+            json!({})
+        } else {
+            input.payload
+        };
+        crate::node_agent_project_feature_tools::try_call(workspace, tool_name, payload)?
+            .ok_or_else(|| anyhow::anyhow!("功能动作没有处理器：{}", input.action))?
+    };
+    let value = project_tool_response(TOOL_NAME, &json!({}), value)?;
+    Ok(json!({
+        "content":[{"type":"text","text":compact_text(TOOL_NAME, &value)?}],
+        "structuredContent":value,
+        "isError":false,
+    }))
 }
 
 fn operation_tool_name(action: &str) -> Result<&'static str> {

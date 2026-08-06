@@ -305,6 +305,8 @@ mod project_feature_registry;
 mod project_feature_registry_api;
 mod project_feature_registry_service;
 mod project_feature_registry_store;
+#[cfg(test)]
+mod project_feature_registry_tests;
 mod project_feature_registry_update;
 mod project_git_worktree_audit;
 mod project_landing;

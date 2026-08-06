@@ -13,8 +13,8 @@ use crate::{
         dependency_blockers, dependency_snapshot, feature_search_text, feature_snapshot,
     },
     project_feature_registry::{
-        transition_allowed, ProjectFeatureAuditEntry, ProjectFeatureClaim, ProjectFeaturePriority,
-        ProjectFeatureRegistry, ProjectFeatureStatus,
+        transition_allowed, ProjectFeature, ProjectFeatureAuditEntry, ProjectFeatureClaim,
+        ProjectFeaturePriority, ProjectFeatureRegistry, ProjectFeatureStatus,
     },
     project_feature_registry_store::{
         bind_evidence, bind_requirement, ensure_implementation_evidence_current,
@@ -394,9 +394,14 @@ pub(crate) fn record_evidence(
         .into_iter()
         .map(|item| bind_evidence(workspace, item))
         .collect::<Result<Vec<_>>>()?;
-    loaded.registry.features[index]
-        .implementation_evidence
-        .extend(bound);
+    for evidence in bound {
+        loaded.registry.features[index]
+            .implementation_evidence
+            .retain(|current| current.path != evidence.path || current.locator != evidence.locator);
+        loaded.registry.features[index]
+            .implementation_evidence
+            .push(evidence);
+    }
     loaded.registry.features[index].updated_at_ms = now_millis();
     let status = loaded.registry.features[index].status;
     append_audit(

@@ -2,15 +2,21 @@
   "mcpServers": {
     "yilong-project-context": {
       "command": "node",
-      "args": ["./scripts/project-memory-mcp-proxy.mjs", "context"]
+      "args": ["./scripts/project-memory-mcp-proxy.mjs", "context"],
+      "cwd": ".",
+      "env_vars": ["ELON_NODE_ADMIN_URL", "ELON_PROJECT_ROOT"]
     },
     "yilong-project-features": {
       "command": "node",
-      "args": ["./scripts/project-memory-mcp-proxy.mjs", "feature"]
+      "args": ["./scripts/project-memory-mcp-proxy.mjs", "feature"],
+      "cwd": ".",
+      "env_vars": ["ELON_NODE_ADMIN_URL", "ELON_PROJECT_ROOT"]
     },
     "yilong-project-memory-receipt": {
       "command": "node",
-      "args": ["./scripts/project-memory-mcp-proxy.mjs", "receipt"]
+      "args": ["./scripts/project-memory-mcp-proxy.mjs", "receipt"],
+      "cwd": ".",
+      "env_vars": ["ELON_NODE_ADMIN_URL", "ELON_PROJECT_ROOT"]
     }
   }
 }

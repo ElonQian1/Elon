@@ -95,7 +95,7 @@ Assert-Contains $hook "bash scripts/format-rust.sh" "Pre-push must enforce the f
 Assert-Contains $hook 'unset $git_local_env_vars' "Pre-push must clear shared Git variables before checking a linked worktree."
 
 $toolchain = Get-Content -Raw -LiteralPath (Join-Path $repoRoot "rust-toolchain.toml") -Encoding UTF8
-Assert-Contains $toolchain 'channel = "stable"' "Rust toolchain must declare the stable baseline channel without forcing a network-only exact toolchain install."
+Assert-Contains $toolchain 'channel = "1.97.0"' "Rust toolchain must match the repository and CI baseline."
 Assert-Contains $toolchain 'components = ["rustfmt"]' "Pinned toolchain must install rustfmt."
 
 $versionLock = Get-Content -Raw -LiteralPath (Join-Path $repoRoot ".rustfmt-version") -Encoding UTF8

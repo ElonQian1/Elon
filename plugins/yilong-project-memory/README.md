@@ -15,12 +15,21 @@ Requirements:
 
 - Node.js 18 or newer is available as `node`.
 - The Yilong Windows node is running on its loopback admin port, or `ELON_NODE_ADMIN_URL` points to it.
-- Codex starts the MCP process inside the target Git project, or `ELON_PROJECT_ROOT` names that
-  project explicitly. The proxy walks upward from its cwd to find the nearest `.git` marker.
+- The plugin starts each MCP process with the installed plugin root as its explicit working
+  directory and forwards only `ELON_NODE_ADMIN_URL` and `ELON_PROJECT_ROOT` from the host.
+- `ELON_PROJECT_ROOT` names the target Git project. The proxy can still walk upward from its cwd
+  for development checkouts, but a cached plugin install is not inside the target project, so
+  desktop/CLI integrations should provide the explicit project root.
 
 Installing or enabling the plugin does not trust its hooks. Review the hook definitions in Codex
 before enabling them. Current source, tests, binding rules, and current ADRs always outrank shared
 navigation memory.
+
+Codex executes a cached copy, not the marketplace source directory. After changing any file in
+this plugin, increment the plugin version, remove the installed copy, add it again from the local
+marketplace, and start a new task. Repeating `add` after changing only SemVer build metadata can
+leave an older equal-precedence cache selected; the repository readiness script detects a cache
+that no longer matches the source.
 
 The context plan can also project at most three related, Git-backed feature records without
 returning requirement bodies. The separate feature dispatcher can register, update, rebind, claim,

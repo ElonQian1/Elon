@@ -1,7 +1,7 @@
 ---
 version_status: current
-reviewed_at: 2026-08-05
-implementation_status: implementation_uncompiled
+reviewed_at: 2026-08-06
+implementation_status: verified
 ---
 
 # 项目功能需求登记与代理任务生命周期
@@ -84,8 +84,8 @@ PC 项目文档工作台的“功能需求”分区读取同一 loopback API，�
 
 ## 当前边界
 
-- 本批次代码已形成但未编译、未运行 Rust/npm 测试，也未做浏览器和真实 Codex/MCP 验收。
-- Git 中的 claim 只能对共享到同一分支/工作区的参与者可见；跨 worktree、离线代理和远端并发仍需真实冲突策略验证。
+- Rust 状态机、漂移、依赖、revision、租约、历史、证据刷新和并发写者回归已通过；真实 Codex app-server、clone/worktree 和 PC 浏览器也已验收。不同 PC/操作系统、真实远端协作和长期生产负载仍需现场验证。
+- Git 中的 claim 只对同步到同一提交谱系的参与者可见；跨进程与同仓库 worktree 写锁会失败关闭，但离线分支仍可能各自合法认领，最终必须通过 Git 合并冲突或团队协调裁决，不能把本地租约冒充全网分布式锁。
 - 注册表不会自动创建 Markdown；这样保留 Codex 原生编辑、Git diff 和用户审核能力。
 - 注册表不会自动修改 `AI_CURRENT.md`、`AI_INDEX.md` 或知识图谱；稳定项目入口仍由文档治理流程审核，避免一次需求登记同时改写多份权威信源。
 - Feature Registry 不替代团队 backlog、项目管理平台或供应商私有任务记忆；未来适配器必须继续以该 Git 合同为项目内真源。

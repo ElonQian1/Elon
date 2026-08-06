@@ -52,6 +52,7 @@ pub(in crate::node_agent_compute_plugin_host) use staging_store::{
     ComputePluginCandidateStagingRecoveryAuthoritySession,
     ComputePluginCandidateStagingRecoveryOutcome,
     ComputePluginPostRevalidationStagingAuthoritySession,
+    HashedComputePluginCandidateStagingReceipt,
 };
 pub(in crate::node_agent_compute_plugin_host) use verification_store::{
     ComputePluginCandidateArtifactAuthorityFacts, ComputePluginCandidateVerificationAuthorityFacts,

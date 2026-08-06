@@ -11,6 +11,7 @@ Assert-True $nodeServer.Contains('"/api/health"') 'Node admin server must expose
 
 $proxyPath = Join-Path $repoRoot 'plugins\yilong-project-memory\scripts\project-memory-mcp-proxy.mjs'
 $observerPath = Join-Path $repoRoot 'scripts\project-memory-app-server-observer.mjs'
+$codexAppServerTestPath = Join-Path $repoRoot 'scripts\test-project-memory-codex-app-server.mjs'
 $readinessPath = Join-Path $repoRoot 'scripts\test-project-memory-codex-readiness.ps1'
 $benchmarkPlanPath = Join-Path $repoRoot 'scripts\new-project-memory-benchmark-plan.ps1'
 $ciPath = Join-Path $repoRoot 'scripts\project-memory-ci.ps1'
@@ -41,9 +42,14 @@ Assert-True ($marketplaceEntry.source.path -eq './plugins/yilong-project-memory'
 Assert-True ($marketplaceEntry.policy.installation -eq 'AVAILABLE') 'Repo marketplace installation policy drifted.'
 Assert-True (@('ON_INSTALL', 'ON_USE') -contains $marketplaceEntry.policy.authentication) 'Repo marketplace authentication policy is invalid.'
 
+$pluginManifest = Get-Content -Raw -LiteralPath (Join-Path $repoRoot 'plugins\yilong-project-memory\.codex-plugin\plugin.json') |
+    ConvertFrom-Json
+Assert-True ($pluginManifest.interface.defaultPrompt.Length -le 128) 'Plugin defaultPrompt exceeds the Codex 128-character limit.'
+
 foreach ($script in @(
     $proxyPath,
     $observerPath,
+    $codexAppServerTestPath,
     (Join-Path $repoRoot 'plugins\yilong-project-memory\scripts\project-memory-hook.mjs')
 )) {
     & node --check $script
@@ -60,6 +66,8 @@ Assert-True ($servers.Name -contains 'yilong-project-memory-receipt') 'Receipt M
 foreach ($server in $servers) {
     Assert-True ($server.Value.command -eq 'node') "MCP server $($server.Name) must use the bundled Node proxy."
     Assert-True (@($server.Value.args).Count -eq 2) "MCP server $($server.Name) must pass script and profile only."
+    Assert-True ($server.Value.cwd -eq '.') "MCP server $($server.Name) must resolve its script from the installed plugin root."
+    Assert-True ((@($server.Value.env_vars) -join ',') -eq 'ELON_NODE_ADMIN_URL,ELON_PROJECT_ROOT') "MCP server $($server.Name) must forward only the node and project routing variables."
 }
 Assert-True ($mcp.mcpServers.'yilong-project-context'.args[1] -eq 'context') 'Context server profile drifted.'
 Assert-True ($mcp.mcpServers.'yilong-project-features'.args[1] -eq 'feature') 'Feature server profile drifted.'
@@ -73,6 +81,40 @@ Assert-True (($events -join ',') -eq 'PostToolUse,SessionEnd,Stop') 'Plugin Hook
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-project-memory-contract-" + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
 try {
+    $hookPath = Join-Path $repoRoot 'plugins\yilong-project-memory\scripts\project-memory-hook.mjs'
+    $hookData = Join-Path $tempRoot 'hook-data'
+    $previousPluginData = $env:PLUGIN_DATA
+    $env:PLUGIN_DATA = $hookData
+    try {
+        $hookSession = 'contract-hook-session'
+        $readEvent = @{
+            session_id = $hookSession; cwd = $repoRoot; hook_event_name = 'PostToolUse'
+            tool_name = 'read_file'; tool_input = @{ path = (Join-Path $repoRoot 'docs\project-feature-registry.md') }
+        } | ConvertTo-Json -Compress -Depth 5
+        $writeEvent = @{
+            session_id = $hookSession; cwd = $repoRoot; hook_event_name = 'PostToolUse'
+            tool_name = 'apply_patch'; tool_input = @{ patch = "*** Update File: server/src/node_agent_project_feature_mcp.rs" }
+        } | ConvertTo-Json -Compress -Depth 5
+        $readEvent | & node $hookPath | Out-Null
+        Assert-True ($LASTEXITCODE -eq 0) 'Plugin Hook failed to record a bounded read path.'
+        $writeEvent | & node $hookPath | Out-Null
+        Assert-True ($LASTEXITCODE -eq 0) 'Plugin Hook failed to record a bounded write path.'
+        $stopEvent = @{ session_id = $hookSession; cwd = $repoRoot; hook_event_name = 'Stop' } | ConvertTo-Json -Compress
+        $stopOutput = @($stopEvent | & node $hookPath)
+        Assert-True ($LASTEXITCODE -eq 0) 'Plugin Hook Stop event failed.'
+        $stop = ($stopOutput -join "`n") | ConvertFrom-Json
+        Assert-True ($stop.decision -eq 'block') 'Plugin Hook did not request the bounded receipt review after mixed evidence access.'
+        Assert-True ($stop.reason.Contains('docs/project-feature-registry.md')) 'Plugin Hook omitted the bounded read evidence path.'
+        Assert-True ($stop.reason.Contains('server/src/node_agent_project_feature_mcp.rs')) 'Plugin Hook omitted the bounded write evidence path.'
+        $endEvent = @{ session_id = $hookSession; cwd = $repoRoot; hook_event_name = 'SessionEnd' } | ConvertTo-Json -Compress
+        $endOutput = @($endEvent | & node $hookPath)
+        Assert-True ($LASTEXITCODE -eq 0) 'Plugin Hook SessionEnd cleanup failed.'
+        Assert-True ((($endOutput -join "`n").Trim()) -eq '{}') 'Plugin Hook SessionEnd must return an empty response.'
+        Assert-True (@(Get-ChildItem (Join-Path $hookData 'session-ledgers') -Filter '*.json' -ErrorAction SilentlyContinue).Count -eq 0) 'Plugin Hook retained the completed session ledger.'
+    } finally {
+        $env:PLUGIN_DATA = $previousPluginData
+    }
+
     $emptyCodexHome = Join-Path $tempRoot 'empty-codex-home'
     New-Item -ItemType Directory -Path $emptyCodexHome | Out-Null
     $staticOutput = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $readinessPath `
@@ -160,8 +202,9 @@ enabled = true
 }
 
 Write-Output 'PROJECT_MEMORY_AGENT_CONTRACT=passed'
-Write-Output 'PROJECT_MEMORY_AGENT_MCP_SERVER_COUNT=2'
+Write-Output 'PROJECT_MEMORY_AGENT_MCP_SERVER_COUNT=3'
 Write-Output 'PROJECT_MEMORY_AGENT_HOOK_EVENTS=PostToolUse,SessionEnd,Stop'
+Write-Output 'PROJECT_MEMORY_AGENT_HOOK_LIFECYCLE=passed'
 Write-Output 'PROJECT_MEMORY_CODEX_MARKETPLACE=passed'
 Write-Output 'PROJECT_MEMORY_CODEX_READINESS=passed'
 Write-Output 'PROJECT_MEMORY_BENCHMARK_PROTOCOL=passed'

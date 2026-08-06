@@ -55,7 +55,7 @@ PC 网页端发起的明确文档整理任务带 `<elon-project-docs-task versio
 
 功能与回执适配器使用同一 bootstrap，分别把 profile 改为 `feature` 或 `receipt`。三个 profile 必须使用各自返回的 session/token；不得拼接 URL 参数切换权限。
 
-仓库内 `plugins/yilong-project-memory` 是直接 Codex Desktop/CLI 的可安装接入包：三个 MCP server 分别 bootstrap context、feature 与 receipt，不复制服务端工具逻辑；Hook 只保存路径账本。该目录已通过静态 plugin manifest 校验，但仓库不会替用户安装、启用或信任插件，真实安装兼容性仍须单独验收。
+仓库内 `plugins/yilong-project-memory` 是直接 Codex Desktop/CLI 的可安装接入包：三个 MCP server 分别 bootstrap context、feature 与 receipt，不复制服务端工具逻辑；Hook 只保存路径账本。该目录已通过静态校验和真实 Codex cache 安装/app-server 工具调用验收；仓库仍不会替用户持久信任 Hook，首次或定义变化后必须在 `/hooks` 人工审核。
 
 返回 URL 和临时配置只在当前短期会话使用，不得把带 token 的 URL 提交到项目或长期配置。
 

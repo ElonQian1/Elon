@@ -1,6 +1,6 @@
 {
   "name": "yilong-project-memory",
-  "version": "0.1.0+codex.20260805081915",
+  "version": "0.1.0+codex.20260806191403",
   "description": "Bounded, evidence-backed project navigation memory for Codex",
   "author": {
     "name": "Yilong Project"
@@ -21,7 +21,7 @@
       "Read",
       "Write"
     ],
-    "defaultPrompt": "Use project context only for broad or unfamiliar work, then verify current files with native tools. Use the feature workflow only for explicit feature lifecycle work, describing its schema on demand. Record only durable evidence-backed navigation facts after the task."
+    "defaultPrompt": "Use bounded project memory on demand; verify current files natively, and record only durable evidence-backed facts."
   },
   "mcpServers": "./.mcp.json"
 }

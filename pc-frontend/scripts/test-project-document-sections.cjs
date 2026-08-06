@@ -26,7 +26,11 @@ const nativeContextModelLoaded = { exports: {} }
 new Function('module', 'exports', 'require', nativeContextModelOutput)(
   nativeContextModelLoaded,
   nativeContextModelLoaded.exports,
-  (request) => request === '../node/localNodeApi' ? { nodeApi: async () => ({}) } : require(request),
+  (request) => {
+    if (request === '../node/localNodeApi') return { nodeApi: async () => ({}) }
+    if (request === './projectDocumentNativeContextHealthModel') return {}
+    return require(request)
+  },
 )
 
 const sourcePath = path.join(__dirname, '..', 'src', 'features', 'project-docs', 'projectDocumentSections.ts')

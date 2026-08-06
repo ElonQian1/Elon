@@ -209,7 +209,7 @@ pub(crate) fn bind_evidence(
     }
     Ok(ProjectContextEvidence {
         path: path.clone(),
-        content_hash: format!("{digest:x}"),
+        content_hash: format!("{:x}", digest.finalize()),
         locator: input.locator,
         evidence_kind: if input.evidence_kind.trim().is_empty() {
             "source".to_string()
