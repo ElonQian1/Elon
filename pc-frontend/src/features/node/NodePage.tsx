@@ -19,6 +19,7 @@ import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigG
 import ShareSettlementCard from './ShareSettlementCard'
 import NodeStorageManagementCard from './storage/NodeStorageManagementCard'
 import { createCodexVaultEmergencyActions } from './codexVaultEmergencyActions'
+import { confirmCodexVaultAction } from './codexVaultConsent'
 import { autostartSummaryLabel } from './autostartStatusModel'
 import { useUserProgression } from '../billing/useUserProgression'
 import { safeNodeAdminUrl } from '../../lib/utils'
@@ -312,12 +313,14 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
   }
 
   async function backupCodexVault() {
+    const consent = confirmCodexVaultAction('backup', 'pc_web_codex_vault_backup')
+    if (!consent) return
     setVaultBusy(true); setResult('正在保存这台电脑的 Codex 账号…'); setError('')
     try {
       const data = await nodeApi<CodexVaultStatusResponse>(
         adminUrl,
         '/api/codex-vault/backup',
-        { method: 'POST', body: JSON.stringify({}) },
+        { method: 'POST', body: JSON.stringify(consent) },
         30000,
       )
       setVaultStatus(data)
@@ -330,12 +333,14 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
   }
 
   async function restoreCodexVault() {
+    const consent = confirmCodexVaultAction('restore', 'pc_web_temporary_codex_cli')
+    if (!consent) return
     setVaultBusy(true); setCodexBusy(true); setResult('正在切换临时 Codex 账号…'); setError('')
     try {
       const data = await nodeApi<CodexVaultStatusResponse>(
         adminUrl,
         '/api/codex-vault/restore',
-        { method: 'POST', body: JSON.stringify({ purpose: 'pc_web_temporary_codex_cli' }) },
+        { method: 'POST', body: JSON.stringify(consent) },
         30000,
       )
       setVaultStatus(data)
@@ -351,12 +356,14 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
   }
 
   async function clearCodexVault() {
+    const consent = confirmCodexVaultAction('clear_local', 'pc_web_clear_managed_codex_home')
+    if (!consent) return
     setVaultBusy(true); setCodexBusy(true); setResult('正在清理本机临时 Codex 会话…'); setError('')
     try {
       const data = await nodeApi<CodexVaultStatusResponse>(
         adminUrl,
         '/api/codex-vault/clear',
-        { method: 'POST', body: JSON.stringify({}) },
+        { method: 'POST', body: JSON.stringify(consent) },
         20000,
       )
       setVaultStatus(data)
@@ -372,12 +379,14 @@ function NodeAdminPanel({ adminUrl, initialStatus, view }: { adminUrl: string; i
   }
 
   async function deleteCloudCodexVault() {
+    const consent = confirmCodexVaultAction('delete_cloud', 'pc_web_delete_cloud_codex_vault')
+    if (!consent) return
     setVaultBusy(true); setResult('正在删除云端 Codex 账号记录…'); setError('')
     try {
       const data = await nodeApi<CodexVaultStatusResponse>(
         adminUrl,
         '/api/codex-vault/delete-cloud',
-        { method: 'POST', body: JSON.stringify({}) },
+        { method: 'POST', body: JSON.stringify(consent) },
         20000,
       )
       setVaultStatus(data)

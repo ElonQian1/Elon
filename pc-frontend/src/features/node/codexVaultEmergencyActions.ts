@@ -1,5 +1,6 @@
 import { nodeApi } from './localNodeApi'
 import type { CodexVaultStatusResponse } from './types'
+import { confirmCodexVaultAction } from './codexVaultConsent'
 
 export interface CodexVaultEmergencyActions {
   onEmergencyRestore: (providerUserId: string) => Promise<void>
@@ -69,6 +70,8 @@ export function createCodexVaultEmergencyActions({
       }
     },
     async onEmergencyRestore(providerUserId: string) {
+      const consent = confirmCodexVaultAction('restore_shared', 'pc_web_robot_shared_codex_cli')
+      if (!consent) return
       setVaultBusy(true); setCodexBusy(true); setResult('正在切换到授权机器人的共享 Codex 账号…'); setError('')
       try {
         const data = await nodeApi<CodexVaultStatusResponse>(
@@ -77,8 +80,8 @@ export function createCodexVaultEmergencyActions({
           {
             method: 'POST',
             body: JSON.stringify({
+              ...consent,
               provider_user_id: providerUserId,
-              purpose: 'pc_web_robot_shared_codex_cli',
             }),
           },
           30000,

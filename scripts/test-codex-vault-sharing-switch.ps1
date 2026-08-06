@@ -193,6 +193,9 @@ try {
     $badProbe = Invoke-CodexProbe -CodexHomePath $badCodexHome -Label "bad" -TimeoutSeconds $BadTimeoutSeconds
     $headers = @{ "x-elon-local-admin-token" = $localAdminToken }
     $restoreBody = @{
+        request_id = "vault:test:$([guid]::NewGuid().ToString('N'))"
+        explicit_consent = $true
+        confirmation = "RESTORE_SHARED_CODEX_VAULT"
         provider_user_id = if ([string]::IsNullOrWhiteSpace($ProviderUserId)) { $null } else { $ProviderUserId }
         provider_account = if ([string]::IsNullOrWhiteSpace($ProviderAccount)) { $null } else { $ProviderAccount }
         purpose = "robot_codex_vault_switch_probe"
@@ -208,7 +211,13 @@ try {
         throw "Sharing restore did not set an active CODEX_HOME."
     }
     $sharedProbe = Invoke-CodexProbe -CodexHomePath $sharedCodexHome -Label "shared" -TimeoutSeconds $SharedTimeoutSeconds
-    $clear = Invoke-NodeJson -Path "/api/codex-vault/clear" -Method "POST" -Headers $headers -TimeoutSec 60
+    $clearBody = @{
+        request_id = "vault:test:$([guid]::NewGuid().ToString('N'))"
+        explicit_consent = $true
+        confirmation = "CLEAR_MANAGED_CODEX_HOME"
+        purpose = "sharing_switch_probe_cleanup"
+    }
+    $clear = Invoke-NodeJson -Path "/api/codex-vault/clear" -Method "POST" -Body $clearBody -Headers $headers -TimeoutSec 60
     $finalStatus = Invoke-NodeJson -Path "/api/status" -Headers @{ "Sec-Fetch-Site" = "same-origin" } -TimeoutSec 15
     $passed = (-not $badProbe.success) -and $sharedProbe.success -and ($null -eq $finalStatus.codex_vault.active_codex_home)
     $result = [pscustomobject]@{
@@ -230,7 +239,13 @@ try {
 } finally {
     if ($null -ne $restore -and $null -eq $clear) {
         try {
-            Invoke-NodeJson -Path "/api/codex-vault/clear" -Method "POST" -Headers @{ "x-elon-local-admin-token" = $localAdminToken } -TimeoutSec 60 | Out-Null
+            $cleanupBody = @{
+                request_id = "vault:test:$([guid]::NewGuid().ToString('N'))"
+                explicit_consent = $true
+                confirmation = "CLEAR_MANAGED_CODEX_HOME"
+                purpose = "sharing_switch_probe_finally_cleanup"
+            }
+            Invoke-NodeJson -Path "/api/codex-vault/clear" -Method "POST" -Body $cleanupBody -Headers @{ "x-elon-local-admin-token" = $localAdminToken } -TimeoutSec 60 | Out-Null
         } catch {}
     }
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue

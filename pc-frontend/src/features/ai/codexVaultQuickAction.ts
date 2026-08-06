@@ -1,4 +1,5 @@
 import { nodeApi, probeLocalNode } from '../node/localNodeApi'
+import { codexVaultConsentBody } from '../node/codexVaultConsent'
 import type {
   CodexVaultAuthInspection,
   CodexVaultCloudStatus,
@@ -155,7 +156,10 @@ export async function runCodexVaultBackupFromAiChat(adminUrl: string): Promise<s
     backup = await nodeApi<CodexVaultStatusResponse>(
       adminUrl,
       '/api/codex-vault/backup',
-      { method: 'POST', body: JSON.stringify({}) },
+      {
+        method: 'POST',
+        body: JSON.stringify(codexVaultConsentBody('backup', 'explicit_ai_chat_vault_backup')),
+      },
       30000,
     )
   } catch (error) {
