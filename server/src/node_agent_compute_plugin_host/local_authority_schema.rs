@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use rusqlite::{params, Connection, TransactionBehavior};
 
 mod authority_fences;
+mod candidate_cleanup;
 mod candidate_health;
 mod candidate_health_quarantine;
 mod candidate_staging;
@@ -17,6 +18,8 @@ const REQUIRED_TABLES: &[&str] = &[
     "authority_meta",
     "candidate_health_receipts",
     "candidate_health_quarantine_receipts",
+    "candidate_cleanup_authorizations",
+    "candidate_cleanup_completions",
     "candidate_owners",
     "candidate_staging_receipts",
     "candidate_verification_runs",
@@ -133,6 +136,9 @@ fn create_schema_objects(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(candidate_health_quarantine::CANDIDATE_HEALTH_QUARANTINE_SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_QUARANTINE_SCHEMA_CREATE_V3")?;
+    connection
+        .execute_batch(candidate_cleanup::CANDIDATE_CLEANUP_SCHEMA_V3)
+        .context("COMPUTE_PLUGIN_AUTHORITY_CANDIDATE_CLEANUP_SCHEMA_CREATE_V3")?;
     connection
         .execute_batch(plan_application::PLAN_APPLICATION_SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_PLAN_APPLICATION_SCHEMA_CREATE_V3")?;
@@ -377,7 +383,7 @@ CREATE TABLE candidate_owners (
     owner_plan_digest               TEXT NOT NULL,
     application_inventory_revision  INTEGER NOT NULL,
     state                           TEXT NOT NULL CHECK (
-        state IN ('owned', 'released', 'promoted')
+        state IN ('owned', 'cleanup_pending', 'released', 'promoted', 'cleaned')
     ),
     created_at_ms                   INTEGER NOT NULL,
     closed_at_ms                    INTEGER,
@@ -395,7 +401,7 @@ CREATE TABLE candidate_owners (
     FOREIGN KEY (closed_by_plan_id, closed_by_plan_digest)
         REFERENCES plan_applications(plan_id, plan_digest) ON DELETE RESTRICT,
     CHECK (
-        (state = 'owned'
+        (state IN ('owned', 'cleanup_pending')
          AND closed_at_ms IS NULL
          AND closed_by_plan_id IS NULL
          AND closed_by_plan_digest IS NULL
@@ -416,11 +422,18 @@ CREATE TABLE candidate_owners (
          AND closed_by_plan_digest IS NULL
          AND close_reason IS NOT NULL
          AND close_reason <> '')
+        OR
+        (state = 'cleaned'
+         AND closed_at_ms IS NOT NULL
+         AND closed_at_ms >= created_at_ms
+         AND closed_by_plan_id IS NULL
+         AND closed_by_plan_digest IS NULL
+         AND close_reason = 'candidate_cleanup_completed')
     )
 );
 
 CREATE UNIQUE INDEX one_owned_candidate_per_plugin
-    ON candidate_owners(plugin_id) WHERE state = 'owned';
+    ON candidate_owners(plugin_id) WHERE state IN ('owned', 'cleanup_pending');
 
 CREATE TABLE planned_downloads (
     plan_id                 TEXT NOT NULL,
@@ -674,56 +687,4 @@ END;
 "#;
 
 #[cfg(test)]
-mod tests {
-    use rusqlite::Connection;
-
-    use super::ensure_schema;
-
-    #[test]
-    fn schema_installs_and_reopens_with_candidate_health_objects() {
-        let mut connection = Connection::open_in_memory().unwrap();
-        connection
-            .pragma_update(None, "foreign_keys", "ON")
-            .unwrap();
-        connection
-            .pragma_update(None, "trusted_schema", "OFF")
-            .unwrap();
-
-        ensure_schema(&mut connection).unwrap();
-        ensure_schema(&mut connection).unwrap();
-
-        let table_count: i64 = connection
-            .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'candidate_health_receipts'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        let trigger_count: i64 = connection
-            .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'candidate_health_receipts'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        let quarantine_table_count: i64 = connection
-            .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'candidate_health_quarantine_receipts'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        let quarantine_trigger_count: i64 = connection
-            .query_row(
-                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'candidate_health_quarantine_receipts'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-
-        assert_eq!(table_count, 1);
-        assert_eq!(trigger_count, 3);
-        assert_eq!(quarantine_table_count, 1);
-        assert_eq!(quarantine_trigger_count, 3);
-    }
-}
+mod tests;

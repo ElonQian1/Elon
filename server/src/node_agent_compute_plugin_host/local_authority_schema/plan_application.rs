@@ -173,9 +173,37 @@ CREATE TRIGGER candidate_state_transition
 BEFORE UPDATE OF
     state, closed_at_ms, closed_by_plan_id, closed_by_plan_digest, close_reason
 ON candidate_owners
-WHEN OLD.state <> 'owned' OR NEW.state NOT IN ('released', 'promoted')
+WHEN NOT (
+    (OLD.state = 'owned' AND NEW.state IN ('released', 'promoted', 'cleanup_pending'))
+    OR (OLD.state = 'cleanup_pending' AND NEW.state = 'cleaned')
+)
 BEGIN
-    SELECT RAISE(ABORT, 'candidate owner may close exactly once');
+    SELECT RAISE(ABORT, 'candidate owner transition is not allowed');
+END;
+
+CREATE TRIGGER candidate_cleanup_pending_requires_authorization
+BEFORE UPDATE OF
+    state, closed_at_ms, closed_by_plan_id, closed_by_plan_digest, close_reason
+ON candidate_owners
+WHEN NEW.state = 'cleanup_pending' AND NOT EXISTS (
+    SELECT 1 FROM candidate_cleanup_authorizations AS authorization
+    WHERE authorization.candidate_token = OLD.candidate_token
+)
+BEGIN
+    SELECT RAISE(ABORT, 'candidate cleanup requires durable authorization');
+END;
+
+CREATE TRIGGER candidate_cleaned_requires_completion
+BEFORE UPDATE OF
+    state, closed_at_ms, closed_by_plan_id, closed_by_plan_digest, close_reason
+ON candidate_owners
+WHEN NEW.state = 'cleaned' AND NOT EXISTS (
+    SELECT 1 FROM candidate_cleanup_completions AS completion
+    WHERE completion.candidate_token = OLD.candidate_token
+      AND completion.completed_at_ms = NEW.closed_at_ms
+)
+BEGIN
+    SELECT RAISE(ABORT, 'candidate cleanup requires durable completion');
 END;
 
 CREATE TRIGGER candidate_promotion_requires_receipt
