@@ -80,6 +80,12 @@ impl CandidateStagingOutcomeUncertainCustody<'_> {
 }
 
 impl StagedComputePluginCandidateArchive<'_> {
+    pub(in crate::node_agent_compute_plugin_host) fn archive(
+        &self,
+    ) -> &ExtractedComputePluginCandidateArchive<'_> {
+        &self.archive
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn receipt(
         &self,
     ) -> &HashedComputePluginCandidateStagingReceipt {
