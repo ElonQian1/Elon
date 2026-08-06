@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
 import { clean } from '../../lib/utils'
+import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from '../node/launchWinClient'
 import { nodeId, nodeCanAccept, nodeLabel } from './nodeHelpers'
 import type { ProjectNode, CreateProjectResult } from './types'
 import styles from './CreateProjectModal.module.css'
@@ -36,6 +37,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
   const [storageHint, setStorageHint] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [setupStarted, setSetupStarted] = useState(false)
 
   const loadNodes = useCallback(async () => {
     setNodesLoading(true)
@@ -76,6 +78,12 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
     const poll = window.setInterval(() => void loadNodes(), 5000)
     return () => window.clearInterval(poll)
   }, [loadNodes])
+
+  function handleLaunchClient() {
+    setSetupStarted(true)
+    launchWinClientProtocol()
+    void loadNodes()
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -137,7 +145,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
   const nodeRecoveryTitle = nodesError
     ? '无法读取电脑状态'
     : nodes.length === 0
-      ? (knownNodeCount > 0 ? '电脑暂时未连接' : '需要先连接你的电脑')
+      ? (setupStarted ? '正在等待电脑连接' : knownNodeCount > 0 ? '电脑暂时未连接' : '需要先连接你的电脑')
       : '电脑已连接，但暂时不能创建项目'
   const nodeSelect = (
     <label className={styles.field}>
@@ -166,10 +174,21 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
             <span>
               {nodesError
                 ? '请先点击“我已启动，重新检测”；如果仍失败，再打开开发平台检查登录状态。'
-                : '项目文件会创建在你的电脑上。安装并启动“一龙开发平台”后，这个窗口会自动检测。'}
+                : setupStarted
+                  ? '如果电脑客户端已经打开，请登录当前账号；连接成功后，这个窗口会自动恢复创建。'
+                  : '项目文件会创建在你的电脑上。首次使用请按下面两步操作。'}
             </span>
+            {!nodesError && !setupStarted && (
+              <span className={styles.nodeSteps}>
+                <span>1. 下载并安装电脑客户端</span>
+                <span>2. 打开客户端，登录当前账号</span>
+              </span>
+            )}
           </div>
           <div className={styles.nodeRecoveryActions}>
+            <a className={styles.downloadBtn} href={WIN_CLIENT_DOWNLOAD_URL} download>
+              下载客户端
+            </a>
             <button
               type="button"
               className={styles.secondaryBtn}
@@ -178,8 +197,11 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
             >
               我已启动，重新检测
             </button>
-            <button type="button" className={styles.linkBtn} onClick={() => navigate('/node')}>
-              安装/启动开发平台
+            <button type="button" className={styles.linkBtn} onClick={handleLaunchClient}>
+              启动电脑客户端
+            </button>
+            <button type="button" className={styles.detailBtn} onClick={() => navigate('/node')}>
+              查看连接状态
             </button>
           </div>
         </div>
