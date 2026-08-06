@@ -5,6 +5,7 @@
 
 pub(crate) mod attempt_contract;
 mod bootstrap;
+mod candidate_cleanup_contract;
 mod candidate_extraction;
 mod candidate_health_contract;
 mod candidate_staging_contract;

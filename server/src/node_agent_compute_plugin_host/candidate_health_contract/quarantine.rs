@@ -266,10 +266,22 @@ impl CandidateHealthQuarantineOutcomeUncertainCustody<'_> {
 }
 
 impl DurableCandidateHealthQuarantine<'_> {
+    pub(in crate::node_agent_compute_plugin_host) fn staged(
+        &self,
+    ) -> &StagedComputePluginCandidateArchive<'_> {
+        &self.staged
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn receipt(
         &self,
     ) -> &HashedComputePluginCandidateHealthQuarantineReceipt {
         &self.receipt
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn revalidate_retained_content(
+        &mut self,
+    ) -> Result<()> {
+        self.staged.revalidate_retained_content()
     }
 }
 
