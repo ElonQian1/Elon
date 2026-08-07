@@ -45,13 +45,19 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
-    fun webViewLabIsOwnerAppOnlyAndReachableFromProviderSettings() {
+    fun webViewAccountIsOwnerAppOnlyAndReachableFromProfileAndProviderSettings() {
         val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
         val providerActivity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/AiProviderAccountsActivity.kt"
         )
         val providerLayout = readRepositoryFile(
             "android/app/src/main/res/layout/activity_ai_provider_accounts.xml"
+        )
+        val profileEntry = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/ProfileChatGptWebEntry.kt"
+        )
+        val profileActions = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/MainProfileQuickActions.kt"
         )
 
         val declarationStart = manifest.indexOf("android:name=\".chatgptweb.ChatGptWebTestActivity\"")
@@ -61,6 +67,9 @@ class ChatGptWebLabContractTest {
         assertTrue(declaration.contains("android:exported=\"false\""))
         assertTrue(providerActivity.contains("ChatGptWebTestActivity::class.java"))
         assertTrue(providerLayout.contains("android:id=\"@+id/aiProviderChatGptWebLab\""))
+        assertTrue(profileEntry.contains("ChatGPT 网页账号"))
+        assertTrue(profileEntry.contains("ChatGptWebTestActivity::class.java"))
+        assertTrue(profileActions.contains("chatGptWebEntry.attach()"))
     }
 
     private fun readRepositoryFile(relativePath: String): String =

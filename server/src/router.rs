@@ -125,6 +125,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/", get(web::web_page))
         .route("/web", get(web::web_page))
+        .route("/chatgpt-web", get(web::chatgpt_web_account_page))
         .route("/favicon.ico", get(web::favicon))
         .nest_service("/pc", pc_router)
         .nest_service("/pc-next", pc_next_router)
@@ -218,6 +219,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/assets/ai_provider_accounts.css",
             get(web::ai_provider_accounts_css),
+        )
+        .route(
+            "/assets/chatgpt_web_account.css",
+            get(web::chatgpt_web_account_css),
         )
         .route(
             "/assets/ai_provider_accounts.js",

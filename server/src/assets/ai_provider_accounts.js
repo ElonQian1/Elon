@@ -1,6 +1,13 @@
 (function () {
   'use strict';
 
+  const chatGptWebAccountRow = document.getElementById('chatGptWebAccountRow');
+  if (chatGptWebAccountRow) {
+    chatGptWebAccountRow.addEventListener('click', () => {
+      window.location.assign('/chatgpt-web');
+    });
+  }
+
   const row = document.getElementById('aiProviderAccountsRow');
   const mask = document.getElementById('aiProviderAccountsMask');
   if (!row || !mask) return;

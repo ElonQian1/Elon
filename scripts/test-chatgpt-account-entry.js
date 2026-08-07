@@ -16,6 +16,7 @@ const androidSideMenu = read('android/app/src/main/kotlin/com/elon/app/ChatSideM
 const androidProfile = read('android/app/src/main/kotlin/com/elon/app/PersonalProfileActivity.kt');
 const androidPage = read('android/app/src/main/res/layout/activity_ai_provider_accounts.xml');
 const pwaPage = read('server/src/assets/web_page.html');
+const pwaAccountPage = read('server/src/assets/chatgpt_web_account.html');
 const pwaController = read('server/src/assets/ai_provider_accounts.js');
 const pcAccount = read('pc-frontend/src/features/account/AccountPage.tsx');
 const pcCard = read('pc-frontend/src/features/account/ChatGptAccountCard.tsx');
@@ -26,8 +27,10 @@ expect(androidProfile.includes('"ChatGPT 账号与聊天", "登录本人账号"'
 expect(androidPage.includes('1  打开 ChatGPT 官方页面'), 'APK page must explain the first login step');
 expect(androidPage.includes('只保存在本 APK'), 'APK page must explain local-only session storage');
 
-expect(pwaPage.includes('profile-action-title">ChatGPT 账号与聊天'), 'PWA profile must expose ChatGPT login');
-expect(pwaPage.includes('<h2>ChatGPT 账号与聊天</h2>'), 'PWA panel must use a user-facing title');
+expect(pwaPage.includes('profile-action-title">ChatGPT 网页账号'), 'PWA profile must expose ChatGPT login');
+expect(pwaPage.includes('profile-action-title">AI 厂商账号'), 'PWA must keep advanced provider management separate');
+expect(pwaAccountPage.includes('<h1 id="accountTitle">登录自己的 ChatGPT</h1>'), 'PWA account page must provide a user-facing login title');
+expect(pwaAccountPage.includes('href="https://chatgpt.com/"'), 'PWA account page must open the official ChatGPT origin');
 expect(pwaController.includes("'本人完成登录或真人验证'"), 'PWA panel must explain the official login step');
 expect(pwaController.includes("open.textContent = '登录或继续使用 ChatGPT'"), 'PWA must provide an explicit login/use action');
 
@@ -36,7 +39,7 @@ expect(pcCard.includes('Cookie 和网页登录数据只保存在这台电脑'), 
 expect(pcCard.includes('to="/user-browser"'), 'PC account card must link to the ChatGPT workspace');
 expect(pcBrowser.includes('登录或打开 ChatGPT'), 'Win workspace must expose a plain-language ChatGPT action');
 
-for (const source of [androidPage, pwaPage, pcCard]) {
+for (const source of [androidPage, pwaPage, pwaAccountPage, pcCard]) {
   expect(!source.includes('已绑定 ChatGPT'), 'UI must not claim that a local web session is cloud-bound');
 }
 

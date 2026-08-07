@@ -132,6 +132,8 @@ const PROJECT_HOME_CSS: &str = include_str!("assets/project_home.css");
 const ORBITAL_MOBILE_THEME_CSS: &str = include_str!("assets/orbital_mobile_theme.css");
 const PROJECT_HOME_JS: &str = include_str!("assets/project_home.js");
 const AI_PROVIDER_ACCOUNTS_CSS: &str = include_str!("assets/ai_provider_accounts.css");
+const CHATGPT_WEB_ACCOUNT_HTML: &str = include_str!("assets/chatgpt_web_account.html");
+const CHATGPT_WEB_ACCOUNT_CSS: &str = include_str!("assets/chatgpt_web_account.css");
 const LOCAL_WEB_PROVIDERS_JS: &str = include_str!("assets/local_web_providers.js");
 const AI_PROVIDER_ACCOUNTS_JS: &str = include_str!("assets/ai_provider_accounts.js");
 const FEDERATED_AUTH_CSS: &str = include_str!("assets/federated_auth.css");
@@ -162,6 +164,16 @@ pub async fn web_page(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         HeaderValue::from_static(page.source),
     );
     (headers, Html(page.html))
+}
+
+pub async fn chatgpt_web_account_page() -> impl IntoResponse {
+    (
+        [
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+            (header::PRAGMA, "no-cache"),
+        ],
+        Html(CHATGPT_WEB_ACCOUNT_HTML),
+    )
 }
 
 pub async fn favicon() -> impl IntoResponse {
@@ -572,6 +584,16 @@ pub async fn ai_provider_accounts_css() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         AI_PROVIDER_ACCOUNTS_CSS,
+    )
+}
+
+pub async fn chatgpt_web_account_css() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        CHATGPT_WEB_ACCOUNT_CSS,
     )
 }
 

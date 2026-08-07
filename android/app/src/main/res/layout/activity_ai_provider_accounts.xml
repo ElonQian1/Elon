@@ -10,7 +10,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="登录本人 ChatGPT，然后直接在一龙里聊天"
+        android:text="登录自己的 ChatGPT，然后直接在一龙里聊天"
         android:textColor="@color/elon_text_primary"
         android:textSize="18sp"
         android:textStyle="bold" />

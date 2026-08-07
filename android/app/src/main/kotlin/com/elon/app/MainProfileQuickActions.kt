@@ -44,6 +44,7 @@ internal class MainProfileQuickActions(
     private val myNodesCard by lazy { MyNodesCard(activity, binding, http, serverUrl) }
     private val userMemoriesCard by lazy { UserMemoriesCard(activity, binding, http, serverUrl) }
     private val accountSecurityEntry by lazy { ProfileAccountSecurityEntry(activity, binding) }
+    private val chatGptWebEntry by lazy { ProfileChatGptWebEntry(activity, binding) }
     private var nodeResourceExpanded = false
     private val stopObservingUpdate = AppUpdateManager.observeProfileStatus(activity) { status ->
         activity.runOnUiThread {
@@ -96,6 +97,7 @@ internal class MainProfileQuickActions(
             }
             userMemoriesCard.attachAndRefresh()
             accountSecurityEntry.attachAndRefresh()
+            chatGptWebEntry.attach()
             refreshUpdateStatus()
         }
     }
