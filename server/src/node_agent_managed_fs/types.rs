@@ -78,6 +78,8 @@ impl QuarantinedManagedFile {
 pub(crate) struct PinnedManagedFile {
     pub(super) file: File,
     pub(super) _directory_handles: Vec<Arc<File>>,
+    pub(super) root_volume_serial: u64,
+    pub(super) root_identity_digest: String,
     pub(super) identity: PlatformFileIdentity,
     pub(super) identity_digest: String,
     pub(super) binding: ManagedObjectBinding,

@@ -156,6 +156,8 @@ impl PinnedManagedDirectory {
         Ok(PinnedManagedFile {
             file,
             _directory_handles: self.directory_handles.clone(),
+            root_volume_serial: self.root_volume_serial,
+            root_identity_digest: self.root_identity_digest.clone(),
             identity,
             identity_digest,
             binding,

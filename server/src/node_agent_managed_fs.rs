@@ -30,7 +30,12 @@ pub(crate) use delete::{
     ManagedDirectoryDeleteFailure, ManagedFileDeleteFailure, ManagedObjectDeleteEvidence,
 };
 pub(crate) use hash::{ManagedFileHashFailure, ManagedFileHashPhase, ManagedFileHashResult};
-pub(crate) use namespace::ManagedObjectBinding;
+pub(crate) use namespace::{
+    ManagedDeleteDisposition, ManagedExpectedIdentityMatchPresence,
+    ManagedNamespaceDurabilityFailure, ManagedNamespaceDurable, ManagedNamespaceObservationFailure,
+    ManagedObjectBinding, ManagedParentRelativeAbsence, ManagedParentRelativeIdentityConflict,
+    ManagedParentRelativeObservation, QuarantinedManagedNamespaceObject,
+};
 pub(crate) use read::ManagedFileReadCursor;
 pub(crate) use types::{
     ManagedDirectoryPrepareFailure, ManagedExclusiveFileLockFailure, ManagedFileOpenFailure,
@@ -370,7 +375,7 @@ fn validate_directory_identity(
     identity: PlatformFileIdentity,
     expected_volume: Option<u64>,
 ) -> Result<()> {
-    if !identity.is_directory || identity.is_reparse_point {
+    if !identity.is_directory || identity.is_reparse_point || identity.file_id == [0; 16] {
         bail!("NODE_MANAGED_DIRECTORY_IDENTITY_INVALID");
     }
     if expected_volume.is_some_and(|volume| volume != identity.volume_serial) {
@@ -385,6 +390,7 @@ fn validate_regular_file_identity(
 ) -> Result<()> {
     if identity.is_directory
         || identity.is_reparse_point
+        || identity.file_id == [0; 16]
         || identity.number_of_links != 1
         || identity.volume_serial != expected_volume
     {

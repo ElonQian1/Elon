@@ -8,6 +8,10 @@ use super::{
     PinnedManagedDirectory, PinnedManagedFile, PinnedManagedRoot,
 };
 
+mod disposition;
+
+/// Legacy process-local evidence used only by the unadapted cleanup executor. It does not retain
+/// parent custody and cannot authorize absence, durability, completion, or recovery.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ManagedObjectDeleteEvidence {
     identity_digest: Option<String>,
@@ -110,7 +114,7 @@ impl PinnedManagedDirectory {
                 return Err(ManagedDirectoryDeleteFailure {
                     error: std::io::Error::other("NODE_MANAGED_DELETE_DIRECTORY_HANDLE_MISSING"),
                     directory: self,
-                })
+                });
             }
         };
         if let Err(error) = platform::delete_by_handle(handle.as_ref()) {
@@ -119,9 +123,13 @@ impl PinnedManagedDirectory {
                 directory: self,
             });
         }
+        let identity_digest = self
+            .binding
+            .as_ref()
+            .map(|binding| binding.identity_digest().to_string());
         drop(self);
         Ok(ManagedObjectDeleteEvidence {
-            identity_digest: None,
+            identity_digest,
             object_kind: ManagedObjectKind::Directory,
         })
     }
@@ -213,6 +221,7 @@ mod tests {
         let evidence = file.delete_exact().expect("delete artifact");
         assert!(!evidence.is_directory());
         assert!(evidence.identity_digest().is_some());
+        drop(evidence);
 
         let directory = root
             .pin_existing_directory_for_cleanup(Path::new("candidate"))

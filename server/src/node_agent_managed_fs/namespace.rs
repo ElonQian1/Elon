@@ -1,5 +1,15 @@
 use std::{ffi::OsStr, ffi::OsString, fmt};
 
+mod lifecycle;
+
+pub(super) use lifecycle::PlatformParentRelativeObservation;
+pub(crate) use lifecycle::{
+    ManagedDeleteDisposition, ManagedExpectedIdentityMatchPresence,
+    ManagedNamespaceDurabilityFailure, ManagedNamespaceDurable, ManagedNamespaceObservationFailure,
+    ManagedParentRelativeAbsence, ManagedParentRelativeIdentityConflict,
+    ManagedParentRelativeObservation, QuarantinedManagedNamespaceObject,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ManagedObjectKind {
     File,

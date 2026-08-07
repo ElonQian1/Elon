@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::PlatformFileIdentity;
+use super::{namespace::PlatformParentRelativeObservation, PlatformFileIdentity};
 
 fn unsupported() -> std::io::Error {
     std::io::Error::new(
@@ -59,6 +59,13 @@ pub(super) fn open_existing_file_relative_deletable(
 }
 
 pub(super) fn delete_by_handle(_file: &File) -> std::io::Result<()> {
+    Err(unsupported())
+}
+
+pub(super) fn observe_child_relative(
+    _parent: &File,
+    _name: &OsStr,
+) -> std::io::Result<PlatformParentRelativeObservation> {
     Err(unsupported())
 }
 

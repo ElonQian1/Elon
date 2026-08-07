@@ -20,7 +20,8 @@ use windows_sys::{
     },
     Win32::{
         Foundation::{
-            RtlNtStatusToDosError, HANDLE, INVALID_HANDLE_VALUE, NTSTATUS, UNICODE_STRING,
+            RtlNtStatusToDosError, HANDLE, INVALID_HANDLE_VALUE, NTSTATUS, STATUS_NO_SUCH_FILE,
+            STATUS_OBJECT_NAME_NOT_FOUND, UNICODE_STRING,
         },
         Storage::FileSystem::{
             FileDispositionInfoEx, FileIdInfo, GetFileInformationByHandle,
@@ -30,13 +31,14 @@ use windows_sys::{
             FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE, FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
             FILE_DISPOSITION_INFO_EX, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
             FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_ID_INFO, FILE_NAME_NORMALIZED,
-            FILE_READ_ATTRIBUTES, FILE_SHARE_READ, FILE_TRAVERSE, SYNCHRONIZE, VOLUME_NAME_GUID,
+            FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
+            FILE_TRAVERSE, SYNCHRONIZE, VOLUME_NAME_GUID,
         },
         System::{Kernel::OBJ_CASE_INSENSITIVE, IO::IO_STATUS_BLOCK},
     },
 };
 
-use super::PlatformFileIdentity;
+use super::{namespace::PlatformParentRelativeObservation, PlatformFileIdentity};
 
 const MAX_FINAL_PATH_UTF16: usize = 32_768;
 
@@ -131,6 +133,28 @@ pub(super) fn open_existing_file_relative_deletable(
     )
 }
 
+pub(super) fn observe_child_relative(
+    parent: &File,
+    name: &OsStr,
+) -> std::io::Result<PlatformParentRelativeObservation> {
+    match open_relative_raw(
+        parent,
+        name,
+        FILE_READ_ATTRIBUTES | SYNCHRONIZE,
+        FILE_OPEN,
+        NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+    ) {
+        Ok(file) => Ok(PlatformParentRelativeObservation::Present(file)),
+        Err(RelativeOpenFailure::NtStatus(status))
+            if status == STATUS_OBJECT_NAME_NOT_FOUND || status == STATUS_NO_SUCH_FILE =>
+        {
+            Ok(PlatformParentRelativeObservation::Absent)
+        }
+        Err(error) => Err(error.into_io_error()),
+    }
+}
+
 pub(super) fn delete_by_handle(file: &File) -> std::io::Result<()> {
     let disposition = FILE_DISPOSITION_INFO_EX {
         Flags: FILE_DISPOSITION_FLAG_DELETE
@@ -161,15 +185,48 @@ fn open_relative(
     create_options: u32,
     share_access: u32,
 ) -> std::io::Result<File> {
+    open_relative_raw(
+        parent,
+        name,
+        desired_access,
+        create_disposition,
+        create_options,
+        share_access,
+    )
+    .map_err(RelativeOpenFailure::into_io_error)
+}
+
+enum RelativeOpenFailure {
+    Io(std::io::Error),
+    NtStatus(NTSTATUS),
+}
+
+impl RelativeOpenFailure {
+    fn into_io_error(self) -> std::io::Error {
+        match self {
+            Self::Io(error) => error,
+            Self::NtStatus(status) => ntstatus_error(status),
+        }
+    }
+}
+
+fn open_relative_raw(
+    parent: &File,
+    name: &OsStr,
+    desired_access: u32,
+    create_disposition: u32,
+    create_options: u32,
+    share_access: u32,
+) -> Result<File, RelativeOpenFailure> {
     let mut name_utf16 = name.encode_wide().collect::<Vec<_>>();
     if name_utf16.is_empty()
         || name_utf16.contains(&0)
         || name_utf16.len() > usize::from(u16::MAX) / size_of::<u16>()
     {
-        return Err(std::io::Error::new(
+        return Err(RelativeOpenFailure::Io(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             "NODE_MANAGED_RELATIVE_NAME_INVALID",
-        ));
+        )));
     }
     let name_bytes = (name_utf16.len() * size_of::<u16>()) as u16;
     let object_name = UNICODE_STRING {
@@ -205,13 +262,13 @@ fn open_relative(
         )
     };
     if status < 0 {
-        return Err(ntstatus_error(status));
+        return Err(RelativeOpenFailure::NtStatus(status));
     }
     if handle.is_null() || handle == INVALID_HANDLE_VALUE {
-        return Err(std::io::Error::new(
+        return Err(RelativeOpenFailure::Io(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             "NODE_MANAGED_RELATIVE_OPEN_INVALID_HANDLE",
-        ));
+        )));
     }
     // SAFETY: NtCreateFile returned one owned live handle and no other owner was constructed.
     Ok(unsafe { File::from_raw_handle(handle as RawHandle) })
