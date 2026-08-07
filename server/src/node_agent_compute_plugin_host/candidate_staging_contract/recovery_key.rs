@@ -164,6 +164,10 @@ impl ComputePluginCandidateStagingRecoveryKey {
         &self.receipt.staging_run_digest
     }
 
+    pub(in crate::node_agent_compute_plugin_host) fn root_identity_digest(&self) -> &str {
+        &self.receipt.root_identity_digest
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn process_owner_epoch(&self) -> i64 {
         self.receipt.process_owner_epoch
     }

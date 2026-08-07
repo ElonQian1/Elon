@@ -104,17 +104,27 @@ impl PreparedComputePluginCandidateStaging<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn pin_cleanup_ancestors(
         &self,
         candidate_token_digest: &str,
-    ) -> Result<(PinnedManagedDirectory, PinnedManagedDirectory)> {
+    ) -> Result<(
+        PinnedManagedDirectory,
+        PinnedManagedDirectory,
+        PinnedManagedDirectory,
+    )> {
         if !is_sha256(candidate_token_digest) {
             return Err(anyhow!("COMPUTE_PLUGIN_CLEANUP_CANDIDATE_DIGEST_INVALID"));
         }
         let candidate_relative =
             format!("{COMPUTE_PLUGIN_DIRECTORY}/{CANDIDATES_DIRECTORY}/{candidate_token_digest}");
+        let candidate_parent_relative =
+            format!("{COMPUTE_PLUGIN_DIRECTORY}/{CANDIDATES_DIRECTORY}");
         let staging_relative = format!("{candidate_relative}/{STAGING_DIRECTORY}");
         let expected_run = format!("{staging_relative}/{}", self.staging_run_digest);
         if self.relative_root != expected_run {
             return Err(anyhow!("COMPUTE_PLUGIN_CLEANUP_STAGING_BINDING_CHANGED"));
         }
+        let candidate_parent = self
+            .root
+            .root
+            .pin_existing_directory_for_cleanup(Path::new(&candidate_parent_relative))?;
         let candidate = self
             .root
             .root
@@ -123,7 +133,7 @@ impl PreparedComputePluginCandidateStaging<'_> {
             .root
             .root
             .pin_existing_directory_for_cleanup(Path::new(&staging_relative))?;
-        Ok((candidate, staging))
+        Ok((candidate_parent, candidate, staging))
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn into_cleanup_directory(

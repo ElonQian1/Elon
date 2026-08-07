@@ -1,9 +1,12 @@
-use std::{cmp::Ordering, collections::VecDeque};
+use std::{cmp::Ordering, collections::VecDeque, path::Path};
 
-use anyhow::{Error, Result};
+use anyhow::{bail, Error, Result};
 
 use super::ComputePluginCandidateCleanupStepEvidence;
-use crate::node_agent_managed_fs::{PinnedManagedDirectory, PinnedManagedFile};
+use crate::node_agent_compute_plugin_host::candidate_cleanup_contract::topology::builder::CandidateCleanupTopologyObjectInput;
+use crate::node_agent_managed_fs::{
+    ManagedObjectBinding, PinnedManagedDirectory, PinnedManagedFile,
+};
 
 pub(super) struct PendingCleanupFile {
     pub object_kind: &'static str,
@@ -17,6 +20,61 @@ pub(super) struct PendingCleanupDirectory {
     pub object_kind: &'static str,
     pub logical_path: String,
     pub directory: PinnedManagedDirectory,
+}
+
+impl PendingCleanupFile {
+    pub(super) fn topology_input(&self) -> Result<CandidateCleanupTopologyObjectInput> {
+        let binding = self.file.object_binding();
+        validate_topology_binding(
+            &self.logical_path,
+            binding,
+            false,
+            Some(&self.expected_identity_digest),
+        )?;
+        Ok(CandidateCleanupTopologyObjectInput {
+            logical_kind: self.object_kind,
+            relative_path: self.logical_path.clone(),
+            expected_identity_digest: binding.identity_digest().to_string(),
+            expected_parent_identity_digest: binding.parent_identity_digest().to_string(),
+            expected_content_digest: Some(self.content_digest.clone()),
+            expected_size_bytes: Some(self.file.len_bytes()),
+        })
+    }
+}
+
+impl PendingCleanupDirectory {
+    pub(super) fn topology_input(&self) -> Result<CandidateCleanupTopologyObjectInput> {
+        let binding = self.directory.object_binding().ok_or_else(|| {
+            anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DIRECTORY_BINDING_MISSING")
+        })?;
+        validate_topology_binding(&self.logical_path, binding, true, None)?;
+        Ok(CandidateCleanupTopologyObjectInput {
+            logical_kind: self.object_kind,
+            relative_path: self.logical_path.clone(),
+            expected_identity_digest: binding.identity_digest().to_string(),
+            expected_parent_identity_digest: binding.parent_identity_digest().to_string(),
+            expected_content_digest: None,
+            expected_size_bytes: None,
+        })
+    }
+}
+
+fn validate_topology_binding(
+    logical_path: &str,
+    binding: &ManagedObjectBinding,
+    expect_directory: bool,
+    expected_identity_digest: Option<&str>,
+) -> Result<()> {
+    let relative_name = Path::new(logical_path)
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_OBJECT_NAME_MISSING"))?;
+    if binding.is_directory() != expect_directory
+        || binding.relative_name() != relative_name
+        || expected_identity_digest.is_some_and(|expected| expected != binding.identity_digest())
+    {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_OBJECT_BINDING_CHANGED");
+    }
+    Ok(())
 }
 
 pub(super) fn ordered_files(mut files: Vec<PendingCleanupFile>) -> VecDeque<PendingCleanupFile> {

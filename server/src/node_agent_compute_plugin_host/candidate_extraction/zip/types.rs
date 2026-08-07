@@ -222,7 +222,11 @@ impl ExtractedComputePluginCandidateArchive<'_> {
 
     pub(in crate::node_agent_compute_plugin_host) fn pin_cleanup_ancestors(
         &self,
-    ) -> anyhow::Result<(PinnedManagedDirectory, PinnedManagedDirectory)> {
+    ) -> anyhow::Result<(
+        PinnedManagedDirectory,
+        PinnedManagedDirectory,
+        PinnedManagedDirectory,
+    )> {
         self.staging
             .pin_cleanup_ancestors(&self.evidence.evidence.candidate_token_digest)
     }

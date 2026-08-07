@@ -13,6 +13,7 @@ use super::local_authority_schema;
 mod candidate_verification_revocation;
 mod cleanup_completion_store;
 mod cleanup_store;
+mod cleanup_topology_store;
 mod fetch_claim_revocation;
 mod fetch_store;
 mod health_quarantine_store;
@@ -51,6 +52,11 @@ pub(in crate::node_agent_compute_plugin_host) use cleanup_store::{
     CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_DIGEST_ALGORITHM,
     CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA,
     HASHED_CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA,
+};
+pub(in crate::node_agent_compute_plugin_host) use cleanup_topology_store::{
+    ComputePluginCandidateCleanupTopologyAuthoritySession,
+    ComputePluginCandidateCleanupTopologyRecoveryAuthoritySession,
+    ComputePluginCandidateCleanupTopologyRecoveryOutcome,
 };
 pub(in crate::node_agent_compute_plugin_host) use fetch_store::{
     ComputePluginFetchAuthorityFacts, ComputePluginFetchAuthoritySession,

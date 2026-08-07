@@ -27,6 +27,7 @@ mod completion_recovery_key;
 mod execution;
 mod recovery_key;
 mod terminal_journal;
+mod topology;
 
 pub(in crate::node_agent_compute_plugin_host) use adoption::{
     adopt_recovered_candidate_cleanup_authorization,
@@ -48,8 +49,8 @@ pub(in crate::node_agent_compute_plugin_host) use completion_recovery_key::{
 pub(in crate::node_agent_compute_plugin_host) use execution::validate_hashed_execution_evidence;
 pub(in crate::node_agent_compute_plugin_host) use execution::{
     prepare_candidate_cleanup_execution, resume_candidate_cleanup_execution,
-    CandidateCleanupExecutionFailure, CandidateCleanupExecutionPreparationFailure,
-    CandidateCleanupExecutionState, ComputePluginCandidateCleanupExecutionEvidence,
+    CandidateCleanupExecutionFailure, CandidateCleanupExecutionState,
+    ComputePluginCandidateCleanupExecutionEvidence,
     HashedComputePluginCandidateCleanupExecutionEvidence, PhysicallyExecutedCandidateCleanup,
 };
 pub(in crate::node_agent_compute_plugin_host) use recovery_key::{
@@ -57,6 +58,20 @@ pub(in crate::node_agent_compute_plugin_host) use recovery_key::{
     CandidateCleanupSlotExpectation,
 };
 pub(in crate::node_agent_compute_plugin_host) use terminal_journal::DurableCandidateCleanupTerminalJournal;
+pub(in crate::node_agent_compute_plugin_host) use topology::{
+    adopt_recovered_candidate_cleanup_topology, prepare_candidate_cleanup_topology,
+    prepare_pinned_candidate_cleanup_topology, restore_hashed_execution_plan,
+    restore_hashed_expected_object, store_candidate_cleanup_topology,
+    validate_hashed_execution_plan, CandidateCleanupPinnedTopologyPreparationFailure,
+    CandidateCleanupTopologyOutcomeUncertainCustody, CandidateCleanupTopologyPreparationCustody,
+    CandidateCleanupTopologyPreparationFailure, CandidateCleanupTopologyRecoveryAdoption,
+    CandidateCleanupTopologyRecoveryAdoptionFailure, CandidateCleanupTopologyRecoveryAdoptionPhase,
+    CandidateCleanupTopologyRecoveryKey, CandidateCleanupTopologyStoreFailure,
+    CandidateCleanupTopologyStorePhase, ComputePluginCandidateCleanupExecutionPlan,
+    ComputePluginCandidateCleanupExpectedObject, HashedCandidateCleanupExpectedObject,
+    HashedComputePluginCandidateCleanupExecutionPlan, PreparedCandidateCleanupTopology,
+    SealedCandidateCleanupTopology, ValidatedCandidateCleanupTopologyPermit,
+};
 
 #[must_use = "prepared cleanup authorization must be stored or returned with candidate custody"]
 pub(in crate::node_agent_compute_plugin_host) struct PreparedCandidateCleanupAuthorization<

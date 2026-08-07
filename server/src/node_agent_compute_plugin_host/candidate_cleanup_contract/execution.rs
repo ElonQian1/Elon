@@ -2,7 +2,9 @@ use std::{collections::VecDeque, error::Error as StdError, fmt, time::Instant};
 
 use anyhow::{bail, Error, Result};
 
-use super::AuthorizedCandidateCleanup;
+use super::{
+    topology::builder::CandidateCleanupTopologyObjectInput, SealedCandidateCleanupTopology,
+};
 use crate::node_agent_compute_plugin_host::{
     candidate_staging_contract::ComputePluginCandidateStagingRecoveryKey,
     fetch_contract::ComputePluginFetchCancellationGuard,
@@ -11,12 +13,15 @@ use crate::node_agent_compute_plugin_host::{
         HashedComputePluginCandidateHealthQuarantineReceipt,
         HashedComputePluginCandidateStagingReceipt,
     },
-    manifest_validation::is_sha256,
     root_lock::ComputePluginRootLockLease,
 };
+use crate::node_agent_managed_fs::PinnedManagedDirectory;
 
 mod delete_steps;
 mod evidence;
+mod preparation;
+
+pub(in crate::node_agent_compute_plugin_host) use preparation::prepare_candidate_cleanup_execution_state;
 
 use delete_steps::{
     delete_directory, delete_file, delete_optional_directory, ordered_files,
@@ -37,6 +42,8 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupExecutionSt
     cancellation_guard: ComputePluginFetchCancellationGuard,
     extraction_evidence_digest: String,
     root_lock_lease: ComputePluginRootLockLease,
+    candidate_parent_anchor: PinnedManagedDirectory,
+    execution_plan_digest: Option<String>,
     staging_files: VecDeque<PendingCleanupFile>,
     seal: Option<PendingCleanupFile>,
     staging_directories: VecDeque<PendingCleanupDirectory>,
@@ -46,13 +53,6 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupExecutionSt
     downloads_directory: Option<PendingCleanupDirectory>,
     candidate_directory: Option<PendingCleanupDirectory>,
     completed_steps: Vec<ComputePluginCandidateCleanupStepEvidence>,
-}
-
-pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupExecutionPreparationFailure<
-    'root,
-> {
-    error: Error,
-    authorized: AuthorizedCandidateCleanup<'root>,
 }
 
 pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupExecutionFailure {
@@ -70,122 +70,18 @@ pub(in crate::node_agent_compute_plugin_host) struct PhysicallyExecutedCandidate
     staging_recovery_key: ComputePluginCandidateStagingRecoveryKey,
     cancellation_guard: ComputePluginFetchCancellationGuard,
     root_lock_lease: ComputePluginRootLockLease,
+    candidate_parent_anchor: PinnedManagedDirectory,
+    execution_plan_digest: String,
     evidence: HashedComputePluginCandidateCleanupExecutionEvidence,
     physical_completed_at: Instant,
 }
 
-pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_execution<'root>(
-    mut authorized: AuthorizedCandidateCleanup<'root>,
-) -> std::result::Result<
-    CandidateCleanupExecutionState,
-    CandidateCleanupExecutionPreparationFailure<'root>,
-> {
-    if let Err(error) = validate_before_execution(&mut authorized) {
-        return Err(CandidateCleanupExecutionPreparationFailure { error, authorized });
-    }
-    let (candidate_directory, staging_parent) = match authorized
-        .quarantined()
-        .staged()
-        .archive()
-        .pin_cleanup_ancestors()
-    {
-        Ok(ancestors) => ancestors,
-        Err(error) => {
-            return Err(CandidateCleanupExecutionPreparationFailure { error, authorized })
-        }
-    };
-
-    let cancellation_guard = authorized
-        .quarantined()
-        .staged()
-        .archive()
-        .snapshot_cancellation_guard();
-    let (quarantined, authorization_receipt) = authorized.into_parts();
-    let (staged, quarantine_receipt) = quarantined.into_parts();
-    let (archive, staging_receipt, staging_recovery_key) = staged.into_parts();
-    let parts = archive.into_cleanup_parts();
-    let candidate_token_digest = parts.evidence.evidence.candidate_token_digest.clone();
-    let staging_run_digest = parts.evidence.evidence.staging_run_digest.clone();
-    let extraction_evidence_digest = parts.evidence.evidence_digest.clone();
-    let seal_file_digest = parts.seal_evidence.file_digest.clone();
-    let seal_identity_digest = parts.seal_evidence.file_identity_digest.clone();
-    let (download_artifacts, downloads) = parts.verified.into_cleanup_parts();
-    let (downloads_directory, root_lock_lease) = downloads.into_cleanup_parts();
-    let staging_run = parts.staging.into_cleanup_directory();
-
-    let staging_files = parts
-        .files
-        .into_iter()
-        .map(|(path, digest, file)| PendingCleanupFile {
-            object_kind: "staging_file",
-            logical_path: format!("staging/{staging_run_digest}/{path}"),
-            content_digest: digest,
-            expected_identity_digest: file.identity_digest().to_string(),
-            file,
-        })
-        .collect::<Vec<_>>();
-
-    let staging_directories = parts
-        .directories
-        .into_iter()
-        .map(|(path, directory)| PendingCleanupDirectory {
-            object_kind: "staging_directory",
-            logical_path: format!("staging/{staging_run_digest}/{path}"),
-            directory,
-        })
-        .collect::<Vec<_>>();
-
-    let download_files = download_artifacts
-        .into_iter()
-        .map(|artifact| PendingCleanupFile {
-            object_kind: "download_file",
-            logical_path: artifact.logical_path,
-            content_digest: artifact.expected_digest,
-            expected_identity_digest: artifact.file.identity_digest().to_string(),
-            file: artifact.file,
-        })
-        .collect::<Vec<_>>();
-
-    Ok(CandidateCleanupExecutionState {
-        authorization_receipt,
-        quarantine_receipt,
-        staging_receipt,
-        staging_recovery_key,
-        cancellation_guard,
-        extraction_evidence_digest,
-        root_lock_lease,
-        staging_files: ordered_files(staging_files),
-        seal: Some(PendingCleanupFile {
-            object_kind: "staging_seal",
-            logical_path: format!("staging/{staging_run_digest}/.elon-staging-seal.json"),
-            content_digest: seal_file_digest,
-            expected_identity_digest: seal_identity_digest,
-            file: parts.seal,
-        }),
-        staging_directories: ordered_staging_directories(staging_directories),
-        staging_run: Some(PendingCleanupDirectory {
-            object_kind: "staging_run_directory",
-            logical_path: format!("staging/{staging_run_digest}"),
-            directory: staging_run,
-        }),
-        staging_parent: Some(PendingCleanupDirectory {
-            object_kind: "staging_parent_directory",
-            logical_path: "staging".to_string(),
-            directory: staging_parent,
-        }),
-        download_files: ordered_files(download_files),
-        downloads_directory: Some(PendingCleanupDirectory {
-            object_kind: "downloads_directory",
-            logical_path: "downloads".to_string(),
-            directory: downloads_directory,
-        }),
-        candidate_directory: Some(PendingCleanupDirectory {
-            object_kind: "candidate_directory",
-            logical_path: format!("candidate/{candidate_token_digest}"),
-            directory: candidate_directory,
-        }),
-        completed_steps: Vec::new(),
-    })
+pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_execution(
+    sealed: SealedCandidateCleanupTopology,
+) -> CandidateCleanupExecutionState {
+    let (mut state, plan) = sealed.into_parts();
+    state.execution_plan_digest = Some(plan.plan_digest().to_string());
+    state
 }
 
 pub(in crate::node_agent_compute_plugin_host) fn resume_candidate_cleanup_execution(
@@ -238,20 +134,6 @@ pub(in crate::node_agent_compute_plugin_host) fn resume_candidate_cleanup_execut
     finish_execution(state).map_err(|(error, state)| execution_failure(error, state))
 }
 
-fn validate_before_execution(authorized: &mut AuthorizedCandidateCleanup<'_>) -> Result<()> {
-    authorized.quarantined.revalidate_retained_content()?;
-    authorized
-        .quarantined
-        .staged()
-        .archive()
-        .validate_cleanup_custody()?;
-    let receipt = authorized.receipt();
-    if receipt.receipt().slot_phase_before() != "failed" || !is_sha256(receipt.receipt_digest()) {
-        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_EXECUTION_AUTHORIZATION_CHANGED");
-    }
-    Ok(())
-}
-
 fn finish_execution(
     state: CandidateCleanupExecutionState,
 ) -> std::result::Result<PhysicallyExecutedCandidateCleanup, (Error, CandidateCleanupExecutionState)>
@@ -275,6 +157,15 @@ fn finish_execution(
         Ok(hashed) => hashed,
         Err(error) => return Err((error, state)),
     };
+    let execution_plan_digest = match state.execution_plan_digest.clone() {
+        Some(digest) => digest,
+        None => {
+            return Err((
+                anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_PLAN_NOT_SEALED"),
+                state,
+            ))
+        }
+    };
     Ok(PhysicallyExecutedCandidateCleanup {
         authorization_receipt: state.authorization_receipt,
         quarantine_receipt: state.quarantine_receipt,
@@ -282,6 +173,8 @@ fn finish_execution(
         staging_recovery_key: state.staging_recovery_key,
         cancellation_guard: state.cancellation_guard,
         root_lock_lease: state.root_lock_lease,
+        candidate_parent_anchor: state.candidate_parent_anchor,
+        execution_plan_digest,
         evidence: hashed,
         physical_completed_at: Instant::now(),
     })
@@ -309,6 +202,79 @@ impl CandidateCleanupExecutionState {
     pub(in crate::node_agent_compute_plugin_host) fn completed_step_count(&self) -> usize {
         self.completed_steps.len()
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn cancellation_guard(
+        &self,
+    ) -> &ComputePluginFetchCancellationGuard {
+        &self.cancellation_guard
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn authorization_receipt(
+        &self,
+    ) -> &HashedComputePluginCandidateCleanupAuthorizationReceipt {
+        &self.authorization_receipt
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn staging_recovery_key(
+        &self,
+    ) -> &ComputePluginCandidateStagingRecoveryKey {
+        &self.staging_recovery_key
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn candidate_parent_anchor_identity_digest(
+        &self,
+    ) -> Result<&str> {
+        let binding = self
+            .candidate_parent_anchor
+            .object_binding()
+            .ok_or_else(|| {
+                anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_ANCHOR_BINDING_MISSING")
+            })?;
+        if !binding.is_directory() {
+            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_ANCHOR_BINDING_CHANGED");
+        }
+        Ok(binding.identity_digest())
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn topology_objects(
+        &self,
+    ) -> Result<Vec<CandidateCleanupTopologyObjectInput>> {
+        self.staging_files
+            .iter()
+            .map(PendingCleanupFile::topology_input)
+            .chain(self.seal.iter().map(PendingCleanupFile::topology_input))
+            .chain(
+                self.staging_directories
+                    .iter()
+                    .map(PendingCleanupDirectory::topology_input),
+            )
+            .chain(
+                self.staging_run
+                    .iter()
+                    .map(PendingCleanupDirectory::topology_input),
+            )
+            .chain(
+                self.staging_parent
+                    .iter()
+                    .map(PendingCleanupDirectory::topology_input),
+            )
+            .chain(
+                self.download_files
+                    .iter()
+                    .map(PendingCleanupFile::topology_input),
+            )
+            .chain(
+                self.downloads_directory
+                    .iter()
+                    .map(PendingCleanupDirectory::topology_input),
+            )
+            .chain(
+                self.candidate_directory
+                    .iter()
+                    .map(PendingCleanupDirectory::topology_input),
+            )
+            .collect()
+    }
 }
 
 impl CandidateCleanupExecutionFailure {
@@ -318,32 +284,6 @@ impl CandidateCleanupExecutionFailure {
         (self.error, self.state)
     }
 }
-
-impl<'root> CandidateCleanupExecutionPreparationFailure<'root> {
-    pub(in crate::node_agent_compute_plugin_host) fn into_parts(
-        self,
-    ) -> (Error, AuthorizedCandidateCleanup<'root>) {
-        (self.error, self.authorized)
-    }
-}
-
-impl fmt::Display for CandidateCleanupExecutionPreparationFailure<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{:#}", self.error)
-    }
-}
-
-impl fmt::Debug for CandidateCleanupExecutionPreparationFailure<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("CandidateCleanupExecutionPreparationFailure")
-            .field("error", &self.error)
-            .field("authorized", &"<retained-handles>")
-            .finish()
-    }
-}
-
-impl StdError for CandidateCleanupExecutionPreparationFailure<'_> {}
 
 impl PhysicallyExecutedCandidateCleanup {
     pub(in crate::node_agent_compute_plugin_host) fn authorization_receipt(
@@ -386,6 +326,10 @@ impl PhysicallyExecutedCandidateCleanup {
         &self.evidence
     }
 
+    pub(in crate::node_agent_compute_plugin_host) fn execution_plan_digest(&self) -> &str {
+        &self.execution_plan_digest
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn into_parts(
         self,
     ) -> (
@@ -395,6 +339,8 @@ impl PhysicallyExecutedCandidateCleanup {
         ComputePluginCandidateStagingRecoveryKey,
         ComputePluginFetchCancellationGuard,
         ComputePluginRootLockLease,
+        PinnedManagedDirectory,
+        String,
         HashedComputePluginCandidateCleanupExecutionEvidence,
         Instant,
     ) {
@@ -405,6 +351,8 @@ impl PhysicallyExecutedCandidateCleanup {
             self.staging_recovery_key,
             self.cancellation_guard,
             self.root_lock_lease,
+            self.candidate_parent_anchor,
+            self.execution_plan_digest,
             self.evidence,
             self.physical_completed_at,
         )
