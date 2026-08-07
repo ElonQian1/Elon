@@ -490,7 +490,8 @@ internal class ChatSideMenuController(
         )
 
         panelBody.addView(accountSummaryRow())
-        panelBody.addView(settingsRow("个人账户") { openAccountEntry() })
+        panelBody.addView(settingsRow("个人账户") { ChatAccountNavigation.openPersonal(activity) })
+        panelBody.addView(settingsRow("ChatGPT 账号与聊天") { ChatAccountNavigation.openChatGpt(activity) })
         usageDropdown = SideMenuUsageDropdown(activity, dp, selectableForeground)
         panelBody.addView(usageDropdown.rowView)
         panelBody.addView(usageDropdown.detailsView)
@@ -850,14 +851,6 @@ internal class ChatSideMenuController(
     private fun accountMenuAccount(): String {
         if (!AuthManager.isLoggedIn(activity)) return "未登录"
         return AuthManager.account(activity) ?: UserProfileStore.load(activity).wechatId
-    }
-
-    private fun openAccountEntry() {
-        if (AuthManager.isLoggedIn(activity)) {
-            activity.startActivity(Intent(activity, PersonalProfileActivity::class.java))
-        } else {
-            activity.startActivity(Intent(activity, LoginActivity::class.java))
-        }
     }
 
     private fun applyPanelWidth() {

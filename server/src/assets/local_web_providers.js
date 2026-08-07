@@ -4,7 +4,7 @@
   const providers = Object.freeze([
     Object.freeze({
       id: 'chatgpt_web',
-      label: 'ChatGPT 网页',
+      label: 'ChatGPT 账号与聊天',
       officialUrl: 'https://chatgpt.com/',
       semanticProtocol: 'yilong.ai.ui.v1',
       capabilities: Object.freeze({
@@ -13,7 +13,7 @@
         nativeProjectionInPwa: false,
         nativeProjectionInApk: true
       }),
-      detail: '登录与 Cookie 由当前浏览器保管。纯 PWA 受同源隔离，不能读取或重新呈现 ChatGPT 页面；APK 可使用本地网页增强模式。'
+      detail: '打开 ChatGPT 官方页面后，由本人完成登录。登录与 Cookie 由当前浏览器保管，不会保存到一龙云端账号。'
     })
   ]);
 

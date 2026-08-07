@@ -10,14 +10,62 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="在一个应用里管理官方 CLI 登录。账号凭据始终由所选 Win 节点上的 Codex、Gemini、Claude 或 Copilot 官方存储保存。"
+        android:text="登录本人 ChatGPT，然后直接在一龙里聊天"
+        android:textColor="@color/elon_text_primary"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="1  打开 ChatGPT 官方页面\n2  本人完成登录和真人验证\n3  留在官方网页，或切换到“一龙界面”开始聊天"
         android:textColor="@color/elon_text_secondary"
-        android:textSize="13sp" />
+        android:textSize="13sp"
+        android:lineSpacingExtra="5dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="登录 Cookie 和网页数据只保存在本 APK，不会绑定到一龙云端账号。"
+        android:textColor="@color/elon_text_tertiary"
+        android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/aiProviderChatGptWebLab"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="14dp"
+        android:backgroundTint="@color/elon_button_primary_bg"
+        android:drawableStart="@android:drawable/ic_menu_view"
+        android:drawableTint="@color/elon_button_primary_text"
+        android:text="@string/chatgpt_web_lab_entry"
+        android:textColor="@color/elon_button_primary_text"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:text="高级功能 · Win 节点 CLI 账号"
+        android:textColor="@color/elon_text_primary"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="管理 Codex、Gemini、Claude 或 Copilot 官方 CLI 登录；与上面的 ChatGPT 网页会话相互独立。"
+        android:textColor="@color/elon_text_tertiary"
+        android:textSize="12sp" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
+        android:layout_marginTop="10dp"
         android:background="@drawable/bg_orbital_panel"
         android:gravity="center_vertical"
         android:orientation="horizontal"
@@ -69,18 +117,6 @@
         android:text="读取脱敏恢复诊断"
         android:textColor="@color/elon_button_secondary_text"
         android:textSize="12sp" />
-
-    <Button
-        android:id="@+id/aiProviderChatGptWebLab"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:layout_marginTop="8dp"
-        android:backgroundTint="@color/elon_button_primary_bg"
-        android:drawableStart="@android:drawable/ic_menu_view"
-        android:drawableTint="@color/elon_button_primary_text"
-        android:text="@string/chatgpt_web_lab_entry"
-        android:textColor="@color/elon_button_primary_text"
-        android:textSize="13sp" />
 
     <ScrollView
         android:layout_width="match_parent"

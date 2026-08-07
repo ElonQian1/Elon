@@ -371,7 +371,7 @@
             android:layout_height="48dp"
             android:layout_marginTop="12dp"
             android:backgroundTint="@color/elon_button_secondary_bg"
-            android:text="AI 厂商账号 · Codex / Gemini / Claude / Copilot"
+            android:text="ChatGPT 账号与聊天 · 登录本人账号"
             android:textColor="@color/elon_button_secondary_text"
             android:textSize="14sp" />
 

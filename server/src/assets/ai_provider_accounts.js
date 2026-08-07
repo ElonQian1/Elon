@@ -27,10 +27,17 @@
       title.textContent = provider.label;
       const state = document.createElement('div');
       state.className = 'ai-provider-card-state';
-      state.textContent = '官方网页模式可用';
+      state.textContent = '登录状态由 ChatGPT 官方页面确认';
       const detail = document.createElement('p');
       detail.className = 'ai-provider-card-detail';
       detail.textContent = provider.detail;
+      const steps = document.createElement('ol');
+      steps.className = 'ai-provider-login-steps';
+      ['打开官方 ChatGPT', '本人完成登录或真人验证', '在官方页面开始聊天'].forEach((label) => {
+        const step = document.createElement('li');
+        step.textContent = label;
+        steps.appendChild(step);
+      });
       const capabilities = document.createElement('div');
       capabilities.className = 'ai-provider-capabilities';
       capabilities.append(
@@ -42,7 +49,7 @@
       actions.className = 'ai-provider-card-actions';
       const open = document.createElement('button');
       open.type = 'button';
-      open.textContent = '打开官方网页';
+      open.textContent = '登录或继续使用 ChatGPT';
       open.addEventListener('click', () => {
         window.open(provider.officialUrl, '_blank', 'noopener,noreferrer');
       });
@@ -50,7 +57,7 @@
       apk.href = '/app/download';
       apk.textContent = '获取 APK 增强模式';
       actions.append(open, apk);
-      card.append(title, state, detail, capabilities, actions);
+      card.append(title, state, detail, steps, capabilities, actions);
       localWebList.appendChild(card);
     });
   }

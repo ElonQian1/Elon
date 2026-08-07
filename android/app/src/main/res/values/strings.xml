@@ -4,8 +4,8 @@
     <!-- Agent 子系统（来自 android-agent 一体化合并） -->
     <string name="agent_accessibility_description">一龙 Agent - 端上自动化操作</string>
     <string name="agent_accessibility_description_v2">一龙 Agent V2 - 多模态视觉 / 智能记忆 / 任务规划 / 错误恢复 / PC 协作</string>
-    <string name="chatgpt_web_lab_entry">ChatGPT 本地网页工作台</string>
-    <string name="chatgpt_web_title">ChatGPT 本地工作台</string>
+    <string name="chatgpt_web_lab_entry">登录或继续使用 ChatGPT</string>
+    <string name="chatgpt_web_title">ChatGPT 账号与聊天</string>
     <string name="chatgpt_web_host">chatgpt.com</string>
     <string name="chatgpt_web_back">返回</string>
     <string name="chatgpt_web_reload">刷新页面</string>

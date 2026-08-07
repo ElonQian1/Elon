@@ -125,6 +125,10 @@ class PersonalProfileActivity : AppCompatActivity() {
         rows.addView(UserProfileViews.divider(this))
         rows.addView(UserProfileViews.row(this, "账号", current.wechatId))
         rows.addView(UserProfileViews.divider(this))
+        rows.addView(UserProfileViews.row(this, "ChatGPT 账号与聊天", "登录本人账号") {
+            startActivity(Intent(this, AiProviderAccountsActivity::class.java))
+        })
+        rows.addView(UserProfileViews.divider(this))
         rows.addView(UserProfileViews.row(this, "我的二维码", "") {
             startActivity(Intent(this, PersonalQrCodeActivity::class.java))
         })

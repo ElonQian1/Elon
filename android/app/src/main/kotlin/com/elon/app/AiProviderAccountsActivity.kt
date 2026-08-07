@@ -49,7 +49,7 @@ class AiProviderAccountsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_ai_provider_accounts)
         supportActionBar?.apply {
-            title = "AI 厂商账号"
+            title = "ChatGPT 账号与聊天"
             setDisplayHomeAsUpEnabled(true)
         }
         if (!AuthManager.isLoggedIn(this)) {

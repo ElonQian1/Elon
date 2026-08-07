@@ -26,7 +26,9 @@ expect(registry.includes('nativeProjectionInApk: true'), 'registry must expose t
 expect(!registry.includes('document.cookie'), 'PWA registry must not read browser cookies');
 expect(!registry.includes('fetch('), 'PWA web-provider registry must not proxy provider traffic');
 expect(pwa.includes('id="localWebProviderList"'), 'PWA provider panel must expose the local web-provider list');
+expect(pwa.includes('profile-action-title">ChatGPT 账号与聊天'), 'PWA profile must expose the ChatGPT account entry');
 expect(pwaController.includes('renderLocalWebProviders()'), 'PWA provider panel must render registered web providers');
+expect(pwaController.includes("open.textContent = '登录或继续使用 ChatGPT'"), 'PWA must label the official login and chat action clearly');
 expect(pwaController.includes("window.open(provider.officialUrl, '_blank', 'noopener,noreferrer')"), 'PWA must open providers in an isolated official tab');
 
 ['document.cookie', 'fetch(', 'XMLHttpRequest', 'WebSocket', 'Authorization'].forEach((forbidden) => {
