@@ -4,15 +4,16 @@ use anyhow::{bail, Context, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Transaction};
 
-use super::{
+use super::super::{
     validation::{count_event_identity_matches, count_events, read_exact_step_event},
     ComputePluginAuthorityInstanceBinding, ComputePluginFetchProcessFence,
     ComputePluginLocalAuthority,
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::{
-        validate_hashed_cleanup_step_event, validate_hashed_execution_plan,
-        CandidateCleanupDeleteIntentRecoveryKey, HashedComputePluginCandidateCleanupStepEvent,
+        build_initial_delete_intent, validate_hashed_cleanup_step_event,
+        validate_hashed_execution_plan, CandidateCleanupDispositionRecoveryKey,
+        HashedComputePluginCandidateCleanupStepEvent,
     },
     fetch_contract::ComputePluginFetchCancellationGuard,
     local_authority::cleanup_topology_store::read_exact_sealed_plan,
@@ -20,7 +21,7 @@ use crate::node_agent_compute_plugin_host::{
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
-pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession<
+pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateCleanupDispositionRecoveryAuthoritySession<
     'authority,
 > {
     authority: &'authority ComputePluginLocalAuthority,
@@ -31,20 +32,20 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateClean
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(in crate::node_agent_compute_plugin_host) enum ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome
+pub(in crate::node_agent_compute_plugin_host) enum ComputePluginCandidateCleanupDispositionRecoveryOutcome
 {
     NotCreated,
     Durable(HashedComputePluginCandidateCleanupStepEvent),
 }
 
 impl ComputePluginLocalAuthority {
-    pub(in crate::node_agent_compute_plugin_host) fn bind_candidate_cleanup_delete_intent_recovery_session<
+    pub(in crate::node_agent_compute_plugin_host) fn bind_candidate_cleanup_disposition_recovery_session<
         'authority,
     >(
         &'authority self,
         process_fence: &'authority ComputePluginFetchProcessFence,
         observation: ComputePluginTrustedTimeObservation,
-    ) -> Result<ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession<'authority>> {
+    ) -> Result<ComputePluginCandidateCleanupDispositionRecoveryAuthoritySession<'authority>> {
         let trusted_now = observation.trusted_now().clone();
         let observed_at = observation.observed_at();
         if !self
@@ -59,10 +60,10 @@ impl ComputePluginLocalAuthority {
             || observed_at <= process_fence.acquired_observed_at()
             || trusted_now.timestamp_millis() < process_fence.acquired_at_ms()
         {
-            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_SESSION_INVALID");
+            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_RECOVERY_SESSION_INVALID");
         }
         Ok(
-            ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession {
+            ComputePluginCandidateCleanupDispositionRecoveryAuthoritySession {
                 authority: self,
                 process_fence,
                 trusted_now,
@@ -73,7 +74,7 @@ impl ComputePluginLocalAuthority {
     }
 }
 
-impl ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession<'_> {
+impl ComputePluginCandidateCleanupDispositionRecoveryAuthoritySession<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn authority_instance_binding(
         &self,
     ) -> &ComputePluginAuthorityInstanceBinding {
@@ -108,17 +109,17 @@ impl ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession<'_> {
         guard.ensure_current()
     }
 
-    pub(in crate::node_agent_compute_plugin_host) fn read_candidate_cleanup_delete_intent_outcome(
+    pub(in crate::node_agent_compute_plugin_host) fn read_candidate_cleanup_disposition_outcome(
         &self,
-        key: &CandidateCleanupDeleteIntentRecoveryKey,
-    ) -> Result<ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome> {
+        key: &CandidateCleanupDispositionRecoveryKey,
+    ) -> Result<ComputePluginCandidateCleanupDispositionRecoveryOutcome> {
         validate_recovery_provenance(self, key)?;
         self.authority
             .with_deferred(|transaction| read_outcome(transaction, self, key))
     }
 }
 
-impl ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome {
+impl ComputePluginCandidateCleanupDispositionRecoveryOutcome {
     pub(in crate::node_agent_compute_plugin_host) fn is_not_created(&self) -> bool {
         matches!(self, Self::NotCreated)
     }
@@ -134,8 +135,8 @@ impl ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome {
 }
 
 fn validate_recovery_provenance(
-    session: &ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession<'_>,
-    key: &CandidateCleanupDeleteIntentRecoveryKey,
+    session: &ComputePluginCandidateCleanupDispositionRecoveryAuthoritySession<'_>,
+    key: &CandidateCleanupDispositionRecoveryKey,
 ) -> Result<()> {
     if !key
         .authority_instance_binding()
@@ -143,57 +144,92 @@ fn validate_recovery_provenance(
         || key.installation_id_digest() != session.installation_id_digest()
         || key.clock_epoch_digest() != session.clock_epoch_digest()
         || key.plan().plan().process_owner_epoch() != session.process_owner_epoch()
-        || key.event().event().recorded_at_ms() > session.trusted_now_ms()
+        || key.disposition_event().event().recorded_at_ms() > session.trusted_now_ms()
         || session.observed_at <= session.process_fence.acquired_observed_at()
         || session.observed_at <= key.prepared_at()
     {
-        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_PROVENANCE_CHANGED");
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_RECOVERY_PROVENANCE_CHANGED");
     }
     validate_hashed_execution_plan(key.plan())?;
-    validate_hashed_cleanup_step_event(key.event())
+    validate_hashed_cleanup_step_event(key.intent_event())?;
+    validate_hashed_cleanup_step_event(key.disposition_event())?;
+    let expected_intent =
+        build_initial_delete_intent(key.plan(), key.intent_event().event().recorded_at_ms())?;
+    let expected_disposition = key.plan().objects().first().ok_or_else(|| {
+        anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_OBJECT_MISSING")
+    })?;
+    let disposition = key.disposition_event().event();
+    if expected_intent != *key.intent_event()
+        || disposition.cleanup_id() != key.plan().plan().cleanup_id()
+        || disposition.plan_digest() != key.plan().plan_digest()
+        || disposition.event_sequence() != 2
+        || disposition.step_ordinal() != 0
+        || disposition.event_kind() != "exact_handle_disposition_set"
+        || disposition.object_digest() != expected_disposition.object_digest()
+        || disposition.observed_identity_digest()
+            != Some(expected_disposition.object().expected_identity_digest())
+        || disposition.observed_parent_identity_digest()
+            != expected_disposition
+                .object()
+                .expected_parent_identity_digest()
+        || disposition.namespace_durability_kind().is_some()
+        || disposition.namespace_durability_evidence_digest().is_some()
+        || disposition.previous_event_digest() != key.intent_event().event_digest()
+        || disposition.process_owner_epoch() != key.plan().plan().process_owner_epoch()
+        || disposition.recorded_at_ms() <= key.intent_event().event().recorded_at_ms()
+    {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_RECOVERY_BINDING_CHANGED");
+    }
+    Ok(())
 }
 
 fn read_outcome(
     transaction: &Transaction<'_>,
-    session: &ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession<'_>,
-    key: &CandidateCleanupDeleteIntentRecoveryKey,
-) -> Result<ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome> {
+    session: &ComputePluginCandidateCleanupDispositionRecoveryAuthoritySession<'_>,
+    key: &CandidateCleanupDispositionRecoveryKey,
+) -> Result<ComputePluginCandidateCleanupDispositionRecoveryOutcome> {
     let stored_plan = read_exact_sealed_plan(transaction, key.plan(), key.candidate_token())?;
     if stored_plan.as_ref() != Some(key.plan())
         || count_exact_authorization(transaction, key)? != 1
-        || count_pending_owner(transaction, key.candidate_token())? != 1
-        || count_completion(transaction, key.candidate_token())? != 0
+        || super::super::recovery::count_pending_owner(transaction, key.candidate_token())? != 1
+        || super::super::recovery::count_completion(transaction, key.candidate_token())? != 0
+        || read_exact_step_event(transaction, key.intent_event())?.as_ref()
+            != Some(key.intent_event())
+        || count_event_identity_matches(transaction, key.intent_event())? != 1
     {
-        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_AUTHORITY_CHANGED");
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_RECOVERY_AUTHORITY_CHANGED");
     }
-    let stored = read_exact_step_event(transaction, key.event())?;
-    let identity_matches = count_event_identity_matches(transaction, key.event())?;
+    let stored = read_exact_step_event(transaction, key.disposition_event())?;
+    let identity_matches = count_event_identity_matches(transaction, key.disposition_event())?;
     match stored {
         Some(event) => {
             if identity_matches != 1
-                || count_events(transaction, event.event().cleanup_id())? != 1
+                || count_events(transaction, event.event().cleanup_id())? != 2
                 || count_authority_time(transaction, session, event.event().recorded_at_ms())? != 1
             {
-                bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_RESULT_AMBIGUOUS");
+                bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_RECOVERY_RESULT_AMBIGUOUS");
             }
-            Ok(ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome::Durable(event))
+            Ok(ComputePluginCandidateCleanupDispositionRecoveryOutcome::Durable(event))
         }
         None => {
             if identity_matches != 0
-                || count_events(transaction, key.plan().plan().cleanup_id())? != 0
-                || count_authority_time(transaction, session, key.plan().plan().planned_at_ms())?
-                    != 1
+                || count_events(transaction, key.plan().plan().cleanup_id())? != 1
+                || count_authority_time(
+                    transaction,
+                    session,
+                    key.intent_event().event().recorded_at_ms(),
+                )? != 1
             {
-                bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_ABSENCE_AMBIGUOUS");
+                bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_RECOVERY_ABSENCE_AMBIGUOUS");
             }
-            Ok(ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome::NotCreated)
+            Ok(ComputePluginCandidateCleanupDispositionRecoveryOutcome::NotCreated)
         }
     }
 }
 
 fn count_exact_authorization(
     transaction: &Transaction<'_>,
-    key: &CandidateCleanupDeleteIntentRecoveryKey,
+    key: &CandidateCleanupDispositionRecoveryKey,
 ) -> Result<i64> {
     let plan = key.plan().plan();
     transaction
@@ -213,41 +249,12 @@ fn count_exact_authorization(
             ],
             |row| row.get(0),
         )
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_AUTHORIZATION_READ")
-}
-
-pub(super) fn count_pending_owner(
-    transaction: &Transaction<'_>,
-    candidate_token: &str,
-) -> Result<i64> {
-    transaction
-        .query_row(
-            r#"SELECT COUNT(*) FROM candidate_owners
-               WHERE candidate_token = ?1 AND state = 'cleanup_pending'
-                 AND closed_at_ms IS NULL AND closed_by_plan_id IS NULL
-                 AND closed_by_plan_digest IS NULL AND close_reason IS NULL"#,
-            params![candidate_token],
-            |row| row.get(0),
-        )
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_OWNER_READ")
-}
-
-pub(super) fn count_completion(
-    transaction: &Transaction<'_>,
-    candidate_token: &str,
-) -> Result<i64> {
-    transaction
-        .query_row(
-            "SELECT COUNT(*) FROM candidate_cleanup_completions WHERE candidate_token = ?1",
-            params![candidate_token],
-            |row| row.get(0),
-        )
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_COMPLETION_READ")
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_RECOVERY_AUTHORIZATION_READ")
 }
 
 fn count_authority_time(
     transaction: &Transaction<'_>,
-    session: &ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession<'_>,
+    session: &ComputePluginCandidateCleanupDispositionRecoveryAuthoritySession<'_>,
     expected_ms: i64,
 ) -> Result<i64> {
     transaction
@@ -263,5 +270,5 @@ fn count_authority_time(
             ],
             |row| row.get(0),
         )
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_TIME_READ")
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_RECOVERY_TIME_READ")
 }

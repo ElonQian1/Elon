@@ -57,16 +57,27 @@ pub(in crate::node_agent_compute_plugin_host) use execution::{
     PhysicallyExecutedCandidateCleanup,
 };
 pub(in crate::node_agent_compute_plugin_host) use journal::{
-    adopt_recovered_candidate_cleanup_delete_intent, prepare_candidate_cleanup_delete_intent,
+    adopt_recovered_candidate_cleanup_delete_intent, adopt_recovered_candidate_cleanup_disposition,
+    prepare_candidate_cleanup_delete_intent, prepare_candidate_cleanup_disposition,
     restore_hashed_cleanup_step_event, store_candidate_cleanup_delete_intent,
-    validate_hashed_cleanup_step_event, CandidateCleanupDeleteIntentOutcomeUncertainCustody,
+    store_candidate_cleanup_disposition, validate_hashed_cleanup_step_event,
+    CandidateCleanupDeleteIntentOutcomeUncertainCustody,
     CandidateCleanupDeleteIntentPreparationFailure, CandidateCleanupDeleteIntentRecoveryAdoption,
     CandidateCleanupDeleteIntentRecoveryAdoptionFailure,
     CandidateCleanupDeleteIntentRecoveryAdoptionPhase, CandidateCleanupDeleteIntentRecoveryKey,
     CandidateCleanupDeleteIntentStoreFailure, CandidateCleanupDeleteIntentStorePhase,
+    CandidateCleanupDispositionOutcomeUncertainCustody,
+    CandidateCleanupDispositionPreparationFailure, CandidateCleanupDispositionRecoveryAdoption,
+    CandidateCleanupDispositionRecoveryAdoptionFailure,
+    CandidateCleanupDispositionRecoveryAdoptionPhase, CandidateCleanupDispositionRecoveryKey,
+    CandidateCleanupDispositionStoreFailure, CandidateCleanupDispositionStorePhase,
     ComputePluginCandidateCleanupStepEvent, DurableCandidateCleanupDeleteIntent,
-    HashedComputePluginCandidateCleanupStepEvent, PreparedCandidateCleanupDeleteIntent,
-    ValidatedCandidateCleanupDeleteIntentPermit,
+    DurableCandidateCleanupDisposition, HashedComputePluginCandidateCleanupStepEvent,
+    PreparedCandidateCleanupDeleteIntent, PreparedCandidateCleanupDisposition,
+    ValidatedCandidateCleanupDeleteIntentPermit, ValidatedCandidateCleanupDispositionPermit,
+};
+pub(in crate::node_agent_compute_plugin_host) use journal::{
+    build_exact_handle_disposition_event, build_initial_delete_intent,
 };
 pub(in crate::node_agent_compute_plugin_host) use recovery_key::{
     CandidateCleanupAuthorizationReceiptExpectation, CandidateCleanupAuthorizationRecoveryKey,

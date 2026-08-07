@@ -14,16 +14,30 @@ use crate::node_agent_compute_plugin_host::{
 };
 
 mod builder;
+mod disposition;
+mod disposition_recovery_key;
 mod recovery_key;
 mod types;
 
+pub(in crate::node_agent_compute_plugin_host) use disposition::{
+    adopt_recovered_candidate_cleanup_disposition, prepare_candidate_cleanup_disposition,
+    store_candidate_cleanup_disposition, CandidateCleanupDispositionOutcomeUncertainCustody,
+    CandidateCleanupDispositionPreparationFailure, CandidateCleanupDispositionRecoveryAdoption,
+    CandidateCleanupDispositionRecoveryAdoptionFailure,
+    CandidateCleanupDispositionRecoveryAdoptionPhase, CandidateCleanupDispositionStoreFailure,
+    CandidateCleanupDispositionStorePhase, DurableCandidateCleanupDisposition,
+    PreparedCandidateCleanupDisposition, ValidatedCandidateCleanupDispositionPermit,
+};
+pub(in crate::node_agent_compute_plugin_host) use disposition_recovery_key::CandidateCleanupDispositionRecoveryKey;
 pub(in crate::node_agent_compute_plugin_host) use recovery_key::CandidateCleanupDeleteIntentRecoveryKey;
 pub(in crate::node_agent_compute_plugin_host) use types::{
     restore_hashed_cleanup_step_event, validate_hashed_cleanup_step_event,
     ComputePluginCandidateCleanupStepEvent, HashedComputePluginCandidateCleanupStepEvent,
 };
 
-pub(super) use builder::build_initial_delete_intent;
+pub(in crate::node_agent_compute_plugin_host) use builder::{
+    build_exact_handle_disposition_event, build_initial_delete_intent,
+};
 
 #[must_use = "prepared delete intent must be stored or retain the sealed topology"]
 pub(in crate::node_agent_compute_plugin_host) struct PreparedCandidateCleanupDeleteIntent<

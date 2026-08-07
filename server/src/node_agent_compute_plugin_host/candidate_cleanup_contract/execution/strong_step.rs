@@ -223,6 +223,12 @@ fn rejected_failure(
 }
 
 impl PhysicallyDisposedCandidateCleanupObject {
+    pub(in crate::node_agent_compute_plugin_host) fn state(
+        &self,
+    ) -> &CandidateCleanupExecutionState {
+        &self.state
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn plan(
         &self,
     ) -> &HashedComputePluginCandidateCleanupExecutionPlan {

@@ -86,7 +86,7 @@ pub(super) fn validate_authority_and_owner(
     Ok(())
 }
 
-pub(super) fn read_exact_intent_event(
+pub(super) fn read_exact_step_event(
     transaction: &Transaction<'_>,
     expected: &HashedComputePluginCandidateCleanupStepEvent,
 ) -> Result<Option<HashedComputePluginCandidateCleanupStepEvent>> {
@@ -120,7 +120,7 @@ pub(super) fn read_exact_intent_event(
             },
         )
         .optional()
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_READ")?;
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_STEP_EVENT_READ")?;
     let Some(row) = row else { return Ok(None) };
     let event: ComputePluginCandidateCleanupStepEvent =
         serde_json::from_str(&row.11).context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_DECODE")?;
@@ -138,11 +138,11 @@ pub(super) fn read_exact_intent_event(
         || event.cleanup_id() != expected_event.cleanup_id()
         || event.event_sequence() != expected_event.event_sequence()
     {
-        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_ROW_CHANGED");
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_STEP_EVENT_ROW_CHANGED");
     }
     let restored = restore_hashed_cleanup_step_event(event, row.12)?;
     if &restored != expected {
-        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_READBACK_CHANGED");
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_STEP_EVENT_READBACK_CHANGED");
     }
     Ok(Some(restored))
 }
@@ -162,7 +162,7 @@ pub(super) fn count_event_identity_matches(
             ],
             |row| row.get(0),
         )
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_IDENTITY_READ")
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_STEP_EVENT_IDENTITY_READ")
 }
 
 pub(super) fn count_events(transaction: &Transaction<'_>, cleanup_id: &str) -> Result<i64> {
@@ -172,7 +172,7 @@ pub(super) fn count_events(transaction: &Transaction<'_>, cleanup_id: &str) -> R
             params![cleanup_id],
             |row| row.get(0),
         )
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_EVENT_COUNT")
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_STEP_EVENT_COUNT")
 }
 
 fn count_exact_authorization(

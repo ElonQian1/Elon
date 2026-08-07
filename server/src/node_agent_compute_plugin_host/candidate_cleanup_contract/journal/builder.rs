@@ -7,8 +7,9 @@ use super::types::{
 use crate::node_agent_compute_plugin_host::candidate_cleanup_contract::{
     validate_hashed_execution_plan, HashedComputePluginCandidateCleanupExecutionPlan,
 };
+use crate::node_agent_managed_fs::ManagedObjectBinding;
 
-pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn build_initial_delete_intent(
+pub(in crate::node_agent_compute_plugin_host) fn build_initial_delete_intent(
     plan: &HashedComputePluginCandidateCleanupExecutionPlan,
     recorded_at_ms: i64,
 ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
@@ -39,6 +40,72 @@ pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn bui
         namespace_durability_kind: None,
         namespace_durability_evidence_digest: None,
         previous_event_digest: plan.plan_digest().to_string(),
+        process_owner_epoch: plan.plan().process_owner_epoch(),
+        recorded_at_ms,
+    })
+}
+
+pub(in crate::node_agent_compute_plugin_host) fn build_exact_handle_disposition_event(
+    plan: &HashedComputePluginCandidateCleanupExecutionPlan,
+    intent: &HashedComputePluginCandidateCleanupStepEvent,
+    binding: &ManagedObjectBinding,
+    recorded_at_ms: i64,
+) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
+    let relative_name = binding
+        .relative_name()
+        .to_str()
+        .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_NAME_INVALID"))?;
+    build_exact_handle_disposition_event_from_fields(
+        plan,
+        intent,
+        binding.is_directory(),
+        relative_name,
+        binding.identity_digest(),
+        binding.parent_identity_digest(),
+        recorded_at_ms,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_exact_handle_disposition_event_from_fields(
+    plan: &HashedComputePluginCandidateCleanupExecutionPlan,
+    intent: &HashedComputePluginCandidateCleanupStepEvent,
+    is_directory: bool,
+    relative_name: &str,
+    identity_digest: &str,
+    parent_identity_digest: &str,
+    recorded_at_ms: i64,
+) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
+    validate_hashed_execution_plan(plan)?;
+    let expected_intent = build_initial_delete_intent(plan, intent.event().recorded_at_ms())?;
+    let object = plan
+        .objects()
+        .first()
+        .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_OBJECT_MISSING"))?;
+    let expected = object.object();
+    if expected_intent != *intent
+        || expected.step_ordinal() != 0
+        || (expected.object_kind() == "directory") != is_directory
+        || expected.relative_name() != relative_name
+        || expected.expected_identity_digest() != identity_digest
+        || expected.expected_parent_identity_digest() != parent_identity_digest
+        || recorded_at_ms <= intent.event().recorded_at_ms()
+    {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_BINDING_INVALID");
+    }
+    hash_cleanup_step_event(ComputePluginCandidateCleanupStepEvent {
+        schema: CANDIDATE_CLEANUP_STEP_EVENT_SCHEMA.to_string(),
+        cleanup_id: plan.plan().cleanup_id().to_string(),
+        plan_digest: plan.plan_digest().to_string(),
+        event_sequence: 2,
+        step_ordinal: 0,
+        event_kind: "exact_handle_disposition_set".to_string(),
+        object_digest: object.object_digest().to_string(),
+        observed_identity_digest: Some(identity_digest.to_string()),
+        observed_parent_identity_digest: parent_identity_digest.to_string(),
+        namespace_durability_kind: None,
+        namespace_durability_evidence_digest: None,
+        previous_event_digest: intent.event_digest().to_string(),
         process_owner_epoch: plan.plan().process_owner_epoch(),
         recorded_at_ms,
     })
@@ -121,5 +188,65 @@ mod tests {
         let error = build_initial_delete_intent(&plan(), 2_000).unwrap_err();
 
         assert!(error.to_string().contains("INTENT_BINDING_INVALID"));
+    }
+
+    #[test]
+    fn cleanup_disposition_is_deterministic_and_chains_exact_intent() {
+        let plan = plan();
+        let intent = build_initial_delete_intent(&plan, 2_001).unwrap();
+        let first = build_exact_handle_disposition_event_from_fields(
+            &plan,
+            &intent,
+            true,
+            plan.objects()[0].object().relative_name(),
+            plan.objects()[0].object().expected_identity_digest(),
+            plan.objects()[0].object().expected_parent_identity_digest(),
+            2_002,
+        )
+        .unwrap();
+        let second = build_exact_handle_disposition_event_from_fields(
+            &plan,
+            &intent,
+            true,
+            plan.objects()[0].object().relative_name(),
+            plan.objects()[0].object().expected_identity_digest(),
+            plan.objects()[0].object().expected_parent_identity_digest(),
+            2_002,
+        )
+        .unwrap();
+
+        assert_eq!(first, second);
+        assert_eq!(first.event().event_sequence(), 2);
+        assert_eq!(first.event().event_kind(), "exact_handle_disposition_set");
+        assert_eq!(first.event().previous_event_digest(), intent.event_digest());
+    }
+
+    #[test]
+    fn cleanup_disposition_rejects_stale_time_or_changed_binding() {
+        let plan = plan();
+        let intent = build_initial_delete_intent(&plan, 2_001).unwrap();
+        let stale = build_exact_handle_disposition_event_from_fields(
+            &plan,
+            &intent,
+            true,
+            plan.objects()[0].object().relative_name(),
+            plan.objects()[0].object().expected_identity_digest(),
+            plan.objects()[0].object().expected_parent_identity_digest(),
+            2_001,
+        )
+        .unwrap_err();
+        let changed = build_exact_handle_disposition_event_from_fields(
+            &plan,
+            &intent,
+            false,
+            plan.objects()[0].object().relative_name(),
+            plan.objects()[0].object().expected_identity_digest(),
+            plan.objects()[0].object().expected_parent_identity_digest(),
+            2_002,
+        )
+        .unwrap_err();
+
+        assert!(stale.to_string().contains("DISPOSITION_BINDING_INVALID"));
+        assert!(changed.to_string().contains("DISPOSITION_BINDING_INVALID"));
     }
 }

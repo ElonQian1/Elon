@@ -48,6 +48,9 @@ pub(in crate::node_agent_compute_plugin_host) use cleanup_journal_store::{
     ComputePluginCandidateCleanupDeleteIntentAuthoritySession,
     ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession,
     ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome,
+    ComputePluginCandidateCleanupDispositionAuthoritySession,
+    ComputePluginCandidateCleanupDispositionRecoveryAuthoritySession,
+    ComputePluginCandidateCleanupDispositionRecoveryOutcome,
 };
 pub(in crate::node_agent_compute_plugin_host) use cleanup_store::{
     ComputePluginCandidateCleanupAuthorityFacts, ComputePluginCandidateCleanupAuthoritySession,

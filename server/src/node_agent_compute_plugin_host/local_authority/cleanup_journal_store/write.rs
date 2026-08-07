@@ -2,7 +2,7 @@ use anyhow::{bail, Context, Result};
 use rusqlite::{params, Transaction};
 
 use super::{
-    validation::{read_exact_intent_event, validate_authority_and_owner, validate_unstored_intent},
+    validation::{read_exact_step_event, validate_authority_and_owner, validate_unstored_intent},
     ComputePluginCandidateCleanupDeleteIntentAuthoritySession,
 };
 use crate::node_agent_compute_plugin_host::{
@@ -33,20 +33,20 @@ pub(super) fn persist_candidate_cleanup_delete_intent(
     session.validate_source(sealed.state().cancellation_guard())?;
     insert_event(transaction, event)?;
     validate_authority_and_owner(transaction, session, sealed, event.event().recorded_at_ms())?;
-    let stored = read_exact_intent_event(transaction, event)?.ok_or_else(|| {
+    let stored = read_exact_step_event(transaction, event)?.ok_or_else(|| {
         anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_READBACK_MISSING")
     })?;
     session.validate_source(sealed.state().cancellation_guard())?;
     Ok(stored)
 }
 
-fn insert_event(
+pub(super) fn insert_event(
     transaction: &Transaction<'_>,
     hashed: &HashedComputePluginCandidateCleanupStepEvent,
 ) -> Result<()> {
     let event = hashed.event();
     let event_json = serde_json::to_string(event)
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_SERIALIZE")?;
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_STEP_EVENT_SERIALIZE")?;
     transaction
         .execute(
             r#"INSERT INTO candidate_cleanup_step_events (
@@ -74,7 +74,7 @@ fn insert_event(
                 hashed.event_digest(),
             ],
         )
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_INSERT")?;
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_STEP_EVENT_INSERT")?;
     Ok(())
 }
 
@@ -140,7 +140,7 @@ mod tests {
         let event = event();
         insert_event(&transaction, &event).unwrap();
 
-        let stored = read_exact_intent_event(&transaction, &event)
+        let stored = read_exact_step_event(&transaction, &event)
             .unwrap()
             .unwrap();
 
@@ -160,8 +160,8 @@ mod tests {
             )
             .unwrap();
 
-        let error = read_exact_intent_event(&transaction, &event).unwrap_err();
+        let error = read_exact_step_event(&transaction, &event).unwrap_err();
 
-        assert!(error.to_string().contains("INTENT_ROW_CHANGED"));
+        assert!(error.to_string().contains("STEP_EVENT_ROW_CHANGED"));
     }
 }
