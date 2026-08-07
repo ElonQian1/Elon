@@ -84,9 +84,9 @@ export default function UserBrowserLauncherPage() {
           <Fingerprint size={30} strokeWidth={1.8} />
         </div>
         <div>
-          <span className={styles.eyebrow}>个人浏览器</span>
-          <h1>我的 ChatGPT</h1>
-          <p>{user?.nickname || user?.account || '未登录'} · 独立账号会话</p>
+          <span className={styles.eyebrow}>CHATGPT 账号与聊天</span>
+          <h1>登录本人 ChatGPT</h1>
+          <p>官方登录 · Cookie 和网页数据仅保存在这台电脑</p>
         </div>
         <Status availability={availability} localBrowserAvailable={localBrowserAvailable} />
       </header>
@@ -98,9 +98,9 @@ export default function UserBrowserLauncherPage() {
         ownerLabel={user?.nickname || user?.account || '未登录'}
       />
 
-      <main className={styles.workspace}>
+      {!localBrowserAvailable && <main className={styles.workspace}>
         <div className={styles.sessionSummary}>
-          <span>CHATGPT WEB</span>
+          <span>普通浏览器备用模式</span>
           <strong>{ready ? '可以启动' : '当前不可启动'}</strong>
           <small>会话所有者：{user?.id || '未识别'}</small>
           <small>模块服务：{match?.merchant.display_name || '未发现'}</small>
@@ -146,7 +146,7 @@ export default function UserBrowserLauncherPage() {
             重新检查
           </button>
         )}
-      </main>
+      </main>}
     </section>
   )
 }

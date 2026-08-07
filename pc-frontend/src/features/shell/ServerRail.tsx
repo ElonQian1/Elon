@@ -31,7 +31,7 @@ const RAIL_ITEMS: RailItem[] = [
   { path: '/my-compute-settlement', Icon: CircleDollarSign, label: '我的算力收益', color: '#26342d', hoverColor: '#30463a' },
   { path: '/compute-challenges', Icon: Scale, label: '结算申诉', color: '#362d29', hoverColor: '#493a33' },
   { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2a2b2f', hoverColor: '#34363b' },
-  { path: '/user-browser', Icon: Globe2, label: '我的 ChatGPT', color: '#26342f', hoverColor: '#315046' },
+  { path: '/user-browser', Icon: Globe2, label: 'ChatGPT 登录', color: '#26342f', hoverColor: '#315046' },
 ]
 
 const LOCAL_TASK_ITEM: RailItem = {

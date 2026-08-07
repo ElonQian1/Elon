@@ -8,7 +8,22 @@ WebView2；普通浏览器/PWA 仍可发现外部托管模块。两条路线都�
 |---|---|---|---|
 | Win 本地 WebView2 | 用户 Windows 设备 | 官方网页、手动登录、本地 Profile | ChatGPT 首版已接线 |
 | 外部托管模块 | 商户模块服务器 | 浏览器/PWA 的隔离远程会话 | 保留既有能力发现 |
-| 一龙原生渲染器 | 本地统一 UI | 消费去凭证化语义事件 | 协议已定义，桥未启用 |
+| APK 一龙界面 | Android 本地 WebView | 消费去凭证化语义事件 | ChatGPT 语义适配器已接线 |
+
+## 用户入口
+
+三个客户端统一使用“ChatGPT 账号与聊天”，不再要求用户先理解“厂商账号”、
+“个人浏览器”或“Win CLI”：
+
+- APK：聊天侧栏设置或个人资料 → ChatGPT 账号与聊天；进入后先打开官方页面登录，
+  登录完成可留在官方网页或切换“一龙界面”。
+- PWA：我的 → ChatGPT 账号与聊天；PWA 在新标签打开官方 ChatGPT，受同源隔离影响，
+  不宣称可以读取登录状态或重渲染官方页面。
+- Win：左侧 ChatGPT 登录，或账号设置 → ChatGPT；本地 WebView2 保存会话，打开窗口后
+  直接完成登录和聊天。
+
+这里的“登录”是设备内的官方网页会话，不是把 ChatGPT 云端账号或 Cookie 绑定到一龙
+云端账号。登录状态由官方页面确认。
 
 ## Win 本地模式
 
@@ -51,9 +66,9 @@ WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。�
 - idle/thinking/streaming/waiting/error 状态；
 - 文本、图片、文件与引用内容块。
 
-协议不定义 Cookie、Authorization、Access Token、原始请求头或网络响应。当前 Rust
-返回 `rendererStatus=reserved`，表示宿主和协议已经铺好，但尚未向官方网页注入 DOM
-适配器，也没有宣称已完成“一龙原生 UI 重渲染”。后续每个厂商适配器必须独立评审：
+协议不定义 Cookie、Authorization、Access Token、原始请求头或网络响应。Win Rust
+宿主当前仍返回 `rendererStatus=reserved`；Android 已通过来源受限的 WebMessage 桥接入
+ChatGPT 可见语义适配器。后续每个厂商适配器仍必须独立评审：
 
 ```text
 官方网页 WebView（网络与登录主体）
@@ -88,4 +103,4 @@ confirmation，再调用商户模块运行时：
 - 用户确认本人账号后才能打开本地会话，清除会话前再次确认。
 - 普通浏览器不显示可调用的本地命令，继续使用托管模式。
 - 尚未进行真实 ChatGPT 登录、Cloudflare、下载、音视频、更新后兼容和安装包验收。
-- 尚未启用 DOM 语义适配器或原生 UI 重渲染。
+- Win 尚未启用 DOM 语义适配器或原生 UI 重渲染；APK 已接线但尚未完成真实账号兼容验收。

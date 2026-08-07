@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/auth'
 import UserAvatar from '../shell/UserAvatar'
 import LinkedIdentitiesCard from './LinkedIdentitiesCard'
 import AccountSecurityCard from './AccountSecurityCard'
+import ChatGptAccountCard from './ChatGptAccountCard'
 import styles from './AccountPage.module.css'
 
 interface Balance {
@@ -108,6 +109,11 @@ export default function AccountPage() {
               <span className={styles.userId}>ID：{user?.id}</span>
             </div>
           </div>
+        </section>
+
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>ChatGPT</h2>
+          <ChatGptAccountCard />
         </section>
 
         <section className={styles.section}>

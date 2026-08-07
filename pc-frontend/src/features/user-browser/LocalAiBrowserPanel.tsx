@@ -51,8 +51,8 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel }: LocalAiBro
       const session = await openLocalAiWebSession(provider.id, ownerKey)
       setOpenedProvider(provider.id)
       setMessage(session.status === 'created'
-        ? `${provider.displayName} 本地独立会话已创建。`
-        : `${provider.displayName} 本地会话已重新聚焦。`)
+        ? `已打开 ${provider.displayName} 官方页面，请本人完成登录后开始聊天。`
+        : `已回到 ${provider.displayName}，可以继续聊天。`)
     } catch (error) {
       setMessage(errorMessage(error))
     } finally {
@@ -86,17 +86,17 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel }: LocalAiBro
         <div className={styles.titleRow}>
           <MonitorUp size={20} aria-hidden="true" />
           <div>
-            <span>WINDOWS · LOCAL WEBVIEW2</span>
-            <h2 id="local-ai-browser-title">本地 AI 浏览器</h2>
+            <span>CHATGPT.COM · 本机登录</span>
+            <h2 id="local-ai-browser-title">登录本人 ChatGPT</h2>
           </div>
         </div>
         <p>
-          官方网页在独立 WebView2 Profile 中运行。登录、Cookie 和网页数据只留在本机，
-          当前不会上传，也不会转换成 CLI 凭证。
+          一龙会打开 ChatGPT 官方页面。由本人输入账号并完成人机验证；登录、Cookie 和
+          网页数据只留在本机，不会上传，也不会转换成 CLI 凭证。
         </p>
         <dl>
-          <div><dt>本地所有者</dt><dd>{ownerLabel}</dd></div>
-          <div><dt>渲染协议</dt><dd>yilong.ai.ui.v1 · 已预留</dd></div>
+          <div><dt>一龙账号</dt><dd>{ownerLabel}</dd></div>
+          <div><dt>登录位置</dt><dd>仅当前电脑</dd></div>
         </dl>
       </div>
 
@@ -113,6 +113,11 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel }: LocalAiBro
           </div>
         ) : (
           <>
+            <ol className={styles.steps} aria-label="ChatGPT 登录与使用步骤">
+              <li><span>1</span><strong>确认只登录本人账号</strong></li>
+              <li><span>2</span><strong>打开官方页面并完成登录</strong></li>
+              <li><span>3</span><strong>在打开的窗口直接聊天</strong></li>
+            </ol>
             <label className={styles.confirmation}>
               <input
                 type="checkbox"
@@ -143,7 +148,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel }: LocalAiBro
                         disabled={!ownerKey || !ownerConfirmed || Boolean(busyProvider)}
                       >
                         {busy ? <LoaderCircle className={styles.spin} size={16} /> : <ShieldCheck size={16} />}
-                        {busy ? '处理中' : '打开本地会话'}
+                        {busy ? '处理中' : '登录或打开 ChatGPT'}
                       </button>
                       <button
                         className={styles.clearButton}
