@@ -132,6 +132,7 @@ const PROJECT_HOME_CSS: &str = include_str!("assets/project_home.css");
 const ORBITAL_MOBILE_THEME_CSS: &str = include_str!("assets/orbital_mobile_theme.css");
 const PROJECT_HOME_JS: &str = include_str!("assets/project_home.js");
 const AI_PROVIDER_ACCOUNTS_CSS: &str = include_str!("assets/ai_provider_accounts.css");
+const LOCAL_WEB_PROVIDERS_JS: &str = include_str!("assets/local_web_providers.js");
 const AI_PROVIDER_ACCOUNTS_JS: &str = include_str!("assets/ai_provider_accounts.js");
 const FEDERATED_AUTH_CSS: &str = include_str!("assets/federated_auth.css");
 const FEDERATED_AUTH_JS: &str = include_str!("assets/federated_auth.js");
@@ -575,6 +576,7 @@ pub async fn ai_provider_accounts_css() -> impl IntoResponse {
 }
 
 pub async fn ai_provider_accounts_js() -> impl IntoResponse {
+    let source = format!("{LOCAL_WEB_PROVIDERS_JS}\n{AI_PROVIDER_ACCOUNTS_JS}");
     (
         [
             (
@@ -583,7 +585,7 @@ pub async fn ai_provider_accounts_js() -> impl IntoResponse {
             ),
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
-        AI_PROVIDER_ACCOUNTS_JS,
+        source,
     )
 }
 

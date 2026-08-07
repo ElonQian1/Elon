@@ -30,6 +30,23 @@
   padding: 2px;
 }
 
+.ai-provider-section {
+  display: grid;
+  gap: 9px;
+}
+
+.ai-provider-section + .ai-provider-section {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.ai-provider-section > h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+}
+
 .ai-provider-card {
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -56,6 +73,29 @@
   font-size: 12px;
   line-height: 1.55;
   white-space: pre-wrap;
+}
+
+.ai-provider-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.ai-provider-capability {
+  min-height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.ai-provider-capability.available {
+  border-color: var(--brand);
+  color: var(--brand);
 }
 
 .ai-provider-card-actions {

@@ -11,8 +11,56 @@
   const refresh = document.getElementById('aiProviderAccountsRefresh');
   const close = document.getElementById('aiProviderAccountsClose');
   const diagnostics = document.getElementById('aiProviderAccountsDiagnostics');
+  const localWebList = document.getElementById('localWebProviderList');
   let nodes = [];
   let pollTimer = 0;
+
+  function renderLocalWebProviders() {
+    if (!localWebList) return;
+    localWebList.innerHTML = '';
+    const registry = window.ElonLocalWebProviders;
+    const providers = registry && typeof registry.list === 'function' ? registry.list() : [];
+    providers.forEach((provider) => {
+      const card = document.createElement('section');
+      card.className = 'ai-provider-card ai-provider-local-web-card';
+      const title = document.createElement('h3');
+      title.textContent = provider.label;
+      const state = document.createElement('div');
+      state.className = 'ai-provider-card-state';
+      state.textContent = '官方网页模式可用';
+      const detail = document.createElement('p');
+      detail.className = 'ai-provider-card-detail';
+      detail.textContent = provider.detail;
+      const capabilities = document.createElement('div');
+      capabilities.className = 'ai-provider-capabilities';
+      capabilities.append(
+        capabilityBadge('本机浏览器会话', provider.capabilities.localBrowserSession),
+        capabilityBadge('PWA 原生投影', provider.capabilities.nativeProjectionInPwa),
+        capabilityBadge('APK 原生投影', provider.capabilities.nativeProjectionInApk)
+      );
+      const actions = document.createElement('div');
+      actions.className = 'ai-provider-card-actions';
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.textContent = '打开官方网页';
+      open.addEventListener('click', () => {
+        window.open(provider.officialUrl, '_blank', 'noopener,noreferrer');
+      });
+      const apk = document.createElement('a');
+      apk.href = '/app/download';
+      apk.textContent = '获取 APK 增强模式';
+      actions.append(open, apk);
+      card.append(title, state, detail, capabilities, actions);
+      localWebList.appendChild(card);
+    });
+  }
+
+  function capabilityBadge(label, available) {
+    const badge = document.createElement('span');
+    badge.className = 'ai-provider-capability ' + (available ? 'available' : 'unavailable');
+    badge.textContent = label + ' · ' + (available ? '可用' : '受限');
+    return badge;
+  }
 
   function authToken() {
     return String(
@@ -235,6 +283,7 @@
 
   async function openPanel() {
     mask.classList.add('active');
+    renderLocalWebProviders();
     try { await loadNodes(); }
     catch (error) { status.textContent = '加载失败：' + String(error.message || error).slice(0, 300); }
   }
