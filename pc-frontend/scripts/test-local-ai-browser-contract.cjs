@@ -1,0 +1,39 @@
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+
+const root = path.resolve(__dirname, '..', '..')
+const rust = read('desktop-shell/src-tauri/src/local_ai_browser.rs')
+const main = read('desktop-shell/src-tauri/src/main.rs')
+const capability = read('desktop-shell/src-tauri/capabilities/main.json')
+const permission = read('desktop-shell/src-tauri/permissions/local-ai-web-session.toml')
+const api = read('pc-frontend/src/features/user-browser/localAiBrowserApi.ts')
+const protocol = read('pc-frontend/src/features/user-browser/unifiedAiProtocol.ts')
+const panel = read('pc-frontend/src/features/user-browser/LocalAiBrowserPanel.tsx')
+
+assert.match(rust, /\.data_directory\(profile_directory\)/)
+assert.match(rust, /owner_fingerprint/)
+assert.match(rust, /\.on_navigation/)
+assert.match(rust, /clear_all_browsing_data/)
+assert.doesNotMatch(rust, /\.cookies\(\)|set_cookie|delete_cookie/)
+assert.match(main, /local_ai_browser::open_local_ai_web_session/)
+assert.match(rust, /ensure_main_webview/)
+assert.match(capability, /"windows": \["main"\]/)
+assert.match(capability, /"local-ai-web-session"/)
+assert.match(permission, /commands\.allow/)
+
+assert.match(protocol, /yilong\.ai\.ui\.v1/)
+assert.match(protocol, /type: 'message_delta'/)
+assert.doesNotMatch(protocol, /authorization|accessToken|cookieValue/)
+
+assert.match(api, /open_local_ai_web_session/)
+assert.match(api, /cookieAccess !== 'webview_only'/)
+assert.doesNotMatch(api, /startUrl|launchUrl|document\.cookie/)
+assert.match(panel, /只登录本人账号/)
+assert.match(panel, /window\.confirm/)
+
+process.stdout.write('PASS local AI browser security and renderer protocol contract\n')
+
+function read(relativePath) {
+  return fs.readFileSync(path.join(root, relativePath), 'utf8')
+}

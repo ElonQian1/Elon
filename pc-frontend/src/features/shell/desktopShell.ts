@@ -11,10 +11,18 @@ interface TauriWindowHandle {
   isMaximized(): Promise<boolean>
 }
 
+export type DesktopInvoke = <T>(
+  command: string,
+  args?: Record<string, unknown>,
+) => Promise<T>
+
 declare global {
   interface Window {
     __ELON_DESKTOP_FRAMELESS__?: boolean
     __TAURI__?: {
+      core?: {
+        invoke?: DesktopInvoke
+      }
       window?: {
         getCurrentWindow?: () => TauriWindowHandle
       }
@@ -31,6 +39,16 @@ export function isDesktopShellFrameless(): boolean {
 export function getDesktopWindow(): TauriWindowHandle | null {
   try {
     return window.__TAURI__?.window?.getCurrentWindow?.() ?? null
+  } catch {
+    return null
+  }
+}
+
+/** 调用桌面壳的本地命令；普通浏览器/PWA 中返回 null。 */
+export function getDesktopInvoke(): DesktopInvoke | null {
+  try {
+    const invoke = window.__TAURI__?.core?.invoke
+    return invoke ? (command, args) => invoke(command, args) : null
   } catch {
     return null
   }

@@ -17,6 +17,7 @@
     "test:project-docs": "node scripts/test-project-document-sections.cjs && node scripts/test-project-document-discussions.cjs",
     "test:project-home": "node ../scripts/test-pc-project-home.js && node ../scripts/test-pc-project-context-sidebar.js",
     "test:open-commerce": "node scripts/test-capability-invocation-schema.cjs && node ../scripts/test-open-commerce-pc-workspace.js && node ../scripts/test-erp-blueprint-pc-workspace.js",
+    "test:user-browser": "node scripts/test-local-ai-browser-contract.cjs",
     "test:node-compute-sharing": "node ../scripts/test-node-compute-sharing-contracts.js",
     "test:plaza": "node scripts/test-project-plaza-carousel.mjs",
     "test:message-actions": "node scripts/test-message-actions-hover.cjs",

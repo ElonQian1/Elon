@@ -1,0 +1,204 @@
+.panel {
+  width: min(880px, 100%);
+  display: grid;
+  grid-template-columns: minmax(230px, .9fr) minmax(360px, 1.5fr);
+  margin: 30px auto 0;
+  overflow: hidden;
+  border: 1px solid rgba(84, 199, 161, .38);
+  border-radius: 6px;
+  background: var(--bg-surface);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .025);
+}
+
+.intro {
+  padding: 24px;
+  border-right: 1px solid var(--border);
+  background:
+    linear-gradient(145deg, rgba(84, 199, 161, .11), transparent 58%),
+    #101312;
+}
+
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #84e2c2;
+}
+
+.titleRow span {
+  display: block;
+  margin-bottom: 6px;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.titleRow h2 {
+  margin: 0;
+  color: #f0f5f2;
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.intro > p {
+  margin: 20px 0 24px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.intro dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.intro dl div {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.intro dt,
+.intro dd {
+  margin: 0;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.intro dt { color: var(--text-muted); }
+.intro dd { color: #b8dfd1; }
+
+.controls {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+}
+
+.desktopNotice {
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px;
+  border: 1px dashed var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.confirmation {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.confirmation input {
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  accent-color: #54c7a1;
+}
+
+.confirmation strong,
+.confirmation small { display: block; }
+.confirmation strong { color: var(--text-primary); font-size: 13px; }
+.confirmation small {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.providerList { display: grid; gap: 10px; }
+
+.provider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-elevated);
+}
+
+.provider strong,
+.provider small { display: block; }
+.provider strong { color: var(--text-primary); font-size: 13px; }
+.provider small {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9px;
+}
+
+.actions { display: flex; gap: 8px; }
+
+.openButton,
+.clearButton {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.openButton {
+  min-width: 132px;
+  padding: 0 13px;
+  color: #06110d;
+  background: #74d7b5;
+}
+
+.openButton:hover:not(:disabled) { background: #9ce6cb; }
+
+.clearButton {
+  width: 36px;
+  border: 1px solid var(--border);
+  color: #e78b8b;
+  background: transparent;
+}
+
+.clearButton:hover:not(:disabled) { border-color: rgba(224, 112, 112, .55); }
+.openButton:disabled,
+.clearButton:disabled { opacity: .38; cursor: not-allowed; }
+
+.message {
+  margin: 0;
+  padding: 9px 11px;
+  border-left: 2px solid #54c7a1;
+  color: #b8dfd1;
+  background: rgba(84, 199, 161, .06);
+  font-size: 11px;
+}
+
+.message[data-error="true"] {
+  border-left-color: #e07070;
+  color: #f0aaaa;
+  background: rgba(224, 112, 112, .07);
+}
+
+.spin { animation: spin 900ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+}
+
+@media (max-width: 760px) {
+  .panel { grid-template-columns: 1fr; margin-top: 22px; }
+  .intro { border-right: 0; border-bottom: 1px solid var(--border); }
+  .provider { align-items: flex-start; flex-direction: column; }
+  .actions { width: 100%; }
+  .openButton { flex: 1; }
+}
