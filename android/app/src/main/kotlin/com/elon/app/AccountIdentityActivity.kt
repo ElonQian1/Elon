@@ -20,6 +20,8 @@ class AccountIdentityActivity : AppCompatActivity() {
     private lateinit var list: LinearLayout
     private lateinit var bindButton: Button
     private lateinit var status: TextView
+    private lateinit var currentAccount: TextView
+    private lateinit var googleBindingState: TextView
     private lateinit var passwordSummary: TextView
     private lateinit var currentPassword: EditText
     private lateinit var newPassword: EditText
@@ -41,6 +43,8 @@ class AccountIdentityActivity : AppCompatActivity() {
         list = findViewById(R.id.accountIdentityList)
         bindButton = findViewById(R.id.accountBindGoogleButton)
         status = findViewById(R.id.accountIdentityStatus)
+        currentAccount = findViewById(R.id.accountCurrentAccount)
+        googleBindingState = findViewById(R.id.accountGoogleBindingSummary)
         passwordSummary = findViewById(R.id.accountPasswordSummary)
         currentPassword = findViewById(R.id.accountCurrentPassword)
         newPassword = findViewById(R.id.accountNewPassword)
@@ -50,6 +54,8 @@ class AccountIdentityActivity : AppCompatActivity() {
         securityStatus = findViewById(R.id.accountSecurityStatus)
         sessionList = findViewById(R.id.accountSessionList)
         revokeOtherSessionsButton = findViewById(R.id.accountRevokeOtherSessionsButton)
+        currentAccount.text = maskedYilongAccount(AuthManager.account(this))
+        bindButton.text = "绑定 Google 到 ${maskedYilongAccount(AuthManager.account(this))}"
         bindButton.setOnClickListener { bindGoogle() }
         changePasswordButton.setOnClickListener { changePassword() }
         rotateRecoveryCodesButton.setOnClickListener { rotateRecoveryCodes() }
@@ -65,18 +71,30 @@ class AccountIdentityActivity : AppCompatActivity() {
 
     private fun refresh() {
         status.text = "读取中…"
+        googleBindingState.text = "正在读取绑定状态…"
         lifecycleScope.launch {
-            runCatching { auth.identities() }
-                .onSuccess(::render)
-                .onFailure { status.text = it.message ?: "读取失败" }
+            runCatching { auth.identities() to auth.isGoogleConfigured() }
+                .onSuccess { (identities, configured) -> render(identities, configured) }
+                .onFailure {
+                    val message = it.message ?: "读取失败"
+                    status.text = message
+                    googleBindingState.text = "Google 绑定状态暂不可用"
+                }
         }
     }
 
-    private fun render(identities: List<LinkedLoginIdentity>) {
+    private fun render(identities: List<LinkedLoginIdentity>, googleConfigured: Boolean) {
         list.removeAllViews()
         identities.forEach { identity -> list.addView(identityRow(identity)) }
-        bindButton.visibility = if (identities.any { it.provider == "google" }) View.GONE else View.VISIBLE
-        status.text = if (identities.isEmpty()) "尚未绑定第三方登录方式" else "已绑定 ${identities.size} 种身份"
+        val hasGoogle = identities.any { it.provider == "google" }
+        bindButton.visibility = if (hasGoogle || !googleConfigured) View.GONE else View.VISIBLE
+        googleBindingState.text = googleBindingSummary(identities, googleConfigured)
+        status.text = when {
+            hasGoogle -> "Google 已绑定到当前一龙账号"
+            !googleConfigured -> "Google 登录尚未配置，暂时无法绑定"
+            identities.isEmpty() -> "尚未绑定第三方登录方式"
+            else -> "已绑定 ${identities.size} 种身份"
+        }
     }
 
     private fun identityRow(identity: LinkedLoginIdentity): View {
@@ -103,6 +121,16 @@ class AccountIdentityActivity : AppCompatActivity() {
     }
 
     private fun bindGoogle() {
+        val account = maskedYilongAccount(AuthManager.account(this))
+        AlertDialog.Builder(this)
+            .setTitle("绑定 Google 账号")
+            .setMessage("接下来选择的 Google 账号将绑定到当前一龙账号 $account。不会按相同邮箱自动合并，也不会保存 Google 密码。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("继续使用 Google") { _, _ -> performGoogleBind() }
+            .show()
+    }
+
+    private fun performGoogleBind() {
         bindButton.isEnabled = false
         status.text = "正在打开 Google…"
         lifecycleScope.launch {

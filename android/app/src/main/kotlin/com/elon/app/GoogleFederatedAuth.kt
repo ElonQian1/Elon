@@ -31,7 +31,7 @@ internal class GoogleFederatedAuth(
         require(mode == "login" || mode == "bind")
         val provider = withContext(Dispatchers.IO) { googleProvider() }
         check(provider.optBoolean("configured") && provider.optString("client_id").isNotBlank()) {
-            "Google 登录等待管理员配置客户端 ID"
+            federatedAuthErrorMessage("google_oidc_not_configured", "")
         }
         val challenge = withContext(Dispatchers.IO) { createChallenge(mode) }
         val idToken = requestIdToken(
@@ -56,6 +56,11 @@ internal class GoogleFederatedAuth(
                 )
             }
         }
+    }
+
+    suspend fun isGoogleConfigured(): Boolean = withContext(Dispatchers.IO) {
+        val provider = googleProvider()
+        provider.optBoolean("configured") && provider.optString("client_id").isNotBlank()
     }
 
     suspend fun unlink(identityId: String) = withContext(Dispatchers.IO) {
@@ -141,9 +146,10 @@ internal class GoogleFederatedAuth(
     private fun execute(request: Request): JSONObject = http.newCall(request).execute().use { response ->
         val body = response.body?.string().orEmpty()
         if (!response.isSuccessful) {
-            val message = runCatching { JSONObject(body).optString("error") }
-                .getOrNull().orEmpty().ifBlank { "请求失败 (${response.code})" }
-            error(message.take(500))
+            val payload = runCatching { JSONObject(body) }.getOrNull()
+            val fallback = payload?.optString("error").orEmpty()
+                .ifBlank { "请求失败 (${response.code})" }
+            error(federatedAuthErrorMessage(payload?.optString("code"), fallback).take(500))
         }
         if (body.isBlank()) JSONObject() else JSONObject(body)
     }

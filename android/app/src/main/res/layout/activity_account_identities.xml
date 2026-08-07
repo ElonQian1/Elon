@@ -23,7 +23,59 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:text="多个登录方式可以进入同一个一龙账号。不会复制 Google 或 AI 厂商凭据。"
+            android:text="把 Google 绑定到当前一龙账号，以后可选择任一登录方式进入同一个账号。"
+            android:textColor="@color/elon_text_secondary"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:background="@drawable/bg_orbital_panel"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="当前一龙账号"
+                android:textColor="@color/elon_text_tertiary"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/accountCurrentAccount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:text="读取中…"
+                android:textColor="@color/elon_text_primary"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:text="Google 将作为这个账号的新登录方式，不会创建副本。"
+                android:textColor="@color/elon_text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Google 登录"
+            android:textColor="@color/elon_text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/accountGoogleBindingSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="正在读取绑定状态…"
             android:textColor="@color/elon_text_secondary"
             android:textSize="13sp" />
 
@@ -31,7 +83,7 @@
             android:id="@+id/accountIdentityList"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="12dp"
             android:orientation="vertical" />
 
         <Button
@@ -40,7 +92,7 @@
             android:layout_height="52dp"
             android:layout_marginTop="16dp"
             android:backgroundTint="@color/elon_button_secondary_bg"
-            android:text="绑定 Google 账号"
+            android:text="绑定 Google 到当前账号"
             android:textColor="@color/elon_button_secondary_text" />
 
         <TextView
@@ -58,7 +110,7 @@
             android:layout_marginTop="20dp"
             android:background="@drawable/bg_orbital_panel"
             android:padding="14dp"
-            android:text="安全提示：同邮箱不会自动合并。请先登录原一龙账号，再从这里主动绑定。"
+            android:text="安全提示：同邮箱不会自动合并，也不会保存 Google 密码或访问令牌。若 Google 已属于另一账号，请先在原账号解绑。"
             android:textColor="@color/elon_text_tertiary"
             android:textSize="12sp" />
 

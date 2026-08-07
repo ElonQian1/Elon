@@ -79,6 +79,13 @@ Win、Android 与移动 Web 共用以下一龙账号合同：
 
 Win React、Android APK 与移动 Web 使用相同响应字段。Android 不打开自建 WebView 登录 Google，而使用系统 Credential Manager；Web 使用 Google Identity Services JavaScript。
 
+### APK / PWA 账号绑定入口
+
+- 已登录用户从个人页的“账号与安全”进入，页面必须先展示脱敏后的当前一龙账号，再允许启动 Google 官方流程；`bind` 不得在未登录状态降级为新账号登录。
+- 个人页和账号安全页都展示 Google 的“已绑定 / 未绑定 / 暂未配置”状态。服务端返回 `configured: false` 时客户端明确提示管理员配置缺失，不显示无法完成的伪按钮。
+- 绑定前文案明确 Google 会成为当前一龙账号的新登录方式；同邮箱不自动合并，身份属于另一账号时按稳定错误码提示先去原账号解绑。
+- APK 只把短时 ID token 交给服务端验证，PWA 只使用 Google Identity Services 官方组件；两端均不持久化 Google ID token、access token、refresh token 或密码。
+
 联合登录创建 challenge 和完成操作均有进程内有界限流，超限返回稳定错误码及 `Retry-After` 并写入脱敏审计。完成响应使用 5 分钟、最多 256 项的进程内精确重放缓存，缓存键绑定 challenge、request、客户端指纹；它允许断线后拿回同一结果，但不跨服务进程持久化 Bearer session。生产多副本部署需要把幂等结果迁到共享短时存储，或者由会话粘性和周边重放防护补足。
 
 限流已通过 `AuthRateLimitStore` 抽象与业务入口解耦，但默认实现仍是最多 4096 个键的进程内有界内存。能力接口明确返回 `multi_replica_ready: false`；只有提供原子递增、TTL 和有界 keyspace 的共享实现，并为含 Bearer 的短时重放结果提供加密临时存储或稳定单写者后，才能宣称多副本安全。
