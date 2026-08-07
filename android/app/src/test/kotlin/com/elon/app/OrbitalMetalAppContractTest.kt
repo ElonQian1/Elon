@@ -31,7 +31,7 @@ class OrbitalMetalAppContractTest {
         val main = source("android/app/src/main/res/layout/activity_main.xml")
         val profile = source("android/app/src/main/kotlin/com/elon/app/UserProfileViews.kt")
         val quota = source("android/app/src/main/kotlin/com/elon/app/ProfileTokenUsageCard.kt")
-        assertTrue(main.count("@drawable/bg_orbital_panel") >= 2)
+        assertTrue(main.split("@drawable/bg_orbital_panel").size - 1 >= 2)
         assertTrue(profile.contains("R.drawable.bg_orbital_panel"))
         assertTrue(quota.contains("R.drawable.bg_orbital_panel"))
         assertFalse(main.contains("@drawable/profile_panel_primary_actions_stable"))

@@ -289,9 +289,9 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.7.0'
 
     // Google 官方 Sign in with Google（Credential Manager + OIDC ID token）
-    implementation 'androidx.credentials:credentials:1.6.0'
-    implementation 'androidx.credentials:credentials-play-services-auth:1.6.0'
-    implementation 'com.google.android.libraries.identity.googleid:googleid:1.2.0'
+    implementation 'androidx.credentials:credentials:1.3.0'
+    implementation 'androidx.credentials:credentials-play-services-auth:1.3.0'
+    implementation 'com.google.android.libraries.identity.googleid:googleid:1.1.1'
 
     // WorkManager（后台定期检查更新）
     implementation 'androidx.work:work-runtime-ktx:2.9.0'
