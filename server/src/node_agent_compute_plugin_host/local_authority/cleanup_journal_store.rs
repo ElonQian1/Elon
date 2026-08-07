@@ -9,8 +9,8 @@ use super::{
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::{
-        CandidateCleanupExecutionState, HashedComputePluginCandidateCleanupExecutionPlan,
-        ValidatedCandidateCleanupTopologyPermit,
+        HashedComputePluginCandidateCleanupStepEvent, SealedCandidateCleanupTopology,
+        ValidatedCandidateCleanupDeleteIntentPermit,
     },
     fetch_contract::ComputePluginFetchCancellationGuard,
     manifest_validation::is_sha256,
@@ -21,14 +21,12 @@ mod recovery;
 mod validation;
 mod write;
 
-pub(super) use validation::read_exact_sealed_plan;
-
 pub(in crate::node_agent_compute_plugin_host) use recovery::{
-    ComputePluginCandidateCleanupTopologyRecoveryAuthoritySession,
-    ComputePluginCandidateCleanupTopologyRecoveryOutcome,
+    ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession,
+    ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome,
 };
 
-pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateCleanupTopologyAuthoritySession<
+pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateCleanupDeleteIntentAuthoritySession<
     'authority,
 > {
     authority: &'authority ComputePluginLocalAuthority,
@@ -39,14 +37,14 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateClean
 }
 
 impl ComputePluginLocalAuthority {
-    pub(in crate::node_agent_compute_plugin_host) fn bind_candidate_cleanup_topology_authority_session<
+    pub(in crate::node_agent_compute_plugin_host) fn bind_candidate_cleanup_delete_intent_authority_session<
         'authority,
     >(
         &'authority self,
         process_fence: &'authority ComputePluginFetchProcessFence,
         observation: ComputePluginTrustedTimeObservation,
         prepared_at: Instant,
-    ) -> Result<ComputePluginCandidateCleanupTopologyAuthoritySession<'authority>> {
+    ) -> Result<ComputePluginCandidateCleanupDeleteIntentAuthoritySession<'authority>> {
         let trusted_now = observation.trusted_now().clone();
         let observed_at = observation.observed_at();
         if !self
@@ -62,9 +60,9 @@ impl ComputePluginLocalAuthority {
             || prepared_at <= observed_at
             || trusted_now.timestamp_millis() < process_fence.acquired_at_ms()
         {
-            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_TOPOLOGY_SESSION_INVALID");
+            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_SESSION_INVALID");
         }
-        Ok(ComputePluginCandidateCleanupTopologyAuthoritySession {
+        Ok(ComputePluginCandidateCleanupDeleteIntentAuthoritySession {
             authority: self,
             process_fence,
             trusted_now,
@@ -74,27 +72,33 @@ impl ComputePluginLocalAuthority {
     }
 }
 
-impl ComputePluginCandidateCleanupTopologyAuthoritySession<'_> {
+impl ComputePluginCandidateCleanupDeleteIntentAuthoritySession<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn authority_instance_binding(
         &self,
     ) -> &ComputePluginAuthorityInstanceBinding {
         self.process_fence.authority_instance_binding()
     }
+
     pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
         self.process_fence.installation_id_digest()
     }
+
     pub(in crate::node_agent_compute_plugin_host) fn process_owner_epoch(&self) -> i64 {
         self.process_fence.process_owner_epoch()
     }
+
     pub(in crate::node_agent_compute_plugin_host) fn clock_epoch_digest(&self) -> &str {
         &self.clock_epoch_digest
     }
+
     pub(in crate::node_agent_compute_plugin_host) fn trusted_now_ms(&self) -> i64 {
         self.trusted_now.timestamp_millis()
     }
+
     pub(in crate::node_agent_compute_plugin_host) fn observed_at(&self) -> Instant {
         self.observed_at
     }
+
     pub(in crate::node_agent_compute_plugin_host) fn validate_source(
         &self,
         guard: &ComputePluginFetchCancellationGuard,
@@ -102,23 +106,25 @@ impl ComputePluginCandidateCleanupTopologyAuthoritySession<'_> {
         guard.validate_source(self.process_fence.cancellation_source())?;
         guard.ensure_current()
     }
-    pub(in crate::node_agent_compute_plugin_host) fn validate_candidate_cleanup_topology(
+
+    pub(in crate::node_agent_compute_plugin_host) fn validate_candidate_cleanup_delete_intent(
         &self,
-        state: &CandidateCleanupExecutionState,
-        plan: &HashedComputePluginCandidateCleanupExecutionPlan,
+        sealed: &SealedCandidateCleanupTopology,
+        event: &HashedComputePluginCandidateCleanupStepEvent,
     ) -> Result<()> {
-        self.validate_source(state.cancellation_guard())?;
+        self.validate_source(sealed.state().cancellation_guard())?;
         self.authority.with_deferred(|transaction| {
-            validation::validate_unsealed_binding(transaction, self, state, plan)
+            validation::validate_unstored_intent(transaction, self, sealed, event)
         })
     }
-    pub(in crate::node_agent_compute_plugin_host) fn persist_candidate_cleanup_topology(
+
+    pub(in crate::node_agent_compute_plugin_host) fn persist_candidate_cleanup_delete_intent(
         &self,
-        permit: ValidatedCandidateCleanupTopologyPermit<'_>,
-    ) -> Result<HashedComputePluginCandidateCleanupExecutionPlan> {
-        self.validate_source(permit.state().cancellation_guard())?;
+        permit: ValidatedCandidateCleanupDeleteIntentPermit<'_>,
+    ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
+        self.validate_source(permit.sealed().state().cancellation_guard())?;
         self.authority.with_immediate(|transaction| {
-            write::persist_candidate_cleanup_topology(transaction, self, permit)
+            write::persist_candidate_cleanup_delete_intent(transaction, self, permit)
         })
     }
 }

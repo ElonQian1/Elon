@@ -75,7 +75,7 @@ pub(super) fn validate_authority_and_owner(
     Ok(())
 }
 
-pub(super) fn read_exact_sealed_plan(
+pub(in crate::node_agent_compute_plugin_host::local_authority) fn read_exact_sealed_plan(
     transaction: &Transaction<'_>,
     expected: &HashedComputePluginCandidateCleanupExecutionPlan,
     candidate_token: &str,

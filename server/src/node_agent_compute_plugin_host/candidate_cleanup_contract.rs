@@ -25,6 +25,7 @@ mod adoption;
 mod completion;
 mod completion_recovery_key;
 mod execution;
+mod journal;
 mod recovery_key;
 mod terminal_journal;
 mod topology;
@@ -48,10 +49,21 @@ pub(in crate::node_agent_compute_plugin_host) use completion_recovery_key::{
 };
 pub(in crate::node_agent_compute_plugin_host) use execution::validate_hashed_execution_evidence;
 pub(in crate::node_agent_compute_plugin_host) use execution::{
-    prepare_candidate_cleanup_execution, resume_candidate_cleanup_execution,
     CandidateCleanupExecutionFailure, CandidateCleanupExecutionState,
     ComputePluginCandidateCleanupExecutionEvidence,
     HashedComputePluginCandidateCleanupExecutionEvidence, PhysicallyExecutedCandidateCleanup,
+};
+pub(in crate::node_agent_compute_plugin_host) use journal::{
+    adopt_recovered_candidate_cleanup_delete_intent, prepare_candidate_cleanup_delete_intent,
+    restore_hashed_cleanup_step_event, store_candidate_cleanup_delete_intent,
+    validate_hashed_cleanup_step_event, CandidateCleanupDeleteIntentOutcomeUncertainCustody,
+    CandidateCleanupDeleteIntentPreparationFailure, CandidateCleanupDeleteIntentRecoveryAdoption,
+    CandidateCleanupDeleteIntentRecoveryAdoptionFailure,
+    CandidateCleanupDeleteIntentRecoveryAdoptionPhase, CandidateCleanupDeleteIntentRecoveryKey,
+    CandidateCleanupDeleteIntentStoreFailure, CandidateCleanupDeleteIntentStorePhase,
+    ComputePluginCandidateCleanupStepEvent, DurableCandidateCleanupDeleteIntent,
+    HashedComputePluginCandidateCleanupStepEvent, PreparedCandidateCleanupDeleteIntent,
+    ValidatedCandidateCleanupDeleteIntentPermit,
 };
 pub(in crate::node_agent_compute_plugin_host) use recovery_key::{
     CandidateCleanupAuthorizationReceiptExpectation, CandidateCleanupAuthorizationRecoveryKey,

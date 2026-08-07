@@ -12,6 +12,7 @@ use super::local_authority_schema;
 
 mod candidate_verification_revocation;
 mod cleanup_completion_store;
+mod cleanup_journal_store;
 mod cleanup_store;
 mod cleanup_topology_store;
 mod fetch_claim_revocation;
@@ -42,6 +43,11 @@ pub(in crate::node_agent_compute_plugin_host) use cleanup_completion_store::{
     CANDIDATE_CLEANUP_COMPLETION_RECEIPT_DIGEST_ALGORITHM,
     CANDIDATE_CLEANUP_COMPLETION_RECEIPT_SCHEMA,
     HASHED_CANDIDATE_CLEANUP_COMPLETION_RECEIPT_SCHEMA,
+};
+pub(in crate::node_agent_compute_plugin_host) use cleanup_journal_store::{
+    ComputePluginCandidateCleanupDeleteIntentAuthoritySession,
+    ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession,
+    ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome,
 };
 pub(in crate::node_agent_compute_plugin_host) use cleanup_store::{
     ComputePluginCandidateCleanupAuthorityFacts, ComputePluginCandidateCleanupAuthoritySession,

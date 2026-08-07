@@ -76,7 +76,7 @@ pub(in crate::node_agent_compute_plugin_host) struct PhysicallyExecutedCandidate
     physical_completed_at: Instant,
 }
 
-pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_execution(
+pub(super) fn prepare_candidate_cleanup_execution(
     sealed: SealedCandidateCleanupTopology,
 ) -> CandidateCleanupExecutionState {
     let (mut state, plan) = sealed.into_parts();
@@ -84,7 +84,7 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_execu
     state
 }
 
-pub(in crate::node_agent_compute_plugin_host) fn resume_candidate_cleanup_execution(
+pub(super) fn resume_candidate_cleanup_execution(
     mut state: CandidateCleanupExecutionState,
 ) -> std::result::Result<PhysicallyExecutedCandidateCleanup, CandidateCleanupExecutionFailure> {
     while let Some(file) = state.staging_files.pop_front() {
