@@ -24,18 +24,24 @@ pub(crate) struct FederatedCompletionCache {
 }
 
 impl FederatedCompletionCache {
-    pub(crate) fn get(&mut self, key: &str) -> Option<CachedFederatedCompletion> {
+    fn prune(&mut self) {
+        let now = Instant::now();
+        self.entries.retain(|_, value| value.expires_at > now);
+    }
+}
+
+pub(crate) trait FederatedCompletionReplayStore: Send {
+    fn get(&mut self, key: &str) -> Option<CachedFederatedCompletion>;
+    fn insert(&mut self, key: String, mode: &str, user_id: Option<&str>, response: Value);
+}
+
+impl FederatedCompletionReplayStore for FederatedCompletionCache {
+    fn get(&mut self, key: &str) -> Option<CachedFederatedCompletion> {
         self.prune();
         self.entries.get(key).cloned()
     }
 
-    pub(crate) fn insert(
-        &mut self,
-        key: String,
-        mode: &str,
-        user_id: Option<&str>,
-        response: Value,
-    ) {
+    fn insert(&mut self, key: String, mode: &str, user_id: Option<&str>, response: Value) {
         self.prune();
         if self.entries.len() >= MAX_ENTRIES {
             if let Some(oldest) = self
@@ -57,15 +63,19 @@ impl FederatedCompletionCache {
             },
         );
     }
-
-    fn prune(&mut self) {
-        let now = Instant::now();
-        self.entries.retain(|_, value| value.expires_at > now);
-    }
 }
 
-pub(crate) fn completion_cache() -> &'static Mutex<FederatedCompletionCache> {
-    CACHE.get_or_init(|| Mutex::new(FederatedCompletionCache::default()))
+pub(crate) fn completion_cache() -> &'static Mutex<Box<dyn FederatedCompletionReplayStore>> {
+    CACHE.get_or_init(|| Mutex::new(Box::new(FederatedCompletionCache::default())))
+}
+
+#[allow(dead_code)]
+pub(crate) fn install_completion_replay_store(
+    store: Box<dyn FederatedCompletionReplayStore>,
+) -> Result<(), &'static str> {
+    CACHE
+        .set(Mutex::new(store))
+        .map_err(|_| "federated completion replay store already initialized")
 }
 
 pub(crate) fn completion_cache_key(
@@ -78,14 +88,25 @@ pub(crate) fn completion_cache_key(
     ))
 }
 
-static CACHE: OnceLock<Mutex<FederatedCompletionCache>> = OnceLock::new();
+static CACHE: OnceLock<Mutex<Box<dyn FederatedCompletionReplayStore>>> = OnceLock::new();
+
+pub(crate) fn replay_capabilities() -> Value {
+    serde_json::json!({
+        "backend": "process_local_bearer_memory",
+        "ttl_seconds": CACHE_TTL.as_secs(),
+        "max_entries": MAX_ENTRIES,
+        "distributed_safe": false,
+        "bearer_persisted": false,
+        "shared_backend_requirement": "encrypted_ephemeral_response_store_or_sticky_single_writer"
+    })
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn cache_replays_only_the_exact_challenge_request_and_client_tuple() {
+    async fn phase2_contract_cache_replays_only_exact_challenge_request_and_client() {
         let key = completion_cache_key("challenge", "request-123", "client-a");
         let other = completion_cache_key("challenge", "request-123", "client-b");
         let mut cache = FederatedCompletionCache::default();

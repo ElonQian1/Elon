@@ -11,6 +11,7 @@
 - consumer 节点必须用本机节点 secret 证明身份。
 - provider 必须在平台上显式授权 consumer。
 - 共享凭据只写入节点托管的临时 `CODEX_HOME`。
+- 用户主动恢复与清理必须分别提交唯一 `request_id`、`explicit_consent=true` 和固定确认短语；脚本会自动生成，不接受空请求体。
 - 所有共享用量记为 `shared_codex`，并能追溯 provider、consumer、lease、token usage、billing event 和 node transaction。
 
 ## 一键上线演练
@@ -45,7 +46,7 @@ powershell -ExecutionPolicy Bypass -File scripts\test-codex-vault-sharing-switch
 3. 运行真实 `codex exec --ignore-user-config --ignore-rules --ephemeral`，坏凭据必须失败。
 4. 通过本机节点申请 provider 的授权共享租约。
 5. 用共享 `CODEX_HOME` 运行同一条 Codex 命令，共享凭据必须成功。
-6. 调用本机 `/api/codex-vault/clear` 清理租约。
+6. 带新的显式同意请求调用本机 `/api/codex-vault/clear` 清理租约。
 7. 输出脱敏 JSON 结果。
 
 通过条件：

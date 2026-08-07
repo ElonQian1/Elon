@@ -88,6 +88,7 @@ mod node_agent_codex_session;
 mod node_agent_codex_task_contract_identity;
 mod node_agent_codex_vault;
 mod node_agent_codex_vault_active;
+mod node_agent_codex_vault_consent;
 mod node_agent_codex_vault_emergency;
 mod node_agent_config;
 use node_agent_config::{
@@ -179,6 +180,7 @@ mod node_agent_provider_auth_monitor;
 mod node_agent_provider_auth_protocol;
 mod node_agent_provider_auth_runtime;
 mod node_agent_provider_diagnostics;
+mod node_agent_provider_simulator;
 mod node_agent_provider_vault_contract;
 mod node_agent_proxy;
 mod node_agent_pwa_auth_profile;

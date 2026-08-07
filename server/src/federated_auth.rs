@@ -75,6 +75,7 @@ async fn providers() -> Response {
             "request_id_supported": true,
             "completion_replay_window_seconds": 300,
             "rate_limit": "process_local_plus_perimeter_required",
+            "capabilities": crate::auth_safety_store::auth_safety_capabilities(),
         }
     }))
     .into_response()

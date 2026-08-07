@@ -138,3 +138,45 @@ fn recovery_code_resets_password_once_and_revokes_all_sessions() {
     drop(store);
     remove_database(&path);
 }
+
+#[test]
+fn phase2_contract_security_events_expose_presence_flags_not_raw_ids() {
+    let (store, path) = temporary_store();
+    let user = store
+        .create_user("events-security@example.com", "secret1", None, None)
+        .unwrap();
+    let (token, _) = store
+        .create_session(&user.id, Some("Current"), None)
+        .unwrap();
+    store
+        .change_account_password(
+            &user.id,
+            &token,
+            Some("secret1"),
+            "secret2",
+            "event-request-secret",
+        )
+        .unwrap();
+    let current_session = store
+        .list_account_sessions(&user.id, &token)
+        .unwrap()
+        .into_iter()
+        .find(|session| session.current)
+        .unwrap();
+    store
+        .revoke_account_session(&user.id, &token, &current_session.id)
+        .unwrap();
+
+    let events = store
+        .list_account_security_events(&user.id, None, 100)
+        .unwrap();
+    assert!(!events.is_empty());
+    assert_eq!(
+        store.count_account_security_events(&user.id).unwrap(),
+        events.len() as u64
+    );
+    assert!(events.iter().any(|event| event.request_id_present));
+    assert!(events.iter().any(|event| event.session_id_present));
+    drop(store);
+    remove_database(&path);
+}

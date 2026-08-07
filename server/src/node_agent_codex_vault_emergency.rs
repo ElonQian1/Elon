@@ -34,6 +34,19 @@ pub(crate) struct EmergencyRestoreRequest {
 }
 
 #[derive(Debug, Deserialize)]
+struct PublicEmergencyRestoreRequest {
+    request_id: String,
+    #[serde(default)]
+    explicit_consent: bool,
+    confirmation: Option<String>,
+    provider_user_id: Option<String>,
+    provider_account: Option<String>,
+    purpose: Option<String>,
+    failure_reason: Option<String>,
+    compute_call_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub(crate) struct EmergencyLeaseResponse {
     pub(crate) auth_json: String,
     pub(crate) lease_id: Option<String>,
@@ -87,28 +100,59 @@ pub(crate) fn routes() -> Router<Arc<crate::NodeRuntime>> {
 
 async fn emergency_restore_handler(
     State(rt): State<Arc<crate::NodeRuntime>>,
-    Json(req): Json<EmergencyRestoreRequest>,
+    Json(req): Json<PublicEmergencyRestoreRequest>,
 ) -> impl IntoResponse {
-    match restore_emergency_from_cloud(&rt, req).await {
-        Ok(lease) => (
-            StatusCode::OK,
-            Json(json!({
-                "ok": true,
-                "message": lease.message.unwrap_or_else(|| "已切换为授权机器人的临时 Codex Pro 会话。".to_string()),
-                "lease_id": lease.lease_id,
-                "slot_id": lease.slot_id,
-                "account_hint_hash": lease.account_hint_hash,
-                "provider_user_id": lease.provider_user_id,
-                "provider_nickname": lease.provider_nickname,
-                "billing_source": lease.billing_source,
-                "lease_expires_at": lease.lease_expires_at,
-                "cloud_control_deadline": lease.cloud_control_deadline,
-                "cloud_control_issued_at": lease.cloud_control_issued_at,
-                "cloud_control_ttl_ms": lease.cloud_control_ttl_ms,
-                "local": local_status_payload(),
-            })),
-        ),
-        Err(error) => error_response(StatusCode::BAD_GATEWAY, error.to_string()),
+    use crate::node_agent_codex_vault_consent::{
+        begin_operation, BeginOperation, VaultOperation, VaultOperationRequest,
+    };
+    let consent = VaultOperationRequest {
+        request_id: req.request_id,
+        explicit_consent: req.explicit_consent,
+        confirmation: req.confirmation,
+        purpose: req.purpose.clone(),
+    };
+    let target = req
+        .provider_user_id
+        .as_deref()
+        .or(req.provider_account.as_deref());
+    let operation = match begin_operation(VaultOperation::RestoreShared, &consent, target) {
+        Ok(BeginOperation::Started(operation)) => operation,
+        Ok(BeginOperation::Replay(status, body)) => return (status, body),
+        Err(response) => return response,
+    };
+    let internal = EmergencyRestoreRequest {
+        provider_user_id: req.provider_user_id,
+        provider_account: req.provider_account,
+        purpose: req.purpose,
+        failure_reason: req.failure_reason,
+        compute_call_id: req.compute_call_id,
+    };
+    match restore_emergency_from_cloud(&rt, internal).await {
+        Ok(lease) => {
+            operation.complete();
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok": true,
+                    "message": lease.message.unwrap_or_else(|| "已切换为授权机器人的临时 Codex Pro 会话。".to_string()),
+                    "lease_id": lease.lease_id,
+                    "slot_id": lease.slot_id,
+                    "account_hint_hash": lease.account_hint_hash,
+                    "provider_user_id": lease.provider_user_id,
+                    "provider_nickname": lease.provider_nickname,
+                    "billing_source": lease.billing_source,
+                    "lease_expires_at": lease.lease_expires_at,
+                    "cloud_control_deadline": lease.cloud_control_deadline,
+                    "cloud_control_issued_at": lease.cloud_control_issued_at,
+                    "cloud_control_ttl_ms": lease.cloud_control_ttl_ms,
+                    "local": local_status_payload(),
+                })),
+            )
+        }
+        Err(error) => {
+            operation.fail("shared_cloud_restore_failed");
+            error_response(StatusCode::BAD_GATEWAY, error.to_string())
+        }
     }
 }
 

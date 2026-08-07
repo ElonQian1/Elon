@@ -52,11 +52,6 @@ pub(crate) struct ManagedAuthSlotInspection {
 }
 
 #[derive(Debug, Deserialize)]
-struct RestoreRequest {
-    purpose: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
 struct CloudLeaseResponse {
     auth_json: String,
     lease_id: Option<String>,
@@ -93,6 +88,7 @@ pub(crate) fn routes() -> Router<Arc<crate::NodeRuntime>> {
         .route("/api/codex-vault/restore", post(restore_handler))
         .route("/api/codex-vault/delete-cloud", post(delete_cloud_handler))
         .route("/api/codex-vault/clear", post(clear_handler))
+        .merge(crate::node_agent_codex_vault_consent::routes())
         .merge(crate::node_agent_codex_vault_emergency::routes())
 }
 
@@ -119,10 +115,26 @@ async fn status_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> (StatusCod
     )
 }
 
-async fn backup_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoResponse {
+async fn backup_handler(
+    State(rt): State<Arc<crate::NodeRuntime>>,
+    Json(req): Json<crate::node_agent_codex_vault_consent::VaultOperationRequest>,
+) -> impl IntoResponse {
+    use crate::node_agent_codex_vault_consent::{BeginOperation, VaultOperation};
+    let operation = match crate::node_agent_codex_vault_consent::begin_operation(
+        VaultOperation::Backup,
+        &req,
+        None,
+    ) {
+        Ok(BeginOperation::Started(operation)) => operation,
+        Ok(BeginOperation::Replay(status, body)) => return (status, body),
+        Err(response) => return response,
+    };
     let creds = match rt.creds().await {
         Some(creds) => creds,
-        None => return error_response(StatusCode::UNAUTHORIZED, "请先绑定本机节点账号"),
+        None => {
+            operation.fail("node_not_bound");
+            return error_response(StatusCode::UNAUTHORIZED, "请先绑定本机节点账号");
+        }
     };
     let token = match creds
         .user_token
@@ -131,17 +143,22 @@ async fn backup_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoR
     {
         Some(token) => token.to_string(),
         None => {
+            operation.fail("missing_cloud_token");
             return error_response(
                 StatusCode::UNAUTHORIZED,
                 "本机节点缺少云端登录 token，请重新绑定",
-            )
+            );
         }
     };
     let auth_path = match source_auth_json_path() {
         Ok(path) => path,
-        Err(error) => return error_response(StatusCode::BAD_REQUEST, error.to_string()),
+        Err(error) => {
+            operation.fail("source_auth_unavailable");
+            return error_response(StatusCode::BAD_REQUEST, error.to_string());
+        }
     };
     if path_in_managed_vault(&auth_path) {
+        operation.fail("shared_account_backup_forbidden");
         return error_response(
             StatusCode::BAD_REQUEST,
             "当前使用共享 Codex 账号，不能覆盖云端。",
@@ -149,9 +166,13 @@ async fn backup_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoR
     }
     let auth_json = match read_auth_json_value(&auth_path) {
         Ok(value) => value,
-        Err(error) => return error_response(StatusCode::BAD_REQUEST, error.to_string()),
+        Err(error) => {
+            operation.fail("auth_cache_read_failed");
+            return error_response(StatusCode::BAD_REQUEST, error.to_string());
+        }
     };
     if let Err(error) = validate_chatgpt_auth_cache(&auth_json) {
+        operation.fail("auth_cache_invalid");
         return error_response(StatusCode::BAD_REQUEST, error.to_string());
     }
     let body = json!({
@@ -165,23 +186,39 @@ async fn backup_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoR
         rt.cloud_http_url().trim_end_matches('/')
     );
     match cloud_post(&url, &token, &body).await {
-        Ok(value) => (
-            StatusCode::OK,
-            Json(json!({
-                "ok": true,
-                "message": "已把这台电脑的 Codex 账号加密保存到云端账号保险箱。",
-                "cloud": value,
-                "local": local_status(),
-            })),
-        ),
-        Err(error) => error_response(StatusCode::BAD_GATEWAY, error.to_string()),
+        Ok(value) => {
+            operation.complete();
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok": true,
+                    "message": "已把这台电脑的 Codex 账号加密保存到云端账号保险箱。",
+                    "cloud": value,
+                    "local": local_status(),
+                })),
+            )
+        }
+        Err(error) => {
+            operation.fail("cloud_backup_failed");
+            error_response(StatusCode::BAD_GATEWAY, error.to_string())
+        }
     }
 }
 
 async fn restore_handler(
     State(rt): State<Arc<crate::NodeRuntime>>,
-    Json(req): Json<RestoreRequest>,
+    Json(req): Json<crate::node_agent_codex_vault_consent::VaultOperationRequest>,
 ) -> impl IntoResponse {
+    use crate::node_agent_codex_vault_consent::{BeginOperation, VaultOperation};
+    let operation = match crate::node_agent_codex_vault_consent::begin_operation(
+        VaultOperation::Restore,
+        &req,
+        None,
+    ) {
+        Ok(BeginOperation::Started(operation)) => operation,
+        Ok(BeginOperation::Replay(status, body)) => return (status, body),
+        Err(response) => return response,
+    };
     match restore_from_cloud(
         &rt,
         req.purpose
@@ -191,18 +228,24 @@ async fn restore_handler(
     )
     .await
     {
-        Ok(lease) => (
-            StatusCode::OK,
-            Json(json!({
-                "ok": true,
-                "message": lease.message.unwrap_or_else(|| "已切换为本机临时 Codex 会话。".to_string()),
-                "lease_id": lease.lease_id,
-                "slot_id": lease.slot_id,
-                "account_hint_hash": lease.account_hint_hash,
-                "local": local_status(),
-            })),
-        ),
-        Err(error) => error_response(StatusCode::BAD_GATEWAY, error.to_string()),
+        Ok(lease) => {
+            operation.complete();
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok": true,
+                    "message": lease.message.unwrap_or_else(|| "已切换为本机临时 Codex 会话。".to_string()),
+                    "lease_id": lease.lease_id,
+                    "slot_id": lease.slot_id,
+                    "account_hint_hash": lease.account_hint_hash,
+                    "local": local_status(),
+                })),
+            )
+        }
+        Err(error) => {
+            operation.fail("cloud_restore_failed");
+            error_response(StatusCode::BAD_GATEWAY, error.to_string())
+        }
     }
 }
 
@@ -329,7 +372,20 @@ async fn restore_from_cloud(
     Ok(lease)
 }
 
-async fn clear_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoResponse {
+async fn clear_handler(
+    State(rt): State<Arc<crate::NodeRuntime>>,
+    Json(req): Json<crate::node_agent_codex_vault_consent::VaultOperationRequest>,
+) -> impl IntoResponse {
+    use crate::node_agent_codex_vault_consent::{BeginOperation, VaultOperation};
+    let operation = match crate::node_agent_codex_vault_consent::begin_operation(
+        VaultOperation::ClearLocal,
+        &req,
+        None,
+    ) {
+        Ok(BeginOperation::Started(operation)) => operation,
+        Ok(BeginOperation::Replay(status, body)) => return (status, body),
+        Err(response) => return response,
+    };
     let active = std::env::var("CODEX_HOME").ok().map(PathBuf::from);
     let active_meta = active
         .as_ref()
@@ -341,6 +397,7 @@ async fn clear_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoRe
     )
     .await;
     if let Err(error) = safe_remove_all_managed_homes() {
+        operation.fail("managed_home_cleanup_failed");
         return error_response(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
     }
     if active
@@ -350,6 +407,7 @@ async fn clear_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoRe
         std::env::remove_var("CODEX_HOME");
     }
     rt.refresh_cli_probe_now().await;
+    operation.complete();
     (
         StatusCode::OK,
         Json(json!({
@@ -361,10 +419,26 @@ async fn clear_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoRe
     )
 }
 
-async fn delete_cloud_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl IntoResponse {
+async fn delete_cloud_handler(
+    State(rt): State<Arc<crate::NodeRuntime>>,
+    Json(req): Json<crate::node_agent_codex_vault_consent::VaultOperationRequest>,
+) -> impl IntoResponse {
+    use crate::node_agent_codex_vault_consent::{BeginOperation, VaultOperation};
+    let operation = match crate::node_agent_codex_vault_consent::begin_operation(
+        VaultOperation::DeleteCloud,
+        &req,
+        None,
+    ) {
+        Ok(BeginOperation::Started(operation)) => operation,
+        Ok(BeginOperation::Replay(status, body)) => return (status, body),
+        Err(response) => return response,
+    };
     let creds = match rt.creds().await {
         Some(creds) => creds,
-        None => return error_response(StatusCode::UNAUTHORIZED, "请先绑定本机节点账号"),
+        None => {
+            operation.fail("node_not_bound");
+            return error_response(StatusCode::UNAUTHORIZED, "请先绑定本机节点账号");
+        }
     };
     let token = match creds
         .user_token
@@ -373,10 +447,11 @@ async fn delete_cloud_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl
     {
         Some(token) => token.to_string(),
         None => {
+            operation.fail("missing_cloud_token");
             return error_response(
                 StatusCode::UNAUTHORIZED,
                 "本机节点缺少云端登录 token，请重新绑定",
-            )
+            );
         }
     };
     let url = format!(
@@ -384,16 +459,22 @@ async fn delete_cloud_handler(State(rt): State<Arc<crate::NodeRuntime>>) -> impl
         rt.cloud_http_url().trim_end_matches('/')
     );
     match cloud_delete(&url, &token).await {
-        Ok(value) => (
-            StatusCode::OK,
-            Json(json!({
-                "ok": true,
-                "message": "已删除云端 Codex 账号记录。",
-                "cloud": value,
-                "local": local_status(),
-            })),
-        ),
-        Err(error) => error_response(StatusCode::BAD_GATEWAY, error.to_string()),
+        Ok(value) => {
+            operation.complete();
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok": true,
+                    "message": "已删除云端 Codex 账号记录。",
+                    "cloud": value,
+                    "local": local_status(),
+                })),
+            )
+        }
+        Err(error) => {
+            operation.fail("cloud_delete_failed");
+            error_response(StatusCode::BAD_GATEWAY, error.to_string())
+        }
     }
 }
 

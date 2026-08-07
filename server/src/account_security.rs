@@ -306,7 +306,7 @@ async fn logout(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Respo
     }
 }
 
-fn authenticated_account(
+pub(crate) fn authenticated_account(
     state: &AppState,
     headers: &HeaderMap,
 ) -> Result<(String, String), Response> {
@@ -365,7 +365,7 @@ fn rate_limited_response(error: AuthRateLimited) -> Response {
     response
 }
 
-fn coded_error(status: StatusCode, code: &str, message: impl ToString) -> Response {
+pub(crate) fn coded_error(status: StatusCode, code: &str, message: impl ToString) -> Response {
     (
         status,
         Json(serde_json::json!({

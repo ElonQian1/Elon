@@ -8,10 +8,12 @@ mod account_identities;
 mod account_identities_tests;
 pub(crate) use account_identities::*;
 mod account_security;
+mod account_security_events;
 mod account_security_support;
 #[cfg(test)]
 mod account_security_tests;
 pub(crate) use account_security::*;
+pub(crate) use account_security_events::*;
 mod admin_stats;
 mod admin_stats_quotas;
 mod ai_resource_policies;
