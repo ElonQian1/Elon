@@ -12,6 +12,7 @@ const AiChatPage = lazy(() => import('./features/ai/AiChatPage'))
 const FriendsPage = lazy(() => import('./features/friends/FriendsPage'))
 const PlazaPage = lazy(() => import('./features/plaza/PlazaPage'))
 const AccountPage = lazy(() => import('./features/account/AccountPage'))
+const UserBrowserLauncherPage = lazy(() => import('./features/user-browser/UserBrowserLauncherPage'))
 const UserProfilePage = lazy(() => import('./features/users/UserProfilePage'))
 const DoctorPage = lazy(() => import('./features/doctor/DoctorPage'))
 const VoicePage = lazy(() => import('./features/voice/VoicePage'))
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="friends" element={lazyRoute(<FriendsPage />)} />
         <Route path="plaza" element={lazyRoute(<PlazaPage />)} />
         <Route path="account" element={lazyRoute(<AccountPage />)} />
+        <Route path="user-browser" element={lazyRoute(<UserBrowserLauncherPage />)} />
         <Route path="users/:userId" element={lazyRoute(<UserProfilePage />)} />
         <Route path="projects" element={lazyRoute(<ProjectsPage />)} />
         <Route path="projects/:id" element={lazyRoute(<ProjectDetailPage />)} />

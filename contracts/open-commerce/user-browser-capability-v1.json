@@ -1,0 +1,49 @@
+{
+  "schema": "yilong.open_commerce.capability_definition.v1",
+  "capability_key": "browser.chatgpt.session.launch",
+  "display_name": "启动我的 ChatGPT 浏览器",
+  "kind": "action",
+  "access_level": "public",
+  "handler_type": "merchant_runtime",
+  "input_schema": {
+    "type": "object",
+    "required": ["target"],
+    "properties": {
+      "target": { "const": "chatgpt" }
+    },
+    "additionalProperties": false
+  },
+  "output_schema": {
+    "type": "object",
+    "required": [
+      "schema",
+      "session_id",
+      "target",
+      "launch_url",
+      "expires_at",
+      "ticket_single_use"
+    ],
+    "properties": {
+      "schema": { "const": "yilong.user_browser.launch.v1" },
+      "session_id": { "type": "string", "format": "uuid" },
+      "target": { "const": "chatgpt" },
+      "launch_url": { "type": "string", "format": "uri" },
+      "expires_at": { "type": "string", "format": "date-time" },
+      "ticket_single_use": { "const": true }
+    },
+    "additionalProperties": false
+  },
+  "pricing": {
+    "unit_price_micros": 0,
+    "currency": "CNY"
+  },
+  "freshness_seconds": 0,
+  "security": {
+    "owner_source": "signed_runtime_envelope.requester_user_id",
+    "launch_ticket": "single_use_fragment",
+    "browser_session": "http_only_same_site_cookie",
+    "profile_isolation": "sha256(requester_user_id,target)",
+    "private_api_capture": false,
+    "cookie_export": false
+  }
+}
