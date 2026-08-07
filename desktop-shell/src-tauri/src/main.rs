@@ -25,6 +25,7 @@
 )]
 
 mod autostart;
+mod local_ai_browser;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -131,6 +132,11 @@ const FRAMELESS_FLAG_SCRIPT: &str = "window.__ELON_DESKTOP_FRAMELESS__ = true;";
 
 fn main() {
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            local_ai_browser::list_local_ai_web_providers,
+            local_ai_browser::open_local_ai_web_session,
+            local_ai_browser::clear_local_ai_web_session,
+        ])
         // 单实例：用户重复双击客户端图标（或启动器再次 spawn elon-desktop）时，
         // 不再开第二个窗口，而是把已有窗口唤出并聚焦。必须是第一个注册的插件，
         // 这样重复启动的进程在做任何初始化之前就会退出。
