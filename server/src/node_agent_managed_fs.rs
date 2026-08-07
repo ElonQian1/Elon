@@ -16,6 +16,7 @@ mod copy;
 mod delete;
 mod hash;
 mod lock;
+mod namespace;
 mod open;
 #[cfg(not(windows))]
 #[path = "node_agent_managed_fs/unsupported.rs"]
@@ -29,6 +30,7 @@ pub(crate) use delete::{
     ManagedDirectoryDeleteFailure, ManagedFileDeleteFailure, ManagedObjectDeleteEvidence,
 };
 pub(crate) use hash::{ManagedFileHashFailure, ManagedFileHashPhase, ManagedFileHashResult};
+pub(crate) use namespace::ManagedObjectBinding;
 pub(crate) use read::ManagedFileReadCursor;
 pub(crate) use types::{
     ManagedDirectoryPrepareFailure, ManagedExclusiveFileLockFailure, ManagedFileOpenFailure,
@@ -129,6 +131,7 @@ impl PinnedManagedRoot {
         let mut path = self.root_path.clone();
         let mut handles = self.root_handles.clone();
         let mut filesystem_mutated = false;
+        let mut binding = None;
         for component in components {
             path.push(&component);
             let parent = match handles.last() {
@@ -199,6 +202,20 @@ impl PinnedManagedRoot {
             {
                 return Err(directory_prepare_failure(error, filesystem_mutated));
             }
+            binding = match managed_parent_identity_digest(
+                &self.root_identity_digest,
+                parent.as_ref(),
+                self.root_volume_serial,
+            ) {
+                Ok(parent_identity_digest) => Some(ManagedObjectBinding::directory(
+                    &component,
+                    identity_digest(&self.root_identity_digest, None, identity),
+                    parent_identity_digest,
+                )),
+                Err(error) => {
+                    return Err(directory_prepare_failure(error, filesystem_mutated));
+                }
+            };
             path = match platform::canonical_path(&file) {
                 Ok(path) => path,
                 Err(error) => {
@@ -215,6 +232,7 @@ impl PinnedManagedRoot {
             root_volume_serial: self.root_volume_serial,
             root_identity_digest: self.root_identity_digest.clone(),
             directory_handles: handles,
+            binding,
             filesystem_mutated,
         })
     }
@@ -223,6 +241,7 @@ impl PinnedManagedRoot {
         let components = normal_relative_components(relative, true)?;
         let mut path = self.root_path.clone();
         let mut handles = self.root_handles.clone();
+        let mut binding = None;
         for component in components {
             path.push(&component);
             let parent = handles
@@ -235,6 +254,15 @@ impl PinnedManagedRoot {
             let identity = platform::inspect(&file)
                 .with_context(|| format!("NODE_MANAGED_DIRECTORY_INSPECT {}", path.display()))?;
             validate_directory_identity(identity, Some(self.root_volume_serial))?;
+            binding = Some(ManagedObjectBinding::directory(
+                &component,
+                identity_digest(&self.root_identity_digest, None, identity),
+                managed_parent_identity_digest(
+                    &self.root_identity_digest,
+                    parent.as_ref(),
+                    self.root_volume_serial,
+                )?,
+            ));
             path =
                 platform::canonical_path(&file).context("NODE_MANAGED_DIRECTORY_CANONICAL_PATH")?;
             handles.push(file);
@@ -244,6 +272,7 @@ impl PinnedManagedRoot {
             root_volume_serial: self.root_volume_serial,
             root_identity_digest: self.root_identity_digest.clone(),
             directory_handles: handles,
+            binding,
             filesystem_mutated: false,
         })
     }
@@ -256,6 +285,10 @@ impl PinnedManagedFile {
 
     pub(crate) fn identity_digest(&self) -> &str {
         &self.identity_digest
+    }
+
+    pub(crate) fn object_binding(&self) -> &ManagedObjectBinding {
+        &self.binding
     }
 
     pub(crate) fn directory_filesystem_mutated(&self) -> bool {
@@ -381,6 +414,16 @@ fn identity_digest(
     digest.update(identity.volume_serial.to_le_bytes());
     digest.update(identity.file_id);
     hex::encode(digest.finalize())
+}
+
+fn managed_parent_identity_digest(
+    root_identity_digest: &str,
+    parent: &std::fs::File,
+    expected_volume: u64,
+) -> Result<String> {
+    let identity = platform::inspect(parent).context("NODE_MANAGED_PARENT_IDENTITY_INSPECT")?;
+    validate_directory_identity(identity, Some(expected_volume))?;
+    Ok(identity_digest(root_identity_digest, None, identity))
 }
 
 fn require_sha256(value: &str) -> Result<()> {

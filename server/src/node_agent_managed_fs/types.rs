@@ -1,6 +1,6 @@
 use std::{error::Error as StdError, fmt, fs::File, path::PathBuf, sync::Arc};
 
-use super::PlatformFileIdentity;
+use super::{namespace::ManagedObjectBinding, PlatformFileIdentity};
 
 pub(crate) struct PinnedManagedRoot {
     pub(super) root_path: PathBuf,
@@ -26,6 +26,7 @@ pub(crate) struct PinnedManagedDirectory {
     pub(super) root_volume_serial: u64,
     pub(super) root_identity_digest: String,
     pub(super) directory_handles: Vec<Arc<File>>,
+    pub(super) binding: Option<ManagedObjectBinding>,
     pub(super) filesystem_mutated: bool,
 }
 
@@ -41,6 +42,10 @@ impl fmt::Debug for PinnedManagedDirectory {
 }
 
 impl PinnedManagedDirectory {
+    pub(crate) fn object_binding(&self) -> Option<&ManagedObjectBinding> {
+        self.binding.as_ref()
+    }
+
     pub(crate) fn filesystem_mutated(&self) -> bool {
         self.filesystem_mutated
     }
@@ -75,6 +80,7 @@ pub(crate) struct PinnedManagedFile {
     pub(super) _directory_handles: Vec<Arc<File>>,
     pub(super) identity: PlatformFileIdentity,
     pub(super) identity_digest: String,
+    pub(super) binding: ManagedObjectBinding,
     pub(super) directory_filesystem_mutated: bool,
 }
 

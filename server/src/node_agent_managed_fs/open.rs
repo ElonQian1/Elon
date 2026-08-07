@@ -3,9 +3,10 @@ use std::{ffi::OsStr, sync::Arc};
 use anyhow::anyhow;
 
 use super::{
-    identity_digest, platform, require_single_normal_component, validate_directory_identity,
-    validate_regular_file_identity, ManagedDirectoryPrepareFailure, ManagedFileOpenFailure,
-    PinnedManagedDirectory, PinnedManagedFile, QuarantinedManagedFile,
+    identity_digest, managed_parent_identity_digest, platform, require_single_normal_component,
+    validate_directory_identity, validate_regular_file_identity, ManagedDirectoryPrepareFailure,
+    ManagedFileOpenFailure, ManagedObjectBinding, PinnedManagedDirectory, PinnedManagedFile,
+    QuarantinedManagedFile,
 };
 
 impl PinnedManagedDirectory {
@@ -26,6 +27,16 @@ impl PinnedManagedDirectory {
             .map_err(|error| ManagedDirectoryPrepareFailure::Mutated(error.into()))?;
         validate_directory_identity(identity, Some(self.root_volume_serial))
             .map_err(ManagedDirectoryPrepareFailure::Mutated)?;
+        let binding = ManagedObjectBinding::directory(
+            name,
+            identity_digest(&self.root_identity_digest, None, identity),
+            managed_parent_identity_digest(
+                &self.root_identity_digest,
+                parent.as_ref(),
+                self.root_volume_serial,
+            )
+            .map_err(ManagedDirectoryPrepareFailure::Mutated)?,
+        );
         let path = platform::canonical_path(&file)
             .map_err(|error| ManagedDirectoryPrepareFailure::Mutated(error.into()))?;
         let mut handles = self.directory_handles.clone();
@@ -35,6 +46,7 @@ impl PinnedManagedDirectory {
             root_volume_serial: self.root_volume_serial,
             root_identity_digest: self.root_identity_digest.clone(),
             directory_handles: handles,
+            binding: Some(binding),
             filesystem_mutated: true,
         })
     }
@@ -120,11 +132,33 @@ impl PinnedManagedDirectory {
             }
         };
         let identity_digest = identity_digest(&self.root_identity_digest, None, identity);
+        let binding = ManagedObjectBinding::file(
+            name,
+            identity_digest.clone(),
+            match managed_parent_identity_digest(
+                &self.root_identity_digest,
+                parent.as_ref(),
+                self.root_volume_serial,
+            ) {
+                Ok(digest) => digest,
+                Err(error) => {
+                    return Err(ManagedFileOpenFailure::Opened {
+                        error,
+                        file: QuarantinedManagedFile {
+                            _file: file,
+                            _directory_handles: self.directory_handles.clone(),
+                            directory_filesystem_mutated: self.filesystem_mutated,
+                        },
+                    });
+                }
+            },
+        );
         Ok(PinnedManagedFile {
             file,
             _directory_handles: self.directory_handles.clone(),
             identity,
             identity_digest,
+            binding,
             directory_filesystem_mutated: self.filesystem_mutated,
         })
     }
@@ -135,6 +169,7 @@ impl PinnedManagedDirectory {
             root_volume_serial: self.root_volume_serial,
             root_identity_digest: self.root_identity_digest.clone(),
             directory_handles: self.directory_handles.clone(),
+            binding: self.binding.clone(),
             filesystem_mutated: self.filesystem_mutated,
         }
     }

@@ -3,7 +3,8 @@ use std::{error::Error as StdError, ffi::OsStr, fmt, path::Path};
 use anyhow::{anyhow, Context, Result};
 
 use super::{
-    normal_relative_components, platform, validate_directory_identity, ManagedFileOpenFailure,
+    identity_digest, managed_parent_identity_digest, normal_relative_components, platform,
+    validate_directory_identity, ManagedFileOpenFailure, ManagedObjectBinding,
     PinnedManagedDirectory, PinnedManagedFile, PinnedManagedRoot,
 };
 
@@ -52,6 +53,7 @@ impl PinnedManagedRoot {
         let mut path = self.root_path.clone();
         let mut handles = self.root_handles.clone();
         let last_index = components.len() - 1;
+        let mut binding = None;
         for (index, component) in components.into_iter().enumerate() {
             path.push(&component);
             let parent = handles
@@ -67,6 +69,15 @@ impl PinnedManagedRoot {
                 format!("NODE_MANAGED_CLEANUP_DIRECTORY_INSPECT {}", path.display())
             })?;
             validate_directory_identity(identity, Some(self.root_volume_serial))?;
+            binding = Some(ManagedObjectBinding::directory(
+                &component,
+                identity_digest(&self.root_identity_digest, None, identity),
+                managed_parent_identity_digest(
+                    &self.root_identity_digest,
+                    parent.as_ref(),
+                    self.root_volume_serial,
+                )?,
+            ));
             path = platform::canonical_path(&file)
                 .context("NODE_MANAGED_CLEANUP_DIRECTORY_CANONICAL_PATH")?;
             handles.push(std::sync::Arc::new(file));
@@ -76,6 +87,7 @@ impl PinnedManagedRoot {
             root_volume_serial: self.root_volume_serial,
             root_identity_digest: self.root_identity_digest.clone(),
             directory_handles: handles,
+            binding,
             filesystem_mutated: false,
         })
     }
