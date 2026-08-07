@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
-import { clean } from '../../lib/utils'
+import { clean, safeNodeAdminUrl } from '../../lib/utils'
+import { probeLocalNode } from '../node/localNodeApi'
 import { launchWinClientProtocol, WIN_CLIENT_DOWNLOAD_URL } from '../node/launchWinClient'
 import { nodeId, nodeCanAccept, nodeLabel } from './nodeHelpers'
 import type { ProjectNode, CreateProjectResult } from './types'
@@ -10,6 +11,7 @@ import styles from './CreateProjectModal.module.css'
 
 const STORAGE_NONE = 'none'
 const STORAGE_AUTO = 'auto'
+type LocalClientState = 'checking' | 'offline' | 'not_logged_in' | 'not_connected' | 'connected'
 
 export interface CreateProjectOptions {
   quickMode?: boolean
@@ -22,6 +24,7 @@ interface Props extends CreateProjectOptions {
 
 export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Props) {
   const navigate = useNavigate()
+  const adminUrl = safeNodeAdminUrl()
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
   const [template, setTemplate] = useState('android_kotlin')
@@ -38,6 +41,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [setupStarted, setSetupStarted] = useState(false)
+  const [localClientState, setLocalClientState] = useState<LocalClientState>('checking')
 
   const loadNodes = useCallback(async () => {
     setNodesLoading(true)
@@ -73,16 +77,32 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
     }
   }, [])
 
+  const probeClient = useCallback(async () => {
+    try {
+      const status = await probeLocalNode(adminUrl) as { connected?: boolean; logged_in?: boolean }
+      setLocalClientState(status.connected && status.logged_in
+        ? 'connected'
+        : status.logged_in ? 'not_connected' : 'not_logged_in')
+    } catch {
+      setLocalClientState('offline')
+    }
+  }, [adminUrl])
+
   useEffect(() => {
     void loadNodes()
-    const poll = window.setInterval(() => void loadNodes(), 5000)
+    void probeClient()
+    const poll = window.setInterval(() => {
+      void loadNodes()
+      void probeClient()
+    }, 5000)
     return () => window.clearInterval(poll)
-  }, [loadNodes])
+  }, [loadNodes, probeClient])
 
   function handleLaunchClient() {
     setSetupStarted(true)
     launchWinClientProtocol()
     void loadNodes()
+    void probeClient()
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -142,11 +162,29 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
           : '电脑已连接，但暂时不能创建项目。请打开开发平台查看详情。')
         : ''
   const showNodeRecovery = !nodesLoading && (!selectedNode || !!nodesError || selectableNodeCount === 0)
+  const localClientHint = {
+    checking: '正在检查电脑客户端状态…',
+    offline: '没有检测到正在运行的电脑客户端。请先下载并安装，然后打开它。',
+    not_logged_in: '电脑客户端已打开，但还没有登录当前账号。请登录后再检测。',
+    not_connected: '电脑客户端已打开，但还没有连上服务器。请检查网络后再检测。',
+    connected: '电脑客户端已连接，正在等待服务器同步。通常几秒内会出现在上方列表中。',
+  }[localClientState]
   const nodeRecoveryTitle = nodesError
     ? '无法读取电脑状态'
     : nodes.length === 0
-      ? (setupStarted ? '正在等待电脑连接' : knownNodeCount > 0 ? '电脑暂时未连接' : '需要先连接你的电脑')
+      ? (localClientState === 'not_logged_in'
+        ? '电脑客户端还没有登录'
+        : localClientState === 'not_connected'
+          ? '电脑客户端还没有连上服务器'
+          : localClientState === 'connected'
+            ? '电脑已连接，正在同步'
+            : setupStarted ? '正在等待电脑连接' : knownNodeCount > 0 ? '电脑暂时未连接' : '需要先连接你的电脑')
       : '电脑已连接，但暂时不能创建项目'
+  const recoveryDescription = nodesError
+    ? '请先点击“我已启动，重新检测”；如果仍失败，再打开开发平台检查登录状态。'
+    : setupStarted
+      ? `已尝试启动客户端。${localClientHint}`
+      : localClientHint
   const nodeSelect = (
     <label className={styles.field}>
       <span>项目创建位置</span>
@@ -171,14 +209,8 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
         <div className={styles.nodeRecovery} role="status" aria-live="polite">
           <div className={styles.nodeRecoveryText}>
             <strong>{nodeRecoveryTitle}</strong>
-            <span>
-              {nodesError
-                ? '请先点击“我已启动，重新检测”；如果仍失败，再打开开发平台检查登录状态。'
-                : setupStarted
-                  ? '如果电脑客户端已经打开，请登录当前账号；连接成功后，这个窗口会自动恢复创建。'
-                  : '项目文件会创建在你的电脑上。首次使用请按下面两步操作。'}
-            </span>
-            {!nodesError && !setupStarted && (
+            <span>{recoveryDescription}</span>
+            {!nodesError && localClientState === 'offline' && !setupStarted && (
               <span className={styles.nodeSteps}>
                 <span>1. 下载并安装电脑客户端</span>
                 <span>2. 打开客户端，登录当前账号</span>
