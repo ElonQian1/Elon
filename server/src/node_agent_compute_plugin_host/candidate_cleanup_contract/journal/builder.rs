@@ -8,7 +8,7 @@ use crate::node_agent_compute_plugin_host::candidate_cleanup_contract::{
     validate_hashed_execution_plan, HashedComputePluginCandidateCleanupExecutionPlan,
 };
 
-pub(super) fn build_initial_delete_intent(
+pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn build_initial_delete_intent(
     plan: &HashedComputePluginCandidateCleanupExecutionPlan,
     recorded_at_ms: i64,
 ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {

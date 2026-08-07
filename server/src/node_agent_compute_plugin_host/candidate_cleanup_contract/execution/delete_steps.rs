@@ -4,8 +4,9 @@ use anyhow::{bail, Error, Result};
 
 use super::ComputePluginCandidateCleanupStepEvidence;
 use crate::node_agent_compute_plugin_host::candidate_cleanup_contract::topology::builder::CandidateCleanupTopologyObjectInput;
+use crate::node_agent_compute_plugin_host::candidate_cleanup_contract::HashedCandidateCleanupExpectedObject;
 use crate::node_agent_managed_fs::{
-    ManagedObjectBinding, PinnedManagedDirectory, PinnedManagedFile,
+    ManagedDeleteDisposition, ManagedObjectBinding, PinnedManagedDirectory, PinnedManagedFile,
 };
 
 pub(super) struct PendingCleanupFile {
@@ -20,6 +21,100 @@ pub(super) struct PendingCleanupDirectory {
     pub object_kind: &'static str,
     pub logical_path: String,
     pub directory: PinnedManagedDirectory,
+}
+
+pub(super) enum PendingCleanupObject {
+    File(PendingCleanupFile),
+    Directory(PendingCleanupDirectory),
+}
+
+impl PendingCleanupObject {
+    pub(super) fn validate_expected(
+        &self,
+        expected: &HashedCandidateCleanupExpectedObject,
+    ) -> Result<()> {
+        let input = match self {
+            Self::File(file) => file.topology_input()?,
+            Self::Directory(directory) => directory.topology_input()?,
+        };
+        let object = expected.object();
+        let expected_size_bytes = input
+            .expected_size_bytes
+            .map(i64::try_from)
+            .transpose()
+            .map_err(|_| anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_SIZE_OVERFLOW"))?;
+        if input.logical_kind != object.logical_kind()
+            || input.relative_path != object.relative_path()
+            || input.expected_identity_digest != object.expected_identity_digest()
+            || input.expected_parent_identity_digest != object.expected_parent_identity_digest()
+            || input.expected_content_digest.as_deref() != object.expected_content_digest()
+            || expected_size_bytes != object.expected_size_bytes()
+        {
+            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_PENDING_OBJECT_CHANGED");
+        }
+        Ok(())
+    }
+
+    pub(super) fn set_delete_disposition_exact(
+        self,
+    ) -> std::result::Result<ManagedDeleteDisposition, (Error, Self)> {
+        match self {
+            Self::File(pending) => set_file_delete_disposition(pending),
+            Self::Directory(pending) => set_directory_delete_disposition(pending),
+        }
+    }
+}
+
+fn set_file_delete_disposition(
+    pending: PendingCleanupFile,
+) -> std::result::Result<ManagedDeleteDisposition, (Error, PendingCleanupObject)> {
+    let PendingCleanupFile {
+        object_kind,
+        logical_path,
+        content_digest,
+        expected_identity_digest,
+        file,
+    } = pending;
+    match file.set_delete_disposition_exact() {
+        Ok(disposition) => Ok(disposition),
+        Err(failure) => {
+            let (error, file) = failure.into_parts();
+            Err((
+                Error::new(error),
+                PendingCleanupObject::File(PendingCleanupFile {
+                    object_kind,
+                    logical_path,
+                    content_digest,
+                    expected_identity_digest,
+                    file,
+                }),
+            ))
+        }
+    }
+}
+
+fn set_directory_delete_disposition(
+    pending: PendingCleanupDirectory,
+) -> std::result::Result<ManagedDeleteDisposition, (Error, PendingCleanupObject)> {
+    let PendingCleanupDirectory {
+        object_kind,
+        logical_path,
+        directory,
+    } = pending;
+    match directory.set_delete_disposition_exact() {
+        Ok(disposition) => Ok(disposition),
+        Err(failure) => {
+            let (error, directory) = failure.into_parts();
+            Err((
+                Error::new(error),
+                PendingCleanupObject::Directory(PendingCleanupDirectory {
+                    object_kind,
+                    logical_path,
+                    directory,
+                }),
+            ))
+        }
+    }
 }
 
 impl PendingCleanupFile {

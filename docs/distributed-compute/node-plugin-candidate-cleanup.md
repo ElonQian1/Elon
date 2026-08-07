@@ -2,7 +2,7 @@
 
 ## 1. 状态
 
-当前状态为 `partial_implementation_mixed`。Windows 受管文件系统、私有 cleanup authorization Store、确定性 topology typed Store、首对象 delete-intent typed Store，以及原子 completion Store 内核和两阶段进程内 outcome-uncertain recovery 已形成代码；远程 canonical 与本批组合通过 `elon-pc-node` 编译、17 项清理定向测试及 1 项包含 topology/journal 对象的 schema 建库与重开测试。topology Store 只消费仍持有全部受管句柄的 `AuthorizedCandidateCleanup`，原子写入 plan、全部 expected objects 与 seal，并 exact readback；intent Store 只消费 sealed topology，在独立事务提交首对象 `delete_intent` 并 exact readback。两者结果不确定时分别只能恢复为 exact `NotCreated/Sealed` 和 `NotCreated/Durable`。旧批量 executor 的 prepare/resume 已收回 cleanup 合同内部，Host 不能绕过 intent；它仍未改造成逐对象消费 intent 和强 disposition。completion 内核继续只接受 sealed plan、物理证据与 terminal namespace-durability journal 共同绑定的能力，后者没有构造入口。单一 cleanup handle tree、后续三阶段 journal、真实 namespace durability、跨重启物理恢复和生产 Host 仍未接入，因此当前不会自动清理生产失败候选。
+当前状态为 `partial_implementation_mixed`。Windows 受管文件系统、私有 cleanup authorization Store、确定性 topology typed Store、首对象 delete-intent typed Store、私有单对象强 disposition executor，以及原子 completion Store 内核和两阶段进程内 outcome-uncertain recovery 已形成代码；远程 canonical 与本批组合通过 `elon-pc-node` 编译、20 项清理定向测试及 1 项包含 topology/journal 对象的 schema 建库与重开测试。topology Store 只消费仍持有全部受管句柄的 `AuthorizedCandidateCleanup`，原子写入 plan、全部 expected objects 与 seal，并 exact readback；intent Store 只消费 sealed topology，在独立事务提交首对象 `delete_intent` 并 exact readback。两者结果不确定时分别只能恢复为 exact `NotCreated/Sealed` 和 `NotCreated/Durable`。新增 executor 只消费 `DurableCandidateCleanupDeleteIntent`，重建并精确比对 retained topology 后取 ordinal 0 对象；OS 失败保留目标句柄与其余 custody，成功返回同时持有 exact parent、剩余对象和根锁的 `PhysicallyDisposedCandidateCleanupObject`。新旧 executor 均未向 Host 暴露，且 disposition 事件 Store 尚未形成。completion 内核继续只接受 sealed plan、物理证据与 terminal namespace-durability journal 共同绑定的能力，后者没有构造入口。后续三阶段 journal、真实 namespace durability、跨重启物理恢复和生产 Host 仍未接入，因此当前不会自动清理生产失败候选。
 
 本文只维护失败候选清理边界。候选本机真源见 `node-plugin-local-authority.md`，健康失败与 quarantine 见 `node-ready-capability.md`，staging 物化见 `node-plugin-archive-extraction.md`。
 
@@ -62,7 +62,7 @@ cleanup authorization Store 当前执行以下单一事务：fresh read failed s
 - `failed` slot phase；
 - 调用方传入的布尔值、路径或 candidate token。
 
-当前生产路径不会自动删除失败候选，也不会创建新候选、恢复下载或允许重试。私有代码能够签发 cleanup authorization、封存 exact topology、持久化首对象 intent，并具备终态 journal 之后的原子 completion 内核；但逐对象强 disposition 和后续 journal/namespace durability 中段尚未实现，完整流水线不可达且未由 Host 调用。物理删除成功在 completion Store 落库前不能对外表现为 owner 已释放或候选可重建。
+当前生产路径不会自动删除失败候选，也不会创建新候选、恢复下载或允许重试。私有代码能够签发 cleanup authorization、封存 exact topology、持久化首对象 intent、对该对象设置原句柄强 disposition，并具备终态 journal 之后的原子 completion 内核；但 disposition 结果尚无独立 Store，后续 absence/namespace durability 中段也未实现，完整流水线不可达且未由 Host 调用。物理 disposition 成功在后续 journal 与 completion Store 落库前不能对外表现为 owner 已释放或候选可重建。
 
 当前 `namespace_durable` 仍只是 schema 合同名称。受管文件系统已有对象/父 identity、强 disposition 和父句柄相对 absence/冲突观测能力，但 durability seam 明确不可用；旧执行器均未接入强 disposition，成功不能生成 absence 或 durability 事件，更不能据此写 completion。topology Store 已对 plan/object JSON、路径摘要和 JCS 摘要执行 exact readback，首 intent Store 也对事件列、event JSON 和摘要执行 exact readback；disposition、absence、durability、物理 evidence v2 及 terminal journal 的 typed Store 仍未实现。
 
@@ -82,7 +82,7 @@ SQLite trigger 只能证明前序 event 在当前事务视图中存在，不能�
 6. **Completion Store**：只有所有对象都到达 `namespace_durable` 且 terminal hash 与执行证据一致后，才能把 owner 从 `cleanup_pending` 推进到 `cleaned`、移除 failed slot、清空 candidate pointer，并精确推进 inventory/state/authority fence。
 7. **Retry gate**：新候选或旧计划重试只能基于 durable completion outcome；cleanup authorization、quarantine、plan seal 或内存执行成功都不能代替完成回执。
 
-上述 authorization、topology、首对象 durable intent、旧物理执行和 completion 已有私有类型或 Store；逐对象强执行、后续三阶段 journal 与 namespace durability 中段仍缺。如果 topology、intent 或 completion Store 结果不确定，调用方必须只凭各自 recovery key 查询 exact `NotCreated/Sealed`、`NotCreated/Durable` 或 `NotCreated/Completed`，不能重复封存、重复写 intent、重复删除、重复释放 owner 或直接开始新候选。
+上述 authorization、topology、首对象 durable intent、首对象强 disposition、旧物理执行和 completion 已有私有类型或 Store；disposition 事件 Store、后续两阶段 journal、后续对象 intent 与 namespace durability 中段仍缺。如果 topology、intent 或 completion Store 结果不确定，调用方必须只凭各自 recovery key 查询 exact `NotCreated/Sealed`、`NotCreated/Durable` 或 `NotCreated/Completed`，不能重复封存、重复写 intent、重复 disposition、重复释放 owner 或直接开始新候选。
 
 ## 5. 目录清理规则
 
@@ -95,7 +95,7 @@ SQLite trigger 只能证明前序 event 在当前事务视图中存在，不能�
 
 ## 6. 当前验证
 
-远程 canonical 与本批组合已通过 `elon-pc-node` 编译和 17 项清理定向测试：
+远程 canonical 与本批组合已通过 `elon-pc-node` 编译和 20 项清理定向测试：
 
 1. 以 create-new 句柄删除精确文件，再删除目录；
 2. 非空目录删除失败后保留原目录 custody，删除子文件后用同一 custody 重试；
@@ -114,9 +114,12 @@ SQLite trigger 只能证明前序 event 在当前事务视图中存在，不能�
 15. 首 delete-intent 拒绝不晚于 plan seal 的可信时间；
 16. intent Store 写入后可 exact round-trip 事件列、JSON 与摘要；
 17. intent Store 在父 identity 列被篡改后拒绝 durable adoption。
+18. 原文件句柄设置强 disposition 后只产生保留 exact parent 的能力，并需父句柄相对观测才能证明 name absence；
+19. 子文件仍持有父目录句柄时，目录强 disposition 失败并保留原目录 custody，子文件 absence 能力释放后可用同一目录 custody 重试；
+20. cleanup pending object 必须与 plan 对象的 logical path、对象/父 identity、内容摘要和大小精确匹配后才能设置强 disposition。
 
-前三项 Windows 测试只证明旧底层句柄删除语义，第四项只证明目录排序函数，第五至八项覆盖 completion，第九至十三项覆盖 topology，第十四至十七项覆盖首 intent 纯构建与 Store exact readback；它们没有运行 retained custody → cleanup authorization → topology → intent 的完整事务夹具，也没有暴露 late `DELETE` open 的 share-access 冲突。另有 1 项 schema 定向测试证明 cleanup authorization/completion、四张 execution topology/journal 表及相关 trigger 可以安装并按相同指纹重开。现有验证仍不覆盖 journal 化物理执行、目录 durability、跨重启物理恢复或生产 Host 接线。
+前三项 Windows 测试只证明旧底层句柄删除语义，第四项只证明目录排序函数，第五至八项覆盖 completion，第九至十三项覆盖 topology，第十四至十七项覆盖首 intent 纯构建与 Store exact readback，第十八至二十项覆盖原句柄强 disposition、父句柄别名失败保管和 pending-to-plan 绑定；它们仍没有运行 retained custody → cleanup authorization → topology → intent → disposition 的完整事务夹具。另有 1 项 schema 定向测试证明 cleanup authorization/completion、四张 execution topology/journal 表及相关 trigger 可以安装并按相同指纹重开。现有验证仍不覆盖 disposition journal Store、目录 durability、跨重启物理恢复或生产 Host 接线。
 
 ## 7. 下一批实现边界
 
-下一批应先把 retained 原始 custody 改造成单一 cleanup handle tree，消除 late `DELETE` reopen 的 share-access 冲突，再实现只消费 `DurableCandidateCleanupDeleteIntent` 的单步强 disposition executor。随后为 `exact_handle_disposition_set/absence_recovered_after_intent`、父句柄相对 absence 和 namespace durability 分别实现 typed Store、exact readback 与 outcome-uncertain recovery，并在一个对象 durable 后封装下一个 ordinal 的 intent。全部对象完成后才构造 completion 所需的 `DurableCandidateCleanupTerminalJournal`。之后补齐受约束的 Windows parent namespace flush、严格晚于 flush 的 authenticated trusted-time binding、部分失败/跨重启物理恢复和完整事务夹具，最后接入生产 Host。不得先暴露“按 candidate token 删除目录”的管理接口，否则会绕过 quarantine、owner、topology 和 fence 合同。
+下一批应实现只消费 `PhysicallyDisposedCandidateCleanupObject` 的 `exact_handle_disposition_set` typed Store、独立提交、exact readback 与 outcome-uncertain recovery；在该 durable capability 之后，才能执行父句柄相对观测并分别持久化 absence 和 namespace durability。一个对象到达 durable 终态且其 parent custody 释放后，才可按下一个 ordinal 封装新 intent；当前 child-first retained 队列与 plan 同序，强 disposition 测试证明父目录别名会失败关闭，因此不需要先做一次高风险的全量句柄树重写，但后续多对象恢复仍可逐步收口为单一 handle-tree 抽象。全部对象完成后才构造 completion 所需的 `DurableCandidateCleanupTerminalJournal`。之后补齐受约束的 Windows parent namespace flush、严格晚于 flush 的 authenticated trusted-time binding、部分失败/跨重启物理恢复和完整事务夹具，最后接入生产 Host。不得先暴露“按 candidate token 删除目录”的管理接口，否则会绕过 quarantine、owner、topology 和 fence 合同。

@@ -49,9 +49,12 @@ pub(in crate::node_agent_compute_plugin_host) use completion_recovery_key::{
 };
 pub(in crate::node_agent_compute_plugin_host) use execution::validate_hashed_execution_evidence;
 pub(in crate::node_agent_compute_plugin_host) use execution::{
-    CandidateCleanupExecutionFailure, CandidateCleanupExecutionState,
-    ComputePluginCandidateCleanupExecutionEvidence,
-    HashedComputePluginCandidateCleanupExecutionEvidence, PhysicallyExecutedCandidateCleanup,
+    CandidateCleanupDispositionFailure, CandidateCleanupDispositionFailureCustody,
+    CandidateCleanupDispositionFailurePhase, CandidateCleanupDispositionRejectedCustody,
+    CandidateCleanupDispositionRetryCustody, CandidateCleanupExecutionFailure,
+    CandidateCleanupExecutionState, ComputePluginCandidateCleanupExecutionEvidence,
+    HashedComputePluginCandidateCleanupExecutionEvidence, PhysicallyDisposedCandidateCleanupObject,
+    PhysicallyExecutedCandidateCleanup,
 };
 pub(in crate::node_agent_compute_plugin_host) use journal::{
     adopt_recovered_candidate_cleanup_delete_intent, prepare_candidate_cleanup_delete_intent,

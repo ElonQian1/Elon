@@ -20,6 +20,7 @@ use crate::node_agent_managed_fs::PinnedManagedDirectory;
 mod delete_steps;
 mod evidence;
 mod preparation;
+mod strong_step;
 
 pub(in crate::node_agent_compute_plugin_host) use preparation::prepare_candidate_cleanup_execution_state;
 
@@ -31,6 +32,14 @@ use evidence::{build_hashed_execution_evidence, ComputePluginCandidateCleanupSte
 pub(in crate::node_agent_compute_plugin_host) use evidence::{
     validate_hashed_execution_evidence, ComputePluginCandidateCleanupExecutionEvidence,
     HashedComputePluginCandidateCleanupExecutionEvidence,
+};
+pub(super) use strong_step::{
+    retry_candidate_cleanup_delete_disposition, set_candidate_cleanup_delete_disposition,
+};
+pub(in crate::node_agent_compute_plugin_host) use strong_step::{
+    CandidateCleanupDispositionFailure, CandidateCleanupDispositionFailureCustody,
+    CandidateCleanupDispositionFailurePhase, CandidateCleanupDispositionRejectedCustody,
+    CandidateCleanupDispositionRetryCustody, PhysicallyDisposedCandidateCleanupObject,
 };
 
 #[must_use = "partial cleanup state must be resumed or retained for operator recovery"]
@@ -201,6 +210,10 @@ fn execution_failure(
 impl CandidateCleanupExecutionState {
     pub(in crate::node_agent_compute_plugin_host) fn completed_step_count(&self) -> usize {
         self.completed_steps.len()
+    }
+
+    pub(super) fn execution_plan_digest(&self) -> Option<&str> {
+        self.execution_plan_digest.as_deref()
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn cancellation_guard(

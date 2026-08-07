@@ -215,3 +215,110 @@ fn validate_delete_binding(
     }
     Ok(())
 }
+
+#[cfg(all(test, windows))]
+mod tests {
+    use std::{ffi::OsStr, fs, path::Path};
+
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::node_agent_managed_fs::{ManagedParentRelativeObservation, PinnedManagedRoot};
+
+    fn test_root() -> (std::path::PathBuf, PinnedManagedRoot) {
+        let path = std::env::temp_dir().join(format!(
+            "elon-managed-disposition-{}",
+            Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(&path).expect("create test root");
+        let root = PinnedManagedRoot::pin(&path, &"a".repeat(64)).expect("pin test root");
+        (path, root)
+    }
+
+    #[test]
+    fn cleanup_strong_disposition_requires_parent_relative_absence() {
+        let (path, root) = test_root();
+        let directory = root
+            .prepare_directory(Path::new("candidate"))
+            .expect("prepare candidate");
+        let file = directory
+            .create_new_read_write(OsStr::new("artifact.bin"))
+            .expect("create artifact");
+        let expected_identity = file.identity_digest().to_string();
+
+        let disposition = file
+            .set_delete_disposition_exact()
+            .expect("set file disposition");
+        assert_eq!(
+            disposition.identity_digest(),
+            Some(expected_identity.as_str())
+        );
+        let absence = match disposition
+            .observe_parent_relative()
+            .expect("observe file namespace")
+        {
+            ManagedParentRelativeObservation::Absent(absence) => absence,
+            _ => panic!("disposed file name must be absent"),
+        };
+        assert_eq!(
+            absence.object_binding().identity_digest(),
+            expected_identity
+        );
+        drop(absence);
+
+        let directory = root
+            .pin_existing_directory_for_cleanup(Path::new("candidate"))
+            .expect("pin candidate for cleanup");
+        let directory_disposition = directory
+            .set_delete_disposition_exact()
+            .expect("set directory disposition");
+        assert!(matches!(
+            directory_disposition
+                .observe_parent_relative()
+                .expect("observe directory namespace"),
+            ManagedParentRelativeObservation::Absent(_)
+        ));
+        drop(root);
+        fs::remove_dir(path).expect("remove test root");
+    }
+
+    #[test]
+    fn cleanup_strong_disposition_failure_retains_exact_directory_for_retry() {
+        let (path, root) = test_root();
+        fs::create_dir(path.join("candidate")).expect("create candidate");
+        fs::write(path.join("candidate/artifact.bin"), b"").expect("create artifact");
+        let directory = root
+            .pin_existing_directory_for_cleanup(Path::new("candidate"))
+            .expect("pin candidate for cleanup");
+        let file = directory
+            .open_existing_read_only_cleanup_child(OsStr::new("artifact.bin"))
+            .expect("pin child for cleanup");
+        let (error, retained_directory) = directory
+            .set_delete_disposition_exact()
+            .expect_err("shared child parent custody must block directory disposition")
+            .into_parts();
+        assert_eq!(error.kind(), std::io::ErrorKind::WouldBlock);
+
+        let file_absence = match file
+            .set_delete_disposition_exact()
+            .expect("set child disposition")
+            .observe_parent_relative()
+            .expect("observe child absence")
+        {
+            ManagedParentRelativeObservation::Absent(absence) => absence,
+            _ => panic!("disposed child name must be absent"),
+        };
+        drop(file_absence);
+
+        assert!(matches!(
+            retained_directory
+                .set_delete_disposition_exact()
+                .expect("retry exact retained directory")
+                .observe_parent_relative()
+                .expect("observe retried directory"),
+            ManagedParentRelativeObservation::Absent(_)
+        ));
+        drop(root);
+        fs::remove_dir(path).expect("remove test root");
+    }
+}

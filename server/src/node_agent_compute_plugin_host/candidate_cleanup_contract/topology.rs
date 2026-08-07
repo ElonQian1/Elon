@@ -374,6 +374,49 @@ impl SealedCandidateCleanupTopology {
     ) -> &HashedComputePluginCandidateCleanupExecutionPlan {
         &self.plan
     }
+    pub(super) fn validate_retained_state(&self) -> Result<()> {
+        validate_hashed_execution_plan(&self.plan)?;
+        self.state.cancellation_guard().ensure_current()?;
+        let receipt = self.state.authorization_receipt();
+        let receipt_body = receipt.receipt();
+        let recovery = self.state.staging_recovery_key();
+        if self.state.completed_step_count() != 0
+            || self.state.execution_plan_digest().is_some()
+            || receipt_body.cleanup_id() != self.plan.plan().cleanup_id()
+            || receipt_body.candidate_token_digest() != self.plan.plan().candidate_token_digest()
+            || receipt_body.process_owner_epoch() != self.plan.plan().process_owner_epoch()
+            || receipt.receipt_digest() != self.plan.plan().authorization_receipt_digest()
+            || recovery.candidate_token_digest() != self.plan.plan().candidate_token_digest()
+            || recovery.root_identity_digest() != self.plan.plan().root_identity_digest()
+            || self.state.candidate_parent_anchor_identity_digest()?
+                != self.plan.plan().candidate_parent_anchor_identity_digest()
+        {
+            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RETAINED_STATE_CHANGED");
+        }
+        let rebuilt = build_execution_plan(CandidateCleanupTopologyPlanInput {
+            cleanup_id: self.plan.plan().cleanup_id().to_string(),
+            candidate_token_digest: self.plan.plan().candidate_token_digest().to_string(),
+            authorization_receipt_digest: self
+                .plan
+                .plan()
+                .authorization_receipt_digest()
+                .to_string(),
+            installation_id_digest: self.plan.plan().installation_id_digest().to_string(),
+            root_identity_digest: self.plan.plan().root_identity_digest().to_string(),
+            candidate_parent_anchor_identity_digest: self
+                .plan
+                .plan()
+                .candidate_parent_anchor_identity_digest()
+                .to_string(),
+            process_owner_epoch: self.plan.plan().process_owner_epoch(),
+            planned_at_ms: self.plan.plan().planned_at_ms(),
+            objects: self.state.topology_objects()?,
+        })?;
+        if rebuilt != self.plan {
+            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RETAINED_TOPOLOGY_CHANGED");
+        }
+        Ok(())
+    }
     pub(super) fn into_parts(
         self,
     ) -> (

@@ -23,7 +23,7 @@ pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginCandidateCleanupStepEvent, HashedComputePluginCandidateCleanupStepEvent,
 };
 
-use builder::build_initial_delete_intent;
+pub(super) use builder::build_initial_delete_intent;
 
 #[must_use = "prepared delete intent must be stored or retain the sealed topology"]
 pub(in crate::node_agent_compute_plugin_host) struct PreparedCandidateCleanupDeleteIntent<
@@ -306,6 +306,10 @@ impl ValidatedCandidateCleanupDeleteIntentPermit<'_> {
 }
 
 impl DurableCandidateCleanupDeleteIntent {
+    pub(super) fn sealed(&self) -> &SealedCandidateCleanupTopology {
+        &self.sealed
+    }
+
     pub(in crate::node_agent_compute_plugin_host) fn event(
         &self,
     ) -> &HashedComputePluginCandidateCleanupStepEvent {
