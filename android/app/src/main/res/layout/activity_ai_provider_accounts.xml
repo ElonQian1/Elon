@@ -70,6 +70,18 @@
         android:textColor="@color/elon_button_secondary_text"
         android:textSize="12sp" />
 
+    <Button
+        android:id="@+id/aiProviderChatGptWebLab"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="@color/elon_button_primary_bg"
+        android:drawableStart="@android:drawable/ic_menu_view"
+        android:drawableTint="@color/elon_button_primary_text"
+        android:text="@string/chatgpt_web_lab_entry"
+        android:textColor="@color/elon_button_primary_text"
+        android:textSize="13sp" />
+
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"

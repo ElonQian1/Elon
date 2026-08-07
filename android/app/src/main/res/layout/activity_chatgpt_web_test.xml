@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/elon_bg_app"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:background="@color/elon_bg_chrome"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="4dp">
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/chatGptWebBack"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/chatgpt_web_back"
+            android:padding="13dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_toolbar_back_custom"
+            android:tooltipText="@string/chatgpt_web_back" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingHorizontal="8dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/chatgpt_web_title"
+                android:textColor="@color/elon_text_primary"
+                android:textSize="16sp" />
+
+            <TextView
+                android:id="@+id/chatGptWebHost"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/chatgpt_web_host"
+                android:textColor="@color/elon_text_tertiary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/chatGptWebReload"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/chatgpt_web_reload"
+            android:padding="13dp"
+            android:src="@android:drawable/ic_popup_sync"
+            android:tooltipText="@string/chatgpt_web_reload"
+            app:tint="@color/elon_icon_primary" />
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/chatGptWebClearSession"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/chatgpt_web_clear"
+            android:padding="13dp"
+            android:src="@android:drawable/ic_menu_delete"
+            android:tooltipText="@string/chatgpt_web_clear"
+            app:tint="@color/elon_status_danger" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/chatGptWebProgress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:max="100"
+        android:progressTint="@color/elon_status_info" />
+
+    <TextView
+        android:id="@+id/chatGptWebStatus"
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:background="@color/elon_surface_header"
+        android:ellipsize="end"
+        android:gravity="center_vertical"
+        android:maxLines="1"
+        android:paddingHorizontal="12dp"
+        android:text="@string/chatgpt_web_preparing"
+        android:textColor="@color/elon_text_secondary"
+        android:textSize="12sp" />
+
+    <WebView
+        android:id="@+id/chatGptWebView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@android:color/white"
+        android:importantForAutofill="yes" />
+
+</LinearLayout>

@@ -1,0 +1,32 @@
+package com.elon.app.chatgptweb
+
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ChatGptWebNavigationPolicyTest {
+    @Test
+    fun allowsChatGptOpenAiAndSupportedIdentityHosts() {
+        listOf(
+            "https://chatgpt.com/",
+            "https://auth.openai.com/log-in",
+            "https://accounts.google.com/o/oauth2/v2/auth",
+            "https://login.microsoftonline.com/common/oauth2/authorize",
+            "https://login.live.com/oauth20_authorize.srf",
+            "https://appleid.apple.com/auth/authorize",
+        ).forEach { url -> assertTrue("expected allowed URL: $url", ChatGptWebNavigationPolicy.allows(url)) }
+    }
+
+    @Test
+    fun blocksInsecureDeceptiveAndUnrelatedUrls() {
+        listOf(
+            "http://chatgpt.com/",
+            "https://chatgpt.com.evil.example/",
+            "https://evil.example/openai.com",
+            "https://user@chatgpt.com/",
+            "https://chatgpt.com:8443/",
+            "intent://chatgpt.com/",
+            "javascript:alert(1)",
+        ).forEach { url -> assertFalse("expected blocked URL: $url", ChatGptWebNavigationPolicy.allows(url)) }
+    }
+}
