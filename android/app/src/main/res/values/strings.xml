@@ -4,8 +4,8 @@
     <!-- Agent 子系统（来自 android-agent 一体化合并） -->
     <string name="agent_accessibility_description">一龙 Agent - 端上自动化操作</string>
     <string name="agent_accessibility_description_v2">一龙 Agent V2 - 多模态视觉 / 智能记忆 / 任务规划 / 错误恢复 / PC 协作</string>
-    <string name="chatgpt_web_lab_entry">ChatGPT 网页登录测试</string>
-    <string name="chatgpt_web_title">ChatGPT 登录测试</string>
+    <string name="chatgpt_web_lab_entry">ChatGPT 本地网页工作台</string>
+    <string name="chatgpt_web_title">ChatGPT 本地工作台</string>
     <string name="chatgpt_web_host">chatgpt.com</string>
     <string name="chatgpt_web_back">返回</string>
     <string name="chatgpt_web_reload">刷新页面</string>
@@ -19,4 +19,16 @@
     <string name="chatgpt_web_cancel">取消</string>
     <string name="chatgpt_web_clear_confirm">清除</string>
     <string name="chatgpt_web_clear_success">网页登录数据已清除</string>
+    <string name="chatgpt_mode_web">官方网页</string>
+    <string name="chatgpt_mode_native">一龙界面</string>
+    <string name="chatgpt_native_new">新建会话</string>
+    <string name="chatgpt_native_stop">停止生成</string>
+    <string name="chatgpt_native_send">发送</string>
+    <string name="chatgpt_native_input_hint">发送到当前 ChatGPT 网页会话</string>
+    <string name="chatgpt_native_empty">当前会话还没有可呈现的消息</string>
+    <string name="chatgpt_native_connecting">正在连接本地网页语义适配器</string>
+    <string name="chatgpt_native_unsupported">当前 Android WebView 不支持安全消息桥，请使用官方网页模式</string>
+    <string name="chatgpt_native_web_login_required">请先在官方网页模式完成登录并打开一个会话</string>
+    <string name="chatgpt_native_active">一龙界面 · 请求仍由本机官方网页执行</string>
+    <string name="chatgpt_native_command_failed">网页操作没有完成，请切回官方网页模式</string>
 </resources>

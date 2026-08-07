@@ -35,5 +35,13 @@ internal object ChatGptWebNavigationPolicy {
         ?.lowercase(Locale.ROOT)
         ?: "chatgpt.com"
 
+    fun supportsEnhancedMode(rawUrl: String?): Boolean {
+        val uri = rawUrl?.let(::parse) ?: return false
+        return uri.scheme.equals("https", ignoreCase = true) &&
+            uri.host.equals("chatgpt.com", ignoreCase = true) &&
+            uri.userInfo == null &&
+            (uri.port == -1 || uri.port == 443)
+    }
+
     private fun parse(rawUrl: String): URI? = runCatching { URI(rawUrl) }.getOrNull()
 }

@@ -26,6 +26,25 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun enhancedBridgeIsOriginScopedAndDoesNotReplayProviderTraffic() {
+        val bridge = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt"
+        )
+        val adapter = readRepositoryFile("android/app/src/main/assets/chatgpt_web_adapter.js")
+
+        assertTrue(bridge.contains("WebViewCompat.addWebMessageListener"))
+        assertTrue(bridge.contains("ALLOWED_ORIGIN = \"https://chatgpt.com\""))
+        assertFalse(bridge.contains("addJavascriptInterface"))
+        assertFalse(bridge.contains("getCookie("))
+        assertTrue(adapter.contains("new MutationObserver"))
+        assertTrue(adapter.contains("schema: 'yilong.ai.ui.v1'"))
+        assertTrue(adapter.contains("action === 'send_prompt'"))
+        listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
+            assertFalse("page adapter must not contain $it", adapter.contains(it))
+        }
+    }
+
+    @Test
     fun webViewLabIsOwnerAppOnlyAndReachableFromProviderSettings() {
         val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
         val providerActivity = readRepositoryFile(
