@@ -116,6 +116,7 @@ server/src/
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
 | 账号信息 + 登录方式 + 账号安全 | 🟡 中 | `src/features/account/AccountPage.tsx`、`src/features/account/LinkedIdentitiesCard.tsx`、`src/features/account/AccountSecurityCard.tsx`、`src/features/auth/GoogleIdentityButton.tsx`、`src/features/auth/PasswordRecoveryPanel.tsx` | 🟡 源码与编译级完成：账号信息、Google OIDC 登录/主动绑定/解绑/最后入口保护，以及设置或修改密码、一次性恢复码、设备会话撤销和登录页离线恢复均已接入并通过 PC 构建与 ESLint；真实 OAuth、真实账号、邮件/短信投递和页面视觉验收仍待统一执行 |
+| OpenAI ChatKit（API 聊天） | 🟡 中 | `src/features/chatkit/`、`src/features/account/OpenAiChatKitCard.tsx`、`server/src/openai_chatkit_api.rs` | 🟡 源码与编译级完成：使用一龙登录态和服务端 OpenAI 配置创建短时 ChatKit session，明确不冒充 ChatGPT 账号登录、不读取 Cookie/历史/Plus/Codex 凭据；Win、PWA、APK 入口已同步，真实 Key/Workflow、会话网络、视觉验收和发布仍待统一执行 |
 | 绑定手机/邮箱 | 🟢 低 | `src/features/account/` | ⬜ 未开始 |
 | 积分/余额查看 | 🟢 低 | `src/features/account/AccountPage.tsx`、`src/features/billing/` | 🟡 部分完成：账号页已展示余额、试用额度和最近账单；独立账单分页/充值页继续补 |
 

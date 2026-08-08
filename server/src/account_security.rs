@@ -17,6 +17,9 @@ use crate::{
     types::AppState,
 };
 
+#[path = "openai_chatkit_api.rs"]
+pub(crate) mod openai_chatkit_api;
+
 #[derive(Debug, Deserialize)]
 struct ChangePasswordRequest {
     current_password: Option<String>,

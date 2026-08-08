@@ -1,0 +1,97 @@
+.page {
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(360px, 1fr) auto;
+  gap: 14px;
+  padding: 22px;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 85% 10%, rgba(45, 212, 191, .1), transparent 34%),
+    var(--bg);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 13px;
+}
+
+.header h1 { margin: 3px 0 4px; font-size: 24px; }
+.header p { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+
+.eyebrow { color: #6ee7c2; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.back,
+.refresh {
+  min-height: 38px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: var(--text-secondary);
+  background: rgba(32, 33, 38, .86);
+  text-decoration: none;
+}
+.back { width: 40px; }
+.refresh { padding: 0 12px; cursor: pointer; }
+
+.boundary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.boundary span {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(110, 231, 194, .3);
+  border-radius: 6px;
+  padding: 0 9px;
+  color: #a7ead4;
+  background: rgba(45, 212, 191, .06);
+  font-size: 11px;
+}
+
+.status {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  border-left: 2px solid #5ee1ba;
+  padding: 7px 10px;
+  color: var(--text-secondary);
+  background: rgba(94, 225, 186, .06);
+  font-size: 12px;
+}
+.status[data-error="true"] { border-color: #f87171; color: #fca5a5; background: rgba(248, 113, 113, .08); }
+
+.empty {
+  align-self: start;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 24px;
+  background: #202126;
+}
+.empty strong { font-size: 16px; }
+.empty p { max-width: 680px; color: var(--text-muted); font-size: 12px; line-height: 1.7; }
+.empty a { color: #76e4c1; font-size: 12px; }
+
+.chatHost {
+  min-height: 480px;
+  overflow: hidden;
+  border: 1px solid rgba(110, 231, 194, .28);
+  border-radius: 12px;
+  background: #151619;
+}
+.chatkit { width: 100%; height: 100%; min-height: 480px; display: block; }
+
+.footer { color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+
+@media (max-width: 720px) {
+  .page { padding: 14px; }
+  .header { grid-template-columns: 40px minmax(0, 1fr); }
+  .refresh { grid-column: 2; width: max-content; }
+  .chatHost, .chatkit { min-height: 580px; }
+}

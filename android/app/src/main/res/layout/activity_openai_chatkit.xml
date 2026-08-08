@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/elon_bg_app"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="OpenAI ChatKit（API 聊天）"
+        android:textColor="@color/elon_text_primary"
+        android:textSize="19sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="使用当前一龙账号。OpenAI API Key 不下发 APK，也不读取 ChatGPT Cookie、历史会话或 Plus 额度。"
+        android:textColor="@color/elon_text_secondary"
+        android:textSize="12sp" />
+
+    <ProgressBar
+        android:id="@+id/openAiChatKitProgress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:layout_marginTop="10dp"
+        android:indeterminate="true" />
+
+    <TextView
+        android:id="@+id/openAiChatKitStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="正在检查 ChatKit 配置…"
+        android:textColor="@color/elon_status_info"
+        android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/openAiChatKitRetry"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="@color/elon_button_secondary_bg"
+        android:text="重新检查"
+        android:textColor="@color/elon_button_secondary_text" />
+
+    <WebView
+        android:id="@+id/openAiChatKitWebView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="10dp"
+        android:layout_weight="1"
+        android:background="@color/elon_bg_app"
+        android:visibility="gone" />
+
+</LinearLayout>

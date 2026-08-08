@@ -5,6 +5,7 @@ import UserAvatar from '../shell/UserAvatar'
 import LinkedIdentitiesCard from './LinkedIdentitiesCard'
 import AccountSecurityCard from './AccountSecurityCard'
 import ChatGptAccountCard from './ChatGptAccountCard'
+import OpenAiChatKitCard from './OpenAiChatKitCard'
 import styles from './AccountPage.module.css'
 
 interface Balance {
@@ -112,8 +113,9 @@ export default function AccountPage() {
         </section>
 
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>ChatGPT</h2>
+          <h2 className={styles.sectionTitle}>OpenAI 聊天方式</h2>
           <ChatGptAccountCard />
+          <OpenAiChatKitCard />
         </section>
 
         <section className={styles.section}>

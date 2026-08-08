@@ -45,6 +45,11 @@ internal data class AiProviderAccount(
     val activeLogin: AiProviderLoginAttempt?,
 )
 
+internal data class OpenAiChatKitCapability(
+    val configured: Boolean,
+    val message: String,
+)
+
 internal class AiProviderAccountsApi(
     private val context: Context,
     private val http: OkHttpClient,
@@ -117,6 +122,24 @@ internal class AiProviderAccountsApi(
         return "脱敏日志保留 ${hours} 小时；最近可重试任务 ${retryable} 个。验证码、授权地址和厂商 token 均不进入诊断。"
     }
 
+    fun fetchChatKitCapability(): OpenAiChatKitCapability {
+        val root = executeJson(authenticated(Request.Builder().url(chatKitUrl("capability"))))
+        return OpenAiChatKitCapability(
+            configured = root.optBoolean("configured", false),
+            message = root.optString("message").ifBlank { "管理员尚未配置 OpenAI ChatKit API 服务。" },
+        )
+    }
+
+    fun createChatKitSession(): String {
+        val request = Request.Builder()
+            .url(chatKitUrl("session"))
+            .post(EMPTY_JSON)
+        return executeJson(authenticated(request))
+            .optString("client_secret")
+            .takeIf(String::isNotBlank)
+            ?: error("服务器没有返回 ChatKit 会话")
+    }
+
     private fun authenticated(builder: Request.Builder): Request =
         AuthManager.applyAuth(context, builder).build()
 
@@ -131,6 +154,10 @@ internal class AiProviderAccountsApi(
             if (suffix.isNotBlank()) append('/').append(suffix)
         }
     }
+
+    private fun chatKitUrl(tail: String): String =
+        ElonApplication.activeServerUrl(context).trimEnd('/') +
+            "/api/openai-chatkit/" + Uri.encode(tail)
 
     private fun executeJson(request: Request): JSONObject =
         http.newCall(request).execute().use { response ->

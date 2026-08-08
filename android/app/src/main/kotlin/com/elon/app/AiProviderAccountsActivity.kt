@@ -17,6 +17,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.chatgptweb.ChatGptWebTestActivity
+import com.elon.app.chatkit.OpenAiChatKitActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -66,6 +67,9 @@ class AiProviderAccountsActivity : AppCompatActivity() {
         findViewById<Button>(R.id.aiProviderDiagnostics).setOnClickListener { loadDiagnostics() }
         findViewById<Button>(R.id.aiProviderChatGptWebLab).setOnClickListener {
             startActivity(Intent(this, ChatGptWebTestActivity::class.java))
+        }
+        findViewById<Button>(R.id.aiProviderOpenAiChatKit).setOnClickListener {
+            startActivity(Intent(this, OpenAiChatKitActivity::class.java))
         }
         nodeSpinner.onItemSelectedListener = SimpleItemSelectedListener { position ->
             if (spinnerReady) nodes.getOrNull(position)?.let(::loadAccounts)

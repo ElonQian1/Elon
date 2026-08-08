@@ -8,6 +8,16 @@
     });
   }
 
+  const chatKitRow = document.getElementById('openAiChatKitRow');
+  const chatKitMask = document.getElementById('openAiChatKitMask');
+  const chatKitClose = document.getElementById('openAiChatKitClose');
+  const chatKitRetry = document.getElementById('openAiChatKitRetry');
+  const chatKitStatus = document.getElementById('openAiChatKitStatus');
+  const chatKitEmpty = document.getElementById('openAiChatKitEmpty');
+  const chatKitHost = document.getElementById('openAiChatKitHost');
+  const chatKitElement = document.getElementById('openAiChatKitElement');
+  let chatKitConfigured = false;
+
   const row = document.getElementById('aiProviderAccountsRow');
   const mask = document.getElementById('aiProviderAccountsMask');
   if (!row || !mask) return;
@@ -99,6 +109,72 @@
     if (!response.ok) throw new Error(value.error || value.message || text || ('HTTP ' + response.status));
     return value;
   }
+
+  async function openChatKit() {
+    if (!chatKitMask || !chatKitStatus) return;
+    chatKitMask.classList.add('active');
+    chatKitStatus.textContent = '正在检查 ChatKit 配置…';
+    chatKitEmpty?.classList.add('hidden');
+    chatKitHost?.classList.add('hidden');
+    if (!authToken()) {
+      chatKitStatus.textContent = '请先登录一龙账号，再使用 ChatKit。';
+      return;
+    }
+    try {
+      const capability = await requestJson('/api/openai-chatkit/capability', { cache: 'no-store' });
+      chatKitConfigured = !!capability.configured;
+      if (!chatKitConfigured) {
+        chatKitStatus.textContent = capability.message || '管理员尚未配置 ChatKit。';
+        chatKitEmpty?.classList.remove('hidden');
+        return;
+      }
+      await Promise.race([
+        window.customElements.whenDefined('openai-chatkit'),
+        new Promise((_, reject) => window.setTimeout(() => reject(new Error('ChatKit 组件加载超时')), 12000))
+      ]);
+      if (!chatKitElement || typeof chatKitElement.setOptions !== 'function') {
+        throw new Error('ChatKit 组件不可用');
+      }
+      chatKitElement.setOptions({
+        api: {
+          async getClientSecret() {
+            const session = await requestJson('/api/openai-chatkit/session', {
+              method: 'POST', body: '{}'
+            });
+            if (!session.client_secret) throw new Error('服务器没有返回 ChatKit 会话');
+            return session.client_secret;
+          }
+        },
+        theme: 'dark'
+      });
+      chatKitHost?.classList.remove('hidden');
+      chatKitStatus.textContent = 'ChatKit 已就绪 · 当前身份是一龙账号';
+    } catch (error) {
+      chatKitStatus.textContent = 'ChatKit 加载失败：' + String(error.message || error).slice(0, 240);
+      if (!chatKitConfigured) chatKitEmpty?.classList.remove('hidden');
+    }
+  }
+
+  function closeChatKit() {
+    chatKitMask?.classList.remove('active');
+  }
+
+  chatKitElement?.addEventListener('chatkit.response.start', () => {
+    if (chatKitStatus) chatKitStatus.textContent = 'OpenAI 正在回复…';
+  });
+  chatKitElement?.addEventListener('chatkit.response.end', () => {
+    if (chatKitStatus) chatKitStatus.textContent = '回复完成';
+  });
+  chatKitElement?.addEventListener('chatkit.error', (event) => {
+    const message = event.detail?.error?.message || 'ChatKit 会话发生错误';
+    if (chatKitStatus) chatKitStatus.textContent = String(message).slice(0, 240);
+  });
+  chatKitRow?.addEventListener('click', openChatKit);
+  chatKitRetry?.addEventListener('click', openChatKit);
+  chatKitClose?.addEventListener('click', closeChatKit);
+  chatKitMask?.addEventListener('click', (event) => {
+    if (event.target === chatKitMask) closeChatKit();
+  });
 
   function relayUrl(nodeId, providerId, tail) {
     const parts = ['/api/pc-relay', nodeId, 'api', 'ai-provider-accounts'];

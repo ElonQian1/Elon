@@ -120,6 +120,18 @@ CLI 登录成功不等于同意上传凭据。Provider V2 为每个 Provider 返
 
 `chatgpt_web` 与 `gemini_web` 有类型化 `WebChatAdapterDescriptor`、授权请求以及启动/刷新/撤销错误合同，但固定 `enabled: false`、`actual_state: unavailable`、`cli_login_reusable: false`、`browser_cookie_reusable: false`。预留生命周期为 `authorization_pending -> active -> expired/revoked`，未来必须具备厂商批准授权、逐次同意、最小 scope、服务端会话绑定、刷新轮换、撤销和仅元数据审计。环境变量、CLI 登录状态、浏览器 Cookie 和保险箱内容都不能绕过禁用状态。
 
+### OpenAI ChatKit API 聊天
+
+`OpenAI ChatKit（API 聊天）` 是独立于 `chatgpt_web` 的官方 API 能力，不是新增的 ChatGPT 账号登录：
+
+- `GET /api/openai-chatkit/capability` 要求有效的一龙账号会话，返回是否完成平台配置、集成模式和不可复用边界。
+- `POST /api/openai-chatkit/session` 先认证一龙账号，再用不可逆稳定用户标识向 OpenAI 创建短时 ChatKit session；客户端只收到 `client_secret`，OpenAI API Key 不下发、不持久化到客户端。
+- Win/PWA 使用官方 ChatKit Web Component；APK 由原生 OkHttp 携带一龙 Bearer 创建 session，内嵌 ChatKit 页面只通过受限桥接取得短时 `client_secret`，不会获得一龙长期 token。
+- 该能力固定返回 `chatgpt_account_login: false`、`chatgpt_cookie_reusable: false`、`chatgpt_history_reusable: false` 和 `chatgpt_subscription_reusable: false`；ChatGPT 官网 Cookie、历史、Plus/Pro 额度及 Codex CLI 登录均不能用于 ChatKit API 计费或认证。
+- 当前可配置入口使用官方已有 workflow 的过渡会话接口：`ELON_CHATKIT_OPENAI_API_KEY`（兼容 `OPENAI_API_KEY`）与 `ELON_CHATKIT_WORKFLOW_ID`（兼容 `OPENAI_CHATKIT_WORKFLOW_ID`）。两者缺失时三端只显示“管理员尚未配置”，不展示伪登录成功。
+
+OpenAI 已宣布 Agent Builder 托管工作流处于过渡期并计划在 2026-11-30 关闭；ChatKit 本身继续可用。新工作应迁移到自有基础设施上的 ChatKit Server，本接口保留稳定的能力发现和客户端入口，后续可在不改变“一龙账号认证、短时客户端凭据、不复用 ChatGPT 会话”的前提下切换 `integration_mode`。
+
 ### 设备内网页增强不是远程 Web 适配器
 
 Android 的 ChatGPT 本地网页工作台与上述控制面 `chatgpt_web` 描述符属于不同边界：

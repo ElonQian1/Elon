@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/assets/project_home.css" />
   <link rel="stylesheet" href="/assets/orbital_mobile_theme.css" />
   <link rel="stylesheet" href="/assets/ai_provider_accounts.css" />
+  <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js" async></script>
   <link rel="stylesheet" href="/assets/federated_auth.css" />
   <link rel="stylesheet" href="/assets/account_security.css" />
   <style>
@@ -4776,6 +4777,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <span class="profile-action-copy"><span class="profile-action-title">ChatGPT 网页账号</span><span class="profile-action-subtitle">当前页打开官方网页</span></span>
         <span class="profile-action-chevron" aria-hidden="true">›</span>
       </button>
+      <button class="profile-row" id="openAiChatKitRow" type="button">
+        <span class="profile-action-icon" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 8h18a4 4 0 0 1 4 4v9a4 4 0 0 1-4 4H15l-7 4v-4H7a4 4 0 0 1-4-4v-9a4 4 0 0 1 4-4Z"/><path d="M10 14h12M10 19h8"/></svg>
+        </span>
+        <span class="profile-action-copy"><span class="profile-action-title">OpenAI ChatKit（API 聊天）</span><span class="profile-action-subtitle">使用一龙账号 · 不登录 ChatGPT</span></span>
+        <span class="profile-action-chevron" aria-hidden="true">›</span>
+      </button>
       <button class="profile-row" id="aiProviderAccountsRow">
         <span class="profile-action-icon" aria-hidden="true">
           <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="7" width="22" height="18" rx="6"/><path d="M11 16h10M16 11v10"/></svg>
@@ -5325,6 +5333,27 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     <div class="actions">
       <button type="button" class="btn-cancel" id="aiProviderAccountsClose">关闭</button>
     </div>
+  </div>
+</div>
+
+<!-- ============ OpenAI ChatKit API 聊天 ============ -->
+<div class="modal-mask" id="openAiChatKitMask">
+  <div class="modal openai-chatkit-modal">
+    <div class="openai-chatkit-heading">
+      <div><span>OPENAI · API CHAT</span><h2>OpenAI ChatKit</h2></div>
+      <button class="btn-cancel" id="openAiChatKitClose" type="button" aria-label="关闭 ChatKit">关闭</button>
+    </div>
+    <p class="openai-chatkit-boundary">使用当前一龙账号；OpenAI API Key 不下发客户端，也不读取 ChatGPT Cookie、历史会话或 Plus 额度。</p>
+    <div class="ai-provider-status" id="openAiChatKitStatus">正在检查 ChatKit 配置…</div>
+    <div class="openai-chatkit-empty hidden" id="openAiChatKitEmpty">
+      <strong>管理员尚未完成 ChatKit 配置</strong>
+      <p>需要配置 OpenAI API Key 和现有 ChatKit workflow。官方建议新项目后续使用自托管 ChatKit Server。</p>
+      <a id="openAiChatKitDocs" href="https://developers.openai.com/api/docs/guides/chatkit" target="_blank" rel="noreferrer">查看 OpenAI 官方文档</a>
+    </div>
+    <div class="openai-chatkit-host hidden" id="openAiChatKitHost">
+      <openai-chatkit id="openAiChatKitElement"></openai-chatkit>
+    </div>
+    <div class="actions"><button type="button" class="btn-cancel" id="openAiChatKitRetry">重新检查</button></div>
   </div>
 </div>
 

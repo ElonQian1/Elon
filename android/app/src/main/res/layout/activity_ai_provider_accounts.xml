@@ -10,7 +10,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="登录自己的 ChatGPT，然后直接在一龙里聊天"
+        android:text="选择 OpenAI 聊天方式"
         android:textColor="@color/elon_text_primary"
         android:textSize="18sp"
         android:textStyle="bold" />
@@ -19,7 +19,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="1  打开 ChatGPT 官方页面\n2  本人完成登录和真人验证\n3  留在官方网页，或切换到“一龙界面”开始聊天"
+        android:text="ChatKit 使用一龙账号和平台 OpenAI API，不需要登录 ChatGPT，也不读取 ChatGPT Cookie、历史或 Plus 额度。"
         android:textColor="@color/elon_text_secondary"
         android:textSize="13sp"
         android:lineSpacingExtra="5dp" />
@@ -28,7 +28,37 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="登录 Cookie 和网页数据只保存在本 APK，不会绑定到一龙云端账号。"
+        android:text="OpenAI API Key 只保存在服务端，APK 只接收短时 ChatKit 会话。"
+        android:textColor="@color/elon_text_tertiary"
+        android:textSize="12sp" />
+
+    <Button
+        android:id="@+id/aiProviderOpenAiChatKit"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_marginTop="14dp"
+        android:backgroundTint="@color/elon_button_primary_bg"
+        android:drawableStart="@android:drawable/ic_dialog_email"
+        android:drawableTint="@color/elon_button_primary_text"
+        android:text="打开 OpenAI ChatKit"
+        android:textColor="@color/elon_button_primary_text"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:text="ChatGPT 官方网页账号"
+        android:textColor="@color/elon_text_primary"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="1  打开 ChatGPT 官方页面\n2  本人完成登录和真人验证\n3  在官方网页或一龙增强界面聊天\nCookie 和网页数据只保存在本 APK。"
         android:textColor="@color/elon_text_tertiary"
         android:textSize="12sp" />
 
@@ -36,12 +66,12 @@
         android:id="@+id/aiProviderChatGptWebLab"
         android:layout_width="match_parent"
         android:layout_height="52dp"
-        android:layout_marginTop="14dp"
-        android:backgroundTint="@color/elon_button_primary_bg"
+        android:layout_marginTop="10dp"
+        android:backgroundTint="@color/elon_button_secondary_bg"
         android:drawableStart="@android:drawable/ic_menu_view"
-        android:drawableTint="@color/elon_button_primary_text"
+        android:drawableTint="@color/elon_button_secondary_text"
         android:text="@string/chatgpt_web_lab_entry"
-        android:textColor="@color/elon_button_primary_text"
+        android:textColor="@color/elon_button_secondary_text"
         android:textSize="14sp"
         android:textStyle="bold" />
 

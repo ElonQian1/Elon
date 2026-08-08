@@ -11,6 +11,7 @@ use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 
+use crate::account_security::openai_chatkit_api;
 use crate::types::AppState;
 use crate::ui_tuner_api;
 use crate::ui_tuner_device_host_api;
@@ -268,6 +269,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .merge(account_security_events::routes())
         .merge(account_lifecycle::routes())
         .merge(federated_auth::routes())
+        .merge(openai_chatkit_api::routes())
         .merge(codex_vault_api::routes())
         .merge(ui_tuner_api::routes())
         .merge(ui_tuner_device_host_api::routes())
