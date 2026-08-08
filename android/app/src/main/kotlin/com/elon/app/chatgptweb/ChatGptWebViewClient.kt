@@ -14,15 +14,30 @@ internal class ChatGptWebViewClient(
     private val onPageReady: (String) -> Unit,
     private val onBlockedNavigation: (String) -> Unit,
     private val onPageError: (String) -> Unit,
+    private val rewriteAllowedMainFrameUrl: (String) -> String?,
 ) : WebViewClient() {
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
         if (!request.isForMainFrame) return false
 
         val url = request.url.toString()
-        if (ChatGptWebNavigationPolicy.allows(url)) return false
+        if (!ChatGptWebNavigationPolicy.allows(url)) {
+            onBlockedNavigation(ChatGptWebNavigationPolicy.displayHost(url))
+            return true
+        }
 
-        onBlockedNavigation(ChatGptWebNavigationPolicy.displayHost(url))
-        return true
+        if (request.method.equals("GET", ignoreCase = true)) {
+            val rewrittenUrl = rewriteAllowedMainFrameUrl(url)
+            if (rewrittenUrl != null && rewrittenUrl != url) {
+                if (!ChatGptWebNavigationPolicy.allows(rewrittenUrl)) {
+                    onBlockedNavigation(ChatGptWebNavigationPolicy.displayHost(rewrittenUrl))
+                    return true
+                }
+                view.loadUrl(rewrittenUrl)
+                return true
+            }
+        }
+
+        return false
     }
 
     override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {

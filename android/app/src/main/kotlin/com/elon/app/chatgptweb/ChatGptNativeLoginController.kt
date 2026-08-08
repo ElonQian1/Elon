@@ -35,14 +35,18 @@ internal class ChatGptNativeLoginController(
             if (authenticated) {
                 onOpenNativeConversation()
             } else {
-                autoOpenNativeAfterLogin = true
-                render(tracker.begin())
-                startTicker()
-                onOpenAuthentication()
+                beginAuthentication()
             }
         }
         officialButton.setOnClickListener { onOpenOfficialPage() }
         render(tracker.snapshot())
+    }
+
+    fun beginAuthentication() {
+        autoOpenNativeAfterLogin = true
+        render(tracker.begin())
+        startTicker()
+        onOpenAuthentication()
     }
 
     fun onPageStarted(url: String) {

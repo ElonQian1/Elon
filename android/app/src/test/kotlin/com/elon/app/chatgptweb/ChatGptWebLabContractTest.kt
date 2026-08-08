@@ -42,6 +42,7 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("url: location.origin + location.pathname"))
         assertFalse(adapter.contains("url: location.href"))
         assertTrue(adapter.contains("action === 'send_prompt'"))
+        assertTrue(adapter.contains("action === 'start_google_login'"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
             assertFalse("page adapter must not contain $it", adapter.contains(it))
         }
@@ -55,6 +56,13 @@ class ChatGptWebLabContractTest {
         val controller = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeLoginController.kt"
         )
+        val googleController = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptGoogleAccountHintController.kt"
+        )
+        val webViewClient = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebViewClient.kt"
+        )
+        val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
         val layout = readRepositoryFile(
             "android/app/src/main/res/layout/activity_chatgpt_web_test.xml"
         )
@@ -63,13 +71,27 @@ class ChatGptWebLabContractTest {
         val loginShell = layout.substring(loginRootStart, loginRootEnd)
 
         assertTrue(layout.contains("android:id=\"@+id/chatGptModeQuick\""))
+        assertTrue(loginShell.contains("android:id=\"@+id/chatGptQuickGoogle\""))
         assertTrue(loginShell.contains("android:id=\"@+id/chatGptQuickLogin\""))
         assertTrue(loginShell.contains("android:id=\"@+id/chatGptQuickOfficial\""))
         assertFalse(loginShell.contains("<EditText"))
         assertTrue(activity.contains("loadUrl(ChatGptWebNavigationPolicy.AUTH_URL)"))
         assertTrue(activity.contains("loginController.onAuthenticated()"))
+        assertTrue(googleController.contains("AccountManager.newChooseAccountIntent"))
+        assertTrue(googleController.contains("GOOGLE_ACCOUNT_TYPE = \"com.google\""))
+        assertTrue(webViewClient.contains("request.method.equals(\"GET\""))
+        assertFalse(manifest.contains("android.permission.GET_ACCOUNTS"))
         listOf("getCookie(", "Authorization", "OkHttpClient", "evaluateJavascript").forEach {
             assertFalse("quick login controller must not contain $it", controller.contains(it))
+        }
+        listOf(
+            "getAuthToken",
+            "idToken",
+            "SharedPreferences",
+            "getCookie(",
+            "Authorization:",
+        ).forEach {
+            assertFalse("Google account hint controller must not contain $it", googleController.contains(it))
         }
     }
 

@@ -44,4 +44,18 @@ class ChatGptWebNavigationPolicyTest {
             assertFalse("enhanced mode must reject: $url", ChatGptWebNavigationPolicy.supportsEnhancedMode(url))
         }
     }
+
+    @Test
+    fun authenticationPageDetectionIsExactOriginAndAuthPathOnly() {
+        assertTrue(ChatGptWebNavigationPolicy.isAuthenticationPage("https://chatgpt.com/auth/login"))
+        assertTrue(ChatGptWebNavigationPolicy.isAuthenticationPage("https://chatgpt.com/auth/error"))
+        listOf(
+            "https://chatgpt.com/",
+            "https://sub.chatgpt.com/auth/login",
+            "https://chatgpt.com.evil.example/auth/login",
+            "http://chatgpt.com/auth/login",
+        ).forEach { url ->
+            assertFalse("authentication page must reject: $url", ChatGptWebNavigationPolicy.isAuthenticationPage(url))
+        }
+    }
 }

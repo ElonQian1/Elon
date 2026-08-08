@@ -29,8 +29,15 @@
     <string name="chatgpt_mode_native">一龙界面</string>
     <string name="chatgpt_quick_eyebrow">一龙 AI · 官方认证</string>
     <string name="chatgpt_quick_title">登录 ChatGPT</string>
-    <string name="chatgpt_quick_summary">使用一龙界面开始登录，账号验证仍在 ChatGPT 官方页面完成。</string>
-    <string name="chatgpt_quick_login">登录 ChatGPT</string>
+    <string name="chatgpt_quick_summary">选择手机里的 Google 账号，密码与验证仍在官方页面完成。</string>
+    <string name="chatgpt_google_account_login">使用手机 Google 账号</string>
+    <string name="chatgpt_google_account_selected">继续使用 %1$s</string>
+    <string name="chatgpt_google_account_picker_title">选择用于 ChatGPT 的 Google 账号</string>
+    <string name="chatgpt_google_account_cancelled">未选择 Google 账号</string>
+    <string name="chatgpt_google_account_invalid">系统没有返回有效的 Google 账号</string>
+    <string name="chatgpt_google_account_unavailable">当前手机无法打开 Google 账号选择器</string>
+    <string name="chatgpt_google_provider_unavailable">未找到 ChatGPT 官方 Google 登录入口，请改用官方网页</string>
+    <string name="chatgpt_quick_login">使用其他方式登录</string>
     <string name="chatgpt_quick_enter_native">进入一龙聊天</string>
     <string name="chatgpt_quick_official">直接打开官方网页</string>
     <string name="chatgpt_quick_privacy">官方认证 · 登录状态仅保存在本机</string>

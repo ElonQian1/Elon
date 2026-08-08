@@ -244,12 +244,12 @@
                     android:visibility="invisible" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/chatGptQuickLogin"
+                    android:id="@+id/chatGptQuickGoogle"
                     android:layout_width="match_parent"
                     android:layout_height="60dp"
                     android:layout_marginTop="24dp"
                     android:maxWidth="360dp"
-                    android:text="@string/chatgpt_quick_login"
+                    android:text="@string/chatgpt_google_account_login"
                     android:textAllCaps="false"
                     android:textColor="@color/elon_titanium_ink"
                     android:textSize="17sp"
@@ -258,11 +258,25 @@
                     app:rippleColor="@android:color/transparent" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/chatGptQuickOfficial"
+                    android:id="@+id/chatGptQuickLogin"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
                     android:layout_marginTop="12dp"
+                    android:maxWidth="360dp"
+                    android:text="@string/chatgpt_quick_login"
+                    android:textAllCaps="false"
+                    android:textColor="@color/elon_text_primary"
+                    app:cornerRadius="6dp"
+                    app:rippleColor="@android:color/transparent"
+                    app:strokeColor="@color/elon_border_primary" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/chatGptQuickOfficial"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="8dp"
                     android:maxWidth="360dp"
                     android:text="@string/chatgpt_quick_official"
                     android:textAllCaps="false"

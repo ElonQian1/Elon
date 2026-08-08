@@ -44,5 +44,10 @@ internal object ChatGptWebNavigationPolicy {
             (uri.port == -1 || uri.port == 443)
     }
 
+    fun isAuthenticationPage(rawUrl: String?): Boolean {
+        val uri = rawUrl?.let(::parse) ?: return false
+        return supportsEnhancedMode(rawUrl) && uri.path.startsWith("/auth")
+    }
+
     private fun parse(rawUrl: String): URI? = runCatching { URI(rawUrl) }.getOrNull()
 }

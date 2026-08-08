@@ -74,6 +74,8 @@ internal class ChatGptWebPageAdapter(
 
     fun startNewConversation() = runCommand("new_conversation")
 
+    fun startGoogleLogin() = runCommand("start_google_login")
+
     fun requestSnapshot() = runCommand("snapshot")
 
     fun markReady() = onStateChanged(State.READY)

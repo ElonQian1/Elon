@@ -169,6 +169,22 @@
     }, 80);
   }
 
+  function startGoogleLogin() {
+    const candidates = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+    const target = candidates.find((node) => {
+      if (!isVisible(node)) return false;
+      const label = cleanText([
+        node.getAttribute('aria-label'),
+        node.getAttribute('data-provider'),
+        node.textContent
+      ].filter(Boolean).join(' ')).toLowerCase();
+      return label.includes('google');
+    });
+    if (!target) return result('start_google_login', false, '官方 Google 登录入口尚未就绪。');
+    target.click();
+    result('start_google_login', true, '');
+  }
+
   function runCommand(raw) {
     let command = {};
     try { command = JSON.parse(String(raw || '{}')); }
@@ -176,6 +192,7 @@
     const action = String(command.action || '');
     if (action === 'snapshot') return snapshot();
     if (action === 'send_prompt') return sendPrompt(String(command.value || '').slice(0, 20000));
+    if (action === 'start_google_login') return startGoogleLogin();
     if (action === 'stop_generation') {
       const stop = findButton('stop-button', ['stop generating', 'stop', '停止生成', '停止']);
       if (!stop) return result(action, false, '当前没有正在生成的回复。');
@@ -196,7 +213,7 @@
   }
 
   window.__elonChatGptBridge = Object.freeze({ command: runCommand });
-  emitEvent({ type: 'adapter_ready', capabilities: ['streaming', 'conversation_history'] });
+  emitEvent({ type: 'adapter_ready', capabilities: ['streaming', 'conversation_history', 'google_login_entry'] });
   new MutationObserver(scheduleSnapshot).observe(document.documentElement, {
     childList: true,
     subtree: true,

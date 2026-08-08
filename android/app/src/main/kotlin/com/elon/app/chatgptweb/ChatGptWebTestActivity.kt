@@ -21,6 +21,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var pageAdapter: ChatGptWebPageAdapter
     private lateinit var nativeController: ChatGptNativeConversationController
     private lateinit var loginController: ChatGptNativeLoginController
+    private lateinit var googleAccountHintController: ChatGptGoogleAccountHintController
     private lateinit var proxyController: ChatGptWebProxyController
     private var proxyStatus = ChatGptWebProxyStatus("手机网络")
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
@@ -113,6 +114,13 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 if (binding.chatGptModeNative.isEnabled) binding.chatGptModeNative.isChecked = true
             },
         )
+        googleAccountHintController = ChatGptGoogleAccountHintController(
+            activity = this,
+            accountButton = binding.chatGptQuickGoogle,
+            onBeginAuthentication = { loginController.beginAuthentication() },
+            onRequestGoogleProvider = { pageAdapter.startGoogleLogin() },
+            onStatusMessage = ::showGoogleLoginStatus,
+        )
 
         binding.chatGptModeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) showMode(checkedId)
@@ -148,6 +156,13 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 onPageReady = ::showReady,
                 onBlockedNavigation = ::showBlockedNavigation,
                 onPageError = ::showError,
+                rewriteAllowedMainFrameUrl = { url ->
+                    if (::googleAccountHintController.isInitialized) {
+                        googleAccountHintController.rewriteGoogleAuthorization(url)
+                    } else {
+                        null
+                    }
+                },
             )
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView, newProgress: Int) {
@@ -190,6 +205,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_success))
         binding.chatGptWebStatus.text = statusWithProxy(R.string.chatgpt_web_ready)
         pageAdapter.onPageReady(url)
+        googleAccountHintController.onPageReady(url)
     }
 
     private fun handleBridgeEvent(event: ChatGptWebEvent) {
@@ -200,6 +216,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     event.value.authenticated &&
                     (event.value.composerReady || event.value.messages.isNotEmpty())
                 ) {
+                    googleAccountHintController.onAuthenticated()
                     pageAdapter.markReady()
                     if (loginController.onAuthenticated()) {
                         binding.chatGptModeNative.isChecked = true
@@ -210,6 +227,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 if (event.value.title.isNotBlank()) binding.chatGptWebHost.text = event.value.title
             }
             is ChatGptWebEvent.CommandResult -> {
+                if (googleAccountHintController.onCommandResult(event)) return
                 if (!event.ok) {
                     nativeController.restoreComposerState()
                     binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_project))
@@ -262,6 +280,12 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         binding.chatGptWebStatus.text = "$message · ${proxyStatus.label}".take(160)
     }
 
+    private fun showGoogleLoginStatus(messageResource: Int) {
+        binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_project))
+        binding.chatGptWebStatus.setText(messageResource)
+        Toast.makeText(this, messageResource, Toast.LENGTH_LONG).show()
+    }
+
     private fun confirmClearSession() {
         AlertDialog.Builder(this)
             .setTitle(R.string.chatgpt_web_clear)
@@ -274,6 +298,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private fun clearSession() {
         binding.chatGptModeQuick.isChecked = true
         loginController.reset()
+        googleAccountHintController.reset()
         cookieManager.removeAllCookies {
             cookieManager.flush()
             WebStorage.getInstance().deleteAllData()
@@ -304,6 +329,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        googleAccountHintController.dispose()
         loginController.dispose()
         pageAdapter.dispose()
         binding.chatGptWebView.apply {
