@@ -69,3 +69,6 @@ pub(super) fn persist_candidate_cleanup_namespace_durability(
     session.validate_source(physical.state().cancellation_guard())?;
     Ok(stored)
 }
+
+#[cfg(test)]
+mod tests;

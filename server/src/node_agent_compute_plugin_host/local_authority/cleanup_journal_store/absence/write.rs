@@ -56,3 +56,6 @@ pub(super) fn persist_candidate_cleanup_parent_absence(
     session.validate_source(observed.state().cancellation_guard())?;
     Ok(stored)
 }
+
+#[cfg(test)]
+mod tests;
