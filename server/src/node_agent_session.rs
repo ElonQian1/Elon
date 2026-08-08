@@ -351,28 +351,14 @@ pub(super) async fn run_session(
                             retryable,
                             cloud_task_id,
                             error,
-                        } => {
-                            local_task_sync_acks.settle(
-                                &task_id,
-                                &revision,
-                                accepted,
-                                retryable,
-                            );
-                            if accepted {
-                                tracing::debug!(
-                                    %task_id,
-                                    cloud_task_id = ?cloud_task_id,
-                                    "本机任务已同步到项目会话"
-                                );
-                            } else {
-                                warn!(
-                                    %task_id,
-                                    retryable,
-                                    error = error.as_deref().unwrap_or("unknown"),
-                                    "本机任务同步到项目会话失败"
-                                );
-                            }
-                        }
+                        } => local_task_sync_acks.handle_cloud_ack(
+                            &task_id,
+                            &revision,
+                            accepted,
+                            retryable,
+                            cloud_task_id.as_deref(),
+                            error.as_deref(),
+                        ),
                         ServerToAgent::ApplyComputePluginSharingPolicyV1 {
                             req_id,
                             snapshot,

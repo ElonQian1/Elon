@@ -35,6 +35,32 @@ impl LocalTaskSyncAcks {
         }
     }
 
+    pub(crate) fn handle_cloud_ack(
+        &self,
+        task_id: &str,
+        revision: &str,
+        accepted: bool,
+        retryable: bool,
+        cloud_task_id: Option<&str>,
+        error: Option<&str>,
+    ) {
+        self.settle(task_id, revision, accepted, retryable);
+        if accepted {
+            tracing::debug!(
+                %task_id,
+                cloud_task_id = ?cloud_task_id,
+                "本机任务已同步到项目会话"
+            );
+        } else {
+            tracing::warn!(
+                %task_id,
+                retryable,
+                error = error.unwrap_or("unknown"),
+                "本机任务同步到项目会话失败"
+            );
+        }
+    }
+
     fn contains(&self, task_id: &str, revision: &str) -> bool {
         self.settled
             .lock()
