@@ -8,8 +8,8 @@ use anyhow::{anyhow, Context, Result};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{
     AgentToServer, CliCompletionProducerIdentity, ServerToAgent, CAP_ANDROID_DEVICE_HOST_V1,
-    CAP_LOCAL_TASK_PROJECT_SYNC_V1, CAP_PROJECT_BUILD_CACHE_V1, CAP_PROJECT_DOCUMENT_FEDERATION_V1,
-    PROTO_VERSION,
+    CAP_COMPUTE_PLUGIN_SHARING_V1, CAP_LOCAL_TASK_PROJECT_SYNC_V1, CAP_PROJECT_BUILD_CACHE_V1,
+    CAP_PROJECT_DOCUMENT_FEDERATION_V1, PROTO_VERSION,
 };
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
@@ -34,6 +34,7 @@ const COMPLETION_REPLAY_BASE_BACKOFF_MS: u64 = 3_000;
 const COMPLETION_REPLAY_MAX_BACKOFF_MS: u64 = 5 * 60 * 1_000;
 const SESSION_TASK_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
 
+mod compute_plugin_sharing;
 mod project_workspace;
 
 // ── 主连接循环 ────────────────────────────────────────────────────────────────
@@ -177,6 +178,7 @@ pub(super) async fn run_session(
             CAP_ANDROID_DEVICE_HOST_V1.to_string(),
             CAP_PROJECT_DOCUMENT_FEDERATION_V1.to_string(),
             CAP_LOCAL_TASK_PROJECT_SYNC_V1.to_string(),
+            CAP_COMPUTE_PLUGIN_SHARING_V1.to_string(),
         ],
         allowed_clis: available_clis.clone(),
         allowed_cwds: vec![],
@@ -371,6 +373,12 @@ pub(super) async fn run_session(
                                 );
                             }
                         }
+                        ServerToAgent::ApplyComputePluginSharingPolicyV1 {
+                            req_id,
+                            snapshot,
+                        } => compute_plugin_sharing::handle_policy_snapshot_v1(
+                            runtime, creds, &out_tx_r, req_id, snapshot,
+                        ),
                         ServerToAgent::LlmStreamRequest {
                             req_id,
                             model,

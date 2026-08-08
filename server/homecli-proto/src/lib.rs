@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+mod agent_to_server;
 mod project_workspace;
 pub use project_workspace::*;
 mod cli_durable_types;
@@ -16,7 +17,14 @@ mod project_document_federation;
 pub use project_document_federation::{
     ProjectDocumentFederationPageRequest, CAP_PROJECT_DOCUMENT_FEDERATION_V1,
 };
-pub const PROTO_VERSION: u32 = 8;
+mod compute_plugin_sharing;
+pub use compute_plugin_sharing::{
+    ComputePluginSharingAuthorizationBindingV1, ComputePluginSharingPolicyObservedV1,
+    ComputePluginSharingPolicySnapshotV1, CAP_COMPUTE_PLUGIN_SHARING_V1,
+    COMPUTE_PLUGIN_SHARING_POLICY_OBSERVED_V1_SCHEMA,
+    COMPUTE_PLUGIN_SHARING_POLICY_SNAPSHOT_V1_SCHEMA, COMPUTE_PLUGIN_SHARING_PROTO_VERSION,
+};
+pub const PROTO_VERSION: u32 = COMPUTE_PLUGIN_SHARING_PROTO_VERSION;
 /// The node applies project-scoped build-cache routing, admission, leases, and cleanup.
 pub const CAP_PROJECT_BUILD_CACHE_V1: &str = "project_build_cache_v1";
 /// The node mirrors locally-admitted Codex tasks into the owner's project
@@ -206,6 +214,12 @@ pub enum ServerToAgent {
         cloud_task_id: Option<String>,
         #[serde(default)]
         error: Option<String>,
+    },
+    /// Apply one complete desired compute-plugin sharing snapshot. This is user intent only: it
+    /// cannot authorize a download, open local authority state, or start a plugin process.
+    ApplyComputePluginSharingPolicyV1 {
+        req_id: String,
+        snapshot: ComputePluginSharingPolicySnapshotV1,
     },
     Ping {
         nonce: Option<String>,
@@ -532,6 +546,11 @@ pub enum AgentToServer {
         dispatch_id: String,
         accepted: bool,
     },
+    /// The node observed or rejected one compute-plugin sharing policy snapshot.
+    ComputePluginSharingPolicyObservedV1 {
+        req_id: String,
+        observed: ComputePluginSharingPolicyObservedV1,
+    },
     /// PC 节点上报本机支持的模型列表
     RegisterCapabilities {
         models: Vec<ModelCapability>,
@@ -704,96 +723,6 @@ pub enum AgentToServer {
         req_id: String,
         message: String,
     },
-}
-
-impl AgentToServer {
-    pub fn task_id(&self) -> Option<&str> {
-        match self {
-            Self::TaskStarted { task_id, .. }
-            | Self::TaskStdout { task_id, .. }
-            | Self::TaskStderr { task_id, .. }
-            | Self::TaskExit { task_id, .. }
-            | Self::TaskError { task_id, .. } => Some(task_id.as_str()),
-            Self::Register { .. }
-            | Self::Pong { .. }
-            | Self::HttpResponse { .. }
-            | Self::HttpError { .. }
-            | Self::CliPromptAccepted { .. }
-            | Self::CliChunk { .. }
-            | Self::CliDone { .. }
-            | Self::CliCompletionReplay { .. }
-            | Self::CliLocalTaskSync { .. }
-            | Self::CliTaskJournalSnapshot { .. }
-            | Self::ToolApprovalDecisionAck { .. }
-            | Self::RegisterCapabilities { .. }
-            | Self::LlmStreamChunk { .. }
-            | Self::LlmStreamEnd { .. }
-            | Self::LlmStreamError { .. }
-            | Self::ProjectWorkspaceProvisioned { .. }
-            | Self::ProjectWorkspaceProvisionError { .. }
-            | Self::ProjectStorageRepoReady { .. }
-            | Self::ProjectStorageRepoError { .. }
-            | Self::ProjectWorkspaceInspected { .. }
-            | Self::ProjectWorkspaceInspectError { .. }
-            | Self::ProjectGitWorktreesAudited { .. }
-            | Self::ProjectGitWorktreeAuditError { .. }
-            | Self::ProjectDocumentsRead { .. }
-            | Self::ProjectDocumentsReadError { .. }
-            | Self::ProjectDocumentFederationRead { .. }
-            | Self::ProjectDocumentFederationReadError { .. }
-            | Self::ProjectDocumentFileRead { .. }
-            | Self::ProjectDocumentFileReadError { .. }
-            | Self::ProjectDocumentFileWritten { .. }
-            | Self::ProjectDocumentFileWriteError { .. }
-            | Self::ProjectWorkspaceCleaned { .. }
-            | Self::ProjectWorkspaceCleanupError { .. }
-            | Self::TtsSynthesizeResponse { .. }
-            | Self::TtsSynthesizeError { .. } => None,
-        }
-    }
-
-    pub fn req_id(&self) -> Option<&str> {
-        match self {
-            Self::HttpResponse { req_id, .. }
-            | Self::HttpError { req_id, .. }
-            | Self::CliPromptAccepted { req_id, .. }
-            | Self::CliChunk { req_id, .. }
-            | Self::CliDone { req_id, .. }
-            | Self::CliTaskJournalSnapshot { req_id, .. }
-            | Self::LlmStreamChunk { req_id, .. }
-            | Self::LlmStreamEnd { req_id, .. }
-            | Self::LlmStreamError { req_id, .. }
-            | Self::ProjectWorkspaceProvisioned { req_id, .. }
-            | Self::ProjectWorkspaceProvisionError { req_id, .. }
-            | Self::ProjectStorageRepoReady { req_id, .. }
-            | Self::ProjectStorageRepoError { req_id, .. }
-            | Self::ProjectWorkspaceInspected { req_id, .. }
-            | Self::ProjectWorkspaceInspectError { req_id, .. }
-            | Self::ProjectGitWorktreesAudited { req_id, .. }
-            | Self::ProjectGitWorktreeAuditError { req_id, .. }
-            | Self::ProjectDocumentsRead { req_id, .. }
-            | Self::ProjectDocumentsReadError { req_id, .. }
-            | Self::ProjectDocumentFederationRead { req_id, .. }
-            | Self::ProjectDocumentFederationReadError { req_id, .. }
-            | Self::ProjectDocumentFileRead { req_id, .. }
-            | Self::ProjectDocumentFileReadError { req_id, .. }
-            | Self::ProjectDocumentFileWritten { req_id, .. }
-            | Self::ProjectDocumentFileWriteError { req_id, .. }
-            | Self::ProjectWorkspaceCleaned { req_id, .. }
-            | Self::ProjectWorkspaceCleanupError { req_id, .. }
-            | Self::TtsSynthesizeResponse { req_id, .. }
-            | Self::TtsSynthesizeError { req_id, .. } => Some(req_id.as_str()),
-            _ => None,
-        }
-    }
-
-    /// 流式消息需要保留在 pending map 中（还有后续），其余 req_id 消息在发送后删除。
-    pub fn is_final_req_msg(&self) -> bool {
-        !matches!(
-            self,
-            Self::CliPromptAccepted { .. } | Self::CliChunk { .. } | Self::LlmStreamChunk { .. }
-        )
-    }
 }
 
 #[cfg(test)]

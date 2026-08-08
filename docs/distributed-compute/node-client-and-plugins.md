@@ -1,7 +1,7 @@
 ---
 title: 分布式算力节点客户端与按需插件
 status: current
-reviewed_at: 2026-08-07
+reviewed_at: 2026-08-09
 owners: node, pc
 ---
 
@@ -119,7 +119,11 @@ Manifest 只能声明请求，不能授予权限、证明本机已安装或健�
 
 第一批内部兼容 seam 仍直接调用现有 Rust 本地推理函数。节点供应链现已形成独立 authority v3、root-signed 双 keyring、PlanApply、可恢复 claim/cursor Store、Windows pinned-root/同句柄耐久写入、候选 exact closure/全文件 pin/预算化完整 hash、可信时间与回滚锚合同，以及原子 verified/rejected resolution。已验证 ZIP 可进入随机 create-new staging run，安全物化并封存 seal；fresh authority binding 后，Store 可保存不可变 staging receipt 并把槽从 `verifying` 推进为 `staged`。typed staged custody 可进入有界健康状态机：成功路径写不可变健康回执，终止失败路径封存 canonical failure observation，并由 quarantine Store 原子推进 `staged -> failed`、推进三类 fence 和写不可变回执。两类提交均有不确定结果恢复；exact quarantine adoption 要求 fresh failed authority 对账与 retained-handle 重哈希，`NotCreated` 不恢复写许可。失败候选随后可进入私有 cleanup authorization Store，原子写授权并推进 `owned -> cleanup_pending`；不确定授权同样只接受 `NotCreated | Authorized`，exact adoption 双读并重哈希 retained 内容。远程 canonical 基线已通过 `elon-pc-node` 编译和定向测试；本批追加 cancellation、exact owner/receipt chain、PlanApply/replay 和 schema fence 加固，未重新编译。授权仍不删除文件或授予重试。目录耐久/跨重启恢复、真实 downloader、Sidecar/IPC/沙箱/探针调度、线性清理 executor/completion、installed/promotion、`ReadyCapability` 上报与 Attempt 接线仍未实现。精确供应链边界由 `node-plugin-local-authority.md`、`node-plugin-candidate-cleanup.md` 与 `node-ready-capability.md` 维护。
 
-NodeRuntime 现额外挂载默认关闭的 `ComputePluginBootstrap`。它只派生 installation identity 和 `NodeDataPaths.compute_plugins()` 下唯一 authority 路径，并绑定不能延长节点状态目录实例锁寿命的进程内 weak witness；派生路径不是 OS reservation 或安全 capability。未来副作用必须在完整临界区持有由该 witness 升级出的短期 lease，并调用 `pin_compute_plugin_root()`：该入口 existing-only 钉住算力目录后，通过同一父句柄相对 open/create 固定持久文件并以 share-none 句柄获得跨进程独占，最终把锁封装进非 Clone 的 `PinnedComputePluginRoot`。当前取数与候选验证流水线返回的线性 custody 会继续持有同一锁句柄的非 Clone lease，解包链则以 `'root` 借用约束根寿命；竞争、根缺失、marker 错误、reparse、hardlink、跨卷和非 Windows 都失败关闭，锁文件不删除。Bootstrap 尚无 sharing-on 入口，所以本地管理状态仍如实报告根锁、生产可信时间 authority、生产回滚见证、root pin、authority open 和 process fence 均未建立。运行中切换数据根会使 dormant binding 失效并要求重启；默认关闭不会建目录、开库、执行 DDL、下载、解包或启动进程。
+NodeRuntime 现额外挂载默认关闭的 `ComputePluginBootstrap`。它只派生 installation identity 和 `NodeDataPaths.compute_plugins()` 下唯一 authority 路径，并绑定不能延长节点状态目录实例锁寿命的进程内 weak witness；派生路径不是 OS reservation 或安全 capability。未来副作用必须在完整临界区持有由该 witness 升级出的短期 lease，并调用 `pin_compute_plugin_root()`：该入口 existing-only 钉住算力目录后，通过同一父句柄相对 open/create 固定持久文件并以 share-none 句柄获得跨进程独占，最终把锁封装进非 Clone 的 `PinnedComputePluginRoot`。当前取数与候选验证流水线返回的线性 custody 会继续持有同一锁句柄的非 Clone lease，解包链则以 `'root` 借用约束根寿命；竞争、根缺失、marker 错误、reparse、hardlink、跨卷和非 Windows 都失败关闭，锁文件不删除。
+
+当前源码已把本人页同一个“AI 算力共享”开关接到独立的插件运行授权域：只有新版请求显式提交 `plugin_runtime_requested`、期望修订号和幂等同意请求号时，服务端才追加不可变 consent、单调策略修订与 delivery intent；历史 `enabled=true` 不会被静默升级为插件下载授权。节点尚无 plugin head 时，旧客户端省略新字段仍可更新原有模型推理策略；一旦已有插件授权摘要，旧请求只能做 committed facts 完全不变的幂等保存，任何 enabled、模型清单或限额变化都失败关闭，必须由新版显式再同意并推进修订。服务端通过现有认证 WebSocket、协议能力协商发送绑定 node、owner、installation、policy digest 与 authorization receipt 的 V1 快照，并在每个新认证会话重放当前 intent；历史 ACK 不能压掉节点重启后的状态重建。Bootstrap 只接受单调修订或 exact replay，开启时仅在内存中生成无副作用的 `DormantComputePluginInitializationPlan`，关闭时撤销该计划并推进 cancellation generation，再返回包含 `side_effects_started=false` 的 observed ACK。节点侧高水位仍是进程内事实；会话重放不是生产回滚见证。
+
+因此本地管理状态仍如实报告根锁、生产可信时间 authority、生产回滚见证、root pin、authority open 和 process fence 均未建立，并明确 `downloads_allowed=false`、`new_work_admission_enabled=false`。运行中切换数据根会销毁休眠计划并要求重启；关闭共享不会建目录、开库、执行 DDL、下载、解包或启动进程。未来即使意愿为开启，也仍必须取得精确匹配该授权的 signed `InstallPlan`、完成本机确认与全部准入门卫，才能进入任何下载副作用。
 
 ## 10. 模型与缓存
 
@@ -145,4 +149,4 @@ V1 只运行平台批准的任务种类和签名 Runner，不接受请求方上�
 
 ## 13. 当前未验证声明
 
-本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam、版本化合同、Manifest/InstallPlan 与双 keyring、本机 authority v3/PlanApply、可恢复分段取数、Windows 受管文件、候选原子验证、可信时间证明和回滚锚回执合同已形成代码。ZIP staging Store、候选健康成功 Store、终止失败 quarantine Store 及各自不确定结果恢复/adoption 合同均已形成，默认关闭的 Bootstrap 已挂载到 NodeRuntime；失败候选还形成 cleanup authorization Store、typed permit 与进程内 outcome recovery。远程 canonical 基线已通过 `elon-pc-node` 编译和定向测试，本批安全加固未重新编译。生产启动、本地建库/迁移和 Host 接线尚未完成；cleanup authorization 只把 owner 推进为 `cleanup_pending`，不是物理清理完成或重试授权。生产时间源与回滚见证、真实 HTTPS downloader/socket-read 取消、跨重启/目录耐久恢复、真实 Sidecar 探针、线性删除 journal/executor、completion Store、installed/promotion、IPC/沙箱、`ReadyCapability` 上报和调度接线仍未实现。节点不直接发布商业 Offer；精确物化、健康和清理边界见 `node-plugin-archive-extraction.md`、`node-ready-capability.md` 与 `node-plugin-candidate-cleanup.md`。
+本文是已接受的客户端目标设计。NodeAgent 内部 legacy Host seam、版本化合同、Manifest/InstallPlan 与双 keyring、本机 authority v3/PlanApply、可恢复分段取数、Windows 受管文件、候选原子验证、可信时间证明和回滚锚回执合同已形成代码。ZIP staging Store、候选健康成功 Store、终止失败 quarantine Store 及各自不确定结果恢复/adoption 合同均已形成，默认关闭的 Bootstrap 已挂载到 NodeRuntime；失败候选还形成 cleanup authorization Store、typed permit 与进程内 outcome recovery。远程 canonical 基线已通过 `elon-pc-node` 编译和定向测试；本批新增的显式插件共享 consent、耐久 delivery intent、能力协商快照/ACK 与休眠初始化计划只做源码和静态审查，未编译、未运行 v208 迁移或联调。生产启动、本地建库/迁移和 Host 接线尚未完成；cleanup authorization 只把 owner 推进为 `cleanup_pending`，不是物理清理完成或重试授权。生产时间源与回滚见证、真实 HTTPS downloader/socket-read 取消、跨重启本机策略见证与目录耐久恢复、真实 Sidecar 探针、线性删除 journal/executor、completion Store、installed/promotion、IPC/沙箱、`ReadyCapability` 上报和调度接线仍未实现。节点不直接发布商业 Offer；精确物化、健康和清理边界见 `node-plugin-archive-extraction.md`、`node-ready-capability.md` 与 `node-plugin-candidate-cleanup.md`。

@@ -6,6 +6,9 @@ use serde::Serialize;
 
 use super::{
     clean_optional, new_id,
+    node_compute_plugin_sharing::{
+        NodeComputePluginSharingAuthorization, NODE_COMPUTE_PLUGIN_SHARING_CONSENT_SCHEMA_V1,
+    },
     node_compute_runs::{
         ensure_compute_run_replay_matches, select_run_by_compute_call_id,
         SERVER_NODE_LLM_LEASE_SECONDS,
@@ -21,6 +24,13 @@ pub struct NodeComputeSharingPolicy {
     pub allowed_model_ids: Vec<String>,
     pub max_concurrent_runs: i64,
     pub daily_token_limit: i64,
+    pub plugin_runtime_requested: bool,
+    pub plugin_policy_revision: i64,
+    pub plugin_policy_digest: Option<String>,
+    pub plugin_consent_schema: Option<String>,
+    pub plugin_consent_receipt_id: Option<String>,
+    pub plugin_installation_identity_digest: Option<String>,
+    pub plugin_authorization: Option<NodeComputePluginSharingAuthorization>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
 }
@@ -52,6 +62,13 @@ impl NodeComputeSharingPolicy {
             allowed_model_ids: Vec::new(),
             max_concurrent_runs: 1,
             daily_token_limit: 0,
+            plugin_runtime_requested: false,
+            plugin_policy_revision: 0,
+            plugin_policy_digest: None,
+            plugin_consent_schema: None,
+            plugin_consent_receipt_id: None,
+            plugin_installation_identity_digest: None,
+            plugin_authorization: None,
             created_at: None,
             updated_at: None,
         }
@@ -75,60 +92,14 @@ impl Store {
         node_id: &str,
         update: UpdateNodeComputeSharingPolicy,
     ) -> Result<NodeComputeSharingStatus> {
-        let node_id = node_id.trim();
-        let owner_user_id = owner_user_id.trim();
-        if node_id.is_empty() || owner_user_id.is_empty() {
-            bail!("节点和所有者不能为空");
-        }
-        let allowed_model_ids = normalize_model_ids(&update.allowed_model_ids)?;
-        if update.enabled && allowed_model_ids.is_empty() {
-            bail!("开启共享前至少选择一个允许共享的模型");
-        }
-        if !(1..=16).contains(&update.max_concurrent_runs) {
-            bail!("共享并发上限必须在 1 到 16 之间");
-        }
-        if !(0..=1_000_000_000_000).contains(&update.daily_token_limit) {
-            bail!("每日 Token 上限必须在 0 到 1000000000000 之间");
-        }
-
-        let ts = now();
-        let allowed_json = serde_json::to_string(&allowed_model_ids)?;
-        let conn = self.conn.lock().unwrap();
-        let owns_node = conn
-            .query_row(
-                "SELECT 1 FROM node_credentials
-                  WHERE agent_id=?1 AND owner_user_id=?2",
-                params![node_id, owner_user_id],
-                |_| Ok(()),
-            )
-            .optional()?
-            .is_some();
-        if !owns_node {
-            bail!("节点不存在或不属于当前用户");
-        }
-        conn.execute(
-            "INSERT INTO node_compute_sharing_policies (
-               node_id, owner_user_id, enabled, allowed_model_ids_json,
-               max_concurrent_runs, daily_token_limit, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
-             ON CONFLICT(node_id) DO UPDATE SET
-               owner_user_id=excluded.owner_user_id,
-               enabled=excluded.enabled,
-               allowed_model_ids_json=excluded.allowed_model_ids_json,
-               max_concurrent_runs=excluded.max_concurrent_runs,
-               daily_token_limit=excluded.daily_token_limit,
-               updated_at=excluded.updated_at",
-            params![
-                node_id,
+        Ok(self
+            .update_node_compute_sharing_policy_with_plugin_runtime(
                 owner_user_id,
-                if update.enabled { 1 } else { 0 },
-                allowed_json,
-                update.max_concurrent_runs,
-                update.daily_token_limit,
-                ts,
-            ],
-        )?;
-        sharing_status(&conn, node_id, owner_user_id, None)
+                node_id,
+                update,
+                None,
+            )?
+            .status)
     }
 
     /// Atomically re-check the provider policy and reserve a shared inference slot.
@@ -214,7 +185,7 @@ impl Store {
     }
 }
 
-fn sharing_status(
+pub(super) fn sharing_status(
     conn: &Connection,
     node_id: &str,
     owner_user_id: &str,
@@ -225,7 +196,29 @@ fn sharing_status(
     let policy = conn
         .query_row(
             "SELECT node_id, owner_user_id, enabled, allowed_model_ids_json,
-                    max_concurrent_runs, daily_token_limit, created_at, updated_at
+                    max_concurrent_runs, daily_token_limit, plugin_runtime_requested,
+                    plugin_policy_revision, plugin_policy_digest, plugin_consent_schema,
+                    plugin_consent_receipt_id, plugin_installation_identity_digest,
+                    plugin_authorization_ref, plugin_authorization_revision,
+                    plugin_authorization_digest, created_at, updated_at,
+                    CASE WHEN plugin_policy_revision=0 THEN 1 ELSE EXISTS (
+                      SELECT 1 FROM node_compute_plugin_sharing_consents c
+                       WHERE c.receipt_id=node_compute_sharing_policies.plugin_consent_receipt_id
+                         AND c.node_id=node_compute_sharing_policies.node_id
+                         AND c.owner_user_id=node_compute_sharing_policies.owner_user_id
+                         AND c.consent_schema=node_compute_sharing_policies.plugin_consent_schema
+                         AND c.installation_identity_digest=node_compute_sharing_policies.plugin_installation_identity_digest
+                         AND c.policy_revision=node_compute_sharing_policies.plugin_policy_revision
+                         AND c.policy_digest=node_compute_sharing_policies.plugin_policy_digest
+                         AND c.plugin_runtime_requested=node_compute_sharing_policies.plugin_runtime_requested
+                         AND c.plugin_runtime_requested=node_compute_sharing_policies.enabled
+                         AND c.allowed_model_ids_json=node_compute_sharing_policies.allowed_model_ids_json
+                         AND c.max_concurrent_runs=node_compute_sharing_policies.max_concurrent_runs
+                         AND c.daily_token_limit=node_compute_sharing_policies.daily_token_limit
+                         AND c.authorization_ref IS node_compute_sharing_policies.plugin_authorization_ref
+                         AND c.authorization_revision IS node_compute_sharing_policies.plugin_authorization_revision
+                         AND c.authorization_digest IS node_compute_sharing_policies.plugin_authorization_digest
+                    ) END
                FROM node_compute_sharing_policies WHERE node_id=?1",
             params![node_id],
             read_policy,
@@ -299,20 +292,79 @@ fn sharing_status(
 
 fn read_policy(row: &rusqlite::Row<'_>) -> rusqlite::Result<NodeComputeSharingPolicy> {
     let json: String = row.get(3)?;
-    let allowed_model_ids = serde_json::from_str::<Vec<String>>(&json).unwrap_or_default();
+    let allowed_model_ids =
+        serde_json::from_str::<Vec<String>>(&json).map_err(|_| rusqlite::Error::InvalidQuery)?;
+    let enabled = row.get::<_, i64>(2)? != 0;
+    let plugin_runtime_requested = row.get::<_, i64>(6)? != 0;
+    let plugin_policy_revision: i64 = row.get(7)?;
+    let plugin_policy_digest: Option<String> = row.get(8)?;
+    let plugin_consent_schema: Option<String> = row.get(9)?;
+    let plugin_consent_receipt_id: Option<String> = row.get(10)?;
+    let plugin_installation_identity_digest: Option<String> = row.get(11)?;
+    let plugin_authorization = match (row.get(12)?, row.get(13)?, row.get(14)?) {
+        (Some(authorization_ref), Some(revision), Some(digest)) => {
+            Some(NodeComputePluginSharingAuthorization {
+                authorization_ref,
+                revision,
+                digest,
+            })
+        }
+        (None, None, None) => None,
+        _ => return Err(rusqlite::Error::InvalidQuery),
+    };
+    if plugin_runtime_requested != plugin_authorization.is_some() {
+        return Err(rusqlite::Error::InvalidQuery);
+    }
+    let head_is_valid = if plugin_policy_revision == 0 {
+        !plugin_runtime_requested
+            && plugin_policy_digest.is_none()
+            && plugin_consent_schema.is_none()
+            && plugin_consent_receipt_id.is_none()
+            && plugin_installation_identity_digest.is_none()
+            && plugin_authorization.is_none()
+    } else {
+        plugin_policy_revision > 0
+            && enabled == plugin_runtime_requested
+            && plugin_policy_digest
+                .as_ref()
+                .is_some_and(|value| value.len() == 64)
+            && plugin_consent_schema.as_deref()
+                == Some(NODE_COMPUTE_PLUGIN_SHARING_CONSENT_SCHEMA_V1)
+            && plugin_consent_receipt_id.is_some()
+            && plugin_installation_identity_digest
+                .as_ref()
+                .is_some_and(|value| value.len() == 64)
+            && plugin_authorization.as_ref().is_none_or(|authorization| {
+                authorization.revision == plugin_policy_revision
+                    && Some(&authorization.digest) == plugin_policy_digest.as_ref()
+            })
+    };
+    if !head_is_valid {
+        return Err(rusqlite::Error::InvalidQuery);
+    }
+    if row.get::<_, i64>(17)? != 1 {
+        return Err(rusqlite::Error::InvalidQuery);
+    }
     Ok(NodeComputeSharingPolicy {
         node_id: row.get(0)?,
         owner_user_id: row.get(1)?,
-        enabled: row.get::<_, i64>(2)? != 0,
+        enabled,
         allowed_model_ids,
         max_concurrent_runs: row.get(4)?,
         daily_token_limit: row.get(5)?,
-        created_at: row.get(6)?,
-        updated_at: row.get(7)?,
+        plugin_runtime_requested,
+        plugin_policy_revision,
+        plugin_policy_digest,
+        plugin_consent_schema,
+        plugin_consent_receipt_id,
+        plugin_installation_identity_digest,
+        plugin_authorization,
+        created_at: row.get(15)?,
+        updated_at: row.get(16)?,
     })
 }
 
-fn normalize_model_ids(values: &[String]) -> Result<Vec<String>> {
+pub(super) fn normalize_model_ids(values: &[String]) -> Result<Vec<String>> {
     let mut normalized = Vec::new();
     for value in values {
         let value = value.trim();

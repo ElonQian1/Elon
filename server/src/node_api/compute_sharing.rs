@@ -9,13 +9,19 @@ use std::sync::Arc;
 
 use crate::{
     project_auth::auth_from_headers,
-    store::{NodeComputeSharingPolicy, UpdateNodeComputeSharingPolicy},
+    store::{
+        NodeComputePluginSharingConsentRequest, NodeComputeSharingPolicy,
+        UpdateNodeComputeSharingPolicy,
+    },
     types::AppState,
 };
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateNodeComputeSharingRequest {
     pub enabled: Option<bool>,
+    pub plugin_runtime_requested: Option<bool>,
+    pub expected_plugin_policy_revision: Option<i64>,
+    pub plugin_consent_request_id: Option<String>,
     pub allowed_model_ids: Option<Vec<String>>,
     pub max_concurrent_runs: Option<i64>,
     pub daily_token_limit: Option<i64>,
@@ -61,8 +67,41 @@ pub async fn update_my_node_compute_sharing(
                 return error_response(StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
             }
         };
+    let enabled = request.enabled.unwrap_or(current.enabled);
+    let plugin_consent = match request.plugin_runtime_requested {
+        Some(plugin_runtime_requested) => {
+            let Some(expected_policy_revision) = request.expected_plugin_policy_revision else {
+                return error_response(
+                    StatusCode::BAD_REQUEST,
+                    "显式更新算力插件意愿必须携带期望策略修订号",
+                );
+            };
+            let Some(consent_request_id) = request.plugin_consent_request_id else {
+                return error_response(
+                    StatusCode::BAD_REQUEST,
+                    "显式更新算力插件意愿必须携带同意请求编号",
+                );
+            };
+            Some(NodeComputePluginSharingConsentRequest {
+                plugin_runtime_requested,
+                expected_policy_revision,
+                consent_request_id,
+            })
+        }
+        None => {
+            if request.expected_plugin_policy_revision.is_some()
+                || request.plugin_consent_request_id.is_some()
+            {
+                return error_response(
+                    StatusCode::BAD_REQUEST,
+                    "未更新算力插件意愿时不能单独携带同意修订字段",
+                );
+            }
+            None
+        }
+    };
     let update = UpdateNodeComputeSharingPolicy {
-        enabled: request.enabled.unwrap_or(current.enabled),
+        enabled,
         allowed_model_ids: request
             .allowed_model_ids
             .unwrap_or(current.allowed_model_ids),
@@ -73,12 +112,35 @@ pub async fn update_my_node_compute_sharing(
             .daily_token_limit
             .unwrap_or(current.daily_token_limit),
     };
-    if let Err(error) =
-        state
-            .store
-            .update_node_compute_sharing_policy(&user.id, &credential.agent_id, update)
-    {
-        return error_response(StatusCode::BAD_REQUEST, error.to_string());
+    let outcome = match state
+        .store
+        .update_node_compute_sharing_policy_with_plugin_runtime(
+            &user.id,
+            &credential.agent_id,
+            update,
+            plugin_consent,
+        ) {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            let message = error.to_string();
+            let status = if message.contains("修订号已变化") || message.contains("请求编号不能改变")
+            {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            return error_response(status, message);
+        }
+    };
+    if let Some(intent) = outcome.dispatch_intent {
+        let notify_state = Arc::clone(&state);
+        tokio::spawn(async move {
+            crate::homecli_agent::dispatch_durable_compute_plugin_sharing_intent(
+                &notify_state,
+                &intent,
+            )
+            .await;
+        });
     }
     compute_sharing_response(&state, &credential.agent_id, &user.id).await
 }
@@ -102,6 +164,13 @@ async fn compute_sharing_response(
         Ok(health) => health,
         Err(error) => return error_response(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
     };
+    let plugin_runtime_control = match state
+        .store
+        .node_compute_plugin_sharing_control_summary(node_id)
+    {
+        Ok(summary) => summary,
+        Err(error) => return error_response(StatusCode::INTERNAL_SERVER_ERROR, error.to_string()),
+    };
     let observed_models = state
         .node_registry
         .list_by_owner(owner_user_id)
@@ -113,6 +182,7 @@ async fn compute_sharing_response(
     Json(serde_json::json!({
         "ok": true,
         "compute_sharing": status,
+        "plugin_runtime_control": plugin_runtime_control,
         "runtime_health": runtime_health,
         "observed_models": observed_models,
     }))

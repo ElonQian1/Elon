@@ -73,11 +73,13 @@ fn freeze_cloud_control_dispatch_window_at(
     })
 }
 mod android_device_host;
+mod compute_plugin_sharing;
 mod heartbeat;
 mod journal;
 mod pending_recovery;
 mod public_dev_handshake;
 mod summary;
+pub(crate) use compute_plugin_sharing::dispatch_durable_compute_plugin_sharing_intent;
 use public_dev_handshake::record_node_public_dev_handshake;
 pub use summary::AgentSummary;
 #[cfg(test)]
@@ -123,6 +125,7 @@ pub struct CliPromptDispatch {
     pub rx: mpsc::UnboundedReceiver<AgentToServer>,
     cancel_handle: CliPromptCancelHandle,
 }
+
 impl CliPromptDispatch {
     pub fn into_parts(
         self,
@@ -202,6 +205,7 @@ impl AgentManager {
                 .any(|candidate| candidate == capability)
         })
     }
+
     /// 把 AI 提示发给 PC agent，让 PC 用指定 CLI（copilot/codex）执行，流式返回 CliChunk/CliDone。
     pub async fn dispatch_cli_prompt(
         &self,

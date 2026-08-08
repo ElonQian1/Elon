@@ -510,6 +510,33 @@ pub(super) async fn run_relay_session(
                 let _ = try_send_json(&out_tx, &err);
             }
 
+            // 旧 relay 从不声明 compute_plugin_sharing_v1，也不持有节点 Bootstrap。
+            // 若服务端误派发，显式失败关闭，不能把收包当成已应用共享意图。
+            ServerToAgent::ApplyComputePluginSharingPolicyV1 { req_id, snapshot } => {
+                let observed = homecli_proto::ComputePluginSharingPolicyObservedV1 {
+                    schema: homecli_proto::COMPUTE_PLUGIN_SHARING_POLICY_OBSERVED_V1_SCHEMA
+                        .to_string(),
+                    node_id: snapshot.node_id,
+                    owner_user_id: snapshot.owner_user_id,
+                    installation_identity_digest: None,
+                    accepted: false,
+                    replayed: false,
+                    observed_policy_revision: None,
+                    observed_policy_digest: None,
+                    observed_snapshot_digest: None,
+                    phase: "unsupported_legacy_relay".to_string(),
+                    configuration_generation: 0,
+                    cancellation_generation: 0,
+                    side_effects_started: false,
+                    blocked_reasons: vec!["compute_plugin_bootstrap_unavailable".to_string()],
+                    error_code: Some("COMPUTE_PLUGIN_SHARING_LEGACY_RELAY_UNSUPPORTED".to_string()),
+                };
+                let _ = try_send_json(
+                    &out_tx,
+                    &AgentToServer::ComputePluginSharingPolicyObservedV1 { req_id, observed },
+                );
+            }
+
             // 更新指令由 node_agent_main 处理；此处静默忽略
             ServerToAgent::UpdateClient { .. } => {}
         }

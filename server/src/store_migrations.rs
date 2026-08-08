@@ -242,6 +242,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (205, "分布式算力隔离恢复计划追加式废止回执", crate::compute_activation_recovery_supersession_migration::migration_v205),
     (206, "一龙多登录身份、短期 OIDC 挑战与审计", crate::account_identity_migration::migration_v206),
     (207, "账号密码、恢复码、设备会话撤销与安全审计", crate::account_security_migration::migration_v207),
+    (208, "节点算力插件显式同意与耐久下发回执", crate::node_compute_plugin_sharing_migration::migration_v208),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {

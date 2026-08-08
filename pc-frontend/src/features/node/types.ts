@@ -70,6 +70,10 @@ export interface NodeComputeSharingPolicy {
   node_id: string
   owner_user_id: string
   enabled: boolean
+  plugin_runtime_requested?: boolean
+  plugin_policy_revision?: number
+  plugin_policy_digest?: string | null
+  plugin_consent_schema?: string | null
   allowed_model_ids: string[]
   max_concurrent_runs: number
   daily_token_limit: number
@@ -101,6 +105,13 @@ export interface NodeComputeSharingRuntimeHealth {
 export interface NodeComputeSharingResponse {
   ok?: boolean
   compute_sharing: NodeComputeSharingStatus
+  plugin_runtime_control?: {
+    latest_delivery_kind?: string | null
+    latest_delivery_detail_code?: string | null
+    latest_delivery_at?: string | null
+    latest_observation?: Record<string, unknown> | null
+    latest_observed_at?: string | null
+  }
   runtime_health?: NodeComputeSharingRuntimeHealth
   observed_models?: NonNullable<NodeSummary['models']>
 }

@@ -265,7 +265,7 @@ pub(super) async fn run_agent_session(
         agent_id: agent_id.clone(),
         version,
         proto_version,
-        capabilities,
+        capabilities: capabilities.clone(),
         device_name: device_name.clone(),
         hardware: hardware.clone(),
         storage: storage.clone(),
@@ -333,6 +333,13 @@ pub(super) async fn run_agent_session(
             connected_at,
         )
         .await;
+
+    super::compute_plugin_sharing::spawn_current_compute_plugin_sharing_session_replay(
+        Arc::clone(&state),
+        agent_id.clone(),
+        proto_version,
+        &capabilities,
+    );
 
     // 服务端 → 节点 ping 定时器：短间隔 Ping，并要求 Pong ACK。
     // 普通家庭/办公网络会静默丢弃空闲 TCP；没有 ACK 就主动摘掉会话，

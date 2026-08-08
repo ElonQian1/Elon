@@ -75,6 +75,9 @@ export async function updateNodeComputeSharing(
   nodeId: string,
   request: {
     enabled: boolean
+    plugin_runtime_requested: boolean
+    expected_plugin_policy_revision: number
+    plugin_consent_request_id: string
     allowed_model_ids: string[]
     max_concurrent_runs: number
     daily_token_limit: number

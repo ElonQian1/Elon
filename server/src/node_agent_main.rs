@@ -23,6 +23,7 @@ const CLOUD_WS_READ_TIMEOUT: Duration = Duration::from_secs(35);
 
 mod agent_runtime_error_summary;
 mod cli_usage;
+mod compute_plugin_sharing_directive;
 #[allow(dead_code)]
 mod errors;
 mod git_command_error;

@@ -2,8 +2,13 @@ use std::{fmt, path::PathBuf, sync::Mutex};
 
 use anyhow::{bail, Result};
 use elon_pc_dev_runtime::NodeDataPaths;
+use homecli_proto::{
+    ComputePluginSharingAuthorizationBindingV1, ComputePluginSharingPolicyObservedV1,
+    ComputePluginSharingPolicySnapshotV1,
+};
 use serde::Serialize;
 
+use crate::compute_plugin_sharing_directive::compute_plugin_sharing_policy_snapshot_digest;
 use crate::node_agent_instance_lock::NodeAgentInstanceLockWitness;
 
 use super::{
@@ -11,13 +16,15 @@ use super::{
 };
 
 pub(crate) const COMPUTE_PLUGIN_BOOTSTRAP_STATUS_SCHEMA: &str =
-    "elon.compute_plugin.bootstrap_status.v1";
+    "elon.compute_plugin.bootstrap_status.v2";
 const BOOTSTRAP_PHASE_DISABLED: &str = "disabled";
 const BOOTSTRAP_PHASE_BLOCKED: &str = "blocked";
 
-/// Default-disabled owner for the future plugin runtime controller. Construction only derives
-/// immutable identities and paths. It never pins a root, opens SQLite, starts networking or
-/// launches a process.
+mod sharing_policy;
+
+/// Default-disabled owner for the future plugin runtime controller. Applying a desired policy only
+/// replaces dormant in-memory intent. It never pins a root, opens SQLite, performs network I/O,
+/// downloads an artifact, admits work, or launches a process.
 pub(crate) struct ComputePluginBootstrap {
     state: Mutex<ComputePluginBootstrapState>,
 }
@@ -27,12 +34,31 @@ struct ComputePluginBootstrapState {
     root: Option<DormantComputePluginRootBinding>,
     instance_lock: Option<NodeAgentInstanceLockWitness>,
     configuration_generation: u64,
+    cancellation_generation: u64,
     configuration_exhausted: bool,
     root_change_requires_restart: bool,
     sharing_requested: bool,
+    desired_policy: Option<AcceptedComputePluginSharingPolicy>,
+    authorization_high_water: Option<ComputePluginSharingAuthorizationBindingV1>,
+    initialization_plan: Option<DormantComputePluginInitializationPlan>,
+}
+
+#[derive(Clone)]
+struct AcceptedComputePluginSharingPolicy {
+    snapshot: ComputePluginSharingPolicySnapshotV1,
+    snapshot_digest: String,
+}
+
+struct DormantComputePluginInitializationPlan {
+    snapshot_digest: String,
+    policy_revision: u64,
+    policy_digest: String,
+    authorization: ComputePluginSharingAuthorizationBindingV1,
+    cancellation_generation: u64,
 }
 
 struct DormantComputePluginRootBinding {
+    node_data_paths: NodeDataPaths,
     compute_plugin_root: PathBuf,
     authority: ComputePluginLocalAuthority,
 }
@@ -42,7 +68,14 @@ pub(crate) struct ComputePluginBootstrapStatus {
     pub schema: &'static str,
     pub phase: &'static str,
     pub configuration_generation: u64,
+    pub cancellation_generation: u64,
     pub sharing_requested: bool,
+    pub desired_policy_revision: Option<u64>,
+    pub desired_policy_digest: Option<String>,
+    pub desired_snapshot_digest: Option<String>,
+    pub authorization_revision: Option<u64>,
+    pub authorization_digest: Option<String>,
+    pub initialization_plan_prepared: bool,
     pub installation_identity_valid: bool,
     pub node_data_root_bound: bool,
     pub node_instance_lock_live: bool,
@@ -53,6 +86,8 @@ pub(crate) struct ComputePluginBootstrapStatus {
     pub root_pinned: bool,
     pub authority_opened: bool,
     pub process_fence_acquired: bool,
+    pub new_work_admission_enabled: bool,
+    pub downloads_allowed: bool,
     pub side_effects_started: bool,
     pub restart_required: bool,
     pub blocked_reasons: Vec<&'static str>,
@@ -66,9 +101,13 @@ impl ComputePluginBootstrap {
                 root: node_data_paths.map(DormantComputePluginRootBinding::new),
                 instance_lock: None,
                 configuration_generation: 1,
+                cancellation_generation: 1,
                 configuration_exhausted: false,
                 root_change_requires_restart: false,
                 sharing_requested: false,
+                desired_policy: None,
+                authorization_high_water: None,
+                initialization_plan: None,
             }),
         }
     }
@@ -92,6 +131,42 @@ impl ComputePluginBootstrap {
         Ok(())
     }
 
+    /// Records one complete desired snapshot after exact local binding and anti-rollback checks.
+    /// Enabled snapshots only prepare an inert initialization plan. Disabled snapshots revoke that
+    /// plan and advance the independent cancellation generation.
+    pub(crate) fn apply_sharing_policy_snapshot_v1(
+        &self,
+        snapshot: &ComputePluginSharingPolicySnapshotV1,
+        session_node_id: &str,
+        session_owner_user_id: &str,
+    ) -> ComputePluginSharingPolicyObservedV1 {
+        let snapshot_digest = match compute_plugin_sharing_policy_snapshot_digest(snapshot) {
+            Ok(digest) => digest,
+            Err(error) => {
+                return self.rejected_observation(
+                    session_node_id,
+                    session_owner_user_id,
+                    error.code(),
+                )
+            }
+        };
+        let mut state = match self.state.lock() {
+            Ok(state) => state,
+            Err(_) => {
+                return ComputePluginBootstrapState::poisoned_observation(
+                    session_node_id,
+                    session_owner_user_id,
+                )
+            }
+        };
+        state.apply_policy_snapshot(
+            snapshot,
+            snapshot_digest,
+            session_node_id,
+            session_owner_user_id,
+        )
+    }
+
     /// Runtime data-root replacement never hot-rebinds plugin authority. The dormant bootstrap is
     /// invalidated and a process restart is required before any future enable path may use it.
     pub(crate) fn note_node_data_root_changed(&self, paths: &NodeDataPaths) {
@@ -99,15 +174,14 @@ impl ComputePluginBootstrap {
             return;
         };
         let next_root = paths.compute_plugins();
-        if state
-            .root
-            .as_ref()
-            .is_some_and(|binding| binding.compute_plugin_root == next_root)
-        {
+        if state.root.as_ref().is_some_and(|binding| {
+            binding.node_data_paths.eq(paths) && binding.compute_plugin_root.eq(&next_root)
+        }) {
             return;
         }
         state.root = None;
         state.root_change_requires_restart = true;
+        state.initialization_plan = None;
         state.advance_configuration_generation();
     }
 
@@ -115,6 +189,18 @@ impl ComputePluginBootstrap {
         match self.state.lock() {
             Ok(state) => state.status(),
             Err(_) => ComputePluginBootstrapStatus::poisoned(),
+        }
+    }
+
+    fn rejected_observation(
+        &self,
+        node_id: &str,
+        owner_user_id: &str,
+        error_code: &'static str,
+    ) -> ComputePluginSharingPolicyObservedV1 {
+        match self.state.lock() {
+            Ok(state) => state.observation(node_id, owner_user_id, false, false, Some(error_code)),
+            Err(_) => ComputePluginBootstrapState::poisoned_observation(node_id, owner_user_id),
         }
     }
 }
@@ -135,11 +221,23 @@ impl ComputePluginBootstrapState {
             .as_ref()
             .is_some_and(NodeAgentInstanceLockWitness::is_live);
         let authority_path_derived = self.root.as_ref().is_some_and(|binding| {
-            binding.authority.path().parent() == Some(binding.compute_plugin_root.as_path())
+            binding.node_data_paths.compute_plugins().as_path()
+                == binding.compute_plugin_root.as_path()
+                && binding.authority.path().parent() == Some(binding.compute_plugin_root.as_path())
+        });
+        let desired = self.desired_policy.as_ref();
+        let authorization = desired.and_then(|current| current.snapshot.authorization.as_ref());
+        let initialization_plan_prepared = desired.is_some_and(|current| {
+            self.initialization_plan
+                .as_ref()
+                .is_some_and(|plan| plan.matches(current, self.cancellation_generation))
         });
         let mut blocked_reasons = Vec::new();
         if !self.sharing_requested {
             blocked_reasons.push("compute_sharing_disabled");
+        }
+        if self.sharing_requested && !initialization_plan_prepared {
+            blocked_reasons.push("compute_plugin_initialization_plan_unavailable");
         }
         if !installation_identity_valid {
             blocked_reasons.push("installation_identity_invalid");
@@ -167,7 +265,14 @@ impl ComputePluginBootstrapState {
                 BOOTSTRAP_PHASE_DISABLED
             },
             configuration_generation: self.configuration_generation,
+            cancellation_generation: self.cancellation_generation,
             sharing_requested: self.sharing_requested,
+            desired_policy_revision: desired.map(|current| current.snapshot.policy_revision),
+            desired_policy_digest: desired.map(|current| current.snapshot.policy_digest.clone()),
+            desired_snapshot_digest: desired.map(|current| current.snapshot_digest.clone()),
+            authorization_revision: authorization.map(|binding| binding.revision),
+            authorization_digest: authorization.map(|binding| binding.digest.clone()),
+            initialization_plan_prepared,
             installation_identity_valid,
             node_data_root_bound,
             node_instance_lock_live,
@@ -178,10 +283,27 @@ impl ComputePluginBootstrapState {
             root_pinned: false,
             authority_opened: false,
             process_fence_acquired: false,
+            new_work_admission_enabled: false,
+            downloads_allowed: false,
             side_effects_started: false,
             restart_required: self.root_change_requires_restart,
             blocked_reasons,
         }
+    }
+}
+
+impl DormantComputePluginInitializationPlan {
+    fn matches(
+        &self,
+        desired: &AcceptedComputePluginSharingPolicy,
+        cancellation_generation: u64,
+    ) -> bool {
+        desired.snapshot.plugin_runtime_requested
+            && desired.snapshot.authorization.as_ref() == Some(&self.authorization)
+            && desired.snapshot.policy_revision == self.policy_revision
+            && desired.snapshot.policy_digest == self.policy_digest
+            && desired.snapshot_digest == self.snapshot_digest
+            && self.cancellation_generation == cancellation_generation
     }
 }
 
@@ -191,7 +313,14 @@ impl ComputePluginBootstrapStatus {
             schema: COMPUTE_PLUGIN_BOOTSTRAP_STATUS_SCHEMA,
             phase: BOOTSTRAP_PHASE_BLOCKED,
             configuration_generation: 0,
+            cancellation_generation: 0,
             sharing_requested: false,
+            desired_policy_revision: None,
+            desired_policy_digest: None,
+            desired_snapshot_digest: None,
+            authorization_revision: None,
+            authorization_digest: None,
+            initialization_plan_prepared: false,
             installation_identity_valid: false,
             node_data_root_bound: false,
             node_instance_lock_live: false,
@@ -202,6 +331,8 @@ impl ComputePluginBootstrapStatus {
             root_pinned: false,
             authority_opened: false,
             process_fence_acquired: false,
+            new_work_admission_enabled: false,
+            downloads_allowed: false,
             side_effects_started: false,
             restart_required: true,
             blocked_reasons: vec!["bootstrap_state_poisoned"],
@@ -214,6 +345,7 @@ impl DormantComputePluginRootBinding {
         let compute_plugin_root = paths.compute_plugins();
         let authority = ComputePluginLocalAuthority::for_compute_plugin_root(&compute_plugin_root);
         Self {
+            node_data_paths: paths.clone(),
             compute_plugin_root,
             authority,
         }

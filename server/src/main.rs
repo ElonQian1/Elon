@@ -1,5 +1,3 @@
-// server/src/main.rs
-
 use anyhow::Result;
 use dotenvy::dotenv;
 use std::{net::SocketAddr, sync::Arc};
@@ -149,6 +147,7 @@ mod compute_offer_lifecycle_migration;
 mod compute_offer_migration;
 mod compute_offer_publication_migration;
 mod compute_offer_terminal_migration;
+mod compute_plugin_sharing_directive;
 mod compute_price_snapshot_migration;
 mod compute_provider_migration;
 mod compute_reservation_migration;
@@ -254,6 +253,7 @@ mod node_agent_downloads;
 mod node_agent_supervision_worktree_lease;
 mod node_api;
 mod node_compute_admin;
+mod node_compute_plugin_sharing_migration;
 mod node_compute_reservation_migration;
 mod node_compute_sharing;
 mod node_compute_sharing_migration;

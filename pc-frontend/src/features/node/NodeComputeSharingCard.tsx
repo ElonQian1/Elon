@@ -47,7 +47,6 @@ export default function NodeComputeSharingCard({ node }: { node: NodeSummary }) 
 
   function changeEnabled(next: boolean) {
     setEnabled(next)
-    if (next && allowedModels.length === 0) setAllowedModels(observedModels)
   }
 
   function toggleModel(modelId: string) {
@@ -63,12 +62,18 @@ export default function NodeComputeSharingCard({ node }: { node: NodeSummary }) 
     try {
       const next = await updateNodeComputeSharing(id, {
         enabled,
+        plugin_runtime_requested: enabled,
+        expected_plugin_policy_revision:
+          response?.compute_sharing.policy.plugin_policy_revision ?? 0,
+        plugin_consent_request_id: globalThis.crypto.randomUUID(),
         allowed_model_ids: allowedModels,
         max_concurrent_runs: Math.max(1, Math.min(16, Math.trunc(maxConcurrent || 1))),
         daily_token_limit: Math.max(0, Math.trunc(dailyTokenLimit || 0)),
       })
       applyResponse(next)
-      setNotice(next.compute_sharing.policy.enabled ? '模型算力共享策略已生效。' : '模型算力共享已关闭。')
+      setNotice(next.compute_sharing.policy.enabled
+        ? '共享意愿已保存。节点确认后才会生成按需初始化计划；此步骤不会下载插件。'
+        : '共享意愿已关闭。节点收到后会停止接受新任务和新的下载计划。')
     } catch (reason) {
       setError((reason as Error).message || '算力共享策略保存失败')
     } finally {
@@ -77,6 +82,14 @@ export default function NodeComputeSharingCard({ node }: { node: NodeSummary }) 
   }
 
   const status = response?.compute_sharing
+  const savedEnabled = status?.policy.enabled ?? false
+  const pluginRuntimeRequested = status?.policy.plugin_runtime_requested ?? false
+  const policyNeedsResave = savedEnabled !== pluginRuntimeRequested
+  const toggleLabel = enabled !== savedEnabled
+    ? (enabled ? '待保存开启' : '待保存关闭')
+    : policyNeedsResave
+      ? (pluginRuntimeRequested ? '插件共享仍开启，需重新保存关闭' : '仅模型共享，需重新保存开启')
+      : (enabled ? '已保存开启' : '已保存关闭')
   const health = response?.runtime_health
   const healthLabel = health?.status === 'critical'
     ? '存在运行风险'
@@ -86,13 +99,13 @@ export default function NodeComputeSharingCard({ node }: { node: NodeSummary }) 
   return (
     <section className={styles.computeSharingCard}>
       <header>
-        <div><Cpu size={16} /><strong>模型算力共享</strong></div>
+        <div><Cpu size={16} /><strong>AI 算力共享</strong></div>
         <label className={styles.computeSharingToggle}>
           <input type="checkbox" checked={enabled} onChange={(event) => changeEnabled(event.target.checked)} />
-          <span>{enabled ? '已开启' : '未开启'}</span>
+          <span>{toggleLabel}</span>
         </label>
       </header>
-      <p>自己的节点始终可自用；只有这里明确选择的本地模型才允许其他用户调度。</p>
+      <p>自己的节点始终可自用。保存后会同时更新所选模型共享和通用 AI 任务算力意愿；插件仍需节点确认与签名安装计划才会按需下载。</p>
 
       <div className={styles.computeSharingModels}>
         {observedModels.map((modelId) => (
