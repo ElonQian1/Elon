@@ -51,11 +51,13 @@ pub(crate) const WINDOWS_NAMESPACE_FENCE_CATALOG_FILE: &str = "ElonComputeNamesp
 pub(crate) const PRIVILEGED_COMPONENT_PLAN_ACTION_INSTALL: &str = "install";
 pub(crate) const PRIVILEGED_COMPONENT_PLAN_ACTION_UPGRADE: &str = "upgrade";
 
-/// Signature fields are metadata until a Bootstrap-pinned first-party resolver verifies them.
+/// Signature fields, including key purpose, are metadata until a Bootstrap-pinned first-party
+/// resolver verifies the key purpose, public-key fingerprint and signature.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PrivilegedComponentSignature {
     pub algorithm: String,
+    pub key_purpose: String,
     pub signing_key_id: String,
     pub signature_base64: String,
 }

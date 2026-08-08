@@ -5,6 +5,9 @@ use super::invalid_data;
 mod decode;
 mod encode;
 
+#[cfg(test)]
+mod tests;
+
 pub(super) use decode::{decode_fence_snapshot_reply, decode_session_reply};
 pub(super) use encode::{
     encode_acquire_request, encode_describe_session_request, encode_query_request,

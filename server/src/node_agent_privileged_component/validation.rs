@@ -28,7 +28,7 @@ pub(crate) fn validate_signed_privileged_component_manifest_shape(
     {
         bail!("PRIVILEGED_COMPONENT_SIGNED_MANIFEST_METADATA_INVALID");
     }
-    validate_signature_metadata(&signed.signature)?;
+    validate_signature_metadata(&signed.signature, PRIVILEGED_COMPONENT_RELEASE_KEY_PURPOSE)?;
     validate_manifest_shape(&signed.manifest)
 }
 
@@ -42,7 +42,10 @@ pub(crate) fn validate_signed_privileged_component_install_plan_shape(
     {
         bail!("PRIVILEGED_COMPONENT_SIGNED_PLAN_METADATA_INVALID");
     }
-    validate_signature_metadata(&signed.signature)?;
+    validate_signature_metadata(
+        &signed.signature,
+        PRIVILEGED_COMPONENT_INSTALL_PLAN_KEY_PURPOSE,
+    )?;
     validate_install_plan_shape(&signed.plan)
 }
 
@@ -52,6 +55,9 @@ pub(crate) fn validate_install_plan_manifest_binding(
 ) -> Result<()> {
     validate_signed_privileged_component_install_plan_shape(signed_plan)?;
     validate_signed_privileged_component_manifest_shape(signed_manifest)?;
+    if signed_plan.signature.signing_key_id == signed_manifest.signature.signing_key_id {
+        bail!("PRIVILEGED_COMPONENT_SIGNING_KEY_ID_REUSE");
+    }
     let plan = &signed_plan.plan;
     let manifest = &signed_manifest.manifest;
     if plan.component_id != manifest.component_id
@@ -276,8 +282,12 @@ fn validate_plan_action(plan: &PrivilegedComponentInstallPlan) -> Result<()> {
     Ok(())
 }
 
-fn validate_signature_metadata(signature: &PrivilegedComponentSignature) -> Result<()> {
+fn validate_signature_metadata(
+    signature: &PrivilegedComponentSignature,
+    expected_key_purpose: &str,
+) -> Result<()> {
     if signature.algorithm != PRIVILEGED_COMPONENT_SIGNATURE_ALGORITHM
+        || signature.key_purpose != expected_key_purpose
         || !is_canonical_text(&signature.signing_key_id, MAX_IDENTIFIER_BYTES)
     {
         bail!("PRIVILEGED_COMPONENT_SIGNATURE_METADATA_INVALID");
@@ -292,6 +302,9 @@ fn validate_signature_metadata(signature: &PrivilegedComponentSignature) -> Resu
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;
 
 fn validate_node_version_range(range: &PrivilegedComponentNodeVersionRange) -> Result<()> {
     let minimum = parse_semver_triplet(&range.minimum_node_version)?;
