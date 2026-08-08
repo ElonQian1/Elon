@@ -24,6 +24,12 @@ class ChatGptLoginFlowTrackerTest {
             tracker.onPageStarted("https://accounts.google.com/o/oauth2/auth?code=secret").stage,
         )
 
+        now = 2_600L
+        assertEquals(
+            ChatGptLoginStage.WAITING_FOR_USER,
+            tracker.onPageStarted("https://accounts.youtube.com/accounts/SetSID?token=secret").stage,
+        )
+
         now = 3_500L
         assertEquals(
             ChatGptLoginStage.COMPLETING,

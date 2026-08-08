@@ -14,6 +14,7 @@ internal object ChatGptWebNavigationPolicy {
 
     private val allowedIdentityHosts = setOf(
         "accounts.google.com",
+        "accounts.youtube.com",
         "appleid.apple.com",
         "login.live.com",
         "login.microsoftonline.com",
@@ -25,10 +26,13 @@ internal object ChatGptWebNavigationPolicy {
         if (uri.userInfo != null || (uri.port != -1 && uri.port != 443)) return false
 
         val host = uri.host?.lowercase(Locale.ROOT) ?: return false
-        return host in allowedIdentityHosts || allowedDomainSuffixes.any { domain ->
+        return isIdentityHost(host) || allowedDomainSuffixes.any { domain ->
             host == domain || host.endsWith(".$domain")
         }
     }
+
+    fun isIdentityHost(rawHost: String?): Boolean =
+        rawHost?.lowercase(Locale.ROOT) in allowedIdentityHosts
 
     fun displayHost(rawUrl: String?): String = rawUrl
         ?.let(::parse)

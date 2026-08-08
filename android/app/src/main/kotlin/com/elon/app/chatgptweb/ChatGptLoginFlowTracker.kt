@@ -93,10 +93,7 @@ internal class ChatGptLoginFlowTracker(
         }
         if (
             host.endsWith(".openai.com") ||
-            host == "accounts.google.com" ||
-            host == "appleid.apple.com" ||
-            host == "login.live.com" ||
-            host == "login.microsoftonline.com"
+            ChatGptWebNavigationPolicy.isIdentityHost(host)
         ) {
             return PageKind.IDENTITY
         }
