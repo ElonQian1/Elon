@@ -2,6 +2,8 @@ package com.elon.app.chatgptweb
 
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.webkit.WebView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -24,6 +26,11 @@ internal class ChatGptWebPageAdapter(
     private val adapterScript = context.assets.open(ADAPTER_ASSET).use { input ->
         input.reader(StandardCharsets.UTF_8).readText()
     }
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val handshake = ChatGptWebBridgeHandshake(
+        schedule = { delayMs, action -> mainHandler.postDelayed({ action() }, delayMs) },
+        injectAndRequestSnapshot = ::injectAndRequestSnapshot,
+    )
     private var listenerInstalled = false
 
     fun install() {
@@ -38,7 +45,10 @@ internal class ChatGptWebPageAdapter(
         ) { _, message, sourceOrigin, isMainFrame, _ ->
             if (!isMainFrame || !isAllowedOrigin(sourceOrigin)) return@addWebMessageListener
             val payload = message.data ?: return@addWebMessageListener
-            ChatGptWebProtocol.parse(payload)?.let(onEvent)
+            ChatGptWebProtocol.parse(payload)?.let { event ->
+                if (event.completesHandshake()) handshake.acknowledge()
+                onEvent(event)
+            }
         }
         listenerInstalled = true
         onStateChanged(State.WEB_ONLY)
@@ -54,10 +64,11 @@ internal class ChatGptWebPageAdapter(
             return
         }
         onStateChanged(State.CONNECTING)
-        webView.evaluateJavascript(adapterScript, null)
+        handshake.start()
     }
 
     fun onPageStarted(url: String) {
+        handshake.cancel()
         val state = if (
             listenerInstalled && ChatGptWebNavigationPolicy.supportsEnhancedMode(url)
         ) {
@@ -66,6 +77,12 @@ internal class ChatGptWebPageAdapter(
             State.WEB_ONLY
         }
         onStateChanged(state)
+    }
+
+    fun onHostResumed(url: String?) {
+        if (listenerInstalled && ChatGptWebNavigationPolicy.supportsEnhancedMode(url)) {
+            handshake.start()
+        }
     }
 
     fun sendPrompt(prompt: String, expectedDraft: String) = runCommand(
@@ -87,10 +104,26 @@ internal class ChatGptWebPageAdapter(
     fun markLoginRequired() = onStateChanged(State.WEB_ONLY)
 
     fun dispose() {
+        handshake.cancel()
+        mainHandler.removeCallbacksAndMessages(null)
         if (listenerInstalled && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             WebViewCompat.removeWebMessageListener(webView, BRIDGE_OBJECT)
         }
         listenerInstalled = false
+    }
+
+    private fun injectAndRequestSnapshot() {
+        if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
+        webView.evaluateJavascript(adapterScript) {
+            if (listenerInstalled && ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) {
+                requestSnapshot()
+            }
+        }
+    }
+
+    private fun ChatGptWebEvent.completesHandshake(): Boolean = when (this) {
+        is ChatGptWebEvent.Snapshot -> value.authenticated || value.composerReady
+        is ChatGptWebEvent.CommandResult -> true
     }
 
     private fun runCommand(

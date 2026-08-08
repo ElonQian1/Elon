@@ -354,6 +354,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         binding.chatGptWebView.onResume()
+        pageAdapter.onHostResumed(binding.chatGptWebView.url)
     }
 
     override fun onPause() {
