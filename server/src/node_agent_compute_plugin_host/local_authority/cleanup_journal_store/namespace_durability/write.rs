@@ -37,6 +37,7 @@ pub(super) fn persist_candidate_cleanup_namespace_durability(
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_NAMESPACE_DURABILITY_TIME_CHANGED");
     }
     session.validate_source(physical.state().cancellation_guard())?;
+    physical.namespace().ensure_mutation_fence_active()?;
     advance_trusted_time(transaction, &time_state, event.event().recorded_at_ms())?;
     session.validate_source(physical.state().cancellation_guard())?;
     insert_event(transaction, event)?;
@@ -64,6 +65,7 @@ pub(super) fn persist_candidate_cleanup_namespace_durability(
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_NAMESPACE_DURABILITY_READBACK_CHANGED");
     }
+    physical.namespace().ensure_mutation_fence_active()?;
     session.validate_source(physical.state().cancellation_guard())?;
     Ok(stored)
 }

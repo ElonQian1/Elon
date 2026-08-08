@@ -100,6 +100,9 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_names
     PreparedCandidateCleanupNamespaceDurability<'authority>,
     CandidateCleanupNamespaceDurabilityPreparationFailure,
 > {
+    if let Err(error) = physical.namespace().ensure_mutation_fence_active() {
+        return Err(preparation_failure(Error::new(error), physical));
+    }
     let prepared_at = Instant::now();
     let authority_session = match authority
         .bind_candidate_cleanup_namespace_durability_authority_session(
@@ -127,6 +130,9 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_names
     {
         return Err(preparation_failure(error, physical));
     }
+    if let Err(error) = physical.namespace().ensure_mutation_fence_active() {
+        return Err(preparation_failure(Error::new(error), physical));
+    }
     Ok(PreparedCandidateCleanupNamespaceDurability {
         physical,
         authority_session,
@@ -139,6 +145,14 @@ pub(in crate::node_agent_compute_plugin_host) fn store_candidate_cleanup_namespa
     prepared: PreparedCandidateCleanupNamespaceDurability<'_>,
 ) -> Result<DurableCandidateCleanupNamespace, CandidateCleanupNamespaceDurabilityStoreFailure> {
     let recovery_key = CandidateCleanupNamespaceDurabilityRecoveryKey::from_prepared(&prepared);
+    if let Err(error) = prepared.physical.namespace().ensure_mutation_fence_active() {
+        return Err(store_failure(
+            CandidateCleanupNamespaceDurabilityStorePhase::PreStorePreparation,
+            Error::new(error),
+            prepared.physical,
+            recovery_key,
+        ));
+    }
     if let Err(error) = validate_hashed_cleanup_step_event(&prepared.event) {
         return Err(store_failure(
             CandidateCleanupNamespaceDurabilityStorePhase::PreStorePreparation,
@@ -170,6 +184,14 @@ pub(in crate::node_agent_compute_plugin_host) fn store_candidate_cleanup_namespa
         return Err(store_failure(
             CandidateCleanupNamespaceDurabilityStorePhase::StoreReturnedPostconditionFailed,
             anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_NAMESPACE_POSTCONDITION_CHANGED"),
+            prepared.physical,
+            recovery_key,
+        ));
+    }
+    if let Err(error) = prepared.physical.namespace().ensure_mutation_fence_active() {
+        return Err(store_failure(
+            CandidateCleanupNamespaceDurabilityStorePhase::StoreReturnedPostconditionFailed,
+            Error::new(error),
             prepared.physical,
             recovery_key,
         ));
@@ -220,6 +242,13 @@ pub(in crate::node_agent_compute_plugin_host) fn adopt_recovered_candidate_clean
             recovery,
         ));
     }
+    if let Err(error) = recovery.physical.namespace().ensure_mutation_fence_active() {
+        return Err(adoption_failure(
+            CandidateCleanupNamespaceDurabilityRecoveryAdoptionPhase::RetainedCustodyChanged,
+            Error::new(error),
+            recovery,
+        ));
+    }
     match fresh {
         ComputePluginCandidateCleanupNamespaceDurabilityRecoveryOutcome::NotCreated => {
             Ok(CandidateCleanupNamespaceDurabilityRecoveryAdoption::NotCreated(recovery.physical))
@@ -250,6 +279,7 @@ fn validate_recovery_provenance(
 ) -> anyhow::Result<()> {
     let key = &recovery.recovery_key;
     let physical = &recovery.physical;
+    physical.namespace().ensure_mutation_fence_active()?;
     let staging = physical.state().staging_recovery_key();
     let owner_slot = staging.slot_expectation();
     let owner_receipt = staging.receipt_expectation();

@@ -23,6 +23,7 @@ pub(super) fn validate_unstored_namespace_durability(
     physical: &PhysicallyDurableCandidateCleanupNamespace,
     event: &HashedComputePluginCandidateCleanupStepEvent,
 ) -> Result<()> {
+    physical.namespace().ensure_mutation_fence_active()?;
     validate_hashed_cleanup_step_event(event)?;
     let expected = build_namespace_durable_event(
         physical.plan(),

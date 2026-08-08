@@ -2,12 +2,13 @@ use std::{ffi::OsStr, ffi::OsString, fmt};
 
 mod durability;
 mod lifecycle;
+mod mutation_fence;
 
 pub(crate) use durability::{
     ManagedNamespaceDurabilityFailure, ManagedNamespaceDurabilityFailureCustody,
     ManagedNamespaceDurabilityFailurePhase, ManagedNamespaceDurabilityRetainedCustody,
-    ManagedNamespaceDurable, ManagedNamespaceMutationFence,
-    ManagedNamespacePostBarrierObservationRetry, ManagedNamespacePreBarrierRetry,
+    ManagedNamespaceDurable, ManagedNamespacePostBarrierObservationRetry,
+    ManagedNamespacePreBarrierRetry,
 };
 pub(super) use lifecycle::PlatformParentRelativeObservation;
 pub(crate) use lifecycle::{
@@ -16,6 +17,7 @@ pub(crate) use lifecycle::{
     ManagedParentRelativeIdentityConflict, ManagedParentRelativeObservation,
     QuarantinedManagedNamespaceObject,
 };
+pub(crate) use mutation_fence::ManagedNamespaceMutationFence;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ManagedObjectKind {

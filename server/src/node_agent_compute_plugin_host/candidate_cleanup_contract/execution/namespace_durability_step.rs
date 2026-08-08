@@ -40,7 +40,10 @@ pub(in crate::node_agent_compute_plugin_host) enum CandidateCleanupNamespaceDura
 
 pub(in crate::node_agent_compute_plugin_host) enum CandidateCleanupNamespaceDurabilityFailureCustody
 {
-    ParentAbsence(DurableCandidateCleanupParentAbsence),
+    RejectedParentAbsence {
+        _durable: DurableCandidateCleanupParentAbsence,
+        _mutation_fence: ManagedNamespaceMutationFence,
+    },
     RetryBeforeBarrier(CandidateCleanupNamespaceDurabilityRetryCustody),
     RetryAfterBarrier(CandidateCleanupNamespacePostBarrierRetryCustody),
     Retained(CandidateCleanupNamespaceDurabilityRetainedCustody),
@@ -93,7 +96,7 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupNamespaceDu
 
 pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn make_candidate_cleanup_namespace_durable(
     durable: DurableCandidateCleanupParentAbsence,
-    mutation_fence: &ManagedNamespaceMutationFence,
+    mutation_fence: ManagedNamespaceMutationFence,
 ) -> std::result::Result<
     PhysicallyDurableCandidateCleanupNamespace,
     CandidateCleanupNamespaceDurabilityFailure,
@@ -102,7 +105,10 @@ pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn mak
         return Err(namespace_failure(
             CandidateCleanupNamespaceDurabilityFailurePhase::RejectedBeforeDurability,
             error,
-            CandidateCleanupNamespaceDurabilityFailureCustody::ParentAbsence(durable),
+            CandidateCleanupNamespaceDurabilityFailureCustody::RejectedParentAbsence {
+                _durable: durable,
+                _mutation_fence: mutation_fence,
+            },
         ));
     }
     let (observed, absence_event) = durable.into_parts();
@@ -115,7 +121,18 @@ pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn mak
         disposition_set_at,
         parent_absence_observed_at,
     ) = observed.into_parts();
-    let result = absence.make_namespace_durable(mutation_fence, parent_absence_observed_at);
+    let result = absence.make_namespace_durable(
+        mutation_fence,
+        plan.plan().cleanup_id(),
+        plan.plan_digest(),
+        plan.plan().installation_id_digest(),
+        state
+            .authorization_receipt()
+            .receipt()
+            .authority_epoch_after(),
+        plan.plan().process_owner_epoch(),
+        parent_absence_observed_at,
+    );
     finish_managed_result(
         result,
         NamespaceDurabilityFacts {
@@ -132,7 +149,6 @@ pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn mak
 
 pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn retry_candidate_cleanup_namespace_durability(
     retry: CandidateCleanupNamespaceDurabilityRetryCustody,
-    mutation_fence: &ManagedNamespaceMutationFence,
 ) -> std::result::Result<
     PhysicallyDurableCandidateCleanupNamespace,
     CandidateCleanupNamespaceDurabilityFailure,
@@ -161,7 +177,7 @@ pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn ret
         disposition_set_at,
         parent_absence_observed_at,
     } = retry;
-    let result = managed_retry.retry_pre_barrier(mutation_fence, parent_absence_observed_at);
+    let result = managed_retry.retry_pre_barrier(parent_absence_observed_at);
     finish_managed_result(
         result,
         NamespaceDurabilityFacts {
@@ -178,7 +194,6 @@ pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn ret
 
 pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn retry_candidate_cleanup_namespace_post_barrier_observation(
     retry: CandidateCleanupNamespacePostBarrierRetryCustody,
-    mutation_fence: &ManagedNamespaceMutationFence,
 ) -> std::result::Result<
     PhysicallyDurableCandidateCleanupNamespace,
     CandidateCleanupNamespaceDurabilityFailure,
@@ -207,7 +222,7 @@ pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn ret
         disposition_set_at,
         parent_absence_observed_at,
     } = retry;
-    let result = managed_retry.retry_post_barrier_observation(mutation_fence);
+    let result = managed_retry.retry_post_barrier_observation();
     finish_managed_result(
         result,
         NamespaceDurabilityFacts {

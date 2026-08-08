@@ -2,7 +2,7 @@
 
 ## 1. 状态
 
-当前状态为 `partial_implementation_mixed`。Windows 受管文件系统、私有 cleanup authorization Store、确定性 topology typed Store、首对象四阶段 journal（delete intent、强 disposition、parent absence、parent namespace durability）、原子 completion Store 内核，以及各 Store 的进程内 outcome-uncertain recovery 已形成代码。远程 canonical 截至序号 2 的基线通过 `elon-pc-node` 编译、24 项清理定向测试及 1 项包含 topology/journal 对象的 schema 建库与重开测试；本批累计新增的序号 3/4 遵照快速铺设策略只执行 Rust 格式化、静态差异和文档门禁，未编译、未测试。topology 与四个 step Store 均独立提交并 exact readback。序号 4 已写出“同一 retained parent handle 上重证 absence → Windows native barrier → 再次重证 absence → 独立 Store”的完整类型/事务形状，提交不确定恢复也不会重复物理操作；但入口强制要求当前不可构造的 `ManagedNamespaceMutationFence`。普通 parent handle 无法排除同权限外部进程在 flush/post-proof 窗口执行瞬时同名 ABA，因此在 OS-enforced fence 落地前，安全代码不能签发 `ManagedNamespaceDurable`，更不能接入 Host。后续还缺该 fence、其余 ordinal、terminal journal、跨重启物理恢复和生产 Host，当前不会自动清理生产失败候选。
+当前状态为 `partial_implementation_mixed`。Windows 受管文件系统、私有 cleanup authorization Store、确定性 topology typed Store、首对象四阶段 journal（delete intent、强 disposition、parent absence、parent namespace durability）、原子 completion Store 内核，以及各 Store 的进程内 outcome-uncertain recovery 已形成代码。远程 canonical 截至序号 2 的基线通过 `elon-pc-node` 编译、24 项清理定向测试及 1 项包含 topology/journal 对象的 schema 建库与重开测试；本批累计新增的序号 3/4 遵照快速铺设策略只执行 Rust 格式化、静态差异和文档门禁，未编译、未测试。topology 与四个 step Store 均独立提交并 exact readback。序号 4 已写出“同一 retained parent handle 上重证 absence → Windows native barrier → 再次重证 absence → 独立 Store”的完整类型/事务形状，提交不确定恢复也不会重复物理操作；本批又把 mutation fence 从可复用借用改为线性租约，精确绑定对象/父 identity、cleanup/plan、installation、authority/process epoch，并随 pre/post retry、terminal custody、物理能力和 Store recovery 一直移动。该租约仍没有安全构造器。微软明确规定目录 R/RH oplock 对子项增删的 break 只是 advisory，变更不等待 ACK，因此不能作为此类型的后端。普通 parent handle 也无法排除同权限外部进程在 flush/post-proof 窗口执行瞬时同名 ABA；在签名 minifilter 或等价隔离执行域真正落地前，安全代码不能签发 `ManagedNamespaceDurable`，更不能接入 Host。后续还缺真实 fence 后端、其余 ordinal、terminal journal、跨重启物理恢复和生产 Host，当前不会自动清理生产失败候选。
 
 本文只维护失败候选清理边界。候选本机真源见 `node-plugin-local-authority.md`，健康失败与 quarantine 见 `node-ready-capability.md`，staging 物化见 `node-plugin-archive-extraction.md`。
 
@@ -21,7 +21,9 @@
 11. 配置受管根的最终分量及根内所有目录首次固定时取得目录语义的最小 `FILE_WRITE_DATA`（等价 `FILE_ADD_FILE`）和 `FILE_SHARE_READ | FILE_SHARE_WRITE`；仍拒绝 `FILE_SHARE_DELETE`，所以 retained parent 本身不能在清理期间被 rename/delete。根之前的 volume/path prefix 保持只读 traverse 句柄。
 12. `ManagedParentRelativeAbsence::make_namespace_durable()` 在同一 retained parent handle 上执行 pre-barrier absence 复验、`NtFlushBuffersFileEx(flags=0)` 和 post-barrier absence 复验。当前明确接受 ntdll user-mode native contract：只在函数返回与 `IO_STATUS_BLOCK.Status` 都为 `STATUS_SUCCESS` 时签发 `ManagedNamespaceDurable`，并把 NTFS、ReFS、FAT、FAT32、exFAT 作为首批 allowlist；非 Windows、未知文件系统、权限或协议结果均失败关闭。
 13. 明确失败的 barrier 可携带同一 absence custody 重做 pre-proof 后重试；barrier 已成功但 post-proof 普通失败只允许重做 post-proof，不能再次 flush；`STATUS_PENDING`、informational/返回值不一致、已打开同名对象、expected identity match 或 identity conflict 均进入不透明 terminal custody，不提供返回 absence/disposition 的回边。
-14. `ComputePluginRootLockLease`、`cleanup_pending` owner、process fence 与 cancellation guard 共同排除 NodeAgent 权威域内的并发写入，但普通父目录 handle 不能阻止同权限外部进程在 barrier 后短暂创建并删除同名对象。pre/post 两次 `Absent` 无法单独排除这种 ABA；因此所有初次/重试 durability 入口还必须取得当前不可构造的 `ManagedNamespaceMutationFence`。在 OS-enforced directory mutation/oplock 等价 fence 为该类型提供唯一构造器前，安全代码无法执行或签发序号 4。
+14. `ComputePluginRootLockLease`、`cleanup_pending` owner、process fence 与 cancellation guard 共同排除 NodeAgent 权威域内的并发写入，但普通父目录 handle 不能阻止同权限外部进程在 barrier 后短暂创建并删除同名对象。pre/post 两次 `Absent` 无法单独排除这种 ABA。目录 R/RH `FSCTL_REQUEST_OPLOCK` 虽会在子项增删时 break，却不会让写操作等待 ACK，只有目录自身 rename/delete 的特定 break 才等待 ACK；因此 directory oplock、`ReadDirectoryChangesW`、USN、share mode、TxF 或循环观察都不能构造排他 `ManagedNamespaceMutationFence`。
+15. mutation fence 已改成不可 Clone 的线性租约：首次物理入口按值消费，连入口拒绝、pre-barrier retry、post-barrier retry、terminal retained custody 与 `ManagedNamespaceDurable` 都拥有同一租约，不再接受可提前释放或跨对象复用的 `&Fence`。绑定门卫同时核对 handle-derived object/name/parent scope、cleanup、plan、installation、authority epoch 与 process-owner epoch；pre-proof 前后、barrier 后、post-proof/mint 前、Store prepare/事务写入前后及 recovery adoption 都强制 `ensure_active`。当前该查询是固定失败的后端未安装 stub，内核租约字段也不可构造，所以仅补一个构造器仍不能解锁序号 4。
+16. 第一种允许构造该租约的后端固定为 `windows_signed_minifilter_child_namespace_fence_v1`。驱动 grant 必须从调用方 parent handle 在内核重建 volume instance、`FILE_ID_128` 与实际大小写语义下的单组件名称，并在回复前原子登记规则、排空已进入的冲突 mutation；不能信任用户态提交的摘要。driver/port 断连、grant/query/release 超时、volume teardown、无法判定的名称或 generation 漂移都进入 outcome-uncertain，不能降级到 oplock 监测结果。
 
 `PinnedComputePluginCandidateArtifactSet` 现在保留完整 `PinnedComputePluginCandidateDownloads`，而不只保留根锁 lease。因此 verified、staged、健康评估和 quarantine 链没有提前丢失 downloads 目录句柄；新建 staging 文件与目录也天然保留删除权。
 
@@ -102,6 +104,14 @@ SQLite trigger 只能证明前序 event 在当前事务视图中存在，不能�
 - 路径字符串只用于规范逻辑名称、审计和错误信息，不参与授权性删除 lookup。
 - 权限、共享冲突或非空错误不允许降级到普通路径 API。
 
+### 5.1 Windows 硬围栏后端合同
+
+首版 minifilter 只承诺本机 NTFS/ReFS，并通过 ACL 限制的单连接 Filter Manager port 与唯一 NodeAgent process object 建立会话。协议至少提供幂等 `AcquireFence(client_nonce, parent_handle, child_name, authority_binding)`、`QueryFence(fence_id)` 和 `ReleaseFence(fence_id, expected_generation)`；grant receipt 绑定 driver boot/session generation、volume instance/serial、parent `FILE_ID_128`、目录实际 case-sensitivity 下的 child name、installation、cleanup/plan、authority/process epoch、fence generation 与 grant sequence。driver 必须在 active grant 存在时拒绝普通 service stop/unload；强制 detach、dismount 或 driver crash 会毒化租约，不能把“不再能查询”解释为已释放。
+
+拦截面至少覆盖 `IRP_MJ_CREATE` 的 create/open-if/overwrite-if、目录创建与 `FILE_DELETE_ON_CLOSE`，以及 `IRP_MJ_SET_INFORMATION` 的 `FileRenameInformation[Ex]`、`FileLinkInformation[Ex]`、`FileDispositionInformation[Ex]`。rename/hard-link 的 destination 与删除目标都必须按 Filter Manager 解析后的 parent FileId 和文件系统名称规则匹配；任一可能命中受管 scope 但无法可靠解析的操作都应拒绝并 poison 对应 fence。命中 active fence 的外部 mutation 首版直接拒绝，不无限 pending。用户态必须在 exact grant 后重新执行 pre-absence → native flush → post-absence，并让现有 `ensure_active` 门在 capability mint 与 Store 临界点 exact query 同一 grant generation；只有完整实现这条路径，才能替换当前不可构造字段和固定失败 stub。
+
+目录 oplock 可以另作诊断监测器，验证瞬时 create/delete 确实触发 break；它必须使用独立 asynchronous handle，并与 durability fence 类型、证据 kind 和构造入口完全分离。这个监测器只能帮助测试威胁模型，不能解锁序号 4。
+
 ## 6. 当前验证
 
 远程 canonical 截至序号 2 的基线已通过 `elon-pc-node` 编译和 24 项清理定向测试：
@@ -135,4 +145,4 @@ SQLite trigger 只能证明前序 event 在当前事务视图中存在，不能�
 
 ## 7. 下一批实现边界
 
-下一批必须先为序号 4 补 OS-enforced child-namespace mutation fence：它要在 pre-proof、barrier、post-proof 和能力签发窗口排除同权限 writer，且 fence break/结果不确定必须保留句柄并失败关闭；不能用无限重复观察或仅依赖 advisory lock 冒充 ABA 证明。完成后才能把 ordinal 0 的线性 custody推进到 ordinal 1：证明前一对象 child/parent custody 已按 topology 安全释放，从 plan 的下一个 expected object 生成新 intent，并把四阶段 builder/Store 参数化为任意 ordinal，同时保持 fresh transaction、exact readback、可信时间单调和 outcome-uncertain 分类。当前 child-first retained 队列与 plan 同序，不需要先做一次高风险的全量句柄树重写，但多对象部分失败与跨重启恢复应逐步收口为单一 handle-tree/step-cursor 抽象。全部对象完成后才构造 `DurableCandidateCleanupTerminalJournal`；随后补齐 evidence v2、完整事务夹具和 native barrier 验证，最后接入生产 Host。不得先暴露“按 candidate token 删除目录”的管理接口，也不得把首对象 `namespace_durable` 冒充 terminal journal。
+下一批必须先实现签名 Windows minifilter 的最小驱动/用户态通信协议、exact grant/query/release 与供应链版本门卫，再为当前线性租约增加唯一安全构造器；它要在 grant 后的 pre-proof、barrier、post-proof、能力签发及后续 journal custody 窗口排除同权限 writer，且 port disconnect、driver/volume teardown 或结果不确定必须保留句柄并失败关闭。不得用目录 oplock、无限重复观察或 advisory lock 冒充 ABA 证明。完成后还要把 minifilter grant facts 纳入物理 evidence v2，才能把 ordinal 0 的线性 custody 推进到 ordinal 1：证明前一对象 child/parent custody 已按 topology 安全释放，从 plan 的下一个 expected object 生成新 intent，并把四阶段 builder/Store 参数化为任意 ordinal，同时保持 fresh transaction、exact readback、可信时间单调和 outcome-uncertain 分类。当前 child-first retained 队列与 plan 同序，不需要先做一次高风险的全量句柄树重写，但多对象部分失败与跨重启恢复应逐步收口为单一 handle-tree/step-cursor 抽象。全部对象完成后才构造 `DurableCandidateCleanupTerminalJournal`；随后补齐完整事务夹具和 native barrier/fence 验证，最后接入生产 Host。不得先暴露“按 candidate token 删除目录”的管理接口，也不得把首对象 `namespace_durable` 冒充 terminal journal。
