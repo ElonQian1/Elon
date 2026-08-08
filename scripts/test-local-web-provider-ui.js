@@ -34,10 +34,10 @@ expect(pwaController.includes('renderLocalWebProviders()'), 'PWA provider panel 
 expect(pwaController.includes("open.textContent = '登录或继续使用 ChatGPT'"), 'PWA must label the official login and chat action clearly');
 expect(pwa.includes('id="chatGptWebAccountRow"'), 'PWA profile must expose a direct ChatGPT account entry');
 expect(pwaController.includes("window.location.assign('/chatgpt-web')"), 'PWA direct entry must open the dedicated account page');
-expect(pwaController.includes("window.open(provider.officialUrl, '_blank', 'noopener,noreferrer')"), 'PWA must open providers in an isolated official tab');
+expect(pwaController.includes('window.location.assign(provider.officialUrl)'), 'PWA must open ChatGPT in the current tab');
 expect(router.includes('"/chatgpt-web", get(web::chatgpt_web_account_page)'), 'server must expose a stable ChatGPT account URL');
 expect(pwaAccountPage.includes('href="https://chatgpt.com/"'), 'account page must link to the official ChatGPT origin');
-expect(pwaAccountPage.includes('rel="noopener noreferrer"'), 'official login must open without opener access');
+expect(!pwaAccountPage.includes('target="_blank"'), 'account page must keep ChatGPT navigation in the current tab');
 expect(!pwaAccountPage.includes('document.cookie'), 'account page must not read ChatGPT cookies');
 
 ['document.cookie', 'fetch(', 'XMLHttpRequest', 'WebSocket', 'Authorization'].forEach((forbidden) => {

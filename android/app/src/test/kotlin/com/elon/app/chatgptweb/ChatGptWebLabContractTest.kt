@@ -45,6 +45,25 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun initialPageLoadWaitsForLocalProxyPreparationWithoutExportingCredentials() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val proxy = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebProxyController.kt"
+        )
+
+        assertTrue(activity.contains("proxyController.prepare { status ->"))
+        assertTrue(proxy.contains("connectivityManager.defaultProxy"))
+        assertTrue(proxy.contains("NetworkCapabilities.TRANSPORT_VPN"))
+        assertTrue(proxy.contains("WebViewFeature.PROXY_OVERRIDE"))
+        assertTrue(proxy.contains("ProxyController.getInstance().setProxyOverride"))
+        assertTrue(proxy.contains("clearProxyOverride"))
+        assertFalse(proxy.contains("getCookie("))
+        assertFalse(proxy.contains("Authorization"))
+    }
+
+    @Test
     fun webViewAccountIsOwnerAppOnlyAndReachableFromProfileAndProviderSettings() {
         val manifest = readRepositoryFile("android/app/src/main/AndroidManifest.xml")
         val providerActivity = readRepositoryFile(

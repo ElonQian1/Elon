@@ -58,7 +58,7 @@
       open.type = 'button';
       open.textContent = '登录或继续使用 ChatGPT';
       open.addEventListener('click', () => {
-        window.open(provider.officialUrl, '_blank', 'noopener,noreferrer');
+        window.location.assign(provider.officialUrl);
       });
       const apk = document.createElement('a');
       apk.href = '/app/download';

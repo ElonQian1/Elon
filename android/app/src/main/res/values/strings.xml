@@ -9,6 +9,11 @@
     <string name="chatgpt_web_host">chatgpt.com</string>
     <string name="chatgpt_web_back">返回</string>
     <string name="chatgpt_web_reload">刷新页面</string>
+    <string name="chatgpt_web_proxy_title">网页代理</string>
+    <string name="chatgpt_web_proxy_current">当前：%1$s</string>
+    <string name="chatgpt_web_proxy_hint">HTTP 代理，例如 192.168.1.2:7890</string>
+    <string name="chatgpt_web_proxy_use_system">使用手机网络</string>
+    <string name="chatgpt_web_proxy_apply">应用并刷新</string>
     <string name="chatgpt_web_clear">清除网页登录数据</string>
     <string name="chatgpt_web_preparing">正在准备本机登录页面</string>
     <string name="chatgpt_web_loading">正在打开 ChatGPT 官方网页</string>

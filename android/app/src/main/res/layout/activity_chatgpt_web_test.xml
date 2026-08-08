@@ -53,6 +53,17 @@
         </LinearLayout>
 
         <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/chatGptWebProxy"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/chatgpt_web_proxy_title"
+            android:padding="13dp"
+            android:src="@android:drawable/ic_menu_manage"
+            android:tooltipText="@string/chatgpt_web_proxy_title"
+            app:tint="@color/elon_icon_primary" />
+
+        <androidx.appcompat.widget.AppCompatImageButton
             android:id="@+id/chatGptWebReload"
             android:layout_width="48dp"
             android:layout_height="48dp"

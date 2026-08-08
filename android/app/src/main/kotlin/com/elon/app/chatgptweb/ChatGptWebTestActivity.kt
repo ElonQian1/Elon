@@ -20,27 +20,55 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var binding: ActivityChatgptWebTestBinding
     private lateinit var pageAdapter: ChatGptWebPageAdapter
     private lateinit var nativeController: ChatGptNativeConversationController
+    private lateinit var proxyController: ChatGptWebProxyController
+    private var proxyStatus = ChatGptWebProxyStatus("手机网络")
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityChatgptWebTestBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        proxyController = ChatGptWebProxyController(this)
 
         configureToolbar()
         configureWebView()
         configureEnhancedMode()
         configureBackNavigation()
 
-        if (savedInstanceState == null || binding.chatGptWebView.restoreState(savedInstanceState) == null) {
-            binding.chatGptWebView.loadUrl(ChatGptWebNavigationPolicy.START_URL)
+        proxyController.prepare { status ->
+            if (isFinishing || isDestroyed) return@prepare
+            proxyStatus = status
+            status.error?.let { Toast.makeText(this, it, Toast.LENGTH_LONG).show() }
+            if (savedInstanceState == null || binding.chatGptWebView.restoreState(savedInstanceState) == null) {
+                binding.chatGptWebView.loadUrl(ChatGptWebNavigationPolicy.START_URL)
+            }
         }
     }
 
     private fun configureToolbar() {
         binding.chatGptWebBack.setOnClickListener { navigateBack() }
-        binding.chatGptWebReload.setOnClickListener { binding.chatGptWebView.reload() }
+        binding.chatGptWebProxy.setOnClickListener {
+            ChatGptWebProxyDialog.show(this, proxyController, ::applyProxyStatusAndReload)
+        }
+        binding.chatGptWebReload.setOnClickListener {
+            proxyController.prepare(::applyProxyStatusAndReload)
+        }
         binding.chatGptWebClearSession.setOnClickListener { confirmClearSession() }
+    }
+
+    private fun applyProxyStatusAndReload(status: ChatGptWebProxyStatus) {
+        proxyStatus = status
+        status.error?.let {
+            Toast.makeText(this, it, Toast.LENGTH_LONG).show()
+            return
+        }
+        binding.chatGptWebStatus.text = status.label
+        binding.chatGptWebView.stopLoading()
+        if (binding.chatGptWebView.url == null) {
+            binding.chatGptWebView.loadUrl(ChatGptWebNavigationPolicy.START_URL)
+        } else {
+            binding.chatGptWebView.reload()
+        }
     }
 
     private fun configureEnhancedMode() {
@@ -127,14 +155,14 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private fun showLoading(url: String) {
         binding.chatGptWebHost.text = ChatGptWebNavigationPolicy.displayHost(url)
         binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_text_secondary))
-        binding.chatGptWebStatus.setText(R.string.chatgpt_web_loading)
+        binding.chatGptWebStatus.text = statusWithProxy(R.string.chatgpt_web_loading)
     }
 
     private fun showReady(url: String) {
         cookieManager.flush()
         binding.chatGptWebHost.text = ChatGptWebNavigationPolicy.displayHost(url)
         binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_success))
-        binding.chatGptWebStatus.setText(R.string.chatgpt_web_ready)
+        binding.chatGptWebStatus.text = statusWithProxy(R.string.chatgpt_web_ready)
         pageAdapter.onPageReady(url)
     }
 
@@ -172,10 +200,13 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private fun showNativeMode(nativeMode: Boolean) {
         binding.chatGptWebView.visibility = if (nativeMode) View.INVISIBLE else View.VISIBLE
         binding.chatGptNativeRoot.visibility = if (nativeMode) View.VISIBLE else View.GONE
-        binding.chatGptWebStatus.setText(
+        binding.chatGptWebStatus.text = statusWithProxy(
             if (nativeMode) R.string.chatgpt_native_active else R.string.chatgpt_web_ready,
         )
     }
+
+    private fun statusWithProxy(messageResource: Int): String =
+        "${getString(messageResource)} · ${proxyStatus.label}"
 
     private fun showBlockedNavigation(host: String) {
         binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_project))
@@ -186,7 +217,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private fun showError(message: String) {
         binding.chatGptWebProgress.visibility = View.GONE
         binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_danger))
-        binding.chatGptWebStatus.text = message.take(120)
+        binding.chatGptWebStatus.text = "$message · ${proxyStatus.label}".take(160)
     }
 
     private fun confirmClearSession() {

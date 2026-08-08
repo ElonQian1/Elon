@@ -28,9 +28,11 @@ expect(androidPage.includes('1  打开 ChatGPT 官方页面'), 'APK page must ex
 expect(androidPage.includes('只保存在本 APK'), 'APK page must explain local-only session storage');
 
 expect(pwaPage.includes('profile-action-title">ChatGPT 网页账号'), 'PWA profile must expose ChatGPT login');
+expect(pwaPage.includes('profile-action-subtitle">当前页打开官方网页'), 'PWA profile must explain same-tab ChatGPT navigation');
 expect(pwaPage.includes('profile-action-title">AI 厂商账号'), 'PWA must keep advanced provider management separate');
 expect(pwaAccountPage.includes('<h1 id="accountTitle">登录自己的 ChatGPT</h1>'), 'PWA account page must provide a user-facing login title');
 expect(pwaAccountPage.includes('href="https://chatgpt.com/"'), 'PWA account page must open the official ChatGPT origin');
+expect(!pwaAccountPage.includes('target="_blank"'), 'PWA account page must keep ChatGPT in the current tab');
 expect(pwaController.includes("'本人完成登录或真人验证'"), 'PWA panel must explain the official login step');
 expect(pwaController.includes("open.textContent = '登录或继续使用 ChatGPT'"), 'PWA must provide an explicit login/use action');
 
