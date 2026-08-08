@@ -13,12 +13,24 @@ use crate::node_agent_compute_plugin_host::{
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
+mod absence;
+mod absence_recovery_key;
 mod builder;
 mod disposition;
 mod disposition_recovery_key;
 mod recovery_key;
 mod types;
 
+pub(in crate::node_agent_compute_plugin_host) use absence::{
+    adopt_recovered_candidate_cleanup_parent_absence, prepare_candidate_cleanup_parent_absence,
+    store_candidate_cleanup_parent_absence, CandidateCleanupParentAbsenceOutcomeUncertainCustody,
+    CandidateCleanupParentAbsencePreparationFailure, CandidateCleanupParentAbsenceRecoveryAdoption,
+    CandidateCleanupParentAbsenceRecoveryAdoptionFailure,
+    CandidateCleanupParentAbsenceRecoveryAdoptionPhase, CandidateCleanupParentAbsenceStoreFailure,
+    CandidateCleanupParentAbsenceStorePhase, DurableCandidateCleanupParentAbsence,
+    PreparedCandidateCleanupParentAbsence, ValidatedCandidateCleanupParentAbsencePermit,
+};
+pub(in crate::node_agent_compute_plugin_host) use absence_recovery_key::CandidateCleanupParentAbsenceRecoveryKey;
 pub(in crate::node_agent_compute_plugin_host) use disposition::{
     adopt_recovered_candidate_cleanup_disposition, prepare_candidate_cleanup_disposition,
     store_candidate_cleanup_disposition, CandidateCleanupDispositionOutcomeUncertainCustody,
@@ -37,6 +49,7 @@ pub(in crate::node_agent_compute_plugin_host) use types::{
 
 pub(in crate::node_agent_compute_plugin_host) use builder::{
     build_exact_handle_disposition_event, build_initial_delete_intent,
+    build_parent_namespace_absence_event,
 };
 
 #[must_use = "prepared delete intent must be stored or retain the sealed topology"]

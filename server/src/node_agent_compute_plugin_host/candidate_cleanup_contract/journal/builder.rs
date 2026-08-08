@@ -66,6 +66,50 @@ pub(in crate::node_agent_compute_plugin_host) fn build_exact_handle_disposition_
     )
 }
 
+pub(in crate::node_agent_compute_plugin_host) fn build_parent_namespace_absence_event(
+    plan: &HashedComputePluginCandidateCleanupExecutionPlan,
+    intent: &HashedComputePluginCandidateCleanupStepEvent,
+    disposition: &HashedComputePluginCandidateCleanupStepEvent,
+    binding: &ManagedObjectBinding,
+    recorded_at_ms: i64,
+) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
+    validate_hashed_execution_plan(plan)?;
+    let expected_disposition = build_exact_handle_disposition_event(
+        plan,
+        intent,
+        binding,
+        disposition.event().recorded_at_ms(),
+    )?;
+    let object = plan
+        .objects()
+        .first()
+        .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_ABSENCE_OBJECT_MISSING"))?;
+    if expected_disposition != *disposition
+        || disposition.event().event_sequence() != 2
+        || disposition.event().step_ordinal() != 0
+        || recorded_at_ms <= disposition.event().recorded_at_ms()
+        || binding.parent_identity_digest() != object.object().expected_parent_identity_digest()
+    {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_ABSENCE_BINDING_INVALID");
+    }
+    hash_cleanup_step_event(ComputePluginCandidateCleanupStepEvent {
+        schema: CANDIDATE_CLEANUP_STEP_EVENT_SCHEMA.to_string(),
+        cleanup_id: plan.plan().cleanup_id().to_string(),
+        plan_digest: plan.plan_digest().to_string(),
+        event_sequence: 3,
+        step_ordinal: 0,
+        event_kind: "parent_namespace_absence_observed".to_string(),
+        object_digest: object.object_digest().to_string(),
+        observed_identity_digest: None,
+        observed_parent_identity_digest: binding.parent_identity_digest().to_string(),
+        namespace_durability_kind: None,
+        namespace_durability_evidence_digest: None,
+        previous_event_digest: disposition.event_digest().to_string(),
+        process_owner_epoch: plan.plan().process_owner_epoch(),
+        recorded_at_ms,
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_exact_handle_disposition_event_from_fields(
     plan: &HashedComputePluginCandidateCleanupExecutionPlan,

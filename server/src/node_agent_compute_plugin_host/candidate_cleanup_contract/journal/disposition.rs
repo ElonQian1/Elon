@@ -313,6 +313,15 @@ impl DurableCandidateCleanupDisposition {
     ) -> &HashedComputePluginCandidateCleanupStepEvent {
         &self.event
     }
+
+    pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn into_parts(
+        self,
+    ) -> (
+        PhysicallyDisposedCandidateCleanupObject,
+        HashedComputePluginCandidateCleanupStepEvent,
+    ) {
+        (self.physical, self.event)
+    }
 }
 
 impl CandidateCleanupDispositionPreparationFailure {

@@ -9,36 +9,24 @@ use super::{
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::{
-        HashedComputePluginCandidateCleanupStepEvent, SealedCandidateCleanupTopology,
-        ValidatedCandidateCleanupDeleteIntentPermit,
+        CandidateCleanupParentAbsenceRecoveryKey, HashedComputePluginCandidateCleanupStepEvent,
+        ObservedCandidateCleanupParentAbsence, ValidatedCandidateCleanupParentAbsencePermit,
     },
     fetch_contract::ComputePluginFetchCancellationGuard,
     manifest_validation::is_sha256,
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
-mod absence;
-mod disposition;
 mod recovery;
 mod validation;
 mod write;
 
-pub(in crate::node_agent_compute_plugin_host) use absence::{
-    ComputePluginCandidateCleanupParentAbsenceAuthoritySession,
+pub(in crate::node_agent_compute_plugin_host) use recovery::{
     ComputePluginCandidateCleanupParentAbsenceRecoveryAuthoritySession,
     ComputePluginCandidateCleanupParentAbsenceRecoveryOutcome,
 };
-pub(in crate::node_agent_compute_plugin_host) use disposition::{
-    ComputePluginCandidateCleanupDispositionAuthoritySession,
-    ComputePluginCandidateCleanupDispositionRecoveryAuthoritySession,
-    ComputePluginCandidateCleanupDispositionRecoveryOutcome,
-};
-pub(in crate::node_agent_compute_plugin_host) use recovery::{
-    ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession,
-    ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome,
-};
 
-pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateCleanupDeleteIntentAuthoritySession<
+pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateCleanupParentAbsenceAuthoritySession<
     'authority,
 > {
     authority: &'authority ComputePluginLocalAuthority,
@@ -49,14 +37,15 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateClean
 }
 
 impl ComputePluginLocalAuthority {
-    pub(in crate::node_agent_compute_plugin_host) fn bind_candidate_cleanup_delete_intent_authority_session<
+    pub(in crate::node_agent_compute_plugin_host) fn bind_candidate_cleanup_parent_absence_authority_session<
         'authority,
     >(
         &'authority self,
         process_fence: &'authority ComputePluginFetchProcessFence,
         observation: ComputePluginTrustedTimeObservation,
+        observed: &ObservedCandidateCleanupParentAbsence,
         prepared_at: Instant,
-    ) -> Result<ComputePluginCandidateCleanupDeleteIntentAuthoritySession<'authority>> {
+    ) -> Result<ComputePluginCandidateCleanupParentAbsenceAuthoritySession<'authority>> {
         let trusted_now = observation.trusted_now().clone();
         let observed_at = observation.observed_at();
         if !self
@@ -69,12 +58,16 @@ impl ComputePluginLocalAuthority {
             || process_fence.process_owner_epoch() <= 0
             || process_fence.acquired_at_ms() < 0
             || observed_at <= process_fence.acquired_observed_at()
+            || observed.observed_at() <= observed.disposition_set_at()
+            || observed_at <= observed.observed_at()
             || prepared_at <= observed_at
             || trusted_now.timestamp_millis() < process_fence.acquired_at_ms()
+            || trusted_now.timestamp_millis()
+                <= observed.disposition_event().event().recorded_at_ms()
         {
-            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_SESSION_INVALID");
+            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_PARENT_ABSENCE_SESSION_INVALID");
         }
-        Ok(ComputePluginCandidateCleanupDeleteIntentAuthoritySession {
+        Ok(ComputePluginCandidateCleanupParentAbsenceAuthoritySession {
             authority: self,
             process_fence,
             trusted_now,
@@ -84,33 +77,27 @@ impl ComputePluginLocalAuthority {
     }
 }
 
-impl ComputePluginCandidateCleanupDeleteIntentAuthoritySession<'_> {
+impl ComputePluginCandidateCleanupParentAbsenceAuthoritySession<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn authority_instance_binding(
         &self,
     ) -> &ComputePluginAuthorityInstanceBinding {
         self.process_fence.authority_instance_binding()
     }
-
     pub(in crate::node_agent_compute_plugin_host) fn installation_id_digest(&self) -> &str {
         self.process_fence.installation_id_digest()
     }
-
     pub(in crate::node_agent_compute_plugin_host) fn process_owner_epoch(&self) -> i64 {
         self.process_fence.process_owner_epoch()
     }
-
     pub(in crate::node_agent_compute_plugin_host) fn clock_epoch_digest(&self) -> &str {
         &self.clock_epoch_digest
     }
-
     pub(in crate::node_agent_compute_plugin_host) fn trusted_now_ms(&self) -> i64 {
         self.trusted_now.timestamp_millis()
     }
-
     pub(in crate::node_agent_compute_plugin_host) fn observed_at(&self) -> Instant {
         self.observed_at
     }
-
     pub(in crate::node_agent_compute_plugin_host) fn validate_source(
         &self,
         guard: &ComputePluginFetchCancellationGuard,
@@ -118,25 +105,23 @@ impl ComputePluginCandidateCleanupDeleteIntentAuthoritySession<'_> {
         guard.validate_source(self.process_fence.cancellation_source())?;
         guard.ensure_current()
     }
-
-    pub(in crate::node_agent_compute_plugin_host) fn validate_candidate_cleanup_delete_intent(
+    pub(in crate::node_agent_compute_plugin_host) fn validate_candidate_cleanup_parent_absence(
         &self,
-        sealed: &SealedCandidateCleanupTopology,
+        observed: &ObservedCandidateCleanupParentAbsence,
         event: &HashedComputePluginCandidateCleanupStepEvent,
     ) -> Result<()> {
-        self.validate_source(sealed.state().cancellation_guard())?;
+        self.validate_source(observed.state().cancellation_guard())?;
         self.authority.with_deferred(|transaction| {
-            validation::validate_unstored_intent(transaction, self, sealed, event)
+            validation::validate_unstored_parent_absence(transaction, self, observed, event)
         })
     }
-
-    pub(in crate::node_agent_compute_plugin_host) fn persist_candidate_cleanup_delete_intent(
+    pub(in crate::node_agent_compute_plugin_host) fn persist_candidate_cleanup_parent_absence(
         &self,
-        permit: ValidatedCandidateCleanupDeleteIntentPermit<'_>,
+        permit: ValidatedCandidateCleanupParentAbsencePermit<'_>,
     ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
-        self.validate_source(permit.sealed().state().cancellation_guard())?;
+        self.validate_source(permit.observed().state().cancellation_guard())?;
         self.authority.with_immediate(|transaction| {
-            write::persist_candidate_cleanup_delete_intent(transaction, self, permit)
+            write::persist_candidate_cleanup_parent_absence(transaction, self, permit)
         })
     }
 }

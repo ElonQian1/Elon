@@ -251,7 +251,7 @@ impl PhysicallyDisposedCandidateCleanupObject {
         self.disposition_set_at
     }
 
-    pub(super) fn into_parts(
+    pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn into_parts(
         self,
     ) -> (
         CandidateCleanupExecutionState,

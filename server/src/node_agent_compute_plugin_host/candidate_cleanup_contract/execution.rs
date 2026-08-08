@@ -17,6 +17,7 @@ use crate::node_agent_compute_plugin_host::{
 };
 use crate::node_agent_managed_fs::PinnedManagedDirectory;
 
+mod absence_step;
 mod delete_steps;
 mod evidence;
 mod preparation;
@@ -24,6 +25,16 @@ mod strong_step;
 
 pub(in crate::node_agent_compute_plugin_host) use preparation::prepare_candidate_cleanup_execution_state;
 
+pub(super) use absence_step::{
+    observe_candidate_cleanup_parent_namespace, retry_candidate_cleanup_parent_observation,
+};
+pub(in crate::node_agent_compute_plugin_host) use absence_step::{
+    CandidateCleanupExpectedIdentityMatchCustody, CandidateCleanupParentObservationFailure,
+    CandidateCleanupParentObservationFailureCustody, CandidateCleanupParentObservationFailurePhase,
+    CandidateCleanupParentObservationQuarantinedCustody,
+    CandidateCleanupParentObservationRetryCustody,
+    CandidateCleanupParentRelativeIdentityConflictCustody, ObservedCandidateCleanupParentAbsence,
+};
 use delete_steps::{
     delete_directory, delete_file, delete_optional_directory, ordered_files,
     ordered_staging_directories, PendingCleanupDirectory, PendingCleanupFile,
