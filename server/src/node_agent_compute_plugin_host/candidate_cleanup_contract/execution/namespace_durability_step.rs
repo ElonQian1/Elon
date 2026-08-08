@@ -125,12 +125,16 @@ pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn mak
         mutation_fence,
         plan.plan().cleanup_id(),
         plan.plan_digest(),
+        state.authorization_receipt().receipt_digest(),
+        intent_event.event().object_digest(),
         plan.plan().installation_id_digest(),
         state
             .authorization_receipt()
             .receipt()
             .authority_epoch_after(),
         plan.plan().process_owner_epoch(),
+        u64::try_from(intent_event.event().step_ordinal())
+            .expect("validated cleanup step ordinal is non-negative"),
         parent_absence_observed_at,
     );
     finish_managed_result(

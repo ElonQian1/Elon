@@ -280,12 +280,6 @@ fn ensure_supported_namespace_durability_filesystem(
         Ok("ntfs")
     } else if filesystem.eq_ignore_ascii_case("ReFS") {
         Ok("refs")
-    } else if filesystem.eq_ignore_ascii_case("FAT") {
-        Ok("fat")
-    } else if filesystem.eq_ignore_ascii_case("FAT32") {
-        Ok("fat32")
-    } else if filesystem.eq_ignore_ascii_case("exFAT") {
-        Ok("exfat")
     } else {
         Err(std::io::Error::new(
             std::io::ErrorKind::Unsupported,

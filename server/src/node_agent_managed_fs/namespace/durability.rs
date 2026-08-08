@@ -150,18 +150,24 @@ impl ManagedParentRelativeAbsence {
         mutation_fence: ManagedNamespaceMutationFence,
         cleanup_id: &str,
         execution_plan_digest: &str,
+        authorization_receipt_digest: &str,
+        expected_object_digest: &str,
         installation_id_digest: &str,
         authority_epoch: i64,
         process_owner_epoch: i64,
+        step_ordinal: u64,
         not_before: Instant,
     ) -> Result<ManagedNamespaceDurable, ManagedNamespaceDurabilityFailure> {
         if let Err(error) = mutation_fence.validate_binding(
             self.object_binding(),
             cleanup_id,
             execution_plan_digest,
+            authorization_receipt_digest,
+            expected_object_digest,
             installation_id_digest,
             authority_epoch,
             process_owner_epoch,
+            step_ordinal,
         ) {
             return Err(failure(
                 ManagedNamespaceDurabilityFailurePhase::FenceBindingChanged,

@@ -1,0 +1,257 @@
+{
+  "authority_binding": {
+    "bytes": 288,
+    "fields": [
+      { "bytes": 32, "name": "installation_id_digest", "offset": 0, "type": "sha256" },
+      { "bytes": 32, "name": "cleanup_id_digest", "offset": 32, "type": "sha256" },
+      { "bytes": 32, "name": "execution_plan_digest", "offset": 64, "type": "sha256" },
+      { "bytes": 32, "name": "authorization_receipt_digest", "offset": 96, "type": "sha256" },
+      { "bytes": 32, "name": "expected_object_digest", "offset": 128, "type": "sha256" },
+      { "bytes": 32, "name": "expected_object_identity_digest", "offset": 160, "type": "sha256" },
+      { "bytes": 32, "name": "expected_parent_identity_digest", "offset": 192, "type": "sha256" },
+      { "bytes": 32, "name": "requested_name_digest", "offset": 224, "type": "sha256" },
+      { "bytes": 8, "name": "authority_epoch", "offset": 256, "type": "u64" },
+      { "bytes": 8, "name": "process_owner_epoch", "offset": 264, "type": "u64" },
+      { "bytes": 8, "name": "step_ordinal", "offset": 272, "type": "u64" },
+      { "bytes": 8, "name": "reserved_zero", "offset": 280, "type": "u64" }
+    ]
+  },
+  "byte_order": "little_endian",
+  "connection_semantics": {
+    "acquire_header_connection": "current_authenticated_transport_and_initial_grant_owner",
+    "describe_request_header_connection": "all_zero",
+    "describe_reply_header_connection": "new_current_authenticated_transport",
+    "query_release_body_connection": "original_grant_owner_connection",
+    "query_release_header_connection": "current_authenticated_transport_may_be_recovery_connection"
+  },
+  "digest_domains": {
+    "authority_binding": {
+      "algorithm": "sha256",
+      "domain_ascii": "ELON_NODE_NAMESPACE_FENCE_AUTHORITY_V1",
+      "payload": "eight_digest_fields_then_three_u64_fields_without_reserved"
+    },
+    "cleanup_id": {
+      "algorithm": "sha256",
+      "domain_ascii": "ELON_NODE_NAMESPACE_FENCE_CLEANUP_ID_V1",
+      "payload": "canonical_utf8_cleanup_id"
+    },
+    "requested_name": {
+      "algorithm": "sha256",
+      "domain_ascii": "ELON_NODE_NAMESPACE_FENCE_REQUESTED_NAME_V1",
+      "payload": "exact_utf16le_name_bytes_without_terminator"
+    },
+    "separator_hex": "00"
+  },
+  "feature_bits": {
+    "0": "authenticate_connecting_process",
+    "1": "acquire_parent_handle_usermode_validation",
+    "10": "exact_query_full_snapshot",
+    "11": "idempotent_release_tombstone",
+    "12": "unload_veto_active_grants",
+    "13": "volume_instance_generation",
+    "14": "case_semantics_binding",
+    "15": "ntfs_refs_only",
+    "2": "reserving_draining_active",
+    "3": "create_mutation_denial",
+    "4": "delete_on_close_cleanup_tracking",
+    "5": "rename_destination_denial",
+    "6": "hardlink_destination_denial",
+    "7": "disposition_denial",
+    "8": "poison_on_ambiguous_name",
+    "9": "disconnect_retains_deny_rule"
+  },
+  "header": {
+    "bytes": 64,
+    "fields": [
+      { "bytes": 8, "name": "magic", "offset": 0, "type": "ascii" },
+      { "bytes": 2, "name": "wire_major", "offset": 8, "type": "u16" },
+      { "bytes": 2, "name": "wire_minor", "offset": 10, "type": "u16" },
+      { "bytes": 2, "name": "message_kind", "offset": 12, "type": "u16" },
+      { "bytes": 2, "name": "header_bytes", "offset": 14, "type": "u16" },
+      { "bytes": 4, "name": "total_bytes", "offset": 16, "type": "u32" },
+      { "bytes": 4, "name": "flags_zero", "offset": 20, "type": "u32" },
+      { "bytes": 4, "name": "status", "offset": 24, "type": "u32" },
+      { "bytes": 4, "name": "reserved_zero", "offset": 28, "type": "u32" },
+      { "bytes": 16, "name": "request_id", "offset": 32, "type": "id128" },
+      { "bytes": 16, "name": "transport_connection_id", "offset": 48, "type": "id128" }
+    ]
+  },
+  "filesystem_kinds": {
+    "1": "ntfs",
+    "2": "refs"
+  },
+  "lease_states": {
+    "1": "active",
+    "2": "poisoned_connection_lost",
+    "3": "poisoned_ambiguous_mutation",
+    "4": "poisoned_instance_teardown",
+    "5": "poisoned_driver_teardown",
+    "6": "poisoned_internal",
+    "7": "releasing",
+    "8": "released"
+  },
+  "limits": {
+    "child_name_forbidden_utf16_units": [0, 47, 58, 92],
+    "child_name_max_utf16_units": 255,
+    "child_name_reject_dot_segments": true,
+    "maximum_message_bytes": 4096,
+    "pointer_width_bits": 64,
+    "poison_reason_zero_for_active_or_released": true
+  },
+  "magic": "ELONFNC1",
+  "message_kinds": {
+    "1": "describe_session_request",
+    "2": "describe_session_reply",
+    "3": "acquire_request",
+    "4": "acquire_reply",
+    "5": "query_request",
+    "6": "query_reply",
+    "7": "release_request",
+    "8": "release_reply"
+  },
+  "name_match_modes": {
+    "1": "case_insensitive",
+    "2": "case_sensitive"
+  },
+  "messages": {
+    "acquire_request": {
+      "fields": [
+        { "bytes": 16, "name": "acquire_nonce", "offset": 64, "type": "id128" },
+        { "bytes": 8, "name": "parent_handle_value", "offset": 80, "type": "u64_transient_x64_handle" },
+        { "bytes": 4, "name": "child_name_offset", "offset": 88, "type": "u32" },
+        { "bytes": 4, "name": "child_name_bytes", "offset": 92, "type": "u32" },
+        { "bytes": 288, "name": "authority_binding", "offset": 96, "type": "authority_binding_v1" }
+      ],
+      "fixed_bytes": 384,
+      "variable_tail": { "name": "child_name", "offset": 384, "type": "utf16le_without_terminator" }
+    },
+    "describe_session_request": {
+      "fields": [],
+      "fixed_bytes": 64
+    },
+    "describe_session_reply": {
+      "fields": [
+        { "bytes": 16, "name": "driver_boot_id", "offset": 64, "type": "id128" },
+        { "bytes": 32, "name": "driver_build_digest", "offset": 80, "type": "sha256" },
+        { "bytes": 32, "name": "wire_schema_digest", "offset": 112, "type": "sha256" },
+        { "bytes": 8, "name": "driver_session_generation", "offset": 144, "type": "u64" },
+        { "bytes": 8, "name": "capability_bits", "offset": 152, "type": "u64" },
+        { "bytes": 4, "name": "maximum_message_bytes", "offset": 160, "type": "u32" },
+        { "bytes": 2, "name": "pointer_width_bits", "offset": 164, "type": "u16" },
+        { "bytes": 2, "name": "reserved_zero", "offset": 166, "type": "u16" }
+      ],
+      "fixed_bytes": 168,
+      "variable_tail": null
+    },
+    "grant_snapshot_reply": {
+      "applies_to_success_kinds": [4, 6, 8],
+      "fields": [
+        { "bytes": 2, "name": "lease_state", "offset": 64, "type": "lease_state_u16" },
+        { "bytes": 2, "name": "filesystem_kind", "offset": 66, "type": "filesystem_kind_u16" },
+        { "bytes": 2, "name": "name_match_mode", "offset": 68, "type": "name_match_mode_u16" },
+        { "bytes": 2, "name": "poison_reason", "offset": 70, "type": "u16" },
+        { "bytes": 16, "name": "driver_boot_id", "offset": 72, "type": "id128" },
+        { "bytes": 16, "name": "grant_owner_connection_id", "offset": 88, "type": "id128" },
+        { "bytes": 32, "name": "driver_build_digest", "offset": 104, "type": "sha256" },
+        { "bytes": 32, "name": "wire_schema_digest", "offset": 136, "type": "sha256" },
+        { "bytes": 8, "name": "driver_session_generation", "offset": 168, "type": "u64" },
+        { "bytes": 8, "name": "capability_bits", "offset": 176, "type": "u64" },
+        { "bytes": 4, "name": "maximum_message_bytes", "offset": 184, "type": "u32" },
+        { "bytes": 2, "name": "pointer_width_bits", "offset": 188, "type": "u16" },
+        { "bytes": 2, "name": "reserved_zero", "offset": 190, "type": "u16" },
+        { "bytes": 16, "name": "volume_instance_id", "offset": 192, "type": "id128" },
+        { "bytes": 8, "name": "volume_instance_generation", "offset": 208, "type": "u64" },
+        { "bytes": 8, "name": "volume_serial", "offset": 216, "type": "u64" },
+        { "bytes": 16, "name": "parent_file_id", "offset": 224, "type": "file_id_128" },
+        { "bytes": 16, "name": "acquire_nonce", "offset": 240, "type": "id128" },
+        { "bytes": 16, "name": "fence_id", "offset": 256, "type": "id128" },
+        { "bytes": 32, "name": "grant_secret", "offset": 272, "type": "secret256_non_persistent" },
+        { "bytes": 8, "name": "grant_generation", "offset": 304, "type": "u64" },
+        { "bytes": 8, "name": "grant_sequence", "offset": 312, "type": "u64" },
+        { "bytes": 8, "name": "state_generation", "offset": 320, "type": "u64" },
+        { "bytes": 8, "name": "query_sequence", "offset": 328, "type": "u64" },
+        { "bytes": 8, "name": "blocked_mutation_count", "offset": 336, "type": "u64" },
+        { "bytes": 8, "name": "release_sequence", "offset": 344, "type": "u64" },
+        { "bytes": 16, "name": "release_nonce_or_zero", "offset": 352, "type": "id128" },
+        { "bytes": 288, "name": "authority_binding", "offset": 368, "type": "authority_binding_v1" },
+        { "bytes": 4, "name": "child_name_offset", "offset": 656, "type": "u32" },
+        { "bytes": 4, "name": "child_name_bytes", "offset": 660, "type": "u32" }
+      ],
+      "fixed_bytes": 664,
+      "variable_tail": { "name": "child_name", "offset": 664, "type": "utf16le_without_terminator" }
+    },
+    "query_request": {
+      "fields": [
+        { "bytes": 16, "name": "fence_id", "offset": 64, "type": "id128" },
+        { "bytes": 32, "name": "grant_secret", "offset": 80, "type": "secret256_non_persistent" },
+        { "bytes": 16, "name": "driver_boot_id", "offset": 112, "type": "id128" },
+        { "bytes": 16, "name": "grant_owner_connection_id", "offset": 128, "type": "id128" },
+        { "bytes": 16, "name": "volume_instance_id", "offset": 144, "type": "id128" },
+        { "bytes": 16, "name": "acquire_nonce", "offset": 160, "type": "id128" },
+        { "bytes": 16, "name": "parent_file_id", "offset": 176, "type": "file_id_128" },
+        { "bytes": 8, "name": "driver_session_generation", "offset": 192, "type": "u64" },
+        { "bytes": 8, "name": "volume_instance_generation", "offset": 200, "type": "u64" },
+        { "bytes": 8, "name": "volume_serial", "offset": 208, "type": "u64" },
+        { "bytes": 8, "name": "grant_generation", "offset": 216, "type": "u64" },
+        { "bytes": 8, "name": "grant_sequence", "offset": 224, "type": "u64" },
+        { "bytes": 8, "name": "expected_state_generation", "offset": 232, "type": "u64" },
+        { "bytes": 2, "name": "filesystem_kind", "offset": 240, "type": "filesystem_kind_u16" },
+        { "bytes": 2, "name": "name_match_mode", "offset": 242, "type": "name_match_mode_u16" },
+        { "bytes": 4, "name": "reserved_zero", "offset": 244, "type": "u32" },
+        { "bytes": 288, "name": "authority_binding", "offset": 248, "type": "authority_binding_v1" },
+        { "bytes": 4, "name": "child_name_offset", "offset": 536, "type": "u32" },
+        { "bytes": 4, "name": "child_name_bytes", "offset": 540, "type": "u32" }
+      ],
+      "fixed_bytes": 544,
+      "variable_tail": { "name": "child_name", "offset": 544, "type": "utf16le_without_terminator" }
+    },
+    "release_request": {
+      "fields": [
+        { "bytes": 16, "name": "fence_id", "offset": 64, "type": "id128" },
+        { "bytes": 32, "name": "grant_secret", "offset": 80, "type": "secret256_non_persistent" },
+        { "bytes": 16, "name": "driver_boot_id", "offset": 112, "type": "id128" },
+        { "bytes": 16, "name": "grant_owner_connection_id", "offset": 128, "type": "id128" },
+        { "bytes": 16, "name": "volume_instance_id", "offset": 144, "type": "id128" },
+        { "bytes": 16, "name": "acquire_nonce", "offset": 160, "type": "id128" },
+        { "bytes": 16, "name": "parent_file_id", "offset": 176, "type": "file_id_128" },
+        { "bytes": 8, "name": "driver_session_generation", "offset": 192, "type": "u64" },
+        { "bytes": 8, "name": "volume_instance_generation", "offset": 200, "type": "u64" },
+        { "bytes": 8, "name": "volume_serial", "offset": 208, "type": "u64" },
+        { "bytes": 8, "name": "grant_generation", "offset": 216, "type": "u64" },
+        { "bytes": 8, "name": "grant_sequence", "offset": 224, "type": "u64" },
+        { "bytes": 8, "name": "expected_state_generation", "offset": 232, "type": "u64" },
+        { "bytes": 2, "name": "filesystem_kind", "offset": 240, "type": "filesystem_kind_u16" },
+        { "bytes": 2, "name": "name_match_mode", "offset": 242, "type": "name_match_mode_u16" },
+        { "bytes": 4, "name": "reserved_zero", "offset": 244, "type": "u32" },
+        { "bytes": 288, "name": "authority_binding", "offset": 248, "type": "authority_binding_v1" },
+        { "bytes": 16, "name": "release_nonce", "offset": 536, "type": "id128" },
+        { "bytes": 4, "name": "child_name_offset", "offset": 552, "type": "u32" },
+        { "bytes": 4, "name": "child_name_bytes", "offset": 556, "type": "u32" }
+      ],
+      "fixed_bytes": 560,
+      "variable_tail": { "name": "child_name", "offset": 560, "type": "utf16le_without_terminator" }
+    }
+  },
+  "rejected_reply": {
+    "body": "forbidden",
+    "fixed_bytes": 64
+  },
+  "protocol_id": "elon.windows.compute_namespace_fence.v1",
+  "reply_statuses": {
+    "0": "request",
+    "1": "success",
+    "10": "internal_failure",
+    "2": "protocol_mismatch",
+    "3": "access_denied",
+    "4": "unsupported_filesystem",
+    "5": "scope_conflict",
+    "6": "nonce_conflict",
+    "7": "unknown_grant",
+    "8": "generation_mismatch",
+    "9": "poisoned"
+  },
+  "required_feature_mask": 65535,
+  "reserved_policy": "all_reserved_and_unknown_flags_must_be_zero",
+  "wire_major": 1,
+  "wire_minor": 0
+}

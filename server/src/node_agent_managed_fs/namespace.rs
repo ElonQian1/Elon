@@ -3,6 +3,8 @@ use std::{ffi::OsStr, ffi::OsString, fmt};
 mod durability;
 mod lifecycle;
 mod mutation_fence;
+mod mutation_fence_client;
+mod mutation_fence_protocol;
 
 pub(crate) use durability::{
     ManagedNamespaceDurabilityFailure, ManagedNamespaceDurabilityFailureCustody,
