@@ -3,6 +3,8 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
+mod install_plan_preparation;
+
 pub(crate) fn migration_v208(conn: &Connection) -> Result<()> {
     for (column, definition) in [
         (
@@ -137,4 +139,8 @@ pub(crate) fn migration_v208(conn: &Connection) -> Result<()> {
            END;",
     )?;
     Ok(())
+}
+
+pub(crate) fn migration_v209(conn: &Connection) -> Result<()> {
+    install_plan_preparation::migration_v209(conn)
 }

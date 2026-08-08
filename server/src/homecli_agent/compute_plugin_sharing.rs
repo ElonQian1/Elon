@@ -7,6 +7,8 @@ use crate::{store::NodeComputePluginSharingDispatchIntent, types::AppState};
 
 const ACK_TIMEOUT: Duration = Duration::from_secs(10);
 
+mod install_plan_preparation;
+
 pub(super) fn spawn_current_compute_plugin_sharing_session_replay(
     state: Arc<AppState>,
     agent_id: String,
@@ -197,6 +199,7 @@ pub(crate) async fn dispatch_durable_compute_plugin_sharing_intent(
             {
                 tracing::warn!(node_id = %intent.node_id, error = %error,
                     "failed to persist compute plugin sharing dispatch ACK event");
+                return;
             }
             let observed_json = match serde_json::to_value(&observed) {
                 Ok(value) => value,
@@ -206,13 +209,40 @@ pub(crate) async fn dispatch_durable_compute_plugin_sharing_intent(
                     return;
                 }
             };
-            if let Err(error) = state.store.record_node_compute_plugin_sharing_observation(
-                intent,
-                observed.accepted,
-                &observed_json,
-            ) {
-                tracing::warn!(node_id = %intent.node_id, error = %error,
-                    "failed to persist compute plugin sharing observation");
+            let observation_persisted =
+                match state.store.record_node_compute_plugin_sharing_observation(
+                    intent,
+                    observed.accepted,
+                    &observed_json,
+                ) {
+                    Ok(()) => true,
+                    Err(error) => {
+                        tracing::warn!(node_id = %intent.node_id, error = %error,
+                        "failed to persist compute plugin sharing observation");
+                        false
+                    }
+                };
+            if observation_persisted && observed.accepted && intent.plugin_runtime_requested {
+                match state
+                    .store
+                    .prepare_node_compute_plugin_install_plan_preparation_delivery(
+                        intent,
+                        &snapshot_digest,
+                    ) {
+                    Ok(Some(preparation)) => {
+                        install_plan_preparation::dispatch_durable_install_plan_preparation(
+                            state,
+                            &preparation,
+                        )
+                        .await;
+                    }
+                    Ok(None) => {}
+                    Err(error) => tracing::warn!(
+                        node_id = %intent.node_id,
+                        error = %error,
+                        "failed to prepare durable InstallPlan context request"
+                    ),
+                }
             }
         }
         Err(failure) => {

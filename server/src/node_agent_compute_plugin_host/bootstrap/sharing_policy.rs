@@ -110,6 +110,7 @@ impl ComputePluginBootstrapState {
         self.cancellation_generation = next_cancellation_generation;
         self.sharing_requested = snapshot.plugin_runtime_requested;
         self.initialization_plan = initialization_plan;
+        self.last_install_plan_preparation = None;
         self.desired_policy = Some(AcceptedComputePluginSharingPolicy {
             snapshot: snapshot.clone(),
             snapshot_digest,

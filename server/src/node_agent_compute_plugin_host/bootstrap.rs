@@ -3,8 +3,8 @@ use std::{fmt, path::PathBuf, sync::Mutex};
 use anyhow::{bail, Result};
 use elon_pc_dev_runtime::NodeDataPaths;
 use homecli_proto::{
-    ComputePluginSharingAuthorizationBindingV1, ComputePluginSharingPolicyObservedV1,
-    ComputePluginSharingPolicySnapshotV1,
+    ComputePluginInstallPlanPreparationRequestV1, ComputePluginSharingAuthorizationBindingV1,
+    ComputePluginSharingPolicyObservedV1, ComputePluginSharingPolicySnapshotV1,
 };
 use serde::Serialize;
 
@@ -20,12 +20,14 @@ pub(crate) const COMPUTE_PLUGIN_BOOTSTRAP_STATUS_SCHEMA: &str =
 const BOOTSTRAP_PHASE_DISABLED: &str = "disabled";
 const BOOTSTRAP_PHASE_BLOCKED: &str = "blocked";
 
+mod install_plan_preparation;
 mod sharing_policy;
 
 /// Default-disabled owner for the future plugin runtime controller. Applying a desired policy only
 /// replaces dormant in-memory intent. It never pins a root, opens SQLite, performs network I/O,
 /// downloads an artifact, admits work, or launches a process.
 pub(crate) struct ComputePluginBootstrap {
+    bootstrap_instance_id: String,
     state: Mutex<ComputePluginBootstrapState>,
 }
 
@@ -41,6 +43,7 @@ struct ComputePluginBootstrapState {
     desired_policy: Option<AcceptedComputePluginSharingPolicy>,
     authorization_high_water: Option<ComputePluginSharingAuthorizationBindingV1>,
     initialization_plan: Option<DormantComputePluginInitializationPlan>,
+    last_install_plan_preparation: Option<ComputePluginInstallPlanPreparationRequestV1>,
 }
 
 #[derive(Clone)]
@@ -66,6 +69,7 @@ struct DormantComputePluginRootBinding {
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub(crate) struct ComputePluginBootstrapStatus {
     pub schema: &'static str,
+    pub bootstrap_instance_id: String,
     pub phase: &'static str,
     pub configuration_generation: u64,
     pub cancellation_generation: u64,
@@ -76,6 +80,9 @@ pub(crate) struct ComputePluginBootstrapStatus {
     pub authorization_revision: Option<u64>,
     pub authorization_digest: Option<String>,
     pub initialization_plan_prepared: bool,
+    pub install_plan_preparation_observed: bool,
+    pub install_plan_context_ready: bool,
+    pub local_confirmation_available: bool,
     pub installation_identity_valid: bool,
     pub node_data_root_bound: bool,
     pub node_instance_lock_live: bool,
@@ -96,6 +103,7 @@ pub(crate) struct ComputePluginBootstrapStatus {
 impl ComputePluginBootstrap {
     pub(crate) fn new_disabled(install_id: &str, node_data_paths: Option<&NodeDataPaths>) -> Self {
         Self {
+            bootstrap_instance_id: uuid::Uuid::new_v4().to_string(),
             state: Mutex::new(ComputePluginBootstrapState {
                 installation: ComputePluginInstallationIdentity::derive(install_id).ok(),
                 root: node_data_paths.map(DormantComputePluginRootBinding::new),
@@ -108,6 +116,7 @@ impl ComputePluginBootstrap {
                 desired_policy: None,
                 authorization_high_water: None,
                 initialization_plan: None,
+                last_install_plan_preparation: None,
             }),
         }
     }
@@ -182,14 +191,17 @@ impl ComputePluginBootstrap {
         state.root = None;
         state.root_change_requires_restart = true;
         state.initialization_plan = None;
+        state.last_install_plan_preparation = None;
         state.advance_configuration_generation();
     }
 
     pub(crate) fn status(&self) -> ComputePluginBootstrapStatus {
-        match self.state.lock() {
+        let mut status = match self.state.lock() {
             Ok(state) => state.status(),
             Err(_) => ComputePluginBootstrapStatus::poisoned(),
-        }
+        };
+        status.bootstrap_instance_id = self.bootstrap_instance_id.clone();
+        status
     }
 
     fn rejected_observation(
@@ -232,6 +244,22 @@ impl ComputePluginBootstrapState {
                 .as_ref()
                 .is_some_and(|plan| plan.matches(current, self.cancellation_generation))
         });
+        let install_plan_preparation_observed = desired.is_some_and(|current| {
+            self.last_install_plan_preparation
+                .as_ref()
+                .is_some_and(|request| {
+                    self.sharing_requested
+                        && request.node_id == current.snapshot.node_id
+                        && request.owner_user_id == current.snapshot.owner_user_id
+                        && self.installation.as_ref().is_some_and(|installation| {
+                            request.installation_identity_digest == installation.digest()
+                        })
+                        && request.policy_revision == current.snapshot.policy_revision
+                        && request.policy_digest == current.snapshot.policy_digest
+                        && request.policy_snapshot_digest == current.snapshot_digest
+                        && current.snapshot.authorization.as_ref() == Some(&request.authorization)
+                })
+        });
         let mut blocked_reasons = Vec::new();
         if !self.sharing_requested {
             blocked_reasons.push("compute_sharing_disabled");
@@ -259,6 +287,7 @@ impl ComputePluginBootstrapState {
         blocked_reasons.push("production_rollback_anchor_witness_unavailable");
         ComputePluginBootstrapStatus {
             schema: COMPUTE_PLUGIN_BOOTSTRAP_STATUS_SCHEMA,
+            bootstrap_instance_id: String::new(),
             phase: if self.sharing_requested {
                 BOOTSTRAP_PHASE_BLOCKED
             } else {
@@ -273,6 +302,9 @@ impl ComputePluginBootstrapState {
             authorization_revision: authorization.map(|binding| binding.revision),
             authorization_digest: authorization.map(|binding| binding.digest.clone()),
             initialization_plan_prepared,
+            install_plan_preparation_observed,
+            install_plan_context_ready: false,
+            local_confirmation_available: false,
             installation_identity_valid,
             node_data_root_bound,
             node_instance_lock_live,
@@ -311,6 +343,7 @@ impl ComputePluginBootstrapStatus {
     fn poisoned() -> Self {
         Self {
             schema: COMPUTE_PLUGIN_BOOTSTRAP_STATUS_SCHEMA,
+            bootstrap_instance_id: String::new(),
             phase: BOOTSTRAP_PHASE_BLOCKED,
             configuration_generation: 0,
             cancellation_generation: 0,
@@ -321,6 +354,9 @@ impl ComputePluginBootstrapStatus {
             authorization_revision: None,
             authorization_digest: None,
             initialization_plan_prepared: false,
+            install_plan_preparation_observed: false,
+            install_plan_context_ready: false,
+            local_confirmation_available: false,
             installation_identity_valid: false,
             node_data_root_bound: false,
             node_instance_lock_live: false,

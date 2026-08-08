@@ -24,7 +24,17 @@ pub use compute_plugin_sharing::{
     COMPUTE_PLUGIN_SHARING_POLICY_OBSERVED_V1_SCHEMA,
     COMPUTE_PLUGIN_SHARING_POLICY_SNAPSHOT_V1_SCHEMA, COMPUTE_PLUGIN_SHARING_PROTO_VERSION,
 };
-pub const PROTO_VERSION: u32 = COMPUTE_PLUGIN_SHARING_PROTO_VERSION;
+mod compute_plugin_install_plan_preparation;
+pub use compute_plugin_install_plan_preparation::{
+    ComputePluginInstallPlanKeyringBindingV1, ComputePluginInstallPlanPreparationContextV1,
+    ComputePluginInstallPlanPreparationObservedV1, ComputePluginInstallPlanPreparationRequestV1,
+    CAP_COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_V1,
+    COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_CONTEXT_V1_SCHEMA,
+    COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_OBSERVED_V1_SCHEMA,
+    COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_PROTO_VERSION,
+    COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_REQUEST_V1_SCHEMA,
+};
+pub const PROTO_VERSION: u32 = COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_PROTO_VERSION;
 /// The node applies project-scoped build-cache routing, admission, leases, and cleanup.
 pub const CAP_PROJECT_BUILD_CACHE_V1: &str = "project_build_cache_v1";
 /// The node mirrors locally-admitted Codex tasks into the owner's project
@@ -220,6 +230,12 @@ pub enum ServerToAgent {
     ApplyComputePluginSharingPolicyV1 {
         req_id: String,
         snapshot: ComputePluginSharingPolicySnapshotV1,
+    },
+    /// Ask the dormant Bootstrap for the exact facts needed to generate a signed InstallPlan.
+    /// This request cannot pin a root, open authority state, download bytes, or start a process.
+    PrepareComputePluginInstallPlanV1 {
+        req_id: String,
+        request: ComputePluginInstallPlanPreparationRequestV1,
     },
     Ping {
         nonce: Option<String>,
@@ -550,6 +566,11 @@ pub enum AgentToServer {
     ComputePluginSharingPolicyObservedV1 {
         req_id: String,
         observed: ComputePluginSharingPolicyObservedV1,
+    },
+    /// The node observed or rejected one no-side-effect InstallPlan preparation request.
+    ComputePluginInstallPlanPreparationObservedV1 {
+        req_id: String,
+        observed: ComputePluginInstallPlanPreparationObservedV1,
     },
     /// PC 节点上报本机支持的模型列表
     RegisterCapabilities {

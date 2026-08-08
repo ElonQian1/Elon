@@ -8,8 +8,9 @@ use anyhow::{anyhow, Context, Result};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{
     AgentToServer, CliCompletionProducerIdentity, ServerToAgent, CAP_ANDROID_DEVICE_HOST_V1,
-    CAP_COMPUTE_PLUGIN_SHARING_V1, CAP_LOCAL_TASK_PROJECT_SYNC_V1, CAP_PROJECT_BUILD_CACHE_V1,
-    CAP_PROJECT_DOCUMENT_FEDERATION_V1, PROTO_VERSION,
+    CAP_COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_V1, CAP_COMPUTE_PLUGIN_SHARING_V1,
+    CAP_LOCAL_TASK_PROJECT_SYNC_V1, CAP_PROJECT_BUILD_CACHE_V1, CAP_PROJECT_DOCUMENT_FEDERATION_V1,
+    PROTO_VERSION,
 };
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
@@ -179,6 +180,7 @@ pub(super) async fn run_session(
             CAP_PROJECT_DOCUMENT_FEDERATION_V1.to_string(),
             CAP_LOCAL_TASK_PROJECT_SYNC_V1.to_string(),
             CAP_COMPUTE_PLUGIN_SHARING_V1.to_string(),
+            CAP_COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_V1.to_string(),
         ],
         allowed_clis: available_clis.clone(),
         allowed_cwds: vec![],
@@ -365,6 +367,11 @@ pub(super) async fn run_session(
                         } => compute_plugin_sharing::handle_policy_snapshot_v1(
                             runtime, creds, &out_tx_r, req_id, snapshot,
                         ),
+                        ServerToAgent::PrepareComputePluginInstallPlanV1 { req_id, request } => {
+                            compute_plugin_sharing::handle_install_plan_preparation_v1(
+                                runtime, creds, &out_tx_r, req_id, request,
+                            )
+                        }
                         ServerToAgent::LlmStreamRequest {
                             req_id,
                             model,

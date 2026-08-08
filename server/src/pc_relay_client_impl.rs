@@ -537,6 +537,53 @@ pub(super) async fn run_relay_session(
                 );
             }
 
+            // 旧 relay 同样不声明 InstallPlan preparation capability。它没有 Bootstrap、
+            // 本机 authority 或可信时间，因此只能返回无副作用的显式拒绝。
+            ServerToAgent::PrepareComputePluginInstallPlanV1 { req_id, request } => {
+                let observed = homecli_proto::ComputePluginInstallPlanPreparationObservedV1 {
+                    schema:
+                        homecli_proto::COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_OBSERVED_V1_SCHEMA
+                            .to_string(),
+                    preparation_id: request.preparation_id,
+                    node_id: request.node_id,
+                    owner_user_id: request.owner_user_id,
+                    installation_identity_digest: None,
+                    accepted: false,
+                    replayed: false,
+                    context_ready: false,
+                    context: None,
+                    observed_policy_revision: None,
+                    observed_policy_digest: None,
+                    observed_policy_snapshot_digest: None,
+                    observed_authorization: None,
+                    bootstrap_instance_id: "legacy-relay-no-bootstrap".to_string(),
+                    phase: "unsupported_legacy_relay".to_string(),
+                    configuration_generation: 0,
+                    cancellation_generation: 0,
+                    compute_plugin_root_lock_acquired: false,
+                    trusted_time_authority_configured: false,
+                    rollback_anchor_witness_configured: false,
+                    root_pinned: false,
+                    authority_opened: false,
+                    process_fence_acquired: false,
+                    new_work_admission_enabled: false,
+                    downloads_allowed: false,
+                    side_effects_started: false,
+                    blocked_reasons: vec!["compute_plugin_bootstrap_unavailable".to_string()],
+                    error_code: Some(
+                        "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_LEGACY_RELAY_UNSUPPORTED"
+                            .to_string(),
+                    ),
+                };
+                let _ = try_send_json(
+                    &out_tx,
+                    &AgentToServer::ComputePluginInstallPlanPreparationObservedV1 {
+                        req_id,
+                        observed,
+                    },
+                );
+            }
+
             // 更新指令由 node_agent_main 处理；此处静默忽略
             ServerToAgent::UpdateClient { .. } => {}
         }

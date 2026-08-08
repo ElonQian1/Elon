@@ -124,6 +124,7 @@ mod join_requests;
 mod message_recall;
 mod native_sessions;
 mod node_cli_completion_receipts;
+mod node_compute_plugin_install_plan_preparation;
 mod node_compute_plugin_sharing;
 mod node_compute_plugin_sharing_digest;
 mod node_compute_plugin_sharing_rows;
@@ -417,6 +418,7 @@ pub(crate) use external_app_tool_executions::{
 pub use node_cli_completion_receipts::{
     NodeCliCompletionIngestOutcome, NodeCliCompletionReceipt, NodeCliCompletionReceiptInput,
 };
+pub(crate) use node_compute_plugin_install_plan_preparation::NodeComputePluginInstallPlanPreparationDispatchIntent;
 pub use node_compute_plugin_sharing::{
     NodeComputePluginSharingAuthorization, NodeComputePluginSharingConsentRequest,
     NodeComputePluginSharingControlSummary, NodeComputePluginSharingDispatchIntent,
