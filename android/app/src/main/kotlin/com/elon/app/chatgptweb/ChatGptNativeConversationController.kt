@@ -112,8 +112,11 @@ internal class ChatGptNativeConversationController(
 
     fun setBridgeState(state: ChatGptWebPageAdapter.State) {
         val value = snapshot
-        val available = state == ChatGptWebPageAdapter.State.READY && value != null
-        if (available) setControls(value) else setAvailable(false)
+        if (state == ChatGptWebPageAdapter.State.READY && value != null) {
+            setControls(value)
+        } else {
+            setAvailable(false)
+        }
         emptyView.setText(
             when (state) {
                 ChatGptWebPageAdapter.State.READY -> R.string.chatgpt_native_empty
