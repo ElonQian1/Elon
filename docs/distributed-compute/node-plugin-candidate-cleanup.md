@@ -2,7 +2,7 @@
 
 ## 1. 状态
 
-当前状态为 `partial_implementation_mixed`。Windows 受管文件系统、私有 cleanup authorization Store、确定性 topology typed Store、首对象四阶段 journal（delete intent、强 disposition、parent absence、parent namespace durability）、原子 completion Store 内核，以及各 Store 的进程内 outcome-uncertain recovery 已形成代码。远程 canonical 截至序号 2 的基线通过 `elon-pc-node` 编译、24 项清理定向测试及 1 项包含 topology/journal 对象的 schema 建库与重开测试；本批累计新增的序号 3/4、minifilter v1 固定二进制协议和独立特权组件供应链合同遵照快速铺设策略只执行 Rust 格式化、静态差异和文档门禁，未编译、未测试。topology 与四个 step Store 均独立提交并 exact readback。序号 4 已写出“同一 retained parent handle 上重证 absence → Windows native barrier → 再次重证 absence → 独立 Store”的完整类型/事务形状，提交不确定恢复也不会重复物理操作；mutation fence 已从可复用借用改为线性租约，精确绑定对象/父 identity、cleanup/plan/authorization receipt、installation、authority/process epoch 与 ordinal，并随 pre/post retry、terminal custody、物理能力和 Store recovery 一直移动。v1 wire 现已固定 Describe/Acquire/Query/Release、完整 grant/session/scope 回读、稳定 release nonce 和规范 descriptor 摘要；特权组件 Manifest/InstallPlan 与普通插件 Publisher 权限完全分离，并把 `.sys/.inf/.cat`、Windows catalog 策略、Node 版本范围和回滚代次纳入首方签名合同。但租约仍没有安全构造器，特权组件信任验证与安装门仍固定失败，仓库也没有 WDK 驱动或真实 Filter Manager transport。微软明确规定目录 R/RH oplock 对子项增删的 break 只是 advisory，变更不等待 ACK，因此不能作为此类型的后端。普通 parent handle 也无法排除同权限外部进程在 flush/post-proof 窗口执行瞬时同名 ABA；在签名 minifilter 或等价隔离执行域真正落地前，安全代码不能签发 `ManagedNamespaceDurable`，更不能接入 Host。后续还缺真实 fence 后端、其余 ordinal、terminal journal、跨重启物理恢复和生产 Host，当前不会自动清理生产失败候选。
+当前状态为 `partial_implementation_mixed`。Windows 受管文件系统、私有 cleanup authorization Store、确定性 topology typed Store、首对象四阶段 journal（delete intent、强 disposition、parent absence、parent namespace durability）、原子 completion Store 内核，以及各 Store 的进程内 outcome-uncertain recovery 已形成代码。当前 canonical 已通过 `elon-pc-node` 编译、32 项候选清理定向测试及 1 项包含 topology/journal 对象的 schema 建库与重开测试；sequence 3/4 的新增证据覆盖纯 builder hash-chain/篡改拒绝及 SQLite exact-row/列篡改拒绝，不代表完整 Store 事务或真实 Windows namespace barrier 已验收。topology 与四个 step Store 均独立提交并 exact readback。序号 4 已写出“同一 retained parent handle 上重证 absence → Windows native barrier → 再次重证 absence → 独立 Store”的完整类型/事务形状，提交不确定恢复也不会重复物理操作；mutation fence 已从可复用借用改为线性租约，精确绑定对象/父 identity、cleanup/plan/authorization receipt、installation、authority/process epoch 与 ordinal，并随 pre/post retry、terminal custody、物理能力和 Store recovery 一直移动。v1 wire 现已固定 Describe/Acquire/Query/Release、完整 grant/session/scope 回读、稳定 release nonce 和规范 descriptor 摘要；特权组件 Manifest/InstallPlan 与普通插件 Publisher 权限完全分离，并把 `.sys/.inf/.cat`、Windows catalog 策略、Node 版本范围和回滚代次纳入首方签名合同。但租约仍没有安全构造器，特权组件信任验证与安装门仍固定失败，仓库也没有 WDK 驱动或真实 Filter Manager transport，且 wire/特权供应链尚无独立 codec、签名或安装测试。微软明确规定目录 R/RH oplock 对子项增删的 break 只是 advisory，变更不等待 ACK，因此不能作为此类型的后端。普通 parent handle 也无法排除同权限外部进程在 flush/post-proof 窗口执行瞬时同名 ABA；在签名 minifilter 或等价隔离执行域真正落地前，安全代码不能签发 `ManagedNamespaceDurable`，更不能接入 Host。后续还缺真实 fence 后端、其余 ordinal、terminal journal、跨重启物理恢复和生产 Host，当前不会自动清理生产失败候选。
 
 本文只维护失败候选清理边界。候选本机真源见 `node-plugin-local-authority.md`，健康失败与 quarantine 见 `node-ready-capability.md`，staging 物化见 `node-plugin-archive-extraction.md`。
 
@@ -75,7 +75,7 @@ cleanup authorization Store 当前执行以下单一事务：fresh read failed s
 
 当前生产路径不会自动删除失败候选，也不会创建新候选、恢复下载或允许重试。私有代码能够签发 cleanup authorization、封存 exact topology，并完成首对象 intent → 原句柄强 disposition → durable disposition event → durable parent absence → 真实 parent namespace barrier → durable namespace event 的分段能力链，同时具备终态 journal 之后的原子 completion 内核；但后续 ordinal 与 terminal journal producer 未实现，完整流水线不可达且未由 Host 调用。首对象到达 `namespace_durable` 仍不能对外表现为 owner 已释放或候选可重建。
 
-`namespace_durable` 已从 schema 名称推进为 ordinal 0 的私有物理/typed Store 架构，但当前不可构造的 mutation fence 会阻止安全代码真正生成该能力。已写部分依赖同一 retained parent handle、Windows native barrier、post-barrier absence proof、可信时间与 exact journal readback，且调用方不能用裸字符串或摘要伪造；外部同权限 writer 的瞬时 ABA fence、旧执行器强路径适配、后续对象、物理 evidence v2 与 terminal journal producer 仍未实现，因此 completion 入口依然不可达。本批 sequence 3/4 路线尚未编译或运行。
+`namespace_durable` 已从 schema 名称推进为 ordinal 0 的私有物理/typed Store 架构，但当前不可构造的 mutation fence 会阻止安全代码真正生成该能力。已写部分依赖同一 retained parent handle、Windows native barrier、post-barrier absence proof、可信时间与 exact journal readback，且调用方不能用裸字符串或摘要伪造；sequence 3/4 已随节点编译并通过纯 builder 与 exact-row 定向测试。外部同权限 writer 的瞬时 ABA fence、真实 barrier/fresh/recovery 事务夹具、旧执行器强路径适配、后续对象、物理 evidence v2 与 terminal journal producer 仍未实现，因此 completion 入口依然不可达。
 
 现有物理执行器的 v1 `execution_evidence_digest` 只聚合进程内 delete-disposition 步骤，尚无不可变 evidence row，也未绑定 `execution_plan_digest` 与逐对象 `object_digest`。completion Store 之前必须持久化并重算该证据，或升级为包含这些绑定的 evidence v2；它与 `terminal_journal_digest` 是两条独立证据链，禁止重新合并为同一摘要。
 
@@ -122,7 +122,7 @@ Acquire 中的 parent handle 只是一龙唯一 NodeAgent 进程句柄表中的�
 
 ## 6. 当前验证
 
-远程 canonical 截至序号 2 的基线已通过 `elon-pc-node` 编译和 24 项清理定向测试：
+当前 canonical 已通过 `elon-pc-node` 编译和 32 项候选清理定向测试：
 
 1. 以 create-new 句柄删除精确文件，再删除目录；
 2. 非空目录删除失败后保留原目录 custody，删除子文件后用同一 custody 重试；
@@ -148,8 +148,16 @@ Acquire 中的 parent handle 只是一龙唯一 NodeAgent 进程句柄表中的�
 22. disposition event 拒绝不晚于 intent 的可信时间或对象种类绑定漂移；
 23. disposition event Store 写入后可 exact round-trip 事件列、JSON 与摘要；
 24. disposition event Store 在前序摘要列被篡改后拒绝 durable adoption。
+25. parent-absence event 对相同 plan、intent、disposition、对象绑定和可信时间产生稳定摘要，并以前序 disposition digest 建立 hash chain；
+26. parent-absence event 拒绝不晚于 disposition 的可信时间或对象绑定漂移；
+27. parent-absence event Store 行写入后可 exact round-trip `observed_identity_digest = NULL`、事件列、JSON 与摘要；
+28. parent-absence event Store 行在 observed identity 被篡改后拒绝 exact adoption；
+29. namespace-durable event 对相同 sequence 3、对象绑定、primitive/filesystem kind 和可信时间产生稳定摘要，并以前序 absence digest 建立 hash chain；
+30. namespace-durable event 拒绝不晚于 absence 的可信时间或不支持的 filesystem kind；
+31. namespace-durable event Store 行写入后可 exact round-trip durability kind/evidence、事件列、JSON 与摘要；
+32. namespace-durable event Store 行在 evidence digest 被篡改后拒绝 exact adoption。
 
-前三项 Windows 测试只证明旧底层句柄删除语义，第四项只证明目录排序函数，第五至八项覆盖 completion，第九至十三项覆盖 topology，第十四至十七项覆盖首 intent 纯构建与 Store exact readback，第十八至二十项覆盖原句柄强 disposition、父句柄别名失败保管和 pending-to-plan 绑定，第二十一至二十四项覆盖 disposition event 构建、链接和 Store exact readback；它们仍没有运行 retained custody → cleanup authorization → topology → intent → physical disposition → disposition Store 的完整事务夹具。另有 1 项 schema 定向测试证明 cleanup authorization/completion、四张 execution topology/journal 表及相关 trigger 可以安装并按相同指纹重开。本批 sequence 3/4 代码只运行仓库规定的 Rust 格式化与静态门禁，没有运行 Cargo 编译、单元测试、完整事务夹具或真实 Windows namespace barrier；因此不得把它们计入上述 24 项。现有验证仍不覆盖 native directory flush、序号 3/4 fresh/recovery 事务、跨重启物理恢复或生产 Host 接线。
+前三项 Windows 测试只证明旧底层句柄删除语义，第四项只证明目录排序函数，第五至八项覆盖 completion，第九至十三项覆盖 topology，第十四至十七项覆盖首 intent 纯构建与 Store exact readback，第十八至二十项覆盖原句柄强 disposition、父句柄别名失败保管和 pending-to-plan 绑定，第二十一至二十四项覆盖 disposition event 构建、链接和 Store exact readback，第二十五至三十二项只覆盖 sequence 3/4 纯 builder 链和 SQLite exact-row 语义。另有 1 项 schema 定向测试证明 cleanup authorization/completion、四张 execution topology/journal 表及相关 trigger 可以安装并按相同指纹重开。现有验证仍没有运行 retained custody → cleanup authorization → topology → intent → physical disposition → disposition Store → parent observation → absence Store → namespace barrier → namespace Store 的完整事务夹具，也不覆盖真实 parent-relative OS observation、native directory flush、序号 3/4 authority/owner fresh/recovery 事务、minifilter transport、跨重启物理恢复或生产 Host 接线。
 
 ## 7. 下一批实现边界
 
