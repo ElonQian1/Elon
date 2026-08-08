@@ -60,6 +60,10 @@ pub(super) fn validate_session_and_prepare_request(
     PolicyBindingSessionFacts,
 )> {
     let snapshot = intent.snapshot();
+    let authority_root = authority
+        .path()
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_POLICY_BINDING_AUTHORITY_PATH_INVALID"))?;
     validate_compute_plugin_sharing_policy_snapshot_v1(snapshot)
         .map_err(|error| anyhow::anyhow!(error.code()))?;
     let calculated_snapshot_digest = compute_plugin_sharing_policy_snapshot_digest(snapshot)
@@ -70,8 +74,8 @@ pub(super) fn validate_session_and_prepare_request(
         || !is_sha256(root.root_identity_digest())
         || root.node_data_paths() != intent.node_data_paths()
         || root.compute_plugin_root() != intent.compute_plugin_root()
-        || root.compute_plugin_root() != authority.path().parent().unwrap_or_default()
-        || intent.compute_plugin_root() != authority.path().parent().unwrap_or_default()
+        || root.compute_plugin_root() != authority_root
+        || intent.compute_plugin_root() != authority_root
         || intent.bootstrap_instance_id().is_empty()
         || intent.configuration_generation() == 0
         || intent.cancellation_generation() == 0
@@ -91,21 +95,18 @@ pub(super) fn validate_session_and_prepare_request(
     }
     let policy_revision = i64::try_from(snapshot.policy_revision)
         .context("COMPUTE_PLUGIN_POLICY_BINDING_REVISION_RANGE")?;
-    let (authorization_ref, authorization_revision, authorization_digest) = snapshot
-        .authorization
-        .as_ref()
-        .map(|binding| {
-            Ok((
-                binding.authorization_ref.clone(),
-                i64::try_from(binding.revision)
-                    .context("COMPUTE_PLUGIN_POLICY_BINDING_AUTHORIZATION_REVISION_RANGE")?,
-                binding.digest.clone(),
-            ))
-        })
-        .transpose()?
-        .map_or((None, None, None), |(reference, revision, digest)| {
-            (Some(reference), Some(revision), Some(digest))
-        });
+    let (authorization_ref, authorization_revision, authorization_digest) =
+        if let Some(binding) = snapshot.authorization.as_ref() {
+            let revision = i64::try_from(binding.revision)
+                .context("COMPUTE_PLUGIN_POLICY_BINDING_AUTHORIZATION_REVISION_RANGE")?;
+            (
+                Some(binding.authorization_ref.clone()),
+                Some(revision),
+                Some(binding.digest.clone()),
+            )
+        } else {
+            (None, None, None)
+        };
     let policy_snapshot_json =
         serde_json::to_string(snapshot).context("COMPUTE_PLUGIN_POLICY_BINDING_SNAPSHOT_JSON")?;
     if policy_snapshot_json.len() > 65_536 {
@@ -303,7 +304,7 @@ pub(super) fn project(
         inventory_revision_before: before.inventory_revision,
         inventory_revision_after: inventory_after.inventory_revision,
         inventory_digest_before: before.inventory_digest.clone(),
-        inventory_digest_after,
+        inventory_digest_after: inventory_after_digest,
         authority_epoch_before: before.authority_epoch,
         authority_epoch_after: checked_next(before.authority_epoch, "AUTHORITY_EPOCH")?,
         process_owner_epoch: before.process_owner_epoch,
