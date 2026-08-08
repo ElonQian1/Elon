@@ -9,6 +9,7 @@ class ChatGptWebNavigationPolicyTest {
     fun allowsChatGptOpenAiAndSupportedIdentityHosts() {
         listOf(
             "https://chatgpt.com/",
+            ChatGptWebNavigationPolicy.AUTH_URL,
             "https://auth.openai.com/log-in",
             "https://accounts.google.com/o/oauth2/v2/auth",
             "https://login.microsoftonline.com/common/oauth2/authorize",

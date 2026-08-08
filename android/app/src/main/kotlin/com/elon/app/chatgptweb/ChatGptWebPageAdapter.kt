@@ -57,6 +57,17 @@ internal class ChatGptWebPageAdapter(
         webView.evaluateJavascript(adapterScript, null)
     }
 
+    fun onPageStarted(url: String) {
+        val state = if (
+            listenerInstalled && ChatGptWebNavigationPolicy.supportsEnhancedMode(url)
+        ) {
+            State.CONNECTING
+        } else {
+            State.WEB_ONLY
+        }
+        onStateChanged(state)
+    }
+
     fun sendPrompt(prompt: String) = runCommand("send_prompt", prompt.take(MAX_PROMPT_LENGTH))
 
     fun stopGeneration() = runCommand("stop_generation")

@@ -5,6 +5,7 @@ import java.util.Locale
 
 internal object ChatGptWebNavigationPolicy {
     const val START_URL = "https://chatgpt.com/"
+    const val AUTH_URL = "https://chatgpt.com/auth/login"
 
     private val allowedDomainSuffixes = setOf(
         "chatgpt.com",

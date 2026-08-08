@@ -45,6 +45,32 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun quickLoginUsesOurShellAndKeepsCredentialsOnOfficialPages() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val controller = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeLoginController.kt"
+        )
+        val layout = readRepositoryFile(
+            "android/app/src/main/res/layout/activity_chatgpt_web_test.xml"
+        )
+        val loginRootStart = layout.indexOf("android:id=\"@+id/chatGptQuickRoot\"")
+        val loginRootEnd = layout.indexOf("android:id=\"@+id/chatGptNativeRoot\"")
+        val loginShell = layout.substring(loginRootStart, loginRootEnd)
+
+        assertTrue(layout.contains("android:id=\"@+id/chatGptModeQuick\""))
+        assertTrue(loginShell.contains("android:id=\"@+id/chatGptQuickLogin\""))
+        assertTrue(loginShell.contains("android:id=\"@+id/chatGptQuickOfficial\""))
+        assertFalse(loginShell.contains("<EditText"))
+        assertTrue(activity.contains("loadUrl(ChatGptWebNavigationPolicy.AUTH_URL)"))
+        assertTrue(activity.contains("loginController.onAuthenticated()"))
+        listOf("getCookie(", "Authorization", "OkHttpClient", "evaluateJavascript").forEach {
+            assertFalse("quick login controller must not contain $it", controller.contains(it))
+        }
+    }
+
+    @Test
     fun initialPageLoadWaitsForLocalProxyPreparationWithoutExportingCredentials() {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"

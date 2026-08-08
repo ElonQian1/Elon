@@ -20,6 +20,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var binding: ActivityChatgptWebTestBinding
     private lateinit var pageAdapter: ChatGptWebPageAdapter
     private lateinit var nativeController: ChatGptNativeConversationController
+    private lateinit var loginController: ChatGptNativeLoginController
     private lateinit var proxyController: ChatGptWebProxyController
     private var proxyStatus = ChatGptWebProxyStatus("手机网络")
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
@@ -91,10 +92,32 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         )
         pageAdapter.install()
 
+        loginController = ChatGptNativeLoginController(
+            context = this,
+            stageView = binding.chatGptQuickStage,
+            elapsedView = binding.chatGptQuickElapsed,
+            primaryButton = binding.chatGptQuickLogin,
+            officialButton = binding.chatGptQuickOfficial,
+            onOpenAuthentication = {
+                binding.chatGptModeWeb.isChecked = true
+                binding.chatGptWebView.stopLoading()
+                binding.chatGptWebView.loadUrl(ChatGptWebNavigationPolicy.AUTH_URL)
+            },
+            onOpenOfficialPage = {
+                binding.chatGptModeWeb.isChecked = true
+                if (binding.chatGptWebView.url == null) {
+                    binding.chatGptWebView.loadUrl(ChatGptWebNavigationPolicy.START_URL)
+                }
+            },
+            onOpenNativeConversation = {
+                if (binding.chatGptModeNative.isEnabled) binding.chatGptModeNative.isChecked = true
+            },
+        )
+
         binding.chatGptModeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (isChecked) showNativeMode(checkedId == R.id.chatGptModeNative)
+            if (isChecked) showMode(checkedId)
         }
-        binding.chatGptModeWeb.isChecked = true
+        binding.chatGptModeQuick.isChecked = true
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -153,6 +176,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     private fun showLoading(url: String) {
+        pageAdapter.onPageStarted(url)
+        loginController.onPageStarted(url)
         binding.chatGptWebHost.text = ChatGptWebNavigationPolicy.displayHost(url)
         binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_text_secondary))
         binding.chatGptWebStatus.text = statusWithProxy(R.string.chatgpt_web_loading)
@@ -160,6 +185,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun showReady(url: String) {
         cookieManager.flush()
+        loginController.onPageReady(url)
         binding.chatGptWebHost.text = ChatGptWebNavigationPolicy.displayHost(url)
         binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_success))
         binding.chatGptWebStatus.text = statusWithProxy(R.string.chatgpt_web_ready)
@@ -172,6 +198,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 nativeController.render(event.value)
                 if (event.value.composerReady || event.value.messages.isNotEmpty()) {
                     pageAdapter.markReady()
+                    if (loginController.onAuthenticated()) {
+                        binding.chatGptModeNative.isChecked = true
+                    }
                 }
                 if (event.value.title.isNotBlank()) binding.chatGptWebHost.text = event.value.title
             }
@@ -197,11 +226,18 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         }
     }
 
-    private fun showNativeMode(nativeMode: Boolean) {
-        binding.chatGptWebView.visibility = if (nativeMode) View.INVISIBLE else View.VISIBLE
+    private fun showMode(checkedId: Int) {
+        val quickMode = checkedId == R.id.chatGptModeQuick
+        val nativeMode = checkedId == R.id.chatGptModeNative
+        binding.chatGptQuickRoot.visibility = if (quickMode) View.VISIBLE else View.GONE
+        binding.chatGptWebView.visibility = if (quickMode || nativeMode) View.INVISIBLE else View.VISIBLE
         binding.chatGptNativeRoot.visibility = if (nativeMode) View.VISIBLE else View.GONE
         binding.chatGptWebStatus.text = statusWithProxy(
-            if (nativeMode) R.string.chatgpt_native_active else R.string.chatgpt_web_ready,
+            when {
+                quickMode -> R.string.chatgpt_quick_status
+                nativeMode -> R.string.chatgpt_native_active
+                else -> R.string.chatgpt_web_ready
+            },
         )
     }
 
@@ -215,6 +251,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     private fun showError(message: String) {
+        loginController.onPageError()
         binding.chatGptWebProgress.visibility = View.GONE
         binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_danger))
         binding.chatGptWebStatus.text = "$message · ${proxyStatus.label}".take(160)
@@ -230,7 +267,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     private fun clearSession() {
-        binding.chatGptModeWeb.isChecked = true
+        binding.chatGptModeQuick.isChecked = true
+        loginController.reset()
         cookieManager.removeAllCookies {
             cookieManager.flush()
             WebStorage.getInstance().deleteAllData()
@@ -261,6 +299,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        loginController.dispose()
         pageAdapter.dispose()
         binding.chatGptWebView.apply {
             stopLoading()
