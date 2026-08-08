@@ -93,7 +93,6 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onEvent = ::handleBridgeEvent,
             onStateChanged = ::handleBridgeState,
         )
-        pageAdapter.install()
 
         modeController = ChatGptWebModeController(
             window = window,
@@ -141,6 +140,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
         renderWebAuthenticationStatus()
         modeController.attach()
+        // install() reports its initial state synchronously, so every callback consumer
+        // must be initialized before the bridge is installed.
+        pageAdapter.install()
     }
 
     @SuppressLint("SetJavaScriptEnabled")

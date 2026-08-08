@@ -71,6 +71,19 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun bridgeInstallationWaitsUntilEveryStateConsumerIsInitialized() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val install = activity.indexOf("pageAdapter.install()")
+
+        assertTrue(install > activity.indexOf("modeController = ChatGptWebModeController("))
+        assertTrue(install > activity.indexOf("loginController = ChatGptNativeLoginController("))
+        assertTrue(install > activity.indexOf("googleAccountHintController = ChatGptGoogleAccountHintController("))
+        assertTrue(install > activity.indexOf("modeController.attach()"))
+    }
+
+    @Test
     fun quickLoginUsesOurShellAndKeepsCredentialsOnOfficialPages() {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
