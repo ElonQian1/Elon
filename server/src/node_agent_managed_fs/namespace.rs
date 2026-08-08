@@ -1,13 +1,20 @@
 use std::{ffi::OsStr, ffi::OsString, fmt};
 
+mod durability;
 mod lifecycle;
 
+pub(crate) use durability::{
+    ManagedNamespaceDurabilityFailure, ManagedNamespaceDurabilityFailureCustody,
+    ManagedNamespaceDurabilityFailurePhase, ManagedNamespaceDurabilityRetainedCustody,
+    ManagedNamespaceDurable, ManagedNamespaceMutationFence,
+    ManagedNamespacePostBarrierObservationRetry, ManagedNamespacePreBarrierRetry,
+};
 pub(super) use lifecycle::PlatformParentRelativeObservation;
 pub(crate) use lifecycle::{
     ManagedDeleteDisposition, ManagedExpectedIdentityMatchPresence,
-    ManagedNamespaceDurabilityFailure, ManagedNamespaceDurable, ManagedNamespaceObservationFailure,
-    ManagedParentRelativeAbsence, ManagedParentRelativeIdentityConflict,
-    ManagedParentRelativeObservation, QuarantinedManagedNamespaceObject,
+    ManagedNamespaceObservationFailure, ManagedParentRelativeAbsence,
+    ManagedParentRelativeIdentityConflict, ManagedParentRelativeObservation,
+    QuarantinedManagedNamespaceObject,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

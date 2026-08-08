@@ -14,31 +14,36 @@ use windows_sys::{
     Wdk::{
         Foundation::OBJECT_ATTRIBUTES,
         Storage::FileSystem::{
-            NtCreateFile, FILE_CREATE, FILE_DIRECTORY_FILE, FILE_NON_DIRECTORY_FILE, FILE_OPEN,
+            NtCreateFile, NtFlushBuffersFileEx, FILE_CREATE, FILE_DIRECTORY_FILE,
+            FILE_NON_DIRECTORY_FILE, FILE_OPEN,
             FILE_OPEN_REPARSE_POINT as NT_FILE_OPEN_REPARSE_POINT, FILE_SYNCHRONOUS_IO_NONALERT,
         },
     },
     Win32::{
         Foundation::{
             RtlNtStatusToDosError, HANDLE, INVALID_HANDLE_VALUE, NTSTATUS, STATUS_NO_SUCH_FILE,
-            STATUS_OBJECT_NAME_NOT_FOUND, UNICODE_STRING,
+            STATUS_OBJECT_NAME_NOT_FOUND, STATUS_SUCCESS, UNICODE_STRING,
         },
         Storage::FileSystem::{
             FileDispositionInfoEx, FileIdInfo, GetFileInformationByHandle,
-            GetFileInformationByHandleEx, GetFinalPathNameByHandleW, SetFileInformationByHandle,
-            BY_HANDLE_FILE_INFORMATION, DELETE, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL,
-            FILE_ATTRIBUTE_REPARSE_POINT, FILE_DISPOSITION_FLAG_DELETE,
-            FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE, FILE_DISPOSITION_FLAG_POSIX_SEMANTICS,
-            FILE_DISPOSITION_INFO_EX, FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
-            FILE_GENERIC_READ, FILE_GENERIC_WRITE, FILE_ID_INFO, FILE_NAME_NORMALIZED,
-            FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE,
-            FILE_TRAVERSE, SYNCHRONIZE, VOLUME_NAME_GUID,
+            GetFileInformationByHandleEx, GetFinalPathNameByHandleW, GetVolumeInformationByHandleW,
+            SetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION, DELETE,
+            FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_NORMAL, FILE_ATTRIBUTE_REPARSE_POINT,
+            FILE_DISPOSITION_FLAG_DELETE, FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE,
+            FILE_DISPOSITION_FLAG_POSIX_SEMANTICS, FILE_DISPOSITION_INFO_EX,
+            FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT, FILE_GENERIC_READ,
+            FILE_GENERIC_WRITE, FILE_ID_INFO, FILE_NAME_NORMALIZED, FILE_READ_ATTRIBUTES,
+            FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_TRAVERSE, FILE_WRITE_DATA,
+            SYNCHRONIZE, VOLUME_NAME_GUID,
         },
         System::{Kernel::OBJ_CASE_INSENSITIVE, IO::IO_STATUS_BLOCK},
     },
 };
 
-use super::{namespace::PlatformParentRelativeObservation, PlatformFileIdentity};
+use super::{
+    namespace::PlatformParentRelativeObservation, PlatformFileIdentity,
+    PlatformNamespaceDurabilityReceipt, PlatformNamespaceFlushFailure,
+};
 
 const MAX_FINAL_PATH_UTF16: usize = 32_768;
 
@@ -63,14 +68,31 @@ pub(super) fn open_directory_relative(parent: &File, name: &OsStr) -> std::io::R
     )
 }
 
+/// Opens a directory inside the managed root with the minimum directory-write bit required by the
+/// native namespace durability barrier. Delete sharing remains denied, so the same retained handle
+/// also continues to fence rename or deletion of the directory itself.
+pub(super) fn open_managed_directory_relative(
+    parent: &File,
+    name: &OsStr,
+) -> std::io::Result<File> {
+    open_relative(
+        parent,
+        name,
+        FILE_READ_ATTRIBUTES | FILE_TRAVERSE | FILE_WRITE_DATA | SYNCHRONIZE,
+        FILE_OPEN,
+        FILE_DIRECTORY_FILE | NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+    )
+}
+
 pub(super) fn create_new_directory_relative(parent: &File, name: &OsStr) -> std::io::Result<File> {
     open_relative(
         parent,
         name,
-        FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRONIZE | DELETE,
+        FILE_READ_ATTRIBUTES | FILE_TRAVERSE | FILE_WRITE_DATA | SYNCHRONIZE | DELETE,
         FILE_CREATE,
         FILE_DIRECTORY_FILE | NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
-        FILE_SHARE_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
     )
 }
 
@@ -81,10 +103,10 @@ pub(super) fn open_directory_relative_deletable(
     open_relative(
         parent,
         name,
-        FILE_READ_ATTRIBUTES | FILE_TRAVERSE | SYNCHRONIZE | DELETE,
+        FILE_READ_ATTRIBUTES | FILE_TRAVERSE | FILE_WRITE_DATA | SYNCHRONIZE | DELETE,
         FILE_OPEN,
         FILE_DIRECTORY_FILE | NT_FILE_OPEN_REPARSE_POINT | FILE_SYNCHRONOUS_IO_NONALERT,
-        FILE_SHARE_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
     )
 }
 
@@ -175,6 +197,101 @@ pub(super) fn delete_by_handle(file: &File) -> std::io::Result<()> {
         return Err(std::io::Error::last_os_error());
     }
     Ok(())
+}
+
+/// Flushes directory data, metadata, and the underlying storage cache synchronously.
+pub(super) fn flush_namespace_directory(
+    directory: &File,
+) -> Result<PlatformNamespaceDurabilityReceipt, PlatformNamespaceFlushFailure> {
+    let filesystem_kind =
+        ensure_supported_namespace_durability_filesystem(directory).map_err(|error| {
+            if error.kind() == std::io::ErrorKind::Unsupported {
+                PlatformNamespaceFlushFailure::unsupported(error)
+            } else {
+                PlatformNamespaceFlushFailure::retryable(error)
+            }
+        })?;
+    let mut io_status = MaybeUninit::<IO_STATUS_BLOCK>::uninit();
+    // SAFETY: the borrowed File owns a live write-capable directory handle, flags=0 is the normal
+    // data+metadata+storage-cache flush, and the synchronous output buffer remains live.
+    let status = unsafe {
+        NtFlushBuffersFileEx(
+            directory.as_raw_handle() as HANDLE,
+            0,
+            std::ptr::null(),
+            0,
+            io_status.as_mut_ptr(),
+        )
+    };
+    if status < 0 {
+        return Err(PlatformNamespaceFlushFailure::retryable(ntstatus_error(
+            status,
+        )));
+    }
+    if status != STATUS_SUCCESS {
+        return Err(PlatformNamespaceFlushFailure::outcome_uncertain(
+            ntstatus_error(status),
+        ));
+    }
+    // SAFETY: STATUS_SUCCESS means the synchronous routine initialized the output block.
+    let io_status = unsafe { io_status.assume_init() };
+    // SAFETY: the Status arm is the documented completion result for this call.
+    let completion_status = unsafe { io_status.Anonymous.Status };
+    if completion_status != STATUS_SUCCESS {
+        return Err(PlatformNamespaceFlushFailure::outcome_uncertain(
+            ntstatus_error(completion_status),
+        ));
+    }
+    Ok(PlatformNamespaceDurabilityReceipt::new(filesystem_kind))
+}
+
+fn ensure_supported_namespace_durability_filesystem(
+    directory: &File,
+) -> std::io::Result<&'static str> {
+    let mut filesystem_name = [0u16; 32];
+    // SAFETY: the borrowed File owns a live handle and the UTF-16 output buffer is writable for
+    // the advertised length. Optional outputs are null as permitted by the API.
+    if unsafe {
+        GetVolumeInformationByHandleW(
+            directory.as_raw_handle() as HANDLE,
+            std::ptr::null_mut(),
+            0,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            filesystem_name.as_mut_ptr(),
+            filesystem_name.len() as u32,
+        )
+    } == 0
+    {
+        return Err(std::io::Error::last_os_error());
+    }
+    let length = filesystem_name
+        .iter()
+        .position(|value| *value == 0)
+        .unwrap_or(filesystem_name.len());
+    let filesystem = String::from_utf16(&filesystem_name[..length]).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "NODE_MANAGED_NAMESPACE_FILESYSTEM_NAME_INVALID",
+        )
+    })?;
+    if filesystem.eq_ignore_ascii_case("NTFS") {
+        Ok("ntfs")
+    } else if filesystem.eq_ignore_ascii_case("ReFS") {
+        Ok("refs")
+    } else if filesystem.eq_ignore_ascii_case("FAT") {
+        Ok("fat")
+    } else if filesystem.eq_ignore_ascii_case("FAT32") {
+        Ok("fat32")
+    } else if filesystem.eq_ignore_ascii_case("exFAT") {
+        Ok("exfat")
+    } else {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "NODE_MANAGED_NAMESPACE_FILESYSTEM_UNSUPPORTED",
+        ))
+    }
 }
 
 fn open_relative(

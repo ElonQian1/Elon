@@ -47,8 +47,8 @@ pub(crate) struct ManagedDirectoryDeleteFailure {
 }
 
 impl PinnedManagedRoot {
-    /// Pins one existing directory with DELETE access only on the final path component. Prefixes
-    /// retain the ordinary traverse-only access used by the managed root.
+    /// Pins one existing directory with DELETE access only on the final path component. Managed
+    /// prefixes retain their flush-capable access but never gain DELETE or delete sharing.
     pub(crate) fn pin_existing_directory_for_cleanup(
         &self,
         relative: &Path,
@@ -66,7 +66,7 @@ impl PinnedManagedRoot {
             let file = if index == last_index {
                 platform::open_directory_relative_deletable(parent.as_ref(), &component)
             } else {
-                platform::open_directory_relative(parent.as_ref(), &component)
+                platform::open_managed_directory_relative(parent.as_ref(), &component)
             }
             .with_context(|| format!("NODE_MANAGED_CLEANUP_DIRECTORY_OPEN {}", path.display()))?;
             let identity = platform::inspect(&file).with_context(|| {

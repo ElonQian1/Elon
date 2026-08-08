@@ -4,7 +4,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::{namespace::PlatformParentRelativeObservation, PlatformFileIdentity};
+use super::{
+    namespace::PlatformParentRelativeObservation, PlatformFileIdentity,
+    PlatformNamespaceDurabilityReceipt, PlatformNamespaceFlushFailure,
+};
 
 fn unsupported() -> std::io::Error {
     std::io::Error::new(
@@ -18,6 +21,13 @@ pub(super) fn open_initial_directory(_path: &Path) -> std::io::Result<File> {
 }
 
 pub(super) fn open_directory_relative(_parent: &File, _name: &OsStr) -> std::io::Result<File> {
+    Err(unsupported())
+}
+
+pub(super) fn open_managed_directory_relative(
+    _parent: &File,
+    _name: &OsStr,
+) -> std::io::Result<File> {
     Err(unsupported())
 }
 
@@ -60,6 +70,12 @@ pub(super) fn open_existing_file_relative_deletable(
 
 pub(super) fn delete_by_handle(_file: &File) -> std::io::Result<()> {
     Err(unsupported())
+}
+
+pub(super) fn flush_namespace_directory(
+    _directory: &File,
+) -> Result<PlatformNamespaceDurabilityReceipt, PlatformNamespaceFlushFailure> {
+    Err(PlatformNamespaceFlushFailure::unsupported(unsupported()))
 }
 
 pub(super) fn observe_child_relative(

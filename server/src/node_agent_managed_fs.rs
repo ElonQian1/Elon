@@ -21,6 +21,7 @@ mod open;
 #[cfg(not(windows))]
 #[path = "node_agent_managed_fs/unsupported.rs"]
 mod platform;
+mod platform_durability;
 mod read;
 mod types;
 mod write;
@@ -32,9 +33,16 @@ pub(crate) use delete::{
 pub(crate) use hash::{ManagedFileHashFailure, ManagedFileHashPhase, ManagedFileHashResult};
 pub(crate) use namespace::{
     ManagedDeleteDisposition, ManagedExpectedIdentityMatchPresence,
-    ManagedNamespaceDurabilityFailure, ManagedNamespaceDurable, ManagedNamespaceObservationFailure,
+    ManagedNamespaceDurabilityFailure, ManagedNamespaceDurabilityFailureCustody,
+    ManagedNamespaceDurabilityFailurePhase, ManagedNamespaceDurabilityRetainedCustody,
+    ManagedNamespaceDurable, ManagedNamespaceMutationFence, ManagedNamespaceObservationFailure,
+    ManagedNamespacePostBarrierObservationRetry, ManagedNamespacePreBarrierRetry,
     ManagedObjectBinding, ManagedParentRelativeAbsence, ManagedParentRelativeIdentityConflict,
     ManagedParentRelativeObservation, QuarantinedManagedNamespaceObject,
+};
+use platform_durability::{
+    PlatformNamespaceDurabilityReceipt, PlatformNamespaceFlushFailure,
+    PlatformNamespaceFlushFailureKind,
 };
 pub(crate) use read::ManagedFileReadCursor;
 pub(crate) use types::{
@@ -75,16 +83,20 @@ impl PinnedManagedRoot {
         let mut root_identity = initial_identity;
         let mut root_handles = Vec::with_capacity(components.len() + 1);
         root_handles.push(Arc::new(initial_file));
-        for component in components {
+        let last_index = components.len() - 1;
+        for (index, component) in components.into_iter().enumerate() {
             current_path.push(&component);
             let parent = root_handles
                 .last()
                 .ok_or_else(|| anyhow!("NODE_MANAGED_ROOT_PARENT_HANDLE_MISSING"))?;
-            let file = Arc::new(
-                platform::open_directory_relative(parent.as_ref(), &component).with_context(
-                    || format!("NODE_MANAGED_ROOT_PREFIX_OPEN {}", current_path.display()),
-                )?,
-            );
+            let opened = if index == last_index {
+                platform::open_managed_directory_relative(parent.as_ref(), &component)
+            } else {
+                platform::open_directory_relative(parent.as_ref(), &component)
+            };
+            let file = Arc::new(opened.with_context(|| {
+                format!("NODE_MANAGED_ROOT_PREFIX_OPEN {}", current_path.display())
+            })?);
             let identity = platform::inspect(&file).with_context(|| {
                 format!(
                     "NODE_MANAGED_ROOT_PREFIX_INSPECT {}",
@@ -148,7 +160,8 @@ impl PinnedManagedRoot {
                     ));
                 }
             };
-            let file = match platform::open_directory_relative(parent.as_ref(), &component) {
+            let file = match platform::open_managed_directory_relative(parent.as_ref(), &component)
+            {
                 Ok(file) => file,
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                     match platform::create_new_directory_relative(parent.as_ref(), &component) {
@@ -160,7 +173,10 @@ impl PinnedManagedRoot {
                             if create_error.kind() == std::io::ErrorKind::AlreadyExists =>
                         {
                             filesystem_mutated = true;
-                            match platform::open_directory_relative(parent.as_ref(), &component) {
+                            match platform::open_managed_directory_relative(
+                                parent.as_ref(),
+                                &component,
+                            ) {
                                 Ok(file) => file,
                                 Err(error) => {
                                     return Err(directory_prepare_failure(
@@ -253,7 +269,7 @@ impl PinnedManagedRoot {
                 .last()
                 .ok_or_else(|| anyhow!("NODE_MANAGED_DIRECTORY_PARENT_HANDLE_MISSING"))?;
             let file = Arc::new(
-                platform::open_directory_relative(parent.as_ref(), &component)
+                platform::open_managed_directory_relative(parent.as_ref(), &component)
                     .with_context(|| format!("NODE_MANAGED_DIRECTORY_OPEN {}", path.display()))?,
             );
             let identity = platform::inspect(&file)

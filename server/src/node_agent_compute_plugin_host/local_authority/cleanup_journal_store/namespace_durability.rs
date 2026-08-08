@@ -9,42 +9,24 @@ use super::{
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::{
-        HashedComputePluginCandidateCleanupStepEvent, SealedCandidateCleanupTopology,
-        ValidatedCandidateCleanupDeleteIntentPermit,
+        HashedComputePluginCandidateCleanupStepEvent, PhysicallyDurableCandidateCleanupNamespace,
+        ValidatedCandidateCleanupNamespaceDurabilityPermit,
     },
     fetch_contract::ComputePluginFetchCancellationGuard,
     manifest_validation::is_sha256,
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
-mod absence;
-mod disposition;
-mod namespace_durability;
 mod recovery;
 mod validation;
 mod write;
 
-pub(in crate::node_agent_compute_plugin_host) use absence::{
-    ComputePluginCandidateCleanupParentAbsenceAuthoritySession,
-    ComputePluginCandidateCleanupParentAbsenceRecoveryAuthoritySession,
-    ComputePluginCandidateCleanupParentAbsenceRecoveryOutcome,
-};
-pub(in crate::node_agent_compute_plugin_host) use disposition::{
-    ComputePluginCandidateCleanupDispositionAuthoritySession,
-    ComputePluginCandidateCleanupDispositionRecoveryAuthoritySession,
-    ComputePluginCandidateCleanupDispositionRecoveryOutcome,
-};
-pub(in crate::node_agent_compute_plugin_host) use namespace_durability::{
-    ComputePluginCandidateCleanupNamespaceDurabilityAuthoritySession,
+pub(in crate::node_agent_compute_plugin_host) use recovery::{
     ComputePluginCandidateCleanupNamespaceDurabilityRecoveryAuthoritySession,
     ComputePluginCandidateCleanupNamespaceDurabilityRecoveryOutcome,
 };
-pub(in crate::node_agent_compute_plugin_host) use recovery::{
-    ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession,
-    ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome,
-};
 
-pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateCleanupDeleteIntentAuthoritySession<
+pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateCleanupNamespaceDurabilityAuthoritySession<
     'authority,
 > {
     authority: &'authority ComputePluginLocalAuthority,
@@ -55,16 +37,18 @@ pub(in crate::node_agent_compute_plugin_host) struct ComputePluginCandidateClean
 }
 
 impl ComputePluginLocalAuthority {
-    pub(in crate::node_agent_compute_plugin_host) fn bind_candidate_cleanup_delete_intent_authority_session<
+    pub(in crate::node_agent_compute_plugin_host) fn bind_candidate_cleanup_namespace_durability_authority_session<
         'authority,
     >(
         &'authority self,
         process_fence: &'authority ComputePluginFetchProcessFence,
         observation: ComputePluginTrustedTimeObservation,
+        physical: &PhysicallyDurableCandidateCleanupNamespace,
         prepared_at: Instant,
-    ) -> Result<ComputePluginCandidateCleanupDeleteIntentAuthoritySession<'authority>> {
+    ) -> Result<ComputePluginCandidateCleanupNamespaceDurabilityAuthoritySession<'authority>> {
         let trusted_now = observation.trusted_now().clone();
         let observed_at = observation.observed_at();
+        let namespace = physical.namespace();
         if !self
             .instance_binding()
             .matches(process_fence.authority_instance_binding())
@@ -75,22 +59,30 @@ impl ComputePluginLocalAuthority {
             || process_fence.process_owner_epoch() <= 0
             || process_fence.acquired_at_ms() < 0
             || observed_at <= process_fence.acquired_observed_at()
+            || physical.parent_absence_observed_at() <= physical.disposition_set_at()
+            || namespace.barrier_completed_at() <= physical.parent_absence_observed_at()
+            || namespace.post_absence_observed_at() <= namespace.barrier_completed_at()
+            || namespace.completed_at() < namespace.post_absence_observed_at()
+            || observed_at <= namespace.completed_at()
             || prepared_at <= observed_at
             || trusted_now.timestamp_millis() < process_fence.acquired_at_ms()
+            || trusted_now.timestamp_millis() <= physical.absence_event().event().recorded_at_ms()
         {
-            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_SESSION_INVALID");
+            bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_NAMESPACE_DURABILITY_SESSION_INVALID");
         }
-        Ok(ComputePluginCandidateCleanupDeleteIntentAuthoritySession {
-            authority: self,
-            process_fence,
-            trusted_now,
-            observed_at,
-            clock_epoch_digest: observation.clock_epoch_digest().to_string(),
-        })
+        Ok(
+            ComputePluginCandidateCleanupNamespaceDurabilityAuthoritySession {
+                authority: self,
+                process_fence,
+                trusted_now,
+                observed_at,
+                clock_epoch_digest: observation.clock_epoch_digest().to_string(),
+            },
+        )
     }
 }
 
-impl ComputePluginCandidateCleanupDeleteIntentAuthoritySession<'_> {
+impl ComputePluginCandidateCleanupNamespaceDurabilityAuthoritySession<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn authority_instance_binding(
         &self,
     ) -> &ComputePluginAuthorityInstanceBinding {
@@ -125,24 +117,24 @@ impl ComputePluginCandidateCleanupDeleteIntentAuthoritySession<'_> {
         guard.ensure_current()
     }
 
-    pub(in crate::node_agent_compute_plugin_host) fn validate_candidate_cleanup_delete_intent(
+    pub(in crate::node_agent_compute_plugin_host) fn validate_candidate_cleanup_namespace_durability(
         &self,
-        sealed: &SealedCandidateCleanupTopology,
+        physical: &PhysicallyDurableCandidateCleanupNamespace,
         event: &HashedComputePluginCandidateCleanupStepEvent,
     ) -> Result<()> {
-        self.validate_source(sealed.state().cancellation_guard())?;
+        self.validate_source(physical.state().cancellation_guard())?;
         self.authority.with_deferred(|transaction| {
-            validation::validate_unstored_intent(transaction, self, sealed, event)
+            validation::validate_unstored_namespace_durability(transaction, self, physical, event)
         })
     }
 
-    pub(in crate::node_agent_compute_plugin_host) fn persist_candidate_cleanup_delete_intent(
+    pub(in crate::node_agent_compute_plugin_host) fn persist_candidate_cleanup_namespace_durability(
         &self,
-        permit: ValidatedCandidateCleanupDeleteIntentPermit<'_>,
+        permit: ValidatedCandidateCleanupNamespaceDurabilityPermit<'_>,
     ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
-        self.validate_source(permit.sealed().state().cancellation_guard())?;
+        self.validate_source(permit.physical().state().cancellation_guard())?;
         self.authority.with_immediate(|transaction| {
-            write::persist_candidate_cleanup_delete_intent(transaction, self, permit)
+            write::persist_candidate_cleanup_namespace_durability(transaction, self, permit)
         })
     }
 }

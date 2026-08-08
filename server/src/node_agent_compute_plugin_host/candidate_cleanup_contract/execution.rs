@@ -20,6 +20,7 @@ use crate::node_agent_managed_fs::PinnedManagedDirectory;
 mod absence_step;
 mod delete_steps;
 mod evidence;
+mod namespace_durability_step;
 mod preparation;
 mod strong_step;
 
@@ -43,6 +44,17 @@ use evidence::{build_hashed_execution_evidence, ComputePluginCandidateCleanupSte
 pub(in crate::node_agent_compute_plugin_host) use evidence::{
     validate_hashed_execution_evidence, ComputePluginCandidateCleanupExecutionEvidence,
     HashedComputePluginCandidateCleanupExecutionEvidence,
+};
+pub(super) use namespace_durability_step::{
+    make_candidate_cleanup_namespace_durable, retry_candidate_cleanup_namespace_durability,
+    retry_candidate_cleanup_namespace_post_barrier_observation,
+};
+pub(in crate::node_agent_compute_plugin_host) use namespace_durability_step::{
+    CandidateCleanupNamespaceDurabilityFailure, CandidateCleanupNamespaceDurabilityFailureCustody,
+    CandidateCleanupNamespaceDurabilityFailurePhase,
+    CandidateCleanupNamespaceDurabilityRetainedCustody,
+    CandidateCleanupNamespaceDurabilityRetryCustody,
+    CandidateCleanupNamespacePostBarrierRetryCustody, PhysicallyDurableCandidateCleanupNamespace,
 };
 pub(super) use strong_step::{
     retry_candidate_cleanup_delete_disposition, set_candidate_cleanup_delete_disposition,
@@ -223,7 +235,7 @@ impl CandidateCleanupExecutionState {
         self.completed_steps.len()
     }
 
-    pub(super) fn execution_plan_digest(&self) -> Option<&str> {
+    pub(in crate::node_agent_compute_plugin_host) fn execution_plan_digest(&self) -> Option<&str> {
         self.execution_plan_digest.as_deref()
     }
 

@@ -18,6 +18,8 @@ mod absence_recovery_key;
 mod builder;
 mod disposition;
 mod disposition_recovery_key;
+mod namespace_durability;
+mod namespace_durability_recovery_key;
 mod recovery_key;
 mod types;
 
@@ -41,6 +43,19 @@ pub(in crate::node_agent_compute_plugin_host) use disposition::{
     PreparedCandidateCleanupDisposition, ValidatedCandidateCleanupDispositionPermit,
 };
 pub(in crate::node_agent_compute_plugin_host) use disposition_recovery_key::CandidateCleanupDispositionRecoveryKey;
+pub(in crate::node_agent_compute_plugin_host) use namespace_durability::{
+    adopt_recovered_candidate_cleanup_namespace_durability,
+    prepare_candidate_cleanup_namespace_durability, store_candidate_cleanup_namespace_durability,
+    CandidateCleanupNamespaceDurabilityOutcomeUncertainCustody,
+    CandidateCleanupNamespaceDurabilityPreparationFailure,
+    CandidateCleanupNamespaceDurabilityRecoveryAdoption,
+    CandidateCleanupNamespaceDurabilityRecoveryAdoptionFailure,
+    CandidateCleanupNamespaceDurabilityRecoveryAdoptionPhase,
+    CandidateCleanupNamespaceDurabilityStoreFailure, CandidateCleanupNamespaceDurabilityStorePhase,
+    DurableCandidateCleanupNamespace, PreparedCandidateCleanupNamespaceDurability,
+    ValidatedCandidateCleanupNamespaceDurabilityPermit,
+};
+pub(in crate::node_agent_compute_plugin_host) use namespace_durability_recovery_key::CandidateCleanupNamespaceDurabilityRecoveryKey;
 pub(in crate::node_agent_compute_plugin_host) use recovery_key::CandidateCleanupDeleteIntentRecoveryKey;
 pub(in crate::node_agent_compute_plugin_host) use types::{
     restore_hashed_cleanup_step_event, validate_hashed_cleanup_step_event,
@@ -49,6 +64,7 @@ pub(in crate::node_agent_compute_plugin_host) use types::{
 
 pub(in crate::node_agent_compute_plugin_host) use builder::{
     build_exact_handle_disposition_event, build_initial_delete_intent,
+    build_namespace_durability_evidence_digest, build_namespace_durable_event,
     build_parent_namespace_absence_event,
 };
 
