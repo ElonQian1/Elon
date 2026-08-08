@@ -1,7 +1,6 @@
 use std::{
     fs,
     path::{Path, PathBuf},
-    process::Command,
     sync::{Arc, Barrier},
     thread,
 };
@@ -66,7 +65,7 @@ impl TestWorkspace {
             uuid::Uuid::new_v4().simple()
         ));
         fs::create_dir_all(&path).unwrap();
-        let status = Command::new("git")
+        let status = crate::git_command_error::git_command()
             .args(["init", "--quiet"])
             .current_dir(&path)
             .status()
