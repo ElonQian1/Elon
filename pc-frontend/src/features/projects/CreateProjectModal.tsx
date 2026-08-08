@@ -32,6 +32,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
   const [template, setTemplate] = useState('android_kotlin')
   const [repoUrl, setRepoUrl] = useState('')
   const [branch, setBranch] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [creationTarget, setCreationTarget] = useState<'server' | 'pc_node'>(TARGET_CLOUD)
   const [selectedNode, setSelectedNode] = useState('')
   const [storageChoice, setStorageChoice] = useState(STORAGE_NONE)
@@ -269,6 +270,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
       </button>
     </div>
   )
+  const advancedVisible = showAdvanced || creationTarget === TARGET_LOCAL
   const submitDisabled = submitting
     || (creationTarget === TARGET_LOCAL && (nodesLoading || !!nodesError || !selectedNode))
 
@@ -279,7 +281,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
         <header className={styles.header}>
           <div>
             <h2 className={styles.title}>{quickMode ? '创建项目' : '新建项目'}</h2>
-            <p className={styles.subtitle}>{quickMode ? '先从一个轻量项目开始' : '云端 APK 开发项目'}</p>
+            <p className={styles.subtitle}>{quickMode ? '先从一个轻量项目开始' : '输入名称，马上开始'}</p>
           </div>
           {!quickMode && (
             <button className={styles.closeBtn} type="button" onClick={onClose}>×</button>
@@ -298,13 +300,6 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
             />
           </label>
 
-          {!quickMode && (
-            <label className={styles.field}>
-              <span>项目描述（可选）</span>
-              <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="简短描述" />
-            </label>
-          )}
-
           <label className={styles.field}>
             <span>模板</span>
             <select value={template} onChange={(e) => setTemplate(e.target.value)}>
@@ -313,10 +308,31 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
             </select>
           </label>
 
-          {targetChoices}
+          <div className={styles.quickStart}>
+            <span>{creationTarget === TARGET_CLOUD
+              ? '默认创建到云端，无需安装电脑客户端'
+              : '项目文件将直接保存到你选择的电脑'}</span>
+            <button
+              type="button"
+              className={styles.advancedToggle}
+              aria-expanded={advancedVisible}
+              onClick={() => setShowAdvanced((value) => !value)}
+            >
+              {advancedVisible ? '收起设置' : '高级设置'}
+            </button>
+          </div>
 
-          {!quickMode && (
+          {advancedVisible && (
             <>
+              {!quickMode && (
+                <label className={styles.field}>
+                  <span>项目描述（可选）</span>
+                  <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="简短描述" />
+                </label>
+              )}
+
+              {targetChoices}
+
               {creationTarget === TARGET_LOCAL && nodeSelect}
 
               {creationTarget === TARGET_LOCAL && <label className={styles.field}>
@@ -351,10 +367,6 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
             </>
           )}
 
-          {quickMode && creationTarget === TARGET_LOCAL && (
-            nodeSelect
-          )}
-
           {error && <p className={styles.error}>{error}</p>}
 
           <div className={styles.actions}>
@@ -364,7 +376,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
               </button>
             )}
             <button type="submit" className={styles.submitBtn} disabled={submitDisabled}>
-              {submitting ? '创建中…' : quickMode ? '创建项目' : '创建'}
+              {submitting ? '创建中…' : '创建项目'}
             </button>
           </div>
         </form>
