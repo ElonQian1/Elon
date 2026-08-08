@@ -11,6 +11,8 @@ import styles from './CreateProjectModal.module.css'
 
 const STORAGE_NONE = 'none'
 const STORAGE_AUTO = 'auto'
+const TARGET_CLOUD = 'server'
+const TARGET_LOCAL = 'pc_node'
 type LocalClientState = 'checking' | 'offline' | 'not_logged_in' | 'not_connected' | 'connected'
 
 export interface CreateProjectOptions {
@@ -30,6 +32,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
   const [template, setTemplate] = useState('android_kotlin')
   const [repoUrl, setRepoUrl] = useState('')
   const [branch, setBranch] = useState('')
+  const [creationTarget, setCreationTarget] = useState<'server' | 'pc_node'>(TARGET_CLOUD)
   const [selectedNode, setSelectedNode] = useState('')
   const [storageChoice, setStorageChoice] = useState(STORAGE_NONE)
   const [nodes, setNodes] = useState<ProjectNode[]>([])
@@ -109,7 +112,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
     e.preventDefault()
     const trimName = clean(name)
     if (!trimName) { setError('请输入项目名'); return }
-    if (!selectedNode) { setError('请先选择开发环境'); return }
+    if (creationTarget === TARGET_LOCAL && !selectedNode) { setError('请先选择开发环境'); return }
     setError('')
     setSubmitting(true)
     try {
@@ -119,13 +122,13 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
         template: template || 'android_kotlin',
         repo_url: clean(repoUrl) || null,
         branch: clean(branch) || null,
-        execution_target: 'pc_node',
-        node_id: selectedNode,
+        execution_target: creationTarget,
+        node_id: creationTarget === TARGET_LOCAL ? selectedNode : undefined,
         storage_node_id:
-          clean(repoUrl) || storageChoice === STORAGE_AUTO || storageChoice === STORAGE_NONE
+          creationTarget === TARGET_CLOUD || clean(repoUrl) || storageChoice === STORAGE_AUTO || storageChoice === STORAGE_NONE
             ? null
             : storageChoice,
-        skip_storage: !!clean(repoUrl) || storageChoice === STORAGE_NONE,
+        skip_storage: creationTarget === TARGET_CLOUD || !!clean(repoUrl) || storageChoice === STORAGE_NONE,
       })
       onCreated?.(result.project ?? {})
       onClose()
@@ -161,7 +164,9 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
           ? `电脑已连接，但暂时不能创建项目。原因：${firstBlockedWarning}`
           : '电脑已连接，但暂时不能创建项目。请打开开发平台查看详情。')
         : ''
-  const showNodeRecovery = !nodesLoading && (!selectedNode || !!nodesError || selectableNodeCount === 0)
+  const showNodeRecovery = creationTarget === TARGET_LOCAL
+    && !nodesLoading
+    && (!selectedNode || !!nodesError || selectableNodeCount === 0)
   const localClientHint = {
     checking: '正在检查电脑客户端状态…',
     offline: '没有检测到正在运行的电脑客户端。请先下载并安装，然后打开它。',
@@ -187,7 +192,7 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
       : localClientHint
   const nodeSelect = (
     <label className={styles.field}>
-      <span>项目创建位置</span>
+      <span>选择你的电脑</span>
       <select
         value={selectedNode}
         onChange={(e) => setSelectedNode(e.target.value)}
@@ -240,7 +245,32 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
       )}
     </label>
   )
-  const submitDisabled = submitting || nodesLoading || !!nodesError || !selectedNode
+  const targetChoices = (
+    <div className={styles.targetChoices} role="radiogroup" aria-label="项目创建位置">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={creationTarget === TARGET_CLOUD}
+        className={`${styles.targetCard} ${creationTarget === TARGET_CLOUD ? styles.targetCardActive : ''}`}
+        onClick={() => { setCreationTarget(TARGET_CLOUD); setError('') }}
+      >
+        <strong>云端创建（推荐）</strong>
+        <span>无需安装电脑客户端，先在线创建项目</span>
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={creationTarget === TARGET_LOCAL}
+        className={`${styles.targetCard} ${creationTarget === TARGET_LOCAL ? styles.targetCardActive : ''}`}
+        onClick={() => { setCreationTarget(TARGET_LOCAL); setError('') }}
+      >
+        <strong>电脑本地创建</strong>
+        <span>项目文件直接保存到你的电脑</span>
+      </button>
+    </div>
+  )
+  const submitDisabled = submitting
+    || (creationTarget === TARGET_LOCAL && (nodesLoading || !!nodesError || !selectedNode))
 
   const modal = (
     <>
@@ -283,11 +313,13 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
             </select>
           </label>
 
+          {targetChoices}
+
           {!quickMode && (
             <>
-              {nodeSelect}
+              {creationTarget === TARGET_LOCAL && nodeSelect}
 
-              <label className={styles.field}>
+              {creationTarget === TARGET_LOCAL && <label className={styles.field}>
                 <span>代码存储</span>
                 <select value={storageChoice} onChange={(e) => setStorageChoice(e.target.value)}>
                   <option value={STORAGE_NONE}>暂不使用代码存储（推荐）</option>
@@ -300,21 +332,26 @@ export function CreateProjectModal({ quickMode = false, onCreated, onClose }: Pr
                   })}
                 </select>
                 {storageHint && <small className={styles.hint}>{storageHint}</small>}
-              </label>
+              </label>}
 
-              <label className={styles.field}>
+              {creationTarget === TARGET_LOCAL && <label className={styles.field}>
                 <span>导入 Git 仓库（可选）</span>
                 <input value={repoUrl} onChange={(e) => setRepoUrl(e.target.value)} placeholder="https://github.com/..." />
-              </label>
+              </label>}
 
-              <label className={styles.field}>
+              {creationTarget === TARGET_LOCAL && <label className={styles.field}>
                 <span>分支（可选）</span>
                 <input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="main" />
-              </label>
+              </label>}
+              {creationTarget === TARGET_CLOUD && (
+                <p className={styles.targetHint}>
+                  项目会先创建在云端，进入项目后仍可连接电脑进行本地开发。
+                </p>
+              )}
             </>
           )}
 
-          {quickMode && (
+          {quickMode && creationTarget === TARGET_LOCAL && (
             nodeSelect
           )}
 

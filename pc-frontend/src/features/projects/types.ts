@@ -33,8 +33,8 @@ export interface CreateProjectPayload {
   template: string
   repo_url?: string | null
   branch?: string | null
-  execution_target: 'pc_node'
-  node_id: string
+  execution_target: 'pc_node' | 'server'
+  node_id?: string
   storage_node_id?: string | null
   skip_storage: boolean
 }

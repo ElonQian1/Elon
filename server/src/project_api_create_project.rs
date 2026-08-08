@@ -1,7 +1,7 @@
 use super::{archive_project_payload, clean_optional_string, CreateProjectRequest};
 use crate::{
     project_auth::{auth_from_headers, json_error},
-    project_storage, project_workspace_provision,
+    project_storage, project_workspace_provision, tools,
     types::AppState,
 };
 use axum::{
@@ -28,14 +28,30 @@ pub async fn create_project(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or("pc_node");
-    if !["pc_node", "pc"].contains(&execution_target) {
+    let is_server_target = matches!(execution_target, "server" | "cloud");
+    if !["pc_node", "pc", "server", "cloud"].contains(&execution_target) {
         return json_error(
             StatusCode::BAD_REQUEST,
-            "服务器磁盘不再承载新代码项目，请选择在线 PC 节点创建项目",
+            "创建位置无效，请选择云端或电脑本地",
         );
     }
     let requested_repo_url = clean_optional_string(req.repo_url.as_deref());
     let requested_branch = clean_optional_string(req.branch.as_deref());
+    if is_server_target && (requested_repo_url.is_some() || requested_branch.is_some()) {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "云端创建暂不支持直接导入 Git 仓库，请先创建项目，再连接电脑导入",
+        );
+    }
+    if is_server_target
+        && (clean_optional_string(req.node_id.as_deref()).is_some()
+            || clean_optional_string(req.storage_node_id.as_deref()).is_some())
+    {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "云端创建不需要选择电脑或代码存储节点",
+        );
+    }
     if requested_repo_url.is_some()
         && req
             .storage_node_id
@@ -77,6 +93,37 @@ pub async fn create_project(
             }
         };
     }
+    if reused_existing
+        && is_server_target
+        && project
+            .node_id
+            .as_deref()
+            .is_none_or(|value| value.trim().is_empty())
+        && project
+            .workspace_path
+            .as_deref()
+            .is_none_or(|value| value.trim().is_empty())
+    {
+        let workspace = state.get_project_workspace(&project.workspace_key);
+        if let Err(e) =
+            tools::create_project_workspace(&workspace, &project.template, &project.name, &user.id)
+        {
+            return json_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("云端项目工作区初始化失败：{e}"),
+            );
+        }
+        let archive_project = archive_project_payload(&state, &user.id, &project.id).await;
+        return Json(serde_json::json!({
+            "project": project,
+            "archive_project": archive_project,
+            "reused_existing": true,
+            "execution_target": "server",
+            "workspace_status": "ready",
+            "provisioned": true,
+        }))
+        .into_response();
+    }
     if reused_existing {
         if project
             .node_id
@@ -102,6 +149,30 @@ pub async fn create_project(
             StatusCode::CONFLICT,
             "同名项目已存在但尚未绑定 PC 工作区，请先绑定 PC 节点或更换项目名称",
         );
+    }
+
+    if is_server_target {
+        let workspace = state.get_project_workspace(&project.workspace_key);
+        if let Err(e) =
+            tools::create_project_workspace(&workspace, &project.template, &project.name, &user.id)
+        {
+            let _ = state.store.purge_project_records(&user.id, &project.id);
+            return json_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("云端项目工作区初始化失败：{e}"),
+            );
+        }
+        let archive_project = archive_project_payload(&state, &user.id, &project.id).await;
+        return Json(serde_json::json!({
+            "project": project,
+            "archive_project": archive_project,
+            "reused_existing": false,
+            "execution_target": "server",
+            "workspace_status": "ready",
+            "provisioned": true,
+            "workspace_created": true,
+        }))
+        .into_response();
     }
 
     let node_id = match project_workspace_provision::resolve_pc_project_node(

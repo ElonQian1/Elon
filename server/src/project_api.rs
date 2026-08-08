@@ -27,13 +27,13 @@ pub struct CreateProjectRequest {
     pub repo_url: Option<String>,
     /// Optional branch to check out on the PC node.
     pub branch: Option<String>,
-    /// 新项目可创建到任意在线 PC CLI 节点；多节点在线时必须显式指定。
+    /// 本地创建时可指定在线 PC CLI 节点；云端创建不需要节点。
     pub node_id: Option<String>,
     /// 可选：项目代码母仓所在的 PC 硬盘节点；不传时优先自动使用当前用户的在线硬盘节点。
     pub storage_node_id: Option<String>,
     /// PC 工作台新建项目默认跳过代码存储，先让用户拿到可用项目；高级场景再显式启用。
     pub skip_storage: Option<bool>,
-    /// 兼容未来扩展。当前只允许 "pc_node" / "pc" / 空值。
+    /// "server"/"cloud" 表示直接创建服务器工作区；"pc_node"/"pc" 表示创建到电脑。
     pub execution_target: Option<String>,
 }
 
