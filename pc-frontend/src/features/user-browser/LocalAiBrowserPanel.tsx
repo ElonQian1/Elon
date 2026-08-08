@@ -1,47 +1,26 @@
-import { useEffect, useState } from 'react'
-import { LoaderCircle, MonitorUp, ShieldCheck, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { AlertTriangle, Download, LoaderCircle, MonitorUp, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
+import { WIN_CLIENT_DOWNLOAD_URL } from '../node/launchWinClient'
 import {
   clearLocalAiWebSession,
-  isLocalAiBrowserAvailable,
-  listLocalAiWebProviders,
   openLocalAiWebSession,
   type LocalAiWebProvider,
 } from './localAiBrowserApi'
+import type { LocalAiBrowserCapability } from './useLocalAiBrowserCapability'
 import styles from './LocalAiBrowserPanel.module.css'
 
 interface LocalAiBrowserPanelProps {
   ownerKey?: string
   ownerLabel: string
+  capability: LocalAiBrowserCapability
 }
 
-type PanelState = 'desktop_required' | 'loading' | 'ready' | 'error'
-
-export default function LocalAiBrowserPanel({ ownerKey, ownerLabel }: LocalAiBrowserPanelProps) {
-  const desktopAvailable = isLocalAiBrowserAvailable()
-  const [state, setState] = useState<PanelState>(desktopAvailable ? 'loading' : 'desktop_required')
-  const [providers, setProviders] = useState<LocalAiWebProvider[]>([])
+export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }: LocalAiBrowserPanelProps) {
+  const { state, providers, message: capabilityMessage, refresh } = capability
   const [ownerConfirmed, setOwnerConfirmed] = useState(false)
   const [busyProvider, setBusyProvider] = useState<string | null>(null)
   const [openedProvider, setOpenedProvider] = useState<string | null>(null)
   const [message, setMessage] = useState('')
-
-  useEffect(() => {
-    if (!desktopAvailable) return
-    let cancelled = false
-    void listLocalAiWebProviders()
-      .then((items) => {
-        if (cancelled) return
-        setProviders(items)
-        setState('ready')
-        setMessage(items.length ? '' : '桌面壳尚未登记可用的 AI 网页厂商。')
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return
-        setState('error')
-        setMessage(errorMessage(error))
-      })
-    return () => { cancelled = true }
-  }, [desktopAvailable])
 
   async function open(provider: LocalAiWebProvider) {
     if (!ownerKey || !ownerConfirmed || busyProvider) return
@@ -101,15 +80,44 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel }: LocalAiBro
       </div>
 
       <div className={styles.controls}>
-        {!desktopAvailable ? (
+        {state === 'desktop_required' ? (
           <div className={styles.desktopNotice}>
             <MonitorUp size={18} />
             <span>请在一龙 Windows 客户端打开本页；普通浏览器继续使用下方托管模式。</span>
           </div>
-        ) : state === 'loading' ? (
+        ) : state === 'checking' ? (
           <div className={styles.desktopNotice}>
             <LoaderCircle className={styles.spin} size={18} />
-            <span>正在读取桌面端本地厂商注册表…</span>
+            <span>正在确认当前 Win 客户端是否支持 ChatGPT…</span>
+          </div>
+        ) : state === 'upgrade_required' ? (
+          <div className={styles.upgradeNotice}>
+            <AlertTriangle size={20} aria-hidden="true" />
+            <div>
+              <strong>当前 Win 客户端需要更新</strong>
+              <p>{capabilityMessage}</p>
+              <div className={styles.noticeActions}>
+                <a href={WIN_CLIENT_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
+                  <Download size={15} />下载新版 Win 客户端
+                </a>
+                <button type="button" onClick={() => void refresh()}>
+                  <RefreshCw size={15} />更新后重试
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : state === 'error' ? (
+          <div className={styles.upgradeNotice}>
+            <AlertTriangle size={20} aria-hidden="true" />
+            <div>
+              <strong>本地 ChatGPT 功能暂不可用</strong>
+              <p>{capabilityMessage}</p>
+              <div className={styles.noticeActions}>
+                <button type="button" onClick={() => void refresh()}>
+                  <RefreshCw size={15} />重新检查
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           <>
@@ -123,7 +131,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel }: LocalAiBro
                 type="checkbox"
                 checked={ownerConfirmed}
                 onChange={(event) => setOwnerConfirmed(event.target.checked)}
-                disabled={!ownerKey || state === 'error'}
+                disabled={!ownerKey}
               />
               <span>
                 <strong>只登录本人账号</strong>
@@ -168,7 +176,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel }: LocalAiBro
           </>
         )}
 
-        {message && <p className={styles.message} data-error={state === 'error'}>{message}</p>}
+        {message && <p className={styles.message}>{message}</p>}
       </div>
     </section>
   )

@@ -91,6 +91,39 @@
   line-height: 1.6;
 }
 
+.upgradeNotice {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid rgba(224, 112, 112, .42);
+  color: #e78b8b;
+  background: rgba(224, 112, 112, .08);
+}
+
+.upgradeNotice strong { display: block; color: #f3c0c0; font-size: 14px; }
+.upgradeNotice p { margin: 7px 0 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.noticeActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.noticeActions a,
+.noticeActions button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid rgba(132, 226, 194, .35);
+  border-radius: 5px;
+  color: #84e2c2;
+  background: rgba(84, 199, 161, .08);
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: none;
+  cursor: pointer;
+}
+.noticeActions a:hover,
+.noticeActions button:hover { border-color: #84e2c2; background: rgba(84, 199, 161, .14); }
+
 .steps {
   display: grid;
   gap: 9px;

@@ -1,10 +1,18 @@
 import { ExternalLink, LockKeyhole, MessageSquareText } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { isLocalAiBrowserAvailable } from '../user-browser/localAiBrowserApi'
+import useLocalAiBrowserCapability from '../user-browser/useLocalAiBrowserCapability'
 import styles from './ChatGptAccountCard.module.css'
 
 export default function ChatGptAccountCard() {
-  const desktopAvailable = isLocalAiBrowserAvailable()
+  const localBrowser = useLocalAiBrowserCapability()
+  const desktopAvailable = localBrowser.state === 'ready'
+  const status = localBrowser.state === 'upgrade_required'
+    ? '需更新 Win 客户端'
+    : localBrowser.state === 'error'
+      ? '本地功能异常'
+    : localBrowser.state === 'checking'
+      ? '正在检查 Win 能力'
+      : desktopAvailable ? 'Win 本地可用' : '需要 Win 客户端'
 
   return (
     <article className={styles.card}>
@@ -15,7 +23,7 @@ export default function ChatGptAccountCard() {
           <small>登录本人账号，再从一龙打开 ChatGPT</small>
         </div>
         <span className={styles.status} data-ready={desktopAvailable}>
-          {desktopAvailable ? 'Win 本地可用' : '需要 Win 客户端'}
+          {status}
         </span>
       </header>
 

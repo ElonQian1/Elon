@@ -10,6 +10,7 @@ const permission = read('desktop-shell/src-tauri/permissions/local-ai-web-sessio
 const api = read('pc-frontend/src/features/user-browser/localAiBrowserApi.ts')
 const protocol = read('pc-frontend/src/features/user-browser/unifiedAiProtocol.ts')
 const panel = read('pc-frontend/src/features/user-browser/LocalAiBrowserPanel.tsx')
+const capabilityHook = read('pc-frontend/src/features/user-browser/useLocalAiBrowserCapability.ts')
 
 assert.match(rust, /\.data_directory\(profile_directory\)/)
 assert.match(rust, /owner_fingerprint/)
@@ -28,9 +29,15 @@ assert.doesNotMatch(protocol, /authorization|accessToken|cookieValue/)
 
 assert.match(api, /open_local_ai_web_session/)
 assert.match(api, /cookieAccess !== 'webview_only'/)
+assert.match(api, /command\.\+not found\|unknown command/)
+assert.match(api, /upgrade_required/)
+assert.match(api, /typeof error === 'string'/)
 assert.doesNotMatch(api, /startUrl|launchUrl|document\.cookie/)
 assert.match(panel, /只登录本人账号/)
+assert.match(panel, /下载新版 Win 客户端/)
 assert.match(panel, /window\.confirm/)
+assert.match(capabilityHook, /listLocalAiWebProviders/)
+assert.match(capabilityHook, /isLocalAiBrowserUpgradeRequired/)
 
 process.stdout.write('PASS local AI browser security and renderer protocol contract\n')
 

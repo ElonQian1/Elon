@@ -26,6 +26,15 @@ export interface ClearedLocalAiWebSession {
   status: 'cleared'
 }
 
+type LocalAiBrowserErrorCode = 'upgrade_required' | 'desktop_required' | 'invoke_failed'
+
+class LocalAiBrowserError extends Error {
+  constructor(readonly code: LocalAiBrowserErrorCode, message: string) {
+    super(message)
+    this.name = 'LocalAiBrowserError'
+  }
+}
+
 export function isLocalAiBrowserAvailable(): boolean {
   return getDesktopInvoke() !== null
 }
@@ -71,8 +80,40 @@ async function invokeDesktop<T>(
   args?: Record<string, unknown>,
 ): Promise<T> {
   const invoke = getDesktopInvoke()
-  if (!invoke) throw new Error('本地 AI 浏览器仅在一龙 Windows 客户端中可用。')
-  return invoke<T>(command, args)
+  if (!invoke) {
+    throw new LocalAiBrowserError('desktop_required', '本地 AI 浏览器仅在一龙 Windows 客户端中可用。')
+  }
+  try {
+    return await invoke<T>(command, args)
+  } catch (error) {
+    throw normalizeDesktopInvokeError(error)
+  }
+}
+
+export function isLocalAiBrowserUpgradeRequired(error: unknown): boolean {
+  return error instanceof LocalAiBrowserError && error.code === 'upgrade_required'
+}
+
+export function localAiBrowserErrorMessage(error: unknown): string {
+  return error instanceof Error && error.message
+    ? error.message
+    : 'Win 本地浏览器调用失败，请重启客户端后重试。'
+}
+
+function normalizeDesktopInvokeError(error: unknown): LocalAiBrowserError {
+  const raw = error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : ''
+  const incompatible = /command.+not found|unknown command|not allowed|allowlist|permission denied/i.test(raw)
+  if (incompatible) {
+    return new LocalAiBrowserError(
+      'upgrade_required',
+      '当前 Win 客户端版本不包含 ChatGPT 本地浏览器。请下载新版，完全退出旧客户端后重新打开。',
+    )
+  }
+  return new LocalAiBrowserError('invoke_failed', 'Win 本地浏览器调用失败，请重启客户端后重试。')
 }
 
 function assertIdentity(providerId: string, ownerKey: string): void {

@@ -14,7 +14,7 @@ import {
 } from './userBrowserLauncherApi'
 import type { ConsumerDiscoveryMatch } from '../open-commerce/openCommerceClientTypes'
 import LocalAiBrowserPanel from './LocalAiBrowserPanel'
-import { isLocalAiBrowserAvailable } from './localAiBrowserApi'
+import useLocalAiBrowserCapability, { type LocalAiBrowserCapabilityState } from './useLocalAiBrowserCapability'
 import styles from './UserBrowserLauncherPage.module.css'
 
 type Availability = 'checking' | 'ready' | 'unavailable' | 'error'
@@ -27,7 +27,8 @@ export default function UserBrowserLauncherPage() {
   const [ownerConfirmed, setOwnerConfirmed] = useState(false)
   const [launching, setLaunching] = useState(false)
   const [message, setMessage] = useState('')
-  const localBrowserAvailable = isLocalAiBrowserAvailable()
+  const localBrowser = useLocalAiBrowserCapability()
+  const localBrowserAvailable = localBrowser.state === 'ready'
 
   const checkAvailability = useCallback(async () => {
     if (!token || !user) {
@@ -88,7 +89,7 @@ export default function UserBrowserLauncherPage() {
           <h1>登录本人 ChatGPT</h1>
           <p>官方登录 · Cookie 和网页数据仅保存在这台电脑</p>
         </div>
-        <Status availability={availability} localBrowserAvailable={localBrowserAvailable} />
+        <Status availability={availability} localBrowserState={localBrowser.state} />
       </header>
 
       <div className={styles.rule} />
@@ -96,6 +97,7 @@ export default function UserBrowserLauncherPage() {
       <LocalAiBrowserPanel
         ownerKey={user?.id}
         ownerLabel={user?.nickname || user?.account || '未登录'}
+        capability={localBrowser}
       />
 
       {!localBrowserAvailable && <main className={styles.workspace}>
@@ -153,20 +155,33 @@ export default function UserBrowserLauncherPage() {
 
 function Status({
   availability,
-  localBrowserAvailable,
+  localBrowserState,
 }: {
   availability: Availability
-  localBrowserAvailable: boolean
+  localBrowserState: LocalAiBrowserCapabilityState
 }) {
-  const content = localBrowserAvailable
+  const content = localBrowserState === 'ready'
     ? { icon: <CircleCheck size={15} />, label: 'Win 本地可用' }
+    : localBrowserState === 'checking'
+      ? { icon: <LoaderCircle className={styles.spin} size={15} />, label: '检查 Win 能力' }
+    : localBrowserState === 'upgrade_required'
+      ? { icon: <ShieldAlert size={15} />, label: '需更新 Win 客户端' }
+    : localBrowserState === 'error'
+      ? { icon: <ShieldAlert size={15} />, label: '本地功能异常' }
     : availability === 'checking'
     ? { icon: <LoaderCircle className={styles.spin} size={15} />, label: '检查中' }
     : availability === 'ready'
       ? { icon: <CircleCheck size={15} />, label: '模块在线' }
       : { icon: <ShieldAlert size={15} />, label: '不可用' }
   return (
-    <span className={styles.status} data-state={localBrowserAvailable ? 'ready' : availability}>
+    <span
+      className={styles.status}
+      data-state={localBrowserState === 'ready'
+        ? 'ready'
+        : localBrowserState === 'upgrade_required' || localBrowserState === 'error'
+          ? 'error'
+          : availability}
+    >
       {content.icon}{content.label}
     </span>
   )

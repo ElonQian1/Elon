@@ -42,6 +42,16 @@ WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。�
 文档也明确区分浏览器中的 ChatGPT 网页会话与 Codex 客户端的浏览器回调登录：
 [OpenAI authentication](https://learn.chatgpt.com/docs/auth)。
 
+### Win 壳版本握手
+
+`/pc` 页面由服务器即时更新，但 Tauri 命令来自本机 `elon-desktop.exe`，两者可能在用户
+完成 Win 客户端更新前短暂错版。前端不能只凭 `window.__TAURI__` 判定本地浏览器可用：
+
+- 必须实际调用 `list_local_ai_web_providers`，成功且列表非空后才显示“Win 本地可用”；
+- 旧壳返回的 command not found、ACL/allowlist 拒绝要归一化为“需更新 Win 客户端”；
+- 升级提示提供正式 Windows 安装包入口，并说明完全退出旧客户端后重新打开；
+- 其他调用错误使用可重试状态，不能吞掉 Tauri 字符串 rejection 后只显示泛化失败。
+
 ### IPC 与导航边界
 
 - `build.rs` 只把三个本地会话命令登记进 Tauri App Manifest。
