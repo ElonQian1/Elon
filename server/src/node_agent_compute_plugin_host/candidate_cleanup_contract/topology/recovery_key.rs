@@ -3,7 +3,13 @@ use std::{fmt, time::Instant};
 use super::{
     types::HashedComputePluginCandidateCleanupExecutionPlan, PreparedCandidateCleanupTopology,
 };
-use crate::node_agent_compute_plugin_host::local_authority::ComputePluginAuthorityInstanceBinding;
+use crate::node_agent_compute_plugin_host::{
+    candidate_cleanup_contract::CandidateCleanupOwnerExpectation,
+    local_authority::{
+        ComputePluginAuthorityInstanceBinding,
+        HashedComputePluginCandidateCleanupAuthorizationReceipt,
+    },
+};
 
 /// Process-local identity for classifying an uncertain topology transaction. It contains the
 /// expected immutable rows but no filesystem operation and cannot authorize deletion by itself.
@@ -14,12 +20,13 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupTopologyRec
     prepared_at: Instant,
     candidate_token: String,
     plan: HashedComputePluginCandidateCleanupExecutionPlan,
-    authorized_at_ms: i64,
+    authorization_receipt: HashedComputePluginCandidateCleanupAuthorizationReceipt,
+    owner: CandidateCleanupOwnerExpectation,
 }
 
 impl CandidateCleanupTopologyRecoveryKey {
     pub(super) fn from_prepared(prepared: &PreparedCandidateCleanupTopology<'_>) -> Self {
-        let authorization = prepared.state.authorization_receipt().receipt();
+        let state = &prepared.state;
         Self {
             authority_instance_binding: prepared
                 .authority_session
@@ -37,7 +44,8 @@ impl CandidateCleanupTopologyRecoveryKey {
                 .candidate_token()
                 .to_string(),
             plan: prepared.plan.clone(),
-            authorized_at_ms: authorization.authorized_at_ms(),
+            authorization_receipt: state.authorization_receipt().clone(),
+            owner: CandidateCleanupOwnerExpectation::from_staging(state.staging_recovery_key()),
         }
     }
 
@@ -64,7 +72,17 @@ impl CandidateCleanupTopologyRecoveryKey {
         &self.plan
     }
     pub(in crate::node_agent_compute_plugin_host) fn authorized_at_ms(&self) -> i64 {
-        self.authorized_at_ms
+        self.authorization_receipt.receipt().authorized_at_ms()
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn authorization_receipt(
+        &self,
+    ) -> &HashedComputePluginCandidateCleanupAuthorizationReceipt {
+        &self.authorization_receipt
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn owner(
+        &self,
+    ) -> &CandidateCleanupOwnerExpectation {
+        &self.owner
     }
 }
 

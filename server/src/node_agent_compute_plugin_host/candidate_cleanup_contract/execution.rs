@@ -7,8 +7,8 @@ use super::{
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_staging_contract::ComputePluginCandidateStagingRecoveryKey,
-    fetch_contract::ComputePluginFetchCancellationGuard,
     local_authority::{
+        AuthorizedCandidateCleanupDeletionGuard,
         HashedComputePluginCandidateCleanupAuthorizationReceipt,
         HashedComputePluginCandidateHealthQuarantineReceipt,
         HashedComputePluginCandidateStagingReceipt,
@@ -71,7 +71,7 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupExecutionSt
     quarantine_receipt: HashedComputePluginCandidateHealthQuarantineReceipt,
     staging_receipt: HashedComputePluginCandidateStagingReceipt,
     staging_recovery_key: ComputePluginCandidateStagingRecoveryKey,
-    cancellation_guard: ComputePluginFetchCancellationGuard,
+    deletion_guard: AuthorizedCandidateCleanupDeletionGuard,
     extraction_evidence_digest: String,
     root_lock_lease: ComputePluginRootLockLease,
     candidate_parent_anchor: PinnedManagedDirectory,
@@ -100,7 +100,7 @@ pub(in crate::node_agent_compute_plugin_host) struct PhysicallyExecutedCandidate
     quarantine_receipt: HashedComputePluginCandidateHealthQuarantineReceipt,
     staging_receipt: HashedComputePluginCandidateStagingReceipt,
     staging_recovery_key: ComputePluginCandidateStagingRecoveryKey,
-    cancellation_guard: ComputePluginFetchCancellationGuard,
+    deletion_guard: AuthorizedCandidateCleanupDeletionGuard,
     root_lock_lease: ComputePluginRootLockLease,
     candidate_parent_anchor: PinnedManagedDirectory,
     execution_plan_digest: String,
@@ -119,6 +119,10 @@ pub(super) fn prepare_candidate_cleanup_execution(
 pub(super) fn resume_candidate_cleanup_execution(
     mut state: CandidateCleanupExecutionState,
 ) -> std::result::Result<PhysicallyExecutedCandidateCleanup, CandidateCleanupExecutionFailure> {
+    let _operation = match state.deletion_guard.enter_operation() {
+        Ok(operation) => operation,
+        Err(error) => return Err(execution_failure(error, state)),
+    };
     while let Some(file) = state.staging_files.pop_front() {
         if let Err((error, retained)) = delete_file(&mut state.completed_steps, file) {
             state.staging_files.push_front(retained);
@@ -203,7 +207,7 @@ fn finish_execution(
         quarantine_receipt: state.quarantine_receipt,
         staging_receipt: state.staging_receipt,
         staging_recovery_key: state.staging_recovery_key,
-        cancellation_guard: state.cancellation_guard,
+        deletion_guard: state.deletion_guard,
         root_lock_lease: state.root_lock_lease,
         candidate_parent_anchor: state.candidate_parent_anchor,
         execution_plan_digest,
@@ -239,10 +243,10 @@ impl CandidateCleanupExecutionState {
         self.execution_plan_digest.as_deref()
     }
 
-    pub(in crate::node_agent_compute_plugin_host) fn cancellation_guard(
+    pub(in crate::node_agent_compute_plugin_host) fn deletion_guard(
         &self,
-    ) -> &ComputePluginFetchCancellationGuard {
-        &self.cancellation_guard
+    ) -> &AuthorizedCandidateCleanupDeletionGuard {
+        &self.deletion_guard
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn authorization_receipt(
@@ -346,10 +350,10 @@ impl PhysicallyExecutedCandidateCleanup {
         &self.staging_recovery_key
     }
 
-    pub(in crate::node_agent_compute_plugin_host) fn cancellation_guard(
+    pub(in crate::node_agent_compute_plugin_host) fn deletion_guard(
         &self,
-    ) -> &ComputePluginFetchCancellationGuard {
-        &self.cancellation_guard
+    ) -> &AuthorizedCandidateCleanupDeletionGuard {
+        &self.deletion_guard
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn physical_completed_at(&self) -> Instant {
@@ -373,7 +377,7 @@ impl PhysicallyExecutedCandidateCleanup {
         HashedComputePluginCandidateHealthQuarantineReceipt,
         HashedComputePluginCandidateStagingReceipt,
         ComputePluginCandidateStagingRecoveryKey,
-        ComputePluginFetchCancellationGuard,
+        AuthorizedCandidateCleanupDeletionGuard,
         ComputePluginRootLockLease,
         PinnedManagedDirectory,
         String,
@@ -385,7 +389,7 @@ impl PhysicallyExecutedCandidateCleanup {
             self.quarantine_receipt,
             self.staging_receipt,
             self.staging_recovery_key,
-            self.cancellation_guard,
+            self.deletion_guard,
             self.root_lock_lease,
             self.candidate_parent_anchor,
             self.execution_plan_digest,

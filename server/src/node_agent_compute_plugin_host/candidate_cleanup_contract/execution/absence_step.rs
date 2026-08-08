@@ -141,6 +141,16 @@ fn execute_observation(
             CandidateCleanupParentObservationFailureCustody::Retry(retry),
         ));
     }
+    let _operation = match retry.state.deletion_guard().enter_operation() {
+        Ok(operation) => operation,
+        Err(error) => {
+            return Err(observation_failure(
+                CandidateCleanupParentObservationFailurePhase::RejectedBeforeObservation,
+                error,
+                CandidateCleanupParentObservationFailureCustody::Retry(retry),
+            ))
+        }
+    };
     let CandidateCleanupParentObservationRetryCustody {
         state,
         plan,
@@ -278,7 +288,7 @@ fn validate_binding(
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_PARENT_OBSERVATION_BINDING_CHANGED");
     }
-    state.cancellation_guard().ensure_current()
+    state.deletion_guard().ensure_current()
 }
 
 fn observation_failure(

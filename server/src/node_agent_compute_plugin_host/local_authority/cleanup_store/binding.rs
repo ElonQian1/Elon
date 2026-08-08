@@ -3,14 +3,18 @@ use rusqlite::{params, Transaction};
 
 use super::{
     ComputePluginCandidateCleanupAuthorityFacts, ComputePluginCandidateCleanupAuthoritySession,
+    HashedComputePluginCandidateCleanupAuthorizationReceipt,
 };
 use crate::node_agent_compute_plugin_host::{
+    candidate_cleanup_contract::CandidateCleanupOwnerExpectation,
     candidate_health_contract::{
         validate_hashed_candidate_health_failure_observation, DurableCandidateHealthQuarantine,
     },
     identity::ComputePluginReleaseRef,
     lifecycle::{ComputePluginInventorySnapshot, SLOT_FAILED},
-    local_authority::plan_application::read_authority_plan_application_state,
+    local_authority::plan_application::{
+        read_authority_plan_application_state, AuthorityPlanApplicationState,
+    },
     manifest_validation::is_sha256,
     signed_artifact_verification::jcs_sha256_hex,
 };
@@ -115,6 +119,115 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) fn validate_faile
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_SLOT_CHANGED");
     }
     Ok(())
+}
+
+pub(in crate::node_agent_compute_plugin_host::local_authority) fn validate_candidate_cleanup_continuation(
+    transaction: &Transaction<'_>,
+    authority: &AuthorityPlanApplicationState,
+    candidate_token: &str,
+    authorization: &HashedComputePluginCandidateCleanupAuthorizationReceipt,
+    owner: &CandidateCleanupOwnerExpectation,
+) -> Result<()> {
+    let receipt = authorization.receipt();
+    if authority.process_owner_epoch != receipt.process_owner_epoch()
+        || authority.state_revision < receipt.authority_state_revision_after()
+        || authority.inventory.inventory_revision < receipt.inventory_revision()
+        || authority.authority_epoch < receipt.authority_epoch_after()
+        || authority.trusted_time_high_water_ms < receipt.authorized_at_ms()
+        || count_exact_cleanup_authorization(transaction, candidate_token, authorization)? != 1
+        || count_exact_pending_cleanup_owner(transaction, candidate_token, owner)? != 1
+    {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_CONTINUATION_CHANGED");
+    }
+    let slot = owner.slot();
+    validate_failed_candidate_inventory(
+        &authority.inventory,
+        &slot.plugin_id,
+        &slot.slot_ref,
+        &slot.release,
+    )
+}
+
+fn count_exact_cleanup_authorization(
+    transaction: &Transaction<'_>,
+    candidate_token: &str,
+    authorization: &HashedComputePluginCandidateCleanupAuthorizationReceipt,
+) -> Result<i64> {
+    let receipt = authorization.receipt();
+    let receipt_json = serde_json::to_string(receipt)
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_CONTINUATION_AUTHORIZATION_SERIALIZE")?;
+    if jcs_sha256_hex(receipt)? != authorization.receipt_digest() {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_CONTINUATION_AUTHORIZATION_DIGEST_CHANGED");
+    }
+    transaction
+        .query_row(
+            r#"SELECT COUNT(*) FROM candidate_cleanup_authorizations
+               WHERE cleanup_id = ?1 AND candidate_token = ?2
+                 AND candidate_token_digest = ?3 AND quarantine_id = ?4
+                 AND quarantine_receipt_digest = ?5 AND staging_id = ?6
+                 AND staging_run_digest = ?7
+                 AND authority_state_revision_before = ?8
+                 AND authority_state_revision_after = ?9
+                 AND inventory_revision = ?10 AND inventory_digest = ?11
+                 AND authority_epoch_before = ?12 AND authority_epoch_after = ?13
+                 AND process_owner_epoch = ?14
+                 AND trusted_time_high_water_ms_before = ?15
+                 AND authorized_at_ms = ?16 AND slot_phase_before = 'failed'
+                 AND receipt_json = ?17 AND receipt_digest = ?18"#,
+            params![
+                receipt.cleanup_id(),
+                candidate_token,
+                receipt.candidate_token_digest(),
+                receipt.quarantine_id(),
+                receipt.quarantine_receipt_digest(),
+                receipt.staging_id(),
+                receipt.staging_run_digest(),
+                receipt.authority_state_revision_before(),
+                receipt.authority_state_revision_after(),
+                receipt.inventory_revision(),
+                receipt.inventory_digest(),
+                receipt.authority_epoch_before(),
+                receipt.authority_epoch_after(),
+                receipt.process_owner_epoch(),
+                receipt.trusted_time_high_water_ms_before(),
+                receipt.authorized_at_ms(),
+                receipt_json,
+                authorization.receipt_digest(),
+            ],
+            |row| row.get(0),
+        )
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_CONTINUATION_AUTHORIZATION_READ")
+}
+
+fn count_exact_pending_cleanup_owner(
+    transaction: &Transaction<'_>,
+    candidate_token: &str,
+    owner: &CandidateCleanupOwnerExpectation,
+) -> Result<i64> {
+    let release_json = serde_json::to_string(&owner.slot().release)
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_CONTINUATION_OWNER_RELEASE_SERIALIZE")?;
+    transaction
+        .query_row(
+            r#"SELECT COUNT(*) FROM candidate_owners
+               WHERE candidate_token = ?1 AND plugin_id = ?2 AND slot_ref = ?3
+                 AND candidate_generation = ?4 AND release_json = ?5
+                 AND owner_plan_id = ?6 AND owner_plan_digest = ?7
+                 AND application_inventory_revision = ?8 AND state = 'cleanup_pending'
+                 AND closed_at_ms IS NULL AND closed_by_plan_id IS NULL
+                 AND closed_by_plan_digest IS NULL AND close_reason IS NULL"#,
+            params![
+                candidate_token,
+                &owner.slot().plugin_id,
+                &owner.slot().slot_ref,
+                owner.candidate_generation(),
+                release_json,
+                owner.owner_plan_id(),
+                owner.owner_plan_digest(),
+                owner.application_inventory_revision(),
+            ],
+            |row| row.get(0),
+        )
+        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_CONTINUATION_OWNER_READ")
 }
 
 fn validate_staging_row(

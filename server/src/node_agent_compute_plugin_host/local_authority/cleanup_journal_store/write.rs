@@ -19,24 +19,26 @@ pub(super) fn persist_candidate_cleanup_delete_intent(
 ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
     let sealed = permit.sealed();
     let event = permit.event();
-    session.validate_source(sealed.state().cancellation_guard())?;
+    session.validate_source(sealed.state().deletion_guard())?;
     validate_unstored_intent(transaction, session, sealed, event)?;
     let plan = sealed.plan();
     let time_state = read_authority_keyring_state(transaction)?;
-    if time_state.trusted_time_high_water_ms != Some(plan.plan().planned_at_ms())
+    if time_state.trusted_time_high_water_ms < Some(plan.plan().planned_at_ms())
         || time_state.clock_status != "trusted"
-        || event.event().recorded_at_ms() <= plan.plan().planned_at_ms()
+        || time_state
+            .trusted_time_high_water_ms
+            .is_none_or(|high_water| event.event().recorded_at_ms() <= high_water)
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_TIME_CHANGED");
     }
     advance_trusted_time(transaction, &time_state, event.event().recorded_at_ms())?;
-    session.validate_source(sealed.state().cancellation_guard())?;
+    session.validate_source(sealed.state().deletion_guard())?;
     insert_event(transaction, event)?;
     validate_authority_and_owner(transaction, session, sealed, event.event().recorded_at_ms())?;
     let stored = read_exact_step_event(transaction, event)?.ok_or_else(|| {
         anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_READBACK_MISSING")
     })?;
-    session.validate_source(sealed.state().cancellation_guard())?;
+    session.validate_source(sealed.state().deletion_guard())?;
     Ok(stored)
 }
 

@@ -12,6 +12,8 @@ use super::local_authority_schema;
 
 mod candidate_verification_revocation;
 mod cleanup_completion_store;
+mod cleanup_deletion_domain;
+mod cleanup_deletion_guard;
 mod cleanup_journal_store;
 mod cleanup_store;
 mod cleanup_topology_store;
@@ -44,6 +46,10 @@ pub(in crate::node_agent_compute_plugin_host) use cleanup_completion_store::{
     CANDIDATE_CLEANUP_COMPLETION_RECEIPT_DIGEST_ALGORITHM,
     CANDIDATE_CLEANUP_COMPLETION_RECEIPT_SCHEMA,
     HASHED_CANDIDATE_CLEANUP_COMPLETION_RECEIPT_SCHEMA,
+};
+pub(in crate::node_agent_compute_plugin_host) use cleanup_deletion_domain::CandidateCleanupDeletionOperationLease;
+pub(in crate::node_agent_compute_plugin_host) use cleanup_deletion_guard::{
+    AuthorizedCandidateCleanupDeletionGuard, PreparedCandidateCleanupDeletionGuard,
 };
 pub(in crate::node_agent_compute_plugin_host) use cleanup_journal_store::{
     ComputePluginCandidateCleanupDeleteIntentAuthoritySession,
@@ -139,12 +145,14 @@ const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 #[derive(Clone)]
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginAuthorityInstanceBinding {
     identity: Arc<()>,
+    cleanup_deletion_domain: cleanup_deletion_domain::CandidateCleanupDeletionDomain,
 }
 
 impl ComputePluginAuthorityInstanceBinding {
     fn new() -> Self {
         Self {
             identity: Arc::new(()),
+            cleanup_deletion_domain: cleanup_deletion_domain::CandidateCleanupDeletionDomain::new(),
         }
     }
 

@@ -235,7 +235,7 @@ pub(in crate::node_agent_compute_plugin_host) fn adopt_recovered_candidate_clean
             recovery,
         ));
     }
-    if let Err(error) = session.validate_source(recovery.physical.state().cancellation_guard()) {
+    if let Err(error) = session.validate_source(recovery.physical.state().deletion_guard()) {
         return Err(adoption_failure(
             CandidateCleanupNamespaceDurabilityRecoveryAdoptionPhase::RetainedCustodyChanged,
             error,
@@ -337,7 +337,7 @@ fn validate_recovery_provenance(
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_NAMESPACE_RECOVERY_PROVENANCE_CHANGED");
     }
-    session.validate_source(physical.state().cancellation_guard())
+    session.validate_source(physical.state().deletion_guard())
 }
 
 fn preparation_failure(

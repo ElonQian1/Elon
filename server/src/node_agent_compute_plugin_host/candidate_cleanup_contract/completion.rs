@@ -205,7 +205,7 @@ pub(in crate::node_agent_compute_plugin_host) fn adopt_recovered_candidate_clean
         ));
     }
     if let Err(error) =
-        authority_session.validate_source(recovery.terminal.physical().cancellation_guard())
+        authority_session.validate_source(recovery.terminal.physical().deletion_guard())
     {
         return Err(adoption_failure(
             CandidateCleanupCompletionRecoveryAdoptionPhase::RetainedCustodyChanged,
@@ -252,7 +252,7 @@ fn validate_recovery_provenance(
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_COMPLETION_RECOVERY_PROVENANCE_CHANGED");
     }
-    session.validate_source(recovery.terminal.physical().cancellation_guard())
+    session.validate_source(recovery.terminal.physical().deletion_guard())
 }
 
 fn validate_cleanup_completion_receipt(

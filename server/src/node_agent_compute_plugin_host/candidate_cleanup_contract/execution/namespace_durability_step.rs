@@ -1,4 +1,4 @@
-use std::{error::Error as StdError, fmt, time::Instant};
+use std::time::Instant;
 
 use anyhow::{bail, Error, Result};
 
@@ -16,83 +16,15 @@ use crate::node_agent_managed_fs::{
     ManagedNamespacePreBarrierRetry, ManagedObjectBinding,
 };
 
-/// The exact parent namespace passed a real native barrier and post-barrier absence proof. This is
-/// physical custody only; sequence 4 must still be independently committed by its typed Store.
-/// The route remains contract-private until an OS-enforced child-namespace ABA fence supplements
-/// the retained process/root/owner authority fences.
-#[must_use = "physical namespace durability must be journaled or retained for recovery"]
-pub(in crate::node_agent_compute_plugin_host) struct PhysicallyDurableCandidateCleanupNamespace {
-    state: CandidateCleanupExecutionState,
-    plan: HashedComputePluginCandidateCleanupExecutionPlan,
-    intent_event: HashedComputePluginCandidateCleanupStepEvent,
-    disposition_event: HashedComputePluginCandidateCleanupStepEvent,
-    absence_event: HashedComputePluginCandidateCleanupStepEvent,
-    namespace: ManagedNamespaceDurable,
-    disposition_set_at: Instant,
-    parent_absence_observed_at: Instant,
-}
+mod types;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::node_agent_compute_plugin_host) enum CandidateCleanupNamespaceDurabilityFailurePhase {
-    RejectedBeforeDurability,
-    Managed(ManagedNamespaceDurabilityFailurePhase),
-}
-
-pub(in crate::node_agent_compute_plugin_host) enum CandidateCleanupNamespaceDurabilityFailureCustody
-{
-    RejectedParentAbsence {
-        _durable: DurableCandidateCleanupParentAbsence,
-        _mutation_fence: ManagedNamespaceMutationFence,
-    },
-    RetryBeforeBarrier(CandidateCleanupNamespaceDurabilityRetryCustody),
-    RetryAfterBarrier(CandidateCleanupNamespacePostBarrierRetryCustody),
-    Retained(CandidateCleanupNamespaceDurabilityRetainedCustody),
-}
-
-#[must_use = "pre-barrier retry must retain the exact durable absence custody"]
-pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupNamespaceDurabilityRetryCustody
-{
-    state: CandidateCleanupExecutionState,
-    plan: HashedComputePluginCandidateCleanupExecutionPlan,
-    intent_event: HashedComputePluginCandidateCleanupStepEvent,
-    disposition_event: HashedComputePluginCandidateCleanupStepEvent,
-    absence_event: HashedComputePluginCandidateCleanupStepEvent,
-    retry: ManagedNamespacePreBarrierRetry,
-    disposition_set_at: Instant,
-    parent_absence_observed_at: Instant,
-}
-
-#[must_use = "post-barrier retry must not repeat the native namespace barrier"]
-pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupNamespacePostBarrierRetryCustody
-{
-    state: CandidateCleanupExecutionState,
-    plan: HashedComputePluginCandidateCleanupExecutionPlan,
-    intent_event: HashedComputePluginCandidateCleanupStepEvent,
-    disposition_event: HashedComputePluginCandidateCleanupStepEvent,
-    absence_event: HashedComputePluginCandidateCleanupStepEvent,
-    retry: ManagedNamespacePostBarrierObservationRetry,
-    disposition_set_at: Instant,
-    parent_absence_observed_at: Instant,
-}
-
-#[must_use = "terminal durability failure must retain every namespace handle"]
-pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupNamespaceDurabilityRetainedCustody
-{
-    _state: CandidateCleanupExecutionState,
-    _plan: HashedComputePluginCandidateCleanupExecutionPlan,
-    _intent_event: HashedComputePluginCandidateCleanupStepEvent,
-    _disposition_event: HashedComputePluginCandidateCleanupStepEvent,
-    _absence_event: HashedComputePluginCandidateCleanupStepEvent,
-    _retained: ManagedNamespaceDurabilityRetainedCustody,
-    _disposition_set_at: Instant,
-    _parent_absence_observed_at: Instant,
-}
-
-pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupNamespaceDurabilityFailure {
-    phase: CandidateCleanupNamespaceDurabilityFailurePhase,
-    error: Error,
-    custody: CandidateCleanupNamespaceDurabilityFailureCustody,
-}
+pub(in crate::node_agent_compute_plugin_host) use types::{
+    CandidateCleanupNamespaceDurabilityFailure, CandidateCleanupNamespaceDurabilityFailureCustody,
+    CandidateCleanupNamespaceDurabilityFailurePhase,
+    CandidateCleanupNamespaceDurabilityRetainedCustody,
+    CandidateCleanupNamespaceDurabilityRetryCustody,
+    CandidateCleanupNamespacePostBarrierRetryCustody, PhysicallyDurableCandidateCleanupNamespace,
+};
 
 pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn make_candidate_cleanup_namespace_durable(
     durable: DurableCandidateCleanupParentAbsence,
@@ -111,6 +43,24 @@ pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn mak
             },
         ));
     }
+    let _operation = match durable
+        .observed()
+        .state()
+        .deletion_guard()
+        .enter_operation()
+    {
+        Ok(operation) => operation,
+        Err(error) => {
+            return Err(namespace_failure(
+                CandidateCleanupNamespaceDurabilityFailurePhase::RejectedBeforeDurability,
+                error,
+                CandidateCleanupNamespaceDurabilityFailureCustody::RejectedParentAbsence {
+                    _durable: durable,
+                    _mutation_fence: mutation_fence,
+                },
+            ))
+        }
+    };
     let (observed, absence_event) = durable.into_parts();
     let (
         state,
@@ -171,6 +121,16 @@ pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn ret
             CandidateCleanupNamespaceDurabilityFailureCustody::RetryBeforeBarrier(retry),
         ));
     }
+    let _operation = match retry.state.deletion_guard().enter_operation() {
+        Ok(operation) => operation,
+        Err(error) => {
+            return Err(namespace_failure(
+                CandidateCleanupNamespaceDurabilityFailurePhase::RejectedBeforeDurability,
+                error,
+                CandidateCleanupNamespaceDurabilityFailureCustody::RetryBeforeBarrier(retry),
+            ))
+        }
+    };
     let CandidateCleanupNamespaceDurabilityRetryCustody {
         state,
         plan,
@@ -216,6 +176,16 @@ pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn ret
             CandidateCleanupNamespaceDurabilityFailureCustody::RetryAfterBarrier(retry),
         ));
     }
+    let _operation = match retry.state.deletion_guard().enter_operation() {
+        Ok(operation) => operation,
+        Err(error) => {
+            return Err(namespace_failure(
+                CandidateCleanupNamespaceDurabilityFailurePhase::RejectedBeforeDurability,
+                error,
+                CandidateCleanupNamespaceDurabilityFailureCustody::RetryAfterBarrier(retry),
+            ))
+        }
+    };
     let CandidateCleanupNamespacePostBarrierRetryCustody {
         state,
         plan,
@@ -386,7 +356,7 @@ fn validate_binding(
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DURABILITY_BINDING_CHANGED");
     }
-    state.cancellation_guard().ensure_current()
+    state.deletion_guard().ensure_current()
 }
 
 fn namespace_failure(
@@ -400,94 +370,3 @@ fn namespace_failure(
         custody,
     }
 }
-
-impl PhysicallyDurableCandidateCleanupNamespace {
-    pub(in crate::node_agent_compute_plugin_host) fn state(
-        &self,
-    ) -> &CandidateCleanupExecutionState {
-        &self.state
-    }
-    pub(in crate::node_agent_compute_plugin_host) fn plan(
-        &self,
-    ) -> &HashedComputePluginCandidateCleanupExecutionPlan {
-        &self.plan
-    }
-    pub(in crate::node_agent_compute_plugin_host) fn intent_event(
-        &self,
-    ) -> &HashedComputePluginCandidateCleanupStepEvent {
-        &self.intent_event
-    }
-    pub(in crate::node_agent_compute_plugin_host) fn disposition_event(
-        &self,
-    ) -> &HashedComputePluginCandidateCleanupStepEvent {
-        &self.disposition_event
-    }
-    pub(in crate::node_agent_compute_plugin_host) fn absence_event(
-        &self,
-    ) -> &HashedComputePluginCandidateCleanupStepEvent {
-        &self.absence_event
-    }
-    pub(in crate::node_agent_compute_plugin_host) fn namespace(&self) -> &ManagedNamespaceDurable {
-        &self.namespace
-    }
-    pub(in crate::node_agent_compute_plugin_host) fn disposition_set_at(&self) -> Instant {
-        self.disposition_set_at
-    }
-    pub(in crate::node_agent_compute_plugin_host) fn parent_absence_observed_at(&self) -> Instant {
-        self.parent_absence_observed_at
-    }
-    pub(in crate::node_agent_compute_plugin_host::candidate_cleanup_contract) fn into_parts(
-        self,
-    ) -> (
-        CandidateCleanupExecutionState,
-        HashedComputePluginCandidateCleanupExecutionPlan,
-        HashedComputePluginCandidateCleanupStepEvent,
-        HashedComputePluginCandidateCleanupStepEvent,
-        HashedComputePluginCandidateCleanupStepEvent,
-        ManagedNamespaceDurable,
-        Instant,
-        Instant,
-    ) {
-        (
-            self.state,
-            self.plan,
-            self.intent_event,
-            self.disposition_event,
-            self.absence_event,
-            self.namespace,
-            self.disposition_set_at,
-            self.parent_absence_observed_at,
-        )
-    }
-}
-
-impl CandidateCleanupNamespaceDurabilityFailure {
-    pub(in crate::node_agent_compute_plugin_host) fn phase(
-        &self,
-    ) -> CandidateCleanupNamespaceDurabilityFailurePhase {
-        self.phase
-    }
-    pub(in crate::node_agent_compute_plugin_host) fn into_parts(
-        self,
-    ) -> (Error, CandidateCleanupNamespaceDurabilityFailureCustody) {
-        (self.error, self.custody)
-    }
-}
-
-impl fmt::Display for CandidateCleanupNamespaceDurabilityFailure {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{:#}", self.error)
-    }
-}
-
-impl fmt::Debug for CandidateCleanupNamespaceDurabilityFailure {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("CandidateCleanupNamespaceDurabilityFailure")
-            .field("phase", &self.phase)
-            .field("error", &self.error)
-            .finish_non_exhaustive()
-    }
-}
-
-impl StdError for CandidateCleanupNamespaceDurabilityFailure {}

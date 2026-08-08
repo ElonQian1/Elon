@@ -6,10 +6,14 @@ use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::{
         restore_hashed_execution_plan, restore_hashed_expected_object,
         validate_hashed_execution_plan, CandidateCleanupExecutionState,
-        ComputePluginCandidateCleanupExecutionPlan, ComputePluginCandidateCleanupExpectedObject,
-        HashedCandidateCleanupExpectedObject, HashedComputePluginCandidateCleanupExecutionPlan,
+        CandidateCleanupOwnerExpectation, ComputePluginCandidateCleanupExecutionPlan,
+        ComputePluginCandidateCleanupExpectedObject, HashedCandidateCleanupExpectedObject,
+        HashedComputePluginCandidateCleanupExecutionPlan,
     },
-    local_authority::plan_application::read_authority_plan_application_state,
+    local_authority::{
+        cleanup_store::binding::validate_candidate_cleanup_continuation,
+        plan_application::read_authority_plan_application_state_at_or_before_observation,
+    },
     signed_artifact_verification::jcs_sha256_hex,
 };
 
@@ -58,16 +62,21 @@ pub(super) fn validate_authority_and_owner(
     let authorization = state.authorization_receipt();
     let receipt = authorization.receipt();
     let recovery = state.staging_recovery_key();
-    let authority = read_authority_plan_application_state(transaction, &session.trusted_now)?;
+    let authority = read_authority_plan_application_state_at_or_before_observation(
+        transaction,
+        &session.trusted_now,
+    )?;
+    let owner = CandidateCleanupOwnerExpectation::from_staging(recovery);
+    validate_candidate_cleanup_continuation(
+        transaction,
+        &authority,
+        recovery.candidate_token(),
+        authorization,
+        &owner,
+    )?;
     if authority.installation_id_digest != session.installation_id_digest()
-        || authority.process_owner_epoch != session.process_owner_epoch()
-        || authority.state_revision != receipt.authority_state_revision_after()
-        || authority.inventory.inventory_revision != receipt.inventory_revision()
-        || authority.inventory_digest != receipt.inventory_digest()
-        || authority.authority_epoch != receipt.authority_epoch_after()
-        || authority.trusted_time_high_water_ms != expected_high_water_ms
-        || count_exact_authorization(transaction, state)? != 1
-        || count_pending_owner(transaction, recovery.candidate_token())? != 1
+        || receipt.process_owner_epoch() != session.process_owner_epoch()
+        || authority.trusted_time_high_water_ms < expected_high_water_ms
         || count_completion(transaction, recovery.candidate_token())? != 0
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_TOPOLOGY_AUTHORITY_CHANGED");
@@ -253,48 +262,6 @@ pub(super) fn count_seals(transaction: &Transaction<'_>, cleanup_id: &str) -> Re
             |row| row.get(0),
         )
         .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_TOPOLOGY_SEAL_COUNT")
-}
-
-fn count_exact_authorization(
-    transaction: &Transaction<'_>,
-    state: &CandidateCleanupExecutionState,
-) -> Result<i64> {
-    let authorization = state.authorization_receipt();
-    let receipt = authorization.receipt();
-    let receipt_json = serde_json::to_string(receipt)
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_TOPOLOGY_AUTHORIZATION_SERIALIZE")?;
-    transaction
-        .query_row(
-            r#"SELECT COUNT(*) FROM candidate_cleanup_authorizations
-           WHERE cleanup_id = ?1 AND candidate_token = ?2
-             AND candidate_token_digest = ?3 AND receipt_json = ?4 AND receipt_digest = ?5
-             AND process_owner_epoch = ?6 AND authorized_at_ms = ?7
-             AND slot_phase_before = 'failed'"#,
-            params![
-                receipt.cleanup_id(),
-                state.staging_recovery_key().candidate_token(),
-                receipt.candidate_token_digest(),
-                receipt_json,
-                authorization.receipt_digest(),
-                receipt.process_owner_epoch(),
-                receipt.authorized_at_ms()
-            ],
-            |row| row.get(0),
-        )
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_TOPOLOGY_AUTHORIZATION_READ")
-}
-
-fn count_pending_owner(transaction: &Transaction<'_>, candidate_token: &str) -> Result<i64> {
-    transaction
-        .query_row(
-            r#"SELECT COUNT(*) FROM candidate_owners
-           WHERE candidate_token = ?1 AND state = 'cleanup_pending'
-             AND closed_at_ms IS NULL AND closed_by_plan_id IS NULL
-             AND closed_by_plan_digest IS NULL AND close_reason IS NULL"#,
-            params![candidate_token],
-            |row| row.get(0),
-        )
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_TOPOLOGY_OWNER_READ")
 }
 
 fn count_completion(transaction: &Transaction<'_>, candidate_token: &str) -> Result<i64> {

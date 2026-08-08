@@ -17,6 +17,10 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_execu
     if let Err(error) = validate_before_execution(&mut authorized) {
         return Err((error, authorized));
     }
+    let _operation = match authorized.deletion_guard().enter_operation() {
+        Ok(operation) => operation,
+        Err(error) => return Err((error, authorized)),
+    };
     let (candidate_parent_anchor, candidate_directory, staging_parent) = match authorized
         .quarantined()
         .staged()
@@ -27,12 +31,7 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_execu
         Err(error) => return Err((error, authorized)),
     };
 
-    let cancellation_guard = authorized
-        .quarantined()
-        .staged()
-        .archive()
-        .snapshot_cancellation_guard();
-    let (quarantined, authorization_receipt) = authorized.into_parts();
+    let (quarantined, authorization_receipt, deletion_guard) = authorized.into_parts();
     let (staged, quarantine_receipt) = quarantined.into_parts();
     let (archive, staging_receipt, staging_recovery_key) = staged.into_parts();
     let parts = archive.into_cleanup_parts();
@@ -85,7 +84,7 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_execu
         quarantine_receipt,
         staging_receipt,
         staging_recovery_key,
-        cancellation_guard,
+        deletion_guard,
         extraction_evidence_digest,
         root_lock_lease,
         candidate_parent_anchor,
@@ -125,7 +124,11 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_execu
 }
 
 fn validate_before_execution(authorized: &mut AuthorizedCandidateCleanup<'_>) -> Result<()> {
-    authorized.quarantined.revalidate_retained_content()?;
+    let deletion_guard = &authorized.deletion_guard;
+    deletion_guard.validate_authorization(&authorized.receipt)?;
+    authorized
+        .quarantined
+        .revalidate_for_authorized_candidate_cleanup(deletion_guard)?;
     authorized
         .quarantined
         .staged()
@@ -135,5 +138,12 @@ fn validate_before_execution(authorized: &mut AuthorizedCandidateCleanup<'_>) ->
     if receipt.receipt().slot_phase_before() != "failed" || !is_sha256(receipt.receipt_digest()) {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_EXECUTION_AUTHORIZATION_CHANGED");
     }
+    authorized.deletion_guard().validate_root_identity(
+        authorized
+            .quarantined()
+            .staged()
+            .recovery_key()
+            .root_identity_digest(),
+    )?;
     Ok(())
 }

@@ -11,8 +11,9 @@ use crate::node_agent_compute_plugin_host::{
         cleanup_journal_store::validation::{
             count_event_identity_matches, count_events, read_exact_step_event,
         },
+        cleanup_store::binding::validate_failed_candidate_inventory,
         cleanup_topology_store::read_exact_sealed_plan,
-        plan_application::read_authority_plan_application_state,
+        plan_application::read_authority_plan_application_state_at_or_before_observation,
     },
     signed_artifact_verification::jcs_sha256_hex,
 };
@@ -70,14 +71,23 @@ pub(super) fn validate_authority_and_owner(
     let authorization = state.authorization_receipt();
     let receipt = authorization.receipt();
     let plan = observed.plan().plan();
-    let authority = read_authority_plan_application_state(transaction, &session.trusted_now)?;
+    let authority = read_authority_plan_application_state_at_or_before_observation(
+        transaction,
+        &session.trusted_now,
+    )?;
+    let slot = state.staging_recovery_key().slot_expectation();
+    validate_failed_candidate_inventory(
+        &authority.inventory,
+        &slot.plugin_id,
+        &slot.slot_ref,
+        &slot.release,
+    )?;
     if authority.installation_id_digest != session.installation_id_digest()
         || authority.process_owner_epoch != session.process_owner_epoch()
-        || authority.state_revision != receipt.authority_state_revision_after()
-        || authority.inventory.inventory_revision != receipt.inventory_revision()
-        || authority.inventory_digest != receipt.inventory_digest()
-        || authority.authority_epoch != receipt.authority_epoch_after()
-        || authority.trusted_time_high_water_ms != expected_high_water_ms
+        || authority.state_revision < receipt.authority_state_revision_after()
+        || authority.inventory.inventory_revision < receipt.inventory_revision()
+        || authority.authority_epoch < receipt.authority_epoch_after()
+        || authority.trusted_time_high_water_ms < expected_high_water_ms
         || plan.cleanup_id() != receipt.cleanup_id()
         || plan.candidate_token_digest() != receipt.candidate_token_digest()
         || plan.authorization_receipt_digest() != authorization.receipt_digest()
@@ -192,7 +202,8 @@ fn count_exact_authority_time(
         .query_row(
             r#"SELECT COUNT(*) FROM authority_meta WHERE singleton = 1
                AND installation_id_digest = ?1 AND process_owner_epoch = ?2
-               AND trusted_time_high_water_ms = ?3 AND updated_at_ms = ?3
+               AND trusted_time_high_water_ms >= ?3
+               AND updated_at_ms = trusted_time_high_water_ms
                AND clock_status = 'trusted'"#,
             params![
                 session.installation_id_digest(),

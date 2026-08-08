@@ -17,13 +17,13 @@ use super::{
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::CandidateCleanupAuthorizationRecoveryKey,
-    fetch_contract::ComputePluginFetchCancellationGuard,
     lifecycle::SLOT_FAILED,
     local_authority::{
         health_quarantine_store::ComputePluginCandidateHealthQuarantineReceipt,
-        plan_application::read_authority_plan_application_state,
+        plan_application::read_authority_plan_application_state_at_or_before_observation,
         staging_store::ComputePluginCandidateStagingReceipt, ComputePluginAuthorityInstanceBinding,
         ComputePluginFetchProcessFence, ComputePluginLocalAuthority,
+        PreparedCandidateCleanupDeletionGuard,
     },
     manifest_validation::is_sha256,
     signed_artifact_verification::jcs_sha256_hex,
@@ -117,12 +117,11 @@ impl ComputePluginCandidateCleanupRecoveryAuthoritySession<'_> {
     pub(in crate::node_agent_compute_plugin_host) fn clock_epoch_digest(&self) -> &str {
         &self.clock_epoch_digest
     }
-    pub(in crate::node_agent_compute_plugin_host) fn validate_source(
+    pub(in crate::node_agent_compute_plugin_host) fn validate_cleanup_deletion_source(
         &self,
-        guard: &ComputePluginFetchCancellationGuard,
+        guard: &PreparedCandidateCleanupDeletionGuard,
     ) -> Result<()> {
-        guard.validate_source(self.process_fence.cancellation_source())?;
-        guard.ensure_current()
+        guard.validate_process_fence(self.process_fence)
     }
     pub(in crate::node_agent_compute_plugin_host) fn read_candidate_cleanup_authorization_outcome(
         &self,
@@ -172,7 +171,10 @@ fn read_outcome(
 ) -> Result<ComputePluginCandidateCleanupRecoveryOutcome> {
     let stored = read_exact_row(transaction, key)?;
     let identity_matches = count_identity_matches(transaction, key)?;
-    let authority = read_authority_plan_application_state(transaction, &session.trusted_now)?;
+    let authority = read_authority_plan_application_state_at_or_before_observation(
+        transaction,
+        &session.trusted_now,
+    )?;
     let expected = key.receipt_expectation();
     let slot = key.slot_expectation();
     if authority.installation_id_digest != key.installation_id_digest()
@@ -192,11 +194,10 @@ fn read_outcome(
             if identity_matches != 1
                 || count_owner_state(transaction, key, "cleanup_pending")? != 1
                 || count_completion(transaction, key)? != 0
-                || authority.state_revision != expected.authority_state_revision_after
-                || authority.inventory.inventory_revision != expected.inventory_revision
-                || authority.inventory_digest != expected.inventory_digest
-                || authority.authority_epoch != expected.authority_epoch_after
-                || authority.trusted_time_high_water_ms != expected.authorized_at_ms
+                || authority.state_revision < expected.authority_state_revision_after
+                || authority.inventory.inventory_revision < expected.inventory_revision
+                || authority.authority_epoch < expected.authority_epoch_after
+                || authority.trusted_time_high_water_ms < expected.authorized_at_ms
             {
                 bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_RECOVERY_RESULT_AMBIGUOUS");
             }

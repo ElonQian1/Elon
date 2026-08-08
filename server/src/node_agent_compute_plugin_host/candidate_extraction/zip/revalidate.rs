@@ -12,6 +12,9 @@ use crate::node_agent_compute_plugin_host::{
     candidate_extraction::{
         COMPUTE_PLUGIN_EXTRACTION_PLAN_SCHEMA, HASHED_COMPUTE_PLUGIN_EXTRACTION_PLAN_SCHEMA,
     },
+    local_authority::{
+        AuthorizedCandidateCleanupDeletionGuard, PreparedCandidateCleanupDeletionGuard,
+    },
     manifest_validation::is_sha256,
     plugin_manifest::{COMPUTE_PLUGIN_DIGEST_ALGORITHM, COMPUTE_PLUGIN_MANIFEST_CANONICALIZATION},
     signed_artifact_verification::jcs_sha256_hex,
@@ -24,7 +27,27 @@ impl ExtractedComputePluginCandidateArchive<'_> {
         &mut self,
     ) -> Result<Instant> {
         let cancellation = self.verified.snapshot_cancellation_guard();
-        cancellation.ensure_current()?;
+        self.revalidate_with(|| cancellation.ensure_current())
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn revalidate_for_prepared_candidate_cleanup(
+        &mut self,
+        guard: &PreparedCandidateCleanupDeletionGuard,
+    ) -> Result<Instant> {
+        let _operation = guard.enter_operation()?;
+        self.revalidate_with(|| Ok(()))
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn revalidate_for_authorized_candidate_cleanup(
+        &mut self,
+        guard: &AuthorizedCandidateCleanupDeletionGuard,
+    ) -> Result<Instant> {
+        let _operation = guard.enter_operation()?;
+        self.revalidate_with(|| Ok(()))
+    }
+
+    fn revalidate_with(&mut self, ensure_current: impl Fn() -> Result<()>) -> Result<Instant> {
+        ensure_current()?;
         self.validate_evidence_closure()?;
 
         let planned_files = &self.plan.envelope().plan.files;
@@ -50,7 +73,7 @@ impl ExtractedComputePluginCandidateArchive<'_> {
                 bail!("COMPUTE_PLUGIN_STAGING_REVALIDATION_FILE_BINDING_CHANGED");
             }
             let hashed = file
-                .hash_sha256_and_revalidate(expected_len, || cancellation.ensure_current())
+                .hash_sha256_and_revalidate(expected_len, &ensure_current)
                 .map_err(|failure| {
                     failure
                         .into_error()
@@ -71,7 +94,7 @@ impl ExtractedComputePluginCandidateArchive<'_> {
         }
         let hashed_seal = self
             .seal
-            .hash_sha256_and_revalidate(seal_len, || cancellation.ensure_current())
+            .hash_sha256_and_revalidate(seal_len, &ensure_current)
             .map_err(|failure| {
                 failure
                     .into_error()
@@ -80,7 +103,7 @@ impl ExtractedComputePluginCandidateArchive<'_> {
         if hashed_seal.digest() != self.seal_evidence.file_digest {
             bail!("COMPUTE_PLUGIN_STAGING_REVALIDATION_SEAL_DIGEST_CHANGED");
         }
-        cancellation.ensure_current()?;
+        ensure_current()?;
         Ok(completed_at.max(hashed_seal.completed_at()))
     }
 

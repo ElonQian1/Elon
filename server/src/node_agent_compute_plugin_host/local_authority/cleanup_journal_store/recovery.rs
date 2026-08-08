@@ -14,8 +14,12 @@ use crate::node_agent_compute_plugin_host::{
         validate_hashed_cleanup_step_event, validate_hashed_execution_plan,
         CandidateCleanupDeleteIntentRecoveryKey, HashedComputePluginCandidateCleanupStepEvent,
     },
-    fetch_contract::ComputePluginFetchCancellationGuard,
     local_authority::cleanup_topology_store::read_exact_sealed_plan,
+    local_authority::{
+        cleanup_store::binding::validate_candidate_cleanup_continuation,
+        plan_application::read_authority_plan_application_state_at_or_before_observation,
+        AuthorizedCandidateCleanupDeletionGuard,
+    },
     manifest_validation::is_sha256,
     trusted_time::ComputePluginTrustedTimeObservation,
 };
@@ -102,10 +106,9 @@ impl ComputePluginCandidateCleanupDeleteIntentRecoveryAuthoritySession<'_> {
 
     pub(in crate::node_agent_compute_plugin_host) fn validate_source(
         &self,
-        guard: &ComputePluginFetchCancellationGuard,
+        guard: &AuthorizedCandidateCleanupDeletionGuard,
     ) -> Result<()> {
-        guard.validate_source(self.process_fence.cancellation_source())?;
-        guard.ensure_current()
+        guard.validate_process_fence(self.process_fence)
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn read_candidate_cleanup_delete_intent_outcome(
@@ -149,6 +152,16 @@ fn validate_recovery_provenance(
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_PROVENANCE_CHANGED");
     }
+    let plan = key.plan().plan();
+    let authorization = key.authorization_receipt();
+    let receipt = authorization.receipt();
+    if authorization.receipt_digest() != plan.authorization_receipt_digest()
+        || receipt.cleanup_id() != plan.cleanup_id()
+        || receipt.candidate_token_digest() != plan.candidate_token_digest()
+        || receipt.process_owner_epoch() != plan.process_owner_epoch()
+    {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_ANCHOR_CHANGED");
+    }
     validate_hashed_execution_plan(key.plan())?;
     validate_hashed_cleanup_step_event(key.event())
 }
@@ -160,12 +173,24 @@ fn read_outcome(
 ) -> Result<ComputePluginCandidateCleanupDeleteIntentRecoveryOutcome> {
     let stored_plan = read_exact_sealed_plan(transaction, key.plan(), key.candidate_token())?;
     if stored_plan.as_ref() != Some(key.plan())
-        || count_exact_authorization(transaction, key)? != 1
-        || count_pending_owner(transaction, key.candidate_token())? != 1
         || count_completion(transaction, key.candidate_token())? != 0
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_AUTHORITY_CHANGED");
     }
+    let authority = read_authority_plan_application_state_at_or_before_observation(
+        transaction,
+        &session.trusted_now,
+    )?;
+    if authority.installation_id_digest != session.installation_id_digest() {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_PROCESS_CHANGED");
+    }
+    validate_candidate_cleanup_continuation(
+        transaction,
+        &authority,
+        key.candidate_token(),
+        key.authorization_receipt(),
+        key.owner(),
+    )?;
     let stored = read_exact_step_event(transaction, key.event())?;
     let identity_matches = count_event_identity_matches(transaction, key.event())?;
     match stored {
@@ -191,47 +216,6 @@ fn read_outcome(
     }
 }
 
-fn count_exact_authorization(
-    transaction: &Transaction<'_>,
-    key: &CandidateCleanupDeleteIntentRecoveryKey,
-) -> Result<i64> {
-    let plan = key.plan().plan();
-    transaction
-        .query_row(
-            r#"SELECT COUNT(*) FROM candidate_cleanup_authorizations
-               WHERE cleanup_id = ?1 AND candidate_token = ?2
-                 AND candidate_token_digest = ?3 AND receipt_digest = ?4
-                 AND process_owner_epoch = ?5 AND authorized_at_ms = ?6
-                 AND slot_phase_before = 'failed'"#,
-            params![
-                plan.cleanup_id(),
-                key.candidate_token(),
-                plan.candidate_token_digest(),
-                plan.authorization_receipt_digest(),
-                plan.process_owner_epoch(),
-                key.authorized_at_ms(),
-            ],
-            |row| row.get(0),
-        )
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_AUTHORIZATION_READ")
-}
-
-pub(super) fn count_pending_owner(
-    transaction: &Transaction<'_>,
-    candidate_token: &str,
-) -> Result<i64> {
-    transaction
-        .query_row(
-            r#"SELECT COUNT(*) FROM candidate_owners
-               WHERE candidate_token = ?1 AND state = 'cleanup_pending'
-                 AND closed_at_ms IS NULL AND closed_by_plan_id IS NULL
-                 AND closed_by_plan_digest IS NULL AND close_reason IS NULL"#,
-            params![candidate_token],
-            |row| row.get(0),
-        )
-        .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_INTENT_RECOVERY_OWNER_READ")
-}
-
 pub(super) fn count_completion(
     transaction: &Transaction<'_>,
     candidate_token: &str,
@@ -254,7 +238,8 @@ fn count_authority_time(
         .query_row(
             r#"SELECT COUNT(*) FROM authority_meta WHERE singleton = 1
                AND installation_id_digest = ?1 AND process_owner_epoch = ?2
-               AND trusted_time_high_water_ms = ?3 AND updated_at_ms = ?3
+               AND trusted_time_high_water_ms >= ?3
+               AND updated_at_ms = trusted_time_high_water_ms
                AND clock_status = 'trusted'"#,
             params![
                 session.installation_id_digest(),

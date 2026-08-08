@@ -397,6 +397,38 @@ pub(super) fn read_authority_plan_application_state(
     transaction: &Transaction<'_>,
     trusted_now: &DateTime<Utc>,
 ) -> Result<AuthorityPlanApplicationState> {
+    read_authority_plan_application_state_with_time_mode(
+        transaction,
+        trusted_now,
+        AuthorityStateTimeMode::StrictlyBeforeObservation,
+    )
+}
+
+/// Reads the same canonical authority snapshot after a Store has advanced the durable clock to
+/// this observation. This is readback/recovery only; mutation callers must retain their own strict
+/// `new_time > current_high_water` gate before writing.
+pub(super) fn read_authority_plan_application_state_at_or_before_observation(
+    transaction: &Transaction<'_>,
+    trusted_now: &DateTime<Utc>,
+) -> Result<AuthorityPlanApplicationState> {
+    read_authority_plan_application_state_with_time_mode(
+        transaction,
+        trusted_now,
+        AuthorityStateTimeMode::AtOrBeforeObservation,
+    )
+}
+
+#[derive(Clone, Copy)]
+enum AuthorityStateTimeMode {
+    StrictlyBeforeObservation,
+    AtOrBeforeObservation,
+}
+
+fn read_authority_plan_application_state_with_time_mode(
+    transaction: &Transaction<'_>,
+    trusted_now: &DateTime<Utc>,
+    time_mode: AuthorityStateTimeMode,
+) -> Result<AuthorityPlanApplicationState> {
     type MetaRow = (
         String,
         i64,
@@ -467,7 +499,7 @@ pub(super) fn read_authority_plan_application_state(
         .optional()
         .context("COMPUTE_PLUGIN_PLAN_AUTHORITY_READ")?
         .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_AUTHORITY_UNINITIALIZED"))?;
-    build_authority_plan_application_state(row, trusted_now)
+    build_authority_plan_application_state(row, trusted_now, time_mode)
 }
 
 fn build_authority_plan_application_state(
@@ -498,6 +530,7 @@ fn build_authority_plan_application_state(
         Option<String>,
     ),
     trusted_now: &DateTime<Utc>,
+    time_mode: AuthorityStateTimeMode,
 ) -> Result<AuthorityPlanApplicationState> {
     let (
         installation_id_digest,
@@ -578,8 +611,18 @@ fn build_authority_plan_application_state(
         1 => true,
         _ => bail!("COMPUTE_PLUGIN_PLAN_SHARING_FLAG_CORRUPT"),
     };
-    if trusted_now.timestamp_millis() <= trusted_time_high_water_ms {
-        bail!("COMPUTE_PLUGIN_PLAN_TRUSTED_TIME_NOT_ADVANCED");
+    match time_mode {
+        AuthorityStateTimeMode::StrictlyBeforeObservation
+            if trusted_now.timestamp_millis() <= trusted_time_high_water_ms =>
+        {
+            bail!("COMPUTE_PLUGIN_PLAN_TRUSTED_TIME_NOT_ADVANCED");
+        }
+        AuthorityStateTimeMode::AtOrBeforeObservation
+            if trusted_now.timestamp_millis() < trusted_time_high_water_ms =>
+        {
+            bail!("COMPUTE_PLUGIN_AUTHORITY_CLOCK_ROLLBACK");
+        }
+        _ => {}
     }
     if state_revision < 0
         || authority_epoch < 0

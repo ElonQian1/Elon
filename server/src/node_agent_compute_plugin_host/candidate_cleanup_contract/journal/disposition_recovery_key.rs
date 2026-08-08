@@ -2,8 +2,13 @@ use std::{fmt, time::Instant};
 
 use super::{HashedComputePluginCandidateCleanupStepEvent, PreparedCandidateCleanupDisposition};
 use crate::node_agent_compute_plugin_host::{
-    candidate_cleanup_contract::HashedComputePluginCandidateCleanupExecutionPlan,
-    local_authority::ComputePluginAuthorityInstanceBinding,
+    candidate_cleanup_contract::{
+        CandidateCleanupOwnerExpectation, HashedComputePluginCandidateCleanupExecutionPlan,
+    },
+    local_authority::{
+        ComputePluginAuthorityInstanceBinding,
+        HashedComputePluginCandidateCleanupAuthorizationReceipt,
+    },
 };
 
 /// Process-local identity for classifying an uncertain disposition-event transaction. The actual
@@ -17,7 +22,8 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupDisposition
     plan: HashedComputePluginCandidateCleanupExecutionPlan,
     intent_event: HashedComputePluginCandidateCleanupStepEvent,
     disposition_event: HashedComputePluginCandidateCleanupStepEvent,
-    authorized_at_ms: i64,
+    authorization_receipt: HashedComputePluginCandidateCleanupAuthorizationReceipt,
+    owner: CandidateCleanupOwnerExpectation,
 }
 
 impl CandidateCleanupDispositionRecoveryKey {
@@ -38,7 +44,8 @@ impl CandidateCleanupDispositionRecoveryKey {
             plan: prepared.physical.plan().clone(),
             intent_event: prepared.physical.intent_event().clone(),
             disposition_event: prepared.event.clone(),
-            authorized_at_ms: state.authorization_receipt().receipt().authorized_at_ms(),
+            authorization_receipt: state.authorization_receipt().clone(),
+            owner: CandidateCleanupOwnerExpectation::from_staging(state.staging_recovery_key()),
         }
     }
 
@@ -83,7 +90,17 @@ impl CandidateCleanupDispositionRecoveryKey {
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn authorized_at_ms(&self) -> i64 {
-        self.authorized_at_ms
+        self.authorization_receipt.receipt().authorized_at_ms()
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn authorization_receipt(
+        &self,
+    ) -> &HashedComputePluginCandidateCleanupAuthorizationReceipt {
+        &self.authorization_receipt
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn owner(
+        &self,
+    ) -> &CandidateCleanupOwnerExpectation {
+        &self.owner
     }
 }
 

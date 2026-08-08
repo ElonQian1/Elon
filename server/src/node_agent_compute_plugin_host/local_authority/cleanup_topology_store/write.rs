@@ -19,20 +19,22 @@ pub(super) fn persist_candidate_cleanup_topology(
 ) -> Result<HashedComputePluginCandidateCleanupExecutionPlan> {
     let state = permit.state();
     let plan = permit.plan();
-    session.validate_source(state.cancellation_guard())?;
+    session.validate_source(state.deletion_guard())?;
     validate_unsealed_binding(transaction, session, state, plan)?;
     let authorization = state.authorization_receipt().receipt();
     let time_state = read_authority_keyring_state(transaction)?;
-    if time_state.state_revision != authorization.authority_state_revision_after()
-        || time_state.authority_epoch != authorization.authority_epoch_after()
-        || time_state.trusted_time_high_water_ms != Some(authorization.authorized_at_ms())
+    if time_state.state_revision < authorization.authority_state_revision_after()
+        || time_state.authority_epoch < authorization.authority_epoch_after()
+        || time_state.trusted_time_high_water_ms < Some(authorization.authorized_at_ms())
         || time_state.clock_status != "trusted"
-        || plan.plan().planned_at_ms() <= authorization.authorized_at_ms()
+        || time_state
+            .trusted_time_high_water_ms
+            .is_none_or(|high_water| plan.plan().planned_at_ms() <= high_water)
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_TOPOLOGY_TIME_CHANGED");
     }
     advance_trusted_time(transaction, &time_state, plan.plan().planned_at_ms())?;
-    session.validate_source(state.cancellation_guard())?;
+    session.validate_source(state.deletion_guard())?;
 
     insert_plan(
         transaction,
@@ -52,7 +54,7 @@ pub(super) fn persist_candidate_cleanup_topology(
         state.staging_recovery_key().candidate_token(),
     )?
     .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_TOPOLOGY_READBACK_MISSING"))?;
-    session.validate_source(state.cancellation_guard())?;
+    session.validate_source(state.deletion_guard())?;
     Ok(stored)
 }
 

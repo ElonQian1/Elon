@@ -19,7 +19,10 @@ use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::ValidatedCandidateCleanupCompletionPermit,
     local_authority::{
         keyring_snapshot::{advance_trusted_time, read_authority_keyring_state},
-        plan_application::read_authority_plan_application_state,
+        plan_application::{
+            read_authority_plan_application_state,
+            read_authority_plan_application_state_at_or_before_observation,
+        },
     },
     signed_artifact_verification::jcs_sha256_hex,
 };
@@ -31,7 +34,7 @@ pub(super) fn persist_candidate_cleanup_completion(
 ) -> Result<HashedComputePluginCandidateCleanupCompletionReceipt> {
     let terminal = permit.terminal();
     let physical = terminal.physical();
-    session.validate_source(physical.cancellation_guard())?;
+    session.validate_source(physical.deletion_guard())?;
     let current = read_candidate_cleanup_completion_binding(transaction, session, terminal)?;
     if &current != permit.facts() {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_COMPLETION_AUTHORITY_CHANGED");
@@ -72,7 +75,7 @@ pub(super) fn persist_candidate_cleanup_completion(
         &projection,
         current.completed_at_ms(),
     )?;
-    session.validate_source(physical.cancellation_guard())?;
+    session.validate_source(physical.deletion_guard())?;
 
     let receipt = ComputePluginCandidateCleanupCompletionReceipt {
         schema: CANDIDATE_CLEANUP_COMPLETION_RECEIPT_SCHEMA.to_string(),
@@ -107,7 +110,7 @@ pub(super) fn persist_candidate_cleanup_completion(
     insert_completion(transaction, &permit, &hashed)?;
     mark_owner_cleaned(transaction, &permit, &hashed)?;
     validate_readback(transaction, session, &permit, &hashed)?;
-    session.validate_source(physical.cancellation_guard())?;
+    session.validate_source(physical.deletion_guard())?;
     Ok(hashed)
 }
 
@@ -292,7 +295,10 @@ fn validate_readback(
             |row| row.get::<_, i64>(0),
         )
         .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_COMPLETION_OWNER_READBACK")?;
-    let authority = read_authority_plan_application_state(transaction, &session.trusted_now)?;
+    let authority = read_authority_plan_application_state_at_or_before_observation(
+        transaction,
+        &session.trusted_now,
+    )?;
     if row_count != 1
         || owner_count != 1
         || authority.state_revision != receipt.authority_state_revision_after()

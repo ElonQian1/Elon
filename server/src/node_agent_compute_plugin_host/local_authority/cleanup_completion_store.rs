@@ -4,14 +4,13 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 
 use super::{
-    ComputePluginAuthorityInstanceBinding, ComputePluginFetchProcessFence,
-    ComputePluginLocalAuthority,
+    AuthorizedCandidateCleanupDeletionGuard, ComputePluginAuthorityInstanceBinding,
+    ComputePluginFetchProcessFence, ComputePluginLocalAuthority,
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::{
         DurableCandidateCleanupTerminalJournal, ValidatedCandidateCleanupCompletionPermit,
     },
-    fetch_contract::ComputePluginFetchCancellationGuard,
     lifecycle::ComputePluginInventorySnapshot,
     manifest_validation::is_sha256,
     trusted_time::ComputePluginTrustedTimeObservation,
@@ -131,16 +130,16 @@ impl ComputePluginCandidateCleanupCompletionAuthoritySession<'_> {
     }
     pub(in crate::node_agent_compute_plugin_host) fn validate_source(
         &self,
-        guard: &ComputePluginFetchCancellationGuard,
+        guard: &AuthorizedCandidateCleanupDeletionGuard,
     ) -> Result<()> {
-        guard.validate_source(self.process_fence.cancellation_source())?;
-        guard.ensure_current()
+        guard.validate_process_fence(self.process_fence)
     }
     pub(in crate::node_agent_compute_plugin_host) fn read_candidate_cleanup_completion_binding(
         &self,
         terminal: &DurableCandidateCleanupTerminalJournal,
     ) -> Result<ComputePluginCandidateCleanupCompletionAuthorityFacts> {
-        self.validate_source(terminal.physical().cancellation_guard())?;
+        self.validate_source(terminal.physical().deletion_guard())?;
+        let _operation = terminal.physical().deletion_guard().enter_operation()?;
         self.authority.with_deferred(|transaction| {
             binding::read_candidate_cleanup_completion_binding(transaction, self, terminal)
         })
@@ -149,6 +148,11 @@ impl ComputePluginCandidateCleanupCompletionAuthoritySession<'_> {
         &self,
         permit: ValidatedCandidateCleanupCompletionPermit<'_, '_>,
     ) -> Result<HashedComputePluginCandidateCleanupCompletionReceipt> {
+        let _operation = permit
+            .terminal()
+            .physical()
+            .deletion_guard()
+            .enter_operation()?;
         self.authority.with_immediate(|transaction| {
             write::persist_candidate_cleanup_completion(transaction, self, permit)
         })

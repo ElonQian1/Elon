@@ -103,6 +103,24 @@ impl StagedComputePluginCandidateArchive<'_> {
     ) -> Result<()> {
         self.archive.revalidate_for_staging_store().map(drop)
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn revalidate_for_prepared_candidate_cleanup(
+        &mut self,
+        guard: &crate::node_agent_compute_plugin_host::local_authority::PreparedCandidateCleanupDeletionGuard,
+    ) -> Result<()> {
+        self.archive
+            .revalidate_for_prepared_candidate_cleanup(guard)
+            .map(drop)
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn revalidate_for_authorized_candidate_cleanup(
+        &mut self,
+        guard: &crate::node_agent_compute_plugin_host::local_authority::AuthorizedCandidateCleanupDeletionGuard,
+    ) -> Result<()> {
+        self.archive
+            .revalidate_for_authorized_candidate_cleanup(guard)
+            .map(drop)
+    }
 }
 
 impl<'root> StagedComputePluginCandidateArchive<'root> {

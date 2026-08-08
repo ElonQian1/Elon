@@ -4,15 +4,14 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 
 use super::{
-    ComputePluginAuthorityInstanceBinding, ComputePluginFetchProcessFence,
-    ComputePluginLocalAuthority,
+    AuthorizedCandidateCleanupDeletionGuard, ComputePluginAuthorityInstanceBinding,
+    ComputePluginFetchProcessFence, ComputePluginLocalAuthority,
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::{
         HashedComputePluginCandidateCleanupStepEvent, SealedCandidateCleanupTopology,
         ValidatedCandidateCleanupDeleteIntentPermit,
     },
-    fetch_contract::ComputePluginFetchCancellationGuard,
     manifest_validation::is_sha256,
     trusted_time::ComputePluginTrustedTimeObservation,
 };
@@ -119,10 +118,9 @@ impl ComputePluginCandidateCleanupDeleteIntentAuthoritySession<'_> {
 
     pub(in crate::node_agent_compute_plugin_host) fn validate_source(
         &self,
-        guard: &ComputePluginFetchCancellationGuard,
+        guard: &AuthorizedCandidateCleanupDeletionGuard,
     ) -> Result<()> {
-        guard.validate_source(self.process_fence.cancellation_source())?;
-        guard.ensure_current()
+        guard.validate_process_fence(self.process_fence)
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn validate_candidate_cleanup_delete_intent(
@@ -130,7 +128,8 @@ impl ComputePluginCandidateCleanupDeleteIntentAuthoritySession<'_> {
         sealed: &SealedCandidateCleanupTopology,
         event: &HashedComputePluginCandidateCleanupStepEvent,
     ) -> Result<()> {
-        self.validate_source(sealed.state().cancellation_guard())?;
+        self.validate_source(sealed.state().deletion_guard())?;
+        let _operation = sealed.state().deletion_guard().enter_operation()?;
         self.authority.with_deferred(|transaction| {
             validation::validate_unstored_intent(transaction, self, sealed, event)
         })
@@ -140,7 +139,8 @@ impl ComputePluginCandidateCleanupDeleteIntentAuthoritySession<'_> {
         &self,
         permit: ValidatedCandidateCleanupDeleteIntentPermit<'_>,
     ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
-        self.validate_source(permit.sealed().state().cancellation_guard())?;
+        self.validate_source(permit.sealed().state().deletion_guard())?;
+        let _operation = permit.sealed().state().deletion_guard().enter_operation()?;
         self.authority.with_immediate(|transaction| {
             write::persist_candidate_cleanup_delete_intent(transaction, self, permit)
         })

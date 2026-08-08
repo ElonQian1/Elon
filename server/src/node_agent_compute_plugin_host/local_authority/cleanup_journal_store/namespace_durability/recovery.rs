@@ -16,10 +16,11 @@ use crate::node_agent_compute_plugin_host::{
         CandidateCleanupNamespaceDurabilityRecoveryKey,
         HashedComputePluginCandidateCleanupStepEvent,
     },
-    fetch_contract::ComputePluginFetchCancellationGuard,
     local_authority::{
+        cleanup_store::binding::validate_failed_candidate_inventory,
         cleanup_topology_store::read_exact_sealed_plan,
-        plan_application::read_authority_plan_application_state,
+        plan_application::read_authority_plan_application_state_at_or_before_observation,
+        AuthorizedCandidateCleanupDeletionGuard,
         CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_CANONICALIZATION,
         CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_DIGEST_ALGORITHM,
         CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA,
@@ -113,10 +114,9 @@ impl ComputePluginCandidateCleanupNamespaceDurabilityRecoveryAuthoritySession<'_
 
     pub(in crate::node_agent_compute_plugin_host) fn validate_source(
         &self,
-        guard: &ComputePluginFetchCancellationGuard,
+        guard: &AuthorizedCandidateCleanupDeletionGuard,
     ) -> Result<()> {
-        guard.validate_source(self.process_fence.cancellation_source())?;
-        guard.ensure_current()
+        guard.validate_process_fence(self.process_fence)
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn read_candidate_cleanup_namespace_durability_outcome(
@@ -325,14 +325,22 @@ fn validate_authority_snapshot(
     expected_high_water_ms: i64,
 ) -> Result<()> {
     let receipt = key.authorization_receipt().receipt();
-    let authority = read_authority_plan_application_state(transaction, &session.trusted_now)?;
+    let authority = read_authority_plan_application_state_at_or_before_observation(
+        transaction,
+        &session.trusted_now,
+    )?;
+    validate_failed_candidate_inventory(
+        &authority.inventory,
+        key.owner_plugin_id(),
+        key.owner_slot_ref(),
+        key.owner_release(),
+    )?;
     if authority.installation_id_digest != session.installation_id_digest()
         || authority.process_owner_epoch != session.process_owner_epoch()
-        || authority.state_revision != receipt.authority_state_revision_after()
-        || authority.inventory.inventory_revision != receipt.inventory_revision()
-        || authority.inventory_digest != receipt.inventory_digest()
-        || authority.authority_epoch != receipt.authority_epoch_after()
-        || authority.trusted_time_high_water_ms != expected_high_water_ms
+        || authority.state_revision < receipt.authority_state_revision_after()
+        || authority.inventory.inventory_revision < receipt.inventory_revision()
+        || authority.authority_epoch < receipt.authority_epoch_after()
+        || authority.trusted_time_high_water_ms < expected_high_water_ms
         || count_authority_time(transaction, session, expected_high_water_ms)? != 1
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_NAMESPACE_DURABILITY_RECOVERY_SNAPSHOT_CHANGED");
@@ -430,7 +438,8 @@ fn count_authority_time(
         .query_row(
             r#"SELECT COUNT(*) FROM authority_meta WHERE singleton = 1
                AND installation_id_digest = ?1 AND process_owner_epoch = ?2
-               AND trusted_time_high_water_ms = ?3 AND updated_at_ms = ?3
+               AND trusted_time_high_water_ms >= ?3
+               AND updated_at_ms = trusted_time_high_water_ms
                AND clock_status = 'trusted'"#,
             params![
                 session.installation_id_digest(),

@@ -22,18 +22,20 @@ pub(super) fn persist_candidate_cleanup_disposition(
 ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
     let physical = permit.physical();
     let event = permit.event();
-    session.validate_source(physical.state().cancellation_guard())?;
+    session.validate_source(physical.state().deletion_guard())?;
     validate_unstored_disposition(transaction, session, physical, event)?;
     let intent_time = physical.intent_event().event().recorded_at_ms();
     let time_state = read_authority_keyring_state(transaction)?;
-    if time_state.trusted_time_high_water_ms != Some(intent_time)
+    if time_state.trusted_time_high_water_ms < Some(intent_time)
         || time_state.clock_status != "trusted"
-        || event.event().recorded_at_ms() <= intent_time
+        || time_state
+            .trusted_time_high_water_ms
+            .is_none_or(|high_water| event.event().recorded_at_ms() <= high_water)
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_TIME_CHANGED");
     }
     advance_trusted_time(transaction, &time_state, event.event().recorded_at_ms())?;
-    session.validate_source(physical.state().cancellation_guard())?;
+    session.validate_source(physical.state().deletion_guard())?;
     insert_event(transaction, event)?;
     validate_authority_and_owner(
         transaction,
@@ -44,7 +46,7 @@ pub(super) fn persist_candidate_cleanup_disposition(
     let stored = read_exact_step_event(transaction, event)?.ok_or_else(|| {
         anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DISPOSITION_READBACK_MISSING")
     })?;
-    session.validate_source(physical.state().cancellation_guard())?;
+    session.validate_source(physical.state().deletion_guard())?;
     Ok(stored)
 }
 

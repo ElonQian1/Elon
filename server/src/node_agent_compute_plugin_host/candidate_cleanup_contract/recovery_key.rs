@@ -2,6 +2,7 @@ use std::fmt;
 
 use super::PreparedCandidateCleanupAuthorization;
 use crate::node_agent_compute_plugin_host::{
+    candidate_staging_contract::ComputePluginCandidateStagingRecoveryKey,
     identity::ComputePluginReleaseRef, local_authority::ComputePluginAuthorityInstanceBinding,
 };
 
@@ -23,10 +24,60 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupAuthorizati
     pub(in crate::node_agent_compute_plugin_host) authorized_at_ms: i64,
 }
 
+#[derive(Clone)]
 pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupSlotExpectation {
     pub(in crate::node_agent_compute_plugin_host) plugin_id: String,
     pub(in crate::node_agent_compute_plugin_host) slot_ref: String,
     pub(in crate::node_agent_compute_plugin_host) release: ComputePluginReleaseRef,
+}
+
+/// Exact durable owner facts retained by post-authorization cleanup recovery keys. This is
+/// evidence only: it carries no handle, deletion guard, process fence or Store write permit.
+#[derive(Clone)]
+pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupOwnerExpectation {
+    slot: CandidateCleanupSlotExpectation,
+    candidate_generation: i64,
+    owner_plan_id: String,
+    owner_plan_digest: String,
+    application_inventory_revision: i64,
+}
+
+impl CandidateCleanupOwnerExpectation {
+    pub(in crate::node_agent_compute_plugin_host) fn from_staging(
+        staging: &ComputePluginCandidateStagingRecoveryKey,
+    ) -> Self {
+        let slot = staging.slot_expectation();
+        let receipt = staging.receipt_expectation();
+        Self {
+            slot: CandidateCleanupSlotExpectation {
+                plugin_id: slot.plugin_id.clone(),
+                slot_ref: slot.slot_ref.clone(),
+                release: slot.release.clone(),
+            },
+            candidate_generation: receipt.candidate_generation,
+            owner_plan_id: receipt.owner_plan_id.clone(),
+            owner_plan_digest: receipt.owner_plan_digest.clone(),
+            application_inventory_revision: receipt.application_inventory_revision,
+        }
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn slot(
+        &self,
+    ) -> &CandidateCleanupSlotExpectation {
+        &self.slot
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn candidate_generation(&self) -> i64 {
+        self.candidate_generation
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn owner_plan_id(&self) -> &str {
+        &self.owner_plan_id
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn owner_plan_digest(&self) -> &str {
+        &self.owner_plan_digest
+    }
+    pub(in crate::node_agent_compute_plugin_host) fn application_inventory_revision(&self) -> i64 {
+        self.application_inventory_revision
+    }
 }
 
 /// Process-local identity for classifying one uncertain authorization commit. It cannot authorize

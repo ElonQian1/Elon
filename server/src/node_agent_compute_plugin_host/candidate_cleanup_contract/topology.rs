@@ -268,7 +268,7 @@ pub(in crate::node_agent_compute_plugin_host) fn adopt_recovered_candidate_clean
             recovery,
         ));
     }
-    if let Err(error) = session.validate_source(recovery.state.cancellation_guard()) {
+    if let Err(error) = session.validate_source(recovery.state.deletion_guard()) {
         return Err(adoption_failure(
             CandidateCleanupTopologyRecoveryAdoptionPhase::RetainedCustodyChanged,
             error,
@@ -312,7 +312,7 @@ fn validate_recovery_provenance(
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_TOPOLOGY_RECOVERY_PROVENANCE_CHANGED");
     }
-    session.validate_source(recovery.state.cancellation_guard())
+    session.validate_source(recovery.state.deletion_guard())
 }
 
 fn pinned_preparation_failure(
@@ -376,7 +376,7 @@ impl SealedCandidateCleanupTopology {
     }
     pub(super) fn validate_retained_state(&self) -> Result<()> {
         validate_hashed_execution_plan(&self.plan)?;
-        self.state.cancellation_guard().ensure_current()?;
+        self.state.deletion_guard().ensure_current()?;
         let receipt = self.state.authorization_receipt();
         let receipt_body = receipt.receipt();
         let recovery = self.state.staging_recovery_key();

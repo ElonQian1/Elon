@@ -111,7 +111,23 @@ fn execute_retry_custody(
         intent_event,
         pending,
     } = retry;
-    match pending.set_delete_disposition_exact() {
+    let _operation = match state.deletion_guard().enter_operation() {
+        Ok(operation) => operation,
+        Err(error) => {
+            return Err(retry_failure(
+                CandidateCleanupDispositionFailurePhase::RejectedBeforeDisposition,
+                error,
+                CandidateCleanupDispositionRetryCustody {
+                    state,
+                    plan,
+                    intent_event,
+                    pending,
+                },
+            ))
+        }
+    };
+    let disposition_result = pending.set_delete_disposition_exact();
+    match disposition_result {
         Ok(disposition) => Ok(PhysicallyDisposedCandidateCleanupObject {
             state,
             plan,
@@ -145,7 +161,7 @@ fn validate_initial_intent_custody(intent: &DurableCandidateCleanupDeleteIntent)
 
 fn validate_retry_custody(retry: &CandidateCleanupDispositionRetryCustody) -> Result<()> {
     validate_hashed_execution_plan(&retry.plan)?;
-    retry.state.cancellation_guard().ensure_current()?;
+    retry.state.deletion_guard().ensure_current()?;
     let expected_intent =
         build_initial_delete_intent(&retry.plan, retry.intent_event.event().recorded_at_ms())?;
     let expected_object = retry.plan.objects().first().ok_or_else(|| {

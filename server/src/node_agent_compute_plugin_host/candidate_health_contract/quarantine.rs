@@ -283,6 +283,21 @@ impl DurableCandidateHealthQuarantine<'_> {
     ) -> Result<()> {
         self.staged.revalidate_retained_content()
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn revalidate_for_prepared_candidate_cleanup(
+        &mut self,
+        guard: &crate::node_agent_compute_plugin_host::local_authority::PreparedCandidateCleanupDeletionGuard,
+    ) -> Result<()> {
+        self.staged.revalidate_for_prepared_candidate_cleanup(guard)
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn revalidate_for_authorized_candidate_cleanup(
+        &mut self,
+        guard: &crate::node_agent_compute_plugin_host::local_authority::AuthorizedCandidateCleanupDeletionGuard,
+    ) -> Result<()> {
+        self.staged
+            .revalidate_for_authorized_candidate_cleanup(guard)
+    }
 }
 
 impl<'root> DurableCandidateHealthQuarantine<'root> {

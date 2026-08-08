@@ -82,26 +82,26 @@ pub(in crate::node_agent_compute_plugin_host) fn adopt_recovered_candidate_clean
             ))
         }
     };
-    let guard = recovery
+    if let Err(error) = authority_session.validate_cleanup_deletion_source(&recovery.deletion_guard)
+    {
+        return Err(adoption_failure(
+            CandidateCleanupAuthorizationRecoveryAdoptionPhase::RetainedContentChanged,
+            error,
+            recovery,
+        ));
+    }
+    if let Err(error) = recovery
         .quarantined
-        .staged()
-        .archive()
-        .snapshot_cancellation_guard();
-    if let Err(error) = authority_session.validate_source(&guard) {
+        .revalidate_for_prepared_candidate_cleanup(&recovery.deletion_guard)
+    {
         return Err(adoption_failure(
             CandidateCleanupAuthorizationRecoveryAdoptionPhase::RetainedContentChanged,
             error,
             recovery,
         ));
     }
-    if let Err(error) = recovery.quarantined.revalidate_retained_content() {
-        return Err(adoption_failure(
-            CandidateCleanupAuthorizationRecoveryAdoptionPhase::RetainedContentChanged,
-            error,
-            recovery,
-        ));
-    }
-    if let Err(error) = authority_session.validate_source(&guard) {
+    if let Err(error) = authority_session.validate_cleanup_deletion_source(&recovery.deletion_guard)
+    {
         return Err(adoption_failure(
             CandidateCleanupAuthorizationRecoveryAdoptionPhase::RetainedContentChanged,
             error,
@@ -115,9 +115,21 @@ pub(in crate::node_agent_compute_plugin_host) fn adopt_recovered_candidate_clean
             recovery,
         ));
     }
+    let deletion_guard = match recovery.deletion_guard.authorize(&receipt) {
+        Ok(guard) => guard,
+        Err((error, guard)) => {
+            recovery.deletion_guard = guard;
+            return Err(adoption_failure(
+                CandidateCleanupAuthorizationRecoveryAdoptionPhase::OutcomeChanged,
+                error,
+                recovery,
+            ));
+        }
+    };
     Ok(AuthorizedCandidateCleanup {
         quarantined: recovery.quarantined,
         receipt,
+        deletion_guard,
     })
 }
 
@@ -127,11 +139,6 @@ fn validate_provenance(
     session: &ComputePluginCandidateCleanupRecoveryAuthoritySession<'_>,
 ) -> Result<()> {
     let key = &recovery.recovery_key;
-    let guard = recovery
-        .quarantined
-        .staged()
-        .archive()
-        .snapshot_cancellation_guard();
     if !key
         .authority_instance_binding()
         .matches(session.authority_instance_binding())
@@ -142,7 +149,7 @@ fn validate_provenance(
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_ADOPTION_PROVENANCE_CHANGED");
     }
-    session.validate_source(&guard)?;
+    session.validate_cleanup_deletion_source(&recovery.deletion_guard)?;
     Ok(())
 }
 

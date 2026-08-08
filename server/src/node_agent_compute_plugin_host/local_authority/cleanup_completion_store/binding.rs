@@ -26,7 +26,7 @@ pub(super) fn read_candidate_cleanup_completion_binding(
     terminal: &DurableCandidateCleanupTerminalJournal,
 ) -> Result<ComputePluginCandidateCleanupCompletionAuthorityFacts> {
     let physical = terminal.physical();
-    session.validate_source(physical.cancellation_guard())?;
+    session.validate_source(physical.deletion_guard())?;
     validate_physical_chain(session, physical)?;
     validate_terminal_journal(transaction, terminal)?;
 
@@ -60,7 +60,7 @@ pub(super) fn read_candidate_cleanup_completion_binding(
         &slot.release,
         &session.trusted_now,
     )?;
-    session.validate_source(physical.cancellation_guard())?;
+    session.validate_source(physical.deletion_guard())?;
 
     Ok(ComputePluginCandidateCleanupCompletionAuthorityFacts {
         authority_state_revision_before: authority.state_revision,

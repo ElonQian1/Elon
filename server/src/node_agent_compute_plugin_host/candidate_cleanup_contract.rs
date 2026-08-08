@@ -8,9 +8,10 @@ use super::{
     install_plan_admission_validation::is_identifier,
     lifecycle::SLOT_FAILED,
     local_authority::{
-        ComputePluginCandidateCleanupAuthorityFacts, ComputePluginCandidateCleanupAuthoritySession,
-        ComputePluginFetchProcessFence, ComputePluginLocalAuthority,
-        HashedComputePluginCandidateCleanupAuthorizationReceipt,
+        AuthorizedCandidateCleanupDeletionGuard, ComputePluginCandidateCleanupAuthorityFacts,
+        ComputePluginCandidateCleanupAuthoritySession, ComputePluginFetchProcessFence,
+        ComputePluginLocalAuthority, HashedComputePluginCandidateCleanupAuthorizationReceipt,
+        PreparedCandidateCleanupDeletionGuard,
         CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_CANONICALIZATION,
         CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_DIGEST_ALGORITHM,
         CANDIDATE_CLEANUP_AUTHORIZATION_RECEIPT_SCHEMA,
@@ -113,7 +114,7 @@ pub(in crate::node_agent_compute_plugin_host) use journal::{
 };
 pub(in crate::node_agent_compute_plugin_host) use recovery_key::{
     CandidateCleanupAuthorizationReceiptExpectation, CandidateCleanupAuthorizationRecoveryKey,
-    CandidateCleanupSlotExpectation,
+    CandidateCleanupOwnerExpectation, CandidateCleanupSlotExpectation,
 };
 pub(in crate::node_agent_compute_plugin_host) use terminal_journal::DurableCandidateCleanupTerminalJournal;
 pub(in crate::node_agent_compute_plugin_host) use topology::{
@@ -140,6 +141,7 @@ pub(in crate::node_agent_compute_plugin_host) struct PreparedCandidateCleanupAut
     authority_session: ComputePluginCandidateCleanupAuthoritySession<'authority>,
     facts: ComputePluginCandidateCleanupAuthorityFacts,
     cleanup_id: String,
+    deletion_guard: PreparedCandidateCleanupDeletionGuard,
 }
 
 pub(in crate::node_agent_compute_plugin_host) struct ValidatedCandidateCleanupAuthorizationPermit<
@@ -153,6 +155,7 @@ pub(in crate::node_agent_compute_plugin_host) struct ValidatedCandidateCleanupAu
 pub(in crate::node_agent_compute_plugin_host) struct AuthorizedCandidateCleanup<'root> {
     quarantined: DurableCandidateHealthQuarantine<'root>,
     receipt: HashedComputePluginCandidateCleanupAuthorizationReceipt,
+    deletion_guard: AuthorizedCandidateCleanupDeletionGuard,
 }
 
 pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupAuthorizationPreparationFailure<
@@ -174,6 +177,7 @@ pub(in crate::node_agent_compute_plugin_host) struct CandidateCleanupAuthorizati
     'root,
 > {
     quarantined: DurableCandidateHealthQuarantine<'root>,
+    deletion_guard: PreparedCandidateCleanupDeletionGuard,
     recovery_key: CandidateCleanupAuthorizationRecoveryKey,
 }
 
@@ -220,11 +224,26 @@ pub(in crate::node_agent_compute_plugin_host) fn prepare_candidate_cleanup_autho
             quarantined,
         });
     }
+    let deletion_guard = match authority_session.prepare_cleanup_deletion_guard(
+        cleanup_id.clone(),
+        &facts,
+        quarantined
+            .staged()
+            .recovery_key()
+            .root_identity_digest()
+            .to_string(),
+    ) {
+        Ok(guard) => guard,
+        Err(error) => {
+            return Err(CandidateCleanupAuthorizationPreparationFailure { error, quarantined })
+        }
+    };
     Ok(PreparedCandidateCleanupAuthorization {
         quarantined,
         authority_session,
         facts,
         cleanup_id,
+        deletion_guard,
     })
 }
 
@@ -240,6 +259,7 @@ pub(in crate::node_agent_compute_plugin_host) fn store_candidate_cleanup_authori
             CandidateCleanupAuthorizationStorePhase::PreStorePreparation,
             anyhow::anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_ID_INVALID"),
             prepared.quarantined,
+            prepared.deletion_guard,
             recovery_key,
         ));
     }
@@ -256,6 +276,7 @@ pub(in crate::node_agent_compute_plugin_host) fn store_candidate_cleanup_authori
                 CandidateCleanupAuthorizationStorePhase::StoreOutcomeUncertain,
                 error,
                 prepared.quarantined,
+                prepared.deletion_guard,
                 recovery_key,
             ))
         }
@@ -265,12 +286,26 @@ pub(in crate::node_agent_compute_plugin_host) fn store_candidate_cleanup_authori
             CandidateCleanupAuthorizationStorePhase::StoreReturnedPostconditionFailed,
             error,
             prepared.quarantined,
+            prepared.deletion_guard,
             recovery_key,
         ));
     }
+    let deletion_guard = match prepared.deletion_guard.authorize(&receipt) {
+        Ok(guard) => guard,
+        Err((error, deletion_guard)) => {
+            return Err(store_failure(
+                CandidateCleanupAuthorizationStorePhase::StoreReturnedPostconditionFailed,
+                error,
+                prepared.quarantined,
+                deletion_guard,
+                recovery_key,
+            ))
+        }
+    };
     Ok(AuthorizedCandidateCleanup {
         quarantined: prepared.quarantined,
         receipt,
+        deletion_guard,
     })
 }
 
@@ -312,6 +347,7 @@ fn store_failure<'root>(
     phase: CandidateCleanupAuthorizationStorePhase,
     error: Error,
     quarantined: DurableCandidateHealthQuarantine<'root>,
+    deletion_guard: PreparedCandidateCleanupDeletionGuard,
     recovery_key: CandidateCleanupAuthorizationRecoveryKey,
 ) -> CandidateCleanupAuthorizationStoreFailure<'root> {
     CandidateCleanupAuthorizationStoreFailure {
@@ -319,6 +355,7 @@ fn store_failure<'root>(
         error,
         recovery: CandidateCleanupAuthorizationOutcomeUncertainCustody {
             quarantined,
+            deletion_guard,
             recovery_key,
         },
     }
@@ -355,6 +392,12 @@ impl AuthorizedCandidateCleanup<'_> {
     ) -> &HashedComputePluginCandidateCleanupAuthorizationReceipt {
         &self.receipt
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn deletion_guard(
+        &self,
+    ) -> &AuthorizedCandidateCleanupDeletionGuard {
+        &self.deletion_guard
+    }
 }
 
 impl<'root> AuthorizedCandidateCleanup<'root> {
@@ -363,8 +406,9 @@ impl<'root> AuthorizedCandidateCleanup<'root> {
     ) -> (
         DurableCandidateHealthQuarantine<'root>,
         HashedComputePluginCandidateCleanupAuthorizationReceipt,
+        AuthorizedCandidateCleanupDeletionGuard,
     ) {
-        (self.quarantined, self.receipt)
+        (self.quarantined, self.receipt, self.deletion_guard)
     }
 }
 
@@ -430,6 +474,7 @@ impl fmt::Debug for CandidateCleanupAuthorizationOutcomeUncertainCustody<'_> {
         formatter
             .debug_struct("CandidateCleanupAuthorizationOutcomeUncertainCustody")
             .field("recovery_key", &self.recovery_key)
+            .field("deletion_guard", &"<retained>")
             .field("quarantined", &"<retained-handles>")
             .finish()
     }
@@ -440,6 +485,7 @@ impl fmt::Debug for AuthorizedCandidateCleanup<'_> {
         formatter
             .debug_struct("AuthorizedCandidateCleanup")
             .field("receipt", &self.receipt)
+            .field("deletion_guard", &"<retained>")
             .field("quarantined", &"<retained-handles>")
             .finish()
     }

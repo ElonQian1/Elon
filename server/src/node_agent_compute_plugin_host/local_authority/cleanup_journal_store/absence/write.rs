@@ -25,18 +25,20 @@ pub(super) fn persist_candidate_cleanup_parent_absence(
 ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
     let observed = permit.observed();
     let event = permit.event();
-    session.validate_source(observed.state().cancellation_guard())?;
+    session.validate_source(observed.state().deletion_guard())?;
     validate_unstored_parent_absence(transaction, session, observed, event)?;
     let disposition_time = observed.disposition_event().event().recorded_at_ms();
     let time_state = read_authority_keyring_state(transaction)?;
-    if time_state.trusted_time_high_water_ms != Some(disposition_time)
+    if time_state.trusted_time_high_water_ms < Some(disposition_time)
         || time_state.clock_status != "trusted"
-        || event.event().recorded_at_ms() <= disposition_time
+        || time_state
+            .trusted_time_high_water_ms
+            .is_none_or(|high_water| event.event().recorded_at_ms() <= high_water)
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_PARENT_ABSENCE_TIME_CHANGED");
     }
     advance_trusted_time(transaction, &time_state, event.event().recorded_at_ms())?;
-    session.validate_source(observed.state().cancellation_guard())?;
+    session.validate_source(observed.state().deletion_guard())?;
     insert_event(transaction, event)?;
     validate_authority_and_owner(
         transaction,
@@ -53,7 +55,7 @@ pub(super) fn persist_candidate_cleanup_parent_absence(
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_PARENT_ABSENCE_READBACK_CHANGED");
     }
-    session.validate_source(observed.state().cancellation_guard())?;
+    session.validate_source(observed.state().deletion_guard())?;
     Ok(stored)
 }
 

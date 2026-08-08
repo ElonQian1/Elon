@@ -26,20 +26,22 @@ pub(super) fn persist_candidate_cleanup_namespace_durability(
 ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
     let physical = permit.physical();
     let event = permit.event();
-    session.validate_source(physical.state().cancellation_guard())?;
+    session.validate_source(physical.state().deletion_guard())?;
     validate_unstored_namespace_durability(transaction, session, physical, event)?;
     let absence_time = physical.absence_event().event().recorded_at_ms();
     let time_state = read_authority_keyring_state(transaction)?;
-    if time_state.trusted_time_high_water_ms != Some(absence_time)
+    if time_state.trusted_time_high_water_ms < Some(absence_time)
         || time_state.clock_status != "trusted"
-        || event.event().recorded_at_ms() <= absence_time
+        || time_state
+            .trusted_time_high_water_ms
+            .is_none_or(|high_water| event.event().recorded_at_ms() <= high_water)
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_NAMESPACE_DURABILITY_TIME_CHANGED");
     }
-    session.validate_source(physical.state().cancellation_guard())?;
+    session.validate_source(physical.state().deletion_guard())?;
     physical.namespace().ensure_mutation_fence_active()?;
     advance_trusted_time(transaction, &time_state, event.event().recorded_at_ms())?;
-    session.validate_source(physical.state().cancellation_guard())?;
+    session.validate_source(physical.state().deletion_guard())?;
     insert_event(transaction, event)?;
     validate_authority_and_owner(
         transaction,
@@ -66,7 +68,7 @@ pub(super) fn persist_candidate_cleanup_namespace_durability(
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_NAMESPACE_DURABILITY_READBACK_CHANGED");
     }
     physical.namespace().ensure_mutation_fence_active()?;
-    session.validate_source(physical.state().cancellation_guard())?;
+    session.validate_source(physical.state().deletion_guard())?;
     Ok(stored)
 }
 

@@ -211,7 +211,7 @@ pub(in crate::node_agent_compute_plugin_host) fn adopt_recovered_candidate_clean
             recovery,
         ));
     }
-    if let Err(error) = session.validate_source(recovery.observed.state().cancellation_guard()) {
+    if let Err(error) = session.validate_source(recovery.observed.state().deletion_guard()) {
         return Err(adoption_failure(
             CandidateCleanupParentAbsenceRecoveryAdoptionPhase::RetainedCustodyChanged,
             error,
@@ -291,7 +291,7 @@ fn validate_recovery_provenance(
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_PARENT_ABSENCE_RECOVERY_PROVENANCE_CHANGED");
     }
-    session.validate_source(recovery.observed.state().cancellation_guard())
+    session.validate_source(recovery.observed.state().deletion_guard())
 }
 
 fn preparation_failure(

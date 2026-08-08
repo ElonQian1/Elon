@@ -18,12 +18,11 @@ use super::{
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::CandidateCleanupCompletionRecoveryKey,
-    fetch_contract::ComputePluginFetchCancellationGuard,
     local_authority::{
         cleanup_store::binding::validate_failed_candidate_inventory,
-        plan_application::read_authority_plan_application_state,
-        ComputePluginAuthorityInstanceBinding, ComputePluginFetchProcessFence,
-        ComputePluginLocalAuthority,
+        plan_application::read_authority_plan_application_state_at_or_before_observation,
+        AuthorizedCandidateCleanupDeletionGuard, ComputePluginAuthorityInstanceBinding,
+        ComputePluginFetchProcessFence, ComputePluginLocalAuthority,
     },
     manifest_validation::is_sha256,
     signed_artifact_verification::jcs_sha256_hex,
@@ -128,10 +127,9 @@ impl ComputePluginCandidateCleanupCompletionRecoveryAuthoritySession<'_> {
     }
     pub(in crate::node_agent_compute_plugin_host) fn validate_source(
         &self,
-        guard: &ComputePluginFetchCancellationGuard,
+        guard: &AuthorizedCandidateCleanupDeletionGuard,
     ) -> Result<()> {
-        guard.validate_source(self.process_fence.cancellation_source())?;
-        guard.ensure_current()
+        guard.validate_process_fence(self.process_fence)
     }
     pub(in crate::node_agent_compute_plugin_host) fn read_candidate_cleanup_completion_outcome(
         &self,
@@ -182,13 +180,15 @@ fn read_outcome(
 ) -> Result<ComputePluginCandidateCleanupCompletionRecoveryOutcome> {
     let stored = read_exact_row(transaction, key)?;
     let identity_matches = count_identity_matches(transaction, key)?;
-    let authority = read_authority_plan_application_state(transaction, &session.trusted_now)?;
+    let authority = read_authority_plan_application_state_at_or_before_observation(
+        transaction,
+        &session.trusted_now,
+    )?;
     let expected = key.receipt_expectation();
     let slot = key.slot_expectation();
     if authority.installation_id_digest != key.installation_id_digest()
         || authority.process_owner_epoch != expected.process_owner_epoch
         || count_exact_authorization(transaction, key)? != 1
-        || count_prepared_work(transaction)? != 0
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_COMPLETION_RECOVERY_AUTHORITY_CHANGED");
     }
@@ -199,12 +199,10 @@ fn read_outcome(
             if identity_matches != 1
                 || count_owner_state(transaction, key, "cleaned", Some(expected.completed_at_ms))?
                     != 1
-                || authority.state_revision != expected.authority_state_revision_after
-                || authority.inventory.inventory_revision != expected.inventory_revision_after
-                || authority.inventory_digest != expected.inventory_digest_after
-                || authority.inventory_json != key.inventory_json_after()
-                || authority.authority_epoch != expected.authority_epoch_after
-                || authority.trusted_time_high_water_ms != expected.completed_at_ms
+                || authority.state_revision < expected.authority_state_revision_after
+                || authority.inventory.inventory_revision < expected.inventory_revision_after
+                || authority.authority_epoch < expected.authority_epoch_after
+                || authority.trusted_time_high_water_ms < expected.completed_at_ms
             {
                 bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_COMPLETION_RECOVERY_RESULT_AMBIGUOUS");
             }
@@ -222,12 +220,11 @@ fn read_outcome(
         None => {
             if identity_matches != 0
                 || count_owner_state(transaction, key, "cleanup_pending", None)? != 1
-                || authority.state_revision != expected.authority_state_revision_before
-                || authority.inventory.inventory_revision != expected.inventory_revision_before
-                || authority.inventory_digest != expected.inventory_digest_before
-                || authority.authority_epoch != expected.authority_epoch_before
-                || authority.trusted_time_high_water_ms
-                    != expected.trusted_time_high_water_ms_before
+                || count_prepared_work(transaction)? != 0
+                || authority.state_revision < expected.authority_state_revision_before
+                || authority.inventory.inventory_revision < expected.inventory_revision_before
+                || authority.authority_epoch < expected.authority_epoch_before
+                || authority.trusted_time_high_water_ms < expected.trusted_time_high_water_ms_before
             {
                 bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_COMPLETION_RECOVERY_ABSENCE_AMBIGUOUS");
             }

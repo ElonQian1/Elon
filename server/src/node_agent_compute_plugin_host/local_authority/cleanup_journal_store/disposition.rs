@@ -4,15 +4,14 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 
 use super::{
-    ComputePluginAuthorityInstanceBinding, ComputePluginFetchProcessFence,
-    ComputePluginLocalAuthority,
+    AuthorizedCandidateCleanupDeletionGuard, ComputePluginAuthorityInstanceBinding,
+    ComputePluginFetchProcessFence, ComputePluginLocalAuthority,
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::{
         HashedComputePluginCandidateCleanupStepEvent, PhysicallyDisposedCandidateCleanupObject,
         ValidatedCandidateCleanupDispositionPermit,
     },
-    fetch_contract::ComputePluginFetchCancellationGuard,
     manifest_validation::is_sha256,
     trusted_time::ComputePluginTrustedTimeObservation,
 };
@@ -104,10 +103,9 @@ impl ComputePluginCandidateCleanupDispositionAuthoritySession<'_> {
 
     pub(in crate::node_agent_compute_plugin_host) fn validate_source(
         &self,
-        guard: &ComputePluginFetchCancellationGuard,
+        guard: &AuthorizedCandidateCleanupDeletionGuard,
     ) -> Result<()> {
-        guard.validate_source(self.process_fence.cancellation_source())?;
-        guard.ensure_current()
+        guard.validate_process_fence(self.process_fence)
     }
 
     pub(in crate::node_agent_compute_plugin_host) fn validate_candidate_cleanup_disposition(
@@ -115,7 +113,8 @@ impl ComputePluginCandidateCleanupDispositionAuthoritySession<'_> {
         physical: &PhysicallyDisposedCandidateCleanupObject,
         event: &HashedComputePluginCandidateCleanupStepEvent,
     ) -> Result<()> {
-        self.validate_source(physical.state().cancellation_guard())?;
+        self.validate_source(physical.state().deletion_guard())?;
+        let _operation = physical.state().deletion_guard().enter_operation()?;
         self.authority.with_deferred(|transaction| {
             validation::validate_unstored_disposition(transaction, self, physical, event)
         })
@@ -125,7 +124,12 @@ impl ComputePluginCandidateCleanupDispositionAuthoritySession<'_> {
         &self,
         permit: ValidatedCandidateCleanupDispositionPermit<'_>,
     ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
-        self.validate_source(permit.physical().state().cancellation_guard())?;
+        self.validate_source(permit.physical().state().deletion_guard())?;
+        let _operation = permit
+            .physical()
+            .state()
+            .deletion_guard()
+            .enter_operation()?;
         self.authority.with_immediate(|transaction| {
             write::persist_candidate_cleanup_disposition(transaction, self, permit)
         })

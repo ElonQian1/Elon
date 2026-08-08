@@ -1,4 +1,7 @@
-use std::time::Instant;
+use std::{
+    sync::{atomic::AtomicBool, Arc},
+    time::Instant,
+};
 
 use anyhow::{bail, Context, Result};
 use rusqlite::{named_params, params, Transaction};
@@ -22,6 +25,7 @@ pub(crate) struct ComputePluginFetchProcessFence {
     acquired_at_ms: i64,
     acquired_observed_at: Instant,
     cancellation_source: ComputePluginFetchCancellationSource,
+    pub(super) cleanup_deletion_fence_liveness: Arc<AtomicBool>,
 }
 
 impl ComputePluginFetchProcessFence {
@@ -64,6 +68,16 @@ impl ComputePluginFetchProcessFence {
     }
 }
 
+impl Drop for ComputePluginFetchProcessFence {
+    fn drop(&mut self) {
+        self.authority_instance_binding.close_cleanup_process_fence(
+            self.process_owner_epoch,
+            &self.cleanup_deletion_fence_liveness,
+        );
+        self.cancellation_source.close();
+    }
+}
+
 struct ProcessOwnershipState {
     installation_id_digest: String,
     state_revision: i64,
@@ -90,7 +104,8 @@ impl ComputePluginLocalAuthority {
         let clock_epoch_digest = observation.clock_epoch_digest().to_string();
         let trusted_now_ms = observation.trusted_now().timestamp_millis();
         let acquired_observed_at = observation.observed_at();
-        self.with_immediate(|transaction| {
+        let mut cleanup_transition = self.instance_binding().begin_cleanup_process_transition()?;
+        let acquired = match self.with_immediate(|transaction| {
             let state = read_process_ownership_state(transaction)?;
             validate_process_ownership_state(
                 &state,
@@ -127,20 +142,34 @@ impl ComputePluginLocalAuthority {
                 next_process_owner_epoch,
                 trusted_now_ms,
             )?;
-            let cancellation_source = ComputePluginFetchCancellationSource::bound(
-                self.instance_binding().clone(),
-                state.installation_id_digest.clone(),
-                next_process_owner_epoch,
-            )?;
-            Ok(ComputePluginFetchProcessFence {
-                authority_instance_binding: self.instance_binding().clone(),
-                installation_id_digest: state.installation_id_digest,
-                clock_epoch_digest,
-                process_owner_epoch: next_process_owner_epoch,
-                acquired_at_ms: trusted_now_ms,
-                acquired_observed_at,
-                cancellation_source,
-            })
+            Ok((state.installation_id_digest, next_process_owner_epoch))
+        }) {
+            Ok(acquired) => acquired,
+            Err(error) => {
+                // The generic transaction seam cannot distinguish a rolled-back failure from an
+                // uncertain COMMIT. Permanently revoke the old process-local deletion domain;
+                // recovery must restart from the durable authority rather than resume OS deletes.
+                cleanup_transition.fail_closed();
+                return Err(error);
+            }
+        };
+        let cancellation_source = ComputePluginFetchCancellationSource::bound(
+            self.instance_binding().clone(),
+            acquired.0.clone(),
+            acquired.1,
+        )?;
+        let cleanup_deletion_fence_liveness = Arc::new(AtomicBool::new(true));
+        cleanup_transition.activate(acquired.1, Arc::clone(&cleanup_deletion_fence_liveness))?;
+        drop(cleanup_transition);
+        Ok(ComputePluginFetchProcessFence {
+            authority_instance_binding: self.instance_binding().clone(),
+            installation_id_digest: acquired.0,
+            clock_epoch_digest,
+            process_owner_epoch: acquired.1,
+            acquired_at_ms: trusted_now_ms,
+            acquired_observed_at,
+            cancellation_source,
+            cleanup_deletion_fence_liveness,
         })
     }
 }

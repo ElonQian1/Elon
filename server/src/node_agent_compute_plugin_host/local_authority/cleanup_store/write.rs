@@ -18,7 +18,11 @@ use crate::node_agent_compute_plugin_host::{
     lifecycle::SLOT_FAILED,
     local_authority::{
         keyring_snapshot::{advance_trusted_time, read_authority_keyring_state},
-        plan_application::{read_authority_plan_application_state, AuthorityPlanApplicationState},
+        plan_application::{
+            read_authority_plan_application_state,
+            read_authority_plan_application_state_at_or_before_observation,
+            AuthorityPlanApplicationState,
+        },
     },
     signed_artifact_verification::jcs_sha256_hex,
 };
@@ -343,7 +347,10 @@ fn validate_readback(
             |row| row.get::<_, i64>(0),
         )
         .context("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_META_READBACK")?;
-    let authority = read_authority_plan_application_state(transaction, &session.trusted_now)?;
+    let authority = read_authority_plan_application_state_at_or_before_observation(
+        transaction,
+        &session.trusted_now,
+    )?;
     if row_count != 1
         || owner_count != 1
         || meta_count != 1

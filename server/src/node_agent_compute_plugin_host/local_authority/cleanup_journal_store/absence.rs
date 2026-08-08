@@ -4,15 +4,14 @@ use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
 
 use super::{
-    ComputePluginAuthorityInstanceBinding, ComputePluginFetchProcessFence,
-    ComputePluginLocalAuthority,
+    AuthorizedCandidateCleanupDeletionGuard, ComputePluginAuthorityInstanceBinding,
+    ComputePluginFetchProcessFence, ComputePluginLocalAuthority,
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::{
         CandidateCleanupParentAbsenceRecoveryKey, HashedComputePluginCandidateCleanupStepEvent,
         ObservedCandidateCleanupParentAbsence, ValidatedCandidateCleanupParentAbsencePermit,
     },
-    fetch_contract::ComputePluginFetchCancellationGuard,
     manifest_validation::is_sha256,
     trusted_time::ComputePluginTrustedTimeObservation,
 };
@@ -100,17 +99,17 @@ impl ComputePluginCandidateCleanupParentAbsenceAuthoritySession<'_> {
     }
     pub(in crate::node_agent_compute_plugin_host) fn validate_source(
         &self,
-        guard: &ComputePluginFetchCancellationGuard,
+        guard: &AuthorizedCandidateCleanupDeletionGuard,
     ) -> Result<()> {
-        guard.validate_source(self.process_fence.cancellation_source())?;
-        guard.ensure_current()
+        guard.validate_process_fence(self.process_fence)
     }
     pub(in crate::node_agent_compute_plugin_host) fn validate_candidate_cleanup_parent_absence(
         &self,
         observed: &ObservedCandidateCleanupParentAbsence,
         event: &HashedComputePluginCandidateCleanupStepEvent,
     ) -> Result<()> {
-        self.validate_source(observed.state().cancellation_guard())?;
+        self.validate_source(observed.state().deletion_guard())?;
+        let _operation = observed.state().deletion_guard().enter_operation()?;
         self.authority.with_deferred(|transaction| {
             validation::validate_unstored_parent_absence(transaction, self, observed, event)
         })
@@ -119,7 +118,12 @@ impl ComputePluginCandidateCleanupParentAbsenceAuthoritySession<'_> {
         &self,
         permit: ValidatedCandidateCleanupParentAbsencePermit<'_>,
     ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
-        self.validate_source(permit.observed().state().cancellation_guard())?;
+        self.validate_source(permit.observed().state().deletion_guard())?;
+        let _operation = permit
+            .observed()
+            .state()
+            .deletion_guard()
+            .enter_operation()?;
         self.authority.with_immediate(|transaction| {
             write::persist_candidate_cleanup_parent_absence(transaction, self, permit)
         })

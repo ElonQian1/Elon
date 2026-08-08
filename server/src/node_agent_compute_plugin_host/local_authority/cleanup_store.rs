@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 
 use super::{
     ComputePluginAuthorityInstanceBinding, ComputePluginFetchProcessFence,
-    ComputePluginLocalAuthority,
+    ComputePluginLocalAuthority, PreparedCandidateCleanupDeletionGuard,
 };
 use crate::node_agent_compute_plugin_host::{
     candidate_cleanup_contract::ValidatedCandidateCleanupAuthorizationPermit,
@@ -146,6 +146,23 @@ impl ComputePluginCandidateCleanupAuthoritySession<'_> {
         self.authority.with_immediate(|transaction| {
             write::persist_candidate_cleanup_authorization(transaction, self, permit)
         })
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn prepare_cleanup_deletion_guard(
+        &self,
+        cleanup_id: String,
+        facts: &ComputePluginCandidateCleanupAuthorityFacts,
+        root_identity_digest: String,
+    ) -> Result<PreparedCandidateCleanupDeletionGuard> {
+        self.process_fence.prepare_candidate_cleanup_deletion_guard(
+            cleanup_id,
+            facts.candidate_token_digest.clone(),
+            facts.quarantine_id.clone(),
+            facts.quarantine_receipt_digest.clone(),
+            facts.staging_id.clone(),
+            facts.staging_run_digest.clone(),
+            root_identity_digest,
+        )
     }
 }
 
