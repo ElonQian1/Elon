@@ -3,6 +3,7 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 
 use super::super::ComputePluginAuthorityInstanceBinding;
+use super::revocation::PreparedPolicyCapabilityRevocation;
 
 pub(in crate::node_agent_compute_plugin_host) const COMPUTE_PLUGIN_SHARING_POLICY_BINDING_RECEIPT_SCHEMA: &str =
     "elon.compute_plugin.sharing_policy_binding_receipt.v1";
@@ -128,4 +129,5 @@ pub(super) struct ComputePluginSharingPolicyBindingRecoveryKey {
     pub before: PolicyBindingAuthorityState,
     pub inventory_after_json: String,
     pub hashed_receipt: HashedComputePluginSharingPolicyBindingReceipt,
+    pub prepared_revocation: PreparedPolicyCapabilityRevocation,
 }

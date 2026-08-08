@@ -4,6 +4,10 @@ use rusqlite::{params, OptionalExtension, Transaction};
 use super::{
     super::{process_ownership::ComputePluginFetchProcessFence, ComputePluginLocalAuthority},
     durable, recovery, rejected,
+    revocation::{
+        insert_prepared_revocation, prepare_revocation, read_exact_revocation,
+        validate_terminalized_work,
+    },
     types::{
         ComputePluginSharingPolicyBindingRecoveryKey,
         HashedComputePluginSharingPolicyBindingReceipt, PreparedSharingPolicyBindingRequest,
@@ -60,16 +64,21 @@ pub(super) fn bind(
         }
         if let Some(replayed) = read_exact_receipt(transaction, &request)? {
             validate_current_policy_head(transaction, &request)?;
+            let revocation =
+                read_exact_revocation(transaction, &request, &replayed)?.ok_or_else(|| {
+                    anyhow::anyhow!("COMPUTE_PLUGIN_POLICY_REVOCATION_RECEIPT_MISSING")
+                })?;
+            validate_terminalized_work(transaction, &revocation)?;
             intent.ensure_current()?;
-            return Ok(replayed);
+            return Ok((replayed, revocation.hashed_receipt));
         }
         validate_revision_absence(transaction, &request)?;
         // Closing is terminal for this process fence: even if the database transition later
         // rejects or becomes uncertain, the old Plan cannot mint a fresh cancellation guard.
         process_fence.close_fetch_cancellation();
         intent.ensure_current()?;
-        require_no_prepared_work(transaction)?;
         let projected = project(request.clone(), current, &session.trusted_now)?;
+        let prepared_revocation = prepare_revocation(transaction, &projected)?;
         recovery_key = Some(ComputePluginSharingPolicyBindingRecoveryKey {
             authority_instance_binding: authority.instance_binding().clone(),
             root_identity_digest: root.root_identity_digest().to_string(),
@@ -79,24 +88,32 @@ pub(super) fn bind(
             before: projected.before.clone(),
             inventory_after_json: projected.inventory_after_json.clone(),
             hashed_receipt: projected.hashed_receipt.clone(),
+            prepared_revocation: prepared_revocation.clone(),
         });
         intent.ensure_current()?;
+        insert_prepared_revocation(transaction, &prepared_revocation)?;
         insert_receipt(transaction, &projected)?;
         let stored = read_exact_receipt(transaction, &projected.request)?
             .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_POLICY_BINDING_RECEIPT_MISSING"))?;
         if stored != projected.hashed_receipt {
             bail!("COMPUTE_PLUGIN_POLICY_BINDING_RECEIPT_CHANGED");
         }
+        let stored_revocation = read_exact_revocation(transaction, &projected.request, &stored)?
+            .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_POLICY_REVOCATION_RECEIPT_MISSING"))?;
+        if stored_revocation != prepared_revocation {
+            bail!("COMPUTE_PLUGIN_POLICY_REVOCATION_RECEIPT_CHANGED");
+        }
+        validate_terminalized_work(transaction, &stored_revocation)?;
         validate_authority_after(transaction, &projected)?;
-        require_no_prepared_work(transaction)?;
         intent.ensure_current()?;
-        Ok(stored)
+        Ok((stored, stored_revocation.hashed_receipt))
     });
     match outcome {
-        Ok(receipt) => match intent.ensure_current() {
+        Ok((receipt, revocation_receipt)) => match intent.ensure_current() {
             Ok(()) => ComputePluginSharingPolicyBindingStoreResult::Durable(durable(
                 intent,
                 receipt,
+                revocation_receipt,
                 root_lock
                     .take()
                     .expect("policy binding root lock must be retained"),
@@ -140,22 +157,6 @@ fn validate_revision_absence(
         .context("COMPUTE_PLUGIN_POLICY_BINDING_REVISION_READ")?;
     if maximum.is_some_and(|revision| request.policy_revision <= revision) {
         bail!("COMPUTE_PLUGIN_POLICY_BINDING_REVISION_STALE_OR_CONFLICT");
-    }
-    Ok(())
-}
-
-pub(super) fn require_no_prepared_work(transaction: &Transaction<'_>) -> Result<()> {
-    let counts = transaction
-        .query_row(
-            r#"SELECT
-                (SELECT COUNT(*) FROM fetch_claims WHERE state = 'prepared'),
-                (SELECT COUNT(*) FROM candidate_verification_runs WHERE state = 'prepared')"#,
-            [],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
-        )
-        .context("COMPUTE_PLUGIN_POLICY_BINDING_PREPARED_WORK_READ")?;
-    if counts != (0, 0) {
-        bail!("COMPUTE_PLUGIN_POLICY_BINDING_PREPARED_WORK_MUST_DRAIN");
     }
     Ok(())
 }

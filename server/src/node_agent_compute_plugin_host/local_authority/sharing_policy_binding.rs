@@ -9,10 +9,17 @@ use crate::node_agent_compute_plugin_host::{
 };
 
 mod recovery;
+mod revocation;
 mod types;
 mod validation;
 mod write;
 
+pub(in crate::node_agent_compute_plugin_host) use revocation::{
+    ComputePluginSharingPolicyCapabilityRevocationReceipt,
+    HashedComputePluginSharingPolicyCapabilityRevocationReceipt,
+    COMPUTE_PLUGIN_SHARING_POLICY_CAPABILITY_REVOCATION_RECEIPT_SCHEMA,
+    HASHED_COMPUTE_PLUGIN_SHARING_POLICY_CAPABILITY_REVOCATION_RECEIPT_SCHEMA,
+};
 use types::ComputePluginSharingPolicyBindingRecoveryKey;
 pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginSharingPolicyBindingReceipt, HashedComputePluginSharingPolicyBindingReceipt,
@@ -26,6 +33,7 @@ pub(in crate::node_agent_compute_plugin_host) use types::{
 pub(in crate::node_agent_compute_plugin_host) struct DurableComputePluginSharingPolicyBinding {
     intent: ComputePluginLocalPolicyBindingIntent,
     receipt: HashedComputePluginSharingPolicyBindingReceipt,
+    revocation_receipt: HashedComputePluginSharingPolicyCapabilityRevocationReceipt,
     _root_lock: ComputePluginRootLockLease,
 }
 
@@ -41,6 +49,12 @@ impl DurableComputePluginSharingPolicyBinding {
     ) -> &HashedComputePluginSharingPolicyBindingReceipt {
         &self.receipt
     }
+
+    pub(in crate::node_agent_compute_plugin_host) fn revocation_receipt(
+        &self,
+    ) -> &HashedComputePluginSharingPolicyCapabilityRevocationReceipt {
+        &self.revocation_receipt
+    }
 }
 
 impl fmt::Debug for DurableComputePluginSharingPolicyBinding {
@@ -49,6 +63,10 @@ impl fmt::Debug for DurableComputePluginSharingPolicyBinding {
             .debug_struct("DurableComputePluginSharingPolicyBinding")
             .field("intent", &self.intent)
             .field("receipt_digest", &self.receipt.receipt_digest())
+            .field(
+                "revocation_receipt_digest",
+                &self.revocation_receipt.receipt_digest(),
+            )
             .finish()
     }
 }
@@ -109,7 +127,10 @@ pub(in crate::node_agent_compute_plugin_host) enum ComputePluginSharingPolicyBin
 pub(in crate::node_agent_compute_plugin_host) enum ComputePluginSharingPolicyBindingRecoveryOutcome
 {
     Durable(DurableComputePluginSharingPolicyBinding),
-    CommittedHistorical(HashedComputePluginSharingPolicyBindingReceipt),
+    CommittedHistorical {
+        binding: HashedComputePluginSharingPolicyBindingReceipt,
+        revocation: HashedComputePluginSharingPolicyCapabilityRevocationReceipt,
+    },
     NotCreated(ComputePluginLocalPolicyBindingIntent),
     NotCreatedSuperseded,
     Retained(ComputePluginSharingPolicyBindingRecovery),
@@ -151,11 +172,13 @@ fn rejected(
 fn durable(
     intent: ComputePluginLocalPolicyBindingIntent,
     receipt: HashedComputePluginSharingPolicyBindingReceipt,
+    revocation_receipt: HashedComputePluginSharingPolicyCapabilityRevocationReceipt,
     root_lock: ComputePluginRootLockLease,
 ) -> DurableComputePluginSharingPolicyBinding {
     DurableComputePluginSharingPolicyBinding {
         intent,
         receipt,
+        revocation_receipt,
         _root_lock: root_lock,
     }
 }

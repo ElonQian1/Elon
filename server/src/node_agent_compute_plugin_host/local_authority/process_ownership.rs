@@ -180,8 +180,8 @@ fn validate_process_ownership_state(
         || state.trusted_time_high_water_ms < 0
         || state.updated_at_ms < 0
         || state.clock_status != "trusted"
-        || trusted_now_ms < state.trusted_time_high_water_ms
-        || trusted_now_ms < state.updated_at_ms
+        || trusted_now_ms <= state.trusted_time_high_water_ms
+        || trusted_now_ms <= state.updated_at_ms
     {
         bail!("COMPUTE_PLUGIN_PROCESS_OWNER_STATE_INVALID");
     }

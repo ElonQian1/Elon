@@ -109,7 +109,9 @@ pub(crate) use rollback_checkpoint::{
 pub(in crate::node_agent_compute_plugin_host) use sharing_policy_binding::{
     ComputePluginSharingPolicyBindingRecovery, ComputePluginSharingPolicyBindingRecoveryOutcome,
     ComputePluginSharingPolicyBindingStoreResult, DurableComputePluginSharingPolicyBinding,
-    HashedComputePluginSharingPolicyBindingReceipt, RejectedComputePluginSharingPolicyBinding,
+    HashedComputePluginSharingPolicyBindingReceipt,
+    HashedComputePluginSharingPolicyCapabilityRevocationReceipt,
+    RejectedComputePluginSharingPolicyBinding,
 };
 pub(in crate::node_agent_compute_plugin_host) use staging_store::{
     ComputePluginCandidateStagingAuthorityFacts,

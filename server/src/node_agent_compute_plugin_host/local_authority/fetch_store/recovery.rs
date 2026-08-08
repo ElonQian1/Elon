@@ -460,6 +460,7 @@ fn parse_abort_reason(reason: &str) -> Result<&'static str> {
         "durable_write_failed" => Ok("durable_write_failed"),
         "file_binding_mismatch" => Ok("file_binding_mismatch"),
         "authority_recovery" => Ok(RECOVERY_ABORT_REASON),
+        "sharing_policy_transition_aborted" => Ok("sharing_policy_transition_aborted"),
         "committed_file_missing" => Ok("committed_file_missing"),
         "committed_file_shorter" => Ok("committed_file_shorter"),
         _ => bail!("COMPUTE_PLUGIN_FETCH_OUTCOME_ABORT_REASON_CORRUPT"),
