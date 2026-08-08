@@ -38,6 +38,9 @@ class ChatGptWebLabContractTest {
         assertFalse(bridge.contains("getCookie("))
         assertTrue(adapter.contains("new MutationObserver"))
         assertTrue(adapter.contains("schema: 'yilong.ai.ui.v1'"))
+        assertTrue(adapter.contains("authenticated: isAuthenticated()"))
+        assertTrue(adapter.contains("url: location.origin + location.pathname"))
+        assertFalse(adapter.contains("url: location.href"))
         assertTrue(adapter.contains("action === 'send_prompt'"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
             assertFalse("page adapter must not contain $it", adapter.contains(it))

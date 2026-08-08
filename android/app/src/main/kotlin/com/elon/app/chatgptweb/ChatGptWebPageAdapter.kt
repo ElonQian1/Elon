@@ -78,6 +78,8 @@ internal class ChatGptWebPageAdapter(
 
     fun markReady() = onStateChanged(State.READY)
 
+    fun markLoginRequired() = onStateChanged(State.WEB_ONLY)
+
     fun dispose() {
         if (listenerInstalled && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
             WebViewCompat.removeWebMessageListener(webView, BRIDGE_OBJECT)

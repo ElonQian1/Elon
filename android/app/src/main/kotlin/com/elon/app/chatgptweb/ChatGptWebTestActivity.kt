@@ -196,11 +196,16 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         when (event) {
             is ChatGptWebEvent.Snapshot -> {
                 nativeController.render(event.value)
-                if (event.value.composerReady || event.value.messages.isNotEmpty()) {
+                if (
+                    event.value.authenticated &&
+                    (event.value.composerReady || event.value.messages.isNotEmpty())
+                ) {
                     pageAdapter.markReady()
                     if (loginController.onAuthenticated()) {
                         binding.chatGptModeNative.isChecked = true
                     }
+                } else {
+                    pageAdapter.markLoginRequired()
                 }
                 if (event.value.title.isNotBlank()) binding.chatGptWebHost.text = event.value.title
             }

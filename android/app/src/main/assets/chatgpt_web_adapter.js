@@ -70,6 +70,33 @@
     return document.querySelector('[data-testid="prompt-textarea"], textarea[placeholder], form textarea, main [contenteditable="true"]');
   }
 
+  function isVisible(node) {
+    if (!node) return false;
+    const rect = node.getBoundingClientRect();
+    const style = window.getComputedStyle(node);
+    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+  }
+
+  function hasVisibleLoginEntry() {
+    const loginLabels = new Set(['log in', 'login', 'sign in', '登录', '登入']);
+    return Array.from(document.querySelectorAll('a, button, [role="button"]')).some((node) => {
+      if (!isVisible(node)) return false;
+      const label = cleanText(node.getAttribute('aria-label') || node.textContent).toLowerCase();
+      const href = String(node.getAttribute('href') || '').toLowerCase();
+      return loginLabels.has(label) || href.includes('/auth/login');
+    });
+  }
+
+  function isAuthenticated() {
+    const path = location.pathname.toLowerCase();
+    if (path.startsWith('/auth') || path.startsWith('/cdn-cgi')) return false;
+    const profile = document.querySelector(
+      '[data-testid="profile-button"], [data-testid="accounts-profile-button"], button[aria-label*="profile" i]'
+    );
+    if (isVisible(profile)) return true;
+    return !!findComposer() && !hasVisibleLoginEntry();
+  }
+
   function findButton(testId, labels) {
     const direct = document.querySelector('[data-testid="' + testId + '"]');
     if (direct) return direct;
@@ -93,8 +120,9 @@
     const event = {
       type: 'message_snapshot',
       title: cleanText(document.title.replace(/\s*[-|]\s*ChatGPT.*$/i, '')),
-      url: location.href,
+      url: location.origin + location.pathname,
       messages,
+      authenticated: isAuthenticated(),
       composerReady: !!findComposer(),
       streaming
     };

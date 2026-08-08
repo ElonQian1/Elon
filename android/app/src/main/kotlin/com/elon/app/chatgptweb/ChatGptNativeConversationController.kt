@@ -67,12 +67,14 @@ internal class ChatGptNativeConversationController(
             adapter.notifyDataSetChanged()
         }
         emptyView.visibility = if (messages.isEmpty()) View.VISIBLE else View.GONE
-        setAvailable(value.composerReady && !value.streaming)
+        setAvailable(value.authenticated && value.composerReady && !value.streaming)
         if (messages.isNotEmpty()) messagesView.scrollToPosition(messages.lastIndex)
     }
 
     fun setBridgeState(state: ChatGptWebPageAdapter.State) {
-        val available = state == ChatGptWebPageAdapter.State.READY && snapshot?.composerReady == true
+        val available = state == ChatGptWebPageAdapter.State.READY &&
+            snapshot?.authenticated == true &&
+            snapshot?.composerReady == true
         setAvailable(available && snapshot?.streaming != true)
         emptyView.setText(
             when (state) {
@@ -85,7 +87,11 @@ internal class ChatGptNativeConversationController(
     }
 
     fun restoreComposerState() {
-        setAvailable(snapshot?.composerReady == true && snapshot?.streaming != true)
+        setAvailable(
+            snapshot?.authenticated == true &&
+                snapshot?.composerReady == true &&
+                snapshot?.streaming != true,
+        )
     }
 
     private fun submit() {

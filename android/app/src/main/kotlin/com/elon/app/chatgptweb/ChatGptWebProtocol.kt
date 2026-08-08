@@ -12,6 +12,7 @@ internal data class ChatGptWebSnapshot(
     val title: String,
     val url: String,
     val messages: List<ChatGptWebMessage>,
+    val authenticated: Boolean,
     val composerReady: Boolean,
     val streaming: Boolean,
 )
@@ -69,6 +70,7 @@ internal object ChatGptWebProtocol {
             title = event.optString("title").trim().take(120),
             url = event.optString("url").take(2_048),
             messages = messages,
+            authenticated = event.optBoolean("authenticated"),
             composerReady = event.optBoolean("composerReady"),
             streaming = event.optBoolean("streaming"),
         )
