@@ -40,12 +40,34 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("schema: 'yilong.ai.ui.v1'"))
         assertTrue(adapter.contains("authenticated: isAuthenticated()"))
         assertTrue(adapter.contains("url: location.origin + location.pathname"))
+        assertTrue(adapter.contains("draft: composerValue(findComposer())"))
+        assertTrue(adapter.contains("command.expectedDraft"))
+        assertTrue(adapter.contains("document.execCommand('insertText'"))
+        assertTrue(adapter.contains("Array.from(document.querySelectorAll(selector)).find(isVisible)"))
+        assertTrue(adapter.contains("网页草稿已变化"))
         assertFalse(adapter.contains("url: location.href"))
         assertTrue(adapter.contains("action === 'send_prompt'"))
         assertTrue(adapter.contains("action === 'start_google_login'"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
             assertFalse("page adapter must not contain $it", adapter.contains(it))
         }
+    }
+
+    @Test
+    fun nativeModeKeepsTheOfficialWebViewActiveBehindTheOpaqueShell() {
+        val modeController = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebModeController.kt"
+        )
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+
+        assertTrue(modeController.contains("webView.visibility = View.VISIBLE"))
+        assertFalse(modeController.contains("webView.visibility = View.INVISIBLE"))
+        assertTrue(modeController.contains("MotionEvent.ACTION_DOWN"))
+        assertTrue(modeController.contains("WindowInsetsCompat.Type.ime()"))
+        assertTrue(activity.contains("modeController.select(ChatGptWebModeController.Mode.NATIVE)"))
+        assertTrue(activity.contains("loginController.onAuthenticated() || modeController.isQuickSelected()"))
     }
 
     @Test

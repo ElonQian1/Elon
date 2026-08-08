@@ -11,6 +11,7 @@ internal data class ChatGptWebMessage(
 internal data class ChatGptWebSnapshot(
     val title: String,
     val url: String,
+    val draft: String,
     val messages: List<ChatGptWebMessage>,
     val authenticated: Boolean,
     val composerReady: Boolean,
@@ -69,6 +70,7 @@ internal object ChatGptWebProtocol {
         return ChatGptWebSnapshot(
             title = event.optString("title").trim().take(120),
             url = event.optString("url").take(2_048),
+            draft = event.optString("draft").take(MAX_DRAFT_LENGTH),
             messages = messages,
             authenticated = event.optBoolean("authenticated"),
             composerReady = event.optBoolean("composerReady"),
@@ -91,4 +93,5 @@ internal object ChatGptWebProtocol {
     private const val MAX_MESSAGES = 80
     private const val MAX_MESSAGE_LENGTH = 40_000
     private const val MAX_CONTENT_PARTS = 20
+    private const val MAX_DRAFT_LENGTH = 20_000
 }

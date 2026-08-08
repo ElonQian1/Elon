@@ -21,6 +21,7 @@ class ChatGptWebProtocolTest {
                 "type":"message_snapshot",
                 "title":"测试会话",
                 "url":"https://chatgpt.com/c/example",
+                "draft":"继续补充",
                 "authenticated":true,
                 "composerReady":true,
                 "streaming":false,
@@ -35,6 +36,7 @@ class ChatGptWebProtocolTest {
         ) as ChatGptWebEvent.Snapshot
 
         assertEquals("测试会话", event.value.title)
+        assertEquals("继续补充", event.value.draft)
         assertTrue(event.value.authenticated)
         assertTrue(event.value.composerReady)
         assertFalse(event.value.streaming)

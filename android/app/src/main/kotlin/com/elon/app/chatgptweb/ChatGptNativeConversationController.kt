@@ -16,15 +16,16 @@ internal class ChatGptNativeConversationController(
     private val emptyView: TextView,
     private val composer: EditText,
     private val sendButton: ImageButton,
-    stopButton: ImageButton,
-    newConversationButton: ImageButton,
-    private val onSend: (String) -> Unit,
+    private val stopButton: ImageButton,
+    private val newConversationButton: ImageButton,
+    private val onSend: (String, String) -> Unit,
     onStop: () -> Unit,
     onNewConversation: () -> Unit,
 ) {
     private val messages = mutableListOf<ChatMessage>()
     private val adapter = ChatAdapter(messages)
     private var snapshot: ChatGptWebSnapshot? = null
+    private var pendingPrompt: String? = null
 
     init {
         messagesView.layoutManager = LinearLayoutManager(messagesView.context)
@@ -45,11 +46,23 @@ internal class ChatGptNativeConversationController(
 
     fun render(value: ChatGptWebSnapshot) {
         snapshot = value
+        val pending = pendingPrompt
+        if (pending != null && value.messages.any { it.role == "user" && it.content == pending }) {
+            pendingPrompt = null
+        }
         val nextMessages = value.messages.map { message ->
             ChatMessage(
                 id = message.id,
                 role = if (message.role == "user") "user" else "ai",
                 content = message.content,
+            )
+        }.toMutableList()
+        pendingPrompt?.let { prompt ->
+            nextMessages += ChatMessage(
+                id = PENDING_MESSAGE_ID,
+                role = "user",
+                content = prompt,
+                sendStatus = PENDING_SEND_STATUS,
             )
         }
         val sameConversationShape = messages.size == nextMessages.size &&
@@ -67,15 +80,40 @@ internal class ChatGptNativeConversationController(
             adapter.notifyDataSetChanged()
         }
         emptyView.visibility = if (messages.isEmpty()) View.VISIBLE else View.GONE
-        setAvailable(value.authenticated && value.composerReady && !value.streaming)
+        if (!composer.hasFocus() && pendingPrompt == null && composer.text.toString() != value.draft) {
+            composer.setText(value.draft)
+            composer.setSelection(composer.text?.length ?: 0)
+        }
+        setControls(value)
         if (messages.isNotEmpty()) messagesView.scrollToPosition(messages.lastIndex)
     }
 
+    fun onCommandResult(event: ChatGptWebEvent.CommandResult) {
+        when (event.action) {
+            "send_prompt" -> {
+                if (event.ok) {
+                    composer.text?.clear()
+                } else {
+                    pendingPrompt?.let(composer::setText)
+                    composer.setSelection(composer.text?.length ?: 0)
+                    pendingPrompt = null
+                }
+                snapshot?.let(::setControls)
+            }
+            "new_conversation" -> if (event.ok) {
+                pendingPrompt = null
+                messages.clear()
+                adapter.notifyDataSetChanged()
+                emptyView.visibility = View.VISIBLE
+                composer.text?.clear()
+            }
+        }
+    }
+
     fun setBridgeState(state: ChatGptWebPageAdapter.State) {
-        val available = state == ChatGptWebPageAdapter.State.READY &&
-            snapshot?.authenticated == true &&
-            snapshot?.composerReady == true
-        setAvailable(available && snapshot?.streaming != true)
+        val value = snapshot
+        val available = state == ChatGptWebPageAdapter.State.READY && value != null
+        if (available) setControls(value) else setAvailable(false)
         emptyView.setText(
             when (state) {
                 ChatGptWebPageAdapter.State.READY -> R.string.chatgpt_native_empty
@@ -87,24 +125,37 @@ internal class ChatGptNativeConversationController(
     }
 
     fun restoreComposerState() {
-        setAvailable(
-            snapshot?.authenticated == true &&
-                snapshot?.composerReady == true &&
-                snapshot?.streaming != true,
-        )
+        pendingPrompt?.let(composer::setText)
+        pendingPrompt = null
+        snapshot?.let(::setControls)
     }
 
     private fun submit() {
         val prompt = composer.text.toString().trim()
         if (prompt.isEmpty() || !sendButton.isEnabled) return
-        onSend(prompt)
-        composer.text?.clear()
+        pendingPrompt = prompt
+        onSend(prompt, snapshot?.draft.orEmpty())
         setAvailable(false)
+    }
+
+    private fun setControls(value: ChatGptWebSnapshot) {
+        val authenticated = value.authenticated && value.composerReady
+        setAvailable(authenticated && !value.streaming && pendingPrompt == null)
+        stopButton.isEnabled = value.streaming
+        stopButton.alpha = if (value.streaming) 1f else DISABLED_ALPHA
+        newConversationButton.isEnabled = value.authenticated && !value.streaming
+        newConversationButton.alpha = if (newConversationButton.isEnabled) 1f else DISABLED_ALPHA
     }
 
     private fun setAvailable(available: Boolean) {
         composer.isEnabled = available
         sendButton.isEnabled = available
-        sendButton.alpha = if (available) 1f else 0.4f
+        sendButton.alpha = if (available) 1f else DISABLED_ALPHA
+    }
+
+    private companion object {
+        const val PENDING_MESSAGE_ID = "chatgpt-native-pending"
+        const val PENDING_SEND_STATUS = "发送中"
+        const val DISABLED_ALPHA = 0.4f
     }
 }

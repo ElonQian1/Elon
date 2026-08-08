@@ -22,6 +22,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var nativeController: ChatGptNativeConversationController
     private lateinit var loginController: ChatGptNativeLoginController
     private lateinit var googleAccountHintController: ChatGptGoogleAccountHintController
+    private lateinit var modeController: ChatGptWebModeController
     private lateinit var proxyController: ChatGptWebProxyController
     private var proxyStatus = ChatGptWebProxyStatus("手机网络")
     private var webAuthenticationStatus = ChatGptWebAuthenticationSupport.Status.UNSUPPORTED
@@ -82,7 +83,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             sendButton = binding.chatGptNativeSend,
             stopButton = binding.chatGptNativeStop,
             newConversationButton = binding.chatGptNativeNew,
-            onSend = { prompt -> pageAdapter.sendPrompt(prompt) },
+            onSend = { prompt, expectedDraft -> pageAdapter.sendPrompt(prompt, expectedDraft) },
             onStop = { pageAdapter.stopGeneration() },
             onNewConversation = { pageAdapter.startNewConversation() },
         )
@@ -94,6 +95,19 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         )
         pageAdapter.install()
 
+        modeController = ChatGptWebModeController(
+            window = window,
+            root = binding.root,
+            toggle = binding.chatGptModeToggle,
+            quickButton = binding.chatGptModeQuick,
+            webButton = binding.chatGptModeWeb,
+            nativeButton = binding.chatGptModeNative,
+            webView = binding.chatGptWebView,
+            quickRoot = binding.chatGptQuickRoot,
+            nativeRoot = binding.chatGptNativeRoot,
+            onModeChanged = ::showMode,
+        )
+
         loginController = ChatGptNativeLoginController(
             context = this,
             stageView = binding.chatGptQuickStage,
@@ -101,18 +115,20 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             primaryButton = binding.chatGptQuickLogin,
             officialButton = binding.chatGptQuickOfficial,
             onOpenAuthentication = {
-                binding.chatGptModeWeb.isChecked = true
+                modeController.select(ChatGptWebModeController.Mode.WEB)
                 binding.chatGptWebView.stopLoading()
                 binding.chatGptWebView.loadUrl(ChatGptWebNavigationPolicy.AUTH_URL)
             },
             onOpenOfficialPage = {
-                binding.chatGptModeWeb.isChecked = true
+                modeController.select(ChatGptWebModeController.Mode.WEB)
                 if (binding.chatGptWebView.url == null) {
                     binding.chatGptWebView.loadUrl(ChatGptWebNavigationPolicy.START_URL)
                 }
             },
             onOpenNativeConversation = {
-                if (binding.chatGptModeNative.isEnabled) binding.chatGptModeNative.isChecked = true
+                if (binding.chatGptModeNative.isEnabled) {
+                    modeController.select(ChatGptWebModeController.Mode.NATIVE)
+                }
             },
         )
         googleAccountHintController = ChatGptGoogleAccountHintController(
@@ -123,11 +139,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onStatusMessage = ::showGoogleLoginStatus,
         )
 
-        binding.chatGptModeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
-            if (isChecked) showMode(checkedId)
-        }
         renderWebAuthenticationStatus()
-        binding.chatGptModeQuick.isChecked = true
+        modeController.attach()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -221,8 +234,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 ) {
                     googleAccountHintController.onAuthenticated()
                     pageAdapter.markReady()
-                    if (loginController.onAuthenticated()) {
-                        binding.chatGptModeNative.isChecked = true
+                    if (loginController.onAuthenticated() || modeController.isQuickSelected()) {
+                        modeController.select(ChatGptWebModeController.Mode.NATIVE)
                     }
                 } else {
                     pageAdapter.markLoginRequired()
@@ -231,8 +244,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             }
             is ChatGptWebEvent.CommandResult -> {
                 if (googleAccountHintController.onCommandResult(event)) return
+                nativeController.onCommandResult(event)
                 if (!event.ok) {
-                    nativeController.restoreComposerState()
                     binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_project))
                     binding.chatGptWebStatus.text = event.detail.ifBlank { getString(R.string.chatgpt_native_command_failed) }
                     Toast.makeText(this, binding.chatGptWebStatus.text, Toast.LENGTH_LONG).show()
@@ -247,22 +260,29 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         nativeController.setBridgeState(state)
         binding.chatGptModeNative.isEnabled = state == ChatGptWebPageAdapter.State.READY
         binding.chatGptModeNative.alpha = if (binding.chatGptModeNative.isEnabled) 1f else 0.48f
-        if (state != ChatGptWebPageAdapter.State.READY && binding.chatGptModeNative.isChecked) {
-            binding.chatGptModeWeb.isChecked = true
+        if (
+            state in setOf(ChatGptWebPageAdapter.State.WEB_ONLY, ChatGptWebPageAdapter.State.UNSUPPORTED) &&
+            modeController.isNativeSelected()
+        ) {
+            modeController.select(ChatGptWebModeController.Mode.WEB)
         }
     }
 
-    private fun showMode(checkedId: Int) {
-        val quickMode = checkedId == R.id.chatGptModeQuick
-        val nativeMode = checkedId == R.id.chatGptModeNative
-        binding.chatGptQuickRoot.visibility = if (quickMode) View.VISIBLE else View.GONE
-        binding.chatGptWebView.visibility = if (quickMode || nativeMode) View.INVISIBLE else View.VISIBLE
-        binding.chatGptNativeRoot.visibility = if (nativeMode) View.VISIBLE else View.GONE
+    private fun showMode(mode: ChatGptWebModeController.Mode) {
+        binding.chatGptWebStatus.setTextColor(
+            getColor(
+                if (mode == ChatGptWebModeController.Mode.NATIVE) {
+                    R.color.elon_status_success
+                } else {
+                    R.color.elon_text_secondary
+                },
+            ),
+        )
         binding.chatGptWebStatus.text = statusWithProxy(
-            when {
-                quickMode -> R.string.chatgpt_quick_status
-                nativeMode -> R.string.chatgpt_native_active
-                else -> R.string.chatgpt_web_ready
+            when (mode) {
+                ChatGptWebModeController.Mode.QUICK -> R.string.chatgpt_quick_status
+                ChatGptWebModeController.Mode.NATIVE -> R.string.chatgpt_native_active
+                ChatGptWebModeController.Mode.WEB -> R.string.chatgpt_web_ready
             },
         )
     }
@@ -313,7 +333,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     private fun clearSession() {
-        binding.chatGptModeQuick.isChecked = true
+        modeController.select(ChatGptWebModeController.Mode.QUICK)
         loginController.reset()
         googleAccountHintController.reset()
         cookieManager.removeAllCookies {

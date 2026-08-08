@@ -68,7 +68,11 @@ internal class ChatGptWebPageAdapter(
         onStateChanged(state)
     }
 
-    fun sendPrompt(prompt: String) = runCommand("send_prompt", prompt.take(MAX_PROMPT_LENGTH))
+    fun sendPrompt(prompt: String, expectedDraft: String) = runCommand(
+        action = "send_prompt",
+        value = prompt.take(MAX_PROMPT_LENGTH),
+        expectedDraft = expectedDraft.take(MAX_PROMPT_LENGTH),
+    )
 
     fun stopGeneration() = runCommand("stop_generation")
 
@@ -89,11 +93,18 @@ internal class ChatGptWebPageAdapter(
         listenerInstalled = false
     }
 
-    private fun runCommand(action: String, value: String? = null) {
+    private fun runCommand(
+        action: String,
+        value: String? = null,
+        expectedDraft: String? = null,
+    ) {
         if (!listenerInstalled || !ChatGptWebNavigationPolicy.supportsEnhancedMode(webView.url)) return
         val command = JSONObject()
             .put("action", action)
-            .apply { if (value != null) put("value", value) }
+            .apply {
+                if (value != null) put("value", value)
+                if (expectedDraft != null) put("expectedDraft", expectedDraft)
+            }
             .toString()
         val encoded = JSONObject.quote(command)
         webView.evaluateJavascript(
