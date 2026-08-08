@@ -271,7 +271,9 @@ impl AuthorityPlanApplicationState {
 
 impl ComputePluginLocalAuthority {
     /// `trusted_now` must come from the future authenticated trusted-time kernel, never directly
-    /// from an ordinary wall clock. This method has no filesystem, network or Sidecar effects.
+    /// from an ordinary wall clock, and a state-changing application must observe a value strictly
+    /// later than the durable authority high-water mark. This method has no filesystem, network or
+    /// Sidecar effects.
     pub(crate) fn apply_install_plan(
         &self,
         signed_plan: &SignedComputePluginInstallPlan,
@@ -576,12 +578,14 @@ fn build_authority_plan_application_state(
         1 => true,
         _ => bail!("COMPUTE_PLUGIN_PLAN_SHARING_FLAG_CORRUPT"),
     };
+    if trusted_now.timestamp_millis() <= trusted_time_high_water_ms {
+        bail!("COMPUTE_PLUGIN_PLAN_TRUSTED_TIME_NOT_ADVANCED");
+    }
     if state_revision < 0
         || authority_epoch < 0
         || process_owner_epoch < 0
         || desired_policy_revision < 0
         || manifest_catalog_revision < 0
-        || trusted_now.timestamp_millis() < trusted_time_high_water_ms
         || inventory.schema != COMPUTE_PLUGIN_INVENTORY_SCHEMA
         || inventory.inventory_revision != inventory_revision
         || inventory.desired_policy_revision != desired_policy_revision

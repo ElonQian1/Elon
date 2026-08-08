@@ -1,6 +1,7 @@
 use std::{fmt, path::Path};
 
 use anyhow::{bail, Error, Result};
+use elon_pc_dev_runtime::NodeDataPaths;
 
 use super::recovery::{
     ComputePluginCursorDamageRecoveryCustody, ComputePluginPinnedFileRecovery,
@@ -35,6 +36,7 @@ pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginRoot {
     pub(super) root: PinnedManagedRoot,
     pub(super) root_lock: ComputePluginRootLock,
     pub(super) installation_id_digest: String,
+    pub(super) node_data_paths: NodeDataPaths,
 }
 
 impl PinnedComputePluginRoot {
@@ -44,6 +46,27 @@ impl PinnedComputePluginRoot {
 
     pub(in crate::node_agent_compute_plugin_host) fn root_identity_digest(&self) -> &str {
         self.root.root_identity_digest()
+    }
+
+    /// Exact configured path model consumed by the private pin constructor. This process-local
+    /// binding proves that a root lock from another data root cannot authorize a path-based
+    /// authority facade, even when both roots use the same installation identity.
+    pub(in crate::node_agent_compute_plugin_host) fn node_data_paths(&self) -> &NodeDataPaths {
+        &self.node_data_paths
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn compute_plugin_root(
+        &self,
+    ) -> std::path::PathBuf {
+        self.node_data_paths.compute_plugins()
+    }
+
+    /// Mints one linear lease for a capability that must keep the already-acquired root lock alive.
+    /// It conveys no path-open or mutation authority by itself.
+    pub(in crate::node_agent_compute_plugin_host) fn root_lock_lease(
+        &self,
+    ) -> ComputePluginRootLockLease {
+        self.root_lock.lease()
     }
 }
 

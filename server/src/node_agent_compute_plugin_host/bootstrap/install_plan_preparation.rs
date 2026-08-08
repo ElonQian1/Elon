@@ -27,12 +27,15 @@ impl ComputePluginBootstrap {
                 session_owner_user_id,
                 &self.bootstrap_instance_id,
             ),
-            Err(_) => poisoned_observation(
-                request,
-                session_node_id,
-                session_owner_user_id,
-                &self.bootstrap_instance_id,
-            ),
+            Err(_) => {
+                self.invalidate_policy_binding_intents_after_poison();
+                poisoned_observation(
+                    request,
+                    session_node_id,
+                    session_owner_user_id,
+                    &self.bootstrap_instance_id,
+                )
+            }
         }
     }
 }

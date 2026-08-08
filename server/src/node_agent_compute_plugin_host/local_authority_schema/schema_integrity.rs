@@ -4,7 +4,7 @@ use anyhow::{bail, Context, Result};
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 
-use super::create_schema_objects;
+use super::{create_schema_objects_v3, create_schema_objects_v4};
 
 #[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
 struct SchemaObjectKey {
@@ -18,10 +18,21 @@ struct SchemaObjectFingerprint {
     definition_sha256: String,
 }
 
-pub(super) fn verify_schema_objects(connection: &Connection) -> Result<()> {
+pub(super) fn verify_schema_objects_v3(connection: &Connection) -> Result<()> {
+    verify_schema_objects(connection, create_schema_objects_v3)
+}
+
+pub(super) fn verify_schema_objects_v4(connection: &Connection) -> Result<()> {
+    verify_schema_objects(connection, create_schema_objects_v4)
+}
+
+fn verify_schema_objects(
+    connection: &Connection,
+    create_reference_schema: fn(&Connection) -> Result<()>,
+) -> Result<()> {
     let reference =
         Connection::open_in_memory().context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_REFERENCE_OPEN")?;
-    create_schema_objects(&reference)?;
+    create_reference_schema(&reference)?;
 
     let expected = load_schema_objects(&reference, "reference")?;
     let actual = load_schema_objects(connection, "authority")?;

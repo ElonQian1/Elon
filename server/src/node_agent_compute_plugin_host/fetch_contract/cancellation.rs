@@ -16,7 +16,8 @@ const INITIAL_CANCELLATION_EPOCH: u64 = 1;
 const EXHAUSTED_CANCELLATION_EPOCH: u64 = u64::MAX;
 
 /// Process-local revocation source for one downloader authority domain. The future Host must
-/// invalidate it whenever sharing, plan, publisher authority or candidate ownership changes.
+/// close it whenever sharing, plan, publisher authority or candidate ownership changes; a new
+/// authority domain requires a newly acquired process fence, not a refreshed guard from this one.
 pub(in crate::node_agent_compute_plugin_host) struct ComputePluginFetchCancellationSource {
     authority_instance_binding: ComputePluginAuthorityInstanceBinding,
     installation_id_digest: String,
@@ -68,13 +69,12 @@ impl ComputePluginFetchCancellationSource {
         })
     }
 
-    pub(in crate::node_agent_compute_plugin_host) fn invalidate(&self) -> Result<()> {
+    /// Permanently closes this process-fence cancellation domain. A policy transition must never
+    /// let callers mint a fresh guard from the old Plan after invalidating its existing guards;
+    /// future work therefore requires a newly acquired process fence with a new source.
+    pub(in crate::node_agent_compute_plugin_host) fn close(&self) {
         self.epoch
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |epoch| {
-                epoch.checked_add(1)
-            })
-            .map(|_| ())
-            .map_err(|_| anyhow::anyhow!("COMPUTE_PLUGIN_FETCH_CANCELLATION_EPOCH_EXHAUSTED"))
+            .store(EXHAUSTED_CANCELLATION_EPOCH, Ordering::Release);
     }
 }
 

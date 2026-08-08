@@ -75,16 +75,14 @@ impl ComputePluginBootstrapState {
                 "COMPUTE_PLUGIN_SHARING_POLICY_CONFIGURATION_GENERATION_EXHAUSTED",
             );
         };
-        let next_cancellation_generation = if snapshot.plugin_runtime_requested {
-            self.cancellation_generation
-        } else {
-            let Some(next) = self.cancellation_generation.checked_add(1) else {
-                return reject(
-                    self,
-                    "COMPUTE_PLUGIN_SHARING_POLICY_CANCELLATION_GENERATION_EXHAUSTED",
-                );
-            };
-            next
+        // Every non-replay policy revision, including enabled-to-enabled authorization
+        // replacement, revokes work admitted under the previous policy. Disabled snapshots are
+        // not the only cancellation boundary.
+        let Some(next_cancellation_generation) = self.cancellation_generation.checked_add(1) else {
+            return reject(
+                self,
+                "COMPUTE_PLUGIN_SHARING_POLICY_CANCELLATION_GENERATION_EXHAUSTED",
+            );
         };
         let initialization_plan = snapshot
             .authorization
@@ -97,6 +95,12 @@ impl ComputePluginBootstrapState {
                 authorization: authorization.clone(),
                 cancellation_generation: next_cancellation_generation,
             });
+        if !self.invalidate_local_policy_binding_intents() {
+            return reject(
+                self,
+                "COMPUTE_PLUGIN_SHARING_POLICY_CONFIGURATION_GENERATION_EXHAUSTED",
+            );
+        }
         if let Some(authorization) = snapshot.authorization.as_ref() {
             if self
                 .authorization_high_water

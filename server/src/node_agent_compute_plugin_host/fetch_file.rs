@@ -71,6 +71,7 @@ pub(in crate::node_agent_compute_plugin_host) fn pin_compute_plugin_root(
         root,
         root_lock,
         installation_id_digest: installation.digest().to_string(),
+        node_data_paths: paths.clone(),
     })
 }
 

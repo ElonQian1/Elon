@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use rusqlite::{params, Connection, TransactionBehavior};
+use rusqlite::{Connection, TransactionBehavior};
 
 mod authority_fences;
 mod candidate_cleanup;
@@ -12,32 +12,14 @@ mod candidate_verification;
 mod fetch_claims;
 mod plan_application;
 mod schema_integrity;
+mod sharing_policy_binding;
 
+/// The singleton row shape remains V3. Database `user_version` advances independently because
+/// V4 only adds an append-only journal and exact transition triggers.
 pub(super) const COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION: i64 = 3;
+const COMPUTE_PLUGIN_LOCAL_AUTHORITY_DATABASE_VERSION: i64 = 4;
 const COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID: i64 = 0x454c_4350;
 
-const REQUIRED_TABLES: &[&str] = &[
-    "authority_meta",
-    "candidate_health_receipts",
-    "candidate_health_quarantine_receipts",
-    "candidate_cleanup_authorizations",
-    "candidate_cleanup_completions",
-    "candidate_cleanup_execution_plan_seals",
-    "candidate_cleanup_execution_plans",
-    "candidate_cleanup_expected_objects",
-    "candidate_cleanup_step_events",
-    "candidate_owners",
-    "candidate_staging_receipts",
-    "candidate_verification_runs",
-    "fetch_claims",
-    "keyring_bundles",
-    "keyring_keys",
-    "keyring_seals",
-    "plan_applications",
-    "plan_application_seals",
-    "plan_events",
-    "planned_downloads",
-];
 pub(super) fn ensure_schema(connection: &mut Connection) -> Result<()> {
     let version = connection
         .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
@@ -46,13 +28,19 @@ pub(super) fn ensure_schema(connection: &mut Connection) -> Result<()> {
         .pragma_query_value(None, "application_id", |row| row.get::<_, i64>(0))
         .context("COMPUTE_PLUGIN_AUTHORITY_APPLICATION_ID_READ")?;
     match version {
-        0 if application_id == 0 => install_schema_v3(connection),
+        0 if application_id == 0 => install_schema_v4(connection),
         COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION
             if application_id == COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID =>
         {
-            verify_required_objects(connection)
+            migrate_schema_v3_to_v4(connection)
         }
-        COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION => bail!(
+        COMPUTE_PLUGIN_LOCAL_AUTHORITY_DATABASE_VERSION
+            if application_id == COMPUTE_PLUGIN_LOCAL_AUTHORITY_APPLICATION_ID =>
+        {
+            verify_required_objects_v4(connection)
+        }
+        COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION
+        | COMPUTE_PLUGIN_LOCAL_AUTHORITY_DATABASE_VERSION => bail!(
             "COMPUTE_PLUGIN_AUTHORITY_APPLICATION_ID: database belongs to another application"
         ),
         0 => bail!(
@@ -64,19 +52,17 @@ pub(super) fn ensure_schema(connection: &mut Connection) -> Result<()> {
     }
 }
 
-fn install_schema_v3(connection: &mut Connection) -> Result<()> {
-    if count_required_tables(connection)? != 0 {
-        bail!("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_UNVERSIONED: refusing to adopt unversioned tables");
-    }
+fn install_schema_v4(connection: &mut Connection) -> Result<()> {
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_BEGIN")?;
-    create_schema_objects(&transaction)?;
+    require_unclaimed_database(&transaction)?;
+    create_schema_objects_v4(&transaction)?;
     transaction
         .pragma_update(
             None,
             "user_version",
-            COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION,
+            COMPUTE_PLUGIN_LOCAL_AUTHORITY_DATABASE_VERSION,
         )
         .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_VERSION_WRITE")?;
     transaction
@@ -89,11 +75,41 @@ fn install_schema_v3(connection: &mut Connection) -> Result<()> {
     transaction
         .commit()
         .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_COMMIT")?;
-    verify_required_objects(connection)
+    verify_required_objects_v4(connection)
 }
 
-fn verify_required_objects(connection: &Connection) -> Result<()> {
-    schema_integrity::verify_schema_objects(connection)?;
+fn migrate_schema_v3_to_v4(connection: &mut Connection) -> Result<()> {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_V4_MIGRATION_BEGIN")?;
+    // The legacy fingerprint and foreign-key proof must be acquired under the same write fence as
+    // the DDL. Verifying before BEGIN IMMEDIATE would leave a schema-drift TOCTOU window.
+    verify_required_objects_v3(&transaction)?;
+    create_schema_objects_v4_additions(&transaction)?;
+    transaction
+        .pragma_update(
+            None,
+            "user_version",
+            COMPUTE_PLUGIN_LOCAL_AUTHORITY_DATABASE_VERSION,
+        )
+        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_V4_VERSION_WRITE")?;
+    transaction
+        .commit()
+        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_V4_MIGRATION_COMMIT")?;
+    verify_required_objects_v4(connection)
+}
+
+fn verify_required_objects_v3(connection: &Connection) -> Result<()> {
+    schema_integrity::verify_schema_objects_v3(connection)?;
+    verify_foreign_keys(connection)
+}
+
+fn verify_required_objects_v4(connection: &Connection) -> Result<()> {
+    schema_integrity::verify_schema_objects_v4(connection)?;
+    verify_foreign_keys(connection)
+}
+
+fn verify_foreign_keys(connection: &Connection) -> Result<()> {
     let mut statement = connection
         .prepare("PRAGMA foreign_key_check")
         .context("COMPUTE_PLUGIN_AUTHORITY_FOREIGN_KEY_CHECK_PREPARE")?;
@@ -110,23 +126,31 @@ fn verify_required_objects(connection: &Connection) -> Result<()> {
     Ok(())
 }
 
-fn count_required_tables(connection: &Connection) -> Result<i64> {
-    REQUIRED_TABLES.iter().try_fold(0_i64, |count, name| {
-        Ok(count + object_exists(connection, "table", name)?)
-    })
-}
-
-fn object_exists(connection: &Connection, object_type: &str, name: &str) -> Result<i64> {
-    connection
+fn require_unclaimed_database(connection: &Connection) -> Result<()> {
+    let version = connection
+        .pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_CLAIM_VERSION_READ")?;
+    let application_id = connection
+        .pragma_query_value(None, "application_id", |row| row.get::<_, i64>(0))
+        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_CLAIM_APPLICATION_ID_READ")?;
+    let user_objects = connection
         .query_row(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = ?1 AND name = ?2",
-            params![object_type, name],
-            |row| row.get(0),
+            r#"SELECT COUNT(*) FROM sqlite_schema
+               WHERE type IN ('table', 'index', 'trigger', 'view')
+                 AND name NOT GLOB 'sqlite_*'"#,
+            [],
+            |row| row.get::<_, i64>(0),
         )
-        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_INSPECT")
+        .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_CLAIM_OBJECTS_READ")?;
+    if version != 0 || application_id != 0 || user_objects != 0 {
+        bail!(
+            "COMPUTE_PLUGIN_AUTHORITY_SCHEMA_UNVERSIONED: refusing to adopt an existing database"
+        );
+    }
+    Ok(())
 }
 
-fn create_schema_objects(connection: &Connection) -> Result<()> {
+fn create_schema_objects_v3(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_CREATE_V3")?;
@@ -160,6 +184,18 @@ fn create_schema_objects(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(fetch_claims::FETCH_CLAIM_SCHEMA_V3)
         .context("COMPUTE_PLUGIN_AUTHORITY_FETCH_CLAIM_SCHEMA_CREATE_V3")?;
+    Ok(())
+}
+
+fn create_schema_objects_v4(connection: &Connection) -> Result<()> {
+    create_schema_objects_v3(connection)?;
+    create_schema_objects_v4_additions(connection)
+}
+
+fn create_schema_objects_v4_additions(connection: &Connection) -> Result<()> {
+    connection
+        .execute_batch(sharing_policy_binding::SHARING_POLICY_BINDING_SCHEMA_V4)
+        .context("COMPUTE_PLUGIN_AUTHORITY_SHARING_POLICY_SCHEMA_CREATE_V4")?;
     Ok(())
 }
 

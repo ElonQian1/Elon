@@ -55,10 +55,8 @@ impl ComputePluginFetchProcessFence {
         self.cancellation_source.snapshot()
     }
 
-    pub(in crate::node_agent_compute_plugin_host) fn invalidate_fetch_cancellation(
-        &self,
-    ) -> Result<()> {
-        self.cancellation_source.invalidate()
+    pub(in crate::node_agent_compute_plugin_host) fn close_fetch_cancellation(&self) {
+        self.cancellation_source.close();
     }
 
     pub(super) fn cancellation_source(&self) -> &ComputePluginFetchCancellationSource {

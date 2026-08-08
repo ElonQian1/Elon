@@ -21,13 +21,18 @@ const BOOTSTRAP_PHASE_DISABLED: &str = "disabled";
 const BOOTSTRAP_PHASE_BLOCKED: &str = "blocked";
 
 mod install_plan_preparation;
+mod policy_binding_intent;
 mod sharing_policy;
+
+use policy_binding_intent::ComputePluginLocalPolicyBindingGenerationSource;
+pub(super) use policy_binding_intent::ComputePluginLocalPolicyBindingIntent;
 
 /// Default-disabled owner for the future plugin runtime controller. Applying a desired policy only
 /// replaces dormant in-memory intent. It never pins a root, opens SQLite, performs network I/O,
 /// downloads an artifact, admits work, or launches a process.
 pub(crate) struct ComputePluginBootstrap {
     bootstrap_instance_id: String,
+    policy_binding_generation: ComputePluginLocalPolicyBindingGenerationSource,
     state: Mutex<ComputePluginBootstrapState>,
 }
 
@@ -37,6 +42,7 @@ struct ComputePluginBootstrapState {
     instance_lock: Option<NodeAgentInstanceLockWitness>,
     configuration_generation: u64,
     cancellation_generation: u64,
+    policy_binding_generation: ComputePluginLocalPolicyBindingGenerationSource,
     configuration_exhausted: bool,
     root_change_requires_restart: bool,
     sharing_requested: bool,
@@ -102,14 +108,17 @@ pub(crate) struct ComputePluginBootstrapStatus {
 
 impl ComputePluginBootstrap {
     pub(crate) fn new_disabled(install_id: &str, node_data_paths: Option<&NodeDataPaths>) -> Self {
+        let policy_binding_generation = ComputePluginLocalPolicyBindingGenerationSource::new();
         Self {
             bootstrap_instance_id: uuid::Uuid::new_v4().to_string(),
+            policy_binding_generation: policy_binding_generation.clone(),
             state: Mutex::new(ComputePluginBootstrapState {
                 installation: ComputePluginInstallationIdentity::derive(install_id).ok(),
                 root: node_data_paths.map(DormantComputePluginRootBinding::new),
                 instance_lock: None,
                 configuration_generation: 1,
                 cancellation_generation: 1,
+                policy_binding_generation,
                 configuration_exhausted: false,
                 root_change_requires_restart: false,
                 sharing_requested: false,
@@ -128,15 +137,15 @@ impl ComputePluginBootstrap {
         let Some(_lock_lease) = witness.try_acquire_lease() else {
             bail!("COMPUTE_PLUGIN_BOOTSTRAP_INSTANCE_LOCK_NOT_LIVE");
         };
-        let mut state = self
-            .state
-            .lock()
-            .map_err(|_| anyhow::anyhow!("COMPUTE_PLUGIN_BOOTSTRAP_STATE_POISONED"))?;
+        let mut state = self.state.lock().map_err(|_| {
+            self.invalidate_policy_binding_intents_after_poison();
+            anyhow::anyhow!("COMPUTE_PLUGIN_BOOTSTRAP_STATE_POISONED")
+        })?;
         if state.instance_lock.is_some() {
             bail!("COMPUTE_PLUGIN_BOOTSTRAP_INSTANCE_LOCK_ALREADY_BOUND");
         }
-        state.instance_lock = Some(witness);
         state.advance_configuration_generation();
+        state.instance_lock = Some(witness);
         Ok(())
     }
 
@@ -162,10 +171,11 @@ impl ComputePluginBootstrap {
         let mut state = match self.state.lock() {
             Ok(state) => state,
             Err(_) => {
+                self.invalidate_policy_binding_intents_after_poison();
                 return ComputePluginBootstrapState::poisoned_observation(
                     session_node_id,
                     session_owner_user_id,
-                )
+                );
             }
         };
         state.apply_policy_snapshot(
@@ -179,8 +189,12 @@ impl ComputePluginBootstrap {
     /// Runtime data-root replacement never hot-rebinds plugin authority. The dormant bootstrap is
     /// invalidated and a process restart is required before any future enable path may use it.
     pub(crate) fn note_node_data_root_changed(&self, paths: &NodeDataPaths) {
-        let Ok(mut state) = self.state.lock() else {
-            return;
+        let mut state = match self.state.lock() {
+            Ok(state) => state,
+            Err(_) => {
+                self.invalidate_policy_binding_intents_after_poison();
+                return;
+            }
         };
         let next_root = paths.compute_plugins();
         if state.root.as_ref().is_some_and(|binding| {
@@ -188,20 +202,40 @@ impl ComputePluginBootstrap {
         }) {
             return;
         }
+        // Revoke every outstanding linear intent before publishing any changed root fact.
+        state.advance_configuration_generation();
         state.root = None;
         state.root_change_requires_restart = true;
         state.initialization_plan = None;
         state.last_install_plan_preparation = None;
-        state.advance_configuration_generation();
     }
 
     pub(crate) fn status(&self) -> ComputePluginBootstrapStatus {
         let mut status = match self.state.lock() {
             Ok(state) => state.status(),
-            Err(_) => ComputePluginBootstrapStatus::poisoned(),
+            Err(_) => {
+                self.invalidate_policy_binding_intents_after_poison();
+                ComputePluginBootstrapStatus::poisoned()
+            }
         };
         status.bootstrap_instance_id = self.bootstrap_instance_id.clone();
         status
+    }
+
+    /// Produces only an opaque, process-local input for a future authority policy-binding
+    /// transition. The returned custody retains the node instance-lock lease, but it does not pin
+    /// the compute-plugin root, open SQLite, authorize downloads, or make preparation context ready.
+    /// This host-only seam intentionally has no production call site: credential/account changes
+    /// do not yet notify Bootstrap, so that hook must invalidate this same generation source before
+    /// any authority wiring is allowed.
+    pub(super) fn prepare_local_policy_binding_intent(
+        &self,
+    ) -> Result<ComputePluginLocalPolicyBindingIntent> {
+        let state = self.state.lock().map_err(|_| {
+            self.invalidate_policy_binding_intents_after_poison();
+            anyhow::anyhow!("COMPUTE_PLUGIN_BOOTSTRAP_STATE_POISONED")
+        })?;
+        state.prepare_local_policy_binding_intent(&self.bootstrap_instance_id)
     }
 
     fn rejected_observation(
@@ -212,17 +246,36 @@ impl ComputePluginBootstrap {
     ) -> ComputePluginSharingPolicyObservedV1 {
         match self.state.lock() {
             Ok(state) => state.observation(node_id, owner_user_id, false, false, Some(error_code)),
-            Err(_) => ComputePluginBootstrapState::poisoned_observation(node_id, owner_user_id),
+            Err(_) => {
+                self.invalidate_policy_binding_intents_after_poison();
+                ComputePluginBootstrapState::poisoned_observation(node_id, owner_user_id)
+            }
         }
+    }
+
+    /// A poisoned state mutex means a transition may have unwound between scalar updates. The
+    /// generation source is duplicated outside that mutex solely so every previously minted
+    /// intent can still be terminally revoked without trusting or recovering the poisoned state.
+    fn invalidate_policy_binding_intents_after_poison(&self) {
+        self.policy_binding_generation.invalidate();
     }
 }
 
 impl ComputePluginBootstrapState {
     fn advance_configuration_generation(&mut self) {
+        self.invalidate_local_policy_binding_intents();
         match self.configuration_generation.checked_add(1) {
             Some(next) => self.configuration_generation = next,
             None => self.configuration_exhausted = true,
         }
+    }
+
+    fn invalidate_local_policy_binding_intents(&mut self) -> bool {
+        let usable = self.policy_binding_generation.invalidate();
+        if !usable {
+            self.configuration_exhausted = true;
+        }
+        usable
     }
 
     fn status(&self) -> ComputePluginBootstrapStatus {
@@ -394,5 +447,14 @@ impl fmt::Debug for ComputePluginBootstrap {
             .debug_struct("ComputePluginBootstrap")
             .field("state", &"<process-local>")
             .finish()
+    }
+}
+
+impl Drop for ComputePluginBootstrap {
+    fn drop(&mut self) {
+        // Intents retain their own Arc-backed guard and instance-lock lease, so dropping the owner
+        // must explicitly revoke them before another account/runtime may construct a fresh
+        // Bootstrap with an unrelated generation source.
+        self.policy_binding_generation.invalidate();
     }
 }
