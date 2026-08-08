@@ -3578,29 +3578,13 @@
       max-width: 360px;
       transform: translateX(-50%);
       z-index: 20;
-      background: var(--bg);
+      background: transparent;
       display: flex;
       flex-direction: row;
       align-items: flex-start;
       gap: 12px;
       min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
       padding: 8px max(0px, calc(50% - 160px)) max(8px, env(safe-area-inset-bottom));
-    }
-    .tabs-bar::before {
-      content: "";
-      position: absolute;
-      left: 50%;
-      top: -4px;
-      width: 100vw;
-      height: 4px;
-      transform: translateX(-50%);
-      background: linear-gradient(
-        to bottom,
-        rgb(0 0 0 / 0%) 0%,
-        rgb(0 0 0 / 70%) 50%,
-        var(--bg) 100%
-      );
-      pointer-events: none;
     }
     .tabs-panel {
       min-width: 0;

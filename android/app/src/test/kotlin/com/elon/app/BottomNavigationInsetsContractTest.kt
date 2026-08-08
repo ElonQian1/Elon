@@ -9,10 +9,9 @@ import org.junit.Test
 
 class BottomNavigationInsetsContractTest {
     @Test
-    fun bottomMenuUsesOpaqueBaseAndFadeOnBothSurfaces() {
+    fun bottomMenuHasNoFullWidthBackgroundBoardOnEitherSurface() {
         val dimens = readRepositoryFile("android/app/src/main/res/values/dimens.xml")
         val layout = readRepositoryFile("android/app/src/main/res/layout/activity_main.xml")
-        val fade = readRepositoryFile("android/app/src/main/res/drawable/bg_bottom_nav_fade.xml")
         assertTrue(dimens.contains("name=\"main_bottom_menu_fade_height\">4dp</dimen>"))
         assertTrue(dimens.contains("name=\"main_bottom_menu_container_height\">76dp</dimen>"))
         assertTrue(
@@ -21,35 +20,17 @@ class BottomNavigationInsetsContractTest {
                 RegexOption.DOT_MATCHES_ALL
             ).containsMatchIn(layout)
         )
-        assertTrue(
-            Regex(
-                """android:id="@\+id/bottomMenuBase"[^>]*android:layout_height="@dimen/main_bottom_menu_outer_height"[^>]*android:layout_gravity="bottom"[^>]*android:background="@color/elon_bg_app"""",
-                RegexOption.DOT_MATCHES_ALL
-            ).containsMatchIn(layout)
-        )
-        assertTrue(
-            Regex(
-                """android:id="@\+id/bottomMenuFade"[^>]*android:layout_height="@dimen/main_bottom_menu_fade_height"[^>]*android:layout_gravity="top"[^>]*android:background="@drawable/bg_bottom_nav_fade"""",
-                RegexOption.DOT_MATCHES_ALL
-            ).containsMatchIn(layout)
-        )
-        assertTrue(fade.contains("android:startColor=\"@android:color/transparent\""))
-        assertTrue(fade.contains("android:centerColor=\"#B3000000\""))
-        assertTrue(fade.contains("android:endColor=\"@color/elon_bg_app\""))
+        assertTrue(!layout.contains("android:id=\"@+id/bottomMenuBase\""))
+        assertTrue(!layout.contains("android:id=\"@+id/bottomMenuFade\""))
 
         val web = readRepositoryFile("server/src/assets/web_page.html")
         assertTrue(
             Regex(
-                """\.tabs-bar\s*\{[^}]*background:\s*var\(--bg\);""",
+                """\.tabs-bar\s*\{[^}]*background:\s*transparent;""",
                 RegexOption.DOT_MATCHES_ALL
             ).containsMatchIn(web)
         )
-        assertTrue(
-            Regex(
-                """\.tabs-bar::before\s*\{[^}]*top:\s*-4px;[^}]*height:\s*4px;[^}]*background:\s*linear-gradient\([^}]*rgb\(0 0 0 / 70%\)\s+50%[^}]*var\(--bg\)\s+100%""",
-                RegexOption.DOT_MATCHES_ALL
-            ).containsMatchIn(web)
-        )
+        assertTrue(!web.contains(".tabs-bar::before"))
     }
 
     @Test

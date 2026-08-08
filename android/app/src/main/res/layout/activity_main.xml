@@ -1286,22 +1286,6 @@
             android:clipToPadding="false"
             android:visibility="gone">
 
-            <View
-                android:id="@+id/bottomMenuBase"
-                android:layout_width="match_parent"
-                android:layout_height="@dimen/main_bottom_menu_outer_height"
-                android:layout_gravity="bottom"
-                android:background="@color/elon_bg_app"
-                android:importantForAccessibility="no" />
-
-            <View
-                android:id="@+id/bottomMenuFade"
-                android:layout_width="match_parent"
-                android:layout_height="@dimen/main_bottom_menu_fade_height"
-                android:layout_gravity="top"
-                android:background="@drawable/bg_bottom_nav_fade"
-                android:importantForAccessibility="no" />
-
             <LinearLayout
                 android:id="@+id/bottomNavContent"
                 android:layout_width="@dimen/main_bottom_menu_content_width"
