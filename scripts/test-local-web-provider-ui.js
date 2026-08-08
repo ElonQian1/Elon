@@ -36,9 +36,10 @@ expect(pwa.includes('id="chatGptWebAccountRow"'), 'PWA profile must expose a dir
 expect(pwaController.includes("window.location.assign('/chatgpt-web')"), 'PWA direct entry must open the dedicated account page');
 expect(pwaController.includes('window.location.assign(provider.officialUrl)'), 'PWA must open ChatGPT in the current tab');
 expect(router.includes('"/chatgpt-web", get(web::chatgpt_web_account_page)'), 'server must expose a stable ChatGPT account URL');
-expect(pwaAccountPage.includes('href="https://chatgpt.com/"'), 'account page must link to the official ChatGPT origin');
+expect(pwaAccountPage.includes('href="https://chatgpt.com/auth/login"'), 'account page must link to the official ChatGPT login route');
 expect(!pwaAccountPage.includes('target="_blank"'), 'account page must keep ChatGPT navigation in the current tab');
 expect(!pwaAccountPage.includes('document.cookie'), 'account page must not read ChatGPT cookies');
+expect(!pwaAccountPage.includes('<iframe'), 'account page must not embed the cross-origin login page');
 
 ['document.cookie', 'fetch(', 'XMLHttpRequest', 'WebSocket', 'Authorization'].forEach((forbidden) => {
   expect(!androidAdapter.includes(forbidden), `Android page adapter must not contain ${forbidden}`);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#111315" />
+  <meta name="theme-color" content="#0d0f12" />
   <title>ChatGPT 网页账号 · 一龙 AI</title>
   <link rel="icon" href="/favicon.ico" />
   <link rel="stylesheet" href="/assets/chatgpt_web_account.css" />
@@ -18,41 +18,43 @@
   </header>
 
   <main class="account-main">
-    <section class="account-summary" aria-labelledby="accountTitle">
-      <img src="/favicon.ico" alt="一龙 AI" width="48" height="48" />
+    <section class="login-stage" aria-labelledby="accountTitle">
+      <div class="account-product">
+        <img src="/favicon.ico" alt="" width="32" height="32" />
+        <span>一龙 AI 网页账号</span>
+      </div>
+      <div class="login-copy">
+        <p class="account-kicker">网页账号</p>
+        <h1 id="accountTitle">ChatGPT</h1>
+        <p>登录你的账号，继续使用 ChatGPT。</p>
+      </div>
+      <div class="login-actions">
+        <a id="chatGptOfficialLogin" class="login-primary" href="https://chatgpt.com/auth/login">
+          <span>登录 ChatGPT</span>
+          <span class="login-arrow" aria-hidden="true">→</span>
+        </a>
+        <a class="login-secondary" href="https://chatgpt.com/">已经登录，直接打开聊天</a>
+      </div>
+      <p class="login-privacy">账号密码只在 ChatGPT 官方页面输入</p>
+    </section>
+
+    <section class="account-details" aria-label="登录说明">
       <div>
-        <h1 id="accountTitle">登录自己的 ChatGPT</h1>
-        <p>登录由 ChatGPT 官方网页完成，账号密码不会提交给一龙服务器。</p>
+        <span>登录页面</span>
+        <strong>ChatGPT 官方网页</strong>
+      </div>
+      <div>
+        <span>会话存储</span>
+        <strong>当前浏览器</strong>
       </div>
     </section>
 
-    <section class="account-section" aria-labelledby="pwaTitle">
-      <div class="section-heading">
-        <div>
-          <h2 id="pwaTitle">当前 PWA 浏览器</h2>
-          <p>官方页面会在当前标签打开，登录状态保存在当前浏览器。</p>
-        </div>
-        <span class="availability">可登录</span>
+    <section class="apk-note" aria-labelledby="apkTitle">
+      <div>
+        <h2 id="apkTitle">在一龙 APK 中继续</h2>
+        <p>APK 使用独立的本机网页登录状态。</p>
       </div>
-      <a class="account-action primary" href="https://chatgpt.com/">
-        打开 ChatGPT 官方登录
-      </a>
-    </section>
-
-    <section class="account-section apk-section" aria-labelledby="apkTitle">
-      <div class="section-heading">
-        <div>
-          <h2 id="apkTitle">一龙 APK 本机模式</h2>
-          <p>安装新版后，从“我的 → ChatGPT 网页账号”进入，可在官方网页和一龙界面之间切换。</p>
-        </div>
-        <span class="availability apk">增强模式</span>
-      </div>
-      <a class="account-action secondary" href="/app/download">下载最新版 APK</a>
-    </section>
-
-    <section class="account-boundary" aria-labelledby="boundaryTitle">
-      <h2 id="boundaryTitle">登录状态保存在本机</h2>
-      <p>PWA 浏览器和 APK WebView 是两个独立的本机会话，需要分别登录。清除浏览器数据或 APK 网页数据后，对应登录状态会被删除。</p>
+      <a href="/app/download">获取最新版</a>
     </section>
   </main>
 </body>

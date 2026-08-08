@@ -17,6 +17,7 @@ const androidProfile = read('android/app/src/main/kotlin/com/elon/app/PersonalPr
 const androidPage = read('android/app/src/main/res/layout/activity_ai_provider_accounts.xml');
 const pwaPage = read('server/src/assets/web_page.html');
 const pwaAccountPage = read('server/src/assets/chatgpt_web_account.html');
+const pwaAccountStyles = read('server/src/assets/chatgpt_web_account.css');
 const pwaController = read('server/src/assets/ai_provider_accounts.js');
 const pcAccount = read('pc-frontend/src/features/account/AccountPage.tsx');
 const pcCard = read('pc-frontend/src/features/account/ChatGptAccountCard.tsx');
@@ -30,9 +31,16 @@ expect(androidPage.includes('只保存在本 APK'), 'APK page must explain local
 expect(pwaPage.includes('profile-action-title">ChatGPT 网页账号'), 'PWA profile must expose ChatGPT login');
 expect(pwaPage.includes('profile-action-subtitle">当前页打开官方网页'), 'PWA profile must explain same-tab ChatGPT navigation');
 expect(pwaPage.includes('profile-action-title">AI 厂商账号'), 'PWA must keep advanced provider management separate');
-expect(pwaAccountPage.includes('<h1 id="accountTitle">登录自己的 ChatGPT</h1>'), 'PWA account page must provide a user-facing login title');
-expect(pwaAccountPage.includes('href="https://chatgpt.com/"'), 'PWA account page must open the official ChatGPT origin');
+expect(pwaAccountPage.includes('<h1 id="accountTitle">ChatGPT</h1>'), 'PWA account page must make ChatGPT the first-screen product signal');
+expect(pwaAccountPage.includes('id="chatGptOfficialLogin"'), 'PWA account page must expose a dedicated login action');
+expect(pwaAccountPage.includes('href="https://chatgpt.com/auth/login"'), 'PWA login action must open the official ChatGPT login route');
+expect(pwaAccountPage.includes('<span>登录 ChatGPT</span>'), 'PWA account page must use a clear login command');
 expect(!pwaAccountPage.includes('target="_blank"'), 'PWA account page must keep ChatGPT in the current tab');
+expect(!pwaAccountPage.includes('<iframe'), 'PWA account page must not embed the cross-origin login page');
+expect(!pwaAccountPage.includes('type="password"'), 'PWA account page must not collect ChatGPT credentials');
+expect(pwaAccountStyles.includes('min-height: 68px'), 'PWA account page must keep the primary login action touch-friendly');
+expect(pwaAccountStyles.includes('@media (max-width: 420px)'), 'PWA account page must define a mobile layout');
+expect(pwaAccountStyles.includes('@media (prefers-reduced-motion: reduce)'), 'PWA account page must respect reduced-motion preferences');
 expect(pwaController.includes("'本人完成登录或真人验证'"), 'PWA panel must explain the official login step');
 expect(pwaController.includes("open.textContent = '登录或继续使用 ChatGPT'"), 'PWA must provide an explicit login/use action');
 
