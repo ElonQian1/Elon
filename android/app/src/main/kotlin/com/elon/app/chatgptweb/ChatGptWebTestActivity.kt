@@ -24,6 +24,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var googleAccountHintController: ChatGptGoogleAccountHintController
     private lateinit var proxyController: ChatGptWebProxyController
     private var proxyStatus = ChatGptWebProxyStatus("手机网络")
+    private var webAuthenticationStatus = ChatGptWebAuthenticationSupport.Status.UNSUPPORTED
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -125,6 +126,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         binding.chatGptModeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) showMode(checkedId)
         }
+        renderWebAuthenticationStatus()
         binding.chatGptModeQuick.isChecked = true
     }
 
@@ -151,6 +153,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 builtInZoomControls = false
                 displayZoomControls = false
             }
+            webAuthenticationStatus = ChatGptWebAuthenticationSupport.configure(settings)
             webViewClient = ChatGptWebViewClient(
                 onPageStarted = ::showLoading,
                 onPageReady = ::showReady,
@@ -266,6 +269,20 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun statusWithProxy(messageResource: Int): String =
         "${getString(messageResource)} · ${proxyStatus.label}"
+
+    private fun renderWebAuthenticationStatus() {
+        val enabled = webAuthenticationStatus == ChatGptWebAuthenticationSupport.Status.ENABLED
+        binding.chatGptQuickWebAuthentication.setText(
+            if (enabled) {
+                R.string.chatgpt_web_authentication_ready
+            } else {
+                R.string.chatgpt_web_authentication_unavailable
+            },
+        )
+        binding.chatGptQuickWebAuthentication.setTextColor(
+            getColor(if (enabled) R.color.elon_status_success else R.color.elon_text_tertiary),
+        )
+    }
 
     private fun showBlockedNavigation(host: String) {
         binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_project))

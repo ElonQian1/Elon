@@ -96,6 +96,33 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun webViewEnablesSystemWebAuthenticationWithoutHandlingCredentials() {
+        val support = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAuthenticationSupport.kt"
+        )
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val build = readRepositoryFile("android/app/build.gradle")
+
+        assertTrue(build.contains("androidx.webkit:webkit:1.12.1"))
+        assertTrue(support.contains("WebViewFeature.WEB_AUTHENTICATION"))
+        assertTrue(support.contains("WebSettingsCompat.setWebAuthenticationSupport"))
+        assertTrue(support.contains("WEB_AUTHENTICATION_SUPPORT_FOR_BROWSER"))
+        assertTrue(activity.contains("ChatGptWebAuthenticationSupport.configure(settings)"))
+        listOf(
+            "AccountManager",
+            "getAuthToken",
+            "GoogleIdToken",
+            "document.cookie",
+            "getCookie(",
+            "Authorization:",
+        ).forEach {
+            assertFalse("WebAuthn support must not contain $it", support.contains(it))
+        }
+    }
+
+    @Test
     fun initialPageLoadWaitsForLocalProxyPreparationWithoutExportingCredentials() {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"

@@ -37,6 +37,8 @@
     <string name="chatgpt_google_account_invalid">系统没有返回有效的 Google 账号</string>
     <string name="chatgpt_google_account_unavailable">当前手机无法打开 Google 账号选择器</string>
     <string name="chatgpt_google_provider_unavailable">未找到 ChatGPT 官方 Google 登录入口，请改用官方网页</string>
+    <string name="chatgpt_web_authentication_ready">系统通行密钥可用</string>
+    <string name="chatgpt_web_authentication_unavailable">当前 WebView 仅支持官方密码验证</string>
     <string name="chatgpt_quick_login">使用其他方式登录</string>
     <string name="chatgpt_quick_enter_native">进入一龙聊天</string>
     <string name="chatgpt_quick_official">直接打开官方网页</string>

@@ -225,10 +225,20 @@
                     android:textSize="15sp" />
 
                 <TextView
+                    android:id="@+id/chatGptQuickWebAuthentication"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:gravity="center"
+                    android:text="@string/chatgpt_web_authentication_unavailable"
+                    android:textColor="@color/elon_text_tertiary"
+                    android:textSize="12sp" />
+
+                <TextView
                     android:id="@+id/chatGptQuickStage"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="36dp"
+                    android:layout_marginTop="26dp"
                     android:text="@string/chatgpt_quick_stage_ready"
                     android:textColor="@color/elon_status_success"
                     android:textSize="14sp" />
