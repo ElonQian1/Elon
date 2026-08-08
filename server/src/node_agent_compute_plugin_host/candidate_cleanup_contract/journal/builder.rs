@@ -141,11 +141,74 @@ pub(in crate::node_agent_compute_plugin_host) fn build_parent_namespace_absence_
     binding: &ManagedObjectBinding,
     recorded_at_ms: i64,
 ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
-    validate_hashed_execution_plan(plan)?;
-    let expected_disposition = build_exact_handle_disposition_event(
+    let relative_name = binding
+        .relative_name()
+        .to_str()
+        .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_ABSENCE_NAME_INVALID"))?;
+    build_parent_namespace_absence_event_from_fields(
         plan,
         intent,
-        binding,
+        disposition,
+        binding.is_directory(),
+        relative_name,
+        binding.identity_digest(),
+        binding.parent_identity_digest(),
+        recorded_at_ms,
+    )
+}
+
+pub(in crate::node_agent_compute_plugin_host) fn build_namespace_durable_event(
+    plan: &HashedComputePluginCandidateCleanupExecutionPlan,
+    intent: &HashedComputePluginCandidateCleanupStepEvent,
+    disposition: &HashedComputePluginCandidateCleanupStepEvent,
+    absence: &HashedComputePluginCandidateCleanupStepEvent,
+    namespace: &ManagedNamespaceDurable,
+    recorded_at_ms: i64,
+) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
+    let binding = namespace.object_binding();
+    let relative_name = binding
+        .relative_name()
+        .to_str()
+        .ok_or_else(|| anyhow!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DURABILITY_NAME_INVALID"))?;
+    if namespace.barrier_completed_at() >= namespace.post_absence_observed_at()
+        || namespace.post_absence_observed_at() > namespace.completed_at()
+    {
+        bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DURABILITY_BINDING_INVALID");
+    }
+    build_namespace_durable_event_from_fields(
+        plan,
+        intent,
+        disposition,
+        absence,
+        binding.is_directory(),
+        relative_name,
+        binding.identity_digest(),
+        binding.parent_identity_digest(),
+        namespace.namespace_durability_kind(),
+        namespace.filesystem_kind(),
+        recorded_at_ms,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_parent_namespace_absence_event_from_fields(
+    plan: &HashedComputePluginCandidateCleanupExecutionPlan,
+    intent: &HashedComputePluginCandidateCleanupStepEvent,
+    disposition: &HashedComputePluginCandidateCleanupStepEvent,
+    is_directory: bool,
+    relative_name: &str,
+    identity_digest: &str,
+    parent_identity_digest: &str,
+    recorded_at_ms: i64,
+) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
+    validate_hashed_execution_plan(plan)?;
+    let expected_disposition = build_exact_handle_disposition_event_from_fields(
+        plan,
+        intent,
+        is_directory,
+        relative_name,
+        identity_digest,
+        parent_identity_digest,
         disposition.event().recorded_at_ms(),
     )?;
     let object = plan
@@ -156,7 +219,7 @@ pub(in crate::node_agent_compute_plugin_host) fn build_parent_namespace_absence_
         || disposition.event().event_sequence() != 2
         || disposition.event().step_ordinal() != 0
         || recorded_at_ms <= disposition.event().recorded_at_ms()
-        || binding.parent_identity_digest() != object.object().expected_parent_identity_digest()
+        || parent_identity_digest != object.object().expected_parent_identity_digest()
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_ABSENCE_BINDING_INVALID");
     }
@@ -169,7 +232,7 @@ pub(in crate::node_agent_compute_plugin_host) fn build_parent_namespace_absence_
         event_kind: "parent_namespace_absence_observed".to_string(),
         object_digest: object.object_digest().to_string(),
         observed_identity_digest: None,
-        observed_parent_identity_digest: binding.parent_identity_digest().to_string(),
+        observed_parent_identity_digest: parent_identity_digest.to_string(),
         namespace_durability_kind: None,
         namespace_durability_evidence_digest: None,
         previous_event_digest: disposition.event_digest().to_string(),
@@ -178,21 +241,29 @@ pub(in crate::node_agent_compute_plugin_host) fn build_parent_namespace_absence_
     })
 }
 
-pub(in crate::node_agent_compute_plugin_host) fn build_namespace_durable_event(
+#[allow(clippy::too_many_arguments)]
+fn build_namespace_durable_event_from_fields(
     plan: &HashedComputePluginCandidateCleanupExecutionPlan,
     intent: &HashedComputePluginCandidateCleanupStepEvent,
     disposition: &HashedComputePluginCandidateCleanupStepEvent,
     absence: &HashedComputePluginCandidateCleanupStepEvent,
-    namespace: &ManagedNamespaceDurable,
+    is_directory: bool,
+    relative_name: &str,
+    identity_digest: &str,
+    parent_identity_digest: &str,
+    namespace_durability_kind: &str,
+    filesystem_kind: &str,
     recorded_at_ms: i64,
 ) -> Result<HashedComputePluginCandidateCleanupStepEvent> {
     validate_hashed_execution_plan(plan)?;
-    let binding = namespace.object_binding();
-    let expected_absence = build_parent_namespace_absence_event(
+    let expected_absence = build_parent_namespace_absence_event_from_fields(
         plan,
         intent,
         disposition,
-        binding,
+        is_directory,
+        relative_name,
+        identity_digest,
+        parent_identity_digest,
         absence.event().recorded_at_ms(),
     )?;
     let object = plan
@@ -203,18 +274,16 @@ pub(in crate::node_agent_compute_plugin_host) fn build_namespace_durable_event(
         || absence.event().event_sequence() != 3
         || absence.event().step_ordinal() != 0
         || recorded_at_ms <= absence.event().recorded_at_ms()
-        || namespace.barrier_completed_at() >= namespace.post_absence_observed_at()
-        || namespace.post_absence_observed_at() > namespace.completed_at()
-        || binding.parent_identity_digest() != object.object().expected_parent_identity_digest()
-        || binding.identity_digest() != object.object().expected_identity_digest()
+        || parent_identity_digest != object.object().expected_parent_identity_digest()
+        || identity_digest != object.object().expected_identity_digest()
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_CLEANUP_DURABILITY_BINDING_INVALID");
     }
     let namespace_durability_evidence_digest = build_namespace_durability_evidence_digest(
         plan,
         absence,
-        namespace.namespace_durability_kind(),
-        namespace.filesystem_kind(),
+        namespace_durability_kind,
+        filesystem_kind,
         recorded_at_ms,
     )?;
     hash_cleanup_step_event(ComputePluginCandidateCleanupStepEvent {
@@ -226,8 +295,8 @@ pub(in crate::node_agent_compute_plugin_host) fn build_namespace_durable_event(
         event_kind: "namespace_durable".to_string(),
         object_digest: object.object_digest().to_string(),
         observed_identity_digest: None,
-        observed_parent_identity_digest: binding.parent_identity_digest().to_string(),
-        namespace_durability_kind: Some(namespace.namespace_durability_kind().to_string()),
+        observed_parent_identity_digest: parent_identity_digest.to_string(),
+        namespace_durability_kind: Some(namespace_durability_kind.to_string()),
         namespace_durability_evidence_digest: Some(namespace_durability_evidence_digest),
         previous_event_digest: absence.event_digest().to_string(),
         process_owner_epoch: plan.plan().process_owner_epoch(),

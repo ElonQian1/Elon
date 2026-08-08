@@ -133,3 +133,179 @@ fn cleanup_disposition_rejects_stale_time_or_changed_binding() {
     assert!(stale.to_string().contains("DISPOSITION_BINDING_INVALID"));
     assert!(changed.to_string().contains("DISPOSITION_BINDING_INVALID"));
 }
+
+fn disposition_chain() -> (
+    HashedComputePluginCandidateCleanupExecutionPlan,
+    HashedComputePluginCandidateCleanupStepEvent,
+    HashedComputePluginCandidateCleanupStepEvent,
+) {
+    let plan = plan();
+    let intent = build_initial_delete_intent(&plan, 2_001).unwrap();
+    let disposition = build_exact_handle_disposition_event_from_fields(
+        &plan,
+        &intent,
+        true,
+        plan.objects()[0].object().relative_name(),
+        plan.objects()[0].object().expected_identity_digest(),
+        plan.objects()[0].object().expected_parent_identity_digest(),
+        2_002,
+    )
+    .unwrap();
+    (plan, intent, disposition)
+}
+
+fn absence_chain() -> (
+    HashedComputePluginCandidateCleanupExecutionPlan,
+    HashedComputePluginCandidateCleanupStepEvent,
+    HashedComputePluginCandidateCleanupStepEvent,
+    HashedComputePluginCandidateCleanupStepEvent,
+) {
+    let (plan, intent, disposition) = disposition_chain();
+    let absence = build_parent_namespace_absence_event_from_fields(
+        &plan,
+        &intent,
+        &disposition,
+        true,
+        plan.objects()[0].object().relative_name(),
+        plan.objects()[0].object().expected_identity_digest(),
+        plan.objects()[0].object().expected_parent_identity_digest(),
+        2_003,
+    )
+    .unwrap();
+    (plan, intent, disposition, absence)
+}
+
+#[test]
+fn cleanup_parent_absence_is_deterministic_and_chains_exact_disposition() {
+    let (plan, intent, disposition) = disposition_chain();
+    let build = || {
+        build_parent_namespace_absence_event_from_fields(
+            &plan,
+            &intent,
+            &disposition,
+            true,
+            plan.objects()[0].object().relative_name(),
+            plan.objects()[0].object().expected_identity_digest(),
+            plan.objects()[0].object().expected_parent_identity_digest(),
+            2_003,
+        )
+        .unwrap()
+    };
+
+    let first = build();
+    let second = build();
+
+    assert_eq!(first, second);
+    assert_eq!(first.event().event_sequence(), 3);
+    assert_eq!(
+        first.event().event_kind(),
+        "parent_namespace_absence_observed"
+    );
+    assert_eq!(first.event().observed_identity_digest(), None);
+    assert_eq!(
+        first.event().previous_event_digest(),
+        disposition.event_digest()
+    );
+}
+
+#[test]
+fn cleanup_parent_absence_rejects_stale_time_or_changed_binding() {
+    let (plan, intent, disposition) = disposition_chain();
+    let stale = build_parent_namespace_absence_event_from_fields(
+        &plan,
+        &intent,
+        &disposition,
+        true,
+        plan.objects()[0].object().relative_name(),
+        plan.objects()[0].object().expected_identity_digest(),
+        plan.objects()[0].object().expected_parent_identity_digest(),
+        2_002,
+    )
+    .unwrap_err();
+    let changed = build_parent_namespace_absence_event_from_fields(
+        &plan,
+        &intent,
+        &disposition,
+        false,
+        plan.objects()[0].object().relative_name(),
+        plan.objects()[0].object().expected_identity_digest(),
+        plan.objects()[0].object().expected_parent_identity_digest(),
+        2_003,
+    )
+    .unwrap_err();
+
+    assert!(stale.to_string().contains("ABSENCE_BINDING_INVALID"));
+    assert!(changed.to_string().contains("DISPOSITION_BINDING_INVALID"));
+}
+
+#[test]
+fn cleanup_namespace_durable_is_deterministic_and_chains_exact_absence() {
+    let (plan, intent, disposition, absence) = absence_chain();
+    let build = || {
+        build_namespace_durable_event_from_fields(
+            &plan,
+            &intent,
+            &disposition,
+            &absence,
+            true,
+            plan.objects()[0].object().relative_name(),
+            plan.objects()[0].object().expected_identity_digest(),
+            plan.objects()[0].object().expected_parent_identity_digest(),
+            CANDIDATE_CLEANUP_NAMESPACE_DURABILITY_KIND,
+            "ntfs",
+            2_004,
+        )
+        .unwrap()
+    };
+
+    let first = build();
+    let second = build();
+
+    assert_eq!(first, second);
+    assert_eq!(first.event().event_sequence(), 4);
+    assert_eq!(first.event().event_kind(), "namespace_durable");
+    assert_eq!(first.event().observed_identity_digest(), None);
+    assert_eq!(
+        first.event().namespace_durability_kind(),
+        Some(CANDIDATE_CLEANUP_NAMESPACE_DURABILITY_KIND)
+    );
+    assert_eq!(
+        first.event().previous_event_digest(),
+        absence.event_digest()
+    );
+    assert_eq!(
+        first
+            .event()
+            .namespace_durability_evidence_digest()
+            .map(str::len),
+        Some(64)
+    );
+}
+
+#[test]
+fn cleanup_namespace_durable_rejects_stale_time_or_unsupported_filesystem() {
+    let (plan, intent, disposition, absence) = absence_chain();
+    let build = |filesystem_kind, recorded_at_ms| {
+        build_namespace_durable_event_from_fields(
+            &plan,
+            &intent,
+            &disposition,
+            &absence,
+            true,
+            plan.objects()[0].object().relative_name(),
+            plan.objects()[0].object().expected_identity_digest(),
+            plan.objects()[0].object().expected_parent_identity_digest(),
+            CANDIDATE_CLEANUP_NAMESPACE_DURABILITY_KIND,
+            filesystem_kind,
+            recorded_at_ms,
+        )
+    };
+
+    let stale = build("ntfs", 2_003).unwrap_err();
+    let unsupported = build("ext4", 2_004).unwrap_err();
+
+    assert!(stale.to_string().contains("DURABILITY_BINDING_INVALID"));
+    assert!(unsupported
+        .to_string()
+        .contains("DURABILITY_EVIDENCE_BINDING_INVALID"));
+}
