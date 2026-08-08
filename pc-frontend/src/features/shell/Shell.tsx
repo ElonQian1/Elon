@@ -14,6 +14,7 @@ import LocalModeBanner from './LocalModeBanner'
 import { useProjectOpenPrewarm } from '../conversation/useProjectOpenPrewarm'
 import { isLocalWorkbench } from '../../api/runtime'
 import styles from './Shell.module.css'
+import { useCodexControlBridge } from '../codex-control/useCodexControlBridge'
 
 function NodeConnectBanner() {
   const { status, errorMessage, detailMessage } = useNodeAutoConnect()
@@ -91,6 +92,7 @@ function DuplicateWorkbenchNotice() {
 }
 
 export default function Shell() {
+  useCodexControlBridge()
   const duplicateTab = useWorkbenchTabCoordinator()
   const localMode = isLocalWorkbench()
   useNotifications(!localMode)

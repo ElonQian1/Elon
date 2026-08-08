@@ -2,7 +2,7 @@
 
 use anyhow::{anyhow, bail, Context, Result};
 use axum::{
-    extract::{Path as AxumPath, Query},
+    extract::{Path as AxumPath, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::post,
@@ -80,7 +80,7 @@ pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
 
 #[cfg(test)]
 pub(crate) fn test_transport_routes() -> Router {
-    Router::new().route("/api/project-docs/mcp/:session_id", post(mcp_handler))
+    Router::new().route("/api/project-docs/mcp/:session_id", post(test_mcp_handler))
 }
 
 pub(crate) fn descriptor_for_project(project_root: &str, host_port: u16) -> Result<Value> {
@@ -101,6 +101,14 @@ pub(crate) fn descriptor_for_project_receipt(project_root: &str, host_port: u16)
 pub(crate) fn descriptor_for_project_feature(project_root: &str, host_port: u16) -> Result<Value> {
     let root = validate_project_root(project_root)?;
     create_descriptor(&root, None, host_port, DescriptorProfile::Feature)
+}
+
+pub(crate) fn descriptor_for_project_win_control(
+    project_root: &str,
+    host_port: u16,
+) -> Result<Value> {
+    let root = validate_project_root(project_root)?;
+    create_descriptor(&root, None, host_port, DescriptorProfile::WinControl)
 }
 
 pub(crate) fn descriptor_for_vault(vault_id: &str, host_port: u16) -> Result<Value> {
@@ -257,7 +265,7 @@ fn named_mcp_config(name: &str, server: Value) -> Value {
 }
 
 pub(crate) async fn handle_request(workspace: &Path, request: McpRequest) -> Option<Value> {
-    handle_request_for_profile(workspace, request, None, None, None).await
+    handle_request_for_profile(workspace, request, None, None, None, None).await
 }
 
 async fn handle_request_for_profile(
@@ -266,6 +274,7 @@ async fn handle_request_for_profile(
     profile: Option<&str>,
     context_receipt_path: Option<&Path>,
     session_id: Option<&str>,
+    runtime: Option<&NodeRuntime>,
 ) -> Option<Value> {
     let id = request.id.clone().unwrap_or(Value::Null);
     if request.method == "notifications/initialized" {
@@ -281,6 +290,14 @@ async fn handle_request_for_profile(
         crate::node_agent_project_feature_mcp::handle_request(workspace, &request)
     } else if crate::node_agent_project_receipt_mcp::handles(profile) {
         crate::node_agent_project_receipt_mcp::handle_request(workspace, &request, session_id)
+    } else if crate::node_agent_win_codex_control_mcp::handles(profile) {
+        runtime
+            .ok_or_else(|| anyhow!("Win 控制 MCP 仅在节点 loopback 会话中可用"))
+            .and_then(|runtime| {
+                crate::node_agent_win_codex_control_mcp::handle_request(
+                    runtime, workspace, &request,
+                )
+            })
     } else if !matches!(profile, None | Some("governance")) {
         Err(anyhow!("未知项目文档 MCP profile"))
     } else {
@@ -328,9 +345,28 @@ async fn bootstrap_handler(Json(request): Json<BootstrapRequest>) -> Response {
 }
 
 async fn mcp_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
     AxumPath(session_id): AxumPath<String>,
     Query(query): Query<McpQuery>,
     Json(request): Json<McpRequest>,
+) -> Response {
+    serve_mcp(session_id, query, request, Some(&runtime)).await
+}
+
+#[cfg(test)]
+async fn test_mcp_handler(
+    AxumPath(session_id): AxumPath<String>,
+    Query(query): Query<McpQuery>,
+    Json(request): Json<McpRequest>,
+) -> Response {
+    serve_mcp(session_id, query, request, None).await
+}
+
+async fn serve_mcp(
+    session_id: String,
+    query: McpQuery,
+    request: McpRequest,
+    runtime: Option<&NodeRuntime>,
 ) -> Response {
     let (workspace, session_profile) = match authorize_session_profile(&session_id, &query.token) {
         Ok(session) => session,
@@ -350,6 +386,7 @@ async fn mcp_handler(
         query.profile.as_deref(),
         Some(&context_receipt_path),
         Some(&session_id),
+        runtime,
     )
     .await
     {

@@ -20,8 +20,8 @@ use super::{
     node_agent_local_pc_frontend, node_agent_local_tasks, node_agent_project_agent_runs,
     node_agent_project_docs_mcp, node_agent_project_picker, node_agent_provider_accounts,
     node_agent_pwa_auth_profile, node_agent_source_preview, node_agent_task_journal_api,
-    pc_storage_git_http, pc_storage_repo, project_landing, project_workspace_inspect,
-    windows_doctor, NodeRuntime,
+    node_agent_win_codex_control, pc_storage_git_http, pc_storage_repo, project_landing,
+    project_workspace_inspect, windows_doctor, NodeRuntime,
 };
 
 pub(super) async fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
@@ -96,6 +96,7 @@ pub(super) async fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .merge(node_agent_codex_vault::routes())
             .merge(node_agent_task_journal_api::routes())
             .merge(node_agent_local_tasks::routes())
+            .merge(node_agent_win_codex_control::routes())
             .route(
                 "/api/project-folder/pick",
                 axum::routing::post(node_agent_project_picker::pick_local_project_folder),

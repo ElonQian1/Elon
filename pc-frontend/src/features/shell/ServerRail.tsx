@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Activity, Banknote, Bot, Boxes, CircleDollarSign, CircleMinus, ClipboardCheck, FileCheck2, Gauge, Gavel, GitBranch, Globe2, HardDrive, Landmark, LockKeyhole, MonitorCog, PackageCheck, Radar, ReceiptText, Scale, Search, ShieldCheck, UsersRound, Mic2, SlidersHorizontal } from 'lucide-react'
+import { Activity, Banknote, Bot, Boxes, CircleDollarSign, CircleMinus, ClipboardCheck, FileCheck2, Gauge, Gavel, GitBranch, Globe2, HardDrive, Landmark, LockKeyhole, MonitorCog, PackageCheck, Radar, ReceiptText, Scale, Search, ShieldCheck, UsersRound, Mic2, SlidersHorizontal, TerminalSquare } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { isLocalWorkbench } from '../../api/runtime'
 import { useProjectStore } from '../conversation/useProjectStore'
@@ -23,6 +23,7 @@ const RAIL_ITEMS: RailItem[] = [
   { path: '/friends', Icon: UsersRound,   label: '好友',      color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/git-worktrees', Icon: GitBranch, label: 'Git 现场', color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/ui-tuner', Icon: SlidersHorizontal, label: '微调画布', color: '#2a2b2f', hoverColor: '#34363b' },
+  { path: '/codex-control', Icon: TerminalSquare, label: 'Codex 控制台', color: '#26342d', hoverColor: '#30463a' },
   { path: '/node',    Icon: MonitorCog,   label: '分享算力',  color: '#2a2b2f', hoverColor: '#34363b' },
   { path: '/compute-supply', Icon: Gauge, label: '供给管理', color: '#2b3138', hoverColor: '#35404a' },
   { path: '/compute-market', Icon: Search, label: '算力市场', color: '#30312d', hoverColor: '#3b3d36' },
@@ -36,6 +37,10 @@ const RAIL_ITEMS: RailItem[] = [
 
 const LOCAL_TASK_ITEM: RailItem = {
   path: '/local-tasks', Icon: HardDrive, label: '本机任务', color: '#26342d', hoverColor: '#30463a',
+}
+
+const LOCAL_CODEX_CONTROL_ITEM: RailItem = {
+  path: '/codex-control', Icon: TerminalSquare, label: 'Codex 控制台', color: '#26342d', hoverColor: '#30463a',
 }
 
 const SETTLEMENT_ITEM: RailItem = {
@@ -114,7 +119,7 @@ export default function ServerRail() {
 
   return (
     <nav className={styles.rail}>
-      {(localMode ? [LOCAL_TASK_ITEM] : railItems).map((item) => {
+      {(localMode ? [LOCAL_TASK_ITEM, LOCAL_CODEX_CONTROL_ITEM] : railItems).map((item) => {
         const active = isActive(item.path)
         const Icon = item.Icon
         return (

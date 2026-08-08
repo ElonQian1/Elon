@@ -22,6 +22,7 @@ const DevTasksPage = lazy(() => import('./features/dev/DevTasksPage'))
 const GitWorktreesPage = lazy(() => import('./features/git-worktrees/GitWorktreesPage'))
 const UiTunerPage = lazy(() => import('./features/ui-tuner/UiTunerPage'))
 const LocalTasksPage = lazy(() => import('./features/local-tasks/LocalTasksPage'))
+const CodexControlPage = lazy(() => import('./features/codex-control/CodexControlPage'))
 const ComputeSettlementPage = lazy(() => import('./features/compute-settlement/ComputeSettlementPage'))
 const MyComputeSettlementPage = lazy(() => import('./features/compute-settlement/MyComputeSettlementPage'))
 const ComputeSupplyPage = lazy(() => import('./features/compute-supply/ComputeSupplyPage'))
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="git-worktrees" element={lazyRoute(<GitWorktreesPage />)} />
         <Route path="ui-tuner" element={lazyRoute(<UiTunerPage />)} />
         <Route path="local-tasks" element={lazyRoute(<LocalTasksPage />)} />
+        <Route path="codex-control" element={lazyRoute(<CodexControlPage />)} />
         <Route path="compute-settlement" element={lazyRoute(<ComputeSettlementPage />)} />
         <Route path="my-compute-settlement" element={lazyRoute(<MyComputeSettlementPage />)} />
         <Route path="compute-supply" element={lazyRoute(<ComputeSupplyPage />)} />

@@ -132,6 +132,19 @@ pub(crate) fn project_docs_mcp_launch_config(
                     }
                 }
             };
+            let win_control_descriptor = if cli_name == "codex" {
+                match crate::node_agent_project_docs_mcp::descriptor_for_project_win_control(
+                    cwd, host_port,
+                ) {
+                    Ok(descriptor) => Some(descriptor),
+                    Err(error) => {
+                        tracing::warn!(error = %error, "无法为 Codex 任务准备 Win 语义控制 MCP");
+                        return None;
+                    }
+                }
+            } else {
+                None
+            };
             let config_path = |provider: &str| {
                 descriptor
                     .pointer(&format!("/configPaths/{provider}"))
@@ -165,6 +178,13 @@ pub(crate) fn project_docs_mcp_launch_config(
                             &mut config.args,
                             "yilong_project_features",
                             feature_descriptor.get("url")?.as_str()?,
+                        );
+                    }
+                    if let Some(win_control_descriptor) = win_control_descriptor.as_ref() {
+                        append_http_mcp_args(
+                            &mut config.args,
+                            "yilong_win_control",
+                            win_control_descriptor.get("url")?.as_str()?,
                         );
                     }
                     if !full_governance
@@ -354,6 +374,14 @@ mod tests {
         assert!(plain
             .args
             .iter()
+            .any(|arg| arg.contains("mcp_servers.yilong_win_control.url")));
+        assert!(plain
+            .args
+            .iter()
+            .any(|arg| arg.contains("profile=win_control")));
+        assert!(plain
+            .args
+            .iter()
             .any(|arg| arg.starts_with("hooks.PostToolUse=")));
         assert!(plain.args.iter().any(|arg| arg.starts_with("hooks.Stop=")));
         assert!(project_docs_mcp_launch_config(
@@ -385,6 +413,10 @@ mod tests {
             .args
             .iter()
             .any(|arg| arg.contains("yilong_project_features")));
+        assert!(config
+            .args
+            .iter()
+            .any(|arg| arg.contains("mcp_servers.yilong_win_control.url")));
         let copilot = project_docs_mcp_launch_config(
             "<elon-project-docs-task version=\"1\">",
             root.to_str(),

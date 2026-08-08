@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     fs::{self, File},
     io::{BufRead, BufReader, Seek, SeekFrom},
     path::Path,
@@ -14,6 +14,53 @@ use crate::node_agent_task_journal_lock::with_task_journal_io_lock;
 impl TaskJournal {
     pub(crate) fn task_events(&self, task_id: &str) -> Result<Vec<TaskJournalEventView>> {
         with_task_journal_io_lock(|| self.cached_task_events(task_id).map(|value| value.0))
+    }
+
+    /// Reads one append-only journal pass and retains only the newest bounded
+    /// events for the requested tasks. The unified diagnostics console needs
+    /// recent CLI evidence, while the task detail endpoint keeps cursor-based
+    /// lossless replay semantics.
+    pub(crate) fn recent_events_for_tasks(
+        &self,
+        task_ids: &HashSet<String>,
+        limit: usize,
+    ) -> Result<HashMap<String, Vec<TaskJournalEventView>>> {
+        with_task_journal_io_lock(|| {
+            let limit = limit.clamp(1, 200);
+            let mut events = task_ids
+                .iter()
+                .cloned()
+                .map(|task_id| (task_id, VecDeque::with_capacity(limit)))
+                .collect::<HashMap<_, _>>();
+            let path = self.events_path();
+            if path.exists() {
+                let file = File::open(&path).with_context(|| format!("打开 {:?}", path))?;
+                for (index, line) in BufReader::new(file).lines().enumerate() {
+                    let line = line.with_context(|| format!("读取 {:?}", path))?;
+                    let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) else {
+                        continue;
+                    };
+                    let Some(task_id) = event.get("req_id").and_then(serde_json::Value::as_str)
+                    else {
+                        continue;
+                    };
+                    let Some(queue) = events.get_mut(task_id) else {
+                        continue;
+                    };
+                    queue.push_back(TaskJournalEventView {
+                        seq: index + 1,
+                        event,
+                    });
+                    while queue.len() > limit {
+                        queue.pop_front();
+                    }
+                }
+            }
+            Ok(events
+                .into_iter()
+                .map(|(task_id, events)| (task_id, events.into_iter().collect()))
+                .collect())
+        })
     }
 
     pub(super) fn cached_task_events(

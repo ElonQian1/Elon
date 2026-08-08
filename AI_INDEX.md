@@ -14,6 +14,7 @@
 | Codex 桌面监督 / PC 本机执行 / 验收、能力修复与续跑（自 2026-07-26 起暂停） | `docs/codex-desktop-pc-supervision.md`、`.agents/skills/codex-pc-supervisor/`、`server/src/node_agent_local_task_supervision.rs` |
 | Codex 桌面低 token 增量 Wait / Resume 上下文 / 终态 / A/B 度量 | `docs/codex-desktop-workflow-efficiency.md`、`server/src/node_agent_supervision_protocol.rs`、`scripts/compare-ai-workflow-efficiency.ps1` |
 | Win 节点轻量工具箱 / Codex CLI 临时 PATH / 工具收录策略 | `docs/win-node-toolbox.md`、`server/src/node_agent_cli_env.rs`、`server/src/node_agent_cli_tool_catalog.rs` |
+| Win Codex 语义控制 / Tauri 白名单动作 / 前端、Rust、CLI、网络、Tauri 统一诊断时间线 | `docs/win-codex-control.md`、`server/src/node_agent_win_codex_control*.rs`、`desktop-shell/src-tauri/src/codex_semantic_bridge.rs`、`pc-frontend/src/features/codex-control/` |
 | PC 节点项目数据架构体检 / 共享缓存分析 / 渐进治理 | `docs/pc-node-data-root.md`、`server/pc-dev-runtime/src/node_data_paths.rs`、`server/src/node_agent_data_root/`、`server/src/node_agent_cache_advisor.rs` |
 | Windows 节点升级兼容 / 自动迁移 / 灰度 / 事故处置 | `docs/node-agent-upgrade-compatibility.md` |
 | PWA 真实无头像素捕获 / `yilong_ui_live` MCP / route-source-PNG 验证 | `docs/system-architecture.md` 的“PWA Runtime 像素证据”、`server/src/node_agent_pwa_runtime/`、`server/src/node_agent_source_preview/pwa_runtime.rs`、`pc-frontend/src/features/ui-tuner/source-preview/` |

@@ -1,0 +1,8 @@
+[[permission]]
+identifier = "codex-semantic-bridge"
+description = "允许一龙 PC 主窗口调用白名单 Win/Tauri 语义动作并读取脱敏原生事件。"
+commands.allow = [
+  "codex_win_capabilities",
+  "codex_execute_semantic_action",
+  "codex_read_native_events",
+]

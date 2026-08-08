@@ -297,7 +297,7 @@ pub(super) struct DiagnosticPaths {
 }
 
 impl DiagnosticPaths {
-    fn default() -> Self {
+    pub(super) fn default() -> Self {
         let state_file = crate::state_path();
         Self::from_state_file(state_file)
     }

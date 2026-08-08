@@ -84,6 +84,7 @@ pub(crate) struct NodeRuntime {
     pub(crate) provider_auth: crate::node_agent_provider_auth_runtime::ProviderAuthRuntime,
     pub(crate) live_ui: std::sync::Arc<crate::node_agent_android_live::LiveUiBroker>,
     pub(crate) ui_fit_runs: std::sync::Arc<crate::node_agent_android_live::fit_run::FitRunService>,
+    pub(crate) win_codex_control: crate::node_agent_win_codex_control::WinCodexControlHub,
     pub(crate) wake: Notify,
     pub(crate) desktop_review_auth: crate::node_agent_desktop_review_auth::DesktopReviewAuth,
     pub(crate) desktop_review_broker: crate::node_agent_desktop_review_broker::DesktopReviewBroker,
@@ -143,6 +144,15 @@ impl NodeRuntime {
             crate::node_agent_provider_auth_attempt_store::default_journal_path(
                 node_data_root.paths.as_ref().map(|paths| paths.root()),
             );
+        let win_codex_control = crate::node_agent_win_codex_control::WinCodexControlHub::default();
+        win_codex_control.record(
+            "node_startup",
+            "rust",
+            "info",
+            "control.ready",
+            "Win Codex 语义控制域已初始化",
+            serde_json::json!({"version": env!("CARGO_PKG_VERSION")}),
+        );
         Self {
             cfg,
             compute_plugin_host,
@@ -178,6 +188,7 @@ impl NodeRuntime {
             ),
             live_ui,
             ui_fit_runs,
+            win_codex_control,
             wake: Notify::new(),
             desktop_review_auth,
             desktop_review_broker,

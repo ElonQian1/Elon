@@ -17,6 +17,7 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
     "core:window:allow-is-maximized",
-    "local-ai-web-session"
+    "local-ai-web-session",
+    "codex-semantic-bridge"
   ]
 }

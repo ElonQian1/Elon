@@ -2,7 +2,7 @@
 
 > 本文记录 `/pc` PC 工作台从原生静态 HTML/CSS/JS 迁移到 `Vite + React + TypeScript` 的路线、边界和模块状态。硬规则见 `.github/instructions/pc-frontend-migration.instructions.md`。
 >
-> 最后状态校准：2026-08-05
+> 最后状态校准：2026-08-08
 
 ## 当前判断
 
@@ -51,6 +51,7 @@ server/src/
 | 任务状态实时更新（task_done 事件） | 🟡 中 | `src/features/dev/` | 🟡 P1.7 已补过程覆盖诊断、当前卡点阶段、结构化命令/文件/测试过程卡、侧栏心跳陈旧提示、运行中停止入口、恢复控制面、项目级多任务现场总览；task_done 细化仍继续 |
 | 多端后台微调画布 | 🔴 高 | `src/features/ui-tuner/headless-design/` | 🟡 已接入 Web/PWA/Tauri/Android designSession、revisioned DesignIntentPlan 与动作回执/暂停/重规划、AI task lease、cursor + checkpoint、DraftOperation v2、绑定漂移健康、分平台写回审批、source patch 二次审批/原子应用/回滚计划、修改前后回归任务、Tauri 分层证据、验证矩阵和右侧默认对话；画布跟随指定任务。代码尚未编译或平台运行验收，安装节点仍待升级到 MCP schema v1.11 |
 | 本机任务桌面监督证据 | 🔴 高 | `src/features/local-tasks/` | ✅ 识别 `elon.desktop_pc_supervision.v1`，展示执行/监督分工、验收条件、精确命令退出码/文件证据/失败摘要和最新桌面验收结论；运行卡显示 phase、脱敏 current command、last progress、heartbeat、idle duration 与 timeout policy，并识别 `resume_required`；普通本机任务保持兼容 |
+| Codex Win 语义控制与统一日志 | 🔴 高 | `src/features/codex-control/` | ✅ `/codex-control` 已完成前端、Rust、CLI、网络、Tauri、控制事件筛选，Win/Tauri 白名单动作排队、原子领取、终态回执和脱敏诊断包；全局桥不读取请求/响应正文。PC lint、静态合同与生产构建已通过，真实安装壳和长期事件量仍待发布后现场验证 |
 
 ### 阶段 P2 — 项目管理
 

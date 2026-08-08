@@ -238,6 +238,8 @@ mod node_agent_update_recovery_api;
 mod node_agent_update_recovery_status;
 mod node_agent_update_recovery_terminal;
 mod node_agent_update_resume;
+mod node_agent_win_codex_control;
+mod node_agent_win_codex_control_mcp;
 mod node_agent_workspace_match;
 mod node_agent_workspace_modules;
 mod node_agent_write_preview;

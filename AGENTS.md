@@ -22,7 +22,7 @@
 | PowerShell 版本兼容 | `docs/powershell-version-policy.md` |
 | 模块化、拆文件、巨型文件 | `.github/instructions/modular-architecture.instructions.md` |
 | 后端架构、API、数据流 | `docs/system-architecture.md` 和相关源码 |
-| Codex 桌面监督/PC 节点/能力修复 | **已暂停**；只读 `docs/supervised-pc-project-development.md`，不得派发或续跑 |
+| Codex 桌面监督/PC 节点 | 自动派发/续跑暂停；读 `docs/supervised-pc-project-development.md` |
 | PC 工作台、`/pc`、React/Vite/TypeScript | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md`、`AI_INDEX.md` |
 | Windows PC 节点、自更新、推送 | `docs/node-agent-upgrade-compatibility.md`、Git/发布手册、相关源码 |
 | 完整流程/复杂发布/任务卡住 | `docs/ai-agent-workflow.md` |
