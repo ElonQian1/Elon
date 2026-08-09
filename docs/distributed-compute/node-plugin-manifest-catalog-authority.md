@@ -16,6 +16,8 @@
 
 catalog binding 的 trusted-time observation 带60秒进程内单调有效期，写入、签名复核后、INSERT前、事务返回前、commit后和Durable recovery边界均会重检。当前能力只证明本机目录头，不授予InstallPlan、下载、安装或任务执行。
 
+当前专项验证只覆盖空目录 binding 写入层：3 项内存 SQLite 事务测试证明收据与 authority 头原子提交并精确回读、过期 authority fence 失败且零残留、已提交收据不可更新或删除。它不覆盖候选 Control/Publisher 验签、完整 `bind` 会话和恢复分支、生产磁盘 VFS 或 Host 接线。
+
 ## Rollback checkpoint V2
 
 V2 checkpoint与V1使用独立 schema、challenge、attestation、签名域、assessment、permit与witness，二者不能互转。V2额外绑定 catalog revision、catalog digest和binding receipt digest；相同revision下任一摘要分叉均失败关闭。witness摘要绑定anchor ID、sequence、checkpoint digest、attestation digest与signing-key fingerprint。
