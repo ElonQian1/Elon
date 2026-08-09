@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingEnd="12dp">
+
+    <View
+        android:id="@+id/chatGptConversationActiveIndicator"
+        android:layout_width="3dp"
+        android:layout_height="28dp"
+        android:background="@color/elon_accent_primary"
+        android:importantForAccessibility="no"
+        android:visibility="invisible" />
+
+    <TextView
+        android:id="@+id/chatGptConversationItemTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="13dp"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textColor="@color/elon_text_primary"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/chatGptConversationCurrent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:includeFontPadding="false"
+        android:text="@string/chatgpt_conversations_current"
+        android:textColor="@color/elon_text_accent"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+</LinearLayout>

@@ -52,6 +52,7 @@
     <string name="chatgpt_quick_stage_failed">官方页面暂时无法访问</string>
     <string name="chatgpt_quick_elapsed">本次流程 %1$s 秒</string>
     <string name="chatgpt_native_new">新建会话</string>
+    <string name="chatgpt_native_history">会话历史</string>
     <string name="chatgpt_native_stop">停止生成</string>
     <string name="chatgpt_native_send">发送</string>
     <string name="chatgpt_native_input_hint">发送到当前 ChatGPT 网页会话</string>
@@ -61,4 +62,15 @@
     <string name="chatgpt_native_web_login_required">请先在官方网页模式完成登录并打开一个会话</string>
     <string name="chatgpt_native_active">一龙界面 · 请求仍由本机官方网页执行</string>
     <string name="chatgpt_native_command_failed">网页操作没有完成，请切回官方网页模式</string>
+    <string name="chatgpt_conversations_title">会话历史</string>
+    <string name="chatgpt_conversations_count">%1$d 个会话</string>
+    <string name="chatgpt_conversations_close">关闭会话历史</string>
+    <string name="chatgpt_conversations_search_hint">搜索当前已加载的会话</string>
+    <string name="chatgpt_conversations_loading">正在读取官网会话列表</string>
+    <string name="chatgpt_conversations_empty">官网当前没有可显示的会话</string>
+    <string name="chatgpt_conversations_no_results">没有匹配的会话</string>
+    <string name="chatgpt_conversations_current">当前</string>
+    <string name="chatgpt_conversations_opening">正在切换会话</string>
+    <string name="chatgpt_conversations_failed">官网会话列表暂时不可用</string>
+    <string name="chatgpt_conversations_open_failed">无法打开这个官网会话</string>
 </resources>

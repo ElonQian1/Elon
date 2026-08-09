@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_update_sheet"
+    android:orientation="vertical"
+    android:paddingTop="10dp">
+
+    <View
+        android:layout_width="36dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:background="@drawable/bg_update_info"
+        android:importantForAccessibility="no" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="20dp"
+        android:paddingEnd="8dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:includeFontPadding="false"
+                android:text="@string/chatgpt_conversations_title"
+                android:textColor="@color/elon_text_primary"
+                android:textSize="19sp" />
+
+            <TextView
+                android:id="@+id/chatGptConversationCount"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:includeFontPadding="false"
+                android:textColor="@color/elon_text_tertiary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/chatGptConversationClose"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@android:color/transparent"
+            android:contentDescription="@string/chatgpt_conversations_close"
+            android:padding="14dp"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:tooltipText="@string/chatgpt_conversations_close"
+            android:tint="@color/elon_icon_primary" />
+    </LinearLayout>
+
+    <EditText
+        android:id="@+id/chatGptConversationSearch"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_input"
+        android:drawableStart="@drawable/ic_search_simple"
+        android:drawablePadding="10dp"
+        android:hint="@string/chatgpt_conversations_search_hint"
+        android:imeOptions="actionDone"
+        android:inputType="text"
+        android:maxLines="1"
+        android:paddingHorizontal="14dp"
+        android:textColor="@color/elon_text_primary"
+        android:textColorHint="@color/elon_text_tertiary"
+        android:textSize="15sp"
+        android:drawableTint="@color/elon_icon_primary" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="10dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/chatGptConversationList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingHorizontal="12dp"
+            android:paddingBottom="24dp" />
+
+        <TextView
+            android:id="@+id/chatGptConversationState"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:padding="32dp"
+            android:text="@string/chatgpt_conversations_loading"
+            android:textColor="@color/elon_text_secondary"
+            android:textSize="14sp" />
+    </FrameLayout>
+
+</LinearLayout>
