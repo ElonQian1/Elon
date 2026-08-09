@@ -1,8 +1,7 @@
 use crate::node_agent_compute_plugin_host::signed_artifact_verification::jcs_sha256_hex;
 
+use super::super::test_support as fixtures;
 use super::{project, validate_hashed_receipt};
-
-mod fixtures;
 
 #[test]
 fn projection_advances_all_fences_and_revokes_existing_plugin_admission() {

@@ -10,6 +10,8 @@ use crate::node_agent_compute_plugin_host::{
 
 mod recovery;
 mod revocation;
+#[cfg(test)]
+mod test_support;
 mod types;
 mod validation;
 mod write;

@@ -1,9 +1,7 @@
 use chrono::{DateTime, TimeZone, Utc};
 
-use super::super::super::types::{
-    PolicyBindingAuthorityState, PreparedSharingPolicyBindingRequest,
-};
-use super::super::ReadPolicyBindingState;
+use super::types::{PolicyBindingAuthorityState, PreparedSharingPolicyBindingRequest};
+use super::validation::ReadPolicyBindingState;
 use crate::node_agent_compute_plugin_host::identity::ComputePluginReleaseRef;
 use crate::node_agent_compute_plugin_host::{
     lifecycle::{
