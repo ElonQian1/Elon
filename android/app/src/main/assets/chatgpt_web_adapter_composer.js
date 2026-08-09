@@ -6,6 +6,7 @@
   const MAX_OPTIONS = 30;
   let lastOptions = { model: [], tools: [] };
   let pendingOptions = { model: null, tools: null };
+  let lastAttachments = [];
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -40,6 +41,90 @@
       document.querySelector('input[type="file"]')
     ];
     return candidates.find((node) => node && !node.disabled) || null;
+  }
+
+  function attachmentState(node) {
+    const value = nodeLabel(node).toLowerCase();
+    if (/failed|error|失败|错误/.test(value)) return 'error';
+    if (node.querySelector('[role="progressbar"]') || /uploading|处理中|上传中/.test(value)) {
+      return 'uploading';
+    }
+    return 'ready';
+  }
+
+  function attachmentName(node, fallback) {
+    const named = node.querySelector(
+      '[data-testid*="file-name" i], [data-testid*="filename" i], [title], img[alt]'
+    );
+    const raw = cleanText([
+      named && named.getAttribute('title'),
+      named && named.getAttribute('alt'),
+      named && named.textContent,
+      node.getAttribute('title'),
+      node.textContent
+    ].filter(Boolean).join(' '));
+    const withoutActions = raw.replace(
+      /\b(remove|delete|download|preview)\b|移除附件|删除附件|删除文件|下载|预览/gi,
+      ' '
+    );
+    return cleanText(withoutActions).slice(0, 180) || fallback;
+  }
+
+  function readAttachments(composer) {
+    const scope = composerScope(composer);
+    const seenNodes = new Set();
+    const candidates = [];
+    const removeLabels = /remove (file|attachment)|delete (file|attachment)|移除附件|删除附件|删除文件/i;
+    Array.from(scope.querySelectorAll('button')).filter((button) =>
+      removeLabels.test(nodeLabel(button))
+    ).forEach((button) => {
+      const container = button.closest(
+        '[data-testid*="attachment" i], [data-testid*="file" i], li, [role="listitem"]'
+      ) || button.parentElement;
+      if (container && isVisible(container) && !seenNodes.has(container)) {
+        seenNodes.add(container);
+        candidates.push({ container, remove: button });
+      }
+    });
+    Array.from(scope.querySelectorAll(
+      '[data-testid*="attachment" i], [data-testid*="file-pill" i], [data-testid*="upload-preview" i]'
+    )).filter(isVisible).forEach((container) => {
+      if (!seenNodes.has(container)) {
+        seenNodes.add(container);
+        const remove = Array.from(container.querySelectorAll('button')).find((button) =>
+          removeLabels.test(nodeLabel(button))
+        ) || null;
+        candidates.push({ container, remove });
+      }
+    });
+    const occurrences = new Map();
+    const attachments = candidates.map(({ container, remove }, index) => {
+      const name = attachmentName(container, '附件 ' + (index + 1));
+      const occurrence = occurrences.get(name) || 0;
+      occurrences.set(name, occurrence + 1);
+      return {
+        id: optionId('attachment', name, occurrence),
+        name,
+        state: attachmentState(container),
+        removable: !!remove,
+        node: remove
+      };
+    });
+    const input = findAttachmentInput();
+    if (!attachments.length && input && input.files) {
+      Array.from(input.files).slice(0, 10).forEach((file, index) => {
+        const name = cleanText(file.name).slice(0, 180) || '附件 ' + (index + 1);
+        attachments.push({
+          id: optionId('attachment', name, index),
+          name,
+          state: 'uploading',
+          removable: false,
+          node: null
+        });
+      });
+    }
+    lastAttachments = attachments.slice(0, 10);
+    return lastAttachments.map(({ id, name, state, removable }) => ({ id, name, state, removable }));
   }
 
   function findToolsButton(composer) {
@@ -91,8 +176,15 @@
     const scope = composerScope(composer);
     return Array.from(scope.querySelectorAll('button')).find((button) => {
       if (!isVisible(button)) return false;
-      return /start dictation|dictation|开始听写|语音输入/i.test(nodeLabel(button));
+      return /dictation|听写|语音输入/i.test(nodeLabel(button));
     }) || null;
+  }
+
+  function dictationActive(composer) {
+    const button = findDictationButton(composer);
+    if (!button) return false;
+    const label = nodeLabel(button);
+    return button.getAttribute('aria-pressed') === 'true' || /stop|end|停止|结束/i.test(label);
   }
 
   function capabilities(composer) {
@@ -244,6 +336,17 @@
     result('start_dictation', true, '');
   }
 
+  function removeAttachment(id, emitEvent, result) {
+    const attachment = lastAttachments.find((item) => item.id === id);
+    if (!attachment || !attachment.removable || !isVisible(attachment.node)) {
+      return result('remove_attachment', false, '附件状态已变化，请刷新后重试。');
+    }
+    if (!emitTouchRequest('remove_attachment', attachment.node, emitEvent)) {
+      return result('remove_attachment', false, '官网附件移除入口当前不可见。');
+    }
+    result('remove_attachment', true, '');
+  }
+
   function openOfficial(section, composer, emitEvent, result) {
     const action = section === 'model' ? 'open_model_selector' : 'open_composer_tools';
     const trigger = triggerFor(section, composer);
@@ -266,10 +369,13 @@
   window.__elonChatGptComposer = Object.freeze({
     capabilities,
     currentModel,
+    readAttachments,
+    dictationActive,
     requestOptions,
     collectRequestedOptions,
     selectOption,
     startDictation,
+    removeAttachment,
     openOfficial,
     dismissOpenMenu
   });

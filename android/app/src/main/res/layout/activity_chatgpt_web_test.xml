@@ -402,6 +402,22 @@
                 android:paddingEnd="10dp"
                 android:paddingBottom="8dp">
 
+                <HorizontalScrollView
+                    android:id="@+id/chatGptNativeAttachmentsScroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:fillViewport="false"
+                    android:scrollbars="none"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:id="@+id/chatGptNativeAttachments"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -470,6 +486,17 @@
                         android:textColor="@color/elon_text_primary"
                         android:textColorHint="@color/elon_text_tertiary"
                         android:textSize="15sp" />
+
+                    <androidx.appcompat.widget.AppCompatImageButton
+                        android:id="@+id/chatGptNativeDictation"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@android:color/transparent"
+                        android:contentDescription="@string/chatgpt_native_dictation_start"
+                        android:padding="8dp"
+                        android:src="@drawable/ic_input_voice"
+                        android:tooltipText="@string/chatgpt_native_dictation_start" />
 
                     <androidx.appcompat.widget.AppCompatImageButton
                         android:id="@+id/chatGptNativeSend"

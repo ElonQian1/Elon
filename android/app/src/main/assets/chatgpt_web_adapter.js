@@ -124,6 +124,8 @@
       composerReady: !!findComposer(),
       streaming,
       currentModel: composerAdapter ? composerAdapter.currentModel(findComposer()) : '',
+      attachments: composerAdapter ? composerAdapter.readAttachments(findComposer()) : [],
+      dictationActive: composerAdapter ? composerAdapter.dictationActive(findComposer()) : false,
       capabilities: detectCapabilities()
     };
     const fingerprint = JSON.stringify(event);
@@ -267,6 +269,9 @@
     }
     if (action === 'start_dictation' && composerAdapter) {
       return composerAdapter.startDictation(findComposer(), emitEvent, result);
+    }
+    if (action === 'remove_attachment' && composerAdapter) {
+      return composerAdapter.removeAttachment(String(command.value || ''), emitEvent, result);
     }
     if (action === 'dismiss_composer_menu' && composerAdapter) {
       return composerAdapter.dismissOpenMenu(result);

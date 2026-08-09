@@ -124,8 +124,9 @@ internal class ChatGptNativeConversationController(
 
     private fun submit() {
         val prompt = composer.text.toString().trim()
-        if (prompt.isEmpty() || !sendButton.isEnabled) return
-        pendingPrompt = prompt
+        val hasAttachments = snapshot?.attachments?.isNotEmpty() == true
+        if ((prompt.isEmpty() && !hasAttachments) || !sendButton.isEnabled) return
+        pendingPrompt = prompt.takeIf(String::isNotEmpty)
         onSend(prompt, snapshot?.draft.orEmpty())
         setAvailable(false)
     }

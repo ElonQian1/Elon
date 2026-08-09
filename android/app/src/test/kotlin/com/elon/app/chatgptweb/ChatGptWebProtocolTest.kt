@@ -26,6 +26,11 @@ class ChatGptWebProtocolTest {
                 "composerReady":true,
                 "streaming":false,
                 "currentModel":"5.6 Sol 轻度",
+                "dictationActive":true,
+                "attachments":[
+                  {"id":"attachment_ab12","name":"需求.txt","state":"ready","removable":true},
+                  {"id":"../unsafe","name":"忽略.txt","state":"ready","removable":true}
+                ],
                 "capabilities":["streaming","conversation_list","invalid capability"],
                 "messages":[
                   {"id":"u1","role":"user","state":"completed","content":[{"type":"text","text":"你好"}]},
@@ -43,6 +48,9 @@ class ChatGptWebProtocolTest {
         assertTrue(event.value.composerReady)
         assertFalse(event.value.streaming)
         assertEquals("5.6 Sol 轻度", event.value.currentModel)
+        assertTrue(event.value.dictationActive)
+        assertEquals("需求.txt", event.value.attachments.single().name)
+        assertTrue(event.value.attachments.single().removable)
         assertEquals(2, event.value.messages.size)
         assertEquals("assistant", event.value.messages.last().role)
         assertEquals("streaming", event.value.messages.last().state)
@@ -100,6 +108,11 @@ class ChatGptWebProtocolTest {
             ChatGptWebProtocol.parse(
                 """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"tap_anywhere","xRatio":0.5,"yRatio":0.5}}""",
             ),
+        )
+        assertTrue(
+            ChatGptWebProtocol.parse(
+                """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"remove_attachment","xRatio":0.5,"yRatio":0.5}}""",
+            ) is ChatGptWebEvent.WebTouchRequest,
         )
         assertNull(
             ChatGptWebProtocol.parse(

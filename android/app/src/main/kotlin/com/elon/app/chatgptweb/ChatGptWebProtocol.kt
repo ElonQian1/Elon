@@ -9,6 +9,13 @@ internal data class ChatGptWebMessage(
     val state: String,
 )
 
+internal data class ChatGptWebAttachment(
+    val id: String,
+    val name: String,
+    val state: String,
+    val removable: Boolean,
+)
+
 internal data class ChatGptWebSnapshot(
     val title: String,
     val url: String,
@@ -18,6 +25,8 @@ internal data class ChatGptWebSnapshot(
     val composerReady: Boolean,
     val streaming: Boolean,
     val currentModel: String,
+    val attachments: List<ChatGptWebAttachment>,
+    val dictationActive: Boolean,
     val capabilities: ChatGptWebCapabilities,
 )
 
@@ -109,8 +118,31 @@ internal object ChatGptWebProtocol {
             composerReady = event.optBoolean("composerReady"),
             streaming = event.optBoolean("streaming"),
             currentModel = event.optString("currentModel").trim().take(MAX_MODEL_LABEL_LENGTH),
+            attachments = parseAttachments(event),
+            dictationActive = event.optBoolean("dictationActive"),
             capabilities = ChatGptWebCapabilities(parseStringSet(event, "capabilities")),
         )
+    }
+
+    private fun parseAttachments(event: JSONObject): List<ChatGptWebAttachment> {
+        val values = event.optJSONArray("attachments") ?: return emptyList()
+        return buildList {
+            for (index in 0 until minOf(values.length(), MAX_ATTACHMENTS)) {
+                val item = values.optJSONObject(index) ?: continue
+                val id = item.optString("id").take(MAX_ATTACHMENT_ID_LENGTH)
+                val name = item.optString("name").trim().take(MAX_ATTACHMENT_NAME_LENGTH)
+                val state = item.optString("state").takeIf { it in ATTACHMENT_STATES } ?: "ready"
+                if (!ATTACHMENT_ID.matches(id) || name.isBlank()) continue
+                add(
+                    ChatGptWebAttachment(
+                        id = id,
+                        name = name,
+                        state = state,
+                        removable = item.optBoolean("removable"),
+                    ),
+                )
+            }
+        }
     }
 
     private fun parseComposerControls(event: JSONObject): ChatGptWebEvent.ComposerControls? {
@@ -206,6 +238,7 @@ internal object ChatGptWebProtocol {
         "open_model_selector",
         "open_composer_tools",
         "start_dictation",
+        "remove_attachment",
     )
     private const val MAX_MESSAGES = 80
     private const val MAX_MESSAGE_LENGTH = 40_000
@@ -219,10 +252,15 @@ internal object ChatGptWebProtocol {
     private const val MAX_OPTION_ID_LENGTH = 64
     private const val MAX_OPTION_LABEL_LENGTH = 120
     private const val MAX_OPTION_KIND_LENGTH = 32
+    private const val MAX_ATTACHMENTS = 10
+    private const val MAX_ATTACHMENT_ID_LENGTH = 64
+    private const val MAX_ATTACHMENT_NAME_LENGTH = 180
     private const val MAX_TITLE_LENGTH = 160
     private const val MAX_PATH_LENGTH = 256
     private const val MAX_ID_LENGTH = 160
     private val CAPABILITY_ID = Regex("[a-z][a-z0-9_]{0,47}")
     private val OPTION_ID = Regex("[a-z][a-z0-9_]{1,63}")
+    private val ATTACHMENT_ID = Regex("attachment_[a-z0-9]{1,48}")
+    private val ATTACHMENT_STATES = setOf("uploading", "ready", "error")
     private val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
 }

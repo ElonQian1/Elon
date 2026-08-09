@@ -122,6 +122,10 @@ internal class ChatGptWebPageAdapter(
 
     fun selectComposerTool(id: String) = runCommand("select_composer_tool", id.take(MAX_OPTION_ID_LENGTH))
 
+    fun startDictation() = runCommand("start_dictation")
+
+    fun removeAttachment(id: String) = runCommand("remove_attachment", id.take(MAX_OPTION_ID_LENGTH))
+
     fun requestSnapshot() = runCommand("snapshot")
 
     fun markReady() = onStateChanged(State.READY)

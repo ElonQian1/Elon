@@ -31,6 +31,9 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("web_touch_request"))
         assertTrue(adapter.contains("const reusable = lastOptions[section].filter"))
         assertTrue(adapter.contains("dismiss_composer_menu"))
+        assertTrue(adapter.contains("readAttachments"))
+        assertTrue(adapter.contains("removeAttachment"))
+        assertTrue(adapter.contains("dictationActive"))
         assertFalse(adapter.contains("input.click()"))
         assertTrue(adapter.contains("选项已过期"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
@@ -52,6 +55,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(activity.contains("fileChooserController.show("))
         assertTrue(activity.contains("allowContentAccess = true"))
         assertTrue(chooser.contains("Intent.ACTION_OPEN_DOCUMENT"))
+        assertTrue(chooser.contains("MediaStore.ACTION_IMAGE_CAPTURE"))
+        assertTrue(chooser.contains("FileProvider.getUriForFile"))
         assertTrue(chooser.contains("FileChooserParams.parseResult"))
         assertTrue(chooser.contains("FLAG_GRANT_READ_URI_PERMISSION"))
         assertTrue(chooser.contains("supportsEnhancedMode(webView.url)"))
@@ -73,10 +78,21 @@ class ChatGptWebComposerContractTest {
         assertTrue(layout.contains("android:id=\"@+id/chatGptNativeModel\""))
         assertTrue(layout.contains("android:id=\"@+id/chatGptNativeAttachment\""))
         assertTrue(layout.contains("android:id=\"@+id/chatGptNativeTools\""))
+        assertTrue(layout.contains("android:id=\"@+id/chatGptNativeDictation\""))
+        assertTrue(layout.contains("android:id=\"@+id/chatGptNativeAttachments\""))
         assertTrue(controller.contains("ChatGptWebCapabilityId.MODEL_SELECTOR"))
         assertTrue(controller.contains("ChatGptWebCapabilityId.ATTACHMENTS"))
         assertTrue(controller.contains("ChatGptWebCapabilityId.COMPOSER_TOOLS"))
         assertTrue(controller.contains("bridgeReady && capabilities.supports"))
+        val voiceController = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeVoiceController.kt",
+        )
+        val permissionController = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebAudioPermissionController.kt",
+        )
+        assertTrue(voiceController.contains("ChatGptWebCapabilityId.DICTATION"))
+        assertTrue(permissionController.contains("request.origin.host == \"chatgpt.com\""))
+        assertTrue(permissionController.contains("RESOURCE_AUDIO_CAPTURE"))
     }
 
     @Test

@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -23,6 +24,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var pageAdapter: ChatGptWebPageAdapter
     private lateinit var nativeController: ChatGptNativeConversationController
     private lateinit var composerToolsController: ChatGptNativeComposerToolsController
+    private lateinit var attachmentController: ChatGptNativeAttachmentController
+    private lateinit var voiceController: ChatGptNativeVoiceController
     private lateinit var touchDispatcher: ChatGptWebTouchDispatcher
     private lateinit var conversationListController: ChatGptNativeConversationListController
     private lateinit var loginController: ChatGptNativeLoginController
@@ -30,6 +33,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var modeController: ChatGptWebModeController
     private lateinit var proxyController: ChatGptWebProxyController
     private lateinit var fileChooserController: ChatGptWebFileChooserController
+    private lateinit var audioPermissionController: ChatGptWebAudioPermissionController
     private var proxyStatus = ChatGptWebProxyStatus("手机网络")
     private var webAuthenticationStatus = ChatGptWebAuthenticationSupport.Status.UNSUPPORTED
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
@@ -107,6 +111,17 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onOpenOfficialModelSelector = { modeController.select(ChatGptWebModeController.Mode.WEB) },
             onOpenOfficialTools = { modeController.select(ChatGptWebModeController.Mode.WEB) },
         )
+        attachmentController = ChatGptNativeAttachmentController(
+            scrollView = binding.chatGptNativeAttachmentsScroll,
+            container = binding.chatGptNativeAttachments,
+            onRemove = { pageAdapter.removeAttachment(it) },
+        )
+        voiceController = ChatGptNativeVoiceController(
+            button = binding.chatGptNativeDictation,
+            onToggle = {
+                audioPermissionController.runWithMicrophone(pageAdapter::startDictation)
+            },
+        )
         conversationListController = ChatGptNativeConversationListController(
             activity = this,
             trigger = binding.chatGptNativeHistory,
@@ -176,6 +191,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private fun configureWebView() {
         WebView.setWebContentsDebuggingEnabled(false)
         fileChooserController = ChatGptWebFileChooserController(this)
+        audioPermissionController = ChatGptWebAudioPermissionController(this) {
+            Toast.makeText(this, R.string.chatgpt_native_microphone_denied, Toast.LENGTH_LONG).show()
+        }
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(binding.chatGptWebView, true)
 
@@ -223,6 +241,14 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     filePathCallback: ValueCallback<Array<Uri>>,
                     fileChooserParams: FileChooserParams,
                 ): Boolean = fileChooserController.show(webView, filePathCallback, fileChooserParams)
+
+                override fun onPermissionRequest(request: PermissionRequest) {
+                    runOnUiThread { audioPermissionController.handle(request) }
+                }
+
+                override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                    runOnUiThread { audioPermissionController.cancel(request) }
+                }
             }
         }
     }
@@ -270,6 +296,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             is ChatGptWebEvent.Snapshot -> {
                 nativeController.render(event.value)
                 composerToolsController.render(event.value)
+                attachmentController.render(event.value)
+                voiceController.render(event.value)
                 conversationListController.renderCapabilities(event.value.capabilities)
                 if (
                     event.value.authenticated &&
@@ -316,7 +344,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     pageAdapter::collectComposerTools,
                     COMPOSER_MENU_SETTLE_MS,
                 )
-                "select_model_option", "select_composer_tool" ->
+                "select_model_option", "select_composer_tool", "remove_attachment", "start_dictation" ->
                     binding.chatGptWebView.postDelayed(pageAdapter::requestSnapshot, COMPOSER_MENU_SETTLE_MS)
             }
         }
@@ -325,6 +353,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private fun handleBridgeState(state: ChatGptWebPageAdapter.State) {
         nativeController.setBridgeState(state)
         composerToolsController.setBridgeState(state)
+        voiceController.setBridgeState(state)
         conversationListController.setBridgeState(state)
         binding.chatGptModeNative.isEnabled = state == ChatGptWebPageAdapter.State.READY
         binding.chatGptModeNative.alpha = if (binding.chatGptModeNative.isEnabled) 1f else 0.48f
@@ -440,6 +469,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         conversationListController.dispose()
         composerToolsController.dispose()
         fileChooserController.dispose()
+        audioPermissionController.dispose()
         pageAdapter.dispose()
         binding.chatGptWebView.apply {
             stopLoading()

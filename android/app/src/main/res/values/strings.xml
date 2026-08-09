@@ -65,7 +65,13 @@
     <string name="chatgpt_native_model_default">模型与能力</string>
     <string name="chatgpt_native_model_title">模型与能力</string>
     <string name="chatgpt_native_attachment">添加附件</string>
+    <string name="chatgpt_native_attachment_remove">移除附件 %1$s</string>
+    <string name="chatgpt_native_attachment_uploading">%1$s · 上传中</string>
+    <string name="chatgpt_native_attachment_error">%1$s · 上传失败</string>
     <string name="chatgpt_native_tools_title">工具</string>
+    <string name="chatgpt_native_dictation_start">开始听写</string>
+    <string name="chatgpt_native_dictation_stop">停止听写</string>
+    <string name="chatgpt_native_microphone_denied">需要麦克风权限才能使用听写</string>
     <string name="chatgpt_native_open_official">官网设置</string>
     <string name="chatgpt_conversations_title">会话历史</string>
     <string name="chatgpt_conversations_count">%1$d 个会话</string>
