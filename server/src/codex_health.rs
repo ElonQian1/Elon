@@ -294,11 +294,17 @@ async fn run_codex_doctor_probe(timeout: Duration) -> Result<(), String> {
 
 fn classify_codex_doctor_output(status_success: bool, output: &str) -> Result<(), String> {
     let lower = output.to_ascii_lowercase();
-    let looks_healthy = lower.contains("0 fail")
-        && lower.contains("websocket")
-        && lower.contains("reachability")
-        && lower.contains("reachable")
-        && !looks_like_codex_network_error(&lower);
+    let no_failed_checks = lower.contains("0 fail");
+    let http_reachability_ok = lower.contains("reachability")
+        && lower.contains("reachable over http")
+        && !lower.contains("unreachable over http");
+    let websocket_is_degraded_only = lower.contains("websocket")
+        && lower.contains("https fallback may still work")
+        && http_reachability_ok;
+    let looks_healthy = status_success
+        && no_failed_checks
+        && http_reachability_ok
+        && (!looks_like_codex_network_error(&lower) || websocket_is_degraded_only);
 
     if status_success && looks_healthy {
         Ok(())
@@ -394,6 +400,12 @@ mod tests {
     fn doctor_output_unhealthy_when_websocket_fails() {
         let output = "Connectivity\n  websocket    Responses WebSocket failed\n  reachability one or more required provider endpoints are unreachable over HTTP\n10 ok · 1 fail failed";
         assert!(classify_codex_doctor_output(true, output).is_err());
+    }
+
+    #[test]
+    fn doctor_output_is_degraded_but_usable_when_https_fallback_is_reachable() {
+        let output = "Connectivity\n  websocket    Responses WebSocket timed out; HTTPS fallback may still work\n  reachability active provider endpoints are reachable over HTTP\n12 ok · 0 fail degraded";
+        assert!(classify_codex_doctor_output(true, output).is_ok());
     }
 
     #[test]
