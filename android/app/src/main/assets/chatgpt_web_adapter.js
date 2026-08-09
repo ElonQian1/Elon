@@ -8,6 +8,7 @@
   const messageAdapter = window.__elonChatGptMessages;
   const composerAdapter = window.__elonChatGptComposer;
   const navigationAdapter = window.__elonChatGptNavigation;
+  const layoutAdapter = window.__elonChatGptLayout;
 
   let emitTimer = 0;
   let lastSnapshot = '';
@@ -131,9 +132,11 @@
       capabilities: detectCapabilities()
     };
     const fingerprint = JSON.stringify(event);
-    if (fingerprint === lastSnapshot) return;
-    lastSnapshot = fingerprint;
-    emitEvent(event);
+    if (fingerprint !== lastSnapshot) {
+      lastSnapshot = fingerprint;
+      emitEvent(event);
+    }
+    if (layoutAdapter) layoutAdapter.emitSnapshot(emitEvent);
   }
 
   function scheduleSnapshot() {
@@ -234,6 +237,13 @@
     catch { return result('unknown', false, '命令格式无效。'); }
     const action = String(command.action || '');
     if (action === 'snapshot') return snapshot();
+    if (action === 'snapshot_ui_manifest' && layoutAdapter) {
+      layoutAdapter.emitSnapshot(emitEvent, true);
+      return result(action, true, '');
+    }
+    if (action === 'invoke_ui_control' && layoutAdapter) {
+      return layoutAdapter.invoke(String(command.value || ''), emitEvent, result);
+    }
     if (action === 'send_prompt') {
       return sendPrompt(
         String(command.value || '').slice(0, 20000),
@@ -332,6 +342,8 @@
     capabilities: detectCapabilities()
   });
   new MutationObserver(scheduleSnapshot).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['aria-selected', 'aria-checked', 'aria-disabled', 'disabled', 'data-state', 'hidden'],
     childList: true,
     subtree: true,
     characterData: true

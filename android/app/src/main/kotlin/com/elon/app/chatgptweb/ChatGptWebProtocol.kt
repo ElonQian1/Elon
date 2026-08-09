@@ -67,10 +67,15 @@ internal sealed interface ChatGptWebEvent {
         val features: List<ChatGptWebFeature>,
     ) : ChatGptWebEvent
 
+    data class UiManifest(
+        val value: ChatGptWebUiManifest,
+    ) : ChatGptWebEvent
+
     data class WebTouchRequest(
         val purpose: String,
         val xRatio: Double,
         val yRatio: Double,
+        val controlId: String? = null,
     ) : ChatGptWebEvent
 
     data class CommandResult(
@@ -92,6 +97,7 @@ internal object ChatGptWebProtocol {
                 )
                 "composer_controls_snapshot" -> parseComposerControls(event)
                 "navigation_snapshot" -> ChatGptWebEvent.FeatureNavigation(parseFeatures(event))
+                "ui_manifest_snapshot" -> ChatGptWebEvent.UiManifest(parseUiManifest(event))
                 "web_touch_request" -> parseWebTouchRequest(event)
                 else -> null
             }
@@ -235,7 +241,53 @@ internal object ChatGptWebProtocol {
         val yRatio = event.optDouble("yRatio", Double.NaN)
         if (!xRatio.isFinite() || !yRatio.isFinite()) return null
         if (xRatio !in 0.0..1.0 || yRatio !in 0.0..1.0) return null
-        return ChatGptWebEvent.WebTouchRequest(purpose, xRatio, yRatio)
+        val controlId = event.optString("controlId")
+            .takeIf { it.isNotBlank() && UI_CONTROL_ID.matches(it) }
+        if (purpose == "invoke_ui_control" && controlId == null) return null
+        return ChatGptWebEvent.WebTouchRequest(purpose, xRatio, yRatio, controlId)
+    }
+
+    private fun parseUiManifest(event: JSONObject): ChatGptWebUiManifest {
+        val rawControls = event.optJSONArray("controls")
+        val controls = buildList {
+            if (rawControls == null) return@buildList
+            for (index in 0 until minOf(rawControls.length(), MAX_UI_CONTROLS)) {
+                val item = rawControls.optJSONObject(index) ?: continue
+                val id = item.optString("id").take(MAX_UI_CONTROL_ID_LENGTH)
+                val semantic = item.optString("semantic")
+                    .takeIf { it in UI_CONTROL_SEMANTICS } ?: "action"
+                val label = item.optString("label").trim().take(MAX_UI_CONTROL_LABEL_LENGTH)
+                val region = item.optString("region").takeIf { it in UI_REGIONS } ?: continue
+                val role = item.optString("role").takeIf { it in UI_ROLES } ?: "button"
+                val contextId = item.optString("contextId")
+                    .takeIf { it.isNotBlank() && UI_CONTEXT_ID.matches(it) }
+                val webXRatio = boundedRatio(item, "xRatio")
+                val webYRatio = boundedRatio(item, "yRatio")
+                if (!UI_CONTROL_ID.matches(id) || label.isBlank()) continue
+                add(
+                    ChatGptWebUiControl(
+                        id = id,
+                        semantic = semantic,
+                        label = label,
+                        region = region,
+                        role = role,
+                        enabled = item.optBoolean("enabled", true),
+                        selected = item.optBoolean("selected"),
+                        contextId = contextId,
+                        webXRatio = webXRatio,
+                        webYRatio = webYRatio,
+                    ),
+                )
+            }
+        }
+        return ChatGptWebUiManifest(
+            version = event.optInt("version", 1).coerceIn(1, MAX_UI_MANIFEST_VERSION),
+            pageKind = event.optString("pageKind").takeIf { it in UI_PAGE_KINDS } ?: "unknown",
+            title = event.optString("title").trim().take(MAX_TITLE_LENGTH),
+            compatibility = event.optString("compatibility")
+                .takeIf { it in UI_COMPATIBILITY } ?: "partial",
+            controls = controls,
+        )
     }
 
     private fun parseConversations(event: JSONObject): List<ChatGptWebConversation> {
@@ -258,6 +310,11 @@ internal object ChatGptWebProtocol {
                 )
             }
         }
+    }
+
+    private fun boundedRatio(value: JSONObject, key: String): Double? {
+        val ratio = value.optDouble(key, Double.NaN)
+        return ratio.takeIf { it.isFinite() && it in 0.0..1.0 }
     }
 
     private fun parseStringSet(payload: JSONObject, key: String): Set<String> {
@@ -305,6 +362,7 @@ internal object ChatGptWebProtocol {
         "list_navigation",
         "select_navigation",
         "dismiss_navigation",
+        "invoke_ui_control",
     )
     private const val MAX_MESSAGES = 80
     private const val MAX_MESSAGE_LENGTH = 40_000
@@ -329,10 +387,16 @@ internal object ChatGptWebProtocol {
     private const val MAX_TITLE_LENGTH = 160
     private const val MAX_PATH_LENGTH = 256
     private const val MAX_ID_LENGTH = 160
+    private const val MAX_UI_CONTROLS = 160
+    private const val MAX_UI_CONTROL_ID_LENGTH = 72
+    private const val MAX_UI_CONTROL_LABEL_LENGTH = 160
+    private const val MAX_UI_MANIFEST_VERSION = 3
     private val CAPABILITY_ID = Regex("[a-z][a-z0-9_]{0,47}")
     private val OPTION_ID = Regex("[a-z][a-z0-9_]{1,63}")
     private val ATTACHMENT_ID = Regex("attachment_[a-z0-9]{1,48}")
     private val FEATURE_ID = Regex("feature_[a-z0-9]{1,48}")
+    private val UI_CONTROL_ID = Regex("control_[a-z0-9_]{1,63}")
+    private val UI_CONTEXT_ID = Regex("[A-Za-z0-9_.:-]{1,160}")
     private val ATTACHMENT_STATES = setOf("uploading", "ready", "error")
     private val FEATURE_KINDS = setOf(
         "library",
@@ -346,4 +410,31 @@ internal object ChatGptWebProtocol {
         "navigation",
     )
     private val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
+    private val UI_REGIONS = setOf("header", "suggestions", "composer", "overlay", "message")
+    private val UI_ROLES = setOf("button", "link", "menuitem", "switch", "tab")
+    private val UI_PAGE_KINDS = setOf("home", "conversation", "feature", "auth", "unknown")
+    private val UI_COMPATIBILITY = setOf("healthy", "partial", "fallback_required")
+    private val UI_CONTROL_SEMANTICS = setOf(
+        "navigation",
+        "title",
+        "profile",
+        "new_conversation",
+        "attachment",
+        "model",
+        "dictation",
+        "send",
+        "stop",
+        "suggestion",
+        "copy",
+        "regenerate",
+        "edit",
+        "share",
+        "feedback",
+        "read_aloud",
+        "branch",
+        "delete",
+        "close",
+        "confirm",
+        "action",
+    )
 }

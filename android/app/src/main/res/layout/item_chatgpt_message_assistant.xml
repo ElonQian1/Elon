@@ -79,6 +79,17 @@
                 android:src="@drawable/ic_side_menu_refresh"
                 android:tooltipText="@string/chatgpt_message_regenerate"
                 android:visibility="gone" />
+
+            <androidx.appcompat.widget.AppCompatImageButton
+                android:id="@+id/chatGptMessageMore"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/chatgpt_message_more_actions"
+                android:padding="12dp"
+                android:src="@drawable/ic_more_horizontal"
+                android:tooltipText="@string/chatgpt_message_more_actions"
+                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 

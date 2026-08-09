@@ -134,6 +134,10 @@ internal class ChatGptWebPageAdapter(
 
     fun dismissFeatures() = runCommand("dismiss_navigation")
 
+    fun requestUiManifest() = runCommand("snapshot_ui_manifest")
+
+    fun invokeUiControl(id: String) = runCommand("invoke_ui_control", id.take(MAX_UI_CONTROL_ID_LENGTH))
+
     fun requestSnapshot() = runCommand("snapshot")
 
     fun markReady() = onStateChanged(State.READY)
@@ -163,6 +167,7 @@ internal class ChatGptWebPageAdapter(
         is ChatGptWebEvent.ConversationList,
         is ChatGptWebEvent.ComposerControls,
         is ChatGptWebEvent.FeatureNavigation,
+        is ChatGptWebEvent.UiManifest,
         is ChatGptWebEvent.WebTouchRequest,
         is ChatGptWebEvent.CommandResult -> true
     }
@@ -196,6 +201,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_messages.js",
             "chatgpt_web_adapter_composer.js",
             "chatgpt_web_adapter_navigation.js",
+            "chatgpt_web_adapter_layout.js",
             "chatgpt_web_adapter.js",
         )
         const val BRIDGE_OBJECT = "elonChatGptNative"
@@ -203,5 +209,6 @@ internal class ChatGptWebPageAdapter(
         const val MAX_PROMPT_LENGTH = 20_000
         const val MAX_CONVERSATION_PATH_LENGTH = 256
         const val MAX_OPTION_ID_LENGTH = 64
+        const val MAX_UI_CONTROL_ID_LENGTH = 72
     }
 }

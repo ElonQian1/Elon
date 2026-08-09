@@ -1,6 +1,8 @@
 package com.elon.app.chatgptweb
 
 import android.annotation.SuppressLint
+import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
@@ -18,6 +20,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.R
 import com.elon.app.databinding.ActivityChatgptWebTestBinding
+import com.elon.app.mcp.McpNativeControlBinding
 
 class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var binding: ActivityChatgptWebTestBinding
@@ -29,6 +32,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var touchDispatcher: ChatGptWebTouchDispatcher
     private lateinit var conversationListController: ChatGptNativeConversationListController
     private lateinit var featureHubController: ChatGptNativeFeatureHubController
+    private lateinit var adaptiveUiController: ChatGptNativeAdaptiveUiController
+    private lateinit var overlayControlsController: ChatGptNativeOverlayControlsController
     private lateinit var loginController: ChatGptNativeLoginController
     private lateinit var googleAccountHintController: ChatGptGoogleAccountHintController
     private lateinit var modeController: ChatGptWebModeController
@@ -37,7 +42,42 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var audioPermissionController: ChatGptWebAudioPermissionController
     private var proxyStatus = ChatGptWebProxyStatus("手机网络")
     private var webAuthenticationStatus = ChatGptWebAuthenticationSupport.Status.UNSUPPORTED
+    private var latestSnapshot: ChatGptWebSnapshot? = null
+    private var latestUiManifest: ChatGptWebUiManifest? = null
+    private var latestBridgeState = ChatGptWebPageAdapter.State.WEB_ONLY
+    private var latestMode = ChatGptWebModeController.Mode.QUICK
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
+
+    private val mcpActions: ChatGptWebMcpActions by lazy {
+        ChatGptWebMcpActions(
+            snapshot = { latestSnapshot },
+            uiManifest = { latestUiManifest },
+            bridgeState = { latestBridgeState },
+            mode = { latestMode },
+            inputText = { binding.chatGptNativeComposer.text?.toString().orEmpty() },
+            setInputText = { text ->
+                binding.chatGptNativeComposer.setText(text)
+                binding.chatGptNativeComposer.setSelection(text.length)
+            },
+            sendInput = { binding.chatGptNativeSend.performClick() },
+            invokeControl = pageAdapter::invokeUiControl,
+            newConversation = pageAdapter::startNewConversation,
+            stopGeneration = pageAdapter::stopGeneration,
+            refresh = { binding.chatGptWebView.reload() },
+            refreshControls = pageAdapter::requestUiManifest,
+            selectMode = modeController::select,
+            openConversation = pageAdapter::openConversation,
+            listConversations = pageAdapter::listConversations,
+        )
+    }
+
+    private val mcpNativeControlBinding: McpNativeControlBinding by lazy {
+        McpNativeControlBinding(
+            activity = this,
+            uiState = mcpActions::uiState,
+            control = mcpActions::control,
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +88,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         configureToolbar()
         configureWebView()
         configureEnhancedMode()
+        applyProductEntryPresentation()
         configureBackNavigation()
 
         proxyController.prepare { status ->
@@ -92,12 +133,13 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             emptyView = binding.chatGptNativeEmpty,
             composer = binding.chatGptNativeComposer,
             sendButton = binding.chatGptNativeSend,
-            stopButton = binding.chatGptNativeStop,
+            stopButton = binding.chatGptNativeComposerStop,
             newConversationButton = binding.chatGptNativeNew,
             onSend = { prompt, expectedDraft -> pageAdapter.sendPrompt(prompt, expectedDraft) },
             onStop = { pageAdapter.stopGeneration() },
             onNewConversation = { pageAdapter.startNewConversation() },
             onRegenerate = { pageAdapter.regenerateResponse() },
+            onInvokeControl = { pageAdapter.invokeUiControl(it) },
             onOpenOfficialOutput = { modeController.select(ChatGptWebModeController.Mode.WEB) },
         )
         composerToolsController = ChatGptNativeComposerToolsController(
@@ -137,6 +179,21 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onSelectFeature = { pageAdapter.selectFeature(it) },
             onDismissNavigation = { pageAdapter.dismissFeatures() },
             onOpenOfficial = { modeController.select(ChatGptWebModeController.Mode.WEB) },
+        )
+        adaptiveUiController = ChatGptNativeAdaptiveUiController(
+            activity = this,
+            titleView = binding.chatGptNativeTitle,
+            headerActionsScroll = binding.chatGptNativeHeaderActionsScroll,
+            headerActions = binding.chatGptNativeHeaderActions,
+            suggestions = binding.chatGptNativeSuggestions,
+            emptyView = binding.chatGptNativeEmpty,
+            onInvoke = { pageAdapter.invokeUiControl(it) },
+        )
+        overlayControlsController = ChatGptNativeOverlayControlsController(
+            activity = this,
+            headerActionsScroll = binding.chatGptNativeHeaderActionsScroll,
+            headerActions = binding.chatGptNativeHeaderActions,
+            onInvoke = { pageAdapter.invokeUiControl(it) },
         )
         pageAdapter = ChatGptWebPageAdapter(
             context = this,
@@ -303,8 +360,15 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             is ChatGptWebEvent.ConversationList -> conversationListController.render(event.conversations)
             is ChatGptWebEvent.ComposerControls -> composerToolsController.render(event)
             is ChatGptWebEvent.FeatureNavigation -> featureHubController.render(event.features)
+            is ChatGptWebEvent.UiManifest -> {
+                latestUiManifest = event.value
+                adaptiveUiController.render(event.value)
+                overlayControlsController.render(event.value)
+                nativeController.renderUiManifest(event.value)
+            }
             is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)
             is ChatGptWebEvent.Snapshot -> {
+                latestSnapshot = event.value
                 nativeController.render(event.value)
                 composerToolsController.render(event.value)
                 attachmentController.render(event.value)
@@ -367,11 +431,16 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     pageAdapter::requestSnapshot,
                     NAVIGATION_SETTLE_MS,
                 )
+                "invoke_ui_control" -> binding.chatGptWebView.postDelayed(
+                    pageAdapter::requestSnapshot,
+                    ADAPTIVE_CONTROL_SETTLE_MS,
+                )
             }
         }
     }
 
     private fun handleBridgeState(state: ChatGptWebPageAdapter.State) {
+        latestBridgeState = state
         nativeController.setBridgeState(state)
         composerToolsController.setBridgeState(state)
         voiceController.setBridgeState(state)
@@ -388,6 +457,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     private fun showMode(mode: ChatGptWebModeController.Mode) {
+        latestMode = mode
         binding.chatGptWebStatus.setTextColor(
             getColor(
                 if (mode == ChatGptWebModeController.Mode.NATIVE) {
@@ -470,6 +540,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        mcpNativeControlBinding.register()
         binding.chatGptWebView.onResume()
         pageAdapter.onHostResumed(binding.chatGptWebView.url)
     }
@@ -486,10 +557,12 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        mcpNativeControlBinding.unregister()
         googleAccountHintController.dispose()
         loginController.dispose()
         conversationListController.dispose()
         featureHubController.dispose()
+        overlayControlsController.dispose()
         composerToolsController.dispose()
         fileChooserController.dispose()
         audioPermissionController.dispose()
@@ -502,8 +575,20 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private companion object {
+    private fun applyProductEntryPresentation() {
+        if (!intent.getBooleanExtra(EXTRA_PRODUCT_ENTRY, false)) return
+        binding.chatGptWebStatus.visibility = View.GONE
+        binding.chatGptModeToggle.visibility = View.GONE
+        binding.chatGptWebHost.setText(R.string.chatgpt_product_host)
+    }
+
+    companion object {
+        private const val EXTRA_PRODUCT_ENTRY = "chatgpt_product_entry"
         const val COMPOSER_MENU_SETTLE_MS = 320L
         const val NAVIGATION_SETTLE_MS = 420L
+        const val ADAPTIVE_CONTROL_SETTLE_MS = 360L
+
+        fun createProductIntent(context: Context): Intent =
+            Intent(context, ChatGptWebTestActivity::class.java).putExtra(EXTRA_PRODUCT_ENTRY, true)
     }
 }

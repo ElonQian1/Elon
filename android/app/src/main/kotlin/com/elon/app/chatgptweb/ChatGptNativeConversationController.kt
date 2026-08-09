@@ -24,6 +24,7 @@ internal class ChatGptNativeConversationController(
     onStop: () -> Unit,
     onNewConversation: () -> Unit,
     onRegenerate: () -> Unit,
+    onInvokeControl: (String) -> Unit,
     onOpenOfficialOutput: () -> Unit,
 ) {
     private var messages: List<ChatGptWebMessage> = emptyList()
@@ -31,6 +32,7 @@ internal class ChatGptNativeConversationController(
         parent = messagesView,
         onCopy = ::copyMessage,
         onRegenerate = onRegenerate,
+        onInvokeControl = onInvokeControl,
         onOpenOfficial = onOpenOfficialOutput,
     )
     private var snapshot: ChatGptWebSnapshot? = null
@@ -102,6 +104,10 @@ internal class ChatGptNativeConversationController(
         }
     }
 
+    fun renderUiManifest(value: ChatGptWebUiManifest) {
+        adapter.submitUiControls(value.controls)
+    }
+
     fun setBridgeState(state: ChatGptWebPageAdapter.State) {
         val value = snapshot
         if (state == ChatGptWebPageAdapter.State.READY && value != null) {
@@ -143,6 +149,8 @@ internal class ChatGptNativeConversationController(
     private fun setControls(value: ChatGptWebSnapshot) {
         val authenticated = value.authenticated && value.composerReady
         setAvailable(authenticated && !value.streaming && pendingPrompt == null)
+        sendButton.visibility = if (value.streaming) View.GONE else View.VISIBLE
+        stopButton.visibility = if (value.streaming) View.VISIBLE else View.GONE
         stopButton.isEnabled = value.streaming
         stopButton.alpha = if (value.streaming) 1f else DISABLED_ALPHA
         newConversationButton.isEnabled = value.authenticated && !value.streaming

@@ -57,6 +57,7 @@
     <string name="chatgpt_native_stop">停止生成</string>
     <string name="chatgpt_native_send">发送</string>
     <string name="chatgpt_native_input_hint">发送到当前 ChatGPT 网页会话</string>
+    <string name="chatgpt_native_title">ChatGPT</string>
     <string name="chatgpt_native_empty">当前会话还没有可呈现的消息</string>
     <string name="chatgpt_native_connecting">正在连接本地网页语义适配器</string>
     <string name="chatgpt_native_unsupported">当前 Android WebView 不支持安全消息桥，请使用官方网页模式</string>
@@ -105,6 +106,13 @@
     <string name="chatgpt_message_copy">复制消息</string>
     <string name="chatgpt_message_copied">消息已复制</string>
     <string name="chatgpt_message_regenerate">重新生成回复</string>
+    <string name="chatgpt_message_more_actions">更多消息操作</string>
+    <string name="chatgpt_official_page_actions">当前网页操作</string>
+    <string name="chatgpt_product_host">一龙 AI · ChatGPT 网页模式</string>
+    <string name="social_ai_mode_picker_title">选择 AI 会话模式</string>
+    <string name="social_ai_mode_yilong">一龙 AI</string>
+    <string name="social_ai_mode_chatgpt_web">ChatGPT 网页</string>
+    <string name="social_ai_mode_current_description">一龙 AI 模式选择，当前一龙 AI</string>
     <string name="chatgpt_message_streaming">正在生成</string>
     <string name="chatgpt_message_sending">正在发送</string>
     <string name="chatgpt_message_part_format">%1$s · %2$s</string>

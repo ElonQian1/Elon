@@ -7,6 +7,7 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.text.method.LinkMovementMethod
+import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.elon.app.R
@@ -18,6 +19,7 @@ internal class ChatGptNativeMessageAdapter(
     parent: View,
     private val onCopy: (ChatGptWebMessage) -> Unit,
     private val onRegenerate: () -> Unit,
+    private val onInvokeControl: (String) -> Unit,
     onOpenOfficial: () -> Unit,
 ) : RecyclerView.Adapter<ChatGptNativeMessageAdapter.MessageViewHolder>() {
     private val markwon = Markwon.builder(parent.context)
@@ -27,6 +29,7 @@ internal class ChatGptNativeMessageAdapter(
     private val partRenderer = ChatGptNativeMessagePartRenderer(onOpenOfficial)
     private var messages: List<ChatGptWebMessage> = emptyList()
     private var capabilities = ChatGptWebCapabilities.EMPTY
+    private var messageControls: Map<String, List<ChatGptWebUiControl>> = emptyMap()
 
     fun submit(
         nextMessages: List<ChatGptWebMessage>,
@@ -37,6 +40,14 @@ internal class ChatGptNativeMessageAdapter(
         messages = nextMessages
         capabilities = nextCapabilities
         diff.dispatchUpdatesTo(this)
+    }
+
+    fun submitUiControls(controls: List<ChatGptWebUiControl>) {
+        messageControls = controls.asSequence()
+            .filter { it.region == ChatGptWebUiRegion.MESSAGE && it.contextId != null }
+            .filter { it.semantic !in LOCALLY_OWNED_ACTIONS }
+            .groupBy { it.contextId.orEmpty() }
+        if (messages.isNotEmpty()) notifyItemRangeChanged(0, messages.size, PAYLOAD_ACTIONS)
     }
 
     override fun getItemViewType(position: Int): Int =
@@ -53,6 +64,9 @@ internal class ChatGptNativeMessageAdapter(
 
     override fun onBindViewHolder(holder: MessageViewHolder, position: Int) {
         val message = messages[position]
+        val stableId = message.id.replace(Regex("[^A-Za-z0-9_-]"), "_").take(80)
+        holder.itemView.contentDescription = "chatgpt-message:$stableId:${message.role}"
+        holder.text.contentDescription = "chatgpt-message-content:$stableId"
         if (message.role == "assistant") {
             markwon.setMarkdown(holder.text, message.content)
             holder.text.movementMethod = LinkMovementMethod.getInstance()
@@ -64,6 +78,10 @@ internal class ChatGptNativeMessageAdapter(
         partRenderer.render(holder.parts, message.parts)
         holder.regenerate.visibility = if (canRegenerate(message, position)) View.VISIBLE else View.GONE
         holder.regenerate.setOnClickListener { onRegenerate() }
+        val actions = messageControls[messageContextId(message.id)].orEmpty()
+        holder.more.visibility = if (actions.isEmpty()) View.GONE else View.VISIBLE
+        holder.more.contentDescription = "chatgpt-message-actions:$stableId:${actions.size}"
+        holder.more.setOnClickListener { showMessageActions(holder, actions) }
         holder.state.visibility = if (message.state in ACTIVE_STATES) View.VISIBLE else View.GONE
         holder.state.setText(
             if (message.state == "pending") {
@@ -82,12 +100,30 @@ internal class ChatGptNativeMessageAdapter(
             position == messages.indexOfLast { it.role == "assistant" } &&
             capabilities.supports(ChatGptWebCapabilityId.MESSAGE_REGENERATE)
 
+    private fun showMessageActions(holder: MessageViewHolder, actions: List<ChatGptWebUiControl>) {
+        val enabledActions = actions.filter(ChatGptWebUiControl::enabled).distinctBy(ChatGptWebUiControl::id)
+        if (enabledActions.isEmpty()) return
+        AlertDialog.Builder(holder.itemView.context)
+            .setTitle(R.string.chatgpt_message_more_actions)
+            .setItems(enabledActions.map(ChatGptWebUiControl::label).toTypedArray()) { dialog, which ->
+                dialog.dismiss()
+                onInvokeControl(enabledActions[which].id)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun messageContextId(value: String): String = value
+        .replace(Regex("[^A-Za-z0-9_.:-]"), "_")
+        .take(MAX_CONTEXT_ID_LENGTH)
+
     internal class MessageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val text: TextView = itemView.findViewById(R.id.chatGptMessageText)
         val parts: LinearLayout = itemView.findViewById(R.id.chatGptMessageParts)
         val state: TextView = itemView.findViewById(R.id.chatGptMessageState)
         val copy: ImageButton = itemView.findViewById(R.id.chatGptMessageCopy)
         val regenerate: ImageButton = itemView.findViewById(R.id.chatGptMessageRegenerate)
+        val more: ImageButton = itemView.findViewById(R.id.chatGptMessageMore)
     }
 
     private class MessageDiff(
@@ -108,6 +144,9 @@ internal class ChatGptNativeMessageAdapter(
     private companion object {
         const val VIEW_TYPE_USER = 1
         const val VIEW_TYPE_ASSISTANT = 2
+        const val MAX_CONTEXT_ID_LENGTH = 160
+        const val PAYLOAD_ACTIONS = "chatgpt_message_actions"
         val ACTIVE_STATES = setOf("pending", "streaming")
+        val LOCALLY_OWNED_ACTIONS = setOf("copy", "regenerate")
     }
 }
