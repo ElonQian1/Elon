@@ -9,9 +9,11 @@ use std::{
 };
 
 use super::super::{
+    ManagedSqliteFileCloseFailure, ManagedSqliteQuarantinedFileCloseFailure,
     PinnedManagedSqliteFile, PinnedManagedSqliteMainFile, PinnedManagedSqliteNamespace,
 };
 use super::{
+    close::ManagedSqliteWalMainBindFailure,
     mapping::ManagedSqliteShmRegionMapping,
     types::{
         ManagedSqliteShmBudget, ManagedSqliteShmFailure, ManagedSqliteShmFailureClass,
@@ -53,6 +55,12 @@ pub(super) struct ManagedSqliteShmCoordinatorState {
     pub(super) main_identity_digest: Option<String>,
     pub(super) node: Option<ManagedSqliteShmNode>,
     pub(super) poisoned: Option<ManagedSqliteShmPoison>,
+    pub(super) quarantined_file_close: Vec<ManagedSqliteShmFileCloseCustody>,
+}
+
+pub(super) enum ManagedSqliteShmFileCloseCustody {
+    Pinned(ManagedSqliteFileCloseFailure),
+    Rejected(ManagedSqliteQuarantinedFileCloseFailure),
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -120,6 +128,7 @@ impl PinnedManagedSqliteNamespace {
                 main_identity_digest: None,
                 node: None,
                 poisoned: None,
+                quarantined_file_close: Vec::new(),
             }),
             namespace: self,
             domain_key,
@@ -137,16 +146,22 @@ impl PinnedManagedSqliteWalRuntime {
     pub(super) fn bind_main_file(
         &self,
         main: PinnedManagedSqliteMainFile,
-    ) -> Result<PinnedManagedSqliteWalMainFile, ManagedSqliteShmFailure> {
+    ) -> Result<PinnedManagedSqliteWalMainFile, ManagedSqliteWalMainBindFailure> {
         if !Arc::ptr_eq(&main.file.namespace, &self.coordinator.namespace.inner) {
-            return Err(ManagedSqliteShmFailure::code(
-                ManagedSqliteShmFailurePhase::RequestValidation,
-                ManagedSqliteShmFailureClass::ProtocolViolation,
-                "NODE_MANAGED_SQLITE_SHM_MAIN_NAMESPACE_MISMATCH",
+            return Err(ManagedSqliteWalMainBindFailure::new(
+                ManagedSqliteShmFailure::code(
+                    ManagedSqliteShmFailurePhase::RequestValidation,
+                    ManagedSqliteShmFailureClass::ProtocolViolation,
+                    "NODE_MANAGED_SQLITE_SHM_MAIN_NAMESPACE_MISMATCH",
+                ),
+                main,
             ));
         }
         let identity = main.identity_digest().to_owned();
-        let shm = self.coordinator.attach(&identity)?;
+        let shm = match self.coordinator.attach(&identity) {
+            Ok(shm) => shm,
+            Err(failure) => return Err(ManagedSqliteWalMainBindFailure::new(failure, main)),
+        };
         Ok(PinnedManagedSqliteWalMainFile {
             shm: Some(shm),
             main,
@@ -276,7 +291,10 @@ impl Drop for ManagedSqliteShmCoordinator {
     fn drop(&mut self) {
         let terminal = match self.state.get_mut() {
             Ok(state) => {
-                state.poisoned.is_some() || state.node.is_some() || !state.connections.is_empty()
+                state.poisoned.is_some()
+                    || state.node.is_some()
+                    || !state.quarantined_file_close.is_empty()
+                    || !state.connections.is_empty()
             }
             Err(_) => true,
         };

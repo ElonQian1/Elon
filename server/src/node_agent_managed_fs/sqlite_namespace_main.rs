@@ -287,6 +287,10 @@ impl ManagedSqliteMainFileBindFailure {
             _file: file,
         }
     }
+
+    pub(crate) fn into_file(self) -> PinnedManagedSqliteFile {
+        self._file
+    }
 }
 
 impl fmt::Debug for PinnedManagedSqliteMainFile {

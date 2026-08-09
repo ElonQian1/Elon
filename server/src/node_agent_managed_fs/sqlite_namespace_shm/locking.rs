@@ -1,11 +1,14 @@
 use std::{io, sync::atomic};
 
-use super::super::{platform, PlatformManagedSqliteLockAttempt};
+use super::super::{
+    platform, ManagedSqliteFileCloseFailure, PinnedManagedSqliteFile,
+    PlatformManagedSqliteLockAttempt,
+};
 use super::{
     coordinator::{
         ManagedSqliteShmConnectionState, ManagedSqliteShmCoordinator,
-        ManagedSqliteShmCoordinatorState, ManagedSqliteShmDmsCustody, ManagedSqliteShmNode,
-        PinnedManagedSqliteShmConnection,
+        ManagedSqliteShmCoordinatorState, ManagedSqliteShmDmsCustody,
+        ManagedSqliteShmFileCloseCustody, ManagedSqliteShmNode, PinnedManagedSqliteShmConnection,
     },
     types::{
         ManagedSqliteShmFailure, ManagedSqliteShmFailureClass, ManagedSqliteShmFailurePhase,
@@ -51,20 +54,7 @@ impl ManagedSqliteShmCoordinator {
     ) -> Result<ManagedSqliteShmNode, ManagedSqliteShmFailure> {
         let mut file = match self.namespace.open_shm_for_wal() {
             Ok(file) => file,
-            Err(failure) => {
-                self.mark_poisoned(
-                    state,
-                    ManagedSqliteShmFailurePhase::ExactSiblingOpen,
-                    true,
-                    false,
-                );
-                return Err(ManagedSqliteShmFailure::poisoned(
-                    ManagedSqliteShmFailurePhase::ExactSiblingOpen,
-                    io::Error::other(failure),
-                    true,
-                    false,
-                ));
-            }
+            Err(failure) => return Err(self.consume_open_failure(state, failure)),
         };
 
         let file_created = file.was_created();
@@ -73,7 +63,7 @@ impl ManagedSqliteShmCoordinator {
                 Ok(PlatformManagedSqliteLockAttempt::Acquired) => true,
                 Ok(PlatformManagedSqliteLockAttempt::Contended) => false,
                 Err(error) => {
-                    return Err(ManagedSqliteShmFailure::new(
+                    let failure = ManagedSqliteShmFailure::new(
                         ManagedSqliteShmFailurePhase::DmsExclusiveAcquire,
                         if file_created {
                             ManagedSqliteShmFailureClass::MutatedButKnown
@@ -81,7 +71,8 @@ impl ManagedSqliteShmCoordinator {
                             classify_platform(&error)
                         },
                         error,
-                    ));
+                    );
+                    return Err(self.close_failed_open_file(state, file, failure));
                 }
             };
 
@@ -154,24 +145,60 @@ impl ManagedSqliteShmCoordinator {
                 regions: Vec::new(),
                 mapped_bytes: 0,
             }),
-            Ok(PlatformManagedSqliteLockAttempt::Contended) => Err(ManagedSqliteShmFailure::code(
-                ManagedSqliteShmFailurePhase::DmsSharedAcquire,
-                if file_created || truncated {
-                    ManagedSqliteShmFailureClass::BusyAfterKnownMutation
-                } else {
-                    ManagedSqliteShmFailureClass::BusyNoMutation
-                },
-                "NODE_MANAGED_SQLITE_SHM_DMS_BUSY",
-            )),
-            Err(error) => Err(ManagedSqliteShmFailure::new(
-                ManagedSqliteShmFailurePhase::DmsSharedAcquire,
-                if file_created || truncated {
-                    ManagedSqliteShmFailureClass::MutatedButKnown
-                } else {
-                    classify_platform(&error)
-                },
-                error,
-            )),
+            Ok(PlatformManagedSqliteLockAttempt::Contended) => {
+                let failure = ManagedSqliteShmFailure::code(
+                    ManagedSqliteShmFailurePhase::DmsSharedAcquire,
+                    if file_created || truncated {
+                        ManagedSqliteShmFailureClass::BusyAfterKnownMutation
+                    } else {
+                        ManagedSqliteShmFailureClass::BusyNoMutation
+                    },
+                    "NODE_MANAGED_SQLITE_SHM_DMS_BUSY",
+                );
+                Err(self.close_failed_open_file(state, file, failure))
+            }
+            Err(error) => {
+                let failure = ManagedSqliteShmFailure::new(
+                    ManagedSqliteShmFailurePhase::DmsSharedAcquire,
+                    if file_created || truncated {
+                        ManagedSqliteShmFailureClass::MutatedButKnown
+                    } else {
+                        classify_platform(&error)
+                    },
+                    error,
+                );
+                Err(self.close_failed_open_file(state, file, failure))
+            }
+        }
+    }
+
+    fn close_failed_open_file(
+        &self,
+        state: &mut ManagedSqliteShmCoordinatorState,
+        file: PinnedManagedSqliteFile,
+        original: ManagedSqliteShmFailure,
+    ) -> ManagedSqliteShmFailure {
+        let mutation = original.mutation_may_have_occurred();
+        match file.close() {
+            Ok(_) => original,
+            Err(close_failure) => {
+                let report = pinned_close_report(&close_failure);
+                state
+                    .quarantined_file_close
+                    .push(ManagedSqliteShmFileCloseCustody::Pinned(close_failure));
+                self.mark_poisoned(
+                    state,
+                    ManagedSqliteShmFailurePhase::FileClose,
+                    mutation,
+                    false,
+                );
+                ManagedSqliteShmFailure::poisoned(
+                    ManagedSqliteShmFailurePhase::FileClose,
+                    report,
+                    mutation,
+                    false,
+                )
+            }
         }
     }
 
@@ -393,6 +420,17 @@ fn protocol(code: &'static str) -> ManagedSqliteShmFailure {
         ManagedSqliteShmFailurePhase::RequestValidation,
         ManagedSqliteShmFailureClass::ProtocolViolation,
         code,
+    )
+}
+
+fn pinned_close_report(failure: &ManagedSqliteFileCloseFailure) -> io::Error {
+    close_report(failure.error_kind(), failure.raw_os_error())
+}
+
+fn close_report(kind: io::ErrorKind, raw_os_error: Option<i32>) -> io::Error {
+    raw_os_error.map_or_else(
+        || io::Error::new(kind, "NODE_MANAGED_SQLITE_SHM_FILE_CLOSE_FAILED"),
+        io::Error::from_raw_os_error,
     )
 }
 

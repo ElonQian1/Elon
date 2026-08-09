@@ -237,6 +237,7 @@ pub(crate) enum ManagedSqliteShmFailurePhase {
     ViewUnmap,
     MappingClose,
     DmsSharedRelease,
+    FileClose,
     DeleteAuthorization,
     ExactSiblingDelete,
 }
@@ -407,8 +408,8 @@ impl ManagedSqliteWalMainUnmapFailure {
         &self.failure
     }
 
-    pub(crate) fn into_wal_main(self) -> PinnedManagedSqliteWalMainFile {
-        self.wal_main
+    pub(crate) fn into_parts(self) -> (ManagedSqliteShmFailure, PinnedManagedSqliteWalMainFile) {
+        (self.failure, self.wal_main)
     }
 }
 

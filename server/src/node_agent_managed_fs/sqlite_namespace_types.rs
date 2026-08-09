@@ -4,6 +4,7 @@ use super::super::{
     namespace::ManagedObjectBinding, PinnedManagedDirectory, PlatformFileIdentity,
     PlatformNamespaceFlushFailureKind,
 };
+use super::close::ManagedSqliteQuarantinedFileCloseFailure;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ManagedSqliteFileKind {
@@ -78,12 +79,14 @@ pub(crate) enum ManagedSqliteFileOpenFailurePhase {
     PlatformOpen,
     OpenCompletion,
     FileValidation,
+    HandleClose,
 }
 
 pub(crate) struct ManagedSqliteFileOpenFailure {
     phase: ManagedSqliteFileOpenFailurePhase,
     error: std::io::Error,
     _custody: Option<QuarantinedManagedSqliteFile>,
+    close_custody: Option<ManagedSqliteQuarantinedFileCloseFailure>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,6 +101,9 @@ pub(crate) enum ManagedSqliteDeleteFailurePhase {
     PostBarrierObservation,
     PostDispositionParentValidation,
     PostBarrierParentValidation,
+    PostDispositionHandleClose,
+    PreBarrierObservationHandleClose,
+    PostBarrierObservationHandleClose,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,6 +118,23 @@ pub(crate) struct ManagedSqliteDeleteFailure {
     error: std::io::Error,
     barrier_failure_kind: Option<ManagedSqliteDirectoryBarrierFailureKind>,
     _custody: Option<QuarantinedManagedSqliteFile>,
+    close_custody: Option<ManagedSqliteQuarantinedFileCloseFailure>,
+}
+
+pub(super) struct ManagedSqliteFailureHandleCustody {
+    pub(super) live: Option<QuarantinedManagedSqliteFile>,
+    pub(super) close_failure: Option<ManagedSqliteQuarantinedFileCloseFailure>,
+}
+
+pub(super) struct ManagedSqliteFileOpenFailureParts {
+    pub(super) error: std::io::Error,
+    pub(super) custody: ManagedSqliteFailureHandleCustody,
+}
+
+pub(super) struct ManagedSqliteDeleteFailureParts {
+    pub(super) error: std::io::Error,
+    pub(super) mutation_may_have_occurred: bool,
+    pub(super) custody: ManagedSqliteFailureHandleCustody,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -138,6 +161,7 @@ impl ManagedSqliteFileOpenFailure {
             phase,
             error: error.into(),
             _custody: None,
+            close_custody: None,
         }
     }
 
@@ -150,6 +174,16 @@ impl ManagedSqliteFileOpenFailure {
             phase,
             error: error.into(),
             _custody: Some(custody),
+            close_custody: None,
+        }
+    }
+
+    pub(super) fn close_failed(custody: ManagedSqliteQuarantinedFileCloseFailure) -> Self {
+        Self {
+            phase: ManagedSqliteFileOpenFailurePhase::HandleClose,
+            error: std::io::Error::other("NODE_MANAGED_SQLITE_OBSERVATION_HANDLE_CLOSE_FAILED"),
+            _custody: None,
+            close_custody: Some(custody),
         }
     }
 
@@ -158,7 +192,37 @@ impl ManagedSqliteFileOpenFailure {
     }
 
     pub(crate) fn handle_retained(&self) -> bool {
-        self._custody.is_some()
+        self._custody.is_some() || self.close_custody.is_some()
+    }
+
+    pub(crate) fn into_retained_file(mut self) -> Result<QuarantinedManagedSqliteFile, Self> {
+        match self._custody.take() {
+            Some(file) => Ok(file),
+            None => Err(self),
+        }
+    }
+
+    pub(crate) fn close_failure(&self) -> Option<&ManagedSqliteQuarantinedFileCloseFailure> {
+        self.close_custody.as_ref()
+    }
+
+    pub(crate) fn into_close_failure(
+        mut self,
+    ) -> Result<ManagedSqliteQuarantinedFileCloseFailure, Self> {
+        match self.close_custody.take() {
+            Some(failure) => Ok(failure),
+            None => Err(self),
+        }
+    }
+
+    pub(super) fn into_shm_parts(self) -> ManagedSqliteFileOpenFailureParts {
+        ManagedSqliteFileOpenFailureParts {
+            error: self.error,
+            custody: ManagedSqliteFailureHandleCustody {
+                live: self._custody,
+                close_failure: self.close_custody,
+            },
+        }
     }
 }
 
@@ -173,6 +237,7 @@ impl ManagedSqliteDeleteFailure {
             error: error.into(),
             barrier_failure_kind: None,
             _custody: custody,
+            close_custody: None,
         }
     }
 
@@ -193,6 +258,20 @@ impl ManagedSqliteDeleteFailure {
             error,
             barrier_failure_kind: Some(kind),
             _custody: None,
+            close_custody: None,
+        }
+    }
+
+    pub(super) fn close_failed(
+        phase: ManagedSqliteDeleteFailurePhase,
+        custody: ManagedSqliteQuarantinedFileCloseFailure,
+    ) -> Self {
+        Self {
+            phase,
+            error: std::io::Error::other("NODE_MANAGED_SQLITE_DELETE_HANDLE_CLOSE_FAILED"),
+            barrier_failure_kind: None,
+            _custody: None,
+            close_custody: Some(custody),
         }
     }
 
@@ -205,7 +284,27 @@ impl ManagedSqliteDeleteFailure {
     }
 
     pub(crate) fn handle_retained(&self) -> bool {
-        self._custody.is_some()
+        self._custody.is_some() || self.close_custody.is_some()
+    }
+
+    pub(crate) fn into_retained_file(mut self) -> Result<QuarantinedManagedSqliteFile, Self> {
+        match self._custody.take() {
+            Some(file) => Ok(file),
+            None => Err(self),
+        }
+    }
+
+    pub(crate) fn close_failure(&self) -> Option<&ManagedSqliteQuarantinedFileCloseFailure> {
+        self.close_custody.as_ref()
+    }
+
+    pub(crate) fn into_close_failure(
+        mut self,
+    ) -> Result<ManagedSqliteQuarantinedFileCloseFailure, Self> {
+        match self.close_custody.take() {
+            Some(failure) => Ok(failure),
+            None => Err(self),
+        }
     }
 
     pub(crate) fn mutation_may_have_occurred(&self) -> bool {
@@ -217,6 +316,9 @@ impl ManagedSqliteDeleteFailure {
                 | ManagedSqliteDeleteFailurePhase::PostBarrierObservation
                 | ManagedSqliteDeleteFailurePhase::PostDispositionParentValidation
                 | ManagedSqliteDeleteFailurePhase::PostBarrierParentValidation
+                | ManagedSqliteDeleteFailurePhase::PostDispositionHandleClose
+                | ManagedSqliteDeleteFailurePhase::PreBarrierObservationHandleClose
+                | ManagedSqliteDeleteFailurePhase::PostBarrierObservationHandleClose
         )
     }
 
@@ -225,7 +327,20 @@ impl ManagedSqliteDeleteFailure {
             self.phase,
             ManagedSqliteDeleteFailurePhase::PostBarrierObservation
                 | ManagedSqliteDeleteFailurePhase::PostBarrierParentValidation
+                | ManagedSqliteDeleteFailurePhase::PostBarrierObservationHandleClose
         )
+    }
+
+    pub(super) fn into_shm_parts(self) -> ManagedSqliteDeleteFailureParts {
+        let mutation_may_have_occurred = self.mutation_may_have_occurred();
+        ManagedSqliteDeleteFailureParts {
+            error: self.error,
+            mutation_may_have_occurred,
+            custody: ManagedSqliteFailureHandleCustody {
+                live: self._custody,
+                close_failure: self.close_custody,
+            },
+        }
     }
 }
 

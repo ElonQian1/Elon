@@ -50,8 +50,9 @@ mod sqlite;
 #[path = "windows_sqlite_locking.rs"]
 mod sqlite_locking;
 pub(super) use sqlite::{
-    flush_sqlite_file, open_sqlite_file_for_access_relative, open_sqlite_file_for_delete_relative,
-    open_sqlite_file_relative, read_sqlite_file_at, write_sqlite_file_at,
+    close_sqlite_file, flush_sqlite_file, open_sqlite_file_for_access_relative,
+    open_sqlite_file_for_delete_relative, open_sqlite_file_relative, read_sqlite_file_at,
+    write_sqlite_file_at, PlatformManagedSqliteCloseCustody, PlatformManagedSqliteCloseFailure,
     PlatformManagedSqliteOpen,
 };
 pub(super) use sqlite_locking::{try_lock_sqlite_byte_range, unlock_sqlite_byte_range};

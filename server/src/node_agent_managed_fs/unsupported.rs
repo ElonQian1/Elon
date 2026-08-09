@@ -17,6 +17,16 @@ pub(super) struct PlatformManagedSqliteOpen {
     pub(super) information: usize,
 }
 
+pub(super) struct PlatformManagedSqliteCloseFailure {
+    pub(in crate::node_agent_managed_fs) error: std::io::Error,
+    pub(in crate::node_agent_managed_fs) custody: PlatformManagedSqliteCloseCustody,
+}
+
+pub(super) enum PlatformManagedSqliteCloseCustody {
+    Unattempted(File),
+    OutcomeUncertainRawHandle(usize),
+}
+
 fn unsupported() -> std::io::Error {
     std::io::Error::new(
         std::io::ErrorKind::Unsupported,
@@ -98,6 +108,13 @@ pub(super) fn open_sqlite_file_for_delete_relative(
     _kind: ManagedSqliteFileKind,
 ) -> std::io::Result<PlatformManagedSqliteOpen> {
     Err(unsupported())
+}
+
+pub(super) fn close_sqlite_file(file: File) -> Result<(), PlatformManagedSqliteCloseFailure> {
+    Err(PlatformManagedSqliteCloseFailure {
+        error: unsupported(),
+        custody: PlatformManagedSqliteCloseCustody::Unattempted(file),
+    })
 }
 
 pub(super) fn read_sqlite_file_at(

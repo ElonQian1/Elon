@@ -35,6 +35,8 @@ mod plan_application_writes;
 mod process_ownership;
 mod rollback_checkpoint;
 mod sharing_policy_binding;
+#[allow(dead_code, unused_imports)]
+mod sqlite_vfs_policy;
 mod staging_store;
 mod verification_store;
 

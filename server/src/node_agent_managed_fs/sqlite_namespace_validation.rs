@@ -1,11 +1,11 @@
 use anyhow::{anyhow, bail, Result};
 
-use super::super::managed_parent_identity_digest;
+use super::super::{managed_parent_identity_digest, namespace::PlatformParentRelativeObservation};
 use super::{
     identity_digest, platform, validate_directory_identity, ManagedSqliteDeleteFailure,
-    ManagedSqliteDeleteFailurePhase, ManagedSqliteFileOpenFailure,
-    ManagedSqliteFileOpenFailurePhase, ManagedSqliteOpenMode, PinnedManagedDirectory, FILE_CREATED,
-    FILE_OPENED,
+    ManagedSqliteDeleteFailurePhase, ManagedSqliteFileKind, ManagedSqliteFileOpenFailure,
+    ManagedSqliteFileOpenFailurePhase, ManagedSqliteOpenMode, PinnedManagedDirectory,
+    PinnedManagedSqliteNamespace, FILE_CREATED, FILE_OPENED,
 };
 
 pub(super) fn reserved_shm_open_failure() -> ManagedSqliteFileOpenFailure {
@@ -81,4 +81,46 @@ pub(super) fn validate_open_completion(
         bail!("NODE_MANAGED_SQLITE_OPEN_DISPOSITION_INVALID");
     }
     Ok(())
+}
+
+impl PinnedManagedSqliteNamespace {
+    pub(super) fn observe_absent(
+        &self,
+        kind: ManagedSqliteFileKind,
+        phase: ManagedSqliteDeleteFailurePhase,
+    ) -> std::result::Result<(), ManagedSqliteDeleteFailure> {
+        let post_barrier = phase == ManagedSqliteDeleteFailurePhase::PostBarrierObservation;
+        let parent_phase = if post_barrier {
+            ManagedSqliteDeleteFailurePhase::PostBarrierParentValidation
+        } else {
+            ManagedSqliteDeleteFailurePhase::PostDispositionParentValidation
+        };
+        let close_phase = if post_barrier {
+            ManagedSqliteDeleteFailurePhase::PostBarrierObservationHandleClose
+        } else {
+            ManagedSqliteDeleteFailurePhase::PreBarrierObservationHandleClose
+        };
+        match platform::observe_child_relative(
+            self.parent().map_err(|error| {
+                ManagedSqliteDeleteFailure::new(parent_phase, super::io_error(error), None)
+            })?,
+            kind.name(),
+        ) {
+            Ok(PlatformParentRelativeObservation::Absent) => Ok(()),
+            Ok(PlatformParentRelativeObservation::Present(file)) => {
+                match self.quarantine(kind, file).close() {
+                    Ok(_) => Err(ManagedSqliteDeleteFailure::new(
+                        phase,
+                        std::io::Error::other("NODE_MANAGED_SQLITE_DELETE_NAME_STILL_PRESENT"),
+                        None,
+                    )),
+                    Err(failure) => Err(ManagedSqliteDeleteFailure::close_failed(
+                        close_phase,
+                        failure,
+                    )),
+                }
+            }
+            Err(error) => Err(ManagedSqliteDeleteFailure::new(phase, error, None)),
+        }
+    }
 }

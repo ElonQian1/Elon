@@ -1,10 +1,11 @@
 use std::io;
 
-use super::super::{platform, ManagedSqliteObservedLock};
+use super::super::{platform, ManagedSqliteFileCloseFailure, ManagedSqliteObservedLock};
 use super::{
     coordinator::{
         ManagedSqliteShmCoordinator, ManagedSqliteShmCoordinatorState, ManagedSqliteShmDmsCustody,
-        PinnedManagedSqliteShmConnection, PinnedManagedSqliteWalMainFile,
+        ManagedSqliteShmFileCloseCustody, ManagedSqliteShmNode, PinnedManagedSqliteShmConnection,
+        PinnedManagedSqliteWalMainFile,
     },
     types::{
         ManagedSqliteShmDeleteDisposition, ManagedSqliteShmFailure, ManagedSqliteShmFailureClass,
@@ -122,7 +123,9 @@ impl ManagedSqliteShmCoordinator {
         self.validate_delete_authority(&mut state, &delete)?;
 
         if state.node.is_some() {
-            if let Err((phase, error, mutation, lock_uncertain)) = teardown_live_node(&mut state) {
+            if let Err((phase, error, mutation, lock_uncertain)) =
+                teardown_and_close_live_node(&mut state)
+            {
                 self.mark_poisoned(&mut state, phase, mutation, lock_uncertain);
                 return Err(ManagedSqliteShmFailure::poisoned(
                     phase,
@@ -131,38 +134,11 @@ impl ManagedSqliteShmCoordinator {
                     lock_uncertain,
                 ));
             }
-            let Some(node) = state.node.take() else {
-                self.mark_poisoned(
-                    &mut state,
-                    ManagedSqliteShmFailurePhase::ConnectionDetach,
-                    true,
-                    false,
-                );
-                return Err(ManagedSqliteShmFailure::poisoned_code(
-                    ManagedSqliteShmFailurePhase::ConnectionDetach,
-                    "NODE_MANAGED_SQLITE_SHM_NODE_DISAPPEARED_DURING_TEARDOWN",
-                    true,
-                    false,
-                ));
-            };
-            drop(node);
         }
 
         if matches!(delete, ManagedSqliteShmDeleteDisposition::Delete { .. }) {
             if let Err(failure) = self.namespace.delete_shm_for_wal() {
-                let mutation = failure.mutation_may_have_occurred();
-                self.mark_poisoned(
-                    &mut state,
-                    ManagedSqliteShmFailurePhase::ExactSiblingDelete,
-                    mutation,
-                    false,
-                );
-                return Err(ManagedSqliteShmFailure::poisoned(
-                    ManagedSqliteShmFailurePhase::ExactSiblingDelete,
-                    io::Error::other(failure),
-                    mutation,
-                    false,
-                ));
+                return Err(self.consume_delete_failure(&mut state, failure));
             }
         }
 
@@ -266,15 +242,67 @@ impl ManagedSqliteShmCoordinator {
             state.connections.remove(&connection_id);
             return;
         }
-        if let Err((phase, _error, mutation, lock_uncertain)) = teardown_live_node(&mut state) {
+        if let Err((phase, _error, mutation, lock_uncertain)) =
+            teardown_and_close_live_node(&mut state)
+        {
             self.mark_poisoned(&mut state, phase, mutation, lock_uncertain);
             return;
         }
-        if let Some(node) = state.node.take() {
-            drop(node);
-        }
         state.connections.remove(&connection_id);
     }
+}
+
+fn teardown_and_close_live_node(
+    state: &mut ManagedSqliteShmCoordinatorState,
+) -> Result<(), (ManagedSqliteShmFailurePhase, io::Error, bool, bool)> {
+    teardown_live_node(state)?;
+    let node = state.node.take().ok_or_else(|| {
+        (
+            ManagedSqliteShmFailurePhase::ConnectionDetach,
+            io::Error::other("NODE_MANAGED_SQLITE_SHM_NODE_DISAPPEARED_DURING_TEARDOWN"),
+            true,
+            false,
+        )
+    })?;
+    let ManagedSqliteShmNode {
+        regions,
+        file,
+        dms: _,
+        initialization_mutated,
+        region_size: _,
+        mapped_bytes: _,
+    } = node;
+    drop(regions);
+    match file.close() {
+        Ok(receipt) => {
+            let _kind = receipt.kind();
+            Ok(())
+        }
+        Err(failure) => {
+            let error = close_failure_report(&failure);
+            state
+                .quarantined_file_close
+                .push(ManagedSqliteShmFileCloseCustody::Pinned(failure));
+            Err((
+                ManagedSqliteShmFailurePhase::FileClose,
+                error,
+                initialization_mutated,
+                false,
+            ))
+        }
+    }
+}
+
+fn close_failure_report(failure: &ManagedSqliteFileCloseFailure) -> io::Error {
+    failure.raw_os_error().map_or_else(
+        || {
+            io::Error::new(
+                failure.error_kind(),
+                "NODE_MANAGED_SQLITE_SHM_FILE_CLOSE_FAILED",
+            )
+        },
+        io::Error::from_raw_os_error,
+    )
 }
 
 fn teardown_live_node(

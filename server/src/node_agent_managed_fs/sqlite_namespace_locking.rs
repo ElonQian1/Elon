@@ -93,6 +93,9 @@ impl PinnedManagedSqliteMainFile {
 
     pub(super) fn release_locks_for_drop(&mut self) {
         if let Ok(mut domain) = self.lock_owner.lock() {
+            if domain.is_terminal() {
+                return;
+            }
             let _ = unlock_all(&self.file.file, &mut domain);
         }
     }

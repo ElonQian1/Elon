@@ -4,7 +4,7 @@ use std::{
     mem::{size_of, MaybeUninit},
     os::windows::{
         ffi::OsStrExt,
-        io::{AsRawHandle, FromRawHandle, RawHandle},
+        io::{AsRawHandle, FromRawHandle, IntoRawHandle, RawHandle},
     },
 };
 
@@ -19,7 +19,8 @@ use windows_sys::{
     },
     Win32::{
         Foundation::{
-            HANDLE, INVALID_HANDLE_VALUE, STATUS_END_OF_FILE, STATUS_SUCCESS, UNICODE_STRING,
+            CloseHandle, HANDLE, INVALID_HANDLE_VALUE, STATUS_END_OF_FILE, STATUS_SUCCESS,
+            UNICODE_STRING,
         },
         Storage::FileSystem::{
             FlushFileBuffers, DELETE, FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ, FILE_GENERIC_WRITE,
@@ -43,6 +44,30 @@ pub(super) struct PlatformManagedSqliteOpen {
     pub(super) call_status: i32,
     pub(super) completion_status: i32,
     pub(super) information: usize,
+}
+
+pub(super) struct PlatformManagedSqliteCloseFailure {
+    pub(in crate::node_agent_managed_fs) error: std::io::Error,
+    pub(in crate::node_agent_managed_fs) custody: PlatformManagedSqliteCloseCustody,
+}
+
+pub(super) enum PlatformManagedSqliteCloseCustody {
+    Unattempted(File),
+    OutcomeUncertainRawHandle(usize),
+}
+
+pub(super) fn close_sqlite_file(file: File) -> Result<(), PlatformManagedSqliteCloseFailure> {
+    let raw_handle = file.into_raw_handle();
+    // SAFETY: `into_raw_handle` transfers the sole File owner into this exact close attempt.
+    if unsafe { CloseHandle(raw_handle as HANDLE) } == 0 {
+        return Err(PlatformManagedSqliteCloseFailure {
+            error: std::io::Error::last_os_error(),
+            custody: PlatformManagedSqliteCloseCustody::OutcomeUncertainRawHandle(
+                raw_handle as usize,
+            ),
+        });
+    }
+    Ok(())
 }
 
 pub(super) fn open_sqlite_file_relative(

@@ -9,8 +9,12 @@ use super::{
     PinnedManagedSqliteFile, PinnedManagedSqliteNamespace,
 };
 
+#[path = "sqlite_namespace_shm/close.rs"]
+mod close;
 #[path = "sqlite_namespace_shm/coordinator.rs"]
 mod coordinator;
+#[path = "sqlite_namespace_shm/failure_custody.rs"]
+mod failure_custody;
 #[path = "sqlite_namespace_shm/locking.rs"]
 mod locking;
 #[path = "sqlite_namespace_shm/mapping.rs"]
@@ -90,6 +94,10 @@ impl PinnedManagedSqliteNamespace {
     }
 }
 
+pub(crate) use close::{
+    ManagedSqliteWalMainBindFailure, ManagedSqliteWalMainCloseFailure,
+    ManagedSqliteWalMainCloseFailurePhase, ManagedSqliteWalMainCloseReceipt,
+};
 pub(crate) use coordinator::{
     PinnedManagedSqliteShmConnection, PinnedManagedSqliteWalMainFile, PinnedManagedSqliteWalRuntime,
 };

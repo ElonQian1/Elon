@@ -3,10 +3,12 @@ use std::{fs::File, sync::Arc};
 use anyhow::{anyhow, bail, Result};
 
 use super::{
-    identity_digest, namespace::PlatformParentRelativeObservation, platform, same_file_identity,
-    validate_directory_identity, validate_regular_file_identity, PinnedManagedDirectory,
+    identity_digest, platform, same_file_identity, validate_directory_identity,
+    validate_regular_file_identity, PinnedManagedDirectory,
 };
 
+#[path = "sqlite_namespace_close.rs"]
+mod close;
 #[path = "sqlite_namespace_io.rs"]
 mod io;
 #[path = "sqlite_namespace_lock_domain.rs"]
@@ -22,6 +24,12 @@ mod types;
 #[path = "sqlite_namespace_validation.rs"]
 mod validation;
 
+pub(crate) use close::{
+    ManagedSqliteFileCloseFailure, ManagedSqliteFileCloseFailureClass,
+    ManagedSqliteFileCloseReceipt, ManagedSqliteMainFileCloseFailure,
+    ManagedSqliteMainFileCloseFailurePhase, ManagedSqliteMainFileCloseReceipt,
+    ManagedSqliteQuarantinedFileCloseFailure,
+};
 pub(crate) use main::{
     ManagedSqliteLockAttempt, ManagedSqliteLockFailure, ManagedSqliteLockFailureKind,
     ManagedSqliteLockFailurePhase, ManagedSqliteMainFileBindFailure, ManagedSqliteObservedLock,
@@ -32,7 +40,9 @@ pub(crate) use shm::{
     ManagedSqliteShmBudget, ManagedSqliteShmFailure, ManagedSqliteShmFailureClass,
     ManagedSqliteShmFailurePhase, ManagedSqliteShmLockAction, ManagedSqliteShmLockAttempt,
     ManagedSqliteShmLockRequest, ManagedSqliteShmMapMode, ManagedSqliteShmMapOutcome,
-    ManagedSqliteShmRegionPointer, ManagedSqliteShmUnmapMode, ManagedSqliteWalMainUnmapFailure,
+    ManagedSqliteShmRegionPointer, ManagedSqliteShmUnmapMode, ManagedSqliteWalMainBindFailure,
+    ManagedSqliteWalMainCloseFailure, ManagedSqliteWalMainCloseFailurePhase,
+    ManagedSqliteWalMainCloseReceipt, ManagedSqliteWalMainUnmapFailure,
     PinnedManagedSqliteShmConnection, PinnedManagedSqliteWalMainFile,
     PinnedManagedSqliteWalRuntime,
 };
@@ -243,8 +253,10 @@ impl PinnedManagedSqliteNamespace {
                 error,
             ));
         }
-        drop(file);
-        Ok(true)
+        self.quarantine(kind, file)
+            .close()
+            .map(|_| true)
+            .map_err(ManagedSqliteFileOpenFailure::close_failed)
     }
 
     pub(crate) fn delete(
@@ -335,7 +347,12 @@ impl PinnedManagedSqliteNamespace {
                 error.into(),
             ));
         }
-        drop(file);
+        self.quarantine(kind, file).close().map_err(|failure| {
+            ManagedSqliteDeleteFailure::close_failed(
+                ManagedSqliteDeleteFailurePhase::PostDispositionHandleClose,
+                failure,
+            )
+        })?;
         self.observe_absent(kind, ManagedSqliteDeleteFailurePhase::PreBarrierObservation)?;
         if sync_parent {
             let receipt = platform::flush_namespace_directory(parent).map_err(|failure| {
@@ -444,34 +461,6 @@ impl PinnedManagedSqliteNamespace {
             _file: file,
             _namespace: Arc::clone(&self.inner),
             kind,
-        }
-    }
-
-    fn observe_absent(
-        &self,
-        kind: ManagedSqliteFileKind,
-        phase: ManagedSqliteDeleteFailurePhase,
-    ) -> std::result::Result<(), ManagedSqliteDeleteFailure> {
-        let parent_phase = if phase == ManagedSqliteDeleteFailurePhase::PostBarrierObservation {
-            ManagedSqliteDeleteFailurePhase::PostBarrierParentValidation
-        } else {
-            ManagedSqliteDeleteFailurePhase::PostDispositionParentValidation
-        };
-        match platform::observe_child_relative(
-            self.parent().map_err(|error| {
-                ManagedSqliteDeleteFailure::new(parent_phase, io_error(error), None)
-            })?,
-            kind.name(),
-        ) {
-            Ok(PlatformParentRelativeObservation::Absent) => Ok(()),
-            Ok(PlatformParentRelativeObservation::Present(file)) => {
-                Err(ManagedSqliteDeleteFailure::new(
-                    phase,
-                    std::io::Error::other("NODE_MANAGED_SQLITE_DELETE_NAME_STILL_PRESENT"),
-                    Some(self.quarantine(kind, file)),
-                ))
-            }
-            Err(error) => Err(ManagedSqliteDeleteFailure::new(phase, error, None)),
         }
     }
 }

@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    mem::ManuallyDrop,
     sync::{Arc, Mutex, MutexGuard, OnceLock, Weak},
 };
 
@@ -136,6 +137,18 @@ impl ManagedSqliteLockOwner {
             owner_id: self.owner_id,
         })
     }
+
+    pub(super) fn into_terminal_tombstone(self) -> ManuallyDrop<Self> {
+        if let Ok(mut state) = self.domain.state.lock() {
+            state.terminal = true;
+            if let Some(held) = state.owners.get_mut(&self.owner_id) {
+                held.terminal = true;
+            }
+        }
+        // Deliberately leak the final strong domain reference. The registry's Weak entry then
+        // remains upgradeable and terminal for this FileId for the rest of the process.
+        ManuallyDrop::new(self)
+    }
 }
 
 impl ManagedSqliteLockDomainGuard<'_> {
@@ -189,8 +202,30 @@ impl ManagedSqliteLockDomainGuard<'_> {
 
 impl Drop for ManagedSqliteLockOwner {
     fn drop(&mut self) {
-        if let Ok(mut state) = self.domain.state.lock() {
-            state.owners.remove(&self.owner_id);
+        let terminal_keepalive = Arc::clone(&self.domain);
+        let Ok(mut state) = self.domain.state.lock() else {
+            std::mem::forget(terminal_keepalive);
+            return;
+        };
+        if state.terminal || self.held_is_terminal(&state) {
+            state.terminal = true;
+            drop(state);
+            std::mem::forget(terminal_keepalive);
+            return;
         }
+        if state.owners.remove(&self.owner_id).is_none() {
+            state.terminal = true;
+            drop(state);
+            std::mem::forget(terminal_keepalive);
+        }
+    }
+}
+
+impl ManagedSqliteLockOwner {
+    fn held_is_terminal(&self, state: &ManagedSqliteLockDomainState) -> bool {
+        state
+            .owners
+            .get(&self.owner_id)
+            .is_some_and(|held| held.terminal)
     }
 }
