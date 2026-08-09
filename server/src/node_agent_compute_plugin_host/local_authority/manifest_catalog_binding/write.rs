@@ -4,6 +4,9 @@ use std::time::Instant;
 
 mod read;
 
+#[cfg(test)]
+mod tests;
+
 pub(super) use read::{
     read_binding_by_revision, validate_current_catalog_head, validate_exact_request,
 };
