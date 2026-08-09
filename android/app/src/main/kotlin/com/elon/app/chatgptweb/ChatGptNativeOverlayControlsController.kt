@@ -3,7 +3,6 @@ package com.elon.app.chatgptweb
 import android.view.View
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatImageButton
 import com.elon.app.R
@@ -15,7 +14,7 @@ internal class ChatGptNativeOverlayControlsController(
     private val shouldPresent: () -> Boolean,
     private val onInvoke: (String) -> Unit,
 ) {
-    private var dialog: AlertDialog? = null
+    private var dialog: androidx.appcompat.app.AlertDialog? = null
     private var controls: List<ChatGptWebUiControl> = emptyList()
     private var contextLabel: String? = null
 
@@ -23,13 +22,7 @@ internal class ChatGptNativeOverlayControlsController(
         val nextContextLabel = value.controls.firstOrNull {
             it.region == ChatGptWebUiRegion.OVERLAY && it.semantic == "timestamp"
         }?.label
-        val nextControls = value.controls.asSequence()
-            .filter { it.region == ChatGptWebUiRegion.OVERLAY && it.enabled }
-            .filterNot { it.semantic == "timestamp" }
-            .filterNot { it.semantic in DEDICATED_NAVIGATION_SEMANTICS }
-            .distinctBy(ChatGptWebUiControl::id)
-            .take(MAX_OVERLAY_ACTIONS)
-            .toList()
+        val nextControls = ChatGptNativeControlPresentation.overlayActions(value.controls)
         val controlsChanged = nextControls.map(ChatGptWebUiControl::id) !=
             controls.map(ChatGptWebUiControl::id)
         controls = nextControls
@@ -67,21 +60,14 @@ internal class ChatGptNativeOverlayControlsController(
         val title = contextLabel?.takeIf(String::isNotBlank)?.let { label ->
             activity.getString(R.string.chatgpt_official_page_actions) + " · " + label
         } ?: activity.getString(R.string.chatgpt_official_page_actions)
-        dialog = AlertDialog.Builder(activity)
-            .setTitle(title)
-            .setItems(current.map(ChatGptWebUiControl::label).toTypedArray()) { opened, which ->
-                opened.dismiss()
-                onInvoke(current[which].id)
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .create()
-            .also(AlertDialog::show)
+        dialog = ChatGptNativeControlDialog.show(
+            context = activity,
+            title = title,
+            controls = current,
+            onSelected = { onInvoke(it.id) },
+        )
     }
 
     private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
 
-    private companion object {
-        const val MAX_OVERLAY_ACTIONS = 40
-        val DEDICATED_NAVIGATION_SEMANTICS = setOf("conversation", "project")
-    }
 }

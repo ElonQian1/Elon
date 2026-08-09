@@ -18,6 +18,10 @@ internal object ChatGptWebCapabilityMatrix {
         val knownCapabilityIds = DEFINITIONS.mapTo(mutableSetOf(), Definition::id)
         val unknownCapabilities = (advertised - knownCapabilityIds).sorted()
         val unknownSemantics = (semantics.keys - ChatGptWebUiSemantics.KNOWN).sorted()
+        val controlCoverage = ChatGptNativeControlPresentation.describe(manifest?.controls.orEmpty())
+        val fallbackControls = controlCoverage.values.count {
+            it.kind == ChatGptNativeControlPresentation.Kind.OFFICIAL_FALLBACK
+        }
         val rows = DEFINITIONS.map { definition ->
             val observed = when (definition.id) {
                 SESSION_LOGIN -> snapshot?.authenticated == true
@@ -45,11 +49,12 @@ internal object ChatGptWebCapabilityMatrix {
             }
             if (unknownCapabilities.isNotEmpty()) add("unknown_capabilities")
             if (unknownSemantics.isNotEmpty()) add("unknown_semantics")
+            if (fallbackControls > 0) add("official_fallback_controls_present")
         }
         return JSONObject()
             .put("control_ok", true)
             .put("action", "chatgpt_get_capability_matrix")
-            .put("schema", "elon.chatgpt_web.capability_matrix.v1")
+            .put("schema", "elon.chatgpt_web.capability_matrix.v2")
             .put("adapter_version", ChatGptWebPageAdapter.ADAPTER_VERSION)
             .put("bridge_state", bridgeState.name.lowercase())
             .put("view_mode", mode.name.lowercase())
@@ -66,8 +71,34 @@ internal object ChatGptWebCapabilityMatrix {
                     "generic_control_count",
                     semantics[ChatGptWebUiSemantics.GENERIC_ACTION].orZero(),
                 )
+                .put(
+                    "native_control_count",
+                    controlCoverage.values.count { it.kind.isNativeAction() },
+                )
+                .put(
+                    "native_menu_control_count",
+                    controlCoverage.values.count { it.kind == ChatGptNativeControlPresentation.Kind.MENU },
+                )
+                .put("official_fallback_control_count", fallbackControls)
             )
             .put("capabilities", JSONArray(rows))
+            .put("control_coverage", JSONArray().apply {
+                manifest?.controls.orEmpty().forEach { control ->
+                    val coverage = controlCoverage.getValue(control.id)
+                    put(JSONObject()
+                        .put("control_id", control.id)
+                        .put("semantic", control.semantic)
+                        .put("region", control.region)
+                        .put("presentation", coverage.kind.wireName)
+                        .put("native_adb_content_description", coverage.nativeSelector ?: JSONObject.NULL)
+                        .put(
+                            "native_trigger_content_description",
+                            coverage.nativeTriggerSelector ?: JSONObject.NULL,
+                        )
+                        .put("official_fallback", true)
+                    )
+                }
+            })
             .put("observed_semantics", JSONObject().apply {
                 semantics.forEach { (semantic, count) -> put(semantic, count) }
             })
@@ -81,6 +112,10 @@ internal object ChatGptWebCapabilityMatrix {
     }
 
     private fun Int?.orZero(): Int = this ?: 0
+
+    private fun ChatGptNativeControlPresentation.Kind.isNativeAction(): Boolean =
+        this != ChatGptNativeControlPresentation.Kind.OFFICIAL_FALLBACK &&
+            this != ChatGptNativeControlPresentation.Kind.METADATA
 
     private data class Definition(
         val id: String,

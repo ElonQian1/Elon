@@ -26,6 +26,8 @@ class ChatGptWebCapabilityMatrixTest {
         assertEquals(0, matrix.getJSONArray("blocking_gaps").length())
         assertTrue(matrix.getJSONObject("adaptation_review").getBoolean("required"))
         assertEquals(1, matrix.getJSONObject("manifest").getInt("generic_control_count"))
+        assertEquals(1, matrix.getJSONObject("manifest").getInt("native_menu_control_count"))
+        assertEquals(0, matrix.getJSONObject("manifest").getInt("official_fallback_control_count"))
     }
 
     @Test
@@ -62,6 +64,30 @@ class ChatGptWebCapabilityMatrixTest {
         assertEquals("not_authenticated", gaps.getString(1))
         assertEquals("manifest_unavailable", gaps.getString(2))
         assertFalse(matrix.getBoolean("ready_for_mcp"))
+    }
+
+    @Test
+    fun reportsKnownControlsThatOnlyHaveTheOfficialFallback() {
+        val matrix = ChatGptWebCapabilityMatrix.build(
+            snapshot = snapshot(emptySet()),
+            manifest = manifest("healthy", "sources").copy(
+                controls = manifest("healthy", "sources").controls.map {
+                    it.copy(region = ChatGptWebUiRegion.SUGGESTIONS)
+                },
+            ),
+            bridgeState = ChatGptWebPageAdapter.State.READY,
+            mode = ChatGptWebModeController.Mode.NATIVE,
+        )
+
+        assertEquals(1, matrix.getJSONObject("manifest").getInt("official_fallback_control_count"))
+        assertEquals(
+            "official_fallback",
+            matrix.getJSONArray("control_coverage").getJSONObject(0).getString("presentation"),
+        )
+        assertEquals(
+            "official_fallback_controls_present",
+            matrix.getJSONObject("adaptation_review").getJSONArray("reasons").getString(0),
+        )
     }
 
     private fun snapshot(capabilities: Set<String>) = ChatGptWebSnapshot(

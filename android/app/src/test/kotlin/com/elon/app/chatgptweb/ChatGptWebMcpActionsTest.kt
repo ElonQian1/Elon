@@ -26,6 +26,11 @@ class ChatGptWebMcpActionsTest {
             "chatgpt-control:control_suggestion_demo:整理待办",
             control.getString("adb_content_description"),
         )
+        assertEquals("direct", control.getString("native_presentation"))
+        assertEquals(
+            "chatgpt-control:control_suggestion_demo:整理待办",
+            control.getString("native_adb_content_description"),
+        )
     }
 
     @Test
@@ -78,6 +83,15 @@ class ChatGptWebMcpActionsTest {
         assertEquals(1, conversations.getInt("match_count"))
         assertEquals("/c/demo", conversations.getJSONArray("conversations")
             .getJSONObject(0).getString("path"))
+
+        val messageControl = actions.control(JSONObject()
+            .put("action", "chatgpt_find_controls")
+            .put("context_id", "conversation-turn-1"))
+        assertEquals(1, messageControl.getInt("match_count"))
+        assertEquals(
+            "menu",
+            messageControl.getJSONArray("controls").getJSONObject(0).getString("native_presentation"),
+        )
     }
 
     @Test
@@ -85,7 +99,7 @@ class ChatGptWebMcpActionsTest {
         val matrix = actions().control(JSONObject().put("action", "chatgpt_get_capability_matrix"))
 
         assertTrue(matrix.getBoolean("control_ok"))
-        assertEquals("elon.chatgpt_web.capability_matrix.v1", matrix.getString("schema"))
+        assertEquals("elon.chatgpt_web.capability_matrix.v2", matrix.getString("schema"))
         assertEquals(ChatGptWebPageAdapter.ADAPTER_VERSION, matrix.getInt("adapter_version"))
         assertTrue(matrix.getBoolean("ready_for_chat"))
     }
@@ -121,6 +135,16 @@ class ChatGptWebMcpActionsTest {
                     inViewport = false,
                     webXRatio = 0.25,
                     webYRatio = 0.75,
+                ),
+                ChatGptWebUiControl(
+                    id = "control_share_demo",
+                    semantic = "share",
+                    label = "分享",
+                    region = ChatGptWebUiRegion.MESSAGE,
+                    role = "button",
+                    enabled = true,
+                    selected = false,
+                    contextId = "conversation-turn-1",
                 ),
             ),
         )

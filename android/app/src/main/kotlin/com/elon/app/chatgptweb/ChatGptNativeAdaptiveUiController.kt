@@ -41,20 +41,16 @@ internal class ChatGptNativeAdaptiveUiController(
 
     private fun renderHeaderActions(controls: List<ChatGptWebUiControl>) {
         headerActions.removeAllViews()
-        controls.asSequence()
-            .filter { it.region == ChatGptWebUiRegion.HEADER }
-            .filter { it.semantic !in HEADER_OWNED_SEMANTICS }
-            .take(MAX_HEADER_ACTIONS)
+        ChatGptNativeControlPresentation.headerActions(controls)
+            .asSequence()
             .forEach { control -> headerActions.addView(compactButton(control)) }
         headerActionsScroll.visibility = if (headerActions.childCount > 0) View.VISIBLE else View.GONE
     }
 
     private fun renderSuggestions(controls: List<ChatGptWebUiControl>) {
         suggestions.removeAllViews()
-        controls.asSequence()
-            .filter { it.region == ChatGptWebUiRegion.SUGGESTIONS && it.semantic == "suggestion" }
-            .distinctBy(ChatGptWebUiControl::id)
-            .take(MAX_SUGGESTIONS)
+        ChatGptNativeControlPresentation.suggestions(controls)
+            .asSequence()
             .forEach { control -> suggestions.addView(suggestionButton(control)) }
         val visible = suggestions.childCount > 0
         suggestions.visibility = if (visible) View.VISIBLE else View.GONE
@@ -104,9 +100,6 @@ internal class ChatGptNativeAdaptiveUiController(
     private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
 
     private companion object {
-        val HEADER_OWNED_SEMANTICS = setOf("navigation", "title", "new_conversation", "stop")
-        const val MAX_HEADER_ACTIONS = 1
-        const val MAX_SUGGESTIONS = 4
         const val MAX_COMPACT_LABEL_LENGTH = 8
     }
 }

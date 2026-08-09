@@ -129,6 +129,7 @@ internal class ChatGptWebMcpActions(
                 (region.isBlank() || control.region == region) &&
                 (contextId.isBlank() || control.contextId == contextId)
         }
+        val presentations = ChatGptNativeControlPresentation.describe(manifest.controls)
         val page = page(args, matches.size, DEFAULT_CONTROL_PAGE_SIZE, MAX_CONTROL_PAGE_SIZE)
         return JSONObject()
             .put("control_ok", true)
@@ -143,7 +144,9 @@ internal class ChatGptWebMcpActions(
             .put("next_offset", page.nextOffset)
             .put("has_more", page.hasMore)
             .put("controls", JSONArray().apply {
-                matches.drop(page.offset).take(page.limit).forEach { put(controlJson(it)) }
+                matches.drop(page.offset).take(page.limit).forEach { control ->
+                    put(controlJson(control, presentations[control.id]))
+                }
             })
     }
 
@@ -266,6 +269,7 @@ internal class ChatGptWebMcpActions(
 
     private fun manifestJson(value: ChatGptWebUiManifest?): Any {
         if (value == null) return JSONObject.NULL
+        val presentations = ChatGptNativeControlPresentation.describe(value.controls)
         return JSONObject()
             .put("version", value.version)
             .put("page_kind", value.pageKind)
@@ -277,12 +281,15 @@ internal class ChatGptWebMcpActions(
             .put("web_position_count", value.controls.count { it.webXRatio != null && it.webYRatio != null })
             .put("controls", JSONArray().apply {
                 value.controls.forEach { control ->
-                    put(controlJson(control))
+                    put(controlJson(control, presentations[control.id]))
                 }
             })
     }
 
-    private fun controlJson(control: ChatGptWebUiControl): JSONObject = JSONObject()
+    private fun controlJson(
+        control: ChatGptWebUiControl,
+        presentation: ChatGptNativeControlPresentation.Coverage?,
+    ): JSONObject = JSONObject()
         .put("control_id", control.id)
         .put("semantic", control.semantic)
         .put("label", control.label)
@@ -295,6 +302,15 @@ internal class ChatGptWebMcpActions(
         .put("web_x_ratio", control.webXRatio ?: JSONObject.NULL)
         .put("web_y_ratio", control.webYRatio ?: JSONObject.NULL)
         .put("adb_content_description", control.accessibilityLabel)
+        .put("native_presentation", presentation?.kind?.wireName ?: "official_fallback")
+        .put(
+            "native_adb_content_description",
+            presentation?.nativeSelector ?: JSONObject.NULL,
+        )
+        .put(
+            "native_trigger_content_description",
+            presentation?.nativeTriggerSelector ?: JSONObject.NULL,
+        )
 
     private fun page(
         args: JSONObject,
