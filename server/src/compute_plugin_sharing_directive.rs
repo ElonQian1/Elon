@@ -6,6 +6,14 @@ use homecli_proto::{
 };
 use sha2::{Digest, Sha256};
 
+mod canonical_json;
+
+pub(crate) use canonical_json::{
+    canonical_compute_plugin_ijson_and_sha256,
+    compute_plugin_install_plan_preparation_context_json_and_digest,
+    compute_plugin_install_plan_preparation_observed_json_and_digest,
+};
+
 const SNAPSHOT_DIGEST_DOMAIN: &[u8] = b"ELON_COMPUTE_PLUGIN_SHARING_POLICY_SNAPSHOT_V1";
 const INSTALLATION_ID_DIGEST_DOMAIN: &[u8] = b"ELON_COMPUTE_PLUGIN_INSTALLATION_ID_V1";
 const MAX_IJSON_SAFE_INTEGER: u64 = 9_007_199_254_740_991;

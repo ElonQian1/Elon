@@ -584,6 +584,61 @@ pub(super) async fn run_relay_session(
                 );
             }
 
+            // V2 is also Bootstrap-only. The legacy relay echoes causal identifiers solely so the
+            // cloud can close its delivery ledger; it never reports a planning snapshot.
+            ServerToAgent::ReadComputePluginInstallPlanPlanningSnapshotV2 { req_id, request } => {
+                let observed =
+                    homecli_proto::ComputePluginInstallPlanPlanningSnapshotObservedV2 {
+                        schema: homecli_proto::
+                            COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_OBSERVED_V2_SCHEMA
+                            .to_string(),
+                        preparation_id: request.preparation_id,
+                        cloud_session_id: request.cloud_session_id,
+                        source_preparation_delivery_id: request.source_preparation_delivery_id,
+                        source_preparation_observation_digest: request
+                            .source_preparation_observation_digest,
+                        node_id: request.node_id,
+                        owner_user_id: request.owner_user_id,
+                        installation_identity_digest: None,
+                        accepted: false,
+                        replayed: false,
+                        snapshot_ready: false,
+                        snapshot: None,
+                        observed_policy_revision: None,
+                        observed_policy_digest: None,
+                        observed_policy_snapshot_digest: None,
+                        observed_authorization: None,
+                        bootstrap_instance_id: "legacy-relay-no-bootstrap".to_string(),
+                        phase: "unsupported_legacy_relay".to_string(),
+                        configuration_generation: 0,
+                        cancellation_generation: 0,
+                        local_confirmation_available: false,
+                        compute_plugin_root_lock_acquired: false,
+                        trusted_time_authority_configured: false,
+                        rollback_anchor_witness_configured: false,
+                        root_pinned: false,
+                        authority_opened: false,
+                        process_fence_acquired: false,
+                        plan_apply_allowed: false,
+                        new_work_admission_enabled: false,
+                        downloads_allowed: false,
+                        sidecar_launch_allowed: false,
+                        side_effects_started: false,
+                        blocked_reasons: vec!["compute_plugin_bootstrap_unavailable".to_string()],
+                        error_code: Some(
+                            "COMPUTE_PLUGIN_PLANNING_SNAPSHOT_LEGACY_RELAY_UNSUPPORTED"
+                                .to_string(),
+                        ),
+                    };
+                let _ = try_send_json(
+                    &out_tx,
+                    &AgentToServer::ComputePluginInstallPlanPlanningSnapshotObservedV2 {
+                        req_id,
+                        observed,
+                    },
+                );
+            }
+
             // 更新指令由 node_agent_main 处理；此处静默忽略
             ServerToAgent::UpdateClient { .. } => {}
         }

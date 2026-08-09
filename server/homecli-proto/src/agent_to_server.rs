@@ -21,6 +21,7 @@ impl AgentToServer {
             | Self::ToolApprovalDecisionAck { .. }
             | Self::ComputePluginSharingPolicyObservedV1 { .. }
             | Self::ComputePluginInstallPlanPreparationObservedV1 { .. }
+            | Self::ComputePluginInstallPlanPlanningSnapshotObservedV2 { .. }
             | Self::RegisterCapabilities { .. }
             | Self::LlmStreamChunk { .. }
             | Self::LlmStreamEnd { .. }
@@ -58,6 +59,7 @@ impl AgentToServer {
             | Self::CliTaskJournalSnapshot { req_id, .. }
             | Self::ComputePluginSharingPolicyObservedV1 { req_id, .. }
             | Self::ComputePluginInstallPlanPreparationObservedV1 { req_id, .. }
+            | Self::ComputePluginInstallPlanPlanningSnapshotObservedV2 { req_id, .. }
             | Self::LlmStreamChunk { req_id, .. }
             | Self::LlmStreamEnd { req_id, .. }
             | Self::LlmStreamError { req_id, .. }

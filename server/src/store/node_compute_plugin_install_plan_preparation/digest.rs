@@ -1,13 +1,17 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
 use super::NodeComputePluginInstallPlanPreparationDispatchIntent;
-use crate::store::{NodeComputePluginSharingAuthorization, NodeComputePluginSharingDispatchIntent};
+use crate::{
+    compute_plugin_sharing_directive::{
+        compute_plugin_install_plan_preparation_context_json_and_digest,
+        compute_plugin_install_plan_preparation_observed_json_and_digest,
+    },
+    store::{NodeComputePluginSharingAuthorization, NodeComputePluginSharingDispatchIntent},
+};
 
 const REQUEST_DOMAIN: &[u8] = b"ELON_COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_REQUEST_V1";
-const CONTEXT_DOMAIN: &[u8] = b"ELON_COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_CONTEXT_V1";
-const OBSERVED_DOMAIN: &[u8] = b"ELON_COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_OBSERVED_V1";
 
 pub(super) fn preparation_request_digest(
     preparation_id: &str,
@@ -93,59 +97,11 @@ fn request_digest(
 }
 
 pub(super) fn context_json_and_digest(value: &Value) -> Result<(String, String)> {
-    canonical_json_and_digest(CONTEXT_DOMAIN, value)
+    compute_plugin_install_plan_preparation_context_json_and_digest(value)
 }
 
 pub(super) fn observed_json_and_digest(value: &Value) -> Result<(String, String)> {
-    canonical_json_and_digest(OBSERVED_DOMAIN, value)
-}
-
-fn canonical_json_and_digest(domain: &[u8], value: &Value) -> Result<(String, String)> {
-    let mut bytes = Vec::new();
-    write_canonical_json(value, &mut bytes)?;
-    let json = String::from_utf8(bytes.clone())?;
-    let mut digest = Sha256::new();
-    digest.update(domain);
-    digest.update([0]);
-    digest.update(bytes);
-    Ok((json, hex::encode(digest.finalize())))
-}
-
-fn write_canonical_json(value: &Value, output: &mut Vec<u8>) -> Result<()> {
-    match value {
-        Value::Null => output.extend_from_slice(b"null"),
-        Value::Bool(value) => output.extend_from_slice(if *value { b"true" } else { b"false" }),
-        Value::Number(value) if value.is_i64() || value.is_u64() => {
-            output.extend_from_slice(value.to_string().as_bytes());
-        }
-        Value::Number(_) => bail!("InstallPlan 准备账本不接受浮点 JSON 数字"),
-        Value::String(value) => output.extend_from_slice(serde_json::to_string(value)?.as_bytes()),
-        Value::Array(values) => {
-            output.push(b'[');
-            for (index, value) in values.iter().enumerate() {
-                if index > 0 {
-                    output.push(b',');
-                }
-                write_canonical_json(value, output)?;
-            }
-            output.push(b']');
-        }
-        Value::Object(values) => {
-            output.push(b'{');
-            let mut keys = values.keys().collect::<Vec<_>>();
-            keys.sort_unstable();
-            for (index, key) in keys.into_iter().enumerate() {
-                if index > 0 {
-                    output.push(b',');
-                }
-                output.extend_from_slice(serde_json::to_string(key)?.as_bytes());
-                output.push(b':');
-                write_canonical_json(&values[key], output)?;
-            }
-            output.push(b'}');
-        }
-    }
-    Ok(())
+    compute_plugin_install_plan_preparation_observed_json_and_digest(value)
 }
 
 fn digest_string(digest: &mut Sha256, label: &[u8], value: &str) {

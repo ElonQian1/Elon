@@ -208,9 +208,10 @@ impl ComputePluginBootstrapState {
             if !initialization_plan.matches(desired, self.cancellation_generation) {
                 bail!("COMPUTE_PLUGIN_LOCAL_POLICY_BINDING_INITIALIZATION_PLAN_CHANGED");
             }
-            let preparation = self.last_install_plan_preparation.as_ref().ok_or_else(|| {
+            let witness = self.last_install_plan_preparation.as_ref().ok_or_else(|| {
                 anyhow::anyhow!("COMPUTE_PLUGIN_LOCAL_POLICY_BINDING_PREPARATION_UNAVAILABLE")
             })?;
+            let preparation = &witness.request;
             if !preparation_matches_current(
                 preparation,
                 desired,

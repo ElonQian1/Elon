@@ -1,6 +1,6 @@
 use homecli_proto::{
-    AgentToServer, ComputePluginInstallPlanPreparationRequestV1,
-    ComputePluginSharingPolicySnapshotV1,
+    AgentToServer, ComputePluginInstallPlanPlanningSnapshotRequestV2,
+    ComputePluginInstallPlanPreparationRequestV1, ComputePluginSharingPolicySnapshotV1,
 };
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
@@ -52,6 +52,7 @@ pub(super) fn handle_install_plan_preparation_v1(
         .compute_plugin_bootstrap
         .observe_install_plan_preparation_v1(
             &request,
+            &req_id,
             &credentials.agent_id,
             &credentials.owner_user_id,
         );
@@ -72,5 +73,39 @@ pub(super) fn handle_install_plan_preparation_v1(
     }
     let _ = out_tx.send(ws_text(
         &AgentToServer::ComputePluginInstallPlanPreparationObservedV1 { req_id, observed },
+    ));
+}
+
+pub(super) fn handle_install_plan_planning_snapshot_v2(
+    runtime: &NodeRuntime,
+    credentials: &Credentials,
+    out_tx: &mpsc::UnboundedSender<Message>,
+    req_id: String,
+    request: ComputePluginInstallPlanPlanningSnapshotRequestV2,
+) {
+    let observed = runtime
+        .compute_plugin_bootstrap
+        .observe_install_plan_planning_snapshot_v2(
+            &request,
+            &credentials.agent_id,
+            &credentials.owner_user_id,
+        );
+    if observed.accepted {
+        info!(
+            preparation_id = %observed.preparation_id,
+            replayed = observed.replayed,
+            snapshot_ready = observed.snapshot_ready,
+            bootstrap_instance_id = %observed.bootstrap_instance_id,
+            "已核对 InstallPlan Planning Snapshot V2 请求；快照源仍不可用且未启动任何副作用"
+        );
+    } else {
+        warn!(
+            preparation_id = %observed.preparation_id,
+            error_code = observed.error_code.as_deref().unwrap_or("unknown"),
+            "拒绝 InstallPlan Planning Snapshot V2 请求"
+        );
+    }
+    let _ = out_tx.send(ws_text(
+        &AgentToServer::ComputePluginInstallPlanPlanningSnapshotObservedV2 { req_id, observed },
     ));
 }

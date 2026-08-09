@@ -181,6 +181,7 @@ pub(super) async fn run_session(
             CAP_LOCAL_TASK_PROJECT_SYNC_V1.to_string(),
             CAP_COMPUTE_PLUGIN_SHARING_V1.to_string(),
             CAP_COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_V1.to_string(),
+            homecli_proto::CAP_COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_V2.to_string(),
         ],
         allowed_clis: available_clis.clone(),
         allowed_cwds: vec![],
@@ -372,6 +373,12 @@ pub(super) async fn run_session(
                                 runtime, creds, &out_tx_r, req_id, request,
                             )
                         }
+                        ServerToAgent::ReadComputePluginInstallPlanPlanningSnapshotV2 {
+                            req_id,
+                            request,
+                        } => compute_plugin_sharing::handle_install_plan_planning_snapshot_v2(
+                            runtime, creds, &out_tx_r, req_id, request,
+                        ),
                         ServerToAgent::LlmStreamRequest {
                             req_id,
                             model,

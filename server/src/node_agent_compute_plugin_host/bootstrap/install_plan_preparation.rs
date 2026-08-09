@@ -5,10 +5,20 @@ use homecli_proto::{
 };
 
 use super::{ComputePluginBootstrap, ComputePluginBootstrapState};
+use crate::compute_plugin_sharing_directive::compute_plugin_install_plan_preparation_observed_json_and_digest;
 
 const PHASE_BLOCKED: &str = "blocked";
 const MAX_IDENTIFIER_BYTES: usize = 256;
 const MAX_IJSON_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+
+pub(super) struct ComputePluginInstallPlanPreparationWitnessV1 {
+    pub(super) request: ComputePluginInstallPlanPreparationRequestV1,
+    pub(super) delivery_id: String,
+    pub(super) observation_digest: String,
+    pub(super) bootstrap_instance_id: String,
+    pub(super) configuration_generation: u64,
+    pub(super) cancellation_generation: u64,
+}
 
 impl ComputePluginBootstrap {
     /// Observes one cloud preparation request against the currently accepted dormant policy.
@@ -17,12 +27,14 @@ impl ComputePluginBootstrap {
     pub(crate) fn observe_install_plan_preparation_v1(
         &self,
         request: &ComputePluginInstallPlanPreparationRequestV1,
+        delivery_id: &str,
         session_node_id: &str,
         session_owner_user_id: &str,
     ) -> ComputePluginInstallPlanPreparationObservedV1 {
         match self.state.lock() {
             Ok(mut state) => state.observe_install_plan_preparation(
                 request,
+                delivery_id,
                 session_node_id,
                 session_owner_user_id,
                 &self.bootstrap_instance_id,
@@ -44,6 +56,7 @@ impl ComputePluginBootstrapState {
     fn observe_install_plan_preparation(
         &mut self,
         request: &ComputePluginInstallPlanPreparationRequestV1,
+        delivery_id: &str,
         session_node_id: &str,
         session_owner_user_id: &str,
         bootstrap_instance_id: &str,
@@ -63,6 +76,12 @@ impl ComputePluginBootstrapState {
             return reject(
                 self,
                 "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_SCHEMA_UNSUPPORTED",
+            );
+        }
+        if !bounded_identifier(delivery_id) {
+            return reject(
+                self,
+                "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_DELIVERY_ID_INVALID",
             );
         }
         if !bounded_identifier(&request.preparation_id) {
@@ -139,16 +158,27 @@ impl ComputePluginBootstrapState {
                 "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_AUTHORIZATION_POLICY_MISMATCH",
             );
         }
+        if !safe_generation(self.configuration_generation)
+            || !safe_generation(self.cancellation_generation)
+        {
+            self.last_install_plan_preparation = None;
+            self.last_install_plan_planning_snapshot = None;
+            return reject(
+                self,
+                "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_GENERATION_OUT_OF_RANGE",
+            );
+        }
         if self
             .last_install_plan_preparation
             .as_ref()
-            .is_some_and(|current| !same_policy_binding(current, request))
+            .is_some_and(|current| !same_policy_binding(&current.request, request))
         {
             self.last_install_plan_preparation = None;
+            self.last_install_plan_planning_snapshot = None;
         }
         let replayed = match self.last_install_plan_preparation.as_ref() {
-            Some(current) if current == request => true,
-            Some(current) if current.preparation_id == request.preparation_id => {
+            Some(current) if &current.request == request => true,
+            Some(current) if current.request.preparation_id == request.preparation_id => {
                 return reject(self, "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_ID_CONFLICT")
             }
             Some(_) => {
@@ -159,10 +189,10 @@ impl ComputePluginBootstrapState {
             }
             None => false,
         };
-        if !replayed {
-            self.last_install_plan_preparation = Some(request.clone());
-        }
-        self.preparation_observation(
+        // Every authenticated V1 observation is the replacement boundary for the following V2
+        // report request. A stale cloud session cannot replace the marker after V2 is accepted.
+        self.last_install_plan_planning_snapshot = None;
+        let observed = self.preparation_observation(
             request,
             session_node_id,
             session_owner_user_id,
@@ -170,7 +200,30 @@ impl ComputePluginBootstrapState {
             true,
             replayed,
             None,
-        )
+        );
+        let Ok((_, observation_digest)) =
+            compute_plugin_install_plan_preparation_observed_json_and_digest(&observed)
+        else {
+            self.last_install_plan_preparation = None;
+            return self.preparation_observation(
+                request,
+                session_node_id,
+                session_owner_user_id,
+                bootstrap_instance_id,
+                false,
+                false,
+                Some("COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_OBSERVATION_DIGEST_UNAVAILABLE"),
+            );
+        };
+        self.last_install_plan_preparation = Some(ComputePluginInstallPlanPreparationWitnessV1 {
+            request: request.clone(),
+            delivery_id: delivery_id.to_string(),
+            observation_digest,
+            bootstrap_instance_id: bootstrap_instance_id.to_string(),
+            configuration_generation: self.configuration_generation,
+            cancellation_generation: self.cancellation_generation,
+        });
+        observed
     }
 
     fn preparation_observation(
@@ -204,8 +257,8 @@ impl ComputePluginBootstrapState {
                 .and_then(|current| current.snapshot.authorization.clone()),
             bootstrap_instance_id: bootstrap_instance_id.to_string(),
             phase: PHASE_BLOCKED.to_string(),
-            configuration_generation: self.configuration_generation,
-            cancellation_generation: self.cancellation_generation,
+            configuration_generation: wire_generation(self.configuration_generation),
+            cancellation_generation: wire_generation(self.cancellation_generation),
             compute_plugin_root_lock_acquired: false,
             trusted_time_authority_configured: false,
             rollback_anchor_witness_configured: false,
@@ -285,6 +338,18 @@ fn bounded_identifier(value: &str) -> bool {
 
 fn safe_positive_revision(value: u64) -> bool {
     value > 0 && value <= MAX_IJSON_SAFE_INTEGER
+}
+
+fn safe_generation(value: u64) -> bool {
+    value <= MAX_IJSON_SAFE_INTEGER
+}
+
+fn wire_generation(value: u64) -> u64 {
+    if safe_generation(value) {
+        value
+    } else {
+        0
+    }
 }
 
 fn same_policy_binding(

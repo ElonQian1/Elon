@@ -115,6 +115,7 @@ impl ComputePluginBootstrapState {
         self.sharing_requested = snapshot.plugin_runtime_requested;
         self.initialization_plan = initialization_plan;
         self.last_install_plan_preparation = None;
+        self.last_install_plan_planning_snapshot = None;
         self.desired_policy = Some(AcceptedComputePluginSharingPolicy {
             snapshot: snapshot.clone(),
             snapshot_digest,

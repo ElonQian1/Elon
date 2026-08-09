@@ -3,11 +3,12 @@ use std::{fmt, path::PathBuf, sync::Mutex};
 use anyhow::{bail, Result};
 use elon_pc_dev_runtime::NodeDataPaths;
 use homecli_proto::{
-    ComputePluginInstallPlanPreparationRequestV1, ComputePluginSharingAuthorizationBindingV1,
+    ComputePluginInstallPlanPlanningSnapshotRequestV2, ComputePluginSharingAuthorizationBindingV1,
     ComputePluginSharingPolicyObservedV1, ComputePluginSharingPolicySnapshotV1,
 };
 use serde::Serialize;
 
+use self::install_plan_preparation::ComputePluginInstallPlanPreparationWitnessV1;
 use crate::compute_plugin_sharing_directive::compute_plugin_sharing_policy_snapshot_digest;
 use crate::node_agent_instance_lock::NodeAgentInstanceLockWitness;
 
@@ -20,6 +21,7 @@ pub(crate) const COMPUTE_PLUGIN_BOOTSTRAP_STATUS_SCHEMA: &str =
 const BOOTSTRAP_PHASE_DISABLED: &str = "disabled";
 const BOOTSTRAP_PHASE_BLOCKED: &str = "blocked";
 
+mod install_plan_planning_snapshot;
 mod install_plan_preparation;
 mod policy_binding_intent;
 mod sharing_policy;
@@ -49,7 +51,8 @@ struct ComputePluginBootstrapState {
     desired_policy: Option<AcceptedComputePluginSharingPolicy>,
     authorization_high_water: Option<ComputePluginSharingAuthorizationBindingV1>,
     initialization_plan: Option<DormantComputePluginInitializationPlan>,
-    last_install_plan_preparation: Option<ComputePluginInstallPlanPreparationRequestV1>,
+    last_install_plan_preparation: Option<ComputePluginInstallPlanPreparationWitnessV1>,
+    last_install_plan_planning_snapshot: Option<ComputePluginInstallPlanPlanningSnapshotRequestV2>,
 }
 
 #[derive(Clone)]
@@ -126,6 +129,7 @@ impl ComputePluginBootstrap {
                 authorization_high_water: None,
                 initialization_plan: None,
                 last_install_plan_preparation: None,
+                last_install_plan_planning_snapshot: None,
             }),
         }
     }
@@ -208,6 +212,7 @@ impl ComputePluginBootstrap {
         state.root_change_requires_restart = true;
         state.initialization_plan = None;
         state.last_install_plan_preparation = None;
+        state.last_install_plan_planning_snapshot = None;
     }
 
     pub(crate) fn status(&self) -> ComputePluginBootstrapStatus {
@@ -264,6 +269,8 @@ impl ComputePluginBootstrap {
 impl ComputePluginBootstrapState {
     fn advance_configuration_generation(&mut self) {
         self.invalidate_local_policy_binding_intents();
+        self.last_install_plan_preparation = None;
+        self.last_install_plan_planning_snapshot = None;
         match self.configuration_generation.checked_add(1) {
             Some(next) => self.configuration_generation = next,
             None => self.configuration_exhausted = true,
@@ -300,7 +307,8 @@ impl ComputePluginBootstrapState {
         let install_plan_preparation_observed = desired.is_some_and(|current| {
             self.last_install_plan_preparation
                 .as_ref()
-                .is_some_and(|request| {
+                .is_some_and(|witness| {
+                    let request = &witness.request;
                     self.sharing_requested
                         && request.node_id == current.snapshot.node_id
                         && request.owner_user_id == current.snapshot.owner_user_id

@@ -34,7 +34,24 @@ pub use compute_plugin_install_plan_preparation::{
     COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_PROTO_VERSION,
     COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_REQUEST_V1_SCHEMA,
 };
-pub const PROTO_VERSION: u32 = COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_PROTO_VERSION;
+mod compute_plugin_install_plan_planning_snapshot;
+pub use compute_plugin_install_plan_planning_snapshot::{
+    ComputePluginInstallPlanPlanningCandidateV2, ComputePluginInstallPlanPlanningInstalledRecordV2,
+    ComputePluginInstallPlanPlanningReleaseV2, ComputePluginInstallPlanPlanningSnapshotObservedV2,
+    ComputePluginInstallPlanPlanningSnapshotRequestV2, ComputePluginInstallPlanPlanningSnapshotV2,
+    HashedComputePluginInstallPlanPlanningSnapshotV2,
+    CAP_COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_V2,
+    COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_OBSERVED_V2_SCHEMA,
+    COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_PROTO_VERSION,
+    COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_REQUEST_V2_SCHEMA,
+    COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_V2_SCHEMA,
+    HASHED_COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_V2_SCHEMA,
+    MAX_COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_INSTALLED_RECORDS,
+    MAX_COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SAFE_INTEGER,
+    MAX_COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_BYTES,
+    MAX_COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_LIFETIME_MS,
+};
+pub const PROTO_VERSION: u32 = COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_PROTO_VERSION;
 /// The node applies project-scoped build-cache routing, admission, leases, and cleanup.
 pub const CAP_PROJECT_BUILD_CACHE_V1: &str = "project_build_cache_v1";
 /// The node mirrors locally-admitted Codex tasks into the owner's project
@@ -236,6 +253,12 @@ pub enum ServerToAgent {
     PrepareComputePluginInstallPlanV1 {
         req_id: String,
         request: ComputePluginInstallPlanPreparationRequestV1,
+    },
+    /// Read a planning-only V2 report bound to one exact V1 preparation observation. The dormant
+    /// Bootstrap cannot open local authority state or turn this request into installation work.
+    ReadComputePluginInstallPlanPlanningSnapshotV2 {
+        req_id: String,
+        request: ComputePluginInstallPlanPlanningSnapshotRequestV2,
     },
     Ping {
         nonce: Option<String>,
@@ -571,6 +594,11 @@ pub enum AgentToServer {
     ComputePluginInstallPlanPreparationObservedV1 {
         req_id: String,
         observed: ComputePluginInstallPlanPreparationObservedV1,
+    },
+    /// The node observed or rejected one planning-only V2 snapshot request.
+    ComputePluginInstallPlanPlanningSnapshotObservedV2 {
+        req_id: String,
+        observed: ComputePluginInstallPlanPlanningSnapshotObservedV2,
     },
     /// PC 节点上报本机支持的模型列表
     RegisterCapabilities {

@@ -244,6 +244,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (207, "账号密码、恢复码、设备会话撤销与安全审计", crate::account_security_migration::migration_v207),
     (208, "节点算力插件显式同意与耐久下发回执", crate::node_compute_plugin_sharing_migration::migration_v208),
     (209, "节点算力插件 InstallPlan 上下文准备账本", crate::node_compute_plugin_sharing_migration::migration_v209),
+    (210, "节点算力插件 Planning Snapshot V2 与生成请求账本", crate::node_compute_plugin_sharing_migration::migration_v210),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
