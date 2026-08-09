@@ -509,6 +509,38 @@ try {
         'repair entrypoint failure after snapshot must roll back'
     Assert-True $script:applyRollback 'repair entrypoint failure must invoke rollback'
 
+    $script:raceGateCalls = 0
+    $script:raceApplied = $false
+    $script:raceRolledBack = $false
+    $deferredRace = Invoke-NodeAgentActivationTransaction -Release $selected `
+        -OwnerGate {
+            $script:raceGateCalls += 1
+            if ($script:raceGateCalls -eq 1) {
+                return [pscustomobject]@{ Safe = $true; Reason = 'fixture_initially_idle' }
+            }
+            return [pscustomobject]@{ Safe = $false; Reason = 'desktop_shell_running' }
+        } `
+        -Prepare {
+            param($release)
+            [pscustomobject]@{
+                SnapshotRoot = $snapshotRoot
+                SnapshotManifestSha256 = $snapshot.ManifestSha256
+            }
+        } `
+        -Apply { $script:raceApplied = $true } `
+        -Health { throw 'health must not run for a deferred pre-apply race' } `
+        -Rollback { $script:raceRolledBack = $true } `
+        -PriorReleaseIdentity ("0.3.69+" + ('b' * 40))
+    Assert-Equal $deferredRace.activation_state 'waiting_for_terminal' `
+        'a desktop reopened during prepare must remain scheduled'
+    Assert-Equal $deferredRace.phase 'pre_apply' `
+        'the deferred race must remain distinguishable from installer failure'
+    Assert-True (-not $script:raceApplied) 'pre-apply owner race must not run the installer'
+    Assert-True (-not $script:raceRolledBack) 'pre-apply owner race must not roll back an untouched install'
+    $deferredState = Read-NodeAgentLocalReleaseState -StatePath ([string]$selected.state_path)
+    Assert-Equal $deferredState.local_terminal_state 'pending' `
+        'a deferred race must preserve pending local terminal state'
+
     $prepareApplied = $false
     $prepareRolledBack = $false
     $prepareFailure = Invoke-NodeAgentActivationTransaction -Release $selected `

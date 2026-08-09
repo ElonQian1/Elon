@@ -235,6 +235,8 @@ function Save-NodeAgentActivationResult {
         $persisted.local_terminal_state = 'complete'
     } elseif ($State -in @('rolled_back','failed')) {
         $persisted.local_terminal_state = 'failed'
+    } elseif ($State -in @('verified','restart_scheduled','waiting_for_terminal')) {
+        $persisted.local_terminal_state = 'pending'
     }
     $persisted.last_error = if ([string]::IsNullOrWhiteSpace($ErrorMessage)) { $null } else { $ErrorMessage }
     if ($null -ne $Receipt) {
@@ -281,6 +283,19 @@ function Invoke-NodeAgentActivationTransaction {
                 error = $preparationError
                 receipt = $receipt
             }
+        }
+    }
+    # Prepare (especially a verified rollback snapshot) can take long enough for the
+    # desktop shell or a CLI owner to reopen. No installation mutation has happened
+    # yet, so re-run the same gate and defer cleanly instead of treating the repair
+    # entrypoint's safety refusal as an apply failure that needs rollback.
+    $preApplyGate = & $OwnerGate
+    if (-not $preApplyGate.Safe) {
+        Save-NodeAgentActivationResult -Release $Release -State 'waiting_for_terminal'
+        return [pscustomobject]@{
+            activation_state = 'waiting_for_terminal'
+            reason = [string]$preApplyGate.Reason
+            phase = 'pre_apply'
         }
     }
     $applyResult = $null
