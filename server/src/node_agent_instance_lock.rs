@@ -22,6 +22,14 @@ struct NodeAgentInstanceLockInner {
     path: PathBuf,
 }
 
+/// Opaque process-local identity for one exact instance-lock handle. Keeping this value does not
+/// retain the lock; it only lets later linear custody prove that its lease descends from the same
+/// configured lock acquired at startup.
+#[derive(Clone)]
+pub(crate) struct NodeAgentInstanceLockBinding {
+    inner: Weak<NodeAgentInstanceLockInner>,
+}
+
 /// Process-local proof that the real node instance lock is still retained. A weak witness cannot
 /// keep the lock alive and becomes unusable as soon as the owning guard is dropped.
 #[derive(Clone)]
@@ -33,7 +41,7 @@ pub(crate) struct NodeAgentInstanceLockWitness {
 /// Bootstrap stores only a weak witness. This lease is a necessary process-liveness prerequisite,
 /// but it does not make a separately configured compute-plugin root exclusive.
 pub(crate) struct NodeAgentInstanceLockLease {
-    _inner: Arc<NodeAgentInstanceLockInner>,
+    inner: Arc<NodeAgentInstanceLockInner>,
 }
 
 impl NodeAgentInstanceLock {
@@ -56,9 +64,39 @@ impl NodeAgentInstanceLockWitness {
     pub(crate) fn try_acquire_lease(&self) -> Option<NodeAgentInstanceLockLease> {
         self.inner
             .upgrade()
-            .map(|inner| NodeAgentInstanceLockLease { _inner: inner })
+            .map(|inner| NodeAgentInstanceLockLease { inner })
+    }
+
+    pub(crate) fn try_acquire_bound_lease(
+        &self,
+    ) -> Option<(NodeAgentInstanceLockBinding, NodeAgentInstanceLockLease)> {
+        let inner = self.inner.upgrade()?;
+        let binding = NodeAgentInstanceLockBinding {
+            inner: Arc::downgrade(&inner),
+        };
+        Some((binding, NodeAgentInstanceLockLease { inner }))
     }
 }
+
+impl NodeAgentInstanceLockBinding {
+    pub(crate) fn matches_witness(&self, witness: &NodeAgentInstanceLockWitness) -> bool {
+        self.inner.ptr_eq(&witness.inner)
+    }
+
+    pub(crate) fn matches_lease(&self, lease: &NodeAgentInstanceLockLease) -> bool {
+        self.inner
+            .upgrade()
+            .is_some_and(|inner| Arc::ptr_eq(&inner, &lease.inner))
+    }
+}
+
+impl PartialEq for NodeAgentInstanceLockBinding {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner.ptr_eq(&other.inner)
+    }
+}
+
+impl Eq for NodeAgentInstanceLockBinding {}
 
 impl fmt::Debug for NodeAgentInstanceLockWitness {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -69,7 +107,13 @@ impl fmt::Debug for NodeAgentInstanceLockWitness {
     }
 }
 
-pub(crate) fn acquire(state_path: &Path) -> Result<NodeAgentInstanceLock> {
+/// Production acquisition is intentionally bound to the one configured node-state location.
+/// Callers cannot mint an authority-compatible witness for an arbitrary path.
+pub(crate) fn acquire_configured() -> Result<NodeAgentInstanceLock> {
+    acquire_at(&crate::node_agent_config::state_path())
+}
+
+fn acquire_at(state_path: &Path) -> Result<NodeAgentInstanceLock> {
     let state_dir = state_path
         .parent()
         .ok_or_else(|| anyhow::anyhow!("节点状态路径没有父目录: {}", state_path.display()))?;
@@ -130,10 +174,10 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("elon-node-instance-lock-{}", uuid::Uuid::new_v4()));
         let state = root.join("node.json");
-        let first = acquire(&state).expect("first instance owns lock");
-        assert!(acquire(&state).is_err());
+        let first = acquire_at(&state).expect("first instance owns lock");
+        assert!(acquire_at(&state).is_err());
         drop(first);
-        acquire(&state).expect("lock is reusable after owner exits");
+        acquire_at(&state).expect("lock is reusable after owner exits");
         let _ = std::fs::remove_dir_all(root);
     }
 }

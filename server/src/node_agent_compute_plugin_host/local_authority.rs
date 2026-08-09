@@ -226,8 +226,18 @@ impl ComputePluginLocalAuthority {
         &self.path
     }
 
-    fn instance_binding(&self) -> &ComputePluginAuthorityInstanceBinding {
+    pub(in crate::node_agent_compute_plugin_host) fn instance_binding(
+        &self,
+    ) -> &ComputePluginAuthorityInstanceBinding {
         &self.instance_binding
+    }
+
+    pub(in crate::node_agent_compute_plugin_host) fn is_handle_bound_locator_for(
+        &self,
+        root: &Path,
+    ) -> bool {
+        self.path.parent() == Some(root)
+            && self.path.file_name() == Some(std::ffi::OsStr::new(COMPUTE_PLUGIN_STATE_FILE))
     }
 
     /// Legacy path-open seam only. It may create the database or migrate schema and therefore must

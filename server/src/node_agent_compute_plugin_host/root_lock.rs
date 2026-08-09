@@ -2,7 +2,9 @@ use std::{ffi::OsStr, fmt, sync::Arc};
 
 use anyhow::{bail, Context, Result};
 
-use crate::node_agent_managed_fs::{PinnedManagedDirectory, PinnedManagedExclusiveFileLock};
+use crate::node_agent_managed_fs::{
+    ManagedObjectBinding, PinnedManagedDirectory, PinnedManagedExclusiveFileLock,
+};
 
 const COMPUTE_PLUGIN_ROOT_LOCK_FILE: &str = ".compute-plugin-root.lock";
 
@@ -16,6 +18,7 @@ pub(super) struct ComputePluginRootLock {
 
 struct ComputePluginRootLockInner {
     exclusive: PinnedManagedExclusiveFileLock,
+    directory_binding: ManagedObjectBinding,
 }
 
 /// Linear lease retained by every capability that can continue touching files below the pinned
@@ -31,13 +34,25 @@ impl ComputePluginRootLock {
         if directory.filesystem_mutated() {
             bail!("COMPUTE_PLUGIN_ROOT_LOCK_DIRECTORY_MUTATED");
         }
+        let directory_binding = directory
+            .object_binding()
+            .filter(|binding| binding.is_directory())
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_ROOT_LOCK_DIRECTORY_BINDING_MISSING"))?;
         let exclusive = directory
             .acquire_exclusive_file_lock(OsStr::new(COMPUTE_PLUGIN_ROOT_LOCK_FILE))
             .map_err(anyhow::Error::new)
             .context("COMPUTE_PLUGIN_ROOT_LOCK_ACQUIRE")?;
         Ok(Self {
-            inner: Arc::new(ComputePluginRootLockInner { exclusive }),
+            inner: Arc::new(ComputePluginRootLockInner {
+                exclusive,
+                directory_binding,
+            }),
         })
+    }
+
+    pub(super) fn matches_directory_binding(&self, binding: Option<&ManagedObjectBinding>) -> bool {
+        binding.is_some_and(|binding| binding == &self.inner.directory_binding)
     }
 
     pub(super) fn lease(&self) -> ComputePluginRootLockLease {

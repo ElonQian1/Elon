@@ -17,7 +17,7 @@ use crate::{
     },
     node_agent_managed_fs::{
         ManagedFileOpenFailure, PinnedManagedDirectory, PinnedManagedFile, PinnedManagedRoot,
-        QuarantinedManagedFile,
+        PinnedManagedSqliteNamespace, QuarantinedManagedFile,
     },
 };
 
@@ -37,6 +37,13 @@ pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginRoot {
     pub(super) root_lock: ComputePluginRootLock,
     pub(super) installation_id_digest: String,
     pub(super) node_data_paths: NodeDataPaths,
+}
+
+/// Sealed namespace proof derived from one pinned compute-plugin root while its exact root-lock
+/// lease remains retained. It intentionally exposes no SQLite file operations or inner namespace.
+pub(in crate::node_agent_compute_plugin_host) struct PinnedComputePluginAuthoritySqliteNamespace {
+    pub(super) _namespace: PinnedManagedSqliteNamespace,
+    pub(super) _root_lock_lease: ComputePluginRootLockLease,
 }
 
 impl PinnedComputePluginRoot {

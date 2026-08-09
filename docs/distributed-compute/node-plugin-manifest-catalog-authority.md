@@ -24,9 +24,11 @@ V2 checkpoint与V1使用独立 schema、challenge、attestation、签名域、as
 
 ## Opened authority 边界
 
-`OpenedComputePluginLocalAuthority`只定义“SQLite连接先于root lock和NodeAgent instance lock析构”的线性持有合同。当前open intent没有构造入口，生产`open()`固定返回`COMPUTE_PLUGIN_HANDLE_BOUND_SQLITE_VFS_UNAVAILABLE`。未来只能由Bootstrap把同一NodeDataPaths/root、authority instance和真实NodeAgent instance-lock见证原子绑定，调用方不得任意拼装lease。
+`OpenedComputePluginLocalAuthority`只定义“SQLite连接先于controller custody析构”的线性持有合同；custody再按终态撤销、namespace、root lock、NodeAgent instance lock的顺序释放。open intent已有仅消费sealed controller custody的内部构造核，但没有Host调用或生产者，生产`open()`固定返回`COMPUTE_PLUGIN_HANDLE_BOUND_SQLITE_VFS_UNAVAILABLE`。调用方不得任意拼装lease或裸namespace。
 
-Bootstrap现已增加独立于共享策略代次的authority-controller前半段。它在状态锁内一次性移出dormant authority locator并取得真实instance-lock lease，锁外只做existing-root pin，随后回到同一状态锁按Bootstrap实例、账号、installation、NodeDataPaths、authority path、nonce与controller epoch逐项复核。输出不可Clone且只能线性移交；凭据替换、数据根变化、instance witness失效、poison或Bootstrap析构都会终态撤销，失败不会恢复成可再次使用的Dormant。当前没有Host调用点，也没有从该输出构造opened authority、process fence或任何Store权限的转换。
+Bootstrap现已增加独立于共享策略代次的authority-controller。生产instance lock只能从配置的node state路径获取；marker保存不保活的Weak身份，并在begin、finalize和转换时把当前witness与保留lease按同一Arc句柄逐项闭合。controller在状态锁内一次性移出dormant authority locator，锁外只做existing-root pin，随后回锁按Bootstrap实例、账号、installation、NodeDataPaths、authority path、nonce与controller epoch复核。凭据替换、数据根变化、instance witness失效、poison或Bootstrap析构都会终态撤销，失败不会恢复成Dormant。
+
+controller现在可以线性转换为不可拆的open-intent custody：root lock会保存首次锁定目录的完整managed object binding，转换时从同一pinned root父句柄重pin `compute-plugin`，只有名称、文件身份摘要和父身份摘要全部相等才封存SQLite namespace。intent直接持有controller与sealed namespace，不接受调用方提供的directory、namespace、root/instance lease、witness或摘要；析构先发布controller终态，再释放namespace、root lock与instance lock。当前仍没有Host调用点，`open()`固定失败，也没有opened authority、process fence或Store权限。
 
 managed-fs现已铺设sealed SQLite namespace内核：只接受already-pinned且未发生目录创建的父句柄，只能按枚举访问`compute-plugin-state.sqlite3`及其`-journal`、`-wal`、`-shm`四个单组件；Windows打开、access、delete均为父句柄相对操作，并保留同句柄identity复验、offset I/O、短读零填、truncate、full sync、delete后absence观察，以及按`sync_parent`请求执行的父目录durability barrier。非Windows固定失败关闭；打开后校验失败会保留quarantine custody。该内核不持有Bootstrap/root-lock/instance-lock，不注册`sqlite3_vfs`，也不提供SQLite锁或SHM映射，因此只能由未来opened-authority控制器包裹，不能独立代表数据库权限。
 
@@ -34,4 +36,4 @@ managed-fs现已铺设sealed SQLite namespace内核：只接受already-pinned且
 
 ## 仍不可达
 
-当前仍没有可注册的handle-bound SQLite VFS、`sqlite3_io_methods`、byte-range locking、WAL SHM映射/锁、临时文件策略、one-shot VFS token registry、生产trusted-time/rollback provider、opened snapshot producer或consumer。Bootstrap联合控制器与managed-fs namespace彼此尚未接线，生产`open()`继续固定unavailable；下一批authority专用转换必须线性消费controller输出、从其exact root派生namespace，并绑定真实instance-lock身份，禁止重新接收任意directory或witness。v11仍固定`context_ready=false`、`snapshot_ready=false`，并保持root/authority、PlanApply、work-admission、下载、安装和Sidecar标志为false。非空库存还缺installed/promotion/signed-manifest provenance、work-admission generation、Ready/Attempt撤销及signed `reauthorize_existing`，不得由本合同推断为已完成。
+当前仍没有可注册的handle-bound SQLite VFS、`sqlite3_io_methods`、byte-range locking、WAL SHM映射/锁、临时文件策略、one-shot VFS token registry、生产trusted-time/rollback provider、opened snapshot producer或consumer。controller与managed-fs namespace只接到不可打开的sealed intent，生产`open()`继续固定unavailable；下一批必须先完成Windows locking、SHM与temp/URI/ATTACH策略，再铺惰性ABI/token callbacks，最后才能单独注册非默认VFS并打开SQLite。v11仍固定`context_ready=false`、`snapshot_ready=false`，并保持root/authority、PlanApply、work-admission、下载、安装和Sidecar标志为false。非空库存还缺installed/promotion/signed-manifest provenance、work-admission generation、Ready/Attempt撤销及signed `reauthorize_existing`，不得由本合同推断为已完成。

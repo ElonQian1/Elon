@@ -9,7 +9,10 @@ use std::{
 use anyhow::{bail, Result};
 use elon_pc_dev_runtime::NodeDataPaths;
 
-use crate::node_agent_compute_plugin_host::local_authority::ComputePluginLocalAuthority;
+use crate::{
+    node_agent_compute_plugin_host::local_authority::ComputePluginLocalAuthority,
+    node_agent_instance_lock::{NodeAgentInstanceLockBinding, NodeAgentInstanceLockLease},
+};
 
 const TERMINAL_CONTROLLER_EPOCH: u64 = u64::MAX;
 const ACTIVATION_PHASE_ACTIVATING: u8 = 1;
@@ -104,6 +107,22 @@ impl ComputePluginAuthorityControllerGenerationGuard {
         self.marker()?.ensure_pinned()
     }
 
+    pub(super) fn ensure_pinned_for_instance_lock(
+        &self,
+        lease: &NodeAgentInstanceLockLease,
+    ) -> Result<()> {
+        self.ensure_pinned()?;
+        if !self
+            .marker()?
+            .binding
+            .instance_lock_binding
+            .matches_lease(lease)
+        {
+            bail!("COMPUTE_PLUGIN_AUTHORITY_CONTROLLER_INSTANCE_LOCK_CHANGED");
+        }
+        Ok(())
+    }
+
     pub(super) fn invalidate_terminal(&self) {
         if let Some(marker) = &self.marker {
             marker.retire();
@@ -134,6 +153,7 @@ pub(super) struct ComputePluginAuthorityControllerBinding {
     pub(super) node_data_paths: NodeDataPaths,
     pub(super) compute_plugin_root: PathBuf,
     pub(super) authority_path: PathBuf,
+    pub(super) instance_lock_binding: NodeAgentInstanceLockBinding,
 }
 
 #[derive(Clone)]

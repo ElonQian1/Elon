@@ -21,6 +21,10 @@ pub(super) use super::authority_controller_state::{
     DormantComputePluginRootBinding,
 };
 
+#[path = "authority_controller_open.rs"]
+mod open;
+pub(in crate::node_agent_compute_plugin_host) use open::PinnedAuthorityOpenCustody;
+
 /// First linear half of activation. The instance lease and authority locator come from one state
 /// lock acquisition; callers cannot supply either ingredient. Field order makes controller
 /// revocation happen before the locator or instance lease is released on abandonment.
@@ -164,13 +168,18 @@ impl ComputePluginBootstrapState {
                 dormant.authority.path().to_path_buf(),
             )
         };
-        let instance_lock_lease = self
-            .instance_lock
-            .as_ref()
-            .and_then(|witness| witness.try_acquire_lease())
-            .ok_or_else(|| {
+        let (instance_lock_binding, instance_lock_lease) = {
+            let witness = self.instance_lock.as_ref().ok_or_else(|| {
                 anyhow::anyhow!("COMPUTE_PLUGIN_AUTHORITY_CONTROLLER_INSTANCE_LOCK_UNAVAILABLE")
             })?;
+            let (binding, lease) = witness.try_acquire_bound_lease().ok_or_else(|| {
+                anyhow::anyhow!("COMPUTE_PLUGIN_AUTHORITY_CONTROLLER_INSTANCE_LOCK_UNAVAILABLE")
+            })?;
+            if !binding.matches_witness(witness) || !binding.matches_lease(&lease) {
+                bail!("COMPUTE_PLUGIN_AUTHORITY_CONTROLLER_INSTANCE_LOCK_CHANGED");
+            }
+            (binding, lease)
+        };
         // Controller activation is the one-way custody handoff away from the dormant legacy
         // path locator. Revoke every earlier policy-binding intent before moving that locator;
         // later policy revisions still use their own generation and do not revoke the controller.
@@ -188,6 +197,7 @@ impl ComputePluginBootstrapState {
             node_data_paths,
             compute_plugin_root,
             authority_path,
+            instance_lock_binding,
         };
         let marker = ComputePluginAuthorityControllerActivationMarker::new(binding);
         generation_guard.bind_marker(marker.clone());
@@ -212,6 +222,12 @@ impl ComputePluginBootstrapState {
         bootstrap_instance_id: &str,
     ) -> Result<()> {
         let binding = &pinned.marker.binding;
+        let instance_lock_matches = self.instance_lock.as_ref().is_some_and(|witness| {
+            binding.instance_lock_binding.matches_witness(witness)
+                && binding
+                    .instance_lock_binding
+                    .matches_lease(&pinned.instance_lock_lease)
+        });
         pinned.generation_guard.ensure_activating()?;
         if !self.authority_controller.matches_activating(&pinned.marker)
             || self.root.is_some()
@@ -222,10 +238,7 @@ impl ComputePluginBootstrapState {
                 .installation
                 .as_ref()
                 .is_none_or(|installation| installation.digest() != binding.installation_id_digest)
-            || self
-                .instance_lock
-                .as_ref()
-                .is_none_or(|witness| !witness.is_live())
+            || !instance_lock_matches
             || binding.bootstrap_instance_id != bootstrap_instance_id
             || binding.controller_epoch != pinned.generation_guard.observed_epoch
             || !binding_is_exact(binding)
@@ -274,15 +287,6 @@ impl PinnedComputePluginAuthorityControllerActivation {
             _root: self.root,
             _instance_lock_lease: self.instance_lock_lease,
         }
-    }
-}
-
-impl PinnedComputePluginAuthorityController {
-    /// Every future conversion into an opened authority, VFS namespace or process-fence owner must
-    /// call this immediately before consuming custody. No such conversion is exposed in this batch.
-    #[allow(dead_code)]
-    fn ensure_current(&self) -> Result<()> {
-        self._generation_guard.ensure_pinned()
     }
 }
 

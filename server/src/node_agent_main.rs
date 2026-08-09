@@ -463,7 +463,7 @@ async fn run_agent_runtime() -> Result<()> {
     let cfg = NodeConfig::from_env()?;
     node_agent_proxy::ensure_localhost_no_proxy();
     node_agent_proxy::ensure_cloud_no_proxy(&cfg.cloud_url, &cfg.cloud_http_url);
-    let _instance_lock = node_agent_instance_lock::acquire(&node_agent_config::state_path())?;
+    let _instance_lock = node_agent_instance_lock::acquire_configured()?;
     info!(
         path = %_instance_lock.path().display(),
         "已独占 PC 节点状态目录"

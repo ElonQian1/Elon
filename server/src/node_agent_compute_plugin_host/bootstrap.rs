@@ -27,6 +27,7 @@ mod install_plan_preparation;
 mod policy_binding_intent;
 mod sharing_policy;
 
+pub(super) use authority_controller::PinnedAuthorityOpenCustody;
 use authority_controller::{
     ComputePluginAuthorityControllerGenerationSource, ComputePluginAuthorityControllerState,
     DormantComputePluginRootBinding,

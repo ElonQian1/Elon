@@ -38,8 +38,9 @@ pub(in crate::node_agent_compute_plugin_host) use staging::{
 pub(in crate::node_agent_compute_plugin_host) use types::{
     ComputePluginPartCursorDamage, ComputePluginPartCursorDamageKind,
     ComputePluginPartReconcileFailure, ComputePluginPartReconcileOutcome,
-    ComputePluginPartReconcileResult, PinnedComputePluginCandidateDownloads,
-    PinnedComputePluginRoot, ReconciledComputePluginPartFile,
+    ComputePluginPartReconcileResult, PinnedComputePluginAuthoritySqliteNamespace,
+    PinnedComputePluginCandidateDownloads, PinnedComputePluginRoot,
+    ReconciledComputePluginPartFile,
 };
 pub(in crate::node_agent_compute_plugin_host) use write::{
     write_compute_plugin_part_segment, ComputePluginSegmentWriteFailure,
@@ -72,6 +73,39 @@ pub(in crate::node_agent_compute_plugin_host) fn pin_compute_plugin_root(
         root_lock,
         installation_id_digest: installation.digest().to_string(),
         node_data_paths: paths.clone(),
+    })
+}
+
+/// Re-pins the exact compute-plugin directory through the retained root handle and proves that it
+/// is the same directory whose share-none root lock is still held before sealing the SQLite
+/// four-name namespace. This grants no SQLite open or VFS registration authority.
+pub(in crate::node_agent_compute_plugin_host) fn pin_compute_plugin_authority_sqlite_namespace(
+    root: &PinnedComputePluginRoot,
+) -> Result<PinnedComputePluginAuthoritySqliteNamespace> {
+    if root.node_data_paths.compute_plugins()
+        != root.node_data_paths.root().join(COMPUTE_PLUGIN_DIRECTORY)
+        || root.root.installation_binding_digest() != root.installation_id_digest
+        || !is_sha256(root.root.root_identity_digest())
+    {
+        bail!("COMPUTE_PLUGIN_AUTHORITY_NAMESPACE_ROOT_BINDING_INVALID");
+    }
+    let directory = root
+        .root
+        .pin_existing_directory(Path::new(COMPUTE_PLUGIN_DIRECTORY))
+        .context("COMPUTE_PLUGIN_AUTHORITY_NAMESPACE_DIRECTORY_PIN")?;
+    if !root
+        .root_lock
+        .matches_directory_binding(directory.object_binding())
+    {
+        bail!("COMPUTE_PLUGIN_AUTHORITY_NAMESPACE_DIRECTORY_CHANGED");
+    }
+    let namespace = directory
+        .into_sqlite_namespace()
+        .map_err(anyhow::Error::new)
+        .context("COMPUTE_PLUGIN_AUTHORITY_NAMESPACE_BIND")?;
+    Ok(PinnedComputePluginAuthoritySqliteNamespace {
+        _namespace: namespace,
+        _root_lock_lease: root.root_lock.lease(),
     })
 }
 
