@@ -100,6 +100,14 @@ impl SealedHandleBoundSqlitePolicy {
         self.authorizer.authorize(request)
     }
 
+    fn enter_schema_migration(&mut self) -> Result<(), ManagedSqliteAuthorizerTransitionError> {
+        self.authorizer.enter_schema_migration()
+    }
+
+    fn enter_runtime(&mut self) -> Result<(), ManagedSqliteAuthorizerTransitionError> {
+        self.authorizer.enter_runtime()
+    }
+
     /// Consumes bootstrap privileges so they cannot be retained beside schema privileges.
     pub(super) fn into_schema_migration(
         self,

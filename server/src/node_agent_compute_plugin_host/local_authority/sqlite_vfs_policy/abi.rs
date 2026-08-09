@@ -8,6 +8,9 @@ mod authorizer;
 mod types;
 mod vfs_requests;
 
+#[cfg(test)]
+mod connection_fixture;
+
 pub(super) use authorizer::ManagedSqliteAuthorizerAbiAdapter;
 pub(super) use types::{
     ManagedSqliteAuthorizerAbiRejection, ManagedSqliteAuthorizerRawField,

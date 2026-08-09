@@ -18,8 +18,9 @@ use super::{
 };
 use crate::node_agent_compute_plugin_host::local_authority::{
     sqlite_vfs_policy::{
-        ManagedSqliteLogicalFileRole, ManagedSqliteLogicalNameRejection,
-        SealedHandleBoundSqlitePolicy,
+        ManagedSqliteAuthorizerDecision, ManagedSqliteAuthorizerRequest,
+        ManagedSqliteAuthorizerTransitionError, ManagedSqliteLogicalFileRole,
+        ManagedSqliteLogicalNameRejection, SealedHandleBoundSqlitePolicy,
     },
     ComputePluginHandleBoundAuthorityOpenIntent,
 };
@@ -46,7 +47,8 @@ impl fmt::Debug for ManagedSqliteRegistryRouteToken {
 
 /// Exact route identity. All three fields must match one entry before custody can be observed.
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) struct ManagedSqliteRegistryRouteHandle {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) struct ManagedSqliteRegistryRouteHandle
+{
     token: ManagedSqliteRegistryRouteToken,
     session_id: ManagedSqliteRegistrySessionId,
     route_epoch: NonZeroU64,
@@ -64,7 +66,8 @@ impl fmt::Debug for ManagedSqliteRegistryRouteHandle {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ManagedSqliteRegistryRegistrationRejection {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) enum ManagedSqliteRegistryRegistrationRejection
+{
     CustodyNotCurrent,
     InvalidNonce(ManagedSqliteLogicalNameRejection),
     TokenAlreadyUsed,
@@ -94,9 +97,11 @@ impl<Custody> fmt::Debug for ManagedSqliteRegistryRegistrationFailure<Custody> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ManagedSqliteRegistryRouteRejection {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) enum ManagedSqliteRegistryRouteRejection
+{
     UnknownOrRetired,
     IdentityMismatch,
+    Authorizer(ManagedSqliteAuthorizerTransitionError),
     State(ManagedSqliteRegistryTransitionRejection),
 }
 
@@ -209,6 +214,34 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
         handle: ManagedSqliteRegistryRouteHandle,
     ) -> Result<ManagedSqliteRegistrySessionPhase, ManagedSqliteRegistryRouteRejection> {
         Ok(self.exact_entry(handle)?.state.phase())
+    }
+
+    pub(super) fn authorize_sql(
+        &self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        request: ManagedSqliteAuthorizerRequest<'_>,
+    ) -> Result<ManagedSqliteAuthorizerDecision, ManagedSqliteRegistryRouteRejection> {
+        Ok(self.exact_entry(handle)?.policy.authorize_sql(request))
+    }
+
+    pub(super) fn enter_schema_migration(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .policy
+            .enter_schema_migration()
+            .map_err(ManagedSqliteRegistryRouteRejection::Authorizer)
+    }
+
+    pub(super) fn enter_runtime(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .policy
+            .enter_runtime()
+            .map_err(ManagedSqliteRegistryRouteRejection::Authorizer)
     }
 
     pub(super) fn begin_open_attempt(

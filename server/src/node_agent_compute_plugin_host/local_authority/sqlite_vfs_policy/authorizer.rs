@@ -120,24 +120,34 @@ impl ManagedSqliteAuthorizerPolicy {
         self.phase
     }
 
-    pub(super) fn into_schema_migration(
-        self,
-    ) -> Result<Self, ManagedSqliteAuthorizerTransitionError> {
+    pub(super) fn enter_schema_migration(
+        &mut self,
+    ) -> Result<(), ManagedSqliteAuthorizerTransitionError> {
         if self.phase != ManagedSqliteAuthorizerPhase::Bootstrap {
             return Err(ManagedSqliteAuthorizerTransitionError::InvalidPhaseTransition);
         }
-        Ok(Self {
-            phase: ManagedSqliteAuthorizerPhase::SchemaMigration,
-        })
+        self.phase = ManagedSqliteAuthorizerPhase::SchemaMigration;
+        Ok(())
     }
 
-    pub(super) fn into_runtime(self) -> Result<Self, ManagedSqliteAuthorizerTransitionError> {
+    pub(super) fn enter_runtime(&mut self) -> Result<(), ManagedSqliteAuthorizerTransitionError> {
         if self.phase != ManagedSqliteAuthorizerPhase::SchemaMigration {
             return Err(ManagedSqliteAuthorizerTransitionError::InvalidPhaseTransition);
         }
-        Ok(Self {
-            phase: ManagedSqliteAuthorizerPhase::Runtime,
-        })
+        self.phase = ManagedSqliteAuthorizerPhase::Runtime;
+        Ok(())
+    }
+
+    pub(super) fn into_schema_migration(
+        mut self,
+    ) -> Result<Self, ManagedSqliteAuthorizerTransitionError> {
+        self.enter_schema_migration()?;
+        Ok(self)
+    }
+
+    pub(super) fn into_runtime(mut self) -> Result<Self, ManagedSqliteAuthorizerTransitionError> {
+        self.enter_runtime()?;
+        Ok(self)
     }
 
     pub(super) fn authorize(

@@ -21,3 +21,8 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) use file_custody:
 };
 pub(in crate::node_agent_compute_plugin_host::local_authority) use owner::ManagedSqliteRegistryCustody;
 pub(in crate::node_agent_compute_plugin_host::local_authority) use process_owner::ManagedSqliteRegistryNonceSource;
+
+#[cfg(test)]
+pub(super) use owner::ManagedSqliteRegistryRouteHandle;
+#[cfg(test)]
+pub(super) use process_owner::ManagedSqliteRegistryProcessOwner;

@@ -8,7 +8,11 @@ use std::{
 };
 
 use super::*;
-use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::types::ManagedSqliteRegistryTransitionRejection;
+use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::{
+    registry::types::ManagedSqliteRegistryTransitionRejection, ManagedSqliteAuthorizerAction,
+    ManagedSqliteAuthorizerDecision, ManagedSqliteAuthorizerRequest,
+    ManagedSqliteAuthorizerTransitionError,
+};
 use crate::node_agent_managed_fs::ManagedSqliteFileKind;
 
 const FIRST_NONCE: [u8; 16] = [0x31; 16];
@@ -108,6 +112,41 @@ fn collision_budget_exhaustion_returns_unconsumed_custody() {
     assert_eq!(duplicate_drops.load(Ordering::SeqCst), 0);
     drop(returned);
     assert_eq!(duplicate_drops.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn routed_authorizer_transition_failure_retains_policy_and_custody() {
+    let process =
+        ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));
+    let (custody, drops) = probe();
+    let route = process.register(custody).expect("authorizer route");
+    let select =
+        || ManagedSqliteAuthorizerRequest::new(ManagedSqliteAuthorizerAction::Select, None, None);
+
+    assert_eq!(
+        process.authorize_sql(route, select()),
+        Ok(ManagedSqliteAuthorizerDecision::Deny)
+    );
+    assert_eq!(
+        process.enter_runtime(route),
+        Err(ManagedSqliteRegistryProcessRouteRejection::Route(
+            ManagedSqliteRegistryRouteRejection::Authorizer(
+                ManagedSqliteAuthorizerTransitionError::InvalidPhaseTransition
+            )
+        ))
+    );
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+
+    process
+        .enter_schema_migration(route)
+        .expect("bootstrap to schema");
+    assert_eq!(
+        process.authorize_sql(route, select()),
+        Ok(ManagedSqliteAuthorizerDecision::Allow)
+    );
+    process.enter_runtime(route).expect("schema to runtime");
+    let _receipt = process.retire_pending(route).expect("retire route");
+    assert_eq!(drops.load(Ordering::SeqCst), 1);
 }
 
 #[test]

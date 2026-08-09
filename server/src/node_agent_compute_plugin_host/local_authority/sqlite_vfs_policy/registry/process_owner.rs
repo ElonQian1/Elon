@@ -21,7 +21,10 @@ use super::{
 };
 use crate::{
     node_agent_compute_plugin_host::local_authority::{
-        sqlite_vfs_policy::ManagedSqliteLogicalFileRole,
+        sqlite_vfs_policy::{
+            ManagedSqliteAuthorizerDecision, ManagedSqliteAuthorizerRequest,
+            ManagedSqliteLogicalFileRole,
+        },
         ComputePluginHandleBoundAuthorityOpenIntent,
     },
     node_agent_managed_fs::{
@@ -53,7 +56,8 @@ impl ManagedSqliteRegistryNonceSource for ManagedSqliteRegistrySystemNonceSource
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ManagedSqliteRegistryProcessRegistrationRejection {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) enum ManagedSqliteRegistryProcessRegistrationRejection
+{
     EntropyUnavailable,
     CollisionBudgetExhausted,
     OwnerPoisoned,
@@ -61,7 +65,9 @@ pub(super) enum ManagedSqliteRegistryProcessRegistrationRejection {
 }
 
 #[must_use = "registration failure retains the authority-open custody"]
-pub(super) struct ManagedSqliteRegistryProcessRegistrationFailure<Custody> {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) struct ManagedSqliteRegistryProcessRegistrationFailure<
+    Custody,
+> {
     reason: ManagedSqliteRegistryProcessRegistrationRejection,
     custody: Custody,
 }
@@ -83,14 +89,18 @@ impl<Custody> fmt::Debug for ManagedSqliteRegistryProcessRegistrationFailure<Cus
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ManagedSqliteRegistryProcessRouteRejection {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) enum ManagedSqliteRegistryProcessRouteRejection
+{
     OwnerPoisoned,
     Route(ManagedSqliteRegistryRouteRejection),
 }
 
 /// A process-lifetime route table. Construction deliberately leaks the wrapper so a poisoned
 /// mutex or abandoned callback can never release live authority custody through `Drop`.
-pub(super) struct ManagedSqliteRegistryProcessOwner<Custody, NonceSource> {
+pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) struct ManagedSqliteRegistryProcessOwner<
+    Custody,
+    NonceSource,
+> {
     routes: Mutex<ManagedSqliteRegistryOwner<Custody>>,
     nonce_source: NonceSource,
 }
@@ -100,14 +110,16 @@ where
     Custody: ManagedSqliteRegistryCustody + 'static,
     NonceSource: ManagedSqliteRegistryNonceSource + 'static,
 {
-    pub(super) fn leak(nonce_source: NonceSource) -> &'static Self {
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn leak(
+        nonce_source: NonceSource,
+    ) -> &'static Self {
         Box::leak(Box::new(Self {
             routes: Mutex::new(ManagedSqliteRegistryOwner::new()),
             nonce_source,
         }))
     }
 
-    pub(super) fn register(
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn register(
         &'static self,
         mut custody: Custody,
     ) -> Result<
@@ -164,6 +176,30 @@ where
             .map_err(ManagedSqliteRegistryProcessRouteRejection::Route)
     }
 
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn authorize_sql(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+        request: ManagedSqliteAuthorizerRequest<'_>,
+    ) -> Result<ManagedSqliteAuthorizerDecision, ManagedSqliteRegistryProcessRouteRejection> {
+        self.lock_routes()?
+            .authorize_sql(route, request)
+            .map_err(ManagedSqliteRegistryProcessRouteRejection::Route)
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn enter_schema_migration(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        self.apply_route(route, |routes| routes.enter_schema_migration(route))
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn enter_runtime(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        self.apply_route(route, |routes| routes.enter_runtime(route))
+    }
+
     pub(super) fn begin_open_attempt(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
@@ -200,6 +236,15 @@ where
     ) -> Result<ManagedSqliteRegistryRetirementReceipt, ManagedSqliteRegistryProcessRouteRejection>
     {
         self.apply_route(route, |routes| routes.retire_pending(route))
+    }
+
+    #[cfg(test)]
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn retire_pending_for_test(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        let _receipt = self.retire_pending(route)?;
+        Ok(())
     }
 
     fn finish_callback(
