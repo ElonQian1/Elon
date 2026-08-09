@@ -6,6 +6,7 @@
   if (!nativeBridge || typeof nativeBridge.postMessage !== 'function') return;
   const conversationAdapter = window.__elonChatGptConversations;
   const messageAdapter = window.__elonChatGptMessages;
+  const composerAdapter = window.__elonChatGptComposer;
 
   let emitTimer = 0;
   let lastSnapshot = '';
@@ -106,10 +107,7 @@
     ];
     if (conversationAdapter) capabilities.push(...conversationAdapter.capabilities());
     if (messageAdapter) capabilities.push(...messageAdapter.capabilities());
-    if (document.querySelector('#upload-fast-tools-files, input[type="file"], [data-testid*="upload" i]')) {
-      capabilities.push('attachments');
-    }
-    if (findButton('', ['start dictation', '开始听写', '语音输入'])) capabilities.push('dictation');
+    if (composerAdapter) capabilities.push(...composerAdapter.capabilities(findComposer()));
     return Array.from(new Set(capabilities));
   }
 
@@ -125,6 +123,7 @@
       authenticated: isAuthenticated(),
       composerReady: !!findComposer(),
       streaming,
+      currentModel: composerAdapter ? composerAdapter.currentModel(findComposer()) : '',
       capabilities: detectCapabilities()
     };
     const fingerprint = JSON.stringify(event);
@@ -238,6 +237,34 @@
       );
     }
     if (action === 'start_google_login') return startGoogleLogin();
+    if (action === 'choose_attachments' && composerAdapter) {
+      return composerAdapter.chooseAttachments(result);
+    }
+    if (action === 'list_model_options' && composerAdapter) {
+      return composerAdapter.requestOptions('model', findComposer(), emitEvent, result);
+    }
+    if (action === 'list_composer_tools' && composerAdapter) {
+      return composerAdapter.requestOptions('tools', findComposer(), emitEvent, result);
+    }
+    if (action === 'select_model_option' && composerAdapter) {
+      return composerAdapter.selectOption(
+        'model', String(command.value || ''), findComposer(), emitEvent, result, scheduleSnapshot
+      );
+    }
+    if (action === 'select_composer_tool' && composerAdapter) {
+      return composerAdapter.selectOption(
+        'tools', String(command.value || ''), findComposer(), emitEvent, result, scheduleSnapshot
+      );
+    }
+    if (action === 'open_model_selector' && composerAdapter) {
+      return composerAdapter.openOfficial('model', findComposer(), result);
+    }
+    if (action === 'open_composer_tools' && composerAdapter) {
+      return composerAdapter.openOfficial('tools', findComposer(), result);
+    }
+    if (action === 'start_dictation' && composerAdapter) {
+      return composerAdapter.startDictation(findComposer(), result);
+    }
     if (action === 'list_conversations' && conversationAdapter) {
       return conversationAdapter.requestList(emitEvent, result);
     }

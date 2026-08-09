@@ -17,7 +17,15 @@ internal data class ChatGptWebSnapshot(
     val authenticated: Boolean,
     val composerReady: Boolean,
     val streaming: Boolean,
+    val currentModel: String,
     val capabilities: ChatGptWebCapabilities,
+)
+
+internal data class ChatGptWebComposerOption(
+    val id: String,
+    val label: String,
+    val selected: Boolean,
+    val kind: String,
 )
 
 internal sealed interface ChatGptWebEvent {
@@ -25,6 +33,12 @@ internal sealed interface ChatGptWebEvent {
 
     data class ConversationList(
         val conversations: List<ChatGptWebConversation>,
+    ) : ChatGptWebEvent
+
+    data class ComposerControls(
+        val section: String,
+        val currentModel: String,
+        val options: List<ChatGptWebComposerOption>,
     ) : ChatGptWebEvent
 
     data class CommandResult(
@@ -44,6 +58,7 @@ internal object ChatGptWebProtocol {
                 "conversation_snapshot" -> ChatGptWebEvent.ConversationList(
                     parseConversations(event),
                 )
+                "composer_controls_snapshot" -> parseComposerControls(event)
                 else -> null
             }
         }
@@ -86,7 +101,36 @@ internal object ChatGptWebProtocol {
             authenticated = event.optBoolean("authenticated"),
             composerReady = event.optBoolean("composerReady"),
             streaming = event.optBoolean("streaming"),
+            currentModel = event.optString("currentModel").trim().take(MAX_MODEL_LABEL_LENGTH),
             capabilities = ChatGptWebCapabilities(parseStringSet(event, "capabilities")),
+        )
+    }
+
+    private fun parseComposerControls(event: JSONObject): ChatGptWebEvent.ComposerControls? {
+        val section = event.optString("section")
+        if (section !in SUPPORTED_COMPOSER_SECTIONS) return null
+        val rawOptions = event.optJSONArray("options")
+        val options = buildList {
+            if (rawOptions == null) return@buildList
+            for (index in 0 until minOf(rawOptions.length(), MAX_COMPOSER_OPTIONS)) {
+                val item = rawOptions.optJSONObject(index) ?: continue
+                val id = item.optString("id").take(MAX_OPTION_ID_LENGTH)
+                val label = item.optString("label").trim().take(MAX_OPTION_LABEL_LENGTH)
+                if (!OPTION_ID.matches(id) || label.isBlank()) continue
+                add(
+                    ChatGptWebComposerOption(
+                        id = id,
+                        label = label,
+                        selected = item.optBoolean("selected"),
+                        kind = item.optString("kind").take(MAX_OPTION_KIND_LENGTH),
+                    ),
+                )
+            }
+        }
+        return ChatGptWebEvent.ComposerControls(
+            section = section,
+            currentModel = event.optString("currentModel").trim().take(MAX_MODEL_LABEL_LENGTH),
+            options = options,
         )
     }
 
@@ -136,6 +180,7 @@ internal object ChatGptWebProtocol {
     private val SUPPORTED_ROLES = setOf("user", "assistant")
     private val SUPPORTED_MESSAGE_STATES = setOf("completed", "streaming")
     private val SUPPORTED_CONTENT_TYPES = setOf("text", "markdown")
+    private val SUPPORTED_COMPOSER_SECTIONS = setOf("model", "tools")
     private const val MAX_MESSAGES = 80
     private const val MAX_MESSAGE_LENGTH = 40_000
     private const val MAX_CONTENT_PARTS = 20
@@ -143,9 +188,15 @@ internal object ChatGptWebProtocol {
     private const val MAX_CONVERSATIONS = 100
     private const val MAX_CAPABILITIES = 40
     private const val MAX_CAPABILITY_LENGTH = 48
+    private const val MAX_MODEL_LABEL_LENGTH = 80
+    private const val MAX_COMPOSER_OPTIONS = 30
+    private const val MAX_OPTION_ID_LENGTH = 64
+    private const val MAX_OPTION_LABEL_LENGTH = 120
+    private const val MAX_OPTION_KIND_LENGTH = 32
     private const val MAX_TITLE_LENGTH = 160
     private const val MAX_PATH_LENGTH = 256
     private const val MAX_ID_LENGTH = 160
     private val CAPABILITY_ID = Regex("[a-z][a-z0-9_]{0,47}")
+    private val OPTION_ID = Regex("[a-z][a-z0-9_]{1,63}")
     private val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
 }

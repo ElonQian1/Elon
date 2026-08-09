@@ -108,6 +108,20 @@ internal class ChatGptWebPageAdapter(
 
     fun startGoogleLogin() = runCommand("start_google_login")
 
+    fun chooseAttachments() = runCommand("choose_attachments")
+
+    fun listModelOptions() = runCommand("list_model_options")
+
+    fun listComposerTools() = runCommand("list_composer_tools")
+
+    fun selectModelOption(id: String) = runCommand("select_model_option", id.take(MAX_OPTION_ID_LENGTH))
+
+    fun selectComposerTool(id: String) = runCommand("select_composer_tool", id.take(MAX_OPTION_ID_LENGTH))
+
+    fun openModelSelector() = runCommand("open_model_selector")
+
+    fun openComposerTools() = runCommand("open_composer_tools")
+
     fun requestSnapshot() = runCommand("snapshot")
 
     fun markReady() = onStateChanged(State.READY)
@@ -135,6 +149,7 @@ internal class ChatGptWebPageAdapter(
     private fun ChatGptWebEvent.completesHandshake(): Boolean = when (this) {
         is ChatGptWebEvent.Snapshot -> value.authenticated || value.composerReady
         is ChatGptWebEvent.ConversationList,
+        is ChatGptWebEvent.ComposerControls,
         is ChatGptWebEvent.CommandResult -> true
     }
 
@@ -165,11 +180,13 @@ internal class ChatGptWebPageAdapter(
         val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_conversations.js",
             "chatgpt_web_adapter_messages.js",
+            "chatgpt_web_adapter_composer.js",
             "chatgpt_web_adapter.js",
         )
         const val BRIDGE_OBJECT = "elonChatGptNative"
         const val ALLOWED_ORIGIN = "https://chatgpt.com"
         const val MAX_PROMPT_LENGTH = 20_000
         const val MAX_CONVERSATION_PATH_LENGTH = 256
+        const val MAX_OPTION_ID_LENGTH = 64
     }
 }

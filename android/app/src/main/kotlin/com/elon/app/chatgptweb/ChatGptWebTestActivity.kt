@@ -2,9 +2,11 @@ package com.elon.app.chatgptweb
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebStorage
@@ -20,11 +22,13 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var binding: ActivityChatgptWebTestBinding
     private lateinit var pageAdapter: ChatGptWebPageAdapter
     private lateinit var nativeController: ChatGptNativeConversationController
+    private lateinit var composerToolsController: ChatGptNativeComposerToolsController
     private lateinit var conversationListController: ChatGptNativeConversationListController
     private lateinit var loginController: ChatGptNativeLoginController
     private lateinit var googleAccountHintController: ChatGptGoogleAccountHintController
     private lateinit var modeController: ChatGptWebModeController
     private lateinit var proxyController: ChatGptWebProxyController
+    private lateinit var fileChooserController: ChatGptWebFileChooserController
     private var proxyStatus = ChatGptWebProxyStatus("手机网络")
     private var webAuthenticationStatus = ChatGptWebAuthenticationSupport.Status.UNSUPPORTED
     private val cookieManager: CookieManager by lazy { CookieManager.getInstance() }
@@ -88,6 +92,19 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onStop = { pageAdapter.stopGeneration() },
             onNewConversation = { pageAdapter.startNewConversation() },
             onRegenerate = { pageAdapter.regenerateResponse() },
+        )
+        composerToolsController = ChatGptNativeComposerToolsController(
+            activity = this,
+            modelButton = binding.chatGptNativeModel,
+            attachmentButton = binding.chatGptNativeAttachment,
+            toolsButton = binding.chatGptNativeTools,
+            onChooseAttachments = { pageAdapter.chooseAttachments() },
+            onRequestModelOptions = { pageAdapter.listModelOptions() },
+            onRequestTools = { pageAdapter.listComposerTools() },
+            onSelectModelOption = { pageAdapter.selectModelOption(it) },
+            onSelectTool = { pageAdapter.selectComposerTool(it) },
+            onOpenOfficialModelSelector = { openOfficialControl(pageAdapter::openModelSelector) },
+            onOpenOfficialTools = { openOfficialControl(pageAdapter::openComposerTools) },
         )
         conversationListController = ChatGptNativeConversationListController(
             activity = this,
@@ -156,6 +173,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun configureWebView() {
         WebView.setWebContentsDebuggingEnabled(false)
+        fileChooserController = ChatGptWebFileChooserController(this)
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(binding.chatGptWebView, true)
 
@@ -195,6 +213,12 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     binding.chatGptWebProgress.progress = newProgress
                     binding.chatGptWebProgress.visibility = if (newProgress < 100) View.VISIBLE else View.GONE
                 }
+
+                override fun onShowFileChooser(
+                    webView: WebView,
+                    filePathCallback: ValueCallback<Array<Uri>>,
+                    fileChooserParams: FileChooserParams,
+                ): Boolean = fileChooserController.show(webView, filePathCallback, fileChooserParams)
             }
         }
     }
@@ -237,8 +261,10 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private fun handleBridgeEvent(event: ChatGptWebEvent) {
         when (event) {
             is ChatGptWebEvent.ConversationList -> conversationListController.render(event.conversations)
+            is ChatGptWebEvent.ComposerControls -> composerToolsController.render(event)
             is ChatGptWebEvent.Snapshot -> {
                 nativeController.render(event.value)
+                composerToolsController.render(event.value)
                 conversationListController.renderCapabilities(event.value.capabilities)
                 if (
                     event.value.authenticated &&
@@ -258,6 +284,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 if (googleAccountHintController.onCommandResult(event)) return
                 if (conversationListController.onCommandResult(event)) return
                 nativeController.onCommandResult(event)
+                composerToolsController.onCommandResult(event)
                 if (!event.ok) {
                     binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_project))
                     binding.chatGptWebStatus.text = event.detail.ifBlank { getString(R.string.chatgpt_native_command_failed) }
@@ -271,6 +298,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun handleBridgeState(state: ChatGptWebPageAdapter.State) {
         nativeController.setBridgeState(state)
+        composerToolsController.setBridgeState(state)
         conversationListController.setBridgeState(state)
         binding.chatGptModeNative.isEnabled = state == ChatGptWebPageAdapter.State.READY
         binding.chatGptModeNative.alpha = if (binding.chatGptModeNative.isEnabled) 1f else 0.48f
@@ -299,6 +327,11 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 ChatGptWebModeController.Mode.WEB -> R.string.chatgpt_web_ready
             },
         )
+    }
+
+    private fun openOfficialControl(action: () -> Unit) {
+        modeController.select(ChatGptWebModeController.Mode.WEB)
+        binding.chatGptWebView.post(action)
     }
 
     private fun statusWithProxy(messageResource: Int): String =
@@ -384,6 +417,8 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         googleAccountHintController.dispose()
         loginController.dispose()
         conversationListController.dispose()
+        composerToolsController.dispose()
+        fileChooserController.dispose()
         pageAdapter.dispose()
         binding.chatGptWebView.apply {
             stopLoading()

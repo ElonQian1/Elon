@@ -25,6 +25,7 @@ class ChatGptWebProtocolTest {
                 "authenticated":true,
                 "composerReady":true,
                 "streaming":false,
+                "currentModel":"5.6 Sol 轻度",
                 "capabilities":["streaming","conversation_list","invalid capability"],
                 "messages":[
                   {"id":"u1","role":"user","state":"completed","content":[{"type":"text","text":"你好"}]},
@@ -41,12 +42,40 @@ class ChatGptWebProtocolTest {
         assertTrue(event.value.authenticated)
         assertTrue(event.value.composerReady)
         assertFalse(event.value.streaming)
+        assertEquals("5.6 Sol 轻度", event.value.currentModel)
         assertEquals(2, event.value.messages.size)
         assertEquals("assistant", event.value.messages.last().role)
         assertEquals("streaming", event.value.messages.last().state)
         assertTrue(event.value.messages.last().content.startsWith("## 你好"))
         assertTrue(event.value.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST))
         assertFalse(event.value.capabilities.supports("invalid capability"))
+    }
+
+    @Test
+    fun parsesComposerControlsAndRejectsUnsafeOptionIds() {
+        val event = ChatGptWebProtocol.parse(
+            """
+            {
+              "schema":"yilong.ai.ui.v1",
+              "event":{
+                "type":"composer_controls_snapshot",
+                "section":"model",
+                "currentModel":"5.6 Sol 轻度",
+                "options":[
+                  {"id":"model_ab12","label":"轻度","selected":true,"kind":"menuitemradio"},
+                  {"id":"../unsafe","label":"错误选项","selected":false,"kind":"menuitem"},
+                  {"id":"model_blank","label":"  ","selected":false,"kind":"menuitem"}
+                ]
+              }
+            }
+            """.trimIndent(),
+        ) as ChatGptWebEvent.ComposerControls
+
+        assertEquals("model", event.section)
+        assertEquals("5.6 Sol 轻度", event.currentModel)
+        assertEquals(1, event.options.size)
+        assertEquals("轻度", event.options.single().label)
+        assertTrue(event.options.single().selected)
     }
 
     @Test

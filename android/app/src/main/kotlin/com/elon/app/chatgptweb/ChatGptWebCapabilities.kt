@@ -19,6 +19,7 @@ internal object ChatGptWebCapabilityId {
     const val NEW_CONVERSATION = "new_conversation"
     const val ATTACHMENTS = "attachments"
     const val MODEL_SELECTOR = "model_selector"
+    const val COMPOSER_TOOLS = "composer_tools"
     const val DICTATION = "dictation"
     const val GOOGLE_LOGIN_ENTRY = "google_login_entry"
     const val RICH_TEXT = "rich_text"
