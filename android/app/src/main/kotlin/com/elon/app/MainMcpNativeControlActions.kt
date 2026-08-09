@@ -333,7 +333,7 @@ internal class MainMcpNativeControlActions(
     }
 
     private fun activeSurface(): String = when {
-        activeFriend()?.id == SOCIAL_AI_USER_ID -> "social_ai"
+        activeFriend().isSocialAi() -> "social_ai"
         activeFriend() != null -> "friend_chat"
         activePage() == "chat" -> "project_chat"
         else -> activePage()
@@ -414,7 +414,7 @@ internal class MainMcpNativeControlActions(
         return JSONObject()
             .put("friend_id", friend.id)
             .put("friend_name", friend.name)
-            .put("is_social_ai", friend.id == SOCIAL_AI_USER_ID)
+            .put("is_social_ai", friend.isSocialAi())
             .put("message_count", messages.size)
             .put("messages", JSONArray().apply {
                 messages.takeLast(MAX_SOCIAL_MESSAGES).forEachIndexed { offset, message ->
@@ -485,7 +485,6 @@ internal class MainMcpNativeControlActions(
     }
 
     private companion object {
-        const val SOCIAL_AI_USER_ID = "usr_elon_ai"
         const val MAX_SOCIAL_MESSAGES = 40
         const val MAX_SOCIAL_MESSAGE_CHARS = 30_000
     }

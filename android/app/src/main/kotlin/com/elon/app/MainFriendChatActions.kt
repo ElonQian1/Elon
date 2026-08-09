@@ -109,7 +109,7 @@ internal class MainFriendChatActions(
 
     fun isActive(): Boolean = activeFriend != null
 
-    fun isDirectSocialAiActive(): Boolean = activeFriend?.id == SOCIAL_AI_USER_ID
+    fun isDirectSocialAiActive(): Boolean = activeFriend.isSocialAi()
 
     fun currentFriend(): AppFriend? = activeFriend
 
@@ -499,7 +499,7 @@ internal class MainFriendChatActions(
     private fun friendMessageFromJson(friend: AppFriend, json: JSONObject): ChatMessage {
         val outgoing = json.optBoolean("outgoing", false)
         val senderUserId = json.optString("sender_user_id", "").trim()
-        val isElAssistant = senderUserId == SOCIAL_AI_USER_ID
+        val isElAssistant = SocialAiIdentity.matches(senderUserId)
         val senderName = json.optString("sender_name", "").trim().takeIf { it.isNotEmpty() }
         return ChatMessage(
             role = if (outgoing) "user" else if (isElAssistant) "ai" else "friend",
@@ -536,6 +536,5 @@ internal class MainFriendChatActions(
         const val AI_REPLY_REFRESH_DELAY_MS = 1200L
         const val SENDING_STATUS = "发送中..."
         const val MAX_ATTACHMENT_BYTES = 12 * 1024 * 1024
-        const val SOCIAL_AI_USER_ID = "usr_elon_ai"
     }
 }

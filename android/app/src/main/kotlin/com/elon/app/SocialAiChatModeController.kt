@@ -15,7 +15,7 @@ internal class SocialAiChatModeController(
     private val onFriendOpened: () -> Unit,
 ) {
     fun onFriendChanged(friend: AppFriend?) {
-        val active = friend?.id == SOCIAL_AI_USER_ID
+        val active = friend.isSocialAi()
         binding.topTitleText.apply {
             isClickable = active
             isFocusable = active
@@ -68,7 +68,6 @@ internal class SocialAiChatModeController(
     private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density).toInt()
 
     companion object {
-        const val SOCIAL_AI_USER_ID = "usr_elon_ai"
         private const val MODE_YILONG = 0
         private const val MODE_CHATGPT_WEB = 1
     }

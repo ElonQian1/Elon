@@ -1039,7 +1039,7 @@ class MainActivity : AppCompatActivity() {
         SocialAiChatModeController(
             activity = this,
             binding = binding,
-            findSocialAiFriend = { s.friends.firstOrNull { it.id == SocialAiChatModeController.SOCIAL_AI_USER_ID } },
+            findSocialAiFriend = { SocialAiIdentity.resolve(s.friends) },
             closeGroupChat = { groupChatActions.closeGroupChat() },
             closeProjectChat = { projectSpaceController.closeChannelChat() },
             openFriend = { friend -> friendChatActions.openFriend(friend, animate = false) },
