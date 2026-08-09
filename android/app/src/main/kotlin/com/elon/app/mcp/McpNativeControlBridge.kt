@@ -76,8 +76,16 @@ internal object McpNativeControlBridge {
             .put("activity_bound", false)
             .put("error", "main_activity_not_bound")
             .put("hint", "Call action=open_main, then retry after MainActivity registers the native MCP controller.")
-        return current.control(args)
-            .put("schema", "elon.apk.native_mcp_control_result.v1")
+        return decorateControlResult(current.control(args), action)
+    }
+
+    internal fun decorateControlResult(result: JSONObject, action: String): JSONObject {
+        if (result.has("schema")) {
+            result.put("envelope_schema", CONTROL_RESULT_SCHEMA)
+        } else {
+            result.put("schema", CONTROL_RESULT_SCHEMA)
+        }
+        return result
             .put("action", action)
             .put("activity_bound", true)
     }
@@ -116,6 +124,8 @@ internal object McpNativeControlBridge {
         } while (SystemClock.elapsedRealtime() < deadline)
         return controller
     }
+
+    private const val CONTROL_RESULT_SCHEMA = "elon.apk.native_mcp_control_result.v1"
 }
 
 internal fun mcpUiState(context: Context, args: JSONObject): JSONObject {
