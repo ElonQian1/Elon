@@ -17,7 +17,7 @@ internal class ChatGptNativeAdaptiveUiController(
     private val headerActionsScroll: HorizontalScrollView,
     private val headerActions: LinearLayout,
     private val suggestions: LinearLayout,
-    private val emptyView: TextView,
+    private val onSuggestionsVisibleChanged: (Boolean) -> Unit,
     private val onInvoke: (String) -> Unit,
 ) {
     private var manifest: ChatGptWebUiManifest? = null
@@ -58,7 +58,7 @@ internal class ChatGptNativeAdaptiveUiController(
             .forEach { control -> suggestions.addView(suggestionButton(control)) }
         val visible = suggestions.childCount > 0
         suggestions.visibility = if (visible) View.VISIBLE else View.GONE
-        emptyView.visibility = if (visible) View.GONE else View.VISIBLE
+        onSuggestionsVisibleChanged(visible)
     }
 
     private fun compactButton(control: ChatGptWebUiControl): MaterialButton =

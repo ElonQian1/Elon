@@ -188,7 +188,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             headerActionsScroll = binding.chatGptNativeHeaderActionsScroll,
             headerActions = binding.chatGptNativeHeaderActions,
             suggestions = binding.chatGptNativeSuggestions,
-            emptyView = binding.chatGptNativeEmpty,
+            onSuggestionsVisibleChanged = nativeController::setSuggestionsVisible,
             onInvoke = { pageAdapter.invokeUiControl(it) },
         )
         overlayControlsController = ChatGptNativeOverlayControlsController(

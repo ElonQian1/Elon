@@ -37,6 +37,7 @@ internal class ChatGptNativeConversationController(
     )
     private var snapshot: ChatGptWebSnapshot? = null
     private var pendingPrompt: String? = null
+    private var suggestionsVisible = false
 
     init {
         messagesView.layoutManager = LinearLayoutManager(messagesView.context)
@@ -73,7 +74,7 @@ internal class ChatGptNativeConversationController(
         }
         messages = nextMessages
         adapter.submit(nextMessages, value.capabilities)
-        emptyView.visibility = if (messages.isEmpty()) View.VISIBLE else View.GONE
+        updateEmptyVisibility()
         if (!composer.hasFocus() && pendingPrompt == null && composer.text.toString() != value.draft) {
             composer.setText(value.draft)
             composer.setSelection(composer.text?.length ?: 0)
@@ -98,10 +99,15 @@ internal class ChatGptNativeConversationController(
                 pendingPrompt = null
                 messages = emptyList()
                 adapter.submit(emptyList(), snapshot?.capabilities ?: ChatGptWebCapabilities.EMPTY)
-                emptyView.visibility = View.VISIBLE
+                updateEmptyVisibility()
                 composer.text?.clear()
             }
         }
+    }
+
+    fun setSuggestionsVisible(visible: Boolean) {
+        suggestionsVisible = visible
+        updateEmptyVisibility()
     }
 
     fun renderUiManifest(value: ChatGptWebUiManifest) {
@@ -161,6 +167,10 @@ internal class ChatGptNativeConversationController(
         composer.isEnabled = available
         sendButton.isEnabled = available
         sendButton.alpha = if (available) 1f else DISABLED_ALPHA
+    }
+
+    private fun updateEmptyVisibility() {
+        emptyView.visibility = if (messages.isEmpty() && !suggestionsVisible) View.VISIBLE else View.GONE
     }
 
     private companion object {

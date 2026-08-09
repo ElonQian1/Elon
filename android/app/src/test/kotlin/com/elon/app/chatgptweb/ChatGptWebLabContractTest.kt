@@ -153,6 +153,23 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun conversationControllerExclusivelyOwnsTheSharedEmptyState() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val conversation = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeConversationController.kt"
+        )
+        val adaptive = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeAdaptiveUiController.kt"
+        )
+
+        assertTrue(activity.contains("onSuggestionsVisibleChanged = nativeController::setSuggestionsVisible"))
+        assertTrue(conversation.contains("messages.isEmpty() && !suggestionsVisible"))
+        assertFalse(adaptive.contains("emptyView.visibility"))
+    }
+
+    @Test
     fun quickLoginUsesOurShellAndKeepsCredentialsOnOfficialPages() {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
