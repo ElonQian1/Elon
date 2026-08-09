@@ -3,6 +3,7 @@ use std::fmt;
 use anyhow::{bail, Context, Result};
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 
+use super::sqlite_vfs_policy::ManagedSqliteRegistryCustody;
 use super::{ComputePluginAuthorityInstanceBinding, COMPUTE_PLUGIN_STATE_FILE};
 use crate::node_agent_compute_plugin_host::bootstrap::PinnedAuthorityOpenCustody;
 
@@ -72,6 +73,12 @@ impl Drop for ComputePluginHandleBoundAuthorityOpenIntent {
         // Publish terminal revocation before automatic field destruction releases the namespace,
         // root lock or configured NodeAgent instance-lock lease.
         self.custody.retire();
+    }
+}
+
+impl ManagedSqliteRegistryCustody for ComputePluginHandleBoundAuthorityOpenIntent {
+    fn ensure_registry_current(&self) -> Result<()> {
+        self.ensure_current()
     }
 }
 

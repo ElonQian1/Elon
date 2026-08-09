@@ -4,8 +4,8 @@ use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::t
 
 /// Process-local identity for one future one-shot routing session.
 ///
-/// The value has no creation API in the current build. It can only become constructible together
-/// with the future routing-table owner that proves exact-token uniqueness.
+/// Only the private routing-table owner can create this value while atomically inserting the
+/// matching custody, policy and lifecycle state.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct ManagedSqliteRegistrySessionId {
     value: NonZeroU64,
@@ -17,17 +17,21 @@ impl fmt::Debug for ManagedSqliteRegistrySessionId {
     }
 }
 
-#[cfg(test)]
 impl ManagedSqliteRegistrySessionId {
-    pub(super) fn test_value(value: u64) -> Self {
-        Self {
-            value: NonZeroU64::new(value).expect("test session id must be non-zero"),
-        }
+    pub(super) fn from_registry(value: NonZeroU64) -> Self {
+        Self { value }
     }
 }
 
-/// A route-removal proof is deliberately impossible to mint in this batch. The future routing
-/// owner must create it only after an exact token, session identity and entry identity all match.
+#[cfg(test)]
+impl ManagedSqliteRegistrySessionId {
+    pub(super) fn test_value(value: u64) -> Self {
+        Self::from_registry(NonZeroU64::new(value).expect("test session id must be non-zero"))
+    }
+}
+
+/// The private routing owner mints this proof only after exact token, session and route identity
+/// match and the entry has been removed under exclusive owner access.
 #[must_use = "route-removal proof must be consumed by the matching session"]
 pub(super) struct ManagedSqliteRegistryRouteRemovalProof {
     session_id: ManagedSqliteRegistrySessionId,
@@ -35,6 +39,16 @@ pub(super) struct ManagedSqliteRegistryRouteRemovalProof {
 }
 
 impl ManagedSqliteRegistryRouteRemovalProof {
+    pub(super) fn from_removed_route(
+        session_id: ManagedSqliteRegistrySessionId,
+        route_epoch: NonZeroU64,
+    ) -> Self {
+        Self {
+            session_id,
+            route_epoch,
+        }
+    }
+
     pub(super) fn session_id(&self) -> ManagedSqliteRegistrySessionId {
         self.session_id
     }
@@ -45,10 +59,10 @@ impl ManagedSqliteRegistryRouteRemovalProof {
 
     #[cfg(test)]
     pub(super) fn test_value(session_id: ManagedSqliteRegistrySessionId, route_epoch: u64) -> Self {
-        Self {
+        Self::from_removed_route(
             session_id,
-            route_epoch: NonZeroU64::new(route_epoch).expect("test route epoch must be non-zero"),
-        }
+            NonZeroU64::new(route_epoch).expect("test route epoch must be non-zero"),
+        )
     }
 }
 

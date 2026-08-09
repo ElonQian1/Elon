@@ -10,9 +10,10 @@ use super::types::{
 };
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::types::ManagedSqliteLogicalFileRole;
 
+mod owner;
 #[cfg(test)]
 mod tests;
-/// Pure, currently unconstructible lifecycle state for one future one-shot registry session.
+/// Pure lifecycle state constructed only while its owning route entry is atomically inserted.
 /// A future owner must quarantine complete custody whenever a session is abandoned before retire.
 #[must_use = "a non-retired session must remain under routing or terminal custody"]
 pub(super) struct ManagedSqliteRegistrySessionState {
@@ -30,14 +31,6 @@ pub(super) struct ManagedSqliteRegistrySessionState {
 }
 
 impl ManagedSqliteRegistrySessionState {
-    pub(super) fn phase(&self) -> ManagedSqliteRegistrySessionPhase {
-        self.phase
-    }
-
-    pub(super) fn terminal_reason(&self) -> Option<ManagedSqliteRegistryTerminalReason> {
-        self.terminal_reason
-    }
-
     pub(super) fn begin_open_attempt(
         &mut self,
     ) -> Result<(), ManagedSqliteRegistryTransitionRejection> {
