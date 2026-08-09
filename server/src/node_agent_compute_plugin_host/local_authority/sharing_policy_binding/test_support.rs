@@ -22,8 +22,10 @@ use crate::node_agent_compute_plugin_host::{
 };
 
 mod prepared_work;
+mod store;
 
 pub(super) use prepared_work::seed_prepared_work;
+pub(super) use store::{commit_transition, connection, projected_binding, read_current_state};
 
 const INSTALLATION_DIGEST: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";

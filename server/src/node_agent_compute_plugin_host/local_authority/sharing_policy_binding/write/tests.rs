@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection, TransactionBehavior};
+use rusqlite::{Connection, TransactionBehavior};
 
 use super::super::{
     revocation::{
@@ -6,102 +6,16 @@ use super::super::{
         validate_terminalized_work,
     },
     test_support,
-    validation::project,
 };
 use super::{insert_receipt, read_exact_receipt};
-use crate::node_agent_compute_plugin_host::{
-    local_authority::sharing_policy_binding::types::{
-        PolicyBindingAuthorityState, ProjectedSharingPolicyBinding,
-    },
-    local_authority_schema::ensure_schema,
-};
+use crate::node_agent_compute_plugin_host::local_authority::sharing_policy_binding::types::ProjectedSharingPolicyBinding;
 
 fn projected_binding() -> ProjectedSharingPolicyBinding {
-    project(
+    test_support::projected_binding(
         test_support::request(4),
         test_support::authority_state(),
         &test_support::bound_at(),
     )
-    .unwrap()
-}
-
-fn connection(before: &PolicyBindingAuthorityState) -> Connection {
-    let mut connection = Connection::open_in_memory().unwrap();
-    connection
-        .pragma_update(None, "foreign_keys", "ON")
-        .unwrap();
-    connection
-        .pragma_update(None, "trusted_schema", "OFF")
-        .unwrap();
-    ensure_schema(&mut connection).unwrap();
-    connection
-        .execute(
-            r#"INSERT INTO authority_meta (
-                singleton, schema_version, installation_id_digest,
-                state_revision, inventory_revision, inventory_digest, inventory_json,
-                desired_policy_revision, sharing_enabled,
-                sharing_authorization_ref, sharing_authorization_revision,
-                sharing_authorization_digest, node_profile_digest,
-                manifest_catalog_revision, target_id, host_api_protocol_id,
-                host_api_revision, active_bundle_revision,
-                publisher_keyring_revision, publisher_keyring_digest,
-                control_keyring_revision, control_keyring_digest,
-                authority_epoch, process_owner_epoch,
-                trusted_time_high_water_ms, clock_status, updated_at_ms
-            ) VALUES (
-                1, 3, ?1,
-                ?2, ?3, ?4, ?5,
-                ?6, ?7,
-                ?8, ?9,
-                ?10, ?11,
-                0, 'windows_x86_64', 'elon_compute_plugin_host',
-                1, NULL,
-                NULL, NULL,
-                NULL, NULL,
-                ?12, ?13,
-                ?14, 'trusted', ?15
-            )"#,
-            params![
-                &before.installation_id_digest,
-                before.state_revision,
-                before.inventory_revision,
-                &before.inventory_digest,
-                &before.inventory_json,
-                before.desired_policy_revision,
-                i64::from(before.sharing_enabled),
-                before.sharing_authorization_ref.as_deref(),
-                before.sharing_authorization_revision,
-                before.sharing_authorization_digest.as_deref(),
-                "f".repeat(64),
-                before.authority_epoch,
-                before.process_owner_epoch,
-                before.trusted_time_high_water_ms,
-                before.updated_at_ms,
-            ],
-        )
-        .unwrap();
-    connection
-}
-
-fn commit_transition(connection: &mut Connection, projected: &ProjectedSharingPolicyBinding) {
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .unwrap();
-    let prepared = prepare_revocation(&transaction, projected).unwrap();
-    assert_eq!(prepared.hashed_receipt.receipt().work_item_count, 0);
-    insert_prepared_revocation(&transaction, &prepared).unwrap();
-    insert_receipt(&transaction, projected).unwrap();
-
-    let binding = read_exact_receipt(&transaction, &projected.request)
-        .unwrap()
-        .unwrap();
-    assert_eq!(binding, projected.hashed_receipt);
-    let revocation = read_exact_revocation(&transaction, &projected.request, &binding)
-        .unwrap()
-        .unwrap();
-    assert_eq!(revocation, prepared);
-    validate_terminalized_work(&transaction, &revocation).unwrap();
-    transaction.commit().unwrap();
 }
 
 fn prepared_work_states(connection: &Connection) -> (String, String) {
@@ -120,9 +34,10 @@ fn prepared_work_states(connection: &Connection) -> (String, String) {
 #[test]
 fn revocation_and_binding_commit_atomically_and_advance_authority() {
     let projected = projected_binding();
-    let mut connection = connection(&projected.before);
+    let mut connection = test_support::connection(&projected.before);
 
-    commit_transition(&mut connection, &projected);
+    let prepared = test_support::commit_transition(&mut connection, &projected);
+    assert_eq!(prepared.hashed_receipt.receipt().work_item_count, 0);
 
     let receipt = &projected.hashed_receipt.receipt;
     let authority: (i64, i64, String, i64, i64, i64) = connection
@@ -169,7 +84,7 @@ fn revocation_and_binding_commit_atomically_and_advance_authority() {
 #[test]
 fn revocation_without_binding_cannot_commit_or_leave_an_orphan() {
     let projected = projected_binding();
-    let mut connection = connection(&projected.before);
+    let mut connection = test_support::connection(&projected.before);
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .unwrap();
@@ -197,8 +112,9 @@ fn revocation_without_binding_cannot_commit_or_leave_an_orphan() {
 #[test]
 fn committed_revocation_receipt_is_immutable_and_append_only() {
     let projected = projected_binding();
-    let mut connection = connection(&projected.before);
-    commit_transition(&mut connection, &projected);
+    let mut connection = test_support::connection(&projected.before);
+    let prepared = test_support::commit_transition(&mut connection, &projected);
+    assert_eq!(prepared.hashed_receipt.receipt().work_item_count, 0);
 
     let update_error = connection
         .execute(
@@ -221,7 +137,7 @@ fn committed_revocation_receipt_is_immutable_and_append_only() {
 #[test]
 fn prepared_fetch_and_verification_terminalize_with_binding() {
     let projected = projected_binding();
-    let mut connection = connection(&projected.before);
+    let mut connection = test_support::connection(&projected.before);
     test_support::seed_prepared_work(&mut connection, &projected.before);
     assert_eq!(
         prepared_work_states(&connection),
@@ -278,7 +194,7 @@ fn prepared_fetch_and_verification_terminalize_with_binding() {
 #[test]
 fn orphan_revocation_rollback_preserves_prepared_work() {
     let projected = projected_binding();
-    let mut connection = connection(&projected.before);
+    let mut connection = test_support::connection(&projected.before);
     test_support::seed_prepared_work(&mut connection, &projected.before);
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)

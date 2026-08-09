@@ -164,7 +164,7 @@ fn validate_revision_absence(
     Ok(())
 }
 
-fn insert_receipt(
+pub(super) fn insert_receipt(
     transaction: &Transaction<'_>,
     projected: &ProjectedSharingPolicyBinding,
 ) -> Result<()> {

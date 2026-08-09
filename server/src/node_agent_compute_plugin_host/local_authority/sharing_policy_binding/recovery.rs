@@ -17,6 +17,9 @@ use crate::node_agent_compute_plugin_host::{
     fetch_file::PinnedComputePluginRoot, trusted_time::ComputePluginTrustedTimeObservation,
 };
 
+#[cfg(test)]
+mod tests;
+
 pub(super) fn adopt(
     authority: &ComputePluginLocalAuthority,
     mut recovery: ComputePluginSharingPolicyBindingRecovery,
