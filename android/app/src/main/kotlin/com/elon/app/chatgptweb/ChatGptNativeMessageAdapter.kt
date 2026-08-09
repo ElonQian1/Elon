@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.text.method.LinkMovementMethod
 import androidx.recyclerview.widget.DiffUtil
@@ -17,11 +18,13 @@ internal class ChatGptNativeMessageAdapter(
     parent: View,
     private val onCopy: (ChatGptWebMessage) -> Unit,
     private val onRegenerate: () -> Unit,
+    onOpenOfficial: () -> Unit,
 ) : RecyclerView.Adapter<ChatGptNativeMessageAdapter.MessageViewHolder>() {
     private val markwon = Markwon.builder(parent.context)
         .usePlugin(StrikethroughPlugin.create())
         .usePlugin(TablePlugin.create(parent.context))
         .build()
+    private val partRenderer = ChatGptNativeMessagePartRenderer(onOpenOfficial)
     private var messages: List<ChatGptWebMessage> = emptyList()
     private var capabilities = ChatGptWebCapabilities.EMPTY
 
@@ -58,6 +61,7 @@ internal class ChatGptNativeMessageAdapter(
             holder.text.movementMethod = null
         }
         holder.copy.setOnClickListener { onCopy(message) }
+        partRenderer.render(holder.parts, message.parts)
         holder.regenerate.visibility = if (canRegenerate(message, position)) View.VISIBLE else View.GONE
         holder.regenerate.setOnClickListener { onRegenerate() }
         holder.state.visibility = if (message.state in ACTIVE_STATES) View.VISIBLE else View.GONE
@@ -80,6 +84,7 @@ internal class ChatGptNativeMessageAdapter(
 
     internal class MessageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val text: TextView = itemView.findViewById(R.id.chatGptMessageText)
+        val parts: LinearLayout = itemView.findViewById(R.id.chatGptMessageParts)
         val state: TextView = itemView.findViewById(R.id.chatGptMessageState)
         val copy: ImageButton = itemView.findViewById(R.id.chatGptMessageCopy)
         val regenerate: ImageButton = itemView.findViewById(R.id.chatGptMessageRegenerate)

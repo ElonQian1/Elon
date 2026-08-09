@@ -98,6 +98,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onStop = { pageAdapter.stopGeneration() },
             onNewConversation = { pageAdapter.startNewConversation() },
             onRegenerate = { pageAdapter.regenerateResponse() },
+            onOpenOfficialOutput = { modeController.select(ChatGptWebModeController.Mode.WEB) },
         )
         composerToolsController = ChatGptNativeComposerToolsController(
             activity = this,

@@ -26,6 +26,7 @@ internal object ChatGptWebCapabilityId {
     const val MESSAGE_COPY = "message_copy"
     const val MESSAGE_REGENERATE = "message_regenerate"
     const val FEATURE_NAVIGATION = "feature_navigation"
+    const val COMPLEX_OUTPUT = "complex_output"
 }
 
 internal data class ChatGptWebConversation(

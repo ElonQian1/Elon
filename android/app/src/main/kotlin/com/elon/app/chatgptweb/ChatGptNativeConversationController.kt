@@ -24,12 +24,14 @@ internal class ChatGptNativeConversationController(
     onStop: () -> Unit,
     onNewConversation: () -> Unit,
     onRegenerate: () -> Unit,
+    onOpenOfficialOutput: () -> Unit,
 ) {
     private var messages: List<ChatGptWebMessage> = emptyList()
     private val adapter = ChatGptNativeMessageAdapter(
         parent = messagesView,
         onCopy = ::copyMessage,
         onRegenerate = onRegenerate,
+        onOpenOfficial = onOpenOfficialOutput,
     )
     private var snapshot: ChatGptWebSnapshot? = null
     private var pendingPrompt: String? = null
@@ -64,6 +66,7 @@ internal class ChatGptNativeConversationController(
                 role = "user",
                 content = prompt,
                 state = "pending",
+                parts = emptyList(),
             )
         }
         messages = nextMessages

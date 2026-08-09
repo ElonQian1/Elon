@@ -107,4 +107,13 @@
     <string name="chatgpt_message_regenerate">重新生成回复</string>
     <string name="chatgpt_message_streaming">正在生成</string>
     <string name="chatgpt_message_sending">正在发送</string>
+    <string name="chatgpt_message_part_format">%1$s · %2$s</string>
+    <string name="chatgpt_message_part_open">在官网查看 %1$s</string>
+    <string name="chatgpt_message_part_image">图片</string>
+    <string name="chatgpt_message_part_file">文件</string>
+    <string name="chatgpt_message_part_citation">引用</string>
+    <string name="chatgpt_message_part_artifact">交互内容</string>
+    <string name="chatgpt_message_part_audio">音频</string>
+    <string name="chatgpt_message_part_video">视频</string>
+    <string name="chatgpt_message_part_content">内容</string>
 </resources>

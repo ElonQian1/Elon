@@ -34,7 +34,12 @@ class ChatGptWebProtocolTest {
                 "capabilities":["streaming","conversation_list","invalid capability"],
                 "messages":[
                   {"id":"u1","role":"user","state":"completed","content":[{"type":"text","text":"你好"}]},
-                  {"id":"a1","role":"assistant","state":"streaming","content":[{"type":"markdown","text":"## 你好\n\n需要什么帮助？"}]},
+                  {"id":"a1","role":"assistant","state":"streaming","content":[
+                    {"type":"markdown","text":"## 你好\n\n需要什么帮助？"},
+                    {"type":"image","text":"生成的图片"},
+                    {"type":"file","text":"分析结果.csv"},
+                    {"type":"script","text":"忽略"}
+                  ]},
                   {"id":"tool","role":"tool","state":"completed","content":[{"type":"text","text":"not projected"}]}
                 ]
               }
@@ -55,6 +60,8 @@ class ChatGptWebProtocolTest {
         assertEquals("assistant", event.value.messages.last().role)
         assertEquals("streaming", event.value.messages.last().state)
         assertTrue(event.value.messages.last().content.startsWith("## 你好"))
+        assertEquals(listOf("image", "file"), event.value.messages.last().parts.map { it.type })
+        assertEquals("生成的图片", event.value.messages.last().parts.first().label)
         assertTrue(event.value.capabilities.supports(ChatGptWebCapabilityId.CONVERSATION_LIST))
         assertFalse(event.value.capabilities.supports("invalid capability"))
     }

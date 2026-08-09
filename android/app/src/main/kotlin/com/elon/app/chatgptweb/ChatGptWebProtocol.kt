@@ -7,6 +7,12 @@ internal data class ChatGptWebMessage(
     val role: String,
     val content: String,
     val state: String,
+    val parts: List<ChatGptWebMessagePart>,
+)
+
+internal data class ChatGptWebMessagePart(
+    val type: String,
+    val label: String,
 )
 
 internal data class ChatGptWebAttachment(
@@ -109,14 +115,16 @@ internal object ChatGptWebProtocol {
                 val role = item.optString("role").lowercase()
                 if (role !in SUPPORTED_ROLES) continue
                 val content = textContent(item).trim().take(MAX_MESSAGE_LENGTH)
-                if (content.isEmpty()) continue
+                val parts = parseMessageParts(item)
+                if (content.isEmpty() && parts.isEmpty()) continue
                 add(
                     ChatGptWebMessage(
                         id = item.optString("id").ifBlank { "$role-$index" }.take(160),
                         role = role,
-                        content = content,
+                        content = content.ifBlank { parts.joinToString("\n", transform = ChatGptWebMessagePart::label) },
                         state = item.optString("state").takeIf { it in SUPPORTED_MESSAGE_STATES }
                             ?: "completed",
+                        parts = parts,
                     ),
                 )
             }
@@ -155,6 +163,20 @@ internal object ChatGptWebProtocol {
                 )
             }
         }
+    }
+
+    private fun parseMessageParts(message: JSONObject): List<ChatGptWebMessagePart> {
+        val content = message.optJSONArray("content") ?: return emptyList()
+        return buildList {
+            for (index in 0 until minOf(content.length(), MAX_CONTENT_PARTS)) {
+                val part = content.optJSONObject(index) ?: continue
+                val type = part.optString("type")
+                if (type !in STRUCTURED_CONTENT_TYPES) continue
+                val label = part.optString("text").trim().take(MAX_MESSAGE_PART_LABEL_LENGTH)
+                if (label.isBlank()) continue
+                add(ChatGptWebMessagePart(type = type, label = label))
+            }
+        }.take(MAX_STRUCTURED_MESSAGE_PARTS)
     }
 
     private fun parseComposerControls(event: JSONObject): ChatGptWebEvent.ComposerControls? {
@@ -262,6 +284,14 @@ internal object ChatGptWebProtocol {
     private val SUPPORTED_ROLES = setOf("user", "assistant")
     private val SUPPORTED_MESSAGE_STATES = setOf("completed", "streaming")
     private val SUPPORTED_CONTENT_TYPES = setOf("text", "markdown")
+    private val STRUCTURED_CONTENT_TYPES = setOf(
+        "image",
+        "file",
+        "citation",
+        "artifact",
+        "audio",
+        "video",
+    )
     private val SUPPORTED_COMPOSER_SECTIONS = setOf("model", "tools")
     private val SUPPORTED_TOUCH_PURPOSES = setOf(
         "list_model_options",
@@ -279,6 +309,8 @@ internal object ChatGptWebProtocol {
     private const val MAX_MESSAGES = 80
     private const val MAX_MESSAGE_LENGTH = 40_000
     private const val MAX_CONTENT_PARTS = 20
+    private const val MAX_STRUCTURED_MESSAGE_PARTS = 16
+    private const val MAX_MESSAGE_PART_LABEL_LENGTH = 180
     private const val MAX_DRAFT_LENGTH = 20_000
     private const val MAX_CONVERSATIONS = 100
     private const val MAX_CAPABILITIES = 40

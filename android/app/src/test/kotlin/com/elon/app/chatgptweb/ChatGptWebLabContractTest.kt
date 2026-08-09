@@ -67,6 +67,9 @@ class ChatGptWebLabContractTest {
         assertFalse(conversations.contains("location.href ="))
         assertTrue(messages.contains("function fencedCode"))
         assertTrue(messages.contains("function tableMarkdown"))
+        assertTrue(messages.contains("function structuredParts"))
+        assertTrue(messages.contains("lastStructuredTypes"))
+        assertTrue(messages.contains("complex_output"))
         assertTrue(messages.contains("message_regenerate"))
     }
 
@@ -77,6 +80,9 @@ class ChatGptWebLabContractTest {
         )
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val partRenderer = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeMessagePartRenderer.kt"
         )
 
         assertTrue(modeController.contains("webView.visibility = View.VISIBLE"))
@@ -138,6 +144,11 @@ class ChatGptWebLabContractTest {
         assertFalse(controller.contains("ChatAdapter("))
         assertTrue(adapter.contains("markwon.setMarkdown"))
         assertTrue(adapter.contains("ChatGptWebCapabilityId.MESSAGE_REGENERATE"))
+        assertTrue(adapter.contains("partRenderer.render"))
+        assertTrue(partRenderer.contains("ChatGptWebMessagePart"))
+        assertTrue(partRenderer.contains("onOpenOfficial"))
+        assertFalse(partRenderer.contains("OkHttpClient"))
+        assertFalse(partRenderer.contains("getCookie("))
         assertTrue(adapter.contains("position == messages.indexOfLast"))
         assertTrue(activity.contains("pageAdapter.regenerateResponse()"))
     }

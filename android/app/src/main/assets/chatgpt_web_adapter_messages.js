@@ -5,6 +5,8 @@
 
   const MAX_MESSAGES = 80;
   const MAX_MESSAGE_LENGTH = 40000;
+  const MAX_STRUCTURED_PARTS = 16;
+  let lastStructuredTypes = new Set();
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
@@ -113,9 +115,70 @@
       : node.querySelector('[data-message-author-role]') || node;
   }
 
-  function messageContent(node, role) {
+  function contentNode(node) {
     const owner = roleNode(node);
-    const content = owner.querySelector('.markdown, [data-message-content], .whitespace-pre-wrap') || owner;
+    return owner.querySelector('.markdown, [data-message-content], .whitespace-pre-wrap') || owner;
+  }
+
+  function structuredLabel(node, fallback) {
+    return cleanText([
+      node.getAttribute('aria-label'),
+      node.getAttribute('title'),
+      node.getAttribute('alt'),
+      node.getAttribute('download'),
+      node.textContent
+    ].filter(Boolean).join(' ')).slice(0, 180) || fallback;
+  }
+
+  function linkPart(node) {
+    let path = '';
+    try { path = new URL(node.getAttribute('href') || '', location.origin).pathname; }
+    catch { return null; }
+    const metadata = cleanText([
+      node.getAttribute('data-testid'),
+      node.getAttribute('aria-label'),
+      node.getAttribute('title')
+    ].filter(Boolean).join(' ')).toLowerCase();
+    const isFile = !!node.getAttribute('download') || /\.[a-z0-9]{2,8}$/i.test(path) || /download|file|attachment/.test(metadata);
+    return {
+      type: isFile ? 'file' : 'citation',
+      text: structuredLabel(node, isFile ? '文件' : '引用')
+    };
+  }
+
+  function structuredParts(content) {
+    const parts = [];
+    const seen = new Set();
+    function add(type, label, node) {
+      const key = type + '|' + label;
+      if (seen.has(key) || parts.length >= MAX_STRUCTURED_PARTS || !isVisible(node)) return;
+      seen.add(key);
+      parts.push({ type, text: label });
+      lastStructuredTypes.add(type);
+    }
+    Array.from(content.querySelectorAll('img')).forEach((node) => {
+      add('image', structuredLabel(node, '图片'), node);
+    });
+    Array.from(content.querySelectorAll('a[href]')).forEach((node) => {
+      const part = linkPart(node);
+      if (part) add(part.type, part.text, node);
+    });
+    Array.from(content.querySelectorAll(
+      '[data-testid*="artifact" i], [data-testid*="canvas" i], [data-testid*="code-interpreter" i], iframe'
+    )).forEach((node) => {
+      add('artifact', structuredLabel(node, '交互内容'), node);
+    });
+    Array.from(content.querySelectorAll('audio')).forEach((node) => {
+      add('audio', structuredLabel(node, '音频'), node);
+    });
+    Array.from(content.querySelectorAll('video')).forEach((node) => {
+      add('video', structuredLabel(node, '视频'), node);
+    });
+    return parts;
+  }
+
+  function messageContent(node, role) {
+    const content = contentNode(node);
     const value = role === 'assistant'
       ? cleanText(childrenMarkdown(content, {}))
       : cleanText(content.innerText || content.textContent);
@@ -131,17 +194,24 @@
 
   function readMessages(streaming) {
     const seen = new Set();
+    lastStructuredTypes = new Set();
     const messages = messageNodes().slice(-MAX_MESSAGES).map((node, index) => {
       const role = messageRole(node);
       const text = messageContent(node, role);
+      const parts = structuredParts(contentNode(node));
       const baseId = node.getAttribute('data-message-id')
         || node.getAttribute('data-testid')
         || node.id
         || role + '-' + index;
       const id = seen.has(baseId) ? baseId + '-' + index : baseId;
       seen.add(id);
-      return { id, role, state: 'completed', content: [{ type: role === 'assistant' ? 'markdown' : 'text', text }] };
-    }).filter((message) => message.role && message.content[0].text);
+      return {
+        id,
+        role,
+        state: 'completed',
+        content: [{ type: role === 'assistant' ? 'markdown' : 'text', text }].concat(parts)
+      };
+    }).filter((message) => message.role && (message.content[0].text || message.content.length > 1));
     if (streaming && messages.length && messages[messages.length - 1].role === 'assistant') {
       messages[messages.length - 1].state = 'streaming';
     }
@@ -178,6 +248,7 @@
   function capabilities() {
     const values = ['message_copy', 'rich_text'];
     if (regenerateButton()) values.push('message_regenerate');
+    if (lastStructuredTypes.size) values.push('complex_output');
     return values;
   }
 
