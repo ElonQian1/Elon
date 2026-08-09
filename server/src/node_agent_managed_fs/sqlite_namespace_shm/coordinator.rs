@@ -268,11 +268,11 @@ impl ManagedSqliteShmPoison {
 }
 
 impl PinnedManagedSqliteWalMainFile {
-    pub(super) fn main_mut(&mut self) -> &mut PinnedManagedSqliteMainFile {
+    pub(crate) fn main_mut(&mut self) -> &mut PinnedManagedSqliteMainFile {
         &mut self.main
     }
 
-    pub(super) fn shm_mut(&mut self) -> Option<&mut PinnedManagedSqliteShmConnection> {
+    pub(crate) fn shm_mut(&mut self) -> Option<&mut PinnedManagedSqliteShmConnection> {
         self.shm.as_mut()
     }
 }

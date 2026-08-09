@@ -24,6 +24,8 @@ use crate::{
     },
 };
 
+mod operations;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum ManagedSqliteRegistryFilePairRejection {
     SidecarRoleMismatch,
@@ -157,11 +159,18 @@ where
     }
 
     pub(super) fn close(mut self) -> Result<(), ManagedSqliteRegistryPinnedFileCloseRejection> {
+        let callback = self
+            .owner
+            .begin_callback(
+                self.route,
+                super::types::ManagedSqliteRegistryCallbackKind::Close,
+            )
+            .map_err(ManagedSqliteRegistryPinnedFileCloseRejection::Registry)?;
         let custody = self
             .custody
             .take()
             .expect("live pinned file state must retain exact custody");
-        match custody {
+        let close = match custody {
             ManagedSqliteRegistryPinnedFileCustody::Sidecar { file, lease } => match file.close() {
                 Ok(receipt) => self
                     .owner
@@ -201,6 +210,14 @@ where
                     }
                 }
             }
+        };
+        let callback_complete = callback.complete();
+        match (close, callback_complete) {
+            (Err(rejection), _) => Err(rejection),
+            (Ok(()), Err(rejection)) => Err(
+                ManagedSqliteRegistryPinnedFileCloseRejection::Registry(rejection),
+            ),
+            (Ok(()), Ok(())) => Ok(()),
         }
     }
 
