@@ -405,6 +405,24 @@
   line-height: 1.65;
 }
 
+.citation {
+  display: inline-flex;
+  max-width: 100%;
+  margin: 8px 7px 0 0;
+  padding: 4px 7px;
+  overflow: hidden;
+  border: 1px solid rgba(132, 226, 194, .24);
+  border-radius: 4px;
+  color: #84e2c2;
+  background: rgba(84, 226, 194, .055);
+  font-size: 9px;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.citation:hover { border-color: rgba(132, 226, 194, .5); }
+
 .emptyChat {
   min-height: 220px;
   display: grid;

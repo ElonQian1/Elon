@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "local-ai-google-web",
+  "description": "Google AI 模式官方网页子窗口只能上报本机可见语义，不能调用主窗口会话控制或读取凭证。",
+  "windows": ["local-ai-google-ai-mode-*"],
+  "remote": {
+    "urls": [
+      "https://google.com/*",
+      "https://www.google.com/*"
+    ]
+  },
+  "permissions": ["local-ai-web-adapter-event"]
+}

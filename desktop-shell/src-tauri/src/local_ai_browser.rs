@@ -6,6 +6,8 @@
 
 #[path = "local_ai_browser/adapter.rs"]
 mod adapter;
+#[path = "local_ai_browser/google_ai_mode.rs"]
+mod google_ai_mode;
 #[path = "local_ai_browser/state.rs"]
 mod state;
 
@@ -69,8 +71,8 @@ const GOOGLE_AI_MODE: ProviderDefinition = ProviderDefinition {
     start_url: "https://www.google.com/aimode",
     start_host: "google.com/aimode",
     login_mode: "guest_web_system_login",
-    renderer_status: "reserved",
-    semantic_adapter: false,
+    renderer_status: "active",
+    semantic_adapter: true,
     allowed_hosts: &["google.com", "www.google.com"],
     allowed_domain_suffixes: &[],
     allowed_identity_hosts: &[],
@@ -173,7 +175,7 @@ pub async fn open_local_ai_web_session(
             .incognito(false)
             .enable_clipboard_access();
     if provider.semantic_adapter {
-        builder = builder.initialization_script(adapter::initialization_script());
+        builder = builder.initialization_script(adapter_initialization_script(provider));
     }
     let window = builder
         .on_navigation(move |url| {
@@ -343,14 +345,15 @@ pub fn run_local_ai_web_adapter_command(
     let label = window_label(provider, &fingerprint);
     let window = app
         .get_webview_window(&label)
-        .ok_or_else(|| "请先打开 ChatGPT 官方网页。".to_string())?;
+        .ok_or_else(|| format!("请先打开 {} 官方网页。", provider.display_name))?;
     runtime.mark_command_pending(&label);
-    let command = adapter_command(&action, value, expected_draft)?;
+    let command = adapter_command(provider, &action, value, expected_draft)?;
     let raw = serde_json::to_string(&command).map_err(display_error)?;
     let encoded = serde_json::to_string(&raw).map_err(display_error)?;
+    let bridge = adapter_bridge_name(provider);
     window
         .eval(format!(
-            "window.__elonChatGptBridge && window.__elonChatGptBridge.command({encoded});"
+            "window.{bridge} && window.{bridge}.command({encoded});"
         ))
         .map_err(display_error)?;
     restore_window(&window)
@@ -363,10 +366,14 @@ pub fn publish_local_ai_web_event(
     payload: String,
 ) -> Result<(), String> {
     let label = webview.label();
-    if !label.starts_with("local-ai-chatgpt-") {
-        return Err("可见语义事件只允许 ChatGPT 本地会话窗口发送。".to_string());
-    }
-    let event = adapter::sanitize_event(&payload)?;
+    let provider = provider_for_window_label(label)
+        .filter(|provider| provider.semantic_adapter)
+        .ok_or_else(|| "可见语义事件只允许已登记的本地 AI 会话窗口发送。".to_string())?;
+    let event = if provider.id == GOOGLE_AI_MODE.id {
+        google_ai_mode::sanitize_event(&payload)?
+    } else {
+        adapter::sanitize_event(&payload)?
+    };
     runtime.record_adapter_event(label, &event.kind, event.payload);
     Ok(())
 }
@@ -422,6 +429,12 @@ fn provider(provider_id: &str) -> Result<&'static ProviderDefinition, String> {
         .iter()
         .find(|provider| provider.id == provider_id.trim())
         .ok_or_else(|| format!("不支持的本地 AI 网页厂商：{provider_id}"))
+}
+
+fn provider_for_window_label(label: &str) -> Option<&'static ProviderDefinition> {
+    PROVIDERS
+        .iter()
+        .find(|provider| label.starts_with(&format!("{LOCAL_AI_WINDOW_PREFIX}{}-", provider.id)))
 }
 
 fn parse_start_url(provider: &ProviderDefinition) -> Result<Url, String> {
@@ -543,17 +556,35 @@ fn request_adapter_snapshot(provider: &ProviderDefinition, window: &WebviewWindo
     if !provider.semantic_adapter {
         return;
     }
-    let _ = window.eval(
-        "window.__elonChatGptBridge && window.__elonChatGptBridge.command('{\"action\":\"snapshot\"}');",
-    );
+    let bridge = adapter_bridge_name(provider);
+    let _ = window.eval(format!(
+        "window.{bridge} && window.{bridge}.command('{{\"action\":\"snapshot\"}}');"
+    ));
+}
+
+fn adapter_initialization_script(provider: &ProviderDefinition) -> String {
+    if provider.id == GOOGLE_AI_MODE.id {
+        google_ai_mode::initialization_script()
+    } else {
+        adapter::initialization_script()
+    }
+}
+
+fn adapter_bridge_name(provider: &ProviderDefinition) -> &'static str {
+    if provider.id == GOOGLE_AI_MODE.id {
+        "__elonGoogleAiModeBridge"
+    } else {
+        "__elonChatGptBridge"
+    }
 }
 
 fn adapter_command(
+    provider: &ProviderDefinition,
     action: &str,
     value: Option<String>,
     expected_draft: Option<String>,
 ) -> Result<Value, String> {
-    const ACTIONS: &[&str] = &[
+    const CHATGPT_ACTIONS: &[&str] = &[
         "snapshot",
         "send_prompt",
         "stop_generation",
@@ -569,20 +600,31 @@ fn adapter_command(
         "select_model_option",
         "select_composer_tool",
     ];
-    if !ACTIONS.contains(&action) {
-        return Err("不支持的 ChatGPT 原生界面动作。".to_string());
+    const GOOGLE_AI_MODE_ACTIONS: &[&str] = &[
+        "snapshot",
+        "send_prompt",
+        "stop_generation",
+        "new_conversation",
+    ];
+    let actions = if provider.id == GOOGLE_AI_MODE.id {
+        GOOGLE_AI_MODE_ACTIONS
+    } else {
+        CHATGPT_ACTIONS
+    };
+    if !actions.contains(&action) {
+        return Err(format!("不支持的 {} 原生界面动作。", provider.display_name));
     }
     let mut command = Map::new();
     command.insert("action".to_string(), Value::String(action.to_string()));
     if let Some(value) = value {
         if value.chars().count() > 20_000 {
-            return Err("ChatGPT 输入内容过长。".to_string());
+            return Err(format!("{} 输入内容过长。", provider.display_name));
         }
         command.insert("value".to_string(), Value::String(value));
     }
     if let Some(expected_draft) = expected_draft {
         if expected_draft.chars().count() > 20_000 {
-            return Err("ChatGPT 网页草稿过长。".to_string());
+            return Err(format!("{} 网页草稿过长。", provider.display_name));
         }
         command.insert("expectedDraft".to_string(), Value::String(expected_draft));
     }
@@ -661,12 +703,12 @@ mod tests {
     }
 
     #[test]
-    fn google_ai_mode_is_registered_without_semantic_adapter() {
+    fn google_ai_mode_is_registered_with_semantic_adapter() {
         let summary = provider_summary(&GOOGLE_AI_MODE);
         assert_eq!(summary.id, "google-ai-mode");
         assert_eq!(summary.login_mode, "guest_web_system_login");
-        assert_eq!(summary.renderer_status, "reserved");
-        assert!(!GOOGLE_AI_MODE.semantic_adapter);
+        assert_eq!(summary.renderer_status, "active");
+        assert!(GOOGLE_AI_MODE.semantic_adapter);
     }
 
     #[test]
@@ -703,7 +745,11 @@ mod tests {
 
     #[test]
     fn adapter_command_does_not_accept_arbitrary_javascript() {
-        assert!(adapter_command("eval", Some("alert(1)".to_string()), None).is_err());
-        assert!(adapter_command("snapshot", None, None).is_ok());
+        assert!(adapter_command(&CHATGPT, "eval", Some("alert(1)".to_string()), None).is_err());
+        assert!(adapter_command(&CHATGPT, "snapshot", None, None).is_ok());
+        assert!(
+            adapter_command(&GOOGLE_AI_MODE, "send_prompt", Some("hi".to_string()), None).is_ok()
+        );
+        assert!(adapter_command(&GOOGLE_AI_MODE, "start_google_login", None, None).is_err());
     }
 }

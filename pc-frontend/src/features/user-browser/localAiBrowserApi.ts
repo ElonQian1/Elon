@@ -39,8 +39,12 @@ export interface LocalAiVisibleMessage {
   id: string
   role: 'user' | 'assistant'
   state: 'streaming' | 'completed'
-  content: Array<{ type: 'text'; text: string }>
+  content: LocalAiVisibleContentPart[]
 }
+
+export type LocalAiVisibleContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'citation'; title?: string; url: string }
 
 export interface LocalAiMessageSnapshot {
   type: 'message_snapshot'

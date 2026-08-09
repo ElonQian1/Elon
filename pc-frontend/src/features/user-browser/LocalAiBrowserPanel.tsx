@@ -128,13 +128,13 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
       if (next) setSessionState(next)
       const result = next?.commandResult
       if (result?.action === action && !result.ok) {
-        setMessage(result.detail || 'ChatGPT 官方网页没有完成这个动作，请显示官方窗口后重试。')
+        setMessage(result.detail || `${provider.displayName} 官方网页没有完成这个动作，请显示官方窗口后重试。`)
         return
       }
       if (action === 'send_prompt') {
         setDraft('')
         setDraftTouched(false)
-        setMessage(result?.detail || '消息已交给 ChatGPT 官方网页发送。')
+        setMessage(result?.detail || `消息已交给 ${provider.displayName} 官方网页发送。`)
       } else if (result?.detail) {
         setMessage(result.detail)
       }
@@ -230,8 +230,8 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
               {provider?.loginMode === 'guest_web_system_login' ? (
                 <>
                   <li><span>1</span><strong>选择 Google AI 模式</strong></li>
-                  <li><span>2</span><strong>在本地窗口使用官方网页</strong></li>
-                  <li><span>3</span><strong>需要账号时改用系统浏览器</strong></li>
+                  <li><span>2</span><strong>打开官方页确认 AI 模式可用</strong></li>
+                  <li><span>3</span><strong>回到这里使用一龙聊天界面</strong></li>
                 </>
               ) : (
                 <>
@@ -342,15 +342,15 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
               }}
               onRun={(action, value, expectedDraft) => void runAdapter(action, value, expectedDraft)}
             /> : (
-              <section className={styles.officialWebOnly} aria-label="Google AI 模式接入说明">
+              <section className={styles.officialWebOnly} aria-label={`${provider?.displayName || '官方 AI'}接入说明`}>
                 <ExternalLink size={24} aria-hidden="true" />
                 <div>
-                  <strong>Google AI 模式官方网页</strong>
+                  <strong>{provider?.displayName || '官方 AI 网页'}</strong>
                   <p>
-                    当前批次直接使用 Google 官方界面，不注入 ChatGPT 适配器，也不读取网页 Cookie、
-                    请求或私有接口。是否开放由 Google 的地区、语言、设备和账号灰度决定。
+                    当前厂商暂时只开放官方网页窗口。一龙不会读取网页凭证、请求或私有接口；
+                    厂商功能是否可用仍由其地区、语言、设备和账号策略决定。
                   </p>
-                  <small>需要登录或查看账号历史时，请点击上方“系统浏览器”。</small>
+                  <small>可继续使用上方“显示窗口”或“系统浏览器”。</small>
                 </div>
               </section>
             )}
