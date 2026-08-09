@@ -1,5 +1,5 @@
 .panel {
-  width: min(880px, 100%);
+  width: min(1120px, 100%);
   display: grid;
   grid-template-columns: minmax(230px, .9fr) minmax(360px, 1.5fr);
   margin: 30px auto 0;
@@ -203,6 +203,194 @@
 }
 
 .actions { display: flex; gap: 8px; }
+
+.browserToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .018);
+}
+
+.browserToolbar button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: transparent;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.browserToolbar button:hover:not(:disabled) {
+  border-color: rgba(132, 226, 194, .3);
+  color: #84e2c2;
+  background: rgba(84, 199, 161, .07);
+}
+
+.browserToolbar button:disabled { opacity: .35; cursor: not-allowed; }
+
+.sessionError {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-left: 2px solid #e07070;
+  color: #f0aaaa;
+  background: rgba(224, 112, 112, .07);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.sessionError svg { flex: 0 0 auto; margin-top: 1px; }
+
+.nativeChat {
+  min-height: 360px;
+  display: grid;
+  grid-template-rows: auto minmax(230px, 1fr) auto;
+  overflow: hidden;
+  border: 1px solid rgba(84, 199, 161, .28);
+  border-radius: 7px;
+  background: #0c0f0e;
+}
+
+.nativeChat > header {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(84, 199, 161, .045);
+}
+
+.nativeChat > header strong,
+.nativeChat > header small { display: block; }
+.nativeChat > header strong { color: var(--text-primary); font-size: 13px; }
+.nativeChat > header small { margin-top: 3px; color: var(--text-muted); font-size: 9px; }
+
+.nativeChat > header button,
+.composer button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: #84e2c2;
+  background: rgba(84, 199, 161, .07);
+  cursor: pointer;
+}
+
+.nativeChat button:disabled { opacity: .35; cursor: not-allowed; }
+
+.messageList {
+  max-height: 520px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+}
+
+.userMessage,
+.assistantMessage {
+  max-width: 88%;
+  padding: 10px 12px;
+  border-radius: 7px;
+}
+
+.userMessage {
+  align-self: flex-end;
+  color: #e6fff6;
+  background: rgba(84, 199, 161, .17);
+}
+
+.assistantMessage {
+  align-self: flex-start;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.userMessage > span,
+.assistantMessage > span {
+  display: block;
+  margin-bottom: 6px;
+  color: #84e2c2;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+.userMessage p,
+.assistantMessage p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.emptyChat {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.emptyChat strong { color: var(--text-secondary); font-size: 13px; }
+.emptyChat p { max-width: 430px; margin: 0; font-size: 11px; line-height: 1.55; }
+.emptyChat button {
+  min-height: 32px;
+  margin-top: 5px;
+  padding: 0 11px;
+  border: 1px solid rgba(132, 226, 194, .35);
+  border-radius: 5px;
+  color: #84e2c2;
+  background: rgba(84, 199, 161, .07);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 9px;
+  padding: 11px;
+  border-top: 1px solid var(--border);
+  background: rgba(255, 255, 255, .015);
+}
+
+.composer textarea {
+  min-height: 54px;
+  max-height: 160px;
+  flex: 1;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: none;
+  color: var(--text-primary);
+  background: #111513;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.composer textarea:focus { border-color: rgba(132, 226, 194, .55); }
+.composer textarea:disabled { opacity: .48; }
 
 .openButton,
 .clearButton {

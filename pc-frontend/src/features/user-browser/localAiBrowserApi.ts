@@ -26,6 +26,66 @@ export interface ClearedLocalAiWebSession {
   status: 'cleared'
 }
 
+export type LocalAiBrowserWindowStatus =
+  | 'opening'
+  | 'loading'
+  | 'ready'
+  | 'minimized'
+  | 'blocked'
+  | 'error'
+  | 'closed'
+
+export interface LocalAiVisibleMessage {
+  id: string
+  role: 'user' | 'assistant'
+  state: 'streaming' | 'completed'
+  content: Array<{ type: 'text'; text: string }>
+}
+
+export interface LocalAiMessageSnapshot {
+  type: 'message_snapshot'
+  title: string
+  url: string
+  draft: string
+  messages: LocalAiVisibleMessage[]
+  authenticated: boolean
+  composerReady: boolean
+  streaming: boolean
+  currentModel: string
+  capabilities: string[]
+}
+
+export interface LocalAiCommandResult {
+  type: 'command_result'
+  action: string
+  ok: boolean
+  detail: string
+}
+
+export interface LocalAiWebSessionState {
+  providerId: string
+  windowLabel: string
+  windowStatus: LocalAiBrowserWindowStatus
+  currentUrl: string
+  currentHost: string
+  loading: boolean
+  rendererStatus: 'connecting' | 'active'
+  lastError?: string | null
+  semanticEvent?: LocalAiMessageSnapshot | Record<string, unknown> | null
+  commandResult?: LocalAiCommandResult | null
+  updatedAtMs: number
+}
+
+export type LocalAiBrowserControlAction = 'restore' | 'reload' | 'back' | 'home' | 'external'
+
+export type LocalAiAdapterAction =
+  | 'snapshot'
+  | 'send_prompt'
+  | 'stop_generation'
+  | 'regenerate_response'
+  | 'new_conversation'
+  | 'start_google_login'
+
 type LocalAiBrowserErrorCode = 'upgrade_required' | 'desktop_required' | 'invoke_failed'
 
 class LocalAiBrowserError extends Error {
@@ -75,6 +135,56 @@ export async function clearLocalAiWebSession(
   })
 }
 
+export async function getLocalAiWebSessionState(
+  providerId: string,
+  ownerKey: string,
+): Promise<LocalAiWebSessionState> {
+  assertIdentity(providerId, ownerKey)
+  return invokeDesktop<LocalAiWebSessionState>('get_local_ai_web_session_state', {
+    providerId,
+    ownerKey,
+  })
+}
+
+export async function controlLocalAiWebSession(
+  providerId: string,
+  ownerKey: string,
+  action: LocalAiBrowserControlAction,
+): Promise<LocalAiWebSessionState> {
+  assertIdentity(providerId, ownerKey)
+  return invokeDesktop<LocalAiWebSessionState>('control_local_ai_web_session', {
+    providerId,
+    ownerKey,
+    action,
+  })
+}
+
+export async function runLocalAiWebAdapterCommand(
+  providerId: string,
+  ownerKey: string,
+  action: LocalAiAdapterAction,
+  value?: string,
+  expectedDraft?: string,
+): Promise<void> {
+  assertIdentity(providerId, ownerKey)
+  await invokeDesktop<void>('run_local_ai_web_adapter_command', {
+    providerId,
+    ownerKey,
+    action,
+    value,
+    expectedDraft,
+  })
+}
+
+export function isLocalAiMessageSnapshot(value: unknown): value is LocalAiMessageSnapshot {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  const snapshot = value as Partial<LocalAiMessageSnapshot>
+  return snapshot.type === 'message_snapshot'
+    && Array.isArray(snapshot.messages)
+    && typeof snapshot.authenticated === 'boolean'
+    && typeof snapshot.composerReady === 'boolean'
+}
+
 async function invokeDesktop<T>(
   command: string,
   args?: Record<string, unknown>,
@@ -113,7 +223,11 @@ function normalizeDesktopInvokeError(error: unknown): LocalAiBrowserError {
       '当前 Win 客户端版本不包含 ChatGPT 本地浏览器。请下载新版，完全退出旧客户端后重新打开。',
     )
   }
-  return new LocalAiBrowserError('invoke_failed', 'Win 本地浏览器调用失败，请重启客户端后重试。')
+  const detail = raw.trim().slice(0, 240)
+  return new LocalAiBrowserError(
+    'invoke_failed',
+    detail || 'Win 本地浏览器调用失败，请重启客户端后重试。',
+  )
 }
 
 function assertIdentity(providerId: string, ownerKey: string): void {

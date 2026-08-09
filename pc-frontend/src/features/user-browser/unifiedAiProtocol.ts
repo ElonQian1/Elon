@@ -89,7 +89,8 @@ export interface UnifiedAiEnvelope {
 
 /**
  * 协议只表达用户可见语义。厂商适配器必须在发出 envelope 前丢弃浏览器凭证、
- * 请求头和原始网络响应；首版 WebView2 宿主尚未启用适配器桥。
+ * 请求头和原始网络响应。Win WebView2 与 Android WebView 均只通过这个语义边界同步
+ * 可见消息和受限动作，不向一龙前端暴露 Cookie 或厂商私有接口。
  */
 export function isUnifiedAiEnvelope(value: unknown): value is UnifiedAiEnvelope {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false

@@ -6,7 +6,7 @@ WebView2；普通浏览器/PWA 仍可发现外部托管模块。两条路线都�
 
 | 路线 | 会话位置 | 当前用途 | 状态 |
 |---|---|---|---|
-| Win 本地 WebView2 | 用户 Windows 设备 | 官方网页、手动登录、本地 Profile | ChatGPT 首版已接线 |
+| Win 本地 WebView2 | 用户 Windows 设备 | 官方网页、手动登录、本地 Profile、可见语义同步 | ChatGPT 已接线 |
 | 外部托管模块 | 商户模块服务器 | 浏览器/PWA 的隔离远程会话 | 保留既有能力发现 |
 | APK 一龙界面 | Android 本地 WebView | 消费去凭证化语义事件 | ChatGPT 语义适配器已接线 |
 
@@ -19,8 +19,8 @@ WebView2；普通浏览器/PWA 仍可发现外部托管模块。两条路线都�
   登录完成可留在官方网页或切换“一龙界面”。
 - PWA：我的 → ChatGPT 账号与聊天；PWA 在新标签打开官方 ChatGPT，受同源隔离影响，
   不宣称可以读取登录状态或重渲染官方页面。
-- Win：左侧 ChatGPT 登录，或账号设置 → ChatGPT；本地 WebView2 保存会话，打开窗口后
-  直接完成登录和聊天。
+- Win：左侧 ChatGPT 登录，或账号设置 → ChatGPT；本地 WebView2 保存会话。用户在官方
+  窗口完成登录与真人验证后，可回到一龙原生聊天区查看消息并发送文字。
 
 这里的“登录”是设备内的官方网页会话，不是把 ChatGPT 云端账号或 Cookie 绑定到一龙
 云端账号。登录状态由官方页面确认。
@@ -54,10 +54,11 @@ WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。�
 
 ### IPC 与导航边界
 
-- `build.rs` 只把三个本地会话命令登记进 Tauri App Manifest。
+- `build.rs` 只登记主窗口会话命令和子窗口语义事件命令。
 - `capabilities/main.json` 只向 `main` 窗口和项目批准的 PC 地址开放该权限。
 - 每个 Rust 命令再次检查调用 WebView 标签必须等于 `main`。
-- ChatGPT 窗口没有匹配的 capability，也没有初始化脚本或一龙语义桥。
+- ChatGPT 子窗口只匹配独立 capability，只能上报经过 Rust 白名单清洗的可见语义；它不能
+  调用主窗口的会话控制命令。初始化脚本不读取 Cookie、Token、请求头或原始响应。
 - 顶层导航仅接受 HTTPS、443、无 URL 凭据的 ChatGPT/OpenAI 域名及精确身份主机。
 - Cloudflare 或身份提供商验证由用户本人完成；应用不绕过、不自动点击。
 - 身份提供商可以拒绝嵌入式浏览器，应用不得伪装 User-Agent 或转移 Cookie 规避。
@@ -77,8 +78,9 @@ WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。�
 - 文本、图片、文件与引用内容块。
 
 协议不定义 Cookie、Authorization、Access Token、原始请求头或网络响应。Win Rust
-宿主当前仍返回 `rendererStatus=reserved`；Android 已通过来源受限的 WebMessage 桥接入
-ChatGPT 可见语义适配器。后续每个厂商适配器仍必须独立评审：
+宿主和 Android 均已通过来源受限的桥接接入 ChatGPT 可见语义适配器；Win 主窗口提供
+刷新、返回主页、恢复窗口、系统浏览器回退以及原生消息/文字输入区。后续每个厂商适配器
+仍必须独立评审：
 
 ```text
 官方网页 WebView（网络与登录主体）
@@ -106,11 +108,11 @@ confirmation，再调用商户模块运行时：
 
 ## 当前验收边界
 
-- Tauri crate 编译与 4 项本地宿主测试通过。
+- Tauri crate 编译与本地宿主安全测试通过。
 - PC TypeScript/Vite 生产构建、ESLint 和本地浏览器安全契约测试通过。
 - 未登录一龙账号时不能创建本地 Profile。
 - 同一账号/厂商复用窗口与 Profile，不同一龙账号使用不同指纹目录。
 - 用户确认本人账号后才能打开本地会话，清除会话前再次确认。
 - 普通浏览器不显示可调用的本地命令，继续使用托管模式。
-- 尚未进行真实 ChatGPT 登录、Cloudflare、下载、音视频、更新后兼容和安装包验收。
-- Win 尚未启用 DOM 语义适配器或原生 UI 重渲染；APK 已接线但尚未完成真实账号兼容验收。
+- 真实 ChatGPT 登录、Cloudflare、下载、音视频和各账号兼容仍需用户本人完成官方验证后验收。
+- DOM 变化会让语义适配器降级；降级时保留完整官方窗口、刷新、主页和系统浏览器入口。

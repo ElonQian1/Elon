@@ -1,17 +1,30 @@
 //! 本地 AI 网页会话宿主。
 //!
-//! WebView2 自己持有 Cookie、DOM storage 与缓存；本模块只负责按一龙账号和厂商
-//! 划分本地 Profile、限制顶层导航并管理窗口生命周期。这里故意不提供 Cookie
-//! 枚举、Token 导出或任意 URL 打开能力，未来原生渲染器只能接收去凭证化的语义事件。
+//! WebView2 自己持有 Cookie、DOM storage 与缓存；本模块只按一龙账号和厂商
+//! 隔离 Profile、限制导航，并把官方网页中用户可见的语义转换为受限内存事件。
+//! Cookie、Token、请求头、原始响应与任意 URL 始终不进入 IPC。
 
-use std::{fs, path::PathBuf};
+#[path = "local_ai_browser/adapter.rs"]
+mod adapter;
+#[path = "local_ai_browser/state.rs"]
+mod state;
+
+use std::{fs, path::PathBuf, process::Command};
 
 use serde::Serialize;
-use tauri::{AppHandle, Manager, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use serde_json::{Map, Value};
+use tauri::{
+    webview::{NewWindowResponse, PageLoadEvent},
+    AppHandle, Manager, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
+};
+
+pub use state::LocalAiBrowserRuntime;
+use state::LocalAiWebSessionState;
 
 const RENDERER_PROTOCOL: &str = "yilong.ai.ui.v1";
 const PROFILE_ROOT: &str = "ai-web-profiles";
 const MAIN_WEBVIEW_LABEL: &str = "main";
+const LOCAL_AI_WINDOW_PREFIX: &str = "local-ai-";
 
 #[derive(Clone, Copy)]
 struct ProviderDefinition {
@@ -27,13 +40,14 @@ const CHATGPT: ProviderDefinition = ProviderDefinition {
     display_name: "ChatGPT",
     start_url: "https://chatgpt.com/",
     allowed_domain_suffixes: &["chatgpt.com", "openai.com"],
-    // 只允许厂商登录流程已知的精确主机，不允许 *.google.com 等宽泛域名。
-    // 身份提供商仍可拒绝嵌入式浏览器；本应用不规避其判断或真人验证。
     allowed_identity_hosts: &[
         "accounts.google.com",
         "appleid.apple.com",
         "login.live.com",
+        "account.live.com",
+        "login.microsoft.com",
         "login.microsoftonline.com",
+        "login.windows.net",
     ],
 };
 
@@ -82,6 +96,7 @@ pub fn list_local_ai_web_providers(
 pub fn open_local_ai_web_session(
     app: AppHandle,
     webview: WebviewWindow,
+    runtime: State<'_, LocalAiBrowserRuntime>,
     provider_id: String,
     owner_key: String,
 ) -> Result<LocalAiWebSession, String> {
@@ -89,21 +104,33 @@ pub fn open_local_ai_web_session(
     let provider = provider(&provider_id)?;
     let owner_fingerprint = owner_fingerprint(&owner_key)?;
     let window_label = window_label(provider, &owner_fingerprint);
+    runtime.ensure_session(&window_label, provider.id);
 
     if let Some(window) = app.get_webview_window(&window_label) {
-        window.show().map_err(display_error)?;
-        window.set_focus().map_err(display_error)?;
+        restore_window(&window)?;
+        runtime.mark_window_status(&window_label, "ready");
+        request_adapter_snapshot(&window);
         return Ok(session_response(provider, window_label, "focused"));
     }
 
+    runtime.mark_opening(&window_label);
     let start_url = parse_start_url(provider)?;
     let profile_directory = profile_directory(&app, provider, &owner_fingerprint)?;
     fs::create_dir_all(&profile_directory)
         .map_err(|error| format!("无法创建本地 AI 浏览器 Profile：{error}"))?;
 
     let navigation_provider = *provider;
-    let page_provider_id = provider.id;
-    WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::External(start_url))
+    let navigation_state = runtime.inner().clone();
+    let navigation_label = window_label.clone();
+    let popup_provider = *provider;
+    let popup_state = runtime.inner().clone();
+    let popup_label = window_label.clone();
+    let page_state = runtime.inner().clone();
+    let page_label = window_label.clone();
+    let window_state = runtime.inner().clone();
+    let window_state_label = window_label.clone();
+
+    let window = WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::External(start_url))
         .title(format!("{} · 一龙本地会话", provider.display_name))
         .inner_size(1180.0, 780.0)
         .min_inner_size(900.0, 620.0)
@@ -111,9 +138,10 @@ pub fn open_local_ai_web_session(
         .data_directory(profile_directory)
         .incognito(false)
         .enable_clipboard_access()
-        // 不注入初始化脚本；官方网页窗口不获得语义桥、Cookie API 或一龙业务状态。
+        .initialization_script(adapter::initialization_script())
         .on_navigation(move |url| {
             let allowed = allows_navigation(&navigation_provider, url);
+            navigation_state.mark_navigation(&navigation_label, url, allowed);
             if !allowed {
                 eprintln!(
                     "[elon-desktop][local-ai] 已阻止 {} 导航到 {}",
@@ -122,40 +150,172 @@ pub fn open_local_ai_web_session(
             }
             allowed
         })
-        .on_page_load(move |_window, payload| {
-            println!(
-                "[elon-desktop][local-ai] {} 页面事件 {:?} -> {}",
-                page_provider_id,
-                payload.event(),
-                payload.url()
-            );
+        .on_new_window(move |url, _features| {
+            let allowed = allows_navigation(&popup_provider, &url);
+            popup_state.mark_navigation(&popup_label, &url, allowed);
+            if allowed {
+                NewWindowResponse::Allow
+            } else {
+                NewWindowResponse::Deny
+            }
+        })
+        .on_page_load(move |_window, payload| match payload.event() {
+            PageLoadEvent::Started => page_state.mark_navigation(&page_label, payload.url(), true),
+            PageLoadEvent::Finished => page_state.mark_page_finished(&page_label, payload.url()),
         })
         .build()
-        .map_err(display_error)?;
+        .map_err(|error| {
+            runtime.record_error(&window_label, format!("无法创建 ChatGPT WebView2：{error}"));
+            display_error(error)
+        })?;
 
+    window.on_window_event(move |event| {
+        if matches!(event, WindowEvent::Destroyed) {
+            window_state.mark_window_status(&window_state_label, "closed");
+        }
+    });
+    restore_window(&window)?;
     Ok(session_response(provider, window_label, "created"))
+}
+
+#[tauri::command]
+pub fn get_local_ai_web_session_state(
+    app: AppHandle,
+    webview: WebviewWindow,
+    runtime: State<'_, LocalAiBrowserRuntime>,
+    provider_id: String,
+    owner_key: String,
+) -> Result<LocalAiWebSessionState, String> {
+    ensure_main_webview(&webview)?;
+    let provider = provider(&provider_id)?;
+    let fingerprint = owner_fingerprint(&owner_key)?;
+    let label = window_label(provider, &fingerprint);
+    runtime.ensure_session(&label, provider.id);
+    if let Some(window) = app.get_webview_window(&label) {
+        if window.is_minimized().unwrap_or(false) {
+            runtime.mark_window_status(&label, "minimized");
+        } else if runtime
+            .snapshot(&label)
+            .is_some_and(|state| state.window_status == "minimized")
+        {
+            runtime.mark_window_status(&label, "ready");
+        }
+        if let Ok(url) = window.url() {
+            runtime.observe_url(&label, &url);
+        }
+    } else {
+        runtime.mark_window_status(&label, "closed");
+    }
+    runtime
+        .snapshot(&label)
+        .ok_or_else(|| "尚未创建 ChatGPT 本地会话。".to_string())
+}
+
+#[tauri::command]
+pub fn control_local_ai_web_session(
+    app: AppHandle,
+    webview: WebviewWindow,
+    runtime: State<'_, LocalAiBrowserRuntime>,
+    provider_id: String,
+    owner_key: String,
+    action: String,
+) -> Result<LocalAiWebSessionState, String> {
+    ensure_main_webview(&webview)?;
+    let provider = provider(&provider_id)?;
+    let fingerprint = owner_fingerprint(&owner_key)?;
+    let label = window_label(provider, &fingerprint);
+    runtime.ensure_session(&label, provider.id);
+    if action == "external" {
+        open_fixed_external_url(provider.start_url)?;
+        return runtime
+            .snapshot(&label)
+            .ok_or_else(|| "ChatGPT 本地会话状态不可用。".to_string());
+    }
+    let window = app
+        .get_webview_window(&label)
+        .ok_or_else(|| "请先打开 ChatGPT 本地网页会话。".to_string())?;
+
+    match action.as_str() {
+        "restore" => restore_window(&window)?,
+        "reload" => window.reload().map_err(display_error)?,
+        "back" => window.eval("history.back();").map_err(display_error)?,
+        "home" => window
+            .navigate(parse_start_url(provider)?)
+            .map_err(display_error)?,
+        _ => return Err("不支持的 ChatGPT 浏览器控制动作。".to_string()),
+    }
+    restore_window(&window)?;
+    runtime.mark_window_status(&label, "ready");
+    runtime
+        .snapshot(&label)
+        .ok_or_else(|| "ChatGPT 本地会话状态不可用。".to_string())
+}
+
+#[tauri::command]
+pub fn run_local_ai_web_adapter_command(
+    app: AppHandle,
+    webview: WebviewWindow,
+    runtime: State<'_, LocalAiBrowserRuntime>,
+    provider_id: String,
+    owner_key: String,
+    action: String,
+    value: Option<String>,
+    expected_draft: Option<String>,
+) -> Result<(), String> {
+    ensure_main_webview(&webview)?;
+    let provider = provider(&provider_id)?;
+    let fingerprint = owner_fingerprint(&owner_key)?;
+    let label = window_label(provider, &fingerprint);
+    let window = app
+        .get_webview_window(&label)
+        .ok_or_else(|| "请先打开 ChatGPT 官方网页。".to_string())?;
+    runtime.mark_command_pending(&label);
+    let command = adapter_command(&action, value, expected_draft)?;
+    let raw = serde_json::to_string(&command).map_err(display_error)?;
+    let encoded = serde_json::to_string(&raw).map_err(display_error)?;
+    window
+        .eval(format!(
+            "window.__elonChatGptBridge && window.__elonChatGptBridge.command({encoded});"
+        ))
+        .map_err(display_error)?;
+    restore_window(&window)
+}
+
+#[tauri::command]
+pub fn publish_local_ai_web_event(
+    webview: WebviewWindow,
+    runtime: State<'_, LocalAiBrowserRuntime>,
+    payload: String,
+) -> Result<(), String> {
+    let label = webview.label();
+    if !label.starts_with("local-ai-chatgpt-") {
+        return Err("可见语义事件只允许 ChatGPT 本地会话窗口发送。".to_string());
+    }
+    let event = adapter::sanitize_event(&payload)?;
+    runtime.record_adapter_event(label, &event.kind, event.payload);
+    Ok(())
 }
 
 #[tauri::command]
 pub fn clear_local_ai_web_session(
     app: AppHandle,
     webview: WebviewWindow,
+    runtime: State<'_, LocalAiBrowserRuntime>,
     provider_id: String,
     owner_key: String,
 ) -> Result<ClearLocalAiWebSession, String> {
     ensure_main_webview(&webview)?;
     let provider = provider(&provider_id)?;
-    let owner_fingerprint = owner_fingerprint(&owner_key)?;
-    let label = window_label(provider, &owner_fingerprint);
+    let fingerprint = owner_fingerprint(&owner_key)?;
+    let label = window_label(provider, &fingerprint);
     let window = app
         .get_webview_window(&label)
         .ok_or_else(|| "请先打开本地网页会话，再清除它的本地数据。".to_string())?;
-
     window.clear_all_browsing_data().map_err(display_error)?;
     window
         .navigate(parse_start_url(provider)?)
         .map_err(display_error)?;
-
+    runtime.mark_opening(&label);
     Ok(ClearLocalAiWebSession {
         provider_id: provider.id,
         status: "cleared",
@@ -170,20 +330,16 @@ fn provider_summary(provider: &ProviderDefinition) -> LocalAiWebProvider {
         login_mode: "manual_web",
         profile_scope: "local_owner_provider",
         renderer_protocol: RENDERER_PROTOCOL,
-        renderer_status: "reserved",
+        renderer_status: "active",
     }
 }
 
 fn ensure_main_webview(webview: &WebviewWindow) -> Result<(), String> {
-    if caller_label_allowed(webview.label()) {
+    if webview.label() == MAIN_WEBVIEW_LABEL {
         Ok(())
     } else {
         Err("本地 AI 浏览器命令只允许一龙 PC 主窗口调用。".to_string())
     }
-}
-
-fn caller_label_allowed(label: &str) -> bool {
-    label == MAIN_WEBVIEW_LABEL
 }
 
 fn provider(provider_id: &str) -> Result<&'static ProviderDefinition, String> {
@@ -208,8 +364,6 @@ fn owner_fingerprint(owner_key: &str) -> Result<String, String> {
     {
         return Err("一龙账号标识无效，无法创建本地隔离 Profile。".to_string());
     }
-
-    // 固定 FNV-1a 仅用于不可逆目录/窗口命名，不用于密码学或鉴权。
     let hash = owner_key
         .as_bytes()
         .iter()
@@ -219,22 +373,18 @@ fn owner_fingerprint(owner_key: &str) -> Result<String, String> {
     Ok(format!("{hash:016x}"))
 }
 
-fn window_label(provider: &ProviderDefinition, owner_fingerprint: &str) -> String {
-    format!("local-ai-{}-{owner_fingerprint}", provider.id)
+fn window_label(provider: &ProviderDefinition, fingerprint: &str) -> String {
+    format!("{LOCAL_AI_WINDOW_PREFIX}{}-{fingerprint}", provider.id)
 }
 
 fn profile_directory(
     app: &AppHandle,
     provider: &ProviderDefinition,
-    owner_fingerprint: &str,
+    fingerprint: &str,
 ) -> Result<PathBuf, String> {
     app.path()
         .app_local_data_dir()
-        .map(|root| {
-            root.join(PROFILE_ROOT)
-                .join(owner_fingerprint)
-                .join(provider.id)
-        })
+        .map(|root| root.join(PROFILE_ROOT).join(fingerprint).join(provider.id))
         .map_err(display_error)
 }
 
@@ -250,11 +400,17 @@ fn session_response(
         profile_scope: "local_owner_provider",
         cookie_access: "webview_only",
         renderer_protocol: RENDERER_PROTOCOL,
-        renderer_status: "reserved",
+        renderer_status: "active",
     }
 }
 
 fn allows_navigation(provider: &ProviderDefinition, url: &Url) -> bool {
+    if url.as_str() == "about:blank" {
+        return true;
+    }
+    if url.scheme() == "edge-error" && url.host_str() == Some("edgewebdata") {
+        return true;
+    }
     if url.scheme() != "https"
         || !url.username().is_empty()
         || url.password().is_some()
@@ -262,7 +418,6 @@ fn allows_navigation(provider: &ProviderDefinition, url: &Url) -> bool {
     {
         return false;
     }
-
     let Some(host) = url.host_str().map(str::to_ascii_lowercase) else {
         return false;
     };
@@ -271,6 +426,78 @@ fn allows_navigation(provider: &ProviderDefinition, url: &Url) -> bool {
             .allowed_domain_suffixes
             .iter()
             .any(|domain| host == *domain || host.ends_with(&format!(".{domain}")))
+}
+
+fn restore_window(window: &WebviewWindow) -> Result<(), String> {
+    if window.is_minimized().unwrap_or(false) {
+        window.unminimize().map_err(display_error)?;
+    }
+    window.show().map_err(display_error)?;
+    window.set_focus().map_err(display_error)
+}
+
+fn request_adapter_snapshot(window: &WebviewWindow) {
+    let _ = window.eval(
+        "window.__elonChatGptBridge && window.__elonChatGptBridge.command('{\"action\":\"snapshot\"}');",
+    );
+}
+
+fn adapter_command(
+    action: &str,
+    value: Option<String>,
+    expected_draft: Option<String>,
+) -> Result<Value, String> {
+    const ACTIONS: &[&str] = &[
+        "snapshot",
+        "send_prompt",
+        "stop_generation",
+        "regenerate_response",
+        "new_conversation",
+        "list_conversations",
+        "open_conversation",
+        "start_google_login",
+        "list_model_options",
+        "list_composer_tools",
+        "collect_model_options",
+        "collect_composer_tools",
+        "select_model_option",
+        "select_composer_tool",
+    ];
+    if !ACTIONS.contains(&action) {
+        return Err("不支持的 ChatGPT 原生界面动作。".to_string());
+    }
+    let mut command = Map::new();
+    command.insert("action".to_string(), Value::String(action.to_string()));
+    if let Some(value) = value {
+        if value.chars().count() > 20_000 {
+            return Err("ChatGPT 输入内容过长。".to_string());
+        }
+        command.insert("value".to_string(), Value::String(value));
+    }
+    if let Some(expected_draft) = expected_draft {
+        if expected_draft.chars().count() > 20_000 {
+            return Err("ChatGPT 网页草稿过长。".to_string());
+        }
+        command.insert("expectedDraft".to_string(), Value::String(expected_draft));
+    }
+    Ok(Value::Object(command))
+}
+
+#[cfg(windows)]
+fn open_fixed_external_url(url: &str) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    Command::new("rundll32.exe")
+        .args(["url.dll,FileProtocolHandler", url])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("无法打开系统浏览器：{error}"))
+}
+
+#[cfg(not(windows))]
+fn open_fixed_external_url(_url: &str) -> Result<(), String> {
+    Err("当前平台不支持系统浏览器回退。".to_string())
 }
 
 fn display_error(error: impl std::fmt::Display) -> String {
@@ -286,7 +513,12 @@ mod tests {
     }
 
     #[test]
-    fn chatgpt_navigation_only_allows_https_vendor_and_exact_identity_hosts() {
+    fn bootstrap_and_vendor_navigation_are_allowed() {
+        assert!(allows_navigation(&CHATGPT, &url("about:blank")));
+        assert!(allows_navigation(
+            &CHATGPT,
+            &url("edge-error://edgewebdata/")
+        ));
         assert!(allows_navigation(&CHATGPT, &url("https://chatgpt.com/")));
         assert!(allows_navigation(
             &CHATGPT,
@@ -296,6 +528,10 @@ mod tests {
             &CHATGPT,
             &url("https://accounts.google.com/o/oauth2/v2/auth")
         ));
+    }
+
+    #[test]
+    fn unsafe_navigation_is_rejected() {
         assert!(!allows_navigation(&CHATGPT, &url("http://chatgpt.com/")));
         assert!(!allows_navigation(
             &CHATGPT,
@@ -317,9 +553,9 @@ mod tests {
 
     #[test]
     fn owner_fingerprint_is_stable_separate_and_path_safe() {
-        let first = owner_fingerprint("account-15692409892").expect("fingerprint");
-        let second = owner_fingerprint("account-15692409892").expect("fingerprint");
-        let other = owner_fingerprint("another-account").expect("fingerprint");
+        let first = owner_fingerprint("account-15692409892").unwrap();
+        let second = owner_fingerprint("account-15692409892").unwrap();
+        let other = owner_fingerprint("another-account").unwrap();
         assert_eq!(first, second);
         assert_ne!(first, other);
         assert_eq!(first.len(), 16);
@@ -327,18 +563,8 @@ mod tests {
     }
 
     #[test]
-    fn provider_contract_keeps_renderer_bridge_reserved() {
-        let summary = provider_summary(&CHATGPT);
-        assert_eq!(summary.id, "chatgpt");
-        assert_eq!(summary.profile_scope, "local_owner_provider");
-        assert_eq!(summary.renderer_protocol, "yilong.ai.ui.v1");
-        assert_eq!(summary.renderer_status, "reserved");
-    }
-
-    #[test]
-    fn only_main_webview_may_request_local_ai_sessions() {
-        assert!(caller_label_allowed("main"));
-        assert!(!caller_label_allowed("local-ai-chatgpt-deadbeef"));
-        assert!(!caller_label_allowed("main-shadow"));
+    fn adapter_command_does_not_accept_arbitrary_javascript() {
+        assert!(adapter_command("eval", Some("alert(1)".to_string()), None).is_err());
+        assert!(adapter_command("snapshot", None, None).is_ok());
     }
 }
