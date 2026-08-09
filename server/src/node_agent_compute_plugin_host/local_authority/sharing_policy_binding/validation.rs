@@ -415,3 +415,6 @@ fn checked_next(value: i64, label: &'static str) -> Result<i64> {
         .checked_add(1)
         .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_POLICY_BINDING_{label}_EXHAUSTED"))
 }
+
+#[cfg(test)]
+mod tests;

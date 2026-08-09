@@ -2,6 +2,8 @@ use rusqlite::Connection;
 
 use super::ensure_schema;
 
+mod versioning_v6;
+
 #[test]
 fn schema_installs_and_reopens_with_candidate_health_and_cleanup_objects() {
     let mut connection = Connection::open_in_memory().unwrap();
