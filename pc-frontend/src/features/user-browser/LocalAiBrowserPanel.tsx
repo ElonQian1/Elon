@@ -45,11 +45,20 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
   const [message, setMessage] = useState('')
   const [draft, setDraft] = useState('')
   const [draftTouched, setDraftTouched] = useState(false)
-  const provider = providers[0]
+  const [selectedProviderId, setSelectedProviderId] = useState('google-ai-mode')
+  const provider = providers.find((item) => item.id === selectedProviderId) || providers[0]
   const snapshot = useMemo(
     () => isLocalAiMessageSnapshot(sessionState?.semanticEvent) ? sessionState.semanticEvent : null,
     [sessionState?.semanticEvent],
   )
+
+  useEffect(() => {
+    setSessionState(null)
+    setOwnerConfirmed(false)
+    setDraft('')
+    setDraftTouched(false)
+    setMessage('')
+  }, [provider?.id])
 
   useEffect(() => {
     if (!ownerKey || !provider || state !== 'ready') return
@@ -83,7 +92,9 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
       const next = await getLocalAiWebSessionState(item.id, ownerKey)
       setSessionState(next)
       setMessage(session.status === 'created'
-        ? `已打开 ${item.displayName} 官方页面，请本人完成登录。登录后可回到这里使用一龙聊天界面。`
+        ? item.loginMode === 'guest_web_system_login'
+          ? `已打开 ${item.displayName} 官方页面。若 Google 要求登录，请使用“系统浏览器”；两边不会共享 Cookie。`
+          : `已打开 ${item.displayName} 官方页面，请本人完成登录。登录后可回到这里使用一龙聊天界面。`
         : `已恢复并聚焦 ${item.displayName} 官方页面。`)
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
@@ -100,7 +111,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
       const next = await controlLocalAiWebSession(provider.id, ownerKey, action)
       setSessionState(next)
       setMessage(action === 'external'
-        ? '已用系统浏览器打开 ChatGPT。系统浏览器会话不会同步到一龙原生聊天区。'
+        ? `已用系统浏览器打开 ${provider.displayName}。系统浏览器与一龙本地窗口不会共享 Cookie。`
         : '')
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
@@ -166,14 +177,21 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
         <div className={styles.titleRow}>
           <MonitorUp size={20} aria-hidden="true" />
           <div>
-            <span>CHATGPT.COM · 本机登录</span>
-            <h2 id="local-ai-browser-title">登录本人 ChatGPT</h2>
+            <span>OFFICIAL AI WEB · 本机隔离</span>
+            <h2 id="local-ai-browser-title">{provider?.displayName || '官方 AI 网页'}</h2>
           </div>
         </div>
-        <p>
-          一龙打开 ChatGPT 官方页面，由本人输入账号并完成人机验证。Cookie 和网页数据
-          只留在本机 WebView2 Profile；原生聊天区只同步屏幕上可见的消息语义。
-        </p>
+        {provider?.loginMode === 'guest_web_system_login' ? (
+          <p>
+            一龙直接打开 Google 官方 AI 模式。访客能力留在本机 WebView2；Google 账号登录
+            按官方要求交给系统浏览器，一龙不接收登录 Cookie 或访问令牌。
+          </p>
+        ) : (
+          <p>
+            一龙打开 ChatGPT 官方页面，由本人输入账号并完成人机验证。Cookie 和网页数据
+            只留在本机 WebView2 Profile；原生聊天区只同步屏幕上可见的消息语义。
+          </p>
+        )}
         <dl>
           <div><dt>一龙账号</dt><dd>{ownerLabel}</dd></div>
           <div><dt>登录位置</dt><dd>仅当前电脑</dd></div>
@@ -191,7 +209,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
         ) : state === 'checking' ? (
           <div className={styles.desktopNotice}>
             <LoaderCircle className={styles.spin} size={18} />
-            <span>正在确认当前 Win 客户端是否支持 ChatGPT…</span>
+            <span>正在确认当前 Win 客户端是否支持官方 AI 网页…</span>
           </div>
         ) : state === 'upgrade_required' ? (
           <Notice title="当前 Win 客户端需要更新" message={capabilityMessage}>
@@ -203,18 +221,47 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
             </button>
           </Notice>
         ) : state === 'error' ? (
-          <Notice title="本地 ChatGPT 功能暂不可用" message={capabilityMessage}>
+          <Notice title="本地官方 AI 网页功能暂不可用" message={capabilityMessage}>
             <button type="button" onClick={() => void refresh()}>
               <RefreshCw size={15} />重新检查
             </button>
           </Notice>
         ) : (
           <>
-            <ol className={styles.steps} aria-label="ChatGPT 登录与使用步骤">
-              <li><span>1</span><strong>确认只登录本人账号</strong></li>
-              <li><span>2</span><strong>打开官方页面并完成登录</strong></li>
-              <li><span>3</span><strong>回到本页使用一龙聊天界面</strong></li>
+            <ol className={styles.steps} aria-label={`${provider?.displayName || '官方 AI 网页'}使用步骤`}>
+              {provider?.loginMode === 'guest_web_system_login' ? (
+                <>
+                  <li><span>1</span><strong>选择 Google AI 模式</strong></li>
+                  <li><span>2</span><strong>在本地窗口使用官方网页</strong></li>
+                  <li><span>3</span><strong>需要账号时改用系统浏览器</strong></li>
+                </>
+              ) : (
+                <>
+                  <li><span>1</span><strong>确认只登录本人账号</strong></li>
+                  <li><span>2</span><strong>打开官方页面并完成登录</strong></li>
+                  <li><span>3</span><strong>回到本页使用一龙聊天界面</strong></li>
+                </>
+              )}
             </ol>
+
+            <div className={styles.providerList} role="list" aria-label="官方 AI 网页提供商">
+              {providers.map((item) => (
+                <button
+                  className={styles.providerChoice}
+                  data-selected={item.id === provider?.id}
+                  key={item.id}
+                  type="button"
+                  onClick={() => setSelectedProviderId(item.id)}
+                >
+                  <span>
+                    <strong>{item.displayName}</strong>
+                    <small>{item.startHost} · 独立本地 Profile</small>
+                  </span>
+                  <em>{item.rendererStatus === 'active' ? '一龙界面' : '官方网页'}</em>
+                </button>
+              ))}
+            </div>
+
             <label className={styles.confirmation}>
               <input
                 type="checkbox"
@@ -223,42 +270,44 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
                 disabled={!ownerKey}
               />
               <span>
-                <strong>只登录本人账号</strong>
-                <small>真人验证由本人完成；一龙不读取密码、Cookie 或访问令牌。</small>
+                <strong>
+                  {provider?.loginMode === 'guest_web_system_login'
+                    ? '我了解 Google 登录使用系统浏览器'
+                    : '只登录本人账号'}
+                </strong>
+                <small>
+                  {provider?.loginMode === 'guest_web_system_login'
+                    ? '本地窗口适合访客模式；账号状态不会从系统浏览器复制回来。'
+                    : '真人验证由本人完成；一龙不读取密码、Cookie 或访问令牌。'}
+                </small>
               </span>
             </label>
 
-            {providers.map((item) => (
-              <article className={styles.provider} key={item.id}>
-                <div>
-                  <strong>{item.displayName}</strong>
-                  <small>{item.startHost} · 独立本地 Profile</small>
-                </div>
-                <div className={styles.actions}>
-                  <button
-                    className={styles.openButton}
-                    type="button"
-                    onClick={() => void open(item)}
-                    disabled={!ownerKey || !ownerConfirmed || busy}
-                  >
-                    {busy ? <LoaderCircle className={styles.spin} size={16} /> : <ShieldCheck size={16} />}
-                    {sessionOpen ? '恢复官方窗口' : '登录或打开 ChatGPT'}
-                  </button>
-                  <button
-                    className={styles.clearButton}
-                    type="button"
-                    title="清除当前账号的本地网页会话"
-                    aria-label={`清除 ${item.displayName} 本地网页会话`}
-                    onClick={() => void clear(item)}
-                    disabled={!sessionOpen || busy}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </article>
-            ))}
+            {provider && (
+              <div className={styles.actions}>
+                <button
+                  className={styles.openButton}
+                  type="button"
+                  onClick={() => void open(provider)}
+                  disabled={!ownerKey || !ownerConfirmed || busy}
+                >
+                  {busy ? <LoaderCircle className={styles.spin} size={16} /> : <ShieldCheck size={16} />}
+                  {openButtonLabel(provider, sessionOpen)}
+                </button>
+                <button
+                  className={styles.clearButton}
+                  type="button"
+                  title="清除当前账号的本地网页会话"
+                  aria-label={`清除 ${provider.displayName} 本地网页会话`}
+                  onClick={() => void clear(provider)}
+                  disabled={!sessionOpen || busy}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            )}
 
-            <div className={styles.browserToolbar} aria-label="ChatGPT 官方窗口控制">
+            <div className={styles.browserToolbar} aria-label={`${provider?.displayName || '官方 AI'}窗口控制`}>
               <button type="button" onClick={() => void control('back')} disabled={!sessionOpen || busy}>
                 <ArrowLeft size={15} />返回
               </button>
@@ -283,7 +332,7 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
               </div>
             )}
 
-            <section className={styles.nativeChat} aria-label="一龙 ChatGPT 原生聊天区">
+            {provider?.rendererStatus === 'active' ? <section className={styles.nativeChat} aria-label="一龙 ChatGPT 原生聊天区">
               <header>
                 <div>
                   <strong>{snapshot?.title || 'ChatGPT 原生聊天'}</strong>
@@ -349,7 +398,19 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
                   </button>
                 )}
               </div>
-            </section>
+            </section> : (
+              <section className={styles.officialWebOnly} aria-label="Google AI 模式接入说明">
+                <ExternalLink size={24} aria-hidden="true" />
+                <div>
+                  <strong>Google AI 模式官方网页</strong>
+                  <p>
+                    当前批次直接使用 Google 官方界面，不注入 ChatGPT 适配器，也不读取网页 Cookie、
+                    请求或私有接口。是否开放由 Google 的地区、语言、设备和账号灰度决定。
+                  </p>
+                  <small>需要登录或查看账号历史时，请点击上方“系统浏览器”。</small>
+                </div>
+              </section>
+            )}
           </>
         )}
 
@@ -384,6 +445,11 @@ function sessionStatusLabel(state: LocalAiWebSessionState | null): string {
     closed: '已关闭',
   }
   return labels[state.windowStatus] || state.windowStatus
+}
+
+function openButtonLabel(provider: LocalAiWebProvider, sessionOpen: boolean): string {
+  if (sessionOpen) return '恢复官方窗口'
+  return provider.id === 'chatgpt' ? '登录或打开 ChatGPT' : `打开 ${provider.displayName}`
 }
 
 async function waitForAdapterResult(

@@ -85,9 +85,9 @@ export default function UserBrowserLauncherPage() {
           <Fingerprint size={30} strokeWidth={1.8} />
         </div>
         <div>
-          <span className={styles.eyebrow}>CHATGPT 账号与聊天</span>
-          <h1>登录本人 ChatGPT</h1>
-          <p>官方登录 · Cookie 和网页数据仅保存在这台电脑</p>
+          <span className={styles.eyebrow}>官方 AI 网页</span>
+          <h1>ChatGPT 与 Google AI 模式</h1>
+          <p>本地隔离会话 · Cookie 和网页数据仅保存在这台电脑</p>
         </div>
         <Status availability={availability} localBrowserState={localBrowser.state} />
       </header>

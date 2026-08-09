@@ -45,7 +45,7 @@ pub struct LocalAiWebSessionState {
 }
 
 impl LocalAiBrowserRuntime {
-    pub fn ensure_session(&self, label: &str, provider_id: &str) {
+    pub fn ensure_session(&self, label: &str, provider_id: &str, renderer_status: &str) {
         let mut sessions = self.sessions();
         sessions
             .entry(label.to_string())
@@ -56,7 +56,7 @@ impl LocalAiBrowserRuntime {
                 current_url: String::new(),
                 current_host: String::new(),
                 loading: true,
-                renderer_status: "connecting".to_string(),
+                renderer_status: renderer_status.to_string(),
                 last_error: None,
                 semantic_event: None,
                 command_result: None,
@@ -72,7 +72,13 @@ impl LocalAiBrowserRuntime {
         });
     }
 
-    pub fn mark_navigation(&self, label: &str, url: &Url, allowed: bool) {
+    pub fn mark_navigation(
+        &self,
+        label: &str,
+        url: &Url,
+        allowed: bool,
+        blocked_message: Option<&str>,
+    ) {
         let safe_url = safe_visible_url(url);
         let host = url.host_str().unwrap_or_default().to_string();
         self.update(label, |record| {
@@ -85,8 +91,11 @@ impl LocalAiBrowserRuntime {
             } else {
                 record.window_status = "blocked".to_string();
                 record.loading = false;
-                record.last_error =
-                    Some("页面尝试离开允许的 ChatGPT 登录域名，已由一龙拦截。".to_string());
+                record.last_error = Some(
+                    blocked_message
+                        .unwrap_or("页面尝试离开允许的本地 AI 网页域名，已由一龙拦截。")
+                        .to_string(),
+                );
             }
         });
     }

@@ -31,14 +31,25 @@ struct ProviderDefinition {
     id: &'static str,
     display_name: &'static str,
     start_url: &'static str,
+    start_host: &'static str,
+    login_mode: &'static str,
+    renderer_status: &'static str,
+    semantic_adapter: bool,
+    allowed_hosts: &'static [&'static str],
     allowed_domain_suffixes: &'static [&'static str],
     allowed_identity_hosts: &'static [&'static str],
+    blocked_identity_hosts: &'static [&'static str],
 }
 
 const CHATGPT: ProviderDefinition = ProviderDefinition {
     id: "chatgpt",
     display_name: "ChatGPT",
     start_url: "https://chatgpt.com/",
+    start_host: "chatgpt.com",
+    login_mode: "manual_web",
+    renderer_status: "active",
+    semantic_adapter: true,
+    allowed_hosts: &[],
     allowed_domain_suffixes: &["chatgpt.com", "openai.com"],
     allowed_identity_hosts: &[
         "accounts.google.com",
@@ -49,9 +60,24 @@ const CHATGPT: ProviderDefinition = ProviderDefinition {
         "login.microsoftonline.com",
         "login.windows.net",
     ],
+    blocked_identity_hosts: &[],
 };
 
-const PROVIDERS: &[ProviderDefinition] = &[CHATGPT];
+const GOOGLE_AI_MODE: ProviderDefinition = ProviderDefinition {
+    id: "google-ai-mode",
+    display_name: "Google AI 模式",
+    start_url: "https://www.google.com/aimode",
+    start_host: "google.com/aimode",
+    login_mode: "guest_web_system_login",
+    renderer_status: "reserved",
+    semantic_adapter: false,
+    allowed_hosts: &["google.com", "www.google.com"],
+    allowed_domain_suffixes: &[],
+    allowed_identity_hosts: &[],
+    blocked_identity_hosts: &["accounts.google.com"],
+};
+
+const PROVIDERS: &[ProviderDefinition] = &[GOOGLE_AI_MODE, CHATGPT];
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -104,12 +130,16 @@ pub async fn open_local_ai_web_session(
     let provider = provider(&provider_id)?;
     let owner_fingerprint = owner_fingerprint(&owner_key)?;
     let window_label = window_label(provider, &owner_fingerprint);
-    runtime.ensure_session(&window_label, provider.id);
+    runtime.ensure_session(
+        &window_label,
+        provider.id,
+        initial_renderer_status(provider),
+    );
 
     if let Some(window) = app.get_webview_window(&window_label) {
         restore_window(&window)?;
         runtime.mark_window_status(&window_label, "ready");
-        request_adapter_snapshot(&window);
+        request_adapter_snapshot(provider, &window);
         return Ok(session_response(provider, window_label, "focused"));
     }
 
@@ -133,7 +163,7 @@ pub async fn open_local_ai_web_session(
     let window_state = runtime.inner().clone();
     let window_state_label = window_label.clone();
 
-    let window =
+    let mut builder =
         WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::External(bootstrap_url))
             .title(format!("{} · 一龙本地会话", provider.display_name))
             .inner_size(1180.0, 780.0)
@@ -141,52 +171,65 @@ pub async fn open_local_ai_web_session(
             .center()
             .data_directory(profile_directory)
             .incognito(false)
-            .enable_clipboard_access()
-            .initialization_script(adapter::initialization_script())
-            .on_navigation(move |url| {
-                let allowed = allows_navigation(&navigation_provider, url);
-                navigation_state.mark_navigation(&navigation_label, url, allowed);
-                println!(
-                    "[elon-desktop][local-ai] {} 导航 allowed={} -> {}",
-                    navigation_provider.id, allowed, url
+            .enable_clipboard_access();
+    if provider.semantic_adapter {
+        builder = builder.initialization_script(adapter::initialization_script());
+    }
+    let window = builder
+        .on_navigation(move |url| {
+            let allowed = allows_navigation(&navigation_provider, url);
+            let blocked_message = navigation_block_message(&navigation_provider, url);
+            navigation_state.mark_navigation(
+                &navigation_label,
+                url,
+                allowed,
+                blocked_message.as_deref(),
+            );
+            println!(
+                "[elon-desktop][local-ai] {} 导航 allowed={} -> {}",
+                navigation_provider.id, allowed, url
+            );
+            if !allowed {
+                eprintln!(
+                    "[elon-desktop][local-ai] 已阻止 {} 导航到 {}",
+                    navigation_provider.id, url
                 );
-                if !allowed {
-                    eprintln!(
-                        "[elon-desktop][local-ai] 已阻止 {} 导航到 {}",
-                        navigation_provider.id, url
-                    );
+            }
+            allowed
+        })
+        .on_new_window(move |url, _features| {
+            let allowed = allows_navigation(&popup_provider, &url);
+            let blocked_message = navigation_block_message(&popup_provider, &url);
+            popup_state.mark_navigation(&popup_label, &url, allowed, blocked_message.as_deref());
+            if allowed {
+                NewWindowResponse::Allow
+            } else {
+                NewWindowResponse::Deny
+            }
+        })
+        .on_page_load(move |_window, payload| {
+            println!(
+                "[elon-desktop][local-ai] 页面事件 {:?} -> {}",
+                payload.event(),
+                payload.url()
+            );
+            match payload.event() {
+                PageLoadEvent::Started => {
+                    page_state.mark_navigation(&page_label, payload.url(), true, None)
                 }
-                allowed
-            })
-            .on_new_window(move |url, _features| {
-                let allowed = allows_navigation(&popup_provider, &url);
-                popup_state.mark_navigation(&popup_label, &url, allowed);
-                if allowed {
-                    NewWindowResponse::Allow
-                } else {
-                    NewWindowResponse::Deny
+                PageLoadEvent::Finished => {
+                    page_state.mark_page_finished(&page_label, payload.url())
                 }
-            })
-            .on_page_load(move |_window, payload| {
-                println!(
-                    "[elon-desktop][local-ai] 页面事件 {:?} -> {}",
-                    payload.event(),
-                    payload.url()
-                );
-                match payload.event() {
-                    PageLoadEvent::Started => {
-                        page_state.mark_navigation(&page_label, payload.url(), true)
-                    }
-                    PageLoadEvent::Finished => {
-                        page_state.mark_page_finished(&page_label, payload.url())
-                    }
-                }
-            })
-            .build()
-            .map_err(|error| {
-                runtime.record_error(&window_label, format!("无法创建 ChatGPT WebView2：{error}"));
-                display_error(error)
-            })?;
+            }
+        })
+        .build()
+        .map_err(|error| {
+            runtime.record_error(
+                &window_label,
+                format!("无法创建 {} WebView2：{error}", provider.display_name),
+            );
+            display_error(error)
+        })?;
 
     window.on_window_event(move |event| {
         if matches!(event, WindowEvent::Destroyed) {
@@ -195,7 +238,10 @@ pub async fn open_local_ai_web_session(
     });
     restore_window(&window)?;
     window.navigate(start_url).map_err(|error| {
-        runtime.record_error(&window_label, format!("ChatGPT 首次导航失败：{error}"));
+        runtime.record_error(
+            &window_label,
+            format!("{} 首次导航失败：{error}", provider.display_name),
+        );
         display_error(error)
     })?;
     Ok(session_response(provider, window_label, "created"))
@@ -213,7 +259,7 @@ pub fn get_local_ai_web_session_state(
     let provider = provider(&provider_id)?;
     let fingerprint = owner_fingerprint(&owner_key)?;
     let label = window_label(provider, &fingerprint);
-    runtime.ensure_session(&label, provider.id);
+    runtime.ensure_session(&label, provider.id, initial_renderer_status(provider));
     if let Some(window) = app.get_webview_window(&label) {
         if window.is_minimized().unwrap_or(false) {
             runtime.mark_window_status(&label, "minimized");
@@ -231,7 +277,7 @@ pub fn get_local_ai_web_session_state(
     }
     runtime
         .snapshot(&label)
-        .ok_or_else(|| "尚未创建 ChatGPT 本地会话。".to_string())
+        .ok_or_else(|| format!("尚未创建 {} 本地会话。", provider.display_name))
 }
 
 #[tauri::command]
@@ -247,16 +293,16 @@ pub fn control_local_ai_web_session(
     let provider = provider(&provider_id)?;
     let fingerprint = owner_fingerprint(&owner_key)?;
     let label = window_label(provider, &fingerprint);
-    runtime.ensure_session(&label, provider.id);
+    runtime.ensure_session(&label, provider.id, initial_renderer_status(provider));
     if action == "external" {
         open_fixed_external_url(provider.start_url)?;
         return runtime
             .snapshot(&label)
-            .ok_or_else(|| "ChatGPT 本地会话状态不可用。".to_string());
+            .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name));
     }
     let window = app
         .get_webview_window(&label)
-        .ok_or_else(|| "请先打开 ChatGPT 本地网页会话。".to_string())?;
+        .ok_or_else(|| format!("请先打开 {} 本地网页会话。", provider.display_name))?;
 
     match action.as_str() {
         "restore" => restore_window(&window)?,
@@ -265,13 +311,13 @@ pub fn control_local_ai_web_session(
         "home" => window
             .navigate(parse_start_url(provider)?)
             .map_err(display_error)?,
-        _ => return Err("不支持的 ChatGPT 浏览器控制动作。".to_string()),
+        _ => return Err("不支持的本地 AI 浏览器控制动作。".to_string()),
     }
     restore_window(&window)?;
     runtime.mark_window_status(&label, "ready");
     runtime
         .snapshot(&label)
-        .ok_or_else(|| "ChatGPT 本地会话状态不可用。".to_string())
+        .ok_or_else(|| format!("{} 本地会话状态不可用。", provider.display_name))
 }
 
 #[tauri::command]
@@ -287,6 +333,12 @@ pub fn run_local_ai_web_adapter_command(
 ) -> Result<(), String> {
     ensure_main_webview(&webview)?;
     let provider = provider(&provider_id)?;
+    if !provider.semantic_adapter {
+        return Err(format!(
+            "{} 当前使用官方网页模式，尚未启用一龙原生语义界面。",
+            provider.display_name
+        ));
+    }
     let fingerprint = owner_fingerprint(&owner_key)?;
     let label = window_label(provider, &fingerprint);
     let window = app
@@ -349,11 +401,11 @@ fn provider_summary(provider: &ProviderDefinition) -> LocalAiWebProvider {
     LocalAiWebProvider {
         id: provider.id,
         display_name: provider.display_name,
-        start_host: provider.allowed_domain_suffixes[0],
-        login_mode: "manual_web",
+        start_host: provider.start_host,
+        login_mode: provider.login_mode,
         profile_scope: "local_owner_provider",
         renderer_protocol: RENDERER_PROTOCOL,
-        renderer_status: "active",
+        renderer_status: provider.renderer_status,
     }
 }
 
@@ -423,7 +475,7 @@ fn session_response(
         profile_scope: "local_owner_provider",
         cookie_access: "webview_only",
         renderer_protocol: RENDERER_PROTOCOL,
-        renderer_status: "active",
+        renderer_status: provider.renderer_status,
     }
 }
 
@@ -444,7 +496,11 @@ fn allows_navigation(provider: &ProviderDefinition, url: &Url) -> bool {
     let Some(host) = url.host_str().map(str::to_ascii_lowercase) else {
         return false;
     };
-    provider.allowed_identity_hosts.contains(&host.as_str())
+    if provider.blocked_identity_hosts.contains(&host.as_str()) {
+        return false;
+    }
+    provider.allowed_hosts.contains(&host.as_str())
+        || provider.allowed_identity_hosts.contains(&host.as_str())
         || provider
             .allowed_domain_suffixes
             .iter()
@@ -459,7 +515,34 @@ fn restore_window(window: &WebviewWindow) -> Result<(), String> {
     window.set_focus().map_err(display_error)
 }
 
-fn request_adapter_snapshot(window: &WebviewWindow) {
+fn initial_renderer_status(provider: &ProviderDefinition) -> &'static str {
+    if provider.semantic_adapter {
+        "connecting"
+    } else {
+        provider.renderer_status
+    }
+}
+
+fn navigation_block_message(provider: &ProviderDefinition, url: &Url) -> Option<String> {
+    if allows_navigation(provider, url) {
+        return None;
+    }
+    if provider.id == GOOGLE_AI_MODE.id && url.host_str() == Some("accounts.google.com") {
+        return Some(
+            "Google 官方要求账号登录在系统浏览器完成；本地窗口不会接收或共享该登录 Cookie。请点击“系统浏览器”继续。"
+                .to_string(),
+        );
+    }
+    Some(format!(
+        "页面尝试离开 {} 允许的官方网页域名，已由一龙拦截。",
+        provider.display_name
+    ))
+}
+
+fn request_adapter_snapshot(provider: &ProviderDefinition, window: &WebviewWindow) {
+    if !provider.semantic_adapter {
+        return;
+    }
     let _ = window.eval(
         "window.__elonChatGptBridge && window.__elonChatGptBridge.command('{\"action\":\"snapshot\"}');",
     );
@@ -551,6 +634,39 @@ mod tests {
             &CHATGPT,
             &url("https://accounts.google.com/o/oauth2/v2/auth")
         ));
+    }
+
+    #[test]
+    fn google_ai_mode_navigation_is_scoped_to_official_search_hosts() {
+        assert!(allows_navigation(
+            &GOOGLE_AI_MODE,
+            &url("https://www.google.com/aimode")
+        ));
+        assert!(allows_navigation(
+            &GOOGLE_AI_MODE,
+            &url("https://www.google.com/search?udm=50&q=rust")
+        ));
+        assert!(!allows_navigation(
+            &GOOGLE_AI_MODE,
+            &url("https://accounts.google.com/v3/signin/identifier")
+        ));
+        assert!(!allows_navigation(
+            &GOOGLE_AI_MODE,
+            &url("https://mail.google.com/mail/u/0/")
+        ));
+        assert!(!allows_navigation(
+            &GOOGLE_AI_MODE,
+            &url("https://google.com.evil.example/aimode")
+        ));
+    }
+
+    #[test]
+    fn google_ai_mode_is_registered_without_semantic_adapter() {
+        let summary = provider_summary(&GOOGLE_AI_MODE);
+        assert_eq!(summary.id, "google-ai-mode");
+        assert_eq!(summary.login_mode, "guest_web_system_login");
+        assert_eq!(summary.renderer_status, "reserved");
+        assert!(!GOOGLE_AI_MODE.semantic_adapter);
     }
 
     #[test]

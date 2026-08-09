@@ -5,7 +5,7 @@ export interface LocalAiWebProvider {
   id: string
   displayName: string
   startHost: string
-  loginMode: 'manual_web'
+  loginMode: 'manual_web' | 'guest_web_system_login'
   profileScope: 'local_owner_provider'
   rendererProtocol: typeof UNIFIED_AI_PROTOCOL
   rendererStatus: 'reserved' | 'active'
@@ -69,7 +69,7 @@ export interface LocalAiWebSessionState {
   currentUrl: string
   currentHost: string
   loading: boolean
-  rendererStatus: 'connecting' | 'active'
+  rendererStatus: 'connecting' | 'reserved' | 'active'
   lastError?: string | null
   semanticEvent?: LocalAiMessageSnapshot | Record<string, unknown> | null
   commandResult?: LocalAiCommandResult | null
@@ -220,7 +220,7 @@ function normalizeDesktopInvokeError(error: unknown): LocalAiBrowserError {
   if (incompatible) {
     return new LocalAiBrowserError(
       'upgrade_required',
-      '当前 Win 客户端版本不包含 ChatGPT 本地浏览器。请下载新版，完全退出旧客户端后重新打开。',
+      '当前 Win 客户端版本不包含新版官方 AI 本地浏览器。请下载新版，完全退出旧客户端后重新打开。',
     )
   }
   const detail = raw.trim().slice(0, 240)
@@ -238,7 +238,7 @@ function assertIdentity(providerId: string, ownerKey: string): void {
 function assertProvider(provider: LocalAiWebProvider): void {
   if (!provider?.id
     || !provider.displayName
-    || provider.loginMode !== 'manual_web'
+    || !['manual_web', 'guest_web_system_login'].includes(provider.loginMode)
     || provider.profileScope !== 'local_owner_provider'
     || provider.rendererProtocol !== UNIFIED_AI_PROTOCOL) {
     throw new Error('桌面壳返回了不受支持的 AI 网页厂商协议。')

@@ -1,26 +1,26 @@
 # 用户专属 AI 浏览器接入
 
 `/user-browser` 同时保留两条互不替代的运行路线。Win 客户端优先使用本机
-WebView2；普通浏览器/PWA 仍可发现外部托管模块。两条路线都要求用户登录本人账号，
-主项目不接收 ChatGPT 密码、Cookie、Access Token 或私有 API 数据。
+WebView2；普通浏览器/PWA 仍可发现外部托管模块。需要登录时只允许用户操作本人账号，
+主项目不接收厂商密码、Cookie、Access Token 或私有 API 数据。
 
 | 路线 | 会话位置 | 当前用途 | 状态 |
 |---|---|---|---|
-| Win 本地 WebView2 | 用户 Windows 设备 | 官方网页、手动登录、本地 Profile、可见语义同步 | ChatGPT 已接线 |
+| Win 本地 WebView2 | 用户 Windows 设备 | 官方网页、本地 Profile、可见语义同步 | ChatGPT 语义适配器、Google AI 模式官方网页已接线 |
 | 外部托管模块 | 商户模块服务器 | 浏览器/PWA 的隔离远程会话 | 保留既有能力发现 |
 | APK 一龙界面 | Android 本地 WebView | 消费去凭证化语义事件 | ChatGPT 语义适配器已接线 |
 
 ## 用户入口
 
-三个客户端统一使用“ChatGPT 账号与聊天”，不再要求用户先理解“厂商账号”、
-“个人浏览器”或“Win CLI”：
+客户端入口统一为“官方 AI 网页”，不再要求用户先理解“个人浏览器”或“Win CLI”：
 
 - APK：聊天侧栏设置或个人资料 → ChatGPT 账号与聊天；进入后先打开官方页面登录，
   登录完成可留在官方网页或切换“一龙界面”。
 - PWA：我的 → ChatGPT 账号与聊天；PWA 在新标签打开官方 ChatGPT，受同源隔离影响，
   不宣称可以读取登录状态或重渲染官方页面。
-- Win：左侧 ChatGPT 登录，或账号设置 → ChatGPT；本地 WebView2 保存会话。用户在官方
-  窗口完成登录与真人验证后，可回到一龙原生聊天区查看消息并发送文字。
+- Win：入口同时展示 ChatGPT 与 Google AI 模式。ChatGPT 在本地官方窗口登录后可回到
+  一龙原生聊天区；Google AI 模式直接打开 `https://www.google.com/aimode`，本批次不做
+  DOM 重渲染。若 Google 要求账号登录，用户改用系统浏览器。
 
 这里的“登录”是设备内的官方网页会话，不是把 ChatGPT 云端账号或 Cookie 绑定到一龙
 云端账号。登录状态由官方页面确认。
@@ -34,7 +34,8 @@ WebView2；普通浏览器/PWA 仍可发现外部托管模块。两条路线都�
 app-local-data/
 └── ai-web-profiles/
     └── <owner-fingerprint>/
-        └── chatgpt/
+        ├── chatgpt/
+        └── google-ai-mode/
 ```
 
 WebView2 自己在 Profile 中保存 Cookie、DOM storage、缓存和权限。应用不枚举、不导出、
@@ -63,13 +64,17 @@ WebView2 窗口创建期间发生已知死锁，只留下无法导航的白色�
 - 每个 Rust 命令再次检查调用 WebView 标签必须等于 `main`。
 - ChatGPT 子窗口只匹配独立 capability，只能上报经过 Rust 白名单清洗的可见语义；它不能
   调用主窗口的会话控制命令。初始化脚本不读取 Cookie、Token、请求头或原始响应。
-- 顶层导航仅接受 HTTPS、443、无 URL 凭据的 ChatGPT/OpenAI 域名及精确身份主机。
+- ChatGPT 顶层导航仅接受 HTTPS、443、无 URL 凭据的 ChatGPT/OpenAI 域名及精确身份主机。
+- Google AI 模式只接受 `google.com` 与 `www.google.com` 的官方搜索顶层页面；
+  `accounts.google.com` 在本地窗口被明确拦截，并提示用户使用系统浏览器。
 - Cloudflare 或身份提供商验证由用户本人完成；应用不绕过、不自动点击。
 - 身份提供商可以拒绝嵌入式浏览器，应用不得伪装 User-Agent 或转移 Cookie 规避。
 
-本地模式当前登记 `chatgpt`。Gemini 暂不登记：Google OAuth 官方政策禁止应用把授权请求
-导向开发者可控制的嵌入式 user-agent，必须先设计系统浏览器/官方 API 路线，不能为了
-页面可登录而扩大 WebView 权限。
+本地模式当前登记 `chatgpt` 与 `google-ai-mode`。Google AI 模式是 Google 搜索的官方
+网页入口，不等于 Gemini 网页版，也不意味着客户端获得 Google OAuth 授权。Google OAuth
+官方政策禁止应用把授权请求导向开发者可控制的嵌入式 user-agent，因此本地窗口只提供
+访客网页，账号登录使用系统浏览器且两者不共享 Cookie。Gemini 仍不登记，后续应采用
+系统浏览器 OAuth、官方 API 或经单独评审的公开接入方案。
 
 ## 统一原生渲染协议
 
@@ -114,6 +119,8 @@ confirmation，再调用商户模块运行时：
 
 - Tauri crate 编译与本地宿主安全测试通过。
 - Win 实机已验证未登录状态的 ChatGPT 官方页面可完整加载、关闭后状态可恢复并可再次打开。
+- Google AI 模式提供商固定指向官方 `google.com/aimode`，以独立 Profile 打开；账号登录
+  被定向到系统浏览器，地区、语言、设备或账号灰度未开放时保留 Google 官方提示。
 - PC TypeScript/Vite 生产构建、ESLint 和本地浏览器安全契约测试通过。
 - 未登录一龙账号时不能创建本地 Profile。
 - 同一账号/厂商复用窗口与 Profile，不同一龙账号使用不同指纹目录。
