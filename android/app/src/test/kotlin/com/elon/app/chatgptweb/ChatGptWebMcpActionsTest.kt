@@ -79,6 +79,15 @@ class ChatGptWebMcpActionsTest {
             .getJSONObject(0).getString("path"))
     }
 
+    @Test
+    fun capabilityMatrixIsAvailableThroughTheStableUiControlTool() {
+        val matrix = actions().control(JSONObject().put("action", "chatgpt_get_capability_matrix"))
+
+        assertTrue(matrix.getBoolean("control_ok"))
+        assertEquals("elon.chatgpt_web.capability_matrix.v1", matrix.getString("schema"))
+        assertTrue(matrix.getBoolean("ready_for_chat"))
+    }
+
     private fun actions(onInvoke: (String) -> Unit = {}): ChatGptWebMcpActions {
         val snapshot = ChatGptWebSnapshot(
             title = "工作",

@@ -66,6 +66,9 @@ internal class ChatGptWebMcpActions(
             "chatgpt_find_controls" -> return controlsPage(args)
             "chatgpt_get_conversations" -> return conversationsPage(args)
             "chatgpt_get_navigation" -> return navigationPage(args)
+            "chatgpt_get_capability_matrix" -> return ChatGptWebCapabilityMatrix.build(
+                snapshot(), uiManifest(), bridgeState(), mode(),
+            )
             "chatgpt_open_conversation" -> {
                 val path = args.optString("conversation_path")
                 if (!CONVERSATION_PATH.matches(path)) return error(action, "invalid_conversation_path")
@@ -343,6 +346,7 @@ internal class ChatGptWebMcpActions(
             "chatgpt_find_controls",
             "chatgpt_get_conversations",
             "chatgpt_get_navigation",
+            "chatgpt_get_capability_matrix",
             "chatgpt_open_conversation",
             "chatgpt_select_view",
         )
