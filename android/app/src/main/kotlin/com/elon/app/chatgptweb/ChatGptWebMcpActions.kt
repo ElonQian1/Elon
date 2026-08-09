@@ -27,6 +27,7 @@ internal class ChatGptWebMcpActions(
         return JSONObject()
             .put("surface", "chatgpt_web")
             .put("active_page", "chatgpt_web")
+            .put("adapter_version", ChatGptWebPageAdapter.ADAPTER_VERSION)
             .put("bridge_state", bridgeState().name.lowercase())
             .put("view_mode", mode().name.lowercase())
             .put("authenticated", current?.authenticated ?: false)

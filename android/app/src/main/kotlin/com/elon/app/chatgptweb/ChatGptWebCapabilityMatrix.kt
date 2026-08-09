@@ -48,6 +48,7 @@ internal object ChatGptWebCapabilityMatrix {
             .put("control_ok", true)
             .put("action", "chatgpt_get_capability_matrix")
             .put("schema", "elon.chatgpt_web.capability_matrix.v1")
+            .put("adapter_version", ChatGptWebPageAdapter.ADAPTER_VERSION)
             .put("bridge_state", bridgeState.name.lowercase())
             .put("view_mode", mode.name.lowercase())
             .put("authenticated", snapshot?.authenticated ?: false)

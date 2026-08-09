@@ -16,6 +16,7 @@ class ChatGptWebMcpActionsTest {
         val control = state.getJSONObject("ui_manifest").getJSONArray("controls").getJSONObject(0)
 
         assertEquals("chatgpt_web", state.getString("surface"))
+        assertEquals(ChatGptWebPageAdapter.ADAPTER_VERSION, state.getInt("adapter_version"))
         assertEquals("完整回答内容", conversation.getJSONArray("messages").getJSONObject(0).getString("content"))
         assertEquals("control_suggestion_demo", control.getString("control_id"))
         assertEquals(0.25, control.getDouble("web_x_ratio"), 0.0)
@@ -85,6 +86,7 @@ class ChatGptWebMcpActionsTest {
 
         assertTrue(matrix.getBoolean("control_ok"))
         assertEquals("elon.chatgpt_web.capability_matrix.v1", matrix.getString("schema"))
+        assertEquals(ChatGptWebPageAdapter.ADAPTER_VERSION, matrix.getInt("adapter_version"))
         assertTrue(matrix.getBoolean("ready_for_chat"))
     }
 
