@@ -4,6 +4,7 @@
   if (window.__elonChatGptBridge || location.origin !== 'https://chatgpt.com') return;
   const nativeBridge = window.elonChatGptNative;
   if (!nativeBridge || typeof nativeBridge.postMessage !== 'function') return;
+  const conversationAdapter = window.__elonChatGptConversations;
 
   const MAX_MESSAGES = 80;
   const MAX_MESSAGE_LENGTH = 40000;
@@ -121,7 +122,7 @@
   }
 
   function findButton(testId, labels) {
-    const direct = document.querySelector('[data-testid="' + testId + '"]');
+    const direct = testId ? document.querySelector('[data-testid="' + testId + '"]') : null;
     if (isVisible(direct)) return direct;
     const needles = labels.map((label) => label.toLowerCase());
     return Array.from(document.querySelectorAll('button')).find((button) => {
@@ -133,6 +134,22 @@
 
   function isStreaming() {
     return !!findButton('stop-button', ['stop generating', 'stop', '停止生成', '停止']);
+  }
+
+  function detectCapabilities() {
+    const capabilities = [
+      'streaming',
+      'conversation_history',
+      'draft_sync',
+      'new_conversation',
+      'google_login_entry'
+    ];
+    if (conversationAdapter) capabilities.push(...conversationAdapter.capabilities());
+    if (document.querySelector('#upload-fast-tools-files, input[type="file"], [data-testid*="upload" i]')) {
+      capabilities.push('attachments');
+    }
+    if (findButton('', ['start dictation', '开始听写', '语音输入'])) capabilities.push('dictation');
+    return Array.from(new Set(capabilities));
   }
 
   function snapshot() {
@@ -149,7 +166,8 @@
       messages,
       authenticated: isAuthenticated(),
       composerReady: !!findComposer(),
-      streaming
+      streaming,
+      capabilities: detectCapabilities()
     };
     const fingerprint = JSON.stringify(event);
     if (fingerprint === lastSnapshot) return;
@@ -262,6 +280,15 @@
       );
     }
     if (action === 'start_google_login') return startGoogleLogin();
+    if (action === 'list_conversations' && conversationAdapter) {
+      return conversationAdapter.requestList(emitEvent, result);
+    }
+    if (action === 'open_conversation' && conversationAdapter) {
+      if (comparableText(composerValue(findComposer()))) {
+        return result(action, false, '网页中有未发送草稿，请先处理草稿。');
+      }
+      return conversationAdapter.openConversation(String(command.value || ''), result);
+    }
     if (action === 'stop_generation') {
       const stop = findButton('stop-button', ['stop generating', 'stop', '停止生成', '停止']);
       if (!stop) return result(action, false, '当前没有正在生成的回复。');
@@ -289,7 +316,7 @@
   window.__elonChatGptBridge = Object.freeze({ command: runCommand });
   emitEvent({
     type: 'adapter_ready',
-    capabilities: ['streaming', 'conversation_history', 'draft_sync', 'google_login_entry']
+    capabilities: detectCapabilities()
   });
   new MutationObserver(scheduleSnapshot).observe(document.documentElement, {
     childList: true,

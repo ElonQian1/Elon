@@ -23,8 +23,10 @@ internal class ChatGptWebPageAdapter(
         UNSUPPORTED,
     }
 
-    private val adapterScript = context.assets.open(ADAPTER_ASSET).use { input ->
-        input.reader(StandardCharsets.UTF_8).readText()
+    private val adapterScript = ADAPTER_ASSETS.joinToString("\n") { asset ->
+        context.assets.open(asset).use { input ->
+            input.reader(StandardCharsets.UTF_8).readText()
+        }
     }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val handshake = ChatGptWebBridgeHandshake(
@@ -95,6 +97,13 @@ internal class ChatGptWebPageAdapter(
 
     fun startNewConversation() = runCommand("new_conversation")
 
+    fun listConversations() = runCommand("list_conversations")
+
+    fun openConversation(path: String) = runCommand(
+        action = "open_conversation",
+        value = path.take(MAX_CONVERSATION_PATH_LENGTH),
+    )
+
     fun startGoogleLogin() = runCommand("start_google_login")
 
     fun requestSnapshot() = runCommand("snapshot")
@@ -151,9 +160,13 @@ internal class ChatGptWebPageAdapter(
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
     private companion object {
-        const val ADAPTER_ASSET = "chatgpt_web_adapter.js"
+        val ADAPTER_ASSETS = listOf(
+            "chatgpt_web_adapter_conversations.js",
+            "chatgpt_web_adapter.js",
+        )
         const val BRIDGE_OBJECT = "elonChatGptNative"
         const val ALLOWED_ORIGIN = "https://chatgpt.com"
         const val MAX_PROMPT_LENGTH = 20_000
+        const val MAX_CONVERSATION_PATH_LENGTH = 256
     }
 }

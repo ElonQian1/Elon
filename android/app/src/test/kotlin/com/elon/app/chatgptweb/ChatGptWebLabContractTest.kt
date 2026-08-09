@@ -31,6 +31,9 @@ class ChatGptWebLabContractTest {
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt"
         )
         val adapter = readRepositoryFile("android/app/src/main/assets/chatgpt_web_adapter.js")
+        val conversations = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_conversations.js"
+        )
 
         assertTrue(bridge.contains("WebViewCompat.addWebMessageListener"))
         assertTrue(bridge.contains("ALLOWED_ORIGIN = \"https://chatgpt.com\""))
@@ -47,10 +50,16 @@ class ChatGptWebLabContractTest {
         assertTrue(adapter.contains("网页草稿已变化"))
         assertFalse(adapter.contains("url: location.href"))
         assertTrue(adapter.contains("action === 'send_prompt'"))
+        assertTrue(adapter.contains("action === 'list_conversations'"))
+        assertTrue(adapter.contains("action === 'open_conversation'"))
         assertTrue(adapter.contains("action === 'start_google_login'"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
             assertFalse("page adapter must not contain $it", adapter.contains(it))
+            assertFalse("conversation adapter must not contain $it", conversations.contains(it))
         }
+        assertTrue(conversations.contains("CONVERSATION_PATH"))
+        assertTrue(conversations.contains("location.assign(new URL(path, location.origin).href)"))
+        assertFalse(conversations.contains("location.href ="))
     }
 
     @Test
