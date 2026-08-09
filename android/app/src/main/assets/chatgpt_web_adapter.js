@@ -7,6 +7,7 @@
   const conversationAdapter = window.__elonChatGptConversations;
   const messageAdapter = window.__elonChatGptMessages;
   const composerAdapter = window.__elonChatGptComposer;
+  const navigationAdapter = window.__elonChatGptNavigation;
 
   let emitTimer = 0;
   let lastSnapshot = '';
@@ -108,6 +109,7 @@
     if (conversationAdapter) capabilities.push(...conversationAdapter.capabilities());
     if (messageAdapter) capabilities.push(...messageAdapter.capabilities());
     if (composerAdapter) capabilities.push(...composerAdapter.capabilities(findComposer()));
+    if (navigationAdapter) capabilities.push(...navigationAdapter.capabilities());
     return Array.from(new Set(capabilities));
   }
 
@@ -275,6 +277,18 @@
     }
     if (action === 'dismiss_composer_menu' && composerAdapter) {
       return composerAdapter.dismissOpenMenu(result);
+    }
+    if (action === 'list_navigation' && navigationAdapter) {
+      return navigationAdapter.requestList(emitEvent, result);
+    }
+    if (action === 'collect_navigation' && navigationAdapter) {
+      return navigationAdapter.collectList(emitEvent, result);
+    }
+    if (action === 'select_navigation' && navigationAdapter) {
+      return navigationAdapter.selectFeature(String(command.value || ''), emitEvent, result);
+    }
+    if (action === 'dismiss_navigation' && navigationAdapter) {
+      return navigationAdapter.dismiss(emitEvent, result);
     }
     if (action === 'list_conversations' && conversationAdapter) {
       return conversationAdapter.requestList(emitEvent, result);

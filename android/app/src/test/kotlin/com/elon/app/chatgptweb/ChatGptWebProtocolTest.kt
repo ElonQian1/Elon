@@ -114,6 +114,11 @@ class ChatGptWebProtocolTest {
                 """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"remove_attachment","xRatio":0.5,"yRatio":0.5}}""",
             ) is ChatGptWebEvent.WebTouchRequest,
         )
+        assertTrue(
+            ChatGptWebProtocol.parse(
+                """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"list_navigation","xRatio":0.5,"yRatio":0.5}}""",
+            ) is ChatGptWebEvent.WebTouchRequest,
+        )
         assertNull(
             ChatGptWebProtocol.parse(
                 """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"list_composer_tools","xRatio":1.5,"yRatio":0.5}}""",
@@ -142,6 +147,30 @@ class ChatGptWebProtocolTest {
         assertEquals(1, event.conversations.size)
         assertEquals("第一场会话", event.conversations.single().title)
         assertTrue(event.conversations.single().active)
+    }
+
+    @Test
+    fun parsesBoundedDynamicFeatureNavigation() {
+        val event = ChatGptWebProtocol.parse(
+            """
+            {
+              "schema":"yilong.ai.ui.v1",
+              "event":{
+                "type":"navigation_snapshot",
+                "features":[
+                  {"id":"feature_ab12","label":"文件库","kind":"library","selected":true},
+                  {"id":"../bad","label":"忽略","kind":"settings","selected":false},
+                  {"id":"feature_cd34","label":"自定义入口","kind":"unknown","selected":false}
+                ]
+              }
+            }
+            """.trimIndent(),
+        ) as ChatGptWebEvent.FeatureNavigation
+
+        assertEquals(2, event.features.size)
+        assertEquals("library", event.features.first().kind)
+        assertTrue(event.features.first().selected)
+        assertEquals("navigation", event.features.last().kind)
     }
 
     @Test

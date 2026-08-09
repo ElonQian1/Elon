@@ -126,6 +126,14 @@ internal class ChatGptWebPageAdapter(
 
     fun removeAttachment(id: String) = runCommand("remove_attachment", id.take(MAX_OPTION_ID_LENGTH))
 
+    fun listFeatures() = runCommand("list_navigation")
+
+    fun collectFeatures() = runCommand("collect_navigation")
+
+    fun selectFeature(id: String) = runCommand("select_navigation", id.take(MAX_OPTION_ID_LENGTH))
+
+    fun dismissFeatures() = runCommand("dismiss_navigation")
+
     fun requestSnapshot() = runCommand("snapshot")
 
     fun markReady() = onStateChanged(State.READY)
@@ -154,6 +162,7 @@ internal class ChatGptWebPageAdapter(
         is ChatGptWebEvent.Snapshot -> value.authenticated || value.composerReady
         is ChatGptWebEvent.ConversationList,
         is ChatGptWebEvent.ComposerControls,
+        is ChatGptWebEvent.FeatureNavigation,
         is ChatGptWebEvent.WebTouchRequest,
         is ChatGptWebEvent.CommandResult -> true
     }
@@ -186,6 +195,7 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_conversations.js",
             "chatgpt_web_adapter_messages.js",
             "chatgpt_web_adapter_composer.js",
+            "chatgpt_web_adapter_navigation.js",
             "chatgpt_web_adapter.js",
         )
         const val BRIDGE_OBJECT = "elonChatGptNative"

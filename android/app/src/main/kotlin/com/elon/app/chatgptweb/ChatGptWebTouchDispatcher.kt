@@ -43,6 +43,9 @@ internal class ChatGptWebTouchDispatcher(
             "open_composer_tools",
             "start_dictation",
             "remove_attachment",
+            "list_navigation",
+            "select_navigation",
+            "dismiss_navigation",
         )
     }
 }

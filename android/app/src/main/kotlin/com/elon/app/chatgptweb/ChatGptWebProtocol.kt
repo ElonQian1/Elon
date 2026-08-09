@@ -37,6 +37,13 @@ internal data class ChatGptWebComposerOption(
     val kind: String,
 )
 
+internal data class ChatGptWebFeature(
+    val id: String,
+    val label: String,
+    val kind: String,
+    val selected: Boolean,
+)
+
 internal sealed interface ChatGptWebEvent {
     data class Snapshot(val value: ChatGptWebSnapshot) : ChatGptWebEvent
 
@@ -48,6 +55,10 @@ internal sealed interface ChatGptWebEvent {
         val section: String,
         val currentModel: String,
         val options: List<ChatGptWebComposerOption>,
+    ) : ChatGptWebEvent
+
+    data class FeatureNavigation(
+        val features: List<ChatGptWebFeature>,
     ) : ChatGptWebEvent
 
     data class WebTouchRequest(
@@ -74,6 +85,7 @@ internal object ChatGptWebProtocol {
                     parseConversations(event),
                 )
                 "composer_controls_snapshot" -> parseComposerControls(event)
+                "navigation_snapshot" -> ChatGptWebEvent.FeatureNavigation(parseFeatures(event))
                 "web_touch_request" -> parseWebTouchRequest(event)
                 else -> null
             }
@@ -173,6 +185,27 @@ internal object ChatGptWebProtocol {
         )
     }
 
+    private fun parseFeatures(event: JSONObject): List<ChatGptWebFeature> {
+        val values = event.optJSONArray("features") ?: return emptyList()
+        return buildList {
+            for (index in 0 until minOf(values.length(), MAX_FEATURES)) {
+                val item = values.optJSONObject(index) ?: continue
+                val id = item.optString("id").take(MAX_FEATURE_ID_LENGTH)
+                val label = item.optString("label").trim().take(MAX_FEATURE_LABEL_LENGTH)
+                val kind = item.optString("kind").takeIf { it in FEATURE_KINDS } ?: "navigation"
+                if (!FEATURE_ID.matches(id) || label.isBlank()) continue
+                add(
+                    ChatGptWebFeature(
+                        id = id,
+                        label = label,
+                        kind = kind,
+                        selected = item.optBoolean("selected"),
+                    ),
+                )
+            }
+        }
+    }
+
     private fun parseWebTouchRequest(event: JSONObject): ChatGptWebEvent.WebTouchRequest? {
         val purpose = event.optString("purpose")
         if (purpose !in SUPPORTED_TOUCH_PURPOSES) return null
@@ -239,6 +272,9 @@ internal object ChatGptWebProtocol {
         "open_composer_tools",
         "start_dictation",
         "remove_attachment",
+        "list_navigation",
+        "select_navigation",
+        "dismiss_navigation",
     )
     private const val MAX_MESSAGES = 80
     private const val MAX_MESSAGE_LENGTH = 40_000
@@ -255,12 +291,27 @@ internal object ChatGptWebProtocol {
     private const val MAX_ATTACHMENTS = 10
     private const val MAX_ATTACHMENT_ID_LENGTH = 64
     private const val MAX_ATTACHMENT_NAME_LENGTH = 180
+    private const val MAX_FEATURES = 60
+    private const val MAX_FEATURE_ID_LENGTH = 64
+    private const val MAX_FEATURE_LABEL_LENGTH = 120
     private const val MAX_TITLE_LENGTH = 160
     private const val MAX_PATH_LENGTH = 256
     private const val MAX_ID_LENGTH = 160
     private val CAPABILITY_ID = Regex("[a-z][a-z0-9_]{0,47}")
     private val OPTION_ID = Regex("[a-z][a-z0-9_]{1,63}")
     private val ATTACHMENT_ID = Regex("attachment_[a-z0-9]{1,48}")
+    private val FEATURE_ID = Regex("feature_[a-z0-9]{1,48}")
     private val ATTACHMENT_STATES = setOf("uploading", "ready", "error")
+    private val FEATURE_KINDS = setOf(
+        "library",
+        "tasks",
+        "projects",
+        "gpts",
+        "memory",
+        "apps",
+        "settings",
+        "more",
+        "navigation",
+    )
     private val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
 }

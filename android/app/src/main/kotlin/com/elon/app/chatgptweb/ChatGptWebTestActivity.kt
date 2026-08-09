@@ -28,6 +28,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var voiceController: ChatGptNativeVoiceController
     private lateinit var touchDispatcher: ChatGptWebTouchDispatcher
     private lateinit var conversationListController: ChatGptNativeConversationListController
+    private lateinit var featureHubController: ChatGptNativeFeatureHubController
     private lateinit var loginController: ChatGptNativeLoginController
     private lateinit var googleAccountHintController: ChatGptGoogleAccountHintController
     private lateinit var modeController: ChatGptWebModeController
@@ -127,6 +128,14 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             trigger = binding.chatGptNativeHistory,
             onRequestList = { pageAdapter.listConversations() },
             onOpenConversation = { path -> pageAdapter.openConversation(path) },
+        )
+        featureHubController = ChatGptNativeFeatureHubController(
+            activity = this,
+            trigger = binding.chatGptNativeFeatures,
+            onRequestFeatures = { pageAdapter.listFeatures() },
+            onSelectFeature = { pageAdapter.selectFeature(it) },
+            onDismissNavigation = { pageAdapter.dismissFeatures() },
+            onOpenOfficial = { modeController.select(ChatGptWebModeController.Mode.WEB) },
         )
         pageAdapter = ChatGptWebPageAdapter(
             context = this,
@@ -292,6 +301,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         when (event) {
             is ChatGptWebEvent.ConversationList -> conversationListController.render(event.conversations)
             is ChatGptWebEvent.ComposerControls -> composerToolsController.render(event)
+            is ChatGptWebEvent.FeatureNavigation -> featureHubController.render(event.features)
             is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)
             is ChatGptWebEvent.Snapshot -> {
                 nativeController.render(event.value)
@@ -299,6 +309,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 attachmentController.render(event.value)
                 voiceController.render(event.value)
                 conversationListController.renderCapabilities(event.value.capabilities)
+                featureHubController.renderCapabilities(event.value.capabilities)
                 if (
                     event.value.authenticated &&
                     (event.value.composerReady || event.value.messages.isNotEmpty())
@@ -316,6 +327,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             is ChatGptWebEvent.CommandResult -> {
                 if (googleAccountHintController.onCommandResult(event)) return
                 if (conversationListController.onCommandResult(event)) return
+                if (featureHubController.onCommandResult(event)) return
                 nativeController.onCommandResult(event)
                 composerToolsController.onCommandResult(event)
                 if (!event.ok) {
@@ -344,8 +356,16 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                     pageAdapter::collectComposerTools,
                     COMPOSER_MENU_SETTLE_MS,
                 )
+                "list_navigation" -> binding.chatGptWebView.postDelayed(
+                    pageAdapter::collectFeatures,
+                    NAVIGATION_SETTLE_MS,
+                )
                 "select_model_option", "select_composer_tool", "remove_attachment", "start_dictation" ->
                     binding.chatGptWebView.postDelayed(pageAdapter::requestSnapshot, COMPOSER_MENU_SETTLE_MS)
+                "select_navigation" -> binding.chatGptWebView.postDelayed(
+                    pageAdapter::requestSnapshot,
+                    NAVIGATION_SETTLE_MS,
+                )
             }
         }
     }
@@ -355,6 +375,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         composerToolsController.setBridgeState(state)
         voiceController.setBridgeState(state)
         conversationListController.setBridgeState(state)
+        featureHubController.setBridgeState(state)
         binding.chatGptModeNative.isEnabled = state == ChatGptWebPageAdapter.State.READY
         binding.chatGptModeNative.alpha = if (binding.chatGptModeNative.isEnabled) 1f else 0.48f
         if (
@@ -467,6 +488,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         googleAccountHintController.dispose()
         loginController.dispose()
         conversationListController.dispose()
+        featureHubController.dispose()
         composerToolsController.dispose()
         fileChooserController.dispose()
         audioPermissionController.dispose()
@@ -481,5 +503,6 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private companion object {
         const val COMPOSER_MENU_SETTLE_MS = 320L
+        const val NAVIGATION_SETTLE_MS = 420L
     }
 }
