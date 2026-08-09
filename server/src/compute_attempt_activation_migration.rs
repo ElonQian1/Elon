@@ -4,6 +4,8 @@ use rusqlite::Connection;
 mod accepted_commit;
 mod attempt_dispatch;
 mod execution_plan;
+#[cfg(test)]
+mod migration_tests;
 mod start_outbox;
 mod start_recovery;
 

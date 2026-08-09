@@ -201,8 +201,7 @@ pub(super) fn install(conn: &Connection) -> Result<()> {
                                AND response.verifier_id=route.verifier_id
                                AND response.verification_digest=route.verifier_digest
                         )))
-                    ))
-               )
+                     ))
                AND NOT EXISTS (
                     SELECT 1 FROM compute_attempt_activations activation
                      WHERE activation.lease_id=prepare.lease_id
