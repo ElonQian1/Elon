@@ -18,6 +18,9 @@ use super::{
     signed_artifact_verification::{jcs_sha256_hex, verify_control_plane_jcs_signature},
 };
 
+#[cfg(test)]
+mod tests;
+
 pub(in crate::node_agent_compute_plugin_host) const COMPUTE_PLUGIN_MANIFEST_CATALOG_SCHEMA: &str =
     "elon.compute_plugin.manifest_catalog.v1";
 pub(in crate::node_agent_compute_plugin_host) const SIGNED_COMPUTE_PLUGIN_MANIFEST_CATALOG_SCHEMA: &str =
@@ -280,6 +283,13 @@ pub(super) fn verify_manifest_catalog_candidate(
         trusted_now,
         control_keys,
     )?;
+    if catalog
+        .entries
+        .iter()
+        .any(|entry| entry.signing_key_fingerprint == control_signing_key_fingerprint)
+    {
+        bail!("COMPUTE_PLUGIN_MANIFEST_CATALOG_SIGNING_ROLE_REUSED");
+    }
     let catalog_json =
         serde_json::to_string(&catalog).context("COMPUTE_PLUGIN_MANIFEST_CATALOG_JSON")?;
     let signed_catalog_json = serde_json::to_string(signed_catalog)
