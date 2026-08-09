@@ -152,7 +152,7 @@ fn validate_absence_for_new_binding(
     Ok(())
 }
 
-fn insert_receipt(
+pub(super) fn insert_receipt(
     transaction: &Transaction<'_>,
     projected: &super::types::ProjectedManifestCatalogBinding,
 ) -> Result<()> {

@@ -1,4 +1,5 @@
-use rusqlite::{params, Connection};
+use chrono::{DateTime, TimeZone, Utc};
+use rusqlite::{params, Connection, TransactionBehavior};
 use serde_json::json;
 
 use crate::node_agent_compute_plugin_host::{
@@ -10,7 +11,11 @@ use crate::node_agent_compute_plugin_host::{
             PreparedManifestCatalogBindingRequest, ProjectedManifestCatalogBinding,
             COMPUTE_PLUGIN_MANIFEST_CATALOG_BINDING_REQUEST_SCHEMA,
         },
-        validation::project,
+        validation::{project, read_state_at_or_before, validate_authority_after},
+        write::{
+            insert_receipt, read_binding_by_revision, validate_current_catalog_head,
+            validate_exact_request,
+        },
     },
     local_authority_schema::ensure_schema,
     manifest_catalog::{
@@ -35,7 +40,15 @@ const CONTROL_KEY_FINGERPRINT: &str =
 const BOUND_AT_MS: i64 = 1_786_233_720_000;
 
 pub(super) fn projected() -> ProjectedManifestCatalogBinding {
-    project(request(), authority_state(), BOUND_AT_MS).unwrap()
+    projected_revision(4, authority_state(), BOUND_AT_MS)
+}
+
+pub(super) fn projected_revision(
+    catalog_revision: i64,
+    before: ManifestCatalogAuthorityState,
+    bound_at_ms: i64,
+) -> ProjectedManifestCatalogBinding {
+    project(request(catalog_revision), before, bound_at_ms).unwrap()
 }
 
 pub(super) fn connection(before: &ManifestCatalogAuthorityState) -> Connection {
@@ -56,12 +69,46 @@ pub(super) fn bound_at_ms() -> i64 {
     BOUND_AT_MS
 }
 
-fn request() -> PreparedManifestCatalogBindingRequest {
+pub(super) fn commit_transition(
+    connection: &mut Connection,
+    projected: &ProjectedManifestCatalogBinding,
+) {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .unwrap();
+    insert_receipt(&transaction, projected).unwrap();
+    let stored = read_binding_by_revision(&transaction, projected.request.catalog_revision)
+        .unwrap()
+        .unwrap();
+    validate_exact_request(&stored.request, &projected.request).unwrap();
+    assert_eq!(stored.hashed_receipt, projected.hashed_receipt);
+    let trusted_now = Utc
+        .timestamp_millis_opt(projected.hashed_receipt.receipt.bound_at_ms)
+        .single()
+        .unwrap();
+    validate_current_catalog_head(&transaction, &stored.hashed_receipt, &trusted_now).unwrap();
+    validate_authority_after(&transaction, projected, &trusted_now).unwrap();
+    transaction.commit().unwrap();
+}
+
+pub(super) fn read_current_state(
+    connection: &mut Connection,
+    trusted_now: &DateTime<Utc>,
+) -> ManifestCatalogAuthorityState {
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Deferred)
+        .unwrap();
+    let current = read_state_at_or_before(&transaction, trusted_now).unwrap();
+    transaction.rollback().unwrap();
+    current
+}
+
+fn request(catalog_revision: i64) -> PreparedManifestCatalogBindingRequest {
     let publisher_keyring = publisher_keyring();
     let control_keyring = control_keyring();
     let catalog = ComputePluginManifestCatalog {
         schema: COMPUTE_PLUGIN_MANIFEST_CATALOG_SCHEMA.to_string(),
-        catalog_revision: 4,
+        catalog_revision,
         target_id: "windows_x86_64".to_string(),
         host_api_protocol_id: "elon_compute_plugin_host".to_string(),
         host_api_revision: 1,
@@ -93,10 +140,10 @@ fn request() -> PreparedManifestCatalogBindingRequest {
     }))
     .unwrap();
     let mut request = PreparedManifestCatalogBindingRequest {
-        request_id: "catalog_request_4".to_string(),
+        request_id: format!("catalog_request_{catalog_revision}"),
         request_digest: String::new(),
         installation_id_digest: INSTALLATION_DIGEST.to_string(),
-        catalog_revision: 4,
+        catalog_revision,
         catalog_json,
         catalog_digest,
         signed_catalog_json,
@@ -136,7 +183,7 @@ fn request() -> PreparedManifestCatalogBindingRequest {
     request
 }
 
-fn authority_state() -> ManifestCatalogAuthorityState {
+pub(super) fn authority_state() -> ManifestCatalogAuthorityState {
     let inventory = ComputePluginInventorySnapshot {
         schema: COMPUTE_PLUGIN_INVENTORY_SCHEMA.to_string(),
         inventory_revision: 2,

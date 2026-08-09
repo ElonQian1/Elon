@@ -16,6 +16,9 @@ use crate::node_agent_compute_plugin_host::{
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
+#[cfg(test)]
+mod tests;
+
 enum RecoveryClassification {
     Durable(super::HashedComputePluginManifestCatalogBindingReceipt),
     CommittedHistorical(super::HashedComputePluginManifestCatalogBindingReceipt),

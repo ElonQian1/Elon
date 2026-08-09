@@ -1,42 +1,15 @@
-mod fixture;
-
-use chrono::{TimeZone, Utc};
 use rusqlite::TransactionBehavior;
 
-use super::{
-    insert_receipt, read_binding_by_revision, validate_current_catalog_head, validate_exact_request,
-};
+use super::insert_receipt;
 use crate::node_agent_compute_plugin_host::local_authority::manifest_catalog_binding::{
-    types::ProjectedManifestCatalogBinding,
-    validation::{project, validate_authority_after},
+    test_support as fixture, validation::project,
 };
-
-fn commit_transition(projected: &ProjectedManifestCatalogBinding) -> rusqlite::Connection {
-    let mut connection = fixture::connection(&projected.before);
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .unwrap();
-    insert_receipt(&transaction, projected).unwrap();
-
-    let stored = read_binding_by_revision(&transaction, projected.request.catalog_revision)
-        .unwrap()
-        .unwrap();
-    validate_exact_request(&stored.request, &projected.request).unwrap();
-    assert_eq!(stored.hashed_receipt, projected.hashed_receipt);
-    let trusted_now = Utc
-        .timestamp_millis_opt(fixture::bound_at_ms())
-        .single()
-        .unwrap();
-    validate_current_catalog_head(&transaction, &stored.hashed_receipt, &trusted_now).unwrap();
-    validate_authority_after(&transaction, projected, &trusted_now).unwrap();
-    transaction.commit().unwrap();
-    connection
-}
 
 #[test]
 fn catalog_binding_commits_atomically_and_advances_authority() {
     let projected = fixture::projected();
-    let connection = commit_transition(&projected);
+    let mut connection = fixture::connection(&projected.before);
+    fixture::commit_transition(&mut connection, &projected);
     let receipt = &projected.hashed_receipt.receipt;
 
     let authority: (i64, i64, i64, i64) = connection
@@ -118,7 +91,8 @@ fn stale_authority_fence_rejects_binding_without_residue() {
 #[test]
 fn committed_catalog_receipt_is_immutable_and_append_only() {
     let projected = fixture::projected();
-    let connection = commit_transition(&projected);
+    let mut connection = fixture::connection(&projected.before);
+    fixture::commit_transition(&mut connection, &projected);
 
     let update_error = connection
         .execute(
