@@ -14,6 +14,7 @@ interface NativeAiWebChatProps {
   draft: string
   onDraftChange: (value: string) => void
   onRun: (action: LocalAiAdapterAction, value?: string, expectedDraft?: string) => void
+  standalone?: boolean
 }
 
 export default function NativeAiWebChat({
@@ -24,13 +25,18 @@ export default function NativeAiWebChat({
   draft,
   onDraftChange,
   onRun,
+  standalone = false,
 }: NativeAiWebChatProps) {
   const guestMode = provider.loginMode === 'guest_web_system_login'
   const canCompose = Boolean(snapshot?.composerReady && (snapshot.authenticated || guestMode))
   const providerName = provider.displayName
 
   return (
-    <section className={styles.nativeChat} aria-label={`一龙 ${providerName} 原生聊天区`}>
+    <section
+      className={styles.nativeChat}
+      data-standalone={standalone}
+      aria-label={`一龙 ${providerName} 原生聊天区`}
+    >
       <header>
         <div>
           <strong>{snapshot?.title || `${providerName} · 一龙界面`}</strong>

@@ -13,6 +13,7 @@ const FriendsPage = lazy(() => import('./features/friends/FriendsPage'))
 const PlazaPage = lazy(() => import('./features/plaza/PlazaPage'))
 const AccountPage = lazy(() => import('./features/account/AccountPage'))
 const UserBrowserLauncherPage = lazy(() => import('./features/user-browser/UserBrowserLauncherPage'))
+const NativeAiWebChatWindow = lazy(() => import('./features/user-browser/NativeAiWebChatWindow'))
 const OpenAiChatKitPage = lazy(() => import('./features/chatkit/OpenAiChatKitPage'))
 const UserProfilePage = lazy(() => import('./features/users/UserProfilePage'))
 const DoctorPage = lazy(() => import('./features/doctor/DoctorPage'))
@@ -54,6 +55,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={lazyRoute(<LoginPage />)} />
+      <Route path="/user-browser/native" element={lazyRoute(<NativeAiWebChatWindow />)} />
       <Route path="/*" element={<Shell />}>
         {/* 首页：一龙 AI 工作台 */}
         <Route index element={<Navigate to={defaultPath} replace />} />

@@ -8,4 +8,5 @@ commands.allow = [
   "control_local_ai_web_session",
   "run_local_ai_web_adapter_command",
   "clear_local_ai_web_session",
+  "open_local_ai_native_chat_window",
 ]

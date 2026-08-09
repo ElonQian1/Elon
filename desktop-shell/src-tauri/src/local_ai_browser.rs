@@ -8,6 +8,8 @@
 mod adapter;
 #[path = "local_ai_browser/google_ai_mode.rs"]
 mod google_ai_mode;
+#[path = "local_ai_browser/native_window.rs"]
+mod native_window;
 #[path = "local_ai_browser/state.rs"]
 mod state;
 
@@ -27,6 +29,7 @@ const RENDERER_PROTOCOL: &str = "yilong.ai.ui.v1";
 const PROFILE_ROOT: &str = "ai-web-profiles";
 const MAIN_WEBVIEW_LABEL: &str = "main";
 const LOCAL_AI_WINDOW_PREFIX: &str = "local-ai-";
+const LOCAL_AI_NATIVE_WINDOW_PREFIX: &str = "local-ai-native-";
 
 #[derive(Clone, Copy)]
 struct ProviderDefinition {
@@ -113,10 +116,20 @@ pub struct ClearLocalAiWebSession {
 }
 
 #[tauri::command]
+pub fn open_local_ai_native_chat_window(
+    app: AppHandle,
+    webview: WebviewWindow,
+    provider_id: String,
+    owner_key: String,
+) -> Result<native_window::LocalAiNativeChatWindow, String> {
+    native_window::open(app, webview, provider_id, owner_key)
+}
+
+#[tauri::command]
 pub fn list_local_ai_web_providers(
     webview: WebviewWindow,
 ) -> Result<Vec<LocalAiWebProvider>, String> {
-    ensure_main_webview(&webview)?;
+    ensure_provider_list_webview(&webview)?;
     Ok(PROVIDERS.iter().map(provider_summary).collect())
 }
 
@@ -128,9 +141,9 @@ pub async fn open_local_ai_web_session(
     provider_id: String,
     owner_key: String,
 ) -> Result<LocalAiWebSession, String> {
-    ensure_main_webview(&webview)?;
     let provider = provider(&provider_id)?;
     let owner_fingerprint = owner_fingerprint(&owner_key)?;
+    ensure_session_webview(&webview, provider, &owner_fingerprint)?;
     let window_label = window_label(provider, &owner_fingerprint);
     runtime.ensure_session(
         &window_label,
@@ -257,9 +270,9 @@ pub fn get_local_ai_web_session_state(
     provider_id: String,
     owner_key: String,
 ) -> Result<LocalAiWebSessionState, String> {
-    ensure_main_webview(&webview)?;
     let provider = provider(&provider_id)?;
     let fingerprint = owner_fingerprint(&owner_key)?;
+    ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
     runtime.ensure_session(&label, provider.id, initial_renderer_status(provider));
     if let Some(window) = app.get_webview_window(&label) {
@@ -291,9 +304,9 @@ pub fn control_local_ai_web_session(
     owner_key: String,
     action: String,
 ) -> Result<LocalAiWebSessionState, String> {
-    ensure_main_webview(&webview)?;
     let provider = provider(&provider_id)?;
     let fingerprint = owner_fingerprint(&owner_key)?;
+    ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
     runtime.ensure_session(&label, provider.id, initial_renderer_status(provider));
     if action == "external" {
@@ -333,7 +346,6 @@ pub fn run_local_ai_web_adapter_command(
     value: Option<String>,
     expected_draft: Option<String>,
 ) -> Result<(), String> {
-    ensure_main_webview(&webview)?;
     let provider = provider(&provider_id)?;
     if !provider.semantic_adapter {
         return Err(format!(
@@ -342,6 +354,7 @@ pub fn run_local_ai_web_adapter_command(
         ));
     }
     let fingerprint = owner_fingerprint(&owner_key)?;
+    ensure_session_webview(&webview, provider, &fingerprint)?;
     let label = window_label(provider, &fingerprint);
     let window = app
         .get_webview_window(&label)
@@ -421,6 +434,29 @@ fn ensure_main_webview(webview: &WebviewWindow) -> Result<(), String> {
         Ok(())
     } else {
         Err("本地 AI 浏览器命令只允许一龙 PC 主窗口调用。".to_string())
+    }
+}
+
+fn ensure_provider_list_webview(webview: &WebviewWindow) -> Result<(), String> {
+    if webview.label() == MAIN_WEBVIEW_LABEL
+        || webview.label().starts_with(LOCAL_AI_NATIVE_WINDOW_PREFIX)
+    {
+        Ok(())
+    } else {
+        Err("AI 网页厂商列表只允许一龙 PC 窗口读取。".to_string())
+    }
+}
+
+fn ensure_session_webview(
+    webview: &WebviewWindow,
+    provider: &ProviderDefinition,
+    fingerprint: &str,
+) -> Result<(), String> {
+    let expected_native = native_window::native_window_label(provider, fingerprint);
+    if webview.label() == MAIN_WEBVIEW_LABEL || webview.label() == expected_native {
+        Ok(())
+    } else {
+        Err("当前一龙窗口不能控制这个本地 AI 会话。".to_string())
     }
 }
 

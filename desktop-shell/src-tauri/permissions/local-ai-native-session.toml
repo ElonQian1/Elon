@@ -1,0 +1,10 @@
+[[permission]]
+identifier = "local-ai-native-session"
+description = "允许一龙原生 AI 独立窗口控制与其窗口标签严格匹配的本地官方网页会话。"
+commands.allow = [
+  "list_local_ai_web_providers",
+  "open_local_ai_web_session",
+  "get_local_ai_web_session_state",
+  "control_local_ai_web_session",
+  "run_local_ai_web_adapter_command",
+]

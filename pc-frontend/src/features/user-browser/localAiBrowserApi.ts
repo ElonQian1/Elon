@@ -21,6 +21,12 @@ export interface LocalAiWebSession {
   rendererStatus: 'reserved' | 'active'
 }
 
+export interface LocalAiNativeChatWindow {
+  providerId: string
+  windowLabel: string
+  status: 'created' | 'focused'
+}
+
 export interface ClearedLocalAiWebSession {
   providerId: string
   status: 'cleared'
@@ -128,6 +134,21 @@ export async function openLocalAiWebSession(
   return session
 }
 
+export async function openLocalAiNativeChatWindow(
+  providerId: string,
+  ownerKey: string,
+): Promise<LocalAiNativeChatWindow> {
+  assertIdentity(providerId, ownerKey)
+  const window = await invokeDesktop<LocalAiNativeChatWindow>('open_local_ai_native_chat_window', {
+    providerId,
+    ownerKey,
+  })
+  if (window.providerId !== providerId || !window.windowLabel.startsWith(`local-ai-native-${providerId}-`)) {
+    throw new Error('桌面壳返回了不受支持的一龙聊天窗口。')
+  }
+  return window
+}
+
 export async function clearLocalAiWebSession(
   providerId: string,
   ownerKey: string,
@@ -187,6 +208,19 @@ export function isLocalAiMessageSnapshot(value: unknown): value is LocalAiMessag
     && Array.isArray(snapshot.messages)
     && typeof snapshot.authenticated === 'boolean'
     && typeof snapshot.composerReady === 'boolean'
+}
+
+export async function waitForLocalAiAdapterResult(
+  providerId: string,
+  ownerKey: string,
+  action: string,
+): Promise<LocalAiWebSessionState | null> {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await new Promise((resolve) => window.setTimeout(resolve, 200))
+    const state = await getLocalAiWebSessionState(providerId, ownerKey)
+    if (state.commandResult?.action === action) return state
+  }
+  return null
 }
 
 async function invokeDesktop<T>(

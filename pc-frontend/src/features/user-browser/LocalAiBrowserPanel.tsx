@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
@@ -16,17 +16,14 @@ import {
   clearLocalAiWebSession,
   controlLocalAiWebSession,
   getLocalAiWebSessionState,
-  isLocalAiMessageSnapshot,
   localAiBrowserErrorMessage,
+  openLocalAiNativeChatWindow,
   openLocalAiWebSession,
-  runLocalAiWebAdapterCommand,
-  type LocalAiAdapterAction,
   type LocalAiBrowserControlAction,
   type LocalAiWebProvider,
   type LocalAiWebSessionState,
 } from './localAiBrowserApi'
 import type { LocalAiBrowserCapability } from './useLocalAiBrowserCapability'
-import NativeAiWebChat from './NativeAiWebChat'
 import styles from './LocalAiBrowserPanel.module.css'
 
 interface LocalAiBrowserPanelProps {
@@ -41,20 +38,12 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
   const [busyProvider, setBusyProvider] = useState<string | null>(null)
   const [sessionState, setSessionState] = useState<LocalAiWebSessionState | null>(null)
   const [message, setMessage] = useState('')
-  const [draft, setDraft] = useState('')
-  const [draftTouched, setDraftTouched] = useState(false)
   const [selectedProviderId, setSelectedProviderId] = useState('google-ai-mode')
   const provider = providers.find((item) => item.id === selectedProviderId) || providers[0]
-  const snapshot = useMemo(
-    () => isLocalAiMessageSnapshot(sessionState?.semanticEvent) ? sessionState.semanticEvent : null,
-    [sessionState?.semanticEvent],
-  )
 
   useEffect(() => {
     setSessionState(null)
     setOwnerConfirmed(false)
-    setDraft('')
-    setDraftTouched(false)
     setMessage('')
   }, [provider?.id])
 
@@ -77,10 +66,6 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
     }
   }, [ownerKey, provider, state])
 
-  useEffect(() => {
-    if (!draftTouched) setDraft(snapshot?.draft ?? '')
-  }, [draftTouched, snapshot?.draft])
-
   async function open(item: LocalAiWebProvider) {
     if (!ownerKey || !ownerConfirmed || busyProvider) return
     setBusyProvider(item.id)
@@ -89,11 +74,26 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
       const session = await openLocalAiWebSession(item.id, ownerKey)
       const next = await getLocalAiWebSessionState(item.id, ownerKey)
       setSessionState(next)
+      await openLocalAiNativeChatWindow(item.id, ownerKey)
       setMessage(session.status === 'created'
         ? item.loginMode === 'guest_web_system_login'
-          ? `已打开 ${item.displayName} 官方页面。若 Google 要求登录，请使用“系统浏览器”；两边不会共享 Cookie。`
-          : `已打开 ${item.displayName} 官方页面，请本人完成登录。登录后可回到这里使用一龙聊天界面。`
-        : `已恢复并聚焦 ${item.displayName} 官方页面。`)
+          ? `已打开 ${item.displayName} 官方页面和独立一龙聊天窗。若 Google 要求登录，请使用“系统浏览器”。`
+          : `已打开 ${item.displayName} 官方页面和独立一龙聊天窗，请本人完成登录。`
+        : `已恢复 ${item.displayName} 官方页面和一龙聊天窗。`)
+    } catch (error) {
+      setMessage(localAiBrowserErrorMessage(error))
+    } finally {
+      setBusyProvider(null)
+    }
+  }
+
+  async function openNativeChat(item: LocalAiWebProvider) {
+    if (!ownerKey || !ownerConfirmed || busyProvider) return
+    setBusyProvider(item.id)
+    setMessage('')
+    try {
+      await openLocalAiNativeChatWindow(item.id, ownerKey)
+      setMessage(`已打开 ${item.displayName} 的一龙独立聊天窗。`)
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
     } finally {
@@ -118,33 +118,6 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
     }
   }
 
-  async function runAdapter(action: LocalAiAdapterAction, value?: string, expectedDraft?: string) {
-    if (!ownerKey || !provider || busyProvider) return
-    setBusyProvider(provider.id)
-    setMessage('')
-    try {
-      await runLocalAiWebAdapterCommand(provider.id, ownerKey, action, value, expectedDraft)
-      const next = await waitForAdapterResult(provider.id, ownerKey, action)
-      if (next) setSessionState(next)
-      const result = next?.commandResult
-      if (result?.action === action && !result.ok) {
-        setMessage(result.detail || `${provider.displayName} 官方网页没有完成这个动作，请显示官方窗口后重试。`)
-        return
-      }
-      if (action === 'send_prompt') {
-        setDraft('')
-        setDraftTouched(false)
-        setMessage(result?.detail || `消息已交给 ${provider.displayName} 官方网页发送。`)
-      } else if (result?.detail) {
-        setMessage(result.detail)
-      }
-    } catch (error) {
-      setMessage(localAiBrowserErrorMessage(error))
-    } finally {
-      setBusyProvider(null)
-    }
-  }
-
   async function clear(item: LocalAiWebProvider) {
     if (!ownerKey || busyProvider) return
     const confirmed = window.confirm(
@@ -157,7 +130,6 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
       await clearLocalAiWebSession(item.id, ownerKey)
       setSessionState(null)
       setOwnerConfirmed(false)
-      setDraft('')
       setMessage(`${item.displayName} 本地网页会话已经清除。`)
     } catch (error) {
       setMessage(localAiBrowserErrorMessage(error))
@@ -293,6 +265,15 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
                   {openButtonLabel(provider, sessionOpen)}
                 </button>
                 <button
+                  className={styles.nativeWindowButton}
+                  type="button"
+                  onClick={() => void openNativeChat(provider)}
+                  disabled={!ownerKey || !ownerConfirmed || busy}
+                >
+                  <MonitorUp size={16} />
+                  单独打开一龙聊天窗
+                </button>
+                <button
                   className={styles.clearButton}
                   type="button"
                   title="清除当前账号的本地网页会话"
@@ -330,18 +311,16 @@ export default function LocalAiBrowserPanel({ ownerKey, ownerLabel, capability }
               </div>
             )}
 
-            {provider?.rendererStatus === 'active' ? <NativeAiWebChat
-              provider={provider}
-              snapshot={snapshot}
-              sessionOpen={sessionOpen}
-              busy={busy}
-              draft={draft}
-              onDraftChange={(value) => {
-                setDraft(value)
-                setDraftTouched(true)
-              }}
-              onRun={(action, value, expectedDraft) => void runAdapter(action, value, expectedDraft)}
-            /> : (
+            {provider?.rendererStatus === 'active' ? (
+              <section className={styles.nativeWindowCard} aria-label={`${provider.displayName} 一龙独立聊天窗`}>
+                <MonitorUp size={26} aria-hidden="true" />
+                <div>
+                  <strong>一龙原生 UI 在独立窗口显示</strong>
+                  <p>官方窗口负责登录和真人验证；独立窗口按一龙聊天样式展示可见对话、输入消息与控制生成。</p>
+                  <small>两个窗口共用同一段本机会话状态，但一龙不会读取 Cookie、密码或访问令牌。</small>
+                </div>
+              </section>
+            ) : (
               <section className={styles.officialWebOnly} aria-label={`${provider?.displayName || '官方 AI'}接入说明`}>
                 <ExternalLink size={24} aria-hidden="true" />
                 <div>
@@ -391,19 +370,6 @@ function sessionStatusLabel(state: LocalAiWebSessionState | null): string {
 }
 
 function openButtonLabel(provider: LocalAiWebProvider, sessionOpen: boolean): string {
-  if (sessionOpen) return '恢复官方窗口'
-  return provider.id === 'chatgpt' ? '登录或打开 ChatGPT' : `打开 ${provider.displayName}`
-}
-
-async function waitForAdapterResult(
-  providerId: string,
-  ownerKey: string,
-  action: string,
-): Promise<LocalAiWebSessionState | null> {
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    await new Promise((resolve) => window.setTimeout(resolve, 200))
-    const state = await getLocalAiWebSessionState(providerId, ownerKey)
-    if (state.commandResult?.action === action) return state
-  }
-  return null
+  if (sessionOpen) return '恢复官方页和聊天窗'
+  return provider.id === 'chatgpt' ? '登录 ChatGPT 并打开聊天窗' : `打开 ${provider.displayName} 和聊天窗`
 }

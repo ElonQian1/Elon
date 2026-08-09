@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "local-ai-native-web",
+  "description": "一龙原生 AI 独立窗口只能控制与自身账号指纹和厂商匹配的本地官方网页会话。",
+  "windows": ["local-ai-native-*"],
+  "remote": {
+    "urls": [
+      "http://43.139.149.158:8080/*",
+      "http://localhost:*/*",
+      "http://127.0.0.1:*/*"
+    ]
+  },
+  "permissions": ["local-ai-native-session"]
+}

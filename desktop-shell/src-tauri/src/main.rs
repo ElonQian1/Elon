@@ -143,6 +143,7 @@ fn main() {
             local_ai_browser::run_local_ai_web_adapter_command,
             local_ai_browser::publish_local_ai_web_event,
             local_ai_browser::clear_local_ai_web_session,
+            local_ai_browser::open_local_ai_native_chat_window,
             codex_semantic_bridge::codex_win_capabilities,
             codex_semantic_bridge::codex_execute_semantic_action,
             codex_semantic_bridge::codex_read_native_events,

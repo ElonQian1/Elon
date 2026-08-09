@@ -316,6 +316,23 @@
 .officialWebOnly p { margin: 8px 0; color: var(--text-secondary); font-size: 11px; line-height: 1.65; }
 .officialWebOnly small { color: var(--text-muted); font-size: 10px; }
 
+.nativeWindowCard {
+  min-height: 150px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-content: center;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid rgba(84, 199, 161, .28);
+  border-radius: 7px;
+  color: #84e2c2;
+  background: linear-gradient(135deg, rgba(84, 199, 161, .09), transparent 68%), #0c0f0e;
+}
+
+.nativeWindowCard strong { color: var(--text-primary); font-size: 14px; }
+.nativeWindowCard p { margin: 8px 0; color: var(--text-secondary); font-size: 11px; line-height: 1.65; }
+.nativeWindowCard small { color: var(--text-muted); font-size: 10px; }
+
 .nativeChat {
   min-height: 360px;
   display: grid;
@@ -325,6 +342,9 @@
   border-radius: 7px;
   background: #0c0f0e;
 }
+
+.nativeChat[data-standalone="true"] { height: 100%; min-height: 0; border: 0; border-radius: 0; }
+.nativeChat[data-standalone="true"] .messageList { min-height: 0; max-height: none; }
 
 .nativeChat > header {
   min-height: 54px;
@@ -476,6 +496,7 @@
 .composer textarea:disabled { opacity: .48; }
 
 .openButton,
+.nativeWindowButton,
 .clearButton {
   min-height: 36px;
   display: inline-flex;
@@ -496,6 +517,19 @@
 
 .openButton:hover:not(:disabled) { background: #9ce6cb; }
 
+.nativeWindowButton {
+  min-width: 150px;
+  padding: 0 13px;
+  border: 1px solid rgba(132, 226, 194, .32);
+  color: #84e2c2;
+  background: rgba(84, 199, 161, .07);
+}
+
+.nativeWindowButton:hover:not(:disabled) {
+  border-color: rgba(132, 226, 194, .6);
+  background: rgba(84, 199, 161, .13);
+}
+
 .clearButton {
   width: 36px;
   border: 1px solid var(--border);
@@ -505,6 +539,7 @@
 
 .clearButton:hover:not(:disabled) { border-color: rgba(224, 112, 112, .55); }
 .openButton:disabled,
+.nativeWindowButton:disabled,
 .clearButton:disabled { opacity: .38; cursor: not-allowed; }
 
 .message {
