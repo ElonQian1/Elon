@@ -20,6 +20,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var binding: ActivityChatgptWebTestBinding
     private lateinit var pageAdapter: ChatGptWebPageAdapter
     private lateinit var nativeController: ChatGptNativeConversationController
+    private lateinit var conversationListController: ChatGptNativeConversationListController
     private lateinit var loginController: ChatGptNativeLoginController
     private lateinit var googleAccountHintController: ChatGptGoogleAccountHintController
     private lateinit var modeController: ChatGptWebModeController
@@ -86,6 +87,12 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onSend = { prompt, expectedDraft -> pageAdapter.sendPrompt(prompt, expectedDraft) },
             onStop = { pageAdapter.stopGeneration() },
             onNewConversation = { pageAdapter.startNewConversation() },
+        )
+        conversationListController = ChatGptNativeConversationListController(
+            activity = this,
+            trigger = binding.chatGptNativeHistory,
+            onRequestList = { pageAdapter.listConversations() },
+            onOpenConversation = { path -> pageAdapter.openConversation(path) },
         )
         pageAdapter = ChatGptWebPageAdapter(
             context = this,
@@ -228,9 +235,10 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun handleBridgeEvent(event: ChatGptWebEvent) {
         when (event) {
-            is ChatGptWebEvent.ConversationList -> Unit
+            is ChatGptWebEvent.ConversationList -> conversationListController.render(event.conversations)
             is ChatGptWebEvent.Snapshot -> {
                 nativeController.render(event.value)
+                conversationListController.renderCapabilities(event.value.capabilities)
                 if (
                     event.value.authenticated &&
                     (event.value.composerReady || event.value.messages.isNotEmpty())
@@ -247,6 +255,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             }
             is ChatGptWebEvent.CommandResult -> {
                 if (googleAccountHintController.onCommandResult(event)) return
+                if (conversationListController.onCommandResult(event)) return
                 nativeController.onCommandResult(event)
                 if (!event.ok) {
                     binding.chatGptWebStatus.setTextColor(getColor(R.color.elon_status_project))
@@ -261,6 +270,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun handleBridgeState(state: ChatGptWebPageAdapter.State) {
         nativeController.setBridgeState(state)
+        conversationListController.setBridgeState(state)
         binding.chatGptModeNative.isEnabled = state == ChatGptWebPageAdapter.State.READY
         binding.chatGptModeNative.alpha = if (binding.chatGptModeNative.isEnabled) 1f else 0.48f
         if (
@@ -372,6 +382,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     override fun onDestroy() {
         googleAccountHintController.dispose()
         loginController.dispose()
+        conversationListController.dispose()
         pageAdapter.dispose()
         binding.chatGptWebView.apply {
             stopLoading()

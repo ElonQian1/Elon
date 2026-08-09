@@ -318,9 +318,32 @@
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:background="@color/elon_surface_header"
-                android:gravity="end|center_vertical"
+                android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingHorizontal="8dp">
+
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/chatGptNativeHistory"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="@string/chatgpt_native_history"
+                    android:padding="9dp"
+                    android:src="@drawable/ic_popup_history"
+                    android:tooltipText="@string/chatgpt_native_history" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:fontFamily="sans-serif-medium"
+                    android:includeFontPadding="false"
+                    android:maxLines="1"
+                    android:text="ChatGPT"
+                    android:textColor="@color/elon_text_primary"
+                    android:textSize="15sp" />
 
                 <androidx.appcompat.widget.AppCompatImageButton
                     android:id="@+id/chatGptNativeNew"

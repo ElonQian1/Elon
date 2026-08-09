@@ -89,7 +89,29 @@ class ChatGptWebLabContractTest {
         assertTrue(install > activity.indexOf("modeController = ChatGptWebModeController("))
         assertTrue(install > activity.indexOf("loginController = ChatGptNativeLoginController("))
         assertTrue(install > activity.indexOf("googleAccountHintController = ChatGptGoogleAccountHintController("))
+        assertTrue(install > activity.indexOf("conversationListController = ChatGptNativeConversationListController("))
         assertTrue(install > activity.indexOf("modeController.attach()"))
+    }
+
+    @Test
+    fun nativeConversationHistoryIsCapabilityGatedAndUsesThePageAdapter() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val controller = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeConversationListController.kt"
+        )
+        val layout = readRepositoryFile(
+            "android/app/src/main/res/layout/activity_chatgpt_web_test.xml"
+        )
+
+        assertTrue(layout.contains("android:id=\"@+id/chatGptNativeHistory\""))
+        assertTrue(activity.contains("pageAdapter.listConversations()"))
+        assertTrue(activity.contains("pageAdapter.openConversation(path)"))
+        assertTrue(activity.contains("conversationListController.render(event.conversations)"))
+        assertTrue(activity.contains("renderCapabilities(event.value.capabilities)"))
+        assertTrue(controller.contains("ChatGptWebCapabilityId.CONVERSATION_LIST"))
+        assertTrue(controller.contains("bridgeReady && listSupported"))
     }
 
     @Test
