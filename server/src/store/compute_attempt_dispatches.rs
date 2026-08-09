@@ -16,6 +16,7 @@ mod validation;
 mod write;
 
 pub(crate) use types::{ComputeAttemptDispatchAckCommit, ComputeAttemptDispatchCommandReceipt};
+pub(in crate::store) use validation::PreparedApplication;
 
 impl Store {
     pub(crate) fn prepare_compute_attempt_start_dispatch(

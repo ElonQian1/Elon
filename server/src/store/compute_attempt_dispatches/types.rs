@@ -5,7 +5,10 @@ use crate::{
         ComputeAttemptAdapterAckEnvelope, ComputeAttemptAdapterBinding,
         ComputeAttemptDispatchCommandEnvelope,
     },
-    store::ComputeAttemptActivationReceipt,
+    store::{
+        compute_attempt_start_outbox::AcceptedStartCommitClosureReceipt,
+        ComputeAttemptActivationReceipt,
+    },
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -52,6 +55,7 @@ pub(crate) enum ComputeAttemptDispatchAckCommit {
     Activated {
         ack: ComputeAttemptDispatchAckReceipt,
         application: ComputeAttemptDispatchApplicationReceipt,
+        accepted_closure: AcceptedStartCommitClosureReceipt,
         activation: ComputeAttemptActivationReceipt,
     },
 }

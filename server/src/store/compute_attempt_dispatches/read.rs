@@ -3,9 +3,12 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::compute_federation::attempt_gateway::{
     canonical_adapter_ack_json_and_digest, canonical_adapter_binding_json_and_digest,
-    canonical_dispatch_command_json_and_digest, ComputeAttemptAdapterAckEnvelope,
-    ComputeAttemptAdapterBinding, ComputeAttemptDispatchCommandEnvelope,
+    canonical_dispatch_application_json_and_digest, canonical_dispatch_command_json_and_digest,
+    ComputeAttemptAdapterAckEnvelope, ComputeAttemptAdapterBinding,
+    ComputeAttemptDispatchApplicationEnvelope, ComputeAttemptDispatchCommandEnvelope,
     ValidatedComputeAttemptStartDispatch,
+    COMPUTE_ATTEMPT_DISPATCH_APPLICATION_ACTION_V185_ACTIVATE,
+    COMPUTE_ATTEMPT_DISPATCH_APPLICATION_SCHEMA,
 };
 
 use super::{
@@ -41,17 +44,26 @@ pub(super) struct StoredDispatchAck {
 }
 
 pub(super) struct StoredDispatchApplication {
-    receipt: ComputeAttemptDispatchApplicationReceipt,
+    envelope: ComputeAttemptDispatchApplicationEnvelope,
     application_json: String,
 }
 
 impl StoredDispatchApplication {
-    pub(super) fn into_receipt(
-        mut self,
-        replayed: bool,
-    ) -> ComputeAttemptDispatchApplicationReceipt {
-        self.receipt.replayed = replayed;
-        self.receipt
+    pub(super) fn into_receipt(self, replayed: bool) -> ComputeAttemptDispatchApplicationReceipt {
+        let envelope = self.envelope;
+        ComputeAttemptDispatchApplicationReceipt {
+            schema: envelope.schema,
+            application_id: envelope.application_id,
+            application_digest: envelope.application_digest,
+            command_id: envelope.command_id,
+            ack_id: envelope.ack_id,
+            action: envelope.action,
+            lease_id: envelope.lease_id,
+            activation_request_digest: envelope.activation_request_digest,
+            lease_digest: envelope.lease_digest,
+            applied_at: envelope.applied_at,
+            replayed,
+        }
     }
 }
 
@@ -343,7 +355,7 @@ pub(super) fn application_by_command_on(
     connection: &Connection,
     command_id: &str,
 ) -> Result<Option<StoredDispatchApplication>> {
-    connection
+    let stored = connection
         .query_row(
             "SELECT application_id, application_digest, command_id, ack_id, action,
                     lease_id, activation_request_digest, lease_digest, applied_at,
@@ -351,26 +363,60 @@ pub(super) fn application_by_command_on(
                FROM compute_attempt_dispatch_applications WHERE command_id=?1",
             params![command_id],
             |row| {
-                Ok(StoredDispatchApplication {
-                    receipt: ComputeAttemptDispatchApplicationReceipt {
-                        application_id: row.get(0)?,
-                        application_digest: row.get(1)?,
-                        command_id: row.get(2)?,
-                        ack_id: row.get(3)?,
-                        action: row.get(4)?,
-                        lease_id: row.get(5)?,
-                        activation_request_digest: row.get(6)?,
-                        lease_digest: row.get(7)?,
-                        applied_at: row.get(8)?,
-                        schema: crate::compute_federation::attempt_gateway::COMPUTE_ATTEMPT_DISPATCH_APPLICATION_SCHEMA.to_string(),
-                        replayed: false,
-                    },
-                    application_json: row.get(9)?,
-                })
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                    row.get::<_, String>(7)?,
+                    row.get::<_, String>(8)?,
+                    row.get::<_, String>(9)?,
+                ))
             },
         )
-        .optional()
-        .map_err(Into::into)
+        .optional()?;
+    let Some((
+        application_id,
+        application_digest,
+        command_id,
+        ack_id,
+        action,
+        lease_id,
+        activation_request_digest,
+        lease_digest,
+        applied_at,
+        application_json,
+    )) = stored
+    else {
+        return Ok(None);
+    };
+    let envelope: ComputeAttemptDispatchApplicationEnvelope =
+        serde_json::from_str(&application_json)?;
+    let (canonical_json, recomputed_digest) =
+        canonical_dispatch_application_json_and_digest(&envelope)?;
+    if canonical_json != application_json
+        || recomputed_digest != application_digest
+        || envelope.schema != COMPUTE_ATTEMPT_DISPATCH_APPLICATION_SCHEMA
+        || envelope.application_id != application_id
+        || envelope.application_digest != application_digest
+        || envelope.command_id != command_id
+        || envelope.ack_id != ack_id
+        || envelope.action != action
+        || envelope.action != COMPUTE_ATTEMPT_DISPATCH_APPLICATION_ACTION_V185_ACTIVATE
+        || envelope.lease_id != lease_id
+        || envelope.activation_request_digest != activation_request_digest
+        || envelope.lease_digest != lease_digest
+        || envelope.applied_at != applied_at
+    {
+        bail!("Stored Attempt dispatch application failed exact canonical audit");
+    }
+    Ok(Some(StoredDispatchApplication {
+        envelope,
+        application_json,
+    }))
 }
 
 pub(super) fn ensure_application_matches(
@@ -379,19 +425,8 @@ pub(super) fn ensure_application_matches(
     activation: &crate::store::ComputeAttemptActivationReceipt,
 ) -> Result<()> {
     let expected = prepare_application(ack, activation)?;
-    let receipt = &stored.receipt;
-    if receipt.schema
-        != crate::compute_federation::attempt_gateway::COMPUTE_ATTEMPT_DISPATCH_APPLICATION_SCHEMA
-        || receipt.application_id != expected.application_id
-        || receipt.application_digest != expected.application_digest
+    if &stored.envelope != expected.envelope()
         || stored.application_json != expected.application_json
-        || receipt.command_id != ack.command_id
-        || receipt.ack_id != ack.ack_id
-        || receipt.action != "v185_activate"
-        || receipt.lease_id != activation.lease.lease_id
-        || receipt.activation_request_digest != activation.request_digest
-        || receipt.lease_digest != activation.lease_digest
-        || receipt.applied_at != activation.activated_at
     {
         bail!("Stored Attempt dispatch application failed exact canonical audit");
     }

@@ -196,7 +196,7 @@ pub(super) fn validate_plan_envelope(plan: &ComputeAttemptExecutionPlanEnvelope)
     Ok(())
 }
 
-fn validate_capability(envelope: &ComputeExecutionCapabilityEnvelope) -> Result<()> {
+pub(super) fn validate_capability(envelope: &ComputeExecutionCapabilityEnvelope) -> Result<()> {
     validate_identifier(&envelope.capability_id, "execution capability ID", 160)?;
     validate_digest(&envelope.capability_digest, "execution capability digest")?;
     if envelope.schema != COMPUTE_EXECUTION_CAPABILITY_SCHEMA

@@ -14,6 +14,7 @@ mod validation;
 mod write;
 
 pub(super) use read::ensure_current_plan_for_dispatch_on;
+pub(in crate::store) use read::{plan_by_id_on as audited_plan_by_id_on, StoredPlan};
 pub(crate) use types::ComputeAttemptExecutionPlanReceipt;
 
 impl Store {

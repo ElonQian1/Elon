@@ -71,6 +71,17 @@ pub(in crate::store) fn enqueue_quarantined_cleanup_on(
     )
 }
 
+/// Returns whether this command already owns the exact cancel/reconcile cleanup pair.
+/// A present pair is a terminal branch decision for accepted ACK handling: it must be
+/// quarantined instead of being allowed to race a newly issued commit operation.
+pub(in crate::store) fn has_cleanup_pair_on(
+    connection: &Connection,
+    command_id: &str,
+) -> Result<bool> {
+    let source = cleanup_source_on(connection, command_id)?;
+    Ok(cleanup_pair_on(connection, &source, AckExpectation::PairOnly)?.is_some())
+}
+
 pub(super) fn ensure_unknown_prepare_cleanup_on(
     connection: &Connection,
     command_id: &str,

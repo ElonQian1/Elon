@@ -8,6 +8,7 @@ use crate::compute_federation::start_outbox::{
 
 use super::Store;
 
+mod accepted_commit;
 mod claim;
 mod cleanup;
 mod currentness;
@@ -19,7 +20,12 @@ mod replay;
 mod send;
 mod types;
 
-pub(super) use cleanup::enqueue_quarantined_cleanup_on;
+pub(crate) use accepted_commit::AcceptedStartCommitClosureReceipt;
+pub(in crate::store) use accepted_commit::{
+    audit_accepted_start_commit_closure_on, ensure_fresh_accepted_start_commit_on,
+    persist_accepted_start_commit_closure_on, AcceptedStartCommitFreshness,
+};
+pub(super) use cleanup::{enqueue_quarantined_cleanup_on, has_cleanup_pair_on};
 pub(super) use enqueue::enqueue_prepare_on;
 pub(super) use no_start::{
     ensure_start_resolved_for_broker_finish_on, record_prepare_rejected_no_start_on,

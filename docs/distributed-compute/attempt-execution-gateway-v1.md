@@ -10,9 +10,9 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-v211 的 Provider-neutral Start command、Adapter binding/ACK 与追加式账本，v212 的 sealed Execution Plan，及 v213 的 route/credential authority、耐久 outbox、send-attempt、认证 observation、LeaseAuthorityBinding、actor receipt 与 no-start proof 均已写入源码。v214 又形成 rejected cleanup、quarantine pair、cancel→reconcile 解锁和 final reconcile proof 的本地 Store 闭包。上述批次均未编译、执行迁移或运行真实链路；accepted happy application/actor/Lease authority/commit outbox issuer 仍固定返回 `COMPUTE_ATTEMPT_ACCEPTED_ACK_V213_ISSUER_UNAVAILABLE`。
+v211 的 Provider-neutral Start command、v212 sealed Execution Plan、v213 route/credential/outbox 与 v214 cleanup/recovery 已写入源码。v215 又形成 accepted 的本地原子闭包：authenticated prepare observation、`accepted_applied` ACK、v185、application actor、LeaseAuthorityBinding、commit outbox 与 application 同事务写入并 exact readback；任何既存 ACK-null cleanup pair 都强制走 quarantine。上述批次均未编译、执行迁移或运行真实链路。
 
-旧的 `prepare_start` Adapter trait 会把远端调用放在 durable command 之前，已从源码移除。v213-v214 registry 与 Store 仍只是生产不可达的本地权威核：没有 sealed route/credential/plan/observation 构造器，也没有 resolver、transport 或 worker 消费 send authority。因此真实 Start、远端 ACK/reconcile 和 accepted 应用都不可达，不会推进 Job、Reservation、Capacity Claim、Attempt Lease 或余额预授权。
+旧的 `prepare_start` Adapter trait 会把远端调用放在 durable command 之前，已从源码移除。v213-v215 registry 与 Store 仍只是生产不可达的本地权威核：没有 sealed route/credential/plan/observation 构造器，也没有 resolver、transport 或 worker 消费 send authority。因此真实 Start 和远端 ACK/reconcile 仍不可达，不会由生产事实推进 Job、Reservation、Capacity Claim、Attempt Lease 或余额预授权。
 
 ## 2. v211 保存的证据
 
@@ -26,16 +26,17 @@ v211 的 Provider-neutral Start command、Adapter binding/ACK 与追加式账本
 
 ## 3. 本地原子边界
 
-v214 当前形成的 cleanup/recovery Store 闭包都在一个 `BEGIN IMMEDIATE` 中完成：
+v214-v215 的 Store 闭包都在一个 `BEGIN IMMEDIATE` 中完成：
 
 1. authenticated final `prepare_response(rejected)` observation、`rejected` ACK 与 exact `prepare_rejected` no-start proof 同事务入账，不调用 v185；
 2. accepted 因 command/source/budget/route currentness 失败而 quarantine 时，先创建 `cancel` pending 与 `reconcile` blocked pair，再提交 `quarantined` ACK；
 3. authenticated cancel observation 只把 exact reconcile 从 `blocked` 解锁为 `pending`，不创建 no-start proof；
 4. authenticated final reconcile 的 `never_committed` observation 与 durable no-commit tombstone 同事务生成 exact `remote_never_committed` proof。
+5. eligible accepted 先重验 Plan、source/budget、route、credential/revocation 与 application actor，再依次写 ACK、v185、actor、LeaseAuthorityBinding、commit outbox 和 application；任一步失败整体回滚。
 
 Store 派生的 proof `recorded_at` 与 outbox 状态转换 `updated_at` 由本地时钟生成；authenticated observation 的 `recorded_at` 则属于不可改摘要的 sealed envelope。任一步失败均整体回滚；cleanup 闭包不推进 Job、Reservation、Claim、Lease 或资金，也不把 cancel ACK 冒充远端未执行。
 
-accepted happy issuer 仍在写入 ACK、v185、application、actor receipt、LeaseAuthorityBinding 或 commit outbox 前固定失败。v211/v213 的 deferred foreign key 与反向 trigger 仍定义目标闭包：未来必须在同一事务逐字段绑定 exact command、`accepted_applied` ACK、v185 activation、application、actor/binding 和 commit outbox，任何一项都不得单独提交。v211 Start V1 仍只允许首次 `attempt_no=1/fencing_generation=1`；相同 `(provider_id, adapter_id, adapter_ack_id)` 重投只能复用首次服务端盖章的 ACK，认证事实变化则冲突。
+v215 只由 Store 从耐久 command/Plan/route、authenticated ACK 与 v185/application 事实派生 actor、LeaseAuthorityBinding 和 commit outbox；调用方不能传入 authority DTO。DDL 反向门禁止缺件提交，也禁止 accepted closure 与任何 cancel/reconcile cleanup pair 共存。历史 accepted replay 重算 canonical 闭包但不读取后来轮换或撤销的 currentness。v211 Start V1 仍只允许首次 `attempt_no=1/fencing_generation=1`；相同 `(provider_id, adapter_id, adapter_ack_id)` 重投只能复用首次服务端盖章的 ACK，认证事实变化则冲突。
 
 v176 继续阻断仍有未解决 Start 的 Reservation 退款与容量释放。v214 可在上述 rejected 或 final reconcile 闭包中生成 exact proof，但只有同一 command/reservation/Job/Claim/budget/Lease/fence 的 proof 才能解阻；command/claim 过期、ACK 缺失、quarantined 或 cancel ACK 仍不足以证明远端未执行。没有可信 observation 构造器与网络时，这些远端证明路径仍不能由生产事实触发。
 
@@ -51,7 +52,7 @@ v176 继续阻断仍有未解决 Start 的 Reservation 退款与容量释放。v
 4. commit 后耐久投递执行授权；
 5. 远端只有收到精确 lease authority 后才可运行。
 
-缺少这条协议时，远端可能已运行而本地事务回滚，所以当前 accepted issuer 保持固定不可用；v214 cleanup/recovery 不会旁路该门。
+v215 只完成上述第 2 至 3 步的本地 durable custody；没有 production transport、authenticated ingress 和 commit authority 消费者时，第 1、4、5 步仍不可达，不能据此宣称任务已派发或远端已运行。
 
 ## 5. 旧入口与兼容边界
 
@@ -64,7 +65,7 @@ v176 继续阻断仍有未解决 Start 的 Reservation 退款与容量释放。v
 - ReadyCapability V2/endpoint/Adapter capability 的真实构建、认证上报与服务端验证，以及 Artifact credential issuer；
 - user-node、managed-cluster、external-pool 三类生产 Adapter、credential verifier 与 resolver；
 - outbox worker、ACK ingress、公网认证、provisional prepare/commit/reconcile/cancel 网络协议与 crash injection；
-- accepted application、actor receipt、LeaseAuthorityBinding 与 commit outbox 的可用 issuer；
+- accepted closure 的可信生产入口、commit transport 与远端执行授权消费者；
 - send authority 的真实消费者；历史 replay receipt、claim 或 send-attempt 都不能单独当发送授权；
 - authenticated remote observation 的真实构造器与 Runner 侧 durable no-commit tombstone producer；
 - Node Agent capability、协议、精确 session 派发及本地 durable redelivery；

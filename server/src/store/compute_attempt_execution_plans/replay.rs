@@ -366,7 +366,7 @@ fn access_binding(
     })
 }
 
-fn ensure_access_audience(
+pub(super) fn ensure_access_audience(
     plan: &ComputeAttemptExecutionPlan,
     envelope: &crate::compute_federation::execution_plan::ComputeArtifactAccessEnvelope,
 ) -> Result<()> {

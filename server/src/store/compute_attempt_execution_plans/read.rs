@@ -17,9 +17,13 @@ use crate::compute_federation::{
 };
 
 use super::{
-    replay_validation::source_time,
+    replay::ensure_access_audience,
+    replay_validation::{source_time, validate_artifact_access},
     source::current_execution_sources_on,
-    validation::{access_kind, access_target_identity, validate_canonical_timestamp},
+    validation::{
+        access_kind, access_target_identity, validate_canonical_timestamp, validate_capability,
+        validate_plan_envelope,
+    },
 };
 
 pub(super) struct StoredCapability {
@@ -30,7 +34,7 @@ pub(super) struct StoredAccess {
     pub envelope: ComputeArtifactAccessEnvelope,
 }
 
-pub(super) struct StoredPlan {
+pub(in crate::store) struct StoredPlan {
     pub plan: ComputeAttemptExecutionPlanEnvelope,
     pub seal: ComputeAttemptExecutionPlanSealEnvelope,
     pub capability: ComputeExecutionCapabilityEnvelope,
@@ -112,7 +116,10 @@ pub(super) fn plan_collision_on(
         .transpose()
 }
 
-pub(super) fn plan_by_id_on(connection: &Connection, plan_id: &str) -> Result<StoredPlan> {
+pub(in crate::store) fn plan_by_id_on(
+    connection: &Connection,
+    plan_id: &str,
+) -> Result<StoredPlan> {
     let row = connection
         .query_row(
             "SELECT plan_json, plan_digest, resource_grant_json, resource_grant_digest,
@@ -149,6 +156,7 @@ pub(super) fn plan_by_id_on(connection: &Connection, plan_id: &str) -> Result<St
     {
         bail!("Stored execution plan failed canonical or resource audit");
     }
+    validate_plan_envelope(&plan)?;
     audit_plan_accesses(connection, &plan)?;
     let capability = capability_collision_on(
         connection,
@@ -207,6 +215,7 @@ fn audit_plan_accesses(
             .ok_or_else(|| anyhow!("Execution plan artifact access receipt is missing"))?
             .envelope;
         let (target_id, target_digest) = access_target_identity(&access);
+        ensure_access_audience(&plan.plan, &access)?;
         if access.access_id != binding.access_id
             || access.access_digest != binding.access_digest
             || access_kind(&access) != binding.access_kind
@@ -259,6 +268,7 @@ fn audit_capability(json: &str, stored_digest: &str) -> Result<StoredCapability>
     if canonical != json || envelope.capability_digest != stored_digest || digest != stored_digest {
         bail!("Stored execution capability failed canonical audit");
     }
+    validate_capability(&envelope)?;
     Ok(StoredCapability { envelope })
 }
 
@@ -268,6 +278,7 @@ fn audit_access(json: &str, stored_digest: &str) -> Result<StoredAccess> {
     if canonical != json || envelope.access_digest != stored_digest || digest != stored_digest {
         bail!("Stored artifact access failed canonical audit");
     }
+    validate_artifact_access(&envelope)?;
     Ok(StoredAccess { envelope })
 }
 

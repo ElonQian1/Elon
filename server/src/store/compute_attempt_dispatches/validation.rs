@@ -1,28 +1,25 @@
 use anyhow::{bail, Result};
 use chrono::{DateTime, SecondsFormat};
-use serde::Serialize;
-use sha2::{Digest, Sha256};
 
 use crate::{
     compute_federation::attempt_gateway::{
         canonical_adapter_ack_json_and_digest, canonical_adapter_binding_json_and_digest,
-        canonical_dispatch_command_json_and_digest, ComputeAttemptAdapterAckEnvelope,
+        canonical_dispatch_application_json_and_digest, canonical_dispatch_command_json_and_digest,
+        ComputeAttemptAdapterAckEnvelope, ComputeAttemptDispatchApplicationEnvelope,
         ValidatedComputeAttemptStartDispatch, VerifiedComputeAttemptAdapterAck,
         COMPUTE_ATTEMPT_ADAPTER_ACK_ACCEPTED, COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED,
         COMPUTE_ATTEMPT_ADAPTER_ACK_SCHEMA, COMPUTE_ATTEMPT_ADAPTER_BINDING_SCHEMA,
+        COMPUTE_ATTEMPT_DISPATCH_APPLICATION_ACTION_V185_ACTIVATE,
         COMPUTE_ATTEMPT_DISPATCH_APPLICATION_SCHEMA, COMPUTE_ATTEMPT_DISPATCH_COMMAND_SCHEMA,
         COMPUTE_ATTEMPT_DISPATCH_COMMAND_TYPE_START, COMPUTE_ATTEMPT_ROUTE_PROVIDER_ENDPOINT,
         COMPUTE_ATTEMPT_ROUTE_SERVER_ADAPTER,
     },
     compute_federation::provider::PROVIDER_KIND_EXTERNAL_POOL,
-    compute_plugin_sharing_directive::canonical_compute_plugin_ijson_and_sha256,
     store::ComputeAttemptActivationReceipt,
 };
 
-const MAX_LEDGER_JSON_BYTES: usize = 512 * 1024;
 const MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
 const MIN_ACTIVATION_MARGIN_SECONDS: i64 = 60;
-const APPLICATION_DIGEST_DOMAIN: &[u8] = b"ELON-COMPUTE-ATTEMPT-DISPATCH-APPLICATION-V1";
 
 pub(super) struct PreparedStartDispatch {
     pub command_json: String,
@@ -37,37 +34,17 @@ pub(super) struct PreparedVerifiedAck {
     pub adapter_digest: String,
 }
 
-pub(super) struct PreparedApplication {
-    pub application_id: String,
-    pub application_json: String,
-    pub application_digest: String,
+pub(in crate::store) struct PreparedApplication {
+    pub(in crate::store) application_id: String,
+    pub(in crate::store) application_json: String,
+    pub(in crate::store) application_digest: String,
+    envelope: ComputeAttemptDispatchApplicationEnvelope,
 }
 
-#[derive(Serialize)]
-struct ApplicationDigestProjection<'a> {
-    schema: &'static str,
-    application_id: &'a str,
-    command_id: &'a str,
-    ack_id: &'a str,
-    action: &'static str,
-    lease_id: &'a str,
-    activation_request_digest: &'a str,
-    lease_digest: &'a str,
-    applied_at: &'a str,
-}
-
-#[derive(Serialize)]
-struct ApplicationEnvelope<'a> {
-    schema: &'static str,
-    application_id: &'a str,
-    application_digest: &'a str,
-    command_id: &'a str,
-    ack_id: &'a str,
-    action: &'static str,
-    lease_id: &'a str,
-    activation_request_digest: &'a str,
-    lease_digest: &'a str,
-    applied_at: &'a str,
+impl PreparedApplication {
+    pub(in crate::store) fn envelope(&self) -> &ComputeAttemptDispatchApplicationEnvelope {
+        &self.envelope
+    }
 }
 
 pub(super) fn prepare_start_dispatch(
@@ -235,42 +212,30 @@ pub(super) fn prepare_application(
     activation: &ComputeAttemptActivationReceipt,
 ) -> Result<PreparedApplication> {
     let application_id = application_id_for_ack(ack);
-    let projection = ApplicationDigestProjection {
-        schema: COMPUTE_ATTEMPT_DISPATCH_APPLICATION_SCHEMA,
-        application_id: &application_id,
-        command_id: &ack.command_id,
-        ack_id: &ack.ack_id,
-        action: "v185_activate",
-        lease_id: &activation.lease.lease_id,
-        activation_request_digest: &activation.request_digest,
-        lease_digest: &activation.lease_digest,
-        applied_at: &activation.activated_at,
-    };
-    let (projection_json, _) =
-        canonical_compute_plugin_ijson_and_sha256(&projection, MAX_LEDGER_JSON_BYTES)?;
-    let mut digest = Sha256::new();
-    digest.update(APPLICATION_DIGEST_DOMAIN);
-    digest.update([0]);
-    digest.update(projection_json.as_bytes());
-    let application_digest = hex::encode(digest.finalize());
-    let envelope = ApplicationEnvelope {
-        schema: COMPUTE_ATTEMPT_DISPATCH_APPLICATION_SCHEMA,
-        application_id: &application_id,
-        application_digest: &application_digest,
-        command_id: &ack.command_id,
-        ack_id: &ack.ack_id,
-        action: "v185_activate",
-        lease_id: &activation.lease.lease_id,
-        activation_request_digest: &activation.request_digest,
-        lease_digest: &activation.lease_digest,
-        applied_at: &activation.activated_at,
-    };
-    let (application_json, _) =
-        canonical_compute_plugin_ijson_and_sha256(&envelope, MAX_LEDGER_JSON_BYTES)?;
-    Ok(PreparedApplication {
+    let mut envelope = ComputeAttemptDispatchApplicationEnvelope {
+        schema: COMPUTE_ATTEMPT_DISPATCH_APPLICATION_SCHEMA.to_string(),
         application_id,
+        application_digest: String::new(),
+        command_id: ack.command_id.clone(),
+        ack_id: ack.ack_id.clone(),
+        action: COMPUTE_ATTEMPT_DISPATCH_APPLICATION_ACTION_V185_ACTIVATE.to_string(),
+        lease_id: activation.lease.lease_id.clone(),
+        activation_request_digest: activation.request_digest.clone(),
+        lease_digest: activation.lease_digest.clone(),
+        applied_at: activation.activated_at.clone(),
+    };
+    let (_, application_digest) = canonical_dispatch_application_json_and_digest(&envelope)?;
+    envelope.application_digest = application_digest.clone();
+    let (application_json, recomputed_digest) =
+        canonical_dispatch_application_json_and_digest(&envelope)?;
+    if recomputed_digest != application_digest {
+        bail!("Attempt dispatch application digest is not stable");
+    }
+    Ok(PreparedApplication {
+        application_id: envelope.application_id.clone(),
         application_json,
         application_digest,
+        envelope,
     })
 }
 

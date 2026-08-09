@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, ensure, Result};
 use chrono::{SecondsFormat, Utc};
 use rusqlite::{params, Connection};
 
@@ -10,8 +10,10 @@ use crate::{
     store::{
         compute_attempt_activations::activate_compute_attempt_on,
         compute_attempt_start_outbox::{
-            enqueue_quarantined_cleanup_on, record_prepare_rejected_no_start_on,
-            record_verified_observation_on,
+            audit_accepted_start_commit_closure_on, enqueue_quarantined_cleanup_on,
+            ensure_fresh_accepted_start_commit_on, has_cleanup_pair_on,
+            persist_accepted_start_commit_closure_on, record_prepare_rejected_no_start_on,
+            record_verified_observation_on, AcceptedStartCommitFreshness,
         },
         ActivateComputeAttemptRequest, ComputeAttemptActivationReceipt,
     },
@@ -37,7 +39,6 @@ pub(super) fn ingest_verified_ack_on(
     prepared: &PreparedVerifiedAck,
 ) -> Result<ComputeAttemptDispatchAckCommit> {
     let ack = verified.ack();
-    ensure_v213_accepted_apply_available(ack)?;
     if let Some(stored) = ack_by_adapter_ack_on(
         connection,
         &verified.adapter().provider_id,
@@ -92,6 +93,16 @@ pub(super) fn ingest_verified_ack_on(
                 .remote_execution_ref
                 .as_deref()
                 .ok_or_else(|| anyhow!("Accepted Adapter ACK is missing its execution ref"))?;
+            if has_cleanup_pair_on(connection, &ack.command_id)? {
+                return quarantine_ack_on(
+                    connection,
+                    &command,
+                    verified,
+                    prepared,
+                    "CLEANUP_ALREADY_ISSUED",
+                    &ingested_at,
+                );
+            }
             if ack_received_after_deadline(ack, &command.command.not_after, &ingested_at)? {
                 return quarantine_ack_on(
                     connection,
@@ -129,6 +140,21 @@ pub(super) fn ingest_verified_ack_on(
                     &ingested_at,
                 );
             }
+            match ensure_fresh_accepted_start_commit_on(connection, &ack.command_id, &ingested_at)?
+            {
+                AcceptedStartCommitFreshness::Current => {}
+                AcceptedStartCommitFreshness::Quarantine { reason_code } => {
+                    return quarantine_ack_on(
+                        connection,
+                        &command,
+                        verified,
+                        prepared,
+                        reason_code,
+                        &ingested_at,
+                    );
+                }
+            }
+            connection.execute_batch("SAVEPOINT accepted_apply_v215")?;
             insert_ack_on(
                 connection,
                 &command,
@@ -145,7 +171,35 @@ pub(super) fn ingest_verified_ack_on(
             )?;
             ensure_activation_matches_command(&command, ack, &activation)?;
             let prepared_application = prepare_application(ack, &activation)?;
-            insert_application_on(connection, ack, &activation, &prepared_application)?;
+            let closure_at = application_created_at(&activation.activated_at)?;
+            if let AcceptedStartCommitFreshness::Quarantine { reason_code } =
+                ensure_fresh_accepted_start_commit_on(connection, &ack.command_id, &closure_at)?
+            {
+                connection.execute_batch(
+                    "ROLLBACK TO accepted_apply_v215; RELEASE accepted_apply_v215",
+                )?;
+                return quarantine_ack_on(
+                    connection,
+                    &command,
+                    verified,
+                    prepared,
+                    reason_code,
+                    &closure_at,
+                );
+            }
+            let accepted_closure = persist_accepted_start_commit_closure_on(
+                connection,
+                &ack.command_id,
+                &prepared_application,
+                &closure_at,
+            )?;
+            insert_application_on(
+                connection,
+                ack,
+                &activation,
+                &prepared_application,
+                &closure_at,
+            )?;
             let stored_ack = ack_by_command_on(connection, &ack.command_id)?
                 .ok_or_else(|| anyhow!("Accepted Adapter ACK is not visible after activation"))?;
             ensure_ack_replay_matches(&stored_ack, verified, prepared)?;
@@ -159,22 +213,23 @@ pub(super) fn ingest_verified_ack_on(
             let stored_application = application_by_command_on(connection, &ack.command_id)?
                 .ok_or_else(|| anyhow!("Accepted Adapter ACK is missing its application"))?;
             ensure_application_matches(&stored_application, ack, &activation)?;
+            let mut audited_closure =
+                audit_accepted_start_commit_closure_on(connection, &ack.command_id)?;
+            audited_closure.replayed = false;
+            ensure!(
+                audited_closure == accepted_closure,
+                "Accepted Adapter ACK commit closure failed exact readback"
+            );
+            connection.execute_batch("RELEASE accepted_apply_v215")?;
             Ok(ComputeAttemptDispatchAckCommit::Activated {
                 ack: ack_receipt(stored_ack, false),
                 application: stored_application.into_receipt(false),
+                accepted_closure,
                 activation,
             })
         }
         _ => bail!("Unsupported Adapter ACK outcome"),
     }
-}
-
-fn ensure_v213_accepted_apply_available(ack: &ComputeAttemptAdapterAckEnvelope) -> Result<()> {
-    // Removing this gate must first route any existing ACK-null cleanup pair to quarantine.
-    if ack.outcome == COMPUTE_ATTEMPT_ADAPTER_ACK_ACCEPTED {
-        bail!("COMPUTE_ATTEMPT_ACCEPTED_ACK_V213_ISSUER_UNAVAILABLE");
-    }
-    Ok(())
 }
 
 fn quarantine_ack_on(
@@ -256,8 +311,8 @@ fn insert_application_on(
     ack: &ComputeAttemptAdapterAckEnvelope,
     activation: &ComputeAttemptActivationReceipt,
     prepared: &PreparedApplication,
+    created_at: &str,
 ) -> Result<()> {
-    let created_at = application_created_at(&activation.activated_at)?;
     connection.execute(
         "INSERT INTO compute_attempt_dispatch_applications (
             application_id, command_id, ack_id, action, lease_id,

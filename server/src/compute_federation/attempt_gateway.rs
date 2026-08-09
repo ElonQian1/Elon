@@ -12,6 +12,10 @@ use super::{
     },
 };
 
+mod application;
+
+pub(crate) use application::*;
+
 pub(crate) const COMPUTE_ATTEMPT_DISPATCH_COMMAND_SCHEMA: &str =
     "compute_federation.attempt_dispatch_command.v1";
 pub(crate) const COMPUTE_ATTEMPT_ADAPTER_BINDING_SCHEMA: &str =
@@ -187,8 +191,9 @@ impl ComputeAttemptStartActivationPlan {
 }
 
 /// Adapter-authenticated response. An `accepted` response is only provisional remote acceptance;
-/// it becomes platform-applied solely when the ACK, v185 activation and application receipt commit
-/// atomically. Construction remains inside this module's future concrete Adapter children.
+/// it becomes platform-applied solely when the ACK, v185 activation, application actor, lease
+/// authority, Commit intent, and application receipt commit atomically. Construction remains
+/// inside this module's future concrete Adapter children.
 pub(crate) struct VerifiedComputeAttemptAdapterAck {
     adapter: ComputeAttemptAdapterBinding,
     ack: ComputeAttemptAdapterAckEnvelope,

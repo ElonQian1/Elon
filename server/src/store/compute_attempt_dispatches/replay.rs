@@ -2,7 +2,9 @@ use anyhow::{anyhow, bail, Result};
 use rusqlite::Connection;
 
 use crate::store::{
-    compute_attempt_activations::compute_attempt_activation_on, ComputeAttemptActivationReceipt,
+    compute_attempt_activations::compute_attempt_activation_on,
+    compute_attempt_start_outbox::audit_accepted_start_commit_closure_on,
+    ComputeAttemptActivationReceipt,
 };
 
 use super::{
@@ -39,7 +41,7 @@ pub(super) fn replay_ack_commit(
                 .application_id
                 .clone()
                 .ok_or_else(|| anyhow!("Accepted Adapter ACK is missing its application ID"))?;
-            let activation = compute_attempt_activation_on(connection, activation_lease_id)?;
+            let mut activation = compute_attempt_activation_on(connection, activation_lease_id)?;
             ensure_activation_matches_command(command, &stored_ack, &activation)?;
             let application = require_application_for_accepted_replay(
                 connection,
@@ -50,9 +52,14 @@ pub(super) fn replay_ack_commit(
             if application.application_id != expected_application_id {
                 bail!("Accepted Adapter ACK application ID conflicts with its application");
             }
+            let accepted_closure =
+                audit_accepted_start_commit_closure_on(connection, &stored_ack.command_id)?;
+            activation.replayed = true;
+            activation.capacity_ledger.replayed = true;
             Ok(ComputeAttemptDispatchAckCommit::Activated {
                 ack: ack_receipt(stored, true),
                 application,
+                accepted_closure,
                 activation,
             })
         }

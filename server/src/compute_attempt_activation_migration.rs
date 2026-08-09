@@ -1,6 +1,7 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
+mod accepted_commit;
 mod attempt_dispatch;
 mod execution_plan;
 mod start_outbox;
@@ -85,4 +86,8 @@ pub(crate) fn migration_v213(conn: &Connection) -> Result<()> {
 
 pub(crate) fn migration_v214(conn: &Connection) -> Result<()> {
     start_recovery::migration_v214(conn)
+}
+
+pub(crate) fn migration_v215(conn: &Connection) -> Result<()> {
+    accepted_commit::migration_v215(conn)
 }
