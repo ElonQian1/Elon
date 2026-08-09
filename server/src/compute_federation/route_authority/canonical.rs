@@ -230,7 +230,7 @@ fn envelope_json_and_digest<P: Serialize, E: Serialize>(
     Ok((json, digest))
 }
 
-fn domain_digest<T: Serialize>(domain: &[u8], value: &T) -> Result<String> {
+fn domain_digest<T: Serialize + ?Sized>(domain: &[u8], value: &T) -> Result<String> {
     let (json, _) =
         canonical_compute_plugin_ijson_and_sha256(value, MAX_ROUTE_AUTHORITY_JSON_BYTES)?;
     let mut digest = Sha256::new();

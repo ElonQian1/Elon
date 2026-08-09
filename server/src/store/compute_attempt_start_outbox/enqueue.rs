@@ -30,7 +30,7 @@ use super::{
 };
 
 /// Must run before the command INSERT in the same outer IMMEDIATE transaction.
-pub(super) fn enqueue_prepare_on(
+pub(in crate::store) fn enqueue_prepare_on(
     connection: &Connection,
     dispatch: &ValidatedComputeAttemptStartDispatch,
 ) -> Result<StartOutboxEnqueueReceipt> {

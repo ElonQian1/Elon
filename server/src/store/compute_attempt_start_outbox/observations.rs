@@ -15,7 +15,7 @@ use super::{
     types::{StartOutboxObservationReceipt, StoredVerifiedObservation},
 };
 
-pub(super) fn record_verified_observation_on(
+pub(in crate::store) fn record_verified_observation_on(
     connection: &Connection,
     verified: &VerifiedComputeStartOutboxRemoteObservation,
 ) -> Result<StartOutboxObservationReceipt> {

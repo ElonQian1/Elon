@@ -128,7 +128,7 @@ pub(super) fn derive_and_record_no_start_on(
     Ok(proof_receipt(&stored, false))
 }
 
-pub(super) fn ensure_start_resolved_for_broker_finish_on(
+pub(in crate::store) fn ensure_start_resolved_for_broker_finish_on(
     connection: &Connection,
     binding: BrokerFinishStartResolutionBinding<'_>,
 ) -> Result<Option<StartResolutionProofReceipt>> {

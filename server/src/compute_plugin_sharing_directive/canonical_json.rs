@@ -12,7 +12,7 @@ const PREPARATION_OBSERVED_DOMAIN: &[u8] =
 
 /// RFC 8785 key ordering and string encoding over the I-JSON integer subset used by compute
 /// plugin control records. Floats and integers outside JavaScript's exact range fail closed.
-pub(crate) fn canonical_compute_plugin_ijson_and_sha256<T: Serialize>(
+pub(crate) fn canonical_compute_plugin_ijson_and_sha256<T: Serialize + ?Sized>(
     value: &T,
     max_bytes: usize,
 ) -> Result<(String, String)> {
@@ -45,7 +45,10 @@ fn domain_separated_json_and_digest<T: Serialize>(
     Ok((String::from_utf8(bytes)?, hex::encode(digest.finalize())))
 }
 
-fn canonical_compute_plugin_ijson<T: Serialize>(value: &T, max_bytes: usize) -> Result<Vec<u8>> {
+fn canonical_compute_plugin_ijson<T: Serialize + ?Sized>(
+    value: &T,
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
     let value = serde_json::to_value(value)?;
     let mut output = Vec::new();
     write_canonical_json(&value, &mut output)?;
