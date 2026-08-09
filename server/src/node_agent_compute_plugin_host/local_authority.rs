@@ -42,6 +42,7 @@ mod sqlite_vfs_abi;
 mod sqlite_vfs_policy;
 mod staging_store;
 mod verification_store;
+mod work_admission_store;
 
 pub(in crate::node_agent_compute_plugin_host) use cleanup_completion_store::{
     ComputePluginCandidateCleanupCompletionAuthorityFacts,
@@ -158,6 +159,11 @@ pub(in crate::node_agent_compute_plugin_host) use verification_store::{
     ComputePluginPostHashVerificationBindingFacts,
     ComputePluginPostPinVerificationAuthoritySession,
     ComputePluginPreparedCandidateVerificationFacts,
+};
+pub(in crate::node_agent_compute_plugin_host) use work_admission_store::{
+    ComputePluginInstalledWorkAdmissionAuthorityFacts,
+    ComputePluginPostRevalidationWorkAdmissionAuthoritySession,
+    ComputePluginWorkAdmissionRecoveryAuthoritySession,
 };
 
 const COMPUTE_PLUGIN_STATE_FILE: &str = "compute-plugin-state.sqlite3";

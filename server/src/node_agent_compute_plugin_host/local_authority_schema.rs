@@ -17,6 +17,7 @@ mod schema_integrity;
 mod sharing_policy_binding;
 mod sharing_policy_revocation;
 mod versioning;
+mod work_admission;
 
 pub(super) use versioning::{ensure_schema, COMPUTE_PLUGIN_LOCAL_AUTHORITY_SCHEMA_VERSION};
 
@@ -65,8 +66,7 @@ fn create_schema_objects_v4(connection: &Connection) -> Result<()> {
 fn create_schema_objects_v4_additions(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(sharing_policy_binding::SHARING_POLICY_BINDING_SCHEMA_V4)
-        .context("COMPUTE_PLUGIN_AUTHORITY_SHARING_POLICY_SCHEMA_CREATE_V4")?;
-    Ok(())
+        .context("COMPUTE_PLUGIN_AUTHORITY_SHARING_POLICY_SCHEMA_CREATE_V4")
 }
 
 fn create_schema_objects_v5(connection: &Connection) -> Result<()> {
@@ -77,8 +77,7 @@ fn create_schema_objects_v5(connection: &Connection) -> Result<()> {
 fn create_schema_objects_v5_additions(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(sharing_policy_revocation::SHARING_POLICY_REVOCATION_SCHEMA_V5)
-        .context("COMPUTE_PLUGIN_AUTHORITY_SHARING_POLICY_REVOCATION_SCHEMA_CREATE_V5")?;
-    Ok(())
+        .context("COMPUTE_PLUGIN_AUTHORITY_SHARING_POLICY_REVOCATION_SCHEMA_CREATE_V5")
 }
 
 fn create_schema_objects_v6(connection: &Connection) -> Result<()> {
@@ -89,8 +88,7 @@ fn create_schema_objects_v6(connection: &Connection) -> Result<()> {
 fn create_schema_objects_v6_additions(connection: &Connection) -> Result<()> {
     connection
         .execute_batch(manifest_catalog_binding::MANIFEST_CATALOG_BINDING_SCHEMA_V6)
-        .context("COMPUTE_PLUGIN_AUTHORITY_MANIFEST_CATALOG_SCHEMA_CREATE_V6")?;
-    Ok(())
+        .context("COMPUTE_PLUGIN_AUTHORITY_MANIFEST_CATALOG_SCHEMA_CREATE_V6")
 }
 
 fn create_schema_objects_v7(connection: &Connection) -> Result<()> {

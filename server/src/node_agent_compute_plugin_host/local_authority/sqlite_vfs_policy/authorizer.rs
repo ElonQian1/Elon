@@ -1,4 +1,4 @@
-const AUTHORITY_DATABASE_VERSION: &str = "7";
+const AUTHORITY_DATABASE_VERSION: &str = "8";
 const AUTHORITY_APPLICATION_ID: &str = "1162625872";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

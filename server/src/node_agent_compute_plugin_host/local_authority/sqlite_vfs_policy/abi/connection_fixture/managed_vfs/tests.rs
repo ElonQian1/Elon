@@ -41,7 +41,7 @@ fn managed_sqlite_vfs_routes_real_rollback_connection_through_file_custody() -> 
              sku TEXT PRIMARY KEY,
              quantity INTEGER NOT NULL
          );
-         PRAGMA user_version=7;
+         PRAGMA user_version=8;
          PRAGMA application_id=1162625872;
          PRAGMA foreign_key_check;",
         )
@@ -128,7 +128,7 @@ fn managed_sqlite_vfs_promotes_main_and_routes_real_wal_connection() -> anyhow::
                  sku TEXT PRIMARY KEY,
                  quantity INTEGER NOT NULL
              );
-             PRAGMA user_version=7;
+             PRAGMA user_version=8;
              PRAGMA application_id=1162625872;
              PRAGMA foreign_key_check;",
         )

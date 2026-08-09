@@ -20,6 +20,7 @@ pub(crate) mod identity;
 pub(crate) mod install_plan;
 pub(crate) mod install_plan_admission;
 mod install_plan_admission_validation;
+mod install_plan_reauthorization;
 pub(crate) mod keyring;
 pub(crate) mod keyring_validation;
 mod legacy_llm;
@@ -35,6 +36,7 @@ mod root_lock;
 pub(crate) mod runner_events;
 mod signed_artifact_verification;
 mod trusted_time;
+mod work_admission_contract;
 
 pub(crate) use bootstrap::{ComputePluginBootstrap, ComputePluginBootstrapStatus};
 pub(crate) use contract::{ComputePluginTask, LlmChatTask};

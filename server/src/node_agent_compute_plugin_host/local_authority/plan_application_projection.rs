@@ -14,10 +14,11 @@ use crate::node_agent_compute_plugin_host::{
     identity::ComputePluginReleaseRef,
     install_plan::{
         PLAN_ACTION_CANCEL_CANDIDATE, PLAN_ACTION_DISABLE, PLAN_ACTION_INSTALL, PLAN_ACTION_KEEP,
-        PLAN_ACTION_REMOVE, PLAN_ACTION_UPGRADE, PLAN_TARGET_ENABLED,
+        PLAN_ACTION_REAUTHORIZE_EXISTING, PLAN_ACTION_REMOVE, PLAN_ACTION_UPGRADE,
     },
     install_plan_admission::AdmittedComputePluginInstallPlan,
     install_plan_admission_validation::{is_identifier, item_plugin_id},
+    install_plan_reauthorization::{apply_existing_record_action, touch_plan_record},
     lifecycle::{
         can_remove_active_slot, is_valid_slot_transition, local_record_shape_is_valid,
         ComputePluginInventorySnapshot, ComputePluginLocalRecord, ComputePluginRuntimeObservation,
@@ -232,17 +233,13 @@ pub(super) fn project_plan_application(
                 candidate_by_item.insert(item_index, candidates_to_create.len());
                 candidates_to_create.push(candidate);
             }
-            PLAN_ACTION_KEEP | PLAN_ACTION_DISABLE => {
-                let record = records
-                    .get_mut(&plugin_id)
-                    .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_PLAN_KEEP_MISSING"))?;
-                record.desired_activation = if item.target_activation == PLAN_TARGET_ENABLED {
-                    ACTIVATION_ENABLED.to_string()
-                } else {
-                    ACTIVATION_DISABLED.to_string()
-                };
-                record.desired_presence = DESIRED_PRESENCE_PRESENT.to_string();
-                touch_record(record, &plan.plan_id, &observed_at);
+            PLAN_ACTION_KEEP | PLAN_ACTION_DISABLE | PLAN_ACTION_REAUTHORIZE_EXISTING => {
+                apply_existing_record_action(
+                    item,
+                    records.get_mut(&plugin_id),
+                    &plan.plan_id,
+                    &observed_at,
+                )?;
             }
             PLAN_ACTION_REMOVE => {
                 let record = records
@@ -253,7 +250,7 @@ pub(super) fn project_plan_application(
                 if can_remove_active_slot(record) {
                     begin_slot_removal(record, &observed_at)?;
                 }
-                touch_record(record, &plan.plan_id, &observed_at);
+                touch_plan_record(record, &plan.plan_id, &observed_at);
             }
             PLAN_ACTION_CANCEL_CANDIDATE => {
                 let existing = owned
@@ -431,7 +428,7 @@ fn attach_candidate(
         .sort_by(|left, right| left.slot_ref.cmp(&right.slot_ref));
     record.desired_activation = ACTIVATION_ENABLED.to_string();
     record.desired_presence = DESIRED_PRESENCE_PRESENT.to_string();
-    touch_record(record, plan_id, observed_at);
+    touch_plan_record(record, plan_id, observed_at);
     Ok(())
 }
 
@@ -483,13 +480,8 @@ fn cancel_candidate(
     } else {
         DESIRED_PRESENCE_ABSENT.to_string()
     };
-    touch_record(record, plan_id, observed_at);
+    touch_plan_record(record, plan_id, observed_at);
     Ok(())
-}
-
-fn touch_record(record: &mut ComputePluginLocalRecord, plan_id: &str, observed_at: &str) {
-    record.last_plan_id = Some(plan_id.to_string());
-    record.state_changed_at = observed_at.to_string();
 }
 
 fn project_downloads(

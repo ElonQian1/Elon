@@ -26,9 +26,10 @@ use super::{
 };
 use crate::node_agent_compute_plugin_host::{
     identity::ComputePluginReleaseRef,
-    install_plan::{SignedComputePluginInstallPlan, PLAN_ACTION_INSTALL, PLAN_ACTION_UPGRADE},
+    install_plan::SignedComputePluginInstallPlan,
     install_plan_admission::AdmittedComputePluginInstallPlan,
     install_plan_admission_validation::is_identifier,
+    install_plan_reauthorization::{manifest_binding_action_is_valid, manifest_release_for_item},
     lifecycle::{
         local_record_shape_is_valid, ComputePluginInventorySnapshot,
         COMPUTE_PLUGIN_INVENTORY_SCHEMA, MAX_COMPUTE_PLUGIN_INVENTORY_RECORDS,
@@ -556,7 +557,7 @@ fn validate_admission_bindings(
         .plan
         .items
         .iter()
-        .filter(|item| item.target_release.is_some())
+        .filter(|item| manifest_release_for_item(item).is_some())
         .count();
     if admission.schema != ADMISSION_BINDINGS_SCHEMA
         || admission.admitted_at_ms != stored.applied_at_ms
@@ -587,18 +588,14 @@ fn validate_admission_bindings(
             .items
             .get(item_index)
             .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_PLAN_REPLAY_ADMISSION_ITEM"))?;
-        let target = item
-            .target_release
-            .as_ref()
+        let target = manifest_release_for_item(item)
             .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_PLAN_REPLAY_ADMISSION_TARGET"))?;
         let matching = manifests
             .iter()
             .filter(|manifest| manifest_release_ref(manifest) == binding.release)
             .collect::<Vec<_>>();
-        if !matches!(
-            item.action.as_str(),
-            PLAN_ACTION_INSTALL | PLAN_ACTION_UPGRADE
-        ) || target != &binding.release
+        if !manifest_binding_action_is_valid(item)
+            || target != &binding.release
             || matching.len() != 1
             || matching[0].manifest.publisher_id != binding.publisher_id
             || matching[0].signature.signing_key_id != binding.signing_key_id

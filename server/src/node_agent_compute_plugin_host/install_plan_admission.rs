@@ -14,6 +14,7 @@ use super::{
         validate_expected_local_state, validate_grant, validate_reason_codes,
         validate_target_compatibility,
     },
+    install_plan_reauthorization::manifest_release_for_item,
     keyring::{
         ComputePluginControlPlaneKeyResolver, ComputePluginKeyringBinding,
         ComputePluginPublisherKeyResolver,
@@ -234,12 +235,12 @@ pub(crate) fn admit_install_plan(
             bail!("COMPUTE_PLUGIN_PLAN_DUPLICATE_ITEM: a plugin may appear only once per plan");
         }
         validate_expected_local_state(item, inventory, plan.drain_before_replace)?;
-        let Some(target) = item.target_release.as_ref() else {
+        let Some(manifest_release) = manifest_release_for_item(item) else {
             continue;
         };
         let manifest = validated_manifests
             .iter()
-            .find(|candidate| candidate.release_ref() == *target)
+            .find(|candidate| candidate.release_ref() == *manifest_release)
             .ok_or_else(|| {
                 anyhow::anyhow!(
                     "COMPUTE_PLUGIN_MANIFEST_MISSING: target release has no verified manifest"
@@ -247,13 +248,17 @@ pub(crate) fn admit_install_plan(
             })?;
         validate_target_compatibility(manifest, live)?;
         validate_grant(item.grant.as_ref(), manifest)?;
-        minimum_disk_bytes = minimum_disk_bytes
-            .checked_add(validate_download_closure(item, manifest)?)
-            .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_DISK_REQUIREMENT_OVERFLOW"))?;
+        if item.target_release.is_some() {
+            minimum_disk_bytes = minimum_disk_bytes
+                .checked_add(validate_download_closure(item, manifest)?)
+                .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_DISK_REQUIREMENT_OVERFLOW"))?;
+        } else if !item.downloads.is_empty() {
+            bail!("COMPUTE_PLUGIN_REAUTHORIZE_DOWNLOADS_FORBIDDEN");
+        }
         used_manifest_digests.insert(manifest.signed().manifest_digest.clone());
         admitted_manifests.push(AdmittedComputePluginManifestBinding {
             item_index,
-            release: target.clone(),
+            release: manifest_release.clone(),
             publisher_id: manifest.manifest().publisher_id.clone(),
             signing_key_id: manifest.signed().signature.signing_key_id.clone(),
             signing_key_fingerprint: manifest.verification_key_fingerprint().to_string(),
@@ -263,7 +268,7 @@ pub(crate) fn admit_install_plan(
             |(offset, download)| AdmittedComputePluginDownload {
                 ordinal: first_ordinal + offset,
                 item_index,
-                release: target.clone(),
+                release: manifest_release.clone(),
                 download,
             },
         ));

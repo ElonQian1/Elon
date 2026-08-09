@@ -12,18 +12,16 @@ use super::{
 use crate::node_agent_compute_plugin_host::{
     identity::ComputePluginReleaseRef,
     install_plan::{
-        SignedComputePluginInstallPlan, PLAN_ACTION_CANCEL_CANDIDATE, PLAN_ACTION_DISABLE,
-        PLAN_ACTION_INSTALL, PLAN_ACTION_KEEP, PLAN_ACTION_REMOVE, PLAN_ACTION_UPGRADE,
+        SignedComputePluginInstallPlan, PLAN_ACTION_CANCEL_CANDIDATE, PLAN_ACTION_INSTALL,
+        PLAN_ACTION_UPGRADE,
     },
     install_plan_admission::{
         AdmittedComputePluginDownload, AdmittedComputePluginInstallPlan,
         AdmittedComputePluginManifestBinding,
     },
     install_plan_admission_validation::is_identifier,
-    lifecycle::{
-        ComputePluginInventorySnapshot, ACTIVATION_DISABLED, DESIRED_PRESENCE_ABSENT,
-        DESIRED_PRESENCE_PRESENT, SLOT_DOWNLOADING, SLOT_REMOVING,
-    },
+    install_plan_reauthorization::validate_replayed_inventory_intent,
+    lifecycle::{ComputePluginInventorySnapshot, SLOT_DOWNLOADING, SLOT_REMOVING},
     manifest_validation::is_sha256,
     signed_artifact_verification::jcs_sha256_hex,
 };
@@ -143,7 +141,7 @@ pub(super) fn validate_replayed_children(
             bail!("COMPUTE_PLUGIN_PLAN_REPLAY_RELEASED_INVENTORY_BINDING");
         }
     }
-    validate_inventory_intent(signed_plan, inventory_after)?;
+    validate_replayed_inventory_intent(signed_plan, inventory_after)?;
     let expected_download_count = signed_plan
         .plan
         .items
@@ -189,50 +187,6 @@ pub(super) fn validate_replayed_children(
                 bail!("COMPUTE_PLUGIN_PLAN_REPLAY_DOWNLOAD_BINDING");
             }
             ordinal += 1;
-        }
-    }
-    Ok(())
-}
-
-fn validate_inventory_intent(
-    signed_plan: &SignedComputePluginInstallPlan,
-    inventory_after: &ComputePluginInventorySnapshot,
-) -> Result<()> {
-    for item in &signed_plan.plan.items {
-        let plugin_id = item
-            .target_release
-            .as_ref()
-            .or(item.expected_candidate_release.as_ref())
-            .or(item.expected_current_release.as_ref())
-            .map(|release| release.plugin_id.as_str())
-            .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_PLAN_REPLAY_INVENTORY_ITEM"))?;
-        let record = inventory_after
-            .plugins
-            .iter()
-            .find(|record| record.plugin_id == plugin_id)
-            .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_PLAN_REPLAY_INVENTORY_RECORD"))?;
-        let expected_presence = match item.action.as_str() {
-            PLAN_ACTION_REMOVE => DESIRED_PRESENCE_ABSENT,
-            PLAN_ACTION_CANCEL_CANDIDATE if record.active_slot_ref.is_none() => {
-                DESIRED_PRESENCE_ABSENT
-            }
-            PLAN_ACTION_INSTALL
-            | PLAN_ACTION_UPGRADE
-            | PLAN_ACTION_KEEP
-            | PLAN_ACTION_DISABLE
-            | PLAN_ACTION_CANCEL_CANDIDATE => DESIRED_PRESENCE_PRESENT,
-            _ => bail!("COMPUTE_PLUGIN_PLAN_REPLAY_INVENTORY_ACTION"),
-        };
-        let expected_activation = if item.action == PLAN_ACTION_REMOVE {
-            ACTIVATION_DISABLED
-        } else {
-            item.target_activation.as_str()
-        };
-        if record.last_plan_id.as_deref() != Some(signed_plan.plan.plan_id.as_str())
-            || record.desired_presence != expected_presence
-            || record.desired_activation != expected_activation
-        {
-            bail!("COMPUTE_PLUGIN_PLAN_REPLAY_INVENTORY_INTENT_BINDING");
         }
     }
     Ok(())

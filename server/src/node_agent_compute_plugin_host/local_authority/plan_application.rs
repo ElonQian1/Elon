@@ -5,19 +5,11 @@ use chrono::{DateTime, Utc};
 use rusqlite::{OptionalExtension, Transaction};
 use serde::{Deserialize, Serialize};
 
-use super::{
-    keyring_snapshot::{
-        load_snapshot_for_state, read_authority_keyring_state, KeyringSnapshotValidation,
-    },
-    plan_application_persistence::{persist_plan_application, replay_plan_application},
-    plan_application_projection::project_plan_application,
-    ComputePluginLocalAuthority,
-};
 use crate::node_agent_compute_plugin_host::{
     install_plan::SignedComputePluginInstallPlan,
-    install_plan_admission::{admit_install_plan, ComputePluginLiveAdmissionState},
+    install_plan_admission::ComputePluginLiveAdmissionState,
     install_plan_admission_validation::is_identifier,
-    keyring::{ComputePluginBootstrapRootKeyResolver, ComputePluginKeyringBinding},
+    keyring::ComputePluginKeyringBinding,
     lifecycle::{
         local_record_shape_is_valid, ComputePluginInventorySnapshot,
         COMPUTE_PLUGIN_INVENTORY_SCHEMA,
@@ -26,6 +18,10 @@ use crate::node_agent_compute_plugin_host::{
     plugin_manifest::SignedComputePluginManifest,
     signed_artifact_verification::jcs_sha256_hex,
 };
+
+mod work_admission;
+
+pub(in crate::node_agent_compute_plugin_host::local_authority) use work_admission::AuthenticatedPlanApplicationBarrier;
 
 pub(super) const PLAN_APPLICATION_RECEIPT_SCHEMA: &str =
     "elon.compute_plugin.plan_application_receipt.v1";
@@ -169,6 +165,7 @@ pub(crate) struct ComputePluginPlanApplicationResult {
     candidate_handles: Vec<ComputePluginCandidateHandle>,
     execution_plan:
         crate::node_agent_compute_plugin_host::install_plan_admission::AdmittedComputePluginInstallPlan,
+    authenticated_work_admission_barrier: Option<AuthenticatedPlanApplicationBarrier>,
 }
 
 impl ComputePluginPlanApplicationResult {
@@ -204,6 +201,7 @@ impl ComputePluginPlanApplicationResult {
             receipt,
             candidate_handles,
             execution_plan,
+            authenticated_work_admission_barrier: None,
         }
     }
 }
@@ -266,75 +264,6 @@ impl AuthorityPlanApplicationState {
             host_api_protocol_id: self.host_api_protocol_id.clone(),
             host_api_revision: self.host_api_revision,
         }
-    }
-}
-
-impl ComputePluginLocalAuthority {
-    /// `trusted_now` must come from the future authenticated trusted-time kernel, never directly
-    /// from an ordinary wall clock, and a state-changing application must observe a value strictly
-    /// later than the durable authority high-water mark. This method has no filesystem, network or
-    /// Sidecar effects.
-    pub(crate) fn apply_install_plan(
-        &self,
-        signed_plan: &SignedComputePluginInstallPlan,
-        signed_manifests: &[SignedComputePluginManifest],
-        trusted_now: DateTime<Utc>,
-        roots: &dyn ComputePluginBootstrapRootKeyResolver,
-    ) -> Result<ComputePluginPlanApplicationResult> {
-        let request = prepare_application_request(signed_plan, signed_manifests)?;
-        self.with_immediate(|transaction| {
-            if let Some(replayed) = replay_plan_application(
-                transaction,
-                &signed_plan.plan.plan_id,
-                &signed_plan.plan_digest,
-                &request.application_request_digest,
-            )? {
-                return Ok(replayed);
-            }
-            let authority = read_authority_plan_application_state(transaction, &trusted_now)?;
-            let keyring_state = read_authority_keyring_state(transaction)?;
-            if keyring_state.state_revision != authority.state_revision
-                || keyring_state.authority_epoch != authority.authority_epoch
-            {
-                bail!("COMPUTE_PLUGIN_PLAN_AUTHORITY_FENCE_CHANGED");
-            }
-            let keyring = load_snapshot_for_state(
-                transaction,
-                &keyring_state,
-                KeyringSnapshotValidation::Current(trusted_now.clone()),
-                roots,
-            )?;
-            if keyring.bundle_revision() != authority.keyring_bundle_revision
-                || keyring.publisher_binding() != &authority.publisher_keyring
-                || keyring.control_binding() != &authority.control_keyring
-            {
-                bail!("COMPUTE_PLUGIN_PLAN_KEYRING_BINDING_CHANGED");
-            }
-            let admitted = admit_install_plan(
-                signed_plan,
-                &request.signed_manifests,
-                &authority.inventory,
-                &authority.live(),
-                trusted_now.clone(),
-                &keyring,
-                &keyring,
-            )?;
-            let projected = project_plan_application(
-                transaction,
-                &authority,
-                &admitted,
-                trusted_now.timestamp_millis(),
-            )?;
-            persist_plan_application(
-                transaction,
-                &authority,
-                &keyring,
-                &request,
-                &admitted,
-                projected,
-                trusted_now.timestamp_millis(),
-            )
-        })
     }
 }
 

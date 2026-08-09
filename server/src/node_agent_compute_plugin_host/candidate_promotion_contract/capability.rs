@@ -106,6 +106,15 @@ impl RevalidatedCandidatePromotion<'_> {
         self.publication.revalidate_retained_content()?;
         guard.ensure_current()
     }
+
+    /// Rehashes the pinned installed content without consulting the superseded candidate-plan
+    /// cancellation source. Callers must bind a fresh installed-slot authority session strictly
+    /// after this returns; this helper alone is never authorization or a retry permit.
+    pub(in crate::node_agent_compute_plugin_host) fn fresh_revalidate_installed_content(
+        &mut self,
+    ) -> anyhow::Result<()> {
+        self.publication.revalidate_retained_content()
+    }
 }
 
 impl<'root> RevalidatedCandidatePromotion<'root> {
@@ -158,6 +167,26 @@ impl<'root> DurableInstalledPluginSlot<'root> {
         CandidatePromotionReceiptPair,
     ) {
         (self.revalidated, self.receipts)
+    }
+
+    /// Initial admission still belongs to the exact candidate plan that produced this custody,
+    /// so its cancellation guard must remain current through the final full rehash.
+    pub(in crate::node_agent_compute_plugin_host) fn fresh_revalidate_initial_work_content(
+        &mut self,
+    ) -> anyhow::Result<Instant> {
+        self.receipts.validate()?;
+        self.revalidated.fresh_revalidate_retained_content()?;
+        Ok(Instant::now())
+    }
+
+    /// Recovery runs after reauthorization may have legitimately closed the candidate source.
+    /// The fresh recovery authority session is therefore responsible for successor ownership.
+    pub(in crate::node_agent_compute_plugin_host) fn fresh_revalidate_installed_content(
+        &mut self,
+    ) -> anyhow::Result<Instant> {
+        self.receipts.validate()?;
+        self.revalidated.fresh_revalidate_installed_content()?;
+        Ok(Instant::now())
     }
 }
 

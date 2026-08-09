@@ -8,9 +8,11 @@ use super::{
     install_plan::{
         ComputePluginGrantBinding, ComputePluginPlanItem, ComputePluginPlannedDownload,
         PLAN_ACTION_CANCEL_CANDIDATE, PLAN_ACTION_DISABLE, PLAN_ACTION_INSTALL, PLAN_ACTION_KEEP,
-        PLAN_ACTION_REMOVE, PLAN_ACTION_UPGRADE, PLAN_TARGET_ENABLED,
+        PLAN_ACTION_REAUTHORIZE_EXISTING, PLAN_ACTION_REMOVE, PLAN_ACTION_UPGRADE,
+        PLAN_TARGET_ENABLED,
     },
     install_plan_admission::ComputePluginLiveAdmissionState,
+    install_plan_reauthorization::validate_reauthorization_source,
     lifecycle::{ComputePluginInventorySnapshot, ComputePluginLocalRecord},
     manifest_validation::{is_sha256, ValidatedComputePluginManifest},
     plugin_manifest::{
@@ -74,10 +76,15 @@ pub(super) fn validate_expected_local_state(
     }
     if !matches!(
         item.action.as_str(),
-        PLAN_ACTION_UPGRADE | PLAN_ACTION_KEEP | PLAN_ACTION_DISABLE | PLAN_ACTION_REMOVE
+        PLAN_ACTION_UPGRADE
+            | PLAN_ACTION_KEEP
+            | PLAN_ACTION_REAUTHORIZE_EXISTING
+            | PLAN_ACTION_DISABLE
+            | PLAN_ACTION_REMOVE
     ) {
         bail!("COMPUTE_PLUGIN_PLAN_ACTION: unsupported action");
     }
+    validate_reauthorization_source(item, record)?;
     Ok(())
 }
 

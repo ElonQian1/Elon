@@ -18,6 +18,7 @@ pub(crate) const COMPUTE_PLUGIN_INSTALL_PLAN_SIGNATURE_DOMAIN: &str =
 pub(crate) const PLAN_ACTION_INSTALL: &str = "install";
 pub(crate) const PLAN_ACTION_UPGRADE: &str = "upgrade";
 pub(crate) const PLAN_ACTION_KEEP: &str = "keep";
+pub(crate) const PLAN_ACTION_REAUTHORIZE_EXISTING: &str = "reauthorize_existing";
 pub(crate) const PLAN_ACTION_DISABLE: &str = "disable";
 pub(crate) const PLAN_ACTION_REMOVE: &str = "remove";
 pub(crate) const PLAN_ACTION_CANCEL_CANDIDATE: &str = "cancel_candidate";
@@ -200,6 +201,9 @@ fn plan_item_shape_is_valid(item: &ComputePluginPlanItem) -> bool {
                         item.target_activation.as_str(),
                         PLAN_TARGET_ENABLED | PLAN_TARGET_DISABLED
                     )
+            }
+            PLAN_ACTION_REAUTHORIZE_EXISTING => {
+                super::install_plan_reauthorization::reauthorization_shape_is_valid(item)
             }
             PLAN_ACTION_DISABLE => {
                 item.expected_current_release.is_some()

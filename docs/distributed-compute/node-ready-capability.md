@@ -70,12 +70,20 @@ v216 把内容安装与 active 指针提升固定为同一个本机 `BEGIN IMMED
 
 promotion 刻意保持 runtime 为 `stopped`、runtime generation 不变、active health 为空。候选预热健康只证明安装前内容检查，不会被复制成活动 Runtime 健康；双回执也不替代 work-admission receipt。因此 v11 Planning Snapshot、ReadyCapability V2 与商业调度仍继续失败关闭。本批已随 `elon-pc-node` 编译，v7 authority 全新安装、重开及 v3-v6 原子迁移等 11 项测试和 69 项 SQLite VFS 回归通过；尚未执行生产磁盘迁移或 install/promotion 完整事务夹具。
 
-## 9. 尚未实现
+## 9. Work-admission 仍不是 Ready
+
+v217 源码新增 `reauthorize_existing`：Control-signed InstallPlan 只能精确引用当前 active installed release、当前 install generation 和一个新的 grant，不得携带 candidate、target release 或下载；Plan admission 会重新验证该 release 的 Publisher-signed Manifest、Host API/target 兼容性、grant 子集和 JCS 摘要。PlanApply 只把当前记录投影为 `present/enabled/allowed` 并更新 grant 与计划引用，不改变 install、activation、runtime generation、active slot、健康或 active attempts。
+
+新的线性 work-admission 合同先消费 `DurableInstalledPluginSlot`，在旧 candidate source 尚可验证时对 retained handles 做全量重哈希；随后取得严格晚于该重哈希 barrier 且仍 live 的 authenticated trusted-time observation P，并用同一个 P 与当前 process fence 应用签名 `reauthorize_existing`。只有 fresh `Applied` 结果会封存私有 PlanApply commit barrier，历史 `Replayed` 或其他 action 都不会获得它；再取得 monotonic 严格晚于 commit、可信时间也严格晚于 P 的 observation S 后，才可绑定 local authority session。v8 本地账本以不可变 source/receipt 和单调 current head 封存 v7 install/promotion 双回执、sealed reauthorization application、签名 Plan/Manifest、policy/catalog/keyring fence、完整 launch profile、授权的 CPU/内存/显存/磁盘/进程/Sidecar 时长及权限上限；单一事务只推进 work-admission head、authority state/epoch 与可信时间，inventory 和 runtime 事实保持不变。提交不确定只能 exact recovery；只有 current exact receipt 且 retained content 再次 fresh rehash 成功，才恢复 `DurableWorkAdmittedPluginSlot`。
+
+这些数值是签名 grant 的授权上限，不是测得容量、设备分配、OS 限制或 v212 `ResourceCeiling`。合同不生成 accelerator count、输出上限、并发上限、runtime/model 摘要或 enforcement receipt，也不启动 Sidecar、不复制 candidate health、不构造 Ready。CPU-only 节点可诚实保留 VRAM=0；服务端现有 accelerator>0 合同必须在后续显式解决，不能用虚构 accelerator 填平。v217 增量同样尚未编译、迁移、运行或接入生产 Host。
+
+## 10. 尚未实现
 
 - Sidecar 启动、预热和动态健康探针；
 - Sidecar 到 Host 的认证 IPC、响应验证和真实探针调度；
 - 失败候选的清理完成 Store、目录耐久闭包、重试授权与跨重启 custody 治理；
-- installed 槽的 work-admission receipt、Runtime 启动/激活和活动健康回执；
+- Host enforcement profile、Runtime 启动/激活和活动健康回执；
 - 发布 Ready 前的 fresh Store read、CAS/fencing 和主动失效链；
 - `ComputeReadyCapability` 的规范短 TTL 构建、认证上报和服务端验证；
 - 共享关闭、排水、崩溃和撤销后的主动失效通知；
