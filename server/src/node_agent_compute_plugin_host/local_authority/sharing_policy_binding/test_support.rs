@@ -21,6 +21,10 @@ use crate::node_agent_compute_plugin_host::{
     signed_artifact_verification::jcs_sha256_hex,
 };
 
+mod prepared_work;
+
+pub(super) use prepared_work::seed_prepared_work;
+
 const INSTALLATION_DIGEST: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const POLICY_DIGEST: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";

@@ -104,6 +104,19 @@ fn commit_transition(connection: &mut Connection, projected: &ProjectedSharingPo
     transaction.commit().unwrap();
 }
 
+fn prepared_work_states(connection: &Connection) -> (String, String) {
+    connection
+        .query_row(
+            r#"SELECT
+                (SELECT state FROM fetch_claims WHERE claim_id = 'claim_prepared'),
+                (SELECT state FROM candidate_verification_runs
+                 WHERE verification_id = 'verification_prepared')"#,
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap()
+}
+
 #[test]
 fn revocation_and_binding_commit_atomically_and_advance_authority() {
     let projected = projected_binding();
@@ -203,4 +216,90 @@ fn committed_revocation_receipt_is_immutable_and_append_only() {
         )
         .unwrap_err();
     assert!(format!("{delete_error:#}").contains("policy prepared-work receipts are append-only"));
+}
+
+#[test]
+fn prepared_fetch_and_verification_terminalize_with_binding() {
+    let projected = projected_binding();
+    let mut connection = connection(&projected.before);
+    test_support::seed_prepared_work(&mut connection, &projected.before);
+    assert_eq!(
+        prepared_work_states(&connection),
+        ("prepared".to_string(), "prepared".to_string())
+    );
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .unwrap();
+    let prepared = prepare_revocation(&transaction, &projected).unwrap();
+    assert_eq!(prepared.hashed_receipt.receipt().fetch_claim_count, 1);
+    assert_eq!(prepared.hashed_receipt.receipt().verification_count, 1);
+    assert_eq!(prepared.hashed_receipt.receipt().work_item_count, 2);
+    insert_prepared_revocation(&transaction, &prepared).unwrap();
+    insert_receipt(&transaction, &projected).unwrap();
+
+    let binding = read_exact_receipt(&transaction, &projected.request)
+        .unwrap()
+        .unwrap();
+    let revocation = read_exact_revocation(&transaction, &projected.request, &binding)
+        .unwrap()
+        .unwrap();
+    assert_eq!(revocation, prepared);
+    validate_terminalized_work(&transaction, &revocation).unwrap();
+    transaction.commit().unwrap();
+
+    assert_eq!(
+        prepared_work_states(&connection),
+        ("aborted".to_string(), "aborted".to_string())
+    );
+    let terminal: (i64, String, i64, String) = connection
+        .query_row(
+            r#"SELECT
+                (SELECT resolved_at_ms FROM fetch_claims WHERE claim_id = 'claim_prepared'),
+                (SELECT resolution_reason FROM fetch_claims WHERE claim_id = 'claim_prepared'),
+                (SELECT resolved_at_ms FROM candidate_verification_runs
+                 WHERE verification_id = 'verification_prepared'),
+                (SELECT resolution_reason FROM candidate_verification_runs
+                 WHERE verification_id = 'verification_prepared')"#,
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        terminal,
+        (
+            projected.hashed_receipt.receipt.bound_at_ms,
+            "sharing_policy_transition_aborted".to_string(),
+            projected.hashed_receipt.receipt.bound_at_ms,
+            "verification_aborted".to_string(),
+        )
+    );
+}
+
+#[test]
+fn orphan_revocation_rollback_preserves_prepared_work() {
+    let projected = projected_binding();
+    let mut connection = connection(&projected.before);
+    test_support::seed_prepared_work(&mut connection, &projected.before);
+    let transaction = connection
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .unwrap();
+    let prepared = prepare_revocation(&transaction, &projected).unwrap();
+    assert_eq!(prepared.hashed_receipt.receipt().work_item_count, 2);
+    insert_prepared_revocation(&transaction, &prepared).unwrap();
+
+    let error = transaction.commit().unwrap_err();
+
+    assert!(format!("{error:#}").contains("FOREIGN KEY"));
+    assert_eq!(
+        prepared_work_states(&connection),
+        ("prepared".to_string(), "prepared".to_string())
+    );
+    let count: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM sharing_policy_binding_revocation_receipts",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(count, 0);
 }
