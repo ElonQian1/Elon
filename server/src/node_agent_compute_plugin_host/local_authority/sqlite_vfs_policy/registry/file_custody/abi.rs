@@ -15,7 +15,9 @@ use crate::node_agent_managed_fs::{
     ManagedSqliteShmMapOutcome, ManagedSqliteShmUnmapMode, ManagedSqliteUnlockTarget,
 };
 
-use super::ComputePluginHandleBoundSqlitePinnedFile;
+use super::{
+    ManagedSqliteRegistryCustody, ManagedSqliteRegistryNonceSource, ManagedSqliteRegistryPinnedFile,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::node_agent_compute_plugin_host::local_authority) enum HandleBoundSqliteAbiLockLevel {
@@ -55,13 +57,28 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) enum HandleBoundS
 /// Concrete production state that keeps registry route, callback leases, managed handles and SHM
 /// connection custody inseparable. Construction remains inside the registry until a real xOpen
 /// producer exists.
-pub(in crate::node_agent_compute_plugin_host::local_authority) struct ComputePluginHandleBoundSqliteAbiFile
+pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiFile<
+    Custody,
+    NonceSource,
+> where
+    Custody: ManagedSqliteRegistryCustody + 'static,
+    NonceSource: ManagedSqliteRegistryNonceSource + 'static,
 {
-    file: ComputePluginHandleBoundSqlitePinnedFile,
+    file: ManagedSqliteRegistryPinnedFile<Custody, NonceSource>,
 }
 
-impl ComputePluginHandleBoundSqliteAbiFile {
-    pub(super) fn from_pinned(file: ComputePluginHandleBoundSqlitePinnedFile) -> Self {
+pub(in crate::node_agent_compute_plugin_host::local_authority) type ComputePluginHandleBoundSqliteAbiFile =
+    HandleBoundSqliteAbiFile<
+        crate::node_agent_compute_plugin_host::local_authority::ComputePluginHandleBoundAuthorityOpenIntent,
+        super::super::process_owner::ManagedSqliteRegistrySystemNonceSource,
+    >;
+
+impl<Custody, NonceSource> HandleBoundSqliteAbiFile<Custody, NonceSource>
+where
+    Custody: ManagedSqliteRegistryCustody + 'static,
+    NonceSource: ManagedSqliteRegistryNonceSource + 'static,
+{
+    pub(super) fn from_pinned(file: ManagedSqliteRegistryPinnedFile<Custody, NonceSource>) -> Self {
         Self { file }
     }
 

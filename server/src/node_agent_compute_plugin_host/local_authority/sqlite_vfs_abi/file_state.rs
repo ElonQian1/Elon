@@ -11,16 +11,22 @@ use std::{
     ptr::NonNull,
 };
 
+#[cfg(test)]
+use std::mem::MaybeUninit;
+
 use rusqlite::ffi;
 
 use super::raw_state;
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::{
-    ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt,
+    ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt, HandleBoundSqliteAbiFile,
     HandleBoundSqliteAbiLockLevel, HandleBoundSqliteAbiShmLockAction, HandleBoundSqliteAbiShmMap,
-    HandleBoundSqliteAbiUnlockLevel,
+    HandleBoundSqliteAbiUnlockLevel, ManagedSqliteRegistryCustody,
+    ManagedSqliteRegistryNonceSource,
 };
 
-trait HandleBoundSqliteFileOperations: 'static {
+pub(in crate::node_agent_compute_plugin_host::local_authority) trait HandleBoundSqliteFileOperations:
+    'static
+{
     fn read_at_zero_filled(&mut self, offset: u64, buffer: &mut [u8]) -> Result<usize, ()>;
     fn write_all_at(&mut self, offset: u64, bytes: &[u8]) -> Result<(), ()>;
     fn truncate(&mut self, size: u64) -> Result<(), ()>;
@@ -49,7 +55,12 @@ trait HandleBoundSqliteFileOperations: 'static {
     fn close(self: Box<Self>) -> Result<(), ()>;
 }
 
-impl HandleBoundSqliteFileOperations for ComputePluginHandleBoundSqliteAbiFile {
+impl<Custody, NonceSource> HandleBoundSqliteFileOperations
+    for HandleBoundSqliteAbiFile<Custody, NonceSource>
+where
+    Custody: ManagedSqliteRegistryCustody + 'static,
+    NonceSource: ManagedSqliteRegistryNonceSource + 'static,
+{
     fn read_at_zero_filled(&mut self, offset: u64, buffer: &mut [u8]) -> Result<usize, ()> {
         Self::read_at_zero_filled(self, offset, buffer)
     }
@@ -113,6 +124,52 @@ impl HandleBoundSqliteFileOperations for ComputePluginHandleBoundSqliteAbiFile {
 
     fn close(self: Box<Self>) -> Result<(), ()> {
         Self::close(*self)
+    }
+}
+
+/// Test-only owner for one raw SQLite file allocation installed with real callback state.
+/// Production construction remains impossible because this type and constructor are absent from
+/// non-test builds.
+#[cfg(test)]
+pub(in crate::node_agent_compute_plugin_host::local_authority) struct HandleBoundSqliteAbiTestFile {
+    storage: Box<MaybeUninit<super::types::InertHandleBoundSqliteFile>>,
+    file: *mut ffi::sqlite3_file,
+}
+
+#[cfg(test)]
+impl HandleBoundSqliteAbiTestFile {
+    pub(in crate::node_agent_compute_plugin_host::local_authority) fn install(
+        operations: impl HandleBoundSqliteFileOperations,
+    ) -> Self {
+        let mut storage =
+            Box::new(MaybeUninit::<super::types::InertHandleBoundSqliteFile>::uninit());
+        let file = storage.as_mut_ptr().cast::<ffi::sqlite3_file>();
+        // SAFETY: this owner supplies fresh aligned storage and serializes every callback.
+        assert!(unsafe { raw_state::initialize_fresh_file(file) });
+        let state = HandleBoundSqliteFileState::from_test(operations);
+        // SAFETY: the fresh allocation is initialized and exclusively owned here.
+        assert!(unsafe { raw_state::install_state(file, state) }.is_ok());
+        Self { storage, file }
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority) fn file(
+        &self,
+    ) -> *mut ffi::sqlite3_file {
+        self.file
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority) fn is_cleared(&self) -> bool {
+        // SAFETY: installation initialized this exact storage and self keeps it alive.
+        let file = unsafe { self.storage.assume_init_ref() };
+        file.base.pMethods.is_null() && file.state.is_null()
+    }
+}
+
+#[cfg(test)]
+impl Drop for HandleBoundSqliteAbiTestFile {
+    fn drop(&mut self) {
+        // SAFETY: this owner has exclusive access. Already-closed state is a no-op.
+        let _ = unsafe { raw_state::abandon_installed_state(self.file) };
     }
 }
 

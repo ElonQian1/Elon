@@ -72,19 +72,19 @@ fn full_lifecycle_closes_every_exact_lease_before_retirement() {
     let callback = session
         .begin_callback(ManagedSqliteRegistryCallbackKind::Io)
         .expect("begin callback");
-    session.finish_callback(callback).expect("finish callback");
+    session.finish_callback(&callback).expect("finish callback");
 
     session.begin_connection_close().expect("begin close");
     let journal_proof = close_proof(&journal);
     session
-        .close_file(journal, journal_proof)
+        .close_file(&journal, &journal_proof)
         .expect("close journal");
     let wal_proof = close_proof(&wal);
-    session.close_file(wal, wal_proof).expect("close wal");
+    session.close_file(&wal, &wal_proof).expect("close wal");
     let shm_proof = close_shm_proof(&shm);
-    session.close_shm(shm, shm_proof).expect("close shm");
+    session.close_shm(&shm, &shm_proof).expect("close shm");
     let main_proof = close_proof(&main);
-    session.close_file(main, main_proof).expect("close main");
+    session.close_file(&main, &main_proof).expect("close main");
     session
         .observe_connection_closed()
         .expect("observe connection close");
@@ -135,7 +135,7 @@ fn mismatched_close_proof_quarantines_live_file_custody() {
     );
 
     assert_eq!(
-        session.close_file(main, wrong),
+        session.close_file(&main, &wrong),
         Err(ManagedSqliteRegistryTransitionRejection::LeaseIdentityMismatch)
     );
     assert_eq!(
@@ -152,8 +152,8 @@ fn unproven_close_preserves_the_exact_terminal_reason() {
 
     assert_eq!(
         session.close_file(
-            main,
-            ManagedSqliteRegistryCloseOutcome::Unproven(
+            &main,
+            &ManagedSqliteRegistryCloseOutcome::Unproven(
                 ManagedSqliteRegistryTerminalReason::HandleCloseUnproven,
             ),
         ),
@@ -179,7 +179,7 @@ fn callbacks_must_drain_before_activation_or_connection_close() {
         Err(ManagedSqliteRegistryTransitionRejection::OutstandingCallbacks)
     );
     session
-        .finish_callback(opening_callback)
+        .finish_callback(&opening_callback)
         .expect("finish opening callback");
     session.activate_connection().expect("activate");
     let active_callback = session
@@ -190,7 +190,7 @@ fn callbacks_must_drain_before_activation_or_connection_close() {
         Err(ManagedSqliteRegistryTransitionRejection::OutstandingCallbacks)
     );
     session
-        .finish_callback(active_callback)
+        .finish_callback(&active_callback)
         .expect("finish active callback");
     session.begin_connection_close().expect("begin close");
 }
@@ -209,7 +209,7 @@ fn main_cannot_close_before_sidecar_and_shm_custody() {
     let proof = close_proof(&main);
 
     assert_eq!(
-        session.close_file(main, proof),
+        session.close_file(&main, &proof),
         Err(ManagedSqliteRegistryTransitionRejection::LeaseIdentityMismatch)
     );
     assert_eq!(
@@ -292,6 +292,6 @@ fn closing_phase_rejects_new_open_and_access_callbacks_but_allows_teardown() {
         let lease = session
             .begin_callback(kind)
             .expect("teardown callback must remain admitted");
-        session.finish_callback(lease).expect("finish callback");
+        session.finish_callback(&lease).expect("finish callback");
     }
 }

@@ -28,7 +28,7 @@ mod abi;
 mod operations;
 
 pub(in crate::node_agent_compute_plugin_host::local_authority) use abi::{
-    ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt,
+    ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt, HandleBoundSqliteAbiFile,
     HandleBoundSqliteAbiLockLevel, HandleBoundSqliteAbiShmLockAction, HandleBoundSqliteAbiShmMap,
     HandleBoundSqliteAbiUnlockLevel,
 };
@@ -78,11 +78,6 @@ where
     route: ManagedSqliteRegistryRouteHandle,
     custody: Option<ManagedSqliteRegistryPinnedFileCustody>,
 }
-
-pub(super) type ComputePluginHandleBoundSqlitePinnedFile = ManagedSqliteRegistryPinnedFile<
-    crate::node_agent_compute_plugin_host::local_authority::ComputePluginHandleBoundAuthorityOpenIntent,
-    super::process_owner::ManagedSqliteRegistrySystemNonceSource,
->;
 
 impl<Custody, NonceSource> ManagedSqliteRegistryPinnedFile<Custody, NonceSource>
 where

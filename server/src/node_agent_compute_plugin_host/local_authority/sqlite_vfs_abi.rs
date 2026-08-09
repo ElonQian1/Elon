@@ -18,6 +18,9 @@ mod result_codes;
 mod types;
 mod vfs_callbacks;
 
+#[cfg(test)]
+pub(in crate::node_agent_compute_plugin_host::local_authority) use file_state::HandleBoundSqliteAbiTestFile;
+
 use types::{InertHandleBoundSqliteFile, InertSqliteVfs};
 
 const INERT_VFS_NAME: &[u8] = b"elon-handle-bound-unavailable-v1\0";

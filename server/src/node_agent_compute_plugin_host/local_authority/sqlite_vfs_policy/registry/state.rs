@@ -73,7 +73,7 @@ impl ManagedSqliteRegistrySessionState {
 
     pub(super) fn finish_callback(
         &mut self,
-        lease: ManagedSqliteRegistryCallbackLease,
+        lease: &ManagedSqliteRegistryCallbackLease,
     ) -> Result<(), ManagedSqliteRegistryTransitionRejection> {
         self.ensure_shape()?;
         if lease.session_id != self.session_id || self.callbacks_in_flight == 0 {
@@ -190,8 +190,8 @@ impl ManagedSqliteRegistrySessionState {
 
     pub(super) fn close_file(
         &mut self,
-        lease: ManagedSqliteRegistryFileLease,
-        outcome: ManagedSqliteRegistryCloseOutcome,
+        lease: &ManagedSqliteRegistryFileLease,
+        outcome: &ManagedSqliteRegistryCloseOutcome,
     ) -> Result<(), ManagedSqliteRegistryTransitionRejection> {
         self.ensure_shape()?;
         self.ensure_matching_session(lease.session_id)?;
@@ -246,8 +246,8 @@ impl ManagedSqliteRegistrySessionState {
 
     pub(super) fn close_shm(
         &mut self,
-        lease: ManagedSqliteRegistryShmLease,
-        outcome: ManagedSqliteRegistryCloseOutcome,
+        lease: &ManagedSqliteRegistryShmLease,
+        outcome: &ManagedSqliteRegistryCloseOutcome,
     ) -> Result<(), ManagedSqliteRegistryTransitionRejection> {
         self.ensure_shape()?;
         self.ensure_matching_session(lease.session_id)?;
@@ -400,13 +400,13 @@ impl ManagedSqliteRegistrySessionState {
 
     fn validate_close_outcome(
         &mut self,
-        outcome: ManagedSqliteRegistryCloseOutcome,
+        outcome: &ManagedSqliteRegistryCloseOutcome,
         expected_ordinal: NonZeroU64,
     ) -> Result<(), ManagedSqliteRegistryTransitionRejection> {
         let proof = match outcome {
             ManagedSqliteRegistryCloseOutcome::Proven(proof) => proof,
             ManagedSqliteRegistryCloseOutcome::Unproven(reason) => {
-                self.enter_terminal(reason);
+                self.enter_terminal(*reason);
                 return Err(ManagedSqliteRegistryTransitionRejection::Terminal);
             }
         };

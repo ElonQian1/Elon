@@ -162,4 +162,5 @@ fn real_wal_main_receipt_retires_main_and_shm_leases_together() {
     fs::remove_dir_all(path).expect("remove closed WAL namespace");
 }
 
+mod abi_callbacks;
 mod operations;

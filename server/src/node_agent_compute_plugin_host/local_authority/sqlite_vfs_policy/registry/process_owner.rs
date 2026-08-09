@@ -13,9 +13,10 @@ use super::{
     },
     types::{
         ManagedSqliteRegistryCallbackKind, ManagedSqliteRegistryCallbackLease,
-        ManagedSqliteRegistryFileLease, ManagedSqliteRegistryRetirementReceipt,
-        ManagedSqliteRegistrySessionPhase, ManagedSqliteRegistryShmLease,
-        ManagedSqliteRegistryTerminalReason, ManagedSqliteRegistryWalMainCloseProofs,
+        ManagedSqliteRegistryCloseOutcome, ManagedSqliteRegistryFileLease,
+        ManagedSqliteRegistryRetirementReceipt, ManagedSqliteRegistrySessionPhase,
+        ManagedSqliteRegistryShmLease, ManagedSqliteRegistryTerminalReason,
+        ManagedSqliteRegistryWalMainCloseProofs,
     },
 };
 use crate::{
@@ -38,11 +39,12 @@ pub(super) type ComputePluginHandleBoundSqliteProcessOwner = ManagedSqliteRegist
     ManagedSqliteRegistrySystemNonceSource,
 >;
 
-pub(super) trait ManagedSqliteRegistryNonceSource {
+pub(in crate::node_agent_compute_plugin_host::local_authority) trait ManagedSqliteRegistryNonceSource
+{
     fn fill_nonce(&self, output: &mut [u8; 16]) -> Result<(), ()>;
 }
 
-pub(super) struct ManagedSqliteRegistrySystemNonceSource;
+pub(in crate::node_agent_compute_plugin_host::local_authority) struct ManagedSqliteRegistrySystemNonceSource;
 
 impl ManagedSqliteRegistryNonceSource for ManagedSqliteRegistrySystemNonceSource {
     fn fill_nonce(&self, output: &mut [u8; 16]) -> Result<(), ()> {
@@ -205,7 +207,9 @@ where
         route: ManagedSqliteRegistryRouteHandle,
         lease: ManagedSqliteRegistryCallbackLease,
     ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
-        self.apply_route(route, |routes| routes.finish_callback(route, lease))
+        self.apply_route_retaining_failure(route, lease, |routes, lease| {
+            routes.finish_callback(route, lease)
+        })
     }
 
     fn apply_route<T>(
@@ -220,6 +224,35 @@ where
             Ok(value) => Ok(value),
             Err(rejection) => {
                 routes.retain_terminal_if_present(route);
+                Err(ManagedSqliteRegistryProcessRouteRejection::Route(rejection))
+            }
+        }
+    }
+
+    /// Linear completion evidence cannot be reconstructed after its one-shot operation. Keep the
+    /// exact value alive forever whenever route locking or the state transition fails; neither
+    /// xClose nor callback completion has a safe retry channel.
+    fn apply_route_retaining_failure<T, Evidence: 'static>(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+        evidence: Evidence,
+        operation: impl FnOnce(
+            &mut ManagedSqliteRegistryOwner<Custody>,
+            &Evidence,
+        ) -> Result<T, ManagedSqliteRegistryRouteRejection>,
+    ) -> Result<T, ManagedSqliteRegistryProcessRouteRejection> {
+        let mut routes = match self.lock_routes() {
+            Ok(routes) => routes,
+            Err(rejection) => {
+                let _permanent_evidence = Box::leak(Box::new(evidence));
+                return Err(rejection);
+            }
+        };
+        match operation(&mut routes, &evidence) {
+            Ok(value) => Ok(value),
+            Err(rejection) => {
+                routes.retain_terminal_if_present(route);
+                let _permanent_evidence = Box::leak(Box::new(evidence));
                 Err(ManagedSqliteRegistryProcessRouteRejection::Route(rejection))
             }
         }

@@ -56,7 +56,9 @@ where
         receipt: ManagedSqliteFileCloseReceipt,
     ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
         let outcome = lease.close_with_file_receipt(receipt);
-        self.apply_route(route, |routes| routes.close_file(route, lease, outcome))
+        self.apply_route_retaining_failure(route, (lease, outcome), |routes, evidence| {
+            routes.close_file(route, &evidence.0, &evidence.1)
+        })
     }
 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn close_main(
@@ -66,7 +68,9 @@ where
         receipt: ManagedSqliteMainFileCloseReceipt,
     ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
         let outcome = lease.close_with_main_receipt(receipt);
-        self.apply_route(route, |routes| routes.close_file(route, lease, outcome))
+        self.apply_route_retaining_failure(route, (lease, outcome), |routes, evidence| {
+            routes.close_file(route, &evidence.0, &evidence.1)
+        })
     }
 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn close_wal_main(
@@ -77,9 +81,26 @@ where
         receipt: ManagedSqliteWalMainCloseReceipt,
     ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
         let proofs = ManagedSqliteRegistryWalMainCloseProofs::from_receipt(&main, &shm, receipt);
-        self.apply_route(route, |routes| {
-            routes.close_wal_main(route, main, shm, proofs)
-        })
+        let (main_outcome, shm_outcome) = match proofs {
+            Ok(proofs) => {
+                let (main_proof, shm_proof) = proofs.into_parts();
+                (
+                    ManagedSqliteRegistryCloseOutcome::Proven(main_proof),
+                    ManagedSqliteRegistryCloseOutcome::Proven(shm_proof),
+                )
+            }
+            Err(reason) => (
+                ManagedSqliteRegistryCloseOutcome::Unproven(reason),
+                ManagedSqliteRegistryCloseOutcome::Unproven(reason),
+            ),
+        };
+        self.apply_route_retaining_failure(
+            route,
+            (main, shm, main_outcome, shm_outcome),
+            |routes, evidence| {
+                routes.close_wal_main(route, &evidence.0, &evidence.1, &evidence.2, &evidence.3)
+            },
+        )
     }
 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn connection_close_failed(

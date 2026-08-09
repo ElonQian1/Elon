@@ -25,9 +25,10 @@ pub(super) use authorizer::{
 };
 pub(super) use name::ManagedSqliteLogicalNameRejection;
 pub(super) use registry::{
-    ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt,
+    ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt, HandleBoundSqliteAbiFile,
     HandleBoundSqliteAbiLockLevel, HandleBoundSqliteAbiShmLockAction, HandleBoundSqliteAbiShmMap,
     HandleBoundSqliteAbiUnlockLevel, ManagedSqliteRegistryCustody,
+    ManagedSqliteRegistryNonceSource,
 };
 pub(super) use types::{
     ManagedSqliteLogicalFileRole, ManagedSqliteRootOpenFlags, ManagedSqliteVfsAccess,

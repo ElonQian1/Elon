@@ -45,8 +45,8 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn close_file(
         &mut self,
         handle: ManagedSqliteRegistryRouteHandle,
-        lease: ManagedSqliteRegistryFileLease,
-        outcome: ManagedSqliteRegistryCloseOutcome,
+        lease: &ManagedSqliteRegistryFileLease,
+        outcome: &ManagedSqliteRegistryCloseOutcome,
     ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
         self.exact_entry_mut(handle)?
             .state
@@ -57,27 +57,12 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
     pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn close_wal_main(
         &mut self,
         handle: ManagedSqliteRegistryRouteHandle,
-        main: ManagedSqliteRegistryFileLease,
-        shm: ManagedSqliteRegistryShmLease,
-        proofs: Result<
-            ManagedSqliteRegistryWalMainCloseProofs,
-            ManagedSqliteRegistryTerminalReason,
-        >,
+        main: &ManagedSqliteRegistryFileLease,
+        shm: &ManagedSqliteRegistryShmLease,
+        main_outcome: &ManagedSqliteRegistryCloseOutcome,
+        shm_outcome: &ManagedSqliteRegistryCloseOutcome,
     ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
         let state = &mut self.exact_entry_mut(handle)?.state;
-        let (main_outcome, shm_outcome) = match proofs {
-            Ok(proofs) => {
-                let (main, shm) = proofs.into_parts();
-                (
-                    ManagedSqliteRegistryCloseOutcome::Proven(main),
-                    ManagedSqliteRegistryCloseOutcome::Proven(shm),
-                )
-            }
-            Err(reason) => (
-                ManagedSqliteRegistryCloseOutcome::Unproven(reason),
-                ManagedSqliteRegistryCloseOutcome::Unproven(reason),
-            ),
-        };
         state
             .close_shm(shm, shm_outcome)
             .and_then(|()| state.close_file(main, main_outcome))

@@ -197,6 +197,52 @@ fn poisoned_process_owner_fails_closed_without_dropping_existing_custody() {
 }
 
 #[test]
+fn close_evidence_is_permanently_retained_when_route_lock_is_poisoned() {
+    let process =
+        ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));
+    let (route_custody, route_drops) = probe();
+    let (close_evidence, evidence_drops) = probe();
+    let route = process.register(route_custody).expect("route");
+    let _ = catch_unwind(AssertUnwindSafe(|| {
+        let _guard = process.routes.lock().expect("lock before poison");
+        panic!("poison process owner before close transition");
+    }));
+
+    let result: Result<(), _> =
+        process.apply_route_retaining_failure(route, close_evidence, |_routes, _evidence| Ok(()));
+
+    assert_eq!(
+        result,
+        Err(ManagedSqliteRegistryProcessRouteRejection::OwnerPoisoned)
+    );
+    assert_eq!(route_drops.load(Ordering::SeqCst), 0);
+    assert_eq!(evidence_drops.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn close_evidence_is_permanently_retained_when_route_transition_rejects() {
+    let process =
+        ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));
+    let (route_custody, route_drops) = probe();
+    let (close_evidence, evidence_drops) = probe();
+    let route = process.register(route_custody).expect("route");
+
+    let result: Result<(), _> =
+        process.apply_route_retaining_failure(route, close_evidence, |_routes, _evidence| {
+            Err(ManagedSqliteRegistryRouteRejection::UnknownOrRetired)
+        });
+
+    assert_eq!(
+        result,
+        Err(ManagedSqliteRegistryProcessRouteRejection::Route(
+            ManagedSqliteRegistryRouteRejection::UnknownOrRetired,
+        ))
+    );
+    assert_eq!(route_drops.load(Ordering::SeqCst), 0);
+    assert_eq!(evidence_drops.load(Ordering::SeqCst), 0);
+}
+
+#[test]
 fn terminal_retention_precedes_exact_route_quarantine() {
     let process =
         ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));

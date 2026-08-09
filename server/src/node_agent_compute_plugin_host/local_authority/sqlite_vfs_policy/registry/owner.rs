@@ -235,7 +235,7 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
     pub(super) fn finish_callback(
         &mut self,
         handle: ManagedSqliteRegistryRouteHandle,
-        lease: ManagedSqliteRegistryCallbackLease,
+        lease: &ManagedSqliteRegistryCallbackLease,
     ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
         self.exact_entry_mut(handle)?
             .state
