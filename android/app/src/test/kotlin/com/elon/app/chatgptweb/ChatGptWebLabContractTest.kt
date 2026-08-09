@@ -93,6 +93,15 @@ class ChatGptWebLabContractTest {
         assertTrue(adapterLayout.indexOf("read.aloud|朗读") < adapterLayout.indexOf("dictat|microphone|voice"))
         assertTrue(adapterLayout.contains("return 'sources'"))
         assertTrue(adapterLayout.contains("return 'more'"))
+        val semanticFunction = adapterLayout.substring(
+            adapterLayout.indexOf("function semanticFor"),
+            adapterLayout.indexOf("function defaultLabel"),
+        )
+        val emittedSemantics = Regex("return '([a-z_]+)'")
+            .findAll(semanticFunction)
+            .map { it.groupValues[1] }
+            .toSet()
+        assertTrue(ChatGptWebUiSemantics.KNOWN.containsAll(emittedSemantics))
     }
 
     @Test

@@ -256,7 +256,8 @@ internal object ChatGptWebProtocol {
                 val item = rawControls.optJSONObject(index) ?: continue
                 val id = item.optString("id").take(MAX_UI_CONTROL_ID_LENGTH)
                 val semantic = item.optString("semantic")
-                    .takeIf { it in UI_CONTROL_SEMANTICS } ?: "action"
+                    .takeIf { it in ChatGptWebUiSemantics.KNOWN }
+                    ?: ChatGptWebUiSemantics.GENERIC_ACTION
                 val label = item.optString("label").trim().take(MAX_UI_CONTROL_LABEL_LENGTH)
                 val region = item.optString("region").takeIf { it in UI_REGIONS } ?: continue
                 val role = item.optString("role").takeIf { it in UI_ROLES } ?: "button"
@@ -416,36 +417,4 @@ internal object ChatGptWebProtocol {
     private val UI_ROLES = setOf("button", "link", "menuitem", "switch", "tab")
     private val UI_PAGE_KINDS = setOf("home", "conversation", "feature", "auth", "unknown")
     private val UI_COMPATIBILITY = setOf("healthy", "partial", "fallback_required")
-    private val UI_CONTROL_SEMANTICS = setOf(
-        "navigation",
-        "title",
-        "profile",
-        "new_conversation",
-        "attachment",
-        "model",
-        "dictation",
-        "send",
-        "stop",
-        "suggestion",
-        "copy",
-        "regenerate",
-        "edit",
-        "share",
-        "feedback",
-        "read_aloud",
-        "branch",
-        "delete",
-        "close",
-        "confirm",
-        "conversation",
-        "search",
-        "library",
-        "tasks",
-        "project",
-        "gpts",
-        "settings",
-        "sources",
-        "more",
-        "action",
-    )
 }

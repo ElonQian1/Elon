@@ -17,7 +17,7 @@ internal object ChatGptWebCapabilityMatrix {
             .toSortedMap()
         val knownCapabilityIds = DEFINITIONS.mapTo(mutableSetOf(), Definition::id)
         val unknownCapabilities = (advertised - knownCapabilityIds).sorted()
-        val unknownSemantics = (semantics.keys - KNOWN_SEMANTICS).sorted()
+        val unknownSemantics = (semantics.keys - ChatGptWebUiSemantics.KNOWN).sorted()
         val rows = DEFINITIONS.map { definition ->
             val observed = when (definition.id) {
                 SESSION_LOGIN -> snapshot?.authenticated == true
@@ -40,7 +40,9 @@ internal object ChatGptWebCapabilityMatrix {
             if (manifest != null && manifest.compatibility != "healthy") add("manifest_${manifest.compatibility}")
         }
         val reviewReasons = buildList {
-            if (semantics[GENERIC_ACTION].orZero() > 0) add("generic_controls_present")
+            if (semantics[ChatGptWebUiSemantics.GENERIC_ACTION].orZero() > 0) {
+                add("generic_controls_present")
+            }
             if (unknownCapabilities.isNotEmpty()) add("unknown_capabilities")
             if (unknownSemantics.isNotEmpty()) add("unknown_semantics")
         }
@@ -60,7 +62,10 @@ internal object ChatGptWebCapabilityMatrix {
                 .put("page_kind", manifest?.pageKind ?: JSONObject.NULL)
                 .put("compatibility", manifest?.compatibility ?: JSONObject.NULL)
                 .put("control_count", manifest?.controls?.size ?: 0)
-                .put("generic_control_count", semantics[GENERIC_ACTION].orZero())
+                .put(
+                    "generic_control_count",
+                    semantics[ChatGptWebUiSemantics.GENERIC_ACTION].orZero(),
+                )
             )
             .put("capabilities", JSONArray(rows))
             .put("observed_semantics", JSONObject().apply {
@@ -85,8 +90,6 @@ internal object ChatGptWebCapabilityMatrix {
 
     private const val SESSION_LOGIN = "session_login"
     private const val PROMPT_SEND = "prompt_send"
-    private const val GENERIC_ACTION = "action"
-
     private val DEFINITIONS = listOf(
         Definition(SESSION_LOGIN, true, "ui_state"),
         Definition(PROMPT_SEND, true, "send_input"),
@@ -108,12 +111,4 @@ internal object ChatGptWebCapabilityMatrix {
         Definition(ChatGptWebCapabilityId.COMPLEX_OUTPUT, true, "chatgpt_get_context"),
     )
 
-    private val KNOWN_SEMANTICS = setOf(
-        "navigation", "title", "profile", "new_conversation", "attachment", "model",
-        "dictation", "send", "stop", "suggestion", "copy", "regenerate", "edit",
-        "share", "feedback", "read_aloud", "branch", "delete", "close", "confirm",
-        "conversation", "search", "library", "tasks", "project", "gpts", "settings",
-        "sources", "more",
-        GENERIC_ACTION,
-    )
 }
