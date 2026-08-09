@@ -3,6 +3,8 @@ use rusqlite::{params, OptionalExtension, Transaction};
 
 use super::{clean_optional, now, Store};
 
+mod endpoint_authority;
+
 impl Store {
     /// Adopt a legacy node credential for the same owner + device name when the
     /// Windows client has a stable install_id but older rows did not.

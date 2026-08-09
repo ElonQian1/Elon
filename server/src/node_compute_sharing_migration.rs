@@ -3,6 +3,8 @@
 use anyhow::Result;
 use rusqlite::Connection;
 
+mod endpoint_authority;
+
 pub(crate) fn migration_v121(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS node_compute_sharing_policies (
@@ -23,6 +25,10 @@ pub(crate) fn migration_v121(conn: &Connection) -> Result<()> {
            ON node_compute_sharing_policies(enabled, owner_user_id, updated_at);",
     )?;
     Ok(())
+}
+
+pub(crate) fn migration_v216(conn: &Connection) -> Result<()> {
+    endpoint_authority::migration_v216(conn)
 }
 
 #[cfg(test)]

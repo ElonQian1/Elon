@@ -4,6 +4,8 @@ use anyhow::Result;
 
 use crate::store::{NodeComputeRun, NodeComputeRunStart, NodeComputeSharingStatus, Store};
 
+pub(crate) mod endpoint_authority;
+
 pub(crate) const DEFAULT_MAX_OUTPUT_TOKENS: u32 = 1024;
 const MAX_MAX_OUTPUT_TOKENS: u32 = 1_000_000;
 

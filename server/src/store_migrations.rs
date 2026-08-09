@@ -250,6 +250,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (213, "分布式算力 Attempt Route Authority 与耐久 Start Outbox", crate::compute_attempt_activation_migration::migration_v213),
     (214, "分布式算力 Attempt Start unknown-delivery 恢复门卫", crate::compute_attempt_activation_migration::migration_v214),
     (215, "分布式算力 Attempt accepted 本地提交闭包", crate::compute_attempt_activation_migration::migration_v215),
+    (216, "节点算力 Endpoint 凭据版本与认证会话权威", crate::node_compute_sharing_migration::migration_v216),
 ];
 
 pub(crate) fn migration_v106(conn: &Connection) -> Result<()> {
