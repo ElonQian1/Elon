@@ -16,7 +16,7 @@
 
 catalog binding 的 trusted-time observation 带60秒进程内单调有效期，写入、签名复核后、INSERT前、事务返回前、commit后和Durable recovery边界均会重检。当前能力只证明本机目录头，不授予InstallPlan、下载、安装或任务执行。
 
-当前专项验证包括两层：3 项内存 SQLite 事务测试证明收据与 authority 头原子提交并精确回读、过期 authority fence 失败且零残留、已提交收据不可更新或删除；5 项真实 Ed25519 候选测试证明独立 Publisher/Control 签名可通过，并拒绝 Manifest/catalog 域混用、InstallPlan 域冒充 catalog、目标不符及两类角色复用同一原始公钥指纹。测试密钥只在进程内生成，不等于生产 root/keyring、Signer/KMS 或密钥轮换已就绪；完整 `bind` 会话和恢复分支、生产磁盘 VFS 与 Host 接线仍未覆盖。
+当前专项验证包括三层：3 项内存 SQLite 事务测试证明收据与 authority 头原子提交、失败零残留和收据不可变；7 项恢复判定测试覆盖全字段前态、身份碰撞、当前/历史提交、合法后继、回滚与缺失 head 回执失败关闭；5 项真实 Ed25519 候选测试证明独立 Publisher/Control 签名并拒绝签名域、目标及公钥角色复用。测试密钥只在进程内生成；外层 `bind/adopt` 生产会话、root/keyring、Signer/KMS、磁盘 VFS 与 Host 接线仍未覆盖。
 
 ## Rollback checkpoint V2
 
