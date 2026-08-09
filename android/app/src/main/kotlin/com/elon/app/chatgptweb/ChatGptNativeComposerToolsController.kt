@@ -12,7 +12,6 @@ internal class ChatGptNativeComposerToolsController(
     private val modelButton: Button,
     private val attachmentButton: ImageButton,
     private val toolsButton: ImageButton,
-    private val onChooseAttachments: () -> Unit,
     private val onRequestModelOptions: () -> Unit,
     private val onRequestTools: () -> Unit,
     private val onSelectModelOption: (String) -> Unit,
@@ -20,7 +19,7 @@ internal class ChatGptNativeComposerToolsController(
     private val onOpenOfficialModelSelector: () -> Unit,
     private val onOpenOfficialTools: () -> Unit,
 ) {
-    private enum class Section { MODEL, TOOLS }
+    private enum class Section { MODEL, TOOLS, ATTACHMENTS }
 
     private var bridgeReady = false
     private var snapshot: ChatGptWebSnapshot? = null
@@ -32,7 +31,10 @@ internal class ChatGptNativeComposerToolsController(
             pendingSection = Section.MODEL
             onRequestModelOptions()
         }
-        attachmentButton.setOnClickListener { onChooseAttachments() }
+        attachmentButton.setOnClickListener {
+            pendingSection = Section.ATTACHMENTS
+            onRequestTools()
+        }
         toolsButton.setOnClickListener {
             pendingSection = Section.TOOLS
             onRequestTools()
@@ -49,14 +51,23 @@ internal class ChatGptNativeComposerToolsController(
     }
 
     fun render(event: ChatGptWebEvent.ComposerControls) {
-        val section = when (event.section) {
+        val eventSection = when (event.section) {
             "model" -> Section.MODEL
             "tools" -> Section.TOOLS
             else -> return
         }
-        if (section != pendingSection) return
+        val section = when {
+            eventSection == Section.TOOLS && pendingSection == Section.ATTACHMENTS -> Section.ATTACHMENTS
+            eventSection == pendingSection -> eventSection
+            else -> return
+        }
         if (event.currentModel.isNotBlank()) modelButton.text = event.currentModel
-        showOptions(section, event.options)
+        val options = if (section == Section.ATTACHMENTS) {
+            event.options.filter(::isAttachmentOption)
+        } else {
+            event.options
+        }
+        showOptions(section, options)
     }
 
     fun onCommandResult(event: ChatGptWebEvent.CommandResult) {
@@ -85,6 +96,8 @@ internal class ChatGptNativeComposerToolsController(
             .setTitle(
                 if (section == Section.MODEL) {
                     R.string.chatgpt_native_model_title
+                } else if (section == Section.ATTACHMENTS) {
+                    R.string.chatgpt_native_attachment
                 } else {
                     R.string.chatgpt_native_tools_title
                 },
@@ -111,6 +124,11 @@ internal class ChatGptNativeComposerToolsController(
         if (section == Section.MODEL) onOpenOfficialModelSelector() else onOpenOfficialTools()
     }
 
+    private fun isAttachmentOption(option: ChatGptWebComposerOption): Boolean {
+        val label = option.label.trim().lowercase()
+        return label in ATTACHMENT_LABELS || label.startsWith("upload ")
+    }
+
     private fun updateControls() {
         val capabilities = snapshot?.capabilities ?: ChatGptWebCapabilities.EMPTY
         updateButton(modelButton, bridgeReady && capabilities.supports(ChatGptWebCapabilityId.MODEL_SELECTOR))
@@ -128,6 +146,21 @@ internal class ChatGptNativeComposerToolsController(
 
     private companion object {
         const val DISABLED_ALPHA = 0.4f
-        val REQUEST_ACTIONS = setOf("list_model_options", "list_composer_tools")
+        val REQUEST_ACTIONS = setOf(
+            "list_model_options",
+            "list_composer_tools",
+            "collect_model_options",
+            "collect_composer_tools",
+        )
+        val ATTACHMENT_LABELS = setOf(
+            "相机",
+            "照片",
+            "文件",
+            "camera",
+            "photo",
+            "photos",
+            "file",
+            "files",
+        )
     }
 }

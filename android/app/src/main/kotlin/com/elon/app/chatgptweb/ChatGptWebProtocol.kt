@@ -41,6 +41,12 @@ internal sealed interface ChatGptWebEvent {
         val options: List<ChatGptWebComposerOption>,
     ) : ChatGptWebEvent
 
+    data class WebTouchRequest(
+        val purpose: String,
+        val xRatio: Double,
+        val yRatio: Double,
+    ) : ChatGptWebEvent
+
     data class CommandResult(
         val action: String,
         val ok: Boolean,
@@ -59,6 +65,7 @@ internal object ChatGptWebProtocol {
                     parseConversations(event),
                 )
                 "composer_controls_snapshot" -> parseComposerControls(event)
+                "web_touch_request" -> parseWebTouchRequest(event)
                 else -> null
             }
         }
@@ -134,6 +141,16 @@ internal object ChatGptWebProtocol {
         )
     }
 
+    private fun parseWebTouchRequest(event: JSONObject): ChatGptWebEvent.WebTouchRequest? {
+        val purpose = event.optString("purpose")
+        if (purpose !in SUPPORTED_TOUCH_PURPOSES) return null
+        val xRatio = event.optDouble("xRatio", Double.NaN)
+        val yRatio = event.optDouble("yRatio", Double.NaN)
+        if (!xRatio.isFinite() || !yRatio.isFinite()) return null
+        if (xRatio !in 0.0..1.0 || yRatio !in 0.0..1.0) return null
+        return ChatGptWebEvent.WebTouchRequest(purpose, xRatio, yRatio)
+    }
+
     private fun parseConversations(event: JSONObject): List<ChatGptWebConversation> {
         val items = event.optJSONArray("conversations") ?: return emptyList()
         return buildList {
@@ -181,6 +198,15 @@ internal object ChatGptWebProtocol {
     private val SUPPORTED_MESSAGE_STATES = setOf("completed", "streaming")
     private val SUPPORTED_CONTENT_TYPES = setOf("text", "markdown")
     private val SUPPORTED_COMPOSER_SECTIONS = setOf("model", "tools")
+    private val SUPPORTED_TOUCH_PURPOSES = setOf(
+        "list_model_options",
+        "list_composer_tools",
+        "select_model_option",
+        "select_composer_tool",
+        "open_model_selector",
+        "open_composer_tools",
+        "start_dictation",
+    )
     private const val MAX_MESSAGES = 80
     private const val MAX_MESSAGE_LENGTH = 40_000
     private const val MAX_CONTENT_PARTS = 20

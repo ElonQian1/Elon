@@ -108,19 +108,17 @@ internal class ChatGptWebPageAdapter(
 
     fun startGoogleLogin() = runCommand("start_google_login")
 
-    fun chooseAttachments() = runCommand("choose_attachments")
-
     fun listModelOptions() = runCommand("list_model_options")
 
     fun listComposerTools() = runCommand("list_composer_tools")
 
+    fun collectModelOptions() = runCommand("collect_model_options")
+
+    fun collectComposerTools() = runCommand("collect_composer_tools")
+
     fun selectModelOption(id: String) = runCommand("select_model_option", id.take(MAX_OPTION_ID_LENGTH))
 
     fun selectComposerTool(id: String) = runCommand("select_composer_tool", id.take(MAX_OPTION_ID_LENGTH))
-
-    fun openModelSelector() = runCommand("open_model_selector")
-
-    fun openComposerTools() = runCommand("open_composer_tools")
 
     fun requestSnapshot() = runCommand("snapshot")
 
@@ -150,6 +148,7 @@ internal class ChatGptWebPageAdapter(
         is ChatGptWebEvent.Snapshot -> value.authenticated || value.composerReady
         is ChatGptWebEvent.ConversationList,
         is ChatGptWebEvent.ComposerControls,
+        is ChatGptWebEvent.WebTouchRequest,
         is ChatGptWebEvent.CommandResult -> true
     }
 

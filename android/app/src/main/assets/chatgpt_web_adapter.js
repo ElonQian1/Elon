@@ -237,14 +237,17 @@
       );
     }
     if (action === 'start_google_login') return startGoogleLogin();
-    if (action === 'choose_attachments' && composerAdapter) {
-      return composerAdapter.chooseAttachments(result);
-    }
     if (action === 'list_model_options' && composerAdapter) {
       return composerAdapter.requestOptions('model', findComposer(), emitEvent, result);
     }
     if (action === 'list_composer_tools' && composerAdapter) {
       return composerAdapter.requestOptions('tools', findComposer(), emitEvent, result);
+    }
+    if (action === 'collect_model_options' && composerAdapter) {
+      return composerAdapter.collectRequestedOptions('model', findComposer(), emitEvent, result);
+    }
+    if (action === 'collect_composer_tools' && composerAdapter) {
+      return composerAdapter.collectRequestedOptions('tools', findComposer(), emitEvent, result);
     }
     if (action === 'select_model_option' && composerAdapter) {
       return composerAdapter.selectOption(
@@ -257,13 +260,13 @@
       );
     }
     if (action === 'open_model_selector' && composerAdapter) {
-      return composerAdapter.openOfficial('model', findComposer(), result);
+      return composerAdapter.openOfficial('model', findComposer(), emitEvent, result);
     }
     if (action === 'open_composer_tools' && composerAdapter) {
-      return composerAdapter.openOfficial('tools', findComposer(), result);
+      return composerAdapter.openOfficial('tools', findComposer(), emitEvent, result);
     }
     if (action === 'start_dictation' && composerAdapter) {
-      return composerAdapter.startDictation(findComposer(), result);
+      return composerAdapter.startDictation(findComposer(), emitEvent, result);
     }
     if (action === 'list_conversations' && conversationAdapter) {
       return conversationAdapter.requestList(emitEvent, result);

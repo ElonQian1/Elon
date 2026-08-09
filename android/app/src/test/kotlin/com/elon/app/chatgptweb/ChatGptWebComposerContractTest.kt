@@ -21,14 +21,15 @@ class ChatGptWebComposerContractTest {
 
         assertTrue(pageAdapter.contains("chatgpt_web_adapter_composer.js"))
         assertTrue(core.contains("composerAdapter.capabilities(findComposer())"))
-        assertTrue(core.contains("action === 'choose_attachments'"))
         assertTrue(core.contains("action === 'list_model_options'"))
         assertTrue(core.contains("action === 'list_composer_tools'"))
         assertTrue(adapter.contains("#upload-fast-tools-files"))
         assertTrue(adapter.contains("#composer-plus-btn"))
         assertTrue(adapter.contains("composer_controls_snapshot"))
-        assertTrue(adapter.contains("const baseline = new Set(visibleOptionNodes())"))
+        assertTrue(adapter.contains("baseline: new Set(visibleOptionNodes())"))
         assertTrue(adapter.contains("!baseline.has(node)"))
+        assertTrue(adapter.contains("web_touch_request"))
+        assertFalse(adapter.contains("input.click()"))
         assertTrue(adapter.contains("选项已过期"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {
             assertFalse("composer adapter must not contain $it", adapter.contains(it))
@@ -73,6 +74,25 @@ class ChatGptWebComposerContractTest {
         assertTrue(controller.contains("ChatGptWebCapabilityId.ATTACHMENTS"))
         assertTrue(controller.contains("ChatGptWebCapabilityId.COMPOSER_TOOLS"))
         assertTrue(controller.contains("bridgeReady && capabilities.supports"))
+    }
+
+    @Test
+    fun trustedWebTouchesAreWhitelistedAndStayInsideTheCurrentWebView() {
+        val dispatcher = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTouchDispatcher.kt",
+        )
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt",
+        )
+
+        assertTrue(dispatcher.contains("request.purpose in ALLOWED_PURPOSES"))
+        assertTrue(dispatcher.contains("supportsEnhancedMode(webView.url)"))
+        assertTrue(dispatcher.contains("webView.dispatchTouchEvent(down)"))
+        assertTrue(dispatcher.contains("webView.dispatchTouchEvent(up)"))
+        assertFalse(dispatcher.contains("Instrumentation"))
+        assertFalse(dispatcher.contains("AccessibilityService"))
+        assertTrue(activity.contains("pageAdapter::collectModelOptions"))
+        assertTrue(activity.contains("pageAdapter::collectComposerTools"))
     }
 
     private fun readRepositoryFile(relativePath: String): String =

@@ -23,6 +23,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
     private lateinit var pageAdapter: ChatGptWebPageAdapter
     private lateinit var nativeController: ChatGptNativeConversationController
     private lateinit var composerToolsController: ChatGptNativeComposerToolsController
+    private lateinit var touchDispatcher: ChatGptWebTouchDispatcher
     private lateinit var conversationListController: ChatGptNativeConversationListController
     private lateinit var loginController: ChatGptNativeLoginController
     private lateinit var googleAccountHintController: ChatGptGoogleAccountHintController
@@ -98,13 +99,12 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             modelButton = binding.chatGptNativeModel,
             attachmentButton = binding.chatGptNativeAttachment,
             toolsButton = binding.chatGptNativeTools,
-            onChooseAttachments = { pageAdapter.chooseAttachments() },
             onRequestModelOptions = { pageAdapter.listModelOptions() },
             onRequestTools = { pageAdapter.listComposerTools() },
             onSelectModelOption = { pageAdapter.selectModelOption(it) },
             onSelectTool = { pageAdapter.selectComposerTool(it) },
-            onOpenOfficialModelSelector = { openOfficialControl(pageAdapter::openModelSelector) },
-            onOpenOfficialTools = { openOfficialControl(pageAdapter::openComposerTools) },
+            onOpenOfficialModelSelector = { modeController.select(ChatGptWebModeController.Mode.WEB) },
+            onOpenOfficialTools = { modeController.select(ChatGptWebModeController.Mode.WEB) },
         )
         conversationListController = ChatGptNativeConversationListController(
             activity = this,
@@ -118,6 +118,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onEvent = ::handleBridgeEvent,
             onStateChanged = ::handleBridgeState,
         )
+        touchDispatcher = ChatGptWebTouchDispatcher(binding.chatGptWebView)
 
         modeController = ChatGptWebModeController(
             window = window,
@@ -262,6 +263,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
         when (event) {
             is ChatGptWebEvent.ConversationList -> conversationListController.render(event.conversations)
             is ChatGptWebEvent.ComposerControls -> composerToolsController.render(event)
+            is ChatGptWebEvent.WebTouchRequest -> handleWebTouchRequest(event)
             is ChatGptWebEvent.Snapshot -> {
                 nativeController.render(event.value)
                 composerToolsController.render(event.value)
@@ -292,6 +294,27 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 } else {
                     pageAdapter.requestSnapshot()
                 }
+            }
+        }
+    }
+
+    private fun handleWebTouchRequest(event: ChatGptWebEvent.WebTouchRequest) {
+        touchDispatcher.dispatch(event) { dispatched ->
+            if (!dispatched) {
+                showError(getString(R.string.chatgpt_native_command_failed))
+                return@dispatch
+            }
+            when (event.purpose) {
+                "list_model_options" -> binding.chatGptWebView.postDelayed(
+                    pageAdapter::collectModelOptions,
+                    COMPOSER_MENU_SETTLE_MS,
+                )
+                "list_composer_tools" -> binding.chatGptWebView.postDelayed(
+                    pageAdapter::collectComposerTools,
+                    COMPOSER_MENU_SETTLE_MS,
+                )
+                "select_model_option", "select_composer_tool" ->
+                    binding.chatGptWebView.postDelayed(pageAdapter::requestSnapshot, COMPOSER_MENU_SETTLE_MS)
             }
         }
     }
@@ -327,11 +350,6 @@ class ChatGptWebTestActivity : AppCompatActivity() {
                 ChatGptWebModeController.Mode.WEB -> R.string.chatgpt_web_ready
             },
         )
-    }
-
-    private fun openOfficialControl(action: () -> Unit) {
-        modeController.select(ChatGptWebModeController.Mode.WEB)
-        binding.chatGptWebView.post(action)
     }
 
     private fun statusWithProxy(messageResource: Int): String =
@@ -426,5 +444,9 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             destroy()
         }
         super.onDestroy()
+    }
+
+    private companion object {
+        const val COMPOSER_MENU_SETTLE_MS = 320L
     }
 }

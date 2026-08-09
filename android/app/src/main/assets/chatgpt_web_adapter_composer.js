@@ -5,6 +5,7 @@
 
   const MAX_OPTIONS = 30;
   let lastOptions = { model: [], tools: [] };
+  let pendingOptions = { model: null, tools: null };
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -142,16 +143,6 @@
     }).filter(Boolean).slice(0, MAX_OPTIONS);
   }
 
-  function dismissMenu(trigger, openedOptions) {
-    const target = document.activeElement || document;
-    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
-    target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', bubbles: true }));
-    window.setTimeout(() => {
-      const stillOpen = openedOptions.some((option) => isVisible(option.node));
-      if (stillOpen && trigger && isVisible(trigger)) trigger.click();
-    }, 80);
-  }
-
   function waitForOptions(section, baseline, onReady, onTimeout) {
     const started = Date.now();
     function poll() {
@@ -177,22 +168,47 @@
     });
   }
 
+  function emitTouchRequest(purpose, node, emitEvent) {
+    if (!isVisible(node)) return false;
+    const rect = node.getBoundingClientRect();
+    const width = Math.max(1, window.innerWidth);
+    const height = Math.max(1, window.innerHeight);
+    const xRatio = (rect.left + rect.width / 2) / width;
+    const yRatio = (rect.top + rect.height / 2) / height;
+    if (xRatio < 0 || xRatio > 1 || yRatio < 0 || yRatio > 1) return false;
+    emitEvent({ type: 'web_touch_request', purpose, xRatio, yRatio });
+    return true;
+  }
+
   function requestOptions(section, composer, emitEvent, result) {
     const action = section === 'model' ? 'list_model_options' : 'list_composer_tools';
     const trigger = triggerFor(section, composer);
     if (!trigger) return result(action, false, '官网当前没有可用入口。');
-    const baseline = new Set(visibleOptionNodes());
-    trigger.click();
+    pendingOptions[section] = {
+      baseline: new Set(visibleOptionNodes()),
+      trigger
+    };
+    if (!emitTouchRequest(action, trigger, emitEvent)) {
+      pendingOptions[section] = null;
+      return result(action, false, '官网入口当前不可见。');
+    }
+    result(action, true, '');
+  }
+
+  function collectRequestedOptions(section, composer, emitEvent, result) {
+    const action = section === 'model' ? 'collect_model_options' : 'collect_composer_tools';
+    const pending = pendingOptions[section];
+    if (!pending) return result(action, false, '没有等待读取的官网菜单。');
     waitForOptions(
       section,
-      baseline,
+      pending.baseline,
       (options) => {
+        pendingOptions[section] = null;
         emitOptions(section, options, composer, emitEvent);
         result(action, true, '');
-        dismissMenu(trigger, options);
       },
       () => {
-        dismissMenu(trigger, []);
+        pendingOptions[section] = null;
         result(action, false, '官网菜单尚未返回可用选项，请切换官方网页。');
       }
     );
@@ -203,54 +219,41 @@
     if (!lastOptions[section].some((option) => option.id === id)) {
       return result(action, false, '选项已过期，请重新打开列表。');
     }
-    const trigger = triggerFor(section, composer);
-    if (!trigger) return result(action, false, '官网当前没有可用入口。');
-    const baseline = new Set(visibleOptionNodes());
-    trigger.click();
-    waitForOptions(
-      section,
-      baseline,
-      (options) => {
-        const target = options.find((option) => option.id === id);
-        if (!target) {
-          dismissMenu(trigger, options);
-          return result(action, false, '官网选项已经变化，请重新选择。');
-        }
-        target.node.click();
-        result(action, true, '');
-        window.setTimeout(scheduleSnapshot, 180);
-      },
-      () => result(action, false, '官网菜单尚未就绪，请切换官方网页。')
-    );
+    const target = lastOptions[section].find((option) => option.id === id);
+    if (!target || !isVisible(target.node)) {
+      return result(action, false, '官网菜单已经关闭，请重新选择。');
+    }
+    if (!emitTouchRequest(action, target.node, emitEvent)) {
+      return result(action, false, '官网选项当前不可见。');
+    }
+    result(action, true, '');
+    window.setTimeout(scheduleSnapshot, 240);
   }
 
-  function chooseAttachments(result) {
-    const input = findAttachmentInput();
-    if (!input) return result('choose_attachments', false, '官网当前没有附件入口。');
-    input.click();
-    result('choose_attachments', true, '');
-  }
-
-  function startDictation(composer, result) {
+  function startDictation(composer, emitEvent, result) {
     const button = findDictationButton(composer);
     if (!button) return result('start_dictation', false, '官网当前没有听写入口。');
-    button.click();
+    if (!emitTouchRequest('start_dictation', button, emitEvent)) {
+      return result('start_dictation', false, '官网听写入口当前不可见。');
+    }
     result('start_dictation', true, '');
   }
 
-  function openOfficial(section, composer, result) {
+  function openOfficial(section, composer, emitEvent, result) {
     const action = section === 'model' ? 'open_model_selector' : 'open_composer_tools';
     const trigger = triggerFor(section, composer);
     if (!trigger) return result(action, false, '官网当前没有可用入口。');
-    trigger.click();
+    if (!emitTouchRequest(action, trigger, emitEvent)) {
+      return result(action, false, '官网入口当前不可见。');
+    }
     result(action, true, '');
   }
 
   window.__elonChatGptComposer = Object.freeze({
     capabilities,
     currentModel,
-    chooseAttachments,
     requestOptions,
+    collectRequestedOptions,
     selectOption,
     startDictation,
     openOfficial

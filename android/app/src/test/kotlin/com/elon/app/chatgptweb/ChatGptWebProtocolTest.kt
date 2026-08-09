@@ -79,6 +79,36 @@ class ChatGptWebProtocolTest {
     }
 
     @Test
+    fun acceptsOnlyBoundedWhitelistedWebTouchRequests() {
+        val event = ChatGptWebProtocol.parse(
+            """
+            {
+              "schema":"yilong.ai.ui.v1",
+              "event":{
+                "type":"web_touch_request",
+                "purpose":"list_composer_tools",
+                "xRatio":0.15,
+                "yRatio":0.91
+              }
+            }
+            """.trimIndent(),
+        ) as ChatGptWebEvent.WebTouchRequest
+
+        assertEquals("list_composer_tools", event.purpose)
+        assertEquals(0.15, event.xRatio, 0.0)
+        assertNull(
+            ChatGptWebProtocol.parse(
+                """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"tap_anywhere","xRatio":0.5,"yRatio":0.5}}""",
+            ),
+        )
+        assertNull(
+            ChatGptWebProtocol.parse(
+                """{"schema":"yilong.ai.ui.v1","event":{"type":"web_touch_request","purpose":"list_composer_tools","xRatio":1.5,"yRatio":0.5}}""",
+            ),
+        )
+    }
+
+    @Test
     fun parsesBoundedConversationListsAndRejectsUnsafePaths() {
         val event = ChatGptWebProtocol.parse(
             """
