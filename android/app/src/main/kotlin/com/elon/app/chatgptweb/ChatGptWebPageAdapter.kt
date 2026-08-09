@@ -123,6 +123,7 @@ internal class ChatGptWebPageAdapter(
 
     private fun ChatGptWebEvent.completesHandshake(): Boolean = when (this) {
         is ChatGptWebEvent.Snapshot -> value.authenticated || value.composerReady
+        is ChatGptWebEvent.ConversationList,
         is ChatGptWebEvent.CommandResult -> true
     }
 

@@ -228,6 +228,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
 
     private fun handleBridgeEvent(event: ChatGptWebEvent) {
         when (event) {
+            is ChatGptWebEvent.ConversationList -> Unit
             is ChatGptWebEvent.Snapshot -> {
                 nativeController.render(event.value)
                 if (

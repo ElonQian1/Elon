@@ -16,10 +16,15 @@ internal data class ChatGptWebSnapshot(
     val authenticated: Boolean,
     val composerReady: Boolean,
     val streaming: Boolean,
+    val capabilities: ChatGptWebCapabilities,
 )
 
 internal sealed interface ChatGptWebEvent {
     data class Snapshot(val value: ChatGptWebSnapshot) : ChatGptWebEvent
+
+    data class ConversationList(
+        val conversations: List<ChatGptWebConversation>,
+    ) : ChatGptWebEvent
 
     data class CommandResult(
         val action: String,
@@ -35,6 +40,9 @@ internal object ChatGptWebProtocol {
             val event = payload.optJSONObject("event") ?: return null
             return when (event.optString("type")) {
                 "message_snapshot" -> ChatGptWebEvent.Snapshot(parseSnapshot(event))
+                "conversation_snapshot" -> ChatGptWebEvent.ConversationList(
+                    parseConversations(event),
+                )
                 else -> null
             }
         }
@@ -75,7 +83,40 @@ internal object ChatGptWebProtocol {
             authenticated = event.optBoolean("authenticated"),
             composerReady = event.optBoolean("composerReady"),
             streaming = event.optBoolean("streaming"),
+            capabilities = ChatGptWebCapabilities(parseStringSet(event, "capabilities")),
         )
+    }
+
+    private fun parseConversations(event: JSONObject): List<ChatGptWebConversation> {
+        val items = event.optJSONArray("conversations") ?: return emptyList()
+        return buildList {
+            for (index in 0 until minOf(items.length(), MAX_CONVERSATIONS)) {
+                val item = items.optJSONObject(index) ?: continue
+                val path = item.optString("path").take(MAX_PATH_LENGTH)
+                if (!CONVERSATION_PATH.matches(path)) continue
+                val id = item.optString("id").ifBlank { path.removePrefix("/c/") }
+                val title = item.optString("title").trim().take(MAX_TITLE_LENGTH)
+                if (title.isBlank()) continue
+                add(
+                    ChatGptWebConversation(
+                        id = id.take(MAX_ID_LENGTH),
+                        title = title,
+                        path = path,
+                        active = item.optBoolean("active"),
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun parseStringSet(payload: JSONObject, key: String): Set<String> {
+        val values = payload.optJSONArray(key) ?: return emptySet()
+        return buildSet {
+            for (index in 0 until minOf(values.length(), MAX_CAPABILITIES)) {
+                val value = values.optString(index).trim().take(MAX_CAPABILITY_LENGTH)
+                if (CAPABILITY_ID.matches(value)) add(value)
+            }
+        }
     }
 
     private fun textContent(message: JSONObject): String {
@@ -94,4 +135,12 @@ internal object ChatGptWebProtocol {
     private const val MAX_MESSAGE_LENGTH = 40_000
     private const val MAX_CONTENT_PARTS = 20
     private const val MAX_DRAFT_LENGTH = 20_000
+    private const val MAX_CONVERSATIONS = 100
+    private const val MAX_CAPABILITIES = 40
+    private const val MAX_CAPABILITY_LENGTH = 48
+    private const val MAX_TITLE_LENGTH = 160
+    private const val MAX_PATH_LENGTH = 256
+    private const val MAX_ID_LENGTH = 160
+    private val CAPABILITY_ID = Regex("[a-z][a-z0-9_]{0,47}")
+    private val CONVERSATION_PATH = Regex("/c/[A-Za-z0-9_-]{1,160}")
 }
