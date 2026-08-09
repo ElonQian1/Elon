@@ -265,6 +265,69 @@ fn failed_generation_restart_reuses_the_clean_owned_worktree() {
 }
 
 #[test]
+fn runtime_reconnect_restores_the_same_installed_generation_without_reinstalling() {
+    let repo = RepositoryFixture::new("runtime-reconnect");
+    let (source, commit) = repo.session("source", "one.txt", "one\n");
+    let coordinator = coordinator("runtime-reconnect");
+    let plan = register(
+        &coordinator,
+        &source,
+        &candidate(&repo.base, &commit, "source"),
+    );
+    coordinator.materialize(&plan).unwrap();
+    coordinator.mark_building(&plan).unwrap();
+    coordinator
+        .record_artifact(
+            &plan,
+            DebugArtifactStatus {
+                apk_path: "artifacts/reused.apk".into(),
+                sha256: "reused-sha".into(),
+                package_name: plan.package_name.clone(),
+                version_code: "1".into(),
+                version_name: "test".into(),
+                app_label: "一龙调试 stable-node".into(),
+                signer_sha256: "signer-a".into(),
+                generation: plan.generation,
+            },
+        )
+        .unwrap();
+    coordinator.record_deployed(&plan).unwrap();
+    coordinator
+        .record_runtime_failure(&plan, "simulated reconnect interruption".into())
+        .unwrap();
+
+    let restarted = coordinator.restart_failed_generation(&plan).unwrap();
+    assert_eq!(restarted.generation, plan.generation);
+    coordinator.confirm_reused_deployment(&restarted).unwrap();
+
+    let status = coordinator.status(&plan.slot_id).unwrap().unwrap();
+    assert_eq!(status.status, "DEPLOYED");
+    assert_eq!(status.installed_generation, Some(plan.generation));
+    assert!(status.last_error.is_none());
+}
+
+#[test]
+fn runtime_reconnect_cannot_claim_a_generation_without_install_evidence() {
+    let repo = RepositoryFixture::new("reconnect-no-install");
+    let (source, commit) = repo.session("source", "one.txt", "one\n");
+    let coordinator = coordinator("reconnect-no-install");
+    let plan = register(
+        &coordinator,
+        &source,
+        &candidate(&repo.base, &commit, "source"),
+    );
+    coordinator.materialize(&plan).unwrap();
+
+    let error = coordinator
+        .confirm_reused_deployment(&plan)
+        .expect_err("never-installed generation must fail closed");
+    assert!(error.to_string().contains("DEBUG_REUSE_NOT_DEPLOYED"));
+    let status = coordinator.status(&plan.slot_id).unwrap().unwrap();
+    assert_eq!(status.status, "MERGED");
+    assert_eq!(status.installed_generation, None);
+}
+
+#[test]
 fn unowned_failed_generation_still_allocates_a_fresh_worktree() {
     let repo = RepositoryFixture::new("unowned-failed-restart");
     let (source, commit) = repo.session("source", "one.txt", "one\n");

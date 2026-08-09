@@ -76,8 +76,6 @@ pub(super) async fn run(
         ),
     )
     .await;
-    broker.debug_integration.mark_building(integration_plan)?;
-
     report_phase(reporter, "APK_REUSE_CHECK", "检查已成功生成的 Debug APK").await;
     let build_started = Instant::now();
     let (apk, reused_apk) = match select_reusable_debug_apk(&gradle_root, &session.package_name)? {
@@ -92,6 +90,7 @@ pub(super) async fn run(
             (apk, true)
         }
         None => {
+            broker.debug_integration.mark_building(integration_plan)?;
             report_phase(
                 reporter,
                 "BUILD",
@@ -159,6 +158,9 @@ pub(super) async fn run(
         .await
         {
             RuntimeReuse::Live(runtime_view) => {
+                broker
+                    .debug_integration
+                    .confirm_reused_deployment(integration_plan)?;
                 return finalize_runtime(
                     broker,
                     session,
@@ -176,6 +178,7 @@ pub(super) async fn run(
                 .await;
             }
             RuntimeReuse::NeedsInstall(reason) => {
+                broker.debug_integration.mark_building(integration_plan)?;
                 report_evidence(reporter, "RUNTIME_RECONNECT", "INSTALL_REQUIRED", reason).await;
             }
         }

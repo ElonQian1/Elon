@@ -361,6 +361,20 @@ impl DebugIntegrationCoordinator {
         })
     }
 
+    pub(crate) fn confirm_reused_deployment(&self, plan: &DebugIntegrationPlan) -> Result<()> {
+        let current = self.assert_current(plan)?;
+        if current.installed_generation != Some(plan.generation) {
+            bail!(
+                "DEBUG_REUSE_NOT_DEPLOYED: 代次 {} 没有匹配的既有安装证据，拒绝把 Runtime 重连冒充部署完成",
+                plan.generation
+            );
+        }
+        self.update(plan, |status| {
+            status.status = "DEPLOYED".into();
+            status.last_error = None;
+        })
+    }
+
     pub(crate) fn record_legacy_packages(
         &self,
         plan: &DebugIntegrationPlan,

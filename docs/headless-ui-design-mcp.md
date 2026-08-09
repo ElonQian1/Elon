@@ -1,6 +1,6 @@
 ---
 version_status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-09
 ---
 
 # 后台多端 UI 设计 MCP
@@ -28,7 +28,7 @@ reviewed_at: 2026-08-05
 - 安全交互支持 `click`、`waitFor`、`assertText`、`scrollIntoView`、白名单键盘键、checkbox/radio、select 和非秘密表单填入。表单值只能引用项目内已审查 `fixtureProfile.formValues` 的 key，MCP/PC 不传真实值；password、hidden、file 与疑似秘密键值失败关闭。
 - 每次成功捕获同时生成 PNG 和紧凑语义 UI 树，两者都只返回绝对路径、SHA-256 和小型元数据，不返回 Base64。
 - AI 可按 selector、role、label 或 tag 查询 UI 树，默认最多读取 40 个节点，单次最多 80 个。
-- Android 继续复用既有 Android Live Runtime；Runtime 未连接时明确返回 `PREPARATION_REQUIRED`，不会用浏览器画面冒充 Android。普通验证找不到 emulator、AVD 或空闲 Renderer 时返回结构化 `VERIFICATION_DEFERRED`，包含有界脱敏错误码和恢复动作，固定 `capabilityGapRequired=false`；除非用户明确要求或反馈视觉不正确，不探测或回退到物理设备。
+- Android 继续复用既有 Android Live Runtime；Runtime 未连接时明确返回 `PREPARATION_REQUIRED`，不会用浏览器画面冒充 Android。普通验证找不到 emulator、AVD 或空闲 Renderer 时返回结构化 `VERIFICATION_DEFERRED`，包含有界脱敏错误码和恢复动作，固定 `capabilityGapRequired=false`；除非用户明确要求或反馈视觉不正确，不探测或回退到物理设备。后台重连复用 APK 时，只允许与当前 generation 相同的安装证据恢复 `DEPLOYED`；缺少同代安装证据时以 `DEBUG_REUSE_NOT_DEPLOYED` 失败关闭，不重新安装也不会把 `BUILDING` 冒充已部署。
 - Tauri 目标可按 `ui_prepare_tauri_runtime -> ui_capture_tauri_host -> ui_capture_tauri_behavior -> ui_stop_tauri_runtime` 管理项目发现出的开发命令，且只枚举该 Runtime 的后代进程。没有全局 `cargo-tauri` 时，Cargo-only 项目回退到 `cargo run --manifest-path <src-tauri/Cargo.toml>`，仍不接受任意命令。Windows 原生窗口通过 `PrintWindow` 保存 PNG、边界、PID 和 SHA-256；行为层另外只读原生菜单、候选系统对话框和项目显式写入的严格 command trace。
 - Tauri 证据分层为 `TAURI_NATIVE_WINDOW`、`WIN32_NATIVE_MENU_OBSERVED`、`DESCENDANT_TOP_LEVEL_WINDOWS_OBSERVED` 与 `PROJECT_INSTRUMENTED_TRACE/NOT_INSTRUMENTED`。项目 trace 不含 command 参数或结果正文，不能冒充操作系统证明；数据面不提供任意菜单点击或任意 Rust command 执行。
 - Web、PWA、Tauri 和 Android 共用项目级 Design Draft v2：除兼容 style patch 外，可表达 `SET_STYLE`、`SET_TEXT`、`REPLACE_ASSET`、`SET_VARIANT`、节点增删移动和 `SET_RESPONSIVE_STYLE`；每项按平台标记 `LIVE_PREVIEW`、`SOURCE_HANDOFF` 或 `UNSUPPORTED`。草稿继续使用乐观 revision、最多 50 层内部历史和单步撤销，MCP 不回传完整历史。
@@ -56,7 +56,16 @@ v1.12 正式门禁已完成：PC 全量 TypeScript/Vite 构建、ESLint 与微�
 
 同轮 Tauri 原生证据已由真实窗口完成：1296×809 `TAURI_NATIVE_WINDOW` PNG SHA-256 为 `5e98308869ee557dc16a82774d5c5001f5560bd70004b3eb864812c0e96a9f74`；只读行为工件 SHA-256 为 `f93693746c6f92c00093b83e65210bd00f891593baeeab6544243ee491088628`，菜单/候选对话框为 0、断言通过、Rust command coverage 为 `NOT_INSTRUMENTED`。这证明当前窗口和受限行为扫描，不把未插桩 command trace 冒充已验证。
 
-Android 隔离验证实际执行到设备选择阶段，但本机未安装 emulator，返回 `VERIFICATION_DEFERRED`、`ANDROID_RENDERER=UNAVAILABLE`、`REAL_DEVICE_STATUS=NOT_REQUIRED`、`capabilityGapRequired=false` 和恢复动作 `INSTALL_ANDROID_EMULATOR`；未使用已在线的物理设备。它证明延期合同可用，不代表 Android 视觉、FitRun、跨端像素损失或人工验收已经通过。
+同日补齐 Android 隔离模拟器验收：在 API 34 Google APIs x86_64 AVD `elon_ui_android34` 上安装隔离包 `com.elon.app.uitest_398d0d9d`（`1.1.454-uitest_398d0d9d+462`），Runtime 回读 generation 1、源码奇偶损失 0，并只用语义节点进入与生产 PWA 相同的未登录页面。Android 1080×2400 PNG SHA-256 为 `8268d22b08b1dfef26c8ad36ba1a07045a7462a53bcad40b580528bf4ed118d9`；生产 PWA 390×844 PNG SHA-256 为 `fc2c3ab31bded675722c1462b97764cd40fbc4301d75d5b6dd2a078cbec0320a`。比较先裁掉 Android 系统栏，再用 Lanczos 缩放到 390×844，归一化 RGB MAE 为 `0.099874198`，低于任务阈值 `0.12`。正式 UI 任务 `goal-multiplatform-ui-20260809` 返回 `VERIFIED`、`completionReady=true`、`businessDeliveryReady=true`，`CAPABILITIES` 与 `CROSS_PLATFORM_VISUAL_PARITY` 均为 `PASSED`；因没有干净目标图，FitRun 按合同为 `NOT_REQUIRED_WITHOUT_CLEAN_TARGET`。整个过程未打开 PC 微调画布、未使用可见浏览器，也未探测或操作在线物理设备。
+
+四端证据矩阵是聚合既有真实写回 receipt 和本轮 Android 正式任务门禁所得，不为生成矩阵伪造无操作草稿：
+
+| 平台 | 源码/构建证据 | 最终界面与行为证据 | 状态 |
+|---|---|---|---|
+| Web | 双审批精确补丁；`BUILD_VERIFIED` | 新构建重捕获；本机回归仅 1 个允许语义变化、像素差 0 | `PASSED` |
+| PWA | 同一写回 receipt；`BUILD_VERIFIED` | 390×844 生产未登录页面；与 Android 同状态比较 | `PASSED` |
+| Tauri | 同一写回 receipt；`BUILD_VERIFIED` | 1296×809 原生窗口 SHA `5e983088…`；行为 SHA `f9369374…`；command trace `NOT_INSTRUMENTED` | `PASSED`（已声明未插桩边界） |
+| Android | 隔离 APK、generation/source proof、patch-free build | 语义进入未登录页；截图 SHA `8268d22b…`；PWA 归一化 MAE `0.099874198 <= 0.12` | `PASSED` |
 
 ## 3. 代理的标准调用顺序
 
@@ -279,7 +288,8 @@ PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作
 4. 已完成：本机发布、自动激活和能力回读；激活器只接受正式安装 listener，7800 候选节点不能推进正式发布状态。旧节点 CLI/Exec 的独立兼容矩阵仍可继续扩展。
 5. 已完成正式运行验收：source patch 漂移/`APPLYING` 恢复、可变长度 rollback offset、本机比较器 artifact/SHA/阈值 PASS/FAIL；正式 7799 节点已回读 v1.12，并在不打开画布的独立 MCP 连接中持久化 Web 比较 `PASSED` 回执。
 6. 已完成：PWA 独立目标的大仓库发现、页面诊断、完整语义 selector、后台点击/断言；Tauri Cargo-only 启动回退、原生窗口和受限行为证据；真实 source binding、双审批源码补丁、构建、三端重捕获、回归比较和 Web/PWA/Tauri `PASSED` 写回矩阵。
-7. 待环境具备后补：Android 隔离 emulator/AVD 的真实 Renderer、FitRun 与跨端视觉损失。当前为 `VERIFICATION_DEFERRED` 而非代码 capability gap；只有用户明确要求或反馈视觉不正确时再做真机复核。项目 command trace 仍需项目自行插桩后才能从 `NOT_INSTRUMENTED` 升级为证据。
+7. 已完成：Android 隔离 API 34 emulator/AVD 的真实 Runtime、源码奇偶、语义交互、最终截图与 PWA 同状态跨端视觉损失；任务门禁为 `VERIFIED`，无干净目标图时 FitRun 为 `NOT_REQUIRED_WITHOUT_CLEAN_TARGET`。真机仍只在用户明确要求或反馈视觉不正确时复核；项目 command trace 仍需项目自行插桩后才能从 `NOT_INSTRUMENTED` 升级为证据。
+8. 已修复并覆盖定向测试：同代已安装 APK 的后台 Runtime 重连恢复 `DEPLOYED`；没有同代安装证据时失败关闭，避免复用路径把集成状态永久留在 `BUILDING`。
 
 每一阶段都先扩展相同 MCP 契约；不得通过让代理操控 Windows 桌面来绕过缺失的数据面。
 
