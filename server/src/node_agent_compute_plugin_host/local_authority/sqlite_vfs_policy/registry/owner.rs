@@ -8,6 +8,7 @@ use std::{
 use super::{
     state::ManagedSqliteRegistrySessionState,
     types::{
+        ManagedSqliteRegistryCallbackKind, ManagedSqliteRegistryCallbackLease,
         ManagedSqliteRegistryRetirementReceipt, ManagedSqliteRegistryRouteRemovalProof,
         ManagedSqliteRegistrySessionId, ManagedSqliteRegistrySessionPhase,
         ManagedSqliteRegistryTerminalReason, ManagedSqliteRegistryTransitionRejection,
@@ -206,6 +207,48 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
         Ok(self.exact_entry(handle)?.state.phase())
     }
 
+    pub(super) fn begin_open_attempt(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .state
+            .begin_open_attempt()
+            .map_err(ManagedSqliteRegistryRouteRejection::State)
+    }
+
+    pub(super) fn begin_callback(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        kind: ManagedSqliteRegistryCallbackKind,
+    ) -> Result<ManagedSqliteRegistryCallbackLease, ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .state
+            .begin_callback(kind)
+            .map_err(ManagedSqliteRegistryRouteRejection::State)
+    }
+
+    pub(super) fn finish_callback(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+        lease: ManagedSqliteRegistryCallbackLease,
+    ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .state
+            .finish_callback(lease)
+            .map_err(ManagedSqliteRegistryRouteRejection::State)
+    }
+
+    pub(super) fn begin_connection_close(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<(), ManagedSqliteRegistryRouteRejection> {
+        self.exact_entry_mut(handle)?
+            .state
+            .begin_connection_close()
+            .map_err(ManagedSqliteRegistryRouteRejection::State)
+    }
+
     pub(super) fn retire_pending(
         &mut self,
         handle: ManagedSqliteRegistryRouteHandle,
@@ -259,6 +302,30 @@ impl<Custody: ManagedSqliteRegistryCustody> ManagedSqliteRegistryOwner<Custody> 
             return Err(ManagedSqliteRegistryRouteRejection::IdentityMismatch);
         }
         Ok(entry)
+    }
+
+    fn exact_entry_mut(
+        &mut self,
+        handle: ManagedSqliteRegistryRouteHandle,
+    ) -> Result<&mut ManagedSqliteRegistryEntry<Custody>, ManagedSqliteRegistryRouteRejection> {
+        let Some(entry) = self.routes.get_mut(&handle.token) else {
+            return Err(ManagedSqliteRegistryRouteRejection::UnknownOrRetired);
+        };
+        if entry.state.session_id() != handle.session_id
+            || entry.state.route_epoch() != handle.route_epoch
+        {
+            return Err(ManagedSqliteRegistryRouteRejection::IdentityMismatch);
+        }
+        Ok(entry)
+    }
+
+    pub(super) fn retain_terminal_if_present(&mut self, handle: ManagedSqliteRegistryRouteHandle) {
+        if self.phase(handle) == Ok(ManagedSqliteRegistrySessionPhase::TerminalQuarantine) {
+            let _ = self.quarantine(
+                handle,
+                ManagedSqliteRegistryTerminalReason::StateInvariantViolated,
+            );
+        }
     }
 
     fn exhausted(&self, custody: Custody) -> ManagedSqliteRegistryRegistrationFailure<Custody> {
