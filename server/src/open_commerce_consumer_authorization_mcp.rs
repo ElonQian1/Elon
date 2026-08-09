@@ -5,7 +5,9 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{
-    open_commerce_client_lifecycle_service, open_commerce_service::OpenCommerceActor, store::Store,
+    open_commerce_client_lifecycle_service,
+    open_commerce_developer_model::OpenCommerceAuthorizationRequest,
+    open_commerce_service::OpenCommerceActor, store::Store,
 };
 
 const LIST_MY_AUTHORIZATION_REQUESTS: &str =
@@ -118,24 +120,7 @@ pub(crate) fn call_if_handled(
                     input.limit,
                 )?
                 .into_iter()
-                .map(|request| {
-                    json!({
-                        "request_id":request.id,
-                        "merchant_id":request.merchant_id,
-                        "requester_app_id":request.requester_app_id,
-                        "scopes":request.scopes,
-                        "purpose":request.purpose,
-                        "status":request.status,
-                        "decision_reason":request.decision_reason,
-                        "grant_id":request.grant_id,
-                        "grant_expires_at":request.grant_expires_at,
-                        "grant_max_invocations":request.grant_max_invocations,
-                        "grant_max_amount_micros":request.grant_max_amount_micros,
-                        "grant_budget_currency":request.grant_budget_currency,
-                        "created_at":request.created_at,
-                        "updated_at":request.updated_at
-                    })
-                })
+                .map(|request| authorization_request_projection(&request))
                 .collect::<Vec<_>>();
             Ok(Some(json!({
                 "schema":"open_commerce.consumer_authorization_request_list.v1",
@@ -165,7 +150,7 @@ pub(crate) fn call_if_handled(
                     project_role: Some(project_role),
                 },
             )?;
-            Ok(Some(serde_json::to_value(request)?))
+            Ok(Some(authorization_request_projection(&request)))
         }
         LIST_MY_ACTIVE_GRANTS => {
             let input: ListGrantsArguments = serde_json::from_value(arguments)
@@ -209,7 +194,6 @@ pub(crate) fn call_if_handled(
                 .collect::<Vec<_>>();
             Ok(Some(json!({
                 "schema":"open_commerce.consumer_active_grants.v1",
-                "project_id":project_id,
                 "app_id_filter":input.app_id,
                 "count":grants.len(),
                 "grants":grants,
@@ -223,3 +207,29 @@ pub(crate) fn call_if_handled(
 fn default_limit() -> usize {
     50
 }
+
+fn authorization_request_projection(request: &OpenCommerceAuthorizationRequest) -> Value {
+    json!({
+        "request_id":request.id,
+        "merchant_id":request.merchant_id,
+        "requester_app_id":request.requester_app_id,
+        "scopes":request.scopes,
+        "purpose":request.purpose,
+        "status":request.status,
+        "decision_reason":request.decision_reason,
+        "grant_id":request.grant_id,
+        "grant_expires_at":request.grant_expires_at,
+        "grant_max_invocations":request.grant_max_invocations,
+        "grant_max_amount_micros":request.grant_max_amount_micros,
+        "grant_budget_currency":request.grant_budget_currency,
+        "created_at":request.created_at,
+        "updated_at":request.updated_at
+    })
+}
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_authorization_mcp_test_support.rs"]
+mod test_support;
+#[cfg(test)]
+#[path = "open_commerce_consumer_authorization_mcp_tests.rs"]
+mod tests;
