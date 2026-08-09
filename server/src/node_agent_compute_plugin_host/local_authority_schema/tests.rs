@@ -2,7 +2,7 @@ use rusqlite::Connection;
 
 use super::ensure_schema;
 
-mod versioning_v6;
+mod versioning_v7;
 
 #[test]
 fn schema_installs_and_reopens_with_candidate_health_and_cleanup_objects() {

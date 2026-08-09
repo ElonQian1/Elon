@@ -81,7 +81,7 @@ pub(super) fn read_candidate_promotion_binding(
         || owner.slot_ref != slot.slot_ref
         || owner.candidate_generation != staging_key.receipt_expectation().candidate_generation
         || owner.release != slot.release
-        || jcs_sha256_hex(staging_key.candidate_token())? != staging_key.candidate_token_digest()
+        || jcs_sha256_hex(&staging_key.candidate_token())? != staging_key.candidate_token_digest()
     {
         bail!("COMPUTE_PLUGIN_CANDIDATE_PROMOTION_OWNER_CHANGED");
     }

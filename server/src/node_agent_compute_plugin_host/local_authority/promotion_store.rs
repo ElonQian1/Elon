@@ -178,7 +178,7 @@ impl ComputePluginPostRevalidationPromotionAuthoritySession<'_> {
 
 macro_rules! fact_getter {
     ($name:ident, $field:ident, $ty:ty) => {
-        pub(in crate::node_agent_compute_plugin_host) fn $name(&self) -> $ty {
+        pub(in crate::node_agent_compute_plugin_host) fn $name(&self) -> &$ty {
             &self.$field
         }
     };

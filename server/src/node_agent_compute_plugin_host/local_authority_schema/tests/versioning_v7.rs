@@ -1,7 +1,8 @@
 use rusqlite::Connection;
 
 use super::super::{
-    create_schema_objects_v3, create_schema_objects_v4, create_schema_objects_v5, ensure_schema,
+    create_schema_objects_v3, create_schema_objects_v4, create_schema_objects_v5,
+    create_schema_objects_v6, ensure_schema,
 };
 
 const APPLICATION_ID: i64 = 0x454c_4350;
@@ -9,10 +10,13 @@ const VERSION_V3: i64 = 3;
 const VERSION_V4: i64 = 4;
 const VERSION_V5: i64 = 5;
 const VERSION_V6: i64 = 6;
+const VERSION_V7: i64 = 7;
 const PLAN_APPLICATION_TRIGGER: &str = "plan_application_matches_authority";
 const POLICY_BINDING_TABLE: &str = "sharing_policy_binding_receipts";
 const POLICY_REVOCATION_TABLE: &str = "sharing_policy_binding_revocation_receipts";
 const CATALOG_BINDING_TABLE: &str = "manifest_catalog_binding_receipts";
+const INSTALL_RECEIPT_TABLE: &str = "candidate_install_receipts";
+const PROMOTION_RECEIPT_TABLE: &str = "candidate_promotion_receipts";
 
 fn connection() -> Connection {
     let connection = Connection::open_in_memory().unwrap();
@@ -30,6 +34,7 @@ fn install_legacy(connection: &Connection, version: i64) {
         VERSION_V3 => create_schema_objects_v3(connection).unwrap(),
         VERSION_V4 => create_schema_objects_v4(connection).unwrap(),
         VERSION_V5 => create_schema_objects_v5(connection).unwrap(),
+        VERSION_V6 => create_schema_objects_v6(connection).unwrap(),
         other => panic!("unsupported legacy fixture version {other}"),
     }
     connection
@@ -66,8 +71,8 @@ fn trigger_sql(connection: &Connection, name: &str) -> String {
         .unwrap()
 }
 
-fn assert_v6_shape(connection: &Connection) {
-    assert_eq!(pragma(connection, "user_version"), VERSION_V6);
+fn assert_v7_shape(connection: &Connection) {
+    assert_eq!(pragma(connection, "user_version"), VERSION_V7);
     assert_eq!(pragma(connection, "application_id"), APPLICATION_ID);
     assert_eq!(object_count(connection, "table", POLICY_BINDING_TABLE), 1);
     assert_eq!(
@@ -75,6 +80,23 @@ fn assert_v6_shape(connection: &Connection) {
         1
     );
     assert_eq!(object_count(connection, "table", CATALOG_BINDING_TABLE), 1);
+    assert_eq!(object_count(connection, "table", INSTALL_RECEIPT_TABLE), 1);
+    assert_eq!(
+        object_count(connection, "table", PROMOTION_RECEIPT_TABLE),
+        1
+    );
+    assert_eq!(
+        object_count(connection, "trigger", "candidate_install_insert_fenced"),
+        1
+    );
+    assert_eq!(
+        object_count(
+            connection,
+            "trigger",
+            "candidate_promotion_requires_receipt"
+        ),
+        1
+    );
 
     let binding_object_count: i64 = connection
         .query_row(
@@ -99,7 +121,7 @@ fn assert_v6_shape(connection: &Connection) {
     assert!(!plan_gate.contains("NEW.applied_at_ms >= meta.trusted_time_high_water_ms"));
 }
 
-fn assert_migrates_to_v6(version: i64) {
+fn assert_migrates_to_v7(version: i64) {
     let mut connection = connection();
     install_legacy(&connection, version);
     if version == VERSION_V3 {
@@ -108,7 +130,7 @@ fn assert_migrates_to_v6(version: i64) {
     }
 
     ensure_schema(&mut connection).unwrap();
-    assert_v6_shape(&connection);
+    assert_v7_shape(&connection);
     ensure_schema(&mut connection).unwrap();
 }
 
@@ -140,50 +162,65 @@ fn assert_drift_rejected_without_later_schema(
         object_count(&connection, "table", CATALOG_BINDING_TABLE),
         expected_catalog
     );
+    assert_eq!(object_count(&connection, "table", INSTALL_RECEIPT_TABLE), 0);
+    assert_eq!(
+        object_count(&connection, "table", PROMOTION_RECEIPT_TABLE),
+        0
+    );
 }
 
 #[test]
-fn fresh_v6_installs_exact_version_chain_and_reopens() {
+fn fresh_v7_installs_exact_version_chain_and_reopens() {
     let mut connection = connection();
 
     ensure_schema(&mut connection).unwrap();
-    assert_v6_shape(&connection);
+    assert_v7_shape(&connection);
     ensure_schema(&mut connection).unwrap();
-    assert_v6_shape(&connection);
+    assert_v7_shape(&connection);
 }
 
 #[test]
-fn exact_v3_migrates_atomically_to_v6() {
-    assert_migrates_to_v6(VERSION_V3);
+fn exact_v3_migrates_atomically_to_v7() {
+    assert_migrates_to_v7(VERSION_V3);
 }
 
 #[test]
-fn exact_v4_migrates_atomically_to_v6() {
-    assert_migrates_to_v6(VERSION_V4);
+fn exact_v4_migrates_atomically_to_v7() {
+    assert_migrates_to_v7(VERSION_V4);
 }
 
 #[test]
-fn exact_v5_migrates_atomically_to_v6() {
-    assert_migrates_to_v6(VERSION_V5);
+fn exact_v5_migrates_atomically_to_v7() {
+    assert_migrates_to_v7(VERSION_V5);
 }
 
 #[test]
-fn drifted_v3_is_rejected_without_v4_v5_or_v6_ddl() {
+fn exact_v6_migrates_atomically_to_v7() {
+    assert_migrates_to_v7(VERSION_V6);
+}
+
+#[test]
+fn drifted_v3_is_rejected_without_later_ddl() {
     assert_drift_rejected_without_later_schema(VERSION_V3, 0, 0, 0);
 }
 
 #[test]
-fn drifted_v4_is_rejected_without_v5_or_v6_ddl() {
+fn drifted_v4_is_rejected_without_later_ddl() {
     assert_drift_rejected_without_later_schema(VERSION_V4, 1, 0, 0);
 }
 
 #[test]
-fn drifted_v5_is_rejected_without_v6_ddl() {
+fn drifted_v5_is_rejected_without_later_ddl() {
     assert_drift_rejected_without_later_schema(VERSION_V5, 1, 1, 0);
 }
 
 #[test]
-fn drifted_v6_is_rejected_on_reopen() {
+fn drifted_v6_is_rejected_without_v7_ddl() {
+    assert_drift_rejected_without_later_schema(VERSION_V6, 1, 1, 1);
+}
+
+#[test]
+fn drifted_v7_is_rejected_on_reopen() {
     let mut connection = connection();
     ensure_schema(&mut connection).unwrap();
     connection
@@ -195,5 +232,5 @@ fn drifted_v6_is_rejected_on_reopen() {
     let message = format!("{error:#}");
     assert!(message.contains("COMPUTE_PLUGIN_AUTHORITY_SCHEMA_INCOMPLETE"));
     assert!(message.contains("sharing_policy_binding_receipt_delete_forbidden"));
-    assert_eq!(pragma(&connection, "user_version"), VERSION_V6);
+    assert_eq!(pragma(&connection, "user_version"), VERSION_V7);
 }

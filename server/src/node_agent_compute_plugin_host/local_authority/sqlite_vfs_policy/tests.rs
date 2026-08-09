@@ -302,7 +302,7 @@ fn authorizer_phase_transition_is_linear_and_strictly_reduces_privilege() {
         schema.authorize_sql(request(
             Action::Pragma {
                 name: Some("user_version"),
-                value: Some("6"),
+                value: Some("7"),
             },
             Some("main"),
         )),
