@@ -93,7 +93,7 @@ pub fn list_local_ai_web_providers(
 }
 
 #[tauri::command]
-pub fn open_local_ai_web_session(
+pub async fn open_local_ai_web_session(
     app: AppHandle,
     webview: WebviewWindow,
     runtime: State<'_, LocalAiBrowserRuntime>,
@@ -115,6 +115,9 @@ pub fn open_local_ai_web_session(
 
     runtime.mark_opening(&window_label);
     let start_url = parse_start_url(provider)?;
+    let bootstrap_url = "about:blank"
+        .parse()
+        .map_err(|error| format!("WebView2 启动页无效：{error}"))?;
     let profile_directory = profile_directory(&app, provider, &owner_fingerprint)?;
     fs::create_dir_all(&profile_directory)
         .map_err(|error| format!("无法创建本地 AI 浏览器 Profile：{error}"))?;
@@ -130,44 +133,60 @@ pub fn open_local_ai_web_session(
     let window_state = runtime.inner().clone();
     let window_state_label = window_label.clone();
 
-    let window = WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::External(start_url))
-        .title(format!("{} · 一龙本地会话", provider.display_name))
-        .inner_size(1180.0, 780.0)
-        .min_inner_size(900.0, 620.0)
-        .center()
-        .data_directory(profile_directory)
-        .incognito(false)
-        .enable_clipboard_access()
-        .initialization_script(adapter::initialization_script())
-        .on_navigation(move |url| {
-            let allowed = allows_navigation(&navigation_provider, url);
-            navigation_state.mark_navigation(&navigation_label, url, allowed);
-            if !allowed {
-                eprintln!(
-                    "[elon-desktop][local-ai] 已阻止 {} 导航到 {}",
-                    navigation_provider.id, url
+    let window =
+        WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::External(bootstrap_url))
+            .title(format!("{} · 一龙本地会话", provider.display_name))
+            .inner_size(1180.0, 780.0)
+            .min_inner_size(900.0, 620.0)
+            .center()
+            .data_directory(profile_directory)
+            .incognito(false)
+            .enable_clipboard_access()
+            .initialization_script(adapter::initialization_script())
+            .on_navigation(move |url| {
+                let allowed = allows_navigation(&navigation_provider, url);
+                navigation_state.mark_navigation(&navigation_label, url, allowed);
+                println!(
+                    "[elon-desktop][local-ai] {} 导航 allowed={} -> {}",
+                    navigation_provider.id, allowed, url
                 );
-            }
-            allowed
-        })
-        .on_new_window(move |url, _features| {
-            let allowed = allows_navigation(&popup_provider, &url);
-            popup_state.mark_navigation(&popup_label, &url, allowed);
-            if allowed {
-                NewWindowResponse::Allow
-            } else {
-                NewWindowResponse::Deny
-            }
-        })
-        .on_page_load(move |_window, payload| match payload.event() {
-            PageLoadEvent::Started => page_state.mark_navigation(&page_label, payload.url(), true),
-            PageLoadEvent::Finished => page_state.mark_page_finished(&page_label, payload.url()),
-        })
-        .build()
-        .map_err(|error| {
-            runtime.record_error(&window_label, format!("无法创建 ChatGPT WebView2：{error}"));
-            display_error(error)
-        })?;
+                if !allowed {
+                    eprintln!(
+                        "[elon-desktop][local-ai] 已阻止 {} 导航到 {}",
+                        navigation_provider.id, url
+                    );
+                }
+                allowed
+            })
+            .on_new_window(move |url, _features| {
+                let allowed = allows_navigation(&popup_provider, &url);
+                popup_state.mark_navigation(&popup_label, &url, allowed);
+                if allowed {
+                    NewWindowResponse::Allow
+                } else {
+                    NewWindowResponse::Deny
+                }
+            })
+            .on_page_load(move |_window, payload| {
+                println!(
+                    "[elon-desktop][local-ai] 页面事件 {:?} -> {}",
+                    payload.event(),
+                    payload.url()
+                );
+                match payload.event() {
+                    PageLoadEvent::Started => {
+                        page_state.mark_navigation(&page_label, payload.url(), true)
+                    }
+                    PageLoadEvent::Finished => {
+                        page_state.mark_page_finished(&page_label, payload.url())
+                    }
+                }
+            })
+            .build()
+            .map_err(|error| {
+                runtime.record_error(&window_label, format!("无法创建 ChatGPT WebView2：{error}"));
+                display_error(error)
+            })?;
 
     window.on_window_event(move |event| {
         if matches!(event, WindowEvent::Destroyed) {
@@ -175,6 +194,10 @@ pub fn open_local_ai_web_session(
         }
     });
     restore_window(&window)?;
+    window.navigate(start_url).map_err(|error| {
+        runtime.record_error(&window_label, format!("ChatGPT 首次导航失败：{error}"));
+        display_error(error)
+    })?;
     Ok(session_response(provider, window_label, "created"))
 }
 
