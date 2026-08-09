@@ -87,6 +87,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onSend = { prompt, expectedDraft -> pageAdapter.sendPrompt(prompt, expectedDraft) },
             onStop = { pageAdapter.stopGeneration() },
             onNewConversation = { pageAdapter.startNewConversation() },
+            onRegenerate = { pageAdapter.regenerateResponse() },
         )
         conversationListController = ChatGptNativeConversationListController(
             activity = this,

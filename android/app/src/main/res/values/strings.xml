@@ -73,4 +73,9 @@
     <string name="chatgpt_conversations_opening">正在切换会话</string>
     <string name="chatgpt_conversations_failed">官网会话列表暂时不可用</string>
     <string name="chatgpt_conversations_open_failed">无法打开这个官网会话</string>
+    <string name="chatgpt_message_copy">复制消息</string>
+    <string name="chatgpt_message_copied">消息已复制</string>
+    <string name="chatgpt_message_regenerate">重新生成回复</string>
+    <string name="chatgpt_message_streaming">正在生成</string>
+    <string name="chatgpt_message_sending">正在发送</string>
 </resources>

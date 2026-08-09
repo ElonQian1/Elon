@@ -123,6 +123,26 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun nativeMessagesUseDedicatedMarkdownRenderingAndCapabilityGatedActions() {
+        val controller = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeConversationController.kt"
+        )
+        val adapter = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeMessageAdapter.kt"
+        )
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+
+        assertTrue(controller.contains("ChatGptNativeMessageAdapter("))
+        assertFalse(controller.contains("ChatAdapter("))
+        assertTrue(adapter.contains("markwon.setMarkdown"))
+        assertTrue(adapter.contains("ChatGptWebCapabilityId.MESSAGE_REGENERATE"))
+        assertTrue(adapter.contains("position == messages.indexOfLast"))
+        assertTrue(activity.contains("pageAdapter.regenerateResponse()"))
+    }
+
+    @Test
     fun quickLoginUsesOurShellAndKeepsCredentialsOnOfficialPages() {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"

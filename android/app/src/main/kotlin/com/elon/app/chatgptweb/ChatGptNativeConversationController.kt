@@ -1,14 +1,16 @@
 package com.elon.app.chatgptweb
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.elon.app.ChatAdapter
-import com.elon.app.ChatMessage
 import com.elon.app.R
 
 internal class ChatGptNativeConversationController(
@@ -21,9 +23,14 @@ internal class ChatGptNativeConversationController(
     private val onSend: (String, String) -> Unit,
     onStop: () -> Unit,
     onNewConversation: () -> Unit,
+    onRegenerate: () -> Unit,
 ) {
-    private val messages = mutableListOf<ChatMessage>()
-    private val adapter = ChatAdapter(messages)
+    private var messages: List<ChatGptWebMessage> = emptyList()
+    private val adapter = ChatGptNativeMessageAdapter(
+        parent = messagesView,
+        onCopy = ::copyMessage,
+        onRegenerate = onRegenerate,
+    )
     private var snapshot: ChatGptWebSnapshot? = null
     private var pendingPrompt: String? = null
 
@@ -50,35 +57,17 @@ internal class ChatGptNativeConversationController(
         if (pending != null && value.messages.any { it.role == "user" && it.content == pending }) {
             pendingPrompt = null
         }
-        val nextMessages = value.messages.map { message ->
-            ChatMessage(
-                id = message.id,
-                role = if (message.role == "user") "user" else "ai",
-                content = message.content,
-            )
-        }.toMutableList()
+        val nextMessages = value.messages.toMutableList()
         pendingPrompt?.let { prompt ->
-            nextMessages += ChatMessage(
+            nextMessages += ChatGptWebMessage(
                 id = PENDING_MESSAGE_ID,
                 role = "user",
                 content = prompt,
-                sendStatus = PENDING_SEND_STATUS,
+                state = "pending",
             )
         }
-        val sameConversationShape = messages.size == nextMessages.size &&
-            messages.indices.all { index -> messages[index].id == nextMessages[index].id }
-        if (sameConversationShape) {
-            nextMessages.forEachIndexed { index, next ->
-                if (messages[index].content != next.content || messages[index].role != next.role) {
-                    messages[index] = next
-                    adapter.notifyItemChanged(index)
-                }
-            }
-        } else {
-            messages.clear()
-            messages += nextMessages
-            adapter.notifyDataSetChanged()
-        }
+        messages = nextMessages
+        adapter.submit(nextMessages, value.capabilities)
         emptyView.visibility = if (messages.isEmpty()) View.VISIBLE else View.GONE
         if (!composer.hasFocus() && pendingPrompt == null && composer.text.toString() != value.draft) {
             composer.setText(value.draft)
@@ -102,8 +91,8 @@ internal class ChatGptNativeConversationController(
             }
             "new_conversation" -> if (event.ok) {
                 pendingPrompt = null
-                messages.clear()
-                adapter.notifyDataSetChanged()
+                messages = emptyList()
+                adapter.submit(emptyList(), snapshot?.capabilities ?: ChatGptWebCapabilities.EMPTY)
                 emptyView.visibility = View.VISIBLE
                 composer.text?.clear()
             }
@@ -141,6 +130,12 @@ internal class ChatGptNativeConversationController(
         setAvailable(false)
     }
 
+    private fun copyMessage(message: ChatGptWebMessage) {
+        val clipboard = messagesView.context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("ChatGPT message", message.content))
+        Toast.makeText(messagesView.context, R.string.chatgpt_message_copied, Toast.LENGTH_SHORT).show()
+    }
+
     private fun setControls(value: ChatGptWebSnapshot) {
         val authenticated = value.authenticated && value.composerReady
         setAvailable(authenticated && !value.streaming && pendingPrompt == null)
@@ -158,7 +153,6 @@ internal class ChatGptNativeConversationController(
 
     private companion object {
         const val PENDING_MESSAGE_ID = "chatgpt-native-pending"
-        const val PENDING_SEND_STATUS = "发送中"
         const val DISABLED_ALPHA = 0.4f
     }
 }
