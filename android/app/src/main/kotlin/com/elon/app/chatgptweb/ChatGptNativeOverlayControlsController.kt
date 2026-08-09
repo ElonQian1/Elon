@@ -12,18 +12,28 @@ internal class ChatGptNativeOverlayControlsController(
     private val activity: AppCompatActivity,
     private val headerActionsScroll: HorizontalScrollView,
     private val headerActions: LinearLayout,
+    private val shouldPresent: () -> Boolean,
     private val onInvoke: (String) -> Unit,
 ) {
     private var dialog: AlertDialog? = null
     private var controls: List<ChatGptWebUiControl> = emptyList()
+    private var contextLabel: String? = null
 
     fun render(value: ChatGptWebUiManifest) {
-        controls = value.controls.asSequence()
+        val nextContextLabel = value.controls.firstOrNull {
+            it.region == ChatGptWebUiRegion.OVERLAY && it.semantic == "timestamp"
+        }?.label
+        val nextControls = value.controls.asSequence()
             .filter { it.region == ChatGptWebUiRegion.OVERLAY && it.enabled }
+            .filterNot { it.semantic == "timestamp" }
             .filterNot { it.semantic in DEDICATED_NAVIGATION_SEMANTICS }
             .distinctBy(ChatGptWebUiControl::id)
             .take(MAX_OVERLAY_ACTIONS)
             .toList()
+        val controlsChanged = nextControls.map(ChatGptWebUiControl::id) !=
+            controls.map(ChatGptWebUiControl::id)
+        controls = nextControls
+        contextLabel = nextContextLabel
         if (controls.isEmpty()) {
             dialog?.dismiss()
             dialog = null
@@ -31,6 +41,7 @@ internal class ChatGptNativeOverlayControlsController(
         }
         headerActions.addView(createTrigger())
         headerActionsScroll.visibility = View.VISIBLE
+        if (controlsChanged && shouldPresent()) showActions()
     }
 
     fun dispose() {
@@ -51,10 +62,12 @@ internal class ChatGptNativeOverlayControlsController(
 
     private fun showActions() {
         val current = controls
-        if (current.isEmpty()) return
+        if (current.isEmpty() || activity.isFinishing || activity.isDestroyed) return
         dialog?.dismiss()
-        dialog = AlertDialog.Builder(activity)
+        val builder = AlertDialog.Builder(activity)
             .setTitle(R.string.chatgpt_official_page_actions)
+        contextLabel?.takeIf(String::isNotBlank)?.let(builder::setMessage)
+        dialog = builder
             .setItems(current.map(ChatGptWebUiControl::label).toTypedArray()) { opened, which ->
                 opened.dismiss()
                 onInvoke(current[which].id)

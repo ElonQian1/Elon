@@ -201,6 +201,22 @@ class ChatGptWebLabContractTest {
     }
 
     @Test
+    fun nativeOverlayAutomaticallyPresentsOfficialMessageActions() {
+        val activity = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
+        )
+        val overlay = readRepositoryFile(
+            "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptNativeOverlayControlsController.kt"
+        )
+
+        assertTrue(overlay.contains("it.semantic == \"timestamp\""))
+        assertTrue(overlay.contains("filterNot { it.semantic == \"timestamp\" }"))
+        assertTrue(overlay.contains("controlsChanged && shouldPresent()"))
+        assertTrue(overlay.contains("contextLabel?.takeIf(String::isNotBlank)"))
+        assertTrue(activity.contains("modeController.isNativeSelected()"))
+    }
+
+    @Test
     fun quickLoginUsesOurShellAndKeepsCredentialsOnOfficialPages() {
         val activity = readRepositoryFile(
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebTestActivity.kt"
