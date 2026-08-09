@@ -21,6 +21,9 @@ mod locking;
 mod mapping;
 #[path = "sqlite_namespace_shm/teardown.rs"]
 mod teardown;
+#[cfg(test)]
+#[path = "sqlite_namespace_shm/test_support.rs"]
+mod test_support;
 #[path = "sqlite_namespace_shm/types.rs"]
 mod types;
 

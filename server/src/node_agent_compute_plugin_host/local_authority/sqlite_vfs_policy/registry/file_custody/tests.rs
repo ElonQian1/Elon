@@ -48,6 +48,11 @@ fn test_namespace(label: &str) -> (PathBuf, PinnedManagedSqliteNamespace) {
         "elon-sqlite-file-custody-{label}-{}",
         Uuid::new_v4().simple()
     ));
+    let namespace = test_namespace_at(&path);
+    (path, namespace)
+}
+
+fn test_namespace_at(path: &Path) -> PinnedManagedSqliteNamespace {
     fs::create_dir_all(path.join("db")).expect("create test namespace");
     let root = PinnedManagedRoot::pin(&path, &"a".repeat(64)).expect("pin test root");
     let directory = root
@@ -57,7 +62,7 @@ fn test_namespace(label: &str) -> (PathBuf, PinnedManagedSqliteNamespace) {
         .into_sqlite_namespace()
         .expect("bind SQLite namespace");
     drop(root);
-    (path, namespace)
+    namespace
 }
 
 fn process_and_route() -> (

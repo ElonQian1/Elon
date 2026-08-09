@@ -1,4 +1,7 @@
-use std::num::{NonZeroU32, NonZeroU8};
+use std::{
+    num::{NonZeroU32, NonZeroU8},
+    process::Command,
+};
 
 use super::super::operations::ManagedSqliteRegistryPinnedFileOperationRejection;
 use super::*;
@@ -192,4 +195,141 @@ fn routed_wal_shm_operations_stop_after_explicit_unmap() {
 
     drop(runtime);
     fs::remove_dir_all(path).expect("remove closed WAL namespace");
+}
+
+#[test]
+fn routed_main_promotion_is_idempotent_until_shm_detaches() {
+    let (path, namespace) = test_namespace("promotion-idempotence");
+    let main_file = namespace
+        .open(
+            ManagedSqliteFileKind::Main,
+            ManagedSqliteAccess::ReadWrite,
+            ManagedSqliteOpenMode::OpenOrCreate,
+        )
+        .expect("open main")
+        .into_main_file()
+        .expect("bind main lock domain");
+    let runtime = namespace
+        .into_wal_runtime(ManagedSqliteShmBudget::authority_default())
+        .expect("create WAL runtime");
+    let (process, route) = process_and_route();
+    let mut main = ManagedSqliteRegistryPinnedFile::bind_main(
+        process,
+        route,
+        main_file,
+        process.claim_main(route).expect("claim main"),
+    )
+    .expect("pair main");
+    process.activate_connection(route).expect("activate");
+
+    main.promote_main_to_wal(&runtime)
+        .expect("promote ordinary main custody");
+    main.promote_main_to_wal(&runtime)
+        .expect("repeat attached promotion without minting custody");
+    main.shm_map(
+        0,
+        NonZeroU32::new(32 * 1024).expect("non-zero region size"),
+        ManagedSqliteShmMapMode::Extend,
+    )
+    .expect("map promoted SHM");
+    main.shm_unmap(ManagedSqliteShmUnmapMode::Keep)
+        .expect("detach promoted SHM");
+    assert!(matches!(
+        main.promote_main_to_wal(&runtime),
+        Err(ManagedSqliteRegistryPinnedFileOperationRejection::ShmDetached)
+    ));
+
+    process.begin_connection_close(route).expect("begin close");
+    main.close().expect("close detached WAL main");
+    process
+        .observe_connection_closed(route)
+        .expect("observe closed connection");
+    let _retirement = process.retire_closed(route).expect("retire exact route");
+
+    drop(runtime);
+    fs::remove_dir_all(path).expect("remove idempotence namespace");
+}
+
+#[test]
+fn failed_main_promotion_retains_all_custody_before_quarantining_route() {
+    const CHILD_ROOT_ENV: &str = "ELON_SQLITE_PROMOTION_FAILURE_CHILD_ROOT";
+    const EXACT_TEST: &str = "node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry::file_custody::tests::operations::failed_main_promotion_retains_all_custody_before_quarantining_route";
+
+    if let Some(path) = std::env::var_os(CHILD_ROOT_ENV).map(std::path::PathBuf::from) {
+        exercise_failed_main_promotion(&path);
+        return;
+    }
+
+    let path = std::env::temp_dir().join(format!(
+        "elon-sqlite-file-custody-promotion-failure-child-{}",
+        uuid::Uuid::new_v4().simple()
+    ));
+    let status = Command::new(std::env::current_exe().expect("resolve current test executable"))
+        .args(["--exact", EXACT_TEST, "--nocapture"])
+        .env(CHILD_ROOT_ENV, &path)
+        .status()
+        .expect("run isolated promotion failure child");
+    let cleanup = fs::remove_dir_all(&path);
+    assert!(status.success(), "promotion failure child must pass");
+    cleanup.expect("remove child promotion namespace after process exit");
+}
+
+fn exercise_failed_main_promotion(path: &std::path::Path) {
+    let namespace = test_namespace_at(path);
+    let main_file = namespace
+        .open(
+            ManagedSqliteFileKind::Main,
+            ManagedSqliteAccess::ReadWrite,
+            ManagedSqliteOpenMode::OpenOrCreate,
+        )
+        .expect("open main")
+        .into_main_file()
+        .expect("bind main lock domain");
+    let runtime = namespace
+        .into_wal_runtime(ManagedSqliteShmBudget::authority_default())
+        .expect("create WAL runtime");
+    let (process, route) = process_and_route();
+    let mut main = ManagedSqliteRegistryPinnedFile::bind_main(
+        process,
+        route,
+        main_file,
+        process.claim_main(route).expect("claim main"),
+    )
+    .expect("pair main");
+    process.activate_connection(route).expect("activate");
+    runtime.inject_terminal_gate_failure_for_test();
+
+    let rejection = main
+        .promote_main_to_wal(&runtime)
+        .expect_err("poisoned runtime must reject promotion");
+    assert!(matches!(
+        rejection,
+        ManagedSqliteRegistryPinnedFileOperationRejection::Shm(ref failure)
+            if failure.phase() == crate::node_agent_managed_fs::ManagedSqliteShmFailurePhase::Gate
+                && failure.class()
+                    == crate::node_agent_managed_fs::ManagedSqliteShmFailureClass::OutcomeUncertainPoisoned
+                && failure.mutation_may_have_occurred()
+                && failure.lock_outcome_uncertain()
+    ));
+    assert!(
+        main.custody.is_none(),
+        "main, main lease and SHM lease must move into permanent terminal retention"
+    );
+    assert!(matches!(
+        process.phase(route),
+        Err(ManagedSqliteRegistryProcessRouteRejection::Route(
+            super::super::super::owner::ManagedSqliteRegistryRouteRejection::UnknownOrRetired,
+        ))
+    ));
+    assert!(matches!(
+        main.size(),
+        Err(ManagedSqliteRegistryPinnedFileOperationRejection::Registry(
+            ManagedSqliteRegistryProcessRouteRejection::Route(
+                super::super::super::owner::ManagedSqliteRegistryRouteRejection::UnknownOrRetired,
+            ),
+        ))
+    ));
+
+    drop(main);
+    drop(runtime);
 }
