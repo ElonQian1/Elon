@@ -49,7 +49,8 @@ pub(super) unsafe extern "C" fn open(
         let operations = match role {
             ManagedSqliteLogicalFileRole::Main => {
                 let opened = context
-                    .namespace
+                    .runtime
+                    .namespace()
                     .open(ManagedSqliteFileKind::Main, access, mode)
                     .map_err(|failure| {
                         let _ = context.route.retain_failure(failure);
@@ -57,11 +58,14 @@ pub(super) unsafe extern "C" fn open(
                 let main = opened.into_main_file().map_err(|failure| {
                     let _ = context.route.retain_failure(failure);
                 })?;
-                context.route.bind_main(main)?
+                context
+                    .route
+                    .bind_main(main, Arc::clone(&context.runtime))?
             }
             ManagedSqliteLogicalFileRole::Journal => {
                 let opened = context
-                    .namespace
+                    .runtime
+                    .namespace()
                     .open(ManagedSqliteFileKind::Journal, access, mode)
                     .map_err(|failure| {
                         let _ = context.route.retain_failure(failure);
@@ -70,10 +74,14 @@ pub(super) unsafe extern "C" fn open(
             }
             ManagedSqliteLogicalFileRole::Wal => {
                 context.wal_open_attempts.fetch_add(1, Ordering::SeqCst);
-                let _ = context
-                    .route
-                    .retain_failure("managed test VFS WAL promotion is unavailable");
-                return Err(());
+                let opened = context
+                    .runtime
+                    .namespace()
+                    .open(ManagedSqliteFileKind::Wal, access, mode)
+                    .map_err(|failure| {
+                        let _ = context.route.retain_failure(failure);
+                    })?;
+                context.route.bind_sidecar(opened, role)?
             }
         };
         // SAFETY: this is the initialized allocation owned by the current xOpen callback.
@@ -118,7 +126,8 @@ pub(super) unsafe extern "C" fn access(
             .project_x_access(unsafe { name_bytes(name) }, flag)?;
         let kind = sidecar_kind(request.role())?;
         let exists = context
-            .namespace
+            .runtime
+            .namespace()
             .access(kind, ManagedSqliteAccess::ReadWrite)
             .map_err(|failure| {
                 let _ = context.route.retain_failure(failure);
@@ -149,7 +158,8 @@ pub(super) unsafe extern "C" fn delete(
             .project_x_delete(unsafe { name_bytes(name) }, sync_directory)?;
         let kind = sidecar_kind(request.role())?;
         let _outcome = context
-            .namespace
+            .runtime
+            .namespace()
             .delete(kind, request.sync_parent())
             .map_err(|failure| {
                 let _ = context.route.retain_failure(failure);

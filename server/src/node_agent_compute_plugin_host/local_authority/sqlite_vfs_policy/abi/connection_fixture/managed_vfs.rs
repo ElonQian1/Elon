@@ -1,8 +1,8 @@
 //! Windows-only real SQLite fixture backed by the managed namespace and exact registry route.
 //!
-//! This fixture intentionally supports rollback-journal mode only. It is registered under a
-//! unique non-default name for one test connection and is unregistered after SQLite closes every
-//! managed file. Production registration remains impossible.
+//! It is registered under a unique non-default name for one test connection and is unregistered
+//! after SQLite closes every managed rollback or WAL file. Production registration remains
+//! impossible.
 
 use std::{
     ffi::CString,
@@ -24,7 +24,9 @@ use crate::{
     node_agent_compute_plugin_host::local_authority::{
         sqlite_vfs_abi::test_vfs_file_size, sqlite_vfs_policy::registry::ManagedSqliteTestVfsRoute,
     },
-    node_agent_managed_fs::{PinnedManagedRoot, PinnedManagedSqliteNamespace},
+    node_agent_managed_fs::{
+        ManagedSqliteShmBudget, PinnedManagedRoot, PinnedManagedSqliteWalRuntime,
+    },
 };
 
 mod callbacks;
@@ -40,7 +42,7 @@ static NEXT_VFS_ID: AtomicU64 = AtomicU64::new(1);
 
 struct ManagedTestVfsContext {
     route: Arc<TestRoute>,
-    namespace: PinnedManagedSqliteNamespace,
+    runtime: Arc<PinnedManagedSqliteWalRuntime>,
     backing: *mut ffi::sqlite3_vfs,
     main_opens: AtomicUsize,
     journal_opens: AtomicUsize,
@@ -73,6 +75,11 @@ impl ManagedTestVfsRegistration {
         let namespace = directory
             .into_sqlite_namespace()
             .map_err(|failure| anyhow!("bind managed SQLite namespace: {failure:?}"))?;
+        let runtime = Arc::new(
+            namespace
+                .into_wal_runtime(ManagedSqliteShmBudget::authority_default())
+                .map_err(|failure| anyhow!("bind managed SQLite WAL runtime: {failure:?}"))?,
+        );
         drop(pinned_root);
 
         // SAFETY: SQLite owns the default VFS for process lifetime. It is used only for entropy,
@@ -86,7 +93,7 @@ impl ManagedTestVfsRegistration {
             .context("construct managed test VFS name")?;
         let mut context = Box::new(ManagedTestVfsContext {
             route,
-            namespace,
+            runtime,
             backing,
             main_opens: AtomicUsize::new(0),
             journal_opens: AtomicUsize::new(0),

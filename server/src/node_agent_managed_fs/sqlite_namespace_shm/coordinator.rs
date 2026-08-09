@@ -141,6 +141,12 @@ impl PinnedManagedSqliteNamespace {
 }
 
 impl PinnedManagedSqliteWalRuntime {
+    /// Borrows the one namespace consumed by this runtime. Borrowers may perform ordinary
+    /// managed file operations, but cannot mint a second SHM coordinator from this reference.
+    pub(crate) fn namespace(&self) -> &PinnedManagedSqliteNamespace {
+        &self.coordinator.namespace
+    }
+
     /// Binds an exact pinned main-file identity to this coordinator. Every later main-file bind
     /// must present the same identity before it receives a local SHM connection id.
     pub(crate) fn bind_main_file(

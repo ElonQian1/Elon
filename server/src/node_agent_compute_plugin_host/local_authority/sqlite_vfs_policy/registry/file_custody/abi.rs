@@ -13,6 +13,7 @@ use crate::node_agent_managed_fs::{
     ManagedSqliteLockAttempt, ManagedSqliteRequestedLock, ManagedSqliteShmLockAction,
     ManagedSqliteShmLockAttempt, ManagedSqliteShmLockRequest, ManagedSqliteShmMapMode,
     ManagedSqliteShmMapOutcome, ManagedSqliteShmUnmapMode, ManagedSqliteUnlockTarget,
+    PinnedManagedSqliteWalRuntime,
 };
 
 use super::{
@@ -149,6 +150,13 @@ where
         &mut self,
     ) -> Result<bool, ()> {
         self.file.check_reserved_lock().map_err(drop)
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy) fn promote_main_to_wal(
+        &mut self,
+        runtime: &PinnedManagedSqliteWalRuntime,
+    ) -> Result<(), ()> {
+        self.file.promote_main_to_wal(runtime).map_err(drop)
     }
 
     pub(in crate::node_agent_compute_plugin_host::local_authority) fn shm_map(
