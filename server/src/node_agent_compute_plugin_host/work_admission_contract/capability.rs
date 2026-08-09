@@ -114,7 +114,7 @@ impl<'root> DurableWorkAdmittedPluginSlot<'root> {
 
     pub(in crate::node_agent_compute_plugin_host) fn installed(
         &self,
-    ) -> &DurableInstalledPluginSlot<'root> {
+    ) -> &DurableInstalledPluginSlot<'_> {
         self.revalidated.installed()
     }
 
