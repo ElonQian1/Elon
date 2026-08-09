@@ -208,7 +208,9 @@ fn default_limit() -> usize {
     50
 }
 
-fn authorization_request_projection(request: &OpenCommerceAuthorizationRequest) -> Value {
+pub(crate) fn authorization_request_projection(
+    request: &OpenCommerceAuthorizationRequest,
+) -> Value {
     json!({
         "request_id":request.id,
         "merchant_id":request.merchant_id,

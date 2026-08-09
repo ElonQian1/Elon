@@ -5,8 +5,8 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{
-    open_commerce_consumer, open_commerce_consumer_execution_plan,
-    open_commerce_consumer_model::ConsumerDiscoveryRequest,
+    open_commerce_consumer, open_commerce_consumer_authorization_mcp,
+    open_commerce_consumer_execution_plan, open_commerce_consumer_model::ConsumerDiscoveryRequest,
     open_commerce_developer_model::CreateAuthorizationRequest, open_commerce_grant_readiness,
     open_commerce_model::normalize_capability_key, store::Store,
 };
@@ -202,6 +202,11 @@ pub(crate) fn call_if_handled(
             {
                 bail!("当前 App 已拥有该能力的有效授权，无需重复申请");
             }
+            let pending_before = store.pending_authorization_for_app_capability(
+                &input.merchant_id,
+                app_id,
+                &capability_key,
+            )?;
             let authorization = open_commerce_consumer::create_authorization_request(
                 store,
                 user_id,
@@ -212,22 +217,28 @@ pub(crate) fn call_if_handled(
                     purpose: input.purpose,
                 },
             )?;
-            store.record_open_commerce_audit(
-                &authorization.merchant_project_id,
-                user_id,
-                Some(&authorization.requester_app_id),
-                "authorization.requested",
-                "authorization_request",
-                &authorization.id,
-                &json!({
-                    "merchant_id": authorization.merchant_id,
-                    "requester_app_id": authorization.requester_app_id,
-                    "scopes": authorization.scopes,
-                    "consumer_user_confirmed": true,
-                    "source": "mcp"
-                }),
-            )?;
-            Ok(Some(serde_json::to_value(authorization)?))
+            if pending_before.as_deref() != Some(authorization.id.as_str()) {
+                store.record_open_commerce_audit(
+                    &authorization.merchant_project_id,
+                    user_id,
+                    Some(&authorization.requester_app_id),
+                    "authorization.requested",
+                    "authorization_request",
+                    &authorization.id,
+                    &json!({
+                        "merchant_id": authorization.merchant_id,
+                        "requester_app_id": authorization.requester_app_id,
+                        "scopes": authorization.scopes,
+                        "consumer_user_confirmed": true,
+                        "source": "mcp"
+                    }),
+                )?;
+            }
+            Ok(Some(
+                open_commerce_consumer_authorization_mcp::authorization_request_projection(
+                    &authorization,
+                ),
+            ))
         }
         _ => Ok(None),
     }
@@ -236,3 +247,10 @@ pub(crate) fn call_if_handled(
 fn empty_object() -> Value {
     json!({})
 }
+
+#[cfg(test)]
+#[path = "open_commerce_consumer_authorization_request_mcp_tests.rs"]
+mod authorization_tests;
+#[cfg(test)]
+#[path = "open_commerce_consumer_mcp_test_support.rs"]
+mod test_support;
