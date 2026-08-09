@@ -337,6 +337,7 @@ pub(super) async fn run_agent_session(
     super::compute_plugin_sharing::spawn_current_compute_plugin_sharing_session_replay(
         Arc::clone(&state),
         agent_id.clone(),
+        session_id.clone(),
         proto_version,
         &capabilities,
     );

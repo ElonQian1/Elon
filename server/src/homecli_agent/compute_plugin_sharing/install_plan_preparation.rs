@@ -1,6 +1,9 @@
 use tokio::sync::mpsc;
 
-use super::{failure, AgentManager, AgentToServer, ComputePluginSharingDispatchFailure};
+use super::{
+    failure, install_plan_planning_snapshot, AgentManager, AgentToServer,
+    ComputePluginSharingDispatchFailure,
+};
 use crate::{store::NodeComputePluginInstallPlanPreparationDispatchIntent, types::AppState};
 
 impl AgentManager {
@@ -8,6 +11,7 @@ impl AgentManager {
         &self,
         agent_id: &str,
         req_id: &str,
+        expected_session_id: &str,
         request: homecli_proto::ComputePluginInstallPlanPreparationRequestV1,
     ) -> std::result::Result<
         homecli_proto::ComputePluginInstallPlanPreparationObservedV1,
@@ -21,6 +25,12 @@ impl AgentManager {
                     "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_AGENT_OFFLINE",
                 ));
             };
+            if agent.session_id != expected_session_id {
+                return Err(preparation_failure(
+                    "dispatch_failed",
+                    "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_SESSION_REPLACED",
+                ));
+            }
             if agent.proto_version
                 < homecli_proto::COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_PROTO_VERSION
                 || !agent.capabilities.iter().any(|capability| {
@@ -86,6 +96,7 @@ impl AgentManager {
 pub(super) async fn dispatch_durable_install_plan_preparation(
     state: &AppState,
     intent: &NodeComputePluginInstallPlanPreparationDispatchIntent,
+    expected_session_id: &str,
 ) {
     let policy_revision = match u64::try_from(intent.policy_revision) {
         Ok(value) => value,
@@ -130,11 +141,12 @@ pub(super) async fn dispatch_durable_install_plan_preparation(
         .dispatch_compute_plugin_install_plan_preparation(
             &intent.node_id,
             &intent.delivery_id,
+            expected_session_id,
             request,
         )
         .await
     {
-        Ok(observed) => record_observed(state, intent, observed),
+        Ok(observed) => record_observed(state, intent, expected_session_id, observed).await,
         Err(dispatch_failure) => {
             if let Err(error) = state
                 .store
@@ -151,9 +163,10 @@ pub(super) async fn dispatch_durable_install_plan_preparation(
     }
 }
 
-fn record_observed(
+async fn record_observed(
     state: &AppState,
     intent: &NodeComputePluginInstallPlanPreparationDispatchIntent,
+    expected_session_id: &str,
     observed: homecli_proto::ComputePluginInstallPlanPreparationObservedV1,
 ) {
     if let Err(code) = validate_observed(intent, &observed) {
@@ -203,6 +216,62 @@ fn record_observed(
     {
         tracing::warn!(node_id = %intent.node_id, error = %error,
             "failed to persist InstallPlan preparation observation");
+        return;
+    }
+    if !observed.accepted {
+        return;
+    }
+    let source_observation_digest = match crate::compute_plugin_sharing_directive::
+        compute_plugin_install_plan_preparation_observed_json_and_digest(&observed)
+    {
+        Ok((_, digest)) => digest,
+        Err(error) => {
+            tracing::warn!(node_id = %intent.node_id, error = %error,
+                "failed to derive exact InstallPlan preparation observation digest");
+            return;
+        }
+    };
+    let policy_revision = match u64::try_from(intent.policy_revision) {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+    let authorization_revision = match u64::try_from(intent.authorization.revision) {
+        Ok(value) => value,
+        Err(_) => return,
+    };
+    let request = homecli_proto::ComputePluginInstallPlanPlanningSnapshotRequestV2 {
+        schema: homecli_proto::COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_REQUEST_V2_SCHEMA
+            .to_string(),
+        preparation_id: intent.preparation_id.clone(),
+        cloud_session_id: expected_session_id.to_string(),
+        source_preparation_delivery_id: intent.delivery_id.clone(),
+        source_preparation_observation_digest,
+        node_id: intent.node_id.clone(),
+        owner_user_id: intent.owner_user_id.clone(),
+        installation_identity_digest: intent.installation_identity_digest.clone(),
+        policy_revision,
+        policy_digest: intent.policy_digest.clone(),
+        policy_snapshot_digest: intent.policy_snapshot_digest.clone(),
+        authorization: homecli_proto::ComputePluginSharingAuthorizationBindingV1 {
+            authorization_ref: intent.authorization.authorization_ref.clone(),
+            revision: authorization_revision,
+            digest: intent.authorization.digest.clone(),
+        },
+    };
+    match state
+        .store
+        .prepare_node_compute_plugin_install_plan_planning_delivery_v2(request)
+    {
+        Ok(planning) => {
+            install_plan_planning_snapshot::dispatch_durable_install_plan_planning_snapshot_v2(
+                state,
+                &planning,
+                expected_session_id,
+            )
+            .await;
+        }
+        Err(error) => tracing::warn!(node_id = %intent.node_id, error = %error,
+            "failed to prepare durable Planning Snapshot V2 request"),
     }
 }
 

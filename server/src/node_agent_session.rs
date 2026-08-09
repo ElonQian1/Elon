@@ -6,25 +6,18 @@ use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use futures::{SinkExt, StreamExt};
-use homecli_proto::{
-    AgentToServer, CliCompletionProducerIdentity, ServerToAgent, CAP_ANDROID_DEVICE_HOST_V1,
-    CAP_COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_V1, CAP_COMPUTE_PLUGIN_SHARING_V1,
-    CAP_LOCAL_TASK_PROJECT_SYNC_V1, CAP_PROJECT_BUILD_CACHE_V1, CAP_PROJECT_DOCUMENT_FEDERATION_V1,
-    PROTO_VERSION,
-};
+use homecli_proto::{AgentToServer, CliCompletionProducerIdentity, ServerToAgent};
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{info, warn};
 
-use super::node_agent_config::machine_label;
 use super::node_agent_local_llm::discover_models;
 use super::{
-    node_agent_active_task, node_agent_full_access, node_agent_lifecycle,
-    node_agent_route_c_status, node_agent_task_journal, node_agent_task_journal_inspect,
-    node_agent_ws_control_queue, pc_storage_repo, project_git_worktree_audit,
-    project_workspace_inspect, resolve_attachment_args, run_cli_prompt, run_exec,
-    run_tts_synthesis, ws_text, CliPromptRun, Credentials, NodeConfig, NodeRuntime,
-    CLOUD_WS_READ_TIMEOUT,
+    node_agent_active_task, node_agent_full_access, node_agent_route_c_status,
+    node_agent_task_journal, node_agent_task_journal_inspect, node_agent_ws_control_queue,
+    pc_storage_repo, project_git_worktree_audit, project_workspace_inspect,
+    resolve_attachment_args, run_cli_prompt, run_exec, run_tts_synthesis, ws_text, CliPromptRun,
+    Credentials, NodeConfig, NodeRuntime, CLOUD_WS_READ_TIMEOUT,
 };
 use crate::node_agent_compute_plugin_host::{ComputePluginTask, LlmChatTask};
 
@@ -37,14 +30,18 @@ const SESSION_TASK_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(2);
 
 mod compute_plugin_sharing;
 mod project_workspace;
+mod registration;
 
 // ── 主连接循环 ────────────────────────────────────────────────────────────────
 
 pub(super) async fn run_session(
     cfg: &NodeConfig,
     creds: &Credentials,
+    credential_epoch: u64,
     runtime: &Arc<NodeRuntime>,
 ) -> Result<()> {
+    let mut credential_epoch_rx = runtime.subscribe_credential_epoch();
+    runtime.require_credential_epoch(credential_epoch)?;
     runtime
         .set_connected(false, "正在扫描本机能力，完成后连接云端")
         .await;
@@ -141,7 +138,9 @@ pub(super) async fn run_session(
     let storage_settings = runtime.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
 
+    runtime.require_credential_epoch(credential_epoch)?;
     let ws_stream = crate::node_agent_cloud_connection::connect(cfg, creds, runtime).await?;
+    runtime.require_credential_epoch(credential_epoch)?;
     info!("✅ 已连接到云端: {}", cfg.cloud_url);
 
     let (ws_write, mut ws_read) = ws_stream.split();
@@ -164,46 +163,18 @@ pub(super) async fn run_session(
         let _ = sink.close().await;
     });
 
-    // The cloud requires the first WebSocket frame to be Register within 10s.
-    // Discover capabilities first so the registered session can immediately
-    // answer protocol pings and accept dispatched work.
-    runtime.set_connection_stage("cloud_register").await;
-    let lifecycle =
-        node_agent_lifecycle::runtime_report(runtime, true, true, "正在注册云端会话").await;
-    out_tx.send(ws_text(&AgentToServer::Register {
-        agent_id: creds.agent_id.clone(),
-        version: crate::node_agent_release_identity::current(),
-        proto_version: PROTO_VERSION,
-        capabilities: vec![
-            CAP_PROJECT_BUILD_CACHE_V1.to_string(),
-            CAP_ANDROID_DEVICE_HOST_V1.to_string(),
-            CAP_PROJECT_DOCUMENT_FEDERATION_V1.to_string(),
-            CAP_LOCAL_TASK_PROJECT_SYNC_V1.to_string(),
-            CAP_COMPUTE_PLUGIN_SHARING_V1.to_string(),
-            CAP_COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_V1.to_string(),
-            homecli_proto::CAP_COMPUTE_PLUGIN_INSTALL_PLAN_PLANNING_SNAPSHOT_V2.to_string(),
-        ],
-        allowed_clis: available_clis.clone(),
-        allowed_cwds: vec![],
-        owner_user_id: Some(creds.owner_user_id.clone()),
-        device_name: Some(machine_label()),
-        install_id: Some(runtime.install_id.clone()),
-        hardware: Some(hardware.clone()),
-        storage: Some(storage.clone()),
-        dev_runtime: Some(dev_runtime.clone()),
-        lifecycle: Some(lifecycle.clone()),
-    }))?;
-    // 发送 RegisterCapabilities（含 TTS Worker URL）
-    let tts_url = runtime.tts_worker_url.read().await.clone();
-    out_tx.send(ws_text(&AgentToServer::RegisterCapabilities {
-        models: models.clone(),
-        allowed_clis: available_clis,
-        tts_worker_url: tts_url,
-        hardware: Some(hardware),
-        storage: Some(storage),
-        dev_runtime: Some(dev_runtime),
-        lifecycle: Some(lifecycle),
-    }))?;
+    registration::send_initial_registration(
+        runtime,
+        creds,
+        credential_epoch,
+        &out_tx,
+        models,
+        available_clis,
+        hardware,
+        storage,
+        dev_runtime,
+    )
+    .await?;
     runtime.set_connected(true, "已连接，贡献算力中").await;
     let session_producer_identity = CliCompletionProducerIdentity {
         owner_user_id: creds.owner_user_id.clone(),
@@ -302,6 +273,11 @@ pub(super) async fn run_session(
     let read_result: Result<()> = async {
         loop {
             let frame = tokio::select! {
+                changed = credential_epoch_rx.changed() => {
+                    let _ = changed;
+                    info!("凭证会话代次已推进，断开当前会话以应用新状态");
+                    break;
+                }
                 _ = runtime.wake.notified() => {
                     info!("凭证已变更，断开当前会话以应用新状态");
                     break;
@@ -317,6 +293,7 @@ pub(super) async fn run_session(
                     }
                 },
             };
+            runtime.require_credential_epoch(credential_epoch)?;
             match frame {
                 Message::Text(t) => {
                     let msg: ServerToAgent = match serde_json::from_str(&t) {
@@ -325,6 +302,17 @@ pub(super) async fn run_session(
                             warn!("反序列化服务器消息失败: {e}: {t}");
                             continue;
                         }
+                    };
+                    let Some(msg) = compute_plugin_sharing::handle_compute_plugin_message(
+                        runtime,
+                        creds,
+                        credential_epoch,
+                        &out_tx_r,
+                        msg,
+                    )
+                    .await?
+                    else {
+                        continue;
                     };
                     match msg {
                         ServerToAgent::CliCompletionAck {
@@ -362,23 +350,11 @@ pub(super) async fn run_session(
                             cloud_task_id.as_deref(),
                             error.as_deref(),
                         ),
-                        ServerToAgent::ApplyComputePluginSharingPolicyV1 {
-                            req_id,
-                            snapshot,
-                        } => compute_plugin_sharing::handle_policy_snapshot_v1(
-                            runtime, creds, &out_tx_r, req_id, snapshot,
-                        ),
-                        ServerToAgent::PrepareComputePluginInstallPlanV1 { req_id, request } => {
-                            compute_plugin_sharing::handle_install_plan_preparation_v1(
-                                runtime, creds, &out_tx_r, req_id, request,
-                            )
+                        ServerToAgent::ApplyComputePluginSharingPolicyV1 { .. }
+                        | ServerToAgent::PrepareComputePluginInstallPlanV1 { .. }
+                        | ServerToAgent::ReadComputePluginInstallPlanPlanningSnapshotV2 { .. } => {
+                            unreachable!("compute-plugin control message was already consumed")
                         }
-                        ServerToAgent::ReadComputePluginInstallPlanPlanningSnapshotV2 {
-                            req_id,
-                            request,
-                        } => compute_plugin_sharing::handle_install_plan_planning_snapshot_v2(
-                            runtime, creds, &out_tx_r, req_id, request,
-                        ),
                         ServerToAgent::LlmStreamRequest {
                             req_id,
                             model,

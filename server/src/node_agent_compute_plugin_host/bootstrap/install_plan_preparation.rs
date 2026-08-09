@@ -14,6 +14,8 @@ const MAX_IJSON_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 pub(super) struct ComputePluginInstallPlanPreparationWitnessV1 {
     pub(super) request: ComputePluginInstallPlanPreparationRequestV1,
     pub(super) delivery_id: String,
+    pub(super) planning_context_id: String,
+    pub(super) observation: ComputePluginInstallPlanPreparationObservedV1,
     pub(super) observation_digest: String,
     pub(super) bootstrap_instance_id: String,
     pub(super) configuration_generation: u64,
@@ -176,8 +178,18 @@ impl ComputePluginBootstrapState {
             self.last_install_plan_preparation = None;
             self.last_install_plan_planning_snapshot = None;
         }
-        let replayed = match self.last_install_plan_preparation.as_ref() {
-            Some(current) if &current.request == request => true,
+        if let Some(current) = self.last_install_plan_preparation.as_ref() {
+            if &current.request == request && current.delivery_id == delivery_id {
+                return current.observation.clone();
+            }
+        }
+        let (replayed, planning_context_id) = match self.last_install_plan_preparation.as_ref() {
+            // A reconnect creates a fresh authenticated delivery for the same immutable
+            // preparation request. It is an explicit planning-context replacement, not an exact
+            // delivery replay; stale V2 custody remains bound to the prior opaque context id.
+            Some(current) if &current.request == request => {
+                (true, uuid::Uuid::new_v4().to_string())
+            }
             Some(current) if current.request.preparation_id == request.preparation_id => {
                 return reject(self, "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_ID_CONFLICT")
             }
@@ -187,7 +199,7 @@ impl ComputePluginBootstrapState {
                     "COMPUTE_PLUGIN_INSTALL_PLAN_PREPARATION_ALREADY_BOUND",
                 )
             }
-            None => false,
+            None => (false, uuid::Uuid::new_v4().to_string()),
         };
         // Every authenticated V1 observation is the replacement boundary for the following V2
         // report request. A stale cloud session cannot replace the marker after V2 is accepted.
@@ -218,6 +230,8 @@ impl ComputePluginBootstrapState {
         self.last_install_plan_preparation = Some(ComputePluginInstallPlanPreparationWitnessV1 {
             request: request.clone(),
             delivery_id: delivery_id.to_string(),
+            planning_context_id,
+            observation: observed.clone(),
             observation_digest,
             bootstrap_instance_id: bootstrap_instance_id.to_string(),
             configuration_generation: self.configuration_generation,

@@ -132,6 +132,12 @@ impl ComputePluginBootstrapState {
                 "COMPUTE_PLUGIN_PLANNING_SNAPSHOT_SOURCE_PREPARATION_UNAVAILABLE",
             );
         };
+        if !bounded_identifier(&source.planning_context_id) {
+            return reject(
+                self,
+                "COMPUTE_PLUGIN_PLANNING_SNAPSHOT_SOURCE_CONTEXT_INVALID",
+            );
+        }
         if !source_preparation_matches(request, &source.request) {
             return reject(
                 self,
@@ -271,6 +277,9 @@ fn validate_ready_snapshot_candidate(
         .last_install_plan_preparation
         .as_ref()
         .ok_or("COMPUTE_PLUGIN_PLANNING_SNAPSHOT_READY_SOURCE_UNAVAILABLE")?;
+    if !bounded_identifier(&source.planning_context_id) {
+        return Err("COMPUTE_PLUGIN_PLANNING_SNAPSHOT_READY_SOURCE_CONTEXT_INVALID");
+    }
     if snapshot.preparation_id != request.preparation_id
         || snapshot.cloud_session_id != request.cloud_session_id
         || snapshot.source_preparation_delivery_id != request.source_preparation_delivery_id

@@ -4,11 +4,11 @@
 
 use anyhow::Context;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
     Arc,
 };
 use std::{collections::BTreeMap, path::Path};
-use tokio::sync::{Mutex, Notify, RwLock};
+use tokio::sync::{watch, Mutex, Notify, RwLock};
 use tracing::{info, warn};
 
 use homecli_proto::{ModelCapability, NodeHardwareProfile};
@@ -35,6 +35,8 @@ use crate::node_agent_tool_approval;
 use crate::node_agent_workspace_match;
 use crate::pc_storage_repo;
 
+mod credentials;
+
 #[derive(Default)]
 pub(crate) struct NodeStatus {
     pub(crate) connected: bool,
@@ -58,6 +60,8 @@ pub(crate) struct NodeRuntime {
         crate::node_agent_compute_plugin_host::ComputePluginBootstrap,
     pub(crate) install_id: String,
     pub(crate) creds: RwLock<Option<Credentials>>,
+    credential_epoch: AtomicU64,
+    credential_epoch_tx: watch::Sender<u64>,
     pub(crate) status: RwLock<NodeStatus>,
     hardware_cached: RwLock<NodeHardwareProfile>,
     cli_paths: RwLock<Vec<(String, String)>>,
@@ -139,7 +143,14 @@ impl NodeRuntime {
             crate::node_agent_compute_plugin_host::ComputePluginBootstrap::new_disabled(
                 &install_id,
                 node_data_root.paths.as_ref(),
+                creds.as_ref().map(|credentials| {
+                    (
+                        credentials.agent_id.as_str(),
+                        credentials.owner_user_id.as_str(),
+                    )
+                }),
             );
+        let (credential_epoch_tx, _) = watch::channel(1_u64);
         let provider_auth_path =
             crate::node_agent_provider_auth_attempt_store::default_journal_path(
                 node_data_root.paths.as_ref().map(|paths| paths.root()),
@@ -159,6 +170,8 @@ impl NodeRuntime {
             compute_plugin_bootstrap,
             install_id,
             creds: RwLock::new(creds),
+            credential_epoch: AtomicU64::new(1),
+            credential_epoch_tx,
             status: RwLock::new(NodeStatus::default()),
             hardware_cached: RwLock::new(crate::node_hardware_probe::collect_hardware_profile()),
             cli_paths: RwLock::new(Vec::new()),
@@ -196,10 +209,6 @@ impl NodeRuntime {
         }
     }
 
-    pub(crate) async fn creds(&self) -> Option<Credentials> {
-        self.creds.read().await.clone()
-    }
-
     /// Rebuild local UI terminal bindings from the durable outbox after an
     /// agent crash. The same bounded pass also runs periodically so stale
     /// runtime markers cannot remain `running` forever.
@@ -222,14 +231,6 @@ impl NodeRuntime {
 
     pub(crate) fn local_admin_token(&self) -> &str {
         &self.local_admin_token
-    }
-
-    pub(crate) async fn user_token(&self) -> Option<String> {
-        self.creds
-            .read()
-            .await
-            .as_ref()
-            .and_then(|creds| creds.user_token.clone())
     }
 
     pub(crate) async fn set_cli_paths(&self, paths: Vec<(String, String)>) {
@@ -532,17 +533,6 @@ impl NodeRuntime {
                 }
             }
         }
-    }
-
-    pub(crate) async fn set_creds(&self, c: Option<Credentials>) -> anyhow::Result<()> {
-        let _transition = self.persisted_state_transition.lock().await;
-        let mut persisted = load_persisted()?;
-        persisted.set_install_id(&self.install_id);
-        persisted.set_credentials(c.as_ref());
-        save_persisted(&persisted)?;
-        *self.creds.write().await = c;
-        self.wake.notify_waiters();
-        Ok(())
     }
 
     pub(crate) async fn set_storage_settings(

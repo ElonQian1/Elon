@@ -21,6 +21,7 @@ pub(crate) const COMPUTE_PLUGIN_BOOTSTRAP_STATUS_SCHEMA: &str =
 const BOOTSTRAP_PHASE_DISABLED: &str = "disabled";
 const BOOTSTRAP_PHASE_BLOCKED: &str = "blocked";
 
+mod account;
 mod install_plan_planning_snapshot;
 mod install_plan_preparation;
 mod policy_binding_intent;
@@ -40,6 +41,7 @@ pub(crate) struct ComputePluginBootstrap {
 
 struct ComputePluginBootstrapState {
     installation: Option<ComputePluginInstallationIdentity>,
+    account: Option<ComputePluginBootstrapAccountBinding>,
     root: Option<DormantComputePluginRootBinding>,
     instance_lock: Option<NodeAgentInstanceLockWitness>,
     configuration_generation: u64,
@@ -53,6 +55,12 @@ struct ComputePluginBootstrapState {
     initialization_plan: Option<DormantComputePluginInitializationPlan>,
     last_install_plan_preparation: Option<ComputePluginInstallPlanPreparationWitnessV1>,
     last_install_plan_planning_snapshot: Option<ComputePluginInstallPlanPlanningSnapshotRequestV2>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct ComputePluginBootstrapAccountBinding {
+    node_id: String,
+    owner_user_id: String,
 }
 
 #[derive(Clone)]
@@ -110,13 +118,23 @@ pub(crate) struct ComputePluginBootstrapStatus {
 }
 
 impl ComputePluginBootstrap {
-    pub(crate) fn new_disabled(install_id: &str, node_data_paths: Option<&NodeDataPaths>) -> Self {
+    pub(crate) fn new_disabled(
+        install_id: &str,
+        node_data_paths: Option<&NodeDataPaths>,
+        account: Option<(&str, &str)>,
+    ) -> Self {
         let policy_binding_generation = ComputePluginLocalPolicyBindingGenerationSource::new();
         Self {
             bootstrap_instance_id: uuid::Uuid::new_v4().to_string(),
             policy_binding_generation: policy_binding_generation.clone(),
             state: Mutex::new(ComputePluginBootstrapState {
                 installation: ComputePluginInstallationIdentity::derive(install_id).ok(),
+                account: account.map(|(node_id, owner_user_id)| {
+                    ComputePluginBootstrapAccountBinding {
+                        node_id: node_id.to_string(),
+                        owner_user_id: owner_user_id.to_string(),
+                    }
+                }),
                 root: node_data_paths.map(DormantComputePluginRootBinding::new),
                 instance_lock: None,
                 configuration_generation: 1,
@@ -230,9 +248,8 @@ impl ComputePluginBootstrap {
     /// Produces only an opaque, process-local input for a future authority policy-binding
     /// transition. The returned custody retains the node instance-lock lease, but it does not pin
     /// the compute-plugin root, open SQLite, authorize downloads, or make preparation context ready.
-    /// This host-only seam intentionally has no production call site: credential/account changes
-    /// do not yet notify Bootstrap, so that hook must invalidate this same generation source before
-    /// any authority wiring is allowed.
+    /// This host-only seam intentionally has no production call site: a pinned-root, handle-bound
+    /// authority controller, catalog binding and production trust witnesses are still unavailable.
     pub(super) fn prepare_local_policy_binding_intent(
         &self,
     ) -> Result<ComputePluginLocalPolicyBindingIntent> {
@@ -287,6 +304,7 @@ impl ComputePluginBootstrapState {
 
     fn status(&self) -> ComputePluginBootstrapStatus {
         let installation_identity_valid = self.installation.is_some();
+        let account_binding_available = self.account.is_some();
         let node_data_root_bound = self.root.is_some();
         let node_instance_lock_live = self
             .instance_lock
@@ -330,6 +348,9 @@ impl ComputePluginBootstrapState {
         }
         if !installation_identity_valid {
             blocked_reasons.push("installation_identity_invalid");
+        }
+        if !account_binding_available {
+            blocked_reasons.push("node_account_binding_unavailable");
         }
         if !node_data_root_bound {
             blocked_reasons.push("node_data_root_unavailable");

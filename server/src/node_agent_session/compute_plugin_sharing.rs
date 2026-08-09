@@ -1,6 +1,7 @@
 use homecli_proto::{
     AgentToServer, ComputePluginInstallPlanPlanningSnapshotRequestV2,
     ComputePluginInstallPlanPreparationRequestV1, ComputePluginSharingPolicySnapshotV1,
+    ServerToAgent,
 };
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::Message;
@@ -8,7 +9,70 @@ use tracing::{info, warn};
 
 use super::{ws_text, Credentials, NodeRuntime};
 
-pub(super) fn handle_policy_snapshot_v1(
+pub(super) async fn handle_compute_plugin_message(
+    runtime: &NodeRuntime,
+    credentials: &Credentials,
+    credential_epoch: u64,
+    out_tx: &mpsc::UnboundedSender<Message>,
+    message: ServerToAgent,
+) -> anyhow::Result<Option<ServerToAgent>> {
+    match message {
+        ServerToAgent::ApplyComputePluginSharingPolicyV1 { req_id, snapshot } => {
+            handle_policy_snapshot_v1(
+                runtime,
+                credentials,
+                credential_epoch,
+                out_tx,
+                req_id,
+                snapshot,
+            )
+            .await?;
+            Ok(None)
+        }
+        ServerToAgent::PrepareComputePluginInstallPlanV1 { req_id, request } => {
+            handle_install_plan_preparation_v1(
+                runtime,
+                credentials,
+                credential_epoch,
+                out_tx,
+                req_id,
+                request,
+            )
+            .await?;
+            Ok(None)
+        }
+        ServerToAgent::ReadComputePluginInstallPlanPlanningSnapshotV2 { req_id, request } => {
+            handle_install_plan_planning_snapshot_v2(
+                runtime,
+                credentials,
+                credential_epoch,
+                out_tx,
+                req_id,
+                request,
+            )
+            .await?;
+            Ok(None)
+        }
+        other => Ok(Some(other)),
+    }
+}
+
+pub(super) async fn handle_policy_snapshot_v1(
+    runtime: &NodeRuntime,
+    credentials: &Credentials,
+    credential_epoch: u64,
+    out_tx: &mpsc::UnboundedSender<Message>,
+    req_id: String,
+    snapshot: ComputePluginSharingPolicySnapshotV1,
+) -> anyhow::Result<()> {
+    runtime
+        .with_current_credential_session(credential_epoch, credentials, || {
+            handle_policy_snapshot_v1_current(runtime, credentials, out_tx, req_id, snapshot)
+        })
+        .await
+}
+
+fn handle_policy_snapshot_v1_current(
     runtime: &NodeRuntime,
     credentials: &Credentials,
     out_tx: &mpsc::UnboundedSender<Message>,
@@ -41,7 +105,28 @@ pub(super) fn handle_policy_snapshot_v1(
     ));
 }
 
-pub(super) fn handle_install_plan_preparation_v1(
+pub(super) async fn handle_install_plan_preparation_v1(
+    runtime: &NodeRuntime,
+    credentials: &Credentials,
+    credential_epoch: u64,
+    out_tx: &mpsc::UnboundedSender<Message>,
+    req_id: String,
+    request: ComputePluginInstallPlanPreparationRequestV1,
+) -> anyhow::Result<()> {
+    runtime
+        .with_current_credential_session(credential_epoch, credentials, || {
+            handle_install_plan_preparation_v1_current(
+                runtime,
+                credentials,
+                out_tx,
+                req_id,
+                request,
+            )
+        })
+        .await
+}
+
+fn handle_install_plan_preparation_v1_current(
     runtime: &NodeRuntime,
     credentials: &Credentials,
     out_tx: &mpsc::UnboundedSender<Message>,
@@ -76,7 +161,28 @@ pub(super) fn handle_install_plan_preparation_v1(
     ));
 }
 
-pub(super) fn handle_install_plan_planning_snapshot_v2(
+pub(super) async fn handle_install_plan_planning_snapshot_v2(
+    runtime: &NodeRuntime,
+    credentials: &Credentials,
+    credential_epoch: u64,
+    out_tx: &mpsc::UnboundedSender<Message>,
+    req_id: String,
+    request: ComputePluginInstallPlanPlanningSnapshotRequestV2,
+) -> anyhow::Result<()> {
+    runtime
+        .with_current_credential_session(credential_epoch, credentials, || {
+            handle_install_plan_planning_snapshot_v2_current(
+                runtime,
+                credentials,
+                out_tx,
+                req_id,
+                request,
+            )
+        })
+        .await
+}
+
+fn handle_install_plan_planning_snapshot_v2_current(
     runtime: &NodeRuntime,
     credentials: &Credentials,
     out_tx: &mpsc::UnboundedSender<Message>,

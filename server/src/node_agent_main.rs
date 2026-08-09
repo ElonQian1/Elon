@@ -362,7 +362,8 @@ pub(crate) use node_agent_cli_prompt_runner::{
 async fn run_loop(runtime: Arc<NodeRuntime>) {
     let mut backoff = Duration::from_secs(2);
     loop {
-        let creds = match runtime.creds().await {
+        let (creds, credential_epoch) = runtime.credential_session().await;
+        let creds = match creds {
             Some(c) => c,
             None => {
                 runtime
@@ -375,7 +376,7 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
         };
         runtime.begin_connection_attempt().await;
         runtime.set_connected(false, "连接中…").await;
-        match run_session(&runtime.cfg, &creds, &runtime).await {
+        match run_session(&runtime.cfg, &creds, credential_epoch, &runtime).await {
             Ok(()) => {
                 runtime.set_connected(false, "已断开，等待重连").await;
                 backoff = Duration::from_secs(2);

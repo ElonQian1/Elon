@@ -7,11 +7,18 @@ use crate::{store::NodeComputePluginSharingDispatchIntent, types::AppState};
 
 const ACK_TIMEOUT: Duration = Duration::from_secs(10);
 
+mod install_plan_planning_snapshot;
 mod install_plan_preparation;
+
+pub(crate) struct ComputePluginSharingSessionAck {
+    observed: homecli_proto::ComputePluginSharingPolicyObservedV1,
+    session_id: String,
+}
 
 pub(super) fn spawn_current_compute_plugin_sharing_session_replay(
     state: Arc<AppState>,
     agent_id: String,
+    session_id: String,
     proto_version: u32,
     capabilities: &[String],
 ) {
@@ -28,7 +35,12 @@ pub(super) fn spawn_current_compute_plugin_sharing_session_replay(
             .prepare_node_compute_plugin_sharing_session_delivery(&agent_id)
         {
             Ok(Some(intent)) => {
-                dispatch_durable_compute_plugin_sharing_intent(&state, &intent).await;
+                dispatch_durable_compute_plugin_sharing_intent_for_session(
+                    &state,
+                    &intent,
+                    Some(&session_id),
+                )
+                .await;
             }
             Ok(None) => {}
             Err(error) => tracing::warn!(
@@ -52,12 +64,11 @@ impl AgentManager {
         &self,
         agent_id: &str,
         req_id: &str,
+        expected_session_id: Option<&str>,
         snapshot: homecli_proto::ComputePluginSharingPolicySnapshotV1,
-    ) -> std::result::Result<
-        homecli_proto::ComputePluginSharingPolicyObservedV1,
-        ComputePluginSharingDispatchFailure,
-    > {
-        let (cmd_tx, pending) = {
+    ) -> std::result::Result<ComputePluginSharingSessionAck, ComputePluginSharingDispatchFailure>
+    {
+        let (cmd_tx, pending, session_id) = {
             let agents = self.agents.read().await;
             let Some(agent) = agents.get(agent_id) else {
                 return Err(failure(
@@ -65,6 +76,12 @@ impl AgentManager {
                     "COMPUTE_PLUGIN_SHARING_AGENT_OFFLINE",
                 ));
             };
+            if expected_session_id.is_some_and(|expected| agent.session_id != expected) {
+                return Err(failure(
+                    "dispatch_failed",
+                    "COMPUTE_PLUGIN_SHARING_SESSION_REPLACED",
+                ));
+            }
             if agent.proto_version < homecli_proto::COMPUTE_PLUGIN_SHARING_PROTO_VERSION
                 || !agent
                     .capabilities
@@ -76,7 +93,11 @@ impl AgentManager {
                     "COMPUTE_PLUGIN_SHARING_CAPABILITY_MISSING",
                 ));
             }
-            (agent.cmd_tx.clone(), agent.pending.clone())
+            (
+                agent.cmd_tx.clone(),
+                agent.pending.clone(),
+                agent.session_id.clone(),
+            )
         };
         let (tx, mut rx) = mpsc::unbounded_channel();
         {
@@ -108,7 +129,10 @@ impl AgentManager {
             Ok(Some(AgentToServer::ComputePluginSharingPolicyObservedV1 {
                 req_id: observed_req_id,
                 observed,
-            })) if observed_req_id == req_id => Ok(observed),
+            })) if observed_req_id == req_id => Ok(ComputePluginSharingSessionAck {
+                observed,
+                session_id,
+            }),
             Ok(Some(_)) => Err(failure(
                 "dispatch_failed",
                 "COMPUTE_PLUGIN_SHARING_ACK_TYPE_INVALID",
@@ -125,6 +149,14 @@ impl AgentManager {
 pub(crate) async fn dispatch_durable_compute_plugin_sharing_intent(
     state: &AppState,
     intent: &NodeComputePluginSharingDispatchIntent,
+) {
+    dispatch_durable_compute_plugin_sharing_intent_for_session(state, intent, None).await;
+}
+
+async fn dispatch_durable_compute_plugin_sharing_intent_for_session(
+    state: &AppState,
+    intent: &NodeComputePluginSharingDispatchIntent,
+    expected_session_id: Option<&str>,
 ) {
     if !intent.dispatchable {
         return;
@@ -184,10 +216,16 @@ pub(crate) async fn dispatch_durable_compute_plugin_sharing_intent(
         };
     match state
         .agent_manager
-        .dispatch_compute_plugin_sharing_policy(&intent.node_id, &intent.delivery_id, snapshot)
+        .dispatch_compute_plugin_sharing_policy(
+            &intent.node_id,
+            &intent.delivery_id,
+            expected_session_id,
+            snapshot,
+        )
         .await
     {
-        Ok(observed) => {
+        Ok(session_ack) => {
+            let observed = session_ack.observed;
             if let Err(code) = validate_observed(intent, &snapshot_digest, &observed) {
                 record_failure(state, intent, code);
                 return;
@@ -233,6 +271,7 @@ pub(crate) async fn dispatch_durable_compute_plugin_sharing_intent(
                         install_plan_preparation::dispatch_durable_install_plan_preparation(
                             state,
                             &preparation,
+                            &session_ack.session_id,
                         )
                         .await;
                     }

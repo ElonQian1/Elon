@@ -3,6 +3,8 @@ use rusqlite::{named_params, params, OptionalExtension, Transaction, Transaction
 
 mod generation;
 
+use generation::ensure_signer_unavailable_in_transaction;
+
 use super::{
     digest::{
         hashed_snapshot_json, planning_observed_json_and_digest, planning_request_json_and_digest,
@@ -168,6 +170,9 @@ impl Store {
             observed.error_code.as_deref(),
         )?;
         let snapshot = read_planning_snapshot(&tx, intent)?;
+        if let Some(snapshot) = snapshot.as_ref() {
+            ensure_signer_unavailable_in_transaction(&tx, snapshot)?;
+        }
         tx.commit()?;
         Ok(match snapshot {
             Some(snapshot) => PlanningSnapshotObservationCommitV2::Snapshot(snapshot),

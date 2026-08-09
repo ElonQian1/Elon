@@ -25,6 +25,17 @@ impl ComputePluginBootstrapState {
                 Some(code),
             )
         };
+        let Some(account) = self.account.as_ref() else {
+            return reject(self, "COMPUTE_PLUGIN_SHARING_POLICY_ACCOUNT_UNAVAILABLE");
+        };
+        if account.node_id != session_node_id || account.node_id != snapshot.node_id {
+            return reject(self, "COMPUTE_PLUGIN_SHARING_POLICY_ACCOUNT_NODE_MISMATCH");
+        }
+        if account.owner_user_id != session_owner_user_id
+            || account.owner_user_id != snapshot.owner_user_id
+        {
+            return reject(self, "COMPUTE_PLUGIN_SHARING_POLICY_ACCOUNT_OWNER_MISMATCH");
+        }
         if snapshot.node_id != session_node_id {
             return reject(self, "COMPUTE_PLUGIN_SHARING_POLICY_NODE_BINDING_MISMATCH");
         }
