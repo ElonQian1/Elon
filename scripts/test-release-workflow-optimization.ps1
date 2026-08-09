@@ -71,6 +71,17 @@ Assert-True ($apkPublisher.Contains("GetEnvironmentVariable(`$Name, 'Process')")
     'APK signing lookup is not safe when an environment variable is absent.'
 Assert-True ($apkPublisher.Contains('sha256      = $apkSha256')) 'APK version metadata is missing SHA-256.'
 Assert-True (-not $apkPublisher.Contains('elon-remote-apk-')) 'APK publisher still downloads the full remote APK.'
+Assert-True (-not $apkPublisher.Contains('Get-FileHash')) `
+    'APK publisher must not depend on module-autoloaded Get-FileHash.'
+$hashFixture = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-apk-hash-" + [Guid]::NewGuid().ToString('N'))
+try {
+    [System.IO.File]::WriteAllBytes($hashFixture, [System.Text.Encoding]::ASCII.GetBytes('abc'))
+    Assert-True ((Get-ElonFileSha256 -Path $hashFixture) -eq `
+        'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad') `
+        'APK publisher .NET SHA-256 helper returned the wrong digest.'
+} finally {
+    Remove-Item -LiteralPath $hashFixture -Force -ErrorAction SilentlyContinue
+}
 $script:ServerDir = '/tmp/elon-app-test'
 $deployScript = New-ElonApkAtomicDeployScript -ApkStage '/tmp/app.apk' -JsonStage '/tmp/version.json' `
     -ReleaseSha $head -ExpectedServerSha $head -ExpectedSha256 ('a' * 64)

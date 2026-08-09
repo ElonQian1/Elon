@@ -841,7 +841,7 @@ if (-not $apk) {
 }
 
 $fileSize = $apk.Length
-$apkSha256 = (Get-FileHash -LiteralPath $apk.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+$apkSha256 = Get-ElonFileSha256 -Path $apk.FullName
 Write-Host "📦 APK: $($apk.Name) ($([math]::Round($fileSize / 1MB, 2)) MB)" -ForegroundColor Green
 Write-Host "   SHA-256: $apkSha256" -ForegroundColor DarkGray
 Assert-ApkManifestVersion -ApkPath $apk.FullName -ExpectedVersionCode $newCode -ExpectedVersionName $versionName -Label "本地 release APK"

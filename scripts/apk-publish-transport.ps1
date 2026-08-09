@@ -1,3 +1,16 @@
+function Get-ElonFileSha256 {
+    param([Parameter(Mandatory)] [string]$Path)
+
+    $stream = [System.IO.File]::OpenRead([System.IO.Path]::GetFullPath($Path))
+    $algorithm = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        return ([System.BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $algorithm.Dispose()
+        $stream.Dispose()
+    }
+}
+
 function Assert-RemoteApkArtifact {
     param(
         [Parameter(Mandatory)] [string]$ExpectedSha256,
