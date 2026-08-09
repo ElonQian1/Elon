@@ -23,6 +23,8 @@ mod open;
 mod platform;
 mod platform_durability;
 mod read;
+#[allow(dead_code)]
+mod sqlite_namespace;
 mod types;
 mod write;
 
@@ -45,6 +47,14 @@ use platform_durability::{
     PlatformNamespaceFlushFailureKind,
 };
 pub(crate) use read::ManagedFileReadCursor;
+#[allow(unused_imports)]
+pub(crate) use sqlite_namespace::{
+    ManagedSqliteAccess, ManagedSqliteDeleteFailure, ManagedSqliteDeleteFailurePhase,
+    ManagedSqliteDeleteOutcome, ManagedSqliteDirectoryBarrierFailureKind, ManagedSqliteFileKind,
+    ManagedSqliteFileOpenFailure, ManagedSqliteFileOpenFailurePhase,
+    ManagedSqliteNamespaceBindFailure, ManagedSqliteOpenMode, PinnedManagedSqliteFile,
+    PinnedManagedSqliteNamespace, QuarantinedManagedSqliteFile,
+};
 pub(crate) use types::{
     ManagedDirectoryPrepareFailure, ManagedExclusiveFileLockFailure, ManagedFileOpenFailure,
     PinnedManagedDirectory, PinnedManagedExclusiveFileLock, PinnedManagedFile, PinnedManagedRoot,

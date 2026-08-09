@@ -5,9 +5,17 @@ use std::{
 };
 
 use super::{
-    namespace::PlatformParentRelativeObservation, PlatformFileIdentity,
-    PlatformNamespaceDurabilityReceipt, PlatformNamespaceFlushFailure,
+    namespace::PlatformParentRelativeObservation, ManagedSqliteAccess, ManagedSqliteFileKind,
+    ManagedSqliteOpenMode, PlatformFileIdentity, PlatformNamespaceDurabilityReceipt,
+    PlatformNamespaceFlushFailure,
 };
+
+pub(super) struct PlatformManagedSqliteOpen {
+    pub(super) file: File,
+    pub(super) call_status: i32,
+    pub(super) completion_status: i32,
+    pub(super) information: usize,
+}
 
 fn unsupported() -> std::io::Error {
     std::io::Error::new(
@@ -65,6 +73,50 @@ pub(super) fn open_existing_file_relative_deletable(
     _parent: &File,
     _name: &OsStr,
 ) -> std::io::Result<File> {
+    Err(unsupported())
+}
+
+pub(super) fn open_sqlite_file_relative(
+    _parent: &File,
+    _kind: ManagedSqliteFileKind,
+    _access: ManagedSqliteAccess,
+    _mode: ManagedSqliteOpenMode,
+) -> std::io::Result<PlatformManagedSqliteOpen> {
+    Err(unsupported())
+}
+
+pub(super) fn open_sqlite_file_for_access_relative(
+    _parent: &File,
+    _kind: ManagedSqliteFileKind,
+    _access: ManagedSqliteAccess,
+) -> std::io::Result<PlatformManagedSqliteOpen> {
+    Err(unsupported())
+}
+
+pub(super) fn open_sqlite_file_for_delete_relative(
+    _parent: &File,
+    _kind: ManagedSqliteFileKind,
+) -> std::io::Result<PlatformManagedSqliteOpen> {
+    Err(unsupported())
+}
+
+pub(super) fn read_sqlite_file_at(
+    _file: &File,
+    _buffer: &mut [u8],
+    _offset: u64,
+) -> std::io::Result<usize> {
+    Err(unsupported())
+}
+
+pub(super) fn write_sqlite_file_at(
+    _file: &File,
+    _buffer: &[u8],
+    _offset: u64,
+) -> std::io::Result<usize> {
+    Err(unsupported())
+}
+
+pub(super) fn flush_sqlite_file(_file: &File) -> std::io::Result<()> {
     Err(unsupported())
 }
 

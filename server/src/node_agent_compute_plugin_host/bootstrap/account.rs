@@ -12,6 +12,14 @@ impl ComputePluginBootstrap {
                 return;
             }
         };
+        // The initial None -> Some login only completes Bootstrap identity binding. Once any
+        // credentials were bound, logout, account replacement and same-account secret rotation
+        // are terminal controller boundaries. Revoke while holding the state lock so finalize
+        // cannot validate and publish a controller from the previous credential session.
+        if state.account.is_some() {
+            self.authority_controller_generation.invalidate_terminal();
+            state.authority_controller.retire_preserving_binding();
+        }
         state.advance_configuration_generation();
         match state.cancellation_generation.checked_add(1) {
             Some(next) => state.cancellation_generation = next,

@@ -1,4 +1,4 @@
-use std::{fmt, path::PathBuf, sync::Mutex};
+use std::{fmt, sync::Mutex};
 
 use anyhow::{bail, Result};
 use elon_pc_dev_runtime::NodeDataPaths;
@@ -12,9 +12,7 @@ use self::install_plan_preparation::ComputePluginInstallPlanPreparationWitnessV1
 use crate::compute_plugin_sharing_directive::compute_plugin_sharing_policy_snapshot_digest;
 use crate::node_agent_instance_lock::NodeAgentInstanceLockWitness;
 
-use super::{
-    identity::ComputePluginInstallationIdentity, local_authority::ComputePluginLocalAuthority,
-};
+use super::identity::ComputePluginInstallationIdentity;
 
 pub(crate) const COMPUTE_PLUGIN_BOOTSTRAP_STATUS_SCHEMA: &str =
     "elon.compute_plugin.bootstrap_status.v2";
@@ -22,11 +20,17 @@ const BOOTSTRAP_PHASE_DISABLED: &str = "disabled";
 const BOOTSTRAP_PHASE_BLOCKED: &str = "blocked";
 
 mod account;
+mod authority_controller;
+mod authority_controller_state;
 mod install_plan_planning_snapshot;
 mod install_plan_preparation;
 mod policy_binding_intent;
 mod sharing_policy;
 
+use authority_controller::{
+    ComputePluginAuthorityControllerGenerationSource, ComputePluginAuthorityControllerState,
+    DormantComputePluginRootBinding,
+};
 use policy_binding_intent::ComputePluginLocalPolicyBindingGenerationSource;
 pub(super) use policy_binding_intent::ComputePluginLocalPolicyBindingIntent;
 
@@ -36,6 +40,7 @@ pub(super) use policy_binding_intent::ComputePluginLocalPolicyBindingIntent;
 pub(crate) struct ComputePluginBootstrap {
     bootstrap_instance_id: String,
     policy_binding_generation: ComputePluginLocalPolicyBindingGenerationSource,
+    authority_controller_generation: ComputePluginAuthorityControllerGenerationSource,
     state: Mutex<ComputePluginBootstrapState>,
 }
 
@@ -44,6 +49,7 @@ struct ComputePluginBootstrapState {
     account: Option<ComputePluginBootstrapAccountBinding>,
     root: Option<DormantComputePluginRootBinding>,
     instance_lock: Option<NodeAgentInstanceLockWitness>,
+    authority_controller: ComputePluginAuthorityControllerState,
     configuration_generation: u64,
     cancellation_generation: u64,
     policy_binding_generation: ComputePluginLocalPolicyBindingGenerationSource,
@@ -75,12 +81,6 @@ struct DormantComputePluginInitializationPlan {
     policy_digest: String,
     authorization: ComputePluginSharingAuthorizationBindingV1,
     cancellation_generation: u64,
-}
-
-struct DormantComputePluginRootBinding {
-    node_data_paths: NodeDataPaths,
-    compute_plugin_root: PathBuf,
-    authority: ComputePluginLocalAuthority,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -124,9 +124,14 @@ impl ComputePluginBootstrap {
         account: Option<(&str, &str)>,
     ) -> Self {
         let policy_binding_generation = ComputePluginLocalPolicyBindingGenerationSource::new();
+        let authority_controller_generation =
+            ComputePluginAuthorityControllerGenerationSource::new();
+        let root = node_data_paths.map(DormantComputePluginRootBinding::new);
+        let authority_controller = ComputePluginAuthorityControllerState::for_root(root.as_ref());
         Self {
             bootstrap_instance_id: uuid::Uuid::new_v4().to_string(),
             policy_binding_generation: policy_binding_generation.clone(),
+            authority_controller_generation,
             state: Mutex::new(ComputePluginBootstrapState {
                 installation: ComputePluginInstallationIdentity::derive(install_id).ok(),
                 account: account.map(|(node_id, owner_user_id)| {
@@ -135,8 +140,9 @@ impl ComputePluginBootstrap {
                         owner_user_id: owner_user_id.to_string(),
                     }
                 }),
-                root: node_data_paths.map(DormantComputePluginRootBinding::new),
+                root,
                 instance_lock: None,
+                authority_controller,
                 configuration_generation: 1,
                 cancellation_generation: 1,
                 policy_binding_generation,
@@ -156,16 +162,20 @@ impl ComputePluginBootstrap {
     /// alive. A future side-effect transition must retain its lease and independently acquire a
     /// compute-plugin-root lock bound to the installation and canonical pinned root.
     pub(crate) fn bind_instance_lock(&self, witness: NodeAgentInstanceLockWitness) -> Result<()> {
-        let Some(_lock_lease) = witness.try_acquire_lease() else {
-            bail!("COMPUTE_PLUGIN_BOOTSTRAP_INSTANCE_LOCK_NOT_LIVE");
-        };
         let mut state = self.state.lock().map_err(|_| {
             self.invalidate_policy_binding_intents_after_poison();
             anyhow::anyhow!("COMPUTE_PLUGIN_BOOTSTRAP_STATE_POISONED")
         })?;
         if state.instance_lock.is_some() {
+            self.authority_controller_generation.invalidate_terminal();
+            state.authority_controller.retire_preserving_binding();
             bail!("COMPUTE_PLUGIN_BOOTSTRAP_INSTANCE_LOCK_ALREADY_BOUND");
         }
+        let Some(_lock_lease) = witness.try_acquire_lease() else {
+            self.authority_controller_generation.invalidate_terminal();
+            state.authority_controller.retire_preserving_binding();
+            bail!("COMPUTE_PLUGIN_BOOTSTRAP_INSTANCE_LOCK_NOT_LIVE");
+        };
         state.advance_configuration_generation();
         state.instance_lock = Some(witness);
         Ok(())
@@ -221,10 +231,12 @@ impl ComputePluginBootstrap {
         let next_root = paths.compute_plugins();
         if state.root.as_ref().is_some_and(|binding| {
             binding.node_data_paths.eq(paths) && binding.compute_plugin_root.eq(&next_root)
-        }) {
+        }) || state.authority_controller.matches_node_data_paths(paths)
+        {
             return;
         }
-        // Revoke every outstanding linear intent before publishing any changed root fact.
+        self.authority_controller_generation.invalidate_terminal();
+        state.authority_controller.retire_without_binding();
         state.advance_configuration_generation();
         state.root = None;
         state.root_change_requires_restart = true;
@@ -280,6 +292,7 @@ impl ComputePluginBootstrap {
     /// intent can still be terminally revoked without trusting or recovering the poisoned state.
     fn invalidate_policy_binding_intents_after_poison(&self) {
         self.policy_binding_generation.invalidate();
+        self.authority_controller_generation.invalidate_terminal();
     }
 }
 
@@ -305,16 +318,20 @@ impl ComputePluginBootstrapState {
     fn status(&self) -> ComputePluginBootstrapStatus {
         let installation_identity_valid = self.installation.is_some();
         let account_binding_available = self.account.is_some();
-        let node_data_root_bound = self.root.is_some();
+        let node_data_root_bound =
+            self.root.is_some() || self.authority_controller.has_bound_root();
         let node_instance_lock_live = self
             .instance_lock
             .as_ref()
             .is_some_and(NodeAgentInstanceLockWitness::is_live);
-        let authority_path_derived = self.root.as_ref().is_some_and(|binding| {
-            binding.node_data_paths.compute_plugins().as_path()
-                == binding.compute_plugin_root.as_path()
-                && binding.authority.path().parent() == Some(binding.compute_plugin_root.as_path())
-        });
+        let authority_controller_restart_required = self.authority_controller.restart_required()
+            || self
+                .instance_lock
+                .as_ref()
+                .is_some_and(|witness| !witness.is_live());
+        let authority_path_derived = self
+            .authority_controller
+            .authority_path_derived(self.root.as_ref());
         let desired = self.desired_policy.as_ref();
         let authorization = desired.and_then(|current| current.snapshot.authorization.as_ref());
         let initialization_plan_prepared = desired.is_some_and(|current| {
@@ -361,6 +378,9 @@ impl ComputePluginBootstrapState {
         if self.root_change_requires_restart {
             blocked_reasons.push("node_data_root_change_requires_restart");
         }
+        if authority_controller_restart_required {
+            blocked_reasons.push("compute_plugin_authority_controller_restart_required");
+        }
         if self.configuration_exhausted {
             blocked_reasons.push("bootstrap_configuration_generation_exhausted");
         }
@@ -400,7 +420,8 @@ impl ComputePluginBootstrapState {
             new_work_admission_enabled: false,
             downloads_allowed: false,
             side_effects_started: false,
-            restart_required: self.root_change_requires_restart,
+            restart_required: self.root_change_requires_restart
+                || authority_controller_restart_required,
             blocked_reasons,
         }
     }
@@ -458,18 +479,6 @@ impl ComputePluginBootstrapStatus {
     }
 }
 
-impl DormantComputePluginRootBinding {
-    fn new(paths: &NodeDataPaths) -> Self {
-        let compute_plugin_root = paths.compute_plugins();
-        let authority = ComputePluginLocalAuthority::for_compute_plugin_root(&compute_plugin_root);
-        Self {
-            node_data_paths: paths.clone(),
-            compute_plugin_root,
-            authority,
-        }
-    }
-}
-
 impl fmt::Debug for ComputePluginBootstrap {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
@@ -485,5 +494,6 @@ impl Drop for ComputePluginBootstrap {
         // must explicitly revoke them before another account/runtime may construct a fresh
         // Bootstrap with an unrelated generation source.
         self.policy_binding_generation.invalidate();
+        self.authority_controller_generation.invalidate_terminal();
     }
 }

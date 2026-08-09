@@ -45,6 +45,14 @@ use super::{
     PlatformNamespaceDurabilityReceipt, PlatformNamespaceFlushFailure,
 };
 
+#[path = "windows_sqlite.rs"]
+mod sqlite;
+pub(super) use sqlite::{
+    flush_sqlite_file, open_sqlite_file_for_access_relative, open_sqlite_file_for_delete_relative,
+    open_sqlite_file_relative, read_sqlite_file_at, write_sqlite_file_at,
+    PlatformManagedSqliteOpen,
+};
+
 const MAX_FINAL_PATH_UTF16: usize = 32_768;
 
 /// The configured namespace is used only to acquire the first volume-root handle. Every child
