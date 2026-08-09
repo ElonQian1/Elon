@@ -40,7 +40,7 @@ managed-fs现已铺设sealed SQLite namespace内核：只接受already-pinned且
 
 该策略新增的安全ABI投影只接受未来raw边界已转换出的借用字节：unknown action、非法UTF-8或不符合bundled 3.45的NULL/参数形状直接拒绝；ALTER的effective database取精确arg1，DROP COLUMN的arg3只作列名；transaction/savepoint只接受固定操作词。VFS请求投影只允许exact sidecar的`SQLITE_ACCESS_EXISTS`、Journal/WAL删除矩阵和Main opaque逻辑名原样full-path输出。投影层没有raw pointer、`extern`、Connection、文件系统或注册调用，不能自行执行SQLite操作。
 
-另有不可构造的one-shot session/lease纯状态核，描述`PendingMain → Opening → Active → Closing → AwaitingRouteRetirement → Retired`及无出口`TerminalQuarantine`，并对main/sidecar lease、单一SHM租约、in-flight callback、单调ID和不可伪造的精确关闭证明做checked不变量。Connection关闭后仍须等待exact route-removal proof；未开始open的`PendingMain`也只能在route已移除后取消退休。它没有全局registry、map插入、随机nonce、controller/namespace/Connection或callback，Retired和Terminal都只定义未来exact-token不可复用要求，当前不会生成token。
+另有不可构造的one-shot session/lease纯状态核，描述`PendingMain → Opening → Active → Closing → AwaitingRouteRetirement → Retired`及无出口`TerminalQuarantine`，并对main/sidecar lease、单一SHM租约、in-flight callback、单调ID和不可伪造的精确关闭证明做checked不变量。Connection关闭后仍须等待exact route-removal proof；未开始open的`PendingMain`也只能在route已移除后取消退休。10项纯状态测试覆盖完整退休、pending取消、精确route/close proof、sidecar容量、callback排空、关闭顺序、live handle拒绝和terminal reason不可改写；夹具构造器只在`cfg(test)`存在。它没有全局registry、map插入、随机nonce、controller/namespace/Connection或live callback，Retired和Terminal仍只定义未来exact-token不可复用要求，生产不会生成token。
 
 私有SQLite ABI外壳现定义VFS v1与IO methods v2表；表没有可变或注册入口，`pNext/pAppData`为空，`xOpen`总是先清`pMethods`、state和out-flags再返回`SQLITE_CANTOPEN`。其余I/O、lock、SHM和动态加载回调统一初始化out参数、捕获Rust unwind并返回保守错误，IO表从未安装到任何`sqlite3_file`。这只证明失败关闭ABI形状，不是live callback、registry或数据库打开能力。
 
