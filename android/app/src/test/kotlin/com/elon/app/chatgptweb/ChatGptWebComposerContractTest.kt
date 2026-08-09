@@ -29,6 +29,8 @@ class ChatGptWebComposerContractTest {
         assertTrue(adapter.contains("baseline: new Set(visibleOptionNodes())"))
         assertTrue(adapter.contains("!baseline.has(node)"))
         assertTrue(adapter.contains("web_touch_request"))
+        assertTrue(adapter.contains("const reusable = lastOptions[section].filter"))
+        assertTrue(adapter.contains("dismiss_composer_menu"))
         assertFalse(adapter.contains("input.click()"))
         assertTrue(adapter.contains("选项已过期"))
         listOf("document.cookie", "fetch(", "XMLHttpRequest", "WebSocket", "Authorization").forEach {

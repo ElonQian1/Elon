@@ -182,6 +182,11 @@
 
   function requestOptions(section, composer, emitEvent, result) {
     const action = section === 'model' ? 'list_model_options' : 'list_composer_tools';
+    const reusable = lastOptions[section].filter((option) => isVisible(option.node));
+    if (reusable.length > 0) {
+      emitOptions(section, reusable, composer, emitEvent);
+      return result(action, true, '');
+    }
     const trigger = triggerFor(section, composer);
     if (!trigger) return result(action, false, '官网当前没有可用入口。');
     pendingOptions[section] = {
@@ -249,6 +254,15 @@
     result(action, true, '');
   }
 
+  function dismissOpenMenu(result) {
+    const target = document.activeElement || document;
+    target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+    target.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', bubbles: true }));
+    lastOptions = { model: [], tools: [] };
+    pendingOptions = { model: null, tools: null };
+    result('dismiss_composer_menu', true, '');
+  }
+
   window.__elonChatGptComposer = Object.freeze({
     capabilities,
     currentModel,
@@ -256,6 +270,7 @@
     collectRequestedOptions,
     selectOption,
     startDictation,
-    openOfficial
+    openOfficial,
+    dismissOpenMenu
   });
 })();

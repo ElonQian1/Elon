@@ -103,6 +103,7 @@ class ChatGptWebTestActivity : AppCompatActivity() {
             onRequestTools = { pageAdapter.listComposerTools() },
             onSelectModelOption = { pageAdapter.selectModelOption(it) },
             onSelectTool = { pageAdapter.selectComposerTool(it) },
+            onDismissMenu = { pageAdapter.dismissComposerMenu() },
             onOpenOfficialModelSelector = { modeController.select(ChatGptWebModeController.Mode.WEB) },
             onOpenOfficialTools = { modeController.select(ChatGptWebModeController.Mode.WEB) },
         )

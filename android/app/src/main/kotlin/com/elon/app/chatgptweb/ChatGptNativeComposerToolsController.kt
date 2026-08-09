@@ -16,6 +16,7 @@ internal class ChatGptNativeComposerToolsController(
     private val onRequestTools: () -> Unit,
     private val onSelectModelOption: (String) -> Unit,
     private val onSelectTool: (String) -> Unit,
+    private val onDismissMenu: () -> Unit,
     private val onOpenOfficialModelSelector: () -> Unit,
     private val onOpenOfficialTools: () -> Unit,
 ) {
@@ -102,8 +103,15 @@ internal class ChatGptNativeComposerToolsController(
                     R.string.chatgpt_native_tools_title
                 },
             )
-            .setNegativeButton(R.string.chatgpt_web_cancel, null)
+            .setNegativeButton(R.string.chatgpt_web_cancel) { _, _ ->
+                pendingSection = null
+                onDismissMenu()
+            }
             .setNeutralButton(R.string.chatgpt_native_open_official) { _, _ -> openOfficial(section) }
+            .setOnCancelListener {
+                pendingSection = null
+                onDismissMenu()
+            }
         if (section == Section.MODEL) {
             builder.setSingleChoiceItems(labels, selected) { currentDialog, index ->
                 currentDialog.dismiss()

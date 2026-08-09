@@ -268,6 +268,9 @@
     if (action === 'start_dictation' && composerAdapter) {
       return composerAdapter.startDictation(findComposer(), emitEvent, result);
     }
+    if (action === 'dismiss_composer_menu' && composerAdapter) {
+      return composerAdapter.dismissOpenMenu(result);
+    }
     if (action === 'list_conversations' && conversationAdapter) {
       return conversationAdapter.requestList(emitEvent, result);
     }

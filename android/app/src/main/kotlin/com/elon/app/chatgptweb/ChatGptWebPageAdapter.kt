@@ -116,6 +116,8 @@ internal class ChatGptWebPageAdapter(
 
     fun collectComposerTools() = runCommand("collect_composer_tools")
 
+    fun dismissComposerMenu() = runCommand("dismiss_composer_menu")
+
     fun selectModelOption(id: String) = runCommand("select_model_option", id.take(MAX_OPTION_ID_LENGTH))
 
     fun selectComposerTool(id: String) = runCommand("select_composer_tool", id.take(MAX_OPTION_ID_LENGTH))
