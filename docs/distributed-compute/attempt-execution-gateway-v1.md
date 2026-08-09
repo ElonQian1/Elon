@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-v211 的 Provider-neutral Start command、Adapter binding/ACK、追加式 SQLite 账本和 Store seam 已写入源码，但没有编译、执行迁移或运行真实链路。当前没有 execution-plan producer、可用 Adapter、外部入口、节点协议、后台投递器或恢复 worker；两个 sealed capability 没有生产构造器，因此 Start 与 accepted ACK 均不可达。
+v211 的 Provider-neutral Start command、Adapter binding/ACK、追加式 SQLite 账本和 Store seam 已写入源码；v212 又补上不可变 Execution Plan producer、capability/ArtifactAccess receipt、数值 ResourceGrant 和 plan seal。两批均没有编译、执行迁移或运行真实链路。当前没有可信输入构造器、可用 Adapter、外部入口、节点协议、后台投递器或恢复 worker；Start 与 accepted ACK 均不可达。
 
 源码只有一个返回 `COMPUTE_PROVIDER_ADAPTER_UNAVAILABLE` 的 unavailable 实现；尚无 registry、resolver 或调用者，sealed capability 整体不可达。该失败发生在 command 入账前，不推进 Job、Reservation、Capacity Claim、Attempt Lease 或余额预授权。
 
@@ -18,7 +18,7 @@ v211 的 Provider-neutral Start command、Adapter binding/ACK、追加式 SQLite
 
 | 账本 | 事实 | 明确不代表 |
 |---|---|---|
-| `compute_attempt_dispatch_commands` | 不可变 Start command、Provider/Offer/Job/Reservation/Claim 精确版本、Adapter 配置、执行计划引用、Lease/fencing、Broker 与余额预授权绑定 | 命令已发送、节点已安装插件、执行计划真实可运行 |
+| `compute_attempt_dispatch_commands` | 不可变 Start command、Provider/Offer/Job/Reservation/Claim 精确版本、Adapter 配置、已 seal Execution Plan、Lease/fencing、Broker 与余额预授权绑定 | 命令已发送、节点已安装插件或远端已准备 |
 | `compute_attempt_dispatch_acks` | Adapter 身份校验后的 `accepted` 或 `rejected` 响应，以及平台的 `accepted_applied/rejected/quarantined` disposition | `accepted` 已经开始执行、产生用量或完成任务 |
 | `compute_attempt_dispatch_applications` | accepted ACK 与唯一 v185 activation 的 exact application 回执 | 节点已收到 commit、Runner 已启动或 Provider 已获得收益 |
 
@@ -57,11 +57,11 @@ v176 现会阻断仍有未 ACK command 或 accepted/quarantined ACK 的 Reservat
 
 原 `/api/me/compute/providers/:provider_id/attempt-activations` POST 依赖调用者填写 `confirm_executor_accepted=true`，不能证明 Adapter 身份或远端接受。v211 源码已把该写入口改为稳定失败 `COMPUTE_ATTEMPT_EXECUTION_GATEWAY_NOT_READY`；候选和历史读取仍可保留，但不能再用人工声明绕过 Gateway。
 
-节点 Host 的 `Start / RenewLease / Cancel` 仍是本机插件执行合同，不是 Provider-neutral wire。现有 Provider-owner Renew/Abort 也仍是人工确认旧路径；真实 Adapter 启用前必须失败关闭，直到各自具备 durable command、认证 ACK、fencing 与恢复账本。当前 Job/Offer 缺少 runner、runtime digest、插件 release、ArtifactAccess 与数值资源上限，不能把 Job digest、最低资源需求或旧 Host 类型改名后冒充可执行计划。
+节点 Host 的 `Start / RenewLease / Cancel` 仍是本机插件执行合同，不是 Provider-neutral wire。现有 Provider-owner Renew/Abort 也仍是人工确认旧路径；真实 Adapter 启用前必须失败关闭，直到各自具备 durable command、认证 ACK、fencing 与恢复账本。v212 只允许从认证 capability、ArtifactAccess、Job/Offer/Reservation/Claim 与预算共同投影完整计划；不能把 Job digest、最低资源需求或旧 Host 类型改名后冒充可执行授权。
 
 ## 6. 尚未实现
 
-- 经 ReadyCapability、ArtifactAccess、ResourceGrant 和可信路由共同生成的 execution plan；
+- ReadyCapability V2/endpoint/Adapter capability 的真实构建、认证上报与服务端验证，以及 Artifact credential issuer；
 - user-node、managed-cluster、external-pool 三类生产 Adapter 与 Adapter credential；
 - command outbox 投递、ACK ingress 身份认证、provisional prepare/commit、崩溃恢复和迟到事件调和；
 - 发送 claim/sweep：每次派发前重审 deadline、Provider route、Offer/Job/Reservation/Claim、Broker、预算与 fencing，历史 replay receipt 不能当发送授权；
@@ -75,10 +75,13 @@ v176 现会阻断仍有未 ACK command 或 accepted/quarantined ACK 的 Reservat
 ## 7. 实现入口
 
 - `server/src/compute_federation/attempt_gateway.rs`
+- `server/src/compute_federation/execution_plan.rs`
 - `server/src/compute_attempt_activation_migration/attempt_dispatch.rs`
+- `server/src/compute_attempt_activation_migration/execution_plan.rs`
 - `server/src/store/compute_attempt_dispatches.rs`
+- `server/src/store/compute_attempt_execution_plans.rs`
 - `server/src/store/compute_attempt_dispatches/`
 - `server/src/store/compute_attempt_activations.rs`
 - `server/src/compute_federation_attempt_service.rs`
 
-上游预留边界见 `broker-api.md`，底层 v185 状态变化见 `attempt-activation-api.md`，节点本机执行合同见 `node-client-and-plugins.md`。
+上游计划权威见 `attempt-execution-plan-v1.md`，预留边界见 `broker-api.md`，底层 v185 状态变化见 `attempt-activation-api.md`，节点本机执行合同见 `node-client-and-plugins.md`。

@@ -7,6 +7,7 @@ pub(crate) mod attempt;
 pub(crate) mod attempt_gateway;
 pub(crate) mod capacity;
 pub(crate) mod execution;
+pub(crate) mod execution_plan;
 pub(crate) mod legacy;
 pub(crate) mod market;
 pub(crate) mod offer;

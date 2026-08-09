@@ -31,7 +31,7 @@ owners: backend, node, ai-economy
 | 激活证据申请与计划控制面 | v177-v181、本人 HTTP/MCP、管理员审核/废止、申请/计划预检、不可变计划、原子应用与紧急隔离回执已写；v203 强制 prepared 激活计划第二人复核，v204 增加隔离恢复计划、第二人复核、预检和原子应用回执，v205 增加恢复计划追加式废止和重做入口。PC `/compute-supply` 已写入本人申请、历史、预检和取消，`/compute-activation` 已写入激活、隔离、恢复和恢复计划废止管理。恢复前旧 active Offer 必须先退场且不会自动重发；所有流程均不发送节点命令、不退款、不付款或移动资金，状态为 `implementation_uncompiled` |
 | Offer 草稿、发布与生命周期控制面 | HTTP/MCP 已可创建、精确修订和撤销本人 draft Offer；管理员 HTTP 可原子发布 active、转为 draining，并在无 pending/active Reservation 时终结。v182-v184 保存追加式回执和依赖索引，所有写入口均不移动资金，状态为 `implementation_uncompiled` |
 | 节点插件治理合同 | Signed Manifest/InstallPlan、双 keyring、authority v3/PlanApply、受管取数、候选验证、ZIP 安全物化及 staging/健康/quarantine Store 均已写。显式共享策略 ACK 后，云端已在同一认证 session 内串行下发 v10 preparation 与 v11 Planning Snapshot V2，并由 v209/v210 追加式账本保存 exact observation；节点凭据/account 变化会先推进不可丢 epoch并撤销旧 Bootstrap custody。该链仍默认阻断：节点固定 `context_ready=false`、`snapshot_ready=false`，generation outcome 仅允许 `signer_unavailable/rejected`，不会伪造 signed Plan。本机 authority v3-v6 已通过 8 项版本链、4 项 policy-binding、5+6 项 v5 Store/恢复判定、3+7 项 v6 binding Store/恢复判定、5 项真实 Ed25519 目录候选、15项SQLite纯策略及one-shot registry状态10项/owner 7项测试；owner可原子封存open intent、policy与state并保留terminal custody，但没有生产实例、随机nonce或callback路由。prepared work及v5/v6内层恢复证据已验证，但外层bind/adopt生产接管、生产磁盘迁移及Host接线仍未验证。这不撤销 Ready/Attempt，也不让旧安装在新授权下自动恢复；句柄型 authority open、真实 planning snapshot producer、signed reauthorization、独立 work-admission epoch、生产 root/keyring、Signer/KMS 与可信时间仍缺。失败候选已有 cleanup authorization Store，其后 sealed topology 与首对象 intent/disposition/absence/namespace-durability 共五个独立 typed Store；sequence 1–4 已通过 32 项清理测试，minifilter wire 与首方特权组件 shape 分别通过 9 项和 5 项测试。真实 WDK 驱动、首方/Windows Catalog 验签、安装/transport、安全 fence 构造器、evidence v2、后续 ordinal、terminal journal、跨重启物理恢复、完整事务夹具与 Host 均缺，因此当前仍不产生生产可达的 completion/retry、installed、ready 或商业 Verification；HTTPS downloader、Sidecar/IPC/探针、installed/promotion、ReadyCapability 和 Attempt 接线也仍缺 |
-| Attempt Execution Gateway | v211 Provider-neutral Start、endpoint/server-adapter 路由、远端 ACK 首次盖章重放及 ACK→v185→application 单事务账本已写；旧人工激活入口失败关闭。execution plan/accepted capability 无构造器，unavailable 实现无 registry/resolver/caller；无真实派发、ACK ingress、节点/矿池 Adapter 或恢复 worker，尚未编译或执行迁移。见 `attempt-execution-gateway-v1.md` |
+| Attempt Execution Plan / Gateway | v211 Provider-neutral Start、endpoint/server-adapter 路由、远端 ACK 首次盖章重放及 ACK→v185→application 单事务账本已写；v212 又补充 capability/ArtifactAccess receipt、数值 ResourceGrant、不可变 plan/seal producer 与 command exact 门。旧人工激活入口失败关闭，所有可信输入与 Start/ACK capability 仍无构造器；无真实派发、ACK ingress、节点/矿池 Adapter 或恢复 worker，尚未编译或执行迁移。见 `attempt-execution-plan-v1.md`、`attempt-execution-gateway-v1.md` |
 | 节点本机 Attempt 执行合同 | Start / RenewLease / Cancel、Runner typed events 与 Host 盖章事件合同已写；它不是 Provider-neutral wire，尚未编译或接入云端协议 |
 | 节点按需插件下载与通用任务执行 | 旧 LLM 已接入内部 Host seam，尚未编译；真实下载器、Sidecar/IPC、动态健康上报、通用任务派发和协议接线仍未实现 |
 | 共享 CapacityPool 与追加式容量账本 | 领域合同、v165-v168 schema、隔离 Store、Store-canonical Supply/Claim 请求摘要、事务内 Claim kernel、只读审计、到期批处理、状态门卫和 epoch 轮换已写；v173 追加 Claim 完整历史，Hold V2 固定 causal binding，Reservation Claim 强制绑定 Offer/Job/Reservation，Finish 继承原 held 绑定；尚未编译、执行迁移或接线 |
@@ -93,27 +93,28 @@ owners: backend, node, ai-economy
 13. `docs/distributed-compute/offer-api.md`：Offer 本人规范化草稿、管理员发布、安全退场与资金边界。
 14. `docs/distributed-compute/price-snapshot-api.md`：Offer 派生 fallback_curve 报价、候选效果与无资金效果边界。
 15. `docs/distributed-compute/broker-api.md`：Job、报价与预留 HTTP/MCP 控制面。
-16. `docs/distributed-compute/attempt-execution-gateway-v1.md`：Provider-neutral Start、Adapter ACK、本地原子激活与 provisional 远端边界。
-17. `docs/distributed-compute/attempt-activation-api.md`：v185 激活内核、fencing、原子状态变化与无节点命令效果边界。
-18. `docs/distributed-compute/attempt-lease-api.md`：Lease 状态投影、受控续租、过期不可复活与无执行效果边界。
-19. `docs/distributed-compute/attempt-abort-api.md`：staging 无用量中止、容量归还、退款和外部声明边界。
-20. `docs/distributed-compute/attempt-usage-api.md`：running Attempt 累计声明用量、单调性、超额标记与无结算效果边界。
-21. `docs/distributed-compute/attempt-terminal-candidate-api.md`：Provider 首次终态候选、输出合同、不可覆盖与无状态/无资金效果边界。
-22. `docs/distributed-compute/attempt-consumer-review-api.md`：消费者首次终态审核、证据引用、不可覆盖与非验证/非结算边界。
-23. `docs/distributed-compute/attempt-platform-observation-api.md`：平台首次终态观测、累计 meter 差异、不可覆盖与非验证/非结算边界。
-24. `docs/distributed-compute/attempt-verification-api.md`：保守 Verification policy、verified/compensable usage、不可覆盖与非状态/非结算边界。
-25. `docs/distributed-compute/attempt-execution-receipt-api.md`：accepted Verification 的执行回执、完整源证据重审计与非状态/非结算边界。
-26. `docs/distributed-compute/attempt-finalization-api.md`：精确 Execution Receipt 的可信终态、容量消费/归还与资金不变边界。
-27. `docs/distributed-compute/attempt-settlement-api.md`：CNY 双价格腿、消费者预授权结清与 Provider pending 收益边界。
-28. `docs/distributed-compute/attempt-settlement-challenge-api.md`：72 小时消费者挑战、不可覆盖记录与无余额移动边界。
-29. `docs/distributed-compute/attempt-settlement-challenge-resolution-api.md`：消费者撤回、管理员裁决与释放门卫边界。
-30. `docs/distributed-compute/attempt-settlement-correction-api.md`：accepted 挑战向下金额纠正、消费者退款和 pending 冲减边界。
-31. `docs/distributed-compute/attempt-settlement-release-api.md`：72 小时后纠正净额从 pending 到 available 的原子释放、账本与非提现边界。
-32. `docs/distributed-compute/settlement-withdrawal-request-api.md`：Provider available 提款申请、withdrawn 内部冻结与非付款边界。
-33. `docs/distributed-compute/settlement-withdrawal-terminal-api.md`：提款取消、拒绝、外部已付款声明和唯一终态边界。
-34. `docs/distributed-compute/settlement-account-view-api.md`：Provider 结算账户账本重建与管理员提款队列边界。
-35. `docs/distributed-compute/settlement-release-batch-api.md`：到期候选、逐笔 v198 释放、部分失败报告与非后台自动化边界。
-36. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
+16. `docs/distributed-compute/attempt-execution-plan-v1.md`：可信 capability、ArtifactAccess、数值 ResourceGrant、不可变 Plan 与 v211 exact 门。
+17. `docs/distributed-compute/attempt-execution-gateway-v1.md`：Provider-neutral Start、Adapter ACK、本地原子激活与 provisional 远端边界。
+18. `docs/distributed-compute/attempt-activation-api.md`：v185 激活内核、fencing、原子状态变化与无节点命令效果边界。
+19. `docs/distributed-compute/attempt-lease-api.md`：Lease 状态投影、受控续租、过期不可复活与无执行效果边界。
+20. `docs/distributed-compute/attempt-abort-api.md`：staging 无用量中止、容量归还、退款和外部声明边界。
+21. `docs/distributed-compute/attempt-usage-api.md`：running Attempt 累计声明用量、单调性、超额标记与无结算效果边界。
+22. `docs/distributed-compute/attempt-terminal-candidate-api.md`：Provider 首次终态候选、输出合同、不可覆盖与无状态/无资金效果边界。
+23. `docs/distributed-compute/attempt-consumer-review-api.md`：消费者首次终态审核、证据引用、不可覆盖与非验证/非结算边界。
+24. `docs/distributed-compute/attempt-platform-observation-api.md`：平台首次终态观测、累计 meter 差异、不可覆盖与非验证/非结算边界。
+25. `docs/distributed-compute/attempt-verification-api.md`：保守 Verification policy、verified/compensable usage、不可覆盖与非状态/非结算边界。
+26. `docs/distributed-compute/attempt-execution-receipt-api.md`：accepted Verification 的执行回执、完整源证据重审计与非状态/非结算边界。
+27. `docs/distributed-compute/attempt-finalization-api.md`：精确 Execution Receipt 的可信终态、容量消费/归还与资金不变边界。
+28. `docs/distributed-compute/attempt-settlement-api.md`：CNY 双价格腿、消费者预授权结清与 Provider pending 收益边界。
+29. `docs/distributed-compute/attempt-settlement-challenge-api.md`：72 小时消费者挑战、不可覆盖记录与无余额移动边界。
+30. `docs/distributed-compute/attempt-settlement-challenge-resolution-api.md`：消费者撤回、管理员裁决与释放门卫边界。
+31. `docs/distributed-compute/attempt-settlement-correction-api.md`：accepted 挑战向下金额纠正、消费者退款和 pending 冲减边界。
+32. `docs/distributed-compute/attempt-settlement-release-api.md`：72 小时后纠正净额从 pending 到 available 的原子释放、账本与非提现边界。
+33. `docs/distributed-compute/settlement-withdrawal-request-api.md`：Provider available 提款申请、withdrawn 内部冻结与非付款边界。
+34. `docs/distributed-compute/settlement-withdrawal-terminal-api.md`：提款取消、拒绝、外部已付款声明和唯一终态边界。
+35. `docs/distributed-compute/settlement-account-view-api.md`：Provider 结算账户账本重建与管理员提款队列边界。
+36. `docs/distributed-compute/settlement-release-batch-api.md`：到期候选、逐笔 v198 释放、部分失败报告与非后台自动化边界。
+37. 现有兼容实现：`docs/decisions/node-compute-sharing-supply-v1.md`。
 
 ## 分阶段落地
 

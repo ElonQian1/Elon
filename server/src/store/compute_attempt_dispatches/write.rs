@@ -30,6 +30,7 @@ use super::{
 };
 use crate::store::{
     compute_attempt_activations::activate_compute_attempt_on,
+    compute_attempt_execution_plans::ensure_current_plan_for_dispatch_on,
     compute_broker_reservation::broker_reserve_binding_on,
     compute_job_registry::current_registered_job_on,
 };
@@ -51,6 +52,12 @@ pub(super) fn prepare_start_dispatch_on(
         ensure_command_replay_matches(&stored, plan, prepared)?;
         return Ok(command_receipt(stored, true));
     }
+    ensure_current_plan_for_dispatch_on(
+        connection,
+        plan.command(),
+        plan.adapter(),
+        plan.activation().activated_by_user_id(),
+    )?;
     let source = plan.command();
     if let Some(reason) = current_source_blocker_on(
         connection,

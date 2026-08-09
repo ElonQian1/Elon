@@ -48,6 +48,7 @@ mod compute_attempt_aborts;
 mod compute_attempt_activations;
 mod compute_attempt_consumer_reviews;
 mod compute_attempt_dispatches;
+mod compute_attempt_execution_plans;
 mod compute_attempt_execution_receipts;
 mod compute_attempt_finalizations;
 mod compute_attempt_leases;
@@ -305,6 +306,7 @@ pub(crate) use compute_attempt_consumer_reviews::{
 pub(crate) use compute_attempt_dispatches::{
     ComputeAttemptDispatchAckCommit, ComputeAttemptDispatchCommandReceipt,
 };
+pub(crate) use compute_attempt_execution_plans::ComputeAttemptExecutionPlanReceipt;
 pub(crate) use compute_attempt_execution_receipts::{
     ComputeAttemptExecutionReceiptEnvelope, ComputePendingExecutionReceiptCandidate,
     IssueComputeAttemptExecutionReceiptRequest,
