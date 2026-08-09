@@ -95,6 +95,8 @@ internal class ChatGptWebPageAdapter(
 
     fun stopGeneration() = runCommand("stop_generation")
 
+    fun regenerateResponse() = runCommand("regenerate_response")
+
     fun startNewConversation() = runCommand("new_conversation")
 
     fun listConversations() = runCommand("list_conversations")
@@ -162,6 +164,7 @@ internal class ChatGptWebPageAdapter(
     private companion object {
         val ADAPTER_ASSETS = listOf(
             "chatgpt_web_adapter_conversations.js",
+            "chatgpt_web_adapter_messages.js",
             "chatgpt_web_adapter.js",
         )
         const val BRIDGE_OBJECT = "elonChatGptNative"

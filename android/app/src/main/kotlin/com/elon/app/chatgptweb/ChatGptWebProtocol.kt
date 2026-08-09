@@ -6,6 +6,7 @@ internal data class ChatGptWebMessage(
     val id: String,
     val role: String,
     val content: String,
+    val state: String,
 )
 
 internal data class ChatGptWebSnapshot(
@@ -71,6 +72,8 @@ internal object ChatGptWebProtocol {
                         id = item.optString("id").ifBlank { "$role-$index" }.take(160),
                         role = role,
                         content = content,
+                        state = item.optString("state").takeIf { it in SUPPORTED_MESSAGE_STATES }
+                            ?: "completed",
                     ),
                 )
             }
@@ -124,13 +127,15 @@ internal object ChatGptWebProtocol {
         return buildList {
             for (index in 0 until minOf(content.length(), MAX_CONTENT_PARTS)) {
                 val part = content.optJSONObject(index) ?: continue
-                if (part.optString("type") == "text") add(part.optString("text"))
+                if (part.optString("type") in SUPPORTED_CONTENT_TYPES) add(part.optString("text"))
             }
         }.joinToString("\n")
     }
 
     const val SCHEMA = "yilong.ai.ui.v1"
     private val SUPPORTED_ROLES = setOf("user", "assistant")
+    private val SUPPORTED_MESSAGE_STATES = setOf("completed", "streaming")
+    private val SUPPORTED_CONTENT_TYPES = setOf("text", "markdown")
     private const val MAX_MESSAGES = 80
     private const val MAX_MESSAGE_LENGTH = 40_000
     private const val MAX_CONTENT_PARTS = 20

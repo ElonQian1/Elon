@@ -21,6 +21,9 @@ internal object ChatGptWebCapabilityId {
     const val MODEL_SELECTOR = "model_selector"
     const val DICTATION = "dictation"
     const val GOOGLE_LOGIN_ENTRY = "google_login_entry"
+    const val RICH_TEXT = "rich_text"
+    const val MESSAGE_COPY = "message_copy"
+    const val MESSAGE_REGENERATE = "message_regenerate"
 }
 
 internal data class ChatGptWebConversation(

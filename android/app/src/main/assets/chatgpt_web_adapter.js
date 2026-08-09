@@ -5,9 +5,8 @@
   const nativeBridge = window.elonChatGptNative;
   if (!nativeBridge || typeof nativeBridge.postMessage !== 'function') return;
   const conversationAdapter = window.__elonChatGptConversations;
+  const messageAdapter = window.__elonChatGptMessages;
 
-  const MAX_MESSAGES = 80;
-  const MAX_MESSAGE_LENGTH = 40000;
   let emitTimer = 0;
   let lastSnapshot = '';
   let sequence = 0;
@@ -30,45 +29,6 @@
 
   function comparableText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\r\n/g, '\n').trim();
-  }
-
-  function messageRole(node) {
-    const own = node.getAttribute('data-message-author-role');
-    const nested = node.querySelector('[data-message-author-role]');
-    const role = own || (nested && nested.getAttribute('data-message-author-role')) || '';
-    return role === 'user' || role === 'assistant' ? role : '';
-  }
-
-  function messageContent(node) {
-    const roleNode = node.matches('[data-message-author-role]')
-      ? node
-      : node.querySelector('[data-message-author-role]') || node;
-    const content = roleNode.querySelector('.markdown, [data-message-content], .whitespace-pre-wrap');
-    return cleanText((content || roleNode).innerText || (content || roleNode).textContent)
-      .slice(0, MAX_MESSAGE_LENGTH);
-  }
-
-  function messageNodes() {
-    const main = document.querySelector('main');
-    if (!main) return [];
-    const turns = Array.from(main.querySelectorAll('[data-testid^="conversation-turn-"]'));
-    if (turns.length) return turns;
-    return Array.from(main.querySelectorAll('[data-message-author-role]'));
-  }
-
-  function readMessages() {
-    const seen = new Set();
-    return messageNodes().slice(-MAX_MESSAGES).map((node, index) => {
-      const role = messageRole(node);
-      const content = messageContent(node);
-      const baseId = node.getAttribute('data-message-id')
-        || node.getAttribute('data-testid')
-        || node.id
-        || role + '-' + index;
-      const id = seen.has(baseId) ? baseId + '-' + index : baseId;
-      seen.add(id);
-      return { id, role, state: 'completed', content: [{ type: 'text', text: content }] };
-    }).filter((message) => message.role && message.content);
   }
 
   function isVisible(node) {
@@ -145,6 +105,7 @@
       'google_login_entry'
     ];
     if (conversationAdapter) capabilities.push(...conversationAdapter.capabilities());
+    if (messageAdapter) capabilities.push(...messageAdapter.capabilities());
     if (document.querySelector('#upload-fast-tools-files, input[type="file"], [data-testid*="upload" i]')) {
       capabilities.push('attachments');
     }
@@ -154,10 +115,7 @@
 
   function snapshot() {
     const streaming = isStreaming();
-    const messages = readMessages();
-    if (streaming && messages.length && messages[messages.length - 1].role === 'assistant') {
-      messages[messages.length - 1].state = 'streaming';
-    }
+    const messages = messageAdapter ? messageAdapter.readMessages(streaming) : [];
     const event = {
       type: 'message_snapshot',
       title: cleanText(document.title.replace(/\s*[-|]\s*ChatGPT.*$/i, '')),
@@ -288,6 +246,9 @@
         return result(action, false, '网页中有未发送草稿，请先处理草稿。');
       }
       return conversationAdapter.openConversation(String(command.value || ''), result);
+    }
+    if (action === 'regenerate_response' && messageAdapter) {
+      return messageAdapter.regenerate(result);
     }
     if (action === 'stop_generation') {
       const stop = findButton('stop-button', ['stop generating', 'stop', '停止生成', '停止']);
