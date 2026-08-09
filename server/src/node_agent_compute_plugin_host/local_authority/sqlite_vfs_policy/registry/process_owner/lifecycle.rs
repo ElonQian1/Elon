@@ -5,14 +5,29 @@ where
     Custody: ManagedSqliteRegistryCustody + 'static,
     NonceSource: ManagedSqliteRegistryNonceSource + 'static,
 {
-    pub(super) fn claim_main(
+    /// Permanently retains physical and registry custody before removing the exact route into
+    /// terminal quarantine. Retention happens first so owner poisoning or a stale route can never
+    /// make an uncertain handle fall through ordinary Rust destruction.
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn retain_terminal_custody<
+        Retained: 'static,
+    >(
+        &self,
+        route: ManagedSqliteRegistryRouteHandle,
+        reason: ManagedSqliteRegistryTerminalReason,
+        custody: Retained,
+    ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
+        let _permanent_physical_custody = Box::leak(Box::new(custody));
+        self.apply_route(route, |routes| routes.quarantine(route, reason))
+    }
+
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn claim_main(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
     ) -> Result<ManagedSqliteRegistryFileLease, ManagedSqliteRegistryProcessRouteRejection> {
         self.apply_route(route, |routes| routes.claim_main(route))
     }
 
-    pub(super) fn claim_sidecar(
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn claim_sidecar(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
         role: ManagedSqliteLogicalFileRole,
@@ -20,21 +35,21 @@ where
         self.apply_route(route, |routes| routes.claim_sidecar(route, role))
     }
 
-    pub(super) fn claim_shm(
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn claim_shm(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
     ) -> Result<ManagedSqliteRegistryShmLease, ManagedSqliteRegistryProcessRouteRejection> {
         self.apply_route(route, |routes| routes.claim_shm(route))
     }
 
-    pub(super) fn activate_connection(
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn activate_connection(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
     ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
         self.apply_route(route, |routes| routes.activate_connection(route))
     }
 
-    pub(super) fn close_sidecar(
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn close_sidecar(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
         lease: ManagedSqliteRegistryFileLease,
@@ -44,7 +59,7 @@ where
         self.apply_route(route, |routes| routes.close_file(route, lease, outcome))
     }
 
-    pub(super) fn close_main(
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn close_main(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
         lease: ManagedSqliteRegistryFileLease,
@@ -54,7 +69,7 @@ where
         self.apply_route(route, |routes| routes.close_file(route, lease, outcome))
     }
 
-    pub(super) fn close_wal_main(
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn close_wal_main(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
         main: ManagedSqliteRegistryFileLease,
@@ -67,7 +82,7 @@ where
         })
     }
 
-    pub(super) fn connection_close_failed(
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn connection_close_failed(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
         reason: ManagedSqliteRegistryTerminalReason,
@@ -77,14 +92,14 @@ where
         })
     }
 
-    pub(super) fn observe_connection_closed(
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn observe_connection_closed(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
     ) -> Result<(), ManagedSqliteRegistryProcessRouteRejection> {
         self.apply_route(route, |routes| routes.observe_connection_closed(route))
     }
 
-    pub(super) fn retire_closed(
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn retire_closed(
         &self,
         route: ManagedSqliteRegistryRouteHandle,
     ) -> Result<ManagedSqliteRegistryRetirementReceipt, ManagedSqliteRegistryProcessRouteRejection>

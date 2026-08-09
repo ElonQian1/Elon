@@ -8,6 +8,7 @@
 
 #![allow(dead_code)]
 
+mod file_custody;
 mod owner;
 mod process_owner;
 mod state;

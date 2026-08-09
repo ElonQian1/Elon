@@ -38,7 +38,7 @@ pub(super) type ComputePluginHandleBoundSqliteProcessOwner = ManagedSqliteRegist
     ManagedSqliteRegistrySystemNonceSource,
 >;
 
-trait ManagedSqliteRegistryNonceSource {
+pub(super) trait ManagedSqliteRegistryNonceSource {
     fn fill_nonce(&self, output: &mut [u8; 16]) -> Result<(), ()>;
 }
 

@@ -143,7 +143,7 @@ impl PinnedManagedSqliteNamespace {
 impl PinnedManagedSqliteWalRuntime {
     /// Binds an exact pinned main-file identity to this coordinator. Every later main-file bind
     /// must present the same identity before it receives a local SHM connection id.
-    pub(super) fn bind_main_file(
+    pub(crate) fn bind_main_file(
         &self,
         main: PinnedManagedSqliteMainFile,
     ) -> Result<PinnedManagedSqliteWalMainFile, ManagedSqliteWalMainBindFailure> {

@@ -197,6 +197,33 @@ fn poisoned_process_owner_fails_closed_without_dropping_existing_custody() {
 }
 
 #[test]
+fn terminal_retention_precedes_exact_route_quarantine() {
+    let process =
+        ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));
+    let (route_custody, route_drops) = probe();
+    let (physical_custody, physical_drops) = probe();
+    let route = process.register(route_custody).expect("route");
+    process.begin_open_attempt(route).expect("opening");
+
+    process
+        .retain_terminal_custody(
+            route,
+            ManagedSqliteRegistryTerminalReason::FailureCustodyRetained,
+            physical_custody,
+        )
+        .expect("quarantine exact route");
+
+    assert_eq!(route_drops.load(Ordering::SeqCst), 0);
+    assert_eq!(physical_drops.load(Ordering::SeqCst), 0);
+    assert!(matches!(
+        process.phase(route),
+        Err(ManagedSqliteRegistryProcessRouteRejection::Route(
+            ManagedSqliteRegistryRouteRejection::UnknownOrRetired,
+        ))
+    ));
+}
+
+#[test]
 fn process_owner_is_explicitly_leaked_and_starts_pending() {
     let process =
         ManagedSqliteRegistryProcessOwner::leak(SequenceNonceSource::new([Ok(FIRST_NONCE)]));
