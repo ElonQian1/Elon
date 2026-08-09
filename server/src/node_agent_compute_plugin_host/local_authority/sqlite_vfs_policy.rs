@@ -16,6 +16,9 @@ mod name;
 mod registry;
 mod types;
 
+#[cfg(test)]
+mod tests;
+
 pub(super) use authorizer::{
     ManagedSqliteAuthorizerAction, ManagedSqliteAuthorizerDecision, ManagedSqliteAuthorizerRequest,
     ManagedSqliteAuthorizerTransitionError, ManagedSqliteTempSchemaAction,
