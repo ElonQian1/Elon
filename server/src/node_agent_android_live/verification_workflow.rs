@@ -127,7 +127,19 @@ async fn prepare_android(
 ) -> Result<Value> {
     let mut android = configure_android_arguments(arguments, real_device_required)?;
     let mut prepared =
-        super::mcp_runtime_preparation::prepare_debug_runtime(broker, session_id, &android).await?;
+        match super::mcp_runtime_preparation::prepare_debug_runtime(broker, session_id, &android)
+            .await
+        {
+            Ok(prepared) => prepared,
+            Err(error) => {
+                return Ok(super::verification_deferred::renderer_unavailable(
+                    &error,
+                    real_device_required,
+                    pwa_failure,
+                    None,
+                ));
+            }
+        };
     let mut physical_failure = None;
     let physical_budget_ms = arguments
         .get("physicalDeviceBudgetMs")
@@ -174,12 +186,23 @@ async fn prepare_android(
         emulator_object.insert("fallbackToEmulator".into(), json!(true));
         emulator_object.insert("isolatedEmulatorPackage".into(), json!(true));
         emulator_object.insert("restart".into(), json!(false));
-        prepared = super::mcp_runtime_preparation::prepare_debug_runtime(
+        prepared = match super::mcp_runtime_preparation::prepare_debug_runtime(
             broker,
             session_id,
             &emulator_android,
         )
-        .await?;
+        .await
+        {
+            Ok(prepared) => prepared,
+            Err(error) => {
+                return Ok(super::verification_deferred::renderer_unavailable(
+                    &error,
+                    real_device_required,
+                    pwa_failure,
+                    physical_failure,
+                ));
+            }
+        };
     }
     let preparation_status = preparation_status(&prepared);
     let selection_source = selection_source(&prepared);

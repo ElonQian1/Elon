@@ -79,6 +79,7 @@ mod tauri_behavior_windows;
 mod tauri_host_runtime;
 mod tauri_host_windows;
 mod ui_ir;
+mod verification_deferred;
 mod verification_gate;
 mod verification_workflow;
 mod visual_diff;

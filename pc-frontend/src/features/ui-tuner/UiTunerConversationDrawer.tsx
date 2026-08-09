@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { GitBranch, MessageSquareText, RefreshCw, Send, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { GitBranch, MessageSquareText, RefreshCw, X } from 'lucide-react'
 import { api } from '../../api/client'
 import { clean } from '../../lib/utils'
 import { useAuthStore } from '../../store/auth'
 import ConversationFeed from '../conversation/ConversationFeed'
+import ConversationPromptDock from '../conversation/ConversationPromptDock'
 import { loadAiDevelopmentTaskMessages } from '../conversation/conversationPageHelpers'
 import { listMemberConversationMessages, targetFromUser } from '../conversation/memberConversationApi'
 import {
@@ -82,6 +83,7 @@ export default function UiTunerConversationDrawer({
   const [sessionTaskMessages, setSessionTaskMessages] = useState<Message[]>([])
   const [drawerError, setDrawerError] = useState('')
   const settledTaskRef = useRef('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const projectId = activeProject?.id ?? ''
   const channelId = aiChannel?.id ?? ''
@@ -218,6 +220,21 @@ export default function UiTunerConversationDrawer({
     void submit('continue')
   }, [submit])
 
+  const handleComposerSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    void submit('continue')
+  }, [submit])
+
+  const resizeComposer = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      const textarea = textareaRef.current
+      if (!textarea) return
+      textarea.style.height = 'var(--composer-control-height)'
+      textarea.style.height = `${Math.min(120, textarea.scrollHeight)}px`
+      textarea.style.overflowY = textarea.scrollHeight > 120 ? 'auto' : 'hidden'
+    })
+  }, [])
+
   const cancelTask = useCallback(async (taskId: string) => {
     if (!projectId || !channelId) return
     await api.post(
@@ -323,30 +340,41 @@ export default function UiTunerConversationDrawer({
           )}
         </div>
 
-        <footer className={panelStyles.conversationComposer}>
+        <form className={panelStyles.conversationComposer} onSubmit={handleComposerSubmit}>
           {(drawerError || status || disabledReason) && (
             <p className={panelStyles.conversationHint}>{drawerError || status || disabledReason}</p>
           )}
-          <textarea
+          <ConversationPromptDock
             value={draft}
-            onChange={(event) => setDraft(event.currentTarget.value)}
-            onKeyDown={handleComposerKeyDown}
             placeholder={pack.headlessDesign
-              ? `告诉 Codex 要怎么修改 ${pack.headlessDesign.platform.toUpperCase()} 端当前页面`
+              ? `描述要修改的 ${pack.headlessDesign.platform.toUpperCase()} 页面，Codex 会自动操控微调画布`
               : '告诉 Codex 你想怎么调整当前 APK 元素'}
-            className={panelStyles.conversationTextarea}
+            disabled={Boolean(disabledReason) || sendingMessage}
+            submitDisabled={cannotSend}
+            sending={sendingMessage}
+            textareaRef={textareaRef}
+            onChange={setDraft}
+            onKeyDown={handleComposerKeyDown}
+            onAutoResize={resizeComposer}
+            leading={(
+              <button
+                type="button"
+                className={conversationStyles.composerFork}
+                disabled={cannotSend}
+                title="从当前稳定检查点分叉"
+                aria-label="分叉设计会话"
+                onClick={() => void submit('fork')}
+              >
+                <GitBranch size={15} aria-hidden="true" />
+              </button>
+            )}
+            controls={(
+              <span className={conversationStyles.composerContext}>
+                {pack.headlessDesign ? `${pack.headlessDesign.platform.toUpperCase()} · Codex` : 'APK · Codex'}
+              </span>
+            )}
           />
-          <div className={panelStyles.conversationActions}>
-            <button type="button" disabled={cannotSend} onClick={() => void submit('fork')}>
-              <GitBranch size={14} aria-hidden="true" />
-              分叉
-            </button>
-            <button type="button" disabled={cannotSend} onClick={() => void submit('continue')}>
-              <Send size={14} aria-hidden="true" />
-              发送到 Codex
-            </button>
-          </div>
-        </footer>
+        </form>
       </aside>
     </>
   )

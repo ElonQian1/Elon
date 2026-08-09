@@ -250,9 +250,9 @@ async fn temporary_profile_cleanup_fails_closed_after_bounded_retry_window() {
 
     let removed = process::remove_temporary_profile_for_test(
         &profile,
-        Duration::from_millis(35),
-        Duration::from_millis(5),
-        Duration::from_millis(10),
+        Duration::from_millis(250),
+        Duration::from_millis(2),
+        Duration::from_millis(8),
         move |_| {
             attempts_for_remove.fetch_add(1, Ordering::SeqCst);
             Err(std::io::Error::new(
@@ -446,4 +446,27 @@ async fn real_headless_fixture_uses_ephemeral_local_storage_auth() {
     assert_eq!(result["processCleanup"]["temporaryProfileRemoved"], true);
     server.abort();
     fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn page_exception_summaries_are_redacted_bounded_and_limited() {
+    let events = (0..12)
+        .map(|index| {
+            json!({
+                "method":"Runtime.exceptionThrown",
+                "params":{"exceptionDetails":{"exception":{"description":format!(
+                    "TypeError {index}: api_key=sk-test-secret-abcdefghijklmnopqrstuvwxyz {}\nstack",
+                    "x".repeat(400)
+                )}}}
+            })
+        })
+        .collect::<Vec<_>>();
+    let summaries = browser::page_exception_summaries(&events);
+    assert_eq!(summaries.len(), 8);
+    assert!(summaries
+        .iter()
+        .all(|summary| summary.chars().count() <= 240));
+    assert!(summaries
+        .iter()
+        .all(|summary| !summary.contains("test-secret")));
 }

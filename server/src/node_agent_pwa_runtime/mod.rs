@@ -431,6 +431,7 @@ pub(crate) async fn capture(project_root: &str, input: PwaCaptureInput) -> Value
                 "testData": {"fixtureProfile": prepared.fixture.profile},
                 "interaction": {"executedStepCount": result.executed_step_count},
                 "processCleanup": result.process_cleanup,
+                "pageDiagnostics": result.page_diagnostics,
                 "contextPackReference": {
                     "path": context_path,
                     "sha256": context_sha256,

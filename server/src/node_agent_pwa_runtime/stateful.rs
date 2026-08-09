@@ -345,6 +345,7 @@ fn captured_response(
         "testData":{"fixtureProfile":prepared.fixture.profile,"formValuesEmbedded":false},
         "interaction":{"executedStepCount":result.executed_step_count},
         "processLifecycle":result.process_cleanup,
+        "pageDiagnostics":result.page_diagnostics,
         "contextPackReference":{"path":pixels_path,"sha256":pixels_sha,
             "pixels":{"path":pixels_path,"sha256":pixels_sha},
             "uiTree":{"path":tree_path,"sha256":tree_sha},"embedBase64":false,

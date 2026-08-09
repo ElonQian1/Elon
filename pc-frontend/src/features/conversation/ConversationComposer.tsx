@@ -1,7 +1,7 @@
 import type { FormEvent, KeyboardEvent, RefObject } from 'react'
-import { SendHorizontal } from 'lucide-react'
 import { AttachmentButton, AttachmentChip, type UploadedAttachment } from './AttachmentButton'
 import ComposerRuntimeToggles from './ComposerRuntimeToggles'
+import ConversationPromptDock from './ConversationPromptDock'
 import type { MemberConversationEntry } from './memberConversationApi'
 import type { RuntimeRoute } from './runtimeRoutes'
 import type { RouteModelButtonCopy } from '../models/routeModelPolicy'
@@ -79,8 +79,6 @@ export default function ConversationComposer({
   onSubmit,
   onToggleModelPicker,
 }: ConversationComposerProps) {
-  const sendLabel = sending ? '发送中' : attachmentUploading ? '上传中' : '发送'
-
   return (
     <form
       className={styles.form}
@@ -101,26 +99,27 @@ export default function ConversationComposer({
           </div>
         )}
 
-        <div className={styles.inputDock}>
-          <AttachmentButton
-            disabled={composerDisabled}
-            uploading={attachmentUploading}
-            onFilesSelected={onFilesSelected}
-          />
-          <textarea
-            ref={textareaRef}
-            className={styles.textarea}
-            value={input}
-            onChange={(event) => {
-              onInputChange(event.target.value)
-              onAutoResize()
-            }}
-            onKeyDown={onKeyDown}
-            placeholder={placeholder}
-            disabled={composerDisabled}
-            rows={1}
-          />
-          <div className={styles.inlineControls}>
+        <ConversationPromptDock
+          value={input}
+          placeholder={placeholder}
+          disabled={composerDisabled}
+          submitDisabled={submitDisabled}
+          sending={sending || attachmentUploading}
+          busyLabel={attachmentUploading ? '上传中' : '发送中'}
+          textareaRef={textareaRef}
+          dropActive={attachmentDropActive}
+          onChange={onInputChange}
+          onKeyDown={onKeyDown}
+          onAutoResize={onAutoResize}
+          leading={(
+            <AttachmentButton
+              disabled={composerDisabled}
+              uploading={attachmentUploading}
+              onFilesSelected={onFilesSelected}
+            />
+          )}
+          controls={(
+            <div className={styles.inlineControls}>
             <button
               ref={modelButtonRef}
               className={styles.modelBtn}
@@ -147,17 +146,9 @@ export default function ConversationComposer({
               modelOptions={modelOptions}
               composerRuntimeRoute={composerRuntimeRoute}
             />
-          </div>
-          <button
-            className={styles.sendBtn}
-            type="submit"
-            disabled={submitDisabled}
-            title={sendLabel}
-            aria-label={sendLabel}
-          >
-            {sending ? <span className={styles.sendingMark}>...</span> : <SendHorizontal size={17} aria-hidden="true" />}
-          </button>
-        </div>
+            </div>
+          )}
+        />
 
         {(sendError || attachmentError) && (
           <div className={styles.errorStack}>

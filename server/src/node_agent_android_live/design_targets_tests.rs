@@ -55,6 +55,39 @@ fn discovers_web_pwa_tauri_and_android_as_independent_targets() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[test]
+fn irrelevant_source_files_do_not_hide_manifest_linked_pwa_target() {
+    let root = fixture_root("large-pwa");
+    let noise = root.join("aaa-noise");
+    let pwa = root.join("zzz-pwa");
+    fs::create_dir_all(&noise).unwrap();
+    fs::create_dir_all(&pwa).unwrap();
+    for index in 0..4_050 {
+        fs::write(
+            noise.join(format!("source-{index:04}.rs")),
+            "pub fn value() {}",
+        )
+        .unwrap();
+    }
+    fs::write(
+        pwa.join("shell.html"),
+        r#"<!doctype html><link rel="manifest" href="/manifest.json"><main>PWA</main>"#,
+    )
+    .unwrap();
+
+    let (targets, inspected, truncated) = discover_targets(&root).unwrap();
+
+    assert!(!truncated);
+    assert_eq!(inspected, 1);
+    assert!(targets
+        .iter()
+        .any(|target| target.platform == DesignPlatform::Pwa));
+    assert!(targets
+        .iter()
+        .any(|target| target.platform == DesignPlatform::Web));
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[tokio::test]
 async fn opens_headless_session_without_android_runtime_or_pc_canvas() {
     let root = fixture_root("session");

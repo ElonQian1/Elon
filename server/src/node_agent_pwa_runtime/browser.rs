@@ -23,8 +23,22 @@ pub(super) struct RenderedCapture {
     pub(super) blocked_request_count: u32,
     pub(super) executed_step_count: usize,
     pub(super) semantic_tree: Value,
+    pub(super) page_diagnostics: PageDiagnostics,
     pub(super) process_cleanup: ProcessCleanup,
     pub(super) page_session_id: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct PageDiagnostics {
+    pub(super) document_ready_state: String,
+    pub(super) has_app_root: bool,
+    pub(super) app_root_child_count: u64,
+    pub(super) body_text_length: u64,
+    pub(super) script_count: u64,
+    pub(super) stylesheet_count: u64,
+    pub(super) exception_count: usize,
+    pub(super) exception_summaries: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -267,6 +281,16 @@ pub(super) async fn capture_existing_page(
     }
     let route = security::sanitize_url(&final_url)?;
     let semantic_tree = semantic_tree::capture(cdp, &session, deadline).await?;
+    let page_diagnostics = page_diagnostics(cdp, &session, deadline).await?;
+    if page_diagnostics.has_app_root && page_diagnostics.app_root_child_count == 0 {
+        return Err(CaptureDiagnostic::new(
+            "EMPTY_APP_SURFACE",
+            "页面包含应用挂载点，但应用没有渲染任何根节点",
+            true,
+            "检查 pageDiagnostics 中的脚本异常、静态资源和入口初始化后重试；不要把纯背景图误报为成功画面",
+        )
+        .with_detail("pageDiagnostics", json!(&page_diagnostics)));
+    }
     let (clip, css_width, css_height) = capture_geometry(prepared, cdp, &session, deadline).await?;
     validate_geometry(css_width, css_height, prepared.viewport.device_scale_factor)?;
     let mut params = json!({
@@ -301,6 +325,7 @@ pub(super) async fn capture_existing_page(
         blocked_request_count: cdp.blocked_request_count,
         executed_step_count,
         semantic_tree,
+        page_diagnostics,
         process_cleanup: ProcessCleanup {
             browser_process_reaped: false,
             temporary_profile_removed: false,
@@ -308,6 +333,94 @@ pub(super) async fn capture_existing_page(
         },
         page_session_id: session.to_string(),
     })
+}
+
+async fn page_diagnostics(
+    cdp: &mut CdpClient,
+    session: &str,
+    deadline: Instant,
+) -> Result<PageDiagnostics, CaptureDiagnostic> {
+    let value = cdp
+        .command(
+            "Runtime.evaluate",
+            json!({
+                "expression": r#"(() => { const root = document.getElementById('root'); return { documentReadyState: document.readyState || '', hasAppRoot: !!root, appRootChildCount: root ? root.childElementCount : 0, bodyTextLength: (document.body?.innerText || '').length, scriptCount: document.scripts.length, stylesheetCount: document.styleSheets.length }; })()"#,
+                "returnByValue": true,
+            }),
+            Some(session),
+            deadline,
+        )
+        .await?
+        .pointer("/result/value")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let exception_summaries = page_exception_summaries(&cdp.events);
+    Ok(PageDiagnostics {
+        document_ready_state: value
+            .get("documentReadyState")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        has_app_root: value
+            .get("hasAppRoot")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        app_root_child_count: value
+            .get("appRootChildCount")
+            .and_then(Value::as_u64)
+            .unwrap_or_default(),
+        body_text_length: value
+            .get("bodyTextLength")
+            .and_then(Value::as_u64)
+            .unwrap_or_default(),
+        script_count: value
+            .get("scriptCount")
+            .and_then(Value::as_u64)
+            .unwrap_or_default(),
+        stylesheet_count: value
+            .get("stylesheetCount")
+            .and_then(Value::as_u64)
+            .unwrap_or_default(),
+        exception_count: cdp
+            .events
+            .iter()
+            .filter(|event| {
+                event.get("method").and_then(Value::as_str) == Some("Runtime.exceptionThrown")
+            })
+            .count(),
+        exception_summaries,
+    })
+}
+
+pub(super) fn page_exception_summaries(events: &[Value]) -> Vec<String> {
+    events
+        .iter()
+        .filter(|event| {
+            event.get("method").and_then(Value::as_str) == Some("Runtime.exceptionThrown")
+        })
+        .filter_map(|event| {
+            event
+                .pointer("/params/exceptionDetails/exception/description")
+                .and_then(Value::as_str)
+                .or_else(|| {
+                    event
+                        .pointer("/params/exceptionDetails/text")
+                        .and_then(Value::as_str)
+                })
+        })
+        .map(|description| {
+            let redacted = crate::node_agent_cli_redaction::redact_text(description);
+            redacted
+                .lines()
+                .next()
+                .unwrap_or_default()
+                .chars()
+                .take(240)
+                .collect::<String>()
+        })
+        .filter(|summary| !summary.is_empty())
+        .take(8)
+        .collect()
 }
 
 async fn wait_for_page(

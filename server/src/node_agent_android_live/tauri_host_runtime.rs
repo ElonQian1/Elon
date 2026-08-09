@@ -52,7 +52,7 @@ static RUNTIMES: OnceLock<Mutex<HashMap<String, RuntimeState>>> = OnceLock::new(
 
 pub(super) fn tool_definitions() -> Vec<Value> {
     vec![
-        tool(PREPARE_TOOL, "为已发现的 Tauri designSession 受控启动项目 CLI；重复调用只轮询本进程树中的原生窗口，不接管用户其他进程。", json!({
+        tool(PREPARE_TOOL, "为已发现的 Tauri designSession 受控启动项目 CLI；没有 JS 包管理入口时直接用项目内 Cargo manifest 启动，不要求全局 cargo-tauri。重复调用只轮询本进程树中的原生窗口，不接管用户其他进程。", json!({
             "type":"object","additionalProperties":false,"required":["designSessionId"],
             "properties":{"designSessionId":{"type":"string","pattern":"^design_[a-f0-9]{32}$"},"restart":{"type":"boolean","default":false}}
         }), false),
@@ -401,7 +401,10 @@ fn launch_spec(module: &Path) -> Result<LaunchSpec> {
     } else if module.join("package.json").is_file() {
         ("npm.cmd", vec!["exec", "tauri", "--", "dev"])
     } else if module.join("src-tauri/Cargo.toml").is_file() {
-        ("cargo.exe", vec!["tauri", "dev"])
+        (
+            "cargo.exe",
+            vec!["run", "--manifest-path", "src-tauri/Cargo.toml"],
+        )
     } else {
         bail!("TAURI_LAUNCHER_NOT_FOUND：模块缺少 package.json 或 src-tauri/Cargo.toml");
     };
@@ -438,4 +441,34 @@ fn runtimes() -> &'static Mutex<HashMap<String, RuntimeState>> {
 
 fn tool(name: &str, description: &str, input_schema: Value, read_only: bool) -> Value {
     json!({"name":name,"description":description,"inputSchema":input_schema,"annotations":{"readOnlyHint":read_only,"destructiveHint":false,"idempotentHint":read_only,"openWorldHint":false}})
+}
+
+#[cfg(test)]
+mod tests {
+    use super::launch_spec;
+
+    #[test]
+    fn cargo_only_tauri_project_does_not_require_global_tauri_cli() {
+        let root = std::env::temp_dir().join(format!(
+            "elon-tauri-launch-spec-{}",
+            uuid::Uuid::new_v4().simple()
+        ));
+        let tauri_root = root.join("src-tauri");
+        std::fs::create_dir_all(&tauri_root).expect("create src-tauri");
+        std::fs::write(tauri_root.join("Cargo.toml"), "[package]\nname='fixture'\n")
+            .expect("write manifest");
+
+        let spec = launch_spec(&root).expect("cargo launch spec");
+
+        assert_eq!(spec.program, "cargo.exe");
+        assert_eq!(
+            spec.args,
+            ["run", "--manifest-path", "src-tauri/Cargo.toml"]
+        );
+        assert_eq!(
+            spec.display,
+            "cargo run --manifest-path src-tauri/Cargo.toml"
+        );
+        std::fs::remove_dir_all(&root).expect("remove fixture");
+    }
 }

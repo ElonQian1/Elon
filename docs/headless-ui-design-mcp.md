@@ -28,8 +28,8 @@ reviewed_at: 2026-08-05
 - 安全交互支持 `click`、`waitFor`、`assertText`、`scrollIntoView`、白名单键盘键、checkbox/radio、select 和非秘密表单填入。表单值只能引用项目内已审查 `fixtureProfile.formValues` 的 key，MCP/PC 不传真实值；password、hidden、file 与疑似秘密键值失败关闭。
 - 每次成功捕获同时生成 PNG 和紧凑语义 UI 树，两者都只返回绝对路径、SHA-256 和小型元数据，不返回 Base64。
 - AI 可按 selector、role、label 或 tag 查询 UI 树，默认最多读取 40 个节点，单次最多 80 个。
-- Android 继续复用既有 Android Live Runtime；Runtime 未连接时明确返回 `PREPARATION_REQUIRED`，不会用浏览器画面冒充 Android。
-- Tauri 目标可按 `ui_prepare_tauri_runtime -> ui_capture_tauri_host -> ui_capture_tauri_behavior -> ui_stop_tauri_runtime` 管理项目发现出的开发命令，且只枚举该 Runtime 的后代进程。Windows 原生窗口通过 `PrintWindow` 保存 PNG、边界、PID 和 SHA-256；行为层另外只读原生菜单、候选系统对话框和项目显式写入的严格 command trace。
+- Android 继续复用既有 Android Live Runtime；Runtime 未连接时明确返回 `PREPARATION_REQUIRED`，不会用浏览器画面冒充 Android。普通验证找不到 emulator、AVD 或空闲 Renderer 时返回结构化 `VERIFICATION_DEFERRED`，包含有界脱敏错误码和恢复动作，固定 `capabilityGapRequired=false`；除非用户明确要求或反馈视觉不正确，不探测或回退到物理设备。
+- Tauri 目标可按 `ui_prepare_tauri_runtime -> ui_capture_tauri_host -> ui_capture_tauri_behavior -> ui_stop_tauri_runtime` 管理项目发现出的开发命令，且只枚举该 Runtime 的后代进程。没有全局 `cargo-tauri` 时，Cargo-only 项目回退到 `cargo run --manifest-path <src-tauri/Cargo.toml>`，仍不接受任意命令。Windows 原生窗口通过 `PrintWindow` 保存 PNG、边界、PID 和 SHA-256；行为层另外只读原生菜单、候选系统对话框和项目显式写入的严格 command trace。
 - Tauri 证据分层为 `TAURI_NATIVE_WINDOW`、`WIN32_NATIVE_MENU_OBSERVED`、`DESCENDANT_TOP_LEVEL_WINDOWS_OBSERVED` 与 `PROJECT_INSTRUMENTED_TRACE/NOT_INSTRUMENTED`。项目 trace 不含 command 参数或结果正文，不能冒充操作系统证明；数据面不提供任意菜单点击或任意 Rust command 执行。
 - Web、PWA、Tauri 和 Android 共用项目级 Design Draft v2：除兼容 style patch 外，可表达 `SET_STYLE`、`SET_TEXT`、`REPLACE_ASSET`、`SET_VARIANT`、节点增删移动和 `SET_RESPONSIVE_STYLE`；每项按平台标记 `LIVE_PREVIEW`、`SOURCE_HANDOFF` 或 `UNSUPPORTED`。草稿继续使用乐观 revision、最多 50 层内部历史和单步撤销，MCP 不回传完整历史。
 - `ui_preview_design_draft` 把最多 32 个白名单视觉属性临时应用到当前持久浏览器，`ui_restore_design_draft_preview` 恢复首次预览前的内联值。它们拒绝外部 CSS 资源、脚本型值和任意 JavaScript，只生成新 PNG/UI tree；响应固定声明 `previewOnly=true`、`sourceModified=false`。
@@ -38,6 +38,8 @@ reviewed_at: 2026-08-05
 - `ui_plan_design_writeback` 把 DraftOperation 按目标平台编译成持久写回计划，展示框架适配器、mutation kind、确定性/AI handoff、阻塞项和 LOW/MEDIUM/HIGH 风险。`ui_decide_design_writeback_plan` 必须显式批准或带原因拒绝；批准不修改源码。`ui_begin_design_writeback` 只接受已批准且 draft revision、绑定 SHA/range 未漂移的 `writebackPlanId`，再固定 Git/source 基线。AI 修改源码并完成分平台验证后，仍由 `ui_complete_design_writeback` 持久化 changed files、source hashes、Git revision 和平台证据。
 - `ui_propose_design_source_patch` 只接受已批准写回计划、已确认 binding、精确 UTF-8 byte range、片段 SHA-256 和有界 replacement。提案把完整审查内容留在项目 review artifact，API 只返回范围/摘要哈希；`ui_decide_design_source_patch` 二次批准后，`ui_apply_design_source_patch` 才能按 `APPROVED -> APPLYING -> APPLIED` journal 原子替换源码。应用后 `ui_plan_design_source_rollback` 生成精确逆向审查计划，但不自动回滚。
 - `ui_create_design_regression_baseline` 只固化已通过文件哈希复核的 PNG/UI tree。重新捕获后，`ui_plan_design_regression_comparison` 固定前后证据、平台、route、viewport、允许变化 selector 和阈值；`ui_run_design_regression_comparison` 在节点本机重新复核四个输入哈希，执行确定性 RGBA 像素与 selector 语义比较，生成项目内紧凑 diff artifact 并按任务阈值计算 `PASSED/FAILED`。外部比较器仍可通过 `ui_complete_design_regression_comparison` 提交已验哈 artifact；规划比较任务本身不等于已执行比较。
+- PWA 目标发现只让相关 HTML/manifest/service worker/设计配置消耗扫描上限，因而不会被大型仓库前置的无关文件挤出；HTML 中 manifest/service worker 线索可形成独立 PWA 目标。捕获额外返回 ready state、app root/body、脚本/样式和脱敏有界异常摘要；空 SPA surface 明确诊断，不把空白页当成功。
+- 语义 selector 会形成到根节点的完整路径，或在唯一 `id`/`data-testid` 锚点处停止；代理可在紧凑树中定位组件并用同一 selector 后台点击、断言和重捕获，无需桌面坐标。
 - `ui_get_project_profile` 的 schema v3 包含相同的多端目标摘要，其他代理可以先读小型档案再决定调用什么工具。
 - Node Admin 提供与 MCP 工具同源的项目级 HTTP 适配层；PC 不复制目标发现、会话、Tauri Runtime、草稿或证据状态机。
 - `ui_get_design_capabilities` 返回节点实际安装的 `yilong-ui-live@1.12.0` schema、能力 ID、安全边界和项目已发现平台；调用成功本身才是当前节点已升级的证据。v1.12 在 v1.11 的意图执行、受审源码补丁/回滚与回归契约之上新增 `NODE_LOCAL_REGRESSION_COMPARATOR`。
@@ -50,11 +52,11 @@ v1.12 正式门禁已完成：PC 全量 TypeScript/Vite 构建、ESLint 与微�
 
 代理未打开 PC 画布或可见浏览器，先用正式节点无头捕获 960×720 Web 页面和 108 节点语义树，再在新 MCP 连接中运行本机比较；原任务从 revision 1 原子推进到 2 并进入 `PASSED`，像素差、缺失/新增/改变 selector 均为 0。视觉/语义工件分别只有 569/531 字节，`contentEmbedded=false`，磁盘 SHA-256 与回执一致。真实语义树含 108 节点但只有 106 个唯一 selector；首轮据此发现重复 selector 兼容缺口，修复为按稳定语义签名多重集比较后，以同一 READY 比较任务复验通过。
 
-代理未打开 PC 画布或可见浏览器，即在正式节点完成 Web/Tauri 目标发现、Web 会话打开、PNG 与 5 节点语义树捕获、按钮点击与文本断言、回归基线、可逆样式草稿预览/恢复、写回安全阻断及六步 DesignIntentPlan 回执闭环；计划最后进入 `COMPLETED`，task lease 进入 `SETTLED`。Web 语义查询读取到 `#status` 的“正式节点后台交互成功”；Tauri 前端也执行相同 2 步后台交互并准确返回 `TAURI_FRONTEND_WEBVIEW_ONLY`、`nativeHostVerified=false`。候选节点首次冷浏览器捕获约 33 秒，后续捕获/交互约 3–8 秒；正式节点本轮小型控制调用约 1.1–2.1 秒，页面捕获约 3.3–3.7 秒。响应只返回路径、哈希和紧凑节点，不嵌入 Base64。复验后已重新打开桌面壳，只有一个安装目录 `elon-desktop.exe`，正式 7799 节点仍保持目标 release identity 且云连接正常。
+2026-08-09 候选节点完成新的全后台闭环，期间未打开 PC 微调画布或可见浏览器：Web、390×844 PWA 与 Tauri WebView 均在新构建上重捕获 PNG/UI tree，并从相同 textarea selector 读回“Codex 会自动操控微调画布”的新提示。代理用真实 UI 节点建立 draft 和回归基线，显式确认 source binding，批准 writeback plan，提交精确 UTF-8 byte range/SHA 补丁，读取 review artifact 后二次批准并应用；最终 receipt 为 `COMPLETE`，Web/PWA/Tauri 均为 `BUILD_VERIFIED + evidenceComplete=true`，验证矩阵 `PASSED`。Web 本机比较只出现 1 个允许的 selector 语义变化，像素差为 0。
 
-本轮仍未验证 Tauri 原生窗口、菜单、对话框或 command trace，未执行 PWA 独立目标、Android Runtime、模拟器、真机或人工视觉；写回计划因 fixture 未确认源码绑定而按设计对 Web/Tauri 返回 `BLOCKED_BINDING`，没有修改源码。Web 后台视觉/语义比较器、正式发布与升级回读已经通过，但这不代表所有平台均已验收。
+同轮 Tauri 原生证据已由真实窗口完成：1296×809 `TAURI_NATIVE_WINDOW` PNG SHA-256 为 `5e98308869ee557dc16a82774d5c5001f5560bd70004b3eb864812c0e96a9f74`；只读行为工件 SHA-256 为 `f93693746c6f92c00093b83e65210bd00f891593baeeab6544243ee491088628`，菜单/候选对话框为 0、断言通过、Rust command coverage 为 `NOT_INSTRUMENTED`。这证明当前窗口和受限行为扫描，不把未插桩 command trace 冒充已验证。
 
-Tauri 前端截图仍只能证明 WebView；只有 `ui_capture_tauri_host` 返回带 SHA-256 的原生工件时才能声明原生窗口证据。菜单、对话框和 command trace 是额外分层证据，不会单独把 `nativeHostVerified` 变为 true。
+Android 隔离验证实际执行到设备选择阶段，但本机未安装 emulator，返回 `VERIFICATION_DEFERRED`、`ANDROID_RENDERER=UNAVAILABLE`、`REAL_DEVICE_STATUS=NOT_REQUIRED`、`capabilityGapRequired=false` 和恢复动作 `INSTALL_ANDROID_EMULATOR`；未使用已在线的物理设备。它证明延期合同可用，不代表 Android 视觉、FitRun、跨端像素损失或人工验收已经通过。
 
 ## 3. 代理的标准调用顺序
 
@@ -276,7 +278,8 @@ PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作
 3. 已完成：正式节点上的 Web 真实浏览器 fixture 无界面发现、捕获、受限交互、断言、基线、草稿预览/恢复和 DesignIntentPlan 回执；Tauri 已验证前端 WebView 分层证据。
 4. 已完成：本机发布、自动激活和能力回读；激活器只接受正式安装 listener，7800 候选节点不能推进正式发布状态。旧节点 CLI/Exec 的独立兼容矩阵仍可继续扩展。
 5. 已完成正式运行验收：source patch 漂移/`APPLYING` 恢复、可变长度 rollback offset、本机比较器 artifact/SHA/阈值 PASS/FAIL；正式 7799 节点已回读 v1.12，并在不打开画布的独立 MCP 连接中持久化 Web 比较 `PASSED` 回执。
-6. 待补：Tauri 原生窗口/菜单/对话框/插桩 trace、Android 隔离模拟器、PWA 独立目标和四端验证矩阵回执；只有用户明确要求或反馈视觉不正确时再做真机复核。
+6. 已完成：PWA 独立目标的大仓库发现、页面诊断、完整语义 selector、后台点击/断言；Tauri Cargo-only 启动回退、原生窗口和受限行为证据；真实 source binding、双审批源码补丁、构建、三端重捕获、回归比较和 Web/PWA/Tauri `PASSED` 写回矩阵。
+7. 待环境具备后补：Android 隔离 emulator/AVD 的真实 Renderer、FitRun 与跨端视觉损失。当前为 `VERIFICATION_DEFERRED` 而非代码 capability gap；只有用户明确要求或反馈视觉不正确时再做真机复核。项目 command trace 仍需项目自行插桩后才能从 `NOT_INSTRUMENTED` 升级为证据。
 
 每一阶段都先扩展相同 MCP 契约；不得通过让代理操控 Windows 桌面来绕过缺失的数据面。
 
@@ -309,7 +312,9 @@ PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作
 - `file:server/src/node_agent_android_live/design_verification_matrix.rs`
 - `file:server/src/node_agent_android_live/tauri_behavior.rs`
 - `file:server/src/node_agent_android_live/tauri_behavior_windows.rs`
+- `file:server/src/node_agent_android_live/verification_deferred.rs`
 - `file:server/src/node_agent_pwa_runtime/stateful.rs`
+- `file:server/src/node_agent_pwa_runtime/browser.rs`
 - `file:server/src/node_agent_pwa_runtime/interaction.rs`
 - `file:server/src/node_agent_pwa_runtime/style_preview.rs`
 - `file:server/src/node_agent_pwa_runtime/semantic_tree.rs`
@@ -319,6 +324,7 @@ PC 只在 localStorage 保存工作区显示模式，不把“当前页面”作
 - `file:server/src/node_agent_ui_design_workspace.rs`
 - `file:pc-frontend/src/features/ui-tuner/headless-design/`
 - `file:pc-frontend/src/features/ui-tuner/UiTunerConversationDrawer.tsx`
+- `file:pc-frontend/src/features/conversation/ConversationPromptDock.tsx`
 - `symbol:node_agent_android_live::design_targets::tool_definitions`
 - `symbol:node_agent_android_live::design_targets::call`
 - `symbol:node_agent_ui_design_workspace::build_project_ui_profile`

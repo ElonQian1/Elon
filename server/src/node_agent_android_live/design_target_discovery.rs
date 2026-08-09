@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fs, path::Path};
+use std::{collections::BTreeSet, fs::File, io::Read, path::Path};
 
 use anyhow::Result;
 use ignore::WalkBuilder;
@@ -23,21 +23,24 @@ pub(super) fn discover_targets(root: &Path) -> Result<(Vec<DesignTarget>, usize,
         .build()
         .filter_map(|entry| entry.ok())
     {
-        if inspected >= MAX_SCANNED_FILES {
-            break;
-        }
         let path = entry.path();
         if !entry.file_type().is_some_and(|kind| kind.is_file()) || ignored_path(path) {
             continue;
         }
-        inspected += 1;
-        let relative = path.strip_prefix(root).unwrap_or(path);
-        let text = relative.to_string_lossy().replace('\\', "/");
         let name = path
             .file_name()
             .and_then(|value| value.to_str())
             .unwrap_or_default()
             .to_ascii_lowercase();
+        if !is_design_config_candidate(&name) {
+            continue;
+        }
+        if inspected >= MAX_SCANNED_FILES {
+            break;
+        }
+        inspected += 1;
+        let relative = path.strip_prefix(root).unwrap_or(path);
+        let text = relative.to_string_lossy().replace('\\', "/");
         if name == "package.json" || name == "index.html" {
             web_configs.insert(text.clone());
             web_roots.insert(relative_parent(relative));
@@ -49,6 +52,24 @@ pub(super) fn discover_targets(root: &Path) -> Result<(Vec<DesignTarget>, usize,
                 .any(|marker| prefix.contains(marker))
             {
                 has_pwa = true;
+                pwa_configs.insert(text.clone());
+            }
+        }
+        if name.ends_with(".html") {
+            let prefix = read_prefix(path, 256 * 1024)
+                .unwrap_or_default()
+                .to_ascii_lowercase();
+            if [
+                "rel=\"manifest\"",
+                "rel='manifest'",
+                "navigator.serviceworker.register",
+            ]
+            .iter()
+            .any(|marker| prefix.contains(marker))
+            {
+                has_pwa = true;
+                web_configs.insert(text.clone());
+                web_roots.insert(relative_parent(relative));
                 pwa_configs.insert(text.clone());
             }
         }
@@ -117,6 +138,23 @@ pub(super) fn discover_targets(root: &Path) -> Result<(Vec<DesignTarget>, usize,
     Ok((targets, inspected, inspected >= MAX_SCANNED_FILES))
 }
 
+fn is_design_config_candidate(name: &str) -> bool {
+    name == "package.json"
+        || name.ends_with(".html")
+        || name.ends_with(".webmanifest")
+        || matches!(
+            name,
+            "service-worker.js"
+                | "service-worker.ts"
+                | "sw.js"
+                | "sw.ts"
+                | "tauri.conf.json"
+                | "tauri.conf.json5"
+                | "tauri.conf.toml"
+                | "androidmanifest.xml"
+        )
+}
+
 fn target(
     platform: DesignPlatform,
     label: &'static str,
@@ -174,6 +212,7 @@ fn ignored_path(path: &Path) -> bool {
 }
 
 fn read_prefix(path: &Path, max: usize) -> Result<String> {
-    let bytes = fs::read(path)?;
-    Ok(String::from_utf8_lossy(&bytes[..bytes.len().min(max)]).to_string())
+    let mut bytes = Vec::with_capacity(max.min(64 * 1024));
+    File::open(path)?.take(max as u64).read_to_end(&mut bytes)?;
+    Ok(String::from_utf8_lossy(&bytes).to_string())
 }

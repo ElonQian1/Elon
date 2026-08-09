@@ -78,12 +78,27 @@ fn semantic_tree_expression() -> &'static str {
         return tag;
       };
       const stableSelector = (element) => {
-        if (element.id) return `#${CSS.escape(element.id)}`;
-        const testId = element.getAttribute('data-testid');
-        if (testId) return `[data-testid="${String(testId).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`;
+        const uniqueAnchor = (candidate) => {
+          if (candidate.id) {
+            const selector = `#${CSS.escape(candidate.id)}`;
+            if (document.querySelectorAll(selector).length === 1) return selector;
+          }
+          const testId = candidate.getAttribute('data-testid');
+          if (testId) {
+            const selector = `[data-testid="${String(testId).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"]`;
+            if (document.querySelectorAll(selector).length === 1) return selector;
+          }
+          return null;
+        };
+        const directAnchor = uniqueAnchor(element);
+        if (directAnchor) return directAnchor;
         const parts = [];
         let current = element;
-        while (current && current !== document.body && parts.length < 6) {
+        while (current && current !== document.body) {
+          if (current !== element) {
+            const anchor = uniqueAnchor(current);
+            if (anchor) return `${anchor} > ${parts.join(' > ')}`;
+          }
           let part = current.tagName.toLowerCase();
           const parent = current.parentElement;
           if (parent) {
@@ -188,5 +203,9 @@ mod tests {
         assert!(validate(json!({"schema":"unknown","nodes":[]})).is_err());
         assert!(semantic_tree_expression().contains("inputType === 'password'"));
         assert!(semantic_tree_expression().contains("data-testid"));
+        assert!(
+            semantic_tree_expression().contains("document.querySelectorAll(selector).length === 1")
+        );
+        assert!(!semantic_tree_expression().contains("parts.length < 6"));
     }
 }

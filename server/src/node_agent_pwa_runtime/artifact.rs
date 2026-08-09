@@ -1,5 +1,5 @@
 use super::{
-    browser::{BrowserIdentity, ProcessCleanup, RenderedCapture},
+    browser::{BrowserIdentity, PageDiagnostics, ProcessCleanup, RenderedCapture},
     security::{CaptureEvidence, PreparedCapture, SanitizedRoute},
     CaptureDiagnostic,
 };
@@ -21,6 +21,7 @@ pub(super) struct PersistedCapture {
     pub(super) viewport: CaptureViewportMetadata,
     pub(super) network_policy: NetworkPolicyMetadata,
     pub(super) process_cleanup: ProcessCleanup,
+    pub(super) page_diagnostics: PageDiagnostics,
     pub(super) executed_step_count: usize,
 }
 
@@ -83,6 +84,7 @@ struct CaptureManifest<'a> {
     viewport: &'a CaptureViewportMetadata,
     network_policy: &'a NetworkPolicyMetadata,
     process_cleanup: &'a ProcessCleanup,
+    page_diagnostics: &'a PageDiagnostics,
     authentication_mode: &'static str,
     fixture_profile: Option<&'a str>,
     executed_step_count: usize,
@@ -219,6 +221,7 @@ pub(super) fn persist(
         viewport: &viewport,
         network_policy: &network_policy,
         process_cleanup: &rendered.process_cleanup,
+        page_diagnostics: &rendered.page_diagnostics,
         authentication_mode: prepared.auth.mode,
         fixture_profile: prepared.fixture.profile.as_deref(),
         executed_step_count: rendered.executed_step_count,
@@ -247,6 +250,7 @@ pub(super) fn persist(
         viewport,
         network_policy,
         process_cleanup: rendered.process_cleanup,
+        page_diagnostics: rendered.page_diagnostics,
         executed_step_count: rendered.executed_step_count,
     })
 }
