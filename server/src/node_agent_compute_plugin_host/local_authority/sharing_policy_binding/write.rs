@@ -33,6 +33,9 @@ use crate::{
     },
 };
 
+#[cfg(test)]
+mod tests;
+
 pub(super) fn bind(
     authority: &ComputePluginLocalAuthority,
     intent: ComputePluginLocalPolicyBindingIntent,

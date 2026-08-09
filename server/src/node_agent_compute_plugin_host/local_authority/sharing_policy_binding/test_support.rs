@@ -1,7 +1,15 @@
 use chrono::{DateTime, TimeZone, Utc};
+use homecli_proto::{
+    ComputePluginSharingAuthorizationBindingV1, ComputePluginSharingPolicySnapshotV1,
+    COMPUTE_PLUGIN_SHARING_POLICY_SNAPSHOT_V1_SCHEMA,
+};
 
-use super::types::{PolicyBindingAuthorityState, PreparedSharingPolicyBindingRequest};
+use super::types::{
+    PolicyBindingAuthorityState, PreparedSharingPolicyBindingRequest,
+    SharingPolicyBindingRequestDigest, COMPUTE_PLUGIN_SHARING_POLICY_BINDING_REQUEST_SCHEMA,
+};
 use super::validation::ReadPolicyBindingState;
+use crate::compute_plugin_sharing_directive::compute_plugin_sharing_policy_snapshot_digest;
 use crate::node_agent_compute_plugin_host::identity::ComputePluginReleaseRef;
 use crate::node_agent_compute_plugin_host::{
     lifecycle::{
@@ -16,9 +24,6 @@ use crate::node_agent_compute_plugin_host::{
 const INSTALLATION_DIGEST: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const POLICY_DIGEST: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-const POLICY_SNAPSHOT_DIGEST: &str =
-    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-const REQUEST_DIGEST: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
 pub(super) fn trusted_high_water() -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2026, 8, 7, 0, 1, 0).single().unwrap()
@@ -29,34 +34,64 @@ pub(super) fn bound_at() -> DateTime<Utc> {
 }
 
 pub(super) fn request(policy_revision: i64) -> PreparedSharingPolicyBindingRequest {
-    PreparedSharingPolicyBindingRequest {
-        node_id: "node_1".to_string(),
-        owner_user_id: "owner_1".to_string(),
-        installation_id_digest: INSTALLATION_DIGEST.to_string(),
-        policy_revision,
-        policy_digest: POLICY_DIGEST.to_string(),
-        policy_snapshot_json: "{\"schema\":\"fixture\"}".to_string(),
-        policy_snapshot_digest: POLICY_SNAPSHOT_DIGEST.to_string(),
-        sharing_enabled: true,
-        sharing_authorization_ref: Some("authorization_4".to_string()),
-        sharing_authorization_revision: Some(policy_revision),
-        sharing_authorization_digest: Some(POLICY_DIGEST.to_string()),
-        source_preparation_id: Some("preparation_4".to_string()),
-        source_bootstrap_instance_id: "bootstrap_1".to_string(),
-        source_configuration_generation: 5,
-        source_cancellation_generation: 7,
-        request_digest: REQUEST_DIGEST.to_string(),
-    }
+    request_with_runtime(policy_revision, true)
 }
 
 pub(super) fn disabled_request(policy_revision: i64) -> PreparedSharingPolicyBindingRequest {
-    let mut request = request(policy_revision);
-    request.sharing_enabled = false;
-    request.sharing_authorization_ref = None;
-    request.sharing_authorization_revision = None;
-    request.sharing_authorization_digest = None;
-    request.source_preparation_id = None;
-    request
+    request_with_runtime(policy_revision, false)
+}
+
+fn request_with_runtime(
+    policy_revision: i64,
+    sharing_enabled: bool,
+) -> PreparedSharingPolicyBindingRequest {
+    let authorization = sharing_enabled.then(|| ComputePluginSharingAuthorizationBindingV1 {
+        authorization_ref: format!("authorization_{policy_revision}"),
+        revision: u64::try_from(policy_revision).unwrap(),
+        digest: POLICY_DIGEST.to_string(),
+    });
+    let snapshot = ComputePluginSharingPolicySnapshotV1 {
+        schema: COMPUTE_PLUGIN_SHARING_POLICY_SNAPSHOT_V1_SCHEMA.to_string(),
+        node_id: "node_1".to_string(),
+        owner_user_id: "owner_1".to_string(),
+        installation_identity_digest: INSTALLATION_DIGEST.to_string(),
+        policy_revision: u64::try_from(policy_revision).unwrap(),
+        policy_digest: POLICY_DIGEST.to_string(),
+        plugin_runtime_requested: sharing_enabled,
+        authorization,
+    };
+    let policy_snapshot_json = serde_json::to_string(&snapshot).unwrap();
+    let policy_snapshot_digest = compute_plugin_sharing_policy_snapshot_digest(&snapshot).unwrap();
+    let request_digest = jcs_sha256_hex(&SharingPolicyBindingRequestDigest {
+        schema: COMPUTE_PLUGIN_SHARING_POLICY_BINDING_REQUEST_SCHEMA,
+        policy_snapshot: &snapshot,
+        policy_snapshot_digest: &policy_snapshot_digest,
+    })
+    .unwrap();
+    PreparedSharingPolicyBindingRequest {
+        node_id: snapshot.node_id,
+        owner_user_id: snapshot.owner_user_id,
+        installation_id_digest: INSTALLATION_DIGEST.to_string(),
+        policy_revision,
+        policy_digest: POLICY_DIGEST.to_string(),
+        policy_snapshot_json,
+        policy_snapshot_digest,
+        sharing_enabled,
+        sharing_authorization_ref: snapshot
+            .authorization
+            .as_ref()
+            .map(|value| value.authorization_ref.clone()),
+        sharing_authorization_revision: snapshot
+            .authorization
+            .as_ref()
+            .map(|value| i64::try_from(value.revision).unwrap()),
+        sharing_authorization_digest: snapshot.authorization.map(|value| value.digest),
+        source_preparation_id: sharing_enabled.then(|| "preparation_4".to_string()),
+        source_bootstrap_instance_id: "bootstrap_1".to_string(),
+        source_configuration_generation: 5,
+        source_cancellation_generation: 7,
+        request_digest,
+    }
 }
 
 pub(super) fn authority_state() -> ReadPolicyBindingState {
