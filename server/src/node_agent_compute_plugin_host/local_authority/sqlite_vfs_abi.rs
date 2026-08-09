@@ -12,6 +12,7 @@ use rusqlite::ffi;
 mod boundary;
 mod io_core;
 mod io_shm;
+mod raw_state;
 mod result_codes;
 mod types;
 mod vfs_callbacks;
@@ -22,7 +23,8 @@ const INERT_VFS_NAME: &[u8] = b"elon-handle-bound-unavailable-v1\0";
 const MAX_LOGICAL_NAME_BYTES: c_int = 64;
 
 /// Version 2 advertises the WAL callback slots but deliberately omits mmap fetch/unfetch.
-/// No callback in this table can observe live managed-file state in this batch.
+/// Production `xOpen` never installs this table. Raw-state tests may install it only to verify
+/// ownership transitions; no callback can perform a managed-file operation in this batch.
 static INERT_IO_METHODS: ffi::sqlite3_io_methods = ffi::sqlite3_io_methods {
     iVersion: 2,
     xClose: Some(io_core::close),

@@ -2,15 +2,17 @@ use std::os::raw::{c_int, c_void};
 
 use rusqlite::ffi;
 
-use super::{boundary, result_codes};
+use super::{boundary, raw_state, result_codes};
 
 pub(super) unsafe extern "C" fn close(file: *mut ffi::sqlite3_file) -> c_int {
-    // Even a forged direct call cannot leave a second callback path installed.
-    // SAFETY: the callback contract supplies the file allocation when non-null.
-    unsafe {
-        let _ = boundary::clear_file(file);
-    }
     boundary::catch_code(result_codes::CLOSE_UNAVAILABLE, || {
+        // No production path installs state yet. A test or future partial adapter that reaches
+        // this inert callback still loses its callback path before payload Drop fail-closes its
+        // custody; a proper live xClose must instead take the typed state and call explicit close.
+        // SAFETY: the callback contract supplies an initialized file allocation when non-null.
+        unsafe {
+            let _ = raw_state::abandon_installed_state(file);
+        }
         result_codes::CLOSE_UNAVAILABLE
     })
 }

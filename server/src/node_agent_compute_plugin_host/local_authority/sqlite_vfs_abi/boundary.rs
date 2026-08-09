@@ -6,8 +6,6 @@ use std::{
 
 use rusqlite::ffi;
 
-use super::types::InertHandleBoundSqliteFile;
-
 /// Prevents a Rust unwind from crossing a C callback boundary.
 pub(super) fn catch_code(fallback: c_int, operation: impl FnOnce() -> c_int) -> c_int {
     catch_unwind(AssertUnwindSafe(operation)).unwrap_or(fallback)
@@ -20,25 +18,6 @@ pub(super) fn catch_value<T: Copy>(fallback: T, operation: impl FnOnce() -> T) -
 
 pub(super) fn catch_void(operation: impl FnOnce()) {
     let _ = catch_unwind(AssertUnwindSafe(operation));
-}
-
-/// Establishes the only valid failed-`xOpen` state: no methods and no Rust custody.
-///
-/// # Safety
-///
-/// A non-null `file` must refer to the aligned `szOsFile` allocation SQLite supplied to this VFS.
-pub(super) unsafe fn clear_file(file: *mut ffi::sqlite3_file) -> bool {
-    if file.is_null() {
-        return false;
-    }
-    let file = file.cast::<InertHandleBoundSqliteFile>();
-    // SAFETY: guaranteed by the callback contract above. `base` is the first repr(C) field and
-    // SQLite allocated the full size published by the inert table.
-    unsafe {
-        ptr::addr_of_mut!((*file).base.pMethods).write(ptr::null());
-        ptr::addr_of_mut!((*file).state).write(ptr::null_mut());
-    }
-    true
 }
 
 /// # Safety

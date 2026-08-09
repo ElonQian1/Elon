@@ -3,7 +3,7 @@ use std::os::raw::{c_char, c_int, c_void};
 use rusqlite::ffi;
 
 use super::{
-    boundary,
+    boundary, raw_state,
     result_codes::{
         ACCESS_UNAVAILABLE, CURRENT_TIME_UNAVAILABLE, DELETE_UNAVAILABLE,
         FULL_PATHNAME_UNAVAILABLE, VFS_UNAVAILABLE,
@@ -21,7 +21,7 @@ pub(super) unsafe extern "C" fn open(
     // any fallible work, and never install the inert I/O table.
     // SAFETY: the SQLite callback contract supplies these output allocations when non-null.
     unsafe {
-        let _ = boundary::clear_file(file);
+        let _ = raw_state::initialize_fresh_file(file);
         boundary::write_int_zero(output_flags);
     }
     boundary::catch_code(VFS_UNAVAILABLE, || VFS_UNAVAILABLE)
