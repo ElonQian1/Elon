@@ -45,4 +45,12 @@ PC 已能要求消费者在动作能力表单上确认当前输入，但该约�
 - `server/src/open_commerce_action_confirmation_mcp.rs`
 - `server/src/store/open_commerce_action_confirmations.rs`
 - `server/src/open_commerce_action_confirmation_api.rs`
+- `server/src/open_commerce_action_confirmation_cancellation_tests.rs`
+- `server/src/open_commerce_action_confirmation_test_support.rs`
 - `pc-frontend/src/features/open-commerce/ConsumerCommerceSandbox.tsx`
+
+## 验证状态
+
+- 动作确认定向 Rust 套件已通过，覆盖主动取消、幂等重试、用户与 App 隔离、自然过期、已消费拒绝、同幂等请求重新准备、审计单写、MCP 安全投影以及取消与 Invocation 创建并发二选一。
+- v166 迁移已随测试 Store 的完整打开路径执行；带既有数据的旧库升级样本和多个独立数据库连接之间的竞争仍需统一回归。
+- WebAuthn、可信设备展示、跨设备确认、真实订单撤销、退款、库存回滚和外部平台补偿不属于本批已验证能力。
