@@ -3,9 +3,9 @@ use std::{error::Error as StdError, fmt, mem::ManuallyDrop, ptr};
 use super::{
     lock_domain::ManagedSqliteLockOwner, platform, ManagedSqliteAccess, ManagedSqliteFileKind,
     ManagedSqliteLockFailure, ManagedSqliteNamespaceInner, ManagedSqliteUnlockTarget,
-    PinnedManagedSqliteFile, PinnedManagedSqliteMainFile, PlatformFileIdentity,
-    QuarantinedManagedSqliteFile,
+    PinnedManagedSqliteFile, PinnedManagedSqliteMainFile, QuarantinedManagedSqliteFile,
 };
+use crate::node_agent_managed_fs::PlatformFileIdentity;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ManagedSqliteFileCloseFailureClass {

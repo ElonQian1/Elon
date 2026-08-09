@@ -12,13 +12,14 @@ use crate::node_agent_compute_plugin_host::{
     trusted_time::ComputePluginTrustedTimeObservation,
 };
 
-pub(super) struct ManifestCatalogBindingSession {
+pub(in crate::node_agent_compute_plugin_host::local_authority::manifest_catalog_binding) struct ManifestCatalogBindingSession
+{
     pub trusted_now: DateTime<Utc>,
     pub prepared_at: Instant,
     pub clock_epoch_digest: String,
 }
 
-pub(super) fn validate_session(
+pub(in crate::node_agent_compute_plugin_host::local_authority::manifest_catalog_binding) fn validate_session(
     authority: &OpenedComputePluginLocalAuthority,
     process_fence: &ComputePluginFetchProcessFence,
     observation: &ComputePluginTrustedTimeObservation,

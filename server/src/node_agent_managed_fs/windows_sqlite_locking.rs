@@ -10,7 +10,7 @@ use windows_sys::Win32::{
 
 use crate::node_agent_managed_fs::PlatformManagedSqliteLockAttempt;
 
-pub(super) fn try_lock_sqlite_byte_range(
+pub(in crate::node_agent_managed_fs) fn try_lock_sqlite_byte_range(
     file: &File,
     offset: u64,
     length: u64,
@@ -43,7 +43,7 @@ pub(super) fn try_lock_sqlite_byte_range(
     }
 }
 
-pub(super) fn unlock_sqlite_byte_range(
+pub(in crate::node_agent_managed_fs) fn unlock_sqlite_byte_range(
     file: &File,
     offset: u64,
     length: u64,

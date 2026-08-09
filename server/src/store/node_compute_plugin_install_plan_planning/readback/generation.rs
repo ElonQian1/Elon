@@ -12,7 +12,7 @@ use crate::store::node_compute_plugin_install_plan_planning::{
     validation::{validate_generation_outcome, validate_generation_request},
 };
 
-pub(super) fn read_generation_request(
+pub(in crate::store::node_compute_plugin_install_plan_planning) fn read_generation_request(
     tx: &Transaction<'_>,
     snapshot_id: &str,
 ) -> Result<Option<DurableComputePluginInstallPlanGenerationRequestV1>> {
@@ -43,7 +43,7 @@ pub(super) fn read_generation_request(
     Ok(Some(durable))
 }
 
-pub(super) fn validate_generation_request_readback(
+pub(in crate::store::node_compute_plugin_install_plan_planning) fn validate_generation_request_readback(
     tx: &Transaction<'_>,
     durable: &DurableComputePluginInstallPlanGenerationRequestV1,
 ) -> Result<()> {
@@ -86,7 +86,7 @@ pub(super) fn validate_generation_request_readback(
     Ok(())
 }
 
-pub(super) fn validate_generation_snapshot_authority(
+pub(in crate::store::node_compute_plugin_install_plan_planning) fn validate_generation_snapshot_authority(
     tx: &Transaction<'_>,
     durable: &DurableComputePluginInstallPlanPlanningSnapshotV2,
 ) -> Result<()> {
@@ -137,7 +137,7 @@ pub(super) fn validate_generation_snapshot_authority(
     Ok(())
 }
 
-pub(super) fn read_generation_outcome(
+pub(in crate::store::node_compute_plugin_install_plan_planning) fn read_generation_outcome(
     tx: &Transaction<'_>,
     generation_request_id: &str,
 ) -> Result<Option<DurableComputePluginInstallPlanGenerationOutcomeV1>> {
@@ -168,7 +168,7 @@ pub(super) fn read_generation_outcome(
     Ok(Some(durable))
 }
 
-pub(super) fn validate_generation_outcome_readback(
+pub(in crate::store::node_compute_plugin_install_plan_planning) fn validate_generation_outcome_readback(
     tx: &Transaction<'_>,
     durable: &DurableComputePluginInstallPlanGenerationOutcomeV1,
 ) -> Result<()> {

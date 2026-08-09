@@ -327,7 +327,14 @@ impl Store {
         let delivery = conn.query_row(
             "SELECT event_kind, detail_code, created_at FROM node_compute_plugin_sharing_delivery_events
               WHERE node_id=?1 ORDER BY created_at DESC, id DESC LIMIT 1",
-            params![node_id.trim()], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            params![node_id.trim()],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            },
         ).optional()?;
         let observation = conn
             .query_row(

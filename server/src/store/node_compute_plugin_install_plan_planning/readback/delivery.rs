@@ -11,7 +11,7 @@ use crate::store::node_compute_plugin_install_plan_planning::{
     PLANNING_DELIVERY_REQUEST_SCHEMA_V2,
 };
 
-pub(super) fn validate_delivery_intent_readback(
+pub(in crate::store::node_compute_plugin_install_plan_planning) fn validate_delivery_intent_readback(
     tx: &Transaction<'_>,
     intent: &NodeComputePluginInstallPlanPlanningDispatchIntentV2,
 ) -> Result<()> {
@@ -72,7 +72,7 @@ pub(super) fn validate_delivery_intent_readback(
     Ok(())
 }
 
-pub(super) fn validate_delivery_outcome_readback(
+pub(in crate::store::node_compute_plugin_install_plan_planning) fn validate_delivery_outcome_readback(
     tx: &Transaction<'_>,
     intent: &NodeComputePluginInstallPlanPlanningDispatchIntentV2,
     event_kind: &str,
@@ -152,7 +152,7 @@ pub(super) fn validate_delivery_outcome_readback(
     Ok(())
 }
 
-pub(super) fn read_planning_snapshot(
+pub(in crate::store::node_compute_plugin_install_plan_planning) fn read_planning_snapshot(
     tx: &Transaction<'_>,
     intent: &NodeComputePluginInstallPlanPlanningDispatchIntentV2,
 ) -> Result<Option<DurableComputePluginInstallPlanPlanningSnapshotV2>> {
@@ -237,7 +237,7 @@ pub(super) fn read_planning_snapshot(
     Ok(Some(durable))
 }
 
-pub(super) fn validate_durable_snapshot_readback(
+pub(in crate::store::node_compute_plugin_install_plan_planning) fn validate_durable_snapshot_readback(
     tx: &Transaction<'_>,
     durable: &DurableComputePluginInstallPlanPlanningSnapshotV2,
 ) -> Result<()> {

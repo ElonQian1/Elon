@@ -143,6 +143,8 @@ fn read_state(
         control_keyring_revision,
         control_keyring_digest,
     ) = row;
+    let host_api_revision = u32::try_from(host_api_revision)
+        .map_err(|_| anyhow::anyhow!("COMPUTE_PLUGIN_MANIFEST_CATALOG_AUTHORITY_CORRUPT"))?;
     let trusted_time_high_water_ms = trusted_time_high_water_ms
         .filter(|_| clock_status == "trusted")
         .ok_or_else(|| anyhow::anyhow!("COMPUTE_PLUGIN_MANIFEST_CATALOG_CLOCK_UNTRUSTED"))?;

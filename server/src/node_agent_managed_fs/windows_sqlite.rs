@@ -39,24 +39,26 @@ use crate::node_agent_managed_fs::{
 // active pinned file prevents rename/delete from silently detaching its fixed namespace name.
 const SQLITE_SHARE_ACCESS: u32 = FILE_SHARE_READ | FILE_SHARE_WRITE;
 
-pub(super) struct PlatformManagedSqliteOpen {
-    pub(super) file: File,
-    pub(super) call_status: i32,
-    pub(super) completion_status: i32,
-    pub(super) information: usize,
+pub(in crate::node_agent_managed_fs) struct PlatformManagedSqliteOpen {
+    pub(in crate::node_agent_managed_fs) file: File,
+    pub(in crate::node_agent_managed_fs) call_status: i32,
+    pub(in crate::node_agent_managed_fs) completion_status: i32,
+    pub(in crate::node_agent_managed_fs) information: usize,
 }
 
-pub(super) struct PlatformManagedSqliteCloseFailure {
+pub(in crate::node_agent_managed_fs) struct PlatformManagedSqliteCloseFailure {
     pub(in crate::node_agent_managed_fs) error: std::io::Error,
     pub(in crate::node_agent_managed_fs) custody: PlatformManagedSqliteCloseCustody,
 }
 
-pub(super) enum PlatformManagedSqliteCloseCustody {
+pub(in crate::node_agent_managed_fs) enum PlatformManagedSqliteCloseCustody {
     Unattempted(File),
     OutcomeUncertainRawHandle(usize),
 }
 
-pub(super) fn close_sqlite_file(file: File) -> Result<(), PlatformManagedSqliteCloseFailure> {
+pub(in crate::node_agent_managed_fs) fn close_sqlite_file(
+    file: File,
+) -> Result<(), PlatformManagedSqliteCloseFailure> {
     let raw_handle = file.into_raw_handle();
     // SAFETY: `into_raw_handle` transfers the sole File owner into this exact close attempt.
     if unsafe { CloseHandle(raw_handle as HANDLE) } == 0 {
@@ -70,7 +72,7 @@ pub(super) fn close_sqlite_file(file: File) -> Result<(), PlatformManagedSqliteC
     Ok(())
 }
 
-pub(super) fn open_sqlite_file_relative(
+pub(in crate::node_agent_managed_fs) fn open_sqlite_file_relative(
     parent: &File,
     kind: ManagedSqliteFileKind,
     access: ManagedSqliteAccess,
@@ -89,7 +91,7 @@ pub(super) fn open_sqlite_file_relative(
     open_relative(parent, kind.name(), desired_access, disposition)
 }
 
-pub(super) fn open_sqlite_file_for_access_relative(
+pub(in crate::node_agent_managed_fs) fn open_sqlite_file_for_access_relative(
     parent: &File,
     kind: ManagedSqliteFileKind,
     access: ManagedSqliteAccess,
@@ -103,7 +105,7 @@ pub(super) fn open_sqlite_file_for_access_relative(
     open_relative(parent, kind.name(), desired_access, FILE_OPEN)
 }
 
-pub(super) fn open_sqlite_file_for_delete_relative(
+pub(in crate::node_agent_managed_fs) fn open_sqlite_file_for_delete_relative(
     parent: &File,
     kind: ManagedSqliteFileKind,
 ) -> std::io::Result<PlatformManagedSqliteOpen> {
@@ -115,7 +117,7 @@ pub(super) fn open_sqlite_file_for_delete_relative(
     )
 }
 
-pub(super) fn read_sqlite_file_at(
+pub(in crate::node_agent_managed_fs) fn read_sqlite_file_at(
     file: &File,
     buffer: &mut [u8],
     offset: u64,
@@ -154,7 +156,7 @@ pub(super) fn read_sqlite_file_at(
     checked_io_count(status, io_status, buffer.len())
 }
 
-pub(super) fn write_sqlite_file_at(
+pub(in crate::node_agent_managed_fs) fn write_sqlite_file_at(
     file: &File,
     buffer: &[u8],
     offset: u64,
@@ -190,7 +192,7 @@ pub(super) fn write_sqlite_file_at(
     checked_io_count(status, io_status, buffer.len())
 }
 
-pub(super) fn flush_sqlite_file(file: &File) -> std::io::Result<()> {
+pub(in crate::node_agent_managed_fs) fn flush_sqlite_file(file: &File) -> std::io::Result<()> {
     // SAFETY: the borrowed File owns a live handle for the duration of the synchronous call.
     if unsafe { FlushFileBuffers(file.as_raw_handle() as HANDLE) } == 0 {
         return Err(std::io::Error::last_os_error());

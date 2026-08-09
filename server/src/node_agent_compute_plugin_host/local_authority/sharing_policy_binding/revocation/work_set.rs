@@ -123,11 +123,12 @@ fn read_fetch_items(
     let mut statement = transaction
         .prepare(&sql)
         .context("COMPUTE_PLUGIN_POLICY_REVOCATION_FETCH_PREPARE")?;
-    statement
+    let rows = statement
         .query_map(values, map_fetch_item)
         .context("COMPUTE_PLUGIN_POLICY_REVOCATION_FETCH_READ")?
         .collect::<rusqlite::Result<Vec<_>>>()
-        .context("COMPUTE_PLUGIN_POLICY_REVOCATION_FETCH_ROWS")
+        .context("COMPUTE_PLUGIN_POLICY_REVOCATION_FETCH_ROWS")?;
+    Ok(rows)
 }
 
 fn map_fetch_item(row: &Row<'_>) -> rusqlite::Result<PolicyPreparedWorkItem> {
@@ -163,11 +164,12 @@ fn read_verification_items(
     let mut statement = transaction
         .prepare(&sql)
         .context("COMPUTE_PLUGIN_POLICY_REVOCATION_VERIFICATION_PREPARE")?;
-    statement
+    let rows = statement
         .query_map(values, map_verification_item)
         .context("COMPUTE_PLUGIN_POLICY_REVOCATION_VERIFICATION_READ")?
         .collect::<rusqlite::Result<Vec<_>>>()
-        .context("COMPUTE_PLUGIN_POLICY_REVOCATION_VERIFICATION_ROWS")
+        .context("COMPUTE_PLUGIN_POLICY_REVOCATION_VERIFICATION_ROWS")?;
+    Ok(rows)
 }
 
 fn map_verification_item(row: &Row<'_>) -> rusqlite::Result<PolicyPreparedWorkItem> {

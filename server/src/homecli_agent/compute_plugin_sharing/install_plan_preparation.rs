@@ -245,7 +245,7 @@ async fn record_observed(
         preparation_id: intent.preparation_id.clone(),
         cloud_session_id: expected_session_id.to_string(),
         source_preparation_delivery_id: intent.delivery_id.clone(),
-        source_preparation_observation_digest,
+        source_preparation_observation_digest: source_observation_digest,
         node_id: intent.node_id.clone(),
         owner_user_id: intent.owner_user_id.clone(),
         installation_identity_digest: intent.installation_identity_digest.clone(),

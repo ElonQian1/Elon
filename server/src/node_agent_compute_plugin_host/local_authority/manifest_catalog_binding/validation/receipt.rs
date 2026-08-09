@@ -18,7 +18,7 @@ use crate::node_agent_compute_plugin_host::{
 
 const I_JSON_MAX_SAFE_INTEGER: i64 = 9_007_199_254_740_991;
 
-pub(super) fn validate_hashed_receipt(
+pub(in crate::node_agent_compute_plugin_host::local_authority::manifest_catalog_binding) fn validate_hashed_receipt(
     request: &PreparedManifestCatalogBindingRequest,
     hashed: &HashedComputePluginManifestCatalogBindingReceipt,
 ) -> Result<()> {

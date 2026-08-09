@@ -17,12 +17,13 @@ use crate::node_agent_compute_plugin_host::{
     signed_artifact_verification::jcs_sha256_hex,
 };
 
-pub(super) struct StoredManifestCatalogBinding {
+pub(in crate::node_agent_compute_plugin_host::local_authority::manifest_catalog_binding) struct StoredManifestCatalogBinding
+{
     pub request: PreparedManifestCatalogBindingRequest,
     pub hashed_receipt: HashedComputePluginManifestCatalogBindingReceipt,
 }
 
-pub(super) fn read_binding_by_revision(
+pub(in crate::node_agent_compute_plugin_host::local_authority::manifest_catalog_binding) fn read_binding_by_revision(
     transaction: &Transaction<'_>,
     catalog_revision: i64,
 ) -> Result<Option<StoredManifestCatalogBinding>> {
@@ -229,7 +230,7 @@ impl StoredManifestCatalogBindingRow {
     }
 }
 
-pub(super) fn validate_exact_request(
+pub(in crate::node_agent_compute_plugin_host::local_authority::manifest_catalog_binding) fn validate_exact_request(
     stored: &PreparedManifestCatalogBindingRequest,
     expected: &PreparedManifestCatalogBindingRequest,
 ) -> Result<()> {
@@ -259,7 +260,7 @@ pub(super) fn validate_exact_request(
     Ok(())
 }
 
-pub(super) fn validate_current_catalog_head(
+pub(in crate::node_agent_compute_plugin_host::local_authority::manifest_catalog_binding) fn validate_current_catalog_head(
     transaction: &Transaction<'_>,
     receipt: &HashedComputePluginManifestCatalogBindingReceipt,
     trusted_now: &chrono::DateTime<chrono::Utc>,
