@@ -112,6 +112,7 @@ internal object ChatGptWebCapabilityMatrix {
         "dictation", "send", "stop", "suggestion", "copy", "regenerate", "edit",
         "share", "feedback", "read_aloud", "branch", "delete", "close", "confirm",
         "conversation", "search", "library", "tasks", "project", "gpts", "settings",
+        "sources", "more",
         GENERIC_ACTION,
     )
 }

@@ -93,8 +93,10 @@
     if (/project|项目/.test(signal + ' ' + path)) return 'project';
     if (/\bgpt(s)?\b|探索.?gpt|发现.?gpt/.test(signal + ' ' + path)) return 'gpts';
     if (/setting|设置/.test(signal + ' ' + path)) return 'settings';
+    if (/sources?|citations?|文件和来源|查看来源/.test(signal)) return 'sources';
     if (/composer-plus|attach|upload|添加|附件|上传/.test(signal)) return 'attachment';
     if (/model|模型|gpt-|sol/.test(signal)) return 'model';
+    if (/read.aloud|朗读/.test(signal)) return 'read_aloud';
     if (/dictat|microphone|voice|听写|麦克风|语音/.test(signal)) return 'dictation';
     if (/send|submit|发送/.test(signal)) return 'send';
     if (/stop|停止/.test(signal)) return 'stop';
@@ -102,7 +104,6 @@
     if (/regenerate|try.again|重新生成|重试/.test(signal)) return 'regenerate';
     if (/edit|编辑/.test(signal)) return 'edit';
     if (/share|分享/.test(signal)) return 'share';
-    if (/read.aloud|朗读/.test(signal)) return 'read_aloud';
     if (/branch|分支/.test(signal)) return 'branch';
     if (/feedback|good.response|bad.response|点赞|点踩|反馈/.test(signal)) return 'feedback';
     if (/delete|删除/.test(signal)) return 'delete';
@@ -110,6 +111,7 @@
     if (/confirm|确定|确认/.test(signal)) return 'confirm';
     if (/new.chat|create.new|新建.*会话|新聊天/.test(signal)) return 'new_conversation';
     if (/profile|account|头像|账户/.test(signal)) return 'profile';
+    if (/\bmore\b|更多/.test(signal)) return 'more';
     if (region === 'suggestions') return 'suggestion';
     if (region === 'header' && index === 0) return 'navigation';
     if (region === 'header' && /workspace|工作区|(^|\s)工作($|\s)|personal|team|business/.test(signal)) return 'title';
@@ -144,7 +146,9 @@
       tasks: '任务',
       project: '项目',
       gpts: 'GPT',
-      settings: '设置'
+      settings: '设置',
+      sources: '文件和来源',
+      more: '更多操作'
     })[semantic] || '操作';
   }
 

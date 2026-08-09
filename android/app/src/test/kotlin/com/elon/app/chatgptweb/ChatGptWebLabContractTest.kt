@@ -37,6 +37,9 @@ class ChatGptWebLabContractTest {
         val messages = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_messages.js"
         )
+        val adapterLayout = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_layout.js"
+        )
 
         assertTrue(bridge.contains("WebViewCompat.addWebMessageListener"))
         assertTrue(bridge.contains("ALLOWED_ORIGIN = \"https://chatgpt.com\""))
@@ -73,6 +76,9 @@ class ChatGptWebLabContractTest {
         assertTrue(messages.contains("table, pre, blockquote, ol, ul"))
         assertTrue(messages.contains("complex_output"))
         assertTrue(messages.contains("message_regenerate"))
+        assertTrue(adapterLayout.indexOf("read.aloud|朗读") < adapterLayout.indexOf("dictat|microphone|voice"))
+        assertTrue(adapterLayout.contains("return 'sources'"))
+        assertTrue(adapterLayout.contains("return 'more'"))
     }
 
     @Test
