@@ -69,6 +69,8 @@ class ChatGptWebLabContractTest {
         assertTrue(messages.contains("function tableMarkdown"))
         assertTrue(messages.contains("function structuredParts"))
         assertTrue(messages.contains("lastStructuredTypes"))
+        assertTrue(messages.contains("lastComplexOutput"))
+        assertTrue(messages.contains("table, pre, blockquote, ol, ul"))
         assertTrue(messages.contains("complex_output"))
         assertTrue(messages.contains("message_regenerate"))
     }

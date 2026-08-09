@@ -7,6 +7,7 @@
   const MAX_MESSAGE_LENGTH = 40000;
   const MAX_STRUCTURED_PARTS = 16;
   let lastStructuredTypes = new Set();
+  let lastComplexOutput = false;
 
   function cleanText(value) {
     return String(value || '').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
@@ -179,6 +180,9 @@
 
   function messageContent(node, role) {
     const content = contentNode(node);
+    if (role === 'assistant' && content.querySelector('table, pre, blockquote, ol, ul')) {
+      lastComplexOutput = true;
+    }
     const value = role === 'assistant'
       ? cleanText(childrenMarkdown(content, {}))
       : cleanText(content.innerText || content.textContent);
@@ -195,6 +199,7 @@
   function readMessages(streaming) {
     const seen = new Set();
     lastStructuredTypes = new Set();
+    lastComplexOutput = false;
     const messages = messageNodes().slice(-MAX_MESSAGES).map((node, index) => {
       const role = messageRole(node);
       const text = messageContent(node, role);
@@ -248,7 +253,7 @@
   function capabilities() {
     const values = ['message_copy', 'rich_text'];
     if (regenerateButton()) values.push('message_regenerate');
-    if (lastStructuredTypes.size) values.push('complex_output');
+    if (lastStructuredTypes.size || lastComplexOutput) values.push('complex_output');
     return values;
   }
 
