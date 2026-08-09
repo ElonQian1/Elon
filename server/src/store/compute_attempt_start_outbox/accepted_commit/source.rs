@@ -231,7 +231,14 @@ fn load_route_on(
                 prepare.envelope.route_authorization_id,
                 prepare.envelope.route_authorization_digest
             ],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            },
         )
         .optional()?
         .ok_or_else(|| anyhow!("accepted closure route authority is missing"))?;
