@@ -273,7 +273,7 @@ fn audit_access(json: &str, stored_digest: &str) -> Result<StoredAccess> {
 
 /// Revalidates a sealed plan for v211. This proves freshness only; it neither claims an outbox
 /// item nor grants network-send authority.
-pub(super) fn ensure_current_plan_for_dispatch_on(
+pub(in crate::store) fn ensure_current_plan_for_dispatch_on(
     connection: &Connection,
     command: &ComputeAttemptDispatchCommandEnvelope,
     adapter: &ComputeAttemptAdapterBinding,

@@ -1,8 +1,9 @@
 use std::fmt;
 
 use anyhow::{bail, Result};
-use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+
+pub(crate) use crate::compute_attempt_contract::ComputePluginReleaseRef;
 
 const INSTALLATION_ID_DOMAIN: &[u8] = b"ELON_COMPUTE_PLUGIN_INSTALLATION_ID_V1";
 const MAX_INSTALLATION_ID_BYTES: usize = 256;
@@ -52,16 +53,4 @@ impl fmt::Debug for ComputePluginInstallationIdentity {
             .field("digest", &"<redacted>")
             .finish()
     }
-}
-
-/// Immutable release identity. `manifest_digest` is the plugin release digest; package and
-/// runner digests identify different byte sets and must never be substituted for it.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct ComputePluginReleaseRef {
-    pub plugin_id: String,
-    pub plugin_version: String,
-    pub target_id: String,
-    pub manifest_digest: String,
-    pub package_digest: String,
 }

@@ -1,1 +1,1 @@
-pub(crate) use crate::compute_federation::attempt::*;
+pub(crate) use crate::compute_attempt_contract::*;

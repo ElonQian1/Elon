@@ -1,14 +1,24 @@
 use serde::{Deserialize, Serialize};
 
-use crate::node_agent_compute_plugin_host::identity::ComputePluginReleaseRef;
+/// Immutable release identity shared by the server execution plan and node Host contract.
+/// `manifest_digest` is the plugin release digest; package bytes use a distinct digest.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ComputePluginReleaseRef {
+    pub plugin_id: String,
+    pub plugin_version: String,
+    pub target_id: String,
+    pub manifest_digest: String,
+    pub package_digest: String,
+}
 
 pub(crate) const COMPUTE_ATTEMPT_COMMAND_SCHEMA: &str = "compute_federation.attempt_command.v1";
 pub(crate) const COMPUTE_ATTEMPT_COMMAND_CANONICALIZATION: &str = "rfc8785_jcs";
 pub(crate) const COMPUTE_ATTEMPT_COMMAND_DIGEST_ALGORITHM: &str = "sha256";
 pub(crate) const COMPUTE_ATTEMPT_COMMAND_DIGEST_DOMAIN: &str = "ELON-COMPUTE-ATTEMPT-COMMAND-V1";
 
-/// Local Host contract only. It is not advertised as a cloud wire capability yet. Digest bytes
-/// are `sha256(DOMAIN || 0x00 || RFC8785_JCS(envelope_without_command_digest))`.
+/// Shared immutable server/node contract. It is not advertised as a cloud wire capability yet.
+/// Digest bytes are `sha256(DOMAIN || 0x00 || RFC8785_JCS(envelope_without_command_digest))`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ComputeAttemptCommandEnvelope {
