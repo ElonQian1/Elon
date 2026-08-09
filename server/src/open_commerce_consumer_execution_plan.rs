@@ -242,7 +242,7 @@ fn next_steps(readiness: &str) -> Vec<ConsumerCapabilityExecutionStep> {
 }
 
 #[cfg(test)]
-#[path = "open_commerce_consumer_execution_plan_test_support.rs"]
+#[path = "open_commerce_consumer_mcp_test_support.rs"]
 mod test_support;
 #[cfg(test)]
 #[path = "open_commerce_consumer_execution_plan_tests.rs"]
