@@ -9,9 +9,11 @@ use super::{
     state::ManagedSqliteRegistrySessionState,
     types::{
         ManagedSqliteRegistryCallbackKind, ManagedSqliteRegistryCallbackLease,
+        ManagedSqliteRegistryCloseOutcome, ManagedSqliteRegistryFileLease,
         ManagedSqliteRegistryRetirementReceipt, ManagedSqliteRegistryRouteRemovalProof,
         ManagedSqliteRegistrySessionId, ManagedSqliteRegistrySessionPhase,
-        ManagedSqliteRegistryTerminalReason, ManagedSqliteRegistryTransitionRejection,
+        ManagedSqliteRegistryShmLease, ManagedSqliteRegistryTerminalReason,
+        ManagedSqliteRegistryTransitionRejection, ManagedSqliteRegistryWalMainCloseProofs,
     },
 };
 use crate::node_agent_compute_plugin_host::local_authority::{
@@ -21,6 +23,8 @@ use crate::node_agent_compute_plugin_host::local_authority::{
     },
     ComputePluginHandleBoundAuthorityOpenIntent,
 };
+
+mod lifecycle;
 
 /// Future production specialization. No instance or nonce provider exists in the current build.
 pub(super) type ComputePluginHandleBoundSqliteRegistryOwner =

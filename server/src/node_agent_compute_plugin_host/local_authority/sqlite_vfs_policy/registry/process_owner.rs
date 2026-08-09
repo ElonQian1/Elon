@@ -13,10 +13,23 @@ use super::{
     },
     types::{
         ManagedSqliteRegistryCallbackKind, ManagedSqliteRegistryCallbackLease,
-        ManagedSqliteRegistryRetirementReceipt, ManagedSqliteRegistrySessionPhase,
+        ManagedSqliteRegistryFileLease, ManagedSqliteRegistryRetirementReceipt,
+        ManagedSqliteRegistrySessionPhase, ManagedSqliteRegistryShmLease,
+        ManagedSqliteRegistryTerminalReason, ManagedSqliteRegistryWalMainCloseProofs,
     },
 };
-use crate::node_agent_compute_plugin_host::local_authority::ComputePluginHandleBoundAuthorityOpenIntent;
+use crate::{
+    node_agent_compute_plugin_host::local_authority::{
+        sqlite_vfs_policy::ManagedSqliteLogicalFileRole,
+        ComputePluginHandleBoundAuthorityOpenIntent,
+    },
+    node_agent_managed_fs::{
+        ManagedSqliteFileCloseReceipt, ManagedSqliteMainFileCloseReceipt,
+        ManagedSqliteWalMainCloseReceipt,
+    },
+};
+
+mod lifecycle;
 
 const ROUTE_NONCE_ATTEMPTS: usize = 8;
 

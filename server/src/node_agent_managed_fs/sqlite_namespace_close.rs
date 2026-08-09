@@ -19,15 +19,20 @@ pub(crate) enum ManagedSqliteMainFileCloseFailurePhase {
     FileClose,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 #[must_use = "a close receipt proves the exact managed handle was released"]
 pub(crate) struct ManagedSqliteFileCloseReceipt {
     kind: ManagedSqliteFileKind,
 }
 
 impl ManagedSqliteFileCloseReceipt {
-    pub(crate) fn kind(self) -> ManagedSqliteFileKind {
+    pub(crate) fn kind(&self) -> ManagedSqliteFileKind {
         self.kind
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_value(kind: ManagedSqliteFileKind) -> Self {
+        Self { kind }
     }
 }
 
@@ -77,6 +82,13 @@ pub(crate) struct ManagedSqliteMainFileCloseReceipt {
 impl ManagedSqliteMainFileCloseReceipt {
     pub(crate) fn kind(&self) -> ManagedSqliteFileKind {
         self.file.kind()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_value() -> Self {
+        Self {
+            file: ManagedSqliteFileCloseReceipt::test_value(ManagedSqliteFileKind::Main),
+        }
     }
 }
 

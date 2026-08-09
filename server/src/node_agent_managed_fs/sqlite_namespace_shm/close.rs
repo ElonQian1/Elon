@@ -43,15 +43,22 @@ pub(crate) enum ManagedSqliteWalMainCloseFailurePhase {
     MainClose,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 #[must_use = "a WAL-main close receipt proves SHM and main custody were released"]
 pub(crate) struct ManagedSqliteWalMainCloseReceipt {
     kind: ManagedSqliteFileKind,
 }
 
 impl ManagedSqliteWalMainCloseReceipt {
-    pub(crate) fn kind(self) -> ManagedSqliteFileKind {
+    pub(crate) fn kind(&self) -> ManagedSqliteFileKind {
         self.kind
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_value() -> Self {
+        Self {
+            kind: ManagedSqliteFileKind::Main,
+        }
     }
 }
 

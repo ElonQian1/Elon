@@ -1,6 +1,10 @@
 use std::{fmt, num::NonZeroU64};
 
 use crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::types::ManagedSqliteLogicalFileRole;
+use crate::node_agent_managed_fs::{
+    ManagedSqliteFileCloseReceipt, ManagedSqliteFileKind, ManagedSqliteMainFileCloseReceipt,
+    ManagedSqliteWalMainCloseReceipt,
+};
 
 /// Process-local identity for one future one-shot routing session.
 ///
@@ -123,6 +127,16 @@ pub(super) struct ManagedSqliteRegistryCloseProof {
 }
 
 impl ManagedSqliteRegistryCloseProof {
+    fn from_managed_fs_close(
+        session_id: ManagedSqliteRegistrySessionId,
+        lease_ordinal: NonZeroU64,
+    ) -> Self {
+        Self {
+            session_id,
+            lease_ordinal,
+        }
+    }
+
     pub(super) fn session_id(&self) -> ManagedSqliteRegistrySessionId {
         self.session_id
     }
@@ -190,6 +204,45 @@ impl ManagedSqliteRegistryFileLease {
     pub(super) fn role(&self) -> ManagedSqliteLogicalFileRole {
         self.role
     }
+
+    pub(super) fn close_with_file_receipt(
+        &self,
+        receipt: ManagedSqliteFileCloseReceipt,
+    ) -> ManagedSqliteRegistryCloseOutcome {
+        let expected = match self.role {
+            ManagedSqliteLogicalFileRole::Journal => ManagedSqliteFileKind::Journal,
+            ManagedSqliteLogicalFileRole::Wal => ManagedSqliteFileKind::Wal,
+            ManagedSqliteLogicalFileRole::Main => {
+                return ManagedSqliteRegistryCloseOutcome::Unproven(
+                    ManagedSqliteRegistryTerminalReason::LeaseIdentityMismatch,
+                );
+            }
+        };
+        if expected != receipt.kind() {
+            return ManagedSqliteRegistryCloseOutcome::Unproven(
+                ManagedSqliteRegistryTerminalReason::LeaseIdentityMismatch,
+            );
+        }
+        ManagedSqliteRegistryCloseOutcome::Proven(
+            ManagedSqliteRegistryCloseProof::from_managed_fs_close(self.session_id, self.ordinal),
+        )
+    }
+
+    pub(super) fn close_with_main_receipt(
+        &self,
+        receipt: ManagedSqliteMainFileCloseReceipt,
+    ) -> ManagedSqliteRegistryCloseOutcome {
+        if self.role != ManagedSqliteLogicalFileRole::Main
+            || receipt.kind() != ManagedSqliteFileKind::Main
+        {
+            return ManagedSqliteRegistryCloseOutcome::Unproven(
+                ManagedSqliteRegistryTerminalReason::LeaseIdentityMismatch,
+            );
+        }
+        ManagedSqliteRegistryCloseOutcome::Proven(
+            ManagedSqliteRegistryCloseProof::from_managed_fs_close(self.session_id, self.ordinal),
+        )
+    }
 }
 
 /// Linear guard for one callback already admitted by the session phase.
@@ -204,6 +257,45 @@ pub(super) struct ManagedSqliteRegistryCallbackLease {
 pub(super) struct ManagedSqliteRegistryShmLease {
     pub(super) session_id: ManagedSqliteRegistrySessionId,
     pub(super) ordinal: NonZeroU64,
+}
+
+pub(super) struct ManagedSqliteRegistryWalMainCloseProofs {
+    main: ManagedSqliteRegistryCloseProof,
+    shm: ManagedSqliteRegistryCloseProof,
+}
+
+impl ManagedSqliteRegistryWalMainCloseProofs {
+    pub(super) fn from_receipt(
+        main: &ManagedSqliteRegistryFileLease,
+        shm: &ManagedSqliteRegistryShmLease,
+        receipt: ManagedSqliteWalMainCloseReceipt,
+    ) -> Result<Self, ManagedSqliteRegistryTerminalReason> {
+        if main.role != ManagedSqliteLogicalFileRole::Main
+            || main.session_id != shm.session_id
+            || receipt.kind() != ManagedSqliteFileKind::Main
+        {
+            return Err(ManagedSqliteRegistryTerminalReason::LeaseIdentityMismatch);
+        }
+        Ok(Self {
+            main: ManagedSqliteRegistryCloseProof::from_managed_fs_close(
+                main.session_id,
+                main.ordinal,
+            ),
+            shm: ManagedSqliteRegistryCloseProof::from_managed_fs_close(
+                shm.session_id,
+                shm.ordinal,
+            ),
+        })
+    }
+
+    pub(super) fn into_parts(
+        self,
+    ) -> (
+        ManagedSqliteRegistryCloseProof,
+        ManagedSqliteRegistryCloseProof,
+    ) {
+        (self.main, self.shm)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
