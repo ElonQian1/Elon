@@ -87,6 +87,11 @@
       node.textContent
     ].filter(Boolean).join(' ')).toLowerCase();
     if (/^\/c\/[A-Za-z0-9_-]{1,160}$/.test(path)) return 'conversation';
+    if (
+      region === 'overlay'
+      && (/timestamp|消息时间/.test(signal)
+        || /(?:today|yesterday|今天|昨天)[,，]?\s*\d{1,2}:\d{2}(?:\s*[ap]\.?m\.?)?/.test(signal))
+    ) return 'timestamp';
     if (/search.chat|搜索聊天/.test(signal)) return 'search';
     if (/library|文件库|资料库/.test(signal + ' ' + path)) return 'library';
     if (/scheduled|schedule|已安排|任务/.test(signal + ' ' + path)) return 'tasks';
@@ -148,7 +153,8 @@
       gpts: 'GPT',
       settings: '设置',
       sources: '文件和来源',
-      more: '更多操作'
+      more: '更多操作',
+      timestamp: '消息时间'
     })[semantic] || '操作';
   }
 

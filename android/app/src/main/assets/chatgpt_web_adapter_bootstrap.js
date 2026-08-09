@@ -3,7 +3,7 @@
 
   if (location.origin !== 'https://chatgpt.com') return;
 
-  const adapterVersion = 4;
+  const adapterVersion = 5;
   if (window.__elonChatGptAdapterVersion === adapterVersion) return;
 
   const previousBridge = window.__elonChatGptBridge;

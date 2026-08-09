@@ -33,6 +33,7 @@ internal object ChatGptWebUiSemantics {
         "settings",
         "sources",
         "more",
+        "timestamp",
         GENERIC_ACTION,
     )
 }
