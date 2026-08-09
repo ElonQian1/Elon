@@ -1,7 +1,7 @@
 ---
 title: 节点 ReadyCapability 健康证明边界
 status: current
-reviewed_at: 2026-08-07
+reviewed_at: 2026-08-10
 owners: node, compute
 ---
 
@@ -11,7 +11,7 @@ owners: node, compute
 
 `ReadyCapability` 只表示某个节点插件在一个很短的时间窗口内具备技术执行条件。它不是安装完成标记、市场报价、可预留容量、账户授权或商业 `ComputeOffer`。
 
-当前代码状态为“远程 canonical 基线已编译验证、本批安全加固未重新编译、生产路径未接线”：staged 候选的进程内健康评估、成功与终止失败观察的规范校验、不可变健康回执 Store、失败 quarantine Store、cleanup authorization Store 及进程内不确定结果恢复均已通过 `elon-pc-node` 基线编译。当前增量只加固 cancellation、exact receipt/owner chain、PlanApply/replay 和 schema fence，按架构铺设策略未重新编译或执行事务夹具。真实 Sidecar 探针、生产本地数据库、NodeRuntime/Host 接线及控制面上报仍未完成。
+当前代码状态为“远程 canonical 基线已编译验证、v216 增量未重新编译、生产路径未接线”：staged 候选健康与 quarantine/cleanup 基线之后，源码又增加同时消费 retained content、staging 与未过期健康回执的本机 installed/promotion 双回执闭包。它仍不启动 Sidecar、不声明 runtime ready，也不生成 work-admission、`ReadyCapability`、Offer 或 Attempt 权威；真实生产数据库、NodeRuntime/Host 接线及控制面上报仍未完成。
 
 ## 2. 已关闭的错误入口
 
@@ -62,13 +62,21 @@ quarantine 授权先做无副作用 fresh authority read，精确核对 staged �
 
 提交结果不确定时，进程内 recovery key 只能得到稳定 `NotCreated` 或 exact `Quarantined`。前者不恢复写许可；后者必须 fresh read 精确的 failed inventory/fence，再从保留句柄重新哈希 staging 文件和 seal，才可恢复 `DurableCandidateHealthQuarantine`。底层同句柄删除、cleanup authorization、旧线性物理执行器及 completion Store 内核已形成私有代码；completion 还必须消费 sealed topology 和全部 namespace-durability journal 的不透明终态能力，而该能力的 topology/journal Store 与目录 durability 生产者尚未实现。只有 durable completion receipt 才能证明 owner/pointer/inventory 已原子释放；整条流水线尚不可达且未接入生产 Host，quarantine、cleanup authorization 或内存物理证据都不能替代完成回执。精确边界见 `node-plugin-candidate-cleanup.md`。
 
-## 8. 尚未实现
+## 8. Installed/promotion 双回执边界
+
+v216 把内容安装与 active 指针提升固定为同一个本机 `BEGIN IMMEDIATE` 事务。入口只能消费继续持有原 staging 文件和 seal 句柄的 `DurableCandidateHealthPublication`；在新的 authenticated trusted-time observation 之后重新校验 retained content，再 fresh-read candidate owner、staged 槽、staging/health 回执、签名 Manifest、permission grant、inventory/state/authority/process fence 和健康 TTL。普通路径、裸摘要、调用方布尔值或已析构的健康 DTO 均不能构造 promotion permit。
+
+事务写入互相精确引用且不可单独提交的 `candidate_install_receipts` 与 `candidate_promotion_receipts`，随后一次性把槽从 `staged` 推进为 `installed`、清除 candidate pointer、切换 active slot、推进 install/activation 与 authority/inventory fence，并把 candidate owner 从 `owned` 终结为 `promoted`。旧 active provenance 在升级时由前一对双回执精确承接；首次安装则保持完整空组。结果继续持有原受管文件句柄，提交不确定时只能通过 exact recovery 判定 `NotCreated` 或已存在的双回执，再经 fresh head 与同句柄重哈希恢复 custody。
+
+promotion 刻意保持 runtime 为 `stopped`、runtime generation 不变、active health 为空。候选预热健康只证明安装前内容检查，不会被复制成活动 Runtime 健康；双回执也不替代 work-admission receipt。因此 v11 Planning Snapshot、ReadyCapability V2 与商业调度仍继续失败关闭。本批按架构铺设要求未编译、未执行迁移或事务夹具。
+
+## 9. 尚未实现
 
 - Sidecar 启动、预热和动态健康探针；
 - Sidecar 到 Host 的认证 IPC、响应验证和真实探针调度；
 - 失败候选的清理完成 Store、目录耐久闭包、重试授权与跨重启 custody 治理；
-- 同时消费 staging 与健康回执的原子 installed/promotion 门卫；
-- 发布前 Store fresh read、CAS/fencing 和不确定结果恢复；
+- installed 槽的 work-admission receipt、Runtime 启动/激活和活动健康回执；
+- 发布 Ready 前的 fresh Store read、CAS/fencing 和主动失效链；
 - `ComputeReadyCapability` 的规范短 TTL 构建、认证上报和服务端验证；
 - 共享关闭、排水、崩溃和撤销后的主动失效通知；
 - 从技术就绪事实到 Provider、CapacityPool、Offer 和 Attempt 的生产接线。

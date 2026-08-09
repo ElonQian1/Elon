@@ -47,7 +47,7 @@ fn real_connection_uses_named_vfs_and_keeps_security_policy_for_lifetime() -> an
              sku TEXT PRIMARY KEY,
              quantity INTEGER NOT NULL
          );
-         PRAGMA user_version=6;
+         PRAGMA user_version=7;
          PRAGMA application_id=1162625872;
          PRAGMA foreign_key_check;",
     )?;

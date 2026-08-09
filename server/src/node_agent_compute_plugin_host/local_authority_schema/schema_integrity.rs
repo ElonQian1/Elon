@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 
 use super::{
     create_schema_objects_v3, create_schema_objects_v4, create_schema_objects_v5,
-    create_schema_objects_v6,
+    create_schema_objects_v6, create_schema_objects_v7,
 };
 
 #[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd)]
@@ -35,6 +35,10 @@ pub(super) fn verify_schema_objects_v5(connection: &Connection) -> Result<()> {
 
 pub(super) fn verify_schema_objects_v6(connection: &Connection) -> Result<()> {
     verify_schema_objects(connection, create_schema_objects_v6)
+}
+
+pub(super) fn verify_schema_objects_v7(connection: &Connection) -> Result<()> {
+    verify_schema_objects(connection, create_schema_objects_v7)
 }
 
 fn verify_schema_objects(

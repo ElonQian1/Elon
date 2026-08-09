@@ -8,6 +8,7 @@ mod bootstrap;
 mod candidate_cleanup_contract;
 mod candidate_extraction;
 mod candidate_health_contract;
+mod candidate_promotion_contract;
 mod candidate_staging_contract;
 pub(crate) mod candidate_verification_contract;
 mod candidate_verification_terminal_result;

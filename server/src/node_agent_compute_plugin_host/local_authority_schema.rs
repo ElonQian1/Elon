@@ -7,6 +7,7 @@ mod candidate_cleanup_execution;
 mod candidate_cleanup_journal;
 mod candidate_health;
 mod candidate_health_quarantine;
+mod candidate_promotion;
 mod candidate_staging;
 mod candidate_verification;
 mod fetch_claims;
@@ -92,6 +93,15 @@ fn create_schema_objects_v6_additions(connection: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn create_schema_objects_v7(connection: &Connection) -> Result<()> {
+    create_schema_objects_v6(connection)?;
+    create_schema_objects_v7_additions(connection)
+}
+
+fn create_schema_objects_v7_additions(connection: &Connection) -> Result<()> {
+    candidate_promotion::create_schema_objects_v7(connection)
+}
+
 const SCHEMA_V3: &str = r#"
 CREATE TABLE keyring_bundles (
     bundle_revision          INTEGER PRIMARY KEY CHECK (bundle_revision > 0),
@@ -120,7 +130,6 @@ CREATE TABLE keyring_bundles (
         control_revision, control_digest
     )
 );
-
 CREATE TABLE keyring_keys (
     bundle_revision          INTEGER NOT NULL,
     purpose                  TEXT NOT NULL CHECK (
@@ -148,14 +157,12 @@ CREATE TABLE keyring_keys (
         OR (status = 'revoked' AND revoked_at_ms IS NOT NULL)
     )
 );
-
 CREATE TABLE keyring_seals (
     bundle_revision          INTEGER PRIMARY KEY,
     sealed_at_ms             INTEGER NOT NULL,
     FOREIGN KEY (bundle_revision)
         REFERENCES keyring_bundles(bundle_revision) ON DELETE RESTRICT
 );
-
 CREATE TABLE authority_meta (
     singleton                       INTEGER PRIMARY KEY CHECK (singleton = 1),
     schema_version                  INTEGER NOT NULL CHECK (schema_version = 3),
@@ -228,7 +235,6 @@ CREATE TABLE authority_meta (
          AND trusted_time_high_water_ms IS NOT NULL)
     )
 );
-
 CREATE TABLE plan_applications (
     plan_id                         TEXT PRIMARY KEY,
     plan_digest                     TEXT NOT NULL,
@@ -287,7 +293,6 @@ CREATE TABLE plan_applications (
     FOREIGN KEY (keyring_bundle_revision)
         REFERENCES keyring_seals(bundle_revision) ON DELETE RESTRICT
 );
-
 CREATE TABLE plan_application_seals (
     plan_id                     TEXT PRIMARY KEY,
     plan_digest                 TEXT NOT NULL,
@@ -298,7 +303,6 @@ CREATE TABLE plan_application_seals (
     FOREIGN KEY (plan_id, plan_digest)
         REFERENCES plan_applications(plan_id, plan_digest) ON DELETE RESTRICT
 );
-
 CREATE TABLE plan_events (
     plan_id             TEXT NOT NULL,
     plan_digest         TEXT NOT NULL,
@@ -312,7 +316,6 @@ CREATE TABLE plan_events (
     FOREIGN KEY (plan_id, plan_digest)
         REFERENCES plan_applications(plan_id, plan_digest) ON DELETE RESTRICT
 );
-
 CREATE TABLE candidate_owners (
     candidate_token                 TEXT PRIMARY KEY,
     plugin_id                       TEXT NOT NULL,
@@ -372,10 +375,8 @@ CREATE TABLE candidate_owners (
          AND close_reason = 'candidate_cleanup_completed')
     )
 );
-
 CREATE UNIQUE INDEX one_owned_candidate_per_plugin
     ON candidate_owners(plugin_id) WHERE state IN ('owned', 'cleanup_pending');
-
 CREATE TABLE planned_downloads (
     plan_id                 TEXT NOT NULL,
     plan_digest             TEXT NOT NULL,
@@ -410,7 +411,6 @@ CREATE TABLE planned_downloads (
     CHECK (committed_offset >= 0 AND committed_offset <= size_bytes),
     CHECK (state <> 'complete' OR committed_offset = size_bytes)
 );
-
 CREATE TABLE fetch_claims (
     claim_id                TEXT PRIMARY KEY,
     plan_id                 TEXT NOT NULL,

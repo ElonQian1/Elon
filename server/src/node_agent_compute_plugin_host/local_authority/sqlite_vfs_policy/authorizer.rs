@@ -1,4 +1,4 @@
-const AUTHORITY_DATABASE_VERSION: &str = "6";
+const AUTHORITY_DATABASE_VERSION: &str = "7";
 const AUTHORITY_APPLICATION_ID: &str = "1162625872";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -285,6 +285,7 @@ fn is_allowed_function(name: Option<&str>) -> bool {
         "glob",
         "instr",
         "json_array_length",
+        "json_each",
         "json_extract",
         "json_type",
         "json_valid",

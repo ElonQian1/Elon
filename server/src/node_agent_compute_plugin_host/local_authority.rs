@@ -33,6 +33,7 @@ mod plan_application_projection;
 mod plan_application_replay_children;
 mod plan_application_writes;
 mod process_ownership;
+mod promotion_store;
 mod rollback_checkpoint;
 mod sharing_policy_binding;
 #[allow(dead_code)]
@@ -122,6 +123,13 @@ pub(crate) use plan_application::{
     ComputePluginPlanApplicationReceipt, ComputePluginPlanApplicationResult,
 };
 pub(crate) use process_ownership::ComputePluginFetchProcessFence;
+pub(in crate::node_agent_compute_plugin_host) use promotion_store::{
+    ComputePluginCandidatePromotionAuthorityFacts,
+    ComputePluginCandidatePromotionRecoveryAuthoritySession,
+    ComputePluginCandidatePromotionRecoveryOutcome,
+    ComputePluginPostRevalidationPromotionAuthoritySession, HashedComputePluginInstallReceipt,
+    HashedComputePluginPromotionReceipt,
+};
 pub(in crate::node_agent_compute_plugin_host) use rollback_checkpoint::GuardedLocalComputePluginAuthorityRollbackCheckpointV2;
 pub(crate) use rollback_checkpoint::{
     ComputePluginAuthorityRollbackCheckpoint, HashedComputePluginAuthorityRollbackCheckpoint,
