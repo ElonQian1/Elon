@@ -31,6 +31,9 @@ class ChatGptWebLabContractTest {
             "android/app/src/main/kotlin/com/elon/app/chatgptweb/ChatGptWebPageAdapter.kt"
         )
         val adapter = readRepositoryFile("android/app/src/main/assets/chatgpt_web_adapter.js")
+        val bootstrap = readRepositoryFile(
+            "android/app/src/main/assets/chatgpt_web_adapter_bootstrap.js"
+        )
         val conversations = readRepositoryFile(
             "android/app/src/main/assets/chatgpt_web_adapter_conversations.js"
         )
@@ -43,9 +46,20 @@ class ChatGptWebLabContractTest {
 
         assertTrue(bridge.contains("WebViewCompat.addWebMessageListener"))
         assertTrue(bridge.contains("ALLOWED_ORIGIN = \"https://chatgpt.com\""))
+        assertTrue(
+            bridge.indexOf("chatgpt_web_adapter_bootstrap.js") <
+                bridge.indexOf("chatgpt_web_adapter_conversations.js")
+        )
         assertFalse(bridge.contains("addJavascriptInterface"))
         assertFalse(bridge.contains("getCookie("))
+        assertTrue(bootstrap.contains("window.__elonChatGptAdapterVersion = adapterVersion"))
+        assertTrue(bootstrap.contains("previousBridge.dispose()"))
+        assertTrue(bootstrap.contains("delete window[name]"))
         assertTrue(adapter.contains("new MutationObserver"))
+        assertTrue(adapter.contains("adapterVersion,"))
+        assertTrue(adapter.contains("observer.disconnect()"))
+        assertTrue(adapter.contains("removeEventListener('popstate', scheduleSnapshot)"))
+        assertTrue(adapter.contains("dispose"))
         assertTrue(adapter.contains("schema: 'yilong.ai.ui.v1'"))
         assertTrue(adapter.contains("authenticated: isAuthenticated()"))
         assertTrue(adapter.contains("url: location.origin + location.pathname"))

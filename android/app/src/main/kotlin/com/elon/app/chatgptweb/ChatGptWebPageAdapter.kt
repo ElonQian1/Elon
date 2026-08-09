@@ -195,8 +195,11 @@ internal class ChatGptWebPageAdapter(
     private fun isAllowedOrigin(origin: Uri): Boolean =
         origin.scheme == "https" && origin.host == "chatgpt.com" && origin.port == -1
 
-    private companion object {
-        val ADAPTER_ASSETS = listOf(
+    companion object {
+        internal const val ADAPTER_VERSION = 4
+
+        private val ADAPTER_ASSETS = listOf(
+            "chatgpt_web_adapter_bootstrap.js",
             "chatgpt_web_adapter_conversations.js",
             "chatgpt_web_adapter_messages.js",
             "chatgpt_web_adapter_composer.js",
@@ -204,11 +207,11 @@ internal class ChatGptWebPageAdapter(
             "chatgpt_web_adapter_layout.js",
             "chatgpt_web_adapter.js",
         )
-        const val BRIDGE_OBJECT = "elonChatGptNative"
-        const val ALLOWED_ORIGIN = "https://chatgpt.com"
-        const val MAX_PROMPT_LENGTH = 20_000
-        const val MAX_CONVERSATION_PATH_LENGTH = 256
-        const val MAX_OPTION_ID_LENGTH = 64
-        const val MAX_UI_CONTROL_ID_LENGTH = 72
+        private const val BRIDGE_OBJECT = "elonChatGptNative"
+        private const val ALLOWED_ORIGIN = "https://chatgpt.com"
+        private const val MAX_PROMPT_LENGTH = 20_000
+        private const val MAX_CONVERSATION_PATH_LENGTH = 256
+        private const val MAX_OPTION_ID_LENGTH = 64
+        private const val MAX_UI_CONTROL_ID_LENGTH = 72
     }
 }

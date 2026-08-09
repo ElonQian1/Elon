@@ -9,14 +9,19 @@
   const composerAdapter = window.__elonChatGptComposer;
   const navigationAdapter = window.__elonChatGptNavigation;
   const layoutAdapter = window.__elonChatGptLayout;
+  const adapterVersion = Number(window.__elonChatGptAdapterVersion || 0);
 
   let emitTimer = 0;
   let lastSnapshot = '';
   let sequence = 0;
+  let disposed = false;
+  let observer = null;
 
   function emitEvent(event) {
+    if (disposed) return;
     nativeBridge.postMessage(JSON.stringify({
       schema: 'yilong.ai.ui.v1',
+      adapterVersion,
       providerId: 'chatgpt',
       source: 'official_web',
       conversationId: location.pathname,
@@ -115,6 +120,7 @@
   }
 
   function snapshot() {
+    if (disposed) return;
     const streaming = isStreaming();
     const messages = messageAdapter ? messageAdapter.readMessages(streaming) : [];
     const event = {
@@ -140,6 +146,7 @@
   }
 
   function scheduleSnapshot() {
+    if (disposed) return;
     clearTimeout(emitTimer);
     emitTimer = window.setTimeout(snapshot, 120);
   }
@@ -167,7 +174,14 @@
   }
 
   function result(action, ok, detail) {
-    nativeBridge.postMessage(JSON.stringify({ type: 'command_result', action, ok, detail: detail || '' }));
+    if (disposed) return;
+    nativeBridge.postMessage(JSON.stringify({
+      type: 'command_result',
+      adapterVersion,
+      action,
+      ok,
+      detail: detail || ''
+    }));
   }
 
   function findSendButton(composer) {
@@ -336,12 +350,25 @@
     result(action || 'unknown', false, '不支持的本地命令。');
   }
 
-  window.__elonChatGptBridge = Object.freeze({ command: runCommand });
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    clearTimeout(emitTimer);
+    if (observer) observer.disconnect();
+    window.removeEventListener('popstate', scheduleSnapshot);
+  }
+
+  window.__elonChatGptBridge = Object.freeze({
+    version: adapterVersion,
+    command: runCommand,
+    dispose
+  });
   emitEvent({
     type: 'adapter_ready',
     capabilities: detectCapabilities()
   });
-  new MutationObserver(scheduleSnapshot).observe(document.documentElement, {
+  observer = new MutationObserver(scheduleSnapshot);
+  observer.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ['aria-selected', 'aria-checked', 'aria-disabled', 'disabled', 'data-state', 'hidden'],
     childList: true,
