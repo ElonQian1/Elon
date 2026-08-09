@@ -313,7 +313,24 @@ pub(super) fn spawn_channel_ai_task(task: ChannelAiTask) {
                 }
             }
         }
-        let _ = runner.await;
+        let runner_result = runner.await;
+        if let Some(unexpected_exit) = mark_unexpected_runner_exit(
+            &mut final_status,
+            &mut final_reply,
+            &mut error,
+            final_done_result_pending,
+            runner_result.as_ref().err(),
+        ) {
+            let raw_error = WsMessage::error(&unexpected_exit).to_json();
+            let _ = task.state.store.record_task_event(
+                &task.task_id,
+                &enrich_project_ws_event(raw_error, &task.task_id),
+            );
+            insert_channel_ai_result(
+                &task,
+                &result_message(&unexpected_exit, None, Some("异常结束")),
+            );
+        }
         remove_channel_ai_task_control(&task.task_id);
         project_tool_approvals::clear_task(&task.task_id);
         if final_reply.is_empty() {
@@ -366,6 +383,34 @@ pub(super) fn spawn_channel_ai_task(task: ChannelAiTask) {
     });
 }
 
+fn mark_unexpected_runner_exit(
+    final_status: &mut String,
+    final_reply: &mut String,
+    error: &mut Option<String>,
+    final_done_result_pending: bool,
+    runner_error: Option<&tokio::task::JoinError>,
+) -> Option<String> {
+    if final_done_result_pending
+        || !final_reply.trim().is_empty()
+        || error.is_some()
+        || final_status != "done"
+    {
+        return None;
+    }
+
+    let detail = runner_error
+        .map(|join_error| format!(" 技术原因：{}。", join_error))
+        .unwrap_or_default();
+    let message = format!(
+        "AI 开发任务异常结束：服务器没有收到 AI 的完成或错误事件，本轮未确认完成，也不会继续在后台处理。请重试任务。{}",
+        detail
+    );
+    *final_status = "failed".to_string();
+    *final_reply = message.clone();
+    *error = Some(message.clone());
+    Some(message)
+}
+
 #[cfg(test)]
 
 fn can_start_channel_ai(role: &str) -> bool {
@@ -388,7 +433,7 @@ impl BlankFallback for str {
 
 #[cfg(test)]
 mod tests {
-    use super::can_start_channel_ai;
+    use super::{can_start_channel_ai, mark_unexpected_runner_exit};
 
     #[test]
     fn channel_ai_requires_edit_role() {
@@ -398,5 +443,34 @@ mod tests {
         assert!(!can_start_channel_ai("member"));
         assert!(!can_start_channel_ai("observer"));
         assert!(!can_start_channel_ai("viewer"));
+    }
+
+    #[test]
+    fn unexpected_runner_exit_is_recorded_as_failed() {
+        let mut status = "done".to_string();
+        let mut reply = String::new();
+        let mut error = None;
+
+        let message = mark_unexpected_runner_exit(&mut status, &mut reply, &mut error, false, None)
+            .expect("unexpected exit should produce a failure message");
+
+        assert_eq!(status, "failed");
+        assert_eq!(error.as_deref(), Some(message.as_str()));
+        assert!(message.contains("未确认完成"));
+        assert!(message.contains("重试任务"));
+    }
+
+    #[test]
+    fn expected_terminal_states_are_not_overwritten() {
+        let mut status = "done".to_string();
+        let mut reply = "已完成".to_string();
+        let mut error = None;
+
+        assert!(
+            mark_unexpected_runner_exit(&mut status, &mut reply, &mut error, true, None,).is_none()
+        );
+        assert_eq!(status, "done");
+        assert_eq!(reply, "已完成");
+        assert!(error.is_none());
     }
 }
