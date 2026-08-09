@@ -14,6 +14,9 @@ mod process_owner;
 mod state;
 mod types;
 
+#[cfg(all(test, windows))]
+mod test_vfs_bridge;
+
 pub(in crate::node_agent_compute_plugin_host::local_authority) use file_custody::{
     ComputePluginHandleBoundSqliteAbiFile, HandleBoundSqliteAbiAttempt, HandleBoundSqliteAbiFile,
     HandleBoundSqliteAbiLockLevel, HandleBoundSqliteAbiShmLockAction, HandleBoundSqliteAbiShmMap,
@@ -26,3 +29,5 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) use process_owner
 pub(super) use owner::ManagedSqliteRegistryRouteHandle;
 #[cfg(test)]
 pub(super) use process_owner::ManagedSqliteRegistryProcessOwner;
+#[cfg(all(test, windows))]
+pub(super) use test_vfs_bridge::{ManagedSqliteTestVfsCallback, ManagedSqliteTestVfsRoute};

@@ -78,7 +78,9 @@ where
     Custody: ManagedSqliteRegistryCustody + 'static,
     NonceSource: ManagedSqliteRegistryNonceSource + 'static,
 {
-    pub(super) fn from_pinned(file: ManagedSqliteRegistryPinnedFile<Custody, NonceSource>) -> Self {
+    pub(in crate::node_agent_compute_plugin_host::local_authority::sqlite_vfs_policy::registry) fn from_pinned(
+        file: ManagedSqliteRegistryPinnedFile<Custody, NonceSource>,
+    ) -> Self {
         Self { file }
     }
 

@@ -10,6 +10,10 @@ use std::{
     panic::{catch_unwind, AssertUnwindSafe},
     path::Path,
     ptr,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
 };
 
 use anyhow::{anyhow, Context};
@@ -29,11 +33,32 @@ use crate::node_agent_compute_plugin_host::local_authority::{
 
 const MAX_AUTHORIZER_FIELD_BYTES: usize = 4 * 1024;
 
-struct TestCustody;
+struct TestCustody {
+    drops: Option<Arc<AtomicUsize>>,
+}
+
+impl TestCustody {
+    fn untracked() -> Self {
+        Self { drops: None }
+    }
+
+    #[cfg(windows)]
+    fn tracked(drops: Arc<AtomicUsize>) -> Self {
+        Self { drops: Some(drops) }
+    }
+}
 
 impl ManagedSqliteRegistryCustody for TestCustody {
     fn ensure_registry_current(&self) -> anyhow::Result<()> {
         Ok(())
+    }
+}
+
+impl Drop for TestCustody {
+    fn drop(&mut self) {
+        if let Some(drops) = self.drops.as_ref() {
+            drops.fetch_add(1, Ordering::SeqCst);
+        }
     }
 }
 
@@ -174,7 +199,7 @@ impl ManagedSqliteConnectionFixture {
         configure_connection(&connection)?;
         let owner = ManagedSqliteRegistryProcessOwner::leak(FixedNonceSource(nonce));
         let route = owner
-            .register(TestCustody)
+            .register(TestCustody::untracked())
             .map_err(|failure| anyhow!("register test authorizer route failed: {failure:?}"))?;
         let mut fixture = Self {
             connection: Some(connection),
@@ -343,3 +368,6 @@ fn read_db_config(db: *mut ffi::sqlite3, operation: c_int) -> anyhow::Result<c_i
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(windows)]
+mod managed_vfs;

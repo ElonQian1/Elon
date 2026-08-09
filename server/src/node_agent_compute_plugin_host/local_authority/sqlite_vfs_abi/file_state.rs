@@ -55,6 +55,32 @@ pub(in crate::node_agent_compute_plugin_host::local_authority) trait HandleBound
     fn close(self: Box<Self>) -> Result<(), ()>;
 }
 
+#[cfg(test)]
+pub(in crate::node_agent_compute_plugin_host::local_authority) fn test_vfs_file_size() -> c_int {
+    std::mem::size_of::<super::types::InertHandleBoundSqliteFile>() as c_int
+}
+
+/// Installs concrete operations into fresh storage supplied to a test-only registered VFS.
+/// Any failed installation drops the operations object, whose managed file custody fails closed.
+#[cfg(test)]
+pub(in crate::node_agent_compute_plugin_host::local_authority) unsafe fn initialize_test_vfs_file(
+    file: *mut ffi::sqlite3_file,
+) -> bool {
+    // SAFETY: forwarded from the test VFS for its own fresh `szOsFile` allocation.
+    unsafe { raw_state::initialize_fresh_file(file) }
+}
+
+/// Installs concrete operations into storage initialized by `initialize_test_vfs_file`.
+#[cfg(test)]
+pub(in crate::node_agent_compute_plugin_host::local_authority) unsafe fn install_test_vfs_file(
+    file: *mut ffi::sqlite3_file,
+    operations: impl HandleBoundSqliteFileOperations,
+) -> Result<(), ()> {
+    let state = HandleBoundSqliteFileState::from_test(operations);
+    // SAFETY: the exact allocation was initialized by the same serialized xOpen invocation.
+    unsafe { raw_state::install_state(file, state) }.map_err(|(_reason, state)| drop(state))
+}
+
 impl<Custody, NonceSource> HandleBoundSqliteFileOperations
     for HandleBoundSqliteAbiFile<Custody, NonceSource>
 where

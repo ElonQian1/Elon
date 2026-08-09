@@ -34,6 +34,7 @@ use crate::{
 };
 
 mod lifecycle;
+mod vfs;
 
 const ROUTE_NONCE_ATTEMPTS: usize = 8;
 

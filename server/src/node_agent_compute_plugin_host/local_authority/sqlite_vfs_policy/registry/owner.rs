@@ -26,6 +26,7 @@ use crate::node_agent_compute_plugin_host::local_authority::{
 };
 
 mod lifecycle;
+mod vfs;
 
 /// Future production specialization. No instance or nonce provider exists in the current build.
 pub(super) type ComputePluginHandleBoundSqliteRegistryOwner =
