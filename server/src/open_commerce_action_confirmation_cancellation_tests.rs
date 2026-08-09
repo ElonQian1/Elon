@@ -7,6 +7,7 @@ use crate::{
     },
     open_commerce_action_confirmation_service,
     open_commerce_service::{self, OpenCommerceActor},
+    store::Store,
 };
 
 use super::test_support::{action_request, fixture};
@@ -164,6 +165,77 @@ async fn cancellation_and_invocation_creation_are_mutually_exclusive() {
     assert_ne!(cancel_result.is_ok(), invoke_result.is_ok());
 
     let row = store
+        .open_commerce_action_confirmation(&prepared.id)
+        .unwrap();
+    assert_ne!(row.canceled_at.is_some(), row.invocation_id.is_some());
+}
+
+#[tokio::test]
+async fn independent_connections_serialize_cancellation_and_invocation_creation() {
+    let fixture = fixture();
+    let request = action_request(&fixture, "cancel-invocation-cross-connection");
+    let actor = OpenCommerceActor {
+        user_id: &fixture.owner_id,
+        app_id: "pc-web",
+        project_role: Some("owner"),
+    };
+    let prepared =
+        open_commerce_action_confirmation_service::prepare(&fixture.store, &actor, request.clone())
+            .unwrap();
+    open_commerce_action_confirmation_service::confirm(
+        &fixture.store,
+        &actor,
+        &prepared.id,
+        ACTION_CONFIRMATION_PHRASE,
+    )
+    .unwrap();
+
+    let cancel_store = Store::open(&fixture.path).unwrap();
+    let invoke_store = Store::open(&fixture.path).unwrap();
+    let barrier = Arc::new(Barrier::new(2));
+    let cancel_barrier = Arc::clone(&barrier);
+    let cancel_user_id = fixture.owner_id.clone();
+    let cancel_confirmation_id = prepared.id.clone();
+    let cancel_task = tokio::task::spawn_blocking(move || {
+        cancel_barrier.wait();
+        let actor = OpenCommerceActor {
+            user_id: &cancel_user_id,
+            app_id: "pc-web",
+            project_role: Some("owner"),
+        };
+        open_commerce_action_confirmation_service::cancel(
+            &cancel_store,
+            &actor,
+            &cancel_confirmation_id,
+            ACTION_CANCELLATION_PHRASE,
+        )
+    });
+
+    let invoke_barrier = Arc::clone(&barrier);
+    let invoke_user_id = fixture.owner_id.clone();
+    let invoke_confirmation_id = prepared.id.clone();
+    let invoke_task = tokio::spawn(async move {
+        invoke_barrier.wait();
+        let actor = OpenCommerceActor {
+            user_id: &invoke_user_id,
+            app_id: "pc-web",
+            project_role: Some("owner"),
+        };
+        open_commerce_service::invoke_with_action_confirmation(
+            &invoke_store,
+            &actor,
+            request,
+            Some(&invoke_confirmation_id),
+        )
+        .await
+    });
+
+    let cancel_result = cancel_task.await.unwrap();
+    let invoke_result = invoke_task.await.unwrap();
+    assert_ne!(cancel_result.is_ok(), invoke_result.is_ok());
+
+    let row = fixture
+        .store
         .open_commerce_action_confirmation(&prepared.id)
         .unwrap();
     assert_ne!(row.canceled_at.is_some(), row.invocation_id.is_some());

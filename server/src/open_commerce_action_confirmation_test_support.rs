@@ -1,10 +1,11 @@
 use serde_json::json;
+use std::path::PathBuf;
 use uuid::Uuid;
 
 use crate::{
     open_commerce_model::{
-        CreateCapabilityRequest, CreateMerchantRequest, InvokeCapabilityRequest, ACCESS_PUBLIC,
-        HANDLER_STATIC_JSON,
+        CreateCapabilityRequest, CreateMerchantRequest, InvokeCapabilityRequest, ACCESS_AUTHORIZED,
+        ACCESS_PUBLIC, HANDLER_STATIC_JSON,
     },
     open_commerce_service::{self, OpenCommerceActor},
     store::Store,
@@ -12,6 +13,7 @@ use crate::{
 
 pub(crate) struct Fixture {
     pub(crate) store: Store,
+    pub(crate) path: PathBuf,
     pub(crate) owner_id: String,
     pub(crate) project_id: String,
     pub(crate) merchant_id: String,
@@ -53,9 +55,25 @@ pub(crate) fn fixture() -> Fixture {
         },
     )
     .unwrap();
-    for (key, kind, response) in [
-        ("order.commit", "action", json!({"order_id":"order-1"})),
-        ("menu.lookup", "query", json!({"items":["latte"]})),
+    for (key, kind, access_level, response) in [
+        (
+            "order.commit",
+            "action",
+            ACCESS_PUBLIC,
+            json!({"order_id":"order-1"}),
+        ),
+        (
+            "order.authorized",
+            "action",
+            ACCESS_AUTHORIZED,
+            json!({"order_id":"order-authorized-1"}),
+        ),
+        (
+            "menu.lookup",
+            "query",
+            ACCESS_PUBLIC,
+            json!({"items":["latte"]}),
+        ),
     ] {
         open_commerce_service::publish_capability(
             &store,
@@ -67,7 +85,7 @@ pub(crate) fn fixture() -> Fixture {
                 display_name: key.to_string(),
                 description: String::new(),
                 kind: kind.to_string(),
-                access_level: ACCESS_PUBLIC.to_string(),
+                access_level: access_level.to_string(),
                 input_schema: json!({
                     "type":"object",
                     "properties":{"private_note":{"type":"string","maxLength":120}},
@@ -99,9 +117,25 @@ pub(crate) fn fixture() -> Fixture {
     }
     Fixture {
         store,
+        path,
         owner_id: owner.id,
         project_id: project.id,
         merchant_id: merchant.id,
+    }
+}
+
+pub(crate) fn authorized_action_request(
+    fixture: &Fixture,
+    grant_id: &str,
+    idempotency_key: &str,
+) -> InvokeCapabilityRequest {
+    InvokeCapabilityRequest {
+        merchant_id: fixture.merchant_id.clone(),
+        capability_key: "order.authorized".to_string(),
+        requester_app_id: "pc-web".to_string(),
+        grant_id: Some(grant_id.to_string()),
+        idempotency_key: idempotency_key.to_string(),
+        input: json!({"private_note":"do-not-store-this-value"}),
     }
 }
 

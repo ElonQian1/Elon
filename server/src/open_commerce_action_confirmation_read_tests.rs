@@ -3,10 +3,11 @@ use serde_json::{json, Value};
 use crate::{
     open_commerce_action_confirmation_model::ACTION_CONFIRMATION_PHRASE,
     open_commerce_action_confirmation_service,
+    open_commerce_model::CreateGrantRequest,
     open_commerce_service::{self, OpenCommerceActor},
 };
 
-use super::test_support::{action_request, fixture, Fixture};
+use super::test_support::{action_request, authorized_action_request, fixture, Fixture};
 
 async fn read_confirmation(fixture: &Fixture, confirmation_id: &str) -> Value {
     crate::open_commerce_mcp::call_tool(
@@ -200,4 +201,48 @@ async fn mcp_read_hides_input_and_internal_identity_and_does_not_enumerate() {
         .unwrap_err();
         assert!(error.to_string().contains("不存在"));
     }
+}
+
+#[tokio::test]
+async fn mcp_read_does_not_consume_grant_count_or_amount_budget() {
+    let fixture = fixture();
+    let actor = OpenCommerceActor {
+        user_id: &fixture.owner_id,
+        app_id: "pc-web",
+        project_role: Some("owner"),
+    };
+    let grant = open_commerce_service::create_grant(
+        &fixture.store,
+        &fixture.project_id,
+        &actor,
+        CreateGrantRequest {
+            merchant_id: fixture.merchant_id.clone(),
+            grantee_app_id: "pc-web".to_string(),
+            scopes: vec!["order.authorized".to_string()],
+            purpose: "验证只读确认不消耗授权预算".to_string(),
+            expires_at: None,
+            max_invocations: Some(2),
+            max_amount_micros: Some(2_000),
+            budget_currency: "CNY".to_string(),
+        },
+    )
+    .unwrap();
+    let prepared = open_commerce_action_confirmation_service::prepare(
+        &fixture.store,
+        &actor,
+        authorized_action_request(&fixture, &grant.id, "read-grant-budget"),
+    )
+    .unwrap();
+    let before = fixture.store.open_commerce_grant(&grant.id).unwrap();
+
+    for _ in 0..3 {
+        let projection = read_confirmation(&fixture, &prepared.id).await;
+        assert_eq!(projection["status"], "pending");
+        assert_eq!(projection["grant_id"], grant.id);
+    }
+
+    let after = fixture.store.open_commerce_grant(&grant.id).unwrap();
+    assert_eq!(after.used_invocations, before.used_invocations);
+    assert_eq!(after.used_amount_micros, before.used_amount_micros);
+    assert_eq!(after.updated_at, before.updated_at);
 }
