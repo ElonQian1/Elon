@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 Attempt Lease 状态与续租控制面
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-09
 owners: backend, node, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-v186、Store、Service、HTTP 路由与 PC `/compute-execution` Lease 控制面已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面在 v185 激活回执之外维护可版本化的 Lease 当前状态，并允许 Provider 所有者依据外部执行器心跳声明延长软期限。
+v186 Store kernel、历史读取、HTTP 路由与 PC `/compute-execution` Lease 控制面已经写入代码，但尚未编译、执行迁移或运行接口/页面验证。v213 铺设真实 Adapter 的耐久派发/恢复权威后，Provider-owner 人工续租 POST 已固定失败 `COMPUTE_ATTEMPT_RENEW_GATEWAY_NOT_READY`；GET、列表和历史回执仍可读取。下文续租事务描述的是保留的 dormant kernel，不是当前可调用写能力。
 
 `executor_heartbeat_ref` 只是调用方提交的外部证据引用。当前平台不读取证明正文、不验证执行器签名，也不发送 `RenewLease` 节点命令，因此续租成功不能证明节点真实在线或任务真实运行。
 
@@ -19,14 +19,14 @@ v186、Store、Service、HTTP 路由与 PC `/compute-execution` Lease 控制面�
 | 方法 | 路径 | 权限 | 作用 |
 |---|---|---|---|
 | GET | `/api/me/compute/providers/:provider_id/attempt-leases?limit=...` | Provider 所有者 | 按最近更新时间列出本人 Provider 的当前 Lease 状态 |
-| POST | `/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/renewals` | Provider 所有者 | 基于当前精确状态登记一次外部心跳声明并续租 |
+| POST | `/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/renewals` | Provider 所有者 | 固定失败，等待 durable Renew command、认证 observation、fencing 与 recovery |
 | GET | `/api/me/compute/attempt-leases/:lease_id/state` | Provider 所有者或 Job 消费者 | 读取并重新审计 Lease 当前状态 |
 
-写请求必须提供当前 `expected_lease_revision`、`expected_lease_digest`、`expected_fencing_generation`、外部心跳引用、新软期限、幂等键，并显式设置 `confirm_executor_alive=true`。确认字段只表示操作者主动声明，不替代可信执行器签名。
+旧请求 shape 仍保留兼容解析，但 `confirm_executor_alive` 和外部心跳引用不再获得写权。未来 Renew 必须来自 exact Adapter route、durable command/send-attempt 和 authenticated observation。
 
 本人 Provider 列表最多返回 100 条当前状态投影，按 `updated_at` 倒序和稳定 Lease ID 排序；服务端先核对 Provider 所有权，再逐条重算摘要并审计投影。该读取不返回独立消费者账户字段，不修改 Lease、Job、Reservation、容量或资金。
 
-PC `/compute-execution` 可在“执行 Lease/待激活”分段队列中选择本人 Provider 的当前 Lease，也可按稳定 Lease ID 读取激活回执和当前状态，并在界面中带入当前 revision、digest 与 fencing generation 发起续租。页面只登记外部心跳引用和新的软期限，不发送 `RenewLease` 命令，也不把续租成功展示为实际执行或平台验证。
+PC `/compute-execution` 仍可选择本人 Provider 的当前 Lease，并按稳定 Lease ID 读取激活回执和状态；旧续租控件在后端只会收到 Gateway-not-ready，不能展示为成功或平台验证。
 
 ## 3. 状态与时间边界
 

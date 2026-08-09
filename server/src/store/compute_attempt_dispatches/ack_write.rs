@@ -8,8 +8,9 @@ use crate::{
         COMPUTE_ATTEMPT_ADAPTER_ACK_ACCEPTED, COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED,
     },
     store::{
-        compute_attempt_activations::activate_compute_attempt_on, ActivateComputeAttemptRequest,
-        ComputeAttemptActivationReceipt,
+        compute_attempt_activations::activate_compute_attempt_on,
+        compute_attempt_start_outbox::record_verified_observation_on,
+        ActivateComputeAttemptRequest, ComputeAttemptActivationReceipt,
     },
 };
 
@@ -33,6 +34,7 @@ pub(super) fn ingest_verified_ack_on(
     prepared: &PreparedVerifiedAck,
 ) -> Result<ComputeAttemptDispatchAckCommit> {
     let ack = verified.ack();
+    ensure_v213_accepted_apply_available(ack)?;
     if let Some(stored) = ack_by_adapter_ack_on(
         connection,
         &verified.adapter().provider_id,
@@ -43,6 +45,7 @@ pub(super) fn ingest_verified_ack_on(
         let command = command_by_id_on(connection, &stored.ack.command_id)?
             .ok_or_else(|| anyhow!("Stored Adapter ACK lost its immutable command"))?;
         ensure_ack_binds_command(&command, verified, prepared)?;
+        record_verified_observation_on(connection, verified.prepare_observation())?;
         return replay_ack_commit(connection, &command, stored);
     }
     if ack_by_command_on(connection, &ack.command_id)?.is_some() {
@@ -57,6 +60,7 @@ pub(super) fn ingest_verified_ack_on(
     {
         bail!("Adapter ACK received_at cannot be later than durable ingestion");
     }
+    record_verified_observation_on(connection, verified.prepare_observation())?;
     match ack.outcome.as_str() {
         COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED => {
             insert_ack_on(
@@ -156,6 +160,13 @@ pub(super) fn ingest_verified_ack_on(
         }
         _ => bail!("Unsupported Adapter ACK outcome"),
     }
+}
+
+fn ensure_v213_accepted_apply_available(ack: &ComputeAttemptAdapterAckEnvelope) -> Result<()> {
+    if ack.outcome == COMPUTE_ATTEMPT_ADAPTER_ACK_ACCEPTED {
+        bail!("COMPUTE_ATTEMPT_ACCEPTED_ACK_V213_ISSUER_UNAVAILABLE");
+    }
+    Ok(())
 }
 
 fn quarantine_ack_on(

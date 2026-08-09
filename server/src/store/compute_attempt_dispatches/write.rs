@@ -14,6 +14,7 @@ use super::{
 };
 use crate::store::{
     compute_attempt_execution_plans::ensure_current_plan_for_dispatch_on,
+    compute_attempt_start_outbox::enqueue_prepare_on,
     compute_broker_reservation::broker_reserve_binding_on,
     compute_job_registry::current_registered_job_on,
 };
@@ -25,6 +26,7 @@ pub(super) fn prepare_start_dispatch_on(
 ) -> Result<ComputeAttemptDispatchCommandReceipt> {
     if let Some(stored) = command_by_id_on(connection, &plan.command().command_id)? {
         ensure_command_replay_matches(&stored, plan, prepared)?;
+        enqueue_prepare_on(connection, plan)?;
         return Ok(command_receipt(stored, true));
     }
     if let Some(stored) = command_by_idempotency_on(
@@ -33,6 +35,7 @@ pub(super) fn prepare_start_dispatch_on(
         plan.activation().idempotency_key(),
     )? {
         ensure_command_replay_matches(&stored, plan, prepared)?;
+        enqueue_prepare_on(connection, plan)?;
         return Ok(command_receipt(stored, true));
     }
     ensure_current_plan_for_dispatch_on(
@@ -72,6 +75,7 @@ pub(super) fn prepare_start_dispatch_on(
     )?;
     let created_at = now_dispatch();
     ensure_command_live_at(source, &created_at)?;
+    enqueue_prepare_on(connection, plan)?;
     connection.execute(
         "INSERT INTO compute_attempt_dispatch_commands (
             command_id, command_schema, command_type, command_digest, command_json,

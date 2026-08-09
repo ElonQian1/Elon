@@ -78,7 +78,7 @@ impl Store {
             .collect()
     }
 
-    pub(crate) fn renew_compute_attempt_lease(
+    pub(super) fn renew_compute_attempt_lease(
         &self,
         input: &RenewComputeAttemptLeaseRequest,
     ) -> Result<ComputeAttemptLeaseRenewalReceipt> {

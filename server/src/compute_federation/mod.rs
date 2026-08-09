@@ -13,4 +13,6 @@ pub(crate) mod market;
 pub(crate) mod offer;
 pub(crate) mod provider;
 pub(crate) mod receipts;
+pub(crate) mod route_authority;
+pub(crate) mod start_outbox;
 pub(crate) mod workload;

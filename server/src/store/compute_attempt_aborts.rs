@@ -74,7 +74,7 @@ pub(crate) struct ComputeAttemptAbortReceipt {
 }
 
 impl Store {
-    pub(crate) fn abort_compute_attempt(
+    pub(super) fn abort_compute_attempt(
         &self,
         request: &AbortComputeAttemptRequest,
     ) -> Result<ComputeAttemptAbortReceipt> {

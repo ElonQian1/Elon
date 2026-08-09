@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use serde::Deserialize;
 
 use crate::store::{
-    AbortComputeAttemptRequest, ComputeAttemptAbortReceipt, ComputeAttemptActivationReceipt,
+    ComputeAttemptAbortReceipt, ComputeAttemptActivationReceipt,
     ComputeAttemptConsumerReviewReceipt, ComputeAttemptLeaseRenewalReceipt,
     ComputeAttemptLeaseStateReceipt, ComputeAttemptPlatformObservationReceipt,
     ComputeAttemptTerminalCandidateReceipt, ComputeAttemptUsageDeclarationReceipt,
@@ -11,9 +11,14 @@ use crate::store::{
     ComputePendingAttemptVerificationCandidate, ComputePendingPlatformObservationCandidate,
     ComputeReservationRegistrationReceipt, DecideComputeAttemptVerificationRequest,
     DeclareComputeAttemptTerminalCandidateRequest, DeclareComputeAttemptUsageRequest,
-    ObserveComputeAttemptTerminalCandidateRequest, RenewComputeAttemptLeaseRequest,
-    ReviewComputeAttemptTerminalCandidateRequest, Store,
+    ObserveComputeAttemptTerminalCandidateRequest, ReviewComputeAttemptTerminalCandidateRequest,
+    Store,
 };
+
+pub(crate) const COMPUTE_ATTEMPT_RENEW_GATEWAY_NOT_READY: &str =
+    "COMPUTE_ATTEMPT_RENEW_GATEWAY_NOT_READY";
+pub(crate) const COMPUTE_ATTEMPT_ABORT_GATEWAY_NOT_READY: &str =
+    "COMPUTE_ATTEMPT_ABORT_GATEWAY_NOT_READY";
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -201,30 +206,13 @@ pub(crate) fn get_for_participant(
 }
 
 pub(crate) fn renew_for_provider_owner(
-    store: &Store,
-    user_id: &str,
-    provider_id: &str,
-    lease_id: &str,
-    request: RenewMyComputeAttemptLeaseRequest,
+    _store: &Store,
+    _user_id: &str,
+    _provider_id: &str,
+    _lease_id: &str,
+    _request: RenewMyComputeAttemptLeaseRequest,
 ) -> Result<ComputeAttemptLeaseRenewalReceipt> {
-    if !request.confirm_executor_alive {
-        bail!("续租 Attempt Lease 前必须显式确认外部执行器仍存活");
-    }
-    let provider = store.compute_provider(provider_id)?;
-    if provider.provider.owner_account_id != user_id {
-        bail!("算力 Provider 不属于当前登录用户");
-    }
-    store.renew_compute_attempt_lease(&RenewComputeAttemptLeaseRequest {
-        lease_id: lease_id.to_string(),
-        provider_id: provider_id.to_string(),
-        expected_lease_revision: request.expected_lease_revision,
-        expected_lease_digest: request.expected_lease_digest,
-        expected_fencing_generation: request.expected_fencing_generation,
-        executor_heartbeat_ref: request.executor_heartbeat_ref,
-        expires_at: request.expires_at,
-        idempotency_key: request.idempotency_key,
-        renewed_by_user_id: user_id.to_string(),
-    })
+    bail!(COMPUTE_ATTEMPT_RENEW_GATEWAY_NOT_READY)
 }
 
 pub(crate) fn get_state_for_participant(
@@ -237,36 +225,13 @@ pub(crate) fn get_state_for_participant(
 }
 
 pub(crate) fn abort_for_provider_owner(
-    store: &Store,
-    user_id: &str,
-    provider_id: &str,
-    lease_id: &str,
-    request: AbortMyComputeAttemptRequest,
+    _store: &Store,
+    _user_id: &str,
+    _provider_id: &str,
+    _lease_id: &str,
+    _request: AbortMyComputeAttemptRequest,
 ) -> Result<ComputeAttemptAbortReceipt> {
-    if !request.confirm_no_execution_started {
-        bail!("无用量中止前必须显式确认外部执行器从未开始执行");
-    }
-    let provider = store.compute_provider(provider_id)?;
-    if provider.provider.owner_account_id != user_id {
-        bail!("算力 Provider 不属于当前登录用户");
-    }
-    store.abort_compute_attempt(&AbortComputeAttemptRequest {
-        lease_id: lease_id.to_string(),
-        provider_id: provider_id.to_string(),
-        expected_lease_revision: request.expected_lease_revision,
-        expected_lease_digest: request.expected_lease_digest,
-        expected_fencing_generation: request.expected_fencing_generation,
-        expected_job_revision: request.expected_job_revision,
-        expected_job_digest: request.expected_job_digest,
-        expected_reservation_revision: request.expected_reservation_revision,
-        expected_reservation_digest: request.expected_reservation_digest,
-        expected_claim_revision: request.expected_claim_revision,
-        expected_claim_digest: request.expected_claim_digest,
-        executor_abort_ref: request.executor_abort_ref,
-        reason_code: request.reason_code,
-        idempotency_key: request.idempotency_key,
-        aborted_by_user_id: user_id.to_string(),
-    })
+    bail!(COMPUTE_ATTEMPT_ABORT_GATEWAY_NOT_READY)
 }
 
 pub(crate) fn get_abort_for_participant(

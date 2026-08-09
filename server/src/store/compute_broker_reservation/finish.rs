@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail, Result};
-use rusqlite::{params, Transaction};
+use rusqlite::Transaction;
 
 use crate::compute_federation::{
     capacity::{ComputeCapacityClaimBinding, ComputeCapacityOfferBinding},
@@ -11,6 +11,9 @@ use crate::compute_federation::{
 
 use super::super::{
     billing_reservations::release_billing_call_reservation_on,
+    compute_attempt_start_outbox::{
+        ensure_start_resolved_for_broker_finish_on, BrokerFinishStartResolutionBinding,
+    },
     compute_capacity_claim_transitions::{
         finish_compute_capacity_reservation_claim_on, ComputeCapacityClaimTerminalAction,
         FinishComputeCapacityClaim,
@@ -49,20 +52,6 @@ pub(super) fn finish_new_broker_contract_on(
     {
         bail!("Broker 终态只处理消费者自己的 reserved Job，运行中任务必须走 Attempt 路径");
     }
-    let unresolved_start: bool = tx.query_row(
-        "SELECT EXISTS(
-            SELECT 1
-              FROM compute_attempt_dispatch_commands c
-              LEFT JOIN compute_attempt_dispatch_acks a ON a.command_id=c.command_id
-             WHERE c.reservation_id=?1
-               AND (a.command_id IS NULL OR a.outcome='accepted')
-        )",
-        params![request.reservation_id],
-        |row| row.get(0),
-    )?;
-    if unresolved_start {
-        bail!("Broker 终态必须等待 Attempt Gateway 的明确拒绝或未来 no-start/cancel 证明");
-    }
     let reserve =
         broker_reserve_binding_on(tx, &request.reservation_id, &request.consumer_account_id)?;
     if reserve.reservation_revision != source_reservation.revision
@@ -75,6 +64,22 @@ pub(super) fn finish_new_broker_contract_on(
     {
         bail!("Broker 终态与原子预留回执绑定不一致");
     }
+    let start_resolution = ensure_start_resolved_for_broker_finish_on(
+        tx,
+        BrokerFinishStartResolutionBinding {
+            reservation_id: &request.reservation_id,
+            reservation_revision: source_reservation.revision,
+            reservation_digest: &source_reservation.reservation_digest,
+            job_id: &source_job.job.job_id,
+            job_revision: source_job.revision,
+            job_digest: &source_job.job_digest,
+            capacity_claim_id: &reserve.capacity_claim.claim_id,
+            capacity_claim_revision: reserve.capacity_claim.claim_revision,
+            capacity_claim_digest: &reserve.capacity_claim.claim_digest,
+            budget_reservation_id: &reserve.budget_reservation_id,
+            budget_refunded_fen: reserve.budget_reserved_fen,
+        },
+    )?;
 
     let billing = release_billing_call_reservation_on(
         tx,
@@ -137,6 +142,7 @@ pub(super) fn finish_new_broker_contract_on(
         &claim,
         &source_reservation,
         &terminal_reservation_receipt,
+        start_resolution.as_ref(),
     )
 }
 

@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -7,6 +7,9 @@ use crate::compute_plugin_sharing_directive::canonical_compute_plugin_ijson_and_
 use super::{
     capacity::ComputeCapacityClaimBinding,
     execution::{ComputeJobVersionBinding, ComputeOfferBinding},
+    start_outbox::{
+        ValidatedComputeStartOutboxOperation, VerifiedComputeStartOutboxRemoteObservation,
+    },
 };
 
 pub(crate) const COMPUTE_ATTEMPT_DISPATCH_COMMAND_SCHEMA: &str =
@@ -22,8 +25,6 @@ pub(crate) const COMPUTE_ATTEMPT_ADAPTER_ACK_ACCEPTED: &str = "accepted";
 pub(crate) const COMPUTE_ATTEMPT_ADAPTER_ACK_REJECTED: &str = "rejected";
 pub(crate) const COMPUTE_ATTEMPT_ROUTE_PROVIDER_ENDPOINT: &str = "provider_endpoint";
 pub(crate) const COMPUTE_ATTEMPT_ROUTE_SERVER_ADAPTER: &str = "server_adapter";
-pub(crate) const COMPUTE_PROVIDER_ADAPTER_UNAVAILABLE: &str =
-    "COMPUTE_PROVIDER_ADAPTER_UNAVAILABLE";
 
 const MAX_LEDGER_JSON_BYTES: usize = 512 * 1024;
 const COMMAND_DIGEST_DOMAIN: &[u8] = b"ELON-COMPUTE-ATTEMPT-DISPATCH-COMMAND-V1";
@@ -146,6 +147,7 @@ pub(crate) struct ValidatedComputeAttemptStartDispatch {
     command: ComputeAttemptDispatchCommandEnvelope,
     adapter: ComputeAttemptAdapterBinding,
     activation: ComputeAttemptStartActivationPlan,
+    prepare_outbox: ValidatedComputeStartOutboxOperation,
 }
 
 impl ValidatedComputeAttemptStartDispatch {
@@ -159,6 +161,10 @@ impl ValidatedComputeAttemptStartDispatch {
 
     pub(crate) fn activation(&self) -> &ComputeAttemptStartActivationPlan {
         &self.activation
+    }
+
+    pub(crate) fn prepare_outbox(&self) -> &ValidatedComputeStartOutboxOperation {
+        &self.prepare_outbox
     }
 }
 
@@ -186,6 +192,7 @@ impl ComputeAttemptStartActivationPlan {
 pub(crate) struct VerifiedComputeAttemptAdapterAck {
     adapter: ComputeAttemptAdapterBinding,
     ack: ComputeAttemptAdapterAckEnvelope,
+    prepare_observation: VerifiedComputeStartOutboxRemoteObservation,
 }
 
 impl VerifiedComputeAttemptAdapterAck {
@@ -196,25 +203,9 @@ impl VerifiedComputeAttemptAdapterAck {
     pub(crate) fn ack(&self) -> &ComputeAttemptAdapterAckEnvelope {
         &self.ack
     }
-}
 
-pub(crate) trait ComputeProviderAttemptAdapter: Send + Sync {
-    fn prepare_start(
-        &self,
-        command: ComputeAttemptDispatchCommandEnvelope,
-    ) -> Result<ValidatedComputeAttemptStartDispatch>;
-}
-
-/// Production default until a concrete user-node, managed-cluster or external-pool Adapter is
-/// installed. It fails before any durable command is created.
-pub(crate) struct UnavailableComputeProviderAttemptAdapter;
-
-impl ComputeProviderAttemptAdapter for UnavailableComputeProviderAttemptAdapter {
-    fn prepare_start(
-        &self,
-        _command: ComputeAttemptDispatchCommandEnvelope,
-    ) -> Result<ValidatedComputeAttemptStartDispatch> {
-        bail!(COMPUTE_PROVIDER_ADAPTER_UNAVAILABLE)
+    pub(crate) fn prepare_observation(&self) -> &VerifiedComputeStartOutboxRemoteObservation {
+        &self.prepare_observation
     }
 }
 

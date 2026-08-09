@@ -72,14 +72,14 @@ v212 为 `compute_attempt_dispatch_commands` 增加 `BEFORE INSERT` 门卫。新
 
 ## 7. 仍禁止的路线
 
-本批不实现 Adapter registry/factory、endpoint credential、KMS、outbox/claim、worker、网络发送、ACK ingress、公网 route、Node wire、外部矿池接入、remote prepare/commit/reconcile/cancel，也不新增 `ValidatedComputeAttemptStartDispatch` 或 `VerifiedComputeAttemptAdapterAck` 构造器。
+v213 已在源码中继续铺设 Adapter/credential/route authorization、outbox/claim/send-attempt、remote observation、LeaseAuthorityBinding、actor receipt 和 no-start proof，但这些仍是无生产构造器、无 worker、无网络消费者的本地权威核。本批仍不实现 concrete Adapter/factory、endpoint credential verifier、KMS、网络发送、ACK ingress、公网 route、Node wire、外部矿池接入或 remote prepare/commit/reconcile/cancel。
 
 真实 Start 启用前还必须：
 
-- 先 durable command/outbox，后做具有幂等和自动过期语义的远端 provisional prepare；
+- 只消费 v213 sealed route authorization，并先 durable command/outbox，后做具有幂等和自动过期语义的远端 provisional prepare；
 - 本地 ACK + v185 + application commit 后才交付 exact Lease authority；
 - 对未知结果先 reconcile，并以 authenticated never-committed/canceled-before-run proof 解阻 v176；
-- 关闭旧 Provider-owner 人工 Renew 与 no-execution Abort，拆分 Provider 授权主体和后台 service actor；
+- 旧 Provider-owner 人工 Renew 与 no-execution Abort 已固定失败；后续继续保持 Provider 授权主体和后台 service actor 分离；
 - 接入 fenced Runner events、Cancel/no-start 与崩溃恢复。首版可以限制短任务、不支持 Renew，但不能省略 Cancel/no-start。
 
 ## 8. 实现入口
@@ -90,4 +90,4 @@ v212 为 `compute_attempt_dispatch_commands` 增加 `BEFORE INSERT` 门卫。新
 - `server/src/store/compute_attempt_execution_plans.rs`
 - `server/src/store/compute_attempt_execution_plans/`
 
-下游派发边界见 `attempt-execution-gateway-v1.md`；Provider/Offer/Job/Reservation 总览见本目录 `README.md`。
+下游派发边界见 `attempt-execution-gateway-v1.md`，耐久投递与恢复证据见 `attempt-delivery-outbox-v1.md`；Provider/Offer/Job/Reservation 总览见本目录 `README.md`。

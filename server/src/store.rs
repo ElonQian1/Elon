@@ -58,6 +58,7 @@ mod compute_attempt_settlement_challenges;
 mod compute_attempt_settlement_corrections;
 mod compute_attempt_settlement_releases;
 mod compute_attempt_settlements;
+mod compute_attempt_start_outbox;
 mod compute_attempt_terminals;
 mod compute_attempt_usage;
 mod compute_attempt_verifications;
@@ -296,7 +297,7 @@ pub(crate) use compute_activation_recoveries::{
 pub(crate) use compute_activation_requests::{
     ReviewComputeActivationEvidenceRequest, SubmitComputeActivationEvidenceRequest,
 };
-pub(crate) use compute_attempt_aborts::{AbortComputeAttemptRequest, ComputeAttemptAbortReceipt};
+pub(crate) use compute_attempt_aborts::ComputeAttemptAbortReceipt;
 pub(crate) use compute_attempt_activations::{
     ActivateComputeAttemptRequest, ComputeAttemptActivationReceipt,
 };
@@ -317,7 +318,6 @@ pub(crate) use compute_attempt_finalizations::{
 };
 pub(crate) use compute_attempt_leases::{
     ComputeAttemptLeaseRenewalReceipt, ComputeAttemptLeaseStateReceipt,
-    RenewComputeAttemptLeaseRequest,
 };
 pub(crate) use compute_attempt_platform_observations::{
     ComputeAttemptPlatformObservationReceipt, ComputeObservedUsageInput,

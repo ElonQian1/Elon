@@ -1,7 +1,7 @@
 ---
 title: 分布式算力 staging Attempt 无用量安全中止控制面
 status: current
-reviewed_at: 2026-08-05
+reviewed_at: 2026-08-09
 owners: backend, node, ai-economy
 implementation_status: implementation_uncompiled
 ---
@@ -10,7 +10,7 @@ implementation_status: implementation_uncompiled
 
 ## 1. 当前状态
 
-v187、Store、Service、HTTP 路由与 PC `/compute-execution` 中止入口已经写入代码，但尚未编译、执行迁移或运行接口/页面验证，状态固定为 `implementation_uncompiled`。本控制面只处理已登记 v185 激活、仍处于 `staging`、从未记录心跳且外部执行器尚未开始执行的 Attempt。
+v187 Store kernel、历史读取、HTTP 路由与 PC `/compute-execution` 中止控制面已经写入代码，但尚未编译、执行迁移或运行接口/页面验证。v213 明确 cancel response 不等于 no-start 后，Provider-owner 人工 Abort POST 已固定失败 `COMPUTE_ATTEMPT_ABORT_GATEWAY_NOT_READY`；GET 和历史回执仍可读取。下文原子中止描述的是保留的 dormant kernel，不是当前可调用写能力。
 
 它用于修复“Broker Finish 已因 Claim 进入 active 而拒绝，但外部执行器实际上尚未开工”这一狭窄状态。它不是运行中取消、超时回收、实际用量结算或节点命令通道。
 
@@ -18,14 +18,14 @@ v187、Store、Service、HTTP 路由与 PC `/compute-execution` 中止入口已�
 
 | 方法 | 路径 | 权限 | 作用 |
 |---|---|---|---|
-| POST | `/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/abort` | Provider 所有者 | 显式登记从未开工的 staging Attempt 无用量中止 |
+| POST | `/api/me/compute/providers/:provider_id/attempt-leases/:lease_id/abort` | Provider 所有者 | 固定失败，等待 authenticated no-start proof 与 service-actor compensation kernel |
 | GET | `/api/me/compute/attempt-leases/:lease_id/abort` | Provider 所有者或 Job 消费者 | 读取并重新审计不可变中止回执 |
 
-写请求必须提供 Lease、Job、Reservation 和 Capacity Claim 的当前精确 revision/digest、当前 `fencing_generation`、外部中止凭据引用、原因码、幂等键，并显式设置 `confirm_no_execution_started=true`。
+旧请求 shape 仍保留兼容解析，但 `confirm_no_execution_started` 和外部中止引用不再获得退款、容量归还或状态推进权。
 
 `executor_abort_ref` 只是外部凭据引用。当前平台不读取证明正文、不验证执行器签名，也不发送 `Cancel` 命令；确认字段表示 Provider 所有者主动声明“执行从未开始”，不是平台验证结果。
 
-PC `/compute-execution` 仅在当前 Lease 仍为 revision 1、`staging` 且没有心跳时显示中止入口，并从激活回执和当前状态带入 Lease、Job、Reservation、Claim 的精确版本。操作者仍需填写外部中止引用和原因，并明确确认没有执行、用量或输出；界面条件不是服务端授权替代，最终仍由服务端重新审计后原子退款和归还容量。
+PC `/compute-execution` 的旧控件条件不是 no-start 证明；后端固定拒绝该写请求。未来只有绑定 exact command/route/fence 的 final authenticated proof 才能进入独立 service-actor 补偿路径。
 
 ## 3. 允许条件
 

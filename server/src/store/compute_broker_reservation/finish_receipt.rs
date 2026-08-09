@@ -11,6 +11,10 @@ use crate::compute_federation::{
 
 use super::super::{
     billing_reservations::BillingReservationOutcome,
+    compute_attempt_start_outbox::{
+        ensure_start_resolved_for_broker_finish_on, BrokerFinishStartResolutionBinding,
+        StartResolutionProofReceipt,
+    },
     compute_capacity_claim_rows::stored_claim_version_on,
     compute_capacity_claim_transitions::FinishComputeCapacityClaimReceipt,
     compute_job_registry::{registered_job_version_on, ComputeJobRegistrationReceipt},
@@ -47,6 +51,8 @@ struct StoredBrokerFinishReceipt {
     source_reservation_digest: String,
     terminal_reservation_revision: i64,
     terminal_reservation_digest: String,
+    start_resolution_proof_id: Option<String>,
+    start_resolution_proof_digest: Option<String>,
     occurred_at: String,
     recorded_at: String,
 }
@@ -84,6 +90,7 @@ pub(super) fn persist_broker_finish_receipt_on(
     terminal_claim: &FinishComputeCapacityClaimReceipt,
     source_reservation: &ComputeReservationRegistrationReceipt,
     terminal_reservation: &ComputeReservationRegistrationReceipt,
+    start_resolution: Option<&StartResolutionProofReceipt>,
 ) -> Result<ComputeBrokerFinishReceipt> {
     conn.execute(
         "INSERT INTO compute_broker_finish_receipts (
@@ -95,11 +102,12 @@ pub(super) fn persist_broker_finish_receipt_on(
             source_claim_digest, terminal_claim_revision,
             terminal_claim_digest, source_reservation_revision,
             source_reservation_digest, terminal_reservation_revision,
-            terminal_reservation_digest, occurred_at, recorded_at
+            terminal_reservation_digest, start_resolution_proof_id,
+            start_resolution_proof_digest, occurred_at, recorded_at
          ) VALUES (
             ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
             ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16,
-            ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24
+            ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26
          )",
         params![
             request.reservation_id,
@@ -124,6 +132,8 @@ pub(super) fn persist_broker_finish_receipt_on(
             source_reservation.reservation_digest,
             terminal_reservation.revision,
             terminal_reservation.reservation_digest,
+            start_resolution.map(|proof| proof.proof_id.as_str()),
+            start_resolution.map(|proof| proof.proof_digest.as_str()),
             request.occurred_at,
             terminal_claim.recorded_at,
         ],
@@ -165,7 +175,8 @@ fn matching_finish_receipts_on(
                 source_claim_digest, terminal_claim_revision,
                 terminal_claim_digest, source_reservation_revision,
                 source_reservation_digest, terminal_reservation_revision,
-                terminal_reservation_digest, occurred_at, recorded_at
+                terminal_reservation_digest, start_resolution_proof_id,
+                start_resolution_proof_digest, occurred_at, recorded_at
            FROM compute_broker_finish_receipts
           WHERE reservation_id=?1
              OR (consumer_account_id=?2 AND idempotency_key=?3)
@@ -202,8 +213,10 @@ fn matching_finish_receipts_on(
                     source_reservation_digest: row.get(19)?,
                     terminal_reservation_revision: row.get(20)?,
                     terminal_reservation_digest: row.get(21)?,
-                    occurred_at: row.get(22)?,
-                    recorded_at: row.get(23)?,
+                    start_resolution_proof_id: row.get(22)?,
+                    start_resolution_proof_digest: row.get(23)?,
+                    occurred_at: row.get(24)?,
+                    recorded_at: row.get(25)?,
                 })
             },
         )?
@@ -244,6 +257,33 @@ fn audit_finish_receipt_on(
     .ok_or_else(|| anyhow!("Broker 终态回执的 terminal Reservation 历史版本缺失"))?;
     let billing = billing_finish_on(conn, &stored.budget_reservation_id)?
         .ok_or_else(|| anyhow!("Broker 终态回执的余额退款记录缺失"))?;
+    let start_resolution = ensure_start_resolved_for_broker_finish_on(
+        conn,
+        BrokerFinishStartResolutionBinding {
+            reservation_id: &stored.reservation_id,
+            reservation_revision: stored.source_reservation_revision,
+            reservation_digest: &stored.source_reservation_digest,
+            job_id: &stored.job_id,
+            job_revision: stored.source_job_revision,
+            job_digest: &stored.source_job_digest,
+            capacity_claim_id: &stored.source_claim_id,
+            capacity_claim_revision: stored.source_claim_revision,
+            capacity_claim_digest: &stored.source_claim_digest,
+            budget_reservation_id: &stored.budget_reservation_id,
+            budget_refunded_fen: stored.budget_refunded_fen,
+        },
+    )?;
+    let stored_start_resolution = match (
+        stored.start_resolution_proof_id.as_deref(),
+        stored.start_resolution_proof_digest.as_deref(),
+    ) {
+        (Some(proof_id), Some(proof_digest)) => Some((proof_id, proof_digest)),
+        (None, None) => None,
+        _ => bail!("Broker 终态回执的 no-start proof 绑定不完整"),
+    };
+    let audited_start_resolution = start_resolution
+        .as_ref()
+        .map(|proof| (proof.proof_id.as_str(), proof.proof_digest.as_str()));
     let (job_status, reservation_status, claim_state) = expected_terminal_states(request.action);
     if source_job.job.status != JOB_STATUS_RESERVED
         || source_job.job_digest != stored.source_job_digest
@@ -275,6 +315,7 @@ fn audit_finish_receipt_on(
         || billing.status != stored.budget_terminal_status
         || billing.status != billing_terminal_status(request.action)
         || billing.refunded_fen != stored.budget_refunded_fen
+        || stored_start_resolution != audited_start_resolution
     {
         bail!("Broker 原子终态回执的历史绑定审计失败");
     }
