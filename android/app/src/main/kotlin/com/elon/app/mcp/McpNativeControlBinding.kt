@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Looper
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import org.json.JSONArray
 import org.json.JSONObject
 
 internal class McpNativeControlBinding(
@@ -48,7 +49,15 @@ internal class McpNativeControlBinding(
             return failure("main_thread_timeout").put("timeout_ms", timeoutMs)
         }
         error?.let {
-            return failure(it.javaClass.simpleName).put("message", it.message ?: "")
+            return failure(it.javaClass.simpleName)
+                .put("message", it.message ?: "")
+                .put("stack", stackJson(it))
+                .put("cause", it.cause?.let { cause ->
+                    JSONObject()
+                        .put("error", cause.javaClass.simpleName)
+                        .put("message", cause.message ?: "")
+                        .put("stack", stackJson(cause))
+                } ?: JSONObject.NULL)
         }
         return result ?: failure("empty_result")
     }
@@ -57,9 +66,14 @@ internal class McpNativeControlBinding(
         .put("control_ok", false)
         .put("error", code)
 
+    private fun stackJson(error: Throwable): JSONArray = JSONArray().apply {
+        error.stackTrace.take(MAX_ERROR_STACK_FRAMES).forEach { put(it.toString()) }
+    }
+
     private companion object {
         const val DEFAULT_TIMEOUT_MS = 15_000L
         const val MIN_TIMEOUT_MS = 1_000L
         const val MAX_TIMEOUT_MS = 60_000L
+        const val MAX_ERROR_STACK_FRAMES = 16
     }
 }
