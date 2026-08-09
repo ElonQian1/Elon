@@ -92,6 +92,8 @@ class ChatGptWebLabContractTest {
         assertTrue(messages.contains("message_regenerate"))
         assertTrue(adapterLayout.indexOf("read.aloud|朗读") < adapterLayout.indexOf("dictat|microphone|voice"))
         assertTrue(adapterLayout.contains("return 'sources'"))
+        assertTrue(adapterLayout.contains("return 'create_asset'"))
+        assertTrue(adapterLayout.contains("文件和来源|查看来源|来源"))
         assertTrue(adapterLayout.contains("return 'more'"))
         val semanticFunction = adapterLayout.substring(
             adapterLayout.indexOf("function semanticFor"),

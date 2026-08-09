@@ -31,6 +31,7 @@ internal object ChatGptWebUiSemantics {
         "project",
         "gpts",
         "settings",
+        "create_asset",
         "sources",
         "more",
         "timestamp",

@@ -98,7 +98,8 @@
     if (/project|项目/.test(signal + ' ' + path)) return 'project';
     if (/\bgpt(s)?\b|探索.?gpt|发现.?gpt/.test(signal + ' ' + path)) return 'gpts';
     if (/setting|设置/.test(signal + ' ' + path)) return 'settings';
-    if (/sources?|citations?|文件和来源|查看来源/.test(signal)) return 'sources';
+    if (/create.*(?:file|website)|创建.*(?:文件|网站)/.test(signal)) return 'create_asset';
+    if (/sources?|citations?|文件和来源|查看来源|来源/.test(signal)) return 'sources';
     if (/composer-plus|attach|upload|添加|附件|上传/.test(signal)) return 'attachment';
     if (/model|模型|gpt-|sol/.test(signal)) return 'model';
     if (/read.aloud|朗读/.test(signal)) return 'read_aloud';
@@ -152,6 +153,7 @@
       project: '项目',
       gpts: 'GPT',
       settings: '设置',
+      create_asset: '创建文件或网站',
       sources: '文件和来源',
       more: '更多操作',
       timestamp: '消息时间'
