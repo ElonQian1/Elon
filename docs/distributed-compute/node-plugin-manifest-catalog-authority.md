@@ -36,7 +36,7 @@ managed-fs现已铺设sealed SQLite namespace内核：只接受already-pinned且
 
 普通、被拒、main及WAL-main句柄现在都有消费式显式关闭合同；SHM teardown也在释放view、mapping和DMS后显式关闭exact SHM句柄。成功返回只读receipt；关闭未尝试时失败值保留live custody，Windows `CloseHandle`已调用但失败时只保留不可重试的terminal raw-handle quarantine，锁或SHM结果不确定时还永久保活对应FileId/domain tombstone。短生命周期access/delete/absence观察与SHM初始化失败也必须消费关闭结果或把失败custody留在typed failure/coordinator，不能把Rust `Drop`当成xClose成功证明。非Windows固定失败关闭；这些源码尚未编译或测试，也没有VFS ABI调用点，不能独立代表数据库权限。
 
-本机另有一个完全惰性的SQLite安全策略内核：one-shot nonce只能投影成opaque主逻辑名及exact `-journal`/`-wal` 名；root `sqlite3_open_v2` flags与bundled SQLite 3.45实际传给VFS的main、WAL、hot-journal xOpen矩阵分别校验；NULL/temp、URI、memory、shared-cache、delete-on-close及未知对象固定拒绝。authorizer按Bootstrap、SchemaMigration、Runtime线性降权，固定启动PRAGMA及读回，拒绝ATTACH/DETACH、temp/virtual schema和未知action，Runtime不允许DDL且函数只走小白名单。
+本机另有一个完全惰性的SQLite安全策略内核：one-shot nonce只能投影成opaque主逻辑名及exact `-journal`/`-wal` 名；root `sqlite3_open_v2` flags与bundled SQLite 3.45实际传给VFS的main、WAL、hot-journal xOpen矩阵分别校验；NULL/temp、URI、memory、shared-cache、delete-on-close及未知对象固定拒绝。authorizer按Bootstrap、SchemaMigration、Runtime线性降权，固定启动PRAGMA及读回，拒绝ATTACH/DETACH、temp/virtual schema和未知action，Runtime不允许DDL且函数只走小白名单。15项纯策略测试覆盖逻辑名、root/xOpen精确flags、三阶段降权、函数白名单、raw action/UTF-8/参数形状，以及xAccess/xDelete/xFullPathname矩阵。
 
 该策略新增的安全ABI投影只接受未来raw边界已转换出的借用字节：unknown action、非法UTF-8或不符合bundled 3.45的NULL/参数形状直接拒绝；ALTER的effective database取精确arg1，DROP COLUMN的arg3只作列名；transaction/savepoint只接受固定操作词。VFS请求投影只允许exact sidecar的`SQLITE_ACCESS_EXISTS`、Journal/WAL删除矩阵和Main opaque逻辑名原样full-path输出。投影层没有raw pointer、`extern`、Connection、文件系统或注册调用，不能自行执行SQLite操作。
 
